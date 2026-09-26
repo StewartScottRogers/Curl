@@ -47,6 +47,9 @@ namespace Curl.Console;
 /// <para>
 /// The parser's warning lines come first on standard error, whether or not the command line
 /// is accepted; a refused command line then prints the refusal's lines and transfers nothing.
+/// An accepted command line's warning lines for after the transfers, such as curl's
+/// <c>Warning: Got more output options than URLs</c>, come last, after every transfer's
+/// lines; they do not change the exit code.
 /// </para>
 /// <para>
 /// Each transfer carries the parsed <c>-r</c> range, the <c>-C</c> offset and the
@@ -123,7 +126,10 @@ internal sealed class CurlCommandRunner(
             return (int)parsed.Refusal.ExitCode;
         }
 
-        return (int)await TransferAllAsync(parsed.Options).ConfigureAwait(false);
+        CurlExitCode exitCode = await TransferAllAsync(parsed.Options).ConfigureAwait(false);
+        await WriteErrorLinesAsync(parsed.WarningLinesAfterTransfers).ConfigureAwait(false);
+
+        return (int)exitCode;
     }
 
     /// <summary>

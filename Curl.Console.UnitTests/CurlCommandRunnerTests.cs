@@ -460,6 +460,48 @@ public sealed class CurlCommandRunnerTests
         Assert.AreEqual(0, calls);
     }
 
+    [TestMethod]
+    public async Task RunAsync_MoreOutputOptionsThanUrlsAndTheTransferFails_PrintsTheWarningAfterTheErrorLine()
+    {
+        RecordingProtocolHandler file = RecordingProtocolHandler.Failing(
+            "file", CurlExitCode.FileCouldntReadFile, "Could not open file Z:/nx");
+
+        int exitCode = await RunAsync(["-o", "f", "-o", "g", "file:///Z:/nx"], file);
+
+        Assert.AreEqual(37, exitCode);
+        Assert.AreEqual(
+            "curl: (37) Could not open file Z:/nx" + NewLine
+            + "Warning: Got more output options than URLs" + NewLine,
+            StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_MoreOutputOptionsThanUrlsAndTheTransferSucceeds_PrintsTheWarningAfterTheTransfer()
+    {
+        RecordingProtocolHandler file = new("file", async context =>
+        {
+            Assert.AreEqual(0, standardError.Length);
+            await context.Output.WriteAsync(new byte[] { 1 });
+
+            return TransferResult.Success(1);
+        });
+
+        int exitCode = await RunAsync(["-o", "f", "-o", "g", "file:///a"], file);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual("Warning: Got more output options than URLs" + NewLine, StandardErrorText);
+        Assert.HasCount(1, fileSystem.Written["f"].ToArray());
+    }
+
+    [TestMethod]
+    public async Task RunAsync_OneOutputOptionForOneUrl_PrintsNoWarning()
+    {
+        int exitCode = await RunAsync(["-o", "f", "file:///a"], RecordingProtocolHandler.WritingPath("file"));
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(string.Empty, StandardErrorText);
+    }
+
     private Task<int> RunAsync(IReadOnlyList<string> arguments, params IProtocolHandler[] handlers) =>
         new CurlCommandRunner(_ => new ProtocolDispatcher(handlers), fileSystem, standardOutput, standardError, standardInput)
             .RunAsync(arguments);
