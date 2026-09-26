@@ -2,7 +2,7 @@ namespace Curl.Networking;
 
 /// <summary>
 /// The one place the message for a failed TLS handshake is written, so the text curl
-/// prints for exit 35 and exit 60 can be settled (BL-064) by changing only this type.
+/// prints for exit 35, exit 60 and exit 77 can be settled (BL-064) by changing only this type.
 /// </summary>
 internal static class TlsFailureMessages
 {
@@ -21,4 +21,14 @@ internal static class TlsFailureMessages
     /// <returns>The message curl prints.</returns>
     public static string SslConnectError(Exception exception) =>
         $"TLS connect error: {exception.Message}";
+
+    /// <summary>
+    /// The message for exit 77: the <c>--cacert</c> file could not be read as PEM
+    /// certificates.
+    /// </summary>
+    /// <param name="caCertificateFile">The path given to <c>--cacert</c>.</param>
+    /// <param name="exception">What reading or parsing the file threw.</param>
+    /// <returns>The message curl prints.</returns>
+    public static string CaCertificateFileUnusable(string caCertificateFile, Exception exception) =>
+        $"failed to read CA file '{caCertificateFile}': {exception.Message}";
 }

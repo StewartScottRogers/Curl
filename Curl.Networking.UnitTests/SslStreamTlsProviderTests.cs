@@ -13,8 +13,8 @@ namespace Curl.Networking;
 /// <summary>
 /// Runs <see cref="SslStreamTlsProvider" /> against a server-side <see cref="SslStream" />
 /// over an <see cref="InMemoryDuplexStream" /> pair, with a self-signed certificate made
-/// here: verification (exit 60), <c>-k</c>, TLS minimum versions and handshake failures
-/// (exit 35), all without a socket.
+/// here: verification (exit 60), <c>-k</c>, <c>--cacert</c> (exit 77 when its file is
+/// unusable), TLS minimum versions and handshake failures (exit 35), all without a socket.
 /// </summary>
 [TestClass]
 public sealed class SslStreamTlsProviderTests
@@ -45,6 +45,18 @@ public sealed class SslStreamTlsProviderTests
 
     [ClassCleanup]
     public static void DisposeServerCertificate() => s_serverCertificate.Dispose();
+
+    private string _caFileDirectory = null!;
+
+    [TestInitialize]
+    public void CreateCaFileDirectory()
+    {
+        _caFileDirectory = Path.Combine(Path.GetTempPath(), "Curl.Networking.UnitTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(_caFileDirectory);
+    }
+
+    [TestCleanup]
+    public void DeleteCaFileDirectory() => Directory.Delete(_caFileDirectory, recursive: true);
 
     [TestMethod]
     public void Constructor_WithNullOptions_ThrowsArgumentNullException()
@@ -209,6 +221,125 @@ public sealed class SslStreamTlsProviderTests
 
         await Assert.ThrowsAsync<OperationCanceledException>(async () => await handshake);
         Assert.IsTrue(client.IsDisposed);
+    }
+
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithCaCertificateFileHoldingTheServerCertificate_Succeeds()
+    {
+        var caFile = WriteCaFile("server.pem", s_serverCertificate.ExportCertificatePem());
+
+        var result = await HandshakeAsync(new TlsClientOptions(CaCertificateFile: caFile), CertificateHost, SslProtocols.None);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.Result.ExitCode);
+        Assert.IsFalse(result.PlaintextDisposed);
+        await result.Result.Connection!.DisposeAsync();
+    }
+
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithCaCertificateFileHoldingTheServerCertificateButAnotherHostName_FailsWithPeerFailedVerification()
+    {
+        var caFile = WriteCaFile("server.pem", s_serverCertificate.ExportCertificatePem());
+
+        var result = await HandshakeAsync(new TlsClientOptions(CaCertificateFile: caFile), "wrong.example", SslProtocols.None);
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
+        Assert.IsTrue(result.PlaintextDisposed);
+    }
+
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithCaCertificateFileHoldingAnUnrelatedAuthority_FailsWithPeerFailedVerification()
+    {
+        var caFile = WriteCaFile("unrelated.pem", CreateUnrelatedAuthorityPem());
+
+        var result = await HandshakeAsync(new TlsClientOptions(CaCertificateFile: caFile), CertificateHost, SslProtocols.None);
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
+        Assert.IsTrue(result.PlaintextDisposed);
+    }
+
+    [TestMethod]
+    [DataRow("unrelated")]
+    [DataRow("empty")]
+    [DataRow("corrupt")]
+    [DataRow("directory")]
+    public async Task AuthenticateAsClientAsync_WithAnyCaCertificateFileWhenInsecure_Succeeds(string caFileContent)
+    {
+        var caFile = caFileContent switch
+        {
+            "unrelated" => WriteCaFile("unrelated.pem", CreateUnrelatedAuthorityPem()),
+            "empty" => WriteCaFile("empty.pem", string.Empty),
+            "corrupt" => WriteCaFile("corrupt.pem", CorruptCertificatePem),
+            _ => _caFileDirectory,
+        };
+
+        var result = await HandshakeAsync(
+            new TlsClientOptions(Insecure: true, CaCertificateFile: caFile), CertificateHost, SslProtocols.None);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.Result.ExitCode);
+        await result.Result.Connection!.DisposeAsync();
+    }
+
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithCaCertificateFileNamingADirectory_FailsWithSslCacertBadfile()
+    {
+        var result = await HandshakeAsync(
+            new TlsClientOptions(CaCertificateFile: _caFileDirectory), CertificateHost, SslProtocols.None);
+
+        Assert.AreEqual(CurlExitCode.SslCacertBadfile, result.Result.ExitCode);
+        Assert.IsNotNull(result.Result.ErrorMessage);
+        StringAssert.Contains(result.Result.ErrorMessage, _caFileDirectory);
+        Assert.IsTrue(result.PlaintextDisposed);
+    }
+
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithCaCertificateFileHoldingACorruptCertificateBlock_FailsWithSslCacertBadfile()
+    {
+        var caFile = WriteCaFile("corrupt.pem", CorruptCertificatePem);
+
+        var result = await HandshakeAsync(new TlsClientOptions(CaCertificateFile: caFile), CertificateHost, SslProtocols.None);
+
+        Assert.AreEqual(CurlExitCode.SslCacertBadfile, result.Result.ExitCode);
+        Assert.IsTrue(result.PlaintextDisposed);
+    }
+
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithEmptyCaCertificateFile_FailsWithPeerFailedVerification()
+    {
+        var caFile = WriteCaFile("empty.pem", string.Empty);
+
+        var result = await HandshakeAsync(new TlsClientOptions(CaCertificateFile: caFile), CertificateHost, SslProtocols.None);
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
+        Assert.IsTrue(result.PlaintextDisposed);
+    }
+
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithCaCertificateFileOfNonPemText_FailsWithPeerFailedVerification()
+    {
+        var caFile = WriteCaFile("text.pem", "this is not a certificate\n");
+
+        var result = await HandshakeAsync(new TlsClientOptions(CaCertificateFile: caFile), CertificateHost, SslProtocols.None);
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
+        Assert.IsTrue(result.PlaintextDisposed);
+    }
+
+    private const string CorruptCertificatePem = "-----BEGIN CERTIFICATE-----\nnot base64 !!!\n-----END CERTIFICATE-----\n";
+
+    private string WriteCaFile(string fileName, string content)
+    {
+        var path = Path.Combine(_caFileDirectory, fileName);
+        File.WriteAllText(path, content);
+        return path;
+    }
+
+    private static string CreateUnrelatedAuthorityPem()
+    {
+        using var key = RSA.Create(2048);
+        var request = new CertificateRequest("CN=Unrelated Test Authority", key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        request.CertificateExtensions.Add(new X509BasicConstraintsExtension(true, false, 0, true));
+        using var authority = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+        return authority.ExportCertificatePem();
     }
 
     private static async Task<(ConnectResult Result, bool PlaintextDisposed)> HandshakeAsync(

@@ -14,8 +14,9 @@ type: `TcpDialer` (behind `ITcpDialer`) is the only type that constructs a TCP
 UDP `Socket`. `SslStreamTlsProvider` (behind `ITlsProvider`, configured by
 `TlsClientOptions`) is the only type that constructs an `SslStream`; it runs the
 handshake over the plaintext `IConnection` through the internal `ConnectionStream`
-adapter and returns an `SslStreamConnection`. The messages for its exit 35 and exit 60
-live in `TlsFailureMessages` and nowhere else. No type here constructs an `HttpClient`.
+adapter and returns an `SslStreamConnection`. With `--cacert` (`TlsClientOptions.CaCertificateFile`)
+it trusts only the certificates in that PEM file. The messages for its exit 35, exit 60 and
+exit 77 live in `TlsFailureMessages` and nowhere else. No type here constructs an `HttpClient`.
 
 Everything else takes the Abstractions contracts (`IDnsResolver`, `ITlsProvider`,
 `IConnection`, `IDatagramChannel`) or `ITcpDialer`, plus an injected `TimeProvider`, so the tests in
