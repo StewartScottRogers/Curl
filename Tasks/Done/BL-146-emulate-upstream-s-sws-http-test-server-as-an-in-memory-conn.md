@@ -72,8 +72,8 @@ HTTP test server, answering from a test case's `<reply>` and recording every byt
     a closed peer can succeed while sws never reads it; `ReceivedBytes` excludes them.
   - Replies are handed over whole, not in sws's 20-byte writes; the reader still gets them
     in pieces when its buffer is smaller.
-- Follow-ups filed: BL-259 (`auth_required`, `no-expect`, `skip`), BL-260 (`idle`, `stream`,
-  `delay`, `writedelay`, `connection-monitor`, `upgrade`, `<postcmd>` `wait`), BL-261
+- Follow-ups filed: BL-263 (`auth_required`, `no-expect`, `skip`), BL-264 (`idle`, `stream`,
+  `delay`, `writedelay`, `connection-monitor`, `upgrade`, `<postcmd>` `wait`), BL-265
   (auth, `swsbounce` and `CONNECT` part selection).
 
 ## Log

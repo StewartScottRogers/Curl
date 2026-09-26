@@ -1,5 +1,5 @@
 ---
-id: BL-259
+id: BL-263
 title: Carry out the request-reading servercmd commands auth_required, no-expect and skip in the sws emulation
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-259 — Carry out the request-reading servercmd commands auth_required, no-expect and skip in the sws emulation
+# BL-263 — Carry out the request-reading servercmd commands auth_required, no-expect and skip in the sws emulation
 
 ## Goal
 

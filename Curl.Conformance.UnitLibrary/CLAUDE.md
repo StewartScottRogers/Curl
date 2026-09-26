@@ -37,9 +37,9 @@ open until a reply containing `swsclose`, an empty or missing part, or `swsclose
 `<servercmd>`. `ReceivedBytes` records every byte the client wrote while the server had the
 connection open, across connections, for comparison with `<verify><protocol>`.
 `SwsServerCommands` reads `<servercmd>`; every other command sws knows is listed by name in
-`UnsupportedServerCommands` so the case can be skipped with a reason (BL-259, BL-260), and
+`UnsupportedServerCommands` so the case can be skipped with a reason (BL-263, BL-264), and
 sws's part-number rules for authentication, `swsbounce` and `CONNECT` are not emulated yet
-(BL-261). A read with no reply waiting returns 0, because in memory nothing else can arrive.
+(BL-265). A read with no reply waiting returns 0, because in memory nothing else can arrive.
 
 What it is to hold in full, per ADR-0013 decision 2:
 

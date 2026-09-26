@@ -1,5 +1,5 @@
 ---
-id: BL-260
+id: BL-264
 title: Carry out the timing and stream servercmd commands idle, stream, delay, writedelay, connection-monitor and upgrade in the sws emulation
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-260 — Carry out the timing and stream servercmd commands idle, stream, delay, writedelay, connection-monitor and upgrade in the sws emulation
+# BL-264 — Carry out the timing and stream servercmd commands idle, stream, delay, writedelay, connection-monitor and upgrade in the sws emulation
 
 ## Goal
 

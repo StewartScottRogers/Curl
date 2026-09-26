@@ -1,5 +1,5 @@
 ---
-id: BL-261
+id: BL-265
 title: Select sws reply parts for authentication, swsbounce and CONNECT in the sws emulation
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-261 — Select sws reply parts for authentication, swsbounce and CONNECT in the sws emulation
+# BL-265 — Select sws reply parts for authentication, swsbounce and CONNECT in the sws emulation
 
 ## Goal
 
