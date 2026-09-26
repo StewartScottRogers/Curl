@@ -23,8 +23,9 @@ Repository, solution and documentation structure.
 ## Milestone 1 — Phase 1, with the small Phase 4 protocols beside it
 
 Phase 1 of `Documentation/Product/Product-Overview.md` (`Abstractions`, `Networking`,
-`Core`, `Cli`, `Output`, `Console`, `File` and `Http`), with DICT, Gopher, Telnet, TFTP
-and MQTT built alongside it.
+`Core`, `Cli`, `Output`, `Console`, `File` and `Http`), with `Curl.Authentication` and
+`Curl.Cookies` moved in from Phase 2 (ADR-0016), and DICT, Gopher, Telnet, TFTP and MQTT
+built alongside it.
 
 - **Status:** In progress
 - **Decision (Stewart, 2026-09-26):** DICT, Gopher, Telnet, TFTP and MQTT are built in
@@ -49,6 +50,9 @@ and MQTT built alongside it.
     library (BL-060).
   - The protocols: `file://` (FR-001 to FR-019) and `dict`, `gopher`, `gophers`,
     `telnet`, `tftp`, `mqtt` and `mqtts` (FR-020 to FR-045).
+  - `Curl.Authentication` and `Curl.Cookies`, moved from Phase 2 by ADR-0016 so that
+    HTTP's `-u`, `--digest`, `-b` and `-c` work in Phase 1: Basic and Bearer, Digest and
+    scheme choice (BL-216 to BL-218), and cookies (BL-219 to BL-223).
   - HTTP and the other Phase 1 option groups are part of Phase 1 but have no tasks yet.
 - **Exit criteria:** `curl <url>` runs end to end through `Curl.Console` for `file`,
   `dict`, `gopher`, `gophers`, `telnet`, `tftp`, `mqtt` and `mqtts`, and returns curl's

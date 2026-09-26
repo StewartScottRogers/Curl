@@ -270,8 +270,8 @@ building and its tests green.
 | Phase | Delivers | Proves |
 | --- | --- | --- |
 | **0** | Solution, documentation, conventions | — (complete) |
-| **1** | `Abstractions`, `Networking`, `Core`, `Cli`, `Output`, `Console`, plus `File` and `Http` | The architecture end to end. `curl https://…` works and the seam holds. |
-| **2** | `Ftp`, `Ssh`, `Authentication`, `Cookies` | A second transport shape — control plus data channels — does not distort the design. |
+| **1** | `Abstractions`, `Networking`, `Core`, `Cli`, `Output`, `Console`, plus `File` and `Http`, with `Authentication` and `Cookies` ([ADR-0016](../Planning/Decisions/ADR-0016-authentication-and-cookies-move-into-milestone-1.md)) | The architecture end to end. `curl https://…` works and the seam holds. |
+| **2** | `Ftp`, `Ssh` | A second transport shape — control plus data channels — does not distort the design. |
 | **3** | `Smtp`, `Imap`, `Pop3` | Line-oriented protocols share machinery cleanly. |
 | **4** | `Ws`, `Mqtt`, `Tftp`, `Dict`, `Gopher`, `Telnet` | Breadth. |
 | **5** | `Ldap`, `Smb`, `Rtsp` | The awkward remainder. |

@@ -30,6 +30,7 @@ choices do not need one.
 | [0013](ADR-0013-upstream-test-cases-run-as-data-driven-mstest.md) | curl's upstream test cases run as data-driven MSTest cases, in process | Accepted | 2026-09-26 |
 | [0014](ADR-0014-http-request-options-and-the-auth-cookie-and-proxy-seams.md) | HTTP request options and the auth, cookie and proxy seams | Accepted | 2026-09-26 |
 | [0015](ADR-0015-transfer-report-on-transfer-result-and-connect-timings-on-connect-result.md) | `TransferReport` on `TransferResult` and `ConnectTimings` on `ConnectResult` | Accepted | 2026-09-26 |
+| [0016](ADR-0016-authentication-and-cookies-move-into-milestone-1.md) | `Curl.Authentication` and `Curl.Cookies` move into Milestone 1 | Accepted | 2026-09-26 |
 
 ## Template
 
