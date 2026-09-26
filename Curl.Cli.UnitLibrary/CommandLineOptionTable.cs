@@ -29,8 +29,8 @@ namespace Curl.Cli;
 /// <para>
 /// <c>--no-</c> negation, measured with the local curl 8.21.0 on 2026-09-26
 /// (<c>curl &lt;arguments&gt; http://127.0.0.1:1/</c>, reading standard error and the exit code):
-/// <c>--no-silent</c>, <c>--no-show-error</c>, <c>--no-insecure</c> and <c>--no-tftp-no-options</c>
-/// are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
+/// <c>--no-silent</c>, <c>--no-show-error</c>, <c>--no-insecure</c>, <c>--no-tftp-no-options</c>,
+/// <c>--no-progress-meter</c> and <c>--no-progress-bar</c> are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
 /// silent and <c>--no-silent -s</c> is. <c>--no-silent=x</c> is accepted, its value ignored.
 /// <c>--no-tlsv1.2</c>, <c>--no-tlsv1.3</c>, <c>--no-url</c>, <c>--no-output</c> (even as the last
 /// argument), <c>--no-output=x</c>, <c>--no-data</c> and <c>--no-range</c> exit 2 with
@@ -46,6 +46,8 @@ public static class CommandLineOptionTable
         CommandLineOption.Text("url", null, (options, url) => options.AddUrl(url)),
         CommandLineOption.NegatableFlag("silent", 's', (options, on) => options.Silent = on),
         CommandLineOption.NegatableFlag("show-error", 'S', (options, on) => options.ShowError = on),
+        CommandLineOption.NegatableFlag("progress-meter", null, (options, on) => options.ProgressMeterOff = !on),
+        CommandLineOption.NegatableFlag("progress-bar", '#', (options, on) => options.ProgressBar = on),
         CommandLineOption.FileName("output", 'o', (options, file) => options.AddOutputFile(file)),
         CommandLineOption.Value("data", 'd', AppendPostData),
         CommandLineOption.Value("user", 'u', AcceptingEmpty((options, user) => options.SetCredentials(user))),

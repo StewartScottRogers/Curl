@@ -34,6 +34,8 @@ public sealed class CommandLineOptionTableTests
     [DataRow("url", null, true)]
     [DataRow("silent", 's', false)]
     [DataRow("show-error", 'S', false)]
+    [DataRow("progress-meter", null, false)]
+    [DataRow("progress-bar", '#', false)]
     [DataRow("output", 'o', true)]
     [DataRow("data", 'd', true)]
     [DataRow("user", 'u', true)]

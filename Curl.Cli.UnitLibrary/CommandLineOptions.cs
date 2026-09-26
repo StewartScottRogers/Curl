@@ -31,6 +31,19 @@ public sealed class CommandLineOptions
     /// <summary><see langword="true"/> when <c>-S</c> / <c>--show-error</c> was given and no <c>--no-show-error</c> came after it.</summary>
     public bool ShowError { get; internal set; }
 
+    /// <summary>
+    /// <see langword="true"/> when <c>--no-progress-meter</c> was given and no <c>--progress-meter</c>
+    /// came after it. In curl 8.21.0 it turns the meter off whatever its form, so it outranks
+    /// <see cref="ProgressBar"/> in either order.
+    /// </summary>
+    public bool ProgressMeterOff { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>-#</c> / <c>--progress-bar</c> was given and no
+    /// <c>--no-progress-bar</c> came after it: the meter, when shown, is the bar form.
+    /// </summary>
+    public bool ProgressBar { get; internal set; }
+
     /// <summary>The <c>-o</c> / <c>--output</c> file names, in command-line order.</summary>
     public IReadOnlyList<string> OutputFiles => outputFiles;
 
