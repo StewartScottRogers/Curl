@@ -20,7 +20,10 @@ namespace Curl.Protocol.Gopher;
 /// selector that decodes to a NUL byte is exit 3 (<see cref="CurlExitCode.UrlMalformat" />),
 /// found after connecting as in curl. A failed connect is returned unchanged; a failed
 /// send is exit 55, a failed receive exit 56 and a failed output write exit 23, all
-/// returned rather than thrown. Cancellation leaves as an exception.
+/// returned rather than thrown. The exit 23 message names the size of the read that failed
+/// to write (at most 16384 bytes, as curl 8.21.0 reads gopher) and the bytes of it the
+/// output accepted, from <see cref="OutputWriteFailedException.BytesAccepted" />.
+/// Cancellation leaves as an exception.
 /// </para>
 /// </remarks>
 public sealed class GopherProtocolHandler : IProtocolHandler
@@ -136,15 +139,23 @@ public sealed class GopherProtocolHandler : IProtocolHandler
             {
                 await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
             }
-            catch (IOException)
+            catch (IOException exception)
             {
                 return new TransferResult(
                     CurlExitCode.WriteError,
                     bytesWritten,
-                    GopherTransferMessages.OutputWriteFailed(read));
+                    GopherTransferMessages.OutputWriteFailed(read, BytesAcceptedBy(exception)));
             }
 
             bytesWritten += read;
         }
     }
+
+    /// <summary>
+    /// How many bytes of a failed write the output accepted: the count an
+    /// <see cref="OutputWriteFailedException" /> carries, and 0 for any other
+    /// <see cref="IOException" />.
+    /// </summary>
+    private static int BytesAcceptedBy(IOException exception) =>
+        exception is OutputWriteFailedException failed ? failed.BytesAccepted : 0;
 }
