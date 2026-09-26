@@ -13,11 +13,12 @@ namespace Curl.Protocol.File;
 /// </param>
 /// <remarks>
 /// <para>
-/// The order of work matches curl 8.21.0's <c>lib/file.c</c>: open, write the
-/// pseudo-headers, return early for <c>-I</c>/<c>--head</c>, apply
-/// <c>-z</c>/<c>--time-cond</c>, resolve <c>-r</c>/<c>--range</c> or
-/// <c>-C</c>/<c>--continue-at</c> into a window of the file, then move the body in
-/// 16-kilobyte chunks.
+/// The order of work matches curl 8.21.0's <c>lib/file.c</c>: open, apply
+/// <c>-z</c>/<c>--time-cond</c> (an unmet condition ends the transfer as a success with
+/// nothing written, headers included), write the pseudo-headers, return early for
+/// <c>-I</c>/<c>--head</c>, resolve <c>-r</c>/<c>--range</c> or
+/// <c>-C</c>/<c>--continue-at</c> into a window of the file — so a resume failure comes
+/// after the headers — then move the body in 16-kilobyte chunks.
 /// </para>
 /// <para>
 /// The exit codes are curl's, not the nearest-looking ones: every failure to open a
@@ -139,7 +140,8 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     }
 
     /// <summary>
-    /// Emits the headers, applies every option that can stop the body, then moves it.
+    /// Applies the time condition, emits the headers, applies every other option that can
+    /// stop the body, then moves it.
     /// </summary>
     /// <param name="context">The transfer being performed.</param>
     /// <param name="source">The opened source, which this method does not dispose.</param>
@@ -150,12 +152,17 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
         Stream source,
         FileOpenResult opened)
     {
+        if (!MeetsTimeCondition(context.TimeCondition, opened.LastWriteTimeUtc))
+        {
+            return TransferResult.Success(0);
+        }
+
         if (await WriteHeadersAsync(context, opened).ConfigureAwait(false) is { } headerFailure)
         {
             return headerFailure;
         }
 
-        if (context.NoBody || !MeetsTimeCondition(context.TimeCondition, opened.LastWriteTimeUtc))
+        if (context.NoBody)
         {
             return TransferResult.Success(0);
         }

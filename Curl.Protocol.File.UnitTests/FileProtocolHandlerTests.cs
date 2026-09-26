@@ -1211,6 +1211,82 @@ public sealed class FileProtocolHandlerTests
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
     }
 
+    // Measured on curl 8.21.0: curl -i -z <a future date> <an older file> prints nothing
+    // at all, headers included, and exits 0. The time condition is decided before the
+    // header block is written.
+    [TestMethod]
+    public async Task ExecuteAsync_UnmetTimeCondition_WritesNoHeaders()
+    {
+        var fileSystem = new FakeFileSystem();
+        fileSystem.AddFile(OsPath, Content);
+        var output = new ChunkRecordingStream();
+        var headers = new ChunkRecordingStream();
+        var context = new FakeTransferContext
+        {
+            Url = FileUrl,
+            Output = output,
+            HeaderOutput = headers,
+            TimeCondition = new TimeCondition(Later, TimeConditionKind.IfModifiedSince),
+        };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        var result = await handler.ExecuteAsync(context);
+
+        Assert.IsEmpty(output.WriteLengths);
+        Assert.IsEmpty(headers.WriteLengths);
+        Assert.AreEqual(0L, result.BytesTransferred);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+    }
+
+    // Measured on curl 8.21.0: -I prints the header block and no body, exit 0.
+    [TestMethod]
+    public async Task ExecuteAsync_NoBodyWithHeaderOutput_WritesHeadersOnly()
+    {
+        var fileSystem = new FakeFileSystem();
+        fileSystem.AddFile(OsPath, Content);
+        var output = new ChunkRecordingStream();
+        var headers = new ChunkRecordingStream();
+        var context = new FakeTransferContext
+        {
+            Url = FileUrl,
+            Output = output,
+            HeaderOutput = headers,
+            NoBody = true,
+        };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        var result = await handler.ExecuteAsync(context);
+
+        Assert.AreEqual(ExpectedHeaders, Encoding.ASCII.GetString(headers.ToArray()));
+        Assert.IsEmpty(output.WriteLengths);
+        Assert.AreEqual(0L, result.BytesTransferred);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+    }
+
+    // Measured on curl 8.21.0: the header block is written before a range or resume
+    // failure, which then exits 36.
+    [TestMethod]
+    public async Task ExecuteAsync_ResumePastEndWithHeaderOutput_WritesHeadersThenFails()
+    {
+        var fileSystem = new FakeFileSystem();
+        fileSystem.AddFile(OsPath, Content);
+        var headers = new ChunkRecordingStream();
+        var context = new FakeTransferContext
+        {
+            Url = FileUrl,
+            Output = new ChunkRecordingStream(),
+            HeaderOutput = headers,
+            ResumeFrom = Content.Length + 1,
+        };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        var result = await handler.ExecuteAsync(context);
+
+        Assert.AreEqual(ExpectedHeaders, Encoding.ASCII.GetString(headers.ToArray()));
+        Assert.AreEqual(CurlExitCode.BadDownloadResume, result.ExitCode);
+        Assert.AreEqual(ResumeFailedMessage, result.ErrorMessage);
+    }
+
     // Measured on curl 8.21.0 against a ten-byte file: -r -10 is the whole file and exit 0.
     [TestMethod]
     public async Task ExecuteAsync_SuffixRangeEqualToTheLength_WritesTheWholeFile()
