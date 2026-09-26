@@ -29,6 +29,7 @@ choices do not need one.
 | [0012](ADR-0012-relicense-from-gpl-3-0-to-mit.md) | Relicense from GPL-3.0 to MIT | Accepted | 2026-09-26 |
 | [0013](ADR-0013-upstream-test-cases-run-as-data-driven-mstest.md) | curl's upstream test cases run as data-driven MSTest cases, in process | Accepted | 2026-09-26 |
 | [0014](ADR-0014-http-request-options-and-the-auth-cookie-and-proxy-seams.md) | HTTP request options and the auth, cookie and proxy seams | Accepted | 2026-09-26 |
+| [0015](ADR-0015-transfer-report-on-transfer-result-and-connect-timings-on-connect-result.md) | `TransferReport` on `TransferResult` and `ConnectTimings` on `ConnectResult` | Accepted | 2026-09-26 |
 
 ## Template
 

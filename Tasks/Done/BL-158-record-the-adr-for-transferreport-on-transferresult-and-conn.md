@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation/Planning/Decisions]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-158 — Record the ADR for TransferReport on TransferResult and ConnectTimings on ConnectResult
 
@@ -32,16 +32,22 @@ An Accepted ADR fixes `TransferReport`, `TransferTimings` and `ConnectTimings` a
 
 ## Acceptance criteria
 
-- [ ] A new ADR under `Documentation/Planning/Decisions/` with the next free number, status Accepted, titled for TransferReport and ConnectTimings, states that it was decided by Claude under Stewart's delegation, and records the decision, the reasons and the alternatives rejected.
-- [ ] `Documentation/Planning/Decisions/README.md` lists the new ADR.
-- [ ] Every field is listed with its type and the `-w` variable(s) (for example `%{response_code}`, `%{http_connect}`, `%{size_header}`, `%{num_connects}`, `%{time_connect}`) or the `-L` decision that reads it.
-- [ ] The ADR states that timings are `TimeProvider` timestamps taken by the connector and handler, never wall-clock reads, and that `TransferResult.Report` and the `ConnectResult` timings default to null so existing handlers compile unchanged.
+- [x] A new ADR under `Documentation/Planning/Decisions/` with the next free number, status Accepted, titled for TransferReport and ConnectTimings, states that it was decided by Claude under Stewart's delegation, and records the decision, the reasons and the alternatives rejected.
+- [x] `Documentation/Planning/Decisions/README.md` lists the new ADR.
+- [x] Every field is listed with its type and the `-w` variable(s) (for example `%{response_code}`, `%{http_connect}`, `%{size_header}`, `%{num_connects}`, `%{time_connect}`) or the `-L` decision that reads it.
+- [x] The ADR states that timings are `TimeProvider` timestamps taken by the connector and handler, never wall-clock reads, and that `TransferResult.Report` and the `ConnectResult` timings default to null so existing handlers compile unchanged.
 
 ## Notes
 
 - Plan item: X2 in the Phase 1 HTTP plan (2026-09-26); plan keys in this file were replaced by their task IDs.
+- Recorded as ADR-0015 (`Documentation/Planning/Decisions/ADR-0015-transfer-report-on-transfer-result-and-connect-timings-on-connect-result.md`); written directly in the session rather than through align-and-document, since the whole deliverable is one new ADR and one index row.
+- Choice: timings are `TimeProvider.GetTimestamp()` longs (monotonic, fake-able), not `TimeSpan` or `DateTimeOffset`; readers convert with `GetElapsedTime`. `null` means the event did not happen.
+- Choice: `ConnectTimings` holds points in time only. `LocalEndPoint` and `ProxyConnectResponseCode` go on `ConnectResult` as separate defaulted members (for `%{local_ip}`/`%{local_port}` and `%{http_connect}`), not on `IConnection`, so no connection or fake changes. BL-160 and BL-211 implement them as the ADR states.
+- Choice: `TransferReport` also carries `EffectiveUrl` and `RedirectCount` (filled by the BL-203 follower) because BL-203's merged report needs them; `RedirectUrl` is a `string` pending ADR-0010.
+- Left to measure: how `%{time_*}` combine across redirects (BL-203, BL-225); whether a failed CONNECT's code reaches `%{http_connect}` (BL-212).
 
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. ADR-0015 fixes TransferReport, TransferTimings and ConnectTimings and maps every field to its -w variable or -L decision
