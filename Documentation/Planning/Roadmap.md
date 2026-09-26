@@ -16,9 +16,9 @@ Repository, solution and documentation structure.
   `dotnet` CLI; documentation structure agreed
 - **Done:** `.slnx` solution and `Documentation.shproj` created and verified
   (2026-09-25) — see `Decisions/ADR-0001-adopt-slnx-solution-format.md`
-- **Outstanding:** no buildable project exists yet, so `dotnet build Curl.slnx`
-  emits `NU1503 Unable to find a project to restore!`. This clears itself when the
-  first real project is added to the solution.
+- **Done:** all sixteen Phase 1 projects exist and are listed in `Curl.slnx`;
+  `dotnet build Curl.slnx -warnaserror` is clean with no `NU1503` (2026-09-26, BL-003)
+- **Outstanding:** nothing.
 
 ## Milestone 1 — > **TODO**
 
