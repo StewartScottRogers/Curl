@@ -63,3 +63,4 @@ Choosing between `-u` and the URL's user information is the command-line layer's
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
