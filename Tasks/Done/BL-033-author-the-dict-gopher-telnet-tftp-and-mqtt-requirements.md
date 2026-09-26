@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation/Product/Requirements.md]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-033 — Author the dict, gopher, telnet, tftp and mqtt requirements
 
@@ -112,19 +112,19 @@ ports), <https://curl.se/docs/manpage.html>, <https://curl.se/docs/mqtt.html>,
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Product/Requirements.md` has one `###` section per scheme family
+- [x] `Documentation/Product/Requirements.md` has one `###` section per scheme family
       above, placed after the `file://` section, each opening with a paragraph in the
       style of the `file://` one: checked against curl 8.21.0, the sources used, and the
       `Curl.Protocol.<Name>.UnitLibrary` that will hold the handler.
-- [ ] Each bullet in `Context` becomes one row - one behaviour - with a new FR ID, an
+- [x] Each bullet in `Context` becomes one row - one behaviour - with a new FR ID, an
       upstream reference link, a MoSCoW priority, Status `Draft` and Checked against
       `curl 8.21.0`. A row that quotes an exit code names its `CURLE_*` constant, as the
       `file://` rows do.
-- [ ] Each new row says the behaviour is not yet implemented, without naming a task ID,
+- [x] Each new row says the behaviour is not yet implemented, without naming a task ID,
       so the row stays true while tasks are split or renumbered.
-- [ ] No existing row (FR-001 to FR-019) changes, and the `TODO` note at the top of the
+- [x] No existing row (FR-001 to FR-019) changes, and the `TODO` note at the top of the
       file is updated to list which schemes now have requirements.
-- [ ] No file other than `Documentation/Product/Requirements.md` is changed.
+- [x] No file other than `Documentation/Product/Requirements.md` is changed.
 
 ## Notes
 
@@ -132,7 +132,21 @@ The measurements were made by pointing the curl binary at a Python loopback list
 recorded what curl sent and replied with canned bytes. They are recorded here so the
 requirements carry measured facts rather than recollections of the C source.
 
+Delivered as FR-020 to FR-045 in five `###` sections after the `file://` section.
+Choices made unattended:
+- Written in-session rather than through `align-and-document`: the task is one
+  table-shaped file whose every row is already specified in `Context`.
+- Each row states "Not yet implemented." rather than naming a task, and each section's
+  opening paragraph says the same, so the rows stay true while tasks are re-planned.
+- Default ports are stated in each section's opening paragraph, not as rows: the
+  `Context` bullets did not list them as behaviours to cite.
+- Exit 0 is named `CURLE_OK`, so every quoted exit code carries its constant.
+- MoSCoW: the core request/response bytes and error mapping are Must; `-t`, uploads,
+  authentication and edge-case errors are Should; `--tftp-no-options`/`--tftp-blksize`
+  clamping and the QoS 0/no-retain limit are Could.
+
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. Requirements.md has FR-020 to FR-045 for dict, gopher, telnet, tftp and mqtt

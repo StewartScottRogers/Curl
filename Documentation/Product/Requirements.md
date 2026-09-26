@@ -1,6 +1,7 @@
 # Requirements
 
-> **TODO** — functional requirements for the `file://` scheme are authored
+> **TODO** — functional requirements are authored for the `file://`, `dict://`,
+> `gopher://`/`gophers://`, `telnet://`, `tftp://` and `mqtt://`/`mqtts://` schemes
 > (2026-09-26). The other Phase 1 option groups — HTTP, the command-line layer, and
 > output formatting — are not yet.
 
@@ -41,6 +42,96 @@ behaviour works today. Source code for the current handler lives in
 | FR-017 | A write failure to a download's destination is reported through `%{errormsg}` as `Failure writing output to destination, passed <n> returned 0`, where `<n>` is the size of the chunk offered to the destination, with exit 23 (`CURLE_WRITE_ERROR`). | [`--write-out`](https://curl.se/docs/manpage.html#-w); [exit codes](https://curl.se/libcurl/c/libcurl-errors.html) | Should | Draft | curl 8.21.0 |
 | FR-018 | A failed `file://` transfer reports the number of bytes that reached the destination before the failure, not zero, for `%{size_download}` and `%{size_upload}` once `--write-out` exists. Not yet implemented — a failure currently reports zero bytes regardless of progress made (task BL-022). | [`--write-out`](https://curl.se/docs/manpage.html#-w) | Should | Draft | curl 8.21.0 |
 | FR-019 | A `file://` path is handed to the operating system exactly as parsed, with no sandboxing or confinement between the URL and the local file system: a path such as `file:///C:/Windows/win.ini` is reachable like any other. | [URL syntax](https://curl.se/docs/url-syntax.html) | Must | Draft | curl 8.21.0 |
+
+### The `dict://` scheme
+
+Every requirement below was checked against curl 8.21.0 (2026-06-24) on 2026-09-26,
+by pointing the curl binary at a loopback listener that recorded what curl sent and
+replied with canned bytes, and against the manpage, `docs/URL-SYNTAX.md` and
+`libcurl-errors` on [curl.se](https://curl.se). The default port is 2628. None of
+these behaviours is implemented yet; each row describes upstream behaviour, not a
+claim that it works today. The handler will live in `Curl.Protocol.Dict.UnitLibrary`.
+
+| ID | Requirement | Upstream reference | Priority | Status | Checked against |
+| --- | --- | --- | --- | --- | --- |
+| FR-020 | A `dict://` transfer sends its whole request without waiting for the server's greeting: `CLIENT libcurl 8.21.0\r\n`, then one command line, then `QUIT\r\n`. Not yet implemented. | [URL syntax](https://curl.se/docs/url-syntax.html) | Must | Draft | curl 8.21.0 |
+| FR-021 | A path of `/d:word` or `/lookup:word` sends `DEFINE ! word`; `/d:word:db` sends `DEFINE db word`. Not yet implemented. | [URL syntax](https://curl.se/docs/url-syntax.html) | Must | Draft | curl 8.21.0 |
+| FR-022 | A path of `/m:word:db:prefix` sends `MATCH db prefix word`; `/find:word` sends `MATCH ! . word`. Not yet implemented. | [URL syntax](https://curl.se/docs/url-syntax.html) | Must | Draft | curl 8.21.0 |
+| FR-023 | Any other path is sent as the command after percent-decoding: `/word` sends `word`, `/show%20db` sends `show db`, and `/` sends an empty line. Not yet implemented. | [URL syntax](https://curl.se/docs/url-syntax.html) | Should | Draft | curl 8.21.0 |
+| FR-024 | Every byte the `dict://` server sends is written to the transfer's output unaltered, and the transfer ends with exit 0 (`CURLE_OK`). Not yet implemented. | [URL syntax](https://curl.se/docs/url-syntax.html); [exit codes](https://curl.se/libcurl/c/libcurl-errors.html) | Must | Draft | curl 8.21.0 |
+
+### The `gopher://` and `gophers://` schemes
+
+Every requirement below was checked against curl 8.21.0 (2026-06-24) on 2026-09-26,
+by pointing the curl binary at a loopback listener that recorded what curl sent and
+replied with canned bytes, and against the manpage, `docs/URL-SYNTAX.md` and
+`libcurl-errors` on [curl.se](https://curl.se). The default port is 70 for both
+schemes; `gophers://` is gopher over TLS. None of these behaviours is implemented yet;
+each row describes upstream behaviour, not a claim that it works today. The handler
+will live in `Curl.Protocol.Gopher.UnitLibrary`.
+
+| ID | Requirement | Upstream reference | Priority | Status | Checked against |
+| --- | --- | --- | --- | --- | --- |
+| FR-025 | The selector sent is the URL path with its leading `/` and item-type character removed, percent-decoded, followed by CRLF: `/` and `/1` send `\r\n`; `/1/foo` sends `/foo\r\n`; `/0/a%09b` sends `/a\tb\r\n`; `/7/search%09term%20x` sends `/search\tterm x\r\n`. Not yet implemented. | [URL syntax](https://curl.se/docs/url-syntax.html) | Must | Draft | curl 8.21.0 |
+| FR-026 | The gopher response is written to the transfer's output unaltered, and the transfer ends with exit 0 (`CURLE_OK`). Not yet implemented. | [URL syntax](https://curl.se/docs/url-syntax.html); [exit codes](https://curl.se/libcurl/c/libcurl-errors.html) | Must | Draft | curl 8.21.0 |
+
+### The `telnet://` scheme
+
+Every requirement below was checked against curl 8.21.0 (2026-06-24) on 2026-09-26,
+by pointing the curl binary at a loopback listener that recorded what curl sent and
+replied with canned bytes, and against the manpage, `docs/URL-SYNTAX.md`,
+`CURLOPT_TELNETOPTIONS` and `libcurl-errors` on [curl.se](https://curl.se). The
+default port is 23. None of these behaviours is implemented yet; each row describes
+upstream behaviour, not a claim that it works today. The handler will live in
+`Curl.Protocol.Telnet.UnitLibrary`.
+
+| ID | Requirement | Upstream reference | Priority | Status | Checked against |
+| --- | --- | --- | --- | --- | --- |
+| FR-027 | The bytes read from standard input are sent to the server unchanged (`a\nb\n` is sent as `a\nb\n`); with empty input nothing is sent. Not yet implemented. | [URL syntax](https://curl.se/docs/url-syntax.html) | Must | Draft | curl 8.21.0 |
+| FR-028 | Received data is written to the transfer's output with telnet command sequences removed, `IAC IAC` is written as a single `0xFF` byte, and a server's `IAC WILL ECHO` is answered with `IAC DO ECHO`. Not yet implemented. | [URL syntax](https://curl.se/docs/url-syntax.html) | Must | Draft | curl 8.21.0 |
+| FR-029 | `-t TTYPE=vt100` answers `IAC DO TTYPE` with `IAC WILL TTYPE`, and `IAC SB TTYPE SEND IAC SE` with `IAC SB TTYPE IS vt100 IAC SE`; `-t` option names are matched ignoring case. Not yet implemented. | [`-t`/`--telnet-option`](https://curl.se/docs/manpage.html#-t); [`CURLOPT_TELNETOPTIONS`](https://curl.se/libcurl/c/CURLOPT_TELNETOPTIONS.html) | Should | Draft | curl 8.21.0 |
+| FR-030 | An unknown `-t` option name is exit 48 (`CURLE_UNKNOWN_OPTION`), `An unknown option was passed in to libcurl`; a `-t` value with no `=` is exit 49 (`CURLE_SETOPT_OPTION_SYNTAX`), `Syntax error in telnet option: TTYPE`. Not yet implemented. | [`CURLOPT_TELNETOPTIONS`](https://curl.se/libcurl/c/CURLOPT_TELNETOPTIONS.html); [exit codes](https://curl.se/libcurl/c/libcurl-errors.html) | Should | Draft | curl 8.21.0 |
+| FR-031 | A telnet session ends with exit 0 (`CURLE_OK`) when the server closes the connection. Not yet implemented. | [exit codes](https://curl.se/libcurl/c/libcurl-errors.html) | Must | Draft | curl 8.21.0 |
+
+### The `tftp://` scheme
+
+Every requirement below was checked against curl 8.21.0 (2026-06-24) on 2026-09-26,
+by pointing the curl binary at a loopback listener that recorded what curl sent and
+replied with canned bytes, and against the manpage, `docs/URL-SYNTAX.md`,
+`CURLOPT_TFTP_BLKSIZE`, `CURLOPT_TFTP_NO_OPTIONS` and `libcurl-errors` on
+[curl.se](https://curl.se). The default port is 69. None of these behaviours is
+implemented yet; each row describes upstream behaviour, not a claim that it works
+today. The handler will live in `Curl.Protocol.Tftp.UnitLibrary`.
+
+| ID | Requirement | Upstream reference | Priority | Status | Checked against |
+| --- | --- | --- | --- | --- | --- |
+| FR-032 | A download sends the read request `00 01 <file> 00 "octet" 00 "tsize" 00 "0" 00 "blksize" 00 "512" 00 "timeout" 00 "6" 00`, acknowledges each DATA block with `00 04 <block>`, and ends at a block shorter than the block size. Not yet implemented. | [URL syntax](https://curl.se/docs/url-syntax.html) | Must | Draft | curl 8.21.0 |
+| FR-033 | An option acknowledgement (OACK) is answered with an ACK of block 0, and an acknowledged `blksize` is used for the rest of the transfer. Not yet implemented. | [`CURLOPT_TFTP_BLKSIZE`](https://curl.se/libcurl/c/CURLOPT_TFTP_BLKSIZE.html) | Must | Draft | curl 8.21.0 |
+| FR-034 | An upload with `-T`/`--upload-file` sends the write request with `tsize` set to the upload's length, then DATA blocks from block 1. Not yet implemented. | [`-T`/`--upload-file`](https://curl.se/docs/manpage.html#-T) | Should | Draft | curl 8.21.0 |
+| FR-035 | A TFTP ERROR packet maps to an exit code and message: code 1 to exit 68 (`CURLE_TFTP_NOTFOUND`), `TFTP: File Not Found`; 2 to exit 69 (`CURLE_TFTP_PERM`), `TFTP: Access Violation`; 3 to exit 70 (`CURLE_REMOTE_DISK_FULL`), `Disk full or allocation exceeded`; 0 and 4 to exit 71 (`CURLE_TFTP_ILLEGAL`), `TFTP: Illegal operation`; 5 to exit 72 (`CURLE_TFTP_UNKNOWNID`), `TFTP: Unknown transfer ID`; 6 to exit 73 (`CURLE_REMOTE_FILE_EXISTS`), `Remote file already exists`; 7 to exit 74 (`CURLE_TFTP_NOSUCHUSER`), `TFTP: No such user`; 8 to exit 42 (`CURLE_ABORTED_BY_CALLBACK`), `Operation was aborted by an application callback`. Not yet implemented. | [exit codes](https://curl.se/libcurl/c/libcurl-errors.html) | Must | Draft | curl 8.21.0 |
+| FR-036 | A `tftp://` URL with no file name is exit 71 (`CURLE_TFTP_ILLEGAL`), `Missing filename`, and no packet is sent. Not yet implemented. | [exit codes](https://curl.se/libcurl/c/libcurl-errors.html) | Should | Draft | curl 8.21.0 |
+| FR-037 | `--tftp-no-options` sends the request with no options; `--tftp-blksize` is clamped to 8-65464 (5 is sent as 8, 70000 as 65464). Not yet implemented. | [`--tftp-no-options`](https://curl.se/docs/manpage.html#--tftp-no-options); [`--tftp-blksize`](https://curl.se/docs/manpage.html#--tftp-blksize); [`CURLOPT_TFTP_NO_OPTIONS`](https://curl.se/libcurl/c/CURLOPT_TFTP_NO_OPTIONS.html); [`CURLOPT_TFTP_BLKSIZE`](https://curl.se/libcurl/c/CURLOPT_TFTP_BLKSIZE.html) | Could | Draft | curl 8.21.0 |
+
+### The `mqtt://` and `mqtts://` schemes
+
+Every requirement below was checked against curl 8.21.0 (2026-06-24) on 2026-09-26,
+by pointing the curl binary at a loopback listener that recorded what curl sent and
+replied with canned bytes, and against the manpage, `docs/URL-SYNTAX.md`,
+`docs/MQTT.md` and `libcurl-errors` on [curl.se](https://curl.se). The default port
+for `mqtt://` is 1883; `mqtts://` is MQTT over TLS. None of these behaviours is
+implemented yet; each row describes upstream behaviour, not a claim that it works
+today. The handler will live in `Curl.Protocol.Mqtt.UnitLibrary`.
+
+| ID | Requirement | Upstream reference | Priority | Status | Checked against |
+| --- | --- | --- | --- | --- | --- |
+| FR-038 | curl connects with an MQTT 3.1.1 CONNECT: protocol level 4, clean session, keep-alive 60 seconds, and a client identifier of `curl` followed by eight random alphanumeric characters. Not yet implemented. | [MQTT](https://curl.se/docs/mqtt.html) | Must | Draft | curl 8.21.0 |
+| FR-039 | Without `-d`, curl subscribes to the topic at QoS 0 with packet identifier 1 and writes each received PUBLISH to the transfer's output as a two-byte big-endian topic length, the topic, then the payload. When the server closes the connection the transfer is exit 56 (`CURLE_RECV_ERROR`), `Connection disconnected`. Not yet implemented. | [MQTT](https://curl.se/docs/mqtt.html); [exit codes](https://curl.se/libcurl/c/libcurl-errors.html) | Must | Draft | curl 8.21.0 |
+| FR-040 | The topic is the URL path without its leading `/`, percent-decoded: `/a%2Fb` subscribes to `a/b`. Not yet implemented. | [MQTT](https://curl.se/docs/mqtt.html) | Must | Draft | curl 8.21.0 |
+| FR-041 | With `-d`, curl publishes the data to the topic at QoS 0, writes nothing to the output, and exits 0 (`CURLE_OK`); when the server keeps the connection open, curl then sends DISCONNECT (`E0 00`). Not yet implemented. | [MQTT](https://curl.se/docs/mqtt.html); [`-d`/`--data`](https://curl.se/docs/manpage.html#-d) | Must | Draft | curl 8.21.0 |
+| FR-042 | With `-u user:password`, split at the first colon (`bob:se:cret` gives password `se:cret`), the CONNECT carries the user name and password (connect flags `0xC2`); user information in the URL (`mqtt://al:pw@host/t`) does the same. Not yet implemented. | [`-u`/`--user`](https://curl.se/docs/manpage.html#-u); [MQTT](https://curl.se/docs/mqtt.html) | Should | Draft | curl 8.21.0 |
+| FR-043 | A CONNACK with a non-zero return code is exit 8 (`CURLE_WEIRD_SERVER_REPLY`); return code 5 gives `Expected 0000 but got 0005`. Not yet implemented. | [exit codes](https://curl.se/libcurl/c/libcurl-errors.html) | Must | Draft | curl 8.21.0 |
+| FR-044 | An empty topic is exit 3 (`CURLE_URL_MALFORMAT`), `No MQTT topic found. Forgot to URL encode it?`, reported after the CONNECT is sent. Not yet implemented. | [exit codes](https://curl.se/libcurl/c/libcurl-errors.html) | Should | Draft | curl 8.21.0 |
+| FR-045 | Publishing uses QoS 0 only, and the retain flag cannot be set. Not yet implemented. | [MQTT](https://curl.se/docs/mqtt.html) | Could | Draft | curl 8.21.0 |
 
 Priorities use MoSCoW (Must / Should / Could / Won't). "Must" means the release is
 not shippable without it — if everything is a Must, nothing is.
