@@ -35,3 +35,4 @@ A `-w` template renderer in `Curl.Output.UnitLibrary` handles variables, headers
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
