@@ -13,4 +13,8 @@
     <ProjectReference Include="..\Curl.Console\Curl.Console.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="UpstreamTestData\test*;UpstreamTestData\COPYING" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
