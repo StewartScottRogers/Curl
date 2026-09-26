@@ -38,7 +38,7 @@ For a 3xx the handler resolves `Location` against the request URL into `Transfer
   - Under `-L --max-redirs 0` curl writes the 3xx head and chunked trailers to `-D`, writes no body byte to stdout, and reports `%{size_download}` 5 for the 5-byte drained body, so the drained body is counted in `DownloadSize`.
 - Choices (sensible defaults, rule 1): non-ASCII in a relative `Location` is percent-encoded as UTF-8, as curl's URL encoder does, but was not measured byte for byte (Git Bash mangles non-ASCII arguments). curl also percent-decodes an absolute URL's host (`http://H%41/x` -> `http://HA/x`); not modelled, since no real server sends it. The base URL is `ITransferContext.Url` as `System.Uri` normalized it.
 - The drain covers only a response with a redirect URL: a 3xx without `Location`, or a `Location` on a 200, still writes its body under `-L`, as curl does (it ignores the body only once it has a URL to follow).
-- Follow-up filed: BL-266 (`RedirectFollower` throws on a redirect URL that does not parse; curl exits 1).
+- Follow-up filed: BL-271 (`RedirectFollower` throws on a redirect URL that does not parse; curl exits 1).
 - Verified: `dotnet build -warnaserror` clean; fast tests green (Http 446); `Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary`: 100% line, 100% branch, 187 members, 0 failing, worst CRAP 10.
 
 ## Log

@@ -1,5 +1,5 @@
 ---
-id: BL-266
+id: BL-271
 title: Fail a -L hop whose redirect URL does not parse with exit 1 instead of throwing
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-266 — Fail a -L hop whose redirect URL does not parse with exit 1 instead of throwing
+# BL-271 — Fail a -L hop whose redirect URL does not parse with exit 1 instead of throwing
 
 ## Goal
 
