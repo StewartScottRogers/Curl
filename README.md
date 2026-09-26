@@ -40,9 +40,22 @@ Code agents built for this one job, porting curl, and not a general-purpose codi
 
 The lights stay off; a person sets direction and answers blocked questions.
 
+## Download
+
+Native binaries for Windows, Linux and macOS, on x64 and Arm64, are on the
+[**download page**](DOWNLOAD.md), with one-line installers:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/StewartScottRogers/Curl/master/install.sh | sh    # Linux, macOS
+```
+
+```powershell
+irm https://raw.githubusercontent.com/StewartScottRogers/Curl/master/install.ps1 | iex          # Windows
+```
+
 ## Build and test
 
-Needs the .NET 10 SDK.
+Needs the .NET 10 SDK. Builds and tests on Windows, Linux and macOS.
 
 ```
 dotnet build
@@ -57,6 +70,7 @@ RunDarkFactory.cmd -Hours 4 -MaxTasks 3
 
 ## Read more
 
+- [Download and install](DOWNLOAD.md) - every supported platform, installers and checksums
 - [Product overview](Documentation/Product/Product-Overview.md) - scope, architecture and roadmap
 - [Task board](Tasks/README.md) - what is being worked on, one Markdown file per task
 
