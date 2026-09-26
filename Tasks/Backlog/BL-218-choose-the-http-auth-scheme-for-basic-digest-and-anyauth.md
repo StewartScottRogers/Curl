@@ -29,6 +29,7 @@ The authenticator chooses among offered challenges as curl ranks them for `--bas
 ## Notes
 
 - Plan item: A3 in the Phase 1 HTTP plan (2026-09-26); plan keys in this file were replaced by their task IDs.
+- From BL-217 (ADR-0023): `DigestAuthenticator` answers the first Digest challenge whenever Digest is allowed, with no ranking; `BasicAndBearerAuthenticator` returns null when its pick is Digest. Choosing between them by libcurl's order is this task's.
 
 ## Log
 
