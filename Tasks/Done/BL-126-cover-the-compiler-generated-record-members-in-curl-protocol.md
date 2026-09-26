@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Abstractions.UnitTests]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-126 — Cover the compiler-generated record members in Curl.Protocol.Abstractions.UnitLibrary
 
@@ -29,15 +29,20 @@ Out of bounds: do not change the production library, do not add `[ExcludeFromCod
 
 ## Acceptance criteria
 
-- [ ] `powershell -NoProfile -ExecutionPolicy Bypass -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Abstractions.UnitLibrary` exits 0, reporting 100% line and 100% branch coverage for the library.
-- [ ] The only files changed are under `Curl.Protocol.Abstractions.UnitTests`; no `[ExcludeFromCodeCoverage]` is added and no threshold changes.
-- [ ] Each of `ByteRange`, `TimeCondition`, `FileOpenResult`, `DatagramReceived` and `TransferResult` has a test that uses a `with` expression and asserts the copy's new values and the original's unchanged values.
-- [ ] `dotnet build Curl.Protocol.Abstractions.UnitTests -warnaserror` is clean.
-- [ ] `dotnet test --filter "TestCategory!=Integration"` passes, and no new test needs `TestCategory=Integration`.
+- [x] `powershell -NoProfile -ExecutionPolicy Bypass -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Abstractions.UnitLibrary` exits 0, reporting 100% line and 100% branch coverage for the library.
+- [x] The only files changed are under `Curl.Protocol.Abstractions.UnitTests`; no `[ExcludeFromCodeCoverage]` is added and no threshold changes.
+- [x] Each of `ByteRange`, `TimeCondition`, `FileOpenResult`, `DatagramReceived` and `TransferResult` has a test that uses a `with` expression and asserts the copy's new values and the original's unchanged values.
+- [x] `dotnet build Curl.Protocol.Abstractions.UnitTests -warnaserror` is clean.
+- [x] `dotnet test --filter "TestCategory!=Integration"` passes, and no new test needs `TestCategory=Integration`.
 
 ## Notes
+
+- `ByteRange` has only get-only properties, so no `with` expression can set one; its test uses `with { }`, which is enough to reach the copy constructor, and asserts the copy is a new, equal instance with the original's values. Chosen as the default because the task forbids a production change and the copy constructor was the only member reported for it.
+- `TransferResult`'s test also sets `SourceLastWriteTimeUtc` (not reported, already covered) so the test sets every property, as the task's naming suggests.
+- Result: `Measure-CodeQuality.ps1 -Library Curl.Protocol.Abstractions.UnitLibrary` exits 0 with 100% line, 100% branch, 110 members, worst CRAP 2. Abstractions tests: 76 passed.
 
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. Curl.Protocol.Abstractions.UnitLibrary measures 100% line and branch coverage; every record's with-expression copy is tested
