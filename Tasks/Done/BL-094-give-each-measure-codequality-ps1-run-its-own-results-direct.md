@@ -74,7 +74,7 @@ does today.
   and exits 1 because Curl.Core.UnitLibrary does **not** meet the thresholds today
   (91.11% line, 87.5% branch, 4 failing `PhysicalFileSystem` members). That is a real,
   pre-existing coverage gap, not this change, so the "exits 0 when the library meets the
-  thresholds" condition is shown with Mqtt (meets them, exit 0). Filed as BL-095.
+  thresholds" condition is shown with Mqtt (meets them, exit 0). Filed as BL-097.
 - Other lanes still running the old script delete the whole `%TEMP%\CurlCodeQuality`
   parent, including the new per-checkout folders, until they rebase onto this commit.
 

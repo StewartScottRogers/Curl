@@ -1,5 +1,5 @@
 ---
-id: BL-095
+id: BL-097
 title: Bring Curl.Core.UnitLibrary PhysicalFileSystem to 100% line and branch coverage
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-095 — Bring Curl.Core.UnitLibrary PhysicalFileSystem to 100% line and branch coverage
+# BL-097 — Bring Curl.Core.UnitLibrary PhysicalFileSystem to 100% line and branch coverage
 
 ## Goal
 
