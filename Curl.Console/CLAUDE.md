@@ -15,7 +15,13 @@ given and must never reference a protocol library directly.
 `Program.Main` only opens the standard streams, builds the composition and hands the
 arguments to `CurlCommandRunner`, which parses them, runs each URL and prints curl's
 `curl: (N) <message>` lines. `-o` files open on the first write through
-`DeferredOutputFileStream`, which is how curl's exit 23 message comes out right.
+`DeferredOutputFileStream`, which is how curl's exit 23 message comes out right. The
+parser's warning lines are written to standard error before anything else.
+
+Each transfer's context carries the parsed `-r` range (`ByteRangeParser`; text that names
+no range ends the transfer with exit 33 before it is dispatched), the `-C` offset and the
+`--max-filesize` limit. `-C -` resumes from the size of the URL's `-o` file, and a transfer
+that resumes past byte zero opens that file for appending before it starts, as curl does.
 
 A URL with no `-o` writes through `StandardOutputFailureDeferringStream`, which
 models curl's 4096-byte stdio buffer: a failed standard output is reported as

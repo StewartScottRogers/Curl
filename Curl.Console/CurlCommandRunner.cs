@@ -32,6 +32,7 @@ namespace Curl.Console;
 /// stdin" (ADR-0006). Every other scheme's upload is <see langword="null" />.
 /// </param>
 /// <remarks>
+/// <para>
 /// URLs are transferred in command-line order; a failure does not stop the rest, and the
 /// exit code is the last transfer's, as curl's is. The first <c>-o</c> receives the first
 /// URL, the second the second, and so on. A failure's line is printed unless <c>-s</c> was
@@ -40,8 +41,18 @@ namespace Curl.Console;
 /// unless <c>-s</c> was given, with or without <c>-S</c>. A transfer whose write to standard
 /// output fails while the body still fits curl's 4096-byte stdio buffer exits 23 and prints
 /// curl's <c>curl: Failed writing body</c>, with no <c>(23)</c>, under the same <c>-s</c> /
-/// <c>-S</c> rule as any failure; a larger body reports the handler's own write failure. A refused command
-/// line prints the refusal's lines and transfers nothing.
+/// <c>-S</c> rule as any failure; a larger body reports the handler's own write failure.
+/// </para>
+/// <para>
+/// The parser's warning lines come first on standard error, whether or not the command line
+/// is accepted; a refused command line then prints the refusal's lines and transfers nothing.
+/// </para>
+/// <para>
+/// Each transfer carries the parsed <c>-r</c> range, the <c>-C</c> offset and the
+/// <c>--max-filesize</c> limit. Range text that names no range ends the transfer with exit 33
+/// before it is dispatched. <c>-C -</c> resumes from the size of the URL's <c>-o</c> file,
+/// and a transfer that resumes past byte zero appends to that file, opening it first.
+/// </para>
 /// </remarks>
 internal sealed class CurlCommandRunner(
     Func<CommandLineOptions, ProtocolDispatcher> createDispatcher,
@@ -62,6 +73,12 @@ internal sealed class CurlCommandRunner(
     /// <c>telnet</c> and <c>file</c> transfers.
     /// </summary>
     internal const string FailedWritingBodyLine = "curl: Failed writing body";
+
+    /// <summary>
+    /// curl 8.21.0's message for a resumed transfer whose <c>-o</c> file cannot be opened
+    /// for appending, measured on <c>-C 3 -o</c> naming a directory.
+    /// </summary>
+    internal const string CannotOpenForResumeMessage = "Failed writing received data to disk/application";
 
     /// <summary>The one scheme whose transfer uploads standard input.</summary>
     private const string TelnetScheme = "telnet";
@@ -88,13 +105,11 @@ internal sealed class CurlCommandRunner(
     internal async Task<int> RunAsync(IReadOnlyList<string> arguments)
     {
         CommandLineParseResult parsed = CommandLineParser.Parse(arguments);
+        await WriteErrorLinesAsync(parsed.WarningLines).ConfigureAwait(false);
 
         if (!parsed.IsAccepted)
         {
-            foreach (string line in parsed.Refusal.StandardErrorLines)
-            {
-                await WriteErrorLineAsync(line).ConfigureAwait(false);
-            }
+            await WriteErrorLinesAsync(parsed.Refusal.StandardErrorLines).ConfigureAwait(false);
 
             return (int)parsed.Refusal.ExitCode;
         }
@@ -108,12 +123,22 @@ internal sealed class CurlCommandRunner(
     /// <param name="options">The parsed command line.</param>
     /// <param name="url">The URL to transfer.</param>
     /// <param name="output">Where the transfer's bytes go.</param>
+    /// <param name="range">The parsed <c>-r</c> range, or <see langword="null" /> for the whole resource.</param>
+    /// <param name="resumeFrom">The <c>-C</c> offset, already resolved for <c>-C -</c>.</param>
     /// <returns>The context.</returns>
-    private TransferContext CreateContext(CommandLineOptions options, Uri url, Stream output) =>
+    private TransferContext CreateContext(
+        CommandLineOptions options,
+        Uri url,
+        Stream output,
+        ByteRange? range,
+        long? resumeFrom) =>
         new()
         {
             Url = url,
             Output = output,
+            Range = range,
+            ResumeFrom = resumeFrom,
+            MaxFileSize = options.MaxFileSize,
             Upload = string.Equals(url.Scheme, TelnetScheme, StringComparison.Ordinal) ? standardInput : null,
             PostData = options.PostData,
             Credentials = options.Credentials,
@@ -132,7 +157,7 @@ internal sealed class CurlCommandRunner(
     {
         CurlExitCode exitCode = CurlExitCode.Ok;
         ProtocolDispatcher dispatcher = createDispatcher(options);
-        bool showsErrors = !options.Silent || options.ShowError;
+        bool showsErrors = ShowsErrors(options);
 
         for (int index = 0; index < options.Urls.Count; index++)
         {
@@ -149,6 +174,13 @@ internal sealed class CurlCommandRunner(
 
         return exitCode;
     }
+
+    /// <summary>
+    /// Tells whether failure lines are printed: always, unless <c>-s</c> was given without <c>-S</c>.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <returns><see langword="true" /> when failure lines are printed.</returns>
+    private static bool ShowsErrors(CommandLineOptions options) => !options.Silent || options.ShowError;
 
     /// <summary>
     /// Formats the line printed for a failed transfer that carries a message.
@@ -178,7 +210,10 @@ internal sealed class CurlCommandRunner(
     /// <param name="options">The accepted command line.</param>
     /// <param name="url">The URL as typed.</param>
     /// <param name="outputFile">The matching <c>-o</c> value, or <see langword="null" />.</param>
-    /// <returns>The transfer's result.</returns>
+    /// <returns>
+    /// The transfer's result; <see cref="ByteRangeParser.NotDeliveredFailure" />, with nothing
+    /// transferred, when the <c>-r</c> text names no range, as curl 8.21.0 reports it.
+    /// </returns>
     private async Task<TransferResult> TransferAsync(
         ProtocolDispatcher dispatcher,
         CommandLineOptions options,
@@ -190,17 +225,105 @@ internal sealed class CurlCommandRunner(
             return TransferResult.Failure(CurlExitCode.UrlMalformat, MalformedUrlMessage);
         }
 
-        if (outputFile is null)
+        if (!TryParseRange(options.Range, out ByteRange? range))
         {
-            return await TransferToStandardOutputAsync(dispatcher, CreateContext(options, uri, deferringStandardOutput))
-                .ConfigureAwait(false);
+            return ByteRangeParser.NotDeliveredFailure;
         }
 
-        DeferredOutputFileStream output = new(outputFileSystem, outputFile);
+        if (outputFile is null)
+        {
+            TransferContext context = CreateContext(options, uri, deferringStandardOutput, range, options.ResumeFrom);
+
+            return await TransferToStandardOutputAsync(dispatcher, context).ConfigureAwait(false);
+        }
+
+        long? resumeFrom = await ResolveResumeFromAsync(options, outputFile).ConfigureAwait(false);
+
+        return await TransferToOutputFileAsync(dispatcher, options, uri, outputFile, range, resumeFrom)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Parses the <c>-r</c> / <c>--range</c> text, when there is any.
+    /// </summary>
+    /// <param name="rangeText">The text, or <see langword="null" /> when <c>-r</c> was not given.</param>
+    /// <param name="range">The range; <see langword="null" /> for the whole resource.</param>
+    /// <returns>
+    /// <see langword="false" /> when the text names no range, so the transfer must end with
+    /// <see cref="ByteRangeParser.NotDeliveredFailure" />.
+    /// </returns>
+    private static bool TryParseRange(string? rangeText, out ByteRange? range)
+    {
+        range = null;
+
+        return rangeText is null || ByteRangeParser.TryParse(rangeText, out range);
+    }
+
+    /// <summary>
+    /// Works out the offset a transfer to <paramref name="outputFile" /> resumes from.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="outputFile">The matching <c>-o</c> value.</param>
+    /// <returns>
+    /// For <c>-C -</c>, the size of <paramref name="outputFile" />, or <see langword="null" />
+    /// when it cannot be opened, since curl 8.21.0 then transfers the whole resource; otherwise
+    /// the <c>-C</c> offset, or <see langword="null" /> when <c>-C</c> was not given.
+    /// </returns>
+    private async Task<long?> ResolveResumeFromAsync(CommandLineOptions options, string outputFile)
+    {
+        if (!options.ResumeFromOutputSize)
+        {
+            return options.ResumeFrom;
+        }
+
+        FileOpenResult existing = await outputFileSystem
+            .OpenForReadAsync(outputFile, CancellationToken.None)
+            .ConfigureAwait(false);
+
+        if (existing.Content is not { } content)
+        {
+            return null;
+        }
+
+        await content.DisposeAsync().ConfigureAwait(false);
+
+        return existing.Length;
+    }
+
+    /// <summary>
+    /// Performs one transfer whose output is <paramref name="outputFile" />.
+    /// </summary>
+    /// <param name="dispatcher">Performs the transfer with the handler for its scheme.</param>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="uri">The URL.</param>
+    /// <param name="outputFile">The matching <c>-o</c> value.</param>
+    /// <param name="range">The parsed <c>-r</c> range, or <see langword="null" />.</param>
+    /// <param name="resumeFrom">The resolved <c>-C</c> offset, or <see langword="null" />.</param>
+    /// <returns>
+    /// The transfer's result. A transfer that resumes past byte zero opens the file for
+    /// appending before it starts, as curl 8.21.0 does; when that open fails the result is
+    /// <see cref="ReportCannotOpenForResumeAsync" />'s, and nothing is transferred.
+    /// </returns>
+    private async Task<TransferResult> TransferToOutputFileAsync(
+        ProtocolDispatcher dispatcher,
+        CommandLineOptions options,
+        Uri uri,
+        string outputFile,
+        ByteRange? range,
+        long? resumeFrom)
+    {
+        bool resumes = resumeFrom is > 0;
+        DeferredOutputFileStream output = new(
+            outputFileSystem, outputFile, resumes ? FileWriteMode.Append : FileWriteMode.Truncate);
         await using (output.ConfigureAwait(false))
         {
-            TransferResult fileResult = await dispatcher.DispatchAsync(CreateContext(options, uri, output))
-                .ConfigureAwait(false);
+            if (resumes && !await output.TryOpenNowAsync().ConfigureAwait(false))
+            {
+                return await ReportCannotOpenForResumeAsync(options, outputFile).ConfigureAwait(false);
+            }
+
+            TransferContext context = CreateContext(options, uri, output, range, resumeFrom);
+            TransferResult fileResult = await dispatcher.DispatchAsync(context).ConfigureAwait(false);
             TransferResult completed = await output.CompleteAsync(fileResult).ConfigureAwait(false);
 
             if (!options.Silent && output.OpenFailureWarning is { } warning)
@@ -210,6 +333,24 @@ internal sealed class CurlCommandRunner(
 
             return completed;
         }
+    }
+
+    /// <summary>
+    /// Prints curl's <c>curl: cannot open '&lt;path&gt;'</c> line for an <c>-o</c> file a
+    /// resumed transfer could not open for appending, unless <c>-s</c> was given without
+    /// <c>-S</c>.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="outputFile">The <c>-o</c> value, as typed.</param>
+    /// <returns>Exit 23 with <see cref="CannotOpenForResumeMessage" />.</returns>
+    private async Task<TransferResult> ReportCannotOpenForResumeAsync(CommandLineOptions options, string outputFile)
+    {
+        if (ShowsErrors(options))
+        {
+            await WriteErrorLineAsync($"curl: cannot open '{outputFile}'").ConfigureAwait(false);
+        }
+
+        return TransferResult.Failure(CurlExitCode.WriteError, CannotOpenForResumeMessage);
     }
 
     /// <summary>
@@ -232,6 +373,19 @@ internal sealed class CurlCommandRunner(
         await deferringStandardOutput.FlushAsync().ConfigureAwait(false);
 
         return result.IsSuccess && deferringStandardOutput.HasWriteFailed ? StandardOutputWriteFailure : result;
+    }
+
+    /// <summary>
+    /// Writes each of <paramref name="lines" /> to standard error, in order.
+    /// </summary>
+    /// <param name="lines">The lines, without terminators.</param>
+    /// <returns>A task that completes when every line is flushed.</returns>
+    private async Task WriteErrorLinesAsync(IReadOnlyList<string> lines)
+    {
+        foreach (string line in lines)
+        {
+            await WriteErrorLineAsync(line).ConfigureAwait(false);
+        }
     }
 
     /// <summary>

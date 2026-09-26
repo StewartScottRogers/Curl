@@ -14,7 +14,7 @@ public sealed class DeferredOutputFileStreamTests
     [TestMethod]
     public void Construct_DoesNotOpenTheFile()
     {
-        using DeferredOutputFileStream stream = new(fileSystem, "a.txt");
+        using DeferredOutputFileStream stream = new(fileSystem, "a.txt", FileWriteMode.Truncate);
 
         Assert.IsFalse(fileSystem.Written.ContainsKey("a.txt"));
     }
@@ -22,7 +22,7 @@ public sealed class DeferredOutputFileStreamTests
     [TestMethod]
     public void Capabilities_AreWriteOnly()
     {
-        using DeferredOutputFileStream stream = new(fileSystem, "a.txt");
+        using DeferredOutputFileStream stream = new(fileSystem, "a.txt", FileWriteMode.Truncate);
 
         Assert.IsFalse(stream.CanRead);
         Assert.IsFalse(stream.CanSeek);
@@ -32,7 +32,7 @@ public sealed class DeferredOutputFileStreamTests
     [TestMethod]
     public void UnsupportedMembers_Throw()
     {
-        using DeferredOutputFileStream stream = new(fileSystem, "a.txt");
+        using DeferredOutputFileStream stream = new(fileSystem, "a.txt", FileWriteMode.Truncate);
 
         Assert.ThrowsExactly<NotSupportedException>(() => stream.Length);
         Assert.ThrowsExactly<NotSupportedException>(() => stream.Position);
@@ -46,7 +46,7 @@ public sealed class DeferredOutputFileStreamTests
     [TestMethod]
     public async Task WriteAsync_ArrayOverload_WritesTheSliceToTheFile()
     {
-        using DeferredOutputFileStream stream = new(fileSystem, "a.txt");
+        using DeferredOutputFileStream stream = new(fileSystem, "a.txt", FileWriteMode.Truncate);
 
         await stream.WriteAsync([1, 2, 3, 4], 1, 2, CancellationToken.None);
         await stream.WriteAsync(new byte[] { 5 }.AsMemory());
@@ -58,7 +58,7 @@ public sealed class DeferredOutputFileStreamTests
     [TestMethod]
     public void Flush_BeforeAnyWrite_DoesNotOpenTheFile()
     {
-        using DeferredOutputFileStream stream = new(fileSystem, "a.txt");
+        using DeferredOutputFileStream stream = new(fileSystem, "a.txt", FileWriteMode.Truncate);
 
         stream.Flush();
 
@@ -69,7 +69,7 @@ public sealed class DeferredOutputFileStreamTests
     public async Task WriteAsync_UncreatableFile_ThrowsIOExceptionAndCompleteReportsTheWriteSize()
     {
         fileSystem.UnwritablePaths.Add("x");
-        using DeferredOutputFileStream stream = new(fileSystem, "x");
+        using DeferredOutputFileStream stream = new(fileSystem, "x", FileWriteMode.Truncate);
 
         await Assert.ThrowsExactlyAsync<IOException>(() => stream.WriteAsync(new byte[7].AsMemory()).AsTask());
         TransferResult result = await stream.CompleteAsync(TransferResult.Failure(CurlExitCode.WriteError, "passed"));
@@ -82,7 +82,7 @@ public sealed class DeferredOutputFileStreamTests
     public async Task WriteAsync_UncreatableFileTwice_CompleteReportsTheFirstWriteSize()
     {
         fileSystem.UnwritablePaths.Add("x");
-        using DeferredOutputFileStream stream = new(fileSystem, "x");
+        using DeferredOutputFileStream stream = new(fileSystem, "x", FileWriteMode.Truncate);
 
         await Assert.ThrowsExactlyAsync<IOException>(() => stream.WriteAsync(new byte[7].AsMemory()).AsTask());
         await Assert.ThrowsExactlyAsync<IOException>(() => stream.WriteAsync(new byte[3].AsMemory()).AsTask());
@@ -96,7 +96,7 @@ public sealed class DeferredOutputFileStreamTests
     {
         InMemoryFileSystem files = new() { UnwritableStatus = FileAccessStatus.AccessDenied };
         files.UnwritablePaths.Add("C:/Windows/System32/x");
-        using DeferredOutputFileStream stream = new(files, "C:/Windows/System32/x");
+        using DeferredOutputFileStream stream = new(files, "C:/Windows/System32/x", FileWriteMode.Truncate);
 
         Assert.IsNull(stream.OpenFailureWarning);
         await Assert.ThrowsExactlyAsync<IOException>(() => stream.WriteAsync(new byte[1].AsMemory()).AsTask());
@@ -107,7 +107,7 @@ public sealed class DeferredOutputFileStreamTests
     [TestMethod]
     public async Task OpenFailureWarning_SuccessfulOpen_IsNull()
     {
-        using DeferredOutputFileStream stream = new(fileSystem, "a.txt");
+        using DeferredOutputFileStream stream = new(fileSystem, "a.txt", FileWriteMode.Truncate);
 
         await stream.WriteAsync(new byte[] { 1 }.AsMemory());
 
@@ -117,7 +117,7 @@ public sealed class DeferredOutputFileStreamTests
     [TestMethod]
     public async Task WriteAsync_CreatesTheFileWithFopensMode0666()
     {
-        using DeferredOutputFileStream stream = new(fileSystem, "a.txt");
+        using DeferredOutputFileStream stream = new(fileSystem, "a.txt", FileWriteMode.Truncate);
 
         await stream.WriteAsync(new byte[] { 1 }.AsMemory());
 
@@ -127,7 +127,7 @@ public sealed class DeferredOutputFileStreamTests
     [TestMethod]
     public async Task FlushAsync_BeforeAndAfterTheFirstWrite_Succeeds()
     {
-        using DeferredOutputFileStream stream = new(fileSystem, "a.txt");
+        using DeferredOutputFileStream stream = new(fileSystem, "a.txt", FileWriteMode.Truncate);
 
         await stream.FlushAsync();
         Assert.IsFalse(fileSystem.Written.ContainsKey("a.txt"));
@@ -140,7 +140,7 @@ public sealed class DeferredOutputFileStreamTests
     [TestMethod]
     public async Task DisposeAsync_OpenFile_ClosesIt()
     {
-        DeferredOutputFileStream stream = new(fileSystem, "a.txt");
+        DeferredOutputFileStream stream = new(fileSystem, "a.txt", FileWriteMode.Truncate);
         await stream.WriteAsync(new byte[] { 1 }.AsMemory());
 
         await stream.DisposeAsync();
@@ -151,7 +151,7 @@ public sealed class DeferredOutputFileStreamTests
     [TestMethod]
     public async Task DisposeAsync_NoFile_OpensNothing()
     {
-        DeferredOutputFileStream stream = new(fileSystem, "a.txt");
+        DeferredOutputFileStream stream = new(fileSystem, "a.txt", FileWriteMode.Truncate);
 
         await stream.DisposeAsync();
 
@@ -161,7 +161,7 @@ public sealed class DeferredOutputFileStreamTests
     [TestMethod]
     public async Task CompleteAsync_AfterWrites_ReturnsTheHandlersResult()
     {
-        using DeferredOutputFileStream stream = new(fileSystem, "a.txt");
+        using DeferredOutputFileStream stream = new(fileSystem, "a.txt", FileWriteMode.Truncate);
         await stream.WriteAsync(new byte[] { 1 }.AsMemory());
         TransferResult handlerResult = TransferResult.Success(1);
 

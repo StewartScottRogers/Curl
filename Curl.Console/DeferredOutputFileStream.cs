@@ -9,6 +9,11 @@ namespace Curl.Console;
 /// </summary>
 /// <param name="fileSystem">Opens the file.</param>
 /// <param name="path">The <c>-o</c> value, as typed.</param>
+/// <param name="writeMode">
+/// <see cref="FileWriteMode.Truncate" /> for a whole transfer;
+/// <see cref="FileWriteMode.Append" /> when <c>-C</c> / <c>--continue-at</c> resumes it, as
+/// curl opens the file <c>"ab"</c> then.
+/// </param>
 /// <remarks>
 /// <para>
 /// Opening late is what gives curl's messages: when the file cannot be created, the
@@ -31,7 +36,7 @@ namespace Curl.Console;
 /// <see cref="Stream.WriteAsync(ReadOnlyMemory{byte}, CancellationToken)" />.
 /// </para>
 /// </remarks>
-internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string path) : Stream
+internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string path, FileWriteMode writeMode) : Stream
 {
     /// <summary>
     /// The mode a newly created <c>-o</c> file receives on a POSIX system, before the umask:
@@ -137,6 +142,22 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
             : result;
     }
 
+    /// <summary>
+    /// Opens the file now rather than on the first write, as curl 8.21.0 does for a resumed
+    /// transfer. A failed open here does not set <see cref="OpenFailureWarning" />: curl
+    /// reports it with its own <c>curl: cannot open</c> line instead.
+    /// </summary>
+    /// <returns><see langword="true" /> when the file is open.</returns>
+    internal async ValueTask<bool> TryOpenNowAsync()
+    {
+        FileOpenResult opened = await fileSystem
+            .OpenForWriteAsync(path, writeMode, CreateMode, CancellationToken.None)
+            .ConfigureAwait(false);
+        file = opened.Content;
+
+        return opened.IsOpen;
+    }
+
     /// <inheritdoc />
     public override async ValueTask DisposeAsync()
     {
@@ -156,14 +177,14 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
     }
 
     /// <summary>
-    /// Opens the file, truncating it, with <see cref="CreateMode" />.
+    /// Opens the file in its write mode, with <see cref="CreateMode" />.
     /// </summary>
     /// <param name="cancellationToken">Cancels the open.</param>
     /// <returns>The open file, or <see langword="null" /> when it could not be opened.</returns>
     private async ValueTask<Stream?> TryOpenAsync(CancellationToken cancellationToken)
     {
         FileOpenResult opened = await fileSystem
-            .OpenForWriteAsync(path, FileWriteMode.Truncate, CreateMode, cancellationToken)
+            .OpenForWriteAsync(path, writeMode, CreateMode, cancellationToken)
             .ConfigureAwait(false);
         file = opened.Content;
 
