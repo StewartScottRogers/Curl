@@ -43,6 +43,19 @@ public sealed class ConsolePasswordPromptTests
         Assert.AreSame(ConsolePasswordPrompt.ForProcessConsole, ConsolePasswordPrompt.ForProcessConsole);
     }
 
+    [TestMethod]
+    public void ForProcessConsole_InputRedirected_ReturnsAnEmptyPassword()
+    {
+        if (!Console.IsInputRedirected)
+        {
+            Assert.Inconclusive("Standard input is a console here; reading a key would wait for a keypress.");
+        }
+
+        string password = ConsolePasswordPrompt.ForProcessConsole.ReadPassword(string.Empty);
+
+        Assert.AreEqual(string.Empty, password);
+    }
+
     /// <summary>Returns each character of <paramref name="keys"/> as a key, then throws as an unreadable console does.</summary>
     private static Func<ConsoleKeyInfo> ScriptedKeys(string keys)
     {
