@@ -1,5 +1,5 @@
 ---
-id: BL-094
+id: BL-098
 title: Surface a closed or broken standard output in the real executable
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-094 — Surface a closed or broken standard output in the real executable
+# BL-098 — Surface a closed or broken standard output in the real executable
 
 ## Goal
 

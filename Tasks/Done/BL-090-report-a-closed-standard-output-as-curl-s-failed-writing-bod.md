@@ -58,8 +58,8 @@ is not protocol-specific. Start at `Curl.Console/CurlCommandRunner.cs` and the
   delayed. An `IOException` escaping a handler still propagates, as before.
 - The unit-level behaviour does not yet reach the real executable: `Console.OpenStandardOutput()`
   returns `Stream.Null` for a closed handle and ignores broken-pipe errors, so the built curl.exe
-  still exits 0 in both measured cases. Filed as BL-094. The exact `returned M` after several
-  small writes overflow the buffer is filed as BL-095.
+  still exits 0 in both measured cases. Filed as BL-098. The exact `returned M` after several
+  small writes overflow the buffer is filed as BL-099.
 - Tests: Curl.Console.UnitTests 87 (was 67), including
   `RunAsync_StandardOutputWriteThrows_ReturnsExit23WithFailedWritingBodyLine`. Coverage of
   `CurlCommandRunner` and `StandardOutputFailureDeferringStream`: 100% line, 100% branch.

@@ -1,5 +1,5 @@
 ---
-id: BL-095
+id: BL-099
 title: Match curl's 'passed N returned M' when stdout fails after several small writes
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-095 — Match curl's 'passed N returned M' when stdout fails after several small writes
+# BL-099 — Match curl's 'passed N returned M' when stdout fails after several small writes
 
 ## Goal
 
