@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation/Planning/Decisions]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-060 — Decide how --ciphers and --tls13-ciphers behave where the BCL cannot set cipher suites
 
@@ -56,12 +56,12 @@ Choices, per platform:
 
 ## Acceptance criteria
 
-- [ ] A new ADR in `Documentation/Planning/Decisions/` (next free number), status
+- [x] A new ADR in `Documentation/Planning/Decisions/` (next free number), status
       Accepted, states what `--ciphers` and `--tls13-ciphers` do on Windows, Linux and
       macOS: honoured (and which name syntax), ignored (and any warning text), or refused
       (exit 59 and the message text).
-- [ ] The ADR names every divergence from upstream curl it accepts.
-- [ ] `Documentation/Planning/Decisions/README.md` lists the new ADR.
+- [x] The ADR names every divergence from upstream curl it accepts.
+- [x] `Documentation/Planning/Decisions/README.md` lists the new ADR.
 
 ## Notes
 
@@ -69,8 +69,18 @@ Choices, per platform:
 
 Blocks BL-066. BL-067 parses both options verbatim regardless of this decision.
 
+**Recorded (Claude, 2026-09-26):** ADR-0011. Measured again the same day. Linux curl 8.18.0/OpenSSL 3.5.5
+accepts both OpenSSL and IANA names, drops unknown entries beside a known one, and fails with
+`failed setting TLS 1.3 cipher suite: <value>` (exit 59) when no `--tls13-ciphers` entry is known. Windows
+Schannel 8.21.0 ignores `--tls13-ciphers` entirely, even `BOGUS` exits 0, so on Windows the ADR says it is
+ignored. The .NET 10 reference docs confirm `CipherSuitesPolicy` works on Linux (OpenSSL 1.1.1+) and macOS.
+Defaults chosen under delegation and recorded in the ADR: `:`/`,`/space separators, unknown entries dropped,
+the defaults filled in when only one option is given, and OpenSSL keywords (`HIGH`, `!aNULL`) left
+uninterpreted (a named divergence).
+
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Stewart decided: refuse on Windows as the Schannel build does, honour on Linux/macOS. Reassigned to Claude to record the ADR.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. ADR-0011 records --ciphers/--tls13-ciphers per platform: Schannel behaviour on Windows, CipherSuitesPolicy with OpenSSL and IANA names on Linux/macOS

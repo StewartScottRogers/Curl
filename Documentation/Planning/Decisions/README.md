@@ -25,6 +25,7 @@ choices do not need one.
 | [0008](ADR-0008-transfer-context-carries-connect-timeout-and-max-time.md) | The transfer context carries the connect timeout and the maximum time | Accepted | 2026-09-26 |
 | [0009](ADR-0009-tls-behaviour-matches-the-platforms-usual-curl-build.md) | TLS failure messages, `--capath`, `--cert` formats and the trust store match the platform's usual curl build | Accepted | 2026-09-26 |
 | [0010](ADR-0010-representing-urls-system-uri-cannot-round-trip.md) | Representing URLs `System.Uri` cannot round-trip: replace, wrap or pre-parse | Proposed | 2026-09-26 |
+| [0011](ADR-0011-cipher-options-follow-schannel-on-windows-and-are-honoured-elsewhere.md) | `--ciphers` and `--tls13-ciphers`: Schannel behaviour on Windows, honoured through `CipherSuitesPolicy` on Linux and macOS | Accepted | 2026-09-26 |
 
 ## Template
 
