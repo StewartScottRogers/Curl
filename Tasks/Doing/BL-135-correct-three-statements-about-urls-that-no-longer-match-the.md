@@ -78,3 +78,4 @@ appending one `Log` line recording the correction.
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
