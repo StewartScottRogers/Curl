@@ -1,5 +1,5 @@
 ---
-id: BL-051
+id: BL-077
 title: Map telnet connection and output failures to curl's exit codes
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-051 — Map telnet connection and output failures to curl's exit codes
+# BL-077 — Map telnet connection and output failures to curl's exit codes
 
 ## Goal
 
@@ -49,3 +49,4 @@ throws.
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Backlog. Returned when the 4-lane shift was stopped to repair task IDs that parallel lanes had duplicated; no lane was working it.

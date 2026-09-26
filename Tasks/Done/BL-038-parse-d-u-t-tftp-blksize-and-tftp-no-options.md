@@ -73,11 +73,11 @@ Scope limits, each to be filed as its own task during the run rather than guesse
   parameter"; both come from `CommandLineNumber`.
 - Defaults taken for the out-of-scope forms until their tasks land: a later `-d` replaces
   an earlier one (BL-057 joins them with `&`); `-d @file` is recorded as the literal text
-  (BL-056 reads it); `-u user` with no colon records the user with an empty password
+  (BL-080 reads it); `-u user` with no colon records the user with an empty password
   (BL-058 prompts, as curl does).
 - `CommandLineParserTests.Parse_UnknownShortOption_Refuses` used `-t` as its unknown
   letter; it now uses `-!`.
-- Follow-up tasks filed: BL-056 (`-d @file`, `-d @-`), BL-057 (several `-d` joined with
+- Follow-up tasks filed: BL-080 (`-d @file`, `-d @-`), BL-057 (several `-d` joined with
   `&`), BL-058 (`-u user` password prompt). task-planner reported duplicated IDs already
   on the board (BL-050 to BL-053); not touched here.
 - Tests: `Curl.Cli.UnitTests` 184 passed; full solution build clean and every fast test

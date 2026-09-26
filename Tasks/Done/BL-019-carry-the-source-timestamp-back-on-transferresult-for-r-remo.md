@@ -88,7 +88,7 @@ Run notes (2026-09-26, dark factory lane 4):
 - Truncation keeps the timestamp's offset and drops sub-second ticks
   (`Ticks - Ticks % TicksPerSecond`).
 - `Requirements.md` FR-011 updated: the value is now carried; applying it is the open gap.
-- Follow-up filed: BL-053 applies `-R` to the output file.
+- Follow-up filed: BL-079 applies `-R` to the output file.
 
 ## Log
 

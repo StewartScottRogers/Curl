@@ -133,7 +133,7 @@ WILL SGA, DO SGA).
 - An upload still pending when the server closes is abandoned (cancelled, not awaited),
   so an idle console cannot hold the session open; its faults are observed. An upload
   read failure does not end the session. Connection and output I/O failures are not
-  mapped to exit codes yet: filed as BL-051.
+  mapped to exit codes yet: filed as BL-077.
 - The follow-up was filed with the board script directly rather than through
   `task-planner`, to keep the unattended run short.
 

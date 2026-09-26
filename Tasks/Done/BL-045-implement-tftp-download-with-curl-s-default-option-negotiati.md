@@ -111,7 +111,7 @@ Choices made unattended (sensible defaults):
   at 512. Not measured against curl.
 - A datagram shorter than 4 bytes, an unexpected opcode, or a DATA block other than the
   one expected is ignored, and the handler waits for the next datagram. How curl re-ACKs
-  duplicates and treats foreign endpoints is part of BL-051.
+  duplicates and treats foreign endpoints is part of BL-075.
 - A failed open is returned as `TransferResult.Failure(code, message)`, which reports
   `BytesTransferred` 0.
 
@@ -123,7 +123,7 @@ Python UDP servers:
 - DATA 1 (512 bytes) from a new port and then silence, with `--connect-timeout 10`: the
   RRQ carried `timeout 3`. curl sent ACK 1 at 0 s and re-sent it to the transfer port at
   6.06, 12.03 and 18.08 s, then ended at about 25 s with exit 28 `Timeout was reached`.
-- Filed as **BL-051** (retransmission, timeout, duplicate DATA, foreign endpoints).
+- Filed as **BL-075** (retransmission, timeout, duplicate DATA, foreign endpoints).
 
 ## Log
 

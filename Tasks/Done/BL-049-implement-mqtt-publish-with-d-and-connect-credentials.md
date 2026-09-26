@@ -76,7 +76,7 @@ Delivered (2026-09-26, dark factory lane 1):
   given; UTF-8 is what a .NET string round-trips to and matches a UTF-8 console.
 - Choice: a failed DISCONNECT send is exit 55 like any other send, as curl's
   `mqtt_disconnect` returns its send result.
-- Housekeeping outside `touches`: BL-056's Context still names
+- Housekeeping outside `touches`: BL-081's Context still names
   `MqttSubscribeSession.cs`; it is now `MqttSession.cs`.
 - Mqtt fast tests 61, all green; `Curl.Protocol.Mqtt.UnitLibrary` at 100% line and
   branch coverage.

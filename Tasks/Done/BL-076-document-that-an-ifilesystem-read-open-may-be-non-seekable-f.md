@@ -1,5 +1,5 @@
 ---
-id: BL-051
+id: BL-076
 title: Document that an IFileSystem read open may be non-seekable for a device
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed: 2026-09-26
 ---
-# BL-051 — Document that an IFileSystem read open may be non-seekable for a device
+# BL-076 — Document that an IFileSystem read open may be non-seekable for a device
 
 ## Goal
 

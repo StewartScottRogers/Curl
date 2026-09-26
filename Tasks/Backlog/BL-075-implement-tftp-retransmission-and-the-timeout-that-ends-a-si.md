@@ -1,5 +1,5 @@
 ---
-id: BL-051
+id: BL-075
 title: Implement TFTP retransmission and the timeout that ends a silent transfer
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-051 — Implement TFTP retransmission and the timeout that ends a silent transfer
+# BL-075 — Implement TFTP retransmission and the timeout that ends a silent transfer
 
 ## Goal
 
@@ -88,3 +88,4 @@ UDP servers written in Python:
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Backlog. Returned when the 4-lane shift was stopped to repair task IDs that parallel lanes had duplicated; no lane was working it.

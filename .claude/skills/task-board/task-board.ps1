@@ -19,6 +19,11 @@
       new      Create a task in Backlog from TASK-TEMPLATE.md.
       move     Move a task to another state, appending a Log line.
       archive  Move finished tasks into Done\<yyyy-MM-dd_HHmm>\.
+      dedupe   Renumber tasks that share an ID with another. A task file that exists
+               at -Since (a git ref; the shared branch before this lane's work) keeps
+               its ID; the others get the next free IDs, and the old ID is rewritten in
+               every Markdown file changed since -Since. Dark factory lanes run it
+               after rebasing, before they push.
 
     Keep this file ASCII only: Windows PowerShell 5.1 reads a script without a
     byte-order mark in the system code page, so a non-ASCII literal would be
@@ -39,7 +44,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true, Position = 0)]
-    [ValidateSet('status', 'next', 'next-id', 'new', 'move', 'archive')]
+    [ValidateSet('status', 'next', 'next-id', 'new', 'move', 'archive', 'dedupe')]
     [string] $Command,
 
     [string] $Id,
@@ -68,6 +73,9 @@ param(
 
     # Task IDs 'next' must not offer, e.g. ones a lane already tried this shift.
     [string[]] $Skip = @(),
+
+    # For 'dedupe': the git ref whose task files keep their IDs.
+    [string] $Since = '',
 
     [string] $Requirement = 'none',
 
@@ -182,6 +190,12 @@ function Find-Task([object[]] $Tasks, [string] $TaskId) {
     if (-not $TaskId) { throw 'Name the task with -Id, for example -Id BL-007.' }
     $wanted = $TaskId.Trim().ToUpperInvariant()
     $live = @($Tasks | Where-Object { $_.Id -eq $wanted -and -not $_.Archived })
+    if ($live.Count -gt 1) {
+        # Acting on the first match would move the wrong task. Parallel lanes can file the
+        # same ID; 'dedupe' renumbers the later ones.
+        $where = ($live | ForEach-Object { $_.Relative }) -join ', '
+        throw "$wanted names $($live.Count) tasks ($where). Renumber the duplicates with the 'dedupe' command first."
+    }
     if ($live.Count -gt 0) { return $live[0] }
     if (@($Tasks | Where-Object { $_.Id -eq $wanted }).Count -gt 0) {
         throw "$wanted is archived. Archived tasks are never changed; file a new task instead."
@@ -397,6 +411,48 @@ switch ($Command) {
         Write-Text $task.Path $text
         Move-Item -LiteralPath $task.Path -Destination $destination
         Write-Output "$($task.Id)  $from -> $To  Tasks\$To\$fileName"
+    }
+
+    'dedupe' {
+        if (-not $Since) { throw 'Name the shared ref with -Since, for example -Since origin/work/dark-factory.' }
+        # git reports "not in <ref>" on stderr, which is the answer here, not a failure;
+        # under 'Stop' Windows PowerShell would turn it into a terminating error.
+        $ErrorActionPreference = 'Continue'
+        $tasks = Get-Tasks
+        $changed = @(& git -C $RepoRoot diff --name-only "$Since" -- '*.md' 2>$null | Where-Object { $_ } |
+            ForEach-Object { Join-Path $RepoRoot $_ } | Where-Object { Test-Path -LiteralPath $_ })
+        $renamed = 0
+        foreach ($group in @($tasks | Where-Object { -not $_.Archived } | Group-Object Id | Where-Object { $_.Count -gt 1 })) {
+            $shared = @(); $mine = @()
+            foreach ($task in $group.Group) {
+                $relative = $task.Path.Substring($RepoRoot.Length).TrimStart('\', '/').Replace([string][char]92, '/')
+                & git -C $RepoRoot cat-file -e "${Since}:$relative" 2>$null
+                if ($LASTEXITCODE -eq 0) { $shared += $task } else { $mine += $task }
+            }
+            # With nothing shared (both new), the first keeps the ID.
+            if ($shared.Count -eq 0) { $mine = @($mine | Select-Object -Skip 1) }
+            foreach ($task in $mine) {
+                $old = $task.Id
+                $new = Get-NextId (Get-Tasks)
+                $text = Read-Text $task.Path
+                $text = [regex]::Replace($text, "(?m)^id: $old\b", "id: $new")
+                $text = [regex]::Replace($text, "(?m)^# $old\b", "# $new")
+                Write-Text $task.Path $text
+                $target = Join-Path (Split-Path $task.Path -Parent) ((Split-Path $task.Path -Leaf) -replace "^$old", $new)
+                Move-Item -LiteralPath $task.Path -Destination $target
+                # This lane's other changes that mention the old ID meant this task.
+                foreach ($file in $changed) {
+                    if ($file -eq $task.Path -or -not (Test-Path -LiteralPath $file)) { continue }
+                    $body = Read-Text $file
+                    $updated = [regex]::Replace($body, "\b$old\b", $new)
+                    if ($updated -ne $body) { Write-Text $file $updated }
+                }
+                $changed = @($changed | ForEach-Object { if ($_ -eq $task.Path) { $target } else { $_ } })
+                Write-Output "$old -> $new  $($task.Title)"
+                $renamed++
+            }
+        }
+        if ($renamed -eq 0) { Write-Output 'No duplicate IDs.' }
     }
 
     'archive' {

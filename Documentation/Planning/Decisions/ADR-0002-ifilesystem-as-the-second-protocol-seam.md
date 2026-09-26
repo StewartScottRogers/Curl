@@ -127,7 +127,7 @@ libcurl 8.21.0:
   `Last-Modified: Thu, 01 Jan 1970 00:00:00 GMT` — so it rests on the upstream source,
   not on a measurement.
 
-## Amendment, 2026-09-26 — a read open may be non-seekable (BL-051)
+## Amendment, 2026-09-26 — a read open may be non-seekable (BL-076)
 
 A read open is seekable for a regular file, not for every path. `PhysicalFileSystem`
 (BL-009) opens a character device or a FIFO — `NUL` on Windows, `/dev/stdin` elsewhere

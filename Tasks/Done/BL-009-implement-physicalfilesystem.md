@@ -71,7 +71,7 @@ It wraps `System.IO.File` and `FileInfo` behind the `IFileSystem` contract from
   per ADR-0002. That drops `Last-Modified` where curl 8.21.0 on Windows prints the
   epoch; filed as BL-052.
 - The `IFileSystem`/`FileOpenResult` docs still call a read open always seekable; that
-  is outside this task's `touches`, so it is filed as BL-051.
+  is outside this task's `touches`, so it is filed as BL-076.
 - Coverage: `Curl.Core.UnitLibrary` is 100% line and branch with the Integration tests
   in the run; `PhysicalFileSystem` itself is exercised only there, by design (ADR-0002).
 - `Curl.Core.UnitLibrary.csproj` gained `InternalsVisibleTo Curl.Core.UnitTests`, the

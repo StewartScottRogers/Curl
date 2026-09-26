@@ -72,7 +72,7 @@ upload.
   reads as it takes, so a pipe that delivers in small pieces still sends full blocks.
 - New `TftpUpload` beside `TftpDownload`; `TftpPackets` gained `BuildWriteRequest` and
   `BuildData` (read and write requests share one builder). Library coverage stays 100%
-  line and branch. Retransmission is still BL-051.
+  line and branch. Retransmission is still BL-075.
 
 ## Log
 

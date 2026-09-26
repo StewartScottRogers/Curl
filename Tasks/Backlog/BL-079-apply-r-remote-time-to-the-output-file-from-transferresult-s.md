@@ -1,16 +1,16 @@
 ---
-id: BL-053
+id: BL-079
 title: Apply -R/--remote-time to the output file from TransferResult.SourceLastWriteTimeUtc
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-019, BL-009]
+depends-on: [BL-019, BL-009, BL-068]
 touches: [Curl.Core.UnitLibrary, Curl.Core.UnitTests, Curl.Console]
 requirement: FR-011
 created: 2026-09-26
 completed:
 ---
-# BL-053 — Apply -R/--remote-time to the output file from TransferResult.SourceLastWriteTimeUtc
+# BL-079 — Apply -R/--remote-time to the output file from TransferResult.SourceLastWriteTimeUtc
 
 ## Goal
 

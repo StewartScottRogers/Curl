@@ -38,7 +38,7 @@ The refusal texts, measured with the local curl 8.21.0 on 2026-09-26 and asserte
 `expected a positive numerical parameter`, each as `curl: option <spelled>: <reason>`
 followed by `curl: try 'curl --help' or 'curl --manual' for more information`.
 
-Write only what the code does at the time this task runs. BL-050 to BL-054 extend the
+Write only what the code does at the time this task runs. BL-074, BL-051, BL-078, BL-053 and BL-054 extend the
 parser; describe their behaviour only if they are in `Done` by then, and otherwise
 mention them only as open gaps with their task IDs, in the same style as FR-006.
 BL-033 (in Doing when this was filed) also adds requirements, so take the next free

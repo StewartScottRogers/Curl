@@ -102,9 +102,9 @@ align-and-document, one fix round):
   Fast tests are green: 152 in Curl.Cli.UnitTests, 305 in the solution. Every `CommandLine*`
   type has 100% line and branch coverage.
 - Follow-ups filed:
-  - BL-050: refuse a command line with no URL.
+  - BL-074: refuse a command line with no URL.
   - BL-051: warn when a filename argument looks like a flag.
-  - BL-052: warn when there are more output options than URLs.
+  - BL-078: warn when there are more output options than URLs.
   - BL-053: numeric ceiling (Stewart).
   - BL-054: `--no-` negation.
   - BL-055: wiki, glossary and requirements.

@@ -1,5 +1,5 @@
 ---
-id: BL-052
+id: BL-078
 title: Warn when there are more output options than URLs
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-052 — Warn when there are more output options than URLs
+# BL-078 — Warn when there are more output options than URLs
 
 ## Goal
 

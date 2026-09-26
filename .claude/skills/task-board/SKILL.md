@@ -89,6 +89,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .claude/skills/task-board/ta
 | `next-id` | | The next free ID. |
 | `new` | `-Title` (required), `-Priority`, `-Assignee`, `-Pipeline`, `-DependsOn BL-001,BL-002`, `-Requirement` | Creates the task in `Backlog` from `TASK-TEMPLATE.md` and prints its path. Fill in the body with an edit afterwards. |
 | `move` | `-Id`, `-To`, `-Reason` | Validates the transition, appends the `Log` line, and moves the file. `-Reason` is required for every destination except `Doing`. |
+| `dedupe` | `-Since <git ref>` | Renumbers tasks that share an ID: files present at the ref keep it, the rest get the next free IDs, and the old ID is rewritten in Markdown changed since the ref. Parallel lanes number tasks from their own copy of the board, so each lane runs this after rebasing, before it pushes. |
 | `archive` | `-OlderThanDays` (default 7; 0 for all) | Moves finished tasks into a new `Done/<yyyy-MM-dd_HHmm>/` folder. |
 
 The script refuses:
@@ -97,6 +98,7 @@ The script refuses:
 - claiming a task assigned to Stewart, or one whose dependencies are not done
 - moving to `Done` while any `- [ ]` box is unticked
 - touching an archived task
+- acting on an ID that names more than one live task (run `dedupe` first)
 
 Do not work around a refusal. It is telling you something about the task.
 

@@ -42,7 +42,7 @@ a leading `-` alone, or by something narrower, must be measured with the local c
 (for example `-o -`, which curl treats as stdout, and `-o -x`) before the rule is coded;
 record what was measured in the XML documentation of the code that decides it.
 
-BL-052 (more output options than URLs) will append to the same warning list.
+BL-078 (more output options than URLs) will append to the same warning list.
 
 ## Acceptance criteria
 

@@ -121,7 +121,7 @@ and loopback measurements on 2026-09-26:**
   through non-ASCII characters, which `Uri` percent-encodes.
 - Other empty packets are passed over. curl's state machine does something odder with
   them (an empty PUBLISH then a PUBLISH measured exit 0, nothing written); filed as
-  BL-056 rather than widening this task.
+  BL-081 rather than widening this task.
 
 **Gates.** 43 tests; `Measure-CodeQuality.ps1 -Library Curl.Protocol.Mqtt.UnitLibrary`:
 100% line, 100% branch, worst CRAP 8, no method over complexity 10. A code-reviewer pass

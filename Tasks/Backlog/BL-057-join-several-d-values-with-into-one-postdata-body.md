@@ -35,7 +35,7 @@ Keep the change inside `CommandLineOptions` (append rather than replace) and the
 row of `CommandLineOptionTable`; the parser does not special-case an option (see
 `Curl.Cli.UnitLibrary/CLAUDE.md`). Update the `PostData` and `SetPostData` XML doc
 comments and any line in `Curl.Cli.UnitLibrary/README.md` that says the last `-d` wins.
-`-d @file` reading is BL-056; if it has landed, a file-sourced piece joins like any other.
+`-d @file` reading is BL-080; if it has landed, a file-sourced piece joins like any other.
 
 ## Acceptance criteria
 

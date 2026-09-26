@@ -1,5 +1,5 @@
 ---
-id: BL-050
+id: BL-074
 title: Refuse a command line that names no URL with exit 2
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-050 — Refuse a command line that names no URL with exit 2
+# BL-074 — Refuse a command line that names no URL with exit 2
 
 ## Goal
 

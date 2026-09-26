@@ -48,8 +48,8 @@ Design constraints:
   the prompt to standard error and reads without echo (`Console.ReadKey(intercept: true)`);
   keep it a thin pass-through so the logic under test lives in the parser, and if it
   cannot reach 100% coverage without a console, say so in `Notes`.
-- Keep `Parse(IReadOnlyList<string>)` working. BL-056 adds a file and stdin reader seam to
-  the same entry point; whichever of BL-056 and BL-058 lands second extends the first's
+- Keep `Parse(IReadOnlyList<string>)` working. BL-080 adds a file and stdin reader seam to
+  the same entry point; whichever of BL-080 and BL-058 lands second extends the first's
   entry point rather than adding another overload.
 - The split at the first colon is unchanged for values that contain one.
 

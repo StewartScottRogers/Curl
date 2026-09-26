@@ -1,5 +1,5 @@
 ---
-id: BL-056
+id: BL-080
 title: Read -d @file and -d @- from an injected file and stdin reader
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-056 — Read -d @file and -d @- from an injected file and stdin reader
+# BL-080 — Read -d @file and -d @- from an injected file and stdin reader
 
 ## Goal
 
@@ -61,7 +61,7 @@ Design constraints:
   decode and re-encode.
 - Joining several `-d` values with `&` is BL-057. If BL-057 has landed, a file-sourced
   piece joins like any other; otherwise the last `-d` still wins.
-- BL-058 adds a password-prompt seam to the same parser entry point; whichever of BL-056
+- BL-058 adds a password-prompt seam to the same parser entry point; whichever of BL-080
   and BL-058 lands second extends the first's entry point rather than adding another
   overload.
 

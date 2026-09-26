@@ -120,7 +120,7 @@ Every table row in `Context` reproduced exactly. Additionally:
   to itself, as curl keeps it.
 - Read failures and `Output` write failures still surface as exceptions rather than
   curl's exit 56 and 23; mapping them is outside this task's criteria (see Telnet's
-  BL-051 for the same work there).
+  BL-077 for the same work there).
 
 ## Log
 

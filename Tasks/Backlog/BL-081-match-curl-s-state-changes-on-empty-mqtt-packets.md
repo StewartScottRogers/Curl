@@ -1,5 +1,5 @@
 ---
-id: BL-056
+id: BL-081
 title: Match curl's state changes on empty MQTT packets
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-056 — Match curl's state changes on empty MQTT packets
+# BL-081 — Match curl's state changes on empty MQTT packets
 
 ## Goal
 
@@ -67,3 +67,4 @@ fakes under `Curl.Protocol.Mqtt.UnitTests/Fakes/`; no test touches the network.
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Backlog. Returned when the 4-lane shift was stopped to repair task IDs that parallel lanes had duplicated; no lane was working it.

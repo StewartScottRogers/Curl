@@ -776,6 +776,15 @@ function Invoke-Integrate {
                     if (Test-Rebasing) { & git -C $Root rebase --abort 2>&1 | Out-Null; return 'rebase conflict the resolver could not settle' }
                 } else { return 'rebase failed' }
             }
+            # Lanes number the tasks they file from their own copy of the board, so two
+            # lanes can file the same ID. The other lane's is already shared and keeps it;
+            # ours are renumbered, with our own references, before anyone else sees them.
+            $dedupe = (Invoke-Board @('dedupe', '-Since', "origin/$Branch")) | Where-Object { $_ -match '->' }
+            if ($dedupe) {
+                Invoke-Git @('add', '-A') | Out-Null
+                Invoke-Git @('commit', '-q', '-m', "chore(tasks): renumber task IDs another lane took first`n`n$($dedupe -join "`n")") | Out-Null
+                foreach ($line in $dedupe) { Write-Trace $Id 'renum' $line 'DarkYellow' }
+            }
             if ($State -eq 'Done') {
                 $red = Test-Green
                 if ($red) { return "$red after rebasing onto the other lanes' work" }
