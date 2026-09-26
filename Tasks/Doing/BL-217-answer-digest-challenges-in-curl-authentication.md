@@ -34,3 +34,4 @@ Digest authentication answers challenges with MD5, SHA-256, SHA-512-256, the `-s
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
