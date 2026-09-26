@@ -37,3 +37,11 @@ yet wired into `Curl.Console`.
 scheme its host prefix implies (`ftp.`, `dict.`, `ldap.`, `imap.`, `smtp.`, `pop3.`, any
 case), otherwise `http`. It only prepends `<scheme>://`; rejecting a malformed URL is left
 to the URL parser. It is not yet wired into `Curl.Console`.
+
+`ProxySelector` chooses the `ProxyEndpoint` curl 8.21.0 would use for a URL from `-x`,
+`--noproxy` and the proxy environment variables (ADR-0023). It reads the environment only
+through the `Func<string, string?>` it is constructed with, asking for curl's exact names;
+production passes `Environment.GetEnvironmentVariable`, and tests pass a dictionary, never
+the real environment. `NoProxyMatcher` is the `--noproxy`/`NO_PROXY` list, and
+`ProxyUrlParser` turns proxy text into an endpoint or curl's exit 5 or 7 failure. It is not
+yet wired into `Curl.Console` (BL-238).
