@@ -40,7 +40,7 @@ namespace Curl.Cli;
 /// argument), <c>--no-output=x</c>, <c>--no-data</c>, <c>--no-dump-header</c>, <c>--no-range</c>, <c>--no-time-cond</c>,
 /// <c>--no-request</c>, <c>--no-header</c> (and <c>--no-header=x</c>), <c>--no-user-agent</c>, <c>--no-referer</c>,
 /// <c>--no-data-ascii</c>, <c>--no-data-binary</c>, <c>--no-data-raw</c>, <c>--no-data-urlencode</c>, <c>--no-json</c>,
-/// <c>--no-url-query</c> and <c>--no-max-redirs</c> (each also with <c>=x</c>) exit 2 with
+/// <c>--no-url-query</c>, <c>--no-max-redirs</c> and <c>--no-config</c> (each also with <c>=x</c>) exit 2 with
 /// <c>curl: option &lt;as typed&gt;: the given option cannot be reversed with a --no- prefix</c> and
 /// the try-help line. <c>--no-bogus</c>, <c>--no-</c>, <c>--no-no-silent</c> and <c>--no-Silent</c>
 /// exit 2 as unknown. A short letter is never negated.
@@ -102,6 +102,7 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("fail", 'f', SetFail),
         CommandLineOption.NegatableFlag("fail-with-body", null, SetFailWithBody),
         CommandLineOption.NegatableFlag("fail-early", null, (options, on) => options.FailEarly = on),
+        CommandLineOption.Value("config", 'K', ApplyConfigFile),
     ];
 
     /// <summary>The largest <c>--create-file-mode</c> curl 8.21.0 accepts: octal <c>0777</c>.</summary>
@@ -121,6 +122,17 @@ public static class CommandLineOptionTable
     /// parsed settings; those are <see cref="CommandLineOptions"/>.
     /// </summary>
     public static IReadOnlyList<CommandLineOption> Rows => RowsInTableOrder;
+
+    /// <summary>
+    /// Applies the <c>-K</c> / <c>--config</c> file the value names with <see cref="ConfigFileApplier"/>,
+    /// after curl's warning for a file name that looks like a flag. An empty value is not refused as
+    /// blank: curl 8.21.0 tries to read the empty file name and reports it unreadable (exit 26).
+    /// </summary>
+    private static CommandLineRefusal? ApplyConfigFile(CommandLineOptions options, string path, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        CommandLineOption.WarnWhenFileNameLooksLikeFlag(options, path);
+        return ConfigFileApplier.ApplyFile(options, path, spelledOption, pathExists, dataFileReader);
+    }
 
     /// <summary>
     /// Builds an applier that accepts any value, empty included, as curl 8.21.0 does for

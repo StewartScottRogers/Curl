@@ -22,9 +22,11 @@ namespace Curl.Cli;
 /// (<c>curl -u bob</c> prompts, then reports no URL; <c>curl -u bob --bogus</c> never prompts).
 /// A <c>-d</c> / <c>--data</c> value starting with <c>@</c> is read, while parsing, through the
 /// injected <see cref="IDataFileReader"/>: the file it names, or standard input for <c>@-</c>.
+/// A <c>-K</c> / <c>--config</c> file is read through the same reader and its lines applied in
+/// place of the option (see <see cref="ConfigFileApplier"/>).
 /// </summary>
 /// <remarks>
-/// It does not implement <c>-K</c>/<c>--config</c>, <c>.curlrc</c>, <c>--variable</c> or <c>--next</c>, and it
+/// It does not implement <c>.curlrc</c>, <c>--variable</c> or <c>--next</c>, and it
 /// neither validates URLs nor opens files itself. Checked against the local curl 8.21.0 on
 /// 2026-09-26; options per <see href="https://curl.se/docs/manpage.html"/>.
 /// </remarks>
@@ -71,7 +73,7 @@ public static class CommandLineParser
     /// <param name="arguments">The arguments; a <see langword="null"/> element reads as an empty argument.</param>
     /// <param name="pathExists">Reports whether a file or directory exists at a path.</param>
     /// <param name="passwordPrompt">Asks for the password of a <c>-u</c> user given without one; called at most once.</param>
-    /// <param name="dataFileReader">Reads the file, or standard input, a <c>-d</c> / <c>--data</c> value starting with <c>@</c> names.</param>
+    /// <param name="dataFileReader">Reads the file, or standard input, a <c>-d</c> / <c>--data</c> value starting with <c>@</c> or a <c>-K</c> / <c>--config</c> value names.</param>
     /// <returns>
     /// The parsed options, or the first refusal met; every refusal carries
     /// <see cref="Curl.Protocol.Abstractions.CurlExitCode.FailedInit"/>, except a <c>-d @file</c> that
@@ -228,6 +230,41 @@ public static class CommandLineParser
         reader.TryTakeNext(out string value)
             ? option.Apply(options, value, argument, reader.PathExists, reader.DataFileReader)
             : CommandLineRefusal.RequiresParameter(argument);
+
+    /// <summary>
+    /// Applies one line of a <c>-K</c> file as curl 8.21.0's <c>getparameter</c> does: an option that
+    /// starts with <c>-</c> but not <c>--</c> is a bundle of short letters, any other is a long name with
+    /// or without its <c>--</c> (so <c>--no-</c> and <c>--name=value</c> work as on the command line), and
+    /// <paramref name="parameter"/> is the one argument that may follow it. A non-empty parameter the
+    /// option does not take is refused with <see cref="CommandLineRefusal.UnusedConfigFileParameter"/>.
+    /// </summary>
+    /// <param name="options">The options being filled in.</param>
+    /// <param name="option">The option as written on the line.</param>
+    /// <param name="parameter">The line's parameter, or <see langword="null"/> when it has none.</param>
+    /// <param name="pathExists">The parse's path-existence check.</param>
+    /// <param name="dataFileReader">The parse's data file reader.</param>
+    /// <returns><see langword="null"/> when the line was applied; otherwise why it was refused.</returns>
+    internal static CommandLineRefusal? ApplyConfigFileLine(CommandLineOptions options, string option, string? parameter, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        ArgumentReader reader = new(parameter is null ? [] : [parameter], pathExists, dataFileReader);
+        CommandLineRefusal? refusal = ParseConfigFileOption(options, option, reader);
+        return refusal is null && !string.IsNullOrEmpty(parameter) && reader.TryTakeNext(out _)
+            ? CommandLineRefusal.UnusedConfigFileParameter(option)
+            : refusal;
+    }
+
+    /// <summary>Reads a <c>-K</c> file line's option as a short bundle when it starts with one <c>-</c>, else as a long name.</summary>
+    private static CommandLineRefusal? ParseConfigFileOption(CommandLineOptions options, string option, ArgumentReader reader)
+    {
+        if (option.StartsWith(EndOfOptions, StringComparison.Ordinal))
+        {
+            return ParseLong(options, option, reader);
+        }
+
+        return option.StartsWith('-')
+            ? ParseShortBundle(options, option, reader)
+            : ParseLong(options, EndOfOptions + option, reader);
+    }
 
     /// <summary>Reports whether a file or a directory exists at <paramref name="path"/>, as curl's check does.</summary>
     private static bool PathExistsOnDisk(string path) => Path.Exists(path);

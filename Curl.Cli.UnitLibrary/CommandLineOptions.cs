@@ -306,6 +306,12 @@ public sealed class CommandLineOptions
     internal bool ErrorsHidden => Silent && !ShowError;
 
     /// <summary>
+    /// How many <c>-K</c> / <c>--config</c> files are being read right now, one inside another; curl
+    /// refuses to open one more once <see cref="CommandLineRefusal.MaximumConfigFileDepth"/> are open.
+    /// </summary>
+    internal int OpenConfigFileCount { get; set; }
+
+    /// <summary>
     /// The warning lines met while reading the command line, in command-line order, without
     /// line terminators. <see cref="CommandLineParser"/> hands them to <see cref="CommandLineParseResult.WarningLines"/>.
     /// </summary>
