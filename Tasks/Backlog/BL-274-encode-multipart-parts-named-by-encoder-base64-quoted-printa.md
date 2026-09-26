@@ -1,5 +1,5 @@
 ---
-id: BL-269
+id: BL-274
 title: Encode multipart parts named by ;encoder= (base64, quoted-printable, 7bit, 8bit, binary)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-269 — Encode multipart parts named by ;encoder= (base64, quoted-printable, 7bit, 8bit, binary)
+# BL-274 — Encode multipart parts named by ;encoder= (base64, quoted-printable, 7bit, 8bit, binary)
 
 ## Goal
 

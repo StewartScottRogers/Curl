@@ -1,5 +1,5 @@
 ---
-id: BL-270
+id: BL-275
 title: Send -F parts read from standard input (@- and <-) in the multipart body
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-270 — Send -F parts read from standard input (@- and <-) in the multipart body
+# BL-275 — Send -F parts read from standard input (@- and <-) in the multipart body
 
 ## Goal
 
