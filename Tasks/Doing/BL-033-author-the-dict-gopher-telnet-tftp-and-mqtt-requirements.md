@@ -135,3 +135,4 @@ requirements carry measured facts rather than recollections of the C source.
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
