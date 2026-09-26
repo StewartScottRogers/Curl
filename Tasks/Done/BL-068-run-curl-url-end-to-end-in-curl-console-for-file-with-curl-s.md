@@ -141,7 +141,7 @@ it through handlers registered by an explicit, hand-written composition root.
   scoped them out - scheme guessing for a URL with no `scheme://` (today exit 3), and
   Ctrl+C cancellation. A flush or close failure on the `-o` file at the end is not mapped to
   exit 23; nothing measured it yet.
-- Follow-up filed: BL-083 (curl's `Warning: Failed to open the file <path>: <reason>`
+- Follow-up filed: BL-087 (curl's `Warning: Failed to open the file <path>: <reason>`
   line when `-s` is not given).
 
 ## Log

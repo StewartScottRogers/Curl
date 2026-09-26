@@ -1,5 +1,5 @@
 ---
-id: BL-083
+id: BL-087
 title: Print curl's Failed to open the file warning when an -o file cannot be created
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-083 — Print curl's Failed to open the file warning when an -o file cannot be created
+# BL-087 — Print curl's Failed to open the file warning when an -o file cannot be created
 
 ## Goal
 
