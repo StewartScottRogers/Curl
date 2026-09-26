@@ -4,10 +4,16 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Protocol.Telnet;
 
 /// <summary>
-/// Reads the <c>-t</c>/<c>--telnet-option</c> values, <c>NAME=VALUE</c> each, as curl
-/// 8.21.0's <c>lib/telnet.c</c> does once connected and before sending a byte.
+/// Reads the <c>-u</c>/<c>--user</c> user name and the <c>-t</c>/<c>--telnet-option</c>
+/// values, <c>NAME=VALUE</c> each, as curl 8.21.0's <c>lib/telnet.c</c> does once connected
+/// and before sending a byte.
 /// </summary>
 /// <remarks>
+/// <para>
+/// A user name, empty included, becomes the first NEW-ENVIRON variable, <c>USER</c>, cut
+/// to 250 characters as curl cuts it. A user name with any non-ASCII character is exit 43,
+/// before any <c>-t</c> option is read.
+/// </para>
 /// <para>
 /// The names are <c>TTYPE</c>, <c>XDISPLOC</c>, <c>NEW_ENV</c>, <c>WS</c> and
 /// <c>BINARY</c>, matched ignoring case. <c>WS</c> is checked as curl checks it and
@@ -39,20 +45,40 @@ internal static class TelnetOptionParser
 
     private const string UnknownOptionMessage = "An unknown option was passed in to libcurl";
 
+    private const string BadFunctionArgumentMessage = "A libcurl function was given a bad argument";
+
+    /// <summary>
+    /// The most user name characters curl 8.21.0 sends: it formats <c>USER,</c> and the
+    /// name into a 256-byte buffer, so 255 characters with the terminating NUL.
+    /// </summary>
+    private const int MaximumUserNameLength = 250;
+
     /// <summary>The known names; no two are the same length, as curl relies on.</summary>
     private static readonly string[] KnownNames =
         [TerminalTypeName, XDisplayLocationName, NewEnvironmentName, WindowSizeName, BinaryName];
 
     /// <summary>
-    /// Reads every option into <paramref name="values" />, in order.
+    /// Reads the user name, then every option, into <paramref name="values" />, in order.
     /// </summary>
+    /// <param name="userName">The <c>-u</c> user name, or <see langword="null" /> without <c>-u</c>.</param>
     /// <param name="options">The <c>-t</c> values, verbatim.</param>
-    /// <param name="values">Receives what the options supplied.</param>
+    /// <param name="values">Receives what the user name and the options supplied.</param>
     /// <returns>
-    /// <see langword="null" />, or the failure the first bad option ends the transfer with.
+    /// <see langword="null" />, or the failure a non-ASCII user name or the first bad option
+    /// ends the transfer with.
     /// </returns>
-    public static TransferResult? Parse(IReadOnlyList<string> options, TelnetOptionValues values)
+    public static TransferResult? Parse(string? userName, IReadOnlyList<string> options, TelnetOptionValues values)
     {
+        if (userName is not null)
+        {
+            if (!Ascii.IsValid(userName))
+            {
+                return new TransferResult(CurlExitCode.BadFunctionArgument, 0, BadFunctionArgumentMessage);
+            }
+
+            values.EnvironmentVariables.Add($"USER,{userName[..Math.Min(userName.Length, MaximumUserNameLength)]}");
+        }
+
         foreach (string option in options)
         {
             TransferResult? failure = ParseOption(option, values);

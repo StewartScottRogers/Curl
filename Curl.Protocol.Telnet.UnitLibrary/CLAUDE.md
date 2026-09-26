@@ -25,7 +25,8 @@ stream with no network.
 - `TelnetOptionSide` is RFC 1143 option state for one side of the connection.
 - `TelnetOptionParser` reads `ITransferContext.TelnetOptions` (`-t`) into
   `TelnetOptionValues` once connected, refusing a bad option with exit 48 or 49
-  before a byte is sent. `TTYPE`, `XDISPLOC` and `NEW_ENV` are negotiated; `BINARY=0`
+  before a byte is sent. It first adds the `-u` user name as the NEW-ENVIRON variable
+  `USER`, refusing a non-ASCII one with exit 43. `TTYPE`, `XDISPLOC` and `NEW_ENV` are negotiated; `BINARY=0`
   refuses BINARY both ways; `WS` is checked as curl checks it and otherwise ignored.
 
 A connection read that fails ends the session with exit 0, a send that fails with
@@ -33,6 +34,6 @@ exit 55 and an output write that fails with exit 23, as curl 8.21.0 on Windows d
 (measured in BL-077's Notes).
 
 Every byte these classes send or write was measured against curl 8.21.0; the
-captures are in BL-043's, BL-044's, BL-077's and BL-083's Notes and pinned by `TelnetProtocolHandlerTests`
-and `TelnetProtocolHandlerTelnetOptionTests`. Change behaviour only against a new
+captures are in BL-043's, BL-044's, BL-077's, BL-083's and BL-084's Notes and pinned by `TelnetProtocolHandlerTests`,
+`TelnetProtocolHandlerTelnetOptionTests` and `TelnetProtocolHandlerUserNameTests`. Change behaviour only against a new
 measurement.

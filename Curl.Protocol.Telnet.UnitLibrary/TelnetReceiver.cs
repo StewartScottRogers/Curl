@@ -26,15 +26,16 @@ namespace Curl.Protocol.Telnet;
 /// </para>
 /// <para>
 /// Each of <c>TTYPE</c>, <c>XDISPLOC</c> and <c>NEW-ENVIRON</c> that a <c>-t</c> option
-/// gave a value for is one more option this side performs when asked, and offers after
-/// SGA, in option-number order, with <c>IAC WILL</c>.
+/// (or, for <c>NEW-ENVIRON</c>, the <c>-u</c> user name) gave a value for is one more
+/// option this side performs when asked, and offers after SGA, in option-number order,
+/// with <c>IAC WILL</c>.
 /// </para>
 /// <para>
 /// A subnegotiation is removed from the output. A <c>TTYPE</c> or <c>XDISPLOC</c> one is
 /// answered with <c>IS</c> and the value <c>-t</c> gave; with none it ends the session,
 /// and so does a value over 1000 characters. A <c>NEW-ENVIRON</c> one is answered with an
-/// <c>IS</c> list of every <c>NEW_ENV</c> variable that fits, empty when <c>-t</c> gave
-/// none. Any other is ignored.
+/// <c>IS</c> list of every variable that fits, <c>USER</c> first when a user name was
+/// given, then each <c>NEW_ENV</c>; empty when neither gave one. Any other is ignored.
 /// </para>
 /// </remarks>
 internal sealed class TelnetReceiver

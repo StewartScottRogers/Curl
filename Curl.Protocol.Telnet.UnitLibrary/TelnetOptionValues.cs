@@ -1,8 +1,8 @@
 namespace Curl.Protocol.Telnet;
 
 /// <summary>
-/// The values the <c>-t</c>/<c>--telnet-option</c> options supplied, as
-/// <see cref="TelnetOptionParser" /> read them: what this side answers a <c>TTYPE</c>,
+/// The values the <c>-t</c>/<c>--telnet-option</c> options and the <c>-u</c> user name
+/// supplied, as <see cref="TelnetOptionParser" /> read them: what this side answers a <c>TTYPE</c>,
 /// <c>XDISPLOC</c> or <c>NEW-ENVIRON</c> subnegotiation with.
 /// </summary>
 internal sealed class TelnetOptionValues
@@ -20,7 +20,8 @@ internal sealed class TelnetOptionValues
     public string? XDisplayLocation { get; set; }
 
     /// <summary>
-    /// Gets each <c>NEW_ENV=</c> value in command-line order: <c>NAME,VALUE</c>, or
+    /// Gets <c>USER,</c> and the <c>-u</c> user name first when one was given, then each
+    /// <c>NEW_ENV=</c> value in command-line order: <c>NAME,VALUE</c>, or
     /// <c>NAME</c> alone for a variable sent without a value.
     /// </summary>
     public List<string> EnvironmentVariables { get; } = [];

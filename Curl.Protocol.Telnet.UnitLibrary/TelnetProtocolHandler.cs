@@ -38,9 +38,11 @@ namespace Curl.Protocol.Telnet;
 /// exit 23 (<see cref="CurlExitCode.WriteError" />).
 /// </para>
 /// <para>
-/// <see cref="ITransferContext.TelnetOptions" /> is read by <see cref="TelnetOptionParser" />
-/// once connected, as curl reads it: a bad option ends the transfer with exit 48 or 49
-/// before a byte is sent.
+/// The <see cref="ITransferContext.Credentials" /> user name and
+/// <see cref="ITransferContext.TelnetOptions" /> are read by <see cref="TelnetOptionParser" />
+/// once connected, as curl reads them: the user name is sent as the NEW-ENVIRON variable
+/// <c>USER</c>, a non-ASCII one ends the transfer with exit 43, and a bad option with
+/// exit 48 or 49, before a byte is sent.
 /// </para>
 /// </remarks>
 public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandler
@@ -99,7 +101,10 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
         await using (connection.ConfigureAwait(false))
         {
             var optionValues = new TelnetOptionValues();
-            TransferResult? optionFailure = TelnetOptionParser.Parse(context.TelnetOptions, optionValues);
+            TransferResult? optionFailure = TelnetOptionParser.Parse(
+                context.Credentials?.UserName,
+                context.TelnetOptions,
+                optionValues);
             return optionFailure
                 ?? await RunSessionAsync(connection, context, optionValues).ConfigureAwait(false);
         }
