@@ -70,6 +70,20 @@ Costs and caveats:
   network." — is currently identical across all 16 protocol `CLAUDE.md` files. It
   remains correct for the other 15; only `Curl.Protocol.File.UnitLibrary/CLAUDE.md`
   is amended by this ADR.
+- **Added 2026-09-26 (BL-026):** every `IFileSystem` implementation, starting with
+  `PhysicalFileSystem` (BL-009), must return `FileOpenResult.Failed` with a
+  `FileAccessStatus` for every reason an open can fail, and let no exception escape
+  either open member except an `OperationCanceledException` from the
+  `CancellationToken`. `FileUrlPath` forwards paths the operating system may reject
+  (`c|/Windows`, a literal `%`), so a `System.IO`-based implementation has to absorb
+  `ArgumentException`, `NotSupportedException`, `PathTooLongException`,
+  `DirectoryNotFoundException`, `FileNotFoundException`,
+  `UnauthorizedAccessException` and `IOException`. Whatever the operating-system
+  error, a failed read open is exit 37 and a failed write open is exit 23
+  (<https://curl.se/libcurl/c/libcurl-errors.html>, curl 8.21.0); an escaped
+  exception would turn either into a crash and break `FileProtocolHandler`'s promise
+  never to throw a transfer failure. The full statement lives in
+  `Curl.Protocol.Abstractions.UnitLibrary/CLAUDE.md`.
 
 ## Alternatives considered
 
