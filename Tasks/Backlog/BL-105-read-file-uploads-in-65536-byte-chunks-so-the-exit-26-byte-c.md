@@ -1,5 +1,5 @@
 ---
-id: BL-100
+id: BL-105
 title: Read file:// uploads in 65536-byte chunks so the exit 26 byte count matches curl
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-100 — Read file:// uploads in 65536-byte chunks so the exit 26 byte count matches curl
+# BL-105 — Read file:// uploads in 65536-byte chunks so the exit 26 byte count matches curl
 
 ## Goal
 
