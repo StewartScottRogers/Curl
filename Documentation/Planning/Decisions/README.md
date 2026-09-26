@@ -37,6 +37,7 @@ choices do not need one.
 | [0020](ADR-0020-compressed-advertises-deflate-gzip-and-br-until-a-zstd-decoder-exists.md) | `--compressed` advertises `deflate, gzip, br` until a zstd decoder exists | Accepted | 2026-09-26 |
 | [0021](ADR-0021-v-version-keeps-curls-format-and-lists-only-what-curl-implements.md) | `-V`/`--version` keeps curl's format and version number and lists only what Curl implements, on each platform | Accepted | 2026-09-26 |
 | [0022](ADR-0022-basic-and-bearer-credentials-are-sent-as-the-platform-curl-sends-them.md) | Basic and Bearer credentials are sent as the platform curl sends them: the ANSI code page on Windows, UTF-8 elsewhere, pre-emptively only for exactly one scheme | Accepted | 2026-09-26 |
+| [0023](ADR-0023-the-connector-tunnels-through-an-http-proxy-as-curl-8-21-0-does.md) | The connector tunnels through an HTTP proxy as curl 8.21.0 does: measured CONNECT bytes, exit 7/56/5 as measured, HTTPS and SOCKS proxies not yet | Accepted | 2026-09-26 |
 
 ## Template
 
