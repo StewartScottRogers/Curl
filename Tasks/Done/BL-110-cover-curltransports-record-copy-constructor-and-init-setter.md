@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-110 — Cover CurlTransports' record copy constructor and init setters in Curl.Console tests
 
@@ -45,21 +45,34 @@ production code; if that proves impossible, stop and move the task to `Blocked` 
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Console.UnitTests` (for example
+- [x] A test in `Curl.Console.UnitTests` (for example
   `CurlTransports_WithExpression_ReplacesNamedPropertyAndCopiesTheRest`) uses `with` on a
   `CurlTransports` from `CurlComposition.CreateTransports`, sets each of the seven properties,
   and passes.
-- [ ] `dotnet build Curl.Console.UnitTests -warnaserror` is clean.
-- [ ] `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` passes.
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Console` (after a test
+- [x] `dotnet build Curl.Console.UnitTests -warnaserror` is clean.
+- [x] `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` passes.
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Console` (after a test
   run, or with `-SkipTestRun` on fresh coverage) reports `Curl.Console` at 100% line and 100%
   branch with 0 failing members.
-- [ ] No `[ExcludeFromCodeCoverage]` attribute is added anywhere, and no file outside
+- [x] No `[ExcludeFromCodeCoverage]` attribute is added anywhere, and no file outside
   `Curl.Console.UnitTests` changes.
 
 ## Notes
+
+- The tests live in a new `Curl.Console.UnitTests\CurlTransportsTests.cs`, not in
+  `CurlCompositionTests`, because the testing rules ask for one test class per production
+  class. Two tests: `CurlTransports_WithExpressionNamingEveryProperty_ReplacesEachProperty`
+  (one `with` naming all seven; covers the copy constructor and every `init` setter) and
+  `CurlTransports_WithExpressionNamingOneProperty_CopiesTheRest` (the carry-over half).
+- `CreateTransports` always returns `TimeProvider.System`, so a second call cannot supply a
+  distinguishable clock; a private empty `ReplacementTimeProvider : TimeProvider` gives a
+  distinct instance. `TlsClientOptions` is a record with value equality, so the replacement
+  is `with { Insecure = true }` and the test asserts that flag.
+- Measured: `Measure-CodeQuality.ps1 -Library Curl.Console` reports 100% line, 100% branch,
+  105 members, 0 failing, worst CRAP 10. `Curl.Console.UnitTests`: 156 passed.
 
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. Curl.Console is at 100% line and branch coverage; CurlTransports' copy constructor and init setters are tested
