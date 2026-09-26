@@ -52,10 +52,18 @@ namespace Curl.Protocol.File;
 /// disagrees with itself in the same way.
 /// </para>
 /// <para>
-/// Of the options on <see cref="ITransferContext" />,
-/// <see cref="ITransferContext.TimeProvider" /> is deliberately unused: nothing in a
-/// local file transfer is timed or retried, and <c>-z</c> compares against the timestamp
-/// the open reported rather than against now.
+/// Of the options on <see cref="ITransferContext" />, the download path ignores
+/// <see cref="ITransferContext.ConvertLineEndings" /> and
+/// <see cref="ITransferContext.CreateFileMode" />, and the upload path ignores
+/// <see cref="ITransferContext.Range" />, <see cref="ITransferContext.NoBody" />,
+/// <see cref="ITransferContext.TimeCondition" />, <see cref="ITransferContext.HeaderOutput" />
+/// and <see cref="ITransferContext.MaxFileSize" />. Both ignore
+/// <see cref="ITransferContext.TimeProvider" />, deliberately: nothing in a local file
+/// transfer is timed or retried, and <c>-z</c> compares against the timestamp the open
+/// reported rather than against now. Both also ignore the options that belong to other
+/// protocols. The table "Transfer options, per direction" in
+/// <c>Curl.Protocol.File.UnitLibrary\CLAUDE.md</c> gives every member, per direction,
+/// with the method that reads it.
 /// </para>
 /// </remarks>
 public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandler
@@ -98,8 +106,8 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     /// bad option should end a transfer rather than the process. It is kept as an unreachable
     /// defensive default, not curl behaviour; ADR-0007 records why. Checking it once, up here,
     /// is also what keeps a download and
-    /// an upload answering it identically, since below this point the two paths share
-    /// nothing.
+    /// an upload answering it identically, since below this point the two paths diverge
+    /// and meet again only in the shared chunked copy.
     /// </remarks>
     public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context)
     {
