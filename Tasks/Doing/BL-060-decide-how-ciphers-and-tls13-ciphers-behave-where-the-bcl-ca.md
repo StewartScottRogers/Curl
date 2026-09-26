@@ -73,3 +73,4 @@ Blocks BL-066. BL-067 parses both options verbatim regardless of this decision.
 
 - 2026-09-26: Created.
 - 2026-09-26: Stewart decided: refuse on Windows as the Schannel build does, honour on Linux/macOS. Reassigned to Claude to record the ADR.
+- 2026-09-26: Backlog -> Doing.
