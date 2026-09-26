@@ -4,7 +4,7 @@ title: Implement TFTP retransmission and the timeout that ends a silent transfer
 priority: Normal
 assignee: Claude
 pipeline: protocol
-depends-on: [BL-045]
+depends-on: [BL-045, BL-123]
 touches: [Curl.Protocol.Tftp.UnitLibrary, Curl.Protocol.Tftp.UnitTests]
 requirement: none
 created: 2026-09-26
@@ -14,66 +14,69 @@ completed:
 
 ## Goal
 
-A TFTP download whose server goes silent re-sends its last packet on curl's schedule and
-then ends with `CurlExitCode.OperationTimedOut` (28) and `Timeout was reached` at the
-deadline curl uses, instead of waiting on `ReceiveAsync` forever.
+A TFTP download whose server goes silent re-sends its last packet on curl 8.21.0's
+schedule and then ends exactly as curl does - exit 7 `Could not connect to server` when
+nothing ever answered the RRQ, exit 28 `Timeout was reached` when the server fell silent
+mid-transfer - instead of waiting on `ReceiveAsync` forever; a duplicate DATA block is
+re-acknowledged and a datagram from a stranger ends the transfer with exit 56.
 
 ## Context
 
 - Builds on BL-045. Today `Curl.Protocol.Tftp.UnitLibrary/TftpDownload.cs` waits on
-  `IDatagramChannel.ReceiveAsync` with no timeout, so a silent server hangs the transfer.
+  `IDatagramChannel.ReceiveAsync` with no timeout, so a silent server hangs the transfer,
+  and it ignores a duplicate DATA block instead of re-acknowledging it.
+- Depends on BL-123, which adds `TimeSpan? ConnectTimeout` and `TimeSpan? MaxTime` to
+  `ITransferContext` and `TransferContext`. Tests set them directly on a
+  `TransferContext`; the command-line wiring (BL-122, BL-124) is not needed for this task.
 - Seam: `IDatagramChannel` / `IDatagramConnector` (ADR-0005,
   `Documentation/Planning/Decisions/ADR-0005-protocol-handlers-acquire-transports-through-connectors.md`).
-  Every wait goes through `ITransferContext.TimeProvider`
-  (`Curl.Protocol.Abstractions.UnitLibrary/ITransferContext.cs`): no `Thread.Sleep`, no
-  real delays in tests. Add a hand-written fake `TimeProvider` under
+  Every wait goes through `ITransferContext.TimeProvider`: no `Thread.Sleep`, no real
+  delays in tests. Add a hand-written fake `TimeProvider` under
   `Curl.Protocol.Tftp.UnitTests/Fakes/` beside `ScriptedDatagramChannel.cs` and
   `RecordingDatagramConnector.cs` (no mocking package; MSTest only).
-- Exit code: `CurlExitCode.OperationTimedOut` = 28 in
-  `Curl.Protocol.Abstractions.UnitLibrary/CurlExitCode.cs`.
-
-Measured 2026-09-26 with local curl 8.21.0 (Release-Date 2026-06-24) against loopback
-UDP servers written in Python:
-
-1. **Silent server, no options** (`curl tftp://127.0.0.1:16901/file.txt`): curl
-   re-sent the identical RRQ (`tsize 0`, `blksize 512`, `timeout 6`) from the same source
-   port at t = 0, 7.08, 14.12, 21.21 s, ... about every 7.05 s, and was still sending at
-   239 s when the measurement was stopped. The default overall give-up time and the
-   final exit code and message were **not** reached and must still be measured. It is
-   expected to be bounded by curl's default connect timeout of 300 s, but measure it; do
-   not assume.
-2. **Server that answered the RRQ with one full 512-byte DATA block 1 from a new port
-   and then went silent**, run with `--connect-timeout 10`: the RRQ's `timeout` option
-   became `3` (not `6`); curl sent ACK 1 at 0 s, re-sent ACK 1 to the transfer port at
-   6.06, 12.03 and 18.08 s, and ended at about 25 s with exit 28 and message
-   `Timeout was reached`.
-3. **Not yet handled by BL-045 and in scope here, still to be measured with curl 8.21.0:**
-   - a duplicate DATA block (curl is expected to re-ACK the last block; confirm);
-   - a datagram from an endpoint other than the learned transfer identifier. RFC 1350
-     section 4 says reply ERROR 5 (unknown transfer ID) to the stranger and carry on;
-     record what curl actually does and match curl.
-
-   If a measurement shows curl diverging from the RFC, match curl and note it; if
-   matching curl is not possible, stop and file a Stewart decision task rather than
-   diverging silently.
+- Exit codes in `Curl.Protocol.Abstractions.UnitLibrary/CurlExitCode.cs`:
+  `CouldntConnect` = 7, `OperationTimedOut` = 28, `RecvError` = 56. The message is
+  `TransferResult.ErrorMessage` (the text after `curl: (N) `).
+- Every number below is in `Notes` ("Measured with curl 8.21.0" and "The rules behind
+  these numbers"), measured 2026-09-26 against loopback Python UDP servers. Derive the
+  schedule from those rules (`timeout` = seconds left, else 15; `retry_max` =
+  clamp(timeout / 5, 3, 50); `retry_time` = max(1, timeout / retry_max); resend interval
+  `retry_time + 1` s; recomputed when the first DATA/OACK arrives) rather than
+  hard-coding each case.
+- The measured times are wall-clock with jitter (7.07 s, 351 s); tests on the fake clock
+  assert the whole-second values the rules give (7 s, 350 s) and the measured count of
+  packets.
+- On an unknown endpoint curl diverges from RFC 1350 section 4 (it sends no ERROR 5).
+  Match curl, as this task's Context always said; this is not a divergence from upstream.
 
 ## Acceptance criteria
 
-- [ ] `Notes` records, measured with curl 8.21.0: the default give-up time for a silent
-      server with no options, and the exit code and message it ends with; how curl
-      handles a duplicate DATA block; and how it handles a datagram from an unknown
-      endpoint.
-- [ ] A test in `Curl.Protocol.Tftp.UnitTests` driving a fake `TimeProvider` asserts the
-      RRQ is re-sent, byte-identical, at the measured interval while the server is silent,
-      and that the transfer ends at the measured default deadline with the measured exit
-      code and message.
-- [ ] A test asserts that with `--connect-timeout 10` the RRQ carries `timeout 3`, ACK 1 is
-      re-sent to the transfer endpoint (not the initial server port) at the measured
-      interval, and the transfer ends with `CurlExitCode.OperationTimedOut` (28) and
-      `Timeout was reached` at the measured deadline.
-- [ ] A test asserts duplicate-DATA handling matches the measured curl behaviour.
-- [ ] A test asserts unknown-endpoint datagram handling matches the measured curl
-      behaviour, and the transfer continues with the learned endpoint.
+- [ ] Silent server, `ConnectTimeout` and `MaxTime` both `null`: a test asserts the RRQ
+      (`tsize 0`, `blksize 512`, `timeout 6`) is sent 50 times, byte-identical and from
+      the same channel, 7 s apart on the fake clock, and that once the 50th interval
+      elapses (t = 350 s) the transfer ends with `CurlExitCode.CouldntConnect` (7) and
+      `Could not connect to server`.
+- [ ] Silent server, `ConnectTimeout = 10 s`: a test asserts the RRQ carries `timeout 3`,
+      is sent 3 times 4 s apart (t = 0, 4, 8), and the transfer ends at t = 12 s with
+      `CurlExitCode.CouldntConnect` (7) and `Could not connect to server`.
+- [ ] Server that answers with one full DATA block 1 from a new port and then falls
+      silent, `ConnectTimeout = 10 s`: a test asserts ACK 1 is sent at once and re-sent
+      3 times, 6 s apart, to the transfer endpoint (not the initial server port), and the
+      transfer ends one interval after the third re-send (t = 24 s by the rules in Notes;
+      measured about 25 s wall-clock) with `CurlExitCode.OperationTimedOut` (28) and
+      `Timeout was reached`.
+- [ ] Duplicate DATA block: a test asserts a repeated DATA 1 is answered with ACK 1 again
+      to the transfer endpoint, its payload is not written a second time, and the transfer
+      then completes with exit 0 and the correct byte count.
+- [ ] Datagram from an unknown endpoint (DATA 2 from a second port after DATA 1 from the
+      transfer port): a test asserts nothing is sent to the stranger and the transfer ends
+      at once with `CurlExitCode.RecvError` (56) and `Data received from another address`,
+      reporting the bytes already written.
+- [ ] `MaxTime`: `Notes` records, measured with curl 8.21.0 as `curl -m 5
+      tftp://127.0.0.1:<port>/file.txt` against a silent server, the RRQ `timeout` option,
+      the resend times, and the exit code and message it ends with; a test with
+      `MaxTime = 5 s` asserts the same. If curl's result cannot be reproduced, stop and
+      file a Stewart decision task instead of diverging.
 - [ ] No test uses `Thread.Sleep`, `Task.Delay` on the real clock, or
       `TestCategory=Integration`; every wait in `TftpDownload` goes through
       `ITransferContext.TimeProvider`.
@@ -138,6 +141,15 @@ No code was written in this run.
 - The first datagram received pins the remote address; any later datagram from another
   address is `CURLE_RECV_ERROR` "Data received from another address".
 
+### Re-planned 2026-09-26
+
+The contract change is split out as BL-123 (`ConnectTimeout` and `MaxTime` on
+`ITransferContext`), which this task now depends on; BL-122 and BL-124 parse and wire the
+options in the CLI and console and are not needed here. The Goal and criteria are
+corrected to the measurements above: exit 7 when the RRQ goes unanswered, exit 28 only in
+the data phase, and exit 56 (not ERROR 5 and carry on) for a stranger. The one behaviour
+not yet measured, `--max-time`, has its own measure-then-match criterion.
+
 ## Log
 
 - 2026-09-26: Created.
@@ -145,3 +157,4 @@ No code was written in this run.
 - 2026-09-26: Doing -> Backlog. Returned when the 4-lane shift was stopped to repair task IDs that parallel lanes had duplicated; no lane was working it.
 - 2026-09-26: Backlog -> Doing.
 - 2026-09-26: Doing -> Blocked. Needs --connect-timeout (and --max-time) on ITransferContext in Curl.Protocol.Abstractions.UnitLibrary plus CLI wiring, outside touches; criteria 2 and 5 also contradict measured curl (exit 7, and exit 56 on a stranger). Re-plan; see Notes.
+- 2026-09-26: Blocked -> Backlog. Re-planned: contract prerequisite split out as BL-123 (now a dependency); criteria corrected to measured curl 8.21.0 (exit 7 unanswered RRQ, 28 data-phase silence, 56 stranger) plus a measure-then-match --max-time criterion.

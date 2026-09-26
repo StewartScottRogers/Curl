@@ -126,3 +126,4 @@ Filed by `task-planner`: BL-114 (contract + Curl.Console stream), BL-115 (telnet
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
 - 2026-09-26: Doing -> Blocked. Matching 'returned M' needs Curl.Protocol.Abstractions and protocol-library changes outside touches; re-plan after BL-114, BL-115, BL-116 (filed) land
+- 2026-09-26: Blocked -> Backlog. Unblocked: BL-114, BL-115 and BL-116 now Done

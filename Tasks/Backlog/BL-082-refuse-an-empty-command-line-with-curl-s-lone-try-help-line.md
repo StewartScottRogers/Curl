@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-074]
-touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
+touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-26
 completed:
@@ -48,8 +48,16 @@ There is no `no URL specified` line.
 - [ ] The `CommandLineRefusal` and `CommandLineParser` XML docs and
       `Curl.Cli.UnitLibrary/README.md` no longer say an empty command line is accepted or
       that every refusal has two lines.
-- [ ] `dotnet build Curl.Cli.UnitLibrary -warnaserror` is clean and
-      `dotnet test Curl.Cli.UnitTests --filter "TestCategory!=Integration"` is green.
+- [ ] `Parse_NoArguments_ReturnsDefaults` and `Parse_EmptyCommandLine_CarriesNoWarning` in
+      `Curl.Cli.UnitTests/CommandLineParserTests.cs` no longer assert that an empty command
+      line is accepted (changed to the refusal, or removed where the new test covers them).
+- [ ] `Curl.Console.UnitTests/CurlCommandRunnerTests.cs` test
+      `RunAsync_EmptyCommandLine_TransfersNothingAndReturns0` is renamed to say what it now
+      asserts and asserts that `RunAsync([])` returns 2, writes nothing to stdout, writes
+      exactly `CommandLineRefusal.TryHelpLine` plus the newline to stderr, and calls no
+      handler. No file under `Curl.Console` changes.
+- [ ] `dotnet build -warnaserror` is clean and
+      `dotnet test --filter "TestCategory!=Integration"` is green.
 
 ## Notes
 
@@ -63,9 +71,12 @@ There is no `no URL specified` line.
 - `Curl.Cli.UnitTests/CommandLineParserTests.cs` has a second pin besides
   `Parse_NoArguments_ReturnsDefaults`: `Parse_EmptyCommandLine_CarriesNoWarning` asserts
   `IsAccepted`; it must change too.
+- Re-planned 2026-09-26: `touches` now includes `Curl.Console.UnitTests`, and the
+  acceptance criteria name both pinned tests and the console test explicitly.
 
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
 - 2026-09-26: Doing -> Blocked. touches must add Curl.Console.UnitTests: CurlCommandRunnerTests.RunAsync_EmptyCommandLine_TransfersNothingAndReturns0 pins exit 0 for an empty command line and must expect exit 2 plus the try-help line; re-plan
+- 2026-09-26: Blocked -> Backlog. Re-planned: touches adds Curl.Console.UnitTests; criteria name the two parser pins and the console test that must expect exit 2 plus the try-help line.

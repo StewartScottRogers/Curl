@@ -76,3 +76,4 @@ With `-v` the first line is followed by `* client returned ERROR on write of 20 
 - 2026-09-26: Blocked -> Backlog. Not blocked: the 2026-09-26 shift ran out of tokens (usage limit), which it misfiled as a stall
 - 2026-09-26: Backlog -> Doing.
 - 2026-09-26: Doing -> Blocked. Waits on BL-121 (wire -D output in Curl.Console), which waits on BL-120 (parse -D in Curl.Cli, outside this task's touches); re-plan after those land
+- 2026-09-26: Blocked -> Backlog. Unblocked: BL-120 and BL-121 now Done

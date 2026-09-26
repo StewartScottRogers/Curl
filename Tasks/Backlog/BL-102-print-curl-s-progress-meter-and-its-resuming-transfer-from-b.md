@@ -68,3 +68,4 @@ Curl.Console prints neither today. `Curl.Cli.UnitLibrary` has `CommandLineOption
 - 2026-09-26: Blocked -> Backlog. Not blocked: the 2026-09-26 shift ran out of tokens (usage limit), which it misfiled as a stall
 - 2026-09-26: Backlog -> Doing.
 - 2026-09-26: Doing -> Blocked. Waits on BL-119: Curl.Cli does not parse --no-progress-meter or -#/--progress-bar yet; move back to Backlog when BL-119 is Done
+- 2026-09-26: Blocked -> Backlog. Unblocked: BL-119 now Done
