@@ -555,6 +555,51 @@ public sealed class MqttProtocolHandlerTests
             result);
     }
 
+    /// <summary>
+    /// curl 8.21.0 measured against a loopback broker sending <c>count</c> QoS 0 PUBLISH
+    /// packets of <c>size</c>-byte payloads on topic <c>t</c>, standard output closed: each
+    /// PUBLISH body (three bytes of topic length and topic, then the payload) is written in
+    /// reads of at most 4096 bytes, and the write that overflows the 4096-byte stdio buffer
+    /// fails having accepted the room left in it. The fake output fails that same write with
+    /// that same count.
+    /// </summary>
+    [TestMethod]
+    [DataRow(100, 100, 40, 79, "Failure writing output to destination, passed 103 returned 79")]
+    [DataRow(300, 100, 14, 157, "Failure writing output to destination, passed 303 returned 157")]
+    [DataRow(1000, 20, 5, 84, "Failure writing output to destination, passed 1003 returned 84")]
+    [DataRow(30, 400, 125, 4, "Failure writing output to destination, passed 33 returned 4")]
+    [DataRow(5000, 5, 1, 0, "Failure writing output to destination, passed 4096 returned 0")]
+    public async Task ExecuteAsync_OutputFailsPartWayThroughMeasuredSubscription_ReportsBytesAccepted(
+        int size,
+        int count,
+        int failingWriteNumber,
+        int bytesAccepted,
+        string expectedMessage)
+    {
+        byte[] publish = Publish("t", new string('x', size));
+        ScriptedConnection connection = new([Connack, Suback, .. Enumerable.Repeat(publish, count).SelectMany(packet => packet.Chunk(4096))]);
+        RecordingStream output = new() { FailingWriteNumber = failingWriteNumber, BytesAcceptedOnFailure = bytesAccepted };
+
+        TransferResult result = await RunAsync(FakeConnector.For(connection), "mqtt://h/t", output);
+
+        Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode);
+        Assert.AreEqual(expectedMessage, result.ErrorMessage);
+        Assert.AreEqual(output.Writes.Sum(write => (long)write.Length), result.BytesTransferred);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_PublishOver4096Bytes_IsWrittenIn4096ByteSlices()
+    {
+        byte[] publish = Publish("t", new string('x', 5000));
+        ScriptedConnection connection = new([Connack, Suback, .. publish.Chunk(4096), Disconnect]);
+        RecordingStream output = new();
+
+        await RunAsync(FakeConnector.For(connection), "mqtt://h/t", output);
+
+        CollectionAssert.AreEqual(new[] { 4096, 907 }, output.Writes.Select(write => write.Length).ToArray());
+        CollectionAssert.AreEqual(publish[3..], output.ToArray());
+    }
+
     [TestMethod]
     public async Task ExecuteAsync_ReadFails_IsRecvError()
     {
@@ -869,10 +914,23 @@ public sealed class MqttProtocolHandlerTests
     }
 
     /// <summary>
-    /// A QoS 0 PUBLISH of under 128 bytes: fixed header, topic length, topic, payload.
+    /// A QoS 0 PUBLISH: fixed header with its variable-length remaining length, topic length,
+    /// topic, payload.
     /// </summary>
-    private static byte[] Publish(string topic, string payload) =>
-        [0x30, (byte)(2 + topic.Length + payload.Length), 0x00, (byte)topic.Length, .. Encoding.ASCII.GetBytes(topic + payload)];
+    private static byte[] Publish(string topic, string payload)
+    {
+        List<byte> packet = [0x30];
+        int remaining = 2 + topic.Length + payload.Length;
+        do
+        {
+            byte digit = (byte)(remaining % 128);
+            remaining /= 128;
+            packet.Add(remaining > 0 ? (byte)(digit | 0x80) : digit);
+        }
+        while (remaining > 0);
+
+        return [.. packet, 0x00, (byte)topic.Length, .. Encoding.ASCII.GetBytes(topic + payload)];
+    }
 
     /// <summary>
     /// Alternates hex and ASCII: hex, text, hex, text, and so on.
