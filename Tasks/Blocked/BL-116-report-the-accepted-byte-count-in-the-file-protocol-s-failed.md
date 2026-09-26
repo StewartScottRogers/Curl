@@ -75,3 +75,4 @@ complexity 10 and the library at 100% line and branch coverage.
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Blocked. Stewart: dark factory run ended in Doing, exit 1; see logs\BL-116-20260926-083111-L3.jsonl
