@@ -34,3 +34,4 @@ The store loads Netscape cookie files and `-b` strings, drops session cookies un
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
