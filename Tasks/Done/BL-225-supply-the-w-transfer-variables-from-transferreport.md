@@ -47,7 +47,7 @@ The renderer's variable source reads response, size, count, URL, method, scheme,
 - Decision: without a report, `size_download` is `BytesTransferred` (ADR-0015) and `size_upload` is `0`, what curl printed for every download measured.
 - Decision: header values are trimmed of spaces and tabs at both ends, BL-224's measurement (`X-Lf: a b  ` -> `a b`).
 - Decision: no new ADR. Every choice above is a measured curl behaviour or ADR-0015's existing mapping; the constructor shape is recorded here.
-- Not covered, and still reported unknown: `%{time_*}`/`%{speed_*}` (BL-226), `%{json}`/`%{header_json}` (BL-227), `%{onerror}`/`%time{}` (BL-279). Filed BL-281 for the other variables curl knows (`referer`, `filename_effective`, `url.*`, certificate and connection ids, ...) and BL-282 for the file:// handler's pseudo-headers (curl prints `nh=3`; we print 0 because the file handler returns no report).
+- Not covered, and still reported unknown: `%{time_*}`/`%{speed_*}` (BL-226), `%{json}`/`%{header_json}` (BL-227), `%{onerror}`/`%time{}` (BL-279). Filed BL-284 for the other variables curl knows (`referer`, `filename_effective`, `url.*`, certificate and connection ids, ...) and BL-285 for the file:// handler's pseudo-headers (curl prints `nh=3`; we print 0 because the file handler returns no report).
 - Gates: `dotnet build -warnaserror` clean; every fast test project green (Curl.Output.UnitTests 47 passed); `Measure-CodeQuality.ps1 -Library Curl.Output*` 100% line, 100% branch, 0 failing members, worst CRAP 8.
 
 ## Log

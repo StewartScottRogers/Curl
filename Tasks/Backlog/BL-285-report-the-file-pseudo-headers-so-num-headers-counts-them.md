@@ -1,5 +1,5 @@
 ---
-id: BL-282
+id: BL-285
 title: Report the file:// pseudo-headers so %{num_headers} counts them
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-282 — Report the file:// pseudo-headers so %{num_headers} counts them
+# BL-285 — Report the file:// pseudo-headers so %{num_headers} counts them
 
 ## Goal
 

@@ -1,5 +1,5 @@
 ---
-id: BL-281
+id: BL-284
 title: Supply the remaining -w variables curl 8.21.0 knows
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-281 — Supply the remaining -w variables curl 8.21.0 knows
+# BL-284 — Supply the remaining -w variables curl 8.21.0 knows
 
 ## Goal
 
