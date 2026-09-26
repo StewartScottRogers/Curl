@@ -38,3 +38,4 @@ The handler sends `BytesBody` and `StreamBody` request bodies with Content-Lengt
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
