@@ -1,5 +1,5 @@
 ---
-id: BL-278
+id: BL-280
 title: Open -w %output{file} targets on disk in Curl.Console
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-278 — Open -w %output{file} targets on disk in Curl.Console
+# BL-280 — Open -w %output{file} targets on disk in Curl.Console
 
 ## Goal
 
