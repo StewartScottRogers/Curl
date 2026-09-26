@@ -4,7 +4,7 @@ namespace Curl.Authentication;
 
 /// <summary>
 /// Answers with the one scheme curl 8.21.0 picks among those offered and allowed, for
-/// <c>--basic</c>, <c>--digest</c>, <c>--anyauth</c> and any mix of them (ADR-0026): the
+/// <c>--basic</c>, <c>--digest</c>, <c>--anyauth</c> and any mix of them (ADR-0028): the
 /// first of Negotiate, Bearer, Digest, NTLM, Basic.
 /// </summary>
 /// <param name="basicAndBearer">Answers when the pick is Basic or Bearer, and before any challenge.</param>
