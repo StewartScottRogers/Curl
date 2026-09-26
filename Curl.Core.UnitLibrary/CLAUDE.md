@@ -11,3 +11,8 @@ recorded byte stream with no network.
 `FileSystem\PhysicalFileSystem` is the real-disk `IFileSystem` behind `file://`
 (ADR-0002). Every failed open comes back as a `FileAccessStatus`; only cancellation
 throws. Its disk tests in `Curl.Core.UnitTests` are `[TestCategory("Integration")]`.
+
+`ProtocolDispatcher` hands a transfer to the `IProtocolHandler` registered for its URL's
+scheme (case-insensitive) and returns exit 1, `Protocol "<scheme>" not supported`, when
+none is; two handlers claiming one scheme make its constructor throw. It is not yet wired
+into `Curl.Console`.
