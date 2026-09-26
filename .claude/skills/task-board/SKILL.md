@@ -23,6 +23,7 @@ description: Rules and tooling for Curl's task board — the Tasks shared projec
 | `assignee` | `Claude`, `Stewart` | `Stewart` means a decision or action only he can take. Claude never claims one. |
 | `pipeline` | `feature`, `protocol`, `docs`, `direct` | How `/task-run` delivers it (below). |
 | `depends-on` | `[BL-###, …]` | Tasks that must be in `Done` or its archive before this one can start. |
+| `touches` | `[path, …]` | Every project folder, folder or file the task will change, e.g. `[Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]`. Two tasks whose `touches` overlap never run at the same time. Empty or `*` means it may change anything, so it runs alone. |
 | `requirement` | requirement ID or `none` | From `Documentation/Product/Requirements.md`. |
 | `created` | `yyyy-MM-dd` | Set by the script. |
 | `completed` | `yyyy-MM-dd` | Set by the script when the task moves to `Done`. |
@@ -50,6 +51,12 @@ appends to it, so hand-written entries go there too, never above it.
   bytes that match upstream curl for a named case, a document section that states X.
   "Works correctly" is not a criterion.
 - **Dependencies are explicit** and never circular.
+- **`touches` is exact and small.** It is what lets dark factory lanes run tasks in
+  parallel. Name the project folders the task changes, not the whole solution; list a
+  shared file (`Curl.slnx`, `Directory.Build.props`, `Documentation/Product/Requirements.md`)
+  by path when the task edits it. A task that changes a shared contract
+  (`Curl.Protocol.Abstractions.UnitLibrary`) touches it and so runs apart from every
+  protocol task, which is the intent: contracts land first, then the protocols fan out.
 - **Stewart's decisions are their own tasks.** A new package, a deliberate divergence
   from upstream curl, the licence, anything the root `CLAUDE.md` says needs his
   approval: file it assigned to `Stewart`, and make the work that waits on it depend
@@ -78,7 +85,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .claude/skills/task-board/ta
 | Command | Options | Does |
 | --- | --- | --- |
 | `status` | | Every state, with each Backlog task marked ready (and its queue position), waiting on named tasks, or needing Stewart. |
-| `next` | | The task `/task-run` takes next, or `No task is ready.` |
+| `next` | `-Skip BL-001,BL-002` | The task `/task-run` takes next: highest priority, then the one the most unfinished tasks wait on, then lowest ID, skipping any whose `touches` overlap a task in `Doing`. Prints `No task is ready.`, or `No task can start yet: …` when every ready task overlaps work in progress. |
 | `next-id` | | The next free ID. |
 | `new` | `-Title` (required), `-Priority`, `-Assignee`, `-Pipeline`, `-DependsOn BL-001,BL-002`, `-Requirement` | Creates the task in `Backlog` from `TASK-TEMPLATE.md` and prints its path. Fill in the body with an edit afterwards. |
 | `move` | `-Id`, `-To`, `-Reason` | Validates the transition, appends the `Log` line, and moves the file. `-Reason` is required for every destination except `Doing`. |
@@ -101,7 +108,9 @@ the log and dates honest.
 1. Claim with `move -To Doing` before the first edit of any other file. If the move
    fails because the task is no longer in `Backlog`, someone else has it; take
    another.
-2. One task in `Doing` per session.
+2. One task in `Doing` per session. A dark factory lane is a session: with `-Lanes 4`
+   up to four tasks are in `Doing` at once, never two whose `touches` overlap, and the
+   shift claims each one before its run starts.
 3. Tick each acceptance box in the file as you verify it. Move to `Done` only when
    every box is ticked and every pipeline gate is green, with a one-line `-Reason`
    saying what now works.

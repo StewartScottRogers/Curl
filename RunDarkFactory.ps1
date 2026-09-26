@@ -23,9 +23,31 @@
 
     Speech is Windows' built-in System.Speech. The key press restores volume and mute.
 
+    PARALLEL LANES (-Lanes 2 or more)
+
+    The shift runs that many lanes at once, each an independent task runner in its own
+    console window and its own git worktree (..\<repo>.lanes\lane-<n>, on a local
+    branch factory/lane-<n>), all feeding the branch this checkout is on:
+
+      claim      A lane takes the next task the board offers - one whose `touches` do
+                 not overlap any task in Doing - moves it to Doing, commits and pushes
+                 that move. The push is the lock: if another lane got there first, the
+                 push is refused and the lane picks again.
+      run        /task-run in the lane's worktree. The run commits but never pushes.
+      integrate  The lane rebases its commits onto the shared branch, rebuilds, runs
+                 the fast tests and pushes. A conflict gets one headless run to resolve
+                 it. Work that still will not integrate is pushed to its own branch,
+                 factory/<ID>-lane-<n>, and the task goes to Blocked for Stewart.
+
+    Claims and integrations hold ..\<repo>.lanes\integrate.lock, so they happen one at
+    a time; runs overlap freely. This window coordinates: it starts the lanes, waits
+    for them, pulls the result and raises the alarm once for all of them. Each lane
+    traces to logs\DarkFactory-<stamp>-L<n>.log in this checkout.
+
 .EXAMPLE
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -Hours 4 -MaxTasks 3
+    powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -Lanes 4
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestAlarm
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestAlarm -AlarmScale 0.1
 #>
@@ -48,22 +70,43 @@ param(
     # Master volume, in percent, that stage 3 raises the speakers to (and unmutes).
     [ValidateRange(0, 100)][int]$AlarmMaxVolume = 100,
     # Banner only: no chime, siren, speech or volume change. For nights.
-    [switch]$QuietAlarm
+    [switch]$QuietAlarm,
+    # How many tasks run at once, each in its own worktree and window. 1 is the classic
+    # single-runner shift in this checkout.
+    [ValidateRange(1, 8)][int]$Lanes = 1,
+    # Start the shift somewhere of its own and return at once: a new herdr tab when this
+    # is running inside herdr, otherwise a new console window. How Claude starts a shift.
+    [switch]$NewTab,
+
+    # The rest are set by the coordinator when it starts a lane; not for direct use.
+    [int]$Lane = 0,
+    [string]$Branch = '',
+    [string]$LogRoot = '',
+    [string]$ShiftStamp = ''
 )
 
 # Continue, not Stop: native stderr from git or dotnet must never kill an unattended shift.
 $ErrorActionPreference = 'Continue'
 
 $Root = $PSScriptRoot
+# The board script and every Claude run use this checkout, never one inherited from a
+# Claude Code session that happened to start the shift.
+$env:CLAUDE_PROJECT_DIR = $Root
 $Board = Join-Path $Root '.claude\skills\task-board\task-board.ps1'
-$LogDir = Join-Path $Root 'logs'
-$Stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$TraceFile = Join-Path $LogDir "DarkFactory-$Stamp.log"
+$LogDir = if ($LogRoot) { $LogRoot } else { Join-Path $Root 'logs' }
+$Stamp = if ($ShiftStamp) { $ShiftStamp } else { Get-Date -Format 'yyyyMMdd-HHmmss' }
+$LaneTag = if ($Lane) { "-L$Lane" } else { '' }
+$TraceFile = Join-Path $LogDir "DarkFactory-$Stamp$LaneTag.log"
+# Lanes live beside the checkout: Z:\repos\Curl -> Z:\repos\Curl.lanes\lane-1. A lane
+# is itself one of those folders, so its lanes directory is its parent.
+$LanesDir = if ($Lane) { Split-Path $Root -Parent } else { "$Root.lanes" }
+$LockFile = Join-Path $LanesDir 'integrate.lock'
 
 # ---------------------------------------------------------------------------- trace
 
 function Write-Trace {
     param([string]$Task, [string]$Verb, [string]$Detail = '', [string]$Color = 'Gray')
+    if ($Lane) { $Task = "L$Lane $Task" }
     $line = '{0} {1,-6} {2,-7} {3}' -f (Get-Date -Format 'HH:mm:ss'), $Task, $Verb, $Detail
     $line = $line.TrimEnd()
     if ($line.Length -gt 118) { $line = $line.Substring(0, 117) + '~' }
@@ -76,6 +119,58 @@ function Get-Short {
     $one = ($Text -replace '\s+', ' ').Trim()
     if ($one.Length -gt $Max) { return $one.Substring(0, $Max - 1) + '~' }
     return $one
+}
+
+# ---------------------------------------------------------------------------- herdr
+
+function Get-HerdrBin {
+    # The herdr binary when this process runs inside a herdr pane, otherwise $null.
+    if ($env:HERDR_ENV -ne '1') { return $null }
+    if ($env:HERDR_BIN_PATH -and (Test-Path $env:HERDR_BIN_PATH)) { return $env:HERDR_BIN_PATH }
+    $cmd = Get-Command herdr -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
+    return $null
+}
+
+function Start-Detached {
+    # Runs RunDarkFactory.ps1 from $Dir with $ScriptArgs somewhere the user can watch: a
+    # new tab in the same herdr workspace when inside herdr, else a new console window.
+    # Returns @{ Process = <Process> } or @{ Tab = '<tab id>' }.
+    param([string]$Label, [string]$Dir, [string[]]$ScriptArgs)
+    $script = Join-Path $Dir 'RunDarkFactory.ps1'
+    $herdr = Get-HerdrBin
+    if ($herdr) {
+        $create = @('tab', 'create', '--cwd', $Dir, '--label', $Label, '--no-focus')
+        if ($env:HERDR_WORKSPACE_ID) { $create += @('--workspace', $env:HERDR_WORKSPACE_ID) }
+        $created = (& $herdr @create) -join "`n" | ConvertFrom-Json
+        $pane = $created.result.root_pane.pane_id
+        if ($pane) {
+            & $herdr pane wait-output $pane --match '>' --timeout 15000 2>&1 | Out-Null
+            $line = "powershell -NoProfile -ExecutionPolicy Bypass -File `"$script`" " + ($ScriptArgs -join ' ')
+            # Windows PowerShell passes a native argument's inner quotes through unescaped,
+            # and herdr's argument parser would then strip them, splitting any path with a
+            # space. \" survives as a literal quote.
+            & $herdr pane run $pane $line.Replace('"', '\"') 2>&1 | Out-Null
+            return @{ Tab = $created.result.tab.tab_id }
+        }
+        Write-Trace '-' 'herdr' 'could not create a herdr tab; using a console window' 'DarkYellow'
+    }
+    $argList = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$script`"") + $ScriptArgs
+    return @{ Process = (Start-Process -FilePath 'powershell.exe' -ArgumentList $argList -WorkingDirectory $Dir -PassThru) }
+}
+
+if ($NewTab) {
+    # Hand this exact shift, minus -NewTab, to a tab or window of its own, and return.
+    $forward = @()
+    foreach ($p in $PSBoundParameters.GetEnumerator()) {
+        if ($p.Key -eq 'NewTab') { continue }
+        if ($p.Value -is [System.Management.Automation.SwitchParameter]) { if ($p.Value) { $forward += "-$($p.Key)" } }
+        else { $forward += @("-$($p.Key)", "`"$($p.Value)`"") }
+    }
+    $where = Start-Detached -Label "Dark factory - $(Split-Path $Root -Leaf)" -Dir $Root -ScriptArgs $forward
+    if ($where.Tab) { Write-Host "Dark factory started in herdr tab $($where.Tab)." }
+    else { Write-Host "Dark factory started in a new console window (pid $($where.Process.Id))." }
+    exit 0
 }
 
 # ---------------------------------------------------------------------------- alarm
@@ -383,6 +478,64 @@ or
 FACTORY: BLOCKED {ID} <the blocker>
 '@
 
+# A lane's run: the shift has claimed the task already, and the shift - not the run -
+# integrates and pushes, so parallel lanes never race each other to the shared branch.
+$LanePrompt = @'
+DARK FACTORY SHIFT, LANE {LANE}. Stewart is away and cannot answer. Never ask a question
+and never wait for input; nobody will reply. Other lanes are working other tasks in
+other checkouts at the same time; the task board guarantees their tasks touch different
+projects from yours.
+
+Run /task-run {ID}. The shift has already claimed {ID}: it is in Tasks/Doing. Skip the
+claim step, do not move it to Doing again, and do not take any other task.
+
+Rules for this unattended run, in addition to CLAUDE.md:
+1. Where a choice has a sensible default, take it and record the choice and why under
+   the task's Notes.
+2. Where only Stewart can decide (a new package, a threshold change, a deliberate
+   divergence from upstream curl, a truly ambiguous requirement, anything CLAUDE.md
+   reserves for him), do not guess: move the task to Blocked with a -Reason that starts
+   "Stewart:" and asks the question in one line.
+3. Stay inside the projects and files the task's `touches` field names. If the work
+   truly needs another project, move the task to Blocked with a -Reason saying which
+   and why, so it can be re-planned; do not edit it.
+4. When the task reaches Done with dotnet build clean and the fast tests green, commit
+   by logical unit (Conventional Commits, including the task file). Do NOT push, pull,
+   rebase, merge or switch branches: the shift integrates your commits.
+5. If the task ends Blocked, commit only the task board change. Leave any unfinished
+   code uncommitted; the shift stashes it.
+6. The task must not be left in Doing.
+
+End your reply with exactly one line, either
+FACTORY: DONE {ID} <what now works>
+or
+FACTORY: BLOCKED {ID} <the blocker>
+'@
+
+$ResolvePrompt = @'
+DARK FACTORY SHIFT, LANE {LANE}. Stewart is away; never ask a question.
+
+This checkout is in the middle of `git rebase origin/{BRANCH}`: this lane's commits for
+task {ID} are being replayed on top of work other lanes pushed meanwhile, and git
+stopped on conflicts. Resolve them:
+
+1. `git status` to see the conflicted files. For each, keep BOTH sides' intent: the
+   other lanes' work is already shared and must survive, and this lane's change must
+   still do what its commit says. Never resolve by discarding one side wholesale.
+2. Files under Tasks/: a task file that one side moved and the other edited keeps the
+   move and the edits. Curl.slnx and other lists: keep every entry from both sides.
+3. `git add` the resolved files, then `git -c core.editor=true rebase --continue`.
+   Repeat until the rebase finishes.
+4. Run `dotnet build` and `dotnet test --filter "TestCategory!=Integration"`; fix what
+   the merge broke, and commit the fix.
+5. Never run git rebase --abort, git reset, git push, or git checkout of another branch.
+
+End your reply with exactly one line, either
+FACTORY: RESOLVED {ID}
+or
+FACTORY: UNRESOLVED {ID} <why>
+'@
+
 $script:ToolLabels = @{}
 
 # Commands only Stewart may authorize (CLAUDE.md). --dangerously-skip-permissions does
@@ -394,6 +547,10 @@ $Forbidden = @(
     'dotnet add package', 'dotnet remove package',
     'gh pr merge', 'gh release', 'gh repo'
 )
+# A lane's run also never touches the remote or the branch: the shift owns both.
+$LaneForbidden = $Forbidden + @('git push', 'git pull', 'git fetch', 'git rebase', 'git checkout', 'git switch', 'git worktree', 'git stash')
+# The conflict resolver needs `git rebase --continue`, and nothing that throws work away.
+$ResolveForbidden = $Forbidden + @('git push', 'git pull', 'git rebase --abort', 'git rebase --skip', 'git checkout', 'git switch', 'git worktree', 'git stash')
 
 function Get-ToolLabel {
     param($Tool)
@@ -477,15 +634,21 @@ function Write-Event {
 }
 
 function Invoke-TaskRun {
-    param([string]$Id)
-    $raw = Join-Path $LogDir "$Id-$Stamp.jsonl"
-    $err = Join-Path $LogDir "$Id-$Stamp.err.txt"
+    # One headless Claude run in this checkout. By default it is the task run; a lane
+    # passes its own prompt and deny list, and a log suffix for the resolver's run.
+    param([string]$Id, [string]$Text = '', [string[]]$Deny = $null, [string]$Suffix = '', [int]$Minutes = 0)
+    if (-not $Text) { $Text = if ($Lane) { $LanePrompt } else { $Prompt } }
+    if ($null -eq $Deny) { $Deny = if ($Lane) { $LaneForbidden } else { $Forbidden } }
+    if ($Minutes -le 0) { $Minutes = $TaskMinutes }
+    $Text = $Text.Replace('{ID}', $Id).Replace('{LANE}', "$Lane").Replace('{BRANCH}', $Branch)
+    $raw = Join-Path $LogDir "$Id-$Stamp$LaneTag$Suffix.jsonl"
+    $err = Join-Path $LogDir "$Id-$Stamp$LaneTag$Suffix.err.txt"
     $script:RunResult = $null
     $script:ToolLabels = @{}
 
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = $env:ComSpec
-    $denied = ($Forbidden | ForEach-Object { "`"Bash($_`:*)`" `"PowerShell($_`:*)`"" }) -join ' '
+    $denied = ($Deny | ForEach-Object { "`"Bash($_`:*)`" `"PowerShell($_`:*)`"" }) -join ' '
     $psi.Arguments = "/d /c claude -p --model $Model --dangerously-skip-permissions --output-format stream-json --verbose --disallowedTools $denied 2>`"$err`""
     $psi.WorkingDirectory = $Root
     $psi.UseShellExecute = $false
@@ -493,10 +656,10 @@ function Invoke-TaskRun {
     $psi.RedirectStandardOutput = $true
     $psi.StandardOutputEncoding = [System.Text.Encoding]::UTF8
     $p = [System.Diagnostics.Process]::Start($psi)
-    $p.StandardInput.Write($Prompt.Replace('{ID}', $Id))
+    $p.StandardInput.Write($Text)
     $p.StandardInput.Close()
 
-    $deadline = (Get-Date).AddMinutes($TaskMinutes)
+    $deadline = (Get-Date).AddMinutes($Minutes)
     $timedOut = $false
     $pending = $p.StandardOutput.ReadLineAsync()
     while ($true) {
@@ -517,18 +680,220 @@ function Invoke-TaskRun {
     return @{ ExitCode = $p.ExitCode; TimedOut = $timedOut }
 }
 
+# ---------------------------------------------------------------------------- lanes
+
+function Invoke-Git {
+    # git in this checkout; returns $true when it exited 0. Output goes to the trace only
+    # on failure, so a quiet lane stays quiet.
+    param([string[]]$GitArgs)
+    $out = & git -C $Root @GitArgs 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        $last = ($out | ForEach-Object { "$_" } | Where-Object { $_.Trim() } | Select-Object -Last 1)
+        Write-Trace '-' 'git' "FAIL git $($GitArgs[0]): $(Get-Short "$last" 60)" 'DarkYellow'
+        return $false
+    }
+    return $true
+}
+
+function Enter-Lock {
+    # Claims and integrations take turns across every lane. Holding the file open with no
+    # sharing is the lock; the operating system releases it if the lane dies.
+    New-Item -ItemType Directory -Force -Path $LanesDir | Out-Null
+    while ($true) {
+        try { return [IO.File]::Open($LockFile, 'OpenOrCreate', 'ReadWrite', 'None') }
+        catch { Start-Sleep -Seconds 3 }
+    }
+}
+
+function Sync-Lane {
+    # Puts this lane's checkout exactly on the shared branch as it is on the remote.
+    Save-StrayChanges 'sync'
+    if (-not (Invoke-Git @('fetch', '-q', 'origin', $Branch))) { return $false }
+    if (-not (Invoke-Git @('checkout', '-q', '-B', "factory/lane-$Lane", "origin/$Branch"))) { return $false }
+    return (Invoke-Git @('reset', '-q', '--hard', "origin/$Branch"))
+}
+
+function Test-Rebasing {
+    foreach ($dir in 'rebase-merge', 'rebase-apply') {
+        $path = (& git -C $Root rev-parse --git-path $dir).Trim()
+        if (-not [IO.Path]::IsPathRooted($path)) { $path = Join-Path $Root $path }
+        if (Test-Path $path) { return $true }
+    }
+    return $false
+}
+
+function Get-DoingCount { return @(Get-ChildItem (Join-Path $Root 'Tasks\Doing') -Filter 'BL-*.md' -ErrorAction SilentlyContinue).Count }
+
+function Invoke-Claim {
+    # Returns @{ Id = 'BL-###' } on success, or @{ Wait = $true } when every ready task
+    # overlaps work in progress (or nothing is ready but other lanes may unlock more), or
+    # @{ None = $true } when the board has nothing left for this shift.
+    param([string[]]$Skip)
+    $lock = Enter-Lock
+    try {
+        foreach ($attempt in 1..5) {
+            if (-not (Sync-Lane)) { Start-Sleep -Seconds 10; continue }
+            $boardArgs = @('next')
+            if ($Skip.Count) { $boardArgs += @('-Skip', ($Skip -join ',')) }
+            $next = (Invoke-Board $boardArgs) -join "`n"
+            if ($next -notmatch '(?m)^(BL-\d{3})\s') {
+                if ($next -match 'can start yet' -or (Get-DoingCount) -gt 0) { return @{ Wait = $true; Why = (Get-Short $next 80) } }
+                return @{ None = $true }
+            }
+            $id = $Matches[1]
+            Invoke-Board @('move', '-Id', $id, '-To', 'Doing') | Out-Null
+            if ((Get-TaskState $id) -ne 'Doing') { continue }
+            Invoke-Git @('add', '-A', 'Tasks') | Out-Null
+            Invoke-Git @('commit', '-q', '-m', "chore(tasks): claim $id on dark factory lane $Lane") | Out-Null
+            if (Invoke-Git @('push', '-q', 'origin', "HEAD:$Branch")) { return @{ Id = $id } }
+            Write-Trace $id 'claim' 'lost the race; picking again' 'DarkYellow'
+        }
+        return @{ Wait = $true; Why = 'claim kept losing races' }
+    } finally { $lock.Dispose() }
+}
+
+function Test-Green {
+    # Build and fast tests in this checkout, after a rebase put other lanes' work under ours.
+    & dotnet build $Root -nologo -v q 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) { return 'build failed' }
+    & dotnet test $Root --no-build -nologo -v q --filter 'TestCategory!=Integration' 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) { return 'fast tests failed' }
+    return ''
+}
+
+function Invoke-Integrate {
+    # Rebases this lane's commits onto the shared branch, checks them, and pushes. Returns
+    # '' on success or why it could not.
+    param([string]$Id, [string]$State)
+    $lock = Enter-Lock
+    try {
+        foreach ($attempt in 1..3) {
+            if (-not (Invoke-Git @('fetch', '-q', 'origin', $Branch))) { Start-Sleep -Seconds 10; continue }
+            if (-not (Invoke-Git @('rebase', '-q', "origin/$Branch"))) {
+                if (Test-Rebasing) {
+                    Write-Trace $Id 'resolve' 'rebase conflict; resolving' 'DarkYellow'
+                    Invoke-TaskRun -Id $Id -Text $ResolvePrompt -Deny $ResolveForbidden -Suffix '-resolve' -Minutes 45 | Out-Null
+                    if (Test-Rebasing) { & git -C $Root rebase --abort 2>&1 | Out-Null; return 'rebase conflict the resolver could not settle' }
+                } else { return 'rebase failed' }
+            }
+            if ($State -eq 'Done') {
+                $red = Test-Green
+                if ($red) { return "$red after rebasing onto the other lanes' work" }
+                Write-Trace $Id 'verify' 'build and fast tests green on the shared branch'
+            }
+            if (Invoke-Git @('push', '-q', 'origin', "HEAD:$Branch")) { return '' }
+        }
+        return 'push kept being refused'
+    } finally { $lock.Dispose() }
+}
+
+function Invoke-Park {
+    # Work that will not integrate is kept on a branch of its own, and the task goes to
+    # Blocked on the shared branch so Stewart sees it.
+    param([string]$Id, [string]$Why)
+    $park = "factory/$Id-lane-$Lane-$Stamp"
+    Invoke-Git @('push', '-q', 'origin', "HEAD:refs/heads/$park") | Out-Null
+    $lock = Enter-Lock
+    try {
+        foreach ($attempt in 1..3) {
+            if (-not (Sync-Lane)) { continue }
+            if ((Get-TaskState $Id) -ne 'Doing') { return }
+            Invoke-Board @('move', '-Id', $Id, '-To', 'Blocked', '-Reason', "Stewart: lane $Lane could not integrate: $Why. The work is on branch $park.") | Out-Null
+            Invoke-Git @('add', '-A', 'Tasks') | Out-Null
+            Invoke-Git @('commit', '-q', '-m', "chore(tasks): block $Id - $Why") | Out-Null
+            if (Invoke-Git @('push', '-q', 'origin', "HEAD:$Branch")) { return }
+        }
+    } finally { $lock.Dispose() }
+}
+
+function Write-LaneSummary {
+    param([string[]]$Lines)
+    $dir = Join-Path $LogDir "lanes-$Stamp"
+    New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    Set-Content -Path (Join-Path $dir "lane-$Lane.txt") -Value $Lines -Encoding UTF8
+}
+
 # ---------------------------------------------------------------------------- shift
 
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
-try { $Host.UI.RawUI.WindowTitle = 'Dark factory - running' } catch { }
-
-$branch = (git -C $Root rev-parse --abbrev-ref HEAD).Trim()
-if ($branch -in 'master', 'main') { Write-Trace '-' 'refuse' "on $branch; switch to a feature branch" 'Red'; exit 1 }
-if (Get-Dirty) { Write-Trace '-' 'refuse' 'working tree not clean; commit or stash first' 'Red'; exit 1 }
-$stuck = @(Get-ChildItem (Join-Path $Root 'Tasks\Doing') -Filter 'BL-*.md' -ErrorAction SilentlyContinue)
-if ($stuck.Count) { Write-Trace '-' 'refuse' "task already in Doing: $($stuck[0].Name)" 'Red'; exit 1 }
-
 $shiftEnd = (Get-Date).AddHours($Hours)
+
+# ------------------------------------------------ coordinator: start lanes, wait, alarm
+
+if ($Lanes -gt 1 -and -not $Lane) {
+    try { $Host.UI.RawUI.WindowTitle = "Dark factory - $Lanes lanes" } catch { }
+    $branch = (git -C $Root rev-parse --abbrev-ref HEAD).Trim()
+    if ($branch -in 'master', 'main') { Write-Trace '-' 'refuse' "on $branch; switch to a feature branch" 'Red'; exit 1 }
+    if (Get-Dirty) { Write-Trace '-' 'refuse' 'working tree not clean; commit or stash first' 'Red'; exit 1 }
+    git -C $Root fetch -q origin $branch
+    if ((git -C $Root rev-parse HEAD).Trim() -ne (git -C $Root rev-parse "origin/$branch").Trim()) {
+        Write-Trace '-' 'refuse' "$branch differs from origin/$branch; push or pull first" 'Red'; exit 1
+    }
+    $stuck = @(Get-ChildItem (Join-Path $Root 'Tasks\Doing') -Filter 'BL-*.md' -ErrorAction SilentlyContinue)
+    if ($stuck.Count) { Write-Trace '-' 'refuse' "task already in Doing: $($stuck[0].Name)" 'Red'; exit 1 }
+
+    Write-Trace '-' 'shift' "start  $Lanes lanes  branch=$branch model=$Model until $($shiftEnd.ToString('HH:mm'))" 'Cyan'
+    New-Item -ItemType Directory -Force -Path $LanesDir | Out-Null
+    $procs = @()
+    foreach ($n in 1..$Lanes) {
+        $dir = Join-Path $LanesDir "lane-$n"
+        if (-not (Test-Path (Join-Path $dir '.git'))) {
+            git -C $Root worktree add -q --detach $dir "origin/$branch" 2>&1 | Out-Null
+        }
+        git -C $dir stash push -q --include-untracked -m "darkfactory lane-$n before $Stamp" 2>&1 | Out-Null
+        git -C $dir checkout -q -B "factory/lane-$n" "origin/$branch" 2>&1 | Out-Null
+        git -C $dir reset -q --hard "origin/$branch" 2>&1 | Out-Null
+        $laneArgs = @('-Lane', $n, '-Branch', $branch, '-Hours', $Hours, '-MaxTasks', $MaxTasks,
+            '-TaskMinutes', $TaskMinutes, '-Model', $Model, '-LogRoot', "`"$LogDir`"", '-ShiftStamp', $Stamp)
+        $started = Start-Detached -Label "Dark factory lane $n" -Dir $dir -ScriptArgs $laneArgs
+        $procs += $started
+        $where = if ($started.Tab) { "herdr tab $($started.Tab)" } else { "pid $($started.Process.Id)" }
+        Write-Trace '-' 'lane' "lane $n started in $dir ($where)"
+        Start-Sleep -Seconds 15
+    }
+    # A lane is finished once it has written its summary. A herdr tab has no process to
+    # watch, so the summaries are the signal; a lane that dies without one is given up on
+    # after the shift's length plus one task's time limit.
+    $summaries = Join-Path $LogDir "lanes-$Stamp"
+    $giveUp = $shiftEnd.AddMinutes($TaskMinutes + 30)
+    while ((Get-Date) -lt $giveUp) {
+        $finished = @(Get-ChildItem $summaries -Filter 'lane-*.txt' -ErrorAction SilentlyContinue).Count
+        if ($finished -ge $Lanes) { break }
+        $running = @($procs | Where-Object { $_.Tab -or -not $_.Process.HasExited }).Count
+        if ($running -eq 0) { break }
+        Start-Sleep -Seconds 30
+    }
+
+    git -C $Root pull -q --ff-only origin $branch 2>&1 | Out-Null
+    $stalls = @()
+    foreach ($file in Get-ChildItem (Join-Path $LogDir "lanes-$Stamp") -Filter 'lane-*.txt' -ErrorAction SilentlyContinue) {
+        foreach ($line in Get-Content $file.FullName) {
+            if ($line -match '^SUMMARY ') { Write-Trace '-' 'lane' ($line -replace '^SUMMARY ', '') 'Cyan' }
+            elseif ($line.Trim()) { $stalls += $line }
+        }
+    }
+    Write-Trace '-' 'shift' "end  $Lanes lanes" 'Cyan'
+    $reasons = @($stalls) + @(Get-WaitingOnStewart)
+    if ($reasons.Count -gt 0) { Invoke-Alarm -Reasons $reasons; exit 2 }
+    try { $Host.UI.RawUI.WindowTitle = 'Dark factory - shift complete' } catch { }
+    exit 0
+}
+
+# ------------------------------------------------ one runner: this checkout, or a lane
+
+try { $Host.UI.RawUI.WindowTitle = if ($Lane) { "Dark factory - lane $Lane" } else { 'Dark factory - running' } } catch { }
+
+if ($Lane) {
+    if (-not $Branch) { Write-Trace '-' 'refuse' 'a lane needs -Branch' 'Red'; exit 1 }
+    $branch = $Branch
+} else {
+    $branch = (git -C $Root rev-parse --abbrev-ref HEAD).Trim()
+    if ($branch -in 'master', 'main') { Write-Trace '-' 'refuse' "on $branch; switch to a feature branch" 'Red'; exit 1 }
+    if (Get-Dirty) { Write-Trace '-' 'refuse' 'working tree not clean; commit or stash first' 'Red'; exit 1 }
+    $stuck = @(Get-ChildItem (Join-Path $Root 'Tasks\Doing') -Filter 'BL-*.md' -ErrorAction SilentlyContinue)
+    if ($stuck.Count) { Write-Trace '-' 'refuse' "task already in Doing: $($stuck[0].Name)" 'Red'; exit 1 }
+}
+
 Write-Trace '-' 'shift' "start  branch=$branch model=$Model until $($shiftEnd.ToString('HH:mm'))" 'Cyan'
 
 $done = 0; $blocked = 0; $stalls = @(); $failStreak = 0; $attempted = @{}
@@ -540,10 +905,17 @@ while ($true) {
     if ($MaxTasks -gt 0 -and ($done + $blocked + $stalls.Count) -ge $MaxTasks) { $stopWhy = 'max tasks'; break }
     if ($failStreak -ge 2) { $stopWhy = 'runs failing'; break }
 
-    $next = (Invoke-Board @('next')) -join "`n"
-    if ($next -notmatch '(BL-\d{3})') { $stopWhy = 'nothing ready'; break }
-    $id = $Matches[1]
-    if ($attempted.ContainsKey($id)) { $stopWhy = "$id offered twice"; $stalls += "$id offered again after a run"; break }
+    if ($Lane) {
+        $claim = Invoke-Claim -Skip @($attempted.Keys)
+        if ($claim.None) { $stopWhy = 'nothing ready'; break }
+        if ($claim.Wait) { Write-Trace '-' 'wait' $claim.Why 'DarkGray'; Start-Sleep -Seconds 60; continue }
+        $id = $claim.Id
+    } else {
+        $next = (Invoke-Board @('next')) -join "`n"
+        if ($next -notmatch '(?m)^(BL-\d{3})\s') { $stopWhy = 'nothing ready'; break }
+        $id = $Matches[1]
+        if ($attempted.ContainsKey($id)) { $stopWhy = "$id offered twice"; $stalls += "$id offered again after a run"; break }
+    }
     $attempted[$id] = $true
 
     Write-Trace $id 'claim' (Get-Short (Get-TaskTitle $id)) 'Cyan'
@@ -553,10 +925,24 @@ while ($true) {
     if ($state -eq 'Doing') {
         $why = if ($run.TimedOut) { "timed out after $TaskMinutes min" } else { "run ended in Doing, exit $($run.ExitCode)" }
         Save-StrayChanges $id
-        Invoke-Board @('move', '-Id', $id, '-To', 'Blocked', '-Reason', "Stewart: dark factory $why; see logs\$id-$Stamp.jsonl") | Out-Null
+        Invoke-Board @('move', '-Id', $id, '-To', 'Blocked', '-Reason', "Stewart: dark factory $why; see logs\$id-$Stamp$LaneTag.jsonl") | Out-Null
+        git -C $Root add -A Tasks 2>&1 | Out-Null
+        git -C $Root commit -q -m "chore(tasks): block $id - dark factory $why" 2>&1 | Out-Null
+        if (-not $Lane) { git -C $Root push -q 2>&1 | Out-Null }
         $state = Get-TaskState $id
     }
     Save-StrayChanges $id
+
+    if ($Lane -and $state -in 'Done', 'Blocked') {
+        $problem = Invoke-Integrate -Id $id -State $state
+        if ($problem) {
+            Write-Trace $id 'PARKED' $problem 'Red'
+            Invoke-Park -Id $id -Why $problem
+            $state = 'Blocked'
+        } else {
+            Write-Trace $id 'push' "integrated into $branch"
+        }
+    }
 
     if ($state -eq 'Done') {
         $done++; $failStreak = 0
@@ -579,9 +965,16 @@ while ($true) {
 }
 
 Write-Trace '-' 'shift' "end ($stopWhy)  done=$done blocked=$blocked stalled=$($stalls.Count)" 'Cyan'
+if ($stopWhy -eq 'runs failing') { $stalls = @('FACTORY STALLED - two runs in a row failed; check logs\') + $stalls }
+
+if ($Lane) {
+    # The coordinator raises one alarm for every lane; a lane only reports.
+    Write-LaneSummary (@("SUMMARY lane $Lane ended ($stopWhy): done=$done blocked=$blocked stalled=$($stalls.Count)") + $stalls)
+    try { $Host.UI.RawUI.WindowTitle = "Dark factory - lane $Lane finished" } catch { }
+    exit 0
+}
 
 $reasons = @($stalls) + @(Get-WaitingOnStewart)
-if ($stopWhy -eq 'runs failing') { $reasons = @('FACTORY STALLED - two runs in a row failed; check logs\') + $reasons }
 if ($reasons.Count -gt 0) {
     Invoke-Alarm -Reasons $reasons
     exit 2

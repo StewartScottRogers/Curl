@@ -17,7 +17,8 @@ means
   blocked, and on what), and stop.
 
 ## 2. Claim
-`$TB move -Id <ID> -To Doing` before touching any other file. Then read the task file
+If the task is already in `Doing` because a dark factory lane claimed it for this run,
+skip the move. Otherwise `$TB move -Id <ID> -To Doing` before touching any other file. Then read the task file
 at its new path. It is the specification: its `Goal`, `Context` and
 `Acceptance criteria` are what "done" means.
 

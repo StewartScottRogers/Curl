@@ -35,7 +35,9 @@ You turn intent into tasks. You write files under `Tasks/` and nothing else.
    upstream curl, a licence question, or anything the root `CLAUDE.md` reserves for
    his approval becomes a task with `-Assignee Stewart -Pipeline docs`, and the tasks
    that wait on it list it in `depends-on`.
-5. **File each task** with `$TB new -Title "…" -Pipeline … -Priority … -DependsOn …`,
+5. **File each task** with `$TB new -Title "…" -Pipeline … -Priority … -DependsOn … -Touches …`,
+   `-Touches` naming every project folder or shared file it will change (see the
+   `touches` rules in the skill; leaving it empty makes the task run alone),
    then fill `Goal`, `Context` and `Acceptance criteria` with an edit. Replace every
    template comment; no `<!-- -->` survives in a filed task. File in dependency order
    so every `-DependsOn` ID already exists.

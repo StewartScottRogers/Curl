@@ -58,6 +58,21 @@ the folder a task sits in is its status: `Backlog`, `Doing`, `Blocked`, `Deferre
 `.claude/skills/task-board/SKILL.md` before creating, moving or editing a task, and move
 tasks only with its script. `/task-plan` files tasks, `/task-run` works them, and
 `/task-status` and `/task-archive` keep the board tidy.
+
+## Dark factory
+`RunDarkFactory.cmd` works the board unattended: each ready task goes to a headless
+`/task-run`, and anything that needs Stewart ends in `Blocked` with an alarm at the end
+of the shift. `-Lanes N` runs N tasks at once, each in its own git worktree beside the
+checkout (`<repo>.lanes\lane-<n>`); the board never gives two lanes tasks whose
+`touches` overlap, and each lane rebases, rebuilds, tests and pushes its own work, one
+lane at a time. See the script's header for the details.
+
+When Claude starts a shift it always passes `-NewTab`, e.g.
+`RunDarkFactory.cmd -NewTab -Lanes 4`. Inside herdr (`HERDR_ENV=1`) that opens the shift
+and each of its lanes as herdr tabs in the current workspace; outside herdr, as console
+windows. Never start one with `Start-Process` or a bare background command: Stewart
+watches shifts in herdr. Stop a shift by closing its tabs (or killing its process tree),
+then return any task left in `Doing` to `Backlog` with the board script.
 ## Repository layout
 Flat and linear. Every project is a directory immediately under the repository root.
 There is no `src/` and no `tests/`; do not create them.
