@@ -8,7 +8,7 @@ depends-on: [BL-051]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-078 — Warn when there are more output options than URLs
 
@@ -40,23 +40,41 @@ ordering.
 
 ## Acceptance criteria
 
-- [ ] Tests in `Curl.Cli.UnitTests` assert that `-o f -o g URL` is accepted with exactly
+- [x] Tests in `Curl.Cli.UnitTests` assert that `-o f -o g URL` is accepted with exactly
       one warning line, `Warning: Got more output options than URLs`.
-- [ ] Tests assert that `-o f URL` and `-o f URL1 URL2` carry no such warning.
-- [ ] A test asserts the order of warning lines when both this warning and BL-051's
+- [x] Tests assert that `-o f URL` and `-o f URL1 URL2` carry no such warning.
+- [x] A test asserts the order of warning lines when both this warning and BL-051's
       flag-like file name warning apply (`-o -s -o g URL`), matching the order the local
       curl 8.21.0 prints them.
-- [ ] Where curl prints the line relative to the transfer is stated, with the command
+- [x] Where curl prints the line relative to the transfer is stated, with the command
       used to measure it, in the XML documentation of the member that produces it and in
       `Curl.Cli.UnitLibrary/README.md`.
-- [ ] If curl prints it after the transfer, a Backlog task against `Curl.Console` exists
+- [x] If curl prints it after the transfer, a Backlog task against `Curl.Console` exists
       for writing it at that point.
-- [ ] `dotnet build Curl.Cli.UnitLibrary -warnaserror` is clean and
+- [x] `dotnet build Curl.Cli.UnitLibrary -warnaserror` is clean and
       `dotnet test Curl.Cli.UnitTests --filter "TestCategory!=Integration"` is green.
 
 ## Notes
+
+- Measured with the local curl 8.21.0 on Windows (2026-09-26): curl prints the warning
+  **after** the transfer. `curl -o f -o g file:///Z:/nx` gives
+  `curl: (37) Could not open file Z:/nx`, then `Warning: Got more output options than URLs`;
+  `curl -o -s -o g file:///Z:/nx` gives the file-name warning, the transfer error, then this
+  warning. It is printed once however many `-o` are left over, `--url` counts as a URL, and
+  `-s` anywhere on the command line drops it (`-s --no-silent` keeps it): curl checks the
+  final silent state when it prints, unlike the warnings raised while reading.
+- Choice: the warning goes in a new `CommandLineParseResult.WarningLinesAfterTransfers`
+  list, not appended to `WarningLines`. Why: `Curl.Console/CurlCommandRunner.cs` writes
+  `WarningLines` before the transfer, so appending there would print it in the wrong place
+  until the console changed, and would make that property's "written before anything else"
+  documentation false. It is still on the parse result, as the task asked, and the order
+  test asserts both lists for `-o -s -o g URL`. The text is `CommandLineWarning.MoreOutputOptionsThanUrls`.
+- `-O`/`--remote-name` also counts as an output option in curl (`curl -o f -O URL` warns),
+  but `-O` is not in the option table yet; whoever adds it must count it here.
+- Filed BL-106 against `Curl.Console` to write the list after the transfers.
 
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. An accepted command line with more -o values than URLs carries 'Warning: Got more output options than URLs' in CommandLineParseResult.WarningLinesAfterTransfers
