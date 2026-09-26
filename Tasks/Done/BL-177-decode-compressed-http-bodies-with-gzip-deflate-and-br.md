@@ -46,7 +46,7 @@ With `Compressed` set the handler sends the BL-154 ADR's Accept-Encoding and dec
   - The first 15 bytes of the gzip body alone write `hell` with exit 0: truncation is no error.
   - `Content-Encoding: foo` with `Content-Length: 0` exits 0, and so does a 304 with it.
   - A 302 with `Content-Encoding: foo` and body `AB`, under `-L --max-redirs 1 --compressed`, ends with `curl: (47) Maximum (1) redirects followed`, not 61, so a followed redirect's body is not decoded.
-  - Bytes after the end of the stream (zlib, br, gzip + `41 42`) write `hello`, then `curl: (23) Failed writing received data to disk/application`. Not done here: filed as BL-272.
+  - Bytes after the end of the stream (zlib, br, gzip + `41 42`) write `hello`, then `curl: (23) Failed writing received data to disk/application`. Not done here: filed as BL-281.
 - **Decision (ADR-0027, decided by Claude under Stewart's delegation).** The BCL does not expose zlib's error text. Curl's own code checks the gzip and zlib headers so that `incorrect header check` and `unknown compression method` match. Any other corrupt data gives curl's generic exit 61 text. For deflate, that differs from the measured `invalid block type`.
 - **Default taken.** A failed output write under decoding reports the encoded piece's size as `passed` in the exit 23 message. Curl reports its decoded write size, which was not measured.
 

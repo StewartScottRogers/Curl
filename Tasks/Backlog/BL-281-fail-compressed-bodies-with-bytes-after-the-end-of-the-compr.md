@@ -1,5 +1,5 @@
 ---
-id: BL-272
+id: BL-281
 title: Fail --compressed bodies with bytes after the end of the compressed stream as curl does
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-272 — Fail --compressed bodies with bytes after the end of the compressed stream as curl does
+# BL-281 — Fail --compressed bodies with bytes after the end of the compressed stream as curl does
 
 ## Goal
 
