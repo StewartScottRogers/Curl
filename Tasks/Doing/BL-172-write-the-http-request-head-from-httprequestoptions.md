@@ -39,3 +39,4 @@ An internal request writer produces the request line and headers byte-equal to c
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
