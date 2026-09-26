@@ -30,10 +30,10 @@ Digest authentication answers challenges with MD5, SHA-256, SHA-512-256, the `-s
 ## Notes
 
 - Plan item: A2 in the Phase 1 HTTP plan (2026-09-26); plan keys in this file were replaced by their task IDs.
-- `touches` widened to `Documentation/Planning/Decisions` for ADR-0023; no task in Doing names it.
+- `touches` widened to `Documentation/Planning/Decisions` for ADR-0025; no task in Doing names it.
 - Delivered: `DigestAuthenticator(Encoding credentialEncoding, Func<string> createClientNonce)`, an `IHttpAuthenticator` that answers the first Digest challenge when Digest is allowed and a credential exists; `DigestClientNonce.CreateRandom` for production. Internals: `DigestChallenge` (finds the first Digest element as http.c's `authcmp` does), `DigestChallengeParameters` + `DigestChallengeBuilder` (curl's `get_pair` and decoder, including the 255/1023/32 limits), `DigestAlgorithm`, `DigestQuoting`, and a hand-rolled `Sha512Slash256` (FIPS 180-4; not in the BCL).
 - Scheme choice among several offered challenges is BL-218's; composing this with `BasicAndBearerAuthenticator` for `Curl.Console` is BL-218/BL-237's. Construct as `new DigestAuthenticator(CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()), DigestClientNonce.CreateRandom)`.
-- **Decision (ADR-0023):** the mingw reference build does Digest through Windows SSPI (WDigest), which refuses SHA-256, SHA-512-256, userhash and md5-sess+auth-int with exit 94 and formats MD5 differently. Curl follows curl's own `lib/vauth/digest.c` (the OpenSSL build's code) on every platform, since that is the only implementation that meets this task and has source to follow.
+- **Decision (ADR-0025):** the mingw reference build does Digest through Windows SSPI (WDigest), which refuses SHA-256, SHA-512-256, userhash and md5-sess+auth-int with exit 94 and formats MD5 differently. Curl follows curl's own `lib/vauth/digest.c` (the OpenSSL build's code) on every platform, since that is the only implementation that meets this task and has source to follow.
 - Stateless (ADR-0014): always `nc=00000001`; `stale` is ignored; curl's "second nonce without stale means bad credentials" check is left to the retry logic.
 - Measurements (2026-09-26). Server: a loopback listener answering every request `HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: <challenge>\r\nContent-Length: 0\r\n\r\n`, 2 connections; URL `http://<host>:<port>/dir/index.html?x=1`; command `curl -s -m 5 --digest -u <user:password> <url>`.
   - mingw curl 8.21.0 (Windows, SSPI) via `Record-CurlExchange.ps1`: MD5 `qop="auth,auth-int"` -> `Authorization: Digest username="Mufasa",realm="testrealm@host.com",nonce="dcd98b7102dd2f0e8b11d0f600bfb0c093",uri="/dir/index.html?x=1",cnonce="355626b99094bc8eb8b6541e63b18fb1",nc=00000001,response="3faabfc3187546be5e073c666e073e73",qop="auth",opaque="5ccc069c403ebaf9f0171e9517f40e41"`; SHA-256, SHA-512-256-sess+userhash, md5-sess+auth-int, SHA-1, unquoted params -> exit 94, no second request; MD5-sess without qop -> answered with `algorithm=MD5-sess`, no cnonce.
@@ -58,4 +58,4 @@ Digest authentication answers challenges with MD5, SHA-256, SHA-512-256, the `-s
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
-- 2026-09-26: Doing -> Done. DigestAuthenticator answers MD5, SHA-256, SHA-512-256, -sess, qop auth/auth-int and userhash challenges as curl 8.21.0's own Digest code does (ADR-0023)
+- 2026-09-26: Doing -> Done. DigestAuthenticator answers MD5, SHA-256, SHA-512-256, -sess, qop auth/auth-int and userhash challenges as curl 8.21.0's own Digest code does (ADR-0025)

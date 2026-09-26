@@ -6,7 +6,7 @@ namespace Curl.Authentication;
 
 /// <summary>
 /// Answers Digest challenges (RFC 7616) with the <c>Authorization</c> value curl 8.21.0
-/// builds in its own Digest code, the one the OpenSSL build uses (ADR-0023): MD5, SHA-256
+/// builds in its own Digest code, the one the OpenSSL build uses (ADR-0025): MD5, SHA-256
 /// and SHA-512-256, their <c>-sess</c> variants, <c>qop=auth</c> and <c>auth-int</c>, and
 /// <c>userhash</c>.
 /// </summary>
