@@ -1,5 +1,5 @@
 ---
-id: BL-090
+id: BL-095
 title: Pass -r, -C and --max-filesize from the command line into each transfer in Curl.Console
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-090 — Pass -r, -C and --max-filesize from the command line into each transfer in Curl.Console
+# BL-095 — Pass -r, -C and --max-filesize from the command line into each transfer in Curl.Console
 
 ## Goal
 

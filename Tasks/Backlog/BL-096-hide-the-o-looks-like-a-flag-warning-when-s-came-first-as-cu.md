@@ -1,5 +1,5 @@
 ---
-id: BL-091
+id: BL-096
 title: Hide the -o looks-like-a-flag warning when -s came first, as curl does
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-091 — Hide the -o looks-like-a-flag warning when -s came first, as curl does
+# BL-096 — Hide the -o looks-like-a-flag warning when -s came first, as curl does
 
 ## Goal
 

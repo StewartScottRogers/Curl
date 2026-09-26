@@ -89,9 +89,9 @@ upstream error list during planning.
 - **`ITransferContext.MaxFileSize`** (`long?`) added to the shared contract (ADR-0003's
   family of options). Only `file://` enforces it. The ADR itself is not amended:
   `Documentation/Planning/Decisions` was not in this task's `touches`.
-- **Not done here, filed:** BL-090 wires `Range`, `ResumeFrom` and `MaxFileSize` into
+- **Not done here, filed:** BL-095 wires `Range`, `ResumeFrom` and `MaxFileSize` into
   `Curl.Console`'s `CurlCommandRunner.CreateContext` (not in `touches`; until then the console
-  accepts the three options and ignores them, and prints no parse warnings). BL-091 makes the
+  accepts the three options and ignores them, and prints no parse warnings). BL-096 makes the
   existing `-o` looks-like-a-flag warning respect `-s`, a divergence found while measuring.
 - **Quality gate:** `Measure-CodeQuality.ps1` shows no failing member added by this task; every
   failure it lists in the four libraries predates it. Run it with a lane-private
