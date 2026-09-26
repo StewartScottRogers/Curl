@@ -97,13 +97,13 @@ internal static class OpenSslCipherSuites
             return (null, null);
         }
 
-        var tls12Suites = ciphers is null ? DefaultTls12Suites : ParseList(ciphers, tls13: false);
+        var tls12Suites = ParseListOrDefault(ciphers, DefaultTls12Suites, tls13: false);
         if (tls12Suites.Count == 0)
         {
             return (null, TlsFailureMessages.OpenSslCipherListUnusable(ciphers!));
         }
 
-        var tls13Suites = tls13Ciphers is null ? DefaultTls13Suites : ParseList(tls13Ciphers, tls13: true);
+        var tls13Suites = ParseListOrDefault(tls13Ciphers, DefaultTls13Suites, tls13: true);
         if (tls13Suites.Count == 0)
         {
             return (null, TlsFailureMessages.OpenSslTls13CipherSuiteUnusable(tls13Ciphers!));
@@ -141,6 +141,13 @@ internal static class OpenSslCipherSuites
 
         return Tls12SuitesByOpenSslName.TryGetValue(entry, out var openSslSuite) ? openSslSuite : null;
     }
+
+    // The option's known suites, or the build's defaults when the option is not given.
+    private static IReadOnlyList<TlsCipherSuite> ParseListOrDefault(
+        string? value,
+        IReadOnlyList<TlsCipherSuite> defaults,
+        bool tls13) =>
+        value is null ? defaults : ParseList(value, tls13);
 
     // Keeps the known suites of the one version, in the order given, each once.
     private static List<TlsCipherSuite> ParseList(string value, bool tls13)
