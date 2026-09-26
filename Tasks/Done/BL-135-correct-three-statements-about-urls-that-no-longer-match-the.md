@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Abstractions.UnitLibrary, Documentation/Product/Requirements.md, Tasks/Backlog/BL-010-decide-urls-system-uri-cannot-round-trip.md]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-135 — Correct three statements about URLs that no longer match the code
 
@@ -53,29 +53,33 @@ appending one `Log` line recording the correction.
 
 ## Acceptance criteria
 
-- [ ] In `Tasks/Backlog/BL-010-decide-urls-system-uri-cannot-round-trip.md` (or wherever
+- [x] In `Tasks/Backlog/BL-010-decide-urls-system-uri-cannot-round-trip.md` (or wherever
       BL-010 sits when this runs, unless archived), the first acceptance criterion
       attributes "A Dos path must be rooted" to `file://C:` only and "The hostname could
       not be parsed" to `file://ab:/x`, both still `UriFormatException`, with the .NET
       version (10.0.12) named; a `Log` line dated the day of the edit records the correction.
-- [ ] The `<summary>` of `ITransferContext.Url` in
+- [x] The `<summary>` of `ITransferContext.Url` in
       `Curl.Protocol.Abstractions.UnitLibrary/ITransferContext.cs` no longer mentions
       scheme rewriting and states what the property is now (the URL being transferred, as
       given on the command line and parsed into a `System.Uri`).
       `Select-String -Path Curl.Protocol.Abstractions.UnitLibrary\*.cs -Pattern "rewrit"`
       returns nothing.
-- [ ] FR-012 in `Documentation/Product/Requirements.md` no longer says there is no option
+- [x] FR-012 in `Documentation/Product/Requirements.md` no longer says there is no option
       parser; it states that `CommandLineParser` does not recognise `--path-as-is` and
       refuses it as unknown with exit 2, and keeps the statement that nothing on
       `ITransferContext` carries the flag. No other requirement row changes.
-- [ ] `dotnet build Curl.Protocol.Abstractions.UnitLibrary -warnaserror` is clean.
-- [ ] `dotnet test --filter "TestCategory!=Integration"` passes with the same test count
+- [x] `dotnet build Curl.Protocol.Abstractions.UnitLibrary -warnaserror` is clean.
+- [x] `dotnet test --filter "TestCategory!=Integration"` passes with the same test count
       as before; `git diff --stat` shows no `.cs` file changed other than
       `ITransferContext.cs`, and within it only comment lines.
 
 ## Notes
 
+- Done directly rather than through `align-and-document`: three one-sentence corrections, each fact re-checked in the code first (the two test comments, `CommandLineRefusal.UnknownOption`, no `path-as-is` in `Curl.Cli.UnitLibrary`).
+- Test count unchanged by construction: the only `.cs` change is a doc comment. Fast run: 0 failed.
+
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. ITransferContext.Url, FR-012 and BL-010's first criterion now state what the code does

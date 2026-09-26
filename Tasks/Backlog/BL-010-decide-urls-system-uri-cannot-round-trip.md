@@ -30,9 +30,11 @@ ahead of it.
 
 - [ ] The decision covers the spellings `System.Uri` **refuses** as well as those it
       silently alters. Measured against curl 8.21.0 on 2026-09-25: `file://C:` gives
-      exit 37 `Could not open file C:`, and `file://ab:/x` gives exit 3 - but
-      `new Uri(...)` throws `UriFormatException` ("A Dos path must be rooted") for both,
-      so neither can reach a protocol handler while `ITransferContext.Url` is a `Uri`.
+      exit 37 `Could not open file C:`, and `file://ab:/x` gives exit 3 - but on
+      .NET 10.0.12 `new Uri(...)` throws `UriFormatException` for both: "A Dos path
+      must be rooted" for `file://C:` and "The hostname could not be parsed" for
+      `file://ab:/x`, so neither can reach a protocol handler while
+      `ITransferContext.Url` is a `Uri`.
       `Curl.Protocol.File.UnitTests` has had to skip `file://C:` for this reason.
 
 - [ ] Claude has chosen, under Stewart's delegation, between replacing, wrapping, or pre-parsing ahead of
@@ -53,3 +55,4 @@ file it as a separate task assigned to Claude and add it to `depends-on`.
 - 2026-09-25: Scope widened to the two spellings System.Uri throws on, not only those it alters (conformance re-audit).
 - 2026-09-26: Waits on BL-128, a proposed ADR Stewart asked for before deciding.
 - 2026-09-26: Stewart delegated the decision to Claude; reassigned. Still waits on BL-128.
+- 2026-09-26: First acceptance criterion corrected: "A Dos path must be rooted" is thrown for `file://C:` only; `file://ab:/x` throws "The hostname could not be parsed" (BL-135).

@@ -7,7 +7,8 @@ namespace Curl.Protocol.Abstractions;
 public interface ITransferContext
 {
     /// <summary>
-    /// Gets the URL being transferred, after any scheme rewriting has been applied.
+    /// Gets the URL being transferred, as given on the command line and parsed into a
+    /// <see cref="System.Uri" />.
     /// </summary>
     Uri Url { get; }
 
