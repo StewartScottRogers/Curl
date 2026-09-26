@@ -1,5 +1,5 @@
 ---
-description: Run the full Curl delivery pipeline for one feature — plan, test, implement, verify, review, document.
+description: Run the full Curl delivery pipeline for one feature — plan, test, implement, verify, review, align and document.
 argument-hint: <what to build, e.g. "--max-time option in Curl.Cli">
 ---
 Deliver this feature end to end: **$ARGUMENTS**
@@ -46,9 +46,12 @@ pipeline, moves the task between states.
    change touches an option, an exit code, or output bytes. Skip for internal refactors.
    *Gate:* no **Blocker** findings. Majors either get fixed or get an ADR.
 
-8. **Document** — delegate to `docs-writer`: add or update the requirement, and write
-   the ADR if any stage called for one. Task state is not `docs-writer`'s job; `/task-run`
-   moves the task.
+8. **Align and document** — delegate to `align-and-document` with the files this feature
+   touched: check every new or changed name says what it does, write the XML doc comments,
+   update the project README, `CLAUDE.md`, wiki and glossary, add or update the
+   requirement, and write the ADR if any stage called for one.
+   *Gate:* no misaligned name or statement left unfixed or unfiled. If it renamed anything,
+   re-run step 5. Task state is not its job; `/task-run` moves the task.
 
 Finish with a summary: what now works, the projects touched, test counts, and anything
 deferred, filed as tasks by `task-planner`, with their task IDs. Do not commit unless the user asks.

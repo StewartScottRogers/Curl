@@ -63,9 +63,9 @@ library's own `CLAUDE.md` should say it out loud.
 
 ## Notes
 
-The XML remarks on the `FileProtocolHandler` class are out of scope: this is a `docs`
-pipeline task and `docs-writer` never edits a `.cs` file. Whoever next edits that file under
-a `feature` pipeline should bring the class remarks in line with the table this task writes.
+The XML remarks on the `FileProtocolHandler` class are out of scope: this task is scoped to
+Markdown (see the last acceptance criterion). Whoever next edits that file should bring the
+class remarks in line with the table this task writes.
 
 Depends on BL-020, which adds `ConvertLineEndings` to `ITransferContext` and makes the
 upload path honour it; writing the table before that lands would make it wrong on its first

@@ -94,7 +94,7 @@ exists yet, and nothing on `ITransferContext` carries the flag. Do not add a mem
 it exists so both behaviours are pinned by tests now. Wiring the option belongs with the
 command line work.
 
-The ADR-0003 correction is a `docs-writer` edit and can be done in the document stage of
+The ADR-0003 correction is an `align-and-document` edit and can be done in the document stage of
 the same `/feature` run; it does not need a separate task.
 
 ## Log

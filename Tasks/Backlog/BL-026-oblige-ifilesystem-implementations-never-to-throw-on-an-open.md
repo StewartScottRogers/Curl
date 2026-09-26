@@ -66,8 +66,8 @@ write the obligation down rather than discover it in a stack trace.
 ## Notes
 
 The XML documentation on `IFileSystem.cs` is where a C# caller would most naturally read
-this, but that is a `.cs` file and `docs-writer` does not edit those. Whoever next changes
-`IFileSystem.cs` under a `feature` pipeline — BL-018 is the first — should copy the
+this, but this task is scoped to Markdown and changes no `.cs` file. Whoever next changes
+`IFileSystem.cs` — BL-018 is the first — should copy the
 obligation into the interface's remarks.
 
 BL-009 now depends on this task and has an acceptance criterion requiring

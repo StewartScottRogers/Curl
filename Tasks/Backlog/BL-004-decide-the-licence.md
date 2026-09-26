@@ -19,7 +19,7 @@ Curl has a chosen licence, recorded as an Architecture Decision Record, and
 ## Context
 
 Open question 1 in `Documentation/Product/Product-Overview.md`. This blocks the
-first public release. The choice is Stewart's; once it is made, `docs-writer` records
+first public release. The choice is Stewart's; once it is made, `align-and-document` records
 it.
 
 ## Acceptance criteria

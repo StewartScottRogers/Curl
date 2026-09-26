@@ -89,6 +89,15 @@ them. The `Solution Items` and `Scripts` solution folders hold loose files only.
 Each project folder may contain its own `CLAUDE.md` with project-specific rules; follow it when working in that folder.
 
 ## Solution-wide conventions
+- **Say what it does, do what it says.** Every name - project, file, type, member,
+  parameter, test, script, task - says exactly what the thing does, and the thing does
+  nothing its name hides. No generic names (`Process`, `Handle`, `Manager`, `Helper`,
+  `Utils`, `Data`) where a specific one exists; one concept has one name, the one in
+  `Documentation/Wiki/Glossary.md` (not yet written; `align-and-document` starts it on
+  its first run). Documents obey the same rule: every statement is true
+  of the code as it is now, and intent is written as intent. A misaligned name or document
+  is a defect, because it is how an agent reading this repository comes to believe
+  something false. The `align-and-document` agent owns this.
 - **Base class library only.** Write against `System.*`. Sockets, TLS, HTTP, DNS,
   compression, JSON and argument handling are all in the BCL already, and
   `Curl.Console` publishes native AOT, where every dependency is a trim risk. The

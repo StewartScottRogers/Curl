@@ -27,7 +27,8 @@ at its new path. It is the specification: its `Goal`, `Context` and
   The acceptance criteria are gates in addition to each stage's own gate.
 - `protocol`: run the `/protocol` stages for the scheme the task names, on the same
   terms.
-- `docs`: delegate to `docs-writer` with the task file.
+- `docs`: delegate to `align-and-document` with the task file, then invoke the `verify`
+  skill if it touched any `.cs` or project file.
 - `direct`: make the change yourself, then invoke the `verify` skill.
 
 As you go, record the plan's summary and anything learned under the task's `Notes`,

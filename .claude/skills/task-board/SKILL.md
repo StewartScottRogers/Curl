@@ -31,7 +31,7 @@ description: Rules and tooling for Curl's task board — the Tasks shared projec
 | --- | --- |
 | `feature` | The `/feature` stages: plan, tests first, implement, verify, review, conformance, document. |
 | `protocol` | The `/protocol` stages for the scheme the task names. |
-| `docs` | `docs-writer` alone. No C# changes. |
+| `docs` | `align-and-document`: names aligned with behaviour, XML doc comments, READMEs, wiki, glossary, requirements and ADRs. Never a behaviour change; renames and doc comments may touch `.cs` files, so the `verify` skill runs after. |
 | `direct` | A small mechanical change made in the session (configuration, scripts, solution file), then the `verify` skill. |
 
 ## Body
