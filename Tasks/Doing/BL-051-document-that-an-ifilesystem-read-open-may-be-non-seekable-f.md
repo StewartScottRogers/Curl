@@ -42,3 +42,4 @@ Abstractions library, so the docs were left for this task.
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
