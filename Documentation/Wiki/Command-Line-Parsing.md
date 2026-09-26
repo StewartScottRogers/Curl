@@ -32,12 +32,13 @@ matched exactly and case-sensitively, with no prefix matching (`--sil` and `--Si
 are unknown); a short letter is matched case-sensitively.
 
 Adding an option is one new row in `CommandLineOptionTable` plus the property it sets on
-`CommandLineOptions`; the parser does not change. A row is made with one of three
+`CommandLineOptions`; the parser does not change. A row is made with one of these
 factories:
 
 | Factory | Makes | Empty value |
 | --- | --- | --- |
-| `CommandLineOption.Flag(longName, shortName, set)` | A flag option; `set` runs when it is given. | Not applicable: a flag takes no value. |
+| `CommandLineOption.Flag(longName, shortName, set)` | A flag option; `set` runs when it is given. Its `--no-` spelling is refused. | Not applicable: a flag takes no value. |
+| `CommandLineOption.NegatableFlag(longName, shortName, set)` | A flag option that `--no-<long name>` turns off; `set` receives `true` for the positive spelling and `false` for the `--no-` spelling. | Not applicable: a flag takes no value. |
 | `CommandLineOption.Text(longName, shortName, set)` | A value option taking text; `set` receives the text. | Refused as `blank argument where content is expected`. |
 | `CommandLineOption.Value(longName, shortName, apply)` | A value option whose applier does all of the checking. | Whatever the applier decides. |
 
@@ -62,6 +63,7 @@ The parser walks the arguments once, left to right.
 | --- | --- |
 | `--` (the first one) | Ends option parsing; every later argument, including `-o` and `--`, is a URL. |
 | `--name` or `--name=value` | A long option. A flag ignores an attached value (`--silent=x`). A value option takes the text after the first `=`, or else the next argument, whatever it looks like (`--output -s` records `-s` as the output file name). |
+| `--no-name` or `--no-name=value` | When `name` is not itself a row, the `--no-` spelling of row `name` (below). |
 | `-` alone | Refused as unknown. |
 | `-x`, `-xyz` | A short option or a bundle. Each letter is looked up in turn and flags are set; the first value letter takes the rest of the argument as its value (`-ofile`, `-sofile`, and `-os` records the output file `s`), or the next argument, whatever it looks like, when it is the last letter (`-so file`, `-o -s`). |
 | Anything else | A positional URL, appended to `Options.Urls`. |
@@ -73,6 +75,24 @@ option.
 
 The parser hands every option value, empty or not, unchanged to the row's applier and
 never refuses a value itself.
+
+### `--no-` negation
+
+A long name that is not in the table but starts with `no-` is read as the `--no-`
+spelling of the row named by the rest. As in curl 8.21.0:
+
+- Only the `NegatableFlag` rows negate: `--silent`, `--show-error`, `--insecure` and
+  `--tftp-no-options`. `--no-silent`, `--no-show-error`, `--no-insecure` and
+  `--no-tftp-no-options` turn their flag off, and the last spelling wins: `-s --no-silent`
+  is not silent, `--no-silent -s` is. An attached value is ignored (`--no-silent=x`).
+- The `--no-` spelling of any other row, a plain flag (`--no-tlsv1.2`) or a value option
+  (`--no-output`, `--no-data`, `--no-url`), is refused with
+  `curl: option <spelled>: the given option cannot be reversed with a --no- prefix`. The
+  check comes before a value is taken, so `--no-output` as the last argument is refused
+  this way, not as `requires parameter`.
+- `--no-` alone, a name with no row (`--no-bogus`), a doubled prefix (`--no-no-silent`)
+  and a case mismatch (`--no-Silent`) are unknown.
+- A short letter is never negated.
 
 ## Refusals
 
@@ -91,6 +111,7 @@ The second line is always the try-help line,
 | Factory | First line | When |
 | --- | --- | --- |
 | `UnknownOption` | `curl: option <spelled>: is unknown` | A long name or a short letter not in the table, or a lone `-`. |
+| `CannotBeReversed` | `curl: option <spelled>: the given option cannot be reversed with a --no- prefix` | The `--no-` spelling of a row that is not a `NegatableFlag`. |
 | `RequiresParameter` | `curl: option <spelled>: requires parameter` | A value option is the last argument and has no attached value. |
 | `BlankArgument` | `curl: option <spelled>: blank argument where content is expected` | An empty value for a `Text` row, or an empty positional argument (then `<spelled>` is empty: `curl: option : blank argument where content is expected`). |
 | `ExpectedProperNumericalParameter` | `curl: option <spelled>: expected a proper numerical parameter` | A numeric value that is malformed, empty or too large for an `int`, or an octal value with a non-octal digit. |
@@ -109,8 +130,6 @@ choosing the newline, is the console layer's job.
 - It does not implement `-K`/`--config`, `.curlrc`, `--variable` or `--next`.
 - An empty command line is accepted with default options. curl 8.21.0 answers it with
   only the try-help line and exit 2; matching that is an open gap (task BL-082).
-- `--no-` negation is not implemented: `--no-silent` is refused as unknown today (task
-  BL-054).
 - It prints no warnings: `Warning: The filename argument '<value>' looks like a flag.`
   for an `-o` value starting with `-` (task BL-051) and
   `Warning: Got more output options than URLs` (task BL-078) are open gaps.
