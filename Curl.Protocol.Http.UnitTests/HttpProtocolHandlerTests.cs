@@ -603,6 +603,90 @@ public sealed class HttpProtocolHandlerTests
         Assert.AreEqual(0L, output.Length);
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_RedirectWithoutFollowing_ReportsTheTargetAndWritesTheBody()
+    {
+        const string head = "HTTP/1.1 302 Found\r\nLocation: ../next?x=1\r\nContent-Length: 5\r\n\r\n";
+        foreach (int chunkSize in ChunkSizes)
+        {
+            MemoryStream output = new();
+            MemoryStream headerOutput = new();
+
+            TransferResult result = await Handler(QueueConnector.For(Connection(head + "moved", chunkSize)))
+                .ExecuteAsync(Context("http://example.com/a/b/c", output, headerOutput));
+
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Assert.AreEqual("http://example.com/a/next?x=1", result.Report!.RedirectUrl, $"Chunk size {chunkSize}");
+            Assert.AreEqual(head, Latin1(headerOutput.ToArray()), $"Chunk size {chunkSize}");
+            Assert.AreEqual("moved", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
+        }
+    }
+
+    [TestMethod]
+    [DataRow(
+        "HTTP/1.1 301 Moved Permanently\r\nLocation: //other.example/x\r\nContent-Length: 5\r\n\r\n",
+        "moved",
+        "",
+        DisplayName = "Content-Length body")]
+    [DataRow(
+        "HTTP/1.1 301 Moved Permanently\r\nLocation: //other.example/x\r\nTransfer-Encoding: chunked\r\n\r\n",
+        "5\r\nmoved\r\n0\r\nX-Trailer: t\r\n\r\n",
+        "X-Trailer: t\r\n",
+        DisplayName = "chunked body with a trailer")]
+    public async Task ExecuteAsync_RedirectWhileFollowing_DrainsTheBodyAndStillWritesTheHeaders(string head, string body, string trailers)
+    {
+        foreach (int chunkSize in ChunkSizes)
+        {
+            MemoryStream output = new();
+            MemoryStream headerOutput = new();
+            ScriptedConnection connection = Connection(head + body, chunkSize);
+
+            TransferResult result = await Handler(QueueConnector.For(connection))
+                .ExecuteAsync(FollowContext("http://example.com/", output, headerOutput));
+
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Assert.AreEqual("http://other.example/x", result.Report!.RedirectUrl, $"Chunk size {chunkSize}");
+            Assert.AreEqual(head + trailers, Latin1(headerOutput.ToArray()), $"Chunk size {chunkSize}");
+            Assert.AreEqual(0L, output.Length, $"Chunk size {chunkSize}");
+            Assert.AreEqual(5L, result.Report.DownloadSize, $"Chunk size {chunkSize}");
+            Assert.AreEqual(0, await connection.ReadAsync(new byte[1], CancellationToken.None), $"Chunk size {chunkSize}");
+        }
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_3xxWithoutLocationWhileFollowing_WritesTheBodyAndReportsNoTarget()
+    {
+        MemoryStream output = new();
+
+        TransferResult result = await Handler(QueueConnector.For(Connection("HTTP/1.1 300 Multiple Choices\r\nContent-Length: 5\r\n\r\nlist!", 65536)))
+            .ExecuteAsync(FollowContext("http://example.com/", output));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.IsNull(result.Report!.RedirectUrl);
+        Assert.AreEqual("list!", Latin1(output.ToArray()));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_LocationOn200WhileFollowing_WritesTheBodyAndReportsNoTarget()
+    {
+        MemoryStream output = new();
+
+        TransferResult result = await Handler(QueueConnector.For(Connection("HTTP/1.1 200 OK\r\nLocation: /x\r\nContent-Length: 5\r\n\r\nhello", 65536)))
+            .ExecuteAsync(FollowContext("http://example.com/", output));
+
+        Assert.IsNull(result.Report!.RedirectUrl);
+        Assert.AreEqual("hello", Latin1(output.ToArray()));
+    }
+
+    private static TransferContext FollowContext(string url, Stream output, Stream? headerOutput = null) =>
+        new()
+        {
+            Url = new Uri(url),
+            Output = output,
+            HeaderOutput = headerOutput,
+            Http = new HttpRequestOptions { FollowRedirects = true },
+        };
+
     private static TransferContext FailContext(
         string url,
         HttpFailMode fail,

@@ -51,6 +51,13 @@ namespace Curl.Protocol.Http;
 /// any body is read, and for <c>--fail-with-body</c> after the body is written, as curl
 /// 8.21.0 does (BL-176 Notes).
 /// </para>
+/// <para>
+/// A 3xx response's <c>Location</c> is resolved against the request URL into
+/// <see cref="TransferReport.RedirectUrl" /> (<see cref="HttpRedirectLocation" />), with or
+/// without <c>-L</c>. Under <see cref="HttpRequestOptions.FollowRedirects" /> the body of a
+/// response that has one is read and discarded, counted in the download size as curl counts
+/// it, while its head and trailers are still written to the header output (BL-179 Notes).
+/// </para>
 /// </remarks>
 public sealed class HttpProtocolHandler(
     IConnector connector,
@@ -128,9 +135,11 @@ public sealed class HttpProtocolHandler(
         {
             await SendBodyAsync(context, framing, responseConnection, upload).ConfigureAwait(false);
             exchange.Head = await new HttpResponseHeadReader(responseConnection).ReadAsync(cancellationToken).ConfigureAwait(false);
+            exchange.RedirectUrl = HttpRedirectLocation.Find(context.Url, exchange.Head);
             await WriteHeadersAsync(context.HeaderOutput, exchange.Head.HeadBytes, cancellationToken).ConfigureAwait(false);
             ThrowIfFailing(options.Fail, HttpFailMode.Fail, exchange.Head);
-            await body.CopyAsync(exchange.Head, context.NoBody, context.Output, cancellationToken).ConfigureAwait(false);
+            Stream bodyOutput = BodyOutput(context.Output, options.FollowRedirects, exchange.RedirectUrl);
+            await body.CopyAsync(exchange.Head, context.NoBody, bodyOutput, cancellationToken).ConfigureAwait(false);
             await WriteHeadersAsync(context.HeaderOutput, body.TrailerBytes, cancellationToken).ConfigureAwait(false);
             ThrowIfFailing(options.Fail, HttpFailMode.FailWithBody, exchange.Head);
         }
@@ -143,6 +152,14 @@ public sealed class HttpProtocolHandler(
 
         return TransferResult.Success(body.BytesWritten) with { Report = exchange.Report(body.BytesWritten) };
     }
+
+    /// <summary>
+    /// Chooses where the response body goes: nowhere when <c>-L</c> will follow the redirect,
+    /// so the 3xx body is read and discarded as curl 8.21.0 does, and
+    /// <paramref name="output" /> otherwise.
+    /// </summary>
+    private static Stream BodyOutput(Stream output, bool followRedirects, string? redirectUrl) =>
+        followRedirects && redirectUrl is not null ? Stream.Null : output;
 
     /// <summary>
     /// Sends the request body, if there is one: at once, or once
@@ -230,6 +247,12 @@ public sealed class HttpProtocolHandler(
         internal HttpResponseHead? Head { get; set; }
 
         /// <summary>
+        /// Gets or sets the final head's <c>Location</c> resolved against the request URL,
+        /// <see langword="null" /> until the head is read or when it names none.
+        /// </summary>
+        internal string? RedirectUrl { get; set; }
+
+        /// <summary>
         /// Builds the report: what the connect and request told, and what the final head told
         /// once it was read. The request size counts the body bytes sent as well as the head,
         /// as curl 8.21.0's <c>%{size_request}</c> does (BL-175 Notes).
@@ -249,7 +272,7 @@ public sealed class HttpProtocolHandler(
                 LocalEndPoint = connect.LocalEndPoint,
                 RemoteEndPoint = connection.RemoteEndPoint as IPEndPoint,
             };
-            return Head is null ? report : WithHead(report, Head);
+            return Head is null ? report : WithHead(report, Head) with { RedirectUrl = RedirectUrl };
         }
 
         private static TransferReport WithHead(TransferReport report, HttpResponseHead head) =>
