@@ -7,6 +7,13 @@ namespace Curl.Protocol.Abstractions;
 /// </summary>
 public sealed class TransferContext : ITransferContext
 {
+    /// <summary>
+    /// curl's mode for a file an upload creates when <c>--create-file-mode</c> is not
+    /// given: <c>0644</c>, read and write for the owner and read for everyone else.
+    /// </summary>
+    public const UnixFileMode DefaultCreateFileMode =
+        UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.OtherRead;
+
     /// <inheritdoc />
     public required Uri Url { get; init; }
 
@@ -48,6 +55,9 @@ public sealed class TransferContext : ITransferContext
 
     /// <inheritdoc />
     public bool ConvertLineEndings { get; init; }
+
+    /// <inheritdoc />
+    public UnixFileMode CreateFileMode { get; init; } = DefaultCreateFileMode;
 
     /// <inheritdoc />
     public TimeProvider TimeProvider { get; init; } = TimeProvider.System;

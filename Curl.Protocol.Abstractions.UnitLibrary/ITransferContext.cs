@@ -142,6 +142,19 @@ public interface ITransferContext
     bool ConvertLineEndings { get; }
 
     /// <summary>
+    /// Gets the permission bits a file created by an upload receives on a POSIX system,
+    /// per <c>--create-file-mode</c>; curl's default of <c>0644</c> when not given.
+    /// </summary>
+    /// <remarks>
+    /// Upstream curl applies it to files created remotely by an upload, over
+    /// <c>file://</c>, SFTP and SCP; it does not apply to <c>-o</c>/<c>--output</c>.
+    /// <c>file://</c> passes it to <see cref="IFileSystem.OpenForWriteAsync" />, where the
+    /// process umask still applies, a file that already exists keeps its mode, and
+    /// Windows ignores it.
+    /// </remarks>
+    UnixFileMode CreateFileMode { get; }
+
+    /// <summary>
     /// Gets the time source. Injected so that timeout and retry behaviour is testable
     /// without a real delay.
     /// </summary>

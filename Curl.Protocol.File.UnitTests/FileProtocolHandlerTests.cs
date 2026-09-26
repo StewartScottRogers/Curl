@@ -1827,6 +1827,44 @@ public sealed class FileProtocolHandlerTests
         Assert.AreEqual(FileSystemCall.Write(OsPath, FileWriteMode.Append), call);
     }
 
+    // curl 8.21.0's lib/file.c opens an upload destination with data->set.new_file_perms,
+    // which is 0644 until --create-file-mode changes it.
+    [TestMethod]
+    public async Task ExecuteAsync_UploadWithoutCreateFileMode_AsksForMode0644()
+    {
+        var fileSystem = new FakeFileSystem();
+        var context = new FakeTransferContext
+        {
+            Url = FileUrl,
+            Upload = new TrackedMemoryStream(Content),
+        };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        await handler.ExecuteAsync(context);
+
+        var call = Assert.ContainsSingle(fileSystem.Calls);
+        Assert.AreEqual((UnixFileMode)0b110_100_100, call.CreateMode);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_UploadWithCreateFileMode_PassesThatModeToTheFileSystem()
+    {
+        const UnixFileMode Mode0600 = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+        var fileSystem = new FakeFileSystem();
+        var context = new FakeTransferContext
+        {
+            Url = FileUrl,
+            Upload = new TrackedMemoryStream(Content),
+            CreateFileMode = Mode0600,
+        };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        await handler.ExecuteAsync(context);
+
+        var call = Assert.ContainsSingle(fileSystem.Calls);
+        Assert.AreEqual(FileSystemCall.Write(OsPath, FileWriteMode.Truncate, Mode0600), call);
+    }
+
     // The skip is relative to wherever the caller left the upload source, so a source
     // already positioned at three with -C 2 starts at five. Seeking to the offset absolutely
     // would silently discard the position the caller had set.

@@ -1,3 +1,4 @@
+using System.Runtime.Versioning;
 using System.Text;
 using Curl.Protocol.Abstractions;
 
@@ -7,11 +8,16 @@ namespace Curl.Core.FileSystem;
 /// Drives <see cref="PhysicalFileSystem" /> against the real disk, in a fresh temporary
 /// directory per test. Every method that touches the disk is
 /// <c>[TestCategory("Integration")]</c>, so the fast run leaves them out; the two
-/// cancellation tests refuse before any disk access and stay in the fast run.
+/// cancellation tests and the Windows create-mode test refuse before any disk access and
+/// stay in the fast run.
 /// </summary>
 [TestClass]
 public sealed class PhysicalFileSystemTests
 {
+    private const UnixFileMode DefaultCreateMode = TransferContext.DefaultCreateFileMode;
+
+    private const UnixFileMode Mode0600 = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+
     private static byte[] Content => Encoding.ASCII.GetBytes("Hello file");
 
     [TestMethod]
@@ -30,7 +36,7 @@ public sealed class PhysicalFileSystemTests
 
         await Assert.ThrowsExactlyAsync<OperationCanceledException>(
             () => fileSystem
-                .OpenForWriteAsync("unused", FileWriteMode.Truncate, new CancellationToken(canceled: true))
+                .OpenForWriteAsync("unused", FileWriteMode.Truncate, DefaultCreateMode, new CancellationToken(canceled: true))
                 .AsTask());
     }
 
@@ -130,7 +136,7 @@ public sealed class PhysicalFileSystemTests
         using var directory = new TemporaryDirectory();
 
         var result = await new PhysicalFileSystem()
-            .OpenForWriteAsync(directory.Combine("missing/destination.txt"), FileWriteMode.Truncate, CancellationToken.None);
+            .OpenForWriteAsync(directory.Combine("missing/destination.txt"), FileWriteMode.Truncate, DefaultCreateMode, CancellationToken.None);
 
         AssertFailed(FileAccessStatus.NotFound, result);
     }
@@ -142,7 +148,7 @@ public sealed class PhysicalFileSystemTests
         using var directory = new TemporaryDirectory();
 
         var result = await new PhysicalFileSystem()
-            .OpenForWriteAsync(directory.Path, FileWriteMode.Truncate, CancellationToken.None);
+            .OpenForWriteAsync(directory.Path, FileWriteMode.Truncate, DefaultCreateMode, CancellationToken.None);
 
         AssertFailed(FileAccessStatus.IsDirectory, result);
     }
@@ -155,7 +161,7 @@ public sealed class PhysicalFileSystemTests
         string path = directory.Combine("destination.txt");
         await System.IO.File.WriteAllTextAsync(path, "old content that is longer");
 
-        var result = await new PhysicalFileSystem().OpenForWriteAsync(path, FileWriteMode.Truncate, CancellationToken.None);
+        var result = await new PhysicalFileSystem().OpenForWriteAsync(path, FileWriteMode.Truncate, DefaultCreateMode, CancellationToken.None);
 
         Assert.AreEqual(FileAccessStatus.Ok, result.Status);
         Assert.AreEqual(0L, result.Length);
@@ -174,7 +180,7 @@ public sealed class PhysicalFileSystemTests
         using var directory = new TemporaryDirectory();
         string path = directory.Combine("created.txt");
 
-        var result = await new PhysicalFileSystem().OpenForWriteAsync(path, FileWriteMode.Truncate, CancellationToken.None);
+        var result = await new PhysicalFileSystem().OpenForWriteAsync(path, FileWriteMode.Truncate, DefaultCreateMode, CancellationToken.None);
 
         Assert.AreEqual(FileAccessStatus.Ok, result.Status);
         await result.Content!.DisposeAsync();
@@ -189,7 +195,7 @@ public sealed class PhysicalFileSystemTests
         string path = directory.Combine("destination.txt");
         await System.IO.File.WriteAllTextAsync(path, "Hello");
 
-        var result = await new PhysicalFileSystem().OpenForWriteAsync(path, FileWriteMode.Append, CancellationToken.None);
+        var result = await new PhysicalFileSystem().OpenForWriteAsync(path, FileWriteMode.Append, DefaultCreateMode, CancellationToken.None);
 
         Assert.AreEqual(FileAccessStatus.Ok, result.Status);
         Assert.AreEqual(5L, result.Length);
@@ -200,6 +206,67 @@ public sealed class PhysicalFileSystemTests
         }
 
         CollectionAssert.AreEqual(Content, await System.IO.File.ReadAllBytesAsync(path));
+    }
+
+    // FileStreamOptions.UnixCreateMode throws on Windows, so reaching it there proves the
+    // create mode is handed to the operating system on the POSIX path; nothing is opened.
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task OpenForWriteAsync_SettingUnixCreateModeOnWindows_ReachesUnixCreateMode()
+    {
+        var fileSystem = new PhysicalFileSystem(setsUnixCreateMode: true);
+
+        await Assert.ThrowsExactlyAsync<PlatformNotSupportedException>(
+            () => fileSystem.OpenForWriteAsync("unused", FileWriteMode.Truncate, Mode0600, CancellationToken.None).AsTask());
+    }
+
+    [TestMethod]
+    [TestCategory("Integration")]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task OpenForWriteAsync_CreateModeOnWindows_IsIgnored()
+    {
+        using var directory = new TemporaryDirectory();
+        string path = directory.Combine("created.txt");
+
+        var result = await new PhysicalFileSystem().OpenForWriteAsync(path, FileWriteMode.Truncate, UnixFileMode.None, CancellationToken.None);
+
+        Assert.AreEqual(FileAccessStatus.Ok, result.Status);
+        await result.Content!.DisposeAsync();
+        Assert.IsTrue(System.IO.File.Exists(path));
+    }
+
+    [TestMethod]
+    [TestCategory("Integration")]
+    [OSCondition(OperatingSystems.Linux | OperatingSystems.OSX | OperatingSystems.FreeBSD)]
+    [UnsupportedOSPlatform("windows")]
+    public async Task OpenForWriteAsync_CreateModeOnPosix_IsTheModeOfTheCreatedFile()
+    {
+        using var directory = new TemporaryDirectory();
+        string path = directory.Combine("created.txt");
+
+        var result = await new PhysicalFileSystem().OpenForWriteAsync(path, FileWriteMode.Truncate, Mode0600, CancellationToken.None);
+
+        Assert.AreEqual(FileAccessStatus.Ok, result.Status);
+        await result.Content!.DisposeAsync();
+        Assert.AreEqual(Mode0600, System.IO.File.GetUnixFileMode(path));
+    }
+
+    [TestMethod]
+    [TestCategory("Integration")]
+    [OSCondition(OperatingSystems.Linux | OperatingSystems.OSX | OperatingSystems.FreeBSD)]
+    [UnsupportedOSPlatform("windows")]
+    public async Task OpenForWriteAsync_CreateModeOnPosixOverExistingFile_KeepsItsMode()
+    {
+        using var directory = new TemporaryDirectory();
+        string path = directory.Combine("existing.txt");
+        await System.IO.File.WriteAllBytesAsync(path, Content);
+        System.IO.File.SetUnixFileMode(path, DefaultCreateMode);
+
+        var result = await new PhysicalFileSystem().OpenForWriteAsync(path, FileWriteMode.Truncate, Mode0600, CancellationToken.None);
+
+        Assert.AreEqual(FileAccessStatus.Ok, result.Status);
+        await result.Content!.DisposeAsync();
+        Assert.AreEqual(DefaultCreateMode, System.IO.File.GetUnixFileMode(path));
     }
 
     private static void AssertFailed(FileAccessStatus expected, FileOpenResult result)

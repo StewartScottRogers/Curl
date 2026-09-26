@@ -219,11 +219,12 @@ public sealed class FakeFileSystem : IFileSystem
     public ValueTask<FileOpenResult> OpenForWriteAsync(
         string path,
         FileWriteMode mode,
+        UnixFileMode createMode,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(path);
 
-        calls.Add(FileSystemCall.Write(path, mode));
+        calls.Add(FileSystemCall.Write(path, mode, createMode));
 
         if (writeFailures.TryGetValue(path, out var forced))
         {

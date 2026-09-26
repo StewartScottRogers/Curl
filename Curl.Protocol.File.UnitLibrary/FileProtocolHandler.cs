@@ -20,7 +20,9 @@ namespace Curl.Protocol.File;
 /// <c>-C</c>/<c>--continue-at</c> into a window of the file — so a resume failure comes
 /// after the headers — then move the body in 16-kilobyte chunks. An upload under
 /// <c>--crlf</c> (<see cref="ITransferContext.ConvertLineEndings" />) converts each chunk
-/// on the way to the destination; a download never does.
+/// on the way to the destination; a download never does. The destination is opened with
+/// <see cref="ITransferContext.CreateFileMode" />, curl's <c>--create-file-mode</c>, as the
+/// mode a newly created file receives on a POSIX system.
 /// </para>
 /// <para>
 /// The exit codes are curl's, not the nearest-looking ones: every failure to open a
@@ -249,7 +251,7 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
             : FileWriteMode.Truncate;
 
         var opened = await fileSystem
-            .OpenForWriteAsync(path.OsPath, mode, context.CancellationToken)
+            .OpenForWriteAsync(path.OsPath, mode, context.CreateFileMode, context.CancellationToken)
             .ConfigureAwait(false);
 
         if (!opened.IsOpen || opened.Content is null)

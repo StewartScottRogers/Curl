@@ -30,6 +30,7 @@ public sealed class TransferContextTests
         Assert.IsNull(context.TftpBlockSize);
         Assert.IsFalse(context.TftpNoOptions);
         Assert.IsFalse(context.ConvertLineEndings);
+        Assert.AreEqual((UnixFileMode)0b110_100_100, context.CreateFileMode);
         Assert.AreSame(TimeProvider.System, context.TimeProvider);
         Assert.AreEqual(CancellationToken.None, context.CancellationToken);
     }
@@ -66,6 +67,7 @@ public sealed class TransferContextTests
             TftpBlockSize = 70000,
             TftpNoOptions = true,
             ConvertLineEndings = true,
+            CreateFileMode = UnixFileMode.UserRead,
             TimeProvider = timeProvider,
             CancellationToken = cancellation.Token,
         };
@@ -85,6 +87,7 @@ public sealed class TransferContextTests
         Assert.AreEqual(70000, context.TftpBlockSize);
         Assert.IsTrue(context.TftpNoOptions);
         Assert.IsTrue(context.ConvertLineEndings);
+        Assert.AreEqual(UnixFileMode.UserRead, context.CreateFileMode);
         Assert.AreSame(timeProvider, context.TimeProvider);
         Assert.AreEqual(cancellation.Token, context.CancellationToken);
     }

@@ -1,3 +1,4 @@
+using System.Runtime.Versioning;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Core.FileSystem;
@@ -26,9 +27,43 @@ namespace Curl.Core.FileSystem;
 /// just as curl's <c>fstat</c> of one does; the handler answers an offset on such a
 /// source with exit 36 rather than seeking it.
 /// </para>
+/// <para>
+/// A write open on a POSIX system creates a missing file with the mode it is given, which
+/// the operating system then narrows by the process umask, just as curl's
+/// <c>open(2)</c> with <c>--create-file-mode</c> does. Windows has no such mode, so there
+/// it is ignored and the option has no effect.
+/// </para>
 /// </remarks>
 public sealed class PhysicalFileSystem : IFileSystem
 {
+    private const int BufferSize = 4096;
+
+    [UnsupportedOSPlatformGuard("windows")]
+    private readonly bool setsUnixCreateMode;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PhysicalFileSystem" /> class that sets
+    /// the create mode of a written file everywhere except Windows.
+    /// </summary>
+    public PhysicalFileSystem()
+        : this(setsUnixCreateMode: !OperatingSystem.IsWindows())
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PhysicalFileSystem" /> class with the
+    /// platform decision made by the caller, so a test on Windows can reach the POSIX path.
+    /// </summary>
+    /// <param name="setsUnixCreateMode">
+    /// <see langword="true" /> to pass the create mode to the operating system; only
+    /// meaningful off Windows, where <see cref="FileStreamOptions.UnixCreateMode" /> throws
+    /// <see cref="PlatformNotSupportedException" />.
+    /// </param>
+    internal PhysicalFileSystem(bool setsUnixCreateMode)
+    {
+        this.setsUnixCreateMode = setsUnixCreateMode;
+    }
+
     /// <inheritdoc />
     /// <exception cref="OperationCanceledException">
     /// <paramref name="cancellationToken" /> was cancelled before the open.
@@ -40,7 +75,7 @@ public sealed class PhysicalFileSystem : IFileSystem
         // ReadWrite and Delete sharing: curl opens with a plain open(2), which locks
         // nothing, so a file another process is writing is still readable.
         return ValueTask.FromResult(
-            Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete));
+            Open(path, OptionsFor(FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete)));
     }
 
     /// <inheritdoc />
@@ -50,31 +85,68 @@ public sealed class PhysicalFileSystem : IFileSystem
     public ValueTask<FileOpenResult> OpenForWriteAsync(
         string path,
         FileWriteMode mode,
+        UnixFileMode createMode,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
         FileMode fileMode = mode == FileWriteMode.Append ? FileMode.Append : FileMode.Create;
+        FileStreamOptions options = setsUnixCreateMode
+            ? WriteOptionsWithCreateMode(fileMode, createMode)
+            : OptionsFor(fileMode, FileAccess.Write, FileShare.Read);
 
-        return ValueTask.FromResult(Open(path, fileMode, FileAccess.Write, FileShare.Read));
+        return ValueTask.FromResult(Open(path, options));
     }
+
+    /// <summary>
+    /// The options for a write open that also sets the mode a created file receives.
+    /// </summary>
+    /// <param name="fileMode">How to open or create the file.</param>
+    /// <param name="createMode">The mode a newly created file receives, before the umask.</param>
+    /// <returns>Options for an asynchronous <see cref="FileStream" />.</returns>
+    [UnsupportedOSPlatform("windows")]
+    private static FileStreamOptions WriteOptionsWithCreateMode(FileMode fileMode, UnixFileMode createMode) =>
+        new()
+        {
+            Mode = fileMode,
+            Access = FileAccess.Write,
+            Share = FileShare.Read,
+            BufferSize = BufferSize,
+            Options = FileOptions.Asynchronous,
+            UnixCreateMode = createMode,
+        };
+
+    /// <summary>
+    /// The options every open shares, with the mode, access and sharing that differ.
+    /// </summary>
+    /// <param name="fileMode">How to open or create the file.</param>
+    /// <param name="access">Read or write.</param>
+    /// <param name="share">What other processes may do meanwhile.</param>
+    /// <returns>Options for an asynchronous <see cref="FileStream" />.</returns>
+    private static FileStreamOptions OptionsFor(FileMode fileMode, FileAccess access, FileShare share) =>
+        new()
+        {
+            Mode = fileMode,
+            Access = access,
+            Share = share,
+            BufferSize = BufferSize,
+            Options = FileOptions.Asynchronous,
+        };
 
     /// <summary>
     /// Opens <paramref name="path" /> and reads the length and timestamp of the handle
     /// that was opened, not of the path.
     /// </summary>
     /// <param name="path">The operating-system path.</param>
-    /// <param name="fileMode">How to open or create the file.</param>
-    /// <param name="access">Read or write.</param>
-    /// <param name="share">What other processes may do meanwhile.</param>
+    /// <param name="options">How to open it.</param>
     /// <returns>The opened handle, or the reason it could not be opened.</returns>
-    private static FileOpenResult Open(string path, FileMode fileMode, FileAccess access, FileShare share)
+    private static FileOpenResult Open(string path, FileStreamOptions options)
     {
         FileStream stream;
 
         try
         {
-            stream = new FileStream(path, fileMode, access, share, bufferSize: 4096, FileOptions.Asynchronous);
+            stream = new FileStream(path, options);
         }
         catch (Exception exception) when (FileOpenFailure.IsOpenFailure(exception))
         {
