@@ -103,4 +103,19 @@ public sealed class ProxyEndpointTests
         Assert.AreEqual("proxy.example", authenticated.Host);
         Assert.AreEqual(1080, authenticated.Port);
     }
+
+    [TestMethod]
+    public void With_AnyChange_CannotBypassHostAndPortChecks()
+    {
+        var proxy = new ProxyEndpoint(ProxyKind.Http, "proxy.example", 3128, null);
+
+        var copy = proxy with { Kind = ProxyKind.Https, Credential = null };
+
+        // Host and Port have no init accessor, so the only way to a new value is the
+        // positional constructor, which validates it.
+        Assert.IsNull(typeof(ProxyEndpoint).GetProperty(nameof(ProxyEndpoint.Host))!.SetMethod);
+        Assert.IsNull(typeof(ProxyEndpoint).GetProperty(nameof(ProxyEndpoint.Port))!.SetMethod);
+        Assert.AreEqual("proxy.example", copy.Host);
+        Assert.AreEqual(3128, copy.Port);
+    }
 }
