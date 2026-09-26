@@ -34,7 +34,8 @@ namespace Curl.Console;
 /// <remarks>
 /// <para>
 /// URLs are transferred in command-line order; a failure does not stop the rest, and the
-/// exit code is the last transfer's, as curl's is. The first <c>-o</c> receives the first
+/// exit code is the last transfer's, as curl's is. The one exception is a resumed transfer
+/// whose <c>-o</c> file cannot be opened: curl stops the run there with exit 23. The first <c>-o</c> receives the first
 /// URL, the second the second, and so on. A failure's line is printed unless <c>-s</c> was
 /// given without <c>-S</c>, and only when the failure carries a message. An <c>-o</c> file
 /// that cannot be created prints curl's <c>Warning: Failed to open the file</c> line first,
@@ -90,6 +91,14 @@ internal sealed class CurlCommandRunner(
     /// </summary>
     private static readonly TransferResult StandardOutputWriteFailure =
         new(CurlExitCode.WriteError, 0, "Failed writing body");
+
+    /// <summary>
+    /// The result of a resumed transfer whose <c>-o</c> file could not be opened for
+    /// appending. It is compared by reference, so that <see cref="TransferAllAsync" /> stops
+    /// before the remaining URLs, as curl 8.21.0 does.
+    /// </summary>
+    private static readonly TransferResult CannotOpenForResumeFailure =
+        TransferResult.Failure(CurlExitCode.WriteError, CannotOpenForResumeMessage);
 
     /// <summary>
     /// Standard output, deferring a write failure as curl's stdio buffer does and recording
@@ -152,7 +161,11 @@ internal sealed class CurlCommandRunner(
     /// Transfers every URL in order and reports each failure.
     /// </summary>
     /// <param name="options">The accepted command line.</param>
-    /// <returns>The last transfer's exit code, or <see cref="CurlExitCode.Ok" /> when there was none.</returns>
+    /// <returns>
+    /// The last transfer's exit code, or <see cref="CurlExitCode.Ok" /> when there was none.
+    /// A resumed transfer whose <c>-o</c> file cannot be opened is the last: the URLs after
+    /// it are not transferred.
+    /// </returns>
     private async Task<CurlExitCode> TransferAllAsync(CommandLineOptions options)
     {
         CurlExitCode exitCode = CurlExitCode.Ok;
@@ -169,6 +182,11 @@ internal sealed class CurlCommandRunner(
             if (showsErrors && result.ErrorMessage is not null)
             {
                 await WriteErrorLineAsync(FormatErrorLine(result)).ConfigureAwait(false);
+            }
+
+            if (ReferenceEquals(result, CannotOpenForResumeFailure))
+            {
+                break;
             }
         }
 
@@ -342,7 +360,7 @@ internal sealed class CurlCommandRunner(
     /// </summary>
     /// <param name="options">The accepted command line.</param>
     /// <param name="outputFile">The <c>-o</c> value, as typed.</param>
-    /// <returns>Exit 23 with <see cref="CannotOpenForResumeMessage" />.</returns>
+    /// <returns><see cref="CannotOpenForResumeFailure" />: exit 23 with <see cref="CannotOpenForResumeMessage" />.</returns>
     private async Task<TransferResult> ReportCannotOpenForResumeAsync(CommandLineOptions options, string outputFile)
     {
         if (ShowsErrors(options))
@@ -350,7 +368,7 @@ internal sealed class CurlCommandRunner(
             await WriteErrorLineAsync($"curl: cannot open '{outputFile}'").ConfigureAwait(false);
         }
 
-        return TransferResult.Failure(CurlExitCode.WriteError, CannotOpenForResumeMessage);
+        return CannotOpenForResumeFailure;
     }
 
     /// <summary>

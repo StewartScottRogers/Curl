@@ -228,6 +228,23 @@ public sealed class CurlCommandRunnerTransferOptionTests
     }
 
     [TestMethod]
+    public async Task RunAsync_ContinueAtToUnopenableOutputFile_StopsBeforeTheRemainingUrls()
+    {
+        RecordingProtocolHandler file = RecordingProtocolHandler.WritingPath("file");
+        outputFiles.UnwritablePaths.Add("d");
+
+        int exitCode = await RunAsync(["-C", "3", SourceUrl, SourceUrl, "-o", "d", "-o", "o9.txt"], file);
+
+        Assert.AreEqual((int)CurlExitCode.WriteError, exitCode);
+        Assert.AreEqual(
+            "curl: cannot open 'd'" + NewLine
+            + "curl: (23) Failed writing received data to disk/application" + NewLine,
+            StandardErrorText);
+        Assert.IsEmpty(file.Contexts);
+        Assert.IsFalse(outputFiles.Written.ContainsKey("o9.txt"));
+    }
+
+    [TestMethod]
     public async Task RunAsync_ContinueAtToUnopenableOutputFileUnderSilent_PrintsNothing()
     {
         outputFiles.UnwritablePaths.Add("d");
