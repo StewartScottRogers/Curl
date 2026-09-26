@@ -1,6 +1,7 @@
 using System.Net;
 using System.Security.Authentication;
 using System.Text;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Cli;
 
@@ -173,6 +174,13 @@ public sealed class CommandLineOptions
     /// <c>--no-remote-time</c> came after it: give the output file the remote file's time.
     /// </summary>
     public bool RemoteTime { get; internal set; }
+
+    /// <summary>
+    /// The <c>-z</c> / <c>--time-cond</c> condition: the date read by <see cref="CurlDateParser"/> and
+    /// its direction; <see langword="null"/> when not given, or when the last value was not a date,
+    /// which curl 8.21.0 warns about and then transfers unconditionally. The last value wins.
+    /// </summary>
+    public TimeCondition? TimeCondition { get; internal set; }
 
     /// <summary>
     /// <see langword="true"/> when <c>-s</c> / <c>--silent</c> has been read and <c>-S</c> /

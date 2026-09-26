@@ -3,6 +3,7 @@ using System.Collections.Frozen;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Security.Authentication;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Cli;
 
@@ -33,7 +34,7 @@ namespace Curl.Cli;
 /// <c>--no-progress-meter</c> and <c>--no-progress-bar</c> are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
 /// silent and <c>--no-silent -s</c> is. <c>--no-silent=x</c> is accepted, its value ignored.
 /// <c>--no-tlsv1.2</c>, <c>--no-tlsv1.3</c>, <c>--no-url</c>, <c>--no-output</c> (even as the last
-/// argument), <c>--no-output=x</c>, <c>--no-data</c>, <c>--no-dump-header</c> and <c>--no-range</c> exit 2 with
+/// argument), <c>--no-output=x</c>, <c>--no-data</c>, <c>--no-dump-header</c>, <c>--no-range</c> and <c>--no-time-cond</c> exit 2 with
 /// <c>curl: option &lt;as typed&gt;: the given option cannot be reversed with a --no- prefix</c> and
 /// the try-help line. <c>--no-bogus</c>, <c>--no-</c>, <c>--no-no-silent</c> and <c>--no-Silent</c>
 /// exit 2 as unknown. A short letter is never negated.
@@ -71,6 +72,7 @@ public static class CommandLineOptionTable
         CommandLineOption.Value("connect-timeout", null, SetConnectTimeout),
         CommandLineOption.Value("max-time", 'm', SetMaxTime),
         CommandLineOption.NegatableFlag("remote-time", 'R', (options, on) => options.RemoteTime = on),
+        CommandLineOption.Value("time-cond", 'z', SetTimeCondition),
     ];
 
     /// <summary>The largest <c>--create-file-mode</c> curl 8.21.0 accepts: octal <c>0777</c>.</summary>
@@ -284,6 +286,32 @@ public static class CommandLineOptionTable
         }
 
         return refusal;
+    }
+
+    /// <summary>
+    /// Records a <c>-z</c>/<c>--time-cond</c> value as curl 8.21.0's tool reads it: a leading <c>-</c>
+    /// asks for the resource only when it is not newer than the date
+    /// (<see cref="TimeConditionKind.IfUnmodifiedSince"/>); a leading <c>+</c>, a leading <c>=</c> or
+    /// none asks for it only when it is newer (<see cref="TimeConditionKind.IfModifiedSince"/>). The
+    /// rest is read by <see cref="CurlDateParser"/>. A value that is not a date, empty included, is
+    /// never refused: it clears any earlier condition and adds
+    /// <see cref="CommandLineWarning.TimeConditionIsNotADate"/> unless <c>-s</c> / <c>--silent</c> has
+    /// been read. curl first tries such a value as a file name whose modification time it uses; that
+    /// is not done here yet.
+    /// </summary>
+    private static CommandLineRefusal? SetTimeCondition(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        TimeConditionKind kind = value.StartsWith('-') ? TimeConditionKind.IfUnmodifiedSince : TimeConditionKind.IfModifiedSince;
+        string date = value.StartsWith('-') || value.StartsWith('+') || value.StartsWith('=') ? value[1..] : value;
+        if (CurlDateParser.TryParse(date, out DateTimeOffset instant))
+        {
+            options.TimeCondition = new TimeCondition(instant, kind);
+            return null;
+        }
+
+        options.TimeCondition = null;
+        options.AddWarningLinesUnlessSilent(CommandLineWarning.TimeConditionIsNotADate);
+        return null;
     }
 
     /// <summary>Finds the row whose long name is exactly <paramref name="longName"/>; no prefix matching.</summary>

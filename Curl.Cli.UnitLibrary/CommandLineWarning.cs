@@ -49,6 +49,18 @@ public static class CommandLineWarning
     ];
 
     /// <summary>
+    /// The two lines curl prints for a <c>-z</c>/<c>--time-cond</c> value that is not a date, after
+    /// which it carries on with no time condition. curl wraps the text at 79 columns, so the first
+    /// line ends in a space. Measured with <c>curl -z notadate -o NUL file:///Z:/.../global.json</c>
+    /// (curl 8.21.0, Windows, 2026-09-26): these two lines, then the transfer, exit 0.
+    /// </summary>
+    public static IReadOnlyList<string> TimeConditionIsNotADate { get; } =
+    [
+        "Warning: Illegal date format for -z, --time-cond (and not a filename). ",
+        "Warning: Disabling time condition. See curl_getdate(3) for valid date syntax.",
+    ];
+
+    /// <summary>
     /// The line curl prints when a command line gives more <c>-o</c>/<c>--output</c> values than
     /// URLs: <c>Warning: Got more output options than URLs</c>. curl 8.21.0 prints it once, however
     /// many values are left over, after the last transfer has ended, not while reading the command
