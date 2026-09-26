@@ -1,5 +1,5 @@
 ---
-id: BL-087
+id: BL-089
 title: Warn when a --cert, --key or --capath value looks like a flag
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-087 — Warn when a --cert, --key or --capath value looks like a flag
+# BL-089 — Warn when a --cert, --key or --capath value looks like a flag
 
 ## Goal
 

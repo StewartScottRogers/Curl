@@ -75,7 +75,7 @@ BL-078 (more output options than URLs) will append to the same warning list.
   change; the parser hands that list to the result. Warning texts live in the new
   `CommandLineWarning` class, mirroring `CommandLineRefusal`.
 - Only `-o`/`--output` uses `FileName` (the task's scope). curl also warns for `--cert`,
-  `-E`, `--key` and `--capath`: filed as BL-087. Writing the lines to stderr in the console:
+  `-E`, `--key` and `--capath`: filed as BL-089. Writing the lines to stderr in the console:
   filed as BL-088.
 - Gates: `dotnet build` clean, all fast tests green (Curl.Cli.UnitTests 287), Curl.Cli.UnitLibrary
   at 100% line and 100% branch coverage, `dotnet format --verify-no-changes` clean for both
