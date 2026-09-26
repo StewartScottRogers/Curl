@@ -32,18 +32,23 @@ internal static class FileTransferMessages
     /// The exit 23 message for a download destination that stopped accepting bytes.
     /// </summary>
     /// <param name="passed">The size of the chunk offered to the destination.</param>
+    /// <param name="returned">How many bytes of that chunk the destination accepted.</param>
     /// <returns>The message to report.</returns>
     /// <remarks>
     /// Measured against curl 8.21.0, which reports how many bytes it offered and how many
-    /// the destination took. Here the destination is a <see cref="Stream" />, and
+    /// the destination took. Here the destination is a <see cref="Stream" />, whose
     /// <see cref="Stream.WriteAsync(ReadOnlyMemory{byte}, CancellationToken)" /> either
-    /// takes the whole chunk or throws, so a partial write is not observable and the
-    /// <c>returned</c> count is always 0.
+    /// takes the whole chunk or throws, so <paramref name="returned" /> comes from the
+    /// exception: <see cref="Abstractions.OutputWriteFailedException.BytesAccepted" /> when
+    /// the destination threw one, and 0 for any other <see cref="IOException" />. Every
+    /// measured <c>file://</c> case prints 0, because curl offers standard output at least
+    /// 4096 bytes at once whenever the body is that long.
     /// </remarks>
-    internal static string OutputWriteFailed(long passed) =>
+    internal static string OutputWriteFailed(long passed, long returned) =>
         "Failure writing output to destination, passed "
         + passed.ToString(CultureInfo.InvariantCulture)
-        + " returned 0";
+        + " returned "
+        + returned.ToString(CultureInfo.InvariantCulture);
 
     /// <summary>
     /// The exit 23 message for a header output (<c>-D</c>) that stopped accepting bytes.

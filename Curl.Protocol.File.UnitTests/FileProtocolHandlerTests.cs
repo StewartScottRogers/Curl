@@ -516,6 +516,64 @@ public sealed class FileProtocolHandlerTests
             result.ErrorMessage);
     }
 
+    // Measured in BL-099 with curl 8.21.0: `curl -sS file:///<N-byte file> >&-` prints
+    // passed 4096 returned 0 for 4096 bytes, and passed 16384 returned 0 for 16385 and
+    // 20000, because libcurl reads 16384 bytes at a time.
+    [TestMethod]
+    [DataRow(4096, 4096)]
+    [DataRow(16385, 16384)]
+    [DataRow(20000, 16384)]
+    public async Task ExecuteAsync_OutputReportsNothingAccepted_ReportsReturnedZero(int fileLength, int passed)
+    {
+        var result = await OutputWriteFailureResultAsync(
+            fileLength,
+            FaultingStream.FailingOnWriteAccepting(1, 0));
+
+        Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode);
+        Assert.AreEqual(
+            $"Failure writing output to destination, passed {passed} returned 0",
+            result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_OutputReportsAPartialAcceptance_ReportsTheAcceptedCount()
+    {
+        var result = await OutputWriteFailureResultAsync(
+            4096,
+            FaultingStream.FailingOnWriteAccepting(1, 96));
+
+        Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode);
+        Assert.AreEqual(
+            "Failure writing output to destination, passed 4096 returned 96",
+            result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_OutputThrowsAPlainIOException_ReportsReturnedZero()
+    {
+        var result = await OutputWriteFailureResultAsync(4096, FaultingStream.FailingOnWrite(1));
+
+        Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode);
+        Assert.AreEqual(
+            "Failure writing output to destination, passed 4096 returned 0",
+            result.ErrorMessage);
+    }
+
+    // An upload destination is the peer, so what it accepted does not reach the message.
+    [TestMethod]
+    public async Task ExecuteAsync_UploadDestinationReportsAPartialAcceptance_ReportsSendError()
+    {
+        var fileSystem = new FakeFileSystem();
+        fileSystem.WriteInto(OsPath, FaultingStream.FailingOnWriteAccepting(1, 96));
+        var context = new FakeTransferContext { Url = FileUrl, Upload = new MemoryStream(Content) };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        var result = await handler.ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
+        Assert.AreEqual("Failed sending data to the peer", result.ErrorMessage);
+    }
+
     // curl 8.21.0 does not reset the count on a failure: %{size_download} reports the
     // bytes that reached the destination before it.
     [TestMethod]
@@ -2506,6 +2564,16 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         fileSystem.FailOpenForRead(OsPath, status);
         var context = new FakeTransferContext { Url = FileUrl, Output = new ChunkRecordingStream() };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        return await handler.ExecuteAsync(context);
+    }
+
+    private static async Task<TransferResult> OutputWriteFailureResultAsync(int fileLength, Stream output)
+    {
+        var fileSystem = new FakeFileSystem();
+        fileSystem.AddFile(OsPath, new byte[fileLength]);
+        var context = new FakeTransferContext { Url = FileUrl, Output = output };
         var handler = new FileProtocolHandler(fileSystem);
 
         return await handler.ExecuteAsync(context);
