@@ -28,4 +28,19 @@ public sealed class DatagramReceivedTests
 
         Assert.AreNotEqual(fromServer, fromStranger);
     }
+
+    [TestMethod]
+    public void With_SettingEveryProperty_ReturnsCopyWithNewValuesAndLeavesOriginalUnchanged()
+    {
+        var originalEndPoint = new IPEndPoint(IPAddress.Loopback, 49152);
+        var newEndPoint = new IPEndPoint(IPAddress.Loopback, 49153);
+        var original = new DatagramReceived(4, originalEndPoint);
+
+        var copy = original with { Length = 516, RemoteEndPoint = newEndPoint };
+
+        Assert.AreEqual(516, copy.Length);
+        Assert.AreSame(newEndPoint, copy.RemoteEndPoint);
+        Assert.AreEqual(4, original.Length);
+        Assert.AreSame(originalEndPoint, original.RemoteEndPoint);
+    }
 }

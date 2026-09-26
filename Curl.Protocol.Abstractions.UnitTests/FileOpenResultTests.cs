@@ -139,4 +139,26 @@ public sealed class FileOpenResultTests
         Assert.AreEqual(0L, result.Length);
         Assert.IsNull(result.LastWriteTimeUtc);
     }
+
+    [TestMethod]
+    public void With_SettingEveryProperty_ReturnsCopyWithNewValuesAndLeavesOriginalUnchanged()
+    {
+        using var content = new MemoryStream([1, 2, 3]);
+        var lastWriteTimeUtc = new DateTimeOffset(2026, 3, 14, 15, 9, 26, TimeSpan.Zero);
+        var original = FileOpenResult.Failed(FileAccessStatus.NotFound);
+
+        var copy = original with
+        {
+            Status = FileAccessStatus.Ok,
+            Content = content,
+            Length = 3,
+            LastWriteTimeUtc = lastWriteTimeUtc,
+        };
+
+        Assert.AreEqual(FileAccessStatus.Ok, copy.Status);
+        Assert.AreSame(content, copy.Content);
+        Assert.AreEqual(3L, copy.Length);
+        Assert.AreEqual(lastWriteTimeUtc, copy.LastWriteTimeUtc);
+        AssertIsClosedFailure(original, FileAccessStatus.NotFound);
+    }
 }

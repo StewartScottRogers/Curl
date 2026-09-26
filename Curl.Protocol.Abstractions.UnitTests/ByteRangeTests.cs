@@ -140,4 +140,19 @@ public sealed class ByteRangeTests
 
         Assert.AreNotEqual(bounded, fromOffset);
     }
+
+    [TestMethod]
+    public void With_NoPropertiesSet_ReturnsAnEqualCopyThatIsANewInstance()
+    {
+        var original = ByteRange.Bounded(0, 4);
+
+        var copy = original with { };
+
+        Assert.AreNotSame(original, copy);
+        Assert.AreEqual(original, copy);
+        Assert.AreEqual(ByteRangeKind.Bounded, copy.Kind);
+        Assert.AreEqual(0L, copy.FirstBytePosition);
+        Assert.AreEqual(4L, copy.LastBytePosition);
+        Assert.IsNull(copy.SuffixLength);
+    }
 }

@@ -63,4 +63,28 @@ public sealed class TransferResultTests
 
         Assert.IsNull(result.SourceLastWriteTimeUtc);
     }
+
+    [TestMethod]
+    public void With_SettingEveryProperty_ReturnsCopyWithNewValuesAndLeavesOriginalUnchanged()
+    {
+        var original = TransferResult.Success(10, SourceTime);
+        var laterTime = SourceTime.AddHours(1);
+
+        var copy = original with
+        {
+            ExitCode = CurlExitCode.WriteError,
+            BytesTransferred = 3,
+            ErrorMessage = "failed",
+            SourceLastWriteTimeUtc = laterTime,
+        };
+
+        Assert.AreEqual(CurlExitCode.WriteError, copy.ExitCode);
+        Assert.AreEqual(3L, copy.BytesTransferred);
+        Assert.AreEqual("failed", copy.ErrorMessage);
+        Assert.AreEqual(laterTime, copy.SourceLastWriteTimeUtc);
+        Assert.AreEqual(CurlExitCode.Ok, original.ExitCode);
+        Assert.AreEqual(10L, original.BytesTransferred);
+        Assert.IsNull(original.ErrorMessage);
+        Assert.AreEqual(SourceTime, original.SourceLastWriteTimeUtc);
+    }
 }
