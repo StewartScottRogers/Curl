@@ -225,6 +225,34 @@ public sealed class CurlCommandRunnerTests
         Assert.IsEmpty(fileSystem.Written["empty.txt"].ToArray());
     }
 
+    // curl 8.21.0, curl -z "1 Jan 2030" -o out.txt file:///... (measured 2026-09-26): the
+    // unmet condition exits 0 and creates no out.txt.
+    [TestMethod]
+    public async Task RunAsync_UnmetTimeCondition_CreatesNoOutputFile()
+    {
+        RecordingProtocolHandler unmet = new("file", _ => ValueTask.FromResult(TransferResult.TimeConditionNotMet()));
+
+        int exitCode = await RunAsync(["-o", "out.txt", "file:///source"], unmet);
+
+        Assert.AreEqual((int)CurlExitCode.Ok, exitCode);
+        Assert.IsFalse(fileSystem.Written.ContainsKey("out.txt"));
+        Assert.IsEmpty(fileSystem.WriteModes);
+    }
+
+    // The same with an existing out.txt holding "old": curl leaves its content as it was.
+    [TestMethod]
+    public async Task RunAsync_UnmetTimeConditionWithExistingOutputFile_KeepsItsContent()
+    {
+        RecordingProtocolHandler unmet = new("file", _ => ValueTask.FromResult(TransferResult.TimeConditionNotMet()));
+        fileSystem.ExistingContent["out.txt"] = Encoding.ASCII.GetBytes("old");
+
+        int exitCode = await RunAsync(["-o", "out.txt", "file:///source"], unmet);
+
+        Assert.AreEqual((int)CurlExitCode.Ok, exitCode);
+        Assert.IsFalse(fileSystem.Written.ContainsKey("out.txt"));
+        Assert.AreEqual("old", Encoding.ASCII.GetString(fileSystem.ExistingContent["out.txt"]));
+    }
+
     [TestMethod]
     public async Task RunAsync_EmptyTransferToUncreatableOutputFile_ReturnsExit23WithNoLine()
     {

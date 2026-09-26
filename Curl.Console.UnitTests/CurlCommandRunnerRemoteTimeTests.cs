@@ -108,6 +108,21 @@ public sealed class CurlCommandRunnerRemoteTimeTests
         Assert.AreEqual(SourceLastWriteTimeUtc, outputFiles.LastWriteTimesSet[0].LastWriteTimeUtc);
     }
 
+    [TestMethod]
+    public async Task RunAsync_RemoteTimeWithUnmetTimeConditionAndExistingOutputFile_StillSetsTheSourceTime()
+    {
+        RecordingProtocolHandler file = new("file", _ => ValueTask.FromResult(
+            TransferResult.TimeConditionNotMet(SourceLastWriteTimeUtc)));
+        outputFiles.ExistingContent["out.txt"] = Encoding.ASCII.GetBytes("old");
+
+        int exitCode = await RunAsync(["-R", "-o", "out.txt", SourceUrl], file);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.IsFalse(outputFiles.Written.ContainsKey("out.txt"));
+        Assert.HasCount(1, outputFiles.LastWriteTimesSet);
+        Assert.AreEqual(("out.txt", SourceLastWriteTimeUtc, false), outputFiles.LastWriteTimesSet[0]);
+    }
+
     private static RecordingProtocolHandler WritingBody(DateTimeOffset? sourceLastWriteTimeUtc) =>
         new("file", async context =>
         {
