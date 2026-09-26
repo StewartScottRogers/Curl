@@ -57,10 +57,10 @@ appends to it, so hand-written entries go there too, never above it.
   by path when the task edits it. A task that changes a shared contract
   (`Curl.Protocol.Abstractions.UnitLibrary`) touches it and so runs apart from every
   protocol task, which is the intent: contracts land first, then the protocols fan out.
-- **Stewart's decisions are their own tasks.** A new package, a deliberate divergence
-  from upstream curl, the licence, anything the root `CLAUDE.md` says needs his
-  approval: file it assigned to `Stewart`, and make the work that waits on it depend
-  on it.
+- **Decisions are Claude's, with two exceptions.** Design and behaviour questions are
+  delegated to Claude (root `CLAUDE.md`, "Decisions"): file one as a `docs` task assigned
+  to `Claude` that decides and records an ADR. Only a new package or a threshold change
+  is filed assigned to `Stewart`. Either way, the work that waits on it depends on it.
 
 ## States
 

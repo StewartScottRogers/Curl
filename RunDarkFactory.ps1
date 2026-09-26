@@ -23,6 +23,14 @@
 
     Speech is Windows' built-in System.Speech. The key press restores volume and mute.
 
+    KEEPING THE BOARD MOVING
+
+    Runs decide design and behaviour questions themselves (Stewart delegated them; see
+    CLAUDE.md "Decisions") and block only for a new package or a threshold change. A
+    task that waits on other tasks goes back to Backlog with them in `depends-on`, and a
+    run that needs a project outside `touches` widens it. Before each claim the shift
+    also requeues any Blocked task whose reason names only tasks that are now Done.
+
     OUT OF TOKENS
 
     When the account's usage limit refuses a run, that is not a stall. The task stays
@@ -607,6 +615,28 @@ function Get-WaitingOnStewart {
     return $reasons
 }
 
+function Test-TaskDone {
+    param([string]$Id)
+    return [bool](Get-ChildItem (Join-Path $Root 'Tasks\Done') -Recurse -Filter "$Id-*.md" -ErrorAction SilentlyContinue)
+}
+
+function Invoke-Requeue {
+    # Moves back to Backlog every Blocked task whose blocker was only other tasks that are
+    # now all Done: a last Log line that names BL-### IDs and is not a question for
+    # Stewart. Returns the IDs it moved.
+    $moved = @()
+    foreach ($f in Get-ChildItem (Join-Path $Root 'Tasks\Blocked') -Filter 'BL-*.md' -ErrorAction SilentlyContinue) {
+        $id = $f.Name.Substring(0, 6)
+        $reason = Get-LastLogLine $id
+        if ($reason -match 'Stewart') { continue }
+        $waits = @([regex]::Matches($reason, 'BL-\d{3}') | ForEach-Object { $_.Value } | Where-Object { $_ -ne $id } | Select-Object -Unique)
+        if (-not $waits.Count -or @($waits | Where-Object { -not (Test-TaskDone $_) }).Count) { continue }
+        Invoke-Board @('move', '-Id', $id, '-To', 'Backlog', '-Reason', "Unblocked: $($waits -join ', ') now Done") | Out-Null
+        if ((Get-TaskState $id) -eq 'Backlog') { $moved += $id; Write-Trace $id 'requeue' "unblocked: $($waits -join ', ') Done" 'Cyan' }
+    }
+    return $moved
+}
+
 # ---------------------------------------------------------------------------- git
 
 function Get-Dirty { return @(git -C $Root status --porcelain) | Where-Object { $_ } }
@@ -629,17 +659,23 @@ Run /task-run {ID}.
 Rules for this unattended run, in addition to CLAUDE.md:
 1. Where a choice has a sensible default, take it and record the choice and why under
    the task's Notes.
-2. Where only Stewart can decide (a new package, a threshold change, a deliberate
-   divergence from upstream curl, a truly ambiguous requirement, anything CLAUDE.md
-   reserves for him), do not guess: move the task to Blocked with a -Reason that starts
-   "Stewart:" and asks the question in one line.
-3. When the task reaches Done with dotnet build clean and the fast tests green, commit
+2. Design and behaviour decisions are yours: Stewart has delegated them (CLAUDE.md,
+   "Decisions"). Decide by his standing rules - match the platform's curl, measure real
+   curl before pinning output, BCL only - record the decision and why in an ADR marked
+   "Decided by Claude under Stewart's delegation", and carry on. Only a new package or
+   a quality-threshold change goes to Blocked, with a -Reason that starts "Stewart:" and
+   asks the question in one line.
+3. If the only thing stopping the task is other work - an existing task, or one you
+   file with the board script - add those IDs to its `depends-on` and move it to
+   Backlog, not Blocked, with a -Reason naming them. The board starts it again once
+   they are Done.
+4. When the task reaches Done with dotnet build clean and the fast tests green, commit
    by logical unit (Conventional Commits, including the task file) and push the current
    branch yourself with git, per the standing authorization in CLAUDE.md. Never push to
    master, never force push, never merge.
-4. If the task ends Blocked, commit only the task board change and push it. Leave any
-   unfinished code uncommitted; the shift stashes it.
-5. The task must not be left in Doing.
+5. If the task ends Blocked or back in Backlog, commit only the task board change and
+   push it. Leave any unfinished code uncommitted; the shift stashes it.
+6. The task must not be left in Doing.
 
 End your reply with exactly one line, either
 FACTORY: DONE {ID} <what now works>
@@ -670,19 +706,28 @@ claim step, do not move it to Doing again, and do not take any other task.
 Rules for this unattended run, in addition to CLAUDE.md:
 1. Where a choice has a sensible default, take it and record the choice and why under
    the task's Notes.
-2. Where only Stewart can decide (a new package, a threshold change, a deliberate
-   divergence from upstream curl, a truly ambiguous requirement, anything CLAUDE.md
-   reserves for him), do not guess: move the task to Blocked with a -Reason that starts
-   "Stewart:" and asks the question in one line.
+2. Design and behaviour decisions are yours: Stewart has delegated them (CLAUDE.md,
+   "Decisions"). Decide by his standing rules - match the platform's curl, measure real
+   curl before pinning output, BCL only - record the decision and why in an ADR marked
+   "Decided by Claude under Stewart's delegation", and carry on. Only a new package or
+   a quality-threshold change goes to Blocked, with a -Reason that starts "Stewart:" and
+   asks the question in one line.
 3. Stay inside the projects and files the task's `touches` field names. If the work
-   truly needs another project, move the task to Blocked with a -Reason saying which
-   and why, so it can be re-planned; do not edit it.
-4. When the task reaches Done with dotnet build clean and the fast tests green, commit
+   truly needs another one, read the `touches` of every task in Tasks/Doing. When none
+   of them names it, add it to this task's `touches`, say why under Notes, and carry
+   on. When one does, add it anyway and move the task to Backlog with a -Reason naming
+   the project and that task; the board will not offer it again until they no longer
+   overlap.
+4. If the only thing stopping the task is other work - an existing task, or one you
+   file with the board script - add those IDs to its `depends-on` and move it to
+   Backlog, not Blocked, with a -Reason naming them. The board starts it again once
+   they are Done. Blocked is only for what needs Stewart.
+5. When the task reaches Done with dotnet build clean and the fast tests green, commit
    by logical unit (Conventional Commits, including the task file). Do NOT push, pull,
    rebase, merge or switch branches: the shift integrates your commits.
-5. If the task ends Blocked, commit only the task board change. Leave any unfinished
-   code uncommitted; the shift stashes it.
-6. The task must not be left in Doing.
+6. If the task ends Blocked or back in Backlog, commit only the task board change.
+   Leave any unfinished code uncommitted; the shift stashes it.
+7. The task must not be left in Doing.
 
 End your reply with exactly one line, either
 FACTORY: DONE {ID} <what now works>
@@ -918,6 +963,12 @@ function Invoke-Claim {
     try {
         foreach ($attempt in 1..5) {
             if (-not (Sync-Lane)) { Start-Sleep -Seconds 10; continue }
+            $requeued = @(Invoke-Requeue)
+            if ($requeued.Count) {
+                Invoke-Git @('add', '-A', 'Tasks') | Out-Null
+                Invoke-Git @('commit', '-q', '-m', "chore(tasks): requeue $($requeued -join ', ') - blockers Done") | Out-Null
+                if (-not (Invoke-Git @('push', '-q', 'origin', "HEAD:$Branch"))) { continue }
+            }
             $boardArgs = @('next')
             if ($Skip.Count) { $boardArgs += @('-Skip', ($Skip -join ',')) }
             $next = (Invoke-Board $boardArgs) -join "`n"
@@ -1120,6 +1171,12 @@ while ($true) {
         if ($claim.Wait) { Write-Trace '-' 'wait' $claim.Why 'DarkGray'; Start-Sleep -Seconds 60; continue }
         $id = $claim.Id
     } else {
+        $requeued = @(Invoke-Requeue)
+        if ($requeued.Count) {
+            git -C $Root add -A Tasks 2>&1 | Out-Null
+            git -C $Root commit -q -m "chore(tasks): requeue $($requeued -join ', ') - blockers Done" 2>&1 | Out-Null
+            git -C $Root push -q 2>&1 | Out-Null
+        }
         $next = (Invoke-Board @('next')) -join "`n"
         if ($next -notmatch '(?m)^(BL-\d{3})\s') { $stopWhy = 'nothing ready'; break }
         $id = $Matches[1]

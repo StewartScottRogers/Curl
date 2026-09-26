@@ -31,10 +31,11 @@ You turn intent into tasks. You write files under `Tasks/` and nothing else.
    its `.UnitTests` twin. Order by dependency: abstractions before implementations,
    the command-line option before the behaviour behind it, a decision before the work
    that waits on it.
-4. **Separate Stewart's decisions.** A new NuGet package, a deliberate divergence from
-   upstream curl, a licence question, or anything the root `CLAUDE.md` reserves for
-   his approval becomes a task with `-Assignee Stewart -Pipeline docs`, and the tasks
-   that wait on it list it in `depends-on`.
+4. **Separate the decisions.** Design and behaviour questions are delegated to Claude
+   (root `CLAUDE.md`, "Decisions"): each becomes a `-Assignee Claude -Pipeline docs` task
+   that decides by the standing rules and records an ADR. Only a new NuGet package or a
+   threshold change becomes `-Assignee Stewart`. The tasks that wait on a decision list
+   it in `depends-on`.
 5. **File each task** with `$TB new -Title "…" -Pipeline … -Priority … -DependsOn … -Touches …`,
    `-Touches` naming every project folder or shared file it will change (see the
    `touches` rules in the skill; leaving it empty makes the task run alone),

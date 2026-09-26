@@ -59,6 +59,18 @@ the folder a task sits in is its status: `Backlog`, `Doing`, `Blocked`, `Deferre
 tasks only with its script. `/task-plan` files tasks, `/task-run` works them, and
 `/task-status` and `/task-archive` keep the board tidy.
 
+## Decisions
+Stewart has delegated design and behaviour decisions to Claude (2026-09-26): which curl
+build to match, option limits, how an unsupported option behaves, test approach, URL
+model, licence-level project choices and the like. Do not ask him and do not block a task
+for one. Decide by the standing rules - match the platform's curl (the Schannel build on
+Windows, the OpenSSL build on Linux and macOS), measure real curl before pinning output
+text, base class library only, simplest thing that stays a drop-in replacement - record
+the decision and why in an ADR marked "Decided by Claude under Stewart's delegation", and
+tell him afterwards. Still his, and still asked first: adding a package, changing a
+threshold in `CodeMetricsConfig.txt`, and the irreversible git and GitHub actions listed
+above.
+
 ## Dark factory
 `RunDarkFactory.cmd` works the board unattended: each ready task goes to a headless
 `/task-run`, and anything that needs Stewart ends in `Blocked` with an alarm at the end
