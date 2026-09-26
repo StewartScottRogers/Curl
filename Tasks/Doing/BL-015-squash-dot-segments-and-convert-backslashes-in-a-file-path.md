@@ -101,3 +101,4 @@ the same `/feature` run; it does not need a separate task.
 ## Log
 
 - 2026-09-25: Created.
+- 2026-09-26: Backlog -> Doing.
