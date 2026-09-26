@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-061 — Return a TLS handshake failure from ITlsProvider as a ConnectResult
 
@@ -39,20 +39,20 @@ four projects in `touches`. No production `ITlsProvider` exists yet (BL-062 adds
 
 ## Acceptance criteria
 
-- [ ] `ITlsProvider.AuthenticateAsClientAsync(IConnection plaintext, string targetHost, CancellationToken cancellationToken)`
+- [x] `ITlsProvider.AuthenticateAsClientAsync(IConnection plaintext, string targetHost, CancellationToken cancellationToken)`
       returns `ValueTask<ConnectResult>`; its XML documentation states that a failed
       handshake is returned as `ConnectResult.Failed` with a curl exit code, that only
       `OperationCanceledException` escapes, and that on failure the provider has
       disposed `plaintext`.
-- [ ] `TcpConnector.ConnectAsync` returns the provider's `Failed` result unchanged
+- [x] `TcpConnector.ConnectAsync` returns the provider's `Failed` result unchanged
       (same `ExitCode`, same `ErrorMessage`) when `UseTls` is set; a test in
       `Curl.Networking.UnitTests/TcpConnectorTests.cs` asserts it with a fake provider
       returning `ConnectResult.Failed(CurlExitCode.SslConnectError, "x")`.
-- [ ] A test asserts that when the provider succeeds, `TcpConnector` returns the
+- [x] A test asserts that when the provider succeeds, `TcpConnector` returns the
       provider's connection.
-- [ ] The `TcpConnector` remark about unmapped TLS failures is removed.
-- [ ] `FakeTlsProvider` can be configured to return either result.
-- [ ] `dotnet build Curl.Networking.UnitLibrary -warnaserror` and
+- [x] The `TcpConnector` remark about unmapped TLS failures is removed.
+- [x] `FakeTlsProvider` can be configured to return either result.
+- [x] `dotnet build Curl.Networking.UnitLibrary -warnaserror` and
       `dotnet build Curl.Protocol.Abstractions.UnitLibrary -warnaserror` are clean, and
       `dotnet test Curl.Networking.UnitTests --filter "TestCategory!=Integration"` and
       `dotnet test Curl.Protocol.Abstractions.UnitTests --filter "TestCategory!=Integration"`
@@ -63,7 +63,17 @@ four projects in `touches`. No production `ITlsProvider` exists yet (BL-062 adds
 This touches the shared contract project on purpose, so it runs apart from protocol
 tasks; it adds nothing a protocol handler sees.
 
+Delivered in the session rather than through the full `/feature` stage agents: the
+task fixes the signature, the connector change and the tests exactly, so a separate
+architecture plan would have added nothing (unattended-run default).
+`TcpConnector` now returns the provider's `ConnectResult` as it is, success or failure;
+`FakeTlsProvider` gained `FailureToReturn` (null means succeed). New test:
+`ConnectAsync_WithUseTls_WhenHandshakeFails_ReturnsTheProvidersFailureUnchanged`; the
+existing `ConnectAsync_WithUseTls_PassesConnectionAndHostToTlsProviderAndReturnsItsResult`
+covers the success case. Networking tests 33, Abstractions tests 63, all green.
+
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. ITlsProvider returns a failed handshake as ConnectResult.Failed and TcpConnector passes it through unchanged
