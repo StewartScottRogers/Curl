@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-- Found while delivering BL-205 (2026-09-26): BL-189 parses `;encoder=` into `FormPartSpecification.Encoder`, but `MultipartFormPart` (ADR-0025) has no encoder yet.
+- Found while delivering BL-205 (2026-09-26): BL-189 parses `;encoder=` into `FormPartSpecification.Encoder`, but `MultipartFormPart` (ADR-0027) has no encoder yet.
 - libcurl 8.21.0 `lib/mime.c` (`encoders[]`, `encoder_base64_*`, `encoder_qp_*`, `Curl_mime_prepare_headers`) is the reference; an unknown encoder name is refused by curl, so measure what it prints and exits with.
 - Where a criterion says *measured*, run curl 8.21.0 (`/mingw64/bin/curl`) with `Record-CurlExchange.ps1`, record the command and bytes in `Notes`, then pin them in a test.
 
