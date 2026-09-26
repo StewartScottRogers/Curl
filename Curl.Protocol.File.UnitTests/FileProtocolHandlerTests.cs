@@ -1755,6 +1755,69 @@ public sealed class FileProtocolHandlerTests
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
     }
 
+    // An unmet condition is told apart from an empty body, so the caller creates no -o file.
+    [TestMethod]
+    [DataRow(TimeConditionKind.IfModifiedSince)]
+    [DataRow(TimeConditionKind.IfUnmodifiedSince)]
+    public async Task ExecuteAsync_UnmetTimeCondition_ReturnsTimeConditionUnmetWithTheSourceTime(TimeConditionKind kind)
+    {
+        DateTimeOffset date = kind == TimeConditionKind.IfModifiedSince ? Later : Earlier;
+
+        var result = await TimeConditionResultAsync(new TimeCondition(date, kind), new ChunkRecordingStream());
+
+        Assert.IsTrue(result.TimeConditionUnmet);
+        Assert.IsTrue(result.IsSuccess);
+        Assert.IsNotNull(result.SourceLastWriteTimeUtc);
+    }
+
+    [TestMethod]
+    [DataRow(TimeConditionKind.IfModifiedSince)]
+    [DataRow(TimeConditionKind.IfUnmodifiedSince)]
+    public async Task ExecuteAsync_MetTimeCondition_DoesNotSetTimeConditionUnmet(TimeConditionKind kind)
+    {
+        DateTimeOffset date = kind == TimeConditionKind.IfModifiedSince ? Earlier : Later;
+
+        var result = await TimeConditionResultAsync(new TimeCondition(date, kind), new ChunkRecordingStream());
+
+        Assert.IsFalse(result.TimeConditionUnmet);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_NoBody_DoesNotSetTimeConditionUnmet()
+    {
+        var fileSystem = new FakeFileSystem();
+        fileSystem.AddFile(OsPath, Content);
+        var context = new FakeTransferContext
+        {
+            Url = FileUrl,
+            Output = new ChunkRecordingStream(),
+            NoBody = true,
+        };
+
+        var result = await new FileProtocolHandler(fileSystem).ExecuteAsync(context);
+
+        Assert.IsTrue(result.IsSuccess);
+        Assert.IsFalse(result.TimeConditionUnmet);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_EmptyFile_DoesNotSetTimeConditionUnmet()
+    {
+        var fileSystem = new FakeFileSystem();
+        fileSystem.AddFile(OsPath, []);
+        var context = new FakeTransferContext
+        {
+            Url = FileUrl,
+            Output = new ChunkRecordingStream(),
+        };
+
+        var result = await new FileProtocolHandler(fileSystem).ExecuteAsync(context);
+
+        Assert.AreEqual(0L, result.BytesTransferred);
+        Assert.IsTrue(result.IsSuccess);
+        Assert.IsFalse(result.TimeConditionUnmet);
+    }
+
     // Measured on curl 8.21.0: a -z date equal to the file's timestamp transfers nothing
     // in either direction. The comparison is strict both ways.
     [TestMethod]

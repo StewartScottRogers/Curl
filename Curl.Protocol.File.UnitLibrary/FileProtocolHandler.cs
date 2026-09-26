@@ -211,7 +211,7 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     {
         if (!MeetsTimeCondition(context.TimeCondition, opened.LastWriteTimeUtc))
         {
-            return TransferResult.Success(0);
+            return TransferResult.TimeConditionNotMet();
         }
 
         if (await WriteHeadersAsync(context, opened).ConfigureAwait(false) is { } headerFailure)
