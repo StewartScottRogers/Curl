@@ -92,3 +92,4 @@ scope. For the record, curl 8.21.0 refuses `--tlsv1.2 --tls-max 1.1` with
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
