@@ -58,3 +58,4 @@ deliberate divergence from upstream on at least one platform, which needs an ADR
 - 2026-09-26: Created.
 - 2026-09-26: Stewart decided: match the platform curl's ceiling. Reassigned to Claude to record the ADR.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Backlog. Shift stopped while waiting for tokens (limit reset early); the run had not started

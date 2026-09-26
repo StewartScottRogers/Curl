@@ -29,9 +29,12 @@ A cookie store implements `ICookieStore`, matching cookies by domain, path, secu
 
 ## Notes
 
+**Partial work from a cut-off run (2026-09-26):** local branch `factory/BL-220-wip` holds one commit of it. Start with `git cherry-pick --no-commit factory/BL-220-wip`, review it, then carry on from there rather than starting over.
+
 - Plan item: Q2 in the Phase 1 HTTP plan (2026-09-26); plan keys in this file were replaced by their task IDs.
 
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Backlog. Shift stopped while waiting for tokens (limit reset early); partial work saved on branch factory/BL-220-wip
