@@ -57,3 +57,4 @@ It wraps `System.IO.File` and `FileInfo` behind the `IFileSystem` contract from
 - 2026-09-25: Added depends-on BL-026 and the never-throw acceptance criterion, so the
   exit 37 and exit 23 mapping is inherited explicitly rather than by inference.
 - 2026-09-25: Added the non-seekable-source criterion; the handler's download seek has no CanSeek check and this task is what makes that reachable.
+- 2026-09-26: Backlog -> Doing.
