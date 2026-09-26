@@ -19,7 +19,7 @@ completed:
 ## Context
 
 - Filed from the Phase 1 HTTP plan (protocol-architect, 2026-09-26), item W10. Upstream references: https://curl.se/docs/manpage.html and https://curl.se/libcurl/c/libcurl-errors.html; behaviour measured on curl 8.21.0.
-- BL-194 parses these into `CommandLineOptions.UrlOutputs` (one `UrlOutput` per URL: `FileName`, `UsesRemoteName`), `RemoteHeaderName`, `OutputDirectory` and `CreateDirectories`; the pairing rules are in ADR-0027. Read `UrlOutputs[index]` instead of `OutputFiles[index]`. Measured for BL-194: `curl -O http://127.0.0.1:1/` prints `Warning: No remote filename, uses "curl_response"` before the connect error.
+- BL-194 parses these into `CommandLineOptions.UrlOutputs` (one `UrlOutput` per URL: `FileName`, `UsesRemoteName`), `RemoteHeaderName`, `OutputDirectory` and `CreateDirectories`; the pairing rules are in ADR-0029. Read `UrlOutputs[index]` instead of `OutputFiles[index]`. Measured for BL-194: `curl -O http://127.0.0.1:1/` prints `Warning: No remote filename, uses "curl_response"` before the connect error.
 - Windows name sanitising exists (`WindowsOutputFileNameSanitizer`, BL-091).
 - Where a criterion says *measured*, run curl 8.21.0 - the mingw build `/mingw64/bin/curl`, first on PATH, which is the Windows reference (ADR-0009 and the BL-153 ADR) - against a loopback server (the BL-165 recording script `Record-CurlExchange.ps1` once it exists), record the exact command and the bytes it produced in `Notes`, then pin them in a test. Never pin text that was not measured.
 
