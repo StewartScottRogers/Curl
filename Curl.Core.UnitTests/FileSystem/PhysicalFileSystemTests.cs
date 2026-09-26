@@ -299,6 +299,30 @@ public sealed class PhysicalFileSystemTests
         Assert.AreEqual(DefaultCreateMode, System.IO.File.GetUnixFileMode(path));
     }
 
+    [TestMethod]
+    public async Task TrySetLastWriteTimeUtc_ExistingFile_SetsItsLastWriteTime()
+    {
+        using var directory = new TemporaryDirectory();
+        string path = directory.Combine("out.txt");
+        await System.IO.File.WriteAllBytesAsync(path, Content);
+        var lastWriteTimeUtc = new DateTimeOffset(2020, 1, 2, 10, 4, 5, TimeSpan.Zero);
+
+        bool set = new PhysicalFileSystem().TrySetLastWriteTimeUtc(path, lastWriteTimeUtc);
+
+        Assert.IsTrue(set);
+        Assert.AreEqual(lastWriteTimeUtc.UtcDateTime, System.IO.File.GetLastWriteTimeUtc(path));
+    }
+
+    [TestMethod]
+    public void TrySetLastWriteTimeUtc_MissingFile_ReturnsFalse()
+    {
+        using var directory = new TemporaryDirectory();
+
+        bool set = new PhysicalFileSystem().TrySetLastWriteTimeUtc(directory.Combine("missing.txt"), DateTimeOffset.UnixEpoch);
+
+        Assert.IsFalse(set);
+    }
+
     private static void AssertFailed(FileAccessStatus expected, FileOpenResult result)
     {
         Assert.AreEqual(expected, result.Status);
