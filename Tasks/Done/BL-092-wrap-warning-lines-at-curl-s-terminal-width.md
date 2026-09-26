@@ -8,7 +8,7 @@ depends-on: [BL-087]
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-092 — Wrap warning lines at curl's terminal width
 
@@ -61,25 +61,52 @@ less; `Curl.Console` is held to 100% line and branch coverage.
 
 ## Acceptance criteria
 
-- [ ] Tests in `Curl.Console.UnitTests` named for the three measured cases pass, each with
+- [x] Tests in `Curl.Console.UnitTests` named for the three measured cases pass, each with
       an injected column count (79, 200, 40) and each asserting the exact lines above,
       trailing spaces included.
-- [ ] A test covers a text with no blank before `width - 1`, asserting the cut at
+- [x] A test covers a text with no blank before `width - 1`, asserting the cut at
       `width - 1`.
-- [ ] Column-resolution tests pass for: `COLUMNS=200` used; `COLUMNS=21` and `COLUMNS=9999`
+- [x] Column-resolution tests pass for: `COLUMNS=200` used; `COLUMNS=21` and `COLUMNS=9999`
       used; `COLUMNS=20`, `COLUMNS=10000` and a non-numeric `COLUMNS` ignored in favour of
       the console width; no `COLUMNS` and no console width gives 79.
-- [ ] A `CurlCommandRunner` test shows the BL-087 open-failure warning written to stderr
+- [x] A `CurlCommandRunner` test shows the BL-087 open-failure warning written to stderr
       wrapped at an injected width of 79, matching the two-line measured output byte for
       byte.
-- [ ] `dotnet build Curl.Console -warnaserror` and
+- [x] `dotnet build Curl.Console -warnaserror` and
       `dotnet build Curl.Console.UnitTests -warnaserror` are clean.
-- [ ] `dotnet test --filter "TestCategory!=Integration"` is green, and no new test needs
+- [x] `dotnet test --filter "TestCategory!=Integration"` is green, and no new test needs
       `TestCategory=Integration`.
 
 ## Notes
+
+- Plan: `WarningLineWrapper` (`WrapText` for the text after `Warning: `, `WrapLine` for a
+  whole stderr line, passing non-warning lines through) and `TerminalColumns` (`Resolve`
+  over injected `COLUMNS` value and console-width reader). `CurlCommandRunner` takes a
+  `terminalColumns` constructor parameter (default 79) and wraps inside
+  `WriteErrorLineAsync`, so parser warnings, the BL-087 open-failure warning and the
+  after-transfer warning are all wrapped; `CurlComposition.CreateRunner` passes
+  `TerminalColumns.Resolve()`. The test-only connector overload keeps 79 so its tests do
+  not depend on the host console.
+- Choice: the console width is one less than `Console.WindowWidth` on Windows, because
+  curl uses the window's `Right - Left` there (80-column console -> 79, as measured); on
+  other platforms curl uses `ws_col` unchanged, so the window width is used as-is.
+- Choice: `COLUMNS` is parsed like curl's `strtol` check - leading white space and a sign
+  allowed, nothing after the digits - with `NumberStyles.AllowLeadingWhite |
+  AllowLeadingSign`, invariant culture.
+- Choice: a console width of 0 or 10000+ falls back to 79 (curl's `cols >= 0 && cols <
+  10000`, then `!width -> 79`). A width no wider than the prefix (columns <= 9, only
+  reachable from a tiny console) leaves the text whole instead of reproducing curl's
+  `size_t` underflow.
+- curl's cut rule also treats a blank at index 0 as "no blank" and cuts at `width - 1`;
+  replicated and tested. Tabs count as blanks (`ISBLANK`).
+- Found: the two `-r` range warnings in `Curl.Cli.UnitLibrary` are pre-cut at 79, so at
+  other widths they still differ from curl. Outside this task's `touches`; filed as
+  BL-113.
+- Coverage: `Measure-CodeQuality.ps1 -Library Curl.Console` - 100% line, 100% branch,
+  worst CRAP 10.
 
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. Warning lines on stderr wrap at curl's terminal width (COLUMNS, stderr console, else 79), byte for byte with curl 8.21.0
