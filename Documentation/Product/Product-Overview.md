@@ -253,17 +253,14 @@ Checkable by someone outside the project, in priority order:
   is a reason dependency injection is wired explicitly rather than by scanning.
 - **Platform:** Windows is the development platform. Linux and macOS parity is
   wanted; > **TODO** confirm whether it is a release requirement.
-- **Licensing — needs a decision.** This repository is **GPL-3.0**. curl is under
-  the **curl licence**, which is permissive and *GPL-compatible*, so incorporating
-  upstream code into a GPL-3.0 project is legally permissible provided copyright
-  notices are preserved. Two things still follow:
+- **Licensing — MIT.** This repository is under the **MIT licence**
+  ([ADR-0012](../Planning/Decisions/ADR-0012-relicense-from-gpl-3-0-to-mit.md)),
+  relicensed from GPL-3.0. curl is under the **curl licence**, a permissive MIT-style
+  licence, and a permissive licence keeps the embed-in-anything use that makes a
+  drop-in replacement worth having.
   - **Clean-room is a choice worth making anyway.** Building from RFCs, the man page
     and observable behaviour — rather than translating C — avoids licence-provenance
     auditing and keeps the codebase unambiguously ours. Adopted as the working rule.
-  - **GPL-3.0 works against the goal.** curl is everywhere *because* it is
-    permissive. Copyleft blocks the embed-in-anything use that makes a drop-in
-    replacement worth having. MIT or Apache-2.0 would serve the product better.
-    > **TODO** confirm GPL-3.0 is intentional, or relicense before first release.
 
 ## Phasing
 
@@ -287,7 +284,7 @@ projects before anything works is a liability, not a head start.
 
 | # | Question | Blocks |
 | --- | --- | --- |
-| 1 | Is GPL-3.0 intentional, or should this relicense to MIT/Apache-2.0 before release? | First public release |
+| 1 | ~~Is GPL-3.0 intentional, or should this relicense to MIT/Apache-2.0 before release?~~ **Answered:** relicensed to MIT, see [ADR-0012](../Planning/Decisions/ADR-0012-relicense-from-gpl-3-0-to-mit.md). | First public release |
 | 2 | Are Linux and macOS release requirements, or is this Windows-first? | Phase 1 CI design |
 | 3 | How is curl's test suite driven from .NET — port the harness, or run upstream's Perl `runtests.pl` against our binary? | Phase 1 conformance work |
 | 4 | Is a managed NuGet API a deliverable, or is the CLI the only product? | Public API surface |
