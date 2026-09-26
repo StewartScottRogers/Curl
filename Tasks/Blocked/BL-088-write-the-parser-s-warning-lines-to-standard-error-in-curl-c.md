@@ -4,7 +4,7 @@ title: Write the parser's warning lines to standard error in Curl.Console
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-051, BL-068]
+depends-on: [BL-051, BL-068, BL-093]
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-26
@@ -63,7 +63,20 @@ accepted and refused command lines, matching curl 8.21.0.
 
 ## Notes
 
+- Measured 2026-09-26 with curl 8.21.0 (x86_64-w64-mingw32, Schannel) on Windows, stderr captured separately:
+  - `curl -s -o -x file:///C:/Windows/win.ini`: no warning, exit 0.
+  - `curl -sS -o -x file:///C:/Windows/win.ini`: no warning, exit 0.
+  - `curl -o -x file:///C:/Windows/win.ini`: the warning, then the progress meter, exit 0.
+  - `curl -s -o -x --bogus`: no warning; unknown-option and try-help lines, exit 2.
+  - `curl -o -x -s file:///...` and `curl -o -x -s --bogus`: the warning IS printed, so
+    suppression depends on whether `-s` came before the warning was raised, not on the
+    final silent state. The console cannot see argument order, so the filtering belongs in
+    the parser (`Curl.Cli.UnitLibrary`), outside this task's `touches`. Filed BL-093 for it
+    and added it to `depends-on`; once it lands, this task prints `WarningLines`
+    unconditionally and its `-s`/`-sS` tests assert no warning.
+
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Blocked. Needs BL-093: -s suppresses the warning only when it precedes -o, so Curl.Cli.UnitLibrary (outside touches) must filter WarningLines first; re-queue once BL-093 is done.
