@@ -1095,7 +1095,8 @@ function Invoke-Integrate {
 
 function Invoke-Park {
     # Work that will not integrate is kept on a branch of its own, and the task goes to
-    # Blocked on the shared branch so Stewart sees it.
+    # back to Backlog on the shared branch, so a later run picks it up from that branch and
+    # fixes what broke. Integration trouble is Claude's to solve, not Stewart's.
     param([string]$Id, [string]$Why)
     $park = "factory/$Id-lane-$Lane-$Stamp"
     Invoke-Git @('push', '-q', 'origin', "HEAD:refs/heads/$park") | Out-Null
@@ -1104,7 +1105,7 @@ function Invoke-Park {
         foreach ($attempt in 1..3) {
             if (-not (Sync-Lane)) { continue }
             if ((Get-TaskState $Id) -ne 'Doing') { return }
-            Invoke-Board @('move', '-Id', $Id, '-To', 'Blocked', '-Reason', "Stewart: lane $Lane could not integrate: $Why. The work is on branch $park.") | Out-Null
+            Invoke-Board @('move', '-Id', $Id, '-To', 'Backlog', '-Reason', "Lane $Lane could not integrate: $Why. The work is on branch $park; start with git cherry-pick --no-commit $park and fix it.") | Out-Null
             Invoke-Git @('add', '-A', 'Tasks') | Out-Null
             Invoke-Git @('commit', '-q', '-m', "chore(tasks): block $Id - $Why") | Out-Null
             if (Invoke-Git @('push', '-q', 'origin', "HEAD:$Branch")) { return }
@@ -1209,7 +1210,7 @@ if ($Lane) {
 
 Write-Trace '-' 'shift' "start  branch=$branch model=$Model until $($shiftEnd.ToString('HH:mm'))" 'Cyan'
 
-$done = 0; $blocked = 0; $stalls = @(); $failStreak = 0; $attempted = @{}
+$done = 0; $blocked = 0; $requeued = 0; $stalls = @(); $failStreak = 0; $attempted = @{}
 $stopWhy = ''
 # The task to run again once the usage limit resets; it is still claimed.
 $resumeId = ''
@@ -1273,12 +1274,12 @@ while ($true) {
     }
     Save-StrayChanges $id
 
-    if ($Lane -and $state -in 'Done', 'Blocked') {
+    if ($Lane -and $state -in 'Done', 'Blocked', 'Backlog') {
         $problem = Invoke-Integrate -Id $id -State $state
         if ($problem) {
-            Write-Trace $id 'PARKED' $problem 'Red'
+            Write-Trace $id 'PARKED' "$problem; back to Backlog" 'Yellow'
             Invoke-Park -Id $id -Why $problem
-            $state = 'Blocked'
+            $state = 'Parked'
         } else {
             Write-Trace $id 'push' "integrated into $branch"
         }
@@ -1291,6 +1292,11 @@ while ($true) {
         $blocked++
         if ($null -eq $script:RunResult -or $run.TimedOut) { $failStreak++ } else { $failStreak = 0 }
         Write-Trace $id 'BLOCKED' (Get-Short (Get-LastLogLine $id)) 'Yellow'
+    } elseif ($state -in 'Backlog', 'Parked') {
+        # Waiting on other tasks, a widened touches, or work that would not integrate: back
+        # in the queue for a later run, not a stall.
+        $requeued++; $failStreak = 0
+        Write-Trace $id 'REQUEUE' (Get-Short (Get-LastLogLine $id)) 'Yellow'
     } else {
         $failStreak++
         $stalls += "$id STALLED  ended in $state, exit $($run.ExitCode)"
@@ -1304,12 +1310,12 @@ while ($true) {
   }
 }
 
-Write-Trace '-' 'shift' "end ($stopWhy)  done=$done blocked=$blocked stalled=$($stalls.Count)" 'Cyan'
+Write-Trace '-' 'shift' "end ($stopWhy)  done=$done blocked=$blocked requeued=$requeued stalled=$($stalls.Count)" 'Cyan'
 if ($stopWhy -eq 'runs failing') { $stalls = @('FACTORY STALLED - two runs in a row failed; check logs\') + $stalls }
 
 if ($Lane) {
     # The coordinator raises one alarm for every lane; a lane only reports.
-    Write-LaneSummary (@("SUMMARY lane $Lane ended ($stopWhy): done=$done blocked=$blocked stalled=$($stalls.Count)") + $stalls)
+    Write-LaneSummary (@("SUMMARY lane $Lane ended ($stopWhy): done=$done blocked=$blocked requeued=$requeued stalled=$($stalls.Count)") + $stalls)
     try { $Host.UI.RawUI.WindowTitle = "Dark factory - lane $Lane finished" } catch { }
     exit 0
 }
