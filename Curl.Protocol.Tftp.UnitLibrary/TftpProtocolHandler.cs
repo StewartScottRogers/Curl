@@ -1,0 +1,78 @@
+using Curl.Protocol.Abstractions;
+
+namespace Curl.Protocol.Tftp;
+
+/// <summary>
+/// Serves the <c>tftp</c> scheme: downloads a file over an
+/// <see cref="IDatagramChannel" /> the way curl 8.21.0 does by default.
+/// </summary>
+/// <param name="connector">
+/// Opens the datagram channel for each transfer (ADR-0005). No <c>Socket</c> is ever
+/// constructed here, so the handler's tests run entirely against a scripted channel.
+/// </param>
+/// <remarks>
+/// <para>
+/// The read request carries curl's default options, <c>tsize 0</c>, <c>blksize 512</c>
+/// and <c>timeout 6</c> (RFC 2347, 2348, 2349). An option acknowledgement is answered with
+/// ACK 0 and its <c>blksize</c> decides which block is the last; without one the block
+/// size stays 512. Every acknowledgement goes to the endpoint the packet it answers came
+/// from, the server's transfer identifier, never back to port 69.
+/// </para>
+/// <para>
+/// An ERROR packet ends the transfer with the exit code and message curl reports for its
+/// code. A URL with no file name is exit 71 (<see cref="CurlExitCode.TftpIllegal" />) with
+/// <c>Missing filename</c>, before any channel is opened, and a channel that will not open
+/// is returned with the connector's code and message unchanged.
+/// </para>
+/// <para>
+/// Upload, <c>--tftp-blksize</c>, <c>--tftp-no-options</c>, retransmission and the timeout
+/// that ends a silent transfer are not implemented yet; see the library's
+/// <c>CLAUDE.md</c>.
+/// </para>
+/// </remarks>
+public sealed class TftpProtocolHandler(IDatagramConnector connector) : IProtocolHandler
+{
+    /// <summary>The port a <c>tftp://</c> URL that names none is sent to.</summary>
+    private const int DefaultPort = 69;
+
+    private static readonly string[] Schemes = ["tftp"];
+
+    private readonly IDatagramConnector connector =
+        connector ?? throw new ArgumentNullException(nameof(connector));
+
+    /// <inheritdoc />
+    public IReadOnlyCollection<string> SupportedSchemes => Schemes;
+
+    /// <inheritdoc />
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="context" /> is <see langword="null" />.
+    /// </exception>
+    /// <exception cref="OperationCanceledException">
+    /// <see cref="ITransferContext.CancellationToken" /> was cancelled.
+    /// </exception>
+    public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        var fileName = Uri.UnescapeDataString(context.Url.AbsolutePath.TrimStart('/'));
+        if (fileName.Length == 0)
+        {
+            return TransferResult.Failure(CurlExitCode.TftpIllegal, "Missing filename");
+        }
+
+        var port = context.Url.Port > 0 ? context.Url.Port : DefaultPort;
+        var opened = await connector
+            .OpenAsync(context.Url.IdnHost, port, context.CancellationToken)
+            .ConfigureAwait(false);
+
+        if (opened.Channel is not { } channel)
+        {
+            return TransferResult.Failure(opened.ExitCode, opened.ErrorMessage!);
+        }
+
+        await using (channel.ConfigureAwait(false))
+        {
+            return await new TftpDownload(context, channel).RunAsync(fileName).ConfigureAwait(false);
+        }
+    }
+}
