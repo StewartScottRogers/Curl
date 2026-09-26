@@ -127,7 +127,7 @@ handle, non-owning handle, broken pipe throws `IOException`, and
 `OpenHandle_File_WritesEachChunkBeforeTheNextIsIssued` pinning no buffering) and
 `ClosedStandardOutputStreamTests`. Coverage (Measure-CodeQuality.ps1): both new classes
 and `Program` at 100% line and branch. Curl.Console as a whole is at 99.04% branch
-because of a pre-existing gap in `TlsClientOptionsMapping.cs:31`, filed as BL-105.
+because of a pre-existing gap in `TlsClientOptionsMapping.cs:31`, filed as BL-106.
 
 ## Log
 

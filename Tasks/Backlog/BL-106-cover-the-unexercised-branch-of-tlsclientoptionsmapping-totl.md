@@ -1,5 +1,5 @@
 ---
-id: BL-105
+id: BL-106
 title: Cover the unexercised branch of TlsClientOptionsMapping.ToTlsMinimumVersion
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-105 — Cover the unexercised branch of TlsClientOptionsMapping.ToTlsMinimumVersion
+# BL-106 — Cover the unexercised branch of TlsClientOptionsMapping.ToTlsMinimumVersion
 
 ## Goal
 
