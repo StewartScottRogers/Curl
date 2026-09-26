@@ -1877,6 +1877,95 @@ public sealed class FileProtocolHandlerTests
         Assert.AreEqual("Could not open file C:/", result.ErrorMessage);
     }
 
+    // -R/--remote-time: curl 8.21.0 applies a file:// source's modification time to the
+    // output in whole seconds, so the handler hands it back already truncated.
+    [TestMethod]
+    public async Task ExecuteAsync_Download_ReportsTheSourceTimestampTruncatedToSeconds()
+    {
+        var fileSystem = new FakeFileSystem();
+        var timestamp = FakeFileSystem.DefaultLastWriteTimeUtc.AddMilliseconds(750);
+        fileSystem.AddFile(OsPath, Content, timestamp);
+        var context = new FakeTransferContext { Url = FileUrl, Output = new ChunkRecordingStream() };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        var result = await handler.ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.IsNotNull(result.SourceLastWriteTimeUtc);
+        Assert.AreEqual(0L, result.SourceLastWriteTimeUtc.Value.Ticks % TimeSpan.TicksPerSecond);
+        Assert.AreEqual(FakeFileSystem.DefaultLastWriteTimeUtc, result.SourceLastWriteTimeUtc);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_DownloadWithUnknownTimestamp_ReportsNoSourceTimestamp()
+    {
+        var fileSystem = new FakeFileSystem();
+        fileSystem.AddFileWithoutTimestamp(OsPath, Content);
+        var context = new FakeTransferContext { Url = FileUrl, Output = new ChunkRecordingStream() };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        var result = await handler.ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.IsNull(result.SourceLastWriteTimeUtc);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_Upload_ReportsNoSourceTimestamp()
+    {
+        var fileSystem = new FakeFileSystem();
+        var context = new FakeTransferContext
+        {
+            Url = FileUrl,
+            Upload = new TrackedMemoryStream(Content),
+        };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        var result = await handler.ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.IsNull(result.SourceLastWriteTimeUtc);
+    }
+
+    // -R with -I writes no body, but the metadata is still known and still applies.
+    [TestMethod]
+    public async Task ExecuteAsync_NoBody_StillReportsTheSourceTimestamp()
+    {
+        var fileSystem = new FakeFileSystem();
+        fileSystem.AddFile(OsPath, Content);
+        var context = new FakeTransferContext
+        {
+            Url = FileUrl,
+            Output = new ChunkRecordingStream(),
+            NoBody = true,
+        };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        var result = await handler.ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(FakeFileSystem.DefaultLastWriteTimeUtc, result.SourceLastWriteTimeUtc);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_DownloadThatFailsAfterTheOpen_ReportsNoSourceTimestamp()
+    {
+        var fileSystem = new FakeFileSystem();
+        fileSystem.AddFile(OsPath, Content);
+        var context = new FakeTransferContext
+        {
+            Url = FileUrl,
+            Output = new ChunkRecordingStream(),
+            ResumeFrom = Content.Length + 1,
+        };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        var result = await handler.ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.BadDownloadResume, result.ExitCode);
+        Assert.IsNull(result.SourceLastWriteTimeUtc);
+    }
+
     private static DateTimeOffset Later => FakeFileSystem.DefaultLastWriteTimeUtc.AddDays(1);
 
     private static DateTimeOffset Earlier => FakeFileSystem.DefaultLastWriteTimeUtc.AddDays(-1);

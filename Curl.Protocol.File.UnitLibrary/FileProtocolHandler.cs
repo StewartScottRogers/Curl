@@ -133,11 +133,33 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
 
         Stream source = opened.Content;
 
+        TransferResult result;
+
         await using (source.ConfigureAwait(false))
         {
-            return await DownloadFromAsync(context, source, opened).ConfigureAwait(false);
+            result = await DownloadFromAsync(context, source, opened).ConfigureAwait(false);
         }
+
+        // -R/--remote-time is applied by whoever owns the output file, so a successful
+        // download hands the source's timestamp back in whole seconds, the resolution
+        // curl 8.21.0 applies it at. A failure carries none.
+        return result.IsSuccess
+            ? result with { SourceLastWriteTimeUtc = TruncateToWholeSeconds(opened.LastWriteTimeUtc) }
+            : result;
     }
+
+    /// <summary>
+    /// Drops everything below the second from a timestamp, keeping its offset.
+    /// </summary>
+    /// <param name="timestamp">The timestamp, or <see langword="null" /> when unknown.</param>
+    /// <returns>
+    /// The timestamp with zero sub-second ticks, or <see langword="null" /> when
+    /// <paramref name="timestamp" /> is.
+    /// </returns>
+    private static DateTimeOffset? TruncateToWholeSeconds(DateTimeOffset? timestamp) =>
+        timestamp is { } value
+            ? new DateTimeOffset(value.Ticks - (value.Ticks % TimeSpan.TicksPerSecond), value.Offset)
+            : null;
 
     /// <summary>
     /// Applies the time condition, emits the headers, applies every other option that can
