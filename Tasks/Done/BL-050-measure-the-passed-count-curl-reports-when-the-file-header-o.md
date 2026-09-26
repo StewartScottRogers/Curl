@@ -76,7 +76,7 @@ stdout curl prints only `curl: Failed writing body`, which Curl.Console already 
 - Choice taken: a failure on a later line reports that line's length. Only the first-line
   failure could be provoked; the later-line count follows from upstream `lib/file.c`
   handing each line to the client writer separately, which the measured 20 confirms.
-- Follow-up filed: BL-109, the tool's own `curl: Failed writing headers to -` line, which
+- Follow-up filed: BL-111, the tool's own `curl: Failed writing headers to -` line, which
   belongs to Curl.Console, outside this task's `touches`.
 
 ## Log

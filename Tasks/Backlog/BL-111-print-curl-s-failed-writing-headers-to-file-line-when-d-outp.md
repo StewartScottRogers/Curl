@@ -1,5 +1,5 @@
 ---
-id: BL-109
+id: BL-111
 title: Print curl's 'Failed writing headers to <file>' line when -D output fails
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-109 — Print curl's 'Failed writing headers to <file>' line when -D output fails
+# BL-111 — Print curl's 'Failed writing headers to <file>' line when -D output fails
 
 ## Goal
 
