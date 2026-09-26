@@ -68,10 +68,11 @@ rm -f "$work/probe.ppm"
 
 # AV1 carries 8K at a fraction of H.264's size and is what 8K displays decode in hardware;
 # a browser plays one codec per stream, so AV1 gets a full ladder of its own. SVT-AV1 is
-# fast enough for a runner; libaom is the slow fallback if ffmpeg lacks it.
+# fast enough for a runner (it refuses 8K below preset 8); libaom is the slow fallback if
+# ffmpeg lacks it.
 gop=$(( fps * 2 ))
 if ffmpeg -hide_banner -encoders 2> /dev/null | grep -q libsvtav1; then
-    av1_8k=(-c:v libsvtav1 -preset 7 -crf 32 -svtav1-params tune=0:scd=0)
+    av1_8k=(-c:v libsvtav1 -preset 8 -crf 32 -svtav1-params tune=0:scd=0)
     av1_small=(-c:v libsvtav1 -preset 8 -crf 36 -svtav1-params tune=0:scd=0)
 else
     av1_8k=(-c:v libaom-av1 -cpu-used 8 -row-mt 1 -crf 32 -b:v 0)
