@@ -31,8 +31,8 @@ The authenticator chooses among offered challenges as curl ranks them for `--bas
 - Plan item: A3 in the Phase 1 HTTP plan (2026-09-26); plan keys in this file were replaced by their task IDs.
 - From BL-217 (ADR-0025): `DigestAuthenticator` answers the first Digest challenge whenever Digest is allowed, with no ranking; `BasicAndBearerAuthenticator` returns null when its pick is Digest. Choosing between them by libcurl's order is this task's.
 - Delivered: `RankedHttpAuthenticator` (public, takes a `BasicAndBearerAuthenticator` and a `DigestAuthenticator`) picks in libcurl's order and hands Digest to the Digest answerer, everything else to Basic/Bearer. The order now lives once in internal `HttpAuthSchemeRanking.PickFirst`, shared with `BasicAndBearerAuthenticator`. Tests: `RankedHttpAuthenticatorTests` (Curl.Authentication.UnitTests 119 -> 138).
-- Decision (ADR-0026, decided by Claude under Stewart's delegation): rank exactly as the reference build, which has NTLM and SPNEGO, and do not fall back. A pick of NTLM or Negotiate, or a Digest challenge curl cannot read, gets no answer, because the reference curl never answers the lower-ranked scheme in those cases (measured below).
-- `touches` widened to `Documentation/Planning/Decisions` for ADR-0026 and its README row; no task in Doing named it.
+- Decision (ADR-0028, decided by Claude under Stewart's delegation): rank exactly as the reference build, which has NTLM and SPNEGO, and do not fall back. A pick of NTLM or Negotiate, or a Digest challenge curl cannot read, gets no answer, because the reference curl never answers the lower-ranked scheme in those cases (measured below).
+- `touches` widened to `Documentation/Planning/Decisions` for ADR-0028 and its README row; no task in Doing named it.
 - Measured 2026-09-26, curl 8.21.0 mingw (`/mingw64/bin/curl`), with `Record-CurlExchange.ps1 -Port 18218 -Connections 3 -Response 'HTTP/1.1 401 Unauthorized
 Content-Length: 0
 Connection: close
@@ -50,3 +50,4 @@ Connection: close
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
 - 2026-09-26: Doing -> Done. RankedHttpAuthenticator picks among offered challenges in libcurl's order (Negotiate, Bearer, Digest, NTLM, Basic) with no fallback, as measured on curl 8.21.0
+- ADR renumbered to 0028 during the rebase: ADR-0026 (BL-192) and ADR-0027 were taken by other lanes.
