@@ -34,3 +34,4 @@ A URL without a scheme gets `http://` or the scheme its host prefix implies, as 
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
