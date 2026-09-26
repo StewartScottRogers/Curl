@@ -16,3 +16,8 @@ given and must never reference a protocol library directly.
 arguments to `CurlCommandRunner`, which parses them, runs each URL and prints curl's
 `curl: (N) <message>` lines. `-o` files open on the first write through
 `DeferredOutputFileStream`, which is how curl's exit 23 message comes out right.
+
+A URL with no `-o` writes through `StandardOutputFailureDeferringStream`, which
+models curl's 4096-byte stdio buffer: a failed standard output is reported as
+`curl: Failed writing body` (exit 23) while the body fits the buffer, and as the
+handler's own `(23)` write failure once it would not.

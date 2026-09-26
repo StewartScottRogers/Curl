@@ -37,7 +37,10 @@ namespace Curl.Console;
 /// URL, the second the second, and so on. A failure's line is printed unless <c>-s</c> was
 /// given without <c>-S</c>, and only when the failure carries a message. An <c>-o</c> file
 /// that cannot be created prints curl's <c>Warning: Failed to open the file</c> line first,
-/// unless <c>-s</c> was given, with or without <c>-S</c>. A refused command
+/// unless <c>-s</c> was given, with or without <c>-S</c>. A transfer whose write to standard
+/// output fails while the body still fits curl's 4096-byte stdio buffer exits 23 and prints
+/// curl's <c>curl: Failed writing body</c>, with no <c>(23)</c>, under the same <c>-s</c> /
+/// <c>-S</c> rule as any failure; a larger body reports the handler's own write failure. A refused command
 /// line prints the refusal's lines and transfers nothing.
 /// </remarks>
 internal sealed class CurlCommandRunner(
@@ -53,8 +56,29 @@ internal sealed class CurlCommandRunner(
     /// </summary>
     internal const string MalformedUrlMessage = "URL rejected: Malformed input to a URL function";
 
+    /// <summary>
+    /// The line curl 8.21.0's own write callback prints, with no <c>(23)</c>, when standard
+    /// output is closed or its reader has gone and the body fits its stdio buffer; measured on
+    /// <c>telnet</c> and <c>file</c> transfers.
+    /// </summary>
+    internal const string FailedWritingBodyLine = "curl: Failed writing body";
+
     /// <summary>The one scheme whose transfer uploads standard input.</summary>
     private const string TelnetScheme = "telnet";
+
+    /// <summary>
+    /// The result of a transfer whose write to standard output failed. It is compared by
+    /// reference, so that <see cref="FormatErrorLine" /> prints
+    /// <see cref="FailedWritingBodyLine" /> for it rather than a <c>curl: (23)</c> line.
+    /// </summary>
+    private static readonly TransferResult StandardOutputWriteFailure =
+        new(CurlExitCode.WriteError, 0, "Failed writing body");
+
+    /// <summary>
+    /// Standard output, deferring a write failure as curl's stdio buffer does and recording
+    /// it for the current transfer.
+    /// </summary>
+    private readonly StandardOutputFailureDeferringStream deferringStandardOutput = new(standardOutput);
 
     /// <summary>
     /// Runs <paramref name="arguments" /> to completion.
@@ -119,12 +143,31 @@ internal sealed class CurlCommandRunner(
 
             if (showsErrors && result.ErrorMessage is not null)
             {
-                string code = ((int)result.ExitCode).ToString(CultureInfo.InvariantCulture);
-                await WriteErrorLineAsync($"curl: ({code}) {result.ErrorMessage}").ConfigureAwait(false);
+                await WriteErrorLineAsync(FormatErrorLine(result)).ConfigureAwait(false);
             }
         }
 
         return exitCode;
+    }
+
+    /// <summary>
+    /// Formats the line printed for a failed transfer that carries a message.
+    /// </summary>
+    /// <param name="result">The failed transfer's result.</param>
+    /// <returns>
+    /// <see cref="FailedWritingBodyLine" /> when standard output could not be written;
+    /// otherwise <c>curl: (N) &lt;message&gt;</c>.
+    /// </returns>
+    private static string FormatErrorLine(TransferResult result)
+    {
+        if (ReferenceEquals(result, StandardOutputWriteFailure))
+        {
+            return FailedWritingBodyLine;
+        }
+
+        string code = ((int)result.ExitCode).ToString(CultureInfo.InvariantCulture);
+
+        return $"curl: ({code}) {result.ErrorMessage}";
     }
 
     /// <summary>
@@ -149,11 +192,8 @@ internal sealed class CurlCommandRunner(
 
         if (outputFile is null)
         {
-            TransferResult result = await dispatcher.DispatchAsync(CreateContext(options, uri, standardOutput))
+            return await TransferToStandardOutputAsync(dispatcher, CreateContext(options, uri, deferringStandardOutput))
                 .ConfigureAwait(false);
-            await standardOutput.FlushAsync().ConfigureAwait(false);
-
-            return result;
         }
 
         DeferredOutputFileStream output = new(outputFileSystem, outputFile);
@@ -170,6 +210,28 @@ internal sealed class CurlCommandRunner(
 
             return completed;
         }
+    }
+
+    /// <summary>
+    /// Performs one transfer whose output is standard output, and flushes it.
+    /// </summary>
+    /// <param name="dispatcher">Performs the transfer with the handler for its scheme.</param>
+    /// <param name="context">The transfer, whose output is standard output.</param>
+    /// <returns>
+    /// <see cref="StandardOutputWriteFailure" /> when the handler succeeded but standard
+    /// output failed, which is curl's failed flush at the end of the transfer; otherwise the
+    /// handler's result, including its own write failure when curl's stdio buffer would have
+    /// filled (see <see cref="StandardOutputFailureDeferringStream" />).
+    /// </returns>
+    private async Task<TransferResult> TransferToStandardOutputAsync(
+        ProtocolDispatcher dispatcher,
+        TransferContext context)
+    {
+        deferringStandardOutput.ClearWriteFailure();
+        TransferResult result = await dispatcher.DispatchAsync(context).ConfigureAwait(false);
+        await deferringStandardOutput.FlushAsync().ConfigureAwait(false);
+
+        return result.IsSuccess && deferringStandardOutput.HasWriteFailed ? StandardOutputWriteFailure : result;
     }
 
     /// <summary>

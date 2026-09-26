@@ -295,7 +295,129 @@ public sealed class CurlCommandRunnerTests
         Assert.IsNull(context.TftpBlockSize);
         Assert.IsFalse(context.TftpNoOptions);
         Assert.AreEqual(TransferContext.DefaultCreateFileMode, context.CreateFileMode);
-        Assert.AreSame(standardOutput, context.Output);
+        Assert.AreEqual("/a", StandardOutputText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_StandardOutputWriteThrows_ReturnsExit23WithFailedWritingBodyLine()
+    {
+        FailingWriteStream closed = new();
+
+        int exitCode = await RunWithStandardOutputAsync(closed, ["file:///a"], RecordingProtocolHandler.WritingPath("file"));
+
+        Assert.AreEqual(23, exitCode);
+        Assert.AreEqual("curl: Failed writing body" + NewLine, StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_StandardOutputWriteThrowsUnderSilent_PrintsNothingAndReturns23()
+    {
+        FailingWriteStream closed = new();
+
+        int exitCode = await RunWithStandardOutputAsync(closed, ["-s", "file:///a"], RecordingProtocolHandler.WritingPath("file"));
+
+        Assert.AreEqual(23, exitCode);
+        Assert.AreEqual(string.Empty, StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_StandardOutputWriteThrowsUnderSilentShowError_PrintsFailedWritingBodyLine()
+    {
+        FailingWriteStream closed = new();
+
+        int exitCode = await RunWithStandardOutputAsync(closed, ["-sS", "file:///a"], RecordingProtocolHandler.WritingPath("file"));
+
+        Assert.AreEqual(23, exitCode);
+        Assert.AreEqual(CurlCommandRunner.FailedWritingBodyLine + NewLine, StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_HandlerReportsItsOwnFailureForAThrowingStandardOutput_PrintsFailedWritingBodyLine()
+    {
+        FailingWriteStream closed = new();
+        RecordingProtocolHandler telnet = new("telnet", async context =>
+        {
+            try
+            {
+                await context.Output.WriteAsync(new byte[] { 1 });
+            }
+            catch (IOException)
+            {
+                return TransferResult.Failure(CurlExitCode.WriteError, "Failure writing output to destination, passed 1 returned 0");
+            }
+
+            return TransferResult.Success(1);
+        });
+
+        int exitCode = await RunWithStandardOutputAsync(closed, ["-sS", "telnet://h/"], telnet);
+
+        Assert.AreEqual(23, exitCode);
+        Assert.AreEqual("curl: Failed writing body" + NewLine, StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_StandardOutputFlushThrows_ReturnsExit23WithFailedWritingBodyLine()
+    {
+        FailingWriteStream closed = new() { WritesToFail = 0, FailsFlush = true };
+
+        int exitCode = await RunWithStandardOutputAsync(closed, ["file:///a"], RecordingProtocolHandler.WritingPath("file"));
+
+        Assert.AreEqual(23, exitCode);
+        Assert.AreEqual("curl: Failed writing body" + NewLine, StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_StandardOutputFailsOnlyForTheFirstUrl_ReportsItAndSucceedsOnTheSecond()
+    {
+        FailingWriteStream flaky = new() { WritesToFail = 1 };
+
+        int exitCode = await RunWithStandardOutputAsync(
+            flaky, ["file:///first", "file:///second"], RecordingProtocolHandler.WritingPath("file"));
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual("curl: Failed writing body" + NewLine, StandardErrorText);
+        Assert.AreEqual("/second", Encoding.ASCII.GetString(flaky.ToArray()));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_StandardOutputWriteOfAFullStdioBufferThrows_PrintsTheHandlersWriteFailureLine()
+    {
+        FailingWriteStream closed = new();
+        RecordingProtocolHandler file = new("file", async context =>
+        {
+            try
+            {
+                await context.Output.WriteAsync(new byte[StandardOutputFailureDeferringStream.StdioBufferSize]);
+            }
+            catch (IOException)
+            {
+                return TransferResult.Failure(CurlExitCode.WriteError, "Failure writing output to destination, passed 4096 returned 0");
+            }
+
+            return TransferResult.Success(4096);
+        });
+
+        int exitCode = await RunWithStandardOutputAsync(closed, ["-sS", "file:///a"], file);
+
+        Assert.AreEqual(23, exitCode);
+        Assert.AreEqual("curl: (23) Failure writing output to destination, passed 4096 returned 0" + NewLine, StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_TransferFailsAfterAFailedStandardOutputWrite_PrintsTheTransfersOwnLine()
+    {
+        FailingWriteStream closed = new();
+        RecordingProtocolHandler telnet = new("telnet", async context =>
+        {
+            await context.Output.WriteAsync(new byte[] { 1 });
+
+            return TransferResult.Failure(CurlExitCode.RecvError, "Failure when receiving data from the peer");
+        });
+
+        int exitCode = await RunWithStandardOutputAsync(closed, ["-sS", "telnet://h/"], telnet);
+
+        Assert.AreEqual(56, exitCode);
+        Assert.AreEqual("curl: (56) Failure when receiving data from the peer" + NewLine, StandardErrorText);
     }
 
     [TestMethod]
@@ -340,6 +462,13 @@ public sealed class CurlCommandRunnerTests
 
     private Task<int> RunAsync(IReadOnlyList<string> arguments, params IProtocolHandler[] handlers) =>
         new CurlCommandRunner(_ => new ProtocolDispatcher(handlers), fileSystem, standardOutput, standardError, standardInput)
+            .RunAsync(arguments);
+
+    private Task<int> RunWithStandardOutputAsync(
+        Stream output,
+        IReadOnlyList<string> arguments,
+        params IProtocolHandler[] handlers) =>
+        new CurlCommandRunner(_ => new ProtocolDispatcher(handlers), fileSystem, output, standardError, standardInput)
             .RunAsync(arguments);
 
     private Task<int> RunToUncreatableOutputFileAsync(params string[] options)
