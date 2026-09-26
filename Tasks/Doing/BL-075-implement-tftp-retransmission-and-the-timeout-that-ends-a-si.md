@@ -158,3 +158,4 @@ not yet measured, `--max-time`, has its own measure-then-match criterion.
 - 2026-09-26: Backlog -> Doing.
 - 2026-09-26: Doing -> Blocked. Needs --connect-timeout (and --max-time) on ITransferContext in Curl.Protocol.Abstractions.UnitLibrary plus CLI wiring, outside touches; criteria 2 and 5 also contradict measured curl (exit 7, and exit 56 on a stranger). Re-plan; see Notes.
 - 2026-09-26: Blocked -> Backlog. Re-planned: contract prerequisite split out as BL-123 (now a dependency); criteria corrected to measured curl 8.21.0 (exit 7 unanswered RRQ, 28 data-phase silence, 56 stranger) plus a measure-then-match --max-time criterion.
+- 2026-09-26: Backlog -> Doing.
