@@ -16,6 +16,8 @@ choices do not need one.
 | ADR | Title | Status | Date |
 | --- | --- | --- | --- |
 | [0001](ADR-0001-adopt-slnx-solution-format.md) | Adopt the `.slnx` solution format and a shared project for documentation | Accepted | 2026-09-25 |
+| [0002](ADR-0002-ifilesystem-as-the-second-protocol-seam.md) | `IFileSystem` as the second protocol seam | Accepted | 2026-09-25 |
+| [0003](ADR-0003-itransfercontext-carries-transfer-options.md) | `ITransferContext` carries transfer options | Accepted | 2026-09-25 |
 
 ## Template
 

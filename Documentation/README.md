@@ -10,7 +10,7 @@ files nobody opens.
 | Path | Holds |
 | --- | --- |
 | `Product/` | What Curl is and what it must do — overview, requirements. |
-| `Planning/` | How and when it gets built — roadmap, backlog. |
+| `Planning/` | How and when it gets built — roadmap and decisions. Work items live on the task board in `Tasks/`, not here. |
 | `Planning/Decisions/` | Architecture Decision Records (ADRs), one file per decision. |
 
 ## Adding a document

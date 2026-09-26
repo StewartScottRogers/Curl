@@ -1,36 +1,17 @@
-# Backlog
+# Backlog (retired)
 
-> **TODO** — seeded only with the concrete items known at creation time.
+The backlog moved to the task board on 2026-09-25. The board is the `Tasks` shared
+project: one Markdown file per task, and the folder a task sits in is its status.
+See `Tasks/README.md`, and use `/task-status` for the current state.
 
-Items move top-to-bottom: **Ready** → **In progress** → **Done**. An item is
-*Ready* only when someone other than its author could pick it up and finish it
-without asking a question.
+Every item that was here moved to the board with its ID unchanged, except the single
+Icebox item:
 
-## Ready
+| Old ID | Now |
+| --- | --- |
+| BL-000, BL-001, BL-006, BL-007 | `Tasks/Done/` |
+| BL-002 – BL-005, BL-008 – BL-013 | `Tasks/Backlog/` |
+| IB-001 | BL-014, in `Tasks/Deferred/` |
 
-| ID | Item | Requirement | Notes |
-| --- | --- | --- | --- |
-| BL-001 | Fill in `Product/Product-Overview.md` | — | Blocks requirements work; nothing else can be prioritised until scope is written down. |
-| BL-002 | Author the first functional requirements in `Product/Requirements.md` | — | Depends on BL-001. |
-| BL-003 | Add the first buildable project to `Curl.slnx` | — | Also clears the `NU1503` restore warning on the solution. |
-
-## In progress
-
-| ID | Item | Requirement | Notes |
-| --- | --- | --- | --- |
-| — | — | — | — |
-
-## Done
-
-| ID | Item | Completed | Notes |
-| --- | --- | --- | --- |
-| BL-000 | Create `Curl.slnx` and the `Documentation` shared project | 2026-09-25 | ADR-0001. |
-
-## Icebox
-
-Ideas kept on record without commitment. Nothing here is scheduled, and an item
-sitting here for two reviews running should be deleted rather than nursed.
-
-| ID | Item | Why not now |
-| --- | --- | --- |
-| IB-001 | Harden `hrdrClaudeNative.cmd`: verify the `npm install -g @anthropic-ai/claude-code` exit code, and quote the PowerShell `--cwd` / `--label` arguments against paths containing `'` | Known minor gaps, no current impact — the script works on the supported paths. |
+Task IDs continue the `BL-###` sequence on the board. Do not add items to this file;
+it is kept only so that old links land somewhere useful.

@@ -1,0 +1,55 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- Drops onto PATH as curl.exe, so scripts cannot tell the difference. -->
+    <AssemblyName>curl</AssemblyName>
+    <RootNamespace>Curl.Console</RootNamespace>
+    <!--
+      Native ahead-of-time is the shipping configuration and the default, so
+      `dotnet publish` produces the binary that ships rather than one that only
+      resembles it. `dotnet build` and `dotnet test` are unaffected - PublishAot
+      only takes effect on publish.
+
+      It needs the MSVC linker from the "Desktop development with C++" workload,
+      and it needs vswhere.exe on PATH to find it. Without vswhere the link step
+      fails with MSB3073 and a confusing "'vswhere.exe' is not recognized", so add
+      it once per shell or machine:
+          C:\Program Files (x86)\Microsoft Visual Studio\Installer
+      A machine that genuinely cannot link native code opts out per publish:
+          dotnet publish Curl.Console -c Release -p:PublishAot=false
+      IsAotCompatible stays on for every production project and is checked by the
+      VerifyAotCompatibility target in Directory.Build.props, so incompatible code
+      is caught at build time rather than here.
+    -->
+    <PublishAot Condition=" '$(PublishAot)' == '' ">true</PublishAot>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Curl.Authentication.UnitLibrary\Curl.Authentication.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Cli.UnitLibrary\Curl.Cli.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Cookies.UnitLibrary\Curl.Cookies.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Core.UnitLibrary\Curl.Core.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Networking.UnitLibrary\Curl.Networking.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Output.UnitLibrary\Curl.Output.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Protocol.Abstractions.UnitLibrary\Curl.Protocol.Abstractions.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Protocol.Dict.UnitLibrary\Curl.Protocol.Dict.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Protocol.File.UnitLibrary\Curl.Protocol.File.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Protocol.Ftp.UnitLibrary\Curl.Protocol.Ftp.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Protocol.Gopher.UnitLibrary\Curl.Protocol.Gopher.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Protocol.Http.UnitLibrary\Curl.Protocol.Http.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Protocol.Imap.UnitLibrary\Curl.Protocol.Imap.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Protocol.Ldap.UnitLibrary\Curl.Protocol.Ldap.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Protocol.Mqtt.UnitLibrary\Curl.Protocol.Mqtt.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Protocol.Pop3.UnitLibrary\Curl.Protocol.Pop3.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Protocol.Rtsp.UnitLibrary\Curl.Protocol.Rtsp.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Protocol.Smb.UnitLibrary\Curl.Protocol.Smb.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Protocol.Smtp.UnitLibrary\Curl.Protocol.Smtp.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Protocol.Ssh.UnitLibrary\Curl.Protocol.Ssh.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Protocol.Telnet.UnitLibrary\Curl.Protocol.Telnet.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Protocol.Tftp.UnitLibrary\Curl.Protocol.Tftp.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Protocol.Ws.UnitLibrary\Curl.Protocol.Ws.UnitLibrary.csproj" />
+  </ItemGroup>
+
+</Project>
