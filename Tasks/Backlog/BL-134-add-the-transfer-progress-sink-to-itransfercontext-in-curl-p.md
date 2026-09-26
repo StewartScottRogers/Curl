@@ -1,24 +1,24 @@
 ---
-id: BL-128
+id: BL-134
 title: Add the transfer progress sink to ITransferContext in Curl.Protocol.Abstractions
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-127]
+depends-on: [BL-133]
 touches: [Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Protocol.File.UnitTests]
 requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-128 — Add the transfer progress sink to ITransferContext in Curl.Protocol.Abstractions
+# BL-134 — Add the transfer progress sink to ITransferContext in Curl.Protocol.Abstractions
 
 ## Goal
 
-`ITransferContext` exposes the progress sink BL-127's ADR decides, `TransferContext` defaults it to a do-nothing implementation, and every existing handler and test compiles and passes unchanged.
+`ITransferContext` exposes the progress sink BL-133's ADR decides, `TransferContext` defaults it to a do-nothing implementation, and every existing handler and test compiles and passes unchanged.
 
 ## Context
 
-BL-127 records the ADR (the next free ADR number under `Documentation/Planning/Decisions/`, ADR-0009 at filing time) that names the sink interface, its members, the `ITransferContext` member and the do-nothing default. Implement exactly what that ADR says; if it and this task disagree, the ADR wins. The purpose is to let `Curl.Console` print the meter after a transfer that failed past connect/open (BL-130), show curl 8.21.0's live status line (BL-131), and draw the `-#` bar (BL-132).
+BL-133 records the ADR (the next free ADR number under `Documentation/Planning/Decisions/`, ADR-0009 at filing time) that names the sink interface, its members, the `ITransferContext` member and the do-nothing default. Implement exactly what that ADR says; if it and this task disagree, the ADR wins. The purpose is to let `Curl.Console` print the meter after a transfer that failed past connect/open (BL-130), show curl 8.21.0's live status line (BL-131), and draw the `-#` bar (BL-132).
 
 Where the code goes:
 
@@ -30,7 +30,7 @@ No handler reports anything yet; `file://` is BL-129. The sink does not read tim
 
 ## Acceptance criteria
 
-- [ ] The interface, members and default named in BL-127's ADR exist in `Curl.Protocol.Abstractions.UnitLibrary` with exactly those names.
+- [ ] The interface, members and default named in BL-133's ADR exist in `Curl.Protocol.Abstractions.UnitLibrary` with exactly those names.
 - [ ] A test in `Curl.Protocol.Abstractions.UnitTests/TransferContextTests.cs` pins that a `TransferContext` built with only `Url` and `Output` returns the do-nothing sink, and one pins that an initialised sink is returned as given.
 - [ ] A test in `Curl.Protocol.Abstractions.UnitTests` calls every member of the do-nothing sink and pins that none throws.
 - [ ] `dotnet build Curl.Protocol.Abstractions.UnitLibrary -warnaserror` and `dotnet build Curl.Protocol.File.UnitTests -warnaserror` are clean, and `dotnet test --filter "TestCategory!=Integration"` is green for the whole solution; no new test needs `TestCategory=Integration`.

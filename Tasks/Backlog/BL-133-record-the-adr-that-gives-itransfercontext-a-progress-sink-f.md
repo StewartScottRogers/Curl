@@ -1,5 +1,5 @@
 ---
-id: BL-127
+id: BL-133
 title: Record the ADR that gives ITransferContext a progress sink for the progress meter
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-127 — Record the ADR that gives ITransferContext a progress sink for the progress meter
+# BL-133 — Record the ADR that gives ITransferContext a progress sink for the progress meter
 
 ## Goal
 
@@ -29,7 +29,7 @@ BL-102 made `Curl.Console` write the opening of curl 8.21.0's progress meter to 
 
 The shape to decide, as a starting proposal the ADR may refine but must settle by name: a new interface in `Curl.Protocol.Abstractions.UnitLibrary` (for example `ITransferProgress` with `ReportTransferStarted()`, `ReportDownloaded(long bytesSoFar, long? expectedTotal)` and `ReportUploaded(long bytesSoFar, long? expectedTotal)`), an `ITransferContext` member exposing it, a do-nothing implementation that `TransferContext` defaults to so every existing handler and test keeps compiling unchanged, and the rule that the sink never reads the clock itself: timing belongs to the consumer in `Curl.Console`, which uses the injected `TimeProvider` (`ITransferContext.TimeProvider`). The ADR must also say that reporting is synchronous and cheap (no `async` on the sink), since handlers call it in their copy loops, and that no handler is obliged to report bytes (`file://` must not, because curl's `file://` status line stays all zeros, per BL-102's Notes).
 
-This is a docs-only task: no `.cs` file changes. The contract is BL-128.
+This is a docs-only task: no `.cs` file changes. The contract is BL-134.
 
 ## Acceptance criteria
 

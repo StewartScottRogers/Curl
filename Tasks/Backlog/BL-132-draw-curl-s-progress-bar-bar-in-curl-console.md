@@ -4,7 +4,7 @@ title: Draw curl's -#/--progress-bar bar in Curl.Console
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-102, BL-128, BL-131]
+depends-on: [BL-102, BL-134, BL-131]
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-26

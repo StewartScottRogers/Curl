@@ -62,11 +62,11 @@ Curl.Console prints neither today. `Curl.Cli.UnitLibrary` has `CommandLineOption
 - 2026-09-26, lane 3 (delivery): `Curl.Console/ProgressMeterLines.cs` holds the recorded lines; `CurlCommandRunner` writes them through its existing stderr line writer (so `Environment.NewLine`, which on Windows gives the `\r\n` curl's mingw build writes) after each transfer. Tests: `CurlCommandRunnerProgressMeterTests` (16), plus `CurlCompositionTests.CreateRunner_FileUrlToStandardOutputThatIsNotATerminal_WritesTheProgressMeter`. The built `curl` was compared with `cmp` against curl 8.21.0 for `-C 5 file://…ten.bin -o m2` and `file://…ten.bin > o`: stderr and output byte-identical.
 - Choices taken as defaults, and why:
   - The meter is written after the transfer, not during it. It goes to stderr and the body does not, so each stream's bytes are unchanged; nothing timing-dependent is involved, so no `TimeProvider` is needed yet.
-  - The meter follows only a successful transfer. Measured: curl writes it when the transfer got past connect/open (`-C 5` against an HTTP server without ranges prints the meter, then `curl: (33) …`) but not before (a missing `file://` source prints only `curl: (37) …`). The console cannot tell those apart until handlers report that a transfer started: BL-128/BL-130.
+  - The meter follows only a successful transfer. Measured: curl writes it when the transfer got past connect/open (`-C 5` against an HTTP server without ranges prints the meter, then `curl: (33) …`) but not before (a missing `file://` source prints only `curl: (37) …`). The console cannot tell those apart until handlers report that a transfer started: BL-134/BL-130.
   - Only the zero status line is written. For network transfers curl rewrites it in place with live counters (measured against a local `python -m http.server`); that needs handler progress reporting: BL-131.
   - Under `-#` nothing is written rather than the wrong form: BL-132.
   - With no `-o` and standard output a terminal, the meter is hidden, as curl hides it; `Program` passes `!Console.IsOutputRedirected`. The runner writes the meter only when constructed with `writesProgressMeter: true` (the production composition), so the existing runner tests keep asserting stderr without it.
-- Follow-ups filed by task-planner: BL-127 (ADR for a progress sink), BL-128 (sink in Abstractions), BL-129 (file:// reports "started"), BL-130 (meter after a failure past connect), BL-131 (live counters), BL-132 (`-#` bar).
+- Follow-ups filed by task-planner: BL-133 (ADR for a progress sink), BL-134 (sink in Abstractions), BL-129 (file:// reports "started"), BL-130 (meter after a failure past connect), BL-131 (live counters), BL-132 (`-#` bar).
 
 ## Log
 

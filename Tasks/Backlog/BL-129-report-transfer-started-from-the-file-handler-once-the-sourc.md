@@ -4,7 +4,7 @@ title: Report transfer started from the file:// handler once the source is open
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-128]
+depends-on: [BL-134]
 touches: [Curl.Protocol.File.UnitLibrary, Curl.Protocol.File.UnitTests]
 requirement: none
 created: 2026-09-26
@@ -14,7 +14,7 @@ completed:
 
 ## Goal
 
-The `file://` handler reports "transfer started" through the BL-128 progress sink at the point curl 8.21.0's meter begins, and reports no byte counts, so `Curl.Console` (after BL-130) shows the meter after a `file://` failure exactly when curl does.
+The `file://` handler reports "transfer started" through the BL-134 progress sink at the point curl 8.21.0's meter begins, and reports no byte counts, so `Curl.Console` (after BL-130) shows the meter after a `file://` failure exactly when curl does.
 
 ## Context
 
