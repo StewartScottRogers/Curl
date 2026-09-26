@@ -93,7 +93,7 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, Content);
         var output = new ChunkRecordingStream();
-        var context = new FakeTransferContext { Url = FileUrl, Output = output };
+        var context = new TransferContext { Url = FileUrl, Output = output };
         var handler = new FileProtocolHandler(fileSystem);
 
         var result = await handler.ExecuteAsync(context);
@@ -109,7 +109,7 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, []);
         var output = new ChunkRecordingStream();
-        var context = new FakeTransferContext { Url = FileUrl, Output = output };
+        var context = new TransferContext { Url = FileUrl, Output = output };
         var handler = new FileProtocolHandler(fileSystem);
 
         var result = await handler.ExecuteAsync(context);
@@ -127,7 +127,7 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, LargeContent());
         var output = new ChunkRecordingStream();
-        var context = new FakeTransferContext { Url = FileUrl, Output = output };
+        var context = new TransferContext { Url = FileUrl, Output = output };
         var handler = new FileProtocolHandler(fileSystem);
 
         await handler.ExecuteAsync(context);
@@ -145,7 +145,7 @@ public sealed class FileProtocolHandlerTests
         byte[] content = LargeContent();
         fileSystem.AddFile(OsPath, content);
         var output = new ChunkRecordingStream();
-        var context = new FakeTransferContext { Url = FileUrl, Output = output };
+        var context = new TransferContext { Url = FileUrl, Output = output };
         var handler = new FileProtocolHandler(fileSystem);
 
         var result = await handler.ExecuteAsync(context);
@@ -163,7 +163,7 @@ public sealed class FileProtocolHandlerTests
         byte[] content = [0x00, 0xFF, 0xFE, 0x00, 0x80, 0xC3, 0x28, 0x00, 0xED, 0xA0, 0x80];
         fileSystem.AddFile(OsPath, content);
         var output = new ChunkRecordingStream();
-        var context = new FakeTransferContext { Url = FileUrl, Output = output };
+        var context = new TransferContext { Url = FileUrl, Output = output };
         var handler = new FileProtocolHandler(fileSystem);
 
         await handler.ExecuteAsync(context);
@@ -213,7 +213,7 @@ public sealed class FileProtocolHandlerTests
     public async Task ExecuteAsync_DotDotSourceNotFound_QuotesThePathWithTheDotDotRemoved()
     {
         var fileSystem = new FakeFileSystem();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = new Uri("file:///C:/dir/../nosuch.txt"),
             Output = new ChunkRecordingStream(),
@@ -260,7 +260,7 @@ public sealed class FileProtocolHandlerTests
     public async Task ExecuteAsync_RejectedHost_ReportsUrlMalformat()
     {
         var fileSystem = new FakeFileSystem();
-        var context = new FakeTransferContext { Url = new Uri("file://example.com/x") };
+        var context = new TransferContext { Output = new ChunkRecordingStream(), Url = new Uri("file://example.com/x") };
         var handler = new FileProtocolHandler(fileSystem);
 
         var result = await handler.ExecuteAsync(context);
@@ -275,7 +275,7 @@ public sealed class FileProtocolHandlerTests
     public async Task ExecuteAsync_RejectedHost_NeverTouchesTheFileSystem()
     {
         var fileSystem = new FakeFileSystem();
-        var context = new FakeTransferContext { Url = new Uri("file://example.com/x") };
+        var context = new TransferContext { Output = new ChunkRecordingStream(), Url = new Uri("file://example.com/x") };
         var handler = new FileProtocolHandler(fileSystem);
 
         await handler.ExecuteAsync(context);
@@ -287,8 +287,9 @@ public sealed class FileProtocolHandlerTests
     public async Task ExecuteAsync_Upload_OpensTheDestinationTruncatedExactlyOnce()
     {
         var fileSystem = new FakeFileSystem();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
+            Output = new ChunkRecordingStream(),
             Url = FileUrl,
             Upload = new TrackedMemoryStream(Content),
         };
@@ -304,8 +305,9 @@ public sealed class FileProtocolHandlerTests
     public async Task ExecuteAsync_Upload_WritesTheSourceBytesToTheDestination()
     {
         var fileSystem = new FakeFileSystem();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
+            Output = new ChunkRecordingStream(),
             Url = FileUrl,
             Upload = new TrackedMemoryStream(Content),
         };
@@ -322,8 +324,9 @@ public sealed class FileProtocolHandlerTests
     public async Task ExecuteAsync_UploadFromNonSeekableSource_Succeeds()
     {
         var fileSystem = new FakeFileSystem();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
+            Output = new ChunkRecordingStream(),
             Url = FileUrl,
             Upload = new NonSeekableStream(Content),
         };
@@ -429,7 +432,7 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, content);
         var output = new ChunkRecordingStream();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = output,
@@ -485,7 +488,7 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, Content);
         var output = FaultingStream.FailingOnWrite(1);
-        var context = new FakeTransferContext { Url = FileUrl, Output = output };
+        var context = new TransferContext { Url = FileUrl, Output = output };
         var handler = new FileProtocolHandler(fileSystem);
 
         var result = await handler.ExecuteAsync(context);
@@ -501,7 +504,7 @@ public sealed class FileProtocolHandlerTests
     {
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, new byte[40000]);
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = FaultingStream.FailingOnWrite(1),
@@ -565,7 +568,7 @@ public sealed class FileProtocolHandlerTests
     {
         var fileSystem = new FakeFileSystem();
         fileSystem.WriteInto(OsPath, FaultingStream.FailingOnWriteAccepting(1, 96));
-        var context = new FakeTransferContext { Url = FileUrl, Upload = new MemoryStream(Content) };
+        var context = new TransferContext { Output = new ChunkRecordingStream(), Url = FileUrl, Upload = new MemoryStream(Content) };
         var handler = new FileProtocolHandler(fileSystem);
 
         var result = await handler.ExecuteAsync(context);
@@ -581,7 +584,7 @@ public sealed class FileProtocolHandlerTests
     {
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, LargeContent());
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = FaultingStream.FailingOnWrite(2),
@@ -601,8 +604,9 @@ public sealed class FileProtocolHandlerTests
     {
         var fileSystem = new FakeFileSystem();
         fileSystem.WriteInto(OsPath, new ChunkRecordingStream());
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
+            Output = new ChunkRecordingStream(),
             Url = FileUrl,
             Upload = FaultingStream.FailingOnRead(UploadContent(), 2),
         };
@@ -628,7 +632,7 @@ public sealed class FileProtocolHandlerTests
     {
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, new byte[1000]);
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = FaultingStream.FailingOnWrite(1),
@@ -653,7 +657,7 @@ public sealed class FileProtocolHandlerTests
     {
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, Content);
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = new ChunkRecordingStream(),
@@ -672,7 +676,7 @@ public sealed class FileProtocolHandlerTests
     {
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, Content);
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = new ChunkRecordingStream(),
@@ -692,7 +696,7 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, Content);
         var headerOutput = new ChunkRecordingStream();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = new ChunkRecordingStream(),
@@ -715,7 +719,7 @@ public sealed class FileProtocolHandlerTests
         byte[] content = LargeContent();
         fileSystem.AddFileReadingFrom(OsPath, FaultingStream.FailingOnRead(content, 2), content.Length);
         var output = new ChunkRecordingStream();
-        var context = new FakeTransferContext { Url = FileUrl, Output = output };
+        var context = new TransferContext { Url = FileUrl, Output = output };
         var handler = new FileProtocolHandler(fileSystem);
 
         var result = await handler.ExecuteAsync(context);
@@ -730,8 +734,9 @@ public sealed class FileProtocolHandlerTests
     public async Task ExecuteAsync_UploadSourceOfKnownLengthFailsOnFirstRead_ReportsClientReadEofFail()
     {
         var fileSystem = new FakeFileSystem();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
+            Output = new ChunkRecordingStream(),
             Url = FileUrl,
             Upload = FaultingStream.FailingOnRead(Content, 1),
         };
@@ -753,8 +758,9 @@ public sealed class FileProtocolHandlerTests
         var destination = new ChunkRecordingStream();
         fileSystem.WriteInto(OsPath, destination);
         byte[] content = UploadContent();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
+            Output = new ChunkRecordingStream(),
             Url = FileUrl,
             Upload = FaultingStream.FailingOnRead(content, 2),
         };
@@ -779,8 +785,9 @@ public sealed class FileProtocolHandlerTests
     {
         var fileSystem = new FakeFileSystem();
         fileSystem.WriteInto(OsPath, new ChunkRecordingStream());
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
+            Output = new ChunkRecordingStream(),
             Url = FileUrl,
             Upload = FaultingStream.FailingOnRead(UploadContent(), 2),
             ResumeFrom = 10,
@@ -805,8 +812,9 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         var destination = new ChunkRecordingStream();
         fileSystem.WriteInto(OsPath, destination);
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
+            Output = new ChunkRecordingStream(),
             Url = FileUrl,
             Upload = FaultingStream.FailingOnRead(new byte[200000], 2),
             ResumeFrom = 70000,
@@ -830,8 +838,9 @@ public sealed class FileProtocolHandlerTests
     {
         var fileSystem = new FakeFileSystem();
         fileSystem.WriteInto(OsPath, new ChunkRecordingStream());
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
+            Output = new ChunkRecordingStream(),
             Url = FileUrl,
             Upload = FaultingStream.FailingOnRead(new byte[200000], 1),
             ResumeFrom = 140000,
@@ -856,8 +865,9 @@ public sealed class FileProtocolHandlerTests
         var destination = new ChunkRecordingStream();
         fileSystem.WriteInto(OsPath, destination);
         byte[] content = UploadContent();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
+            Output = new ChunkRecordingStream(),
             Url = FileUrl,
             Upload = FaultingStream.FailingOnReadWithoutSeeking(content, 2),
         };
@@ -876,8 +886,9 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         var destination = new ChunkRecordingStream();
         fileSystem.WriteInto(OsPath, destination);
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
+            Output = new ChunkRecordingStream(),
             Url = FileUrl,
             Upload = FaultingStream.FailingOnReadWithoutSeeking(Content, 1),
             ResumeFrom = 4,
@@ -896,8 +907,9 @@ public sealed class FileProtocolHandlerTests
     {
         var fileSystem = new FakeFileSystem();
         fileSystem.WriteInto(OsPath, FaultingStream.FailingOnWrite(2));
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
+            Output = new ChunkRecordingStream(),
             Url = FileUrl,
             Upload = new TrackedMemoryStream(UploadContent()),
         };
@@ -915,7 +927,7 @@ public sealed class FileProtocolHandlerTests
     {
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, Content);
-        var context = new FakeTransferContext { Url = FileUrl, Output = new ChunkRecordingStream() };
+        var context = new TransferContext { Url = FileUrl, Output = new ChunkRecordingStream() };
         var handler = new FileProtocolHandler(fileSystem);
 
         await handler.ExecuteAsync(context);
@@ -930,7 +942,7 @@ public sealed class FileProtocolHandlerTests
         byte[] content = Content;
         var source = FaultingStream.FailingOnRead(content, 1);
         fileSystem.AddFileReadingFrom(OsPath, source, content.Length);
-        var context = new FakeTransferContext { Url = FileUrl, Output = new ChunkRecordingStream() };
+        var context = new TransferContext { Url = FileUrl, Output = new ChunkRecordingStream() };
         var handler = new FileProtocolHandler(fileSystem);
 
         await handler.ExecuteAsync(context);
@@ -943,7 +955,7 @@ public sealed class FileProtocolHandlerTests
     {
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, Content);
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = FaultingStream.FailingOnWrite(1),
@@ -967,7 +979,7 @@ public sealed class FileProtocolHandlerTests
         fileSystem.AddFile(OsPath, Content);
         using var cancellation = new CancellationTokenSource();
         await cancellation.CancelAsync();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = new ChunkRecordingStream(),
@@ -987,8 +999,9 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         using var cancellation = new CancellationTokenSource();
         await cancellation.CancelAsync();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
+            Output = new ChunkRecordingStream(),
             Url = FileUrl,
             Upload = new TrackedMemoryStream(Content),
             CancellationToken = cancellation.Token,
@@ -1017,7 +1030,7 @@ public sealed class FileProtocolHandlerTests
             StreamCancellationStyle.None,
             cancellation);
         fileSystem.AddFileReadingFrom(OsPath, source, content.Length);
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = CancellingStream.Writing(0, StreamCancellationStyle.None, null),
@@ -1044,8 +1057,9 @@ public sealed class FileProtocolHandlerTests
             triggerOperationNumber: 1,
             StreamCancellationStyle.None,
             cancellation);
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
+            Output = new ChunkRecordingStream(),
             Url = FileUrl,
             Upload = upload,
             CancellationToken = cancellation.Token,
@@ -1072,8 +1086,9 @@ public sealed class FileProtocolHandlerTests
             triggerOperationNumber: 1,
             StreamCancellationStyle.None,
             cancellation);
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
+            Output = new ChunkRecordingStream(),
             Url = FileUrl,
             Upload = upload,
             ResumeFrom = UploadChunkSize + 1,
@@ -1105,7 +1120,7 @@ public sealed class FileProtocolHandlerTests
                 StreamCancellationStyle.FaultedValueTask,
                 cancellation),
             content.Length);
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = new ChunkRecordingStream(),
@@ -1131,7 +1146,7 @@ public sealed class FileProtocolHandlerTests
                 StreamCancellationStyle.ThrownTaskCanceledException,
                 cancellation),
             content.Length);
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = new ChunkRecordingStream(),
@@ -1160,7 +1175,7 @@ public sealed class FileProtocolHandlerTests
                 StreamCancellationStyle.ThrownTaskCanceledException,
                 cancels: null),
             content.Length);
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = new ChunkRecordingStream(),
@@ -1179,7 +1194,7 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, Content);
         using var cancellation = new CancellationTokenSource();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = CancellingStream.Writing(
@@ -1205,8 +1220,9 @@ public sealed class FileProtocolHandlerTests
                 triggerOperationNumber: 1,
                 StreamCancellationStyle.FaultedValueTask,
                 cancellation));
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
+            Output = new ChunkRecordingStream(),
             Url = FileUrl,
             Upload = new TrackedMemoryStream(Content),
             CancellationToken = cancellation.Token,
@@ -1228,8 +1244,9 @@ public sealed class FileProtocolHandlerTests
                 triggerOperationNumber: 1,
                 StreamCancellationStyle.ThrownTaskCanceledException,
                 cancellation));
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
+            Output = new ChunkRecordingStream(),
             Url = FileUrl,
             Upload = new TrackedMemoryStream(Content),
             CancellationToken = cancellation.Token,
@@ -1250,8 +1267,9 @@ public sealed class FileProtocolHandlerTests
                 triggerOperationNumber: 1,
                 StreamCancellationStyle.ThrownTaskCanceledException,
                 cancels: null));
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
+            Output = new ChunkRecordingStream(),
             Url = FileUrl,
             Upload = new TrackedMemoryStream(Content),
         };
@@ -1270,7 +1288,7 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, Content);
         var output = new ChunkRecordingStream();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = output,
@@ -1292,7 +1310,7 @@ public sealed class FileProtocolHandlerTests
     public async Task ExecuteAsync_ResumeFromOnNonSeekableSource_ReturnsBadDownloadResume()
     {
         var output = new ChunkRecordingStream();
-        var context = new FakeTransferContext { Url = FileUrl, Output = output, ResumeFrom = 5 };
+        var context = new TransferContext { Url = FileUrl, Output = output, ResumeFrom = 5 };
 
         var result = await NonSeekableSourceResultAsync(context);
 
@@ -1305,7 +1323,7 @@ public sealed class FileProtocolHandlerTests
     public async Task ExecuteAsync_RangeStartOnNonSeekableSource_ReturnsBadDownloadResume()
     {
         var output = new ChunkRecordingStream();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = output,
@@ -1324,7 +1342,7 @@ public sealed class FileProtocolHandlerTests
     public async Task ExecuteAsync_NonSeekableSourceWithoutOffset_WritesTheWholeSource()
     {
         var output = new ChunkRecordingStream();
-        var context = new FakeTransferContext { Url = FileUrl, Output = output };
+        var context = new TransferContext { Url = FileUrl, Output = output };
 
         var result = await NonSeekableSourceResultAsync(context);
 
@@ -1343,7 +1361,7 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, Content);
         var output = new ChunkRecordingStream();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = output,
@@ -1366,7 +1384,7 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, Content);
         var output = new ChunkRecordingStream();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = output,
@@ -1389,7 +1407,7 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, []);
         var output = new ChunkRecordingStream();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = output,
@@ -1410,7 +1428,7 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, Content);
         var output = new ChunkRecordingStream();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = output,
@@ -1430,7 +1448,7 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, Content);
         var output = new ChunkRecordingStream();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = output,
@@ -1451,7 +1469,7 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, [0x41]);
         var output = new ChunkRecordingStream();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = output,
@@ -1471,7 +1489,7 @@ public sealed class FileProtocolHandlerTests
     {
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, Content);
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = new ChunkRecordingStream(),
@@ -1491,7 +1509,7 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, Content);
         var output = new ChunkRecordingStream();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = output,
@@ -1514,7 +1532,7 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, Content);
         var output = new ChunkRecordingStream();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = output,
@@ -1534,7 +1552,7 @@ public sealed class FileProtocolHandlerTests
     {
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, Content);
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = new ChunkRecordingStream(),
@@ -1555,7 +1573,7 @@ public sealed class FileProtocolHandlerTests
     {
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, Content);
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = new ChunkRecordingStream(),
@@ -1575,7 +1593,7 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, Content);
         var output = new ChunkRecordingStream();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = output,
@@ -1597,7 +1615,7 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, Content);
         var headers = new ChunkRecordingStream();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = new ChunkRecordingStream(),
@@ -1617,7 +1635,7 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, Content);
         var headers = new ChunkRecordingStream();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = new ChunkRecordingStream(),
@@ -1639,7 +1657,7 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFileWithoutTimestamp(OsPath, Content);
         var headers = new ChunkRecordingStream();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = new ChunkRecordingStream(),
@@ -1660,7 +1678,7 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, Content, FakeFileSystem.DefaultLastWriteTimeUtc);
         var headers = new ChunkRecordingStream();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = new ChunkRecordingStream(),
@@ -1683,8 +1701,9 @@ public sealed class FileProtocolHandlerTests
     {
         var fileSystem = new FakeFileSystem();
         var headers = new ChunkRecordingStream();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
+            Output = new ChunkRecordingStream(),
             Url = FileUrl,
             Upload = new TrackedMemoryStream(Content),
             HeaderOutput = headers,
@@ -1787,7 +1806,7 @@ public sealed class FileProtocolHandlerTests
     {
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, Content);
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = new ChunkRecordingStream(),
@@ -1805,7 +1824,7 @@ public sealed class FileProtocolHandlerTests
     {
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, []);
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = new ChunkRecordingStream(),
@@ -2024,7 +2043,7 @@ public sealed class FileProtocolHandlerTests
         fileSystem.AddFile(OsPath, Content);
         var output = new ChunkRecordingStream();
         var headers = new ChunkRecordingStream();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = output,
@@ -2049,7 +2068,7 @@ public sealed class FileProtocolHandlerTests
         fileSystem.AddFile(OsPath, Content);
         var output = new ChunkRecordingStream();
         var headers = new ChunkRecordingStream();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = output,
@@ -2074,7 +2093,7 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, Content);
         var headers = new ChunkRecordingStream();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = new ChunkRecordingStream(),
@@ -2098,7 +2117,7 @@ public sealed class FileProtocolHandlerTests
         byte[] content = Content;
         fileSystem.AddFile(OsPath, content);
         var output = new ChunkRecordingStream();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = output,
@@ -2122,7 +2141,7 @@ public sealed class FileProtocolHandlerTests
         byte[] content = Content;
         fileSystem.AddFile(OsPath, content);
         var output = new ChunkRecordingStream();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = output,
@@ -2145,7 +2164,7 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         byte[] content = Content;
         fileSystem.AddFile(OsPath, content);
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = new ChunkRecordingStream(),
@@ -2168,7 +2187,7 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         byte[] content = Content;
         fileSystem.AddFile(OsPath, content);
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = new ChunkRecordingStream(),
@@ -2192,7 +2211,7 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, []);
         var output = new ChunkRecordingStream();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = output,
@@ -2213,7 +2232,7 @@ public sealed class FileProtocolHandlerTests
     {
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, []);
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = new ChunkRecordingStream(),
@@ -2237,8 +2256,9 @@ public sealed class FileProtocolHandlerTests
     public async Task ExecuteAsync_UploadWithResumeFromZero_OpensTheDestinationTruncated()
     {
         var fileSystem = new FakeFileSystem();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
+            Output = new ChunkRecordingStream(),
             Url = FileUrl,
             Upload = new TrackedMemoryStream(Content),
             ResumeFrom = 0,
@@ -2255,8 +2275,9 @@ public sealed class FileProtocolHandlerTests
     public async Task ExecuteAsync_UploadWithResumeFromZero_WritesTheWholeSource()
     {
         var fileSystem = new FakeFileSystem();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
+            Output = new ChunkRecordingStream(),
             Url = FileUrl,
             Upload = new TrackedMemoryStream(Content),
             ResumeFrom = 0,
@@ -2273,8 +2294,9 @@ public sealed class FileProtocolHandlerTests
     public async Task ExecuteAsync_UploadWithPositiveResumeFrom_OpensTheDestinationAppending()
     {
         var fileSystem = new FakeFileSystem();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
+            Output = new ChunkRecordingStream(),
             Url = FileUrl,
             Upload = new TrackedMemoryStream(Content),
             ResumeFrom = 1,
@@ -2293,8 +2315,9 @@ public sealed class FileProtocolHandlerTests
     public async Task ExecuteAsync_UploadWithoutCreateFileMode_AsksForMode0644()
     {
         var fileSystem = new FakeFileSystem();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
+            Output = new ChunkRecordingStream(),
             Url = FileUrl,
             Upload = new TrackedMemoryStream(Content),
         };
@@ -2311,8 +2334,9 @@ public sealed class FileProtocolHandlerTests
     {
         const UnixFileMode Mode0600 = UnixFileMode.UserRead | UnixFileMode.UserWrite;
         var fileSystem = new FakeFileSystem();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
+            Output = new ChunkRecordingStream(),
             Url = FileUrl,
             Upload = new TrackedMemoryStream(Content),
             CreateFileMode = Mode0600,
@@ -2336,8 +2360,9 @@ public sealed class FileProtocolHandlerTests
         {
             Position = 3,
         };
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
+            Output = new ChunkRecordingStream(),
             Url = FileUrl,
             Upload = upload,
             ResumeFrom = 2,
@@ -2359,8 +2384,9 @@ public sealed class FileProtocolHandlerTests
     public async Task ExecuteAsync_UploadResumeFromPastTheEndOfTheSource_SucceedsWithNothingWritten()
     {
         var fileSystem = new FakeFileSystem();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
+            Output = new ChunkRecordingStream(),
             Url = FileUrl,
             Upload = new TrackedMemoryStream(Content),
             ResumeFrom = Content.Length + 1,
@@ -2380,8 +2406,9 @@ public sealed class FileProtocolHandlerTests
     public async Task ExecuteAsync_NonSeekableUploadResumeFromPastTheEndOfTheSource_SucceedsWithNothingWritten()
     {
         var fileSystem = new FakeFileSystem();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
+            Output = new ChunkRecordingStream(),
             Url = FileUrl,
             Upload = new NonSeekableStream(Content),
             ResumeFrom = Content.Length + 1,
@@ -2403,7 +2430,7 @@ public sealed class FileProtocolHandlerTests
     {
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, Content);
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = new ChunkRecordingStream(),
@@ -2425,7 +2452,7 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, Content);
         var headers = new ChunkRecordingStream();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = new ChunkRecordingStream(),
@@ -2444,8 +2471,9 @@ public sealed class FileProtocolHandlerTests
     public async Task ExecuteAsync_NegativeResumeFromOnAnUpload_ReportsBadDownloadResume()
     {
         var fileSystem = new FakeFileSystem();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
+            Output = new ChunkRecordingStream(),
             Url = FileUrl,
             Upload = new TrackedMemoryStream(Content),
             ResumeFrom = -4,
@@ -2463,8 +2491,9 @@ public sealed class FileProtocolHandlerTests
     {
         var fileSystem = new FakeFileSystem();
         var headers = new ChunkRecordingStream();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
+            Output = new ChunkRecordingStream(),
             Url = FileUrl,
             Upload = new TrackedMemoryStream(Content),
             HeaderOutput = headers,
@@ -2489,7 +2518,7 @@ public sealed class FileProtocolHandlerTests
     public async Task ExecuteAsync_DriveLetterAuthorityWithNoFileName_ReportsExitThirtySeven()
     {
         var fileSystem = new FakeFileSystem();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = new Uri("file://C:/"),
             Output = new ChunkRecordingStream(),
@@ -2510,7 +2539,7 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         var timestamp = FakeFileSystem.DefaultLastWriteTimeUtc.AddMilliseconds(750);
         fileSystem.AddFile(OsPath, Content, timestamp);
-        var context = new FakeTransferContext { Url = FileUrl, Output = new ChunkRecordingStream() };
+        var context = new TransferContext { Url = FileUrl, Output = new ChunkRecordingStream() };
         var handler = new FileProtocolHandler(fileSystem);
 
         var result = await handler.ExecuteAsync(context);
@@ -2526,7 +2555,7 @@ public sealed class FileProtocolHandlerTests
     {
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFileWithoutTimestamp(OsPath, Content);
-        var context = new FakeTransferContext { Url = FileUrl, Output = new ChunkRecordingStream() };
+        var context = new TransferContext { Url = FileUrl, Output = new ChunkRecordingStream() };
         var handler = new FileProtocolHandler(fileSystem);
 
         var result = await handler.ExecuteAsync(context);
@@ -2539,8 +2568,9 @@ public sealed class FileProtocolHandlerTests
     public async Task ExecuteAsync_Upload_ReportsNoSourceTimestamp()
     {
         var fileSystem = new FakeFileSystem();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
+            Output = new ChunkRecordingStream(),
             Url = FileUrl,
             Upload = new TrackedMemoryStream(Content),
         };
@@ -2558,7 +2588,7 @@ public sealed class FileProtocolHandlerTests
     {
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, Content);
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = new ChunkRecordingStream(),
@@ -2577,7 +2607,7 @@ public sealed class FileProtocolHandlerTests
     {
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, Content);
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = new ChunkRecordingStream(),
@@ -2626,7 +2656,7 @@ public sealed class FileProtocolHandlerTests
     {
         var fileSystem = new FakeFileSystem();
         fileSystem.FailOpenForRead(OsPath, status);
-        var context = new FakeTransferContext { Url = FileUrl, Output = new ChunkRecordingStream() };
+        var context = new TransferContext { Url = FileUrl, Output = new ChunkRecordingStream() };
         var handler = new FileProtocolHandler(fileSystem);
 
         return await handler.ExecuteAsync(context);
@@ -2636,7 +2666,7 @@ public sealed class FileProtocolHandlerTests
     {
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, new byte[fileLength]);
-        var context = new FakeTransferContext { Url = FileUrl, Output = output };
+        var context = new TransferContext { Url = FileUrl, Output = output };
         var handler = new FileProtocolHandler(fileSystem);
 
         return await handler.ExecuteAsync(context);
@@ -2646,8 +2676,9 @@ public sealed class FileProtocolHandlerTests
     {
         var fileSystem = new FakeFileSystem();
         fileSystem.FailOpenForWrite(OsPath, status);
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
+            Output = new ChunkRecordingStream(),
             Url = FileUrl,
             Upload = new TrackedMemoryStream(Content),
         };
@@ -2664,7 +2695,7 @@ public sealed class FileProtocolHandlerTests
     {
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, Content, lastWriteTimeUtc);
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = output,
@@ -2676,7 +2707,7 @@ public sealed class FileProtocolHandlerTests
         return await handler.ExecuteAsync(context);
     }
 
-    private static async Task<TransferResult> NonSeekableSourceResultAsync(FakeTransferContext context)
+    private static async Task<TransferResult> NonSeekableSourceResultAsync(TransferContext context)
     {
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFileReadingFrom(OsPath, new NonSeekableStream(Content), Content.Length);
@@ -2691,7 +2722,7 @@ public sealed class FileProtocolHandlerTests
     {
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFileWithoutTimestamp(OsPath, Content);
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = output,
@@ -2708,7 +2739,7 @@ public sealed class FileProtocolHandlerTests
     {
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, Content);
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
             Url = FileUrl,
             Output = output,
@@ -2724,8 +2755,9 @@ public sealed class FileProtocolHandlerTests
         bool convertLineEndings)
     {
         var fileSystem = new FakeFileSystem();
-        var context = new FakeTransferContext
+        var context = new TransferContext
         {
+            Output = new ChunkRecordingStream(),
             Url = FileUrl,
             Upload = new TrackedMemoryStream(content),
             ConvertLineEndings = convertLineEndings,

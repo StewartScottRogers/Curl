@@ -28,7 +28,7 @@ public sealed class FileProtocolHandlerMaxFileSizeTests
     {
         var output = new ChunkRecordingStream();
 
-        var result = await DownloadAsync(Content, new FakeTransferContext { Output = output, MaxFileSize = 9 });
+        var result = await DownloadAsync(Content, new TransferContext { Url = FileUrl, Output = output, MaxFileSize = 9 });
 
         CollectionAssert.AreEqual(Encoding.ASCII.GetBytes("HelloWorl"), output.ToArray());
         Assert.AreEqual(CurlExitCode.FilesizeExceeded, result.ExitCode);
@@ -45,7 +45,7 @@ public sealed class FileProtocolHandlerMaxFileSizeTests
     {
         var output = new ChunkRecordingStream();
 
-        var result = await DownloadAsync(Content, new FakeTransferContext { Output = output, MaxFileSize = maxFileSize });
+        var result = await DownloadAsync(Content, new TransferContext { Url = FileUrl, Output = output, MaxFileSize = maxFileSize });
 
         CollectionAssert.AreEqual(Content, output.ToArray());
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
@@ -59,7 +59,7 @@ public sealed class FileProtocolHandlerMaxFileSizeTests
     public async Task ExecuteAsync_RangeWithMaxFileSize_CountsOnlyTheRange(long maxFileSize, string expected, CurlExitCode exitCode)
     {
         var output = new ChunkRecordingStream();
-        var context = new FakeTransferContext { Output = output, MaxFileSize = maxFileSize, Range = ByteRange.Bounded(2, 8) };
+        var context = new TransferContext { Url = FileUrl, Output = output, MaxFileSize = maxFileSize, Range = ByteRange.Bounded(2, 8) };
 
         var result = await DownloadAsync(Content, context);
 
@@ -72,7 +72,7 @@ public sealed class FileProtocolHandlerMaxFileSizeTests
     public async Task ExecuteAsync_ResumeWithMaxFileSize_CountsFromTheOffset()
     {
         var output = new ChunkRecordingStream();
-        var context = new FakeTransferContext { Output = output, MaxFileSize = 5, ResumeFrom = 4 };
+        var context = new TransferContext { Url = FileUrl, Output = output, MaxFileSize = 5, ResumeFrom = 4 };
 
         var result = await DownloadAsync(Content, context);
 
@@ -85,7 +85,7 @@ public sealed class FileProtocolHandlerMaxFileSizeTests
     public async Task ExecuteAsync_HeadersWithMaxFileSize_DoNotCountTowardsTheLimit()
     {
         var output = new ChunkRecordingStream();
-        var context = new FakeTransferContext { Output = output, HeaderOutput = output, MaxFileSize = 3 };
+        var context = new TransferContext { Url = FileUrl, Output = output, HeaderOutput = output, MaxFileSize = 3 };
 
         var result = await DownloadAsync(Content, context);
 
@@ -99,7 +99,7 @@ public sealed class FileProtocolHandlerMaxFileSizeTests
     public async Task ExecuteAsync_NoBodyWithMaxFileSize_Succeeds()
     {
         var output = new ChunkRecordingStream();
-        var context = new FakeTransferContext { Output = output, HeaderOutput = output, NoBody = true, MaxFileSize = 3 };
+        var context = new TransferContext { Url = FileUrl, Output = output, HeaderOutput = output, NoBody = true, MaxFileSize = 3 };
 
         var result = await DownloadAsync(Content, context);
 
@@ -115,7 +115,7 @@ public sealed class FileProtocolHandlerMaxFileSizeTests
         var output = new ChunkRecordingStream();
         byte[] content = [.. Enumerable.Repeat((byte)'y', ChunkSize * 2)];
 
-        var result = await DownloadAsync(content, new FakeTransferContext { Output = output, MaxFileSize = ChunkSize });
+        var result = await DownloadAsync(content, new TransferContext { Url = FileUrl, Output = output, MaxFileSize = ChunkSize });
 
         CollectionAssert.AreEqual(new[] { ChunkSize }, output.WriteLengths.ToArray());
         Assert.AreEqual($"Exceeded the maximum allowed file size ({ChunkSize}) with {ChunkSize} bytes", result.ErrorMessage);
@@ -127,7 +127,7 @@ public sealed class FileProtocolHandlerMaxFileSizeTests
         var output = new ChunkRecordingStream();
         byte[] content = [.. Enumerable.Repeat((byte)'y', ChunkSize * 2)];
 
-        var result = await DownloadAsync(content, new FakeTransferContext { Output = output, MaxFileSize = ChunkSize + 7 });
+        var result = await DownloadAsync(content, new TransferContext { Url = FileUrl, Output = output, MaxFileSize = ChunkSize + 7 });
 
         CollectionAssert.AreEqual(new[] { ChunkSize, 7 }, output.WriteLengths.ToArray());
         Assert.AreEqual(CurlExitCode.FilesizeExceeded, result.ExitCode);
@@ -138,7 +138,7 @@ public sealed class FileProtocolHandlerMaxFileSizeTests
     public async Task ExecuteAsync_UploadWithMaxFileSize_IgnoresTheLimit()
     {
         var fileSystem = new FakeFileSystem();
-        var context = new FakeTransferContext { Url = FileUrl, Upload = new TrackedMemoryStream(Content), MaxFileSize = 3 };
+        var context = new TransferContext { Output = new ChunkRecordingStream(), Url = FileUrl, Upload = new TrackedMemoryStream(Content), MaxFileSize = 3 };
 
         var result = await new FileProtocolHandler(fileSystem).ExecuteAsync(context);
 
@@ -146,11 +146,10 @@ public sealed class FileProtocolHandlerMaxFileSizeTests
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
     }
 
-    private static async Task<TransferResult> DownloadAsync(byte[] content, FakeTransferContext context)
+    private static async Task<TransferResult> DownloadAsync(byte[] content, TransferContext context)
     {
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, content);
-        context.Url = FileUrl;
 
         return await new FileProtocolHandler(fileSystem).ExecuteAsync(context);
     }
