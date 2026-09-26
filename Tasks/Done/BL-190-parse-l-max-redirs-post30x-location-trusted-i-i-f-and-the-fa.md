@@ -41,7 +41,7 @@ completed: 2026-09-26
   - `FailMode` uses the existing `HttpFailMode` from `Curl.Protocol.Abstractions` (ADR-0014) rather than a new enum.
   - `--no-location-trusted` turns off both following and credential sending, and `-L`/`--no-location` leave the credential flag alone, as curl's tool source (`C_LOCATION_TRUSTED` falls through to `C_LOCATION`) does; this is state, not output text, so it could not be measured without a redirecting server.
   - `-I` conflicts needed a flag whose applier can refuse: `CommandLineOption.Negate` is now a `CommandLineOptionApplier` (was `Action<CommandLineOptions>`), the new `CommandLineOption.NegatableFlagThatCanRefuse` builds such a row, and the parser now checks a flag's result inside a bundle. `ParseShortBundle` was split (`ApplyRestOfBundle`) to stay at complexity 10 or less.
-  - `-I` / `--no-head` combined with `-d`/`--json` (POST) is not refused here: curl 8.21.0 checks it in `tool_operate` at transfer setup, whatever the order, exiting 2 with the two warning lines only. Filed as BL-253 rather than widening this task.
+  - `-I` / `--no-head` combined with `-d`/`--json` (POST) is not refused here: curl 8.21.0 checks it in `tool_operate` at transfer setup, whatever the order, exiting 2 with the two warning lines only. Filed as BL-255 rather than widening this task.
 - Quality: `Measure-CodeQuality.ps1 -Library "Curl.Cli*"` reports Curl.Cli.UnitLibrary 100% line, 100% branch, 335 members, 0 failing, worst CRAP 10. A first full run hit two `Curl.Networking` TLS test failures that pass alone and on rerun (load from parallel lanes, not this change).
 
 ## Log

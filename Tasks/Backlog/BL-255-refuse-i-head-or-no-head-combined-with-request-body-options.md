@@ -1,5 +1,5 @@
 ---
-id: BL-253
+id: BL-255
 title: Refuse -I/--head (or --no-head) combined with request-body options at transfer setup, as curl 8.21.0 does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-253 — Refuse -I/--head (or --no-head) combined with request-body options at transfer setup, as curl 8.21.0 does
+# BL-255 — Refuse -I/--head (or --no-head) combined with request-body options at transfer setup, as curl 8.21.0 does
 
 ## Goal
 
