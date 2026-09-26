@@ -8,7 +8,7 @@ depends-on: [BL-090, BL-114, BL-115, BL-116]
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-099 — Match curl's 'passed N returned M' when stdout fails after several small writes
 
@@ -56,11 +56,11 @@ that and pin the existing behaviour with tests instead.
 
 ## Acceptance criteria
 
-- [ ] `Notes` records, for curl 8.21.0, each command listed in Context with its exact
+- [x] `Notes` records, for curl 8.21.0, each command listed in Context with its exact
       standard error and exit code.
-- [ ] A test in `Curl.Console.UnitTests` pins each measured case: the `passed N returned M`
+- [x] A test in `Curl.Console.UnitTests` pins each measured case: the `passed N returned M`
       line (or `curl: Failed writing body`) byte for byte and exit 23.
-- [ ] `dotnet build Curl.Console -warnaserror` is clean and
+- [x] `dotnet build Curl.Console -warnaserror` is clean and
       `dotnet test --filter "TestCategory!=Integration"` is green.
 
 ## Notes
@@ -121,6 +121,22 @@ re-planning:
 
 Filed by `task-planner`: BL-114 (contract + Curl.Console stream), BL-115 (telnet `M` and 4096-byte reads), BL-116 (file), BL-117 (gopher), BL-118 (MQTT). This task depends on BL-114..BL-116, which cover every command it measures; once they land, re-plan it to pin the end-to-end cases in `Curl.Console.UnitTests` or close it as done by them.
 
+### Re-run after BL-114, BL-115 and BL-116, 2026-09-26
+
+- No production change was needed: BL-114 (the stream's `BytesAccepted`), BL-115
+  (telnet's `returned M` and 4096-byte reads) and BL-116 (file's `returned M`) already
+  produce every measured line. Choice taken unattended: delivered as tests only, directly
+  rather than through the `/feature` agent chain, because there is no code to plan or
+  implement, only the measured cases above to pin.
+- `Curl.Console.UnitTests/CurlCommandRunnerStandardOutputFailureTests.cs` runs the real
+  `FileProtocolHandler` (in-memory file system) and `TelnetProtocolHandler` (new fake
+  `ScriptedConnector`, which splits a scripted read longer than the handler's buffer as a
+  socket would) through `CurlCommandRunner` to an always-failing standard output, with
+  `-sS`. It pins all seven `file://` rows and all five telnet rows of the tables above,
+  byte for byte, with exit 23. All twelve passed on first run.
+- `dotnet build -warnaserror` clean, `dotnet format --verify-no-changes` clean, fast suite
+  green (Curl.Console.UnitTests 232 passed).
+
 ## Log
 
 - 2026-09-26: Created.
@@ -128,3 +144,4 @@ Filed by `task-planner`: BL-114 (contract + Curl.Console stream), BL-115 (telnet
 - 2026-09-26: Doing -> Blocked. Matching 'returned M' needs Curl.Protocol.Abstractions and protocol-library changes outside touches; re-plan after BL-114, BL-115, BL-116 (filed) land
 - 2026-09-26: Blocked -> Backlog. Unblocked: BL-114, BL-115 and BL-116 now Done
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. curl.exe's 'passed N returned M' lines for file:// and telnet:// to a closed stdout are pinned end to end in Curl.Console.UnitTests
