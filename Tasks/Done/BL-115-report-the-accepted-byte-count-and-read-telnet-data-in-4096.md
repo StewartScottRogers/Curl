@@ -8,7 +8,7 @@ depends-on: [BL-114]
 touches: [Curl.Protocol.Telnet.UnitLibrary, Curl.Protocol.Telnet.UnitTests]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-115 — Report the accepted byte count and read telnet data in 4096-byte chunks on a failed output write
 
@@ -54,22 +54,35 @@ and the library at 100% line and branch coverage.
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Protocol.Telnet.UnitTests` with a fake output stream that throws
+- [x] A test in `Curl.Protocol.Telnet.UnitTests` with a fake output stream that throws
       `OutputWriteFailedException` with `BytesAccepted` 96 on a 100-byte write gets a
       `TransferResult` with `CurlExitCode.WriteError` and message exactly
       `Failure writing output to destination, passed 100 returned 96`.
-- [ ] Tests do the same for 300 bytes / 196, 1000 bytes / 96 and 30 bytes / 16, matching the
+- [x] Tests do the same for 300 bytes / 196, 1000 bytes / 96 and 30 bytes / 16, matching the
       table above.
-- [ ] A test with a fake output stream that throws a plain `IOException` still gets
+- [x] A test with a fake output stream that throws a plain `IOException` still gets
       `Failure writing output to destination, passed <n> returned 0`.
-- [ ] A test whose fake `IConnection` offers 10000 bytes of data in one read shows the
+- [x] A test whose fake `IConnection` offers 10000 bytes of data in one read shows the
       handler's first `ReadAsync` buffer is 4096 bytes long, and a failing output reports
       `Failure writing output to destination, passed 4096 returned 0` (the 5000 x 5 row).
-- [ ] No literal `returned 0` remains in `TelnetProtocolHandler.cs`.
-- [ ] `dotnet build Curl.Protocol.Telnet.UnitLibrary -warnaserror` is clean and
+- [x] No literal `returned 0` remains in `TelnetProtocolHandler.cs`.
+- [x] `dotnet build Curl.Protocol.Telnet.UnitLibrary -warnaserror` is clean and
       `dotnet test --filter "TestCategory!=Integration"` is green.
 
 ## Notes
+
+- Delivered directly rather than through the full `/feature` agent chain: the change is
+  two constants and one helper in one handler, fully specified by the Context above.
+- `TryWriteOutputAsync` became `WriteOutputAsync`, returning `int?`: `null` when the
+  output took the write, else the bytes it accepted (`OutputWriteFailedException.BytesAccepted`,
+  or 0 for any other `IOException`). `WriteFailure` takes that count.
+- New `ReceiveBufferSize = 4096` for the socket read; the upload buffer keeps
+  `BufferSize = 16384`, which did not need to change.
+- Test fakes: `FaultingOutputStream(int? bytesAccepted)` throws `OutputWriteFailedException`
+  when given a count; `ScriptedConnection` records each read buffer's length
+  (`ReadBufferLengths`) and splits a scripted read longer than the buffer across reads.
+  An extra test pins that 10000 offered bytes still all reach a working output.
+- Telnet library measured at 100% line and 100% branch coverage.
 
 ## Log
 
@@ -78,3 +91,4 @@ and the library at 100% line and branch coverage.
 - 2026-09-26: Doing -> Blocked. Stewart: dark factory run ended in Doing, exit 1; see logs\BL-115-20260926-083111-L2.jsonl
 - 2026-09-26: Blocked -> Backlog. Not blocked: the 2026-09-26 shift ran out of tokens (usage limit), which it misfiled as a stall
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. telnet write failures report curl's passed N returned M, with N capped at the 4096-byte receive read
