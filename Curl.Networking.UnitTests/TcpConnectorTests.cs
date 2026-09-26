@@ -10,7 +10,7 @@ namespace Curl.Networking;
 /// (exit 6), dial failure (exit 7), address order, TLS hand-off and cancellation.
 /// </summary>
 [TestClass]
-public sealed class TcpConnectorTests
+public sealed partial class TcpConnectorTests
 {
     private static readonly IPAddress Loopback = IPAddress.Parse("127.0.0.1");
 

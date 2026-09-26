@@ -36,6 +36,13 @@ The messages for its exit 35, exit 43, exit 58, exit 59, exit 60 and exit 77 liv
 `TlsFailureMessages` and nowhere else; the `More details here` block after an exit 60 is
 the console's to print. No type here constructs an `HttpClient`.
 
+`TcpConnector` tunnels through `ConnectTarget.Proxy` when it is an HTTP proxy
+(`ProxyKind.Http`, `Http10`) per ADR-0023: `HttpProxyTunnel` writes curl 8.21.0's CONNECT
+request (its `User-Agent` and credential encoding from `HttpProxyTunnelOptions`) and reads
+the reply one byte at a time, so the tunnel's bytes stay on the connection; TLS then runs
+over the tunnel for an https target. HTTPS and SOCKS proxies throw `NotSupportedException`
+until their tasks land.
+
 Everything else takes the Abstractions contracts (`IDnsResolver`, `ITlsProvider`,
 `IConnection`, `IDatagramChannel`) or `ITcpDialer`, plus an injected `TimeProvider`, so the tests in
 `Curl.Networking.UnitTests` drive every branch with fakes and no network.
