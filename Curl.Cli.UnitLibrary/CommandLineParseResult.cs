@@ -4,14 +4,16 @@ namespace Curl.Cli;
 
 /// <summary>
 /// The outcome of <see cref="CommandLineParser"/>: either the parsed
-/// <see cref="CommandLineOptions"/> or the <see cref="CommandLineRefusal"/> that stopped parsing.
+/// <see cref="CommandLineOptions"/> or the <see cref="CommandLineRefusal"/> that stopped parsing,
+/// and in either case the warning lines met on the way.
 /// </summary>
 public sealed class CommandLineParseResult
 {
-    private CommandLineParseResult(CommandLineOptions? options, CommandLineRefusal? refusal)
+    private CommandLineParseResult(CommandLineOptions? options, CommandLineRefusal? refusal, IReadOnlyList<string> warningLines)
     {
         Options = options;
         Refusal = refusal;
+        WarningLines = warningLines;
     }
 
     /// <summary>
@@ -28,13 +30,24 @@ public sealed class CommandLineParseResult
     /// <summary>The first refusal met; <see langword="null"/> when the command line was accepted.</summary>
     public CommandLineRefusal? Refusal { get; }
 
-    /// <summary>Creates the result for an accepted command line.</summary>
+    /// <summary>
+    /// The warning lines curl prints on standard error while reading the command line, in
+    /// command-line order and without line terminators; empty when there are none. A refused
+    /// command line keeps the warnings met before the refusal, because curl 8.21.0 has already
+    /// printed them by then (<c>-o -s --bogus</c> prints the warning, then the refusal). The
+    /// console layer writes them before anything else and chooses the newline.
+    /// </summary>
+    public IReadOnlyList<string> WarningLines { get; }
+
+    /// <summary>Creates the result for an accepted command line, with the warning lines its options collected.</summary>
     /// <param name="options">The parsed options.</param>
     /// <returns>A result whose <see cref="IsAccepted"/> is <see langword="true"/>.</returns>
-    internal static CommandLineParseResult Accepted(CommandLineOptions options) => new(options, null);
+    internal static CommandLineParseResult Accepted(CommandLineOptions options) => new(options, null, options.WarningLines);
 
     /// <summary>Creates the result for a refused command line.</summary>
     /// <param name="refusal">The first refusal met.</param>
+    /// <param name="warningLines">The warning lines met before the refusal.</param>
     /// <returns>A result whose <see cref="IsAccepted"/> is <see langword="false"/>.</returns>
-    internal static CommandLineParseResult Refused(CommandLineRefusal refusal) => new(null, refusal);
+    internal static CommandLineParseResult Refused(CommandLineRefusal refusal, IReadOnlyList<string> warningLines) =>
+        new(null, refusal, warningLines);
 }

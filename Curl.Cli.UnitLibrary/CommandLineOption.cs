@@ -76,6 +76,37 @@ public sealed class CommandLineOption
     }
 
     /// <summary>
+    /// Creates a row for an option that takes a file name: refused when empty, as
+    /// <see cref="Text"/> is, and otherwise passed to <paramref name="set"/>, after adding
+    /// <see cref="CommandLineWarning.FileNameLooksLikeFlag(string)"/> when the value looks like a flag.
+    /// </summary>
+    /// <remarks>
+    /// A value looks like a flag when it starts with <c>-</c> and is longer than that one
+    /// character. Measured with the local curl 8.21.0 on 2026-09-26: <c>-o -s</c>, <c>-o -x</c>,
+    /// <c>-o --</c>, <c>--output --output</c>, <c>-o-s</c> and <c>--output=-s</c> all warn and still
+    /// take the value as the file name; <c>-o -</c> (standard output) and <c>-o file</c> do not warn.
+    /// </remarks>
+    /// <param name="longName">The long name without its leading <c>--</c>.</param>
+    /// <param name="shortName">The short letter, or <see langword="null"/> when there is none.</param>
+    /// <param name="set">Stores the non-empty file name on the options being filled in.</param>
+    /// <returns>The row.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="longName"/> or <paramref name="set"/> is <see langword="null"/>.</exception>
+    public static CommandLineOption FileName(string longName, char? shortName, Action<CommandLineOptions, string> set)
+    {
+        ArgumentNullException.ThrowIfNull(set);
+
+        return Text(longName, shortName, (options, fileName) =>
+        {
+            if (fileName.Length > 1 && fileName[0] == '-')
+            {
+                options.AddWarningLine(CommandLineWarning.FileNameLooksLikeFlag(fileName));
+            }
+
+            set(options, fileName);
+        });
+    }
+
+    /// <summary>
     /// Creates a row for an option that takes a value, with an applier that does all of the
     /// value's checking itself, including what an empty value means. Use <see cref="Text"/>
     /// for plain text; a numeric option passes an applier built on <see cref="CommandLineNumber"/>.

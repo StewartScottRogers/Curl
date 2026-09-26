@@ -11,7 +11,9 @@ namespace Curl.Cli;
 /// To add an option, add one row here (with its applier, when it takes a value) and the
 /// property it sets on <see cref="CommandLineOptions"/>; the parser does not change. A flag
 /// is <see cref="CommandLineOption.Flag"/>; a text value is <see cref="CommandLineOption.Text"/>,
-/// which refuses an empty value as blank; a numeric value is <see cref="CommandLineOption.Value"/>
+/// which refuses an empty value as blank; a file name is <see cref="CommandLineOption.FileName"/>,
+/// which is <see cref="CommandLineOption.Text"/> plus curl's warning for a file name that looks
+/// like a flag; a numeric value is <see cref="CommandLineOption.Value"/>
 /// with an applier built on <see cref="CommandLineNumber"/>, which refuses an empty value as not
 /// a proper number. The parser never refuses a value itself. Long
 /// names are matched exactly and case-sensitively, as curl 8.21.0 does: <c>--sil</c> and
@@ -26,7 +28,7 @@ public static class CommandLineOptionTable
         CommandLineOption.Text("url", null, (options, url) => options.AddUrl(url)),
         CommandLineOption.Flag("silent", 's', options => options.Silent = true),
         CommandLineOption.Flag("show-error", 'S', options => options.ShowError = true),
-        CommandLineOption.Text("output", 'o', (options, file) => options.AddOutputFile(file)),
+        CommandLineOption.FileName("output", 'o', (options, file) => options.AddOutputFile(file)),
         CommandLineOption.Value("data", 'd', AcceptingEmpty((options, data) => options.SetPostData(data))),
         CommandLineOption.Value("user", 'u', AcceptingEmpty((options, user) => options.SetCredentials(user))),
         CommandLineOption.Value("telnet-option", 't', AcceptingEmpty((options, telnetOption) => options.AddTelnetOption(telnetOption))),

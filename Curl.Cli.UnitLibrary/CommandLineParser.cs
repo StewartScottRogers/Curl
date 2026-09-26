@@ -8,7 +8,9 @@ namespace Curl.Cli;
 /// option parsing; every other argument is a URL. An empty URL argument is refused as
 /// blank; an option's value, empty or not, is handed unchanged to the row's
 /// <see cref="CommandLineOption.Apply"/>, which decides whether to refuse it. Parsing stops
-/// at the first refusal. A command line that is read without refusal but names no URL is
+/// at the first refusal. Warning lines a row adds while applying its value (a file name that
+/// looks like a flag) are carried on the result, accepted or refused. A command line that is
+/// read without refusal but names no URL is
 /// refused with <see cref="CommandLineRefusal.NoUrlSpecified"/>; an empty command line is
 /// accepted, because curl answers it differently. The one file-system question it asks is
 /// whether the <c>--cacert</c> path exists, through a check <see cref="Parse(IReadOnlyList{string}, Func{string, bool})"/>
@@ -59,12 +61,12 @@ public static class CommandLineParser
                 : ParseArgument(options, argument, reader);
             if (refusal is not null)
             {
-                return CommandLineParseResult.Refused(refusal);
+                return CommandLineParseResult.Refused(refusal, options.WarningLines);
             }
         }
 
         return options.Urls.Count == 0 && arguments.Count > 0
-            ? CommandLineParseResult.Refused(CommandLineRefusal.NoUrlSpecified())
+            ? CommandLineParseResult.Refused(CommandLineRefusal.NoUrlSpecified(), options.WarningLines)
             : CommandLineParseResult.Accepted(options);
     }
 

@@ -3,10 +3,11 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Cli;
 
 /// <summary>
-/// Pins the three kinds of option-table row: <see cref="CommandLineOption.Flag"/> takes no
+/// Pins the four kinds of option-table row: <see cref="CommandLineOption.Flag"/> takes no
 /// value and always applies; <see cref="CommandLineOption.Text"/> takes a value, refuses an
 /// empty one as blank without storing it and stores any other; <see cref="CommandLineOption.Value"/>
-/// takes a value and returns whatever its own applier returns.
+/// takes a value and returns whatever its own applier returns; <see cref="CommandLineOption.FileName"/>
+/// refuses and stores as <see cref="CommandLineOption.Text"/> does.
 /// </summary>
 [TestClass]
 public sealed class CommandLineOptionTests
@@ -208,5 +209,62 @@ public sealed class CommandLineOptionTests
         Assert.AreSame(options, seenOptions);
         Assert.AreEqual(string.Empty, seenValue);
         Assert.AreEqual("--tftp-blksize=", seenSpelledOption);
+    }
+
+    // ---- FileName -----------------------------------------------------------------
+
+    [TestMethod]
+    public void FileName_WithShortName_KeepsNamesAndTakesValue()
+    {
+        CommandLineOption option = CommandLineOption.FileName("output", 'o', (_, _) => { });
+
+        Assert.AreEqual("output", option.LongName);
+        Assert.AreEqual('o', option.ShortName);
+        Assert.IsTrue(option.TakesValue);
+    }
+
+    [TestMethod]
+    public void FileName_NullLongName_ThrowsArgumentNull()
+    {
+        ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(
+            () => CommandLineOption.FileName(null!, 'o', (_, _) => { }));
+
+        Assert.AreEqual("longName", exception.ParamName);
+    }
+
+    [TestMethod]
+    public void FileName_NullSet_ThrowsArgumentNull()
+    {
+        ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(
+            () => CommandLineOption.FileName("output", 'o', null!));
+
+        Assert.AreEqual("set", exception.ParamName);
+    }
+
+    [TestMethod]
+    public void FileNameApply_EmptyValue_RefusesAsBlankWithoutCallingSet()
+    {
+        bool setCalled = false;
+        CommandLineOption option = CommandLineOption.FileName("output", 'o', (_, _) => setCalled = true);
+
+        CommandLineRefusal? refusal = option.Apply(new CommandLineOptions(), string.Empty, "--output=", _ => false);
+
+        Assert.IsNotNull(refusal);
+        Assert.AreEqual("curl: option --output=: blank argument where content is expected", refusal.StandardErrorLines[0]);
+        Assert.IsFalse(setCalled);
+    }
+
+    [TestMethod]
+    [DataRow("-s")]
+    [DataRow("file")]
+    public void FileNameApply_NonEmptyValue_PassesValueToSetAndReturnsNull(string value)
+    {
+        string? setValue = null;
+        CommandLineOption option = CommandLineOption.FileName("output", 'o', (_, fileName) => setValue = fileName);
+
+        CommandLineRefusal? refusal = option.Apply(new CommandLineOptions(), value, "-o", _ => false);
+
+        Assert.IsNull(refusal);
+        Assert.AreEqual(value, setValue);
     }
 }

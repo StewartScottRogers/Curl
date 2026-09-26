@@ -367,6 +367,109 @@ public sealed class CommandLineParserTests
         CollectionAssert.AreEqual(new[] { "http://example.com/" }, result.Options.Urls.ToArray());
     }
 
+    // ---- warning lines ------------------------------------------------------------
+
+    [TestMethod]
+    [DataRow("-o", "-s")]
+    [DataRow("--output", "--output")]
+    [DataRow("-o", "--")]
+    public void Parse_FlagLikeOutputFile_IsAcceptedWithOneWarning(string option, string fileName)
+    {
+        CommandLineParseResult result = CommandLineParser.Parse([option, fileName, "http://example.com/"]);
+
+        Assert.IsTrue(result.IsAccepted);
+        CollectionAssert.AreEqual(new[] { fileName }, result.Options.OutputFiles.ToArray());
+        CollectionAssert.AreEqual(new[] { "http://example.com/" }, result.Options.Urls.ToArray());
+        CollectionAssert.AreEqual(
+            new[] { $"Warning: The filename argument '{fileName}' looks like a flag." },
+            result.WarningLines.ToArray());
+    }
+
+    [TestMethod]
+    [DataRow("-o-s")]
+    [DataRow("--output=-s")]
+    public void Parse_AttachedFlagLikeOutputFile_IsAcceptedWithOneWarning(string argument)
+    {
+        CommandLineParseResult result = CommandLineParser.Parse([argument, "http://example.com/"]);
+
+        Assert.IsTrue(result.IsAccepted);
+        CollectionAssert.AreEqual(new[] { "-s" }, result.Options.OutputFiles.ToArray());
+        CollectionAssert.AreEqual(
+            new[] { "Warning: The filename argument '-s' looks like a flag." },
+            result.WarningLines.ToArray());
+    }
+
+    [TestMethod]
+    public void Parse_TwoFlagLikeOutputFiles_WarnsTwiceInCommandLineOrder()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["-o", "-a", "-o", "-b", "http://example.com/"]);
+
+        Assert.IsTrue(result.IsAccepted);
+        CollectionAssert.AreEqual(new[] { "-a", "-b" }, result.Options.OutputFiles.ToArray());
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "Warning: The filename argument '-a' looks like a flag.",
+                "Warning: The filename argument '-b' looks like a flag.",
+            },
+            result.WarningLines.ToArray());
+    }
+
+    [TestMethod]
+    [DataRow("file")]
+    [DataRow("a-b")]
+    public void Parse_OrdinaryOutputFile_CarriesNoWarning(string fileName)
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["-o", fileName, "http://example.com/"]);
+
+        Assert.IsTrue(result.IsAccepted);
+        CollectionAssert.AreEqual(new[] { fileName }, result.Options.OutputFiles.ToArray());
+        Assert.IsEmpty(result.WarningLines);
+    }
+
+    [TestMethod]
+    public void Parse_StandardOutputDash_IsAcceptedWithoutWarning()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["-o", "-", "http://example.com/"]);
+
+        Assert.IsTrue(result.IsAccepted);
+        CollectionAssert.AreEqual(new[] { "-" }, result.Options.OutputFiles.ToArray());
+        Assert.IsEmpty(result.WarningLines);
+    }
+
+    [TestMethod]
+    public void Parse_FlagLikeOutputFileThenUnknownOption_RefusesAndKeepsTheWarning()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["-o", "-s", "--bogus"]);
+
+        Assert.IsFalse(result.IsAccepted);
+        Assert.AreEqual("curl: option --bogus: is unknown", result.Refusal.StandardErrorLines[0]);
+        CollectionAssert.AreEqual(
+            new[] { "Warning: The filename argument '-s' looks like a flag." },
+            result.WarningLines.ToArray());
+    }
+
+    [TestMethod]
+    public void Parse_FlagLikeOutputFileAndNoUrl_RefusesAsNoUrlAndKeepsTheWarning()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["-o", "-s"]);
+
+        Assert.IsFalse(result.IsAccepted);
+        Assert.AreEqual("curl: (2) no URL specified", result.Refusal.StandardErrorLines[0]);
+        CollectionAssert.AreEqual(
+            new[] { "Warning: The filename argument '-s' looks like a flag." },
+            result.WarningLines.ToArray());
+    }
+
+    [TestMethod]
+    public void Parse_EmptyCommandLine_CarriesNoWarning()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse([]);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsEmpty(result.WarningLines);
+    }
+
     private static void AssertRefused(CommandLineParseResult result, string expectedFirstLine)
     {
         Assert.IsFalse(result.IsAccepted);

@@ -16,6 +16,7 @@ public sealed class CommandLineOptions
     private readonly List<string> urls = [];
     private readonly List<string> outputFiles = [];
     private readonly List<string> telnetOptions = [];
+    private readonly List<string> warningLines = [];
 
     /// <summary>
     /// The URLs to transfer, in command-line order: positional arguments and
@@ -99,6 +100,16 @@ public sealed class CommandLineOptions
 
     /// <summary>The <c>--tls13-ciphers</c> list, verbatim; <see langword="null"/> when not given. The last value wins.</summary>
     public string? Tls13Ciphers { get; internal set; }
+
+    /// <summary>
+    /// The warning lines met while reading the command line, in command-line order, without
+    /// line terminators. <see cref="CommandLineParser"/> hands them to <see cref="CommandLineParseResult.WarningLines"/>.
+    /// </summary>
+    internal IReadOnlyList<string> WarningLines => warningLines;
+
+    /// <summary>Appends <paramref name="warningLine"/> to <see cref="WarningLines"/>.</summary>
+    /// <param name="warningLine">One whole warning line, without a line terminator.</param>
+    internal void AddWarningLine(string warningLine) => warningLines.Add(warningLine);
 
     /// <summary>Appends <paramref name="url"/> to <see cref="Urls"/>, unchanged and unvalidated.</summary>
     /// <param name="url">A positional argument or a <c>--url</c> value.</param>
