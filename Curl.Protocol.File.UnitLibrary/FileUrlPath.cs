@@ -8,21 +8,25 @@ namespace Curl.Protocol.File;
 /// in the URL, and as handed to the operating system.
 /// </summary>
 /// <param name="UrlPath">
-/// The path exactly as it appears in the URL, still percent-encoded. This is the text
-/// curl echoes in its exit 37 message, so it has to survive parsing unaltered rather than
-/// be reconstructed from the decoded form.
+/// The path as curl reports it, still percent-encoded: every <c>\</c> already turned into
+/// <c>/</c> and, unless <c>--path-as-is</c> is in force, its dot segments removed. This is
+/// the text curl echoes in its exit 37 message — <c>file:///C:/dir/../nosuch.txt</c> is
+/// quoted as <c>C:/nosuch.txt</c> — so it is built from the encoded text rather than
+/// reconstructed from the decoded form.
 /// </param>
 /// <param name="OsPath">
 /// The percent-decoded operating-system path handed to
-/// <see cref="Abstractions.IFileSystem" />. Directory separators are the platform's, and
-/// no <c>.</c> or <c>..</c> segment has been resolved.
+/// <see cref="Abstractions.IFileSystem" />: <c>UrlPath</c> decoded, with the platform's
+/// directory separators. It holds a <c>.</c> or <c>..</c> segment only when the URL was
+/// parsed with <c>pathAsIs</c>.
 /// </param>
 /// <remarks>
 /// <para>
 /// Parsing works from <see cref="Uri.OriginalString" />, never
 /// <see cref="Uri.AbsolutePath" /> and never <see cref="Uri.LocalPath" />. Those two
-/// normalise <c>..</c> away, rewrite <c>c|</c> to <c>c:</c>, and fold
-/// <c>file:////server/share</c> into a UNC authority — none of which curl does. The
+/// rewrite <c>c|</c> to <c>c:</c> and fold <c>file:////server/share</c> into a UNC
+/// authority, neither of which curl does, and they remove <c>..</c> always, where curl
+/// removes it only without <c>--path-as-is</c>. The
 /// measurements behind that are recorded in ADR-0003
 /// (<c>Documentation/Planning/Decisions</c>), taken against curl 8.21.0.
 /// </para>
@@ -45,7 +49,8 @@ public sealed record FileUrlPath(string UrlPath, string OsPath)
     private static readonly char[] QueryOrFragment = ['?', '#'];
 
     /// <summary>
-    /// Extracts the URL path and the operating-system path from a <c>file://</c> URL.
+    /// Extracts the URL path and the operating-system path from a <c>file://</c> URL,
+    /// removing its dot segments as curl does without <c>--path-as-is</c>.
     /// </summary>
     /// <param name="url">The URL to read. Its scheme must be <c>file</c>.</param>
     /// <param name="path">
@@ -57,8 +62,34 @@ public sealed record FileUrlPath(string UrlPath, string OsPath)
     /// <see cref="Abstractions.CurlExitCode.UrlMalformat" />.
     /// </returns>
     /// <remarks>
+    /// The same as <see cref="TryParse(Uri, bool, out FileUrlPath)" /> with
+    /// <c>pathAsIs</c> <see langword="false" />.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="url" /> is <see langword="null" />.
+    /// </exception>
+    public static bool TryParse(Uri url, [MaybeNullWhen(false)] out FileUrlPath path) =>
+        TryParse(url, pathAsIs: false, out path);
+
+    /// <summary>
+    /// Extracts the URL path and the operating-system path from a <c>file://</c> URL.
+    /// </summary>
+    /// <param name="url">The URL to read. Its scheme must be <c>file</c>.</param>
+    /// <param name="pathAsIs">
+    /// <see langword="true" /> to keep <c>.</c> and <c>..</c> segments, as curl's
+    /// <c>--path-as-is</c> does; backslashes become <c>/</c> either way.
+    /// </param>
+    /// <param name="path">
+    /// On success, the parsed pair; otherwise undefined and not to be read.
+    /// </param>
+    /// <returns>
+    /// <see langword="true" /> when <paramref name="url" /> is a <c>file://</c> URL whose
+    /// path curl would accept; <see langword="false" /> when the caller should report
+    /// <see cref="Abstractions.CurlExitCode.UrlMalformat" />.
+    /// </returns>
+    /// <remarks>
     /// <para>
-    /// The seven steps, in order:
+    /// The nine steps, in order:
     /// </para>
     /// <list type="number">
     /// <item>
@@ -75,6 +106,16 @@ public sealed record FileUrlPath(string UrlPath, string OsPath)
     /// the first <c>?</c> or <c>#</c>, both of which end the path.
     /// <see cref="Uri.AbsolutePath" /> and <see cref="Uri.LocalPath" /> are both
     /// off-limits, for the reasons in the remarks on <see cref="FileUrlPath" />.
+    /// </description>
+    /// </item>
+    /// <item>
+    /// <description>
+    /// <strong>Backslashes.</strong> Turn every <c>\</c> into <c>/</c>, before the
+    /// authority is read and whatever <c>pathAsIs</c> says. Measured against curl
+    /// 8.21.0: <c>file:///C:/dir\..\secret.txt</c> opens <c>C:/secret.txt</c>,
+    /// <c>file://localhost\C:/dir/../nosuch.txt</c> quotes <c>C:/nosuch.txt</c>, and
+    /// <c>--path-as-is</c> on <c>file:///C:/dir\..\x</c> quotes <c>C:/dir/../x</c>. An
+    /// escaped backslash, <c>%5C</c>, is not converted: it stays an escape.
     /// </description>
     /// </item>
     /// <item>
@@ -103,7 +144,25 @@ public sealed record FileUrlPath(string UrlPath, string OsPath)
     /// <strong>The UNC form.</strong> <c>file:////server/share</c> leaves
     /// <c>//server/share</c> once its empty authority is dropped. Both leading slashes
     /// are kept: this is the one UNC spelling curl accepts, and collapsing them would
-    /// turn a network path into a local one.
+    /// turn a network path into a local one. The server name is not a root that the
+    /// next step protects, though: curl 8.21.0 quotes <c>file:////server/../x</c> as
+    /// <c>//x</c> and <c>file:////server/share/../../../x</c> as the local <c>/x</c>.
+    /// </description>
+    /// </item>
+    /// <item>
+    /// <description>
+    /// <strong>Dot segments.</strong> Unless <c>pathAsIs</c> is <see langword="true" />,
+    /// remove every <c>.</c> segment, and every <c>..</c> segment together with the kept
+    /// segment before it. A <c>..</c> with nothing before it to remove is dropped, and a
+    /// dot segment that ends the path leaves it ending in <c>/</c>, so
+    /// <c>C:/dir/..</c> becomes <c>C:/</c>. For a path that begins with <c>/</c> this is
+    /// RFC 3986 section 5.2.4. A drive specification (<c>C:</c> or <c>C|</c>, with or
+    /// without a leading <c>/</c>) followed by <c>/</c> or by nothing is the root and is
+    /// never removed: curl 8.21.0 quotes <c>file:///C:/../../nosuch.txt</c> as
+    /// <c>C:/nosuch.txt</c>. Followed by anything else it is an ordinary segment, and
+    /// <c>file:///Q:dir/../x</c> is quoted as <c>/x</c>. A dot may be spelled <c>%2e</c>
+    /// in either case — curl reads <c>.%2e</c> and <c>%2E%2E</c> as <c>..</c> — but
+    /// <c>...</c> is an ordinary segment.
     /// </description>
     /// </item>
     /// <item>
@@ -118,7 +177,7 @@ public sealed record FileUrlPath(string UrlPath, string OsPath)
     /// </item>
     /// <item>
     /// <description>
-    /// <strong>Decode.</strong> <c>UrlPath</c> is the result of steps three to five,
+    /// <strong>Decode.</strong> <c>UrlPath</c> is the result of steps two to seven,
     /// still encoded. <c>OsPath</c> is that text with each <c>%XX</c> escape decoded to
     /// the byte it names and runs of escapes then read as UTF-8, including <c>%2F</c> to
     /// a literal <c>/</c>; a malformed escape — <c>%2</c>, <c>%GG</c>, a trailing
@@ -128,11 +187,10 @@ public sealed record FileUrlPath(string UrlPath, string OsPath)
     /// </item>
     /// <item>
     /// <description>
-    /// <strong>Hand over unnormalised.</strong> Convert <c>/</c> to the platform
-    /// directory separator in <c>OsPath</c>, and stop there: no <c>.</c> or <c>..</c>
-    /// segment is resolved, no trailing separator is trimmed and no case is changed. curl
-    /// gives the path to the operating system as the user wrote it. An empty path after
-    /// all of this returns <see langword="false" />.
+    /// <strong>Hand over.</strong> Convert <c>/</c> to the platform directory separator
+    /// in <c>OsPath</c>, and stop there: no trailing separator is trimmed and no case is
+    /// changed. A path that is empty once the authority and drive slash are gone returns
+    /// <see langword="false" />.
     /// </description>
     /// </item>
     /// </list>
@@ -140,7 +198,10 @@ public sealed record FileUrlPath(string UrlPath, string OsPath)
     /// <exception cref="ArgumentNullException">
     /// <paramref name="url" /> is <see langword="null" />.
     /// </exception>
-    public static bool TryParse(Uri url, [MaybeNullWhen(false)] out FileUrlPath path)
+    public static bool TryParse(
+        Uri url,
+        bool pathAsIs,
+        [MaybeNullWhen(false)] out FileUrlPath path)
     {
         ArgumentNullException.ThrowIfNull(url);
 
@@ -151,11 +212,17 @@ public sealed record FileUrlPath(string UrlPath, string OsPath)
             return false;
         }
 
-        string remainder = TrimQueryAndFragment(AfterScheme(url.OriginalString));
+        string remainder = TrimQueryAndFragment(AfterScheme(url.OriginalString))
+            .Replace('\\', '/');
 
         if (!TryDropAuthority(remainder, out string urlPath))
         {
             return false;
+        }
+
+        if (!pathAsIs)
+        {
+            urlPath = RemoveDotSegmentsBelowTheDrive(urlPath);
         }
 
         urlPath = StripDriveLetterSlash(urlPath);
@@ -294,8 +361,97 @@ public sealed record FileUrlPath(string UrlPath, string OsPath)
             : urlPath;
 
     /// <summary>
-    /// Decodes the escapes and switches to the platform's directory separator, resolving
-    /// nothing else.
+    /// Removes the dot segments from a path, keeping a leading drive specification as
+    /// the root they cannot climb above.
+    /// </summary>
+    /// <param name="urlPath">The still-encoded path, its authority already dropped.</param>
+    /// <returns>The path with no <c>.</c> or <c>..</c> segment left.</returns>
+    private static string RemoveDotSegmentsBelowTheDrive(string urlPath)
+    {
+        int rootLength = DriveRootLength(urlPath);
+
+        return urlPath[..rootLength] + RemoveDotSegments(urlPath[rootLength..]);
+    }
+
+    /// <summary>
+    /// Measures the drive specification at the head of a path, with its optional leading
+    /// <c>/</c>, when it is a root: followed by <c>/</c> or by nothing at all.
+    /// </summary>
+    /// <param name="urlPath">The still-encoded path, its authority already dropped.</param>
+    /// <returns>
+    /// The length of the root — <c>/C:</c> is three, <c>C:</c> is two — or zero when the
+    /// path does not begin with a drive specification that is a root.
+    /// </returns>
+    private static int DriveRootLength(string urlPath)
+    {
+        int end = (urlPath.StartsWith('/') ? 1 : 0) + 2;
+
+        bool isRoot = urlPath.Length >= end
+            && IsDriveSpecification(urlPath[(end - 2)..end])
+            && (urlPath.Length == end || urlPath[end] == '/');
+
+        return isRoot ? end : 0;
+    }
+
+    /// <summary>
+    /// Removes <c>.</c> segments, and <c>..</c> segments with the kept segment before each.
+    /// </summary>
+    /// <param name="path">The still-encoded path below any drive specification.</param>
+    /// <returns>
+    /// The path without dot segments, keeping its leading <c>/</c> if it had one and
+    /// ending in <c>/</c> when its last segment was a dot segment.
+    /// </returns>
+    private static string RemoveDotSegments(string path)
+    {
+        bool rooted = path.StartsWith('/');
+        string[] segments = (rooted ? path[1..] : path).Split('/');
+        var kept = new List<string>(segments.Length);
+
+        foreach (string segment in segments)
+        {
+            string dots = SpellDotsPlainly(segment);
+
+            if (dots == "..")
+            {
+                RemoveLastKept(kept);
+            }
+            else if (dots != ".")
+            {
+                kept.Add(segment);
+            }
+        }
+
+        if (SpellDotsPlainly(segments[^1]) is "." or "..")
+        {
+            kept.Add(string.Empty);
+        }
+
+        return (rooted ? "/" : string.Empty) + string.Join('/', kept);
+    }
+
+    /// <summary>
+    /// Rewrites each <c>%2e</c> escape, in either case, as the <c>.</c> it encodes, so
+    /// that a segment can be compared with <c>.</c> and <c>..</c>.
+    /// </summary>
+    /// <param name="segment">One still-encoded path segment.</param>
+    /// <returns>The segment with its encoded dots decoded and nothing else changed.</returns>
+    private static string SpellDotsPlainly(string segment) =>
+        segment.Replace("%2e", ".", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Removes the last kept segment, if there is one.
+    /// </summary>
+    /// <param name="kept">The segments kept so far.</param>
+    private static void RemoveLastKept(List<string> kept)
+    {
+        if (kept.Count > 0)
+        {
+            kept.RemoveAt(kept.Count - 1);
+        }
+    }
+
+    /// <summary>
+    /// Decodes the escapes and switches to the platform's directory separator.
     /// </summary>
     /// <param name="urlPath">The still-encoded path.</param>
     /// <returns>The path to hand to <see cref="Abstractions.IFileSystem" />.</returns>

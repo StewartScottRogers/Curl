@@ -351,34 +351,201 @@ public sealed class FileUrlPathTests
         Assert.AreEqual(NativePath("C:/x"), path.OsPath);
     }
 
-    // No normalisation of any kind: a backslash is just a character in the URL, and on
-    // Windows it is already the separator the operating system wants.
+    // curl 8.21.0 opens C:/secret.txt for this URL: every backslash becomes a slash, and
+    // only then are the dot segments removed.
     [TestMethod]
-    public void TryParse_Backslashes_SurviveUnnormalised()
+    public void TryParse_BackslashDotDotSegments_ResolveBeforeTheOpen()
     {
-        var url = new Uri(@"file:///C:/dir\sub\file.txt");
+        var url = new Uri(@"file:///C:/dir\..\secret.txt");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
-        Assert.AreEqual(@"C:/dir\sub\file.txt", path.UrlPath);
-        Assert.AreEqual(NativePath(@"C:/dir\sub\file.txt"), path.OsPath);
+        Assert.AreEqual("C:/secret.txt", path.UrlPath);
+        Assert.AreEqual(NativePath("C:/secret.txt"), path.OsPath);
     }
 
-    // There is no sandboxing: curl passes .. to the operating system unresolved, and so
-    // does this parser. Resolving it here would be a behaviour upstream does not have.
+    // C:/b holds only if the backslash became a separator before the .. was resolved:
+    // resolved first, "a\.." is one ordinary segment and the path would stay C:/a\../b.
     [TestMethod]
-    public void TryParse_DotDotSegment_SurvivesUnresolved()
+    public void TryParse_BackslashBeforeDotDot_BecomesASeparatorBeforeTheDotDotIsResolved()
     {
-        var url = new Uri("file:///C:/dir/../secret.txt");
+        var url = new Uri(@"file:///C:/a\../b");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
-        Assert.AreEqual("C:/dir/../secret.txt", path.UrlPath);
-        Assert.AreEqual(NativePath("C:/dir/../secret.txt"), path.OsPath);
+        Assert.AreEqual("C:/b", path.UrlPath);
+        Assert.AreEqual(NativePath("C:/b"), path.OsPath);
+    }
+
+    [TestMethod]
+    public void TryParse_SingleDotSegments_AreRemoved()
+    {
+        var url = new Uri("file:///C:/./a/./b.txt");
+
+        bool parsed = FileUrlPath.TryParse(url, out var path);
+
+        Assert.IsTrue(parsed);
+        Assert.IsNotNull(path);
+        Assert.AreEqual("C:/a/b.txt", path.UrlPath);
+        Assert.AreEqual(NativePath("C:/a/b.txt"), path.OsPath);
+    }
+
+    // Measured against curl 8.21.0: -w "%{exitcode}" on this URL prints 0 and the body is
+    // C:\Windows\win.ini, and file:///C:/../../nosuch.txt is quoted as C:/nosuch.txt. The
+    // drive is the root; a .. with nothing left above it is dropped.
+    [TestMethod]
+    public void TryParse_DotDotAboveTheDrive_StopsAtTheDrive()
+    {
+        var url = new Uri("file:///C:/../../Windows/win.ini");
+
+        bool parsed = FileUrlPath.TryParse(url, out var path);
+
+        Assert.IsTrue(parsed);
+        Assert.IsNotNull(path);
+        Assert.AreEqual("C:/Windows/win.ini", path.UrlPath);
+        Assert.AreEqual(NativePath("C:/Windows/win.ini"), path.OsPath);
+    }
+
+    // A drive letter not followed by a slash is not a root, so the .. removes it: curl
+    // 8.21.0 quotes file://localhost/Q:dir/../x as /x. The three-slash spelling is the
+    // same to curl, but Uri throws on it.
+    [TestMethod]
+    public void TryParse_DriveLetterWithoutASlash_IsRemovedByDotDotLikeAnySegment()
+    {
+        var url = new Uri("file://localhost/Q:dir/../x");
+
+        bool parsed = FileUrlPath.TryParse(url, out var path);
+
+        Assert.IsTrue(parsed);
+        Assert.IsNotNull(path);
+        Assert.AreEqual("/x", path.UrlPath);
+        Assert.AreEqual(NativePath("/x"), path.OsPath);
+    }
+
+    // curl 8.21.0 quotes file://localhost/C: as C: — a drive with nothing after it is
+    // still a root. Uri throws on the three-slash spelling, file:///C:.
+    [TestMethod]
+    public void TryParse_BareDrive_IsKeptWhole()
+    {
+        var url = new Uri("file://localhost/C:");
+
+        bool parsed = FileUrlPath.TryParse(url, out var path);
+
+        Assert.IsTrue(parsed);
+        Assert.IsNotNull(path);
+        Assert.AreEqual("C:", path.UrlPath);
+        Assert.AreEqual("C:", path.OsPath);
+    }
+
+    // Each row was quoted by curl 8.21.0 in its exit 37 message exactly as expected here.
+    [TestMethod]
+    [DataRow("file:///C:/dir/..", "C:/")]
+    [DataRow("file:///C:/dir/.", "C:/dir/")]
+    [DataRow("file:///C:/dir/../", "C:/")]
+    [DataRow("file:///C:/dir/.../nosuch.txt", "C:/dir/.../nosuch.txt")]
+    [DataRow("file:///C|/dir/../nosuch.txt", "C|/nosuch.txt")]
+    [DataRow("file:///tmp/a/../b", "/tmp/b")]
+    [DataRow("file:////server/share/../x.txt", "//server/x.txt")]
+    [DataRow("file:////server/../x", "//x")]
+    [DataRow("file:////server/share/../../../x", "/x")]
+    [DataRow("file://localhost/C:/dir/../nosuch.txt", "C:/nosuch.txt")]
+    [DataRow("file:///C:/dir/..?q=1", "C:/")]
+    [DataRow(@"file://localhost\C:/dir/../nosuch.txt", "C:/nosuch.txt")]
+    [DataRow(@"file:///C:\dir\..\nosuch.txt", "C:/nosuch.txt")]
+    public void TryParse_DotSegments_AreRemovedAsCurlQuotesThem(string urlText, string expected)
+    {
+        var url = new Uri(urlText);
+
+        bool parsed = FileUrlPath.TryParse(url, out var path);
+
+        Assert.IsTrue(parsed);
+        Assert.IsNotNull(path);
+        Assert.AreEqual(expected, path.UrlPath);
+        Assert.AreEqual(NativePath(expected), path.OsPath);
+    }
+
+    // curl 8.21.0 reads an encoded dot as a dot when it decides what a dot segment is.
+    [TestMethod]
+    [DataRow("file:///C:/dir/.%2e/x", "C:/x")]
+    [DataRow("file:///C:/dir/%2E%2E/x", "C:/x")]
+    [DataRow("file:///C:/dir/%2e%2e/x", "C:/x")]
+    [DataRow("file:///C:/dir/%2e/x", "C:/dir/x")]
+    [DataRow("file:///C:/dir/%2e", "C:/dir/")]
+    public void TryParse_EncodedDotSegments_AreRemovedLikePlainOnes(string urlText, string expected)
+    {
+        var url = new Uri(urlText);
+
+        bool parsed = FileUrlPath.TryParse(url, out var path);
+
+        Assert.IsTrue(parsed);
+        Assert.IsNotNull(path);
+        Assert.AreEqual(expected, path.UrlPath);
+    }
+
+    // An escaped backslash is not a separator in the URL, so "dir%5c..%5cx" is one
+    // segment and nothing is removed.
+    [TestMethod]
+    public void TryParse_EscapedBackslash_IsNotASeparatorForDotSegmentRemoval()
+    {
+        var url = new Uri("file:///C:/dir%5c..%5cx");
+
+        bool parsed = FileUrlPath.TryParse(url, out var path);
+
+        Assert.IsTrue(parsed);
+        Assert.IsNotNull(path);
+        Assert.AreEqual("C:/dir%5c..%5cx", path.UrlPath);
+        Assert.AreEqual(NativePath("C:/dir") + @"\..\x", path.OsPath);
+    }
+
+    [TestMethod]
+    public void TryParse_PathAsIsFalse_RemovesDotSegments()
+    {
+        var url = new Uri("file:///C:/dir/../x");
+
+        bool parsed = FileUrlPath.TryParse(url, pathAsIs: false, out var path);
+
+        Assert.IsTrue(parsed);
+        Assert.IsNotNull(path);
+        Assert.AreEqual("C:/x", path.UrlPath);
+        Assert.AreEqual(NativePath("C:/x"), path.OsPath);
+    }
+
+    // curl 8.21.0 with --path-as-is quotes file:///C:/dir\..\x as C:/dir/../x: the dot
+    // segments survive, the backslashes do not.
+    [TestMethod]
+    public void TryParse_PathAsIs_KeepsDotDotButStillConvertsBackslashes()
+    {
+        var url = new Uri(@"file:///C:/dir\..\x");
+
+        bool parsed = FileUrlPath.TryParse(url, pathAsIs: true, out var path);
+
+        Assert.IsTrue(parsed);
+        Assert.IsNotNull(path);
+        Assert.AreEqual("C:/dir/../x", path.UrlPath);
+        Assert.AreEqual(NativePath("C:/dir/../x"), path.OsPath);
+    }
+
+    [TestMethod]
+    public void TryParse_PathAsIs_KeepsSingleDotSegments()
+    {
+        var url = new Uri("file:///C:/dir/./x");
+
+        bool parsed = FileUrlPath.TryParse(url, pathAsIs: true, out var path);
+
+        Assert.IsTrue(parsed);
+        Assert.IsNotNull(path);
+        Assert.AreEqual("C:/dir/./x", path.UrlPath);
+    }
+
+    [TestMethod]
+    public void TryParse_PathAsIsNullUrl_ThrowsArgumentNullException()
+    {
+        Assert.ThrowsExactly<ArgumentNullException>(
+            () => FileUrlPath.TryParse(null!, pathAsIs: true, out _));
     }
 
     // file://C:/dir/hello.txt is not a host named "C:" — curl 8.21.0 reads the authority

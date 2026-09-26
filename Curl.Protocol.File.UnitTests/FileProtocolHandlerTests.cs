@@ -205,6 +205,25 @@ public sealed class FileProtocolHandlerTests
         Assert.AreEqual($"Could not open file {EncodedUrlPath}", result.ErrorMessage);
     }
 
+    // curl 8.21.0 prints "curl: (37) Could not open file C:/nosuch.txt" for this URL: the
+    // message quotes the path after its dot segments are removed, not as written.
+    [TestMethod]
+    public async Task ExecuteAsync_DotDotSourceNotFound_QuotesThePathWithTheDotDotRemoved()
+    {
+        var fileSystem = new FakeFileSystem();
+        var context = new FakeTransferContext
+        {
+            Url = new Uri("file:///C:/dir/../nosuch.txt"),
+            Output = new ChunkRecordingStream(),
+        };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        var result = await handler.ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.FileCouldntReadFile, result.ExitCode);
+        Assert.AreEqual("Could not open file C:/nosuch.txt", result.ErrorMessage);
+    }
+
     // Exit 78 is the remote-protocol "file not found"; file:// never reports it, however
     // the open failed. Verified against curl 8.21.0.
     [TestMethod]
