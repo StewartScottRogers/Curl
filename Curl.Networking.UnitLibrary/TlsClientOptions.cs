@@ -37,10 +37,23 @@ namespace Curl.Networking;
 /// from the certificate file when this is <see langword="null" />; the Schannel build takes
 /// the key from the PKCS#12 file and ignores it.
 /// </param>
+/// <param name="Ciphers">
+/// curl's <c>--ciphers</c> value, verbatim: the TLS 1.2-and-below suites to offer. The
+/// Schannel build refuses any value with exit 59; the OpenSSL build offers the suites it
+/// names, by IANA or OpenSSL name, as ADR-0011 decides (<see cref="OpenSslCipherSuites" />).
+/// <see langword="null" /> leaves the choice to the platform.
+/// </param>
+/// <param name="Tls13Ciphers">
+/// curl's <c>--tls13-ciphers</c> value, verbatim: the TLS 1.3 suites to offer. The Schannel
+/// build ignores it; the OpenSSL build offers the suites it names, as ADR-0011 decides.
+/// <see langword="null" /> leaves the choice to the platform.
+/// </param>
 public sealed record TlsClientOptions(
     bool Insecure = false,
     TlsMinimumVersion MinimumVersion = TlsMinimumVersion.SystemDefault,
     string? CaCertificateFile = null,
     string? CaCertificateDirectory = null,
     string? ClientCertificate = null,
-    string? PrivateKey = null);
+    string? PrivateKey = null,
+    string? Ciphers = null,
+    string? Tls13Ciphers = null);

@@ -90,7 +90,9 @@ public sealed class SslStreamTlsProvider : ITlsProvider
     /// <see cref="TlsClientOptions.CaCertificateDirectory" /> is trusted beside the
     /// <c>--cacert</c> file or the system store; a missing directory, or a file in it that
     /// cannot be read, adds nothing. No file is read when
-    /// <see cref="TlsClientOptions.Insecure" /> is set. The plaintext connection is
+    /// <see cref="TlsClientOptions.Insecure" /> is set. A <see cref="TlsClientOptions.Ciphers" />
+    /// or <see cref="TlsClientOptions.Tls13Ciphers" /> value the build cannot apply is exit 59
+    /// (<see cref="CurlExitCode.SslCipher" />), as ADR-0011 decides. The plaintext connection is
     /// disposed on every failure and on cancellation.
     /// </remarks>
     public async ValueTask<ConnectResult> AuthenticateAsClientAsync(
@@ -100,6 +102,13 @@ public sealed class SslStreamTlsProvider : ITlsProvider
     {
         ArgumentNullException.ThrowIfNull(plaintext);
         ArgumentException.ThrowIfNullOrWhiteSpace(targetHost);
+
+        var (cipherSuitesPolicy, cipherFailure) = CreateCipherSuitesPolicy();
+        if (cipherFailure is not null)
+        {
+            await plaintext.DisposeAsync().ConfigureAwait(false);
+            return ConnectResult.Failed(CurlExitCode.SslCipher, cipherFailure);
+        }
 
         var (clientCertificate, clientCertificateFailure) = LoadClientCertificate();
         if (clientCertificateFailure is not null)
@@ -128,6 +137,7 @@ public sealed class SslStreamTlsProvider : ITlsProvider
             EnabledSslProtocols = ToSslProtocols(_options.MinimumVersion),
             CertificateChainPolicy = chainPolicy,
             ClientCertificateContext = ToCertificateContext(clientCertificate),
+            CipherSuitesPolicy = cipherSuitesPolicy,
             RemoteCertificateValidationCallback = (_, _, chain, errors) =>
             {
                 verificationFailure = VerifyPeer(errors, chain, targetHost, anchorsBesideSystemStore);
@@ -191,6 +201,30 @@ public sealed class SslStreamTlsProvider : ITlsProvider
         return _matchesSchannelBuild
             ? TlsFailureMessages.SchannelPeerFailedVerification(errors, _options.CaCertificateFile is not null)
             : TlsFailureMessages.OpenSslPeerFailedVerification(errors, chain, targetHost);
+    }
+
+    // ADR-0011: the Schannel build refuses --ciphers and ignores --tls13-ciphers; the
+    // OpenSSL build offers what they name. CipherSuitesPolicy cannot be constructed on
+    // Windows, where only the tests run the OpenSSL build, so there it cannot apply them.
+    private (CipherSuitesPolicy? Policy, string? FailureMessage) CreateCipherSuitesPolicy()
+    {
+        if (_matchesSchannelBuild)
+        {
+            return (null, _options.Ciphers is null ? null : TlsFailureMessages.SchannelCipherListRefused);
+        }
+
+        var (suites, failureMessage) = OpenSslCipherSuites.Select(_options.Ciphers, _options.Tls13Ciphers);
+        if (suites is null)
+        {
+            return (null, failureMessage);
+        }
+
+        if (OperatingSystem.IsWindows())
+        {
+            return (null, OpenSslCipherSuites.Unapplied(_options.Ciphers, _options.Tls13Ciphers));
+        }
+
+        return (new CipherSuitesPolicy(suites), null);
     }
 
     // The Schannel build reads the key from the PKCS#12 file and ignores --key; only the

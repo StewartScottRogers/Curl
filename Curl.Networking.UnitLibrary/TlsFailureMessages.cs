@@ -7,7 +7,7 @@ namespace Curl.Networking;
 
 /// <summary>
 /// The one place the message for a failed TLS handshake is written: the text curl prints
-/// after <c>curl: (NN) </c> for exit 35, exit 43, exit 58, exit 60 and exit 77, in the two builds ADR-0009
+/// after <c>curl: (NN) </c> for exit 35, exit 43, exit 58, exit 59, exit 60 and exit 77, in the two builds ADR-0009
 /// reproduces, the Schannel build of curl on Windows and the OpenSSL build elsewhere.
 /// </summary>
 /// <remarks>
@@ -219,6 +219,30 @@ internal static class TlsFailureMessages
     /// <returns>The message curl prints.</returns>
     public static string OpenSslPrivateKeyUnusable(string privateKeyFile) =>
         $"unable to set private key file: '{privateKeyFile}' type PEM";
+
+    /// <summary>
+    /// The Schannel build's message for exit 59: it refuses every <c>--ciphers</c> value
+    /// (ADR-0011).
+    /// </summary>
+    public const string SchannelCipherListRefused = "schannel: Failed setting algorithm cipher list";
+
+    /// <summary>
+    /// The OpenSSL build's message for exit 59: no entry of the <c>--ciphers</c> list names a
+    /// TLS 1.2-and-below suite it knows.
+    /// </summary>
+    /// <param name="ciphers">The <c>--ciphers</c> value, verbatim.</param>
+    /// <returns>The message curl prints.</returns>
+    public static string OpenSslCipherListUnusable(string ciphers) =>
+        $"failed setting cipher list: {ciphers}";
+
+    /// <summary>
+    /// The OpenSSL build's message for exit 59: no entry of the <c>--tls13-ciphers</c> list
+    /// names a TLS 1.3 suite.
+    /// </summary>
+    /// <param name="tls13Ciphers">The <c>--tls13-ciphers</c> value, verbatim.</param>
+    /// <returns>The message curl prints.</returns>
+    public static string OpenSslTls13CipherSuiteUnusable(string tls13Ciphers) =>
+        $"failed setting TLS 1.3 cipher suite: {tls13Ciphers}";
 
     // OpenSSL reports a failed trust before a failed validity period.
     private static string OpenSslVerifyError(X509Chain? chain)

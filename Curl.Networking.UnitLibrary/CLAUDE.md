@@ -26,7 +26,13 @@ file and passphrase by `ClientCertificateArgument` as curl splits it) it present
 certificate that `ClientCertificateLoader` loads: PKCS#12 in the Schannel build, PEM with
 `--key` (`TlsClientOptions.PrivateKey`) in the OpenSSL build. A certificate that does not
 load is exit 58; in the OpenSSL build a key that does not load is exit 43, as curl reports
-it. The messages for its exit 35, exit 43, exit 58, exit 60 and exit 77 live in
+it. `--ciphers` and `--tls13-ciphers` (`TlsClientOptions.Ciphers`, `Tls13Ciphers`) follow
+ADR-0011: the Schannel build refuses `--ciphers` with exit 59 and ignores `--tls13-ciphers`;
+the OpenSSL build turns both into one `CipherSuitesPolicy` through `OpenSslCipherSuites`,
+the hand-written OpenSSL-name table, and a list naming no known suite is exit 59. On
+Windows `CipherSuitesPolicy` cannot be constructed, so there the OpenSSL build (reached
+only from tests) reports exit 59 instead of throwing.
+The messages for its exit 35, exit 43, exit 58, exit 59, exit 60 and exit 77 live in
 `TlsFailureMessages` and nowhere else; the `More details here` block after an exit 60 is
 the console's to print. No type here constructs an `HttpClient`.
 
