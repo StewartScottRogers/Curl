@@ -39,3 +39,4 @@ An Accepted ADR records curl's `-V` format as Curl will print it on Windows, Lin
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
