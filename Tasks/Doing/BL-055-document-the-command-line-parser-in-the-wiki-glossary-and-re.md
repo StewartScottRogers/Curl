@@ -69,3 +69,4 @@ BL-033 (in Doing when this was filed) also adds requirements, so take the next f
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
