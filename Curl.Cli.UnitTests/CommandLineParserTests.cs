@@ -525,6 +525,77 @@ public sealed class CommandLineParserTests
         Assert.IsEmpty(result.WarningLines);
     }
 
+    // ---- warning lines after the transfers -------------------------------------------
+
+    [TestMethod]
+    [DataRow(new[] { "-o", "f", "-o", "g", "file:///x" })]
+    [DataRow(new[] { "-o", "f", "-o", "g", "-o", "h", "file:///x" })]
+    [DataRow(new[] { "-o", "f", "--url", "file:///x", "-o", "g" })]
+    [DataRow(new[] { "-s", "--no-silent", "-o", "f", "-o", "g", "file:///x" })]
+    public void Parse_MoreOutputFilesThanUrls_IsAcceptedWithOneWarningAfterTheTransfers(string[] arguments)
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsEmpty(result.WarningLines);
+        CollectionAssert.AreEqual(
+            new[] { "Warning: Got more output options than URLs" },
+            result.WarningLinesAfterTransfers.ToArray());
+    }
+
+    [TestMethod]
+    [DataRow(new[] { "-o", "f", "file:///x" })]
+    [DataRow(new[] { "-o", "f", "file:///x", "file:///y" })]
+    [DataRow(new[] { "file:///x" })]
+    public void Parse_NoMoreOutputFilesThanUrls_CarriesNoWarningAfterTheTransfers(string[] arguments)
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsEmpty(result.WarningLinesAfterTransfers);
+    }
+
+    [TestMethod]
+    [DataRow(new[] { "-s", "-o", "f", "-o", "g", "file:///x" })]
+    [DataRow(new[] { "-o", "f", "-o", "g", "file:///x", "-s" })]
+    [DataRow(new[] { "-sS", "-o", "f", "-o", "g", "file:///x" })]
+    public void Parse_MoreOutputFilesThanUrlsWhileSilentAtTheEnd_CarriesNoWarningAfterTheTransfers(string[] arguments)
+    {
+        // Unlike a warning raised while reading, curl 8.21.0 checks -s when it prints this one,
+        // after the transfers, so a -s anywhere on the command line drops it.
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsEmpty(result.WarningLinesAfterTransfers);
+    }
+
+    [TestMethod]
+    public void Parse_FlagLikeOutputFileAndMoreOutputFilesThanUrls_WarnsAboutTheFileNameFirst()
+    {
+        // curl 8.21.0 prints `curl -o -s -o g file:///Z:/nx` as the file-name warning, then the
+        // transfer's error, then the output-options warning.
+        CommandLineParseResult result = CommandLineParser.Parse(["-o", "-s", "-o", "g", "file:///x"]);
+
+        Assert.IsTrue(result.IsAccepted);
+        CollectionAssert.AreEqual(
+            new[] { "Warning: The filename argument '-s' looks like a flag." },
+            result.WarningLines.ToArray());
+        CollectionAssert.AreEqual(
+            new[] { "Warning: Got more output options than URLs" },
+            result.WarningLinesAfterTransfers.ToArray());
+    }
+
+    [TestMethod]
+    [DataRow(new[] { "-o", "f", "-o", "g" })]
+    [DataRow(new[] { "-o", "f", "-o", "g", "file:///x", "--bogus" })]
+    public void Parse_MoreOutputFilesThanUrlsButRefused_CarriesNoWarningAfterTheTransfers(string[] arguments)
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+
+        Assert.IsFalse(result.IsAccepted);
+        Assert.IsEmpty(result.WarningLinesAfterTransfers);
+    }
+
     private static void AssertRefused(CommandLineParseResult result, string expectedFirstLine)
     {
         Assert.IsFalse(result.IsAccepted);

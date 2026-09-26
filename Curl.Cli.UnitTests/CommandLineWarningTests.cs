@@ -23,4 +23,10 @@ public sealed class CommandLineWarningTests
 
         Assert.AreEqual("fileName", exception.ParamName);
     }
+
+    [TestMethod]
+    public void MoreOutputOptionsThanUrls_IsCurlsExactText()
+    {
+        Assert.AreEqual("Warning: Got more output options than URLs", CommandLineWarning.MoreOutputOptionsThanUrls);
+    }
 }

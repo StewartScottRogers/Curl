@@ -1,9 +1,10 @@
 namespace Curl.Cli;
 
 /// <summary>
-/// The warning lines curl prints on standard error while reading a command line, before it
-/// carries on. Each is one whole line without a line terminator; the console layer writes it
-/// and chooses the newline.
+/// The warning lines curl prints on standard error about a command line it carries on with:
+/// most while reading it, and <see cref="MoreOutputOptionsThanUrls"/> after the transfers. Each
+/// is one whole line without a line terminator; the console layer writes it and chooses the
+/// newline.
 /// </summary>
 /// <remarks>
 /// The texts were checked byte for byte against the local curl 8.21.0 on 2026-09-26.
@@ -46,4 +47,14 @@ public static class CommandLineWarning
         "Warning: have only digits in 'start'-'stop'. The server's response to this ",
         "Warning: request is uncertain.",
     ];
+
+    /// <summary>
+    /// The line curl prints when a command line gives more <c>-o</c>/<c>--output</c> values than
+    /// URLs: <c>Warning: Got more output options than URLs</c>. curl 8.21.0 prints it once, however
+    /// many values are left over, after the last transfer has ended, not while reading the command
+    /// line: <c>curl -o f -o g file:///Z:/nx</c> prints <c>curl: (37) Could not open file Z:/nx</c>
+    /// and then this line (measured on Windows on 2026-09-26). It is dropped when <c>-s</c> /
+    /// <c>--silent</c> is in effect at the end of the command line.
+    /// </summary>
+    public static string MoreOutputOptionsThanUrls { get; } = "Warning: Got more output options than URLs";
 }

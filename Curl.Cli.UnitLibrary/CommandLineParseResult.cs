@@ -9,11 +9,12 @@ namespace Curl.Cli;
 /// </summary>
 public sealed class CommandLineParseResult
 {
-    private CommandLineParseResult(CommandLineOptions? options, CommandLineRefusal? refusal, IReadOnlyList<string> warningLines)
+    private CommandLineParseResult(CommandLineOptions? options, CommandLineRefusal? refusal, IReadOnlyList<string> warningLines, IReadOnlyList<string> warningLinesAfterTransfers)
     {
         Options = options;
         Refusal = refusal;
         WarningLines = warningLines;
+        WarningLinesAfterTransfers = warningLinesAfterTransfers;
     }
 
     /// <summary>
@@ -39,15 +40,38 @@ public sealed class CommandLineParseResult
     /// </summary>
     public IReadOnlyList<string> WarningLines { get; }
 
-    /// <summary>Creates the result for an accepted command line, with the warning lines its options collected.</summary>
+    /// <summary>
+    /// The warning lines curl prints on standard error about the command line after the last
+    /// transfer has ended, without line terminators; empty when there are none, and always empty
+    /// for a refused command line, which never reaches a transfer. It holds
+    /// <see cref="CommandLineWarning.MoreOutputOptionsThanUrls"/> when an accepted command line has
+    /// more <see cref="CommandLineOptions.OutputFiles"/> than <see cref="CommandLineOptions.Urls"/>
+    /// and <c>-s</c> / <c>--silent</c> is not in effect at its end. The console layer must write
+    /// these after the transfers, not with <see cref="WarningLines"/>: curl 8.21.0 prints
+    /// <c>curl -o f -o g file:///Z:/nx</c> as <c>curl: (37) Could not open file Z:/nx</c> and then
+    /// the warning (measured on Windows on 2026-09-26).
+    /// </summary>
+    public IReadOnlyList<string> WarningLinesAfterTransfers { get; }
+
+    /// <summary>
+    /// Creates the result for an accepted command line, with the warning lines its options
+    /// collected and the ones curl prints after the transfers.
+    /// </summary>
     /// <param name="options">The parsed options.</param>
     /// <returns>A result whose <see cref="IsAccepted"/> is <see langword="true"/>.</returns>
-    internal static CommandLineParseResult Accepted(CommandLineOptions options) => new(options, null, options.WarningLines);
+    internal static CommandLineParseResult Accepted(CommandLineOptions options)
+    {
+        IReadOnlyList<string> warningLinesAfterTransfers =
+            options.OutputFiles.Count > options.Urls.Count && !options.Silent
+                ? [CommandLineWarning.MoreOutputOptionsThanUrls]
+                : [];
+        return new(options, null, options.WarningLines, warningLinesAfterTransfers);
+    }
 
     /// <summary>Creates the result for a refused command line.</summary>
     /// <param name="refusal">The first refusal met.</param>
     /// <param name="warningLines">The warning lines met before the refusal.</param>
     /// <returns>A result whose <see cref="IsAccepted"/> is <see langword="false"/>.</returns>
     internal static CommandLineParseResult Refused(CommandLineRefusal refusal, IReadOnlyList<string> warningLines) =>
-        new(null, refusal, warningLines);
+        new(null, refusal, warningLines, []);
 }
