@@ -45,6 +45,9 @@ internal static class TelnetByte
     /// <summary>Option 24, terminal type (RFC 1091).</summary>
     public const byte TerminalTypeOption = 24;
 
+    /// <summary>Option 31, negotiate about window size, NAWS (RFC 1073).</summary>
+    public const byte WindowSizeOption = 31;
+
     /// <summary>Option 35, X display location (RFC 1096).</summary>
     public const byte XDisplayLocationOption = 35;
 

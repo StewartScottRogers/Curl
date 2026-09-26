@@ -25,10 +25,17 @@ namespace Curl.Protocol.Telnet;
 /// A server that never negotiates is never sent a command.
 /// </para>
 /// <para>
-/// Each of <c>TTYPE</c>, <c>XDISPLOC</c> and <c>NEW-ENVIRON</c> that a <c>-t</c> option
-/// (or, for <c>NEW-ENVIRON</c>, the <c>-u</c> user name) gave a value for is one more
-/// option this side performs when asked, and offers after SGA, in option-number order,
-/// with <c>IAC WILL</c>.
+/// Each of <c>TTYPE</c>, <c>NAWS</c>, <c>XDISPLOC</c> and <c>NEW-ENVIRON</c> that a
+/// <c>-t</c> option (or, for <c>NEW-ENVIRON</c>, the <c>-u</c> user name) gave a value for
+/// is one more option this side performs when asked, and offers after SGA, in
+/// option-number order, with <c>IAC WILL</c>.
+/// </para>
+/// <para>
+/// NAWS is performed when asked even without <c>-t WS</c>, as curl 8.21.0 does. Each time
+/// it becomes enabled, by a <c>DO</c> answering this side's offer or by one answered with
+/// <c>WILL</c>, this side sends <c>IAC SB NAWS</c>, the columns and rows as 16-bit
+/// big-endian numbers with each <c>0xFF</c> doubled, and <c>IAC SE</c>; the size is 0x0
+/// without <c>-t WS</c>.
 /// </para>
 /// <para>
 /// A subnegotiation is removed from the output. A <c>TTYPE</c> or <c>XDISPLOC</c> one is
@@ -84,7 +91,10 @@ internal sealed class TelnetReceiver
             ? [TelnetByte.SuppressGoAheadOption]
             : [TelnetByte.BinaryOption, TelnetByte.SuppressGoAheadOption];
         localOptionsOffered = [.. optionsOfferedBothWays, .. OptionsWithValues(optionValues)];
-        localOptions = new TelnetOptionSide(TelnetByte.Will, TelnetByte.Wont, localOptionsOffered);
+        localOptions = new TelnetOptionSide(
+            TelnetByte.Will,
+            TelnetByte.Wont,
+            [.. localOptionsOffered, TelnetByte.WindowSizeOption]);
         remoteOptions = new TelnetOptionSide(
             TelnetByte.Do,
             TelnetByte.Dont,
@@ -194,13 +204,17 @@ internal sealed class TelnetReceiver
         switch (state)
         {
             case TelnetReceiveState.Will:
-                remoteOptions.ReceiveEnable(option, replies);
+                _ = remoteOptions.ReceiveEnable(option, replies);
                 break;
             case TelnetReceiveState.Wont:
                 remoteOptions.ReceiveDisable(option, replies);
                 break;
             case TelnetReceiveState.Do:
-                localOptions.ReceiveEnable(option, replies);
+                if (localOptions.ReceiveEnable(option, replies) && option == TelnetByte.WindowSizeOption)
+                {
+                    AppendWindowSize(replies);
+                }
+
                 break;
             default:
                 localOptions.ReceiveDisable(option, replies);
@@ -322,6 +336,28 @@ internal sealed class TelnetReceiver
         replies.AddRange(Encoding.ASCII.GetBytes(variable[(comma + 1)..]));
     }
 
+    private void AppendWindowSize(List<byte> replies)
+    {
+        TelnetWindowSize size = optionValues.WindowSize ?? new TelnetWindowSize(0, 0);
+        replies.Add(TelnetByte.InterpretAsCommand);
+        replies.Add(TelnetByte.SubnegotiationBegin);
+        replies.Add(TelnetByte.WindowSizeOption);
+        AppendDoublingInterpretAsCommand((byte)(size.Columns >> 8), replies);
+        AppendDoublingInterpretAsCommand((byte)size.Columns, replies);
+        AppendDoublingInterpretAsCommand((byte)(size.Rows >> 8), replies);
+        AppendDoublingInterpretAsCommand((byte)size.Rows, replies);
+        AppendSubnegotiationEnd(replies);
+    }
+
+    private static void AppendDoublingInterpretAsCommand(byte value, List<byte> replies)
+    {
+        replies.Add(value);
+        if (value == TelnetByte.InterpretAsCommand)
+        {
+            replies.Add(value);
+        }
+    }
+
     private static void AppendSubnegotiationStart(byte option, List<byte> replies)
     {
         replies.Add(TelnetByte.InterpretAsCommand);
@@ -341,6 +377,11 @@ internal sealed class TelnetReceiver
         if (optionValues.TerminalType is not null)
         {
             yield return TelnetByte.TerminalTypeOption;
+        }
+
+        if (optionValues.WindowSize is not null)
+        {
+            yield return TelnetByte.WindowSizeOption;
         }
 
         if (optionValues.XDisplayLocation is not null)

@@ -18,22 +18,29 @@ internal sealed class TelnetOptionSide(byte enableCommand, byte disableCommand, 
     /// </summary>
     /// <param name="option">The option named.</param>
     /// <param name="replies">Receives any reply to send.</param>
-    public void ReceiveEnable(byte option, List<byte> replies)
+    /// <returns>
+    /// <see langword="true" /> when this enabled the option, whether answering an offer or
+    /// confirming this side's own request; <see langword="false" /> when it was already
+    /// enabled or is refused.
+    /// </returns>
+    public bool ReceiveEnable(byte option, List<byte> replies)
     {
-        if (states[option] != TelnetOptionState.No)
+        TelnetOptionState previous = states[option];
+        if (previous != TelnetOptionState.No)
         {
             states[option] = TelnetOptionState.Yes;
-            return;
+            return previous == TelnetOptionState.WantYes;
         }
 
         if (Array.IndexOf(preferredOptions, option) < 0)
         {
             AppendCommand(replies, disableCommand, option);
-            return;
+            return false;
         }
 
         states[option] = TelnetOptionState.Yes;
         AppendCommand(replies, enableCommand, option);
+        return true;
     }
 
     /// <summary>

@@ -3,7 +3,8 @@ namespace Curl.Protocol.Telnet;
 /// <summary>
 /// The values the <c>-t</c>/<c>--telnet-option</c> options and the <c>-u</c> user name
 /// supplied, as <see cref="TelnetOptionParser" /> read them: what this side answers a <c>TTYPE</c>,
-/// <c>XDISPLOC</c> or <c>NEW-ENVIRON</c> subnegotiation with.
+/// <c>XDISPLOC</c> or <c>NEW-ENVIRON</c> subnegotiation with, and the window size it sends
+/// once NAWS is agreed.
 /// </summary>
 internal sealed class TelnetOptionValues
 {
@@ -32,4 +33,11 @@ internal sealed class TelnetOptionValues
     /// <c>BINARY=1</c> does not undo it, as in curl 8.21.0.
     /// </summary>
     public bool BinaryRefused { get; set; }
+
+    /// <summary>
+    /// Gets or sets the window size the last <c>WS=</c> gave, or <see langword="null" />
+    /// when none did. With one, this side offers NAWS; without, it still agrees to NAWS
+    /// when asked and sends a size of 0x0, as curl 8.21.0 does.
+    /// </summary>
+    public TelnetWindowSize? WindowSize { get; set; }
 }
