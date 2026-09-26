@@ -36,3 +36,4 @@ a create-mode parameter. Upstream behaviour: https://curl.se/docs/manpage.html,
 ## Log
 
 - 2026-09-25: Migrated from Documentation/Planning/Backlog.md (Ready).
+- 2026-09-26: Backlog -> Doing.
