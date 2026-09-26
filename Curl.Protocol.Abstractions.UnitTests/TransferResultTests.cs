@@ -87,4 +87,42 @@ public sealed class TransferResultTests
         Assert.IsNull(original.ErrorMessage);
         Assert.AreEqual(SourceTime, original.SourceLastWriteTimeUtc);
     }
+
+    [TestMethod]
+    public void TimeConditionNotMet_WithATimestamp_IsASuccessThatCarriesItAndMovedNothing()
+    {
+        var result = TransferResult.TimeConditionNotMet(SourceTime);
+
+        Assert.IsTrue(result.IsSuccess);
+        Assert.IsTrue(result.TimeConditionUnmet);
+        Assert.AreEqual(SourceTime, result.SourceLastWriteTimeUtc);
+        Assert.AreEqual(0L, result.BytesTransferred);
+        Assert.IsNull(result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public void TimeConditionNotMet_WithoutATimestamp_LeavesSourceLastWriteTimeUtcNull()
+    {
+        var result = TransferResult.TimeConditionNotMet();
+
+        Assert.IsTrue(result.TimeConditionUnmet);
+        Assert.IsNull(result.SourceLastWriteTimeUtc);
+    }
+
+    [TestMethod]
+    public void TimeConditionUnmet_OnEveryOtherFactoryAndTheConstructor_IsFalse()
+    {
+        Assert.IsFalse(TransferResult.Success(0).TimeConditionUnmet);
+        Assert.IsFalse(TransferResult.Failure(CurlExitCode.ReadError, "failed").TimeConditionUnmet);
+        Assert.IsFalse(new TransferResult(CurlExitCode.Ok, 0).TimeConditionUnmet);
+    }
+
+    [TestMethod]
+    public void With_SettingSourceLastWriteTimeUtc_KeepsTimeConditionUnmet()
+    {
+        var result = TransferResult.TimeConditionNotMet() with { SourceLastWriteTimeUtc = SourceTime };
+
+        Assert.IsTrue(result.TimeConditionUnmet);
+        Assert.AreEqual(SourceTime, result.SourceLastWriteTimeUtc);
+    }
 }
