@@ -50,3 +50,4 @@ the quality audit, with behaviour unchanged.
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
