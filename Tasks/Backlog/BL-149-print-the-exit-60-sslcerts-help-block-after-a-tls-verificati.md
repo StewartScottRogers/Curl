@@ -1,5 +1,5 @@
 ---
-id: BL-135
+id: BL-149
 title: Print the exit 60 sslcerts help block after a TLS verification failure in Curl.Console
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-135 — Print the exit 60 sslcerts help block after a TLS verification failure in Curl.Console
+# BL-149 — Print the exit 60 sslcerts help block after a TLS verification failure in Curl.Console
 
 ## Goal
 

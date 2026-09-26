@@ -62,7 +62,7 @@ the ADR from BL-059 decides, and the tests pin the decided text byte for byte.
   `TlsFailureMessages`, now one method per build per exit.
 - **Exit 60 help block: the console prints it.** The five `More details here` lines are
   written by curl's tool, not by libcurl's error buffer, so `ConnectResult.ErrorMessage`
-  carries only the one line after `curl: (60) `. Filed as BL-135 (`Curl.Console`).
+  carries only the one line after `curl: (60) `. Filed as BL-149 (`Curl.Console`).
 - **`--capath`.** `TlsClientOptions.CaCertificateDirectory` added. Schannel build: the
   directory is never read, and `SslStreamTlsProvider.Warnings` holds the two measured
   lines (trailing space kept); they are reported whether or not `-k` is given, and the
@@ -85,7 +85,7 @@ the ADR from BL-059 decides, and the tests pin the decided text byte for byte.
   recorded exception. OpenSSL: the first message in the exception chain that starts
   `error:` is the OpenSSL error string; its real-handshake test runs on Linux only
   (macOS's SslStream is not OpenSSL) and could not be run here: WSL has no .NET.
-- **Defaults taken for cases the ADR did not measure** (all re-checked by BL-136):
+- **Defaults taken for cases the ADR did not measure** (all re-checked by BL-150):
   handshake closed with no status, Schannel `schannel: failed to receive handshake,
   SSL/TLS connection failed` (curl's source text), OpenSSL `TLS connect error:
   <innermost exception message>`; OpenSSL verify results 19, 20, 9 and 10 beside the
@@ -94,7 +94,7 @@ the ADR from BL-059 decides, and the tests pin the decided text byte for byte.
   a different line for a certificate with subjectAltNames; chain errors win over a name
   mismatch in both builds, as both verify the chain first; `--cacert` still replaces
   the system store. The ADR's store-replacement and macOS bundle measurements are
-  deferred to BL-136, since no reference build is available to this lane.
+  deferred to BL-150, since no reference build is available to this lane.
 - **ADR Consequences, "a test that asserts Windows text must not run a real handshake
   on Linux".** The handshake tests that assert Schannel text for exit 60 and 77 run on
   every platform on purpose: that text comes from our own mapping of platform-neutral
@@ -109,7 +109,7 @@ the ADR from BL-059 decides, and the tests pin the decided text byte for byte.
   members still failing are the socket paths in `TcpDialer` and `UdpDatagramChannel`,
   which were already failing before this task because only `Integration` tests reach
   them.
-- **Filed:** BL-135 (console prints the exit 60 help block), BL-136 (measure the
+- **Filed:** BL-149 (console prints the exit 60 help block), BL-150 (measure the
   unmeasured cases and pin them).
 
 ## Log

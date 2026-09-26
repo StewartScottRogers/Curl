@@ -1,5 +1,5 @@
 ---
-id: BL-136
+id: BL-150
 title: Measure the TLS failure cases ADR-0009 left unmeasured and pin them in SslStreamTlsProvider
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-136 — Measure the TLS failure cases ADR-0009 left unmeasured and pin them in SslStreamTlsProvider
+# BL-150 — Measure the TLS failure cases ADR-0009 left unmeasured and pin them in SslStreamTlsProvider
 
 ## Goal
 
@@ -30,7 +30,7 @@ Every TLS failure case listed below is measured against the reference curl build
 - Reference builds: curl 8.21.0 Schannel on Windows, and an OpenSSL build of curl 8.21.0 on Linux. For macOS, record what was or was not measured. Run each case with `-sS` and capture standard error byte for byte.
 - **Measuring needs the reference curl binaries and a TLS test server**, for example `openssl s_server` with purpose-made certificates (CN-only, SAN with DNS names, SAN with IP addresses, self-signed, missing intermediate, expired, not yet valid). If the running agent does not have them, do not guess. Move this task to `Blocked` with the reason "needs Stewart to provide curl 8.21.0 Schannel and OpenSSL reference binaries and a TLS test server (openssl s_server) to measure against".
 - Do not edit ADR-0009. If a measurement contradicts one of its decisions, file a new ADR task for Stewart rather than changing this one's scope.
-- Out of scope: the exit 60 help block (BL-135, `Curl.Console`) and printing `SslStreamTlsProvider.Warnings` (BL-072).
+- Out of scope: the exit 60 help block (BL-149, `Curl.Console`) and printing `SslStreamTlsProvider.Warnings` (BL-072).
 
 ## Acceptance criteria
 
