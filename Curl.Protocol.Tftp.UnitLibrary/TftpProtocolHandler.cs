@@ -24,9 +24,9 @@ namespace Curl.Protocol.Tftp;
 /// from, the server's transfer identifier, never back to port 69.
 /// </para>
 /// <para>
-/// The write request carries the same options with <c>tsize</c> set to the upload's
-/// remaining length, or 0 when the upload cannot seek. Each DATA block goes to the
-/// endpoint whose acknowledgement it follows; an option acknowledgement stands in for
+/// The write request carries the same options, its <c>timeout</c> derived the same
+/// way, with <c>tsize</c> set to the upload's remaining length, or 0 when the upload
+/// cannot seek. Each DATA block goes to the endpoint whose acknowledgement it follows; an option acknowledgement stands in for
 /// ACK 0 and sets the block size. The first block shorter than the block size is the
 /// last, so an exact multiple ends with an empty block, and the upload succeeds once that
 /// block is acknowledged, writing nothing to <see cref="ITransferContext.Output" />.
@@ -38,12 +38,13 @@ namespace Curl.Protocol.Tftp;
 /// is returned with the connector's code and message unchanged.
 /// </para>
 /// <para>
-/// A download re-sends its last packet to a silent server on curl's schedule and ends
-/// with exit 7 when the read request goes unanswered, exit 28 when the server falls
-/// silent mid-transfer or <see cref="ITransferContext.MaxTime" /> passes, and exit 56
-/// when a datagram comes from an endpoint other than the server's (see
-/// <c>TftpDownload</c>). An upload does not re-send yet; see the library's
-/// <c>CLAUDE.md</c>.
+/// A download or an upload re-sends its last packet to a silent server on curl's
+/// schedule and ends with exit 7 when the read or write request goes unanswered, exit
+/// 28 when the server falls silent mid-transfer or
+/// <see cref="ITransferContext.MaxTime" /> passes, and exit 56 when a datagram comes
+/// from an endpoint other than the server's. An upload also ends with exit 55 when the
+/// server acknowledges the wrong block once too often (see <c>TftpDownload</c> and
+/// <c>TftpUpload</c>).
 /// </para>
 /// </remarks>
 public sealed class TftpProtocolHandler(IDatagramConnector connector) : IProtocolHandler
@@ -90,7 +91,7 @@ public sealed class TftpProtocolHandler(IDatagramConnector connector) : IProtoco
         await using (channel.ConfigureAwait(false))
         {
             return context.Upload is { } upload
-                ? await new TftpUpload(context, channel, upload).RunAsync(fileName).ConfigureAwait(false)
+                ? await new TftpUpload(context, channel, upload, startTimestamp).RunAsync(fileName).ConfigureAwait(false)
                 : await new TftpDownload(context, channel, startTimestamp).RunAsync(fileName).ConfigureAwait(false);
         }
     }

@@ -1,7 +1,7 @@
 namespace Curl.Protocol.Tftp;
 
 /// <summary>
-/// How often a TFTP download re-sends its last packet to a silent server, and how many
+/// How often a TFTP transfer re-sends its last packet to a silent server, and how many
 /// times, derived from the time the transfer has left the way curl 8.21.0's
 /// <c>tftp_set_timeouts</c> derives them.
 /// </summary>
@@ -16,19 +16,19 @@ internal readonly struct TftpRetrySchedule(int retryLimit, int retrySeconds)
     private static readonly TimeSpan LongestTimeLeft = TimeSpan.FromHours(1);
 
     /// <summary>
-    /// Gets how many times a read request is sent, or an acknowledgement re-sent, before
+    /// Gets how many times a request is sent, or an ACK or DATA block re-sent, before
     /// the transfer gives up: the time left in seconds divided by 5, clamped to 3-50.
     /// </summary>
     internal int RetryLimit { get; } = retryLimit;
 
     /// <summary>
     /// Gets the time left in seconds divided by <see cref="RetryLimit" />, at least 1. It
-    /// is the <c>timeout</c> option the read request carries.
+    /// is the <c>timeout</c> option the read or write request carries.
     /// </summary>
     internal int RetrySeconds { get; } = retrySeconds;
 
     /// <summary>
-    /// Gets how long the download waits after a send before re-sending it. curl re-sends
+    /// Gets how long the transfer waits after a send before re-sending it. curl re-sends
     /// once the whole-second clock is past the last send plus <see cref="RetrySeconds" />,
     /// so the observed interval is one second longer.
     /// </summary>

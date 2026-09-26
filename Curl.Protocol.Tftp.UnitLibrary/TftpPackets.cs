@@ -45,12 +45,6 @@ internal static class TftpPackets
     internal const int MaximumBlockSize = 65464;
 
     /// <summary>
-    /// The <c>timeout</c> option value curl 8.21.0 sends in a write request when no
-    /// timeout option was given, measured on the wire.
-    /// </summary>
-    private const int DefaultTimeoutSeconds = 6;
-
-    /// <summary>
     /// Gets the <c>blksize</c> a request asks for, or <see langword="null" /> when
     /// <c>--tftp-no-options</c> means the request carries no options at all.
     /// </summary>
@@ -86,7 +80,7 @@ internal static class TftpPackets
 
     /// <summary>
     /// Builds the write request curl 8.21.0 sends: octet mode, then <c>tsize</c> with the
-    /// upload's length, <c>blksize</c> and <c>timeout 6</c>, each string null-terminated,
+    /// upload's length, <c>blksize</c> and <c>timeout</c>, each string null-terminated,
     /// or octet mode alone when there are no options.
     /// </summary>
     /// <param name="fileName">The file name from the URL path, decoded.</param>
@@ -97,9 +91,13 @@ internal static class TftpPackets
     /// <param name="blockSize">
     /// The <c>blksize</c> to ask for, or <see langword="null" /> to send no options.
     /// </param>
+    /// <param name="timeoutSeconds">
+    /// The <c>timeout</c> to send: the retry schedule's
+    /// <see cref="TftpRetrySchedule.RetrySeconds" />, 6 by default.
+    /// </param>
     /// <returns>The whole datagram.</returns>
-    internal static byte[] BuildWriteRequest(string fileName, long transferSize, int? blockSize) =>
-        BuildRequest(WriteRequestOpcode, fileName, transferSize, blockSize, DefaultTimeoutSeconds);
+    internal static byte[] BuildWriteRequest(string fileName, long transferSize, int? blockSize, int timeoutSeconds) =>
+        BuildRequest(WriteRequestOpcode, fileName, transferSize, blockSize, timeoutSeconds);
 
     /// <summary>
     /// Builds the DATA packet that carries block <paramref name="blockNumber" />.

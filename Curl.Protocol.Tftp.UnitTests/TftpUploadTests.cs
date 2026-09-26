@@ -171,15 +171,12 @@ public sealed class TftpUploadTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_ShortDatagramWrongAckLateOptionAckAndUnexpectedOpcode_AreIgnored()
+    public async Task ExecuteAsync_LateOptionAckAndUnexpectedOpcode_AreIgnored()
     {
         var channel = Channel(
-            ([0, 4], TransferEndPoint),
-            Ack(5),
             Ack(0),
             OptionAcknowledgement("blksize\08\0"),
             ([0, 3, 0, 1], TransferEndPoint),
-            Ack(0),
             Ack(1));
 
         var result = await Run(channel, new MemoryStream("abc"u8.ToArray()));
