@@ -38,3 +38,4 @@ An ADR (or an amendment to ADR-0009) records that the mingw build of curl 8.21.0
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
