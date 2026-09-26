@@ -56,6 +56,12 @@ public sealed class FakeTransferContext : ITransferContext
     /// <inheritdoc cref="ITransferContext.CreateFileMode" />
     public UnixFileMode CreateFileMode { get; set; } = TransferContext.DefaultCreateFileMode;
 
+    /// <inheritdoc cref="ITransferContext.ConnectTimeout" />
+    public TimeSpan? ConnectTimeout { get; set; }
+
+    /// <inheritdoc cref="ITransferContext.MaxTime" />
+    public TimeSpan? MaxTime { get; set; }
+
     /// <inheritdoc cref="ITransferContext.TimeProvider" />
     public TimeProvider TimeProvider { get; set; } =
         new FakeTimeProvider(FakeFileSystem.DefaultLastWriteTimeUtc);

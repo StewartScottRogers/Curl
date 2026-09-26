@@ -32,6 +32,8 @@ public sealed class TransferContextTests
         Assert.IsFalse(context.TftpNoOptions);
         Assert.IsFalse(context.ConvertLineEndings);
         Assert.AreEqual((UnixFileMode)0b110_100_100, context.CreateFileMode);
+        Assert.IsNull(context.ConnectTimeout);
+        Assert.IsNull(context.MaxTime);
         Assert.AreSame(TimeProvider.System, context.TimeProvider);
         Assert.AreEqual(CancellationToken.None, context.CancellationToken);
     }
@@ -70,6 +72,8 @@ public sealed class TransferContextTests
             TftpNoOptions = true,
             ConvertLineEndings = true,
             CreateFileMode = UnixFileMode.UserRead,
+            ConnectTimeout = TimeSpan.FromSeconds(3),
+            MaxTime = TimeSpan.FromMilliseconds(12500),
             TimeProvider = timeProvider,
             CancellationToken = cancellation.Token,
         };
@@ -91,6 +95,8 @@ public sealed class TransferContextTests
         Assert.IsTrue(context.TftpNoOptions);
         Assert.IsTrue(context.ConvertLineEndings);
         Assert.AreEqual(UnixFileMode.UserRead, context.CreateFileMode);
+        Assert.AreEqual(TimeSpan.FromSeconds(3), context.ConnectTimeout);
+        Assert.AreEqual(TimeSpan.FromMilliseconds(12500), context.MaxTime);
         Assert.AreSame(timeProvider, context.TimeProvider);
         Assert.AreEqual(cancellation.Token, context.CancellationToken);
     }

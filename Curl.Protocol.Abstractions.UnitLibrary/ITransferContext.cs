@@ -172,6 +172,27 @@ public interface ITransferContext
     UnixFileMode CreateFileMode { get; }
 
     /// <summary>
+    /// Gets the longest time the connection phase may take, per <c>--connect-timeout</c>,
+    /// or <see langword="null" /> when none was given.
+    /// </summary>
+    /// <remarks>
+    /// It limits only the connection phase; once the connection is made it no longer
+    /// applies. The value arrives as given, and a handler that does not use it ignores it
+    /// (ADR-0008).
+    /// </remarks>
+    TimeSpan? ConnectTimeout { get; }
+
+    /// <summary>
+    /// Gets the longest time the whole transfer may take, per <c>-m</c>/<c>--max-time</c>,
+    /// or <see langword="null" /> when none was given.
+    /// </summary>
+    /// <remarks>
+    /// It limits the whole transfer, connection phase included. The value arrives as
+    /// given, and a handler that does not use it ignores it (ADR-0008).
+    /// </remarks>
+    TimeSpan? MaxTime { get; }
+
+    /// <summary>
     /// Gets the time source. Injected so that timeout and retry behaviour is testable
     /// without a real delay.
     /// </summary>
