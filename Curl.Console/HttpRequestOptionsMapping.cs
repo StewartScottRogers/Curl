@@ -7,7 +7,8 @@ namespace Curl.Console;
 /// <summary>
 /// Maps the HTTP request options of a parsed command line onto the
 /// <see cref="HttpRequestOptions" /> an HTTP handler reads: <c>-X</c>, <c>-H</c>, <c>-A</c>,
-/// <c>-e</c>, the <c>-d</c> family, <c>--json</c>, <c>-G</c>, <c>-f</c> and <c>--fail-with-body</c>.
+/// <c>-e</c>, the <c>-d</c> family, <c>--json</c>, <c>-G</c>, <c>-f</c>, <c>--fail-with-body</c>
+/// and <c>-L</c>.
 /// </summary>
 /// <remarks>
 /// Measured with curl 8.21.0 (mingw, Schannel) against a loopback recorder on 2026-09-26
@@ -37,7 +38,8 @@ internal static class HttpRequestOptionsMapping
     /// verbatim; the <c>-H</c> headers followed by the ones <c>--json</c> adds; and
     /// <see cref="CommandLineOptions.PostData" /> as a <see cref="BytesBody" />, unless
     /// <see cref="CommandLineOptions.DataInQuery" /> moved it into the query; and
-    /// <see cref="CommandLineOptions.FailMode" /> as <see cref="HttpRequestOptions.Fail" />.
+    /// <see cref="CommandLineOptions.FailMode" /> as <see cref="HttpRequestOptions.Fail" />; and
+    /// <see cref="CommandLineOptions.FollowRedirects" /> as <see cref="HttpRequestOptions.FollowRedirects" />.
     /// </returns>
     internal static HttpRequestOptions FromCommandLine(CommandLineOptions options) =>
         new()
@@ -48,6 +50,7 @@ internal static class HttpRequestOptionsMapping
             Referer = options.Referer,
             Body = options.PostData is { } data && !options.DataInQuery ? new BytesBody(data, FormUrlEncoded) : null,
             Fail = options.FailMode,
+            FollowRedirects = options.FollowRedirects,
         };
 
     /// <summary>

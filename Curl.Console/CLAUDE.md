@@ -47,6 +47,13 @@ as curl 8.21.0 does. `-I` also sets the context's `NoBody`, and `-f` / `--fail-w
 become `HttpRequestOptions.Fail`. Under `--fail-early` the first failed transfer stops the
 run with its own exit code.
 
+Every transfer goes through `Curl.Core`'s `RedirectFollower`. `-L` becomes
+`HttpRequestOptions.FollowRedirects`, and `RedirectPolicyMapping` turns `--max-redirs`,
+`--post301`/`--post302`/`--post303` and `--location-trusted` into its `RedirectPolicy`. Every
+hop writes to the same body and header outputs, so `-L -i` prints every response's head and
+only the last body, and one redirect past `--max-redirs` exits 47 with
+`curl: (47) Maximum (N) redirects followed`, as measured on curl 8.21.0 (BL-234).
+
 Under `-R`/`--remote-time` a successful transfer to an `-o` file whose result carries
 `SourceLastWriteTimeUtc` stamps the closed file with it through `IFileTimeSetter`
 (`PhysicalFileSystem` in production), even when no body was written, as curl does. A

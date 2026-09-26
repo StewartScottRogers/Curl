@@ -9,8 +9,8 @@ namespace Curl.Console;
 
 /// <summary>
 /// Runs one command line: parses it with <see cref="CommandLineParser" />, turns each URL
-/// into a <see cref="TransferContext" />, performs it through the
-/// <see cref="ProtocolDispatcher" /> built for that command line, and prints curl 8.21.0's
+/// into a <see cref="TransferContext" />, performs it through a <see cref="RedirectFollower" />
+/// over the <see cref="ProtocolDispatcher" /> built for that command line, and prints curl 8.21.0's
 /// <c>curl: (N) &lt;message&gt;</c> line for each failure.
 /// </summary>
 /// <param name="createTransferDispatch">
@@ -102,6 +102,15 @@ namespace Curl.Console;
 /// <c>** Resuming transfer from byte position N</c> line when it resumed past byte zero.
 /// The meter is on standard error and the body is not, so writing it after the transfer
 /// leaves the bytes of each stream as curl's.
+/// </para>
+/// <para>
+/// Every transfer goes through <see cref="RedirectFollower" /> with the
+/// <see cref="RedirectPolicy" /> <see cref="RedirectPolicyMapping" /> maps from the command
+/// line, so under <c>-L</c> each redirect is followed into the same body and header outputs:
+/// <c>-L -i</c> writes every response's head and the last response's body, and following one
+/// redirect more than <c>--max-redirs</c> allows fails with exit 47,
+/// <c>Maximum (N) redirects followed</c>, as curl 8.21.0 does. Without <c>-L</c> the
+/// follower dispatches once.
 /// </para>
 /// <para>
 /// Under <c>-R</c> a successful transfer to an <c>-o</c> file whose result carries
@@ -404,7 +413,7 @@ internal sealed class CurlCommandRunner(
             await WriteErrorLinesAsync(dispatch.WarningLinesBeforeEachTransfer).ConfigureAwait(false);
         }
 
-        ProtocolDispatcher dispatcher = dispatch.Dispatcher;
+        RedirectFollower follower = new(dispatch.Dispatcher);
 
         if (!Uri.TryCreate(QueryUrl.Append(url, options), UriKind.Absolute, out Uri? uri))
         {
@@ -421,7 +430,7 @@ internal sealed class CurlCommandRunner(
             TransferContext context = transferContextFactory.Create(
                 options, uri, deferringStandardOutput, range, options.ResumeFrom, headerOutput);
             TransferResult standardOutputResult =
-                await TransferToStandardOutputAsync(dispatcher, context).ConfigureAwait(false);
+                await TransferToStandardOutputAsync(follower, options, context).ConfigureAwait(false);
 
             return await WriteProgressMeterAsync(options, standardOutputResult, options.ResumeFrom, toStandardOutput: true)
                 .ConfigureAwait(false);
@@ -430,7 +439,7 @@ internal sealed class CurlCommandRunner(
         string outputFileName = runsOnWindows ? WindowsOutputFileNameSanitizer.Sanitize(outputFile) : outputFile;
         long? resumeFrom = await ResolveResumeFromAsync(options, outputFileName).ConfigureAwait(false);
         TransferResult fileResult = await TransferToOutputFileAsync(
-                dispatcher, options, uri, outputFileName, range, resumeFrom, headerOutput)
+                follower, options, uri, outputFileName, range, resumeFrom, headerOutput)
             .ConfigureAwait(false);
 
         return await WriteProgressMeterAsync(options, fileResult, resumeFrom, toStandardOutput: false)
@@ -531,7 +540,7 @@ internal sealed class CurlCommandRunner(
     /// <summary>
     /// Performs one transfer whose output is <paramref name="outputFile" />.
     /// </summary>
-    /// <param name="dispatcher">Performs the transfer with the handler for its scheme.</param>
+    /// <param name="follower">Performs the transfer with the handler for its scheme, following redirects under <c>-L</c>.</param>
     /// <param name="options">The accepted command line.</param>
     /// <param name="uri">The URL.</param>
     /// <param name="outputFile">The file: the <c>-o</c> value, after <see cref="WindowsOutputFileNameSanitizer" /> on Windows.</param>
@@ -545,7 +554,7 @@ internal sealed class CurlCommandRunner(
     /// <c>-R</c> a success then stamps the closed file with the source's time.
     /// </returns>
     private async Task<TransferResult> TransferToOutputFileAsync(
-        ProtocolDispatcher dispatcher,
+        RedirectFollower follower,
         CommandLineOptions options,
         Uri uri,
         string outputFile,
@@ -554,7 +563,7 @@ internal sealed class CurlCommandRunner(
         Stream? headerOutput)
     {
         TransferResult completed = await TransferIntoOutputFileAsync(
-                dispatcher, options, uri, outputFile, range, resumeFrom, headerOutput)
+                follower, options, uri, outputFile, range, resumeFrom, headerOutput)
             .ConfigureAwait(false);
 
         if (options.RemoteTime && completed.IsSuccess && completed.SourceLastWriteTimeUtc is { } sourceLastWriteTimeUtc)
@@ -570,7 +579,7 @@ internal sealed class CurlCommandRunner(
     /// <summary>
     /// Performs one transfer into <paramref name="outputFile" /> and closes the file.
     /// </summary>
-    /// <param name="dispatcher">Performs the transfer with the handler for its scheme.</param>
+    /// <param name="follower">Performs the transfer with the handler for its scheme, following redirects under <c>-L</c>.</param>
     /// <param name="options">The accepted command line.</param>
     /// <param name="uri">The URL.</param>
     /// <param name="outputFile">The file: the <c>-o</c> value, after <see cref="WindowsOutputFileNameSanitizer" /> on Windows.</param>
@@ -579,7 +588,7 @@ internal sealed class CurlCommandRunner(
     /// <param name="headerOutput">Where the <c>-D</c> header lines go, or <see langword="null" /> without <c>-D</c>.</param>
     /// <returns>The transfer's result, as <see cref="TransferToOutputFileAsync" /> describes it.</returns>
     private async Task<TransferResult> TransferIntoOutputFileAsync(
-        ProtocolDispatcher dispatcher,
+        RedirectFollower follower,
         CommandLineOptions options,
         Uri uri,
         string outputFile,
@@ -598,7 +607,9 @@ internal sealed class CurlCommandRunner(
             }
 
             TransferContext context = transferContextFactory.Create(options, uri, output, range, resumeFrom, headerOutput);
-            TransferResult fileResult = await dispatcher.DispatchAsync(context).ConfigureAwait(false);
+            TransferResult fileResult = await follower
+                .FollowAsync(context, RedirectPolicyMapping.FromCommandLine(options))
+                .ConfigureAwait(false);
             TransferResult completed = await output.CompleteAsync(fileResult).ConfigureAwait(false);
 
             if (!options.Silent && output.OpenFailureWarning is { } warning)
@@ -631,7 +642,8 @@ internal sealed class CurlCommandRunner(
     /// <summary>
     /// Performs one transfer whose output is standard output, and flushes it.
     /// </summary>
-    /// <param name="dispatcher">Performs the transfer with the handler for its scheme.</param>
+    /// <param name="follower">Performs the transfer with the handler for its scheme, following redirects under <c>-L</c>.</param>
+    /// <param name="options">The accepted command line, whose redirect options the follower applies.</param>
     /// <param name="context">The transfer, whose output is standard output.</param>
     /// <returns>
     /// <see cref="StandardOutputWriteFailure" /> when the handler succeeded but standard
@@ -640,11 +652,14 @@ internal sealed class CurlCommandRunner(
     /// filled (see <see cref="StandardOutputFailureDeferringStream" />).
     /// </returns>
     private async Task<TransferResult> TransferToStandardOutputAsync(
-        ProtocolDispatcher dispatcher,
+        RedirectFollower follower,
+        CommandLineOptions options,
         TransferContext context)
     {
         deferringStandardOutput.ClearWriteFailure();
-        TransferResult result = await dispatcher.DispatchAsync(context).ConfigureAwait(false);
+        TransferResult result = await follower
+            .FollowAsync(context, RedirectPolicyMapping.FromCommandLine(options))
+            .ConfigureAwait(false);
         await deferringStandardOutput.FlushAsync().ConfigureAwait(false);
 
         return result.IsSuccess && deferringStandardOutput.HasWriteFailed ? StandardOutputWriteFailure : result;
