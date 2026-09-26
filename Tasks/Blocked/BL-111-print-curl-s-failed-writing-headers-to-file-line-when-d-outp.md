@@ -4,7 +4,7 @@ title: Print curl's 'Failed writing headers to <file>' line when -D output fails
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-050]
+depends-on: [BL-050, BL-121]
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-26
@@ -43,7 +43,7 @@ With `-v` the first line is followed by `* client returned ERROR on write of 20 
 
 ## Acceptance criteria
 
-- [ ] The curl 8.21.0 stderr for a `-D <named file>` whose header write fails is measured and recorded verbatim in this task's Notes, with the command used.
+- [x] The curl 8.21.0 stderr for a `-D <named file>` whose header write fails is measured and recorded verbatim in this task's Notes, with the command used.
 - [ ] A test in `Curl.Console.UnitTests` drives `-sS -D - -o body.txt` over a transfer whose header write to standard output fails with the file handler's `client returned ERROR on write of 20 bytes` (exit `CurlExitCode.WriteError`, 23), and asserts stderr is exactly `curl: Failed writing headers to -` followed by `curl: (23) client returned ERROR on write of 20 bytes`, and nothing else.
 - [ ] A test in `Curl.Console.UnitTests` covers the named-file case and asserts the stderr wording recorded in Notes.
 - [ ] A test asserts that with `-s` alone neither line is printed and the exit code is still 23.
@@ -52,6 +52,22 @@ With `-v` the first line is followed by `* client returned ERROR on write of 20 
 
 ## Notes
 
+- 2026-09-26, lane 1: named-file case measured against curl 8.21.0 (x86_64-w64-mingw32, Schannel) on Windows. `CONIN$` opens for writing but rejects the write:
+
+  ```
+  curl -sS -D 'CONIN$' -o body.txt file:///C:/Temp/bl050/ten.txt
+  ```
+
+  exits 23 and prints exactly:
+
+  ```
+  curl: Failed writing headers to CONIN$
+  curl: (23) client returned ERROR on write of 20 bytes
+  ```
+
+  So the named-file wording is the same as for `-`: the `-D` argument as given. A `-D` file that cannot be opened at all (read-only `ro.txt`, or `\.\CONIN$`) is a different path: `curl: Failed to open ro.txt` then `curl: (23) Failed writing received data to disk/application`, exit 23 (recorded in BL-121).
+- 2026-09-26, lane 1: blocked before any code. `Curl.Cli.UnitLibrary` does not parse `-D`/`--dump-header` at all (no entry in `CommandLineOptionTable.cs`), and `Curl.Console` never sets `TransferContext.HeaderOutput`, so there is no header write to fail. Parsing is outside this task's `touches`; filed BL-120 (parse `-D` in Curl.Cli) and BL-121 (wire `-D` output in Curl.Console, depends on BL-120), and this task now depends on BL-121.
+
 ## Log
 
 - 2026-09-26: Created.
@@ -59,3 +75,4 @@ With `-v` the first line is followed by `* client returned ERROR on write of 20 
 - 2026-09-26: Doing -> Blocked. Stewart: dark factory run ended in Doing, exit 1; see logs\BL-111-20260926-083111-L4.jsonl
 - 2026-09-26: Blocked -> Backlog. Not blocked: the 2026-09-26 shift ran out of tokens (usage limit), which it misfiled as a stall
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Blocked. Waits on BL-121 (wire -D output in Curl.Console), which waits on BL-120 (parse -D in Curl.Cli, outside this task's touches); re-plan after those land
