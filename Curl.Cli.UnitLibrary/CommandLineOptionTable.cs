@@ -1,0 +1,56 @@
+using System.Collections.Frozen;
+using System.Diagnostics.CodeAnalysis;
+
+namespace Curl.Cli;
+
+/// <summary>
+/// The options <see cref="CommandLineParser"/> recognises, one <see cref="CommandLineOption"/> row each.
+/// </summary>
+/// <remarks>
+/// To add an option, add one row here (with its applier, when it takes a value) and the
+/// property it sets on <see cref="CommandLineOptions"/>; the parser does not change. A flag
+/// is <see cref="CommandLineOption.Flag"/>; a text value is <see cref="CommandLineOption.Text"/>,
+/// which refuses an empty value as blank; a numeric value is <see cref="CommandLineOption.Value"/>
+/// with an applier built on <see cref="CommandLineNumber"/>, which refuses an empty value as not
+/// a proper number. The parser never refuses a value itself. Long
+/// names are matched exactly and case-sensitively, as curl 8.21.0 does: <c>--sil</c> and
+/// <c>--Silent</c> are both unknown (checked against the local curl 8.21.0 on 2026-09-26;
+/// option list per <see href="https://curl.se/docs/manpage.html"/>). Each long name and
+/// each short letter must appear in at most one row.
+/// </remarks>
+public static class CommandLineOptionTable
+{
+    private static readonly CommandLineOption[] RowsInTableOrder =
+    [
+        CommandLineOption.Text("url", null, (options, url) => options.AddUrl(url)),
+        CommandLineOption.Flag("silent", 's', options => options.Silent = true),
+        CommandLineOption.Flag("show-error", 'S', options => options.ShowError = true),
+        CommandLineOption.Text("output", 'o', (options, file) => options.AddOutputFile(file)),
+    ];
+
+    private static readonly FrozenDictionary<string, CommandLineOption> RowsByLongName =
+        RowsInTableOrder.ToFrozenDictionary(option => option.LongName, StringComparer.Ordinal);
+
+    private static readonly FrozenDictionary<char, CommandLineOption> RowsByShortName =
+        RowsInTableOrder.Where(option => option.ShortName.HasValue).ToFrozenDictionary(option => option.ShortName!.Value);
+
+    /// <summary>
+    /// Every row of the table, in table order. These are the option definitions, not the
+    /// parsed settings; those are <see cref="CommandLineOptions"/>.
+    /// </summary>
+    public static IReadOnlyList<CommandLineOption> Rows => RowsInTableOrder;
+
+    /// <summary>Finds the row whose long name is exactly <paramref name="longName"/>; no prefix matching.</summary>
+    /// <param name="longName">The name without its leading <c>--</c> and without any <c>=value</c>.</param>
+    /// <param name="option">The row found; <see langword="null"/> when there is none.</param>
+    /// <returns><see langword="true"/> when a row was found.</returns>
+    internal static bool TryFindLong(string longName, [NotNullWhen(true)] out CommandLineOption? option) =>
+        RowsByLongName.TryGetValue(longName, out option);
+
+    /// <summary>Finds the row whose short letter is <paramref name="shortName"/>, case-sensitively.</summary>
+    /// <param name="shortName">The letter after <c>-</c>, or one letter of a bundle.</param>
+    /// <param name="option">The row found; <see langword="null"/> when there is none.</param>
+    /// <returns><see langword="true"/> when a row was found.</returns>
+    internal static bool TryFindShort(char shortName, [NotNullWhen(true)] out CommandLineOption? option) =>
+        RowsByShortName.TryGetValue(shortName, out option);
+}
