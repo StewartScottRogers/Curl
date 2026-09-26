@@ -40,6 +40,14 @@ namespace Curl.Console;
 /// line is wrapped by <see cref="WarningLineWrapper" /> before it is written; curl's default
 /// of 79 when not given.
 /// </param>
+/// <param name="writesProgressMeter">
+/// Whether this runner writes curl's progress meter at all; the composition passes
+/// <see langword="true" />. See <see cref="ShowsProgressMeter" /> for when it is shown.
+/// </param>
+/// <param name="standardOutputIsTerminal">
+/// Whether standard output is a terminal, where curl hides the meter of a transfer with no
+/// <c>-o</c>.
+/// </param>
 /// <remarks>
 /// <para>
 /// URLs are transferred in command-line order; a failure does not stop the rest, and the
@@ -72,6 +80,13 @@ namespace Curl.Console;
 /// opened prints curl's <c>curl: Failed to open &lt;file&gt;</c>, under the same <c>-s</c> /
 /// <c>-S</c> rule as any failure, and stops the run with exit 23.
 /// </para>
+/// <para>
+/// A successful transfer is followed on standard error by the opening of curl's progress
+/// meter (<see cref="ProgressMeterLines.Opening" />), preceded by curl's
+/// <c>** Resuming transfer from byte position N</c> line when it resumed past byte zero.
+/// The meter is on standard error and the body is not, so writing it after the transfer
+/// leaves the bytes of each stream as curl's.
+/// </para>
 /// </remarks>
 internal sealed class CurlCommandRunner(
     Func<CommandLineOptions, ProtocolDispatcher> createDispatcher,
@@ -80,7 +95,9 @@ internal sealed class CurlCommandRunner(
     Stream standardError,
     Stream standardInput,
     bool runsOnWindows,
-    int terminalColumns = TerminalColumns.Default)
+    int terminalColumns = TerminalColumns.Default,
+    bool writesProgressMeter = false,
+    bool standardOutputIsTerminal = false)
 {
     /// <summary>
     /// curl 8.21.0's message for a URL that cannot be parsed at all, measured on
@@ -367,17 +384,61 @@ internal sealed class CurlCommandRunner(
         {
             TransferContext context = CreateContext(
                 options, uri, deferringStandardOutput, range, options.ResumeFrom, headerOutput);
+            TransferResult standardOutputResult =
+                await TransferToStandardOutputAsync(dispatcher, context).ConfigureAwait(false);
 
-            return await TransferToStandardOutputAsync(dispatcher, context).ConfigureAwait(false);
+            return await WriteProgressMeterAsync(options, standardOutputResult, options.ResumeFrom, toStandardOutput: true)
+                .ConfigureAwait(false);
         }
 
         string outputFileName = runsOnWindows ? WindowsOutputFileNameSanitizer.Sanitize(outputFile) : outputFile;
         long? resumeFrom = await ResolveResumeFromAsync(options, outputFileName).ConfigureAwait(false);
-
-        return await TransferToOutputFileAsync(
+        TransferResult fileResult = await TransferToOutputFileAsync(
                 dispatcher, options, uri, outputFileName, range, resumeFrom, headerOutput)
             .ConfigureAwait(false);
+
+        return await WriteProgressMeterAsync(options, fileResult, resumeFrom, toStandardOutput: false)
+            .ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Writes the opening of curl's progress meter for a finished transfer, when
+    /// <see cref="ShowsProgressMeter" /> says it is shown.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="result">The transfer's result; the meter follows only a success.</param>
+    /// <param name="resumeFrom">The resolved <c>-C</c> offset, or <see langword="null" />.</param>
+    /// <param name="toStandardOutput">Whether the transfer wrote its body to standard output.</param>
+    /// <returns><paramref name="result" />, unchanged.</returns>
+    private async Task<TransferResult> WriteProgressMeterAsync(
+        CommandLineOptions options,
+        TransferResult result,
+        long? resumeFrom,
+        bool toStandardOutput)
+    {
+        if (result.IsSuccess && ShowsProgressMeter(options, toStandardOutput))
+        {
+            await WriteErrorLinesAsync(ProgressMeterLines.Opening(resumeFrom)).ConfigureAwait(false);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Tells whether a transfer's progress meter is shown: only when this runner writes it,
+    /// never under <c>-s</c> or <c>--no-progress-meter</c>, never under <c>-#</c> (whose bar
+    /// form is not modelled), and not for a body written to standard output when that is a
+    /// terminal, as curl 8.21.0 does.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="toStandardOutput">Whether the transfer wrote its body to standard output.</param>
+    /// <returns><see langword="true" /> when the meter is shown.</returns>
+    private bool ShowsProgressMeter(CommandLineOptions options, bool toStandardOutput) =>
+        writesProgressMeter
+        && !options.Silent
+        && !options.ProgressMeterOff
+        && !options.ProgressBar
+        && !(toStandardOutput && standardOutputIsTerminal);
 
     /// <summary>
     /// Parses the <c>-r</c> / <c>--range</c> text, when there is any.

@@ -79,8 +79,16 @@ internal static class CurlComposition
     /// <param name="standardOutput">Where a transfer without <c>-o</c> writes its bytes.</param>
     /// <param name="standardError">Where the <c>curl: (N) message</c> lines go.</param>
     /// <param name="standardInput">What a <c>telnet</c> transfer sends to the server.</param>
-    /// <returns>The runner.</returns>
-    internal static CurlCommandRunner CreateRunner(Stream standardOutput, Stream standardError, Stream standardInput) =>
+    /// <param name="standardOutputIsTerminal">
+    /// Whether standard output is a terminal, where the progress meter of a transfer with no
+    /// <c>-o</c> is hidden, as curl hides it.
+    /// </param>
+    /// <returns>The runner, which writes curl's progress meter.</returns>
+    internal static CurlCommandRunner CreateRunner(
+        Stream standardOutput,
+        Stream standardError,
+        Stream standardInput,
+        bool standardOutputIsTerminal) =>
         new(
             options => CreateDispatcher(CreateTransports(options)),
             new PhysicalFileSystem(),
@@ -88,7 +96,9 @@ internal static class CurlComposition
             standardError,
             standardInput,
             OperatingSystem.IsWindows(),
-            TerminalColumns.Resolve());
+            TerminalColumns.Resolve(),
+            writesProgressMeter: true,
+            standardOutputIsTerminal);
 
     /// <summary>
     /// Creates the runner with the production handler set built around the given

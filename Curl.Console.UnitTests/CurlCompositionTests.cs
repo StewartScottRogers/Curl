@@ -108,12 +108,40 @@ public sealed class CurlCompositionTests
             using MemoryStream standardError = new();
             using MemoryStream standardInput = new();
 
-            int exitCode = await CurlComposition.CreateRunner(standardOutput, standardError, standardInput)
+            int exitCode = await CurlComposition
+                .CreateRunner(standardOutput, standardError, standardInput, standardOutputIsTerminal: true)
                 .RunAsync([new Uri(path).AbsoluteUri]);
 
             Assert.AreEqual(0, exitCode);
             CollectionAssert.AreEqual(content, standardOutput.ToArray());
             Assert.AreEqual(0, standardError.Length);
+        }
+        finally
+        {
+            System.IO.File.Delete(path);
+        }
+    }
+
+    [TestMethod]
+    public async Task CreateRunner_FileUrlToStandardOutputThatIsNotATerminal_WritesTheProgressMeter()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"curl-bl102-{Guid.NewGuid():N}.bin");
+        await System.IO.File.WriteAllBytesAsync(path, [1, 2, 3]);
+
+        try
+        {
+            using MemoryStream standardOutput = new();
+            using MemoryStream standardError = new();
+            using MemoryStream standardInput = new();
+
+            int exitCode = await CurlComposition
+                .CreateRunner(standardOutput, standardError, standardInput, standardOutputIsTerminal: false)
+                .RunAsync([new Uri(path).AbsoluteUri]);
+
+            Assert.AreEqual(0, exitCode);
+            Assert.AreEqual(
+                string.Concat(ProgressMeterLines.Opening(null).Select(line => line + Environment.NewLine)),
+                Encoding.UTF8.GetString(standardError.ToArray()));
         }
         finally
         {

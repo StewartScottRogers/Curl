@@ -33,6 +33,13 @@ that resumes past byte zero opens that file for appending before it starts, as c
 and one that cannot be opened prints `curl: Failed to open <file>` and stops the run with
 exit 23.
 
+After each successful transfer, standard error gets the opening of curl's progress meter
+(`ProgressMeterLines`): `** Resuming transfer from byte position N` when it resumed past
+byte zero, the two header lines, and the all-zero status line - every byte curl 8.21.0
+writes for a `file://` transfer. It is not written under `-s`, `--no-progress-meter` or
+`-#`, nor for a body on standard output when that is a terminal. Live counters, the bar
+form and the meter after a failed transfer are not modelled yet (BL-130 to BL-132).
+
 A URL with no `-o` writes through `StandardOutputFailureDeferringStream`, which
 models curl's 4096-byte stdio buffer: a failed standard output is reported as
 `curl: Failed writing body` (exit 23) while the body fits the buffer, and as the
