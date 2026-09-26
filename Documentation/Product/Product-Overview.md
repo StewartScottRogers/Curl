@@ -286,7 +286,7 @@ projects before anything works is a liability, not a head start.
 | --- | --- | --- |
 | 1 | ~~Is GPL-3.0 intentional, or should this relicense to MIT/Apache-2.0 before release?~~ **Answered:** relicensed to MIT, see [ADR-0012](../Planning/Decisions/ADR-0012-relicense-from-gpl-3-0-to-mit.md). | First public release |
 | 2 | Are Linux and macOS release requirements, or is this Windows-first? | Phase 1 CI design |
-| 3 | How is curl's test suite driven from .NET — port the harness, or run upstream's Perl `runtests.pl` against our binary? | Phase 1 conformance work |
+| 3 | ~~How is curl's test suite driven from .NET — port the harness, or run upstream's Perl `runtests.pl` against our binary?~~ **Answered:** ported to data-driven MSTest cases run in process, no Perl, see [ADR-0013](../Planning/Decisions/ADR-0013-upstream-test-cases-run-as-data-driven-mstest.md). | Phase 1 conformance work |
 | 4 | Is a managed NuGet API a deliverable, or is the CLI the only product? | Public API surface |
 | 5 | HTTP/2 and HTTP/3: BCL framing, or implemented over the seam like everything else? | Phases 1 and 6 |
 
