@@ -80,3 +80,4 @@ There is no `no URL specified` line.
 - 2026-09-26: Backlog -> Doing.
 - 2026-09-26: Doing -> Blocked. touches must add Curl.Console.UnitTests: CurlCommandRunnerTests.RunAsync_EmptyCommandLine_TransfersNothingAndReturns0 pins exit 0 for an empty command line and must expect exit 2 plus the try-help line; re-plan
 - 2026-09-26: Blocked -> Backlog. Re-planned: touches adds Curl.Console.UnitTests; criteria name the two parser pins and the console test that must expect exit 2 plus the try-help line.
+- 2026-09-26: Backlog -> Doing.
