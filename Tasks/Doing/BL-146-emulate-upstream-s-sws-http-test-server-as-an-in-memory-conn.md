@@ -48,3 +48,4 @@ HTTP test server, answering from a test case's `<reply>` and recording every byt
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
