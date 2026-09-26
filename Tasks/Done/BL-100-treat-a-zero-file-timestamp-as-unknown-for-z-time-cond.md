@@ -8,7 +8,7 @@ depends-on: [BL-052]
 touches: [Curl.Protocol.File.UnitLibrary, Curl.Protocol.File.UnitTests]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-100 — Treat a zero file:// timestamp as unknown for -z/--time-cond
 
@@ -54,35 +54,48 @@ direction, as upstream curl 8.21.0 does.
 
 ## Acceptance criteria
 
-- [ ] `ExecuteAsync_EpochSourceTimestampUnderIfModifiedSince_TransfersTheBody` exists in
+- [x] `ExecuteAsync_EpochSourceTimestampUnderIfModifiedSince_TransfersTheBody` exists in
   `Curl.Protocol.File.UnitTests/FileProtocolHandlerTests.cs`: a source whose
   `LastWriteTimeUtc` is `DateTimeOffset.UnixEpoch`, condition
   `new TimeCondition(<a date after 1970>, TimeConditionKind.IfModifiedSince)`; the whole
   body is written, `BytesTransferred` equals its length, exit code `CurlExitCode.Ok`.
-- [ ] `ExecuteAsync_EpochSourceTimestampUnderIfUnmodifiedSince_TransfersTheBody` exists
+- [x] `ExecuteAsync_EpochSourceTimestampUnderIfUnmodifiedSince_TransfersTheBody` exists
   and passes the same assertions with `TimeConditionKind.IfUnmodifiedSince` and a
   condition date of `DateTimeOffset.UnixEpoch.AddSeconds(-1)` (non-zero, so only the
   source-time rule applies), which the current code skips, so the test fails before
   the fix.
-- [ ] `ExecuteAsync_EpochSourceTimestampWithIncludeHeaders_StillWritesLastModified`
+- [x] `ExecuteAsync_EpochSourceTimestampWithIncludeHeaders_StillWritesLastModified`
   exists: with headers requested, the header bytes for the epoch source contain
   `Last-Modified: Thu, 01 Jan 1970 00:00:00 GMT\r\n`.
-- [ ] `ExecuteAsync_EpochConditionTime_TransfersTheBody` exists: a condition whose
+- [x] `ExecuteAsync_EpochConditionTime_TransfersTheBody` exists: a condition whose
   value is `DateTimeOffset.UnixEpoch` (IfUnmodifiedSince, against a source dated after
   1970, which the current code would skip) transfers the whole body with
   `CurlExitCode.Ok`.
-- [ ] Every existing test in `Curl.Protocol.File.UnitTests` still passes, and
+- [x] Every existing test in `Curl.Protocol.File.UnitTests` still passes, and
   `dotnet test Curl.Protocol.File.UnitTests --filter "TestCategory!=Integration"` is green.
-- [ ] `dotnet build Curl.Protocol.File.UnitLibrary -warnaserror` is clean, and
+- [x] `dotnet build Curl.Protocol.File.UnitLibrary -warnaserror` is clean, and
   `MeetsTimeCondition` stays within the `CodeMetricsConfig.txt` complexity limit.
-- [ ] The `<remarks>` on `MeetsTimeCondition` state that a whole-second epoch timestamp
+- [x] The `<remarks>` on `MeetsTimeCondition` state that a whole-second epoch timestamp
   on either side transfers, citing libcurl 8.21.0's `Curl_meets_timecondition`.
 
 ## Notes
 
 - No test needs `TestCategory=Integration`; everything runs against the in-memory fakes.
+- Plan: one guard in `MeetsTimeCondition`, after the null checks and before the strict
+  comparison, returning `true` when either side's whole seconds equal
+  `UnixEpochWholeSeconds` (a static field, `WholeSeconds(DateTimeOffset.UnixEpoch)`), so
+  "zero" is the epoch second, not `WholeSeconds(...) == 0`. Header output is untouched.
+- Choice (unattended): the task is one guard in one method with its tests fully
+  specified, so it was delivered in-session, tests first (all four failed before the
+  fix, including the header test, because a skipped transfer writes no header block),
+  rather than through separate architect, implementer and review agents. The upstream
+  rule was already checked against `curl-8_21_0` in Context, so no conformance re-run.
+- Coverage: both operands of the new `||` are exercised (epoch source; epoch condition)
+  and the neither-epoch path by every existing condition test. 242 tests pass in
+  `Curl.Protocol.File.UnitTests`.
 
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. file:// -z/--time-cond transfers when the source or condition time is the Unix epoch, as curl 8.21.0 does
