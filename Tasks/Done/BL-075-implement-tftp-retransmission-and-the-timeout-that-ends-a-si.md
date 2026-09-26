@@ -8,7 +8,7 @@ depends-on: [BL-045, BL-123]
 touches: [Curl.Protocol.Tftp.UnitLibrary, Curl.Protocol.Tftp.UnitTests]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-075 — Implement TFTP retransmission and the timeout that ends a silent transfer
 
@@ -51,39 +51,39 @@ re-acknowledged and a datagram from a stranger ends the transfer with exit 56.
 
 ## Acceptance criteria
 
-- [ ] Silent server, `ConnectTimeout` and `MaxTime` both `null`: a test asserts the RRQ
+- [x] Silent server, `ConnectTimeout` and `MaxTime` both `null`: a test asserts the RRQ
       (`tsize 0`, `blksize 512`, `timeout 6`) is sent 50 times, byte-identical and from
       the same channel, 7 s apart on the fake clock, and that once the 50th interval
       elapses (t = 350 s) the transfer ends with `CurlExitCode.CouldntConnect` (7) and
       `Could not connect to server`.
-- [ ] Silent server, `ConnectTimeout = 10 s`: a test asserts the RRQ carries `timeout 3`,
+- [x] Silent server, `ConnectTimeout = 10 s`: a test asserts the RRQ carries `timeout 3`,
       is sent 3 times 4 s apart (t = 0, 4, 8), and the transfer ends at t = 12 s with
       `CurlExitCode.CouldntConnect` (7) and `Could not connect to server`.
-- [ ] Server that answers with one full DATA block 1 from a new port and then falls
+- [x] Server that answers with one full DATA block 1 from a new port and then falls
       silent, `ConnectTimeout = 10 s`: a test asserts ACK 1 is sent at once and re-sent
       3 times, 6 s apart, to the transfer endpoint (not the initial server port), and the
       transfer ends one interval after the third re-send (t = 24 s by the rules in Notes;
       measured about 25 s wall-clock) with `CurlExitCode.OperationTimedOut` (28) and
       `Timeout was reached`.
-- [ ] Duplicate DATA block: a test asserts a repeated DATA 1 is answered with ACK 1 again
+- [x] Duplicate DATA block: a test asserts a repeated DATA 1 is answered with ACK 1 again
       to the transfer endpoint, its payload is not written a second time, and the transfer
       then completes with exit 0 and the correct byte count.
-- [ ] Datagram from an unknown endpoint (DATA 2 from a second port after DATA 1 from the
+- [x] Datagram from an unknown endpoint (DATA 2 from a second port after DATA 1 from the
       transfer port): a test asserts nothing is sent to the stranger and the transfer ends
       at once with `CurlExitCode.RecvError` (56) and `Data received from another address`,
       reporting the bytes already written.
-- [ ] `MaxTime`: `Notes` records, measured with curl 8.21.0 as `curl -m 5
+- [x] `MaxTime`: `Notes` records, measured with curl 8.21.0 as `curl -m 5
       tftp://127.0.0.1:<port>/file.txt` against a silent server, the RRQ `timeout` option,
       the resend times, and the exit code and message it ends with; a test with
       `MaxTime = 5 s` asserts the same. If curl's result cannot be reproduced, stop and
       file a Stewart decision task instead of diverging.
-- [ ] No test uses `Thread.Sleep`, `Task.Delay` on the real clock, or
+- [x] No test uses `Thread.Sleep`, `Task.Delay` on the real clock, or
       `TestCategory=Integration`; every wait in `TftpDownload` goes through
       `ITransferContext.TimeProvider`.
-- [ ] `dotnet build Curl.Protocol.Tftp.UnitLibrary -warnaserror` and
+- [x] `dotnet build Curl.Protocol.Tftp.UnitLibrary -warnaserror` and
       `dotnet build Curl.Protocol.Tftp.UnitTests -warnaserror` are clean, and
       `dotnet test --filter "TestCategory!=Integration"` is green.
-- [ ] `Curl.Protocol.Tftp.UnitLibrary` has 100% line and 100% branch coverage.
+- [x] `Curl.Protocol.Tftp.UnitLibrary` has 100% line and 100% branch coverage.
 
 ## Notes
 
@@ -150,6 +150,42 @@ corrected to the measurements above: exit 7 when the RRQ goes unanswered, exit 2
 the data phase, and exit 56 (not ERROR 5 and carry on) for a stranger. The one behaviour
 not yet measured, `--max-time`, has its own measure-then-match criterion.
 
+### Measured `--max-time` with curl 8.21.0 (2026-09-26, lane 1)
+
+`curl -m 5 tftp://127.0.0.1:<port>/file.txt` against a silent loopback Python UDP server:
+RRQ carries `timeout 1` (`tsize 0`, `blksize 512`); three byte-identical RRQs from one
+source port at t = 0, 2.01, 4.04 s; then exit **28** with
+`curl: (28) Operation timed out after 5008 milliseconds with 0 bytes received` at 5.1 s.
+This is the rules above with 5 s left (retry_max 3, retry_time 1, interval 2 s) plus the
+generic max-time check; the test on the fake clock asserts
+`Operation timed out after 5000 milliseconds with 0 bytes received` at t = 5 s.
+
+### Delivered 2026-09-26 (lane 1)
+
+- `TftpRetrySchedule` derives `RetryLimit`/`RetrySeconds` from the time left; the RRQ's
+  `timeout` option is `RetrySeconds`. `TftpDownload` waits with a
+  `CancellationTokenSource(delay, TimeProvider)` linked to the transfer token, until the
+  next re-send or `MaxTime`, whichever is sooner. The start timestamp is taken in
+  `TftpProtocolHandler.ExecuteAsync` before the channel opens, since curl counts
+  `--max-time` from the start of the transfer.
+- Tests: `TftpRetransmissionTests` (10 tests) on the new fakes `ManualTimeProvider` and
+  `FallsSilentDatagramChannel`. Tftp tests 51 -> 61; library at 100% line and branch.
+- Choices taken (sensible defaults, no Stewart decision needed):
+  - `ConnectTimeout` or `MaxTime` of zero or less means no limit, as curl treats
+    `--connect-timeout 0` and `-m 0`.
+  - A repeated last block is re-ACKed and restarts the resend wait (curl sets `rx_time`)
+    but does not reset the retry count; a short repeat ends the transfer as curl's
+    `TFTP_STATE_FIN` check does.
+  - The first datagram of any kind, even one too short to parse, pins the server
+    endpoint, because curl pins in `recvfrom` before reading the packet.
+  - `MaxTime` in the data phase re-derives the schedule from what it leaves (20 s left
+    gives 4 retries 6 s apart); a test pins it. Time left of an hour or more uses 15 s.
+  - The MaxTime message always uses the `with N bytes received` form; curl's
+    `with N out of M bytes received` form (when a size is known) does not arise because
+    the download does not read `tsize` from an OACK.
+  - Upload is unchanged: its write request still sends `timeout 6` and it does not
+    re-send. Filed as BL-127.
+
 ## Log
 
 - 2026-09-26: Created.
@@ -159,3 +195,4 @@ not yet measured, `--max-time`, has its own measure-then-match criterion.
 - 2026-09-26: Doing -> Blocked. Needs --connect-timeout (and --max-time) on ITransferContext in Curl.Protocol.Abstractions.UnitLibrary plus CLI wiring, outside touches; criteria 2 and 5 also contradict measured curl (exit 7, and exit 56 on a stranger). Re-plan; see Notes.
 - 2026-09-26: Blocked -> Backlog. Re-planned: contract prerequisite split out as BL-123 (now a dependency); criteria corrected to measured curl 8.21.0 (exit 7 unanswered RRQ, 28 data-phase silence, 56 stranger) plus a measure-then-match --max-time criterion.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. TFTP download re-sends to a silent server on curl 8.21.0's schedule and ends with exit 7, 28 or 56 as curl does; --max-time measured and matched
