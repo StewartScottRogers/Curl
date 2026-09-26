@@ -39,10 +39,27 @@ public interface ITransferContext
     /// </summary>
     /// <remarks>
     /// curl accepts a comma-separated list but honours only the first range for
-    /// <c>file://</c>; the command-line layer reduces the list, so a handler sees at most
-    /// one <see cref="Abstractions.ByteRange" />.
+    /// <c>file://</c>. The range text is for parsing once, before any handler runs, by
+    /// <c>ByteRangeParser</c> in <c>Curl.Core.UnitLibrary</c>, which also answers text that
+    /// names no range with exit 33 (<see cref="CurlExitCode.RangeError" />); so a handler
+    /// sees at most one <see cref="Abstractions.ByteRange" />, already validated. <c>Curl.Console</c>
+    /// does not call it yet (task BL-090).
     /// </remarks>
     ByteRange? Range { get; }
+
+    /// <summary>
+    /// Gets the largest body, in bytes, that <c>--max-filesize</c> allows a download to
+    /// deliver, or <see langword="null" /> when no limit was given.
+    /// </summary>
+    /// <remarks>
+    /// Zero also means no limit, as it does to curl. Measured on curl 8.21.0 over
+    /// <c>file://</c>, a download with more body bytes than this writes exactly this many,
+    /// then fails with exit 63 (<see cref="CurlExitCode.FilesizeExceeded" />); the limit
+    /// counts body bytes only, so headers written to <see cref="HeaderOutput" /> do not use
+    /// it up, and an upload ignores it. <c>file://</c> enforces it; the other handlers do not
+    /// read it yet.
+    /// </remarks>
+    long? MaxFileSize { get; }
 
     /// <summary>
     /// Gets a value indicating whether only metadata was asked for, per

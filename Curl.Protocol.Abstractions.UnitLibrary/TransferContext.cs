@@ -30,6 +30,9 @@ public sealed class TransferContext : ITransferContext
     public ByteRange? Range { get; init; }
 
     /// <inheritdoc />
+    public long? MaxFileSize { get; init; }
+
+    /// <inheritdoc />
     public bool NoBody { get; init; }
 
     /// <inheritdoc />

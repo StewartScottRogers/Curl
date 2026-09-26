@@ -18,7 +18,9 @@ namespace Curl.Protocol.File;
 /// nothing written, headers included), write the pseudo-headers, return early for
 /// <c>-I</c>/<c>--head</c>, resolve <c>-r</c>/<c>--range</c> or
 /// <c>-C</c>/<c>--continue-at</c> into a window of the file — so a resume failure comes
-/// after the headers — then move the body in 16-kilobyte chunks. An upload under
+/// after the headers — then move the body in 16-kilobyte chunks, writing no more than
+/// <see cref="ITransferContext.MaxFileSize" /> allows and failing with exit 63 when there is
+/// more. An upload under
 /// <c>--crlf</c> (<see cref="ITransferContext.ConvertLineEndings" />) converts each chunk
 /// on the way to the destination; a download never does. The destination is opened with
 /// <see cref="ITransferContext.CreateFileMode" />, curl's <c>--create-file-mode</c>, as the
@@ -87,9 +89,9 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     /// file system call, as exit 36 (<see cref="CurlExitCode.BadDownloadResume" />) with
     /// the same message as a resume offset past the end of the file. It is a returned
     /// failure rather than an <see cref="ArgumentOutOfRangeException" />, unlike the guards
-    /// on <see cref="ByteRange" />: the command line layer that will normally reject a
-    /// malformed <c>-C</c> value is not written yet, and a bad option should end a transfer
-    /// rather than the process. Checking it once, up here, is also what keeps a download and
+    /// on <see cref="ByteRange" />: the command line refuses a negative <c>-C</c> with exit 2
+    /// before any transfer, so this branch only answers a context built by hand, and a bad
+    /// option should end a transfer rather than the process (whether to keep it is task BL-027). Checking it once, up here, is also what keeps a download and
     /// an upload answering it identically, since below this point the two paths share
     /// nothing.
     /// </remarks>
@@ -223,6 +225,7 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
                 source,
                 context.Output,
                 count,
+                context.MaxFileSize is > 0 and long maxFileSize ? maxFileSize : long.MaxValue,
                 static chunk => chunk,
                 FileTransferMessages.OutputWriteFailed,
                 context.CancellationToken)
@@ -303,6 +306,7 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
                 upload,
                 destination,
                 long.MaxValue,
+                long.MaxValue,
                 convertChunk,
                 static _ => FileTransferMessages.DestinationWriteFailed,
                 context.CancellationToken)
@@ -319,6 +323,11 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     /// How many bytes at most to read, or <see cref="long.MaxValue" /> to run to the end of
     /// <paramref name="source" />.
     /// </param>
+    /// <param name="maxWritten">
+    /// How many bytes at most to write, <c>--max-filesize</c>, or <see cref="long.MaxValue" />
+    /// for no limit. A chunk that would pass it is written only up to it, and the copy then
+    /// fails with exit 63, as curl 8.21.0 does.
+    /// </param>
     /// <param name="convertChunk">
     /// Turns each chunk read into the chunk written: the chunk itself, or its
     /// <c>--crlf</c> conversion on an upload.
@@ -330,12 +339,14 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     /// <returns>
     /// A success carrying the number of bytes written, which after a <c>--crlf</c>
     /// conversion is more than were read, as curl 8.21.0's <c>size_upload</c> is; exit 26
-    /// for a failed read or exit 23 for a failed write.
+    /// for a failed read, exit 23 for a failed write, or exit 63 carrying the bytes written
+    /// when there was more to write than <paramref name="maxWritten" />.
     /// </returns>
     private static async ValueTask<TransferResult> CopyAsync(
         Stream source,
         Stream destination,
         long count,
+        long maxWritten,
         Func<ReadOnlyMemory<byte>, ReadOnlyMemory<byte>> convertChunk,
         Func<long, string> writeErrorMessage,
         CancellationToken cancellationToken)
@@ -365,17 +376,25 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
             }
 
             ReadOnlyMemory<byte> chunk = convertChunk(buffer.AsMemory(0, read));
+            int allowed = (int)Math.Min(chunk.Length, maxWritten - transferred);
 
-            bool written = await TryWriteAsync(destination, chunk, cancellationToken)
-                .ConfigureAwait(false);
-
-            if (!written)
+            // At the limit exactly, the next chunk writes nothing at all, not an empty write.
+            if (allowed > 0
+                && !await TryWriteAsync(destination, chunk[..allowed], cancellationToken).ConfigureAwait(false))
             {
-                return TransferResult.Failure(CurlExitCode.WriteError, writeErrorMessage(chunk.Length));
+                return TransferResult.Failure(CurlExitCode.WriteError, writeErrorMessage(allowed));
             }
 
             consumed += read;
-            transferred += chunk.Length;
+            transferred += allowed;
+
+            if (allowed < chunk.Length)
+            {
+                return new TransferResult(
+                    CurlExitCode.FilesizeExceeded,
+                    transferred,
+                    FileTransferMessages.MaxFileSizeExceeded(maxWritten, transferred));
+            }
         }
 
         return TransferResult.Success(transferred);
@@ -608,8 +627,9 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     /// </param>
     /// <returns>
     /// <see langword="false" /> when the start is strictly past the end of the file, which
-    /// is exit 36. A start exactly equal to the length is a success sending nothing, and
-    /// <c>-C</c> wins over <c>-r</c> when a caller somehow supplies both. A negative
+    /// is exit 36. A start exactly equal to the length is a success sending nothing. The
+    /// command line refuses <c>-C</c> with <c>-r</c> (exit 2, as curl 8.21.0 does), so a
+    /// context carrying both never comes from it; built by hand, <c>-C</c> wins. A negative
     /// <see cref="ITransferContext.ResumeFrom" /> never arrives here: <see cref="ExecuteAsync" />
     /// has already refused it.
     /// </returns>

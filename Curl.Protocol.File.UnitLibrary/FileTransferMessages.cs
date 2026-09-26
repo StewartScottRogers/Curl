@@ -48,6 +48,21 @@ internal static class FileTransferMessages
         + " returned 0";
 
     /// <summary>
+    /// The exit 63 message for a download that delivered all <paramref name="maxFileSize" />
+    /// bytes <c>--max-filesize</c> allows and had more to deliver, measured against curl
+    /// 8.21.0: <c>Exceeded the maximum allowed file size (9) with 9 bytes</c>.
+    /// </summary>
+    /// <param name="maxFileSize">The limit.</param>
+    /// <param name="delivered">The body bytes written before the transfer stopped.</param>
+    /// <returns>The message.</returns>
+    internal static string MaxFileSizeExceeded(long maxFileSize, long delivered) =>
+        "Exceeded the maximum allowed file size ("
+        + maxFileSize.ToString(CultureInfo.InvariantCulture)
+        + ") with "
+        + delivered.ToString(CultureInfo.InvariantCulture)
+        + " bytes";
+
+    /// <summary>
     /// The exit 36 message for a resume offset or range start past the end of the file.
     /// </summary>
     internal const string ResumeFailed = "failed to resume file:// transfer";

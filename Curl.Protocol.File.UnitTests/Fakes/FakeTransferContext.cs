@@ -23,6 +23,9 @@ public sealed class FakeTransferContext : ITransferContext
     /// <inheritdoc cref="ITransferContext.Range" />
     public ByteRange? Range { get; set; }
 
+    /// <inheritdoc cref="ITransferContext.MaxFileSize" />
+    public long? MaxFileSize { get; set; }
+
     /// <inheritdoc cref="ITransferContext.NoBody" />
     public bool NoBody { get; set; }
 
