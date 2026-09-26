@@ -133,8 +133,8 @@ internal sealed class CurlCommandRunner(
     /// <summary>The <c>-D</c> value that sends the header lines to standard output.</summary>
     private const string StandardOutputHeaderFile = "-";
 
-    /// <summary>The one scheme whose transfer uploads standard input.</summary>
-    private const string TelnetScheme = "telnet";
+    /// <summary>Builds each transfer's context; gives a <c>telnet</c> transfer standard input.</summary>
+    private readonly TransferContextFactory transferContextFactory = new(standardInput);
 
     /// <summary>
     /// The result of a transfer whose write to standard output failed. It is compared by
@@ -189,43 +189,6 @@ internal sealed class CurlCommandRunner(
 
         return (int)exitCode;
     }
-
-    /// <summary>
-    /// Creates the context for one transfer, carrying every option a handler reads.
-    /// </summary>
-    /// <param name="options">The parsed command line.</param>
-    /// <param name="url">The URL to transfer.</param>
-    /// <param name="output">Where the transfer's bytes go.</param>
-    /// <param name="range">The parsed <c>-r</c> range, or <see langword="null" /> for the whole resource.</param>
-    /// <param name="resumeFrom">The <c>-C</c> offset, already resolved for <c>-C -</c>.</param>
-    /// <param name="headerOutput">Where the <c>-D</c> header lines go, or <see langword="null" /> without <c>-D</c>.</param>
-    /// <returns>The context.</returns>
-    private TransferContext CreateContext(
-        CommandLineOptions options,
-        Uri url,
-        Stream output,
-        ByteRange? range,
-        long? resumeFrom,
-        Stream? headerOutput) =>
-        new()
-        {
-            Url = url,
-            Output = output,
-            HeaderOutput = headerOutput,
-            Range = range,
-            ResumeFrom = resumeFrom,
-            MaxFileSize = options.MaxFileSize,
-            Upload = string.Equals(url.Scheme, TelnetScheme, StringComparison.Ordinal) ? standardInput : null,
-            PostData = options.PostData,
-            Credentials = options.Credentials,
-            TelnetOptions = options.TelnetOptions,
-            TftpBlockSize = options.TftpBlockSize,
-            TftpNoOptions = options.TftpNoOptions,
-            CreateFileMode = options.CreateFileMode ?? TransferContext.DefaultCreateFileMode,
-            ConnectTimeout = options.ConnectTimeout,
-            MaxTime = options.MaxTime,
-            TimeCondition = options.TimeCondition,
-        };
 
     /// <summary>
     /// Transfers every URL in order and reports each failure.
@@ -422,7 +385,7 @@ internal sealed class CurlCommandRunner(
 
         if (outputFile is null)
         {
-            TransferContext context = CreateContext(
+            TransferContext context = transferContextFactory.Create(
                 options, uri, deferringStandardOutput, range, options.ResumeFrom, headerOutput);
             TransferResult standardOutputResult =
                 await TransferToStandardOutputAsync(dispatcher, context).ConfigureAwait(false);
@@ -596,7 +559,7 @@ internal sealed class CurlCommandRunner(
                 return await ReportCannotOpenForResumeAsync(options, outputFile).ConfigureAwait(false);
             }
 
-            TransferContext context = CreateContext(options, uri, output, range, resumeFrom, headerOutput);
+            TransferContext context = transferContextFactory.Create(options, uri, output, range, resumeFrom, headerOutput);
             TransferResult fileResult = await dispatcher.DispatchAsync(context).ConfigureAwait(false);
             TransferResult completed = await output.CompleteAsync(fileResult).ConfigureAwait(false);
 

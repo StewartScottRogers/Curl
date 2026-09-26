@@ -24,7 +24,8 @@ On Windows each `-o` name is first rewritten by `WindowsOutputFileNameSanitizer`
 (`"*<>?|` and control characters become `_`, as curl 8.21.0 does), and that name is the
 one opened, sized for `-C -` and named in every message.
 
-Each transfer's context carries the parsed `-r` range (`ByteRangeParser`; text that names
+`TransferContextFactory` builds each transfer's context from the parsed options; the
+context carries the parsed `-r` range (`ByteRangeParser`; text that names
 no range ends the transfer with exit 33 before it is dispatched), the `-C` offset and the
 `--max-filesize` limit. `-C -` resumes from the size of the URL's `-o` file, and a transfer
 that resumes past byte zero opens that file for appending before it starts, as curl does.
