@@ -6,7 +6,8 @@ The tests of `Curl.Conformance.UnitLibrary`. It follows ADR-0013
 Today it holds `HarnessReferencesTests`, which pins that the harness library and
 `curl` (`Curl.Console`, the runner each case will go through) are both copied beside
 the tests, and `UpstreamTestCaseParserTests`, which drive the test-file parser from
-inline test-file text. What it is to hold in full, per ADR-0013:
+inline test-file text, and `UpstreamTestFileExpanderTests`, which pin variable
+substitution, `%if` evaluation and the inline instructions against upstream's `prepro`. What it is to hold in full, per ADR-0013:
 
 - the harness library's own tests;
 - upstream test data vendored under `UpstreamTestData/` from one pinned curl release,
