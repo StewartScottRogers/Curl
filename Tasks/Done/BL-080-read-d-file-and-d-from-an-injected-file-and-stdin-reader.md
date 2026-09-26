@@ -8,7 +8,7 @@ depends-on: [BL-038]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-080 — Read -d @file and -d @- from an injected file and stdin reader
 
@@ -67,22 +67,50 @@ Design constraints:
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Cli.UnitTests` shows `-d @body.txt`, with a fake reader returning
+- [x] A test in `Curl.Cli.UnitTests` shows `-d @body.txt`, with a fake reader returning
       bytes `61 0D 0A 62 0A 00 63` for `body.txt`, gives `PostData` bytes `61 62 63`.
-- [ ] A test shows `--data @-`, with a fake reader returning standard-input bytes
+- [x] A test shows `--data @-`, with a fake reader returning standard-input bytes
       `71 20 72 0A`, gives `PostData` bytes `71 20 72`.
-- [ ] A test shows `-d abc` (no `@`) never calls the reader and gives bytes `61 62 63`.
-- [ ] A test shows `-d @missing`, with a fake reader reporting the file cannot be opened,
+- [x] A test shows `-d abc` (no `@`) never calls the reader and gives bytes `61 62 63`.
+- [x] A test shows `-d @missing`, with a fake reader reporting the file cannot be opened,
       is refused with `CurlExitCode.ReadError` (26) and the three standard-error lines
       measured against local curl 8.21.0, written verbatim in the test.
-- [ ] No code in `Curl.Cli.UnitLibrary` other than the BCL-backed reader calls
+- [x] No code in `Curl.Cli.UnitLibrary` other than the BCL-backed reader calls
       `System.IO.File`, `FileStream` or `Console`.
-- [ ] `dotnet build Curl.Cli.UnitLibrary -warnaserror` is clean and
+- [x] `dotnet build Curl.Cli.UnitLibrary -warnaserror` is clean and
       `dotnet test Curl.Cli.UnitTests --filter "TestCategory!=Integration"` is green.
 
 ## Notes
+
+- Measured 2026-09-26 with `MSYS_NO_PATHCONV=1 /mingw64/bin/curl` 8.21.0: `-d @/nonexistent/zz`
+  prints `curl: Failed to open /nonexistent/zz`, `curl: option -d: error encountered when reading
+  a file` and the try-help line, exit 26. The option is named as typed: `--data`, `--data=@missing`,
+  `-d@missing`. `-d @` prints `curl: Failed to open ` (trailing space). `-s -d @missing` drops the
+  first line; `-s -S -d @missing` and `-d @missing -s` keep it, the same rule as
+  `ContinueAtExclusiveWithRange`, so `DataFileUnreadable` takes `errorsHidden`. A directory
+  (`-d @dd`) is `Failed to open dd`. `printf 'q r\n' | curl -G -d @-` requests `?q r`.
+- Entry point: BL-058 landed first, so its `Parse(arguments, pathExists, passwordPrompt)` was
+  extended to `Parse(arguments, pathExists, passwordPrompt, dataFileReader)` rather than adding a
+  fifth overload. `Parse(arguments)` and `Parse(arguments, pathExists)` keep working and use
+  `DiskDataFileReader.ForProcess`. `Curl.Console` calls only those two, so it needed no change.
+- The reader reaches the `data` row through a fifth `CommandLineOptionApplier` parameter
+  (`IDataFileReader dataFileReader`), beside `pathExists`, so the parser still special-cases no
+  option.
+- BL-057 has landed: a file-sourced piece joins with `&` like any other (`-d a -d@b` gives `a&b`).
+  `CommandLineOptions.AppendPostData` now joins bytes, and the string overload encodes and delegates.
+- `IDataFileReader.ReadStandardInput` returns bytes and has no failure result: curl reads stdin
+  with no "Failed to open" path, and an I/O failure there is left to throw (documented on the
+  interface and on `Parse`).
+- `DiskDataFileReader` takes `File.ReadAllBytes` and `Console.OpenStandardInput` through its
+  constructor, like `ConsolePasswordPrompt`, so every line and branch is covered without a disk:
+  measured 100% line and branch on the new and changed code. The only uncovered lines in the
+  library are older ones (`ConsolePasswordPrompt.ForProcessConsole`'s lambda, `UploadUrl` line 85).
+- `ConsolePasswordPrompt` (BL-058) also touches `Console`; it is the other BCL-backed seam, so the
+  "no `File`/`FileStream`/`Console`" criterion reads as "nothing but the seam implementations".
+- Reviewed by `code-reviewer`: no findings but a doc claim that `Parse` never throws, narrowed.
 
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. -d @file and -d @- read through an injected IDataFileReader with CR, LF and NUL removed; an unreadable file exits 26 with curl's lines
