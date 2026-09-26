@@ -8,7 +8,7 @@ depends-on: [BL-051]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-089 — Warn when a --cert, --key or --capath value looks like a flag
 
@@ -49,19 +49,37 @@ to do.
 
 ## Acceptance criteria
 
-- [ ] Tests in `Curl.Cli.UnitTests` parse `--cert -x URL`, `-E -x URL`, `--key -x URL`
+- [x] Tests in `Curl.Cli.UnitTests` parse `--cert -x URL`, `-E -x URL`, `--key -x URL`
       and `--capath -x URL`; each result is accepted and its `WarningLines` is exactly
       `["Warning: The filename argument '-x' looks like a flag."]`.
-- [ ] A test parses `--ciphers -x URL`; the result is accepted and `WarningLines` is empty.
-- [ ] The `--cacert -x` measurements (file absent, file present) are recorded in `Notes`
+- [x] A test parses `--ciphers -x URL`; the result is accepted and `WarningLines` is empty.
+- [x] The `--cacert -x` measurements (file absent, file present) are recorded in `Notes`
       with the curl version, and a test per case asserts the measured `WarningLines`
       and, when refused, the refusal lines and exit code 2.
-- [ ] `dotnet build Curl.Cli.UnitLibrary -warnaserror` is clean.
-- [ ] `dotnet test Curl.Cli.UnitTests --filter "TestCategory!=Integration"` is green.
+- [x] `dotnet build Curl.Cli.UnitLibrary -warnaserror` is clean.
+- [x] `dotnet test Curl.Cli.UnitTests --filter "TestCategory!=Integration"` is green.
 
 ## Notes
+
+- `--cacert -x` measured 2026-09-26 with the local `curl 8.21.0 (x86_64-w64-mingw32) libcurl/8.21.0 Schannel`,
+  in a scratch directory, `curl --cacert -x file:///C:/Windows/win.ini`:
+  - no file named `-x`: `Warning: The filename argument '-x' looks like a flag.` first, then
+    `curl: The file '-x' provided to --cacert does not exist`, `curl: option --cacert: is badly used here`,
+    the try-help line; exit 2. The warning comes before the refusal lines.
+  - empty file named `-x` present: the same warning, then the transfer runs; exit 0.
+- Implemented: `capath`, `cert` (`E`) and `key` rows are now `CommandLineOption.FileName`. The warning test
+  moved into `CommandLineOption.WarnWhenFileNameLooksLikeFlag` (internal), which `FileName` and
+  `SetCaCertificateFile` both call; `--cacert` calls it before the existence check, so a refused result
+  carries the warning in `WarningLines`.
+- Choice (no decision needed): `--cacert` respects `-s` read earlier, as every `FileName` row does, because
+  it shares the helper. `-s --cacert -x` was not measured against curl.
+- Delivered in-session rather than through the full `/feature` agent stages: the Context spelled out the
+  change row by row, and it is two small edits plus tests.
+- Tests: `CommandLineTlsOptionTests` gained 7 cases (4 data rows, ciphers, cacert present, cacert absent).
+  Curl.Cli.UnitTests 538 passed.
 
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. --cert/-E, --key, --capath and --cacert add curl 8.21.0's flag-like filename warning, --cacert before its missing-file refusal
