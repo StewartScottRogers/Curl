@@ -52,3 +52,10 @@ libcurl's `Curl_mime_prepare_headers` chooses them, files opened through `IFileS
 building so `Content-Length` is known, then streamed; an unopenable file is exit 26 before
 anything is sent. The text encoding and the boundary source are injected. It is not yet
 wired into `Curl.Console`.
+
+`Globbing\UrlGlob` is curl 8.21.0's URL globbing (ADR-0028): `TryParse` reads `{a,b}` sets
+and `[1-10]`, `[01-10]`, `[a-z:2]` ranges as `tool_urlglob.c` does, failing with exit 3 and
+curl's `<reason> in position N:` message, caret and all; `Unglobbed` is the URL under `-g`.
+`Expand()` yields each URL lazily, rightmost glob fastest, and `UrlGlobMatch.SubstituteGlobValues`
+replaces `#N` in an `-o` name. Windows name sanitizing is not done here (BL-277). It is not
+yet wired into `Curl.Console` (BL-240).
