@@ -1,5 +1,5 @@
 ---
-id: BL-251
+id: BL-256
 title: Share one curl date parser between Curl.Cli and Curl.Cookies
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-251 — Share one curl date parser between Curl.Cli and Curl.Cookies
+# BL-256 — Share one curl date parser between Curl.Cli and Curl.Cookies
 
 ## Goal
 
