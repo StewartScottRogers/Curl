@@ -29,6 +29,7 @@ completed:
 
 ## Notes
 
+- From BL-206 (ADR-0023): construct `new ProxySelector(Environment.GetEnvironmentVariable)` and call `TrySelect(url, -x text, --noproxy text, ...)`; its failure is the transfer's result. It takes no `-U`, `--proxy1.0` or `--socks*` input: `-U` replaces `ProxyEndpoint.Credential`, and the kind options are this task's to combine.
 - Plan item: W9 in the Phase 1 HTTP plan (2026-09-26); plan keys in this file were replaced by their task IDs.
 
 ## Log
