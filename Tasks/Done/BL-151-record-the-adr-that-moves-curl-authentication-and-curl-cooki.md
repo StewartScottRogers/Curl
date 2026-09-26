@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation/Planning/Decisions, Documentation/Product/Product-Overview.md, Documentation/Planning/Roadmap.md]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-151 — Record the ADR that moves Curl.Authentication and Curl.Cookies into Milestone 1
 
@@ -26,17 +26,19 @@ An Accepted ADR records that `Curl.Authentication` and `Curl.Cookies` are built 
 
 ## Acceptance criteria
 
-- [ ] A new ADR under `Documentation/Planning/Decisions/` with the next free number, status Accepted, titled for moving Authentication and Cookies into Milestone 1, states that it was decided by Claude under Stewart's delegation, and records the decision, the reasons and the alternatives rejected.
-- [ ] `Documentation/Planning/Decisions/README.md` lists the new ADR.
-- [ ] `Documentation/Product/Product-Overview.md`, "Phasing": Phase 1 lists `Authentication` and `Cookies`; Phase 2 no longer does; the row links the ADR.
-- [ ] `Documentation/Planning/Roadmap.md`, "Milestone 1": the opening paragraph and "Delivers" name `Curl.Authentication` and `Curl.Cookies`, citing the ADR.
+- [x] A new ADR under `Documentation/Planning/Decisions/` with the next free number, status Accepted, titled for moving Authentication and Cookies into Milestone 1, states that it was decided by Claude under Stewart's delegation, and records the decision, the reasons and the alternatives rejected.
+- [x] `Documentation/Planning/Decisions/README.md` lists the new ADR.
+- [x] `Documentation/Product/Product-Overview.md`, "Phasing": Phase 1 lists `Authentication` and `Cookies`; Phase 2 no longer does; the row links the ADR.
+- [x] `Documentation/Planning/Roadmap.md`, "Milestone 1": the opening paragraph and "Delivers" name `Curl.Authentication` and `Curl.Cookies`, citing the ADR.
 
 ## Notes
 
 - Record only; the decision is not reopened here.
 - Plan item: D1 in the Phase 1 HTTP plan (2026-09-26); plan keys in this file were replaced by their task IDs.
+- 2026-09-26: Recorded as ADR-0016 (next free number). Choice: the ADR scopes the move to what HTTP needs in Phase 1 (BL-216 to BL-223); NTLM, Negotiate and AWS SigV4 are explicitly not pulled forward, because no Phase 1 task names them. Delivered directly rather than through align-and-document: four Markdown edits, no code.
 
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. ADR-0016 records Authentication and Cookies in Milestone 1; Product Overview and Roadmap say so
