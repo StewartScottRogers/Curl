@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-106 — Cover the unexercised branch of TlsClientOptionsMapping.ToTlsMinimumVersion
 
@@ -45,21 +45,33 @@ at 100% branch coverage.
 
 ## Acceptance criteria
 
-- [ ] `Curl.Console.UnitTests/TlsClientOptionsMappingTests.cs` contains a test named
+- [x] `Curl.Console.UnitTests/TlsClientOptionsMappingTests.cs` contains a test named
   `ToTlsMinimumVersion_OtherNonNullVersion_MapsToSystemDefault` that passes a non-null
   `SslProtocols` value other than `Tls12` and `Tls13` (e.g. `SslProtocols.Tls11`) and
   asserts `TlsMinimumVersion.SystemDefault`.
-- [ ] The six existing tests in `TlsClientOptionsMappingTests` pass unchanged.
-- [ ] `dotnet build Curl.Console -warnaserror` and
+- [x] The six existing tests in `TlsClientOptionsMappingTests` pass unchanged.
+- [x] `dotnet build Curl.Console -warnaserror` and
   `dotnet build Curl.Console.UnitTests -warnaserror` are clean.
-- [ ] `dotnet test --filter "TestCategory!=Integration"` is green.
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1` reports
+- [x] `dotnet test --filter "TestCategory!=Integration"` is green.
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1` reports
   `TlsClientOptionsMapping` at 100% branch coverage (line 31 at 6 of 6 conditions), and
   `Curl.Console` introduces no new line or branch gap.
 
 ## Notes
 
+- Made `ToTlsMinimumVersion` `internal` with an XML doc comment, and tested it directly;
+  `FromCommandLine` and the mapping's behaviour are unchanged.
+- Test value is `SslProtocols.None`, not the suggested `Tls11`: `SslProtocols.Tls11` carries
+  `[Obsolete]` (SYSLIB0039), which warnings-as-errors turns into a build break. `None` is
+  non-null and neither Tls12 nor Tls13, so it takes the same `_` arm.
+- Coverage: the Cobertura report shows the switch (now line 43, after the doc comment) at
+  6/6 conditions and the `curl` package at line-rate 1, branch-rate 1.
+- `Measure-CodeQuality.ps1` does not print a Curl.Console row at all: the assembly is
+  `curl.dll`, and the script matches only the name `Curl.Console`. Verified from the raw
+  Cobertura file instead; filed as BL-109.
+
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. ToTlsMinimumVersion fully branch-covered; Curl.Console back at 100% branch coverage
