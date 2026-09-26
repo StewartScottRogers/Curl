@@ -43,6 +43,7 @@ choices do not need one.
 | [0026](ADR-0026-auth-scheme-and-proxy-options-parse-as-curls-tool-keeps-them.md) | The auth-scheme and proxy options parse as curl's tool keeps them: one scheme bit set, one proxy slot, an unknown proxy scheme fails the transfer with exit 7 | Accepted | 2026-09-26 |
 | [0027](ADR-0027-multipart-form-bodies-are-built-as-libcurl-8-21-0-builds-them.md) | Multipart form bodies are built as libcurl 8.21.0 builds them: measured headers and bytes, files streamed, exit 26 before connecting | Accepted | 2026-09-26 |
 | [0028](ADR-0028-auth-scheme-ranking-follows-libcurl-with-no-fallback.md) | The auth scheme is ranked as libcurl ranks it - Negotiate, Bearer, Digest, NTLM, Basic - with no fallback from a scheme not built | Accepted | 2026-09-26 |
+| [0029](ADR-0029-output-options-pair-with-urls-as-curls-tool-pairs-them.md) | The output options pair with URLs as curl's tool pairs them: one list of URL and output entries, `--remote-name-all` a creation-time default, `-w @file` read as `-d @file` is | Accepted | 2026-09-26 |
 
 ## Template
 
