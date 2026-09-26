@@ -33,3 +33,4 @@ Stewart asked for this before deciding BL-010 (2026-09-26). The cases, all measu
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
