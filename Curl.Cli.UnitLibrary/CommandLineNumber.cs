@@ -6,7 +6,7 @@ namespace Curl.Cli;
 /// Whitespace, a leading <c>+</c>, hexadecimal and fractions are refused.
 /// </summary>
 /// <remarks>
-/// No option in <see cref="CommandLineOptionTable"/> uses it yet. The refusals were checked
+/// <c>--tftp-blksize</c> in <see cref="CommandLineOptionTable"/> uses it. The refusals were checked
 /// against the local curl 8.21.0 on 2026-09-26: <c>--tftp-blksize abc</c> and
 /// <c>--tftp-blksize 99999999999</c> are "expected a proper numerical parameter",
 /// <c>--tftp-blksize -1</c> is "expected a positive numerical parameter", and

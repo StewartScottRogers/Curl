@@ -2,8 +2,10 @@ namespace Curl.Cli;
 
 /// <summary>
 /// Pins the option table the parser reads: every long name and every short letter
-/// appears once, and the first table holds <c>--url</c>, <c>-s</c>/<c>--silent</c>,
-/// <c>-S</c>/<c>--show-error</c> and <c>-o</c>/<c>--output</c> with the right arity,
+/// appears once, the table holds <c>--url</c>, <c>-s</c>/<c>--silent</c>,
+/// <c>-S</c>/<c>--show-error</c>, <c>-o</c>/<c>--output</c>, <c>-d</c>/<c>--data</c>,
+/// <c>-u</c>/<c>--user</c>, <c>-t</c>/<c>--telnet-option</c>, <c>--tftp-blksize</c> and
+/// <c>--tftp-no-options</c> with the right arity,
 /// and its two text options refuse an empty value as blank.
 /// </summary>
 [TestClass]
@@ -33,6 +35,11 @@ public sealed class CommandLineOptionTableTests
     [DataRow("silent", 's', false)]
     [DataRow("show-error", 'S', false)]
     [DataRow("output", 'o', true)]
+    [DataRow("data", 'd', true)]
+    [DataRow("user", 'u', true)]
+    [DataRow("telnet-option", 't', true)]
+    [DataRow("tftp-blksize", null, true)]
+    [DataRow("tftp-no-options", null, false)]
     public void Rows_FirstTableOption_HasItsShortNameAndArity(string longName, char? shortName, bool takesValue)
     {
         CommandLineOption option = CommandLineOptionTable.Rows.Single(row => row.LongName == longName);

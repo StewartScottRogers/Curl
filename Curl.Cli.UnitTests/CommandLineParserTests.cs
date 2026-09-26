@@ -195,10 +195,9 @@ public sealed class CommandLineParserTests
     [TestMethod]
     public void Parse_UnknownShortOption_Refuses()
     {
-        // Real curl's -t is --telnet-option; it is not in the first table, so it is unknown here.
-        CommandLineParseResult result = CommandLineParser.Parse(["-t"]);
+        CommandLineParseResult result = CommandLineParser.Parse(["-!"]);
 
-        AssertRefused(result, "curl: option -t: is unknown");
+        AssertRefused(result, "curl: option -!: is unknown");
     }
 
     [TestMethod]

@@ -26,6 +26,11 @@ public static class CommandLineOptionTable
         CommandLineOption.Flag("silent", 's', options => options.Silent = true),
         CommandLineOption.Flag("show-error", 'S', options => options.ShowError = true),
         CommandLineOption.Text("output", 'o', (options, file) => options.AddOutputFile(file)),
+        CommandLineOption.Value("data", 'd', AcceptingEmpty((options, data) => options.SetPostData(data))),
+        CommandLineOption.Value("user", 'u', AcceptingEmpty((options, user) => options.SetCredentials(user))),
+        CommandLineOption.Value("telnet-option", 't', AcceptingEmpty((options, telnetOption) => options.AddTelnetOption(telnetOption))),
+        CommandLineOption.Value("tftp-blksize", null, SetTftpBlockSize),
+        CommandLineOption.Flag("tftp-no-options", null, options => options.TftpNoOptions = true),
     ];
 
     private static readonly FrozenDictionary<string, CommandLineOption> RowsByLongName =
@@ -39,6 +44,28 @@ public static class CommandLineOptionTable
     /// parsed settings; those are <see cref="CommandLineOptions"/>.
     /// </summary>
     public static IReadOnlyList<CommandLineOption> Rows => RowsInTableOrder;
+
+    /// <summary>
+    /// Builds an applier that accepts any value, empty included, as curl 8.21.0 does for
+    /// <c>-d ''</c>, <c>-u ''</c> and <c>-t ''</c>, and passes it to <paramref name="set"/>.
+    /// </summary>
+    private static CommandLineOptionApplier AcceptingEmpty(Action<CommandLineOptions, string> set) =>
+        (options, value, _) =>
+        {
+            set(options, value);
+            return null;
+        };
+
+    private static CommandLineRefusal? SetTftpBlockSize(CommandLineOptions options, string value, string spelledOption)
+    {
+        CommandLineRefusal? refusal = CommandLineNumber.ParseNonNegative(spelledOption, value, out int blockSize);
+        if (refusal is null)
+        {
+            options.TftpBlockSize = blockSize;
+        }
+
+        return refusal;
+    }
 
     /// <summary>Finds the row whose long name is exactly <paramref name="longName"/>; no prefix matching.</summary>
     /// <param name="longName">The name without its leading <c>--</c> and without any <c>=value</c>.</param>
