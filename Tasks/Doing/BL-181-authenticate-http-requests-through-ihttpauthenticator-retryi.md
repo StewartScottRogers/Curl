@@ -37,3 +37,4 @@ The handler asks `IHttpAuthenticator` for an Authorization value, sends Basic up
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
