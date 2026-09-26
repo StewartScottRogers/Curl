@@ -9,7 +9,8 @@ namespace Curl.Console;
 /// <remarks>
 /// The reason is the text the Windows C runtime's <c>strerror</c> gives for the failed
 /// <c>fopen</c>, each measured with the local curl 8.21.0 on 2026-09-26. curl wraps a
-/// warning longer than its terminal width; that wrapping is not done here.
+/// warning longer than its terminal width; <see cref="CurlCommandRunner" /> wraps this line
+/// with <see cref="WarningLineWrapper" /> as it writes it.
 /// </remarks>
 internal static class OutputFileOpenWarning
 {

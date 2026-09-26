@@ -35,6 +35,11 @@ namespace Curl.Console;
 /// Whether the process runs on Windows, where each <c>-o</c> name is rewritten by
 /// <see cref="WindowsOutputFileNameSanitizer" /> before it is used, as curl 8.21.0 does.
 /// </param>
+/// <param name="terminalColumns">
+/// The terminal width, from <see cref="TerminalColumns" />, at which each <c>Warning: </c>
+/// line is wrapped by <see cref="WarningLineWrapper" /> before it is written; curl's default
+/// of 79 when not given.
+/// </param>
 /// <remarks>
 /// <para>
 /// URLs are transferred in command-line order; a failure does not stop the rest, and the
@@ -68,7 +73,8 @@ internal sealed class CurlCommandRunner(
     Stream standardOutput,
     Stream standardError,
     Stream standardInput,
-    bool runsOnWindows)
+    bool runsOnWindows,
+    int terminalColumns = TerminalColumns.Default)
 {
     /// <summary>
     /// curl 8.21.0's message for a URL that cannot be parsed at all, measured on
@@ -423,14 +429,21 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
-    /// Writes <paramref name="line" /> and <see cref="Environment.NewLine" /> to standard
-    /// error as UTF-8.
+    /// Writes <paramref name="line" /> to standard error as UTF-8, wrapped at
+    /// <c>terminalColumns</c> by <see cref="WarningLineWrapper" /> when it is a
+    /// <c>Warning: </c> line, each piece followed by <see cref="Environment.NewLine" />.
     /// </summary>
     /// <param name="line">The line, without a terminator.</param>
     /// <returns>A task that completes when the line is flushed.</returns>
     private async Task WriteErrorLineAsync(string line)
     {
-        byte[] bytes = Encoding.UTF8.GetBytes(line + Environment.NewLine);
+        StringBuilder text = new();
+        foreach (string piece in WarningLineWrapper.WrapLine(line, terminalColumns))
+        {
+            text.Append(piece).Append(Environment.NewLine);
+        }
+
+        byte[] bytes = Encoding.UTF8.GetBytes(text.ToString());
         await standardError.WriteAsync(bytes).ConfigureAwait(false);
         await standardError.FlushAsync().ConfigureAwait(false);
     }

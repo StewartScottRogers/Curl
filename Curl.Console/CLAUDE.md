@@ -17,6 +17,9 @@ arguments to `CurlCommandRunner`, which parses them, runs each URL and prints cu
 `curl: (N) <message>` lines. `-o` files open on the first write through
 `DeferredOutputFileStream`, which is how curl's exit 23 message comes out right. The
 parser's warning lines are written to standard error before anything else.
+Every `Warning: ` line is wrapped by `WarningLineWrapper` as curl's `warnf` wraps it, at the
+width `TerminalColumns` resolves (`COLUMNS` from 21 to 9999, else the standard-error
+console, else 79).
 On Windows each `-o` name is first rewritten by `WindowsOutputFileNameSanitizer`
 (`"*<>?|` and control characters become `_`, as curl 8.21.0 does), and that name is the
 one opened, sized for `-C -` and named in every message.

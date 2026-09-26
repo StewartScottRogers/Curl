@@ -157,6 +157,30 @@ public sealed class CurlCommandRunnerTests
     }
 
     [TestMethod]
+    public async Task RunAsync_OutputFileOpenWarningAt79Columns_IsWrappedAsCurlWrapsIt()
+    {
+        InMemoryFileSystem files = new() { ReadContent = new byte[92], UnwritableStatus = FileAccessStatus.AccessDenied };
+        files.UnwritablePaths.Add("C:/Windows/System32/bl087.txt");
+        CurlCommandRunner runner = new(
+            _ => new ProtocolDispatcher([new FileProtocolHandler(files)]),
+            files,
+            standardOutput,
+            standardError,
+            standardInput,
+            runsOnWindows: false,
+            terminalColumns: 79);
+
+        int exitCode = await runner.RunAsync(["-o", "C:/Windows/System32/bl087.txt", "file:///C:/Windows/win.ini"]);
+
+        Assert.AreEqual(23, exitCode);
+        Assert.AreEqual(
+            "Warning: Failed to open the file C:/Windows/System32/bl087.txt: Permission " + NewLine
+            + "Warning: denied" + NewLine
+            + "curl: (23) client returned ERROR on write of 92 bytes" + NewLine,
+            StandardErrorText);
+    }
+
+    [TestMethod]
     public async Task RunAsync_OutputFileCannotBeCreatedUnderSilent_PrintsNoWarning()
     {
         int exitCode = await RunToUncreatableOutputFileAsync("-s", "-o", "Z:/nonexist/x");

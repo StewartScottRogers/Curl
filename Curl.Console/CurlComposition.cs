@@ -71,7 +71,8 @@ internal static class CurlComposition
 
     /// <summary>
     /// Creates the runner that parses a command line and performs its transfers against
-    /// the real disk, the real network and the given standard streams. The network
+    /// the real disk, the real network and the given standard streams, wrapping warnings at
+    /// the width <see cref="TerminalColumns.Resolve()" /> gives. The network
     /// transports are built by <see cref="CreateTransports(CommandLineOptions)" /> once the
     /// command line is parsed, because their TLS settings come from it.
     /// </summary>
@@ -86,7 +87,8 @@ internal static class CurlComposition
             standardOutput,
             standardError,
             standardInput,
-            OperatingSystem.IsWindows());
+            OperatingSystem.IsWindows(),
+            TerminalColumns.Resolve());
 
     /// <summary>
     /// Creates the runner with the production handler set built around the given
