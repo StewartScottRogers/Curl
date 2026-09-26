@@ -8,7 +8,7 @@ depends-on: []
 touches: [Measure-CodeQuality.ps1]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-109 — Report the curl Cobertura package as Curl.Console in Measure-CodeQuality.ps1
 
@@ -39,20 +39,37 @@ listed.
 
 ## Acceptance criteria
 
-- [ ] Running `powershell -NoProfile -File Measure-CodeQuality.ps1` from the
+- [x] Running `powershell -NoProfile -File Measure-CodeQuality.ps1` from the
       repository root prints a row beginning `| Curl.Console |` in the `## Libraries`
       table.
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1 -SkipTestRun -Library Curl.Console`
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1 -SkipTestRun -Library Curl.Console`
       prints a `## Libraries` table whose only row is `| Curl.Console |`.
-- [ ] No row named `| curl |` appears in the report.
-- [ ] Every other library's row (name, Line %, Branch %, Members, Failing, Worst CRAP)
+- [x] No row named `| curl |` appears in the report.
+- [x] Every other library's row (name, Line %, Branch %, Members, Failing, Worst CRAP)
       is identical to a run of the unmodified script against the same Cobertura files
       (compare with `-SkipTestRun` before and after the change).
-- [ ] Only `Measure-CodeQuality.ps1` is changed.
+- [x] Only `Measure-CodeQuality.ps1` is changed.
 
 ## Notes
+
+- Added `Get-ReportedAssemblyName`, which maps the Cobertura package `curl` (case-sensitive,
+  `-ceq`) to `Curl.Console`; the merge loop uses the mapped name for the method key and
+  `Assembly`, so the table, failing-member heading and `-Library` filter all see
+  `Curl.Console`. Case-sensitive because the task asks for that one exact name only.
+  `.PARAMETER Library` help now says Curl.Console's assembly is `curl` and is matched as
+  `Curl.Console`.
+- Verified against the same Cobertura files: before, 10 library rows and no Curl.Console;
+  after, the same 10 rows byte-identical plus `| Curl.Console | 97.88 | 100 | 103 | 8 | 10 |`;
+  no `| curl |` row. `-SkipTestRun -Library Curl.Console` prints only the Curl.Console row.
+- The newly visible Curl.Console gaps (8 compiler-generated `CurlTransports` record members
+  at 0% line) are filed as BL-110.
+- Verify: build clean (0 warnings), fast tests green. `dotnet format --verify-no-changes`
+  fails on pre-existing LF line endings in
+  `Curl.Protocol.Abstractions.UnitLibrary\ITransferContext.cs`, outside this task's
+  `touches` and unaffected by it; left alone.
 
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. Measure-CodeQuality.ps1 reports the curl Cobertura package as Curl.Console in the table, failing members and -Library filter
