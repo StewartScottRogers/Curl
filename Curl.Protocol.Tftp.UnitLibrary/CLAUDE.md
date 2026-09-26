@@ -19,7 +19,7 @@ which a byte stream cannot express. The tests in the matching `.UnitTests` proje
 ## What is implemented
 
 - Download with curl 8.21.0's default read request (`tsize 0`, `blksize 512`,
-  `timeout 6`), OACK handling (ACK 0, then the acknowledged `blksize`), ACKs sent to
+  `timeout 6` when no time limit is given), OACK handling (ACK 0, then the acknowledged `blksize`), ACKs sent to
   the endpoint the DATA came from, and every TFTP ERROR code mapped to curl's exit code
   and message (`TftpErrorMapping`).
 - Upload (`-T`) with curl 8.21.0's default write request (`tsize` = the upload's
@@ -32,5 +32,19 @@ which a byte stream cannot express. The tests in the matching `.UnitTests` proje
   server that answers with plain DATA is read in 512-byte blocks, as curl does.
 - `--tftp-no-options` (`TftpNoOptions`): the read or write request is the file name
   and `octet` alone, with no `tsize`, `blksize` or `timeout`.
-- Not yet: retransmission, and the timeout that ends a silent transfer. Until then a silent server leaves the
-  receive waiting until the transfer's token is cancelled.
+- Download retransmission and timeouts (`TftpDownload`, `TftpRetrySchedule`), as curl
+  8.21.0's `tftp_set_timeouts` derives them: from the time left (`ConnectTimeout`, 300 s
+  by default, or `MaxTime` if sooner; after the first DATA/OACK, what `MaxTime` leaves,
+  else 15 s) come `retry_max` = clamp(seconds / 5, 3, 50) and `retry_time` =
+  max(1, seconds / retry_max). The RRQ's `timeout` option is `retry_time`, and the last
+  packet is re-sent every `retry_time + 1` s. An unanswered RRQ (sent `retry_max` times)
+  ends with exit 7 `Could not connect to server`; an ACK re-sent `retry_max` times
+  without an answer ends with exit 28 `Timeout was reached`; `MaxTime` passing ends
+  with exit 28 `Operation timed out after N milliseconds with M bytes received`. A
+  repeated last block is re-ACKed and not written twice. The first datagram pins the
+  server's endpoint; one from anywhere else ends the transfer with exit 56
+  `Data received from another address` and the stranger is sent nothing. Every wait
+  goes through `ITransferContext.TimeProvider`.
+- Not yet: retransmission and timeouts for an upload; its write request still carries
+  `timeout 6` whatever the time limits, and a silent server leaves it waiting until the
+  transfer's token is cancelled.

@@ -14,7 +14,8 @@ namespace Curl.Protocol.Tftp;
 /// <remarks>
 /// <para>
 /// The read request carries curl's options, <c>tsize 0</c>, <c>blksize</c> and
-/// <c>timeout 6</c> (RFC 2347, 2348, 2349); <c>blksize</c> is
+/// <c>timeout</c>, 6 by default and less under a connect timeout or maximum time
+/// (RFC 2347, 2348, 2349); <c>blksize</c> is
 /// <see cref="ITransferContext.TftpBlockSize" /> clamped to 8-65464, or 512 when it is not
 /// given. <see cref="ITransferContext.TftpNoOptions" /> sends no options at all, on a read
 /// or a write request. An option acknowledgement is answered with ACK 0 and its
@@ -37,8 +38,12 @@ namespace Curl.Protocol.Tftp;
 /// is returned with the connector's code and message unchanged.
 /// </para>
 /// <para>
-/// Retransmission and the timeout that ends a silent transfer are not implemented yet;
-/// see the library's <c>CLAUDE.md</c>.
+/// A download re-sends its last packet to a silent server on curl's schedule and ends
+/// with exit 7 when the read request goes unanswered, exit 28 when the server falls
+/// silent mid-transfer or <see cref="ITransferContext.MaxTime" /> passes, and exit 56
+/// when a datagram comes from an endpoint other than the server's (see
+/// <c>TftpDownload</c>). An upload does not re-send yet; see the library's
+/// <c>CLAUDE.md</c>.
 /// </para>
 /// </remarks>
 public sealed class TftpProtocolHandler(IDatagramConnector connector) : IProtocolHandler
@@ -64,6 +69,7 @@ public sealed class TftpProtocolHandler(IDatagramConnector connector) : IProtoco
     public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
+        var startTimestamp = context.TimeProvider.GetTimestamp();
 
         var fileName = Uri.UnescapeDataString(context.Url.AbsolutePath.TrimStart('/'));
         if (fileName.Length == 0)
@@ -85,7 +91,7 @@ public sealed class TftpProtocolHandler(IDatagramConnector connector) : IProtoco
         {
             return context.Upload is { } upload
                 ? await new TftpUpload(context, channel, upload).RunAsync(fileName).ConfigureAwait(false)
-                : await new TftpDownload(context, channel).RunAsync(fileName).ConfigureAwait(false);
+                : await new TftpDownload(context, channel, startTimestamp).RunAsync(fileName).ConfigureAwait(false);
         }
     }
 }
