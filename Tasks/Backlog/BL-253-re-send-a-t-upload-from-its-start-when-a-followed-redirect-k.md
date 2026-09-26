@@ -1,5 +1,5 @@
 ---
-id: BL-251
+id: BL-253
 title: Re-send a -T upload from its start when a followed redirect keeps PUT
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-251 — Re-send a -T upload from its start when a followed redirect keeps PUT
+# BL-253 — Re-send a -T upload from its start when a followed redirect keeps PUT
 
 ## Goal
 

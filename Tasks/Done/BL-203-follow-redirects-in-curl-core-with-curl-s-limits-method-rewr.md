@@ -47,14 +47,14 @@ Connection: close
   - `-sS -L --max-redirs 0 http://127.0.0.1:18203/a`, 301 to `/next`: one `GET /a`; stderr `curl: (47) Maximum (0) redirects followed`, exit 47. `--max-redirs 2` with `-d x=1 -u u:p`: `POST /a` then two `GET /next` (Authorization kept, same host), `Maximum (2) redirects followed`.
   - `-d x=1`, 301/302/303: `POST /a` + `x=1`, then `GET /next` with no body. With `--post301`/`--post302`/`--post303` for the matching code: `POST /next` + `x=1`. 307: `POST /next` + `x=1`.
   - `-X POST -d x=1`, 301: `POST /next` with no body (custom method kept, body dropped). `-X PUT -d x=1`, 303: `PUT /next`, no body.
-  - `-T up.txt` (3 bytes `abc`), 303: `PUT /a` + `abc`, then `GET /next`. 301: `PUT /next` + `abc` again (re-send filed as BL-251).
+  - `-T up.txt` (3 bytes `abc`), 303: `PUT /a` + `abc`, then `GET /next`. 301: `PUT /next` + `abc` again (re-send filed as BL-253).
   - `-I`, 303: `HEAD /a`, `HEAD /next`.
   - `-u u:p -H "Authorization: Bearer t" -H "Cookie: a=b" -H "X-K: v" --oauth2-bearer zz`, 302 to `http://localhost:18203/next`: second request carries only `X-K: v`. With `--location-trusted -u u:p -H "Cookie: a=b"`: `Authorization: Basic dTpw` and `Cookie: a=b` both kept. 302 to `http://127.0.0.1:18204/next` (second listener): no `Authorization`, so a port change drops credentials too.
   - Location `file:///C:/Windows/win.ini`, `dict://...`, `scp://...`: `curl: (1) Protocol "file" is disabled (in redirect)` (resp. "dict", "scp"), exit 1, no second request. `foo://127.0.0.1/x` and `ipfs://abc/x`: `curl: (1) The redirect target URL could not be parsed: Unsupported URL scheme`, exit 1. `ftp://` and `HTTPS://` targets are followed (connect attempted).
   - `--max-redirs 0` with Location `file:///x` or `foo://x/`: `Maximum (0) redirects followed`, so the limit is checked before the scheme.
 - From libcurl source, not separately measured: credentials are compared with the first URL's host, port and scheme (not the previous hop's), so a chain that returns to the first host sends them again.
 - Quality: `Measure-CodeQuality.ps1 -Library Curl.Core.UnitLibrary` reports 100% line, 100% branch, 53 members, 0 failing, worst CRAP 10.
-- Follow-up filed: BL-251 (re-send a `-T` upload from its start on a hop that keeps PUT).
+- Follow-up filed: BL-253 (re-send a `-T` upload from its start on a hop that keeps PUT).
 
 ## Log
 
