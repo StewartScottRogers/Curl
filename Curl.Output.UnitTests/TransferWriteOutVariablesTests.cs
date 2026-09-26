@@ -1,0 +1,272 @@
+using System.Net;
+using Curl.Protocol.Abstractions;
+
+namespace Curl.Output;
+
+/// <summary>
+/// Pins <see cref="TransferWriteOutVariables"/> to what curl 8.21.0 (mingw, Schannel)
+/// printed for the same transfers on 2026-09-26; the commands are in BL-225's Notes.
+/// </summary>
+[TestClass]
+public sealed class TransferWriteOutVariablesTests
+{
+    private const string LoopbackUrl = "http://127.0.0.1:18225/a?b";
+
+    [TestMethod]
+    public void TryGetVariableText_RedirectResponseNotFollowed_MatchesCurl()
+    {
+        // curl -s -o NUL -w "..." http://127.0.0.1:18225/a?b against a 302 with a relative Location.
+        TransferReport report = new()
+        {
+            ResponseCode = 302,
+            HttpVersion = new Version(1, 1),
+            Method = "GET",
+            ContentType = "text/plain; charset=utf-8",
+            RedirectUrl = "http://127.0.0.1:18225/next?q=1",
+            HeaderSize = 111,
+            RequestSize = 82,
+            DownloadSize = 5,
+            ConnectionCount = 1,
+            ResponseHeaders =
+            [
+                new("Location", "/next?q=1"),
+                new("Content-Type", "text/plain; charset=utf-8"),
+                new("X-A", "1"),
+                new("Content-Length", "5"),
+            ],
+            LocalEndPoint = new IPEndPoint(IPAddress.Loopback, 50123),
+            RemoteEndPoint = new IPEndPoint(IPAddress.Loopback, 18225),
+        };
+        TransferWriteOutVariables variables = new(TransferResult.Success(5) with { Report = report }, LoopbackUrl, 0, LoopbackUrl, "http");
+
+        Assert.AreEqual(
+            "302|302|000|1.1|GET|text/plain; charset=utf-8|http://127.0.0.1:18225/next?q=1|http://127.0.0.1:18225/a?b|0|111|82|5|0|1|127.0.0.1|50123|127.0.0.1|18225|0||http://127.0.0.1:18225/a?b|0|http",
+            RenderAll(variables));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_FileTransferWithoutReport_MatchesCurl()
+    {
+        // curl -s -o NUL -w "..." file:///C:/Windows/win.ini: nothing learned beyond the bytes.
+        TransferWriteOutVariables variables = new(
+            TransferResult.Success(92), "file:///C:/Windows/win.ini", 0, "file://C:/Windows/win.ini", "file");
+
+        Assert.AreEqual(
+            "000|000|000|0|GET|||file://C:/Windows/win.ini|0|0|0|92|0|0||-1||-1|0||file:///C:/Windows/win.ini|0|file",
+            RenderAll(variables));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_ConnectionRefused_MatchesCurl()
+    {
+        // curl -s -o NUL -w "..." http://127.0.0.1:1/x exited 7.
+        const string message = "Failed to connect to 127.0.0.1:1 after 2043 ms: Could not connect to server";
+        TransferWriteOutVariables variables = new(
+            TransferResult.Failure(CurlExitCode.CouldntConnect, message), "http://127.0.0.1:1/x", 0, "http://127.0.0.1:1/x", "http");
+
+        Assert.AreEqual(
+            "000|000|000|0|GET|||http://127.0.0.1:1/x|0|0|0|0|0|0||-1||-1|7|" + message + "|http://127.0.0.1:1/x|0|http",
+            RenderAll(variables));
+        Assert.AreEqual("0", Get(variables, "num_headers"));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_UnsupportedScheme_PrintsAnEmptyScheme()
+    {
+        // curl -w "%{scheme}" nope://x/ printed nothing and exited 1.
+        TransferWriteOutVariables variables = new(
+            TransferResult.Failure(CurlExitCode.UnsupportedProtocol, "Protocol \"nope\" not supported"), "nope://x/", 0, "nope://x/", null);
+
+        Assert.AreEqual(string.Empty, Get(variables, "scheme"));
+        Assert.AreEqual("1", Get(variables, "exitcode"));
+        Assert.AreEqual("Protocol \"nope\" not supported", Get(variables, "errormsg"));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_SecondUrl_PrintsItsNumberAndTheUrlAsGiven()
+    {
+        // curl ... file:///C:/Windows/win.ini FILE:///C:/Windows/nosuch.ini: the second line had urlnum 1 and url as typed.
+        TransferWriteOutVariables variables = new(
+            TransferResult.Failure(CurlExitCode.FileCouldntReadFile, "Could not open file C:/Windows/nosuch.ini"),
+            "FILE:///C:/Windows/nosuch.ini",
+            1,
+            "file://C:/Windows/nosuch.ini",
+            "file");
+
+        Assert.AreEqual("1", Get(variables, "urlnum"));
+        Assert.AreEqual("FILE:///C:/Windows/nosuch.ini", Get(variables, "url"));
+        Assert.AreEqual("file://C:/Windows/nosuch.ini", Get(variables, "url_effective"));
+        Assert.AreEqual("37", Get(variables, "exitcode"));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_FailedPostUnderFail_KeepsTheReportsCodesAndSizes()
+    {
+        // curl -s -f -o NUL -d abcdef -w "..." against a 404: exit 22, code 404, method POST, size_upload 6.
+        TransferReport report = new() { ResponseCode = 404, HttpVersion = new Version(1, 1), Method = "POST", UploadSize = 6, RequestSize = 155, HeaderSize = 45 };
+        TransferResult result = TransferResult.Failure(CurlExitCode.HttpReturnedError, "The requested URL returned error: 404") with { Report = report };
+        TransferWriteOutVariables variables = new(result, "http://127.0.0.1:18225/p", 0, "http://127.0.0.1:18225/p", "http");
+
+        Assert.AreEqual("404", Get(variables, "http_code"));
+        Assert.AreEqual("POST", Get(variables, "method"));
+        Assert.AreEqual("6", Get(variables, "size_upload"));
+        Assert.AreEqual("0", Get(variables, "size_download"));
+        Assert.AreEqual("155", Get(variables, "size_request"));
+        Assert.AreEqual("22", Get(variables, "exitcode"));
+        Assert.AreEqual("The requested URL returned error: 404", Get(variables, "errormsg"));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_RefusedTunnel_PrintsTheConnectCode()
+    {
+        // curl -s -p -x http://127.0.0.1:18225 -w "%{http_code}|%{http_connect}" against a 407 CONNECT reply.
+        TransferReport report = new() { ProxyConnectResponseCode = 407 };
+        TransferWriteOutVariables variables = new(
+            TransferResult.Failure(CurlExitCode.CouldntConnect, "CONNECT tunnel failed, response 407") with { Report = report },
+            "http://example.invalid/",
+            0,
+            "http://example.invalid/",
+            "http");
+
+        Assert.AreEqual("000", Get(variables, "http_code"));
+        Assert.AreEqual("407", Get(variables, "http_connect"));
+    }
+
+    [TestMethod]
+    [DataRow(1, 0, "1")]
+    [DataRow(1, 1, "1.1")]
+    [DataRow(2, 0, "2")]
+    [DataRow(3, 0, "3")]
+    [DataRow(0, 9, "0")]
+    public void TryGetVariableText_HttpVersion_PrintsAsCurl(int major, int minor, string expected)
+    {
+        // An HTTP/1.0 status line printed "1" and HTTP/1.1 printed "1.1".
+        TransferWriteOutVariables variables = WithReport(new TransferReport { HttpVersion = new Version(major, minor) });
+
+        Assert.AreEqual(expected, Get(variables, "http_version"));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_ExplicitMethod_PrintsItAsSent()
+    {
+        // curl -X PATCH -w "%{method}" printed PATCH.
+        TransferWriteOutVariables variables = WithReport(new TransferReport { Method = "PATCH" });
+
+        Assert.AreEqual("PATCH", Get(variables, "method"));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_IPv6Endpoints_PrintWithoutBrackets()
+    {
+        // curl -w "%{local_ip}|%{remote_ip}|%{remote_port}" http://[::1]:18226/ printed "::1|::1|18226".
+        TransferReport report = new()
+        {
+            LocalEndPoint = new IPEndPoint(IPAddress.IPv6Loopback, 50200),
+            RemoteEndPoint = new IPEndPoint(IPAddress.IPv6Loopback, 18226),
+        };
+        TransferWriteOutVariables variables = WithReport(report);
+
+        Assert.AreEqual("::1", Get(variables, "local_ip"));
+        Assert.AreEqual("::1", Get(variables, "remote_ip"));
+        Assert.AreEqual("18226", Get(variables, "remote_port"));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_FollowedRedirect_PrintsTheFollowersUrlAndCount()
+    {
+        TransferReport report = new() { EffectiveUrl = "http://127.0.0.1:18225/next", RedirectCount = 2 };
+        TransferWriteOutVariables variables = WithReport(report);
+
+        Assert.AreEqual("http://127.0.0.1:18225/next", Get(variables, "url_effective"));
+        Assert.AreEqual("2", Get(variables, "num_redirects"));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_ReportSizes_WinOverBytesTransferred()
+    {
+        TransferWriteOutVariables variables = new(
+            TransferResult.Success(999) with { Report = new TransferReport { DownloadSize = 7 } }, LoopbackUrl, 0, LoopbackUrl, "http");
+
+        Assert.AreEqual("7", Get(variables, "size_download"));
+    }
+
+    [TestMethod]
+    [DataRow("nosuch")]
+    [DataRow("HTTP_CODE")]
+    [DataRow(" http_code")]
+    [DataRow("")]
+    public void TryGetVariableText_UnknownName_IsNotKnown(string name)
+    {
+        TransferWriteOutVariables variables = WithReport(new TransferReport());
+
+        Assert.IsFalse(variables.TryGetVariableText(name, out string? text));
+        Assert.IsNull(text);
+    }
+
+    [TestMethod]
+    public void FindFirstHeaderValue_DuplicatesAndPadding_FirstValueTrimmedCaseInsensitively()
+    {
+        // curl -w "[%header{x-dup}][%header{X-DUP}][%header{x-lf}][%header{ x-dup}]" printed "[one][one][a b][]".
+        TransferReport report = new()
+        {
+            ResponseHeaders = [new("X-Dup", "one"), new("X-Dup", "two"), new("X-Lf", " \ta b  ")],
+        };
+        TransferWriteOutVariables variables = WithReport(report);
+
+        Assert.AreEqual("one", variables.FindFirstHeaderValue("x-dup"));
+        Assert.AreEqual("one", variables.FindFirstHeaderValue("X-DUP"));
+        Assert.AreEqual("a b", variables.FindFirstHeaderValue("x-lf"));
+        Assert.IsNull(variables.FindFirstHeaderValue(" x-dup"));
+    }
+
+    [TestMethod]
+    public void FindFirstHeaderValue_NoReport_FindsNothing()
+    {
+        TransferWriteOutVariables variables = new(TransferResult.Success(0), LoopbackUrl, 0, LoopbackUrl, "http");
+
+        Assert.IsNull(variables.FindFirstHeaderValue("content-length"));
+    }
+
+    [TestMethod]
+    public void Constructor_NullArguments_Throw()
+    {
+        TransferResult result = TransferResult.Success(0);
+
+        Assert.ThrowsExactly<ArgumentNullException>(() => new TransferWriteOutVariables(null!, LoopbackUrl, 0, LoopbackUrl, "http"));
+        Assert.ThrowsExactly<ArgumentNullException>(() => new TransferWriteOutVariables(result, null!, 0, LoopbackUrl, "http"));
+        Assert.ThrowsExactly<ArgumentNullException>(() => new TransferWriteOutVariables(result, LoopbackUrl, 0, null!, "http"));
+    }
+
+    [TestMethod]
+    public void Lookups_NullName_Throw()
+    {
+        TransferWriteOutVariables variables = WithReport(new TransferReport());
+
+        Assert.ThrowsExactly<ArgumentNullException>(() => variables.TryGetVariableText(null!, out _));
+        Assert.ThrowsExactly<ArgumentNullException>(() => variables.FindFirstHeaderValue(null!));
+    }
+
+    private static readonly string[] MeasuredVariableOrder =
+    [
+        "response_code", "http_code", "http_connect", "http_version", "method", "content_type", "redirect_url",
+        "url_effective", "num_redirects", "size_header", "size_request", "size_download", "size_upload",
+        "num_connects", "local_ip", "local_port", "remote_ip", "remote_port", "exitcode",
+        "errormsg", "url", "urlnum", "scheme",
+    ];
+
+    private static TransferWriteOutVariables WithReport(TransferReport report)
+    {
+        return new TransferWriteOutVariables(TransferResult.Success(0) with { Report = report }, LoopbackUrl, 0, LoopbackUrl, "http");
+    }
+
+    private static string RenderAll(TransferWriteOutVariables variables)
+    {
+        return string.Join('|', MeasuredVariableOrder.Select(name => Get(variables, name)));
+    }
+
+    private static string Get(TransferWriteOutVariables variables, string name)
+    {
+        Assert.IsTrue(variables.TryGetVariableText(name, out string? text), name);
+        return text;
+    }
+}
