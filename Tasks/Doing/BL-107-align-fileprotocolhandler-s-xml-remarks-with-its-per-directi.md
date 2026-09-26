@@ -43,3 +43,4 @@ BL-025 wrote the table in `CLAUDE.md` ("Transfer options, per direction"). Two r
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
