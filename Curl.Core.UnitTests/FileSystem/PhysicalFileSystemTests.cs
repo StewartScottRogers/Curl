@@ -6,10 +6,9 @@ namespace Curl.Core.FileSystem;
 
 /// <summary>
 /// Drives <see cref="PhysicalFileSystem" /> against the real disk, in a fresh temporary
-/// directory per test. Every method that touches the disk is
-/// <c>[TestCategory("Integration")]</c>, so the fast run leaves them out; the two
-/// cancellation tests and the Windows create-mode test refuse before any disk access and
-/// stay in the fast run.
+/// directory per test, or against the null device. None is
+/// <c>[TestCategory("Integration")]</c>: a temporary file needs no network, and the fast
+/// run must reach every line of <see cref="PhysicalFileSystem" /> for its coverage gate.
 /// </summary>
 [TestClass]
 public sealed class PhysicalFileSystemTests
@@ -41,7 +40,6 @@ public sealed class PhysicalFileSystemTests
     }
 
     [TestMethod]
-    [TestCategory("Integration")]
     public async Task OpenForReadAsync_ExistingFile_OpensASeekableHandleWithItsLengthAndTimestamp()
     {
         using var directory = new TemporaryDirectory();
@@ -63,7 +61,6 @@ public sealed class PhysicalFileSystemTests
     }
 
     [TestMethod]
-    [TestCategory("Integration")]
     public async Task OpenForReadAsync_MissingFile_IsNotFound()
     {
         using var directory = new TemporaryDirectory();
@@ -74,7 +71,6 @@ public sealed class PhysicalFileSystemTests
     }
 
     [TestMethod]
-    [TestCategory("Integration")]
     public async Task OpenForReadAsync_Directory_IsIsDirectory()
     {
         using var directory = new TemporaryDirectory();
@@ -88,7 +84,6 @@ public sealed class PhysicalFileSystemTests
     // name character, an IOException; elsewhere it is a legal name whose parent "c|" is
     // missing.
     [TestMethod]
-    [TestCategory("Integration")]
     public async Task OpenForReadAsync_BarInPlaceOfDriveColon_FailsWithoutThrowing()
     {
         using var directory = new TemporaryDirectory();
@@ -102,7 +97,6 @@ public sealed class PhysicalFileSystemTests
     // A malformed escape such as %GG reaches the file system as a literal percent sign,
     // which is a legal file name character everywhere, so a missing one is plain NotFound.
     [TestMethod]
-    [TestCategory("Integration")]
     public async Task OpenForReadAsync_LiteralPercentInMissingName_IsNotFound()
     {
         using var directory = new TemporaryDirectory();
@@ -115,7 +109,6 @@ public sealed class PhysicalFileSystemTests
     // A character device opens, but as a handle that cannot seek and has no length: the
     // shape file:///dev/stdin arrives in, which the handler must not seek.
     [TestMethod]
-    [TestCategory("Integration")]
     public async Task OpenForReadAsync_NullDevice_OpensANonSeekableHandleOfLengthZero()
     {
         string nullDevice = OperatingSystem.IsWindows() ? "NUL" : "/dev/null";
@@ -130,7 +123,6 @@ public sealed class PhysicalFileSystemTests
     }
 
     [TestMethod]
-    [TestCategory("Integration")]
     public async Task OpenForWriteAsync_DestinationDirectoryMissing_IsNotFound()
     {
         using var directory = new TemporaryDirectory();
@@ -142,7 +134,6 @@ public sealed class PhysicalFileSystemTests
     }
 
     [TestMethod]
-    [TestCategory("Integration")]
     public async Task OpenForWriteAsync_Directory_IsIsDirectory()
     {
         using var directory = new TemporaryDirectory();
@@ -154,7 +145,6 @@ public sealed class PhysicalFileSystemTests
     }
 
     [TestMethod]
-    [TestCategory("Integration")]
     public async Task OpenForWriteAsync_TruncateOverExistingFile_ReplacesItsContent()
     {
         using var directory = new TemporaryDirectory();
@@ -174,7 +164,6 @@ public sealed class PhysicalFileSystemTests
     }
 
     [TestMethod]
-    [TestCategory("Integration")]
     public async Task OpenForWriteAsync_TruncateWithNoFile_CreatesIt()
     {
         using var directory = new TemporaryDirectory();
@@ -188,7 +177,6 @@ public sealed class PhysicalFileSystemTests
     }
 
     [TestMethod]
-    [TestCategory("Integration")]
     public async Task OpenForWriteAsync_Append_PositionsAfterTheExistingContent()
     {
         using var directory = new TemporaryDirectory();
@@ -221,7 +209,6 @@ public sealed class PhysicalFileSystemTests
     }
 
     [TestMethod]
-    [TestCategory("Integration")]
     [OSCondition(OperatingSystems.Windows)]
     public async Task OpenForWriteAsync_CreateModeOnWindows_IsIgnored()
     {
@@ -236,7 +223,6 @@ public sealed class PhysicalFileSystemTests
     }
 
     [TestMethod]
-    [TestCategory("Integration")]
     [OSCondition(OperatingSystems.Linux | OperatingSystems.OSX | OperatingSystems.FreeBSD)]
     [UnsupportedOSPlatform("windows")]
     public async Task OpenForWriteAsync_CreateModeOnPosix_IsTheModeOfTheCreatedFile()
@@ -252,7 +238,6 @@ public sealed class PhysicalFileSystemTests
     }
 
     [TestMethod]
-    [TestCategory("Integration")]
     [OSCondition(OperatingSystems.Linux | OperatingSystems.OSX | OperatingSystems.FreeBSD)]
     [UnsupportedOSPlatform("windows")]
     public async Task OpenForWriteAsync_CreateModeOnPosixOverExistingFile_KeepsItsMode()
