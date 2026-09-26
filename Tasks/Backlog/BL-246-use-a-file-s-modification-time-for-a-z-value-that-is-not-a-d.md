@@ -1,5 +1,5 @@
 ---
-id: BL-143
+id: BL-246
 title: Use a file's modification time for a -z value that is not a date
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: FR-009
 created: 2026-09-26
 completed:
 ---
-# BL-143 — Use a file's modification time for a -z value that is not a date
+# BL-246 — Use a file's modification time for a -z value that is not a date
 
 ## Goal
 

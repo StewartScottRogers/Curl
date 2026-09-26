@@ -1,5 +1,5 @@
 ---
-id: BL-144
+id: BL-247
 title: Accept -z dates beyond year 9999 as curl does
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: FR-009
 created: 2026-09-26
 completed:
 ---
-# BL-144 — Accept -z dates beyond year 9999 as curl does
+# BL-247 — Accept -z dates beyond year 9999 as curl does
 
 ## Goal
 

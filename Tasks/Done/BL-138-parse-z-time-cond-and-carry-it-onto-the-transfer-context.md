@@ -87,10 +87,10 @@ time-condition logic runs from the real command line.
   `CurlCommandRunnerTransferOptionTests.RunAsync_TimeCondNotADate_WarnsAndTransfersUnconditionally`.
 - Unsupported `curl_getdate` range: a year outside 1-9999 (`1 Jan 099999999`), which curl
   computes in a 64-bit `time_t` and `DateTimeOffset` cannot hold; refused as not a date.
-  Follow-up BL-144.
-- File-name fallback deferred to follow-up BL-143: the applier signature carries only
+  Follow-up BL-247.
+- File-name fallback deferred to follow-up BL-246: the applier signature carries only
   `pathExists` and `IDataFileReader`, and a modification-time seam is its own change. Until it
-  lands, `-z <existing file>` warns and drops the condition. BL-143 also records curl's extra
+  lands, `-z <existing file>` warns and drops the condition. BL-246 also records curl's extra
   `Warning: Failed to get filetime: CreateFile failed: GetLastError 0x00000003` line, printed
   before the two lines for `-z ""` and `-z -` on Windows.
 - Choice: `-z =<date>` (curl's `CURL_TIMECOND_LASTMOD`) is recorded as `IfModifiedSince`.
