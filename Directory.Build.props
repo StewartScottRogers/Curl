@@ -55,4 +55,21 @@
     <IsAotCompatible>true</IsAotCompatible>
   </PropertyGroup>
 
+  <!--
+    Cyclomatic complexity is enforced by the SDK's own CA1502 analyzer, which only
+    reads its threshold from an AdditionalFile named CodeMetricsConfig.txt - hence
+    the link rather than a property. Only production projects get it: a test method
+    is allowed to be long, and CA1502 stays silent in a project that has no such
+    file. The indirection through CodeMetricsConfigFile lets the coverage-auditor
+    agent point a probe build at a copy with the threshold lowered to 1, which is how
+    it reads the complexity of every method instead of only the ones over the gate.
+  -->
+  <PropertyGroup>
+    <CodeMetricsConfigFile Condition="'$(CodeMetricsConfigFile)' == ''">$(MSBuildThisFileDirectory)CodeMetricsConfig.txt</CodeMetricsConfigFile>
+  </PropertyGroup>
+
+  <ItemGroup Condition="!$(MSBuildProjectName.EndsWith('UnitTests'))">
+    <AdditionalFiles Include="$(CodeMetricsConfigFile)" Visible="false" />
+  </ItemGroup>
+
 </Project>

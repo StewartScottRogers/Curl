@@ -11,14 +11,19 @@
   -->
 
   <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
     <File Path=".gitattributes" />
     <File Path=".gitignore" />
+    <File Path="CodeMetricsConfig.txt" />
+    <File Path="hrdrClaudeNative.cmd" />
     <File Path="LICENSE.txt" />
+    <File Path="RunClaude.cmd" />
   </Folder>
 
   <Folder Name="/Scripts/">
     <File Path="RunClaude.cmd" />
     <File Path="hrdrClaudeNative.cmd" />
+    <File Path="Measure-CodeQuality.ps1" />
   </Folder>
   <Project Path="Curl.Authentication.UnitLibrary/Curl.Authentication.UnitLibrary.csproj" />
   <Project Path="Curl.Authentication.UnitTests/Curl.Authentication.UnitTests.csproj" />

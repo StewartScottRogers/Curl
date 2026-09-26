@@ -39,3 +39,8 @@ dotnet_naming_rule.interfaces_begin_with_i.style = begins_with_i
 dotnet_naming_symbols.interfaces.applicable_kinds = interface
 dotnet_naming_style.begins_with_i.required_prefix = I
 dotnet_naming_style.begins_with_i.capitalization = pascal_case
+
+# Cyclomatic complexity (CA1502). Off by default in the SDK, on here, and an error
+# because warnings are errors. The threshold lives in CodeMetricsConfig.txt at the
+# repository root; the rule is silent in test projects, which are not given that file.
+dotnet_diagnostic.CA1502.severity = warning
