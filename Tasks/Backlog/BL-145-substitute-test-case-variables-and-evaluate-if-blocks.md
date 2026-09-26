@@ -28,6 +28,10 @@ reports.
   `%repeat[…]%` and `%if <feature>` / `%if !<feature>` / `%else` / `%endif`.
 - The feature set is an input (a set of names), not read from `curl --version` here; BL-147
   supplies it.
+- Upstream preprocesses the whole file before `getpart.pm` reads it, and `%if` blocks can wrap
+  whole parts. BL-144's `UpstreamTestCaseParser` ignores `%if` lines outside a part, so a case
+  with such a block parses with the parts of both branches: expand the file's bytes first and
+  parse the result, rather than expanding an already-parsed `UpstreamTestCase` (BL-144 Notes).
 - An unknown variable is left as is and reported, so a case using one can be skipped with a
   reason.
 
