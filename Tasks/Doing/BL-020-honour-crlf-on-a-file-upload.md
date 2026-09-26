@@ -84,3 +84,4 @@ for the `file` upload path is BL-025.
 ## Log
 
 - 2026-09-25: Created.
+- 2026-09-26: Backlog -> Doing.
