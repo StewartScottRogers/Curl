@@ -1,5 +1,5 @@
 ---
-id: BL-088
+id: BL-090
 title: Report a closed standard output as curl's 'Failed writing body'
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-088 — Report a closed standard output as curl's 'Failed writing body'
+# BL-090 — Report a closed standard output as curl's 'Failed writing body'
 
 ## Goal
 
