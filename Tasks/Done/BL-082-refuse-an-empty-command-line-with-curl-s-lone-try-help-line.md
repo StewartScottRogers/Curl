@@ -8,7 +8,7 @@ depends-on: [BL-074]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-082 — Refuse an empty command line with curl's lone try-help line and exit 2
 
@@ -40,23 +40,23 @@ There is no `no URL specified` line.
 
 ## Acceptance criteria
 
-- [ ] `CommandLineRefusal` has a factory for the empty-command-line refusal whose
+- [x] `CommandLineRefusal` has a factory for the empty-command-line refusal whose
       `StandardErrorLines` are exactly one line, `CommandLineRefusal.TryHelpLine`, and whose
       `ExitCode` is `CurlExitCode.FailedInit`.
-- [ ] A test in `Curl.Cli.UnitTests` asserts that `Parse([])` is refused with exactly that
+- [x] A test in `Curl.Cli.UnitTests` asserts that `Parse([])` is refused with exactly that
       one line and exit 2.
-- [ ] The `CommandLineRefusal` and `CommandLineParser` XML docs and
+- [x] The `CommandLineRefusal` and `CommandLineParser` XML docs and
       `Curl.Cli.UnitLibrary/README.md` no longer say an empty command line is accepted or
       that every refusal has two lines.
-- [ ] `Parse_NoArguments_ReturnsDefaults` and `Parse_EmptyCommandLine_CarriesNoWarning` in
+- [x] `Parse_NoArguments_ReturnsDefaults` and `Parse_EmptyCommandLine_CarriesNoWarning` in
       `Curl.Cli.UnitTests/CommandLineParserTests.cs` no longer assert that an empty command
       line is accepted (changed to the refusal, or removed where the new test covers them).
-- [ ] `Curl.Console.UnitTests/CurlCommandRunnerTests.cs` test
+- [x] `Curl.Console.UnitTests/CurlCommandRunnerTests.cs` test
       `RunAsync_EmptyCommandLine_TransfersNothingAndReturns0` is renamed to say what it now
       asserts and asserts that `RunAsync([])` returns 2, writes nothing to stdout, writes
       exactly `CommandLineRefusal.TryHelpLine` plus the newline to stderr, and calls no
       handler. No file under `Curl.Console` changes.
-- [ ] `dotnet build -warnaserror` is clean and
+- [x] `dotnet build -warnaserror` is clean and
       `dotnet test --filter "TestCategory!=Integration"` is green.
 
 ## Notes
@@ -74,6 +74,14 @@ There is no `no URL specified` line.
 - Re-planned 2026-09-26: `touches` now includes `Curl.Console.UnitTests`, and the
   acceptance criteria name both pinned tests and the console test explicitly.
 
+- 2026-09-26 (lane 3): Delivered directly rather than through the full `/feature` stages: the
+  change is one guard clause and one factory, fully specified by the criteria. `Parse` checks
+  `arguments.Count == 0` first and returns `CommandLineRefusal.EmptyCommandLine()` before any
+  option is read, so the no-URL check lost its `arguments.Count > 0` clause. A third pin the
+  criteria did not name, `CommandLinePasswordPromptTests.Parse_EmptyCommandLine_NeverPrompts`,
+  asserted acceptance; renamed `Parse_EmptyCommandLine_IsRefusedWithoutPrompting` and now
+  asserts refusal and no prompt. `EmptyCommandLine` is also covered in `CommandLineRefusalTests`.
+
 ## Log
 
 - 2026-09-26: Created.
@@ -81,3 +89,4 @@ There is no `no URL specified` line.
 - 2026-09-26: Doing -> Blocked. touches must add Curl.Console.UnitTests: CurlCommandRunnerTests.RunAsync_EmptyCommandLine_TransfersNothingAndReturns0 pins exit 0 for an empty command line and must expect exit 2 plus the try-help line; re-plan
 - 2026-09-26: Blocked -> Backlog. Re-planned: touches adds Curl.Console.UnitTests; criteria name the two parser pins and the console test that must expect exit 2 plus the try-help line.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. Parse([]) is refused with the lone try-help line and exit 2, as curl 8.21.0 does; curl with no arguments now prints only that line and exits 2
