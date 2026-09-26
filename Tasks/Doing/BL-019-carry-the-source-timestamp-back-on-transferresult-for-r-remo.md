@@ -78,3 +78,4 @@ way round would mean changing the same two files twice.
 ## Log
 
 - 2026-09-25: Created.
+- 2026-09-26: Backlog -> Doing.
