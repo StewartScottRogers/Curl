@@ -39,3 +39,4 @@ An Accepted ADR records that `--compressed` sends `Accept-Encoding: deflate, gzi
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
