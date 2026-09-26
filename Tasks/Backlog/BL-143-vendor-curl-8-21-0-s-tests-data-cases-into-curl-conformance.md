@@ -4,7 +4,7 @@ title: Vendor curl 8.21.0's tests/data cases into Curl.Conformance.UnitTests
 priority: Normal
 assignee: Claude
 pipeline: direct
-depends-on: [BL-005, BL-142]
+depends-on: [BL-005, BL-148]
 touches: [Curl.Conformance.UnitTests/UpstreamTestData, Curl.Conformance.UnitTests/Curl.Conformance.UnitTests.csproj]
 requirement: none
 created: 2026-09-26

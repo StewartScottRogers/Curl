@@ -51,7 +51,7 @@ Harness design choices made under Stewart's delegation, and why:
   while the pass rate climbs, and a passing case cannot silently regress.
 - libcurl `<tool>` cases are out of scope: Curl replaces the tool, not the library.
 
-Harness tasks filed: BL-142 (scaffold projects), BL-143 (vendor test data), BL-144 (parser),
+Harness tasks filed: BL-148 (scaffold projects), BL-143 (vendor test data), BL-144 (parser),
 BL-145 (variables and `%if`), BL-146 (sws HTTP emulation), BL-147 (data-driven runner and
 ratchet). Each lists BL-005 in `depends-on`. Other server emulations are filed after BL-147.
 
@@ -60,4 +60,4 @@ ratchet). Each lists BL-005 in `depends-on`. Other server emulations are filed a
 - 2026-09-25: Migrated from Documentation/Planning/Backlog.md (Ready). Assigned to Stewart because the decision is his.
 - 2026-09-26: Stewart chose porting the test cases to MSTest. Reassigned to Claude to record the ADR.
 - 2026-09-26: Backlog -> Doing.
-- 2026-09-26: Doing -> Done. ADR-0013 records porting upstream cases to in-process data-driven MSTest; harness tasks BL-142..BL-147 filed
+- 2026-09-26: Doing -> Done. ADR-0013 records porting upstream cases to in-process data-driven MSTest; harness tasks BL-148..BL-147 filed

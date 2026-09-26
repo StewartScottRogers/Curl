@@ -1,5 +1,5 @@
 ---
-id: BL-142
+id: BL-148
 title: Scaffold Curl.Conformance.UnitLibrary and Curl.Conformance.UnitTests
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-142 — Scaffold Curl.Conformance.UnitLibrary and Curl.Conformance.UnitTests
+# BL-148 — Scaffold Curl.Conformance.UnitLibrary and Curl.Conformance.UnitTests
 
 ## Goal
 

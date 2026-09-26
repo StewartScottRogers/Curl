@@ -4,7 +4,7 @@ title: Parse curl's upstream test-case file format into a test-case model
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-005, BL-142]
+depends-on: [BL-005, BL-148]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-09-26
