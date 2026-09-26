@@ -84,3 +84,4 @@ arrives, so the replacement stream must not buffer beyond what the current
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
