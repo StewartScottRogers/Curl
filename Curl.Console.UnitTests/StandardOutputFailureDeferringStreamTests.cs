@@ -1,3 +1,5 @@
+using Curl.Protocol.Abstractions;
+
 namespace Curl.Console;
 
 /// <summary>
@@ -66,7 +68,7 @@ public sealed class StandardOutputFailureDeferringStreamTests
     {
         using StandardOutputFailureDeferringStream stream = new(new FailingWriteStream());
 
-        Assert.ThrowsExactly<IOException>(() => stream.Write(new byte[BufferSize], 0, BufferSize));
+        Assert.ThrowsExactly<OutputWriteFailedException>(() => stream.Write(new byte[BufferSize], 0, BufferSize));
 
         Assert.IsTrue(stream.HasWriteFailed);
     }
@@ -78,7 +80,7 @@ public sealed class StandardOutputFailureDeferringStreamTests
         stream.Write(new byte[BufferSize - 2], 0, BufferSize - 2);
         stream.Write([1], 0, 1);
 
-        Assert.ThrowsExactly<IOException>(() => stream.Write([1], 0, 1));
+        Assert.ThrowsExactly<OutputWriteFailedException>(() => stream.Write([1], 0, 1));
     }
 
     [TestMethod]
@@ -97,7 +99,94 @@ public sealed class StandardOutputFailureDeferringStreamTests
         using StandardOutputFailureDeferringStream stream = new(new FailingWriteStream());
         await stream.WriteAsync(new byte[BufferSize - 1].AsMemory());
 
-        await Assert.ThrowsExactlyAsync<IOException>(async () => await stream.WriteAsync(new byte[] { 1 }.AsMemory()));
+        await Assert.ThrowsExactlyAsync<OutputWriteFailedException>(async () => await stream.WriteAsync(new byte[] { 1 }.AsMemory()));
+    }
+
+    [TestMethod]
+    [DataRow(100, 41, 96)]
+    [DataRow(300, 14, 196)]
+    [DataRow(1000, 5, 96)]
+    [DataRow(30, 137, 16)]
+    public void Write_ThatOverflowsTheBufferAfterAFailure_AcceptsTheRoomLeft(int size, int throwingWrite, int bytesAccepted)
+    {
+        using StandardOutputFailureDeferringStream stream = new(new FailingWriteStream());
+        for (int write = 1; write < throwingWrite; write++)
+        {
+            stream.Write(new byte[size], 0, size);
+        }
+
+        var exception = Assert.ThrowsExactly<OutputWriteFailedException>(() => stream.Write(new byte[size], 0, size));
+
+        Assert.AreEqual(bytesAccepted, exception.BytesAccepted);
+    }
+
+    [TestMethod]
+    [DataRow(100, 41, 96)]
+    [DataRow(300, 14, 196)]
+    [DataRow(1000, 5, 96)]
+    [DataRow(30, 137, 16)]
+    public async Task WriteAsync_ThatOverflowsTheBufferAfterAFailure_AcceptsTheRoomLeft(int size, int throwingWrite, int bytesAccepted)
+    {
+        using StandardOutputFailureDeferringStream stream = new(new FailingWriteStream());
+        for (int write = 1; write < throwingWrite; write++)
+        {
+            await stream.WriteAsync(new byte[size].AsMemory());
+        }
+
+        var exception = await Assert.ThrowsExactlyAsync<OutputWriteFailedException>(
+            async () => await stream.WriteAsync(new byte[size].AsMemory()));
+
+        Assert.AreEqual(bytesAccepted, exception.BytesAccepted);
+    }
+
+    [TestMethod]
+    [DataRow(BufferSize)]
+    [DataRow(16384)]
+    public void Write_ThatFailsAtOrAboveTheBufferSizeWithNothingBefore_AcceptsNothing(int size)
+    {
+        using StandardOutputFailureDeferringStream stream = new(new FailingWriteStream());
+
+        var exception = Assert.ThrowsExactly<OutputWriteFailedException>(() => stream.Write(new byte[size], 0, size));
+
+        Assert.AreEqual(0, exception.BytesAccepted);
+    }
+
+    [TestMethod]
+    [DataRow(BufferSize)]
+    [DataRow(16384)]
+    public async Task WriteAsync_ThatFailsAtOrAboveTheBufferSizeWithNothingBefore_AcceptsNothing(int size)
+    {
+        using StandardOutputFailureDeferringStream stream = new(new FailingWriteStream());
+
+        var exception = await Assert.ThrowsExactlyAsync<OutputWriteFailedException>(
+            async () => await stream.WriteAsync(new byte[size].AsMemory()));
+
+        Assert.AreEqual(0, exception.BytesAccepted);
+    }
+
+    [TestMethod]
+    public void Write_AfterTheOverflowingWrite_AcceptsNothing()
+    {
+        using StandardOutputFailureDeferringStream stream = new(new FailingWriteStream());
+        stream.Write(new byte[BufferSize - 4], 0, BufferSize - 4);
+        Assert.ThrowsExactly<OutputWriteFailedException>(() => stream.Write(new byte[100], 0, 100));
+
+        var exception = Assert.ThrowsExactly<OutputWriteFailedException>(() => stream.Write(new byte[100], 0, 100));
+
+        Assert.AreEqual(0, exception.BytesAccepted);
+    }
+
+    [TestMethod]
+    public async Task WriteAsync_AfterTheOverflowingWrite_AcceptsNothing()
+    {
+        using StandardOutputFailureDeferringStream stream = new(new FailingWriteStream());
+        await stream.WriteAsync(new byte[BufferSize - 4].AsMemory());
+        await Assert.ThrowsExactlyAsync<OutputWriteFailedException>(async () => await stream.WriteAsync(new byte[100].AsMemory()));
+
+        var exception = await Assert.ThrowsExactlyAsync<OutputWriteFailedException>(
+            async () => await stream.WriteAsync(new byte[100].AsMemory()));
+
+        Assert.AreEqual(0, exception.BytesAccepted);
     }
 
     [TestMethod]

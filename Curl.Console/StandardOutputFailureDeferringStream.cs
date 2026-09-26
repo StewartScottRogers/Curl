@@ -1,3 +1,5 @@
+using Curl.Protocol.Abstractions;
+
 namespace Curl.Console;
 
 /// <summary>
@@ -20,8 +22,12 @@ namespace Curl.Console;
 /// So after the first <see cref="IOException" /> from <paramref name="inner" /> this stream
 /// sets <see cref="HasWriteFailed" /> and discards writes without throwing until
 /// <see cref="StdioBufferSize" /> bytes have been offered since the failure, counting the
-/// write that failed; from then on every write throws an <see cref="IOException" />, so the
-/// handler stops and reports its own write failure. A flush never throws: its failure also
+/// write that failed; from then on every write throws an
+/// <see cref="OutputWriteFailedException" />, so the handler stops and reports its own write
+/// failure. Its <see cref="OutputWriteFailedException.BytesAccepted" /> is the room the
+/// buffer had left when the write that overflowed it arrived - curl's <c>returned M</c>, 96
+/// for the forty-first of a run of 100-byte writes - and 0 for the write that failed with
+/// nothing absorbed before it, or for any write after the buffer is full. A flush never throws: its failure also
 /// sets <see cref="HasWriteFailed" />. The stream does not own <paramref name="inner" /> and
 /// never disposes it.
 /// </para>
@@ -107,9 +113,10 @@ internal sealed class StandardOutputFailureDeferringStream(Stream inner) : Strea
     public override void SetLength(long value) => throw new NotSupportedException();
 
     /// <inheritdoc />
-    /// <exception cref="IOException">
+    /// <exception cref="OutputWriteFailedException">
     /// Standard output has failed and <see cref="StdioBufferSize" /> bytes have been offered
-    /// since.
+    /// since; its <see cref="OutputWriteFailedException.BytesAccepted" /> is the room the
+    /// stdio buffer had left for this write.
     /// </exception>
     public override void Write(byte[] buffer, int offset, int count)
     {
@@ -135,9 +142,10 @@ internal sealed class StandardOutputFailureDeferringStream(Stream inner) : Strea
         WriteAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
 
     /// <inheritdoc />
-    /// <exception cref="IOException">
+    /// <exception cref="OutputWriteFailedException">
     /// Standard output has failed and <see cref="StdioBufferSize" /> bytes have been offered
-    /// since.
+    /// since; its <see cref="OutputWriteFailedException.BytesAccepted" /> is the room the
+    /// stdio buffer had left for this write.
     /// </exception>
     public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
     {
@@ -163,14 +171,20 @@ internal sealed class StandardOutputFailureDeferringStream(Stream inner) : Strea
     /// would still have room for it.
     /// </summary>
     /// <param name="count">The size of the write.</param>
-    /// <exception cref="IOException">The buffer would be full, so curl's write would fail.</exception>
+    /// <exception cref="OutputWriteFailedException">
+    /// The buffer would be full, so curl's write would fail, having accepted what room the
+    /// buffer had left; a write with nothing absorbed before it accepts nothing.
+    /// </exception>
     private void AbsorbIntoStdioBuffer(int count)
     {
+        long offeredBefore = bytesOfferedSinceFailure;
         bytesOfferedSinceFailure += count;
 
         if (bytesOfferedSinceFailure >= StdioBufferSize)
         {
-            throw new IOException("Standard output is closed or its reader has gone.");
+            int bytesAccepted = offeredBefore == 0 ? 0 : (int)Math.Max(0, StdioBufferSize - offeredBefore);
+
+            throw new OutputWriteFailedException(bytesAccepted, "Standard output is closed or its reader has gone.");
         }
     }
 }
