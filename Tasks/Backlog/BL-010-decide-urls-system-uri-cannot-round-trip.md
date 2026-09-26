@@ -4,7 +4,7 @@ title: Decide how to represent URLs System.Uri cannot round-trip
 priority: Normal
 assignee: Stewart
 pipeline: docs
-depends-on: [BL-007]
+depends-on: [BL-007, BL-128]
 requirement: none
 created: 2026-09-25
 completed:
@@ -42,6 +42,8 @@ ahead of it.
 
 ## Notes
 
+**Stewart, 2026-09-26:** wants Claude's proposed ADR comparing the three options before deciding; filed as BL-128.
+
 Claude can draft a proposed ADR comparing the three options. If that would help,
 file it as a separate task assigned to Claude and add it to `depends-on`.
 
@@ -49,3 +51,4 @@ file it as a separate task assigned to Claude and add it to `depends-on`.
 
 - 2026-09-25: Migrated from Documentation/Planning/Backlog.md (Ready). Assigned to Stewart because the decision is his.
 - 2026-09-25: Scope widened to the two spellings System.Uri throws on, not only those it alters (conformance re-audit).
+- 2026-09-26: Waits on BL-128, a proposed ADR Stewart asked for before deciding.

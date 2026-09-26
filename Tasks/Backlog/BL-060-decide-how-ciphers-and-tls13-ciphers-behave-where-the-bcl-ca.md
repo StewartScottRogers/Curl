@@ -2,7 +2,7 @@
 id: BL-060
 title: Decide how --ciphers and --tls13-ciphers behave where the BCL cannot set cipher suites
 priority: Normal
-assignee: Stewart
+assignee: Claude
 pipeline: docs
 depends-on: []
 touches: [Documentation/Planning/Decisions]
@@ -65,8 +65,11 @@ Choices, per platform:
 
 ## Notes
 
+**Decision (Stewart, 2026-09-26):** Option 1. Windows: behave as the measured Schannel build of curl 8.21.0 - `--ciphers` refused with exit 59 `schannel: Failed setting algorithm cipher list`; `--tls13-ciphers` follows the measurement above (accepted, exit 0), which the ADR records. Linux and macOS: honoured through `CipherSuitesPolicy`, accepting both OpenSSL names and IANA names (a hand-written name map; no package).
+
 Blocks BL-066. BL-067 parses both options verbatim regardless of this decision.
 
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Stewart decided: refuse on Windows as the Schannel build does, honour on Linux/macOS. Reassigned to Claude to record the ADR.

@@ -2,7 +2,7 @@
 id: BL-053
 title: Decide the numeric option ceiling - match the platform curl or one ceiling everywhere
 priority: Normal
-assignee: Stewart
+assignee: Claude
 pipeline: docs
 depends-on: []
 touches: [Documentation/Planning/Decisions]
@@ -51,6 +51,9 @@ deliberate divergence from upstream on at least one platform, which needs an ADR
 
 ## Notes
 
+**Decision (Stewart, 2026-09-26):** Match the platform curl: 2^31-1 on Windows, 2^63-1 on Linux and macOS, as upstream's C `long` does. `--continue-at` reads a 64-bit value on every platform regardless.
+
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Stewart decided: match the platform curl's ceiling. Reassigned to Claude to record the ADR.

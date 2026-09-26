@@ -2,7 +2,7 @@
 id: BL-059
 title: Decide which curl TLS build Curl matches for TLS failure messages, --capath and --cert formats
 priority: High
-assignee: Stewart
+assignee: Claude
 pipeline: docs
 depends-on: []
 touches: [Documentation/Planning/Decisions]
@@ -77,9 +77,12 @@ Also state whether the default trust store is the operating system's store (what
 
 ## Notes
 
+**Decision (Stewart, 2026-09-26):** Option 2 - match the platform's usual curl. Windows: the Schannel build of curl 8.21.0 as measured above (its failure message text; `--capath` ignored with its two warning lines; `--cert` as that build behaves, PEM refused with exit 58). Linux and macOS: the OpenSSL build of curl 8.21.0 is the reference (its message text, a working `--capath`, PEM `--cert`); measure it before pinning text. Default trust store: the one the reference build uses on each platform. Where a measurement shows the platform's usual curl differs from this, the ADR records it.
+
 Blocks BL-064 (messages and `--capath`) and BL-065 (`--cert`/`--key`). BL-062 and BL-063
 proceed without it.
 
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Stewart decided: match the platform's usual curl. Reassigned to Claude to record the ADR.
