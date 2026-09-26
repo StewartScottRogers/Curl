@@ -1,5 +1,5 @@
 ---
-id: BL-277
+id: BL-278
 title: Pass the composition root's TimeProvider to SslStreamTlsProvider in CurlComposition
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-277 — Pass the composition root's TimeProvider to SslStreamTlsProvider in CurlComposition
+# BL-278 — Pass the composition root's TimeProvider to SslStreamTlsProvider in CurlComposition
 
 ## Goal
 
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-- ADR-0029 (from BL-211): `SslStreamTlsProvider` reports its handshake timestamps on the `TimeProvider` it is constructed with, `TimeProvider.System` by default, and `TcpConnector` keeps its `TlsHandshakeCompleted`. The two are only comparable when both share one provider.
+- ADR-0030 (from BL-211): `SslStreamTlsProvider` reports its handshake timestamps on the `TimeProvider` it is constructed with, `TimeProvider.System` by default, and `TcpConnector` keeps its `TlsHandshakeCompleted`. The two are only comparable when both share one provider.
 - `Curl.Console/CurlComposition.cs` line 67 constructs `new SslStreamTlsProvider(tlsClientOptions)`; use the `SslStreamTlsProvider(TlsClientOptions, TimeProvider)` overload with the `timeProvider` already passed to `TcpConnector`.
 
 ## Acceptance criteria
