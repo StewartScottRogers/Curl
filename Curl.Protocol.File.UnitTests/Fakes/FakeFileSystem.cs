@@ -65,6 +65,19 @@ public sealed class FakeFileSystem : IFileSystem
     }
 
     /// <summary>
+    /// Adds a file whose open reports no timestamp, as an implementation that could not
+    /// determine a modification time would.
+    /// </summary>
+    /// <param name="path">The operating-system path.</param>
+    /// <param name="content">The file's bytes.</param>
+    public void AddFileWithoutTimestamp(string path, byte[] content)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+
+        entries[path] = FakeFileEntry.ForFile(content, null);
+    }
+
+    /// <summary>
     /// Adds a directory, which a read open rejects.
     /// </summary>
     /// <param name="path">The operating-system path.</param>
@@ -220,7 +233,7 @@ public sealed class FakeFileSystem : IFileSystem
         entries.TryGetValue(path, out var existing);
 
         byte[] kept = mode == FileWriteMode.Append && existing is not null ? existing.Content : [];
-        DateTimeOffset lastWriteTimeUtc = existing?.LastWriteTimeUtc ?? DefaultLastWriteTimeUtc;
+        DateTimeOffset? lastWriteTimeUtc = existing is null ? DefaultLastWriteTimeUtc : existing.LastWriteTimeUtc;
 
         if (writeDestinations.TryGetValue(path, out var destination))
         {

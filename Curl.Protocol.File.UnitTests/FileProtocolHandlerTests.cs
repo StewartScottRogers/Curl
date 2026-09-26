@@ -1134,6 +1134,53 @@ public sealed class FileProtocolHandlerTests
         Assert.AreEqual(ExpectedHeaders, Encoding.ASCII.GetString(headers.ToArray()));
     }
 
+    // Upstream libcurl 8.21.0's file.c writes Last-Modified only when the stat of the
+    // opened handle gave a usable modification time, so an unknown one drops the line.
+    [TestMethod]
+    public async Task ExecuteAsync_HeaderOutputWithUnknownTimestamp_OmitsTheLastModifiedLine()
+    {
+        var fileSystem = new FakeFileSystem();
+        fileSystem.AddFileWithoutTimestamp(OsPath, Content);
+        var headers = new ChunkRecordingStream();
+        var context = new FakeTransferContext
+        {
+            Url = FileUrl,
+            Output = new ChunkRecordingStream(),
+            HeaderOutput = headers,
+        };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        await handler.ExecuteAsync(context);
+
+        Assert.AreEqual(
+            "Content-Length: 10\r\nAccept-ranges: bytes\r\n\r\n",
+            Encoding.ASCII.GetString(headers.ToArray()));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_HeaderOutputWithKnownTimestamp_WritesAllThreeLines()
+    {
+        var fileSystem = new FakeFileSystem();
+        fileSystem.AddFile(OsPath, Content, FakeFileSystem.DefaultLastWriteTimeUtc);
+        var headers = new ChunkRecordingStream();
+        var context = new FakeTransferContext
+        {
+            Url = FileUrl,
+            Output = new ChunkRecordingStream(),
+            HeaderOutput = headers,
+        };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        await handler.ExecuteAsync(context);
+
+        Assert.AreEqual(
+            "Content-Length: 10\r\n"
+            + "Accept-ranges: bytes\r\n"
+            + "Last-Modified: Wed, 24 Jun 2026 12:34:56 GMT\r\n"
+            + "\r\n",
+            Encoding.ASCII.GetString(headers.ToArray()));
+    }
+
     [TestMethod]
     public async Task ExecuteAsync_Upload_WritesNothingToTheHeaderOutput()
     {
@@ -1297,6 +1344,36 @@ public sealed class FileProtocolHandlerTests
             new TimeCondition(FakeFileSystem.DefaultLastWriteTimeUtc, TimeConditionKind.IfUnmodifiedSince),
             output,
             headers);
+
+        CollectionAssert.AreEqual(Content, output.ToArray());
+        Assert.AreEqual((long)Content.Length, result.BytesTransferred);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+    }
+
+    // Upstream libcurl 8.21.0's Curl_meets_timecondition transfers when the document time
+    // is unknown: a condition that cannot be evaluated must not suppress the data.
+    [TestMethod]
+    public async Task ExecuteAsync_UnknownTimestampWithIfModifiedSince_TransfersEveryByte()
+    {
+        var output = new ChunkRecordingStream();
+
+        var result = await UnknownTimestampResultAsync(
+            new TimeCondition(Later, TimeConditionKind.IfModifiedSince),
+            output);
+
+        CollectionAssert.AreEqual(Content, output.ToArray());
+        Assert.AreEqual((long)Content.Length, result.BytesTransferred);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_UnknownTimestampWithIfUnmodifiedSince_TransfersEveryByte()
+    {
+        var output = new ChunkRecordingStream();
+
+        var result = await UnknownTimestampResultAsync(
+            new TimeCondition(Earlier, TimeConditionKind.IfUnmodifiedSince),
+            output);
 
         CollectionAssert.AreEqual(Content, output.ToArray());
         Assert.AreEqual((long)Content.Length, result.BytesTransferred);
@@ -1809,6 +1886,23 @@ public sealed class FileProtocolHandlerTests
             Url = FileUrl,
             Output = output,
             HeaderOutput = headerOutput,
+            TimeCondition = condition,
+        };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        return await handler.ExecuteAsync(context);
+    }
+
+    private static async Task<TransferResult> UnknownTimestampResultAsync(
+        TimeCondition condition,
+        Stream output)
+    {
+        var fileSystem = new FakeFileSystem();
+        fileSystem.AddFileWithoutTimestamp(OsPath, Content);
+        var context = new FakeTransferContext
+        {
+            Url = FileUrl,
+            Output = output,
             TimeCondition = condition,
         };
         var handler = new FileProtocolHandler(fileSystem);

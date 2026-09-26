@@ -35,6 +35,28 @@ public sealed class FileOpenResultTests
     }
 
     [TestMethod]
+    public void Opened_WithNullTimestamp_ReportsOkWithAnUnknownTimestamp()
+    {
+        using var content = new MemoryStream([1, 2, 3]);
+
+        var result = FileOpenResult.Opened(content, 3, null);
+
+        Assert.AreEqual(FileAccessStatus.Ok, result.Status);
+        Assert.IsTrue(result.IsOpen);
+        Assert.AreSame(content, result.Content);
+        Assert.AreEqual(3L, result.Length);
+        Assert.IsNull(result.LastWriteTimeUtc);
+    }
+
+    [TestMethod]
+    public void Failed_ReportsANullTimestamp()
+    {
+        var result = FileOpenResult.Failed(FileAccessStatus.NotFound);
+
+        Assert.IsNull(result.LastWriteTimeUtc);
+    }
+
+    [TestMethod]
     public void Failed_WithOk_ThrowsArgumentOutOfRangeException()
     {
         var status = FileAccessStatus.Ok;
@@ -115,6 +137,6 @@ public sealed class FileOpenResultTests
         Assert.IsFalse(result.IsOpen);
         Assert.IsNull(result.Content);
         Assert.AreEqual(0L, result.Length);
-        Assert.AreEqual(default(DateTimeOffset), result.LastWriteTimeUtc);
+        Assert.IsNull(result.LastWriteTimeUtc);
     }
 }

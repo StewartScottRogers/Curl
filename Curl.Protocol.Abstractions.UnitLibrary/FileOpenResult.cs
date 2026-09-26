@@ -15,8 +15,12 @@ namespace Curl.Protocol.Abstractions;
 /// The length in bytes of the opened handle, or zero when the open failed.
 /// </param>
 /// <param name="LastWriteTimeUtc">
-/// The last-write timestamp of the opened handle, in Coordinated Universal Time, or the
-/// <see langword="default" /> value when the open failed.
+/// The last-write timestamp of the opened handle, in Coordinated Universal Time, or
+/// <see langword="null" /> when the implementation could not determine a modification
+/// time — which is always the case when the open failed. <see langword="null" /> means
+/// "unknown", not "the epoch": a <c>-z</c>/<c>--time-cond</c> condition that cannot be
+/// evaluated transfers the body, and the <c>file://</c> header block leaves out its
+/// <c>Last-Modified</c> line.
 /// </param>
 /// <remarks>
 /// <para>
@@ -38,7 +42,7 @@ public sealed record FileOpenResult(
     FileAccessStatus Status,
     Stream? Content,
     long Length,
-    DateTimeOffset LastWriteTimeUtc)
+    DateTimeOffset? LastWriteTimeUtc)
 {
     /// <summary>
     /// Gets a value indicating whether the open succeeded, and therefore whether
@@ -52,7 +56,9 @@ public sealed record FileOpenResult(
     /// <param name="content">The opened stream; seekable when the open was for reading.</param>
     /// <param name="length">The length in bytes of the opened handle.</param>
     /// <param name="lastWriteTimeUtc">
-    /// The last-write timestamp of the opened handle, in Coordinated Universal Time.
+    /// The last-write timestamp of the opened handle, in Coordinated Universal Time, or
+    /// <see langword="null" /> when the implementation could not determine a modification
+    /// time. <see langword="null" /> means "unknown", not "the epoch".
     /// </param>
     /// <returns>
     /// A result whose <see cref="Status" /> is <see cref="FileAccessStatus.Ok" />.
@@ -61,7 +67,7 @@ public sealed record FileOpenResult(
     /// <paramref name="content" /> is <see langword="null" />, which would leave a result
     /// claiming to be open with nothing to read or write.
     /// </exception>
-    public static FileOpenResult Opened(Stream content, long length, DateTimeOffset lastWriteTimeUtc)
+    public static FileOpenResult Opened(Stream content, long length, DateTimeOffset? lastWriteTimeUtc)
     {
         ArgumentNullException.ThrowIfNull(content);
 
@@ -74,11 +80,11 @@ public sealed record FileOpenResult(
     /// <param name="status">Why the open failed.</param>
     /// <returns>
     /// A result with no <see cref="Content" />, a <see cref="Length" /> of zero and a
-    /// <see langword="default" /> <see cref="LastWriteTimeUtc" />.
+    /// <see langword="null" /> <see cref="LastWriteTimeUtc" />.
     /// </returns>
     /// <exception cref="ArgumentOutOfRangeException">
     /// <paramref name="status" /> is <see cref="FileAccessStatus.Ok" />, which is not a
-    /// failure; use <see cref="Opened(Stream, long, DateTimeOffset)" /> instead.
+    /// failure; use <see cref="Opened(Stream, long, DateTimeOffset?)" /> instead.
     /// </exception>
     public static FileOpenResult Failed(FileAccessStatus status)
     {
@@ -90,6 +96,6 @@ public sealed record FileOpenResult(
                 "A failed open cannot report FileAccessStatus.Ok; use FileOpenResult.Opened instead.");
         }
 
-        return new FileOpenResult(status, null, 0, default);
+        return new FileOpenResult(status, null, 0, null);
     }
 }

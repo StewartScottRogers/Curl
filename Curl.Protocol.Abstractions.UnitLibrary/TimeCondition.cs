@@ -13,6 +13,9 @@ namespace Curl.Protocol.Abstractions;
 /// A handler compares this against the last-write time of the resource it opened — for
 /// <c>file://</c>, <see cref="FileOpenResult.LastWriteTimeUtc" /> — and skips the body
 /// when the condition is not met. curl treats a skipped transfer as a success, not an
-/// error, so the exit code stays <see cref="CurlExitCode.Ok" />.
+/// error, so the exit code stays <see cref="CurlExitCode.Ok" />. When the resource's
+/// last-write time is unknown (<see langword="null" />), the condition cannot be
+/// evaluated and the body is transferred, as libcurl 8.21.0's
+/// <c>Curl_meets_timecondition</c> does for an unknown document time.
 /// </remarks>
 public sealed record TimeCondition(DateTimeOffset Value, TimeConditionKind Kind);

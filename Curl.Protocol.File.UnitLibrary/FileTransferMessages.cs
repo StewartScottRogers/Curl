@@ -95,18 +95,52 @@ internal static class FileTransferMessages
         $"cannot open {osPath} for writing";
 
     /// <summary>
-    /// The three pseudo-headers curl synthesises for a local file, followed by the blank
-    /// line that ends a header block.
+    /// The pseudo-headers curl synthesises for a local file, followed by the blank line
+    /// that ends a header block.
     /// </summary>
     /// <param name="length">
     /// The length of the whole file. It stays the whole file even when a range was asked
     /// for, which is measured behaviour rather than an oversight.
     /// </param>
-    /// <param name="lastWriteTimeUtc">The file's last-write timestamp.</param>
+    /// <param name="lastWriteTimeUtc">
+    /// The file's last-write timestamp, or <see langword="null" /> when the file system
+    /// could not determine one.
+    /// </param>
     /// <returns>The header block to write.</returns>
-    internal static string PseudoHeaders(long length, DateTimeOffset lastWriteTimeUtc) =>
+    /// <remarks>
+    /// <para>
+    /// With a timestamp the block is three lines: <c>Content-Length</c>,
+    /// <c>Accept-ranges</c> and <c>Last-Modified</c>. Without one the whole
+    /// <c>Last-Modified</c> line is left out, so the block is
+    /// <c>Content-Length: &lt;n&gt;\r\nAccept-ranges: bytes\r\n\r\n</c>. The premise is
+    /// upstream libcurl 8.21.0's <c>lib/file.c</c>, which writes <c>Last-Modified</c> only
+    /// when the stat of the opened handle succeeded and so gave a usable modification
+    /// time; a year-0001 date is not something curl can print.
+    /// </para>
+    /// <para>
+    /// That case could not be produced from the curl 8.21.0 binary on Windows: even
+    /// <c>curl -sI file:///NUL</c>, a device with no real modification time, prints
+    /// <c>Last-Modified: Thu, 01 Jan 1970 00:00:00 GMT</c>, because the stat succeeds and
+    /// reports zero. The omission therefore rests on the upstream source, not on a
+    /// measurement.
+    /// </para>
+    /// </remarks>
+    internal static string PseudoHeaders(long length, DateTimeOffset? lastWriteTimeUtc) =>
         "Content-Length: " + length.ToString(CultureInfo.InvariantCulture) + "\r\n"
         + "Accept-ranges: bytes\r\n"
-        + "Last-Modified: " + lastWriteTimeUtc.UtcDateTime.ToString("R", CultureInfo.InvariantCulture)
-        + "\r\n\r\n";
+        + LastModifiedLine(lastWriteTimeUtc)
+        + "\r\n";
+
+    /// <summary>
+    /// The <c>Last-Modified</c> pseudo-header line, or nothing when the timestamp is
+    /// unknown.
+    /// </summary>
+    /// <param name="lastWriteTimeUtc">
+    /// The file's last-write timestamp, or <see langword="null" /> when unknown.
+    /// </param>
+    /// <returns>The line with its line ending, or an empty string.</returns>
+    private static string LastModifiedLine(DateTimeOffset? lastWriteTimeUtc) =>
+        lastWriteTimeUtc is { } knownLastWriteTimeUtc
+            ? "Last-Modified: " + knownLastWriteTimeUtc.UtcDateTime.ToString("R", CultureInfo.InvariantCulture) + "\r\n"
+            : string.Empty;
 }

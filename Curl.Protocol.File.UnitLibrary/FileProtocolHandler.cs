@@ -497,7 +497,10 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     /// Applies <c>-z</c>/<c>--time-cond</c> to the timestamp the open reported.
     /// </summary>
     /// <param name="condition">The condition, or <see langword="null" /> for none.</param>
-    /// <param name="lastWriteTimeUtc">The file's last-write timestamp.</param>
+    /// <param name="lastWriteTimeUtc">
+    /// The file's last-write timestamp, or <see langword="null" /> when the file system
+    /// could not determine one.
+    /// </param>
     /// <returns>
     /// <see langword="true" /> when the body should be transferred. An unmet condition is
     /// a success with no body, not a failure.
@@ -507,18 +510,21 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     /// timestamp in whole seconds, and both comparisons are strict: at equality neither
     /// direction transfers, as measured on curl 8.21.0. Truncation is this handler's
     /// comparison rule; <see cref="TimeCondition" /> itself is left as the command line
-    /// parsed it.
+    /// parsed it. An unknown timestamp transfers whichever way the condition runs: a
+    /// condition that cannot be evaluated must not silently suppress the data, which is
+    /// what libcurl 8.21.0's <c>Curl_meets_timecondition</c> does for an unknown document
+    /// time.
     /// </remarks>
     private static bool MeetsTimeCondition(
         TimeCondition? condition,
-        DateTimeOffset lastWriteTimeUtc)
+        DateTimeOffset? lastWriteTimeUtc)
     {
-        if (condition is null)
+        if (condition is null || lastWriteTimeUtc is not { } knownLastWriteTimeUtc)
         {
             return true;
         }
 
-        long fileSeconds = WholeSeconds(lastWriteTimeUtc);
+        long fileSeconds = WholeSeconds(knownLastWriteTimeUtc);
         long conditionSeconds = WholeSeconds(condition.Value);
 
         return condition.Kind == TimeConditionKind.IfModifiedSince
