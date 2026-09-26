@@ -43,3 +43,4 @@ If a researched proposal would help, file a separate task assigned to Claude wit
 
 - 2026-09-25: Migrated from Documentation/Planning/Backlog.md (Ready). Assigned to Stewart because the decision is his.
 - 2026-09-26: Stewart chose porting the test cases to MSTest. Reassigned to Claude to record the ADR.
+- 2026-09-26: Backlog -> Doing.
