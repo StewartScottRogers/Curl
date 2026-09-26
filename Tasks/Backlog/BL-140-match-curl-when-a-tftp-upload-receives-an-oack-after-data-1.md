@@ -1,5 +1,5 @@
 ---
-id: BL-128
+id: BL-140
 title: Match curl when a TFTP upload receives an OACK after DATA 1
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-128 — Match curl when a TFTP upload receives an OACK after DATA 1
+# BL-140 — Match curl when a TFTP upload receives an OACK after DATA 1
 
 ## Goal
 

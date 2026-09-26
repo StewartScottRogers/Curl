@@ -86,7 +86,7 @@ Loopback Python UDP servers answering from a second (transfer) port, a 1000-byte
   `-m 5` (one short datagram then silence).
 - **DATA packet received during an upload:** ignored; DATA 1 re-sent at 6.05 s.
 - **OACK `blksize 8` after DATA 1:** curl sends DATA block 1 again with 8 bytes, then
-  DATA 2 with 8 bytes after ACK 1 (not matched; filed as BL-128).
+  DATA 2 with 8 bytes after ACK 1 (not matched; filed as BL-140).
 
 These are curl 8.21.0's `tftp_set_timeouts` rules as recorded under BL-075, applied to
 the WRQ; after the first ACK/OACK the schedule is 3 retries 6 s apart (15 s default).
@@ -119,7 +119,7 @@ the WRQ; after the first ACK/OACK the schedule is 3 retries 6 s apart (15 s defa
     rule that was measured for 7, 28 and 55).
   - curl's acceptance of ACK 65535 when block 0 is expected (block-number wrap) is not
     matched; it needs a 32 MiB upload to reach and was not measured.
-- Follow-ups filed: BL-128 (late OACK during an upload), BL-129 (too-short datagram
+- Follow-ups filed: BL-140 (late OACK during an upload), BL-141 (too-short datagram
   during a download, unmeasured).
 
 ## Log
