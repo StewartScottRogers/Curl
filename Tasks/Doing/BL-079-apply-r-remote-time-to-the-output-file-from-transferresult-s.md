@@ -107,3 +107,4 @@ original Context is now a measure-then-match criterion.
 - 2026-09-26: Backlog -> Doing.
 - 2026-09-26: Doing -> Blocked. Re-plan touches: -R/--remote-time is not parsed (needs Curl.Cli.UnitLibrary + Curl.Cli.UnitTests) and the runner's tests are in Curl.Console.UnitTests; none are in touches
 - 2026-09-26: Blocked -> Backlog. Re-planned: -R parse split out as BL-125 (now a dependency); touches now Core, Core.UnitTests, Console, Console.UnitTests and Requirements.md; criteria name the setter seam and the -z case to measure.
+- 2026-09-26: Backlog -> Doing.
