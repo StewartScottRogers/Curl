@@ -119,3 +119,4 @@ tests came about.
 
 - 2026-09-25: Created.
 - 2026-09-25: Added the four surviving mutants and the CancellingStream fake defect found by the BL-008 re-review.
+- 2026-09-26: Backlog -> Doing.
