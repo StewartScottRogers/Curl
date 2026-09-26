@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Text;
 
 namespace Curl.Protocol.File;
@@ -16,6 +17,9 @@ namespace Curl.Protocol.File;
 /// written with uppercase hexadecimal digits, as curl 8.21.0 quotes it:
 /// <c>file:///C:/dir/a%2eb/x</c> is quoted as <c>C:/dir/a%2Eb/x</c>. A malformed escape
 /// — <c>%2</c>, <c>%GG</c>, <c>%g2</c>, a trailing <c>%</c> — is kept exactly as written.
+/// A non-ASCII character written unescaped is encoded as its UTF-8 bytes, so
+/// <c>file:///C:/dir/é</c> is quoted as <c>C:/dir/%C3%A9</c>; printable ASCII is never
+/// encoded.
 /// </param>
 /// <param name="OsPath">
 /// The percent-decoded operating-system path handed to
@@ -181,8 +185,9 @@ public sealed record FileUrlPath(string UrlPath, string OsPath)
     /// <item>
     /// <description>
     /// <strong>Decode.</strong> <c>UrlPath</c> is the result of steps two to seven,
-    /// still encoded, with the hexadecimal digits of each well-formed escape uppercased
-    /// and a malformed one left as written. <c>OsPath</c> is that text with each <c>%XX</c> escape decoded to
+    /// still encoded, with each unescaped non-ASCII character encoded as its UTF-8 bytes,
+    /// the hexadecimal digits of each well-formed escape uppercased and a malformed one
+    /// left as written. <c>OsPath</c> is that text with each <c>%XX</c> escape decoded to
     /// the byte it names and runs of escapes then read as UTF-8, including <c>%2F</c> to
     /// a literal <c>/</c>; a malformed escape — <c>%2</c>, <c>%GG</c>, a trailing
     /// <c>%</c> — is left exactly as written rather than rejected, which is what curl
@@ -236,7 +241,9 @@ public sealed record FileUrlPath(string UrlPath, string OsPath)
             return false;
         }
 
-        path = new FileUrlPath(UppercaseEscapes(urlPath), ToOperatingSystemPath(urlPath));
+        path = new FileUrlPath(
+            UppercaseEscapes(EncodeNonAscii(urlPath)),
+            ToOperatingSystemPath(urlPath));
 
         return true;
     }
@@ -452,6 +459,42 @@ public sealed record FileUrlPath(string UrlPath, string OsPath)
         {
             kept.RemoveAt(kept.Count - 1);
         }
+    }
+
+    /// <summary>
+    /// Percent-encodes every non-ASCII character as its UTF-8 bytes, leaving ASCII,
+    /// escapes included, exactly as written.
+    /// </summary>
+    /// <param name="urlPath">The still-encoded path.</param>
+    /// <returns>The path with nothing but ASCII in it.</returns>
+    /// <remarks>
+    /// Measured against the Unicode build of curl 8.21.0, which receives its arguments as
+    /// UTF-16 as .NET does: <c>file:///C:/nodir/aéb</c> is quoted as
+    /// <c>C:/nodir/a%C3%A9b</c>, and a character outside code page 1252 such as
+    /// <c>日</c> as <c>%E6%97%A5</c>. A lone surrogate is encoded as U+FFFD.
+    /// </remarks>
+    private static string EncodeNonAscii(string urlPath)
+    {
+        var encoded = new StringBuilder(urlPath.Length);
+        Span<byte> utf8 = stackalloc byte[4];
+
+        foreach (Rune rune in urlPath.EnumerateRunes())
+        {
+            if (rune.IsAscii)
+            {
+                encoded.Append((char)rune.Value);
+                continue;
+            }
+
+            int length = rune.EncodeToUtf8(utf8);
+
+            foreach (byte value in utf8[..length])
+            {
+                encoded.Append('%').Append(value.ToString("X2", CultureInfo.InvariantCulture));
+            }
+        }
+
+        return encoded.ToString();
     }
 
     /// <summary>

@@ -591,6 +591,55 @@ public sealed class FileUrlPathTests
         Assert.AreEqual(expected, path.UrlPath);
     }
 
+    // Measured against the Unicode build of curl 8.21.0 (C:\Windows\System32\curl.exe),
+    // which, like .NET, receives its arguments as UTF-16: a non-ASCII character written
+    // unescaped is quoted as its UTF-8 bytes, each an uppercase escape, whether or not it
+    // is in code page 1252. The ANSI mingw build quotes code page bytes instead and loses
+    // characters outside the code page, an artefact of how that build reads its arguments.
+    [TestMethod]
+    [DataRow("file:///C:/nodir/a\u00E9b", "C:/nodir/a%C3%A9b")]
+    [DataRow("file:///C:/nodir/a\u20ACb", "C:/nodir/a%E2%82%ACb")]
+    [DataRow("file:///C:/nodir/a\u03A9b", "C:/nodir/a%CE%A9b")]
+    [DataRow("file:///C:/nodir/a\u65E5b", "C:/nodir/a%E6%97%A5b")]
+    [DataRow("file:///C:/nodir/a\uD83D\uDE00b", "C:/nodir/a%F0%9F%98%80b")]
+    public void TryParse_UnescapedNonAsciiCharacter_IsQuotedAsUppercaseUtf8Escapes(
+        string url,
+        string expected)
+    {
+        bool parsed = FileUrlPath.TryParse(new Uri(url), out var path);
+
+        Assert.IsTrue(parsed);
+        Assert.IsNotNull(path);
+        Assert.AreEqual(expected, path.UrlPath);
+    }
+
+    // Only the quoted form is encoded: the operating-system path keeps the character.
+    [TestMethod]
+    public void TryParse_UnescapedNonAsciiCharacter_IsKeptInTheOperatingSystemPath()
+    {
+        var url = new Uri("file:///C:/nodir/a\u00E9b");
+
+        bool parsed = FileUrlPath.TryParse(url, out var path);
+
+        Assert.IsTrue(parsed);
+        Assert.IsNotNull(path);
+        Assert.AreEqual(NativePath("C:/nodir/a\u00E9b"), path.OsPath);
+    }
+
+    // Printable ASCII is never re-encoded (curl 8.21.0 quotes file:///C:/dir/a"b as
+    // C:/dir/a"b), and an escape written beside a non-ASCII character is only uppercased.
+    [TestMethod]
+    public void TryParse_NonAsciiBesideAsciiAndAnEscape_EncodesOnlyTheNonAsciiCharacter()
+    {
+        var url = new Uri("file:///C:/dir/../a\"%e9\u00E9b");
+
+        bool parsed = FileUrlPath.TryParse(url, out var path);
+
+        Assert.IsTrue(parsed);
+        Assert.IsNotNull(path);
+        Assert.AreEqual("C:/a\"%E9%C3%A9b", path.UrlPath);
+    }
+
     [TestMethod]
     public void TryParse_PathAsIsNullUrl_ThrowsArgumentNullException()
     {
