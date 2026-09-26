@@ -18,7 +18,9 @@ namespace Curl.Protocol.File;
 /// nothing written, headers included), write the pseudo-headers, return early for
 /// <c>-I</c>/<c>--head</c>, resolve <c>-r</c>/<c>--range</c> or
 /// <c>-C</c>/<c>--continue-at</c> into a window of the file — so a resume failure comes
-/// after the headers — then move the body in 16-kilobyte chunks.
+/// after the headers — then move the body in 16-kilobyte chunks. An upload under
+/// <c>--crlf</c> (<see cref="ITransferContext.ConvertLineEndings" />) converts each chunk
+/// on the way to the destination; a download never does.
 /// </para>
 /// <para>
 /// The exit codes are curl's, not the nearest-looking ones: every failure to open a
@@ -219,6 +221,7 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
                 source,
                 context.Output,
                 count,
+                static chunk => chunk,
                 FileTransferMessages.OutputWriteFailed,
                 context.CancellationToken)
             .ConfigureAwait(false);
@@ -265,7 +268,8 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     }
 
     /// <summary>
-    /// Skips whatever <c>-C</c>/<c>--continue-at</c> asked for, then moves the body.
+    /// Skips whatever <c>-C</c>/<c>--continue-at</c> asked for, then moves the body,
+    /// converting line endings on the way when <c>--crlf</c> asked for it.
     /// </summary>
     /// <param name="context">The transfer being performed.</param>
     /// <param name="upload">The stream to upload from.</param>
@@ -287,10 +291,17 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
             return TransferResult.Failure(CurlExitCode.ReadError, FileTransferMessages.ReadFailed);
         }
 
+        // A fresh converter per upload, so the carriage return it remembers never leaks
+        // from one transfer into the next. Bytes skipped by -C are not seen by it.
+        Func<ReadOnlyMemory<byte>, ReadOnlyMemory<byte>> convertChunk = context.ConvertLineEndings
+            ? new CrlfUploadConverter(ChunkSize).Convert
+            : static chunk => chunk;
+
         return await CopyAsync(
                 upload,
                 destination,
                 long.MaxValue,
+                convertChunk,
                 static _ => FileTransferMessages.DestinationWriteFailed,
                 context.CancellationToken)
             .ConfigureAwait(false);
@@ -303,32 +314,39 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     /// <param name="source">Where the bytes come from.</param>
     /// <param name="destination">Where they go.</param>
     /// <param name="count">
-    /// How many bytes at most, or <see cref="long.MaxValue" /> to run to the end of
+    /// How many bytes at most to read, or <see cref="long.MaxValue" /> to run to the end of
     /// <paramref name="source" />.
+    /// </param>
+    /// <param name="convertChunk">
+    /// Turns each chunk read into the chunk written: the chunk itself, or its
+    /// <c>--crlf</c> conversion on an upload.
     /// </param>
     /// <param name="writeErrorMessage">
     /// Builds the message to report if a write fails, from the size of the chunk offered.
     /// </param>
     /// <param name="cancellationToken">Cancels the copy.</param>
     /// <returns>
-    /// A success carrying the number of bytes moved, exit 26 for a failed read or exit 23
-    /// for a failed write.
+    /// A success carrying the number of bytes written, which after a <c>--crlf</c>
+    /// conversion is more than were read, as curl 8.21.0's <c>size_upload</c> is; exit 26
+    /// for a failed read or exit 23 for a failed write.
     /// </returns>
     private static async ValueTask<TransferResult> CopyAsync(
         Stream source,
         Stream destination,
         long count,
+        Func<ReadOnlyMemory<byte>, ReadOnlyMemory<byte>> convertChunk,
         Func<long, string> writeErrorMessage,
         CancellationToken cancellationToken)
     {
         byte[] buffer = new byte[ChunkSize];
+        long consumed = 0;
         long transferred = 0;
 
-        while (transferred < count)
+        while (consumed < count)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            int wanted = (int)Math.Min(ChunkSize, count - transferred);
+            int wanted = (int)Math.Min(ChunkSize, count - consumed);
             int read = await TryReadAsync(source, buffer, wanted, cancellationToken)
                 .ConfigureAwait(false);
 
@@ -344,18 +362,18 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
                 break;
             }
 
-            bool written = await TryWriteAsync(
-                    destination,
-                    buffer.AsMemory(0, read),
-                    cancellationToken)
+            ReadOnlyMemory<byte> chunk = convertChunk(buffer.AsMemory(0, read));
+
+            bool written = await TryWriteAsync(destination, chunk, cancellationToken)
                 .ConfigureAwait(false);
 
             if (!written)
             {
-                return TransferResult.Failure(CurlExitCode.WriteError, writeErrorMessage(read));
+                return TransferResult.Failure(CurlExitCode.WriteError, writeErrorMessage(chunk.Length));
             }
 
-            transferred += read;
+            consumed += read;
+            transferred += chunk.Length;
         }
 
         return TransferResult.Success(transferred);

@@ -333,6 +333,114 @@ public sealed class FileProtocolHandlerTests
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
     }
 
+    // --crlf, measured on curl 8.21.0 with
+    // curl -T in.txt --crlf file:///C:/crlfprobe/out.txt -w "%{size_upload}": a\nb\n lands
+    // as a\r\nb\r\n and size_upload prints 6, the converted count, not the 4 read.
+    [TestMethod]
+    public async Task ExecuteAsync_UploadWithCrlf_ConvertsEveryLineFeed()
+    {
+        var (written, result) = await UploadAsync("a\nb\n"u8.ToArray(), convertLineEndings: true);
+
+        CollectionAssert.AreEqual("a\r\nb\r\n"u8.ToArray(), written);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(6L, result.BytesTransferred);
+    }
+
+    [TestMethod]
+    [DataRow("a\nb\n")]
+    [DataRow("a\r\nb\r\n")]
+    public async Task ExecuteAsync_UploadWithoutCrlf_WritesTheBytesUnchanged(string content)
+    {
+        byte[] bytes = Encoding.ASCII.GetBytes(content);
+
+        var (written, result) = await UploadAsync(bytes, convertLineEndings: false);
+
+        CollectionAssert.AreEqual(bytes, written);
+        Assert.AreEqual((long)bytes.Length, result.BytesTransferred);
+    }
+
+    // Measured: a\r\nb uploaded with --crlf lands unchanged, size_upload 4. curl looks at
+    // the byte before a line feed rather than inserting a carriage return before every one.
+    [TestMethod]
+    public async Task ExecuteAsync_UploadWithCrlf_LeavesAnExistingCrlfPairUnchanged()
+    {
+        var (written, result) = await UploadAsync("a\r\nb"u8.ToArray(), convertLineEndings: true);
+
+        CollectionAssert.AreEqual("a\r\nb"u8.ToArray(), written);
+        Assert.AreEqual(4L, result.BytesTransferred);
+    }
+
+    // Measured: a\r\r\nb\rc\n\n lands as a\r\r\nb\rc\r\n\r\n, size_upload 11. A lone
+    // carriage return is left alone, and only the byte immediately before a line feed
+    // counts.
+    [TestMethod]
+    public async Task ExecuteAsync_UploadWithCrlf_LeavesALoneCarriageReturnAlone()
+    {
+        var (written, result) = await UploadAsync(
+            "a\r\r\nb\rc\n\n"u8.ToArray(),
+            convertLineEndings: true);
+
+        CollectionAssert.AreEqual("a\r\r\nb\rc\r\n\r\n"u8.ToArray(), written);
+        Assert.AreEqual(11L, result.BytesTransferred);
+    }
+
+    // Measured: 16383 bytes of x, a carriage return as byte 16384, a line feed as byte
+    // 16385 and ten bytes of y - 16395 in all - land unchanged with size_upload 16395. The
+    // carriage return ends the first 16384-byte chunk and the line feed starts the second,
+    // so the conversion has to remember the carriage return across the chunk boundary.
+    [TestMethod]
+    public async Task ExecuteAsync_UploadWithCrlf_KeepsAPairSplitAcrossChunksWhole()
+    {
+        byte[] content =
+        [
+            .. Enumerable.Repeat((byte)'x', ChunkSize - 1),
+            (byte)'\r',
+            (byte)'\n',
+            .. Enumerable.Repeat((byte)'y', 10),
+        ];
+
+        var (written, result) = await UploadAsync(content, convertLineEndings: true);
+
+        CollectionAssert.AreEqual(content, written);
+        Assert.AreEqual(16395L, result.BytesTransferred);
+    }
+
+    // A chunk of nothing but line feeds is the worst case: its conversion is twice its
+    // size, and all of it has to reach the destination.
+    [TestMethod]
+    public async Task ExecuteAsync_UploadWithCrlf_DoublesAFullChunkOfLineFeeds()
+    {
+        byte[] content = [.. Enumerable.Repeat((byte)'\n', ChunkSize + 1)];
+        byte[] expected = [.. Enumerable.Range(0, ChunkSize + 1).SelectMany(static _ => "\r\n"u8.ToArray())];
+
+        var (written, result) = await UploadAsync(content, convertLineEndings: true);
+
+        CollectionAssert.AreEqual(expected, written);
+        Assert.AreEqual((long)expected.Length, result.BytesTransferred);
+    }
+
+    // --crlf converts uploads only; a download of the same bytes is untouched.
+    [TestMethod]
+    public async Task ExecuteAsync_DownloadWithCrlf_WritesTheBytesUnchanged()
+    {
+        byte[] content = "a\nb\n"u8.ToArray();
+        var fileSystem = new FakeFileSystem();
+        fileSystem.AddFile(OsPath, content);
+        var output = new ChunkRecordingStream();
+        var context = new FakeTransferContext
+        {
+            Url = FileUrl,
+            Output = output,
+            ConvertLineEndings = true,
+        };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        var result = await handler.ExecuteAsync(context);
+
+        CollectionAssert.AreEqual(content, output.ToArray());
+        Assert.AreEqual(4L, result.BytesTransferred);
+    }
+
     [TestMethod]
     public async Task ExecuteAsync_UploadDestinationNotFound_ReportsWriteError()
     {
@@ -2089,5 +2197,23 @@ public sealed class FileProtocolHandlerTests
         var handler = new FileProtocolHandler(fileSystem);
 
         return await handler.ExecuteAsync(context);
+    }
+
+    private static async Task<(byte[] Written, TransferResult Result)> UploadAsync(
+        byte[] content,
+        bool convertLineEndings)
+    {
+        var fileSystem = new FakeFileSystem();
+        var context = new FakeTransferContext
+        {
+            Url = FileUrl,
+            Upload = new TrackedMemoryStream(content),
+            ConvertLineEndings = convertLineEndings,
+        };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        var result = await handler.ExecuteAsync(context);
+
+        return (fileSystem.WrittenBytes(OsPath), result);
     }
 }
