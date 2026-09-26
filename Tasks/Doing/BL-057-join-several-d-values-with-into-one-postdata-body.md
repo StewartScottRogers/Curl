@@ -54,3 +54,4 @@ comments and any line in `Curl.Cli.UnitLibrary/README.md` that says the last `-d
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
