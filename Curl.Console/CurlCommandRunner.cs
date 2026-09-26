@@ -322,6 +322,33 @@ internal sealed class CurlCommandRunner(
             return await TransferAsync(dispatcher, options, url, outputFile, headerOutput).ConfigureAwait(false);
         }
 
+        return await TransferWithHeaderFileAsync(dispatcher, options, index, url, outputFile, headerFile)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Opens the <c>-D</c> file (truncated for the first URL, appended to after it), performs
+    /// the transfer with its header lines going there, and closes the file; reports the file
+    /// when it cannot be opened.
+    /// </summary>
+    /// <param name="dispatcher">Performs the transfer with the handler for its scheme.</param>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="index">The URL's position on the command line.</param>
+    /// <param name="url">The URL as typed.</param>
+    /// <param name="outputFile">The matching <c>-o</c> value, or <see langword="null" />.</param>
+    /// <param name="headerFile">The <c>-D</c> file name, used as given.</param>
+    /// <returns>
+    /// The transfer's result; <see cref="CannotOpenHeaderFileFailure" />, with nothing
+    /// transferred, when the <c>-D</c> file cannot be opened.
+    /// </returns>
+    private async Task<TransferResult> TransferWithHeaderFileAsync(
+        ProtocolDispatcher dispatcher,
+        CommandLineOptions options,
+        int index,
+        string url,
+        string? outputFile,
+        string headerFile)
+    {
         FileOpenResult opened = await outputFileSystem
             .OpenForWriteAsync(
                 headerFile,

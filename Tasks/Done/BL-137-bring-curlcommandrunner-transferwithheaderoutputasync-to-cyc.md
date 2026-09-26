@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-137 — Bring CurlCommandRunner.TransferWithHeaderOutputAsync to cyclomatic complexity 10 or less
 
@@ -35,19 +35,23 @@ the quality audit, with behaviour unchanged.
 
 ## Acceptance criteria
 
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Console` reports
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Console` reports
       0 failing members, and every method it lists for `CurlCommandRunner` is at
       complexity 10 or less.
-- [ ] No test in `Curl.Console.UnitTests` is changed in its assertions; tests are added
+- [x] No test in `Curl.Console.UnitTests` is changed in its assertions; tests are added
       only if a new method is not already fully covered, keeping `Curl.Console` at 100%
       line and branch coverage.
-- [ ] `dotnet build Curl.Console -warnaserror` is clean.
-- [ ] `dotnet test --filter "TestCategory!=Integration"` passes.
-- [ ] Every extracted method has an XML `<summary>` that states what it does.
+- [x] `dotnet build Curl.Console -warnaserror` is clean.
+- [x] `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Every extracted method has an XML `<summary>` that states what it does.
 
 ## Notes
+
+- Extracted the `-D` file branch (open, failure report, transfer, dispose) into `TransferWithHeaderFileAsync`; `TransferWithHeaderOutputAsync` now only chooses between no `-D`, `-D -` and a `-D` file. Existing tests cover the new method fully, so no test was added or changed.
+- Measured after: `Measure-CodeQuality.ps1 -Library Curl.Console` reports 123 members, 0 failing, 100% line and branch, worst CRAP 10.
 
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. TransferWithHeaderOutputAsync is at complexity 10 or less; Curl.Console has 0 failing members
