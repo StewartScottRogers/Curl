@@ -58,3 +58,4 @@ the ADR from BL-059 decides, and the tests pin the decided text byte for byte.
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
