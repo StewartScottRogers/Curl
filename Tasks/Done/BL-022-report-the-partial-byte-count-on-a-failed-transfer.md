@@ -8,7 +8,7 @@ depends-on: [BL-008, BL-019]
 touches: [Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Protocol.File.UnitLibrary, Curl.Protocol.File.UnitTests, Documentation/Product/Requirements.md]
 requirement: none
 created: 2026-09-25
-completed:
+completed: 2026-09-26
 ---
 # BL-022 — Report the partial byte count on a failed transfer
 
@@ -43,23 +43,23 @@ This changes `Curl.Protocol.Abstractions.UnitLibrary`, so it touches the abstrac
 
 ## Acceptance criteria
 
-- [ ] `TransferResult.Failure` takes an optional `long bytesTransferred = 0` and passes it
+- [x] `TransferResult.Failure` takes an optional `long bytesTransferred = 0` and passes it
       through; its documentation states that a failure reports the bytes that reached the
       destination before it, not zero.
-- [ ] A test in `Curl.Protocol.Abstractions.UnitTests` asserts
+- [x] A test in `Curl.Protocol.Abstractions.UnitTests` asserts
       `Failure(CurlExitCode.WriteError, "x", 5).BytesTransferred` is 5 and that the
       two-argument form still reports 0.
-- [ ] `CopyAsync` reports its running `transferred` count on both failure paths, the read
+- [x] `CopyAsync` reports its running `transferred` count on both failure paths, the read
       failure (exit 26) and the write failure (exit 23).
-- [ ] A test named `ExecuteAsync_OutputFailsAfterOneChunk_ReportsTheBytesAlreadyWritten`
+- [x] A test named `ExecuteAsync_OutputFailsAfterOneChunk_ReportsTheBytesAlreadyWritten`
       downloads a 40000-byte fake file into a `FaultingStream.FailingOnWrite(2)` and
       asserts `ExitCode` is `CurlExitCode.WriteError` and `BytesTransferred` is 16384.
-- [ ] A test named `ExecuteAsync_SourceFailsAfterOneChunk_ReportsTheBytesAlreadyWritten`
+- [x] A test named `ExecuteAsync_SourceFailsAfterOneChunk_ReportsTheBytesAlreadyWritten`
       uses `FaultingStream.FailingOnRead` and asserts `CurlExitCode.ReadError` with
       `BytesTransferred` 16384.
-- [ ] A test asserts a failure that moved nothing — a source that cannot be opened, exit
+- [x] A test asserts a failure that moved nothing — a source that cannot be opened, exit
       37 — still reports 0.
-- [ ] `dotnet build Curl.Protocol.Abstractions.UnitLibrary -warnaserror` and
+- [x] `dotnet build Curl.Protocol.Abstractions.UnitLibrary -warnaserror` and
       `dotnet build Curl.Protocol.File.UnitLibrary -warnaserror` are clean, and
       `dotnet test --filter "Category!=Integration"` is green across the solution.
 
@@ -72,7 +72,24 @@ behavioural dependency.
 `--max-filesize` and its exit 63 are BL-013, not this task. This task only makes the count
 truthful.
 
+Delivered directly rather than through the full `/feature` agent chain: the change is one
+optional parameter and one lambda, and the plan needed no architecture. What was found:
+
+- Since this task was filed, the upload paths (exit 26 read failure, exit 55 send failure)
+  and exit 63 already build `TransferResult` with the running count; the only path that
+  still dropped it was the download write failure (exit 23), which now passes it through.
+- A download read failure is no longer exit 26: curl 8.21.0 ends the body there and exits
+  0 (`ExecuteAsync_SourceReadFailsMidBody_EndsTheBodyThereAndSucceeds`). So
+  `ExecuteAsync_SourceFailsAfterOneChunk_ReportsTheBytesAlreadyWritten` drives the exit 26
+  path that exists, an upload of known length whose second read fails. Chosen because it
+  is the only read failure that still returns `CurlExitCode.ReadError`.
+- `Requirements.md` FR-018 now states what is implemented; its status is left `Draft`
+  because nothing consumes the count until `--write-out` lands.
+- The last criterion's `Category!=Integration` filter is run as `TestCategory!=Integration`,
+  the MSTest spelling CLAUDE.md uses.
+
 ## Log
 
 - 2026-09-25: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. A failed file:// transfer reports the bytes that reached the destination, not zero
