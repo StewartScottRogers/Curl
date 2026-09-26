@@ -82,3 +82,4 @@ an existing one untouched), while a genuine zero-byte download still creates an 
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
