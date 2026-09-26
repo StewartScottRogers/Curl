@@ -66,7 +66,7 @@ against `FILEFORMAT.md`, `getpart.pm`, `runtests.pl` and `testutil.pm` at `curl-
   (`mode="text"`), each tested. The comparison stage calls them in each part's upstream order.
 - **`base64="yes"` and `hex="yes"` are not implemented: curl 8.21.0 has no such attributes.**
   Its `FILEFORMAT.md` documents only `%b64[...]b64%` and `%hex[...]hex%` preprocessing macros;
-  `getpart.pm` decodes nothing. Filed as BL-151. `crlf="headers"`, which Context did not list, is
+  `getpart.pm` decodes nothing. Filed as BL-250. `crlf="headers"`, which Context did not list, is
   implemented because 8.21.0 uses it on data, stdout, stderr, protocol and file parts.
 - **Attribute truth follows Perl** (`IsAttributeSet`): present and not empty or `0`, so
   `nonewline="no"` is on, as upstream's `if($hash{'nonewline'})` has it.

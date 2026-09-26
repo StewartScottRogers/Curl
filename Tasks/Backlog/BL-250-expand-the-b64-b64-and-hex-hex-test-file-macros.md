@@ -1,5 +1,5 @@
 ---
-id: BL-151
+id: BL-250
 title: Expand the %b64[...]b64% and %hex[...]hex% test-file macros
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-151 — Expand the %b64[...]b64% and %hex[...]hex% test-file macros
+# BL-250 — Expand the %b64[...]b64% and %hex[...]hex% test-file macros
 
 ## Goal
 
