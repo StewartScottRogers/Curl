@@ -21,21 +21,12 @@ namespace Curl.Authentication;
 /// </remarks>
 public sealed class BasicAndBearerAuthenticator(Encoding credentialEncoding) : IHttpAuthenticator
 {
-    private static readonly HttpAuthSchemes[] LibcurlPickOrder =
-    [
-        HttpAuthSchemes.Negotiate,
-        HttpAuthSchemes.Bearer,
-        HttpAuthSchemes.Digest,
-        HttpAuthSchemes.Ntlm,
-        HttpAuthSchemes.Basic,
-    ];
-
     /// <inheritdoc />
     public string? CreateAuthorization(HttpAuthRequest request, IReadOnlyList<string> challenges)
     {
         HttpAuthSchemes scheme = challenges.Count == 0
             ? request.AllowedSchemes
-            : Pick(request.AllowedSchemes & HttpChallengeSchemes.Offered(challenges));
+            : HttpAuthSchemeRanking.PickFirst(request.AllowedSchemes & HttpChallengeSchemes.Offered(challenges));
 
         return scheme switch
         {
@@ -44,9 +35,6 @@ public sealed class BasicAndBearerAuthenticator(Encoding credentialEncoding) : I
             _ => null,
         };
     }
-
-    private static HttpAuthSchemes Pick(HttpAuthSchemes available) =>
-        Array.Find(LibcurlPickOrder, scheme => (available & scheme) != 0);
 
     private string? CreateBasic(HttpAuthRequest request) =>
         request.Credential is { } credential

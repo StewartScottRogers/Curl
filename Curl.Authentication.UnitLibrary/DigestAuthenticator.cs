@@ -22,7 +22,8 @@ namespace Curl.Authentication;
 /// It answers when Digest is allowed, a credential exists and the first Digest challenge
 /// among the header values is one curl accepts; otherwise it returns
 /// <see langword="null" />. It never answers before a challenge, as curl does not. Which
-/// scheme to answer when several are offered and allowed is not decided here. Keeping no
+/// scheme to answer when several are offered and allowed is decided by
+/// <see cref="RankedHttpAuthenticator" />. Keeping no
 /// state (ADR-0014), every answer is the first for its nonce: <c>nc=00000001</c>.
 /// <c>auth-int</c> hashes an empty body, as curl does whatever the body.
 /// </remarks>
