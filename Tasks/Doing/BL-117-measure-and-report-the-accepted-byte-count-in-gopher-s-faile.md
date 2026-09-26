@@ -74,3 +74,4 @@ part of this one. Keep every method within cyclomatic complexity 10 and the libr
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
