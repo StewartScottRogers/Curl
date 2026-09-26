@@ -86,3 +86,4 @@ proceed without it.
 
 - 2026-09-26: Created.
 - 2026-09-26: Stewart decided: match the platform's usual curl. Reassigned to Claude to record the ADR.
+- 2026-09-26: Backlog -> Doing.
