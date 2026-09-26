@@ -14,7 +14,7 @@ namespace Curl.Cli;
 /// looks like a flag) are carried on the result, accepted or refused. A command line that is
 /// read without refusal but names no URL is
 /// refused with <see cref="CommandLineRefusal.NoUrlSpecified"/>; an empty command line is
-/// accepted, because curl answers it differently. The one file-system question it asks is
+/// refused with <see cref="CommandLineRefusal.EmptyCommandLine"/>, the try-help line alone. The one file-system question it asks is
 /// whether the <c>--cacert</c> path exists, through a check <see cref="Parse(IReadOnlyList{string}, Func{string, bool}, IPasswordPrompt, IDataFileReader)"/>
 /// takes as a parameter. When the whole command line is read without refusal and the last
 /// <c>-u</c> / <c>--user</c> names a user with no colon, it asks the injected
@@ -86,6 +86,11 @@ public static class CommandLineParser
         ArgumentNullException.ThrowIfNull(passwordPrompt);
         ArgumentNullException.ThrowIfNull(dataFileReader);
 
+        if (arguments.Count == 0)
+        {
+            return CommandLineParseResult.Refused(CommandLineRefusal.EmptyCommandLine(), []);
+        }
+
         CommandLineOptions options = new();
         ArgumentReader reader = new(arguments, pathExists, dataFileReader);
         while (reader.TryTakeNext(out string argument))
@@ -100,7 +105,7 @@ public static class CommandLineParser
         }
 
         options.ReadMissingPassword(passwordPrompt);
-        return options.Urls.Count == 0 && arguments.Count > 0
+        return options.Urls.Count == 0
             ? CommandLineParseResult.Refused(CommandLineRefusal.NoUrlSpecified(), options.WarningLines)
             : CommandLineParseResult.Accepted(options);
     }

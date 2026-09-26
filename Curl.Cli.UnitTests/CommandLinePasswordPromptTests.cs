@@ -129,13 +129,13 @@ public sealed class CommandLinePasswordPromptTests
     }
 
     [TestMethod]
-    public void Parse_EmptyCommandLine_NeverPrompts()
+    public void Parse_EmptyCommandLine_IsRefusedWithoutPrompting()
     {
         RecordingPasswordPrompt prompt = new("unused");
 
         CommandLineParseResult result = Parse([], prompt);
 
-        Assert.IsTrue(result.IsAccepted);
+        Assert.IsFalse(result.IsAccepted);
         Assert.IsEmpty(prompt.Prompts);
     }
 

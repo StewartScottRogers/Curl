@@ -84,6 +84,15 @@ public sealed class CommandLineRefusalTests
     }
 
     [TestMethod]
+    public void EmptyCommandLine_Always_IsTheTryHelpLineAloneWithExit2()
+    {
+        CommandLineRefusal refusal = CommandLineRefusal.EmptyCommandLine();
+
+        Assert.AreEqual(CurlExitCode.FailedInit, refusal.ExitCode);
+        CollectionAssert.AreEqual(new[] { CommandLineRefusal.TryHelpLine }, refusal.StandardErrorLines.ToArray());
+    }
+
+    [TestMethod]
     public void NoUrlSpecified_Always_ReportsNoUrlWithCurlsExitCodePrefix()
     {
         CommandLineRefusal refusal = CommandLineRefusal.NoUrlSpecified();

@@ -5,7 +5,8 @@ namespace Curl.Cli;
 /// <summary>
 /// Why the command line was refused: the lines curl prints on standard error,
 /// <c>curl: option &lt;spelled&gt;: &lt;reason&gt;</c> (or, for <see cref="NoUrlSpecified"/>,
-/// <c>curl: (2) no URL specified</c>) followed by <see cref="TryHelpLine"/>, with one more line
+/// <c>curl: (2) no URL specified</c>) followed by <see cref="TryHelpLine"/>, or <see cref="TryHelpLine"/>
+/// alone for <see cref="EmptyCommandLine"/>, with one more line
 /// in front for <see cref="FileDoesNotExist"/>, <see cref="ContinueAtExclusiveWithRange"/> and
 /// <see cref="DataFileUnreadable"/>, and the exit code, which is <see cref="CurlExitCode.FailedInit"/>
 /// (curl's <c>CURLE_FAILED_INIT</c>, exit 2; see <see href="https://curl.se/libcurl/c/libcurl-errors.html"/>)
@@ -17,7 +18,7 @@ namespace Curl.Cli;
 /// </remarks>
 public sealed class CommandLineRefusal
 {
-    /// <summary>The second line of every refusal, exactly as curl prints it.</summary>
+    /// <summary>The last line of every refusal, exactly as curl prints it.</summary>
     public const string TryHelpLine = "curl: try 'curl --help' or 'curl --manual' for more information";
 
     private CommandLineRefusal(params string[] linesBeforeTryHelp)
@@ -38,7 +39,8 @@ public sealed class CommandLineRefusal
     public CurlExitCode ExitCode { get; }
 
     /// <summary>
-    /// The lines to write to standard error, without line terminators: two, or three for
+    /// The lines to write to standard error, without line terminators: two, one for
+    /// <see cref="EmptyCommandLine"/>, or three for
     /// <see cref="FileDoesNotExist"/>, and for <see cref="ContinueAtExclusiveWithRange"/> and
     /// <see cref="DataFileUnreadable"/> when errors are not hidden.
     /// </summary>
@@ -129,6 +131,17 @@ public sealed class CommandLineRefusal
             ? new CommandLineRefusal(badlyUsedLine)
             : new CommandLineRefusal("curl: --continue-at is mutually exclusive with --range", badlyUsedLine);
     }
+
+    /// <summary>
+    /// Refuses an empty command line with <see cref="TryHelpLine"/> alone, as curl does.
+    /// </summary>
+    /// <remarks>
+    /// Measured with the local curl 8.21.0 on 2026-09-26: <c>curl</c> with no arguments prints only
+    /// the try-help line on standard error, no <c>no URL specified</c> line, and exits 2.
+    /// </remarks>
+    /// <returns>A refusal of one line, <see cref="TryHelpLine"/>.</returns>
+    public static CommandLineRefusal EmptyCommandLine() =>
+        new();
 
     /// <summary>Refuses a command line that has arguments but names no URL.</summary>
     /// <returns>A refusal whose first line is <c>curl: (2) no URL specified</c>.</returns>

@@ -265,12 +265,16 @@ public sealed class CurlCommandRunnerTests
     }
 
     [TestMethod]
-    public async Task RunAsync_EmptyCommandLine_TransfersNothingAndReturns0()
+    public async Task RunAsync_EmptyCommandLine_PrintsOnlyTheTryHelpLineRunsNoHandlerAndReturns2()
     {
-        int exitCode = await RunAsync([]);
+        RecordingProtocolHandler file = RecordingProtocolHandler.WritingPath("file");
 
-        Assert.AreEqual(0, exitCode);
-        Assert.AreEqual(0, standardError.Length);
+        int exitCode = await RunAsync([], file);
+
+        Assert.AreEqual(2, exitCode);
+        Assert.AreEqual(0, standardOutput.Length);
+        Assert.AreEqual(CommandLineRefusal.TryHelpLine + NewLine, StandardErrorText);
+        Assert.IsEmpty(file.Contexts);
     }
 
     [TestMethod]

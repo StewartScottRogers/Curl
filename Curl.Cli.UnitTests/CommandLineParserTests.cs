@@ -131,16 +131,15 @@ public sealed class CommandLineParserTests
     }
 
     [TestMethod]
-    public void Parse_NoArguments_ReturnsDefaults()
+    public void Parse_EmptyCommandLine_RefusesWithTheTryHelpLineAloneAndExit2()
     {
         CommandLineParseResult result = CommandLineParser.Parse([]);
 
-        Assert.IsTrue(result.IsAccepted);
-        Assert.IsNull(result.Refusal);
-        Assert.IsEmpty(result.Options.Urls);
-        Assert.IsEmpty(result.Options.OutputFiles);
-        Assert.IsFalse(result.Options.Silent);
-        Assert.IsFalse(result.Options.ShowError);
+        Assert.IsFalse(result.IsAccepted);
+        Assert.IsNotNull(result.Refusal);
+        Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal.ExitCode);
+        Assert.AreEqual(2, (int)result.Refusal.ExitCode);
+        CollectionAssert.AreEqual(new[] { CommandLineRefusal.TryHelpLine }, result.Refusal.StandardErrorLines.ToArray());
     }
 
     [TestMethod]
@@ -517,12 +516,13 @@ public sealed class CommandLineParserTests
     }
 
     [TestMethod]
-    public void Parse_EmptyCommandLine_CarriesNoWarning()
+    public void Parse_EmptyCommandLine_IsRefusedWithNoWarning()
     {
         CommandLineParseResult result = CommandLineParser.Parse([]);
 
-        Assert.IsTrue(result.IsAccepted);
+        Assert.IsFalse(result.IsAccepted);
         Assert.IsEmpty(result.WarningLines);
+        Assert.IsEmpty(result.WarningLinesAfterTransfers);
     }
 
     // ---- warning lines after the transfers -------------------------------------------
