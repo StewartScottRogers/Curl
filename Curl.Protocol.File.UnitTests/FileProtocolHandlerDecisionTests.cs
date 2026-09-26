@@ -14,8 +14,8 @@ namespace Curl.Protocol.File;
 [TestClass]
 public sealed class FileProtocolHandlerDecisionTests
 {
-    private const string OutputWriteFailedForHeaderBlock =
-        "Failure writing output to destination, passed 90 returned 0";
+    private const string HeaderWriteFailedForFirstLine =
+        "client returned ERROR on write of 20 bytes";
 
     private const string ResumeFailedMessage = "failed to resume file:// transfer";
 
@@ -87,8 +87,8 @@ public sealed class FileProtocolHandlerDecisionTests
 
         await handler.ExecuteAsync(context);
 
-        CancellationToken headerToken = Assert.ContainsSingle(headers.WriteCancellationTokens);
-        Assert.AreEqual(cancellation.Token, headerToken);
+        Assert.HasCount(4, headers.WriteCancellationTokens);
+        Assert.IsTrue(headers.WriteCancellationTokens.All(token => token == cancellation.Token));
         CancellationToken bodyToken = Assert.ContainsSingle(output.WriteCancellationTokens);
         Assert.AreEqual(cancellation.Token, bodyToken);
     }
@@ -112,7 +112,7 @@ public sealed class FileProtocolHandlerDecisionTests
         var result = await handler.ExecuteAsync(context);
 
         Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode);
-        Assert.AreEqual(OutputWriteFailedForHeaderBlock, result.ErrorMessage);
+        Assert.AreEqual(HeaderWriteFailedForFirstLine, result.ErrorMessage);
         Assert.AreEqual(0L, result.BytesTransferred);
         Assert.IsEmpty(output.WriteLengths);
     }

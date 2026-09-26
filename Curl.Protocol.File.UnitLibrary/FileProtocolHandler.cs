@@ -575,13 +575,15 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     }
 
     /// <summary>
-    /// Writes curl's synthesised header block, when the caller asked for headers at all.
+    /// Writes curl's synthesised header block, when the caller asked for headers at all,
+    /// one line per write as curl does.
     /// </summary>
     /// <param name="context">The transfer being performed.</param>
     /// <param name="opened">The metadata that came with the open.</param>
     /// <returns>
     /// <see langword="null" /> when the headers were written or not asked for, otherwise
-    /// the exit 23 failure, reporting the whole header block as the bytes offered.
+    /// the exit 23 failure, reporting the length of the line that failed as the bytes
+    /// offered.
     /// </returns>
     private static async ValueTask<TransferResult?> WriteHeadersAsync(
         ITransferContext context,
@@ -592,17 +594,19 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
             return null;
         }
 
-        byte[] headers = Encoding.ASCII.GetBytes(
-            FileTransferMessages.PseudoHeaders(opened.Length, opened.LastWriteTimeUtc));
+        foreach (string line in FileTransferMessages.PseudoHeaderLines(opened.Length, opened.LastWriteTimeUtc))
+        {
+            byte[] bytes = Encoding.ASCII.GetBytes(line);
 
-        bool written = await TryWriteAsync(headerOutput, headers, context.CancellationToken)
-            .ConfigureAwait(false);
+            if (!await TryWriteAsync(headerOutput, bytes, context.CancellationToken).ConfigureAwait(false))
+            {
+                return TransferResult.Failure(
+                    CurlExitCode.WriteError,
+                    FileTransferMessages.HeaderWriteFailed(bytes.Length));
+            }
+        }
 
-        return written
-            ? null
-            : TransferResult.Failure(
-                CurlExitCode.WriteError,
-                FileTransferMessages.OutputWriteFailed(headers.Length));
+        return null;
     }
 
     /// <summary>

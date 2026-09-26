@@ -46,6 +46,26 @@ internal static class FileTransferMessages
         + " returned 0";
 
     /// <summary>
+    /// The exit 23 message for a header output (<c>-D</c>) that stopped accepting bytes.
+    /// </summary>
+    /// <param name="passed">The length of the header line offered, CRLF included.</param>
+    /// <returns>The message to report.</returns>
+    /// <remarks>
+    /// Measured against curl 8.21.0 on Windows on 2026-09-26, with the header output a pipe
+    /// whose reader had already exited:
+    /// <c>{ sleep 0.3; curl -sS -D - -o body.txt file:///C:/Temp/bl050/ten.txt; } | true</c>
+    /// on a ten-byte file printed <c>curl: (23) client returned ERROR on write of 20 bytes</c>,
+    /// and on a 100-byte file <c>of 21 bytes</c>: the length of the <c>Content-Length</c>
+    /// line and its CRLF. libcurl hands each pseudo-header line to the client writer
+    /// separately, so the count is the failing line's, not the whole block's, and the
+    /// wording is not <see cref="OutputWriteFailed" />'s.
+    /// </remarks>
+    internal static string HeaderWriteFailed(long passed) =>
+        "client returned ERROR on write of "
+        + passed.ToString(CultureInfo.InvariantCulture)
+        + " bytes";
+
+    /// <summary>
     /// The exit 63 message for a download that delivered all <paramref name="maxFileSize" />
     /// bytes <c>--max-filesize</c> allows and had more to deliver, measured against curl
     /// 8.21.0: <c>Exceeded the maximum allowed file size (9) with 9 bytes</c>.
@@ -152,8 +172,10 @@ internal static class FileTransferMessages
         $"cannot open {osPath} for writing";
 
     /// <summary>
-    /// The pseudo-headers curl synthesises for a local file, followed by the blank line
-    /// that ends a header block.
+    /// The pseudo-header lines curl synthesises for a local file, each with its CRLF,
+    /// followed by the blank line that ends a header block. They are kept apart because
+    /// curl writes them apart, and a failing header output reports the length of the line
+    /// it failed on (<see cref="HeaderWriteFailed" />).
     /// </summary>
     /// <param name="length">
     /// The length of the whole file. It stays the whole file even when a range was asked
@@ -163,7 +185,7 @@ internal static class FileTransferMessages
     /// The file's last-write timestamp, or <see langword="null" /> when the file system
     /// could not determine one.
     /// </param>
-    /// <returns>The header block to write.</returns>
+    /// <returns>The header lines to write, in order.</returns>
     /// <remarks>
     /// <para>
     /// With a timestamp the block is three lines: <c>Content-Length</c>,
@@ -182,22 +204,30 @@ internal static class FileTransferMessages
     /// measurement.
     /// </para>
     /// </remarks>
-    internal static string PseudoHeaders(long length, DateTimeOffset? lastWriteTimeUtc) =>
-        "Content-Length: " + length.ToString(CultureInfo.InvariantCulture) + "\r\n"
-        + "Accept-ranges: bytes\r\n"
-        + LastModifiedLine(lastWriteTimeUtc)
-        + "\r\n";
+    internal static string[] PseudoHeaderLines(long length, DateTimeOffset? lastWriteTimeUtc)
+    {
+        string contentLength = "Content-Length: " + length.ToString(CultureInfo.InvariantCulture) + "\r\n";
+
+        return lastWriteTimeUtc is { } knownLastWriteTimeUtc
+            ? [contentLength, AcceptRangesLine, LastModifiedLine(knownLastWriteTimeUtc), EndOfHeaders]
+            : [contentLength, AcceptRangesLine, EndOfHeaders];
+    }
 
     /// <summary>
-    /// The <c>Last-Modified</c> pseudo-header line, or nothing when the timestamp is
-    /// unknown.
+    /// The <c>Accept-ranges</c> pseudo-header line.
     /// </summary>
-    /// <param name="lastWriteTimeUtc">
-    /// The file's last-write timestamp, or <see langword="null" /> when unknown.
-    /// </param>
-    /// <returns>The line with its line ending, or an empty string.</returns>
-    private static string LastModifiedLine(DateTimeOffset? lastWriteTimeUtc) =>
-        lastWriteTimeUtc is { } knownLastWriteTimeUtc
-            ? "Last-Modified: " + knownLastWriteTimeUtc.UtcDateTime.ToString("R", CultureInfo.InvariantCulture) + "\r\n"
-            : string.Empty;
+    private const string AcceptRangesLine = "Accept-ranges: bytes\r\n";
+
+    /// <summary>
+    /// The blank line that ends a header block.
+    /// </summary>
+    private const string EndOfHeaders = "\r\n";
+
+    /// <summary>
+    /// The <c>Last-Modified</c> pseudo-header line.
+    /// </summary>
+    /// <param name="lastWriteTimeUtc">The file's last-write timestamp.</param>
+    /// <returns>The line with its line ending.</returns>
+    private static string LastModifiedLine(DateTimeOffset lastWriteTimeUtc) =>
+        "Last-Modified: " + lastWriteTimeUtc.UtcDateTime.ToString("R", CultureInfo.InvariantCulture) + "\r\n";
 }

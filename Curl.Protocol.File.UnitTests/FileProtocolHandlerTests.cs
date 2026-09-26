@@ -580,11 +580,13 @@ public sealed class FileProtocolHandlerTests
             result.ErrorMessage);
     }
 
-    // The header block for a ten-byte file dated DefaultLastWriteTimeUtc is 90 bytes:
+    // The header block for a ten-byte file dated DefaultLastWriteTimeUtc is four writes:
     // the Content-Length line (20 with its CRLF), the Accept-ranges line (22), the
-    // Last-Modified line (46) and the blank line that ends the block (2).
+    // Last-Modified line (46) and the blank line that ends the block (2). Measured against
+    // curl 8.21.0: `{ sleep 0.3; curl -sS -D - -o body.txt file:///C:/Temp/bl050/ten.txt; } | true`
+    // printed `curl: (23) client returned ERROR on write of 20 bytes`.
     [TestMethod]
-    public async Task ExecuteAsync_HeaderOutputFails_ReportsTheHeaderBlockSize()
+    public async Task ExecuteAsync_HeaderOutputFails_ReportsTheFirstHeaderLineSize()
     {
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, Content);
@@ -599,9 +601,46 @@ public sealed class FileProtocolHandlerTests
         var result = await handler.ExecuteAsync(context);
 
         Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode);
-        Assert.AreEqual(
-            "Failure writing output to destination, passed 90 returned 0",
-            result.ErrorMessage);
+        Assert.AreEqual("client returned ERROR on write of 20 bytes", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_HeaderOutputFailsOnTheThirdLine_ReportsThatLinesSize()
+    {
+        var fileSystem = new FakeFileSystem();
+        fileSystem.AddFile(OsPath, Content);
+        var context = new FakeTransferContext
+        {
+            Url = FileUrl,
+            Output = new ChunkRecordingStream(),
+            HeaderOutput = FaultingStream.FailingOnWrite(3),
+        };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        var result = await handler.ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode);
+        Assert.AreEqual("client returned ERROR on write of 46 bytes", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_WithHeaderOutput_WritesEachHeaderLineSeparately()
+    {
+        var fileSystem = new FakeFileSystem();
+        fileSystem.AddFile(OsPath, Content);
+        var headerOutput = new ChunkRecordingStream();
+        var context = new FakeTransferContext
+        {
+            Url = FileUrl,
+            Output = new ChunkRecordingStream(),
+            HeaderOutput = headerOutput,
+        };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        var result = await handler.ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(new[] { 20, 22, 46, 2 }, headerOutput.WriteLengths.ToArray());
     }
 
     // curl 8.21.0 treats a download read that fails after the open as the end of the file:
