@@ -66,3 +66,5 @@ upstream error list during planning.
 - 2026-09-25: Amended from the file:// conformance audit against curl 8.21.0: added the
   `-r 3-1`, `-r abc` and `-r -0` exit 33 cases and the `-r` with `-C` exit 2 refusal.
 - 2026-09-25: Recorded all three stderr lines of the -C-with-r refusal; the criterion named only the first.
+- 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Backlog. Dark factory shift stopped by Stewart before work began; returned unchanged.
