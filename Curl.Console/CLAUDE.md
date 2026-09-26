@@ -27,3 +27,11 @@ A URL with no `-o` writes through `StandardOutputFailureDeferringStream`, which
 models curl's 4096-byte stdio buffer: a failed standard output is reported as
 `curl: Failed writing body` (exit 23) while the body fits the buffer, and as the
 handler's own `(23)` write failure once it would not.
+
+`Program.Main` opens standard output with `StandardOutputOpener`, not
+`System.Console.OpenStandardOutput()`, because the latter hides both failures that
+stream models: it returns `Stream.Null` for a closed standard output and reports a write
+to a pipe whose reader has gone as a success. A console is still opened the .NET way; a
+redirected standard output becomes an unbuffered `FileStream` over the process's own
+handle (`GetStdHandle` on Windows, descriptor 1 elsewhere), and a closed one a
+`ClosedStandardOutputStream` whose writes throw.
