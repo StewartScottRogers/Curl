@@ -66,3 +66,4 @@ tasks; it adds nothing a protocol handler sees.
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
