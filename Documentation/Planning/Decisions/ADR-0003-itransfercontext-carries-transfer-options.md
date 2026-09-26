@@ -66,7 +66,17 @@ every URL curl accepts. Measured against curl 8.21.0 (2026-06-24) on this machin
 - `Uri` rewrites `c|` to `c:`, where curl does not.
 - `Uri` folds `file:////server/share` into a UNC authority, destroying the only UNC
   form curl accepts.
-- `Uri` normalises `..` away, where curl passes it straight to the OS.
+- Dot segments (corrected 2026-09-26, measured against curl 8.21.0; an earlier note
+  here said curl passes `..` straight to the OS, which is false). Both `Uri` and curl
+  remove `.` and `..` segments, but `Uri` does it always, where curl skips it under
+  `--path-as-is`. Both also turn every `\` into `/` first, and curl does that with or
+  without `--path-as-is`: `file:///C:/dir\..\secret.txt` opens `C:/secret.txt`, and
+  with `--path-as-is` `file:///C:/dir\..\x` is quoted as `C:/dir/../x`. Because
+  `FileUrlPath` works from `Uri.OriginalString`, it does both steps itself, with a
+  `pathAsIs` switch (task BL-015).
+- `Uri` throws on `file:///C:` and `file:///Q:dir/../x`, which curl accepts (both exit
+  37 on this machine, quoting `C:` and `/x`); the `file://localhost/` spellings of the
+  same paths reach `FileUrlPath`.
 
 This affects HTTP equally — `%2F` in a path, `--path-as-is` — not only `file`. It is
 **not** decided by this ADR; it is deferred to a separate decision owned by the
