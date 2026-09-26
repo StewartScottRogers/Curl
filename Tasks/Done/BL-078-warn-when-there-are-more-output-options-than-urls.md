@@ -71,7 +71,7 @@ ordering.
   test asserts both lists for `-o -s -o g URL`. The text is `CommandLineWarning.MoreOutputOptionsThanUrls`.
 - `-O`/`--remote-name` also counts as an output option in curl (`curl -o f -O URL` warns),
   but `-O` is not in the option table yet; whoever adds it must count it here.
-- Filed BL-106 against `Curl.Console` to write the list after the transfers.
+- Filed BL-108 against `Curl.Console` to write the list after the transfers.
 
 ## Log
 
