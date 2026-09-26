@@ -45,3 +45,10 @@ production passes `Environment.GetEnvironmentVariable`, and tests pass a diction
 the real environment. `NoProxyMatcher` is the `--noproxy`/`NO_PROXY` list, and
 `ProxyUrlParser` turns proxy text into an endpoint or curl's exit 5 or 7 failure. It is not
 yet wired into `Curl.Console` (BL-238).
+
+`Multipart\MultipartFormBodyBuilder` turns `MultipartFormPart`s into the `multipart/form-data`
+`StreamBody` curl 8.21.0 sends for `-F`, byte for byte (ADR-0025): headers chosen as
+libcurl's `Curl_mime_prepare_headers` chooses them, files opened through `IFileSystem` while
+building so `Content-Length` is known, then streamed; an unopenable file is exit 26 before
+anything is sent. The text encoding and the boundary source are injected. It is not yet
+wired into `Curl.Console`.
