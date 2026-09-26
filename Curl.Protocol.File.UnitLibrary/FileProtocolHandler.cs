@@ -150,11 +150,9 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
         Stream source,
         FileOpenResult opened)
     {
-        if (!await TryWriteHeadersAsync(context, opened).ConfigureAwait(false))
+        if (await WriteHeadersAsync(context, opened).ConfigureAwait(false) is { } headerFailure)
         {
-            return TransferResult.Failure(
-                CurlExitCode.WriteError,
-                FileTransferMessages.OutputWriteFailed);
+            return headerFailure;
         }
 
         if (context.NoBody || !MeetsTimeCondition(context.TimeCondition, opened.LastWriteTimeUtc))
@@ -253,7 +251,7 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
                 upload,
                 destination,
                 long.MaxValue,
-                FileTransferMessages.DestinationWriteFailed,
+                static _ => FileTransferMessages.DestinationWriteFailed,
                 context.CancellationToken)
             .ConfigureAwait(false);
     }
@@ -268,7 +266,9 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     /// How many bytes at most, or <see cref="long.MaxValue" /> to run to the end of
     /// <paramref name="source" />.
     /// </param>
-    /// <param name="writeErrorMessage">The message to report if a write fails.</param>
+    /// <param name="writeErrorMessage">
+    /// Builds the message to report if a write fails, from the size of the chunk offered.
+    /// </param>
     /// <param name="cancellationToken">Cancels the copy.</param>
     /// <returns>
     /// A success carrying the number of bytes moved, exit 26 for a failed read or exit 23
@@ -278,7 +278,7 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
         Stream source,
         Stream destination,
         long count,
-        string writeErrorMessage,
+        Func<long, string> writeErrorMessage,
         CancellationToken cancellationToken)
     {
         byte[] buffer = new byte[ChunkSize];
@@ -312,7 +312,7 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
 
             if (!written)
             {
-                return TransferResult.Failure(CurlExitCode.WriteError, writeErrorMessage);
+                return TransferResult.Failure(CurlExitCode.WriteError, writeErrorMessage(read));
             }
 
             transferred += read;
@@ -460,21 +460,30 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     /// </summary>
     /// <param name="context">The transfer being performed.</param>
     /// <param name="opened">The metadata that came with the open.</param>
-    /// <returns><see langword="false" /> when the header write failed.</returns>
-    private static async ValueTask<bool> TryWriteHeadersAsync(
+    /// <returns>
+    /// <see langword="null" /> when the headers were written or not asked for, otherwise
+    /// the exit 23 failure, reporting the whole header block as the bytes offered.
+    /// </returns>
+    private static async ValueTask<TransferResult?> WriteHeadersAsync(
         ITransferContext context,
         FileOpenResult opened)
     {
         if (context.HeaderOutput is not { } headerOutput)
         {
-            return true;
+            return null;
         }
 
         byte[] headers = Encoding.ASCII.GetBytes(
             FileTransferMessages.PseudoHeaders(opened.Length, opened.LastWriteTimeUtc));
 
-        return await TryWriteAsync(headerOutput, headers, context.CancellationToken)
+        bool written = await TryWriteAsync(headerOutput, headers, context.CancellationToken)
             .ConfigureAwait(false);
+
+        return written
+            ? null
+            : TransferResult.Failure(
+                CurlExitCode.WriteError,
+                FileTransferMessages.OutputWriteFailed(headers.Length));
     }
 
     /// <summary>

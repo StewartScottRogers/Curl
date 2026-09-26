@@ -362,7 +362,73 @@ public sealed class FileProtocolHandlerTests
         var result = await handler.ExecuteAsync(context);
 
         Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode);
-        Assert.AreEqual("Failure writing output to destination", result.ErrorMessage);
+        Assert.AreEqual(
+            "Failure writing output to destination, passed 10 returned 0",
+            result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_OutputFailsOnFirstWrite_ReportsThePassedChunkSize()
+    {
+        var fileSystem = new FakeFileSystem();
+        fileSystem.AddFile(OsPath, new byte[40000]);
+        var context = new FakeTransferContext
+        {
+            Url = FileUrl,
+            Output = FaultingStream.FailingOnWrite(1),
+        };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        var result = await handler.ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode);
+        Assert.AreEqual(
+            "Failure writing output to destination, passed 16384 returned 0",
+            result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_OutputFailsOnAShortFinalChunk_ReportsThatChunksOwnSize()
+    {
+        var fileSystem = new FakeFileSystem();
+        fileSystem.AddFile(OsPath, new byte[1000]);
+        var context = new FakeTransferContext
+        {
+            Url = FileUrl,
+            Output = FaultingStream.FailingOnWrite(1),
+        };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        var result = await handler.ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode);
+        Assert.AreEqual(
+            "Failure writing output to destination, passed 1000 returned 0",
+            result.ErrorMessage);
+    }
+
+    // The header block for a ten-byte file dated DefaultLastWriteTimeUtc is 90 bytes:
+    // the Content-Length line (20 with its CRLF), the Accept-ranges line (22), the
+    // Last-Modified line (46) and the blank line that ends the block (2).
+    [TestMethod]
+    public async Task ExecuteAsync_HeaderOutputFails_ReportsTheHeaderBlockSize()
+    {
+        var fileSystem = new FakeFileSystem();
+        fileSystem.AddFile(OsPath, Content);
+        var context = new FakeTransferContext
+        {
+            Url = FileUrl,
+            Output = new ChunkRecordingStream(),
+            HeaderOutput = FaultingStream.FailingOnWrite(1),
+        };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        var result = await handler.ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode);
+        Assert.AreEqual(
+            "Failure writing output to destination, passed 90 returned 0",
+            result.ErrorMessage);
     }
 
     [TestMethod]

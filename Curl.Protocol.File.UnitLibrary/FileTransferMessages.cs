@@ -31,9 +31,21 @@ internal static class FileTransferMessages
     internal const string BadUrl = "URL rejected: Bad file:// URL";
 
     /// <summary>
-    /// The exit 23 message for a destination write that failed part way through.
+    /// The exit 23 message for a download destination that stopped accepting bytes.
     /// </summary>
-    internal const string OutputWriteFailed = "Failure writing output to destination";
+    /// <param name="passed">The size of the chunk offered to the destination.</param>
+    /// <returns>The message to report.</returns>
+    /// <remarks>
+    /// Measured against curl 8.21.0, which reports how many bytes it offered and how many
+    /// the destination took. Here the destination is a <see cref="Stream" />, and
+    /// <see cref="Stream.WriteAsync(ReadOnlyMemory{byte}, CancellationToken)" /> either
+    /// takes the whole chunk or throws, so a partial write is not observable and the
+    /// <c>returned</c> count is always 0.
+    /// </remarks>
+    internal static string OutputWriteFailed(long passed) =>
+        "Failure writing output to destination, passed "
+        + passed.ToString(CultureInfo.InvariantCulture)
+        + " returned 0";
 
     /// <summary>
     /// The exit 36 message for a resume offset or range start past the end of the file.
