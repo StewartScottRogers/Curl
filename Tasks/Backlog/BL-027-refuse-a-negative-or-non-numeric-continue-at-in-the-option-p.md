@@ -4,7 +4,8 @@ title: Refuse a negative or non-numeric --continue-at in the option parser with 
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-037]
+touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Protocol.File.UnitLibrary, Curl.Protocol.File.UnitTests, Documentation/Planning/Decisions, Documentation/Product/Requirements.md]
 requirement: none
 created: 2026-09-25
 completed:

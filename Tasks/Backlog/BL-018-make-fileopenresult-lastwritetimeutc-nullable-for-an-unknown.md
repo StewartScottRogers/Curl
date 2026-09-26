@@ -5,6 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-008, BL-016, BL-017]
+touches: [Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Protocol.File.UnitLibrary, Curl.Protocol.File.UnitTests, Documentation/Planning/Decisions/ADR-0002-ifilesystem-as-the-second-protocol-seam.md, Documentation/Planning/Decisions/ADR-0003-itransfercontext-carries-transfer-options.md, Documentation/Product/Requirements.md]
 requirement: none
 created: 2026-09-25
 completed:

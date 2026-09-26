@@ -5,6 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: docs
 depends-on: [BL-008, BL-020]
+touches: [Curl.Protocol.File.UnitLibrary/CLAUDE.md]
 requirement: none
 created: 2026-09-25
 completed:

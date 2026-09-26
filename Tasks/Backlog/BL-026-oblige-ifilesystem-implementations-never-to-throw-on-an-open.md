@@ -5,6 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: docs
 depends-on: [BL-008]
+touches: [Curl.Protocol.Abstractions.UnitLibrary/CLAUDE.md, Documentation/Planning/Decisions/ADR-0002-ifilesystem-as-the-second-protocol-seam.md]
 requirement: none
 created: 2026-09-25
 completed:

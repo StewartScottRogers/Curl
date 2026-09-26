@@ -4,7 +4,8 @@ title: Implement --max-filesize and shared range parsing
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-007]
+depends-on: [BL-007, BL-037]
+touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Core.UnitLibrary, Curl.Core.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Protocol.File.UnitLibrary, Curl.Protocol.File.UnitTests, Documentation/Product/Requirements.md]
 requirement: none
 created: 2026-09-25
 completed:

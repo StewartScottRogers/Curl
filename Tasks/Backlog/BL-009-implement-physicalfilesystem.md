@@ -5,6 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-006, BL-026]
+touches: [Curl.Core.UnitLibrary, Curl.Core.UnitTests, Curl.Protocol.File.UnitLibrary, Curl.Protocol.File.UnitTests]
 requirement: none
 created: 2026-09-25
 completed:
