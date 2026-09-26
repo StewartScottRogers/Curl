@@ -31,7 +31,8 @@
 
 .PARAMETER Library
     Assembly names to report on, wildcards allowed. Defaults to every production
-    assembly - anything named *.UnitLibrary, plus Curl.Console.
+    assembly - anything named *.UnitLibrary, plus Curl.Console. Curl.Console's
+    assembly is named curl, and is reported and matched here as Curl.Console.
 
 .PARAMETER SkipTestRun
     Reuse the Cobertura files already in ResultsDirectory instead of running tests.
@@ -135,6 +136,16 @@ function Test-IsProductionAssembly {
     return ($Name -like '*.UnitLibrary') -or ($Name -eq 'Curl.Console')
 }
 
+# Curl.Console.csproj sets <AssemblyName>curl</AssemblyName> so the binary is a drop-in
+# for curl, which makes its Cobertura package "curl". Report it under its project name,
+# so the table, the failing-member heading and -Library all see Curl.Console.
+function Get-ReportedAssemblyName {
+    param([string] $PackageName)
+
+    if ($PackageName -ceq 'curl') { return 'Curl.Console' }
+    return $PackageName
+}
+
 $methods = @{}
 
 foreach ($file in $coverageFiles) {
@@ -142,7 +153,7 @@ foreach ($file in $coverageFiles) {
     $document.Load($file.FullName)
 
     foreach ($package in $document.SelectNodes('/coverage/packages/package')) {
-        $assembly = $package.GetAttribute('name')
+        $assembly = Get-ReportedAssemblyName $package.GetAttribute('name')
         if (-not (Test-IsProductionAssembly $assembly)) { continue }
 
         foreach ($class in $package.SelectNodes('classes/class')) {
