@@ -303,6 +303,48 @@ public sealed class CommandLineOptions
     public bool FailEarly { get; internal set; }
 
     /// <summary>
+    /// <see langword="true"/> when <c>--compressed</c> was given and no <c>--no-compressed</c> came after
+    /// it: ask for a compressed response and decompress it.
+    /// </summary>
+    public bool Compressed { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--raw</c> was given and no <c>--no-raw</c> came after it: pass
+    /// content and transfer encodings through undecoded.
+    /// </summary>
+    public bool Raw { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--tr-encoding</c> was given and no <c>--no-tr-encoding</c> came
+    /// after it: ask for a compressed transfer encoding and decode it.
+    /// </summary>
+    public bool TransferEncoding { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--ignore-content-length</c> was given and no
+    /// <c>--no-ignore-content-length</c> came after it: ignore the response's <c>Content-Length</c>.
+    /// </summary>
+    public bool IgnoreContentLength { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--path-as-is</c> was given and no <c>--no-path-as-is</c> came after
+    /// it: send the URL path without squashing <c>/../</c> and <c>/./</c>.
+    /// </summary>
+    public bool PathAsIs { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--request-target</c>, sent in place of the URL's path in the request line;
+    /// <see langword="null"/> when not given. An empty value is refused as blank.
+    /// </summary>
+    public string? RequestTarget { get; internal set; }
+
+    /// <summary>
+    /// The HTTP version the last <c>-0</c> / <c>--http1.0</c> or <c>--http1.1</c> asked for;
+    /// <see langword="null"/> when neither was given, which means curl's default, HTTP/1.1.
+    /// </summary>
+    public HttpVersionPreference? HttpVersion { get; private set; }
+
+    /// <summary>
     /// The HTTP request method <c>-I</c> / <c>--head</c> (<see cref="SelectedHttpMethod.Head"/>),
     /// <c>--no-head</c> (<see cref="SelectedHttpMethod.Get"/>) or <c>-F</c> / <c>--form</c> and
     /// <c>--form-string</c> (<see cref="SelectedHttpMethod.MultipartFormPost"/>) selected first; once one
@@ -327,6 +369,21 @@ public sealed class CommandLineOptions
     /// line terminators. <see cref="CommandLineParser"/> hands them to <see cref="CommandLineParseResult.WarningLines"/>.
     /// </summary>
     internal IReadOnlyList<string> WarningLines => warningLines;
+
+    /// <summary>
+    /// Sets <see cref="HttpVersion"/>, first adding <see cref="CommandLineWarning.OverridesPreviousHttpVersion"/>,
+    /// unless <c>-s</c> came first, when an earlier option asked for a different version, as curl 8.21.0 does.
+    /// </summary>
+    /// <param name="version">The version the option asks for.</param>
+    internal void SelectHttpVersion(HttpVersionPreference version)
+    {
+        if (HttpVersion is not null && HttpVersion != version)
+        {
+            AddWarningLinesUnlessSilent(CommandLineWarning.OverridesPreviousHttpVersion);
+        }
+
+        HttpVersion = version;
+    }
 
     /// <summary>
     /// Appends <paramref name="lines"/> to <see cref="WarningLines"/> unless <c>-s</c> /

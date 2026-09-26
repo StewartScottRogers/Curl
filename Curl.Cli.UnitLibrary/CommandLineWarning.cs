@@ -124,6 +124,18 @@ public static class CommandLineWarning
             $"You can only select one HTTP request method! You asked for both {RequestMethodNames[(int)requested]} and {RequestMethodNames[(int)selected]}.");
 
     /// <summary>
+    /// The line curl prints when <c>-0</c> / <c>--http1.0</c> or <c>--http1.1</c> asks for a different HTTP
+    /// version from the one an earlier of them asked for: <c>Warning: Overrides previous HTTP version option</c>.
+    /// Asking for the same version again does not warn. Measured with <c>curl --http1.1 -0</c>,
+    /// <c>curl -0 --http1.1 -0</c> (two warnings), <c>curl -0 -0</c> and <c>curl --http1.1 --http1.1</c>
+    /// (none) against <c>http://127.0.0.1:1/</c> (curl 8.21.0, Windows, 2026-09-26).
+    /// </summary>
+    public static IReadOnlyList<string> OverridesPreviousHttpVersion { get; } =
+    [
+        "Warning: Overrides previous HTTP version option",
+    ];
+
+    /// <summary>
     /// The line curl prints when a command line gives more <c>-o</c>/<c>--output</c> values than
     /// URLs: <c>Warning: Got more output options than URLs</c>. curl 8.21.0 prints it once, however
     /// many values are left over, after the last transfer has ended, not while reading the command

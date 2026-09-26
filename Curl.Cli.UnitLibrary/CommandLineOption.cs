@@ -63,6 +63,24 @@ public sealed class CommandLineOption
     }
 
     /// <summary>
+    /// Creates a row for an option that takes no value and that this build knows but cannot honour:
+    /// every spelling of it, with or without an attached value, is refused with
+    /// <see cref="CommandLineRefusal.InstalledLibcurlDoesNotSupport(string)"/>, and its <c>--no-</c>
+    /// spelling with <see cref="CommandLineRefusal.CannotBeReversed(string)"/>, as the Windows curl 8.21.0
+    /// refuses <c>--http2</c> and <c>--no-http2</c> (ADR-0017).
+    /// </summary>
+    /// <param name="longName">The long name without its leading <c>--</c>.</param>
+    /// <returns>The row.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="longName"/> is <see langword="null"/>.</exception>
+    public static CommandLineOption UnsupportedFlag(string longName)
+    {
+        ArgumentNullException.ThrowIfNull(longName);
+
+        return new CommandLineOption(longName, shortName: null, takesValue: false, (_, _, spelledOption, _, _) =>
+            CommandLineRefusal.InstalledLibcurlDoesNotSupport(spelledOption));
+    }
+
+    /// <summary>
     /// Creates a row for an option that takes no value and that <c>--no-&lt;long name&gt;</c> turns
     /// off, as curl 8.21.0 allows for the boolean options its manual marks as negatable
     /// (<see href="https://curl.se/docs/manpage.html"/>). The positive spelling passes

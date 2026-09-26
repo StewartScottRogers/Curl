@@ -101,6 +101,17 @@ public sealed class CommandLineRefusal
     public static CommandLineRefusal CannotBeReversed(string spelledOption) =>
         Create(spelledOption, "the given option cannot be reversed with a --no- prefix");
 
+    /// <summary>
+    /// Refuses an option this build knows but cannot honour, as the Windows curl 8.21.0 refuses
+    /// <c>--http2</c>, <c>--http2-prior-knowledge</c>, <c>--http3</c> and <c>--http3-only</c> (ADR-0017),
+    /// whether or not <c>-s</c> came first.
+    /// </summary>
+    /// <param name="spelledOption">The whole argument as typed, such as <c>--http2</c> or <c>--http2=x</c>.</param>
+    /// <returns>A refusal reading <c>the installed libcurl version does not support this</c>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="spelledOption"/> is <see langword="null"/>.</exception>
+    public static CommandLineRefusal InstalledLibcurlDoesNotSupport(string spelledOption) =>
+        Create(spelledOption, "the installed libcurl version does not support this");
+
     /// <summary>Refuses an option that takes a value but is the last argument.</summary>
     /// <param name="spelledOption">The whole argument as typed.</param>
     /// <returns>A refusal reading <c>requires parameter</c>.</returns>

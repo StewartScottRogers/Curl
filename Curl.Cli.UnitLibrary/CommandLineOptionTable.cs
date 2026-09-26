@@ -34,14 +34,16 @@ namespace Curl.Cli;
 /// <c>--no-silent</c>, <c>--no-show-error</c>, <c>--no-insecure</c>, <c>--no-tftp-no-options</c>, <c>--no-remote-time</c>,
 /// <c>--no-progress-meter</c>, <c>--no-progress-bar</c>, <c>--no-get</c>, <c>--no-location</c>, <c>--no-location-trusted</c>,
 /// <c>--no-post301</c>, <c>--no-post302</c>, <c>--no-post303</c>, <c>--no-show-headers</c>, <c>--no-include</c>, <c>--no-head</c>,
-/// <c>--no-fail</c>, <c>--no-fail-with-body</c> and <c>--no-fail-early</c> are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
+/// <c>--no-fail</c>, <c>--no-fail-with-body</c>, <c>--no-fail-early</c>, <c>--no-compressed</c>, <c>--no-raw</c>, <c>--no-tr-encoding</c>,
+/// <c>--no-ignore-content-length</c> and <c>--no-path-as-is</c> are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
 /// silent and <c>--no-silent -s</c> is. <c>--no-silent=x</c> is accepted, its value ignored.
 /// <c>--no-tlsv1.2</c>, <c>--no-tlsv1.3</c>, <c>--no-url</c>, <c>--no-output</c> (even as the last
 /// argument), <c>--no-output=x</c>, <c>--no-data</c>, <c>--no-dump-header</c>, <c>--no-range</c>, <c>--no-time-cond</c>,
 /// <c>--no-request</c>, <c>--no-header</c> (and <c>--no-header=x</c>), <c>--no-user-agent</c>, <c>--no-referer</c>,
 /// <c>--no-data-ascii</c>, <c>--no-data-binary</c>, <c>--no-data-raw</c>, <c>--no-data-urlencode</c>, <c>--no-json</c>,
 /// <c>--no-form</c>, <c>--no-form-string</c>,
-/// <c>--no-url-query</c>, <c>--no-max-redirs</c> and <c>--no-config</c> (each also with <c>=x</c>) exit 2 with
+/// <c>--no-url-query</c>, <c>--no-max-redirs</c>, <c>--no-config</c>, <c>--no-http1.0</c>, <c>--no-http1.1</c>, <c>--no-http2</c>,
+/// <c>--no-http2-prior-knowledge</c>, <c>--no-http3</c>, <c>--no-http3-only</c> and <c>--no-request-target</c> (each also with <c>=x</c>) exit 2 with
 /// <c>curl: option &lt;as typed&gt;: the given option cannot be reversed with a --no- prefix</c> and
 /// the try-help line. <c>--no-bogus</c>, <c>--no-</c>, <c>--no-no-silent</c> and <c>--no-Silent</c>
 /// exit 2 as unknown. A short letter is never negated.
@@ -106,6 +108,18 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("fail-with-body", null, SetFailWithBody),
         CommandLineOption.NegatableFlag("fail-early", null, (options, on) => options.FailEarly = on),
         CommandLineOption.Value("config", 'K', ApplyConfigFile),
+        CommandLineOption.NegatableFlag("compressed", null, (options, on) => options.Compressed = on),
+        CommandLineOption.NegatableFlag("raw", null, (options, on) => options.Raw = on),
+        CommandLineOption.NegatableFlag("tr-encoding", null, (options, on) => options.TransferEncoding = on),
+        CommandLineOption.NegatableFlag("ignore-content-length", null, (options, on) => options.IgnoreContentLength = on),
+        CommandLineOption.NegatableFlag("path-as-is", null, (options, on) => options.PathAsIs = on),
+        CommandLineOption.Text("request-target", null, (options, target) => options.RequestTarget = target),
+        CommandLineOption.Flag("http1.0", '0', options => options.SelectHttpVersion(HttpVersionPreference.Http10)),
+        CommandLineOption.Flag("http1.1", null, options => options.SelectHttpVersion(HttpVersionPreference.Http11)),
+        CommandLineOption.UnsupportedFlag("http2"),
+        CommandLineOption.UnsupportedFlag("http2-prior-knowledge"),
+        CommandLineOption.UnsupportedFlag("http3"),
+        CommandLineOption.UnsupportedFlag("http3-only"),
     ];
 
     /// <summary>The largest <c>--create-file-mode</c> curl 8.21.0 accepts: octal <c>0777</c>.</summary>
