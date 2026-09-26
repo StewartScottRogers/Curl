@@ -22,6 +22,8 @@ public sealed class CommandLineOptions
     private readonly List<FormPartSpecification> formParts = [];
     private readonly Stack<FormPartSpecification> openMultiparts = new();
     private string? userAwaitingPassword;
+    private string? proxyUserAwaitingPassword;
+    private HttpAuthSchemes wantedAuthSchemes;
 
     /// <summary>
     /// The URLs to transfer, in command-line order: positional arguments and
@@ -102,6 +104,69 @@ public sealed class CommandLineOptions
     /// (<c>-u ;opt</c>) is a user name with an empty password, as in curl 8.21.0.
     /// </summary>
     public NetworkCredential? Credentials { get; private set; }
+
+    /// <summary>
+    /// The <c>-U</c> / <c>--proxy-user</c> value split at its first colon into user name and
+    /// password, for the proxy; <see langword="null"/> when not given. A user with no password is
+    /// asked for as <see cref="Credentials"/> is, with curl 8.21.0's proxy prompt. An empty value is
+    /// accepted: curl 8.21.0 asks for the password of the user <c>''</c>.
+    /// </summary>
+    public NetworkCredential? ProxyCredentials { get; private set; }
+
+    /// <summary>
+    /// The HTTP authentication schemes to allow for the origin, as curl 8.21.0's tool asks libcurl
+    /// for them: <c>--basic</c> and <c>--digest</c> add their scheme and their <c>--no-</c> spellings
+    /// remove it; <c>--anyauth</c> replaces the set with every scheme; <c>--oauth2-bearer</c> adds
+    /// Bearer. <see cref="HttpAuthSchemes.Bearer"/> is only ever allowed with a
+    /// <see cref="BearerToken"/>, so <c>--anyauth</c> alone gives <see cref="HttpAuthSchemes.Any"/>.
+    /// When nothing is left, which is also when no scheme option was given, the set is
+    /// <see cref="HttpAuthSchemes.Basic"/>, libcurl's default.
+    /// </summary>
+    /// <remarks>
+    /// Measured with the reference curl 8.21.0 (<c>Record-CurlExchange.ps1</c>, a 401 offering Bearer
+    /// and Basic, 2026-09-26): <c>-u u:p --no-basic</c> and <c>-u u:p --digest --no-digest</c> send
+    /// <c>Basic dTpw</c> at once; <c>-u u:p --basic --no-basic --digest</c> sends nothing;
+    /// <c>-u u:p --oauth2-bearer tok --basic</c> sends nothing, then <c>Bearer tok</c>;
+    /// <c>-u u:p --anyauth --basic</c> and <c>-u u:p --anyauth</c> send nothing, then
+    /// <c>Basic dTpw</c>; <c>--oauth2-bearer tok --anyauth</c> sends nothing, then <c>Bearer tok</c>;
+    /// <c>--oauth2-bearer tok --no-basic</c> sends <c>Bearer tok</c> at once. See ADR-0026.
+    /// </remarks>
+    public HttpAuthSchemes AuthSchemes
+    {
+        get
+        {
+            HttpAuthSchemes allowed = BearerToken is null ? wantedAuthSchemes & ~HttpAuthSchemes.Bearer : wantedAuthSchemes;
+            return allowed == HttpAuthSchemes.None ? HttpAuthSchemes.Basic : allowed;
+        }
+    }
+
+    /// <summary>
+    /// The last <c>--oauth2-bearer</c> token; <see langword="null"/> when not given. An empty value is
+    /// refused as blank. While it is set, a <c>-u</c> user with no password is not prompted for.
+    /// </summary>
+    public string? BearerToken { get; private set; }
+
+    /// <summary>
+    /// The last <c>-x</c> / <c>--proxy</c>, <c>--socks4</c>, <c>--socks4a</c>, <c>--socks5</c> or
+    /// <c>--socks5-hostname</c> value, with the kind of proxy that option names; <see langword="null"/>
+    /// when none was given. curl 8.21.0 keeps one proxy: the last of these options wins, value and kind
+    /// together, and a scheme in the value outranks the option's kind. An empty <c>-x ''</c> is kept:
+    /// it asks for no proxy at all, the environment's included.
+    /// </summary>
+    public CommandLineProxy? Proxy { get; private set; }
+
+    /// <summary>
+    /// The last <c>--noproxy</c> value, verbatim: the hosts to reach without a proxy. Empty is
+    /// accepted. <see langword="null"/> when not given. Matching hosts against it is the proxy
+    /// selector's job.
+    /// </summary>
+    public string? NoProxy { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>-p</c> / <c>--proxytunnel</c> was given and no
+    /// <c>--no-proxytunnel</c> came after it: tunnel through an HTTP proxy with CONNECT.
+    /// </summary>
+    public bool ProxyTunnel { get; internal set; }
 
     /// <summary>Every <c>-t</c> / <c>--telnet-option</c> value, verbatim and unvalidated, in command-line order.</summary>
     public IReadOnlyList<string> TelnetOptions => telnetOptions;
@@ -449,34 +514,102 @@ public sealed class CommandLineOptions
     /// <param name="userAndPassword">A <c>-u</c> / <c>--user</c> value, possibly empty.</param>
     internal void SetCredentials(string userAndPassword)
     {
+        Credentials = SplitAtFirstColon(userAndPassword);
+        userAwaitingPassword = UserWhosePasswordIsMissing(userAndPassword);
+    }
+
+    /// <summary>Sets <see cref="ProxyCredentials"/> from <paramref name="userAndPassword"/>, split at its first colon.</summary>
+    /// <param name="userAndPassword">A <c>-U</c> / <c>--proxy-user</c> value, possibly empty.</param>
+    internal void SetProxyCredentials(string userAndPassword)
+    {
+        ProxyCredentials = SplitAtFirstColon(userAndPassword);
+        proxyUserAwaitingPassword = UserWhosePasswordIsMissing(userAndPassword);
+    }
+
+    private static NetworkCredential SplitAtFirstColon(string userAndPassword)
+    {
         int colon = userAndPassword.IndexOf(':', StringComparison.Ordinal);
-        Credentials = colon < 0
+        return colon < 0
             ? new NetworkCredential(userAndPassword, string.Empty)
             : new NetworkCredential(userAndPassword[..colon], userAndPassword[(colon + 1)..]);
-        userAwaitingPassword = colon < 0 && !userAndPassword.StartsWith(';') ? userAndPassword : null;
     }
 
     /// <summary>
-    /// When the last <c>-u</c> / <c>--user</c> value named a user with no password, asks
-    /// <paramref name="passwordPrompt"/> for it with curl 8.21.0's prompt,
-    /// <c>Enter host password for user '&lt;user&gt;':</c>, the user being the value up to its first
-    /// <c>;</c> (curl's login options are not shown), and records the answer as the
-    /// <see cref="Credentials"/> password. Does nothing otherwise.
+    /// The value itself when it names a user with no password, which curl 8.21.0 prompts for: no
+    /// colon, and not starting with <c>;</c>. <see langword="null"/> otherwise.
     /// </summary>
-    /// <param name="passwordPrompt">Asks for the password.</param>
-    internal void ReadMissingPassword(IPasswordPrompt passwordPrompt)
+    private static string? UserWhosePasswordIsMissing(string userAndPassword) =>
+        !userAndPassword.Contains(':', StringComparison.Ordinal) && !userAndPassword.StartsWith(';') ? userAndPassword : null;
+
+    /// <summary>
+    /// Asks <paramref name="passwordPrompt"/> for each password the command line left out, with
+    /// curl 8.21.0's prompts, host first: when the last <c>-u</c> / <c>--user</c> value named a user
+    /// with no password and no <c>--oauth2-bearer</c> was given,
+    /// <c>Enter host password for user '&lt;user&gt;':</c>, recorded as the <see cref="Credentials"/>
+    /// password; then, when the last <c>-U</c> / <c>--proxy-user</c> value named a user with no
+    /// password, <c>Enter proxy password for user '&lt;user&gt;':</c>, recorded as the
+    /// <see cref="ProxyCredentials"/> password. The user shown is the value up to its first
+    /// <c>;</c> (curl's login options are not shown). Does nothing when no password is missing.
+    /// </summary>
+    /// <remarks>
+    /// Measured with the local curl 8.21.0 on 2026-09-26: <c>-u u --oauth2-bearer tok</c> never
+    /// prompts; <c>-U p -u h</c> prompts for <c>'h'</c>'s host password first.
+    /// </remarks>
+    /// <param name="passwordPrompt">Asks for the passwords.</param>
+    internal void ReadMissingPasswords(IPasswordPrompt passwordPrompt)
     {
-        if (userAwaitingPassword is not { } user)
+        if (userAwaitingPassword is { } user && BearerToken is null)
         {
-            return;
+            Credentials = new NetworkCredential(user, ReadPassword(passwordPrompt, "host", user));
+            userAwaitingPassword = null;
         }
 
+        if (proxyUserAwaitingPassword is { } proxyUser)
+        {
+            ProxyCredentials = new NetworkCredential(proxyUser, ReadPassword(passwordPrompt, "proxy", proxyUser));
+            proxyUserAwaitingPassword = null;
+        }
+    }
+
+    private static string ReadPassword(IPasswordPrompt passwordPrompt, string kind, string user)
+    {
         int loginOptions = user.IndexOf(';', StringComparison.Ordinal);
         string shownUser = loginOptions < 0 ? user : user[..loginOptions];
-        string password = passwordPrompt.ReadPassword($"Enter host password for user '{shownUser}':");
-        Credentials = new NetworkCredential(user, password);
-        userAwaitingPassword = null;
+        return passwordPrompt.ReadPassword($"Enter {kind} password for user '{shownUser}':");
     }
+
+    /// <summary>
+    /// Adds <paramref name="scheme"/> to, or for its <c>--no-</c> spelling removes it from, the
+    /// schemes <c>--basic</c>, <c>--digest</c>, <c>--anyauth</c> and <c>--oauth2-bearer</c> asked for.
+    /// </summary>
+    /// <param name="scheme">The scheme the option names.</param>
+    /// <param name="on"><see langword="false"/> for the <c>--no-</c> spelling.</param>
+    internal void WantAuthScheme(HttpAuthSchemes scheme, bool on) =>
+        wantedAuthSchemes = on ? wantedAuthSchemes | scheme : wantedAuthSchemes & ~scheme;
+
+    /// <summary>Replaces every scheme asked for so far with every scheme there is, for <c>--anyauth</c>.</summary>
+    internal void WantEveryAuthScheme() =>
+        wantedAuthSchemes = HttpAuthSchemes.Any | HttpAuthSchemes.Bearer;
+
+    /// <summary>
+    /// Records an <c>--oauth2-bearer</c> token as <see cref="BearerToken"/> and adds
+    /// <see cref="HttpAuthSchemes.Bearer"/> to the schemes asked for, as curl 8.21.0's tool does.
+    /// </summary>
+    /// <param name="token">The non-empty token.</param>
+    internal void SetBearerToken(string token)
+    {
+        BearerToken = token;
+        WantAuthScheme(HttpAuthSchemes.Bearer, on: true);
+    }
+
+    /// <summary>
+    /// Records a <c>-x</c> / <c>--proxy</c> value, or a <c>--socks4</c>, <c>--socks4a</c>, <c>--socks5</c>
+    /// or <c>--socks5-hostname</c> one, as <see cref="Proxy"/>, replacing any earlier one.
+    /// </summary>
+    /// <param name="address">The value as given, possibly empty.</param>
+    /// <param name="kindWithoutScheme">The kind the option names, used when the value has no scheme.</param>
+    internal void SetProxy(string address, ProxyKind kindWithoutScheme) =>
+        Proxy = new CommandLineProxy(address, kindWithoutScheme);
 
     /// <summary>Appends <paramref name="telnetOption"/> to <see cref="TelnetOptions"/>, unchanged and unvalidated.</summary>
     /// <param name="telnetOption">A <c>-t</c> / <c>--telnet-option</c> value, possibly empty.</param>

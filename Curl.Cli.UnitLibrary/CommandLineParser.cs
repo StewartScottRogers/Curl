@@ -17,8 +17,8 @@ namespace Curl.Cli;
 /// refused with <see cref="CommandLineRefusal.EmptyCommandLine"/>, the try-help line alone. The one file-system question it asks is
 /// whether the <c>--cacert</c> path exists, through a check <see cref="Parse(IReadOnlyList{string}, Func{string, bool}, IPasswordPrompt, IDataFileReader)"/>
 /// takes as a parameter. When the whole command line is read without refusal and the last
-/// <c>-u</c> / <c>--user</c> names a user with no colon, it asks the injected
-/// <see cref="IPasswordPrompt"/> for the password, before the no-URL check, as curl 8.21.0 does
+/// <c>-u</c> / <c>--user</c> or <c>-U</c> / <c>--proxy-user</c> names a user with no colon, it asks the
+/// injected <see cref="IPasswordPrompt"/> for the password, host first, before the no-URL check, as curl 8.21.0 does
 /// (<c>curl -u bob</c> prompts, then reports no URL; <c>curl -u bob --bogus</c> never prompts).
 /// A <c>-d</c> / <c>--data</c> value starting with <c>@</c> is read, while parsing, through the
 /// injected <see cref="IDataFileReader"/>: the file it names, or standard input for <c>@-</c>.
@@ -109,7 +109,7 @@ public static class CommandLineParser
             }
         }
 
-        options.ReadMissingPassword(passwordPrompt);
+        options.ReadMissingPasswords(passwordPrompt);
         return Finish(options);
     }
 
