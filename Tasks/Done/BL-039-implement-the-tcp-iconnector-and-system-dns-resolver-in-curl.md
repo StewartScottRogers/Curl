@@ -8,7 +8,7 @@ depends-on: [BL-034]
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-039 — Implement the TCP IConnector and system DNS resolver in Curl.Networking
 
@@ -51,28 +51,50 @@ job is to construct them; this task corrects it.
 
 ## Acceptance criteria
 
-- [ ] `TcpConnector : IConnector`, `SystemDnsResolver : IDnsResolver` and a
+- [x] `TcpConnector : IConnector`, `SystemDnsResolver : IDnsResolver` and a
       `NetworkStream`-backed `IConnection` exist in `Curl.Networking.UnitLibrary`, which
       references only `Curl.Protocol.Abstractions.UnitLibrary`.
-- [ ] A test asserts a resolver returning no addresses gives
+- [x] A test asserts a resolver returning no addresses gives
       `ConnectResult.Failed(CurlExitCode.CouldntResolveHost, "Could not resolve host: nonexistent.invalid")`
       for host `nonexistent.invalid`, and the dialer is never called.
-- [ ] A test asserts every address failing to dial gives `CurlExitCode.CouldntConnect`
+- [x] A test asserts every address failing to dial gives `CurlExitCode.CouldntConnect`
       with `Failed to connect to 127.0.0.1:1 after 2013 ms: Could not connect to server`,
       where a fake `TimeProvider` advances 2013 ms during the dial.
-- [ ] Tests assert addresses are tried in the resolver's order and the first success is
+- [x] Tests assert addresses are tried in the resolver's order and the first success is
       returned; that `UseTls` true passes the connection and host to `ITlsProvider` and
       returns its result; that `UseTls` false never calls it; and that cancellation
       surfaces as `OperationCanceledException`, not as a failure result.
-- [ ] `Curl.Networking.UnitLibrary/CLAUDE.md` states which types may construct a
+- [x] `Curl.Networking.UnitLibrary/CLAUDE.md` states which types may construct a
       `Socket` and that everything else takes the Abstractions contracts.
-- [ ] `dotnet build Curl.Networking.UnitLibrary -warnaserror` is clean and
+- [x] `dotnet build Curl.Networking.UnitLibrary -warnaserror` is clean and
       `dotnet test Curl.Networking.UnitTests --filter "TestCategory!=Integration"` is
       green; the only `Integration` test is the loopback test described in `Context`.
 
 ## Notes
 
+- Plan: `TcpConnector(IDnsResolver, ITcpDialer, ITlsProvider, TimeProvider)` resolves,
+  returns exit 6 on an empty list without dialing, dials each address in order (a
+  `SocketException` moves to the next), returns exit 7 with the `TimeProvider`-measured
+  milliseconds when all fail, then hands the connection and host to `ITlsProvider` only
+  when `UseTls` is set. `OperationCanceledException` is never caught.
+- Choice: `ITcpDialer` is public, not internal, so `Curl.Console` can register
+  `TcpDialer` with dependency injection and `TcpConnector` keeps one public constructor.
+- Choice: the `IConnection` is `StreamConnection` over any `Stream`; `TcpDialer` gives it
+  the `NetworkStream` that owns the socket. Taking `Stream` lets every member be covered
+  by fast tests over a `MemoryStream`, leaving only `TcpDialer`'s socket body to the one
+  `Integration` loopback test (which also checks a dial to the stopped listener throws
+  `SocketException`).
+- Choice: `SystemDnsResolver` maps the system resolver's `SocketException` to an empty
+  list (so the connector reports exit 6); an internal constructor takes the lookup
+  delegate so that path is tested without a network (`InternalsVisibleTo` the tests).
+- Choice: exit 7 prints the host as given in the target (`<host>:<port>`), matching the
+  measured `127.0.0.1:1` case.
+- Known gap, by the task's scope: TLS handshake exceptions from `ITlsProvider` propagate
+  unchanged; mapping them to exits 35/60 belongs with the production `ITlsProvider`.
+- Tests: 19 in `Curl.Networking.UnitTests` (18 fast, 1 Integration), all green.
+
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. TcpConnector resolves, dials in order and hands TLS targets to ITlsProvider, returning curl 8.21.0's exit 6 and 7 messages; SystemDnsResolver and the socket-backed dialer exist
