@@ -58,6 +58,9 @@ public sealed class CommandLineOptionTableTests
     [DataRow("header", 'H', true)]
     [DataRow("user-agent", 'A', true)]
     [DataRow("referer", 'e', true)]
+    [DataRow("cookie", 'b', true)]
+    [DataRow("cookie-jar", 'c', true)]
+    [DataRow("junk-session-cookies", 'j', false)]
     public void Rows_FirstTableOption_HasItsShortNameAndArity(string longName, char? shortName, bool takesValue)
     {
         CommandLineOption option = CommandLineOptionTable.Rows.Single(row => row.LongName == longName);

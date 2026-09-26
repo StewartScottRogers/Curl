@@ -18,6 +18,7 @@ public sealed class CommandLineOptions
     private readonly List<UrlOutput> urlOutputs = [];
     private readonly List<string> telnetOptions = [];
     private readonly List<string> headers = [];
+    private readonly List<CommandLineCookie> cookies = [];
     private readonly List<string> warningLines = [];
     private readonly List<FormPartSpecification> formParts = [];
     private readonly Stack<FormPartSpecification> openMultiparts = new();
@@ -354,6 +355,26 @@ public sealed class CommandLineOptions
     /// <see langword="null"/> when not given. The last value wins.
     /// </summary>
     public string? Referer { get; internal set; }
+
+    /// <summary>
+    /// Every <c>-b</c> / <c>--cookie</c> value, cookie strings and cookie file names alike, in
+    /// command-line order. Empty is accepted, as a file name.
+    /// </summary>
+    public IReadOnlyList<CommandLineCookie> Cookies => cookies;
+
+    /// <summary>
+    /// The last <c>-c</c> / <c>--cookie-jar</c> value, verbatim and never empty: the file to write
+    /// every cookie to after the transfer (<c>-</c> for standard output). <see langword="null"/>
+    /// when not given.
+    /// </summary>
+    public string? CookieJar { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>-j</c> / <c>--junk-session-cookies</c> was given and no
+    /// <c>--no-junk-session-cookies</c> came after it: drop the session cookies read from a
+    /// <c>-b</c> file.
+    /// </summary>
+    public bool JunkSessionCookies { get; internal set; }
 
     /// <summary>
     /// <see langword="true"/> when <c>-L</c> / <c>--location</c> or <c>--location-trusted</c> was
@@ -711,6 +732,10 @@ public sealed class CommandLineOptions
     /// <summary>Appends <paramref name="telnetOption"/> to <see cref="TelnetOptions"/>, unchanged and unvalidated.</summary>
     /// <param name="telnetOption">A <c>-t</c> / <c>--telnet-option</c> value, possibly empty.</param>
     internal void AddTelnetOption(string telnetOption) => telnetOptions.Add(telnetOption);
+
+    /// <summary>Appends <paramref name="cookie"/> to <see cref="Cookies"/>, unchanged and unvalidated.</summary>
+    /// <param name="cookie">A <c>-b</c> / <c>--cookie</c> value, possibly empty.</param>
+    internal void AddCookie(string cookie) => cookies.Add(new CommandLineCookie(cookie));
 
     /// <summary>Appends <paramref name="header"/> to <see cref="Headers"/>, unchanged and unvalidated.</summary>
     /// <param name="header">A <c>-H</c> / <c>--header</c> value, or one line of its <c>@file</c>.</param>
