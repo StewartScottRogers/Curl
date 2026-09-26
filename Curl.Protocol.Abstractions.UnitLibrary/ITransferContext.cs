@@ -39,11 +39,11 @@ public interface ITransferContext
     /// </summary>
     /// <remarks>
     /// curl accepts a comma-separated list but honours only the first range for
-    /// <c>file://</c>. The range text is for parsing once, before any handler runs, by
-    /// <c>ByteRangeParser</c> in <c>Curl.Core.UnitLibrary</c>, which also answers text that
-    /// names no range with exit 33 (<see cref="CurlExitCode.RangeError" />); so a handler
-    /// sees at most one <see cref="Abstractions.ByteRange" />, already validated. <c>Curl.Console</c>
-    /// does not call it yet (task BL-090).
+    /// <c>file://</c>. <c>Curl.Console</c> parses the <c>-r</c>/<c>--range</c> text once per
+    /// transfer, before any handler runs, with <c>ByteRangeParser</c> in
+    /// <c>Curl.Core.UnitLibrary</c>, which answers text that names no range with exit 33
+    /// (<see cref="CurlExitCode.RangeError" />) and no handler call; so a handler sees at most
+    /// one <see cref="Abstractions.ByteRange" />, already validated.
     /// </remarks>
     ByteRange? Range { get; }
 
@@ -56,8 +56,8 @@ public interface ITransferContext
     /// <c>file://</c>, a download with more body bytes than this writes exactly this many,
     /// then fails with exit 63 (<see cref="CurlExitCode.FilesizeExceeded" />); the limit
     /// counts body bytes only, so headers written to <see cref="HeaderOutput" /> do not use
-    /// it up, and an upload ignores it. <c>file://</c> enforces it; the other handlers do not
-    /// read it yet.
+    /// it up, and an upload ignores it. <c>Curl.Console</c> fills it from <c>--max-filesize</c>.
+    /// Only the <c>file://</c> handler enforces it; no other handler reads it yet.
     /// </remarks>
     long? MaxFileSize { get; }
 
