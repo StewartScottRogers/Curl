@@ -45,7 +45,8 @@ public sealed class CommandLineParseResult
     /// transfer has ended, without line terminators; empty when there are none, and always empty
     /// for a refused command line, which never reaches a transfer. It holds
     /// <see cref="CommandLineWarning.MoreOutputOptionsThanUrls"/> when an accepted command line has
-    /// more <see cref="CommandLineOptions.OutputFiles"/> than <see cref="CommandLineOptions.Urls"/>
+    /// an <c>-o</c>, <c>-O</c> or kept <c>--no-remote-name</c> with no URL to pair with (an entry of
+    /// <see cref="CommandLineOptions.UrlOutputs"/> with no URL)
     /// and <c>-s</c> / <c>--silent</c> is not in effect at its end. The console layer must write
     /// these after the transfers, not with <see cref="WarningLines"/>: curl 8.21.0 prints
     /// <c>curl -o f -o g file:///Z:/nx</c> as <c>curl: (37) Could not open file Z:/nx</c> and then
@@ -62,7 +63,7 @@ public sealed class CommandLineParseResult
     internal static CommandLineParseResult Accepted(CommandLineOptions options)
     {
         IReadOnlyList<string> warningLinesAfterTransfers =
-            options.OutputFiles.Count > options.Urls.Count && !options.Silent
+            options.HasMoreOutputOptionsThanUrls && !options.Silent
                 ? [CommandLineWarning.MoreOutputOptionsThanUrls]
                 : [];
         return new(options, null, options.WarningLines, warningLinesAfterTransfers);

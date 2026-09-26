@@ -15,7 +15,7 @@ namespace Curl.Cli;
 public sealed class CommandLineOptions
 {
     private readonly List<string> urls = [];
-    private readonly List<string> outputFiles = [];
+    private readonly List<UrlOutput> urlOutputs = [];
     private readonly List<string> telnetOptions = [];
     private readonly List<string> headers = [];
     private readonly List<string> warningLines = [];
@@ -50,8 +50,54 @@ public sealed class CommandLineOptions
     /// </summary>
     public bool ProgressBar { get; internal set; }
 
-    /// <summary>The <c>-o</c> / <c>--output</c> file names, in command-line order.</summary>
-    public IReadOnlyList<string> OutputFiles => outputFiles;
+    /// <summary>
+    /// The <c>-o</c> / <c>--output</c> file name of each entry of <see cref="UrlOutputs"/>, in the same
+    /// order and up to the last entry that has one, <see langword="null"/> for an entry before it that
+    /// has none: the Nth element is the <c>-o</c> file paired with the Nth URL, and a URL past the end
+    /// has none. Empty when no <c>-o</c> was given.
+    /// </summary>
+    public IReadOnlyList<string?> OutputFiles =>
+        urlOutputs[..(urlOutputs.FindLastIndex(output => output.FileName is not null) + 1)].ConvertAll(output => output.FileName);
+
+    /// <summary>
+    /// Where each URL's body goes, one <see cref="UrlOutput"/> per URL or output option, in the order
+    /// curl 8.21.0 pairs them: the Nth URL with the Nth <c>-o</c>, <c>-O</c> or kept
+    /// <c>--no-remote-name</c>. Entries past the last URL have no <see cref="UrlOutput.Url"/>.
+    /// </summary>
+    public IReadOnlyList<UrlOutput> UrlOutputs => urlOutputs;
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--remote-name-all</c> was given and no <c>--no-remote-name-all</c>
+    /// came after it. It applies to each URL or output option read while it is on, not to earlier ones.
+    /// </summary>
+    public bool RemoteNameAll { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>-J</c> / <c>--remote-header-name</c> was given and no
+    /// <c>--no-remote-header-name</c> came after it: a remote-named file takes its name from the
+    /// <c>Content-Disposition</c> header when there is one.
+    /// </summary>
+    public bool RemoteHeaderName { get; internal set; }
+
+    /// <summary>
+    /// The <c>--output-dir</c> directory, verbatim and unchecked; <see langword="null"/> when not given.
+    /// The last value wins.
+    /// </summary>
+    public string? OutputDirectory { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--create-dirs</c> was given and no <c>--no-create-dirs</c> came
+    /// after it: missing directories in an output path are created.
+    /// </summary>
+    public bool CreateDirectories { get; internal set; }
+
+    /// <summary>
+    /// The <c>-w</c> / <c>--write-out</c> template, unexpanded; <see langword="null"/> when not given or
+    /// when the last <c>-w @file</c> named an empty file. The last value wins. An <c>@file</c> or
+    /// <c>@-</c> value is the file's (or standard input's) text with every carriage return, line feed and
+    /// NUL removed, as curl 8.21.0 reads it.
+    /// </summary>
+    public string? WriteOut { get; internal set; }
 
     /// <summary>
     /// The request body built from every <c>-d</c> / <c>--data</c>, <c>--data-ascii</c>, <c>--data-binary</c>,
@@ -467,11 +513,62 @@ public sealed class CommandLineOptions
 
     /// <summary>Appends <paramref name="url"/> to <see cref="Urls"/>, unchanged and unvalidated.</summary>
     /// <param name="url">A positional argument or a <c>--url</c> value.</param>
-    internal void AddUrl(string url) => urls.Add(url);
+    internal void AddUrl(string url)
+    {
+        urls.Add(url);
+        (urlOutputs.Find(output => output.Url is null) ?? AddUrlOutput()).Url = url;
+    }
 
-    /// <summary>Appends <paramref name="outputFile"/> to <see cref="OutputFiles"/>; nothing is opened or created.</summary>
+    /// <summary>
+    /// Pairs <paramref name="outputFile"/> with the next URL in <see cref="UrlOutputs"/>; nothing is
+    /// opened or created.
+    /// </summary>
     /// <param name="outputFile">A <c>-o</c> / <c>--output</c> value.</param>
-    internal void AddOutputFile(string outputFile) => outputFiles.Add(outputFile);
+    internal void AddOutputFile(string outputFile)
+    {
+        UrlOutput output = urlOutputs.Find(output => !output.HasOutputOption) ?? AddUrlOutput();
+        output.FileName = outputFile;
+        output.HasOutputOption = true;
+    }
+
+    /// <summary>
+    /// Pairs <c>-O</c> / <c>--remote-name</c> (<paramref name="on"/> <see langword="true"/>) or
+    /// <c>--no-remote-name</c> with the next URL in <see cref="UrlOutputs"/>. When no entry is left
+    /// without an output option and <see cref="RemoteNameAll"/> is off, <c>--no-remote-name</c> is
+    /// dropped, as curl 8.21.0 drops it: <c>--no-remote-name --no-remote-name u</c> gives no warning
+    /// about more output options than URLs.
+    /// </summary>
+    /// <param name="on"><see langword="false"/> for the <c>--no-</c> spelling.</param>
+    internal void PairRemoteName(bool on)
+    {
+        UrlOutput? output = urlOutputs.Find(output => !output.HasOutputOption);
+        if (output is null)
+        {
+            if (!on && !RemoteNameAll)
+            {
+                return;
+            }
+
+            output = AddUrlOutput();
+        }
+
+        output.UsesRemoteName = on;
+        output.HasOutputOption = true;
+    }
+
+    /// <summary>
+    /// <see langword="true"/> when an output option has no URL to pair with, so curl 8.21.0 warns
+    /// with <see cref="CommandLineWarning.MoreOutputOptionsThanUrls"/>.
+    /// </summary>
+    internal bool HasMoreOutputOptionsThanUrls =>
+        urlOutputs.Exists(output => output.HasOutputOption && output.Url is null);
+
+    private UrlOutput AddUrlOutput()
+    {
+        UrlOutput output = new(RemoteNameAll);
+        urlOutputs.Add(output);
+        return output;
+    }
 
     /// <summary>
     /// Appends the UTF-8 bytes of <paramref name="data"/> to <see cref="PostData"/>, after a single

@@ -35,7 +35,8 @@ namespace Curl.Cli;
 /// <c>--no-progress-meter</c>, <c>--no-progress-bar</c>, <c>--no-get</c>, <c>--no-location</c>, <c>--no-location-trusted</c>,
 /// <c>--no-post301</c>, <c>--no-post302</c>, <c>--no-post303</c>, <c>--no-show-headers</c>, <c>--no-include</c>, <c>--no-head</c>,
 /// <c>--no-fail</c>, <c>--no-fail-with-body</c>, <c>--no-fail-early</c>, <c>--no-compressed</c>, <c>--no-raw</c>, <c>--no-tr-encoding</c>,
-/// <c>--no-ignore-content-length</c>, <c>--no-path-as-is</c>, <c>--no-basic</c>, <c>--no-digest</c> and <c>--no-proxytunnel</c> are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
+/// <c>--no-ignore-content-length</c>, <c>--no-path-as-is</c>, <c>--no-basic</c>, <c>--no-digest</c>, <c>--no-proxytunnel</c>, <c>--no-remote-name</c>,
+/// <c>--no-remote-name-all</c>, <c>--no-remote-header-name</c> and <c>--no-create-dirs</c> are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
 /// silent and <c>--no-silent -s</c> is. <c>--no-silent=x</c> is accepted, its value ignored.
 /// <c>--no-tlsv1.2</c>, <c>--no-tlsv1.3</c>, <c>--no-url</c>, <c>--no-output</c> (even as the last
 /// argument), <c>--no-output=x</c>, <c>--no-data</c>, <c>--no-dump-header</c>, <c>--no-range</c>, <c>--no-time-cond</c>,
@@ -45,7 +46,7 @@ namespace Curl.Cli;
 /// <c>--no-url-query</c>, <c>--no-max-redirs</c>, <c>--no-config</c>, <c>--no-http1.0</c>, <c>--no-http1.1</c>, <c>--no-http2</c>,
 /// <c>--no-http2-prior-knowledge</c>, <c>--no-http3</c>, <c>--no-http3-only</c>, <c>--no-request-target</c>, <c>--no-anyauth</c>,
 /// <c>--no-oauth2-bearer</c>, <c>--no-proxy</c>, <c>--no-proxy-user</c>, <c>--no-noproxy</c>, <c>--no-socks4</c>, <c>--no-socks4a</c>,
-/// <c>--no-socks5</c> and <c>--no-socks5-hostname</c> (each also with <c>=x</c>) exit 2 with
+/// <c>--no-socks5</c>, <c>--no-socks5-hostname</c>, <c>--no-write-out</c> and <c>--no-output-dir</c> (each also with <c>=x</c>) exit 2 with
 /// <c>curl: option &lt;as typed&gt;: the given option cannot be reversed with a --no- prefix</c> and
 /// the try-help line. <c>--no-bogus</c>, <c>--no-</c>, <c>--no-no-silent</c> and <c>--no-Silent</c>
 /// exit 2 as unknown. A short letter is never negated.
@@ -61,6 +62,12 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("progress-meter", null, (options, on) => options.ProgressMeterOff = !on),
         CommandLineOption.NegatableFlag("progress-bar", '#', (options, on) => options.ProgressBar = on),
         CommandLineOption.FileName("output", 'o', (options, file) => options.AddOutputFile(file)),
+        CommandLineOption.NegatableFlag("remote-name", 'O', (options, on) => options.PairRemoteName(on)),
+        CommandLineOption.NegatableFlag("remote-name-all", null, (options, on) => options.RemoteNameAll = on),
+        CommandLineOption.NegatableFlag("remote-header-name", 'J', (options, on) => options.RemoteHeaderName = on),
+        CommandLineOption.Text("output-dir", null, (options, directory) => options.OutputDirectory = directory),
+        CommandLineOption.NegatableFlag("create-dirs", null, (options, on) => options.CreateDirectories = on),
+        CommandLineOption.Value("write-out", 'w', SetWriteOut),
         CommandLineOption.Value("data", 'd', AppendPostData),
         CommandLineOption.Value("data-ascii", null, AppendPostData),
         CommandLineOption.Value("data-binary", null, AppendBinaryPostData),
@@ -361,6 +368,40 @@ public static class CommandLineOptionTable
         return dataFileReader.TryReadFile(file, out contents)
             ? null
             : CommandLineRefusal.DataFileUnreadable(spelledOption, file, options.ErrorsHidden);
+    }
+
+    /// <summary>
+    /// Records a <c>-w</c> / <c>--write-out</c> template: the value's own text, empty included, or, when
+    /// it starts with <c>@</c>, the text of the file it names (standard input for <c>@-</c>) with every
+    /// carriage return, line feed and NUL removed, as curl 8.21.0 does. A file with no bytes at all
+    /// clears the template and adds <see cref="CommandLineWarning.FailedToRead(string)"/> unless
+    /// <c>-s</c> / <c>--silent</c> has been read; one that cannot be read is refused with
+    /// <see cref="CommandLineRefusal.DataFileUnreadable"/>.
+    /// </summary>
+    private static CommandLineRefusal? SetWriteOut(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        if (!value.StartsWith('@'))
+        {
+            options.WriteOut = value;
+            return null;
+        }
+
+        string file = value[1..];
+        CommandLineRefusal? refusal = ReadAtFile(options, file, spelledOption, dataFileReader, out byte[] contents);
+        if (refusal is not null)
+        {
+            return refusal;
+        }
+
+        if (contents.Length == 0)
+        {
+            options.WriteOut = null;
+            options.AddWarningLinesUnlessSilent([CommandLineWarning.FailedToRead(file == "-" ? "<stdin>" : file)]);
+            return null;
+        }
+
+        options.WriteOut = Encoding.UTF8.GetString(RemoveLineBreaksAndNuls(contents));
+        return null;
     }
 
     private static byte[] RemoveLineBreaksAndNuls(byte[] contents) =>

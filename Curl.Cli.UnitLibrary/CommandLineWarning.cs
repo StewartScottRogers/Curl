@@ -36,6 +36,23 @@ public static class CommandLineWarning
     }
 
     /// <summary>
+    /// The warning for a <c>-w @file</c> or <c>-w @-</c> whose file or standard input holds no bytes,
+    /// which clears the template: <c>Warning: Failed to read &lt;file&gt;</c>, naming standard input
+    /// <c>&lt;stdin&gt;</c>. Measured with <c>curl -w @empty.txt --bogus</c> and
+    /// <c>curl -w @- --bogus &lt;/dev/null</c> (curl 8.21.0, Windows, 2026-09-26); a file holding only
+    /// a line break or a NUL is not warned about.
+    /// </summary>
+    /// <param name="fileName">The file name after the <c>@</c>, or <c>&lt;stdin&gt;</c>.</param>
+    /// <returns>The warning line.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="fileName"/> is <see langword="null"/>.</exception>
+    public static string FailedToRead(string fileName)
+    {
+        ArgumentNullException.ThrowIfNull(fileName);
+
+        return $"Warning: Failed to read {fileName}";
+    }
+
+    /// <summary>
     /// The warning for a <c>-H</c> / <c>--header</c> value holding neither a colon nor a semicolon,
     /// which curl still sends as given: <c>Warning: The provided HTTP header '&lt;value&gt;' does not look like a header?</c>.
     /// Measured with <c>curl -H foo http://127.0.0.1:1/</c> (curl 8.21.0, Windows, 2026-09-26); <c>-H ''</c>
