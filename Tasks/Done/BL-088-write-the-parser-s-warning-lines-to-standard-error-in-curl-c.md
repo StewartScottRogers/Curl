@@ -8,7 +8,7 @@ depends-on: [BL-051, BL-068, BL-093]
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-088 — Write the parser's warning lines to standard error in Curl.Console
 
@@ -49,17 +49,17 @@ accepted and refused command lines, matching curl 8.21.0.
 
 ## Acceptance criteria
 
-- [ ] A `Curl.Console.UnitTests` test runs `-o -s --bogus`: stderr is exactly
+- [x] A `Curl.Console.UnitTests` test runs `-o -s --bogus`: stderr is exactly
       `Warning: The filename argument '-s' looks like a flag.`, then
       `curl: option --bogus: is unknown`, then the try-help line, each followed by
       `Environment.NewLine`; stdout is empty; the exit code is 2.
-- [ ] A test runs an accepted command line with a flag-like `-o` value against a
+- [x] A test runs an accepted command line with a flag-like `-o` value against a
       `file://` URL and asserts the warning line is the first thing on stderr and is
       written before any transfer output.
-- [ ] The `-s` / `-sS` / neither measurements are recorded in `Notes` with the curl
+- [x] The `-s` / `-sS` / neither measurements are recorded in `Notes` with the curl
       version, and a test asserts the measured behaviour for `-s` and for `-sS`.
-- [ ] `dotnet build Curl.Console -warnaserror` and `dotnet build Curl.Console.UnitTests -warnaserror` are clean.
-- [ ] `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` is green.
+- [x] `dotnet build Curl.Console -warnaserror` and `dotnet build Curl.Console.UnitTests -warnaserror` are clean.
+- [x] `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` is green.
 
 ## Notes
 
@@ -74,6 +74,11 @@ accepted and refused command lines, matching curl 8.21.0.
     the parser (`Curl.Cli.UnitLibrary`), outside this task's `touches`. Filed BL-093 for it
     and added it to `depends-on`; once it lands, this task prints `WarningLines`
     unconditionally and its `-s`/`-sS` tests assert no warning.
+- 2026-09-26 (lane 3): `CurlCommandRunner.RunAsync` already wrote `WarningLines` first on
+  both paths (landed with BL-068/BL-093), so no production change was needed. Added
+  `CurlCommandRunnerWarningLineTests` (7 tests): refused `-o -s --bogus`, accepted and failed
+  transfers with the warning first, `-s`/`-sS` before `-o` print nothing, `-s -o -x --bogus`
+  prints only the refusal, and `-o -x -s` still prints the warning.
 
 ## Log
 
@@ -82,3 +87,4 @@ accepted and refused command lines, matching curl 8.21.0.
 - 2026-09-26: Doing -> Blocked. Needs BL-093: -s suppresses the warning only when it precedes -o, so Curl.Cli.UnitLibrary (outside touches) must filter WarningLines first; re-queue once BL-093 is done.
 - 2026-09-26: Blocked -> Backlog. Unblocked: BL-093 now Done
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. Curl.Console's warning-line ordering and -s suppression are pinned by CurlCommandRunnerWarningLineTests
