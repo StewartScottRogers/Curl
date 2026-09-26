@@ -1,5 +1,5 @@
 ---
-id: BL-273
+id: BL-277
 title: Write the progress meter for a followed redirect and before exit 47 in Curl.Console
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-273 — Write the progress meter for a followed redirect and before exit 47 in Curl.Console
+# BL-277 — Write the progress meter for a followed redirect and before exit 47 in Curl.Console
 
 ## Goal
 

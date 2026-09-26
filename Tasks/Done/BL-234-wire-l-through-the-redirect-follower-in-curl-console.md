@@ -47,7 +47,7 @@ hello`.
   - `curl -i -sS http://127.0.0.1:18247/a` (no `-L`): stdout = the full 302 including `xyz`; one request.
   - `curl -L -sS --max-redirs 1` with both hops answering the 302: stdout empty, stderr `curl: (47) Maximum (1) redirects followed`, two requests.
   - Pinned in `CurlCommandRunnerRedirectTests`.
-- Without `-s`, curl writes a meter status line per hop and the meter before the exit-47 line; the runner does not model that yet. Filed as BL-273.
+- Without `-s`, curl writes a meter status line per hop and the meter before the exit-47 line; the runner does not model that yet. Filed as BL-277.
 - `Measure-CodeQuality.ps1` flagged three members of `TransferDispatch` (the record's generated copy constructor and init setters, from BL-072) as uncovered; turned it into a sealed class with get-only properties, which has no such members. Curl.Console now measures 100% line and branch, 0 failing members.
 
 ## Log
