@@ -35,7 +35,9 @@ namespace Curl.Console;
 /// URLs are transferred in command-line order; a failure does not stop the rest, and the
 /// exit code is the last transfer's, as curl's is. The first <c>-o</c> receives the first
 /// URL, the second the second, and so on. A failure's line is printed unless <c>-s</c> was
-/// given without <c>-S</c>, and only when the failure carries a message. A refused command
+/// given without <c>-S</c>, and only when the failure carries a message. An <c>-o</c> file
+/// that cannot be created prints curl's <c>Warning: Failed to open the file</c> line first,
+/// unless <c>-s</c> was given, with or without <c>-S</c>. A refused command
 /// line prints the refusal's lines and transfers nothing.
 /// </remarks>
 internal sealed class CurlCommandRunner(
@@ -159,8 +161,14 @@ internal sealed class CurlCommandRunner(
         {
             TransferResult fileResult = await dispatcher.DispatchAsync(CreateContext(options, uri, output))
                 .ConfigureAwait(false);
+            TransferResult completed = await output.CompleteAsync(fileResult).ConfigureAwait(false);
 
-            return await output.CompleteAsync(fileResult).ConfigureAwait(false);
+            if (!options.Silent && output.OpenFailureWarning is { } warning)
+            {
+                await WriteErrorLineAsync(warning).ConfigureAwait(false);
+            }
+
+            return completed;
         }
     }
 

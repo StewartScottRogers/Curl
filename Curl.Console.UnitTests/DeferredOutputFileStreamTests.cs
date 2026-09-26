@@ -92,6 +92,29 @@ public sealed class DeferredOutputFileStreamTests
     }
 
     [TestMethod]
+    public async Task OpenFailureWarning_BeforeAndAfterAFailedOpen_IsNullThenCurlsWarning()
+    {
+        InMemoryFileSystem files = new() { UnwritableStatus = FileAccessStatus.AccessDenied };
+        files.UnwritablePaths.Add("C:/Windows/System32/x");
+        using DeferredOutputFileStream stream = new(files, "C:/Windows/System32/x");
+
+        Assert.IsNull(stream.OpenFailureWarning);
+        await Assert.ThrowsExactlyAsync<IOException>(() => stream.WriteAsync(new byte[1].AsMemory()).AsTask());
+
+        Assert.AreEqual("Warning: Failed to open the file C:/Windows/System32/x: Permission denied", stream.OpenFailureWarning);
+    }
+
+    [TestMethod]
+    public async Task OpenFailureWarning_SuccessfulOpen_IsNull()
+    {
+        using DeferredOutputFileStream stream = new(fileSystem, "a.txt");
+
+        await stream.WriteAsync(new byte[] { 1 }.AsMemory());
+
+        Assert.IsNull(stream.OpenFailureWarning);
+    }
+
+    [TestMethod]
     public async Task WriteAsync_CreatesTheFileWithFopensMode0666()
     {
         using DeferredOutputFileStream stream = new(fileSystem, "a.txt");

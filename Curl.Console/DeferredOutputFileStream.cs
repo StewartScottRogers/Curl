@@ -22,6 +22,10 @@ namespace Curl.Console;
 /// message, which is what curl 8.21.0 prints under <c>-sS</c> (measured 2026-09-26).
 /// </para>
 /// <para>
+/// Either failed open also sets <see cref="OpenFailureWarning" />, the warning curl prints
+/// before its exit 23 line unless <c>-s</c> was given.
+/// </para>
+/// <para>
 /// Only asynchronous writes are supported: the file system opens files asynchronously,
 /// and every handler writes with
 /// <see cref="Stream.WriteAsync(ReadOnlyMemory{byte}, CancellationToken)" />.
@@ -41,6 +45,12 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
 
     private Stream? file;
     private long? failedWriteLength;
+
+    /// <summary>
+    /// Gets curl's <c>Warning: Failed to open the file &lt;path&gt;: &lt;reason&gt;</c> line once an
+    /// open of the file has failed, or <see langword="null" /> while none has.
+    /// </summary>
+    internal string? OpenFailureWarning { get; private set; }
 
     /// <inheritdoc />
     public override bool CanRead => false;
@@ -156,6 +166,11 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
             .OpenForWriteAsync(path, FileWriteMode.Truncate, CreateMode, cancellationToken)
             .ConfigureAwait(false);
         file = opened.Content;
+
+        if (!opened.IsOpen)
+        {
+            OpenFailureWarning = OutputFileOpenWarning.For(path, opened.Status);
+        }
 
         return file;
     }

@@ -144,6 +144,50 @@ public sealed class CurlCommandRunnerTests
     }
 
     [TestMethod]
+    public async Task RunAsync_OutputFileCannotBeCreatedWithoutSilent_PrintsFailedToOpenWarningBeforeWriteLine()
+    {
+        int exitCode = await RunToUncreatableOutputFileAsync("-o", "Z:/nonexist/x");
+
+        Assert.AreEqual(23, exitCode);
+        Assert.AreEqual(
+            "Warning: Failed to open the file Z:/nonexist/x: No such file or directory" + NewLine
+            + "curl: (23) client returned ERROR on write of 92 bytes" + NewLine,
+            StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_OutputFileCannotBeCreatedUnderSilent_PrintsNoWarning()
+    {
+        int exitCode = await RunToUncreatableOutputFileAsync("-s", "-o", "Z:/nonexist/x");
+
+        Assert.AreEqual(23, exitCode);
+        Assert.AreEqual(string.Empty, StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_OutputFileCannotBeCreatedUnderSilentShowError_PrintsOnlyTheWriteLine()
+    {
+        int exitCode = await RunToUncreatableOutputFileAsync("-sS", "-o", "Z:/nonexist/x");
+
+        Assert.AreEqual(23, exitCode);
+        Assert.AreEqual("curl: (23) client returned ERROR on write of 92 bytes" + NewLine, StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_EmptyTransferToUncreatableOutputFileWithoutSilent_PrintsOnlyTheWarning()
+    {
+        RecordingProtocolHandler empty = new("file", _ => ValueTask.FromResult(TransferResult.Success(0)));
+        fileSystem.UnwritablePaths.Add("Z:/nonexist/x");
+
+        int exitCode = await RunAsync(["-o", "Z:/nonexist/x", "file:///empty"], empty);
+
+        Assert.AreEqual(23, exitCode);
+        Assert.AreEqual(
+            "Warning: Failed to open the file Z:/nonexist/x: No such file or directory" + NewLine,
+            StandardErrorText);
+    }
+
+    [TestMethod]
     public async Task RunAsync_EmptyTransferToOutputFile_CreatesEmptyFile()
     {
         RecordingProtocolHandler empty = new("file", _ => ValueTask.FromResult(TransferResult.Success(0)));
@@ -297,4 +341,18 @@ public sealed class CurlCommandRunnerTests
     private Task<int> RunAsync(IReadOnlyList<string> arguments, params IProtocolHandler[] handlers) =>
         new CurlCommandRunner(_ => new ProtocolDispatcher(handlers), fileSystem, standardOutput, standardError, standardInput)
             .RunAsync(arguments);
+
+    private Task<int> RunToUncreatableOutputFileAsync(params string[] options)
+    {
+        InMemoryFileSystem files = new() { ReadContent = new byte[92] };
+        files.UnwritablePaths.Add("Z:/nonexist/x");
+        CurlCommandRunner runner = new(
+            _ => new ProtocolDispatcher([new FileProtocolHandler(files)]),
+            files,
+            standardOutput,
+            standardError,
+            standardInput);
+
+        return runner.RunAsync([.. options, "file:///C:/Windows/win.ini"]);
+    }
 }

@@ -5,13 +5,15 @@ namespace Curl.Console;
 /// <summary>
 /// An in-memory file system: reads serve <see cref="ReadContent" /> for any path, writes
 /// land in <see cref="Written" />, and a path in <see cref="UnwritablePaths" /> fails to open
-/// for writing.
+/// for writing with <see cref="UnwritableStatus" />.
 /// </summary>
 internal sealed class InMemoryFileSystem : IFileSystem
 {
     public byte[] ReadContent { get; init; } = [];
 
     public HashSet<string> UnwritablePaths { get; } = [];
+
+    public FileAccessStatus UnwritableStatus { get; init; } = FileAccessStatus.NotFound;
 
     public Dictionary<string, MemoryStream> Written { get; } = [];
 
@@ -30,7 +32,7 @@ internal sealed class InMemoryFileSystem : IFileSystem
 
         if (UnwritablePaths.Contains(path))
         {
-            return ValueTask.FromResult(FileOpenResult.Failed(FileAccessStatus.NotFound));
+            return ValueTask.FromResult(FileOpenResult.Failed(UnwritableStatus));
         }
 
         MemoryStream stream = new();
