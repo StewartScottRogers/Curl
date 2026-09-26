@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation/Planning/Decisions]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-059 — Decide which curl TLS build Curl matches for TLS failure messages, --capath and --cert formats
 
@@ -64,20 +64,26 @@ Also state whether the default trust store is the operating system's store (what
 
 ## Acceptance criteria
 
-- [ ] A new ADR in `Documentation/Planning/Decisions/` (next free number), status
+- [x] A new ADR in `Documentation/Planning/Decisions/` (next free number), status
       Accepted, records the choice for TLS failure message text, for `--capath`, for the
       accepted `--cert`/`--key` formats, and for the default trust store, each per
       platform.
-- [ ] The ADR states, for each of those four, the exact behaviour BL-064 and BL-065 must
+- [x] The ADR states, for each of those four, the exact behaviour BL-064 and BL-065 must
       test: for messages, the text for exit 35, 58, 60 and 77 or the rule that produces
       it; for `--capath`, honour or warn-and-ignore with the warning text.
-- [ ] Any divergence from the reference Schannel build is named as a divergence in the
+- [x] Any divergence from the reference Schannel build is named as a divergence in the
       ADR's Consequences.
-- [ ] `Documentation/Planning/Decisions/README.md` lists the new ADR.
+- [x] `Documentation/Planning/Decisions/README.md` lists the new ADR.
 
 ## Notes
 
 **Decision (Stewart, 2026-09-26):** Option 2 - match the platform's usual curl. Windows: the Schannel build of curl 8.21.0 as measured above (its failure message text; `--capath` ignored with its two warning lines; `--cert` as that build behaves, PEM refused with exit 58). Linux and macOS: the OpenSSL build of curl 8.21.0 is the reference (its message text, a working `--capath`, PEM `--cert`); measure it before pinning text. Default trust store: the one the reference build uses on each platform. Where a measurement shows the platform's usual curl differs from this, the ADR records it.
+
+**Recorded (2026-09-26):** ADR-0009. Choices made while writing it:
+- Linux strings were measured with the Ubuntu OpenSSL build of curl 8.18.0 under WSL 2, the only OpenSSL build on the host; the ADR names 8.21.0 as the reference and tells BL-064/BL-065 to re-measure and replace any string that differs, rather than blocking on an 8.21.0 build.
+- Measuring found three things the task's table did not show: Schannel reports a garbage or empty `--cacert` as exit 60 (77 only when the file cannot be opened, e.g. a directory, `schannel: failed to open CA file '<path>'`); Schannel accepts PKCS#12 `--cert` with or without `--cert-type P12`; `-s` silences the two `--capath` warnings. All are in the ADR.
+- macOS was not measured (no host). Apple's `/usr/bin/curl` is LibreSSL, so "platform's usual curl" and "OpenSSL build" differ there; the ADR follows Stewart's words (OpenSSL build) and records the difference as a Consequence, per his instruction to record such differences.
+- Unmeasured cases (P12/DER load-failure text on OpenSSL, whether `--cacert`/`--capath` replace or add to the default store, macOS bundle path) are left to BL-064/BL-065 to measure before pinning, not guessed.
 
 Blocks BL-064 (messages and `--capath`) and BL-065 (`--cert`/`--key`). BL-062 and BL-063
 proceed without it.
@@ -87,3 +93,4 @@ proceed without it.
 - 2026-09-26: Created.
 - 2026-09-26: Stewart decided: match the platform's usual curl. Reassigned to Claude to record the ADR.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. ADR-0009 records the per-platform TLS message text, --capath, --cert formats and trust store BL-064/BL-065 must test
