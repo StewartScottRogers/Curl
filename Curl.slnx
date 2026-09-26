@@ -15,6 +15,7 @@
     <File Path=".gitattributes" />
     <File Path=".gitignore" />
     <File Path="CodeMetricsConfig.txt" />
+    <File Path="GitHub-Curl-README.url" />
     <File Path="hrdrClaudeNative.cmd" />
     <File Path="LICENSE.txt" />
     <File Path="README.md" />
