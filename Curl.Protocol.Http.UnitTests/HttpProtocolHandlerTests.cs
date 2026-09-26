@@ -333,6 +333,161 @@ public sealed class HttpProtocolHandlerTests
             async () => await Handler(QueueConnector.For(Connection(Head, 1))).ExecuteAsync(context));
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_FormBody_SendsTheMeasuredPostAndReportsItsSize()
+    {
+        // curl -d x=1 http://127.0.0.1:18081/ (BL-175 Notes); -w reported size_request 151, size_upload 3.
+        const string request = "POST / HTTP/1.1\r\nHost: 127.0.0.1:18081\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+            + "Content-Length: 3\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\nx=1";
+        foreach (int chunkSize in ChunkSizes)
+        {
+            HttpRequestOptions options = new() { Body = new BytesBody("x=1"u8.ToArray(), "application/x-www-form-urlencoded") };
+
+            TransferResult result = await Handler(QueueConnector.For(Connection(NoContent, chunkSize, request)))
+                .ExecuteAsync(BodyContext("http://127.0.0.1:18081/", options));
+
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Assert.AreEqual("POST", result.Report!.Method, $"Chunk size {chunkSize}");
+            Assert.AreEqual(151L, result.Report.RequestSize, $"Chunk size {chunkSize}");
+            Assert.AreEqual(3L, result.Report.UploadSize, $"Chunk size {chunkSize}");
+        }
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_JsonBody_SendsTheMeasuredContentTypeAndAccept()
+    {
+        // curl --json {"a":1} http://127.0.0.1:18081/ (BL-175 Notes).
+        const string request = "POST / HTTP/1.1\r\nHost: 127.0.0.1:18081\r\nUser-Agent: curl/8.21.0\r\n"
+            + "Content-Type: application/json\r\nAccept: application/json\r\nContent-Length: 7\r\n\r\n{\"a\":1}";
+        HttpRequestOptions options = new()
+        {
+            Headers = ["Content-Type: application/json", "Accept: application/json"],
+            Body = new BytesBody("{\"a\":1}"u8.ToArray(), "application/json"),
+        };
+
+        TransferResult result = await Handler(QueueConnector.For(Connection(NoContent, 65536, request)))
+            .ExecuteAsync(BodyContext("http://127.0.0.1:18081/", options));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_BodyWithCustomMethod_ReportsThatMethod()
+    {
+        // curl -X PUT -d x=1: -w reported method PUT, size_request 150.
+        HttpRequestOptions options = new() { CustomMethod = "PUT", Body = new BytesBody("x=1"u8.ToArray(), "application/x-www-form-urlencoded") };
+
+        TransferResult result = await Handler(QueueConnector.For(Connection(NoContent, 65536)))
+            .ExecuteAsync(BodyContext("http://127.0.0.1:18081/", options));
+
+        Assert.AreEqual("PUT", result.Report!.Method);
+        Assert.AreEqual(150L, result.Report.RequestSize);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_BodyAboveOneMebibyteAndNoReply_SendsItAfterTheMeasuredOneSecondWait()
+    {
+        // curl --data-binary @b with 1048577 bytes: Expect: 100-continue, body sent 1.005 s later; size_request 1048753.
+        const string head = "POST / HTTP/1.1\r\nHost: 127.0.0.1:18081\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+            + "Content-Length: 1048577\r\nContent-Type: application/x-www-form-urlencoded\r\nExpect: 100-continue\r\n\r\n";
+        FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
+        GatedConnection connection = new(Encoding.Latin1.GetBytes(NoContent), 65536, head.Length + 1048577);
+        HttpRequestOptions options = new() { Body = new BytesBody(new byte[1048577], "application/x-www-form-urlencoded") };
+
+        Task<TransferResult> transfer = Handler(QueueConnector.For(connection))
+            .ExecuteAsync(BodyContext("http://127.0.0.1:18081/", options, time)).AsTask();
+        await time.FirstTimerCreated;
+        time.Advance(TimeSpan.FromMilliseconds(999));
+        Assert.AreEqual(head, Latin1(connection.Written), "The body was sent before one second.");
+        time.Advance(TimeSpan.FromMilliseconds(1));
+        TransferResult result = await transfer;
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.HasCount(head.Length + 1048577, connection.Written);
+        Assert.AreEqual(1048753L, result.Report!.RequestSize);
+        Assert.AreEqual(1048577L, result.Report.UploadSize);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ContinueArrives_SendsTheBodyAndWritesBothHeads()
+    {
+        const string response = "HTTP/1.1 100 Continue\r\n\r\nHTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok";
+        foreach (int chunkSize in ChunkSizes)
+        {
+            MemoryStream output = new();
+            MemoryStream headers = new();
+            GatedConnection connection = new(Encoding.Latin1.GetBytes(response), chunkSize, 0);
+            HttpRequestOptions options = new() { Headers = ["Expect: 100-continue"], Body = new BytesBody("x=1"u8.ToArray(), "a/b") };
+            TransferContext context = new()
+            {
+                Url = new Uri("http://127.0.0.1:18081/"),
+                Output = output,
+                HeaderOutput = headers,
+                Http = options,
+                TimeProvider = new FakeTimeProvider(DateTimeOffset.UnixEpoch),
+            };
+
+            TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(context);
+
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Assert.EndsWith("\r\n\r\nx=1", Latin1(connection.Written), $"Chunk size {chunkSize}");
+            Assert.AreEqual("HTTP/1.1 100 Continue\r\n\r\nHTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n", Latin1(headers.ToArray()), $"Chunk size {chunkSize}");
+            Assert.AreEqual("ok", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
+        }
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_FinalStatusArrivesDuringTheWait_LeavesTheBodyUnsent()
+    {
+        // A server that answered 401 at once: curl sent no body byte and wrote the 401 body.
+        foreach (int chunkSize in ChunkSizes)
+        {
+            MemoryStream output = new();
+            GatedConnection connection = new(Encoding.Latin1.GetBytes("HTTP/1.1 401 No\r\nContent-Length: 3\r\n\r\nno!"), chunkSize, 0);
+            HttpRequestOptions options = new() { Body = new BytesBody(new byte[1048577], "application/x-www-form-urlencoded") };
+            TransferContext context = new()
+            {
+                Url = new Uri("http://127.0.0.1:18081/"),
+                Output = output,
+                Http = options,
+                TimeProvider = new FakeTimeProvider(DateTimeOffset.UnixEpoch),
+            };
+
+            TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(context);
+
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Assert.EndsWith("Expect: 100-continue\r\n\r\n", Latin1(connection.Written), $"Chunk size {chunkSize}");
+            Assert.AreEqual("no!", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
+            Assert.AreEqual(0L, result.Report!.UploadSize, $"Chunk size {chunkSize}");
+            Assert.AreEqual(401, result.Report.ResponseCode, $"Chunk size {chunkSize}");
+        }
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_StreamBodyReadFails_FailsWithExit26AndTheMeasuredMessage()
+    {
+        // curl -F f=@locked: exit 26, "client mime read EOF fail, only 207/100207 of needed bytes read".
+        FailingReadStream stream = new(new byte[207], 65536, new IOException("Lock violation."));
+        HttpRequestOptions options = new() { Body = new StreamBody(stream, 100207, "multipart/form-data; boundary=b") };
+
+        TransferResult result = await Handler(QueueConnector.For(Connection(NoContent, 65536)))
+            .ExecuteAsync(BodyContext("http://127.0.0.1:18081/", options));
+
+        Assert.AreEqual(CurlExitCode.ReadError, result.ExitCode);
+        Assert.AreEqual("client mime read EOF fail, only 207/100207 of needed bytes read", result.ErrorMessage);
+        Assert.AreEqual(207L, result.Report!.UploadSize);
+        Assert.AreEqual(0, result.Report.ResponseCode);
+    }
+
+    private static TransferContext BodyContext(string url, HttpRequestOptions options, TimeProvider? timeProvider = null) =>
+        new()
+        {
+            Url = new Uri(url),
+            Output = new MemoryStream(),
+            Http = options,
+            TimeProvider = timeProvider ?? new FakeTimeProvider(DateTimeOffset.UnixEpoch),
+        };
+
     private static HttpProtocolHandler Handler(QueueConnector connector) => new(connector, new SilentAuthenticator());
 
     private static TransferContext Context(string url, Stream output, Stream? headerOutput = null) =>

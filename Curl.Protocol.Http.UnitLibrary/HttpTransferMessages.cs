@@ -4,9 +4,10 @@ using System.Net.Sockets;
 namespace Curl.Protocol.Http;
 
 /// <summary>
-/// Every failure message reading an HTTP/1.x response head or body reports, as curl 8.21.0
-/// prints it. Each was measured against a loopback server (BL-169, BL-170, BL-171) except
-/// <see cref="ReceiveFailed" />, which is the text <c>curl_easy_strerror</c> gives exit 56.
+/// Every failure message sending an HTTP/1.x request body or reading a response head or
+/// body reports, as curl 8.21.0 prints it. Each was measured against a loopback server
+/// (BL-169, BL-170, BL-171, BL-175) except <see cref="ReceiveFailed" />, which is the text
+/// <c>curl_easy_strerror</c> gives exit 56.
 /// </summary>
 internal static class HttpTransferMessages
 {
@@ -173,4 +174,17 @@ internal static class HttpTransferMessages
         string.Create(
             CultureInfo.InvariantCulture,
             $"Failure writing output to destination, passed {passed} returned {returned}");
+
+    /// <summary>
+    /// Formats the exit 26 message for a request body stream that failed a read, or ended,
+    /// before its known length was sent. curl cannot tell the two apart: a failed read ends
+    /// its body reader as the end of the stream does.
+    /// </summary>
+    /// <param name="read">How many body bytes were read before the stream stopped.</param>
+    /// <param name="needed">The body's known length.</param>
+    /// <returns>
+    /// The message, such as <c>client mime read EOF fail, only 207/100207 of needed bytes read</c>.
+    /// </returns>
+    internal static string BodyStreamEndedEarly(long read, long needed) =>
+        string.Create(CultureInfo.InvariantCulture, $"client mime read EOF fail, only {read}/{needed} of needed bytes read");
 }

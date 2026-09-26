@@ -159,6 +159,92 @@ public sealed class HttpRequestHeadFormatterTests
             HttpRequestHeadFormatter.Format(new Uri(Url), new HttpRequestOptions()));
     }
 
+    [TestMethod]
+    [DataRow("x=1", "", "POST / HTTP/1.1\r\n" + DefaultHeaders + "Content-Length: 3\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n", DisplayName = "-d x=1")]
+    [DataRow("", "", "POST / HTTP/1.1\r\n" + DefaultHeaders + "Content-Length: 0\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n", DisplayName = "-d ''")]
+    [DataRow("x=1", "X-A: b", "POST / HTTP/1.1\r\n" + DefaultHeaders + "X-A: b\r\nContent-Length: 3\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n", DisplayName = "-H before Content-Length")]
+    [DataRow("x=1", "Content-Type: text/plain", "POST / HTTP/1.1\r\n" + DefaultHeaders + "Content-Type: text/plain\r\nContent-Length: 3\r\n\r\n", DisplayName = "-H Content-Type replaces")]
+    [DataRow("x=1", "Content-Type:\nContent-Length: 3", "POST / HTTP/1.1\r\n" + DefaultHeaders + "Content-Length: 3\r\n\r\n", DisplayName = "-H removes Content-Type, replaces Content-Length")]
+    [DataRow("x=1", "Expect: 100-continue", "POST / HTTP/1.1\r\n" + DefaultHeaders + "Expect: 100-continue\r\nContent-Length: 3\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n", DisplayName = "-H Expect in its -H slot")]
+    [DataRow("x=1", "Transfer-Encoding: chunked", "POST / HTTP/1.1\r\n" + DefaultHeaders + "Transfer-Encoding: chunked\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n", DisplayName = "-H chunked drops Content-Length")]
+    public void Format_FormBody_SendsMeasuredHead(string content, string headers, string expected)
+    {
+        HttpRequestOptions options = new()
+        {
+            Headers = headers.Length == 0 ? [] : headers.Split('\n'),
+            Body = new BytesBody(Encoding.ASCII.GetBytes(content), "application/x-www-form-urlencoded"),
+        };
+
+        AssertHead(expected, new Uri(Url), options);
+    }
+
+    [TestMethod]
+    public void Format_JsonBody_SendsMeasuredContentTypeAndAccept()
+    {
+        // curl --json {} -H 'X-A: b': the command-line layer appends --json's two headers after every -H.
+        HttpRequestOptions options = new()
+        {
+            Headers = ["X-A: b", "Content-Type: application/json", "Accept: application/json"],
+            Body = new BytesBody("{}"u8.ToArray(), "application/json"),
+        };
+
+        AssertHead(
+            "POST / HTTP/1.1\r\nHost: 127.0.0.1:18091\r\nUser-Agent: curl/8.21.0\r\nX-A: b\r\nContent-Type: application/json\r\nAccept: application/json\r\nContent-Length: 2\r\n\r\n",
+            new Uri(Url),
+            options);
+    }
+
+    [TestMethod]
+    [DataRow(1048576, "", DisplayName = "1 MiB sends no Expect")]
+    [DataRow(1048577, "Expect: 100-continue\r\n", DisplayName = "1 MiB + 1 sends Expect")]
+    public void Format_LargeBody_SendsExpectAboveTheMeasuredThreshold(int length, string expect)
+    {
+        HttpRequestOptions options = new() { Body = new BytesBody(new byte[length], "application/x-www-form-urlencoded") };
+
+        AssertHead(
+            $"POST / HTTP/1.1\r\n{DefaultHeaders}Content-Length: {length}\r\nContent-Type: application/x-www-form-urlencoded\r\n{expect}\r\n",
+            new Uri(Url),
+            options);
+    }
+
+    [TestMethod]
+    public void Format_LargeBodyWithExpectRemoved_SendsNoExpect()
+    {
+        HttpRequestOptions options = new() { Headers = ["Expect:"], Body = new BytesBody(new byte[1048577], "a/b") };
+
+        AssertHead($"POST / HTTP/1.1\r\n{DefaultHeaders}Content-Length: 1048577\r\nContent-Type: a/b\r\n\r\n", new Uri(Url), options);
+    }
+
+    [TestMethod]
+    public void Format_StreamBodyOfUnknownLength_SendsChunkedAndExpect()
+    {
+        HttpRequestOptions options = new() { Body = new StreamBody(new MemoryStream(), null, "text/plain") };
+
+        AssertHead(
+            $"POST / HTTP/1.1\r\n{DefaultHeaders}Transfer-Encoding: chunked\r\nContent-Type: text/plain\r\nExpect: 100-continue\r\n\r\n",
+            new Uri(Url),
+            options);
+    }
+
+    [TestMethod]
+    public void Format_StreamBodyOfKnownLength_SendsContentLength()
+    {
+        HttpRequestOptions options = new() { Body = new StreamBody(new MemoryStream(), 100207, "multipart/form-data; boundary=b") };
+
+        AssertHead(
+            $"POST / HTTP/1.1\r\n{DefaultHeaders}Content-Length: 100207\r\nContent-Type: multipart/form-data; boundary=b\r\n\r\n",
+            new Uri(Url),
+            options);
+    }
+
+    [TestMethod]
+    public void Format_BodyWithCustomMethodAndNoContentType_SendsThatMethodAndNoContentType()
+    {
+        HttpRequestOptions options = new() { CustomMethod = "PUT", Body = new BytesBody("x=1"u8.ToArray(), string.Empty) };
+
+        AssertHead($"PUT / HTTP/1.1\r\n{DefaultHeaders}Content-Length: 3\r\n\r\n", new Uri(Url), options);
+    }
+
     private static void AssertHead(string expected, Uri url, HttpRequestOptions? options)
     {
         Assert.AreEqual(expected, Encoding.Latin1.GetString(HttpRequestHeadFormatter.Format(url, options)));

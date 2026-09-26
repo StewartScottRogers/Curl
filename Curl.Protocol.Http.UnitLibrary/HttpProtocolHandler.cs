@@ -1,5 +1,6 @@
 using System.Net;
 using Curl.Protocol.Abstractions;
+using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 
 namespace Curl.Protocol.Http;
 
@@ -29,6 +30,13 @@ namespace Curl.Protocol.Http;
 /// code and message unchanged. Every other failure while the response is read is returned
 /// with the exit code and message curl 8.21.0 reports, and with a report of whatever was
 /// learned before it; only cancellation leaves this handler as an exception.
+/// </para>
+/// <para>
+/// A body in <see cref="HttpRequestOptions.Body" /> makes the request a POST unless <c>-X</c>
+/// names another method, and is sent after the head as <see cref="HttpRequestFraming" />
+/// decides: at once, or after up to one second's wait for <c>100 Continue</c>, and not at all
+/// when a final status arrives during that wait. A body stream of known length that fails a
+/// read ends the transfer with exit 26.
 /// </para>
 /// <para>
 /// Every response head read, 1xx heads included, is written to the header output as one
@@ -99,15 +107,20 @@ public sealed class HttpProtocolHandler(
         IConnection connection)
     {
         CancellationToken cancellationToken = context.CancellationToken;
-        byte[] request = HttpRequestHeadFormatter.Format(context.Url, context.Http);
+        HttpRequestOptions options = context.Http ?? new HttpRequestOptions();
+        HttpRequestFraming framing = HttpRequestFraming.Of(options, [.. options.Headers.Select(HttpCustomHeader.Parse)]);
+        byte[] request = HttpRequestHeadFormatter.Format(context.Url, options);
         await connection.WriteAsync(request, cancellationToken).ConfigureAwait(false);
         await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
 
-        HttpExchange exchange = new(context, connect, connection, request.Length);
-        HttpResponseBodyReader body = new(connection);
+        HttpRequestBodyWriter upload = new(connection);
+        HttpExchange exchange = new(connect, connection, framing.Method, request.Length, upload);
+        IConnection responseConnection = framing.AwaitsContinue ? new HttpContinueWaitConnection(connection) : connection;
+        HttpResponseBodyReader body = new(responseConnection);
         try
         {
-            exchange.Head = await new HttpResponseHeadReader(connection).ReadAsync(cancellationToken).ConfigureAwait(false);
+            await SendBodyAsync(context, framing, responseConnection, upload).ConfigureAwait(false);
+            exchange.Head = await new HttpResponseHeadReader(responseConnection).ReadAsync(cancellationToken).ConfigureAwait(false);
             await WriteHeadersAsync(context.HeaderOutput, exchange.Head.HeadBytes, cancellationToken).ConfigureAwait(false);
             await body.CopyAsync(exchange.Head, false, context.Output, cancellationToken).ConfigureAwait(false);
             await WriteHeadersAsync(context.HeaderOutput, body.TrailerBytes, cancellationToken).ConfigureAwait(false);
@@ -120,6 +133,31 @@ public sealed class HttpProtocolHandler(
         }
 
         return TransferResult.Success(body.BytesWritten) with { Report = exchange.Report(body.BytesWritten) };
+    }
+
+    /// <summary>
+    /// Sends the request body, if there is one: at once, or once
+    /// <paramref name="responseConnection" /> has waited for <c>100 Continue</c> and not been
+    /// answered with a final status instead.
+    /// </summary>
+    private static async ValueTask SendBodyAsync(
+        ITransferContext context,
+        HttpRequestFraming framing,
+        IConnection responseConnection,
+        HttpRequestBodyWriter upload)
+    {
+        if (framing.Body is not { } requestBody)
+        {
+            return;
+        }
+
+        if (responseConnection is HttpContinueWaitConnection waiting
+            && !await waiting.WaitForContinueAsync(context.TimeProvider, context.CancellationToken).ConfigureAwait(false))
+        {
+            return;
+        }
+
+        await upload.WriteAsync(requestBody, framing.IsChunked, context.CancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -155,7 +193,12 @@ public sealed class HttpProtocolHandler(
     /// What one exchange has learned so far, turned into a <see cref="TransferReport" /> when
     /// the transfer ends, successfully or not.
     /// </summary>
-    private sealed class HttpExchange(ITransferContext context, ConnectResult connect, IConnection connection, int requestSize)
+    private sealed class HttpExchange(
+        ConnectResult connect,
+        IConnection connection,
+        string method,
+        int headSize,
+        HttpRequestBodyWriter upload)
     {
         /// <summary>
         /// Gets or sets the final response head, <see langword="null" /> until it is read.
@@ -164,7 +207,8 @@ public sealed class HttpProtocolHandler(
 
         /// <summary>
         /// Builds the report: what the connect and request told, and what the final head told
-        /// once it was read.
+        /// once it was read. The request size counts the body bytes sent as well as the head,
+        /// as curl 8.21.0's <c>%{size_request}</c> does (BL-175 Notes).
         /// </summary>
         /// <param name="downloadSize">The body bytes the output accepted.</param>
         /// <returns>The report.</returns>
@@ -172,8 +216,9 @@ public sealed class HttpProtocolHandler(
         {
             TransferReport report = new()
             {
-                Method = context.Http?.CustomMethod ?? "GET",
-                RequestSize = requestSize,
+                Method = method,
+                RequestSize = headSize + upload.BytesWritten,
+                UploadSize = upload.BytesWritten,
                 DownloadSize = downloadSize,
                 ConnectionCount = 1,
                 ProxyConnectResponseCode = connect.ProxyConnectResponseCode,

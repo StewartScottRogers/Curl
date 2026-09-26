@@ -8,13 +8,17 @@ namespace Curl.Protocol.Http;
 /// <summary>
 /// Formats the head of an HTTP/1.1 request - the request line, the headers and the empty
 /// line after them - byte for byte as curl 8.21.0 sends it for <c>-X</c>, <c>-H</c>,
-/// <c>-A</c> and <c>-e</c>. Every rule was measured (BL-172 Notes).
+/// <c>-A</c>, <c>-e</c> and a request body. Every rule was measured (BL-172 and BL-175
+/// Notes).
 /// </summary>
 /// <remarks>
 /// curl's own headers come first, in the order <c>Host</c>, <c>User-Agent</c>,
 /// <c>Accept</c>, <c>Referer</c>, each left out when an <c>-H</c> value names it; the
 /// <c>-H</c> values follow in command-line order. A custom <c>Host</c> is the exception: it
-/// takes the <c>Host</c> slot. Text is sent one byte per character (Latin-1), as curl
+/// takes the <c>Host</c> slot. A request with a body ends with <c>Content-Length</c> (or
+/// <c>Transfer-Encoding: chunked</c> when the length is unknown), <c>Content-Type</c> and
+/// <c>Expect: 100-continue</c> as <see cref="HttpRequestFraming" /> decides, each again left
+/// out when an <c>-H</c> value names it. Text is sent one byte per character (Latin-1), as curl
 /// sends a command-line argument on Windows; a character above U+00FF takes Latin-1's
 /// best fit, such as <c>A</c> for U+0100, or else <c>?</c>.
 /// </remarks>
@@ -39,8 +43,9 @@ internal static class HttpRequestHeadFormatter
     {
         options ??= new HttpRequestOptions();
         HttpCustomHeader[] customHeaders = [.. options.Headers.Select(HttpCustomHeader.Parse)];
+        HttpRequestFraming framing = HttpRequestFraming.Of(options, customHeaders);
         StringBuilder head = new();
-        head.Append(options.CustomMethod ?? "GET").Append(' ').Append(url.PathAndQuery).Append(" HTTP/1.1\r\n");
+        head.Append(framing.Method).Append(' ').Append(url.PathAndQuery).Append(" HTTP/1.1\r\n");
         string? hostLine = FormatHostLine(url, customHeaders);
         if (hostLine is not null)
         {
@@ -51,6 +56,7 @@ internal static class HttpRequestHeadFormatter
         AppendUnlessOverridden(head, customHeaders, "Accept", "*/*");
         AppendUnlessOverridden(head, customHeaders, "Referer", options.Referer);
         AppendCustomHeaders(head, customHeaders, hostLine is not null);
+        AppendBodyHeaders(head, customHeaders, framing);
         head.Append("\r\n");
         return Encoding.Latin1.GetBytes(head.ToString());
     }
@@ -107,5 +113,24 @@ internal static class HttpRequestHeadFormatter
                 head.Append(line).Append("\r\n");
             }
         }
+    }
+
+    /// <summary>
+    /// Appends the body's framing headers: <c>Content-Length</c> unless the body is sent
+    /// chunked, <c>Transfer-Encoding: chunked</c> when its length is unknown, its
+    /// <c>Content-Type</c>, and curl's own <c>Expect: 100-continue</c>.
+    /// </summary>
+    private static void AppendBodyHeaders(StringBuilder head, HttpCustomHeader[] customHeaders, HttpRequestFraming framing)
+    {
+        if (framing.Body is not { } body)
+        {
+            return;
+        }
+
+        string? contentLength = framing.IsChunked ? null : framing.KnownLength.GetValueOrDefault().ToString(CultureInfo.InvariantCulture);
+        AppendUnlessOverridden(head, customHeaders, "Content-Length", contentLength);
+        AppendUnlessOverridden(head, customHeaders, "Transfer-Encoding", framing.KnownLength is null ? "chunked" : null);
+        AppendUnlessOverridden(head, customHeaders, "Content-Type", body.ContentType);
+        AppendUnlessOverridden(head, customHeaders, "Expect", framing.AddsExpect ? "100-continue" : null);
     }
 }
