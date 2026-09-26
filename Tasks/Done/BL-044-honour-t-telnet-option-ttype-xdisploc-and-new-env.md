@@ -122,7 +122,7 @@ Server bytes → bytes curl sent (`O` = `FF FB 00 FF FD 00 FF FB 03 FF FD 03`, t
 
 - `WS` and `BINARY` are accepted and checked exactly as measured but otherwise ignored,
   so a script passing them is not refused with a 48 curl never gives. Negotiating them is
-  filed as BL-082 (NAWS) and BL-083 (BINARY=0).
+  filed as BL-085 (NAWS) and BL-083 (BINARY=0).
 - curl also sends the `-u` user name as `NEW-ENVIRON USER`; not in this task's goal, filed
   as BL-084.
 - New tests live in their own class, `TelnetProtocolHandlerTelnetOptionTests`, beside

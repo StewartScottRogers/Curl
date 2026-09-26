@@ -1,5 +1,5 @@
 ---
-id: BL-082
+id: BL-085
 title: Negotiate NAWS for -t WS=COLSxROWS on telnet
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-082 — Negotiate NAWS for -t WS=COLSxROWS on telnet
+# BL-085 — Negotiate NAWS for -t WS=COLSxROWS on telnet
 
 ## Goal
 
