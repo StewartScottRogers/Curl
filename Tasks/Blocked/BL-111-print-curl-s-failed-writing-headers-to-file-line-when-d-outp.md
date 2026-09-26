@@ -56,3 +56,4 @@ With `-v` the first line is followed by `* client returned ERROR on write of 20 
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Blocked. Stewart: dark factory run ended in Doing, exit 1; see logs\BL-111-20260926-083111-L4.jsonl
