@@ -4,7 +4,8 @@
 #   curl -fsSL https://raw.githubusercontent.com/StewartScottRogers/Curl/master/install.sh | sh
 #
 # Environment:
-#   CURL_VERSION      release tag to install, e.g. v0.1.0 (default: the latest release)
+#   CURL_VERSION      release tag to install, e.g. v0.1.0 (default: the newest release,
+#                     pre-releases included)
 #   CURL_INSTALL_DIR  where the binary goes (default: $HOME/.curl-dotnet/bin)
 #
 # The binary is named `curl`. It is installed into a directory of its own so it never
@@ -28,12 +29,6 @@ case "$(uname -m)" in
 esac
 package="curl-$os-$arch.tar.gz"
 
-if [ "$version" = latest ]; then
-  base="https://github.com/$repo/releases/latest/download"
-else
-  base="https://github.com/$repo/releases/download/$version"
-fi
-
 fetch() {
   if command -v curl >/dev/null 2>&1; then curl -fsSL -o "$2" "$1"
   elif command -v wget >/dev/null 2>&1; then wget -qO "$2" "$1"
@@ -43,6 +38,17 @@ fetch() {
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
+
+# releases/latest skips pre-releases, so ask the API for the newest release of any kind.
+if [ "$version" = latest ]; then
+  fetch "https://api.github.com/repos/$repo/releases?per_page=1" "$tmp/releases.json"
+  version="$(sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' "$tmp/releases.json" | head -n 1)"
+  if [ -z "$version" ]; then
+    echo "install.sh: no release found at https://github.com/$repo/releases" >&2
+    exit 1
+  fi
+fi
+base="https://github.com/$repo/releases/download/$version"
 
 echo "Downloading $package ($version)"
 fetch "$base/$package" "$tmp/$package"
