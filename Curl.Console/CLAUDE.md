@@ -29,6 +29,14 @@ context carries the parsed `-r` range (`ByteRangeParser`; text that names
 no range ends the transfer with exit 33 before it is dispatched), the `-C` offset and the
 `--max-filesize` limit. `-C -` resumes from the size of the URL's `-o` file, and a transfer
 that resumes past byte zero opens that file for appending before it starts, as curl does.
+Every context also carries `Http`, which `HttpRequestOptionsMapping` fills from `-X`,
+`-H`, `-A`, `-e`, the `-d` family and `--json`: `--json` appends `Content-Type: application/json` and
+`Accept: application/json` after the `-H` headers unless a `-H` header already starts with
+that name (case-insensitive), and a body is a `BytesBody` sent as
+`application/x-www-form-urlencoded` unless `-G` moved it into the query. The runner appends
+the `-G` / `--url-query` query with `QueryUrl` before the URL is parsed. `http` and
+`https` are served by `HttpProtocolHandler`, registered in `CurlComposition` with a
+`BasicAndBearerAuthenticator` in the platform's credential encoding and no cookie store.
 `-D -` sends the handler's header lines to standard output; any other `-D` name is opened
 (unsanitized, truncated for the first URL and appended for the rest) before the transfer,
 and one that cannot be opened prints `curl: Failed to open <file>` and stops the run with

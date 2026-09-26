@@ -91,6 +91,26 @@ public sealed class TransferContextFactoryTests
     }
 
     [TestMethod]
+    public void Create_HttpRequestOptions_AreMappedOntoHttp()
+    {
+        using MemoryStream standardInput = new();
+        using MemoryStream output = new();
+        CommandLineOptions options = Parse(
+            "-X", "PATCH", "-H", "X: 1", "-A", "a/1", "-e", "http://r/", "-d", "a=b", "http://example.com/");
+
+        TransferContext context = new TransferContextFactory(standardInput)
+            .Create(options, new Uri("http://example.com/"), output, null, null, null);
+
+        Assert.AreEqual("PATCH", context.Http!.CustomMethod);
+        CollectionAssert.AreEqual(new[] { "X: 1" }, context.Http.Headers.ToArray());
+        Assert.AreEqual("a/1", context.Http.UserAgent);
+        Assert.AreEqual("http://r/", context.Http.Referer);
+        BytesBody body = (BytesBody)context.Http.Body!;
+        Assert.AreEqual("a=b", System.Text.Encoding.ASCII.GetString(body.Content.Span));
+        Assert.AreEqual(HttpRequestOptionsMapping.FormUrlEncoded, body.ContentType);
+    }
+
+    [TestMethod]
     public void Create_TelnetUrl_UploadsStandardInput()
     {
         using MemoryStream standardInput = new();

@@ -8,6 +8,7 @@ using Curl.Protocol.Abstractions;
 using Curl.Protocol.Dict;
 using Curl.Protocol.File;
 using Curl.Protocol.Gopher;
+using Curl.Protocol.Http;
 using Curl.Protocol.Mqtt;
 using Curl.Protocol.Telnet;
 using Curl.Protocol.Tftp;
@@ -44,6 +45,8 @@ public sealed class CurlCompositionTests
             ["tftp"] = typeof(TftpProtocolHandler),
             ["mqtt"] = typeof(MqttProtocolHandler),
             ["mqtts"] = typeof(MqttProtocolHandler),
+            ["http"] = typeof(HttpProtocolHandler),
+            ["https"] = typeof(HttpProtocolHandler),
         };
         CollectionAssert.AreEquivalent(expected.ToList(), served.ToList());
         _ = new ProtocolDispatcher(handlers);
@@ -56,6 +59,8 @@ public sealed class CurlCompositionTests
     [DataRow("mqtt://h/", 1883, false)]
     [DataRow("dict://h/d:x", 2628, false)]
     [DataRow("telnet://h/", 23, false)]
+    [DataRow("http://h/", 80, false)]
+    [DataRow("https://h/", 443, true)]
     public async Task CreateRunner_TcpSchemeUrl_ReachesConnectorAtDefaultPortWithSchemesTls(
         string url,
         int port,

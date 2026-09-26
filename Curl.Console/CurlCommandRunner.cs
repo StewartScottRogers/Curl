@@ -355,7 +355,10 @@ internal sealed class CurlCommandRunner(
     /// </summary>
     /// <param name="dispatcher">Performs the transfer with the handler for its scheme.</param>
     /// <param name="options">The accepted command line.</param>
-    /// <param name="url">The URL as typed.</param>
+    /// <param name="url">
+    /// The URL as typed; the <c>-G</c> / <c>--url-query</c> query is appended by
+    /// <see cref="QueryUrl" /> before it is parsed.
+    /// </param>
     /// <param name="outputFile">
     /// The matching <c>-o</c> value, or <see langword="null" />. On Windows the file used is
     /// its <see cref="WindowsOutputFileNameSanitizer" /> rewrite, for the <c>-C -</c> size, the
@@ -373,7 +376,7 @@ internal sealed class CurlCommandRunner(
         string? outputFile,
         Stream? headerOutput)
     {
-        if (!Uri.TryCreate(url, UriKind.Absolute, out Uri? uri))
+        if (!Uri.TryCreate(QueryUrl.Append(url, options), UriKind.Absolute, out Uri? uri))
         {
             return TransferResult.Failure(CurlExitCode.UrlMalformat, MalformedUrlMessage);
         }

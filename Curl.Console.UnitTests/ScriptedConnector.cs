@@ -6,17 +6,28 @@ namespace Curl.Console;
 /// <summary>
 /// A connector whose one connection replays scripted server reads, one per
 /// <see cref="IConnection.ReadAsync" />, splitting a scripted read longer than the caller's
-/// buffer across reads as a socket would, then reports the server closing. Writes to it are
-/// discarded, so no socket is ever opened.
+/// buffer across reads as a socket would, then reports the server closing. Every connect
+/// target and every byte written are recorded, so no socket is ever opened.
 /// </summary>
 internal sealed class ScriptedConnector(IEnumerable<byte[]> reads) : IConnector
 {
     private readonly Queue<byte[]> pendingReads = new(reads);
 
-    public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken) =>
-        ValueTask.FromResult(ConnectResult.Connected(new ScriptedConnection(pendingReads)));
+    private readonly MemoryStream written = new();
 
-    private sealed class ScriptedConnection(Queue<byte[]> pendingReads) : IConnection
+    /// <summary>Gets each target connected to, in order.</summary>
+    public List<ConnectTarget> Targets { get; } = [];
+
+    /// <summary>Gets every byte written to any connection, in order.</summary>
+    public byte[] Written => written.ToArray();
+
+    public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
+    {
+        Targets.Add(target);
+        return ValueTask.FromResult(ConnectResult.Connected(new ScriptedConnection(pendingReads, written)));
+    }
+
+    private sealed class ScriptedConnection(Queue<byte[]> pendingReads, MemoryStream written) : IConnection
     {
         private byte[] remainder = [];
 
@@ -39,7 +50,11 @@ internal sealed class ScriptedConnector(IEnumerable<byte[]> reads) : IConnector
             return ValueTask.FromResult(count);
         }
 
-        public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+        public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
+        {
+            written.Write(buffer.Span);
+            return ValueTask.CompletedTask;
+        }
 
         public ValueTask FlushAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
 

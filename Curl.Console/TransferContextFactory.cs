@@ -52,5 +52,6 @@ internal sealed class TransferContextFactory(Stream standardInput)
             ConnectTimeout = options.ConnectTimeout,
             MaxTime = options.MaxTime,
             TimeCondition = options.TimeCondition,
+            Http = HttpRequestOptionsMapping.FromCommandLine(options),
         };
 }

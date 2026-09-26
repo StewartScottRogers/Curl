@@ -1,3 +1,4 @@
+using Curl.Authentication;
 using Curl.Cli;
 using Curl.Core;
 using Curl.Core.FileSystem;
@@ -6,6 +7,7 @@ using Curl.Protocol.Abstractions;
 using Curl.Protocol.Dict;
 using Curl.Protocol.File;
 using Curl.Protocol.Gopher;
+using Curl.Protocol.Http;
 using Curl.Protocol.Mqtt;
 using Curl.Protocol.Telnet;
 using Curl.Protocol.Tftp;
@@ -21,8 +23,10 @@ internal static class CurlComposition
 {
     /// <summary>
     /// Creates the protocol handlers the executable registers: <c>file</c> over the real
-    /// disk; <c>dict</c>, <c>gopher</c> and <c>gophers</c>, <c>telnet</c>, and <c>mqtt</c>
-    /// and <c>mqtts</c> over <paramref name="connector" />; and <c>tftp</c> over
+    /// disk; <c>dict</c>, <c>gopher</c> and <c>gophers</c>, <c>telnet</c>, <c>mqtt</c>
+    /// and <c>mqtts</c>, and <c>http</c> and <c>https</c> over <paramref name="connector" />,
+    /// the last two answering authentication with a <see cref="BasicAndBearerAuthenticator" />
+    /// in the platform's credential encoding and keeping no cookies; and <c>tftp</c> over
     /// <paramref name="datagramConnector" />. Each scheme is claimed by exactly one handler.
     /// </summary>
     /// <param name="connector">Connects the TCP protocols, with TLS for <c>gophers</c> and <c>mqtts</c>.</param>
@@ -38,6 +42,9 @@ internal static class CurlComposition
             new TelnetProtocolHandler(connector),
             new TftpProtocolHandler(datagramConnector),
             new MqttProtocolHandler(connector),
+            new HttpProtocolHandler(
+                connector,
+                new BasicAndBearerAuthenticator(CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()))),
         ];
 
     /// <summary>
