@@ -8,7 +8,7 @@ depends-on: [BL-038]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-057 — Join several -d values with & into one PostData body
 
@@ -39,19 +39,31 @@ comments and any line in `Curl.Cli.UnitLibrary/README.md` that says the last `-d
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Cli.UnitTests` shows `-d a -d b` gives `PostData` bytes `61 26 62`.
-- [ ] A test shows `-d name=daniel --data skill=lousy` gives the UTF-8 bytes of
+- [x] A test in `Curl.Cli.UnitTests` shows `-d a -d b` gives `PostData` bytes `61 26 62`.
+- [x] A test shows `-d name=daniel --data skill=lousy` gives the UTF-8 bytes of
       `name=daniel&skill=lousy`.
-- [ ] A test shows `-d a -d "" -d b` gives bytes `61 26 26 62`.
-- [ ] A test shows a single `-d 75` still gives bytes `37 35`, and a command line with no
+- [x] A test shows `-d a -d "" -d b` gives bytes `61 26 26 62`.
+- [x] A test shows a single `-d 75` still gives bytes `37 35`, and a command line with no
       `-d` leaves `PostData` null.
-- [ ] No doc comment or README in `Curl.Cli.UnitLibrary` still says the last `-d` wins.
-- [ ] `dotnet build Curl.Cli.UnitLibrary -warnaserror` is clean and
+- [x] No doc comment or README in `Curl.Cli.UnitLibrary` still says the last `-d` wins.
+- [x] `dotnet build Curl.Cli.UnitLibrary -warnaserror` is clean and
       `dotnet test Curl.Cli.UnitTests --filter "TestCategory!=Integration"` is green.
 
 ## Notes
+
+- Delivered in-session rather than through the full /feature agent chain: the change is one
+  method and one table row, fully specified by the task. Choice recorded per the dark
+  factory's sensible-default rule.
+- Measured with curl 8.21.0 `--libcurl -` on 2026-09-26: curl adds the `&` only when the body so
+  far is non-empty. `-d a -d '' -d b` gives `a&&b`, `-d a -d ''` gives `a&`, `-d '' -d b` gives
+  `b`, `-d '' -d ''` gives an empty body. `SetPostData` became `AppendPostData` and follows that
+  rule; `Parse_DataWithEmptyValues_JoinsAsCurlDoes` pins all four cases.
+- The old test `Parse_DataGivenTwice_KeepsTheLast` was replaced by
+  `Parse_DataGivenTwice_JoinsThemWithAnAmpersand`. The single `-d 75` and no-`-d` criteria are
+  covered by the existing `Parse_Data_RecordsUtf8Bytes` and `Parse_NoProtocolOptions_LeavesThemNotGiven`.
 
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. Several -d values join into one PostData body with & as curl 8.21.0 joins them

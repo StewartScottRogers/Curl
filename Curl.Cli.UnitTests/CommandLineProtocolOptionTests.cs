@@ -43,12 +43,38 @@ public sealed class CommandLineProtocolOptionTests
     }
 
     [TestMethod]
-    public void Parse_DataGivenTwice_KeepsTheLast()
+    public void Parse_DataGivenTwice_JoinsThemWithAnAmpersand()
     {
         CommandLineParseResult result = CommandLineParser.Parse(["-d", "a", "-d", "b", "http://example.com/"]);
 
         Assert.IsTrue(result.IsAccepted);
-        CollectionAssert.AreEqual(new byte[] { (byte)'b' }, result.Options.PostData!.Value.ToArray());
+        CollectionAssert.AreEqual(new byte[] { 0x61, 0x26, 0x62 }, result.Options.PostData!.Value.ToArray());
+    }
+
+    [TestMethod]
+    public void Parse_DataAndLongDataSpelling_JoinsThemInOrder()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["-d", "name=daniel", "--data", "skill=lousy", "http://example.com/"]);
+
+        Assert.IsTrue(result.IsAccepted);
+        CollectionAssert.AreEqual("name=daniel&skill=lousy"u8.ToArray(), result.Options.PostData!.Value.ToArray());
+    }
+
+    // Measured with curl 8.21.0 --libcurl on 2026-09-26: an "&" is added only after a non-empty body,
+    // so an empty value in the middle leaves two, and an empty first value leaves none.
+    [TestMethod]
+    [DataRow(new[] { "a", "", "b" }, new byte[] { 0x61, 0x26, 0x26, 0x62 })]
+    [DataRow(new[] { "a", "" }, new byte[] { 0x61, 0x26 })]
+    [DataRow(new[] { "", "b" }, new byte[] { 0x62 })]
+    [DataRow(new[] { "", "" }, new byte[0])]
+    public void Parse_DataWithEmptyValues_JoinsAsCurlDoes(string[] values, byte[] expected)
+    {
+        string[] arguments = [.. values.SelectMany(value => new[] { "-d", value }), "http://example.com/"];
+
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+
+        Assert.IsTrue(result.IsAccepted);
+        CollectionAssert.AreEqual(expected, result.Options.PostData!.Value.ToArray());
     }
 
     [TestMethod]

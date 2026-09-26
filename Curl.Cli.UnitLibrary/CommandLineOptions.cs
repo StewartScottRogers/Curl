@@ -35,8 +35,9 @@ public sealed class CommandLineOptions
 
     /// <summary>
     /// The <c>-d</c> / <c>--data</c> value as UTF-8 bytes; <see langword="null"/> when not given.
-    /// An empty value is empty data, not a refusal. When given more than once the last value wins,
-    /// and <c>@file</c> is recorded as the literal text, not read.
+    /// An empty value is empty data, not a refusal. When given more than once the values are joined
+    /// in command-line order, each one after the first preceded by a single <c>&amp;</c> when the body
+    /// so far is not empty, as in curl 8.21.0; <c>@file</c> is recorded as the literal text, not read.
     /// </summary>
     public ReadOnlyMemory<byte>? PostData { get; private set; }
 
@@ -165,9 +166,17 @@ public sealed class CommandLineOptions
     /// <param name="outputFile">A <c>-o</c> / <c>--output</c> value.</param>
     internal void AddOutputFile(string outputFile) => outputFiles.Add(outputFile);
 
-    /// <summary>Sets <see cref="PostData"/> to the UTF-8 bytes of <paramref name="data"/>, replacing any earlier value.</summary>
+    /// <summary>
+    /// Appends the UTF-8 bytes of <paramref name="data"/> to <see cref="PostData"/>, after a single
+    /// <c>&amp;</c> when <see cref="PostData"/> already holds at least one byte, as curl 8.21.0 does.
+    /// </summary>
     /// <param name="data">A <c>-d</c> / <c>--data</c> value, possibly empty.</param>
-    internal void SetPostData(string data) => PostData = Encoding.UTF8.GetBytes(data);
+    internal void AppendPostData(string data)
+    {
+        string separator = PostData is { Length: > 0 } ? "&" : string.Empty;
+        byte[] piece = Encoding.UTF8.GetBytes(separator + data);
+        PostData = PostData is { } body ? [.. body.Span, .. piece] : piece;
+    }
 
     /// <summary>Sets <see cref="Credentials"/> from <paramref name="userAndPassword"/>, split at its first colon.</summary>
     /// <param name="userAndPassword">A <c>-u</c> / <c>--user</c> value, possibly empty.</param>

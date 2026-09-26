@@ -47,7 +47,7 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("silent", 's', (options, on) => options.Silent = on),
         CommandLineOption.NegatableFlag("show-error", 'S', (options, on) => options.ShowError = on),
         CommandLineOption.FileName("output", 'o', (options, file) => options.AddOutputFile(file)),
-        CommandLineOption.Value("data", 'd', AcceptingEmpty((options, data) => options.SetPostData(data))),
+        CommandLineOption.Value("data", 'd', AcceptingEmpty((options, data) => options.AppendPostData(data))),
         CommandLineOption.Value("user", 'u', AcceptingEmpty((options, user) => options.SetCredentials(user))),
         CommandLineOption.Value("telnet-option", 't', AcceptingEmpty((options, telnetOption) => options.AddTelnetOption(telnetOption))),
         CommandLineOption.Value("tftp-blksize", null, SetTftpBlockSize),
