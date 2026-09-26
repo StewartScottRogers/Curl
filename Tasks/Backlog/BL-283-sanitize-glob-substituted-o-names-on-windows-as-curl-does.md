@@ -1,5 +1,5 @@
 ---
-id: BL-277
+id: BL-283
 title: Sanitize glob-substituted -o names on Windows as curl does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-277 — Sanitize glob-substituted -o names on Windows as curl does
+# BL-283 — Sanitize glob-substituted -o names on Windows as curl does
 
 ## Goal
 

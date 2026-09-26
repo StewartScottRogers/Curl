@@ -57,5 +57,5 @@ wired into `Curl.Console`.
 and `[1-10]`, `[01-10]`, `[a-z:2]` ranges as `tool_urlglob.c` does, failing with exit 3 and
 curl's `<reason> in position N:` message, caret and all; `Unglobbed` is the URL under `-g`.
 `Expand()` yields each URL lazily, rightmost glob fastest, and `UrlGlobMatch.SubstituteGlobValues`
-replaces `#N` in an `-o` name. Windows name sanitizing is not done here (BL-277). It is not
+replaces `#N` in an `-o` name. Windows name sanitizing is not done here (BL-283). It is not
 yet wired into `Curl.Console` (BL-240).

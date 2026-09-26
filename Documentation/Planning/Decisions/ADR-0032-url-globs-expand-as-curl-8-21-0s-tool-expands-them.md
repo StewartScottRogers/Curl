@@ -45,10 +45,10 @@ cases are pinned in `UrlGlobTests` in `Curl.Core.UnitTests`.
 - **`-g` means no glob values.** Under `-g` the one URL is taken as written and every `#N`
   stays as written, as measured.
 - **Windows name sanitizing is separate.** On Windows curl runs `sanitize_file_name` on the
-  substituted name; that step is BL-277, not part of `SubstituteGlobValues`.
+  substituted name; that step is BL-283, not part of `SubstituteGlobValues`.
 
 ## Consequences
 
-`Curl.Console` (BL-240) parses each URL with `UrlGlob.TryParse` unless `-g` (BL-276) is
+`Curl.Console` (BL-240) parses each URL with `UrlGlob.TryParse` unless `-g` (BL-282) is
 set, prints the failure as `curl: (3) <message>` when not silent, and runs one transfer per
 match with `SubstituteGlobValues` applied to its `-o` name.

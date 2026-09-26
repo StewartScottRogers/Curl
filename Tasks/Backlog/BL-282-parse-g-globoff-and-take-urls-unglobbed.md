@@ -1,5 +1,5 @@
 ---
-id: BL-276
+id: BL-282
 title: Parse -g/--globoff and take URLs unglobbed
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-276 — Parse -g/--globoff and take URLs unglobbed
+# BL-282 — Parse -g/--globoff and take URLs unglobbed
 
 ## Goal
 
