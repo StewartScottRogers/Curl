@@ -78,7 +78,8 @@ public sealed class CommandLineOption
     /// <summary>
     /// Creates a row for an option that takes a file name: refused when empty, as
     /// <see cref="Text"/> is, and otherwise passed to <paramref name="set"/>, after adding
-    /// <see cref="CommandLineWarning.FileNameLooksLikeFlag(string)"/> when the value looks like a flag.
+    /// <see cref="CommandLineWarning.FileNameLooksLikeFlag(string)"/> when the value looks like a flag
+    /// and <c>-s</c> / <c>--silent</c> has not been read yet.
     /// </summary>
     /// <remarks>
     /// A value looks like a flag when it starts with <c>-</c> and is longer than that one
@@ -99,7 +100,7 @@ public sealed class CommandLineOption
         {
             if (fileName.Length > 1 && fileName[0] == '-')
             {
-                options.AddWarningLine(CommandLineWarning.FileNameLooksLikeFlag(fileName));
+                options.AddWarningLinesUnlessSilent([CommandLineWarning.FileNameLooksLikeFlag(fileName)]);
             }
 
             set(options, fileName);

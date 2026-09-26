@@ -142,14 +142,11 @@ public sealed class CommandLineOptions
     /// </summary>
     internal IReadOnlyList<string> WarningLines => warningLines;
 
-    /// <summary>Appends <paramref name="warningLine"/> to <see cref="WarningLines"/>.</summary>
-    /// <param name="warningLine">One whole warning line, without a line terminator.</param>
-    internal void AddWarningLine(string warningLine) => warningLines.Add(warningLine);
-
     /// <summary>
     /// Appends <paramref name="lines"/> to <see cref="WarningLines"/> unless <c>-s</c> /
-    /// <c>--silent</c> has already been read, which hides curl 8.21.0's range warnings even with
-    /// <c>-S</c>; a <c>-s</c> read later does not.
+    /// <c>--silent</c> has already been read: curl 8.21.0 drops a warning raised while <c>-s</c> is in
+    /// effect, even with <c>-S</c> and even if <c>--no-silent</c> follows, and keeps one raised
+    /// before a later <c>-s</c>.
     /// </summary>
     /// <param name="lines">One warning's lines, without line terminators.</param>
     internal void AddWarningLinesUnlessSilent(IReadOnlyList<string> lines)

@@ -462,6 +462,61 @@ public sealed class CommandLineParserTests
     }
 
     [TestMethod]
+    [DataRow("-s")]
+    [DataRow("-sS")]
+    public void Parse_FlagLikeOutputFileAfterSilent_IsAcceptedWithoutWarning(string silentArgument)
+    {
+        CommandLineParseResult result = CommandLineParser.Parse([silentArgument, "-o", "-x", "file:///x"]);
+
+        Assert.IsTrue(result.IsAccepted);
+        CollectionAssert.AreEqual(new[] { "-x" }, result.Options.OutputFiles.ToArray());
+        Assert.IsEmpty(result.WarningLines);
+    }
+
+    [TestMethod]
+    public void Parse_FlagLikeOutputFileBeforeSilent_KeepsTheWarning()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["-o", "-x", "-s", "file:///x"]);
+
+        Assert.IsTrue(result.IsAccepted);
+        CollectionAssert.AreEqual(
+            new[] { "Warning: The filename argument '-x' looks like a flag." },
+            result.WarningLines.ToArray());
+    }
+
+    [TestMethod]
+    public void Parse_FlagLikeOutputFileAfterSilentThenUnknownOption_RefusesWithoutWarning()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["-s", "-o", "-x", "--bogus"]);
+
+        Assert.IsFalse(result.IsAccepted);
+        Assert.AreEqual("curl: option --bogus: is unknown", result.Refusal.StandardErrorLines[0]);
+        Assert.IsEmpty(result.WarningLines);
+    }
+
+    [TestMethod]
+    public void Parse_FlagLikeOutputFileBeforeSilentThenUnknownOption_RefusesAndKeepsTheWarning()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["-o", "-x", "-s", "--bogus"]);
+
+        Assert.IsFalse(result.IsAccepted);
+        Assert.AreEqual("curl: option --bogus: is unknown", result.Refusal.StandardErrorLines[0]);
+        CollectionAssert.AreEqual(
+            new[] { "Warning: The filename argument '-x' looks like a flag." },
+            result.WarningLines.ToArray());
+    }
+
+    [TestMethod]
+    public void Parse_FlagLikeOutputFileWhileSilentThenNoSilent_StaysWithoutWarning()
+    {
+        // --no-silent is refused as unknown until BL-054 adds --no- negation; either way the
+        // warning raised while -s was in effect stays dropped, as curl 8.21.0 drops it.
+        CommandLineParseResult result = CommandLineParser.Parse(["-s", "-o", "-x", "--no-silent", "file:///x"]);
+
+        Assert.IsEmpty(result.WarningLines);
+    }
+
+    [TestMethod]
     public void Parse_EmptyCommandLine_CarriesNoWarning()
     {
         CommandLineParseResult result = CommandLineParser.Parse([]);
