@@ -84,9 +84,64 @@ UDP servers written in Python:
 
 ## Notes
 
+### Blocked 2026-09-26 (dark factory lane 1): needs work outside `touches`
+
+Nothing in the solution carries `--connect-timeout`: `ITransferContext` has no connect
+timeout (or `--max-time`) property and no `.cs` file mentions one. curl derives TFTP's
+RRQ `timeout` option, its retry interval and its retry count from the time left
+(`tftp_set_timeouts`), so acceptance criterion 3 cannot be met without adding a
+connect-timeout property to `Curl.Protocol.Abstractions.UnitLibrary/ITransferContext.cs`
+and its `--connect-timeout` parse/plumbing in the CLI. Both are outside
+`[Curl.Protocol.Tftp.UnitLibrary, Curl.Protocol.Tftp.UnitTests]`, and an Abstractions change
+runs apart from every protocol task. Suggested re-plan: (1) a task adding
+`ConnectTimeout` (and `MaxTime`, which curl also counts) to `ITransferContext` and wiring
+`--connect-timeout`/`-m`; (2) this task depending on it, with the criteria below corrected.
+No code was written in this run.
+
+### Measured with curl 8.21.0 (mingw64, Schannel) against loopback Python UDP servers
+
+- **Silent server, no options:** 50 byte-identical RRQs (`tsize 0`, `blksize 512`,
+  `timeout 6`) from one source port at t = 0, 7.07, 14.12, 21.22, ... 344.35 s (about
+  every 7.05 s), then exit **7** (`CurlExitCode.CouldntConnect`) with
+  `curl: (7) Could not connect to server` at about 351 s. **Not 28**: the Goal and
+  criterion 2 assume 28 and must be corrected. The 300 s default connect timeout does
+  not end it.
+- **Silent server, `--connect-timeout 10`:** RRQ carries `timeout 3`; RRQs at 0, 4.05,
+  8.08 s, then exit **7** `Could not connect to server` at 12.1 s.
+- **Server silent after DATA 1, `--connect-timeout 10`** (from the task's Context): ACK 1
+  re-sent to the transfer port every ~6 s, exit 28 `Timeout was reached` at ~25 s.
+- **Duplicate DATA block:** curl re-ACKs it (ACK 1 sent again to the transfer endpoint)
+  and does not write its payload a second time; the transfer then completes (522 bytes
+  written, exit 0). Today's `TftpDownload` ignores the duplicate instead.
+- **Datagram from an unknown endpoint** (DATA 2 from a second port after DATA 1 from the
+  transfer port): curl sends **nothing** to the stranger (no RFC 1350 ERROR 5) and ends
+  the transfer at once with exit **56** (`RecvError`) and
+  `curl: (56) Data received from another address`. This diverges from RFC 1350 section 4;
+  per the Context we match curl, so criterion 5's "the transfer continues with the
+  learned endpoint" is false and must be corrected.
+
+### The rules behind these numbers (curl 8.21.0 `lib/tftp.c`)
+
+- `tftp_set_timeouts` runs once at connect and again when the first DATA/OACK arrives:
+  `timeout` = time left in seconds (rounded) if 0 < left < 3600 s, else 15;
+  `retry_max` = clamp(timeout / 5, 3, 50); `retry_time` = max(1, timeout / retry_max).
+  At connect the time left is the connect timeout (300 s default, so 50 and 6); after
+  the first packet there is no connect timeout left, so 15 gives 3 and 5 unless
+  `--max-time` is set.
+- The RRQ's `timeout` option is `retry_time`.
+- A resend fires when `time(NULL) > rx_time + retry_time` in whole seconds, so the
+  observed interval is `retry_time + 1` s (7 s and 4 s before the first packet, 6 s
+  after it).
+- RRQ phase: the first send counts as retry 1; when retries exceed `retry_max` the
+  result is `TFTP_ERR_NORESPONSE`, exit 7. Data phase: re-ACK up to `retry_max` times,
+  then `TFTP_ERR_TIMEOUT`, exit 28. `Curl_timeleft_ms` < 0 at any point is exit 28.
+- The first datagram received pins the remote address; any later datagram from another
+  address is `CURLE_RECV_ERROR` "Data received from another address".
+
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
 - 2026-09-26: Doing -> Backlog. Returned when the 4-lane shift was stopped to repair task IDs that parallel lanes had duplicated; no lane was working it.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Blocked. Needs --connect-timeout (and --max-time) on ITransferContext in Curl.Protocol.Abstractions.UnitLibrary plus CLI wiring, outside touches; criteria 2 and 5 also contradict measured curl (exit 7, and exit 56 on a stranger). Re-plan; see Notes.
