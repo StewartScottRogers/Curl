@@ -1,4 +1,3 @@
-using System.Net.Sockets;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Http;
@@ -94,7 +93,7 @@ internal sealed class HttpLineReader(IConnection connection)
         }
         catch (IOException exception)
         {
-            throw new HttpTransferException(CurlExitCode.RecvError, ReceiveFailureMessage(exception));
+            throw new HttpTransferException(CurlExitCode.RecvError, HttpTransferMessages.ReceiveFailure(exception));
         }
 
         end += read;
@@ -122,9 +121,4 @@ internal sealed class HttpLineReader(IConnection connection)
         end -= start;
         start = 0;
     }
-
-    private static string ReceiveFailureMessage(IOException exception) =>
-        exception.InnerException is SocketException { SocketErrorCode: SocketError.ConnectionReset }
-            ? HttpTransferMessages.ConnectionReset
-            : HttpTransferMessages.ReceiveFailed;
 }

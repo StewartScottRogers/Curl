@@ -1,10 +1,11 @@
 using System.Globalization;
+using System.Net.Sockets;
 
 namespace Curl.Protocol.Http;
 
 /// <summary>
-/// Every failure message reading an HTTP/1.x response head reports, as curl 8.21.0 prints
-/// it. Each was measured against a loopback server (BL-169) except
+/// Every failure message reading an HTTP/1.x response head or body reports, as curl 8.21.0
+/// prints it. Each was measured against a loopback server (BL-169, BL-170) except
 /// <see cref="ReceiveFailed" />, which is the text <c>curl_easy_strerror</c> gives exit 56.
 /// </summary>
 internal static class HttpTransferMessages
@@ -44,6 +45,12 @@ internal static class HttpTransferMessages
     internal const string CarriageReturnInHeader = "Carriage return found in header";
 
     /// <summary>
+    /// The exit 8 message for a Content-Length header that is not a list of equal decimal
+    /// numbers, or that disagrees with another Content-Length header.
+    /// </summary>
+    internal const string InvalidContentLength = "Invalid Content-Length: value";
+
+    /// <summary>
     /// The exit 52 message for a peer that closed before a final status line arrived.
     /// </summary>
     internal const string EmptyReply = "Empty reply from server";
@@ -74,4 +81,37 @@ internal static class HttpTransferMessages
         string.Create(
             CultureInfo.InvariantCulture,
             $"Too large response headers: {headSize} > {HttpResponseHeadBuilder.MaximumHeadSize}");
+
+    /// <summary>
+    /// Chooses the exit 56 message for a failed read: <see cref="ConnectionReset" /> when the
+    /// peer reset the connection, and <see cref="ReceiveFailed" /> for anything else.
+    /// </summary>
+    /// <param name="exception">The failure the read threw.</param>
+    /// <returns>The message.</returns>
+    internal static string ReceiveFailure(IOException exception) =>
+        exception.InnerException is SocketException { SocketErrorCode: SocketError.ConnectionReset }
+            ? ConnectionReset
+            : ReceiveFailed;
+
+    /// <summary>
+    /// Formats the exit 18 message for a peer that closed before the Content-Length body
+    /// was whole.
+    /// </summary>
+    /// <param name="missing">How many body bytes never arrived.</param>
+    /// <returns>The message, such as <c>end of response with 7 bytes missing</c>.</returns>
+    internal static string BodyBytesMissing(long missing) =>
+        string.Create(CultureInfo.InvariantCulture, $"end of response with {missing} bytes missing");
+
+    /// <summary>
+    /// Formats the exit 23 message for an output that stopped accepting body bytes.
+    /// </summary>
+    /// <param name="passed">The size of the write offered to the output.</param>
+    /// <param name="returned">How many bytes of that write the output accepted.</param>
+    /// <returns>
+    /// The message, such as <c>Failure writing output to destination, passed 16384 returned 0</c>.
+    /// </returns>
+    internal static string OutputWriteFailed(int passed, int returned) =>
+        string.Create(
+            CultureInfo.InvariantCulture,
+            $"Failure writing output to destination, passed {passed} returned {returned}");
 }
