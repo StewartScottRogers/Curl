@@ -121,9 +121,74 @@ public sealed class CommandLineOptionTests
         bool? setTo = null;
         CommandLineOption option = CommandLineOption.NegatableFlag("silent", 's', (_, on) => setTo = on);
 
-        option.Negate!(new CommandLineOptions());
+        CommandLineRefusal? refusal = option.Negate!(new CommandLineOptions(), string.Empty, "--no-silent", _ => false, new RecordingDataFileReader());
 
+        Assert.IsNull(refusal);
         Assert.IsFalse(setTo);
+    }
+
+    // ---- NegatableFlagThatCanRefuse -------------------------------------------------
+
+    [TestMethod]
+    public void NegatableFlagThatCanRefuse_WithShortName_KeepsNamesAndTakesNoValue()
+    {
+        CommandLineOption option = CommandLineOption.NegatableFlagThatCanRefuse("head", 'I', (_, _, _) => null);
+
+        Assert.AreEqual("head", option.LongName);
+        Assert.AreEqual('I', option.ShortName);
+        Assert.IsFalse(option.TakesValue);
+        Assert.IsNotNull(option.Negate);
+    }
+
+    [TestMethod]
+    public void NegatableFlagThatCanRefuse_NullLongName_ThrowsArgumentNull()
+    {
+        ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(
+            () => CommandLineOption.NegatableFlagThatCanRefuse(null!, 'I', (_, _, _) => null));
+
+        Assert.AreEqual("longName", exception.ParamName);
+    }
+
+    [TestMethod]
+    public void NegatableFlagThatCanRefuse_NullSetOrRefuse_ThrowsArgumentNull()
+    {
+        ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(
+            () => CommandLineOption.NegatableFlagThatCanRefuse("head", 'I', null!));
+
+        Assert.AreEqual("setOrRefuse", exception.ParamName);
+    }
+
+    [TestMethod]
+    public void NegatableFlagThatCanRefuseApply_Called_PassesOnAndSpellingAndReturnsItsRefusal()
+    {
+        CommandLineRefusal badlyUsed = CommandLineRefusal.BadlyUsedHere("-I");
+        (bool On, string Spelling)? call = null;
+        CommandLineOption option = CommandLineOption.NegatableFlagThatCanRefuse("head", 'I', (_, on, spelling) =>
+        {
+            call = (on, spelling);
+            return badlyUsed;
+        });
+
+        CommandLineRefusal? refusal = option.Apply(new CommandLineOptions(), string.Empty, "-I", _ => false, new RecordingDataFileReader());
+
+        Assert.AreSame(badlyUsed, refusal);
+        Assert.AreEqual((true, "-I"), call);
+    }
+
+    [TestMethod]
+    public void NegatableFlagThatCanRefuseNegate_Called_PassesOffAndSpelling()
+    {
+        (bool On, string Spelling)? call = null;
+        CommandLineOption option = CommandLineOption.NegatableFlagThatCanRefuse("head", 'I', (_, on, spelling) =>
+        {
+            call = (on, spelling);
+            return null;
+        });
+
+        CommandLineRefusal? refusal = option.Negate!(new CommandLineOptions(), string.Empty, "--no-head", _ => false, new RecordingDataFileReader());
+
+        Assert.IsNull(refusal);
+        Assert.AreEqual((false, "--no-head"), call);
     }
 
     // ---- Text ---------------------------------------------------------------------

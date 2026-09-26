@@ -71,6 +71,38 @@ public static class CommandLineNumber
     }
 
     /// <summary>
+    /// Reads <paramref name="value"/> as a whole number of at least <c>-1</c>, as curl 8.21.0 reads
+    /// <c>--max-redirs</c>, where <c>-1</c> means no limit: an optional <c>-</c> then decimal digits,
+    /// at most <see cref="int.MaxValue"/>. <c>-0</c> reads as zero and <c>-01</c> as <c>-1</c>.
+    /// </summary>
+    /// <param name="spelledOption">The whole argument as typed, for naming it in a refusal.</param>
+    /// <param name="value">The option's value.</param>
+    /// <param name="number">The number read; zero when the value is refused.</param>
+    /// <returns>
+    /// <see langword="null"/> when the value was read; otherwise
+    /// <see cref="CommandLineRefusal.ExpectedProperNumericalParameter"/>, whether the value is
+    /// malformed, too large or below <c>-1</c>.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="spelledOption"/> or <paramref name="value"/> is <see langword="null"/>.
+    /// </exception>
+    public static CommandLineRefusal? ParseMinusOneOrMore(string spelledOption, string value, out int number)
+    {
+        ArgumentNullException.ThrowIfNull(spelledOption);
+        ArgumentNullException.ThrowIfNull(value);
+
+        number = 0;
+        bool negative = value.StartsWith('-');
+        if (!TryReadDigits(value.AsSpan(negative ? 1 : 0), out int magnitude) || (negative && magnitude > 1))
+        {
+            return CommandLineRefusal.ExpectedProperNumericalParameter(spelledOption);
+        }
+
+        number = negative ? -magnitude : magnitude;
+        return null;
+    }
+
+    /// <summary>
     /// Reads <paramref name="value"/> as an unsigned octal number no larger than <paramref name="maximum"/>.
     /// </summary>
     /// <param name="spelledOption">The whole argument as typed, for naming it in a refusal.</param>

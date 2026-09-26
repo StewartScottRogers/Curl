@@ -32,13 +32,15 @@ namespace Curl.Cli;
 /// <c>--no-</c> negation, measured with the local curl 8.21.0 on 2026-09-26
 /// (<c>curl &lt;arguments&gt; http://127.0.0.1:1/</c>, reading standard error and the exit code):
 /// <c>--no-silent</c>, <c>--no-show-error</c>, <c>--no-insecure</c>, <c>--no-tftp-no-options</c>, <c>--no-remote-time</c>,
-/// <c>--no-progress-meter</c>, <c>--no-progress-bar</c> and <c>--no-get</c> are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
+/// <c>--no-progress-meter</c>, <c>--no-progress-bar</c>, <c>--no-get</c>, <c>--no-location</c>, <c>--no-location-trusted</c>,
+/// <c>--no-post301</c>, <c>--no-post302</c>, <c>--no-post303</c>, <c>--no-show-headers</c>, <c>--no-include</c>, <c>--no-head</c>,
+/// <c>--no-fail</c>, <c>--no-fail-with-body</c> and <c>--no-fail-early</c> are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
 /// silent and <c>--no-silent -s</c> is. <c>--no-silent=x</c> is accepted, its value ignored.
 /// <c>--no-tlsv1.2</c>, <c>--no-tlsv1.3</c>, <c>--no-url</c>, <c>--no-output</c> (even as the last
 /// argument), <c>--no-output=x</c>, <c>--no-data</c>, <c>--no-dump-header</c>, <c>--no-range</c>, <c>--no-time-cond</c>,
 /// <c>--no-request</c>, <c>--no-header</c> (and <c>--no-header=x</c>), <c>--no-user-agent</c>, <c>--no-referer</c>,
-/// <c>--no-data-ascii</c>, <c>--no-data-binary</c>, <c>--no-data-raw</c>, <c>--no-data-urlencode</c>, <c>--no-json</c>
-/// and <c>--no-url-query</c> (each also with <c>=x</c>) exit 2 with
+/// <c>--no-data-ascii</c>, <c>--no-data-binary</c>, <c>--no-data-raw</c>, <c>--no-data-urlencode</c>, <c>--no-json</c>,
+/// <c>--no-url-query</c> and <c>--no-max-redirs</c> (each also with <c>=x</c>) exit 2 with
 /// <c>curl: option &lt;as typed&gt;: the given option cannot be reversed with a --no- prefix</c> and
 /// the try-help line. <c>--no-bogus</c>, <c>--no-</c>, <c>--no-no-silent</c> and <c>--no-Silent</c>
 /// exit 2 as unknown. A short letter is never negated.
@@ -88,6 +90,18 @@ public static class CommandLineOptionTable
         CommandLineOption.Value("header", 'H', AddHeaders),
         CommandLineOption.Value("user-agent", 'A', AcceptingEmpty((options, userAgent) => options.UserAgent = userAgent)),
         CommandLineOption.Value("referer", 'e', AcceptingEmpty((options, referer) => options.Referer = referer)),
+        CommandLineOption.NegatableFlag("location", 'L', (options, on) => options.FollowRedirects = on),
+        CommandLineOption.NegatableFlag("location-trusted", null, SetLocationTrusted),
+        CommandLineOption.Value("max-redirs", null, SetMaxRedirects),
+        CommandLineOption.NegatableFlag("post301", null, (options, on) => options.KeepPostAfter301 = on),
+        CommandLineOption.NegatableFlag("post302", null, (options, on) => options.KeepPostAfter302 = on),
+        CommandLineOption.NegatableFlag("post303", null, (options, on) => options.KeepPostAfter303 = on),
+        CommandLineOption.NegatableFlag("show-headers", 'i', (options, on) => options.ShowHeaders = on),
+        CommandLineOption.NegatableFlag("include", null, (options, on) => options.ShowHeaders = on),
+        CommandLineOption.NegatableFlagThatCanRefuse("head", 'I', SetHead),
+        CommandLineOption.NegatableFlag("fail", 'f', SetFail),
+        CommandLineOption.NegatableFlag("fail-with-body", null, SetFailWithBody),
+        CommandLineOption.NegatableFlag("fail-early", null, (options, on) => options.FailEarly = on),
     ];
 
     /// <summary>The largest <c>--create-file-mode</c> curl 8.21.0 accepts: octal <c>0777</c>.</summary>
@@ -485,6 +499,72 @@ public static class CommandLineOptionTable
         options.TimeCondition = null;
         options.AddWarningLinesUnlessSilent(CommandLineWarning.TimeConditionIsNotADate);
         return null;
+    }
+
+    /// <summary>
+    /// Turns <c>--location-trusted</c> on or off: it follows redirects and sends credentials to every
+    /// host they lead to, and its <c>--no-</c> spelling turns off both, as curl 8.21.0's tool does.
+    /// </summary>
+    private static void SetLocationTrusted(CommandLineOptions options, bool on)
+    {
+        options.SendCredentialsToRedirectHosts = on;
+        options.FollowRedirects = on;
+    }
+
+    private static CommandLineRefusal? SetMaxRedirects(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        CommandLineRefusal? refusal = CommandLineNumber.ParseMinusOneOrMore(spelledOption, value, out int limit);
+        if (refusal is null)
+        {
+            options.MaxRedirects = limit;
+        }
+
+        return refusal;
+    }
+
+    /// <summary>
+    /// Turns <c>-I</c> / <c>--head</c> on, which selects <c>HEAD</c> and shows the headers, or, for
+    /// <c>--no-head</c>, off, which selects <c>GET</c> and hides them. Once one method is selected the
+    /// other is refused with <see cref="CommandLineRefusal.BadlyUsedHere"/> after curl 8.21.0's two
+    /// warning lines, which <c>-s</c> read before it drops.
+    /// </summary>
+    private static CommandLineRefusal? SetHead(CommandLineOptions options, bool on, string spelledOption)
+    {
+        SelectedHttpMethod method = on ? SelectedHttpMethod.Head : SelectedHttpMethod.Get;
+        if (options.HttpMethodSelected != SelectedHttpMethod.None && options.HttpMethodSelected != method)
+        {
+            options.AddWarningLinesUnlessSilent(on ? CommandLineWarning.HeadRequestedAfterGet : CommandLineWarning.GetRequestedAfterHead);
+            return CommandLineRefusal.BadlyUsedHere(spelledOption);
+        }
+
+        options.HttpMethodSelected = method;
+        options.NoBody = on;
+        options.ShowHeaders = on;
+        return null;
+    }
+
+    /// <summary>
+    /// Turns <c>-f</c> / <c>--fail</c> on, after <see cref="CommandLineWarning.FailDeselectsFailWithBody"/>
+    /// when it replaces <c>--fail-with-body</c>, or, for <c>--no-fail</c>, turns off either fail mode.
+    /// </summary>
+    private static void SetFail(CommandLineOptions options, bool on) =>
+        SetFailMode(options, on, HttpFailMode.Fail, HttpFailMode.FailWithBody, CommandLineWarning.FailDeselectsFailWithBody);
+
+    /// <summary>
+    /// Turns <c>--fail-with-body</c> on, after <see cref="CommandLineWarning.FailWithBodyDeselectsFail"/>
+    /// when it replaces <c>-f</c> / <c>--fail</c>, or, for <c>--no-fail-with-body</c>, turns off either fail mode.
+    /// </summary>
+    private static void SetFailWithBody(CommandLineOptions options, bool on) =>
+        SetFailMode(options, on, HttpFailMode.FailWithBody, HttpFailMode.Fail, CommandLineWarning.FailWithBodyDeselectsFail);
+
+    private static void SetFailMode(CommandLineOptions options, bool on, HttpFailMode mode, HttpFailMode deselected, IReadOnlyList<string> deselectWarning)
+    {
+        if (on && options.FailMode == deselected)
+        {
+            options.AddWarningLinesUnlessSilent(deselectWarning);
+        }
+
+        options.FailMode = on ? mode : HttpFailMode.None;
     }
 
     /// <summary>Finds the row whose long name is exactly <paramref name="longName"/>; no prefix matching.</summary>

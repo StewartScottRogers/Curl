@@ -77,6 +77,47 @@ public static class CommandLineWarning
     ];
 
     /// <summary>
+    /// The line curl prints when <c>--fail-with-body</c> replaces an earlier <c>-f</c> / <c>--fail</c>.
+    /// Measured with <c>curl -f --fail-with-body http://127.0.0.1:1/</c> (curl 8.21.0, Windows, 2026-09-26).
+    /// </summary>
+    public static IReadOnlyList<string> FailWithBodyDeselectsFail { get; } =
+    [
+        "Warning: --fail-with-body deselects --fail here",
+    ];
+
+    /// <summary>
+    /// The line curl prints when <c>-f</c> / <c>--fail</c> replaces an earlier <c>--fail-with-body</c>;
+    /// it names <c>--fail</c> even when <c>-f</c> was typed. Measured with
+    /// <c>curl --fail-with-body -f http://127.0.0.1:1/</c> (curl 8.21.0, Windows, 2026-09-26).
+    /// </summary>
+    public static IReadOnlyList<string> FailDeselectsFailWithBody { get; } =
+    [
+        "Warning: --fail deselects --fail-with-body here",
+    ];
+
+    /// <summary>
+    /// The two lines curl prints when <c>-I</c> / <c>--head</c> follows <c>--no-head</c>, before it
+    /// refuses the <c>-I</c>. curl wraps the text at 79 columns, so the first line ends in a space.
+    /// Measured with <c>curl --no-head -I http://127.0.0.1:1/</c> (curl 8.21.0, Windows, 2026-09-26).
+    /// </summary>
+    public static IReadOnlyList<string> HeadRequestedAfterGet { get; } =
+    [
+        "Warning: You can only select one HTTP request method! You asked for both HEAD ",
+        "Warning: (-I, --head) and GET (-G, --get).",
+    ];
+
+    /// <summary>
+    /// The two lines curl prints when <c>--no-head</c> follows <c>-I</c> / <c>--head</c>, before it
+    /// refuses the <c>--no-head</c>. curl wraps the text at 79 columns, so the first line ends in a space.
+    /// Measured with <c>curl -I --no-head http://127.0.0.1:1/</c> (curl 8.21.0, Windows, 2026-09-26).
+    /// </summary>
+    public static IReadOnlyList<string> GetRequestedAfterHead { get; } =
+    [
+        "Warning: You can only select one HTTP request method! You asked for both GET ",
+        "Warning: (-G, --get) and HEAD (-I, --head).",
+    ];
+
+    /// <summary>
     /// The line curl prints when a command line gives more <c>-o</c>/<c>--output</c> values than
     /// URLs: <c>Warning: Got more output options than URLs</c>. curl 8.21.0 prints it once, however
     /// many values are left over, after the last transfer has ended, not while reading the command

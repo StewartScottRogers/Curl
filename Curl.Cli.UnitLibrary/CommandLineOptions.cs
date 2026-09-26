@@ -235,6 +235,71 @@ public sealed class CommandLineOptions
     public string? Referer { get; internal set; }
 
     /// <summary>
+    /// <see langword="true"/> when <c>-L</c> / <c>--location</c> or <c>--location-trusted</c> was
+    /// given and no <c>--no-location</c> or <c>--no-location-trusted</c> came after it: follow redirects.
+    /// </summary>
+    public bool FollowRedirects { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--location-trusted</c> was given and no <c>--no-location-trusted</c>
+    /// came after it: send the <c>-u</c> credentials and any <c>Authorization</c> header to every host
+    /// a redirect leads to, not only the first. <c>-L</c> and <c>--no-location</c> leave it as it is,
+    /// as in curl 8.21.0.
+    /// </summary>
+    public bool SendCredentialsToRedirectHosts { get; internal set; }
+
+    /// <summary>
+    /// The <c>--max-redirs</c> limit on redirects followed: 50 when not given, as in curl 8.21.0,
+    /// and <c>-1</c> for no limit. The last value wins.
+    /// </summary>
+    public int MaxRedirects { get; internal set; } = 50;
+
+    /// <summary><see langword="true"/> when <c>--post301</c> was given and no <c>--no-post301</c> came after it: keep a POST a POST after a 301.</summary>
+    public bool KeepPostAfter301 { get; internal set; }
+
+    /// <summary><see langword="true"/> when <c>--post302</c> was given and no <c>--no-post302</c> came after it: keep a POST a POST after a 302.</summary>
+    public bool KeepPostAfter302 { get; internal set; }
+
+    /// <summary><see langword="true"/> when <c>--post303</c> was given and no <c>--no-post303</c> came after it: keep a POST a POST after a 303.</summary>
+    public bool KeepPostAfter303 { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when the last of <c>-i</c> / <c>--show-headers</c> / <c>--include</c>,
+    /// <c>-I</c> / <c>--head</c> and their <c>--no-</c> spellings turned it on: write the response
+    /// headers to the output before the body.
+    /// </summary>
+    public bool ShowHeaders { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>-I</c> / <c>--head</c> was given and no <c>--no-head</c> came
+    /// after it: ask for the headers only (a <c>HEAD</c> request over HTTP). It maps onto the
+    /// transfer's <c>NoBody</c>.
+    /// </summary>
+    public bool NoBody { get; internal set; }
+
+    /// <summary>
+    /// How an HTTP error response ends the transfer: <see cref="HttpFailMode.Fail"/> for <c>-f</c> /
+    /// <c>--fail</c>, <see cref="HttpFailMode.FailWithBody"/> for <c>--fail-with-body</c>, whichever came
+    /// last; <see cref="HttpFailMode.None"/> when neither was given or <c>--no-fail</c> or
+    /// <c>--no-fail-with-body</c> came after it. Either <c>--no-</c> spelling turns off both, as in
+    /// curl 8.21.0.
+    /// </summary>
+    public HttpFailMode FailMode { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--fail-early</c> was given and no <c>--no-fail-early</c> came after
+    /// it: stop at the first transfer that fails instead of going on to the next URL.
+    /// </summary>
+    public bool FailEarly { get; internal set; }
+
+    /// <summary>
+    /// The HTTP request method <c>-I</c> / <c>--head</c> (<see cref="SelectedHttpMethod.Head"/>) or
+    /// <c>--no-head</c> (<see cref="SelectedHttpMethod.Get"/>) selected first; once one is selected,
+    /// selecting the other is refused, as curl 8.21.0 does.
+    /// </summary>
+    internal SelectedHttpMethod HttpMethodSelected { get; set; }
+
+    /// <summary>
     /// <see langword="true"/> when <c>-s</c> / <c>--silent</c> has been read and <c>-S</c> /
     /// <c>--show-error</c> has not, so far: curl then hides error messages.
     /// </summary>

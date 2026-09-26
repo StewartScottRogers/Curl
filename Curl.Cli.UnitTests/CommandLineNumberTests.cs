@@ -116,6 +116,33 @@ public sealed class CommandLineNumberTests
     }
 
     [TestMethod]
+    public void ParseMinusOneOrMore_NullSpelledOption_ThrowsArgumentNull()
+    {
+        ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(
+            () => CommandLineNumber.ParseMinusOneOrMore(null!, "5", out _));
+
+        Assert.AreEqual("spelledOption", exception.ParamName);
+    }
+
+    [TestMethod]
+    public void ParseMinusOneOrMore_NullValue_ThrowsArgumentNull()
+    {
+        ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(
+            () => CommandLineNumber.ParseMinusOneOrMore("--max-redirs", null!, out _));
+
+        Assert.AreEqual("value", exception.ParamName);
+    }
+
+    [TestMethod]
+    public void ParseMinusOneOrMore_Refused_LeavesNumberZero()
+    {
+        CommandLineRefusal? refusal = CommandLineNumber.ParseMinusOneOrMore("--max-redirs", "-2", out int number);
+
+        Assert.IsNotNull(refusal);
+        Assert.AreEqual(0, number);
+    }
+
+    [TestMethod]
     [DataRow("0", 0)]
     [DataRow("0000", 0)]
     [DataRow("7", 7)]

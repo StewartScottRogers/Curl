@@ -5,7 +5,7 @@ namespace Curl.Cli;
 /// driven by <see cref="CommandLineOptionTable"/>. Short options bundle (<c>-sS</c>) and a
 /// value letter takes the rest of its bundle (<c>-ofile</c>) or else the next argument;
 /// long options match exactly and accept <c>--name=value</c>; <c>--no-&lt;name&gt;</c> turns off
-/// a row built with <see cref="CommandLineOption.NegatableFlag"/> and is refused for any other
+/// a row built with <see cref="CommandLineOption.NegatableFlag"/> or <see cref="CommandLineOption.NegatableFlagThatCanRefuse"/> and is refused for any other
 /// row (see <see cref="CommandLineOptionTable"/>); the first <c>--</c> ends
 /// option parsing; every other argument is a URL. An empty URL argument is refused as
 /// blank; an option's value, empty or not, is handed unchanged to the row's
@@ -150,7 +150,7 @@ public static class CommandLineParser
         string longName = hasAttachedValue ? nameAndValue[..equals] : nameAndValue;
         if (!CommandLineOptionTable.TryFindLong(longName, out CommandLineOption? option))
         {
-            return ParseNegatedLong(options, argument, longName);
+            return ParseNegatedLong(options, argument, longName, reader);
         }
 
         if (!option.TakesValue)
@@ -166,11 +166,11 @@ public static class CommandLineParser
 
     /// <summary>
     /// Reads a long name that is not in the table as <c>--no-&lt;name&gt;</c>: it turns off a
-    /// negatable flag (any attached value ignored), is refused as not reversible for any other row,
+    /// negatable flag (any attached value ignored) unless the row refuses that, is refused as not reversible for any other row,
     /// and is unknown when there is no <c>no-</c> or no row after it. Checked before a value is
     /// taken, so <c>--no-output</c> as the last argument is refused as not reversible.
     /// </summary>
-    private static CommandLineRefusal? ParseNegatedLong(CommandLineOptions options, string argument, string longName)
+    private static CommandLineRefusal? ParseNegatedLong(CommandLineOptions options, string argument, string longName, ArgumentReader reader)
     {
         if (!longName.StartsWith(NegationPrefix, StringComparison.Ordinal)
             || !CommandLineOptionTable.TryFindLong(longName[NegationPrefix.Length..], out CommandLineOption? option))
@@ -183,8 +183,7 @@ public static class CommandLineParser
             return CommandLineRefusal.CannotBeReversed(argument);
         }
 
-        option.Negate(options);
-        return null;
+        return option.Negate(options, string.Empty, argument, reader.PathExists, reader.DataFileReader);
     }
 
     private static CommandLineRefusal? ParseShortBundle(CommandLineOptions options, string argument, ArgumentReader reader)
@@ -203,18 +202,27 @@ public static class CommandLineParser
 
             if (option.TakesValue)
             {
-                string restOfBundle = argument[(letter + 1)..];
-                return restOfBundle.Length > 0
-                    ? option.Apply(options, restOfBundle, argument, reader.PathExists, reader.DataFileReader)
-                    : ApplyNextArgument(options, option, argument, reader);
+                return ApplyRestOfBundle(options, option, argument, argument[(letter + 1)..], reader);
             }
 
-            // A flag's applier never refuses, so its result is not inspected.
-            _ = option.Apply(options, string.Empty, argument, reader.PathExists, reader.DataFileReader);
+            CommandLineRefusal? refusal = option.Apply(options, string.Empty, argument, reader.PathExists, reader.DataFileReader);
+            if (refusal is not null)
+            {
+                return refusal;
+            }
         }
 
         return null;
     }
+
+    /// <summary>
+    /// Applies a value letter's value: the rest of its bundle (<c>-ofile</c>), or, when nothing follows
+    /// the letter, the next argument.
+    /// </summary>
+    private static CommandLineRefusal? ApplyRestOfBundle(CommandLineOptions options, CommandLineOption option, string argument, string restOfBundle, ArgumentReader reader) =>
+        restOfBundle.Length > 0
+            ? option.Apply(options, restOfBundle, argument, reader.PathExists, reader.DataFileReader)
+            : ApplyNextArgument(options, option, argument, reader);
 
     private static CommandLineRefusal? ApplyNextArgument(CommandLineOptions options, CommandLineOption option, string argument, ArgumentReader reader) =>
         reader.TryTakeNext(out string value)
