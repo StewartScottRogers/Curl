@@ -24,6 +24,12 @@ Check the remote before your first push of a session (`git remote -v`). This rep
 `CLAUDE.md` names `github.com/StewartScottRogers/Curl`, and if `origin` points somewhere
 else, name both and ask which is right rather than pushing to whichever answers.
 
+## Standing authorization
+
+Stewart has authorized commits and pushes to a feature branch as a standing rule: do not
+ask before committing or before `git push -u origin HEAD`. Verify the work is green first,
+then commit, push, and report. That authorization covers those two things and nothing else.
+
 ## Never without Stewart's confirmation
 
 Ask, in plain words, and wait — for a force push, a merge, a release, deleting a remote

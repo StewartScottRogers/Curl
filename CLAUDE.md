@@ -35,8 +35,17 @@ for any of it. Complexity is enforced at build time: the threshold lives in
 `CodeMetricsConfig.txt` are Stewart's to change; never raise one to make code pass.
 
 ## Git and GitHub
-All git and gh operations are delegated to github-operator. Never push, merge, or release
-without my confirmation.
+Reversible git and gh work is delegated to github-operator: status, commits, rebases,
+explaining conflicts, pull request bodies, Actions triage, branch cleanup.
+
+Committing and pushing to a feature branch is automatic and needs no confirmation. Once
+`dotnet build` is clean and the fast tests are green, commit by logical unit and push;
+report it afterwards rather than asking first.
+
+Ask first for: a force push or any rewrite of already-pushed history, a merge to `master`,
+a tag or a release, creating a repository or changing its visibility, and deleting a
+branch. Irreversible GitHub actions are run directly and not through the subagent, which
+by design refuses authorization relayed to it in a prompt.
 
 ## Task board
 Work is tracked as Markdown files in the `Tasks` shared project, one file per task, and
