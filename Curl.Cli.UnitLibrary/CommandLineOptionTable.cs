@@ -32,11 +32,13 @@ namespace Curl.Cli;
 /// <c>--no-</c> negation, measured with the local curl 8.21.0 on 2026-09-26
 /// (<c>curl &lt;arguments&gt; http://127.0.0.1:1/</c>, reading standard error and the exit code):
 /// <c>--no-silent</c>, <c>--no-show-error</c>, <c>--no-insecure</c>, <c>--no-tftp-no-options</c>, <c>--no-remote-time</c>,
-/// <c>--no-progress-meter</c> and <c>--no-progress-bar</c> are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
+/// <c>--no-progress-meter</c>, <c>--no-progress-bar</c> and <c>--no-get</c> are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
 /// silent and <c>--no-silent -s</c> is. <c>--no-silent=x</c> is accepted, its value ignored.
 /// <c>--no-tlsv1.2</c>, <c>--no-tlsv1.3</c>, <c>--no-url</c>, <c>--no-output</c> (even as the last
 /// argument), <c>--no-output=x</c>, <c>--no-data</c>, <c>--no-dump-header</c>, <c>--no-range</c>, <c>--no-time-cond</c>,
-/// <c>--no-request</c>, <c>--no-header</c> (and <c>--no-header=x</c>), <c>--no-user-agent</c> and <c>--no-referer</c> exit 2 with
+/// <c>--no-request</c>, <c>--no-header</c> (and <c>--no-header=x</c>), <c>--no-user-agent</c>, <c>--no-referer</c>,
+/// <c>--no-data-ascii</c>, <c>--no-data-binary</c>, <c>--no-data-raw</c>, <c>--no-data-urlencode</c>, <c>--no-json</c>
+/// and <c>--no-url-query</c> (each also with <c>=x</c>) exit 2 with
 /// <c>curl: option &lt;as typed&gt;: the given option cannot be reversed with a --no- prefix</c> and
 /// the try-help line. <c>--no-bogus</c>, <c>--no-</c>, <c>--no-no-silent</c> and <c>--no-Silent</c>
 /// exit 2 as unknown. A short letter is never negated.
@@ -53,6 +55,13 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("progress-bar", '#', (options, on) => options.ProgressBar = on),
         CommandLineOption.FileName("output", 'o', (options, file) => options.AddOutputFile(file)),
         CommandLineOption.Value("data", 'd', AppendPostData),
+        CommandLineOption.Value("data-ascii", null, AppendPostData),
+        CommandLineOption.Value("data-binary", null, AppendBinaryPostData),
+        CommandLineOption.Value("data-raw", null, AcceptingEmpty((options, data) => options.AppendPostData(data))),
+        CommandLineOption.Value("data-urlencode", null, AppendUrlEncodedPostData),
+        CommandLineOption.Value("json", null, AppendJsonData),
+        CommandLineOption.NegatableFlag("get", 'G', (options, on) => options.DataInQuery = on),
+        CommandLineOption.Value("url-query", null, AppendUrlQuery),
         CommandLineOption.FileName("dump-header", 'D', (options, file) => options.DumpHeaderFile = file),
         CommandLineOption.Value("user", 'u', AcceptingEmpty((options, user) => options.SetCredentials(user))),
         CommandLineOption.Value("telnet-option", 't', AcceptingEmpty((options, telnetOption) => options.AddTelnetOption(telnetOption))),
@@ -111,7 +120,7 @@ public static class CommandLineOptionTable
         };
 
     /// <summary>
-    /// Appends a <c>-d</c> / <c>--data</c> value to the body: the value's own text, empty included, or,
+    /// Appends a <c>-d</c> / <c>--data</c> or <c>--data-ascii</c> value to the body: the value's own text, empty included, or,
     /// when it starts with <c>@</c>, the bytes of the file it names (standard input for <c>@-</c>) with
     /// every carriage return, line feed and NUL byte removed, as curl 8.21.0 does. A file that cannot
     /// be read is refused with <see cref="CommandLineRefusal.DataFileUnreadable"/>.
@@ -132,6 +141,119 @@ public static class CommandLineOptionTable
 
         return refusal;
     }
+
+    /// <summary>
+    /// Appends a <c>--data-binary</c> value to the body, after a <c>&amp;</c> when the body so far is not
+    /// empty: the value's own text, or, when it starts with <c>@</c>, the bytes of the file it names
+    /// (standard input for <c>@-</c>) unchanged, as curl 8.21.0 does.
+    /// </summary>
+    private static CommandLineRefusal? AppendBinaryPostData(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader) =>
+        AppendTextOrFileBytes(options, value, spelledOption, dataFileReader, options.AppendPostData);
+
+    /// <summary>
+    /// Appends a <c>--json</c> value to the body with no separator and marks the request as JSON:
+    /// the value's own text, or, when it starts with <c>@</c>, the bytes of the file it names
+    /// (standard input for <c>@-</c>) unchanged, as curl 8.21.0 does.
+    /// </summary>
+    private static CommandLineRefusal? AppendJsonData(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader) =>
+        AppendTextOrFileBytes(options, value, spelledOption, dataFileReader, options.AppendJsonData);
+
+    /// <summary>
+    /// Hands <paramref name="append"/> the UTF-8 bytes of <paramref name="value"/>, or, when it starts
+    /// with <c>@</c>, the unchanged bytes of the file it names. A file that cannot be read is refused
+    /// with <see cref="CommandLineRefusal.DataFileUnreadable"/> and nothing is appended.
+    /// </summary>
+    private static CommandLineRefusal? AppendTextOrFileBytes(CommandLineOptions options, string value, string spelledOption, IDataFileReader dataFileReader, Action<byte[]> append)
+    {
+        if (!value.StartsWith('@'))
+        {
+            append(Encoding.UTF8.GetBytes(value));
+            return null;
+        }
+
+        CommandLineRefusal? refusal = ReadAtFile(options, value[1..], spelledOption, dataFileReader, out byte[] contents);
+        if (refusal is null)
+        {
+            append(contents);
+        }
+
+        return refusal;
+    }
+
+    /// <summary>
+    /// Appends a <c>--data-urlencode</c> value to the body, after a <c>&amp;</c> when the body so far
+    /// is not empty, encoded by <see cref="UrlEncodeValue"/>.
+    /// </summary>
+    private static CommandLineRefusal? AppendUrlEncodedPostData(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        CommandLineRefusal? refusal = UrlEncodeValue(options, value, spelledOption, dataFileReader, out string encoded);
+        if (refusal is null)
+        {
+            options.AppendPostData(encoded);
+        }
+
+        return refusal;
+    }
+
+    /// <summary>
+    /// Appends a <c>--url-query</c> value to <see cref="CommandLineOptions.UrlQuery"/>: the text after
+    /// a leading <c>+</c> verbatim, or else the value encoded by <see cref="UrlEncodeValue"/>, as
+    /// curl 8.21.0 does.
+    /// </summary>
+    private static CommandLineRefusal? AppendUrlQuery(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        if (value.StartsWith('+'))
+        {
+            options.AppendUrlQuery(value[1..]);
+            return null;
+        }
+
+        CommandLineRefusal? refusal = UrlEncodeValue(options, value, spelledOption, dataFileReader, out string encoded);
+        if (refusal is null)
+        {
+            options.AppendUrlQuery(encoded);
+        }
+
+        return refusal;
+    }
+
+    /// <summary>
+    /// Encodes a <c>--data-urlencode</c> or <c>--url-query</c> value as curl 8.21.0 does. The value
+    /// splits at its first <c>=</c>, or, when it holds none, at its first <c>@</c>. With neither, the
+    /// whole value is the content. With <c>=</c>, the text after it is the content. With <c>@</c>, the
+    /// content is the bytes of the file named after it (standard input for <c>-</c>), and an empty
+    /// file makes the whole piece empty. The content is escaped by <see cref="UrlEncodedContent.Escape"/>
+    /// and, when the text before the split is not empty, follows that text, unencoded, and a <c>=</c>.
+    /// A file that cannot be read is refused with <see cref="CommandLineRefusal.DataFileUnreadable"/>.
+    /// </summary>
+    private static CommandLineRefusal? UrlEncodeValue(CommandLineOptions options, string value, string spelledOption, IDataFileReader dataFileReader, out string encoded)
+    {
+        int split = value.IndexOf('=', StringComparison.Ordinal);
+        if (split < 0)
+        {
+            split = value.IndexOf('@', StringComparison.Ordinal);
+        }
+
+        if (split < 0)
+        {
+            encoded = UrlEncodedContent.Escape(Encoding.UTF8.GetBytes(value));
+            return null;
+        }
+
+        string name = value[..split];
+        if (value[split] == '=')
+        {
+            encoded = NameAndEscapedContent(name, Encoding.UTF8.GetBytes(value[(split + 1)..]));
+            return null;
+        }
+
+        CommandLineRefusal? refusal = ReadAtFile(options, value[(split + 1)..], spelledOption, dataFileReader, out byte[] contents);
+        encoded = contents.Length == 0 ? string.Empty : NameAndEscapedContent(name, contents);
+        return refusal;
+    }
+
+    private static string NameAndEscapedContent(string name, byte[] content) =>
+        name.Length == 0 ? UrlEncodedContent.Escape(content) : $"{name}={UrlEncodedContent.Escape(content)}";
 
     /// <summary>
     /// Adds a <c>-H</c> / <c>--header</c> value to the headers. A value that does not start with

@@ -50,13 +50,40 @@ public sealed class CommandLineOptions
     public IReadOnlyList<string> OutputFiles => outputFiles;
 
     /// <summary>
-    /// The <c>-d</c> / <c>--data</c> value as UTF-8 bytes; <see langword="null"/> when not given.
-    /// An empty value is empty data, not a refusal. When given more than once the values are joined
-    /// in command-line order, each one after the first preceded by a single <c>&amp;</c> when the body
-    /// so far is not empty, as in curl 8.21.0. A value <c>@file</c> (or <c>@-</c>) contributes the
-    /// file's (or standard input's) bytes with every carriage return, line feed and NUL removed.
+    /// The request body built from every <c>-d</c> / <c>--data</c>, <c>--data-ascii</c>, <c>--data-binary</c>,
+    /// <c>--data-raw</c>, <c>--data-urlencode</c> and <c>--json</c> value, as bytes; <see langword="null"/>
+    /// when none was given. An empty value is empty data, not a refusal. The pieces are joined in
+    /// command-line order, as in curl 8.21.0: a <c>--json</c> piece is appended as it is, and any other
+    /// piece after a single <c>&amp;</c> when the body so far is not empty. Text is taken as UTF-8.
+    /// A <c>-d</c> or <c>--data-ascii</c> value <c>@file</c> (or <c>@-</c>) contributes the file's (or
+    /// standard input's) bytes with every carriage return, line feed and NUL removed; a
+    /// <c>--data-binary</c> or <c>--json</c> one contributes them unchanged; <c>--data-raw</c> never
+    /// reads a file. With <see cref="DataInQuery"/> the body is sent as the URL query instead
+    /// (see <see cref="QueryUrl"/>).
     /// </summary>
     public ReadOnlyMemory<byte>? PostData { get; private set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--json</c> was given at least once: curl 8.21.0 then sends
+    /// <c>Content-Type: application/json</c> and <c>Accept: application/json</c>, even when a later
+    /// <c>-d</c> adds to the body.
+    /// </summary>
+    public bool SendsJson { get; private set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>-G</c> / <c>--get</c> was given and no <c>--no-get</c> came after it:
+    /// the request is a GET and <see cref="PostData"/>, when given, is sent as the URL query
+    /// (see <see cref="QueryUrl"/>).
+    /// </summary>
+    public bool DataInQuery { get; internal set; }
+
+    /// <summary>
+    /// The <c>--url-query</c> values joined in command-line order with a <c>&amp;</c> between each
+    /// two, even when one is empty, as curl 8.21.0 does; <see langword="null"/> when not given.
+    /// Each value is encoded as <c>--data-urlencode</c> encodes it, except that one starting with
+    /// <c>+</c> is kept verbatim without its <c>+</c>. Appended to the URL by <see cref="QueryUrl"/>.
+    /// </summary>
+    public string? UrlQuery { get; private set; }
 
     /// <summary>
     /// The <c>-D</c> / <c>--dump-header</c> file, verbatim and unchecked; <see langword="null"/> when
@@ -259,6 +286,25 @@ public sealed class CommandLineOptions
         byte[] separator = PostData is { Length: > 0 } ? [(byte)'&'] : [];
         PostData = PostData is { } body ? [.. body.Span, .. separator, .. data] : data;
     }
+
+    /// <summary>
+    /// Appends <paramref name="data"/> to <see cref="PostData"/> with no separator and sets
+    /// <see cref="SendsJson"/>, as curl 8.21.0 does for <c>--json</c>.
+    /// </summary>
+    /// <param name="data">The bytes of one <c>--json</c> value, possibly empty.</param>
+    internal void AppendJsonData(byte[] data)
+    {
+        PostData = PostData is { } body ? [.. body.Span, .. data] : data;
+        SendsJson = true;
+    }
+
+    /// <summary>
+    /// Appends <paramref name="query"/> to <see cref="UrlQuery"/>, after a <c>&amp;</c> when
+    /// <see cref="UrlQuery"/> is already set, even to empty text.
+    /// </summary>
+    /// <param name="query">One encoded <c>--url-query</c> value, possibly empty.</param>
+    internal void AppendUrlQuery(string query) =>
+        UrlQuery = UrlQuery is null ? query : $"{UrlQuery}&{query}";
 
     /// <summary>Sets <see cref="Credentials"/> from <paramref name="userAndPassword"/>, split at its first colon.</summary>
     /// <param name="userAndPassword">A <c>-u</c> / <c>--user</c> value, possibly empty.</param>
