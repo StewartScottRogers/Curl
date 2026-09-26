@@ -1,5 +1,5 @@
 ---
-id: BL-266
+id: BL-273
 title: Read Set-Cookie header lines in cookie files
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-266 — Read Set-Cookie header lines in cookie files
+# BL-273 — Read Set-Cookie header lines in cookie files
 
 ## Goal
 

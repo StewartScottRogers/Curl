@@ -39,7 +39,7 @@ The store loads Netscape cookie files and `-b` strings, drops session cookies un
   - Unwritable jar (`-c nodir\x.txt`, `-c adir`): nothing on stderr with `-s`, `-sS`, the default, `-v` or `--trace-ascii`, and exit 0. So "the measured message" is no message: `SaveCookieJarAsync` returns `false` and the caller must stay silent.
 - For BL-237 (Console wiring): without a `-b` file or `-c`, curl does not store `Set-Cookie` (a `-b x=1` run sent `x=1` on both requests, not the received `a=1`); read the file as Latin-1; write the jar with `Environment.NewLine`.
 - Choices (no ADR: each follows measured behaviour or the standing "match the platform's curl" rule): the jar line ending is the platform's (`Environment.NewLine`), because curl writes the jar in text mode (CR LF measured on Windows, LF on Linux and macOS); bytes are handled as Latin-1 so a file round-trips unchanged; the jar is opened with `FileWriteMode.Truncate` rather than curl's temp-file-and-rename.
-- Follow-up filed: BL-266 (`Set-Cookie:` header lines inside a cookie file, which curl also reads).
+- Follow-up filed: BL-273 (`Set-Cookie:` header lines inside a cookie file, which curl also reads).
 - Quality: `Measure-CodeQuality.ps1 -Library Curl.Cookies.UnitLibrary` reports 100% line, 100% branch, 131 members, 0 failing, worst CRAP 10. `dotnet build` clean; fast tests green (Curl.Cookies.UnitTests 279).
 
 ## Log
