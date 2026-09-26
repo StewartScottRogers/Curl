@@ -38,3 +38,4 @@ With `Compressed` set the handler sends the BL-154 ADR's Accept-Encoding and dec
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
