@@ -1,0 +1,53 @@
+namespace Curl.Core;
+
+/// <summary>
+/// The command-line options that decide how <see cref="RedirectFollower" /> follows a
+/// redirect under <c>-L</c>/<c>--location</c>; every member defaults to curl 8.21.0's
+/// behaviour when the option is not given.
+/// </summary>
+public sealed record RedirectPolicy
+{
+    /// <summary>
+    /// curl's <c>--max-redirs</c> default: 50 redirects.
+    /// </summary>
+    public const int DefaultMaxRedirects = 50;
+
+    /// <summary>
+    /// Gets the most redirects to follow, per <c>--max-redirs</c>; a negative value, as
+    /// curl's <c>-1</c>, means no limit. Following one more fails with exit 47
+    /// (<c>Maximum (N) redirects followed</c>).
+    /// </summary>
+    public int MaxRedirects { get; init; } = DefaultMaxRedirects;
+
+    /// <summary>
+    /// Gets a value indicating whether <c>--post301</c> was given: a POST answered with
+    /// 301 is re-sent as POST instead of becoming GET.
+    /// </summary>
+    public bool KeepPostOn301 { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether <c>--post302</c> was given: a POST answered with
+    /// 302 is re-sent as POST instead of becoming GET.
+    /// </summary>
+    public bool KeepPostOn302 { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether <c>--post303</c> was given: a POST answered with
+    /// 303 is re-sent as POST instead of becoming GET.
+    /// </summary>
+    public bool KeepPostOn303 { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether <c>--location-trusted</c> was given: credentials,
+    /// the bearer token and <c>-H</c> <c>Authorization:</c> and <c>Cookie:</c> headers are
+    /// sent to every redirect target, not only to the first URL's host, port and scheme.
+    /// </summary>
+    public bool LocationTrusted { get; init; }
+
+    /// <summary>
+    /// Gets the lowercase schemes a redirect may lead to; curl's default, <c>http</c>,
+    /// <c>https</c>, <c>ftp</c> and <c>ftps</c>, when not given.
+    /// </summary>
+    public IReadOnlySet<string> AllowedSchemes { get; init; } =
+        new HashSet<string>(["http", "https", "ftp", "ftps"], StringComparer.Ordinal);
+}
