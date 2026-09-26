@@ -8,7 +8,7 @@ namespace Curl.Cookies;
 /// reached with <c>--connect-to ::127.0.0.1:&lt;port&gt;</c>. BL-220's Notes record the runs re-measured when it finished.
 /// </summary>
 [TestClass]
-public sealed class CookieStoreTests
+public sealed partial class CookieStoreTests
 {
     private static readonly DateTimeOffset Now = DateTimeOffset.FromUnixTimeSeconds(1_790_460_351);
 

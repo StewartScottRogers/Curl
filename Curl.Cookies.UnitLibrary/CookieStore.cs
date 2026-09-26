@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using Curl.Protocol.Abstractions;
 
@@ -10,7 +11,9 @@ namespace Curl.Cookies;
 /// </summary>
 /// <remarks>
 /// The store never reads a clock: every call is handed the time it acts at. It does not yet refuse a
-/// cookie set on a public suffix (BL-223), and it does not load or write a cookie file (BL-221).
+/// cookie set on a public suffix (BL-223). It loads Netscape cookie files (<c>-b</c>, <c>-j</c>), keeps
+/// <c>-b name=value</c> strings and writes the <c>-c</c> jar, as <see cref="NetscapeCookieFile"/> reads and
+/// writes them.
 /// </remarks>
 public sealed class CookieStore : ICookieStore
 {
@@ -23,8 +26,18 @@ public sealed class CookieStore : ICookieStore
     /// <summary>The longest <c>Cookie</c> header value curl sends; the cookie that would make it longer, and every one after it, is left out.</summary>
     public const int LongestCookieHeader = 8183;
 
+    /// <summary>
+    /// The permission bits a new jar file is created with on a POSIX system, <c>0666</c> before the umask:
+    /// curl creates the jar with <c>fopen</c>.
+    /// </summary>
+    public const UnixFileMode JarCreateMode =
+        UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.OtherRead | UnixFileMode.OtherWrite;
+
     /// <summary>The stored cookies, oldest first; a replaced cookie keeps its place.</summary>
     private readonly List<Cookie> cookies = [];
+
+    /// <summary>The <c>-b</c> arguments that hold a <c>=</c>, in the order given.</summary>
+    private readonly List<string> cookieStrings = [];
 
     /// <summary>The stored cookies, oldest first. A cookie that replaced a namesake sits where the namesake was.</summary>
     public IReadOnlyList<Cookie> Cookies => cookies;
@@ -45,6 +58,10 @@ public sealed class CookieStore : ICookieStore
     /// <c>name=value</c>, separated by <c>; </c>. Writing stops at the first cookie that would make the
     /// value longer than <see cref="LongestCookieHeader"/> characters.
     /// </para>
+    /// <para>
+    /// The strings given to <see cref="AddCookieString"/> follow, verbatim, each after <c>; </c>, however
+    /// long they make the value; they are left out when a stored cookie was.
+    /// </para>
     /// </remarks>
     /// <exception cref="ArgumentNullException"><paramref name="uri"/> is <see langword="null"/>.</exception>
     public string? GetCookieHeader(Uri uri, bool secure, DateTimeOffset now)
@@ -56,7 +73,135 @@ public sealed class CookieStore : ICookieStore
         bool secureContext = secure || CookieOrigin.IsLoopback(host);
         string path = uri.AbsolutePath;
         IEnumerable<Cookie> sent = InSendingOrder(cookies.Where(cookie => IsSentTo(cookie, host, path, secureContext)).Take(MostCookiesSent));
-        return WriteHeader(sent);
+        StringBuilder header = new();
+        if (TryAppendCookies(header, sent) && cookieStrings.Count > 0)
+        {
+            header.Append(header.Length == 0 ? string.Empty : "; ").AppendJoin("; ", cookieStrings);
+        }
+
+        return header.Length == 0 ? null : header.ToString();
+    }
+
+    /// <summary>
+    /// Keeps a <c>-b</c> argument that holds a <c>=</c> (curl's <c>CURLOPT_COOKIE</c>): it is sent verbatim
+    /// at the end of every <c>Cookie</c> header, after the stored cookies, and is never stored or written to
+    /// the jar.
+    /// </summary>
+    /// <param name="cookieString">The argument as given, spaces and separators included.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="cookieString"/> is <see langword="null"/>.</exception>
+    public void AddCookieString(string cookieString)
+    {
+        ArgumentNullException.ThrowIfNull(cookieString);
+
+        cookieStrings.Add(cookieString);
+    }
+
+    /// <summary>Loads a Netscape cookie file (<c>-b</c> naming a file) as curl does.</summary>
+    /// <remarks>
+    /// Each cookie <see cref="NetscapeCookieFile.Read"/> accepts is stored in file order, replacing a
+    /// namesake in its place as a received cookie does, except that under <c>-j</c>
+    /// (<paramref name="discardSessionCookies"/>) a session cookie is skipped. Cookies that have expired by
+    /// <paramref name="now"/> are then removed.
+    /// </remarks>
+    /// <param name="reader">The file's text, one character per byte.</param>
+    /// <param name="discardSessionCookies"><see langword="true"/> for <c>-j</c> (<c>--junk-session-cookies</c>).</param>
+    /// <param name="now">The time that decides which loaded cookies have expired.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="reader"/> is <see langword="null"/>.</exception>
+    public void LoadCookieFile(TextReader reader, bool discardSessionCookies, DateTimeOffset now)
+    {
+        foreach (Cookie cookie in NetscapeCookieFile.Read(reader))
+        {
+            if (!discardSessionCookies || !cookie.IsSessionCookie)
+            {
+                Store(cookie);
+            }
+        }
+
+        RemoveExpired(now);
+    }
+
+    /// <summary>
+    /// Loads the cookie file at <paramref name="path"/> with <see cref="LoadCookieFile"/>, reading its bytes
+    /// as Latin-1. A file that cannot be opened loads nothing and is not an error, as in curl.
+    /// </summary>
+    /// <exception cref="ArgumentNullException"><paramref name="fileSystem"/> or <paramref name="path"/> is <see langword="null"/>.</exception>
+    public async Task LoadCookieFileAsync(IFileSystem fileSystem, string path, bool discardSessionCookies, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(fileSystem);
+        ArgumentNullException.ThrowIfNull(path);
+
+        FileOpenResult opened = await fileSystem.OpenForReadAsync(path, cancellationToken).ConfigureAwait(false);
+        if (!opened.IsOpen)
+        {
+            return;
+        }
+
+        string text;
+        using (StreamReader reader = new(opened.Content!, Encoding.Latin1, detectEncodingFromByteOrderMarks: false))
+        {
+            text = await reader.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        using StringReader textReader = new(text);
+        LoadCookieFile(textReader, discardSessionCookies, now);
+    }
+
+    /// <summary>Writes the <c>-c</c> jar as curl does: every cookie that has not expired by <paramref name="now"/>, newest first.</summary>
+    /// <remarks>
+    /// Expired cookies are removed first. A replaced cookie keeps the place of the one it replaced, so it is
+    /// written where that one would have been. The lines end with <paramref name="writer"/>'s
+    /// <see cref="TextWriter.NewLine"/>.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="writer"/> is <see langword="null"/>.</exception>
+    public void WriteCookieJar(TextWriter writer, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(writer);
+
+        RemoveExpired(now);
+        List<Cookie> newestFirst = [.. cookies];
+        newestFirst.Reverse();
+        NetscapeCookieFile.Write(writer, newestFirst);
+    }
+
+    /// <summary>
+    /// Writes the jar with <see cref="WriteCookieJar"/> to the file at <paramref name="path"/>, replacing it,
+    /// as Latin-1 with this platform's line ending (CR LF on Windows, LF elsewhere), as curl does.
+    /// </summary>
+    /// <remarks>
+    /// A jar that cannot be written is not an error: curl 8.21.0 prints nothing, even with <c>-v</c>, and
+    /// exits as the transfer did. The result tells the caller, which must stay silent too.
+    /// </remarks>
+    /// <returns><see langword="true"/> when the jar was written; <see langword="false"/> when the file could not be opened or written.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="fileSystem"/> or <paramref name="path"/> is <see langword="null"/>.</exception>
+    public async Task<bool> SaveCookieJarAsync(IFileSystem fileSystem, string path, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(fileSystem);
+        ArgumentNullException.ThrowIfNull(path);
+
+        using StringWriter jar = new(CultureInfo.InvariantCulture);
+        WriteCookieJar(jar, now);
+        byte[] bytes = Encoding.Latin1.GetBytes(jar.ToString());
+
+        FileOpenResult opened = await fileSystem.OpenForWriteAsync(path, FileWriteMode.Truncate, JarCreateMode, cancellationToken).ConfigureAwait(false);
+        if (!opened.IsOpen)
+        {
+            return false;
+        }
+
+        Stream content = opened.Content!;
+        await using (content.ConfigureAwait(false))
+        {
+            try
+            {
+                await content.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
+                await content.FlushAsync(cancellationToken).ConfigureAwait(false);
+                return true;
+            }
+            catch (IOException)
+            {
+                return false;
+            }
+        }
     }
 
     /// <summary>curl's tests in <c>Curl_cookie_getlist</c>: secure, domain and path.</summary>
@@ -170,21 +315,21 @@ public sealed class CookieStore : ICookieStore
         || (requestPath.StartsWith(cookiePath, StringComparison.Ordinal)
             && (requestPath.Length == cookiePath.Length || requestPath[cookiePath.Length] == '/'));
 
-    private static string? WriteHeader(IEnumerable<Cookie> sent)
+    /// <summary>Appends <c>name=value</c> pairs; <see langword="false"/> when one was left out to keep the value within <see cref="LongestCookieHeader"/>.</summary>
+    private static bool TryAppendCookies(StringBuilder header, IEnumerable<Cookie> sent)
     {
-        StringBuilder header = new();
         foreach (Cookie cookie in sent)
         {
             string separator = header.Length == 0 ? string.Empty : "; ";
             if (header.Length + separator.Length + cookie.Name.Length + 1 + cookie.Value.Length > LongestCookieHeader)
             {
-                break;
+                return false;
             }
 
             header.Append(separator).Append(cookie.Name).Append('=').Append(cookie.Value);
         }
 
-        return header.Length == 0 ? null : header.ToString();
+        return true;
     }
 
     /// <summary>Compares two cookies by curl's <c>cookie_sort</c> keys, leaving ties to a stable sort.</summary>

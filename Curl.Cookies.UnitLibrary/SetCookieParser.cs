@@ -35,10 +35,6 @@ public static class SetCookieParser
     /// <summary>curl's expiry for a cookie that arrived already expired.</summary>
     private const long AlreadyExpired = 1;
 
-    private const string SecurePrefix = "__Secure-";
-
-    private const string HostPrefix = "__Host-";
-
     /// <summary>Reads <paramref name="headerValue"/>, received in answer to <paramref name="requestUri"/>, as curl does.</summary>
     /// <remarks>
     /// <para>
@@ -88,7 +84,7 @@ public static class SetCookieParser
         ArgumentNullException.ThrowIfNull(headerValue);
         ArgumentNullException.ThrowIfNull(requestUri);
 
-        if (headerValue.Length > LongestHeaderValue || headerValue.Any(IsRefusedControlCharacter))
+        if (headerValue.Length > LongestHeaderValue || CookieFieldRules.ContainsRefusedControlCharacter(headerValue))
         {
             return null;
         }
@@ -96,8 +92,6 @@ public static class SetCookieParser
         CookieUnderConstruction cookie = new(requestUri, now.ToUnixTimeSeconds());
         return TryReadParts(headerValue, cookie) ? cookie.Finish() : null;
     }
-
-    private static bool IsRefusedControlCharacter(char character) => (character < ' ' && character != '\t') || character == '\x7F';
 
     /// <summary>Reads every part in turn; <see langword="false"/> as soon as one refuses the cookie.</summary>
     private static bool TryReadParts(string text, CookieUnderConstruction cookie)
@@ -219,7 +213,7 @@ public static class SetCookieParser
             switch (attribute)
             {
                 case "path":
-                    path = SanitizePath(attributeValue);
+                    path = CookieFieldRules.SanitizePath(attributeValue);
                     return true;
                 case "domain":
                     return TrySetDomain(attributeValue);
@@ -232,24 +226,6 @@ public static class SetCookieParser
                 default:
                     return true;
             }
-        }
-
-        /// <summary>curl's <c>sanitize_cookie_path</c>, as measured.</summary>
-        private static string SanitizePath(string attributeValue)
-        {
-            string sanitized = attributeValue;
-            if (sanitized.StartsWith('"'))
-            {
-                sanitized = sanitized[1..];
-                sanitized = sanitized.EndsWith('"') ? sanitized[..^1] : sanitized;
-            }
-
-            if (!sanitized.StartsWith('/'))
-            {
-                return "/";
-            }
-
-            return sanitized.Length > 1 && sanitized.EndsWith('/') ? sanitized[..^1] : sanitized;
         }
 
         private bool TrySetDomain(string attributeValue)
@@ -293,7 +269,7 @@ public static class SetCookieParser
         public Cookie? Finish()
         {
             string finalPath = path ?? DefaultPath(requestUri.AbsolutePath);
-            if (!HasValidPrefix(finalPath))
+            if (!CookieFieldRules.SatisfiesNamePrefix(name, isSecure, finalPath, includesSubdomains))
             {
                 return null;
             }
@@ -306,16 +282,6 @@ public static class SetCookieParser
         {
             int lastSlash = requestPath.LastIndexOf('/');
             return lastSlash > 0 ? requestPath[..lastSlash] : "/";
-        }
-
-        private bool HasValidPrefix(string finalPath)
-        {
-            if (name.StartsWith(SecurePrefix, StringComparison.Ordinal))
-            {
-                return isSecure;
-            }
-
-            return !name.StartsWith(HostPrefix, StringComparison.Ordinal) || (isSecure && finalPath == "/" && !includesSubdomains);
         }
 
         /// <summary>curl's <c>cap_expires</c>: no cookie outlives 400 days from now, rounded down to the minute.</summary>
