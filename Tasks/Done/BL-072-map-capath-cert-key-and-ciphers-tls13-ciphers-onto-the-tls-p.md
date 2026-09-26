@@ -63,7 +63,7 @@ provider reports for them on standard error, as the TLS decisions require.
   lines curl prints at 79 columns (through a pipe, the case scripts see). The runner
   writes them through `WarningLineWrapper` unchanged. On a wider terminal curl prints one
   line; fixing that needs `Curl.Networking.UnitLibrary`, outside `touches`, so it is filed
-  as BL-269.
+  as BL-272.
 
 ## Log
 

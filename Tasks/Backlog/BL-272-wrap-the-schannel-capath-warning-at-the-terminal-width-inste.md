@@ -1,5 +1,5 @@
 ---
-id: BL-269
+id: BL-272
 title: Wrap the Schannel --capath warning at the terminal width instead of pre-wrapped at 79
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-269 — Wrap the Schannel --capath warning at the terminal width instead of pre-wrapped at 79
+# BL-272 — Wrap the Schannel --capath warning at the terminal width instead of pre-wrapped at 79
 
 ## Goal
 
