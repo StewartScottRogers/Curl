@@ -31,6 +31,7 @@ completed:
 ## Notes
 
 - Plan item: W8 in the Phase 1 HTTP plan (2026-09-26); plan keys in this file were replaced by their task IDs.
+- From BL-216 (ADR-0022): construct the authenticator as `new BasicAndBearerAuthenticator(CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()))`.
 
 ## Log
 

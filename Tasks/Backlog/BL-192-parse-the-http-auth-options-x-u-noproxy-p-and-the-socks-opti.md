@@ -30,6 +30,7 @@ completed:
 ## Notes
 
 - Plan item: C6 in the Phase 1 HTTP plan (2026-09-26); plan keys in this file were replaced by their task IDs.
+- From BL-216 (ADR-0022): `--oauth2-bearer` sets the wanted schemes from nothing, as curl's tool does, so with no other scheme option it must give `AuthSchemes = Bearer`, not `Basic | Bearer`; measured `-u u:p --oauth2-bearer tok` sends `Bearer tok`, and `--oauth2-bearer tok --anyauth` sends nothing until challenged.
 
 ## Log
 
