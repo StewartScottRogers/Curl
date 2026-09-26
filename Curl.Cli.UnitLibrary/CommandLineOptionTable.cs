@@ -29,7 +29,7 @@ namespace Curl.Cli;
 /// <para>
 /// <c>--no-</c> negation, measured with the local curl 8.21.0 on 2026-09-26
 /// (<c>curl &lt;arguments&gt; http://127.0.0.1:1/</c>, reading standard error and the exit code):
-/// <c>--no-silent</c>, <c>--no-show-error</c>, <c>--no-insecure</c>, <c>--no-tftp-no-options</c>,
+/// <c>--no-silent</c>, <c>--no-show-error</c>, <c>--no-insecure</c>, <c>--no-tftp-no-options</c>, <c>--no-remote-time</c>,
 /// <c>--no-progress-meter</c> and <c>--no-progress-bar</c> are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
 /// silent and <c>--no-silent -s</c> is. <c>--no-silent=x</c> is accepted, its value ignored.
 /// <c>--no-tlsv1.2</c>, <c>--no-tlsv1.3</c>, <c>--no-url</c>, <c>--no-output</c> (even as the last
@@ -70,6 +70,7 @@ public static class CommandLineOptionTable
         CommandLineOption.Value("max-filesize", null, SetMaxFileSize),
         CommandLineOption.Value("connect-timeout", null, SetConnectTimeout),
         CommandLineOption.Value("max-time", 'm', SetMaxTime),
+        CommandLineOption.NegatableFlag("remote-time", 'R', (options, on) => options.RemoteTime = on),
     ];
 
     /// <summary>The largest <c>--create-file-mode</c> curl 8.21.0 accepts: octal <c>0777</c>.</summary>

@@ -169,6 +169,12 @@ public sealed class CommandLineOptions
     public TimeSpan? MaxTime { get; internal set; }
 
     /// <summary>
+    /// <see langword="true"/> when <c>-R</c> / <c>--remote-time</c> was given and no
+    /// <c>--no-remote-time</c> came after it: give the output file the remote file's time.
+    /// </summary>
+    public bool RemoteTime { get; internal set; }
+
+    /// <summary>
     /// <see langword="true"/> when <c>-s</c> / <c>--silent</c> has been read and <c>-S</c> /
     /// <c>--show-error</c> has not, so far: curl then hides error messages.
     /// </summary>
