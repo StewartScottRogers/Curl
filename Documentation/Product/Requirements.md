@@ -1,9 +1,9 @@
 # Requirements
 
 > **TODO** — functional requirements are authored for the `file://`, `dict://`,
-> `gopher://`/`gophers://`, `telnet://`, `tftp://` and `mqtt://`/`mqtts://` schemes
-> (2026-09-26). The other Phase 1 option groups — HTTP, the command-line layer, and
-> output formatting — are not yet.
+> `gopher://`/`gophers://`, `telnet://`, `tftp://` and `mqtt://`/`mqtts://` schemes,
+> and for the command line's refusals (2026-09-26). The other Phase 1 option groups —
+> HTTP, the rest of the command-line layer, and output formatting — are not yet.
 
 Each requirement gets a stable identifier so planning, commits and tests can cite
 it. Identifiers are never reused or renumbered, even after a requirement is
@@ -132,6 +132,28 @@ today. The handler will live in `Curl.Protocol.Mqtt.UnitLibrary`.
 | FR-043 | A CONNACK with a non-zero return code is exit 8 (`CURLE_WEIRD_SERVER_REPLY`); return code 5 gives `Expected 0000 but got 0005`. Not yet implemented. | [exit codes](https://curl.se/libcurl/c/libcurl-errors.html) | Must | Draft | curl 8.21.0 |
 | FR-044 | An empty topic is exit 3 (`CURLE_URL_MALFORMAT`), `No MQTT topic found. Forgot to URL encode it?`, reported after the CONNECT is sent. Not yet implemented. | [exit codes](https://curl.se/libcurl/c/libcurl-errors.html) | Should | Draft | curl 8.21.0 |
 | FR-045 | Publishing uses QoS 0 only, and the retain flag cannot be set. Not yet implemented. | [MQTT](https://curl.se/docs/mqtt.html) | Could | Draft | curl 8.21.0 |
+
+### The command line
+
+Every requirement below was checked against curl 8.21.0 (2026-06-24) on 2026-09-26, by
+running the local curl binary with each command line and recording its standard error
+and exit code, and against the manpage and `libcurl-errors` on
+[curl.se](https://curl.se). Each refusal writes exactly two lines to standard error and
+nothing to standard output, and exits 2 (`CURLE_FAILED_INIT`); `<spelled>` is the whole
+argument as typed. `CommandLineParser` and `CommandLineRefusal` in
+`Curl.Cli.UnitLibrary` implement these rows, and `Curl.Cli.UnitTests` asserts the exact
+lines; `Curl.Console` does not call the parser yet, so the executable does not refuse
+anything this way today. How the parser reads a command line is in
+`Documentation/Wiki/Command-Line-Parsing.md`.
+
+| ID | Requirement | Upstream reference | Priority | Status | Checked against |
+| --- | --- | --- | --- | --- | --- |
+| FR-046 | An option whose long name (matched exactly and case-sensitively, with no prefix matching) or short letter curl does not know, or a lone `-`, is refused with `curl: option <spelled>: is unknown` then `curl: try 'curl --help' or 'curl --manual' for more information`, exit 2 (`CURLE_FAILED_INIT`); `--bogus=x` and a bundle such as `-s!x` are named whole. Accepting a `--no-` spelling of a negatable option (`--no-silent` is refused as unknown today) is an open gap (task BL-054). | [manpage](https://curl.se/docs/manpage.html); [exit codes](https://curl.se/libcurl/c/libcurl-errors.html) | Must | Draft | curl 8.21.0 |
+| FR-047 | An option that takes a value but is the last argument, with no attached value, is refused with `curl: option <spelled>: requires parameter` then `curl: try 'curl --help' or 'curl --manual' for more information`, exit 2 (`CURLE_FAILED_INIT`); a bundle is named whole (`-so` gives `curl: option -so: requires parameter`). | [manpage](https://curl.se/docs/manpage.html); [exit codes](https://curl.se/libcurl/c/libcurl-errors.html) | Must | Draft | curl 8.21.0 |
+| FR-048 | An empty value for a text option (`-o`/`--output`, `--url`), attached or separate, is refused with `curl: option <spelled>: blank argument where content is expected` then `curl: try 'curl --help' or 'curl --manual' for more information`, exit 2 (`CURLE_FAILED_INIT`); an empty positional argument gives the same reason with nothing spelled, `curl: option : blank argument where content is expected`. `-d`/`--data`, `-u`/`--user` and `-t`/`--telnet-option` accept an empty value, and a numeric option refuses it as `expected a proper numerical parameter` (FR-049, FR-014). | [manpage](https://curl.se/docs/manpage.html); [exit codes](https://curl.se/libcurl/c/libcurl-errors.html) | Must | Draft | curl 8.21.0 |
+| FR-049 | A decimal numeric option value (`--tftp-blksize`) that is not an optional `-` followed by ASCII digits only (empty, whitespace, `+`, hexadecimal, fractions, trailing text) is refused with `curl: option <spelled>: expected a proper numerical parameter` then `curl: try 'curl --help' or 'curl --manual' for more information`, exit 2 (`CURLE_FAILED_INIT`); for example `--tftp-blksize abc`. `--tftp-blksize 99999999999` is refused the same way; which ceiling Curl should apply is an open decision (task BL-053). | [manpage](https://curl.se/docs/manpage.html); [exit codes](https://curl.se/libcurl/c/libcurl-errors.html) | Must | Draft | curl 8.21.0 |
+| FR-050 | A negative decimal numeric option value is refused with `curl: option <spelled>: expected a positive numerical parameter` then `curl: try 'curl --help' or 'curl --manual' for more information`, exit 2 (`CURLE_FAILED_INIT`); for example `--tftp-blksize -1`. `-0` is accepted as zero. | [manpage](https://curl.se/docs/manpage.html); [exit codes](https://curl.se/libcurl/c/libcurl-errors.html) | Must | Draft | curl 8.21.0 |
+| FR-051 | A non-empty command line read without any other refusal that names no URL (`-s`, `--`, `-o file`) is refused with `curl: (2) no URL specified` then `curl: try 'curl --help' or 'curl --manual' for more information`, exit 2 (`CURLE_FAILED_INIT`). A refusal met while reading the arguments wins over it. A command line with no arguments at all prints only the second line, exit 2; matching that is an open gap (task BL-082), and today it is accepted. | [manpage](https://curl.se/docs/manpage.html); [exit codes](https://curl.se/libcurl/c/libcurl-errors.html) | Must | Draft | curl 8.21.0 |
 
 Priorities use MoSCoW (Must / Should / Could / Won't). "Must" means the release is
 not shippable without it — if everything is a Must, nothing is.
