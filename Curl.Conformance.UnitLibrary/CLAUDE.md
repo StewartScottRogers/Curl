@@ -26,6 +26,21 @@ variables with no value and instructions it does not carry out (`%days`, `%inclu
 left as written so the case can be skipped with a reason; `Parse()` hands it to the parser.
 It works on bytes, not on a parsed case, because a `%if` block can wrap whole parts.
 
+`SwsHttpServerConnector` is the first in-memory test server: an `IConnector` whose
+connections emulate upstream's `sws` (`tests/server/sws.c` at `curl-8_21_0`) for one parsed,
+expanded case. `SwsHttpRequestFraming` finds where each request ends (headers, then a body
+by chunked encoding or `Content-Length`, as sws reads them); `SwsHttpReplySelector` answers
+it with `<data>`, or `<dataN>` when the path's last segment is a number over 10000 whose last
+four digits are N (`SwsHttpRequestLine`), decoding `base64` and applying `nonewline` as sws's
+`getpart` does, or with sws's 404 document for a malformed first line. The connection stays
+open until a reply containing `swsclose`, an empty or missing part, or `swsclose` in
+`<servercmd>`. `ReceivedBytes` records every byte the client wrote while the server had the
+connection open, across connections, for comparison with `<verify><protocol>`.
+`SwsServerCommands` reads `<servercmd>`; every other command sws knows is listed by name in
+`UnsupportedServerCommands` so the case can be skipped with a reason (BL-259, BL-260), and
+sws's part-number rules for authentication, `swsbounce` and `CONNECT` are not emulated yet
+(BL-261). A read with no reply waiting returns 0, because in memory nothing else can arrive.
+
 What it is to hold in full, per ADR-0013 decision 2:
 
 - the test-file parser, variable substitution (`%HOSTIP`, `%TESTNUMBER`, `%LOGDIR`, ...)
