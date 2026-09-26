@@ -83,6 +83,7 @@ public sealed class CurlCommandRunnerStandardOutputFailureTests
         new CurlCommandRunner(
             _ => new ProtocolDispatcher(handlers),
             new InMemoryFileSystem(),
+            new InMemoryFileSystem(),
             closedStandardOutput,
             standardError,
             new MemoryStream(),

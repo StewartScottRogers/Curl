@@ -87,6 +87,7 @@ public sealed class CurlCommandRunnerOutputFileNameTests
         new CurlCommandRunner(
             _ => new ProtocolDispatcher([fileHandler]),
             files,
+            files,
             new MemoryStream(),
             standardError,
             new MemoryStream(),

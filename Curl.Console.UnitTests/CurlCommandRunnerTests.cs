@@ -132,6 +132,7 @@ public sealed class CurlCommandRunnerTests
         CurlCommandRunner runner = new(
             _ => new ProtocolDispatcher([new FileProtocolHandler(files)]),
             files,
+            files,
             standardOutput,
             standardError,
             standardInput,
@@ -163,6 +164,7 @@ public sealed class CurlCommandRunnerTests
         files.UnwritablePaths.Add("C:/Windows/System32/bl087.txt");
         CurlCommandRunner runner = new(
             _ => new ProtocolDispatcher([new FileProtocolHandler(files)]),
+            files,
             files,
             standardOutput,
             standardError,
@@ -500,6 +502,7 @@ public sealed class CurlCommandRunnerTests
                 return new ProtocolDispatcher([]);
             },
             fileSystem,
+            fileSystem,
             standardOutput,
             standardError,
             standardInput,
@@ -553,14 +556,14 @@ public sealed class CurlCommandRunnerTests
     }
 
     private Task<int> RunAsync(IReadOnlyList<string> arguments, params IProtocolHandler[] handlers) =>
-        new CurlCommandRunner(_ => new ProtocolDispatcher(handlers), fileSystem, standardOutput, standardError, standardInput, runsOnWindows: false)
+        new CurlCommandRunner(_ => new ProtocolDispatcher(handlers), fileSystem, fileSystem, standardOutput, standardError, standardInput, runsOnWindows: false)
             .RunAsync(arguments);
 
     private Task<int> RunWithStandardOutputAsync(
         Stream output,
         IReadOnlyList<string> arguments,
         params IProtocolHandler[] handlers) =>
-        new CurlCommandRunner(_ => new ProtocolDispatcher(handlers), fileSystem, output, standardError, standardInput, runsOnWindows: false)
+        new CurlCommandRunner(_ => new ProtocolDispatcher(handlers), fileSystem, fileSystem, output, standardError, standardInput, runsOnWindows: false)
             .RunAsync(arguments);
 
     private Task<int> RunToUncreatableOutputFileAsync(params string[] options)
@@ -569,6 +572,7 @@ public sealed class CurlCommandRunnerTests
         files.UnwritablePaths.Add("Z:/nonexist/x");
         CurlCommandRunner runner = new(
             _ => new ProtocolDispatcher([new FileProtocolHandler(files)]),
+            files,
             files,
             standardOutput,
             standardError,

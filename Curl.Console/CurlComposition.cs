@@ -92,6 +92,7 @@ internal static class CurlComposition
         new(
             options => CreateDispatcher(CreateTransports(options)),
             new PhysicalFileSystem(),
+            new PhysicalFileSystem(),
             standardOutput,
             standardError,
             standardInput,
@@ -119,6 +120,7 @@ internal static class CurlComposition
         IDatagramConnector datagramConnector) =>
         new(
             _ => new ProtocolDispatcher(CreateProtocolHandlers(connector, datagramConnector)),
+            new PhysicalFileSystem(),
             new PhysicalFileSystem(),
             standardOutput,
             standardError,

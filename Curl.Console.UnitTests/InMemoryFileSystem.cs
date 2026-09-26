@@ -1,3 +1,4 @@
+using Curl.Core.FileSystem;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Console;
@@ -8,8 +9,10 @@ namespace Curl.Console;
 /// <see cref="UnreadablePaths" />; writes land in <see cref="Written" />, appending to the
 /// path's <see cref="ExistingContent" /> under <see cref="FileWriteMode.Append" />, and a path
 /// in <see cref="UnwritablePaths" /> fails to open for writing with <see cref="UnwritableStatus" />.
+/// Each last-write time set is recorded in <see cref="LastWriteTimesSet" />, with whether the
+/// path's written stream was still open at the time.
 /// </summary>
-internal sealed class InMemoryFileSystem : IFileSystem
+internal sealed class InMemoryFileSystem : IFileSystem, IFileTimeSetter
 {
     public byte[] ReadContent { get; init; } = [];
 
@@ -26,6 +29,8 @@ internal sealed class InMemoryFileSystem : IFileSystem
     public List<UnixFileMode> CreateModes { get; } = [];
 
     public List<FileWriteMode> WriteModes { get; } = [];
+
+    public List<(string Path, DateTimeOffset LastWriteTimeUtc, bool WhileOpen)> LastWriteTimesSet { get; } = [];
 
     public ValueTask<FileOpenResult> OpenForReadAsync(string path, CancellationToken cancellationToken)
     {
@@ -62,5 +67,13 @@ internal sealed class InMemoryFileSystem : IFileSystem
         Written[path] = stream;
 
         return ValueTask.FromResult(FileOpenResult.Opened(stream, 0, null));
+    }
+
+    public bool TrySetLastWriteTimeUtc(string path, DateTimeOffset lastWriteTimeUtc)
+    {
+        bool whileOpen = Written.TryGetValue(path, out MemoryStream? stream) && stream.CanWrite;
+        LastWriteTimesSet.Add((path, lastWriteTimeUtc, whileOpen));
+
+        return true;
     }
 }

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using Curl.Cli;
 using Curl.Core;
+using Curl.Core.FileSystem;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Console;
@@ -18,6 +19,10 @@ namespace Curl.Console;
 /// line. It takes the options because the network handlers' TLS settings come from them.
 /// </param>
 /// <param name="outputFileSystem">Opens the <c>-o</c> / <c>--output</c> files.</param>
+/// <param name="outputFileTimeSetter">
+/// Stamps an <c>-o</c> file with the source's modification time under <c>-R</c> /
+/// <c>--remote-time</c>.
+/// </param>
 /// <param name="standardOutput">
 /// The raw standard output stream; a URL with no matching <c>-o</c> writes its bytes here,
 /// unencoded.
@@ -87,10 +92,17 @@ namespace Curl.Console;
 /// The meter is on standard error and the body is not, so writing it after the transfer
 /// leaves the bytes of each stream as curl's.
 /// </para>
+/// <para>
+/// Under <c>-R</c> a successful transfer to an <c>-o</c> file whose result carries
+/// <see cref="TransferResult.SourceLastWriteTimeUtc" /> sets the file's last-write time to it,
+/// after the file is closed. As in curl 8.21.0 the time is applied even when the transfer
+/// wrote no body, as for an unmet <c>-z</c>. A transfer to standard output has no file to stamp.
+/// </para>
 /// </remarks>
 internal sealed class CurlCommandRunner(
     Func<CommandLineOptions, ProtocolDispatcher> createDispatcher,
     IFileSystem outputFileSystem,
+    IFileTimeSetter outputFileTimeSetter,
     Stream standardOutput,
     Stream standardError,
     Stream standardInput,
@@ -500,9 +512,44 @@ internal sealed class CurlCommandRunner(
     /// <returns>
     /// The transfer's result. A transfer that resumes past byte zero opens the file for
     /// appending before it starts, as curl 8.21.0 does; when that open fails the result is
-    /// <see cref="ReportCannotOpenForResumeAsync" />'s, and nothing is transferred.
+    /// <see cref="ReportCannotOpenForResumeAsync" />'s, and nothing is transferred. Under
+    /// <c>-R</c> a success then stamps the closed file with the source's time.
     /// </returns>
     private async Task<TransferResult> TransferToOutputFileAsync(
+        ProtocolDispatcher dispatcher,
+        CommandLineOptions options,
+        Uri uri,
+        string outputFile,
+        ByteRange? range,
+        long? resumeFrom,
+        Stream? headerOutput)
+    {
+        TransferResult completed = await TransferIntoOutputFileAsync(
+                dispatcher, options, uri, outputFile, range, resumeFrom, headerOutput)
+            .ConfigureAwait(false);
+
+        if (options.RemoteTime && completed.IsSuccess && completed.SourceLastWriteTimeUtc is { } sourceLastWriteTimeUtc)
+        {
+            // curl 8.21.0 prints a warning when the time cannot be set; that line is not
+            // modelled yet, so a failure is ignored.
+            _ = outputFileTimeSetter.TrySetLastWriteTimeUtc(outputFile, sourceLastWriteTimeUtc);
+        }
+
+        return completed;
+    }
+
+    /// <summary>
+    /// Performs one transfer into <paramref name="outputFile" /> and closes the file.
+    /// </summary>
+    /// <param name="dispatcher">Performs the transfer with the handler for its scheme.</param>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="uri">The URL.</param>
+    /// <param name="outputFile">The file: the <c>-o</c> value, after <see cref="WindowsOutputFileNameSanitizer" /> on Windows.</param>
+    /// <param name="range">The parsed <c>-r</c> range, or <see langword="null" />.</param>
+    /// <param name="resumeFrom">The resolved <c>-C</c> offset, or <see langword="null" />.</param>
+    /// <param name="headerOutput">Where the <c>-D</c> header lines go, or <see langword="null" /> without <c>-D</c>.</param>
+    /// <returns>The transfer's result, as <see cref="TransferToOutputFileAsync" /> describes it.</returns>
+    private async Task<TransferResult> TransferIntoOutputFileAsync(
         ProtocolDispatcher dispatcher,
         CommandLineOptions options,
         Uri uri,

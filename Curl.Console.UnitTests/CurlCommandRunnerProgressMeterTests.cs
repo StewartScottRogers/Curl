@@ -151,6 +151,7 @@ public sealed class CurlCommandRunnerProgressMeterTests
         await new CurlCommandRunner(
                 _ => new ProtocolDispatcher([fileHandler]),
                 outputFiles,
+                outputFiles,
                 standardOutput,
                 standardError,
                 new MemoryStream(),
@@ -166,6 +167,7 @@ public sealed class CurlCommandRunnerProgressMeterTests
         IProtocolHandler? handler = null) =>
         new CurlCommandRunner(
                 _ => new ProtocolDispatcher([handler ?? fileHandler]),
+                outputFiles,
                 outputFiles,
                 standardOutput,
                 standardError,
