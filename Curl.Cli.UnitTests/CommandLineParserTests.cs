@@ -18,7 +18,7 @@ public sealed class CommandLineParserTests
     [TestMethod]
     public void Parse_BundledSilentAndShowError_SetsBothFlags()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-sS"]);
+        CommandLineParseResult result = CommandLineParser.Parse(["-sS", "http://example.com/"]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.IsTrue(result.Options.Silent);
@@ -28,7 +28,7 @@ public sealed class CommandLineParserTests
     [TestMethod]
     public void Parse_SeparateLongFlags_SetsBothFlags()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--silent", "--show-error"]);
+        CommandLineParseResult result = CommandLineParser.Parse(["--silent", "--show-error", "http://example.com/"]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.IsTrue(result.Options.Silent);
@@ -38,7 +38,7 @@ public sealed class CommandLineParserTests
     [TestMethod]
     public void Parse_AttachedShortValue_SetsOutputFile()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-ofile"]);
+        CommandLineParseResult result = CommandLineParser.Parse(["-ofile", "http://example.com/"]);
 
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { "file" }, result.Options.OutputFiles.ToArray());
@@ -47,27 +47,27 @@ public sealed class CommandLineParserTests
     [TestMethod]
     public void Parse_SeparateShortValue_SetsOutputFile()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-o", "file"]);
+        CommandLineParseResult result = CommandLineParser.Parse(["-o", "file", "http://example.com/"]);
 
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { "file" }, result.Options.OutputFiles.ToArray());
-        Assert.IsEmpty(result.Options.Urls);
+        CollectionAssert.AreEqual(new[] { "http://example.com/" }, result.Options.Urls.ToArray());
     }
 
     [TestMethod]
     public void Parse_SeparateLongValue_SetsOutputFile()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--output", "file"]);
+        CommandLineParseResult result = CommandLineParser.Parse(["--output", "file", "http://example.com/"]);
 
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { "file" }, result.Options.OutputFiles.ToArray());
-        Assert.IsEmpty(result.Options.Urls);
+        CollectionAssert.AreEqual(new[] { "http://example.com/" }, result.Options.Urls.ToArray());
     }
 
     [TestMethod]
     public void Parse_LongValueAfterEquals_SetsOutputFile()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--output=file"]);
+        CommandLineParseResult result = CommandLineParser.Parse(["--output=file", "http://example.com/"]);
 
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { "file" }, result.Options.OutputFiles.ToArray());
@@ -76,7 +76,7 @@ public sealed class CommandLineParserTests
     [TestMethod]
     public void Parse_FlagThenValueInBundle_TakesRestOfBundle()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-sofile"]);
+        CommandLineParseResult result = CommandLineParser.Parse(["-sofile", "http://example.com/"]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.IsTrue(result.Options.Silent);
@@ -86,7 +86,7 @@ public sealed class CommandLineParserTests
     [TestMethod]
     public void Parse_ValueThenFlagLetterInBundle_TakesLetterAsValue()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-os"]);
+        CommandLineParseResult result = CommandLineParser.Parse(["-os", "http://example.com/"]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.IsFalse(result.Options.Silent);
@@ -96,7 +96,7 @@ public sealed class CommandLineParserTests
     [TestMethod]
     public void Parse_ValueLooksLikeOption_TakesItAsValue()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-o", "-s"]);
+        CommandLineParseResult result = CommandLineParser.Parse(["-o", "-s", "http://example.com/"]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.IsFalse(result.Options.Silent);
@@ -124,7 +124,7 @@ public sealed class CommandLineParserTests
     [TestMethod]
     public void Parse_RepeatedOutput_CollectsInOrder()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-o", "f", "-o", "g"]);
+        CommandLineParseResult result = CommandLineParser.Parse(["-o", "f", "-o", "g", "http://example.com/"]);
 
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { "f", "g" }, result.Options.OutputFiles.ToArray());
@@ -157,11 +157,11 @@ public sealed class CommandLineParserTests
     [TestMethod]
     public void Parse_FlagWithAttachedValue_IgnoresValue()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--silent=x"]);
+        CommandLineParseResult result = CommandLineParser.Parse(["--silent=x", "http://example.com/"]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.IsTrue(result.Options.Silent);
-        Assert.IsEmpty(result.Options.Urls);
+        CollectionAssert.AreEqual(new[] { "http://example.com/" }, result.Options.Urls.ToArray());
     }
 
     // ---- refusals -----------------------------------------------------------------
@@ -327,6 +327,35 @@ public sealed class CommandLineParserTests
         CommandLineParseResult result = CommandLineParser.Parse(["-sS", "--bogus", "-o"]);
 
         AssertRefused(result, "curl: option --bogus: is unknown");
+    }
+
+    [TestMethod]
+    [DataRow(new[] { "-s" })]
+    [DataRow(new[] { "--" })]
+    [DataRow(new[] { "-o", "file" })]
+    public void Parse_ArgumentsButNoUrl_RefusesAsNoUrlSpecified(string[] arguments)
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+
+        AssertRefused(result, "curl: (2) no URL specified");
+    }
+
+    [TestMethod]
+    public void Parse_UnknownOptionAndNoUrl_RefusesAsUnknownNotAsNoUrl()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--bogus"]);
+
+        AssertRefused(result, "curl: option --bogus: is unknown");
+    }
+
+    [TestMethod]
+    public void Parse_FlagAndUrl_IsAccepted()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["-s", "http://example.com/"]);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsTrue(result.Options.Silent);
+        CollectionAssert.AreEqual(new[] { "http://example.com/" }, result.Options.Urls.ToArray());
     }
 
     private static void AssertRefused(CommandLineParseResult result, string expectedFirstLine)

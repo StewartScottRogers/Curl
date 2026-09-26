@@ -4,7 +4,8 @@ namespace Curl.Cli;
 
 /// <summary>
 /// Why the command line was refused: the two lines curl prints on standard error,
-/// <c>curl: option &lt;spelled&gt;: &lt;reason&gt;</c> followed by <see cref="TryHelpLine"/>,
+/// <c>curl: option &lt;spelled&gt;: &lt;reason&gt;</c> (or, for <see cref="NoUrlSpecified"/>,
+/// <c>curl: (2) no URL specified</c>) followed by <see cref="TryHelpLine"/>,
 /// and the exit code, which is always <see cref="CurlExitCode.FailedInit"/> (curl's
 /// <c>CURLE_FAILED_INIT</c>, exit 2; see <see href="https://curl.se/libcurl/c/libcurl-errors.html"/>).
 /// It writes nothing itself; the console layer writes the lines and chooses the newline.
@@ -17,9 +18,9 @@ public sealed class CommandLineRefusal
     /// <summary>The second line of every refusal, exactly as curl prints it.</summary>
     public const string TryHelpLine = "curl: try 'curl --help' or 'curl --manual' for more information";
 
-    private CommandLineRefusal(string spelledOption, string reason)
+    private CommandLineRefusal(string firstLine)
     {
-        StandardErrorLines = [$"curl: option {spelledOption}: {reason}", TryHelpLine];
+        StandardErrorLines = [firstLine, TryHelpLine];
     }
 
     /// <summary>The exit code curl returns for a refused command line: <see cref="CurlExitCode.FailedInit"/>.</summary>
@@ -70,10 +71,15 @@ public sealed class CommandLineRefusal
     public static CommandLineRefusal TooLargeNumber(string spelledOption) =>
         Create(spelledOption, "too large number");
 
+    /// <summary>Refuses a command line that has arguments but names no URL.</summary>
+    /// <returns>A refusal whose first line is <c>curl: (2) no URL specified</c>.</returns>
+    public static CommandLineRefusal NoUrlSpecified() =>
+        new("curl: (2) no URL specified");
+
     private static CommandLineRefusal Create(string spelledOption, string reason)
     {
         ArgumentNullException.ThrowIfNull(spelledOption);
 
-        return new CommandLineRefusal(spelledOption, reason);
+        return new CommandLineRefusal($"curl: option {spelledOption}: {reason}");
     }
 }

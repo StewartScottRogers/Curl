@@ -25,7 +25,7 @@ public sealed class CommandLineCreateFileModeTests
     [DataRow("0", UnixFileMode.None)]
     public void Parse_OctalCreateFileMode_RecordsTheMode(string value, UnixFileMode expected)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--create-file-mode", value]);
+        CommandLineParseResult result = CommandLineParser.Parse(["--create-file-mode", value, "http://example.com/"]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expected, result.Options.CreateFileMode);
@@ -34,7 +34,7 @@ public sealed class CommandLineCreateFileModeTests
     [TestMethod]
     public void Parse_CreateFileModeWithEquals_RecordsTheMode()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--create-file-mode=0640"]);
+        CommandLineParseResult result = CommandLineParser.Parse(["--create-file-mode=0640", "http://example.com/"]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual((UnixFileMode)0b110_100_000, result.Options.CreateFileMode);
@@ -43,7 +43,7 @@ public sealed class CommandLineCreateFileModeTests
     [TestMethod]
     public void Parse_CreateFileModeTwice_KeepsTheLast()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--create-file-mode", "0600", "--create-file-mode", "0644"]);
+        CommandLineParseResult result = CommandLineParser.Parse(["--create-file-mode", "0600", "--create-file-mode", "0644", "http://example.com/"]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual((UnixFileMode)0b110_100_100, result.Options.CreateFileMode);

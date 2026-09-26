@@ -8,7 +8,9 @@ namespace Curl.Cli;
 /// option parsing; every other argument is a URL. An empty URL argument is refused as
 /// blank; an option's value, empty or not, is handed unchanged to the row's
 /// <see cref="CommandLineOption.Apply"/>, which decides whether to refuse it. Parsing stops
-/// at the first refusal.
+/// at the first refusal. A command line that is read without refusal but names no URL is
+/// refused with <see cref="CommandLineRefusal.NoUrlSpecified"/>; an empty command line is
+/// accepted, because curl answers it differently.
 /// </summary>
 /// <remarks>
 /// It does not implement <c>--no-</c> negation (<c>--no-silent</c> is refused as unknown),
@@ -44,7 +46,9 @@ public static class CommandLineParser
             }
         }
 
-        return CommandLineParseResult.Accepted(options);
+        return options.Urls.Count == 0 && arguments.Count > 0
+            ? CommandLineParseResult.Refused(CommandLineRefusal.NoUrlSpecified())
+            : CommandLineParseResult.Accepted(options);
     }
 
     private static CommandLineRefusal? ParseArgument(CommandLineOptions options, string argument, ArgumentReader reader)

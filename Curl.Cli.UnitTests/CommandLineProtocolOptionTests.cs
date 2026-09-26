@@ -17,7 +17,7 @@ public sealed class CommandLineProtocolOptionTests
     [DataRow("--data")]
     public void Parse_Data_RecordsUtf8Bytes(string spelledOption)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([spelledOption, "75"]);
+        CommandLineParseResult result = CommandLineParser.Parse([spelledOption, "75", "http://example.com/"]);
 
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new byte[] { 0x37, 0x35 }, result.Options.PostData!.Value.ToArray());
@@ -26,7 +26,7 @@ public sealed class CommandLineProtocolOptionTests
     [TestMethod]
     public void Parse_DataWithNonAsciiText_RecordsUtf8Bytes()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-d", "é"]);
+        CommandLineParseResult result = CommandLineParser.Parse(["-d", "é", "http://example.com/"]);
 
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new byte[] { 0xC3, 0xA9 }, result.Options.PostData!.Value.ToArray());
@@ -35,7 +35,7 @@ public sealed class CommandLineProtocolOptionTests
     [TestMethod]
     public void Parse_EmptyData_RecordsEmptyData()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--data="]);
+        CommandLineParseResult result = CommandLineParser.Parse(["--data=", "http://example.com/"]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.IsTrue(result.Options.PostData.HasValue);
@@ -45,7 +45,7 @@ public sealed class CommandLineProtocolOptionTests
     [TestMethod]
     public void Parse_DataGivenTwice_KeepsTheLast()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-d", "a", "-d", "b"]);
+        CommandLineParseResult result = CommandLineParser.Parse(["-d", "a", "-d", "b", "http://example.com/"]);
 
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new byte[] { (byte)'b' }, result.Options.PostData!.Value.ToArray());
@@ -71,7 +71,7 @@ public sealed class CommandLineProtocolOptionTests
     [DataRow(":secret", "", "secret")]
     public void Parse_UserWithColon_SplitsAtTheFirstColon(string value, string expectedUser, string expectedPassword)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-u", value]);
+        CommandLineParseResult result = CommandLineParser.Parse(["-u", value, "http://example.com/"]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expectedUser, result.Options.Credentials!.UserName);
@@ -81,7 +81,7 @@ public sealed class CommandLineProtocolOptionTests
     [TestMethod]
     public void Parse_UserWithoutColon_RecordsUserWithEmptyPassword()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--user", "bob"]);
+        CommandLineParseResult result = CommandLineParser.Parse(["--user", "bob", "http://example.com/"]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual("bob", result.Options.Credentials!.UserName);
@@ -91,7 +91,7 @@ public sealed class CommandLineProtocolOptionTests
     [TestMethod]
     public void Parse_TelnetOptions_RecordsEveryValueInOrder()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-t", "TTYPE=vt100", "-t", "XDISPLOC=host:0"]);
+        CommandLineParseResult result = CommandLineParser.Parse(["-t", "TTYPE=vt100", "-t", "XDISPLOC=host:0", "http://example.com/"]);
 
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { "TTYPE=vt100", "XDISPLOC=host:0" }, result.Options.TelnetOptions.ToArray());
@@ -103,7 +103,7 @@ public sealed class CommandLineProtocolOptionTests
     [DataRow("")]
     public void Parse_TelnetOptionCurlRefusesAtTransferTime_IsRecordedNotRefused(string value)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--telnet-option", value]);
+        CommandLineParseResult result = CommandLineParser.Parse(["--telnet-option", value, "http://example.com/"]);
 
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { value }, result.Options.TelnetOptions.ToArray());
@@ -115,7 +115,7 @@ public sealed class CommandLineProtocolOptionTests
     [DataRow("70000", 70000)]
     public void Parse_TftpBlockSize_RecordsTheValueUnclamped(string value, int expected)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--tftp-blksize", value]);
+        CommandLineParseResult result = CommandLineParser.Parse(["--tftp-blksize", value, "http://example.com/"]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expected, result.Options.TftpBlockSize);
@@ -135,7 +135,7 @@ public sealed class CommandLineProtocolOptionTests
     [TestMethod]
     public void Parse_TftpNoOptions_SetsTheFlag()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--tftp-no-options"]);
+        CommandLineParseResult result = CommandLineParser.Parse(["--tftp-no-options", "http://example.com/"]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.IsTrue(result.Options.TftpNoOptions);

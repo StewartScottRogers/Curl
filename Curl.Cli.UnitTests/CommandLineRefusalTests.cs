@@ -5,7 +5,7 @@ namespace Curl.Cli;
 /// <summary>
 /// Pins the exact two standard-error lines and the exit code of every refusal the
 /// command-line parser can raise: <c>curl: option &lt;spelled&gt;: &lt;reason&gt;</c>
-/// followed by the try-help line, exiting with <see cref="CurlExitCode.FailedInit"/>,
+/// (or <c>curl: (2) no URL specified</c>) followed by the try-help line, exiting with <see cref="CurlExitCode.FailedInit"/>,
 /// byte for byte as curl 8.21.0 prints them.
 /// </summary>
 [TestClass]
@@ -73,6 +73,14 @@ public sealed class CommandLineRefusalTests
         CommandLineRefusal refusal = CommandLineRefusal.ExpectedPositiveNumericalParameter("--tftp-blksize");
 
         AssertRefusal(refusal, "curl: option --tftp-blksize: expected a positive numerical parameter");
+    }
+
+    [TestMethod]
+    public void NoUrlSpecified_Always_ReportsNoUrlWithCurlsExitCodePrefix()
+    {
+        CommandLineRefusal refusal = CommandLineRefusal.NoUrlSpecified();
+
+        AssertRefusal(refusal, "curl: (2) no URL specified");
     }
 
     private static void AssertRefusal(CommandLineRefusal refusal, string expectedFirstLine)
