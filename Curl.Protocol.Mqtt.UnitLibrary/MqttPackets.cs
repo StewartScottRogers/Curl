@@ -62,9 +62,7 @@ internal static class MqttPackets
     {
         byte[] userName = EncodeCredential(credentials?.UserName, MqttTransferMessages.UserNameTooLong);
         byte[] password = EncodeCredential(credentials?.Password, MqttTransferMessages.PasswordTooLong);
-        byte flags = CleanSessionFlag;
-        flags |= userName.Length > 0 ? UserNameFlag : (byte)0;
-        flags |= password.Length > 0 ? PasswordFlag : (byte)0;
+        byte flags = ConnectFlags(userName, password);
 
         return Assemble(
             ConnectType,
@@ -129,6 +127,18 @@ internal static class MqttPackets
         while (length > 0);
 
         return [.. encoded];
+    }
+
+    /// <summary>
+    /// The CONNECT flags: clean session always, and the user name and password flags for
+    /// each that is sent.
+    /// </summary>
+    private static byte ConnectFlags(byte[] userName, byte[] password)
+    {
+        byte flags = CleanSessionFlag;
+        flags |= userName.Length > 0 ? UserNameFlag : (byte)0;
+        flags |= password.Length > 0 ? PasswordFlag : (byte)0;
+        return flags;
     }
 
     private static byte[] Assemble(byte firstByte, byte[] body) =>
