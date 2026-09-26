@@ -1099,6 +1099,8 @@ function Invoke-Park {
     # fixes what broke. Integration trouble is Claude's to solve, not Stewart's.
     param([string]$Id, [string]$Why)
     $park = "factory/$Id-lane-$Lane-$Stamp"
+    # A local branch too: lanes may not fetch, but every worktree sees local branches.
+    Invoke-Git @('branch', '-f', $park, 'HEAD') | Out-Null
     Invoke-Git @('push', '-q', 'origin', "HEAD:refs/heads/$park") | Out-Null
     $lock = Enter-Lock
     try {
