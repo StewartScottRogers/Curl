@@ -5,7 +5,8 @@ namespace Curl.Cli;
 /// <summary>
 /// Pins how the parser records the Phase 4 protocol options under their ADR-0006 names:
 /// <c>-d</c>/<c>--data</c> as UTF-8 <see cref="CommandLineOptions.PostData"/>,
-/// <c>-u</c>/<c>--user</c> split at the first colon, every <c>-t</c>/<c>--telnet-option</c>
+/// <c>-u</c>/<c>--user</c> split at the first colon (a value with no colon is pinned in
+/// <see cref="CommandLinePasswordPromptTests"/>), every <c>-t</c>/<c>--telnet-option</c>
 /// verbatim and in order, <c>--tftp-blksize</c> unclamped, and <c>--tftp-no-options</c>.
 /// Refusal lines were measured against the local curl 8.21.0 on 2026-09-26.
 /// </summary>
@@ -102,16 +103,6 @@ public sealed class CommandLineProtocolOptionTests
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expectedUser, result.Options.Credentials!.UserName);
         Assert.AreEqual(expectedPassword, result.Options.Credentials.Password);
-    }
-
-    [TestMethod]
-    public void Parse_UserWithoutColon_RecordsUserWithEmptyPassword()
-    {
-        CommandLineParseResult result = CommandLineParser.Parse(["--user", "bob", "http://example.com/"]);
-
-        Assert.IsTrue(result.IsAccepted);
-        Assert.AreEqual("bob", result.Options.Credentials!.UserName);
-        Assert.AreEqual(string.Empty, result.Options.Credentials.Password);
     }
 
     [TestMethod]

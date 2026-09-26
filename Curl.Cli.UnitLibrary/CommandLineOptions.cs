@@ -17,6 +17,7 @@ public sealed class CommandLineOptions
     private readonly List<string> outputFiles = [];
     private readonly List<string> telnetOptions = [];
     private readonly List<string> warningLines = [];
+    private string? userAwaitingPassword;
 
     /// <summary>
     /// The URLs to transfer, in command-line order: positional arguments and
@@ -43,8 +44,10 @@ public sealed class CommandLineOptions
 
     /// <summary>
     /// The <c>-u</c> / <c>--user</c> value split at its first colon into user name and password;
-    /// <see langword="null"/> when not given. A value with no colon is a user name with an empty
-    /// password; curl would prompt for the password instead.
+    /// <see langword="null"/> when not given. A value with no colon that does not start with <c>;</c>
+    /// is a user name whose password <see cref="CommandLineParser"/> asks for through its
+    /// <see cref="IPasswordPrompt"/> once the whole command line is read; <c>;</c> with no colon
+    /// (<c>-u ;opt</c>) is a user name with an empty password, as in curl 8.21.0.
     /// </summary>
     public NetworkCredential? Credentials { get; private set; }
 
@@ -186,6 +189,29 @@ public sealed class CommandLineOptions
         Credentials = colon < 0
             ? new NetworkCredential(userAndPassword, string.Empty)
             : new NetworkCredential(userAndPassword[..colon], userAndPassword[(colon + 1)..]);
+        userAwaitingPassword = colon < 0 && !userAndPassword.StartsWith(';') ? userAndPassword : null;
+    }
+
+    /// <summary>
+    /// When the last <c>-u</c> / <c>--user</c> value named a user with no password, asks
+    /// <paramref name="passwordPrompt"/> for it with curl 8.21.0's prompt,
+    /// <c>Enter host password for user '&lt;user&gt;':</c>, the user being the value up to its first
+    /// <c>;</c> (curl's login options are not shown), and records the answer as the
+    /// <see cref="Credentials"/> password. Does nothing otherwise.
+    /// </summary>
+    /// <param name="passwordPrompt">Asks for the password.</param>
+    internal void ReadMissingPassword(IPasswordPrompt passwordPrompt)
+    {
+        if (userAwaitingPassword is not { } user)
+        {
+            return;
+        }
+
+        int loginOptions = user.IndexOf(';', StringComparison.Ordinal);
+        string shownUser = loginOptions < 0 ? user : user[..loginOptions];
+        string password = passwordPrompt.ReadPassword($"Enter host password for user '{shownUser}':");
+        Credentials = new NetworkCredential(user, password);
+        userAwaitingPassword = null;
     }
 
     /// <summary>Appends <paramref name="telnetOption"/> to <see cref="TelnetOptions"/>, unchanged and unvalidated.</summary>

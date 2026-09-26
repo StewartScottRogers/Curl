@@ -15,8 +15,11 @@ namespace Curl.Cli;
 /// read without refusal but names no URL is
 /// refused with <see cref="CommandLineRefusal.NoUrlSpecified"/>; an empty command line is
 /// accepted, because curl answers it differently. The one file-system question it asks is
-/// whether the <c>--cacert</c> path exists, through a check <see cref="Parse(IReadOnlyList{string}, Func{string, bool})"/>
-/// takes as a parameter.
+/// whether the <c>--cacert</c> path exists, through a check <see cref="Parse(IReadOnlyList{string}, Func{string, bool}, IPasswordPrompt)"/>
+/// takes as a parameter. When the whole command line is read without refusal and the last
+/// <c>-u</c> / <c>--user</c> names a user with no colon, it asks the injected
+/// <see cref="IPasswordPrompt"/> for the password, before the no-URL check, as curl 8.21.0 does
+/// (<c>curl -u bob</c> prompts, then reports no URL; <c>curl -u bob --bogus</c> never prompts).
 /// </summary>
 /// <remarks>
 /// It does not implement <c>-K</c>/<c>--config</c>, <c>.curlrc</c>, <c>--variable</c> or <c>--next</c>, and it
@@ -37,7 +40,7 @@ public static class CommandLineParser
     /// </returns>
     /// <exception cref="ArgumentNullException"><paramref name="arguments"/> is <see langword="null"/>.</exception>
     public static CommandLineParseResult Parse(IReadOnlyList<string> arguments) =>
-        Parse(arguments, PathExistsOnDisk);
+        Parse(arguments, PathExistsOnDisk, ConsolePasswordPrompt.ForProcessConsole);
 
     /// <summary>
     /// Parses <paramref name="arguments"/>, asking <paramref name="pathExists"/> whether a path an
@@ -50,10 +53,27 @@ public static class CommandLineParser
     /// <see cref="Curl.Protocol.Abstractions.CurlExitCode.FailedInit"/>. Never throws for non-null arguments.
     /// </returns>
     /// <exception cref="ArgumentNullException"><paramref name="arguments"/> or <paramref name="pathExists"/> is <see langword="null"/>.</exception>
-    public static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists)
+    public static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists) =>
+        Parse(arguments, pathExists, ConsolePasswordPrompt.ForProcessConsole);
+
+    /// <summary>
+    /// Parses <paramref name="arguments"/>, asking <paramref name="pathExists"/> whether a path an
+    /// option names exists (<c>--cacert</c>), and <paramref name="passwordPrompt"/> for the password
+    /// when <c>-u</c> / <c>--user</c> names a user with no colon.
+    /// </summary>
+    /// <param name="arguments">The arguments; a <see langword="null"/> element reads as an empty argument.</param>
+    /// <param name="pathExists">Reports whether a file or directory exists at a path.</param>
+    /// <param name="passwordPrompt">Asks for the password of a <c>-u</c> user given without one; called at most once.</param>
+    /// <returns>
+    /// The parsed options, or the first refusal met; every refusal carries
+    /// <see cref="Curl.Protocol.Abstractions.CurlExitCode.FailedInit"/>. Never throws for non-null arguments.
+    /// </returns>
+    /// <exception cref="ArgumentNullException"><paramref name="arguments"/>, <paramref name="pathExists"/> or <paramref name="passwordPrompt"/> is <see langword="null"/>.</exception>
+    public static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt)
     {
         ArgumentNullException.ThrowIfNull(arguments);
         ArgumentNullException.ThrowIfNull(pathExists);
+        ArgumentNullException.ThrowIfNull(passwordPrompt);
 
         CommandLineOptions options = new();
         ArgumentReader reader = new(arguments, pathExists);
@@ -68,6 +88,7 @@ public static class CommandLineParser
             }
         }
 
+        options.ReadMissingPassword(passwordPrompt);
         return options.Urls.Count == 0 && arguments.Count > 0
             ? CommandLineParseResult.Refused(CommandLineRefusal.NoUrlSpecified(), options.WarningLines)
             : CommandLineParseResult.Accepted(options);
