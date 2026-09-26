@@ -35,3 +35,4 @@ A proxy selector returns the `ProxyEndpoint` curl would use for a URL, from `-x`
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
