@@ -1,3 +1,4 @@
+using Curl.Cli;
 using Curl.Core;
 using Curl.Core.FileSystem;
 using Curl.Networking;
@@ -26,16 +27,18 @@ internal static class CurlComposition
     /// <see cref="SystemDnsResolver" />, a <see cref="TcpDialer" /> and an
     /// <see cref="SslStreamTlsProvider" />, and a <see cref="UdpDatagramConnector" />. Both
     /// connectors share the one resolver and <see cref="TimeProvider.System" />. TLS uses
-    /// <see cref="TlsClientOptions" />'s defaults: certificates are verified and the
-    /// version is left to the operating system.
+    /// the <see cref="TlsClientOptions" /> mapped from <paramref name="options" />'s
+    /// <c>-k</c>, <c>--cacert</c>, <c>--tlsv1.2</c> and <c>--tlsv1.3</c>, one set shared
+    /// by every URL on the command line.
     /// </summary>
+    /// <param name="options">The parsed command line.</param>
     /// <returns>The connectors and the pieces they were built from.</returns>
-    internal static CurlTransports CreateTransports()
+    internal static CurlTransports CreateTransports(CommandLineOptions options)
     {
         SystemDnsResolver dnsResolver = new();
         TimeProvider timeProvider = TimeProvider.System;
         TcpDialer tcpDialer = new();
-        TlsClientOptions tlsClientOptions = new();
+        TlsClientOptions tlsClientOptions = TlsClientOptionsMapping.FromCommandLine(options);
         SslStreamTlsProvider tlsProvider = new(tlsClientOptions);
 
         return new CurlTransports(

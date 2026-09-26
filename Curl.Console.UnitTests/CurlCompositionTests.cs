@@ -1,5 +1,6 @@
 using System.Reflection;
 
+using Curl.Cli;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.File;
@@ -52,7 +53,7 @@ public sealed class CurlCompositionTests
     [TestMethod]
     public void CreateTransports_BothConnectors_ShareOneSystemDnsResolverAndTimeProviderSystem()
     {
-        CurlTransports transports = CurlComposition.CreateTransports();
+        CurlTransports transports = CurlComposition.CreateTransports(NoOptions());
 
         Assert.IsInstanceOfType<SystemDnsResolver>(transports.DnsResolver);
         Assert.AreSame(TimeProvider.System, transports.TimeProvider);
@@ -65,7 +66,7 @@ public sealed class CurlCompositionTests
     [TestMethod]
     public void CreateTransports_TcpConnector_ReceivesTcpDialerAndSecureSslStreamTlsProvider()
     {
-        CurlTransports transports = CurlComposition.CreateTransports();
+        CurlTransports transports = CurlComposition.CreateTransports(NoOptions());
 
         Assert.AreSame(transports.TcpDialer, CapturedDependency<ITcpDialer>(transports.TcpConnector));
         Assert.AreSame(transports.TlsProvider, CapturedDependency<ITlsProvider>(transports.TcpConnector));
@@ -74,11 +75,36 @@ public sealed class CurlCompositionTests
     }
 
     [TestMethod]
+    public void CreateTransports_InsecureCaCertificateAndTlsv13_SslStreamTlsProviderReceivesMappedOptions()
+    {
+        CommandLineOptions options = Parse("-k", "--cacert", "x.pem", "--tlsv1.3", "gophers://example.com/");
+
+        CurlTransports transports = CurlComposition.CreateTransports(options);
+
+        TlsClientOptions expected = new(Insecure: true, MinimumVersion: TlsMinimumVersion.Tls13, CaCertificateFile: "x.pem");
+        Assert.AreEqual(expected, transports.TlsClientOptions);
+        Assert.AreSame(transports.TlsClientOptions, CapturedDependency<TlsClientOptions>(transports.TlsProvider));
+    }
+
+    [TestMethod]
     public void CreateTransports_EachCall_BuildsItsOwnResolver()
     {
         Assert.AreNotSame(
-            CurlComposition.CreateTransports().DnsResolver,
-            CurlComposition.CreateTransports().DnsResolver);
+            CurlComposition.CreateTransports(NoOptions()).DnsResolver,
+            CurlComposition.CreateTransports(NoOptions()).DnsResolver);
+    }
+
+    private static CommandLineOptions NoOptions() => Parse("gophers://example.com/");
+
+    /// <summary>
+    /// Parses <paramref name="arguments" /> as if every path exists, so <c>--cacert</c>
+    /// accepts a file name without touching the disk.
+    /// </summary>
+    private static CommandLineOptions Parse(params string[] arguments)
+    {
+        CommandLineParseResult parsed = CommandLineParser.Parse(arguments, _ => true);
+        Assert.IsTrue(parsed.IsAccepted);
+        return parsed.Options;
     }
 
     /// <summary>
