@@ -1,5 +1,5 @@
 ---
-id: BL-258
+id: BL-261
 title: Record the ADR for BL-175's HTTP request body decisions
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-258 — Record the ADR for BL-175's HTTP request body decisions
+# BL-261 — Record the ADR for BL-175's HTTP request body decisions
 
 ## Goal
 

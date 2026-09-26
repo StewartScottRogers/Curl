@@ -68,13 +68,13 @@ x=1
   - A server answering `HTTP/1.1 401 No` (Content-Length 3, `no!`) as soon as the Expect head arrived: curl sent no body byte, printed `no!`, exit 0. A 417 reply: curl resent the head without Expect plus the body (BL-260).
   - `-X PUT -d x=1`: `-w` printed `150 3 PUT`.
   - `curl -F f=@locked`, a 100000-byte file with every byte locked by another process (`msvcrt.locking`) so each read fails: `Content-Length: 100207` sent, then only the 207 multipart framing bytes; exit 26, `curl: (26) client mime read EOF fail, only 207/100207 of needed bytes read`. curl's reader takes the failed read as end of file.
-- Decisions (Claude, under Stewart's delegation; the ADR is BL-258, because `Documentation/Planning/Decisions` is in the `touches` of BL-154, in Doing on another lane):
+- Decisions (Claude, under Stewart's delegation; the ADR is BL-261, because `Documentation/Planning/Decisions` is in the `touches` of BL-154, in Doing on another lane):
   - `--json` reaches the handler as a `BytesBody` with `application/json` plus `Content-Type: application/json` and `Accept: application/json` appended after every -H, each only when no -H names it. That is the measured order; the handler then needs no --json flag. Filling the options is BL-231.
   - A StreamBody of unknown length that fails a read ends the chunked body there, as curl's reader does; one of known length fails with exit 26 and the measured message (a stream that simply ends early gets the same, as in curl).
   - A final status that arrives during the wait leaves the body unsent and is the response (measured with 401). The 417 retry is filed as BL-260.
   - `TransferReport.RequestSize` counts head and body, as `%{size_request}` does; its doc comment in Abstractions still says "body excluded", filed as BL-259.
   - The wait reads only up to the first line feed to decide 100 vs final; the buffer is capped at the 100 KiB line limit so a server that never sends a line feed cannot grow it.
-- Follow-ups filed: BL-258 (ADR), BL-259 (RequestSize doc), BL-260 (417 retry).
+- Follow-ups filed: BL-261 (ADR), BL-259 (RequestSize doc), BL-260 (417 retry).
 - Gates: `dotnet build -warnaserror` clean; fast tests green solution-wide (Http 374); `Measure-CodeQuality.ps1 -Library Curl.Protocol.Http*` reports 100% line, 100% branch, 0 failing members, worst CRAP 10.
 
 ## Log
