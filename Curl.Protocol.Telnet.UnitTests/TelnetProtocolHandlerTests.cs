@@ -275,6 +275,61 @@ public sealed class TelnetProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ConnectionReadIsReset_EndsWithExit0AndKeepsWhatWasWritten()
+    {
+        var connection = new FaultingConnection(Hex("68 69 0D 0A")) { ReadFailsAfterReads = true };
+        var output = new MemoryStream();
+
+        TransferResult result = await new TelnetProtocolHandler(new RecordingConnector(ConnectResult.Connected(connection)))
+            .ExecuteAsync(new TransferContext { Url = TelnetUrl, Output = output });
+
+        Assert.AreEqual(TransferResult.Success(4), result);
+        Assert.AreEqual("68 69 0D 0A", ToHex(output.ToArray()));
+        Assert.IsTrue(connection.IsDisposed);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_UploadSendIsReset_ExitsWith55SendFailure()
+    {
+        var connection = new FaultingConnection(Hex("68 69")) { WritesFail = true };
+        var output = new MemoryStream();
+
+        TransferResult result = await new TelnetProtocolHandler(new RecordingConnector(ConnectResult.Connected(connection)))
+            .ExecuteAsync(new TransferContext { Url = TelnetUrl, Output = output, Upload = new MemoryStream("a\n"u8.ToArray()) });
+
+        Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
+        Assert.AreEqual("Send failure: Connection was reset", result.ErrorMessage);
+        Assert.IsTrue(connection.IsDisposed);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_NegotiationReplySendIsReset_ExitsWith55SendFailure()
+    {
+        var connection = new FaultingConnection(Hex("68 69 FF FB 01")) { WritesFail = true };
+        var output = new MemoryStream();
+
+        TransferResult result = await new TelnetProtocolHandler(new RecordingConnector(ConnectResult.Connected(connection)))
+            .ExecuteAsync(new TransferContext { Url = TelnetUrl, Output = output });
+
+        Assert.AreEqual(new TransferResult(CurlExitCode.SendError, 2, "Send failure: Connection was reset"), result);
+        Assert.AreEqual("68 69", ToHex(output.ToArray()));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_OutputWriteFails_ExitsWith23WriteFailure()
+    {
+        var connection = new ScriptedConnection(Read("68 69 0D 0A"), Read("78"));
+
+        TransferResult result = await new TelnetProtocolHandler(new RecordingConnector(ConnectResult.Connected(connection)))
+            .ExecuteAsync(new TransferContext { Url = TelnetUrl, Output = new FaultingOutputStream() });
+
+        Assert.AreEqual(
+            new TransferResult(CurlExitCode.WriteError, 0, "Failure writing output to destination, passed 4 returned 0"),
+            result);
+        Assert.IsTrue(connection.IsDisposed);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_Cancelled_Throws()
     {
         var connection = new ScriptedConnection(Read("68 69"));

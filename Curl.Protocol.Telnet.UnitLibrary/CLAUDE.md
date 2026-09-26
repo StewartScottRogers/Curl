@@ -28,7 +28,11 @@ stream with no network.
   before a byte is sent. `TTYPE`, `XDISPLOC` and `NEW_ENV` are negotiated; `WS` and
   `BINARY` are checked as curl checks them and otherwise ignored.
 
+A connection read that fails ends the session with exit 0, a send that fails with
+exit 55 and an output write that fails with exit 23, as curl 8.21.0 on Windows does
+(measured in BL-077's Notes).
+
 Every byte these classes send or write was measured against curl 8.21.0; the
-captures are in BL-043's and BL-044's Notes and pinned by `TelnetProtocolHandlerTests`
+captures are in BL-043's, BL-044's and BL-077's Notes and pinned by `TelnetProtocolHandlerTests`
 and `TelnetProtocolHandlerTelnetOptionTests`. Change behaviour only against a new
 measurement.
