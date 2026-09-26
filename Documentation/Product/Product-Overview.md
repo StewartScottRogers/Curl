@@ -288,7 +288,7 @@ projects before anything works is a liability, not a head start.
 | 2 | Are Linux and macOS release requirements, or is this Windows-first? | Phase 1 CI design |
 | 3 | ~~How is curl's test suite driven from .NET — port the harness, or run upstream's Perl `runtests.pl` against our binary?~~ **Answered:** ported to data-driven MSTest cases run in process, no Perl, see [ADR-0013](../Planning/Decisions/ADR-0013-upstream-test-cases-run-as-data-driven-mstest.md). | Phase 1 conformance work |
 | 4 | Is a managed NuGet API a deliverable, or is the CLI the only product? | Public API surface |
-| 5 | HTTP/2 and HTTP/3: BCL framing, or implemented over the seam like everything else? | Phases 1 and 6 |
+| 5 | ~~HTTP/2 and HTTP/3: BCL framing, or implemented over the seam like everything else?~~ **Answered:** the BCL has no public framing, so HTTP/2 will be hand-written over `IConnection`; it is not in Milestone 1, and `--http2`, `--http2-prior-knowledge` and `--http3` are refused as the Windows reference build refuses them, see [ADR-0017](../Planning/Decisions/ADR-0017-no-http-2-or-http-3-in-milestone-1.md). | Phases 1 and 6 |
 
 ## Sources
 

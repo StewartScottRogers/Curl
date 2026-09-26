@@ -69,3 +69,7 @@ built alongside it.
 ## Later / unscheduled
 
 Work that is agreed in principle but not yet sequenced.
+
+- Hand-written HTTP/2 over `IConnection` (HPACK and framing; the BCL has none). Until
+  then `--http2`, `--http2-prior-knowledge` and `--http3` are refused on every platform;
+  see [ADR-0017](Decisions/ADR-0017-no-http-2-or-http-3-in-milestone-1.md).

@@ -31,6 +31,7 @@ choices do not need one.
 | [0014](ADR-0014-http-request-options-and-the-auth-cookie-and-proxy-seams.md) | HTTP request options and the auth, cookie and proxy seams | Accepted | 2026-09-26 |
 | [0015](ADR-0015-transfer-report-on-transfer-result-and-connect-timings-on-connect-result.md) | `TransferReport` on `TransferResult` and `ConnectTimings` on `ConnectResult` | Accepted | 2026-09-26 |
 | [0016](ADR-0016-authentication-and-cookies-move-into-milestone-1.md) | `Curl.Authentication` and `Curl.Cookies` move into Milestone 1 | Accepted | 2026-09-26 |
+| [0017](ADR-0017-no-http-2-or-http-3-in-milestone-1.md) | No HTTP/2 or HTTP/3 in Milestone 1: `--http2`, `--http2-prior-knowledge` and `--http3` are refused as the reference build refuses them | Accepted | 2026-09-26 |
 
 ## Template
 
