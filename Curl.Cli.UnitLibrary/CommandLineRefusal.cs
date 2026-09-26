@@ -41,6 +41,16 @@ public sealed class CommandLineRefusal
     public static CommandLineRefusal UnknownOption(string spelledOption) =>
         Create(spelledOption, "is unknown");
 
+    /// <summary>
+    /// Refuses <c>--no-&lt;name&gt;</c> where the option named is in the table but curl does not let
+    /// it be negated: a value option, or a flag that is not a <see cref="CommandLineOption.NegatableFlag"/>.
+    /// </summary>
+    /// <param name="spelledOption">The whole argument as typed, such as <c>--no-output</c> or <c>--no-output=x</c>.</param>
+    /// <returns>A refusal reading <c>the given option cannot be reversed with a --no- prefix</c>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="spelledOption"/> is <see langword="null"/>.</exception>
+    public static CommandLineRefusal CannotBeReversed(string spelledOption) =>
+        Create(spelledOption, "the given option cannot be reversed with a --no- prefix");
+
     /// <summary>Refuses an option that takes a value but is the last argument.</summary>
     /// <param name="spelledOption">The whole argument as typed.</param>
     /// <returns>A refusal reading <c>requires parameter</c>.</returns>

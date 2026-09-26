@@ -12,7 +12,11 @@ namespace Curl.Cli;
 /// <remarks>
 /// To add an option, add one row here (with its applier, when it takes a value) and the
 /// property it sets on <see cref="CommandLineOptions"/>; the parser does not change. A flag
-/// is <see cref="CommandLineOption.Flag"/>; a text value is <see cref="CommandLineOption.Text"/>,
+/// that curl lets be turned off with <c>--no-&lt;name&gt;</c> opts in by being a
+/// <see cref="CommandLineOption.NegatableFlag"/>; any other flag is <see cref="CommandLineOption.Flag"/>,
+/// and its <c>--no-</c> spelling, like that of every value option, is refused with
+/// <see cref="CommandLineRefusal.CannotBeReversed(string)"/>. Check the new row's <c>--no-</c>
+/// spelling against a real curl before choosing. A text value is <see cref="CommandLineOption.Text"/>,
 /// which refuses an empty value as blank; a file name is <see cref="CommandLineOption.FileName"/>,
 /// which is <see cref="CommandLineOption.Text"/> plus curl's warning for a file name that looks
 /// like a flag; a numeric value is <see cref="CommandLineOption.Value"/>
@@ -22,22 +26,34 @@ namespace Curl.Cli;
 /// <c>--Silent</c> are both unknown (checked against the local curl 8.21.0 on 2026-09-26;
 /// option list per <see href="https://curl.se/docs/manpage.html"/>). Each long name and
 /// each short letter must appear in at most one row.
+/// <para>
+/// <c>--no-</c> negation, measured with the local curl 8.21.0 on 2026-09-26
+/// (<c>curl &lt;arguments&gt; http://127.0.0.1:1/</c>, reading standard error and the exit code):
+/// <c>--no-silent</c>, <c>--no-show-error</c>, <c>--no-insecure</c> and <c>--no-tftp-no-options</c>
+/// are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
+/// silent and <c>--no-silent -s</c> is. <c>--no-silent=x</c> is accepted, its value ignored.
+/// <c>--no-tlsv1.2</c>, <c>--no-tlsv1.3</c>, <c>--no-url</c>, <c>--no-output</c> (even as the last
+/// argument), <c>--no-output=x</c>, <c>--no-data</c> and <c>--no-range</c> exit 2 with
+/// <c>curl: option &lt;as typed&gt;: the given option cannot be reversed with a --no- prefix</c> and
+/// the try-help line. <c>--no-bogus</c>, <c>--no-</c>, <c>--no-no-silent</c> and <c>--no-Silent</c>
+/// exit 2 as unknown. A short letter is never negated.
+/// </para>
 /// </remarks>
 public static class CommandLineOptionTable
 {
     private static readonly CommandLineOption[] RowsInTableOrder =
     [
         CommandLineOption.Text("url", null, (options, url) => options.AddUrl(url)),
-        CommandLineOption.Flag("silent", 's', options => options.Silent = true),
-        CommandLineOption.Flag("show-error", 'S', options => options.ShowError = true),
+        CommandLineOption.NegatableFlag("silent", 's', (options, on) => options.Silent = on),
+        CommandLineOption.NegatableFlag("show-error", 'S', (options, on) => options.ShowError = on),
         CommandLineOption.FileName("output", 'o', (options, file) => options.AddOutputFile(file)),
         CommandLineOption.Value("data", 'd', AcceptingEmpty((options, data) => options.SetPostData(data))),
         CommandLineOption.Value("user", 'u', AcceptingEmpty((options, user) => options.SetCredentials(user))),
         CommandLineOption.Value("telnet-option", 't', AcceptingEmpty((options, telnetOption) => options.AddTelnetOption(telnetOption))),
         CommandLineOption.Value("tftp-blksize", null, SetTftpBlockSize),
-        CommandLineOption.Flag("tftp-no-options", null, options => options.TftpNoOptions = true),
+        CommandLineOption.NegatableFlag("tftp-no-options", null, (options, on) => options.TftpNoOptions = on),
         CommandLineOption.Value("create-file-mode", null, SetCreateFileMode),
-        CommandLineOption.Flag("insecure", 'k', options => options.Insecure = true),
+        CommandLineOption.NegatableFlag("insecure", 'k', (options, on) => options.Insecure = on),
         CommandLineOption.Value("cacert", null, SetCaCertificateFile),
         CommandLineOption.Text("capath", null, (options, directory) => options.CaCertificateDirectory = directory),
         CommandLineOption.Text("cert", 'E', (options, certificate) => options.ClientCertificate = certificate),

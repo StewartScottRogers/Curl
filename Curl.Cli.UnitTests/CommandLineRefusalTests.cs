@@ -28,6 +28,14 @@ public sealed class CommandLineRefusalTests
     }
 
     [TestMethod]
+    public void CannotBeReversed_Spelled_NamesOptionAsNotReversible()
+    {
+        CommandLineRefusal refusal = CommandLineRefusal.CannotBeReversed("--no-output");
+
+        AssertRefusal(refusal, "curl: option --no-output: the given option cannot be reversed with a --no- prefix");
+    }
+
+    [TestMethod]
     public void RequiresParameter_Spelled_NamesOptionAsRequiringParameter()
     {
         CommandLineRefusal refusal = CommandLineRefusal.RequiresParameter("-o");

@@ -3,8 +3,9 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Cli;
 
 /// <summary>
-/// Pins the four kinds of option-table row: <see cref="CommandLineOption.Flag"/> takes no
-/// value and always applies; <see cref="CommandLineOption.Text"/> takes a value, refuses an
+/// Pins the five kinds of option-table row: <see cref="CommandLineOption.Flag"/> takes no
+/// value, always applies and cannot be negated; <see cref="CommandLineOption.NegatableFlag"/> is a
+/// flag that <c>--no-</c> turns off; <see cref="CommandLineOption.Text"/> takes a value, refuses an
 /// empty one as blank without storing it and stores any other; <see cref="CommandLineOption.Value"/>
 /// takes a value and returns whatever its own applier returns; <see cref="CommandLineOption.FileName"/>
 /// refuses and stores as <see cref="CommandLineOption.Text"/> does.
@@ -61,6 +62,68 @@ public sealed class CommandLineOptionTests
 
         Assert.IsNull(refusal);
         Assert.AreSame(options, setOn);
+    }
+
+    [TestMethod]
+    public void Flag_Built_CannotBeNegated()
+    {
+        CommandLineOption option = CommandLineOption.Flag("tlsv1.2", null, _ => { });
+
+        Assert.IsNull(option.Negate);
+    }
+
+    // ---- NegatableFlag ------------------------------------------------------------
+
+    [TestMethod]
+    public void NegatableFlag_WithShortName_KeepsNamesAndTakesNoValue()
+    {
+        CommandLineOption option = CommandLineOption.NegatableFlag("silent", 's', (_, _) => { });
+
+        Assert.AreEqual("silent", option.LongName);
+        Assert.AreEqual('s', option.ShortName);
+        Assert.IsFalse(option.TakesValue);
+        Assert.IsNotNull(option.Negate);
+    }
+
+    [TestMethod]
+    public void NegatableFlag_NullLongName_ThrowsArgumentNull()
+    {
+        ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(
+            () => CommandLineOption.NegatableFlag(null!, 's', (_, _) => { }));
+
+        Assert.AreEqual("longName", exception.ParamName);
+    }
+
+    [TestMethod]
+    public void NegatableFlag_NullSet_ThrowsArgumentNull()
+    {
+        ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(
+            () => CommandLineOption.NegatableFlag("silent", 's', null!));
+
+        Assert.AreEqual("set", exception.ParamName);
+    }
+
+    [TestMethod]
+    public void NegatableFlagApply_Called_SetsFlagOnAndReturnsNull()
+    {
+        bool? setTo = null;
+        CommandLineOption option = CommandLineOption.NegatableFlag("silent", 's', (_, on) => setTo = on);
+
+        CommandLineRefusal? refusal = option.Apply(new CommandLineOptions(), string.Empty, "-s", _ => false);
+
+        Assert.IsNull(refusal);
+        Assert.IsTrue(setTo);
+    }
+
+    [TestMethod]
+    public void NegatableFlagNegate_Called_SetsFlagOff()
+    {
+        bool? setTo = null;
+        CommandLineOption option = CommandLineOption.NegatableFlag("silent", 's', (_, on) => setTo = on);
+
+        option.Negate!(new CommandLineOptions());
+
+        Assert.IsFalse(setTo);
     }
 
     // ---- Text ---------------------------------------------------------------------

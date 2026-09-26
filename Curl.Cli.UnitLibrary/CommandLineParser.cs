@@ -4,7 +4,9 @@ namespace Curl.Cli;
 /// Reads a command line into <see cref="CommandLineOptions"/> the way curl 8.21.0 does,
 /// driven by <see cref="CommandLineOptionTable"/>. Short options bundle (<c>-sS</c>) and a
 /// value letter takes the rest of its bundle (<c>-ofile</c>) or else the next argument;
-/// long options match exactly and accept <c>--name=value</c>; the first <c>--</c> ends
+/// long options match exactly and accept <c>--name=value</c>; <c>--no-&lt;name&gt;</c> turns off
+/// a row built with <see cref="CommandLineOption.NegatableFlag"/> and is refused for any other
+/// row (see <see cref="CommandLineOptionTable"/>); the first <c>--</c> ends
 /// option parsing; every other argument is a URL. An empty URL argument is refused as
 /// blank; an option's value, empty or not, is handed unchanged to the row's
 /// <see cref="CommandLineOption.Apply"/>, which decides whether to refuse it. Parsing stops
@@ -17,14 +19,15 @@ namespace Curl.Cli;
 /// takes as a parameter.
 /// </summary>
 /// <remarks>
-/// It does not implement <c>--no-</c> negation (<c>--no-silent</c> is refused as unknown),
-/// <c>-K</c>/<c>--config</c>, <c>.curlrc</c>, <c>--variable</c> or <c>--next</c>, and it
+/// It does not implement <c>-K</c>/<c>--config</c>, <c>.curlrc</c>, <c>--variable</c> or <c>--next</c>, and it
 /// neither validates URLs nor opens files. Checked against the local curl 8.21.0 on
 /// 2026-09-26; options per <see href="https://curl.se/docs/manpage.html"/>.
 /// </remarks>
 public static class CommandLineParser
 {
     private const string EndOfOptions = "--";
+
+    private const string NegationPrefix = "no-";
 
     /// <summary>Parses <paramref name="arguments"/>, the command line without the program name.</summary>
     /// <param name="arguments">The arguments; a <see langword="null"/> element reads as an empty argument.</param>
@@ -110,7 +113,7 @@ public static class CommandLineParser
         string longName = hasAttachedValue ? nameAndValue[..equals] : nameAndValue;
         if (!CommandLineOptionTable.TryFindLong(longName, out CommandLineOption? option))
         {
-            return CommandLineRefusal.UnknownOption(argument);
+            return ParseNegatedLong(options, argument, longName);
         }
 
         if (!option.TakesValue)
@@ -122,6 +125,29 @@ public static class CommandLineParser
         return hasAttachedValue
             ? option.Apply(options, nameAndValue[(equals + 1)..], argument, reader.PathExists)
             : ApplyNextArgument(options, option, argument, reader);
+    }
+
+    /// <summary>
+    /// Reads a long name that is not in the table as <c>--no-&lt;name&gt;</c>: it turns off a
+    /// negatable flag (any attached value ignored), is refused as not reversible for any other row,
+    /// and is unknown when there is no <c>no-</c> or no row after it. Checked before a value is
+    /// taken, so <c>--no-output</c> as the last argument is refused as not reversible.
+    /// </summary>
+    private static CommandLineRefusal? ParseNegatedLong(CommandLineOptions options, string argument, string longName)
+    {
+        if (!longName.StartsWith(NegationPrefix, StringComparison.Ordinal)
+            || !CommandLineOptionTable.TryFindLong(longName[NegationPrefix.Length..], out CommandLineOption? option))
+        {
+            return CommandLineRefusal.UnknownOption(argument);
+        }
+
+        if (option.Negate is null)
+        {
+            return CommandLineRefusal.CannotBeReversed(argument);
+        }
+
+        option.Negate(options);
+        return null;
     }
 
     private static CommandLineRefusal? ParseShortBundle(CommandLineOptions options, string argument, ArgumentReader reader)

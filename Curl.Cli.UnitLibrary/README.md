@@ -34,8 +34,9 @@ the row's applier and never in the parser.
 
 - Writing to standard error or choosing the newline: the console layer does that with
   `CommandLineRefusal.StandardErrorLines` and `CommandLineParseResult.WarningLines`.
-- `--no-` negation, `-K`/`--config`, `.curlrc`, `--variable` and `--next`: not
-  implemented. `--no-silent` is refused as unknown today.
+- `-K`/`--config`, `.curlrc`, `--variable` and `--next`: not implemented. `--no-`
+  negation is implemented: a `CommandLineOption.NegatableFlag` row is turned off by
+  `--no-<name>`, and any other row's `--no-` spelling is refused as curl refuses it.
 - URL parsing and validation, and opening output files: other layers, after parsing. The
   only file-system question asked here is whether the `--cacert` path exists.
 - Applying the TLS settings: `Curl.Console` maps them onto the TLS provider.

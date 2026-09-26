@@ -509,8 +509,8 @@ public sealed class CommandLineParserTests
     [TestMethod]
     public void Parse_FlagLikeOutputFileWhileSilentThenNoSilent_StaysWithoutWarning()
     {
-        // --no-silent is refused as unknown until BL-054 adds --no- negation; either way the
-        // warning raised while -s was in effect stays dropped, as curl 8.21.0 drops it.
+        // --no-silent turns silence off, but the warning raised while -s was in effect stays
+        // dropped, as curl 8.21.0 drops it.
         CommandLineParseResult result = CommandLineParser.Parse(["-s", "-o", "-x", "--no-silent", "file:///x"]);
 
         Assert.IsEmpty(result.WarningLines);

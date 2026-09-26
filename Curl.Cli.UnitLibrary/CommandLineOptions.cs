@@ -24,10 +24,10 @@ public sealed class CommandLineOptions
     /// </summary>
     public IReadOnlyList<string> Urls => urls;
 
-    /// <summary><see langword="true"/> when <c>-s</c> / <c>--silent</c> was given.</summary>
+    /// <summary><see langword="true"/> when <c>-s</c> / <c>--silent</c> was given and no <c>--no-silent</c> came after it.</summary>
     public bool Silent { get; internal set; }
 
-    /// <summary><see langword="true"/> when <c>-S</c> / <c>--show-error</c> was given.</summary>
+    /// <summary><see langword="true"/> when <c>-S</c> / <c>--show-error</c> was given and no <c>--no-show-error</c> came after it.</summary>
     public bool ShowError { get; internal set; }
 
     /// <summary>The <c>-o</c> / <c>--output</c> file names, in command-line order.</summary>
@@ -56,7 +56,7 @@ public sealed class CommandLineOptions
     /// </summary>
     public int? TftpBlockSize { get; internal set; }
 
-    /// <summary><see langword="true"/> when <c>--tftp-no-options</c> was given.</summary>
+    /// <summary><see langword="true"/> when <c>--tftp-no-options</c> was given and no <c>--no-tftp-no-options</c> came after it.</summary>
     public bool TftpNoOptions { get; internal set; }
 
     /// <summary>
@@ -66,7 +66,7 @@ public sealed class CommandLineOptions
     /// </summary>
     public UnixFileMode? CreateFileMode { get; internal set; }
 
-    /// <summary><see langword="true"/> when <c>-k</c> / <c>--insecure</c> was given: skip server certificate verification.</summary>
+    /// <summary><see langword="true"/> when <c>-k</c> / <c>--insecure</c> was given and no <c>--no-insecure</c> came after it: skip server certificate verification.</summary>
     public bool Insecure { get; internal set; }
 
     /// <summary>
