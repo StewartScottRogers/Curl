@@ -74,3 +74,4 @@ scope; file them as tasks if the design here makes any of them awkward.
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
