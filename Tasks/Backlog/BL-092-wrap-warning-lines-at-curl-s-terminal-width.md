@@ -1,5 +1,5 @@
 ---
-id: BL-090
+id: BL-092
 title: Wrap warning lines at curl's terminal width
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-090 — Wrap warning lines at curl's terminal width
+# BL-092 — Wrap warning lines at curl's terminal width
 
 ## Goal
 

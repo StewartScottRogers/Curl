@@ -71,7 +71,7 @@ the exit 23 line, as upstream does.
 - Empty successful transfer to an uncreatable `-o` file, without `-s`: curl prints the
   warning only, no `curl: (23)` line, exit 23. Matched.
 - Not done here, filed: curl wraps warnings at its terminal width (79 columns by default,
-  so a long path wraps) -> BL-090; curl on Windows replaces `?` and `*` in the `-o` name
+  so a long path wraps) -> BL-092; curl on Windows replaces `?` and `*` in the `-o` name
   with `_` before opening -> BL-091. Choice: print the warning unwrapped, as the existing
   `CommandLineWarning` lines are, since the measured acceptance case fits in 79 columns.
 
