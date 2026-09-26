@@ -42,8 +42,11 @@ namespace Curl.Protocol.Tftp;
 /// first block has gone, what curl re-sends is the write request's first four bytes, and
 /// that is what is sent. The first datagram received pins the server's endpoint; one from
 /// anywhere else ends the upload with exit 56 (<see cref="CurlExitCode.RecvError" />).
-/// An option acknowledgement after the first block has gone, and an opcode an upload
-/// never receives, are ignored.
+/// An option acknowledgement after the first block has gone is taken as curl 8.21.0
+/// takes it: its <c>blksize</c> comes into force and the block count restarts, so the
+/// next DATA packet is block 1 again, carrying the upload's next bytes at the new size
+/// (an empty block 1 when the last block had already gone). An opcode an upload never
+/// receives is ignored.
 /// </para>
 /// </remarks>
 internal sealed class TftpUpload(ITransferContext context, IDatagramChannel channel, Stream upload, long startTimestamp)
@@ -62,7 +65,6 @@ internal sealed class TftpUpload(ITransferContext context, IDatagramChannel chan
     private int blockSize = TftpPackets.DefaultBlockSize;
     private ushort lastSentBlock;
     private bool lastBlockSent;
-    private bool firstBlockSent;
     private long bytesTransferred;
     private EndPoint? pinnedEndPoint;
     private bool answered;
@@ -153,8 +155,10 @@ internal sealed class TftpUpload(ITransferContext context, IDatagramChannel chan
                     .ConfigureAwait(false);
             case TftpPackets.ErrorOpcode:
                 return TftpErrorMapping.ToTransferResult(TftpPackets.ReadField(receiveBuffer, 2));
-            case TftpPackets.OptionAcknowledgementOpcode when !firstBlockSent:
+            case TftpPackets.OptionAcknowledgementOpcode:
                 blockSize = TftpPackets.ReadAcknowledgedBlockSize(receiveBuffer.AsSpan(2, received.Length - 2));
+                lastSentBlock = 0;
+                lastBlockSent = false;
                 return await AcceptAcknowledgementAsync(0, received.RemoteEndPoint).ConfigureAwait(false);
             default:
                 return null;
@@ -252,7 +256,6 @@ internal sealed class TftpUpload(ITransferContext context, IDatagramChannel chan
         }
 
         lastSentBlock = unchecked((ushort)(lastSentBlock + 1));
-        firstBlockSent = true;
         lastBlockSent = filled < blockSize;
         bytesTransferred += filled;
 

@@ -52,7 +52,9 @@ which a byte stream cannot express. The tests in the matching `.UnitTests` proje
   says `Received too short packet` (curl keeps the first failure it noted). Neither
   moves the next scheduled re-send. Before DATA 1, that re-send is the WRQ's first four
   bytes, as curl sends.
-- Not yet: an upload ignores an OACK that arrives after DATA 1, where curl 8.21.0 takes
-  its `blksize` and sends block 1 again at that size; and a download ignores a datagram
-  under four bytes, where curl's upload treats one as a timeout (its download is not
-  measured). Both are filed on the task board.
+- Upload only: an OACK that arrives after DATA 1 is taken as curl 8.21.0 takes it: its
+  `blksize` comes into force and the block count restarts, so the next DATA is block 1
+  again, carrying the next bytes of the upload (nothing is re-read) at the new size.
+  An OACK after the last block has gone sends an empty DATA 1.
+- Not yet: a download ignores a datagram under four bytes, where curl's upload treats
+  one as a timeout (its download is not measured). It is filed on the task board.
