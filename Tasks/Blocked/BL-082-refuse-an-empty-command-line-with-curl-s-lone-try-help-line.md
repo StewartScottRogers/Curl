@@ -53,7 +53,19 @@ There is no `no URL specified` line.
 
 ## Notes
 
+- 2026-09-26 (lane 4): `touches` is short. `Curl.Console.UnitTests/CurlCommandRunnerTests.cs`
+  test `RunAsync_EmptyCommandLine_TransfersNothingAndReturns0` pins exit 0 and empty stderr
+  for `RunAsync([])`; once `Parse([])` is refused, `CurlCommandRunner` returns 2 and writes the
+  try-help line, so that test must change to expect exit 2 and
+  `CommandLineRefusal.TryHelpLine + NewLine`. Re-plan with `touches` adding
+  `Curl.Console.UnitTests`. No production change in `Curl.Console` is needed: the runner
+  already writes any refusal's lines and returns its exit code.
+- `Curl.Cli.UnitTests/CommandLineParserTests.cs` has a second pin besides
+  `Parse_NoArguments_ReturnsDefaults`: `Parse_EmptyCommandLine_CarriesNoWarning` asserts
+  `IsAccepted`; it must change too.
+
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Blocked. touches must add Curl.Console.UnitTests: CurlCommandRunnerTests.RunAsync_EmptyCommandLine_TransfersNothingAndReturns0 pins exit 0 for an empty command line and must expect exit 2 plus the try-help line; re-plan
