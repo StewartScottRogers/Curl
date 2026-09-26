@@ -1,5 +1,5 @@
 ---
-id: BL-274
+id: BL-276
 title: Carry the source timestamp on an unmet -z result for -R
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: FR-011
 created: 2026-09-26
 completed:
 ---
-# BL-274 — Carry the source timestamp on an unmet -z result for -R
+# BL-276 — Carry the source timestamp on an unmet -z result for -R
 
 ## Goal
 
