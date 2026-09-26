@@ -16,11 +16,31 @@ public interface ITlsProvider
     /// <summary>
     /// Performs a client-side TLS handshake over an existing plaintext connection.
     /// </summary>
-    /// <param name="plaintext">The connection to upgrade. Ownership transfers to the result.</param>
+    /// <remarks>
+    /// A failed handshake is returned, never thrown, so it reaches the protocol handler
+    /// as a curl exit code like every other connect failure: the provider alone sees the
+    /// certificate validation callback, so it alone can tell a verification failure
+    /// (<see cref="CurlExitCode.PeerFailedVerification" />, 60) from any other handshake
+    /// failure (<see cref="CurlExitCode.SslConnectError" />, 35). Only an
+    /// <see cref="OperationCanceledException" /> escapes.
+    /// </remarks>
+    /// <param name="plaintext">
+    /// The connection to upgrade. Ownership transfers to the provider: on success it is
+    /// owned by the returned connection, and on failure the provider has disposed it.
+    /// </param>
     /// <param name="targetHost">The host name to validate the server certificate against.</param>
     /// <param name="cancellationToken">Cancels the handshake.</param>
-    /// <returns>A connection whose <see cref="IConnection.IsSecure" /> is <see langword="true" />.</returns>
-    ValueTask<IConnection> AuthenticateAsClientAsync(
+    /// <returns>
+    /// <see cref="ConnectResult.Connected(IConnection)" /> with a connection whose
+    /// <see cref="IConnection.IsSecure" /> is <see langword="true" />, or
+    /// <see cref="ConnectResult.Failed(CurlExitCode, string)" /> with the curl exit code
+    /// and message for a failed handshake, after <paramref name="plaintext" /> has been
+    /// disposed.
+    /// </returns>
+    /// <exception cref="OperationCanceledException">
+    /// <paramref name="cancellationToken" /> was cancelled during the handshake.
+    /// </exception>
+    ValueTask<ConnectResult> AuthenticateAsClientAsync(
         IConnection plaintext,
         string targetHost,
         CancellationToken cancellationToken);

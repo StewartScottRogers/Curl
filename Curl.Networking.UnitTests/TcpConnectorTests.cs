@@ -109,6 +109,24 @@ public sealed class TcpConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_WithUseTls_WhenHandshakeFails_ReturnsTheProvidersFailureUnchanged()
+    {
+        var failure = ConnectResult.Failed(CurlExitCode.SslConnectError, "x");
+        var tlsProvider = new FakeTlsProvider { FailureToReturn = failure };
+        var connector = CreateConnector(
+            new FakeDnsResolver(Loopback),
+            new FakeTcpDialer { DialOutcome = _ => new FakeConnection() },
+            tlsProvider);
+
+        var result = await connector.ConnectAsync(new ConnectTarget("example.com", 443, UseTls: true), CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
+        Assert.AreEqual("x", result.ErrorMessage);
+        Assert.IsNull(result.Connection);
+        Assert.AreEqual(1, tlsProvider.HandshakeCount);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_WithoutUseTls_NeverCallsTlsProvider()
     {
         var plaintext = new FakeConnection();

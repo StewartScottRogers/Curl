@@ -25,9 +25,10 @@ public sealed class TcpConnector(
     /// The messages are curl 8.21.0's: <c>Could not resolve host: &lt;host&gt;</c> for
     /// exit 6, and <c>Failed to connect to &lt;host&gt;:&lt;port&gt; after &lt;n&gt; ms:
     /// Could not connect to server</c> for exit 7, where <c>n</c> is the time spent
-    /// dialing as measured by the injected <see cref="TimeProvider" />. TLS handshake
-    /// failures are not yet mapped to curl's exit codes and propagate from
-    /// <see cref="ITlsProvider" /> unchanged.
+    /// dialing as measured by the injected <see cref="TimeProvider" />. When
+    /// <see cref="ConnectTarget.UseTls" /> is set, the <see cref="ITlsProvider" />'s result
+    /// is returned as it is, so a failed handshake keeps the exit code and message the
+    /// provider chose.
     /// </remarks>
     public async ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
     {
@@ -56,8 +57,7 @@ public sealed class TcpConnector(
             return ConnectResult.Connected(connection);
         }
 
-        var secured = await tlsProvider.AuthenticateAsClientAsync(connection, target.Host, cancellationToken).ConfigureAwait(false);
-        return ConnectResult.Connected(secured);
+        return await tlsProvider.AuthenticateAsClientAsync(connection, target.Host, cancellationToken).ConfigureAwait(false);
     }
 
     private async ValueTask<IConnection?> DialFirstReachableAsync(
