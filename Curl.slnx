@@ -24,6 +24,8 @@
     <File Path="RunClaude.cmd" />
     <File Path="hrdrClaudeNative.cmd" />
     <File Path="Measure-CodeQuality.ps1" />
+    <File Path="DarkFactory.ps1" />
+    <File Path="RunDarkFactory.cmd" />
   </Folder>
   <Project Path="Curl.Authentication.UnitLibrary/Curl.Authentication.UnitLibrary.csproj" />
   <Project Path="Curl.Authentication.UnitTests/Curl.Authentication.UnitTests.csproj" />
