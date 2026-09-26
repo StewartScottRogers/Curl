@@ -29,8 +29,13 @@
     <File Path="Measure-CodeQuality.ps1" />
     <File Path="RunDarkFactory.ps1" />
     <File Path="RunDarkFactory.cmd" />
+    <File Path=".github/gource/avatars.txt" />
+    <File Path=".github/gource/make-captions.py" />
     <File Path=".github/gource/make-log.py" />
+    <File Path=".github/gource/make-master-playlist.py" />
+    <File Path=".github/gource/make-stats.py" />
     <File Path=".github/gource/render.sh" />
+    <File Path=".github/gource/site/index.html" />
     <File Path=".github/workflows/gource.yml" />
     <File Path=".github/workflows/ci.yml" />
     <File Path=".github/workflows/release.yml" />

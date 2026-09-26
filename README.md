@@ -1,9 +1,13 @@
 # Curl
 
-<a href="https://github.com/StewartScottRogers/Curl/raw/gource/gource.mp4"><img src="https://github.com/StewartScottRogers/Curl/raw/gource/gource.gif" alt="Gource animation of Curl's commit history across every branch" width="800"></a>
+<a href="https://stewartscottrogers.github.io/Curl/" target="_blank"><img src="https://github.com/StewartScottRogers/Curl/raw/gource/gource.gif" alt="Gource animation of Curl's commit history across every branch - click to watch in 8K, full screen" width="800"></a>
 
-*Curl's history across every branch, drawn by [Gource](https://gource.io) and re-rendered
-after new commits and at least once a day. Click it for the full video.*
+### [▶ Watch in 8K, full screen](https://stewartscottrogers.github.io/Curl/)
+
+*Every commit on every branch, human and AI, drawn by [Gource](https://gource.io) at
+7680 × 4320 and re-rendered after new commits and at least once a day. The viewer plays
+the best quality your screen can show - 8K, 4K or HD - with a 4K MP4 and an 8K still to
+download. Ctrl-click (⌘-click on a Mac) to open it in its own tab.*
 
 ## What this is
 
