@@ -28,6 +28,7 @@ choices do not need one.
 | [0011](ADR-0011-cipher-options-follow-schannel-on-windows-and-are-honoured-elsewhere.md) | `--ciphers` and `--tls13-ciphers`: Schannel behaviour on Windows, honoured through `CipherSuitesPolicy` on Linux and macOS | Accepted | 2026-09-26 |
 | [0012](ADR-0012-relicense-from-gpl-3-0-to-mit.md) | Relicense from GPL-3.0 to MIT | Accepted | 2026-09-26 |
 | [0013](ADR-0013-upstream-test-cases-run-as-data-driven-mstest.md) | curl's upstream test cases run as data-driven MSTest cases, in process | Accepted | 2026-09-26 |
+| [0014](ADR-0014-http-request-options-and-the-auth-cookie-and-proxy-seams.md) | HTTP request options and the auth, cookie and proxy seams | Accepted | 2026-09-26 |
 
 ## Template
 

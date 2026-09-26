@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation/Planning/Decisions]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-157 — Record the ADR for HTTP request options, proxy connect targets and the auth and cookie seams
 
@@ -31,17 +31,23 @@ An Accepted ADR fixes the public surface of `HttpRequestOptions`, `HttpRequestBo
 
 ## Acceptance criteria
 
-- [ ] A new ADR under `Documentation/Planning/Decisions/` with the next free number, status Accepted, titled for HTTP request options and the auth, cookie and proxy seams, states that it was decided by Claude under Stewart's delegation, and records the decision, the reasons and the alternatives rejected.
-- [ ] `Documentation/Planning/Decisions/README.md` lists the new ADR.
-- [ ] The ADR lists every type and member named in Context with its C# signature and nullability, the `HttpAuthSchemes` flags, and what each `HttpRequestOptions` member maps from on the command line.
-- [ ] The ADR states why these live in Abstractions (Http may not reference Authentication or Cookies) and why the multipart builder lives in `Curl.Core.UnitLibrary`.
-- [ ] The ADR states that `TransferContext.Http` defaults to null and that non-HTTP handlers ignore it.
+- [x] A new ADR under `Documentation/Planning/Decisions/` with the next free number, status Accepted, titled for HTTP request options and the auth, cookie and proxy seams, states that it was decided by Claude under Stewart's delegation, and records the decision, the reasons and the alternatives rejected.
+- [x] `Documentation/Planning/Decisions/README.md` lists the new ADR.
+- [x] The ADR lists every type and member named in Context with its C# signature and nullability, the `HttpAuthSchemes` flags, and what each `HttpRequestOptions` member maps from on the command line.
+- [x] The ADR states why these live in Abstractions (Http may not reference Authentication or Cookies) and why the multipart builder lives in `Curl.Core.UnitLibrary`.
+- [x] The ADR states that `TransferContext.Http` defaults to null and that non-HTTP handlers ignore it.
 
 ## Notes
 
 - Plan item: X1 in the Phase 1 HTTP plan (2026-09-26); plan keys in this file were replaced by their task IDs.
 
+- Delivered as ADR-0014 (`Documentation/Planning/Decisions/ADR-0014-http-request-options-and-the-auth-cookie-and-proxy-seams.md`), written by align-and-document; docs only, no `.cs` changed.
+- Choices recorded in the ADR (defaults taken, unattended run): `bool ProxyTunnel` (`-p`) added so BL-192/BL-212 have a member to fill; `-T` stays on `ITransferContext.Upload` (PUT) and `Body` carries only the `-d`/`-F` families (POST), because curl sends them with different methods; `Bearer = 16` is a flag but not in `Any`, since `--anyauth` covers only user/password schemes; `ProxyKind` has Http, Http10, Https, Socks4, Socks4a, Socks5, Socks5Hostname because Phase 1 tasks need SOCKS; `IHttpAuthenticator` returns only the header value (null = no header) and is stateless, so NTLM/Negotiate need a later ADR.
+- TransferReport, TransferTimings and ConnectTimings are only named here; BL-158 specifies them.
+- Number 0014 was the next free one in this lane; if a parallel lane lands another ADR-0014 first, the second to integrate renumbers.
+
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. ADR-0014 fixes HttpRequestOptions, HttpRequestBody, ProxyEndpoint/ConnectTarget.Proxy, IHttpAuthenticator and ICookieStore
