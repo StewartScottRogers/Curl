@@ -37,3 +37,4 @@ The Http library decodes `Transfer-Encoding: chunked` bodies, including chunk ex
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
