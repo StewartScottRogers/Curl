@@ -36,7 +36,7 @@ exit 23.
 Under `-R`/`--remote-time` a successful transfer to an `-o` file whose result carries
 `SourceLastWriteTimeUtc` stamps the closed file with it through `IFileTimeSetter`
 (`PhysicalFileSystem` in production), even when no body was written, as curl does. A
-failed stamp is ignored for now; curl's warning lines for it are BL-135.
+failed stamp is ignored for now; curl's warning lines for it are BL-139.
 
 After each successful transfer, standard error gets the opening of curl's progress meter
 (`ProgressMeterLines`): `** Resuming transfer from byte position N` when it resumed past

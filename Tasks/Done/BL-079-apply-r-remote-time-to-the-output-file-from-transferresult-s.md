@@ -108,7 +108,7 @@ original Context is now a measure-then-match criterion.
   (never throws) for every exception `FileOpenFailure.IsOpenFailure` names, because the
   setter can fail: a missing `-o` file is the measured case below. Choice: a `bool` rather
   than an exception, so the runner stays exception-free; printing curl's warning for the
-  failure is BL-135.
+  failure is BL-139.
 - `CurlCommandRunner` takes it as a new constructor parameter beside `outputFileSystem`;
   `CurlComposition` passes a `PhysicalFileSystem`. `TransferToOutputFileAsync` now wraps
   the old body (`TransferIntoOutputFileAsync`) and stamps the file after the
@@ -127,7 +127,7 @@ original Context is now a measure-then-match criterion.
 - Matched here: the runner applies the time for a bodiless success, as for an unmet `-z`
   (`RunAsync_RemoteTimeWithTransferThatWroteNoBody_StillSetsTheSourceTime`). Not matched,
   and filed: our runner creates an empty `-o` file for any bodiless success, which curl
-  does not for an unmet `-z` (BL-136); the two warning lines (BL-135); `-z` itself is not
+  does not for an unmet `-z` (BL-136); the two warning lines (BL-139); `-z` itself is not
   parsed yet, so the case is driven by a handler that returns what `FileProtocolHandler`
   returns for an unmet condition (BL-138).
 - Coverage: `Measure-CodeQuality.ps1` reports 100% line and branch for both

@@ -24,7 +24,7 @@ an existing one untouched), while a genuine zero-byte download still creates an 
   - `curl -R -z "1 Jan 2030" -o out2.txt file:///Z:/tmp/src.txt` (unmet, `out2.txt` did
     not exist) exits 0 and creates **no** `out2.txt`.
   - The same with an existing `out3.txt` containing `old` exits 0 and leaves its content
-    `old` (under `-R` its mtime is set to the source's; that part is BL-079's and BL-135's).
+    `old` (under `-R` its mtime is set to the source's; that part is BL-079's and BL-139's).
   - `-z "1 Jan 2000"` (met) downloads normally.
 - `Curl.Console/DeferredOutputFileStream.cs`, `CompleteAsync`, creates the `-o` file for
   any successful result when nothing was written (`createsEmptyFile = file is null && result.IsSuccess`).

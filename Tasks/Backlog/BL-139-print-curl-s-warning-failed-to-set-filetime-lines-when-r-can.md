@@ -1,5 +1,5 @@
 ---
-id: BL-135
+id: BL-139
 title: Print curl's Warning: Failed to set filetime lines when -R cannot stamp the -o file
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: FR-011
 created: 2026-09-26
 completed:
 ---
-# BL-135 — Print curl's Warning: Failed to set filetime lines when -R cannot stamp the -o file
+# BL-139 — Print curl's Warning: Failed to set filetime lines when -R cannot stamp the -o file
 
 ## Goal
 
