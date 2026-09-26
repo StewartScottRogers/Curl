@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
 requirement: FR-011
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-125 — Parse -R/--remote-time and --no-remote-time into CommandLineOptions
 
@@ -34,15 +34,15 @@ spelling asked for the remote time.
 
 ## Acceptance criteria
 
-- [ ] Tests in `Curl.Cli.UnitTests` assert `RemoteTime` is `true` for `-R` and for
+- [x] Tests in `Curl.Cli.UnitTests` assert `RemoteTime` is `true` for `-R` and for
       `--remote-time`, `false` when absent, `false` for `-R --no-remote-time`, and `true`
       for `--no-remote-time -R`.
-- [ ] `CommandLineOptionTable.Rows` contains the `remote-time` row with short name `R`, a
+- [x] `CommandLineOptionTable.Rows` contains the `remote-time` row with short name `R`, a
       flag that takes no value; a data row in
       `Curl.Cli.UnitTests/CommandLineOptionTableTests.cs`
       (`Rows_FirstTableOption_HasItsShortNameAndArity`) asserts it.
-- [ ] `Curl.Cli.UnitLibrary/README.md` lists the option.
-- [ ] `dotnet build Curl.Cli.UnitLibrary -warnaserror` is clean, `dotnet test --filter
+- [x] `Curl.Cli.UnitLibrary/README.md` lists the option.
+- [x] `dotnet build Curl.Cli.UnitLibrary -warnaserror` is clean, `dotnet test --filter
       "TestCategory!=Integration"` is green, and `Curl.Cli.UnitLibrary` keeps 100% line and
       branch coverage.
 
@@ -50,7 +50,18 @@ spelling asked for the remote time.
 
 Filed 2026-09-26 while re-planning BL-079, which was blocked because `-R` is not parsed.
 
+- Delivered directly instead of through the full `/feature` agent chain: the Context already
+  fixed the design (one `NegatableFlag` row plus one property), so a separate plan stage would
+  have added nothing. The existing negation machinery already covers `--no-remote-time`.
+- Tests live in the new `Curl.Cli.UnitTests/CommandLineRemoteTimeOptionTests.cs`; the table
+  row is asserted in `Rows_FirstTableOption_HasItsShortNameAndArity`.
+- Verified: `dotnet build Curl.Cli.UnitLibrary -warnaserror` clean, fast tests green (Curl.Cli
+  622 passed), Curl.Cli.UnitLibrary line-rate 1 and branch-rate 1.
+- `dotnet format --verify-no-changes` reports ENDOFLINE on `CommandLineOptionTableTests.cs`;
+  that file was already LF-only at HEAD, so this is not new and was left alone.
+
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. -R/--remote-time and --no-remote-time parse into CommandLineOptions.RemoteTime, last spelling wins
