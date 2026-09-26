@@ -36,3 +36,4 @@ Found in BL-111 (2026-09-26): once BL-120 parses `-D`, nothing in `Curl.Console/
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
