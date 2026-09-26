@@ -72,4 +72,22 @@
     <AdditionalFiles Include="$(CodeMetricsConfigFile)" Visible="false" />
   </ItemGroup>
 
+  <!--
+    Native ahead-of-time is not optional in this solution, so it is checked rather than
+    merely configured. IsAotCompatible is set above for every production project, which
+    turns on the trim and AOT analyzers; this target makes a project that quietly turns
+    it back off fail the build instead of failing much later at publish time. A new
+    project inherits both without touching its own csproj.
+
+    Test projects are exempt and must stay exempt: MSTest discovers tests by reflection,
+    which is exactly what the AOT analyzers exist to forbid. Nothing in a .UnitTests
+    project is published.
+  -->
+  <Target Name="VerifyAotCompatibility"
+          BeforeTargets="Build"
+          Condition="!$(MSBuildProjectName.EndsWith('UnitTests'))">
+    <Error Condition="'$(IsAotCompatible)' != 'true'"
+           Text="$(MSBuildProjectName) is a production project and must be ahead-of-time compatible. It sets IsAotCompatible=$(IsAotCompatible); remove that override and let Directory.Build.props set it to true." />
+  </Target>
+
 </Project>

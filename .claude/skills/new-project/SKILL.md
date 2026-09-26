@@ -26,4 +26,10 @@ There is no `src/` and no `tests/` — do not create them.
    `Directory.Packages.props` (create those at the root if missing).
 9. Add `Curl.<Area>.UnitLibrary/CLAUDE.md` with a short purpose statement and any
    project-specific rules.
-10. Run `dotnet build` and `dotnet test`; both must pass before finishing.
+10. Leave ahead-of-time compilation alone. `Directory.Build.props` sets
+    `IsAotCompatible` for every project that is not `*.UnitTests`, and its
+    `VerifyAotCompatibility` target fails the build if a project overrides it, so a new
+    project is AOT-checked the moment it exists. Never add `IsAotCompatible` or
+    `PublishAot` to a new csproj, and never set `IsAotCompatible` on a test project -
+    MSTest finds tests by reflection and the AOT analyzers forbid it.
+11. Run `dotnet build` and `dotnet test`; both must pass before finishing.

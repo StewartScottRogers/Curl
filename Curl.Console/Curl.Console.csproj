@@ -6,15 +6,23 @@
     <AssemblyName>curl</AssemblyName>
     <RootNamespace>Curl.Console</RootNamespace>
     <!--
-      Native ahead-of-time is the shipping configuration, but it needs the MSVC
-      linker from the "Desktop development with C++" workload. Defaulting it on
-      makes a plain `dotnet publish` fail on any machine without that workload,
-      including build agents, so it is opt-in:
-          dotnet publish Curl.Console -c Release -p:PublishAot=true
-      IsAotCompatible stays on for every library (Directory.Build.props), so the
-      trim and AOT analyzers still catch incompatible code at build time.
+      Native ahead-of-time is the shipping configuration and the default, so
+      `dotnet publish` produces the binary that ships rather than one that only
+      resembles it. `dotnet build` and `dotnet test` are unaffected - PublishAot
+      only takes effect on publish.
+
+      It needs the MSVC linker from the "Desktop development with C++" workload,
+      and it needs vswhere.exe on PATH to find it. Without vswhere the link step
+      fails with MSB3073 and a confusing "'vswhere.exe' is not recognized", so add
+      it once per shell or machine:
+          C:\Program Files (x86)\Microsoft Visual Studio\Installer
+      A machine that genuinely cannot link native code opts out per publish:
+          dotnet publish Curl.Console -c Release -p:PublishAot=false
+      IsAotCompatible stays on for every production project and is checked by the
+      VerifyAotCompatibility target in Directory.Build.props, so incompatible code
+      is caught at build time rather than here.
     -->
-    <PublishAot Condition=" '$(PublishAot)' == '' ">false</PublishAot>
+    <PublishAot Condition=" '$(PublishAot)' == '' ">true</PublishAot>
     <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
 

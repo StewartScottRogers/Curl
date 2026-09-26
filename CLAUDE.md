@@ -92,7 +92,13 @@ Each project folder may contain its own `CLAUDE.md` with project-specific rules;
 - Protocol handlers never construct a `Socket`, `SslStream` or `HttpClient`; they
   receive `IConnection`. This is what keeps protocol tests off the network.
 - Inject `TimeProvider` for anything time-dependent; never `Thread.Sleep`.
-- Published native-AOT: no reflection-based DI scanning, no dynamic code paths.
+- Published native-AOT: no reflection-based DI scanning, no dynamic code paths. Every
+  production project is AOT-compatible, `Directory.Build.props` sets it, and its
+  `VerifyAotCompatibility` target fails the build if a project overrides it - so a new
+  project is covered without touching its csproj. Test projects are exempt on purpose:
+  MSTest discovers tests by reflection. `dotnet publish Curl.Console` produces a native
+  binary by default and needs
+  `C:\Program Files (x86)\Microsoft Visual Studio\Installer` on PATH for vswhere.
 
 ## Things to never do
 - Do not edit anything under `bin/`, `obj/`, `.vs/`, or `data/`.
