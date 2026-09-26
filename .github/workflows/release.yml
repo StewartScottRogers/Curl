@@ -11,7 +11,8 @@
 # Native AOT cannot cross-compile between operating systems, so each package is built on
 # a runner of its own OS. Linux builds on Ubuntu 22.04 so the binary runs on glibc 2.35
 # and newer. DOWNLOAD.md, install.sh and install.ps1 rely on the package names below;
-# keep the four in step.
+# keep the four in step. DOWNLOAD.md links to one version by tag, because
+# releases/latest skips pre-releases: point it at each new release's tag.
 name: Release
 
 on:

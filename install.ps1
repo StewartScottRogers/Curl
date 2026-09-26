@@ -17,7 +17,7 @@
 #>
 [CmdletBinding()]
 param(
-    # Release tag to install, e.g. v0.1.0. Default: the latest release.
+    # Release tag to install, e.g. v0.1.0. Default: the newest release, pre-releases included.
     [string]$Version = 'latest',
     # Where curl.exe goes.
     [string]$InstallDir = (Join-Path $env:LOCALAPPDATA 'Programs\curl-dotnet\bin'),
@@ -37,11 +37,15 @@ switch ($arch) {
     default { throw "install.ps1: unsupported processor $arch; see DOWNLOAD.md" }
 }
 $package = "curl-$rid.zip"
+# releases/latest skips pre-releases, so ask the API for the newest release of any kind.
 if ($Version -eq 'latest') {
-    $base = "https://github.com/$repo/releases/latest/download"
-} else {
-    $base = "https://github.com/$repo/releases/download/$Version"
+    # Windows PowerShell returns a JSON array as one object; the pipeline unrolls it.
+    $newest = Invoke-RestMethod -UseBasicParsing -Uri "https://api.github.com/repos/$repo/releases?per_page=1" |
+        ForEach-Object { $_ } | Select-Object -First 1
+    if (-not $newest) { throw "install.ps1: no release found at https://github.com/$repo/releases" }
+    $Version = $newest.tag_name
 }
+$base = "https://github.com/$repo/releases/download/$Version"
 
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ([IO.Path]::GetRandomFileName())
 New-Item -ItemType Directory -Path $tmp | Out-Null
