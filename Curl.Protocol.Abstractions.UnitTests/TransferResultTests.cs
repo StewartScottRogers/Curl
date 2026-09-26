@@ -125,4 +125,25 @@ public sealed class TransferResultTests
         Assert.IsTrue(result.TimeConditionUnmet);
         Assert.AreEqual(SourceTime, result.SourceLastWriteTimeUtc);
     }
+
+    [TestMethod]
+    public void Report_OnEveryFactoryAndTheConstructor_IsNull()
+    {
+        Assert.IsNull(TransferResult.Success(0).Report);
+        Assert.IsNull(TransferResult.TimeConditionNotMet().Report);
+        Assert.IsNull(TransferResult.Failure(CurlExitCode.ReadError, "failed").Report);
+        Assert.IsNull(new TransferResult(CurlExitCode.Ok, 0).Report);
+    }
+
+    [TestMethod]
+    public void With_SettingReport_CarriesItAndKeepsThePositionalValues()
+    {
+        var report = new TransferReport { ResponseCode = 404 };
+
+        var result = TransferResult.Failure(CurlExitCode.HttpReturnedError, "failed", 7) with { Report = report };
+
+        Assert.AreSame(report, result.Report);
+        Assert.AreEqual(7L, result.BytesTransferred);
+        Assert.AreEqual("failed", result.ErrorMessage);
+    }
 }

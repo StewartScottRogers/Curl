@@ -35,6 +35,15 @@ public sealed record TransferResult(
     public bool TimeConditionUnmet { get; init; }
 
     /// <summary>
+    /// Gets what the transfer learned beyond <see cref="ExitCode" /> and
+    /// <see cref="BytesTransferred" />, for <c>-w</c>/<c>--write-out</c> and
+    /// <c>-L</c>/<c>--location</c>; <see langword="null" /> when the handler reported
+    /// nothing more. A failed transfer may carry one too. A handler fills it with
+    /// <c>with</c>: <c>TransferResult.Success(n) with { Report = report }</c>. See ADR-0015.
+    /// </summary>
+    public TransferReport? Report { get; init; }
+
+    /// <summary>
     /// Creates a successful result.
     /// </summary>
     /// <param name="bytesTransferred">The number of payload bytes moved.</param>
