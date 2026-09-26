@@ -126,3 +126,18 @@ libcurl 8.21.0:
   from the curl 8.21.0 binary on Windows — `curl -sI file:///NUL` still prints
   `Last-Modified: Thu, 01 Jan 1970 00:00:00 GMT` — so it rests on the upstream source,
   not on a measurement.
+
+## Amendment, 2026-09-26 — a read open may be non-seekable (BL-051)
+
+A read open is seekable for a regular file, not for every path. `PhysicalFileSystem`
+(BL-009) opens a character device or a FIFO — `NUL` on Windows, `/dev/stdin` elsewhere
+— as a stream whose `CanSeek` is `false` and whose `FileOpenResult.Length` is zero, as
+curl's `fstat` of one reports size zero. The Decision's premise that `-r`/`--range` and
+`-C`/`--continue-at` are served by seeking still holds for regular files, and
+`IFileSystem` still needs no seek member; a caller checks `CanSeek` first.
+
+`FileProtocolHandler` answers a download's non-zero range or resume offset on a non-seekable
+source with exit 36 (`CURLE_BAD_DOWNLOAD_RESUME`) instead of seeking, as curl 8.21.0's
+`lib/file.c` does for a failed `lseek`
+(<https://curl.se/libcurl/c/libcurl-errors.html>). The XML docs on
+`IFileSystem.OpenForReadAsync` and `FileOpenResult` say the same.

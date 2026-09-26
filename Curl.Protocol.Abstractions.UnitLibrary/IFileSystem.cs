@@ -42,8 +42,11 @@ public interface IFileSystem
     /// </param>
     /// <param name="cancellationToken">Cancels the open.</param>
     /// <returns>
-    /// The outcome. When it succeeded, <see cref="FileOpenResult.Content" /> is
-    /// seekable, so a range or resume offset is applied by seeking it.
+    /// The outcome. When it succeeded for a regular file,
+    /// <see cref="FileOpenResult.Content" /> is seekable, so a range or resume offset is
+    /// applied by seeking it. For a character device or a FIFO it may be non-seekable,
+    /// with a <see cref="FileOpenResult.Length" /> of zero; check
+    /// <see cref="Stream.CanSeek" /> before seeking.
     /// </returns>
     ValueTask<FileOpenResult> OpenForReadAsync(string path, CancellationToken cancellationToken);
 

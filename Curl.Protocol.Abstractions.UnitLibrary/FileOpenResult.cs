@@ -8,8 +8,10 @@ namespace Curl.Protocol.Abstractions;
 /// <param name="Content">
 /// The opened stream, non-<see langword="null" /> exactly when <see cref="IsOpen" /> is
 /// <see langword="true" /> and <see langword="null" /> in every other case. Ownership
-/// passes to the caller, which disposes it. For an open for reading,
-/// <see cref="Stream.CanSeek" /> is contractually <see langword="true" />.
+/// passes to the caller, which disposes it. For an open for reading of a regular file,
+/// <see cref="Stream.CanSeek" /> is <see langword="true" />; for a character device or a
+/// FIFO (<c>NUL</c>, <c>/dev/stdin</c>) it may be <see langword="false" />, with a
+/// <see cref="Length" /> of zero.
 /// </param>
 /// <param name="Length">
 /// The length in bytes of the opened handle, or zero when the open failed.
@@ -33,9 +35,18 @@ namespace Curl.Protocol.Abstractions;
 /// timestamp belonging to a file that is no longer the one being read.
 /// </para>
 /// <para>
-/// Because a read open is always seekable, <c>-r</c>/<c>--range</c> and
+/// A read open of a regular file is seekable, so <c>-r</c>/<c>--range</c> and
 /// <c>-C</c>/<c>--continue-at</c> are served by seeking <see cref="Content" />, which is
 /// why <see cref="IFileSystem" /> needs no seek or position member of its own.
+/// </para>
+/// <para>
+/// A read open of a character device or a FIFO may not be: <see cref="Stream.CanSeek" />
+/// is <see langword="false" /> and <see cref="Length" /> is zero, as curl's
+/// <c>fstat</c> of one reports size zero. A caller must check
+/// <see cref="Stream.CanSeek" /> before seeking; the <c>file</c> handler answers a
+/// download's non-zero offset on such a source with exit 36
+/// (<see cref="CurlExitCode.BadDownloadResume" />), as curl 8.21.0 does for a failed
+/// <c>lseek</c>.
 /// </para>
 /// </remarks>
 public sealed record FileOpenResult(
@@ -53,7 +64,10 @@ public sealed record FileOpenResult(
     /// <summary>
     /// Creates the result of a successful open.
     /// </summary>
-    /// <param name="content">The opened stream; seekable when the open was for reading.</param>
+    /// <param name="content">
+    /// The opened stream. A read open of a regular file is seekable; one of a character
+    /// device or a FIFO may not be.
+    /// </param>
     /// <param name="length">The length in bytes of the opened handle.</param>
     /// <param name="lastWriteTimeUtc">
     /// The last-write timestamp of the opened handle, in Coordinated Universal Time, or
