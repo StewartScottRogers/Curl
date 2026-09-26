@@ -1,5 +1,5 @@
 ---
-id: BL-100
+id: BL-103
 title: Stop the remaining URLs when a resumed -o file cannot be opened in Curl.Console
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-100 — Stop the remaining URLs when a resumed -o file cannot be opened in Curl.Console
+# BL-103 — Stop the remaining URLs when a resumed -o file cannot be opened in Curl.Console
 
 ## Goal
 

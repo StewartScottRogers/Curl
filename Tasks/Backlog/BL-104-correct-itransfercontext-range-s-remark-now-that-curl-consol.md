@@ -1,5 +1,5 @@
 ---
-id: BL-101
+id: BL-104
 title: Correct ITransferContext.Range's remark now that Curl.Console parses -r
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-101 — Correct ITransferContext.Range's remark now that Curl.Console parses -r
+# BL-104 — Correct ITransferContext.Range's remark now that Curl.Console parses -r
 
 ## Goal
 

@@ -82,8 +82,8 @@ reach standard error. Measured behaviour is in BL-013's Notes and in
 - Coverage: every line and branch added here is covered (`dotnet test --collect "Code
   Coverage;Format=cobertura"`). The only uncovered code in `Curl.Console` predates this task:
   `CurlTransports.cs` lines 16-23 and one branch of `TlsClientOptionsMapping.cs` line 31.
-- Follow-ups filed: BL-100 (stop the remaining URLs after a resumed `-o` cannot be opened),
-  BL-101 (stale BL-090 remark on `ITransferContext.Range`), BL-102 (progress meter and the
+- Follow-ups filed: BL-103 (stop the remaining URLs after a resumed `-o` cannot be opened),
+  BL-104 (stale BL-090 remark on `ITransferContext.Range`), BL-102 (progress meter and the
   `** Resuming` line).
 
 ## Log
