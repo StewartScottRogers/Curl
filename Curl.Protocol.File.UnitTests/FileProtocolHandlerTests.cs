@@ -1211,6 +1211,98 @@ public sealed class FileProtocolHandlerTests
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
     }
 
+    // Measured on curl 8.21.0: a -z date equal to the file's timestamp transfers nothing
+    // in either direction. The comparison is strict both ways.
+    [TestMethod]
+    public async Task ExecuteAsync_IfModifiedSinceEqualToFileTime_TransfersNothing()
+    {
+        var output = new ChunkRecordingStream();
+        var headers = new ChunkRecordingStream();
+
+        var result = await TimeConditionResultAsync(
+            FakeFileSystem.DefaultLastWriteTimeUtc,
+            new TimeCondition(FakeFileSystem.DefaultLastWriteTimeUtc, TimeConditionKind.IfModifiedSince),
+            output,
+            headers);
+
+        Assert.IsEmpty(output.ToArray());
+        Assert.IsEmpty(headers.WriteLengths);
+        Assert.AreEqual(0L, result.BytesTransferred);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_IfUnmodifiedSinceEqualToFileTime_TransfersNothing()
+    {
+        var output = new ChunkRecordingStream();
+        var headers = new ChunkRecordingStream();
+
+        var result = await TimeConditionResultAsync(
+            FakeFileSystem.DefaultLastWriteTimeUtc,
+            new TimeCondition(FakeFileSystem.DefaultLastWriteTimeUtc, TimeConditionKind.IfUnmodifiedSince),
+            output,
+            headers);
+
+        Assert.IsEmpty(output.ToArray());
+        Assert.IsEmpty(headers.WriteLengths);
+        Assert.AreEqual(0L, result.BytesTransferred);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+    }
+
+    // curl sees a local file's timestamp in whole seconds, so a file 200 milliseconds
+    // newer than the condition is the same second and is not newer.
+    [TestMethod]
+    public async Task ExecuteAsync_FileNewerBySubSecondOnly_TransfersNothing()
+    {
+        var output = new ChunkRecordingStream();
+        var headers = new ChunkRecordingStream();
+
+        var result = await TimeConditionResultAsync(
+            FakeFileSystem.DefaultLastWriteTimeUtc.AddMilliseconds(200),
+            new TimeCondition(FakeFileSystem.DefaultLastWriteTimeUtc, TimeConditionKind.IfModifiedSince),
+            output,
+            headers);
+
+        Assert.IsEmpty(output.ToArray());
+        Assert.IsEmpty(headers.WriteLengths);
+        Assert.AreEqual(0L, result.BytesTransferred);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_FileNewerByOneWholeSecond_IfModifiedSinceTransfersTheBody()
+    {
+        var output = new ChunkRecordingStream();
+        var headers = new ChunkRecordingStream();
+
+        var result = await TimeConditionResultAsync(
+            FakeFileSystem.DefaultLastWriteTimeUtc.AddSeconds(1),
+            new TimeCondition(FakeFileSystem.DefaultLastWriteTimeUtc, TimeConditionKind.IfModifiedSince),
+            output,
+            headers);
+
+        CollectionAssert.AreEqual(Content, output.ToArray());
+        Assert.AreEqual((long)Content.Length, result.BytesTransferred);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_FileOlderByOneWholeSecond_IfUnmodifiedSinceTransfersTheBody()
+    {
+        var output = new ChunkRecordingStream();
+        var headers = new ChunkRecordingStream();
+
+        var result = await TimeConditionResultAsync(
+            FakeFileSystem.DefaultLastWriteTimeUtc.AddSeconds(-1),
+            new TimeCondition(FakeFileSystem.DefaultLastWriteTimeUtc, TimeConditionKind.IfUnmodifiedSince),
+            output,
+            headers);
+
+        CollectionAssert.AreEqual(Content, output.ToArray());
+        Assert.AreEqual((long)Content.Length, result.BytesTransferred);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+    }
+
     // Measured on curl 8.21.0: curl -i -z <a future date> <an older file> prints nothing
     // at all, headers included, and exits 0. The time condition is decided before the
     // header block is written.
@@ -1698,6 +1790,26 @@ public sealed class FileProtocolHandlerTests
         {
             Url = FileUrl,
             Upload = new TrackedMemoryStream(Content),
+        };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        return await handler.ExecuteAsync(context);
+    }
+
+    private static async Task<TransferResult> TimeConditionResultAsync(
+        DateTimeOffset lastWriteTimeUtc,
+        TimeCondition condition,
+        Stream output,
+        Stream headerOutput)
+    {
+        var fileSystem = new FakeFileSystem();
+        fileSystem.AddFile(OsPath, Content, lastWriteTimeUtc);
+        var context = new FakeTransferContext
+        {
+            Url = FileUrl,
+            Output = output,
+            HeaderOutput = headerOutput,
+            TimeCondition = condition,
         };
         var handler = new FileProtocolHandler(fileSystem);
 

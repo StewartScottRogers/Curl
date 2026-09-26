@@ -502,13 +502,38 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     /// <see langword="true" /> when the body should be transferred. An unmet condition is
     /// a success with no body, not a failure.
     /// </returns>
+    /// <remarks>
+    /// Both operands are truncated to whole seconds, because curl sees a local file's
+    /// timestamp in whole seconds, and both comparisons are strict: at equality neither
+    /// direction transfers, as measured on curl 8.21.0. Truncation is this handler's
+    /// comparison rule; <see cref="TimeCondition" /> itself is left as the command line
+    /// parsed it.
+    /// </remarks>
     private static bool MeetsTimeCondition(
         TimeCondition? condition,
-        DateTimeOffset lastWriteTimeUtc) =>
-        condition is null
-        || (condition.Kind == TimeConditionKind.IfModifiedSince
-            ? lastWriteTimeUtc > condition.Value
-            : lastWriteTimeUtc <= condition.Value);
+        DateTimeOffset lastWriteTimeUtc)
+    {
+        if (condition is null)
+        {
+            return true;
+        }
+
+        long fileSeconds = WholeSeconds(lastWriteTimeUtc);
+        long conditionSeconds = WholeSeconds(condition.Value);
+
+        return condition.Kind == TimeConditionKind.IfModifiedSince
+            ? fileSeconds > conditionSeconds
+            : fileSeconds < conditionSeconds;
+    }
+
+    /// <summary>
+    /// Counts the whole seconds from <see cref="DateTimeOffset.MinValue" /> to
+    /// <paramref name="value" /> in UTC, dropping any fraction of a second.
+    /// </summary>
+    /// <param name="value">The timestamp to truncate.</param>
+    /// <returns>The timestamp as a count of whole seconds.</returns>
+    private static long WholeSeconds(DateTimeOffset value) =>
+        value.UtcTicks / TimeSpan.TicksPerSecond;
 
     /// <summary>
     /// Turns <c>-C</c>/<c>--continue-at</c> or <c>-r</c>/<c>--range</c> into the window of
