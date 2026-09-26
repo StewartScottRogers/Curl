@@ -16,7 +16,9 @@ namespace Curl.Protocol.Telnet;
 /// </para>
 /// <para>
 /// Option negotiation follows RFC 1143. This side performs BINARY and SGA when asked and
-/// asks the server to perform BINARY, SGA and ECHO; every other option is refused. The
+/// asks the server to perform BINARY, SGA and ECHO; every other option is refused. A
+/// <c>-t BINARY=0</c> takes BINARY out of all of these, so it is refused both ways and
+/// left out of the offers. The
 /// first <c>WILL</c>, <c>WONT</c>, <c>DO</c> or <c>DONT</c> the server sends makes this
 /// side offer its own options once, after the replies to that read: <c>IAC WILL BINARY</c>,
 /// <c>IAC DO BINARY</c>, <c>IAC WILL SGA</c>, <c>IAC DO SGA</c>, less any already settled.
@@ -47,18 +49,16 @@ internal sealed class TelnetReceiver
     /// </summary>
     private const int NewEnvironmentReplyLimit = 2042;
 
-    /// <summary>The options this side asks the server to perform, as well as performing them.</summary>
-    private static readonly byte[] OptionsOfferedBothWays =
-        [TelnetByte.BinaryOption, TelnetByte.SuppressGoAheadOption];
-
     private readonly TelnetOptionValues optionValues;
+
+    /// <summary>The options this side asks the server to perform, as well as performing them.</summary>
+    private readonly byte[] optionsOfferedBothWays;
 
     private readonly byte[] localOptionsOffered;
 
     private readonly TelnetOptionSide localOptions;
 
-    private readonly TelnetOptionSide remoteOptions =
-        new(TelnetByte.Do, TelnetByte.Dont, [.. OptionsOfferedBothWays, TelnetByte.EchoOption]);
+    private readonly TelnetOptionSide remoteOptions;
 
     private readonly List<byte> subnegotiation = [];
 
@@ -73,13 +73,21 @@ internal sealed class TelnetReceiver
     /// </summary>
     /// <param name="optionValues">
     /// What the <c>-t</c> options supplied: each of <c>TTYPE</c>, <c>XDISPLOC</c> and
-    /// <c>NEW-ENVIRON</c> that has a value is one more option this side performs and offers.
+    /// <c>NEW-ENVIRON</c> that has a value is one more option this side performs and offers,
+    /// and a refused <c>BINARY</c> is neither offered nor accepted.
     /// </param>
     public TelnetReceiver(TelnetOptionValues optionValues)
     {
         this.optionValues = optionValues;
-        localOptionsOffered = [.. OptionsOfferedBothWays, .. OptionsWithValues(optionValues)];
+        optionsOfferedBothWays = optionValues.BinaryRefused
+            ? [TelnetByte.SuppressGoAheadOption]
+            : [TelnetByte.BinaryOption, TelnetByte.SuppressGoAheadOption];
+        localOptionsOffered = [.. optionsOfferedBothWays, .. OptionsWithValues(optionValues)];
         localOptions = new TelnetOptionSide(TelnetByte.Will, TelnetByte.Wont, localOptionsOffered);
+        remoteOptions = new TelnetOptionSide(
+            TelnetByte.Do,
+            TelnetByte.Dont,
+            [.. optionsOfferedBothWays, TelnetByte.EchoOption]);
     }
 
     /// <summary>
@@ -356,7 +364,7 @@ internal sealed class TelnetReceiver
         foreach (byte option in localOptionsOffered)
         {
             localOptions.RequestEnable(option, replies);
-            if (Array.IndexOf(OptionsOfferedBothWays, option) >= 0)
+            if (Array.IndexOf(optionsOfferedBothWays, option) >= 0)
             {
                 remoteOptions.RequestEnable(option, replies);
             }

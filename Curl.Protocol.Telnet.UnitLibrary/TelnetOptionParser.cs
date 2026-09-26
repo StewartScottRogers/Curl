@@ -10,9 +10,11 @@ namespace Curl.Protocol.Telnet;
 /// <remarks>
 /// <para>
 /// The names are <c>TTYPE</c>, <c>XDISPLOC</c>, <c>NEW_ENV</c>, <c>WS</c> and
-/// <c>BINARY</c>, matched ignoring case. <c>WS</c> and <c>BINARY</c> are checked as curl
-/// checks them and otherwise ignored: the window size and binary refusal they ask for are
-/// not negotiated.
+/// <c>BINARY</c>, matched ignoring case. <c>WS</c> is checked as curl checks it and
+/// otherwise ignored: the window size it asks for is not negotiated. A <c>BINARY</c> value
+/// whose leading digits are all zeros (<c>0</c>, <c>00</c>, <c>0x</c>) refuses BINARY;
+/// any other value, <c>x</c>, <c>+0</c> and <c>0</c> after a space included, leaves it on, as
+/// measured against curl 8.21.0.
 /// </para>
 /// <para>
 /// A value with any non-ASCII character makes curl skip the option unread, whatever its
@@ -106,8 +108,20 @@ internal static class TelnetOptionParser
             case WindowSizeName:
                 return IsWindowSize(value) ? null : SyntaxError(option);
             default:
+                values.BinaryRefused |= IsZero(value);
                 return null;
         }
+    }
+
+    private static bool IsZero(string value)
+    {
+        int digits = 0;
+        while (digits < value.Length && char.IsAsciiDigit(value[digits]))
+        {
+            digits++;
+        }
+
+        return digits > 0 && value.AsSpan(0, digits).TrimStart('0').IsEmpty;
     }
 
     private static bool IsWindowSize(string value)

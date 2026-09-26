@@ -311,6 +311,73 @@ public sealed class TelnetProtocolHandlerTelnetOptionTests
         Assert.AreEqual(string.Empty, exchange.Sent);
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_BinaryZeroAndServerSendsDoThenWillBinary_RefusesBothAndOffersOnlySga()
+    {
+        Exchange exchange = await RunAsync(["BINARY=0"], Read("FF FD 00"), Read("FF FB 00"));
+
+        Assert.AreEqual("FF FC 00 FF FB 03 FF FD 03 FF FE 00", exchange.Sent);
+        Assert.AreEqual(CurlExitCode.Ok, exchange.Result.ExitCode);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_BinaryZeroAndServerSendsDoAndWillBinaryInOneRead_RefusesBothThenOffersSga()
+    {
+        Exchange exchange = await RunAsync(["BINARY=0"], Read("FF FD 00 FF FB 00"));
+
+        Assert.AreEqual("FF FC 00 FF FE 00 FF FB 03 FF FD 03", exchange.Sent);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_BinaryZeroAndServerWillEcho_OffersOnlySga()
+    {
+        Exchange exchange = await RunAsync(["BINARY=0"], Read("FF FB 01"));
+
+        Assert.AreEqual("FF FD 01 FF FB 03 FF FD 03", exchange.Sent);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_BinaryZeroWithTerminalType_OffersTtypeAfterSga()
+    {
+        Exchange exchange = await RunAsync(["BINARY=0", "TTYPE=vt"], Read("FF FD 00"), Read("FF FB 00"));
+
+        Assert.AreEqual("FF FC 00 FF FB 03 FF FD 03 FF FB 18 FF FE 00", exchange.Sent);
+    }
+
+    [TestMethod]
+    [DataRow(new[] { "BINARY=0" }, false, DisplayName = "0 refuses")]
+    [DataRow(new[] { "binary=0" }, false, DisplayName = "lower-case name refuses")]
+    [DataRow(new[] { "BINARY=00" }, false, DisplayName = "00 refuses")]
+    [DataRow(new[] { "BINARY=000000000000000000000" }, false, DisplayName = "many zeros refuse")]
+    [DataRow(new[] { "BINARY=0x" }, false, DisplayName = "0 then a letter refuses")]
+    [DataRow(new[] { "BINARY=0 " }, false, DisplayName = "0 then a space refuses")]
+    [DataRow(new[] { "BINARY=0,1" }, false, DisplayName = "0 then a comma refuses")]
+    [DataRow(new[] { "BINARY=0", "BINARY=1" }, false, DisplayName = "a later 1 does not undo a 0")]
+    [DataRow(new[] { "BINARY=1", "BINARY=0" }, false, DisplayName = "a later 0 refuses")]
+    [DataRow(new[] { "BINARY=1" }, true, DisplayName = "1 keeps it")]
+    [DataRow(new[] { "BINARY=01" }, true, DisplayName = "01 keeps it")]
+    [DataRow(new[] { "BINARY=00001" }, true, DisplayName = "00001 keeps it")]
+    [DataRow(new[] { "BINARY=1x" }, true, DisplayName = "1x keeps it")]
+    [DataRow(new[] { "BINARY= 1" }, true, DisplayName = "space then 1 keeps it")]
+    [DataRow(new[] { "BINARY= 0" }, true, DisplayName = "space then 0 keeps it")]
+    [DataRow(new[] { "BINARY=	0" }, true, DisplayName = "tab then 0 keeps it")]
+    [DataRow(new[] { "BINARY=+0" }, true, DisplayName = "+0 keeps it")]
+    [DataRow(new[] { "BINARY=-0" }, true, DisplayName = "-0 keeps it")]
+    [DataRow(new[] { "BINARY=+1" }, true, DisplayName = "+1 keeps it")]
+    [DataRow(new[] { "BINARY=-1" }, true, DisplayName = "-1 keeps it")]
+    [DataRow(new[] { "BINARY=2" }, true, DisplayName = "2 keeps it")]
+    [DataRow(new[] { "BINARY=4294967297" }, true, DisplayName = "2^32 + 1 keeps it")]
+    [DataRow(new[] { "BINARY=x" }, true, DisplayName = "a letter keeps it")]
+    [DataRow(new[] { "BINARY=" }, true, DisplayName = "empty keeps it")]
+    public async Task ExecuteAsync_BinaryValue_KeepsOrRefusesBinaryAsCurlDoes(string[] options, bool binaryKept)
+    {
+        Exchange exchange = await RunAsync(options, Read("FF FD 00"), Read("FF FB 00"));
+
+        string expected = binaryKept ? Offers : "FF FC 00 FF FB 03 FF FD 03 FF FE 00";
+        Assert.AreEqual(expected, exchange.Sent);
+        Assert.AreEqual(CurlExitCode.Ok, exchange.Result.ExitCode);
+    }
+
     private static ScriptedRead Read(string hex) => new(Convert.FromHexString(hex.Replace(" ", string.Empty, StringComparison.Ordinal)));
 
     private static string ToHex(byte[] bytes) =>

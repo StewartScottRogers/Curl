@@ -24,4 +24,11 @@ internal sealed class TelnetOptionValues
     /// <c>NAME</c> alone for a variable sent without a value.
     /// </summary>
     public List<string> EnvironmentVariables { get; } = [];
+
+    /// <summary>
+    /// Gets or sets a value indicating whether a <c>BINARY=</c> value read as zero, so
+    /// this side neither offers nor accepts BINARY in either direction. A later
+    /// <c>BINARY=1</c> does not undo it, as in curl 8.21.0.
+    /// </summary>
+    public bool BinaryRefused { get; set; }
 }
