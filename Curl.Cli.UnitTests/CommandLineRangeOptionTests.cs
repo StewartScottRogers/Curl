@@ -188,6 +188,7 @@ public sealed class CommandLineRangeOptionTests
 
     [TestMethod]
     [DataRow("-C", "abc")]
+    [DataRow("-C", "-5")]
     [DataRow("-C", "-1")]
     [DataRow("-C", "-0")]
     [DataRow("-C", "")]
@@ -206,6 +207,37 @@ public sealed class CommandLineRangeOptionTests
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal.ExitCode);
         CollectionAssert.AreEqual(
             new[] { $"curl: option {spelledOption}: expected a proper numerical parameter", TryHelp },
+            result.Refusal.StandardErrorLines.ToArray());
+    }
+
+    // curl -C -5 <bad URL> and curl -C -5 with no URL: exit 2 on the -C value, measured on curl
+    // 8.21.0 on 2026-09-25. The option parser refuses it before any URL is looked at, so a
+    // malformed URL never gets the chance to make it exit 3.
+    [TestMethod]
+    [DataRow("-C", "file://[bad")]
+    [DataRow("--continue-at", "htp:/%zz")]
+    public void Parse_NegativeContinueAtWithAMalformedUrl_IsRefusedOnTheOptionWithExit2(
+        string spelledOption,
+        string malformedUrl)
+    {
+        CommandLineParseResult result = CommandLineParser.Parse([spelledOption, "-5", malformedUrl]);
+
+        Assert.IsFalse(result.IsAccepted);
+        Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal.ExitCode);
+        Assert.AreEqual(2, (int)result.Refusal.ExitCode);
+        CollectionAssert.AreEqual(
+            new[] { $"curl: option {spelledOption}: expected a proper numerical parameter", TryHelp },
+            result.Refusal.StandardErrorLines.ToArray());
+    }
+
+    [TestMethod]
+    public void Parse_NegativeContinueAtWithNoUrl_IsRefusedOnTheOptionNotForTheMissingUrl()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["-C", "-5"]);
+
+        Assert.IsFalse(result.IsAccepted);
+        CollectionAssert.AreEqual(
+            new[] { "curl: option -C: expected a proper numerical parameter", TryHelp },
             result.Refusal.StandardErrorLines.ToArray());
     }
 
