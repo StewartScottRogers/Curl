@@ -28,6 +28,10 @@ Each transfer's context carries the parsed `-r` range (`ByteRangeParser`; text t
 no range ends the transfer with exit 33 before it is dispatched), the `-C` offset and the
 `--max-filesize` limit. `-C -` resumes from the size of the URL's `-o` file, and a transfer
 that resumes past byte zero opens that file for appending before it starts, as curl does.
+`-D -` sends the handler's header lines to standard output; any other `-D` name is opened
+(unsanitized, truncated for the first URL and appended for the rest) before the transfer,
+and one that cannot be opened prints `curl: Failed to open <file>` and stops the run with
+exit 23.
 
 A URL with no `-o` writes through `StandardOutputFailureDeferringStream`, which
 models curl's 4096-byte stdio buffer: a failed standard output is reported as
