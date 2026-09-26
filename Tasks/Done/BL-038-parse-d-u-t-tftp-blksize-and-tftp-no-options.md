@@ -8,7 +8,7 @@ depends-on: [BL-037, BL-032]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-038 — Parse -d, -u, -t, --tftp-blksize and --tftp-no-options
 
@@ -45,25 +45,46 @@ Scope limits, each to be filed as its own task during the run rather than guesse
 
 ## Acceptance criteria
 
-- [ ] Tests in `Curl.Cli.UnitTests` show `-d 75` and `--data 75` give `PostData` bytes
+- [x] Tests in `Curl.Cli.UnitTests` show `-d 75` and `--data 75` give `PostData` bytes
       `37 35`; `-u bob:secret` gives user `bob`, password `secret`; `-u bob:se:cret`
       gives password `se:cret`.
-- [ ] A test shows `-t TTYPE=vt100 -t XDISPLOC=host:0` gives `TelnetOptions`
+- [x] A test shows `-t TTYPE=vt100 -t XDISPLOC=host:0` gives `TelnetOptions`
       `["TTYPE=vt100", "XDISPLOC=host:0"]` in that order, and `-t BOGUS=1` and `-t TTYPE`
       are recorded, not refused.
-- [ ] Tests show `--tftp-blksize 1024` gives 1024, `--tftp-blksize 5` gives 5, and
+- [x] Tests show `--tftp-blksize 1024` gives 1024, `--tftp-blksize 5` gives 5, and
       `--tftp-blksize abc` is refused with exit 2 and the two measured lines;
       `--tftp-no-options` sets `TftpNoOptions`.
-- [ ] Tests show `-t`, `--data`, `-u` and `--tftp-blksize` as the last argument are
+- [x] Tests show `-t`, `--data`, `-u` and `--tftp-blksize` as the last argument are
       refused with the measured `requires parameter` line naming the option as spelled.
-- [ ] The out-of-scope forms in `Context` are filed as tasks and their IDs recorded in
+- [x] The out-of-scope forms in `Context` are filed as tasks and their IDs recorded in
       `Notes`.
-- [ ] `dotnet build Curl.Cli.UnitLibrary -warnaserror` is clean and
+- [x] `dotnet build Curl.Cli.UnitLibrary -warnaserror` is clean and
       `dotnet test Curl.Cli.UnitTests --filter "TestCategory!=Integration"` is green.
 
 ## Notes
+
+- Delivered in-session rather than through the separate architect/test-writer agents: the
+  library's own `CLAUDE.md` already fixes the design (one table row plus one
+  `CommandLineOptions` property per option), so no plan was needed.
+- Measured with local curl 8.21.0 on 2026-09-26: `-d ''`, `--data=`, `-t ''` are accepted
+  (not refused as blank), so `-d`, `-u` and `-t` use `CommandLineOption.Value` with an
+  applier that accepts an empty value, not `CommandLineOption.Text`. `--tftp-blksize ''`
+  is "expected a proper numerical parameter" and `-1` is "expected a positive numerical
+  parameter"; both come from `CommandLineNumber`.
+- Defaults taken for the out-of-scope forms until their tasks land: a later `-d` replaces
+  an earlier one (BL-057 joins them with `&`); `-d @file` is recorded as the literal text
+  (BL-056 reads it); `-u user` with no colon records the user with an empty password
+  (BL-058 prompts, as curl does).
+- `CommandLineParserTests.Parse_UnknownShortOption_Refuses` used `-t` as its unknown
+  letter; it now uses `-!`.
+- Follow-up tasks filed: BL-056 (`-d @file`, `-d @-`), BL-057 (several `-d` joined with
+  `&`), BL-058 (`-u user` password prompt). task-planner reported duplicated IDs already
+  on the board (BL-050 to BL-053); not touched here.
+- Tests: `Curl.Cli.UnitTests` 184 passed; full solution build clean and every fast test
+  project green.
 
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. The parser records -d, -u, -t, --tftp-blksize and --tftp-no-options under their ADR-0006 names
