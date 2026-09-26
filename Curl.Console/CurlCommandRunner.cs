@@ -193,6 +193,8 @@ internal sealed class CurlCommandRunner(
             TftpBlockSize = options.TftpBlockSize,
             TftpNoOptions = options.TftpNoOptions,
             CreateFileMode = options.CreateFileMode ?? TransferContext.DefaultCreateFileMode,
+            ConnectTimeout = options.ConnectTimeout,
+            MaxTime = options.MaxTime,
         };
 
     /// <summary>

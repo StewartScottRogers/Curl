@@ -324,6 +324,30 @@ public sealed class CurlCommandRunnerTests
     }
 
     [TestMethod]
+    public async Task RunAsync_ConnectTimeoutAndMaxTime_ReachTheHandlersContext()
+    {
+        RecordingProtocolHandler tftp = RecordingProtocolHandler.WritingPath("tftp");
+
+        await RunAsync(["--connect-timeout", "10", "-m", "20", "tftp://127.0.0.1/f"], tftp);
+
+        ITransferContext context = tftp.Contexts.Single();
+        Assert.AreEqual(TimeSpan.FromSeconds(10), context.ConnectTimeout);
+        Assert.AreEqual(TimeSpan.FromSeconds(20), context.MaxTime);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_NoConnectTimeoutOrMaxTime_ContextCarriesNull()
+    {
+        RecordingProtocolHandler tftp = RecordingProtocolHandler.WritingPath("tftp");
+
+        await RunAsync(["tftp://127.0.0.1/f"], tftp);
+
+        ITransferContext context = tftp.Contexts.Single();
+        Assert.IsNull(context.ConnectTimeout);
+        Assert.IsNull(context.MaxTime);
+    }
+
+    [TestMethod]
     public async Task RunAsync_StandardOutputWriteThrows_ReturnsExit23WithFailedWritingBodyLine()
     {
         FailingWriteStream closed = new();
