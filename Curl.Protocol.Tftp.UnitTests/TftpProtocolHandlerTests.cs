@@ -204,10 +204,9 @@ public sealed class TftpProtocolHandlerTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_ShortDatagramUnexpectedOpcodeAndWrongBlock_AreIgnored()
+    public async Task ExecuteAsync_UnexpectedOpcodeAndWrongBlock_AreIgnored()
     {
         var channel = Channel(
-            ([0, 3], TransferEndPoint),
             ([0, 4, 0, 1], TransferEndPoint),
             ([0, 9, 0, 1], TransferEndPoint),
             Data(2, "early"),

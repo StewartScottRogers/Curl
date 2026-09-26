@@ -46,15 +46,15 @@ which a byte stream cannot express. The tests in the matching `.UnitTests` proje
   transfer with exit 56 `Data received from another address` and the stranger is sent
   nothing. Every wait goes through `ITransferContext.TimeProvider`.
 - Download only: a repeated last block is re-ACKed and not written twice.
+- Download and upload: a datagram under four bytes re-sends the last packet (RRQ, WRQ,
+  ACK or DATA) at once and counts a retry without moving the next scheduled re-send;
+  whatever failure then ends the transfer says `Received too short packet` (curl keeps
+  the first failure it noted; measured for a download at exits 7, 28, 56 and 68).
 - Upload only: an ACK of the wrong block re-sends the last packet at once and counts a
-  retry (one too many is exit 55 `tftp_tx: giving up waiting for block N ack`); a
-  datagram under four bytes does the same, and whatever failure then ends the upload
-  says `Received too short packet` (curl keeps the first failure it noted). Neither
-  moves the next scheduled re-send. Before DATA 1, that re-send is the WRQ's first four
-  bytes, as curl sends.
+  retry (one too many is exit 55 `tftp_tx: giving up waiting for block N ack`), without
+  moving the next scheduled re-send. Before DATA 1, a re-send after an ACK is the WRQ's
+  first four bytes, as curl sends.
 - Upload only: an OACK that arrives after DATA 1 is taken as curl 8.21.0 takes it: its
   `blksize` comes into force and the block count restarts, so the next DATA is block 1
   again, carrying the next bytes of the upload (nothing is re-read) at the new size.
   An OACK after the last block has gone sends an empty DATA 1.
-- Not yet: a download ignores a datagram under four bytes, where curl's upload treats
-  one as a timeout (its download is not measured). It is filed on the task board.

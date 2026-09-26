@@ -6,8 +6,8 @@ using Curl.Protocol.Tftp.Fakes;
 namespace Curl.Protocol.Tftp;
 
 /// <summary>
-/// Pins what a <c>tftp://</c> download does when the server goes silent, repeats itself
-/// or is joined by a stranger, against curl 8.21.0 measured on 2026-09-26 with loopback
+/// Pins what a <c>tftp://</c> download does when the server goes silent, repeats itself,
+/// sends a datagram under four bytes or is joined by a stranger, against curl 8.21.0 measured on 2026-09-26 with loopback
 /// UDP servers: when the last packet is re-sent, how often, and the exit code and message
 /// the transfer ends with. Every wait runs on a <see cref="ManualTimeProvider" />, so the
 /// times asserted are the whole seconds curl's rules give rather than its wall-clock
@@ -23,6 +23,9 @@ public sealed class TftpDownloadRetransmissionTests
 
     /// <summary>A port nothing in the transfer asked to hear from.</summary>
     private static readonly IPEndPoint StrangerEndPoint = new(IPAddress.Loopback, 50999);
+
+    /// <summary>A datagram under four bytes, from the transfer endpoint.</summary>
+    private static readonly (byte[] Datagram, EndPoint Source) TooShort = ([0, 3], TransferEndPoint);
 
     private readonly ManualTimeProvider clock = new();
 
@@ -151,6 +154,139 @@ public sealed class TftpDownloadRetransmissionTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_TooShortReplyToReadRequest_ResendsItAtOnceAndEndsWithItsMessage()
+    {
+        var channel = Channel(TooShort);
+
+        var result = await Run(channel, Context(connectTimeout: TimeSpan.FromSeconds(10)));
+
+        AssertReadRequestsSentAt(channel, timeoutSeconds: 3, 0, 0, 4);
+        Assert.AreEqual(TimeSpan.FromSeconds(8), clock.Now);
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.AreEqual("Received too short packet", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ThreeTooShortRepliesToReadRequest_ResendsItTwiceThenCouldntConnectAtOnce()
+    {
+        var channel = Channel(TooShort, TooShort, TooShort);
+
+        var result = await Run(channel, Context(connectTimeout: TimeSpan.FromSeconds(10)));
+
+        AssertReadRequestsSentAt(channel, timeoutSeconds: 3, 0, 0, 0);
+        Assert.AreEqual(TimeSpan.Zero, clock.Now);
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.AreEqual("Received too short packet", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TooShortReplyToReadRequestMaxTime5_RetriesRunOutAt4BeforeMaxTime()
+    {
+        var channel = Channel(TooShort);
+
+        var result = await Run(channel, Context(maxTime: TimeSpan.FromSeconds(5)));
+
+        AssertReadRequestsSentAt(channel, timeoutSeconds: 1, 0, 0, 2);
+        Assert.AreEqual(TimeSpan.FromSeconds(4), clock.Now);
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.AreEqual("Received too short packet", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TooShortReplyToReadRequestThenLastBlock_ResendsItToServerAndCompletes()
+    {
+        var channel = Channel(TooShort, Data(1, "hello"));
+        var output = new MemoryStream();
+
+        var result = await Run(channel, Context(output: output));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.IsNull(result.ErrorMessage);
+        Assert.AreEqual("hello", Encoding.ASCII.GetString(output.ToArray()));
+        Assert.HasCount(3, channel.Sent);
+        CollectionAssert.AreEqual(ReadRequest(6), channel.Sent[1].Datagram);
+        Assert.AreEqual(ServerEndPoint, channel.Sent[1].Destination);
+        CollectionAssert.AreEqual(new byte[] { 0, 4, 0, 1 }, channel.Sent[2].Datagram);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TooShortDatagramAfterFirstBlockThenSilence_ResendsAckAtOnceThenOnScheduleAndTimesOut()
+    {
+        var channel = Channel(Data(1, Payload(512, 'a')), TooShort);
+
+        var result = await Run(channel, Context());
+
+        AssertAcknowledgementsOfBlock1At(channel, 0, 0, 0, 6, 12);
+        Assert.AreEqual(TimeSpan.FromSeconds(18), clock.Now);
+        Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
+        Assert.AreEqual("Received too short packet", result.ErrorMessage);
+        Assert.AreEqual(512, result.BytesTransferred);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_FourTooShortDatagramsAfterFirstBlock_ResendsAckThreeTimesThenTimesOutAtOnce()
+    {
+        var channel = Channel(Data(1, Payload(512, 'a')), TooShort, TooShort, TooShort, TooShort);
+
+        var result = await Run(channel, Context());
+
+        AssertAcknowledgementsOfBlock1At(channel, 0, 0, 0, 0, 0);
+        Assert.AreEqual(TimeSpan.Zero, clock.Now);
+        Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
+        Assert.AreEqual("Received too short packet", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TooShortDatagramAfterFirstBlockMaxTime5_OperationTimedOutAt5WithItsMessage()
+    {
+        var channel = Channel(Data(1, Payload(512, 'a')), TooShort);
+
+        var result = await Run(channel, Context(maxTime: TimeSpan.FromSeconds(5)));
+
+        AssertAcknowledgementsOfBlock1At(channel, 0, 0, 0, 2, 4);
+        Assert.AreEqual(TimeSpan.FromSeconds(5), clock.Now);
+        Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
+        Assert.AreEqual("Received too short packet", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TooShortDatagramAfterFirstBlockThenNextBlock_AcksAgainAndCompletes()
+    {
+        var channel = Channel(Data(1, Payload(512, 'a')), TooShort, Data(2, "end"));
+
+        var result = await Run(channel, Context());
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.IsNull(result.ErrorMessage);
+        Assert.AreEqual(515, result.BytesTransferred);
+        CollectionAssert.AreEqual(new ushort[] { 1, 1, 2 }, AcknowledgedBlocks(channel));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TooShortDatagramThenErrorPacket_EndsWithTheErrorsCodeAndTheTooShortMessage()
+    {
+        var error = (new byte[] { 0, 5, 0, 1, (byte)'n', (byte)'f', 0 }, (EndPoint)TransferEndPoint);
+        var channel = Channel(Data(1, Payload(512, 'a')), TooShort, error);
+
+        var result = await Run(channel, Context());
+
+        Assert.AreEqual(CurlExitCode.TftpNotFound, result.ExitCode);
+        Assert.AreEqual("Received too short packet", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TooShortDatagramThenStranger_EndsWithRecvErrorAndTheTooShortMessage()
+    {
+        var channel = Channel(Data(1, Payload(512, 'a')), TooShort, (Data(2, "end").Datagram, StrangerEndPoint));
+
+        var result = await Run(channel, Context());
+
+        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Assert.AreEqual("Received too short packet", result.ErrorMessage);
+        Assert.IsFalse(channel.Sent.Any(sent => StrangerEndPoint.Equals(sent.Destination)));
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_TokenCancelledWhileWaiting_ThrowsOperationCanceled()
     {
         using var cancellation = new CancellationTokenSource();
@@ -191,6 +327,27 @@ public sealed class TftpDownloadRetransmissionTests
             CollectionAssert.AreEqual(expected, channel.Sent[index].Datagram);
             Assert.AreEqual(ServerEndPoint, channel.Sent[index].Destination);
             Assert.AreEqual(TimeSpan.FromSeconds(index * intervalSeconds), channel.Sent[index].At);
+        }
+    }
+
+    /// <summary>
+    /// Asserts the channel was sent only read requests, each byte-identical with
+    /// <paramref name="timeoutSeconds" /> as its <c>timeout</c>, to the server endpoint, at
+    /// each of <paramref name="seconds" />.
+    /// </summary>
+    private static void AssertReadRequestsSentAt(
+        FallsSilentDatagramChannel channel,
+        int timeoutSeconds,
+        params int[] seconds)
+    {
+        CollectionAssert.AreEqual(
+            seconds.Select(second => TimeSpan.FromSeconds(second)).ToArray(),
+            channel.Sent.Select(sent => sent.At).ToArray());
+        var expected = ReadRequest(timeoutSeconds);
+        foreach (var (datagram, destination, _) in channel.Sent)
+        {
+            CollectionAssert.AreEqual(expected, datagram);
+            Assert.AreEqual(ServerEndPoint, destination);
         }
     }
 

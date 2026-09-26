@@ -20,8 +20,15 @@ namespace Curl.Protocol.Tftp;
 /// The first datagram received pins the server's endpoint; a later one from anywhere else
 /// ends the transfer with exit 56 (<see cref="CurlExitCode.RecvError" />) and sends the
 /// stranger nothing, as curl does. A repeat of the last block is acknowledged again and
-/// not written twice. A datagram shorter than four bytes, any other unexpected block, and
-/// an opcode a download never receives are ignored, and the download waits on.
+/// not written twice. Any other unexpected block and an opcode a download never receives
+/// are ignored, and the download waits on.
+/// </para>
+/// <para>
+/// A datagram shorter than four bytes re-sends the last packet (the read request or the
+/// last ACK) at once and counts a retry, without moving the next scheduled re-send; when
+/// the retries have already run out it ends the download as silence would. From then on
+/// whatever failure ends the download carries the message <c>Received too short packet</c>,
+/// since curl keeps the first failure it noted (measured for exits 7, 28, 56 and 68).
 /// </para>
 /// <para>
 /// Every wait goes through <see cref="ITransferContext.TimeProvider" />. The schedule
@@ -37,6 +44,12 @@ namespace Curl.Protocol.Tftp;
 /// </remarks>
 internal sealed class TftpDownload(ITransferContext context, IDatagramChannel channel, long startTimestamp)
 {
+    /// <summary>
+    /// The message curl notes on a datagram under four bytes, and keeps as the failure's
+    /// message whatever later ends the transfer.
+    /// </summary>
+    private const string TooShortMessage = "Received too short packet";
+
     private readonly byte[] buffer =
         new byte[TftpPackets.MaximumBlockSize + TftpPackets.DataHeaderLength];
 
@@ -47,6 +60,7 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
     private long bytesTransferred;
     private EndPoint? pinnedEndPoint;
     private bool answered;
+    private bool tooShortReceived;
     private TftpRetrySchedule schedule;
     private int retries;
     private TimeSpan resendAt;
@@ -74,14 +88,16 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
                 : await AnswerSilenceAsync().ConfigureAwait(false);
             if (outcome is not null)
             {
-                return outcome;
+                return tooShortReceived && !outcome.IsSuccess
+                    ? outcome with { ErrorMessage = TooShortMessage }
+                    : outcome;
             }
         }
     }
 
     /// <summary>
     /// Ends the transfer when the maximum time or the retries have run out, otherwise
-    /// re-sends the last packet.
+    /// re-sends the last packet and sets when the next re-send is due.
     /// </summary>
     /// <returns>The transfer's outcome when the silence ended it, otherwise <see langword="null" />.</returns>
     private async ValueTask<TransferResult?> AnswerSilenceAsync()
@@ -91,15 +107,12 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
             return timedOut;
         }
 
-        if (retries >= schedule.RetryLimit)
+        if (!await ResendAsync().ConfigureAwait(false))
         {
-            return answered
-                ? TransferResult.Failure(CurlExitCode.OperationTimedOut, "Timeout was reached", bytesTransferred)
-                : TransferResult.Failure(CurlExitCode.CouldntConnect, "Could not connect to server");
+            return RetriesRunOut();
         }
 
-        retries++;
-        await SendAsync(lastPacket, lastDestination).ConfigureAwait(false);
+        resendAt = limits.Elapsed() + schedule.ResendInterval;
         return null;
     }
 
@@ -108,32 +121,51 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
     /// </summary>
     /// <param name="received">The datagram's length and source.</param>
     /// <returns>The transfer's outcome when this datagram ended it, otherwise <see langword="null" />.</returns>
-    private async ValueTask<TransferResult?> AnswerAsync(DatagramReceived received)
+    private ValueTask<TransferResult?> AnswerAsync(DatagramReceived received)
     {
-        pinnedEndPoint ??= received.RemoteEndPoint;
-        if (!pinnedEndPoint.Equals(received.RemoteEndPoint))
+        if (IsFromStranger(received.RemoteEndPoint))
         {
-            return TransferResult.Failure(CurlExitCode.RecvError, "Data received from another address", bytesTransferred);
+            return ValueTask.FromResult<TransferResult?>(
+                TransferResult.Failure(CurlExitCode.RecvError, "Data received from another address", bytesTransferred));
         }
 
         if (received.Length < TftpPackets.DataHeaderLength)
         {
-            return null;
+            return AnswerTooShortAsync();
         }
 
-        switch (TftpPackets.ReadField(buffer, 0))
+        return TftpPackets.ReadField(buffer, 0) switch
         {
-            case TftpPackets.DataOpcode:
-                return await AcceptDataAsync(received).ConfigureAwait(false);
-            case TftpPackets.ErrorOpcode:
-                return TftpErrorMapping.ToTransferResult(TftpPackets.ReadField(buffer, 2));
-            case TftpPackets.OptionAcknowledgementOpcode:
-                blockSize = TftpPackets.ReadAcknowledgedBlockSize(buffer.AsSpan(2, received.Length - 2));
-                await AcknowledgeNewAsync(0, received.RemoteEndPoint).ConfigureAwait(false);
-                return null;
-            default:
-                return null;
-        }
+            TftpPackets.DataOpcode => AcceptDataAsync(received),
+            TftpPackets.ErrorOpcode => ValueTask.FromResult<TransferResult?>(
+                TftpErrorMapping.ToTransferResult(TftpPackets.ReadField(buffer, 2))),
+            TftpPackets.OptionAcknowledgementOpcode => AcceptOptionAcknowledgementAsync(received),
+            _ => ValueTask.FromResult<TransferResult?>(null),
+        };
+    }
+
+    /// <summary>
+    /// Pins the server's endpoint to the source of the first datagram received, and tells
+    /// whether a datagram came from anywhere else.
+    /// </summary>
+    /// <param name="source">Where the datagram came from.</param>
+    /// <returns><see langword="true" /> when <paramref name="source" /> is not the pinned endpoint.</returns>
+    private bool IsFromStranger(EndPoint source)
+    {
+        pinnedEndPoint ??= source;
+        return !pinnedEndPoint.Equals(source);
+    }
+
+    /// <summary>
+    /// Takes the block size an OACK grants and acknowledges it as block 0.
+    /// </summary>
+    /// <param name="received">The OACK datagram's length and source.</param>
+    /// <returns><see langword="null" />, since an OACK never ends the transfer.</returns>
+    private async ValueTask<TransferResult?> AcceptOptionAcknowledgementAsync(DatagramReceived received)
+    {
+        blockSize = TftpPackets.ReadAcknowledgedBlockSize(buffer.AsSpan(2, received.Length - 2));
+        await AcknowledgeNewAsync(0, received.RemoteEndPoint).ConfigureAwait(false);
+        return null;
     }
 
     /// <summary>
@@ -190,6 +222,44 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
         retries = 0;
         return SendAsync(TftpPackets.BuildAcknowledgement(block), destination);
     }
+
+    /// <summary>
+    /// Answers a datagram under four bytes as curl does: notes it, so the failure that ends
+    /// the download carries its message, and re-sends the last packet at once without
+    /// moving the next scheduled re-send.
+    /// </summary>
+    /// <returns>The failure when the retries had already run out, otherwise <see langword="null" />.</returns>
+    private async ValueTask<TransferResult?> AnswerTooShortAsync()
+    {
+        tooShortReceived = true;
+        return await ResendAsync().ConfigureAwait(false) ? null : RetriesRunOut();
+    }
+
+    /// <summary>
+    /// Re-sends the last packet and counts a retry, unless the retries have run out.
+    /// </summary>
+    /// <returns><see langword="false" /> when the retries had run out and nothing was sent.</returns>
+    private async ValueTask<bool> ResendAsync()
+    {
+        if (retries >= schedule.RetryLimit)
+        {
+            return false;
+        }
+
+        retries++;
+        await channel.SendAsync(lastPacket, lastDestination, context.CancellationToken).ConfigureAwait(false);
+        return true;
+    }
+
+    /// <summary>
+    /// Gets the failure the download ends with when its retries run out: exit 7 before the
+    /// server has answered, exit 28 after.
+    /// </summary>
+    /// <returns>The failure.</returns>
+    private TransferResult RetriesRunOut() =>
+        answered
+            ? TransferResult.Failure(CurlExitCode.OperationTimedOut, "Timeout was reached", bytesTransferred)
+            : TransferResult.Failure(CurlExitCode.CouldntConnect, "Could not connect to server");
 
     /// <summary>
     /// Sends a packet, remembers it for re-sending and sets when the next re-send is due.
