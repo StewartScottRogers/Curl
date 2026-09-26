@@ -1,5 +1,5 @@
 ---
-id: BL-106
+id: BL-107
 title: Align FileProtocolHandler's XML remarks with its per-direction options table
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-106 — Align FileProtocolHandler's XML remarks with its per-direction options table
+# BL-107 — Align FileProtocolHandler's XML remarks with its per-direction options table
 
 ## Goal
 

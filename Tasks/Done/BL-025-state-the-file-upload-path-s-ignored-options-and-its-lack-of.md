@@ -88,7 +88,7 @@ Choices made unattended:
 
 Found while reading: the `ExecuteAsync` remarks say "below this point the two paths share
 nothing", but both call `CopyAsync`. Out of scope here (no `.cs` changes); worth fixing with
-the class-remarks alignment noted above, filed as BL-106.
+the class-remarks alignment noted above, filed as BL-107.
 
 ## Log
 
