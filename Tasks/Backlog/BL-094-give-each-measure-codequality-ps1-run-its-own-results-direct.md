@@ -1,5 +1,5 @@
 ---
-id: BL-090
+id: BL-094
 title: Give each Measure-CodeQuality.ps1 run its own results directory
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-090 — Give each Measure-CodeQuality.ps1 run its own results directory
+# BL-094 — Give each Measure-CodeQuality.ps1 run its own results directory
 
 ## Goal
 
