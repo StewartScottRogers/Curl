@@ -10,5 +10,9 @@ namespace Curl.Cli;
 /// Reports whether a file or directory exists at a path, for an option curl checks while parsing
 /// (<c>--cacert</c>); injected so tests never touch the disk.
 /// </param>
+/// <param name="dataFileReader">
+/// Reads the file, or standard input, a <c>-d @file</c> value names; injected so tests never touch
+/// the disk or the console.
+/// </param>
 /// <returns><see langword="null"/> when the value was applied; otherwise why it was refused.</returns>
-public delegate CommandLineRefusal? CommandLineOptionApplier(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists);
+public delegate CommandLineRefusal? CommandLineOptionApplier(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader);

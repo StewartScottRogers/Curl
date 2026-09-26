@@ -58,7 +58,7 @@ public sealed class CommandLineOptionTests
         CommandLineOption option = CommandLineOption.Flag("silent", 's', options => setOn = options);
         CommandLineOptions options = new();
 
-        CommandLineRefusal? refusal = option.Apply(options, string.Empty, "-s", _ => false);
+        CommandLineRefusal? refusal = option.Apply(options, string.Empty, "-s", _ => false, new RecordingDataFileReader());
 
         Assert.IsNull(refusal);
         Assert.AreSame(options, setOn);
@@ -109,7 +109,7 @@ public sealed class CommandLineOptionTests
         bool? setTo = null;
         CommandLineOption option = CommandLineOption.NegatableFlag("silent", 's', (_, on) => setTo = on);
 
-        CommandLineRefusal? refusal = option.Apply(new CommandLineOptions(), string.Empty, "-s", _ => false);
+        CommandLineRefusal? refusal = option.Apply(new CommandLineOptions(), string.Empty, "-s", _ => false, new RecordingDataFileReader());
 
         Assert.IsNull(refusal);
         Assert.IsTrue(setTo);
@@ -170,7 +170,7 @@ public sealed class CommandLineOptionTests
         bool setCalled = false;
         CommandLineOption option = CommandLineOption.Text("output", 'o', (_, _) => setCalled = true);
 
-        CommandLineRefusal? refusal = option.Apply(new CommandLineOptions(), string.Empty, "--output=", _ => false);
+        CommandLineRefusal? refusal = option.Apply(new CommandLineOptions(), string.Empty, "--output=", _ => false, new RecordingDataFileReader());
 
         Assert.IsNotNull(refusal);
         Assert.AreEqual(CurlExitCode.FailedInit, refusal.ExitCode);
@@ -195,7 +195,7 @@ public sealed class CommandLineOptionTests
         });
         CommandLineOptions options = new();
 
-        CommandLineRefusal? refusal = option.Apply(options, value, "-o", _ => false);
+        CommandLineRefusal? refusal = option.Apply(options, value, "-o", _ => false, new RecordingDataFileReader());
 
         Assert.IsNull(refusal);
         Assert.AreSame(options, setOn);
@@ -207,7 +207,7 @@ public sealed class CommandLineOptionTests
     [TestMethod]
     public void Value_WithShortName_KeepsNamesAndTakesValue()
     {
-        CommandLineOption option = CommandLineOption.Value("max-time", 'm', (_, _, _, _) => null);
+        CommandLineOption option = CommandLineOption.Value("max-time", 'm', (_, _, _, _, _) => null);
 
         Assert.AreEqual("max-time", option.LongName);
         Assert.AreEqual('m', option.ShortName);
@@ -217,7 +217,7 @@ public sealed class CommandLineOptionTests
     [TestMethod]
     public void Value_WithoutShortName_HasNullShortName()
     {
-        CommandLineOption option = CommandLineOption.Value("tftp-blksize", null, (_, _, _, _) => null);
+        CommandLineOption option = CommandLineOption.Value("tftp-blksize", null, (_, _, _, _, _) => null);
 
         Assert.IsNull(option.ShortName);
     }
@@ -226,7 +226,7 @@ public sealed class CommandLineOptionTests
     public void Value_NullLongName_ThrowsArgumentNull()
     {
         ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(
-            () => CommandLineOption.Value(null!, 'm', (_, _, _, _) => null));
+            () => CommandLineOption.Value(null!, 'm', (_, _, _, _, _) => null));
 
         Assert.AreEqual("longName", exception.ParamName);
     }
@@ -244,9 +244,9 @@ public sealed class CommandLineOptionTests
     public void ValueApply_ApplierRefuses_ReturnsApplierRefusal()
     {
         CommandLineRefusal applierRefusal = CommandLineRefusal.ExpectedProperNumericalParameter("--tftp-blksize");
-        CommandLineOption option = CommandLineOption.Value("tftp-blksize", null, (_, _, _, _) => applierRefusal);
+        CommandLineOption option = CommandLineOption.Value("tftp-blksize", null, (_, _, _, _, _) => applierRefusal);
 
-        CommandLineRefusal? refusal = option.Apply(new CommandLineOptions(), "abc", "--tftp-blksize", _ => false);
+        CommandLineRefusal? refusal = option.Apply(new CommandLineOptions(), "abc", "--tftp-blksize", _ => false, new RecordingDataFileReader());
 
         Assert.AreSame(applierRefusal, refusal);
     }
@@ -257,7 +257,7 @@ public sealed class CommandLineOptionTests
         CommandLineOptions? seenOptions = null;
         string? seenValue = null;
         string? seenSpelledOption = null;
-        CommandLineOption option = CommandLineOption.Value("tftp-blksize", null, (options, value, spelledOption, _) =>
+        CommandLineOption option = CommandLineOption.Value("tftp-blksize", null, (options, value, spelledOption, _, _) =>
         {
             seenOptions = options;
             seenValue = value;
@@ -266,7 +266,7 @@ public sealed class CommandLineOptionTests
         });
         CommandLineOptions options = new();
 
-        CommandLineRefusal? refusal = option.Apply(options, string.Empty, "--tftp-blksize=", _ => false);
+        CommandLineRefusal? refusal = option.Apply(options, string.Empty, "--tftp-blksize=", _ => false, new RecordingDataFileReader());
 
         Assert.IsNull(refusal);
         Assert.AreSame(options, seenOptions);
@@ -310,7 +310,7 @@ public sealed class CommandLineOptionTests
         bool setCalled = false;
         CommandLineOption option = CommandLineOption.FileName("output", 'o', (_, _) => setCalled = true);
 
-        CommandLineRefusal? refusal = option.Apply(new CommandLineOptions(), string.Empty, "--output=", _ => false);
+        CommandLineRefusal? refusal = option.Apply(new CommandLineOptions(), string.Empty, "--output=", _ => false, new RecordingDataFileReader());
 
         Assert.IsNotNull(refusal);
         Assert.AreEqual("curl: option --output=: blank argument where content is expected", refusal.StandardErrorLines[0]);
@@ -325,7 +325,7 @@ public sealed class CommandLineOptionTests
         string? setValue = null;
         CommandLineOption option = CommandLineOption.FileName("output", 'o', (_, fileName) => setValue = fileName);
 
-        CommandLineRefusal? refusal = option.Apply(new CommandLineOptions(), value, "-o", _ => false);
+        CommandLineRefusal? refusal = option.Apply(new CommandLineOptions(), value, "-o", _ => false, new RecordingDataFileReader());
 
         Assert.IsNull(refusal);
         Assert.AreEqual(value, setValue);

@@ -47,7 +47,7 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("silent", 's', (options, on) => options.Silent = on),
         CommandLineOption.NegatableFlag("show-error", 'S', (options, on) => options.ShowError = on),
         CommandLineOption.FileName("output", 'o', (options, file) => options.AddOutputFile(file)),
-        CommandLineOption.Value("data", 'd', AcceptingEmpty((options, data) => options.AppendPostData(data))),
+        CommandLineOption.Value("data", 'd', AppendPostData),
         CommandLineOption.Value("user", 'u', AcceptingEmpty((options, user) => options.SetCredentials(user))),
         CommandLineOption.Value("telnet-option", 't', AcceptingEmpty((options, telnetOption) => options.AddTelnetOption(telnetOption))),
         CommandLineOption.Value("tftp-blksize", null, SetTftpBlockSize),
@@ -87,16 +87,48 @@ public static class CommandLineOptionTable
 
     /// <summary>
     /// Builds an applier that accepts any value, empty included, as curl 8.21.0 does for
-    /// <c>-d ''</c>, <c>-u ''</c> and <c>-t ''</c>, and passes it to <paramref name="set"/>.
+    /// <c>-u ''</c> and <c>-t ''</c>, and passes it to <paramref name="set"/>.
     /// </summary>
     private static CommandLineOptionApplier AcceptingEmpty(Action<CommandLineOptions, string> set) =>
-        (options, value, _, _) =>
+        (options, value, _, _, _) =>
         {
             set(options, value);
             return null;
         };
 
-    private static CommandLineRefusal? SetTftpBlockSize(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists)
+    /// <summary>
+    /// Appends a <c>-d</c> / <c>--data</c> value to the body: the value's own text, empty included, or,
+    /// when it starts with <c>@</c>, the bytes of the file it names (standard input for <c>@-</c>) with
+    /// every carriage return, line feed and NUL byte removed, as curl 8.21.0 does. A file that cannot
+    /// be read is refused with <see cref="CommandLineRefusal.DataFileUnreadable"/>.
+    /// </summary>
+    private static CommandLineRefusal? AppendPostData(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        if (!value.StartsWith('@'))
+        {
+            options.AppendPostData(value);
+            return null;
+        }
+
+        string file = value[1..];
+        byte[] contents;
+        if (file == "-")
+        {
+            contents = dataFileReader.ReadStandardInput();
+        }
+        else if (!dataFileReader.TryReadFile(file, out contents))
+        {
+            return CommandLineRefusal.DataFileUnreadable(spelledOption, file, options.ErrorsHidden);
+        }
+
+        options.AppendPostData(RemoveLineBreaksAndNuls(contents));
+        return null;
+    }
+
+    private static byte[] RemoveLineBreaksAndNuls(byte[] contents) =>
+        Array.FindAll(contents, octet => octet is not ((byte)'\r' or (byte)'\n' or 0));
+
+    private static CommandLineRefusal? SetTftpBlockSize(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
     {
         CommandLineRefusal? refusal = CommandLineNumber.ParseNonNegative(spelledOption, value, out int blockSize);
         if (refusal is null)
@@ -107,7 +139,7 @@ public static class CommandLineOptionTable
         return refusal;
     }
 
-    private static CommandLineRefusal? SetCreateFileMode(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists)
+    private static CommandLineRefusal? SetCreateFileMode(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
     {
         CommandLineRefusal? refusal = CommandLineNumber.ParseOctal(spelledOption, value, MaximumCreateFileMode, out int mode);
         if (refusal is null)
@@ -123,7 +155,7 @@ public static class CommandLineOptionTable
     /// it with curl 8.21.0's three lines. An empty value is checked like any other, so it is refused
     /// as a missing file, not as blank. A directory passes here; curl fails it later, at handshake.
     /// </summary>
-    private static CommandLineRefusal? SetCaCertificateFile(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists)
+    private static CommandLineRefusal? SetCaCertificateFile(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
     {
         if (!pathExists(value))
         {
@@ -143,7 +175,7 @@ public static class CommandLineOptionTable
     /// value holding anything but digits, dashes and commas is kept verbatim with a warning.
     /// Parsing the text into a range is <c>ByteRangeParser</c>'s job, at transfer time.
     /// </summary>
-    private static CommandLineRefusal? SetRange(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists)
+    private static CommandLineRefusal? SetRange(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
     {
         if (options.ResumeFrom is not null || options.ResumeFromOutputSize)
         {
@@ -189,7 +221,7 @@ public static class CommandLineOptionTable
     /// or a byte offset read by <see cref="CommandLineNumber.ParseOffset"/>. It is refused when
     /// <c>-r</c>/<c>--range</c> came first, before the value is looked at, as curl 8.21.0 does.
     /// </summary>
-    private static CommandLineRefusal? SetResumeFrom(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists)
+    private static CommandLineRefusal? SetResumeFrom(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
     {
         if (options.Range is not null)
         {
@@ -213,7 +245,7 @@ public static class CommandLineOptionTable
         return refusal;
     }
 
-    private static CommandLineRefusal? SetMaxFileSize(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists)
+    private static CommandLineRefusal? SetMaxFileSize(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
     {
         CommandLineRefusal? refusal = CommandLineNumber.ParseSize(spelledOption, value, out long size);
         if (refusal is null)

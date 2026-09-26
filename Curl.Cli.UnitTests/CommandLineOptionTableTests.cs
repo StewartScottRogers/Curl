@@ -66,7 +66,7 @@ public sealed class CommandLineOptionTableTests
         CommandLineOption option = CommandLineOptionTable.Rows.Single(row => row.LongName == longName);
         CommandLineOptions options = new();
 
-        CommandLineRefusal? refusal = option.Apply(options, string.Empty, spelledOption, _ => false);
+        CommandLineRefusal? refusal = option.Apply(options, string.Empty, spelledOption, _ => false, new RecordingDataFileReader());
 
         Assert.IsNotNull(refusal);
         CollectionAssert.AreEqual(
@@ -82,7 +82,7 @@ public sealed class CommandLineOptionTableTests
         CommandLineOption option = CommandLineOptionTable.Rows.Single(row => row.LongName == "url");
         CommandLineOptions options = new();
 
-        CommandLineRefusal? refusal = option.Apply(options, "http://example.com", "--url", _ => false);
+        CommandLineRefusal? refusal = option.Apply(options, "http://example.com", "--url", _ => false, new RecordingDataFileReader());
 
         Assert.IsNull(refusal);
         CollectionAssert.AreEqual(new[] { "http://example.com" }, options.Urls.ToArray());
@@ -94,7 +94,7 @@ public sealed class CommandLineOptionTableTests
         CommandLineOption option = CommandLineOptionTable.Rows.Single(row => row.LongName == "output");
         CommandLineOptions options = new();
 
-        CommandLineRefusal? refusal = option.Apply(options, "page.html", "-o", _ => false);
+        CommandLineRefusal? refusal = option.Apply(options, "page.html", "-o", _ => false, new RecordingDataFileReader());
 
         Assert.IsNull(refusal);
         CollectionAssert.AreEqual(new[] { "page.html" }, options.OutputFiles.ToArray());

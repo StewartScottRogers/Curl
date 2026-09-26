@@ -38,7 +38,8 @@ public sealed class CommandLineOptions
     /// The <c>-d</c> / <c>--data</c> value as UTF-8 bytes; <see langword="null"/> when not given.
     /// An empty value is empty data, not a refusal. When given more than once the values are joined
     /// in command-line order, each one after the first preceded by a single <c>&amp;</c> when the body
-    /// so far is not empty, as in curl 8.21.0; <c>@file</c> is recorded as the literal text, not read.
+    /// so far is not empty, as in curl 8.21.0. A value <c>@file</c> (or <c>@-</c>) contributes the
+    /// file's (or standard input's) bytes with every carriage return, line feed and NUL removed.
     /// </summary>
     public ReadOnlyMemory<byte>? PostData { get; private set; }
 
@@ -174,11 +175,17 @@ public sealed class CommandLineOptions
     /// <c>&amp;</c> when <see cref="PostData"/> already holds at least one byte, as curl 8.21.0 does.
     /// </summary>
     /// <param name="data">A <c>-d</c> / <c>--data</c> value, possibly empty.</param>
-    internal void AppendPostData(string data)
+    internal void AppendPostData(string data) => AppendPostData(Encoding.UTF8.GetBytes(data));
+
+    /// <summary>
+    /// Appends <paramref name="data"/> to <see cref="PostData"/>, after a single <c>&amp;</c> when
+    /// <see cref="PostData"/> already holds at least one byte, as curl 8.21.0 does.
+    /// </summary>
+    /// <param name="data">The bytes of one <c>-d</c> / <c>--data</c> piece, possibly empty.</param>
+    internal void AppendPostData(byte[] data)
     {
-        string separator = PostData is { Length: > 0 } ? "&" : string.Empty;
-        byte[] piece = Encoding.UTF8.GetBytes(separator + data);
-        PostData = PostData is { } body ? [.. body.Span, .. piece] : piece;
+        byte[] separator = PostData is { Length: > 0 } ? [(byte)'&'] : [];
+        PostData = PostData is { } body ? [.. body.Span, .. separator, .. data] : data;
     }
 
     /// <summary>Sets <see cref="Credentials"/> from <paramref name="userAndPassword"/>, split at its first colon.</summary>

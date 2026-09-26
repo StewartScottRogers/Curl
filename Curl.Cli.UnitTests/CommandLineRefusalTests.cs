@@ -119,6 +119,44 @@ public sealed class CommandLineRefusalTests
         Assert.AreEqual(expectedParamName, exception.ParamName);
     }
 
+    [TestMethod]
+    public void DataFileUnreadable_ErrorsShown_ExitsWithReadErrorInThreeLines()
+    {
+        CommandLineRefusal refusal = CommandLineRefusal.DataFileUnreadable("-d", string.Empty, errorsHidden: false);
+
+        Assert.AreEqual(CurlExitCode.ReadError, refusal.ExitCode);
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "curl: Failed to open ",
+                "curl: option -d: error encountered when reading a file",
+                CommandLineRefusal.TryHelpLine,
+            },
+            refusal.StandardErrorLines.ToArray());
+    }
+
+    [TestMethod]
+    public void DataFileUnreadable_ErrorsHidden_ExitsWithReadErrorInTwoLines()
+    {
+        CommandLineRefusal refusal = CommandLineRefusal.DataFileUnreadable("--data", "missing", errorsHidden: true);
+
+        Assert.AreEqual(CurlExitCode.ReadError, refusal.ExitCode);
+        CollectionAssert.AreEqual(
+            new[] { "curl: option --data: error encountered when reading a file", CommandLineRefusal.TryHelpLine },
+            refusal.StandardErrorLines.ToArray());
+    }
+
+    [TestMethod]
+    [DataRow(null, "f", "spelledOption")]
+    [DataRow("-d", null, "file")]
+    public void DataFileUnreadable_NullArgument_ThrowsArgumentNull(string? spelledOption, string? file, string expectedParamName)
+    {
+        ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(
+            () => CommandLineRefusal.DataFileUnreadable(spelledOption!, file!, errorsHidden: false));
+
+        Assert.AreEqual(expectedParamName, exception.ParamName);
+    }
+
     private static void AssertRefusal(CommandLineRefusal refusal, string expectedFirstLine)
     {
         Assert.AreEqual(CurlExitCode.FailedInit, refusal.ExitCode);

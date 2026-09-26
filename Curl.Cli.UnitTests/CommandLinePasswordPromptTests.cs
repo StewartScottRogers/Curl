@@ -143,11 +143,11 @@ public sealed class CommandLinePasswordPromptTests
     public void Parse_NullPasswordPrompt_Throws()
     {
         Assert.ThrowsExactly<ArgumentNullException>(
-            () => CommandLineParser.Parse(["http://example.com/"], _ => true, null!));
+            () => CommandLineParser.Parse(["http://example.com/"], _ => true, null!, new RecordingDataFileReader()));
     }
 
     private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, IPasswordPrompt prompt) =>
-        CommandLineParser.Parse(arguments, _ => true, prompt);
+        CommandLineParser.Parse(arguments, _ => true, prompt, new RecordingDataFileReader());
 
     private sealed class RecordingPasswordPrompt(string answer) : IPasswordPrompt
     {

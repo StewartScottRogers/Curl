@@ -6,9 +6,10 @@ namespace Curl.Cli;
 /// Why the command line was refused: the lines curl prints on standard error,
 /// <c>curl: option &lt;spelled&gt;: &lt;reason&gt;</c> (or, for <see cref="NoUrlSpecified"/>,
 /// <c>curl: (2) no URL specified</c>) followed by <see cref="TryHelpLine"/>, with one more line
-/// in front for <see cref="FileDoesNotExist"/> and <see cref="ContinueAtExclusiveWithRange"/>,
-/// and the exit code, which is always <see cref="CurlExitCode.FailedInit"/> (curl's
-/// <c>CURLE_FAILED_INIT</c>, exit 2; see <see href="https://curl.se/libcurl/c/libcurl-errors.html"/>).
+/// in front for <see cref="FileDoesNotExist"/>, <see cref="ContinueAtExclusiveWithRange"/> and
+/// <see cref="DataFileUnreadable"/>, and the exit code, which is <see cref="CurlExitCode.FailedInit"/>
+/// (curl's <c>CURLE_FAILED_INIT</c>, exit 2; see <see href="https://curl.se/libcurl/c/libcurl-errors.html"/>)
+/// for every refusal but <see cref="DataFileUnreadable"/>, which is <see cref="CurlExitCode.ReadError"/> (26).
 /// It writes nothing itself; the console layer writes the lines and chooses the newline.
 /// </summary>
 /// <remarks>
@@ -20,17 +21,26 @@ public sealed class CommandLineRefusal
     public const string TryHelpLine = "curl: try 'curl --help' or 'curl --manual' for more information";
 
     private CommandLineRefusal(params string[] linesBeforeTryHelp)
+        : this(CurlExitCode.FailedInit, linesBeforeTryHelp)
     {
+    }
+
+    private CommandLineRefusal(CurlExitCode exitCode, params string[] linesBeforeTryHelp)
+    {
+        ExitCode = exitCode;
         StandardErrorLines = [.. linesBeforeTryHelp, TryHelpLine];
     }
 
-    /// <summary>The exit code curl returns for a refused command line: <see cref="CurlExitCode.FailedInit"/>.</summary>
-    public CurlExitCode ExitCode => CurlExitCode.FailedInit;
+    /// <summary>
+    /// The exit code curl returns for the refused command line: <see cref="CurlExitCode.FailedInit"/>,
+    /// or <see cref="CurlExitCode.ReadError"/> for <see cref="DataFileUnreadable"/>.
+    /// </summary>
+    public CurlExitCode ExitCode { get; }
 
     /// <summary>
     /// The lines to write to standard error, without line terminators: two, or three for
-    /// <see cref="FileDoesNotExist"/> and for <see cref="ContinueAtExclusiveWithRange"/> when
-    /// errors are not hidden.
+    /// <see cref="FileDoesNotExist"/>, and for <see cref="ContinueAtExclusiveWithRange"/> and
+    /// <see cref="DataFileUnreadable"/> when errors are not hidden.
     /// </summary>
     public IReadOnlyList<string> StandardErrorLines { get; }
 
@@ -144,6 +154,33 @@ public sealed class CommandLineRefusal
         return new CommandLineRefusal(
             $"curl: The file '{file}' provided to {longOption} does not exist",
             $"curl: option {spelledOption}: is badly used here");
+    }
+
+    /// <summary>
+    /// Refuses a <c>-d @file</c> / <c>--data @file</c> whose file cannot be opened or read, in curl's
+    /// three lines: <c>curl: Failed to open &lt;file&gt;</c>,
+    /// <c>curl: option &lt;spelled&gt;: error encountered when reading a file</c> and the try-help
+    /// line, with exit code <see cref="CurlExitCode.ReadError"/> (26).
+    /// </summary>
+    /// <remarks>
+    /// Measured with the local curl 8.21.0 on 2026-09-26: <c>-s</c> without <c>-S</c>, read before
+    /// the <c>-d</c>, hides the first line; <c>-d @</c> names the empty file and prints
+    /// <c>curl: Failed to open </c> with its trailing space.
+    /// </remarks>
+    /// <param name="spelledOption">The whole argument as typed, such as <c>-d</c>, <c>-d@missing</c> or <c>--data=@missing</c>.</param>
+    /// <param name="file">The file name after <c>@</c>, possibly empty.</param>
+    /// <param name="errorsHidden"><see langword="true"/> when <c>-s</c> without <c>-S</c> was read before the refused option.</param>
+    /// <returns>A refusal of three lines, or two when <paramref name="errorsHidden"/>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="spelledOption"/> or <paramref name="file"/> is <see langword="null"/>.</exception>
+    public static CommandLineRefusal DataFileUnreadable(string spelledOption, string file, bool errorsHidden)
+    {
+        ArgumentNullException.ThrowIfNull(spelledOption);
+        ArgumentNullException.ThrowIfNull(file);
+
+        string readErrorLine = $"curl: option {spelledOption}: error encountered when reading a file";
+        return errorsHidden
+            ? new CommandLineRefusal(CurlExitCode.ReadError, readErrorLine)
+            : new CommandLineRefusal(CurlExitCode.ReadError, $"curl: Failed to open {file}", readErrorLine);
     }
 
     private static CommandLineRefusal Create(string spelledOption, string reason)
