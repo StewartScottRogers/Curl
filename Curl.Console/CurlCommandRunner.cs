@@ -31,6 +31,10 @@ namespace Curl.Console;
 /// <see cref="ITransferContext.Upload" />, because curl's telnet "sends what it reads on
 /// stdin" (ADR-0006). Every other scheme's upload is <see langword="null" />.
 /// </param>
+/// <param name="runsOnWindows">
+/// Whether the process runs on Windows, where each <c>-o</c> name is rewritten by
+/// <see cref="WindowsOutputFileNameSanitizer" /> before it is used, as curl 8.21.0 does.
+/// </param>
 /// <remarks>
 /// <para>
 /// URLs are transferred in command-line order; a failure does not stop the rest, and the
@@ -63,7 +67,8 @@ internal sealed class CurlCommandRunner(
     IFileSystem outputFileSystem,
     Stream standardOutput,
     Stream standardError,
-    Stream standardInput)
+    Stream standardInput,
+    bool runsOnWindows)
 {
     /// <summary>
     /// curl 8.21.0's message for a URL that cannot be parsed at all, measured on
@@ -233,7 +238,11 @@ internal sealed class CurlCommandRunner(
     /// <param name="dispatcher">Performs the transfer with the handler for its scheme.</param>
     /// <param name="options">The accepted command line.</param>
     /// <param name="url">The URL as typed.</param>
-    /// <param name="outputFile">The matching <c>-o</c> value, or <see langword="null" />.</param>
+    /// <param name="outputFile">
+    /// The matching <c>-o</c> value, or <see langword="null" />. On Windows the file used is
+    /// its <see cref="WindowsOutputFileNameSanitizer" /> rewrite, for the <c>-C -</c> size, the
+    /// file itself and every message that names it.
+    /// </param>
     /// <returns>
     /// The transfer's result; <see cref="ByteRangeParser.NotDeliveredFailure" />, with nothing
     /// transferred, when the <c>-r</c> text names no range, as curl 8.21.0 reports it.
@@ -261,9 +270,10 @@ internal sealed class CurlCommandRunner(
             return await TransferToStandardOutputAsync(dispatcher, context).ConfigureAwait(false);
         }
 
-        long? resumeFrom = await ResolveResumeFromAsync(options, outputFile).ConfigureAwait(false);
+        string outputFileName = runsOnWindows ? WindowsOutputFileNameSanitizer.Sanitize(outputFile) : outputFile;
+        long? resumeFrom = await ResolveResumeFromAsync(options, outputFileName).ConfigureAwait(false);
 
-        return await TransferToOutputFileAsync(dispatcher, options, uri, outputFile, range, resumeFrom)
+        return await TransferToOutputFileAsync(dispatcher, options, uri, outputFileName, range, resumeFrom)
             .ConfigureAwait(false);
     }
 
@@ -287,7 +297,7 @@ internal sealed class CurlCommandRunner(
     /// Works out the offset a transfer to <paramref name="outputFile" /> resumes from.
     /// </summary>
     /// <param name="options">The accepted command line.</param>
-    /// <param name="outputFile">The matching <c>-o</c> value.</param>
+    /// <param name="outputFile">The file: the <c>-o</c> value, after <see cref="WindowsOutputFileNameSanitizer" /> on Windows.</param>
     /// <returns>
     /// For <c>-C -</c>, the size of <paramref name="outputFile" />, or <see langword="null" />
     /// when it cannot be opened, since curl 8.21.0 then transfers the whole resource; otherwise
@@ -320,7 +330,7 @@ internal sealed class CurlCommandRunner(
     /// <param name="dispatcher">Performs the transfer with the handler for its scheme.</param>
     /// <param name="options">The accepted command line.</param>
     /// <param name="uri">The URL.</param>
-    /// <param name="outputFile">The matching <c>-o</c> value.</param>
+    /// <param name="outputFile">The file: the <c>-o</c> value, after <see cref="WindowsOutputFileNameSanitizer" /> on Windows.</param>
     /// <param name="range">The parsed <c>-r</c> range, or <see langword="null" />.</param>
     /// <param name="resumeFrom">The resolved <c>-C</c> offset, or <see langword="null" />.</param>
     /// <returns>
@@ -365,7 +375,7 @@ internal sealed class CurlCommandRunner(
     /// <c>-S</c>.
     /// </summary>
     /// <param name="options">The accepted command line.</param>
-    /// <param name="outputFile">The <c>-o</c> value, as typed.</param>
+    /// <param name="outputFile">The file: the <c>-o</c> value, after <see cref="WindowsOutputFileNameSanitizer" /> on Windows.</param>
     /// <returns><see cref="CannotOpenForResumeFailure" />: exit 23 with <see cref="CannotOpenForResumeMessage" />.</returns>
     private async Task<TransferResult> ReportCannotOpenForResumeAsync(CommandLineOptions options, string outputFile)
     {

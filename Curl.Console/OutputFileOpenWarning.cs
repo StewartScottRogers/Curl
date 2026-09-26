@@ -16,7 +16,7 @@ internal static class OutputFileOpenWarning
     /// <summary>
     /// Builds the warning line, without a line terminator.
     /// </summary>
-    /// <param name="path">The <c>-o</c> value, as typed.</param>
+    /// <param name="path">The file that failed to open: the <c>-o</c> value, after <see cref="WindowsOutputFileNameSanitizer" /> on Windows.</param>
     /// <param name="status">Why the open failed.</param>
     /// <returns>The warning line.</returns>
     internal static string For(string path, FileAccessStatus status) =>

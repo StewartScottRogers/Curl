@@ -134,7 +134,8 @@ public sealed class CurlCommandRunnerTests
             files,
             standardOutput,
             standardError,
-            standardInput);
+            standardInput,
+            runsOnWindows: false);
 
         int exitCode = await runner.RunAsync(["-sS", "-o", "C:/nonexist/dir/x", "file:///C:/Windows/win.ini"]);
 
@@ -453,7 +454,8 @@ public sealed class CurlCommandRunnerTests
             fileSystem,
             standardOutput,
             standardError,
-            standardInput);
+            standardInput,
+            runsOnWindows: false);
 
         await runner.RunAsync(["--no-such-option", "file:///a"]);
 
@@ -503,14 +505,14 @@ public sealed class CurlCommandRunnerTests
     }
 
     private Task<int> RunAsync(IReadOnlyList<string> arguments, params IProtocolHandler[] handlers) =>
-        new CurlCommandRunner(_ => new ProtocolDispatcher(handlers), fileSystem, standardOutput, standardError, standardInput)
+        new CurlCommandRunner(_ => new ProtocolDispatcher(handlers), fileSystem, standardOutput, standardError, standardInput, runsOnWindows: false)
             .RunAsync(arguments);
 
     private Task<int> RunWithStandardOutputAsync(
         Stream output,
         IReadOnlyList<string> arguments,
         params IProtocolHandler[] handlers) =>
-        new CurlCommandRunner(_ => new ProtocolDispatcher(handlers), fileSystem, output, standardError, standardInput)
+        new CurlCommandRunner(_ => new ProtocolDispatcher(handlers), fileSystem, output, standardError, standardInput, runsOnWindows: false)
             .RunAsync(arguments);
 
     private Task<int> RunToUncreatableOutputFileAsync(params string[] options)
@@ -522,7 +524,8 @@ public sealed class CurlCommandRunnerTests
             files,
             standardOutput,
             standardError,
-            standardInput);
+            standardInput,
+            runsOnWindows: false);
 
         return runner.RunAsync([.. options, "file:///C:/Windows/win.ini"]);
     }

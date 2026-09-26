@@ -85,7 +85,8 @@ internal static class CurlComposition
             new PhysicalFileSystem(),
             standardOutput,
             standardError,
-            standardInput);
+            standardInput,
+            OperatingSystem.IsWindows());
 
     /// <summary>
     /// Creates the runner with the production handler set built around the given
@@ -109,7 +110,8 @@ internal static class CurlComposition
             new PhysicalFileSystem(),
             standardOutput,
             standardError,
-            standardInput);
+            standardInput,
+            OperatingSystem.IsWindows());
 
     /// <summary>
     /// Creates the dispatcher over the production handler set, connecting through

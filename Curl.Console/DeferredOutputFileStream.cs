@@ -8,7 +8,7 @@ namespace Curl.Console;
 /// on the first write rather than up front, as curl 8.21.0 does.
 /// </summary>
 /// <param name="fileSystem">Opens the file.</param>
-/// <param name="path">The <c>-o</c> value, as typed.</param>
+/// <param name="path">The file to open: the <c>-o</c> value, after <see cref="WindowsOutputFileNameSanitizer" /> on Windows.</param>
 /// <param name="writeMode">
 /// <see cref="FileWriteMode.Truncate" /> for a whole transfer;
 /// <see cref="FileWriteMode.Append" /> when <c>-C</c> / <c>--continue-at</c> resumes it, as
