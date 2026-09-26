@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation/Planning/Decisions/ADR-0005-protocol-handlers-acquire-transports-through-connectors.md, Documentation/Planning/Decisions/ADR-0006-transfer-context-carries-phase-4-protocol-options.md, Documentation/Planning/Decisions/README.md, Documentation/Product/Product-Overview.md]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-032 — Record ADR-0005 and ADR-0006 for transport connectors and the Phase 4 transfer options
 
@@ -80,7 +80,7 @@ those projects are outside the adding task's `touches`. One settable data class 
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Planning/Decisions/ADR-0005-protocol-handlers-acquire-transports-through-connectors.md`
+- [x] `Documentation/Planning/Decisions/ADR-0005-protocol-handlers-acquire-transports-through-connectors.md`
       exists in the template shape from `Decisions/README.md`, Status `Accepted`, dated
       the day it is written, and its Decision section names exactly:
       `IConnector.ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)`
@@ -95,13 +95,13 @@ those projects are outside the adding task's `touches`. One settable data class 
       returning `ValueTask`, and
       `ReceiveAsync(Memory<byte> buffer, CancellationToken cancellationToken)` returning
       `ValueTask<DatagramReceived>`, where `DatagramReceived(int Length, EndPoint RemoteEndPoint)`.
-- [ ] ADR-0005 states that a connector returns every resolve, connect or TLS failure as
+- [x] ADR-0005 states that a connector returns every resolve, connect or TLS failure as
       a result carrying the curl exit code and message and lets only an
       `OperationCanceledException` escape; that handlers take connectors in their
       constructors and never construct a `Socket` or `SslStream`; that the production
       implementations live in `Curl.Networking.UnitLibrary`; and it quotes the exit 6
       and exit 7 measurements above with the curl version.
-- [ ] `Documentation/Planning/Decisions/ADR-0006-transfer-context-carries-phase-4-protocol-options.md`
+- [x] `Documentation/Planning/Decisions/ADR-0006-transfer-context-carries-phase-4-protocol-options.md`
       exists in the same shape, and its Decision section names exactly these
       `ITransferContext` members: `ReadOnlyMemory<byte>? PostData` (`-d`; `null` when
       not given), `System.Net.NetworkCredential? Credentials` (`-u`, else the URL's user
@@ -109,20 +109,20 @@ those projects are outside the adding task's `touches`. One settable data class 
       value verbatim, in command-line order; empty when none), `int? TftpBlockSize`
       (`--tftp-blksize` as given, unclamped, `null` when not given; the TFTP handler
       clamps) and `bool TftpNoOptions` (`--tftp-no-options`).
-- [ ] ADR-0006 also decides `TransferContext`: a sealed class in
+- [x] ADR-0006 also decides `TransferContext`: a sealed class in
       `Curl.Protocol.Abstractions.UnitLibrary` implementing `ITransferContext` with
       `init` properties, `Url` and `Output` `required`, `TimeProvider` defaulting to
       `TimeProvider.System`, and every other member defaulting to its "not given"
       value; and it states that protocol test projects build contexts with it instead of
       declaring their own `ITransferContext` implementation.
-- [ ] ADR-0006 records the rejected alternatives - an untyped option bag (already
+- [x] ADR-0006 records the rejected alternatives - an untyped option bag (already
       rejected by ADR-0003) and a per-protocol context interface - each with its reason.
-- [ ] The index table in `Documentation/Planning/Decisions/README.md` gains rows for 0005
+- [x] The index table in `Documentation/Planning/Decisions/README.md` gains rows for 0005
       and 0006.
-- [ ] Rule 2 in `Documentation/Product/Product-Overview.md` no longer shows a handler
+- [x] Rule 2 in `Documentation/Product/Product-Overview.md` no longer shows a handler
       receiving `IConnection` in its constructor: it shows `IConnector`, names
       `IDatagramConnector` for TFTP, and points to ADR-0005.
-- [ ] No `.cs` or project file is changed.
+- [x] No `.cs` or project file is changed.
 
 ## Notes
 
@@ -130,7 +130,19 @@ If ADR-0005 or ADR-0006 is already taken when this runs, do not renumber anythin
 the task to `Blocked` saying which number is taken, because the file names are in this
 task's `touches`.
 
+- 2026-09-26 (lane 1): Numbers 0005 and 0006 were free. Written directly in the session
+  rather than delegated to `align-and-document`: the task fixes every name verbatim, so
+  there was nothing to align, and writing it in one place kept the names exact.
+- Rule 2 now sketches `FtpProtocolHandler(IConnector, TimeProvider)`, dropping
+  `IDnsResolver`: under ADR-0005 resolving is the connector's job. The contract list in
+  the Overview's layer text (line 131, the Networking row) was left naming only types
+  that exist today; the contract tasks add `IConnector` and friends and can update it.
+- ADR-0006 lists `CancellationToken.None` as `TransferContext`'s "not given" default for
+  `CancellationToken`, the one member the task did not spell out.
+- `dotnet build` clean; fast tests 211 passed (Abstractions 32, Cli 58, File 121).
+
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. ADR-0005 (transport connectors) and ADR-0006 (Phase 4 transfer options, TransferContext) recorded and indexed; Rule 2 points to ADR-0005
