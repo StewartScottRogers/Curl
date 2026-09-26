@@ -38,6 +38,7 @@ public sealed class CommandLineOptionTableTests
     [DataRow("progress-bar", '#', false)]
     [DataRow("output", 'o', true)]
     [DataRow("data", 'd', true)]
+    [DataRow("dump-header", 'D', true)]
     [DataRow("user", 'u', true)]
     [DataRow("telnet-option", 't', true)]
     [DataRow("tftp-blksize", null, true)]

@@ -57,6 +57,13 @@ public sealed class CommandLineOptions
     public ReadOnlyMemory<byte>? PostData { get; private set; }
 
     /// <summary>
+    /// The <c>-D</c> / <c>--dump-header</c> file, verbatim and unchecked; <see langword="null"/> when
+    /// not given. <c>-</c> means standard output. Nothing is opened or created here. The last value
+    /// wins, as in curl 8.21.0.
+    /// </summary>
+    public string? DumpHeaderFile { get; internal set; }
+
+    /// <summary>
     /// The <c>-u</c> / <c>--user</c> value split at its first colon into user name and password;
     /// <see langword="null"/> when not given. A value with no colon that does not start with <c>;</c>
     /// is a user name whose password <see cref="CommandLineParser"/> asks for through its

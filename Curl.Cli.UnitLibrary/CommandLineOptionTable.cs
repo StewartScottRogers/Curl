@@ -33,7 +33,7 @@ namespace Curl.Cli;
 /// <c>--no-progress-meter</c> and <c>--no-progress-bar</c> are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
 /// silent and <c>--no-silent -s</c> is. <c>--no-silent=x</c> is accepted, its value ignored.
 /// <c>--no-tlsv1.2</c>, <c>--no-tlsv1.3</c>, <c>--no-url</c>, <c>--no-output</c> (even as the last
-/// argument), <c>--no-output=x</c>, <c>--no-data</c> and <c>--no-range</c> exit 2 with
+/// argument), <c>--no-output=x</c>, <c>--no-data</c>, <c>--no-dump-header</c> and <c>--no-range</c> exit 2 with
 /// <c>curl: option &lt;as typed&gt;: the given option cannot be reversed with a --no- prefix</c> and
 /// the try-help line. <c>--no-bogus</c>, <c>--no-</c>, <c>--no-no-silent</c> and <c>--no-Silent</c>
 /// exit 2 as unknown. A short letter is never negated.
@@ -50,6 +50,7 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("progress-bar", '#', (options, on) => options.ProgressBar = on),
         CommandLineOption.FileName("output", 'o', (options, file) => options.AddOutputFile(file)),
         CommandLineOption.Value("data", 'd', AppendPostData),
+        CommandLineOption.FileName("dump-header", 'D', (options, file) => options.DumpHeaderFile = file),
         CommandLineOption.Value("user", 'u', AcceptingEmpty((options, user) => options.SetCredentials(user))),
         CommandLineOption.Value("telnet-option", 't', AcceptingEmpty((options, telnetOption) => options.AddTelnetOption(telnetOption))),
         CommandLineOption.Value("tftp-blksize", null, SetTftpBlockSize),
