@@ -53,4 +53,10 @@ internal static class TelnetByte
 
     /// <summary>The subnegotiation qualifier that carries a value: <c>IS</c>.</summary>
     public const byte IsQualifier = 0;
+
+    /// <summary>Starts a variable's name in a <c>NEW-ENVIRON</c> list: <c>VAR</c> (RFC 1572).</summary>
+    public const byte EnvironmentVariable = 0;
+
+    /// <summary>Starts a variable's value in a <c>NEW-ENVIRON</c> list: <c>VALUE</c> (RFC 1572).</summary>
+    public const byte EnvironmentValue = 1;
 }

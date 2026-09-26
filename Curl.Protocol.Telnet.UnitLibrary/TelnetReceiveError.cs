@@ -15,6 +15,18 @@ internal enum TelnetReceiveError
     SubnegotiationValueMissing,
 
     /// <summary>
+    /// The server asked for the terminal type and the one <c>-t</c> supplied is over 1000
+    /// characters: curl 8.21.0 exits 55.
+    /// </summary>
+    TerminalTypeTooLong,
+
+    /// <summary>
+    /// The server asked for the X display location and the one <c>-t</c> supplied is over
+    /// 1000 characters: curl 8.21.0 exits 55.
+    /// </summary>
+    XDisplayLocationTooLong,
+
+    /// <summary>
     /// A subnegotiation contained <c>IAC</c> followed by something other than <c>SE</c> or
     /// <c>IAC</c>: curl 8.21.0 exits 56.
     /// </summary>

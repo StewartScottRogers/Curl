@@ -23,7 +23,12 @@ stream with no network.
 - `TelnetReceiver` turns received bytes into output data and replies, byte for byte
   as curl 8.21.0 does; it is pure, with no I/O.
 - `TelnetOptionSide` is RFC 1143 option state for one side of the connection.
+- `TelnetOptionParser` reads `ITransferContext.TelnetOptions` (`-t`) into
+  `TelnetOptionValues` once connected, refusing a bad option with exit 48 or 49
+  before a byte is sent. `TTYPE`, `XDISPLOC` and `NEW_ENV` are negotiated; `WS` and
+  `BINARY` are checked as curl checks them and otherwise ignored.
 
 Every byte these classes send or write was measured against curl 8.21.0; the
-captures are in BL-043's Notes and pinned by `TelnetProtocolHandlerTests`. Change
-behaviour only against a new measurement.
+captures are in BL-043's and BL-044's Notes and pinned by `TelnetProtocolHandlerTests`
+and `TelnetProtocolHandlerTelnetOptionTests`. Change behaviour only against a new
+measurement.

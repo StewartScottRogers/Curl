@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace Curl.Protocol.Telnet;
 
 /// <summary>
@@ -21,27 +23,42 @@ namespace Curl.Protocol.Telnet;
 /// A server that never negotiates is never sent a command.
 /// </para>
 /// <para>
-/// A subnegotiation is removed from the output. With no <c>-t</c> options, a
-/// <c>NEW-ENVIRON</c> subnegotiation is answered with an empty <c>IS</c> list, a
-/// <c>TTYPE</c> or <c>XDISPLOC</c> one ends the session, and any other is ignored.
+/// Each of <c>TTYPE</c>, <c>XDISPLOC</c> and <c>NEW-ENVIRON</c> that a <c>-t</c> option
+/// gave a value for is one more option this side performs when asked, and offers after
+/// SGA, in option-number order, with <c>IAC WILL</c>.
+/// </para>
+/// <para>
+/// A subnegotiation is removed from the output. A <c>TTYPE</c> or <c>XDISPLOC</c> one is
+/// answered with <c>IS</c> and the value <c>-t</c> gave; with none it ends the session,
+/// and so does a value over 1000 characters. A <c>NEW-ENVIRON</c> one is answered with an
+/// <c>IS</c> list of every <c>NEW_ENV</c> variable that fits, empty when <c>-t</c> gave
+/// none. Any other is ignored.
 /// </para>
 /// </remarks>
 internal sealed class TelnetReceiver
 {
-    private static readonly byte[] OptionsOffered =
+    /// <summary>The most characters curl sends as a terminal type or X display location.</summary>
+    private const int MaximumSubnegotiationValueLength = 1000;
+
+    /// <summary>
+    /// curl 8.21.0 adds a <c>NEW-ENVIRON</c> variable to its reply only while the reply,
+    /// less its closing <c>IAC SE</c>, stays shorter than this; a variable that does not
+    /// fit is left out and the next one tried.
+    /// </summary>
+    private const int NewEnvironmentReplyLimit = 2042;
+
+    /// <summary>The options this side asks the server to perform, as well as performing them.</summary>
+    private static readonly byte[] OptionsOfferedBothWays =
         [TelnetByte.BinaryOption, TelnetByte.SuppressGoAheadOption];
 
-    private static readonly byte[] EmptyNewEnvironmentReply =
-    [
-        TelnetByte.InterpretAsCommand, TelnetByte.SubnegotiationBegin, TelnetByte.NewEnvironmentOption,
-        TelnetByte.IsQualifier, TelnetByte.InterpretAsCommand, TelnetByte.SubnegotiationEnd,
-    ];
+    private readonly TelnetOptionValues optionValues;
 
-    private readonly TelnetOptionSide localOptions =
-        new(TelnetByte.Will, TelnetByte.Wont, OptionsOffered);
+    private readonly byte[] localOptionsOffered;
+
+    private readonly TelnetOptionSide localOptions;
 
     private readonly TelnetOptionSide remoteOptions =
-        new(TelnetByte.Do, TelnetByte.Dont, [.. OptionsOffered, TelnetByte.EchoOption]);
+        new(TelnetByte.Do, TelnetByte.Dont, [.. OptionsOfferedBothWays, TelnetByte.EchoOption]);
 
     private readonly List<byte> subnegotiation = [];
 
@@ -50,6 +67,20 @@ internal sealed class TelnetReceiver
     private bool serverNegotiated;
 
     private bool optionsOffered;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="TelnetReceiver" /> class.
+    /// </summary>
+    /// <param name="optionValues">
+    /// What the <c>-t</c> options supplied: each of <c>TTYPE</c>, <c>XDISPLOC</c> and
+    /// <c>NEW-ENVIRON</c> that has a value is one more option this side performs and offers.
+    /// </param>
+    public TelnetReceiver(TelnetOptionValues optionValues)
+    {
+        this.optionValues = optionValues;
+        localOptionsOffered = [.. OptionsOfferedBothWays, .. OptionsWithValues(optionValues)];
+        localOptions = new TelnetOptionSide(TelnetByte.Will, TelnetByte.Wont, localOptionsOffered);
+    }
 
     /// <summary>
     /// Processes the bytes of one read.
@@ -211,13 +242,106 @@ internal sealed class TelnetReceiver
         switch (subnegotiation[0])
         {
             case TelnetByte.TerminalTypeOption:
+                return AnswerWithValue(
+                    TelnetByte.TerminalTypeOption,
+                    optionValues.TerminalType,
+                    TelnetReceiveError.TerminalTypeTooLong,
+                    replies);
             case TelnetByte.XDisplayLocationOption:
-                return TelnetReceiveError.SubnegotiationValueMissing;
+                return AnswerWithValue(
+                    TelnetByte.XDisplayLocationOption,
+                    optionValues.XDisplayLocation,
+                    TelnetReceiveError.XDisplayLocationTooLong,
+                    replies);
             case TelnetByte.NewEnvironmentOption:
-                replies.AddRange(EmptyNewEnvironmentReply);
+                AnswerNewEnvironment(replies);
                 return TelnetReceiveError.None;
             default:
                 return TelnetReceiveError.None;
+        }
+    }
+
+    private static TelnetReceiveError AnswerWithValue(
+        byte option,
+        string? value,
+        TelnetReceiveError tooLong,
+        List<byte> replies)
+    {
+        if (value is null)
+        {
+            return TelnetReceiveError.SubnegotiationValueMissing;
+        }
+
+        if (value.Length > MaximumSubnegotiationValueLength)
+        {
+            return tooLong;
+        }
+
+        AppendSubnegotiationStart(option, replies);
+        replies.AddRange(Encoding.ASCII.GetBytes(value));
+        AppendSubnegotiationEnd(replies);
+        return TelnetReceiveError.None;
+    }
+
+    private void AnswerNewEnvironment(List<byte> replies)
+    {
+        int start = replies.Count;
+        AppendSubnegotiationStart(TelnetByte.NewEnvironmentOption, replies);
+        foreach (string variable in optionValues.EnvironmentVariables)
+        {
+            if (replies.Count - start + variable.Length + 1 < NewEnvironmentReplyLimit)
+            {
+                AppendEnvironmentVariable(variable, replies);
+            }
+        }
+
+        AppendSubnegotiationEnd(replies);
+    }
+
+    private static void AppendEnvironmentVariable(string variable, List<byte> replies)
+    {
+        int comma = variable.IndexOf(',', StringComparison.Ordinal);
+        replies.Add(TelnetByte.EnvironmentVariable);
+        if (comma < 0)
+        {
+            replies.AddRange(Encoding.ASCII.GetBytes(variable));
+            return;
+        }
+
+        replies.AddRange(Encoding.ASCII.GetBytes(variable[..comma]));
+        replies.Add(TelnetByte.EnvironmentValue);
+        replies.AddRange(Encoding.ASCII.GetBytes(variable[(comma + 1)..]));
+    }
+
+    private static void AppendSubnegotiationStart(byte option, List<byte> replies)
+    {
+        replies.Add(TelnetByte.InterpretAsCommand);
+        replies.Add(TelnetByte.SubnegotiationBegin);
+        replies.Add(option);
+        replies.Add(TelnetByte.IsQualifier);
+    }
+
+    private static void AppendSubnegotiationEnd(List<byte> replies)
+    {
+        replies.Add(TelnetByte.InterpretAsCommand);
+        replies.Add(TelnetByte.SubnegotiationEnd);
+    }
+
+    private static IEnumerable<byte> OptionsWithValues(TelnetOptionValues optionValues)
+    {
+        if (optionValues.TerminalType is not null)
+        {
+            yield return TelnetByte.TerminalTypeOption;
+        }
+
+        if (optionValues.XDisplayLocation is not null)
+        {
+            yield return TelnetByte.XDisplayLocationOption;
+        }
+
+        if (optionValues.EnvironmentVariables.Count > 0)
+        {
+            yield return TelnetByte.NewEnvironmentOption;
         }
     }
 
@@ -229,10 +353,13 @@ internal sealed class TelnetReceiver
         }
 
         optionsOffered = true;
-        foreach (byte option in OptionsOffered)
+        foreach (byte option in localOptionsOffered)
         {
             localOptions.RequestEnable(option, replies);
-            remoteOptions.RequestEnable(option, replies);
+            if (Array.IndexOf(OptionsOfferedBothWays, option) >= 0)
+            {
+                remoteOptions.RequestEnable(option, replies);
+            }
         }
     }
 }
