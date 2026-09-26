@@ -63,6 +63,13 @@ public sealed class CommandLineRefusal
     public static CommandLineRefusal ExpectedPositiveNumericalParameter(string spelledOption) =>
         Create(spelledOption, "expected a positive numerical parameter");
 
+    /// <summary>Refuses a numeric option value that is larger than the option allows.</summary>
+    /// <param name="spelledOption">The whole argument as typed.</param>
+    /// <returns>A refusal reading <c>too large number</c>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="spelledOption"/> is <see langword="null"/>.</exception>
+    public static CommandLineRefusal TooLargeNumber(string spelledOption) =>
+        Create(spelledOption, "too large number");
+
     private static CommandLineRefusal Create(string spelledOption, string reason)
     {
         ArgumentNullException.ThrowIfNull(spelledOption);

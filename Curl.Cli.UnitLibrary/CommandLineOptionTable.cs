@@ -31,7 +31,11 @@ public static class CommandLineOptionTable
         CommandLineOption.Value("telnet-option", 't', AcceptingEmpty((options, telnetOption) => options.AddTelnetOption(telnetOption))),
         CommandLineOption.Value("tftp-blksize", null, SetTftpBlockSize),
         CommandLineOption.Flag("tftp-no-options", null, options => options.TftpNoOptions = true),
+        CommandLineOption.Value("create-file-mode", null, SetCreateFileMode),
     ];
+
+    /// <summary>The largest <c>--create-file-mode</c> curl 8.21.0 accepts: octal <c>0777</c>.</summary>
+    private const int MaximumCreateFileMode = 0b111_111_111;
 
     private static readonly FrozenDictionary<string, CommandLineOption> RowsByLongName =
         RowsInTableOrder.ToFrozenDictionary(option => option.LongName, StringComparer.Ordinal);
@@ -62,6 +66,17 @@ public static class CommandLineOptionTable
         if (refusal is null)
         {
             options.TftpBlockSize = blockSize;
+        }
+
+        return refusal;
+    }
+
+    private static CommandLineRefusal? SetCreateFileMode(CommandLineOptions options, string value, string spelledOption)
+    {
+        CommandLineRefusal? refusal = CommandLineNumber.ParseOctal(spelledOption, value, MaximumCreateFileMode, out int mode);
+        if (refusal is null)
+        {
+            options.CreateFileMode = (UnixFileMode)mode;
         }
 
         return refusal;

@@ -56,6 +56,13 @@ public sealed class CommandLineOptions
     /// <summary><see langword="true"/> when <c>--tftp-no-options</c> was given.</summary>
     public bool TftpNoOptions { get; internal set; }
 
+    /// <summary>
+    /// The <c>--create-file-mode</c> value, read as octal and at most <c>0777</c>;
+    /// <see langword="null"/> when not given, where curl's default of <c>0644</c> applies.
+    /// When given more than once the last value wins.
+    /// </summary>
+    public UnixFileMode? CreateFileMode { get; internal set; }
+
     /// <summary>Appends <paramref name="url"/> to <see cref="Urls"/>, unchanged and unvalidated.</summary>
     /// <param name="url">A positional argument or a <c>--url</c> value.</param>
     internal void AddUrl(string url) => urls.Add(url);

@@ -52,6 +52,14 @@ public sealed class CommandLineRefusalTests
     }
 
     [TestMethod]
+    public void TooLargeNumber_Spelled_NamesOptionAsTooLarge()
+    {
+        CommandLineRefusal refusal = CommandLineRefusal.TooLargeNumber("--create-file-mode");
+
+        AssertRefusal(refusal, "curl: option --create-file-mode: too large number");
+    }
+
+    [TestMethod]
     public void ExpectedProperNumericalParameter_Spelled_NamesOptionAsNotNumerical()
     {
         CommandLineRefusal refusal = CommandLineRefusal.ExpectedProperNumericalParameter("--tftp-blksize");
