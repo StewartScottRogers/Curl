@@ -81,3 +81,4 @@ accepted and refused command lines, matching curl 8.21.0.
 - 2026-09-26: Backlog -> Doing.
 - 2026-09-26: Doing -> Blocked. Needs BL-093: -s suppresses the warning only when it precedes -o, so Curl.Cli.UnitLibrary (outside touches) must filter WarningLines first; re-queue once BL-093 is done.
 - 2026-09-26: Blocked -> Backlog. Unblocked: BL-093 now Done
+- 2026-09-26: Backlog -> Doing.
