@@ -11,6 +11,16 @@ namespace Curl.Cli;
 /// </remarks>
 public static class CommandLineWarning
 {
+    /// <summary>How curl 8.21.0 names each <see cref="SelectedHttpMethod"/>, indexed by its value.</summary>
+    private static readonly string[] RequestMethodNames =
+    [
+        string.Empty,
+        "GET (-G, --get)",
+        "HEAD (-I, --head)",
+        "multipart formpost (-F, --form)",
+        "POST (-d, --data)",
+    ];
+
     /// <summary>
     /// The warning for a file name that looks like a flag, which curl still takes as the file
     /// name: <c>Warning: The filename argument '&lt;value&gt;' looks like a flag.</c>
@@ -96,26 +106,22 @@ public static class CommandLineWarning
     ];
 
     /// <summary>
-    /// The two lines curl prints when <c>-I</c> / <c>--head</c> follows <c>--no-head</c>, before it
-    /// refuses the <c>-I</c>. curl wraps the text at 79 columns, so the first line ends in a space.
-    /// Measured with <c>curl --no-head -I http://127.0.0.1:1/</c> (curl 8.21.0, Windows, 2026-09-26).
+    /// The lines curl prints when an option asks for an HTTP request method after another option has
+    /// selected a different one: <c>Warning: You can only select one HTTP request method! You asked for
+    /// both &lt;requested&gt; and &lt;selected&gt;.</c>, wrapped at 79 columns as curl wraps it, each method
+    /// named as curl 8.21.0 names it: <c>GET (-G, --get)</c>, <c>HEAD (-I, --head)</c>,
+    /// <c>multipart formpost (-F, --form)</c> or <c>POST (-d, --data)</c>. Measured with
+    /// <c>curl --no-head -I</c>, <c>curl -I --no-head</c>, <c>curl -F a=b -I</c>, <c>curl -I -F a=b</c>,
+    /// <c>curl --no-head -F a=b</c>, <c>curl -F a=b --no-head</c>, <c>curl -F a=b -d x</c> and
+    /// <c>curl -F a=b -d x -G</c> against <c>http://127.0.0.1:1/</c> (curl 8.21.0, Windows, 2026-09-26).
     /// </summary>
-    public static IReadOnlyList<string> HeadRequestedAfterGet { get; } =
-    [
-        "Warning: You can only select one HTTP request method! You asked for both HEAD ",
-        "Warning: (-I, --head) and GET (-G, --get).",
-    ];
-
-    /// <summary>
-    /// The two lines curl prints when <c>--no-head</c> follows <c>-I</c> / <c>--head</c>, before it
-    /// refuses the <c>--no-head</c>. curl wraps the text at 79 columns, so the first line ends in a space.
-    /// Measured with <c>curl -I --no-head http://127.0.0.1:1/</c> (curl 8.21.0, Windows, 2026-09-26).
-    /// </summary>
-    public static IReadOnlyList<string> GetRequestedAfterHead { get; } =
-    [
-        "Warning: You can only select one HTTP request method! You asked for both GET ",
-        "Warning: (-G, --get) and HEAD (-I, --head).",
-    ];
+    /// <param name="requested">The method the later option asks for.</param>
+    /// <param name="selected">The method already selected.</param>
+    /// <returns>The warning's lines.</returns>
+    internal static IReadOnlyList<string> OnlyOneRequestMethod(SelectedHttpMethod requested, SelectedHttpMethod selected) =>
+        WrappedMessage.Lines(
+            "Warning: ",
+            $"You can only select one HTTP request method! You asked for both {RequestMethodNames[(int)requested]} and {RequestMethodNames[(int)selected]}.");
 
     /// <summary>
     /// The line curl prints when a command line gives more <c>-o</c>/<c>--output</c> values than

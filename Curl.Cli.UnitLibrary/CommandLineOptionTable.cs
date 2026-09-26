@@ -40,6 +40,7 @@ namespace Curl.Cli;
 /// argument), <c>--no-output=x</c>, <c>--no-data</c>, <c>--no-dump-header</c>, <c>--no-range</c>, <c>--no-time-cond</c>,
 /// <c>--no-request</c>, <c>--no-header</c> (and <c>--no-header=x</c>), <c>--no-user-agent</c>, <c>--no-referer</c>,
 /// <c>--no-data-ascii</c>, <c>--no-data-binary</c>, <c>--no-data-raw</c>, <c>--no-data-urlencode</c>, <c>--no-json</c>,
+/// <c>--no-form</c>, <c>--no-form-string</c>,
 /// <c>--no-url-query</c>, <c>--no-max-redirs</c> and <c>--no-config</c> (each also with <c>=x</c>) exit 2 with
 /// <c>curl: option &lt;as typed&gt;: the given option cannot be reversed with a --no- prefix</c> and
 /// the try-help line. <c>--no-bogus</c>, <c>--no-</c>, <c>--no-no-silent</c> and <c>--no-Silent</c>
@@ -62,6 +63,8 @@ public static class CommandLineOptionTable
         CommandLineOption.Value("data-raw", null, AcceptingEmpty((options, data) => options.AppendPostData(data))),
         CommandLineOption.Value("data-urlencode", null, AppendUrlEncodedPostData),
         CommandLineOption.Value("json", null, AppendJsonData),
+        CommandLineOption.Value("form", 'F', (options, value, spelledOption, _, dataFileReader) => MultipartFormField.Apply(options, value, literal: false, spelledOption, dataFileReader)),
+        CommandLineOption.Value("form-string", null, (options, value, spelledOption, _, dataFileReader) => MultipartFormField.Apply(options, value, literal: true, spelledOption, dataFileReader)),
         CommandLineOption.NegatableFlag("get", 'G', (options, on) => options.DataInQuery = on),
         CommandLineOption.Value("url-query", null, AppendUrlQuery),
         CommandLineOption.FileName("dump-header", 'D', (options, file) => options.DumpHeaderFile = file),
@@ -536,22 +539,35 @@ public static class CommandLineOptionTable
 
     /// <summary>
     /// Turns <c>-I</c> / <c>--head</c> on, which selects <c>HEAD</c> and shows the headers, or, for
-    /// <c>--no-head</c>, off, which selects <c>GET</c> and hides them. Once one method is selected the
-    /// other is refused with <see cref="CommandLineRefusal.BadlyUsedHere"/> after curl 8.21.0's two
-    /// warning lines, which <c>-s</c> read before it drops.
+    /// <c>--no-head</c>, off, which selects <c>GET</c> and hides them. Once another method is selected
+    /// the option is refused by <see cref="SelectRequestMethod"/>.
     /// </summary>
     private static CommandLineRefusal? SetHead(CommandLineOptions options, bool on, string spelledOption)
     {
-        SelectedHttpMethod method = on ? SelectedHttpMethod.Head : SelectedHttpMethod.Get;
+        CommandLineRefusal? refusal = SelectRequestMethod(options, on ? SelectedHttpMethod.Head : SelectedHttpMethod.Get, spelledOption);
+        if (refusal is null)
+        {
+            options.NoBody = on;
+            options.ShowHeaders = on;
+        }
+
+        return refusal;
+    }
+
+    /// <summary>
+    /// Selects <paramref name="method"/>, or, when an earlier option selected a different one, refuses
+    /// with <see cref="CommandLineRefusal.BadlyUsedHere"/> after curl 8.21.0's
+    /// <see cref="CommandLineWarning.OnlyOneRequestMethod"/> lines, which <c>-s</c> read before it drops.
+    /// </summary>
+    internal static CommandLineRefusal? SelectRequestMethod(CommandLineOptions options, SelectedHttpMethod method, string spelledOption)
+    {
         if (options.HttpMethodSelected != SelectedHttpMethod.None && options.HttpMethodSelected != method)
         {
-            options.AddWarningLinesUnlessSilent(on ? CommandLineWarning.HeadRequestedAfterGet : CommandLineWarning.GetRequestedAfterHead);
+            options.AddWarningLinesUnlessSilent(CommandLineWarning.OnlyOneRequestMethod(method, options.HttpMethodSelected));
             return CommandLineRefusal.BadlyUsedHere(spelledOption);
         }
 
         options.HttpMethodSelected = method;
-        options.NoBody = on;
-        options.ShowHeaders = on;
         return null;
     }
 

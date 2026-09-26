@@ -19,6 +19,8 @@ public sealed class CommandLineOptions
     private readonly List<string> telnetOptions = [];
     private readonly List<string> headers = [];
     private readonly List<string> warningLines = [];
+    private readonly List<FormPartSpecification> formParts = [];
+    private readonly Stack<FormPartSpecification> openMultiparts = new();
     private string? userAwaitingPassword;
 
     /// <summary>
@@ -223,6 +225,14 @@ public sealed class CommandLineOptions
     public IReadOnlyList<string> Headers => headers;
 
     /// <summary>
+    /// The multipart form <c>-F</c> / <c>--form</c> and <c>--form-string</c> values describe, one
+    /// top-level part per value in command-line order, parts given between <c>name=(</c> and <c>=)</c>
+    /// inside the part that opened them; empty when neither option was given. A multipart part still
+    /// open when the command line ends is simply closed there.
+    /// </summary>
+    public IReadOnlyList<FormPartSpecification> FormParts => formParts;
+
+    /// <summary>
     /// The <c>-A</c> / <c>--user-agent</c> value, verbatim; empty when given empty, which curl 8.21.0
     /// sends as no <c>User-Agent</c> header at all; <see langword="null"/> when not given. The last value wins.
     /// </summary>
@@ -293,9 +303,10 @@ public sealed class CommandLineOptions
     public bool FailEarly { get; internal set; }
 
     /// <summary>
-    /// The HTTP request method <c>-I</c> / <c>--head</c> (<see cref="SelectedHttpMethod.Head"/>) or
-    /// <c>--no-head</c> (<see cref="SelectedHttpMethod.Get"/>) selected first; once one is selected,
-    /// selecting the other is refused, as curl 8.21.0 does.
+    /// The HTTP request method <c>-I</c> / <c>--head</c> (<see cref="SelectedHttpMethod.Head"/>),
+    /// <c>--no-head</c> (<see cref="SelectedHttpMethod.Get"/>) or <c>-F</c> / <c>--form</c> and
+    /// <c>--form-string</c> (<see cref="SelectedHttpMethod.MultipartFormPost"/>) selected first; once one
+    /// is selected, selecting another is refused, as curl 8.21.0 does.
     /// </summary>
     internal SelectedHttpMethod HttpMethodSelected { get; set; }
 
@@ -417,4 +428,36 @@ public sealed class CommandLineOptions
     /// <summary>Appends <paramref name="header"/> to <see cref="Headers"/>, unchanged and unvalidated.</summary>
     /// <param name="header">A <c>-H</c> / <c>--header</c> value, or one line of its <c>@file</c>.</param>
     internal void AddHeader(string header) => headers.Add(header);
+
+    /// <summary>
+    /// Appends <paramref name="part"/> to the innermost multipart part still open, or to
+    /// <see cref="FormParts"/> when none is.
+    /// </summary>
+    /// <param name="part">The part to append.</param>
+    internal void AddFormPart(FormPartSpecification part)
+    {
+        if (openMultiparts.TryPeek(out FormPartSpecification? multipart))
+        {
+            multipart.AddPart(part);
+        }
+        else
+        {
+            formParts.Add(part);
+        }
+    }
+
+    /// <summary>
+    /// Appends <paramref name="multipart"/> as <see cref="AddFormPart"/> does and opens it, so the
+    /// parts that follow go inside it until <see cref="TryCloseMultipart"/>.
+    /// </summary>
+    /// <param name="multipart">A <see cref="FormPartKind.Multipart"/> part.</param>
+    internal void OpenMultipart(FormPartSpecification multipart)
+    {
+        AddFormPart(multipart);
+        openMultiparts.Push(multipart);
+    }
+
+    /// <summary>Closes the innermost multipart part still open.</summary>
+    /// <returns><see langword="true"/> when one was closed; <see langword="false"/> when none is open.</returns>
+    internal bool TryCloseMultipart() => openMultiparts.TryPop(out _);
 }

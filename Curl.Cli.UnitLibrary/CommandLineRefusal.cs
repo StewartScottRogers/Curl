@@ -40,6 +40,14 @@ public sealed class CommandLineRefusal
         StandardErrorLines = [.. errorLines, $"curl: option {spelledOption}: {reason}", TryHelpLine];
     }
 
+    private CommandLineRefusal(CurlExitCode exitCode, IReadOnlyList<string> errorLines, IReadOnlyList<string> standardErrorLines)
+    {
+        ExitCode = exitCode;
+        ErrorLines = errorLines;
+        Reason = string.Empty;
+        StandardErrorLines = standardErrorLines;
+    }
+
     private CommandLineRefusal(params string[] linesBeforeTryHelp)
     {
         ExitCode = CurlExitCode.FailedInit;
@@ -55,8 +63,8 @@ public sealed class CommandLineRefusal
     public CurlExitCode ExitCode { get; }
 
     /// <summary>
-    /// The lines to write to standard error, without line terminators: two, one for
-    /// <see cref="EmptyCommandLine"/>, or three for
+    /// The lines to write to standard error, without line terminators: two, none for
+    /// <see cref="FormAndDataBoth"/>, one for <see cref="EmptyCommandLine"/>, or three for
     /// <see cref="FileDoesNotExist"/>, and for <see cref="ContinueAtExclusiveWithRange"/> and
     /// <see cref="DataFileUnreadable"/> when errors are not hidden, and more for a refusal met inside
     /// a <c>-K</c> file.
@@ -173,6 +181,22 @@ public sealed class CommandLineRefusal
     /// <returns>A refusal of one line, <see cref="TryHelpLine"/>.</returns>
     public static CommandLineRefusal EmptyCommandLine() =>
         new();
+
+    /// <summary>
+    /// Refuses a command line that, once read, asks for a multipart form post (<c>-F</c> /
+    /// <c>--form</c>) and a <c>-d</c> / <c>--data</c> body both. curl 8.21.0 prints only
+    /// <see cref="CommandLineWarning.OnlyOneRequestMethod"/> for it, which the parser adds to the
+    /// warning lines, so the refusal itself has no lines, not even <see cref="TryHelpLine"/>; it exits 2.
+    /// </summary>
+    /// <remarks>
+    /// Measured with the local curl 8.21.0 on 2026-09-26: <c>curl -F a=b -d x http://127.0.0.1:1/</c>
+    /// and <c>curl -d x -F a=b http://127.0.0.1:1/</c> print the two warning lines and exit 2 without
+    /// connecting; with <c>-s</c> anywhere they print nothing; with no URL, <c>no URL specified</c> is
+    /// reported instead.
+    /// </remarks>
+    /// <returns>A refusal with no lines.</returns>
+    public static CommandLineRefusal FormAndDataBoth() =>
+        new CommandLineRefusal(CurlExitCode.FailedInit, [], []);
 
     /// <summary>Refuses a command line that has arguments but names no URL.</summary>
     /// <returns>A refusal whose first line is <c>curl: (2) no URL specified</c>.</returns>

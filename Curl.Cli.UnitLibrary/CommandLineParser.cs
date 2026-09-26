@@ -22,6 +22,9 @@ namespace Curl.Cli;
 /// (<c>curl -u bob</c> prompts, then reports no URL; <c>curl -u bob --bogus</c> never prompts).
 /// A <c>-d</c> / <c>--data</c> value starting with <c>@</c> is read, while parsing, through the
 /// injected <see cref="IDataFileReader"/>: the file it names, or standard input for <c>@-</c>.
+/// A <c>-F</c> / <c>--form</c> value is read into form parts by <see cref="MultipartFormField"/>,
+/// and a command line that asks for a form and a <c>-d</c> body both is refused once read, with
+/// <see cref="CommandLineRefusal.FormAndDataBoth"/>.
 /// A <c>-K</c> / <c>--config</c> file is read through the same reader and its lines applied in
 /// place of the option (see <see cref="ConfigFileApplier"/>).
 /// </summary>
@@ -107,9 +110,34 @@ public static class CommandLineParser
         }
 
         options.ReadMissingPassword(passwordPrompt);
-        return options.Urls.Count == 0
-            ? CommandLineParseResult.Refused(CommandLineRefusal.NoUrlSpecified(), options.WarningLines)
+        return Finish(options);
+    }
+
+    /// <summary>
+    /// Checks the command line once it is all read: refused when it names no URL, or when it asks for
+    /// a multipart form post and a <c>-d</c> body both; otherwise accepted.
+    /// </summary>
+    private static CommandLineParseResult Finish(CommandLineOptions options)
+    {
+        if (options.Urls.Count == 0)
+        {
+            return CommandLineParseResult.Refused(CommandLineRefusal.NoUrlSpecified(), options.WarningLines);
+        }
+
+        return options.HttpMethodSelected == SelectedHttpMethod.MultipartFormPost && options.PostData is not null
+            ? RefuseFormAndDataBoth(options)
             : CommandLineParseResult.Accepted(options);
+    }
+
+    /// <summary>
+    /// Refuses a multipart form post that also has a <c>-d</c> body, after curl's warning naming the
+    /// body's method: <c>GET</c> when <c>-G</c> sends it as the query, else <c>POST</c>.
+    /// </summary>
+    private static CommandLineParseResult RefuseFormAndDataBoth(CommandLineOptions options)
+    {
+        SelectedHttpMethod dataMethod = options.DataInQuery ? SelectedHttpMethod.Get : SelectedHttpMethod.Post;
+        options.AddWarningLinesUnlessSilent(CommandLineWarning.OnlyOneRequestMethod(dataMethod, SelectedHttpMethod.MultipartFormPost));
+        return CommandLineParseResult.Refused(CommandLineRefusal.FormAndDataBoth(), options.WarningLines);
     }
 
     private static CommandLineRefusal? ParseArgument(CommandLineOptions options, string argument, ArgumentReader reader)
