@@ -653,6 +653,30 @@ public sealed class HttpProtocolHandlerTests
         }
     }
 
+    /// <summary>
+    /// Measured with curl 8.21.0 <c>-L --max-redirs 1 --compressed</c> against a 302 with
+    /// <c>Content-Encoding: foo</c> and body <c>AB</c> (BL-177 Notes): curl follows it and
+    /// ends with exit 47, not 61, so the discarded body is not decoded.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_CompressedWhileFollowing_DoesNotDecodeTheDiscardedBody()
+    {
+        MemoryStream output = new();
+        TransferContext context = new()
+        {
+            Url = new Uri("http://example.com/"),
+            Output = output,
+            Http = new HttpRequestOptions { FollowRedirects = true, Compressed = true },
+        };
+
+        TransferResult result = await Handler(QueueConnector.For(Connection("HTTP/1.1 302 Found\r\nLocation: /b\r\nContent-Encoding: foo\r\nContent-Length: 2\r\n\r\nAB", 65536)))
+            .ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("http://example.com/b", result.Report!.RedirectUrl);
+        Assert.AreEqual(0L, output.Length);
+    }
+
     [TestMethod]
     public async Task ExecuteAsync_3xxWithoutLocationWhileFollowing_WritesTheBodyAndReportsNoTarget()
     {
@@ -676,6 +700,65 @@ public sealed class HttpProtocolHandlerTests
 
         Assert.IsNull(result.Report!.RedirectUrl);
         Assert.AreEqual("hello", Latin1(output.ToArray()));
+    }
+
+    /// <summary>
+    /// Measured with curl 8.21.0 <c>-s -S --compressed</c> and <c>--raw --compressed</c>
+    /// (BL-177 Notes): both send Accept-Encoding; <c>--compressed</c> writes <c>hello</c>, and
+    /// <c>--raw</c> writes the 25 gzip bytes untouched. Either way the download size is 25.
+    /// </summary>
+    [TestMethod]
+    [DataRow(false, DisplayName = "--compressed decodes")]
+    [DataRow(true, DisplayName = "--raw --compressed does not")]
+    public async Task ExecuteAsync_Compressed_SendsAcceptEncodingAndDecodesUnlessRaw(bool raw)
+    {
+        byte[] gzip = HttpContentDecoderTests.Bytes(HttpContentDecoderTests.Gzip);
+        string response = "HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nContent-Length: 25\r\n\r\n" + Latin1(gzip);
+        string request = "GET / HTTP/1.1\r\nHost: example.com\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nAccept-Encoding: deflate, gzip, br\r\n\r\n";
+        foreach (int chunkSize in ChunkSizes)
+        {
+            MemoryStream output = new();
+            TransferContext context = new()
+            {
+                Url = new Uri("http://example.com/"),
+                Output = output,
+                Http = new HttpRequestOptions { Compressed = true, Raw = raw },
+            };
+
+            TransferResult result = await Handler(QueueConnector.For(Connection(response, chunkSize, request))).ExecuteAsync(context);
+
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            CollectionAssert.AreEqual(raw ? gzip : "hello"u8.ToArray(), output.ToArray(), $"Chunk size {chunkSize}");
+            Assert.AreEqual(25L, result.Report!.DownloadSize, $"Chunk size {chunkSize}");
+        }
+    }
+
+    /// <summary>
+    /// Measured: a gzip body starting <c>00 01 02</c> gives
+    /// <c>curl: (61) Error while processing content unencoding: incorrect header check</c>
+    /// and writes nothing.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_CompressedAndCorruptGzip_ReturnsExit61()
+    {
+        foreach (int chunkSize in ChunkSizes)
+        {
+            MemoryStream output = new();
+            TransferContext context = new()
+            {
+                Url = new Uri("http://example.com/"),
+                Output = output,
+                Http = new HttpRequestOptions { Compressed = true },
+            };
+            string response = "HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nContent-Length: 12\r\n\r\n"
+                + Latin1(HttpContentDecoderTests.Bytes("000102030405060708090A0B"));
+
+            TransferResult result = await Handler(QueueConnector.For(Connection(response, chunkSize))).ExecuteAsync(context);
+
+            Assert.AreEqual(CurlExitCode.BadContentEncoding, result.ExitCode, $"Chunk size {chunkSize}");
+            Assert.AreEqual("Error while processing content unencoding: incorrect header check", result.ErrorMessage, $"Chunk size {chunkSize}");
+            Assert.AreEqual(0L, output.Length, $"Chunk size {chunkSize}");
+        }
     }
 
     private static TransferContext FollowContext(string url, Stream output, Stream? headerOutput = null) =>

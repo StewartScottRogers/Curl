@@ -99,6 +99,30 @@ internal static class HttpTransferMessages
     internal const string ChunkedBodyIncomplete = "transfer closed with outstanding read data remaining";
 
     /// <summary>
+    /// The exit 61 message for a Content-Encoding coding <c>--compressed</c> does not decode.
+    /// </summary>
+    internal const string UnrecognizedContentEncoding = "Unrecognized content encoding type";
+
+    /// <summary>
+    /// The exit 61 message for a <c>gzip</c> body whose first two bytes are neither a gzip
+    /// nor a zlib header.
+    /// </summary>
+    internal const string IncorrectHeaderCheck = "Error while processing content unencoding: incorrect header check";
+
+    /// <summary>
+    /// The exit 61 message for a gzip or zlib header that names a compression method other
+    /// than deflate.
+    /// </summary>
+    internal const string UnknownCompressionMethod = "Error while processing content unencoding: unknown compression method";
+
+    /// <summary>
+    /// The exit 61 message for any other corrupt encoded body: measured for <c>br</c>, and
+    /// the text <c>curl_easy_strerror</c> gives exit 61, used for corrupt <c>gzip</c> and
+    /// <c>deflate</c> data too because the BCL does not report zlib's own text (ADR-0027).
+    /// </summary>
+    internal const string BadContentEncoding = "Unrecognized or bad HTTP Content or Transfer-Encoding";
+
+    /// <summary>
     /// Formats the exit 22 message for a final status of 400 or above under <c>-f</c> or
     /// <c>--fail-with-body</c>.
     /// </summary>

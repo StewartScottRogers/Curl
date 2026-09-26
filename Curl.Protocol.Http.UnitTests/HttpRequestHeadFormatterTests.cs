@@ -141,6 +141,40 @@ public sealed class HttpRequestHeadFormatterTests
         AssertHead("GET / HTTP/1.1\r\n" + expectedHeaders + "\r\n", new Uri(Url), options);
     }
 
+    /// <summary>
+    /// Measured with curl 8.21.0 <c>--compressed -e http://r/ -H "X-A: 1"</c> (BL-177 Notes):
+    /// Accept-Encoding follows Accept and comes before Referer and the <c>-H</c> values; the
+    /// reference's <c>zstd</c> token is left out (ADR-0020).
+    /// </summary>
+    [TestMethod]
+    public void Format_Compressed_SendsAcceptEncodingAfterAccept()
+    {
+        HttpRequestOptions options = new() { Compressed = true, Referer = "http://r/", Headers = ["X-A: 1"] };
+
+        AssertHead(
+            "GET / HTTP/1.1\r\n" + DefaultHeaders + "Accept-Encoding: deflate, gzip, br\r\nReferer: http://r/\r\nX-A: 1\r\n\r\n",
+            new Uri(Url),
+            options);
+    }
+
+    [TestMethod]
+    public void Format_NotCompressed_SendsNoAcceptEncoding()
+    {
+        AssertHead("GET / HTTP/1.1\r\n" + DefaultHeaders + "\r\n", new Uri(Url), new HttpRequestOptions { Compressed = false });
+    }
+
+    /// <summary>
+    /// Measured with curl 8.21.0 <c>--compressed -H "Accept-Encoding: gzip"</c> (BL-177 Notes):
+    /// the <c>-H</c> value replaces curl's own.
+    /// </summary>
+    [TestMethod]
+    public void Format_CompressedAndCustomAcceptEncoding_SendsTheCustomOne()
+    {
+        HttpRequestOptions options = new() { Compressed = true, Headers = ["Accept-Encoding: gzip"] };
+
+        AssertHead("GET / HTTP/1.1\r\n" + DefaultHeaders + "Accept-Encoding: gzip\r\n\r\n", new Uri(Url), options);
+    }
+
     [TestMethod]
     public void Format_NonAsciiHeader_SendsLatin1WithBestFit()
     {

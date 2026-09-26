@@ -8,14 +8,14 @@ namespace Curl.Protocol.Http;
 /// <summary>
 /// Formats the head of an HTTP/1.1 request - the request line, the headers and the empty
 /// line after them - byte for byte as curl 8.21.0 sends it for <c>-X</c>, <c>-H</c>,
-/// <c>-A</c>, <c>-e</c>, <c>-I</c> and a request body. Every rule was measured (BL-172 and BL-175
-/// Notes).
+/// <c>-A</c>, <c>-e</c>, <c>-I</c>, <c>--compressed</c> and a request body. Every rule was
+/// measured (BL-172, BL-175 and BL-177 Notes).
 /// </summary>
 /// <remarks>
 /// curl's own headers come first, in the order <c>Host</c>, <c>User-Agent</c>,
-/// <c>Accept</c>, <c>Referer</c>, each left out when an <c>-H</c> value names it; the
-/// <c>-H</c> values follow in command-line order. A custom <c>Host</c> is the exception: it
-/// takes the <c>Host</c> slot. A request with a body ends with <c>Content-Length</c> (or
+/// <c>Accept</c>, <c>Accept-Encoding</c> (for <c>--compressed</c>), <c>Referer</c>, each
+/// left out when an <c>-H</c> value names it; the <c>-H</c> values follow in command-line
+/// order. A custom <c>Host</c> is the exception: it takes the <c>Host</c> slot. A request with a body ends with <c>Content-Length</c> (or
 /// <c>Transfer-Encoding: chunked</c> when the length is unknown), <c>Content-Type</c> and
 /// <c>Expect: 100-continue</c> as <see cref="HttpRequestFraming" /> decides, each again left
 /// out when an <c>-H</c> value names it. Text is sent one byte per character (Latin-1), as curl
@@ -28,6 +28,12 @@ internal static class HttpRequestHeadFormatter
     /// The <c>User-Agent</c> curl 8.21.0 sends when <c>-A</c> is not given.
     /// </summary>
     internal const string DefaultUserAgent = "curl/8.21.0";
+
+    /// <summary>
+    /// The <c>Accept-Encoding</c> value <c>--compressed</c> sends: curl 8.21.0's without
+    /// <c>zstd</c>, which Curl cannot decode (ADR-0020).
+    /// </summary>
+    internal const string AcceptEncoding = "deflate, gzip, br";
 
     private const string HostName = "Host";
 
@@ -58,6 +64,7 @@ internal static class HttpRequestHeadFormatter
 
         AppendUnlessOverridden(head, customHeaders, "User-Agent", options.UserAgent ?? DefaultUserAgent);
         AppendUnlessOverridden(head, customHeaders, "Accept", "*/*");
+        AppendUnlessOverridden(head, customHeaders, "Accept-Encoding", options.Compressed ? AcceptEncoding : null);
         AppendUnlessOverridden(head, customHeaders, "Referer", options.Referer);
         AppendCustomHeaders(head, customHeaders, hostLine is not null);
         AppendBodyHeaders(head, customHeaders, framing);

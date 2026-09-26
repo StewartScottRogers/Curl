@@ -58,6 +58,11 @@ namespace Curl.Protocol.Http;
 /// response that has one is read and discarded, counted in the download size as curl counts
 /// it, while its head and trailers are still written to the header output (BL-179 Notes).
 /// </para>
+/// <para>
+/// <see cref="HttpRequestOptions.Compressed" /> sends <c>Accept-Encoding: deflate, gzip, br</c>
+/// (ADR-0020) and, unless <see cref="HttpRequestOptions.Raw" /> is set, decodes the body as
+/// its Content-Encoding says (<see cref="HttpContentDecoder" />, BL-177 Notes).
+/// </para>
 /// </remarks>
 public sealed class HttpProtocolHandler(
     IConnector connector,
@@ -138,8 +143,10 @@ public sealed class HttpProtocolHandler(
             exchange.RedirectUrl = HttpRedirectLocation.Find(context.Url, exchange.Head);
             await WriteHeadersAsync(context.HeaderOutput, exchange.Head.HeadBytes, cancellationToken).ConfigureAwait(false);
             ThrowIfFailing(options.Fail, HttpFailMode.Fail, exchange.Head);
-            Stream bodyOutput = BodyOutput(context.Output, options.FollowRedirects, exchange.RedirectUrl);
-            await body.CopyAsync(exchange.Head, context.NoBody, bodyOutput, cancellationToken).ConfigureAwait(false);
+            bool followsRedirect = options.FollowRedirects && exchange.RedirectUrl is not null;
+            Stream bodyOutput = followsRedirect ? Stream.Null : context.Output;
+            await body.CopyAsync(exchange.Head, context.NoBody, bodyOutput, DecodesContent(options, followsRedirect), cancellationToken)
+                .ConfigureAwait(false);
             await WriteHeadersAsync(context.HeaderOutput, body.TrailerBytes, cancellationToken).ConfigureAwait(false);
             ThrowIfFailing(options.Fail, HttpFailMode.FailWithBody, exchange.Head);
         }
@@ -154,12 +161,12 @@ public sealed class HttpProtocolHandler(
     }
 
     /// <summary>
-    /// Chooses where the response body goes: nowhere when <c>-L</c> will follow the redirect,
-    /// so the 3xx body is read and discarded as curl 8.21.0 does, and
-    /// <paramref name="output" /> otherwise.
+    /// Decides whether the body is decoded: for <c>--compressed</c> without <c>--raw</c>, and
+    /// not for a 3xx body that <c>-L</c> reads and discards, which curl 8.21.0 does not
+    /// decode (measured, BL-177 Notes).
     /// </summary>
-    private static Stream BodyOutput(Stream output, bool followRedirects, string? redirectUrl) =>
-        followRedirects && redirectUrl is not null ? Stream.Null : output;
+    private static bool DecodesContent(HttpRequestOptions options, bool followsRedirect) =>
+        options.Compressed && !options.Raw && !followsRedirect;
 
     /// <summary>
     /// Sends the request body, if there is one: at once, or once

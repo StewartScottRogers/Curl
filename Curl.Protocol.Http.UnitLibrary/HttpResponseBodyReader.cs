@@ -27,6 +27,8 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
 
     private HttpChunkedDecoder? decoder;
 
+    private HttpContentDecoder? contentDecoder;
+
     /// <summary>
     /// Gets how many body bytes the output has accepted, whole writes only: after a failure
     /// it is the count that reached the output before the write that failed.
@@ -64,18 +66,26 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     /// <see cref="HasBody(HttpResponseHead, bool)" />.
     /// </param>
     /// <param name="output">Where the body goes.</param>
+    /// <param name="decodeContent">
+    /// <see langword="true" /> for <c>--compressed</c> without <c>--raw</c>: the body is decoded
+    /// as its Content-Encoding headers say (<see cref="HttpContentDecoder" />) before it is written,
+    /// while <see cref="BytesWritten" /> still counts the encoded bytes, as curl's
+    /// <c>%{size_download}</c> does.
+    /// </param>
     /// <param name="cancellationToken">Cancels every read and write.</param>
     /// <returns>A task that completes when the whole body is written.</returns>
     /// <exception cref="HttpTransferException">
     /// The Content-Length or a chunked body's trailer is invalid (exit 8), the peer closed
     /// before the body was whole (exit 18), the output failed a write (exit 23), a read
     /// failed or the chunked framing is malformed (exit 56), the Transfer-Encoding names a
-    /// coding curl does not decode (exit 61), or a trailer line is too long (exit 100).
+    /// coding curl does not decode or a decoded Content-Encoding is unrecognized or corrupt
+    /// (exit 61), or a trailer line is too long (exit 100).
     /// </exception>
     internal async ValueTask CopyAsync(
         HttpResponseHead head,
         bool noBody,
         Stream output,
+        bool decodeContent,
         CancellationToken cancellationToken)
     {
         if (!HasBody(head, noBody))
@@ -85,14 +95,36 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
 
         bool isChunked = HttpTransferEncoding.IsChunked(head.Headers);
         long? contentLength = HttpContentLength.Find(head.Headers);
+        contentDecoder = decodeContent ? HttpContentDecoder.For(head.Headers) : null;
+        try
+        {
+            await CopyFramedAsync(head.BodyPrefix, isChunked, contentLength, output, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            contentDecoder?.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Reads the body as its framing says, starting with the bytes read along with the head:
+    /// chunked, up to a Content-Length, or until the peer closes.
+    /// </summary>
+    private async ValueTask CopyFramedAsync(
+        ReadOnlyMemory<byte> bodyPrefix,
+        bool isChunked,
+        long? contentLength,
+        Stream output,
+        CancellationToken cancellationToken)
+    {
         if (isChunked)
         {
-            await CopyChunkedAsync(head.BodyPrefix, output, cancellationToken).ConfigureAwait(false);
+            await CopyChunkedAsync(bodyPrefix, output, cancellationToken).ConfigureAwait(false);
             return;
         }
 
         long remaining = contentLength ?? long.MaxValue;
-        ReadOnlyMemory<byte> prefix = head.BodyPrefix[..(int)Math.Min(head.BodyPrefix.Length, remaining)];
+        ReadOnlyMemory<byte> prefix = bodyPrefix[..(int)Math.Min(bodyPrefix.Length, remaining)];
         remaining -= await WriteAsync(output, prefix, cancellationToken).ConfigureAwait(false);
 
         byte[] buffer = new byte[ReadSize];
@@ -169,6 +201,11 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
         }
     }
 
+    private ValueTask WriteDecodedAsync(Stream output, ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken) =>
+        contentDecoder is null
+            ? output.WriteAsync(bytes, cancellationToken)
+            : contentDecoder.WriteAsync(output, bytes, cancellationToken);
+
     private async ValueTask<int> WriteAsync(Stream output, ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken)
     {
         if (bytes.IsEmpty)
@@ -178,7 +215,7 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
 
         try
         {
-            await output.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
+            await WriteDecodedAsync(output, bytes, cancellationToken).ConfigureAwait(false);
         }
         catch (OutputWriteFailedException failure)
         {

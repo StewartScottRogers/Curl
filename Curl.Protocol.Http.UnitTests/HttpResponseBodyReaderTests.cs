@@ -44,7 +44,7 @@ public sealed class HttpResponseBodyReaderTests
             HttpResponseHead head = await new HttpResponseHeadReader(connection).ReadAsync(CancellationToken.None);
             int readsForHead = connection.ReadCount;
 
-            await new HttpResponseBodyReader(connection).CopyAsync(head, false, new FailingWriteStream(), CancellationToken.None);
+            await new HttpResponseBodyReader(connection).CopyAsync(head, false, new FailingWriteStream(), false, CancellationToken.None);
 
             Assert.AreEqual(readsForHead + (5 - head.BodyPrefix.Length + chunkSize - 1) / chunkSize, connection.ReadCount, $"Chunk size {chunkSize}");
         }
@@ -67,7 +67,7 @@ public sealed class HttpResponseBodyReaderTests
             FailingWriteStream output = new();
             HttpResponseBodyReader reader = new(connection);
 
-            await reader.CopyAsync(head, noBody, output, CancellationToken.None);
+            await reader.CopyAsync(head, noBody, output, false, CancellationToken.None);
 
             Assert.AreEqual(readsForHead, connection.ReadCount, $"Chunk size {chunkSize}");
             Assert.IsEmpty(output.WriteSizes, $"Chunk size {chunkSize}");
@@ -102,7 +102,7 @@ public sealed class HttpResponseBodyReaderTests
             HttpResponseBodyReader reader = new(connection);
 
             HttpTransferException thrown = await Assert.ThrowsExactlyAsync<HttpTransferException>(
-                async () => await reader.CopyAsync(head, false, output, CancellationToken.None));
+                async () => await reader.CopyAsync(head, false, output, false, CancellationToken.None));
 
             Assert.AreEqual(CurlExitCode.PartialFile, thrown.ExitCode);
             Assert.AreEqual($"end of response with {missing} bytes missing", thrown.Message);
@@ -137,7 +137,7 @@ public sealed class HttpResponseBodyReaderTests
         HttpResponseBodyReader reader = new(connection);
 
         HttpTransferException thrown = await Assert.ThrowsExactlyAsync<HttpTransferException>(
-            async () => await reader.CopyAsync(Head("Content-Length: 20000"), false, output, CancellationToken.None));
+            async () => await reader.CopyAsync(Head("Content-Length: 20000"), false, output, false, CancellationToken.None));
 
         Assert.AreEqual(CurlExitCode.WriteError, thrown.ExitCode);
         Assert.AreEqual("Failure writing output to destination, passed 16384 returned 0", thrown.Message);
@@ -152,7 +152,7 @@ public sealed class HttpResponseBodyReaderTests
         HttpResponseBodyReader reader = new(connection);
 
         HttpTransferException thrown = await Assert.ThrowsExactlyAsync<HttpTransferException>(
-            async () => await reader.CopyAsync(Head(string.Empty), false, output, CancellationToken.None));
+            async () => await reader.CopyAsync(Head(string.Empty), false, output, false, CancellationToken.None));
 
         Assert.AreEqual(CurlExitCode.WriteError, thrown.ExitCode);
         Assert.AreEqual("Failure writing output to destination, passed 3616 returned 100", thrown.Message);
@@ -170,7 +170,7 @@ public sealed class HttpResponseBodyReaderTests
             FailingWriteStream output = new(1, new IOException("Disk full."));
 
             HttpTransferException thrown = await Assert.ThrowsExactlyAsync<HttpTransferException>(
-                async () => await new HttpResponseBodyReader(connection).CopyAsync(head, false, output, CancellationToken.None));
+                async () => await new HttpResponseBodyReader(connection).CopyAsync(head, false, output, false, CancellationToken.None));
 
             Assert.AreEqual(CurlExitCode.WriteError, thrown.ExitCode);
             Assert.AreEqual($"Failure writing output to destination, passed {output.WriteSizes[0]} returned 0", thrown.Message);
@@ -190,6 +190,100 @@ public sealed class HttpResponseBodyReaderTests
         Assert.IsEmpty(output.WriteSizes);
     }
 
+    /// <summary>
+    /// Measured (BL-177 Notes): with <c>--compressed</c> curl writes the decoded body, and
+    /// <c>%{size_download}</c> is 25 for the 25-byte gzip body, the encoded size.
+    /// </summary>
+    [TestMethod]
+    [DataRow("Content-Length: 25\r\n", DisplayName = "Content-Length body")]
+    [DataRow("Transfer-Encoding: chunked\r\n", DisplayName = "Chunked body")]
+    [DataRow("", DisplayName = "Read-to-close body")]
+    public async Task CopyAsync_DecodeContent_WritesTheDecodedBodyAndCountsTheEncodedBytes(string framing)
+    {
+        byte[] gzip = HttpContentDecoderTests.Bytes(HttpContentDecoderTests.Gzip);
+        string body = framing.StartsWith("Transfer", StringComparison.Ordinal)
+            ? $"19\r\n{Latin1(gzip)}\r\n0\r\n\r\n"
+            : Latin1(gzip);
+        string response = $"HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\n{framing}\r\n{body}";
+        foreach (int chunkSize in ChunkSizes)
+        {
+            (HttpResponseBodyReader reader, _, FailingWriteStream output) = await CopyAsync(response, chunkSize, noBody: false, decodeContent: true);
+
+            Assert.AreEqual("hello", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
+            Assert.AreEqual(25L, reader.BytesWritten, $"Chunk size {chunkSize}");
+        }
+    }
+
+    /// <summary>
+    /// Measured (BL-177 Notes): without <c>--compressed</c>, and with <c>--raw</c>, curl writes
+    /// a gzip body untouched.
+    /// </summary>
+    [TestMethod]
+    public async Task CopyAsync_NoDecodeContent_WritesTheEncodedBodyUntouched()
+    {
+        byte[] gzip = HttpContentDecoderTests.Bytes(HttpContentDecoderTests.Gzip);
+        string response = $"HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nContent-Length: 25\r\n\r\n{Latin1(gzip)}";
+        foreach (int chunkSize in ChunkSizes)
+        {
+            (_, _, FailingWriteStream output) = await CopyAsync(response, chunkSize, noBody: false);
+
+            CollectionAssert.AreEqual(gzip, output.ToArray(), $"Chunk size {chunkSize}");
+        }
+    }
+
+    [TestMethod]
+    public async Task CopyAsync_DecodeContentWithAnUnrecognizedCoding_ThrowsExit61BeforeWritingAnything()
+    {
+        FailingWriteStream output = new();
+
+        HttpTransferException thrown = await Assert.ThrowsExactlyAsync<HttpTransferException>(
+            async () => await CopyAsync("HTTP/1.1 200 OK\r\nContent-Encoding: compress\r\n\r\nAB", 65536, noBody: false, output, decodeContent: true));
+
+        Assert.AreEqual(CurlExitCode.BadContentEncoding, thrown.ExitCode);
+        Assert.AreEqual("Unrecognized content encoding type", thrown.Message);
+        Assert.IsEmpty(output.WriteSizes);
+    }
+
+    /// <summary>
+    /// Measured (BL-177 Notes): <c>Content-Encoding: foo</c> with <c>Content-Length: 0</c>
+    /// makes curl exit 0; an unrecognized coding fails only once a body byte arrives.
+    /// </summary>
+    [TestMethod]
+    [DataRow("foo")]
+    [DataRow("gzip")]
+    public async Task CopyAsync_DecodeContentWithAnEmptyBody_WritesNothingAndSucceeds(string contentEncoding)
+    {
+        (HttpResponseBodyReader reader, _, FailingWriteStream output) = await CopyAsync(
+            $"HTTP/1.1 200 OK\r\nContent-Encoding: {contentEncoding}\r\nContent-Length: 0\r\n\r\n", 65536, noBody: false, decodeContent: true);
+
+        Assert.IsEmpty(output.WriteSizes);
+        Assert.AreEqual(0L, reader.BytesWritten);
+    }
+
+    [TestMethod]
+    public async Task CopyAsync_DecodeContentWithNoBody_ChecksNoCoding()
+    {
+        (HttpResponseBodyReader reader, _, FailingWriteStream output) =
+            await CopyAsync("HTTP/1.1 200 OK\r\nContent-Encoding: compress\r\n\r\nAB", 65536, noBody: true, decodeContent: true);
+
+        Assert.IsEmpty(output.WriteSizes);
+        Assert.AreEqual(0L, reader.BytesWritten);
+    }
+
+    [TestMethod]
+    public async Task CopyAsync_DecodeContentAndTheOutputFails_ThrowsExit23WithTheEncodedSize()
+    {
+        byte[] gzip = HttpContentDecoderTests.Bytes(HttpContentDecoderTests.Gzip);
+        FailingWriteStream output = new(1, new OutputWriteFailedException(0, "Gone."));
+
+        HttpTransferException thrown = await Assert.ThrowsExactlyAsync<HttpTransferException>(
+            async () => await CopyAsync(
+                $"HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nContent-Length: 25\r\n\r\n{Latin1(gzip)}", 65536, noBody: false, output, decodeContent: true));
+
+        Assert.AreEqual(CurlExitCode.WriteError, thrown.ExitCode);
+        Assert.AreEqual("Failure writing output to destination, passed 25 returned 0", thrown.Message);
+    }
+
     [TestMethod]
     public async Task CopyAsync_LargeReadToCloseBody_ArrivesWholeInReadsOfAtMostTheReadSize()
     {
@@ -197,7 +291,7 @@ public sealed class HttpResponseBodyReaderTests
         ScriptedConnection connection = new(body, 65536);
         FailingWriteStream output = new();
 
-        await new HttpResponseBodyReader(connection).CopyAsync(Head(string.Empty), false, output, CancellationToken.None);
+        await new HttpResponseBodyReader(connection).CopyAsync(Head(string.Empty), false, output, false, CancellationToken.None);
 
         CollectionAssert.AreEqual(body, output.ToArray());
         CollectionAssert.AreEqual(new[] { 16384, 16384, 7232 }, output.WriteSizes);
@@ -212,7 +306,7 @@ public sealed class HttpResponseBodyReaderTests
             FailingWriteStream output = new();
 
             HttpTransferException thrown = await Assert.ThrowsExactlyAsync<HttpTransferException>(
-                async () => await new HttpResponseBodyReader(connection).CopyAsync(head, false, output, CancellationToken.None));
+                async () => await new HttpResponseBodyReader(connection).CopyAsync(head, false, output, false, CancellationToken.None));
 
             Assert.AreEqual(CurlExitCode.RecvError, thrown.ExitCode);
             Assert.AreEqual(message, thrown.Message);
@@ -224,13 +318,14 @@ public sealed class HttpResponseBodyReaderTests
         string response,
         int chunkSize,
         bool noBody,
-        FailingWriteStream? output = null)
+        FailingWriteStream? output = null,
+        bool decodeContent = false)
     {
         output ??= new FailingWriteStream();
         ScriptedConnection connection = Connection(response, chunkSize);
         HttpResponseHead head = await new HttpResponseHeadReader(connection).ReadAsync(CancellationToken.None);
         HttpResponseBodyReader reader = new(connection);
-        await reader.CopyAsync(head, noBody, output, CancellationToken.None);
+        await reader.CopyAsync(head, noBody, output, decodeContent, CancellationToken.None);
         return (reader, connection, output);
     }
 
