@@ -3,6 +3,7 @@ using System.Collections.Frozen;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Security.Authentication;
+using System.Text;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Cli;
@@ -34,7 +35,8 @@ namespace Curl.Cli;
 /// <c>--no-progress-meter</c> and <c>--no-progress-bar</c> are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
 /// silent and <c>--no-silent -s</c> is. <c>--no-silent=x</c> is accepted, its value ignored.
 /// <c>--no-tlsv1.2</c>, <c>--no-tlsv1.3</c>, <c>--no-url</c>, <c>--no-output</c> (even as the last
-/// argument), <c>--no-output=x</c>, <c>--no-data</c>, <c>--no-dump-header</c>, <c>--no-range</c> and <c>--no-time-cond</c> exit 2 with
+/// argument), <c>--no-output=x</c>, <c>--no-data</c>, <c>--no-dump-header</c>, <c>--no-range</c>, <c>--no-time-cond</c>,
+/// <c>--no-request</c>, <c>--no-header</c> (and <c>--no-header=x</c>), <c>--no-user-agent</c> and <c>--no-referer</c> exit 2 with
 /// <c>curl: option &lt;as typed&gt;: the given option cannot be reversed with a --no- prefix</c> and
 /// the try-help line. <c>--no-bogus</c>, <c>--no-</c>, <c>--no-no-silent</c> and <c>--no-Silent</c>
 /// exit 2 as unknown. A short letter is never negated.
@@ -73,6 +75,10 @@ public static class CommandLineOptionTable
         CommandLineOption.Value("max-time", 'm', SetMaxTime),
         CommandLineOption.NegatableFlag("remote-time", 'R', (options, on) => options.RemoteTime = on),
         CommandLineOption.Value("time-cond", 'z', SetTimeCondition),
+        CommandLineOption.Text("request", 'X', (options, method) => options.RequestMethod = method),
+        CommandLineOption.Value("header", 'H', AddHeaders),
+        CommandLineOption.Value("user-agent", 'A', AcceptingEmpty((options, userAgent) => options.UserAgent = userAgent)),
+        CommandLineOption.Value("referer", 'e', AcceptingEmpty((options, referer) => options.Referer = referer)),
     ];
 
     /// <summary>The largest <c>--create-file-mode</c> curl 8.21.0 accepts: octal <c>0777</c>.</summary>
@@ -118,19 +124,64 @@ public static class CommandLineOptionTable
             return null;
         }
 
-        string file = value[1..];
-        byte[] contents;
+        CommandLineRefusal? refusal = ReadAtFile(options, value[1..], spelledOption, dataFileReader, out byte[] contents);
+        if (refusal is null)
+        {
+            options.AppendPostData(RemoveLineBreaksAndNuls(contents));
+        }
+
+        return refusal;
+    }
+
+    /// <summary>
+    /// Adds a <c>-H</c> / <c>--header</c> value to the headers. A value that does not start with
+    /// <c>@</c> is kept verbatim, empty included, after
+    /// <see cref="CommandLineWarning.HeaderDoesNotLookLikeAHeader(string)"/> when it holds neither a
+    /// colon nor a semicolon. A value that starts with <c>@</c> reads the file it names (standard
+    /// input for <c>@-</c>) and adds each of its lines verbatim, splitting at every run of carriage
+    /// returns and line feeds, so empty lines are skipped, and warning about none, as curl 8.21.0 does.
+    /// A file that cannot be read is refused with <see cref="CommandLineRefusal.DataFileUnreadable"/>.
+    /// </summary>
+    private static CommandLineRefusal? AddHeaders(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        if (!value.StartsWith('@'))
+        {
+            if (!value.AsSpan().ContainsAny(':', ';'))
+            {
+                options.AddWarningLinesUnlessSilent([CommandLineWarning.HeaderDoesNotLookLikeAHeader(value)]);
+            }
+
+            options.AddHeader(value);
+            return null;
+        }
+
+        CommandLineRefusal? refusal = ReadAtFile(options, value[1..], spelledOption, dataFileReader, out byte[] contents);
+        if (refusal is null)
+        {
+            foreach (string line in Encoding.UTF8.GetString(contents).Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+            {
+                options.AddHeader(line);
+            }
+        }
+
+        return refusal;
+    }
+
+    /// <summary>
+    /// Reads the file an <c>@file</c> value names, or standard input when <paramref name="file"/> is
+    /// <c>-</c>, and refuses a file that cannot be read with <see cref="CommandLineRefusal.DataFileUnreadable"/>.
+    /// </summary>
+    private static CommandLineRefusal? ReadAtFile(CommandLineOptions options, string file, string spelledOption, IDataFileReader dataFileReader, out byte[] contents)
+    {
         if (file == "-")
         {
             contents = dataFileReader.ReadStandardInput();
-        }
-        else if (!dataFileReader.TryReadFile(file, out contents))
-        {
-            return CommandLineRefusal.DataFileUnreadable(spelledOption, file, options.ErrorsHidden);
+            return null;
         }
 
-        options.AppendPostData(RemoveLineBreaksAndNuls(contents));
-        return null;
+        return dataFileReader.TryReadFile(file, out contents)
+            ? null
+            : CommandLineRefusal.DataFileUnreadable(spelledOption, file, options.ErrorsHidden);
     }
 
     private static byte[] RemoveLineBreaksAndNuls(byte[] contents) =>

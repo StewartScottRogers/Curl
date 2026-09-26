@@ -170,7 +170,8 @@ public sealed class CommandLineRefusal
     }
 
     /// <summary>
-    /// Refuses a <c>-d @file</c> / <c>--data @file</c> whose file cannot be opened or read, in curl's
+    /// Refuses a <c>-d @file</c> / <c>--data @file</c> or <c>-H @file</c> / <c>--header @file</c>
+    /// whose file cannot be opened or read, in curl's
     /// three lines: <c>curl: Failed to open &lt;file&gt;</c>,
     /// <c>curl: option &lt;spelled&gt;: error encountered when reading a file</c> and the try-help
     /// line, with exit code <see cref="CurlExitCode.ReadError"/> (26).

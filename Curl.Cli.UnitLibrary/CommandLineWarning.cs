@@ -26,6 +26,22 @@ public static class CommandLineWarning
     }
 
     /// <summary>
+    /// The warning for a <c>-H</c> / <c>--header</c> value holding neither a colon nor a semicolon,
+    /// which curl still sends as given: <c>Warning: The provided HTTP header '&lt;value&gt;' does not look like a header?</c>.
+    /// Measured with <c>curl -H foo http://127.0.0.1:1/</c> (curl 8.21.0, Windows, 2026-09-26); <c>-H ''</c>
+    /// warns with empty quotes, and the lines of a <c>-H @file</c> are never warned about.
+    /// </summary>
+    /// <param name="header">The value exactly as given.</param>
+    /// <returns>The warning line.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="header"/> is <see langword="null"/>.</exception>
+    public static string HeaderDoesNotLookLikeAHeader(string header)
+    {
+        ArgumentNullException.ThrowIfNull(header);
+
+        return $"Warning: The provided HTTP header '{header}' does not look like a header?";
+    }
+
+    /// <summary>
     /// The two lines curl prints for a <c>-r</c>/<c>--range</c> value that starts with a digit and
     /// has no dash, which it reads as the range from that position to the end. curl wraps the
     /// text at 79 columns, so the first line ends in a space.

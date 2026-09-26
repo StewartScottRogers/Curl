@@ -17,6 +17,7 @@ public sealed class CommandLineOptions
     private readonly List<string> urls = [];
     private readonly List<string> outputFiles = [];
     private readonly List<string> telnetOptions = [];
+    private readonly List<string> headers = [];
     private readonly List<string> warningLines = [];
     private string? userAwaitingPassword;
 
@@ -183,6 +184,30 @@ public sealed class CommandLineOptions
     public TimeCondition? TimeCondition { get; internal set; }
 
     /// <summary>
+    /// The <c>-X</c> / <c>--request</c> method, verbatim and never empty; <see langword="null"/> when
+    /// not given. The last value wins.
+    /// </summary>
+    public string? RequestMethod { get; internal set; }
+
+    /// <summary>
+    /// The <c>-H</c> / <c>--header</c> values in command-line order, each verbatim, empty included,
+    /// with an <c>@file</c> value replaced by the file's non-empty lines in file order.
+    /// </summary>
+    public IReadOnlyList<string> Headers => headers;
+
+    /// <summary>
+    /// The <c>-A</c> / <c>--user-agent</c> value, verbatim; empty when given empty, which curl 8.21.0
+    /// sends as no <c>User-Agent</c> header at all; <see langword="null"/> when not given. The last value wins.
+    /// </summary>
+    public string? UserAgent { get; internal set; }
+
+    /// <summary>
+    /// The <c>-e</c> / <c>--referer</c> value, verbatim, empty included, and <c>;auto</c> kept as given;
+    /// <see langword="null"/> when not given. The last value wins.
+    /// </summary>
+    public string? Referer { get; internal set; }
+
+    /// <summary>
     /// <see langword="true"/> when <c>-s</c> / <c>--silent</c> has been read and <c>-S</c> /
     /// <c>--show-error</c> has not, so far: curl then hides error messages.
     /// </summary>
@@ -271,4 +296,8 @@ public sealed class CommandLineOptions
     /// <summary>Appends <paramref name="telnetOption"/> to <see cref="TelnetOptions"/>, unchanged and unvalidated.</summary>
     /// <param name="telnetOption">A <c>-t</c> / <c>--telnet-option</c> value, possibly empty.</param>
     internal void AddTelnetOption(string telnetOption) => telnetOptions.Add(telnetOption);
+
+    /// <summary>Appends <paramref name="header"/> to <see cref="Headers"/>, unchanged and unvalidated.</summary>
+    /// <param name="header">A <c>-H</c> / <c>--header</c> value, or one line of its <c>@file</c>.</param>
+    internal void AddHeader(string header) => headers.Add(header);
 }

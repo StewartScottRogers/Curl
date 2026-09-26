@@ -54,6 +54,10 @@ public sealed class CommandLineOptionTableTests
     [DataRow("ciphers", null, true)]
     [DataRow("tls13-ciphers", null, true)]
     [DataRow("remote-time", 'R', false)]
+    [DataRow("request", 'X', true)]
+    [DataRow("header", 'H', true)]
+    [DataRow("user-agent", 'A', true)]
+    [DataRow("referer", 'e', true)]
     public void Rows_FirstTableOption_HasItsShortNameAndArity(string longName, char? shortName, bool takesValue)
     {
         CommandLineOption option = CommandLineOptionTable.Rows.Single(row => row.LongName == longName);

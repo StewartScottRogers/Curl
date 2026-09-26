@@ -1,7 +1,7 @@
 namespace Curl.Cli;
 
 /// <summary>
-/// Reads the file a <c>-d @file</c> / <c>--data @file</c> value names, or standard input for
+/// Reads the file a <c>-d @file</c> / <c>--data @file</c> or <c>-H @file</c> / <c>--header @file</c> value names, or standard input for
 /// <c>@-</c>, for <see cref="CommandLineParser"/>; injected so the parser never touches the disk or
 /// the console and tests can supply the bytes.
 /// </summary>
