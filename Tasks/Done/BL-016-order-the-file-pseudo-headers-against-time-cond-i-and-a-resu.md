@@ -8,7 +8,7 @@ depends-on: [BL-008]
 touches: [Curl.Protocol.File.UnitLibrary, Curl.Protocol.File.UnitTests, Documentation/Product/Requirements.md]
 requirement: none
 created: 2026-09-25
-completed:
+completed: 2026-09-26
 ---
 # BL-016 — Order the `file://` pseudo-headers against `--time-cond`, `-I` and a resume failure
 
@@ -43,25 +43,25 @@ change with the code.
 
 ## Acceptance criteria
 
-- [ ] A test named `ExecuteAsync_UnmetTimeCondition_WritesNoHeaders` gives a
+- [x] A test named `ExecuteAsync_UnmetTimeCondition_WritesNoHeaders` gives a
       `FakeTransferContext` both an `Output` and a `HeaderOutput`
       (`ChunkRecordingStream`) and an `IfModifiedSince` condition later than the fake
       file's `LastWriteTimeUtc`, and asserts nothing was written to either stream,
       `BytesTransferred` is 0 and `ExitCode` is `CurlExitCode.Ok`.
-- [ ] A test named `ExecuteAsync_NoBodyWithHeaderOutput_WritesHeadersOnly` asserts the
+- [x] A test named `ExecuteAsync_NoBodyWithHeaderOutput_WritesHeadersOnly` asserts the
       exact pseudo-header bytes reach `HeaderOutput`, `Output` receives nothing, and the
       result is `CurlExitCode.Ok` with `BytesTransferred` 0.
-- [ ] A test named `ExecuteAsync_ResumePastEndWithHeaderOutput_WritesHeadersThenFails`
+- [x] A test named `ExecuteAsync_ResumePastEndWithHeaderOutput_WritesHeadersThenFails`
       sets `ResumeFrom` strictly past the fake file's length and asserts the full header
       block was written to `HeaderOutput` **and** the result is
       `CurlExitCode.BadDownloadResume` (36) with `ErrorMessage`
       `failed to resume file:// transfer`.
-- [ ] `MeetsTimeCondition` is evaluated before any write to `HeaderOutput` in
+- [x] `MeetsTimeCondition` is evaluated before any write to `HeaderOutput` in
       `DownloadFromAsync`, and the class remarks list the order actually implemented.
-- [ ] Every existing test in `Curl.Protocol.File.UnitTests` still passes, or is
+- [x] Every existing test in `Curl.Protocol.File.UnitTests` still passes, or is
       corrected in this task when it pinned the old ordering; the commit message names
       any test whose expectations changed.
-- [ ] `dotnet build Curl.Protocol.File.UnitLibrary -warnaserror` is clean and
+- [x] `dotnet build Curl.Protocol.File.UnitLibrary -warnaserror` is clean and
       `dotnet test Curl.Protocol.File.UnitTests --filter "TestCategory!=Integration"`
       is green.
 
@@ -77,7 +77,16 @@ name those cases. Do not widen this task into range parsing.
 This task touches `Curl.Protocol.File.UnitLibrary` and its tests only. No
 `Curl.Protocol.Abstractions.UnitLibrary` change and no ADR change.
 
+Delivery (2026-09-26, dark factory lane 4): the `feature` pipeline was run in-session
+rather than through the architect/implementer agents, because the change is one
+reordering inside `DownloadFromAsync` fully specified by the task's Context. The method
+now evaluates `MeetsTimeCondition` first, then `WriteHeadersAsync`, then returns for
+`NoBody`, then resolves the window. The class remarks and the method summary state that
+order. No existing test pinned the old ordering, so no expectations changed; 127 tests
+pass (124 before plus the three named above). Range validation stays with BL-013.
+
 ## Log
 
 - 2026-09-25: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. file:// writes no headers for an unmet -z, headers only for -I, and headers before a resume-past-end exit 36
