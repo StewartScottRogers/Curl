@@ -1730,6 +1730,80 @@ public sealed class FileProtocolHandlerTests
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
     }
 
+    // Upstream libcurl 8.21.0's Curl_meets_timecondition reads a document time of 0 as
+    // unknown and transfers, so a source dated exactly the Unix epoch - a Windows device
+    // such as NUL - is sent whichever way the condition runs.
+    [TestMethod]
+    public async Task ExecuteAsync_EpochSourceTimestampUnderIfModifiedSince_TransfersTheBody()
+    {
+        var output = new ChunkRecordingStream();
+        var headers = new ChunkRecordingStream();
+
+        var result = await TimeConditionResultAsync(
+            DateTimeOffset.UnixEpoch,
+            new TimeCondition(Earlier, TimeConditionKind.IfModifiedSince),
+            output,
+            headers);
+
+        CollectionAssert.AreEqual(Content, output.ToArray());
+        Assert.AreEqual((long)Content.Length, result.BytesTransferred);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_EpochSourceTimestampUnderIfUnmodifiedSince_TransfersTheBody()
+    {
+        var output = new ChunkRecordingStream();
+        var headers = new ChunkRecordingStream();
+
+        var result = await TimeConditionResultAsync(
+            DateTimeOffset.UnixEpoch,
+            new TimeCondition(DateTimeOffset.UnixEpoch.AddSeconds(-1), TimeConditionKind.IfUnmodifiedSince),
+            output,
+            headers);
+
+        CollectionAssert.AreEqual(Content, output.ToArray());
+        Assert.AreEqual((long)Content.Length, result.BytesTransferred);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+    }
+
+    // The epoch is unknown only to the time condition: for the header block it is still a
+    // known timestamp, as curl's Last-Modified line for NUL shows.
+    [TestMethod]
+    public async Task ExecuteAsync_EpochSourceTimestampWithIncludeHeaders_StillWritesLastModified()
+    {
+        var headers = new ChunkRecordingStream();
+
+        await TimeConditionResultAsync(
+            DateTimeOffset.UnixEpoch,
+            new TimeCondition(Earlier, TimeConditionKind.IfModifiedSince),
+            new ChunkRecordingStream(),
+            headers);
+
+        StringAssert.Contains(
+            Encoding.ASCII.GetString(headers.ToArray()),
+            "Last-Modified: Thu, 01 Jan 1970 00:00:00 GMT\r\n");
+    }
+
+    // A -z date of the epoch gives libcurl a timevalue of 0, which it also reads as no
+    // condition at all.
+    [TestMethod]
+    public async Task ExecuteAsync_EpochConditionTime_TransfersTheBody()
+    {
+        var output = new ChunkRecordingStream();
+        var headers = new ChunkRecordingStream();
+
+        var result = await TimeConditionResultAsync(
+            FakeFileSystem.DefaultLastWriteTimeUtc,
+            new TimeCondition(DateTimeOffset.UnixEpoch, TimeConditionKind.IfUnmodifiedSince),
+            output,
+            headers);
+
+        CollectionAssert.AreEqual(Content, output.ToArray());
+        Assert.AreEqual((long)Content.Length, result.BytesTransferred);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+    }
+
     // Upstream libcurl 8.21.0's Curl_meets_timecondition transfers when the document time
     // is unknown: a condition that cannot be evaluated must not suppress the data.
     [TestMethod]

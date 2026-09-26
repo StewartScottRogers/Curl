@@ -83,6 +83,12 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     /// </summary>
     private static readonly string[] Schemes = ["file"];
 
+    /// <summary>
+    /// The Unix epoch as <see cref="WholeSeconds" /> counts it: the value libcurl holds as a
+    /// <c>time_t</c> of 0.
+    /// </summary>
+    private static readonly long UnixEpochWholeSeconds = WholeSeconds(DateTimeOffset.UnixEpoch);
+
     private readonly IFileSystem fileSystem =
         fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
 
@@ -629,7 +635,10 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     /// parsed it. An unknown timestamp transfers whichever way the condition runs: a
     /// condition that cannot be evaluated must not silently suppress the data, which is
     /// what libcurl 8.21.0's <c>Curl_meets_timecondition</c> does for an unknown document
-    /// time.
+    /// time. That function also reads a <c>time_t</c> of 0 on either side as unknown, so a
+    /// timestamp or a condition date that truncates to the whole second of the Unix epoch
+    /// transfers too, whichever way the condition runs. The epoch is unknown only here:
+    /// the <c>Last-Modified</c> header line still reports it.
     /// </remarks>
     private static bool MeetsTimeCondition(
         TimeCondition? condition,
@@ -642,6 +651,11 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
 
         long fileSeconds = WholeSeconds(knownLastWriteTimeUtc);
         long conditionSeconds = WholeSeconds(condition.Value);
+
+        if (fileSeconds == UnixEpochWholeSeconds || conditionSeconds == UnixEpochWholeSeconds)
+        {
+            return true;
+        }
 
         return condition.Kind == TimeConditionKind.IfModifiedSince
             ? fileSeconds > conditionSeconds
