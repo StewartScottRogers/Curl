@@ -41,3 +41,4 @@ An Accepted ADR records that Milestone 1 has no HTTP/2, that `--http2`, `--http2
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
