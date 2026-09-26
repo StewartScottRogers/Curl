@@ -8,7 +8,7 @@ depends-on: [BL-008]
 touches: [Curl.Protocol.Abstractions.UnitLibrary/CLAUDE.md, Documentation/Planning/Decisions/ADR-0002-ifilesystem-as-the-second-protocol-seam.md]
 requirement: none
 created: 2026-09-25
-completed:
+completed: 2026-09-26
 ---
 # BL-026 — Oblige `IFileSystem` implementations never to throw on an open failure
 
@@ -44,25 +44,25 @@ write the obligation down rather than discover it in a stack trace.
 
 ## Acceptance criteria
 
-- [ ] `Curl.Protocol.Abstractions.UnitLibrary\CLAUDE.md` gains a section stating that an
+- [x] `Curl.Protocol.Abstractions.UnitLibrary\CLAUDE.md` gains a section stating that an
       `IFileSystem` implementation returns `FileOpenResult.Failed` with a
       `FileAccessStatus` for every reason an open can fail, and lets no exception escape
       either open member except an `OperationCanceledException` from the
       `CancellationToken`.
-- [ ] The same section names the exception types a `System.IO`-based implementation has to
+- [x] The same section names the exception types a `System.IO`-based implementation has to
       absorb — at least `ArgumentException`, `NotSupportedException`,
       `PathTooLongException`, `DirectoryNotFoundException`, `FileNotFoundException`,
       `UnauthorizedAccessException` and `IOException` — and states that the path may be
       syntactically invalid for the platform because `FileUrlPath` forwards it as curl
       does, giving `c|/Windows` and a literal `%` as examples.
-- [ ] The same section states the consequence in curl's terms: a failed read open is exit
+- [x] The same section states the consequence in curl's terms: a failed read open is exit
       37 (`CURLE_FILE_COULDNT_READ_FILE`) and a failed write open is exit 23
       (`CURLE_WRITE_ERROR`), whichever operating-system error occurred, citing
       <https://curl.se/libcurl/c/libcurl-errors.html> and curl 8.21.0.
-- [ ] `Documentation\Planning\Decisions\ADR-0002-ifilesystem-as-the-second-protocol-seam.md`
+- [x] `Documentation\Planning\Decisions\ADR-0002-ifilesystem-as-the-second-protocol-seam.md`
       records the obligation under its consequences, dated, so the seam's decision record
       carries it too.
-- [ ] No `.cs` file is changed by this task.
+- [x] No `.cs` file is changed by this task.
 
 ## Notes
 
@@ -74,7 +74,19 @@ obligation into the interface's remarks.
 BL-009 now depends on this task and has an acceptance criterion requiring
 `PhysicalFileSystem` to honour it.
 
+Delivered 2026-09-26 in the session rather than through `align-and-document`: the change
+is two Markdown sections whose wording the acceptance criteria fix almost verbatim, so a
+subagent added nothing. Choices made unattended:
+
+- The ADR entry sits at the end of `Costs and caveats`, marked "Added 2026-09-26 (BL-026)",
+  because the obligation is a cost every implementation carries; the ADR's `Status` and
+  `Date` are left as accepted, since this records a consequence rather than changing the
+  decision.
+- The `c|/Windows`, `%2`/`%GG` and `--path-as-is` claims were checked against
+  `Curl.Protocol.File.UnitLibrary/FileUrlPath.cs` before being written down.
+
 ## Log
 
 - 2026-09-25: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. IFileSystem's never-throw-on-open obligation is written in the Abstractions CLAUDE.md and ADR-0002
