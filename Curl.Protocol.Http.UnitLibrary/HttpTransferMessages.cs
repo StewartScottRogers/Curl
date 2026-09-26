@@ -5,7 +5,7 @@ namespace Curl.Protocol.Http;
 
 /// <summary>
 /// Every failure message reading an HTTP/1.x response head or body reports, as curl 8.21.0
-/// prints it. Each was measured against a loopback server (BL-169, BL-170) except
+/// prints it. Each was measured against a loopback server (BL-169, BL-170, BL-171) except
 /// <see cref="ReceiveFailed" />, which is the text <c>curl_easy_strerror</c> gives exit 56.
 /// </summary>
 internal static class HttpTransferMessages
@@ -70,6 +70,65 @@ internal static class HttpTransferMessages
     /// folded in, of <see cref="HttpLineReader.MaximumLineLength" /> bytes or more.
     /// </summary>
     internal const string LineTooLarge = "A value or data field grew larger than allowed";
+
+    /// <summary>
+    /// The exit 56 message for a chunk size of more than
+    /// <see cref="HttpChunkedDecoder.MaximumSizeDigits" /> hexadecimal digits.
+    /// </summary>
+    internal const string ChunkSizeTooLong = "chunk hex-length longer than 16";
+
+    /// <summary>
+    /// The exit 56 message for a byte other than a carriage return or line feed after a
+    /// chunk's data, or a carriage return inside a trailer line rather than before its line
+    /// feed.
+    /// </summary>
+    internal const string MalformedChunkedEncoding = "Malformed encoding found in chunked-encoding";
+
+    /// <summary>
+    /// The exit 100 message for a trailer line of
+    /// <see cref="HttpChunkedDecoder.MaximumTrailerLineLength" /> bytes or more once its
+    /// carriage return and line feed are added.
+    /// </summary>
+    internal const string TrailerTooLarge = "Out of memory in chunked-encoding";
+
+    /// <summary>
+    /// The exit 18 message for a peer that closed before a chunked body's last chunk and
+    /// trailers were whole.
+    /// </summary>
+    internal const string ChunkedBodyIncomplete = "transfer closed with outstanding read data remaining";
+
+    /// <summary>
+    /// Formats the exit 56 message for a chunk size line that does not start with a
+    /// hexadecimal digit.
+    /// </summary>
+    /// <param name="value">The offending byte.</param>
+    /// <returns>The message, such as <c>chunk hex-length char not a hex digit: 0x7a</c>.</returns>
+    internal static string ChunkSizeNotHex(byte value) =>
+        string.Create(CultureInfo.InvariantCulture, $"chunk hex-length char not a hex digit: 0x{value:x}");
+
+    /// <summary>
+    /// Formats the exit 56 message for a chunk size too large for a signed 64-bit integer.
+    /// </summary>
+    /// <param name="digits">The chunk size's hexadecimal digits, as received.</param>
+    /// <returns>The message, such as <c>invalid chunk size: 'FFFFFFFFFFFFFFFF'</c>.</returns>
+    internal static string InvalidChunkSize(string digits) => $"invalid chunk size: '{digits}'";
+
+    /// <summary>
+    /// Formats the exit 61 message for a Transfer-Encoding header that lists a coding after
+    /// <c>chunked</c>.
+    /// </summary>
+    /// <param name="coding">The coding listed after <c>chunked</c>, as received.</param>
+    /// <returns>The message, such as <c>A Transfer-Encoding (gzip) was listed after chunked</c>.</returns>
+    internal static string CodingListedAfterChunked(string coding) =>
+        $"A Transfer-Encoding ({coding}) was listed after chunked";
+
+    /// <summary>
+    /// Formats the exit 61 message for a transfer coding curl was not asked to decode.
+    /// </summary>
+    /// <param name="coding">The coding, as received.</param>
+    /// <returns>The message, such as <c>Unsolicited Transfer-Encoding (gzip) found</c>.</returns>
+    internal static string UnsolicitedTransferCoding(string coding) =>
+        $"Unsolicited Transfer-Encoding ({coding}) found";
 
     /// <summary>
     /// Formats the exit 56 message for heads whose combined size passed
