@@ -511,6 +511,55 @@ public sealed class FileProtocolHandlerTests
             result.ErrorMessage);
     }
 
+    // curl 8.21.0 does not reset the count on a failure: %{size_download} reports the
+    // bytes that reached the destination before it.
+    [TestMethod]
+    public async Task ExecuteAsync_OutputFailsAfterOneChunk_ReportsTheBytesAlreadyWritten()
+    {
+        var fileSystem = new FakeFileSystem();
+        fileSystem.AddFile(OsPath, LargeContent());
+        var context = new FakeTransferContext
+        {
+            Url = FileUrl,
+            Output = FaultingStream.FailingOnWrite(2),
+        };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        var result = await handler.ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode);
+        Assert.AreEqual((long)ChunkSize, result.BytesTransferred);
+    }
+
+    // A download read failure ends the body and succeeds, so the exit 26 read failure is
+    // an upload's: a -T source of known length that fails on its second read.
+    [TestMethod]
+    public async Task ExecuteAsync_SourceFailsAfterOneChunk_ReportsTheBytesAlreadyWritten()
+    {
+        var fileSystem = new FakeFileSystem();
+        fileSystem.WriteInto(OsPath, new ChunkRecordingStream());
+        var context = new FakeTransferContext
+        {
+            Url = FileUrl,
+            Upload = FaultingStream.FailingOnRead(LargeContent(), 2),
+        };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        var result = await handler.ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.ReadError, result.ExitCode);
+        Assert.AreEqual((long)ChunkSize, result.BytesTransferred);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_SourceCannotBeOpened_ReportsNoBytesTransferred()
+    {
+        var result = await ReadFailureResultAsync(FileAccessStatus.NotFound);
+
+        Assert.AreEqual(CurlExitCode.FileCouldntReadFile, result.ExitCode);
+        Assert.AreEqual(0L, result.BytesTransferred);
+    }
+
     [TestMethod]
     public async Task ExecuteAsync_OutputFailsOnAShortFinalChunk_ReportsThatChunksOwnSize()
     {

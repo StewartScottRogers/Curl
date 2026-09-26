@@ -41,6 +41,22 @@ public sealed class TransferResultTests
     }
 
     [TestMethod]
+    public void Failure_WithABytesTransferredCount_ReportsIt()
+    {
+        var result = TransferResult.Failure(CurlExitCode.WriteError, "x", 5);
+
+        Assert.AreEqual(5L, result.BytesTransferred);
+    }
+
+    [TestMethod]
+    public void Failure_WithoutABytesTransferredCount_ReportsZero()
+    {
+        var result = TransferResult.Failure(CurlExitCode.WriteError, "x");
+
+        Assert.AreEqual(0L, result.BytesTransferred);
+    }
+
+    [TestMethod]
     public void Constructor_WithThreePositionalValues_LeavesSourceLastWriteTimeUtcNull()
     {
         var result = new TransferResult(CurlExitCode.Ok, 5, null);

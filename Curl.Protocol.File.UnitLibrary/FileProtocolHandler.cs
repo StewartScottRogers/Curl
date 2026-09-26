@@ -242,9 +242,10 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
                 context.MaxFileSize is > 0 and long maxFileSize ? maxFileSize : long.MaxValue,
                 static chunk => chunk,
                 static (_, transferred) => TransferResult.Success(transferred),
-                static (offered, _) => TransferResult.Failure(
+                static (offered, transferred) => TransferResult.Failure(
                     CurlExitCode.WriteError,
-                    FileTransferMessages.OutputWriteFailed(offered)),
+                    FileTransferMessages.OutputWriteFailed(offered),
+                    transferred),
                 context.CancellationToken)
             .ConfigureAwait(false);
     }

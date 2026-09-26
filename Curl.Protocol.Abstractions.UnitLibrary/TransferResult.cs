@@ -44,9 +44,20 @@ public sealed record TransferResult(
     /// Creates a failed result, whose <see cref="SourceLastWriteTimeUtc" /> is always
     /// <see langword="null" />.
     /// </summary>
+    /// <remarks>
+    /// A failure reports the bytes that reached the destination before it, not zero, as
+    /// curl 8.21.0's <c>%{size_download}</c> and <c>%{size_upload}</c> do.
+    /// </remarks>
     /// <param name="exitCode">The code to report.</param>
     /// <param name="errorMessage">A description of the failure.</param>
+    /// <param name="bytesTransferred">
+    /// The number of payload bytes that reached the destination before the failure; zero
+    /// when nothing moved.
+    /// </param>
     /// <returns>A failed <see cref="TransferResult" />.</returns>
-    public static TransferResult Failure(CurlExitCode exitCode, string errorMessage) =>
-        new(exitCode, 0, errorMessage);
+    public static TransferResult Failure(
+        CurlExitCode exitCode,
+        string errorMessage,
+        long bytesTransferred = 0) =>
+        new(exitCode, bytesTransferred, errorMessage);
 }
