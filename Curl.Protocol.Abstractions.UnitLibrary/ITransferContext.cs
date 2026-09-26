@@ -76,6 +76,58 @@ public interface ITransferContext
     Stream? HeaderOutput { get; }
 
     /// <summary>
+    /// Gets the data given with <c>-d</c>/<c>--data</c>, or <see langword="null" /> when
+    /// none was given.
+    /// </summary>
+    /// <remarks>
+    /// <c>mqtt://</c> reads it and sends it as a PUBLISH instead of subscribing
+    /// (ADR-0006). A scheme that has no use for request data ignores it.
+    /// </remarks>
+    ReadOnlyMemory<byte>? PostData { get; }
+
+    /// <summary>
+    /// Gets the user name and password from <c>-u</c>/<c>--user</c>, else from the URL's
+    /// user information, or <see langword="null" /> when neither is present.
+    /// </summary>
+    /// <remarks>
+    /// <c>mqtt://</c> reads it and sends it in its CONNECT packet (ADR-0006). A scheme
+    /// that does not authenticate ignores it.
+    /// </remarks>
+    System.Net.NetworkCredential? Credentials { get; }
+
+    /// <summary>
+    /// Gets each <c>-t</c>/<c>--telnet-option</c> value verbatim, in command-line order,
+    /// or an empty list when none was given.
+    /// </summary>
+    /// <remarks>
+    /// <c>telnet://</c> reads it. The values arrive unvalidated: curl rejects an unknown
+    /// option name (exit 48) or a value without <c>=</c> (exit 49) at transfer time,
+    /// after connecting, so the telnet handler validates them (ADR-0006).
+    /// </remarks>
+    IReadOnlyList<string> TelnetOptions { get; }
+
+    /// <summary>
+    /// Gets the block size given with <c>--tftp-blksize</c>, as given and unclamped, or
+    /// <see langword="null" /> when none was given.
+    /// </summary>
+    /// <remarks>
+    /// <c>tftp://</c> reads it and clamps it to 8-65464, as curl does rather than
+    /// refusing an out-of-range value; when it is <see langword="null" /> the TFTP
+    /// default of 512 applies (ADR-0006).
+    /// </remarks>
+    int? TftpBlockSize { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether <c>--tftp-no-options</c> was given, which
+    /// suppresses the RFC 2347, 2348 and 2349 options; <see langword="false" /> when not
+    /// given.
+    /// </summary>
+    /// <remarks>
+    /// <c>tftp://</c> reads it (ADR-0006).
+    /// </remarks>
+    bool TftpNoOptions { get; }
+
+    /// <summary>
     /// Gets the time source. Injected so that timeout and retry behaviour is testable
     /// without a real delay.
     /// </summary>
