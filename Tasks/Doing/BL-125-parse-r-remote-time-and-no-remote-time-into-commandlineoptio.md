@@ -53,3 +53,4 @@ Filed 2026-09-26 while re-planning BL-079, which was blocked because `-R` is not
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
