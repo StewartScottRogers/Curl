@@ -1,5 +1,5 @@
 ---
-id: BL-258
+id: BL-266
 title: Tunnel through an HTTPS proxy in the connector
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-258 — Tunnel through an HTTPS proxy in the connector
+# BL-266 — Tunnel through an HTTPS proxy in the connector
 
 ## Goal
 

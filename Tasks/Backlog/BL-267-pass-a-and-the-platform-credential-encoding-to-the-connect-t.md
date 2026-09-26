@@ -1,5 +1,5 @@
 ---
-id: BL-259
+id: BL-267
 title: Pass -A and the platform credential encoding to the CONNECT tunnel in Curl.Console
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-259 — Pass -A and the platform credential encoding to the CONNECT tunnel in Curl.Console
+# BL-267 — Pass -A and the platform credential encoding to the CONNECT tunnel in Curl.Console
 
 ## Goal
 

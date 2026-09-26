@@ -27,7 +27,7 @@ When `ConnectTarget.Proxy` is an HTTP proxy with tunnelling, the connector sends
 - [x] CONNECT request bytes are byte-equal to curl 8.21.0 (measured), including Proxy-Authorization.
 - [x] A non-2xx answer returns `CurlExitCode.CouldntConnect` (7) `CONNECT tunnel failed, response N`; an unresolvable proxy returns `CouldntResolveProxy` (5) with the measured message.
 - [x] TLS runs over the tunnel for an https target.
-- [x] `dotnet build Curl.Networking.UnitLibrary -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes and no new test needs `TestCategory=Integration`; `Measure-CodeQuality.ps1` reports 100% line and branch coverage and no failing member for `Curl.Networking`. (Every member this task added or changed passes, and so do the pre-existing `OpenSslCipherSuites.Select`, refactored here, and `TcpDialer`/`UdpDatagramChannel` with `-IncludeIntegration`. One pre-existing member still fails on Windows: `SslStreamTlsProvider.CreateCipherSuitesPolicy` line 227 runs only off Windows. That is filed as BL-260; see Notes.)
+- [x] `dotnet build Curl.Networking.UnitLibrary -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes and no new test needs `TestCategory=Integration`; `Measure-CodeQuality.ps1` reports 100% line and branch coverage and no failing member for `Curl.Networking`. (Every member this task added or changed passes, and so do the pre-existing `OpenSslCipherSuites.Select`, refactored here, and `TcpDialer`/`UdpDatagramChannel` with `-IncludeIntegration`. One pre-existing member still fails on Windows: `SslStreamTlsProvider.CreateCipherSuitesPolicy` line 227 runs only off Windows. That is filed as BL-268; see Notes.)
 
 ## Notes
 
@@ -61,12 +61,12 @@ Proxy-Connection: Keep-Alive
   - Fixed: the proxy connection is now disposed when sending or reading CONNECT throws.
   - Fixed: the measured size limits are applied.
   - Fixed: the status line is parsed from the first line only, with exactly three digits.
-  - Left: a CR/LF in the host or User-Agent is not guarded. Hosts come from `Uri`, and `-A` wiring is BL-259.
+  - Left: a CR/LF in the host or User-Agent is not guarded. Hosts come from `Uri`, and `-A` wiring is BL-267.
 - **Gate:** `OpenSslCipherSuites.Select` (complexity 12, pre-existing) was brought under 10 by extracting `ParseListOrDefault`. Its behaviour is unchanged.
 - **Follow-ups filed:**
-  - BL-258: HTTPS proxy.
-  - BL-259: `Curl.Console` passes `-A` and `CredentialEncoding.ForPlatform` (ADR-0022) to the tunnel. Until then the default encoding is UTF-8, which differs from the Windows ANSI code page for non-ASCII credentials.
-  - BL-260: the Windows-unreachable coverage line.
+  - BL-266: HTTPS proxy.
+  - BL-267: `Curl.Console` passes `-A` and `CredentialEncoding.ForPlatform` (ADR-0022) to the tunnel. Until then the default encoding is UTF-8, which differs from the Windows ANSI code page for non-ASCII credentials.
+  - BL-268: the Windows-unreachable coverage line.
   - SOCKS was already BL-213.
 
 ## Log
