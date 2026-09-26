@@ -83,3 +83,4 @@ separable.
 - 2026-09-25: Created.
 - 2026-09-25: Criterion 4 corrected. The second write-failure message was a mis-measurement (the auditor's own bad -o argument) and is retracted; the 'passed <n> returned 0' suffix in criteria 1-3 was measured correctly and stands.
 - 2026-09-25: Title corrected from "two write-failure messages" to one; the file name keeps its original slug.
+- 2026-09-26: Backlog -> Doing.
