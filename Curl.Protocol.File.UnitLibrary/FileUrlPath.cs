@@ -12,7 +12,10 @@ namespace Curl.Protocol.File;
 /// <c>/</c> and, unless <c>--path-as-is</c> is in force, its dot segments removed. This is
 /// the text curl echoes in its exit 37 message — <c>file:///C:/dir/../nosuch.txt</c> is
 /// quoted as <c>C:/nosuch.txt</c> — so it is built from the encoded text rather than
-/// reconstructed from the decoded form.
+/// reconstructed from the decoded form. Every well-formed <c>%xx</c> escape it keeps is
+/// written with uppercase hexadecimal digits, as curl 8.21.0 quotes it:
+/// <c>file:///C:/dir/a%2eb/x</c> is quoted as <c>C:/dir/a%2Eb/x</c>. A malformed escape
+/// — <c>%2</c>, <c>%GG</c>, <c>%g2</c>, a trailing <c>%</c> — is kept exactly as written.
 /// </param>
 /// <param name="OsPath">
 /// The percent-decoded operating-system path handed to
@@ -178,7 +181,8 @@ public sealed record FileUrlPath(string UrlPath, string OsPath)
     /// <item>
     /// <description>
     /// <strong>Decode.</strong> <c>UrlPath</c> is the result of steps two to seven,
-    /// still encoded. <c>OsPath</c> is that text with each <c>%XX</c> escape decoded to
+    /// still encoded, with the hexadecimal digits of each well-formed escape uppercased
+    /// and a malformed one left as written. <c>OsPath</c> is that text with each <c>%XX</c> escape decoded to
     /// the byte it names and runs of escapes then read as UTF-8, including <c>%2F</c> to
     /// a literal <c>/</c>; a malformed escape — <c>%2</c>, <c>%GG</c>, a trailing
     /// <c>%</c> — is left exactly as written rather than rejected, which is what curl
@@ -232,7 +236,7 @@ public sealed record FileUrlPath(string UrlPath, string OsPath)
             return false;
         }
 
-        path = new FileUrlPath(urlPath, ToOperatingSystemPath(urlPath));
+        path = new FileUrlPath(UppercaseEscapes(urlPath), ToOperatingSystemPath(urlPath));
 
         return true;
     }
@@ -448,6 +452,29 @@ public sealed record FileUrlPath(string UrlPath, string OsPath)
         {
             kept.RemoveAt(kept.Count - 1);
         }
+    }
+
+    /// <summary>
+    /// Rewrites the hexadecimal digits of every well-formed <c>%xx</c> escape in uppercase,
+    /// leaving a malformed escape and every other character exactly as written.
+    /// </summary>
+    /// <param name="urlPath">The still-encoded path.</param>
+    /// <returns>The path as curl 8.21.0 quotes it in its exit 37 message.</returns>
+    private static string UppercaseEscapes(string urlPath)
+    {
+        var quoted = new StringBuilder(urlPath);
+
+        for (int index = 0; index < quoted.Length; index++)
+        {
+            if (TryReadEscape(urlPath, index, out _))
+            {
+                quoted[index + 1] = char.ToUpperInvariant(quoted[index + 1]);
+                quoted[index + 2] = char.ToUpperInvariant(quoted[index + 2]);
+                index += 2;
+            }
+        }
+
+        return quoted.ToString();
     }
 
     /// <summary>

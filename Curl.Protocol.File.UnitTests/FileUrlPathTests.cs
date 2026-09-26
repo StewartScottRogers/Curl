@@ -497,7 +497,7 @@ public sealed class FileUrlPathTests
 
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
-        Assert.AreEqual("C:/dir%5c..%5cx", path.UrlPath);
+        Assert.AreEqual("C:/dir%5C..%5Cx", path.UrlPath);
         Assert.AreEqual(NativePath("C:/dir") + @"\..\x", path.OsPath);
     }
 
@@ -539,6 +539,56 @@ public sealed class FileUrlPathTests
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
         Assert.AreEqual("C:/dir/./x", path.UrlPath);
+    }
+
+    // curl 8.21.0 quotes every well-formed escape it keeps with uppercase hexadecimal
+    // digits in its exit 37 message; the operating-system path is decoded either way.
+    [TestMethod]
+    [DataRow("file:///C:/dir/a%2eb/x", "C:/dir/a%2Eb/x")]
+    [DataRow("file:///C:/dir/../a%20b%2fc", "C:/a%20b%2Fc")]
+    [DataRow("file:///C:/dir/a%5cb", "C:/dir/a%5Cb")]
+    [DataRow("file:///C:/dir/a%e9b", "C:/dir/a%E9b")]
+    [DataRow("file:///C:/dir/%7e", "C:/dir/%7E")]
+    [DataRow("file:///C:/dir/a%2Eb", "C:/dir/a%2Eb")]
+    public void TryParse_LowercaseEscape_IsQuotedWithUppercaseHexDigits(string url, string expected)
+    {
+        bool parsed = FileUrlPath.TryParse(new Uri(url), out var path);
+
+        Assert.IsTrue(parsed);
+        Assert.IsNotNull(path);
+        Assert.AreEqual(expected, path.UrlPath);
+    }
+
+    [TestMethod]
+    public void TryParse_PathAsIsLowercaseEncodedDots_AreQuotedWithUppercaseHexDigits()
+    {
+        var url = new Uri("file:///C:/dir/%2e%2e/x");
+
+        bool parsed = FileUrlPath.TryParse(url, pathAsIs: true, out var path);
+
+        Assert.IsTrue(parsed);
+        Assert.IsNotNull(path);
+        Assert.AreEqual("C:/dir/%2E%2E/x", path.UrlPath);
+    }
+
+    // Measured against curl 8.21.0: only a percent sign followed by two hexadecimal
+    // digits is uppercased. A malformed escape is quoted exactly as written, and in
+    // "a%%2eb" the first percent is malformed while the "%2e" after it is not.
+    [TestMethod]
+    [DataRow("file:///C:/dir/a%2/x", "C:/dir/a%2/x")]
+    [DataRow("file:///C:/dir/a%GG/x", "C:/dir/a%GG/x")]
+    [DataRow("file:///C:/dir/a%g2b", "C:/dir/a%g2b")]
+    [DataRow("file:///C:/dir/a%2gb", "C:/dir/a%2gb")]
+    [DataRow("file:///C:/dir/a%", "C:/dir/a%")]
+    [DataRow("file:///C:/dir/a%2", "C:/dir/a%2")]
+    [DataRow("file:///C:/dir/a%%2eb", "C:/dir/a%%2Eb")]
+    public void TryParse_MalformedEscape_IsQuotedExactlyAsWritten(string url, string expected)
+    {
+        bool parsed = FileUrlPath.TryParse(new Uri(url), out var path);
+
+        Assert.IsTrue(parsed);
+        Assert.IsNotNull(path);
+        Assert.AreEqual(expected, path.UrlPath);
     }
 
     [TestMethod]
