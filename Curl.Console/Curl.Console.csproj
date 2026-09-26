@@ -27,6 +27,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Curl.Console.UnitTests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Curl.Authentication.UnitLibrary\Curl.Authentication.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Cli.UnitLibrary\Curl.Cli.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Cookies.UnitLibrary\Curl.Cookies.UnitLibrary.csproj" />

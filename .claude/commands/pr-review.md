@@ -9,7 +9,7 @@ number, or the current branch's pull request if blank).
    done or open, with the file and line it refers to.
 3. `gh pr checks` - report each check's conclusion, and for a failure point at the run.
 4. Group what is left into must-fix and optional, and name which agent should do each:
-   `test-writer`, `protocol-implementer`, `docs-writer`.
+   `test-writer`, `protocol-implementer`, `align-and-document`.
 
 Change no code. Reply to no comment without being asked.
 

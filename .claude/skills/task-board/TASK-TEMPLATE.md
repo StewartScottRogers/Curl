@@ -5,6 +5,7 @@ priority: {{PRIORITY}}
 assignee: {{ASSIGNEE}}
 pipeline: {{PIPELINE}}
 depends-on: [{{DEPENDS}}]
+touches: [{{TOUCHES}}]
 requirement: {{REQUIREMENT}}
 created: {{DATE}}
 completed:

@@ -22,12 +22,19 @@ namespace Curl.Protocol.File.Fakes;
 public sealed class ChunkRecordingStream : Stream, IRecordingStream
 {
     private readonly List<int> writeLengths = [];
+    private readonly List<CancellationToken> writeCancellationTokens = [];
     private readonly MemoryStream written = new();
 
     /// <summary>
     /// Gets the length passed to each write, in the order the writes happened.
     /// </summary>
     public IReadOnlyList<int> WriteLengths => writeLengths;
+
+    /// <summary>
+    /// Gets the cancellation token passed to each asynchronous write, in the order the
+    /// writes were attempted, including one refused because its token was cancelled.
+    /// </summary>
+    public IReadOnlyList<CancellationToken> WriteCancellationTokens => writeCancellationTokens;
 
     /// <inheritdoc />
     public bool WasDisposed { get; private set; }
@@ -95,6 +102,8 @@ public sealed class ChunkRecordingStream : Stream, IRecordingStream
     {
         ArgumentNullException.ThrowIfNull(buffer);
 
+        writeCancellationTokens.Add(cancellationToken);
+
         if (cancellationToken.IsCancellationRequested)
         {
             return Task.FromCanceled(cancellationToken);
@@ -110,6 +119,8 @@ public sealed class ChunkRecordingStream : Stream, IRecordingStream
         ReadOnlyMemory<byte> buffer,
         CancellationToken cancellationToken = default)
     {
+        writeCancellationTokens.Add(cancellationToken);
+
         if (cancellationToken.IsCancellationRequested)
         {
             return ValueTask.FromCanceled(cancellationToken);

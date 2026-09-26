@@ -18,6 +18,10 @@ choices do not need one.
 | [0001](ADR-0001-adopt-slnx-solution-format.md) | Adopt the `.slnx` solution format and a shared project for documentation | Accepted | 2026-09-25 |
 | [0002](ADR-0002-ifilesystem-as-the-second-protocol-seam.md) | `IFileSystem` as the second protocol seam | Accepted | 2026-09-25 |
 | [0003](ADR-0003-itransfercontext-carries-transfer-options.md) | `ITransferContext` carries transfer options | Accepted | 2026-09-25 |
+| [0004](ADR-0004-upload-file-name-percent-encoded-as-utf8.md) | The `-T` file name appended to a URL is percent-encoded as UTF-8 | Proposed | 2026-09-26 |
+| [0005](ADR-0005-protocol-handlers-acquire-transports-through-connectors.md) | Protocol handlers acquire transports through connectors | Accepted | 2026-09-26 |
+| [0006](ADR-0006-transfer-context-carries-phase-4-protocol-options.md) | The transfer context carries the Phase 4 protocol options | Accepted | 2026-09-26 |
+| [0007](ADR-0007-file-handler-keeps-negative-resume-guard.md) | `FileProtocolHandler` keeps its negative-`ResumeFrom` guard as an unreachable defensive default | Accepted | 2026-09-26 |
 
 ## Template
 

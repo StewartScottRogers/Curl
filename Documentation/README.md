@@ -12,6 +12,7 @@ files nobody opens.
 | `Product/` | What Curl is and what it must do — overview, requirements. |
 | `Planning/` | How and when it gets built — roadmap and decisions. Work items live on the task board in `Tasks/`, not here. |
 | `Planning/Decisions/` | Architecture Decision Records (ADRs), one file per decision. |
+| `Wiki/` | Cross-cutting explanations and the glossary: one term, one meaning, one name in code. Kept in the repository, not the GitHub Wiki, so it changes with the code. Owned by the `align-and-document` agent. |
 
 ## Adding a document
 

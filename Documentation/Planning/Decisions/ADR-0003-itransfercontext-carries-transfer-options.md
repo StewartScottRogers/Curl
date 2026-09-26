@@ -66,7 +66,17 @@ every URL curl accepts. Measured against curl 8.21.0 (2026-06-24) on this machin
 - `Uri` rewrites `c|` to `c:`, where curl does not.
 - `Uri` folds `file:////server/share` into a UNC authority, destroying the only UNC
   form curl accepts.
-- `Uri` normalises `..` away, where curl passes it straight to the OS.
+- Dot segments (corrected 2026-09-26, measured against curl 8.21.0; an earlier note
+  here said curl passes `..` straight to the OS, which is false). Both `Uri` and curl
+  remove `.` and `..` segments, but `Uri` does it always, where curl skips it under
+  `--path-as-is`. Both also turn every `\` into `/` first, and curl does that with or
+  without `--path-as-is`: `file:///C:/dir\..\secret.txt` opens `C:/secret.txt`, and
+  with `--path-as-is` `file:///C:/dir\..\x` is quoted as `C:/dir/../x`. Because
+  `FileUrlPath` works from `Uri.OriginalString`, it does both steps itself, with a
+  `pathAsIs` switch (task BL-015).
+- `Uri` throws on `file:///C:` and `file:///Q:dir/../x`, which curl accepts (both exit
+  37 on this machine, quoting `C:` and `/x`); the `file://localhost/` spellings of the
+  same paths reach `FileUrlPath`.
 
 This affects HTTP equally — `%2F` in a path, `--path-as-is` — not only `file`. It is
 **not** decided by this ADR; it is deferred to a separate decision owned by the
@@ -74,3 +84,58 @@ Core and HTTP work (see `Documentation/Planning/Decisions/README.md` for the ADR
 process, and task BL-010 in `Tasks/` for the tracking item). Sources:
 <https://curl.se/docs/manpage.html> (`--path-as-is`) and
 <https://curl.se/docs/url-syntax.html>, both checked against curl 8.21.0.
+
+## Amendment, 2026-09-26 — an unknown timestamp under `-z` (BL-018)
+
+A handler deciding `TimeCondition` must also decide what an unknown last-write time
+means. For `file://` the timestamp is optional (`FileOpenResult.LastWriteTimeUtc` is a
+`DateTimeOffset?`, see ADR-0002's amendment of the same date), and an unknown one
+transfers the body under either `TimeConditionKind`, matching libcurl 8.21.0's
+`Curl_meets_timecondition`: a condition that cannot be evaluated does not suppress
+data. The same absence drops the `Last-Modified` line from the `HeaderOutput` block
+rather than printing a made-up date. Sources: <https://curl.se/docs/manpage.html>
+(`-z`, `--time-cond`) and <https://curl.se/libcurl/c/CURLOPT_TIMECONDITION.html>,
+checked against curl 8.21.0.
+
+## Amendment, 2026-09-26 — the result carries transfer-option data too (BL-019)
+
+Transfer-option data does not only travel in on `ITransferContext`; some of it travels
+back out on `TransferResult`. The first case is `-R`/`--remote-time`, which curl 8.21.0
+applies to `file://`: `curl -R -o out.txt file:///C:/dir/hello.txt` leaves `out.txt`
+with the source's modification time, truncated to whole seconds. A `file://` handler
+cannot apply it itself, because its destination is `ITransferContext.Output`, a `Stream`
+it neither opened nor owns, and behind which there may be no file at all. So
+`TransferResult` gains `DateTimeOffset? SourceLastWriteTimeUtc` as its last positional
+member (default `null`), set by `TransferResult.Success(bytes, timestamp)` and never by
+`TransferResult.Failure`, and whoever opened `Output` applies it when `-R` was asked
+for. `null` means the time is unknown or no source was opened; an upload reports `null`.
+The `file` handler reports it on every successful download, `-I`/`--head` included,
+already truncated to whole seconds. Sources: <https://curl.se/docs/manpage.html>
+(`-R`, `--remote-time`), checked against curl 8.21.0.
+
+## Amendment, 2026-09-26 — a sixth member, `ConvertLineEndings` (BL-020)
+
+`ITransferContext` gains `bool ConvertLineEndings`, curl's `--crlf`, `false` when not
+given. It goes on the shared contract rather than on a `file`-specific type for the
+reason the first five did: `--crlf` is not a `file` concept. curl documents it for
+uploads generally (`--help all`: "Convert LF to CRLF in upload"), and FTP and SMTP
+uploads will need the same flag, so one member serves every handler and each states
+whether it applies. It applies to uploads only; a download ignores it.
+
+Measured on this machine against curl 8.21.0 (Release-Date 2026-06-24) on 2026-09-26,
+with `curl -T in.txt --crlf file:///C:/crlfprobe/out.txt -w "%{size_upload}"`:
+
+- `a\nb\n` lands as `a\r\nb\r\n`, and `size_upload` is 6: the reported byte count is
+  the converted count, not the 4 bytes read.
+- `a\r\nb` lands unchanged, `size_upload` 4. curl does not double an existing pair.
+- `a\r\r\nb\rc\n\n` lands as `a\r\r\nb\rc\r\n\r\n`, `size_upload` 11: a carriage return
+  is inserted before a line feed only when the byte immediately before it is not one,
+  and a lone carriage return is left alone.
+- 16383 bytes of `x`, then `\r` as the last byte of the first 16384-byte chunk and `\n`
+  as the first byte of the second, then ten bytes of `y` (16395 bytes) land unchanged,
+  `size_upload` 16395: the byte before is remembered across chunks.
+
+The `file` handler converts chunk by chunk (`CrlfUploadConverter`), so an upload is
+never read whole into memory; a converted chunk is at most twice the size of the one
+read. Sources: <https://curl.se/docs/manpage.html> (`--crlf`), checked against curl
+8.21.0.

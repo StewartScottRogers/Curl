@@ -6,7 +6,10 @@ namespace Curl.Protocol.File.Fakes;
 /// </summary>
 /// <param name="Content">The bytes of a file, or empty for a directory.</param>
 /// <param name="Length">The length the open reports.</param>
-/// <param name="LastWriteTimeUtc">The timestamp the open reports.</param>
+/// <param name="LastWriteTimeUtc">
+/// The timestamp the open reports, or <see langword="null" /> for a file whose
+/// modification time is unknown.
+/// </param>
 /// <param name="IsDirectory">Whether opening this entry for reading fails as a directory.</param>
 /// <param name="PresetContent">
 /// A stream the test supplied for the open to hand back — a faulting one, for instance —
@@ -16,7 +19,7 @@ namespace Curl.Protocol.File.Fakes;
 public sealed record FakeFileEntry(
     byte[] Content,
     long Length,
-    DateTimeOffset LastWriteTimeUtc,
+    DateTimeOffset? LastWriteTimeUtc,
     bool IsDirectory,
     Stream? PresetContent)
 {
@@ -24,9 +27,9 @@ public sealed record FakeFileEntry(
     /// Creates a readable file entry.
     /// </summary>
     /// <param name="content">The file's bytes.</param>
-    /// <param name="lastWriteTimeUtc">The file's timestamp.</param>
+    /// <param name="lastWriteTimeUtc">The file's timestamp, or <see langword="null" /> for unknown.</param>
     /// <returns>The entry.</returns>
-    public static FakeFileEntry ForFile(byte[] content, DateTimeOffset lastWriteTimeUtc)
+    public static FakeFileEntry ForFile(byte[] content, DateTimeOffset? lastWriteTimeUtc)
     {
         ArgumentNullException.ThrowIfNull(content);
 
@@ -37,7 +40,7 @@ public sealed record FakeFileEntry(
     /// Creates a directory entry, which a read open rejects.
     /// </summary>
     /// <returns>The entry.</returns>
-    public static FakeFileEntry ForDirectory() => new([], 0, default, true, null);
+    public static FakeFileEntry ForDirectory() => new([], 0, null, true, null);
 
     /// <summary>
     /// Creates a file entry whose read open hands back a stream the test owns.
@@ -49,7 +52,7 @@ public sealed record FakeFileEntry(
     public static FakeFileEntry ForStream(
         Stream content,
         long length,
-        DateTimeOffset lastWriteTimeUtc)
+        DateTimeOffset? lastWriteTimeUtc)
     {
         ArgumentNullException.ThrowIfNull(content);
 

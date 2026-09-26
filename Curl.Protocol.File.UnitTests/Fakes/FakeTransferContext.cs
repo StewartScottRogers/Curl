@@ -23,6 +23,9 @@ public sealed class FakeTransferContext : ITransferContext
     /// <inheritdoc cref="ITransferContext.Range" />
     public ByteRange? Range { get; set; }
 
+    /// <inheritdoc cref="ITransferContext.MaxFileSize" />
+    public long? MaxFileSize { get; set; }
+
     /// <inheritdoc cref="ITransferContext.NoBody" />
     public bool NoBody { get; set; }
 
@@ -31,6 +34,27 @@ public sealed class FakeTransferContext : ITransferContext
 
     /// <inheritdoc cref="ITransferContext.HeaderOutput" />
     public Stream? HeaderOutput { get; set; }
+
+    /// <inheritdoc cref="ITransferContext.PostData" />
+    public ReadOnlyMemory<byte>? PostData { get; set; }
+
+    /// <inheritdoc cref="ITransferContext.Credentials" />
+    public System.Net.NetworkCredential? Credentials { get; set; }
+
+    /// <inheritdoc cref="ITransferContext.TelnetOptions" />
+    public IReadOnlyList<string> TelnetOptions { get; set; } = [];
+
+    /// <inheritdoc cref="ITransferContext.TftpBlockSize" />
+    public int? TftpBlockSize { get; set; }
+
+    /// <inheritdoc cref="ITransferContext.TftpNoOptions" />
+    public bool TftpNoOptions { get; set; }
+
+    /// <inheritdoc cref="ITransferContext.ConvertLineEndings" />
+    public bool ConvertLineEndings { get; set; }
+
+    /// <inheritdoc cref="ITransferContext.CreateFileMode" />
+    public UnixFileMode CreateFileMode { get; set; } = TransferContext.DefaultCreateFileMode;
 
     /// <inheritdoc cref="ITransferContext.TimeProvider" />
     public TimeProvider TimeProvider { get; set; } =

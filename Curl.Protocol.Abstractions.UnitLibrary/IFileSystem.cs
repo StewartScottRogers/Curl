@@ -42,8 +42,11 @@ public interface IFileSystem
     /// </param>
     /// <param name="cancellationToken">Cancels the open.</param>
     /// <returns>
-    /// The outcome. When it succeeded, <see cref="FileOpenResult.Content" /> is
-    /// seekable, so a range or resume offset is applied by seeking it.
+    /// The outcome. When it succeeded for a regular file,
+    /// <see cref="FileOpenResult.Content" /> is seekable, so a range or resume offset is
+    /// applied by seeking it. For a character device or a FIFO it may be non-seekable,
+    /// with a <see cref="FileOpenResult.Length" /> of zero; check
+    /// <see cref="Stream.CanSeek" /> before seeking.
     /// </returns>
     ValueTask<FileOpenResult> OpenForReadAsync(string path, CancellationToken cancellationToken);
 
@@ -55,6 +58,14 @@ public interface IFileSystem
     /// protocol handler; this interface never sees a <see cref="Uri" />.
     /// </param>
     /// <param name="mode">Whether existing content is discarded or appended to.</param>
+    /// <param name="createMode">
+    /// The permission bits a file created by this open is to receive on a POSIX system:
+    /// the <c>--create-file-mode</c> value, else curl's default of <c>0644</c>
+    /// (<see cref="ITransferContext.CreateFileMode" />). An implementation on a real disk
+    /// hands it to the operating system as curl's <c>open(2)</c> does, so the process
+    /// umask narrows it, a file that already exists keeps its mode, and Windows, which
+    /// has no such mode, ignores it.
+    /// </param>
     /// <param name="cancellationToken">Cancels the open.</param>
     /// <returns>
     /// The outcome. When it succeeded, <see cref="FileOpenResult.Content" /> is
@@ -65,5 +76,6 @@ public interface IFileSystem
     ValueTask<FileOpenResult> OpenForWriteAsync(
         string path,
         FileWriteMode mode,
+        UnixFileMode createMode,
         CancellationToken cancellationToken);
 }

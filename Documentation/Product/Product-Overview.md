@@ -139,19 +139,24 @@ violation. Modularity that is only a convention decays on contact with a deadlin
 ### Rule 2 — the transport is an injected seam
 
 Protocol handlers never construct a `Socket`, an `SslStream` or an `HttpClient`.
-They receive `IConnection` — except `file`, which has no wire and receives
-`IFileSystem` instead (`Documentation/Planning/Decisions/ADR-0002-ifilesystem-as-the-second-protocol-seam.md`).
+They take an `IConnector` in their constructor and ask it for an `IConnection` once
+per transfer, from the host and port in that transfer's URL; TFTP, the one datagram
+protocol, takes an `IDatagramConnector` and receives an `IDatagramChannel` instead
+(`Documentation/Planning/Decisions/ADR-0005-protocol-handlers-acquire-transports-through-connectors.md`).
+`file`, which has no wire, receives `IFileSystem`
+(`Documentation/Planning/Decisions/ADR-0002-ifilesystem-as-the-second-protocol-seam.md`).
 That single decision is what makes "deeply unit testable" true rather than
 aspirational:
 
 ```
-FtpProtocolHandler(IConnection, IDnsResolver, TimeProvider)
+FtpProtocolHandler(IConnector, TimeProvider)
         │
-        ├─ unit test  → FakeConnection replaying recorded bytes.
+        ├─ unit test  → a fake IConnector handing back a FakeConnection that
+        │               replays recorded bytes, or a Failed result (exit 6, 7).
         │               No network. No server. No [TestCategory("Integration")].
         │
-        └─ production → SocketConnection, wrapped by SslStream when the
-                        scheme is secure.
+        └─ production → the connector in Curl.Networking.UnitLibrary: DNS, a
+                        socket, wrapped by SslStream when the scheme is secure.
 ```
 
 Every protocol's wire behaviour — FTP's `227` PASV reply parsing, SMTP's multiline

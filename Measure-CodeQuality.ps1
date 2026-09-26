@@ -31,10 +31,28 @@
 
 .PARAMETER Library
     Assembly names to report on, wildcards allowed. Defaults to every production
-    assembly - anything named *.UnitLibrary, plus Curl.Console.
+    assembly - anything named *.UnitLibrary, plus Curl.Console. Curl.Console's
+    assembly is named curl, and is reported and matched here as Curl.Console.
 
 .PARAMETER SkipTestRun
     Reuse the Cobertura files already in ResultsDirectory instead of running tests.
+    Without -ResultsDirectory these are the reports this checkout's last run left in
+    its own default directory (see ResultsDirectory).
+
+.PARAMETER ResultsDirectory
+    Where the Cobertura reports are written and read. Unless -SkipTestRun is given,
+    this directory is deleted and recreated before the tests run, and every
+    *.cobertura.xml under it is merged into the report.
+
+    Defaults to a directory that belongs to this checkout alone:
+    $env:TEMP\CurlCodeQuality\<checkout folder name>-<first 16 hex digits of the
+    SHA-256 of the checkout's full path>. Each git worktree (for example each dark
+    factory lane under <repo>.lanes\lane-<n>) therefore gets its own directory, so two
+    runs from different checkouts at the same time never delete or read each other's
+    reports, and -SkipTestRun still finds the reports of this checkout's last run.
+    Two runs from the same checkout at the same time still share it.
+
+    An explicit value is used exactly as given.
 
 .PARAMETER IncludeIntegration
     Run the integration tests too. Off by default, matching the fast test command in
@@ -64,8 +82,23 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = $PSScriptRoot
+
+function Get-CheckoutResultsDirectory {
+    param([string] $CheckoutRoot)
+    $fullPath = [System.IO.Path]::GetFullPath($CheckoutRoot).TrimEnd([char] '\', [char] '/').ToLowerInvariant()
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $hash = $sha256.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($fullPath))
+    } finally {
+        $sha256.Dispose()
+    }
+    $hashText = -join ($hash[0..7] | ForEach-Object { $_.ToString('x2') })
+    $checkoutName = Split-Path $fullPath -Leaf
+    return Join-Path (Join-Path $env:TEMP 'CurlCodeQuality') "$checkoutName-$hashText"
+}
+
 if ([string]::IsNullOrWhiteSpace($ResultsDirectory)) {
-    $ResultsDirectory = Join-Path $env:TEMP 'CurlCodeQuality'
+    $ResultsDirectory = Get-CheckoutResultsDirectory -CheckoutRoot $repositoryRoot
 }
 
 # --- 1. Collect coverage ----------------------------------------------------------
@@ -103,6 +136,16 @@ function Test-IsProductionAssembly {
     return ($Name -like '*.UnitLibrary') -or ($Name -eq 'Curl.Console')
 }
 
+# Curl.Console.csproj sets <AssemblyName>curl</AssemblyName> so the binary is a drop-in
+# for curl, which makes its Cobertura package "curl". Report it under its project name,
+# so the table, the failing-member heading and -Library all see Curl.Console.
+function Get-ReportedAssemblyName {
+    param([string] $PackageName)
+
+    if ($PackageName -ceq 'curl') { return 'Curl.Console' }
+    return $PackageName
+}
+
 $methods = @{}
 
 foreach ($file in $coverageFiles) {
@@ -110,7 +153,7 @@ foreach ($file in $coverageFiles) {
     $document.Load($file.FullName)
 
     foreach ($package in $document.SelectNodes('/coverage/packages/package')) {
-        $assembly = $package.GetAttribute('name')
+        $assembly = Get-ReportedAssemblyName $package.GetAttribute('name')
         if (-not (Test-IsProductionAssembly $assembly)) { continue }
 
         foreach ($class in $package.SelectNodes('classes/class')) {

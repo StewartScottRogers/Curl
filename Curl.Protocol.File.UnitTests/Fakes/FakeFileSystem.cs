@@ -31,6 +31,7 @@ public sealed class FakeFileSystem : IFileSystem
         new(2026, 6, 24, 12, 34, 56, TimeSpan.Zero);
 
     private readonly List<FileSystemCall> calls = [];
+    private readonly List<CancellationToken> openCancellationTokens = [];
     private readonly Dictionary<string, FakeFileEntry> entries = new(StringComparer.Ordinal);
     private readonly Dictionary<string, FileAccessStatus> readFailures = new(StringComparer.Ordinal);
     private readonly Dictionary<string, FileAccessStatus> writeFailures = new(StringComparer.Ordinal);
@@ -42,6 +43,17 @@ public sealed class FakeFileSystem : IFileSystem
     /// Gets every call made to this file system, in order.
     /// </summary>
     public IReadOnlyList<FileSystemCall> Calls => calls;
+
+    /// <summary>
+    /// Gets the cancellation token each open was given, in the same order as
+    /// <see cref="Calls" />.
+    /// </summary>
+    /// <remarks>
+    /// Kept apart from <see cref="FileSystemCall" /> so the calls stay comparable by value:
+    /// a test that pins the path and mode need not also name a token. Recording the token is
+    /// not honouring it; the opens still ignore it, for the reason in the class remarks.
+    /// </remarks>
+    public IReadOnlyList<CancellationToken> OpenCancellationTokens => openCancellationTokens;
 
     /// <summary>
     /// Adds a file with the default timestamp.
@@ -62,6 +74,19 @@ public sealed class FakeFileSystem : IFileSystem
         ArgumentNullException.ThrowIfNull(path);
 
         entries[path] = FakeFileEntry.ForFile(content, lastWriteTimeUtc);
+    }
+
+    /// <summary>
+    /// Adds a file whose open reports no timestamp, as an implementation that could not
+    /// determine a modification time would.
+    /// </summary>
+    /// <param name="path">The operating-system path.</param>
+    /// <param name="content">The file's bytes.</param>
+    public void AddFileWithoutTimestamp(string path, byte[] content)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+
+        entries[path] = FakeFileEntry.ForFile(content, null);
     }
 
     /// <summary>
@@ -179,6 +204,7 @@ public sealed class FakeFileSystem : IFileSystem
         ArgumentNullException.ThrowIfNull(path);
 
         calls.Add(FileSystemCall.Read(path));
+        openCancellationTokens.Add(cancellationToken);
 
         if (readFailures.TryGetValue(path, out var forced))
         {
@@ -206,11 +232,13 @@ public sealed class FakeFileSystem : IFileSystem
     public ValueTask<FileOpenResult> OpenForWriteAsync(
         string path,
         FileWriteMode mode,
+        UnixFileMode createMode,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(path);
 
-        calls.Add(FileSystemCall.Write(path, mode));
+        calls.Add(FileSystemCall.Write(path, mode, createMode));
+        openCancellationTokens.Add(cancellationToken);
 
         if (writeFailures.TryGetValue(path, out var forced))
         {
@@ -220,7 +248,7 @@ public sealed class FakeFileSystem : IFileSystem
         entries.TryGetValue(path, out var existing);
 
         byte[] kept = mode == FileWriteMode.Append && existing is not null ? existing.Content : [];
-        DateTimeOffset lastWriteTimeUtc = existing?.LastWriteTimeUtc ?? DefaultLastWriteTimeUtc;
+        DateTimeOffset? lastWriteTimeUtc = existing is null ? DefaultLastWriteTimeUtc : existing.LastWriteTimeUtc;
 
         if (writeDestinations.TryGetValue(path, out var destination))
         {

@@ -12,11 +12,18 @@
     Commands:
       status   The whole board, with each Backlog task marked ready, waiting on
                its dependencies, or needing Stewart.
-      next     The task /task-run should take next, or "No task is ready."
+      next     The task /task-run should take next, or "No task is ready.". A ready
+               task whose touches overlap a task in Doing is not offered, so lanes
+               of the dark factory never work on the same files at once.
       next-id  The next free task ID.
       new      Create a task in Backlog from TASK-TEMPLATE.md.
       move     Move a task to another state, appending a Log line.
       archive  Move finished tasks into Done\<yyyy-MM-dd_HHmm>\.
+      dedupe   Renumber tasks that share an ID with another. A task file that exists
+               at -Since (a git ref; the shared branch before this lane's work) keeps
+               its ID; the others get the next free IDs, and the old ID is rewritten in
+               every Markdown file changed since -Since. Dark factory lanes run it
+               after rebasing, before they push.
 
     Keep this file ASCII only: Windows PowerShell 5.1 reads a script without a
     byte-order mark in the system code page, so a non-ASCII literal would be
@@ -26,7 +33,7 @@
     powershell -NoProfile -ExecutionPolicy Bypass -File .claude/skills/task-board/task-board.ps1 status
 
 .EXAMPLE
-    ... task-board.ps1 new -Title "Parse --max-time" -Pipeline feature -DependsOn BL-012,BL-013
+    ... task-board.ps1 new -Title "Parse --max-time" -Pipeline feature -DependsOn BL-012,BL-013 -Touches Curl.Cli.UnitLibrary,Curl.Cli.UnitTests
 
 .EXAMPLE
     ... task-board.ps1 move -Id BL-014 -To Blocked -Reason "Needs Stewart to approve an ADR on X."
@@ -37,7 +44,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true, Position = 0)]
-    [ValidateSet('status', 'next', 'next-id', 'new', 'move', 'archive')]
+    [ValidateSet('status', 'next', 'next-id', 'new', 'move', 'archive', 'dedupe')]
     [string] $Command,
 
     [string] $Id,
@@ -59,6 +66,16 @@ param(
     [string] $Pipeline = 'feature',
 
     [string[]] $DependsOn = @(),
+
+    # Projects, folders or files the task will change; '*' or nothing means it may
+    # change anything, so it never runs beside another task.
+    [string[]] $Touches = @(),
+
+    # Task IDs 'next' must not offer, e.g. ones a lane already tried this shift.
+    [string[]] $Skip = @(),
+
+    # For 'dedupe': the git ref whose task files keep their IDs.
+    [string] $Since = '',
 
     [string] $Requirement = 'none',
 
@@ -113,6 +130,13 @@ function ConvertTo-Task([IO.FileInfo] $File) {
         $dependencies = @([regex]::Matches($fields['depends-on'], 'BL-\d+') | ForEach-Object { $_.Value })
     }
 
+    $touched = @()
+    if ($fields['touches']) {
+        $touched = @(($fields['touches'].Trim('[', ']', ' ') -split ',') |
+            ForEach-Object { ConvertTo-TouchPath $_ } | Where-Object { $_ })
+    }
+    if ($touched.Count -eq 0) { $touched = @('*') }
+
     $taskPriority = [string]$fields['priority']
     if (-not $PriorityRank.ContainsKey($taskPriority)) { $taskPriority = 'Normal' }
 
@@ -124,12 +148,32 @@ function ConvertTo-Task([IO.FileInfo] $File) {
         Assignee  = [string]$fields['assignee']
         Pipeline  = [string]$fields['pipeline']
         DependsOn = $dependencies
+        Touches   = $touched
         Completed = [string]$fields['completed']
         State     = $state
         Archived  = ($state -eq 'Done') -and ($File.DirectoryName -ne $DoneFolder)
         Path      = $File.FullName
         Relative  = 'Tasks\' + $relative
     }
+}
+
+function ConvertTo-TouchPath([string] $Item) {
+    return $Item.Trim().Trim('"', "'").Replace([string][char]92, '/').TrimEnd('/')
+}
+
+# Two tasks overlap when either may touch anything, or one names a path equal to or
+# inside a path the other names. Curl.Core.UnitLibrary overlaps
+# Curl.Core.UnitLibrary/Transfer.cs; it does not overlap Curl.Core.UnitTests.
+function Test-Overlap([string[]] $A, [string[]] $B) {
+    if ($A -contains '*' -or $B -contains '*') { return $true }
+    foreach ($x in $A) {
+        foreach ($y in $B) {
+            if ($x -ieq $y) { return $true }
+            if ($x.StartsWith("$y/", [StringComparison]::OrdinalIgnoreCase)) { return $true }
+            if ($y.StartsWith("$x/", [StringComparison]::OrdinalIgnoreCase)) { return $true }
+        }
+    }
+    return $false
 }
 
 function Get-Tasks {
@@ -146,6 +190,12 @@ function Find-Task([object[]] $Tasks, [string] $TaskId) {
     if (-not $TaskId) { throw 'Name the task with -Id, for example -Id BL-007.' }
     $wanted = $TaskId.Trim().ToUpperInvariant()
     $live = @($Tasks | Where-Object { $_.Id -eq $wanted -and -not $_.Archived })
+    if ($live.Count -gt 1) {
+        # Acting on the first match would move the wrong task. Parallel lanes can file the
+        # same ID; 'dedupe' renumbers the later ones.
+        $where = ($live | ForEach-Object { $_.Relative }) -join ', '
+        throw "$wanted names $($live.Count) tasks ($where). Renumber the duplicates with the 'dedupe' command first."
+    }
     if ($live.Count -gt 0) { return $live[0] }
     if (@($Tasks | Where-Object { $_.Id -eq $wanted }).Count -gt 0) {
         throw "$wanted is archived. Archived tasks are never changed; file a new task instead."
@@ -161,14 +211,52 @@ function Get-MissingDependencies($Task, [object[]] $DoneIds) {
     return @($Task.DependsOn | Where-Object { $DoneIds -notcontains $_ })
 }
 
+# How many unfinished tasks wait on this one, directly or through others. Ready tasks
+# with more waiting on them go first, so the work that unlocks the most parallel work
+# lands first.
+function Get-WaitingCounts([object[]] $Tasks) {
+    $open = @($Tasks | Where-Object { $_.State -ne 'Done' })
+    $dependents = @{}
+    foreach ($task in $open) {
+        foreach ($dependency in $task.DependsOn) {
+            if (-not $dependents.ContainsKey($dependency)) { $dependents[$dependency] = @() }
+            $dependents[$dependency] += $task.Id
+        }
+    }
+    $counts = @{}
+    foreach ($task in $open) {
+        $seen = @{}
+        $queue = New-Object System.Collections.Queue
+        $queue.Enqueue($task.Id)
+        while ($queue.Count -gt 0) {
+            $current = $queue.Dequeue()
+            foreach ($waiter in @($dependents[$current])) {
+                if ($waiter -and -not $seen.ContainsKey($waiter)) { $seen[$waiter] = $true; $queue.Enqueue($waiter) }
+            }
+        }
+        $counts[$task.Id] = $seen.Count
+    }
+    return $counts
+}
+
 function Get-ReadyTasks([object[]] $Tasks) {
     $doneIds = Get-DoneIds $Tasks
+    $waiting = Get-WaitingCounts $Tasks
     $ready = @($Tasks | Where-Object {
             $_.State -eq 'Backlog' -and
             $_.Assignee -eq 'Claude' -and
             @(Get-MissingDependencies $_ $doneIds).Count -eq 0
         })
-    return , @($ready | Sort-Object -Property @{ Expression = { $PriorityRank[$_.Priority] } }, Number)
+    return , @($ready | Sort-Object -Property @{ Expression = { $PriorityRank[$_.Priority] } },
+        @{ Expression = { $waiting[$_.Id] }; Descending = $true }, Number)
+}
+
+# The Doing task a ready task would collide with, or $null if it can start now.
+function Get-Collision($Task, [object[]] $Tasks) {
+    foreach ($busy in @($Tasks | Where-Object { $_.State -eq 'Doing' })) {
+        if (Test-Overlap $Task.Touches $busy.Touches) { return $busy }
+    }
+    return $null
 }
 
 function Get-NextId([object[]] $Tasks) {
@@ -207,7 +295,11 @@ switch ($Command) {
                     $missing = @(Get-MissingDependencies $task $doneIds)
                     if ($task.Assignee -ne 'Claude') { $flag = "needs $($task.Assignee)" }
                     elseif ($missing.Count -gt 0) { $flag = 'waiting on ' + ($missing -join ', ') }
-                    else { $flag = 'ready, #' + ([array]::IndexOf($readyIds, $task.Id) + 1) + ' in queue' }
+                    else {
+                        $flag = 'ready, #' + ([array]::IndexOf($readyIds, $task.Id) + 1) + ' in queue'
+                        $collision = Get-Collision $task $tasks
+                        if ($collision) { $flag += ", overlaps $($collision.Id) in Doing" }
+                    }
                 }
                 elseif ($state -eq 'Done' -and $task.Completed) { $flag = "completed $($task.Completed)" }
 
@@ -224,9 +316,17 @@ switch ($Command) {
     }
 
     'next' {
-        $ready = Get-ReadyTasks (Get-Tasks)
+        $tasks = Get-Tasks
+        $skipIds = @($Skip | ForEach-Object { $_ -split '[,\s]+' } | Where-Object { $_ } | ForEach-Object { $_.ToUpperInvariant() })
+        $ready = @((Get-ReadyTasks $tasks) | Where-Object { $skipIds -notcontains $_.Id })
         if ($ready.Count -eq 0) { Write-Output 'No task is ready.'; break }
-        $task = $ready[0]
+        $free = @($ready | Where-Object { -not (Get-Collision $_ $tasks) })
+        if ($free.Count -eq 0) {
+            $first = $ready[0]
+            Write-Output ('No task can start yet: every ready task overlaps one in Doing, e.g. {0} with {1}.' -f $first.Id, (Get-Collision $first $tasks).Id)
+            break
+        }
+        $task = $free[0]
         Write-Output ('{0}  pipeline: {1}  {2}' -f $task.Id, $task.Pipeline, $task.Relative)
     }
 
@@ -249,6 +349,8 @@ switch ($Command) {
             }
         }
 
+        $touchList = @($Touches | ForEach-Object { $_ -split ',' } | ForEach-Object { ConvertTo-TouchPath $_ } | Where-Object { $_ })
+
         $slug = ($Title.ToLowerInvariant() -replace '[^a-z0-9]+', '-').Trim('-')
         if ($slug.Length -gt 60) { $slug = $slug.Substring(0, 60).TrimEnd('-') }
         $fileName = "$newId-$slug.md"
@@ -262,6 +364,7 @@ switch ($Command) {
             Replace('{{ASSIGNEE}}', $Assignee).
             Replace('{{PIPELINE}}', $Pipeline).
             Replace('{{DEPENDS}}', ($dependencies -join ', ')).
+            Replace('{{TOUCHES}}', ($touchList -join ', ')).
             Replace('{{REQUIREMENT}}', $Requirement).
             Replace('{{DATE}}', $Today)
         Write-Text $path $text
@@ -308,6 +411,48 @@ switch ($Command) {
         Write-Text $task.Path $text
         Move-Item -LiteralPath $task.Path -Destination $destination
         Write-Output "$($task.Id)  $from -> $To  Tasks\$To\$fileName"
+    }
+
+    'dedupe' {
+        if (-not $Since) { throw 'Name the shared ref with -Since, for example -Since origin/work/dark-factory.' }
+        # git reports "not in <ref>" on stderr, which is the answer here, not a failure;
+        # under 'Stop' Windows PowerShell would turn it into a terminating error.
+        $ErrorActionPreference = 'Continue'
+        $tasks = Get-Tasks
+        $changed = @(& git -C $RepoRoot diff --name-only "$Since" -- '*.md' 2>$null | Where-Object { $_ } |
+            ForEach-Object { Join-Path $RepoRoot $_ } | Where-Object { Test-Path -LiteralPath $_ })
+        $renamed = 0
+        foreach ($group in @($tasks | Where-Object { -not $_.Archived } | Group-Object Id | Where-Object { $_.Count -gt 1 })) {
+            $shared = @(); $mine = @()
+            foreach ($task in $group.Group) {
+                $relative = $task.Path.Substring($RepoRoot.Length).TrimStart('\', '/').Replace([string][char]92, '/')
+                & git -C $RepoRoot cat-file -e "${Since}:$relative" 2>$null
+                if ($LASTEXITCODE -eq 0) { $shared += $task } else { $mine += $task }
+            }
+            # With nothing shared (both new), the first keeps the ID.
+            if ($shared.Count -eq 0) { $mine = @($mine | Select-Object -Skip 1) }
+            foreach ($task in $mine) {
+                $old = $task.Id
+                $new = Get-NextId (Get-Tasks)
+                $text = Read-Text $task.Path
+                $text = [regex]::Replace($text, "(?m)^id: $old\b", "id: $new")
+                $text = [regex]::Replace($text, "(?m)^# $old\b", "# $new")
+                Write-Text $task.Path $text
+                $target = Join-Path (Split-Path $task.Path -Parent) ((Split-Path $task.Path -Leaf) -replace "^$old", $new)
+                Move-Item -LiteralPath $task.Path -Destination $target
+                # This lane's other changes that mention the old ID meant this task.
+                foreach ($file in $changed) {
+                    if ($file -eq $task.Path -or -not (Test-Path -LiteralPath $file)) { continue }
+                    $body = Read-Text $file
+                    $updated = [regex]::Replace($body, "\b$old\b", $new)
+                    if ($updated -ne $body) { Write-Text $file $updated }
+                }
+                $changed = @($changed | ForEach-Object { if ($_ -eq $task.Path) { $target } else { $_ } })
+                Write-Output "$old -> $new  $($task.Title)"
+                $renamed++
+            }
+        }
+        if ($renamed -eq 0) { Write-Output 'No duplicate IDs.' }
     }
 
     'archive' {

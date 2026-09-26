@@ -39,10 +39,27 @@ public interface ITransferContext
     /// </summary>
     /// <remarks>
     /// curl accepts a comma-separated list but honours only the first range for
-    /// <c>file://</c>; the command-line layer reduces the list, so a handler sees at most
-    /// one <see cref="Abstractions.ByteRange" />.
+    /// <c>file://</c>. <c>Curl.Console</c> parses the <c>-r</c>/<c>--range</c> text once per
+    /// transfer, before any handler runs, with <c>ByteRangeParser</c> in
+    /// <c>Curl.Core.UnitLibrary</c>, which answers text that names no range with exit 33
+    /// (<see cref="CurlExitCode.RangeError" />) and no handler call; so a handler sees at most
+    /// one <see cref="Abstractions.ByteRange" />, already validated.
     /// </remarks>
     ByteRange? Range { get; }
+
+    /// <summary>
+    /// Gets the largest body, in bytes, that <c>--max-filesize</c> allows a download to
+    /// deliver, or <see langword="null" /> when no limit was given.
+    /// </summary>
+    /// <remarks>
+    /// Zero also means no limit, as it does to curl. Measured on curl 8.21.0 over
+    /// <c>file://</c>, a download with more body bytes than this writes exactly this many,
+    /// then fails with exit 63 (<see cref="CurlExitCode.FilesizeExceeded" />); the limit
+    /// counts body bytes only, so headers written to <see cref="HeaderOutput" /> do not use
+    /// it up, and an upload ignores it. <c>Curl.Console</c> fills it from <c>--max-filesize</c>.
+    /// Only the <c>file://</c> handler enforces it; no other handler reads it yet.
+    /// </remarks>
+    long? MaxFileSize { get; }
 
     /// <summary>
     /// Gets a value indicating whether only metadata was asked for, per
@@ -74,6 +91,85 @@ public interface ITransferContext
     /// <c>Last-Modified</c> lines rather than anything received from a peer.
     /// </remarks>
     Stream? HeaderOutput { get; }
+
+    /// <summary>
+    /// Gets the data given with <c>-d</c>/<c>--data</c>, or <see langword="null" /> when
+    /// none was given.
+    /// </summary>
+    /// <remarks>
+    /// <c>mqtt://</c> reads it and sends it as a PUBLISH instead of subscribing
+    /// (ADR-0006). A scheme that has no use for request data ignores it.
+    /// </remarks>
+    ReadOnlyMemory<byte>? PostData { get; }
+
+    /// <summary>
+    /// Gets the user name and password from <c>-u</c>/<c>--user</c>, else from the URL's
+    /// user information, or <see langword="null" /> when neither is present.
+    /// </summary>
+    /// <remarks>
+    /// <c>mqtt://</c> reads it and sends it in its CONNECT packet (ADR-0006). A scheme
+    /// that does not authenticate ignores it.
+    /// </remarks>
+    System.Net.NetworkCredential? Credentials { get; }
+
+    /// <summary>
+    /// Gets each <c>-t</c>/<c>--telnet-option</c> value verbatim, in command-line order,
+    /// or an empty list when none was given.
+    /// </summary>
+    /// <remarks>
+    /// <c>telnet://</c> reads it. The values arrive unvalidated: curl rejects an unknown
+    /// option name (exit 48) or a value without <c>=</c> (exit 49) at transfer time,
+    /// after connecting, so the telnet handler validates them (ADR-0006).
+    /// </remarks>
+    IReadOnlyList<string> TelnetOptions { get; }
+
+    /// <summary>
+    /// Gets the block size given with <c>--tftp-blksize</c>, as given and unclamped, or
+    /// <see langword="null" /> when none was given.
+    /// </summary>
+    /// <remarks>
+    /// <c>tftp://</c> reads it and clamps it to 8-65464, as curl does rather than
+    /// refusing an out-of-range value; when it is <see langword="null" /> the TFTP
+    /// default of 512 applies (ADR-0006).
+    /// </remarks>
+    int? TftpBlockSize { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether <c>--tftp-no-options</c> was given, which
+    /// suppresses the RFC 2347, 2348 and 2349 options; <see langword="false" /> when not
+    /// given.
+    /// </summary>
+    /// <remarks>
+    /// <c>tftp://</c> reads it (ADR-0006).
+    /// </remarks>
+    bool TftpNoOptions { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether <c>--crlf</c> was given, which converts each line
+    /// feed in an upload to a carriage return plus line feed; <see langword="false" /> when
+    /// not given.
+    /// </summary>
+    /// <remarks>
+    /// It applies to uploads only; a download ignores it. <c>file://</c> reads it, and
+    /// measured on curl 8.21.0 the conversion inserts a carriage return before a line feed
+    /// only when the byte before that line feed is not already one, so <c>a\r\nb</c> is
+    /// sent unchanged, a lone carriage return is left alone, and that state carries across
+    /// chunk boundaries. The upload's byte count is the converted count (ADR-0003).
+    /// </remarks>
+    bool ConvertLineEndings { get; }
+
+    /// <summary>
+    /// Gets the permission bits a file created by an upload receives on a POSIX system,
+    /// per <c>--create-file-mode</c>; curl's default of <c>0644</c> when not given.
+    /// </summary>
+    /// <remarks>
+    /// Upstream curl applies it to files created remotely by an upload, over
+    /// <c>file://</c>, SFTP and SCP; it does not apply to <c>-o</c>/<c>--output</c>.
+    /// <c>file://</c> passes it to <see cref="IFileSystem.OpenForWriteAsync" />, where the
+    /// process umask still applies, a file that already exists keeps its mode, and
+    /// Windows ignores it.
+    /// </remarks>
+    UnixFileMode CreateFileMode { get; }
 
     /// <summary>
     /// Gets the time source. Injected so that timeout and retry behaviour is testable

@@ -13,18 +13,29 @@ namespace Curl.Protocol.File;
 /// </param>
 /// <remarks>
 /// <para>
-/// The order of work matches curl 8.21.0's <c>lib/file.c</c>: open, write the
-/// pseudo-headers, return early for <c>-I</c>/<c>--head</c>, apply
-/// <c>-z</c>/<c>--time-cond</c>, resolve <c>-r</c>/<c>--range</c> or
-/// <c>-C</c>/<c>--continue-at</c> into a window of the file, then move the body in
-/// 16-kilobyte chunks.
+/// The order of work matches curl 8.21.0's <c>lib/file.c</c>: open, apply
+/// <c>-z</c>/<c>--time-cond</c> (an unmet condition ends the transfer as a success with
+/// nothing written, headers included), write the pseudo-headers, return early for
+/// <c>-I</c>/<c>--head</c>, resolve <c>-r</c>/<c>--range</c> or
+/// <c>-C</c>/<c>--continue-at</c> into a window of the file — so a resume failure comes
+/// after the headers — then move the body in 16-kilobyte chunks, writing no more than
+/// <see cref="ITransferContext.MaxFileSize" /> allows and failing with exit 63 when there is
+/// more. An upload under
+/// <c>--crlf</c> (<see cref="ITransferContext.ConvertLineEndings" />) converts each chunk
+/// on the way to the destination; a download never does. The destination is opened with
+/// <see cref="ITransferContext.CreateFileMode" />, curl's <c>--create-file-mode</c>, as the
+/// mode a newly created file receives on a POSIX system.
 /// </para>
 /// <para>
 /// The exit codes are curl's, not the nearest-looking ones: every failure to open a
 /// source is exit 37 (<see cref="CurlExitCode.FileCouldntReadFile" />) whatever the
 /// operating system said, never exit 78 or exit 9; a destination that will not open is
-/// exit 23 (<see cref="CurlExitCode.WriteError" />); a read that fails after the open is
-/// exit 26 (<see cref="CurlExitCode.ReadError" />); a download offset past the end of the
+/// exit 23 (<see cref="CurlExitCode.WriteError" />); a download source that fails to be
+/// read after the open ends the body there and exits 0, because curl treats the failed
+/// read as the end of the file; an upload source of known length that fails to be read
+/// is exit 26 (<see cref="CurlExitCode.ReadError" />), and one of unknown length - standard
+/// input - ends there with exit 0; an upload destination that fails to be written after
+/// the open is exit 55 (<see cref="CurlExitCode.SendError" />); a download offset past the end of the
 /// file is exit 36 (<see cref="CurlExitCode.BadDownloadResume" />), where an offset exactly
 /// equal to the length is a success with no bytes. A transfer failure is returned as a
 /// <see cref="TransferResult" /> and never thrown; only cancellation leaves this handler
@@ -41,16 +52,24 @@ namespace Curl.Protocol.File;
 /// disagrees with itself in the same way.
 /// </para>
 /// <para>
-/// Of the options on <see cref="ITransferContext" />,
-/// <see cref="ITransferContext.TimeProvider" /> is deliberately unused: nothing in a
-/// local file transfer is timed or retried, and <c>-z</c> compares against the timestamp
-/// the open reported rather than against now.
+/// Of the options on <see cref="ITransferContext" />, the download path ignores
+/// <see cref="ITransferContext.ConvertLineEndings" /> and
+/// <see cref="ITransferContext.CreateFileMode" />, and the upload path ignores
+/// <see cref="ITransferContext.Range" />, <see cref="ITransferContext.NoBody" />,
+/// <see cref="ITransferContext.TimeCondition" />, <see cref="ITransferContext.HeaderOutput" />
+/// and <see cref="ITransferContext.MaxFileSize" />. Both ignore
+/// <see cref="ITransferContext.TimeProvider" />, deliberately: nothing in a local file
+/// transfer is timed or retried, and <c>-z</c> compares against the timestamp the open
+/// reported rather than against now. Both also ignore the options that belong to other
+/// protocols. The table "Transfer options, per direction" in
+/// <c>Curl.Protocol.File.UnitLibrary\CLAUDE.md</c> gives every member, per direction,
+/// with the method that reads it.
 /// </para>
 /// </remarks>
 public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandler
 {
     /// <summary>
-    /// The chunk size for a <c>file://</c> body, which is curl's
+    /// The chunk size for a <c>file://</c> download body, which is curl's
     /// <c>CURL_MAX_WRITE_SIZE</c>. It is observable — it is the size of every write to
     /// the output but the last — so it is pinned here rather than left to
     /// <see cref="Stream.CopyToAsync(Stream)" />, whose buffer is five times larger.
@@ -58,11 +77,26 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     private const int ChunkSize = 16384;
 
     /// <summary>
+    /// The chunk size for a <c>file://</c> upload body. curl 8.21.0 reads a <c>-T</c>
+    /// source 65536 bytes at a time, counted from the start of the file even when
+    /// <c>-C</c> skips part of it, which is observable in the exit 26 message: a
+    /// 100000-byte source that fails to read from byte 99000 on reports
+    /// <c>only 65536/100000</c>.
+    /// </summary>
+    private const int UploadChunkSize = 65536;
+
+    /// <summary>
     /// The one scheme this handler serves. Checked against curl 8.21.0's
     /// <c>--version</c> protocol list, which names <c>file</c> and nothing else that
     /// belongs to this library.
     /// </summary>
     private static readonly string[] Schemes = ["file"];
+
+    /// <summary>
+    /// The Unix epoch as <see cref="WholeSeconds" /> counts it: the value libcurl holds as a
+    /// <c>time_t</c> of 0.
+    /// </summary>
+    private static readonly long UnixEpochWholeSeconds = WholeSeconds(DateTimeOffset.UnixEpoch);
 
     private readonly IFileSystem fileSystem =
         fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
@@ -82,11 +116,13 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     /// file system call, as exit 36 (<see cref="CurlExitCode.BadDownloadResume" />) with
     /// the same message as a resume offset past the end of the file. It is a returned
     /// failure rather than an <see cref="ArgumentOutOfRangeException" />, unlike the guards
-    /// on <see cref="ByteRange" />: the command line layer that will normally reject a
-    /// malformed <c>-C</c> value is not written yet, and a bad option should end a transfer
-    /// rather than the process. Checking it once, up here, is also what keeps a download and
-    /// an upload answering it identically, since below this point the two paths share
-    /// nothing.
+    /// on <see cref="ByteRange" />: the command line refuses a negative <c>-C</c> with exit 2
+    /// before any URL is looked at, so this branch only answers a context built by hand, and a
+    /// bad option should end a transfer rather than the process. It is kept as an unreachable
+    /// defensive default, not curl behaviour; ADR-0007 records why. Checking it once, up here,
+    /// is also what keeps a download and
+    /// an upload answering it identically, since below this point the two paths diverge
+    /// and meet again only in the shared chunked copy.
     /// </remarks>
     public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context)
     {
@@ -132,14 +168,37 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
 
         Stream source = opened.Content;
 
+        TransferResult result;
+
         await using (source.ConfigureAwait(false))
         {
-            return await DownloadFromAsync(context, source, opened).ConfigureAwait(false);
+            result = await DownloadFromAsync(context, source, opened).ConfigureAwait(false);
         }
+
+        // -R/--remote-time is applied by whoever owns the output file, so a successful
+        // download hands the source's timestamp back in whole seconds, the resolution
+        // curl 8.21.0 applies it at. A failure carries none.
+        return result.IsSuccess
+            ? result with { SourceLastWriteTimeUtc = TruncateToWholeSeconds(opened.LastWriteTimeUtc) }
+            : result;
     }
 
     /// <summary>
-    /// Emits the headers, applies every option that can stop the body, then moves it.
+    /// Drops everything below the second from a timestamp, keeping its offset.
+    /// </summary>
+    /// <param name="timestamp">The timestamp, or <see langword="null" /> when unknown.</param>
+    /// <returns>
+    /// The timestamp with zero sub-second ticks, or <see langword="null" /> when
+    /// <paramref name="timestamp" /> is.
+    /// </returns>
+    private static DateTimeOffset? TruncateToWholeSeconds(DateTimeOffset? timestamp) =>
+        timestamp is { } value
+            ? new DateTimeOffset(value.Ticks - (value.Ticks % TimeSpan.TicksPerSecond), value.Offset)
+            : null;
+
+    /// <summary>
+    /// Applies the time condition, emits the headers, applies every other option that can
+    /// stop the body, then moves it.
     /// </summary>
     /// <param name="context">The transfer being performed.</param>
     /// <param name="source">The opened source, which this method does not dispose.</param>
@@ -150,14 +209,17 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
         Stream source,
         FileOpenResult opened)
     {
-        if (!await TryWriteHeadersAsync(context, opened).ConfigureAwait(false))
+        if (!MeetsTimeCondition(context.TimeCondition, opened.LastWriteTimeUtc))
         {
-            return TransferResult.Failure(
-                CurlExitCode.WriteError,
-                FileTransferMessages.OutputWriteFailed);
+            return TransferResult.Success(0);
         }
 
-        if (context.NoBody || !MeetsTimeCondition(context.TimeCondition, opened.LastWriteTimeUtc))
+        if (await WriteHeadersAsync(context, opened).ConfigureAwait(false) is { } headerFailure)
+        {
+            return headerFailure;
+        }
+
+        if (context.NoBody)
         {
             return TransferResult.Success(0);
         }
@@ -174,14 +236,33 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
 
         if (start > 0)
         {
+            // A character device or a FIFO - file:///dev/stdin - opens as a stream that
+            // cannot seek, and Seek would throw NotSupportedException out of a handler that
+            // promises to return every transfer failure. curl 8.21.0's lib/file.c answers a
+            // failed lseek with exit 36, so this does too.
+            if (!source.CanSeek)
+            {
+                return TransferResult.Failure(
+                    CurlExitCode.BadDownloadResume,
+                    FileTransferMessages.ResumeFailed);
+            }
+
             source.Seek(start, SeekOrigin.Begin);
         }
 
         return await CopyAsync(
                 source,
                 context.Output,
+                ChunkSize,
+                ChunkSize,
                 count,
-                FileTransferMessages.OutputWriteFailed,
+                context.MaxFileSize is > 0 and long maxFileSize ? maxFileSize : long.MaxValue,
+                static chunk => chunk,
+                static (_, transferred) => TransferResult.Success(transferred),
+                static (offered, transferred) => TransferResult.Failure(
+                    CurlExitCode.WriteError,
+                    FileTransferMessages.OutputWriteFailed(offered),
+                    transferred),
                 context.CancellationToken)
             .ConfigureAwait(false);
     }
@@ -208,7 +289,7 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
             : FileWriteMode.Truncate;
 
         var opened = await fileSystem
-            .OpenForWriteAsync(path.OsPath, mode, context.CancellationToken)
+            .OpenForWriteAsync(path.OsPath, mode, context.CreateFileMode, context.CancellationToken)
             .ConfigureAwait(false);
 
         if (!opened.IsOpen || opened.Content is null)
@@ -227,7 +308,8 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     }
 
     /// <summary>
-    /// Skips whatever <c>-C</c>/<c>--continue-at</c> asked for, then moves the body.
+    /// Skips whatever <c>-C</c>/<c>--continue-at</c> asked for, then moves the body,
+    /// converting line endings on the way when <c>--crlf</c> asked for it.
     /// </summary>
     /// <param name="context">The transfer being performed.</param>
     /// <param name="upload">The stream to upload from.</param>
@@ -238,65 +320,130 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
         Stream upload,
         Stream destination)
     {
-        bool skipped = await TrySkipAsync(
-                upload,
-                context.ResumeFrom ?? 0,
-                context.CancellationToken)
+        // curl knows the length of a -T file and not of standard input, and only a known
+        // length turns a failed read into exit 26; the curl tool reports a failed read as the
+        // end of the file, so with no length to fall short of, the upload simply ends there.
+        long? needed = upload.CanSeek ? upload.Length - upload.Position : null;
+        long skip = context.ResumeFrom ?? 0;
+
+        bool skipped = await TrySkipAsync(upload, skip, context.CancellationToken)
             .ConfigureAwait(false);
 
         if (!skipped)
         {
-            return TransferResult.Failure(CurlExitCode.ReadError, FileTransferMessages.ReadFailed);
+            return TransferResult.Success(0);
         }
+
+        // curl reads the source in UploadChunkSize chunks from its start, skipped bytes
+        // included, so the first read after a -C skip only reaches the next chunk boundary,
+        // and a failed read reports the boundary it started from: measured with a 200000-byte
+        // source unreadable from byte 150000, -C 10, -C 70000 and -C 140000 all print
+        // only 131072/200000, with size_upload 131062, 61072 and 0.
+        int firstChunkSize = UploadChunkSize - (int)(skip % UploadChunkSize);
+
+        // A fresh converter per upload, so the carriage return it remembers never leaks
+        // from one transfer into the next. Bytes skipped by -C are not seen by it.
+        Func<ReadOnlyMemory<byte>, ReadOnlyMemory<byte>> convertChunk = context.ConvertLineEndings
+            ? new CrlfUploadConverter(UploadChunkSize).Convert
+            : static chunk => chunk;
 
         return await CopyAsync(
                 upload,
                 destination,
+                UploadChunkSize,
+                firstChunkSize,
                 long.MaxValue,
-                FileTransferMessages.DestinationWriteFailed,
+                long.MaxValue,
+                convertChunk,
+                (consumed, transferred) => needed is { } length
+                    ? new TransferResult(
+                        CurlExitCode.ReadError,
+                        transferred,
+                        FileTransferMessages.UploadSourceReadFailed(
+                            (skip + consumed) / UploadChunkSize * UploadChunkSize,
+                            length))
+                    : TransferResult.Success(transferred),
+                static (_, transferred) => new TransferResult(
+                    CurlExitCode.SendError,
+                    transferred,
+                    FileTransferMessages.DestinationWriteFailed),
                 context.CancellationToken)
             .ConfigureAwait(false);
     }
 
     /// <summary>
-    /// Moves up to <paramref name="count" /> bytes in <see cref="ChunkSize" /> chunks,
+    /// Moves up to <paramref name="count" /> bytes in <paramref name="chunkSize" /> chunks,
     /// telling a failed read apart from a failed write.
     /// </summary>
     /// <param name="source">Where the bytes come from.</param>
     /// <param name="destination">Where they go.</param>
+    /// <param name="chunkSize">
+    /// The most to read at once: <see cref="ChunkSize" /> for a download,
+    /// <see cref="UploadChunkSize" /> for an upload.
+    /// </param>
+    /// <param name="firstChunkSize">
+    /// The most to read the first time, which is <paramref name="chunkSize" /> unless an
+    /// upload's <c>-C</c> skip left the source part-way into a chunk.
+    /// </param>
     /// <param name="count">
-    /// How many bytes at most, or <see cref="long.MaxValue" /> to run to the end of
+    /// How many bytes at most to read, or <see cref="long.MaxValue" /> to run to the end of
     /// <paramref name="source" />.
     /// </param>
-    /// <param name="writeErrorMessage">The message to report if a write fails.</param>
+    /// <param name="maxWritten">
+    /// How many bytes at most to write, <c>--max-filesize</c>, or <see cref="long.MaxValue" />
+    /// for no limit. A chunk that would pass it is written only up to it, and the copy then
+    /// fails with exit 63, as curl 8.21.0 does.
+    /// </param>
+    /// <param name="convertChunk">
+    /// Turns each chunk read into the chunk written: the chunk itself, or its
+    /// <c>--crlf</c> conversion on an upload.
+    /// </param>
+    /// <param name="reportReadFailure">
+    /// Builds the outcome of a failed read, from the bytes read and the bytes written
+    /// before it. Every direction answers this differently, and one of the answers is
+    /// success.
+    /// </param>
+    /// <param name="reportWriteFailure">
+    /// Builds the outcome of a failed write, from the size of the chunk offered and the
+    /// bytes written before it.
+    /// </param>
     /// <param name="cancellationToken">Cancels the copy.</param>
     /// <returns>
-    /// A success carrying the number of bytes moved, exit 26 for a failed read or exit 23
-    /// for a failed write.
+    /// A success carrying the number of bytes written, which after a <c>--crlf</c>
+    /// conversion is more than were read, as curl 8.21.0's <c>size_upload</c> is; whatever
+    /// <paramref name="reportReadFailure" /> or <paramref name="reportWriteFailure" /> makes
+    /// of a failure; or exit 63 carrying the bytes written when there was more to write
+    /// than <paramref name="maxWritten" />.
     /// </returns>
     private static async ValueTask<TransferResult> CopyAsync(
         Stream source,
         Stream destination,
+        int chunkSize,
+        int firstChunkSize,
         long count,
-        string writeErrorMessage,
+        long maxWritten,
+        Func<ReadOnlyMemory<byte>, ReadOnlyMemory<byte>> convertChunk,
+        Func<long, long, TransferResult> reportReadFailure,
+        Func<long, long, TransferResult> reportWriteFailure,
         CancellationToken cancellationToken)
     {
-        byte[] buffer = new byte[ChunkSize];
+        byte[] buffer = new byte[chunkSize];
+        long consumed = 0;
         long transferred = 0;
+        int nextChunkSize = firstChunkSize;
 
-        while (transferred < count)
+        while (consumed < count)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            int wanted = (int)Math.Min(ChunkSize, count - transferred);
+            int wanted = (int)Math.Min(nextChunkSize, count - consumed);
+            nextChunkSize = chunkSize;
             int read = await TryReadAsync(source, buffer, wanted, cancellationToken)
                 .ConfigureAwait(false);
 
             if (read < 0)
             {
-                return TransferResult.Failure(
-                    CurlExitCode.ReadError,
-                    FileTransferMessages.ReadFailed);
+                return reportReadFailure(consumed, transferred);
             }
 
             if (read == 0)
@@ -304,18 +451,26 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
                 break;
             }
 
-            bool written = await TryWriteAsync(
-                    destination,
-                    buffer.AsMemory(0, read),
-                    cancellationToken)
-                .ConfigureAwait(false);
+            ReadOnlyMemory<byte> chunk = convertChunk(buffer.AsMemory(0, read));
+            int allowed = (int)Math.Min(chunk.Length, maxWritten - transferred);
 
-            if (!written)
+            // At the limit exactly, the next chunk writes nothing at all, not an empty write.
+            if (allowed > 0
+                && !await TryWriteAsync(destination, chunk[..allowed], cancellationToken).ConfigureAwait(false))
             {
-                return TransferResult.Failure(CurlExitCode.WriteError, writeErrorMessage);
+                return reportWriteFailure(allowed, transferred);
             }
 
-            transferred += read;
+            consumed += read;
+            transferred += allowed;
+
+            if (allowed < chunk.Length)
+            {
+                return new TransferResult(
+                    CurlExitCode.FilesizeExceeded,
+                    transferred,
+                    FileTransferMessages.MaxFileSizeExceeded(maxWritten, transferred));
+            }
         }
 
         return TransferResult.Success(transferred);
@@ -401,7 +556,11 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     /// <param name="source">The stream to advance.</param>
     /// <param name="count">How many bytes to skip; zero or less does nothing.</param>
     /// <param name="cancellationToken">Cancels the skip.</param>
-    /// <returns><see langword="false" /> when a read failed.</returns>
+    /// <returns>
+    /// <see langword="false" /> when a read failed, which ends the upload as a success with
+    /// nothing sent: the curl tool reports a failed read of standard input as its end, and
+    /// an offset past the end of the source is the measured exit 0 with nothing written.
+    /// </returns>
     /// <remarks>
     /// The skip is relative to wherever the caller left the stream, so an upload source
     /// handed over already positioned keeps that position. An offset past the end of the
@@ -429,13 +588,13 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
             return true;
         }
 
-        byte[] buffer = new byte[ChunkSize];
+        byte[] buffer = new byte[UploadChunkSize];
 
         for (long skipped = 0; skipped < count;)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            int wanted = (int)Math.Min(ChunkSize, count - skipped);
+            int wanted = (int)Math.Min(UploadChunkSize, count - skipped);
             int read = await TryReadAsync(source, buffer, wanted, cancellationToken)
                 .ConfigureAwait(false);
 
@@ -456,43 +615,95 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     }
 
     /// <summary>
-    /// Writes curl's synthesised header block, when the caller asked for headers at all.
+    /// Writes curl's synthesised header block, when the caller asked for headers at all,
+    /// one line per write as curl does.
     /// </summary>
     /// <param name="context">The transfer being performed.</param>
     /// <param name="opened">The metadata that came with the open.</param>
-    /// <returns><see langword="false" /> when the header write failed.</returns>
-    private static async ValueTask<bool> TryWriteHeadersAsync(
+    /// <returns>
+    /// <see langword="null" /> when the headers were written or not asked for, otherwise
+    /// the exit 23 failure, reporting the length of the line that failed as the bytes
+    /// offered.
+    /// </returns>
+    private static async ValueTask<TransferResult?> WriteHeadersAsync(
         ITransferContext context,
         FileOpenResult opened)
     {
         if (context.HeaderOutput is not { } headerOutput)
         {
-            return true;
+            return null;
         }
 
-        byte[] headers = Encoding.ASCII.GetBytes(
-            FileTransferMessages.PseudoHeaders(opened.Length, opened.LastWriteTimeUtc));
+        foreach (string line in FileTransferMessages.PseudoHeaderLines(opened.Length, opened.LastWriteTimeUtc))
+        {
+            byte[] bytes = Encoding.ASCII.GetBytes(line);
 
-        return await TryWriteAsync(headerOutput, headers, context.CancellationToken)
-            .ConfigureAwait(false);
+            if (!await TryWriteAsync(headerOutput, bytes, context.CancellationToken).ConfigureAwait(false))
+            {
+                return TransferResult.Failure(
+                    CurlExitCode.WriteError,
+                    FileTransferMessages.HeaderWriteFailed(bytes.Length));
+            }
+        }
+
+        return null;
     }
 
     /// <summary>
     /// Applies <c>-z</c>/<c>--time-cond</c> to the timestamp the open reported.
     /// </summary>
     /// <param name="condition">The condition, or <see langword="null" /> for none.</param>
-    /// <param name="lastWriteTimeUtc">The file's last-write timestamp.</param>
+    /// <param name="lastWriteTimeUtc">
+    /// The file's last-write timestamp, or <see langword="null" /> when the file system
+    /// could not determine one.
+    /// </param>
     /// <returns>
     /// <see langword="true" /> when the body should be transferred. An unmet condition is
     /// a success with no body, not a failure.
     /// </returns>
+    /// <remarks>
+    /// Both operands are truncated to whole seconds, because curl sees a local file's
+    /// timestamp in whole seconds, and both comparisons are strict: at equality neither
+    /// direction transfers, as measured on curl 8.21.0. Truncation is this handler's
+    /// comparison rule; <see cref="TimeCondition" /> itself is left as the command line
+    /// parsed it. An unknown timestamp transfers whichever way the condition runs: a
+    /// condition that cannot be evaluated must not silently suppress the data, which is
+    /// what libcurl 8.21.0's <c>Curl_meets_timecondition</c> does for an unknown document
+    /// time. That function also reads a <c>time_t</c> of 0 on either side as unknown, so a
+    /// timestamp or a condition date that truncates to the whole second of the Unix epoch
+    /// transfers too, whichever way the condition runs. The epoch is unknown only here:
+    /// the <c>Last-Modified</c> header line still reports it.
+    /// </remarks>
     private static bool MeetsTimeCondition(
         TimeCondition? condition,
-        DateTimeOffset lastWriteTimeUtc) =>
-        condition is null
-        || (condition.Kind == TimeConditionKind.IfModifiedSince
-            ? lastWriteTimeUtc > condition.Value
-            : lastWriteTimeUtc <= condition.Value);
+        DateTimeOffset? lastWriteTimeUtc)
+    {
+        if (condition is null || lastWriteTimeUtc is not { } knownLastWriteTimeUtc)
+        {
+            return true;
+        }
+
+        long fileSeconds = WholeSeconds(knownLastWriteTimeUtc);
+        long conditionSeconds = WholeSeconds(condition.Value);
+
+        if (fileSeconds == UnixEpochWholeSeconds || conditionSeconds == UnixEpochWholeSeconds)
+        {
+            return true;
+        }
+
+        return condition.Kind == TimeConditionKind.IfModifiedSince
+            ? fileSeconds > conditionSeconds
+            : fileSeconds < conditionSeconds;
+    }
+
+    /// <summary>
+    /// Counts the whole seconds from <see cref="DateTimeOffset.MinValue" /> to
+    /// <paramref name="value" /> in UTC, dropping any fraction of a second.
+    /// </summary>
+    /// <param name="value">The timestamp to truncate.</param>
+    /// <returns>The timestamp as a count of whole seconds.</returns>
+    private static long WholeSeconds(DateTimeOffset value) =>
+        value.UtcTicks / TimeSpan.TicksPerSecond;
 
     /// <summary>
     /// Turns <c>-C</c>/<c>--continue-at</c> or <c>-r</c>/<c>--range</c> into the window of
@@ -508,8 +719,9 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     /// </param>
     /// <returns>
     /// <see langword="false" /> when the start is strictly past the end of the file, which
-    /// is exit 36. A start exactly equal to the length is a success sending nothing, and
-    /// <c>-C</c> wins over <c>-r</c> when a caller somehow supplies both. A negative
+    /// is exit 36. A start exactly equal to the length is a success sending nothing. The
+    /// command line refuses <c>-C</c> with <c>-r</c> (exit 2, as curl 8.21.0 does), so a
+    /// context carrying both never comes from it; built by hand, <c>-C</c> wins. A negative
     /// <see cref="ITransferContext.ResumeFrom" /> never arrives here: <see cref="ExecuteAsync" />
     /// has already refused it.
     /// </returns>
