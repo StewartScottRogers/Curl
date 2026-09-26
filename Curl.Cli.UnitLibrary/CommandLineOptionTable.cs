@@ -55,9 +55,9 @@ public static class CommandLineOptionTable
         CommandLineOption.Value("create-file-mode", null, SetCreateFileMode),
         CommandLineOption.NegatableFlag("insecure", 'k', (options, on) => options.Insecure = on),
         CommandLineOption.Value("cacert", null, SetCaCertificateFile),
-        CommandLineOption.Text("capath", null, (options, directory) => options.CaCertificateDirectory = directory),
-        CommandLineOption.Text("cert", 'E', (options, certificate) => options.ClientCertificate = certificate),
-        CommandLineOption.Text("key", null, (options, key) => options.PrivateKey = key),
+        CommandLineOption.FileName("capath", null, (options, directory) => options.CaCertificateDirectory = directory),
+        CommandLineOption.FileName("cert", 'E', (options, certificate) => options.ClientCertificate = certificate),
+        CommandLineOption.FileName("key", null, (options, key) => options.PrivateKey = key),
         CommandLineOption.Flag("tlsv1.2", null, options => options.MinimumTlsVersion = SslProtocols.Tls12),
         CommandLineOption.Flag("tlsv1.3", null, options => options.MinimumTlsVersion = SslProtocols.Tls13),
         CommandLineOption.Text("ciphers", null, (options, ciphers) => options.Ciphers = ciphers),
@@ -154,9 +154,11 @@ public static class CommandLineOptionTable
     /// Records a <c>--cacert</c> value when a file or directory exists at it, and otherwise refuses
     /// it with curl 8.21.0's three lines. An empty value is checked like any other, so it is refused
     /// as a missing file, not as blank. A directory passes here; curl fails it later, at handshake.
+    /// A value that looks like a flag gets curl's filename warning first, whether or not it exists.
     /// </summary>
     private static CommandLineRefusal? SetCaCertificateFile(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
     {
+        CommandLineOption.WarnWhenFileNameLooksLikeFlag(options, value);
         if (!pathExists(value))
         {
             return CommandLineRefusal.FileDoesNotExist(spelledOption, "--cacert", value);

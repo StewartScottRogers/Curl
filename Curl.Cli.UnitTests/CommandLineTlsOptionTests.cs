@@ -239,6 +239,57 @@ public sealed class CommandLineTlsOptionTests
         AssertRefused(result, $"curl: option {spelledOption}: blank argument where content is expected");
     }
 
+    [TestMethod]
+    [DataRow("--cert")]
+    [DataRow("-E")]
+    [DataRow("--key")]
+    [DataRow("--capath")]
+    public void Parse_FileNameOptionGivenFlagLikeValue_AcceptsWithFileNameWarning(string spelledOption)
+    {
+        CommandLineParseResult result = CommandLineParser.Parse([spelledOption, "-x", Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        CollectionAssert.AreEqual(
+            new[] { "Warning: The filename argument '-x' looks like a flag." },
+            result.WarningLines.ToArray());
+    }
+
+    [TestMethod]
+    public void Parse_CiphersGivenFlagLikeValue_AcceptsWithoutWarning()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--ciphers", "-x", Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual("-x", result.Options.Ciphers);
+        Assert.IsEmpty(result.WarningLines);
+    }
+
+    [TestMethod]
+    public void Parse_CacertGivenFlagLikeFileThatExists_AcceptsWithFileNameWarning()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--cacert", "-x", Url], EveryPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual("-x", result.Options.CaCertificateFile);
+        CollectionAssert.AreEqual(
+            new[] { "Warning: The filename argument '-x' looks like a flag." },
+            result.WarningLines.ToArray());
+    }
+
+    [TestMethod]
+    public void Parse_CacertGivenFlagLikeFileThatDoesNotExist_RefusesAfterFileNameWarning()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--cacert", "-x", Url], NoPathExists);
+
+        AssertRefused(
+            result,
+            "curl: The file '-x' provided to --cacert does not exist",
+            "curl: option --cacert: is badly used here");
+        CollectionAssert.AreEqual(
+            new[] { "Warning: The filename argument '-x' looks like a flag." },
+            result.WarningLines.ToArray());
+    }
+
     private static void AssertRefused(CommandLineParseResult result, params string[] expectedLinesBeforeTryHelp)
     {
         Assert.IsFalse(result.IsAccepted);

@@ -140,13 +140,25 @@ public sealed class CommandLineOption
 
         return Text(longName, shortName, (options, fileName) =>
         {
-            if (fileName.Length > 1 && fileName[0] == '-')
-            {
-                options.AddWarningLinesUnlessSilent([CommandLineWarning.FileNameLooksLikeFlag(fileName)]);
-            }
-
+            WarnWhenFileNameLooksLikeFlag(options, fileName);
             set(options, fileName);
         });
+    }
+
+    /// <summary>
+    /// Adds <see cref="CommandLineWarning.FileNameLooksLikeFlag(string)"/> to the warning lines when
+    /// <paramref name="fileName"/> starts with <c>-</c> and is longer than that one character, unless
+    /// <c>-s</c> / <c>--silent</c> has been read already. <see cref="FileName"/> rows call it, and so
+    /// does <c>--cacert</c>, which warns before it checks that the file exists.
+    /// </summary>
+    /// <param name="options">The options being filled in.</param>
+    /// <param name="fileName">The file name as given on the command line.</param>
+    internal static void WarnWhenFileNameLooksLikeFlag(CommandLineOptions options, string fileName)
+    {
+        if (fileName.Length > 1 && fileName[0] == '-')
+        {
+            options.AddWarningLinesUnlessSilent([CommandLineWarning.FileNameLooksLikeFlag(fileName)]);
+        }
     }
 
     /// <summary>
