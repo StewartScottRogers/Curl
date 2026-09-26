@@ -8,7 +8,7 @@ depends-on: [BL-114]
 touches: [Curl.Protocol.File.UnitLibrary, Curl.Protocol.File.UnitTests]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-116 — Report the accepted byte count in the file protocol's failed output write message
 
@@ -54,22 +54,40 @@ complexity 10 and the library at 100% line and branch coverage.
 
 ## Acceptance criteria
 
-- [ ] `FileTransferMessages.OutputWriteFailed` takes the accepted count as a parameter;
+- [x] `FileTransferMessages.OutputWriteFailed` takes the accepted count as a parameter;
       no literal `returned 0` remains in `FileTransferMessages.cs`, and its remarks state
       where the count comes from.
-- [ ] A test in `Curl.Protocol.File.UnitTests` whose output stream throws
+- [x] A test in `Curl.Protocol.File.UnitTests` whose output stream throws
       `OutputWriteFailedException` with `BytesAccepted` 96 on the first chunk of a
       4096-byte file gets `CurlExitCode.WriteError` and message exactly
       `Failure writing output to destination, passed 4096 returned 96`.
-- [ ] Tests whose output stream throws `OutputWriteFailedException` with `BytesAccepted` 0
+- [x] Tests whose output stream throws `OutputWriteFailedException` with `BytesAccepted` 0
       reproduce the measured lines for 4096, 16385 and 20000-byte files byte for byte:
       `Failure writing output to destination, passed 4096 returned 0`, `... passed 16384
       returned 0` and `... passed 16384 returned 0`.
-- [ ] A test whose output stream throws a plain `IOException` still gets `returned 0`.
-- [ ] `dotnet build Curl.Protocol.File.UnitLibrary -warnaserror` is clean and
+- [x] A test whose output stream throws a plain `IOException` still gets `returned 0`.
+- [x] `dotnet build Curl.Protocol.File.UnitLibrary -warnaserror` is clean and
       `dotnet test --filter "TestCategory!=Integration"` is green.
 
 ## Notes
+
+- Delivered directly rather than through the full `/feature` stage agents: the change is
+  one message parameter and one catch clause inside one library, and the task's Context
+  already fixed the design. Choice taken unattended on 2026-09-26.
+- `TryWriteAsync` now returns `int?`: `null` when the write succeeded, otherwise the bytes
+  the destination accepted (`OutputWriteFailedException.BytesAccepted`, or 0 for any other
+  `IOException` or a stream that cancelled itself). The `-D` header path only tests for
+  `null`, so its message is unchanged; the upload path ignores the count, because its
+  exit 55 message carries none.
+- `BytesTransferred` on the download failure still counts only whole chunks written before
+  the failing one, not the bytes the failing write accepted. Unchanged on purpose: no
+  measurement shows curl adding them to `%{size_download}`, and the task is about the
+  message.
+- Tests: `ExecuteAsync_OutputReportsNothingAccepted_ReportsReturnedZero` (4096, 16385,
+  20000), `ExecuteAsync_OutputReportsAPartialAcceptance_ReportsTheAcceptedCount`,
+  `ExecuteAsync_OutputThrowsAPlainIOException_ReportsReturnedZero` and
+  `ExecuteAsync_UploadDestinationReportsAPartialAcceptance_ReportsSendError`; the fake
+  `FaultingStream` gained `FailingOnWriteAccepting`. File tests 257 passed.
 
 ## Log
 
@@ -78,3 +96,4 @@ complexity 10 and the library at 100% line and branch coverage.
 - 2026-09-26: Doing -> Blocked. Stewart: dark factory run ended in Doing, exit 1; see logs\BL-116-20260926-083111-L3.jsonl
 - 2026-09-26: Blocked -> Backlog. Not blocked: the 2026-09-26 shift ran out of tokens (usage limit), which it misfiled as a stall
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. file:// output write failures report returned M from OutputWriteFailedException.BytesAccepted, 0 for a plain IOException
