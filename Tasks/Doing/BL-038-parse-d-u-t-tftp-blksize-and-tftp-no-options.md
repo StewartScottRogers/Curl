@@ -66,3 +66,4 @@ Scope limits, each to be filed as its own task during the run rather than guesse
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
