@@ -17,7 +17,15 @@ namespace Curl.Networking;
 /// the server's chain may lead to, in place of the system store; <see langword="null" />
 /// verifies against the system store. Ignored when <paramref name="Insecure" /> is set.
 /// </param>
+/// <param name="CaCertificateDirectory">
+/// curl's <c>--capath</c>: a directory of PEM certificate files. The OpenSSL build of curl
+/// adds every certificate in it to the roots the server's chain may lead to; the Schannel
+/// build ignores it with a warning (<see cref="SslStreamTlsProvider.Warnings" />), as
+/// ADR-0009 decides. <see langword="null" /> when not given. Ignored when
+/// <paramref name="Insecure" /> is set.
+/// </param>
 public sealed record TlsClientOptions(
     bool Insecure = false,
     TlsMinimumVersion MinimumVersion = TlsMinimumVersion.SystemDefault,
-    string? CaCertificateFile = null);
+    string? CaCertificateFile = null,
+    string? CaCertificateDirectory = null);

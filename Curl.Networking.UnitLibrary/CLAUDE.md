@@ -15,8 +15,15 @@ UDP `Socket`. `SslStreamTlsProvider` (behind `ITlsProvider`, configured by
 `TlsClientOptions`) is the only type that constructs an `SslStream`; it runs the
 handshake over the plaintext `IConnection` through the internal `ConnectionStream`
 adapter and returns an `SslStreamConnection`. With `--cacert` (`TlsClientOptions.CaCertificateFile`)
-it trusts only the certificates in that PEM file. The messages for its exit 35, exit 60 and
-exit 77 live in `TlsFailureMessages` and nowhere else. No type here constructs an `HttpClient`.
+it trusts only the certificates in that PEM file. Per ADR-0009 it behaves like the curl
+build the platform usually runs, the Schannel build on Windows and the OpenSSL build
+elsewhere; its internal constructor names the build so tests pin both on any platform.
+The builds differ in message text, in which `--cacert` files are exit 77, and in `--capath`
+(`TlsClientOptions.CaCertificateDirectory`): the OpenSSL build trusts its certificates, the
+Schannel build ignores it and reports the two warning lines in `SslStreamTlsProvider.Warnings`
+for the console to print. The messages for its exit 35, exit 60 and exit 77 live in
+`TlsFailureMessages` and nowhere else; the `More details here` block after an exit 60 is
+the console's to print. No type here constructs an `HttpClient`.
 
 Everything else takes the Abstractions contracts (`IDnsResolver`, `ITlsProvider`,
 `IConnection`, `IDatagramChannel`) or `ITcpDialer`, plus an injected `TimeProvider`, so the tests in

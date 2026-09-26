@@ -14,6 +14,7 @@ public sealed class TlsClientOptionsTests
         Assert.IsFalse(options.Insecure);
         Assert.AreEqual(TlsMinimumVersion.SystemDefault, options.MinimumVersion);
         Assert.IsNull(options.CaCertificateFile);
+        Assert.IsNull(options.CaCertificateDirectory);
     }
 
     [TestMethod]
@@ -26,11 +27,13 @@ public sealed class TlsClientOptionsTests
             Insecure = true,
             MinimumVersion = TlsMinimumVersion.Tls13,
             CaCertificateFile = "ca.pem",
+            CaCertificateDirectory = "certs",
         };
 
         Assert.IsTrue(changed.Insecure);
         Assert.AreEqual(TlsMinimumVersion.Tls13, changed.MinimumVersion);
         Assert.AreEqual("ca.pem", changed.CaCertificateFile);
+        Assert.AreEqual("certs", changed.CaCertificateDirectory);
         Assert.AreEqual(new TlsClientOptions(), original);
     }
 }
