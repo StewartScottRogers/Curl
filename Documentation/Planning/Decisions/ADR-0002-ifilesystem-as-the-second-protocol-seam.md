@@ -107,3 +107,22 @@ Costs and caveats:
 2. `Documentation/Product/Product-Overview.md` — Rule 2 is amended to state that the
    transport is an injected seam: `IConnection` for the wire protocols, `IFileSystem`
    for `file`.
+
+## Amendment, 2026-09-26 — the timestamp is optional (BL-018)
+
+`FileOpenResult.LastWriteTimeUtc` is a `DateTimeOffset?`. `null` means the
+`IFileSystem` implementation could not determine a modification time for the opened
+handle; it does not mean the epoch, and `FileOpenResult.Failed` always reports `null`.
+An absent timestamp has two consequences for `file://`, both following upstream
+libcurl 8.21.0:
+
+- **`-z`/`--time-cond`** transfers the body whichever way the condition runs, as
+  `Curl_meets_timecondition` does for an unknown document time: a condition that
+  cannot be evaluated must not silently suppress data
+  (<https://curl.se/libcurl/c/CURLOPT_TIMECONDITION.html>).
+- **The header block** leaves out the whole `Last-Modified` line, so it is
+  `Content-Length: <n>\r\nAccept-ranges: bytes\r\n\r\n`; `lib/file.c` writes that line
+  only when the stat of the opened handle succeeded. This case could not be produced
+  from the curl 8.21.0 binary on Windows — `curl -sI file:///NUL` still prints
+  `Last-Modified: Thu, 01 Jan 1970 00:00:00 GMT` — so it rests on the upstream source,
+  not on a measurement.

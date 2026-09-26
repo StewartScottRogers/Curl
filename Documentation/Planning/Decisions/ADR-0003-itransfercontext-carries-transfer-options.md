@@ -74,3 +74,15 @@ Core and HTTP work (see `Documentation/Planning/Decisions/README.md` for the ADR
 process, and task BL-010 in `Tasks/` for the tracking item). Sources:
 <https://curl.se/docs/manpage.html> (`--path-as-is`) and
 <https://curl.se/docs/url-syntax.html>, both checked against curl 8.21.0.
+
+## Amendment, 2026-09-26 — an unknown timestamp under `-z` (BL-018)
+
+A handler deciding `TimeCondition` must also decide what an unknown last-write time
+means. For `file://` the timestamp is optional (`FileOpenResult.LastWriteTimeUtc` is a
+`DateTimeOffset?`, see ADR-0002's amendment of the same date), and an unknown one
+transfers the body under either `TimeConditionKind`, matching libcurl 8.21.0's
+`Curl_meets_timecondition`: a condition that cannot be evaluated does not suppress
+data. The same absence drops the `Last-Modified` line from the `HeaderOutput` block
+rather than printing a made-up date. Sources: <https://curl.se/docs/manpage.html>
+(`-z`, `--time-cond`) and <https://curl.se/libcurl/c/CURLOPT_TIMECONDITION.html>,
+checked against curl 8.21.0.
