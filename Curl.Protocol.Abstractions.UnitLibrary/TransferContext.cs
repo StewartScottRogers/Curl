@@ -47,6 +47,9 @@ public sealed class TransferContext : ITransferContext
     public bool TftpNoOptions { get; init; }
 
     /// <inheritdoc />
+    public bool ConvertLineEndings { get; init; }
+
+    /// <inheritdoc />
     public TimeProvider TimeProvider { get; init; } = TimeProvider.System;
 
     /// <inheritdoc />

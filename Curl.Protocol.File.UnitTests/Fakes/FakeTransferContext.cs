@@ -47,6 +47,9 @@ public sealed class FakeTransferContext : ITransferContext
     /// <inheritdoc cref="ITransferContext.TftpNoOptions" />
     public bool TftpNoOptions { get; set; }
 
+    /// <inheritdoc cref="ITransferContext.ConvertLineEndings" />
+    public bool ConvertLineEndings { get; set; }
+
     /// <inheritdoc cref="ITransferContext.TimeProvider" />
     public TimeProvider TimeProvider { get; set; } =
         new FakeTimeProvider(FakeFileSystem.DefaultLastWriteTimeUtc);

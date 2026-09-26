@@ -128,6 +128,20 @@ public interface ITransferContext
     bool TftpNoOptions { get; }
 
     /// <summary>
+    /// Gets a value indicating whether <c>--crlf</c> was given, which converts each line
+    /// feed in an upload to a carriage return plus line feed; <see langword="false" /> when
+    /// not given.
+    /// </summary>
+    /// <remarks>
+    /// It applies to uploads only; a download ignores it. <c>file://</c> reads it, and
+    /// measured on curl 8.21.0 the conversion inserts a carriage return before a line feed
+    /// only when the byte before that line feed is not already one, so <c>a\r\nb</c> is
+    /// sent unchanged, a lone carriage return is left alone, and that state carries across
+    /// chunk boundaries. The upload's byte count is the converted count (ADR-0003).
+    /// </remarks>
+    bool ConvertLineEndings { get; }
+
+    /// <summary>
     /// Gets the time source. Injected so that timeout and retry behaviour is testable
     /// without a real delay.
     /// </summary>

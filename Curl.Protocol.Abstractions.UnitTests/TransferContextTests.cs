@@ -29,6 +29,7 @@ public sealed class TransferContextTests
         Assert.IsEmpty(context.TelnetOptions);
         Assert.IsNull(context.TftpBlockSize);
         Assert.IsFalse(context.TftpNoOptions);
+        Assert.IsFalse(context.ConvertLineEndings);
         Assert.AreSame(TimeProvider.System, context.TimeProvider);
         Assert.AreEqual(CancellationToken.None, context.CancellationToken);
     }
@@ -64,6 +65,7 @@ public sealed class TransferContextTests
             TelnetOptions = telnetOptions,
             TftpBlockSize = 70000,
             TftpNoOptions = true,
+            ConvertLineEndings = true,
             TimeProvider = timeProvider,
             CancellationToken = cancellation.Token,
         };
@@ -82,6 +84,7 @@ public sealed class TransferContextTests
         Assert.AreSame(telnetOptions, context.TelnetOptions);
         Assert.AreEqual(70000, context.TftpBlockSize);
         Assert.IsTrue(context.TftpNoOptions);
+        Assert.IsTrue(context.ConvertLineEndings);
         Assert.AreSame(timeProvider, context.TimeProvider);
         Assert.AreEqual(cancellation.Token, context.CancellationToken);
     }
