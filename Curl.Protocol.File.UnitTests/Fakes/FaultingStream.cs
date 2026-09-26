@@ -85,6 +85,27 @@ public sealed class FaultingStream : Stream, IRecordingStream
     }
 
     /// <summary>
+    /// Creates a forward-only readable stream over <paramref name="content" />, standing in
+    /// for standard input, whose <paramref name="readNumber" />th read throws.
+    /// </summary>
+    /// <param name="content">The content the earlier reads return.</param>
+    /// <param name="readNumber">The one-based read that fails.</param>
+    /// <returns>The stream.</returns>
+    public static FaultingStream FailingOnReadWithoutSeeking(byte[] content, int readNumber)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(readNumber);
+
+        return new FaultingStream(
+            new MemoryStream(content),
+            readNumber,
+            failingWriteNumber: 0,
+            readable: true,
+            writable: false,
+            seekable: false);
+    }
+
+    /// <summary>
     /// Creates a non-seekable writable stream whose <paramref name="writeNumber" />th
     /// write throws.
     /// </summary>

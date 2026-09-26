@@ -16,11 +16,9 @@ namespace Curl.Protocol.File;
 /// capitalised as HTTP spells them.
 /// </para>
 /// <para>
-/// The two messages curl does not print itself — a mid-transfer read failure and a
-/// failure writing to an upload destination — carry the text
-/// <c>curl_easy_strerror</c> gives for <c>CURLE_READ_ERROR</c> and
-/// <c>CURLE_WRITE_ERROR</c>, which is what <c>%{errormsg}</c> falls back to when no
-/// more specific message was set.
+/// There is no message for a download source that fails to be read after it opened:
+/// curl 8.21.0 treats that as the end of the file and exits 0, measured with the
+/// source under another process's byte-range lock.
 /// </para>
 /// </remarks>
 internal static class FileTransferMessages
@@ -77,16 +75,60 @@ internal static class FileTransferMessages
     internal const string CouldNotResumeDownload = "Could not resume download";
 
     /// <summary>
-    /// The exit 26 message for a source that opened and then failed to be read.
+    /// The exit 26 message for an upload source of known length that failed to be read
+    /// before all of it was sent.
     /// </summary>
-    internal const string ReadFailed = "Failed to open/read local data from file/application";
+    /// <param name="read">
+    /// The bytes read from the source before the failure, counting any skipped by
+    /// <c>-C</c>.
+    /// </param>
+    /// <param name="needed">The length of the source, which is what curl expected to send.</param>
+    /// <returns>The message to report.</returns>
+    /// <remarks>
+    /// <para>
+    /// Measured against curl 8.21.0 on Windows on 2026-09-26, with the source's bytes from
+    /// 99000 on held under a byte-range lock by another process so that the open succeeds
+    /// and a later read fails:
+    /// <c>curl -sS -T src.txt file:///Z:/repos/Curl.lanes/bl023tmp/out.txt</c> on a
+    /// 100000-byte <c>src.txt</c> printed
+    /// <c>curl: (26) client read function EOF fail, only 65536/100000 of needed bytes read</c>,
+    /// and <c>-C 10</c> and <c>--crlf</c> printed the same line. With the whole file
+    /// locked it printed <c>only 0/100000</c>.
+    /// </para>
+    /// <para>
+    /// The wording is libcurl's, not the tool's: the curl tool's read callback turns a
+    /// failed <c>read()</c> into end of file, and libcurl then reports an upload that
+    /// ended short of its known size. The libcurl <c>strerror</c> text,
+    /// <c>Failed to open/read local data from file/application</c>, is never printed on
+    /// this path; curl prints it only when the tool cannot open the <c>-T</c> file at all,
+    /// which happens before any handler runs. curl reads an upload 65536 bytes at a time
+    /// and this handler 16384, so the two agree on <paramref name="read" /> only where the
+    /// failure falls on a 64-kilobyte boundary.
+    /// </para>
+    /// </remarks>
+    internal static string UploadSourceReadFailed(long read, long needed) =>
+        "client read function EOF fail, only "
+        + read.ToString(CultureInfo.InvariantCulture)
+        + "/"
+        + needed.ToString(CultureInfo.InvariantCulture)
+        + " of needed bytes read";
 
     /// <summary>
-    /// The exit 23 message for an upload destination that opened and then failed to be
+    /// The exit 55 message for an upload destination that opened and then failed to be
     /// written to.
     /// </summary>
-    internal const string DestinationWriteFailed =
-        "Failed writing received data to disk/application";
+    /// <remarks>
+    /// Measured against curl 8.21.0 on Windows on 2026-09-26, with the destination held
+    /// under a byte-range lock by another process from byte 99000 on, so that the open and
+    /// the first write succeed and a later write fails:
+    /// <c>curl -sS -T src.txt file:///Z:/repos/Curl.lanes/bl023tmp/dest.txt</c> on a
+    /// 100000-byte <c>src.txt</c> printed <c>curl: (55) Failed sending data to the peer</c>
+    /// with <c>%{size_upload}</c> 65536, and so did <c>-a</c> and a lock from byte 0. It is
+    /// exit 55, <c>CURLE_SEND_ERROR</c>, not exit 23: libcurl's <c>file://</c> upload
+    /// treats the destination as the peer. The <c>CURLE_WRITE_ERROR</c> text,
+    /// <c>Failed writing received data to disk/application</c>, is not printed on this path.
+    /// </remarks>
+    internal const string DestinationWriteFailed = "Failed sending data to the peer";
 
     /// <summary>
     /// The exit 37 message for a source that could not be opened, whichever

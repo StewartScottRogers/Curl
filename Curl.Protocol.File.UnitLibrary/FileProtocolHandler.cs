@@ -30,8 +30,12 @@ namespace Curl.Protocol.File;
 /// The exit codes are curl's, not the nearest-looking ones: every failure to open a
 /// source is exit 37 (<see cref="CurlExitCode.FileCouldntReadFile" />) whatever the
 /// operating system said, never exit 78 or exit 9; a destination that will not open is
-/// exit 23 (<see cref="CurlExitCode.WriteError" />); a read that fails after the open is
-/// exit 26 (<see cref="CurlExitCode.ReadError" />); a download offset past the end of the
+/// exit 23 (<see cref="CurlExitCode.WriteError" />); a download source that fails to be
+/// read after the open ends the body there and exits 0, because curl treats the failed
+/// read as the end of the file; an upload source of known length that fails to be read
+/// is exit 26 (<see cref="CurlExitCode.ReadError" />), and one of unknown length - standard
+/// input - ends there with exit 0; an upload destination that fails to be written after
+/// the open is exit 55 (<see cref="CurlExitCode.SendError" />); a download offset past the end of the
 /// file is exit 36 (<see cref="CurlExitCode.BadDownloadResume" />), where an offset exactly
 /// equal to the length is a success with no bytes. A transfer failure is returned as a
 /// <see cref="TransferResult" /> and never thrown; only cancellation leaves this handler
@@ -229,7 +233,10 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
                 count,
                 context.MaxFileSize is > 0 and long maxFileSize ? maxFileSize : long.MaxValue,
                 static chunk => chunk,
-                FileTransferMessages.OutputWriteFailed,
+                static (_, transferred) => TransferResult.Success(transferred),
+                static (offered, _) => TransferResult.Failure(
+                    CurlExitCode.WriteError,
+                    FileTransferMessages.OutputWriteFailed(offered)),
                 context.CancellationToken)
             .ConfigureAwait(false);
     }
@@ -287,15 +294,18 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
         Stream upload,
         Stream destination)
     {
-        bool skipped = await TrySkipAsync(
-                upload,
-                context.ResumeFrom ?? 0,
-                context.CancellationToken)
+        // curl knows the length of a -T file and not of standard input, and only a known
+        // length turns a failed read into exit 26; the curl tool reports a failed read as the
+        // end of the file, so with no length to fall short of, the upload simply ends there.
+        long? needed = upload.CanSeek ? upload.Length - upload.Position : null;
+        long skip = context.ResumeFrom ?? 0;
+
+        bool skipped = await TrySkipAsync(upload, skip, context.CancellationToken)
             .ConfigureAwait(false);
 
         if (!skipped)
         {
-            return TransferResult.Failure(CurlExitCode.ReadError, FileTransferMessages.ReadFailed);
+            return TransferResult.Success(0);
         }
 
         // A fresh converter per upload, so the carriage return it remembers never leaks
@@ -310,7 +320,16 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
                 long.MaxValue,
                 long.MaxValue,
                 convertChunk,
-                static _ => FileTransferMessages.DestinationWriteFailed,
+                (consumed, transferred) => needed is { } length
+                    ? new TransferResult(
+                        CurlExitCode.ReadError,
+                        transferred,
+                        FileTransferMessages.UploadSourceReadFailed(skip + consumed, length))
+                    : TransferResult.Success(transferred),
+                static (_, transferred) => new TransferResult(
+                    CurlExitCode.SendError,
+                    transferred,
+                    FileTransferMessages.DestinationWriteFailed),
                 context.CancellationToken)
             .ConfigureAwait(false);
     }
@@ -334,15 +353,22 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     /// Turns each chunk read into the chunk written: the chunk itself, or its
     /// <c>--crlf</c> conversion on an upload.
     /// </param>
-    /// <param name="writeErrorMessage">
-    /// Builds the message to report if a write fails, from the size of the chunk offered.
+    /// <param name="reportReadFailure">
+    /// Builds the outcome of a failed read, from the bytes read and the bytes written
+    /// before it. Every direction answers this differently, and one of the answers is
+    /// success.
+    /// </param>
+    /// <param name="reportWriteFailure">
+    /// Builds the outcome of a failed write, from the size of the chunk offered and the
+    /// bytes written before it.
     /// </param>
     /// <param name="cancellationToken">Cancels the copy.</param>
     /// <returns>
     /// A success carrying the number of bytes written, which after a <c>--crlf</c>
-    /// conversion is more than were read, as curl 8.21.0's <c>size_upload</c> is; exit 26
-    /// for a failed read, exit 23 for a failed write, or exit 63 carrying the bytes written
-    /// when there was more to write than <paramref name="maxWritten" />.
+    /// conversion is more than were read, as curl 8.21.0's <c>size_upload</c> is; whatever
+    /// <paramref name="reportReadFailure" /> or <paramref name="reportWriteFailure" /> makes
+    /// of a failure; or exit 63 carrying the bytes written when there was more to write
+    /// than <paramref name="maxWritten" />.
     /// </returns>
     private static async ValueTask<TransferResult> CopyAsync(
         Stream source,
@@ -350,7 +376,8 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
         long count,
         long maxWritten,
         Func<ReadOnlyMemory<byte>, ReadOnlyMemory<byte>> convertChunk,
-        Func<long, string> writeErrorMessage,
+        Func<long, long, TransferResult> reportReadFailure,
+        Func<long, long, TransferResult> reportWriteFailure,
         CancellationToken cancellationToken)
     {
         byte[] buffer = new byte[ChunkSize];
@@ -367,9 +394,7 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
 
             if (read < 0)
             {
-                return TransferResult.Failure(
-                    CurlExitCode.ReadError,
-                    FileTransferMessages.ReadFailed);
+                return reportReadFailure(consumed, transferred);
             }
 
             if (read == 0)
@@ -384,7 +409,7 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
             if (allowed > 0
                 && !await TryWriteAsync(destination, chunk[..allowed], cancellationToken).ConfigureAwait(false))
             {
-                return TransferResult.Failure(CurlExitCode.WriteError, writeErrorMessage(allowed));
+                return reportWriteFailure(allowed, transferred);
             }
 
             consumed += read;
@@ -482,7 +507,11 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     /// <param name="source">The stream to advance.</param>
     /// <param name="count">How many bytes to skip; zero or less does nothing.</param>
     /// <param name="cancellationToken">Cancels the skip.</param>
-    /// <returns><see langword="false" /> when a read failed.</returns>
+    /// <returns>
+    /// <see langword="false" /> when a read failed, which ends the upload as a success with
+    /// nothing sent: the curl tool reports a failed read of standard input as its end, and
+    /// an offset past the end of the source is the measured exit 0 with nothing written.
+    /// </returns>
     /// <remarks>
     /// The skip is relative to wherever the caller left the stream, so an upload source
     /// handed over already positioned keeps that position. An offset past the end of the

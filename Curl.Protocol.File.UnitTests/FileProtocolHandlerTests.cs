@@ -44,17 +44,11 @@ public sealed class FileProtocolHandlerTests
     private const string CouldNotResumeDownloadMessage = "Could not resume download";
 
     /// <summary>
-    /// The exit 26 message for a source that opened and then failed to be read.
+    /// The exit 55 message for an upload destination that opened and then failed to be
+    /// written to, measured against curl 8.21.0 with the destination under another
+    /// process's byte-range lock.
     /// </summary>
-    private const string ReadFailedMessage =
-        "Failed to open/read local data from file/application";
-
-    /// <summary>
-    /// The exit 23 message for an upload destination that opened and then failed to be
-    /// written to.
-    /// </summary>
-    private const string DestinationWriteFailedMessage =
-        "Failed writing received data to disk/application";
+    private const string DestinationWriteFailedMessage = "Failed sending data to the peer";
 
     private static Uri FileUrl => new("file:///C:/dir/my%20file.txt");
 
@@ -558,22 +552,28 @@ public sealed class FileProtocolHandlerTests
             result.ErrorMessage);
     }
 
+    // curl 8.21.0 treats a download read that fails after the open as the end of the file:
+    // with the source under another process's byte-range lock it exits 0 with what it had.
     [TestMethod]
-    public async Task ExecuteAsync_SourceReadFails_ReportsReadError()
+    public async Task ExecuteAsync_SourceReadFailsMidBody_EndsTheBodyThereAndSucceeds()
     {
         var fileSystem = new FakeFileSystem();
-        byte[] content = Content;
-        fileSystem.AddFileReadingFrom(OsPath, FaultingStream.FailingOnRead(content, 1), content.Length);
-        var context = new FakeTransferContext { Url = FileUrl, Output = new ChunkRecordingStream() };
+        byte[] content = LargeContent();
+        fileSystem.AddFileReadingFrom(OsPath, FaultingStream.FailingOnRead(content, 2), content.Length);
+        var output = new ChunkRecordingStream();
+        var context = new FakeTransferContext { Url = FileUrl, Output = output };
         var handler = new FileProtocolHandler(fileSystem);
 
         var result = await handler.ExecuteAsync(context);
 
-        Assert.AreEqual(CurlExitCode.ReadError, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.IsNull(result.ErrorMessage);
+        Assert.AreEqual((long)ChunkSize, result.BytesTransferred);
+        CollectionAssert.AreEqual(content[..ChunkSize], output.ToArray());
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_UploadSourceReadFails_ReportsReadError()
+    public async Task ExecuteAsync_UploadSourceOfKnownLengthFailsOnFirstRead_ReportsClientReadEofFail()
     {
         var fileSystem = new FakeFileSystem();
         var context = new FakeTransferContext
@@ -586,6 +586,120 @@ public sealed class FileProtocolHandlerTests
         var result = await handler.ExecuteAsync(context);
 
         Assert.AreEqual(CurlExitCode.ReadError, result.ExitCode);
+        Assert.AreEqual(
+            "client read function EOF fail, only 0/10 of needed bytes read",
+            result.ErrorMessage);
+        Assert.AreEqual(0L, result.BytesTransferred);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_UploadSourceOfKnownLengthFailsMidBody_ReportsTheBytesReadOfTheLength()
+    {
+        var fileSystem = new FakeFileSystem();
+        var destination = new ChunkRecordingStream();
+        fileSystem.WriteInto(OsPath, destination);
+        byte[] content = LargeContent();
+        var context = new FakeTransferContext
+        {
+            Url = FileUrl,
+            Upload = FaultingStream.FailingOnRead(content, 2),
+        };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        var result = await handler.ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.ReadError, result.ExitCode);
+        Assert.AreEqual(
+            "client read function EOF fail, only 16384/40000 of needed bytes read",
+            result.ErrorMessage);
+        Assert.AreEqual((long)ChunkSize, result.BytesTransferred);
+        CollectionAssert.AreEqual(content[..ChunkSize], destination.ToArray());
+    }
+
+    // Measured: with -C 10 curl 8.21.0 still reports the whole file as needed and counts
+    // the skipped bytes as read.
+    [TestMethod]
+    public async Task ExecuteAsync_ResumedUploadSourceFailsMidBody_CountsTheSkippedBytesAsRead()
+    {
+        var fileSystem = new FakeFileSystem();
+        fileSystem.WriteInto(OsPath, new ChunkRecordingStream());
+        var context = new FakeTransferContext
+        {
+            Url = FileUrl,
+            Upload = FaultingStream.FailingOnRead(LargeContent(), 2),
+            ResumeFrom = 10,
+        };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        var result = await handler.ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.ReadError, result.ExitCode);
+        Assert.AreEqual(
+            "client read function EOF fail, only 16394/40000 of needed bytes read",
+            result.ErrorMessage);
+    }
+
+    // Standard input has no length to fall short of, so curl 8.21.0, whose read callback
+    // reports a failed read as the end of the file, uploads what it had and exits 0.
+    [TestMethod]
+    public async Task ExecuteAsync_UploadSourceOfUnknownLengthFailsMidBody_EndsTheUploadThereAndSucceeds()
+    {
+        var fileSystem = new FakeFileSystem();
+        var destination = new ChunkRecordingStream();
+        fileSystem.WriteInto(OsPath, destination);
+        byte[] content = LargeContent();
+        var context = new FakeTransferContext
+        {
+            Url = FileUrl,
+            Upload = FaultingStream.FailingOnReadWithoutSeeking(content, 2),
+        };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        var result = await handler.ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual((long)ChunkSize, result.BytesTransferred);
+        CollectionAssert.AreEqual(content[..ChunkSize], destination.ToArray());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_UnseekableUploadSourceFailsWhileSkippingTheResumeOffset_SucceedsWithNothingSent()
+    {
+        var fileSystem = new FakeFileSystem();
+        var destination = new ChunkRecordingStream();
+        fileSystem.WriteInto(OsPath, destination);
+        var context = new FakeTransferContext
+        {
+            Url = FileUrl,
+            Upload = FaultingStream.FailingOnReadWithoutSeeking(Content, 1),
+            ResumeFrom = 4,
+        };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        var result = await handler.ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(0L, result.BytesTransferred);
+        Assert.IsEmpty(destination.WriteLengths);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_UploadDestinationFailsMidBody_ReportsSendErrorWithTheBytesWritten()
+    {
+        var fileSystem = new FakeFileSystem();
+        fileSystem.WriteInto(OsPath, FaultingStream.FailingOnWrite(2));
+        var context = new FakeTransferContext
+        {
+            Url = FileUrl,
+            Upload = new TrackedMemoryStream(LargeContent()),
+        };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        var result = await handler.ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
+        Assert.AreEqual(DestinationWriteFailedMessage, result.ErrorMessage);
+        Assert.AreEqual((long)ChunkSize, result.BytesTransferred);
     }
 
     [TestMethod]
@@ -823,9 +937,10 @@ public sealed class FileProtocolHandlerTests
 
     // The other half of that catch: a stream that reports cancellation while the token is
     // untouched cancelled itself, which is a read failure and not the caller's
-    // cancellation. It stays a returned exit 26 rather than becoming a thrown exception.
+    // cancellation. A download read failure ends the body, so it stays a returned exit 0
+    // rather than becoming a thrown exception.
     [TestMethod]
-    public async Task ExecuteAsync_SourceThrowsTaskCanceledWithAnUncancelledToken_ReportsReadError()
+    public async Task ExecuteAsync_SourceThrowsTaskCanceledWithAnUncancelledToken_EndsTheBodyAndSucceeds()
     {
         var fileSystem = new FakeFileSystem();
         byte[] content = Content;
@@ -846,8 +961,8 @@ public sealed class FileProtocolHandlerTests
 
         var result = await handler.ExecuteAsync(context);
 
-        Assert.AreEqual(CurlExitCode.ReadError, result.ExitCode);
-        Assert.AreEqual(ReadFailedMessage, result.ErrorMessage);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(0L, result.BytesTransferred);
     }
 
     [TestMethod]
@@ -918,7 +1033,7 @@ public sealed class FileProtocolHandlerTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_UploadDestinationThrowsTaskCanceledWithAnUncancelledToken_ReportsWriteError()
+    public async Task ExecuteAsync_UploadDestinationThrowsTaskCanceledWithAnUncancelledToken_ReportsSendError()
     {
         var fileSystem = new FakeFileSystem();
         fileSystem.WriteInto(
@@ -936,7 +1051,7 @@ public sealed class FileProtocolHandlerTests
 
         var result = await handler.ExecuteAsync(context);
 
-        Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
         Assert.AreEqual(DestinationWriteFailedMessage, result.ErrorMessage);
     }
 
