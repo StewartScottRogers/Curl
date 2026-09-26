@@ -36,7 +36,7 @@ The messages for its exit 35, exit 43, exit 58, exit 59, exit 60 and exit 77 liv
 `TlsFailureMessages` and nowhere else; the `More details here` block after an exit 60 is
 the console's to print. No type here constructs an `HttpClient`.
 
-`TcpConnector` fills `ConnectResult.Timings` and `LocalEndPoint` per ADR-0029: it takes
+`TcpConnector` fills `ConnectResult.Timings` and `LocalEndPoint` per ADR-0030: it takes
 `Started`, `NameResolved` and `Connected` from its `TimeProvider`, the local end point from
 the `DialedTcpConnection` that `ITcpDialer` returns, and `TlsHandshakeCompleted` from the
 timings `SslStreamTlsProvider` reports on its own `TimeProvider`.

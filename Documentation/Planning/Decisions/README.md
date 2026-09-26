@@ -44,6 +44,7 @@ choices do not need one.
 | [0027](ADR-0027-multipart-form-bodies-are-built-as-libcurl-8-21-0-builds-them.md) | Multipart form bodies are built as libcurl 8.21.0 builds them: measured headers and bytes, files streamed, exit 26 before connecting | Accepted | 2026-09-26 |
 | [0028](ADR-0028-auth-scheme-ranking-follows-libcurl-with-no-fallback.md) | The auth scheme is ranked as libcurl ranks it - Negotiate, Bearer, Digest, NTLM, Basic - with no fallback from a scheme not built | Accepted | 2026-09-26 |
 | [0029](ADR-0029-output-options-pair-with-urls-as-curls-tool-pairs-them.md) | The output options pair with URLs as curl's tool pairs them: one list of URL and output entries, `--remote-name-all` a creation-time default, `-w @file` read as `-d @file` is | Accepted | 2026-09-26 |
+| [0030](ADR-0030-connect-timings-are-taken-by-the-connector-with-the-handshake-from-the-tls-provider.md) | Connect timings are taken by the connector, with the handshake's end from the TLS provider; the dialer reports the local end point | Accepted | 2026-09-26 |
 
 ## Template
 
