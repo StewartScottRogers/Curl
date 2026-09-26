@@ -48,3 +48,4 @@ opened; re-plan it if the command line layer puts that elsewhere.
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
