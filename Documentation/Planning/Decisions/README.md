@@ -33,6 +33,7 @@ choices do not need one.
 | [0016](ADR-0016-authentication-and-cookies-move-into-milestone-1.md) | `Curl.Authentication` and `Curl.Cookies` move into Milestone 1 | Accepted | 2026-09-26 |
 | [0017](ADR-0017-no-http-2-or-http-3-in-milestone-1.md) | No HTTP/2 or HTTP/3 in Milestone 1: `--http2`, `--http2-prior-knowledge` and `--http3` are refused as the reference build refuses them | Accepted | 2026-09-26 |
 | [0018](ADR-0018-the-mingw-curl-8-21-0-build-is-the-windows-http-reference.md) | The mingw build of curl 8.21.0 is the Windows reference for HTTP; Curl may differ from System32 `curl.exe` only where that build lacks a feature | Accepted | 2026-09-26 |
+| [0019](ADR-0019-numeric-option-ceiling-matches-the-platform-curl.md) | The ceiling of a numeric option matches the platform curl: 2^31-1 on Windows, 2^63-1 on Linux and macOS | Accepted | 2026-09-26 |
 
 ## Template
 

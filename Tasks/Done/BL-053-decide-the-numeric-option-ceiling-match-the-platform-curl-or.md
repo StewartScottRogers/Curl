@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation/Planning/Decisions]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-053 — Decide the numeric option ceiling
 
@@ -41,17 +41,25 @@ deliberate divergence from upstream on at least one platform, which needs an ADR
 
 ## Acceptance criteria
 
-- [ ] Stewart's choice is recorded as the next free ADR under
+- [x] Stewart's choice is recorded as the next free ADR under
       `Documentation/Planning/Decisions/`, stating the ceiling per platform, the upstream
       behaviour it matches or diverges from (curl 8.21.0), and that `--continue-at`
       reads a 64-bit value on every platform regardless.
-- [ ] `Documentation/Planning/Decisions/README.md` lists the new ADR.
-- [ ] If the decision requires a code change to `CommandLineNumber`, a Claude task for
+- [x] `Documentation/Planning/Decisions/README.md` lists the new ADR.
+- [x] If the decision requires a code change to `CommandLineNumber`, a Claude task for
       it exists in `Tasks/Backlog` depending on this one.
 
 ## Notes
 
 **Decision (Stewart, 2026-09-26):** Match the platform curl: 2^31-1 on Windows, 2^63-1 on Linux and macOS, as upstream's C `long` does. `--continue-at` reads a 64-bit value on every platform regardless.
+
+Recorded as ADR-0019 (Accepted), listed in the Decisions README. Written directly rather
+than through `align-and-document`: the ADR only records Stewart's decision and touches no
+`.cs` or project file, so no `verify` run is needed beyond the shift's build and fast tests.
+The code change is filed as BL-257 (`feature`, touches `Curl.Cli.UnitLibrary` and
+`Curl.Cli.UnitTests`, depends on BL-053): platform-dependent ceilings in `CommandLineNumber`
+for `ParseNonNegative`, `ParseMinusOneOrMore` and `MaximumWholeSeconds`. BL-257 edits the
+board only, inside `Tasks/`, so no `touches` change was needed here.
 
 ## Log
 
@@ -60,3 +68,4 @@ deliberate divergence from upstream on at least one platform, which needs an ADR
 - 2026-09-26: Backlog -> Doing.
 - 2026-09-26: Doing -> Backlog. Shift stopped while waiting for tokens (limit reset early); the run had not started
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. ADR-0019 records the platform-matched numeric ceiling (2^31-1 Windows, 2^63-1 Linux/macOS); code change filed as BL-257
