@@ -49,3 +49,4 @@ how a `gophers://` or `mqtts://` transfer verifies and negotiates TLS.
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
