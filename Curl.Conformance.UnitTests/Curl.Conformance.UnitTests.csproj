@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="MSTest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Curl.Conformance.UnitLibrary\Curl.Conformance.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Console\Curl.Console.csproj" />
+  </ItemGroup>
+
+</Project>
