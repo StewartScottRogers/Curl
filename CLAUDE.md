@@ -34,6 +34,10 @@ for any of it. Complexity is enforced at build time: the threshold lives in
 `coverage-auditor` agent measures the rest and files the gaps as tasks. Thresholds in
 `CodeMetricsConfig.txt` are Stewart's to change; never raise one to make code pass.
 
+## Git and GitHub
+All git and gh operations are delegated to github-operator. Never push, merge, or release
+without my confirmation.
+
 ## Task board
 Work is tracked as Markdown files in the `Tasks` shared project, one file per task, and
 the folder a task sits in is its status: `Backlog`, `Doing`, `Blocked`, `Deferred`,
