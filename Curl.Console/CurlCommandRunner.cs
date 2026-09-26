@@ -56,7 +56,8 @@ namespace Curl.Console;
 /// <remarks>
 /// <para>
 /// URLs are transferred in command-line order; a failure does not stop the rest, and the
-/// exit code is the last transfer's, as curl's is. The one exception is a resumed transfer
+/// exit code is the last transfer's, as curl's is. The exceptions are <c>--fail-early</c>,
+/// under which the first failure stops the run with its own exit code, and a resumed transfer
 /// whose <c>-o</c> file cannot be opened: curl stops the run there with exit 23. The first <c>-o</c> receives the first
 /// URL, the second the second, and so on. A failure's line is printed unless <c>-s</c> was
 /// given without <c>-S</c>, and only when the failure carries a message. An <c>-o</c> file
@@ -81,12 +82,13 @@ namespace Curl.Console;
 /// </para>
 /// <para>
 /// Each transfer's header lines go where <c>-D</c> says: standard output for <c>-D -</c>,
-/// otherwise the named file, opened before the transfer. A <c>-D</c> file that cannot be
+/// otherwise the named file, opened before the transfer. Under <c>-i</c> or <c>-I</c> they
+/// also go to the body output (<see cref="TransferContextFactory" />). A <c>-D</c> file that cannot be
 /// opened prints curl's <c>curl: Failed to open &lt;file&gt;</c>, under the same <c>-s</c> /
 /// <c>-S</c> rule as any failure, and stops the run with exit 23.
 /// </para>
 /// <para>
-/// A successful transfer is followed on standard error by the opening of curl's progress
+/// A successful transfer, or one <c>-f</c> failed with exit 22, is followed on standard error by the opening of curl's progress
 /// meter (<see cref="ProgressMeterLines.Opening" />), preceded by curl's
 /// <c>** Resuming transfer from byte position N</c> line when it resumed past byte zero.
 /// The meter is on standard error and the body is not, so writing it after the transfer
@@ -196,8 +198,7 @@ internal sealed class CurlCommandRunner(
     /// <param name="options">The accepted command line.</param>
     /// <returns>
     /// The last transfer's exit code, or <see cref="CurlExitCode.Ok" /> when there was none.
-    /// A resumed transfer whose <c>-o</c> file cannot be opened, or a transfer whose <c>-D</c>
-    /// file cannot be opened, is the last: the URLs after it are not transferred.
+    /// A transfer <see cref="EndsTheRun" /> names is the last: the URLs after it are not transferred.
     /// </returns>
     private async Task<CurlExitCode> TransferAllAsync(CommandLineOptions options)
     {
@@ -216,7 +217,7 @@ internal sealed class CurlCommandRunner(
                 await WriteErrorLineAsync(FormatErrorLine(result)).ConfigureAwait(false);
             }
 
-            if (ReferenceEquals(result, CannotOpenForResumeFailure) || ReferenceEquals(result, CannotOpenHeaderFileFailure))
+            if (EndsTheRun(options, result))
             {
                 break;
             }
@@ -224,6 +225,19 @@ internal sealed class CurlCommandRunner(
 
         return exitCode;
     }
+
+    /// <summary>
+    /// Tells whether a transfer's result stops the URLs after it: a resumed transfer whose
+    /// <c>-o</c> file cannot be opened, a transfer whose <c>-D</c> file cannot be opened, and,
+    /// under <c>--fail-early</c>, any failed transfer, as curl 8.21.0 does.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="result">The transfer's result.</param>
+    /// <returns><see langword="true" /> when no further URL is transferred.</returns>
+    private static bool EndsTheRun(CommandLineOptions options, TransferResult result) =>
+        ReferenceEquals(result, CannotOpenForResumeFailure)
+        || ReferenceEquals(result, CannotOpenHeaderFileFailure)
+        || (options.FailEarly && !result.IsSuccess);
 
     /// <summary>
     /// Tells whether failure lines are printed: always, unless <c>-s</c> was given without <c>-S</c>.
@@ -412,7 +426,11 @@ internal sealed class CurlCommandRunner(
     /// <see cref="ShowsProgressMeter" /> says it is shown.
     /// </summary>
     /// <param name="options">The accepted command line.</param>
-    /// <param name="result">The transfer's result; the meter follows only a success.</param>
+    /// <param name="result">
+    /// The transfer's result; the meter follows a success, and a <c>-f</c> failure
+    /// (<see cref="CurlExitCode.HttpReturnedError" />), which curl 8.21.0 reports after the
+    /// meter's opening lines.
+    /// </param>
     /// <param name="resumeFrom">The resolved <c>-C</c> offset, or <see langword="null" />.</param>
     /// <param name="toStandardOutput">Whether the transfer wrote its body to standard output.</param>
     /// <returns><paramref name="result" />, unchanged.</returns>
@@ -422,7 +440,8 @@ internal sealed class CurlCommandRunner(
         long? resumeFrom,
         bool toStandardOutput)
     {
-        if (result.IsSuccess && ShowsProgressMeter(options, toStandardOutput))
+        if ((result.IsSuccess || result.ExitCode == CurlExitCode.HttpReturnedError)
+            && ShowsProgressMeter(options, toStandardOutput))
         {
             await WriteErrorLinesAsync(ProgressMeterLines.Opening(resumeFrom)).ConfigureAwait(false);
         }
