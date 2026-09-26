@@ -50,3 +50,4 @@ throws.
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
 - 2026-09-26: Doing -> Backlog. Returned when the 4-lane shift was stopped to repair task IDs that parallel lanes had duplicated; no lane was working it.
+- 2026-09-26: Backlog -> Doing.
