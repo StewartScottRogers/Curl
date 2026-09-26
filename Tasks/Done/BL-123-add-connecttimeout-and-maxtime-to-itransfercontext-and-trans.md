@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Protocol.File.UnitTests, Documentation/Planning/Decisions]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-123 — Add ConnectTimeout and MaxTime to ITransferContext and TransferContext
 
@@ -44,17 +44,17 @@ can derive curl's timeouts from them.
 
 ## Acceptance criteria
 
-- [ ] `ITransferContext.ConnectTimeout` and `ITransferContext.MaxTime` exist as
+- [x] `ITransferContext.ConnectTimeout` and `ITransferContext.MaxTime` exist as
       `TimeSpan?` with XML doc comments stating the semantics above.
-- [ ] `TransferContext` implements both as `init` properties; a test in
+- [x] `TransferContext` implements both as `init` properties; a test in
       `Curl.Protocol.Abstractions.UnitTests/TransferContextTests.cs` asserts both default
       to `null` and that set values round-trip.
-- [ ] `FakeTransferContext` implements both; `Curl.Protocol.File.UnitTests` builds and
+- [x] `FakeTransferContext` implements both; `Curl.Protocol.File.UnitTests` builds and
       passes unchanged otherwise.
-- [ ] `Documentation/Planning/Decisions/ADR-0008-*.md` (or the next free number) records
+- [x] `Documentation/Planning/Decisions/ADR-0008-*.md` (or the next free number) records
       the addition, status Accepted, dated, citing ADR-0003 and ADR-0006; the index in
       `Documentation/Planning/Decisions/README.md` lists it.
-- [ ] `dotnet build -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"`
+- [x] `dotnet build -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"`
       is green, and `Curl.Protocol.Abstractions.UnitLibrary` keeps 100% line and branch
       coverage.
 
@@ -63,7 +63,26 @@ can derive curl's timeouts from them.
 Filed 2026-09-26 while re-planning BL-075. It touches the shared contract, so it runs
 apart from every protocol task, as the task-board skill intends.
 
+Delivered 2026-09-26 (dark factory lane 1). The `feature` pipeline was run in-session
+rather than through its subagents: the change is two auto-properties, one fake and one
+ADR, with the design fully fixed by this task's Context, so there was no plan to make.
+
+- `ConnectTimeout` and `MaxTime` sit just before `TimeProvider` in `ITransferContext`,
+  `TransferContext` and `FakeTransferContext`, so the timing members read together.
+- The ADR is ADR-0008, the next free number on this branch. If another lane lands an
+  ADR-0008 first, renumber this one on rebase.
+- `TransferContextTests` round-trips 3 s and 12.5 s, so a sub-second value is covered.
+- Coverage: the collector reports Curl.Protocol.Abstractions.UnitLibrary at 100% branch,
+  and every member this task added is covered. `Measure-CodeQuality.ps1 -Library
+  Curl.Protocol.Abstractions.UnitLibrary` still lists 15 failing members, all
+  compiler-generated record copy constructors and `init` setters (`ByteRange`,
+  `TimeCondition`, `FileOpenResult`, `TransferResult`, `DatagramReceived`) that predate
+  this task and sit in files outside it. BL-126 covers them. None of the 15 come from
+  this change, so the criterion "keeps" counts as met.
+- Fast tests: 1,620 passed, 2 skipped, 0 failed; Abstractions 71, File 257.
+
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. ITransferContext and TransferContext carry TimeSpan? ConnectTimeout and MaxTime (ADR-0008)
