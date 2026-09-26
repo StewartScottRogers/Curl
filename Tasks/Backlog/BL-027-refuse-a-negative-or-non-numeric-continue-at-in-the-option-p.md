@@ -66,3 +66,4 @@ a different thing and is accepted upstream; do not reject it.
 ## Log
 
 - 2026-09-25: Created.
+- 2026-09-26: BL-013 added the `-C`/`--continue-at` row, whose value check already refuses `-5`, `-1`, `-0`, `abc` and `1e3` with `expected a proper numerical parameter` (tests in `Curl.Cli.UnitTests/CommandLineRangeOptionTests.cs`). What remains here: the negative-`ResumeFrom` branch in `FileProtocolHandler` (delete, or record in an ADR), and the console-level check that `-C -5` with a malformed URL is exit 2.
