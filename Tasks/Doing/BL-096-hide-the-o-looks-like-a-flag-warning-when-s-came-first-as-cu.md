@@ -36,3 +36,4 @@ file:///C:/rp13/f.txt` prints nothing on standard error. curl's warnings are hid
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
