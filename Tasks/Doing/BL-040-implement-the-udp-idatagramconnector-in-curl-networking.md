@@ -59,3 +59,4 @@ socket, and the one loopback round trip through a real UDP socket is tagged
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
