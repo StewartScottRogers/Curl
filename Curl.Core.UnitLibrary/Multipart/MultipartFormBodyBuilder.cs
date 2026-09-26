@@ -20,14 +20,14 @@ namespace Curl.Core.Multipart;
 /// <c>--&lt;boundary&gt;</c> CRLF (with a CRLF before it for all but the first), the last is
 /// followed by CRLF <c>--&lt;boundary&gt;--</c> CRLF, and each part's headers are chosen by
 /// <see cref="MultipartPartHeaders" />. Names, file names, headers and text values are
-/// sent in the text encoding the builder is given. See ADR-0025.
+/// sent in the text encoding the builder is given. See ADR-0027.
 /// </para>
 /// </remarks>
 /// <param name="fileSystem">Opens the files of file parts.</param>
 /// <param name="textEncoding">
 /// How names, file names, headers and text values become bytes: the platform curl's, which is
 /// the ANSI code page on Windows and UTF-8 on Linux and macOS, as ADR-0022 measured for
-/// credentials and ADR-0025 for form fields.
+/// credentials and ADR-0027 for form fields.
 /// </param>
 /// <param name="createBoundary">
 /// Makes each multipart's boundary, the outermost first and then each nested one in the

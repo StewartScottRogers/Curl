@@ -41,6 +41,7 @@ choices do not need one.
 | [0024](ADR-0024-proxy-selection-follows-the-platform-curl-and-reads-an-injected-environment.md) | Proxy selection follows the platform curl and reads an injected environment | Accepted | 2026-09-26 |
 | [0025](ADR-0025-digest-answers-as-curls-own-digest-code-on-every-platform.md) | Digest answers as curl's own Digest code does on every platform, not as Windows' WDigest does for the Schannel build | Accepted | 2026-09-26 |
 | [0026](ADR-0026-auth-scheme-and-proxy-options-parse-as-curls-tool-keeps-them.md) | The auth-scheme and proxy options parse as curl's tool keeps them: one scheme bit set, one proxy slot, an unknown proxy scheme fails the transfer with exit 7 | Accepted | 2026-09-26 |
+| [0027](ADR-0027-multipart-form-bodies-are-built-as-libcurl-8-21-0-builds-them.md) | Multipart form bodies are built as libcurl 8.21.0 builds them: measured headers and bytes, files streamed, exit 26 before connecting | Accepted | 2026-09-26 |
 
 ## Template
 
