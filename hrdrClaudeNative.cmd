@@ -48,8 +48,10 @@ REM  * Claude Code will ask you to sign in on first run -- that cannot be baked 
 REM
 REM  CUSTOMISING THE MODEL
 REM  ---------------------
-REM      setx CLAUDE_MODEL "claude-sonnet-5"
-REM  (default below is claude-opus-5, the latest and most capable model)
+REM      setx CLAUDE_MODEL "claude-opus-5-5"
+REM  (default below is "opus", a moving alias Claude Code resolves to the newest
+REM   Opus release at launch -- today Opus 5.5 -- so this script does not go stale
+REM   when a better model ships. Set CLAUDE_MODEL to pin an exact id instead.)
 REM
 REM  IMPLEMENTATION NOTE
 REM  -------------------
@@ -62,7 +64,7 @@ REM ============================================================================
 REM -----------------------------------------------------------------------------
 REM  Configuration
 REM -----------------------------------------------------------------------------
-if not defined CLAUDE_MODEL set "CLAUDE_MODEL=claude-opus-5"
+if not defined CLAUDE_MODEL set "CLAUDE_MODEL=opus"
 set "REPO_URL=https://github.com/StewartScottRogers/Curl.git"
 set "DEFAULT_REPO_DIR=%USERPROFILE%\Curl"
 
