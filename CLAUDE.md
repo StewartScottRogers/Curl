@@ -42,6 +42,10 @@ Committing and pushing to a feature branch is automatic and needs no confirmatio
 `dotnet build` is clean and the fast tests are green, commit by logical unit and push;
 report it afterwards rather than asking first.
 
+One standing exception: the `gource` branch holds only the latest Gource render and is
+force-pushed on every render by `.github/workflows/gource.yml` (owned by the
+`gource-publisher` agent). That force push, to that branch only, needs no confirmation.
+
 Ask first for: a force push or any rewrite of already-pushed history, a merge to `master`,
 a tag or a release, creating a repository or changing its visibility, and deleting a
 branch. Irreversible GitHub actions are run directly and not through the subagent, which

@@ -17,6 +17,7 @@
     <File Path="CodeMetricsConfig.txt" />
     <File Path="hrdrClaudeNative.cmd" />
     <File Path="LICENSE.txt" />
+    <File Path="README.md" />
     <File Path="RunClaude.cmd" />
   </Folder>
 
@@ -26,6 +27,9 @@
     <File Path="Measure-CodeQuality.ps1" />
     <File Path="DarkFactory.ps1" />
     <File Path="RunDarkFactory.cmd" />
+    <File Path=".github/gource/make-log.py" />
+    <File Path=".github/gource/render.sh" />
+    <File Path=".github/workflows/gource.yml" />
   </Folder>
   <Project Path="Curl.Authentication.UnitLibrary/Curl.Authentication.UnitLibrary.csproj" />
   <Project Path="Curl.Authentication.UnitTests/Curl.Authentication.UnitTests.csproj" />
