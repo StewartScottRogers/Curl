@@ -5,14 +5,17 @@ using System.Text;
 namespace Curl.Protocol.Tftp;
 
 /// <summary>
-/// Builds and reads the TFTP packets a download uses: the read request and
-/// acknowledgement it sends (RFC 1350 section 5), and the block size an option
-/// acknowledgement carries (RFC 2347, RFC 2348).
+/// Builds and reads the TFTP packets a transfer uses: the read and write requests,
+/// DATA packets and acknowledgements it sends (RFC 1350 section 5), and the block size
+/// an option acknowledgement carries (RFC 2347, RFC 2348).
 /// </summary>
 internal static class TftpPackets
 {
     /// <summary>The opcode of a read request.</summary>
     internal const ushort ReadRequestOpcode = 1;
+
+    /// <summary>The opcode of a write request.</summary>
+    internal const ushort WriteRequestOpcode = 2;
 
     /// <summary>The opcode of a DATA packet.</summary>
     internal const ushort DataOpcode = 3;
@@ -53,30 +56,36 @@ internal static class TftpPackets
     /// </summary>
     /// <param name="fileName">The file name from the URL path, decoded.</param>
     /// <returns>The whole datagram.</returns>
-    internal static byte[] BuildReadRequest(string fileName)
+    internal static byte[] BuildReadRequest(string fileName) =>
+        BuildRequest(ReadRequestOpcode, fileName, 0);
+
+    /// <summary>
+    /// Builds the write request curl 8.21.0 sends by default: octet mode, then
+    /// <c>tsize</c> with the upload's length, <c>blksize 512</c> and <c>timeout 6</c>,
+    /// each string null-terminated.
+    /// </summary>
+    /// <param name="fileName">The file name from the URL path, decoded.</param>
+    /// <param name="transferSize">
+    /// The upload's length in bytes, or 0 when it is not known, as curl sends for an
+    /// upload read from a pipe.
+    /// </param>
+    /// <returns>The whole datagram.</returns>
+    internal static byte[] BuildWriteRequest(string fileName, long transferSize) =>
+        BuildRequest(WriteRequestOpcode, fileName, transferSize);
+
+    /// <summary>
+    /// Builds the DATA packet that carries block <paramref name="blockNumber" />.
+    /// </summary>
+    /// <param name="blockNumber">The block's number; the first block is 1.</param>
+    /// <param name="payload">The block's bytes, shorter than the block size only in the last block.</param>
+    /// <returns>The whole datagram.</returns>
+    internal static byte[] BuildData(ushort blockNumber, ReadOnlySpan<byte> payload)
     {
-        string[] fields =
-        [
-            fileName,
-            "octet",
-            "tsize",
-            "0",
-            "blksize",
-            DefaultBlockSize.ToString(CultureInfo.InvariantCulture),
-            "timeout",
-            DefaultTimeoutSeconds,
-        ];
-
-        using var packet = new MemoryStream();
-        packet.WriteByte(0);
-        packet.WriteByte((byte)ReadRequestOpcode);
-        foreach (var field in fields)
-        {
-            packet.Write(Encoding.UTF8.GetBytes(field));
-            packet.WriteByte(0);
-        }
-
-        return packet.ToArray();
+        var packet = new byte[DataHeaderLength + payload.Length];
+        BinaryPrimitives.WriteUInt16BigEndian(packet, DataOpcode);
+        BinaryPrimitives.WriteUInt16BigEndian(packet.AsSpan(2), blockNumber);
+        payload.CopyTo(packet.AsSpan(DataHeaderLength));
+        return packet;
     }
 
     /// <summary>
@@ -126,5 +135,38 @@ internal static class TftpPackets
         }
 
         return DefaultBlockSize;
+    }
+
+    /// <summary>
+    /// Builds a read or write request with curl 8.21.0's default options.
+    /// </summary>
+    /// <param name="opcode">The request's opcode.</param>
+    /// <param name="fileName">The file name from the URL path, decoded.</param>
+    /// <param name="transferSize">The <c>tsize</c> option's value.</param>
+    /// <returns>The whole datagram.</returns>
+    private static byte[] BuildRequest(ushort opcode, string fileName, long transferSize)
+    {
+        string[] fields =
+        [
+            fileName,
+            "octet",
+            "tsize",
+            transferSize.ToString(CultureInfo.InvariantCulture),
+            "blksize",
+            DefaultBlockSize.ToString(CultureInfo.InvariantCulture),
+            "timeout",
+            DefaultTimeoutSeconds,
+        ];
+
+        using var packet = new MemoryStream();
+        packet.WriteByte(0);
+        packet.WriteByte((byte)opcode);
+        foreach (var field in fields)
+        {
+            packet.Write(Encoding.UTF8.GetBytes(field));
+            packet.WriteByte(0);
+        }
+
+        return packet.ToArray();
     }
 }

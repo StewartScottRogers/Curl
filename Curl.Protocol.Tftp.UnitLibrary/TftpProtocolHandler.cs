@@ -3,7 +3,8 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Protocol.Tftp;
 
 /// <summary>
-/// Serves the <c>tftp</c> scheme: downloads a file over an
+/// Serves the <c>tftp</c> scheme: downloads a file, or uploads
+/// <see cref="ITransferContext.Upload" /> when it is set, over an
 /// <see cref="IDatagramChannel" /> the way curl 8.21.0 does by default.
 /// </summary>
 /// <param name="connector">
@@ -19,13 +20,21 @@ namespace Curl.Protocol.Tftp;
 /// from, the server's transfer identifier, never back to port 69.
 /// </para>
 /// <para>
+/// The write request carries the same options with <c>tsize</c> set to the upload's
+/// remaining length, or 0 when the upload cannot seek. Each DATA block goes to the
+/// endpoint whose acknowledgement it follows; an option acknowledgement stands in for
+/// ACK 0 and sets the block size. The first block shorter than the block size is the
+/// last, so an exact multiple ends with an empty block, and the upload succeeds once that
+/// block is acknowledged, writing nothing to <see cref="ITransferContext.Output" />.
+/// </para>
+/// <para>
 /// An ERROR packet ends the transfer with the exit code and message curl reports for its
 /// code. A URL with no file name is exit 71 (<see cref="CurlExitCode.TftpIllegal" />) with
 /// <c>Missing filename</c>, before any channel is opened, and a channel that will not open
 /// is returned with the connector's code and message unchanged.
 /// </para>
 /// <para>
-/// Upload, <c>--tftp-blksize</c>, <c>--tftp-no-options</c>, retransmission and the timeout
+/// <c>--tftp-blksize</c>, <c>--tftp-no-options</c>, retransmission and the timeout
 /// that ends a silent transfer are not implemented yet; see the library's
 /// <c>CLAUDE.md</c>.
 /// </para>
@@ -72,7 +81,9 @@ public sealed class TftpProtocolHandler(IDatagramConnector connector) : IProtoco
 
         await using (channel.ConfigureAwait(false))
         {
-            return await new TftpDownload(context, channel).RunAsync(fileName).ConfigureAwait(false);
+            return context.Upload is { } upload
+                ? await new TftpUpload(context, channel, upload).RunAsync(fileName).ConfigureAwait(false)
+                : await new TftpDownload(context, channel).RunAsync(fileName).ConfigureAwait(false);
         }
     }
 }
