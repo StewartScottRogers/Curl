@@ -43,3 +43,4 @@ Curl.Console prints neither today. `Curl.Cli.UnitLibrary` has `CommandLineOption
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
 - 2026-09-26: Doing -> Blocked. Stewart: dark factory run ended in Doing, exit 1; see logs\BL-102-20260926-083111-L4.jsonl
+- 2026-09-26: Blocked -> Backlog. Not blocked: the 2026-09-26 shift ran out of tokens (usage limit), which it misfiled as a stall
