@@ -34,3 +34,4 @@ The authenticator chooses among offered challenges as curl ranks them for `--bas
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
