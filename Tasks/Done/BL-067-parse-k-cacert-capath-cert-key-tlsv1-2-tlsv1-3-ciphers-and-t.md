@@ -119,7 +119,7 @@ Choices made (unattended run):
 - Coverage (`Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary`, fast tests only): every
   member this task added or changed is at 100% line and branch. The library reports 99.21%
   because of three pre-existing uncovered `UrlParts` init setters in `UploadUrl.cs`, filed as
-  BL-083.
+  BL-086.
 - Verified: `dotnet build Curl.Cli.UnitLibrary -warnaserror` clean; `dotnet test
   Curl.Cli.UnitTests --filter "TestCategory!=Integration"` 267 passed; all 269 passed with
   Integration; `dotnet format --verify-no-changes` clean for both projects.

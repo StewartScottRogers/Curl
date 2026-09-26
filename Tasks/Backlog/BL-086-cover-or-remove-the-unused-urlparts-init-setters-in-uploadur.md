@@ -1,5 +1,5 @@
 ---
-id: BL-083
+id: BL-086
 title: Cover or remove the unused UrlParts init setters in UploadUrl
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-083 — Cover or remove the unused UrlParts init setters in UploadUrl
+# BL-086 — Cover or remove the unused UrlParts init setters in UploadUrl
 
 ## Goal
 
