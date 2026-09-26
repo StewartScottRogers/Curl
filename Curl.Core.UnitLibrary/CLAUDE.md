@@ -39,7 +39,7 @@ case), otherwise `http`. It only prepends `<scheme>://`; rejecting a malformed U
 to the URL parser. It is not yet wired into `Curl.Console`.
 
 `ProxySelector` chooses the `ProxyEndpoint` curl 8.21.0 would use for a URL from `-x`,
-`--noproxy` and the proxy environment variables (ADR-0023). It reads the environment only
+`--noproxy` and the proxy environment variables (ADR-0024). It reads the environment only
 through the `Func<string, string?>` it is constructed with, asking for curl's exact names;
 production passes `Environment.GetEnvironmentVariable`, and tests pass a dictionary, never
 the real environment. `NoProxyMatcher` is the `--noproxy`/`NO_PROXY` list, and

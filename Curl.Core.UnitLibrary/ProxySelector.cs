@@ -23,7 +23,7 @@ namespace Curl.Core;
 /// The lookups use exactly these names; how a name matches is the reader's business. On
 /// Windows the process environment ignores case, so there <c>HTTP_PROXY</c> is read as
 /// <c>http_proxy</c>, as the measured Schannel build does. An empty variable counts as
-/// unset, as it does in that build. Measured against curl 8.21.0 on 2026-09-26 (ADR-0023).
+/// unset, as it does in that build. Measured against curl 8.21.0 on 2026-09-26 (ADR-0024).
 /// </para>
 /// </remarks>
 /// <param name="readEnvironmentVariable">
