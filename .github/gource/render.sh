@@ -25,12 +25,12 @@ py="$(command -v python3 || command -v python)"
 work="$out/.work"
 rm -rf "$work"
 mkdir -p "$work/hls/av1/4320p" "$work/hls/av1/2160p" "$work/hls/av1/1080p" \
-    "$work/hls/h264/2160p" "$work/hls/h264/1080p" "$work/avatars"
+    "$work/hls/h264/2160p" "$work/hls/h264/1080p"
 
 width=7680
 height=4320
 fps=30
-# Gource sizes text and avatars in pixels. Scaling them 4x makes 8K read like 1080p: file
+# Gource sizes text and user icons in pixels. Scaling them 4x makes 8K read like 1080p: file
 # and project names stay legible on a wall-sized screen without crowding the tree.
 scale=4
 # Target length of the animation, however long or short the project's history is.
@@ -45,14 +45,6 @@ days=$(awk -v s=$(( last - first + 1 )) 'BEGIN { printf "%.2f", s / 86400 }')
 # history is not a blur. Quiet stretches are skipped (--auto-skip-seconds), so the
 # finished animation can come in a little shorter.
 spd=$(awk -v d="$days" -v t="$seconds" 'BEGIN { s = (t - 5) / d; if (s < 0.2) s = 0.2; printf "%.2f", s }')
-
-# Avatars: one image per Gource user name, fetched from GitHub. Claude is drawn with
-# Anthropic's organisation avatar. A failed download only costs that user their picture.
-while IFS='|' read -r user login; do
-    if [ -z "$user" ] || [ "${user:0:1}" = '#' ]; then continue; fi
-    curl -fsSL "https://github.com/${login}.png?size=460" -o "$work/avatars/${user}.png" \
-        || rm -f "$work/avatars/${user}.png"
-done < "$here/avatars.txt"
 
 run=()
 if command -v xvfb-run > /dev/null; then run=(xvfb-run -a -s "-screen 0 ${width}x${height}x24"); fi
@@ -91,7 +83,7 @@ echo "rendering ${width}x${height} at ${fps} fps: $days day(s) at ${spd}s/day, $
     --seconds-per-day "$spd" --auto-skip-seconds 0.5 --max-file-lag 0.1 \
     --file-idle-time 0 --stop-at-end --camera-mode overview --padding 1.15 \
     --key --highlight-users --highlight-dirs --dir-name-depth 1 --filename-time 4 \
-    --user-image-dir "$work/avatars" --user-scale "$scale" \
+    --user-scale "$scale" \
     --caption-file "$work/captions.txt" --caption-size $(( 20 * scale )) \
     --caption-duration 6 --caption-colour FFD866 \
     --bloom-multiplier 1.3 --bloom-intensity 0.9 \

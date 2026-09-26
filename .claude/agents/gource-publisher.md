@@ -15,7 +15,6 @@ current without anyone's involvement.
 | `.github/workflows/gource.yml` | Decides whether to render, renders on an Ubuntu runner, publishes to the `gource` branch, and asks GitHub Pages to rebuild. |
 | `.github/gource/make-log.py` | Builds a Gource custom log from every branch except `gource`. A co-authored commit is drawn once per author; every Claude model is the one user "Claude". |
 | `.github/gource/make-captions.py` | Captions for each merged pull request and each version tag. |
-| `.github/gource/avatars.txt` | Which GitHub avatar draws which Gource user. |
 | `.github/gource/render.sh` | One render at 7680x4320, 30 fps, about 75 s, split into an AV1 HLS ladder (8K, 4K, 1080p), an H.264 ladder (4K, 1080p), `gource.mp4` (4K H.264), `gource.gif` (widest under 10 MB), `still-8k.jpg`, `poster.jpg` and `stats.json`. Writes to a work directory and moves everything into place only when complete. |
 | `.github/gource/make-master-playlist.py` | Each ladder's `master.m3u8`, with codec strings and peak bandwidth measured from the segments. |
 | `.github/gource/make-stats.py` | `stats.json`: commits, pull requests, lines of C#, tests, projects, tasks done. |
@@ -51,6 +50,8 @@ day regardless, and whenever it is dispatched by hand.
   on a 90-inch 8K screen; lower quality, never resolution. Every file stays under GitHub's
   100 MB limit (HLS segments are 2 s for that reason), the whole branch well under GitHub
   Pages' 1 GB site limit, and the GIF under 10 MB, or GitHub will not show it in the README.
+- Users are drawn with Gource's default icon, never a person's photo or avatar
+  (Stewart's decision, 2026-09-26).
 - A browser plays one codec per stream, so AV1 and H.264 stay separate ladders; the viewer
   picks AV1 when the browser can decode it.
 - No new Actions from the marketplace beyond `actions/checkout`; Gource, ffmpeg and xvfb
