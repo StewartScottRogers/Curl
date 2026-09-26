@@ -3,7 +3,12 @@ using Curl.Core;
 using Curl.Core.FileSystem;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
+using Curl.Protocol.Dict;
 using Curl.Protocol.File;
+using Curl.Protocol.Gopher;
+using Curl.Protocol.Mqtt;
+using Curl.Protocol.Telnet;
+using Curl.Protocol.Tftp;
 
 namespace Curl.Console;
 
@@ -15,12 +20,25 @@ namespace Curl.Console;
 internal static class CurlComposition
 {
     /// <summary>
-    /// Creates the protocol handlers the executable registers. Today that is the
-    /// <c>file</c> handler only.
+    /// Creates the protocol handlers the executable registers: <c>file</c> over the real
+    /// disk; <c>dict</c>, <c>gopher</c> and <c>gophers</c>, <c>telnet</c>, and <c>mqtt</c>
+    /// and <c>mqtts</c> over <paramref name="connector" />; and <c>tftp</c> over
+    /// <paramref name="datagramConnector" />. Each scheme is claimed by exactly one handler.
     /// </summary>
+    /// <param name="connector">Connects the TCP protocols, with TLS for <c>gophers</c> and <c>mqtts</c>.</param>
+    /// <param name="datagramConnector">Opens the UDP channels TFTP uses.</param>
     /// <returns>Every registered handler.</returns>
-    internal static IReadOnlyList<IProtocolHandler> CreateProtocolHandlers() =>
-        [new FileProtocolHandler(new PhysicalFileSystem())];
+    internal static IReadOnlyList<IProtocolHandler> CreateProtocolHandlers(
+        IConnector connector,
+        IDatagramConnector datagramConnector) =>
+        [
+            new FileProtocolHandler(new PhysicalFileSystem()),
+            new DictProtocolHandler(connector),
+            new GopherProtocolHandler(connector),
+            new TelnetProtocolHandler(connector),
+            new TftpProtocolHandler(datagramConnector),
+            new MqttProtocolHandler(connector),
+        ];
 
     /// <summary>
     /// Creates the network transports for one run: a <see cref="TcpConnector" /> over a
@@ -53,15 +71,52 @@ internal static class CurlComposition
 
     /// <summary>
     /// Creates the runner that parses a command line and performs its transfers against
-    /// the real disk and the given standard streams.
+    /// the real disk, the real network and the given standard streams. The network
+    /// transports are built by <see cref="CreateTransports(CommandLineOptions)" /> once the
+    /// command line is parsed, because their TLS settings come from it.
     /// </summary>
     /// <param name="standardOutput">Where a transfer without <c>-o</c> writes its bytes.</param>
     /// <param name="standardError">Where the <c>curl: (N) message</c> lines go.</param>
+    /// <param name="standardInput">What a <c>telnet</c> transfer sends to the server.</param>
     /// <returns>The runner.</returns>
-    internal static CurlCommandRunner CreateRunner(Stream standardOutput, Stream standardError) =>
+    internal static CurlCommandRunner CreateRunner(Stream standardOutput, Stream standardError, Stream standardInput) =>
         new(
-            new ProtocolDispatcher(CreateProtocolHandlers()),
+            options => CreateDispatcher(CreateTransports(options)),
             new PhysicalFileSystem(),
             standardOutput,
-            standardError);
+            standardError,
+            standardInput);
+
+    /// <summary>
+    /// Creates the runner with the production handler set built around the given
+    /// connectors instead of the real network, so the wiring can be checked without
+    /// opening a socket.
+    /// </summary>
+    /// <param name="standardOutput">Where a transfer without <c>-o</c> writes its bytes.</param>
+    /// <param name="standardError">Where the <c>curl: (N) message</c> lines go.</param>
+    /// <param name="standardInput">What a <c>telnet</c> transfer sends to the server.</param>
+    /// <param name="connector">Connects the TCP protocols.</param>
+    /// <param name="datagramConnector">Opens the UDP channels TFTP uses.</param>
+    /// <returns>The runner.</returns>
+    internal static CurlCommandRunner CreateRunner(
+        Stream standardOutput,
+        Stream standardError,
+        Stream standardInput,
+        IConnector connector,
+        IDatagramConnector datagramConnector) =>
+        new(
+            _ => new ProtocolDispatcher(CreateProtocolHandlers(connector, datagramConnector)),
+            new PhysicalFileSystem(),
+            standardOutput,
+            standardError,
+            standardInput);
+
+    /// <summary>
+    /// Creates the dispatcher over the production handler set, connecting through
+    /// <paramref name="transports" />.
+    /// </summary>
+    /// <param name="transports">The run's connectors.</param>
+    /// <returns>The dispatcher.</returns>
+    internal static ProtocolDispatcher CreateDispatcher(CurlTransports transports) =>
+        new(CreateProtocolHandlers(transports.TcpConnector, transports.UdpDatagramConnector));
 }

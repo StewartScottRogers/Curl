@@ -19,6 +19,7 @@ public sealed class CurlCommandRunnerTests
 
     private readonly MemoryStream standardOutput = new();
     private readonly MemoryStream standardError = new();
+    private readonly MemoryStream standardInput = new();
     private readonly InMemoryFileSystem fileSystem = new();
 
     private string StandardErrorText => Encoding.UTF8.GetString(standardError.ToArray());
@@ -129,10 +130,11 @@ public sealed class CurlCommandRunnerTests
         InMemoryFileSystem files = new() { ReadContent = new byte[92] };
         files.UnwritablePaths.Add("C:/nonexist/dir/x");
         CurlCommandRunner runner = new(
-            new ProtocolDispatcher([new FileProtocolHandler(files)]),
+            _ => new ProtocolDispatcher([new FileProtocolHandler(files)]),
             files,
             standardOutput,
-            standardError);
+            standardError,
+            standardInput);
 
         int exitCode = await runner.RunAsync(["-sS", "-o", "C:/nonexist/dir/x", "file:///C:/Windows/win.ini"]);
 
@@ -252,7 +254,47 @@ public sealed class CurlCommandRunnerTests
         Assert.AreSame(standardOutput, context.Output);
     }
 
+    [TestMethod]
+    public async Task RunAsync_TelnetUrl_ReceivesStandardInputAsUpload()
+    {
+        RecordingProtocolHandler telnet = RecordingProtocolHandler.WritingPath("telnet");
+
+        await RunAsync(["telnet://h/"], telnet);
+
+        Assert.AreSame(standardInput, telnet.Contexts.Single().Upload);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_DictUrl_ReceivesNullUpload()
+    {
+        RecordingProtocolHandler dict = RecordingProtocolHandler.WritingPath("dict");
+
+        await RunAsync(["dict://h/d:x"], dict);
+
+        Assert.IsNull(dict.Contexts.Single().Upload);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RefusedCommandLine_NeverBuildsTheDispatcher()
+    {
+        int calls = 0;
+        CurlCommandRunner runner = new(
+            _ =>
+            {
+                calls++;
+                return new ProtocolDispatcher([]);
+            },
+            fileSystem,
+            standardOutput,
+            standardError,
+            standardInput);
+
+        await runner.RunAsync(["--no-such-option", "file:///a"]);
+
+        Assert.AreEqual(0, calls);
+    }
+
     private Task<int> RunAsync(IReadOnlyList<string> arguments, params IProtocolHandler[] handlers) =>
-        new CurlCommandRunner(new ProtocolDispatcher(handlers), fileSystem, standardOutput, standardError)
+        new CurlCommandRunner(_ => new ProtocolDispatcher(handlers), fileSystem, standardOutput, standardError, standardInput)
             .RunAsync(arguments);
 }

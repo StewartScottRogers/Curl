@@ -1,9 +1,16 @@
 using System.Reflection;
+using System.Text;
 
 using Curl.Cli;
+using Curl.Core;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
+using Curl.Protocol.Dict;
 using Curl.Protocol.File;
+using Curl.Protocol.Gopher;
+using Curl.Protocol.Mqtt;
+using Curl.Protocol.Telnet;
+using Curl.Protocol.Tftp;
 
 namespace Curl.Console;
 
@@ -15,14 +22,77 @@ namespace Curl.Console;
 [TestClass]
 public sealed class CurlCompositionTests
 {
-    [TestMethod]
-    public void CreateProtocolHandlers_ServesFileThroughFileProtocolHandler()
-    {
-        IReadOnlyList<IProtocolHandler> handlers = CurlComposition.CreateProtocolHandlers();
+    private const string ConnectFailure = "Failed to connect to h:2628 after 0 ms: Could not connect to server";
 
-        IProtocolHandler handler = handlers.Single();
-        Assert.IsInstanceOfType<FileProtocolHandler>(handler);
-        CollectionAssert.Contains(handler.SupportedSchemes.ToArray(), "file");
+    [TestMethod]
+    public void CreateProtocolHandlers_ServesEachSchemeThroughItsHandlerOnce()
+    {
+        IReadOnlyList<IProtocolHandler> handlers = CurlComposition.CreateProtocolHandlers(
+            new RecordingConnector(CurlExitCode.CouldntConnect, ConnectFailure),
+            new RecordingDatagramConnector(CurlExitCode.CouldntConnect, ConnectFailure));
+
+        Dictionary<string, Type> served = handlers
+            .SelectMany(handler => handler.SupportedSchemes.Select(scheme => (scheme, type: handler.GetType())))
+            .ToDictionary(pair => pair.scheme, pair => pair.type);
+        Dictionary<string, Type> expected = new()
+        {
+            ["file"] = typeof(FileProtocolHandler),
+            ["dict"] = typeof(DictProtocolHandler),
+            ["gopher"] = typeof(GopherProtocolHandler),
+            ["gophers"] = typeof(GopherProtocolHandler),
+            ["telnet"] = typeof(TelnetProtocolHandler),
+            ["tftp"] = typeof(TftpProtocolHandler),
+            ["mqtt"] = typeof(MqttProtocolHandler),
+            ["mqtts"] = typeof(MqttProtocolHandler),
+        };
+        CollectionAssert.AreEquivalent(expected.ToList(), served.ToList());
+        _ = new ProtocolDispatcher(handlers);
+    }
+
+    [TestMethod]
+    [DataRow("gophers://h/", 70, true)]
+    [DataRow("mqtts://h/", 8883, true)]
+    [DataRow("gopher://h/", 70, false)]
+    [DataRow("mqtt://h/", 1883, false)]
+    [DataRow("dict://h/d:x", 2628, false)]
+    [DataRow("telnet://h/", 23, false)]
+    public async Task CreateRunner_TcpSchemeUrl_ReachesConnectorAtDefaultPortWithSchemesTls(
+        string url,
+        int port,
+        bool useTls)
+    {
+        RecordingConnector connector = new(CurlExitCode.CouldntConnect, ConnectFailure);
+
+        await RunWithFakeConnectorsAsync(url, connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, ConnectFailure));
+
+        Assert.AreEqual(new ConnectTarget("h", port, useTls), connector.Targets.Single());
+    }
+
+    [TestMethod]
+    public async Task CreateRunner_ConnectorFailsToConnect_PrintsExit7LineAndReturns7()
+    {
+        RecordingConnector connector = new(CurlExitCode.CouldntConnect, ConnectFailure);
+
+        (int exitCode, string standardErrorText) = await RunWithFakeConnectorsAsync(
+            "dict://h/d:x",
+            connector,
+            new RecordingDatagramConnector(CurlExitCode.CouldntConnect, ConnectFailure));
+
+        Assert.AreEqual(7, exitCode);
+        Assert.AreEqual($"curl: (7) {ConnectFailure}{Environment.NewLine}", standardErrorText);
+    }
+
+    [TestMethod]
+    public async Task CreateRunner_TftpUrl_ReachesDatagramConnectorAtHostAndPort69()
+    {
+        RecordingDatagramConnector datagramConnector = new(CurlExitCode.CouldntConnect, ConnectFailure);
+
+        await RunWithFakeConnectorsAsync(
+            "tftp://h/f",
+            new RecordingConnector(CurlExitCode.CouldntConnect, ConnectFailure),
+            datagramConnector);
+
+        Assert.AreEqual(("h", 69), datagramConnector.Opens.Single());
     }
 
     [TestMethod]
@@ -36,8 +106,9 @@ public sealed class CurlCompositionTests
         {
             using MemoryStream standardOutput = new();
             using MemoryStream standardError = new();
+            using MemoryStream standardInput = new();
 
-            int exitCode = await CurlComposition.CreateRunner(standardOutput, standardError)
+            int exitCode = await CurlComposition.CreateRunner(standardOutput, standardError, standardInput)
                 .RunAsync([new Uri(path).AbsoluteUri]);
 
             Assert.AreEqual(0, exitCode);
@@ -92,6 +163,34 @@ public sealed class CurlCompositionTests
         Assert.AreNotSame(
             CurlComposition.CreateTransports(NoOptions()).DnsResolver,
             CurlComposition.CreateTransports(NoOptions()).DnsResolver);
+    }
+
+    [TestMethod]
+    public void CreateDispatcher_ProductionTransports_BuildsWithoutADuplicateScheme()
+    {
+        ProtocolDispatcher dispatcher = CurlComposition.CreateDispatcher(CurlComposition.CreateTransports(NoOptions()));
+
+        Assert.IsNotNull(dispatcher);
+    }
+
+    /// <summary>
+    /// Runs <paramref name="url" /> through the production handler set built around the
+    /// fake connectors, and returns the exit code and what reached standard error.
+    /// </summary>
+    private static async Task<(int ExitCode, string StandardErrorText)> RunWithFakeConnectorsAsync(
+        string url,
+        IConnector connector,
+        IDatagramConnector datagramConnector)
+    {
+        using MemoryStream standardOutput = new();
+        using MemoryStream standardError = new();
+        using MemoryStream standardInput = new();
+
+        int exitCode = await CurlComposition
+            .CreateRunner(standardOutput, standardError, standardInput, connector, datagramConnector)
+            .RunAsync([url]);
+
+        return (exitCode, Encoding.UTF8.GetString(standardError.ToArray()));
     }
 
     private static CommandLineOptions NoOptions() => Parse("gophers://example.com/");

@@ -16,8 +16,9 @@ internal static class Program
 
         using Stream standardOutput = System.Console.OpenStandardOutput();
         using Stream standardError = System.Console.OpenStandardError();
+        using Stream standardInput = System.Console.OpenStandardInput();
 
-        return await CurlComposition.CreateRunner(standardOutput, standardError)
+        return await CurlComposition.CreateRunner(standardOutput, standardError, standardInput)
             .RunAsync(args)
             .ConfigureAwait(false);
     }
