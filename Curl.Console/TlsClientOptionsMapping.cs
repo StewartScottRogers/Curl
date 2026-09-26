@@ -28,7 +28,19 @@ internal static class TlsClientOptionsMapping
             ToTlsMinimumVersion(options.MinimumTlsVersion),
             options.CaCertificateFile);
 
-    private static TlsMinimumVersion ToTlsMinimumVersion(SslProtocols? minimumTlsVersion) => minimumTlsVersion switch
+    /// <summary>
+    /// Maps a minimum TLS version from the command line onto the one the TLS provider applies.
+    /// </summary>
+    /// <param name="minimumTlsVersion">
+    /// <see cref="CommandLineOptions.MinimumTlsVersion" />, or <see langword="null" /> when no
+    /// version option was given.
+    /// </param>
+    /// <returns>
+    /// <see cref="TlsMinimumVersion.Tls12" /> for <see cref="SslProtocols.Tls12" />,
+    /// <see cref="TlsMinimumVersion.Tls13" /> for <see cref="SslProtocols.Tls13" />, and
+    /// <see cref="TlsMinimumVersion.SystemDefault" /> for <see langword="null" /> or any other value.
+    /// </returns>
+    internal static TlsMinimumVersion ToTlsMinimumVersion(SslProtocols? minimumTlsVersion) => minimumTlsVersion switch
     {
         SslProtocols.Tls12 => TlsMinimumVersion.Tls12,
         SslProtocols.Tls13 => TlsMinimumVersion.Tls13,

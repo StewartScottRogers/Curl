@@ -1,3 +1,4 @@
+using System.Security.Authentication;
 using Curl.Cli;
 using Curl.Networking;
 
@@ -49,6 +50,14 @@ public sealed class TlsClientOptionsMappingTests
         Assert.AreEqual(
             new TlsClientOptions(MinimumVersion: TlsMinimumVersion.Tls12),
             Map("--tlsv1.3", "--tlsv1.2", Url));
+    }
+
+    [TestMethod]
+    public void ToTlsMinimumVersion_OtherNonNullVersion_MapsToSystemDefault()
+    {
+        Assert.AreEqual(
+            TlsMinimumVersion.SystemDefault,
+            TlsClientOptionsMapping.ToTlsMinimumVersion(SslProtocols.None));
     }
 
     /// <summary>
