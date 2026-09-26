@@ -43,6 +43,11 @@
       -LimitWarnSeconds    before the reset: the new session is about to start
       on resuming          the new session has started, and which task it resumed
 
+    If the limit is lifted early, the shift carries on at once: every -LimitProbeMinutes
+    the coordinator (or lone runner) asks Claude for one word, and an answer wakes every
+    waiting runner. After resetting the limit by hand, `RunDarkFactory.cmd -Wake` does
+    the same without waiting for the next probe.
+
     The reset time comes from the run's rate_limit_event. Time spent waiting is added
     to the shift, so -Hours is always working time. With lanes, every lane waits on its
     own and the coordinator makes the announcements, once for all of them.
@@ -100,6 +105,10 @@ param(
     [switch]$TestOutOfTokens,
     # How long before the usage limit resets to say the new session is about to start.
     [ValidateRange(0, 3600)][int]$LimitWarnSeconds = 60,
+    # While waiting for tokens, how often to check whether the limit was lifted early. 0 = never.
+    [ValidateRange(0, 600)][int]$LimitProbeMinutes = 10,
+    # Wake a shift that is waiting for tokens (after resetting the limit), and exit.
+    [switch]$Wake,
     # How many tasks run at once, each in its own worktree and window. 1 is the classic
     # single-runner shift in this checkout.
     [ValidateRange(1, 8)][int]$Lanes = 1,
@@ -533,6 +542,45 @@ function Update-LimitNotice {
     try { $Host.UI.RawUI.WindowTitle = "Dark factory - out of tokens, new session at $at (in $(Format-Span $left))" } catch { }
 }
 
+function Test-WakeRequested {
+    # True once "wake <unix>" for this reset is in the limit file: tokens came back early,
+    # because Stewart reset the limit or the probe found the account answering again.
+    param([long]$Unix)
+    if (-not (Test-Path $LimitFile)) { return $false }
+    return [bool](@(Get-Content $LimitFile -ErrorAction SilentlyContinue) -contains "wake $Unix")
+}
+
+$script:NextProbe = [datetime]::MinValue
+function Invoke-LimitProbe {
+    # While the shift waits, asks Claude for one word every -LimitProbeMinutes. A refused
+    # probe costs nothing; one that is answered means the limit was lifted early, and
+    # every waiting runner is woken.
+    if (-not (Test-WaitingForSession) -or $LimitProbeMinutes -le 0 -or (Get-Date) -lt $script:NextProbe) { return }
+    $script:NextProbe = (Get-Date).AddMinutes($LimitProbeMinutes)
+    $reset = $script:Notice.Reset
+    if (Test-WakeRequested $reset) { return }
+    try {
+        $psi = New-Object System.Diagnostics.ProcessStartInfo
+        $psi.FileName = $env:ComSpec
+        $psi.Arguments = "/d /c claude -p --model $Model --output-format stream-json --verbose --max-turns 1 2>nul"
+        $psi.WorkingDirectory = $Root
+        $psi.UseShellExecute = $false
+        $psi.RedirectStandardInput = $true
+        $psi.RedirectStandardOutput = $true
+        $p = [System.Diagnostics.Process]::Start($psi)
+        $p.StandardInput.Write('Reply with the single word OK.')
+        $p.StandardInput.Close()
+        $read = $p.StandardOutput.ReadToEndAsync()
+        if (-not $p.WaitForExit(120000)) { & taskkill /T /F /PID $p.Id 2>&1 | Out-Null; return }
+        $out = $read.Result
+    } catch { return }
+    $answered = $out -match '"type":"result"' -and $out -notmatch '"status":"rejected"' -and $out -notmatch '"is_error":true'
+    if ($answered) {
+        Add-LimitMark "wake $reset"
+        Write-Trace '-' 'TOKENS' 'probe answered: tokens are back before the reset; waking the lanes' 'Green'
+    }
+}
+
 function Wait-ForNewSession {
     # Holds this runner until just after the usage limit resets, and returns how long it
     # waited so the shift can add it back. A lone runner announces as it waits; a lane
@@ -546,8 +594,9 @@ function Wait-ForNewSession {
     $resume = $Until.AddSeconds(20)
     $nextTrace = (Get-Date).AddMinutes(30)
     while ((Get-Date) -lt $resume) {
+        if (Test-WakeRequested $unix) { Write-Trace $Id 'wake' 'tokens are back before the reset' 'Green'; break }
         if ($Lane) { try { $Host.UI.RawUI.WindowTitle = "Dark factory - lane $Lane out of tokens until $($Until.ToString('HH:mm'))" } catch { } }
-        else { Update-LimitNotice }
+        else { Update-LimitNotice; Invoke-LimitProbe }
         if ((Get-Date) -ge $nextTrace) {
             Write-Trace $Id 'wait' "new session in $(Format-Span ($Until - (Get-Date)))" 'DarkGray'
             $nextTrace = (Get-Date).AddMinutes(30)
@@ -559,6 +608,18 @@ function Wait-ForNewSession {
     if ($Lane) { try { $Host.UI.RawUI.WindowTitle = "Dark factory - lane $Lane" } catch { } }
     else { Update-LimitNotice }
     return ((Get-Date) - $began)
+}
+
+if ($Wake) {
+    # Tells every runner of the newest shift that is waiting for tokens to carry on now.
+    $file = Get-ChildItem $LogDir -Filter 'limit-*.txt' -ErrorAction SilentlyContinue | Sort-Object LastWriteTime | Select-Object -Last 1
+    $resets = if ($file) { @(Get-Content $file.FullName | Where-Object { $_ -match '^reset \d+$' }) } else { @() }
+    if (-not $resets.Count) { Write-Host 'No shift is waiting for tokens.'; exit 0 }
+    $script:LimitFile = $file.FullName
+    $LimitFile = $file.FullName
+    Add-LimitMark "wake $(($resets[-1] -split ' ')[1])"
+    Write-Host "Woke the shift waiting in $($file.Name)."
+    exit 0
 }
 
 if ($TestOutOfTokens) {
@@ -1106,6 +1167,7 @@ if ($Lanes -gt 1 -and -not $Lane) {
         # The coordinator announces the usage limit for every lane, and lanes waiting for a
         # new session add that wait to their shift, so the coordinator waits longer too.
         Update-LimitNotice
+        Invoke-LimitProbe
         if (Test-WaitingForSession) { $giveUp = $giveUp.Add((Get-Date) - $tick) }
         $tick = Get-Date
         $finished = @(Get-ChildItem $summaries -Filter 'lane-*.txt' -ErrorAction SilentlyContinue).Count
