@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Core.UnitLibrary, Curl.Core.UnitTests]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-097 — Bring Curl.Core.UnitLibrary PhysicalFileSystem to 100% line and branch coverage
 
@@ -43,15 +43,22 @@ network and must not need `TestCategory=Integration`; temporary files under
 
 ## Acceptance criteria
 
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Core.UnitLibrary` exits 0 on Windows.
-- [ ] `dotnet build Curl.Core.UnitLibrary -warnaserror` and `dotnet build Curl.Core.UnitTests -warnaserror` are clean.
-- [ ] `dotnet test --filter "TestCategory!=Integration"` is green, and no new test carries `TestCategory=Integration`.
-- [ ] `CodeMetricsConfig.txt` and the thresholds in `Measure-CodeQuality.ps1` are unchanged (`git diff master -- CodeMetricsConfig.txt Measure-CodeQuality.ps1` shows no threshold change).
-- [ ] No `[ExcludeFromCodeCoverage]` attribute or coverage exclusion is added to `PhysicalFileSystem` or its members.
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Core.UnitLibrary` exits 0 on Windows.
+- [x] `dotnet build Curl.Core.UnitLibrary -warnaserror` and `dotnet build Curl.Core.UnitTests -warnaserror` are clean.
+- [x] `dotnet test --filter "TestCategory!=Integration"` is green, and no new test carries `TestCategory=Integration`.
+- [x] `CodeMetricsConfig.txt` and the thresholds in `Measure-CodeQuality.ps1` are unchanged (`git diff master -- CodeMetricsConfig.txt Measure-CodeQuality.ps1` shows no threshold change).
+- [x] No `[ExcludeFromCodeCoverage]` attribute or coverage exclusion is added to `PhysicalFileSystem` or its members.
 
 ## Notes
+
+- Cause: every disk test in `PhysicalFileSystemTests` carried `[TestCategory("Integration")]`, and `Measure-CodeQuality.ps1` measures the fast run only. With `-IncludeIntegration` the library was already 100%/100%.
+- Choice (default taken, unattended run): remove the `Integration` category from those tests rather than add a seam. They use only a temporary directory under `Path.GetTempPath()` and the null device, which the task allows; no production code changed. The POSIX-only tests stay behind `OSCondition`, and `setsUnixCreateMode: true` on Windows was already covered by the fast test that expects `PlatformNotSupportedException`.
+- Also updated the class summary and `Curl.Core.UnitLibrary/CLAUDE.md`, which said the disk tests were `Integration`.
+- Ran the change directly rather than the full `/feature` pipeline: it is a test-category change with no production code to plan or implement.
+- Measured: Curl.Core.UnitLibrary 100% line, 100% branch, 19 members, 0 failing, worst CRAP 8; `Measure-CodeQuality.ps1` exits 0. Fast suite: Curl.Core.UnitTests 67 passed, 2 skipped (POSIX-only).
 
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. PhysicalFileSystem is 100% line and branch covered by the fast suite; Measure-CodeQuality.ps1 -Library Curl.Core.UnitLibrary exits 0
