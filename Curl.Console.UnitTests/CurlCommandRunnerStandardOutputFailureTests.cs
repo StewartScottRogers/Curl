@@ -81,7 +81,7 @@ public sealed class CurlCommandRunnerStandardOutputFailureTests
 
     private Task<int> RunAsync(IReadOnlyList<string> arguments, params IProtocolHandler[] handlers) =>
         new CurlCommandRunner(
-            _ => new ProtocolDispatcher(handlers),
+            _ => new TransferDispatch(new ProtocolDispatcher(handlers)),
             new InMemoryFileSystem(),
             new InMemoryFileSystem(),
             closedStandardOutput,

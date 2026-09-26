@@ -13,10 +13,12 @@ namespace Curl.Console;
 /// <see cref="ProtocolDispatcher" /> built for that command line, and prints curl 8.21.0's
 /// <c>curl: (N) &lt;message&gt;</c> line for each failure.
 /// </summary>
-/// <param name="createDispatcher">
+/// <param name="createTransferDispatch">
 /// Builds, from the accepted command line, the dispatcher that performs each transfer with
-/// the handler for its scheme; called once per run, and not at all for a refused command
-/// line. It takes the options because the network handlers' TLS settings come from them.
+/// the handler for its scheme and the warning lines printed before each transfer; called
+/// once per run, and not at all for a refused command line. It takes the options because
+/// the network handlers' TLS settings, and the warnings for the ones the build ignores,
+/// come from them.
 /// </param>
 /// <param name="outputFileSystem">Opens the <c>-o</c> / <c>--output</c> files.</param>
 /// <param name="outputFileTimeSetter">
@@ -68,6 +70,13 @@ namespace Curl.Console;
 /// <c>-S</c> rule as any failure; a larger body reports the handler's own write failure.
 /// </para>
 /// <para>
+/// Each transfer starts with the <see cref="TransferDispatch.WarningLinesBeforeEachTransfer" />,
+/// unless <c>-s</c> was given anywhere on the command line, with or without <c>-S</c>: once per
+/// URL, before its malformed-URL, range, <c>-o</c> or transfer lines, but after a <c>-D</c> file
+/// that cannot be opened, which ends the run without them. curl 8.21.0 (Schannel) prints its
+/// <c>--capath</c> lines this way, measured on 2026-09-26.
+/// </para>
+/// <para>
 /// The parser's warning lines come first on standard error, whether or not the command line
 /// is accepted; a refused command line then prints the refusal's lines and transfers nothing.
 /// An accepted command line's warning lines for after the transfers, such as curl's
@@ -102,7 +111,7 @@ namespace Curl.Console;
 /// </para>
 /// </remarks>
 internal sealed class CurlCommandRunner(
-    Func<CommandLineOptions, ProtocolDispatcher> createDispatcher,
+    Func<CommandLineOptions, TransferDispatch> createTransferDispatch,
     IFileSystem outputFileSystem,
     IFileTimeSetter outputFileTimeSetter,
     Stream standardOutput,
@@ -203,12 +212,12 @@ internal sealed class CurlCommandRunner(
     private async Task<CurlExitCode> TransferAllAsync(CommandLineOptions options)
     {
         CurlExitCode exitCode = CurlExitCode.Ok;
-        ProtocolDispatcher dispatcher = createDispatcher(options);
+        TransferDispatch dispatch = createTransferDispatch(options);
         bool showsErrors = ShowsErrors(options);
 
         for (int index = 0; index < options.Urls.Count; index++)
         {
-            TransferResult result = await TransferWithHeaderOutputAsync(dispatcher, options, index)
+            TransferResult result = await TransferWithHeaderOutputAsync(dispatch, options, index)
                 .ConfigureAwait(false);
             exitCode = result.ExitCode;
 
@@ -271,7 +280,7 @@ internal sealed class CurlCommandRunner(
     /// sending its header lines where <c>-D</c> says: nowhere without <c>-D</c>, standard
     /// output for <c>-D -</c>, otherwise the named file.
     /// </summary>
-    /// <param name="dispatcher">Performs the transfer with the handler for its scheme.</param>
+    /// <param name="dispatch">Performs the transfer with the handler for its scheme, after its warning lines.</param>
     /// <param name="options">The accepted command line.</param>
     /// <param name="index">The URL's position on the command line.</param>
     /// <returns>
@@ -285,7 +294,7 @@ internal sealed class CurlCommandRunner(
     /// <c>-o</c> names only.
     /// </remarks>
     private async Task<TransferResult> TransferWithHeaderOutputAsync(
-        ProtocolDispatcher dispatcher,
+        TransferDispatch dispatch,
         CommandLineOptions options,
         int index)
     {
@@ -297,10 +306,10 @@ internal sealed class CurlCommandRunner(
         {
             Stream? headerOutput = headerFile is null ? null : deferringStandardOutput;
 
-            return await TransferAsync(dispatcher, options, url, outputFile, headerOutput).ConfigureAwait(false);
+            return await TransferAsync(dispatch, options, url, outputFile, headerOutput).ConfigureAwait(false);
         }
 
-        return await TransferWithHeaderFileAsync(dispatcher, options, index, url, outputFile, headerFile)
+        return await TransferWithHeaderFileAsync(dispatch, options, index, url, outputFile, headerFile)
             .ConfigureAwait(false);
     }
 
@@ -309,7 +318,7 @@ internal sealed class CurlCommandRunner(
     /// the transfer with its header lines going there, and closes the file; reports the file
     /// when it cannot be opened.
     /// </summary>
-    /// <param name="dispatcher">Performs the transfer with the handler for its scheme.</param>
+    /// <param name="dispatch">Performs the transfer with the handler for its scheme, after its warning lines.</param>
     /// <param name="options">The accepted command line.</param>
     /// <param name="index">The URL's position on the command line.</param>
     /// <param name="url">The URL as typed.</param>
@@ -320,7 +329,7 @@ internal sealed class CurlCommandRunner(
     /// transferred, when the <c>-D</c> file cannot be opened.
     /// </returns>
     private async Task<TransferResult> TransferWithHeaderFileAsync(
-        ProtocolDispatcher dispatcher,
+        TransferDispatch dispatch,
         CommandLineOptions options,
         int index,
         string url,
@@ -342,7 +351,7 @@ internal sealed class CurlCommandRunner(
 
         await using (headerStream.ConfigureAwait(false))
         {
-            return await TransferAsync(dispatcher, options, url, outputFile, headerStream).ConfigureAwait(false);
+            return await TransferAsync(dispatch, options, url, outputFile, headerStream).ConfigureAwait(false);
         }
     }
 
@@ -367,7 +376,7 @@ internal sealed class CurlCommandRunner(
     /// Performs one transfer, to <paramref name="outputFile" /> when one is given and to
     /// standard output otherwise.
     /// </summary>
-    /// <param name="dispatcher">Performs the transfer with the handler for its scheme.</param>
+    /// <param name="dispatch">Performs the transfer with the handler for its scheme, after its warning lines.</param>
     /// <param name="options">The accepted command line.</param>
     /// <param name="url">
     /// The URL as typed; the <c>-G</c> / <c>--url-query</c> query is appended by
@@ -384,12 +393,19 @@ internal sealed class CurlCommandRunner(
     /// transferred, when the <c>-r</c> text names no range, as curl 8.21.0 reports it.
     /// </returns>
     private async Task<TransferResult> TransferAsync(
-        ProtocolDispatcher dispatcher,
+        TransferDispatch dispatch,
         CommandLineOptions options,
         string url,
         string? outputFile,
         Stream? headerOutput)
     {
+        if (!options.Silent)
+        {
+            await WriteErrorLinesAsync(dispatch.WarningLinesBeforeEachTransfer).ConfigureAwait(false);
+        }
+
+        ProtocolDispatcher dispatcher = dispatch.Dispatcher;
+
         if (!Uri.TryCreate(QueryUrl.Append(url, options), UriKind.Absolute, out Uri? uri))
         {
             return TransferResult.Failure(CurlExitCode.UrlMalformat, MalformedUrlMessage);

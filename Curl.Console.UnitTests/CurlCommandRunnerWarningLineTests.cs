@@ -105,6 +105,6 @@ public sealed class CurlCommandRunnerWarningLineTests
     }
 
     private Task<int> RunAsync(IReadOnlyList<string> arguments, params IProtocolHandler[] handlers) =>
-        new CurlCommandRunner(_ => new ProtocolDispatcher(handlers), fileSystem, fileSystem, standardOutput, standardError, standardInput, runsOnWindows: false)
+        new CurlCommandRunner(_ => new TransferDispatch(new ProtocolDispatcher(handlers)), fileSystem, fileSystem, standardOutput, standardError, standardInput, runsOnWindows: false)
             .RunAsync(arguments);
 }

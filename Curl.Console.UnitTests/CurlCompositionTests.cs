@@ -206,6 +206,55 @@ public sealed class CurlCompositionTests
         Assert.IsNotNull(dispatcher);
     }
 
+    [TestMethod]
+    public void CreateTransferDispatch_ProductionTransports_WarnsWithTheTlsProvidersWarnings()
+    {
+        CurlTransports transports = CurlComposition.CreateTransports(NoOptions());
+
+        TransferDispatch dispatch = CurlComposition.CreateTransferDispatch(transports);
+
+        Assert.IsNotNull(dispatch.Dispatcher);
+        Assert.AreSame(transports.TlsProvider.Warnings, dispatch.WarningLinesBeforeEachTransfer);
+    }
+
+    [TestMethod]
+    public void CreateTransferDispatch_CaPath_WarnsAsThePlatformsCurlBuildDoes()
+    {
+        CurlTransports transports = CurlComposition.CreateTransports(Parse("--capath", ".", "https://example.com/"));
+
+        TransferDispatch dispatch = CurlComposition.CreateTransferDispatch(transports);
+
+        // ADR-0009: the Schannel build ignores --capath with these two lines; the OpenSSL
+        // build honours it and prints nothing.
+        string[] expected = OperatingSystem.IsWindows()
+            ?
+            [
+                "Warning: ignoring setting the CA path for the proxy, not supported by libcurl ",
+                "Warning: with Schannel",
+            ]
+            : [];
+        CollectionAssert.AreEqual(expected, dispatch.WarningLinesBeforeEachTransfer.ToArray());
+    }
+
+    [TestMethod]
+    public void CreateTransports_CaPathCertKeyAndCiphers_SslStreamTlsProviderReceivesMappedOptions()
+    {
+        CommandLineOptions options = Parse(
+            "--capath", "certs", "--cert", "c.p12:pw", "--key", "k.pem",
+            "--ciphers", "AES128-SHA", "--tls13-ciphers", "TLS_AES_128_GCM_SHA256", "https://example.com/");
+
+        CurlTransports transports = CurlComposition.CreateTransports(options);
+
+        TlsClientOptions expected = new(
+            CaCertificateDirectory: "certs",
+            ClientCertificate: "c.p12:pw",
+            PrivateKey: "k.pem",
+            Ciphers: "AES128-SHA",
+            Tls13Ciphers: "TLS_AES_128_GCM_SHA256");
+        Assert.AreEqual(expected, transports.TlsClientOptions);
+        Assert.AreSame(transports.TlsClientOptions, CapturedDependency<TlsClientOptions>(transports.TlsProvider));
+    }
+
     /// <summary>
     /// Runs <paramref name="url" /> through the production handler set built around the
     /// fake connectors, and returns the exit code and what reached standard error.

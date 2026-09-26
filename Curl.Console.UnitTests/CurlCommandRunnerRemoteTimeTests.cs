@@ -133,6 +133,6 @@ public sealed class CurlCommandRunnerRemoteTimeTests
         });
 
     private Task<int> RunAsync(IReadOnlyList<string> arguments, IProtocolHandler handler) =>
-        new CurlCommandRunner(_ => new ProtocolDispatcher([handler]), outputFiles, outputFiles, standardOutput, standardError, new MemoryStream(), runsOnWindows: false)
+        new CurlCommandRunner(_ => new TransferDispatch(new ProtocolDispatcher([handler])), outputFiles, outputFiles, standardOutput, standardError, new MemoryStream(), runsOnWindows: false)
             .RunAsync(arguments);
 }

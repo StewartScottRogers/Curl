@@ -85,7 +85,7 @@ public sealed class CurlCommandRunnerOutputFileNameTests
 
     private Task<int> RunAsync(InMemoryFileSystem files, bool runsOnWindows, IReadOnlyList<string> arguments) =>
         new CurlCommandRunner(
-            _ => new ProtocolDispatcher([fileHandler]),
+            _ => new TransferDispatch(new ProtocolDispatcher([fileHandler])),
             files,
             files,
             new MemoryStream(),

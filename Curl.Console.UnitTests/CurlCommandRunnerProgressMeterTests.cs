@@ -149,7 +149,7 @@ public sealed class CurlCommandRunnerProgressMeterTests
     public async Task RunAsync_RunnerThatDoesNotWriteTheMeter_WritesNothing()
     {
         await new CurlCommandRunner(
-                _ => new ProtocolDispatcher([fileHandler]),
+                _ => new TransferDispatch(new ProtocolDispatcher([fileHandler])),
                 outputFiles,
                 outputFiles,
                 standardOutput,
@@ -166,7 +166,7 @@ public sealed class CurlCommandRunnerProgressMeterTests
         bool standardOutputIsTerminal = false,
         IProtocolHandler? handler = null) =>
         new CurlCommandRunner(
-                _ => new ProtocolDispatcher([handler ?? fileHandler]),
+                _ => new TransferDispatch(new ProtocolDispatcher([handler ?? fileHandler])),
                 outputFiles,
                 outputFiles,
                 standardOutput,

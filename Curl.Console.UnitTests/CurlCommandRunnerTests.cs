@@ -130,7 +130,7 @@ public sealed class CurlCommandRunnerTests
         InMemoryFileSystem files = new() { ReadContent = new byte[92] };
         files.UnwritablePaths.Add("C:/nonexist/dir/x");
         CurlCommandRunner runner = new(
-            _ => new ProtocolDispatcher([new FileProtocolHandler(files)]),
+            _ => new TransferDispatch(new ProtocolDispatcher([new FileProtocolHandler(files)])),
             files,
             files,
             standardOutput,
@@ -163,7 +163,7 @@ public sealed class CurlCommandRunnerTests
         InMemoryFileSystem files = new() { ReadContent = new byte[92], UnwritableStatus = FileAccessStatus.AccessDenied };
         files.UnwritablePaths.Add("C:/Windows/System32/bl087.txt");
         CurlCommandRunner runner = new(
-            _ => new ProtocolDispatcher([new FileProtocolHandler(files)]),
+            _ => new TransferDispatch(new ProtocolDispatcher([new FileProtocolHandler(files)])),
             files,
             files,
             standardOutput,
@@ -531,7 +531,7 @@ public sealed class CurlCommandRunnerTests
             _ =>
             {
                 calls++;
-                return new ProtocolDispatcher([]);
+                return new TransferDispatch(new ProtocolDispatcher([]));
             },
             fileSystem,
             fileSystem,
@@ -588,14 +588,14 @@ public sealed class CurlCommandRunnerTests
     }
 
     private Task<int> RunAsync(IReadOnlyList<string> arguments, params IProtocolHandler[] handlers) =>
-        new CurlCommandRunner(_ => new ProtocolDispatcher(handlers), fileSystem, fileSystem, standardOutput, standardError, standardInput, runsOnWindows: false)
+        new CurlCommandRunner(_ => new TransferDispatch(new ProtocolDispatcher(handlers)), fileSystem, fileSystem, standardOutput, standardError, standardInput, runsOnWindows: false)
             .RunAsync(arguments);
 
     private Task<int> RunWithStandardOutputAsync(
         Stream output,
         IReadOnlyList<string> arguments,
         params IProtocolHandler[] handlers) =>
-        new CurlCommandRunner(_ => new ProtocolDispatcher(handlers), fileSystem, fileSystem, output, standardError, standardInput, runsOnWindows: false)
+        new CurlCommandRunner(_ => new TransferDispatch(new ProtocolDispatcher(handlers)), fileSystem, fileSystem, output, standardError, standardInput, runsOnWindows: false)
             .RunAsync(arguments);
 
     private Task<int> RunToUncreatableOutputFileAsync(params string[] options)
@@ -603,7 +603,7 @@ public sealed class CurlCommandRunnerTests
         InMemoryFileSystem files = new() { ReadContent = new byte[92] };
         files.UnwritablePaths.Add("Z:/nonexist/x");
         CurlCommandRunner runner = new(
-            _ => new ProtocolDispatcher([new FileProtocolHandler(files)]),
+            _ => new TransferDispatch(new ProtocolDispatcher([new FileProtocolHandler(files)])),
             files,
             files,
             standardOutput,

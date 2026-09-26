@@ -301,6 +301,6 @@ public sealed class CurlCommandRunnerTransferOptionTests
     private string WrittenText(string path) => Encoding.ASCII.GetString(outputFiles.Written[path].ToArray());
 
     private Task<int> RunAsync(IReadOnlyList<string> arguments, IProtocolHandler handler) =>
-        new CurlCommandRunner(_ => new ProtocolDispatcher([handler]), outputFiles, outputFiles, standardOutput, standardError, new MemoryStream(), runsOnWindows: false)
+        new CurlCommandRunner(_ => new TransferDispatch(new ProtocolDispatcher([handler])), outputFiles, outputFiles, standardOutput, standardError, new MemoryStream(), runsOnWindows: false)
             .RunAsync(arguments);
 }

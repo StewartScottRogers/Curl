@@ -205,7 +205,7 @@ public sealed class CurlCommandRunnerHeaderAndFailTests
         HttpProtocolHandler http = new(server, new BasicAndBearerAuthenticator(CredentialEncoding.ForPlatform(isWindows: false)));
 
         return new CurlCommandRunner(
-                _ => new ProtocolDispatcher([http]),
+                _ => new TransferDispatch(new ProtocolDispatcher([http])),
                 outputFiles,
                 outputFiles,
                 standardOutput,
