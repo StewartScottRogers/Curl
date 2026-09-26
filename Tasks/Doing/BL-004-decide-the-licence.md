@@ -38,3 +38,4 @@ it.
 
 - 2026-09-25: Migrated from Documentation/Planning/Backlog.md (Ready). Assigned to Stewart because the decision is his.
 - 2026-09-26: Stewart chose MIT. Reassigned to Claude to record the ADR and replace LICENSE.txt.
+- 2026-09-26: Backlog -> Doing.
