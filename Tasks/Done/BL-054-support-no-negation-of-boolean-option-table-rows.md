@@ -89,7 +89,7 @@ Choices:
   row whose own name starts with `no-` still matches directly.
 - `CommandLineRefusal.CannotBeReversed` carries the new text.
 - `Documentation/Wiki/Command-Line-Parsing.md` and FR-046 in `Documentation/Product/Requirements.md`
-  still say `--no-` is unimplemented; they are outside this task's `touches`, so BL-100
+  still say `--no-` is unimplemented; they are outside this task's `touches`, so BL-101
   is filed to fix them.
 - Tests: `CommandLineNegationTests` (parser), plus `NegatableFlag`/`Negate` in
   `CommandLineOptionTests` and `CannotBeReversed` in `CommandLineRefusalTests`.

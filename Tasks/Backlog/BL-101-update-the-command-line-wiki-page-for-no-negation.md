@@ -1,5 +1,5 @@
 ---
-id: BL-100
+id: BL-101
 title: Update the command-line wiki page for --no- negation
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-100 — Update the command-line wiki page for --no- negation
+# BL-101 — Update the command-line wiki page for --no- negation
 
 ## Goal
 
