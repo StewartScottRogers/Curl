@@ -1,5 +1,5 @@
 ---
-id: BL-152
+id: BL-249
 title: Honour --cert-type, --key-type and --pass in the SslStream TLS provider
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-152 — Honour --cert-type, --key-type and --pass in the SslStream TLS provider
+# BL-249 — Honour --cert-type, --key-type and --pass in the SslStream TLS provider
 
 ## Goal
 

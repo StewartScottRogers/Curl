@@ -65,7 +65,7 @@ loaded.
 
 ## Notes
 
-`--cert-type`, `--key-type` and `--pass` are not in scope (filed as BL-152).
+`--cert-type`, `--key-type` and `--pass` are not in scope (filed as BL-249).
 
 ### Measured `--cert` split (2026-09-26)
 
@@ -142,7 +142,7 @@ changed here is at 100% line and branch coverage, complexity at most 10. The thr
 it still lists (`TcpDialer.DialAsync`, `UdpDatagramChannel.SendAsync`/`ReceiveAsync`) were
 already there before this task; only the Integration tests cover them.
 
-Follow-ups: BL-151 (Schannel certificate-store `--cert`), BL-152 (`--cert-type`,
+Follow-ups: BL-248 (Schannel certificate-store `--cert`), BL-249 (`--cert-type`,
 `--key-type`, `--pass`). Wiring the options from the command line is BL-072.
 
 ## Log

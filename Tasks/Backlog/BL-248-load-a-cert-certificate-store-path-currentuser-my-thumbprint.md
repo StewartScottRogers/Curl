@@ -1,5 +1,5 @@
 ---
-id: BL-151
+id: BL-248
 title: Load a --cert certificate-store path (CurrentUser\MY\<thumbprint>) in the Schannel build
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-151 — Load a --cert certificate-store path (CurrentUser\MY\<thumbprint>) in the Schannel build
+# BL-248 — Load a --cert certificate-store path (CurrentUser\MY\<thumbprint>) in the Schannel build
 
 ## Goal
 
