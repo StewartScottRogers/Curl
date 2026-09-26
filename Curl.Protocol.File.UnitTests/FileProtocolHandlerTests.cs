@@ -20,9 +20,14 @@ public sealed class FileProtocolHandlerTests
     private const string EncodedUrlPath = "C:/dir/my%20file.txt";
 
     /// <summary>
-    /// The chunk size curl uses for a <c>file://</c> body, measured at 16 kilobytes.
+    /// The chunk size curl uses for a <c>file://</c> download body, measured at 16 kilobytes.
     /// </summary>
     private const int ChunkSize = 16384;
+
+    /// <summary>
+    /// The chunk size curl uses for a <c>file://</c> upload body, measured at 64 kilobytes.
+    /// </summary>
+    private const int UploadChunkSize = 65536;
 
     private const string ExpectedHeaders =
         "Content-Length: 10\r\n"
@@ -381,16 +386,16 @@ public sealed class FileProtocolHandlerTests
         Assert.AreEqual(11L, result.BytesTransferred);
     }
 
-    // Measured: 16383 bytes of x, a carriage return as byte 16384, a line feed as byte
-    // 16385 and ten bytes of y - 16395 in all - land unchanged with size_upload 16395. The
-    // carriage return ends the first 16384-byte chunk and the line feed starts the second,
-    // so the conversion has to remember the carriage return across the chunk boundary.
+    // 65535 bytes of x, a carriage return as byte 65536, a line feed as byte 65537 and ten
+    // bytes of y - 65547 in all - land unchanged with size_upload 65547. The carriage return
+    // ends the first 65536-byte upload chunk and the line feed starts the second, so the
+    // conversion has to remember the carriage return across the chunk boundary.
     [TestMethod]
     public async Task ExecuteAsync_UploadWithCrlf_KeepsAPairSplitAcrossChunksWhole()
     {
         byte[] content =
         [
-            .. Enumerable.Repeat((byte)'x', ChunkSize - 1),
+            .. Enumerable.Repeat((byte)'x', UploadChunkSize - 1),
             (byte)'\r',
             (byte)'\n',
             .. Enumerable.Repeat((byte)'y', 10),
@@ -399,7 +404,7 @@ public sealed class FileProtocolHandlerTests
         var (written, result) = await UploadAsync(content, convertLineEndings: true);
 
         CollectionAssert.AreEqual(content, written);
-        Assert.AreEqual(16395L, result.BytesTransferred);
+        Assert.AreEqual(65547L, result.BytesTransferred);
     }
 
     // A chunk of nothing but line feeds is the worst case: its conversion is twice its
@@ -407,8 +412,8 @@ public sealed class FileProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_UploadWithCrlf_DoublesAFullChunkOfLineFeeds()
     {
-        byte[] content = [.. Enumerable.Repeat((byte)'\n', ChunkSize + 1)];
-        byte[] expected = [.. Enumerable.Range(0, ChunkSize + 1).SelectMany(static _ => "\r\n"u8.ToArray())];
+        byte[] content = [.. Enumerable.Repeat((byte)'\n', UploadChunkSize + 1)];
+        byte[] expected = [.. Enumerable.Range(0, UploadChunkSize + 1).SelectMany(static _ => "\r\n"u8.ToArray())];
 
         var (written, result) = await UploadAsync(content, convertLineEndings: true);
 
@@ -541,14 +546,14 @@ public sealed class FileProtocolHandlerTests
         var context = new FakeTransferContext
         {
             Url = FileUrl,
-            Upload = FaultingStream.FailingOnRead(LargeContent(), 2),
+            Upload = FaultingStream.FailingOnRead(UploadContent(), 2),
         };
         var handler = new FileProtocolHandler(fileSystem);
 
         var result = await handler.ExecuteAsync(context);
 
         Assert.AreEqual(CurlExitCode.ReadError, result.ExitCode);
-        Assert.AreEqual((long)ChunkSize, result.BytesTransferred);
+        Assert.AreEqual((long)UploadChunkSize, result.BytesTransferred);
     }
 
     [TestMethod]
@@ -689,7 +694,7 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         var destination = new ChunkRecordingStream();
         fileSystem.WriteInto(OsPath, destination);
-        byte[] content = LargeContent();
+        byte[] content = UploadContent();
         var context = new FakeTransferContext
         {
             Url = FileUrl,
@@ -701,14 +706,16 @@ public sealed class FileProtocolHandlerTests
 
         Assert.AreEqual(CurlExitCode.ReadError, result.ExitCode);
         Assert.AreEqual(
-            "client read function EOF fail, only 16384/40000 of needed bytes read",
+            "client read function EOF fail, only 65536/100000 of needed bytes read",
             result.ErrorMessage);
-        Assert.AreEqual((long)ChunkSize, result.BytesTransferred);
-        CollectionAssert.AreEqual(content[..ChunkSize], destination.ToArray());
+        Assert.AreEqual((long)UploadChunkSize, result.BytesTransferred);
+        CollectionAssert.AreEqual(content[..UploadChunkSize], destination.ToArray());
     }
 
-    // Measured: with -C 10 curl 8.21.0 still reports the whole file as needed and counts
-    // the skipped bytes as read.
+    // Measured: a 100000-byte source that fails to read from byte 99000 on prints
+    // only 65536/100000 with size_upload 65526 under -C 10. curl reads the source in
+    // 65536-byte chunks from its start, skipped bytes included, so the first read after the
+    // skip stops at byte 65536 and the whole file is still what it needed.
     [TestMethod]
     public async Task ExecuteAsync_ResumedUploadSourceFailsMidBody_CountsTheSkippedBytesAsRead()
     {
@@ -717,7 +724,7 @@ public sealed class FileProtocolHandlerTests
         var context = new FakeTransferContext
         {
             Url = FileUrl,
-            Upload = FaultingStream.FailingOnRead(LargeContent(), 2),
+            Upload = FaultingStream.FailingOnRead(UploadContent(), 2),
             ResumeFrom = 10,
         };
         var handler = new FileProtocolHandler(fileSystem);
@@ -726,8 +733,60 @@ public sealed class FileProtocolHandlerTests
 
         Assert.AreEqual(CurlExitCode.ReadError, result.ExitCode);
         Assert.AreEqual(
-            "client read function EOF fail, only 16394/40000 of needed bytes read",
+            "client read function EOF fail, only 65536/100000 of needed bytes read",
             result.ErrorMessage);
+        Assert.AreEqual(65526L, result.BytesTransferred);
+    }
+
+    // Measured: a 200000-byte source unreadable from byte 150000 on, under -C 70000, prints
+    // only 131072/200000 with size_upload 61072: one read from the skip to the chunk
+    // boundary at 131072, then a failed one.
+    [TestMethod]
+    public async Task ExecuteAsync_UploadResumedPastTheFirstChunkFailsMidBody_ReadsToTheNextChunkBoundaryFirst()
+    {
+        var fileSystem = new FakeFileSystem();
+        var destination = new ChunkRecordingStream();
+        fileSystem.WriteInto(OsPath, destination);
+        var context = new FakeTransferContext
+        {
+            Url = FileUrl,
+            Upload = FaultingStream.FailingOnRead(new byte[200000], 2),
+            ResumeFrom = 70000,
+        };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        var result = await handler.ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.ReadError, result.ExitCode);
+        Assert.AreEqual(
+            "client read function EOF fail, only 131072/200000 of needed bytes read",
+            result.ErrorMessage);
+        Assert.AreEqual(61072L, result.BytesTransferred);
+        CollectionAssert.AreEqual(new[] { 61072 }, destination.WriteLengths.ToArray());
+    }
+
+    // Measured: the same source under -C 140000 prints only 131072/200000 with size_upload
+    // 0: the read that fails starts at the chunk boundary below the skip, not at the skip.
+    [TestMethod]
+    public async Task ExecuteAsync_ResumedUploadSourceFailsOnItsFirstRead_ReportsTheChunkBoundaryBelowTheSkip()
+    {
+        var fileSystem = new FakeFileSystem();
+        fileSystem.WriteInto(OsPath, new ChunkRecordingStream());
+        var context = new FakeTransferContext
+        {
+            Url = FileUrl,
+            Upload = FaultingStream.FailingOnRead(new byte[200000], 1),
+            ResumeFrom = 140000,
+        };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        var result = await handler.ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.ReadError, result.ExitCode);
+        Assert.AreEqual(
+            "client read function EOF fail, only 131072/200000 of needed bytes read",
+            result.ErrorMessage);
+        Assert.AreEqual(0L, result.BytesTransferred);
     }
 
     // Standard input has no length to fall short of, so curl 8.21.0, whose read callback
@@ -738,7 +797,7 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         var destination = new ChunkRecordingStream();
         fileSystem.WriteInto(OsPath, destination);
-        byte[] content = LargeContent();
+        byte[] content = UploadContent();
         var context = new FakeTransferContext
         {
             Url = FileUrl,
@@ -749,8 +808,8 @@ public sealed class FileProtocolHandlerTests
         var result = await handler.ExecuteAsync(context);
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        Assert.AreEqual((long)ChunkSize, result.BytesTransferred);
-        CollectionAssert.AreEqual(content[..ChunkSize], destination.ToArray());
+        Assert.AreEqual((long)UploadChunkSize, result.BytesTransferred);
+        CollectionAssert.AreEqual(content[..UploadChunkSize], destination.ToArray());
     }
 
     [TestMethod]
@@ -782,7 +841,7 @@ public sealed class FileProtocolHandlerTests
         var context = new FakeTransferContext
         {
             Url = FileUrl,
-            Upload = new TrackedMemoryStream(LargeContent()),
+            Upload = new TrackedMemoryStream(UploadContent()),
         };
         var handler = new FileProtocolHandler(fileSystem);
 
@@ -790,7 +849,7 @@ public sealed class FileProtocolHandlerTests
 
         Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
         Assert.AreEqual(DestinationWriteFailedMessage, result.ErrorMessage);
-        Assert.AreEqual((long)ChunkSize, result.BytesTransferred);
+        Assert.AreEqual((long)UploadChunkSize, result.BytesTransferred);
     }
 
     [TestMethod]
@@ -951,7 +1010,7 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         using var cancellation = new CancellationTokenSource();
         var upload = CancellingStream.ReadingNonSeekable(
-            LargeContent(),
+            UploadContent(),
             triggerOperationNumber: 1,
             StreamCancellationStyle.None,
             cancellation);
@@ -959,7 +1018,7 @@ public sealed class FileProtocolHandlerTests
         {
             Url = FileUrl,
             Upload = upload,
-            ResumeFrom = ChunkSize + 1,
+            ResumeFrom = UploadChunkSize + 1,
             CancellationToken = cancellation.Token,
         };
         var handler = new FileProtocolHandler(fileSystem);
@@ -2417,6 +2476,18 @@ public sealed class FileProtocolHandlerTests
 
     private static string NativePath(string slashedPath) =>
         slashedPath.Replace('/', Path.DirectorySeparatorChar);
+
+    private static byte[] UploadContent()
+    {
+        byte[] content = new byte[100000];
+
+        for (int index = 0; index < content.Length; index++)
+        {
+            content[index] = (byte)(index % 251);
+        }
+
+        return content;
+    }
 
     private static byte[] LargeContent()
     {

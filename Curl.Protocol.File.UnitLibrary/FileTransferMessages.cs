@@ -99,8 +99,8 @@ internal static class FileTransferMessages
     /// before all of it was sent.
     /// </summary>
     /// <param name="read">
-    /// The bytes read from the source before the failure, counting any skipped by
-    /// <c>-C</c>.
+    /// The bytes read from the start of the source before the failed read, which is a whole
+    /// number of 65536-byte chunks and counts any skipped by <c>-C</c>.
     /// </param>
     /// <param name="needed">The length of the source, which is what curl expected to send.</param>
     /// <returns>The message to report.</returns>
@@ -122,8 +122,8 @@ internal static class FileTransferMessages
     /// <c>Failed to open/read local data from file/application</c>, is never printed on
     /// this path; curl prints it only when the tool cannot open the <c>-T</c> file at all,
     /// which happens before any handler runs. curl reads an upload 65536 bytes at a time
-    /// and this handler 16384, so the two agree on <paramref name="read" /> only where the
-    /// failure falls on a 64-kilobyte boundary.
+    /// from the start of the file, <c>-C</c> or not, and so does this handler, so the two
+    /// report the same <paramref name="read" /> for the same failure point.
     /// </para>
     /// </remarks>
     internal static string UploadSourceReadFailed(long read, long needed) =>

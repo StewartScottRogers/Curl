@@ -69,12 +69,21 @@ namespace Curl.Protocol.File;
 public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandler
 {
     /// <summary>
-    /// The chunk size for a <c>file://</c> body, which is curl's
+    /// The chunk size for a <c>file://</c> download body, which is curl's
     /// <c>CURL_MAX_WRITE_SIZE</c>. It is observable — it is the size of every write to
     /// the output but the last — so it is pinned here rather than left to
     /// <see cref="Stream.CopyToAsync(Stream)" />, whose buffer is five times larger.
     /// </summary>
     private const int ChunkSize = 16384;
+
+    /// <summary>
+    /// The chunk size for a <c>file://</c> upload body. curl 8.21.0 reads a <c>-T</c>
+    /// source 65536 bytes at a time, counted from the start of the file even when
+    /// <c>-C</c> skips part of it, which is observable in the exit 26 message: a
+    /// 100000-byte source that fails to read from byte 99000 on reports
+    /// <c>only 65536/100000</c>.
+    /// </summary>
+    private const int UploadChunkSize = 65536;
 
     /// <summary>
     /// The one scheme this handler serves. Checked against curl 8.21.0's
@@ -244,6 +253,8 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
         return await CopyAsync(
                 source,
                 context.Output,
+                ChunkSize,
+                ChunkSize,
                 count,
                 context.MaxFileSize is > 0 and long maxFileSize ? maxFileSize : long.MaxValue,
                 static chunk => chunk,
@@ -323,15 +334,24 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
             return TransferResult.Success(0);
         }
 
+        // curl reads the source in UploadChunkSize chunks from its start, skipped bytes
+        // included, so the first read after a -C skip only reaches the next chunk boundary,
+        // and a failed read reports the boundary it started from: measured with a 200000-byte
+        // source unreadable from byte 150000, -C 10, -C 70000 and -C 140000 all print
+        // only 131072/200000, with size_upload 131062, 61072 and 0.
+        int firstChunkSize = UploadChunkSize - (int)(skip % UploadChunkSize);
+
         // A fresh converter per upload, so the carriage return it remembers never leaks
         // from one transfer into the next. Bytes skipped by -C are not seen by it.
         Func<ReadOnlyMemory<byte>, ReadOnlyMemory<byte>> convertChunk = context.ConvertLineEndings
-            ? new CrlfUploadConverter(ChunkSize).Convert
+            ? new CrlfUploadConverter(UploadChunkSize).Convert
             : static chunk => chunk;
 
         return await CopyAsync(
                 upload,
                 destination,
+                UploadChunkSize,
+                firstChunkSize,
                 long.MaxValue,
                 long.MaxValue,
                 convertChunk,
@@ -339,7 +359,9 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
                     ? new TransferResult(
                         CurlExitCode.ReadError,
                         transferred,
-                        FileTransferMessages.UploadSourceReadFailed(skip + consumed, length))
+                        FileTransferMessages.UploadSourceReadFailed(
+                            (skip + consumed) / UploadChunkSize * UploadChunkSize,
+                            length))
                     : TransferResult.Success(transferred),
                 static (_, transferred) => new TransferResult(
                     CurlExitCode.SendError,
@@ -350,11 +372,19 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     }
 
     /// <summary>
-    /// Moves up to <paramref name="count" /> bytes in <see cref="ChunkSize" /> chunks,
+    /// Moves up to <paramref name="count" /> bytes in <paramref name="chunkSize" /> chunks,
     /// telling a failed read apart from a failed write.
     /// </summary>
     /// <param name="source">Where the bytes come from.</param>
     /// <param name="destination">Where they go.</param>
+    /// <param name="chunkSize">
+    /// The most to read at once: <see cref="ChunkSize" /> for a download,
+    /// <see cref="UploadChunkSize" /> for an upload.
+    /// </param>
+    /// <param name="firstChunkSize">
+    /// The most to read the first time, which is <paramref name="chunkSize" /> unless an
+    /// upload's <c>-C</c> skip left the source part-way into a chunk.
+    /// </param>
     /// <param name="count">
     /// How many bytes at most to read, or <see cref="long.MaxValue" /> to run to the end of
     /// <paramref name="source" />.
@@ -388,6 +418,8 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     private static async ValueTask<TransferResult> CopyAsync(
         Stream source,
         Stream destination,
+        int chunkSize,
+        int firstChunkSize,
         long count,
         long maxWritten,
         Func<ReadOnlyMemory<byte>, ReadOnlyMemory<byte>> convertChunk,
@@ -395,15 +427,17 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
         Func<long, long, TransferResult> reportWriteFailure,
         CancellationToken cancellationToken)
     {
-        byte[] buffer = new byte[ChunkSize];
+        byte[] buffer = new byte[chunkSize];
         long consumed = 0;
         long transferred = 0;
+        int nextChunkSize = firstChunkSize;
 
         while (consumed < count)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            int wanted = (int)Math.Min(ChunkSize, count - consumed);
+            int wanted = (int)Math.Min(nextChunkSize, count - consumed);
+            nextChunkSize = chunkSize;
             int read = await TryReadAsync(source, buffer, wanted, cancellationToken)
                 .ConfigureAwait(false);
 
@@ -554,13 +588,13 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
             return true;
         }
 
-        byte[] buffer = new byte[ChunkSize];
+        byte[] buffer = new byte[UploadChunkSize];
 
         for (long skipped = 0; skipped < count;)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            int wanted = (int)Math.Min(ChunkSize, count - skipped);
+            int wanted = (int)Math.Min(UploadChunkSize, count - skipped);
             int read = await TryReadAsync(source, buffer, wanted, cancellationToken)
                 .ConfigureAwait(false);
 
