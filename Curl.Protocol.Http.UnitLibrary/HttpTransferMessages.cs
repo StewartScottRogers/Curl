@@ -6,7 +6,7 @@ namespace Curl.Protocol.Http;
 /// <summary>
 /// Every failure message sending an HTTP/1.x request body or reading a response head or
 /// body reports, as curl 8.21.0 prints it. Each was measured against a loopback server
-/// (BL-169, BL-170, BL-171, BL-175) except <see cref="ReceiveFailed" />, which is the text
+/// (BL-169, BL-170, BL-171, BL-175, BL-176) except <see cref="ReceiveFailed" />, which is the text
 /// <c>curl_easy_strerror</c> gives exit 56.
 /// </summary>
 internal static class HttpTransferMessages
@@ -97,6 +97,15 @@ internal static class HttpTransferMessages
     /// trailers were whole.
     /// </summary>
     internal const string ChunkedBodyIncomplete = "transfer closed with outstanding read data remaining";
+
+    /// <summary>
+    /// Formats the exit 22 message for a final status of 400 or above under <c>-f</c> or
+    /// <c>--fail-with-body</c>.
+    /// </summary>
+    /// <param name="statusCode">The final status code.</param>
+    /// <returns>The message, such as <c>The requested URL returned error: 404</c>.</returns>
+    internal static string RequestedUrlReturnedError(int statusCode) =>
+        string.Create(CultureInfo.InvariantCulture, $"The requested URL returned error: {statusCode}");
 
     /// <summary>
     /// Formats the exit 56 message for a chunk size line that does not start with a

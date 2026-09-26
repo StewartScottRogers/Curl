@@ -9,7 +9,8 @@ namespace Curl.Protocol.Http;
 /// Every rule was measured (BL-175 Notes).
 /// </summary>
 /// <remarks>
-/// A request with a body is a POST unless <c>-X</c> names another method. The body is sent
+/// A request with a body is a POST unless <c>-X</c> names another method; one without is a
+/// GET, or a HEAD for <c>-I</c>. The body is sent
 /// chunked when its length is unknown or an <c>-H</c> value asks for
 /// <c>Transfer-Encoding: chunked</c>, and with <c>Content-Length</c> otherwise. curl adds
 /// <c>Expect: 100-continue</c> when the length is unknown or above
@@ -41,7 +42,8 @@ internal sealed class HttpRequestFraming
     }
 
     /// <summary>
-    /// Gets the request method: <c>-X</c>'s, or POST with a body and GET without.
+    /// Gets the request method: <c>-X</c>'s, or POST with a body, HEAD for <c>-I</c> and GET
+    /// otherwise.
     /// </summary>
     internal string Method { get; }
 
@@ -77,12 +79,17 @@ internal sealed class HttpRequestFraming
     /// </summary>
     /// <param name="options">The HTTP options.</param>
     /// <param name="customHeaders">The parsed <c>-H</c> values, in command-line order.</param>
+    /// <param name="noBody">
+    /// <see langword="true" /> for <c>-I</c>/<c>--head</c>, which makes a request without a
+    /// body a HEAD unless <c>-X</c> names another method. curl refuses <c>-I</c> with a body
+    /// on the command line, so a body keeps its POST here.
+    /// </param>
     /// <returns>The framing.</returns>
-    internal static HttpRequestFraming Of(HttpRequestOptions options, HttpCustomHeader[] customHeaders)
+    internal static HttpRequestFraming Of(HttpRequestOptions options, HttpCustomHeader[] customHeaders, bool noBody = false)
     {
         if (options.Body is not { } body)
         {
-            return new HttpRequestFraming(options.CustomMethod ?? "GET", null, null, false, false, false);
+            return new HttpRequestFraming(options.CustomMethod ?? (noBody ? "HEAD" : "GET"), null, null, false, false, false);
         }
 
         return OfBody(options.CustomMethod ?? "POST", body, customHeaders);

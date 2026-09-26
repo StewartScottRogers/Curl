@@ -39,6 +39,27 @@ public sealed class HttpRequestFramingTests
     }
 
     [TestMethod]
+    [DataRow(null, "HEAD", DisplayName = "-I sends HEAD")]
+    [DataRow("GET", "GET", DisplayName = "-I -X GET sends GET")]
+    public void Of_NoBodyRequested_IsHeadUnlessCustomMethod(string? customMethod, string method)
+    {
+        HttpRequestOptions options = new() { CustomMethod = customMethod };
+
+        HttpRequestFraming framing = HttpRequestFraming.Of(options, [], noBody: true);
+
+        Assert.AreEqual(method, framing.Method);
+        Assert.IsNull(framing.Body);
+    }
+
+    [TestMethod]
+    public void Of_NoBodyRequestedWithBody_StaysPost()
+    {
+        HttpRequestOptions options = new() { Body = new BytesBody("x"u8.ToArray(), "a/b") };
+
+        Assert.AreEqual("POST", HttpRequestFraming.Of(options, [], noBody: true).Method);
+    }
+
+    [TestMethod]
     public void Of_CustomMethodWithoutBody_KeepsTheMethod() =>
         Assert.AreEqual("DELETE", Of(new HttpRequestOptions { CustomMethod = "DELETE" }).Method);
 

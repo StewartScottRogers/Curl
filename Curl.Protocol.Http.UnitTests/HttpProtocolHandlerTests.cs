@@ -479,6 +479,146 @@ public sealed class HttpProtocolHandlerTests
         Assert.AreEqual(0, result.Report.ResponseCode);
     }
 
+    [TestMethod]
+    [DataRow(null, "HEAD", DisplayName = "-I")]
+    [DataRow("GET", "GET", DisplayName = "-I -X GET")]
+    public async Task ExecuteAsync_NoBody_SendsTheMeasuredRequestAndWritesOnlyTheHead(string? customMethod, string method)
+    {
+        const string head = "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\n";
+        string request = method + " /a?b HTTP/1.1\r\nHost: 127.0.0.1:18276\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
+        foreach (int chunkSize in ChunkSizes)
+        {
+            ScriptedConnection connection = Connection(head + "hello", chunkSize, request);
+            MemoryStream output = new();
+            MemoryStream headerOutput = new();
+
+            TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(
+                FailContext("http://127.0.0.1:18276/a?b", HttpFailMode.None, output, headerOutput, customMethod, noBody: true));
+
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Assert.AreEqual(0L, result.BytesTransferred, $"Chunk size {chunkSize}");
+            Assert.AreEqual(head, Latin1(headerOutput.ToArray()), $"Chunk size {chunkSize}");
+            Assert.AreEqual(0L, output.Length, $"Chunk size {chunkSize}");
+            Assert.AreEqual(method, result.Report!.Method, $"Chunk size {chunkSize}");
+            Assert.AreEqual(0L, result.Report.DownloadSize, $"Chunk size {chunkSize}");
+        }
+    }
+
+    [TestMethod]
+    [DataRow(400, DisplayName = "400")]
+    [DataRow(401, DisplayName = "401")]
+    [DataRow(404, DisplayName = "404")]
+    [DataRow(407, DisplayName = "407")]
+    [DataRow(500, DisplayName = "500")]
+    [DataRow(599, DisplayName = "599")]
+    public async Task ExecuteAsync_FailAtOrAbove400_Returns22AndWritesTheHeadButNoBody(int status)
+    {
+        string head = $"HTTP/1.1 {status} X\r\nContent-Length: 5\r\n\r\n";
+        foreach (int chunkSize in ChunkSizes)
+        {
+            MemoryStream output = new();
+            MemoryStream headerOutput = new();
+
+            TransferResult result = await Handler(QueueConnector.For(Connection(head + "nope!", chunkSize, RootRequest)))
+                .ExecuteAsync(FailContext("http://example.com/", HttpFailMode.Fail, output, headerOutput));
+
+            Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode, $"Chunk size {chunkSize}");
+            Assert.AreEqual($"The requested URL returned error: {status}", result.ErrorMessage, $"Chunk size {chunkSize}");
+            Assert.AreEqual(0L, result.BytesTransferred, $"Chunk size {chunkSize}");
+            Assert.AreEqual(head, Latin1(headerOutput.ToArray()), $"Chunk size {chunkSize}");
+            Assert.AreEqual(0L, output.Length, $"Chunk size {chunkSize}");
+            Assert.AreEqual(status, result.Report!.ResponseCode, $"Chunk size {chunkSize}");
+            Assert.AreEqual(0L, result.Report.DownloadSize, $"Chunk size {chunkSize}");
+        }
+    }
+
+    [TestMethod]
+    [DataRow(HttpFailMode.Fail, DisplayName = "-f")]
+    [DataRow(HttpFailMode.FailWithBody, DisplayName = "--fail-with-body")]
+    public async Task ExecuteAsync_FailBelow400_WritesTheBodyAndSucceeds(HttpFailMode fail)
+    {
+        MemoryStream output = new();
+
+        TransferResult result = await Handler(QueueConnector.For(Connection("HTTP/1.1 399 X\r\nContent-Length: 5\r\n\r\nnope!", 65536)))
+            .ExecuteAsync(FailContext("http://example.com/", fail, output));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("nope!", Latin1(output.ToArray()));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_FailWithCredentialsOn401_Returns22()
+    {
+        TransferContext context = new()
+        {
+            Url = new Uri("http://example.com/"),
+            Output = new MemoryStream(),
+            Credentials = new NetworkCredential("a", "b"),
+            Http = new HttpRequestOptions { Fail = HttpFailMode.Fail },
+        };
+
+        TransferResult result = await Handler(QueueConnector.For(Connection("HTTP/1.1 401 Unauthorized\r\nContent-Length: 5\r\n\r\nnope!", 65536)))
+            .ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
+        Assert.AreEqual("The requested URL returned error: 401", result.ErrorMessage);
+        Assert.AreEqual(0L, context.Output.Length);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_FailWithBodyOn404_WritesTheBodyThenReturns22()
+    {
+        const string head = "HTTP/1.1 404 Not Found\r\nContent-Length: 5\r\n\r\n";
+        foreach (int chunkSize in ChunkSizes)
+        {
+            MemoryStream output = new();
+            MemoryStream headerOutput = new();
+
+            TransferResult result = await Handler(QueueConnector.For(Connection(head + "nope!", chunkSize, RootRequest)))
+                .ExecuteAsync(FailContext("http://example.com/", HttpFailMode.FailWithBody, output, headerOutput));
+
+            Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode, $"Chunk size {chunkSize}");
+            Assert.AreEqual("The requested URL returned error: 404", result.ErrorMessage, $"Chunk size {chunkSize}");
+            Assert.AreEqual(5L, result.BytesTransferred, $"Chunk size {chunkSize}");
+            Assert.AreEqual(head, Latin1(headerOutput.ToArray()), $"Chunk size {chunkSize}");
+            Assert.AreEqual("nope!", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
+            Assert.AreEqual(5L, result.Report!.DownloadSize, $"Chunk size {chunkSize}");
+        }
+    }
+
+    [TestMethod]
+    [DataRow(HttpFailMode.Fail, DisplayName = "-I -f")]
+    [DataRow(HttpFailMode.FailWithBody, DisplayName = "-I --fail-with-body")]
+    public async Task ExecuteAsync_NoBodyAndFailOn404_WritesTheHeadAndReturns22(HttpFailMode fail)
+    {
+        const string head = "HTTP/1.1 404 Not Found\r\nContent-Length: 5\r\n\r\n";
+        MemoryStream output = new();
+        MemoryStream headerOutput = new();
+
+        TransferResult result = await Handler(QueueConnector.For(Connection(head, 65536)))
+            .ExecuteAsync(FailContext("http://example.com/", fail, output, headerOutput, noBody: true));
+
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
+        Assert.AreEqual(head, Latin1(headerOutput.ToArray()));
+        Assert.AreEqual(0L, output.Length);
+    }
+
+    private static TransferContext FailContext(
+        string url,
+        HttpFailMode fail,
+        Stream output,
+        Stream? headerOutput = null,
+        string? customMethod = null,
+        bool noBody = false) =>
+        new()
+        {
+            Url = new Uri(url),
+            Output = output,
+            HeaderOutput = headerOutput,
+            NoBody = noBody,
+            Http = new HttpRequestOptions { Fail = fail, CustomMethod = customMethod },
+        };
+
     private static TransferContext BodyContext(string url, HttpRequestOptions options, TimeProvider? timeProvider = null) =>
         new()
         {

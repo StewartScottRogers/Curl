@@ -44,6 +44,13 @@ namespace Curl.Protocol.Http;
 /// chunked body's trailers follow the body. A header output that fails a write ends the
 /// transfer with exit 23.
 /// </para>
+/// <para>
+/// <see cref="ITransferContext.NoBody" /> (<c>-I</c>) sends HEAD unless <c>-X</c> names
+/// another method, and reads and writes no body whatever the method. A final status of 400 or
+/// above ends the transfer with exit 22 for <c>-f</c>, after the head is written and before
+/// any body is read, and for <c>--fail-with-body</c> after the body is written, as curl
+/// 8.21.0 does (BL-176 Notes).
+/// </para>
 /// </remarks>
 public sealed class HttpProtocolHandler(
     IConnector connector,
@@ -108,8 +115,8 @@ public sealed class HttpProtocolHandler(
     {
         CancellationToken cancellationToken = context.CancellationToken;
         HttpRequestOptions options = context.Http ?? new HttpRequestOptions();
-        HttpRequestFraming framing = HttpRequestFraming.Of(options, [.. options.Headers.Select(HttpCustomHeader.Parse)]);
-        byte[] request = HttpRequestHeadFormatter.Format(context.Url, options);
+        HttpRequestFraming framing = HttpRequestFraming.Of(options, [.. options.Headers.Select(HttpCustomHeader.Parse)], context.NoBody);
+        byte[] request = HttpRequestHeadFormatter.Format(context.Url, options, context.NoBody);
         await connection.WriteAsync(request, cancellationToken).ConfigureAwait(false);
         await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
 
@@ -122,8 +129,10 @@ public sealed class HttpProtocolHandler(
             await SendBodyAsync(context, framing, responseConnection, upload).ConfigureAwait(false);
             exchange.Head = await new HttpResponseHeadReader(responseConnection).ReadAsync(cancellationToken).ConfigureAwait(false);
             await WriteHeadersAsync(context.HeaderOutput, exchange.Head.HeadBytes, cancellationToken).ConfigureAwait(false);
-            await body.CopyAsync(exchange.Head, false, context.Output, cancellationToken).ConfigureAwait(false);
+            ThrowIfFailing(options.Fail, HttpFailMode.Fail, exchange.Head);
+            await body.CopyAsync(exchange.Head, context.NoBody, context.Output, cancellationToken).ConfigureAwait(false);
             await WriteHeadersAsync(context.HeaderOutput, body.TrailerBytes, cancellationToken).ConfigureAwait(false);
+            ThrowIfFailing(options.Fail, HttpFailMode.FailWithBody, exchange.Head);
         }
         catch (HttpTransferException failure)
         {
@@ -158,6 +167,21 @@ public sealed class HttpProtocolHandler(
         }
 
         await upload.WriteAsync(requestBody, framing.IsChunked, context.CancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Ends the transfer with exit 22 when <paramref name="fail" /> is
+    /// <paramref name="failAt" /> and the final status is 400 or above: before the body for
+    /// <c>-f</c>, after it for <c>--fail-with-body</c>. The head is written first either way.
+    /// </summary>
+    /// <exception cref="HttpTransferException">The status fails the transfer (exit 22).</exception>
+    private static void ThrowIfFailing(HttpFailMode fail, HttpFailMode failAt, HttpResponseHead head)
+    {
+        int statusCode = head.StatusLine.StatusCode;
+        if (fail == failAt && statusCode >= 400)
+        {
+            throw new HttpTransferException(CurlExitCode.HttpReturnedError, HttpTransferMessages.RequestedUrlReturnedError(statusCode));
+        }
     }
 
     /// <summary>

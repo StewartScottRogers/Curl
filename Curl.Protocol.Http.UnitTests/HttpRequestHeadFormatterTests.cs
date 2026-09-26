@@ -245,6 +245,20 @@ public sealed class HttpRequestHeadFormatterTests
         AssertHead($"PUT / HTTP/1.1\r\n{DefaultHeaders}Content-Length: 3\r\n\r\n", new Uri(Url), options);
     }
 
+    [TestMethod]
+    [DataRow(null, "HEAD", DisplayName = "-I")]
+    [DataRow("GET", "GET", DisplayName = "-I -X GET")]
+    public void Format_NoBody_SendsTheMeasuredHead(string? customMethod, string method)
+    {
+        HttpRequestOptions options = new() { CustomMethod = customMethod };
+
+        byte[] head = HttpRequestHeadFormatter.Format(new Uri("http://127.0.0.1:18276/a?b"), options, noBody: true);
+
+        Assert.AreEqual(
+            method + " /a?b HTTP/1.1\r\nHost: 127.0.0.1:18276\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
+            Encoding.Latin1.GetString(head));
+    }
+
     private static void AssertHead(string expected, Uri url, HttpRequestOptions? options)
     {
         Assert.AreEqual(expected, Encoding.Latin1.GetString(HttpRequestHeadFormatter.Format(url, options)));

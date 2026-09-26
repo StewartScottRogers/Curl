@@ -81,11 +81,11 @@ public sealed class HttpChunkedDecoderTests
     [DataRow("HTTP/1.1 204 No Content\r\nTransfer-Encoding: chunked\r\n\r\n", false, DisplayName = "204")]
     [DataRow("HTTP/1.1 204 No Content\r\nTransfer-Encoding: foo\r\n\r\n", false, DisplayName = "204 with an unsolicited coding")]
     [DataRow("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n", true, DisplayName = "HEAD request")]
-    public async Task CopyAsync_ChunkedResponseWithNoBody_WritesNothing(string head, bool isHeadRequest)
+    public async Task CopyAsync_ChunkedResponseWithNoBody_WritesNothing(string head, bool noBody)
     {
         foreach (int chunkSize in ChunkSizes)
         {
-            (_, FailingWriteStream output) = await CopyAsync(head + "5\r\nhello\r\n0\r\n\r\n", chunkSize, isHeadRequest);
+            (_, FailingWriteStream output) = await CopyAsync(head + "5\r\nhello\r\n0\r\n\r\n", chunkSize, noBody);
 
             Assert.IsEmpty(output.WriteSizes, $"Chunk size {chunkSize}");
         }
@@ -260,14 +260,14 @@ public sealed class HttpChunkedDecoderTests
     private static async Task<(HttpResponseBodyReader Reader, FailingWriteStream Output)> CopyAsync(
         string response,
         int chunkSize,
-        bool isHeadRequest = false,
+        bool noBody = false,
         FailingWriteStream? output = null)
     {
         output ??= new FailingWriteStream();
         ScriptedConnection connection = Connection(response, chunkSize);
         HttpResponseHead head = await new HttpResponseHeadReader(connection).ReadAsync(CancellationToken.None);
         HttpResponseBodyReader reader = new(connection);
-        await reader.CopyAsync(head, isHeadRequest, output, CancellationToken.None);
+        await reader.CopyAsync(head, noBody, output, CancellationToken.None);
         return (reader, output);
     }
 

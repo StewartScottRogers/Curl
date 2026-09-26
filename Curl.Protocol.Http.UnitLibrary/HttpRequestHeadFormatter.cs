@@ -8,7 +8,7 @@ namespace Curl.Protocol.Http;
 /// <summary>
 /// Formats the head of an HTTP/1.1 request - the request line, the headers and the empty
 /// line after them - byte for byte as curl 8.21.0 sends it for <c>-X</c>, <c>-H</c>,
-/// <c>-A</c>, <c>-e</c> and a request body. Every rule was measured (BL-172 and BL-175
+/// <c>-A</c>, <c>-e</c>, <c>-I</c> and a request body. Every rule was measured (BL-172 and BL-175
 /// Notes).
 /// </summary>
 /// <remarks>
@@ -38,12 +38,16 @@ internal static class HttpRequestHeadFormatter
     /// <param name="options">
     /// The HTTP options, or <see langword="null" /> for every option at its default.
     /// </param>
+    /// <param name="noBody">
+    /// <see langword="true" /> for <c>-I</c>/<c>--head</c>, which sends HEAD unless
+    /// <c>-X</c> names another method.
+    /// </param>
     /// <returns>The head's bytes, ending in the empty line.</returns>
-    internal static byte[] Format(Uri url, HttpRequestOptions? options)
+    internal static byte[] Format(Uri url, HttpRequestOptions? options, bool noBody = false)
     {
         options ??= new HttpRequestOptions();
         HttpCustomHeader[] customHeaders = [.. options.Headers.Select(HttpCustomHeader.Parse)];
-        HttpRequestFraming framing = HttpRequestFraming.Of(options, customHeaders);
+        HttpRequestFraming framing = HttpRequestFraming.Of(options, customHeaders, noBody);
         StringBuilder head = new();
         head.Append(framing.Method).Append(' ').Append(url.PathAndQuery).Append(" HTTP/1.1\r\n");
         string? hostLine = FormatHostLine(url, customHeaders);

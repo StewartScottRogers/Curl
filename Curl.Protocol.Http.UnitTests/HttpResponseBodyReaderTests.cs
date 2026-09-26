@@ -28,7 +28,7 @@ public sealed class HttpResponseBodyReaderTests
     {
         foreach (int chunkSize in ChunkSizes)
         {
-            (HttpResponseBodyReader reader, _, FailingWriteStream output) = await CopyAsync(response, chunkSize, isHeadRequest: false);
+            (HttpResponseBodyReader reader, _, FailingWriteStream output) = await CopyAsync(response, chunkSize, noBody: false);
 
             Assert.AreEqual(body, Latin1(output.ToArray()), $"Chunk size {chunkSize}");
             Assert.AreEqual(body.Length, reader.BytesWritten, $"Chunk size {chunkSize}");
@@ -57,7 +57,7 @@ public sealed class HttpResponseBodyReaderTests
     [DataRow("HTTP/1.1 204 No Content\r\n\r\nhello", false, DisplayName = "204 without Content-Length")]
     [DataRow("HTTP/1.1 204 No Content\r\nContent-Length: abc\r\n\r\n", false, DisplayName = "204 with an invalid Content-Length")]
     [DataRow("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\nhello", false, DisplayName = "Content-Length 0")]
-    public async Task CopyAsync_ResponseWithNoBody_ReadsAndWritesNothing(string response, bool isHeadRequest)
+    public async Task CopyAsync_ResponseWithNoBody_ReadsAndWritesNothing(string response, bool noBody)
     {
         foreach (int chunkSize in ChunkSizes)
         {
@@ -67,7 +67,7 @@ public sealed class HttpResponseBodyReaderTests
             FailingWriteStream output = new();
             HttpResponseBodyReader reader = new(connection);
 
-            await reader.CopyAsync(head, isHeadRequest, output, CancellationToken.None);
+            await reader.CopyAsync(head, noBody, output, CancellationToken.None);
 
             Assert.AreEqual(readsForHead, connection.ReadCount, $"Chunk size {chunkSize}");
             Assert.IsEmpty(output.WriteSizes, $"Chunk size {chunkSize}");
@@ -81,11 +81,11 @@ public sealed class HttpResponseBodyReaderTests
     [DataRow(false, 304, false, DisplayName = "304")]
     [DataRow(false, 200, true, DisplayName = "200")]
     [DataRow(false, 205, true, DisplayName = "205")]
-    public void HasBody_ByRequestAndStatus_MatchesCurl(bool isHeadRequest, int statusCode, bool hasBody)
+    public void HasBody_ByRequestAndStatus_MatchesCurl(bool noBody, int statusCode, bool hasBody)
     {
         HttpResponseHead head = new(HttpStatusLine.Parse($"HTTP/1.1 {statusCode} X"), [], default, default);
 
-        Assert.AreEqual(hasBody, HttpResponseBodyReader.HasBody(head, isHeadRequest));
+        Assert.AreEqual(hasBody, HttpResponseBodyReader.HasBody(head, noBody));
     }
 
     [TestMethod]
@@ -183,7 +183,7 @@ public sealed class HttpResponseBodyReaderTests
         FailingWriteStream output = new();
 
         HttpTransferException thrown = await Assert.ThrowsExactlyAsync<HttpTransferException>(
-            async () => await CopyAsync("HTTP/1.1 200 OK\r\nContent-Length: abc\r\n\r\nhello", 65536, isHeadRequest: false, output));
+            async () => await CopyAsync("HTTP/1.1 200 OK\r\nContent-Length: abc\r\n\r\nhello", 65536, noBody: false, output));
 
         Assert.AreEqual(CurlExitCode.WeirdServerReply, thrown.ExitCode);
         Assert.AreEqual("Invalid Content-Length: value", thrown.Message);
@@ -223,14 +223,14 @@ public sealed class HttpResponseBodyReaderTests
     private static async Task<(HttpResponseBodyReader Reader, ScriptedConnection Connection, FailingWriteStream Output)> CopyAsync(
         string response,
         int chunkSize,
-        bool isHeadRequest,
+        bool noBody,
         FailingWriteStream? output = null)
     {
         output ??= new FailingWriteStream();
         ScriptedConnection connection = Connection(response, chunkSize);
         HttpResponseHead head = await new HttpResponseHeadReader(connection).ReadAsync(CancellationToken.None);
         HttpResponseBodyReader reader = new(connection);
-        await reader.CopyAsync(head, isHeadRequest, output, CancellationToken.None);
+        await reader.CopyAsync(head, noBody, output, CancellationToken.None);
         return (reader, connection, output);
     }
 

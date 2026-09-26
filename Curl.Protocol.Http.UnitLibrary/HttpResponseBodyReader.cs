@@ -41,25 +41,26 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     internal ReadOnlyMemory<byte> TrailerBytes => decoder?.TrailerBytes ?? ReadOnlyMemory<byte>.Empty;
 
     /// <summary>
-    /// Determines whether a response carries a body: not for a HEAD request, and not for a
+    /// Determines whether a response carries a body: not for <c>-I</c>, and not for a
     /// 204 or 304 status, whatever its Content-Length says.
     /// </summary>
     /// <param name="head">The final response's head.</param>
-    /// <param name="isHeadRequest">
-    /// <see langword="true" /> when curl sent HEAD for <c>-I</c>. A HEAD sent through
-    /// <c>-X HEAD</c> is not one: curl 8.21.0 still reads that response's body (measured).
+    /// <param name="noBody">
+    /// <see langword="true" /> for <c>-I</c>, whatever method <c>-X</c> names: curl 8.21.0
+    /// reads no body for <c>-I -X GET</c>. A HEAD sent through <c>-X HEAD</c> alone is not
+    /// one: curl still reads that response's body (measured, BL-176 Notes).
     /// </param>
     /// <returns><see langword="true" /> when the body should be read.</returns>
-    internal static bool HasBody(HttpResponseHead head, bool isHeadRequest) =>
-        !isHeadRequest && head.StatusLine.StatusCode is not (204 or 304);
+    internal static bool HasBody(HttpResponseHead head, bool noBody) =>
+        !noBody && head.StatusLine.StatusCode is not (204 or 304);
 
     /// <summary>
     /// Reads the body and writes it to <paramref name="output" />, or reads nothing when the
     /// response has none.
     /// </summary>
     /// <param name="head">The final response's head, whose body prefix is written first.</param>
-    /// <param name="isHeadRequest">
-    /// <see langword="true" /> when curl sent HEAD for <c>-I</c>; see
+    /// <param name="noBody">
+    /// <see langword="true" /> for <c>-I</c>; see
     /// <see cref="HasBody(HttpResponseHead, bool)" />.
     /// </param>
     /// <param name="output">Where the body goes.</param>
@@ -73,11 +74,11 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     /// </exception>
     internal async ValueTask CopyAsync(
         HttpResponseHead head,
-        bool isHeadRequest,
+        bool noBody,
         Stream output,
         CancellationToken cancellationToken)
     {
-        if (!HasBody(head, isHeadRequest))
+        if (!HasBody(head, noBody))
         {
             return;
         }
