@@ -8,7 +8,7 @@ depends-on: [BL-136]
 touches: [Documentation/Product/Requirements.md, Documentation/Planning/Decisions/ADR-0003-itransfercontext-carries-transfer-options.md]
 requirement: FR-009
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-142 — Record TransferResult.TimeConditionUnmet in FR-009 and ADR-0003
 
@@ -34,15 +34,25 @@ leaves an existing one's content untouched.
 
 ## Acceptance criteria
 
-- [ ] FR-009 states that an unmet condition creates no `-o` file and leaves an existing
+- [x] FR-009 states that an unmet condition creates no `-o` file and leaves an existing
       one's content untouched (BL-136).
-- [ ] ADR-0003 has a dated amendment naming `TransferResult.TimeConditionUnmet` and
+- [x] ADR-0003 has a dated amendment naming `TransferResult.TimeConditionUnmet` and
       `TransferResult.TimeConditionNotMet`, and why a flag on the result was chosen over
       a new exit code (the transfer is a success; exit 0).
 
 ## Notes
 
+- Done directly rather than through `align-and-document`: two paragraphs in two documents.
+- FR-009 now names the `-o` behaviour and the `TimeConditionNotMet`/`TimeConditionUnmet`
+  mechanism; ADR-0003 has a dated amendment (marked "Decided by Claude under Stewart's
+  delegation") giving why a flag on a successful result beats a new exit code, and why an
+  init-only property beats a fifth positional member.
+- Found: FR-011 says `-R` applies on an unmet `-z`, but `FileProtocolHandler` returns
+  `TimeConditionNotMet()` with no timestamp. Outside this task's scope (code); filed as
+  BL-274.
+
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. FR-009 and ADR-0003 record TransferResult.TimeConditionUnmet and the no -o file behaviour of an unmet -z

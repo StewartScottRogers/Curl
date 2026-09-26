@@ -139,3 +139,25 @@ The `file` handler converts chunk by chunk (`CrlfUploadConverter`), so an upload
 never read whole into memory; a converted chunk is at most twice the size of the one
 read. Sources: <https://curl.se/docs/manpage.html> (`--crlf`), checked against curl
 8.21.0.
+
+## Amendment, 2026-09-26 — an unmet `-z` is flagged on the result (BL-136)
+
+Decided by Claude under Stewart's delegation.
+
+A successful transfer that wrote nothing still leaves an `-o` file behind, empty, as
+curl does. An unmet `-z`/`--time-cond` does not: measured on curl 8.21.0 (Windows,
+2026-09-26), `curl -z "1 Jan 2030" -o out.txt file:///...` exits 0, creates no
+`out.txt`, and leaves an existing `out.txt` with its content. Whoever opened
+`ITransferContext.Output` therefore has to tell the two apart, and a zero byte count
+cannot. So `TransferResult` gains `bool TimeConditionUnmet` (init-only, default `false`),
+set only by the factory `TransferResult.TimeConditionNotMet(DateTimeOffset?)`, which
+returns exit 0 with no bytes moved. The `file` handler returns it for an unmet
+condition, and `Curl.Console`'s `DeferredOutputFileStream.CompleteAsync` skips the
+empty-file create for it.
+
+It is a flag on a successful result rather than a new `CurlExitCode` because the
+transfer is a success: curl exits 0, `IsSuccess` must stay `true`, and a code of its own
+would put a value in the exit-code enumeration that no process ever reports. It is an
+init-only property rather than a fifth positional member so that no existing
+construction changes. Sources: <https://curl.se/docs/manpage.html> (`-z`,
+`--time-cond`), checked against curl 8.21.0.
