@@ -71,3 +71,4 @@ Message text follows BL-064; assert exit codes here.
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
