@@ -80,3 +80,4 @@ This task touches `Curl.Protocol.File.UnitLibrary` and its tests only. No
 ## Log
 
 - 2026-09-25: Created.
+- 2026-09-26: Backlog -> Doing.
