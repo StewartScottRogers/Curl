@@ -77,3 +77,4 @@ BL-009 now depends on this task and has an acceptance criterion requiring
 ## Log
 
 - 2026-09-25: Created.
+- 2026-09-26: Backlog -> Doing.
