@@ -177,3 +177,10 @@ measured; BL-064 measures it on each reference build and pins what it finds.
 2. **Honour the manpage everywhere** (PEM `--cert`, working `--capath`, one text
    family). Lost: on Windows it diverges from the Schannel build that curl for Windows
    ships, which a drop-in replacement exists to match.
+
+## Related
+
+- [ADR-0018](ADR-0018-the-mingw-curl-8-21-0-build-is-the-windows-http-reference.md)
+  (2026-09-26) makes the same mingw build, `/mingw64/bin/curl`, the Windows reference
+  for HTTP behaviour, and records where System32 `curl.exe` 8.21.0 differs. It adds a
+  cross-reference only; the decision above is unchanged.
