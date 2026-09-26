@@ -101,6 +101,13 @@ public sealed class SslStreamTlsProvider : ITlsProvider
         ArgumentNullException.ThrowIfNull(plaintext);
         ArgumentException.ThrowIfNullOrWhiteSpace(targetHost);
 
+        var (clientCertificate, clientCertificateFailure) = LoadClientCertificate();
+        if (clientCertificateFailure is not null)
+        {
+            await plaintext.DisposeAsync().ConfigureAwait(false);
+            return clientCertificateFailure;
+        }
+
         X509ChainPolicy? chainPolicy;
         X509Certificate2Collection anchorsBesideSystemStore;
         try
@@ -109,6 +116,7 @@ public sealed class SslStreamTlsProvider : ITlsProvider
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or CryptographicException)
         {
+            clientCertificate?.Dispose();
             await plaintext.DisposeAsync().ConfigureAwait(false);
             return ConnectResult.Failed(CurlExitCode.SslCacertBadfile, CaCertificateFileUnusable(_options.CaCertificateFile!));
         }
@@ -119,6 +127,7 @@ public sealed class SslStreamTlsProvider : ITlsProvider
             TargetHost = targetHost,
             EnabledSslProtocols = ToSslProtocols(_options.MinimumVersion),
             CertificateChainPolicy = chainPolicy,
+            ClientCertificateContext = ToCertificateContext(clientCertificate),
             RemoteCertificateValidationCallback = (_, _, chain, errors) =>
             {
                 verificationFailure = VerifyPeer(errors, chain, targetHost, anchorsBesideSystemStore);
@@ -131,13 +140,14 @@ public sealed class SslStreamTlsProvider : ITlsProvider
         try
         {
             await sslStream.AuthenticateAsClientAsync(authenticationOptions, cancellationToken).ConfigureAwait(false);
-            return ConnectResult.Connected(new SslStreamConnection(sslStream, plaintext));
+            return ConnectResult.Connected(new SslStreamConnection(sslStream, plaintext, clientCertificate));
         }
         catch (Exception exception)
         {
             failure = exception;
         }
 
+        clientCertificate?.Dispose();
         await DisposeAfterFailedHandshakeAsync(sslStream, plaintext).ConfigureAwait(false);
         RethrowIfCancellation(failure);
 
@@ -182,6 +192,25 @@ public sealed class SslStreamTlsProvider : ITlsProvider
             ? TlsFailureMessages.SchannelPeerFailedVerification(errors, _options.CaCertificateFile is not null)
             : TlsFailureMessages.OpenSslPeerFailedVerification(errors, chain, targetHost);
     }
+
+    // The Schannel build reads the key from the PKCS#12 file and ignores --key; only the
+    // Windows build of curl keeps a drive letter's colon in the --cert value.
+    private (X509Certificate2? Certificate, ConnectResult? Failure) LoadClientCertificate()
+    {
+        if (_options.ClientCertificate is null)
+        {
+            return (null, null);
+        }
+
+        var (path, passphrase) = ClientCertificateArgument.Split(_options.ClientCertificate, _matchesSchannelBuild);
+        return _matchesSchannelBuild
+            ? ClientCertificateLoader.LoadAsSchannelBuild(path, passphrase)
+            : ClientCertificateLoader.LoadAsOpenSslBuild(path, passphrase, _options.PrivateKey);
+    }
+
+    // Offline: the chain is built from the certificate alone, without fetching issuers.
+    private static SslStreamCertificateContext? ToCertificateContext(X509Certificate2? clientCertificate) =>
+        clientCertificate is null ? null : SslStreamCertificateContext.Create(clientCertificate, null, offline: true);
 
     private string SslConnectError(Exception failure) => _matchesSchannelBuild
         ? TlsFailureMessages.SchannelSslConnectError(failure)

@@ -24,8 +24,23 @@ namespace Curl.Networking;
 /// ADR-0009 decides. <see langword="null" /> when not given. Ignored when
 /// <paramref name="Insecure" /> is set.
 /// </param>
+/// <param name="ClientCertificate">
+/// curl's <c>-E</c>/<c>--cert</c> value, verbatim: a certificate file path, optionally
+/// followed by <c>:</c> and its passphrase, split as curl splits it
+/// (<see cref="ClientCertificateArgument" />). The Schannel build loads it as PKCS#12, the
+/// OpenSSL build as PEM, as ADR-0009 decides; the certificate is presented when the server
+/// asks for one. <see langword="null" /> presents none.
+/// </param>
+/// <param name="PrivateKey">
+/// curl's <c>--key</c>: the PEM file holding the private key for
+/// <paramref name="ClientCertificate" />. Used by the OpenSSL build only, which reads the key
+/// from the certificate file when this is <see langword="null" />; the Schannel build takes
+/// the key from the PKCS#12 file and ignores it.
+/// </param>
 public sealed record TlsClientOptions(
     bool Insecure = false,
     TlsMinimumVersion MinimumVersion = TlsMinimumVersion.SystemDefault,
     string? CaCertificateFile = null,
-    string? CaCertificateDirectory = null);
+    string? CaCertificateDirectory = null,
+    string? ClientCertificate = null,
+    string? PrivateKey = null);

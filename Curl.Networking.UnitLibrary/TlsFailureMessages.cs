@@ -7,7 +7,7 @@ namespace Curl.Networking;
 
 /// <summary>
 /// The one place the message for a failed TLS handshake is written: the text curl prints
-/// after <c>curl: (NN) </c> for exit 35, exit 60 and exit 77, in the two builds ADR-0009
+/// after <c>curl: (NN) </c> for exit 35, exit 43, exit 58, exit 60 and exit 77, in the two builds ADR-0009
 /// reproduces, the Schannel build of curl on Windows and the OpenSSL build elsewhere.
 /// </summary>
 /// <remarks>
@@ -153,6 +153,72 @@ internal static class TlsFailureMessages
     /// <returns>The message curl prints.</returns>
     public static string OpenSslCaCertificateFileUnusable(string caCertificateFile) =>
         $"error adding trust anchors from file: {caCertificateFile}";
+
+    /// <summary>
+    /// The Schannel build's message for exit 58 when the <c>--cert</c> file cannot be opened:
+    /// it is missing, or is a directory.
+    /// </summary>
+    /// <param name="clientCertificateFile">The certificate file, as split from <c>--cert</c>.</param>
+    /// <returns>The message curl prints.</returns>
+    public static string SchannelClientCertificateNotFound(string clientCertificateFile) =>
+        $"schannel: Failed to get certificate location or file for {clientCertificateFile}";
+
+    /// <summary>
+    /// The Schannel build's message for exit 58 when the <c>--cert</c> file is empty.
+    /// </summary>
+    /// <param name="clientCertificateFile">The certificate file, as split from <c>--cert</c>.</param>
+    /// <returns>The message curl prints.</returns>
+    public static string SchannelClientCertificateNotRead(string clientCertificateFile) =>
+        $"schannel: Failed to read cert file {clientCertificateFile}";
+
+    /// <summary>
+    /// The Schannel build's message for exit 58 when the <c>--cert</c> file is not PKCS#12,
+    /// such as a PEM or DER certificate: <c>CRYPT_E_BAD_ENCODE</c>.
+    /// </summary>
+    /// <param name="clientCertificateFile">The certificate file, as split from <c>--cert</c>.</param>
+    /// <returns>The message curl prints.</returns>
+    public static string SchannelClientCertificateNotImported(string clientCertificateFile) =>
+        $"schannel: Failed to import cert file {clientCertificateFile}, last error is 0x80092002";
+
+    /// <summary>
+    /// The Schannel build's message for exit 58 when the PKCS#12 <c>--cert</c> file does not
+    /// open with the passphrase given, or with none.
+    /// </summary>
+    /// <param name="clientCertificateFile">The certificate file, as split from <c>--cert</c>.</param>
+    /// <returns>The message curl prints.</returns>
+    public static string SchannelClientCertificatePasswordBad(string clientCertificateFile) =>
+        $"schannel: Failed to import cert file {clientCertificateFile}, password is bad";
+
+    /// <summary>OpenSSL's error string for a file that does not exist.</summary>
+    public const string OpenSslNoSuchFile = "error:80000002:system library::No such file or directory";
+
+    /// <summary>
+    /// OpenSSL's error string for a file with no PEM block in it, which is also what a
+    /// directory, an empty file and a DER or PKCS#12 file give.
+    /// </summary>
+    public const string OpenSslNoStartLine = "error:0480006C:PEM routines::no start line";
+
+    /// <summary>
+    /// The OpenSSL build's message for exit 58: the <c>--cert</c> file did not load as a PEM
+    /// certificate.
+    /// </summary>
+    /// <param name="clientCertificateFile">The certificate file, as split from <c>--cert</c>.</param>
+    /// <param name="openSslError">
+    /// <see cref="OpenSslNoSuchFile" /> or <see cref="OpenSslNoStartLine" />.
+    /// </param>
+    /// <returns>The message curl prints.</returns>
+    public static string OpenSslClientCertificateNotLoaded(string clientCertificateFile, string openSslError) =>
+        $"could not load PEM client certificate from {clientCertificateFile}, OpenSSL error {openSslError}, (no key found, wrong passphrase, or wrong file format?)";
+
+    /// <summary>
+    /// The OpenSSL build's message for exit 43: the private key file is missing, holds no
+    /// key, holds one that does not match the certificate, or is encrypted and the
+    /// passphrase does not open it.
+    /// </summary>
+    /// <param name="privateKeyFile">The <c>--key</c> file, or the certificate file without one.</param>
+    /// <returns>The message curl prints.</returns>
+    public static string OpenSslPrivateKeyUnusable(string privateKeyFile) =>
+        $"unable to set private key file: '{privateKeyFile}' type PEM";
 
     // OpenSSL reports a failed trust before a failed validity period.
     private static string OpenSslVerifyError(X509Chain? chain)

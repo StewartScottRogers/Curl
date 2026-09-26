@@ -17,10 +17,10 @@ namespace Curl.Networking;
 /// unusable), <c>--capath</c>, TLS minimum versions and handshake failures (exit 35), all
 /// without a socket. Each failure's message is pinned for both builds ADR-0009 reproduces,
 /// the Schannel build and the OpenSSL build, through the internal constructor that names
-/// the build.
+/// the build. The --cert and --key tests are in SslStreamTlsProviderTests.ClientCertificate.cs.
 /// </summary>
 [TestClass]
-public sealed class SslStreamTlsProviderTests
+public sealed partial class SslStreamTlsProviderTests
 {
     private const string CertificateHost = "localhost";
 
@@ -56,7 +56,12 @@ public sealed class SslStreamTlsProviderTests
     }
 
     [ClassCleanup]
-    public static void DisposeServerCertificate() => s_serverCertificate.Dispose();
+    public static void DisposeCertificates()
+    {
+        s_serverCertificate.Dispose();
+        s_clientCertificate.Dispose();
+        s_clientKey.Dispose();
+    }
 
     private string _caFileDirectory = null!;
 

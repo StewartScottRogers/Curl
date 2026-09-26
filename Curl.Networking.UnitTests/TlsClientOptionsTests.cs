@@ -7,7 +7,7 @@ namespace Curl.Networking;
 public sealed class TlsClientOptionsTests
 {
     [TestMethod]
-    public void Constructor_WithNoArguments_VerifiesAgainstTheSystemStoreAtTheSystemDefaultVersion()
+    public void Constructor_WithNoArguments_VerifiesAgainstTheSystemStoreAtTheSystemDefaultVersionWithNoClientCertificate()
     {
         var options = new TlsClientOptions();
 
@@ -15,6 +15,8 @@ public sealed class TlsClientOptionsTests
         Assert.AreEqual(TlsMinimumVersion.SystemDefault, options.MinimumVersion);
         Assert.IsNull(options.CaCertificateFile);
         Assert.IsNull(options.CaCertificateDirectory);
+        Assert.IsNull(options.ClientCertificate);
+        Assert.IsNull(options.PrivateKey);
     }
 
     [TestMethod]
@@ -28,12 +30,16 @@ public sealed class TlsClientOptionsTests
             MinimumVersion = TlsMinimumVersion.Tls13,
             CaCertificateFile = "ca.pem",
             CaCertificateDirectory = "certs",
+            ClientCertificate = "client.p12:secret",
+            PrivateKey = "key.pem",
         };
 
         Assert.IsTrue(changed.Insecure);
         Assert.AreEqual(TlsMinimumVersion.Tls13, changed.MinimumVersion);
         Assert.AreEqual("ca.pem", changed.CaCertificateFile);
         Assert.AreEqual("certs", changed.CaCertificateDirectory);
+        Assert.AreEqual("client.p12:secret", changed.ClientCertificate);
+        Assert.AreEqual("key.pem", changed.PrivateKey);
         Assert.AreEqual(new TlsClientOptions(), original);
     }
 }
