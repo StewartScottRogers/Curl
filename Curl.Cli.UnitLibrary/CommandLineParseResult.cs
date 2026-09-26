@@ -3,7 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 namespace Curl.Cli;
 
 /// <summary>
-/// The outcome of <see cref="CommandLineParser.Parse"/>: either the parsed
+/// The outcome of <see cref="CommandLineParser"/>: either the parsed
 /// <see cref="CommandLineOptions"/> or the <see cref="CommandLineRefusal"/> that stopped parsing.
 /// </summary>
 public sealed class CommandLineParseResult

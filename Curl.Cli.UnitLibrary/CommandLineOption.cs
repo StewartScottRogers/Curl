@@ -41,7 +41,7 @@ public sealed class CommandLineOption
         ArgumentNullException.ThrowIfNull(longName);
         ArgumentNullException.ThrowIfNull(set);
 
-        return new CommandLineOption(longName, shortName, takesValue: false, (options, _, _) =>
+        return new CommandLineOption(longName, shortName, takesValue: false, (options, _, _, _) =>
         {
             set(options);
             return null;
@@ -63,7 +63,7 @@ public sealed class CommandLineOption
         ArgumentNullException.ThrowIfNull(longName);
         ArgumentNullException.ThrowIfNull(set);
 
-        return new CommandLineOption(longName, shortName, takesValue: true, (options, value, spelledOption) =>
+        return new CommandLineOption(longName, shortName, takesValue: true, (options, value, spelledOption, _) =>
         {
             if (value.Length == 0)
             {

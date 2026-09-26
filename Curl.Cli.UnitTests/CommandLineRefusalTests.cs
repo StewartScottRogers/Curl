@@ -83,6 +83,34 @@ public sealed class CommandLineRefusalTests
         AssertRefusal(refusal, "curl: (2) no URL specified");
     }
 
+    [TestMethod]
+    public void FileDoesNotExist_Spelled_NamesFileAndOptionInThreeLines()
+    {
+        CommandLineRefusal refusal = CommandLineRefusal.FileDoesNotExist("--cacert=", "--cacert", "nonexist.pem");
+
+        Assert.AreEqual(CurlExitCode.FailedInit, refusal.ExitCode);
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "curl: The file 'nonexist.pem' provided to --cacert does not exist",
+                "curl: option --cacert=: is badly used here",
+                CommandLineRefusal.TryHelpLine,
+            },
+            refusal.StandardErrorLines.ToArray());
+    }
+
+    [TestMethod]
+    [DataRow(null, "--cacert", "f", "spelledOption")]
+    [DataRow("--cacert", null, "f", "longOption")]
+    [DataRow("--cacert", "--cacert", null, "file")]
+    public void FileDoesNotExist_NullArgument_ThrowsArgumentNull(string? spelledOption, string? longOption, string? file, string expectedParamName)
+    {
+        ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(
+            () => CommandLineRefusal.FileDoesNotExist(spelledOption!, longOption!, file!));
+
+        Assert.AreEqual(expectedParamName, exception.ParamName);
+    }
+
     private static void AssertRefusal(CommandLineRefusal refusal, string expectedFirstLine)
     {
         Assert.AreEqual(CurlExitCode.FailedInit, refusal.ExitCode);

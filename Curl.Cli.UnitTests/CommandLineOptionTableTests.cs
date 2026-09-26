@@ -5,7 +5,7 @@ namespace Curl.Cli;
 /// appears once, the table holds <c>--url</c>, <c>-s</c>/<c>--silent</c>,
 /// <c>-S</c>/<c>--show-error</c>, <c>-o</c>/<c>--output</c>, <c>-d</c>/<c>--data</c>,
 /// <c>-u</c>/<c>--user</c>, <c>-t</c>/<c>--telnet-option</c>, <c>--tftp-blksize</c>,
-/// <c>--tftp-no-options</c> and <c>--create-file-mode</c> with the right arity,
+/// <c>--tftp-no-options</c>, <c>--create-file-mode</c> and the TLS options with the right arity,
 /// and its two text options refuse an empty value as blank.
 /// </summary>
 [TestClass]
@@ -41,6 +41,15 @@ public sealed class CommandLineOptionTableTests
     [DataRow("tftp-blksize", null, true)]
     [DataRow("tftp-no-options", null, false)]
     [DataRow("create-file-mode", null, true)]
+    [DataRow("insecure", 'k', false)]
+    [DataRow("cacert", null, true)]
+    [DataRow("capath", null, true)]
+    [DataRow("cert", 'E', true)]
+    [DataRow("key", null, true)]
+    [DataRow("tlsv1.2", null, false)]
+    [DataRow("tlsv1.3", null, false)]
+    [DataRow("ciphers", null, true)]
+    [DataRow("tls13-ciphers", null, true)]
     public void Rows_FirstTableOption_HasItsShortNameAndArity(string longName, char? shortName, bool takesValue)
     {
         CommandLineOption option = CommandLineOptionTable.Rows.Single(row => row.LongName == longName);
@@ -57,7 +66,7 @@ public sealed class CommandLineOptionTableTests
         CommandLineOption option = CommandLineOptionTable.Rows.Single(row => row.LongName == longName);
         CommandLineOptions options = new();
 
-        CommandLineRefusal? refusal = option.Apply(options, string.Empty, spelledOption);
+        CommandLineRefusal? refusal = option.Apply(options, string.Empty, spelledOption, _ => false);
 
         Assert.IsNotNull(refusal);
         CollectionAssert.AreEqual(
@@ -73,7 +82,7 @@ public sealed class CommandLineOptionTableTests
         CommandLineOption option = CommandLineOptionTable.Rows.Single(row => row.LongName == "url");
         CommandLineOptions options = new();
 
-        CommandLineRefusal? refusal = option.Apply(options, "http://example.com", "--url");
+        CommandLineRefusal? refusal = option.Apply(options, "http://example.com", "--url", _ => false);
 
         Assert.IsNull(refusal);
         CollectionAssert.AreEqual(new[] { "http://example.com" }, options.Urls.ToArray());
@@ -85,7 +94,7 @@ public sealed class CommandLineOptionTableTests
         CommandLineOption option = CommandLineOptionTable.Rows.Single(row => row.LongName == "output");
         CommandLineOptions options = new();
 
-        CommandLineRefusal? refusal = option.Apply(options, "page.html", "-o");
+        CommandLineRefusal? refusal = option.Apply(options, "page.html", "-o", _ => false);
 
         Assert.IsNull(refusal);
         CollectionAssert.AreEqual(new[] { "page.html" }, options.OutputFiles.ToArray());

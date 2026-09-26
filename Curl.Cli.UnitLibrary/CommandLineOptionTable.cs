@@ -1,5 +1,6 @@
 using System.Collections.Frozen;
 using System.Diagnostics.CodeAnalysis;
+using System.Security.Authentication;
 
 namespace Curl.Cli;
 
@@ -32,6 +33,15 @@ public static class CommandLineOptionTable
         CommandLineOption.Value("tftp-blksize", null, SetTftpBlockSize),
         CommandLineOption.Flag("tftp-no-options", null, options => options.TftpNoOptions = true),
         CommandLineOption.Value("create-file-mode", null, SetCreateFileMode),
+        CommandLineOption.Flag("insecure", 'k', options => options.Insecure = true),
+        CommandLineOption.Value("cacert", null, SetCaCertificateFile),
+        CommandLineOption.Text("capath", null, (options, directory) => options.CaCertificateDirectory = directory),
+        CommandLineOption.Text("cert", 'E', (options, certificate) => options.ClientCertificate = certificate),
+        CommandLineOption.Text("key", null, (options, key) => options.PrivateKey = key),
+        CommandLineOption.Flag("tlsv1.2", null, options => options.MinimumTlsVersion = SslProtocols.Tls12),
+        CommandLineOption.Flag("tlsv1.3", null, options => options.MinimumTlsVersion = SslProtocols.Tls13),
+        CommandLineOption.Text("ciphers", null, (options, ciphers) => options.Ciphers = ciphers),
+        CommandLineOption.Text("tls13-ciphers", null, (options, ciphers) => options.Tls13Ciphers = ciphers),
     ];
 
     /// <summary>The largest <c>--create-file-mode</c> curl 8.21.0 accepts: octal <c>0777</c>.</summary>
@@ -54,13 +64,13 @@ public static class CommandLineOptionTable
     /// <c>-d ''</c>, <c>-u ''</c> and <c>-t ''</c>, and passes it to <paramref name="set"/>.
     /// </summary>
     private static CommandLineOptionApplier AcceptingEmpty(Action<CommandLineOptions, string> set) =>
-        (options, value, _) =>
+        (options, value, _, _) =>
         {
             set(options, value);
             return null;
         };
 
-    private static CommandLineRefusal? SetTftpBlockSize(CommandLineOptions options, string value, string spelledOption)
+    private static CommandLineRefusal? SetTftpBlockSize(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists)
     {
         CommandLineRefusal? refusal = CommandLineNumber.ParseNonNegative(spelledOption, value, out int blockSize);
         if (refusal is null)
@@ -71,7 +81,7 @@ public static class CommandLineOptionTable
         return refusal;
     }
 
-    private static CommandLineRefusal? SetCreateFileMode(CommandLineOptions options, string value, string spelledOption)
+    private static CommandLineRefusal? SetCreateFileMode(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists)
     {
         CommandLineRefusal? refusal = CommandLineNumber.ParseOctal(spelledOption, value, MaximumCreateFileMode, out int mode);
         if (refusal is null)
@@ -80,6 +90,22 @@ public static class CommandLineOptionTable
         }
 
         return refusal;
+    }
+
+    /// <summary>
+    /// Records a <c>--cacert</c> value when a file or directory exists at it, and otherwise refuses
+    /// it with curl 8.21.0's three lines. An empty value is checked like any other, so it is refused
+    /// as a missing file, not as blank. A directory passes here; curl fails it later, at handshake.
+    /// </summary>
+    private static CommandLineRefusal? SetCaCertificateFile(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists)
+    {
+        if (!pathExists(value))
+        {
+            return CommandLineRefusal.FileDoesNotExist(spelledOption, "--cacert", value);
+        }
+
+        options.CaCertificateFile = value;
+        return null;
     }
 
     /// <summary>Finds the row whose long name is exactly <paramref name="longName"/>; no prefix matching.</summary>

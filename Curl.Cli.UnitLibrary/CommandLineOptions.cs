@@ -1,4 +1,5 @@
 using System.Net;
+using System.Security.Authentication;
 using System.Text;
 
 namespace Curl.Cli;
@@ -7,7 +8,8 @@ namespace Curl.Cli;
 /// The settings a command line asks for, filled in by <see cref="CommandLineParser"/>
 /// through the rows of <see cref="CommandLineOptionTable"/>. Each option in the table
 /// sets one property here. This is only what was asked for: nothing here validates a URL,
-/// touches the file system or starts a transfer.
+/// touches the file system or starts a transfer. The TLS settings are recorded, not applied;
+/// the console layer maps them onto the TLS provider.
 /// </summary>
 public sealed class CommandLineOptions
 {
@@ -62,6 +64,41 @@ public sealed class CommandLineOptions
     /// When given more than once the last value wins.
     /// </summary>
     public UnixFileMode? CreateFileMode { get; internal set; }
+
+    /// <summary><see langword="true"/> when <c>-k</c> / <c>--insecure</c> was given: skip server certificate verification.</summary>
+    public bool Insecure { get; internal set; }
+
+    /// <summary>
+    /// The <c>--cacert</c> file, verbatim; <see langword="null"/> when not given. The parser has
+    /// already refused a value at which nothing exists, and records a directory here unchanged.
+    /// The last value wins.
+    /// </summary>
+    public string? CaCertificateFile { get; internal set; }
+
+    /// <summary>The <c>--capath</c> directory, verbatim and unchecked; <see langword="null"/> when not given. The last value wins.</summary>
+    public string? CaCertificateDirectory { get; internal set; }
+
+    /// <summary>
+    /// The <c>-E</c> / <c>--cert</c> value, verbatim, with <c>certificate[:password]</c> not yet split;
+    /// <see langword="null"/> when not given. The last value wins.
+    /// </summary>
+    public string? ClientCertificate { get; internal set; }
+
+    /// <summary>The <c>--key</c> private key file, verbatim and unchecked; <see langword="null"/> when not given. The last value wins.</summary>
+    public string? PrivateKey { get; internal set; }
+
+    /// <summary>
+    /// The lowest TLS version to accept: <see cref="SslProtocols.Tls12"/> for <c>--tlsv1.2</c> (1.2 or later),
+    /// <see cref="SslProtocols.Tls13"/> for <c>--tlsv1.3</c> (1.3 or later); <see langword="null"/> when neither
+    /// was given. When both are given the last one wins, as in curl 8.21.0.
+    /// </summary>
+    public SslProtocols? MinimumTlsVersion { get; internal set; }
+
+    /// <summary>The <c>--ciphers</c> list, verbatim; <see langword="null"/> when not given. The last value wins.</summary>
+    public string? Ciphers { get; internal set; }
+
+    /// <summary>The <c>--tls13-ciphers</c> list, verbatim; <see langword="null"/> when not given. The last value wins.</summary>
+    public string? Tls13Ciphers { get; internal set; }
 
     /// <summary>Appends <paramref name="url"/> to <see cref="Urls"/>, unchanged and unvalidated.</summary>
     /// <param name="url">A positional argument or a <c>--url</c> value.</param>

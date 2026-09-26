@@ -56,7 +56,7 @@ public sealed class CommandLineOptionTests
         CommandLineOption option = CommandLineOption.Flag("silent", 's', options => setOn = options);
         CommandLineOptions options = new();
 
-        CommandLineRefusal? refusal = option.Apply(options, string.Empty, "-s");
+        CommandLineRefusal? refusal = option.Apply(options, string.Empty, "-s", _ => false);
 
         Assert.IsNull(refusal);
         Assert.AreSame(options, setOn);
@@ -106,7 +106,7 @@ public sealed class CommandLineOptionTests
         bool setCalled = false;
         CommandLineOption option = CommandLineOption.Text("output", 'o', (_, _) => setCalled = true);
 
-        CommandLineRefusal? refusal = option.Apply(new CommandLineOptions(), string.Empty, "--output=");
+        CommandLineRefusal? refusal = option.Apply(new CommandLineOptions(), string.Empty, "--output=", _ => false);
 
         Assert.IsNotNull(refusal);
         Assert.AreEqual(CurlExitCode.FailedInit, refusal.ExitCode);
@@ -131,7 +131,7 @@ public sealed class CommandLineOptionTests
         });
         CommandLineOptions options = new();
 
-        CommandLineRefusal? refusal = option.Apply(options, value, "-o");
+        CommandLineRefusal? refusal = option.Apply(options, value, "-o", _ => false);
 
         Assert.IsNull(refusal);
         Assert.AreSame(options, setOn);
@@ -143,7 +143,7 @@ public sealed class CommandLineOptionTests
     [TestMethod]
     public void Value_WithShortName_KeepsNamesAndTakesValue()
     {
-        CommandLineOption option = CommandLineOption.Value("max-time", 'm', (_, _, _) => null);
+        CommandLineOption option = CommandLineOption.Value("max-time", 'm', (_, _, _, _) => null);
 
         Assert.AreEqual("max-time", option.LongName);
         Assert.AreEqual('m', option.ShortName);
@@ -153,7 +153,7 @@ public sealed class CommandLineOptionTests
     [TestMethod]
     public void Value_WithoutShortName_HasNullShortName()
     {
-        CommandLineOption option = CommandLineOption.Value("tftp-blksize", null, (_, _, _) => null);
+        CommandLineOption option = CommandLineOption.Value("tftp-blksize", null, (_, _, _, _) => null);
 
         Assert.IsNull(option.ShortName);
     }
@@ -162,7 +162,7 @@ public sealed class CommandLineOptionTests
     public void Value_NullLongName_ThrowsArgumentNull()
     {
         ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(
-            () => CommandLineOption.Value(null!, 'm', (_, _, _) => null));
+            () => CommandLineOption.Value(null!, 'm', (_, _, _, _) => null));
 
         Assert.AreEqual("longName", exception.ParamName);
     }
@@ -180,9 +180,9 @@ public sealed class CommandLineOptionTests
     public void ValueApply_ApplierRefuses_ReturnsApplierRefusal()
     {
         CommandLineRefusal applierRefusal = CommandLineRefusal.ExpectedProperNumericalParameter("--tftp-blksize");
-        CommandLineOption option = CommandLineOption.Value("tftp-blksize", null, (_, _, _) => applierRefusal);
+        CommandLineOption option = CommandLineOption.Value("tftp-blksize", null, (_, _, _, _) => applierRefusal);
 
-        CommandLineRefusal? refusal = option.Apply(new CommandLineOptions(), "abc", "--tftp-blksize");
+        CommandLineRefusal? refusal = option.Apply(new CommandLineOptions(), "abc", "--tftp-blksize", _ => false);
 
         Assert.AreSame(applierRefusal, refusal);
     }
@@ -193,7 +193,7 @@ public sealed class CommandLineOptionTests
         CommandLineOptions? seenOptions = null;
         string? seenValue = null;
         string? seenSpelledOption = null;
-        CommandLineOption option = CommandLineOption.Value("tftp-blksize", null, (options, value, spelledOption) =>
+        CommandLineOption option = CommandLineOption.Value("tftp-blksize", null, (options, value, spelledOption, _) =>
         {
             seenOptions = options;
             seenValue = value;
@@ -202,7 +202,7 @@ public sealed class CommandLineOptionTests
         });
         CommandLineOptions options = new();
 
-        CommandLineRefusal? refusal = option.Apply(options, string.Empty, "--tftp-blksize=");
+        CommandLineRefusal? refusal = option.Apply(options, string.Empty, "--tftp-blksize=", _ => false);
 
         Assert.IsNull(refusal);
         Assert.AreSame(options, seenOptions);

@@ -322,6 +322,15 @@ public sealed class CommandLineParserTests
     }
 
     [TestMethod]
+    public void Parse_NullPathExists_ThrowsArgumentNull()
+    {
+        ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(
+            () => CommandLineParser.Parse(["http://example.com/"], null!));
+
+        Assert.AreEqual("pathExists", exception.ParamName);
+    }
+
+    [TestMethod]
     public void Parse_SeveralRefusableArguments_RefusesTheFirst()
     {
         CommandLineParseResult result = CommandLineParser.Parse(["-sS", "--bogus", "-o"]);
