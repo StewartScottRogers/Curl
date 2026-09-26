@@ -34,3 +34,4 @@ For a 3xx the handler resolves `Location` against the request URL into `Transfer
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
