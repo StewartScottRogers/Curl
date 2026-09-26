@@ -90,8 +90,10 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     /// the same message as a resume offset past the end of the file. It is a returned
     /// failure rather than an <see cref="ArgumentOutOfRangeException" />, unlike the guards
     /// on <see cref="ByteRange" />: the command line refuses a negative <c>-C</c> with exit 2
-    /// before any transfer, so this branch only answers a context built by hand, and a bad
-    /// option should end a transfer rather than the process (whether to keep it is task BL-027). Checking it once, up here, is also what keeps a download and
+    /// before any URL is looked at, so this branch only answers a context built by hand, and a
+    /// bad option should end a transfer rather than the process. It is kept as an unreachable
+    /// defensive default, not curl behaviour; ADR-0007 records why. Checking it once, up here,
+    /// is also what keeps a download and
     /// an upload answering it identically, since below this point the two paths share
     /// nothing.
     /// </remarks>
