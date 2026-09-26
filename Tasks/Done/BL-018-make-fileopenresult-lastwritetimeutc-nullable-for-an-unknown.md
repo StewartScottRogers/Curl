@@ -8,7 +8,7 @@ depends-on: [BL-008, BL-016, BL-017]
 touches: [Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Protocol.File.UnitLibrary, Curl.Protocol.File.UnitTests, Documentation/Planning/Decisions/ADR-0002-ifilesystem-as-the-second-protocol-seam.md, Documentation/Planning/Decisions/ADR-0003-itransfercontext-carries-transfer-options.md, Documentation/Product/Requirements.md]
 requirement: none
 created: 2026-09-25
-completed:
+completed: 2026-09-26
 ---
 # BL-018 — Make `FileOpenResult.LastWriteTimeUtc` nullable for an unknown timestamp
 
@@ -46,32 +46,32 @@ must decide about the transfer options).
 
 ## Acceptance criteria
 
-- [ ] `FileOpenResult.LastWriteTimeUtc` is `DateTimeOffset?`; `FileOpenResult.Failed`
+- [x] `FileOpenResult.LastWriteTimeUtc` is `DateTimeOffset?`; `FileOpenResult.Failed`
       sets it to `null`; `FileOpenResult.Opened` accepts `DateTimeOffset?` and its
       documentation states that `null` means "the implementation could not determine a
       modification time", not "the epoch".
-- [ ] A test in `Curl.Protocol.Abstractions.UnitTests\FileOpenResultTests.cs` asserts
+- [x] A test in `Curl.Protocol.Abstractions.UnitTests\FileOpenResultTests.cs` asserts
       `Failed` returns `null` for the timestamp, and that `Opened(stream, length, null)`
       is accepted.
-- [ ] `MeetsTimeCondition` transfers when the timestamp is `null`, for both
+- [x] `MeetsTimeCondition` transfers when the timestamp is `null`, for both
       `TimeConditionKind` values; two tests named
       `ExecuteAsync_UnknownTimestampWithIfModifiedSince_TransfersEveryByte` and
       `ExecuteAsync_UnknownTimestampWithIfUnmodifiedSince_TransfersEveryByte` assert the
       whole file reaches `Output` and the exit code is `CurlExitCode.Ok`.
-- [ ] `FileTransferMessages.PseudoHeaders` takes `DateTimeOffset?` and omits the whole
+- [x] `FileTransferMessages.PseudoHeaders` takes `DateTimeOffset?` and omits the whole
       `Last-Modified` line when it is `null`, so the block is exactly
       `Content-Length: <n>\r\nAccept-ranges: bytes\r\n\r\n`; a test asserts those bytes
       verbatim, and another asserts the three-line block is unchanged when a timestamp is
       present.
-- [ ] `FakeFileSystem` gains a way to add a file with no timestamp (for example
+- [x] `FakeFileSystem` gains a way to add a file with no timestamp (for example
       `AddFileWithoutTimestamp`), and `FakeFileEntry` carries `DateTimeOffset?`.
-- [ ] The `Last-Modified`-omission rule is recorded in the `PseudoHeaders` remarks with
+- [x] The `Last-Modified`-omission rule is recorded in the `PseudoHeaders` remarks with
       its premise: upstream libcurl 8.21.0 emits the line only for a handle with a usable
       modification time, and whether that case can be produced from the curl 8.21.0
       binary on Windows is stated either way (with the command tried, if one was).
-- [ ] ADR-0002 and ADR-0003 are updated to say the timestamp is optional and what an
+- [x] ADR-0002 and ADR-0003 are updated to say the timestamp is optional and what an
       absent one means for `-z` and for the header block, dated, citing curl 8.21.0.
-- [ ] `dotnet build Curl.Protocol.Abstractions.UnitLibrary -warnaserror` and
+- [x] `dotnet build Curl.Protocol.Abstractions.UnitLibrary -warnaserror` and
       `dotnet build Curl.Protocol.File.UnitLibrary -warnaserror` are clean, and
       `dotnet test --filter "Category!=Integration"` is green across the solution — the
       contract change must not leave another project failing to compile.
@@ -85,7 +85,31 @@ comparison this task adds a null case to), so the three do not fight over
 `Curl.Core.UnitLibrary`'s `PhysicalFileSystem` does not exist yet (BL-009), so no
 production implementation needs updating; only the fakes do.
 
+Delivered 2026-09-26 (dark factory lane 4):
+
+- Pipeline: the change was small and fully specified by the acceptance criteria, so it
+  was made in-session with tests first rather than via a separate architect plan.
+- Measured curl 8.21.0 (mingw64, Windows): `curl -sI file:///NUL` prints
+  `Last-Modified: Thu, 01 Jan 1970 00:00:00 GMT`, so the no-timestamp header block
+  cannot be produced from the Windows binary; the omission rests on upstream
+  `lib/file.c`. Recorded in the `PseudoHeaders` remarks and both ADR amendments.
+- Choice: `FakeFileEntry.ForDirectory` now reports `null` instead of `default`, and a
+  write open onto an existing entry passes its (possibly `null`) timestamp through
+  rather than falling back to the default; the fallback applies only when no entry
+  exists. Why: `null` is the honest "unknown" now that the contract has one.
+- Choice: the "three-line block unchanged" test is
+  `ExecuteAsync_HeaderOutputWithKnownTimestamp_WritesAllThreeLines`, beside the
+  existing `ExpectedHeaders` assertions.
+- Choice: the verification filter used is `TestCategory!=Integration` (the MSTest
+  property per CLAUDE.md); the criterion's `Category!=Integration` spelling is the
+  same intent.
+- `Documentation/Product/Requirements.md` FR-010 now says `Last-Modified` appears when
+  the handle has a known modification time.
+- Results: `dotnet build -warnaserror` clean; fast tests green (Abstractions 59, File
+  136, Cli 58).
+
 ## Log
 
 - 2026-09-25: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. FileOpenResult.LastWriteTimeUtc is nullable; an unknown timestamp transfers under -z and drops the Last-Modified header line
