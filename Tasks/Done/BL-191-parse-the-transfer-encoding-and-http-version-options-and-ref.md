@@ -55,7 +55,7 @@ completed: 2026-09-26
     "not given" is distinguishable from `--http1.1`; curl's override warning needs that.
   - New row kind `CommandLineOption.UnsupportedFlag` rather than special-casing in the parser, per
     `Curl.Cli.UnitLibrary/CLAUDE.md`.
-- Follow-up filed: BL-259 (`--http0.9` / `--no-http0.9`, measured negatable, outside this goal).
+- Follow-up filed: BL-262 (`--http0.9` / `--no-http0.9`, measured negatable, outside this goal).
   Wiring into `HttpRequestOptions` is already BL-236 and BL-245.
 - Tests: `Curl.Cli.UnitTests/CommandLineTransferEncodingOptionTests.cs`; Cli suite 1096 passing.
 

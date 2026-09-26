@@ -1,5 +1,5 @@
 ---
-id: BL-259
+id: BL-262
 title: Parse --http0.9 and --no-http0.9 into CommandLineOptions
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: FR-074
 created: 2026-09-26
 completed:
 ---
-# BL-259 — Parse --http0.9 and --no-http0.9 into CommandLineOptions
+# BL-262 — Parse --http0.9 and --no-http0.9 into CommandLineOptions
 
 ## Goal
 
