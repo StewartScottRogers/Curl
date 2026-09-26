@@ -35,3 +35,4 @@ URL globs (`{a,b}`, `[1-10]`, `[01-10]`, `[a-z:2]`) expand in curl's order, `#N`
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
