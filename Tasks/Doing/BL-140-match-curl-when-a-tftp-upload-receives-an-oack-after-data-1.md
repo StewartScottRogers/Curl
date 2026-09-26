@@ -46,3 +46,4 @@ A TFTP upload that receives an OACK after DATA 1 has gone does what curl 8.21.0 
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
