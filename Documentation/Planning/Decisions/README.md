@@ -35,6 +35,7 @@ choices do not need one.
 | [0018](ADR-0018-the-mingw-curl-8-21-0-build-is-the-windows-http-reference.md) | The mingw build of curl 8.21.0 is the Windows reference for HTTP; Curl may differ from System32 `curl.exe` only where that build lacks a feature | Accepted | 2026-09-26 |
 | [0019](ADR-0019-numeric-option-ceiling-matches-the-platform-curl.md) | The ceiling of a numeric option matches the platform curl: 2^31-1 on Windows, 2^63-1 on Linux and macOS | Accepted | 2026-09-26 |
 | [0020](ADR-0020-compressed-advertises-deflate-gzip-and-br-until-a-zstd-decoder-exists.md) | `--compressed` advertises `deflate, gzip, br` until a zstd decoder exists | Accepted | 2026-09-26 |
+| [0021](ADR-0021-v-version-keeps-curls-format-and-lists-only-what-curl-implements.md) | `-V`/`--version` keeps curl's format and version number and lists only what Curl implements, on each platform | Accepted | 2026-09-26 |
 
 ## Template
 
