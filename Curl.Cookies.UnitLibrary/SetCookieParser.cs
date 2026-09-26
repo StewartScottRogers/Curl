@@ -39,10 +39,6 @@ public static class SetCookieParser
 
     private const string HostPrefix = "__Host-";
 
-    private static readonly string[] SecureSchemes = ["https", "wss"];
-
-    private static readonly string[] SecureHosts = ["localhost", "127.0.0.1", "::1"];
-
     /// <summary>Reads <paramref name="headerValue"/>, received in answer to <paramref name="requestUri"/>, as curl does.</summary>
     /// <remarks>
     /// <para>
@@ -169,7 +165,7 @@ public static class SetCookieParser
     /// <summary>The fields read so far, as curl fills its <c>struct Cookie</c> while it parses.</summary>
     private sealed class CookieUnderConstruction(Uri requestUri, long nowUnixSeconds)
     {
-        private readonly string host = requestUri.HostNameType == UriHostNameType.IPv6 ? requestUri.Host.Trim('[', ']') : requestUri.Host;
+        private readonly string host = CookieOrigin.HostOf(requestUri);
 
         private readonly bool hostIsIpAddress = requestUri.HostNameType is UriHostNameType.IPv4 or UriHostNameType.IPv6;
 
@@ -211,17 +207,12 @@ public static class SetCookieParser
             if (flag.Equals("secure", StringComparison.OrdinalIgnoreCase))
             {
                 isSecure = true;
-                return IsSecureOrigin();
+                return CookieOrigin.IsSecure(requestUri);
             }
 
             isHttpOnly |= flag.Equals("httponly", StringComparison.OrdinalIgnoreCase);
             return true;
         }
-
-        /// <summary>curl's <c>Curl_secure_context</c>: a TLS scheme, or a loopback host by name or address.</summary>
-        private bool IsSecureOrigin() =>
-            SecureSchemes.Contains(requestUri.Scheme, StringComparer.Ordinal)
-            || SecureHosts.Contains(host, StringComparer.OrdinalIgnoreCase);
 
         private bool TryApplyValuedAttribute(string attribute, string attributeValue)
         {
@@ -264,16 +255,11 @@ public static class SetCookieParser
         private bool TrySetDomain(string attributeValue)
         {
             string candidate = attributeValue.StartsWith('.') ? attributeValue[1..] : attributeValue;
-            bool matches = hostIsIpAddress ? string.Equals(candidate, host, StringComparison.Ordinal) : IsHostOrParentOfHost(candidate);
+            bool matches = hostIsIpAddress ? string.Equals(candidate, host, StringComparison.Ordinal) : CookieOrigin.IsDomainOrSubdomain(candidate, host);
             domain = candidate;
             includesSubdomains = !hostIsIpAddress;
             return matches;
         }
-
-        /// <summary>curl's <c>cookie_tailmatch</c>: the host ends with the domain, at a dot or whole.</summary>
-        private bool IsHostOrParentOfHost(string candidate) =>
-            host.EndsWith(candidate, StringComparison.OrdinalIgnoreCase)
-            && (host.Length == candidate.Length || host[host.Length - candidate.Length - 1] == '.');
 
         private long ExpiryFromMaxAge(string attributeValue)
         {
