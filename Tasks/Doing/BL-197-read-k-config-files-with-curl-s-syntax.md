@@ -40,3 +40,4 @@ completed:
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
 - 2026-09-26: Doing -> Backlog. Shift stopped while waiting for tokens (limit reset early); partial work saved on branch factory/BL-197-wip
+- 2026-09-26: Backlog -> Doing.
