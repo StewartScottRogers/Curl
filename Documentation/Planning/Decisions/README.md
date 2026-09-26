@@ -22,6 +22,7 @@ choices do not need one.
 | [0005](ADR-0005-protocol-handlers-acquire-transports-through-connectors.md) | Protocol handlers acquire transports through connectors | Accepted | 2026-09-26 |
 | [0006](ADR-0006-transfer-context-carries-phase-4-protocol-options.md) | The transfer context carries the Phase 4 protocol options | Accepted | 2026-09-26 |
 | [0007](ADR-0007-file-handler-keeps-negative-resume-guard.md) | `FileProtocolHandler` keeps its negative-`ResumeFrom` guard as an unreachable defensive default | Accepted | 2026-09-26 |
+| [0008](ADR-0008-transfer-context-carries-connect-timeout-and-max-time.md) | The transfer context carries the connect timeout and the maximum time | Accepted | 2026-09-26 |
 
 ## Template
 
