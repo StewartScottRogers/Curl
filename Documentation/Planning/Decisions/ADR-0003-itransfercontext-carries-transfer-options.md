@@ -112,3 +112,30 @@ for. `null` means the time is unknown or no source was opened; an upload reports
 The `file` handler reports it on every successful download, `-I`/`--head` included,
 already truncated to whole seconds. Sources: <https://curl.se/docs/manpage.html>
 (`-R`, `--remote-time`), checked against curl 8.21.0.
+
+## Amendment, 2026-09-26 — a sixth member, `ConvertLineEndings` (BL-020)
+
+`ITransferContext` gains `bool ConvertLineEndings`, curl's `--crlf`, `false` when not
+given. It goes on the shared contract rather than on a `file`-specific type for the
+reason the first five did: `--crlf` is not a `file` concept. curl documents it for
+uploads generally (`--help all`: "Convert LF to CRLF in upload"), and FTP and SMTP
+uploads will need the same flag, so one member serves every handler and each states
+whether it applies. It applies to uploads only; a download ignores it.
+
+Measured on this machine against curl 8.21.0 (Release-Date 2026-06-24) on 2026-09-26,
+with `curl -T in.txt --crlf file:///C:/crlfprobe/out.txt -w "%{size_upload}"`:
+
+- `a\nb\n` lands as `a\r\nb\r\n`, and `size_upload` is 6: the reported byte count is
+  the converted count, not the 4 bytes read.
+- `a\r\nb` lands unchanged, `size_upload` 4. curl does not double an existing pair.
+- `a\r\r\nb\rc\n\n` lands as `a\r\r\nb\rc\r\n\r\n`, `size_upload` 11: a carriage return
+  is inserted before a line feed only when the byte immediately before it is not one,
+  and a lone carriage return is left alone.
+- 16383 bytes of `x`, then `\r` as the last byte of the first 16384-byte chunk and `\n`
+  as the first byte of the second, then ten bytes of `y` (16395 bytes) land unchanged,
+  `size_upload` 16395: the byte before is remembered across chunks.
+
+The `file` handler converts chunk by chunk (`CrlfUploadConverter`), so an upload is
+never read whole into memory; a converted chunk is at most twice the size of the one
+read. Sources: <https://curl.se/docs/manpage.html> (`--crlf`), checked against curl
+8.21.0.
