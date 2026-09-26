@@ -8,7 +8,7 @@ depends-on: [BL-008, BL-016]
 touches: [Curl.Protocol.File.UnitLibrary, Curl.Protocol.File.UnitTests, Documentation/Product/Requirements.md]
 requirement: none
 created: 2026-09-25
-completed:
+completed: 2026-09-26
 ---
 # BL-017 — Compare `--time-cond` at whole-second resolution, strictly in both directions
 
@@ -54,23 +54,23 @@ open reported, never against now.
 
 ## Acceptance criteria
 
-- [ ] `MeetsTimeCondition` truncates both operands to whole seconds (for example with
+- [x] `MeetsTimeCondition` truncates both operands to whole seconds (for example with
       `DateTimeOffset` arithmetic on `Ticks` and `TimeSpan.TicksPerSecond`) and uses `>`
       for `IfModifiedSince` and `<` for `IfUnmodifiedSince`.
-- [ ] A test named `ExecuteAsync_IfModifiedSinceEqualToFileTime_TransfersNothing`
+- [x] A test named `ExecuteAsync_IfModifiedSinceEqualToFileTime_TransfersNothing`
       asserts exit 0, `BytesTransferred` 0 and an empty `Output`.
-- [ ] A test named `ExecuteAsync_IfUnmodifiedSinceEqualToFileTime_TransfersNothing`
+- [x] A test named `ExecuteAsync_IfUnmodifiedSinceEqualToFileTime_TransfersNothing`
       asserts the same three things: this is the `>` versus `>=` boundary, and it fails
       against the current `<=`.
-- [ ] A test named `ExecuteAsync_FileNewerBySubSecondOnly_TransfersNothing` uses a file
+- [x] A test named `ExecuteAsync_FileNewerBySubSecondOnly_TransfersNothing` uses a file
       timestamp 200 milliseconds after an `IfModifiedSince` value in the same second and
       asserts nothing transfers.
-- [ ] Tests assert each direction still transfers when it should: a file one whole second
+- [x] Tests assert each direction still transfers when it should: a file one whole second
       newer than an `IfModifiedSince` value transfers every byte; a file one whole second
       older than an `IfUnmodifiedSince` value transfers every byte.
-- [ ] No `HeaderOutput` bytes are written for any of the non-transferring cases above,
+- [x] No `HeaderOutput` bytes are written for any of the non-transferring cases above,
       which is the behaviour BL-016 establishes.
-- [ ] `dotnet build Curl.Protocol.File.UnitLibrary -warnaserror` is clean and
+- [x] `dotnet build Curl.Protocol.File.UnitLibrary -warnaserror` is clean and
       `dotnet test Curl.Protocol.File.UnitTests --filter "TestCategory!=Integration"`
       is green.
 
@@ -84,7 +84,20 @@ the handler's comparison rule, not a change to what the command line layer parse
 in the `MeetsTimeCondition` remarks so a reader does not go looking for it in the
 contract.
 
+Delivered directly rather than through the full `/feature` stages: the plan was already
+exact in this task (one expression, five named tests), so a separate architect pass would
+have added nothing. Tests were written first; `IfUnmodifiedSinceEqualToFileTime` and
+`FileNewerBySubSecondOnly` failed against the old code, as expected.
+
+Truncation uses `UtcTicks / TimeSpan.TicksPerSecond` in a private `WholeSeconds`, so an
+offset on either operand cannot shift the comparison. The whole-second passing tests are
+named `ExecuteAsync_FileNewerByOneWholeSecond_IfModifiedSinceTransfersTheBody` and
+`ExecuteAsync_FileOlderByOneWholeSecond_IfUnmodifiedSinceTransfersTheBody`. FR-009 in
+`Requirements.md` now states the rule, and no longer lists BL-016 as an open gap since it
+is done.
+
 ## Log
 
 - 2026-09-25: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. -z compares at whole seconds, strictly both ways; equality transfers in neither direction
