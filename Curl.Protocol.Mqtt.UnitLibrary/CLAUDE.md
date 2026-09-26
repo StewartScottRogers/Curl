@@ -2,9 +2,11 @@
 
 Phase 4.
 
-MQTT 3.1.1 over a byte stream: `MqttProtocolHandler` subscribes to the URL's topic and
-writes each PUBLISH it receives in curl 8.21.0's format. Publishing with `-d` and
-credentials from `-u` are not implemented yet.
+MQTT 3.1.1 over a byte stream, as curl 8.21.0 speaks it. `MqttProtocolHandler` puts
+`ITransferContext.Credentials` in the CONNECT; then, with `PostData` (`-d`) set, it
+sends one QoS 0 PUBLISH to the URL's topic and a DISCONNECT, and otherwise it subscribes
+to the topic and writes each PUBLISH it receives in curl's format. `MqttSession` runs
+one transfer; `MqttPackets` builds every packet sent.
 
 **URL schemes:** `mqtt` (default port 1883), `mqtts` (default port 8883, the same
 handler with `ConnectTarget.UseTls` true)

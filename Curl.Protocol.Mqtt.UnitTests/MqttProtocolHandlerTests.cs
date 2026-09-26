@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Mqtt.Fakes;
@@ -5,9 +6,10 @@ using Curl.Protocol.Mqtt.Fakes;
 namespace Curl.Protocol.Mqtt;
 
 /// <summary>
-/// Pins the <c>mqtt://</c> subscribe against curl 8.21.0: the CONNECT and SUBSCRIBE bytes,
-/// the bytes written for each PUBLISH, and the exit code and message of every way a
-/// subscribe ends. Each exchange is replayed through <see cref="ScriptedConnection" />, so
+/// Pins <c>mqtt://</c> against curl 8.21.0: the CONNECT bytes with and without credentials,
+/// the SUBSCRIBE bytes and the bytes written for each PUBLISH received, the PUBLISH and
+/// DISCONNECT bytes sent for <c>-d</c>, and the exit code and message of every way a
+/// transfer ends. Each exchange is replayed through <see cref="ScriptedConnection" />, so
 /// nothing here touches a network.
 /// </summary>
 [TestClass]
@@ -534,6 +536,280 @@ public sealed class MqttProtocolHandlerTests
     }
 
     /// <summary>
+    /// Replays <c>curl -d 75 mqtt://h/bedroom/dimmer</c> as measured against curl 8.21.0 on
+    /// 2026-09-26, with DISCONNECT pinned as sent to a broker that stays open.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_MeasuredPublish_SendsConnectPublishAndDisconnectAndWritesNothing()
+    {
+        ScriptedConnection connection = new(Connack);
+        RecordingStream output = new();
+
+        TransferResult result = await RunAsync(
+            FakeConnector.For(connection),
+            new TransferContext
+            {
+                Url = new Uri("mqtt://h/bedroom/dimmer"),
+                Output = output,
+                PostData = Encoding.ASCII.GetBytes("75"),
+            });
+
+        CollectionAssert.AreEqual(
+            Concat(MeasuredConnect, Bytes("30 12 00 0E", "bedroom/dimmer", string.Empty, "75"), Disconnect),
+            connection.Written);
+        Assert.IsEmpty(output.Writes);
+        Assert.AreEqual(TransferResult.Success(0), result);
+        Assert.IsTrue(connection.IsDisposed);
+    }
+
+    /// <summary>
+    /// Replays <c>curl -u bob:secret -d x mqtt://h/t</c> as measured against curl 8.21.0 on
+    /// 2026-09-26: flags <c>C2</c>, then the user name and password after the client identifier.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_MeasuredCredentials_ConnectCarriesUserNameAndPassword()
+    {
+        ScriptedConnection connection = new(Connack);
+
+        TransferResult result = await PublishAsync(connection, "mqtt://h/t", "x", new NetworkCredential("bob", "secret"));
+
+        CollectionAssert.AreEqual(
+            Concat(
+                Bytes("10 25 00 04", "MQTT", "04 C2 00 3C 00 0C", "curlPBadK4E3", "00 03", "bob", "00 06", "secret"),
+                Bytes("30 04 00 01", "t", string.Empty, "x"),
+                Disconnect),
+            connection.Written);
+        Assert.AreEqual(TransferResult.Success(0), result);
+    }
+
+    /// <summary>
+    /// curl 8.21.0 measured on 2026-09-26: <c>curl -u bob:se:cret -d x mqtt://h/t</c> sends
+    /// the password <c>se:cret</c> whole.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_PasswordContainingColon_IsSentWhole()
+    {
+        ScriptedConnection connection = new(Connack);
+
+        await PublishAsync(connection, "mqtt://h/t", "x", new NetworkCredential("bob", "se:cret"));
+
+        CollectionAssert.AreEqual(
+            Bytes("10 26 00 04", "MQTT", "04 C2 00 3C 00 0C", "curlPBadK4E3", "00 03", "bob", "00 07", "se:cret"),
+            connection.Written[..40]);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_UserNameWithoutPassword_SetsOnlyTheUserNameFlag()
+    {
+        ScriptedConnection connection = new(Connack);
+
+        await PublishAsync(connection, "mqtt://h/t", "x", new NetworkCredential("bob", string.Empty));
+
+        CollectionAssert.AreEqual(
+            Bytes("10 1D 00 04", "MQTT", "04 82 00 3C 00 0C", "curlPBadK4E3", "00 03", "bob"),
+            connection.Written[..31]);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_PasswordWithoutUserName_SetsOnlyThePasswordFlag()
+    {
+        ScriptedConnection connection = new(Connack);
+
+        await PublishAsync(connection, "mqtt://h/t", "x", new NetworkCredential(string.Empty, "pw"));
+
+        CollectionAssert.AreEqual(
+            Bytes("10 1C 00 04", "MQTT", "04 42 00 3C 00 0C", "curlPBadK4E3", "00 02", "pw"),
+            connection.Written[..30]);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_EmptyCredentials_ConnectCarriesNeither()
+    {
+        ScriptedConnection connection = new(Connack);
+
+        await PublishAsync(connection, "mqtt://h/t", "x", new NetworkCredential(string.Empty, string.Empty));
+
+        CollectionAssert.AreEqual(MeasuredConnect, connection.Written[..MeasuredConnect.Length]);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_NonAsciiUserName_IsSentAsUtf8()
+    {
+        ScriptedConnection connection = new(Connack);
+
+        await PublishAsync(connection, "mqtt://h/t", "x", new NetworkCredential("é", string.Empty));
+
+        CollectionAssert.AreEqual(
+            Bytes("10 1C 00 04", "MQTT", "04 82 00 3C 00 0C", "curlPBadK4E3", "00 02 C3 A9"),
+            connection.Written[..30]);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_CredentialsWhileSubscribing_ConnectCarriesThem()
+    {
+        ScriptedConnection connection = new(Connack);
+
+        await RunAsync(
+            FakeConnector.For(connection),
+            new TransferContext
+            {
+                Url = new Uri("mqtt://h/t"),
+                Output = new RecordingStream(),
+                Credentials = new NetworkCredential("al", "pw"),
+            });
+
+        CollectionAssert.AreEqual(
+            Concat(
+                Bytes("10 20 00 04", "MQTT", "04 C2 00 3C 00 0C", "curlPBadK4E3", "00 02", "al", "00 02", "pw"),
+                Bytes("82 06 00 01 00 01", "t", "00")),
+            connection.Written);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_UserNameOver65535Bytes_IsWeirdServerReplyAndSendsNothing()
+    {
+        ScriptedConnection connection = new(Connack);
+
+        TransferResult result = await PublishAsync(
+            connection,
+            "mqtt://h/t",
+            "x",
+            new NetworkCredential(new string('u', 65536), string.Empty));
+
+        Assert.AreEqual(new TransferResult(CurlExitCode.WeirdServerReply, 0, "Username too long: [65536]"), result);
+        Assert.IsEmpty(connection.Written);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_PasswordOver65535Bytes_IsWeirdServerReplyAndSendsNothing()
+    {
+        ScriptedConnection connection = new(Connack);
+
+        TransferResult result = await PublishAsync(
+            connection,
+            "mqtt://h/t",
+            "x",
+            new NetworkCredential("bob", new string('p', 65536)));
+
+        Assert.AreEqual(new TransferResult(CurlExitCode.WeirdServerReply, 0, "Password too long: [65536]"), result);
+        Assert.IsEmpty(connection.Written);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_CredentialsOf65535Bytes_AreSent()
+    {
+        ScriptedConnection connection = new(Connack);
+        string longest = new('u', 65535);
+
+        await PublishAsync(connection, "mqtt://h/t", "x", new NetworkCredential(longest, longest));
+
+        CollectionAssert.AreEqual(Bytes("10 9A 80 08"), connection.Written[..4]);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_PublishPayloadOver127Bytes_UsesTwoByteRemainingLength()
+    {
+        ScriptedConnection connection = new(Connack);
+        string payload = new('p', 200);
+
+        await PublishAsync(connection, "mqtt://h/t", payload);
+
+        CollectionAssert.AreEqual(
+            Concat(MeasuredConnect, Bytes("30 CB 01 00 01", "t", string.Empty, payload), Disconnect),
+            connection.Written);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_EmptyPostData_PublishesAnEmptyPayload()
+    {
+        ScriptedConnection connection = new(Connack);
+
+        await PublishAsync(connection, "mqtt://h/t", string.Empty);
+
+        CollectionAssert.AreEqual(Concat(MeasuredConnect, Bytes("30 03 00 01", "t"), Disconnect), connection.Written);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_PostDataSet_SendsNoSubscribeAndWritesNothing()
+    {
+        ScriptedConnection connection = new(Connack, Suback, Publish("t", "HELLO"));
+        RecordingStream output = new();
+
+        TransferResult result = await RunAsync(
+            FakeConnector.For(connection),
+            new TransferContext
+            {
+                Url = new Uri("mqtt://h/t"),
+                Output = output,
+                PostData = Encoding.ASCII.GetBytes("x"),
+            });
+
+        CollectionAssert.AreEqual(
+            Concat(MeasuredConnect, Bytes("30 04 00 01", "t", string.Empty, "x"), Disconnect),
+            connection.Written);
+        Assert.IsEmpty(output.Writes);
+        Assert.AreEqual(TransferResult.Success(0), result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_PublishConnackReturnCode5_IsWeirdServerReplyAndPublishesNothing()
+    {
+        ScriptedConnection connection = new(Bytes("20 02 00 05"));
+
+        TransferResult result = await PublishAsync(connection, "mqtt://h/t", "x");
+
+        Assert.AreEqual(new TransferResult(CurlExitCode.WeirdServerReply, 0, "Expected 0000 but got 0005"), result);
+        CollectionAssert.AreEqual(MeasuredConnect, connection.Written);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_PublishWithoutTopic_IsUrlMalformatAfterConnack()
+    {
+        ScriptedConnection connection = new(Connack);
+
+        TransferResult result = await PublishAsync(connection, "mqtt://h/", "x");
+
+        Assert.AreEqual(
+            new TransferResult(CurlExitCode.UrlMalformat, 0, "No MQTT topic found. Forgot to URL encode it?"),
+            result);
+        CollectionAssert.AreEqual(MeasuredConnect, connection.Written);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_PublishWriteFails_IsSendError()
+    {
+        ScriptedConnection connection = new(Connack) { FailWrites = true };
+
+        TransferResult result = await PublishAsync(connection, "mqtt://h/t", "x");
+
+        Assert.AreEqual(new TransferResult(CurlExitCode.SendError, 0, "Failure when sending data to the peer"), result);
+    }
+
+    /// <summary>
+    /// curl's <c>mqtt_publish</c> refuses a remaining length over <c>MAX_MQTT_MESSAGE_SIZE</c>
+    /// (0xFFFFFFF) less the first byte and a four-byte length: over 268435450 bytes.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_PublishOverCurlsSizeLimit_IsTooLargeAndPublishesNothing()
+    {
+        ScriptedConnection connection = new(Connack);
+
+        TransferResult result = await RunAsync(
+            FakeConnector.For(connection),
+            new TransferContext
+            {
+                Url = new Uri("mqtt://h/t"),
+                Output = new RecordingStream(),
+                PostData = new byte[268435451 - 3],
+            });
+
+        Assert.AreEqual(
+            new TransferResult(CurlExitCode.TooLarge, 0, "A value or data field grew larger than allowed"),
+            result);
+        CollectionAssert.AreEqual(MeasuredConnect, connection.Written);
+    }
+
+    /// <summary>
     /// A QoS 0 PUBLISH of under 128 bytes: fixed header, topic length, topic, payload.
     /// </summary>
     private static byte[] Publish(string topic, string payload) =>
@@ -551,6 +827,26 @@ public sealed class MqttProtocolHandlerTests
 
     private static TransferContext Context(string url, Stream output) =>
         new() { Url = new Uri(url), Output = output };
+
+    private Task<TransferResult> PublishAsync(
+        ScriptedConnection connection,
+        string url,
+        string payload,
+        NetworkCredential? credentials = null) =>
+        RunAsync(
+            FakeConnector.For(connection),
+            new TransferContext
+            {
+                Url = new Uri(url),
+                Output = new RecordingStream(),
+                PostData = Encoding.ASCII.GetBytes(payload),
+                Credentials = credentials,
+            });
+
+    private Task<TransferResult> RunAsync(IConnector connector, TransferContext context) =>
+        new MqttProtocolHandler(connector, () => FixedSuffix)
+            .ExecuteAsync(context)
+            .AsTask();
 
     private Task<TransferResult> RunAsync(IConnector connector, string url, Stream output) =>
         new MqttProtocolHandler(connector, () => FixedSuffix)

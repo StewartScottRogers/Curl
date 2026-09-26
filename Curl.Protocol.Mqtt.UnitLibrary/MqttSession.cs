@@ -1,20 +1,22 @@
+using System.Net;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Mqtt;
 
 /// <summary>
-/// One subscribe over an open connection, in the order curl 8.21.0's <c>lib/mqtt.c</c>
-/// runs it: CONNECT, wait for CONNACK, read the topic from the URL, SUBSCRIBE, then write
-/// every PUBLISH to the output until the peer disconnects.
+/// One MQTT transfer over an open connection, in the order curl 8.21.0's
+/// <c>lib/mqtt.c</c> runs it: CONNECT, wait for CONNACK, read the topic from the URL, then
+/// either PUBLISH the request data and DISCONNECT, or SUBSCRIBE and write every PUBLISH to
+/// the output until the peer disconnects.
 /// </summary>
 /// <param name="connection">The connection to talk over; the caller owns and disposes it.</param>
-/// <param name="output">The stream each PUBLISH is written to.</param>
+/// <param name="output">The stream each received PUBLISH is written to.</param>
 /// <param name="cancellationToken">Cancels every read and write.</param>
 /// <remarks>
 /// <para>
-/// A PUBLISH is written as curl writes it: its whole body after the fixed header - the
-/// two-byte topic length, the topic, then the payload - with nothing parsed out. Each one
-/// is gathered whole before it is written, so one PUBLISH is one write to the output
+/// A received PUBLISH is written as curl writes it: its whole body after the fixed header -
+/// the two-byte topic length, the topic, then the payload - with nothing parsed out. Each
+/// one is gathered whole before it is written, so one PUBLISH is one write to the output
 /// however the peer split it; one cut short by the peer closing is written as far as it
 /// got, as curl's is, before the transfer fails with exit 18.
 /// </para>
@@ -23,7 +25,7 @@ namespace Curl.Protocol.Mqtt;
 /// code and message; <see cref="BytesWritten" /> still says how much reached the output.
 /// </para>
 /// </remarks>
-internal sealed class MqttSubscribeSession(IConnection connection, Stream output, CancellationToken cancellationToken)
+internal sealed class MqttSession(IConnection connection, Stream output, CancellationToken cancellationToken)
 {
     private readonly MqttPacketReader reader = new(connection, cancellationToken);
 
@@ -37,11 +39,24 @@ internal sealed class MqttSubscribeSession(IConnection connection, Stream output
     /// </summary>
     /// <param name="url">The transfer's URL, whose path names the topic.</param>
     /// <param name="clientIdentifier">The client identifier the CONNECT carries.</param>
-    /// <returns>A task that completes when the peer has sent DISCONNECT.</returns>
+    /// <param name="credentials">
+    /// The user name and password the CONNECT carries, or <see langword="null" /> for none.
+    /// </param>
+    /// <param name="postData">
+    /// The payload to publish, or <see langword="null" /> to subscribe instead.
+    /// </param>
+    /// <returns>
+    /// A task that completes when a publish has sent its DISCONNECT, or when the peer has
+    /// sent DISCONNECT.
+    /// </returns>
     /// <exception cref="MqttTransferException">The session failed; see its exit code.</exception>
-    internal async ValueTask RunAsync(Uri url, string clientIdentifier)
+    internal async ValueTask RunAsync(
+        Uri url,
+        string clientIdentifier,
+        NetworkCredential? credentials,
+        ReadOnlyMemory<byte>? postData)
     {
-        await SendAsync(MqttPackets.BuildConnect(clientIdentifier)).ConfigureAwait(false);
+        await SendAsync(MqttPackets.BuildConnect(clientIdentifier, credentials)).ConfigureAwait(false);
         MqttFixedHeader? connack = await ReadPacketHeaderAsync().ConfigureAwait(false);
         if (connack is null)
         {
@@ -49,7 +64,15 @@ internal sealed class MqttSubscribeSession(IConnection connection, Stream output
         }
 
         await VerifyConnackAsync(connack.Value).ConfigureAwait(false);
-        await SendAsync(MqttPackets.BuildSubscribe(MqttTopic.Decode(url))).ConfigureAwait(false);
+        byte[] topic = MqttTopic.Decode(url);
+        if (postData is { } payload)
+        {
+            await SendAsync(MqttPackets.BuildPublish(topic, payload)).ConfigureAwait(false);
+            await SendAsync(MqttPackets.BuildDisconnect()).ConfigureAwait(false);
+            return;
+        }
+
+        await SendAsync(MqttPackets.BuildSubscribe(topic)).ConfigureAwait(false);
         await ReceivePublishesAsync().ConfigureAwait(false);
     }
 

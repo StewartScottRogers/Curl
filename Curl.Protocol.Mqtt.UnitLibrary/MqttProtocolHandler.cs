@@ -4,8 +4,9 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Protocol.Mqtt;
 
 /// <summary>
-/// Serves the <c>mqtt</c> and <c>mqtts</c> schemes by subscribing to the URL's topic and
-/// writing every message the broker publishes to it, as curl 8.21.0 does.
+/// Serves the <c>mqtt</c> and <c>mqtts</c> schemes as curl 8.21.0 does: publishes the
+/// <c>-d</c> data to the URL's topic, or without it subscribes to the topic and writes
+/// every message the broker publishes to it.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -15,20 +16,29 @@ namespace Curl.Protocol.Mqtt;
 /// or <c>SslStream</c> is constructed here.
 /// </para>
 /// <para>
-/// Each PUBLISH is written to <see cref="ITransferContext.Output" /> as curl writes it: two
-/// bytes of topic length, the topic, then the payload. The transfer runs until the broker
-/// ends it: a DISCONNECT is a success, and a closed connection is exit 56
-/// (<see cref="CurlExitCode.RecvError" />, <c>Connection disconnected</c>), which is how a
-/// subscribe usually ends. A refused CONNACK and any packet curl does not expect are exit 8
-/// (<see cref="CurlExitCode.WeirdServerReply" />); a URL with no topic is exit 3
-/// (<see cref="CurlExitCode.UrlMalformat" />), found after the CONNACK as in curl. A
-/// failure of the connection, or an <see cref="IOException" /> from the output, is
-/// returned rather than thrown; cancellation leaves as an exception.
+/// Every CONNECT carries <see cref="ITransferContext.Credentials" /> when they are set: the
+/// user name and the password in UTF-8, each only when it is not empty. Choosing between
+/// <c>-u</c> and the URL's user information is the command line's job (ADR-0006).
 /// </para>
 /// <para>
-/// Publishing with <c>-d</c> and credentials from <c>-u</c> are not implemented yet:
-/// <see cref="ITransferContext.PostData" /> and <see cref="ITransferContext.Credentials" />
-/// are ignored.
+/// With <see cref="ITransferContext.PostData" /> set, the handler sends one PUBLISH at QoS 0
+/// without the retain flag, the only kind curl sends, then DISCONNECT, and succeeds without
+/// waiting for the broker or writing anything to the output. A PUBLISH over curl's
+/// 268435455-byte limit is exit 100 (<see cref="CurlExitCode.TooLarge" />).
+/// </para>
+/// <para>
+/// Without it, each PUBLISH received is written to <see cref="ITransferContext.Output" /> as
+/// curl writes it: two bytes of topic length, the topic, then the payload. The transfer runs
+/// until the broker ends it: a DISCONNECT is a success, and a closed connection is exit 56
+/// (<see cref="CurlExitCode.RecvError" />, <c>Connection disconnected</c>), which is how a
+/// subscribe usually ends.
+/// </para>
+/// <para>
+/// Either way, a refused CONNACK, any packet curl does not expect and a user name or
+/// password over 65535 bytes are exit 8 (<see cref="CurlExitCode.WeirdServerReply" />); a
+/// URL with no topic is exit 3 (<see cref="CurlExitCode.UrlMalformat" />), found after the
+/// CONNACK as in curl. A failure of the connection, or an <see cref="IOException" /> from
+/// the output, is returned rather than thrown; cancellation leaves as an exception.
 /// </para>
 /// </remarks>
 public sealed class MqttProtocolHandler : IProtocolHandler
@@ -107,10 +117,15 @@ public sealed class MqttProtocolHandler : IProtocolHandler
 
         await using (connection.ConfigureAwait(false))
         {
-            MqttSubscribeSession session = new(connection, context.Output, context.CancellationToken);
+            MqttSession session = new(connection, context.Output, context.CancellationToken);
             try
             {
-                await session.RunAsync(context.Url, ClientIdentifierPrefix + clientIdentifierSuffixSource())
+                await session
+                    .RunAsync(
+                        context.Url,
+                        ClientIdentifierPrefix + clientIdentifierSuffixSource(),
+                        context.Credentials,
+                        context.PostData)
                     .ConfigureAwait(false);
                 return TransferResult.Success(session.BytesWritten);
             }

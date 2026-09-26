@@ -48,6 +48,11 @@ internal static class MqttTransferMessages
     internal const string WeirdServerReply = "Weird server reply";
 
     /// <summary>
+    /// The exit 100 message curl falls back to for a PUBLISH over its size limit.
+    /// </summary>
+    internal const string TooLarge = "A value or data field grew larger than allowed";
+
+    /// <summary>
     /// The exit 23 message for an output that stopped accepting bytes, as curl words it
     /// when a write takes none of what it was offered.
     /// </summary>
@@ -57,6 +62,22 @@ internal static class MqttTransferMessages
         string.Create(
             CultureInfo.InvariantCulture,
             $"Failure writing output to destination, passed {passed} returned 0");
+
+    /// <summary>
+    /// The exit 8 message for a user name over 65535 bytes.
+    /// </summary>
+    /// <param name="length">The user name's length in bytes.</param>
+    /// <returns>The message to report.</returns>
+    internal static string UserNameTooLong(int length) =>
+        string.Create(CultureInfo.InvariantCulture, $"Username too long: [{length}]");
+
+    /// <summary>
+    /// The exit 8 message for a password over 65535 bytes.
+    /// </summary>
+    /// <param name="length">The password's length in bytes.</param>
+    /// <returns>The message to report.</returns>
+    internal static string PasswordTooLong(int length) =>
+        string.Create(CultureInfo.InvariantCulture, $"Password too long: [{length}]");
 
     /// <summary>
     /// The exit 8 message for a CONNACK whose remaining length is not two.
