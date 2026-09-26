@@ -4,7 +4,19 @@ The harness that runs curl's own upstream test cases (`tests/data/test*`) agains
 Curl, in process, as data-driven MSTest cases. It follows ADR-0013
 (`Documentation/Planning/Decisions/ADR-0013-upstream-test-cases-run-as-data-driven-mstest.md`).
 
-It is empty today (BL-148 scaffolded it). What it is to hold, per ADR-0013 decision 2:
+Today it holds the test-file parser. `UpstreamTestCaseParser.Parse` reads one test file's
+bytes line by line, the way upstream's `getpart.pm` does (`UpstreamTestFileTag` recognises
+tag lines), into an `UpstreamTestCase` whose `UpstreamTestSection` parts keep their bodies
+and attributes as written, or into an `UpstreamTestCaseParseFailure` naming the section and
+line. Bodies stay as written because `runtests.pl` applies `nonewline`, `crlf` and
+`mode="text"` where it uses a part, after variable substitution and in a different order
+per part; `UpstreamTestSectionLineEndings` holds those transforms (with
+`UpstreamTestHeaderLine` guessing header lines for `crlf="headers"`) for the comparison
+stage to call. Variables and `%if` blocks are left as written. Tag lines are recognised by
+hand, not with `Regex`: source-generated regex code is compiled into this assembly and
+would count against its coverage gate.
+
+What it is to hold in full, per ADR-0013 decision 2:
 
 - the test-file parser, variable substitution (`%HOSTIP`, `%TESTNUMBER`, `%LOGDIR`, ...)
   and `%if` evaluation;
