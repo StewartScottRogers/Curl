@@ -69,6 +69,9 @@ public sealed class TransferContext : ITransferContext
     public TimeSpan? MaxTime { get; init; }
 
     /// <inheritdoc />
+    public HttpRequestOptions? Http { get; init; }
+
+    /// <inheritdoc />
     public TimeProvider TimeProvider { get; init; } = TimeProvider.System;
 
     /// <inheritdoc />

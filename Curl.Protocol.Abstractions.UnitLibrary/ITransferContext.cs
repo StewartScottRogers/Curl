@@ -194,6 +194,17 @@ public interface ITransferContext
     TimeSpan? MaxTime { get; }
 
     /// <summary>
+    /// Gets the HTTP-only options, or <see langword="null" /> when no HTTP option was
+    /// given.
+    /// </summary>
+    /// <remarks>
+    /// An HTTP handler treats <see langword="null" /> exactly as
+    /// <c>new HttpRequestOptions()</c>, every member at its default; every other handler
+    /// ignores it (ADR-0014).
+    /// </remarks>
+    HttpRequestOptions? Http { get; }
+
+    /// <summary>
     /// Gets the time source. Injected so that timeout and retry behaviour is testable
     /// without a real delay.
     /// </summary>

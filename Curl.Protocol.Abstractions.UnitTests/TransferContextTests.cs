@@ -34,6 +34,7 @@ public sealed class TransferContextTests
         Assert.AreEqual((UnixFileMode)0b110_100_100, context.CreateFileMode);
         Assert.IsNull(context.ConnectTimeout);
         Assert.IsNull(context.MaxTime);
+        Assert.IsNull(context.Http);
         Assert.AreSame(TimeProvider.System, context.TimeProvider);
         Assert.AreEqual(CancellationToken.None, context.CancellationToken);
     }
@@ -53,6 +54,7 @@ public sealed class TransferContextTests
         var credentials = new NetworkCredential("bob", "secret");
         string[] telnetOptions = ["TTYPE=vt100", "XDISPLOC=host:0"];
         var timeProvider = new StubTimeProvider();
+        var http = new HttpRequestOptions { CustomMethod = "PATCH" };
 
         var context = new TransferContext
         {
@@ -74,6 +76,7 @@ public sealed class TransferContextTests
             CreateFileMode = UnixFileMode.UserRead,
             ConnectTimeout = TimeSpan.FromSeconds(3),
             MaxTime = TimeSpan.FromMilliseconds(12500),
+            Http = http,
             TimeProvider = timeProvider,
             CancellationToken = cancellation.Token,
         };
@@ -97,6 +100,7 @@ public sealed class TransferContextTests
         Assert.AreEqual(UnixFileMode.UserRead, context.CreateFileMode);
         Assert.AreEqual(TimeSpan.FromSeconds(3), context.ConnectTimeout);
         Assert.AreEqual(TimeSpan.FromMilliseconds(12500), context.MaxTime);
+        Assert.AreSame(http, context.Http);
         Assert.AreSame(timeProvider, context.TimeProvider);
         Assert.AreEqual(cancellation.Token, context.CancellationToken);
     }
