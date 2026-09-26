@@ -44,8 +44,9 @@ internal sealed class TftpUpload(ITransferContext context, IDatagramChannel chan
     internal async ValueTask<TransferResult> RunAsync(string fileName)
     {
         var transferSize = upload.CanSeek ? upload.Length - upload.Position : 0;
+        var request = TftpPackets.BuildWriteRequest(fileName, transferSize, TftpPackets.RequestedBlockSize(context));
         await channel
-            .SendAsync(TftpPackets.BuildWriteRequest(fileName, transferSize), channel.ServerEndPoint, context.CancellationToken)
+            .SendAsync(request, channel.ServerEndPoint, context.CancellationToken)
             .ConfigureAwait(false);
 
         while (true)

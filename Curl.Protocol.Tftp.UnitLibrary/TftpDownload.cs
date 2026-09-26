@@ -32,7 +32,7 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
     internal async ValueTask<TransferResult> RunAsync(string fileName)
     {
         await channel
-            .SendAsync(TftpPackets.BuildReadRequest(fileName), channel.ServerEndPoint, context.CancellationToken)
+            .SendAsync(TftpPackets.BuildReadRequest(fileName, TftpPackets.RequestedBlockSize(context)), channel.ServerEndPoint, context.CancellationToken)
             .ConfigureAwait(false);
 
         while (true)

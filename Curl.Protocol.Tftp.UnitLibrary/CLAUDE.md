@@ -27,6 +27,10 @@ which a byte stream cannot express. The tests in the matching `.UnitTests` proje
   after the previous block's ACK to the endpoint that ACK came from, an OACK taken as
   ACK 0 with its `blksize`, and a zero-length last block when the length is an exact
   multiple of the block size (so an empty upload is one empty DATA 1).
-- Not yet: `--tftp-blksize`, `--tftp-no-options`, retransmission, and
-  the timeout that ends a silent transfer. Until then a silent server leaves the
+- `--tftp-blksize` (`TftpBlockSize`), clamped to 8-65464 and sent as `blksize`; 0 or
+  absent sends 512. The block size in force is 512 until an OACK grants another, so a
+  server that answers with plain DATA is read in 512-byte blocks, as curl does.
+- `--tftp-no-options` (`TftpNoOptions`): the read or write request is the file name
+  and `octet` alone, with no `tsize`, `blksize` or `timeout`.
+- Not yet: retransmission, and the timeout that ends a silent transfer. Until then a silent server leaves the
   receive waiting until the transfer's token is cancelled.

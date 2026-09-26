@@ -13,10 +13,13 @@ namespace Curl.Protocol.Tftp;
 /// </param>
 /// <remarks>
 /// <para>
-/// The read request carries curl's default options, <c>tsize 0</c>, <c>blksize 512</c>
-/// and <c>timeout 6</c> (RFC 2347, 2348, 2349). An option acknowledgement is answered with
-/// ACK 0 and its <c>blksize</c> decides which block is the last; without one the block
-/// size stays 512. Every acknowledgement goes to the endpoint the packet it answers came
+/// The read request carries curl's options, <c>tsize 0</c>, <c>blksize</c> and
+/// <c>timeout 6</c> (RFC 2347, 2348, 2349); <c>blksize</c> is
+/// <see cref="ITransferContext.TftpBlockSize" /> clamped to 8-65464, or 512 when it is not
+/// given. <see cref="ITransferContext.TftpNoOptions" /> sends no options at all, on a read
+/// or a write request. An option acknowledgement is answered with ACK 0 and its
+/// <c>blksize</c> decides which block is the last; without one the block size is 512,
+/// whatever was asked for. Every acknowledgement goes to the endpoint the packet it answers came
 /// from, the server's transfer identifier, never back to port 69.
 /// </para>
 /// <para>
@@ -34,9 +37,8 @@ namespace Curl.Protocol.Tftp;
 /// is returned with the connector's code and message unchanged.
 /// </para>
 /// <para>
-/// <c>--tftp-blksize</c>, <c>--tftp-no-options</c>, retransmission and the timeout
-/// that ends a silent transfer are not implemented yet; see the library's
-/// <c>CLAUDE.md</c>.
+/// Retransmission and the timeout that ends a silent transfer are not implemented yet;
+/// see the library's <c>CLAUDE.md</c>.
 /// </para>
 /// </remarks>
 public sealed class TftpProtocolHandler(IDatagramConnector connector) : IProtocolHandler

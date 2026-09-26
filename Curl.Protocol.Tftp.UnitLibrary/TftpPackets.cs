@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Globalization;
 using System.Text;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Tftp;
 
@@ -50,28 +51,51 @@ internal static class TftpPackets
     private const string DefaultTimeoutSeconds = "6";
 
     /// <summary>
-    /// Builds the read request curl 8.21.0 sends by default: octet mode, then
-    /// <c>tsize 0</c>, <c>blksize 512</c> and <c>timeout 6</c>, each string
-    /// null-terminated.
+    /// Gets the <c>blksize</c> a request asks for, or <see langword="null" /> when
+    /// <c>--tftp-no-options</c> means the request carries no options at all.
     /// </summary>
-    /// <param name="fileName">The file name from the URL path, decoded.</param>
-    /// <returns>The whole datagram.</returns>
-    internal static byte[] BuildReadRequest(string fileName) =>
-        BuildRequest(ReadRequestOpcode, fileName, 0);
+    /// <param name="context">The transfer being performed.</param>
+    /// <returns>
+    /// <see cref="ITransferContext.TftpBlockSize" /> clamped to 8-65464, as curl 8.21.0
+    /// sends it; 512 when it is not given or is 0, as curl sends for
+    /// <c>--tftp-blksize 0</c>.
+    /// </returns>
+    internal static int? RequestedBlockSize(ITransferContext context) =>
+        context.TftpNoOptions
+            ? null
+            : context.TftpBlockSize is null or 0
+                ? DefaultBlockSize
+                : Math.Clamp(context.TftpBlockSize.Value, MinimumBlockSize, MaximumBlockSize);
 
     /// <summary>
-    /// Builds the write request curl 8.21.0 sends by default: octet mode, then
-    /// <c>tsize</c> with the upload's length, <c>blksize 512</c> and <c>timeout 6</c>,
-    /// each string null-terminated.
+    /// Builds the read request curl 8.21.0 sends: octet mode, then <c>tsize 0</c>,
+    /// <c>blksize</c> and <c>timeout 6</c>, each string null-terminated, or octet mode
+    /// alone when there are no options.
+    /// </summary>
+    /// <param name="fileName">The file name from the URL path, decoded.</param>
+    /// <param name="blockSize">
+    /// The <c>blksize</c> to ask for, or <see langword="null" /> to send no options.
+    /// </param>
+    /// <returns>The whole datagram.</returns>
+    internal static byte[] BuildReadRequest(string fileName, int? blockSize) =>
+        BuildRequest(ReadRequestOpcode, fileName, 0, blockSize);
+
+    /// <summary>
+    /// Builds the write request curl 8.21.0 sends: octet mode, then <c>tsize</c> with the
+    /// upload's length, <c>blksize</c> and <c>timeout 6</c>, each string null-terminated,
+    /// or octet mode alone when there are no options.
     /// </summary>
     /// <param name="fileName">The file name from the URL path, decoded.</param>
     /// <param name="transferSize">
     /// The upload's length in bytes, or 0 when it is not known, as curl sends for an
     /// upload read from a pipe.
     /// </param>
+    /// <param name="blockSize">
+    /// The <c>blksize</c> to ask for, or <see langword="null" /> to send no options.
+    /// </param>
     /// <returns>The whole datagram.</returns>
-    internal static byte[] BuildWriteRequest(string fileName, long transferSize) =>
-        BuildRequest(WriteRequestOpcode, fileName, transferSize);
+    internal static byte[] BuildWriteRequest(string fileName, long transferSize, int? blockSize) =>
+        BuildRequest(WriteRequestOpcode, fileName, transferSize, blockSize);
 
     /// <summary>
     /// Builds the DATA packet that carries block <paramref name="blockNumber" />.
@@ -138,25 +162,30 @@ internal static class TftpPackets
     }
 
     /// <summary>
-    /// Builds a read or write request with curl 8.21.0's default options.
+    /// Builds a read or write request with curl 8.21.0's options, or none.
     /// </summary>
     /// <param name="opcode">The request's opcode.</param>
     /// <param name="fileName">The file name from the URL path, decoded.</param>
     /// <param name="transferSize">The <c>tsize</c> option's value.</param>
+    /// <param name="blockSize">
+    /// The <c>blksize</c> option's value, or <see langword="null" /> to send no options.
+    /// </param>
     /// <returns>The whole datagram.</returns>
-    private static byte[] BuildRequest(ushort opcode, string fileName, long transferSize)
+    private static byte[] BuildRequest(ushort opcode, string fileName, long transferSize, int? blockSize)
     {
-        string[] fields =
-        [
-            fileName,
-            "octet",
-            "tsize",
-            transferSize.ToString(CultureInfo.InvariantCulture),
-            "blksize",
-            DefaultBlockSize.ToString(CultureInfo.InvariantCulture),
-            "timeout",
-            DefaultTimeoutSeconds,
-        ];
+        string[] fields = blockSize is { } requested
+            ?
+            [
+                fileName,
+                "octet",
+                "tsize",
+                transferSize.ToString(CultureInfo.InvariantCulture),
+                "blksize",
+                requested.ToString(CultureInfo.InvariantCulture),
+                "timeout",
+                DefaultTimeoutSeconds,
+            ]
+            : [fileName, "octet"];
 
         using var packet = new MemoryStream();
         packet.WriteByte(0);
