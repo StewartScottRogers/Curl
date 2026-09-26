@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Net;
 using Curl.Protocol.Abstractions;
 
@@ -38,13 +37,10 @@ namespace Curl.Protocol.Tftp;
 /// </remarks>
 internal sealed class TftpDownload(ITransferContext context, IDatagramChannel channel, long startTimestamp)
 {
-    /// <summary>The connect timeout curl applies when none is given.</summary>
-    private static readonly TimeSpan DefaultConnectTimeout = TimeSpan.FromSeconds(300);
-
     private readonly byte[] buffer =
         new byte[TftpPackets.MaximumBlockSize + TftpPackets.DataHeaderLength];
 
-    private readonly TimeSpan? maxTime = Positive(context.MaxTime);
+    private readonly TftpTimeLimits limits = new(context, startTimestamp);
 
     private int blockSize = TftpPackets.DefaultBlockSize;
     private ushort expectedBlock = 1;
@@ -64,8 +60,7 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
     /// <returns>The outcome of the transfer.</returns>
     internal async ValueTask<TransferResult> RunAsync(string fileName)
     {
-        schedule = TftpRetrySchedule.ForTimeLeft(
-            Min(Positive(context.ConnectTimeout) ?? DefaultConnectTimeout, maxTime) - Elapsed());
+        schedule = limits.RequestSchedule();
         await SendAsync(
                 TftpPackets.BuildReadRequest(fileName, TftpPackets.RequestedBlockSize(context), schedule.RetrySeconds),
                 channel.ServerEndPoint)
@@ -74,44 +69,13 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
 
         while (true)
         {
-            var outcome = await ReceiveBeforeDeadlineAsync().ConfigureAwait(false) is { } received
+            var outcome = await limits.ReceiveBeforeAsync(channel, buffer, resendAt).ConfigureAwait(false) is { } received
                 ? await AnswerAsync(received).ConfigureAwait(false)
                 : await AnswerSilenceAsync().ConfigureAwait(false);
             if (outcome is not null)
             {
                 return outcome;
             }
-        }
-    }
-
-    private static TimeSpan? Positive(TimeSpan? limit) => limit > TimeSpan.Zero ? limit : null;
-
-    private static TimeSpan Min(TimeSpan limit, TimeSpan? other) =>
-        other < limit ? other.Value : limit;
-
-    private TimeSpan Elapsed() => context.TimeProvider.GetElapsedTime(startTimestamp);
-
-    /// <summary>
-    /// Waits for one datagram until the next re-send is due or the maximum time passes.
-    /// </summary>
-    /// <returns>
-    /// The datagram's length and source, or <see langword="null" /> when the deadline came
-    /// first.
-    /// </returns>
-    private async ValueTask<DatagramReceived?> ReceiveBeforeDeadlineAsync()
-    {
-        var wait = Min(resendAt, maxTime) - Elapsed();
-        using var deadline = new CancellationTokenSource(
-            TimeSpan.FromTicks(Math.Max(0, wait.Ticks)),
-            context.TimeProvider);
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(context.CancellationToken, deadline.Token);
-        try
-        {
-            return await channel.ReceiveAsync(buffer, linked.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (!context.CancellationToken.IsCancellationRequested)
-        {
-            return null;
         }
     }
 
@@ -122,15 +86,9 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
     /// <returns>The transfer's outcome when the silence ended it, otherwise <see langword="null" />.</returns>
     private async ValueTask<TransferResult?> AnswerSilenceAsync()
     {
-        var elapsed = Elapsed();
-        if (elapsed >= maxTime)
+        if (limits.FailureIfMaxTimePassed(bytesTransferred, bytesTransferred) is { } timedOut)
         {
-            return TransferResult.Failure(
-                CurlExitCode.OperationTimedOut,
-                string.Create(
-                    CultureInfo.InvariantCulture,
-                    $"Operation timed out after {(long)elapsed.TotalMilliseconds} milliseconds with {bytesTransferred} bytes received"),
-                bytesTransferred);
+            return timedOut;
         }
 
         if (retries >= schedule.RetryLimit)
@@ -226,7 +184,7 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
         if (!answered)
         {
             answered = true;
-            schedule = TftpRetrySchedule.ForTimeLeft(maxTime - Elapsed());
+            schedule = limits.AnsweredSchedule();
         }
 
         retries = 0;
@@ -244,6 +202,6 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
         await channel.SendAsync(packet, destination, context.CancellationToken).ConfigureAwait(false);
         lastPacket = packet;
         lastDestination = destination;
-        resendAt = Elapsed() + schedule.ResendInterval;
+        resendAt = limits.Elapsed() + schedule.ResendInterval;
     }
 }

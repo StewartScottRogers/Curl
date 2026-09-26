@@ -14,7 +14,7 @@ namespace Curl.Protocol.Tftp;
 /// jitter.
 /// </summary>
 [TestClass]
-public sealed class TftpRetransmissionTests
+public sealed class TftpDownloadRetransmissionTests
 {
     private static readonly IPEndPoint ServerEndPoint = new(IPAddress.Loopback, 69);
 
