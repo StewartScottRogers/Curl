@@ -835,6 +835,53 @@ public sealed class FileProtocolHandlerTests
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
     }
 
+    // A character device or FIFO - file:///dev/stdin - opens through the real file system
+    // as a stream that cannot seek. Seeking it would throw NotSupportedException out of
+    // ExecuteAsync; curl answers a failed lseek with exit 36, and so must the handler.
+    [TestMethod]
+    public async Task ExecuteAsync_ResumeFromOnNonSeekableSource_ReturnsBadDownloadResume()
+    {
+        var output = new ChunkRecordingStream();
+        var context = new FakeTransferContext { Url = FileUrl, Output = output, ResumeFrom = 5 };
+
+        var result = await NonSeekableSourceResultAsync(context);
+
+        Assert.AreEqual(CurlExitCode.BadDownloadResume, result.ExitCode);
+        Assert.AreEqual(ResumeFailedMessage, result.ErrorMessage);
+        Assert.IsEmpty(output.WriteLengths);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_RangeStartOnNonSeekableSource_ReturnsBadDownloadResume()
+    {
+        var output = new ChunkRecordingStream();
+        var context = new FakeTransferContext
+        {
+            Url = FileUrl,
+            Output = output,
+            Range = ByteRange.Bounded(5, 9),
+        };
+
+        var result = await NonSeekableSourceResultAsync(context);
+
+        Assert.AreEqual(CurlExitCode.BadDownloadResume, result.ExitCode);
+        Assert.AreEqual(ResumeFailedMessage, result.ErrorMessage);
+        Assert.IsEmpty(output.WriteLengths);
+    }
+
+    // The guard is only for an offset: from the start, a non-seekable source is read as is.
+    [TestMethod]
+    public async Task ExecuteAsync_NonSeekableSourceWithoutOffset_WritesTheWholeSource()
+    {
+        var output = new ChunkRecordingStream();
+        var context = new FakeTransferContext { Url = FileUrl, Output = output };
+
+        var result = await NonSeekableSourceResultAsync(context);
+
+        CollectionAssert.AreEqual(Content, output.ToArray());
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+    }
+
     // A bounded range whose end is far past the file must deliver the whole file, not an
     // empty one. ByteRange.Bounded(0, long.MaxValue) is legal - the factory only requires
     // the end not to precede the start - and the earlier arithmetic overflowed on it,
@@ -1888,6 +1935,15 @@ public sealed class FileProtocolHandlerTests
             HeaderOutput = headerOutput,
             TimeCondition = condition,
         };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        return await handler.ExecuteAsync(context);
+    }
+
+    private static async Task<TransferResult> NonSeekableSourceResultAsync(FakeTransferContext context)
+    {
+        var fileSystem = new FakeFileSystem();
+        fileSystem.AddFileReadingFrom(OsPath, new NonSeekableStream(Content), Content.Length);
         var handler = new FileProtocolHandler(fileSystem);
 
         return await handler.ExecuteAsync(context);

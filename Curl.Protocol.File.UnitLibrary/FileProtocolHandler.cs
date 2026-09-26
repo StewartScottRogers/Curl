@@ -179,6 +179,17 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
 
         if (start > 0)
         {
+            // A character device or a FIFO - file:///dev/stdin - opens as a stream that
+            // cannot seek, and Seek would throw NotSupportedException out of a handler that
+            // promises to return every transfer failure. curl 8.21.0's lib/file.c answers a
+            // failed lseek with exit 36, so this does too.
+            if (!source.CanSeek)
+            {
+                return TransferResult.Failure(
+                    CurlExitCode.BadDownloadResume,
+                    FileTransferMessages.ResumeFailed);
+            }
+
             source.Seek(start, SeekOrigin.Begin);
         }
 
