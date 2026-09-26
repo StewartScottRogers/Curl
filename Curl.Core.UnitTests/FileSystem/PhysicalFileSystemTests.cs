@@ -6,9 +6,10 @@ namespace Curl.Core.FileSystem;
 
 /// <summary>
 /// Drives <see cref="PhysicalFileSystem" /> against the real disk, in a fresh temporary
-/// directory per test, or against the null device. None is
-/// <c>[TestCategory("Integration")]</c>: a temporary file needs no network, and the fast
-/// run must reach every line of <see cref="PhysicalFileSystem" /> for its coverage gate.
+/// directory per test, or against the null device. Only the pin of curl 8.21.0's measured
+/// <c>file:///NUL</c> header date is <c>[TestCategory("Integration")]</c>; the rest need no
+/// network, and the fast run must reach every line of <see cref="PhysicalFileSystem" />
+/// for its coverage gate.
 /// </summary>
 [TestClass]
 public sealed class PhysicalFileSystemTests
@@ -120,6 +121,50 @@ public sealed class PhysicalFileSystemTests
         await using var content = result.Content;
         Assert.IsFalse(content.CanSeek);
         Assert.AreEqual(0L, result.Length);
+    }
+
+    // Windows reports no last-write time for NUL; the Windows C runtime's fstat reports
+    // zero, which curl 8.21.0 prints as the epoch.
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task OpenForReadAsync_WindowsNullDeviceReportingEpoch_ReportsTheUnixEpoch()
+    {
+        var fileSystem = new PhysicalFileSystem(setsUnixCreateMode: false, reportsUnreadableTimestampAsEpoch: true);
+
+        var result = await fileSystem.OpenForReadAsync("NUL", CancellationToken.None);
+
+        await result.Content!.DisposeAsync();
+        Assert.AreEqual(DateTimeOffset.UnixEpoch, result.LastWriteTimeUtc);
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task OpenForReadAsync_WindowsNullDeviceNotReportingEpoch_ReportsNoTimestamp()
+    {
+        var fileSystem = new PhysicalFileSystem(setsUnixCreateMode: false, reportsUnreadableTimestampAsEpoch: false);
+
+        var result = await fileSystem.OpenForReadAsync("NUL", CancellationToken.None);
+
+        await result.Content!.DisposeAsync();
+        Assert.IsNull(result.LastWriteTimeUtc);
+    }
+
+    // curl 8.21.0 on Windows, measured: `curl -sI file:///NUL` prints
+    // "Content-Length: 0", "Accept-ranges: bytes" and "Last-Modified: Thu, 01 Jan 1970 00:00:00 GMT".
+    // FileProtocolHandler writes the date with the "R" format, so this pins its bytes.
+    [TestMethod]
+    [TestCategory("Integration")]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task OpenForReadAsync_WindowsNullDevice_ReportsCurlsMeasuredLastModifiedDate()
+    {
+        var result = await new PhysicalFileSystem().OpenForReadAsync("NUL", CancellationToken.None);
+
+        await result.Content!.DisposeAsync();
+        Assert.AreEqual(0L, result.Length);
+        Assert.IsNotNull(result.LastWriteTimeUtc);
+        Assert.AreEqual(
+            "Thu, 01 Jan 1970 00:00:00 GMT",
+            result.LastWriteTimeUtc.Value.UtcDateTime.ToString("R", System.Globalization.CultureInfo.InvariantCulture));
     }
 
     [TestMethod]

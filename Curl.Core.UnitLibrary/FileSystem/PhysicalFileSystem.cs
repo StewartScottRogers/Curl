@@ -28,6 +28,15 @@ namespace Curl.Core.FileSystem;
 /// source with exit 36 rather than seeking it.
 /// </para>
 /// <para>
+/// On Windows a device such as <c>NUL</c> has no last-write time the operating system
+/// will report, and <see cref="File.GetLastWriteTimeUtc(Microsoft.Win32.SafeHandles.SafeFileHandle)" />
+/// throws for it. The Windows C runtime's <c>fstat</c>, which curl 8.21.0 calls, succeeds
+/// for the same handle with a modification time of zero, so there this class reports the
+/// Unix epoch and <c>curl -sI file:///NUL</c> prints
+/// <c>Last-Modified: Thu, 01 Jan 1970 00:00:00 GMT</c> as upstream does. Elsewhere an
+/// unreadable timestamp stays <see langword="null" />.
+/// </para>
+/// <para>
 /// A write open on a POSIX system creates a missing file with the mode it is given, which
 /// the operating system then narrows by the process umask, just as curl's
 /// <c>open(2)</c> with <c>--create-file-mode</c> does. Windows has no such mode, so there
@@ -41,27 +50,38 @@ public sealed class PhysicalFileSystem : IFileSystem
     [UnsupportedOSPlatformGuard("windows")]
     private readonly bool setsUnixCreateMode;
 
+    private readonly bool reportsUnreadableTimestampAsEpoch;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="PhysicalFileSystem" /> class that sets
-    /// the create mode of a written file everywhere except Windows.
+    /// the create mode of a written file everywhere except Windows, and reports the Unix
+    /// epoch for an unreadable timestamp only on Windows.
     /// </summary>
     public PhysicalFileSystem()
-        : this(setsUnixCreateMode: !OperatingSystem.IsWindows())
+        : this(
+            setsUnixCreateMode: !OperatingSystem.IsWindows(),
+            reportsUnreadableTimestampAsEpoch: OperatingSystem.IsWindows())
     {
     }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="PhysicalFileSystem" /> class with the
-    /// platform decision made by the caller, so a test on Windows can reach the POSIX path.
+    /// platform decisions made by the caller, so a test on Windows can reach the POSIX paths.
     /// </summary>
     /// <param name="setsUnixCreateMode">
     /// <see langword="true" /> to pass the create mode to the operating system; only
     /// meaningful off Windows, where <see cref="FileStreamOptions.UnixCreateMode" /> throws
     /// <see cref="PlatformNotSupportedException" />.
     /// </param>
-    internal PhysicalFileSystem(bool setsUnixCreateMode)
+    /// <param name="reportsUnreadableTimestampAsEpoch">
+    /// <see langword="true" /> to report the Unix epoch, as the Windows C runtime's
+    /// <c>fstat</c> does, for a handle whose last-write time cannot be read;
+    /// <see langword="false" /> to report <see langword="null" />.
+    /// </param>
+    internal PhysicalFileSystem(bool setsUnixCreateMode, bool reportsUnreadableTimestampAsEpoch = false)
     {
         this.setsUnixCreateMode = setsUnixCreateMode;
+        this.reportsUnreadableTimestampAsEpoch = reportsUnreadableTimestampAsEpoch;
     }
 
     /// <inheritdoc />
@@ -140,7 +160,7 @@ public sealed class PhysicalFileSystem : IFileSystem
     /// <param name="path">The operating-system path.</param>
     /// <param name="options">How to open it.</param>
     /// <returns>The opened handle, or the reason it could not be opened.</returns>
-    private static FileOpenResult Open(string path, FileStreamOptions options)
+    private FileOpenResult Open(string path, FileStreamOptions options)
     {
         FileStream stream;
 
@@ -164,12 +184,13 @@ public sealed class PhysicalFileSystem : IFileSystem
     private static long LengthOf(FileStream stream) => stream.CanSeek ? stream.Length : 0;
 
     /// <summary>
-    /// The last-write timestamp of an opened handle, or <see langword="null" /> when the
-    /// operating system reports none for it, as for a device.
+    /// The last-write timestamp of an opened handle; when the operating system reports none
+    /// for it, as for a Windows device, the Unix epoch or <see langword="null" /> as this
+    /// instance was constructed to report.
     /// </summary>
     /// <param name="stream">The opened handle.</param>
     /// <returns>The timestamp in Coordinated Universal Time, or <see langword="null" />.</returns>
-    private static DateTimeOffset? LastWriteTimeUtcOf(FileStream stream)
+    private DateTimeOffset? LastWriteTimeUtcOf(FileStream stream)
     {
         try
         {
@@ -177,7 +198,7 @@ public sealed class PhysicalFileSystem : IFileSystem
         }
         catch (Exception exception) when (FileOpenFailure.IsOpenFailure(exception))
         {
-            return null;
+            return reportsUnreadableTimestampAsEpoch ? DateTimeOffset.UnixEpoch : null;
         }
     }
 }
