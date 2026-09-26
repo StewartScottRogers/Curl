@@ -214,7 +214,12 @@ public sealed class CancellingStream : Stream, IRecordingStream
 
             if (style == StreamCancellationStyle.FaultedValueTask)
             {
-                return ValueTask.FromCanceled<int>(cancellationToken);
+                // ValueTask.FromCanceled rejects a token that is not cancelled, which is
+                // what the handler passes when cancels is null, so that case faults with
+                // the exception a cancelled task would have carried instead.
+                return cancellationToken.IsCancellationRequested
+                    ? ValueTask.FromCanceled<int>(cancellationToken)
+                    : ValueTask.FromException<int>(new TaskCanceledException());
             }
 
             if (style == StreamCancellationStyle.ThrownTaskCanceledException)
@@ -269,7 +274,10 @@ public sealed class CancellingStream : Stream, IRecordingStream
 
             if (style == StreamCancellationStyle.FaultedValueTask)
             {
-                return ValueTask.FromCanceled(cancellationToken);
+                // As in ReadAsync: an uncancelled token cannot make a cancelled ValueTask.
+                return cancellationToken.IsCancellationRequested
+                    ? ValueTask.FromCanceled(cancellationToken)
+                    : ValueTask.FromException(new TaskCanceledException());
             }
 
             if (style == StreamCancellationStyle.ThrownTaskCanceledException)

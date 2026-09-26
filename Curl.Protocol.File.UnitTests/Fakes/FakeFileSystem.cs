@@ -31,6 +31,7 @@ public sealed class FakeFileSystem : IFileSystem
         new(2026, 6, 24, 12, 34, 56, TimeSpan.Zero);
 
     private readonly List<FileSystemCall> calls = [];
+    private readonly List<CancellationToken> openCancellationTokens = [];
     private readonly Dictionary<string, FakeFileEntry> entries = new(StringComparer.Ordinal);
     private readonly Dictionary<string, FileAccessStatus> readFailures = new(StringComparer.Ordinal);
     private readonly Dictionary<string, FileAccessStatus> writeFailures = new(StringComparer.Ordinal);
@@ -42,6 +43,17 @@ public sealed class FakeFileSystem : IFileSystem
     /// Gets every call made to this file system, in order.
     /// </summary>
     public IReadOnlyList<FileSystemCall> Calls => calls;
+
+    /// <summary>
+    /// Gets the cancellation token each open was given, in the same order as
+    /// <see cref="Calls" />.
+    /// </summary>
+    /// <remarks>
+    /// Kept apart from <see cref="FileSystemCall" /> so the calls stay comparable by value:
+    /// a test that pins the path and mode need not also name a token. Recording the token is
+    /// not honouring it; the opens still ignore it, for the reason in the class remarks.
+    /// </remarks>
+    public IReadOnlyList<CancellationToken> OpenCancellationTokens => openCancellationTokens;
 
     /// <summary>
     /// Adds a file with the default timestamp.
@@ -192,6 +204,7 @@ public sealed class FakeFileSystem : IFileSystem
         ArgumentNullException.ThrowIfNull(path);
 
         calls.Add(FileSystemCall.Read(path));
+        openCancellationTokens.Add(cancellationToken);
 
         if (readFailures.TryGetValue(path, out var forced))
         {
@@ -225,6 +238,7 @@ public sealed class FakeFileSystem : IFileSystem
         ArgumentNullException.ThrowIfNull(path);
 
         calls.Add(FileSystemCall.Write(path, mode, createMode));
+        openCancellationTokens.Add(cancellationToken);
 
         if (writeFailures.TryGetValue(path, out var forced))
         {

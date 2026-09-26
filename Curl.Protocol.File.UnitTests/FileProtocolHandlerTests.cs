@@ -114,7 +114,8 @@ public sealed class FileProtocolHandlerTests
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
     }
 
-    // curl reads a file:// body in 16 kilobyte chunks; the first write pins the size.
+    // curl reads a file:// body in 16 kilobyte chunks. LargeContent() is 40000 bytes, so
+    // the whole sequence of writes is determined: two full chunks and the 7232 left over.
     [TestMethod]
     public async Task ExecuteAsync_FileLargerThanOneChunk_WritesAFullChunkFirst()
     {
@@ -126,8 +127,10 @@ public sealed class FileProtocolHandlerTests
 
         await handler.ExecuteAsync(context);
 
-        Assert.IsNotEmpty(output.WriteLengths);
-        Assert.AreEqual(ChunkSize, output.WriteLengths[0]);
+        CollectionAssert.AreEqual(
+            new[] { ChunkSize, ChunkSize, 40000 - (2 * ChunkSize) },
+            output.WriteLengths.ToArray());
+        Assert.AreEqual(7232, output.WriteLengths[2]);
     }
 
     [TestMethod]
