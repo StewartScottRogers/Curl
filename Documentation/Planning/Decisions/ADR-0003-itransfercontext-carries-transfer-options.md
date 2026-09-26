@@ -86,3 +86,19 @@ data. The same absence drops the `Last-Modified` line from the `HeaderOutput` bl
 rather than printing a made-up date. Sources: <https://curl.se/docs/manpage.html>
 (`-z`, `--time-cond`) and <https://curl.se/libcurl/c/CURLOPT_TIMECONDITION.html>,
 checked against curl 8.21.0.
+
+## Amendment, 2026-09-26 — the result carries transfer-option data too (BL-019)
+
+Transfer-option data does not only travel in on `ITransferContext`; some of it travels
+back out on `TransferResult`. The first case is `-R`/`--remote-time`, which curl 8.21.0
+applies to `file://`: `curl -R -o out.txt file:///C:/dir/hello.txt` leaves `out.txt`
+with the source's modification time, truncated to whole seconds. A `file://` handler
+cannot apply it itself, because its destination is `ITransferContext.Output`, a `Stream`
+it neither opened nor owns, and behind which there may be no file at all. So
+`TransferResult` gains `DateTimeOffset? SourceLastWriteTimeUtc` as its last positional
+member (default `null`), set by `TransferResult.Success(bytes, timestamp)` and never by
+`TransferResult.Failure`, and whoever opened `Output` applies it when `-R` was asked
+for. `null` means the time is unknown or no source was opened; an upload reports `null`.
+The `file` handler reports it on every successful download, `-I`/`--head` included,
+already truncated to whole seconds. Sources: <https://curl.se/docs/manpage.html>
+(`-R`, `--remote-time`), checked against curl 8.21.0.
