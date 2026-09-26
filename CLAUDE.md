@@ -65,7 +65,9 @@ tasks only with its script. `/task-plan` files tasks, `/task-run` works them, an
 of the shift. `-Lanes N` runs N tasks at once, each in its own git worktree beside the
 checkout (`<repo>.lanes\lane-<n>`); the board never gives two lanes tasks whose
 `touches` overlap, and each lane rebases, rebuilds, tests and pushes its own work, one
-lane at a time. See the script's header for the details.
+lane at a time. Running out of tokens is not a stall: the shift announces it with the
+reset time, waits (the wait does not count against `-Hours`), warns a minute before the
+new session and reruns the cut-off task. See the script's header for the details.
 
 When Claude starts a shift it always passes `-NewTab`, e.g.
 `RunDarkFactory.cmd -NewTab -Lanes 4`. Inside herdr (`HERDR_ENV=1`) that opens the shift

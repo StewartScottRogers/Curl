@@ -23,6 +23,22 @@
 
     Speech is Windows' built-in System.Speech. The key press restores volume and mute.
 
+    OUT OF TOKENS
+
+    When the account's usage limit refuses a run, that is not a stall. The task stays
+    claimed, the shift waits for the new session and then runs the same task again,
+    telling it to carry on from the partial work. Stewart is told three times, each
+    with a coloured notice, a chime and one spoken sentence (screen only under
+    -QuietAlarm), never the escalating alarm:
+
+      at once              out of tokens, when the new session starts and how long until then
+      -LimitWarnSeconds    before the reset: the new session is about to start
+      on resuming          the new session has started, and which task it resumed
+
+    The reset time comes from the run's rate_limit_event. Time spent waiting is added
+    to the shift, so -Hours is always working time. With lanes, every lane waits on its
+    own and the coordinator makes the announcements, once for all of them.
+
     PARALLEL LANES (-Lanes 2 or more)
 
     The shift runs that many lanes at once, each an independent task runner in its own
@@ -50,6 +66,7 @@
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -Lanes 4
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestAlarm
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestAlarm -AlarmScale 0.1
+    powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestOutOfTokens
 #>
 [CmdletBinding()]
 param(
@@ -71,6 +88,10 @@ param(
     [ValidateRange(0, 100)][int]$AlarmMaxVolume = 100,
     # Banner only: no chime, siren, speech or volume change. For nights.
     [switch]$QuietAlarm,
+    # Rehearse the out-of-tokens notices with a pretend reset 90 seconds away, and exit.
+    [switch]$TestOutOfTokens,
+    # How long before the usage limit resets to say the new session is about to start.
+    [ValidateRange(0, 3600)][int]$LimitWarnSeconds = 60,
     # How many tasks run at once, each in its own worktree and window. 1 is the classic
     # single-runner shift in this checkout.
     [ValidateRange(1, 8)][int]$Lanes = 1,
@@ -101,6 +122,8 @@ $TraceFile = Join-Path $LogDir "DarkFactory-$Stamp$LaneTag.log"
 # is itself one of those folders, so its lanes directory is its parent.
 $LanesDir = if ($Lane) { Split-Path $Root -Parent } else { "$Root.lanes" }
 $LockFile = Join-Path $LanesDir 'integrate.lock'
+# Every runner of a shift records usage-limit hits here; the coordinator reads it.
+$LimitFile = Join-Path $LogDir "limit-$Stamp.txt"
 
 # ---------------------------------------------------------------------------- trace
 
@@ -391,6 +414,152 @@ if ($TestAlarm) {
     exit 0
 }
 
+# ---------------------------------------------------------------------------- usage limit
+
+function Format-Span {
+    # 2 h 55 min, or 40 min, rounded up to the minute.
+    param([TimeSpan]$Span)
+    $mins = [int][math]::Max(0, [math]::Ceiling($Span.TotalMinutes))
+    if ($mins -ge 60) { return "$([math]::Floor($mins / 60)) h $($mins % 60) min" }
+    return "$mins min"
+}
+
+function Format-SpokenSpan {
+    # 2 hours 55 minutes, or 1 minute, rounded up to the minute.
+    param([TimeSpan]$Span)
+    $mins = [int][math]::Max(1, [math]::Ceiling($Span.TotalMinutes))
+    $h = [int][math]::Floor($mins / 60); $m = $mins % 60
+    $parts = @()
+    if ($h) { $parts += if ($h -eq 1) { '1 hour' } else { "$h hours" } }
+    if ($m) { $parts += if ($m -eq 1) { '1 minute' } else { "$m minutes" } }
+    return $parts -join ' '
+}
+
+function ConvertTo-Unix { param([datetime]$When) return ([DateTimeOffset]$When).ToUnixTimeSeconds() }
+function ConvertFrom-Unix { param([long]$Seconds) return [DateTimeOffset]::FromUnixTimeSeconds($Seconds).LocalDateTime }
+
+function Get-OutOfTokensUntil {
+    # When the last run was refused for the account's usage limit, the local time the
+    # limit resets; otherwise $null. The run's rate_limit_event gives it exactly; the
+    # result's text is the fallback: "You've hit your session limit · resets 12:50pm".
+    if ($script:LimitResetAt) { return $script:LimitResetAt }
+    $text = if ($script:RunResult) { "$($script:RunResult.result)" } else { '' }
+    if ($text -notmatch '(?i)hit your .*limit|usage limit|limit reached') { return $null }
+    if ($text -match '\|(\d{10})') { return (ConvertFrom-Unix ([long]$Matches[1])) }
+    if ($text -match '(?i)resets\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)') {
+        $hour = [int]$Matches[1] % 12
+        if ($Matches[3] -ieq 'pm') { $hour += 12 }
+        $min = if ($Matches[2]) { [int]$Matches[2] } else { 0 }
+        $at = (Get-Date).Date.AddHours($hour).AddMinutes($min)
+        if ($at -lt (Get-Date).AddMinutes(-10)) { $at = $at.AddDays(1) }
+        return $at
+    }
+    # Refused, but no reset time given: look again in half an hour.
+    return (Get-Date).AddMinutes(30)
+}
+
+function Add-LimitMark {
+    # Lanes write at the same moment when the limit hits them all; retry a busy file.
+    param([string]$Line)
+    foreach ($try in 1..10) {
+        try { Add-Content -Path $LimitFile -Value $Line -Encoding UTF8 -ErrorAction Stop; return }
+        catch { Start-Sleep -Milliseconds 200 }
+    }
+}
+
+function Show-LimitNotice {
+    # A one-off notice, not the alarm: a coloured block, a chime and one spoken sentence.
+    param([string]$Headline, [string]$Detail, [string]$Spoken, [string]$Color)
+    $bar = '=' * 78
+    foreach ($l in @($bar, "  $Headline", "  $Detail", $bar)) { Write-Host $l.PadRight(78) -ForegroundColor Black -BackgroundColor $Color }
+    Write-Trace '-' 'TOKENS' "$Headline  $Detail" $Color
+    if ($QuietAlarm) { return }
+    Invoke-Chime
+    $voice = Get-Voice
+    if ($voice) {
+        $voice.SpeakAsyncCancelAll()
+        $voice.Volume = 100
+        $voice.Rate = 0
+        [void]$voice.SpeakAsync($Spoken)
+    }
+}
+
+$script:Notice = @{ Reset = 0L; Warned = $false; Resumed = $false }
+
+function Test-WaitingForSession { return ($script:Notice.Reset -and -not $script:Notice.Resumed) }
+
+function Update-LimitNotice {
+    # Tells Stewart about the usage limit once per stage however many lanes hit it: out of
+    # tokens, the new session about to start, and the new session in use. Runners record
+    # "reset <unix>" and "resumed <unix> <ID>" in the limit file; whoever Stewart watches -
+    # the coordinator, or a lone runner - calls this to announce them.
+    if (-not (Test-Path $LimitFile)) { return }
+    $lines = @(Get-Content $LimitFile -ErrorAction SilentlyContinue)
+    $resets = @($lines | Where-Object { $_ -match '^reset \d+$' } | ForEach-Object { [long]($_ -split ' ')[1] })
+    if (-not $resets.Count) { return }
+    $latest = [long]($resets | Measure-Object -Maximum).Maximum
+    $reset = ConvertFrom-Unix $latest
+    $at = $reset.ToString('HH:mm')
+    $n = $script:Notice
+    if ($n.Reset -ne $latest) {
+        $n.Reset = $latest; $n.Warned = $false; $n.Resumed = $false
+        $left = $reset - (Get-Date)
+        Show-LimitNotice 'OUT OF TOKENS' "Out of tokens at $(Get-Date -Format 'HH:mm'). New session starts at $at, in $(Format-Span $left)." `
+            "Stewart, the dark factory is out of tokens. The new session starts at $($reset.ToString('h:mm tt')), in $(Format-SpokenSpan $left)." 'Yellow'
+    }
+    $resumed = @($lines | Where-Object { $_ -match "^resumed $latest \S+$" } | ForEach-Object { ($_ -split ' ')[2] })
+    if (-not $n.Resumed -and $resumed.Count) {
+        $n.Resumed = $true; $n.Warned = $true
+        Show-LimitNotice 'NEW SESSION STARTED' "Started using the new session at $(Get-Date -Format 'HH:mm'); resuming $($resumed[0])." `
+            "Stewart, the new session has started. The dark factory is working again." 'Green'
+        try { $Host.UI.RawUI.WindowTitle = if ($Lanes -gt 1) { "Dark factory - $Lanes lanes" } else { 'Dark factory - running' } } catch { }
+        return
+    }
+    if ($n.Resumed) { return }
+    $left = $reset - (Get-Date)
+    if (-not $n.Warned -and $left.TotalSeconds -le $LimitWarnSeconds) {
+        $n.Warned = $true
+        Show-LimitNotice 'NEW SESSION SOON' "The new session starts at $at, in $(Format-Span $left)." `
+            "Stewart, the new session will be ready in about $(Format-SpokenSpan $left)." 'Cyan'
+    }
+    try { $Host.UI.RawUI.WindowTitle = "Dark factory - out of tokens, new session at $at (in $(Format-Span $left))" } catch { }
+}
+
+function Wait-ForNewSession {
+    # Holds this runner until just after the usage limit resets, and returns how long it
+    # waited so the shift can add it back. A lone runner announces as it waits; a lane
+    # leaves the announcing to the coordinator.
+    param([string]$Id, [datetime]$Until)
+    $began = Get-Date
+    $unix = ConvertTo-Unix $Until
+    Add-LimitMark "reset $unix"
+    Write-Trace $Id 'tokens' "out of tokens; waiting for the new session at $($Until.ToString('HH:mm'))" 'Yellow'
+    # A little past the reset, so the first request lands in the new session.
+    $resume = $Until.AddSeconds(20)
+    $nextTrace = (Get-Date).AddMinutes(30)
+    while ((Get-Date) -lt $resume) {
+        if ($Lane) { try { $Host.UI.RawUI.WindowTitle = "Dark factory - lane $Lane out of tokens until $($Until.ToString('HH:mm'))" } catch { } }
+        else { Update-LimitNotice }
+        if ((Get-Date) -ge $nextTrace) {
+            Write-Trace $Id 'wait' "new session in $(Format-Span ($Until - (Get-Date)))" 'DarkGray'
+            $nextTrace = (Get-Date).AddMinutes(30)
+        }
+        Start-Sleep -Seconds 1
+    }
+    Add-LimitMark "resumed $unix $Id"
+    Write-Trace $Id 'resume' 'new session; running the task again' 'Green'
+    if ($Lane) { try { $Host.UI.RawUI.WindowTitle = "Dark factory - lane $Lane" } catch { } }
+    else { Update-LimitNotice }
+    return ((Get-Date) - $began)
+}
+
+if ($TestOutOfTokens) {
+    New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
+    [void](Wait-ForNewSession -Id 'TEST' -Until (Get-Date).AddSeconds(90))
+    if ($script:Voice) { Start-Sleep -Seconds 6 }
+    exit 0
+}
+
 # ---------------------------------------------------------------------------- board
 
 function Invoke-Board {
@@ -476,6 +645,15 @@ End your reply with exactly one line, either
 FACTORY: DONE {ID} <what now works>
 or
 FACTORY: BLOCKED {ID} <the blocker>
+'@
+
+# Put in front of either prompt when a task runs again after the usage limit.
+$ResumeNote = @'
+RESUMING. The previous run of {ID} was cut off when the account ran out of tokens, before
+the task was finished. Whatever that run had done is still here: read git status, git log
+and the task file before changing anything, and carry on from that work rather than
+starting over.
+
 '@
 
 # A lane's run: the shift has claimed the task already, and the shift - not the run -
@@ -625,6 +803,10 @@ function Write-Event {
                 Write-Trace $Id $verb $outcome $color
             }
         }
+        'rate_limit_event' {
+            $info = $Evt.rate_limit_info
+            if ($info.status -eq 'rejected' -and $info.resetsAt) { $script:LimitResetAt = ConvertFrom-Unix ([long]$info.resetsAt) }
+        }
         'result' {
             $mins = [math]::Round($Evt.duration_ms / 60000, 1)
             $script:RunResult = $Evt
@@ -636,14 +818,17 @@ function Write-Event {
 function Invoke-TaskRun {
     # One headless Claude run in this checkout. By default it is the task run; a lane
     # passes its own prompt and deny list, and a log suffix for the resolver's run.
-    param([string]$Id, [string]$Text = '', [string[]]$Deny = $null, [string]$Suffix = '', [int]$Minutes = 0)
+    # -Resume is the task run again after the usage limit cut the last one off.
+    param([string]$Id, [string]$Text = '', [string[]]$Deny = $null, [string]$Suffix = '', [int]$Minutes = 0, [switch]$Resume)
     if (-not $Text) { $Text = if ($Lane) { $LanePrompt } else { $Prompt } }
+    if ($Resume) { $Text = $ResumeNote + $Text; $Suffix += '-resumed' }
     if ($null -eq $Deny) { $Deny = if ($Lane) { $LaneForbidden } else { $Forbidden } }
     if ($Minutes -le 0) { $Minutes = $TaskMinutes }
     $Text = $Text.Replace('{ID}', $Id).Replace('{LANE}', "$Lane").Replace('{BRANCH}', $Branch)
     $raw = Join-Path $LogDir "$Id-$Stamp$LaneTag$Suffix.jsonl"
     $err = Join-Path $LogDir "$Id-$Stamp$LaneTag$Suffix.err.txt"
     $script:RunResult = $null
+    $script:LimitResetAt = $null
     $script:ToolLabels = @{}
 
     $psi = New-Object System.Diagnostics.ProcessStartInfo
@@ -865,12 +1050,18 @@ if ($Lanes -gt 1 -and -not $Lane) {
     # after the shift's length plus one task's time limit.
     $summaries = Join-Path $LogDir "lanes-$Stamp"
     $giveUp = $shiftEnd.AddMinutes($TaskMinutes + 30)
+    $tick = Get-Date
     while ((Get-Date) -lt $giveUp) {
+        # The coordinator announces the usage limit for every lane, and lanes waiting for a
+        # new session add that wait to their shift, so the coordinator waits longer too.
+        Update-LimitNotice
+        if (Test-WaitingForSession) { $giveUp = $giveUp.Add((Get-Date) - $tick) }
+        $tick = Get-Date
         $finished = @(Get-ChildItem $summaries -Filter 'lane-*.txt' -ErrorAction SilentlyContinue).Count
         if ($finished -ge $Lanes) { break }
         $running = @($procs | Where-Object { $_.Tab -or -not $_.Process.HasExited }).Count
         if ($running -eq 0) { break }
-        Start-Sleep -Seconds 30
+        Start-Sleep -Seconds 5
     }
 
     git -C $Root pull -q --ff-only origin $branch 2>&1 | Out-Null
@@ -907,14 +1098,23 @@ Write-Trace '-' 'shift' "start  branch=$branch model=$Model until $($shiftEnd.To
 
 $done = 0; $blocked = 0; $stalls = @(); $failStreak = 0; $attempted = @{}
 $stopWhy = ''
+# The task to run again once the usage limit resets; it is still claimed.
+$resumeId = ''
 
 while ($true) {
   try {
-    if ((Get-Date) -gt $shiftEnd) { $stopWhy = 'time up'; break }
-    if ($MaxTasks -gt 0 -and ($done + $blocked + $stalls.Count) -ge $MaxTasks) { $stopWhy = 'max tasks'; break }
-    if ($failStreak -ge 2) { $stopWhy = 'runs failing'; break }
+    # A task cut off by the usage limit is finished first, whatever else says stop.
+    $resuming = [bool]$resumeId
+    if (-not $resuming) {
+        if ((Get-Date) -gt $shiftEnd) { $stopWhy = 'time up'; break }
+        if ($MaxTasks -gt 0 -and ($done + $blocked + $stalls.Count) -ge $MaxTasks) { $stopWhy = 'max tasks'; break }
+        if ($failStreak -ge 2) { $stopWhy = 'runs failing'; break }
+    }
 
-    if ($Lane) {
+    if ($resuming) {
+        $id = $resumeId
+        $resumeId = ''
+    } elseif ($Lane) {
         $claim = Invoke-Claim -Skip @($attempted.Keys)
         if ($claim.None) { $stopWhy = 'nothing ready'; break }
         if ($claim.Wait) { Write-Trace '-' 'wait' $claim.Why 'DarkGray'; Start-Sleep -Seconds 60; continue }
@@ -927,9 +1127,21 @@ while ($true) {
     }
     $attempted[$id] = $true
 
-    Write-Trace $id 'claim' (Get-Short (Get-TaskTitle $id)) 'Cyan'
-    $run = Invoke-TaskRun $id
+    if (-not $resuming) { Write-Trace $id 'claim' (Get-Short (Get-TaskTitle $id)) 'Cyan' }
+    $run = Invoke-TaskRun $id -Resume:$resuming
     $state = Get-TaskState $id
+
+    # Out of tokens is not a stall. The task keeps its claim and its partial work - nothing
+    # is stashed or blocked - the shift waits for the new session and runs it again, and
+    # the wait is added to the shift so it costs no working time.
+    $until = if ($run.TimedOut) { $null } else { Get-OutOfTokensUntil }
+    if ($until -and $state -in 'Doing', 'Backlog') {
+        $waited = Wait-ForNewSession -Id $id -Until $until
+        $shiftEnd = $shiftEnd.Add($waited)
+        Write-Trace '-' 'shift' "waited $(Format-Span $waited) for tokens; shift now ends $($shiftEnd.ToString('HH:mm'))" 'Cyan'
+        $resumeId = $id
+        continue
+    }
 
     if ($state -eq 'Doing') {
         $why = if ($run.TimedOut) { "timed out after $TaskMinutes min" } else { "run ended in Doing, exit $($run.ExitCode)" }
