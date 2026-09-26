@@ -7,7 +7,7 @@ namespace Curl.Networking.Fakes;
 
 /// <summary>
 /// An <see cref="ITcpDialer" /> that records every end point it is asked for and answers
-/// with <see cref="DialOutcome" />.
+/// with <see cref="DialOutcome" />, bound locally to <see cref="LocalEndPoint" />.
 /// </summary>
 public sealed class FakeTcpDialer : ITcpDialer
 {
@@ -17,14 +17,17 @@ public sealed class FakeTcpDialer : ITcpDialer
     public Func<IPEndPoint, IConnection> DialOutcome { get; init; } =
         _ => throw new SocketException((int)SocketError.ConnectionRefused);
 
+    /// <summary>Gets or sets the local end point every successful dial reports.</summary>
+    public IPEndPoint LocalEndPoint { get; init; } = new(IPAddress.Loopback, 50000);
+
     /// <summary>Gets the end points dialed, in order.</summary>
     public List<IPEndPoint> DialedEndPoints { get; } = [];
 
     /// <inheritdoc />
-    public ValueTask<IConnection> DialAsync(IPEndPoint endPoint, CancellationToken cancellationToken)
+    public ValueTask<DialedTcpConnection> DialAsync(IPEndPoint endPoint, CancellationToken cancellationToken)
     {
         DialedEndPoints.Add(endPoint);
 
-        return ValueTask.FromResult(DialOutcome(endPoint));
+        return ValueTask.FromResult(new DialedTcpConnection(DialOutcome(endPoint), LocalEndPoint));
     }
 }

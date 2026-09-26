@@ -29,7 +29,8 @@ public sealed class TcpDialerTests
         var endPoint = (IPEndPoint)listener.LocalEndpoint;
         var dialer = new TcpDialer();
 
-        await using (var connection = await dialer.DialAsync(endPoint, cancellation.Token))
+        var dialed = await dialer.DialAsync(endPoint, cancellation.Token);
+        await using (var connection = dialed.Connection)
         {
             using var accepted = await listener.AcceptTcpClientAsync(cancellation.Token);
             var serverStream = accepted.GetStream();
@@ -47,6 +48,7 @@ public sealed class TcpDialerTests
             Assert.AreEqual(9, reply[0]);
             Assert.IsFalse(connection.IsSecure);
             Assert.AreEqual(endPoint, connection.RemoteEndPoint);
+            Assert.AreEqual(accepted.Client.RemoteEndPoint, dialed.LocalEndPoint);
         }
 
         listener.Stop();

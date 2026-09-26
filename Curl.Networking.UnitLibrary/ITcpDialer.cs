@@ -1,8 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
 
-using Curl.Protocol.Abstractions;
-
 namespace Curl.Networking;
 
 /// <summary>
@@ -17,10 +15,10 @@ public interface ITcpDialer
     /// </summary>
     /// <param name="endPoint">The address and port to connect to.</param>
     /// <param name="cancellationToken">Cancels the connect.</param>
-    /// <returns>The open plaintext connection.</returns>
+    /// <returns>The open plaintext connection and the local end point of its socket.</returns>
     /// <exception cref="SocketException">The connection could not be made.</exception>
     /// <exception cref="OperationCanceledException">
     /// <paramref name="cancellationToken" /> was cancelled.
     /// </exception>
-    ValueTask<IConnection> DialAsync(IPEndPoint endPoint, CancellationToken cancellationToken);
+    ValueTask<DialedTcpConnection> DialAsync(IPEndPoint endPoint, CancellationToken cancellationToken);
 }

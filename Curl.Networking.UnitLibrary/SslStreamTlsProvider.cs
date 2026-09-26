@@ -39,19 +39,35 @@ public sealed class SslStreamTlsProvider : ITlsProvider
 
     private readonly bool _matchesSchannelBuild;
 
+    private readonly TimeProvider _timeProvider;
+
+    /// <summary>
+    /// Creates the provider for the curl build this platform usually runs: Schannel on
+    /// Windows, OpenSSL elsewhere, timing its handshakes on <see cref="TimeProvider.System" />.
+    /// </summary>
+    /// <param name="options">The settings applied to every handshake.</param>
+    public SslStreamTlsProvider(TlsClientOptions options)
+        : this(options, TimeProvider.System)
+    {
+    }
+
     /// <summary>
     /// Creates the provider for the curl build this platform usually runs: Schannel on
     /// Windows, OpenSSL elsewhere.
     /// </summary>
     /// <param name="options">The settings applied to every handshake.</param>
-    public SslStreamTlsProvider(TlsClientOptions options)
-        : this(options, OperatingSystem.IsWindows())
+    /// <param name="timeProvider">
+    /// Takes the timestamps in a successful handshake's <see cref="ConnectResult.Timings" />;
+    /// pass the connector's, so a reader can subtract one connector timestamp from another.
+    /// </param>
+    public SslStreamTlsProvider(TlsClientOptions options, TimeProvider timeProvider)
+        : this(options, OperatingSystem.IsWindows(), timeProvider)
     {
     }
 
     /// <summary>
     /// Creates the provider for a named curl build, so either build's behaviour can be
-    /// tested on any platform.
+    /// tested on any platform, timing its handshakes on <see cref="TimeProvider.System" />.
     /// </summary>
     /// <param name="options">The settings applied to every handshake.</param>
     /// <param name="matchesSchannelBuild">
@@ -59,8 +75,23 @@ public sealed class SslStreamTlsProvider : ITlsProvider
     /// like its OpenSSL build.
     /// </param>
     internal SslStreamTlsProvider(TlsClientOptions options, bool matchesSchannelBuild)
+        : this(options, matchesSchannelBuild, TimeProvider.System)
+    {
+    }
+
+    /// <summary>
+    /// Creates the provider for a named curl build with the clock its handshakes are timed on.
+    /// </summary>
+    /// <param name="options">The settings applied to every handshake.</param>
+    /// <param name="matchesSchannelBuild">
+    /// <see langword="true" /> to behave like curl's Schannel build, <see langword="false" />
+    /// like its OpenSSL build.
+    /// </param>
+    /// <param name="timeProvider">Takes the timestamps in a successful handshake's timings.</param>
+    internal SslStreamTlsProvider(TlsClientOptions options, bool matchesSchannelBuild, TimeProvider timeProvider)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
+        _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         _matchesSchannelBuild = matchesSchannelBuild;
         Warnings = matchesSchannelBuild && options.CaCertificateDirectory is not null
             ? SchannelCaCertificateDirectoryWarnings
@@ -77,6 +108,7 @@ public sealed class SslStreamTlsProvider : ITlsProvider
 
     /// <inheritdoc />
     /// <remarks>
+    /// <para>
     /// The target host is passed to the handshake for server name indication and is the
     /// name the certificate is checked against. A certificate that fails the check is
     /// exit 60 (<see cref="CurlExitCode.PeerFailedVerification" />); any other failure,
@@ -94,6 +126,16 @@ public sealed class SslStreamTlsProvider : ITlsProvider
     /// or <see cref="TlsClientOptions.Tls13Ciphers" /> value the build cannot apply is exit 59
     /// (<see cref="CurlExitCode.SslCipher" />), as ADR-0011 decides. The plaintext connection is
     /// disposed on every failure and on cancellation.
+    /// </para>
+    /// <para>
+    /// A success carries <see cref="ConnectResult.Timings" /> from the provider's
+    /// <see cref="TimeProvider" />: <see cref="ConnectTimings.TlsHandshakeCompleted" /> when the
+    /// handshake completed, and <see cref="ConnectTimings.Started" /> and
+    /// <see cref="ConnectTimings.Connected" /> both when it began, the moment the plaintext
+    /// connection was handed over; <see cref="ConnectTimings.NameResolved" /> is
+    /// <see langword="null" />, since the provider resolves nothing. <see cref="TcpConnector" />
+    /// keeps only the handshake's completion and supplies the rest itself.
+    /// </para>
     /// </remarks>
     public async ValueTask<ConnectResult> AuthenticateAsClientAsync(
         IConnection plaintext,
@@ -149,8 +191,11 @@ public sealed class SslStreamTlsProvider : ITlsProvider
         Exception failure;
         try
         {
+            var handshakeStarted = _timeProvider.GetTimestamp();
             await sslStream.AuthenticateAsClientAsync(authenticationOptions, cancellationToken).ConfigureAwait(false);
-            return ConnectResult.Connected(new SslStreamConnection(sslStream, plaintext, clientCertificate));
+            return ConnectResult.Connected(
+                new SslStreamConnection(sslStream, plaintext, clientCertificate),
+                new ConnectTimings(handshakeStarted, null, handshakeStarted, _timeProvider.GetTimestamp()));
         }
         catch (Exception exception)
         {
