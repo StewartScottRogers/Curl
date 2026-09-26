@@ -18,7 +18,7 @@ public sealed class HttpContentCodingDecoderTests
     /// Measured: <c>00 01 02 …</c> as gzip gives <c>incorrect header check</c>, and
     /// <c>1F 8B 07</c> gives <c>unknown compression method</c>. A zlib header naming method 7
     /// (<c>77 09</c>) fails the same way, as zlib reports it. Corrupt data past a good header,
-    /// and corrupt Brotli (measured), give curl's generic exit 61 text (ADR-0027).
+    /// and corrupt Brotli (measured), give curl's generic exit 61 text (ADR-0031).
     /// </summary>
     [TestMethod]
     [DataRow("gzip", "000102030405060708090A0B", "Error while processing content unencoding: incorrect header check", DisplayName = "gzip: not a gzip or zlib header")]

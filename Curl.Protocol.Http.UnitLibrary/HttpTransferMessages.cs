@@ -118,7 +118,7 @@ internal static class HttpTransferMessages
     /// <summary>
     /// The exit 61 message for any other corrupt encoded body: measured for <c>br</c>, and
     /// the text <c>curl_easy_strerror</c> gives exit 61, used for corrupt <c>gzip</c> and
-    /// <c>deflate</c> data too because the BCL does not report zlib's own text (ADR-0027).
+    /// <c>deflate</c> data too because the BCL does not report zlib's own text (ADR-0031).
     /// </summary>
     internal const string BadContentEncoding = "Unrecognized or bad HTTP Content or Transfer-Encoding";
 

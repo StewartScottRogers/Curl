@@ -17,7 +17,7 @@ namespace Curl.Protocol.Http;
 /// <c>deflate</c> decodes a zlib stream, or a raw deflate stream when the first two bytes
 /// fail the zlib header check, as curl retries it. The first bytes are held until there are
 /// enough to tell. Any other corrupt data is exit 61
-/// <see cref="HttpTransferMessages.BadContentEncoding" /> (ADR-0027).
+/// <see cref="HttpTransferMessages.BadContentEncoding" /> (ADR-0031).
 /// </para>
 /// <para>
 /// A body that ends before its coding's stream does is not an error: what was decoded is
