@@ -224,6 +224,7 @@ internal sealed class CurlCommandRunner(
             CreateFileMode = options.CreateFileMode ?? TransferContext.DefaultCreateFileMode,
             ConnectTimeout = options.ConnectTimeout,
             MaxTime = options.MaxTime,
+            TimeCondition = options.TimeCondition,
         };
 
     /// <summary>

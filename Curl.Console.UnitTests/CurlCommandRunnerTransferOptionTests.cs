@@ -255,6 +255,47 @@ public sealed class CurlCommandRunnerTransferOptionTests
         Assert.AreEqual(string.Empty, StandardErrorText);
     }
 
+    [TestMethod]
+    public async Task RunAsync_TimeCond_PassesConditionToHandler()
+    {
+        RecordingProtocolHandler file = RecordingProtocolHandler.WritingPath("file");
+
+        await RunAsync(["-z", "-1 Jan 2000", SourceUrl], file);
+
+        Assert.AreEqual(
+            new TimeCondition(new DateTimeOffset(2000, 1, 1, 0, 0, 0, TimeSpan.Zero), TimeConditionKind.IfUnmodifiedSince),
+            file.Contexts.Single().TimeCondition);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_NoTimeCond_PassesNoConditionToHandler()
+    {
+        RecordingProtocolHandler file = RecordingProtocolHandler.WritingPath("file");
+
+        await RunAsync([SourceUrl], file);
+
+        Assert.IsNull(file.Contexts.Single().TimeCondition);
+    }
+
+    /// <summary>
+    /// curl 8.21.0, <c>curl -z notadate -o NUL file:///Z:/repos/Curl.lanes/lane-3/global.json</c>
+    /// (Windows, 2026-09-26): the two warning lines on standard error, then the transfer with no
+    /// condition, exit 0.
+    /// </summary>
+    /// <returns>A task that completes when the test has run.</returns>
+    [TestMethod]
+    public async Task RunAsync_TimeCondNotADate_WarnsAndTransfersUnconditionally()
+    {
+        int exitCode = await RunAsync(["-z", "notadate", SourceUrl], fileHandler);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual("0123456789", StandardOutputText);
+        Assert.AreEqual(
+            "Warning: Illegal date format for -z, --time-cond (and not a filename). " + NewLine
+            + "Warning: Disabling time condition. See curl_getdate(3) for valid date syntax." + NewLine,
+            StandardErrorText);
+    }
+
     private static string Lines(IReadOnlyList<string> lines) => string.Concat(lines.Select(line => line + NewLine));
 
     private string WrittenText(string path) => Encoding.ASCII.GetString(outputFiles.Written[path].ToArray());
