@@ -6,7 +6,7 @@ namespace Curl.Cli;
 /// Why the command line was refused: the lines curl prints on standard error,
 /// <c>curl: option &lt;spelled&gt;: &lt;reason&gt;</c> (or, for <see cref="NoUrlSpecified"/>,
 /// <c>curl: (2) no URL specified</c>) followed by <see cref="TryHelpLine"/>, with one more line
-/// in front for <see cref="FileDoesNotExist"/>,
+/// in front for <see cref="FileDoesNotExist"/> and <see cref="ContinueAtExclusiveWithRange"/>,
 /// and the exit code, which is always <see cref="CurlExitCode.FailedInit"/> (curl's
 /// <c>CURLE_FAILED_INIT</c>, exit 2; see <see href="https://curl.se/libcurl/c/libcurl-errors.html"/>).
 /// It writes nothing itself; the console layer writes the lines and chooses the newline.
@@ -29,7 +29,8 @@ public sealed class CommandLineRefusal
 
     /// <summary>
     /// The lines to write to standard error, without line terminators: two, or three for
-    /// <see cref="FileDoesNotExist"/>.
+    /// <see cref="FileDoesNotExist"/> and for <see cref="ContinueAtExclusiveWithRange"/> when
+    /// errors are not hidden.
     /// </summary>
     public IReadOnlyList<string> StandardErrorLines { get; }
 
@@ -74,6 +75,40 @@ public sealed class CommandLineRefusal
     /// <exception cref="ArgumentNullException"><paramref name="spelledOption"/> is <see langword="null"/>.</exception>
     public static CommandLineRefusal TooLargeNumber(string spelledOption) =>
         Create(spelledOption, "too large number");
+
+    /// <summary>Refuses an option value curl reads but cannot use, such as a size in an unknown unit.</summary>
+    /// <param name="spelledOption">The whole argument as typed.</param>
+    /// <returns>A refusal reading <c>is badly used here</c>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="spelledOption"/> is <see langword="null"/>.</exception>
+    public static CommandLineRefusal BadlyUsedHere(string spelledOption) =>
+        Create(spelledOption, "is badly used here");
+
+    /// <summary>
+    /// Refuses <c>-C</c>/<c>--continue-at</c> and <c>-r</c>/<c>--range</c> on one command line,
+    /// naming whichever came second: <c>curl: --continue-at is mutually exclusive with --range</c>,
+    /// <c>curl: option &lt;spelled&gt;: is badly used here</c> and the try-help line.
+    /// </summary>
+    /// <remarks>
+    /// curl 8.21.0 prints the first line as an error message, which <c>-s</c>/<c>--silent</c>
+    /// hides unless <c>-S</c>/<c>--show-error</c> is also given, and only the options read before
+    /// the refused one count: <c>-s -r 0-4 -C 5</c> prints two lines, <c>-r 0-4 -C 5 -s</c> and
+    /// <c>-s -S -r 0-4 -C 5</c> print three. The other two lines are always printed.
+    /// </remarks>
+    /// <param name="spelledOption">The whole argument as typed, for whichever option came second.</param>
+    /// <param name="errorsHidden">
+    /// <see langword="true"/> when <c>-s</c> without <c>-S</c> was read before the refused option.
+    /// </param>
+    /// <returns>A refusal of three lines, or two when <paramref name="errorsHidden"/>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="spelledOption"/> is <see langword="null"/>.</exception>
+    public static CommandLineRefusal ContinueAtExclusiveWithRange(string spelledOption, bool errorsHidden)
+    {
+        ArgumentNullException.ThrowIfNull(spelledOption);
+
+        string badlyUsedLine = $"curl: option {spelledOption}: is badly used here";
+        return errorsHidden
+            ? new CommandLineRefusal(badlyUsedLine)
+            : new CommandLineRefusal("curl: --continue-at is mutually exclusive with --range", badlyUsedLine);
+    }
 
     /// <summary>Refuses a command line that has arguments but names no URL.</summary>
     /// <returns>A refusal whose first line is <c>curl: (2) no URL specified</c>.</returns>

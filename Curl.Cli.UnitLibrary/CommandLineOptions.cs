@@ -102,6 +102,41 @@ public sealed class CommandLineOptions
     public string? Tls13Ciphers { get; internal set; }
 
     /// <summary>
+    /// The <c>-r</c> / <c>--range</c> text as curl keeps it, not yet parsed; <see langword="null"/>
+    /// when not given. A value that starts with a digit and has no dash is kept as that leading
+    /// number with a dash appended (<c>5abc</c> becomes <c>5-</c>); anything else is kept verbatim.
+    /// <c>ByteRangeParser</c> in <c>Curl.Core.UnitLibrary</c> turns it into the range a handler
+    /// receives. The last value wins.
+    /// </summary>
+    public string? Range { get; internal set; }
+
+    /// <summary>
+    /// The <c>-C</c> / <c>--continue-at</c> byte offset; <see langword="null"/> when not given, or
+    /// when <c>-C -</c> asked for the offset to be worked out (<see cref="ResumeFromOutputSize"/>).
+    /// The last value wins.
+    /// </summary>
+    public long? ResumeFrom { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when the last <c>-C</c> / <c>--continue-at</c> was <c>-</c>: resume
+    /// from the size of the output file.
+    /// </summary>
+    public bool ResumeFromOutputSize { get; internal set; }
+
+    /// <summary>
+    /// The <c>--max-filesize</c> limit in bytes, units and fractions already applied;
+    /// <see langword="null"/> when not given. Zero is recorded as given and means no limit, as it
+    /// does to curl. The last value wins.
+    /// </summary>
+    public long? MaxFileSize { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>-s</c> / <c>--silent</c> has been read and <c>-S</c> /
+    /// <c>--show-error</c> has not, so far: curl then hides error messages.
+    /// </summary>
+    internal bool ErrorsHidden => Silent && !ShowError;
+
+    /// <summary>
     /// The warning lines met while reading the command line, in command-line order, without
     /// line terminators. <see cref="CommandLineParser"/> hands them to <see cref="CommandLineParseResult.WarningLines"/>.
     /// </summary>
@@ -110,6 +145,20 @@ public sealed class CommandLineOptions
     /// <summary>Appends <paramref name="warningLine"/> to <see cref="WarningLines"/>.</summary>
     /// <param name="warningLine">One whole warning line, without a line terminator.</param>
     internal void AddWarningLine(string warningLine) => warningLines.Add(warningLine);
+
+    /// <summary>
+    /// Appends <paramref name="lines"/> to <see cref="WarningLines"/> unless <c>-s</c> /
+    /// <c>--silent</c> has already been read, which hides curl 8.21.0's range warnings even with
+    /// <c>-S</c>; a <c>-s</c> read later does not.
+    /// </summary>
+    /// <param name="lines">One warning's lines, without line terminators.</param>
+    internal void AddWarningLinesUnlessSilent(IReadOnlyList<string> lines)
+    {
+        if (!Silent)
+        {
+            warningLines.AddRange(lines);
+        }
+    }
 
     /// <summary>Appends <paramref name="url"/> to <see cref="Urls"/>, unchanged and unvalidated.</summary>
     /// <param name="url">A positional argument or a <c>--url</c> value.</param>

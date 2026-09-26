@@ -1,5 +1,7 @@
+using System.Buffers;
 using System.Collections.Frozen;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Security.Authentication;
 
 namespace Curl.Cli;
@@ -44,10 +46,16 @@ public static class CommandLineOptionTable
         CommandLineOption.Flag("tlsv1.3", null, options => options.MinimumTlsVersion = SslProtocols.Tls13),
         CommandLineOption.Text("ciphers", null, (options, ciphers) => options.Ciphers = ciphers),
         CommandLineOption.Text("tls13-ciphers", null, (options, ciphers) => options.Tls13Ciphers = ciphers),
+        CommandLineOption.Value("range", 'r', SetRange),
+        CommandLineOption.Value("continue-at", 'C', SetResumeFrom),
+        CommandLineOption.Value("max-filesize", null, SetMaxFileSize),
     ];
 
     /// <summary>The largest <c>--create-file-mode</c> curl 8.21.0 accepts: octal <c>0777</c>.</summary>
     private const int MaximumCreateFileMode = 0b111_111_111;
+
+    /// <summary>The characters curl 8.21.0 expects in a range, and warns about any other.</summary>
+    private static readonly SearchValues<char> RangeCharacters = SearchValues.Create("0123456789-,");
 
     private static readonly FrozenDictionary<string, CommandLineOption> RowsByLongName =
         RowsInTableOrder.ToFrozenDictionary(option => option.LongName, StringComparer.Ordinal);
@@ -108,6 +116,96 @@ public static class CommandLineOptionTable
 
         options.CaCertificateFile = value;
         return null;
+    }
+
+    /// <summary>
+    /// Records a <c>-r</c>/<c>--range</c> value the way curl 8.21.0 keeps it. It is refused when
+    /// <c>-C</c>/<c>--continue-at</c> came first (checked before anything else, so
+    /// <c>-C 5 -r ''</c> is that refusal, not a blank one) and when empty. A value that starts
+    /// with a digit and has no dash becomes its leading number with a dash appended, with a
+    /// warning, unless that number does not fit, when it is kept verbatim without one; any other
+    /// value holding anything but digits, dashes and commas is kept verbatim with a warning.
+    /// Parsing the text into a range is <c>ByteRangeParser</c>'s job, at transfer time.
+    /// </summary>
+    private static CommandLineRefusal? SetRange(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists)
+    {
+        if (options.ResumeFrom is not null || options.ResumeFromOutputSize)
+        {
+            return CommandLineRefusal.ContinueAtExclusiveWithRange(spelledOption, options.ErrorsHidden);
+        }
+
+        if (value.Length == 0)
+        {
+            return CommandLineRefusal.BlankArgument(spelledOption);
+        }
+
+        options.Range = char.IsAsciiDigit(value[0]) && !value.Contains('-', StringComparison.Ordinal)
+            ? AppendDashToLeadingNumber(options, value)
+            : WarnOfInvalidRangeCharacter(options, value);
+        return null;
+    }
+
+    private static string AppendDashToLeadingNumber(CommandLineOptions options, string value)
+    {
+        int digitCount = value.AsSpan().IndexOfAnyExceptInRange('0', '9');
+        ReadOnlySpan<char> digits = digitCount < 0 ? value : value.AsSpan(0, digitCount);
+        if (!long.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture, out long firstBytePosition))
+        {
+            return value;
+        }
+
+        options.AddWarningLinesUnlessSilent(CommandLineWarning.RangeHasNoDash);
+        return firstBytePosition.ToString(CultureInfo.InvariantCulture) + "-";
+    }
+
+    private static string WarnOfInvalidRangeCharacter(CommandLineOptions options, string value)
+    {
+        if (value.AsSpan().ContainsAnyExcept(RangeCharacters))
+        {
+            options.AddWarningLinesUnlessSilent(CommandLineWarning.RangeHasInvalidCharacter);
+        }
+
+        return value;
+    }
+
+    /// <summary>
+    /// Records a <c>-C</c>/<c>--continue-at</c> value: <c>-</c> for "from the output file's size",
+    /// or a byte offset read by <see cref="CommandLineNumber.ParseOffset"/>. It is refused when
+    /// <c>-r</c>/<c>--range</c> came first, before the value is looked at, as curl 8.21.0 does.
+    /// </summary>
+    private static CommandLineRefusal? SetResumeFrom(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists)
+    {
+        if (options.Range is not null)
+        {
+            return CommandLineRefusal.ContinueAtExclusiveWithRange(spelledOption, options.ErrorsHidden);
+        }
+
+        if (value == "-")
+        {
+            options.ResumeFrom = null;
+            options.ResumeFromOutputSize = true;
+            return null;
+        }
+
+        CommandLineRefusal? refusal = CommandLineNumber.ParseOffset(spelledOption, value, out long offset);
+        if (refusal is null)
+        {
+            options.ResumeFrom = offset;
+            options.ResumeFromOutputSize = false;
+        }
+
+        return refusal;
+    }
+
+    private static CommandLineRefusal? SetMaxFileSize(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists)
+    {
+        CommandLineRefusal? refusal = CommandLineNumber.ParseSize(spelledOption, value, out long size);
+        if (refusal is null)
+        {
+            options.MaxFileSize = size;
+        }
+
+        return refusal;
     }
 
     /// <summary>Finds the row whose long name is exactly <paramref name="longName"/>; no prefix matching.</summary>
