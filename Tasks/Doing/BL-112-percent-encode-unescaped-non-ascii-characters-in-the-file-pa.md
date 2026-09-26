@@ -41,3 +41,4 @@ argument arrives through `CommandLineToArgvW` as UTF-16, since .NET receives `ar
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
