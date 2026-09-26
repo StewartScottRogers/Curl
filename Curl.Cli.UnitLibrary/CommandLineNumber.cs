@@ -30,6 +30,12 @@ namespace Curl.Cli;
 public static class CommandLineNumber
 {
     /// <summary>
+    /// The most whole seconds curl 8.21.0 on Windows accepts for <c>--connect-timeout</c> and
+    /// <c>-m</c>: its 32-bit <c>LONG_MAX</c> divided by 1000, less one.
+    /// </summary>
+    public const long MaximumWholeSeconds = (int.MaxValue / 1000) - 1;
+
+    /// <summary>
     /// Reads <paramref name="value"/> as a number that is zero or more. <c>-0</c> reads as zero.
     /// </summary>
     /// <param name="spelledOption">The whole argument as typed, for naming it in a refusal.</param>
@@ -194,6 +200,84 @@ public static class CommandLineNumber
         }
 
         return ScaleByUnit(spelledOption, rest, wholeUnits, fraction, out size);
+    }
+
+    /// <summary>
+    /// Reads <paramref name="value"/> as a duration in seconds the way curl 8.21.0 reads
+    /// <c>--connect-timeout</c> and <c>-m</c>/<c>--max-time</c>: whole seconds, then an optional
+    /// <c>.</c> and fraction digits kept to the millisecond, rounding down. Anything after the
+    /// digits is ignored, so <c>1,5</c> and <c>1e999</c> are one second and <c>0x10</c> is zero.
+    /// </summary>
+    /// <remarks>
+    /// Measured against the local curl 8.21.0 (Windows, where a C <c>long</c> is 32 bits) on
+    /// 2026-09-26, through the milliseconds <c>--libcurl</c> writes: <c>3.14</c> is 3140,
+    /// <c>1.123456789012</c> is 1123 and <c>0.0001</c> is 0. At most
+    /// <see cref="MaximumWholeSeconds"/> whole seconds are accepted. A fraction of more than ten
+    /// digits, or one larger than <c>21474836</c>, drops its last digits until it is neither,
+    /// before the milliseconds are taken from it.
+    /// </remarks>
+    /// <param name="spelledOption">The whole argument as typed, for naming it in a refusal.</param>
+    /// <param name="value">The option's value.</param>
+    /// <param name="duration">The duration read; zero when the value is refused.</param>
+    /// <returns>
+    /// <see langword="null"/> when the value was read;
+    /// <see cref="CommandLineRefusal.ExpectedProperNumericalParameter"/> when it does not start with
+    /// a digit (so a sign, a space or a leading <c>.</c>) or its whole seconds are more than
+    /// <see cref="MaximumWholeSeconds"/>; <see cref="CommandLineRefusal.TooLargeNumber"/> when a
+    /// <c>.</c> is not followed by digits that fit in a <see cref="long"/>.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="spelledOption"/> or <paramref name="value"/> is <see langword="null"/>.
+    /// </exception>
+    public static CommandLineRefusal? ParseSeconds(string spelledOption, string value, out TimeSpan duration)
+    {
+        ArgumentNullException.ThrowIfNull(spelledOption);
+        ArgumentNullException.ThrowIfNull(value);
+
+        duration = TimeSpan.Zero;
+        ReadOnlySpan<char> rest = value;
+        if (TryReadLeadingDigits(ref rest, out long wholeSeconds) != LeadingDigits.Read || wholeSeconds > MaximumWholeSeconds)
+        {
+            return CommandLineRefusal.ExpectedProperNumericalParameter(spelledOption);
+        }
+
+        long milliseconds = 0;
+        if (rest.StartsWith('.'))
+        {
+            rest = rest[1..];
+            int lengthBefore = rest.Length;
+            if (TryReadLeadingDigits(ref rest, out long fractionDigits) != LeadingDigits.Read)
+            {
+                return CommandLineRefusal.TooLargeNumber(spelledOption);
+            }
+
+            milliseconds = FractionInMilliseconds(fractionDigits, lengthBefore - rest.Length);
+        }
+
+        duration = TimeSpan.FromMilliseconds((wholeSeconds * 1000) + milliseconds);
+        return null;
+    }
+
+    /// <summary>
+    /// The milliseconds in a fraction written with <paramref name="digitCount"/> digits, as curl's
+    /// <c>secs2ms</c> takes them: digits are dropped from the end while there are more than ten or
+    /// the fraction is larger than a 32-bit <c>LONG_MAX</c> divided by 100.
+    /// </summary>
+    private static long FractionInMilliseconds(long digits, int digitCount)
+    {
+        while (digitCount > 10 || digits > int.MaxValue / 100)
+        {
+            digits /= 10;
+            digitCount--;
+        }
+
+        long divisor = 1;
+        for (int digit = 1; digit < digitCount; digit++)
+        {
+            divisor *= 10;
+        }
+
+        return digits * 100 / divisor;
     }
 
     private static CommandLineRefusal? ScaleByUnit(string spelledOption, ReadOnlySpan<char> unit, long wholeUnits, Fraction fraction, out long size)

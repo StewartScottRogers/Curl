@@ -156,6 +156,19 @@ public sealed class CommandLineOptions
     public long? MaxFileSize { get; internal set; }
 
     /// <summary>
+    /// The <c>--connect-timeout</c> limit, to the millisecond; <see langword="null"/> when not
+    /// given. Zero is recorded as given and means no limit, as it does to curl. The last value wins.
+    /// </summary>
+    public TimeSpan? ConnectTimeout { get; internal set; }
+
+    /// <summary>
+    /// The <c>-m</c> / <c>--max-time</c> limit on the whole transfer, to the millisecond;
+    /// <see langword="null"/> when not given. Zero is recorded as given and means no limit, as it
+    /// does to curl. The last value wins.
+    /// </summary>
+    public TimeSpan? MaxTime { get; internal set; }
+
+    /// <summary>
     /// <see langword="true"/> when <c>-s</c> / <c>--silent</c> has been read and <c>-S</c> /
     /// <c>--show-error</c> has not, so far: curl then hides error messages.
     /// </summary>

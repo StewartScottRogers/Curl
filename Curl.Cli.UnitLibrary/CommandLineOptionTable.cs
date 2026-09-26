@@ -68,6 +68,8 @@ public static class CommandLineOptionTable
         CommandLineOption.Value("range", 'r', SetRange),
         CommandLineOption.Value("continue-at", 'C', SetResumeFrom),
         CommandLineOption.Value("max-filesize", null, SetMaxFileSize),
+        CommandLineOption.Value("connect-timeout", null, SetConnectTimeout),
+        CommandLineOption.Value("max-time", 'm', SetMaxTime),
     ];
 
     /// <summary>The largest <c>--create-file-mode</c> curl 8.21.0 accepts: octal <c>0777</c>.</summary>
@@ -256,6 +258,28 @@ public static class CommandLineOptionTable
         if (refusal is null)
         {
             options.MaxFileSize = size;
+        }
+
+        return refusal;
+    }
+
+    private static CommandLineRefusal? SetConnectTimeout(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        CommandLineRefusal? refusal = CommandLineNumber.ParseSeconds(spelledOption, value, out TimeSpan duration);
+        if (refusal is null)
+        {
+            options.ConnectTimeout = duration;
+        }
+
+        return refusal;
+    }
+
+    private static CommandLineRefusal? SetMaxTime(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        CommandLineRefusal? refusal = CommandLineNumber.ParseSeconds(spelledOption, value, out TimeSpan duration);
+        if (refusal is null)
+        {
+            options.MaxTime = duration;
         }
 
         return refusal;
