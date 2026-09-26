@@ -34,3 +34,4 @@ A cookie store implements `ICookieStore`, matching cookies by domain, path, secu
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
