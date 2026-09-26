@@ -273,18 +273,19 @@ function Write-Event {
                 if ($c.type -ne 'tool_use') { continue }
                 $label = Get-ToolLabel $c
                 if (-not $label) { continue }
-                $script:ToolLabels[$c.id] = $label[0]
-                if ($label[0] -in 'agent', 'skill', 'edit', 'write', 'move') { Write-Trace $Id $label[0] (Get-Short $label[1]) }
+                $script:ToolLabels[$c.id] = $label
+                if ($label[0] -in 'agent', 'skill', 'edit', 'write') { Write-Trace $Id $label[0] (Get-Short $label[1]) }
             }
         }
         'user' {
             foreach ($c in @($Evt.message.content)) {
                 if ($c.type -ne 'tool_result' -or -not $script:ToolLabels.ContainsKey($c.tool_use_id)) { continue }
-                $verb = $script:ToolLabels[$c.tool_use_id]
-                if ($verb -in 'agent', 'skill', 'edit', 'write', 'move') { continue }
+                $verb, $detail = $script:ToolLabels[$c.tool_use_id]
+                if ($verb -in 'agent', 'skill', 'edit', 'write') { continue }
                 $isErr = [bool]($c.PSObject.Properties['is_error'] -and $c.is_error)
                 $outcome = Get-Outcome $verb (Get-ResultText $c.content) $isErr
                 $color = if ($outcome -like 'FAIL*') { 'Red' } else { 'Gray' }
+                if ($verb -eq 'move') { $outcome = "$detail $outcome" }
                 Write-Trace $Id $verb $outcome $color
             }
         }
