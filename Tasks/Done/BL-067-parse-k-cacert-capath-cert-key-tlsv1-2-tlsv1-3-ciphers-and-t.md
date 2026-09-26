@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-067 — Parse -k, --cacert, --capath, --cert, --key, --tlsv1.2, --tlsv1.3, --ciphers and --tls13-ciphers
 
@@ -64,21 +64,21 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `CommandLineOptions` has `Insecure` (`bool`), `CaCertificateFile`,
+- [x] `CommandLineOptions` has `Insecure` (`bool`), `CaCertificateFile`,
       `CaCertificateDirectory`, `ClientCertificate`, `PrivateKey`, `Ciphers`,
       `Tls13Ciphers` (each `string?`, `null` when not given) and a minimum TLS version
       (not given, 1.2, 1.3) where the last of `--tlsv1.2`/`--tlsv1.3` wins.
-- [ ] A named test per option in `Curl.Cli.UnitTests` asserts the property it sets, for
+- [x] A named test per option in `Curl.Cli.UnitTests` asserts the property it sets, for
       the long spelling and, for `-k` and `-E`, the short one.
-- [ ] Named tests assert the last-wins rule for `--tlsv1.2`/`--tlsv1.3` in both orders.
-- [ ] Named tests assert the exact two-line blank refusals, exit 2, for `--capath ''`,
+- [x] Named tests assert the last-wins rule for `--tlsv1.2`/`--tlsv1.3` in both orders.
+- [x] Named tests assert the exact two-line blank refusals, exit 2, for `--capath ''`,
       `--cert ''` and `--ciphers ''`, and the measured behaviour for `--key ''` and
       `--tls13-ciphers ''`.
-- [ ] Named tests assert the exact three-line `--cacert` refusal, exit 2
+- [x] Named tests assert the exact three-line `--cacert` refusal, exit 2
       (`CurlExitCode.FailedInit`), for a file the injected seam reports missing and for
       `--cacert ''`; and acceptance when the seam reports it present.
-- [ ] `Curl.Cli.UnitLibrary/README.md` lists the new options and properties.
-- [ ] `dotnet build Curl.Cli.UnitLibrary -warnaserror` is clean and
+- [x] `Curl.Cli.UnitLibrary/README.md` lists the new options and properties.
+- [x] `dotnet build Curl.Cli.UnitLibrary -warnaserror` is clean and
       `dotnet test Curl.Cli.UnitTests --filter "TestCategory!=Integration"` is green.
 
 ## Notes
@@ -89,7 +89,43 @@ scope. For the record, curl 8.21.0 refuses `--tlsv1.2 --tls-max 1.1` with
 `curl: option --tls-max: is badly used here` (measured 2026-09-26), for whoever adds
 `--tls-max`.
 
+Measured 2026-09-26 with the local curl 8.21.0 (the cases the Context left open):
+
+- `--key ''` and `--tls13-ciphers ''`: refused, exit 2, with the two-line
+  `blank argument where content is expected` refusal. Both are `Text` rows.
+- `-sk` and `-ks` bundle (silent, no error line); `-kE x` bundles too, with `-E` taking the
+  next argument. `--insecure=x` and `--tlsv1.2=x` accept and ignore the attached value, as
+  every flag already does.
+- `--cacert=` names the option as typed in the second line (`curl: option --cacert=: is
+  badly used here`) and as `--cacert` in the first; pinned in a test.
+
+Choices made (unattended run):
+
+- **Seam.** BL-080's file reader has not landed, so the seam is new:
+  `CommandLineParser.Parse(arguments, Func<string, bool> pathExists)`, with
+  `Parse(arguments)` passing `Path.Exists` (true for a file or a directory, matching curl
+  letting `--cacert .` through). It reaches the rows through a fourth parameter on the
+  `CommandLineOptionApplier` delegate rather than through `CommandLineOptions`, because
+  that type's contract is "nothing here touches the file system". When BL-080 adds a file
+  reader, it can ride the same parameter path.
+- **Minimum TLS version** is `SslProtocols?` (`Tls12`, `Tls13`, `null`) in
+  `MinimumTlsVersion`: a BCL type the console can hand to the TLS provider without a
+  mapping enum.
+- **Refusal shape.** `CommandLineRefusal.FileDoesNotExist(spelled, longOption, file)` adds
+  the three-line shape; the private constructor now takes the lines before the try-help line.
+- **Tests on disk.** The two tests that pin `Path.Exists` against a real file and directory
+  are `[TestCategory("Integration")]` per `.claude/rules/testing.md`; the fast run covers the
+  default through `--cacert ''`, which `Path.Exists` answers without touching the disk.
+- Coverage (`Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary`, fast tests only): every
+  member this task added or changed is at 100% line and branch. The library reports 99.21%
+  because of three pre-existing uncovered `UrlParts` init setters in `UploadUrl.cs`, filed as
+  BL-083.
+- Verified: `dotnet build Curl.Cli.UnitLibrary -warnaserror` clean; `dotnet test
+  Curl.Cli.UnitTests --filter "TestCategory!=Integration"` 267 passed; all 269 passed with
+  Integration; `dotnet format --verify-no-changes` clean for both projects.
+
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. CommandLineParser records -k, --cacert (existence-checked through an injected seam), --capath, -E, --key, --tlsv1.2/--tlsv1.3 (last wins), --ciphers and --tls13-ciphers with curl 8.21.0's refusals
