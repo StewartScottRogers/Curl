@@ -8,7 +8,7 @@ depends-on: [BL-008, BL-020]
 touches: [Curl.Protocol.File.UnitLibrary/CLAUDE.md]
 requirement: none
 created: 2026-09-25
-completed:
+completed: 2026-09-26
 ---
 # BL-025 — State the `file://` upload path's ignored options and its lack of path sandboxing
 
@@ -42,24 +42,24 @@ library's own `CLAUDE.md` should say it out loud.
 
 ## Acceptance criteria
 
-- [ ] `Curl.Protocol.File.UnitLibrary\CLAUDE.md` gains a table with one row per
+- [x] `Curl.Protocol.File.UnitLibrary\CLAUDE.md` gains a table with one row per
       `ITransferContext` member — `ResumeFrom`, `Range`, `NoBody`, `TimeCondition`,
       `HeaderOutput`, `ConvertLineEndings`, `TimeProvider` — and a column each for
       download and upload, saying "honoured" or "ignored" for each, matching the code as it
       stands when the task is done.
-- [ ] The same file states that `TimeProvider` is unused in both directions and why
+- [x] The same file states that `TimeProvider` is unused in both directions and why
       (nothing in a local file transfer is timed or retried, and `-z` compares against the
       timestamp the open reported).
-- [ ] The same file states, in its own short section, that no component between the URL and
+- [x] The same file states, in its own short section, that no component between the URL and
       `IFileSystem` sandboxes or confines a path; that this matches curl, with a link to
       <https://curl.se/docs/url-syntax.html> and the curl version checked (8.21.0); and
       that an `IFileSystem` implementation must not treat a path it receives as validated
       or trusted.
-- [ ] Every claim in the table is verified against
+- [x] Every claim in the table is verified against
       `Curl.Protocol.File.UnitLibrary\FileProtocolHandler.cs` at the time of writing, and
       the section names the methods it read (`DownloadFromAsync`, `UploadAsync`,
       `UploadIntoAsync`, `TryResolveWindow`).
-- [ ] No `.cs` file is changed by this task, and `Curl.Protocol.File.UnitLibrary\CLAUDE.md`
+- [x] No `.cs` file is changed by this task, and `Curl.Protocol.File.UnitLibrary\CLAUDE.md`
       repeats no rule already in the root `CLAUDE.md`.
 
 ## Notes
@@ -72,7 +72,26 @@ Depends on BL-020, which adds `ConvertLineEndings` to `ITransferContext` and mak
 upload path honour it; writing the table before that lands would make it wrong on its first
 day.
 
+Delivered by the session directly rather than through `align-and-document`: one Markdown
+file, and the work is reading `FileProtocolHandler.cs` against the table.
+
+Choices made unattended:
+- The table also has rows for `MaxFileSize` (download honoured, upload ignored),
+  `CreateFileMode` (download ignored, upload honoured) and one row for the protocol-specific
+  members (`PostData`, `Credentials`, `TelnetOptions`, `TftpBlockSize`, `TftpNoOptions`,
+  ignored both ways). The criterion names seven members; ADR-0003 asks for every ignored
+  option, so leaving the rest implicit would have repeated the gap this task closes.
+  `Url`, `Output`, `Upload` and `CancellationToken` are not transfer options and have no row.
+- The curl claim cites url-syntax.html's two statements that bear on it: only the hostname
+  of a `file://` URL is restricted, and on Windows a path may turn into an SMB access curl
+  cannot control.
+
+Found while reading: the `ExecuteAsync` remarks say "below this point the two paths share
+nothing", but both call `CopyAsync`. Out of scope here (no `.cs` changes); worth fixing with
+the class-remarks alignment noted above, filed as BL-106.
+
 ## Log
 
 - 2026-09-25: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. File CLAUDE.md states each transfer option per direction and that no layer sandboxes a path
