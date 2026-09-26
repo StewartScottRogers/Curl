@@ -41,7 +41,17 @@ narrow widths re-wrapping each piece differs from wrapping the whole text. Fix: 
 
 ## Notes
 
+- 2026-09-26 (lane 3): Blocked before any code change. `Curl.Console.UnitTests/CurlCommandRunnerTransferOptionTests.cs`
+  (lines 66, 94, 107, helper `Lines` at 258) builds its expected stderr from
+  `CommandLineWarning.RangeHasNoDash` / `RangeHasInvalidCharacter` joined unwrapped, while the
+  runner under test wraps at the default 79 columns. Once each warning is one unwrapped line,
+  those three tests expect the unwrapped text but get the 79-column wrap, so they fail (and a
+  change of type from list to string would not compile there). The fix needs
+  `Curl.Console.UnitTests` in `touches`: pin the literal 79-column pieces there (or wrap the
+  expectation), then this task is the one-line change the Goal describes.
+
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Blocked. Needs Curl.Console.UnitTests added to touches: three CurlCommandRunnerTransferOptionTests build expected stderr from the unwrapped range warnings and fail at 79 columns; re-plan to include it
