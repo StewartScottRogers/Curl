@@ -38,3 +38,4 @@ A `-w` template renderer in `Curl.Output.UnitLibrary` handles variables, headers
 - 2026-09-26: Backlog -> Doing.
 - 2026-09-26: Doing -> Blocked. Stewart: lane 1 could not integrate: fast tests failed after rebasing onto the other lanes' work. The work is on branch factory/BL-224-lane-1-20260926-132927.
 - 2026-09-26: Blocked -> Backlog. Not for Stewart: integration failed (fast tests red after rebase). The work is on branch factory/BL-224-lane-1-20260926-132927; start with git cherry-pick --no-commit factory/BL-224-lane-1-20260926-132927 and fix it.
+- 2026-09-26: Backlog -> Doing.
