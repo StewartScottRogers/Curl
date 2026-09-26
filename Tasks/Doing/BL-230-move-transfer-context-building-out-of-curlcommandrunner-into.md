@@ -35,3 +35,4 @@ Building a `TransferContext` from `CommandLineOptions` lives in its own class in
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
