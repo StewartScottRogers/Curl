@@ -89,3 +89,4 @@ task.
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
