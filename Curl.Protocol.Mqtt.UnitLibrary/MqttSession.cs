@@ -21,6 +21,13 @@ namespace Curl.Protocol.Mqtt;
 /// got, as curl's is, before the transfer fails with exit 18.
 /// </para>
 /// <para>
+/// A packet with no body moves the session as curl's does, however odd the result: a
+/// PINGRESP makes the next packet with a body a PUBLISH or SUBACK even before the CONNACK,
+/// so neither the CONNACK check nor the SUBSCRIBE happens; any other empty packet but
+/// DISCONNECT drops what was awaited, so the next packet's body is read as headers, and the
+/// first of those with a body ends the transfer with exit 0 and nothing written.
+/// </para>
+/// <para>
 /// A failure is thrown as an <see cref="MqttTransferException" /> carrying curl's exit
 /// code and message; <see cref="BytesWritten" /> still says how much reached the output.
 /// </para>
@@ -57,64 +64,81 @@ internal sealed class MqttSession(IConnection connection, Stream output, Cancell
         ReadOnlyMemory<byte>? postData)
     {
         await SendAsync(MqttPackets.BuildConnect(clientIdentifier, credentials)).ConfigureAwait(false);
-        MqttFixedHeader? connack = await ReadPacketHeaderAsync().ConfigureAwait(false);
-        if (connack is null)
+        SessionState state = SessionState.AwaitingConnack;
+        while (state != SessionState.Done)
         {
-            return;
+            MqttFixedHeader header = await reader.ReadFixedHeaderAsync().ConfigureAwait(false);
+            state = header.RemainingLength == 0
+                ? StateAfterEmptyPacket(header)
+                : await ReadPacketAsync(state, header, url, postData).ConfigureAwait(false);
         }
+    }
 
-        await VerifyConnackAsync(connack.Value).ConfigureAwait(false);
+    /// <summary>
+    /// The state after a packet with no body, as curl's <c>MQTT_REMAINING_LENGTH</c> case
+    /// sets it: a DISCONNECT ends the transfer, a PINGRESP awaits a PUBLISH or SUBACK even
+    /// before the CONNACK has come, and any other empty packet drops whatever was awaited.
+    /// </summary>
+    private static SessionState StateAfterEmptyPacket(MqttFixedHeader header) => header.PacketType switch
+    {
+        MqttPackets.DisconnectType => SessionState.Done,
+        MqttPackets.PingResponseType => SessionState.AwaitingPublishOrSuback,
+        _ => SessionState.LeavingBodyUnread,
+    };
+
+    /// <summary>
+    /// Handles a packet that has a body according to the state the session is in, and
+    /// returns the next state.
+    /// </summary>
+    private async ValueTask<SessionState> ReadPacketAsync(
+        SessionState state,
+        MqttFixedHeader header,
+        Uri url,
+        ReadOnlyMemory<byte>? postData) => state switch
+        {
+            SessionState.AwaitingConnack => await AcceptConnackAsync(header, url, postData).ConfigureAwait(false),
+            SessionState.AwaitingPublishOrSuback => await ReceivePublishOrSubackAsync(header).ConfigureAwait(false),
+            SessionState.LeavingBodyUnread => SessionState.StateNotHandled,
+            _ => SessionState.Done,
+        };
+
+    /// <summary>
+    /// Checks the CONNACK, then either publishes and disconnects, ending the transfer, or
+    /// subscribes and awaits the SUBACK.
+    /// </summary>
+    private async ValueTask<SessionState> AcceptConnackAsync(
+        MqttFixedHeader header,
+        Uri url,
+        ReadOnlyMemory<byte>? postData)
+    {
+        await VerifyConnackAsync(header).ConfigureAwait(false);
         byte[] topic = MqttTopic.Decode(url);
         if (postData is { } payload)
         {
             await SendAsync(MqttPackets.BuildPublish(topic, payload)).ConfigureAwait(false);
             await SendAsync(MqttPackets.BuildDisconnect()).ConfigureAwait(false);
-            return;
+            return SessionState.Done;
         }
 
         await SendAsync(MqttPackets.BuildSubscribe(topic)).ConfigureAwait(false);
-        await ReceivePublishesAsync().ConfigureAwait(false);
+        return SessionState.AwaitingPublishOrSuback;
     }
 
-    private async ValueTask ReceivePublishesAsync()
+    private async ValueTask<SessionState> ReceivePublishOrSubackAsync(MqttFixedHeader header)
     {
-        while (await ReadPacketHeaderAsync().ConfigureAwait(false) is { } header)
+        switch (header.PacketType)
         {
-            switch (header.PacketType)
-            {
-                case MqttPackets.PublishType:
-                    await WritePublishAsync(header).ConfigureAwait(false);
-                    break;
-                case MqttPackets.SubackType:
-                    await VerifySubackAsync(header).ConfigureAwait(false);
-                    break;
-                default:
-                    throw new MqttTransferException(CurlExitCode.WeirdServerReply, MqttTransferMessages.WeirdServerReply);
-            }
+            case MqttPackets.PublishType:
+                await WritePublishAsync(header).ConfigureAwait(false);
+                break;
+            case MqttPackets.SubackType:
+                await VerifySubackAsync(header).ConfigureAwait(false);
+                break;
+            default:
+                throw new MqttTransferException(CurlExitCode.WeirdServerReply, MqttTransferMessages.WeirdServerReply);
         }
-    }
 
-    /// <summary>
-    /// Reads fixed headers until one has a body, returning <see langword="null" /> for a
-    /// DISCONNECT and passing over any other empty packet. Passing over a PINGRESP after
-    /// the SUBACK is what curl 8.21.0 was measured to do; an empty packet anywhere else
-    /// moves curl's state machine in ways this does not reproduce.
-    /// </summary>
-    private async ValueTask<MqttFixedHeader?> ReadPacketHeaderAsync()
-    {
-        while (true)
-        {
-            MqttFixedHeader header = await reader.ReadFixedHeaderAsync().ConfigureAwait(false);
-            if (header.RemainingLength > 0)
-            {
-                return header;
-            }
-
-            if (header.PacketType == MqttPackets.DisconnectType)
-            {
-                return null;
-            }
-        }
+        return SessionState.AwaitingPublishOrSuback;
     }
 
     /// <summary>
@@ -219,5 +243,35 @@ internal sealed class MqttSession(IConnection connection, Stream output, Cancell
         {
             throw new MqttTransferException(CurlExitCode.SendError, MqttTransferMessages.SendFailed);
         }
+    }
+
+    /// <summary>
+    /// Where the session stands between packets, after curl 8.21.0's <c>mqttstate</c> and
+    /// the <c>nextstate</c> it keeps while reading a fixed header.
+    /// </summary>
+    private enum SessionState
+    {
+        /// <summary>The CONNECT is sent; the next packet with a body is taken as the CONNACK.</summary>
+        AwaitingConnack,
+
+        /// <summary>The next packet with a body must be a PUBLISH or a SUBACK.</summary>
+        AwaitingPublishOrSuback,
+
+        /// <summary>
+        /// An empty packet dropped what was awaited (curl's <c>MQTT_FIRST</c> as next
+        /// state): the next packet's body is left unread, so its bytes are read as the
+        /// fixed header after it.
+        /// </summary>
+        LeavingBodyUnread,
+
+        /// <summary>
+        /// A body was left unread (curl's <c>MQTT_NOSTATE</c> as next state): the next
+        /// packet with a body ends the transfer with exit 0, as curl's
+        /// <c>State not handled yet</c> does.
+        /// </summary>
+        StateNotHandled,
+
+        /// <summary>The transfer has ended successfully.</summary>
+        Done,
     }
 }

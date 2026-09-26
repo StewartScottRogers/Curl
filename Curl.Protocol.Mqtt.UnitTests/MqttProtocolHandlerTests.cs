@@ -342,6 +342,65 @@ public sealed class MqttProtocolHandlerTests
     }
 
     /// <summary>
+    /// curl 8.21.0 measured on 2026-09-26: an empty PUBLISH after the SUBACK drops the
+    /// PUBLISH-or-SUBACK wait, so the next PUBLISH's body is read as headers; <c>00 05</c> is
+    /// taken as a packet with a body, which curl answers with <c>State not handled yet</c>
+    /// and exit 0, writing nothing.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_EmptyPublishThenPublish_WritesNothingAndSucceeds()
+    {
+        ScriptedConnection connection = new(
+            Concat(Connack, Suback),
+            Concat(Bytes("30 00"), Bytes("30 0C 00 05", "a/b/c", string.Empty, "HELLO")));
+        RecordingStream output = new();
+
+        TransferResult result = await RunAsync(FakeConnector.For(connection), "mqtt://h/a/b/c", output);
+
+        CollectionAssert.AreEqual(
+            Concat(MeasuredConnect, Bytes("82 0A 00 01 00 05", "a/b/c", "00")),
+            connection.Written);
+        Assert.IsEmpty(output.ToArray());
+        Assert.AreEqual(TransferResult.Success(0), result);
+    }
+
+    /// <summary>
+    /// curl 8.21.0 measured on 2026-09-26: a PINGRESP before the CONNACK makes curl await a
+    /// PUBLISH or SUBACK, so the CONNACK that follows is a weird server reply and no
+    /// SUBSCRIBE is ever sent.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_PingResponseBeforeConnack_ConnackIsWeirdServerReplyAndSubscribesNothing()
+    {
+        ScriptedConnection connection = new(Concat(Bytes("D0 00"), Connack));
+        RecordingStream output = new();
+
+        TransferResult result = await RunAsync(FakeConnector.For(connection), "mqtt://h/a/b/c", output);
+
+        CollectionAssert.AreEqual(MeasuredConnect, connection.Written);
+        Assert.IsEmpty(output.ToArray());
+        Assert.AreEqual(new TransferResult(CurlExitCode.WeirdServerReply, 0, WeirdServerReply), result);
+    }
+
+    /// <summary>
+    /// curl 8.21.0 measured on 2026-09-26: after a PINGRESP in place of the CONNACK, a
+    /// PUBLISH is written without any CONNACK or SUBSCRIBE, and the close that follows is
+    /// exit 56.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_PingResponseThenPublishWithoutConnack_WritesPublishWithoutSubscribing()
+    {
+        ScriptedConnection connection = new(Concat(Bytes("D0 00"), Bytes("30 0C 00 05", "a/b/c", string.Empty, "HELLO")));
+        RecordingStream output = new();
+
+        TransferResult result = await RunAsync(FakeConnector.For(connection), "mqtt://h/a/b/c", output);
+
+        CollectionAssert.AreEqual(MeasuredConnect, connection.Written);
+        CollectionAssert.AreEqual(Bytes("00 05", "a/b/c", string.Empty, "HELLO"), output.ToArray());
+        Assert.AreEqual(new TransferResult(CurlExitCode.RecvError, 12, ConnectionDisconnected), result);
+    }
+
+    /// <summary>
     /// curl 8.21.0 measured on 2026-09-26: a QoS 1 PUBLISH is written raw, its packet
     /// identifier between the topic and the payload.
     /// </summary>
