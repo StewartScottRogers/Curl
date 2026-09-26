@@ -35,3 +35,4 @@ The measured curl 8.21.0 behaviour is recorded in the XML remarks of `CommandLin
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
