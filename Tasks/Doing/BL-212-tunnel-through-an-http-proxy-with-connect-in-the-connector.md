@@ -36,3 +36,4 @@ When `ConnectTarget.Proxy` is an HTTP proxy with tunnelling, the connector sends
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
