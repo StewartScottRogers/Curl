@@ -32,3 +32,4 @@ Split out of BL-102, which cannot print or suppress curl's progress meter until 
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
