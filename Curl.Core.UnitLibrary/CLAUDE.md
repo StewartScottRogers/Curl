@@ -16,3 +16,7 @@ throws. Its disk tests in `Curl.Core.UnitTests` are `[TestCategory("Integration"
 scheme (case-insensitive) and returns exit 1, `Protocol "<scheme>" not supported`, when
 none is; two handlers claiming one scheme make its constructor throw. It is not yet wired
 into `Curl.Console`.
+
+`ByteRangeParser` is the one place `-r`/`--range` text becomes the `ByteRange` a handler
+receives on `ITransferContext.Range`, read as libcurl 8.21.0's `Curl_range` reads it; text
+that names no range is `NotDeliveredFailure`, exit 33. Handlers never parse range text.
