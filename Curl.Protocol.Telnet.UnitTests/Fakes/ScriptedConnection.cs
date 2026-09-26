@@ -6,8 +6,10 @@ namespace Curl.Protocol.Telnet.Fakes;
 /// <summary>
 /// An <see cref="IConnection" /> that plays a telnet server from a script: each
 /// <see cref="ScriptedRead" /> is returned by one read, in order, and once the script is
-/// exhausted every read returns zero, which is the server closing. Every byte written is
-/// recorded in <see cref="Sent" />.
+/// exhausted every read returns zero, which is the server closing. A scripted read longer
+/// than the reader's buffer is returned over as many reads as it takes. Every byte written
+/// is recorded in <see cref="Sent" />, and the length of every read buffer in
+/// <see cref="ReadBufferLengths" />.
 /// </summary>
 /// <param name="reads">What the server sends, one read at a time.</param>
 public sealed class ScriptedConnection(params ScriptedRead[] reads) : IConnection
@@ -16,7 +18,11 @@ public sealed class ScriptedConnection(params ScriptedRead[] reads) : IConnectio
 
     private readonly List<byte> sent = [];
 
+    private readonly List<int> readBufferLengths = [];
+
     private int nextRead;
+
+    private int readOffset;
 
     private TaskCompletionSource sentChanged = NewSignal();
 
@@ -28,6 +34,9 @@ public sealed class ScriptedConnection(params ScriptedRead[] reads) : IConnectio
 
     /// <summary>Gets a value indicating whether the connection has been disposed.</summary>
     public bool IsDisposed { get; private set; }
+
+    /// <summary>Gets the length of the buffer each read was given, in order.</summary>
+    public IReadOnlyList<int> ReadBufferLengths => readBufferLengths;
 
     /// <summary>Gets every byte written so far, in order.</summary>
     public byte[] Sent
@@ -44,15 +53,24 @@ public sealed class ScriptedConnection(params ScriptedRead[] reads) : IConnectio
     /// <inheritdoc />
     public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
+        readBufferLengths.Add(buffer.Length);
         if (nextRead == reads.Length)
         {
             return 0;
         }
 
-        ScriptedRead read = reads[nextRead++];
+        ScriptedRead read = reads[nextRead];
         await WaitUntilSentAsync(read.AfterBytesSent).ConfigureAwait(false);
-        read.Bytes.CopyTo(buffer);
-        return read.Bytes.Length;
+        int count = Math.Min(buffer.Length, read.Bytes.Length - readOffset);
+        read.Bytes.AsMemory(readOffset, count).CopyTo(buffer);
+        readOffset += count;
+        if (readOffset == read.Bytes.Length)
+        {
+            nextRead++;
+            readOffset = 0;
+        }
+
+        return count;
     }
 
     /// <inheritdoc />

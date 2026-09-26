@@ -50,8 +50,14 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
     /// <summary>The port a <c>telnet</c> URL without one connects to.</summary>
     private const int DefaultPort = 23;
 
-    /// <summary>The most bytes read from the server or the upload at once.</summary>
+    /// <summary>The most bytes read from the upload at once.</summary>
     private const int BufferSize = 16384;
+
+    /// <summary>
+    /// The most bytes read from the server at once: curl 8.21.0's telnet reads the socket
+    /// at most 4096 bytes at a time, so no single output write is ever larger.
+    /// </summary>
+    private const int ReceiveBufferSize = 4096;
 
     private const string BadFunctionArgumentMessage = "A libcurl function was given a bad argument";
 
@@ -154,7 +160,7 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
     {
         CancellationToken cancellationToken = context.CancellationToken;
         var receiver = new TelnetReceiver(optionValues);
-        var buffer = new byte[BufferSize];
+        var buffer = new byte[ReceiveBufferSize];
         var data = new List<byte>();
         var replies = new List<byte>();
         long bytesWritten = 0;
@@ -177,9 +183,9 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
             data.Clear();
             replies.Clear();
             TelnetReceiveError error = receiver.Receive(buffer.AsSpan(0, count), data, replies);
-            if (!await TryWriteOutputAsync(context.Output, data, cancellationToken).ConfigureAwait(false))
+            if (await WriteOutputAsync(context.Output, data, cancellationToken).ConfigureAwait(false) is { } accepted)
             {
-                return WriteFailure(data.Count, bytesWritten);
+                return WriteFailure(data.Count, accepted, bytesWritten);
             }
 
             bytesWritten += data.Count;
@@ -216,36 +222,45 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
         }
     }
 
-    /// <summary>Writes received data to the output, reporting whether the output took it.</summary>
-    private static async Task<bool> TryWriteOutputAsync(
+    /// <summary>
+    /// Writes received data to the output, returning <see langword="null" /> when the output
+    /// took it, or how many bytes of the write it accepted when it failed: the
+    /// <see cref="OutputWriteFailedException.BytesAccepted" /> of one, and 0 for any other
+    /// <see cref="IOException" />.
+    /// </summary>
+    private static async Task<int?> WriteOutputAsync(
         Stream output,
         List<byte> data,
         CancellationToken cancellationToken)
     {
         if (data.Count == 0)
         {
-            return true;
+            return null;
         }
 
         try
         {
             await output.WriteAsync(data.ToArray(), cancellationToken).ConfigureAwait(false);
-            return true;
+            return null;
+        }
+        catch (OutputWriteFailedException failure)
+        {
+            return failure.BytesAccepted;
         }
         catch (IOException)
         {
-            return false;
+            return 0;
         }
     }
 
     private static TransferResult SendFailure(long bytesWritten) =>
         new(CurlExitCode.SendError, bytesWritten, SendFailureMessage);
 
-    private static TransferResult WriteFailure(int passed, long bytesWritten) =>
+    private static TransferResult WriteFailure(int passed, int accepted, long bytesWritten) =>
         new(
             CurlExitCode.WriteError,
             bytesWritten,
-            string.Create(CultureInfo.InvariantCulture, $"Failure writing output to destination, passed {passed} returned 0"));
+            string.Create(CultureInfo.InvariantCulture, $"Failure writing output to destination, passed {passed} returned {accepted}"));
 
     private static TransferResult ToFailure(TelnetReceiveError error, long bytesWritten) =>
         error switch
