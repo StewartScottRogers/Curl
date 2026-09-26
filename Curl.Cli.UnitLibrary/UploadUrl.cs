@@ -82,8 +82,14 @@ public static class UploadUrl
     /// Offsets splitting a URL into scheme and authority, path, query and fragment.
     /// Each part runs from its start to the next part's start.
     /// </summary>
-    private readonly record struct UrlParts(int PathStart, int QueryStart, int FragmentStart)
+    private readonly struct UrlParts(int pathStart, int queryStart, int fragmentStart)
     {
+        public int PathStart { get; } = pathStart;
+
+        public int QueryStart { get; } = queryStart;
+
+        public int FragmentStart { get; } = fragmentStart;
+
         public static UrlParts Split(string url)
         {
             int fragmentStart = StartOrEnd(url.IndexOf('#', StringComparison.Ordinal), url.Length);
