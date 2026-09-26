@@ -68,3 +68,4 @@ leave it unchanged and file a follow-up task with the measured output.
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
