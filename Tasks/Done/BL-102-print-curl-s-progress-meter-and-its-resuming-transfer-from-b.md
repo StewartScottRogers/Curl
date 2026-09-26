@@ -8,7 +8,7 @@ depends-on: [BL-095, BL-119]
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-102 — Print curl's progress meter and its '** Resuming transfer from byte position N' line in Curl.Console
 
@@ -31,10 +31,10 @@ Curl.Console prints neither today. `Curl.Cli.UnitLibrary` has `CommandLineOption
 ## Acceptance criteria
 
 - [x] Before any code is written, the exact stderr bytes of curl 8.21.0's meter for a ten-byte `file://` download (with and without `-C 5`) are recorded under Notes in this file, with the command that produced them.
-- [ ] A test in `Curl.Console.UnitTests` pins that `-C 5` writes `** Resuming transfer from byte position 5` to stderr, before the meter.
-- [ ] Tests in `Curl.Console.UnitTests` pin that neither the resuming line nor the meter appears under `-s` and under `--no-progress-meter`.
-- [ ] A test pins the meter's header lines as recorded in Notes.
-- [ ] `dotnet build Curl.Console -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green; no new test needs `TestCategory=Integration`.
+- [x] A test in `Curl.Console.UnitTests` pins that `-C 5` writes `** Resuming transfer from byte position 5` to stderr, before the meter.
+- [x] Tests in `Curl.Console.UnitTests` pin that neither the resuming line nor the meter appears under `-s` and under `--no-progress-meter`.
+- [x] A test pins the meter's header lines as recorded in Notes.
+- [x] `dotnet build Curl.Console -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green; no new test needs `TestCategory=Integration`.
 
 ## Notes
 
@@ -59,6 +59,14 @@ Curl.Console prints neither today. `Curl.Cli.UnitLibrary` has `CommandLineOption
 ` is for whoever implements, following how Curl.Console already writes its other stderr lines.
   - Note the file:// status line reports zeros throughout, even though ten bytes were transferred.
 - 2026-09-26, lane 3: blocked on the parser. `Curl.Cli.UnitLibrary` still has no `progress` option (grep), so `--no-progress-meter` exits 2 as unknown and the third criterion cannot be tested from Curl.Console. As the Context instructs, filed BL-119 (touches `Curl.Cli.UnitLibrary`, `Curl.Cli.UnitTests`) and added it to `depends-on`; no code was written here.
+- 2026-09-26, lane 3 (delivery): `Curl.Console/ProgressMeterLines.cs` holds the recorded lines; `CurlCommandRunner` writes them through its existing stderr line writer (so `Environment.NewLine`, which on Windows gives the `\r\n` curl's mingw build writes) after each transfer. Tests: `CurlCommandRunnerProgressMeterTests` (16), plus `CurlCompositionTests.CreateRunner_FileUrlToStandardOutputThatIsNotATerminal_WritesTheProgressMeter`. The built `curl` was compared with `cmp` against curl 8.21.0 for `-C 5 file://…ten.bin -o m2` and `file://…ten.bin > o`: stderr and output byte-identical.
+- Choices taken as defaults, and why:
+  - The meter is written after the transfer, not during it. It goes to stderr and the body does not, so each stream's bytes are unchanged; nothing timing-dependent is involved, so no `TimeProvider` is needed yet.
+  - The meter follows only a successful transfer. Measured: curl writes it when the transfer got past connect/open (`-C 5` against an HTTP server without ranges prints the meter, then `curl: (33) …`) but not before (a missing `file://` source prints only `curl: (37) …`). The console cannot tell those apart until handlers report that a transfer started: BL-128/BL-130.
+  - Only the zero status line is written. For network transfers curl rewrites it in place with live counters (measured against a local `python -m http.server`); that needs handler progress reporting: BL-131.
+  - Under `-#` nothing is written rather than the wrong form: BL-132.
+  - With no `-o` and standard output a terminal, the meter is hidden, as curl hides it; `Program` passes `!Console.IsOutputRedirected`. The runner writes the meter only when constructed with `writesProgressMeter: true` (the production composition), so the existing runner tests keep asserting stderr without it.
+- Follow-ups filed by task-planner: BL-127 (ADR for a progress sink), BL-128 (sink in Abstractions), BL-129 (file:// reports "started"), BL-130 (meter after a failure past connect), BL-131 (live counters), BL-132 (`-#` bar).
 
 ## Log
 
@@ -70,3 +78,4 @@ Curl.Console prints neither today. `Curl.Cli.UnitLibrary` has `CommandLineOption
 - 2026-09-26: Doing -> Blocked. Waits on BL-119: Curl.Cli does not parse --no-progress-meter or -#/--progress-bar yet; move back to Backlog when BL-119 is Done
 - 2026-09-26: Blocked -> Backlog. Unblocked: BL-119 now Done
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. Curl.Console writes curl 8.21.0's progress meter opening and its '** Resuming transfer from byte position N' line to stderr, byte-identical for file://, and hides both under -s and --no-progress-meter
