@@ -44,3 +44,4 @@ An Accepted ADR fixes the public surface of `HttpRequestOptions`, `HttpRequestBo
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
