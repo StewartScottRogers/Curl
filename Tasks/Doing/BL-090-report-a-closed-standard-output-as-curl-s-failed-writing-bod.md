@@ -43,3 +43,4 @@ is not protocol-specific. Start at `Curl.Console/CurlCommandRunner.cs` and the
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
