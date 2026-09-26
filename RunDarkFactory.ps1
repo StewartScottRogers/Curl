@@ -24,10 +24,10 @@
     Speech is Windows' built-in System.Speech. The key press restores volume and mute.
 
 .EXAMPLE
-    powershell -NoProfile -ExecutionPolicy Bypass -File DarkFactory.ps1
-    powershell -NoProfile -ExecutionPolicy Bypass -File DarkFactory.ps1 -Hours 4 -MaxTasks 3
-    powershell -NoProfile -ExecutionPolicy Bypass -File DarkFactory.ps1 -TestAlarm
-    powershell -NoProfile -ExecutionPolicy Bypass -File DarkFactory.ps1 -TestAlarm -AlarmScale 0.1
+    powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1
+    powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -Hours 4 -MaxTasks 3
+    powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestAlarm
+    powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestAlarm -AlarmScale 0.1
 #>
 [CmdletBinding()]
 param(

@@ -25,7 +25,7 @@
     <File Path="RunClaude.cmd" />
     <File Path="hrdrClaudeNative.cmd" />
     <File Path="Measure-CodeQuality.ps1" />
-    <File Path="DarkFactory.ps1" />
+    <File Path="RunDarkFactory.ps1" />
     <File Path="RunDarkFactory.cmd" />
     <File Path=".github/gource/make-log.py" />
     <File Path=".github/gource/render.sh" />
