@@ -38,3 +38,4 @@ The Http library reads a response body framed by Content-Length or by connection
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
