@@ -102,3 +102,4 @@ it through handlers registered by an explicit, hand-written composition root.
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
