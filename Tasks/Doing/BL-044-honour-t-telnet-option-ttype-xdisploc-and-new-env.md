@@ -70,3 +70,4 @@ Exit codes: <https://curl.se/libcurl/c/libcurl-errors.html>.
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
