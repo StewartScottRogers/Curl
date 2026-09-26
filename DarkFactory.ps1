@@ -216,6 +216,16 @@ FACTORY: BLOCKED {ID} <the blocker>
 
 $script:ToolLabels = @{}
 
+# Commands only Stewart may authorize (CLAUDE.md). --dangerously-skip-permissions does
+# not enforce "ask" rules, so each run gets these as a hard --disallowedTools deny.
+$Forbidden = @(
+    'git push --force', 'git push -f', 'git push --force-with-lease',
+    'git push origin master', 'git push origin HEAD:master', 'git merge',
+    'git tag', 'git branch -D', 'git branch -d', 'git reset --hard',
+    'dotnet add package', 'dotnet remove package',
+    'gh pr merge', 'gh release', 'gh repo'
+)
+
 function Get-ToolLabel {
     param($Tool)
     $in = $Tool.input
@@ -306,7 +316,8 @@ function Invoke-TaskRun {
 
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = $env:ComSpec
-    $psi.Arguments = "/d /c claude -p --model $Model --dangerously-skip-permissions --output-format stream-json --verbose 2>`"$err`""
+    $denied = ($Forbidden | ForEach-Object { "`"Bash($_`:*)`" `"PowerShell($_`:*)`"" }) -join ' '
+    $psi.Arguments = "/d /c claude -p --model $Model --dangerously-skip-permissions --output-format stream-json --verbose --disallowedTools $denied 2>`"$err`""
     $psi.WorkingDirectory = $Root
     $psi.UseShellExecute = $false
     $psi.RedirectStandardInput = $true
