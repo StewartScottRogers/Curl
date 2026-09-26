@@ -66,3 +66,4 @@ apart from every protocol task, as the task-board skill intends.
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
