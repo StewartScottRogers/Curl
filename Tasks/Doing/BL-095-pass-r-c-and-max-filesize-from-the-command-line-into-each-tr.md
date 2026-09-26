@@ -50,3 +50,4 @@ reach standard error. Measured behaviour is in BL-013's Notes and in
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
