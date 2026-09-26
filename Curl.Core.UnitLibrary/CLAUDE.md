@@ -32,3 +32,8 @@ rewriting POST to GET and dropping credentials to another host, port or scheme a
 effective URL, summed header/request/connection counts, timings from the first hop with
 `RedirectDuration`). Without `-L` it returns the dispatcher's result unchanged. It is not
 yet wired into `Curl.Console`.
+
+`UrlSchemeGuesser` gives a URL typed without a scheme the one curl 8.21.0 guesses: the
+scheme its host prefix implies (`ftp.`, `dict.`, `ldap.`, `imap.`, `smtp.`, `pop3.`, any
+case), otherwise `http`. It only prepends `<scheme>://`; rejecting a malformed URL is left
+to the URL parser. It is not yet wired into `Curl.Console`.
