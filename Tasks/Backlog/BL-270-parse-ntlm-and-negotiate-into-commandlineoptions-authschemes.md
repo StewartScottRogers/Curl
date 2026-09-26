@@ -1,5 +1,5 @@
 ---
-id: BL-264
+id: BL-270
 title: Parse --ntlm and --negotiate into CommandLineOptions.AuthSchemes
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-264 — Parse --ntlm and --negotiate into CommandLineOptions.AuthSchemes
+# BL-270 — Parse --ntlm and --negotiate into CommandLineOptions.AuthSchemes
 
 ## Goal
 

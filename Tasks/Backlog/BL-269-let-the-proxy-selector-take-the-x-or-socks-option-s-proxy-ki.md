@@ -1,5 +1,5 @@
 ---
-id: BL-263
+id: BL-269
 title: Let the proxy selector take the -x or --socks option's proxy kind and read socks:// as SOCKS4
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-263 — Let the proxy selector take the -x or --socks option's proxy kind and read socks:// as SOCKS4
+# BL-269 — Let the proxy selector take the -x or --socks option's proxy kind and read socks:// as SOCKS4
 
 ## Goal
 
