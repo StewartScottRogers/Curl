@@ -8,7 +8,7 @@ depends-on: [BL-090]
 touches: [Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-114 — Carry the accepted byte count of a failed output write in an IOException subtype
 
@@ -68,31 +68,45 @@ before this write is added:
 
 ## Acceptance criteria
 
-- [ ] `Curl.Protocol.Abstractions.UnitLibrary/OutputWriteFailedException.cs` declares a
+- [x] `Curl.Protocol.Abstractions.UnitLibrary/OutputWriteFailedException.cs` declares a
       public sealed `OutputWriteFailedException : IOException` with a public `int
       BytesAccepted` (read-only, set by a constructor taking the count and a message;
       a negative count throws `ArgumentOutOfRangeException`), and XML doc comments that
       state what `BytesAccepted` means.
-- [ ] `Curl.Protocol.Abstractions.UnitTests` has tests pinning the constructor, the
+- [x] `Curl.Protocol.Abstractions.UnitTests` has tests pinning the constructor, the
       property, the negative-count guard, and that the type is an `IOException`.
-- [ ] `StandardOutputFailureDeferringStream` throws `OutputWriteFailedException` instead of
+- [x] `StandardOutputFailureDeferringStream` throws `OutputWriteFailedException` instead of
       a plain `IOException`, with `BytesAccepted` per the rules in Context; its remarks and
       `<exception>` docs say so.
-- [ ] `Curl.Console.UnitTests` has tests (with a fake inner stream that throws
+- [x] `Curl.Console.UnitTests` has tests (with a fake inner stream that throws
       `IOException`) showing: 41 writes of 100 bytes after the failing first write gives
       `BytesAccepted` 96 on write 41; 300-byte writes give 196 on write 14; 1000-byte
       writes give 96 on write 5; 30-byte writes give 16 on write 137; a single 4096-byte
       failing write gives 0; a single 16384-byte failing write gives 0; a write after the
       throwing one gives 0. Both `Write` and `WriteAsync` are covered.
-- [ ] The existing `Curl.Console.UnitTests` for BL-090's `curl: Failed writing body` and
+- [x] The existing `Curl.Console.UnitTests` for BL-090's `curl: Failed writing body` and
       `passed N returned 0` cases still pass unchanged.
-- [ ] `dotnet build Curl.Protocol.Abstractions.UnitLibrary -warnaserror` and
+- [x] `dotnet build Curl.Protocol.Abstractions.UnitLibrary -warnaserror` and
       `dotnet build Curl.Console -warnaserror` are clean, and
       `dotnet test --filter "TestCategory!=Integration"` is green.
 
 ## Notes
 
+- Delivered in-session rather than through every `/feature` stage: the task file already
+  specifies the type, the rule and the test cases, and the change is one small class plus
+  one method, so a separate architect plan would restate it.
+- Rule as implemented in `AbsorbIntoStdioBuffer`: with `before` the bytes offered since
+  the failure ahead of this write, `BytesAccepted = before == 0 ? 0 : max(0, 4096 - before)`.
+  Choice: a zero-length write absorbed before an overflowing one leaves `before` at 0, so
+  that write reports 0 - nothing was buffered, which matches the "nothing absorbed" rule.
+- The existing `StandardOutputFailureDeferringStreamTests` asserted
+  `ThrowsExactly<IOException>`; `ThrowsExactly` rejects a subtype, so those three asserts
+  now name `OutputWriteFailedException`. The BL-090 `CurlCommandRunnerTests` cases are
+  unchanged and pass.
+- Tests: Abstractions 71 (6 new rows), Console 202 (14 new rows), fast suite green.
+
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. Standard output write failures throw OutputWriteFailedException with curl's BytesAccepted (96, 196, 16, 0)
