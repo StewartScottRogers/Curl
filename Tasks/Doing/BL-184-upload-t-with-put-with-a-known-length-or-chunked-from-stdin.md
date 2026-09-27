@@ -36,3 +36,4 @@ An upload source on `ITransferContext.Upload` is sent as PUT with Content-Length
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-27: Backlog -> Doing.
