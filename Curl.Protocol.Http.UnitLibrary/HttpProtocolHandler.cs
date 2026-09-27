@@ -344,6 +344,12 @@ public sealed class HttpProtocolHandler(
         IConnection connection,
         TransferReport? earlier)
     {
+        if (HttpTimeConditionLimit.Refuses(plan.Context.TimeCondition, OperatingSystem.IsWindows()))
+        {
+            connection.MarkReusable();
+            return TimeValueRefused(plan, connect);
+        }
+
         HttpAttemptOutcome outcome = await ExchangeAsync(plan, connect, connection, earlier, newConnection: !connect.IsReused).ConfigureAwait(false);
         while (outcome.Retry is { } retry && outcome.KeepsAlive)
         {
@@ -360,6 +366,23 @@ public sealed class HttpProtocolHandler(
         }
 
         return outcome;
+    }
+
+    /// <summary>
+    /// Fails a request whose <c>-z</c> time curl 8.21.0 on Windows cannot write into its header
+    /// (<see cref="HttpTimeConditionLimit" />): exit 43 before any byte is sent, the connection
+    /// left intact, as measured (BL-381 Notes).
+    /// </summary>
+    private static HttpAttemptOutcome TimeValueRefused(HttpRequestPlan plan, ConnectResult connect)
+    {
+        TransferReport report = new()
+        {
+            UsedProxy = plan.Options.ForwardProxy is not null,
+            LocalEndPoint = connect.LocalEndPoint,
+            Timings = new TransferTimings(plan.Started, connect.Timings, null, null, null, plan.Context.TimeProvider.GetTimestamp()),
+        };
+        TransferResult refused = TransferResult.Failure(CurlExitCode.BadFunctionArgument, HttpTimeConditionLimit.InvalidTimeValue) with { Report = report };
+        return new HttpAttemptOutcome(refused, null, KeepsAlive: true);
     }
 
     /// <summary>

@@ -246,6 +246,53 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_TimeConditionOfTheLastTimeWindowsFormats_SendsIt()
+    {
+        const string expected = "GET /f HTTP/1.1\r\nHost: 127.0.0.1:18798\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+            + "If-Modified-Since: Thu, 01 Jan 3001 20:59:59 GMT\r\n\r\n";
+        TransferContext context = new TransferContext
+        {
+            Url = ConditionUrl(18798),
+            Output = new MemoryStream(),
+            TimeCondition = new TimeCondition(HttpTimeConditionLimit.LastWindowsTime, TimeConditionKind.IfModifiedSince),
+        };
+
+        TransferResult result = await Handler(QueueConnector.For(Connection(WholeHead + "hello", 65536, expected))).ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+    }
+
+    [TestMethod]
+    [DataRow(TimeConditionKind.IfModifiedSince, DisplayName = "-z \"1 Jan 099999999\"")]
+    [DataRow(TimeConditionKind.IfUnmodifiedSince, DisplayName = "-z \"-1 Jan 099999999\"")]
+    public async Task ExecuteAsync_TimeConditionAfterTheYear9999_FailsWith43OnWindowsAndSendsTheClampedDateElsewhere(TimeConditionKind kind)
+    {
+        string name = kind == TimeConditionKind.IfModifiedSince ? "If-Modified-Since" : "If-Unmodified-Since";
+        string expected = $"GET /f HTTP/1.1\r\nHost: 127.0.0.1:18799\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n{name}: Fri, 31 Dec 9999 23:59:59 GMT\r\n\r\n";
+        ScriptedConnection connection = Connection(WholeHead + "hello", 65536, OperatingSystem.IsWindows() ? null : expected);
+        TransferContext context = new TransferContext
+        {
+            Url = ConditionUrl(18799),
+            Output = new MemoryStream(),
+            TimeCondition = new TimeCondition(new DateTimeOffset(9999, 12, 31, 23, 59, 59, TimeSpan.Zero), kind),
+        };
+
+        TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(context);
+
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.AreEqual(CurlExitCode.BadFunctionArgument, result.ExitCode);
+            Assert.AreEqual("Invalid TIMEVALUE", result.ErrorMessage);
+            Assert.IsEmpty(connection.Written);
+            Assert.IsTrue(connection.IsMarkedReusable);
+        }
+        else
+        {
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        }
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_TimeConditionOverriddenByHeader_SendsTheHeaderOnly()
     {
         const string expected = "GET /f HTTP/1.1\r\nHost: 127.0.0.1:18833\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nIf-Modified-Since: x\r\n\r\n";
