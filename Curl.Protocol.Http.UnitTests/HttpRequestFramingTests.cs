@@ -69,7 +69,7 @@ public sealed class HttpRequestFramingTests
         Assert.IsTrue(framing.IsChunked);
         Assert.IsTrue(framing.AddsExpect);
         Assert.IsTrue(framing.AwaitsContinue);
-        Assert.IsTrue(framing.WithoutExpect().IsUpload);
+        Assert.IsTrue(framing.WithoutExpect(framing.Body).IsUpload);
     }
 
     [TestMethod]
@@ -228,7 +228,7 @@ public sealed class HttpRequestFramingTests
         HttpRequestFraming framing = HttpRequestFraming.Of(options, [], range: ByteRange.Bounded(first, last));
 
         Assert.AreEqual(expected, framing.ContentRange);
-        Assert.AreEqual(expected, framing.WithoutExpect().ContentRange);
+        Assert.AreEqual(expected, framing.WithoutExpect(framing.Body).ContentRange);
     }
 
     [TestMethod]

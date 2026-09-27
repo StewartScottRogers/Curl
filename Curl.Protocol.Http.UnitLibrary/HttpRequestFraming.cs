@@ -125,9 +125,12 @@ internal sealed class HttpRequestFraming
     /// <c>417 Expectation Failed</c>. An <c>-H</c> <c>Expect</c> line is still sent, but the
     /// body follows the head at once (measured, BL-260 Notes).
     /// </summary>
+    /// <param name="body">
+    /// The body to resend: <see cref="Body" />, or the stream it rewinds to (BL-319 Notes).
+    /// </param>
     /// <returns>The framing of the resent request.</returns>
-    internal HttpRequestFraming WithoutExpect() =>
-        new(Method, Body, KnownLength, IsChunked, addsExpect: false, awaitsContinue: false, RefusesUnknownLength, Upload, ContentRange);
+    internal HttpRequestFraming WithoutExpect(HttpRequestBody? body) =>
+        new(Method, body, KnownLength, IsChunked, addsExpect: false, awaitsContinue: false, RefusesUnknownLength, Upload, ContentRange);
 
     /// <summary>
     /// Decides the framing for a request with <paramref name="options" />.

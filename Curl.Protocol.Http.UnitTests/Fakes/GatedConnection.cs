@@ -50,6 +50,13 @@ public sealed class GatedConnection : IConnection
         }
     }
 
+    /// <summary>
+    /// Gets a value indicating whether a write started once the response can be read waits
+    /// until it is cancelled, writing nothing, as a server that answered early and stopped
+    /// reading leaves the sender stuck on a full window.
+    /// </summary>
+    public bool StallsWritesOnceReleased { get; init; }
+
     /// <inheritdoc />
     public bool IsSecure => false;
 
@@ -105,6 +112,11 @@ public sealed class GatedConnection : IConnection
     public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (StallsWritesOnceReleased && released.Task.IsCompleted)
+        {
+            return new ValueTask(Task.Delay(Timeout.Infinite, cancellationToken));
+        }
+
         lock (gate)
         {
             written.Write(buffer.Span);

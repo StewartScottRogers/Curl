@@ -95,6 +95,11 @@ namespace Curl.Protocol.Http;
 /// same connection without curl's own <c>Expect</c> line and without the wait: the 417's head
 /// and trailers are written, its body is read and discarded, and the resend's response is the
 /// result; an <c>-H</c> <c>Expect</c> line is sent again. Measured on curl 8.21.0 (BL-260 Notes).
+/// A 417 that arrives once the wait ran out, while the body is being sent, stops the sending
+/// at the piece under way, and is answered the same way but on a new connection, with the body
+/// sent from its start; a stream that cannot seek goes on from the first byte not sent. Under
+/// <c>-f</c>, or when the 417 closes the connection, sending stops just the same and the 417
+/// is the result. Measured on curl 8.21.0 (BL-319 Notes).
 /// </para>
 /// <para>
 /// With a cookie store, every request, an authentication retry included, asks it afresh for
@@ -340,13 +345,15 @@ public sealed class HttpProtocolHandler(
             HttpRangeHeader.ValueFor(context, framing.Body is not null),
             context.TimeCondition,
             framing);
+        HttpFirstByteTimingConnection timedConnection = new(connection, context.TimeProvider);
+        IConnection responseConnection = framing.AwaitsContinue ? new HttpContinueWaitConnection(timedConnection) : timedConnection;
         HttpRequestBodyWriter upload = new(connection)
         {
             SharedHeadLength = framing.AwaitsContinue ? 0 : request.Length,
             IsUpload = framing.IsUpload,
             Progress = plan.Progress,
+            ExpectationWatch = responseConnection as HttpContinueWaitConnection,
         };
-        HttpFirstByteTimingConnection timedConnection = new(connection, context.TimeProvider);
         HttpExchange exchange = new(connect, connection, framing.Method, request.Length, upload, earlier, newConnection)
         {
             UsedProxy = options.ForwardProxy is not null,
@@ -354,7 +361,6 @@ public sealed class HttpProtocolHandler(
             TimeProvider = context.TimeProvider,
             ResponseConnection = timedConnection,
         };
-        IConnection responseConnection = framing.AwaitsContinue ? new HttpContinueWaitConnection(timedConnection) : timedConnection;
         HttpResponseBodyReader body = new(responseConnection)
         {
             PassesTransferCoding = options.Raw,
@@ -375,7 +381,7 @@ public sealed class HttpProtocolHandler(
             exchange.RedirectUrl = HttpRedirectLocation.Find(context.Url, exchange.Head);
             StoreCookies(context, exchange.Head);
             await WriteHeadersAsync(context.HeaderOutput, exchange.Head.HeadBytes, cancellationToken).ConfigureAwait(false);
-            retry = RetryOf(plan, exchange.Head, bodyLeftUnsent);
+            retry = RetryOf(plan, exchange.Head, bodyLeftUnsent, upload);
             HttpFailMode fail = retry is null ? options.Fail : HttpFailMode.None;
             ThrowIfFailing(fail, HttpFailMode.Fail, exchange.Head);
             bool discardsBody = retry is not null || (options.FollowRedirects && exchange.RedirectUrl is not null);
@@ -400,9 +406,17 @@ public sealed class HttpProtocolHandler(
         }
 
         TransferResult result = Succeeded(delivery, exchange.Head!, exchange.Report(body.BytesWritten));
-        bool keepsAlive = HttpConnectionPersistence.KeepsAlive(exchange.Head, context.NoBody, options.Raw, options.IgnoreContentLength, options.TransferEncoding);
-        return new HttpAttemptOutcome(result, retry, keepsAlive);
+        return new HttpAttemptOutcome(result, retry, KeepsAlive(plan, exchange.Head, upload));
     }
+
+    /// <summary>
+    /// Decides whether the connection can carry another request: not after a body a
+    /// <c>417</c> cut short, which curl 8.21.0 shuts the connection on (measured, BL-319
+    /// Notes), and else as <see cref="HttpConnectionPersistence" /> says.
+    /// </summary>
+    private static bool KeepsAlive(HttpRequestPlan plan, HttpResponseHead head, HttpRequestBodyWriter upload) =>
+        !upload.CutShort
+            && HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, plan.Options.Raw, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding);
 
     /// <summary>
     /// Fails a request before any byte of it is sent, as curl 8.21.0 does once connected: a
@@ -504,27 +518,29 @@ public sealed class HttpProtocolHandler(
     /// Decides whether a response is answered with one more request, and which: the same
     /// request with the <c>Authorization</c> value <see cref="RetryAuthorization" /> gives, or
     /// else, for a 417 <see cref="RetriesWithoutExpect" /> accepts, the same request without
-    /// <c>Expect</c>; <see langword="null" /> when the response is the result.
+    /// <c>Expect</c> and with the body <paramref name="upload" /> rewinds; <see langword="null" />
+    /// when the response is the result.
     /// </summary>
-    private HttpRequestPlan? RetryOf(HttpRequestPlan plan, HttpResponseHead head, bool bodyLeftUnsent)
+    private HttpRequestPlan? RetryOf(HttpRequestPlan plan, HttpResponseHead head, bool bodyLeftUnsent, HttpRequestBodyWriter upload)
     {
         if (RetryAuthorization(plan, head) is { } authorization)
         {
             return plan.WithAuthorization(authorization);
         }
 
-        return RetriesWithoutExpect(plan, head, bodyLeftUnsent) ? plan.WithoutExpect() : null;
+        return RetriesWithoutExpect(plan, head, bodyLeftUnsent || upload.CutShort) ? plan.WithoutExpect(upload.Rewound(plan.Framing.Body!)) : null;
     }
 
     /// <summary>
     /// Decides whether <paramref name="head" /> is answered by resending the request without
-    /// <c>Expect</c>, as curl 8.21.0 does (measured, BL-260 Notes): a 417 that arrived while
-    /// the body waited for <c>100 Continue</c> and so was left unsent, on a connection the 417
-    /// leaves open, and not under <c>-f</c>, which fails on the 417 itself. The resent request
-    /// waits for nothing, so it is never resent again.
+    /// <c>Expect</c>, as curl 8.21.0 does (measured, BL-260 and BL-319 Notes): a 417 that
+    /// arrived before the whole body was sent - while it waited for <c>100 Continue</c>, or
+    /// while it was being sent once the wait ran out - on a connection the 417 leaves open, and
+    /// not under <c>-f</c>, which fails on the 417 itself. The resent request waits for
+    /// nothing, so it is never resent again.
     /// </summary>
-    private static bool RetriesWithoutExpect(HttpRequestPlan plan, HttpResponseHead head, bool bodyLeftUnsent) =>
-        bodyLeftUnsent
+    private static bool RetriesWithoutExpect(HttpRequestPlan plan, HttpResponseHead head, bool bodyStopped) =>
+        bodyStopped
             && head.StatusLine.StatusCode == 417
             && plan.Options.Fail != HttpFailMode.Fail
             && HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, plan.Options.Raw, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding);
@@ -841,10 +857,12 @@ public sealed class HttpProtocolHandler(
 
         /// <summary>
         /// Makes the same request without curl's own <c>Expect</c> and without the wait for
-        /// <c>100 Continue</c> (<see cref="HttpRequestFraming.WithoutExpect" />).
+        /// <c>100 Continue</c> (<see cref="HttpRequestFraming.WithoutExpect" />), sending
+        /// <paramref name="body" />.
         /// </summary>
+        /// <param name="body">The body to resend.</param>
         /// <returns>The resent request's plan.</returns>
-        public HttpRequestPlan WithoutExpect() => With(Framing.WithoutExpect(), Authorization);
+        public HttpRequestPlan WithoutExpect(HttpRequestBody body) => With(Framing.WithoutExpect(body), Authorization);
 
         private HttpRequestPlan With(HttpRequestFraming framing, string? authorization) =>
             new(Context, Options, framing, AuthRequest, authorization)

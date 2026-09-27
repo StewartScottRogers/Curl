@@ -17,7 +17,10 @@ namespace Curl.Protocol.Http;
 /// is read in the same pieces curl reads it in (measured, BL-184 Notes). A stream of known
 /// length is read up to that length and no further; if a read fails or the stream ends
 /// first, the transfer ends with exit 26. A stream of unknown length ends at its end or at
-/// its first failed read, as curl's body reader treats both.
+/// its first failed read, as curl's body reader treats both. Under
+/// <see cref="ExpectationWatch" /> every piece, a <see cref="BytesBody" /> cut into the same
+/// buffer-sized pieces, is raced against a <c>417</c>, and sending stops at the first piece the
+/// <c>417</c> beats (<see cref="CutShort" />, measured, BL-319 Notes).
 /// </remarks>
 /// <param name="connection">The connection the request head was written to.</param>
 internal sealed class HttpRequestBodyWriter(IConnection connection)
@@ -66,6 +69,23 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
 
     private long? expectedLength;
 
+    private long? startPosition;
+
+    private ReadOnlyMemory<byte> unsent;
+
+    /// <summary>
+    /// Gets the connection that waited for <c>100 Continue</c> and so watches for a
+    /// <c>417</c> while the body is sent, or <see langword="null" /> when the request waited
+    /// for nothing and the body is sent whole.
+    /// </summary>
+    internal HttpContinueWaitConnection? ExpectationWatch { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether sending stopped before the end of the body because a
+    /// <c>417</c> arrived first.
+    /// </summary>
+    internal bool CutShort { get; private set; }
+
     /// <summary>
     /// Writes <paramref name="body" /> and flushes the connection.
     /// </summary>
@@ -83,14 +103,14 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
         Progress.ReportUploaded(BytesWritten, expectedLength);
         if (body is BytesBody bytes)
         {
-            await WritePieceAsync(bytes.Content, isChunked, cancellationToken).ConfigureAwait(false);
+            await WriteBytesAsync(bytes.Content, isChunked, cancellationToken).ConfigureAwait(false);
         }
         else
         {
             await WriteStreamAsync((StreamBody)body, isChunked, cancellationToken).ConfigureAwait(false);
         }
 
-        if (isChunked)
+        if (isChunked && !CutShort)
         {
             await HttpConnectionSend.WriteAsync(connection, LastChunk, cancellationToken).ConfigureAwait(false);
         }
@@ -98,10 +118,54 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
         await HttpConnectionSend.FlushAsync(connection, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Gives the body a resend of this request sends: the same bytes, or the same stream
+    /// rewound to where this writer began reading it; a stream that cannot seek goes on from
+    /// where it is, after the bytes of a piece a <c>417</c> cut short, as curl 8.21.0 goes on
+    /// reading stdin rather than failing (measured, BL-319 Notes).
+    /// </summary>
+    /// <param name="body">The body this writer was given.</param>
+    /// <returns>The body to resend.</returns>
+    internal HttpRequestBody Rewound(HttpRequestBody body)
+    {
+        if (body is not StreamBody stream)
+        {
+            return body;
+        }
+
+        if (startPosition is { } start)
+        {
+            stream.Content.Position = start;
+            return body;
+        }
+
+        return stream with { Content = new HttpPrefixedStream(unsent, stream.Content) };
+    }
+
+    /// <summary>
+    /// Writes a body of bytes: whole, or under <see cref="ExpectationWatch" /> in the pieces
+    /// curl's upload buffer holds, until they are all sent or one is cut short.
+    /// </summary>
+    private async ValueTask WriteBytesAsync(ReadOnlyMemory<byte> content, bool isChunked, CancellationToken cancellationToken)
+    {
+        if (ExpectationWatch is null)
+        {
+            await WritePieceAsync(content, isChunked, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        while (BytesWritten < content.Length && !CutShort)
+        {
+            int length = (int)Math.Min(NextReadRoom(isChunked), content.Length - BytesWritten);
+            await WritePieceAsync(content.Slice((int)BytesWritten, length), isChunked, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
     private async ValueTask WriteStreamAsync(StreamBody body, bool isChunked, CancellationToken cancellationToken)
     {
+        startPosition = body.Content.CanSeek ? body.Content.Position : null;
         byte[] buffer = new byte[UploadBufferSize];
-        while (true)
+        while (!CutShort)
         {
             int room = NextReadRoom(isChunked);
             long remaining = body.Length is { } length ? length - BytesWritten : room;
@@ -169,10 +233,30 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
             return;
         }
 
+        if (ExpectationWatch is not { } watch)
+        {
+            await WriteFramedAsync(piece, isChunked, cancellationToken).ConfigureAwait(false);
+        }
+        else if (!await watch.SendUnlessExpectationFailedAsync(Framed(piece, isChunked), cancellationToken).ConfigureAwait(false))
+        {
+            CutShort = true;
+            unsent = piece.ToArray();
+            return;
+        }
+
+        BytesWritten += piece.Length;
+        Progress.ReportUploaded(BytesWritten, expectedLength);
+    }
+
+    /// <summary>
+    /// Writes a piece, for a chunked body with its chunk's size line and closing CRLF as
+    /// writes of their own.
+    /// </summary>
+    private async ValueTask WriteFramedAsync(ReadOnlyMemory<byte> piece, bool isChunked, CancellationToken cancellationToken)
+    {
         if (isChunked)
         {
-            byte[] size = Encoding.ASCII.GetBytes(string.Create(CultureInfo.InvariantCulture, $"{piece.Length:x}\r\n"));
-            await HttpConnectionSend.WriteAsync(connection, size, cancellationToken).ConfigureAwait(false);
+            await HttpConnectionSend.WriteAsync(connection, ChunkSizeLine(piece.Length), cancellationToken).ConfigureAwait(false);
         }
 
         await HttpConnectionSend.WriteAsync(connection, piece, cancellationToken).ConfigureAwait(false);
@@ -180,8 +264,15 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
         {
             await HttpConnectionSend.WriteAsync(connection, "\r\n"u8.ToArray(), cancellationToken).ConfigureAwait(false);
         }
-
-        BytesWritten += piece.Length;
-        Progress.ReportUploaded(BytesWritten, expectedLength);
     }
+
+    /// <summary>
+    /// Gives a piece as one write: itself, or for a chunked body the whole chunk, size line
+    /// and closing CRLF included.
+    /// </summary>
+    private static ReadOnlyMemory<byte> Framed(ReadOnlyMemory<byte> piece, bool isChunked) =>
+        isChunked ? (byte[])[.. ChunkSizeLine(piece.Length), .. piece.Span, .. "\r\n"u8] : piece;
+
+    private static byte[] ChunkSizeLine(int length) =>
+        Encoding.ASCII.GetBytes(string.Create(CultureInfo.InvariantCulture, $"{length:x}\r\n"));
 }
