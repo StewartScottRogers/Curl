@@ -80,3 +80,4 @@ Globbing of the `-T` argument is BL-031 and is out of scope here.
 
 - 2026-09-26: Created.
 - 2026-09-26: Depends on BL-292 as well: ADR-0010 accepted `CurlUrl` as the URL representation (BL-010).
+- 2026-09-27: Backlog -> Doing.
