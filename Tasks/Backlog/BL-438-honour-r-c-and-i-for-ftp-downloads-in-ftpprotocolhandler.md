@@ -1,5 +1,5 @@
 ---
-id: BL-432
+id: BL-438
 title: Honour -r, -C and -I for ftp:// downloads in FtpProtocolHandler
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-432 — Honour -r, -C and -I for ftp:// downloads in FtpProtocolHandler
+# BL-438 — Honour -r, -C and -I for ftp:// downloads in FtpProtocolHandler
 
 ## Goal
 

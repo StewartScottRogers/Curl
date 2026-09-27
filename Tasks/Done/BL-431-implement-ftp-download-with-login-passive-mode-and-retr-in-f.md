@@ -54,7 +54,7 @@ completed: 2026-09-27
 - Not measured, nearest rule followed: a failed data connect returns the connector's
   result without `QUIT`; a failed data read is exit 56.
 - The handler is not registered in `Curl.Console` and still ignores `-r`, `-C`, `-T` and
-  `-I`; follow-ups filed: BL-432 (-r, -C, -I), BL-433 (-T upload), BL-434 (register in
+  `-I`; follow-ups filed: BL-438 (-r, -C, -I), BL-439 (-T upload), BL-434 (register in
   Curl.Console), BL-435 and BL-436 (FTP control options), BL-437 (active mode, ftps).
 
 ## Log

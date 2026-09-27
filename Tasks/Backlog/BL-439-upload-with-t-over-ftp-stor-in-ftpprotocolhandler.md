@@ -1,5 +1,5 @@
 ---
-id: BL-433
+id: BL-439
 title: Upload with -T over ftp:// (STOR) in FtpProtocolHandler
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-433 — Upload with -T over ftp:// (STOR) in FtpProtocolHandler
+# BL-439 — Upload with -T over ftp:// (STOR) in FtpProtocolHandler
 
 ## Goal
 

@@ -4,7 +4,7 @@ title: Register FtpProtocolHandler for non-proxied ftp:// in Curl.Console
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-431, BL-432, BL-433]
+depends-on: [BL-431, BL-438, BL-439]
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-27
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-- BL-431 added `FtpProtocolHandler(IConnector connector)` in `Curl.Protocol.Ftp.UnitLibrary`; ADR-0093 (`Documentation/Planning/Decisions/ADR-0093-ftp-downloads-hold-curls-measured-conversation-in-passive-mode-only.md`) records its conversation and says, under Consequences, that it is registered in `Curl.Console` by a separate task once it honours `Range`, `ResumeFrom`, `Upload` and `NoBody`. BL-432 (`-r`, `-C`, `-I`) and BL-433 (`-T`) do that, so this task depends on both.
+- BL-431 added `FtpProtocolHandler(IConnector connector)` in `Curl.Protocol.Ftp.UnitLibrary`; ADR-0093 (`Documentation/Planning/Decisions/ADR-0093-ftp-downloads-hold-curls-measured-conversation-in-passive-mode-only.md`) records its conversation and says, under Consequences, that it is registered in `Curl.Console` by a separate task once it honours `Range`, `ResumeFrom`, `Upload` and `NoBody`. BL-438 (`-r`, `-C`, `-I`) and BL-439 (`-T`) do that, so this task depends on both.
 - Today `Curl.Console/CurlComposition.cs` (`CreateProtocolHandlers`, around line 58) registers `new ForwardedFtpProtocolHandler(http)` as the only `ftp` handler. `Curl.Console/ForwardedFtpProtocolHandler.cs` hands a transfer to the HTTP handler when `context.Http` has a `ForwardProxy` of kind `ProxyKind.Http` or `ProxyKind.Http10` with `ProxyTunnel: false`, and otherwise fails with exit 1 (`CurlExitCode.UnsupportedProtocol`) and `Protocol "ftp" not supported`.
 - Two handlers cannot both claim `ftp` in `SupportedSchemes`, so the simplest wiring is to give `ForwardedFtpProtocolHandler` the `FtpProtocolHandler` as the handler for every transfer it does not forward (replacing the exit-1 branch), constructed with the same `connector` the other TCP handlers get. Update its XML doc comment and name if its behaviour no longer matches "forwarded" (root `CLAUDE.md`, "Say what it does, do what it says").
 - `Curl.Console.csproj` already references `Curl.Protocol.Ftp.UnitLibrary`.
