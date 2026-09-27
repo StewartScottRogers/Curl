@@ -1,0 +1,93 @@
+using System.Globalization;
+
+namespace Curl.Protocol.Ftp;
+
+/// <summary>
+/// Every failure message the <c>ftp</c> scheme reports, as curl 8.21.0 words it, each
+/// measured against a loopback server with <c>Record-CurlExchange.ps1 -Ftp</c> (BL-431).
+/// </summary>
+internal static class FtpTransferMessages
+{
+    /// <summary>The exit 56 message for a control connection closed or failed mid-reply.</summary>
+    internal const string ResponseReadingFailed = "response reading failed (errno: 0)";
+
+    /// <summary>
+    /// The exit 100 message for a reply line of 65536 bytes or more: curl's text for the
+    /// code, printed with no <c>failf</c> of its own.
+    /// </summary>
+    internal const string ReplyLineTooLarge = "A value or data field grew larger than allowed";
+
+    /// <summary>The exit 28 message for a <c>421</c> reply before the data transfer.</summary>
+    internal const string TimeoutReached = "Timeout was reached";
+
+    /// <summary>The exit 28 message for a <c>421</c> reply that ends the data transfer.</summary>
+    internal const string ControlConnectionLooksDead = "control connection looks dead";
+
+    /// <summary>The exit 55 message for a command that could not be sent.</summary>
+    internal const string SendFailed = "Failure when sending data to the peer";
+
+    /// <summary>The exit 56 message for a data connection that failed mid-transfer.</summary>
+    internal const string ReceiveFailed = "Failure when receiving data from the peer";
+
+    /// <summary>The exit 3 message for a path that decodes to a control character.</summary>
+    internal const string PathHasControlCharacters = "path contains control characters";
+
+    /// <summary>The exit 67 message for a <c>332</c> reply to <c>PASS</c>.</summary>
+    internal const string AccountRequested = "ACCT requested but none available";
+
+    /// <summary>The exit 9 message for a <c>CWD</c> the server refused.</summary>
+    internal const string ChangeDirectoryDenied = "Server denied you to change to the given directory";
+
+    /// <summary>The exit 13 message for a <c>229</c> reply with no port curl can read.</summary>
+    internal const string WeirdEpsvReply = "Weirdly formatted EPSV reply";
+
+    /// <summary>The exit 14 message for a <c>227</c> reply with no port curl can read.</summary>
+    internal const string Weird227Reply = "Could not interpret the 227-response";
+
+    /// <summary>The exit 17 message for a <c>TYPE</c> the server refused.</summary>
+    internal const string CouldNotSetType = "Could not set desired mode";
+
+    /// <summary>The exit 78 message for a <c>550</c> reply to <c>SIZE</c>.</summary>
+    internal const string FileDoesNotExist = "The file does not exist";
+
+    /// <summary>The exit 8 message for a greeting other than <c>220</c>.</summary>
+    /// <param name="code">The greeting's code.</param>
+    /// <returns>The message to report.</returns>
+    internal static string UnexpectedGreeting(int code) =>
+        Format($"Got a {code} ftp-server response when 220 was expected");
+
+    /// <summary>The exit 67 message for a refused <c>USER</c> or <c>PASS</c>.</summary>
+    /// <param name="code">The refusing reply's code.</param>
+    /// <returns>The message to report.</returns>
+    internal static string AccessDenied(int code) => Format($"Access denied: {code}");
+
+    /// <summary>The exit 13 message when neither <c>EPSV</c> nor <c>PASV</c> was accepted.</summary>
+    /// <param name="code">The code of the reply to <c>PASV</c>.</param>
+    /// <returns>The message to report.</returns>
+    internal static string BadPassiveReply(int code) => Format($"Bad PASV/EPSV response: {code}");
+
+    /// <summary>The exit 19 or 78 message for a refused <c>RETR</c> or <c>LIST</c>.</summary>
+    /// <param name="code">The refusing reply's code.</param>
+    /// <returns>The message to report.</returns>
+    internal static string RetrieveRefused(int code) => Format($"RETR response: {code}");
+
+    /// <summary>The exit 18 message for a transfer that ended with a code other than 226 or 250.</summary>
+    /// <param name="code">The code of the reply that ended the transfer.</param>
+    /// <returns>The message to report.</returns>
+    internal static string TransferNotOk(int code) => Format($"server did not report OK, got {code}");
+
+    /// <summary>The exit 18 message for a data connection that closed short of <c>SIZE</c>'s count.</summary>
+    /// <param name="remaining">The bytes still expected.</param>
+    /// <returns>The message to report.</returns>
+    internal static string ClosedWithBytesRemaining(long remaining) =>
+        Format($"transfer closed with {remaining} bytes remaining to read");
+
+    /// <summary>The exit 23 message for an output that stopped accepting bytes.</summary>
+    /// <param name="passed">The number of bytes offered to the output: one read's worth.</param>
+    /// <param name="returned">The number of those bytes the output accepted before it failed.</param>
+    /// <returns>The message to report.</returns>
+    internal static string OutputWriteFailed(int passed, int returned) =>
+        Format($"Failure writing output to destination, passed {passed} returned {returned}");
+
+    private static string Format(FormattableString message) => message.ToString(CultureInfo.InvariantCulture);
+}
