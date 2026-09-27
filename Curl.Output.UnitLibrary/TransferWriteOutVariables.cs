@@ -31,7 +31,7 @@ namespace Curl.Output;
 /// fixed text curl 8.21.0 (Schannel) prints for every transfer this tool can run: a
 /// verify result of <c>0</c>, which Schannel reports even for a failed verification;
 /// <c>0</c> early-data bytes, which Schannel never sends; <c>0</c> retries and an empty
-/// FTP entry path, because no <c>--retry</c> and no FTP handler exist yet. See ADR-0041.
+/// FTP entry path, because no <c>--retry</c> and no FTP handler exist yet. See ADR-0043.
 /// </para>
 /// <para>
 /// A <c>time_*</c> value is the seconds from <see cref="TransferTimings.Started"/> to its

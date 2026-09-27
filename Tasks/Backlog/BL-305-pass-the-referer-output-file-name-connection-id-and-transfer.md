@@ -1,5 +1,5 @@
 ---
-id: BL-301
+id: BL-305
 title: Pass the referer, output file name, connection id and transfer id to TransferWriteOutVariables
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-301 — Pass the referer, output file name, connection id and transfer id to TransferWriteOutVariables
+# BL-305 — Pass the referer, output file name, connection id and transfer id to TransferWriteOutVariables
 
 ## Goal
 
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-- Measured on 2026-09-26 with curl 8.21.0 (mingw, Schannel); commands and bytes are in BL-284's Notes. ADR-0041 records why BL-284 left these unknown.
+- Measured on 2026-09-26 with curl 8.21.0 (mingw, Schannel); commands and bytes are in BL-284's Notes. ADR-0043 records why BL-284 left these unknown.
 - Measured: `-e http://ref.example/x` printed `http://ref.example/x`, no `-e` printed nothing; `-o out.bin` printed `out.bin`, `-O` printed `wo.txt`, stdout printed nothing; `conn_id` and `xfer_id` were `0` for the first transfer and `1` for the second of two URLs to a server that closes each connection; a URL curl rejected (exit 3) printed `conn_id` `-1`.
 - These are known to the command line and the process, not to a handler (ADR-0015, "What the report does not carry"), so they are constructor inputs. `conn_id` and `xfer_id` count per process.
 - BL-235 wires `TransferWriteOutVariables` into `Curl.Console`; this builds on it.

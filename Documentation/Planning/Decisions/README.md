@@ -57,7 +57,7 @@ choices do not need one.
 | [0040](ADR-0040-http-enforces-max-time-and-connect-timeout-in-the-handler.md) | The HTTP handler enforces `-m` and `--connect-timeout` itself on the transfer's clock, and maps failed sends to exit 55 | Accepted | 2026-09-26 |
 | [0041](ADR-0041-multipart-encoder-parts-are-encoded-whole-while-the-body-is-built.md) | Multipart `;encoder=` parts are encoded whole while the body is built: `binary` and `8bit` files still stream, `base64`, `quoted-printable` and `7bit` are read and encoded in memory, and a `7bit` refusal is reported after every other part | Accepted | 2026-09-26 |
 | [0042](ADR-0042-the-sws-emulation-carries-out-timing-commands-on-an-injected-clock-and-leaves-delay-unsupported.md) | The sws emulation carries out `idle`, `stream`, `writedelay`, `connection-monitor`, `upgrade` and `<postcmd>` `wait` on an injected clock, and leaves `delay` unsupported | Accepted | 2026-09-26 |
-| [0043](ADR-0043-w-variables-with-a-fixed-value-print-it-and-those-without-a-source-stay-unknown.md) | `-w` variables with a fixed value print it (`ssl_verify_result`, `proxy_ssl_verify_result`, `tls_earlydata`, `num_retries`, `ftp_entry_path`), `time_queue` is the handler's start, and those without a source stay unknown until BL-300 to BL-303 | Accepted | 2026-09-26 |
+| [0043](ADR-0043-w-variables-with-a-fixed-value-print-it-and-those-without-a-source-stay-unknown.md) | `-w` variables with a fixed value print it (`ssl_verify_result`, `proxy_ssl_verify_result`, `tls_earlydata`, `num_retries`, `ftp_entry_path`), `time_queue` is the handler's start, and those without a source stay unknown until BL-302 to BL-305 | Accepted | 2026-09-26 |
 
 ## Template
 

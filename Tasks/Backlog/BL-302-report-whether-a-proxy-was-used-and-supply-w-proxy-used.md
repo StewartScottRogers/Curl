@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-- Measured on 2026-09-26 with curl 8.21.0 (mingw, Schannel); commands and bytes are in BL-284's Notes. ADR-0041 records why BL-284 left these unknown.
+- Measured on 2026-09-26 with curl 8.21.0 (mingw, Schannel); commands and bytes are in BL-284's Notes. ADR-0043 records why BL-284 left these unknown.
 - Measured: `0` for file:// and a direct http:// transfer. Measure a transfer through a loopback HTTP proxy (`-x`) and a CONNECT tunnel before pinning `1`.
 - The source is the handler, which knows whether it connected to a proxy: record in an ADR a `TransferReport` member (ADR-0015 says a later ADR adds it), set it in the HTTP handler, and print it in `TransferWriteOutVariables`.
 

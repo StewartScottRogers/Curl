@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-- Measured on 2026-09-26 with curl 8.21.0 (mingw, Schannel); commands and bytes are in BL-284's Notes. ADR-0041 records why BL-284 left these unknown.
+- Measured on 2026-09-26 with curl 8.21.0 (mingw, Schannel); commands and bytes are in BL-284's Notes. ADR-0043 records why BL-284 left these unknown.
 - Measured: file:// and http:// print `0` and nothing. `https://example.com/` printed `num_certs` `4` without `--certinfo`, and `certs` began `Subject:CN=example.com`, `Issuer:C=US, O=SSL Corporation, CN=Cloudflare TLS Issuing ECC CA 3`, `Version:2`, `Serial Number:01:ee:...:`, `Signature Algorithm:ecdsa-with-SHA256`, `Start Date:... GMT`, `Expire Date:... GMT`, `Public Key Algorithm:`. Measure against a loopback TLS server with a known certificate before pinning the full text.
 - The chain comes from the TLS handshake (`SslStream.RemoteCertificate` and the chain the validation callback sees); record in an ADR how it reaches `TransferReport`.
 

@@ -45,9 +45,9 @@ variable per run, `curl -s -o out.bin -w "%{<name>}" <url>`, for
   `0.000001` with timings and `0.000000` without.
 - **Leave the rest unknown until their source exists**, rather than print a value that is
   right only sometimes. Each has a task:
-  - `url.<part>`, `urle.<part>`: BL-300, after BL-292's `CurlUrl`, because a part must be
+  - `url.<part>`, `urle.<part>`: BL-304, after BL-292's `CurlUrl`, because a part must be
     split as curl's URL API splits it.
-  - `referer`, `filename_effective`, `conn_id`, `xfer_id`: BL-301, constructor inputs from
+  - `referer`, `filename_effective`, `conn_id`, `xfer_id`: BL-305, constructor inputs from
     `Curl.Console` once BL-235 wires `-w` there.
   - `proxy_used`: BL-302, a `TransferReport` member set by the handler, since proxies are
     parsed and `0` would be wrong through one.

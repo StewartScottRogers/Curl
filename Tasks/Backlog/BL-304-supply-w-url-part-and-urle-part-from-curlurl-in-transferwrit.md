@@ -1,5 +1,5 @@
 ---
-id: BL-300
+id: BL-304
 title: Supply -w url.<part> and urle.<part> from CurlUrl in TransferWriteOutVariables
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-300 — Supply -w url.<part> and urle.<part> from CurlUrl in TransferWriteOutVariables
+# BL-304 — Supply -w url.<part> and urle.<part> from CurlUrl in TransferWriteOutVariables
 
 ## Goal
 
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-- Measured on 2026-09-26 with curl 8.21.0 (mingw, Schannel); commands and bytes are in BL-284's Notes. ADR-0041 records why BL-284 left these unknown.
+- Measured on 2026-09-26 with curl 8.21.0 (mingw, Schannel); commands and bytes are in BL-284's Notes. ADR-0043 records why BL-284 left these unknown.
 - curl's `tool_writeout.c` `urlpart()` parses `per->url` for `url.` and `CURLINFO_EFFECTIVE_URL` for `urle.` with `CURLU_GUESS_SCHEME|CURLU_NON_SUPPORT_SCHEME`, and gets the port with `CURLU_DEFAULT_PORT`; an unknown part name stays an unknown variable.
 - Measured: `file:///Z:/bl284tmp/wo.txt` printed scheme `file`, host empty, port `0`, path `Z:/bl284tmp/wo.txt`; `http://u:p@127.0.0.1:18284/wo.txt?q=1#frag` printed `http|u|p||127.0.0.1|18284|/wo.txt|q=1|frag|` for scheme..zoneid; `127.0.0.1:18284` (no scheme) printed scheme `http`, path `/`.
 - Parse with `CurlUrl` from BL-292, not `System.Uri`.
