@@ -207,6 +207,21 @@ public interface ITransferContext
     TimeSpan? MaxTime { get; }
 
     /// <summary>
+    /// Gets the <see cref="TimeProvider.GetTimestamp" /> value on <see cref="TimeProvider" />
+    /// at which the whole operation began, or <see langword="null" /> when it begins with
+    /// this call.
+    /// </summary>
+    /// <remarks>
+    /// <c>-m</c> limits the whole operation, so a handler honouring <see cref="MaxTime" />
+    /// should count it from here, and print the operation's elapsed time from here, as curl
+    /// counts from its <c>t_startop</c>. The HTTP handler does; the TFTP handler still
+    /// counts <c>-m</c> from its own call. <c>Curl.Core</c>'s redirect
+    /// follower sets it on every hop after the first, so a <c>-L</c> chain shares one
+    /// <c>-m</c> (ADR-0040).
+    /// </remarks>
+    long? OperationStarted { get; }
+
+    /// <summary>
     /// Gets the proxy selected for this transfer, or <see langword="null" /> when the
     /// transfer connects directly.
     /// </summary>

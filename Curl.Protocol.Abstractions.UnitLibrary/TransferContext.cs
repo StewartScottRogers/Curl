@@ -72,6 +72,9 @@ public sealed class TransferContext : ITransferContext
     public TimeSpan? MaxTime { get; init; }
 
     /// <inheritdoc />
+    public long? OperationStarted { get; init; }
+
+    /// <inheritdoc />
     public ProxyEndpoint? Proxy { get; init; }
 
     /// <inheritdoc />

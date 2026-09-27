@@ -35,6 +35,7 @@ public sealed class TransferContextTests
         Assert.AreEqual((UnixFileMode)0b110_100_100, context.CreateFileMode);
         Assert.IsNull(context.ConnectTimeout);
         Assert.IsNull(context.MaxTime);
+        Assert.IsNull(context.OperationStarted);
         Assert.IsNull(context.Proxy);
         Assert.IsNull(context.Http);
         Assert.AreSame(TimeProvider.System, context.TimeProvider);
@@ -80,6 +81,7 @@ public sealed class TransferContextTests
             CreateFileMode = UnixFileMode.UserRead,
             ConnectTimeout = TimeSpan.FromSeconds(3),
             MaxTime = TimeSpan.FromMilliseconds(12500),
+            OperationStarted = 42,
             Proxy = proxy,
             Http = http,
             TimeProvider = timeProvider,
@@ -106,6 +108,7 @@ public sealed class TransferContextTests
         Assert.AreEqual(UnixFileMode.UserRead, context.CreateFileMode);
         Assert.AreEqual(TimeSpan.FromSeconds(3), context.ConnectTimeout);
         Assert.AreEqual(TimeSpan.FromMilliseconds(12500), context.MaxTime);
+        Assert.AreEqual(42L, context.OperationStarted);
         Assert.AreSame(proxy, context.Proxy);
         Assert.AreSame(http, context.Http);
         Assert.AreSame(timeProvider, context.TimeProvider);
