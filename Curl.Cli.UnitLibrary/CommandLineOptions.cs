@@ -643,9 +643,11 @@ public sealed class CommandLineOptions
     /// The HTTP request method <c>-I</c> / <c>--head</c> (<see cref="SelectedHttpMethod.Head"/>),
     /// <c>--no-head</c> (<see cref="SelectedHttpMethod.Get"/>) or <c>-F</c> / <c>--form</c> and
     /// <c>--form-string</c> (<see cref="SelectedHttpMethod.MultipartFormPost"/>) selected first; once one
-    /// is selected, selecting another is refused, as curl 8.21.0 does.
+    /// is selected, selecting another is refused, as curl 8.21.0 does. <see cref="SelectedHttpMethod.None"/>
+    /// when none of them was given. Transfer setup reads it to refuse a <see cref="PostData"/> body
+    /// sent with <c>HEAD</c> or <c>GET</c>.
     /// </summary>
-    internal SelectedHttpMethod HttpMethodSelected { get; set; }
+    public SelectedHttpMethod HttpMethodSelected { get; internal set; }
 
     /// <summary>
     /// <see langword="true"/> when <c>-s</c> / <c>--silent</c> has been read and <c>-S</c> /

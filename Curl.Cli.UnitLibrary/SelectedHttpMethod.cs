@@ -5,7 +5,7 @@ namespace Curl.Cli;
 /// once per command line: selecting a different one is refused. The values are in the order of
 /// curl's own <c>reqname</c> table, which <see cref="CommandLineWarning.OnlyOneRequestMethod"/> indexes.
 /// </summary>
-internal enum SelectedHttpMethod
+public enum SelectedHttpMethod
 {
     /// <summary>No option has selected a method yet.</summary>
     None = 0,
