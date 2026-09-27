@@ -203,6 +203,9 @@ public sealed class TransferWriteOutVariablesTests
 
     [TestMethod]
     [DataRow("nosuch")]
+    [DataRow("url.host")]
+    [DataRow("referer")]
+    [DataRow("num_certs")]
     [DataRow("HTTP_CODE")]
     [DataRow(" http_code")]
     [DataRow("")]
@@ -328,6 +331,54 @@ public sealed class TransferWriteOutVariablesTests
     }
 
     [TestMethod]
+    public void TryGetVariableText_FileTransfer_PrintsTheFixedVariablesAsCurl()
+    {
+        // curl -s -o out.bin -w "%{<name>}" file:///Z:/bl284tmp/wo.txt, one name at a time; see BL-284's Notes.
+        TransferWriteOutVariables variables = new(
+            TransferResult.Success(3), "file:///Z:/bl284tmp/wo.txt", 0, "file:///Z:/bl284tmp/wo.txt", "file", Clock);
+
+        Assert.AreEqual("0|0|0|0|", RenderFixed(variables));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_HttpTransfer_PrintsTheFixedVariablesAsCurl()
+    {
+        // curl -s -o out.bin -w "%{<name>}" "http://u:p@127.0.0.1:18284/wo.txt?q=1#frag", one name at a time.
+        TransferWriteOutVariables variables = WithReport(new TransferReport { ResponseCode = 200, ConnectionCount = 1 });
+
+        Assert.AreEqual("0|0|0|0|", RenderFixed(variables));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_FailedTransfer_PrintsTheFixedVariablesAsCurl()
+    {
+        // curl -s -o out.bin -w "..." https://self-signed.badssl.com/ exited 60 with ssl_verify_result 0 under Schannel.
+        TransferWriteOutVariables variables = new(
+            TransferResult.Failure(CurlExitCode.PeerFailedVerification, "SSL certificate problem"),
+            "https://self-signed.badssl.com/", 0, "https://self-signed.badssl.com/", "https", Clock);
+
+        Assert.AreEqual("0|0|0|0|", RenderFixed(variables));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_TimeQueueWithTimings_PrintsOneMicrosecond()
+    {
+        // curl printed 0.000083 and 0.000038: the queue is left as the transfer starts, which is the handler's start here.
+        TransferReport report = new()
+        {
+            Timings = new TransferTimings(Started: 500, Connect: null, RequestReady: null, RequestSent: null, FirstByteReceived: null, Completed: 900),
+        };
+
+        Assert.AreEqual("0.000001", Get(WithReport(report), "time_queue"));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_TimeQueueWithoutTimings_PrintsZero()
+    {
+        Assert.AreEqual("0.000000", Get(WithReport(new TransferReport()), "time_queue"));
+    }
+
+    [TestMethod]
     public void Constructor_NullArguments_Throw()
     {
         TransferResult result = TransferResult.Success(0);
@@ -363,6 +414,16 @@ public sealed class TransferWriteOutVariablesTests
     private static string RenderAll(TransferWriteOutVariables variables)
     {
         return string.Join('|', MeasuredVariableOrder.Select(name => Get(variables, name)));
+    }
+
+    private static readonly string[] FixedVariableOrder =
+    [
+        "ssl_verify_result", "proxy_ssl_verify_result", "tls_earlydata", "num_retries", "ftp_entry_path",
+    ];
+
+    private static string RenderFixed(TransferWriteOutVariables variables)
+    {
+        return string.Join('|', FixedVariableOrder.Select(name => Get(variables, name)));
     }
 
     private static string RenderTimesAndSpeeds(TransferWriteOutVariables variables)

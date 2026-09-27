@@ -20,8 +20,18 @@ namespace Curl.Output;
 /// <c>exitcode</c>, <c>errormsg</c>, <c>url</c>, <c>urlnum</c>, <c>scheme</c>,
 /// <c>time_namelookup</c>, <c>time_connect</c>, <c>time_appconnect</c>,
 /// <c>time_pretransfer</c>, <c>time_posttransfer</c>, <c>time_starttransfer</c>,
-/// <c>time_redirect</c>, <c>time_total</c>, <c>speed_download</c> and
-/// <c>speed_upload</c>. Any other name is reported unknown.
+/// <c>time_redirect</c>, <c>time_total</c>, <c>time_queue</c>, <c>speed_download</c>,
+/// <c>speed_upload</c>, <c>ssl_verify_result</c>, <c>proxy_ssl_verify_result</c>,
+/// <c>tls_earlydata</c>, <c>num_retries</c> and <c>ftp_entry_path</c>. Any other name is
+/// reported unknown.
+/// </para>
+/// <para>
+/// <c>time_queue</c> is the handler's start, the moment the transfer left the queue, so
+/// one microsecond with timings and <c>0.000000</c> without. The last five print the
+/// fixed text curl 8.21.0 (Schannel) prints for every transfer this tool can run: a
+/// verify result of <c>0</c>, which Schannel reports even for a failed verification;
+/// <c>0</c> early-data bytes, which Schannel never sends; <c>0</c> retries and an empty
+/// FTP entry path, because no <c>--retry</c> and no FTP handler exist yet. See ADR-0041.
 /// </para>
 /// <para>
 /// A <c>time_*</c> value is the seconds from <see cref="TransferTimings.Started"/> to its
@@ -83,6 +93,7 @@ public sealed class TransferWriteOutVariables(
         ["url"] = variables => variables.url,
         ["urlnum"] = variables => FormatNumber(variables.urlNumber),
         ["scheme"] = variables => variables.scheme ?? string.Empty,
+        ["time_queue"] = variables => FormatSeconds(variables.MicrosecondsSinceStart(variables.Timings?.Started)),
         ["time_namelookup"] = variables => FormatSeconds(variables.MicrosecondsSinceStart(variables.Timings?.Connect?.NameResolved)),
         ["time_connect"] = variables => FormatSeconds(variables.MicrosecondsSinceStart(variables.Timings?.Connect?.Connected)),
         ["time_appconnect"] = variables => FormatSeconds(variables.MicrosecondsSinceStart(variables.Timings?.Connect?.TlsHandshakeCompleted)),
@@ -93,6 +104,11 @@ public sealed class TransferWriteOutVariables(
         ["time_total"] = variables => FormatSeconds(variables.TotalMicroseconds),
         ["speed_download"] = variables => FormatNumber(ComputeBytesPerSecond(variables.DownloadSize, variables.TotalMicroseconds)),
         ["speed_upload"] = variables => FormatNumber(ComputeBytesPerSecond(variables.report.UploadSize, variables.TotalMicroseconds)),
+        ["ssl_verify_result"] = _ => "0",
+        ["proxy_ssl_verify_result"] = _ => "0",
+        ["tls_earlydata"] = _ => "0",
+        ["num_retries"] = _ => "0",
+        ["ftp_entry_path"] = _ => string.Empty,
     };
 
     private static readonly char[] HeaderValueWhitespace = [' ', '\t'];
