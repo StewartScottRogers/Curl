@@ -197,13 +197,13 @@ public sealed class CurlCommandRunnerTests
     public async Task RunAsync_TwoFailures_PrintsBothLinesInOrderAndReturnsLast()
     {
         RecordingProtocolHandler file = RecordingProtocolHandler.Failing(
-            "file", CurlExitCode.FileCouldntReadFile, "Could not open file C:/nonexist/a");
+            "file", CurlExitCode.FileCouldntReadFile, "Could not open file /nonexist/a");
 
-        int exitCode = await RunAsync(["file:///C:/nonexist/a", "foo://x/"], file);
+        int exitCode = await RunAsync(["file:///nonexist/a", "foo://x/"], file);
 
         Assert.AreEqual(1, exitCode);
         Assert.AreEqual(
-            "curl: (37) Could not open file C:/nonexist/a" + NewLine
+            "curl: (37) Could not open file /nonexist/a" + NewLine
             + "curl: (1) Protocol \"foo\" not supported" + NewLine,
             StandardErrorText);
     }
@@ -247,7 +247,7 @@ public sealed class CurlCommandRunnerTests
             standardInput,
             runsOnWindows: false);
 
-        int exitCode = await runner.RunAsync(["-sS", "-o", "C:/nonexist/dir/x", "file:///C:/Windows/win.ini"]);
+        int exitCode = await runner.RunAsync(["-sS", "-o", "C:/nonexist/dir/x", "file:///Windows/win.ini"]);
 
         Assert.AreEqual(23, exitCode);
         Assert.AreEqual("curl: (23) client returned ERROR on write of 92 bytes" + NewLine, StandardErrorText);
@@ -281,7 +281,7 @@ public sealed class CurlCommandRunnerTests
             runsOnWindows: false,
             terminalColumns: 79);
 
-        int exitCode = await runner.RunAsync(["-o", "C:/Windows/System32/bl087.txt", "file:///C:/Windows/win.ini"]);
+        int exitCode = await runner.RunAsync(["-o", "C:/Windows/System32/bl087.txt", "file:///Windows/win.ini"]);
 
         Assert.AreEqual(23, exitCode);
         Assert.AreEqual(
@@ -378,9 +378,9 @@ public sealed class CurlCommandRunnerTests
     public async Task RunAsync_FailedTransferToOutputFile_DoesNotCreateTheFile()
     {
         RecordingProtocolHandler file = RecordingProtocolHandler.Failing(
-            "file", CurlExitCode.FileCouldntReadFile, "Could not open file C:/nonexist/a");
+            "file", CurlExitCode.FileCouldntReadFile, "Could not open file /nonexist/a");
 
-        int exitCode = await RunAsync(["-o", "a.txt", "file:///C:/nonexist/a"], file);
+        int exitCode = await RunAsync(["-o", "a.txt", "file:///nonexist/a"], file);
 
         Assert.AreEqual(37, exitCode);
         Assert.IsFalse(fileSystem.Written.ContainsKey("a.txt"));
@@ -658,13 +658,13 @@ public sealed class CurlCommandRunnerTests
     public async Task RunAsync_MoreOutputOptionsThanUrlsAndTheTransferFails_PrintsTheWarningAfterTheErrorLine()
     {
         RecordingProtocolHandler file = RecordingProtocolHandler.Failing(
-            "file", CurlExitCode.FileCouldntReadFile, "Could not open file Z:/nx");
+            "file", CurlExitCode.FileCouldntReadFile, "Could not open file /nx");
 
-        int exitCode = await RunAsync(["-o", "f", "-o", "g", "file:///Z:/nx"], file);
+        int exitCode = await RunAsync(["-o", "f", "-o", "g", "file:///nx"], file);
 
         Assert.AreEqual(37, exitCode);
         Assert.AreEqual(
-            "curl: (37) Could not open file Z:/nx" + NewLine
+            "curl: (37) Could not open file /nx" + NewLine
             + "Warning: Got more output options than URLs" + NewLine,
             StandardErrorText);
     }
@@ -720,6 +720,6 @@ public sealed class CurlCommandRunnerTests
             standardInput,
             runsOnWindows: false);
 
-        return runner.RunAsync([.. options, "file:///C:/Windows/win.ini"]);
+        return runner.RunAsync([.. options, "file:///Windows/win.ini"]);
     }
 }

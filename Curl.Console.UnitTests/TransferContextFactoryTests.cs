@@ -17,11 +17,11 @@ public sealed class TransferContextFactoryTests
         using MemoryStream standardInput = new();
         using MemoryStream output = new();
         using MemoryStream headerOutput = new();
-        CurlUrl url = CurlUrl.Parse("file:///C:/x.txt");
+        CurlUrl url = CurlUrl.Parse("file:///x.txt");
         ByteRange range = ByteRange.Bounded(2, 5);
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse("file:///C:/x.txt"), url, output, range, 7, headerOutput);
+            .Create(Parse("file:///x.txt"), url, output, range, 7, headerOutput);
 
         Assert.AreSame(url, context.Url);
         Assert.AreSame(output, context.Output);
@@ -38,7 +38,7 @@ public sealed class TransferContextFactoryTests
         TransferProgressRecorder progress = new(new ManualTimeProvider());
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse("file:///C:/x.txt"), CurlUrl.Parse("file:///C:/x.txt"), output, null, null, null, progress: progress);
+            .Create(Parse("file:///x.txt"), CurlUrl.Parse("file:///x.txt"), output, null, null, null, progress: progress);
 
         Assert.AreSame(progress, context.Progress);
     }
@@ -51,7 +51,7 @@ public sealed class TransferContextFactoryTests
         ManualTimeProvider clock = new();
 
         TransferContext context = new TransferContextFactory(standardInput, clock)
-            .Create(Parse("file:///C:/x.txt"), CurlUrl.Parse("file:///C:/x.txt"), output, null, null, null);
+            .Create(Parse("file:///x.txt"), CurlUrl.Parse("file:///x.txt"), output, null, null, null);
 
         Assert.AreSame(clock, context.TimeProvider);
     }
@@ -63,7 +63,7 @@ public sealed class TransferContextFactoryTests
         using MemoryStream output = new();
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse("file:///C:/x.txt"), CurlUrl.Parse("file:///C:/x.txt"), output, null, null, null);
+            .Create(Parse("file:///x.txt"), CurlUrl.Parse("file:///x.txt"), output, null, null, null);
 
         Assert.AreSame(TimeProvider.System, context.TimeProvider);
     }
@@ -75,7 +75,7 @@ public sealed class TransferContextFactoryTests
         using MemoryStream output = new();
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse("file:///C:/x.txt"), CurlUrl.Parse("file:///C:/x.txt"), output, null, null, null);
+            .Create(Parse("file:///x.txt"), CurlUrl.Parse("file:///x.txt"), output, null, null, null);
 
         Assert.AreSame(NoTransferProgress.Instance, context.Progress);
     }
@@ -87,7 +87,7 @@ public sealed class TransferContextFactoryTests
         using MemoryStream output = new();
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse("file:///C:/x.txt"), CurlUrl.Parse("file:///C:/x.txt"), output, null, null, null);
+            .Create(Parse("file:///x.txt"), CurlUrl.Parse("file:///x.txt"), output, null, null, null);
 
         Assert.IsNull(context.HeaderOutput);
         Assert.IsNull(context.Range);

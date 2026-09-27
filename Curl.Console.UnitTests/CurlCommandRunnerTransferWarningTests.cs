@@ -51,7 +51,7 @@ public sealed class CurlCommandRunnerTransferWarningTests
     public async Task RunAsync_CaPathWarningAt79Columns_PrintsTheTwoMeasuredLines()
     {
         int exitCode = await RunAsync(
-            ["--capath", ".", "file:///C:/Windows/win.ini"], 79, RecordingProtocolHandler.WritingPath("file"));
+            ["--capath", ".", "file:///Windows/win.ini"], 79, RecordingProtocolHandler.WritingPath("file"));
 
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(
@@ -64,7 +64,7 @@ public sealed class CurlCommandRunnerTransferWarningTests
     public async Task RunAsync_CaPathWarningAt200Columns_PrintsOneLine()
     {
         int exitCode = await RunAsync(
-            ["--capath", ".", "file:///C:/Windows/win.ini"], 200, RecordingProtocolHandler.WritingPath("file"));
+            ["--capath", ".", "file:///Windows/win.ini"], 200, RecordingProtocolHandler.WritingPath("file"));
 
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(CaPathWarningLine + Environment.NewLine, StandardErrorText);
@@ -80,7 +80,7 @@ public sealed class CurlCommandRunnerTransferWarningTests
             return ValueTask.FromResult(TransferResult.Success(0));
         });
 
-        int exitCode = await RunAsync(["--capath", ".", "file:///C:/Windows/win.ini"], file);
+        int exitCode = await RunAsync(["--capath", ".", "file:///Windows/win.ini"], file);
 
         Assert.AreEqual(0, exitCode);
         Assert.HasCount(1, file.Contexts);
@@ -116,7 +116,7 @@ public sealed class CurlCommandRunnerTransferWarningTests
         fileSystem.UnwritablePaths.Add("hd.txt");
 
         int exitCode = await RunAsync(
-            ["--capath", ".", "-D", "hd.txt", "file:///C:/Windows/win.ini"],
+            ["--capath", ".", "-D", "hd.txt", "file:///Windows/win.ini"],
             RecordingProtocolHandler.WritingPath("file"));
 
         Assert.AreEqual(23, exitCode);
@@ -132,7 +132,7 @@ public sealed class CurlCommandRunnerTransferWarningTests
     public async Task RunAsync_SilentAnywhereWithCaPathWarnings_PrintsNoWarning(string silent)
     {
         int exitCode = await RunAsync(
-            ["--capath", ".", "file:///C:/Windows/win.ini", silent], RecordingProtocolHandler.WritingPath("file"));
+            ["--capath", ".", "file:///Windows/win.ini", silent], RecordingProtocolHandler.WritingPath("file"));
 
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(string.Empty, StandardErrorText);
