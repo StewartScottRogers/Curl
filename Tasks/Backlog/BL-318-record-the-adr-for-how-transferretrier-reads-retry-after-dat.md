@@ -1,5 +1,5 @@
 ---
-id: BL-316
+id: BL-318
 title: Record the ADR for how TransferRetrier reads Retry-After dates
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-316 — Record the ADR for how TransferRetrier reads Retry-After dates
+# BL-318 — Record the ADR for how TransferRetrier reads Retry-After dates
 
 ## Goal
 

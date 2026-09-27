@@ -1,5 +1,5 @@
 ---
-id: BL-315
+id: BL-317
 title: Retry under --retry-max-time, --retry-all-errors, --retry-connrefused and FTP 4xx
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-315 — Retry under --retry-max-time, --retry-all-errors, --retry-connrefused and FTP 4xx
+# BL-317 — Retry under --retry-max-time, --retry-all-errors, --retry-connrefused and FTP 4xx
 
 ## Goal
 
