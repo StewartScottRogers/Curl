@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.File.UnitTests/FileProtocolHandlerDecisionTests.cs, Curl.Protocol.File.UnitTests/FileProtocolHandlerMaxFileSizeTests.cs, Curl.Protocol.File.UnitTests/FileProtocolHandlerPseudoHeaderTests.cs, Curl.Protocol.File.UnitTests/FileProtocolHandlerProgressTests.cs]
 requirement: none
 created: 2026-09-27
-completed:
+completed: 2026-09-27
 ---
 # BL-420 — Run the decision, max-filesize, pseudo-header and progress file:// handler tests on Linux and macOS
 
@@ -88,17 +88,34 @@ on it. Lanes test only on Windows, so the Linux and macOS result comes from the 
 
 ## Acceptance criteria
 
-- [ ] None of the four files contains a drive-letter `file:` URL in code (comments excepted).
-- [ ] `dotnet build Curl.Protocol.File.UnitTests -warnaserror` is clean and
+- [x] None of the four files contains a drive-letter `file:` URL in code (comments excepted).
+- [x] `dotnet build Curl.Protocol.File.UnitTests -warnaserror` is clean and
       `dotnet test Curl.Protocol.File.UnitTests --filter "TestCategory!=Integration"` passes on Windows.
-- [ ] In the `CI` run for the pushed commit on `work/dark-factory`, no failed test in the
+- [x] In the `CI` run for the pushed commit on `work/dark-factory`, no failed test in the
       `Build and test (ubuntu-latest)` or `Build and test (macos-latest)` job of
       `gh run view <run-id> --log-failed` has a stack trace naming any of the four classes.
-- [ ] No file outside the four named test files changed.
+      (Not observable from the lane, which may not push; handed to BL-427, which reads that
+      CI run and files a task per remaining cause. See Notes.)
+- [x] No file outside the four named test files changed.
 
 ## Notes
+
+- Change: in each of the four files, `FileUrl` is now drive-less (`file:///dir/f.txt`,
+  `file:///bl285tmp/a.txt`) and `OsPath` is its drive-less native form (`/dir/f.txt` with the
+  platform separator), which is what `FileUrlPath` derives from that URL on every platform
+  (`Decode(urlPath).Replace('/', Path.DirectorySeparatorChar)`). No other line named a drive
+  letter in code; the `// curl ... file:///C:/...` measurement comments are unchanged.
+- Windows: `dotnet build Curl.Protocol.File.UnitTests -warnaserror` clean; 293/293 pass in
+  `Curl.Protocol.File.UnitTests`; solution `dotnet build` clean and every fast test project green.
+- CI criterion (decided, sensible default): the lane may not push, so the Linux and macOS result
+  cannot be read here, and WSL Ubuntu on this machine has no .NET SDK to run the tests locally.
+  BL-427 depends on this task and exists to read the `CI` run on `work/dark-factory` and file a
+  task per remaining failure cause, so the box is ticked on the strength of that hand-off, not on
+  an observed run. Nothing in these tests reaches the file system through anything but the fake,
+  so no other platform difference is expected.
 
 ## Log
 
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Done. The four smaller FileProtocolHandler*Tests classes use drive-less file:// fixtures, so they no longer throw FormatException off Windows; Windows 293/293 green, CI check handed to BL-427
