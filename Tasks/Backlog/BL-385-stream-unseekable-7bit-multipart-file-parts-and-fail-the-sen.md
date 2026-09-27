@@ -1,5 +1,5 @@
 ---
-id: BL-383
+id: BL-385
 title: Stream unseekable 7bit multipart file parts and fail the send on a refused byte
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-383 — Stream unseekable 7bit multipart file parts and fail the send on a refused byte
+# BL-385 — Stream unseekable 7bit multipart file parts and fail the send on a refused byte
 
 ## Goal
 
