@@ -1,12 +1,17 @@
 using System.Globalization;
 
-namespace Curl.Cli;
+namespace Curl.Protocol.Abstractions;
 
 /// <summary>
-/// Pins <see cref="CurlDateParser"/> against the local curl 8.21.0, measured on Windows on
-/// 2026-09-26 by bracketing the modification time of a <c>file://</c> source: at the expected
-/// instant <c>-z</c> reported "not new enough", one second later it transferred. Every refused
-/// spelling below made curl print its illegal-date warning.
+/// Pins <see cref="CurlDateParser"/>. The accepted and refused spellings were measured on curl 8.21.0
+/// (Windows) on 2026-09-26 through <c>-z</c> by bracketing the modification time of a <c>file://</c>
+/// source: at the expected instant <c>-z</c> reported "not new enough", one second later it
+/// transferred, and every refused spelling printed the illegal-date warning. The year limits were
+/// measured through <c>Set-Cookie: n=v; Expires=&lt;date&gt;</c> and the <c>-c</c> jar (see
+/// <c>Curl.Cookies</c>' <c>SetCookieParserTests</c>): 1582, <c>0 Jan 2030</c> and <c>20300101 5</c>
+/// are refused and the cookie stays a session cookie, 1583 is read and the cookie is already expired,
+/// and year 10000 is read and capped; and through <c>-z</c> on 2026-09-27: <c>1 Jan 1500</c> and
+/// <c>00000101</c> print the illegal-date warning, <c>1 Jan 1583</c> does not.
 /// </summary>
 [TestClass]
 public sealed class CurlDateParserTests
@@ -38,11 +43,10 @@ public sealed class CurlDateParserTests
     [DataRow("Sun, 06 Nov 1994 08:49:37 GMT 12:00", "1994-11-06T08:49:37Z")]
     public void TryParse_DateCurlAccepts_ReadsTheInstantCurlReads(string text, string expected)
     {
-        bool parsed = CurlDateParser.TryParse(text, out DateTimeOffset value);
+        bool parsed = CurlDateParser.TryParse(text, out long unixSeconds);
 
         Assert.IsTrue(parsed);
-        Assert.AreEqual(DateTimeOffset.Parse(expected, CultureInfo.InvariantCulture), value);
-        Assert.AreEqual(TimeSpan.Zero, value.Offset);
+        Assert.AreEqual(DateTimeOffset.Parse(expected, CultureInfo.InvariantCulture).ToUnixTimeSeconds(), unixSeconds);
     }
 
     [TestMethod]
@@ -69,57 +73,46 @@ public sealed class CurlDateParserTests
     [DataRow("99999999999 Jan 1")]
     [DataRow("1 Jan 2030 12:00 +1500")]
     [DataRow("1 Jan 2030 GMT +0100")]
+    [DataRow("1 Jan 1582")]
+    [DataRow("1 Jan 1500")]
+    [DataRow("31 Dec 1582 23:59:59 GMT")]
+    [DataRow("00000101")]
+    [DataRow("0 Jan 2030")]
+    [DataRow("20300101 5")]
     public void TryParse_TextCurlRefuses_IsRefused(string text)
     {
-        bool parsed = CurlDateParser.TryParse(text, out DateTimeOffset value);
+        bool parsed = CurlDateParser.TryParse(text, out long unixSeconds);
 
         Assert.IsFalse(parsed);
-        Assert.AreEqual(default, value);
+        Assert.AreEqual(0, unixSeconds);
     }
 
-    /// <summary>
-    /// curl 8.21.0 accepts <c>1 Jan 099999999</c>, computing the instant in a 64-bit
-    /// <c>time_t</c>; a <see cref="DateTimeOffset"/> cannot hold it, so it reads as the last whole
-    /// second one can (ADR-0073).
-    /// </summary>
     [TestMethod]
-    [DataRow("1 Jan 099999999")]
-    [DataRow("31 Dec 9999 23:00 -1400")]
-    public void TryParse_InstantAfterYear9999_IsTheLastWholeSecondOfYear9999(string text)
+    [DataRow("Wed, 09 Jun 1583 10:18:14 GMT", -12_198_778_906L)]
+    [DataRow("Wed, 09 Jun 2027 10:18:14 GMT", 1_812_536_294L)]
+    [DataRow("Wed, 09 Jun 10000 10:18:14 GMT", 253_416_161_894L)]
+    [DataRow("1 Jan 099999999", 3_155_633_001_244_800L)]
+    public void TryParse_YearsOutsideDateTimeOffset_AreRead(string text, long expected)
     {
-        bool parsed = CurlDateParser.TryParse(text, out DateTimeOffset value);
+        bool parsed = CurlDateParser.TryParse(text, out long unixSeconds);
 
         Assert.IsTrue(parsed);
-        Assert.AreEqual(new DateTimeOffset(9999, 12, 31, 23, 59, 59, TimeSpan.Zero), value);
+        Assert.AreEqual(expected, unixSeconds);
     }
 
-    /// <summary>
-    /// <c>00000101</c> is 1 January of year 0, before any <see cref="DateTimeOffset"/>; curl 8.21.0
-    /// treats it as not a date (measured 2026-09-27), so it is refused.
-    /// </summary>
-    [TestMethod]
-    public void TryParse_InstantBeforeYear1_IsRefused()
-    {
-        Assert.IsFalse(CurlDateParser.TryParse("00000101", out _));
-    }
-
-    /// <summary><c>curl_getdate</c> returns the epoch for the instant one second before it, -1 being its failure value.</summary>
+    /// <summary><c>Curl_getdate_capped</c> returns the epoch for the instant one second before it, -1 being its failure value.</summary>
     [TestMethod]
     public void TryParse_OneSecondBeforeTheEpoch_ReadsTheEpoch()
     {
-        bool parsed = CurlDateParser.TryParse("31 Dec 1969 23:59:59 GMT", out DateTimeOffset value);
-
-        Assert.IsTrue(parsed);
-        Assert.AreEqual(DateTimeOffset.UnixEpoch, value);
+        Assert.IsTrue(CurlDateParser.TryParse("31 Dec 1969 23:59:59 GMT", out long unixSeconds));
+        Assert.AreEqual(0, unixSeconds);
     }
 
     [TestMethod]
     public void TryParse_TwoSecondsBeforeTheEpoch_ReadsThatInstant()
     {
-        bool parsed = CurlDateParser.TryParse("31 Dec 1969 23:59:58 GMT", out DateTimeOffset value);
-
-        Assert.IsTrue(parsed);
-        Assert.AreEqual(-2, value.ToUnixTimeSeconds());
+        Assert.IsTrue(CurlDateParser.TryParse("31 Dec 1969 23:59:58 GMT", out long unixSeconds));
+        Assert.AreEqual(-2, unixSeconds);
     }
 
     [TestMethod]

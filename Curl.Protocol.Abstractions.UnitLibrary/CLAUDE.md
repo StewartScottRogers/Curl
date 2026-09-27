@@ -2,7 +2,9 @@
 
 Phase 1.
 
-Contracts every other project depends on. Depends on nothing itself.
+Contracts every other project depends on. Depends on nothing itself. Besides the contracts it
+holds `CurlDateParser`, the one port of libcurl's `parsedate`, shared by `-z` in `Curl.Cli` and
+cookie `Expires` in `Curl.Cookies` (ADR-0074).
 
 Never construct a `Socket`, `SslStream` or `HttpClient` here. Take `IConnection`
 so the tests in the matching `.UnitTests` project can drive this code from a

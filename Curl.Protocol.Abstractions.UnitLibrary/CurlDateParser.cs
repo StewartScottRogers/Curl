@@ -1,15 +1,16 @@
 using System.Collections.Frozen;
 using System.Globalization;
 
-namespace Curl.Cookies;
+namespace Curl.Protocol.Abstractions;
 
 /// <summary>
-/// Reads a cookie's <c>Expires</c> date the way libcurl 8.21.0's <c>Curl_getdate_capped</c> does, for
-/// <see cref="SetCookieParser"/>.
+/// Reads a date the way libcurl 8.21.0's <c>curl_getdate</c> and <c>Curl_getdate_capped</c> do
+/// (<see href="https://curl.se/libcurl/c/curl_getdate.html"/>), for <c>-z</c>/<c>--time-cond</c> in
+/// <c>Curl.Cli</c> and a cookie's <c>Expires</c> in <c>Curl.Cookies</c> (ADR-0074).
 /// It is a port of <c>parsedate</c> in libcurl's <c>lib/parsedate.c</c>, not a general date parser:
 /// it accepts what curl accepts and refuses what curl refuses.
 /// </summary>
-public static class CookieDateParser
+public static class CurlDateParser
 {
     /// <summary>curl reads at most six words and numbers and ignores anything after them.</summary>
     private const int MaximumParts = 6;
@@ -147,13 +148,12 @@ public static class CookieDateParser
     /// <c>Curl_getdate_capped</c> returns it.
     /// </para>
     /// <para>
-    /// This is the same port as <c>Curl.Cli</c>'s <c>CurlDateParser</c>, which reads <c>-z</c> into a
-    /// <see cref="DateTimeOffset"/>; this one keeps curl's whole range, which cookie expiry needs.
-    /// Measured on curl 8.21.0 on 2026-09-26 through <c>Set-Cookie: n=v; Expires=&lt;date&gt;</c> and
-    /// the <c>-c</c> jar, as <c>CookieDateParserTests</c> records.
+    /// Measured on curl 8.21.0 on 2026-09-26 and 2026-09-27 through <c>-z</c> against a
+    /// <c>file://</c> source and through <c>Set-Cookie: n=v; Expires=&lt;date&gt;</c> and the
+    /// <c>-c</c> jar, as <c>CurlDateParserTests</c> records.
     /// </para>
     /// </remarks>
-    /// <param name="text">The date text, the <c>Expires</c> attribute's value.</param>
+    /// <param name="text">The date text: a <c>-z</c> value without its direction prefix, or an <c>Expires</c> attribute's value.</param>
     /// <param name="unixSeconds">The instant read, in seconds since the Unix epoch; 0 when the text is not a date.</param>
     /// <returns><see langword="true"/> when <paramref name="text"/> is a date curl accepts.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="text"/> is <see langword="null"/>.</exception>

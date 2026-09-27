@@ -761,9 +761,23 @@ public static class CommandLineOptionTable
     private static bool TryReadTimeConditionDate(string date, IDataFileReader dataFileReader, out DateTimeOffset instant, out string? failureReason)
     {
         failureReason = null;
-        return CurlDateParser.TryParse(date, out instant)
-            || dataFileReader.TryReadModificationTime(date, out instant, out failureReason);
+        if (CurlDateParser.TryParse(date, out long unixSeconds))
+        {
+            instant = TimeConditionInstant(unixSeconds);
+            return true;
+        }
+
+        return dataFileReader.TryReadModificationTime(date, out instant, out failureReason);
     }
+
+    /// <summary>
+    /// The instant a <c>-z</c> date's Unix seconds name. One after the last whole second a
+    /// <see cref="DateTimeOffset"/> holds, which curl computes in a 64-bit <c>time_t</c>, reads as that
+    /// second, 9999-12-31 23:59:59 UTC (ADR-0073); <see cref="CurlDateParser"/> refuses every year
+    /// before 1583, so none falls before year 1.
+    /// </summary>
+    private static DateTimeOffset TimeConditionInstant(long unixSeconds) =>
+        DateTimeOffset.FromUnixTimeSeconds(Math.Min(unixSeconds, DateTimeOffset.MaxValue.ToUnixTimeSeconds()));
 
     /// <summary>
     /// Turns <c>--location-trusted</c> on or off: it follows redirects and sends credentials to every
