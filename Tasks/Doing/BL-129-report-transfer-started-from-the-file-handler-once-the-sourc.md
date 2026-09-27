@@ -45,3 +45,4 @@ Report "started" at exactly the point the measurements put the start of curl's m
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-27: Backlog -> Doing.
