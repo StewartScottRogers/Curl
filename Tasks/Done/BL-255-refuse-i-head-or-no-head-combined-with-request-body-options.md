@@ -8,7 +8,7 @@ depends-on: [BL-190]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-27
 ---
 # BL-255 — Refuse -I/--head (or --no-head) combined with request-body options at transfer setup, as curl 8.21.0 does
 
@@ -44,19 +44,25 @@ Upstream: https://curl.se/docs/manpage.html (`-I`, `-d`, `-G`, `--json`), https:
 
 ## Acceptance criteria
 
-- [ ] `CommandLineWarning` in `Curl.Cli.UnitLibrary` has the two two-line warnings above, and tests in `Curl.Cli.UnitTests` pin each line byte for byte, including the trailing space on the first line.
-- [ ] Tests in `Curl.Console.UnitTests` run `CurlCommandRunner` with `-I -d x`, `-d x -I` and `-I --json x` against `http://127.0.0.1:1/` and assert standard error is exactly the POST/HEAD two lines, standard output is empty, no transfer is dispatched, and the exit code is 2 (`CurlExitCode.FailedInit`).
-- [ ] Tests in `Curl.Console.UnitTests` do the same for `--no-head -d x` and `-d x --no-head` with the POST/GET two lines and exit 2.
-- [ ] A test in `Curl.Console.UnitTests` runs `-s -I -d x` and asserts standard error is empty and the exit code is 2.
-- [ ] A test in `Curl.Console.UnitTests` runs `-I -G -d x` and asserts the refusal lines are not written and the transfer is dispatched.
-- [ ] No test needs `TestCategory=Integration`, and `dotnet test --filter "TestCategory!=Integration"` is green.
-- [ ] `dotnet build Curl.Cli.UnitLibrary -warnaserror` and `dotnet build Curl.Console -warnaserror` are clean.
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1` reports 100% line and 100% branch coverage for `Curl.Cli.UnitLibrary` and `Curl.Console`, with no method above cyclomatic complexity 10 or CRAP 30.
-- [ ] `Curl.Console/CLAUDE.md` and `Curl.Cli.UnitLibrary/README.md` state that this refusal happens at transfer setup, not while parsing.
+- [x] `CommandLineWarning` in `Curl.Cli.UnitLibrary` has the two two-line warnings above, and tests in `Curl.Cli.UnitTests` pin each line byte for byte, including the trailing space on the first line.
+- [x] Tests in `Curl.Console.UnitTests` run `CurlCommandRunner` with `-I -d x`, `-d x -I` and `-I --json x` against `http://127.0.0.1:1/` and assert standard error is exactly the POST/HEAD two lines, standard output is empty, no transfer is dispatched, and the exit code is 2 (`CurlExitCode.FailedInit`).
+- [x] Tests in `Curl.Console.UnitTests` do the same for `--no-head -d x` and `-d x --no-head` with the POST/GET two lines and exit 2.
+- [x] A test in `Curl.Console.UnitTests` runs `-s -I -d x` and asserts standard error is empty and the exit code is 2.
+- [x] A test in `Curl.Console.UnitTests` runs `-I -G -d x` and asserts the refusal lines are not written and the transfer is dispatched.
+- [x] No test needs `TestCategory=Integration`, and `dotnet test --filter "TestCategory!=Integration"` is green.
+- [x] `dotnet build Curl.Cli.UnitLibrary -warnaserror` and `dotnet build Curl.Console -warnaserror` are clean.
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1` reports 100% line and 100% branch coverage for `Curl.Cli.UnitLibrary` and `Curl.Console`, with no method above cyclomatic complexity 10 or CRAP 30.
+- [x] `Curl.Console/CLAUDE.md` and `Curl.Cli.UnitLibrary/README.md` state that this refusal happens at transfer setup, not while parsing.
 
 ## Notes
+
+- Measured on curl 8.21.0 (mingw, Schannel) on 2026-09-27: `-s -S -I -d x`, `-I -d x -s` and `-s -I -d x -S` print nothing and exit 2, so the lines are dropped whenever `-s` is in effect at the end of the command line; `-S` does not bring them back. Pinned in `CurlCommandRunnerRequestMethodConflictTests`.
+- Also measured: `-I -d ''`, `-I --data-binary x`, `-I --data-urlencode ''` and `-I -d x -G --no-get` refuse the same way; `--no-head -G -d x` runs the transfer; two URLs print the lines once. So the check is `PostData` not null, no `DataInQuery`, and `HttpMethodSelected` `Head` or `Get`.
+- `SelectedHttpMethod` and `CommandLineOptions.HttpMethodSelected` (getter) are now public, as the task suggested. `PostRequestedWithHead`/`PostRequestedWithGet` reuse `OnlyOneRequestMethod`, so the wrap is the existing one.
+- The check runs after `-V` is handled (curl handles `-V` while parsing) and before `createTransferDispatch`, so no dispatch is built. No ADR: every choice was a measurement, not a design decision.
 
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Done. -I or --no-head with a -d/--json body (no -G) is refused at transfer setup with curl's two warning lines and exit 2

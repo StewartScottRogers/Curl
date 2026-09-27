@@ -334,10 +334,48 @@ internal sealed class CurlCommandRunner(
             return (int)CurlExitCode.Ok;
         }
 
+        if (RequestMethodConflictLines(parsed.Options) is { } conflictLines)
+        {
+            if (!parsed.Options.Silent)
+            {
+                await WriteErrorLinesAsync(conflictLines).ConfigureAwait(false);
+            }
+
+            return (int)CurlExitCode.FailedInit;
+        }
+
         CurlExitCode exitCode = await TransferAllAsync(parsed.Options).ConfigureAwait(false);
         await WriteErrorLinesAsync(parsed.WarningLinesAfterTransfers).ConfigureAwait(false);
 
         return (int)exitCode;
+    }
+
+    /// <summary>
+    /// The warning lines curl 8.21.0 prints at transfer setup, not while reading the command line,
+    /// before it refuses with <see cref="CurlExitCode.FailedInit" /> a <c>-d</c> / <c>--json</c> body to
+    /// be posted (no <c>-G</c>) when <c>-I</c> selected <c>HEAD</c> or <c>--no-head</c> selected
+    /// <c>GET</c>, whatever order the options came in. <c>-s</c> drops the lines, and <c>-S</c> does not
+    /// bring them back.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <returns>
+    /// <see cref="CommandLineWarning.PostRequestedWithHead" /> or
+    /// <see cref="CommandLineWarning.PostRequestedWithGet" />, or <see langword="null" /> when the
+    /// request methods do not conflict.
+    /// </returns>
+    private static IReadOnlyList<string>? RequestMethodConflictLines(CommandLineOptions options)
+    {
+        if (options.PostData is null || options.DataInQuery)
+        {
+            return null;
+        }
+
+        return options.HttpMethodSelected switch
+        {
+            SelectedHttpMethod.Head => CommandLineWarning.PostRequestedWithHead,
+            SelectedHttpMethod.Get => CommandLineWarning.PostRequestedWithGet,
+            _ => null,
+        };
     }
 
     /// <summary>

@@ -76,6 +76,12 @@ as curl 8.21.0 does. `-I` also sets the context's `NoBody`, and `-f` / `--fail-w
 become `HttpRequestOptions.Fail`. Under `--fail-early` the first failed transfer stops the
 run with its own exit code.
 
+A `-d` / `--data*` / `--json` body to be posted (no `-G`) with `-I` (HEAD) or `--no-head` (GET) is
+refused at transfer setup, not while parsing, as curl 8.21.0 refuses it in `tool_operate`: after
+the parse is accepted and `-V` is handled, and before any dispatch is built, `RunAsync` writes
+`CommandLineWarning.PostRequestedWithHead` or `PostRequestedWithGet` (nothing under `-s`, even
+with `-S`), with no `curl: try` line, and exits 2, whatever order the options came in (BL-255).
+
 The Nth `-T` / `--upload-file` value uploads to the Nth URL (ADR-0051). Its URL is resolved
 by `UploadTransferUrl` before anything else of that transfer: one it cannot parse is exit 3
 with no warning lines. The `-T` file is opened through the runner's `IFileSystem` after the
