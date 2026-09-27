@@ -30,6 +30,7 @@ completed:
 ## Notes
 
 - Plan item: W14 in the Phase 1 HTTP plan (2026-09-26); plan keys in this file were replaced by their task IDs.
+- From BL-198 (2026-09-27): `Curl.Cli` now reads `.curlrc`, but only through `CommandLineParser.Parse(arguments, pathExists, passwordPrompt, dataFileReader, DefaultConfigFileSearch.ForProcess)`; `CurlCommandRunner` still calls `Parse(arguments)`, which never reads it. Switch the call, and print `Note: Read config file from '<path>'` from `CommandLineOptions.DefaultConfigFile` when `-v` is on, after the command line is read (curl 8.21.0 `operate`). `-K` files are already applied in place by `Curl.Cli`.
 
 ## Log
 
