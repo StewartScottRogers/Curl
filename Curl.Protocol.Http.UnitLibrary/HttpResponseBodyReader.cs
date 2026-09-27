@@ -4,7 +4,7 @@ namespace Curl.Protocol.Http;
 
 /// <summary>
 /// Reads an HTTP/1.x response body framed by chunked transfer coding, by Content-Length or by
-/// the peer closing, and writes it to the transfer's output, failing with the exit code and
+/// the peer closing (<see cref="HttpResponseBodyFraming" />), and writes it to the transfer's output, failing with the exit code and
 /// message curl 8.21.0 reports (measured, BL-170, BL-171).
 /// </summary>
 /// <remarks>
@@ -48,6 +48,18 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     /// written as the limit allows, then fails with exit 63.
     /// </summary>
     internal long? MaximumBodySize { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether transfer coding is written undecoded, as
+    /// <c>--raw</c> asks (<see cref="HttpResponseBodyFraming" />).
+    /// </summary>
+    internal bool PassesTransferCoding { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the Content-Length is ignored and a body that is
+    /// not chunked read until the peer closes, as <c>--ignore-content-length</c> asks.
+    /// </summary>
+    internal bool IgnoresContentLength { get; set; }
 
     /// <summary>
     /// Gets the Content-Length of the body being read, once reading has started and the body
@@ -108,13 +120,12 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
             return;
         }
 
-        bool isChunked = HttpTransferEncoding.IsChunked(head.Headers);
-        long? contentLength = HttpContentLength.Find(head.Headers);
+        HttpResponseBodyFraming framing = HttpResponseBodyFraming.Of(head.Headers, PassesTransferCoding, IgnoresContentLength);
         contentDecoder = decodeContent ? HttpContentDecoder.For(head.Headers) : null;
-        ExpectedLength = isChunked ? null : contentLength;
+        ExpectedLength = framing.ContentLength;
         try
         {
-            await CopyFramedAsync(head.BodyPrefix, isChunked, contentLength, output, cancellationToken).ConfigureAwait(false);
+            await CopyFramedAsync(head.BodyPrefix, framing.IsChunked, framing.ContentLength, output, cancellationToken).ConfigureAwait(false);
         }
         finally
         {

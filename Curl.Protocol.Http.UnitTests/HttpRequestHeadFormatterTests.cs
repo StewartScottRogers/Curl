@@ -420,6 +420,32 @@ public sealed class HttpRequestHeadFormatterTests
         Assert.AreEqual(expected, Encoding.Latin1.GetString(head));
     }
 
+    [TestMethod]
+    public void Format_Http10_EndsTheRequestLineInHttp10WithTheSameHeaders()
+    {
+        AssertHead(
+            "GET /a HTTP/1.0\r\n" + DefaultHeaders + "\r\n",
+            new Uri("http://127.0.0.1:18091/a"),
+            new HttpRequestOptions { Version = HttpVersionPreference.Http10 });
+    }
+
+    [TestMethod]
+    public void Format_Http10BodyAboveTheThreshold_SendsNoExpect()
+    {
+        HttpRequestOptions options = new()
+        {
+            Version = HttpVersionPreference.Http10,
+            CustomMethod = "PUT",
+            Body = new BytesBody(new byte[1048577], "application/octet-stream"),
+            Headers = ["Content-Type:"],
+        };
+
+        AssertHead(
+            "PUT /a HTTP/1.0\r\n" + DefaultHeaders + "Content-Length: 1048577\r\n\r\n",
+            new Uri("http://127.0.0.1:18091/a"),
+            options);
+    }
+
     private static void AssertHead(string expected, Uri url, HttpRequestOptions? options)
     {
         Assert.AreEqual(expected, Encoding.Latin1.GetString(HttpRequestHeadFormatter.Format(url, options)));

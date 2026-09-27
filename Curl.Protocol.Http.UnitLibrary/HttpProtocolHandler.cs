@@ -5,7 +5,7 @@ using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 namespace Curl.Protocol.Http;
 
 /// <summary>
-/// Serves the <c>http</c> and <c>https</c> schemes over HTTP/1.1: connects through the
+/// Serves the <c>http</c> and <c>https</c> schemes over HTTP/1.1, or HTTP/1.0 for <c>-0</c>: connects through the
 /// injected <see cref="IConnector" />, sends the request head, writes the response head to
 /// <see cref="ITransferContext.HeaderOutput" /> and the body to
 /// <see cref="ITransferContext.Output" />, and reports what it learned in a
@@ -61,6 +61,16 @@ namespace Curl.Protocol.Http;
 /// <see cref="HttpRequestOptions.Compressed" /> sends <c>Accept-Encoding: deflate, gzip, br</c>
 /// (ADR-0020) and, unless <see cref="HttpRequestOptions.Raw" /> is set, decodes the body as
 /// its Content-Encoding says (<see cref="HttpContentDecoder" />, BL-177 Notes).
+/// </para>
+/// <para>
+/// <see cref="HttpVersionPreference.Http10" /> (<c>-0</c>) ends the request line in
+/// <c>HTTP/1.0</c>, adds no <c>Expect: 100-continue</c>, and fails a body of unknown length
+/// with exit 25 once connected, sending nothing. <see cref="HttpRequestOptions.Raw" /> writes a
+/// chunked body undecoded, chunk lines included, until the server closes, and refuses no
+/// transfer coding. <see cref="HttpRequestOptions.IgnoreContentLength" /> reads a body that is
+/// not chunked until the server closes, whatever its Content-Length says. Either leaves a
+/// connection whose body ran to close unused afterwards (<see cref="HttpResponseBodyFraming" />;
+/// measured on curl 8.21.0, BL-180 Notes).
 /// </para>
 /// <para>
 /// The first request carries the authenticator's answer to no challenge, placed after
@@ -269,11 +279,16 @@ public sealed class HttpProtocolHandler(
         HttpRequestBodyWriter upload = new(connection);
         HttpExchange exchange = new(connect, connection, framing.Method, request.Length, upload, earlier, newConnection);
         IConnection responseConnection = framing.AwaitsContinue ? new HttpContinueWaitConnection(connection) : connection;
-        HttpResponseBodyReader body = new(responseConnection);
+        HttpResponseBodyReader body = new(responseConnection)
+        {
+            PassesTransferCoding = options.Raw,
+            IgnoresContentLength = options.IgnoreContentLength,
+        };
         string? retryAuthorization = null;
         HttpBodyDelivery delivery = HttpBodyDelivery.Deliver;
         try
         {
+            ThrowIfRefused(framing);
             await HttpConnectionSend.WriteAsync(connection, request, cancellationToken).ConfigureAwait(false);
             await HttpConnectionSend.FlushAsync(connection, cancellationToken).ConfigureAwait(false);
             await SendBodyAsync(context.TimeProvider, framing, responseConnection, upload, cancellationToken).ConfigureAwait(false);
@@ -306,7 +321,23 @@ public sealed class HttpProtocolHandler(
         }
 
         TransferResult result = Succeeded(delivery, exchange.Head!, exchange.Report(body.BytesWritten));
-        return new HttpAttemptOutcome(result, retryAuthorization, HttpConnectionPersistence.KeepsAlive(exchange.Head, context.NoBody));
+        bool keepsAlive = HttpConnectionPersistence.KeepsAlive(exchange.Head, context.NoBody, options.Raw, options.IgnoreContentLength);
+        return new HttpAttemptOutcome(result, retryAuthorization, keepsAlive);
+    }
+
+    /// <summary>
+    /// Fails an HTTP/1.0 request whose body length is unknown before any byte of it is sent,
+    /// with exit 25, as curl 8.21.0 does once connected (measured, BL-180 Notes).
+    /// </summary>
+    /// <exception cref="HttpTransferException">
+    /// <see cref="HttpRequestFraming.RefusesUnknownLength" /> is set.
+    /// </exception>
+    private static void ThrowIfRefused(HttpRequestFraming framing)
+    {
+        if (framing.RefusesUnknownLength)
+        {
+            throw new HttpTransferException(CurlExitCode.UploadFailed, HttpTransferMessages.ChunkedUploadNeedsHttp11);
+        }
     }
 
     /// <summary>

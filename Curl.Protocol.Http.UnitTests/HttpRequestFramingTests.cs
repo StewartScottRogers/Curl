@@ -115,6 +115,57 @@ public sealed class HttpRequestFramingTests
         Assert.AreEqual(3L, framing.KnownLength);
     }
 
+    [TestMethod]
+    public void Of_Http10BodyAboveTheThreshold_AddsNoExpect()
+    {
+        HttpRequestOptions options = new()
+        {
+            Version = HttpVersionPreference.Http10,
+            Body = new BytesBody(new byte[HttpRequestFraming.ExpectContinueThreshold + 1], "a/b"),
+        };
+
+        HttpRequestFraming framing = Of(options);
+
+        Assert.IsFalse(framing.AddsExpect);
+        Assert.IsFalse(framing.AwaitsContinue);
+        Assert.IsFalse(framing.RefusesUnknownLength);
+    }
+
+    [TestMethod]
+    public void Of_Http10WithExpectHeader_StillWaitsForContinue()
+    {
+        HttpRequestOptions options = new()
+        {
+            Version = HttpVersionPreference.Http10,
+            Headers = ["Expect: 100-continue"],
+            Body = new BytesBody("x"u8.ToArray(), "a/b"),
+        };
+
+        HttpRequestFraming framing = Of(options);
+
+        Assert.IsFalse(framing.AddsExpect);
+        Assert.IsTrue(framing.AwaitsContinue);
+    }
+
+    [TestMethod]
+    [DataRow(HttpVersionPreference.Http10, null, true, DisplayName = "-0 refuses an unknown length")]
+    [DataRow(HttpVersionPreference.Http10, "Transfer-Encoding: chunked", false, DisplayName = "-0 with -H chunked sends it chunked")]
+    [DataRow(HttpVersionPreference.Http11, null, false, DisplayName = "HTTP/1.1 sends it chunked")]
+    public void Of_BodyOfUnknownLength_IsRefusedOnlyOverHttp10WithoutChunkedHeader(HttpVersionPreference version, string? header, bool refused)
+    {
+        HttpRequestOptions options = new()
+        {
+            Version = version,
+            Headers = header is null ? [] : [header],
+            Body = new StreamBody(Stream.Null, null, "a/b"),
+        };
+
+        HttpRequestFraming framing = Of(options);
+
+        Assert.AreEqual(refused, framing.RefusesUnknownLength);
+        Assert.IsTrue(framing.IsChunked);
+    }
+
     private static HttpRequestFraming Of(HttpRequestOptions options) =>
         HttpRequestFraming.Of(options, [.. options.Headers.Select(HttpCustomHeader.Parse)]);
 }

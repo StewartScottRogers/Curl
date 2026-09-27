@@ -6,14 +6,15 @@ using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 namespace Curl.Protocol.Http;
 
 /// <summary>
-/// Formats the head of an HTTP/1.1 request - the request line, the headers and the empty
+/// Formats the head of an HTTP/1.1 or HTTP/1.0 request - the request line, the headers and the empty
 /// line after them - byte for byte as curl 8.21.0 sends it for <c>-X</c>, <c>-H</c>,
 /// <c>-A</c>, <c>-e</c>, <c>-I</c>, <c>--compressed</c>, an <c>Authorization</c> value, a
 /// <c>Cookie</c> value, a request body, a forward proxy, <c>-r</c>, <c>-C</c> and <c>-z</c>. Every
-/// rule was measured (BL-172, BL-175, BL-177, BL-178, BL-181, BL-182 and BL-183 Notes).
+/// rule was measured (BL-172, BL-175, BL-177, BL-178, BL-180, BL-181, BL-182 and BL-183 Notes).
 /// </summary>
 /// <remarks>
-/// curl's own headers come first, in the order <c>Host</c>, <c>Proxy-Authorization</c>,
+/// The request line ends in <c>HTTP/1.0</c> for <c>-0</c> and in <c>HTTP/1.1</c> otherwise;
+/// the headers are the same for both. curl's own headers come first, in the order <c>Host</c>, <c>Proxy-Authorization</c>,
 /// <c>Authorization</c>, <c>Range</c>, <c>User-Agent</c>, <c>Accept</c>, <c>Accept-Encoding</c> (for
 /// <c>--compressed</c>), <c>Referer</c>, <c>Proxy-Connection: Keep-Alive</c> (through a forward
 /// proxy), each left out when an <c>-H</c> value names it, then the cookie store's
@@ -92,7 +93,7 @@ internal static class HttpRequestHeadFormatter
         HttpCustomHeader[] customHeaders = [.. options.Headers.Select(HttpCustomHeader.Parse)];
         HttpRequestFraming framing = HttpRequestFraming.Of(options, customHeaders, noBody);
         StringBuilder head = new();
-        head.Append(framing.Method).Append(' ').Append(forwardProxy ? AbsoluteForm(url) : url.PathAndQuery).Append(" HTTP/1.1\r\n");
+        head.Append(framing.Method).Append(' ').Append(forwardProxy ? AbsoluteForm(url) : url.PathAndQuery).Append(VersionOf(options)).Append("\r\n");
         string? hostLine = FormatHostLine(url, customHeaders);
         if (hostLine is not null)
         {
@@ -111,6 +112,12 @@ internal static class HttpRequestHeadFormatter
         head.Append("\r\n");
         return Encoding.Latin1.GetBytes(head.ToString());
     }
+
+    /// <summary>
+    /// Gives the request line's version: <c>HTTP/1.0</c> for <c>-0</c>, <c>HTTP/1.1</c> otherwise.
+    /// </summary>
+    private static string VersionOf(HttpRequestOptions options) =>
+        options.Version == HttpVersionPreference.Http10 ? " HTTP/1.0" : " HTTP/1.1";
 
     /// <summary>
     /// Appends <c>User-Agent</c>, <c>Accept</c>, <c>Accept-Encoding</c> (for

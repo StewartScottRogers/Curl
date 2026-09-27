@@ -6,7 +6,7 @@ namespace Curl.Protocol.Http;
 /// <summary>
 /// Every failure message sending an HTTP/1.x request body or reading a response head or
 /// body reports, as curl 8.21.0 prints it. Each was measured against a loopback server
-/// (BL-169, BL-170, BL-171, BL-174, BL-175, BL-176, BL-178) except <see cref="ReceiveFailed" /> and
+/// (BL-169, BL-170, BL-171, BL-174, BL-175, BL-176, BL-178, BL-180) except <see cref="ReceiveFailed" /> and
 /// <see cref="SendFailed" />, which are the texts <c>curl_easy_strerror</c> gives exits 56 and
 /// 55.
 /// </summary>
@@ -132,6 +132,12 @@ internal static class HttpTransferMessages
     /// The exit 63 message for a Content-Length over the <c>--max-filesize</c> limit.
     /// </summary>
     internal const string MaximumFileSizeExceeded = "Maximum file size exceeded";
+
+    /// <summary>
+    /// The exit 25 message for an HTTP/1.0 request (<c>-0</c>) whose body length is unknown
+    /// and that no <c>-H</c> value asks to send chunked (measured, BL-180 Notes).
+    /// </summary>
+    internal const string ChunkedUploadNeedsHttp11 = "Chunky upload is not supported by HTTP 1.0";
 
     /// <summary>
     /// Formats the exit 63 message for a body that grew past the <c>--max-filesize</c> limit,
