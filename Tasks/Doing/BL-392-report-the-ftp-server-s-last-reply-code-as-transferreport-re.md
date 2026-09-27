@@ -32,3 +32,4 @@ An FTP transfer's `TransferReport.ResponseCode` is the last reply code the serve
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
