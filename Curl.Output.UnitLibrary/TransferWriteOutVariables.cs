@@ -23,7 +23,8 @@ namespace Curl.Output;
 /// <c>time_redirect</c>, <c>time_total</c>, <c>time_queue</c>, <c>speed_download</c>,
 /// <c>speed_upload</c>, <c>ssl_verify_result</c>, <c>proxy_ssl_verify_result</c>,
 /// <c>tls_earlydata</c>, <c>num_retries</c>, <c>ftp_entry_path</c>, <c>num_certs</c>,
-/// <c>certs</c>, <c>proxy_used</c>, and
+/// <c>certs</c>, <c>proxy_used</c>, <c>referer</c>, <c>filename_effective</c>,
+/// <c>conn_id</c>, <c>xfer_id</c>, and
 /// <c>url.&lt;part&gt;</c> and <c>urle.&lt;part&gt;</c> for the parts <c>scheme</c>,
 /// <c>user</c>, <c>password</c>, <c>options</c>, <c>host</c>, <c>port</c>, <c>path</c>,
 /// <c>query</c>, <c>fragment</c> and <c>zoneid</c>. Any other name is reported unknown.
@@ -43,6 +44,14 @@ namespace Curl.Output;
 /// <c>proxy_used</c> is <c>1</c> when <see cref="TransferReport.UsedProxy"/> says the
 /// transfer was set to go through a proxy and <c>0</c> otherwise, as measured on 2026-09-27
 /// against curl 8.21.0 (mingw, Schannel). See ADR-0058 and BL-302.
+/// </para>
+/// <para>
+/// <c>referer</c>, <c>filename_effective</c>, <c>conn_id</c> and <c>xfer_id</c> are known
+/// to the command line and the process, not to a handler, so they are set by the caller
+/// through <see cref="Referer"/>, <see cref="OutputFileName"/>, <see cref="ConnectionId"/>
+/// and <see cref="TransferId"/>. Measured on 2026-09-26 against curl 8.21.0 (mingw,
+/// Schannel): no <c>-e</c> and output to standard output print nothing, and a URL curl
+/// rejects prints <c>conn_id</c> <c>-1</c>. See BL-305.
 /// </para>
 /// <para>
 /// <c>time_queue</c> is the handler's start, the moment the transfer left the queue, so
@@ -150,6 +159,10 @@ public sealed class TransferWriteOutVariables(
         ["num_certs"] = variables => FormatNumber(variables.report.PeerCertificates.Count),
         ["proxy_used"] = variables => variables.report.UsedProxy ? "1" : "0",
         ["certs"] = variables => string.Concat(variables.report.PeerCertificates.Select(PeerCertificateText.Format)),
+        ["referer"] = variables => variables.Referer ?? string.Empty,
+        ["filename_effective"] = variables => variables.OutputFileName ?? string.Empty,
+        ["conn_id"] = variables => FormatNumber(variables.ConnectionId),
+        ["xfer_id"] = variables => FormatNumber(variables.TransferId),
     });
 
     private static readonly char[] HeaderValueWhitespace = [' ', '\t'];
@@ -161,6 +174,29 @@ public sealed class TransferWriteOutVariables(
     private readonly int urlNumber = urlNumber;
     private readonly string? scheme = scheme;
     private readonly TimeProvider timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+
+    /// <summary>
+    /// Gets the <c>Referer</c> the request was sent with, printed by <c>%{referer}</c>, or
+    /// <see langword="null"/> (printed as nothing) when it was sent without one.
+    /// </summary>
+    public string? Referer { get; init; }
+
+    /// <summary>
+    /// Gets the file the body was saved to, printed by <c>%{filename_effective}</c>, or
+    /// <see langword="null"/> (printed as nothing) when it went to standard output.
+    /// </summary>
+    public string? OutputFileName { get; init; }
+
+    /// <summary>
+    /// Gets the process-wide number of the connection the transfer used, printed by
+    /// <c>%{conn_id}</c>; <c>-1</c>, the default, when it used none.
+    /// </summary>
+    public long ConnectionId { get; init; } = -1;
+
+    /// <summary>
+    /// Gets the process-wide zero-based number of the transfer, printed by <c>%{xfer_id}</c>.
+    /// </summary>
+    public long TransferId { get; init; }
 
     private long DownloadSize => result.Report?.DownloadSize ?? result.BytesTransferred;
 
