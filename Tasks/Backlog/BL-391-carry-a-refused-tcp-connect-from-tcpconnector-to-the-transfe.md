@@ -1,5 +1,5 @@
 ---
-id: BL-388
+id: BL-391
 title: Carry a refused TCP connect from TcpConnector to the TransferResult
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-388 — Carry a refused TCP connect from TcpConnector to the TransferResult
+# BL-391 — Carry a refused TCP connect from TcpConnector to the TransferResult
 
 ## Goal
 

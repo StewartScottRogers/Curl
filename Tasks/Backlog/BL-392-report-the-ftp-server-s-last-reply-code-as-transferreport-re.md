@@ -1,5 +1,5 @@
 ---
-id: BL-389
+id: BL-392
 title: Report the FTP server's last reply code as TransferReport.ResponseCode
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-389 — Report the FTP server's last reply code as TransferReport.ResponseCode
+# BL-392 — Report the FTP server's last reply code as TransferReport.ResponseCode
 
 ## Goal
 
