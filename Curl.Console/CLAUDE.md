@@ -66,6 +66,14 @@ writes for a `file://` transfer. It is not written under `-s`, `--no-progress-me
 `-#`, nor for a body on standard output when that is a terminal. Live counters, the bar
 form and the meter after any other failed transfer are not modelled yet (BL-130 to BL-132).
 
+With `-w`, each transfer's template is rendered by `Curl.Output`'s `WriteOutTemplateRenderer`
+after its failure lines, after a failure as after a success (a `-D` or resumed `-o` file that
+cannot be opened included), with `TransferWriteOutVariables` as its values. On Windows the
+line feeds it writes to standard error, and to standard output while curl's standard output
+would still be in text mode, go through `LineFeedToCrLfStream` as CR LF (ADR-0040).
+`%output{file}` targets go through the runner's `IWriteOutFileOpener`; the default,
+`RefusingWriteOutFileOpener`, opens none until BL-280.
+
 A URL with no `-o` writes through `StandardOutputFailureDeferringStream`, which
 models curl's 4096-byte stdio buffer: a failed standard output is reported as
 `curl: Failed writing body` (exit 23) while the body fits the buffer, and as the

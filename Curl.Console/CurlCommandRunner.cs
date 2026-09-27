@@ -5,6 +5,7 @@ using Curl.Cli;
 using Curl.Core;
 using Curl.Core.FileSystem;
 using Curl.Core.Multipart;
+using Curl.Output;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Console;
@@ -62,6 +63,15 @@ namespace Curl.Console;
 /// real disk, encoding text in the platform's encoding (ADR-0027: the one
 /// <see cref="CredentialEncoding.ForPlatform" /> gives) and drawing random boundaries with
 /// <see cref="MultipartBoundary.CreateRandom" />.
+/// </param>
+/// <param name="writeOutFileOpener">
+/// Opens the <c>%output{file}</c> targets of a <c>-w</c> template; when not given, a
+/// <see cref="RefusingWriteOutFileOpener" />.
+/// </param>
+/// <param name="timeProvider">
+/// The provider that took each transfer's <see cref="TransferTimings" />, which the <c>-w</c>
+/// <c>time_*</c> variables are measured with, and the clock <c>%time{format}</c> reads;
+/// <see cref="TimeProvider.System" /> when not given.
 /// </param>
 /// <remarks>
 /// <para>
@@ -132,6 +142,16 @@ namespace Curl.Console;
 /// form file that cannot be opened ends that transfer with the builder's exit 26 and no
 /// connection, as curl 8.21.0 does.
 /// </para>
+/// <para>
+/// With <c>-w</c> each transfer's template is rendered by <see cref="WriteOutTemplateRenderer" />
+/// after its failure lines, whether it succeeded or failed, and also after a <c>-D</c> or resumed
+/// <c>-o</c> file that could not be opened, as curl 8.21.0 does (measured 2026-09-26, BL-235).
+/// On Windows curl writes standard error, and standard output until a body is sent there, in
+/// text mode, so those line feeds are written as CR LF (<see cref="LineFeedToCrLfStream" />).
+/// Because curl's standard output is buffered, its mode when the buffer is written out decides:
+/// the template's standard output is binary once any transfer of the run sends its body to
+/// standard output, including a later one (see <see cref="IsStandardOutputBinaryForWriteOut" />).
+/// </para>
 /// </remarks>
 internal sealed class CurlCommandRunner(
     Func<CommandLineOptions, TransferDispatch> createTransferDispatch,
@@ -144,7 +164,9 @@ internal sealed class CurlCommandRunner(
     int terminalColumns = TerminalColumns.Default,
     bool writesProgressMeter = false,
     bool standardOutputIsTerminal = false,
-    MultipartFormBodyBuilder? formBodyBuilder = null)
+    MultipartFormBodyBuilder? formBodyBuilder = null,
+    IWriteOutFileOpener? writeOutFileOpener = null,
+    TimeProvider? timeProvider = null)
 {
     /// <summary>
     /// curl 8.21.0's message for a URL that cannot be parsed at all, measured on
@@ -177,6 +199,18 @@ internal sealed class CurlCommandRunner(
             new PhysicalFileSystem(),
             CredentialEncoding.ForPlatform(runsOnWindows),
             MultipartBoundary.CreateRandom);
+
+    /// <summary>The clock the <c>-w</c> variables and <c>%time{format}</c> read.</summary>
+    private readonly TimeProvider timeProvider = timeProvider ?? TimeProvider.System;
+
+    /// <summary>
+    /// Renders each transfer's <c>-w</c> template. It writes line feeds as they are; the
+    /// runner decides which targets are in text mode.
+    /// </summary>
+    private readonly WriteOutTemplateRenderer writeOutRenderer = new(
+        writeOutFileOpener ?? new RefusingWriteOutFileOpener(),
+        writesLineFeedAsCrLf: false,
+        timeProvider ?? TimeProvider.System);
 
     /// <summary>
     /// The result of a transfer whose write to standard output failed. It is compared by
@@ -253,6 +287,8 @@ internal sealed class CurlCommandRunner(
         TransferDispatch dispatch = createTransferDispatch(options);
         bool showsErrors = ShowsErrors(options);
 
+        bool bodyWrittenToStandardOutput = false;
+
         for (int index = 0; index < options.Urls.Count; index++)
         {
             TransferResult result = await TransferWithHeaderOutputAsync(dispatch, options, index)
@@ -261,14 +297,16 @@ internal sealed class CurlCommandRunner(
 
             if (showsErrors && result.ErrorMessage is not null)
             {
-                await WriteErrorLineAsync(FormatErrorLine(result)).ConfigureAwait(false);
-                if (result.ExitCode == CurlExitCode.PeerFailedVerification)
-                {
-                    await WriteCertificateHelpBlockAsync().ConfigureAwait(false);
-                }
+                await WriteFailureLinesAsync(result).ConfigureAwait(false);
             }
 
-            if (EndsTheRun(options, result))
+            bool endsTheRun = EndsTheRun(options, result);
+            bodyWrittenToStandardOutput |= SendsBodyToStandardOutput(options, index, result);
+            bool standardOutputIsBinary = IsStandardOutputBinaryForWriteOut(
+                options, index, bodyWrittenToStandardOutput, endsTheRun);
+            await WriteOutAsync(options, index, result, standardOutputIsBinary).ConfigureAwait(false);
+
+            if (endsTheRun)
             {
                 break;
             }
@@ -276,6 +314,110 @@ internal sealed class CurlCommandRunner(
 
         return exitCode;
     }
+
+    /// <summary>
+    /// Writes a failed transfer's <c>curl: (N) &lt;message&gt;</c> line, followed by curl's
+    /// certificate help block for exit 60.
+    /// </summary>
+    /// <param name="result">The failed transfer's result, which carries a message.</param>
+    /// <returns>A task that completes when the lines are flushed.</returns>
+    private async Task WriteFailureLinesAsync(TransferResult result)
+    {
+        await WriteErrorLineAsync(FormatErrorLine(result)).ConfigureAwait(false);
+        if (result.ExitCode == CurlExitCode.PeerFailedVerification)
+        {
+            await WriteCertificateHelpBlockAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Tells whether the transfer of the URL at <paramref name="index" /> was set up to send its
+    /// body to standard output, which is when curl switches standard output to binary mode: it
+    /// has no <c>-o</c>, and its <c>-D</c> file, if any, could be opened.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="index">The URL's position on the command line.</param>
+    /// <param name="result">The transfer's result.</param>
+    /// <returns><see langword="true" /> when the body went, or was to go, to standard output.</returns>
+    private static bool SendsBodyToStandardOutput(CommandLineOptions options, int index, TransferResult result) =>
+        index >= options.OutputFiles.Count && !ReferenceEquals(result, CannotOpenHeaderFileFailure);
+
+    /// <summary>
+    /// Tells whether the <c>-w</c> output of the URL at <paramref name="index" /> reaches
+    /// standard output in binary mode, its line feeds unchanged.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="index">The URL's position on the command line.</param>
+    /// <param name="bodyWrittenToStandardOutput">Whether this or an earlier transfer sent its body to standard output.</param>
+    /// <param name="endsTheRun">Whether this transfer is the run's last.</param>
+    /// <returns>
+    /// Always <see langword="true" /> off Windows. On Windows, <see langword="true" /> when this or
+    /// an earlier transfer sent its body to standard output, or when the run goes on and a later
+    /// URL has no <c>-o</c>: curl 8.21.0 holds the <c>-w</c> text in its stdio buffer, and the
+    /// later transfer switches standard output to binary before the buffer is written out.
+    /// Measured on 2026-09-26: <c>-o NUL -o NUL -w "%{exitcode}\n" f f g</c>, with <c>g</c> to
+    /// standard output, writes <c>0\n0\n</c> before <c>g</c>'s body. A later transfer whose
+    /// resumed <c>-o</c> file cannot be opened stops the run before that URL, which curl reports as
+    /// CR LF and this reports as LF; that case is not modelled.
+    /// </returns>
+    private bool IsStandardOutputBinaryForWriteOut(
+        CommandLineOptions options,
+        int index,
+        bool bodyWrittenToStandardOutput,
+        bool endsTheRun) =>
+        !runsOnWindows
+        || bodyWrittenToStandardOutput
+        || (!endsTheRun && options.Urls.Count > Math.Max(index + 1, options.OutputFiles.Count));
+
+    /// <summary>
+    /// Renders the <c>-w</c> template, when one was given, for the finished transfer of the URL
+    /// at <paramref name="index" />: its standard output goes where the body does, or nowhere once
+    /// standard output has failed, while the rest of the template still renders, as curl 8.21.0
+    /// prints <c>-w "A%{exitcode}%{stderr}B%{exitcode}\n"</c> to a closed standard output as
+    /// <c>B23</c> on standard error (measured 2026-09-26); and on Windows
+    /// the line feeds written to standard error, and to standard output while it is in text mode,
+    /// become CR LF.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="index">The URL's position on the command line, printed by <c>%{urlnum}</c>.</param>
+    /// <param name="result">The transfer's result.</param>
+    /// <param name="standardOutputIsBinary">Whether standard output keeps its line feeds.</param>
+    /// <returns>A task that completes when the template is rendered.</returns>
+    private async Task WriteOutAsync(CommandLineOptions options, int index, TransferResult result, bool standardOutputIsBinary)
+    {
+        if (options.WriteOut is not { } template)
+        {
+            return;
+        }
+
+        string url = options.Urls[index];
+        string requestUrl = QueryUrl.Append(url, options);
+        TransferWriteOutVariables variables = new(
+            result, url, index, requestUrl, WriteOutScheme(requestUrl, result), timeProvider);
+
+        Stream liveStandardOutput = deferringStandardOutput.HasWriteFailed ? Stream.Null : deferringStandardOutput;
+        Stream writeOutStandardOutput = standardOutputIsBinary
+            ? liveStandardOutput
+            : new LineFeedToCrLfStream(liveStandardOutput);
+        Stream writeOutStandardError = runsOnWindows ? new LineFeedToCrLfStream(standardError) : standardError;
+        await writeOutRenderer
+            .RenderAsync(template, variables, writeOutStandardOutput, writeOutStandardError)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The scheme <c>%{scheme}</c> prints: the URL's, in lower case, or <see langword="null" />
+    /// (printed as nothing) when the URL cannot be parsed or no handler serves its scheme, as
+    /// curl 8.21.0 prints it for <c>dict://exa mple.com/</c> and <c>xyz://a/b</c>.
+    /// </summary>
+    /// <param name="requestUrl">The URL, with any <c>-G</c> / <c>--url-query</c> query.</param>
+    /// <param name="result">The transfer's result.</param>
+    /// <returns>The scheme, or <see langword="null" />.</returns>
+    private static string? WriteOutScheme(string requestUrl, TransferResult result) =>
+        result.ExitCode != CurlExitCode.UnsupportedProtocol
+        && Uri.TryCreate(requestUrl, UriKind.Absolute, out Uri? uri)
+            ? uri.Scheme.ToLowerInvariant()
+            : null;
 
     /// <summary>
     /// Tells whether a transfer's result stops the URLs after it: a resumed transfer whose
