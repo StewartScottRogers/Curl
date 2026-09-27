@@ -57,7 +57,7 @@ Under `-v`, the cookie store reports each cookie it adds and each one it drops a
   - 52 headers `k<i>=v; Path=/` -> 50 `Added` lines, nothing for k51 and k52 (pinned)
   - `Path=nope` -> stored with path `/`, `Path="/x"` -> path `/x`: `Added` lines, no drop.
   - Host longer than 255 characters (`(a*63.)x4example.com`): curl exits 3, `URL rejected: Malformed input to a URL function`, so the store's 255-character rule cannot be reached from curl and prints the PSL line in our store. Not pinned: unmeasurable.
-- Out of scope, filed as BL-441 (refused inside `SetCookieParser`, which returns `null` with no reason; giving it one is a separate change to another class):
+- Out of scope, filed as BL-443 (refused inside `SetCookieParser`, which returns `null` with no reason; giving it one is a separate change to another class):
   - `n3=v; Path=/; Domain=other.test` -> `skipped cookie with bad tailmatch domain: other.test`; host `127.0.0.1`, `i=1; Domain=127.0.0.2` -> `skipped cookie with bad tailmatch domain: 127.0.0.2`
   - `n4=v; Path=/; Secure` over HTTP -> `skipped cookie because not 'secure'`
   - `noequals`, `=emptyname` -> `invalid cookie, dropped` each

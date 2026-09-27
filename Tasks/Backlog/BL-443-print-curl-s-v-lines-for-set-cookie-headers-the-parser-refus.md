@@ -1,5 +1,5 @@
 ---
-id: BL-441
+id: BL-443
 title: Print curl's -v lines for Set-Cookie headers the parser refuses
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-441 — Print curl's -v lines for Set-Cookie headers the parser refuses
+# BL-443 — Print curl's -v lines for Set-Cookie headers the parser refuses
 
 ## Goal
 
