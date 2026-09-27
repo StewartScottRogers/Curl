@@ -32,3 +32,4 @@ A connect that failed because every address refused it reaches `TransferResult` 
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
