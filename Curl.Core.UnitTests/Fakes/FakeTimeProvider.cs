@@ -27,6 +27,19 @@ internal sealed class FakeTimeProvider(DateTimeOffset start) : TimeProvider
         }
     }
 
+    /// <summary>
+    /// Moves the clock forward without a timer, as time spent inside an operation does;
+    /// <see cref="Waits" /> does not record it.
+    /// </summary>
+    /// <param name="duration">How far to move the clock.</param>
+    public void Advance(TimeSpan duration)
+    {
+        lock (gate)
+        {
+            elapsed += duration;
+        }
+    }
+
     /// <inheritdoc />
     public override DateTimeOffset GetUtcNow()
     {

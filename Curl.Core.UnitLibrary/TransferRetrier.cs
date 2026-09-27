@@ -10,11 +10,21 @@ namespace Curl.Core;
 /// <remarks>
 /// <para>
 /// A transfer is retried when it failed with exit 28, 6, 5 or 12
-/// (<see cref="TransferRetryReason.Timeout" />), or when an http:// or https:// transfer
+/// (<see cref="TransferRetryReason.Timeout" />); when an http:// or https:// transfer
 /// succeeded, or failed with exit 22 under <c>-f</c>, with status 408, 429, 500, 502, 503,
-/// 504, 522 or 524 (<see cref="TransferRetryReason.HttpError" />). The scheme is that of the
-/// last URL requested, so a redirect chain's last hop decides. Every other result is final,
-/// and so is the result of the last retry.
+/// 504, 522 or 524 (<see cref="TransferRetryReason.HttpError" />); when any other failure of
+/// an ftp:// or ftps:// transfer carries a 4xx <see cref="TransferReport.ResponseCode" />
+/// (<see cref="TransferRetryReason.FtpError" />); and, under <c>--retry-all-errors</c>, when
+/// it failed in any other way (<see cref="TransferRetryReason.AllErrors" />). The scheme is
+/// that of the last URL requested, so a redirect chain's last hop decides. Every other
+/// result is final, and so is the result of the last retry.
+/// </para>
+/// <para>
+/// Under <c>--retry-max-time</c> no retry follows an attempt that ends that long after the
+/// first began, and a <c>Retry-After</c> that would wait past it ends the retries with
+/// <see cref="TransferRetryWarning.RetryAfterExceedsMaxTime" />; a backoff or
+/// <c>--retry-delay</c> wait may run past it. Measured with curl 8.21.0 on 2026-09-27; the
+/// commands are in BL-317's notes.
 /// </para>
 /// <para>
 /// The wait before a retry is the <c>Retry-After</c> of an HTTP error, read by
@@ -55,6 +65,12 @@ public sealed class TransferRetrier(Func<ITransferContext, ValueTask<TransferRes
     /// (<see cref="TransferRetryWarning" />), before the wait; the caller reports the attempt's
     /// failure, prints the warning unless silenced, and readies the output for the next attempt.
     /// </param>
+    /// <param name="retriesAbandoned">
+    /// Called with the attempt that is returned instead of retried and
+    /// <see cref="TransferRetryWarning.RetryAfterExceedsMaxTime" />, when its
+    /// <c>Retry-After</c> would wait past <see cref="RetryPolicy.MaxTime" />; the caller prints
+    /// the warning unless silenced.
+    /// </param>
     /// <returns>The result of the first attempt not retried.</returns>
     /// <exception cref="OperationCanceledException">
     /// <see cref="ITransferContext.CancellationToken" /> was cancelled during a wait.
@@ -62,40 +78,73 @@ public sealed class TransferRetrier(Func<ITransferContext, ValueTask<TransferRes
     public async ValueTask<TransferResult> RunAsync(
         ITransferContext context,
         RetryPolicy policy,
-        Action<TransferResult, string> retrying)
+        Action<TransferResult, string> retrying,
+        Action<TransferResult, string> retriesAbandoned)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(policy);
         ArgumentNullException.ThrowIfNull(retrying);
+        ArgumentNullException.ThrowIfNull(retriesAbandoned);
 
+        TimeProvider clock = context.TimeProvider;
+        long started = clock.GetTimestamp();
         RetryWaits waits = new(policy.Delay);
         long retriesLeft = policy.Retries;
         while (true)
         {
             TransferResult result = await transfer(context).ConfigureAwait(false);
-            if (retriesLeft <= 0 || RetryReason(context.Url, result) is not { } reason)
+            TimeSpan elapsed = clock.GetElapsedTime(started);
+            if (retriesLeft <= 0 || HasReached(policy.MaxTime, elapsed) || RetryReason(policy, context.Url, result) is not { } reason)
             {
                 return result;
             }
 
-            TimeSpan wait = waits.Next(RetryAfter(reason, result.Report, context.TimeProvider));
+            TimeSpan retryAfter = RetryAfter(reason, result.Report, clock);
+            if (RetryAfterPassesMaxTime(policy.MaxTime, elapsed, retryAfter))
+            {
+                retriesAbandoned(result, TransferRetryWarning.RetryAfterExceedsMaxTime);
+                return result;
+            }
+
+            TimeSpan wait = waits.Next(retryAfter);
             retrying(result, TransferRetryWarning.For(reason, wait, retriesLeft));
             retriesLeft--;
-            await Task.Delay(wait, context.TimeProvider, context.CancellationToken).ConfigureAwait(false);
+            await Task.Delay(wait, clock, context.CancellationToken).ConfigureAwait(false);
         }
     }
 
-    private static TransferRetryReason? RetryReason(CurlUrl url, TransferResult result)
+    /// <summary>Whether <paramref name="elapsed" /> has reached a set <c>--retry-max-time</c>.</summary>
+    private static bool HasReached(TimeSpan maxTime, TimeSpan elapsed) =>
+        maxTime != TimeSpan.Zero && elapsed >= maxTime;
+
+    /// <summary>
+    /// Whether a <c>Retry-After</c> wait, begun at <paramref name="elapsed" />, would end after
+    /// a set <c>--retry-max-time</c>.
+    /// </summary>
+    private static bool RetryAfterPassesMaxTime(TimeSpan maxTime, TimeSpan elapsed, TimeSpan retryAfter) =>
+        maxTime != TimeSpan.Zero && retryAfter != TimeSpan.Zero && elapsed + retryAfter > maxTime;
+
+    private static TransferRetryReason? RetryReason(RetryPolicy policy, CurlUrl url, TransferResult result) =>
+        TransientReason(url, result)
+        ?? (policy.RetryAllErrors && !result.IsSuccess ? TransferRetryReason.AllErrors : null);
+
+    private static TransferRetryReason? TransientReason(CurlUrl url, TransferResult result) =>
+        TimeoutFailures.Contains(result.ExitCode) ? TransferRetryReason.Timeout : ProtocolErrorReason(url, result);
+
+    private static TransferRetryReason? ProtocolErrorReason(CurlUrl url, TransferResult result)
     {
-        if (TimeoutFailures.Contains(result.ExitCode))
+        if (result.ExitCode is CurlExitCode.Ok or CurlExitCode.HttpReturnedError)
         {
-            return TransferRetryReason.Timeout;
+            return IsTransientHttpError(url, result.Report) ? TransferRetryReason.HttpError : null;
         }
 
-        return result.ExitCode is CurlExitCode.Ok or CurlExitCode.HttpReturnedError && IsTransientHttpError(url, result.Report)
-            ? TransferRetryReason.HttpError
-            : null;
+        return IsTransientFtpError(url, result.Report) ? TransferRetryReason.FtpError : null;
     }
+
+    private static bool IsTransientFtpError(CurlUrl url, TransferReport? report) =>
+        report is not null
+        && report.ResponseCode / 100 == 4
+        && LastScheme(url, report) is "ftp" or "ftps";
 
     private static bool IsTransientHttpError(CurlUrl url, TransferReport? report) =>
         report is not null

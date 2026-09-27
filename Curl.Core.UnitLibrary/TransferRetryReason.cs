@@ -17,4 +17,16 @@ public enum TransferRetryReason
     /// <c>: HTTP error</c>.
     /// </summary>
     HttpError,
+
+    /// <summary>
+    /// An FTP or FTPS transfer failed after the server's last reply was a 4xx:
+    /// <c>: FTP error</c>.
+    /// </summary>
+    FtpError,
+
+    /// <summary>
+    /// The transfer failed for a reason curl does not retry by itself, and
+    /// <c>--retry-all-errors</c> was given: <c>(retrying all errors)</c>.
+    /// </summary>
+    AllErrors,
 }
