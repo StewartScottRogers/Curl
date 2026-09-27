@@ -88,6 +88,7 @@ choices do not need one.
 | [0071](ADR-0071-a-failed-z-file-lookup-off-windows-stands-in-for-stat-and-prints-its-strerror-text.md) | A failed `-z` file lookup off Windows stands in for `stat` (`File.GetAttributes`) and prints curl's `strerror` text, file not found included; symbolic links and the Windows `con`/`nul` devices are follow-ups | Accepted | 2026-09-27 |
 | [0072](ADR-0072-failure-messages-naming-a-host-are-cut-to-curls-255-byte-error-buffer.md) | A host `Dns` refuses as over 255 characters is not resolved (exit 6, or 5 for a proxy), and resolve failures naming a host are cut to 255 characters (`CurlErrorBuffer`), as curl 8.21.0's 256-byte error buffer cuts them; the general cut in `Curl.Console` is BL-380 | Accepted | 2026-09-27 |
 | [0073](ADR-0073-a-z-date-after-the-year-9999-reads-as-the-last-second-of-9999.md) | A `-z` date after the year 9999, which curl reads in a 64-bit `time_t`, reads as 9999-12-31 23:59:59 UTC in `CurlDateParser`; `TimeCondition` stays a `DateTimeOffset`, and a date before year 1 is still refused | Accepted | 2026-09-27 |
+| [0074](ADR-0074-one-curl-date-parser-lives-in-curl-protocol-abstractions.md) | One port of libcurl's `parsedate`, `CurlDateParser` in `Curl.Protocol.Abstractions`, reads `-z` dates and cookie `Expires`; `Curl.Cli` caps it into a `DateTimeOffset`, and `-z` refuses a year before 1583 | Accepted | 2026-09-27 |
 
 ## Template
 
