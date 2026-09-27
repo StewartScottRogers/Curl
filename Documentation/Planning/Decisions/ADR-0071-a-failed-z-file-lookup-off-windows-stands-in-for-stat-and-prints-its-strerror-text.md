@@ -43,7 +43,8 @@ Measured with curl 8.18.0 (x86_64-pc-linux-gnu, OpenSSL/3.5.5, Ubuntu under WSL)
 ## Consequences
 
 Every row above matches except the symbolic links: `File.GetAttributes` uses `lstat`, so a
-dangling link or a loop reads the link's own time where curl warns (follow-up task).
+dangling link or a loop reads the link's own time where curl warns (BL-379 closes this: ADR-0090
+follows the final link).
 `-z con` and `-z nul` on Windows still differ: .NET opens both devices with `GENERIC_READ` and
 then fails in `GetFileInformationByHandleEx` with `ERROR_INVALID_FUNCTION` for each, so the base
 class library's file API gives no signal separating curl's `CreateFile failed: GetLastError

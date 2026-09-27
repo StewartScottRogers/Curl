@@ -26,6 +26,12 @@ public sealed class DiskDataFileReader(Func<string, byte[]> readAllBytes, Func<S
 
     private const string NotADirectory = "Not a directory";
 
+    private const string TooManyLevelsOfSymbolicLinks = "Too many levels of symbolic links";
+
+    private static readonly Func<string, byte[]> ReadAllBytesFromDisk = File.ReadAllBytes;
+
+    private static readonly Func<Stream> OpenProcessStandardInput = Console.OpenStandardInput;
+
     /// <summary>
     /// The reader over the disk for the operating system this process runs on:
     /// <see cref="ForPlatform"/> <see cref="OperatingSystem.IsWindows()"/>.
@@ -43,7 +49,26 @@ public sealed class DiskDataFileReader(Func<string, byte[]> readAllBytes, Func<S
     /// <param name="isWindows">Whether to behave as curl's Windows build.</param>
     /// <returns>The reader.</returns>
     public static DiskDataFileReader ForPlatform(bool isWindows) =>
-        new(File.ReadAllBytes, Console.OpenStandardInput, isWindows ? WindowsFileTimeReader.ReadLastWriteTimeUtc : ReadLastWriteTimeUtcByStat, isWindows);
+        isWindows
+            ? new(ReadAllBytesFromDisk, OpenProcessStandardInput, WindowsFileTimeReader.ReadLastWriteTimeUtc, true)
+            : ForStatFollowingLinksWith(ResolveFinalLinkTarget);
+
+    /// <summary>
+    /// The reader over the disk that looks up a modification time as curl's Linux and macOS builds
+    /// do with <c>stat</c>, following a symbolic link to its final target through
+    /// <paramref name="resolveFinalLinkTarget"/>: a link whose final target is missing fails as
+    /// <c>No such file or directory</c>, a link loop as <c>Too many levels of symbolic links</c>, and
+    /// a link to an existing file has that file's time (ADR-0090).
+    /// </summary>
+    /// <param name="resolveFinalLinkTarget">
+    /// Resolves a path to the final target of its symbolic link, as
+    /// <see cref="File.ResolveLinkTarget(string, bool)"/> does with <c>returnFinalTarget</c>:
+    /// <see langword="null"/> when the path is not a link, and an <see cref="IOException"/> of exactly
+    /// that type when the links loop.
+    /// </param>
+    /// <returns>The reader.</returns>
+    public static DiskDataFileReader ForStatFollowingLinksWith(Func<string, FileSystemInfo?> resolveFinalLinkTarget) =>
+        new(ReadAllBytesFromDisk, OpenProcessStandardInput, path => ReadLastWriteTimeUtcByStat(path, resolveFinalLinkTarget), false);
 
     /// <inheritdoc/>
     public bool TryReadFile(string path, out byte[] contents)
@@ -134,9 +159,10 @@ public sealed class DiskDataFileReader(Func<string, byte[]> readAllBytes, Func<S
     /// <summary>
     /// Stands in for <c>stat</c>: <see cref="File.GetAttributes(string)"/> fails as it does, except that
     /// .NET reports <c>ENOTDIR</c> as a missing directory and ignores a trailing separator after a
-    /// file, so both are told apart here by looking for the file in the way.
+    /// file, so both are told apart here by looking for the file in the way. <see cref="File.GetAttributes(string)"/>
+    /// does not follow a final symbolic link, so the link is followed afterwards.
     /// </summary>
-    private static DateTime ReadLastWriteTimeUtcByStat(string path)
+    private static DateTime ReadLastWriteTimeUtcByStat(string path, Func<string, FileSystemInfo?> resolveFinalLinkTarget)
     {
         FileAttributes attributes;
         try
@@ -153,8 +179,37 @@ public sealed class DiskDataFileReader(Func<string, byte[]> readAllBytes, Func<S
             throw new IOException(NotADirectory);
         }
 
-        return File.GetLastWriteTimeUtc(path);
+        return File.GetLastWriteTimeUtc(ResolveFinalLinkTargetAsStatDoes(path, resolveFinalLinkTarget)?.FullName ?? path);
     }
+
+    /// <summary>
+    /// A missing final target fails as <c>stat</c> does: <c>ENOTDIR</c> when a file stands in its
+    /// path, otherwise <c>ENOENT</c>; a link loop fails as <c>ELOOP</c>. Existence is asked of the
+    /// path, not the <see cref="FileSystemInfo"/>, because <see cref="File.ResolveLinkTarget(string, bool)"/>
+    /// returns a <see cref="FileInfo"/> even for a directory.
+    /// </summary>
+    private static FileSystemInfo? ResolveFinalLinkTargetAsStatDoes(string path, Func<string, FileSystemInfo?> resolveFinalLinkTarget)
+    {
+        FileSystemInfo? linkTarget;
+        try
+        {
+            linkTarget = resolveFinalLinkTarget(path);
+        }
+        catch (IOException exception) when (exception.GetType() == typeof(IOException))
+        {
+            throw new IOException(TooManyLevelsOfSymbolicLinks, exception);
+        }
+
+        if (linkTarget is not null && !Path.Exists(linkTarget.FullName))
+        {
+            throw HasFileAncestor(linkTarget.FullName) ? new IOException(NotADirectory) : new FileNotFoundException(NoSuchFileOrDirectory);
+        }
+
+        return linkTarget;
+    }
+
+    private static FileSystemInfo? ResolveFinalLinkTarget(string path) =>
+        File.ResolveLinkTarget(Path.GetFullPath(path), returnFinalTarget: true);
 
     private static bool HasFileAncestor(string path)
     {

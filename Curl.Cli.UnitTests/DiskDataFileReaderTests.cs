@@ -178,6 +178,108 @@ public sealed class DiskDataFileReaderTests
         Assert.IsNull(failureReason);
     }
 
+    /// <summary>
+    /// curl 8.18.0 (OpenSSL build, Ubuntu), 2026-09-27: <c>stat</c> follows a symbolic link, so a
+    /// dangling one fails as <c>No such file or directory</c>, one whose target runs through a file as
+    /// <c>Not a directory</c>, and a loop as <c>Too many levels of symbolic links</c> (ADR-0090).
+    /// </summary>
+    /// <param name="linkTarget">What the link resolves to, under a scratch directory holding the file <c>file</c>, or <c>loop</c>.</param>
+    /// <param name="expectedReason">The reason reported.</param>
+    [TestMethod]
+    [DataRow("nothing", "No such file or directory")]
+    [DataRow("file/x", "Not a directory")]
+    [DataRow("loop", "Too many levels of symbolic links")]
+    public void TryReadModificationTime_ForStatLinkThatCannotBeFollowed_ReportsCurlsStatReason(string linkTarget, string expectedReason)
+    {
+        using ScratchDirectory scratch = new();
+        DiskDataFileReader reader = DiskDataFileReader.ForStatFollowingLinksWith(_ => linkTarget == "loop"
+            ? throw new IOException("Too many levels of symbolic links in '/tmp/loop1'.")
+            : new FileInfo(Path.Combine(scratch.Path, linkTarget)));
+
+        bool read = reader.TryReadModificationTime(Path.Combine(scratch.Path, "file"), out _, out string? failureReason);
+
+        Assert.IsFalse(read);
+        Assert.AreEqual(expectedReason, failureReason);
+    }
+
+    [TestMethod]
+    public void TryReadModificationTime_ForStatLinkFailingOtherwise_ReportsThatFailure()
+    {
+        using ScratchDirectory scratch = new();
+        DiskDataFileReader reader = DiskDataFileReader.ForStatFollowingLinksWith(_ => throw new UnauthorizedAccessException());
+
+        bool read = reader.TryReadModificationTime(Path.Combine(scratch.Path, "file"), out _, out string? failureReason);
+
+        Assert.IsFalse(read);
+        Assert.AreEqual("Permission denied", failureReason);
+    }
+
+    /// <summary>
+    /// curl 8.18.0 (OpenSSL build, Ubuntu), 2026-09-27: a link to an existing file has the target's
+    /// time; so does a link to a directory, which <see cref="File.ResolveLinkTarget(string, bool)"/>
+    /// returns as a <see cref="FileInfo"/>.
+    /// </summary>
+    /// <param name="targetName">The link's target under a scratch directory holding the file <c>file</c> and the directory <c>dir</c>.</param>
+    [TestMethod]
+    [DataRow("file")]
+    [DataRow("dir")]
+    public void TryReadModificationTime_ForStatLinkToExistingTarget_IsTheTargetsLastWriteTime(string targetName)
+    {
+        using ScratchDirectory scratch = new();
+        string target = Path.Combine(scratch.Path, targetName);
+        DateTime targetTime = new(2001, 2, 3, 4, 5, 6, DateTimeKind.Utc);
+        Directory.SetLastWriteTimeUtc(target, targetTime);
+        DiskDataFileReader reader = DiskDataFileReader.ForStatFollowingLinksWith(_ => new FileInfo(target));
+
+        bool read = reader.TryReadModificationTime(Path.Combine(scratch.Path, "file"), out DateTimeOffset modificationTime, out string? failureReason);
+
+        Assert.IsTrue(read);
+        Assert.AreEqual(new DateTimeOffset(targetTime), modificationTime);
+        Assert.IsNull(failureReason);
+    }
+
+    /// <summary>
+    /// curl 8.18.0 (OpenSSL build, Ubuntu), 2026-09-27: <c>ln -s nothing dangling</c> and
+    /// <c>ln -s loop1 loop2; ln -s loop2 loop1</c>, relative targets as measured.
+    /// </summary>
+    /// <param name="linkName">The link after <c>-z</c>.</param>
+    /// <param name="expectedReason">The reason curl reports.</param>
+    [TestMethod]
+    [OSCondition(OperatingSystems.Linux | OperatingSystems.OSX | OperatingSystems.FreeBSD)]
+    [DataRow("dangling", "No such file or directory")]
+    [DataRow("loop1", "Too many levels of symbolic links")]
+    public void TryReadModificationTime_ForPlatformOffWindowsUnfollowableLink_ReportsCurlsStatReason(string linkName, string expectedReason)
+    {
+        using ScratchDirectory scratch = new();
+        File.CreateSymbolicLink(Path.Combine(scratch.Path, "dangling"), "nothing");
+        File.CreateSymbolicLink(Path.Combine(scratch.Path, "loop2"), "loop1");
+        File.CreateSymbolicLink(Path.Combine(scratch.Path, "loop1"), "loop2");
+
+        bool read = DiskDataFileReader.ForPlatform(isWindows: false).TryReadModificationTime(
+            Path.Combine(scratch.Path, linkName), out _, out string? failureReason);
+
+        Assert.IsFalse(read);
+        Assert.AreEqual(expectedReason, failureReason);
+    }
+
+    /// <summary>curl 8.18.0 (OpenSSL build, Ubuntu), 2026-09-27: <c>ln -s f goodlink</c> prints nothing and uses the target's time.</summary>
+    [TestMethod]
+    [OSCondition(OperatingSystems.Linux | OperatingSystems.OSX | OperatingSystems.FreeBSD)]
+    public void TryReadModificationTime_ForPlatformOffWindowsLinkToExistingFile_IsTheTargetsLastWriteTime()
+    {
+        using ScratchDirectory scratch = new();
+        DateTime targetTime = new(2001, 2, 3, 4, 5, 6, DateTimeKind.Utc);
+        File.SetLastWriteTimeUtc(Path.Combine(scratch.Path, "file"), targetTime);
+        string link = Path.Combine(scratch.Path, "goodlink");
+        File.CreateSymbolicLink(link, "file");
+
+        bool read = DiskDataFileReader.ForPlatform(isWindows: false).TryReadModificationTime(link, out DateTimeOffset modificationTime, out string? failureReason);
+
+        Assert.IsTrue(read);
+        Assert.AreEqual(new DateTimeOffset(targetTime), modificationTime);
+        Assert.IsNull(failureReason);
+    }
+
     /// <summary>curl 8.21.0 on Windows, 2026-09-26: <c>-z &lt;a directory&gt;</c> reports 0x00000005.</summary>
     [TestMethod]
     public void TryReadModificationTime_ForPlatformWindowsDirectory_IsAccessDenied()
