@@ -130,7 +130,7 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
 
         context.CancellationToken.ThrowIfCancellationRequested();
 
-        if (!FileUrlPath.TryParse(context.Url, context.PathAsIs, out var path))
+        if (!FileUrlPath.TryParse(context.Url, out var path))
         {
             return TransferResult.Failure(CurlExitCode.UrlMalformat, FileTransferMessages.BadUrl);
         }

@@ -405,7 +405,7 @@ public sealed class FileUrlPathTests
 
     // A drive letter not followed by a slash is not a root, so the .. removes it: curl
     // 8.21.0 quotes file://localhost/Q:dir/../x as /x. The three-slash spelling is the
-    // same to curl; BL-295 covers it.
+    // same to curl; TryParse_SpellingUriRefused_QuotesThePathCurlQuotes covers it.
     [TestMethod]
     public void TryParse_DriveLetterWithoutASlash_IsRemovedByDotDotLikeAnySegment()
     {
@@ -420,7 +420,7 @@ public sealed class FileUrlPathTests
     }
 
     // curl 8.21.0 quotes file://localhost/C: as C: — a drive with nothing after it is
-    // still a root. The three-slash spelling, file:///C:, is BL-295's.
+    // still a root. TryParse_SpellingUriRefused_QuotesThePathCurlQuotes covers file:///C:.
     [TestMethod]
     public void TryParse_BareDrive_IsKeptWhole()
     {
@@ -432,6 +432,41 @@ public sealed class FileUrlPathTests
         Assert.IsNotNull(path);
         Assert.AreEqual("C:", path.UrlPath);
         Assert.AreEqual("C:", path.OsPath);
+    }
+
+    // The spellings System.Uri refused (ADR-0010). Measured 2026-09-27 against curl 8.21.0
+    // with curl -sS -o /dev/null URL: file://C: and file:///C: print
+    // "curl: (37) Could not open file C:" and file:///Q:dir/../x prints
+    // "curl: (37) Could not open file /x".
+    [TestMethod]
+    [DataRow("file://C:", "C:")]
+    [DataRow("file:///C:", "C:")]
+    [DataRow("file:///Q:dir/../x", "/x")]
+    public void TryParse_SpellingUriRefused_QuotesThePathCurlQuotes(string text, string urlPath)
+    {
+        var url = CurlUrl.Parse(text);
+
+        bool parsed = FileUrlPath.TryParse(url, out var path);
+
+        Assert.IsTrue(parsed);
+        Assert.IsNotNull(path);
+        Assert.AreEqual(urlPath, path.UrlPath);
+        Assert.AreEqual(NativePath(urlPath), path.OsPath);
+    }
+
+    // curl 8.21.0 exits 0 for file:///C:%2FWindows/win.ini and writes C:\Windows\win.ini:
+    // the escaped slash ends the drive, and the drive's leading slash still goes.
+    [TestMethod]
+    public void TryParse_DriveFollowedByAnEscapedSlash_OpensThePathTheEscapeSpells()
+    {
+        var url = CurlUrl.Parse("file:///C:%2FWindows/win.ini");
+
+        bool parsed = FileUrlPath.TryParse(url, out var path);
+
+        Assert.IsTrue(parsed);
+        Assert.IsNotNull(path);
+        Assert.AreEqual("C:%2FWindows/win.ini", path.UrlPath);
+        Assert.AreEqual(NativePath("C:/Windows/win.ini"), path.OsPath);
     }
 
     // Each row was quoted by curl 8.21.0 in its exit 37 message exactly as expected here.
@@ -499,7 +534,7 @@ public sealed class FileUrlPathTests
     {
         var url = CurlUrl.Parse("file:///C:/dir/../x");
 
-        bool parsed = FileUrlPath.TryParse(url, pathAsIs: false, out var path);
+        bool parsed = FileUrlPath.TryParse(url, out var path);
 
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
@@ -512,9 +547,9 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_PathAsIs_KeepsDotDotButStillConvertsBackslashes()
     {
-        var url = CurlUrl.Parse(@"file:///C:/dir\..\x");
+        var url = CurlUrl.Parse(@"file:///C:/dir\..\x", pathAsIs: true);
 
-        bool parsed = FileUrlPath.TryParse(url, pathAsIs: true, out var path);
+        bool parsed = FileUrlPath.TryParse(url, out var path);
 
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
@@ -525,9 +560,9 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_PathAsIs_KeepsSingleDotSegments()
     {
-        var url = CurlUrl.Parse("file:///C:/dir/./x");
+        var url = CurlUrl.Parse("file:///C:/dir/./x", pathAsIs: true);
 
-        bool parsed = FileUrlPath.TryParse(url, pathAsIs: true, out var path);
+        bool parsed = FileUrlPath.TryParse(url, out var path);
 
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
@@ -555,9 +590,9 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_PathAsIsLowercaseEncodedDots_AreQuotedWithUppercaseHexDigits()
     {
-        var url = CurlUrl.Parse("file:///C:/dir/%2e%2e/x");
+        var url = CurlUrl.Parse("file:///C:/dir/%2e%2e/x", pathAsIs: true);
 
-        bool parsed = FileUrlPath.TryParse(url, pathAsIs: true, out var path);
+        bool parsed = FileUrlPath.TryParse(url, out var path);
 
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
@@ -631,13 +666,6 @@ public sealed class FileUrlPathTests
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
         Assert.AreEqual("C:/a\"%E9%C3%A9b", path.UrlPath);
-    }
-
-    [TestMethod]
-    public void TryParse_PathAsIsNullUrl_ThrowsArgumentNullException()
-    {
-        Assert.ThrowsExactly<ArgumentNullException>(
-            () => FileUrlPath.TryParse(null!, pathAsIs: true, out _));
     }
 
     // file://C:/dir/hello.txt is not a host named "C:" — curl 8.21.0 reads the authority

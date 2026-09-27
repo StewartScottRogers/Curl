@@ -34,10 +34,11 @@ a negative `ResumeFrom` as exit 36 for both before either starts.
 | `TimeProvider` | ignored | ignored |
 | `MaxFileSize` | honoured: exit 63 past the limit (`DownloadFromAsync`) | ignored |
 | `CreateFileMode` | ignored | honoured: the mode the destination is opened with (`UploadAsync`) |
+| `PathAsIs` | not read: `Url` was parsed with it, so `FileUrlPath.TryParse` gets its dot segments already kept or removed (`ExecuteAsync`) | the same |
 | `PostData`, `Credentials`, `TelnetOptions`, `TftpBlockSize`, `TftpNoOptions` | ignored | ignored |
 
 Every row was read from `FileProtocolHandler.cs` — `ExecuteAsync`, `DownloadFromAsync`,
-`UploadAsync`, `UploadIntoAsync` and `TryResolveWindow` — on 2026-09-26. When the handler
+`UploadAsync`, `UploadIntoAsync` and `TryResolveWindow` — on 2026-09-26, and the `PathAsIs` row on 2026-09-27. When the handler
 starts or stops reading a member, change its row in the same commit.
 
 `TimeProvider` is unused in both directions on purpose: nothing in a local file transfer
