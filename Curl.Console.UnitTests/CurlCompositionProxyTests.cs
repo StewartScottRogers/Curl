@@ -14,7 +14,9 @@ namespace Curl.Console;
 /// the CONNECT tunnel opened by a real <see cref="TcpConnector" /> over a
 /// <see cref="ScriptedTcpDialer" />. Every expected byte was measured on 2026-09-27 with
 /// curl 8.21.0 (mingw, Schannel) against <c>Record-CurlExchange.ps1</c> or a loopback proxy
-/// answering CONNECT with <c>200 Connection established</c> (BL-238 Notes).
+/// answering CONNECT with <c>200 Connection established</c> (BL-238 Notes). The SOCKS5 bytes
+/// were measured the same way against a loopback SOCKS5 proxy answering <c>05 00</c>, and the
+/// HTTPS-proxy CONNECT bytes inside the proxy's TLS by BL-266 (BL-328 Notes).
 /// </summary>
 [TestClass]
 public sealed class CurlCompositionProxyTests
@@ -172,23 +174,53 @@ public sealed class CurlCompositionProxyTests
     }
 
     [TestMethod]
-    [DataRow(new[] { "--socks5", "127.0.0.1:18238", "http://example.com/a" }, "127.0.0.1:18238", "Socks5", DisplayName = "--socks5")]
-    [DataRow(new[] { "-x", "https://127.0.0.1:18238", "https://example.com/a" }, "127.0.0.1:18238", "Https", DisplayName = "https proxy, https URL")]
-    [DataRow(new[] { "-p", "-x", "https://127.0.0.1:18238", "http://example.com/a" }, "127.0.0.1:18238", "Https", DisplayName = "https proxy, -p")]
-    [DataRow(new[] { "-L", "-x", "https://127.0.0.1:18238", "http://example.com/a" }, "127.0.0.1:18238", "Https", DisplayName = "https proxy, -L")]
-    [DataRow(new[] { "--socks5", "127.0.0.1:1", "dict://example.com/d:x" }, "127.0.0.1:1", "Socks5", DisplayName = "--socks5, dict URL")]
-    [DataRow(new[] { "-x", "https://127.0.0.1:18238", "gopher://example.com/" }, "127.0.0.1:18238", "Https", DisplayName = "https proxy, gopher URL")]
-    public async Task RunAsync_TunnelTheConnectorCannotOpenYet_ExitsFourWithoutConnecting(string[] arguments, string proxy, string kind)
+    [DataRow("--socks5", new byte[] { 5, 1, 0, 1, 127, 0, 0, 1, 0, 80 }, DisplayName = "--socks5")]
+    [DataRow("--socks5-hostname", new byte[] { 5, 1, 0, 3, 11, (byte)'e', (byte)'x', (byte)'a', (byte)'m', (byte)'p', (byte)'l', (byte)'e', (byte)'.', (byte)'c', (byte)'o', (byte)'m', 0, 80 }, DisplayName = "--socks5-hostname")]
+    public async Task RunAsync_Socks5Option_SendsCurlsGreetingAndConnectRequestThenTheRequestThroughTheTunnel(string option, byte[] connectRequest)
     {
-        ScriptedConnector server = new([Latin1(Hello)]);
+        ScriptedConnector server = new([[5, 0], [5, 0, 0, 1, 127, 0, 0, 1, 0, 80], Latin1(Hello)]);
 
-        Run run = await RunAsync(server, ["-sS", .. arguments]);
+        Run run = await RunThroughTcpConnectorAsync(server, "-sS", option, "127.0.0.1:18238", "http://example.com/a");
 
-        Assert.AreEqual(4, run.ExitCode);
+        Assert.AreEqual(0, run.ExitCode);
+        CollectionAssert.AreEqual(
+            (byte[])[5, 2, 0, 1, .. connectRequest, .. Latin1(TunnelledGet)],
+            server.Written);
+        Assert.AreEqual(Proxy, server.Targets.Single());
+        Assert.AreEqual("hello", run.StandardOutput);
+    }
+
+    [TestMethod]
+    [DataRow(new[] { "-x", "https://127.0.0.1:18238", "https://example.com/a" }, 443, DisplayName = "https URL")]
+    [DataRow(new[] { "-p", "-x", "https://127.0.0.1:18238", "http://example.com/a" }, 80, DisplayName = "-p, http URL")]
+    public async Task RunAsync_HttpsProxyTunnel_SendsConnectOverTlsThenTheRequestThroughTheTunnel(string[] arguments, int port)
+    {
+        ScriptedConnector server = new([Latin1(ConnectionEstablished), Latin1(Hello)]);
+
+        Run run = await RunThroughTcpConnectorAsync(server, ["-sS", .. arguments]);
+
+        Assert.AreEqual(0, run.ExitCode);
         Assert.AreEqual(
-            $"curl: (4) Unsupported proxy '{proxy}', Curl cannot tunnel through a {kind} proxy yet{Environment.NewLine}",
-            run.StandardError);
-        Assert.AreEqual(0, server.Targets.Count);
+            $"CONNECT example.com:{port} HTTP/1.1\r\nHost: example.com:{port}\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n\r\n"
+            + TunnelledGet,
+            Latin1(server.Written));
+        Assert.AreEqual(Proxy, server.Targets.Single());
+        Assert.AreEqual("hello", run.StandardOutput);
+    }
+
+    [TestMethod]
+    [DataRow(new[] { "--socks5", "127.0.0.1:1", "dict://example.com/d:x" }, ProxyKind.Socks5, DisplayName = "--socks5, dict URL")]
+    [DataRow(new[] { "-x", "https://127.0.0.1:1", "gopher://example.com/" }, ProxyKind.Https, DisplayName = "https proxy, gopher URL")]
+    [DataRow(new[] { "--socks4a", "127.0.0.1:1", "https://example.com/a" }, ProxyKind.Socks4a, DisplayName = "--socks4a, https URL")]
+    [DataRow(new[] { "-L", "--socks4", "127.0.0.1:1", "http://example.com/a" }, ProxyKind.Socks4, DisplayName = "--socks4, -L")]
+    public async Task RunAsync_SocksOrHttpsProxyForATunnelledUrl_ConnectTargetCarriesTheProxy(string[] arguments, ProxyKind kind)
+    {
+        RecordingConnector connector = new(CurlExitCode.CouldntConnect, "refused");
+
+        await RunAsync(connector, new Dictionary<string, string>(), ["-sS", .. arguments]);
+
+        ProxyEndpoint proxy = connector.Targets.Single().Proxy!;
+        Assert.AreEqual((kind, "127.0.0.1", 1), (proxy.Kind, proxy.Host, proxy.Port));
     }
 
     [TestMethod]
@@ -204,18 +236,15 @@ public sealed class CurlCompositionProxyTests
     }
 
     [TestMethod]
-    public async Task RunAsync_SocksProxyEnvironmentVariableForAnotherScheme_ExitsFourWithoutConnecting()
+    public async Task RunAsync_SocksProxyEnvironmentVariableForAnotherScheme_ConnectTargetCarriesTheProxy()
     {
-        ScriptedConnector server = new([Latin1("hello")]);
+        RecordingConnector connector = new(CurlExitCode.CouldntConnect, "refused");
         Dictionary<string, string> environment = new() { ["all_proxy"] = "socks5://127.0.0.1:1" };
 
-        Run run = await RunAsync(server, environment, "-sS", "telnet://127.0.0.1:18238");
+        await RunAsync(connector, environment, ["-sS", "telnet://127.0.0.1:18238"]);
 
-        Assert.AreEqual(4, run.ExitCode);
-        Assert.AreEqual(
-            $"curl: (4) Unsupported proxy '127.0.0.1:1', Curl cannot tunnel through a Socks5 proxy yet{Environment.NewLine}",
-            run.StandardError);
-        Assert.AreEqual(0, server.Targets.Count);
+        ProxyEndpoint proxy = connector.Targets.Single().Proxy!;
+        Assert.AreEqual((ProxyKind.Socks5, "127.0.0.1", 1), (proxy.Kind, proxy.Host, proxy.Port));
     }
 
     [TestMethod]
