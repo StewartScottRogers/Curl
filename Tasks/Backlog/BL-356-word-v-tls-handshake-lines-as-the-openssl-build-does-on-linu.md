@@ -1,5 +1,5 @@
 ---
-id: BL-354
+id: BL-356
 title: Word -v TLS handshake lines as the OpenSSL build does on Linux and macOS
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-354 — Word -v TLS handshake lines as the OpenSSL build does on Linux and macOS
+# BL-356 — Word -v TLS handshake lines as the OpenSSL build does on Linux and macOS
 
 ## Goal
 
