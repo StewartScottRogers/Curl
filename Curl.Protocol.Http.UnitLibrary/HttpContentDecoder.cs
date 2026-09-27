@@ -15,9 +15,18 @@ namespace Curl.Protocol.Http;
 /// arrives: an empty body with an unrecognized coding is no error, as measured. For
 /// <c>--tr-encoding</c> the Transfer-Encoding codings other than <c>chunked</c> are decoded the
 /// same way, before the Content-Encoding ones, with the same messages (measured, BL-315 Notes).
+/// More than <see cref="MaximumCodings" /> Content-Encoding codings are refused while the
+/// headers are read (<see cref="HttpResponseBodyReader.ThrowIfTooManyContentCodings" />).
 /// </remarks>
 internal sealed class HttpContentDecoder : IDisposable
 {
+    /// <summary>
+    /// The most codings <c>--compressed</c> accepts across a response's Content-Encoding
+    /// headers: curl 8.21.0's limit, counted apart from the Transfer-Encoding one (measured,
+    /// BL-364 Notes).
+    /// </summary>
+    internal const int MaximumCodings = 5;
+
     private const string HeaderName = "Content-Encoding";
 
     private static readonly char[] Blanks = [' ', '\t'];
@@ -57,10 +66,36 @@ internal sealed class HttpContentDecoder : IDisposable
     /// <returns>The codings.</returns>
     internal static IEnumerable<string> ContentCodings(IReadOnlyList<HttpResponseHeader> headers) =>
         headers
-            .Where(header => string.Equals(header.Name, HeaderName, StringComparison.OrdinalIgnoreCase))
-            .SelectMany(header => header.Value.Split(','))
-            .Select(item => item.Trim(Blanks))
-            .Where(item => item.Length > 0);
+            .Where(IsContentEncoding)
+            .SelectMany(header => CodingsOf(header.Value));
+
+    /// <summary>
+    /// Finds the Content-Encoding header whose codings take the response past
+    /// <see cref="MaximumCodings" />, counting every coding of every header, <c>identity</c> and
+    /// unrecognized ones included, as curl 8.21.0 does (measured, BL-364 Notes).
+    /// </summary>
+    /// <param name="headers">The response's headers.</param>
+    /// <returns>The header's index, or <see langword="null" /> when the codings are within the limit.</returns>
+    internal static int? IndexPastCodingLimit(IReadOnlyList<HttpResponseHeader> headers)
+    {
+        int count = 0;
+        for (int index = 0; index < headers.Count; index++)
+        {
+            count += IsContentEncoding(headers[index]) ? CodingsOf(headers[index].Value).Count() : 0;
+            if (count > MaximumCodings)
+            {
+                return index;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool IsContentEncoding(HttpResponseHeader header) =>
+        string.Equals(header.Name, HeaderName, StringComparison.OrdinalIgnoreCase);
+
+    private static IEnumerable<string> CodingsOf(string value) =>
+        value.Split(',').Select(item => item.Trim(Blanks)).Where(item => item.Length > 0);
 
     private static HttpContentDecoder? Of(HttpContentCoding?[] codings)
     {

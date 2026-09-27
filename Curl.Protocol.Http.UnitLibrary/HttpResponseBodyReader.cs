@@ -96,6 +96,32 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
         !noBody && head.StatusLine.StatusCode is not (204 or 304);
 
     /// <summary>
+    /// Refuses a response whose Content-Encoding headers list more than
+    /// <see cref="HttpContentDecoder.MaximumCodings" /> codings, as curl 8.21.0 does for
+    /// <c>--compressed</c> while it reads the headers (measured, BL-364 Notes): whatever the
+    /// body, for <c>-I</c>, before <c>-f</c> and before a redirect is followed; but not for a
+    /// 204 or 304. A header before the one past the limit is read first, so an invalid
+    /// Content-Length or a refused Transfer-Encoding there is reported instead.
+    /// </summary>
+    /// <param name="head">The response's head.</param>
+    /// <param name="decodeContent"><see langword="true" /> for <c>--compressed</c> without <c>--raw</c>.</param>
+    /// <exception cref="HttpTransferException">
+    /// The codings are past the limit (exit 61), or a header before them is refused as
+    /// <see cref="HttpResponseBodyFraming.Of" /> says (exit 8 or 61).
+    /// </exception>
+    internal void ThrowIfTooManyContentCodings(HttpResponseHead head, bool decodeContent)
+    {
+        int? index = decodeContent && HasBody(head, noBody: false) ? HttpContentDecoder.IndexPastCodingLimit(head.Headers) : null;
+        if (index is null)
+        {
+            return;
+        }
+
+        HttpResponseBodyFraming.Of([.. head.Headers.Take(index.Value)], PassesTransferCoding, IgnoresContentLength, DecodesTransferCoding);
+        throw new HttpTransferException(CurlExitCode.BadContentEncoding, HttpTransferMessages.TooManyContentCodings);
+    }
+
+    /// <summary>
     /// Reads the body and writes it to <paramref name="output" />, or reads nothing when the
     /// response has none.
     /// </summary>

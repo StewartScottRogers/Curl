@@ -451,6 +451,7 @@ public sealed class HttpProtocolHandler(
             exchange.RedirectUrl = HttpRedirectLocation.Find(context.Url, exchange.Head);
             StoreCookies(context, exchange.Head);
             await WriteHeadersAsync(context.HeaderOutput, exchange.Head.HeadBytes, cancellationToken).ConfigureAwait(false);
+            body.ThrowIfTooManyContentCodings(exchange.Head, DecodesContent(options));
             retry = RetryOf(plan, exchange.Head, bodyLeftUnsent, upload);
             HttpFailMode fail = retry is null ? options.Fail : HttpFailMode.None;
             ThrowIfFailing(fail, HttpFailMode.Fail, exchange.Head);
@@ -690,7 +691,15 @@ public sealed class HttpProtocolHandler(
     /// retry follows.
     /// </summary>
     private static bool DecodesContent(HttpRequestOptions options, bool discardsBody) =>
-        options.Compressed && !options.Raw && !discardsBody;
+        DecodesContent(options) && !discardsBody;
+
+    /// <summary>
+    /// Decides whether Content-Encoding is decoded at all: for <c>--compressed</c> without
+    /// <c>--raw</c>, which is also when curl 8.21.0 holds the response to
+    /// <see cref="HttpContentDecoder.MaximumCodings" /> (measured, BL-364 Notes).
+    /// </summary>
+    private static bool DecodesContent(HttpRequestOptions options) =>
+        options.Compressed && !options.Raw;
 
     /// <summary>
     /// Sends the request head and body, if there is one: the head alone when there is no body

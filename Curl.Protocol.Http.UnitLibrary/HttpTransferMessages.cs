@@ -227,6 +227,12 @@ internal static class HttpTransferMessages
     internal const string TooManyTransferCodings = "Reject response exceeding limit of 5 transfer encodings";
 
     /// <summary>
+    /// The exit 61 message, under <c>--compressed</c>, for a response whose Content-Encoding
+    /// headers list more than five codings (measured, BL-364 Notes).
+    /// </summary>
+    internal const string TooManyContentCodings = "Reject response exceeding limit of 5 content encodings";
+
+    /// <summary>
     /// Formats the exit 56 message for heads whose combined size passed
     /// <see cref="HttpResponseHeadBuilder.MaximumHeadSize" />.
     /// </summary>
