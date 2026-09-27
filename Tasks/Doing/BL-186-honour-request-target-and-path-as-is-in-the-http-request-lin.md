@@ -35,3 +35,4 @@ completed:
 
 - 2026-09-26: Created.
 - 2026-09-26: Depends on BL-293 and BL-294 as well: ADR-0010 accepted `CurlUrl`, which keeps dot segments under path-as-is (BL-010).
+- 2026-09-27: Backlog -> Doing.
