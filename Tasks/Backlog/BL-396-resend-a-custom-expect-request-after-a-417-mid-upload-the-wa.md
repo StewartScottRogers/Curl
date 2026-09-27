@@ -1,5 +1,5 @@
 ---
-id: BL-389
+id: BL-396
 title: Resend a custom Expect request after a 417 mid-upload the way curl loops to its redirect limit
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-389 — Resend a custom Expect request after a 417 mid-upload the way curl loops to its redirect limit
+# BL-396 — Resend a custom Expect request after a 417 mid-upload the way curl loops to its redirect limit
 
 ## Goal
 

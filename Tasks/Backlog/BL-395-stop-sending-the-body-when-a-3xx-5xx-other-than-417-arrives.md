@@ -1,5 +1,5 @@
 ---
-id: BL-388
+id: BL-395
 title: Stop sending the body when a 3xx-5xx other than 417 arrives mid-upload
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-388 — Stop sending the body when a 3xx-5xx other than 417 arrives mid-upload
+# BL-395 — Stop sending the body when a 3xx-5xx other than 417 arrives mid-upload
 
 ## Goal
 

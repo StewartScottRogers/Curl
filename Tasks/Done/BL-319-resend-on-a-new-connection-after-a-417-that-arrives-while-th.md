@@ -49,7 +49,7 @@ Every run used `-D h -o out -w "%{http_code} %{size_request} %{size_upload} %{si
 | `--data-binary @big.bin`, 417 with `Connection: close` | `* we are done reading and this is set to close, stop send`, `* abort upload after having sent 65536 bytes`, no resend: exit 0, `417 65713 65536 73 1`. |
 | `--data-binary @big.bin`, 417 only after all 1048577 body bytes | `* upload completely sent off`, no resend: exit 0, `417 1048754 1048577 54 1`. |
 | `cat seq.bin \| curl -T -` | Chunked, `Expect`. `* abort upload after having sent 65532 bytes` (one 65524-byte chunk), rewind "needed" but stdin cannot seek and curl does not fail: the resend (108-byte head, chunked, no `Expect`) goes on from stdin byte 65524, so the server gets 983052 more bytes, none twice and none lost. `200 1048995 983225 92 2`, exit 0. Another run stopped mid-chunk after 196626 bytes and resent from exactly the first byte not on the wire. |
-| `-T big.bin -H "Expect: 100-continue"`, every `Expect` request answered 417 mid-body | The custom line goes on every resend, each waits for `100 Continue` again and draws 417 again: 51 connections, `* Maximum (50) redirects followed`, exit 47, `417 7543117 131072 2754 51`. Not built here: filed as BL-389. |
+| `-T big.bin -H "Expect: 100-continue"`, every `Expect` request answered 417 mid-body | The custom line goes on every resend, each waits for `100 Continue` again and draws 417 again: 51 connections, `* Maximum (50) redirects followed`, exit 47, `417 7543117 131072 2754 51`. Not built here: filed as BL-396. |
 
 ### What was built
 
@@ -78,7 +78,7 @@ Every run used `-D h -o out -w "%{http_code} %{size_request} %{size_upload} %{si
   sends one to four pieces depending on timing, and the bytes that decide the result (heads,
   resend, exit code, connection count) do not depend on it.
 - Only a 417 stops the sending. curl also stops for any status of 300 or above mid-upload;
-  that is filed as BL-388 rather than widening this task.
+  that is filed as BL-395 rather than widening this task.
 - A cancelled socket write that already put some bytes on the wire would have those bytes sent
   again ahead of stdin, since how much of a cancelled write went out is unknowable; the
   loopback runs showed no such overlap.
