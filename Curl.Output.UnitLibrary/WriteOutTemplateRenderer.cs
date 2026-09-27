@@ -53,7 +53,7 @@ public sealed class WriteOutTemplateRenderer(
     /// <summary>
     /// Creates a renderer whose <c>%time{format}</c> follows the Windows C runtime
     /// (<see cref="WriteOutTimeDialect.WindowsCRuntime"/>) on every platform. <c>Curl.Console</c>
-    /// still calls this one; BL-383 makes it pass the platform's dialect instead.
+    /// still calls this one; BL-387 makes it pass the platform's dialect instead.
     /// </summary>
     /// <param name="fileOpener">Opens the <c>%output{file}</c> targets.</param>
     /// <param name="writesLineFeedAsCrLf"><see langword="true"/> to write each line feed as CR LF, as the Windows curl does.</param>

@@ -48,7 +48,7 @@ widths and modifiers, plus edge cases) at three instants are in
   measured. It is checked against every row of the fixture.
 - `WriteOutTemplateRenderer` takes the dialect as a constructor argument. Its
   three-argument constructor keeps the Windows dialect so `Curl.Console`, which BL-131 had
-  in progress, builds unchanged; BL-383 makes `Curl.Console` pass `Glibc` off Windows and
+  in progress, builds unchanged; BL-387 makes `Curl.Console` pass `Glibc` off Windows and
   removes that constructor.
 - The C locale, not the machine's: `Curl.Console` publishes with `InvariantGlobalization`,
   as ADR-0038 says for Windows, and the C locale is what curl prints with no `LANG` set.
@@ -60,12 +60,12 @@ widths and modifiers, plus edge cases) at three instants are in
 
 ## Consequences
 
-- Once BL-383 lands, `%time{…}` on Linux matches curl 8.21.0 byte for byte for a machine
+- Once BL-387 lands, `%time{…}` on Linux matches curl 8.21.0 byte for byte for a machine
   whose locale is `C` or `POSIX`. Under another locale curl prints that locale's names and
   `%c %x %X %r` layouts, and Curl prints the C locale's.
 - A zone whose standard offset changed in the past gives `%-s` from today's standard offset
   where `mktime` would use the historical one.
-- Until BL-383, every platform renders the Windows dialect, as before this decision.
+- Until BL-387, every platform renders the Windows dialect, as before this decision.
 
 ## Alternatives considered
 
