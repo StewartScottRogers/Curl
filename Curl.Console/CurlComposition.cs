@@ -1,3 +1,4 @@
+using System.Text;
 using Curl.Authentication;
 using Curl.Cli;
 using Curl.Core;
@@ -25,16 +26,20 @@ internal static class CurlComposition
     /// Creates the protocol handlers the executable registers: <c>file</c> over the real
     /// disk; <c>dict</c>, <c>gopher</c> and <c>gophers</c>, <c>telnet</c>, <c>mqtt</c>
     /// and <c>mqtts</c>, and <c>http</c> and <c>https</c> over <paramref name="connector" />,
-    /// the last two answering authentication with a <see cref="BasicAndBearerAuthenticator" />
-    /// in the platform's credential encoding and keeping no cookies; and <c>tftp</c> over
+    /// the last two answering authentication with <see cref="CreateHttpAuthenticator" />'s
+    /// authenticator and keeping cookies in <paramref name="cookieStore" />; and <c>tftp</c> over
     /// <paramref name="datagramConnector" />. Each scheme is claimed by exactly one handler.
     /// </summary>
     /// <param name="connector">Connects the TCP protocols, with TLS for <c>gophers</c> and <c>mqtts</c>.</param>
     /// <param name="datagramConnector">Opens the UDP channels TFTP uses.</param>
+    /// <param name="cookieStore">
+    /// The cookies the HTTP handler sends and stores, or <see langword="null" /> to keep none.
+    /// </param>
     /// <returns>Every registered handler.</returns>
     internal static IReadOnlyList<IProtocolHandler> CreateProtocolHandlers(
         IConnector connector,
-        IDatagramConnector datagramConnector) =>
+        IDatagramConnector datagramConnector,
+        ICookieStore? cookieStore = null) =>
         [
             new FileProtocolHandler(new PhysicalFileSystem()),
             new DictProtocolHandler(connector),
@@ -42,10 +47,26 @@ internal static class CurlComposition
             new TelnetProtocolHandler(connector),
             new TftpProtocolHandler(datagramConnector),
             new MqttProtocolHandler(connector),
-            new HttpProtocolHandler(
-                connector,
-                new BasicAndBearerAuthenticator(CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()))),
+            new HttpProtocolHandler(connector, CreateHttpAuthenticator(), cookieStore),
         ];
+
+    /// <summary>
+    /// Creates the HTTP authenticator: a <see cref="RankedHttpAuthenticator" /> that answers the
+    /// scheme curl 8.21.0 picks among those <c>--basic</c>, <c>--digest</c> and <c>--anyauth</c>
+    /// allow, with a <see cref="BasicAndBearerAuthenticator" /> for Basic, Bearer
+    /// (<c>--oauth2-bearer</c>) and the first request, and a <see cref="DigestAuthenticator" />
+    /// drawing each client nonce from <see cref="DigestClientNonce.CreateRandom" />; both encode
+    /// credentials in the platform's encoding (<see cref="CredentialEncoding.ForPlatform" />).
+    /// </summary>
+    /// <returns>The authenticator.</returns>
+    internal static RankedHttpAuthenticator CreateHttpAuthenticator()
+    {
+        Encoding credentialEncoding = CredentialEncoding.ForPlatform(OperatingSystem.IsWindows());
+
+        return new RankedHttpAuthenticator(
+            new BasicAndBearerAuthenticator(credentialEncoding),
+            new DigestAuthenticator(credentialEncoding, DigestClientNonce.CreateRandom));
+    }
 
     /// <summary>
     /// Creates the network transports for one run: a <see cref="TcpConnector" /> over a
@@ -97,7 +118,7 @@ internal static class CurlComposition
         Stream standardInput,
         bool standardOutputIsTerminal) =>
         new(
-            options => CreateTransferDispatch(CreateTransports(options)),
+            options => CreateTransferDispatch(CreateTransports(options), CookieEngine.FromCommandLine(options)),
             new PhysicalFileSystem(),
             new PhysicalFileSystem(),
             standardOutput,
@@ -126,7 +147,7 @@ internal static class CurlComposition
         IConnector connector,
         IDatagramConnector datagramConnector) =>
         new(
-            _ => new TransferDispatch(new ProtocolDispatcher(CreateProtocolHandlers(connector, datagramConnector))),
+            options => CreateTransferDispatch(connector, datagramConnector, CookieEngine.FromCommandLine(options)),
             new PhysicalFileSystem(),
             new PhysicalFileSystem(),
             standardOutput,
@@ -136,7 +157,7 @@ internal static class CurlComposition
 
     /// <summary>
     /// Creates the dispatcher over the production handler set, connecting through
-    /// <paramref name="transports" />.
+    /// <paramref name="transports" /> and keeping no cookies.
     /// </summary>
     /// <param name="transports">The run's connectors.</param>
     /// <returns>The dispatcher.</returns>
@@ -144,13 +165,33 @@ internal static class CurlComposition
         new(CreateProtocolHandlers(transports.TcpConnector, transports.UdpDatagramConnector));
 
     /// <summary>
-    /// Creates what one run transfers through: the dispatcher from
-    /// <see cref="CreateDispatcher(CurlTransports)" />, and the TLS provider's
-    /// <see cref="SslStreamTlsProvider.Warnings" /> as the lines printed before each transfer,
-    /// as curl 8.21.0 prints its <c>--capath</c> warnings once per URL.
+    /// Creates what one run transfers through: the production handler set over
+    /// <paramref name="transports" />, its HTTP handler keeping cookies in
+    /// <paramref name="cookies" />; the TLS provider's <see cref="SslStreamTlsProvider.Warnings" />
+    /// as the lines printed before each transfer, as curl 8.21.0 prints its <c>--capath</c>
+    /// warnings once per URL; and <paramref name="cookies" /> for the runner to load and save.
     /// </summary>
     /// <param name="transports">The run's connectors.</param>
-    /// <returns>The dispatcher and the warning lines.</returns>
-    internal static TransferDispatch CreateTransferDispatch(CurlTransports transports) =>
-        new(CreateDispatcher(transports), transports.TlsProvider.Warnings);
+    /// <param name="cookies">The run's cookies, or <see langword="null" /> without <c>-b</c> or <c>-c</c>.</param>
+    /// <returns>The dispatcher, the warning lines and the cookies.</returns>
+    internal static TransferDispatch CreateTransferDispatch(CurlTransports transports, CookieEngine? cookies = null) =>
+        new(
+            new ProtocolDispatcher(CreateProtocolHandlers(transports.TcpConnector, transports.UdpDatagramConnector, cookies?.HandlerStore)),
+            transports.TlsProvider.Warnings,
+            cookies);
+
+    /// <summary>
+    /// Creates what one run transfers through over the given connectors instead of the real
+    /// network: the production handler set, its HTTP handler keeping cookies in
+    /// <paramref name="cookies" />, no warning lines, and <paramref name="cookies" />.
+    /// </summary>
+    /// <param name="connector">Connects the TCP protocols.</param>
+    /// <param name="datagramConnector">Opens the UDP channels TFTP uses.</param>
+    /// <param name="cookies">The run's cookies, or <see langword="null" /> without <c>-b</c> or <c>-c</c>.</param>
+    /// <returns>The dispatcher, no warning lines and the cookies.</returns>
+    private static TransferDispatch CreateTransferDispatch(
+        IConnector connector,
+        IDatagramConnector datagramConnector,
+        CookieEngine? cookies) =>
+        new(new ProtocolDispatcher(CreateProtocolHandlers(connector, datagramConnector, cookies?.HandlerStore)), [], cookies);
 }

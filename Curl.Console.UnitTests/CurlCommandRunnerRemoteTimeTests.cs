@@ -8,7 +8,8 @@ namespace Curl.Console;
 /// Pins how the runner applies <c>-R</c> / <c>--remote-time</c> to the <c>-o</c> file,
 /// against curl 8.21.0 measured on Windows on 2026-09-26: the file's last-write time becomes
 /// the source's, in whole seconds, after the file is closed, and only for a successful
-/// transfer.
+/// transfer. A time that cannot be set prints curl's <c>Failed to set filetime</c> warning,
+/// wrapped into two lines, and still exits 0.
 /// </summary>
 [TestClass]
 public sealed class CurlCommandRunnerRemoteTimeTests
@@ -19,7 +20,7 @@ public sealed class CurlCommandRunnerRemoteTimeTests
 
     private readonly MemoryStream standardOutput = new();
     private readonly MemoryStream standardError = new();
-    private readonly InMemoryFileSystem outputFiles = new();
+    private InMemoryFileSystem outputFiles = new();
 
     [TestMethod]
     [DataRow("-R")]
@@ -121,6 +122,69 @@ public sealed class CurlCommandRunnerRemoteTimeTests
         Assert.IsFalse(outputFiles.Written.ContainsKey("out.txt"));
         Assert.HasCount(1, outputFiles.LastWriteTimesSet);
         Assert.AreEqual(("out.txt", SourceLastWriteTimeUtc, false), outputFiles.LastWriteTimesSet[0]);
+    }
+
+    /// <summary>
+    /// curl 8.21.0, <c>curl -R -z "1 Jan 2030" -o out2.txt file:///Z:/tmp/src.txt</c> with no
+    /// <c>out2.txt</c> and a source time of 2020-01-02 03:04:05.678 local: exit 0, and these
+    /// two lines, the first ending in a space, last on standard error.
+    /// </summary>
+    /// <returns>A task that completes when the test has run.</returns>
+    [TestMethod]
+    public async Task RunAsync_RemoteTimeCannotSetMissingFile_PrintsFailedToSetFiletimeWarnings()
+    {
+        outputFiles = new InMemoryFileSystem { FileTimeErrorCode = 2 };
+
+        int exitCode = await RunAsync(["-R", "-o", "out2.txt", SourceUrl], WritingBody(DateTimeOffset.FromUnixTimeSeconds(1577959445)));
+
+        Assert.AreEqual((int)CurlExitCode.Ok, exitCode);
+        Assert.EndsWith(
+            "Warning: Failed to set filetime 1577959445 on outfile: CreateFile failed: " + Environment.NewLine
+            + "Warning: GetLastError 0x00000002" + Environment.NewLine,
+            Encoding.UTF8.GetString(standardError.ToArray()));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RemoteTimeCannotSetWithFractionalSourceTime_PrintsWholeSecondsAndErrorCodeInHex()
+    {
+        outputFiles = new InMemoryFileSystem { FileTimeErrorCode = 5 };
+        DateTimeOffset fractional = DateTimeOffset.FromUnixTimeMilliseconds(1577959445678);
+
+        int exitCode = await RunAsync(["-R", "-o", "out2.txt", SourceUrl], WritingBody(fractional));
+
+        Assert.AreEqual(0, exitCode);
+        Assert.EndsWith(
+            "Warning: Failed to set filetime 1577959445 on outfile: CreateFile failed: " + Environment.NewLine
+            + "Warning: GetLastError 0x00000005" + Environment.NewLine,
+            Encoding.UTF8.GetString(standardError.ToArray()));
+    }
+
+    /// <summary>
+    /// curl 8.21.0 on Windows, 2026-09-26: the measured case above with <c>-s</c>, and with
+    /// <c>-s -S</c>, exits 0 and writes nothing to standard error.
+    /// </summary>
+    /// <param name="silentOptions">The silencing options.</param>
+    /// <returns>A task that completes when the test has run.</returns>
+    [TestMethod]
+    [DataRow(new[] { "-s" })]
+    [DataRow(new[] { "-s", "-S" })]
+    public async Task RunAsync_RemoteTimeCannotSetUnderSilent_PrintsNothing(string[] silentOptions)
+    {
+        outputFiles = new InMemoryFileSystem { FileTimeErrorCode = 2 };
+
+        int exitCode = await RunAsync([.. silentOptions, "-R", "-o", "out2.txt", SourceUrl], WritingBody(SourceLastWriteTimeUtc));
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(0, standardError.Length);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RemoteTimeSetsTheTime_PrintsNoWarning()
+    {
+        int exitCode = await RunAsync(["-R", "-o", "out.txt", SourceUrl], WritingBody(SourceLastWriteTimeUtc));
+
+        Assert.AreEqual(0, exitCode);
+        Assert.DoesNotContain("Warning", Encoding.UTF8.GetString(standardError.ToArray()));
     }
 
     private static RecordingProtocolHandler WritingBody(DateTimeOffset? sourceLastWriteTimeUtc) =>

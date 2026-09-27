@@ -229,15 +229,52 @@ public sealed class CommandLineHttpRequestOptionTests
     }
 
     [TestMethod]
-    [DataRow("-e", ";auto")]
-    [DataRow("--referer", "http://a.example/;auto")]
+    [DataRow("-e", "http://r.example/x")]
+    [DataRow("--referer", "http://r.example/x")]
     [DataRow("-e", "")]
-    public void Parse_Referer_KeepsTheValueAsGiven(string option, string referer)
+    [DataRow("-e", "http://r.example/;Auto")]
+    [DataRow("-e", "http://r.example/;auto/x")]
+    public void Parse_Referer_KeepsTheValueAsGivenWithoutAutoReferer(string option, string referer)
     {
         CommandLineParseResult result = Parse([option, referer, Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(referer, result.Options.Referer);
+        Assert.IsFalse(result.Options.AutoReferer);
+    }
+
+    [TestMethod]
+    [DataRow("-e")]
+    [DataRow("--referer")]
+    public void Parse_RefererEndingInAuto_StripsTheSuffixAndTurnsOnAutoReferer(string option)
+    {
+        CommandLineParseResult result = Parse([option, "http://r.example/x;auto", Url]);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual("http://r.example/x", result.Options.Referer);
+        Assert.IsTrue(result.Options.AutoReferer);
+    }
+
+    [TestMethod]
+    [DataRow("-e")]
+    [DataRow("--referer")]
+    public void Parse_RefererAutoAlone_SetsNoRefererAndTurnsOnAutoReferer(string option)
+    {
+        CommandLineParseResult result = Parse([option, ";auto", Url]);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsNull(result.Options.Referer);
+        Assert.IsTrue(result.Options.AutoReferer);
+    }
+
+    [TestMethod]
+    public void Parse_RefererWithoutAutoAfterOneWithIt_TurnsAutoRefererOff()
+    {
+        CommandLineParseResult result = Parse(["-e", ";auto", "-e", "http://r.example/x", Url]);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual("http://r.example/x", result.Options.Referer);
+        Assert.IsFalse(result.Options.AutoReferer);
     }
 
     [TestMethod]

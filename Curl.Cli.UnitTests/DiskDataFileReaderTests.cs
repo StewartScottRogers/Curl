@@ -139,7 +139,9 @@ public sealed class DiskDataFileReaderTests
     [TestMethod]
     public void ForProcess_Always_IsTheSameReader()
     {
-        Assert.AreSame(DiskDataFileReader.ForProcess, DiskDataFileReader.ForProcess);
+        var first = DiskDataFileReader.ForProcess;
+        var second = DiskDataFileReader.ForProcess;
+        Assert.AreSame(first, second);
     }
 
     private static DateTime NoModificationTime(string path) => throw new FileNotFoundException(null, path);

@@ -52,7 +52,9 @@ option reader.
 - The same command line can be accepted on Linux and refused on Windows. That is upstream
   behaviour, reproduced on purpose.
 - `CommandLineNumber` needs a platform-dependent ceiling and a 64-bit result type where the
-  value can exceed `int`; the consumers of those values widen with it. Filed as BL-257.
+  value can exceed `int`. Done in BL-257; where the value is recorded in a type that holds
+  less, it saturates without changing what is accepted
+  ([ADR-0039](ADR-0039-a-64-bit-numeric-option-value-saturates-where-commandlineoptions-holds-less.md)).
 - Tests must cover both ceilings on one host, so the ceiling is a choice the tests can
   make, not only a compile-time or run-time platform check they cannot reach.
 

@@ -173,6 +173,19 @@ public interface ITransferContext
     UnixFileMode CreateFileMode { get; }
 
     /// <summary>
+    /// Gets a value indicating whether <c>--path-as-is</c> was given, which keeps the
+    /// <c>.</c> and <c>..</c> segments of the URL's path instead of removing them;
+    /// <see langword="false" /> when not given.
+    /// </summary>
+    /// <remarks>
+    /// <c>file://</c> reads it. Measured on curl 8.21.0, <c>file:///Z:/d/dir/../nosuch</c>
+    /// fails quoting <c>Z:/d/nosuch</c> without it and <c>Z:/d/dir/../nosuch</c> with it
+    /// (ADR-0003, ADR-0010). A handler that does not read it removes dot segments as
+    /// curl does by default.
+    /// </remarks>
+    bool PathAsIs { get; }
+
+    /// <summary>
     /// Gets the longest time the connection phase may take, per <c>--connect-timeout</c>,
     /// or <see langword="null" /> when none was given.
     /// </summary>

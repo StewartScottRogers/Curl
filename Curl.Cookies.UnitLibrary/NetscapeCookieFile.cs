@@ -12,8 +12,8 @@ namespace Curl.Cookies;
 /// <remarks>
 /// A line is seven fields separated by tabs: domain, includes-subdomains, path, secure, expiry, name and
 /// value. The text is handled one character per byte, so a caller reads and writes the file as Latin-1
-/// to keep its bytes as they are. A <c>Set-Cookie:</c> header line, which curl also accepts in a cookie
-/// file, is not read here: it is refused like any other malformed line.
+/// to keep its bytes as they are. A line starting <c>Set-Cookie:</c> is instead read as a header, by
+/// <see cref="SetCookieParser.ParseFromCookieFile"/>.
 /// </remarks>
 public static class NetscapeCookieFile
 {
@@ -24,6 +24,8 @@ public static class NetscapeCookieFile
     public const int LongestLine = 4998;
 
     private const string HttpOnlyPrefix = "#HttpOnly_";
+
+    private const string SetCookiePrefix = "Set-Cookie:";
 
     private const int FieldsWithValue = 7;
 
@@ -42,9 +44,10 @@ public static class NetscapeCookieFile
     /// shorter one is read by <see cref="ParseLine"/>.
     /// </remarks>
     /// <param name="reader">The file's text, one character per byte.</param>
+    /// <param name="now">The time the file is read, which a <c>Set-Cookie:</c> line's <c>Max-Age</c> counts from.</param>
     /// <returns>The cookies read, oldest (first in the file) first. Expired cookies are included.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="reader"/> is <see langword="null"/>.</exception>
-    public static IReadOnlyList<Cookie> Read(TextReader reader)
+    public static IReadOnlyList<Cookie> Read(TextReader reader, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(reader);
 
@@ -52,7 +55,7 @@ public static class NetscapeCookieFile
         StringBuilder line = new();
         while (TryReadLine(reader, line))
         {
-            Cookie? cookie = ParseLine(line.ToString());
+            Cookie? cookie = ParseLine(line.ToString(), now);
             if (cookie is not null)
             {
                 cookies.Add(cookie);
@@ -84,7 +87,9 @@ public static class NetscapeCookieFile
     /// <summary>Reads one line of a cookie file as curl does, or refuses it.</summary>
     /// <remarks>
     /// <para>
-    /// The line ends at its first carriage return. A line starting <c>#HttpOnly_</c> (that case only) is
+    /// The line ends at its first carriage return. A line starting <c>Set-Cookie:</c>, in any case, is a
+    /// header: the blanks after the colon are skipped and the rest is read by
+    /// <see cref="SetCookieParser.ParseFromCookieFile"/>. A line starting <c>#HttpOnly_</c> (that case only) is
     /// an <c>HttpOnly</c> cookie with the prefix removed; any other line starting <c>#</c> is a comment.
     /// The rest is split at every tab, empty fields included:
     /// </para>
@@ -107,14 +112,20 @@ public static class NetscapeCookieFile
     /// </para>
     /// </remarks>
     /// <param name="line">One line of the file, without its line feed.</param>
+    /// <param name="now">The time the file is read, which a <c>Set-Cookie:</c> line's <c>Max-Age</c> counts from.</param>
     /// <returns>The cookie, or <see langword="null"/> when curl would skip the line.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="line"/> is <see langword="null"/>.</exception>
-    public static Cookie? ParseLine(string line)
+    public static Cookie? ParseLine(string line, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(line);
 
         int carriageReturn = line.IndexOf('\r');
         string text = carriageReturn < 0 ? line : line[..carriageReturn];
+        if (text.StartsWith(SetCookiePrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return SetCookieParser.ParseFromCookieFile(text[SetCookiePrefix.Length..].TrimStart(' ', '\t'), now);
+        }
+
         bool isHttpOnly = text.StartsWith(HttpOnlyPrefix, StringComparison.Ordinal);
         if (isHttpOnly)
         {
@@ -177,7 +188,10 @@ public static class NetscapeCookieFile
         return digits.Length > 0 && long.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture, out expiresUnixSeconds);
     }
 
-    /// <summary>Writes a jar as curl does: <see cref="HeaderLines"/>, then one line per cookie, in the order given.</summary>
+    /// <summary>
+    /// Writes a jar as curl does: <see cref="HeaderLines"/>, then one line per cookie, in the order given,
+    /// leaving out each cookie without a domain (one read from a <c>Set-Cookie:</c> line without a <c>Domain</c>).
+    /// </summary>
     /// <remarks>
     /// Every line, the empty one included, ends with <paramref name="writer"/>'s
     /// <see cref="TextWriter.NewLine"/>: curl writes the jar in text mode, which ends lines with CR LF on
@@ -196,7 +210,7 @@ public static class NetscapeCookieFile
             writer.WriteLine(headerLine);
         }
 
-        foreach (Cookie cookie in cookies)
+        foreach (Cookie cookie in cookies.Where(cookie => cookie.Domain is not null))
         {
             writer.WriteLine(FormatLine(cookie));
         }
@@ -206,7 +220,7 @@ public static class NetscapeCookieFile
     /// <remarks>
     /// <c>#HttpOnly_</c> first for an <c>HttpOnly</c> cookie; the domain, with a leading dot when it
     /// includes subdomains and does not already start with one; then <c>TRUE</c> or <c>FALSE</c>, the
-    /// path, <c>TRUE</c> or <c>FALSE</c> for secure, the expiry, the name and the value, separated by tabs.
+    /// path (<c>/</c> for an empty one), <c>TRUE</c> or <c>FALSE</c> for secure, the expiry, the name and the value, separated by tabs.
     /// </remarks>
     /// <exception cref="ArgumentNullException"><paramref name="cookie"/> is <see langword="null"/>.</exception>
     public static string FormatLine(Cookie cookie)
@@ -214,10 +228,10 @@ public static class NetscapeCookieFile
         ArgumentNullException.ThrowIfNull(cookie);
 
         string httpOnly = cookie.IsHttpOnly ? HttpOnlyPrefix : string.Empty;
-        string dot = cookie.IncludesSubdomains && !cookie.Domain.StartsWith('.') ? "." : string.Empty;
+        string dot = cookie.IncludesSubdomains && !cookie.Domain!.StartsWith('.') ? "." : string.Empty;
         return string.Create(
             CultureInfo.InvariantCulture,
-            $"{httpOnly}{dot}{cookie.Domain}\t{Flag(cookie.IncludesSubdomains)}\t{cookie.Path}\t{Flag(cookie.IsSecure)}\t{cookie.ExpiresUnixSeconds}\t{cookie.Name}\t{cookie.Value}");
+            $"{httpOnly}{dot}{cookie.Domain}\t{Flag(cookie.IncludesSubdomains)}\t{(cookie.Path.Length == 0 ? "/" : cookie.Path)}\t{Flag(cookie.IsSecure)}\t{cookie.ExpiresUnixSeconds}\t{cookie.Name}\t{cookie.Value}");
     }
 
     private static string Flag(bool value) => value ? "TRUE" : "FALSE";

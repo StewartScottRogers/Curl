@@ -5,7 +5,7 @@ using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 namespace Curl.Protocol.Http;
 
 /// <summary>
-/// Serves the <c>http</c> and <c>https</c> schemes over HTTP/1.1: connects through the
+/// Serves the <c>http</c> and <c>https</c> schemes over HTTP/1.1, or HTTP/1.0 for <c>-0</c>: connects through the
 /// injected <see cref="IConnector" />, sends the request head, writes the response head to
 /// <see cref="ITransferContext.HeaderOutput" /> and the body to
 /// <see cref="ITransferContext.Output" />, and reports what it learned in a
@@ -20,8 +20,7 @@ namespace Curl.Protocol.Http;
 /// in answer to a 401's <c>WWW-Authenticate</c> challenges.
 /// </param>
 /// <param name="cookieStore">
-/// The cookies to send and store, or <see langword="null" /> when cookies are off. Held for
-/// the cookie task (BL-182); this handler sends and stores no cookie yet.
+/// The cookies to send and store, or <see langword="null" /> when cookies are off.
 /// </param>
 /// <remarks>
 /// <para>
@@ -35,7 +34,7 @@ namespace Curl.Protocol.Http;
 /// A body in <see cref="HttpRequestOptions.Body" /> makes the request a POST unless <c>-X</c>
 /// names another method, and is sent after the head as <see cref="HttpRequestFraming" />
 /// decides: at once, or after up to one second's wait for <c>100 Continue</c>, and not at all
-/// when a final status arrives during that wait. A body stream of known length that fails a
+/// when a final status arrives during that wait (but see the 417 resend below). A body stream of known length that fails a
 /// read ends the transfer with exit 26.
 /// </para>
 /// <para>
@@ -64,6 +63,16 @@ namespace Curl.Protocol.Http;
 /// its Content-Encoding says (<see cref="HttpContentDecoder" />, BL-177 Notes).
 /// </para>
 /// <para>
+/// <see cref="HttpVersionPreference.Http10" /> (<c>-0</c>) ends the request line in
+/// <c>HTTP/1.0</c>, adds no <c>Expect: 100-continue</c>, and fails a body of unknown length
+/// with exit 25 once connected, sending nothing. <see cref="HttpRequestOptions.Raw" /> writes a
+/// chunked body undecoded, chunk lines included, until the server closes, and refuses no
+/// transfer coding. <see cref="HttpRequestOptions.IgnoreContentLength" /> reads a body that is
+/// not chunked until the server closes, whatever its Content-Length says. Either leaves a
+/// connection whose body ran to close unused afterwards (<see cref="HttpResponseBodyFraming" />;
+/// measured on curl 8.21.0, BL-180 Notes).
+/// </para>
+/// <para>
 /// The first request carries the authenticator's answer to no challenge, placed after
 /// <c>Host</c> (<c>Basic dTpw</c> for <c>-u u:p</c>). A 401 to a request that carried none
 /// is answered once more when the authenticator answers its challenges and the body, if any,
@@ -72,6 +81,54 @@ namespace Curl.Protocol.Http;
 /// (<see cref="HttpConnectionPersistence" />), in which case on a new one. A 401 that is not
 /// retried is the result, exit 0, or exit 22 under <c>-f</c>; the 401 a retry answers never
 /// fails the transfer. Measured on curl 8.21.0 (BL-181 Notes, ADR-0034).
+/// </para>
+/// <para>
+/// A 417 that arrives while the body waits for <c>100 Continue</c> is answered, unless
+/// <c>-f</c> is set or the 417 closes the connection, by resending the request once on the
+/// same connection without curl's own <c>Expect</c> line and without the wait: the 417's head
+/// and trailers are written, its body is read and discarded, and the resend's response is the
+/// result; an <c>-H</c> <c>Expect</c> line is sent again. Measured on curl 8.21.0 (BL-260 Notes).
+/// </para>
+/// <para>
+/// With a cookie store, every request, an authentication retry included, asks it afresh for
+/// the <c>Cookie</c> value (sent over TLS for <c>https</c>, at the time from
+/// <see cref="ITransferContext.TimeProvider" />), and every final response head read, a 3xx
+/// or a 401 included, hands its <c>Set-Cookie</c> values to it in received order, before the
+/// head is written. Measured on curl 8.21.0 (BL-182 Notes).
+/// </para>
+/// <para>
+/// With <see cref="HttpRequestOptions.ForwardProxy" /> an HTTP-kind proxy
+/// (<see cref="ProxyKind.Http" />, <see cref="ProxyKind.Http10" /> or
+/// <see cref="ProxyKind.Https" />), an <c>http</c> URL and no
+/// <see cref="HttpRequestOptions.ProxyTunnel" />, the handler connects to the proxy itself (with
+/// TLS for <see cref="ProxyKind.Https" />) and sends the request in absolute form, with the
+/// authenticator's pre-emptive <c>Proxy-Authorization</c> for the proxy's credential and
+/// <c>Proxy-Connection: Keep-Alive</c>. Any other proxy - an <c>https</c> URL, <c>-p</c>, or a
+/// SOCKS kind - is handed to the connector as <see cref="ConnectTarget.Proxy" /> to tunnel
+/// through, and the request goes in origin form over the connection it returns. Measured on
+/// curl 8.21.0 (BL-183 Notes).
+/// </para>
+/// <para>
+/// <see cref="ITransferContext.MaxTime" /> limits the whole transfer, authentication retry
+/// included, and <see cref="ITransferContext.ConnectTimeout" /> (300 seconds when not given)
+/// each connect (<see cref="HttpTransferDeadline" />). A limit that passes during a connect
+/// ends it with exit 28 and <c>Connection timed out after N milliseconds</c>; <c>-m</c> passing
+/// after it ends the transfer with exit 28 and <c>Operation timed out after N milliseconds with
+/// M bytes received</c>, or <c>M out of T bytes</c> while a Content-Length body is read. A
+/// connection that fails a write ends the transfer with exit 55. Measured on curl 8.21.0
+/// (BL-174 Notes).
+/// </para>
+/// <para>
+/// <see cref="ITransferContext.ResumeFrom" /> above zero sends <c>Range: bytes=N-</c>, and else
+/// <see cref="ITransferContext.Range" /> sends its range, for a request without a body
+/// (<see cref="HttpRangeHeader" />); <see cref="ITransferContext.TimeCondition" /> sends
+/// <c>If-Modified-Since</c> or <c>If-Unmodified-Since</c>. Once the final head is written,
+/// <see cref="HttpDownloadConditions" /> ends the transfer with exit 63 for a Content-Length over
+/// <see cref="ITransferContext.MaxFileSize" /> and with exit 33 for a resume the response does not
+/// honour, and delivers no body for a 416 to a resume or an unmet <c>-z</c> condition. A body
+/// that grows past the limit ends the transfer with exit 63 after as many bytes as it allows.
+/// A successful result carries the <c>Last-Modified</c> time (<see cref="HttpLastModified" />).
+/// Measured on curl 8.21.0 (BL-178 Notes, ADR-0044).
 /// </para>
 /// </remarks>
 public sealed class HttpProtocolHandler(
@@ -116,7 +173,14 @@ public sealed class HttpProtocolHandler(
             options.BearerToken,
             options.AuthSchemes,
             IsProxy: false);
-        HttpRequestPlan plan = new(context, options, framing, authRequest, Authenticator.CreateAuthorization(authRequest, []));
+        ProxyEndpoint? forwardProxy = ForwardProxyOf(context.Url, options);
+        using HttpTransferDeadline deadline = new(context);
+        HttpRequestPlan plan = new(context, options, framing, authRequest, Authenticator.CreateAuthorization(authRequest, []))
+        {
+            Deadline = deadline,
+            ForwardProxy = forwardProxy,
+            ProxyAuthorization = forwardProxy is null ? null : ProxyAuthorizationFor(authRequest, forwardProxy),
+        };
         return await ConnectAndExchangeAsync(plan, earlier: null).ConfigureAwait(false);
     }
 
@@ -128,20 +192,49 @@ public sealed class HttpProtocolHandler(
         new(url.DnsSafeHost, url.Port, string.Equals(url.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
-    /// Opens a connection and sends <paramref name="plan" /> on it, then its authentication
-    /// retry if the response asks for one: on the same connection when it stays open, or on
-    /// a new one when it closes.
+    /// Builds the connect target for <paramref name="plan" />: the forward proxy itself, with
+    /// TLS for an HTTPS proxy; or else the URL's host, tunnelled through the transfer's proxy
+    /// when it has one.
+    /// </summary>
+    private static ConnectTarget TargetOf(HttpRequestPlan plan) =>
+        plan.ForwardProxy is { } proxy
+            ? new ConnectTarget(proxy.Host, proxy.Port, proxy.Kind == ProxyKind.Https)
+            : TargetOf(plan.Context.Url) with { Proxy = plan.Options.ForwardProxy };
+
+    /// <summary>
+    /// Gives the proxy the request is forwarded through in absolute form: an HTTP-kind proxy,
+    /// for an <c>http</c> URL, without <c>-p</c>. Every other proxy is tunnelled through by
+    /// the connector, and <see langword="null" /> is returned for it.
+    /// </summary>
+    private static ProxyEndpoint? ForwardProxyOf(Uri url, HttpRequestOptions options) =>
+        options.ForwardProxy is { Kind: ProxyKind.Http or ProxyKind.Http10 or ProxyKind.Https } proxy
+            && !options.ProxyTunnel
+            && !TargetOf(url).UseTls
+            ? proxy
+            : null;
+
+    /// <summary>
+    /// Asks the authenticator for the pre-emptive <c>Proxy-Authorization</c> value: Basic, curl's
+    /// default proxy scheme, for the proxy's credential, with no bearer token.
+    /// </summary>
+    private string? ProxyAuthorizationFor(HttpAuthRequest originRequest, ProxyEndpoint proxy) =>
+        Authenticator.CreateAuthorization(
+            originRequest with { Credential = proxy.Credential, BearerToken = null, AllowedSchemes = HttpAuthSchemes.Basic, IsProxy = true },
+            []);
+
+    /// <summary>
+    /// Opens a connection and sends <paramref name="plan" /> on it, then each retry a response
+    /// asks for - an authentication retry, or a resend without <c>Expect</c> - on the same
+    /// connection while it stays open, or on a new one when it closes.
     /// </summary>
     /// <param name="plan">The request to send.</param>
     /// <param name="earlier">
-    /// The report of the exchange that was answered with a 401, or <see langword="null" />
-    /// for the first.
+    /// The report of the exchange whose response asked for this retry, or
+    /// <see langword="null" /> for the first.
     /// </param>
     private async ValueTask<TransferResult> ConnectAndExchangeAsync(HttpRequestPlan plan, TransferReport? earlier)
     {
-        ITransferContext context = plan.Context;
-        ConnectResult connect = await connector.ConnectAsync(TargetOf(context.Url), context.CancellationToken)
-            .ConfigureAwait(false);
+        ConnectResult connect = await plan.Deadline.ConnectAsync(connector, TargetOf(plan)).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
         {
             return TransferResult.Failure(connect.ExitCode, connect.ErrorMessage!);
@@ -151,23 +244,22 @@ public sealed class HttpProtocolHandler(
         await using (connection.ConfigureAwait(false))
         {
             outcome = await ExchangeAsync(plan, connect, connection, earlier, newConnection: true).ConfigureAwait(false);
-            if (outcome.RetryAuthorization is { } authorization && outcome.KeepsAlive)
+            while (outcome.Retry is { } retry && outcome.KeepsAlive)
             {
-                HttpRequestPlan retry = plan.WithAuthorization(authorization);
                 outcome = await ExchangeAsync(retry, connect, connection, outcome.Result.Report, newConnection: false).ConfigureAwait(false);
             }
         }
 
-        return outcome.RetryAuthorization is { } reconnectAuthorization
-            ? await ConnectAndExchangeAsync(plan.WithAuthorization(reconnectAuthorization), outcome.Result.Report).ConfigureAwait(false)
+        return outcome.Retry is { } reconnect
+            ? await ConnectAndExchangeAsync(reconnect, outcome.Result.Report).ConfigureAwait(false)
             : outcome.Result;
     }
 
     /// <summary>
     /// Sends the request on <paramref name="connection" /> and reads the response into the
-    /// transfer's outputs; or, when the response is a 401 this handler retries, writes its
-    /// head and trailers, reads and discards its body, and returns the retry's
-    /// <c>Authorization</c> value.
+    /// transfer's outputs; or, when the response is one this handler retries (a 401 it
+    /// answers, or a 417 to a request whose body waited for <c>100 Continue</c>), writes its
+    /// head and trailers, reads and discards its body, and returns the retry's plan.
     /// </summary>
     private async ValueTask<HttpAttemptOutcome> ExchangeAsync(
         HttpRequestPlan plan,
@@ -179,30 +271,44 @@ public sealed class HttpProtocolHandler(
         ITransferContext context = plan.Context;
         HttpRequestOptions options = plan.Options;
         HttpRequestFraming framing = plan.Framing;
-        CancellationToken cancellationToken = context.CancellationToken;
-        byte[] request = HttpRequestHeadFormatter.Format(context.Url, options, context.NoBody, plan.Authorization);
-        await connection.WriteAsync(request, cancellationToken).ConfigureAwait(false);
-        await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
-
+        CancellationToken cancellationToken = plan.Deadline.Token;
+        byte[] request = HttpRequestHeadFormatter.Format(
+            context.Url,
+            options,
+            context.NoBody,
+            plan.Authorization,
+            CookieHeaderFor(context),
+            plan.ForwardProxy is not null,
+            plan.ProxyAuthorization,
+            HttpRangeHeader.ValueFor(context, framing.Body is not null),
+            context.TimeCondition,
+            framing);
         HttpRequestBodyWriter upload = new(connection);
         HttpExchange exchange = new(connect, connection, framing.Method, request.Length, upload, earlier, newConnection);
         IConnection responseConnection = framing.AwaitsContinue ? new HttpContinueWaitConnection(connection) : connection;
-        HttpResponseBodyReader body = new(responseConnection);
-        string? retryAuthorization = null;
+        HttpResponseBodyReader body = new(responseConnection)
+        {
+            PassesTransferCoding = options.Raw,
+            IgnoresContentLength = options.IgnoreContentLength,
+        };
+        HttpRequestPlan? retry = null;
+        HttpBodyDelivery delivery = HttpBodyDelivery.Deliver;
         try
         {
-            await SendBodyAsync(context, framing, responseConnection, upload).ConfigureAwait(false);
+            ThrowIfRefused(framing);
+            await HttpConnectionSend.WriteAsync(connection, request, cancellationToken).ConfigureAwait(false);
+            await HttpConnectionSend.FlushAsync(connection, cancellationToken).ConfigureAwait(false);
+            bool bodyLeftUnsent = await SendBodyAsync(context.TimeProvider, framing, responseConnection, upload, cancellationToken).ConfigureAwait(false);
             exchange.Head = await new HttpResponseHeadReader(responseConnection).ReadAsync(cancellationToken).ConfigureAwait(false);
             exchange.RedirectUrl = HttpRedirectLocation.Find(context.Url, exchange.Head);
+            StoreCookies(context, exchange.Head);
             await WriteHeadersAsync(context.HeaderOutput, exchange.Head.HeadBytes, cancellationToken).ConfigureAwait(false);
-            retryAuthorization = RetryAuthorization(plan, exchange.Head);
-            HttpFailMode fail = retryAuthorization is null ? options.Fail : HttpFailMode.None;
+            retry = RetryOf(plan, exchange.Head, bodyLeftUnsent);
+            HttpFailMode fail = retry is null ? options.Fail : HttpFailMode.None;
             ThrowIfFailing(fail, HttpFailMode.Fail, exchange.Head);
-            bool discardsBody = retryAuthorization is not null || (options.FollowRedirects && exchange.RedirectUrl is not null);
-            Stream bodyOutput = discardsBody ? Stream.Null : context.Output;
-            await body.CopyAsync(exchange.Head, context.NoBody, bodyOutput, DecodesContent(options, discardsBody), cancellationToken)
-                .ConfigureAwait(false);
-            await WriteHeadersAsync(context.HeaderOutput, body.TrailerBytes, cancellationToken).ConfigureAwait(false);
+            bool discardsBody = retry is not null || (options.FollowRedirects && exchange.RedirectUrl is not null);
+            delivery = DeliveryOf(plan, exchange.Head, discardsBody);
+            await ReadBodyAsync(plan, exchange.Head, body, delivery, discardsBody, cancellationToken).ConfigureAwait(false);
             ThrowIfFailing(fail, HttpFailMode.FailWithBody, exchange.Head);
         }
         catch (HttpTransferException failure)
@@ -212,10 +318,135 @@ public sealed class HttpProtocolHandler(
             { Report = exchange.Report(body.BytesWritten) };
             return new HttpAttemptOutcome(failed, null, KeepsAlive: false);
         }
+        catch (OperationCanceledException) when (plan.Deadline.EndedByLimit)
+        {
+            string message = HttpTransferMessages.OperationTimedOut(plan.Deadline.ElapsedMilliseconds, body.BytesWritten, body.ExpectedLength);
+            TransferResult timedOut = TransferResult.Failure(CurlExitCode.OperationTimedOut, message, body.BytesWritten)
+                with
+            { Report = exchange.Report(body.BytesWritten) };
+            return new HttpAttemptOutcome(timedOut, null, KeepsAlive: false);
+        }
 
-        TransferResult result = TransferResult.Success(body.BytesWritten) with { Report = exchange.Report(body.BytesWritten) };
-        return new HttpAttemptOutcome(result, retryAuthorization, HttpConnectionPersistence.KeepsAlive(exchange.Head, context.NoBody));
+        TransferResult result = Succeeded(delivery, exchange.Head!, exchange.Report(body.BytesWritten));
+        bool keepsAlive = HttpConnectionPersistence.KeepsAlive(exchange.Head, context.NoBody, options.Raw, options.IgnoreContentLength);
+        return new HttpAttemptOutcome(result, retry, keepsAlive);
     }
+
+    /// <summary>
+    /// Fails an HTTP/1.0 request whose body length is unknown before any byte of it is sent,
+    /// with exit 25, as curl 8.21.0 does once connected (measured, BL-180 Notes).
+    /// </summary>
+    /// <exception cref="HttpTransferException">
+    /// <see cref="HttpRequestFraming.RefusesUnknownLength" /> is set.
+    /// </exception>
+    private static void ThrowIfRefused(HttpRequestFraming framing)
+    {
+        if (framing.RefusesUnknownLength)
+        {
+            throw new HttpTransferException(CurlExitCode.UploadFailed, HttpTransferMessages.ChunkedUploadNeedsHttp11);
+        }
+    }
+
+    /// <summary>
+    /// Applies <c>--max-filesize</c> to the head's Content-Length, then decides what becomes of
+    /// a body that is not being discarded (<see cref="HttpDownloadConditions" />).
+    /// </summary>
+    /// <exception cref="HttpTransferException">
+    /// The Content-Length is over the limit (exit 63), or a resume was not honoured (exit 33).
+    /// </exception>
+    private static HttpBodyDelivery DeliveryOf(HttpRequestPlan plan, HttpResponseHead head, bool discardsBody)
+    {
+        HttpDownloadConditions.ThrowIfContentLengthExceeds(plan.Context.MaxFileSize, head);
+        return discardsBody ? HttpBodyDelivery.Deliver : HttpDownloadConditions.Decide(plan.Context, plan.Framing.Body is not null, head);
+    }
+
+    /// <summary>
+    /// Reads the body into the transfer's output, or into nothing when it is discarded, held to
+    /// the <c>--max-filesize</c> limit unless discarded, then writes a chunked body's trailers;
+    /// or reads nothing when <paramref name="delivery" /> says there is no body to deliver.
+    /// </summary>
+    private static async ValueTask ReadBodyAsync(
+        HttpRequestPlan plan,
+        HttpResponseHead head,
+        HttpResponseBodyReader body,
+        HttpBodyDelivery delivery,
+        bool discardsBody,
+        CancellationToken cancellationToken)
+    {
+        if (delivery != HttpBodyDelivery.Deliver)
+        {
+            return;
+        }
+
+        ITransferContext context = plan.Context;
+        Stream bodyOutput = discardsBody ? Stream.Null : context.Output;
+        body.MaximumBodySize = discardsBody ? null : HttpDownloadConditions.LimitOf(context.MaxFileSize);
+        await body.CopyAsync(head, context.NoBody, bodyOutput, DecodesContent(plan.Options, discardsBody), cancellationToken)
+            .ConfigureAwait(false);
+        await WriteHeadersAsync(context.HeaderOutput, body.TrailerBytes, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Builds a successful exchange's result, carrying the <c>Last-Modified</c> time for
+    /// <c>-R</c>: an unmet <c>-z</c> condition is marked so and reported as a 304, as curl
+    /// 8.21.0's <c>%{response_code}</c> does for a response whose <c>Last-Modified</c> fails it.
+    /// </summary>
+    private static TransferResult Succeeded(HttpBodyDelivery delivery, HttpResponseHead head, TransferReport report)
+    {
+        DateTimeOffset? lastModified = HttpLastModified.Find(head);
+        return delivery == HttpBodyDelivery.TimeConditionUnmet
+            ? TransferResult.TimeConditionNotMet(lastModified) with { Report = report with { ResponseCode = 304 } }
+            : TransferResult.Success(report.DownloadSize, lastModified) with { Report = report };
+    }
+
+    /// <summary>
+    /// Asks the cookie store for the <c>Cookie</c> value to send to the transfer's URL, or
+    /// gives <see langword="null" /> when cookies are off.
+    /// </summary>
+    private string? CookieHeaderFor(ITransferContext context) =>
+        CookieStore?.GetCookieHeader(context.Url, TargetOf(context.Url).UseTls, context.TimeProvider.GetUtcNow());
+
+    /// <summary>
+    /// Hands the <c>Set-Cookie</c> values of <paramref name="head" />, in received order, to
+    /// the cookie store, when cookies are on and the head has any.
+    /// </summary>
+    private void StoreCookies(ITransferContext context, HttpResponseHead head)
+    {
+        string[] setCookies = ValuesOf(head, "Set-Cookie");
+        if (CookieStore is { } store && setCookies.Length > 0)
+        {
+            store.StoreFromResponse(context.Url, setCookies, context.TimeProvider.GetUtcNow());
+        }
+    }
+
+    /// <summary>
+    /// Decides whether a response is answered with one more request, and which: the same
+    /// request with the <c>Authorization</c> value <see cref="RetryAuthorization" /> gives, or
+    /// else, for a 417 <see cref="RetriesWithoutExpect" /> accepts, the same request without
+    /// <c>Expect</c>; <see langword="null" /> when the response is the result.
+    /// </summary>
+    private HttpRequestPlan? RetryOf(HttpRequestPlan plan, HttpResponseHead head, bool bodyLeftUnsent)
+    {
+        if (RetryAuthorization(plan, head) is { } authorization)
+        {
+            return plan.WithAuthorization(authorization);
+        }
+
+        return RetriesWithoutExpect(plan, head, bodyLeftUnsent) ? plan.WithoutExpect() : null;
+    }
+
+    /// <summary>
+    /// Decides whether <paramref name="head" /> is answered by resending the request without
+    /// <c>Expect</c>, as curl 8.21.0 does (measured, BL-260 Notes): a 417 that arrived while
+    /// the body waited for <c>100 Continue</c> and so was left unsent, on a connection the 417
+    /// leaves open, and not under <c>-f</c>, which fails on the 417 itself. The resent request
+    /// waits for nothing, so it is never resent again.
+    /// </summary>
+    private static bool RetriesWithoutExpect(HttpRequestPlan plan, HttpResponseHead head, bool bodyLeftUnsent) =>
+        bodyLeftUnsent
+            && head.StatusLine.StatusCode == 417
+            && plan.Options.Fail != HttpFailMode.Fail
+            && HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, plan.Options.Raw, plan.Options.IgnoreContentLength);
 
     /// <summary>
     /// Decides whether a response is answered with one more request, and with what
@@ -231,7 +462,7 @@ public sealed class HttpProtocolHandler(
             return null;
         }
 
-        string[] challenges = ChallengesOf(head);
+        string[] challenges = ValuesOf(head, "WWW-Authenticate");
         return challenges.Length == 0 ? null : Authenticator.CreateAuthorization(plan.AuthRequest, challenges);
     }
 
@@ -243,11 +474,12 @@ public sealed class HttpProtocolHandler(
         plan.Authorization is null && head.StatusLine.StatusCode == 401 && plan.Framing.Body is not StreamBody;
 
     /// <summary>
-    /// Gets the <c>WWW-Authenticate</c> values of <paramref name="head" />, in order.
+    /// Gets the values of every <paramref name="name" /> header of <paramref name="head" />,
+    /// in received order.
     /// </summary>
-    private static string[] ChallengesOf(HttpResponseHead head) =>
+    private static string[] ValuesOf(HttpResponseHead head, string name) =>
         [.. head.Headers
-            .Where(header => string.Equals(header.Name, "WWW-Authenticate", StringComparison.OrdinalIgnoreCase))
+            .Where(header => string.Equals(header.Name, name, StringComparison.OrdinalIgnoreCase))
             .Select(header => header.Value)];
 
     /// <summary>
@@ -264,24 +496,30 @@ public sealed class HttpProtocolHandler(
     /// <paramref name="responseConnection" /> has waited for <c>100 Continue</c> and not been
     /// answered with a final status instead.
     /// </summary>
-    private static async ValueTask SendBodyAsync(
-        ITransferContext context,
+    /// <returns>
+    /// <see langword="true" /> when a final status arrived during the wait and the body was left
+    /// unsent; <see langword="false" /> when the body was sent or there is none.
+    /// </returns>
+    private static async ValueTask<bool> SendBodyAsync(
+        TimeProvider timeProvider,
         HttpRequestFraming framing,
         IConnection responseConnection,
-        HttpRequestBodyWriter upload)
+        HttpRequestBodyWriter upload,
+        CancellationToken cancellationToken)
     {
         if (framing.Body is not { } requestBody)
         {
-            return;
+            return false;
         }
 
         if (responseConnection is HttpContinueWaitConnection waiting
-            && !await waiting.WaitForContinueAsync(context.TimeProvider, context.CancellationToken).ConfigureAwait(false))
+            && !await waiting.WaitForContinueAsync(timeProvider, cancellationToken).ConfigureAwait(false))
         {
-            return;
+            return true;
         }
 
-        await upload.WriteAsync(requestBody, framing.IsChunked, context.CancellationToken).ConfigureAwait(false);
+        await upload.WriteAsync(requestBody, framing.IsChunked, cancellationToken).ConfigureAwait(false);
+        return false;
     }
 
     /// <summary>
@@ -338,10 +576,10 @@ public sealed class HttpProtocolHandler(
     /// <param name="headSize">The request head's size in bytes.</param>
     /// <param name="upload">The writer that sends the request body.</param>
     /// <param name="earlier">
-    /// The report of the exchange an authentication retry answers, whose request and header
-    /// sizes and connections this one's report adds to, as curl 8.21.0's
-    /// <c>%{size_request}</c>, <c>%{size_header}</c> and <c>%{num_connects}</c> do (BL-181
-    /// Notes); <see langword="null" /> for the first exchange.
+    /// The report of the exchange a retry answers, whose request and header sizes and
+    /// connections this one's report adds to, as curl 8.21.0's <c>%{size_request}</c>,
+    /// <c>%{size_header}</c> and <c>%{num_connects}</c> do (BL-181 and BL-260 Notes);
+    /// <see langword="null" /> for the first exchange.
     /// </param>
     /// <param name="newConnection">
     /// <see langword="true" /> when this exchange opened its connection, rather than reusing
@@ -441,35 +679,65 @@ public sealed class HttpProtocolHandler(
         public string? Authorization { get; } = Authorization;
 
         /// <summary>
+        /// Gets the time limits the transfer runs under, whose token cancels every read and
+        /// write of the exchange.
+        /// </summary>
+        public required HttpTransferDeadline Deadline { get; init; }
+
+        /// <summary>
+        /// Gets the proxy the request is forwarded through in absolute form, or
+        /// <see langword="null" /> when it goes to the origin, directly or through a tunnel.
+        /// </summary>
+        public ProxyEndpoint? ForwardProxy { get; init; }
+
+        /// <summary>
+        /// Gets the <c>Proxy-Authorization</c> value to send, or <see langword="null" /> to
+        /// send none.
+        /// </summary>
+        public string? ProxyAuthorization { get; init; }
+
+        /// <summary>
         /// Makes the same request sent with <paramref name="authorization" /> instead.
         /// </summary>
         /// <param name="authorization">The <c>Authorization</c> value the retry is sent with.</param>
         /// <returns>The retry's plan.</returns>
-        public HttpRequestPlan WithAuthorization(string authorization) =>
-            new(Context, Options, Framing, AuthRequest, authorization);
+        public HttpRequestPlan WithAuthorization(string authorization) => With(Framing, authorization);
+
+        /// <summary>
+        /// Makes the same request without curl's own <c>Expect</c> and without the wait for
+        /// <c>100 Continue</c> (<see cref="HttpRequestFraming.WithoutExpect" />).
+        /// </summary>
+        /// <returns>The resent request's plan.</returns>
+        public HttpRequestPlan WithoutExpect() => With(Framing.WithoutExpect(), Authorization);
+
+        private HttpRequestPlan With(HttpRequestFraming framing, string? authorization) =>
+            new(Context, Options, framing, AuthRequest, authorization)
+            {
+                Deadline = Deadline,
+                ForwardProxy = ForwardProxy,
+                ProxyAuthorization = ProxyAuthorization,
+            };
     }
 
     /// <summary>
-    /// How one exchange ended: its result, and whether an authentication retry follows.
+    /// How one exchange ended: its result, and whether a retry follows.
     /// </summary>
     /// <param name="Result">The result, with the report so far.</param>
-    /// <param name="RetryAuthorization">
-    /// The <c>Authorization</c> value to retry with, or <see langword="null" /> when the
-    /// result is final.
+    /// <param name="Retry">
+    /// The request to send next, or <see langword="null" /> when the result is final.
     /// </param>
     /// <param name="KeepsAlive">
     /// <see langword="true" /> when the retry may be sent on the same connection.
     /// </param>
-    private sealed class HttpAttemptOutcome(TransferResult Result, string? RetryAuthorization, bool KeepsAlive)
+    private sealed class HttpAttemptOutcome(TransferResult Result, HttpRequestPlan? Retry, bool KeepsAlive)
     {
         /// <summary>Gets the result, with the report so far.</summary>
         public TransferResult Result { get; } = Result;
 
         /// <summary>
-        /// Gets the <c>Authorization</c> value to retry with, or <see langword="null" /> when
-        /// the result is final.
+        /// Gets the request to send next, or <see langword="null" /> when the result is final.
         /// </summary>
-        public string? RetryAuthorization { get; } = RetryAuthorization;
+        public HttpRequestPlan? Retry { get; } = Retry;
 
         /// <summary>
         /// Gets a value indicating whether the retry may be sent on the same connection.

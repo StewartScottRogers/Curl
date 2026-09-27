@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.File.UnitLibrary, Curl.Protocol.File.UnitTests]
+touches: [Curl.Protocol.File.UnitLibrary, Curl.Protocol.File.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Output.UnitLibrary, Curl.Output.UnitTests]
 requirement: none
 created: 2026-09-26
 completed:
@@ -29,6 +29,63 @@ The file:// handler returns a `TransferReport` whose `ResponseHeaders` hold the 
 
 ## Notes
 
+### Measured 2026-09-26, curl 8.21.0 (x86_64-w64-mingw32, Schannel), `/mingw64/bin/curl`
+
+File `C:/bl285tmp/a.txt` holding `hello world
+` (12 bytes), URL `file:///C:/bl285tmp/a.txt`:
+
+| Command | `-w` output |
+| --- | --- |
+| `curl -s -o NUL -D - -w "[%header{Content-Length}][%header{Accept-ranges}][%header{Last-Modified}][%{num_headers}]
+%{header_json}
+" URL` | headers `Content-Length: 12
+Accept-ranges: bytes
+Last-Modified: <date> GMT
+
+`, then `[][][][3]
+{
+}
+` |
+| same without `-D -` | `[][3][{
+}]` |
+| `-I` | `[][3]` |
+| `-r 0-2` | `[3]` |
+| `-C 100` (past the end, exit 36) | `[3]` |
+| `-z "Sat, 01 Jan 2099 00:00:00 GMT"` (unmet, exit 0) | `[0]` |
+| missing file (exit 37) | `[0]` |
+| `-T a.txt file:///C:/bl285tmp/b.txt` (upload) | `[0]` |
+| `file:///dev/stdin` | `[0]` |
+
+(`-z "2099-01-01"` is not a date curl parses, so it ran unconditioned and printed `[3]`; not a finding.)
+
+**Why.** curl's `%{num_headers}` counts the header lines its tool header callback receives,
+while `%header{}` and `%{header_json}` read libcurl's header API (`curl_easy_header`), which
+only the HTTP family fills. `lib/file.c` writes its pseudo-headers as client header writes and
+never files them in the header API, so every `%header{}` is empty and `header_json` is `{}`
+while `num_headers` is 3 - whenever the headers were produced, `-o`/`-D` or not.
+
+**Why this cannot be done inside `touches`.** `Curl.Output.UnitLibrary`'s
+`TransferWriteOutVariables` derives both `num_headers` (`ResponseHeaders.Count`) and
+`FindFirstHeaderValue` (`%header{}`) from `TransferReport.ResponseHeaders`. Putting the three
+pseudo-headers there would make `%header{Content-Length}` print `12`, which curl does not.
+Renaming or disguising the keys to dodge the lookup would break "say what it does".
+
+**Design chosen (Decided by Claude under Stewart's delegation; ADR to be written with the code).**
+Add `TransferReport.PseudoHeaders` (`IReadOnlyList<KeyValuePair<string,string>>`, default
+empty): header lines a handler wrote to the header stream that curl's header API does not
+hold (file:// today, FTP's `-I` lines later). `TransferWriteOutVariables` prints
+`num_headers` as `ResponseHeaders.Count + PseudoHeaders.Count`; `%header{}` and
+`header_json` keep reading `ResponseHeaders` only. `FileProtocolHandler` sets the three
+pseudo-headers on the report whenever `WriteHeadersAsync`'s lines were produced (after an
+unmet `-z` and before the open succeeded it sets none), whether or not `HeaderOutput` is set.
+No change to `Curl.Protocol.Http.UnitLibrary`, which BL-178 holds.
+
+**Touches widened** to `Curl.Protocol.Abstractions.UnitLibrary/UnitTests` (no task in Doing
+names them) and `Curl.Output.UnitLibrary/UnitTests`, which BL-284 in Doing names, so the task
+goes back to Backlog until BL-284 finishes.
+
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Backlog. Needs Curl.Output.UnitLibrary (and Curl.Protocol.Abstractions.UnitLibrary) for a PseudoHeaders report member; Curl.Output.UnitLibrary is held by BL-284 in Doing

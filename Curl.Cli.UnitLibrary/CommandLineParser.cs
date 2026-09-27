@@ -187,6 +187,7 @@ public static class CommandLineParser
         int equals = nameAndValue.IndexOf('=', StringComparison.Ordinal);
         bool hasAttachedValue = equals >= 0;
         string longName = hasAttachedValue ? nameAndValue[..equals] : nameAndValue;
+        options.FirstOptionOfArgument = true;
         if (!CommandLineOptionTable.TryFindLong(longName, out CommandLineOption? option))
         {
             return ParseNegatedLong(options, argument, longName, reader);
@@ -238,6 +239,8 @@ public static class CommandLineParser
             {
                 return CommandLineRefusal.UnknownOption(argument);
             }
+
+            options.FirstOptionOfArgument = letter == 1;
 
             if (option.TakesValue)
             {

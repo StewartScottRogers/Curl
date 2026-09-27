@@ -4,14 +4,16 @@ namespace Curl.Core.Multipart;
 
 /// <summary>
 /// Writes the header block of one multipart part as libcurl 8.21.0's
-/// <c>Curl_mime_prepare_headers</c> does: the <c>Content-Disposition</c> and <c>Content-Type</c>
-/// it chooses, then the part's own headers, then the empty line.
+/// <c>Curl_mime_prepare_headers</c> does: the <c>Content-Disposition</c>, <c>Content-Type</c> and
+/// <c>Content-Transfer-Encoding</c> it chooses, then the part's own headers, then the empty line.
 /// </summary>
 internal static class MultipartPartHeaders
 {
     private const string ContentTypeLabel = "Content-Type";
 
     private const string ContentDispositionLabel = "Content-Disposition";
+
+    private const string ContentTransferEncodingLabel = "Content-Transfer-Encoding";
 
     private const string FileContentTypeDefault = "application/octet-stream";
 
@@ -39,9 +41,13 @@ internal static class MultipartPartHeaders
     /// to <c>attachment</c>.
     /// </param>
     /// <param name="boundary">The boundary of a multipart part's own parts; <see langword="null" /> for any other part.</param>
+    /// <param name="transferEncoding">
+    /// The name of the encoder the part's body is sent in, or <see langword="null" /> when it is
+    /// sent as it is; the part's own <c>Content-Transfer-Encoding</c> header replaces it.
+    /// </param>
     /// <param name="contentType">The content type the part was sent with, or <see langword="null" /> when it was sent without one.</param>
     /// <returns>Every header line, each ending CRLF, followed by the CRLF that ends the block.</returns>
-    internal static string Format(MultipartFormPart part, string? disposition, string? boundary, out string? contentType)
+    internal static string Format(MultipartFormPart part, string? disposition, string? boundary, string? transferEncoding, out string? contentType)
     {
         string? fileName = FileNameOf(part);
         contentType = ChooseContentType(part, fileName);
@@ -51,11 +57,8 @@ internal static class MultipartPartHeaders
             AppendDisposition(block, part.Name, fileName, disposition);
         }
 
-        if (contentType is not null)
-        {
-            block.Append($"{ContentTypeLabel}: {contentType}");
-            block.Append(boundary is null ? "\r\n" : $"; boundary={boundary}\r\n");
-        }
+        AppendContentType(block, contentType, boundary);
+        AppendTransferEncoding(block, part.Headers, transferEncoding);
 
         foreach (string header in part.Headers.Where(header => !IsHeader(header, ContentTypeLabel)))
         {
@@ -99,15 +102,40 @@ internal static class MultipartPartHeaders
     {
         MultipartFormPartKind.Multipart => MultipartContentTypeDefault,
         MultipartFormPartKind.Text => ContentTypeForName(fileName),
-        _ => ContentTypeForName(fileName)
-            ?? ContentTypeForName(part.Content)
-            ?? (fileName is null ? null : FileContentTypeDefault),
+        _ => ContentTypeForName(fileName) ?? FileFallbackContentType(part, fileName),
     };
+
+    /// <summary>
+    /// The content type of a file part whose file name's extension gave none: its path's, or
+    /// <c>application/octet-stream</c> when it has a file name. Standard input goes to libcurl as a
+    /// callback part, not a file part, so, as with text, it gets neither.
+    /// </summary>
+    private static string? FileFallbackContentType(MultipartFormPart part, string? fileName) =>
+        part.ReadsStandardInput
+            ? null
+            : ContentTypeForName(part.Content) ?? (fileName is null ? null : FileContentTypeDefault);
 
     private static string? ContentTypeForName(string? name) =>
         name is null
             ? null
             : Array.Find(ContentTypesByExtension, entry => name.EndsWith(entry.Extension, StringComparison.OrdinalIgnoreCase)).ContentType;
+
+    private static void AppendContentType(StringBuilder block, string? contentType, string? boundary)
+    {
+        if (contentType is not null)
+        {
+            block.Append($"{ContentTypeLabel}: {contentType}");
+            block.Append(boundary is null ? "\r\n" : $"; boundary={boundary}\r\n");
+        }
+    }
+
+    private static void AppendTransferEncoding(StringBuilder block, IReadOnlyList<string> headers, string? transferEncoding)
+    {
+        if (transferEncoding is not null && FindHeaderValue(headers, ContentTransferEncodingLabel) is null)
+        {
+            block.Append($"{ContentTransferEncodingLabel}: {transferEncoding}\r\n");
+        }
+    }
 
     private static void AppendDisposition(StringBuilder block, string? name, string? fileName, string? disposition)
     {

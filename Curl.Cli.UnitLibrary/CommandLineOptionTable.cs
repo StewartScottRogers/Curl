@@ -35,8 +35,8 @@ namespace Curl.Cli;
 /// <c>--no-progress-meter</c>, <c>--no-progress-bar</c>, <c>--no-get</c>, <c>--no-location</c>, <c>--no-location-trusted</c>,
 /// <c>--no-post301</c>, <c>--no-post302</c>, <c>--no-post303</c>, <c>--no-show-headers</c>, <c>--no-include</c>, <c>--no-head</c>,
 /// <c>--no-fail</c>, <c>--no-fail-with-body</c>, <c>--no-fail-early</c>, <c>--no-compressed</c>, <c>--no-raw</c>, <c>--no-tr-encoding</c>,
-/// <c>--no-ignore-content-length</c>, <c>--no-path-as-is</c>, <c>--no-basic</c>, <c>--no-digest</c>, <c>--no-proxytunnel</c>, <c>--no-remote-name</c>,
-/// <c>--no-remote-name-all</c>, <c>--no-remote-header-name</c>, <c>--no-create-dirs</c>, <c>--no-junk-session-cookies</c> and <c>--no-version</c> are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
+/// <c>--no-ignore-content-length</c>, <c>--no-path-as-is</c>, <c>--no-http0.9</c>, <c>--no-basic</c>, <c>--no-digest</c>, <c>--no-ntlm</c>, <c>--no-negotiate</c>, <c>--no-proxytunnel</c>, <c>--no-remote-name</c>,
+/// <c>--no-remote-name-all</c>, <c>--no-remote-header-name</c>, <c>--no-create-dirs</c>, <c>--no-junk-session-cookies</c>, <c>--no-globoff</c>, <c>--no-version</c>, <c>--no-verbose</c>, <c>--no-trace-time</c>, <c>--no-retry-all-errors</c> and <c>--no-retry-connrefused</c> are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
 /// silent and <c>--no-silent -s</c> is. <c>--no-silent=x</c> is accepted, its value ignored.
 /// <c>--no-tlsv1.2</c>, <c>--no-tlsv1.3</c>, <c>--no-url</c>, <c>--no-output</c> (even as the last
 /// argument), <c>--no-output=x</c>, <c>--no-data</c>, <c>--no-dump-header</c>, <c>--no-range</c>, <c>--no-time-cond</c>,
@@ -46,7 +46,8 @@ namespace Curl.Cli;
 /// <c>--no-url-query</c>, <c>--no-max-redirs</c>, <c>--no-config</c>, <c>--no-http1.0</c>, <c>--no-http1.1</c>, <c>--no-http2</c>,
 /// <c>--no-http2-prior-knowledge</c>, <c>--no-http3</c>, <c>--no-http3-only</c>, <c>--no-request-target</c>, <c>--no-anyauth</c>,
 /// <c>--no-oauth2-bearer</c>, <c>--no-proxy</c>, <c>--no-proxy-user</c>, <c>--no-noproxy</c>, <c>--no-socks4</c>, <c>--no-socks4a</c>,
-/// <c>--no-socks5</c>, <c>--no-socks5-hostname</c>, <c>--no-write-out</c> and <c>--no-output-dir</c> (each also with <c>=x</c>) exit 2 with
+/// <c>--no-socks5</c>, <c>--no-socks5-hostname</c>, <c>--no-write-out</c>, <c>--no-output-dir</c>, <c>--no-trace</c>, <c>--no-trace-ascii</c>, <c>--no-stderr</c>, <c>--no-retry</c>, <c>--no-retry-delay</c>, <c>--no-retry-max-time</c>, <c>--no-limit-rate</c>,
+/// <c>--no-speed-limit</c> and <c>--no-speed-time</c> (each also with <c>=x</c>) exit 2 with
 /// <c>curl: option &lt;as typed&gt;: the given option cannot be reversed with a --no- prefix</c> and
 /// the try-help line. <c>--no-bogus</c>, <c>--no-</c>, <c>--no-no-silent</c> and <c>--no-Silent</c>
 /// exit 2 as unknown. A short letter is never negated.
@@ -57,10 +58,16 @@ public static class CommandLineOptionTable
     private static readonly CommandLineOption[] RowsInTableOrder =
     [
         CommandLineOption.Text("url", null, (options, url) => options.AddUrl(url)),
+        CommandLineOption.NegatableFlag("globoff", 'g', (options, on) => options.GlobOff = on),
         CommandLineOption.NegatableFlag("silent", 's', (options, on) => options.Silent = on),
         CommandLineOption.NegatableFlag("show-error", 'S', (options, on) => options.ShowError = on),
         CommandLineOption.NegatableFlag("progress-meter", null, (options, on) => options.ProgressMeterOff = !on),
         CommandLineOption.NegatableFlag("progress-bar", '#', (options, on) => options.ProgressBar = on),
+        CommandLineOption.NegatableFlag("verbose", 'v', (options, on) => options.SetVerbose(on)),
+        CommandLineOption.FileName("trace", null, (options, file) => options.SelectTraceDump(TraceKind.HexDump, file, "--trace")),
+        CommandLineOption.FileName("trace-ascii", null, (options, file) => options.SelectTraceDump(TraceKind.AsciiDump, file, "--trace-ascii")),
+        CommandLineOption.NegatableFlag("trace-time", null, (options, on) => options.TraceTime = on),
+        CommandLineOption.Value("stderr", null, SetStandardErrorFile),
         CommandLineOption.FileName("output", 'o', (options, file) => options.AddOutputFile(file)),
         CommandLineOption.NegatableFlag("remote-name", 'O', (options, on) => options.PairRemoteName(on)),
         CommandLineOption.NegatableFlag("remote-name-all", null, (options, on) => options.RemoteNameAll = on),
@@ -82,6 +89,8 @@ public static class CommandLineOptionTable
         CommandLineOption.Value("user", 'u', AcceptingEmpty((options, user) => options.SetCredentials(user))),
         CommandLineOption.NegatableFlag("basic", null, (options, on) => options.WantAuthScheme(HttpAuthSchemes.Basic, on)),
         CommandLineOption.NegatableFlag("digest", null, (options, on) => options.WantAuthScheme(HttpAuthSchemes.Digest, on)),
+        CommandLineOption.NegatableFlag("ntlm", null, (options, on) => options.WantAuthScheme(HttpAuthSchemes.Ntlm, on)),
+        CommandLineOption.NegatableFlag("negotiate", null, (options, on) => options.WantAuthScheme(HttpAuthSchemes.Negotiate, on)),
         CommandLineOption.Flag("anyauth", null, options => options.WantEveryAuthScheme()),
         CommandLineOption.Text("oauth2-bearer", null, (options, token) => options.SetBearerToken(token)),
         CommandLineOption.Value("proxy", 'x', AcceptingEmpty((options, proxy) => options.SetProxy(proxy, ProxyKind.Http))),
@@ -94,6 +103,8 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("proxytunnel", 'p', (options, on) => options.ProxyTunnel = on),
         CommandLineOption.Value("telnet-option", 't', AcceptingEmpty((options, telnetOption) => options.AddTelnetOption(telnetOption))),
         CommandLineOption.Value("tftp-blksize", null, SetTftpBlockSize),
+        CommandLineOption.Value("resolve", null, AcceptingEmpty((options, entry) => options.AddResolveEntry(entry))),
+        CommandLineOption.Value("connect-to", null, AcceptingEmpty((options, entry) => options.AddConnectToEntry(entry))),
         CommandLineOption.NegatableFlag("tftp-no-options", null, (options, on) => options.TftpNoOptions = on),
         CommandLineOption.Value("create-file-mode", null, SetCreateFileMode),
         CommandLineOption.NegatableFlag("insecure", 'k', (options, on) => options.Insecure = on),
@@ -110,12 +121,20 @@ public static class CommandLineOptionTable
         CommandLineOption.Value("max-filesize", null, SetMaxFileSize),
         CommandLineOption.Value("connect-timeout", null, SetConnectTimeout),
         CommandLineOption.Value("max-time", 'm', SetMaxTime),
+        CommandLineOption.Value("retry", null, SetRetryCount),
+        CommandLineOption.Value("retry-delay", null, SetRetryDelay),
+        CommandLineOption.Value("retry-max-time", null, SetRetryMaxTime),
+        CommandLineOption.NegatableFlag("retry-all-errors", null, (options, on) => options.RetryAllErrors = on),
+        CommandLineOption.NegatableFlag("retry-connrefused", null, (options, on) => options.RetryConnectionRefused = on),
+        CommandLineOption.Value("limit-rate", null, SetLimitRate),
+        CommandLineOption.Value("speed-limit", 'Y', SetSpeedLimit),
+        CommandLineOption.Value("speed-time", 'y', SetSpeedTime),
         CommandLineOption.NegatableFlag("remote-time", 'R', (options, on) => options.RemoteTime = on),
         CommandLineOption.Value("time-cond", 'z', SetTimeCondition),
         CommandLineOption.Text("request", 'X', (options, method) => options.RequestMethod = method),
         CommandLineOption.Value("header", 'H', AddHeaders),
         CommandLineOption.Value("user-agent", 'A', AcceptingEmpty((options, userAgent) => options.UserAgent = userAgent)),
-        CommandLineOption.Value("referer", 'e', AcceptingEmpty((options, referer) => options.Referer = referer)),
+        CommandLineOption.Value("referer", 'e', AcceptingEmpty(SetReferer)),
         CommandLineOption.Value("cookie", 'b', AcceptingEmpty((options, cookie) => options.AddCookie(cookie))),
         CommandLineOption.Text("cookie-jar", 'c', (options, file) => options.CookieJar = file),
         CommandLineOption.NegatableFlag("junk-session-cookies", 'j', (options, on) => options.JunkSessionCookies = on),
@@ -138,6 +157,7 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("tr-encoding", null, (options, on) => options.TransferEncoding = on),
         CommandLineOption.NegatableFlag("ignore-content-length", null, (options, on) => options.IgnoreContentLength = on),
         CommandLineOption.NegatableFlag("path-as-is", null, (options, on) => options.PathAsIs = on),
+        CommandLineOption.NegatableFlag("http0.9", null, (options, on) => options.AllowHttp09Reply = on),
         CommandLineOption.Text("request-target", null, (options, target) => options.RequestTarget = target),
         CommandLineOption.Flag("http1.0", '0', options => options.SelectHttpVersion(HttpVersionPreference.Http10)),
         CommandLineOption.Flag("http1.1", null, options => options.SelectHttpVersion(HttpVersionPreference.Http11)),
@@ -177,6 +197,17 @@ public static class CommandLineOptionTable
     }
 
     /// <summary>
+    /// Sets the <c>--stderr</c> file after curl's warning for a file name that looks like a flag. An empty
+    /// value is not refused as blank: curl 8.21.0 tries to open the empty file name, warns and carries on.
+    /// </summary>
+    private static CommandLineRefusal? SetStandardErrorFile(CommandLineOptions options, string file, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        CommandLineOption.WarnWhenFileNameLooksLikeFlag(options, file);
+        options.StandardErrorFile = file;
+        return null;
+    }
+
+    /// <summary>
     /// Builds an applier that accepts any value, empty included, as curl 8.21.0 does for
     /// <c>-u ''</c> and <c>-t ''</c>, and passes it to <paramref name="set"/>.
     /// </summary>
@@ -186,6 +217,26 @@ public static class CommandLineOptionTable
             set(options, value);
             return null;
         };
+
+    /// <summary>
+    /// Sets the <c>-e</c> / <c>--referer</c> value as curl 8.21.0 does: a value ending in <c>;auto</c>
+    /// turns <see cref="CommandLineOptions.AutoReferer"/> on and leaves the text before the suffix as the
+    /// referer, or none when that text is empty; any other value, empty included, is kept verbatim and
+    /// turns the autoreferer off.
+    /// </summary>
+    private static void SetReferer(CommandLineOptions options, string value)
+    {
+        const string AutoRefererSuffix = ";auto";
+        options.AutoReferer = value.EndsWith(AutoRefererSuffix, StringComparison.Ordinal);
+        if (!options.AutoReferer)
+        {
+            options.Referer = value;
+            return;
+        }
+
+        string referer = value[..^AutoRefererSuffix.Length];
+        options.Referer = referer.Length == 0 ? null : referer;
+    }
 
     /// <summary>
     /// Appends a <c>-d</c> / <c>--data</c> or <c>--data-ascii</c> value to the body: the value's own text, empty included, or,
@@ -413,10 +464,11 @@ public static class CommandLineOptionTable
 
     private static CommandLineRefusal? SetTftpBlockSize(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
     {
-        CommandLineRefusal? refusal = CommandLineNumber.ParseNonNegative(spelledOption, value, out int blockSize);
+        CommandLineRefusal? refusal = CommandLineNumber.ParseNonNegative(spelledOption, value, CommandLineNumber.PlatformLongMaximum, out long blockSize);
         if (refusal is null)
         {
-            options.TftpBlockSize = blockSize;
+            // TFTP clamps the block size to 65464, so any size past int.MaxValue means the same.
+            options.TftpBlockSize = (int)Math.Min(blockSize, int.MaxValue);
         }
 
         return refusal;
@@ -543,7 +595,7 @@ public static class CommandLineOptionTable
 
     private static CommandLineRefusal? SetConnectTimeout(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
     {
-        CommandLineRefusal? refusal = CommandLineNumber.ParseSeconds(spelledOption, value, out TimeSpan duration);
+        CommandLineRefusal? refusal = CommandLineNumber.ParseSeconds(spelledOption, value, CommandLineNumber.PlatformLongMaximum, out TimeSpan duration);
         if (refusal is null)
         {
             options.ConnectTimeout = duration;
@@ -554,10 +606,76 @@ public static class CommandLineOptionTable
 
     private static CommandLineRefusal? SetMaxTime(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
     {
-        CommandLineRefusal? refusal = CommandLineNumber.ParseSeconds(spelledOption, value, out TimeSpan duration);
+        CommandLineRefusal? refusal = CommandLineNumber.ParseSeconds(spelledOption, value, CommandLineNumber.PlatformLongMaximum, out TimeSpan duration);
         if (refusal is null)
         {
             options.MaxTime = duration;
+        }
+
+        return refusal;
+    }
+
+    private static CommandLineRefusal? SetRetryCount(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        CommandLineRefusal? refusal = CommandLineNumber.ParseNonNegative(spelledOption, value, CommandLineNumber.PlatformLongMaximum, out long count);
+        if (refusal is null)
+        {
+            options.RetryCount = count;
+        }
+
+        return refusal;
+    }
+
+    private static CommandLineRefusal? SetRetryDelay(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        CommandLineRefusal? refusal = CommandLineNumber.ParseSeconds(spelledOption, value, CommandLineNumber.PlatformLongMaximum, out TimeSpan delay);
+        if (refusal is null)
+        {
+            options.RetryDelay = delay;
+        }
+
+        return refusal;
+    }
+
+    private static CommandLineRefusal? SetRetryMaxTime(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        CommandLineRefusal? refusal = CommandLineNumber.ParseSeconds(spelledOption, value, CommandLineNumber.PlatformLongMaximum, out TimeSpan duration);
+        if (refusal is null)
+        {
+            options.RetryMaxTime = duration;
+        }
+
+        return refusal;
+    }
+
+    private static CommandLineRefusal? SetLimitRate(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        CommandLineRefusal? refusal = CommandLineNumber.ParseSize(spelledOption, value, out long bytesPerSecond);
+        if (refusal is null)
+        {
+            options.LimitRate = bytesPerSecond;
+        }
+
+        return refusal;
+    }
+
+    private static CommandLineRefusal? SetSpeedLimit(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        CommandLineRefusal? refusal = CommandLineNumber.ParseNonNegative(spelledOption, value, CommandLineNumber.PlatformLongMaximum, out long bytesPerSecond);
+        if (refusal is null)
+        {
+            options.SpeedLimit = bytesPerSecond;
+        }
+
+        return refusal;
+    }
+
+    private static CommandLineRefusal? SetSpeedTime(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        CommandLineRefusal? refusal = CommandLineNumber.ParseNonNegative(spelledOption, value, CommandLineNumber.PlatformLongMaximum, out long seconds);
+        if (refusal is null)
+        {
+            options.SpeedTimeSeconds = seconds;
         }
 
         return refusal;
@@ -628,10 +746,11 @@ public static class CommandLineOptionTable
 
     private static CommandLineRefusal? SetMaxRedirects(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
     {
-        CommandLineRefusal? refusal = CommandLineNumber.ParseMinusOneOrMore(spelledOption, value, out int limit);
+        CommandLineRefusal? refusal = CommandLineNumber.ParseMinusOneOrMore(spelledOption, value, CommandLineNumber.PlatformLongMaximum, out long limit);
         if (refusal is null)
         {
-            options.MaxRedirects = limit;
+            // No transfer follows int.MaxValue redirects, so any limit past it means the same.
+            options.MaxRedirects = (int)Math.Min(limit, int.MaxValue);
         }
 
         return refusal;

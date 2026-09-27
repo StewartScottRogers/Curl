@@ -36,10 +36,32 @@ four digits are N (`SwsHttpRequestLine`), decoding `base64` and applying `nonewl
 open until a reply containing `swsclose`, an empty or missing part, or `swsclose` in
 `<servercmd>`. `ReceivedBytes` records every byte the client wrote while the server had the
 connection open, across connections, for comparison with `<verify><protocol>`.
-`SwsServerCommands` reads `<servercmd>`; every other command sws knows is listed by name in
-`UnsupportedServerCommands` so the case can be skipped with a reason (BL-263, BL-264), and
-sws's part-number rules for authentication, `swsbounce` and `CONNECT` are not emulated yet
-(BL-265). A read with no reply waiting returns 0, because in memory nothing else can arrive.
+`SwsServerCommands` reads `<servercmd>`. Framing carries out the commands that change where a
+request ends: `auth_required` ends one with no `Authorization:` in it at its headers,
+`no-expect` does the same for one with `Expect: 100-continue`, and `skip: N` takes N off its
+`Content-Length` (past zero, the request never ends, as sws's `size_t` wraps). Bytes past
+such an early end start the next request; `upgrade` ends a request with `Upgrade:` in it at its
+headers too. `SwsHttpServerConnection` carries out the rest (ADR-0042): each reply goes out in
+writes of up to 20 bytes (`SwsServerSend`), each readable when sws would write it, with
+`writedelay: N` ms after each and `<postcmd>` `wait N` seconds (`SwsPostReplyCommands`) after
+the last, timed on the `TimeProvider` given to the connector; `idle` answers nothing, and a read
+then waits until cancelled; `stream` answers with `a string to stream 01234567890\n` without end
+and reads nothing more; `connection-monitor` records `[DISCONNECT]\n` in `ReceivedBytes`
+(`SwsServerRecording`, one flag for the server as in sws) when a connection that carried a
+request closes; after an `upgrade` reply the connection records raw traffic until the client
+has been quiet for one second, then closes. `delay: N` alone is listed in
+`UnsupportedServerCommands`, so a case using it can be skipped with a reason: sws applies it
+only when it accepts a connection while another's request is part-read, which needs its
+single-threaded interleaving of connections, not modelled here, and no case at `curl-8_21_0`
+uses it. `SwsHttpReplySelector` then moves the part number as sws does (ADR-0047): the first
+of `Authorization: Negotiate` (a counter from the first such request's part, plus one each
+time), `Digest` (+1000), NTLM type 3 (+1002), NTLM type 1 (+1001) and, from part 1000 up,
+`Basic` (+1) found anywhere in the request applies, except to a chunked request or one with an
+unreadable `Content-Length`, which sws stops reading before the rules; after a reply
+containing `swsbounce` the next request gets that part plus one; both states are kept across
+connections. A `CONNECT host:port HTTP/x.y` request with no number in its path is answered
+from `<connect>` / `<connectN>`, and the connection stays open for the tunnelled request.
+Otherwise a read with no reply waiting returns 0, because in memory nothing else can arrive.
 
 What it is to hold in full, per ADR-0013 decision 2:
 

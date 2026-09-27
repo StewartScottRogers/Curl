@@ -13,6 +13,12 @@ namespace Curl.Output;
 public interface IWriteOutVariableSource
 {
     /// <summary>
+    /// Gets a value indicating whether the transfer failed, which decides whether
+    /// <c>%{onerror}</c> lets the rest of the template render.
+    /// </summary>
+    bool TransferFailed { get; }
+
+    /// <summary>
     /// Gets the text a <c>%{name}</c> variable renders as.
     /// </summary>
     /// <param name="name">The variable name exactly as written between the braces; curl matches it case-sensitively.</param>

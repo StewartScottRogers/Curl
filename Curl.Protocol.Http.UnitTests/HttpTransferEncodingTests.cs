@@ -66,4 +66,17 @@ public sealed class HttpTransferEncodingTests
     {
         Assert.IsFalse(HttpTransferEncoding.IsChunked([new HttpResponseHeader("Content-Length", "5")]));
     }
+
+    [TestMethod]
+    [DataRow("chunked", true, DisplayName = "chunked")]
+    [DataRow("gzip, chunked", true, DisplayName = "gzip before chunked is not refused")]
+    [DataRow(" foo ,CHUNKED", true, DisplayName = "Any case, with blanks")]
+    [DataRow("gzip", false, DisplayName = "gzip alone")]
+    [DataRow("chunkedx", false, DisplayName = "chunkedx")]
+    public void ListsChunked_Value_TellsWhetherChunkedIsListedRefusingNothing(string value, bool expected)
+    {
+        HttpResponseHeader[] headers = [new("Content-Length", "5"), new("transfer-encoding", value)];
+
+        Assert.AreEqual(expected, HttpTransferEncoding.ListsChunked(headers));
+    }
 }

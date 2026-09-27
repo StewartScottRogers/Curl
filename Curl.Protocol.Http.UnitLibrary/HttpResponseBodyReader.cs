@@ -4,7 +4,7 @@ namespace Curl.Protocol.Http;
 
 /// <summary>
 /// Reads an HTTP/1.x response body framed by chunked transfer coding, by Content-Length or by
-/// the peer closing, and writes it to the transfer's output, failing with the exit code and
+/// the peer closing (<see cref="HttpResponseBodyFraming" />), and writes it to the transfer's output, failing with the exit code and
 /// message curl 8.21.0 reports (measured, BL-170, BL-171).
 /// </summary>
 /// <remarks>
@@ -43,6 +43,32 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     internal ReadOnlyMemory<byte> TrailerBytes => decoder?.TrailerBytes ?? ReadOnlyMemory<byte>.Empty;
 
     /// <summary>
+    /// Gets or sets the most body bytes the output may be given, <c>--max-filesize</c>'s limit,
+    /// or <see langword="null" /> for no limit. A body that grows past it has as many bytes
+    /// written as the limit allows, then fails with exit 63.
+    /// </summary>
+    internal long? MaximumBodySize { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether transfer coding is written undecoded, as
+    /// <c>--raw</c> asks (<see cref="HttpResponseBodyFraming" />).
+    /// </summary>
+    internal bool PassesTransferCoding { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the Content-Length is ignored and a body that is
+    /// not chunked read until the peer closes, as <c>--ignore-content-length</c> asks.
+    /// </summary>
+    internal bool IgnoresContentLength { get; set; }
+
+    /// <summary>
+    /// Gets the Content-Length of the body being read, once reading has started and the body
+    /// is framed by one rather than by chunked coding or the peer closing; otherwise
+    /// <see langword="null" />. It is the <c>out of</c> size of curl's exit 28 message.
+    /// </summary>
+    internal long? ExpectedLength { get; private set; }
+
+    /// <summary>
     /// Determines whether a response carries a body: not for <c>-I</c>, and not for a
     /// 204 or 304 status, whatever its Content-Length says.
     /// </summary>
@@ -79,7 +105,8 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     /// before the body was whole (exit 18), the output failed a write (exit 23), a read
     /// failed or the chunked framing is malformed (exit 56), the Transfer-Encoding names a
     /// coding curl does not decode or a decoded Content-Encoding is unrecognized or corrupt
-    /// (exit 61), or a trailer line is too long (exit 100).
+    /// (exit 61), the body grew past <see cref="MaximumBodySize" /> (exit 63), or a trailer line
+    /// is too long (exit 100).
     /// </exception>
     internal async ValueTask CopyAsync(
         HttpResponseHead head,
@@ -93,12 +120,12 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
             return;
         }
 
-        bool isChunked = HttpTransferEncoding.IsChunked(head.Headers);
-        long? contentLength = HttpContentLength.Find(head.Headers);
+        HttpResponseBodyFraming framing = HttpResponseBodyFraming.Of(head.Headers, PassesTransferCoding, IgnoresContentLength);
         contentDecoder = decodeContent ? HttpContentDecoder.For(head.Headers) : null;
+        ExpectedLength = framing.ContentLength;
         try
         {
-            await CopyFramedAsync(head.BodyPrefix, isChunked, contentLength, output, cancellationToken).ConfigureAwait(false);
+            await CopyFramedAsync(head.BodyPrefix, framing.IsChunked, framing.ContentLength, output, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -206,7 +233,29 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
             ? output.WriteAsync(bytes, cancellationToken)
             : contentDecoder.WriteAsync(output, bytes, cancellationToken);
 
+    /// <summary>
+    /// Gets how many more body bytes <see cref="MaximumBodySize" /> allows.
+    /// </summary>
+    private long RoomLeft => MaximumBodySize is { } limit ? limit - BytesWritten : long.MaxValue;
+
+    /// <summary>
+    /// Writes <paramref name="bytes" />, or as many as <see cref="MaximumBodySize" /> allows and
+    /// then fails with exit 63.
+    /// </summary>
     private async ValueTask<int> WriteAsync(Stream output, ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken)
+    {
+        if (bytes.Length > RoomLeft)
+        {
+            await WriteWithinLimitAsync(output, bytes[..(int)RoomLeft], cancellationToken).ConfigureAwait(false);
+            throw new HttpTransferException(
+                CurlExitCode.FilesizeExceeded,
+                HttpTransferMessages.FileSizeLimitExceeded(MaximumBodySize.GetValueOrDefault(), BytesWritten));
+        }
+
+        return await WriteWithinLimitAsync(output, bytes, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async ValueTask<int> WriteWithinLimitAsync(Stream output, ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken)
     {
         if (bytes.IsEmpty)
         {

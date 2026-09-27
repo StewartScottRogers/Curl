@@ -133,12 +133,40 @@ public sealed class CommandLineRedirectAndFailOptionTests
     [DataRow("+5")]
     [DataRow("0x10")]
     [DataRow("1.5")]
-    [DataRow("2147483648")]
     [DataRow("-2147483648")]
     [DataRow("99999999999999999999")]
     public void Parse_MaxRedirsUnreadable_IsRefusedAsNotProperNumber(string value)
     {
         CommandLineParseResult result = CommandLineParser.Parse(["--max-redirs", value, Url]);
+
+        AssertRefused(result, "curl: option --max-redirs: " + ProperNumber, TryHelp);
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public void Parse_OnWindows_MaxRedirsPastTwoToThe31_IsRefusedAsNotProperNumber()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--max-redirs", "2147483648", Url]);
+
+        AssertRefused(result, "curl: option --max-redirs: " + ProperNumber, TryHelp);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    [DataRow("2147483648")]
+    [DataRow("9223372036854775807")]
+    public void Parse_OnLinuxOrMacOS_MaxRedirsPastTwoToThe31_RecordsIntMaximum(string value)
+    {
+        CommandLineOptions options = Accept("--max-redirs", value, Url);
+
+        Assert.AreEqual(int.MaxValue, options.MaxRedirects);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public void Parse_OnLinuxOrMacOS_MaxRedirsPastTwoToThe63_IsRefusedAsNotProperNumber()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--max-redirs", "9223372036854775808", Url]);
 
         AssertRefused(result, "curl: option --max-redirs: " + ProperNumber, TryHelp);
     }

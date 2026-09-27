@@ -55,6 +55,18 @@ internal static class HttpTransferEncoding
     }
 
     /// <summary>
+    /// Determines whether any Transfer-Encoding header lists <c>chunked</c>, refusing no
+    /// coding: how <c>--raw</c>, which decodes none, reads the headers (measured, BL-180 Notes).
+    /// </summary>
+    /// <param name="headers">The final response's headers.</param>
+    /// <returns><see langword="true" /> when a Transfer-Encoding header lists <c>chunked</c>.</returns>
+    internal static bool ListsChunked(IReadOnlyList<HttpResponseHeader> headers) =>
+        headers
+            .Where(header => string.Equals(header.Name, HeaderName, StringComparison.OrdinalIgnoreCase))
+            .SelectMany(header => Codings(header.Value))
+            .Any(coding => Is(coding, "chunked"));
+
+    /// <summary>
     /// Reads one Transfer-Encoding header's codings.
     /// </summary>
     /// <param name="value">The header's value.</param>

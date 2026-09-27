@@ -20,8 +20,25 @@ namespace Curl.Output;
 /// <c>exitcode</c>, <c>errormsg</c>, <c>url</c>, <c>urlnum</c>, <c>scheme</c>,
 /// <c>time_namelookup</c>, <c>time_connect</c>, <c>time_appconnect</c>,
 /// <c>time_pretransfer</c>, <c>time_posttransfer</c>, <c>time_starttransfer</c>,
-/// <c>time_redirect</c>, <c>time_total</c>, <c>speed_download</c> and
-/// <c>speed_upload</c>. Any other name is reported unknown.
+/// <c>time_redirect</c>, <c>time_total</c>, <c>time_queue</c>, <c>speed_download</c>,
+/// <c>speed_upload</c>, <c>ssl_verify_result</c>, <c>proxy_ssl_verify_result</c>,
+/// <c>tls_earlydata</c>, <c>num_retries</c>, <c>ftp_entry_path</c>, and
+/// <c>url.&lt;part&gt;</c> and <c>urle.&lt;part&gt;</c> for the parts <c>scheme</c>,
+/// <c>user</c>, <c>password</c>, <c>options</c>, <c>host</c>, <c>port</c>, <c>path</c>,
+/// <c>query</c>, <c>fragment</c> and <c>zoneid</c>. Any other name is reported unknown.
+/// </para>
+/// <para>
+/// <c>url.</c> parts come from the URL as given and <c>urle.</c> parts from the
+/// <c>url_effective</c> URL, each parsed with <see cref="CurlUrl"/>; a part the URL does
+/// not have, or a URL that does not parse, prints nothing. See BL-304.
+/// </para>
+/// <para>
+/// <c>time_queue</c> is the handler's start, the moment the transfer left the queue, so
+/// one microsecond with timings and <c>0.000000</c> without. The last five print the
+/// fixed text curl 8.21.0 (Schannel) prints for every transfer this tool can run: a
+/// verify result of <c>0</c>, which Schannel reports even for a failed verification;
+/// <c>0</c> early-data bytes, which Schannel never sends; <c>0</c> retries and an empty
+/// FTP entry path, because no <c>--retry</c> and no FTP handler exist yet. See ADR-0043.
 /// </para>
 /// <para>
 /// A <c>time_*</c> value is the seconds from <see cref="TransferTimings.Started"/> to its
@@ -57,7 +74,25 @@ public sealed class TransferWriteOutVariables(
 
     private const long MicrosecondsPerSecond = 1_000_000;
 
-    private static readonly Dictionary<string, Func<TransferWriteOutVariables, string>> VariableFormatters = new(StringComparer.Ordinal)
+    /// <summary>
+    /// The URL parts <c>url.</c> and <c>urle.</c> name, in the order curl 8.21.0's
+    /// <c>tool_writeout.c</c> lists them, each read from a parsed <see cref="CurlUrl"/>.
+    /// </summary>
+    private static readonly (string Name, Func<CurlUrl, string?> Read)[] UrlParts =
+    [
+        ("scheme", url => url.Scheme),
+        ("user", url => url.User),
+        ("password", url => url.Password),
+        ("options", url => url.Options),
+        ("host", url => url.Host),
+        ("port", FormatUrlPort),
+        ("path", url => url.AbsolutePath),
+        ("query", url => url.Query),
+        ("fragment", url => url.Fragment),
+        ("zoneid", url => url.ZoneId),
+    ];
+
+    private static readonly Dictionary<string, Func<TransferWriteOutVariables, string>> VariableFormatters = AddUrlPartFormatters(new(StringComparer.Ordinal)
     {
         ["response_code"] = variables => FormatStatusCode(variables.report.ResponseCode),
         ["http_code"] = variables => FormatStatusCode(variables.report.ResponseCode),
@@ -66,7 +101,7 @@ public sealed class TransferWriteOutVariables(
         ["method"] = variables => variables.report.Method ?? "GET",
         ["content_type"] = variables => variables.report.ContentType ?? string.Empty,
         ["redirect_url"] = variables => variables.report.RedirectUrl ?? string.Empty,
-        ["url_effective"] = variables => variables.report.EffectiveUrl ?? variables.requestUrl,
+        ["url_effective"] = variables => variables.EffectiveUrl,
         ["num_redirects"] = variables => FormatNumber(variables.report.RedirectCount),
         ["size_header"] = variables => FormatNumber(variables.report.HeaderSize),
         ["size_request"] = variables => FormatNumber(variables.report.RequestSize),
@@ -83,6 +118,7 @@ public sealed class TransferWriteOutVariables(
         ["url"] = variables => variables.url,
         ["urlnum"] = variables => FormatNumber(variables.urlNumber),
         ["scheme"] = variables => variables.scheme ?? string.Empty,
+        ["time_queue"] = variables => FormatSeconds(variables.MicrosecondsSinceStart(variables.Timings?.Started)),
         ["time_namelookup"] = variables => FormatSeconds(variables.MicrosecondsSinceStart(variables.Timings?.Connect?.NameResolved)),
         ["time_connect"] = variables => FormatSeconds(variables.MicrosecondsSinceStart(variables.Timings?.Connect?.Connected)),
         ["time_appconnect"] = variables => FormatSeconds(variables.MicrosecondsSinceStart(variables.Timings?.Connect?.TlsHandshakeCompleted)),
@@ -93,7 +129,12 @@ public sealed class TransferWriteOutVariables(
         ["time_total"] = variables => FormatSeconds(variables.TotalMicroseconds),
         ["speed_download"] = variables => FormatNumber(ComputeBytesPerSecond(variables.DownloadSize, variables.TotalMicroseconds)),
         ["speed_upload"] = variables => FormatNumber(ComputeBytesPerSecond(variables.report.UploadSize, variables.TotalMicroseconds)),
-    };
+        ["ssl_verify_result"] = _ => "0",
+        ["proxy_ssl_verify_result"] = _ => "0",
+        ["tls_earlydata"] = _ => "0",
+        ["num_retries"] = _ => "0",
+        ["ftp_entry_path"] = _ => string.Empty,
+    });
 
     private static readonly char[] HeaderValueWhitespace = [' ', '\t'];
 
@@ -109,7 +150,12 @@ public sealed class TransferWriteOutVariables(
 
     private TransferTimings? Timings => report.Timings;
 
+    private string EffectiveUrl => report.EffectiveUrl ?? requestUrl;
+
     private long TotalMicroseconds => MicrosecondsSinceStart(Timings?.Completed);
+
+    /// <inheritdoc/>
+    public bool TransferFailed => !result.IsSuccess;
 
     /// <inheritdoc/>
     public bool TryGetVariableText(string name, [NotNullWhen(true)] out string? text)
@@ -150,6 +196,46 @@ public sealed class TransferWriteOutVariables(
         return timestamp is long reached
             ? Math.Max(1, ToMicroseconds(timeProvider.GetElapsedTime(Timings!.Started, reached)))
             : 0;
+    }
+
+    /// <summary>
+    /// Adds <c>url.&lt;part&gt;</c>, read from the URL as given, and <c>urle.&lt;part&gt;</c>,
+    /// read from the effective URL, for every part in <see cref="UrlParts"/>.
+    /// </summary>
+    private static Dictionary<string, Func<TransferWriteOutVariables, string>> AddUrlPartFormatters(
+        Dictionary<string, Func<TransferWriteOutVariables, string>> formatters)
+    {
+        foreach ((string name, Func<CurlUrl, string?> read) in UrlParts)
+        {
+            formatters["url." + name] = variables => FormatUrlPart(variables.url, read);
+            formatters["urle." + name] = variables => FormatUrlPart(variables.EffectiveUrl, read);
+        }
+
+        return formatters;
+    }
+
+    /// <summary>
+    /// One part of <paramref name="text"/> as curl's <c>urlpart</c> prints it: parsed
+    /// without path-as-is, and nothing when the URL does not parse or has no such part.
+    /// </summary>
+    private static string FormatUrlPart(string text, Func<CurlUrl, string?> read)
+    {
+        return CurlUrl.TryParse(text, pathAsIs: false, out CurlUrl? parsed) ? read(parsed) ?? string.Empty : string.Empty;
+    }
+
+    /// <summary>
+    /// The port as <c>curl_url_get</c> with <c>CURLU_DEFAULT_PORT</c> gives it: the one
+    /// written, else the scheme's default, which is <c>0</c> for <c>file</c>; nothing for
+    /// a scheme curl does not know.
+    /// </summary>
+    private static string FormatUrlPort(CurlUrl url)
+    {
+        if (url.Port != UnknownPort)
+        {
+            return FormatNumber(url.Port);
+        }
+
+        return url.Scheme == "file" ? "0" : string.Empty;
     }
 
     private static long ToMicroseconds(TimeSpan duration)

@@ -63,6 +63,9 @@ public sealed class TransferContext : ITransferContext
     public UnixFileMode CreateFileMode { get; init; } = DefaultCreateFileMode;
 
     /// <inheritdoc />
+    public bool PathAsIs { get; init; }
+
+    /// <inheritdoc />
     public TimeSpan? ConnectTimeout { get; init; }
 
     /// <inheritdoc />

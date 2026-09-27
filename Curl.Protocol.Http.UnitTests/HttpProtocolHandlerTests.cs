@@ -396,7 +396,7 @@ public sealed partial class HttpProtocolHandlerTests
 
         Task<TransferResult> transfer = Handler(QueueConnector.For(connection))
             .ExecuteAsync(BodyContext("http://127.0.0.1:18081/", options, time)).AsTask();
-        await time.FirstTimerCreated;
+        await time.TimerCreatedAsync(HttpContinueWaitConnection.ContinueWait);
         time.Advance(TimeSpan.FromMilliseconds(999));
         Assert.AreEqual(head, Latin1(connection.Written), "The body was sent before one second.");
         time.Advance(TimeSpan.FromMilliseconds(1));

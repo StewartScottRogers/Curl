@@ -36,7 +36,16 @@ that name (case-insensitive), and a body is a `BytesBody` sent as
 `application/x-www-form-urlencoded` unless `-G` moved it into the query. The runner appends
 the `-G` / `--url-query` query with `QueryUrl` before the URL is parsed. `http` and
 `https` are served by `HttpProtocolHandler`, registered in `CurlComposition` with a
-`BasicAndBearerAuthenticator` in the platform's credential encoding and no cookie store.
+`RankedHttpAuthenticator` (Basic and Bearer, and Digest with a random client nonce, all in the
+platform's credential encoding), which answers the scheme `-u`, `--basic`, `--digest`,
+`--anyauth` and `--oauth2-bearer` allow (`HttpRequestOptions.AuthSchemes` and `BearerToken`).
+With `-b` or `-c` the handler also gets the run's `CookieEngine`: one `CookieStore` shared by
+every URL, the `-b` files loaded before the first transfer (session cookies dropped under
+`-j`, a missing file ignored), the `-b name=value` strings sent after the stored cookies, and
+the `-c` jar written after every `http`/`https` transfer, after its `-w` output, whatever its
+outcome, and after no other scheme's (`-c -` prints it to standard output each time, in the
+mode standard output is in). With nothing but `-b` strings, received cookies are not stored,
+as curl's cookie engine stays off. Measured on curl 8.21.0 (BL-237 Notes).
 `-D -` sends the handler's header lines to standard output; any other `-D` name is opened
 (unsanitized, truncated for the first URL and appended for the rest) before the transfer,
 and one that cannot be opened prints `curl: Failed to open <file>` and stops the run with
@@ -65,6 +74,14 @@ byte zero, the two header lines, and the all-zero status line - every byte curl 
 writes for a `file://` transfer. It is not written under `-s`, `--no-progress-meter` or
 `-#`, nor for a body on standard output when that is a terminal. Live counters, the bar
 form and the meter after any other failed transfer are not modelled yet (BL-130 to BL-132).
+
+With `-w`, each transfer's template is rendered by `Curl.Output`'s `WriteOutTemplateRenderer`
+after its failure lines, after a failure as after a success (a `-D` or resumed `-o` file that
+cannot be opened included), with `TransferWriteOutVariables` as its values. On Windows the
+line feeds it writes to standard error, and to standard output while curl's standard output
+would still be in text mode, go through `LineFeedToCrLfStream` as CR LF (ADR-0040).
+`%output{file}` targets go through the runner's `IWriteOutFileOpener`; the default,
+`RefusingWriteOutFileOpener`, opens none until BL-280.
 
 A URL with no `-o` writes through `StandardOutputFailureDeferringStream`, which
 models curl's 4096-byte stdio buffer: a failed standard output is reported as

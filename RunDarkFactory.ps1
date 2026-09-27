@@ -1053,7 +1053,9 @@ function Test-Green {
     # Build and fast tests in this checkout, after a rebase put other lanes' work under ours.
     & dotnet build $Root -nologo -v q 2>&1 | Out-Null
     if ($LASTEXITCODE -ne 0) { return 'build failed' }
-    & dotnet test $Root --no-build -nologo -v q --filter 'TestCategory!=Integration' 2>&1 | Out-Null
+    # A hung test would hold the integrate lock, and so every lane, for ever: the blame
+    # collector kills a test host that stops making progress, and the run counts as red.
+    & dotnet test $Root --no-build -nologo -v q --filter 'TestCategory!=Integration' --blame-hang-timeout 10m 2>&1 | Out-Null
     if ($LASTEXITCODE -ne 0) { return 'fast tests failed' }
     return ''
 }

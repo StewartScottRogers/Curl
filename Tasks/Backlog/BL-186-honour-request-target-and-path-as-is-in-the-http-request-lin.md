@@ -4,7 +4,7 @@ title: Honour --request-target and --path-as-is in the HTTP request line
 priority: Low
 assignee: Claude
 pipeline: protocol
-depends-on: [BL-172, BL-010]
+depends-on: [BL-172, BL-010, BL-293, BL-294]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-09-26
@@ -34,3 +34,4 @@ completed:
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Depends on BL-293 and BL-294 as well: ADR-0010 accepted `CurlUrl`, which keeps dot segments under path-as-is (BL-010).

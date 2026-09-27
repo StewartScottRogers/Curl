@@ -150,6 +150,27 @@ public sealed class CommandLineProtocolOptionTests
     }
 
     [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public void Parse_OnWindows_TftpBlockSizePastTwoToThe31_Refuses()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--tftp-blksize", "2147483648"]);
+
+        AssertRefused(result, "curl: option --tftp-blksize: expected a proper numerical parameter");
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    [DataRow("2147483648")]
+    [DataRow("9223372036854775807")]
+    public void Parse_OnLinuxOrMacOS_TftpBlockSizePastTwoToThe31_RecordsIntMaximum(string value)
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--tftp-blksize", value, "http://example.com/"]);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual(int.MaxValue, result.Options.TftpBlockSize);
+    }
+
+    [TestMethod]
     public void Parse_TftpNoOptions_SetsTheFlag()
     {
         CommandLineParseResult result = CommandLineParser.Parse(["--tftp-no-options", "http://example.com/"]);

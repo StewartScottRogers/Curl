@@ -5,7 +5,7 @@ namespace Curl.Cli;
 /// <summary>
 /// Pins the transfer-encoding and HTTP version options: <c>--compressed</c>, <c>--raw</c>,
 /// <c>--tr-encoding</c>, <c>--ignore-content-length</c> and <c>--path-as-is</c> (each negatable),
-/// <c>--request-target</c>, <c>-0</c>/<c>--http1.0</c> and <c>--http1.1</c>, and the refusal of
+/// <c>--http0.9</c> (negatable), <c>--request-target</c>, <c>-0</c>/<c>--http1.0</c> and <c>--http1.1</c>, and the refusal of
 /// <c>--http2</c>, <c>--http2-prior-knowledge</c>, <c>--http3</c> and <c>--http3-only</c> (ADR-0017).
 /// Every refusal and warning line was measured with <c>/mingw64/bin/curl</c> 8.21.0 against
 /// <c>http://127.0.0.1:1/</c> on 2026-09-26.
@@ -30,6 +30,7 @@ public sealed class CommandLineTransferEncodingOptionTests
         Assert.IsFalse(result.Options.TransferEncoding);
         Assert.IsFalse(result.Options.IgnoreContentLength);
         Assert.IsFalse(result.Options.PathAsIs);
+        Assert.IsFalse(result.Options.AllowHttp09Reply);
         Assert.IsNull(result.Options.RequestTarget);
         Assert.IsNull(result.Options.HttpVersion);
     }
@@ -111,6 +112,30 @@ public sealed class CommandLineTransferEncodingOptionTests
     public void Parse_NoPathAsIsAfterPathAsIs_TurnsPathAsIsOff()
     {
         Assert.IsFalse(Accept("--path-as-is", "--no-path-as-is").PathAsIs);
+    }
+
+    [TestMethod]
+    public void Parse_Http09_AllowsAnHttp09Reply()
+    {
+        Assert.IsTrue(Accept("--http0.9").AllowHttp09Reply);
+    }
+
+    [TestMethod]
+    public void Parse_NoHttp09AfterHttp09_RefusesAnHttp09ReplyAgain()
+    {
+        Assert.IsFalse(Accept("--http0.9", "--no-http0.9").AllowHttp09Reply);
+    }
+
+    [TestMethod]
+    public void Parse_NoHttp09WithAttachedValueAfterHttp09_IgnoresTheValueAndTurnsItOff()
+    {
+        Assert.IsFalse(Accept("--http0.9", "--no-http0.9=x").AllowHttp09Reply);
+    }
+
+    [TestMethod]
+    public void Parse_Http09AfterNoHttp09_AllowsAnHttp09Reply()
+    {
+        Assert.IsTrue(Accept("--no-http0.9", "--http0.9").AllowHttp09Reply);
     }
 
     [TestMethod]

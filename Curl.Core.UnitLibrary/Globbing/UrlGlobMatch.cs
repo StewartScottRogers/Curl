@@ -8,10 +8,13 @@ namespace Curl.Core.Globbing;
 /// </summary>
 public sealed class UrlGlobMatch
 {
-    internal UrlGlobMatch(string url, IReadOnlyList<string> globValues)
+    private readonly bool isGlobbing;
+
+    internal UrlGlobMatch(string url, IReadOnlyList<string> globValues, bool isGlobbing)
     {
         Url = url;
         GlobValues = globValues;
+        this.isGlobbing = isGlobbing;
     }
 
     /// <summary>Gets the expanded URL.</summary>
@@ -44,6 +47,38 @@ public sealed class UrlGlobMatch
         }
 
         return result.ToString();
+    }
+
+    /// <summary>
+    /// Gets the file name curl 8.21.0 writes this URL to for the <c>-o</c> name
+    /// <paramref name="outputFileName" />.
+    /// </summary>
+    /// <remarks>
+    /// Under <c>-g</c>/<c>--globoff</c> curl never runs <c>glob_match_url</c>, so the name is
+    /// used as written. Otherwise, even for a URL with no glob in it, each <c>#N</c> is
+    /// substituted (<see cref="SubstituteGlobValues" />) and, on Windows, the whole result is
+    /// then sanitized as curl's <c>sanitize_file_name</c> does: control characters and
+    /// <c>| &lt; &gt; " ? *</c> become <c>_</c>, while path separators, colons and reserved
+    /// device names stay.
+    /// </remarks>
+    /// <param name="outputFileName">The <c>-o</c> file name as given.</param>
+    /// <param name="sanitizesForWindows">
+    /// <see langword="true" /> to sanitize as curl's Windows build does; pass
+    /// <see cref="OperatingSystem.IsWindows" />.
+    /// </param>
+    /// <returns>The file name curl writes to.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="outputFileName" /> is <see langword="null" />.</exception>
+    public string ResolveOutputFileName(string outputFileName, bool sanitizesForWindows)
+    {
+        ArgumentNullException.ThrowIfNull(outputFileName);
+
+        if (!isGlobbing)
+        {
+            return outputFileName;
+        }
+
+        string substituted = SubstituteGlobValues(outputFileName);
+        return sanitizesForWindows ? WindowsOutputFileNameSanitizer.Sanitize(substituted) : substituted;
     }
 
     /// <summary>

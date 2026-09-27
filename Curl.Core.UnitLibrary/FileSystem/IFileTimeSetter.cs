@@ -16,9 +16,14 @@ public interface IFileTimeSetter
     /// </summary>
     /// <param name="path">The operating-system path of an existing file.</param>
     /// <param name="lastWriteTimeUtc">The time to set.</param>
+    /// <param name="errorCode">
+    /// Zero when the time was set; otherwise the Win32 error code of the failure, such as
+    /// <c>2</c> (<c>ERROR_FILE_NOT_FOUND</c>) for a missing file, which curl 8.21.0 prints in
+    /// its <c>Warning: GetLastError 0x%08x</c> line.
+    /// </param>
     /// <returns>
     /// <see langword="true" /> when the time was set; <see langword="false" /> when it could
     /// not be, for example because the file does not exist.
     /// </returns>
-    bool TrySetLastWriteTimeUtc(string path, DateTimeOffset lastWriteTimeUtc);
+    bool TrySetLastWriteTimeUtc(string path, DateTimeOffset lastWriteTimeUtc, out int errorCode);
 }

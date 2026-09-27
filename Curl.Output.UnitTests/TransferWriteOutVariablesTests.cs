@@ -63,6 +63,7 @@ public sealed class TransferWriteOutVariablesTests
         Assert.AreEqual(
             "000|000|000|0|GET|||file://C:/Windows/win.ini|0|0|0|92|0|0||-1||-1|0||file:///C:/Windows/win.ini|0|file",
             RenderAll(variables));
+        Assert.IsFalse(variables.TransferFailed);
     }
 
     [TestMethod]
@@ -77,6 +78,7 @@ public sealed class TransferWriteOutVariablesTests
             "000|000|000|0|GET|||http://127.0.0.1:1/x|0|0|0|0|0|0||-1||-1|7|" + message + "|http://127.0.0.1:1/x|0|http",
             RenderAll(variables));
         Assert.AreEqual("0", Get(variables, "num_headers"));
+        Assert.IsTrue(variables.TransferFailed);
     }
 
     [TestMethod]
@@ -201,6 +203,11 @@ public sealed class TransferWriteOutVariablesTests
 
     [TestMethod]
     [DataRow("nosuch")]
+    [DataRow("url.bogus")]
+    [DataRow("urle.bogus")]
+    [DataRow("url.")]
+    [DataRow("referer")]
+    [DataRow("num_certs")]
     [DataRow("HTTP_CODE")]
     [DataRow(" http_code")]
     [DataRow("")]
@@ -326,6 +333,117 @@ public sealed class TransferWriteOutVariablesTests
     }
 
     [TestMethod]
+    public void TryGetVariableText_FileTransfer_PrintsTheFixedVariablesAsCurl()
+    {
+        // curl -s -o out.bin -w "%{<name>}" file:///Z:/bl284tmp/wo.txt, one name at a time; see BL-284's Notes.
+        TransferWriteOutVariables variables = new(
+            TransferResult.Success(3), "file:///Z:/bl284tmp/wo.txt", 0, "file:///Z:/bl284tmp/wo.txt", "file", Clock);
+
+        Assert.AreEqual("0|0|0|0|", RenderFixed(variables));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_HttpTransfer_PrintsTheFixedVariablesAsCurl()
+    {
+        // curl -s -o out.bin -w "%{<name>}" "http://u:p@127.0.0.1:18284/wo.txt?q=1#frag", one name at a time.
+        TransferWriteOutVariables variables = WithReport(new TransferReport { ResponseCode = 200, ConnectionCount = 1 });
+
+        Assert.AreEqual("0|0|0|0|", RenderFixed(variables));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_FailedTransfer_PrintsTheFixedVariablesAsCurl()
+    {
+        // curl -s -o out.bin -w "..." https://self-signed.badssl.com/ exited 60 with ssl_verify_result 0 under Schannel.
+        TransferWriteOutVariables variables = new(
+            TransferResult.Failure(CurlExitCode.PeerFailedVerification, "SSL certificate problem"),
+            "https://self-signed.badssl.com/", 0, "https://self-signed.badssl.com/", "https", Clock);
+
+        Assert.AreEqual("0|0|0|0|", RenderFixed(variables));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_TimeQueueWithTimings_PrintsOneMicrosecond()
+    {
+        // curl printed 0.000083 and 0.000038: the queue is left as the transfer starts, which is the handler's start here.
+        TransferReport report = new()
+        {
+            Timings = new TransferTimings(Started: 500, Connect: null, RequestReady: null, RequestSent: null, FirstByteReceived: null, Completed: 900),
+        };
+
+        Assert.AreEqual("0.000001", Get(WithReport(report), "time_queue"));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_TimeQueueWithoutTimings_PrintsZero()
+    {
+        Assert.AreEqual("0.000000", Get(WithReport(new TransferReport()), "time_queue"));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_UrlPartsOfFileUrl_MatchCurl()
+    {
+        // curl -s -o out.bin -w "..." file:///Z:/bl284tmp/wo.txt (BL-284's Notes); url_effective is file://Z:/bl284tmp/wo.txt.
+        TransferWriteOutVariables variables = new(
+            TransferResult.Success(3), "file:///Z:/bl284tmp/wo.txt", 0, "file://Z:/bl284tmp/wo.txt", "file", Clock);
+
+        Assert.AreEqual("file|||||0|Z:/bl284tmp/wo.txt|||", RenderUrlParts(variables, "url."));
+        Assert.AreEqual("file|||||0|Z:/bl284tmp/wo.txt|||", RenderUrlParts(variables, "urle."));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_UrlPartsOfHttpUrl_MatchCurl()
+    {
+        // curl -s -o NUL -w "..." "http://u:p@127.0.0.1:18284/wo.txt?q=1#frag" (BL-284's Notes).
+        const string given = "http://u:p@127.0.0.1:18284/wo.txt?q=1#frag";
+        TransferReport report = new() { EffectiveUrl = given };
+        TransferWriteOutVariables variables = new(TransferResult.Success(0) with { Report = report }, given, 0, given, "http", Clock);
+
+        Assert.AreEqual("http|u|p||127.0.0.1|18284|/wo.txt|q=1|frag|", RenderUrlParts(variables, "url."));
+        Assert.AreEqual("http|u|p||127.0.0.1|18284|/wo.txt|q=1|frag|", RenderUrlParts(variables, "urle."));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_UrlPartsOfUrlWithoutScheme_GuessHttp()
+    {
+        // curl -s -o NUL -w "..." 127.0.0.1:18284 (BL-284's Notes).
+        TransferWriteOutVariables variables = new(
+            TransferResult.Success(0), "127.0.0.1:18284", 0, "http://127.0.0.1:18284/", "http", Clock);
+
+        Assert.AreEqual("http||||127.0.0.1|18284|/|||", RenderUrlParts(variables, "url."));
+        Assert.AreEqual("http||||127.0.0.1|18284|/|||", RenderUrlParts(variables, "urle."));
+    }
+
+    [TestMethod]
+    [DataRow("http://h/", "80")]
+    [DataRow("imap://h/", "143")]
+    [DataRow("nosuch://h/", "")]
+    [DataRow("nosuch://h:7/", "7")]
+    public void TryGetVariableText_UrlPortWithoutOne_IsSchemeDefault(string url, string expected)
+    {
+        TransferWriteOutVariables variables = new(TransferResult.Success(0), url, 0, url, null, Clock);
+
+        Assert.AreEqual(expected, Get(variables, "url.port"));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_UrlPartsOfOptionsAndZoneId_AreRead()
+    {
+        const string given = "imap://u;AUTH=PLAIN@[fe80::1%25eth0]/";
+        TransferWriteOutVariables variables = new(TransferResult.Success(0), given, 0, given, "imap", Clock);
+
+        Assert.AreEqual("imap|u||AUTH=PLAIN|[fe80::1]|143|/|||eth0", RenderUrlParts(variables, "url."));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_UrlThatDoesNotParse_PrintsNothing()
+    {
+        TransferWriteOutVariables variables = new(TransferResult.Success(0), "http://[::1", 0, "http://[::1", "http", Clock);
+
+        Assert.AreEqual("|||||||||", RenderUrlParts(variables, "url."));
+    }
+
+    [TestMethod]
     public void Constructor_NullArguments_Throw()
     {
         TransferResult result = TransferResult.Success(0);
@@ -361,6 +479,26 @@ public sealed class TransferWriteOutVariablesTests
     private static string RenderAll(TransferWriteOutVariables variables)
     {
         return string.Join('|', MeasuredVariableOrder.Select(name => Get(variables, name)));
+    }
+
+    private static readonly string[] FixedVariableOrder =
+    [
+        "ssl_verify_result", "proxy_ssl_verify_result", "tls_earlydata", "num_retries", "ftp_entry_path",
+    ];
+
+    private static readonly string[] UrlPartOrder =
+    [
+        "scheme", "user", "password", "options", "host", "port", "path", "query", "fragment", "zoneid",
+    ];
+
+    private static string RenderUrlParts(TransferWriteOutVariables variables, string prefix)
+    {
+        return string.Join('|', UrlPartOrder.Select(part => Get(variables, prefix + part)));
+    }
+
+    private static string RenderFixed(TransferWriteOutVariables variables)
+    {
+        return string.Join('|', FixedVariableOrder.Select(name => Get(variables, name)));
     }
 
     private static string RenderTimesAndSpeeds(TransferWriteOutVariables variables)

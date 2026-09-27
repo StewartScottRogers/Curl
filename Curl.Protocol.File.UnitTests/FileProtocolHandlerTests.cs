@@ -226,6 +226,27 @@ public sealed class FileProtocolHandlerTests
         Assert.AreEqual("Could not open file C:/nosuch.txt", result.ErrorMessage);
     }
 
+    // curl 8.21.0 with --path-as-is prints "curl: (37) Could not open file
+    // Z:/.../dir/../nosuch" for file:///Z:/.../dir/../nosuch, where without it the quoted
+    // path is Z:/.../nosuch (measured in BL-293): the dot segments are kept.
+    [TestMethod]
+    public async Task ExecuteAsync_PathAsIsDotDotSourceNotFound_QuotesThePathWithTheDotDotKept()
+    {
+        var fileSystem = new FakeFileSystem();
+        var context = new TransferContext
+        {
+            Url = new Uri("file:///C:/dir/../nosuch.txt"),
+            Output = new ChunkRecordingStream(),
+            PathAsIs = true,
+        };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        var result = await handler.ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.FileCouldntReadFile, result.ExitCode);
+        Assert.AreEqual("Could not open file C:/dir/../nosuch.txt", result.ErrorMessage);
+    }
+
     // Exit 78 is the remote-protocol "file not found"; file:// never reports it, however
     // the open failed. Verified against curl 8.21.0.
     [TestMethod]

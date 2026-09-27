@@ -1,8 +1,11 @@
 using System.Globalization;
 using System.Text;
+using Curl.Authentication;
 using Curl.Cli;
 using Curl.Core;
 using Curl.Core.FileSystem;
+using Curl.Core.Multipart;
+using Curl.Output;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Console;
@@ -20,7 +23,9 @@ namespace Curl.Console;
 /// the network handlers' TLS settings, and the warnings for the ones the build ignores,
 /// come from them.
 /// </param>
-/// <param name="outputFileSystem">Opens the <c>-o</c> / <c>--output</c> files.</param>
+/// <param name="fileSystem">
+/// Opens the <c>-o</c> / <c>--output</c> files, the <c>-b</c> cookie files and the <c>-c</c> jar.
+/// </param>
 /// <param name="outputFileTimeSetter">
 /// Stamps an <c>-o</c> file with the source's modification time under <c>-R</c> /
 /// <c>--remote-time</c>.
@@ -54,6 +59,21 @@ namespace Curl.Console;
 /// <param name="standardOutputIsTerminal">
 /// Whether standard output is a terminal, where curl hides the meter of a transfer with no
 /// <c>-o</c>.
+/// </param>
+/// <param name="formBodyBuilder">
+/// Builds each transfer's <c>-F</c> / <c>--form-string</c> body; when not given, one reading the
+/// real disk, encoding text in the platform's encoding (ADR-0027: the one
+/// <see cref="CredentialEncoding.ForPlatform" /> gives) and drawing random boundaries with
+/// <see cref="MultipartBoundary.CreateRandom" />.
+/// </param>
+/// <param name="writeOutFileOpener">
+/// Opens the <c>%output{file}</c> targets of a <c>-w</c> template; when not given, a
+/// <see cref="RefusingWriteOutFileOpener" />.
+/// </param>
+/// <param name="timeProvider">
+/// The provider that took each transfer's <see cref="TransferTimings" />, which the <c>-w</c>
+/// <c>time_*</c> variables are measured with, and the clock <c>%time{format}</c> reads;
+/// <see cref="TimeProvider.System" /> when not given.
 /// </param>
 /// <remarks>
 /// <para>
@@ -118,10 +138,32 @@ namespace Curl.Console;
 /// after the file is closed. As in curl 8.21.0 the time is applied even when the transfer
 /// wrote no body, as for an unmet <c>-z</c>. A transfer to standard output has no file to stamp.
 /// </para>
+/// <para>
+/// With <c>-F</c> / <c>--form-string</c> each URL gets its own multipart body, built after the
+/// URL and range are checked and before anything is sent, and closed when the transfer ends. A
+/// form file that cannot be opened ends that transfer with the builder's exit 26 and no
+/// connection, as curl 8.21.0 does.
+/// </para>
+/// <para>
+/// With <c>-w</c> each transfer's template is rendered by <see cref="WriteOutTemplateRenderer" />
+/// after its failure lines, whether it succeeded or failed, and also after a <c>-D</c> or resumed
+/// <c>-o</c> file that could not be opened, as curl 8.21.0 does (measured 2026-09-26, BL-235).
+/// On Windows curl writes standard error, and standard output until a body is sent there, in
+/// text mode, so those line feeds are written as CR LF (<see cref="LineFeedToCrLfStream" />).
+/// Because curl's standard output is buffered, its mode when the buffer is written out decides:
+/// the template's standard output is binary once any transfer of the run sends its body to
+/// standard output, including a later one (see <see cref="IsStandardOutputBinaryForWriteOut" />).
+/// </para>
+/// <para>
+/// With <c>-b</c> or <c>-c</c>, the <see cref="TransferDispatch.Cookies" /> load their <c>-b</c>
+/// files before the first transfer, and the <c>-c</c> jar is written after each <c>http</c> or
+/// <c>https</c> transfer's <c>-w</c> output (<see cref="WriteCookieJarAsync" />), as curl 8.21.0
+/// does (measured 2026-09-26, BL-237).
+/// </para>
 /// </remarks>
 internal sealed class CurlCommandRunner(
     Func<CommandLineOptions, TransferDispatch> createTransferDispatch,
-    IFileSystem outputFileSystem,
+    IFileSystem fileSystem,
     IFileTimeSetter outputFileTimeSetter,
     Stream standardOutput,
     Stream standardError,
@@ -129,7 +171,10 @@ internal sealed class CurlCommandRunner(
     bool runsOnWindows,
     int terminalColumns = TerminalColumns.Default,
     bool writesProgressMeter = false,
-    bool standardOutputIsTerminal = false)
+    bool standardOutputIsTerminal = false,
+    MultipartFormBodyBuilder? formBodyBuilder = null,
+    IWriteOutFileOpener? writeOutFileOpener = null,
+    TimeProvider? timeProvider = null)
 {
     /// <summary>
     /// curl 8.21.0's message for a URL that cannot be parsed at all, measured on
@@ -155,6 +200,25 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>Builds each transfer's context; gives a <c>telnet</c> transfer standard input.</summary>
     private readonly TransferContextFactory transferContextFactory = new(standardInput);
+
+    /// <summary>Builds each transfer's <c>-F</c> body.</summary>
+    private readonly MultipartFormBodyBuilder formBodyBuilder = formBodyBuilder
+        ?? new MultipartFormBodyBuilder(
+            new PhysicalFileSystem(),
+            CredentialEncoding.ForPlatform(runsOnWindows),
+            MultipartBoundary.CreateRandom);
+
+    /// <summary>The clock the <c>-w</c> variables and <c>%time{format}</c> read.</summary>
+    private readonly TimeProvider timeProvider = timeProvider ?? TimeProvider.System;
+
+    /// <summary>
+    /// Renders each transfer's <c>-w</c> template. It writes line feeds as they are; the
+    /// runner decides which targets are in text mode.
+    /// </summary>
+    private readonly WriteOutTemplateRenderer writeOutRenderer = new(
+        writeOutFileOpener ?? new RefusingWriteOutFileOpener(),
+        writesLineFeedAsCrLf: false,
+        timeProvider ?? TimeProvider.System);
 
     /// <summary>
     /// The result of a transfer whose write to standard output failed. It is compared by
@@ -230,6 +294,12 @@ internal sealed class CurlCommandRunner(
         CurlExitCode exitCode = CurlExitCode.Ok;
         TransferDispatch dispatch = createTransferDispatch(options);
         bool showsErrors = ShowsErrors(options);
+        if (dispatch.Cookies is { } cookies)
+        {
+            await cookies.LoadCookieFilesAsync(fileSystem, timeProvider.GetUtcNow()).ConfigureAwait(false);
+        }
+
+        bool bodyWrittenToStandardOutput = false;
 
         for (int index = 0; index < options.Urls.Count; index++)
         {
@@ -239,10 +309,17 @@ internal sealed class CurlCommandRunner(
 
             if (showsErrors && result.ErrorMessage is not null)
             {
-                await WriteErrorLineAsync(FormatErrorLine(result)).ConfigureAwait(false);
+                await WriteFailureLinesAsync(result).ConfigureAwait(false);
             }
 
-            if (EndsTheRun(options, result))
+            bool endsTheRun = EndsTheRun(options, result);
+            bodyWrittenToStandardOutput |= SendsBodyToStandardOutput(options, index, result);
+            bool standardOutputIsBinary = IsStandardOutputBinaryForWriteOut(
+                options, index, bodyWrittenToStandardOutput, endsTheRun);
+            await WriteOutAsync(options, index, result, standardOutputIsBinary).ConfigureAwait(false);
+            await WriteCookieJarAsync(dispatch, options, index, standardOutputIsBinary).ConfigureAwait(false);
+
+            if (endsTheRun)
             {
                 break;
             }
@@ -250,6 +327,144 @@ internal sealed class CurlCommandRunner(
 
         return exitCode;
     }
+
+    /// <summary>
+    /// Writes a failed transfer's <c>curl: (N) &lt;message&gt;</c> line, followed by curl's
+    /// certificate help block for exit 60.
+    /// </summary>
+    /// <param name="result">The failed transfer's result, which carries a message.</param>
+    /// <returns>A task that completes when the lines are flushed.</returns>
+    private async Task WriteFailureLinesAsync(TransferResult result)
+    {
+        await WriteErrorLineAsync(FormatErrorLine(result)).ConfigureAwait(false);
+        if (result.ExitCode == CurlExitCode.PeerFailedVerification)
+        {
+            await WriteCertificateHelpBlockAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Tells whether the transfer of the URL at <paramref name="index" /> was set up to send its
+    /// body to standard output, which is when curl switches standard output to binary mode: it
+    /// has no <c>-o</c>, and its <c>-D</c> file, if any, could be opened.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="index">The URL's position on the command line.</param>
+    /// <param name="result">The transfer's result.</param>
+    /// <returns><see langword="true" /> when the body went, or was to go, to standard output.</returns>
+    private static bool SendsBodyToStandardOutput(CommandLineOptions options, int index, TransferResult result) =>
+        index >= options.OutputFiles.Count && !ReferenceEquals(result, CannotOpenHeaderFileFailure);
+
+    /// <summary>
+    /// Tells whether the <c>-w</c> output of the URL at <paramref name="index" /> reaches
+    /// standard output in binary mode, its line feeds unchanged.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="index">The URL's position on the command line.</param>
+    /// <param name="bodyWrittenToStandardOutput">Whether this or an earlier transfer sent its body to standard output.</param>
+    /// <param name="endsTheRun">Whether this transfer is the run's last.</param>
+    /// <returns>
+    /// Always <see langword="true" /> off Windows. On Windows, <see langword="true" /> when this or
+    /// an earlier transfer sent its body to standard output, or when the run goes on and a later
+    /// URL has no <c>-o</c>: curl 8.21.0 holds the <c>-w</c> text in its stdio buffer, and the
+    /// later transfer switches standard output to binary before the buffer is written out.
+    /// Measured on 2026-09-26: <c>-o NUL -o NUL -w "%{exitcode}\n" f f g</c>, with <c>g</c> to
+    /// standard output, writes <c>0\n0\n</c> before <c>g</c>'s body. A later transfer whose
+    /// resumed <c>-o</c> file cannot be opened stops the run before that URL, which curl reports as
+    /// CR LF and this reports as LF; that case is not modelled.
+    /// </returns>
+    private bool IsStandardOutputBinaryForWriteOut(
+        CommandLineOptions options,
+        int index,
+        bool bodyWrittenToStandardOutput,
+        bool endsTheRun) =>
+        !runsOnWindows
+        || bodyWrittenToStandardOutput
+        || (!endsTheRun && options.Urls.Count > Math.Max(index + 1, options.OutputFiles.Count));
+
+    /// <summary>
+    /// Renders the <c>-w</c> template, when one was given, for the finished transfer of the URL
+    /// at <paramref name="index" />: its standard output goes where the body does, or nowhere once
+    /// standard output has failed, while the rest of the template still renders, as curl 8.21.0
+    /// prints <c>-w "A%{exitcode}%{stderr}B%{exitcode}\n"</c> to a closed standard output as
+    /// <c>B23</c> on standard error (measured 2026-09-26); and on Windows
+    /// the line feeds written to standard error, and to standard output while it is in text mode,
+    /// become CR LF.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="index">The URL's position on the command line, printed by <c>%{urlnum}</c>.</param>
+    /// <param name="result">The transfer's result.</param>
+    /// <param name="standardOutputIsBinary">Whether standard output keeps its line feeds.</param>
+    /// <returns>A task that completes when the template is rendered.</returns>
+    private async Task WriteOutAsync(CommandLineOptions options, int index, TransferResult result, bool standardOutputIsBinary)
+    {
+        if (options.WriteOut is not { } template)
+        {
+            return;
+        }
+
+        string url = options.Urls[index];
+        string requestUrl = QueryUrl.Append(url, options);
+        TransferWriteOutVariables variables = new(
+            result, url, index, requestUrl, WriteOutScheme(requestUrl, result), timeProvider);
+
+        Stream liveStandardOutput = deferringStandardOutput.HasWriteFailed ? Stream.Null : deferringStandardOutput;
+        Stream writeOutStandardOutput = standardOutputIsBinary
+            ? liveStandardOutput
+            : new LineFeedToCrLfStream(liveStandardOutput);
+        Stream writeOutStandardError = runsOnWindows ? new LineFeedToCrLfStream(standardError) : standardError;
+        await writeOutRenderer
+            .RenderAsync(template, variables, writeOutStandardOutput, writeOutStandardError)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Writes the run's <c>-c</c> jar after the transfer of the URL at <paramref name="index" />,
+    /// when there is a jar and the URL is <c>http</c> or <c>https</c>, whatever the transfer's
+    /// outcome: curl 8.21.0 writes it after every HTTP transfer, after its <c>-w</c> output, and
+    /// not after a <c>file</c> or <c>dict</c> one (measured 2026-09-26, BL-237 Notes). The jar
+    /// file is replaced each time; <c>-c -</c> prints the jar once per HTTP transfer, in the mode
+    /// standard output is in, and not at all once standard output has failed.
+    /// </summary>
+    /// <param name="dispatch">What the run transfers through, with its cookies.</param>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="index">The URL's position on the command line.</param>
+    /// <param name="standardOutputIsBinary">Whether standard output keeps its line feeds.</param>
+    /// <returns>A task that completes when the jar is written.</returns>
+    private async Task WriteCookieJarAsync(TransferDispatch dispatch, CommandLineOptions options, int index, bool standardOutputIsBinary)
+    {
+        if (dispatch.Cookies is not { } cookies || !IsHttpUrl(QueryUrl.Append(options.Urls[index], options)))
+        {
+            return;
+        }
+
+        Stream liveStandardOutput = deferringStandardOutput.HasWriteFailed ? Stream.Null : deferringStandardOutput;
+        Stream jarStandardOutput = standardOutputIsBinary ? liveStandardOutput : new LineFeedToCrLfStream(liveStandardOutput);
+        await cookies.WriteCookieJarAsync(fileSystem, jarStandardOutput, timeProvider.GetUtcNow()).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Tells whether <paramref name="requestUrl" /> is an absolute <c>http</c> or <c>https</c> URL.
+    /// </summary>
+    /// <param name="requestUrl">The URL, with any <c>-G</c> / <c>--url-query</c> query.</param>
+    /// <returns><see langword="true" /> for an HTTP URL.</returns>
+    private static bool IsHttpUrl(string requestUrl) =>
+        Uri.TryCreate(requestUrl, UriKind.Absolute, out Uri? uri)
+        && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
+
+    /// <summary>
+    /// The scheme <c>%{scheme}</c> prints: the URL's, in lower case, or <see langword="null" />
+    /// (printed as nothing) when the URL cannot be parsed or no handler serves its scheme, as
+    /// curl 8.21.0 prints it for <c>dict://exa mple.com/</c> and <c>xyz://a/b</c>.
+    /// </summary>
+    /// <param name="requestUrl">The URL, with any <c>-G</c> / <c>--url-query</c> query.</param>
+    /// <param name="result">The transfer's result.</param>
+    /// <returns>The scheme, or <see langword="null" />.</returns>
+    private static string? WriteOutScheme(string requestUrl, TransferResult result) =>
+        result.ExitCode != CurlExitCode.UnsupportedProtocol
+        && Uri.TryCreate(requestUrl, UriKind.Absolute, out Uri? uri)
+            ? uri.Scheme.ToLowerInvariant()
+            : null;
 
     /// <summary>
     /// Tells whether a transfer's result stops the URLs after it: a resumed transfer whose
@@ -263,6 +478,28 @@ internal sealed class CurlCommandRunner(
         ReferenceEquals(result, CannotOpenForResumeFailure)
         || ReferenceEquals(result, CannotOpenHeaderFileFailure)
         || (options.FailEarly && !result.IsSuccess);
+
+    /// <summary>
+    /// Writes the five lines curl 8.21.0's command-line tool prints on standard error after
+    /// the <c>curl: (60)</c> line (its <c>CURL_CA_CERT_ERRORMSG</c>), identical in the Schannel
+    /// and OpenSSL builds (ADR-0009), each followed by <see cref="Environment.NewLine" />.
+    /// Printed only where the error line is, so <c>-s</c> without <c>-S</c> prints neither.
+    /// </summary>
+    /// <returns>A task that completes when the lines are flushed.</returns>
+    private async Task WriteCertificateHelpBlockAsync()
+    {
+        string newLine = Environment.NewLine;
+        string text =
+            "More details here: https://curl.se/docs/sslcerts.html" + newLine
+            + newLine
+            + "curl failed to verify the legitimacy of the server and therefore could not" + newLine
+            + "establish a secure connection to it. To learn more about this situation and" + newLine
+            + "how to fix it, please visit the webpage mentioned above." + newLine;
+
+        byte[] bytes = Encoding.UTF8.GetBytes(text);
+        await standardError.WriteAsync(bytes).ConfigureAwait(false);
+        await standardError.FlushAsync().ConfigureAwait(false);
+    }
 
     /// <summary>
     /// Tells whether failure lines are printed: always, unless <c>-s</c> was given without <c>-S</c>.
@@ -352,7 +589,7 @@ internal sealed class CurlCommandRunner(
         string? outputFile,
         string headerFile)
     {
-        FileOpenResult opened = await outputFileSystem
+        FileOpenResult opened = await fileSystem
             .OpenForWriteAsync(
                 headerFile,
                 index == 0 ? FileWriteMode.Truncate : FileWriteMode.Append,
@@ -406,7 +643,8 @@ internal sealed class CurlCommandRunner(
     /// <param name="headerOutput">Where the <c>-D</c> header lines go, or <see langword="null" /> without <c>-D</c>.</param>
     /// <returns>
     /// The transfer's result; <see cref="ByteRangeParser.NotDeliveredFailure" />, with nothing
-    /// transferred, when the <c>-r</c> text names no range, as curl 8.21.0 reports it.
+    /// transferred, when the <c>-r</c> text names no range, as curl 8.21.0 reports it; the
+    /// <c>-F</c> body's build failure, with nothing transferred, when a form file cannot be opened.
     /// </returns>
     private async Task<TransferResult> TransferAsync(
         TransferDispatch dispatch,
@@ -432,10 +670,53 @@ internal sealed class CurlCommandRunner(
             return ByteRangeParser.NotDeliveredFailure;
         }
 
+        if (options.FormParts.Count == 0)
+        {
+            return await TransferWithBodyAsync(follower, options, uri, outputFile, range, headerOutput, null)
+                .ConfigureAwait(false);
+        }
+
+        MultipartFormBuildResult form = await formBodyBuilder
+            .BuildAsync(MultipartFormPartMapping.FromCommandLine(options.FormParts), CancellationToken.None)
+            .ConfigureAwait(false);
+        if (!form.IsBuilt)
+        {
+            return form.Failure;
+        }
+
+        await using (form.Body.Content.ConfigureAwait(false))
+        {
+            return await TransferWithBodyAsync(follower, options, uri, outputFile, range, headerOutput, form.Body)
+                .ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Performs one checked transfer, sending <paramref name="formBody" /> when given, to
+    /// <paramref name="outputFile" /> when one is given and to standard output otherwise, and
+    /// writes the progress meter after it.
+    /// </summary>
+    /// <param name="follower">Performs the transfer with the handler for its scheme, following redirects under <c>-L</c>.</param>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="uri">The URL, with any <c>-G</c> / <c>--url-query</c> query.</param>
+    /// <param name="outputFile">The matching <c>-o</c> value, or <see langword="null" />.</param>
+    /// <param name="range">The parsed <c>-r</c> range, or <see langword="null" />.</param>
+    /// <param name="headerOutput">Where the <c>-D</c> header lines go, or <see langword="null" /> without <c>-D</c>.</param>
+    /// <param name="formBody">The <c>-F</c> body, or <see langword="null" /> without <c>-F</c>.</param>
+    /// <returns>The transfer's result.</returns>
+    private async Task<TransferResult> TransferWithBodyAsync(
+        RedirectFollower follower,
+        CommandLineOptions options,
+        Uri uri,
+        string? outputFile,
+        ByteRange? range,
+        Stream? headerOutput,
+        HttpRequestBody? formBody)
+    {
         if (outputFile is null)
         {
             TransferContext context = transferContextFactory.Create(
-                options, uri, deferringStandardOutput, range, options.ResumeFrom, headerOutput);
+                options, uri, deferringStandardOutput, range, options.ResumeFrom, headerOutput, formBody);
             TransferResult standardOutputResult =
                 await TransferToStandardOutputAsync(follower, options, context).ConfigureAwait(false);
 
@@ -446,7 +727,7 @@ internal sealed class CurlCommandRunner(
         string outputFileName = runsOnWindows ? WindowsOutputFileNameSanitizer.Sanitize(outputFile) : outputFile;
         long? resumeFrom = await ResolveResumeFromAsync(options, outputFileName).ConfigureAwait(false);
         TransferResult fileResult = await TransferToOutputFileAsync(
-                follower, options, uri, outputFileName, range, resumeFrom, headerOutput)
+                follower, options, uri, outputFileName, range, resumeFrom, headerOutput, formBody)
             .ConfigureAwait(false);
 
         return await WriteProgressMeterAsync(options, fileResult, resumeFrom, toStandardOutput: false)
@@ -530,7 +811,7 @@ internal sealed class CurlCommandRunner(
             return options.ResumeFrom;
         }
 
-        FileOpenResult existing = await outputFileSystem
+        FileOpenResult existing = await fileSystem
             .OpenForReadAsync(outputFile, CancellationToken.None)
             .ConfigureAwait(false);
 
@@ -554,6 +835,7 @@ internal sealed class CurlCommandRunner(
     /// <param name="range">The parsed <c>-r</c> range, or <see langword="null" />.</param>
     /// <param name="resumeFrom">The resolved <c>-C</c> offset, or <see langword="null" />.</param>
     /// <param name="headerOutput">Where the <c>-D</c> header lines go, or <see langword="null" /> without <c>-D</c>.</param>
+    /// <param name="formBody">The <c>-F</c> body, or <see langword="null" /> without <c>-F</c>.</param>
     /// <returns>
     /// The transfer's result. A transfer that resumes past byte zero opens the file for
     /// appending before it starts, as curl 8.21.0 does; when that open fails the result is
@@ -567,20 +849,47 @@ internal sealed class CurlCommandRunner(
         string outputFile,
         ByteRange? range,
         long? resumeFrom,
-        Stream? headerOutput)
+        Stream? headerOutput,
+        HttpRequestBody? formBody)
     {
         TransferResult completed = await TransferIntoOutputFileAsync(
-                follower, options, uri, outputFile, range, resumeFrom, headerOutput)
+                follower, options, uri, outputFile, range, resumeFrom, headerOutput, formBody)
             .ConfigureAwait(false);
 
         if (options.RemoteTime && completed.IsSuccess && completed.SourceLastWriteTimeUtc is { } sourceLastWriteTimeUtc)
         {
-            // curl 8.21.0 prints a warning when the time cannot be set; that line is not
-            // modelled yet, so a failure is ignored.
-            _ = outputFileTimeSetter.TrySetLastWriteTimeUtc(outputFile, sourceLastWriteTimeUtc);
+            await StampOutputFileTimeAsync(options, outputFile, sourceLastWriteTimeUtc).ConfigureAwait(false);
         }
 
         return completed;
+    }
+
+    /// <summary>
+    /// Sets <paramref name="outputFile" />'s last-write time to the source's for <c>-R</c>, and
+    /// when that fails prints <see cref="RemoteTimeFailureWarning" />'s line unless <c>-s</c>
+    /// was given; the transfer's exit code is unchanged either way.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="outputFile">The closed <c>-o</c> file.</param>
+    /// <param name="sourceLastWriteTimeUtc">The source's last-write time.</param>
+    /// <returns>A task that completes when the time is set or the warning written.</returns>
+    /// <remarks>
+    /// curl 8.21.0 (Windows, measured 2026-09-26) mutes the warning under <c>-s</c> and under
+    /// <c>-s -S</c> alike: <c>-S</c> brings back error messages, not warnings. The line is the
+    /// Windows form on every platform, for the reason <see cref="RemoteTimeFailureWarning" />
+    /// gives.
+    /// </remarks>
+    private async Task StampOutputFileTimeAsync(
+        CommandLineOptions options,
+        string outputFile,
+        DateTimeOffset sourceLastWriteTimeUtc)
+    {
+        if (!outputFileTimeSetter.TrySetLastWriteTimeUtc(outputFile, sourceLastWriteTimeUtc, out int errorCode)
+            && !options.Silent)
+        {
+            await WriteErrorLineAsync(RemoteTimeFailureWarning.For(sourceLastWriteTimeUtc, errorCode))
+                .ConfigureAwait(false);
+        }
     }
 
     /// <summary>
@@ -593,6 +902,7 @@ internal sealed class CurlCommandRunner(
     /// <param name="range">The parsed <c>-r</c> range, or <see langword="null" />.</param>
     /// <param name="resumeFrom">The resolved <c>-C</c> offset, or <see langword="null" />.</param>
     /// <param name="headerOutput">Where the <c>-D</c> header lines go, or <see langword="null" /> without <c>-D</c>.</param>
+    /// <param name="formBody">The <c>-F</c> body, or <see langword="null" /> without <c>-F</c>.</param>
     /// <returns>The transfer's result, as <see cref="TransferToOutputFileAsync" /> describes it.</returns>
     private async Task<TransferResult> TransferIntoOutputFileAsync(
         RedirectFollower follower,
@@ -601,11 +911,12 @@ internal sealed class CurlCommandRunner(
         string outputFile,
         ByteRange? range,
         long? resumeFrom,
-        Stream? headerOutput)
+        Stream? headerOutput,
+        HttpRequestBody? formBody)
     {
         bool resumes = resumeFrom is > 0;
         DeferredOutputFileStream output = new(
-            outputFileSystem, outputFile, resumes ? FileWriteMode.Append : FileWriteMode.Truncate);
+            fileSystem, outputFile, resumes ? FileWriteMode.Append : FileWriteMode.Truncate);
         await using (output.ConfigureAwait(false))
         {
             if (resumes && !await output.TryOpenNowAsync().ConfigureAwait(false))
@@ -613,7 +924,7 @@ internal sealed class CurlCommandRunner(
                 return await ReportCannotOpenForResumeAsync(options, outputFile).ConfigureAwait(false);
             }
 
-            TransferContext context = transferContextFactory.Create(options, uri, output, range, resumeFrom, headerOutput);
+            TransferContext context = transferContextFactory.Create(options, uri, output, range, resumeFrom, headerOutput, formBody);
             TransferResult fileResult = await follower
                 .FollowAsync(context, RedirectPolicyMapping.FromCommandLine(options))
                 .ConfigureAwait(false);

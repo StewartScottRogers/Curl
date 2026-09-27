@@ -1,0 +1,142 @@
+using System.Text;
+
+using Curl.Core;
+using Curl.Core.FileSystem;
+using Curl.Core.Multipart;
+using Curl.Protocol.Abstractions;
+
+namespace Curl.Console;
+
+/// <summary>
+/// Pins <c>-F</c> / <c>--form</c> end to end through the production HTTP handler over a
+/// <see cref="ScriptedConnector" />, with an injected boundary and an in-memory file. The
+/// expected request was measured on 2026-09-26 with curl 8.21.0 (mingw, Schannel) as
+/// <c>curl --no-progress-meter -u u:p -F a=b -F f=@&lt;dir&gt;\srv.py http://127.0.0.1:18233/</c>,
+/// <c>srv.py</c> holding <c>print(1)</c> LF, through <c>Record-CurlExchange.ps1</c> (BL-233 Notes).
+/// </summary>
+[TestClass]
+public sealed class CurlCommandRunnerFormTests
+{
+    private const string Url = "http://127.0.0.1:18233/";
+
+    private const string Boundary = "------------------------26sLGDDRgOYwegSEyKubav";
+
+    private const string MeasuredRequest =
+        "POST / HTTP/1.1\r\n"
+        + "Host: 127.0.0.1:18233\r\n"
+        + "Authorization: Basic dTpw\r\n"
+        + "User-Agent: curl/8.21.0\r\n"
+        + "Accept: */*\r\n"
+        + "Content-Length: 313\r\n"
+        + "Content-Type: multipart/form-data; boundary=" + Boundary + "\r\n"
+        + "\r\n"
+        + "--" + Boundary + "\r\n"
+        + "Content-Disposition: form-data; name=\"a\"\r\n"
+        + "\r\n"
+        + "b\r\n"
+        + "--" + Boundary + "\r\n"
+        + "Content-Disposition: form-data; name=\"f\"; filename=\"srv.py\"\r\n"
+        + "Content-Type: application/octet-stream\r\n"
+        + "\r\n"
+        + "print(1)\n\r\n"
+        + "--" + Boundary + "--\r\n";
+
+    private readonly InMemoryFileSystem files = new();
+
+    private readonly MemoryStream standardOutput = new();
+
+    private readonly MemoryStream standardError = new();
+
+    private readonly ScriptedConnector server = new([Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello")]);
+
+    public CurlCommandRunnerFormTests() =>
+        files.ExistingContent["srv.py"] = Encoding.ASCII.GetBytes("print(1)\n");
+
+    [TestMethod]
+    public async Task RunAsync_FormTextAndFileUpload_SendsTheMeasuredMultipartRequest()
+    {
+        int exitCode = await RunAsync("-sS", "-u", "u:p", "-F", "a=b", "-F", "f=@srv.py", Url);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(MeasuredRequest, Encoding.Latin1.GetString(server.Written));
+        Assert.AreEqual("hello", Encoding.Latin1.GetString(standardOutput.ToArray()));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_FormWithOutputFile_SendsTheMultipartRequestAndWritesTheFile()
+    {
+        int exitCode = await RunAsync("-sS", "-u", "u:p", "-F", "a=b", "-F", "f=@srv.py", "-o", "out.txt", Url);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(MeasuredRequest, Encoding.Latin1.GetString(server.Written));
+        Assert.AreEqual("hello", Encoding.Latin1.GetString(files.Written["out.txt"].ToArray()));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_FormFileThatCannotBeOpened_Exits26WithoutConnecting()
+    {
+        files.UnreadablePaths.Add("nope.txt");
+
+        int exitCode = await RunAsync("-F", "a=b", "-F", "f=@nope.txt", Url);
+
+        Assert.AreEqual(26, exitCode);
+        Assert.AreEqual(
+            $"curl: (26) {MultipartFormBodyBuilder.OpenFailedMessage}{Environment.NewLine}",
+            Encoding.UTF8.GetString(standardError.ToArray()));
+        Assert.IsEmpty(server.Targets);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_FormFile_ClosesTheFileAfterTheTransfer()
+    {
+        TrackingFileSystem tracking = new();
+
+        await new CurlCommandRunner(
+                _ => new TransferDispatch(new ProtocolDispatcher(
+                    CurlComposition.CreateProtocolHandlers(server, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused")))),
+                files,
+                files,
+                standardOutput,
+                standardError,
+                new MemoryStream(),
+                runsOnWindows: false,
+                formBodyBuilder: new MultipartFormBodyBuilder(tracking, Encoding.UTF8, () => Boundary))
+            .RunAsync(["-sS", "-F", "f=<x", Url]);
+
+        Assert.IsFalse(tracking.Opened.Single().CanRead);
+    }
+
+    private Task<int> RunAsync(params string[] arguments) =>
+        new CurlCommandRunner(
+                _ => new TransferDispatch(new ProtocolDispatcher(
+                    CurlComposition.CreateProtocolHandlers(server, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused")))),
+                files,
+                files,
+                standardOutput,
+                standardError,
+                new MemoryStream(),
+                runsOnWindows: false,
+                formBodyBuilder: new MultipartFormBodyBuilder(files, Encoding.UTF8, () => Boundary))
+            .RunAsync(arguments);
+
+    /// <summary>Opens every path as <c>xy</c> and keeps each stream it opened.</summary>
+    private sealed class TrackingFileSystem : IFileSystem
+    {
+        public List<Stream> Opened { get; } = [];
+
+        public ValueTask<FileOpenResult> OpenForReadAsync(string path, CancellationToken cancellationToken)
+        {
+            MemoryStream stream = new("xy"u8.ToArray(), writable: false);
+            Opened.Add(stream);
+
+            return ValueTask.FromResult(FileOpenResult.Opened(stream, stream.Length, null));
+        }
+
+        public ValueTask<FileOpenResult> OpenForWriteAsync(
+            string path,
+            FileWriteMode mode,
+            UnixFileMode createMode,
+            CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+    }
+}

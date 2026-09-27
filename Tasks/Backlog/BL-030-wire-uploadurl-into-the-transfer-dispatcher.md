@@ -4,7 +4,7 @@ title: Wire UploadUrl into the transfer dispatcher
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-010, BL-012]
+depends-on: [BL-010, BL-012, BL-292]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Core.UnitLibrary, Curl.Core.UnitTests, Documentation/Product/Requirements.md]
 requirement: FR-005
 created: 2026-09-26
@@ -45,9 +45,10 @@ Upstream behaviour, from curl 8.21.0 `src/tool_operate.c` (`setup_transfer_uploa
   lowercased, and `-T local.txt http:/host` yields `http://host/local.txt`.
 
 The parse-and-normalise step is URL-layer work, which BL-012's notes leave to the URL
-representation Stewart is choosing in BL-010 (replace, wrap, or pre-parse ahead of
-`System.Uri`). That is why this task depends on BL-010 as well as BL-012. Use the
-representation BL-010's ADR records; do not introduce a second URL parser here.
+representation BL-010 chose: ADR-0010 (Accepted) replaces `System.Uri` with `CurlUrl`,
+the curl-compatible URL type BL-292 adds to `Curl.Protocol.Abstractions.UnitLibrary`.
+That is why this task depends on BL-010, BL-012 and BL-292. Parse and normalise with
+`CurlUrl`; do not introduce a second URL parser here.
 
 Upstream references: https://curl.se/docs/manpage.html#-T and
 https://curl.se/libcurl/c/libcurl-errors.html, checked against curl 8.21.0.
@@ -78,3 +79,4 @@ Globbing of the `-T` argument is BL-031 and is out of scope here.
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Depends on BL-292 as well: ADR-0010 accepted `CurlUrl` as the URL representation (BL-010).

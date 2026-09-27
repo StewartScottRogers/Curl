@@ -63,4 +63,26 @@ internal static class FileOpenFailure
             _ => FileAccessStatus.IoError,
         };
     }
+
+    /// <summary>
+    /// The Win32 error code behind <paramref name="exception" />, as <c>GetLastError</c>
+    /// would have returned it to curl.
+    /// </summary>
+    /// <param name="exception">The exception a file operation threw.</param>
+    /// <returns>
+    /// The low 16 bits of <see cref="Exception.HResult" /> when it is an
+    /// <c>HRESULT_FROM_WIN32</c> value (facility 7, as for
+    /// <see cref="FileNotFoundException" />'s <c>0x80070002</c> or
+    /// <see cref="UnauthorizedAccessException" />'s <c>0x80070005</c>); otherwise the
+    /// <see cref="Exception.HResult" /> itself, since no Win32 code is known.
+    /// </returns>
+    internal static int Win32ErrorCodeOf(Exception exception)
+    {
+        const int FacilityWin32Mask = unchecked((int)0xFFFF0000);
+        const int FacilityWin32 = unchecked((int)0x80070000);
+
+        int hresult = exception.HResult;
+
+        return (hresult & FacilityWin32Mask) == FacilityWin32 ? hresult & 0xFFFF : hresult;
+    }
 }

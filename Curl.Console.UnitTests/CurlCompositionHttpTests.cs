@@ -138,6 +138,18 @@ public sealed class CurlCompositionHttpTests
         new[] { "-G", "--json", "a", Url },
         "GET /?a HTTP/1.1\r\nHost: 127.0.0.1:18231\r\nUser-Agent: curl/8.21.0\r\nContent-Type: application/json\r\nAccept: application/json\r\n\r\n",
         DisplayName = "-G --json")]
+    [DataRow(
+        new[] { "-u", "user:pw", Url },
+        "GET / HTTP/1.1\r\nHost: 127.0.0.1:18231\r\nAuthorization: Basic dXNlcjpwdw==\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
+        DisplayName = "-u")]
+    [DataRow(
+        new[] { "--oauth2-bearer", "tok", Url },
+        "GET / HTTP/1.1\r\nHost: 127.0.0.1:18231\r\nAuthorization: Bearer tok\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
+        DisplayName = "--oauth2-bearer")]
+    [DataRow(
+        new[] { "-b", "a=1; b=2", Url },
+        $"GET / HTTP/1.1\r\n{Head}Cookie: a=1; b=2\r\n\r\n",
+        DisplayName = "-b string")]
     public async Task RunAsync_HttpOption_SendsTheRequestCurlSends(string[] arguments, string expectedRequest)
     {
         (ScriptedConnector server, int exitCode, string standardOutput) = await RunAsync(["-sS", .. arguments]);
@@ -148,12 +160,61 @@ public sealed class CurlCompositionHttpTests
     }
 
     /// <summary>
+    /// <c>--digest</c> and <c>--anyauth</c> send no credentials first, then answer the 401's
+    /// challenge on a new connection, as curl 8.21.0 does against a server that closes after the
+    /// 401 (measured 2026-09-26, BL-237 Notes). A Digest challenge without <c>qop</c> needs no
+    /// client nonce, so the answer is fixed.
+    /// </summary>
+    [TestMethod]
+    [DataRow(
+        "--digest",
+        "WWW-Authenticate: Digest realm=\"r\", nonce=\"n1\"",
+        "Authorization: Digest username=\"user\", realm=\"r\", nonce=\"n1\", uri=\"/p\", response=\"62d3592a5392f0c06d5d3c4e46bf17ae\"",
+        DisplayName = "--digest")]
+    [DataRow(
+        "--anyauth",
+        "WWW-Authenticate: Digest realm=\"r\", nonce=\"n1\"",
+        "Authorization: Digest username=\"user\", realm=\"r\", nonce=\"n1\", uri=\"/p\", response=\"62d3592a5392f0c06d5d3c4e46bf17ae\"",
+        DisplayName = "--anyauth offered Digest")]
+    [DataRow(
+        "--anyauth",
+        "WWW-Authenticate: Basic realm=\"r\"",
+        "Authorization: Basic dXNlcjpwdw==",
+        DisplayName = "--anyauth offered Basic")]
+    public async Task RunAsync_AuthSchemeOption_AnswersTheChallengeAsCurlDoes(string schemeOption, string challenge, string authorization)
+    {
+        ScriptedConnector server = new(
+        [
+            Encoding.Latin1.GetBytes($"HTTP/1.1 401 Unauthorized\r\n{challenge}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"),
+            Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello"),
+        ]);
+
+        (int exitCode, string standardOutput) = await RunAsync(server, "-sS", schemeOption, "-u", "user:pw", "http://127.0.0.1:18231/p");
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(
+            $"GET /p HTTP/1.1\r\n{Head}\r\nGET /p HTTP/1.1\r\nHost: 127.0.0.1:18231\r\n{authorization}\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
+            Latin1(server.Written));
+        Assert.AreEqual("hello", standardOutput);
+    }
+
+    /// <summary>
     /// Runs <paramref name="arguments" /> through the production composition over a
     /// <see cref="ScriptedConnector" /> answering <c>200 OK</c> with the body <c>hello</c>.
     /// </summary>
     private static async Task<(ScriptedConnector Server, int ExitCode, string StandardOutput)> RunAsync(params string[] arguments)
     {
         ScriptedConnector server = new([Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello")]);
+        (int exitCode, string standardOutput) = await RunAsync(server, arguments);
+
+        return (server, exitCode, standardOutput);
+    }
+
+    /// <summary>
+    /// Runs <paramref name="arguments" /> through the production composition over <paramref name="server" />.
+    /// </summary>
+    private static async Task<(int ExitCode, string StandardOutput)> RunAsync(ScriptedConnector server, params string[] arguments)
+    {
         using MemoryStream standardOutput = new();
         using MemoryStream standardError = new();
         using MemoryStream standardInput = new();
@@ -167,7 +228,7 @@ public sealed class CurlCompositionHttpTests
                 new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"))
             .RunAsync(arguments);
 
-        return (server, exitCode, Encoding.Latin1.GetString(standardOutput.ToArray()));
+        return (exitCode, Encoding.Latin1.GetString(standardOutput.ToArray()));
     }
 
     private static string Latin1(byte[] bytes) => Encoding.Latin1.GetString(bytes);

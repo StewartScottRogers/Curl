@@ -35,6 +35,23 @@ public sealed partial class SslStreamTlsProviderTests
         Assert.IsNull(handshake.Received);
     }
 
+    // BL-254: on Windows SslStream caches the credential handle of a handshake that
+    // presented a certificate under the key of one that presents none, so every later
+    // handshake without --cert in the process presented it too. Real curl presents none.
+    [TestMethod]
+    [DataRow(SchannelBuild)]
+    [DataRow(OpenSslBuild)]
+    public async Task AuthenticateAsClientAsync_WithoutClientCertificateAfterAHandshakeThatPresentedOne_PresentsNone(bool matchesSchannelBuild)
+    {
+        var file = WriteCertificateFile("client.p12", s_clientCertificate.Export(X509ContentType.Pkcs12));
+        AssertPresented(await HandshakeWithClientCertificateRequestAsync(ClientCertificate(file), SchannelBuild));
+
+        var handshake = await HandshakeWithClientCertificateRequestAsync(new TlsClientOptions(Insecure: true), matchesSchannelBuild);
+
+        Assert.AreEqual(CurlExitCode.Ok, handshake.Result.ExitCode);
+        Assert.IsNull(handshake.Received);
+    }
+
     [TestMethod]
     public async Task AuthenticateAsClientAsync_WithPkcs12AndItsPassphraseInTheSchannelBuild_PresentsTheCertificate()
     {

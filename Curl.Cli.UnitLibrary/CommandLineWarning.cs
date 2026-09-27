@@ -171,6 +171,32 @@ public static class CommandLineWarning
     ];
 
     /// <summary>
+    /// The line curl prints when <c>-v</c> / <c>--verbose</c> replaces an earlier <c>--trace</c> or
+    /// <c>--trace-ascii</c>: <c>Warning: -v, --verbose overrides an earlier trace option</c>. Measured with
+    /// <c>curl --trace t1 -v</c> and <c>curl --trace-ascii t2 -v</c> against <c>http://127.0.0.1:1/</c>
+    /// (curl 8.21.0, Windows, 2026-09-26); <c>-v -v</c> does not warn.
+    /// </summary>
+    public static IReadOnlyList<string> VerboseOverridesTrace { get; } =
+    [
+        "Warning: -v, --verbose overrides an earlier trace option",
+    ];
+
+    /// <summary>
+    /// The line curl prints when <c>--trace</c> or <c>--trace-ascii</c> replaces an earlier
+    /// <c>-v</c> / <c>--verbose</c> or a trace of the other kind:
+    /// <c>Warning: &lt;option&gt; overrides an earlier trace/verbose option</c>. Measured with
+    /// <c>curl -v --trace t1</c>, <c>curl -v --trace-ascii t2</c>, <c>curl --trace t1 --trace-ascii t2</c> and
+    /// <c>curl --trace-ascii t2 --trace t1</c> against <c>http://127.0.0.1:1/</c> (curl 8.21.0, Windows,
+    /// 2026-09-26); <c>--trace t1 --trace t3</c> does not warn.
+    /// </summary>
+    /// <param name="longName">The option's long name with its <c>--</c>: <c>--trace</c> or <c>--trace-ascii</c>.</param>
+    /// <returns>The warning's lines.</returns>
+    internal static IReadOnlyList<string> TraceOverridesEarlierTrace(string longName) =>
+    [
+        $"Warning: {longName} overrides an earlier trace/verbose option",
+    ];
+
+    /// <summary>
     /// The line curl prints when a command line gives more <c>-o</c>/<c>--output</c> values than
     /// URLs: <c>Warning: Got more output options than URLs</c>. curl 8.21.0 prints it once, however
     /// many values are left over, after the last transfer has ended, not while reading the command
