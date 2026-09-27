@@ -42,3 +42,4 @@ accepted with curl's meaning instead of being reported as not a date.
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-27: Backlog -> Doing.
