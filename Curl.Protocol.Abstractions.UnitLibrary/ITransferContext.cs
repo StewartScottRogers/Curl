@@ -207,6 +207,18 @@ public interface ITransferContext
     TimeSpan? MaxTime { get; }
 
     /// <summary>
+    /// Gets the proxy selected for this transfer, or <see langword="null" /> when the
+    /// transfer connects directly.
+    /// </summary>
+    /// <remarks>
+    /// It is scheme-neutral: a handler that connects over TCP passes it to
+    /// <see cref="ConnectTarget" /> for its control connection, and the connector opens the
+    /// tunnel (ADR-0056). <see cref="HttpRequestOptions.ForwardProxy" /> is still the HTTP
+    /// handler's input; both are set from the one selection, so they cannot disagree.
+    /// </remarks>
+    ProxyEndpoint? Proxy { get; }
+
+    /// <summary>
     /// Gets the HTTP-only options, or <see langword="null" /> when no HTTP option was
     /// given.
     /// </summary>
