@@ -420,13 +420,14 @@ public sealed class RedirectFollowerTests
     }
 
     [TestMethod]
-    [DataRow("file:///C:/Windows/win.ini", "file")]
+    [DataRow("file:///Windows/win.ini", "file")]
     [DataRow("dict://127.0.0.1:18203/x", "dict")]
     [DataRow("scp://127.0.0.1/x", "scp")]
     public async Task FollowAsync_SchemeNotAllowed_Exits1ProtocolDisabledInRedirect(string target, string scheme)
     {
         // curl -sS -L, Location: file:///C:/Windows/win.ini
         // -> exit 1, "curl: (1) Protocol "file" is disabled (in redirect)".
+        // The file row is drive-less so it reaches the scheme check on every platform.
         ScriptedHandler handler = new(Redirect(302, target));
 
         TransferResult result = await Follow(handler, Context(Location()));

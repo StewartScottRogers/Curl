@@ -270,7 +270,7 @@ public sealed class TransferRetrierTests
 
     [TestMethod]
     [DataRow("ftp://127.0.0.1/f")]
-    [DataRow("file:///Z:/f")]
+    [DataRow("file:///f")]
     public async Task RunAsync_TransientStatusFromAnotherScheme_IsFinal(string url)
     {
         Run run = await Retry(new RetryPolicy { Retries = 1 }, CurlUrl.Parse(url), Http(503), Http(200));

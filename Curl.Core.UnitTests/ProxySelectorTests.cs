@@ -86,7 +86,7 @@ public sealed class ProxySelectorTests
     [TestMethod]
     public void TrySelect_FileUrl_NeverUsesAProxy()
     {
-        ProxyEndpoint? proxy = Select("file:///c:/nonexist", CaseSensitive(("all_proxy", Proxy1111)), Proxy1111);
+        ProxyEndpoint? proxy = Select("file:///nonexist", CaseSensitive(("all_proxy", Proxy1111)), Proxy1111);
 
         Assert.IsNull(proxy);
     }
