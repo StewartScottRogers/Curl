@@ -84,7 +84,7 @@ internal static class HttpRequestHeadFormatter
     /// </param>
     /// <returns>The head's bytes, ending in the empty line.</returns>
     internal static byte[] Format(
-        Uri url,
+        CurlUrl url,
         HttpRequestOptions? options,
         bool noBody = false,
         string? authorization = null,
@@ -130,8 +130,8 @@ internal static class HttpRequestHeadFormatter
     /// Appends the request line: the method, the target - the absolute form for a forward
     /// proxy, the path and query otherwise - and the version.
     /// </summary>
-    private static void AppendRequestLine(StringBuilder head, string method, Uri url, bool forwardProxy, HttpRequestOptions options) =>
-        head.Append(method).Append(' ').Append(forwardProxy ? AbsoluteForm(url) : url.PathAndQuery).Append(VersionOf(options)).Append("\r\n");
+    private static void AppendRequestLine(StringBuilder head, string method, CurlUrl url, bool forwardProxy, HttpRequestOptions options) =>
+        head.Append(method).Append(' ').Append(forwardProxy ? AbsoluteForm(url) : HttpUrlText.RequestTarget(url)).Append(VersionOf(options)).Append("\r\n");
 
     /// <summary>
     /// Gives the request line's version: <c>HTTP/1.0</c> for <c>-0</c>, <c>HTTP/1.1</c> otherwise.
@@ -172,7 +172,7 @@ internal static class HttpRequestHeadFormatter
     /// the URL's host as written, bracketed if IPv6, with its port unless it is the
     /// scheme's default.
     /// </summary>
-    private static string? FormatHostLine(Uri url, HttpCustomHeader[] customHeaders)
+    private static string? FormatHostLine(CurlUrl url, HttpCustomHeader[] customHeaders)
     {
         foreach (HttpCustomHeader header in customHeaders)
         {
@@ -182,34 +182,14 @@ internal static class HttpRequestHeadFormatter
             }
         }
 
-        return $"Host: {HostAndPort(url)}";
+        return $"Host: {HttpUrlText.HostAndPort(url)}";
     }
 
     /// <summary>
     /// Formats the absolute-form request target a forward proxy is sent: the scheme, the host
     /// and port as the <c>Host</c> line has them, then the path and query.
     /// </summary>
-    private static string AbsoluteForm(Uri url) => $"{url.Scheme}://{HostAndPort(url)}{url.PathAndQuery}";
-
-    /// <summary>
-    /// Formats the URL's host as written, with its port unless it is the scheme's default.
-    /// </summary>
-    private static string HostAndPort(Uri url)
-    {
-        string port = url.IsDefaultPort ? string.Empty : string.Create(CultureInfo.InvariantCulture, $":{url.Port}");
-        return HostAsWritten(url) + port;
-    }
-
-    /// <summary>
-    /// Returns the URL's host in the letter case it was written in, which curl keeps and
-    /// <see cref="Uri.Host" /> lower-cases.
-    /// </summary>
-    private static string HostAsWritten(Uri url)
-    {
-        string host = url.Host;
-        int start = url.OriginalString.IndexOf(host, StringComparison.OrdinalIgnoreCase);
-        return start < 0 ? host : url.OriginalString.Substring(start, host.Length);
-    }
+    private static string AbsoluteForm(CurlUrl url) => $"{url.Scheme}://{HttpUrlText.HostAndPort(url)}{HttpUrlText.RequestTarget(url)}";
 
     private static void AppendUnlessOverridden(StringBuilder head, HttpCustomHeader[] customHeaders, string name, string? value)
     {

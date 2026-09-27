@@ -354,7 +354,7 @@ public sealed class GopherProtocolHandlerTests
         ScriptedConnection connection = new(MeasuredReply);
         TransferContext context = new()
         {
-            Url = new Uri("gopher://h/"),
+            Url = CurlUrl.Parse("gopher://h/"),
             Output = new MemoryStream(),
             CancellationToken = cancellation.Token,
         };
@@ -375,5 +375,5 @@ public sealed class GopherProtocolHandlerTests
     }
 
     private static TransferContext Context(string url, Stream? output = null) =>
-        new() { Url = new Uri(url), Output = output ?? new MemoryStream() };
+        new() { Url = CurlUrl.Parse(url), Output = output ?? new MemoryStream() };
 }

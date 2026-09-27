@@ -630,7 +630,7 @@ public sealed class MqttProtocolHandlerTests
         MqttProtocolHandler handler = new(FakeConnector.For(connection), () => FixedSuffix);
         TransferContext context = new()
         {
-            Url = new Uri("mqtt://h/t"),
+            Url = CurlUrl.Parse("mqtt://h/t"),
             Output = new RecordingStream(),
             CancellationToken = new CancellationToken(canceled: true),
         };
@@ -653,7 +653,7 @@ public sealed class MqttProtocolHandlerTests
             FakeConnector.For(connection),
             new TransferContext
             {
-                Url = new Uri("mqtt://h/bedroom/dimmer"),
+                Url = CurlUrl.Parse("mqtt://h/bedroom/dimmer"),
                 Output = output,
                 PostData = Encoding.ASCII.GetBytes("75"),
             });
@@ -757,7 +757,7 @@ public sealed class MqttProtocolHandlerTests
             FakeConnector.For(connection),
             new TransferContext
             {
-                Url = new Uri("mqtt://h/t"),
+                Url = CurlUrl.Parse("mqtt://h/t"),
                 Output = new RecordingStream(),
                 Credentials = new NetworkCredential("al", "pw"),
             });
@@ -843,7 +843,7 @@ public sealed class MqttProtocolHandlerTests
             FakeConnector.For(connection),
             new TransferContext
             {
-                Url = new Uri("mqtt://h/t"),
+                Url = CurlUrl.Parse("mqtt://h/t"),
                 Output = output,
                 PostData = Encoding.ASCII.GetBytes("x"),
             });
@@ -902,7 +902,7 @@ public sealed class MqttProtocolHandlerTests
             FakeConnector.For(connection),
             new TransferContext
             {
-                Url = new Uri("mqtt://h/t"),
+                Url = CurlUrl.Parse("mqtt://h/t"),
                 Output = new RecordingStream(),
                 PostData = new byte[268435451 - 3],
             });
@@ -943,7 +943,7 @@ public sealed class MqttProtocolHandlerTests
     private static byte[] Concat(params byte[][] parts) => [.. parts.SelectMany(part => part)];
 
     private static TransferContext Context(string url, Stream output) =>
-        new() { Url = new Uri(url), Output = output };
+        new() { Url = CurlUrl.Parse(url), Output = output };
 
     private Task<TransferResult> PublishAsync(
         ScriptedConnection connection,
@@ -954,7 +954,7 @@ public sealed class MqttProtocolHandlerTests
             FakeConnector.For(connection),
             new TransferContext
             {
-                Url = new Uri(url),
+                Url = CurlUrl.Parse(url),
                 Output = new RecordingStream(),
                 PostData = Encoding.ASCII.GetBytes(payload),
                 Credentials = credentials,

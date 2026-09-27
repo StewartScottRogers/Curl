@@ -9,7 +9,7 @@ namespace Curl.Protocol.Abstractions;
 [TestClass]
 public sealed class TransferContextTests
 {
-    private static readonly Uri AnyUrl = new("tftp://example.com/file");
+    private static readonly CurlUrl AnyUrl = CurlUrl.Parse("tftp://example.com/file");
 
     [TestMethod]
     public void TransferContext_OnlyRequiredMembersSet_ReportsNotGivenForEveryOption()

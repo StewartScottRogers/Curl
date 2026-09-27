@@ -168,7 +168,7 @@ public sealed class HttpProtocolHandler(
         HttpAuthRequest authRequest = new(
             framing.Method,
             context.Url,
-            context.Url.PathAndQuery,
+            HttpUrlText.RequestTarget(context.Url),
             context.Credentials,
             options.BearerToken,
             options.AuthSchemes,
@@ -188,8 +188,8 @@ public sealed class HttpProtocolHandler(
     /// Builds the connect target for <paramref name="url" />: its host without IPv6
     /// brackets, its port, and TLS for <c>https</c>.
     /// </summary>
-    private static ConnectTarget TargetOf(Uri url) =>
-        new(url.DnsSafeHost, url.Port, string.Equals(url.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase));
+    private static ConnectTarget TargetOf(CurlUrl url) =>
+        new(url.IdnHost, url.Port, url.Scheme == "https");
 
     /// <summary>
     /// Builds the connect target for <paramref name="plan" />: the forward proxy itself, with
@@ -206,7 +206,7 @@ public sealed class HttpProtocolHandler(
     /// for an <c>http</c> URL, without <c>-p</c>. Every other proxy is tunnelled through by
     /// the connector, and <see langword="null" /> is returned for it.
     /// </summary>
-    private static ProxyEndpoint? ForwardProxyOf(Uri url, HttpRequestOptions options) =>
+    private static ProxyEndpoint? ForwardProxyOf(CurlUrl url, HttpRequestOptions options) =>
         options.ForwardProxy is { Kind: ProxyKind.Http or ProxyKind.Http10 or ProxyKind.Https } proxy
             && !options.ProxyTunnel
             && !TargetOf(url).UseTls

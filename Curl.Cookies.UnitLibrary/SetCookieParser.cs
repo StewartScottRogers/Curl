@@ -1,4 +1,5 @@
 using System.Globalization;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Cookies;
 
@@ -35,7 +36,7 @@ public static class SetCookieParser
     /// <summary>curl's expiry for a cookie that arrived already expired.</summary>
     private const long AlreadyExpired = 1;
 
-    /// <summary>Reads <paramref name="headerValue"/>, received in answer to <paramref name="requestUri"/>, as curl does.</summary>
+    /// <summary>Reads <paramref name="headerValue"/>, received in answer to <paramref name="requestUrl"/>, as curl does.</summary>
     /// <remarks>
     /// <para>
     /// The value is split at <c>;</c>. The first part is the cookie: a name, <c>=</c>, and a value,
@@ -75,16 +76,16 @@ public static class SetCookieParser
     /// The <c>Set-Cookie</c> header's value as received, everything after the colon, without the line
     /// ending.
     /// </param>
-    /// <param name="requestUri">The request the header answered; it gives the host, the path and whether the origin is secure.</param>
+    /// <param name="requestUrl">The request the header answered; it gives the host, the path and whether the origin is secure.</param>
     /// <param name="now">The time the header was received, which <c>Max-Age</c> counts from.</param>
     /// <returns>The cookie; <see langword="null"/> when curl drops it.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="headerValue"/> or <paramref name="requestUri"/> is <see langword="null"/>.</exception>
-    public static Cookie? Parse(string headerValue, Uri requestUri, DateTimeOffset now)
+    /// <exception cref="ArgumentNullException"><paramref name="headerValue"/> or <paramref name="requestUrl"/> is <see langword="null"/>.</exception>
+    public static Cookie? Parse(string headerValue, CurlUrl requestUrl, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(headerValue);
-        ArgumentNullException.ThrowIfNull(requestUri);
+        ArgumentNullException.ThrowIfNull(requestUrl);
 
-        return ParseFor(headerValue, requestUri, now);
+        return ParseFor(headerValue, requestUrl, now);
     }
 
     /// <summary>
@@ -105,17 +106,17 @@ public static class SetCookieParser
     {
         ArgumentNullException.ThrowIfNull(headerValue);
 
-        return ParseFor(headerValue, requestUri: null, now);
+        return ParseFor(headerValue, requestUrl: null, now);
     }
 
-    private static Cookie? ParseFor(string headerValue, Uri? requestUri, DateTimeOffset now)
+    private static Cookie? ParseFor(string headerValue, CurlUrl? requestUrl, DateTimeOffset now)
     {
         if (headerValue.Length > LongestHeaderValue || CookieFieldRules.ContainsRefusedControlCharacter(headerValue))
         {
             return null;
         }
 
-        CookieUnderConstruction cookie = new(requestUri, now.ToUnixTimeSeconds());
+        CookieUnderConstruction cookie = new(requestUrl, now.ToUnixTimeSeconds());
         return TryReadParts(headerValue, cookie) ? cookie.Finish() : null;
     }
 
@@ -183,14 +184,14 @@ public static class SetCookieParser
     }
 
     /// <summary>
-    /// The fields read so far, as curl fills its <c>struct Cookie</c> while it parses; <paramref name="requestUri"/>
+    /// The fields read so far, as curl fills its <c>struct Cookie</c> while it parses; <paramref name="requestUrl"/>
     /// is <see langword="null"/> for a line of a cookie file.
     /// </summary>
-    private sealed class CookieUnderConstruction(Uri? requestUri, long nowUnixSeconds)
+    private sealed class CookieUnderConstruction(CurlUrl? requestUrl, long nowUnixSeconds)
     {
-        private readonly string? host = requestUri is null ? null : CookieOrigin.HostOf(requestUri);
+        private readonly string? host = requestUrl is null ? null : CookieOrigin.HostOf(requestUrl);
 
-        private readonly bool hostIsIpAddress = requestUri?.HostNameType is UriHostNameType.IPv4 or UriHostNameType.IPv6;
+        private readonly bool hostIsIpAddress = requestUrl is not null && CookieOrigin.IsIpAddress(requestUrl);
 
         private string name = string.Empty;
 
@@ -230,7 +231,7 @@ public static class SetCookieParser
             if (flag.Equals("secure", StringComparison.OrdinalIgnoreCase))
             {
                 isSecure = true;
-                return requestUri is null || CookieOrigin.IsSecure(requestUri);
+                return requestUrl is null || CookieOrigin.IsSecure(requestUrl);
             }
 
             isHttpOnly |= flag.Equals("httponly", StringComparison.OrdinalIgnoreCase);
@@ -304,7 +305,7 @@ public static class SetCookieParser
 
         public Cookie? Finish()
         {
-            string finalPath = path ?? (requestUri is null ? string.Empty : DefaultPath(requestUri.AbsolutePath));
+            string finalPath = path ?? (requestUrl is null ? string.Empty : DefaultPath(requestUrl.AbsolutePath));
             if (!CookieFieldRules.SatisfiesNamePrefix(name, isSecure, finalPath, includesSubdomains))
             {
                 return null;

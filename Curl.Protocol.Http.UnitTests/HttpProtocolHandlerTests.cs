@@ -64,7 +64,7 @@ public sealed partial class HttpProtocolHandlerTests
     [TestMethod]
     [DataRow("http://example.com/", "example.com", 80, false, DisplayName = "http defaults to 80")]
     [DataRow("https://example.com/", "example.com", 443, true, DisplayName = "https defaults to 443 with TLS")]
-    [DataRow("HTTPS://Example.com:8443/", "example.com", 8443, true, DisplayName = "https with a port")]
+    [DataRow("HTTPS://Example.com:8443/", "Example.com", 8443, true, DisplayName = "https with a port")]
     [DataRow("http://example.com:8080/", "example.com", 8080, false, DisplayName = "http with a port")]
     [DataRow("http://[::1]/", "::1", 80, false, DisplayName = "IPv6 literal without brackets")]
     public async Task ExecuteAsync_Url_ConnectsToItsHostPortAndTls(string url, string host, int port, bool useTls)
@@ -224,7 +224,7 @@ public sealed partial class HttpProtocolHandlerTests
         const string request = "DELETE / HTTP/1.1\r\nHost: example.com\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
         TransferContext context = new()
         {
-            Url = new Uri("http://example.com/"),
+            Url = CurlUrl.Parse("http://example.com/"),
             Output = new MemoryStream(),
             Http = new HttpRequestOptions { CustomMethod = "DELETE" },
         };
@@ -239,7 +239,7 @@ public sealed partial class HttpProtocolHandlerTests
     {
         TransferContext context = new()
         {
-            Url = new Uri("http://example.com/"),
+            Url = CurlUrl.Parse("http://example.com/"),
             Output = new MemoryStream(),
             Http = new HttpRequestOptions(),
         };
@@ -324,7 +324,7 @@ public sealed partial class HttpProtocolHandlerTests
         await cancellation.CancelAsync();
         TransferContext context = new()
         {
-            Url = new Uri("http://example.com/"),
+            Url = CurlUrl.Parse("http://example.com/"),
             Output = new MemoryStream(),
             CancellationToken = cancellation.Token,
         };
@@ -420,7 +420,7 @@ public sealed partial class HttpProtocolHandlerTests
             HttpRequestOptions options = new() { Headers = ["Expect: 100-continue"], Body = new BytesBody("x=1"u8.ToArray(), "a/b") };
             TransferContext context = new()
             {
-                Url = new Uri("http://127.0.0.1:18081/"),
+                Url = CurlUrl.Parse("http://127.0.0.1:18081/"),
                 Output = output,
                 HeaderOutput = headers,
                 Http = options,
@@ -447,7 +447,7 @@ public sealed partial class HttpProtocolHandlerTests
             HttpRequestOptions options = new() { Body = new BytesBody(new byte[1048577], "application/x-www-form-urlencoded") };
             TransferContext context = new()
             {
-                Url = new Uri("http://127.0.0.1:18081/"),
+                Url = CurlUrl.Parse("http://127.0.0.1:18081/"),
                 Output = output,
                 Http = options,
                 TimeProvider = new FakeTimeProvider(DateTimeOffset.UnixEpoch),
@@ -551,7 +551,7 @@ public sealed partial class HttpProtocolHandlerTests
     {
         TransferContext context = new()
         {
-            Url = new Uri("http://example.com/"),
+            Url = CurlUrl.Parse("http://example.com/"),
             Output = new MemoryStream(),
             Credentials = new NetworkCredential("a", "b"),
             Http = new HttpRequestOptions { Fail = HttpFailMode.Fail },
@@ -664,7 +664,7 @@ public sealed partial class HttpProtocolHandlerTests
         MemoryStream output = new();
         TransferContext context = new()
         {
-            Url = new Uri("http://example.com/"),
+            Url = CurlUrl.Parse("http://example.com/"),
             Output = output,
             Http = new HttpRequestOptions { FollowRedirects = true, Compressed = true },
         };
@@ -720,7 +720,7 @@ public sealed partial class HttpProtocolHandlerTests
             MemoryStream output = new();
             TransferContext context = new()
             {
-                Url = new Uri("http://example.com/"),
+                Url = CurlUrl.Parse("http://example.com/"),
                 Output = output,
                 Http = new HttpRequestOptions { Compressed = true, Raw = raw },
             };
@@ -746,7 +746,7 @@ public sealed partial class HttpProtocolHandlerTests
             MemoryStream output = new();
             TransferContext context = new()
             {
-                Url = new Uri("http://example.com/"),
+                Url = CurlUrl.Parse("http://example.com/"),
                 Output = output,
                 Http = new HttpRequestOptions { Compressed = true },
             };
@@ -764,7 +764,7 @@ public sealed partial class HttpProtocolHandlerTests
     private static TransferContext FollowContext(string url, Stream output, Stream? headerOutput = null) =>
         new()
         {
-            Url = new Uri(url),
+            Url = CurlUrl.Parse(url),
             Output = output,
             HeaderOutput = headerOutput,
             Http = new HttpRequestOptions { FollowRedirects = true },
@@ -779,7 +779,7 @@ public sealed partial class HttpProtocolHandlerTests
         bool noBody = false) =>
         new()
         {
-            Url = new Uri(url),
+            Url = CurlUrl.Parse(url),
             Output = output,
             HeaderOutput = headerOutput,
             NoBody = noBody,
@@ -789,7 +789,7 @@ public sealed partial class HttpProtocolHandlerTests
     private static TransferContext BodyContext(string url, HttpRequestOptions options, TimeProvider? timeProvider = null) =>
         new()
         {
-            Url = new Uri(url),
+            Url = CurlUrl.Parse(url),
             Output = new MemoryStream(),
             Http = options,
             TimeProvider = timeProvider ?? new FakeTimeProvider(DateTimeOffset.UnixEpoch),
@@ -798,7 +798,7 @@ public sealed partial class HttpProtocolHandlerTests
     private static HttpProtocolHandler Handler(QueueConnector connector) => new(connector, new SilentAuthenticator());
 
     private static TransferContext Context(string url, Stream output, Stream? headerOutput = null) =>
-        new() { Url = new Uri(url), Output = output, HeaderOutput = headerOutput };
+        new() { Url = CurlUrl.Parse(url), Output = output, HeaderOutput = headerOutput };
 
     private static ScriptedConnection Connection(string response, int chunkSize, string? expectedRequest = null) =>
         new(Encoding.Latin1.GetBytes(response), chunkSize, expectedRequest is null ? null : Encoding.Latin1.GetBytes(expectedRequest));

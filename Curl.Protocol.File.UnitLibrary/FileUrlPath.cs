@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.File;
 
@@ -10,18 +11,14 @@ namespace Curl.Protocol.File;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Parsing works from <see cref="Uri.OriginalString" />, never
-/// <see cref="Uri.AbsolutePath" /> and never <see cref="Uri.LocalPath" />. Those two
-/// rewrite <c>c|</c> to <c>c:</c> and fold <c>file:////server/share</c> into a UNC
-/// authority, neither of which curl does, and they remove <c>..</c> always, where curl
-/// removes it only without <c>--path-as-is</c>. The
-/// measurements behind that are recorded in ADR-0003
-/// (<c>Documentation/Planning/Decisions</c>), taken against curl 8.21.0.
+/// Parsing works from <see cref="CurlUrl.OriginalString" />, applying curl's
+/// <c>file://</c> rules to the text as typed. The measurements behind those rules are
+/// recorded in ADR-0003 (<c>Documentation/Planning/Decisions</c>), taken against curl
+/// 8.21.0.
 /// </para>
 /// <para>
-/// The wider question of URLs <see cref="Uri" /> cannot round-trip at all — a
-/// <c>%2F</c> in the drive position, a userinfo component — is task BL-010; those URLs
-/// never reach this type, because <see cref="Uri" /> throws before it is called.
+/// A URL <see cref="CurlUrl.TryParse(string, bool, out CurlUrl)" /> rejects never
+/// reaches this type: the transfer ends with exit 3 before a handler runs.
 /// </para>
 /// </remarks>
 public sealed record FileUrlPath
@@ -65,6 +62,9 @@ public sealed record FileUrlPath
     /// </summary>
     private const string FileScheme = "file";
 
+    /// <summary>The length of a drive specification: a letter and <c>:</c> or <c>|</c>.</summary>
+    private const int DriveSpecificationLength = 2;
+
     /// <summary>
     /// The two characters that end the path and begin something this type discards.
     /// </summary>
@@ -84,13 +84,13 @@ public sealed record FileUrlPath
     /// <see cref="Abstractions.CurlExitCode.UrlMalformat" />.
     /// </returns>
     /// <remarks>
-    /// The same as <see cref="TryParse(Uri, bool, out FileUrlPath)" /> with
+    /// The same as <see cref="TryParse(CurlUrl, bool, out FileUrlPath)" /> with
     /// <c>pathAsIs</c> <see langword="false" />.
     /// </remarks>
     /// <exception cref="ArgumentNullException">
     /// <paramref name="url" /> is <see langword="null" />.
     /// </exception>
-    public static bool TryParse(Uri url, [MaybeNullWhen(false)] out FileUrlPath path) =>
+    public static bool TryParse(CurlUrl url, [MaybeNullWhen(false)] out FileUrlPath path) =>
         TryParse(url, pathAsIs: false, out path);
 
     /// <summary>
@@ -124,10 +124,8 @@ public sealed record FileUrlPath
     /// <item>
     /// <description>
     /// <strong>Take the original text.</strong> Work on the remainder of
-    /// <see cref="Uri.OriginalString" /> after the leading <c>file:</c>, verbatim, up to
+    /// <see cref="CurlUrl.OriginalString" /> after the leading <c>file:</c>, verbatim, up to
     /// the first <c>?</c> or <c>#</c>, both of which end the path.
-    /// <see cref="Uri.AbsolutePath" /> and <see cref="Uri.LocalPath" /> are both
-    /// off-limits, for the reasons in the remarks on <see cref="FileUrlPath" />.
     /// </description>
     /// </item>
     /// <item>
@@ -147,9 +145,10 @@ public sealed record FileUrlPath
     /// are accepted, and each is dropped so only the path that follows survives: the
     /// empty one (<c>file:///tmp/x</c>), <c>localhost</c> compared ignoring case
     /// (<c>file://localhost/tmp/x</c>) and the literal <c>127.0.0.1</c>
-    /// (<c>file://127.0.0.1/tmp/x</c>). Any other authority returns
-    /// <see langword="false" />, including <c>[::1]</c>: curl 8.21.0 accepts those three
-    /// spellings of "this machine" and no other host part in a <c>file://</c> URL.
+    /// (<c>file://127.0.0.1/tmp/x</c>). curl 8.21.0 accepts those three spellings of
+    /// "this machine" and no other host part in a <c>file://</c> URL, not even
+    /// <c>[::1]</c>; <see cref="CurlUrl.TryParse(string, bool, out CurlUrl)" /> rejects
+    /// every other one, so no other reaches this method.
     /// One authority is neither accepted-and-dropped nor rejected: exactly two
     /// characters, a single ASCII letter followed by <c>:</c> or <c>|</c>, is not a host
     /// at all but the start of the path, and so it is kept —
@@ -158,7 +157,8 @@ public sealed record FileUrlPath
     /// <c>file://D|/nope.txt</c> exits 37 quoting the path <c>D|/nope.txt</c>, which is
     /// only possible if the authority became the head of the path; the letter's case does
     /// not matter, as <c>file://d:/nope.txt</c> also exits 37. The exception is that
-    /// narrow: <c>ab:</c>, <c>c</c>, <c>zz</c> and <c>1</c> were each measured at exit 3.
+    /// narrow: <c>ab:</c>, <c>c</c>, <c>zz</c> and <c>1</c> were each measured at exit 3,
+    /// and <see cref="CurlUrl" /> rejects them too.
     /// </description>
     /// </item>
     /// <item>
@@ -192,9 +192,8 @@ public sealed record FileUrlPath
     /// <strong>Drive letters.</strong> A path of the form <c>/X:/…</c> or <c>/X|/…</c>,
     /// where <c>X</c> is a single ASCII letter, loses its leading slash so that
     /// <c>file:///c:/Windows/win.ini</c> becomes an absolute Windows path. The <c>|</c>
-    /// spelling is preserved as written and not translated to <c>:</c>, because
-    /// translating it is a <see cref="Uri.LocalPath" /> behaviour that curl does not
-    /// share (ADR-0003).
+    /// spelling is preserved as written and not translated to <c>:</c>, because curl does
+    /// not translate it (ADR-0003).
     /// </description>
     /// </item>
     /// <item>
@@ -213,8 +212,7 @@ public sealed record FileUrlPath
     /// <description>
     /// <strong>Hand over.</strong> Convert <c>/</c> to the platform directory separator
     /// in <c>OsPath</c>, and stop there: no trailing separator is trimmed and no case is
-    /// changed. A path that is empty once the authority and drive slash are gone returns
-    /// <see langword="false" />.
+    /// changed.
     /// </description>
     /// </item>
     /// </list>
@@ -223,7 +221,7 @@ public sealed record FileUrlPath
     /// <paramref name="url" /> is <see langword="null" />.
     /// </exception>
     public static bool TryParse(
-        Uri url,
+        CurlUrl url,
         bool pathAsIs,
         [MaybeNullWhen(false)] out FileUrlPath path)
     {
@@ -239,22 +237,15 @@ public sealed record FileUrlPath
         string remainder = TrimQueryAndFragment(AfterScheme(url.OriginalString))
             .Replace('\\', '/');
 
-        if (!TryDropAuthority(remainder, out string urlPath))
-        {
-            return false;
-        }
+        string urlPath = DropAuthority(remainder);
 
         if (!pathAsIs)
         {
             urlPath = RemoveDotSegmentsBelowTheDrive(urlPath);
         }
 
+        // CurlUrl reads a scheme only before ":/", so the path is never empty here.
         urlPath = StripDriveLetterSlash(urlPath);
-
-        if (urlPath.Length == 0)
-        {
-            return false;
-        }
 
         path = new FileUrlPath(
             UppercaseEscapes(EncodeNonAscii(urlPath)),
@@ -289,89 +280,28 @@ public sealed record FileUrlPath
     }
 
     /// <summary>
-    /// Removes a leading authority, rejecting any host curl does not accept.
+    /// Removes a leading authority, keeping one that is a drive specification.
     /// </summary>
     /// <param name="remainder">The scheme-specific part, without query or fragment.</param>
-    /// <param name="urlPath">
-    /// On success, the still-encoded path with the authority removed.
-    /// </param>
-    /// <returns>
-    /// <see langword="false" /> when an authority is present and is not one curl accepts.
-    /// </returns>
-    private static bool TryDropAuthority(string remainder, out string urlPath)
+    /// <returns>The still-encoded path with the authority removed.</returns>
+    /// <remarks>
+    /// <see cref="CurlUrl.TryParse(string, bool, out CurlUrl)" /> has already accepted the
+    /// authority, so it is empty, <c>localhost</c>, <c>127.0.0.1</c> or, on Windows, a
+    /// drive specification such as <c>C:</c> or <c>D|</c>: the only one two characters
+    /// long, and the only one kept, because curl reads <c>file://C:/x</c> as a path and not
+    /// as a host named <c>C:</c>.
+    /// </remarks>
+    private static string DropAuthority(string remainder)
     {
-        urlPath = remainder;
-
         if (!remainder.StartsWith("//", StringComparison.Ordinal))
         {
-            return true;
+            return remainder;
         }
 
-        int slash = remainder.IndexOf('/', 2);
-        string authority = slash < 0 ? remainder[2..] : remainder[2..slash];
+        string authority = remainder[2..].Split('/')[0];
 
-        if (IsDriveSpecification(authority))
-        {
-            urlPath = remainder[2..];
-
-            return true;
-        }
-
-        if (!IsAcceptedHost(authority))
-        {
-            return false;
-        }
-
-        urlPath = slash < 0 ? string.Empty : remainder[slash..];
-
-        return true;
+        return authority.Length == DriveSpecificationLength ? remainder[2..] : remainder[(2 + authority.Length)..];
     }
-
-    /// <summary>
-    /// Reports whether an authority is really the start of a Windows path — <c>C:</c> or
-    /// <c>D|</c> — rather than a host.
-    /// </summary>
-    /// <param name="authority">The authority as written, without its leading <c>//</c>.</param>
-    /// <returns>
-    /// <see langword="true" /> when the authority is to be kept as the head of the path
-    /// instead of being dropped or rejected.
-    /// </returns>
-    /// <remarks>
-    /// <para>
-    /// The test is exactly two characters wide because that is what curl 8.21.0 does.
-    /// A lone letter with no <c>:</c> or <c>|</c> after it is a rejected host, and that
-    /// case does reach here.
-    /// </para>
-    /// <para>
-    /// A longer authority ending in <c>:</c> does not. <c>file://ab:/x</c> is exit 3
-    /// upstream, but <see cref="Uri" /> throws <see cref="UriFormatException" /> on it
-    /// before this method is called, as it does for <c>file://c:x/y</c>,
-    /// <c>file://D|x/y</c> and <c>file://C|D|/x</c>. So no test can cover the width
-    /// check against those spellings, and widening it to two-or-more would leave the
-    /// suite green. The check is cheap insurance against a future URL type that does
-    /// admit them; do not simplify it on the strength of the tests passing.
-    /// </para>
-    /// </remarks>
-    private static bool IsDriveSpecification(string authority) =>
-        authority.Length == 2
-        && char.IsAsciiLetter(authority[0])
-        && (authority[1] == ':' || authority[1] == '|');
-
-    /// <summary>
-    /// Reports whether an authority is one of the three curl 8.21.0 accepts for
-    /// <c>file://</c>.
-    /// </summary>
-    /// <param name="authority">The authority as written, without its leading <c>//</c>.</param>
-    /// <returns><see langword="true" /> when the authority may be dropped.</returns>
-    /// <remarks>
-    /// A drive specification never reaches here: <see cref="IsDriveSpecification" /> has
-    /// already claimed it as path text, because curl reads <c>file://C:/x</c> as a path
-    /// and not as a host named <c>C:</c>.
-    /// </remarks>
-    private static bool IsAcceptedHost(string authority) =>
-        authority.Length == 0
-        || string.Equals(authority, "localhost", StringComparison.OrdinalIgnoreCase)
-        || string.Equals(authority, "127.0.0.1", StringComparison.Ordinal);
 
     /// <summary>
     /// Drops the slash in front of a <c>/X:/…</c> or <c>/X|/…</c> drive specification.
@@ -400,6 +330,16 @@ public sealed record FileUrlPath
     }
 
     /// <summary>
+    /// Reports whether two characters are a Windows drive specification, <c>C:</c> or
+    /// <c>D|</c>: exactly one ASCII letter and then <c>:</c> or <c>|</c>, as curl 8.21.0
+    /// reads one.
+    /// </summary>
+    /// <param name="text">The two characters to test.</param>
+    /// <returns><see langword="true" /> for a drive specification.</returns>
+    private static bool IsDriveSpecification(string text) =>
+        char.IsAsciiLetter(text[0]) && (text[1] == ':' || text[1] == '|');
+
+    /// <summary>
     /// Measures the drive specification at the head of a path, with its optional leading
     /// <c>/</c>, when it is a root: followed by <c>/</c> or by nothing at all.
     /// </summary>
@@ -410,10 +350,10 @@ public sealed record FileUrlPath
     /// </returns>
     private static int DriveRootLength(string urlPath)
     {
-        int end = (urlPath.StartsWith('/') ? 1 : 0) + 2;
+        int end = (urlPath.StartsWith('/') ? 1 : 0) + DriveSpecificationLength;
 
         bool isRoot = urlPath.Length >= end
-            && IsDriveSpecification(urlPath[(end - 2)..end])
+            && IsDriveSpecification(urlPath[(end - DriveSpecificationLength)..end])
             && (urlPath.Length == end || urlPath[end] == '/');
 
         return isRoot ? end : 0;

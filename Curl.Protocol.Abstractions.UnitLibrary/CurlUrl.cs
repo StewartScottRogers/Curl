@@ -22,8 +22,11 @@ namespace Curl.Protocol.Abstractions;
 /// keeps <c>%2F</c> and, when parsed with path-as-is, its dot segments, and
 /// <see cref="Query" /> and <see cref="Fragment" /> do not carry their <c>?</c> or <c>#</c>.
 /// </para>
+/// <para>
+/// Two values are equal when every part, <see cref="OriginalString" /> included, is equal.
+/// </para>
 /// </remarks>
-public sealed class CurlUrl
+public sealed record CurlUrl
 {
     internal CurlUrl(
         string originalString,
@@ -154,6 +157,23 @@ public sealed class CurlUrl
     /// <exception cref="ArgumentNullException"><paramref name="text" /> is <see langword="null" />.</exception>
     public static bool TryParse(string text, bool pathAsIs, [NotNullWhen(true)] out CurlUrl? url) =>
         TryParse(text, pathAsIs, OperatingSystem.IsWindows(), out url);
+
+    /// <summary>
+    /// Parses <paramref name="text" /> as <see cref="TryParse(string, bool, out CurlUrl)" />
+    /// does, for text already known to be a URL curl accepts.
+    /// </summary>
+    /// <param name="text">The URL as typed.</param>
+    /// <param name="pathAsIs">
+    /// <see langword="true" /> to keep <c>.</c> and <c>..</c> path segments, as curl's
+    /// <c>--path-as-is</c> does.
+    /// </param>
+    /// <returns>The parsed URL.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="text" /> is <see langword="null" />.</exception>
+    /// <exception cref="FormatException">curl rejects <paramref name="text" />.</exception>
+    public static CurlUrl Parse(string text, bool pathAsIs = false) =>
+        TryParse(text, pathAsIs, out CurlUrl? url)
+            ? url
+            : throw new FormatException($"curl rejects the URL \"{text}\".");
 
     /// <summary>
     /// Parses <paramref name="text" /> with the drive-letter rules of the chosen platform,

@@ -14,21 +14,21 @@ public sealed class ScriptedCookieStore(params string?[] cookieHeaders) : ICooki
     /// <summary>
     /// Gets every <see cref="GetCookieHeader" /> call made, in order.
     /// </summary>
-    public List<(Uri Uri, bool Secure, DateTimeOffset Now)> Requests { get; } = [];
+    public List<(CurlUrl Url, bool Secure, DateTimeOffset Now)> Requests { get; } = [];
 
     /// <summary>
     /// Gets every <see cref="StoreFromResponse" /> call made, in order.
     /// </summary>
-    public List<(Uri Uri, IReadOnlyList<string> SetCookieHeaders, DateTimeOffset Now)> Responses { get; } = [];
+    public List<(CurlUrl Url, IReadOnlyList<string> SetCookieHeaders, DateTimeOffset Now)> Responses { get; } = [];
 
     /// <inheritdoc />
-    public string? GetCookieHeader(Uri uri, bool secure, DateTimeOffset now)
+    public string? GetCookieHeader(CurlUrl url, bool secure, DateTimeOffset now)
     {
-        Requests.Add((uri, secure, now));
+        Requests.Add((url, secure, now));
         return answers.TryDequeue(out string? answer) ? answer : null;
     }
 
     /// <inheritdoc />
-    public void StoreFromResponse(Uri uri, IReadOnlyList<string> setCookieHeaders, DateTimeOffset now) =>
-        Responses.Add((uri, setCookieHeaders, now));
+    public void StoreFromResponse(CurlUrl url, IReadOnlyList<string> setCookieHeaders, DateTimeOffset now) =>
+        Responses.Add((url, setCookieHeaders, now));
 }

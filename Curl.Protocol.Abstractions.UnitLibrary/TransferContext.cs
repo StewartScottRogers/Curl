@@ -15,7 +15,7 @@ public sealed class TransferContext : ITransferContext
         UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.OtherRead;
 
     /// <inheritdoc />
-    public required Uri Url { get; init; }
+    public required CurlUrl Url { get; init; }
 
     /// <inheritdoc />
     public required Stream Output { get; init; }

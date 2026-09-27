@@ -63,15 +63,15 @@ public sealed class CookieStore : ICookieStore
     /// long they make the value; they are left out when a stored cookie was.
     /// </para>
     /// </remarks>
-    /// <exception cref="ArgumentNullException"><paramref name="uri"/> is <see langword="null"/>.</exception>
-    public string? GetCookieHeader(Uri uri, bool secure, DateTimeOffset now)
+    /// <exception cref="ArgumentNullException"><paramref name="url"/> is <see langword="null"/>.</exception>
+    public string? GetCookieHeader(CurlUrl url, bool secure, DateTimeOffset now)
     {
-        ArgumentNullException.ThrowIfNull(uri);
+        ArgumentNullException.ThrowIfNull(url);
 
         RemoveExpired(now);
-        string host = CookieOrigin.HostOf(uri);
+        string host = CookieOrigin.HostOf(url);
         bool secureContext = secure || CookieOrigin.IsLoopback(host);
-        string path = uri.AbsolutePath;
+        string path = url.AbsolutePath;
         IEnumerable<Cookie> sent = InSendingOrder(cookies.Where(cookie => IsSentTo(cookie, host, path, secureContext)).Take(MostCookiesSent));
         StringBuilder header = new();
         if (TryAppendCookies(header, sent) && cookieStrings.Count > 0)
@@ -232,13 +232,13 @@ public sealed class CookieStore : ICookieStore
     /// removed with every other expired cookie, so it deletes the namesake.
     /// </para>
     /// </remarks>
-    /// <exception cref="ArgumentNullException"><paramref name="uri"/> or <paramref name="setCookieHeaders"/> is <see langword="null"/>.</exception>
-    public void StoreFromResponse(Uri uri, IReadOnlyList<string> setCookieHeaders, DateTimeOffset now)
+    /// <exception cref="ArgumentNullException"><paramref name="url"/> or <paramref name="setCookieHeaders"/> is <see langword="null"/>.</exception>
+    public void StoreFromResponse(CurlUrl url, IReadOnlyList<string> setCookieHeaders, DateTimeOffset now)
     {
-        ArgumentNullException.ThrowIfNull(uri);
+        ArgumentNullException.ThrowIfNull(url);
         ArgumentNullException.ThrowIfNull(setCookieHeaders);
 
-        bool secureOrigin = CookieOrigin.IsSecure(uri);
+        bool secureOrigin = CookieOrigin.IsSecure(url);
         int stored = 0;
         foreach (string header in setCookieHeaders)
         {
@@ -247,7 +247,7 @@ public sealed class CookieStore : ICookieStore
                 break;
             }
 
-            Cookie? cookie = SetCookieParser.Parse(header, uri, now);
+            Cookie? cookie = SetCookieParser.Parse(header, url, now);
             if (cookie is not null && (secureOrigin || !OverlaysSecureCookie(cookie)))
             {
                 Store(cookie);

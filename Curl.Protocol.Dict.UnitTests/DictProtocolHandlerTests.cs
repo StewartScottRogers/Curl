@@ -228,7 +228,7 @@ public sealed class DictProtocolHandlerTests
         var connection = new ScriptedConnection();
         var context = new TransferContext
         {
-            Url = new Uri("dict://h/d:word"),
+            Url = CurlUrl.Parse("dict://h/d:word"),
             Output = new MemoryStream(),
             CancellationToken = new CancellationToken(canceled: true),
         };
@@ -301,7 +301,7 @@ public sealed class DictProtocolHandlerTests
     }
 
     private static TransferContext Context(string url, Stream output) =>
-        new() { Url = new Uri(url), Output = output };
+        new() { Url = CurlUrl.Parse(url), Output = output };
 
     private static async Task<string> SentForAsync(string path) =>
         Encoding.Latin1.GetString(await SentBytesForAsync(path));

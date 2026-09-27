@@ -20,7 +20,7 @@ public sealed class TelnetProtocolHandlerWindowSizeTests
     /// <summary><c>IAC WILL NAWS</c>.</summary>
     private const string WillNaws = "FF FB 1F";
 
-    private static readonly Uri TelnetUrl = new("telnet://example.test/");
+    private static readonly CurlUrl TelnetUrl = CurlUrl.Parse("telnet://example.test/");
 
     [TestMethod]
     public async Task ExecuteAsync_WindowSize80x24AndServerDoNaws_SendsWillNawsTheSizeThenOffers()

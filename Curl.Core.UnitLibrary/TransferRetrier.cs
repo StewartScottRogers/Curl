@@ -85,7 +85,7 @@ public sealed class TransferRetrier(Func<ITransferContext, ValueTask<TransferRes
         }
     }
 
-    private static TransferRetryReason? RetryReason(Uri url, TransferResult result)
+    private static TransferRetryReason? RetryReason(CurlUrl url, TransferResult result)
     {
         if (TimeoutFailures.Contains(result.ExitCode))
         {
@@ -97,13 +97,13 @@ public sealed class TransferRetrier(Func<ITransferContext, ValueTask<TransferRes
             : null;
     }
 
-    private static bool IsTransientHttpError(Uri url, TransferReport? report) =>
+    private static bool IsTransientHttpError(CurlUrl url, TransferReport? report) =>
         report is not null
         && TransientHttpStatuses.Contains(report.ResponseCode)
         && LastScheme(url, report) is "http" or "https";
 
-    private static string LastScheme(Uri url, TransferReport report) =>
-        report.EffectiveUrl is { } effective && Uri.TryCreate(effective, UriKind.Absolute, out Uri? last)
+    private static string LastScheme(CurlUrl url, TransferReport report) =>
+        report.EffectiveUrl is { } effective && CurlUrl.TryParse(effective, pathAsIs: false, out CurlUrl? last)
             ? last.Scheme
             : url.Scheme;
 

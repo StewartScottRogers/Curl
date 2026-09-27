@@ -1,3 +1,5 @@
+using Curl.Protocol.Abstractions;
+
 namespace Curl.Cookies;
 
 /// <summary>
@@ -26,7 +28,7 @@ public sealed class NetscapeCookieFileTests
         DateTimeOffset received = DateTimeOffset.FromUnixTimeSeconds(1_790_463_538);
         CookieStore store = new();
         store.StoreFromResponse(
-            new Uri("http://localhost:18221/p/x"),
+            CurlUrl.Parse("http://localhost:18221/p/x"),
             ["a=1; Path=/", "h=2; HttpOnly; Path=/p", "d=3; Domain=localhost; Max-Age=3600", "s=4; Secure; HttpOnly", "q=\"x y\""],
             received);
 
@@ -133,7 +135,7 @@ public sealed class NetscapeCookieFileTests
             WriteJar(store, Now));
         Assert.AreEqual(
             "A20=20; __Host-A9=9; A18=1 8 ; A17=17; A7=7; A6=6; A5=5; A4=4; A2=2; A1=1; =14",
-            store.GetCookieHeader(new Uri("http://127.0.0.1:18221/p/x"), secure: false, Now));
+            store.GetCookieHeader(CurlUrl.Parse("http://127.0.0.1:18221/p/x"), secure: false, Now));
     }
 
     /// <summary>
@@ -344,7 +346,7 @@ public sealed class NetscapeCookieFileTests
 
         Assert.AreEqual(
             "ff=6; lower=l1; ii=net; hh=net; gg=net; gg=7; cc=3; bb=2; a=1; __Secure-s=10; hh=8; q=13",
-            store.GetCookieHeader(new Uri("http://127.0.0.1:18273/x/y"), secure: false, loaded));
+            store.GetCookieHeader(CurlUrl.Parse("http://127.0.0.1:18273/x/y"), secure: false, loaded));
     }
 
     /// <summary>
@@ -376,7 +378,7 @@ public sealed class NetscapeCookieFileTests
 
         Assert.AreEqual(
             "nospace=n1; sec=s1; plain=p1; far=f1; exp=e1; ma=m1",
-            store.GetCookieHeader(new Uri("http://127.0.0.1:18273/"), secure: false, loaded));
+            store.GetCookieHeader(CurlUrl.Parse("http://127.0.0.1:18273/"), secure: false, loaded));
         Assert.AreEqual(
             Header
             + ".127.0.0.1\tTRUE\t/\tFALSE\t0\tnospace\tn1\r\n"
@@ -409,7 +411,7 @@ public sealed class NetscapeCookieFileTests
 
         Assert.AreEqual(
             "mm=net; nn=net; yy=1; jj=5; mm=4; nn=3; zz=2; jj=6; kk=6",
-            store.GetCookieHeader(new Uri("http://127.0.0.1:18273/"), secure: false, Now));
+            store.GetCookieHeader(CurlUrl.Parse("http://127.0.0.1:18273/"), secure: false, Now));
         Assert.AreEqual(
             Header
             + ".127.0.0.1\tTRUE\t/\tFALSE\t0\tmm\t4\r\n"
@@ -434,7 +436,7 @@ public sealed class NetscapeCookieFileTests
             + "Set-Cookie: __Host-c=1; Secure; Path=/; domain=127.0.0.1\n",
             discardSessionCookies: false);
 
-        Assert.AreEqual("__Host-b=1", store.GetCookieHeader(new Uri("http://127.0.0.1:18273/"), secure: false, Now));
+        Assert.AreEqual("__Host-b=1", store.GetCookieHeader(CurlUrl.Parse("http://127.0.0.1:18273/"), secure: false, Now));
     }
 
     /// <summary>
@@ -446,7 +448,7 @@ public sealed class NetscapeCookieFileTests
     public void StoreFromResponse_SecureSetCookieLinesWithoutPath_DoNotBlockInsecureNamesakes()
     {
         CookieStore store = Load("Set-Cookie: s=1; Secure\nSet-Cookie: t=1; Secure; domain=foo.test\n", discardSessionCookies: false);
-        Uri foo = new("http://foo.test:18273/");
+        CurlUrl foo = CurlUrl.Parse("http://foo.test:18273/");
 
         store.StoreFromResponse(foo, ["s=2", "t=2"], Now);
 
@@ -467,7 +469,7 @@ public sealed class NetscapeCookieFileTests
     public void StoreFromResponse_SecureSetCookieLineWithoutDomain_DoesNotBlockAnInsecureNamesake()
     {
         CookieStore store = Load("Set-Cookie: s=1; Secure; Path=/\nSet-Cookie: t=1; Secure; domain=foo.test; Path=/\n", discardSessionCookies: false);
-        Uri foo = new("http://foo.test:18273/");
+        CurlUrl foo = CurlUrl.Parse("http://foo.test:18273/");
 
         store.StoreFromResponse(foo, ["s=2", "t=2"], Now);
 
@@ -488,7 +490,7 @@ public sealed class NetscapeCookieFileTests
     {
         CookieStore store = Load("Set-Cookie: t=1; Secure; domain=foo.test; Path=/\n", discardSessionCookies: false);
 
-        store.StoreFromResponse(new Uri("http://bar.test:18273/"), ["t=2"], Now);
+        store.StoreFromResponse(CurlUrl.Parse("http://bar.test:18273/"), ["t=2"], Now);
 
         Assert.AreEqual(
             Header

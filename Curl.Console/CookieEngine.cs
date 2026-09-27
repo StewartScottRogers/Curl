@@ -117,9 +117,9 @@ internal sealed class CookieEngine
     /// <param name="store">The store that holds the strings.</param>
     private sealed class CookieStringSender(CookieStore store) : ICookieStore
     {
-        public string? GetCookieHeader(Uri uri, bool secure, DateTimeOffset now) => store.GetCookieHeader(uri, secure, now);
+        public string? GetCookieHeader(CurlUrl url, bool secure, DateTimeOffset now) => store.GetCookieHeader(url, secure, now);
 
-        public void StoreFromResponse(Uri uri, IReadOnlyList<string> setCookieHeaders, DateTimeOffset now)
+        public void StoreFromResponse(CurlUrl url, IReadOnlyList<string> setCookieHeaders, DateTimeOffset now)
         {
         }
     }

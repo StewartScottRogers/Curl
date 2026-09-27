@@ -51,7 +51,7 @@ public sealed class DictProtocolHandler(IConnector connector) : IProtocolHandler
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        Uri url = context.Url;
+        CurlUrl url = context.Url;
         var target = new ConnectTarget(url.IdnHost, url.IsDefaultPort ? DefaultPort : url.Port, false);
         ConnectResult connect = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
         if (connect.Connection is not { } connection)

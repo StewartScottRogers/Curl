@@ -34,7 +34,7 @@ namespace Curl.Protocol.Abstractions;
 /// </param>
 public sealed record HttpAuthRequest(
     string Method,
-    Uri Url,
+    CurlUrl Url,
     string RequestTarget,
     NetworkCredential? Credential,
     string? BearerToken,

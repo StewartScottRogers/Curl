@@ -50,7 +50,7 @@ public sealed partial class HttpProtocolHandlerTests
             ScriptedAuthenticator authenticator = new("Basic dTpw", null);
             MemoryStream output = new();
             NetworkCredential credential = new("u", "p");
-            TransferContext context = new() { Url = new Uri(AuthUrl), Output = output, Credentials = credential };
+            TransferContext context = new() { Url = CurlUrl.Parse(AuthUrl), Output = output, Credentials = credential };
 
             TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator).ExecuteAsync(context);
 
@@ -58,7 +58,7 @@ public sealed partial class HttpProtocolHandlerTests
             Assert.AreEqual(BasicRequest, connection.Written, $"Chunk size {chunkSize}");
             Assert.AreEqual("ok", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
             (HttpAuthRequest request, IReadOnlyList<string> challenges) = authenticator.Calls.Single();
-            Assert.AreEqual(new HttpAuthRequest("GET", new Uri(AuthUrl), "/a", credential, null, HttpAuthSchemes.Basic, false), request);
+            Assert.AreEqual(new HttpAuthRequest("GET", CurlUrl.Parse(AuthUrl), "/a", credential, null, HttpAuthSchemes.Basic, false), request);
             Assert.IsEmpty(challenges, $"Chunk size {chunkSize}");
         }
     }
@@ -316,5 +316,5 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     private static TransferContext AuthContext(Stream output, Stream? headerOutput = null, HttpRequestOptions? options = null) =>
-        new() { Url = new Uri(AuthUrl), Output = output, HeaderOutput = headerOutput, Http = options };
+        new() { Url = CurlUrl.Parse(AuthUrl), Output = output, HeaderOutput = headerOutput, Http = options };
 }

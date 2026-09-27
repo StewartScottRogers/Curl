@@ -35,7 +35,7 @@ public sealed class RedirectFollowerTests
         TransferResult redirect = Redirect(301, Next);
         ScriptedHandler handler = new(redirect);
 
-        TransferResult result = await Follow(handler, new TransferContext { Url = new Uri(First), Output = Stream.Null });
+        TransferResult result = await Follow(handler, new TransferContext { Url = CurlUrl.Parse(First), Output = Stream.Null });
 
         Assert.AreSame(redirect, result);
     }
@@ -63,7 +63,7 @@ public sealed class RedirectFollowerTests
         Assert.AreEqual(5, result.BytesTransferred);
         CollectionAssert.AreEqual(
             new[] { First, "http://127.0.0.1:18203/b", Next },
-            handler.Contexts.Select(context => context.Url.AbsoluteUri).ToArray());
+            handler.Contexts.Select(context => context.Url.OriginalString).ToArray());
         Assert.AreEqual(2, result.Report!.RedirectCount);
         Assert.AreEqual(Next, result.Report.EffectiveUrl);
         Assert.AreEqual(200, result.Report.ResponseCode);
@@ -427,7 +427,7 @@ public sealed class RedirectFollowerTests
         TransferResult result = await Follow(handler, Context(Location()));
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        Assert.AreEqual(target, handler.Contexts[1].Url.AbsoluteUri);
+        Assert.AreEqual(target, handler.Contexts[1].Url.OriginalString);
     }
 
     [TestMethod]
@@ -546,7 +546,7 @@ public sealed class RedirectFollowerTests
         ScriptedHandler handler = new(Redirect(302, Next), Ok(200, 0));
         TransferContext first = new()
         {
-            Url = new Uri(First),
+            Url = CurlUrl.Parse(First),
             Output = Stream.Null,
             PathAsIs = true,
             Http = Location(),
@@ -566,7 +566,7 @@ public sealed class RedirectFollowerTests
         MemoryStream headers = new();
         TransferContext first = new()
         {
-            Url = new Uri(First),
+            Url = CurlUrl.Parse(First),
             Output = output,
             ResumeFrom = 4,
             Range = ByteRange.Bounded(1, 2),
@@ -621,7 +621,7 @@ public sealed class RedirectFollowerTests
         Stream? uploadStream = null) =>
         new()
         {
-            Url = new Uri(url),
+            Url = CurlUrl.Parse(url),
             Output = Stream.Null,
             Http = http,
             PostData = postData ? new byte[] { 1 } : null,

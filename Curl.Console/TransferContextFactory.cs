@@ -33,7 +33,7 @@ internal sealed class TransferContextFactory(Stream standardInput)
     /// </returns>
     internal TransferContext Create(
         CommandLineOptions options,
-        Uri url,
+        CurlUrl url,
         Stream output,
         ByteRange? range,
         long? resumeFrom,

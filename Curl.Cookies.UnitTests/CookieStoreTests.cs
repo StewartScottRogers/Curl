@@ -1,3 +1,5 @@
+using Curl.Protocol.Abstractions;
+
 namespace Curl.Cookies;
 
 /// <summary>
@@ -12,11 +14,11 @@ public sealed partial class CookieStoreTests
 {
     private static readonly DateTimeOffset Now = DateTimeOffset.FromUnixTimeSeconds(1_790_460_351);
 
-    private static readonly Uri Loopback = new("http://127.0.0.1/");
+    private static readonly CurlUrl Loopback = CurlUrl.Parse("http://127.0.0.1/");
 
-    private static readonly Uri Www = new("http://www.example.test/");
+    private static readonly CurlUrl Www = CurlUrl.Parse("http://www.example.test/");
 
-    private static readonly Uri SecureWww = new("https://www.example.test/");
+    private static readonly CurlUrl SecureWww = CurlUrl.Parse("https://www.example.test/");
 
     /// <summary>
     /// Measured: <c>curl -b none.txt http://127.0.0.1:18220/ http://127.0.0.1:18220/p/q/r?x=/a</c>. Longest
@@ -32,7 +34,7 @@ public sealed partial class CookieStoreTests
             ["a=1; Path=/", "bbb=2; Path=/", "cc=3; Path=/", "z=4; Path=/p", "y=5; Path=/p/q", "d=6; Domain=127.0.0.1; Path=/", "s=7; Secure; Path=/", "e=8; Max-Age=1; Path=/", "x=9; Path=/pq", "w=10; Path=/P"],
             Now);
 
-        Assert.AreEqual("y=5; z=4; bbb=2; cc=3; e=8; s=7; d=6; a=1", store.GetCookieHeader(new Uri("http://127.0.0.1/p/q/r?x=/a"), secure: false, Now));
+        Assert.AreEqual("y=5; z=4; bbb=2; cc=3; e=8; s=7; d=6; a=1", store.GetCookieHeader(CurlUrl.Parse("http://127.0.0.1/p/q/r?x=/a"), secure: false, Now));
     }
 
     /// <summary>
@@ -47,7 +49,7 @@ public sealed partial class CookieStoreTests
         store.StoreFromResponse(Www, ["hostonly=1", "domcookie=2; Domain=example.test", "parent=4; Domain=example.test"], Now);
         store.StoreFromResponse(SecureWww, ["sec=5; Secure"], Now);
         store.StoreFromResponse(Www, ["old=6; Max-Age=10", "r1=7", "r2=8"], Now.AddSeconds(-20));
-        store.StoreFromResponse(new Uri("http://other.example.test/"), ["sib=9"], Now);
+        store.StoreFromResponse(CurlUrl.Parse("http://other.example.test/"), ["sib=9"], Now);
         store.StoreFromResponse(Www, ["upper=10"], Now);
 
         Assert.AreEqual("hostonly=1; upper=10; r2=8; r1=7; domcookie=2; parent=4", store.GetCookieHeader(Www, secure: false, Now));
@@ -80,7 +82,7 @@ public sealed partial class CookieStoreTests
         store.StoreFromResponse(Www, ["a=2; Domain=example.test"], Now);
         store.StoreFromResponse(SecureWww, ["sec=5; Secure"], Now);
         store.StoreFromResponse(Www, ["r2=8", "p=1", "q=1; Path=/x", "dd=1; Domain=.example.test"], Now);
-        Uri first = new("http://www.example.test/x/");
+        CurlUrl first = CurlUrl.Parse("http://www.example.test/x/");
 
         Assert.AreEqual("q=1; r2=8; p=1; a=1; dd=1; a=2", store.GetCookieHeader(first, secure: false, Now));
 
@@ -88,7 +90,7 @@ public sealed partial class CookieStoreTests
 
         Assert.AreEqual(
             "dd=host; p=2; a=3; q=1; n=1; r2=8; p=1; a=1; dd=1; a=2",
-            store.GetCookieHeader(new Uri("http://www.example.test/x/X"), secure: false, Now));
+            store.GetCookieHeader(CurlUrl.Parse("http://www.example.test/x/X"), secure: false, Now));
     }
 
     /// <summary>
@@ -103,11 +105,11 @@ public sealed partial class CookieStoreTests
         CookieStore store = new();
         store.StoreFromResponse(Www, ["Nm=1; Path=/", "pp=1; Path=/Y", "dc=1; Domain=example.test; Path=/"], Now);
         store.StoreFromResponse(SecureWww, ["s1=1; Secure; Domain=example.test; Path=/"], Now);
-        store.StoreFromResponse(new Uri("https://other.example.test/"), ["s2=1; Secure; Path=/"], Now);
+        store.StoreFromResponse(CurlUrl.Parse("https://other.example.test/"), ["s2=1; Secure; Path=/"], Now);
         store.StoreFromResponse(SecureWww, ["s3=1; Secure; Path=/login/en", "s4=1; Secure; Path=/Z", "s5=1; Secure; Path=/q"], Now);
 
         store.StoreFromResponse(
-            new Uri("http://www.example.test/y/"),
+            CurlUrl.Parse("http://www.example.test/y/"),
             ["nm=2; Path=/", "pp=2; Path=/y", "dc=2; Domain=EXAMPLE.TEST; Path=/", "s1=2; Path=/y", "s2=2; Domain=example.test; Path=/", "s3=2; Path=/loginhelper", "s4=2; Path=/z", "s5=2; Path=/y"],
             Now);
 
@@ -228,7 +230,7 @@ public sealed partial class CookieStoreTests
         CookieStore store = new();
         store.StoreFromResponse(Loopback, ["t3=v; Path=/x//", "t4=v; Path=/x/y"], Now);
 
-        Assert.AreEqual(expectedHeader, store.GetCookieHeader(new Uri(url), secure: false, Now));
+        Assert.AreEqual(expectedHeader, store.GetCookieHeader(CurlUrl.Parse(url), secure: false, Now));
     }
 
     /// <summary>libcurl's <c>remove_expired</c>: a cookie is dropped once its expiry is before the passed time.</summary>
@@ -248,7 +250,7 @@ public sealed partial class CookieStoreTests
     public void GetCookieHeader_IPv6Loopback_SendsItsSecureCookie()
     {
         CookieStore store = new();
-        Uri ipv6 = new("http://[::1]/");
+        CurlUrl ipv6 = CurlUrl.Parse("http://[::1]/");
         store.StoreFromResponse(ipv6, ["s=1; Secure"], Now);
 
         Assert.AreEqual("s=1", store.GetCookieHeader(ipv6, secure: false, Now));

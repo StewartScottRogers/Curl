@@ -175,7 +175,7 @@ public sealed class ProxySelectorTests
         var selector = new ProxySelector(CaseSensitive());
 
         Assert.IsTrue(selector.TrySelect(
-            new Uri("http://a.test:2222/"), "127.0.0.1", ProxyKind.Socks5, null, out ProxyEndpoint? proxy, out _));
+            CurlUrl.Parse("http://a.test:2222/"), "127.0.0.1", ProxyKind.Socks5, null, out ProxyEndpoint? proxy, out _));
 
         Assert.AreEqual(new ProxyEndpoint(ProxyKind.Socks5, "127.0.0.1", 1080, null), proxy);
     }
@@ -186,7 +186,7 @@ public sealed class ProxySelectorTests
         var selector = new ProxySelector(CaseSensitive());
 
         Assert.IsTrue(selector.TrySelect(
-            new Uri("http://a.test:2222/"), "http://127.0.0.1:1111", ProxyKind.Socks4, null, out ProxyEndpoint? proxy, out _));
+            CurlUrl.Parse("http://a.test:2222/"), "http://127.0.0.1:1111", ProxyKind.Socks4, null, out ProxyEndpoint? proxy, out _));
 
         Assert.AreEqual(new ProxyEndpoint(ProxyKind.Http, "127.0.0.1", 1111, null), proxy);
     }
@@ -197,7 +197,7 @@ public sealed class ProxySelectorTests
         var selector = new ProxySelector(CaseSensitive(("http_proxy", "127.0.0.1:1111")));
 
         Assert.IsTrue(selector.TrySelect(
-            new Uri("http://a.test:2222/"), null, ProxyKind.Socks5, null, out ProxyEndpoint? proxy, out _));
+            CurlUrl.Parse("http://a.test:2222/"), null, ProxyKind.Socks5, null, out ProxyEndpoint? proxy, out _));
 
         Assert.AreEqual(new ProxyEndpoint(ProxyKind.Http, "127.0.0.1", 1111, null), proxy);
     }
@@ -215,7 +215,7 @@ public sealed class ProxySelectorTests
     {
         var selector = new ProxySelector(CaseSensitive(("http_proxy", "foo://127.0.0.1:1111")));
 
-        bool selected = selector.TrySelect(new Uri("http://a.test:2222/"), null, null, out ProxyEndpoint? proxy, out TransferResult? failure);
+        bool selected = selector.TrySelect(CurlUrl.Parse("http://a.test:2222/"), null, null, out ProxyEndpoint? proxy, out TransferResult? failure);
 
         Assert.IsFalse(selected);
         Assert.IsNull(proxy);
@@ -227,7 +227,7 @@ public sealed class ProxySelectorTests
     {
         var selector = new ProxySelector(CaseSensitive());
 
-        bool selected = selector.TrySelect(new Uri("http://a.test:2222/"), null, null, out ProxyEndpoint? proxy, out TransferResult? failure);
+        bool selected = selector.TrySelect(CurlUrl.Parse("http://a.test:2222/"), null, null, out ProxyEndpoint? proxy, out TransferResult? failure);
 
         Assert.IsTrue(selected);
         Assert.IsNull(proxy);
@@ -255,7 +255,7 @@ public sealed class ProxySelectorTests
         string? noProxyOption = null)
     {
         var selector = new ProxySelector(environment);
-        Assert.IsTrue(selector.TrySelect(new Uri(url), proxyOption, noProxyOption, out ProxyEndpoint? proxy, out _));
+        Assert.IsTrue(selector.TrySelect(CurlUrl.Parse(url), proxyOption, noProxyOption, out ProxyEndpoint? proxy, out _));
         return proxy;
     }
 

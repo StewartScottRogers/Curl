@@ -66,7 +66,7 @@ internal sealed class MqttSession(IConnection connection, Stream output, Cancell
     /// </returns>
     /// <exception cref="MqttTransferException">The session failed; see its exit code.</exception>
     internal async ValueTask RunAsync(
-        Uri url,
+        CurlUrl url,
         string clientIdentifier,
         NetworkCredential? credentials,
         ReadOnlyMemory<byte>? postData)
@@ -101,7 +101,7 @@ internal sealed class MqttSession(IConnection connection, Stream output, Cancell
     private async ValueTask<SessionState> ReadPacketAsync(
         SessionState state,
         MqttFixedHeader header,
-        Uri url,
+        CurlUrl url,
         ReadOnlyMemory<byte>? postData) => state switch
         {
             SessionState.AwaitingConnack => await AcceptConnackAsync(header, url, postData).ConfigureAwait(false),
@@ -116,7 +116,7 @@ internal sealed class MqttSession(IConnection connection, Stream output, Cancell
     /// </summary>
     private async ValueTask<SessionState> AcceptConnackAsync(
         MqttFixedHeader header,
-        Uri url,
+        CurlUrl url,
         ReadOnlyMemory<byte>? postData)
     {
         await VerifyConnackAsync(header).ConfigureAwait(false);

@@ -337,7 +337,7 @@ public sealed class CurlCommandRunnerTests
         Assert.AreEqual(1024, context.TftpBlockSize);
         Assert.IsTrue(context.TftpNoOptions);
         Assert.AreEqual(UnixFileMode.UserRead | UnixFileMode.UserWrite, context.CreateFileMode);
-        Assert.AreEqual(new Uri("file:///a"), context.Url);
+        Assert.AreEqual(CurlUrl.Parse("file:///a"), context.Url);
     }
 
     [TestMethod]

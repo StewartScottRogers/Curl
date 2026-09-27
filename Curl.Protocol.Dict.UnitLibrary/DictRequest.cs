@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.Text;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Dict;
 
@@ -51,8 +53,8 @@ internal static class DictRequest
     /// decodes to a control character.
     /// </summary>
     /// <param name="escapedPath">
-    /// The URL's path as <see cref="Uri.AbsolutePath" /> gives it: ASCII, still
-    /// percent-encoded, with every <c>%</c> followed by two hexadecimal digits.
+    /// The URL's path as <see cref="CurlUrl.AbsolutePath" /> gives it: as written, still
+    /// percent-encoded.
     /// </param>
     /// <param name="request">The whole request, or empty when refused.</param>
     /// <returns><see langword="true" /> unless the decoded path holds a byte below <c>0x20</c>.</returns>
@@ -159,29 +161,33 @@ internal static class DictRequest
     }
 
     /// <summary>
-    /// Decodes each <c>%</c> and the two hexadecimal digits after it to one byte.
-    /// </summary>
-    /// <remarks>
-    /// <see cref="Uri.AbsolutePath" /> has already escaped any <c>%</c> not followed by two
-    /// hexadecimal digits as <c>%25</c>, so a stray <c>%</c> decodes back to itself, as
+    /// Decodes each <c>%</c> followed by two hexadecimal digits to one byte and copies
+    /// every other character as its UTF-8 bytes, so a stray <c>%</c> stays as it is, as
     /// curl leaves one.
-    /// </remarks>
+    /// </summary>
     private static byte[] PercentDecode(string escaped)
     {
-        var decoded = new List<byte>(escaped.Length);
-        for (int index = 0; index < escaped.Length; index++)
+        byte[] encoded = Encoding.UTF8.GetBytes(escaped);
+        var decoded = new List<byte>(encoded.Length);
+        int index = 0;
+        while (index < encoded.Length)
         {
-            if (escaped[index] == '%')
-            {
-                decoded.Add(Convert.FromHexString(escaped.AsSpan(index + 1, 2))[0]);
-                index += 2;
-            }
-            else
-            {
-                decoded.Add((byte)escaped[index]);
-            }
+            decoded.Add(DecodeAt(encoded, ref index));
         }
 
         return [.. decoded];
+    }
+
+    private static byte DecodeAt(byte[] encoded, ref int index)
+    {
+        if (encoded[index] == '%'
+            && index + 2 < encoded.Length
+            && byte.TryParse(encoded.AsSpan(index + 1, 2), NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out byte escaped))
+        {
+            index += 3;
+            return escaped;
+        }
+
+        return encoded[index++];
     }
 }

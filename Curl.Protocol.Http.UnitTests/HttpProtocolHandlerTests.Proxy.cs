@@ -44,7 +44,7 @@ public sealed partial class HttpProtocolHandlerTests
             Assert.AreEqual(new ConnectTarget("127.0.0.1", 18183, false), connector.Targets.Single(), $"Chunk size {chunkSize}");
             HttpAuthRequest proxyRequest = authenticator.Calls.Single(call => call.Request.IsProxy).Request;
             Assert.AreEqual(
-                new HttpAuthRequest("GET", new Uri("http://Example.com/a/b?c=d"), "/a/b?c=d", LoopbackProxy.Credential, null, HttpAuthSchemes.Basic, true),
+                new HttpAuthRequest("GET", CurlUrl.Parse("http://Example.com/a/b?c=d"), "/a/b?c=d", LoopbackProxy.Credential, null, HttpAuthSchemes.Basic, true),
                 proxyRequest,
                 $"Chunk size {chunkSize}");
         }
@@ -67,7 +67,7 @@ public sealed partial class HttpProtocolHandlerTests
             OriginAndProxyAuthenticator authenticator = new("Basic YTpi", null, "Basic dTpw");
             TransferContext context = new()
             {
-                Url = new Uri("http://x:y@EXample.com:80/A%20b?q#frag"),
+                Url = CurlUrl.Parse("http://x:y@EXample.com:80/A%20b?q#frag"),
                 Output = new MemoryStream(),
                 Credentials = new NetworkCredential("a", "b"),
                 Http = new HttpRequestOptions { ForwardProxy = LoopbackProxy },
@@ -124,7 +124,7 @@ public sealed partial class HttpProtocolHandlerTests
             TurnTakingConnection connection = new(chunkSize, ProxyOkHead);
             QueueConnector connector = QueueConnector.For(connection);
             HttpRequestOptions options = new() { ForwardProxy = new ProxyEndpoint(ProxyKind.Http10, "127.0.0.1", 18183, null) };
-            TransferContext context = new() { Url = new Uri("http://example.com/h"), Output = new MemoryStream(), NoBody = true, Http = options };
+            TransferContext context = new() { Url = CurlUrl.Parse("http://example.com/h"), Output = new MemoryStream(), NoBody = true, Http = options };
 
             TransferResult result = await Handler(connector).ExecuteAsync(context);
 
@@ -216,5 +216,5 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     private static TransferContext ProxyContext(string url, Stream output, HttpRequestOptions options) =>
-        new() { Url = new Uri(url), Output = output, Http = options };
+        new() { Url = CurlUrl.Parse(url), Output = output, Http = options };
 }

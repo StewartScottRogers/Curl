@@ -23,7 +23,7 @@ public sealed class FileProtocolHandlerDecisionTests
 
     private const string DestinationWriteFailedMessage = "Failed sending data to the peer";
 
-    private static Uri FileUrl => new("file:///C:/dir/f.txt");
+    private static CurlUrl FileUrl => CurlUrl.Parse("file:///C:/dir/f.txt");
 
     private static string OsPath => "C:/dir/f.txt".Replace('/', Path.DirectorySeparatorChar);
 

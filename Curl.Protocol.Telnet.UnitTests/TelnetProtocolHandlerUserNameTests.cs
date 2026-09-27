@@ -22,7 +22,7 @@ public sealed class TelnetProtocolHandlerUserNameTests
     /// <summary><c>IAC SB NEW-ENVIRON IS VAR "USER" VALUE</c>.</summary>
     private const string UserVariableStart = "FF FA 27 00 00 55 53 45 52 01";
 
-    private static readonly Uri TelnetUrl = new("telnet://example.test/");
+    private static readonly CurlUrl TelnetUrl = CurlUrl.Parse("telnet://example.test/");
 
     [TestMethod]
     public async Task ExecuteAsync_UserNameAndNewEnvironmentAskedFor_SendsWillNewEnvironOffersAndUser()

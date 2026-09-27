@@ -387,7 +387,7 @@ public sealed class TftpDownloadRetransmissionTests
         CancellationToken cancellationToken = default) =>
         new()
         {
-            Url = new Uri("tftp://h/file.txt"),
+            Url = CurlUrl.Parse("tftp://h/file.txt"),
             Output = output ?? new MemoryStream(),
             ConnectTimeout = connectTimeout,
             MaxTime = maxTime,

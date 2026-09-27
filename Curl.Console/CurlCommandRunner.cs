@@ -449,8 +449,8 @@ internal sealed class CurlCommandRunner(
     /// <param name="requestUrl">The URL, with any <c>-G</c> / <c>--url-query</c> query.</param>
     /// <returns><see langword="true" /> for an HTTP URL.</returns>
     private static bool IsHttpUrl(string requestUrl) =>
-        Uri.TryCreate(requestUrl, UriKind.Absolute, out Uri? uri)
-        && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
+        CurlUrl.TryParse(requestUrl, pathAsIs: false, out CurlUrl? url)
+        && url.Scheme is "http" or "https";
 
     /// <summary>
     /// The scheme <c>%{scheme}</c> prints: the URL's, in lower case, or <see langword="null" />
@@ -462,8 +462,8 @@ internal sealed class CurlCommandRunner(
     /// <returns>The scheme, or <see langword="null" />.</returns>
     private static string? WriteOutScheme(string requestUrl, TransferResult result) =>
         result.ExitCode != CurlExitCode.UnsupportedProtocol
-        && Uri.TryCreate(requestUrl, UriKind.Absolute, out Uri? uri)
-            ? uri.Scheme.ToLowerInvariant()
+        && CurlUrl.TryParse(requestUrl, pathAsIs: false, out CurlUrl? url)
+            ? url.Scheme
             : null;
 
     /// <summary>
@@ -660,7 +660,7 @@ internal sealed class CurlCommandRunner(
 
         RedirectFollower follower = new(dispatch.Dispatcher);
 
-        if (!Uri.TryCreate(QueryUrl.Append(url, options), UriKind.Absolute, out Uri? uri))
+        if (!CurlUrl.TryParse(QueryUrl.Append(url, options), options.PathAsIs, out CurlUrl? transferUrl))
         {
             return TransferResult.Failure(CurlExitCode.UrlMalformat, MalformedUrlMessage);
         }
@@ -672,7 +672,7 @@ internal sealed class CurlCommandRunner(
 
         if (options.FormParts.Count == 0)
         {
-            return await TransferWithBodyAsync(follower, options, uri, outputFile, range, headerOutput, null)
+            return await TransferWithBodyAsync(follower, options, transferUrl, outputFile, range, headerOutput, null)
                 .ConfigureAwait(false);
         }
 
@@ -686,7 +686,7 @@ internal sealed class CurlCommandRunner(
 
         await using (form.Body.Content.ConfigureAwait(false))
         {
-            return await TransferWithBodyAsync(follower, options, uri, outputFile, range, headerOutput, form.Body)
+            return await TransferWithBodyAsync(follower, options, transferUrl, outputFile, range, headerOutput, form.Body)
                 .ConfigureAwait(false);
         }
     }
@@ -698,7 +698,7 @@ internal sealed class CurlCommandRunner(
     /// </summary>
     /// <param name="follower">Performs the transfer with the handler for its scheme, following redirects under <c>-L</c>.</param>
     /// <param name="options">The accepted command line.</param>
-    /// <param name="uri">The URL, with any <c>-G</c> / <c>--url-query</c> query.</param>
+    /// <param name="url">The URL, with any <c>-G</c> / <c>--url-query</c> query.</param>
     /// <param name="outputFile">The matching <c>-o</c> value, or <see langword="null" />.</param>
     /// <param name="range">The parsed <c>-r</c> range, or <see langword="null" />.</param>
     /// <param name="headerOutput">Where the <c>-D</c> header lines go, or <see langword="null" /> without <c>-D</c>.</param>
@@ -707,7 +707,7 @@ internal sealed class CurlCommandRunner(
     private async Task<TransferResult> TransferWithBodyAsync(
         RedirectFollower follower,
         CommandLineOptions options,
-        Uri uri,
+        CurlUrl url,
         string? outputFile,
         ByteRange? range,
         Stream? headerOutput,
@@ -716,7 +716,7 @@ internal sealed class CurlCommandRunner(
         if (outputFile is null)
         {
             TransferContext context = transferContextFactory.Create(
-                options, uri, deferringStandardOutput, range, options.ResumeFrom, headerOutput, formBody);
+                options, url, deferringStandardOutput, range, options.ResumeFrom, headerOutput, formBody);
             TransferResult standardOutputResult =
                 await TransferToStandardOutputAsync(follower, options, context).ConfigureAwait(false);
 
@@ -727,7 +727,7 @@ internal sealed class CurlCommandRunner(
         string outputFileName = runsOnWindows ? WindowsOutputFileNameSanitizer.Sanitize(outputFile) : outputFile;
         long? resumeFrom = await ResolveResumeFromAsync(options, outputFileName).ConfigureAwait(false);
         TransferResult fileResult = await TransferToOutputFileAsync(
-                follower, options, uri, outputFileName, range, resumeFrom, headerOutput, formBody)
+                follower, options, url, outputFileName, range, resumeFrom, headerOutput, formBody)
             .ConfigureAwait(false);
 
         return await WriteProgressMeterAsync(options, fileResult, resumeFrom, toStandardOutput: false)
@@ -830,7 +830,7 @@ internal sealed class CurlCommandRunner(
     /// </summary>
     /// <param name="follower">Performs the transfer with the handler for its scheme, following redirects under <c>-L</c>.</param>
     /// <param name="options">The accepted command line.</param>
-    /// <param name="uri">The URL.</param>
+    /// <param name="url">The URL.</param>
     /// <param name="outputFile">The file: the <c>-o</c> value, after <see cref="WindowsOutputFileNameSanitizer" /> on Windows.</param>
     /// <param name="range">The parsed <c>-r</c> range, or <see langword="null" />.</param>
     /// <param name="resumeFrom">The resolved <c>-C</c> offset, or <see langword="null" />.</param>
@@ -845,7 +845,7 @@ internal sealed class CurlCommandRunner(
     private async Task<TransferResult> TransferToOutputFileAsync(
         RedirectFollower follower,
         CommandLineOptions options,
-        Uri uri,
+        CurlUrl url,
         string outputFile,
         ByteRange? range,
         long? resumeFrom,
@@ -853,7 +853,7 @@ internal sealed class CurlCommandRunner(
         HttpRequestBody? formBody)
     {
         TransferResult completed = await TransferIntoOutputFileAsync(
-                follower, options, uri, outputFile, range, resumeFrom, headerOutput, formBody)
+                follower, options, url, outputFile, range, resumeFrom, headerOutput, formBody)
             .ConfigureAwait(false);
 
         if (options.RemoteTime && completed.IsSuccess && completed.SourceLastWriteTimeUtc is { } sourceLastWriteTimeUtc)
@@ -897,7 +897,7 @@ internal sealed class CurlCommandRunner(
     /// </summary>
     /// <param name="follower">Performs the transfer with the handler for its scheme, following redirects under <c>-L</c>.</param>
     /// <param name="options">The accepted command line.</param>
-    /// <param name="uri">The URL.</param>
+    /// <param name="url">The URL.</param>
     /// <param name="outputFile">The file: the <c>-o</c> value, after <see cref="WindowsOutputFileNameSanitizer" /> on Windows.</param>
     /// <param name="range">The parsed <c>-r</c> range, or <see langword="null" />.</param>
     /// <param name="resumeFrom">The resolved <c>-C</c> offset, or <see langword="null" />.</param>
@@ -907,7 +907,7 @@ internal sealed class CurlCommandRunner(
     private async Task<TransferResult> TransferIntoOutputFileAsync(
         RedirectFollower follower,
         CommandLineOptions options,
-        Uri uri,
+        CurlUrl url,
         string outputFile,
         ByteRange? range,
         long? resumeFrom,
@@ -924,7 +924,7 @@ internal sealed class CurlCommandRunner(
                 return await ReportCannotOpenForResumeAsync(options, outputFile).ConfigureAwait(false);
             }
 
-            TransferContext context = transferContextFactory.Create(options, uri, output, range, resumeFrom, headerOutput, formBody);
+            TransferContext context = transferContextFactory.Create(options, url, output, range, resumeFrom, headerOutput, formBody);
             TransferResult fileResult = await follower
                 .FollowAsync(context, RedirectPolicyMapping.FromCommandLine(options))
                 .ConfigureAwait(false);

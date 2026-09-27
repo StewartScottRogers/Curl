@@ -198,7 +198,7 @@ public sealed partial class HttpProtocolHandlerTests
     private static TransferContext ExpectContext(HttpRequestOptions options, Stream output, Stream? headerOutput) =>
         new()
         {
-            Url = new Uri(ExpectUrl),
+            Url = CurlUrl.Parse(ExpectUrl),
             Output = output,
             HeaderOutput = headerOutput,
             Http = options,

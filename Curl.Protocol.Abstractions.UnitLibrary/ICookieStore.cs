@@ -13,9 +13,9 @@ namespace Curl.Protocol.Abstractions;
 public interface ICookieStore
 {
     /// <summary>
-    /// Returns the value of the <c>Cookie</c> header to send to <paramref name="uri" />.
+    /// Returns the value of the <c>Cookie</c> header to send to <paramref name="url" />.
     /// </summary>
-    /// <param name="uri">The URL the request is sent to.</param>
+    /// <param name="url">The URL the request is sent to.</param>
     /// <param name="secure">
     /// <see langword="true" /> when the request travels over TLS, so the store can
     /// withhold <c>Secure</c> cookies otherwise.
@@ -25,17 +25,17 @@ public interface ICookieStore
     /// The header value without the header name, or <see langword="null" /> when no stored
     /// cookie matches.
     /// </returns>
-    string? GetCookieHeader(Uri uri, bool secure, DateTimeOffset now);
+    string? GetCookieHeader(CurlUrl url, bool secure, DateTimeOffset now);
 
     /// <summary>
-    /// Stores the cookies from a response to a request for <paramref name="uri" />.
+    /// Stores the cookies from a response to a request for <paramref name="url" />.
     /// </summary>
-    /// <param name="uri">The URL of the request the response answered.</param>
+    /// <param name="url">The URL of the request the response answered.</param>
     /// <param name="setCookieHeaders">
     /// The value of each <c>Set-Cookie</c> header, verbatim and in the order received.
     /// </param>
     /// <param name="now">
     /// The receive time that relative expiry (<c>Max-Age</c>) counts from.
     /// </param>
-    void StoreFromResponse(Uri uri, IReadOnlyList<string> setCookieHeaders, DateTimeOffset now);
+    void StoreFromResponse(CurlUrl url, IReadOnlyList<string> setCookieHeaders, DateTimeOffset now);
 }

@@ -38,7 +38,7 @@ public interface IFileSystem
     /// </summary>
     /// <param name="path">
     /// An operating-system path, already percent-decoded. URL knowledge stays in the
-    /// protocol handler; this interface never sees a <see cref="Uri" />.
+    /// protocol handler; this interface never sees a <see cref="CurlUrl" />.
     /// </param>
     /// <param name="cancellationToken">Cancels the open.</param>
     /// <returns>
@@ -55,7 +55,7 @@ public interface IFileSystem
     /// </summary>
     /// <param name="path">
     /// An operating-system path, already percent-decoded. URL knowledge stays in the
-    /// protocol handler; this interface never sees a <see cref="Uri" />.
+    /// protocol handler; this interface never sees a <see cref="CurlUrl" />.
     /// </param>
     /// <param name="mode">Whether existing content is discarded or appended to.</param>
     /// <param name="createMode">

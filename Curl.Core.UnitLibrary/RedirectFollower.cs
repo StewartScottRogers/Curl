@@ -86,7 +86,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher)
                 return chain.Merge(result);
             }
 
-            if (Refusal(target, chain.RedirectCount, policy, out Uri? next) is { } refusal)
+            if (Refusal(target, context.PathAsIs, chain.RedirectCount, policy, out CurlUrl? next) is { } refusal)
             {
                 return chain.Merge(TransferResult.Failure(refusal.ExitCode, refusal.Message, result.BytesTransferred));
             }
@@ -106,9 +106,10 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher)
 
     private static (CurlExitCode ExitCode, string Message)? Refusal(
         string target,
+        bool pathAsIs,
         int followed,
         RedirectPolicy policy,
-        out Uri? next)
+        out CurlUrl? next)
     {
         next = null;
         if (policy.MaxRedirects >= 0 && followed >= policy.MaxRedirects)
@@ -116,7 +117,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher)
             return (CurlExitCode.TooManyRedirects, $"Maximum ({policy.MaxRedirects}) redirects followed");
         }
 
-        if (!Uri.TryCreate(target, UriKind.Absolute, out next))
+        if (!CurlUrl.TryParse(target, pathAsIs, out next))
         {
             return (CurlExitCode.UrlMalformat, $"The redirect target URL could not be parsed: {UnparsableUrlReason(target)}");
         }
@@ -181,7 +182,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher)
         }
     }
 
-    private static bool IsSameOrigin(Uri first, Uri next) =>
+    private static bool IsSameOrigin(CurlUrl first, CurlUrl next) =>
         string.Equals(first.Scheme, next.Scheme, StringComparison.Ordinal)
         && string.Equals(first.Host, next.Host, StringComparison.OrdinalIgnoreCase)
         && first.Port == next.Port;
@@ -204,7 +205,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher)
 
     private static TransferContext NextHop(
         ITransferContext first,
-        Uri url,
+        CurlUrl url,
         HttpRequestOptions http,
         bool bodyDropped,
         bool sendCredentials) =>

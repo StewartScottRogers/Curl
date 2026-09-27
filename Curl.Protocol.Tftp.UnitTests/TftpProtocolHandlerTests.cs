@@ -221,7 +221,7 @@ public sealed class TftpProtocolHandlerTests
     }
 
     private static TransferContext Context(string url, Stream? output = null) =>
-        new() { Url = new Uri(url), Output = output ?? new MemoryStream() };
+        new() { Url = CurlUrl.Parse(url), Output = output ?? new MemoryStream() };
 
     private static ScriptedDatagramChannel Channel(params (byte[] Datagram, EndPoint Source)[] script) =>
         new(ServerEndPoint, script);

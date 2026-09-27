@@ -90,7 +90,7 @@ public sealed class GopherProtocolHandler : IProtocolHandler
         }
     }
 
-    private static ConnectTarget CreateTarget(Uri url) =>
+    private static ConnectTarget CreateTarget(CurlUrl url) =>
         new(url.IdnHost, url.IsDefaultPort ? DefaultPort : url.Port, url.Scheme == "gophers");
 
     private static async ValueTask<bool> TrySendAsync(

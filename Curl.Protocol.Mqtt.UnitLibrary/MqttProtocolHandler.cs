@@ -136,7 +136,7 @@ public sealed class MqttProtocolHandler : IProtocolHandler
         }
     }
 
-    private static ConnectTarget CreateTarget(Uri url)
+    private static ConnectTarget CreateTarget(CurlUrl url)
     {
         bool useTls = url.Scheme == "mqtts";
         int defaultPort = useTls ? MqttsDefaultPort : MqttDefaultPort;

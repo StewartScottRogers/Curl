@@ -55,7 +55,7 @@ public sealed class FileProtocolHandlerTests
     /// </summary>
     private const string DestinationWriteFailedMessage = "Failed sending data to the peer";
 
-    private static Uri FileUrl => new("file:///C:/dir/my%20file.txt");
+    private static CurlUrl FileUrl => CurlUrl.Parse("file:///C:/dir/my%20file.txt");
 
     private static string OsPath => NativePath("C:/dir/my file.txt");
 
@@ -215,7 +215,7 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         var context = new TransferContext
         {
-            Url = new Uri("file:///C:/dir/../nosuch.txt"),
+            Url = CurlUrl.Parse("file:///C:/dir/../nosuch.txt"),
             Output = new ChunkRecordingStream(),
         };
         var handler = new FileProtocolHandler(fileSystem);
@@ -235,7 +235,7 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         var context = new TransferContext
         {
-            Url = new Uri("file:///C:/dir/../nosuch.txt"),
+            Url = CurlUrl.Parse("file:///C:/dir/../nosuch.txt"),
             Output = new ChunkRecordingStream(),
             PathAsIs = true,
         };
@@ -278,10 +278,10 @@ public sealed class FileProtocolHandlerTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_RejectedHost_ReportsUrlMalformat()
+    public async Task ExecuteAsync_NotAFileUrl_ReportsUrlMalformat()
     {
         var fileSystem = new FakeFileSystem();
-        var context = new TransferContext { Output = new ChunkRecordingStream(), Url = new Uri("file://example.com/x") };
+        var context = new TransferContext { Output = new ChunkRecordingStream(), Url = CurlUrl.Parse("http://example.com/x") };
         var handler = new FileProtocolHandler(fileSystem);
 
         var result = await handler.ExecuteAsync(context);
@@ -290,13 +290,14 @@ public sealed class FileProtocolHandlerTests
         Assert.AreEqual("URL rejected: Bad file:// URL", result.ErrorMessage);
     }
 
-    // A host curl will not accept has to be refused before any open: an unsupported URL
-    // must not turn into a file system access.
+    // A URL this handler cannot read has to be refused before any open: it must not turn
+    // into a file system access. CurlUrl already refuses a host curl will not accept, so a
+    // URL of another scheme stands in for one.
     [TestMethod]
-    public async Task ExecuteAsync_RejectedHost_NeverTouchesTheFileSystem()
+    public async Task ExecuteAsync_NotAFileUrl_NeverTouchesTheFileSystem()
     {
         var fileSystem = new FakeFileSystem();
-        var context = new TransferContext { Output = new ChunkRecordingStream(), Url = new Uri("file://example.com/x") };
+        var context = new TransferContext { Output = new ChunkRecordingStream(), Url = CurlUrl.Parse("http://example.com/x") };
         var handler = new FileProtocolHandler(fileSystem);
 
         await handler.ExecuteAsync(context);
@@ -2530,9 +2531,7 @@ public sealed class FileProtocolHandlerTests
 
     // A drive-letter authority is path text, so this reaches the open and fails there with
     // exit 37 rather than being rejected as a host with exit 3. Two caveats. The bare
-    // file://C: the measured rule implies cannot be written as a test at all: new Uri throws
-    // UriFormatException ("A Dos path must be rooted") before the parser is reached, exactly
-    // as it does for file://ab:/x, so file://C:/ is the nearest expressible form. And the
+    // file://C: the measured rule implies is BL-295's, so file://C:/ stands in for it. And the
     // exit 37 itself is inference from the drive-letter rule rather than an observation -
     // this URL was never run against curl 8.21.0.
     [TestMethod]
@@ -2541,7 +2540,7 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         var context = new TransferContext
         {
-            Url = new Uri("file://C:/"),
+            Url = CurlUrl.Parse("file://C:/"),
             Output = new ChunkRecordingStream(),
         };
         var handler = new FileProtocolHandler(fileSystem);

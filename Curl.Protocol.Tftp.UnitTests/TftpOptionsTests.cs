@@ -111,7 +111,7 @@ public sealed class TftpOptionsTests
 
         var result = await Handler(channel).ExecuteAsync(new TransferContext
         {
-            Url = new Uri("tftp://h/dest.txt"),
+            Url = CurlUrl.Parse("tftp://h/dest.txt"),
             Output = new MemoryStream(),
             Upload = new MemoryStream("abc"u8.ToArray()),
             TftpNoOptions = true,
@@ -130,7 +130,7 @@ public sealed class TftpOptionsTests
 
         await Handler(channel).ExecuteAsync(new TransferContext
         {
-            Url = new Uri("tftp://h/dest.txt"),
+            Url = CurlUrl.Parse("tftp://h/dest.txt"),
             Output = new MemoryStream(),
             Upload = new MemoryStream("abc"u8.ToArray()),
             TftpBlockSize = 70000,
@@ -147,7 +147,7 @@ public sealed class TftpOptionsTests
     private static TransferContext Context(Stream? output = null, int? tftpBlockSize = null, bool noOptions = false) =>
         new()
         {
-            Url = new Uri("tftp://h/file.txt"),
+            Url = CurlUrl.Parse("tftp://h/file.txt"),
             Output = output ?? new MemoryStream(),
             TftpBlockSize = tftpBlockSize,
             TftpNoOptions = noOptions,

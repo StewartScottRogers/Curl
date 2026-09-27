@@ -31,7 +31,7 @@ public sealed partial class HttpProtocolHandlerTests
             MemoryStream output = new();
             TransferContext context = new()
             {
-                Url = new Uri("http://127.0.0.1:18174/"),
+                Url = CurlUrl.Parse("http://127.0.0.1:18174/"),
                 Output = output,
                 TimeProvider = time,
                 MaxTime = TimeSpan.FromSeconds(1),
@@ -59,7 +59,7 @@ public sealed partial class HttpProtocolHandlerTests
         MemoryStream output = new();
         TransferContext context = new()
         {
-            Url = new Uri("http://127.0.0.1:18174/"),
+            Url = CurlUrl.Parse("http://127.0.0.1:18174/"),
             Output = output,
             TimeProvider = time,
             MaxTime = TimeSpan.FromMilliseconds(2500),
@@ -85,7 +85,7 @@ public sealed partial class HttpProtocolHandlerTests
         using CancellationTokenSource cancellation = new();
         TransferContext context = new()
         {
-            Url = new Uri("http://127.0.0.1:18174/"),
+            Url = CurlUrl.Parse("http://127.0.0.1:18174/"),
             Output = new MemoryStream(),
             TimeProvider = time,
             MaxTime = TimeSpan.Zero,
@@ -109,7 +109,7 @@ public sealed partial class HttpProtocolHandlerTests
         using CancellationTokenSource cancellation = new();
         TransferContext context = new()
         {
-            Url = new Uri("http://127.0.0.1:18174/"),
+            Url = CurlUrl.Parse("http://127.0.0.1:18174/"),
             Output = new MemoryStream(),
             TimeProvider = time,
             MaxTime = TimeSpan.FromSeconds(1),
@@ -137,7 +137,7 @@ public sealed partial class HttpProtocolHandlerTests
         StalledConnector connector = new();
         TransferContext context = new()
         {
-            Url = new Uri("http://10.255.255.1/"),
+            Url = CurlUrl.Parse("http://10.255.255.1/"),
             Output = new MemoryStream(),
             TimeProvider = time,
             ConnectTimeout = connectTimeout is { } connect ? TimeSpan.FromMilliseconds(connect) : null,
@@ -162,7 +162,7 @@ public sealed partial class HttpProtocolHandlerTests
         using CancellationTokenSource cancellation = new();
         TransferContext context = new()
         {
-            Url = new Uri("http://10.255.255.1/"),
+            Url = CurlUrl.Parse("http://10.255.255.1/"),
             Output = new MemoryStream(),
             TimeProvider = new FakeTimeProvider(DateTimeOffset.UnixEpoch),
             CancellationToken = cancellation.Token,

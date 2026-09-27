@@ -81,5 +81,5 @@ public sealed class RankedHttpAuthenticatorTests
     }
 
     private static HttpAuthRequest Request(HttpAuthSchemes allowed) =>
-        new("GET", new Uri("http://127.0.0.1:18218/a"), "/a", new NetworkCredential("u", "p"), null, allowed, IsProxy: false);
+        new("GET", CurlUrl.Parse("http://127.0.0.1:18218/a"), "/a", new NetworkCredential("u", "p"), null, allowed, IsProxy: false);
 }
