@@ -219,10 +219,34 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
             return headerFailure;
         }
 
-        return context.NoBody
+        TransferResult result = context.NoBody
             ? TransferResult.Success(0)
             : await DownloadBodyAsync(context, source, opened.Length).ConfigureAwait(false);
+
+        return WithPseudoHeaders(result, opened);
     }
+
+    /// <summary>
+    /// Reports the pseudo-headers the transfer produced, so <c>%{num_headers}</c> counts
+    /// them. curl 8.21.0 counts them once they were produced, whether or not <c>-D</c>
+    /// wrote them anywhere and whatever the body did after, as measured in BL-285.
+    /// </summary>
+    /// <param name="result">The outcome of the body stage.</param>
+    /// <param name="opened">The metadata the pseudo-headers were built from.</param>
+    /// <returns>
+    /// <paramref name="result" /> with a report of the pseudo-headers and, because a report
+    /// replaces <see cref="TransferResult.BytesTransferred" /> as the source of
+    /// <c>%{size_download}</c>, its byte count.
+    /// </returns>
+    private static TransferResult WithPseudoHeaders(TransferResult result, FileOpenResult opened) =>
+        result with
+        {
+            Report = new TransferReport
+            {
+                PseudoHeaders = FileTransferMessages.PseudoHeaders(opened.Length, opened.LastWriteTimeUtc),
+                DownloadSize = result.BytesTransferred,
+            },
+        };
 
     /// <summary>
     /// Applies <c>-C</c>/<c>--continue-at</c> or <c>-r</c>/<c>--range</c> to the opened

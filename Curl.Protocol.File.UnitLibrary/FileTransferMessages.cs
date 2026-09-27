@@ -209,19 +209,36 @@ internal static class FileTransferMessages
     /// measurement.
     /// </para>
     /// </remarks>
-    internal static string[] PseudoHeaderLines(long length, DateTimeOffset? lastWriteTimeUtc)
+    internal static string[] PseudoHeaderLines(long length, DateTimeOffset? lastWriteTimeUtc) =>
+        [
+            .. PseudoHeaders(length, lastWriteTimeUtc).Select(header => header.Key + ": " + header.Value + "\r\n"),
+            EndOfHeaders,
+        ];
+
+    /// <summary>
+    /// The pseudo-headers of <see cref="PseudoHeaderLines" /> as name and value pairs,
+    /// without line endings or the blank line, in the order they are written: what the
+    /// handler reports as <see cref="Abstractions.TransferReport.PseudoHeaders" />.
+    /// </summary>
+    /// <param name="length">The length of the whole file.</param>
+    /// <param name="lastWriteTimeUtc">
+    /// The file's last-write timestamp, or <see langword="null" /> when the file system
+    /// could not determine one, which leaves <c>Last-Modified</c> out.
+    /// </param>
+    /// <returns>Two or three headers.</returns>
+    internal static KeyValuePair<string, string>[] PseudoHeaders(long length, DateTimeOffset? lastWriteTimeUtc)
     {
-        string contentLength = "Content-Length: " + length.ToString(CultureInfo.InvariantCulture) + "\r\n";
+        KeyValuePair<string, string> contentLength = new("Content-Length", length.ToString(CultureInfo.InvariantCulture));
 
         return lastWriteTimeUtc is { } knownLastWriteTimeUtc
-            ? [contentLength, AcceptRangesLine, LastModifiedLine(knownLastWriteTimeUtc), EndOfHeaders]
-            : [contentLength, AcceptRangesLine, EndOfHeaders];
+            ? [contentLength, AcceptRanges, LastModified(knownLastWriteTimeUtc)]
+            : [contentLength, AcceptRanges];
     }
 
     /// <summary>
-    /// The <c>Accept-ranges</c> pseudo-header line.
+    /// The <c>Accept-ranges</c> pseudo-header.
     /// </summary>
-    private const string AcceptRangesLine = "Accept-ranges: bytes\r\n";
+    private static readonly KeyValuePair<string, string> AcceptRanges = new("Accept-ranges", "bytes");
 
     /// <summary>
     /// The blank line that ends a header block.
@@ -229,10 +246,10 @@ internal static class FileTransferMessages
     private const string EndOfHeaders = "\r\n";
 
     /// <summary>
-    /// The <c>Last-Modified</c> pseudo-header line.
+    /// The <c>Last-Modified</c> pseudo-header.
     /// </summary>
     /// <param name="lastWriteTimeUtc">The file's last-write timestamp.</param>
-    /// <returns>The line with its line ending.</returns>
-    private static string LastModifiedLine(DateTimeOffset lastWriteTimeUtc) =>
-        "Last-Modified: " + lastWriteTimeUtc.UtcDateTime.ToString("R", CultureInfo.InvariantCulture) + "\r\n";
+    /// <returns>The header, its value in RFC 1123 form.</returns>
+    private static KeyValuePair<string, string> LastModified(DateTimeOffset lastWriteTimeUtc) =>
+        new("Last-Modified", lastWriteTimeUtc.UtcDateTime.ToString("R", CultureInfo.InvariantCulture));
 }
