@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-- Filed by BL-238 (2026-09-27). `Curl.Console/TransferProxySelection.cs` ends an `http`/`https` transfer with exit 4 `Unsupported proxy '<host>:<port>', Curl cannot tunnel through a <kind> proxy yet` when the route needs a SOCKS tunnel or an HTTPS-proxy tunnel, because `TcpConnector` throws `NotSupportedException` for those kinds (ADR-0051).
+- Filed by BL-238 (2026-09-27). `Curl.Console/TransferProxySelection.cs` ends an `http`/`https` transfer with exit 4 `Unsupported proxy '<host>:<port>', Curl cannot tunnel through a <kind> proxy yet` when the route needs a SOCKS tunnel or an HTTPS-proxy tunnel, because `TcpConnector` throws `NotSupportedException` for those kinds (ADR-0053).
 - Once BL-213 (SOCKS) and BL-266 (HTTPS proxy) land in `Curl.Networking`, remove `TunnelNotBuiltYetFailure` and its tests in `CurlCompositionProxyTests`.
 - Where a criterion says *measured*, run curl 8.21.0 - the mingw build `/mingw64/bin/curl`, first on PATH (ADR-0009) - against a loopback server (`Record-CurlExchange.ps1`), record the exact command and the bytes in `Notes`, then pin them in a test. Never pin text that was not measured.
 
