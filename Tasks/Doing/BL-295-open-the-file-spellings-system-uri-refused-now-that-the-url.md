@@ -41,3 +41,4 @@ curl 8.21.0: `file://C:`, `file:///C:` and `file:///Q:dir/../x` exit 37 quoting 
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-27: Backlog -> Doing.
