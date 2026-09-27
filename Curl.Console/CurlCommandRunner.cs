@@ -400,6 +400,12 @@ internal sealed class CurlCommandRunner(
     private bool progressMeterHeaderWritten;
 
     /// <summary>
+    /// Where this run's <c>-v</c>, <c>--trace</c> and <c>--trace-ascii</c> output goes, opened once the
+    /// first command-line URL has parsed as a glob and closed after the last transfer.
+    /// </summary>
+    private TransferEventOutput transferEventOutput = TransferEventOutput.None;
+
+    /// <summary>
     /// Runs <paramref name="arguments" /> to completion.
     /// </summary>
     /// <param name="arguments">The command-line arguments, without the program name.</param>
@@ -502,6 +508,27 @@ internal sealed class CurlCommandRunner(
             await cookies.LoadCookieFilesAsync(fileSystem, timeProvider.GetUtcNow()).ConfigureAwait(false);
         }
 
+        try
+        {
+            return await TransferEachUrlAsync(dispatch, options).ConfigureAwait(false);
+        }
+        finally
+        {
+            await transferEventOutput.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Transfers every URL in order, for <see cref="TransferAllAsync" />, opening the run's
+    /// <see cref="transferEventOutput" /> once the first URL has parsed as a glob: curl 8.21.0
+    /// opens its trace file at the first event, and a URL that is not a well-formed glob makes
+    /// none (measured 2026-09-27, BL-242 Notes).
+    /// </summary>
+    /// <param name="dispatch">What the run transfers through.</param>
+    /// <param name="options">The accepted command line.</param>
+    /// <returns>The exit code <see cref="TransferAllAsync" /> returns.</returns>
+    private async Task<CurlExitCode> TransferEachUrlAsync(TransferDispatch dispatch, CommandLineOptions options)
+    {
         CurlExitCode exitCode = CurlExitCode.Ok;
         for (int index = 0; index < options.Urls.Count; index++)
         {
@@ -509,6 +536,13 @@ internal sealed class CurlCommandRunner(
             {
                 await WriteGlobFailureLinesAsync(options, globFailure).ConfigureAwait(false);
                 return globFailure.ExitCode;
+            }
+
+            if (index == 0)
+            {
+                transferEventOutput = await TransferEventOutput
+                    .OpenAsync(options, fileSystem, deferringStandardOutput, standardError, runsOnWindows, standardOutputIsTerminal, timeProvider)
+                    .ConfigureAwait(false);
             }
 
             foreach (UrlGlobMatch match in glob.Expand())
@@ -1382,7 +1416,8 @@ internal sealed class CurlCommandRunner(
                         formBody,
                         upload,
                         proxy,
-                        progress: transferProgress))
+                        progress: transferProgress,
+                        events: transferEventOutput.Events))
                 .ConfigureAwait(false);
 
             return await WriteProgressAsync(options, standardOutputResult, options.ResumeFrom, toStandardOutput: true)
@@ -1819,7 +1854,8 @@ internal sealed class CurlCommandRunner(
                         upload,
                         proxy,
                         watchHeaderOutput,
-                        transferProgress),
+                        transferProgress,
+                        transferEventOutput.Events),
                     resumeFrom,
                     output)
                 .ConfigureAwait(false);

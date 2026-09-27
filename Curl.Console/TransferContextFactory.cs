@@ -50,6 +50,10 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// Where the handler reports how far the transfer got, or <see langword="null" /> for
     /// <see cref="NoTransferProgress.Instance" />.
     /// </param>
+    /// <param name="events">
+    /// Where the handler and its connector report transfer events for <c>-v</c> and <c>--trace</c>, or
+    /// <see langword="null" /> for <see cref="NoTransferEvents.Instance" />.
+    /// </param>
     /// <returns>
     /// The context. Its <see cref="TransferContext.NoBody" /> is <c>-I</c>, and its
     /// <see cref="TransferContext.HeaderOutput" /> is <see cref="HeaderOutputOf" />'s, wrapped by
@@ -66,7 +70,8 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
         Stream? upload = null,
         ProxyEndpoint? proxy = null,
         Func<Stream?, Stream>? watchHeaderOutput = null,
-        ITransferProgress? progress = null) =>
+        ITransferProgress? progress = null,
+        ITransferEvents? events = null) =>
         new()
         {
             Url = url,
@@ -92,8 +97,16 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             Proxy = proxy,
             Http = HttpRequestOptionsMapping.FromCommandLine(options, formBody, proxy),
             Progress = progress ?? NoTransferProgress.Instance,
+            Events = EventsOrNone(events),
             TimeProvider = timeProvider ?? TimeProvider.System,
         };
+
+    /// <summary>
+    /// Gets <paramref name="events" />, or <see cref="NoTransferEvents.Instance" /> when it is <see langword="null" />.
+    /// </summary>
+    /// <param name="events">The sink given to <see cref="Create" />.</param>
+    /// <returns>The sink the context carries.</returns>
+    private static ITransferEvents EventsOrNone(ITransferEvents? events) => events ?? NoTransferEvents.Instance;
 
     /// <summary>
     /// Chooses where a transfer's header lines go. <c>-i</c> and <c>-I</c> send them to the

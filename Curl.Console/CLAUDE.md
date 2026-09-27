@@ -138,6 +138,16 @@ Under `-R`/`--remote-time` a successful transfer to an `-o` file whose result ca
 (`PhysicalFileSystem` in production), even when no body was written, as curl does. A
 failed stamp is ignored for now; curl's warning lines for it are BL-139.
 
+Under `-v`, `--trace` or `--trace-ascii` every transfer's context carries the run's
+`ITransferEvents`, which `TransferEventOutput` opens once the first command-line URL has parsed
+as a glob and closes after the last transfer (ADR-0046): `-v` is `Curl.Output`'s
+`VerboseTransferEventWriter` on standard error, with no `[N bytes data]` lines when standard
+output is a terminal; a trace is its `TraceTransferEventWriter`, stamped under `--trace-time`, into
+the named file (opened once per run, truncated), standard output for `-`, standard error for `%`,
+and standard error, with no warning, for a file that cannot be opened. On Windows each is text
+mode, CR LF. Measured on curl 8.21.0 (BL-242 Notes). The lines are only as complete as what the
+handler and connector report; `--stderr` is not wired yet (BL-242 Notes name the follow-ups).
+
 After each successful transfer, after one `-f` failed with exit 22, and after one that failed
 once its handler reported it past connect or open (BL-130), standard error gets curl's progress
 meter: `** Resuming transfer from byte position N` when it resumed past byte zero, the two
