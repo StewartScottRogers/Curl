@@ -89,3 +89,4 @@ goes back to Backlog until BL-284 finishes.
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
 - 2026-09-26: Doing -> Backlog. Needs Curl.Output.UnitLibrary (and Curl.Protocol.Abstractions.UnitLibrary) for a PseudoHeaders report member; Curl.Output.UnitLibrary is held by BL-284 in Doing
+- 2026-09-27: Backlog -> Doing.
