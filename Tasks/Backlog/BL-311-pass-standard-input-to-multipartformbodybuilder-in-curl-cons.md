@@ -1,5 +1,5 @@
 ---
-id: BL-302
+id: BL-311
 title: Pass standard input to MultipartFormBodyBuilder in Curl.Console for -F @- and <- parts
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-302 — Pass standard input to MultipartFormBodyBuilder in Curl.Console for -F @- and <- parts
+# BL-311 — Pass standard input to MultipartFormBodyBuilder in Curl.Console for -F @- and <- parts
 
 ## Goal
 
