@@ -8,7 +8,7 @@ depends-on: [BL-050, BL-121]
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-27
 ---
 # BL-111 — Print curl's 'Failed writing headers to <file>' line when -D output fails
 
@@ -44,11 +44,11 @@ With `-v` the first line is followed by `* client returned ERROR on write of 20 
 ## Acceptance criteria
 
 - [x] The curl 8.21.0 stderr for a `-D <named file>` whose header write fails is measured and recorded verbatim in this task's Notes, with the command used.
-- [ ] A test in `Curl.Console.UnitTests` drives `-sS -D - -o body.txt` over a transfer whose header write to standard output fails with the file handler's `client returned ERROR on write of 20 bytes` (exit `CurlExitCode.WriteError`, 23), and asserts stderr is exactly `curl: Failed writing headers to -` followed by `curl: (23) client returned ERROR on write of 20 bytes`, and nothing else.
-- [ ] A test in `Curl.Console.UnitTests` covers the named-file case and asserts the stderr wording recorded in Notes.
-- [ ] A test asserts that with `-s` alone neither line is printed and the exit code is still 23.
-- [ ] The existing `-i` to closed stdout behaviour (`curl: Failed writing body` only) still passes unchanged.
-- [ ] `dotnet build Curl.Console -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
+- [x] A test in `Curl.Console.UnitTests` drives `-sS -D - -o body.txt` over a transfer whose header write to standard output fails with the file handler's `client returned ERROR on write of 20 bytes` (exit `CurlExitCode.WriteError`, 23), and asserts stderr is exactly `curl: Failed writing headers to -` followed by `curl: (23) client returned ERROR on write of 20 bytes`, and nothing else.
+- [x] A test in `Curl.Console.UnitTests` covers the named-file case and asserts the stderr wording recorded in Notes.
+- [x] A test asserts that with `-s` alone neither line is printed and the exit code is still 23.
+- [x] The existing `-i` to closed stdout behaviour (`curl: Failed writing body` only) still passes unchanged.
+- [x] `dotnet build Curl.Console -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
 
 ## Notes
 
@@ -67,6 +67,10 @@ With `-v` the first line is followed by `* client returned ERROR on write of 20 
 
   So the named-file wording is the same as for `-`: the `-D` argument as given. A `-D` file that cannot be opened at all (read-only `ro.txt`, or `\.\CONIN$`) is a different path: `curl: Failed to open ro.txt` then `curl: (23) Failed writing received data to disk/application`, exit 23 (recorded in BL-121).
 - 2026-09-26, lane 1: blocked before any code. `Curl.Cli.UnitLibrary` does not parse `-D`/`--dump-header` at all (no entry in `CommandLineOptionTable.cs`), and `Curl.Console` never sets `TransferContext.HeaderOutput`, so there is no header write to fail. Parsing is outside this task's `touches`; filed BL-120 (parse `-D` in Curl.Cli) and BL-121 (wire `-D` output in Curl.Console, depends on BL-120), and this task now depends on BL-121.
+- 2026-09-27, lane 2: implemented. `-D` output now goes through the new `Curl.Console/DumpHeaderOutputStream`, which writes each header and flushes it at once, as curl's header callback (`tool_cb_hdr.c`) fflushes after every header and prints `Failed writing headers to <headerfile>` when that fails. A failed write or flush sets `HasWriteFailed` and rethrows the `IOException`, which the handler turns into its own `client returned ERROR on write of N bytes`. `CurlCommandRunner.TransferReportingHeaderWriteFailureAsync` prints `curl: Failed writing headers to <-D value as given>` after the transfer when that flag is set and `ShowsErrors`, so it comes before the `curl: (23)` line.
+- Choice (sensible default): `-D -` now writes the headers straight to the raw standard output, not through `StandardOutputFailureDeferringStream`. That stream models curl's buffered body writes, whose failures surface late; curl flushes each header immediately, so a header failure surfaces at once. Body ordering is unchanged because the deferring stream passes writes straight through.
+- Known difference, filed as BL-388: the line is printed after the transfer returns, not at the moment of failure, so under `-v` a verbose line the handler writes after the failure would come before it. Without `-v` the stderr bytes match curl exactly.
+- Tests: `CurlCommandRunnerDumpHeaderTests` (`-sS -D -` failing write, `-sS -D CONIN$` failing file write, failing flush, `-s` alone) and `DumpHeaderOutputStreamTests`. The `-i` closed-stdout tests in `CurlCommandRunnerStandardOutputFailureTests`/`ClosedStandardOutputStreamTests` pass unchanged. Console.UnitTests 739 passed; full fast suite green.
 
 ## Log
 
@@ -78,3 +82,4 @@ With `-v` the first line is followed by `* client returned ERROR on write of 20 
 - 2026-09-26: Doing -> Blocked. Waits on BL-121 (wire -D output in Curl.Console), which waits on BL-120 (parse -D in Curl.Cli, outside this task's touches); re-plan after those land
 - 2026-09-26: Blocked -> Backlog. Unblocked: BL-120 and BL-121 now Done
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Done. -D output failures print curl's 'Failed writing headers to <file>' line before the (23) line, muted by -s alone
