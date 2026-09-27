@@ -24,6 +24,17 @@ public sealed class SwsHttpServerConnectorTests
     }
 
     [TestMethod]
+    [DataRow("data crlf=\"headers\"", "HTTP/1.1 200 OK\r\nA: b\r\n\r\nbody\n")]
+    [DataRow("data crlf=\"yes\"", "HTTP/1.1 200 OK\r\nA: b\r\n\r\nbody\r\n")]
+    [DataRow("data crlf=\"yes\" nonewline=\"yes\"", "HTTP/1.1 200 OK\r\nA: b\r\n\r\nbody\r")]
+    public async Task Get_ReceivesDataWithTheLineEndingsPreproForces(string openingTag, string expected)
+    {
+        IConnection connection = await ConnectAsync(new SwsHttpServerConnector(Case(Reply(openingTag, "HTTP/1.1 200 OK\nA: b\n\nbody\n"))));
+
+        Assert.AreEqual(expected, await ExchangeAsync(connection, Get));
+    }
+
+    [TestMethod]
     [DataRow("/12340002", "second\n")]
     [DataRow("/want/12340002?query=1", "second\n")]
     [DataRow("/12340000", "first\n")]

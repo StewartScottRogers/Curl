@@ -41,7 +41,7 @@ public static class UpstreamTestFileExpander
         List<string> unsupportedInstructions = [];
         StringBuilder output = new();
         int lineNumber = 0;
-        foreach (string line in SplitLines(Encoding.Latin1.GetString(file)))
+        foreach (string line in UpstreamTestLines.SplitAfterLineFeeds(Encoding.Latin1.GetString(file)))
         {
             lineNumber++;
             UpstreamTestLineDisposition disposition = conditions.ReadLine(line, lineNumber);
@@ -63,17 +63,5 @@ public static class UpstreamTestFileExpander
             substitution.UnknownVariables,
             unsupportedInstructions,
             conditions.Error);
-    }
-
-    private static IEnumerable<string> SplitLines(string text)
-    {
-        int lineStart = 0;
-        while (lineStart < text.Length)
-        {
-            int lineFeed = text.IndexOf('\n', lineStart);
-            int lineEnd = lineFeed < 0 ? text.Length : lineFeed + 1;
-            yield return text[lineStart..lineEnd];
-            lineStart = lineEnd;
-        }
     }
 }

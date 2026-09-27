@@ -7,7 +7,8 @@ namespace Curl.Conformance;
 /// <c>curl-8_21_0</c> does (<c>sws_ProcessRequest</c> and <c>sws_send_doc</c>): the part
 /// number is the number in the request path's last segment modulo 10000 when that number
 /// is over 10000, and 0 otherwise; part 0 is <c>&lt;reply&gt;&lt;data&gt;</c> and part N is
-/// <c>&lt;dataN&gt;</c>. The part is read as sws's <c>getpart</c> reads it: base64-decoded when
+/// <c>&lt;dataN&gt;</c>. The part is read as sws's <c>getpart</c> reads it after <c>runtests.pl</c>'s
+/// <c>prepro</c> has forced the line endings its <c>crlf</c> attribute asks for: base64-decoded when
 /// it has a <c>base64</c> attribute, with its last byte cut when it has <c>nonewline</c>.
 /// </summary>
 /// <remarks>
@@ -56,7 +57,8 @@ internal sealed class SwsHttpReplySelector(UpstreamTestCase testCase, bool close
             return [];
         }
 
-        byte[] bytes = part.Attributes.ContainsKey("base64") ? DecodeBase64(part.Content.Span) : part.Content.ToArray();
+        byte[] served = UpstreamTestPartBodies.Served(part);
+        byte[] bytes = part.Attributes.ContainsKey("base64") ? DecodeBase64(served) : served;
         return part.Attributes.ContainsKey("nonewline") && bytes.Length > 0 ? bytes[..^1] : bytes;
     }
 
