@@ -59,3 +59,4 @@ Upstream: https://curl.se/docs/manpage.html (`-I`, `-d`, `-G`, `--json`), https:
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-27: Backlog -> Doing.
