@@ -34,3 +34,4 @@ completed:
 
 - 2026-09-27: Created.
 - 2026-09-27: Filed by BL-303 (replaces the BL-314 reference lost when another lane took that ID).
+- 2026-09-27: Backlog -> Doing.
