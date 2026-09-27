@@ -39,7 +39,7 @@ Content-Length: 20000
   - Times: microseconds printed `%lu.%06lu`. Speeds: whole bytes per second, `size*1000000/us` truncated (350170 = 20000/0.057115, curl's last progress update, just before `time_total`).
 - Decisions (ADR-0035, decided by Claude under Stewart's delegation): `TransferWriteOutVariables` takes a `TimeProvider` as its last constructor argument (nobody outside the tests constructs it yet; BL-235 wires it); times are truncated microseconds since `TransferTimings.Started`, at least 1 µs for an event that happened (`Curl_pgrsTime`); speeds divide by `time_total` with curl's `trspeed` overflow rules; no timings print `0.000000` and `0`.
 - Added `Documentation` to `touches` for ADR-0035 and its index row; no task in Doing names it.
-- Filed BL-286: curl takes a namelookup time for a literal address and pretransfer/starttransfer times after a refused connect; our handlers do not. That is where timestamps are taken, not formatting.
+- Filed BL-287: curl takes a namelookup time for a literal address and pretransfer/starttransfer times after a refused connect; our handlers do not. That is where timestamps are taken, not formatting.
 - Quality: `Measure-CodeQuality.ps1 -Library Curl.Output.UnitLibrary` reports 100% line, 100% branch, 69 members, 0 failing, worst CRAP 10.
 
 ## Log

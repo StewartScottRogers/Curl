@@ -1,5 +1,5 @@
 ---
-id: BL-286
+id: BL-287
 title: Take the -w timestamps curl takes on a literal address and a refused connect
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-286 — Take the -w timestamps curl takes on a literal address and a refused connect
+# BL-287 — Take the -w timestamps curl takes on a literal address and a refused connect
 
 ## Goal
 
