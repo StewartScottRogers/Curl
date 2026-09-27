@@ -26,11 +26,13 @@ namespace Curl.Core.Globbing;
 public sealed class UrlGlob
 {
     private readonly IReadOnlyList<UrlGlobPiece> pieces;
+    private readonly bool isGlobbing;
 
-    private UrlGlob(IReadOnlyList<UrlGlobPiece> pieces, long urlCount)
+    private UrlGlob(IReadOnlyList<UrlGlobPiece> pieces, long urlCount, bool isGlobbing)
     {
         this.pieces = pieces;
         UrlCount = urlCount;
+        this.isGlobbing = isGlobbing;
     }
 
     /// <summary>Gets how many URLs <see cref="Expand" /> produces; always at least one.</summary>
@@ -59,7 +61,7 @@ public sealed class UrlGlob
             return false;
         }
 
-        glob = new UrlGlob(parser.Pieces, parser.UrlCount);
+        glob = new UrlGlob(parser.Pieces, parser.UrlCount, isGlobbing: true);
         failure = null;
         return true;
     }
@@ -74,7 +76,7 @@ public sealed class UrlGlob
     public static UrlGlob Unglobbed(string url)
     {
         ArgumentNullException.ThrowIfNull(url);
-        return new UrlGlob([UrlGlobPiece.Fixed(url)], 1);
+        return new UrlGlob([UrlGlobPiece.Fixed(url)], 1, isGlobbing: false);
     }
 
     /// <summary>Produces every URL the glob stands for, rightmost glob fastest.</summary>
@@ -103,7 +105,7 @@ public sealed class UrlGlob
             }
         }
 
-        return new UrlGlobMatch(url.ToString(), globValues);
+        return new UrlGlobMatch(url.ToString(), globValues, isGlobbing);
     }
 
     private void Advance(long[] indexes)

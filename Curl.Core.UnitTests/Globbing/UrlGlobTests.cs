@@ -200,6 +200,56 @@ public sealed class UrlGlobTests
         Assert.ThrowsExactly<ArgumentNullException>(() => UrlGlob.Unglobbed(null!));
 
     [TestMethod]
+    [DataRow("file:///n/{a?b,c*d,e:f,g\"h,i<j,k>l,m|n,q/r}", "o_#1", "o_a_b|o_c_d|o_e:f|o_g_h|o_i_j|o_k_l|o_m_n|o_q/r")]
+    [DataRow("file:///n/{CON,a.,b%20,a%3Fb}", "o_#1", "o_CON|o_a.|o_b%20|o_a%3Fb")]
+    [DataRow("file:///n/{a,b}", "o?_#1", "o__a|o__b")]
+    [DataRow("file:///n/a", "o?x", "o_x")]
+    [DataRow("file:///n/a", "o\u0001\u001Fx", "o__x")]
+    [DataRow("file:///n/{a}", "o\t\u007Fx\u00E9 #1", "o_\u007Fx\u00E9 a")]
+    [DataRow("file:///n/a", "\\\\?\\C:\\tmp\\a?b", "\\\\?\\C:\\tmp\\a_b")]
+    [DataRow("file:///n/a", "\\\\srv\\a?b", "\\\\srv\\a_b")]
+    [DataRow("file:///n/a", "a\\\\b\\c", "a\\\\b\\c")]
+    public void ResolveOutputFileName_OnWindows_IsSanitizedAsCurlSanitizesIt(string url, string outputFileName, string expectedNames)
+    {
+        Assert.IsTrue(UrlGlob.TryParse(url, out UrlGlob? glob, out _));
+
+        CollectionAssert.AreEqual(
+            expectedNames.Split('|'),
+            glob.Expand().Select(match => match.ResolveOutputFileName(outputFileName, sanitizesForWindows: true)).ToArray());
+    }
+
+    [TestMethod]
+    public void ResolveOutputFileName_OnWindows_HasNoLengthLimit()
+    {
+        string name = new('a', 40000);
+        Assert.IsTrue(UrlGlob.TryParse("file:///n/a", out UrlGlob? glob, out _));
+
+        Assert.AreEqual(name, glob.Expand().Single().ResolveOutputFileName(name, sanitizesForWindows: true));
+    }
+
+    [TestMethod]
+    public void ResolveOutputFileName_OffWindows_IsOnlySubstituted()
+    {
+        Assert.IsTrue(UrlGlob.TryParse("file:///n/{a?b}", out UrlGlob? glob, out _));
+
+        Assert.AreEqual("o?_a?b", glob.Expand().Single().ResolveOutputFileName("o?_#1", sanitizesForWindows: false));
+    }
+
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public void ResolveOutputFileName_GlobOff_IsTheNameAsWritten(bool sanitizesForWindows)
+    {
+        UrlGlobMatch match = UrlGlob.Unglobbed("file:///n/[1-2]").Expand().Single();
+
+        Assert.AreEqual("o?x#1", match.ResolveOutputFileName("o?x#1", sanitizesForWindows));
+    }
+
+    [TestMethod]
+    public void ResolveOutputFileName_NullName_Throws() =>
+        Assert.ThrowsExactly<ArgumentNullException>(() => UrlGlob.Unglobbed("x").Expand().Single().ResolveOutputFileName(null!, sanitizesForWindows: true));
+
+    [TestMethod]
     public void SubstituteGlobValues_NullName_Throws() =>
         Assert.ThrowsExactly<ArgumentNullException>(() => UrlGlob.Unglobbed("x").Expand().Single().SubstituteGlobValues(null!));
 }
