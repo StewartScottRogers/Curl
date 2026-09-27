@@ -33,7 +33,7 @@ The handler asks `IHttpAuthenticator` for an Authorization value, sends Basic up
 ## Notes
 
 - Plan item: H13 in the Phase 1 HTTP plan (2026-09-26); plan keys in this file were replaced by their task IDs.
-- Added `Documentation` to `touches` for ADR-0032 and its index line; no task in Doing names it.
+- Added `Documentation` to `touches` for ADR-0034 and its index line; no task in Doing names it.
 - Measured with `/mingw64/bin/curl` 8.21.0 against a Python loopback server on 127.0.0.1:18183 that serves scripted responses on one keep-alive connection and closes after a response carrying `Connection: close` (`Record-CurlExchange.ps1` closes every connection, so it cannot show reuse). `-w` was `
 %{http_code} %{num_connects} %{size_request} %{size_header} %{size_download}
 `. Responses: challenge `HTTP/1.1 401 Unauthorized
@@ -58,11 +58,11 @@ Accept: */*
   - `--digest`, 401 then a second 401 (`Content-Length: 5`, `nope2`) -> no third request; both heads, `nope2`, `401 1 269 190 5`, exit 0. With `-sS -f`: `curl: (22) The requested URL returned error: 401` after both heads, `401 1 269 190 0`, exit 22.
   - `--digest` against a 401 with no `WWW-Authenticate` -> no retry; `nope`, `401 1 80 48 4`, exit 0.
   - `--anyauth -u u:p -d hello` against a Basic 401 -> the body is sent with both requests; `ok`, `200 1 335 121 2`, exit 0.
-- Exit code for an authentication failure: measured exit 0 with the 401 as the result (exit 22 under `-f`), never 94. Decision and the unmeasured stream-body case recorded in ADR-0032.
+- Exit code for an authentication failure: measured exit 0 with the 401 as the result (exit 22 under `-f`), never 94. Decision and the unmeasured stream-body case recorded in ADR-0034.
 - The run that was cut off by the token limit had written the code and tests; this run re-measured every pinned value (all matched), split `RetryAuthorization` (complexity 12) and replaced the two private records with classes so no compiler-generated member goes uncovered.
 
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
-- 2026-09-26: Doing -> Done. Basic up front, one 401 retry on the same or a new connection, 401 as the result (exit 0, 22 under -f) as measured on curl 8.21.0; ADR-0032
+- 2026-09-26: Doing -> Done. Basic up front, one 401 retry on the same or a new connection, 401 as the result (exit 0, 22 under -f) as measured on curl 8.21.0; ADR-0034
