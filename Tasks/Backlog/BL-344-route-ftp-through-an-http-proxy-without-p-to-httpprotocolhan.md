@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-338, BL-343]
-touches: [Curl.Console]
+touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-27
 completed:
@@ -29,7 +29,10 @@ completed:
 
 ## Notes
 
+- 2026-09-27 (lane 1): The three acceptance tests exercise handler selection in `Curl.Console`, so they belong in `Curl.Console.UnitTests`, which `touches` did not name. Added it. BL-295 (in Doing) also touches `Curl.Console.UnitTests`, so this task returns to Backlog until BL-295 leaves Doing.
+
 ## Log
 
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Backlog. Needs Curl.Console.UnitTests for its tests, which BL-295 (in Doing) also touches; retry once BL-295 is no longer in Doing.
