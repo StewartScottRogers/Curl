@@ -55,6 +55,7 @@ internal sealed class TransferContextFactory(Stream standardInput)
             TftpBlockSize = options.TftpBlockSize,
             TftpNoOptions = options.TftpNoOptions,
             CreateFileMode = options.CreateFileMode ?? TransferContext.DefaultCreateFileMode,
+            PathAsIs = options.PathAsIs,
             ConnectTimeout = options.ConnectTimeout,
             MaxTime = options.MaxTime,
             TimeCondition = options.TimeCondition,
