@@ -82,6 +82,12 @@ internal sealed class FormFileSystem : IFileSystem
         public override Task CopyToAsync(Stream destination, int bufferSize, CancellationToken cancellationToken) =>
             refusesRead ? throw new IOException("The device is not ready.") : base.CopyToAsync(destination, bufferSize, cancellationToken);
 
+        public override int Read(Span<byte> buffer) =>
+            refusesRead ? throw new IOException("The device is not ready.") : base.Read(buffer);
+
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
+            refusesRead ? throw new IOException("The device is not ready.") : base.ReadAsync(buffer, cancellationToken);
+
         protected override void Dispose(bool disposing)
         {
             IsDisposed = true;

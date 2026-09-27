@@ -229,7 +229,90 @@ public sealed class MultipartFormBodyBuilderEncoderTests
         MultipartFormBuildResult result = await BuildAsync(
             files,
             "------------------------0000000000000000000000",
+            new MultipartFormPart("f", MultipartFormPartKind.FileContent, "dev", null, null, NoHeaders, NoParts) { Encoder = "7bit" });
+
+        Assert.AreEqual(CurlExitCode.ReadError, result.Failure!.ExitCode);
+        Assert.AreEqual(MultipartFormBodyBuilder.ReadFailedMessage, result.Failure.ErrorMessage);
+        Assert.IsTrue(files.Opened.Single().IsDisposed);
+    }
+
+    [TestMethod]
+    [DataRow("base64")]
+    [DataRow("quoted-printable")]
+    public async Task AnEncodedFilePartIsNotReadBeforeTheBodyIsRead(string encoder)
+    {
+        FormFileSystem files = DataFiles();
+        MultipartFormBuildResult result = await BuildAsync(files, "------------------------0000000000000000000000", FilePart(encoder));
+
+        FormFileSystem.TrackedStream file = files.Opened.Single();
+        Assert.IsTrue(result.IsBuilt);
+        Assert.AreEqual(0, file.Position, "Nothing is read while building.");
+        Assert.IsFalse(file.IsDisposed);
+
+        await result.Body.Content.ReadExactlyAsync(new byte[300], TestContext.CancellationToken);
+        Assert.AreNotEqual(0, file.Position, "The file is read as the body is read.");
+        await result.Body.Content.DisposeAsync();
+        Assert.IsTrue(file.IsDisposed);
+    }
+
+    [TestMethod]
+    public async Task AStreamedEncodedFileThatCannotBeReadFailsTheBodysRead()
+    {
+        // A base64 file is read only while sending, so a failed read reaches whoever sends the
+        // body, as it does for a file sent as it is.
+        FormFileSystem files = new FormFileSystem().WithUnreadableFile("dev");
+        MultipartFormBuildResult result = await BuildAsync(
+            files,
+            "------------------------0000000000000000000000",
             new MultipartFormPart("f", MultipartFormPartKind.FileContent, "dev", null, null, NoHeaders, NoParts) { Encoder = "base64" });
+
+        Assert.IsTrue(result.IsBuilt);
+        await Assert.ThrowsExactlyAsync<IOException>(() => result.Body.Content.CopyToAsync(Stream.Null, TestContext.CancellationToken));
+        await result.Body.Content.DisposeAsync();
+    }
+
+    [TestMethod]
+    public async Task ASevenBitFileIsCheckedThenStreamedWithItsLength()
+    {
+        const string B = "------------------------0000000000000000000000";
+        FormFileSystem files = new FormFileSystem().WithFile("data.txt", "plain\r\nascii");
+        MultipartFormBuildResult result = await BuildAsync(files, B, FilePart("7bit"));
+
+        Assert.IsFalse(files.Opened.Single().IsDisposed, "The checked file is streamed, not read into memory.");
+        Assert.AreEqual(0, files.Opened.Single().Position, "The check leaves the file at its start.");
+        string expected = FileHeaders(B, "7bit") + "plain\r\nascii" + $"\r\n--{B}--\r\n";
+        await AssertBodyAsync(result, expected, expected.Length, "7bit file");
+    }
+
+    [TestMethod]
+    public async Task ASevenBitFileThatCannotSeekIsReadWholeAndLeavesTheLengthUnknown()
+    {
+        const string B = "------------------------0000000000000000000000";
+        FormFileSystem files = new FormFileSystem().WithUnseekableFile("pipe", "hi").WithUnseekableFile("high", "x").WithFile("high", [0xE9]);
+        MultipartFormBuildResult result = await BuildAsync(
+            files,
+            B,
+            new MultipartFormPart("f", MultipartFormPartKind.FileContent, "pipe", null, null, NoHeaders, NoParts) { Encoder = "7bit" });
+        MultipartFormBuildResult refused = await BuildAsync(
+            files,
+            B,
+            new MultipartFormPart("f", MultipartFormPartKind.FileContent, "high", null, null, NoHeaders, NoParts) { Encoder = "7bit" });
+
+        Assert.IsTrue(files.Opened[0].IsDisposed, "A pipe cannot be read twice, so it is read whole.");
+        string expected = $"--{B}\r\nContent-Disposition: form-data; name=\"f\"\r\nContent-Transfer-Encoding: 7bit\r\n\r\nhi\r\n--{B}--\r\n";
+        await AssertBodyAsync(result, expected, null, "7bit pipe");
+        Assert.AreEqual(CurlExitCode.ReadError, refused.Failure!.ExitCode);
+        Assert.AreEqual(MultipartFormBodyBuilder.ReadFailedMessage, refused.Failure.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ASevenBitFileThatCannotSeekOrBeReadIsReadError()
+    {
+        FormFileSystem files = new FormFileSystem().WithUnseekableFile("dev", "u").WithUnreadableFile("dev");
+        MultipartFormBuildResult result = await BuildAsync(
+            files,
+            "------------------------0000000000000000000000",
+            new MultipartFormPart("f", MultipartFormPartKind.FileContent, "dev", null, null, NoHeaders, NoParts) { Encoder = "7bit" });
 
         Assert.AreEqual(CurlExitCode.ReadError, result.Failure!.ExitCode);
         Assert.AreEqual(MultipartFormBodyBuilder.ReadFailedMessage, result.Failure.ErrorMessage);

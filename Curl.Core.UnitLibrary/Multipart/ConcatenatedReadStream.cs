@@ -124,7 +124,8 @@ internal sealed class ConcatenatedReadStream : Stream
         long remaining = position;
         for (int index = 0; index < segments.Count; index++)
         {
-            long offset = Math.Min(remaining, segments[index].Length - segmentStarts[index]);
+            // A segment placed at its start needs no length, which an encoded one may have to measure.
+            long offset = remaining == 0 ? 0 : Math.Min(remaining, segments[index].Length - segmentStarts[index]);
             segments[index].Position = segmentStarts[index] + offset;
             remaining -= offset;
         }

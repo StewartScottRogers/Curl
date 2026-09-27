@@ -65,9 +65,11 @@ environment is always HTTP) and `socks://` is SOCKS4 (BL-269). It is not yet wir
 libcurl's `Curl_mime_prepare_headers` chooses them, files opened through `IFileSystem` while
 building so `Content-Length` is known, then streamed; an unopenable file is exit 26 before
 anything is sent. The text encoding and the boundary source are injected. A part's
-`Encoder` (`;encoder=`) goes through `MultipartPartEncoder`: `binary`/`8bit` files still
-stream, `base64`, `quoted-printable` and `7bit` are encoded whole in memory, and an unknown
-name is exit 43 (ADR-0041). An `@-` or `<-` part reads the standard-input `Stream` the
+`Encoder` (`;encoder=`) goes through `MultipartPartEncoder`: every file part streams, and
+`base64`, `quoted-printable` and `7bit` files are encoded as they are sent by
+`EncodedReadStream`, never held whole; a seekable `7bit` file is read through once while
+building so a byte above 127 still fails before sending, and an unseekable one is read
+whole. An unknown name is exit 43 (ADR-0041, ADR-0076). An `@-` or `<-` part reads the standard-input `Stream` the
 builder is given whole, never closing it, so the body keeps its `Content-Length`; without
 one it opens the path `-` as before (BL-275). It is not yet wired into `Curl.Console`.
 
