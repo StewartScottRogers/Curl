@@ -35,3 +35,4 @@ The handler's request line, headers and body handling match curl 8.21.0 for `Ver
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
