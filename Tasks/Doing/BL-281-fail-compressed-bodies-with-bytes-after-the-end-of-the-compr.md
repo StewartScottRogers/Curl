@@ -34,3 +34,4 @@ With `--compressed`, a gzip, deflate or br body that carries bytes after the end
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
