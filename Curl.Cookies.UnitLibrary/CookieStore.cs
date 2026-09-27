@@ -109,7 +109,7 @@ public sealed class CookieStore : ICookieStore
     /// <exception cref="ArgumentNullException"><paramref name="reader"/> is <see langword="null"/>.</exception>
     public void LoadCookieFile(TextReader reader, bool discardSessionCookies, DateTimeOffset now)
     {
-        foreach (Cookie cookie in NetscapeCookieFile.Read(reader))
+        foreach (Cookie cookie in NetscapeCookieFile.Read(reader, now))
         {
             if (!discardSessionCookies || !cookie.IsSessionCookie)
             {
@@ -281,14 +281,22 @@ public sealed class CookieStore : ICookieStore
     /// <summary>
     /// curl's rule that a cookie from an origin that is not secure may not overlay a <c>Secure</c> one:
     /// the same name, domains where one is the other or a parent of it, and the stored path's first
-    /// segment (<c>/</c> for the path <c>/</c>) starting the new path.
+    /// segment (<c>/</c> for the path <c>/</c>) starting the new path. A stored cookie without a domain or
+    /// a path (read from a <c>Set-Cookie:</c> line of a cookie file) never blocks one.
     /// </summary>
-    private bool OverlaysSecureCookie(Cookie cookie) =>
-        cookies.Exists(stored =>
-            stored.IsSecure
-            && string.Equals(stored.Name, cookie.Name, StringComparison.Ordinal)
-            && (CookieOrigin.IsDomainOrSubdomain(stored.Domain, cookie.Domain) || CookieOrigin.IsDomainOrSubdomain(cookie.Domain, stored.Domain))
-            && cookie.Path.StartsWith(FirstPathSegment(stored.Path), StringComparison.Ordinal));
+    private bool OverlaysSecureCookie(Cookie cookie) => cookies.Exists(stored => IsSecureCookieOverlaidBy(stored, cookie));
+
+    private static bool IsSecureCookieOverlaidBy(Cookie stored, Cookie cookie) =>
+        stored.IsSecure
+        && string.Equals(stored.Name, cookie.Name, StringComparison.Ordinal)
+        && stored.Domain is string storedDomain
+        && stored.Path.Length > 0
+        && CoversDomainAndPath(storedDomain, stored.Path, cookie);
+
+    /// <summary>One domain is the other or a parent of it, and the stored path's first segment starts the new path.</summary>
+    private static bool CoversDomainAndPath(string storedDomain, string storedPath, Cookie cookie) =>
+        (CookieOrigin.IsDomainOrSubdomain(storedDomain, cookie.Domain!) || CookieOrigin.IsDomainOrSubdomain(cookie.Domain!, storedDomain))
+        && cookie.Path.StartsWith(FirstPathSegment(storedPath), StringComparison.Ordinal);
 
     private static string FirstPathSegment(string path)
     {
@@ -303,13 +311,16 @@ public sealed class CookieStore : ICookieStore
         cookies.RemoveAll(cookie => !cookie.IsSessionCookie && cookie.ExpiresUnixSeconds < nowUnixSeconds);
     }
 
-    /// <summary>curl's domain test in <c>Curl_cookie_getlist</c>.</summary>
+    /// <summary>curl's domain test in <c>Curl_cookie_getlist</c>; a cookie without a domain goes to every host.</summary>
     private static bool DomainMatches(Cookie cookie, string host) =>
-        cookie.IncludesSubdomains
-            ? CookieOrigin.IsDomainOrSubdomain(cookie.Domain, host)
-            : string.Equals(cookie.Domain, host, StringComparison.OrdinalIgnoreCase);
+        cookie.Domain switch
+        {
+            null => true,
+            string domain when cookie.IncludesSubdomains => CookieOrigin.IsDomainOrSubdomain(domain, host),
+            string domain => string.Equals(domain, host, StringComparison.OrdinalIgnoreCase),
+        };
 
-    /// <summary>curl's <c>pathmatch</c>: <c>/</c>, or the request path itself or up to a <c>/</c>, case-sensitively.</summary>
+    /// <summary>curl's <c>pathmatch</c>: empty, <c>/</c>, or the request path itself or up to a <c>/</c>, case-sensitively.</summary>
     private static bool PathMatches(string cookiePath, string requestPath) =>
         cookiePath == "/"
         || (requestPath.StartsWith(cookiePath, StringComparison.Ordinal)
@@ -340,8 +351,11 @@ public sealed class CookieStore : ICookieStore
         public int Compare(Cookie? x, Cookie? y)
         {
             int byPath = y!.Path.Length.CompareTo(x!.Path.Length);
-            int byDomain = byPath != 0 ? byPath : y.Domain.Length.CompareTo(x.Domain.Length);
+            int byDomain = byPath != 0 ? byPath : DomainLength(y).CompareTo(DomainLength(x));
             return byDomain != 0 ? byDomain : y.Name.Length.CompareTo(x.Name.Length);
         }
+
+        /// <summary>The domain's length; <c>0</c> for a cookie without one, as curl sorts it.</summary>
+        private static int DomainLength(Cookie cookie) => cookie.Domain?.Length ?? 0;
     }
 }

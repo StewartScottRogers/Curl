@@ -8,14 +8,19 @@ namespace Curl.Cookies;
 /// <param name="Value">The cookie's value, as sent, quotes included, with surrounding spaces and tabs removed.</param>
 /// <param name="Domain">
 /// The host the cookie belongs to, without a leading dot: the <c>Domain</c> attribute when one was
-/// accepted, otherwise the request's host. Kept in the case it was written in.
+/// accepted, otherwise the request's host. Kept in the case it was written in. <see langword="null"/> for a
+/// cookie read from a <c>Set-Cookie:</c> line of a cookie file without a <c>Domain</c>: it is sent to every
+/// host, sorts as an empty domain, and is never written to the jar.
 /// </param>
 /// <param name="IncludesSubdomains">
 /// <see langword="true"/> when a <c>Domain</c> attribute named a host name, so the cookie is also sent
 /// to its subdomains (the jar's <c>TRUE</c> column, curl's <c>tailmatch</c>); <see langword="false"/>
 /// for a host-only cookie, including one whose <c>Domain</c> repeated an IP address.
 /// </param>
-/// <param name="Path">The path the cookie is sent under.</param>
+/// <param name="Path">
+/// The path the cookie is sent under. Empty for a cookie read from a <c>Set-Cookie:</c> line of a cookie
+/// file without a <c>Path</c>: it matches every path, sorts before <c>/</c> and is written to the jar as <c>/</c>.
+/// </param>
 /// <param name="IsSecure"><see langword="true"/> when the cookie carried the <c>Secure</c> attribute.</param>
 /// <param name="IsHttpOnly"><see langword="true"/> when the cookie carried the <c>HttpOnly</c> attribute.</param>
 /// <param name="ExpiresUnixSeconds">
@@ -26,7 +31,7 @@ namespace Curl.Cookies;
 public sealed record Cookie(
     string Name,
     string Value,
-    string Domain,
+    string? Domain,
     bool IncludesSubdomains,
     string Path,
     bool IsSecure,

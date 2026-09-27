@@ -23,6 +23,15 @@ internal sealed class MultipartBodySegments(Encoding textEncoding) : IDisposable
     /// </summary>
     internal long? Length => lengthIsKnown ? knownLength : null;
 
+    /// <summary>
+    /// Gets a value indicating whether a part's data was refused by its encoder, which fails the
+    /// body once every file has been opened, as curl fails it only when it reaches that data.
+    /// </summary>
+    internal bool HoldsRefusedData { get; private set; }
+
+    /// <summary>Records that a part's encoder refused its data.</summary>
+    internal void AddRefusedData() => HoldsRefusedData = true;
+
     /// <summary>Appends <paramref name="text" />, sent in the text encoding.</summary>
     /// <param name="text">The text.</param>
     internal void AddText(string text) => pendingText.Append(text);

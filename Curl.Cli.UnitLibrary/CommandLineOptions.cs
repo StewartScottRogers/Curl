@@ -17,6 +17,8 @@ public sealed class CommandLineOptions
     private readonly List<string> urls = [];
     private readonly List<UrlOutput> urlOutputs = [];
     private readonly List<string> telnetOptions = [];
+    private readonly List<string> resolveEntries = [];
+    private readonly List<string> connectToEntries = [];
     private readonly List<string> headers = [];
     private readonly List<CommandLineCookie> cookies = [];
     private readonly List<string> warningLines = [];
@@ -31,6 +33,13 @@ public sealed class CommandLineOptions
     /// <c>--url</c> values interleaved as they were given.
     /// </summary>
     public IReadOnlyList<string> Urls => urls;
+
+    /// <summary>
+    /// <see langword="true"/> when <c>-g</c> / <c>--globoff</c> was given and no <c>--no-globoff</c>
+    /// came after it: take each URL as written, with <c>UrlGlob.Unglobbed</c>, instead of expanding
+    /// <c>{a,b}</c> sets and <c>[1-3]</c> ranges with <c>UrlGlob.TryParse</c>.
+    /// </summary>
+    public bool GlobOff { get; internal set; }
 
     /// <summary>
     /// <see langword="true"/> when <c>-V</c> / <c>--version</c> was given on the command line. Parsing
@@ -58,6 +67,45 @@ public sealed class CommandLineOptions
     /// <c>--no-progress-bar</c> came after it: the meter, when shown, is the bar form.
     /// </summary>
     public bool ProgressBar { get; internal set; }
+
+    /// <summary>
+    /// Which of <c>-v</c> / <c>--verbose</c>, <c>--trace</c> and <c>--trace-ascii</c> came last, or
+    /// <see cref="TraceKind.None"/> when none did or <c>--no-verbose</c> came after it.
+    /// </summary>
+    public TraceKind Trace { get; private set; }
+
+    /// <summary>
+    /// The file the last <c>--trace</c> or <c>--trace-ascii</c> names, <c>-</c> for standard output, while
+    /// <see cref="Trace"/> is <see cref="TraceKind.HexDump"/> or <see cref="TraceKind.AsciiDump"/>;
+    /// otherwise <see langword="null"/>, as <c>-v</c> writes to standard error.
+    /// </summary>
+    public string? TraceFile { get; private set; }
+
+    /// <summary>
+    /// How many times <c>-v</c> was given in a row, 0 to 4, as curl 8.21.0 counts it: the letters of
+    /// one argument add up (<c>-vv</c> is 2, and so is <c>-vsv</c>), but a <c>-v</c> or <c>--verbose</c>
+    /// that is the first option of its argument starts again at 1 (<c>-v -v</c> is 1, <c>-vv -v</c> is
+    /// 1, <c>-vv -sv</c> is 3). A fifth <c>v</c> changes nothing and <c>--no-verbose</c> sets 0. From 2
+    /// curl adds transfer and connection IDs and times to its verbose lines, from 3 protocol
+    /// details and from 4 every component's trace.
+    /// </summary>
+    public int Verbosity { get; private set; }
+
+    /// <summary>
+    /// <see langword="true"/> when every verbose or trace line starts with the time of day: set by
+    /// <c>--trace-time</c> and by the second <c>v</c> of <c>-vv</c>, cleared by <c>--no-trace-time</c>,
+    /// by <c>--no-verbose</c> and by a <c>-v</c> or <c>--verbose</c> that is the first option of its
+    /// argument (<c>--trace-time -v</c> shows no times; <c>--trace-time -sv</c> and <c>-v --trace-time</c> do).
+    /// </summary>
+    public bool TraceTime { get; internal set; }
+
+    /// <summary>
+    /// The file the last <c>--stderr</c> names, to which curl writes what it would write to standard
+    /// error: <c>-</c> for standard output; <see langword="null"/> when none was given. An empty name is
+    /// kept, not refused: curl 8.21.0 fails to open it, warns and carries on writing to standard error,
+    /// which the console layer does when it opens the file.
+    /// </summary>
+    public string? StandardErrorFile { get; internal set; }
 
     /// <summary>
     /// The <c>-o</c> / <c>--output</c> file name of each entry of <see cref="UrlOutputs"/>, in the same
@@ -170,7 +218,7 @@ public sealed class CommandLineOptions
 
     /// <summary>
     /// The HTTP authentication schemes to allow for the origin, as curl 8.21.0's tool asks libcurl
-    /// for them: <c>--basic</c> and <c>--digest</c> add their scheme and their <c>--no-</c> spellings
+    /// for them: <c>--basic</c>, <c>--digest</c>, <c>--ntlm</c> and <c>--negotiate</c> add their scheme and their <c>--no-</c> spellings
     /// remove it; <c>--anyauth</c> replaces the set with every scheme; <c>--oauth2-bearer</c> adds
     /// Bearer. <see cref="HttpAuthSchemes.Bearer"/> is only ever allowed with a
     /// <see cref="BearerToken"/>, so <c>--anyauth</c> alone gives <see cref="HttpAuthSchemes.Any"/>.
@@ -184,7 +232,10 @@ public sealed class CommandLineOptions
     /// <c>-u u:p --oauth2-bearer tok --basic</c> sends nothing, then <c>Bearer tok</c>;
     /// <c>-u u:p --anyauth --basic</c> and <c>-u u:p --anyauth</c> send nothing, then
     /// <c>Basic dTpw</c>; <c>--oauth2-bearer tok --anyauth</c> sends nothing, then <c>Bearer tok</c>;
-    /// <c>--oauth2-bearer tok --no-basic</c> sends <c>Bearer tok</c> at once. See ADR-0026.
+    /// <c>--oauth2-bearer tok --no-basic</c> sends <c>Bearer tok</c> at once. Against a plain 200
+    /// (2026-09-26): <c>-u u:p --ntlm</c> sends an NTLM type-1 message at once; <c>-u u:p --negotiate</c>,
+    /// <c>--basic --ntlm</c> and <c>--ntlm --negotiate</c> send nothing; <c>--ntlm --no-ntlm</c> and
+    /// <c>--negotiate --no-negotiate</c> send <c>Basic dTpw</c>. See ADR-0026.
     /// </remarks>
     public HttpAuthSchemes AuthSchemes
     {
@@ -225,6 +276,21 @@ public sealed class CommandLineOptions
 
     /// <summary>Every <c>-t</c> / <c>--telnet-option</c> value, verbatim and unvalidated, in command-line order.</summary>
     public IReadOnlyList<string> TelnetOptions => telnetOptions;
+
+    /// <summary>
+    /// Every <c>--resolve</c> value (<c>[+]host:port:addr[,addr]...</c>, or <c>-host:port</c> to drop an
+    /// entry), verbatim and unvalidated, in command-line order. curl 8.21.0 checks the syntax only when a
+    /// transfer starts, failing it with exit code 49 (<c>Could not parse CURLOPT_RESOLVE entry</c>), so the
+    /// parser never refuses one.
+    /// </summary>
+    public IReadOnlyList<string> ResolveEntries => resolveEntries;
+
+    /// <summary>
+    /// Every <c>--connect-to</c> value (<c>host1:port1:host2:port2</c>, any part possibly empty), verbatim
+    /// and unvalidated, in command-line order. curl 8.21.0 reads an entry only when a transfer starts, so
+    /// the parser never refuses one.
+    /// </summary>
+    public IReadOnlyList<string> ConnectToEntries => connectToEntries;
 
     /// <summary>
     /// The <c>--tftp-blksize</c> value as given, unclamped, except that a value past
@@ -324,6 +390,65 @@ public sealed class CommandLineOptions
     /// does to curl. The last value wins.
     /// </summary>
     public TimeSpan? MaxTime { get; internal set; }
+
+    /// <summary>
+    /// The <c>--retry</c> count: how many times a transient failure is retried, from 0 to the
+    /// platform's C <c>LONG_MAX</c> (<see cref="CommandLineNumber.PlatformLongMaximum"/>). Zero,
+    /// the default, retries nothing. The last value wins.
+    /// </summary>
+    public long RetryCount { get; internal set; }
+
+    /// <summary>
+    /// The <c>--retry-delay</c> wait between retries, to the millisecond, read as
+    /// <see cref="CommandLineNumber.ParseSeconds"/> reads <c>-m</c>; <see langword="null"/> when not
+    /// given, which leaves curl's own backoff in place. The last value wins.
+    /// </summary>
+    public TimeSpan? RetryDelay { get; internal set; }
+
+    /// <summary>
+    /// The <c>--retry-max-time</c> limit on the time spent retrying, to the millisecond, read as
+    /// <see cref="CommandLineNumber.ParseSeconds"/> reads <c>-m</c>; <see langword="null"/> when not
+    /// given. Zero is recorded as given and means no limit, as it does to curl. The last value wins.
+    /// </summary>
+    public TimeSpan? RetryMaxTime { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--retry-all-errors</c> was given and no
+    /// <c>--no-retry-all-errors</c> came after it: <c>--retry</c> retries after any error.
+    /// </summary>
+    public bool RetryAllErrors { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--retry-connrefused</c> was given and no
+    /// <c>--no-retry-connrefused</c> came after it: <c>--retry</c> counts a refused connection as
+    /// transient.
+    /// </summary>
+    public bool RetryConnectionRefused { get; internal set; }
+
+    /// <summary>
+    /// The <c>--limit-rate</c> ceiling in bytes per second, for both download and upload, read as
+    /// <see cref="CommandLineNumber.ParseSize"/> reads <c>--max-filesize</c> (<c>b</c>, <c>k</c>,
+    /// <c>m</c>, <c>g</c>, <c>t</c> and <c>p</c> in either case, and fractions);
+    /// <see langword="null"/> when not given. Zero is recorded as given and means no limit, as it
+    /// does to curl. The last value wins.
+    /// </summary>
+    public long? LimitRate { get; internal set; }
+
+    /// <summary>
+    /// The <c>-Y</c> / <c>--speed-limit</c> in bytes per second below which a transfer is too slow;
+    /// <see langword="null"/> when not given. Curl 8.21.0 aborts a transfer that stays slower than
+    /// this for <see cref="SpeedTimeSeconds"/>, or for 30 seconds when that is not given (measured
+    /// through <c>--libcurl</c>). The last value wins.
+    /// </summary>
+    public long? SpeedLimit { get; internal set; }
+
+    /// <summary>
+    /// The <c>-y</c> / <c>--speed-time</c> in whole seconds a transfer may stay slower than
+    /// <see cref="SpeedLimit"/>; <see langword="null"/> when not given. When it is given and
+    /// <see cref="SpeedLimit"/> is not, curl 8.21.0 uses a limit of 1 byte per second (measured
+    /// through <c>--libcurl</c>). The last value wins.
+    /// </summary>
+    public long? SpeedTimeSeconds { get; internal set; }
 
     /// <summary>
     /// <see langword="true"/> when <c>-R</c> / <c>--remote-time</c> was given and no
@@ -548,6 +673,79 @@ public sealed class CommandLineOptions
     }
 
     /// <summary>
+    /// <see langword="true"/> while the option being applied is the first one of its argument
+    /// (<c>--verbose</c>, or the <c>v</c> of <c>-v</c> and of <c>-vs</c>, but not of <c>-sv</c>); set by
+    /// <see cref="CommandLineParser"/> before each option it applies.
+    /// </summary>
+    internal bool FirstOptionOfArgument { get; set; }
+
+    /// <summary>
+    /// Applies <c>-v</c> / <c>--verbose</c>, or <c>--no-verbose</c> when <paramref name="on"/> is
+    /// <see langword="false"/>, as curl 8.21.0 does: see <see cref="Verbosity"/> and <see cref="TraceTime"/>.
+    /// The first <c>v</c> after a reset selects <see cref="TraceKind.Verbose"/>, first adding
+    /// <see cref="CommandLineWarning.VerboseOverridesTrace"/>, unless <c>-s</c> came first, when a
+    /// <c>--trace</c> or <c>--trace-ascii</c> was in effect.
+    /// </summary>
+    /// <param name="on"><see langword="false"/> for <c>--no-verbose</c>.</param>
+    internal void SetVerbose(bool on)
+    {
+        if (!on || FirstOptionOfArgument)
+        {
+            Verbosity = 0;
+            TraceTime = false;
+        }
+
+        if (!on)
+        {
+            Trace = TraceKind.None;
+            TraceFile = null;
+            return;
+        }
+
+        RaiseVerbosity();
+    }
+
+    /// <summary>Takes <see cref="Verbosity"/> one step up, to at most 4, as one more <c>v</c> does.</summary>
+    private void RaiseVerbosity()
+    {
+        const int MostVerbose = 4;
+        if (Verbosity == 0)
+        {
+            SelectTrace(TraceKind.Verbose, null, CommandLineWarning.VerboseOverridesTrace);
+        }
+        else if (Verbosity == 1)
+        {
+            TraceTime = true;
+        }
+
+        Verbosity = Math.Min(Verbosity + 1, MostVerbose);
+    }
+
+    /// <summary>
+    /// Applies <c>--trace</c> (<see cref="TraceKind.HexDump"/>) or <c>--trace-ascii</c>
+    /// (<see cref="TraceKind.AsciiDump"/>) to <paramref name="file"/>, first adding
+    /// <see cref="CommandLineWarning.TraceOverridesEarlierTrace"/>, unless <c>-s</c> came first, when
+    /// <c>-v</c> or the other kind of trace was in effect. <see cref="Verbosity"/> is left as it is.
+    /// </summary>
+    /// <param name="dump">The kind of dump the option asks for.</param>
+    /// <param name="file">The non-empty file name, <c>-</c> for standard output.</param>
+    /// <param name="longName">The option's long name with its <c>--</c>, for the warning.</param>
+    internal void SelectTraceDump(TraceKind dump, string file, string longName) =>
+        SelectTrace(dump, file, CommandLineWarning.TraceOverridesEarlierTrace(longName));
+
+    /// <summary>Sets <see cref="Trace"/> and <see cref="TraceFile"/>, warning when another kind was in effect.</summary>
+    private void SelectTrace(TraceKind trace, string? file, IReadOnlyList<string> overrideWarning)
+    {
+        if (Trace != TraceKind.None && Trace != trace)
+        {
+            AddWarningLinesUnlessSilent(overrideWarning);
+        }
+
+        Trace = trace;
+        TraceFile = file;
+    }
+
+    /// <summary>
     /// Appends <paramref name="lines"/> to <see cref="WarningLines"/> unless <c>-s</c> /
     /// <c>--silent</c> has already been read: curl 8.21.0 drops a warning raised while <c>-s</c> is in
     /// effect, even with <c>-S</c> and even if <c>--no-silent</c> follows, and keeps one raised
@@ -728,7 +926,8 @@ public sealed class CommandLineOptions
 
     /// <summary>
     /// Adds <paramref name="scheme"/> to, or for its <c>--no-</c> spelling removes it from, the
-    /// schemes <c>--basic</c>, <c>--digest</c>, <c>--anyauth</c> and <c>--oauth2-bearer</c> asked for.
+    /// schemes <c>--basic</c>, <c>--digest</c>, <c>--ntlm</c>, <c>--negotiate</c>, <c>--anyauth</c> and
+    /// <c>--oauth2-bearer</c> asked for.
     /// </summary>
     /// <param name="scheme">The scheme the option names.</param>
     /// <param name="on"><see langword="false"/> for the <c>--no-</c> spelling.</param>
@@ -762,6 +961,14 @@ public sealed class CommandLineOptions
     /// <summary>Appends <paramref name="telnetOption"/> to <see cref="TelnetOptions"/>, unchanged and unvalidated.</summary>
     /// <param name="telnetOption">A <c>-t</c> / <c>--telnet-option</c> value, possibly empty.</param>
     internal void AddTelnetOption(string telnetOption) => telnetOptions.Add(telnetOption);
+
+    /// <summary>Appends <paramref name="entry"/> to <see cref="ResolveEntries"/>, unchanged and unvalidated.</summary>
+    /// <param name="entry">A <c>--resolve</c> value, possibly empty.</param>
+    internal void AddResolveEntry(string entry) => resolveEntries.Add(entry);
+
+    /// <summary>Appends <paramref name="entry"/> to <see cref="ConnectToEntries"/>, unchanged and unvalidated.</summary>
+    /// <param name="entry">A <c>--connect-to</c> value, possibly empty.</param>
+    internal void AddConnectToEntry(string entry) => connectToEntries.Add(entry);
 
     /// <summary>Appends <paramref name="cookie"/> to <see cref="Cookies"/>, unchanged and unvalidated.</summary>
     /// <param name="cookie">A <c>-b</c> / <c>--cookie</c> value, possibly empty.</param>

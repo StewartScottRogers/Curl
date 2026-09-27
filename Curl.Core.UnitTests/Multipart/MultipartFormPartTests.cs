@@ -29,4 +29,17 @@ public sealed class MultipartFormPartTests
         Assert.AreSame(inner, changed.Parts.Single());
         Assert.AreEqual("a", part.Name);
     }
+
+    [TestMethod]
+    [DataRow(MultipartFormPartKind.FileUpload, "-", true)]
+    [DataRow(MultipartFormPartKind.FileContent, "-", true)]
+    [DataRow(MultipartFormPartKind.FileUpload, "-.txt", false)]
+    [DataRow(MultipartFormPartKind.Text, "-", false)]
+    [DataRow(MultipartFormPartKind.Multipart, "-", false)]
+    public void OnlyAFilePartWhosePathIsADashReadsStandardInput(MultipartFormPartKind kind, string content, bool readsStandardInput)
+    {
+        MultipartFormPart part = new("a", kind, content, null, null, [], []);
+
+        Assert.AreEqual(readsStandardInput, part.ReadsStandardInput);
+    }
 }

@@ -6,8 +6,9 @@ namespace Curl.Protocol.Http;
 /// <summary>
 /// Every failure message sending an HTTP/1.x request body or reading a response head or
 /// body reports, as curl 8.21.0 prints it. Each was measured against a loopback server
-/// (BL-169, BL-170, BL-171, BL-175, BL-176) except <see cref="ReceiveFailed" />, which is the text
-/// <c>curl_easy_strerror</c> gives exit 56.
+/// (BL-169, BL-170, BL-171, BL-174, BL-175, BL-176, BL-178, BL-180) except <see cref="ReceiveFailed" /> and
+/// <see cref="SendFailed" />, which are the texts <c>curl_easy_strerror</c> gives exits 56 and
+/// 55.
 /// </summary>
 internal static class HttpTransferMessages
 {
@@ -123,6 +124,34 @@ internal static class HttpTransferMessages
     internal const string BadContentEncoding = "Unrecognized or bad HTTP Content or Transfer-Encoding";
 
     /// <summary>
+    /// The exit 33 message for a <c>-C</c> resume the response does not honour.
+    /// </summary>
+    internal const string ResumeNotSupported = "HTTP server does not seem to support byte ranges. Cannot resume.";
+
+    /// <summary>
+    /// The exit 63 message for a Content-Length over the <c>--max-filesize</c> limit.
+    /// </summary>
+    internal const string MaximumFileSizeExceeded = "Maximum file size exceeded";
+
+    /// <summary>
+    /// The exit 25 message for an HTTP/1.0 request (<c>-0</c>) whose body length is unknown
+    /// and that no <c>-H</c> value asks to send chunked (measured, BL-180 Notes).
+    /// </summary>
+    internal const string ChunkedUploadNeedsHttp11 = "Chunky upload is not supported by HTTP 1.0";
+
+    /// <summary>
+    /// Formats the exit 63 message for a body that grew past the <c>--max-filesize</c> limit,
+    /// after as many bytes as the limit allows were written.
+    /// </summary>
+    /// <param name="maxFileSize">The limit.</param>
+    /// <param name="received">The body bytes written.</param>
+    /// <returns>
+    /// The message, such as <c>Exceeded the maximum allowed file size (10) with 10 bytes</c>.
+    /// </returns>
+    internal static string FileSizeLimitExceeded(long maxFileSize, long received) =>
+        string.Create(CultureInfo.InvariantCulture, $"Exceeded the maximum allowed file size ({maxFileSize}) with {received} bytes");
+
+    /// <summary>
     /// Formats the exit 22 message for a final status of 400 or above under <c>-f</c> or
     /// <c>--fail-with-body</c>.
     /// </summary>
@@ -185,6 +214,59 @@ internal static class HttpTransferMessages
         exception.InnerException is SocketException { SocketErrorCode: SocketError.ConnectionReset }
             ? ConnectionReset
             : ReceiveFailed;
+
+    /// <summary>
+    /// The exit 55 message for a write the peer reset (measured, BL-174 Notes).
+    /// </summary>
+    internal const string SendConnectionReset = "Send failure: Connection was reset";
+
+    /// <summary>
+    /// The exit 55 message curl falls back to for any other failed write: the text
+    /// <c>curl_easy_strerror</c> gives exit 55.
+    /// </summary>
+    internal const string SendFailed = "Failed sending data to the peer";
+
+    /// <summary>
+    /// Chooses the exit 55 message for a failed write: <see cref="SendConnectionReset" />
+    /// when the peer reset the connection, and <see cref="SendFailed" /> for anything else.
+    /// </summary>
+    /// <param name="exception">The failure the write threw.</param>
+    /// <returns>The message.</returns>
+    internal static string SendFailure(IOException exception) =>
+        exception.InnerException is SocketException { SocketErrorCode: SocketError.ConnectionReset }
+            ? SendConnectionReset
+            : SendFailed;
+
+    /// <summary>
+    /// Formats the exit 28 message for a connect that the connect timeout or <c>-m</c> ended
+    /// (measured, BL-174 Notes).
+    /// </summary>
+    /// <param name="elapsedMilliseconds">Milliseconds since the transfer started.</param>
+    /// <returns>The message, such as <c>Connection timed out after 1015 milliseconds</c>.</returns>
+    internal static string ConnectionTimedOut(long elapsedMilliseconds) =>
+        string.Create(CultureInfo.InvariantCulture, $"Connection timed out after {elapsedMilliseconds} milliseconds");
+
+    /// <summary>
+    /// Formats the exit 28 message for a transfer <c>-m</c> ended after it connected
+    /// (measured, BL-174 Notes).
+    /// </summary>
+    /// <param name="elapsedMilliseconds">Milliseconds since the transfer started.</param>
+    /// <param name="received">The body bytes received so far.</param>
+    /// <param name="expected">
+    /// The body's Content-Length when the body being read has one, or <see langword="null" />.
+    /// </param>
+    /// <returns>
+    /// The message, such as <c>Operation timed out after 1008 milliseconds with 5 out of 100
+    /// bytes received</c>, or <c>... with 5 bytes received</c> when the size is not known.
+    /// </returns>
+    internal static string OperationTimedOut(long elapsedMilliseconds, long received, long? expected) =>
+        expected is { } size
+            ? string.Create(
+                CultureInfo.InvariantCulture,
+                $"Operation timed out after {elapsedMilliseconds} milliseconds with {received} out of {size} bytes received")
+            : string.Create(
+                CultureInfo.InvariantCulture,
+                $"Operation timed out after {elapsedMilliseconds} milliseconds with {received} bytes received");
 
     /// <summary>
     /// Formats the exit 18 message for a peer that closed before the Content-Length body

@@ -21,6 +21,7 @@ completed:
 - Found by BL-224. The renderer in `Curl.Output.UnitLibrary` takes `IWriteOutFileOpener`; a disk implementation was left out of `Curl.Output` because its tests would touch the file system and need `TestCategory=Integration`, which BL-224 forbade.
 - Open with `FileShare.ReadWrite`: curl 8.21.0 opens the same file twice in `%output{o.txt}A%output{>>o.txt}B` and the renderer flushes the first handle before opening the second. Catch `IOException`, `UnauthorizedAccessException` and `ArgumentException` (empty name) and return false.
 - BL-235 composes the renderer; this can land before or with it.
+- BL-235 landed: `CurlCommandRunner` takes an `IWriteOutFileOpener` (default `RefusingWriteOutFileOpener`) and builds the renderer with `writesLineFeedAsCrLf: false`, so the disk opener must wrap each opened file in `LineFeedToCrLfStream` on Windows to get the CR LF above (ADR-0040), and `CurlComposition.CreateRunner` must pass it.
 
 ## Acceptance criteria
 

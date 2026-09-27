@@ -16,6 +16,10 @@ public sealed class FakeTimeProvider(DateTimeOffset start) : TimeProvider
 
     private readonly TaskCompletionSource timerCreated = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+    private readonly List<TimeSpan> createdDueTimes = [];
+
+    private readonly List<(TimeSpan DueTime, TaskCompletionSource Created)> dueTimeWaiters = [];
+
     private TimeSpan elapsed;
 
     /// <inheritdoc />
@@ -27,6 +31,27 @@ public sealed class FakeTimeProvider(DateTimeOffset start) : TimeProvider
     /// the code under test has started a wait before it moves the clock.
     /// </summary>
     public Task FirstTimerCreated => timerCreated.Task;
+
+    /// <summary>
+    /// Returns a task that completes when a timer due <paramref name="dueTime" /> after its
+    /// creation has been created, so a test can wait for one wait among several timers.
+    /// </summary>
+    /// <param name="dueTime">The due time the timer was created with.</param>
+    /// <returns>The task.</returns>
+    public Task TimerCreatedAsync(TimeSpan dueTime)
+    {
+        lock (gate)
+        {
+            if (createdDueTimes.Contains(dueTime))
+            {
+                return Task.CompletedTask;
+            }
+
+            TaskCompletionSource created = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            dueTimeWaiters.Add((dueTime, created));
+            return created.Task;
+        }
+    }
 
     /// <inheritdoc />
     public override DateTimeOffset GetUtcNow() => start + elapsed;
@@ -45,6 +70,11 @@ public sealed class FakeTimeProvider(DateTimeOffset start) : TimeProvider
         lock (gate)
         {
             timers.Add(timer);
+            createdDueTimes.Add(dueTime);
+            foreach ((TimeSpan _, TaskCompletionSource created) in dueTimeWaiters.Where(waiter => waiter.DueTime == dueTime))
+            {
+                created.TrySetResult();
+            }
         }
 
         timerCreated.TrySetResult();

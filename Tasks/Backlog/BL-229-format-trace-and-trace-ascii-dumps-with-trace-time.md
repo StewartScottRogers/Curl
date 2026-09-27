@@ -4,7 +4,7 @@ title: Format --trace and --trace-ascii dumps with --trace-time
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-163]
+depends-on: [BL-163, BL-313]
 touches: [Curl.Output.UnitLibrary, Curl.Output.UnitTests]
 requirement: none
 created: 2026-09-26

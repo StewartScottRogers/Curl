@@ -33,6 +33,17 @@ effective URL, summed header/request/connection counts, timings from the first h
 `RedirectDuration`). Without `-L` it returns the dispatcher's result unchanged. It is not
 yet wired into `Curl.Console`.
 
+`TransferRetrier` runs a transfer again under `--retry` (`RetryPolicy`: `--retry`,
+`--retry-delay`) after curl 8.21.0's transient failures: exit 28, 6, 5 or 12
+(`: timeout`), or an http(s) status 408, 429, 500, 502, 503, 504, 522 or 524 on a
+success or a `-f` exit 22 (`: HTTP error`). It waits a `Retry-After`
+(`RetryAfterHeader`, capped at six hours) when one asks for a wait, else the fixed
+delay, else curl's backoff (1 s doubling to 10 min, advanced only when used), with
+`Task.Delay` on the context's `TimeProvider`, and hands each retried attempt and its
+`TransferRetryWarning` line (`Warning: Problem : HTTP error. Retrying in 1 second. 3
+retries left.`) to the caller, which prints and wraps it and readies the output. It is
+not yet wired into `Curl.Console` (BL-241).
+
 `UrlSchemeGuesser` gives a URL typed without a scheme the one curl 8.21.0 guesses: the
 scheme its host prefix implies (`ftp.`, `dict.`, `ldap.`, `imap.`, `smtp.`, `pop3.`, any
 case), otherwise `http`. It only prepends `<scheme>://`; rejecting a malformed URL is left
@@ -52,12 +63,19 @@ environment is always HTTP) and `socks://` is SOCKS4 (BL-269). It is not yet wir
 `StreamBody` curl 8.21.0 sends for `-F`, byte for byte (ADR-0027): headers chosen as
 libcurl's `Curl_mime_prepare_headers` chooses them, files opened through `IFileSystem` while
 building so `Content-Length` is known, then streamed; an unopenable file is exit 26 before
-anything is sent. The text encoding and the boundary source are injected. It is not yet
-wired into `Curl.Console`.
+anything is sent. The text encoding and the boundary source are injected. A part's
+`Encoder` (`;encoder=`) goes through `MultipartPartEncoder`: `binary`/`8bit` files still
+stream, `base64`, `quoted-printable` and `7bit` are encoded whole in memory, and an unknown
+name is exit 43 (ADR-0041). An `@-` or `<-` part reads the standard-input `Stream` the
+builder is given whole, never closing it, so the body keeps its `Content-Length`; without
+one it opens the path `-` as before (BL-275). It is not yet wired into `Curl.Console`.
 
 `Globbing\UrlGlob` is curl 8.21.0's URL globbing (ADR-0032): `TryParse` reads `{a,b}` sets
 and `[1-10]`, `[01-10]`, `[a-z:2]` ranges as `tool_urlglob.c` does, failing with exit 3 and
 curl's `<reason> in position N:` message, caret and all; `Unglobbed` is the URL under `-g`.
 `Expand()` yields each URL lazily, rightmost glob fastest, and `UrlGlobMatch.SubstituteGlobValues`
-replaces `#N` in an `-o` name. Windows name sanitizing is not done here (BL-283). It is not
+replaces `#N` in an `-o` name. `UrlGlobMatch.ResolveOutputFileName` is the name curl
+writes to: as written under `-g`, otherwise substituted and, when the caller passes
+`OperatingSystem.IsWindows()`, sanitized by `WindowsOutputFileNameSanitizer` as curl's
+Windows build does (control characters and `| < > " ? *` become `_`; BL-283). It is not
 yet wired into `Curl.Console` (BL-240).

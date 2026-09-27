@@ -29,6 +29,8 @@ The resolver honours `--resolve` entries and the connector honours `--connect-to
 
 ## Notes
 
+- From BL-202 (2026-09-26): the parser keeps every `--resolve` / `--connect-to` value verbatim in `CommandLineOptions.ResolveEntries` / `ConnectToEntries` and never refuses one. Measured on curl 8.21.0: `--resolve garbage`, `a:x:1.2.3.4` and `a:80:` fail at transfer time with exit 49 and `curl: (49) Could not parse CURLOPT_RESOLVE entry 'garbage'`; `''`, `*:80:…`, `+a:80:…`, `-a:80`, `[::1]:80:…` and `a:80:127.0.0.1,[::1]` are accepted; `--connect-to ''` and `garbage` are accepted and the transfer goes on. Syntax checking belongs here (or in BL-244).
+
 - Plan item: N4 in the Phase 1 HTTP plan (2026-09-26); plan keys in this file were replaced by their task IDs.
 
 ## Log

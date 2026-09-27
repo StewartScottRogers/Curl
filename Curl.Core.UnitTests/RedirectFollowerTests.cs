@@ -541,6 +541,23 @@ public sealed class RedirectFollowerTests
     }
 
     [TestMethod]
+    public async Task FollowAsync_FirstHopPathAsIs_SecondHopKeepsPathAsIs()
+    {
+        ScriptedHandler handler = new(Redirect(302, Next), Ok(200, 0));
+        TransferContext first = new()
+        {
+            Url = new Uri(First),
+            Output = Stream.Null,
+            PathAsIs = true,
+            Http = Location(),
+        };
+
+        await Follow(handler, first);
+
+        Assert.IsTrue(handler.Contexts[1].PathAsIs);
+    }
+
+    [TestMethod]
     public async Task FollowAsync_NextHop_CarriesEveryOtherOptionUnchanged()
     {
         ScriptedHandler handler = new(Redirect(307, Next), Ok(200, 0));

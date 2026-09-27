@@ -26,6 +26,7 @@ internal sealed class TransferContextFactory(Stream standardInput)
     /// <param name="range">The parsed <c>-r</c> range, or <see langword="null" /> for the whole resource.</param>
     /// <param name="resumeFrom">The <c>-C</c> offset, already resolved for <c>-C -</c>.</param>
     /// <param name="headerOutput">Where the <c>-D</c> header lines go, or <see langword="null" /> without <c>-D</c>.</param>
+    /// <param name="formBody">The <c>-F</c> body built for this transfer, or <see langword="null" /> without <c>-F</c>.</param>
     /// <returns>
     /// The context. Its <see cref="TransferContext.NoBody" /> is <c>-I</c>, and its
     /// <see cref="TransferContext.HeaderOutput" /> is <see cref="HeaderOutputOf" />'s.
@@ -36,7 +37,8 @@ internal sealed class TransferContextFactory(Stream standardInput)
         Stream output,
         ByteRange? range,
         long? resumeFrom,
-        Stream? headerOutput) =>
+        Stream? headerOutput,
+        HttpRequestBody? formBody = null) =>
         new()
         {
             Url = url,
@@ -53,10 +55,11 @@ internal sealed class TransferContextFactory(Stream standardInput)
             TftpBlockSize = options.TftpBlockSize,
             TftpNoOptions = options.TftpNoOptions,
             CreateFileMode = options.CreateFileMode ?? TransferContext.DefaultCreateFileMode,
+            PathAsIs = options.PathAsIs,
             ConnectTimeout = options.ConnectTimeout,
             MaxTime = options.MaxTime,
             TimeCondition = options.TimeCondition,
-            Http = HttpRequestOptionsMapping.FromCommandLine(options),
+            Http = HttpRequestOptionsMapping.FromCommandLine(options, formBody),
         };
 
     /// <summary>

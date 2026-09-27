@@ -31,6 +31,7 @@ public sealed class TransferContextTests
         Assert.IsNull(context.TftpBlockSize);
         Assert.IsFalse(context.TftpNoOptions);
         Assert.IsFalse(context.ConvertLineEndings);
+        Assert.IsFalse(context.PathAsIs);
         Assert.AreEqual((UnixFileMode)0b110_100_100, context.CreateFileMode);
         Assert.IsNull(context.ConnectTimeout);
         Assert.IsNull(context.MaxTime);
@@ -73,6 +74,7 @@ public sealed class TransferContextTests
             TftpBlockSize = 70000,
             TftpNoOptions = true,
             ConvertLineEndings = true,
+            PathAsIs = true,
             CreateFileMode = UnixFileMode.UserRead,
             ConnectTimeout = TimeSpan.FromSeconds(3),
             MaxTime = TimeSpan.FromMilliseconds(12500),
@@ -97,6 +99,7 @@ public sealed class TransferContextTests
         Assert.AreEqual(70000, context.TftpBlockSize);
         Assert.IsTrue(context.TftpNoOptions);
         Assert.IsTrue(context.ConvertLineEndings);
+        Assert.IsTrue(context.PathAsIs);
         Assert.AreEqual(UnixFileMode.UserRead, context.CreateFileMode);
         Assert.AreEqual(TimeSpan.FromSeconds(3), context.ConnectTimeout);
         Assert.AreEqual(TimeSpan.FromMilliseconds(12500), context.MaxTime);
