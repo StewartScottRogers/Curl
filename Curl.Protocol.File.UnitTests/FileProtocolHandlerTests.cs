@@ -2550,6 +2550,28 @@ public sealed class FileProtocolHandlerTests
         Assert.AreEqual(FakeFileSystem.DefaultLastWriteTimeUtc, result.SourceLastWriteTimeUtc);
     }
 
+    // curl 8.21.0 with -R and an unmet -z still stamps an existing -o file with the
+    // source's whole-second time, leaving its content alone, so the unmet result carries it.
+    [TestMethod]
+    public async Task ExecuteAsync_UnmetTimeCondition_ReportsTheSourceTimestampTruncatedToSeconds()
+    {
+        var fileSystem = new FakeFileSystem();
+        var timestamp = FakeFileSystem.DefaultLastWriteTimeUtc.AddMilliseconds(750);
+        fileSystem.AddFile(OsPath, Content, timestamp);
+        var context = new TransferContext
+        {
+            Url = FileUrl,
+            Output = new ChunkRecordingStream(),
+            TimeCondition = new TimeCondition(Later, TimeConditionKind.IfModifiedSince),
+        };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        var result = await handler.ExecuteAsync(context);
+
+        Assert.IsTrue(result.TimeConditionUnmet);
+        Assert.AreEqual(FakeFileSystem.DefaultLastWriteTimeUtc, result.SourceLastWriteTimeUtc);
+    }
+
     [TestMethod]
     public async Task ExecuteAsync_DownloadWithUnknownTimestamp_ReportsNoSourceTimestamp()
     {

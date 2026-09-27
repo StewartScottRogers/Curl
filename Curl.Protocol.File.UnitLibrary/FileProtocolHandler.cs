@@ -176,8 +176,8 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
         }
 
         // -R/--remote-time is applied by whoever owns the output file, so a successful
-        // download hands the source's timestamp back in whole seconds, the resolution
-        // curl 8.21.0 applies it at. A failure carries none.
+        // download, an unmet -z included, hands the source's timestamp back in whole
+        // seconds, the resolution curl 8.21.0 applies it at. A failure carries none.
         return result.IsSuccess
             ? result with { SourceLastWriteTimeUtc = TruncateToWholeSeconds(opened.LastWriteTimeUtc) }
             : result;
