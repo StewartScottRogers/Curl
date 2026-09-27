@@ -58,7 +58,12 @@ public interface ITransferContext
     /// then fails with exit 63 (<see cref="CurlExitCode.FilesizeExceeded" />); the limit
     /// counts body bytes only, so headers written to <see cref="HeaderOutput" /> do not use
     /// it up, and an upload ignores it. <c>Curl.Console</c> fills it from <c>--max-filesize</c>.
-    /// Only the <c>file://</c> handler enforces it; no other handler reads it yet.
+    /// The <c>file://</c> and <c>http</c>/<c>https</c> handlers enforce it; no other
+    /// handler reads it yet. Over HTTP a response whose Content-Length is over the limit
+    /// fails before any body is written, with exit 63 and <c>Maximum file size exceeded</c>;
+    /// a body with no Content-Length, or one that grows past it, is cut at the limit and
+    /// fails with exit 63 and <c>Exceeded the maximum allowed file size (N) with N bytes</c>
+    /// (ADR-0044).
     /// </remarks>
     long? MaxFileSize { get; }
 
