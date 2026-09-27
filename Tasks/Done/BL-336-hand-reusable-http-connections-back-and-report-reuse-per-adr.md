@@ -8,7 +8,7 @@ depends-on: [BL-335, BL-173]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-27
-completed:
+completed: 2026-09-27
 ---
 # BL-336 — Hand reusable HTTP connections back and report reuse per ADR-0050 in Curl.Protocol.Http
 
@@ -28,12 +28,12 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] Tests pin `PoolScheme` `http`/`https` on the target the handler connects to.
-- [ ] Tests pin that `MarkReusable` is called on the connection the handler was given for a `Content-Length` and a chunked keep-alive response, and not for `Connection: close`, HTTP/1.0 without keep-alive, a read-to-close body, exit 63, and a 101.
-- [ ] Tests pin `ConnectionCount` `0` when the connector returns `IsReused = true` and `1` otherwise.
-- [ ] Tests pin each of the three end-of-transfer lines byte for byte as ADR-0050 measured them.
-- [ ] A test pins that a reused connection failing before the first response byte is retried once on a new connection, with the measured `-v` text.
-- [ ] `dotnet build Curl.Protocol.Http.UnitLibrary -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes and no new test needs `TestCategory=Integration`; `Measure-CodeQuality.ps1` reports 100% line and branch coverage and no failing member for `Curl.Protocol.Http`.
+- [x] Tests pin `PoolScheme` `http`/`https` on the target the handler connects to.
+- [x] Tests pin that `MarkReusable` is called on the connection the handler was given for a `Content-Length` and a chunked keep-alive response, and not for `Connection: close`, HTTP/1.0 without keep-alive, a read-to-close body, exit 63, and a 101.
+- [x] Tests pin `ConnectionCount` `0` when the connector returns `IsReused = true` and `1` otherwise.
+- [x] Tests pin each of the three end-of-transfer lines byte for byte as ADR-0050 measured them.
+- [x] A test pins that a reused connection failing before the first response byte is retried once on a new connection, with the measured `-v` text.
+- [x] `dotnet build Curl.Protocol.Http.UnitLibrary -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes and no new test needs `TestCategory=Integration`; `Measure-CodeQuality.ps1` reports 100% line and branch coverage and no failing member for `Curl.Protocol.Http`.
 
 ## Notes
 
@@ -69,6 +69,15 @@ completed:
   bytes of both attempts. So the retry adds to the dead attempt's report (the WIP's
   `RetryEarlier`, which dropped the dead attempt's bytes, is removed) and the test pins
   `2 * ReuseRequest.Length`.
+- 2026-09-27, lane 2: restored lane 3's stash (`darkfactory BL-336 20260927-061859`) and
+  merged it with master's newer `HttpProtocolHandler` (ADR-0075 `FailedConnectReport`,
+  `RequestSent` timing, BL-319's `upload.CutShort`): `KeepsAlive` now also requires the
+  body delivered and no 101. BL-240 has left Doing, so the 12 `Curl.Console.UnitTests`
+  assertions now expect `PoolScheme` - `http`/`https` for a direct HTTP target and `http`
+  for a forward proxy (a new `ForwardProxy` constant); tunnelled targets, dialed by the
+  connector, keep none. `Measure-CodeQuality.ps1` found three members at complexity 12,
+  so `CanSendAgainOnFreshConnection`, `FailedOutcome` and `ConnectionEndLine` were split
+  out; `Curl.Protocol.Http.UnitLibrary` is now 100% line, 100% branch, 0 failing members.
 
 ## Log
 
@@ -78,3 +87,4 @@ completed:
 - 2026-09-27: Backlog -> Doing.
 - 2026-09-27: Doing -> Backlog. Needs Curl.Console.UnitTests (9 ConnectTarget assertions need PoolScheme), which BL-240 in Doing touches; code is complete and uncommitted for the shift to stash
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Done. HTTP handler pools connections under http/https, marks persisting ones reusable, reports num_connects 0 on reuse, writes curl's end-of-transfer -v lines and resends once when a pooled connection died
