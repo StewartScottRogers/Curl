@@ -43,3 +43,4 @@ Constraints: the BL-134 sink is the input (extend the console-side sink BL-130 a
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-27: Backlog -> Doing.
