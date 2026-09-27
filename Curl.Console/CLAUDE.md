@@ -83,7 +83,8 @@ are copied as they are (BL-236); `CurlCommandRunnerTransferEncodingTests` pins e
 bytes and output as BL-177, BL-180 and BL-315 measured them.
 With `-b` or `-c` the handler also gets the run's `CookieEngine`: one `CookieStore` shared by
 every URL, the `-b` files loaded before the first transfer (session cookies dropped under
-`-j`, a missing file ignored), the `-b name=value` strings sent after the stored cookies, and
+`-j`, a missing file ignored), the `-b name=value` strings sent after the stored cookies (left out when an `-H` value names
+`Cookie`, BL-291), and
 the `-c` jar written after every `http`/`https` transfer, after its `-w` output, whatever its
 outcome, and after no other scheme's (`-c -` prints it to standard output each time, in the
 mode standard output is in). With nothing but `-b` strings, received cookies are not stored,

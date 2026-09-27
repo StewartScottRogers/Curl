@@ -17,7 +17,9 @@ namespace Curl.Console;
 /// cookie engine - storing the <c>Set-Cookie</c> headers received and sending them to later
 /// requests - is on only when a <c>-b</c> file is named (one that does not exist included) or
 /// <c>-c</c> is given; with nothing but <c>-b name=value</c> strings, received cookies are
-/// never stored.
+/// never stored. The <c>-b name=value</c> strings are left out altogether when an <c>-H</c> value
+/// names <c>Cookie</c> (<c>-H "Cookie:"</c> included), while the stored cookies are still sent
+/// (BL-182 Notes, BL-291).
 /// </remarks>
 internal sealed class CookieEngine
 {
@@ -34,18 +36,7 @@ internal sealed class CookieEngine
 
     private CookieEngine(CommandLineOptions options)
     {
-        foreach (CommandLineCookie cookie in options.Cookies)
-        {
-            if (cookie.IsCookieString)
-            {
-                store.AddCookieString(cookie.Value);
-            }
-            else
-            {
-                cookieFiles.Add(cookie.Value);
-            }
-        }
-
+        AddCookies(options.Cookies, sendCookieStrings: !options.Headers.Any(NamesCookie));
         cookieJar = options.CookieJar;
         discardSessionCookies = options.JunkSessionCookies;
         HandlerStore = cookieFiles.Count > 0 || cookieJar is not null ? store : new CookieStringSender(store);
@@ -109,6 +100,37 @@ internal sealed class CookieEngine
         await standardOutput.WriteAsync(Encoding.Latin1.GetBytes(jar.ToString())).ConfigureAwait(false);
         await standardOutput.FlushAsync().ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Keeps each <c>-b</c> file to load and puts each <c>-b name=value</c> string in the store,
+    /// unless <paramref name="sendCookieStrings" /> is <see langword="false" />.
+    /// </summary>
+    /// <param name="cookies">The <c>-b</c> values, in command-line order.</param>
+    /// <param name="sendCookieStrings">Whether the <c>name=value</c> strings are sent.</param>
+    private void AddCookies(IEnumerable<CommandLineCookie> cookies, bool sendCookieStrings)
+    {
+        foreach (CommandLineCookie cookie in cookies)
+        {
+            if (!cookie.IsCookieString)
+            {
+                cookieFiles.Add(cookie.Value);
+            }
+            else if (sendCookieStrings)
+            {
+                store.AddCookieString(cookie.Value);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Tells whether an <c>-H</c> value names <c>Cookie</c> as curl's <c>Curl_checkheaders</c>
+    /// matches it: the name, in any case, followed by <c>:</c> or <c>;</c>.
+    /// </summary>
+    /// <param name="header">The <c>-H</c> value.</param>
+    /// <returns><see langword="true" /> when it names <c>Cookie</c>.</returns>
+    private static bool NamesCookie(string header) =>
+        header.StartsWith("Cookie:", StringComparison.OrdinalIgnoreCase)
+        || header.StartsWith("Cookie;", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Sends the <c>-b name=value</c> strings and stores nothing, as curl does while its cookie
