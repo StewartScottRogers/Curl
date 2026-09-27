@@ -93,10 +93,12 @@ public static class CommandLineWarning
 
     /// <summary>
     /// The line curl prints when it cannot read the modification time of the file a
-    /// <c>-z</c>/<c>--time-cond</c> value that is not a date names, for any reason but the file not
-    /// existing; <see cref="TimeConditionIsNotADate"/> follows it. Measured with
-    /// <c>curl -z "" -o NUL file:///Z:/.../global.json</c> (curl 8.21.0, Windows, 2026-09-26):
-    /// <c>Warning: Failed to get filetime: CreateFile failed: GetLastError 0x00000003</c>.
+    /// <c>-z</c>/<c>--time-cond</c> value that is not a date names, on Windows for any reason but the
+    /// file not existing and elsewhere for any reason; <see cref="TimeConditionIsNotADate"/> follows it.
+    /// Measured with <c>curl -z "" -o NUL file:///Z:/.../global.json</c> (curl 8.21.0, Windows, 2026-09-26):
+    /// <c>Warning: Failed to get filetime: CreateFile failed: GetLastError 0x00000003</c>; and with
+    /// <c>curl -z "" file:///dev/null</c> (curl 8.18.0, OpenSSL, Ubuntu, 2026-09-27):
+    /// <c>Warning: Failed to get filetime: No such file or directory</c>.
     /// </summary>
     /// <param name="reason">The failure <see cref="IDataFileReader.TryReadModificationTime"/> reported.</param>
     /// <returns>The warning line.</returns>

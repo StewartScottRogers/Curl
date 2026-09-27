@@ -721,8 +721,8 @@ public static class CommandLineOptionTable
     /// and that file's modification time, read through <paramref name="dataFileReader"/>, is the date.
     /// A value that is neither, empty included, is never refused: it clears any earlier condition and
     /// adds <see cref="CommandLineWarning.TimeConditionIsNotADate"/>, after
-    /// <see cref="CommandLineWarning.FailedToGetFileTime"/> when the lookup failed other than as file
-    /// not found, unless <c>-s</c> / <c>--silent</c> has been read.
+    /// <see cref="CommandLineWarning.FailedToGetFileTime"/> when the lookup reported a failure reason
+    /// (on Windows, any failure but file not found), unless <c>-s</c> / <c>--silent</c> has been read.
     /// </summary>
     private static CommandLineRefusal? SetTimeCondition(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
     {

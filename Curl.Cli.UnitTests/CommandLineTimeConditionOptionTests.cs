@@ -153,6 +153,62 @@ public sealed class CommandLineTimeConditionOptionTests
             result.WarningLines.ToArray());
     }
 
+    /// <summary>
+    /// curl 8.18.0 (OpenSSL build, Ubuntu), 2026-09-27, whose <c>getfiletime</c> is unchanged in 8.21.0:
+    /// <c>curl -z nodir/x file:///dev/null</c> and <c>curl -z "" ...</c> print <c>No such file or
+    /// directory</c>, <c>curl -z file/x ...</c> <c>Not a directory</c> and <c>curl -z noaccess/x ...</c>
+    /// <c>Permission denied</c> before the two illegal-date lines, then transfer, exit 0.
+    /// </summary>
+    /// <param name="value">The value after <c>-z</c>.</param>
+    /// <param name="failureKind">What the injected <c>stat</c> stand-in throws.</param>
+    /// <param name="expectedFirstLine">The filetime line curl prints.</param>
+    [TestMethod]
+    [DataRow("nodir/x", "DirectoryNotFound", "Warning: Failed to get filetime: No such file or directory")]
+    [DataRow("", "EmptyPath", "Warning: Failed to get filetime: No such file or directory")]
+    [DataRow("file/x", "NotADirectory", "Warning: Failed to get filetime: Not a directory")]
+    [DataRow("noaccess/x", "AccessDenied", "Warning: Failed to get filetime: Permission denied")]
+    public void Parse_TimeCondFileLookupFailsOffWindows_WarnsWithCurlsStatLineFirst(string value, string failureKind, string expectedFirstLine)
+    {
+        Exception failure = failureKind switch
+        {
+            "DirectoryNotFound" => new DirectoryNotFoundException(),
+            "EmptyPath" => new ArgumentException(),
+            "NotADirectory" => new IOException("Not a directory"),
+            _ => new UnauthorizedAccessException(),
+        };
+        DiskDataFileReader reader = new(_ => [], () => Stream.Null, _ => throw failure, reportsWindowsErrors: false);
+
+        CommandLineParseResult result = Parse(["-z", value, Url], reader);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsNull(result.Options.TimeCondition);
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                expectedFirstLine,
+                "Warning: Illegal date format for -z, --time-cond (and not a filename). ",
+                "Warning: Disabling time condition. See curl_getdate(3) for valid date syntax.",
+            },
+            result.WarningLines.ToArray());
+    }
+
+    /// <summary>
+    /// curl 8.18.0 (OpenSSL build, Ubuntu), 2026-09-27: <c>curl -z &lt;a file mode 000&gt; ...</c> prints
+    /// nothing and uses the file's time, because <c>stat</c> needs no read access.
+    /// </summary>
+    [TestMethod]
+    public void Parse_TimeCondUnreadableFileOffWindows_UsesItsModificationTimeSilently()
+    {
+        DateTime modified = new(2026, 9, 27, 14, 19, 38, DateTimeKind.Utc);
+        DiskDataFileReader reader = new(_ => throw new UnauthorizedAccessException(), () => Stream.Null, _ => modified, reportsWindowsErrors: false);
+
+        CommandLineParseResult result = Parse(["-z", "unreadable", Url], reader);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual(new TimeCondition(new DateTimeOffset(modified), TimeConditionKind.IfModifiedSince), result.Options.TimeCondition);
+        Assert.IsEmpty(result.WarningLines);
+    }
+
     /// <summary>curl 8.21.0: <c>curl -s -z "" ...</c> prints nothing on standard error.</summary>
     [TestMethod]
     public void Parse_SilentThenTimeCondFileLookupFails_DoesNotWarn()
