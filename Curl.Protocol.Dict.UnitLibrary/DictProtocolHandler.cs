@@ -14,8 +14,9 @@ namespace Curl.Protocol.Dict;
 /// Matches curl 8.21.0, measured against a loopback listener. The port defaults to 2628.
 /// The request, encoded by <see cref="DictRequest" />, is sent whole without waiting for
 /// the server's greeting. A server that closes without sending anything ends the transfer
-/// with exit 0 and nothing written. A connect failure is returned as the connector
-/// reported it. A path that decodes to a control character is refused after connecting,
+/// with exit 0 and nothing written. When <see cref="ITransferContext.Proxy" /> is set the
+/// connection is tunnelled through it, <c>-p</c> or not; the connector opens the tunnel
+/// (ADR-0056). A connect failure is returned as the connector reported it. A path that decodes to a control character is refused after connecting,
 /// with exit 3 (<see cref="CurlExitCode.UrlMalformat" />), nothing sent and nothing written.
 /// </remarks>
 public sealed class DictProtocolHandler(IConnector connector) : IProtocolHandler
@@ -52,7 +53,10 @@ public sealed class DictProtocolHandler(IConnector connector) : IProtocolHandler
         ArgumentNullException.ThrowIfNull(context);
 
         CurlUrl url = context.Url;
-        var target = new ConnectTarget(url.IdnHost, url.IsDefaultPort ? DefaultPort : url.Port, false);
+        var target = new ConnectTarget(url.IdnHost, url.IsDefaultPort ? DefaultPort : url.Port, false)
+        {
+            Proxy = context.Proxy,
+        };
         ConnectResult connect = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
         {
