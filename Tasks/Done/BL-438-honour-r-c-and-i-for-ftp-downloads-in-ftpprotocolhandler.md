@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: protocol
 depends-on: [BL-431]
-touches: [Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests, Record-CurlExchange.ps1]
+touches: [Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests, Record-CurlExchange.ps1, Documentation/Planning/Decisions/ADR-0093-ftp-downloads-hold-curls-measured-conversation-in-passive-mode-only.md]
 requirement: none
 created: 2026-09-27
-completed:
+completed: 2026-09-27
 ---
 # BL-438 — Honour -r, -C and -I for ftp:// downloads in FtpProtocolHandler
 
@@ -28,15 +28,34 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] Tests in `Curl.Protocol.Ftp.UnitTests/FtpProtocolHandlerTests.cs` (or a new `FtpProtocolHandlerRangeTests.cs` beside it) pin, for each of `-r 0-4`, `-r 5-`, `-r -3`, `-C 5`, `-C -` and `-I` on a file, the command bytes the handler sends and the output bytes it writes, both matching curl 8.21.0 as recorded with `Record-CurlExchange.ps1 -Ftp`.
-- [ ] A refused `REST` and a `-C` offset past the file's `SIZE` each return the `CurlExitCode` and message curl 8.21.0 printed, pinned in a named test.
-- [ ] The measured cases (curl version, date, what was sent and printed) are recorded in an ADR (addendum to ADR-0093 or a new one) marked "Decided by Claude under Stewart's delegation".
-- [ ] `dotnet build Curl.Protocol.Ftp.UnitLibrary -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes; no new test needs `TestCategory=Integration`.
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1` reports 100% line and branch coverage, complexity at most 10 and CRAP at most 30 for every member of `Curl.Protocol.Ftp.UnitLibrary`.
+- [x] Tests in `Curl.Protocol.Ftp.UnitTests/FtpProtocolHandlerTests.cs` (or a new `FtpProtocolHandlerRangeTests.cs` beside it) pin, for each of `-r 0-4`, `-r 5-`, `-r -3`, `-C 5`, `-C -` and `-I` on a file, the command bytes the handler sends and the output bytes it writes, both matching curl 8.21.0 as recorded with `Record-CurlExchange.ps1 -Ftp`.
+- [x] A refused `REST` and a `-C` offset past the file's `SIZE` each return the `CurlExitCode` and message curl 8.21.0 printed, pinned in a named test.
+- [x] The measured cases (curl version, date, what was sent and printed) are recorded in an ADR (addendum to ADR-0093 or a new one) marked "Decided by Claude under Stewart's delegation".
+- [x] `dotnet build Curl.Protocol.Ftp.UnitLibrary -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes; no new test needs `TestCategory=Integration`.
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1` reports 100% line and branch coverage, complexity at most 10 and CRAP at most 30 for every member of `Curl.Protocol.Ftp.UnitLibrary`.
 
 ## Notes
+
+- Measured 26 cases with curl 8.21.0 on 2026-09-27; the table is ADR-0093's BL-438 addendum.
+  `Record-CurlExchange.ps1 -Ftp` now answers `REST` 350 (serving data from that offset,
+  clamped to the file), `MDTM` 213 with a fixed time, and tolerates an early-closed data
+  connection.
+- Design: `FtpDownloadWindow` (offset + optional byte limit, as `lib/ftp.c` keeps them);
+  `FtpDownloadSession` sends `REST` for a non-zero offset, stops at the limit and sends
+  `ABOR`, and answers `-I` with `MDTM`/`TYPE I`/`SIZE`/`REST 0` and curl's three header
+  lines on `HeaderOutput`, with no data connection. `FtpHeadHeaderLines` formats them.
+- `-C -` is resolved to a number by `Curl.Console` before the handler runs, so it is pinned
+  as `ResumeFrom` 5 (existing file) and 0 (no file), both measured.
+- Touches widened to ADR-0093's file for the addendum; no task in Doing names it.
+- The test runner `FtpRun` moved from `FtpProtocolHandlerTests` to `Fakes/FtpRun.cs` so the
+  new `FtpProtocolHandlerRangeTests` can share it. 114 tests in the project, all green;
+  quality: 100% line and branch, worst CRAP 10.
+- Unmeasured choices (in the ADR): `-r` ignored for a directory listing; a 14-digit MDTM
+  time that is no real date writes no `Last-Modified`; a refused header write is exit 23
+  with the `file://` text.
 
 ## Log
 
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Done. ftp:// downloads honour -r, -C and -I with curl 8.21.0's REST/ABOR/MDTM conversation, output and exit codes
