@@ -47,7 +47,7 @@ completed: 2026-09-27
   it wherever it rewinds a `-T` upload: every followed hop that keeps the body (307, 308,
   and 301/302/303 under `--post30x`).
 - A body with a non-seekable file part (pipe, device) is still sent as what is left of
-  it; curl's behaviour there is unmeasured, filed as BL-357.
+  it; curl's behaviour there is unmeasured, filed as BL-359.
 - `Measure-CodeQuality.ps1`: Curl.Core.UnitLibrary 100% line and branch, 0 failing.
   Curl.Console production code is unchanged by this task (only its tests); its one
   failing member, `DiskWriteOutFileOpener.TryOpen`, is covered only by BL-280's

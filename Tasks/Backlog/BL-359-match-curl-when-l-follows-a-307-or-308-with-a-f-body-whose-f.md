@@ -1,5 +1,5 @@
 ---
-id: BL-357
+id: BL-359
 title: Match curl when -L follows a 307 or 308 with a -F body whose file cannot seek
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-357 — Match curl when -L follows a 307 or 308 with a -F body whose file cannot seek
+# BL-359 — Match curl when -L follows a 307 or 308 with a -F body whose file cannot seek
 
 ## Goal
 
