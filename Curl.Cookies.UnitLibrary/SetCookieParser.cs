@@ -11,7 +11,7 @@ namespace Curl.Cookies;
 /// </summary>
 /// <remarks>
 /// The Public Suffix List is not consulted here: a <c>Domain</c> that is a public suffix is refused
-/// by the cookie store (BL-223), not by this parser.
+/// by <see cref="CookieStore"/>, not by this parser.
 /// </remarks>
 public static class SetCookieParser
 {

@@ -10,8 +10,8 @@ namespace Curl.Cookies;
 /// <c>CookieStoreTests</c> records.
 /// </summary>
 /// <remarks>
-/// The store never reads a clock: every call is handed the time it acts at. It does not yet refuse a
-/// cookie set on a public suffix (BL-223). It loads Netscape cookie files (<c>-b</c>, <c>-j</c>), keeps
+/// The store never reads a clock: every call is handed the time it acts at. It refuses a received
+/// cookie whose domain is a public suffix, by the embedded Public Suffix List snapshot. It loads Netscape cookie files (<c>-b</c>, <c>-j</c>), keeps
 /// <c>-b name=value</c> strings and writes the <c>-c</c> jar, as <see cref="NetscapeCookieFile"/> reads and
 /// writes them.
 /// </remarks>
@@ -219,7 +219,10 @@ public sealed class CookieStore : ICookieStore
     /// <inheritdoc/>
     /// <remarks>
     /// <para>
-    /// Each header is read by <see cref="SetCookieParser"/>; one it refuses is skipped. A cookie with
+    /// Each header is read by <see cref="SetCookieParser"/>; one it refuses is skipped, and so is one whose
+    /// domain the host may not set by the Public Suffix List: a domain other than the host itself must be
+    /// longer than the public suffix the host ends in (<c>Domain=co.uk</c> from <c>www.example.co.uk</c> is
+    /// dropped, <c>Domain=example.co.uk</c> kept), and a host longer than 255 characters sets no cookie. A cookie with
     /// the name (case-sensitively), domain (in any case), host-only flag and path (case-sensitively) of
     /// a stored one replaces it in its place; any other is added as the newest. A cookie that is not
     /// <c>Secure</c>, from an origin that is not secure, is dropped when a stored <c>Secure</c> cookie
@@ -239,6 +242,7 @@ public sealed class CookieStore : ICookieStore
         ArgumentNullException.ThrowIfNull(setCookieHeaders);
 
         bool secureOrigin = CookieOrigin.IsSecure(url);
+        string host = CookieOrigin.HostOf(url);
         int stored = 0;
         foreach (string header in setCookieHeaders)
         {
@@ -248,7 +252,7 @@ public sealed class CookieStore : ICookieStore
             }
 
             Cookie? cookie = SetCookieParser.Parse(header, url, now);
-            if (cookie is not null && (secureOrigin || !OverlaysSecureCookie(cookie)))
+            if (cookie is not null && MayStore(cookie, host, secureOrigin))
             {
                 Store(cookie);
                 stored++;
@@ -257,6 +261,10 @@ public sealed class CookieStore : ICookieStore
 
         RemoveExpired(now);
     }
+
+    /// <summary>The host may set the cookie's domain by the Public Suffix List, and the cookie does not overlay a <c>Secure</c> one it may not.</summary>
+    private bool MayStore(Cookie cookie, string host, bool secureOrigin) =>
+        PublicSuffixList.Embedded.IsCookieDomainAcceptable(host, cookie.Domain!) && (secureOrigin || !OverlaysSecureCookie(cookie));
 
     private void Store(Cookie cookie)
     {
