@@ -362,6 +362,64 @@ public sealed class HttpRequestHeadFormatterTests
         Assert.AreEqual("GET / HTTP/1.1\r\n" + DefaultHeaders + "\r\n", Encoding.Latin1.GetString(head));
     }
 
+    /// <summary>
+    /// Measured through <c>-x http://127.0.0.1:18183</c> (BL-183 Notes): a <c>-H</c> value naming
+    /// <c>Proxy-Connection</c> replaces or removes curl's, in any letter case, while curl's
+    /// <c>Proxy-Authorization</c> is sent beside a custom one.
+    /// </summary>
+    [TestMethod]
+    [DataRow(
+        "http://example.com",
+        new[] { "Proxy-Connection: close", "Proxy-Authorization: X" },
+        "Basic dTpw",
+        "GET http://example.com/ HTTP/1.1\r\nHost: example.com\r\nProxy-Authorization: Basic dTpw\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+            + "Proxy-Connection: close\r\nProxy-Authorization: X\r\n\r\n",
+        DisplayName = "-H Proxy-Connection and Proxy-Authorization")]
+    [DataRow(
+        "http://example.com/",
+        new[] { "Proxy-Connection:" },
+        null,
+        "GET http://example.com/ HTTP/1.1\r\nHost: example.com\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
+        DisplayName = "-H Proxy-Connection: removes it")]
+    [DataRow(
+        "http://Example.COM",
+        new[] { "proxy-connection: x" },
+        null,
+        "GET http://Example.COM/ HTTP/1.1\r\nHost: Example.COM\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nproxy-connection: x\r\n\r\n",
+        DisplayName = "-H proxy-connection in lower case")]
+    [DataRow(
+        "http://example.com:8080/p",
+        new[] { "X-A: 1" },
+        "Basic cHU6cHA=",
+        "GET http://example.com:8080/p HTTP/1.1\r\nHost: example.com:8080\r\nProxy-Authorization: Basic cHU6cHA=\r\nUser-Agent: curl/8.21.0\r\n"
+            + "Accept: */*\r\nProxy-Connection: Keep-Alive\r\nX-A: 1\r\n\r\n",
+        DisplayName = "Port kept, -H after Proxy-Connection")]
+    public void Format_ForwardProxy_SendsMeasuredHead(string url, string[] headers, string? proxyAuthorization, string expected)
+    {
+        HttpRequestOptions options = new() { Headers = headers };
+
+        byte[] head = HttpRequestHeadFormatter.Format(new Uri(url), options, forwardProxy: true, proxyAuthorization: proxyAuthorization);
+
+        Assert.AreEqual(expected, Encoding.Latin1.GetString(head));
+    }
+
+    /// <summary>
+    /// Measured: <c>curl -x http://127.0.0.1:18183 -H "Host: other" -b a=b -e r --compressed
+    /// http://example.com/h</c> sends <c>Proxy-Connection</c> after <c>Referer</c> and before
+    /// <c>Cookie</c>; <c>Accept-Encoding</c> leaves out <c>zstd</c> (ADR-0020).
+    /// </summary>
+    [TestMethod]
+    public void Format_ForwardProxyWithRefererAndCookie_SendsProxyConnectionBetweenThem()
+    {
+        const string expected = "GET http://example.com/h HTTP/1.1\r\nHost: other\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+            + "Accept-Encoding: deflate, gzip, br\r\nReferer: r\r\nProxy-Connection: Keep-Alive\r\nCookie: a=b\r\n\r\n";
+        HttpRequestOptions options = new() { Headers = ["Host: other"], Referer = "r", Compressed = true };
+
+        byte[] head = HttpRequestHeadFormatter.Format(new Uri("http://example.com/h"), options, cookie: "a=b", forwardProxy: true);
+
+        Assert.AreEqual(expected, Encoding.Latin1.GetString(head));
+    }
+
     private static void AssertHead(string expected, Uri url, HttpRequestOptions? options)
     {
         Assert.AreEqual(expected, Encoding.Latin1.GetString(HttpRequestHeadFormatter.Format(url, options)));

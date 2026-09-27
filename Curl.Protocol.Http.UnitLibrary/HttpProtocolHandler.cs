@@ -79,6 +79,18 @@ namespace Curl.Protocol.Http;
 /// or a 401 included, hands its <c>Set-Cookie</c> values to it in received order, before the
 /// head is written. Measured on curl 8.21.0 (BL-182 Notes).
 /// </para>
+/// <para>
+/// With <see cref="HttpRequestOptions.ForwardProxy" /> an HTTP-kind proxy
+/// (<see cref="ProxyKind.Http" />, <see cref="ProxyKind.Http10" /> or
+/// <see cref="ProxyKind.Https" />), an <c>http</c> URL and no
+/// <see cref="HttpRequestOptions.ProxyTunnel" />, the handler connects to the proxy itself (with
+/// TLS for <see cref="ProxyKind.Https" />) and sends the request in absolute form, with the
+/// authenticator's pre-emptive <c>Proxy-Authorization</c> for the proxy's credential and
+/// <c>Proxy-Connection: Keep-Alive</c>. Any other proxy - an <c>https</c> URL, <c>-p</c>, or a
+/// SOCKS kind - is handed to the connector as <see cref="ConnectTarget.Proxy" /> to tunnel
+/// through, and the request goes in origin form over the connection it returns. Measured on
+/// curl 8.21.0 (BL-183 Notes).
+/// </para>
 /// </remarks>
 public sealed class HttpProtocolHandler(
     IConnector connector,
@@ -122,7 +134,12 @@ public sealed class HttpProtocolHandler(
             options.BearerToken,
             options.AuthSchemes,
             IsProxy: false);
-        HttpRequestPlan plan = new(context, options, framing, authRequest, Authenticator.CreateAuthorization(authRequest, []));
+        ProxyEndpoint? forwardProxy = ForwardProxyOf(context.Url, options);
+        HttpRequestPlan plan = new(context, options, framing, authRequest, Authenticator.CreateAuthorization(authRequest, []))
+        {
+            ForwardProxy = forwardProxy,
+            ProxyAuthorization = forwardProxy is null ? null : ProxyAuthorizationFor(authRequest, forwardProxy),
+        };
         return await ConnectAndExchangeAsync(plan, earlier: null).ConfigureAwait(false);
     }
 
@@ -132,6 +149,37 @@ public sealed class HttpProtocolHandler(
     /// </summary>
     private static ConnectTarget TargetOf(Uri url) =>
         new(url.DnsSafeHost, url.Port, string.Equals(url.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Builds the connect target for <paramref name="plan" />: the forward proxy itself, with
+    /// TLS for an HTTPS proxy; or else the URL's host, tunnelled through the transfer's proxy
+    /// when it has one.
+    /// </summary>
+    private static ConnectTarget TargetOf(HttpRequestPlan plan) =>
+        plan.ForwardProxy is { } proxy
+            ? new ConnectTarget(proxy.Host, proxy.Port, proxy.Kind == ProxyKind.Https)
+            : TargetOf(plan.Context.Url) with { Proxy = plan.Options.ForwardProxy };
+
+    /// <summary>
+    /// Gives the proxy the request is forwarded through in absolute form: an HTTP-kind proxy,
+    /// for an <c>http</c> URL, without <c>-p</c>. Every other proxy is tunnelled through by
+    /// the connector, and <see langword="null" /> is returned for it.
+    /// </summary>
+    private static ProxyEndpoint? ForwardProxyOf(Uri url, HttpRequestOptions options) =>
+        options.ForwardProxy is { Kind: ProxyKind.Http or ProxyKind.Http10 or ProxyKind.Https } proxy
+            && !options.ProxyTunnel
+            && !TargetOf(url).UseTls
+            ? proxy
+            : null;
+
+    /// <summary>
+    /// Asks the authenticator for the pre-emptive <c>Proxy-Authorization</c> value: Basic, curl's
+    /// default proxy scheme, for the proxy's credential, with no bearer token.
+    /// </summary>
+    private string? ProxyAuthorizationFor(HttpAuthRequest originRequest, ProxyEndpoint proxy) =>
+        Authenticator.CreateAuthorization(
+            originRequest with { Credential = proxy.Credential, BearerToken = null, AllowedSchemes = HttpAuthSchemes.Basic, IsProxy = true },
+            []);
 
     /// <summary>
     /// Opens a connection and sends <paramref name="plan" /> on it, then its authentication
@@ -146,7 +194,7 @@ public sealed class HttpProtocolHandler(
     private async ValueTask<TransferResult> ConnectAndExchangeAsync(HttpRequestPlan plan, TransferReport? earlier)
     {
         ITransferContext context = plan.Context;
-        ConnectResult connect = await connector.ConnectAsync(TargetOf(context.Url), context.CancellationToken)
+        ConnectResult connect = await connector.ConnectAsync(TargetOf(plan), context.CancellationToken)
             .ConfigureAwait(false);
         if (connect.Connection is not { } connection)
         {
@@ -186,7 +234,14 @@ public sealed class HttpProtocolHandler(
         HttpRequestOptions options = plan.Options;
         HttpRequestFraming framing = plan.Framing;
         CancellationToken cancellationToken = context.CancellationToken;
-        byte[] request = HttpRequestHeadFormatter.Format(context.Url, options, context.NoBody, plan.Authorization, CookieHeaderFor(context));
+        byte[] request = HttpRequestHeadFormatter.Format(
+            context.Url,
+            options,
+            context.NoBody,
+            plan.Authorization,
+            CookieHeaderFor(context),
+            plan.ForwardProxy is not null,
+            plan.ProxyAuthorization);
         await connection.WriteAsync(request, cancellationToken).ConfigureAwait(false);
         await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
 
@@ -469,12 +524,28 @@ public sealed class HttpProtocolHandler(
         public string? Authorization { get; } = Authorization;
 
         /// <summary>
+        /// Gets the proxy the request is forwarded through in absolute form, or
+        /// <see langword="null" /> when it goes to the origin, directly or through a tunnel.
+        /// </summary>
+        public ProxyEndpoint? ForwardProxy { get; init; }
+
+        /// <summary>
+        /// Gets the <c>Proxy-Authorization</c> value to send, or <see langword="null" /> to
+        /// send none.
+        /// </summary>
+        public string? ProxyAuthorization { get; init; }
+
+        /// <summary>
         /// Makes the same request sent with <paramref name="authorization" /> instead.
         /// </summary>
         /// <param name="authorization">The <c>Authorization</c> value the retry is sent with.</param>
         /// <returns>The retry's plan.</returns>
         public HttpRequestPlan WithAuthorization(string authorization) =>
-            new(Context, Options, Framing, AuthRequest, authorization);
+            new(Context, Options, Framing, AuthRequest, authorization)
+            {
+                ForwardProxy = ForwardProxy,
+                ProxyAuthorization = ProxyAuthorization,
+            };
     }
 
     /// <summary>

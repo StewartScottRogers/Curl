@@ -9,14 +9,17 @@ namespace Curl.Protocol.Http;
 /// Formats the head of an HTTP/1.1 request - the request line, the headers and the empty
 /// line after them - byte for byte as curl 8.21.0 sends it for <c>-X</c>, <c>-H</c>,
 /// <c>-A</c>, <c>-e</c>, <c>-I</c>, <c>--compressed</c>, an <c>Authorization</c> value, a
-/// <c>Cookie</c> value and a request body. Every rule was measured (BL-172, BL-175, BL-177,
-/// BL-181 and BL-182 Notes).
+/// <c>Cookie</c> value, a request body and a forward proxy. Every rule was measured (BL-172,
+/// BL-175, BL-177, BL-181, BL-182 and BL-183 Notes).
 /// </summary>
 /// <remarks>
-/// curl's own headers come first, in the order <c>Host</c>, <c>Authorization</c>, <c>User-Agent</c>,
-/// <c>Accept</c>, <c>Accept-Encoding</c> (for <c>--compressed</c>), <c>Referer</c>, each
-/// left out when an <c>-H</c> value names it, then the cookie store's <c>Cookie</c>, which is
-/// sent even when an <c>-H</c> value names <c>Cookie</c>; the <c>-H</c> values follow in
+/// curl's own headers come first, in the order <c>Host</c>, <c>Proxy-Authorization</c>,
+/// <c>Authorization</c>, <c>User-Agent</c>, <c>Accept</c>, <c>Accept-Encoding</c> (for
+/// <c>--compressed</c>), <c>Referer</c>, <c>Proxy-Connection: Keep-Alive</c> (through a forward
+/// proxy), each left out when an <c>-H</c> value names it, then the cookie store's
+/// <c>Cookie</c>; <c>Cookie</c> and <c>Proxy-Authorization</c> are sent even when an <c>-H</c>
+/// value names them. Through a forward proxy the request target is the absolute form,
+/// <c>http://host[:port]/path?query</c>, with no user information or fragment. The <c>-H</c> values follow in
 /// command-line order. A custom <c>Host</c> is the exception: it takes the <c>Host</c> slot. A request with a body ends with <c>Content-Length</c> (or
 /// <c>Transfer-Encoding: chunked</c> when the length is unknown), <c>Content-Type</c> and
 /// <c>Expect: 100-continue</c> as <see cref="HttpRequestFraming" /> decides, each again left
@@ -57,30 +60,56 @@ internal static class HttpRequestHeadFormatter
     /// <param name="cookie">
     /// The <c>Cookie</c> value the cookie store gave, or <see langword="null" /> to send none.
     /// </param>
+    /// <param name="forwardProxy">
+    /// <see langword="true" /> when the request is sent to a forward proxy rather than the
+    /// origin: its target is the absolute form and <c>Proxy-Connection: Keep-Alive</c> is sent.
+    /// </param>
+    /// <param name="proxyAuthorization">
+    /// The <c>Proxy-Authorization</c> value the authenticator gave, or <see langword="null" />
+    /// to send none.
+    /// </param>
     /// <returns>The head's bytes, ending in the empty line.</returns>
-    internal static byte[] Format(Uri url, HttpRequestOptions? options, bool noBody = false, string? authorization = null, string? cookie = null)
+    internal static byte[] Format(
+        Uri url,
+        HttpRequestOptions? options,
+        bool noBody = false,
+        string? authorization = null,
+        string? cookie = null,
+        bool forwardProxy = false,
+        string? proxyAuthorization = null)
     {
         options ??= new HttpRequestOptions();
         HttpCustomHeader[] customHeaders = [.. options.Headers.Select(HttpCustomHeader.Parse)];
         HttpRequestFraming framing = HttpRequestFraming.Of(options, customHeaders, noBody);
         StringBuilder head = new();
-        head.Append(framing.Method).Append(' ').Append(url.PathAndQuery).Append(" HTTP/1.1\r\n");
+        head.Append(framing.Method).Append(' ').Append(forwardProxy ? AbsoluteForm(url) : url.PathAndQuery).Append(" HTTP/1.1\r\n");
         string? hostLine = FormatHostLine(url, customHeaders);
         if (hostLine is not null)
         {
             head.Append(hostLine).Append("\r\n");
         }
 
+        AppendAlways(head, "Proxy-Authorization", proxyAuthorization);
         AppendUnlessOverridden(head, customHeaders, "Authorization", authorization);
-        AppendUnlessOverridden(head, customHeaders, "User-Agent", options.UserAgent ?? DefaultUserAgent);
-        AppendUnlessOverridden(head, customHeaders, "Accept", "*/*");
-        AppendUnlessOverridden(head, customHeaders, "Accept-Encoding", options.Compressed ? AcceptEncoding : null);
-        AppendUnlessOverridden(head, customHeaders, "Referer", options.Referer);
-        AppendCookie(head, cookie);
+        AppendClientHeaders(head, customHeaders, options);
+        AppendUnlessOverridden(head, customHeaders, "Proxy-Connection", forwardProxy ? "Keep-Alive" : null);
+        AppendAlways(head, "Cookie", cookie);
         AppendCustomHeaders(head, customHeaders, hostLine is not null);
         AppendBodyHeaders(head, customHeaders, framing);
         head.Append("\r\n");
         return Encoding.Latin1.GetBytes(head.ToString());
+    }
+
+    /// <summary>
+    /// Appends <c>User-Agent</c>, <c>Accept</c>, <c>Accept-Encoding</c> (for
+    /// <c>--compressed</c>) and <c>Referer</c>, each unless an <c>-H</c> value names it.
+    /// </summary>
+    private static void AppendClientHeaders(StringBuilder head, HttpCustomHeader[] customHeaders, HttpRequestOptions options)
+    {
+        AppendUnlessOverridden(head, customHeaders, "User-Agent", options.UserAgent ?? DefaultUserAgent);
+        AppendUnlessOverridden(head, customHeaders, "Accept", "*/*");
+        AppendUnlessOverridden(head, customHeaders, "Accept-Encoding", options.Compressed ? AcceptEncoding : null);
+        AppendUnlessOverridden(head, customHeaders, "Referer", options.Referer);
     }
 
     /// <summary>
@@ -99,8 +128,22 @@ internal static class HttpRequestHeadFormatter
             }
         }
 
+        return $"Host: {HostAndPort(url)}";
+    }
+
+    /// <summary>
+    /// Formats the absolute-form request target a forward proxy is sent: the scheme, the host
+    /// and port as the <c>Host</c> line has them, then the path and query.
+    /// </summary>
+    private static string AbsoluteForm(Uri url) => $"{url.Scheme}://{HostAndPort(url)}{url.PathAndQuery}";
+
+    /// <summary>
+    /// Formats the URL's host as written, with its port unless it is the scheme's default.
+    /// </summary>
+    private static string HostAndPort(Uri url)
+    {
         string port = url.IsDefaultPort ? string.Empty : string.Create(CultureInfo.InvariantCulture, $":{url.Port}");
-        return $"Host: {HostAsWritten(url)}{port}";
+        return HostAsWritten(url) + port;
     }
 
     /// <summary>
@@ -123,14 +166,15 @@ internal static class HttpRequestHeadFormatter
     }
 
     /// <summary>
-    /// Appends the cookie store's <c>Cookie</c> line, whatever the <c>-H</c> values name, as
-    /// curl 8.21.0 sends its cookie engine's line beside a custom <c>Cookie</c> (BL-182 Notes).
+    /// Appends a line whatever the <c>-H</c> values name, as curl 8.21.0 sends its cookie
+    /// engine's <c>Cookie</c> and its <c>Proxy-Authorization</c> beside custom ones (BL-182 and
+    /// BL-183 Notes).
     /// </summary>
-    private static void AppendCookie(StringBuilder head, string? cookie)
+    private static void AppendAlways(StringBuilder head, string name, string? value)
     {
-        if (!string.IsNullOrEmpty(cookie))
+        if (!string.IsNullOrEmpty(value))
         {
-            head.Append("Cookie: ").Append(cookie).Append("\r\n");
+            head.Append(name).Append(": ").Append(value).Append("\r\n");
         }
     }
 
