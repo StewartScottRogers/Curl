@@ -251,6 +251,43 @@ public sealed class RedirectFollowerTests
     }
 
     [TestMethod]
+    [DataRow(301)]
+    [DataRow(302)]
+    [DataRow(307)]
+    [DataRow(308)]
+    public async Task FollowAsync_SeekableUploadRedirectKeepingPut_ResendsUploadFromItsStart(int status)
+    {
+        // curl -L --max-redirs 2 -T up.txt: every PUT hop sends "abc" with Content-Length: 3.
+        ScriptedHandler handler = new(Redirect(status, "http://127.0.0.1:18203/b"), Redirect(status, Next), Ok(200, 0));
+
+        await Follow(handler, Context(Location(), upload: true));
+
+        Assert.HasCount(3, handler.Uploads);
+        foreach (byte[] sent in handler.Uploads)
+        {
+            CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, sent);
+        }
+    }
+
+    [TestMethod]
+    [DataRow(301)]
+    [DataRow(307)]
+    public async Task FollowAsync_NonSeekableUploadRedirectKeepingPut_ResendsWhatIsLeftOfIt(int status)
+    {
+        // curl -L --max-redirs 1 -T - with "abc" on stdin: PUT /a sends chunked "abc", then
+        // PUT /next sends an empty chunked body - stdin cannot be rewound (BL-253's notes).
+        ScriptedHandler handler = new(Redirect(status, Next), Ok(200, 0));
+        TransferContext context = Context(Location(), uploadStream: new NonSeekableStream([1, 2, 3]));
+
+        TransferResult result = await Follow(handler, context);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.HasCount(2, handler.Uploads);
+        CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, handler.Uploads[0]);
+        Assert.IsEmpty(handler.Uploads[1]);
+    }
+
+    [TestMethod]
     public async Task FollowAsync_HeadAnswered303_StaysNoBody()
     {
         // curl -L -I --max-redirs 1, 303: HEAD /a then HEAD /next.
@@ -531,14 +568,15 @@ public sealed class RedirectFollowerTests
         bool noBody = false,
         bool credentials = false,
         string url = First,
-        TimeProvider? timeProvider = null) =>
+        TimeProvider? timeProvider = null,
+        Stream? uploadStream = null) =>
         new()
         {
             Url = new Uri(url),
             Output = Stream.Null,
             Http = http,
             PostData = postData ? new byte[] { 1 } : null,
-            Upload = upload ? new MemoryStream([1, 2, 3]) : null,
+            Upload = upload ? new MemoryStream([1, 2, 3]) : uploadStream,
             NoBody = noBody,
             Credentials = credentials ? new NetworkCredential("u", "p") : null,
             TimeProvider = timeProvider ?? TimeProvider.System,
@@ -588,11 +626,28 @@ public sealed class RedirectFollowerTests
 
         public IReadOnlyCollection<string> SupportedSchemes => ["http", "https", "ftp", "ftps", "file", "dict", "scp"];
 
+        public List<byte[]> Uploads { get; } = [];
+
         public ValueTask<TransferResult> ExecuteAsync(ITransferContext context)
         {
             Contexts.Add(context);
+            if (context.Upload is { } upload)
+            {
+                using MemoryStream sent = new();
+                upload.CopyTo(sent);
+                Uploads.Add(sent.ToArray());
+            }
+
             return ValueTask.FromResult(script[Math.Min(Contexts.Count, script.Length) - 1]);
         }
+    }
+
+    /// <summary>
+    /// A readable stream that cannot seek, as standard input is for <c>-T -</c>.
+    /// </summary>
+    private sealed class NonSeekableStream(byte[] content) : MemoryStream(content)
+    {
+        public override bool CanSeek => false;
     }
 
     /// <summary>

@@ -72,6 +72,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher)
         RedirectPolicy policy)
     {
         RedirectChain chain = new(context.TimeProvider);
+        long? uploadStart = SeekableStart(context.Upload);
         ITransferContext hop = context;
         bool bodyDropped = false;
         while (true)
@@ -90,6 +91,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher)
             }
 
             bodyDropped |= DropsBody(result.Report!.ResponseCode, hop, policy);
+            RewindUpload(context.Upload, uploadStart, bodyDropped);
             hop = NextHop(context, next, http, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next));
             chain.Followed(target);
         }
@@ -127,6 +129,18 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher)
             303 => posts ? !policy.KeepPostOn303 : hop.Upload is not null,
             _ => false,
         };
+    }
+
+    private static long? SeekableStart(Stream? upload) =>
+        upload is { CanSeek: true } ? upload.Position : null;
+
+    private static void RewindUpload(Stream? upload, long? start, bool bodyDropped)
+    {
+        if (!bodyDropped && start is { } position)
+        {
+            // A seekable upload's start was only recorded when the upload exists.
+            upload!.Position = position;
+        }
     }
 
     private static bool IsSameOrigin(Uri first, Uri next) =>
