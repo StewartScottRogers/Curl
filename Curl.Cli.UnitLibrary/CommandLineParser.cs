@@ -29,7 +29,7 @@ namespace Curl.Cli;
 /// place of the option (see <see cref="ConfigFileApplier"/>). Only the overload taking a
 /// <see cref="DefaultConfigFileSearch"/> reads the default config file (<c>.curlrc</c>) first; the others
 /// never do, so what they return does not depend on the machine they run on, except that a
-/// <c>--variable %name</c> reads this process's environment (ADR-0063). An option given as
+/// <c>--variable %name</c> reads this process's environment (ADR-0064). An option given as
 /// <c>--expand-&lt;name&gt;</c> has its value expanded by <see cref="VariableExpansion"/> first.
 /// <c>-V</c> / <c>--version</c> on the command line ends parsing where it stands, even inside a bundle,
 /// with <see cref="CommandLineParseResult.VersionRequested(CommandLineOptions)"/>: the arguments after it

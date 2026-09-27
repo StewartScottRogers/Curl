@@ -15,7 +15,7 @@ namespace Curl.Cli;
 /// Measured with the local curl 8.21.0 on 2026-09-27 through <c>--expand-data</c> against a loopback
 /// server, and checked against <c>src/var.c</c> at tag <c>curl-8_21_0</c>. The value is expanded as
 /// UTF-8 bytes and the result read back as UTF-8, so bytes that are not UTF-8 (from a file, or from
-/// <c>64dec</c>) become U+FFFD; see ADR-0063.
+/// <c>64dec</c>) become U+FFFD; see ADR-0064.
 /// </remarks>
 internal static class VariableExpansion
 {

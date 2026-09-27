@@ -14,7 +14,7 @@ namespace Curl.Cli;
 /// <remarks>
 /// Measured with the local curl 8.21.0 on 2026-09-27 (through <c>--expand-data</c> against a loopback
 /// server, from PowerShell, since Git Bash rewrites some arguments) and checked against <c>src/var.c</c>
-/// at tag <c>curl-8_21_0</c>. The environment is this process's; see ADR-0063.
+/// at tag <c>curl-8_21_0</c>. The environment is this process's; see ADR-0064.
 /// </remarks>
 internal static class VariableDefinition
 {

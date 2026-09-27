@@ -78,6 +78,7 @@ choices do not need one.
 | [0061](ADR-0061-an-https-proxy-is-tunnelled-over-its-own-tls-handshake-through-the-transfers-tls-provider.md) | An HTTPS proxy gets TLS to the proxy host, then the HTTP-proxy CONNECT inside it, then target TLS inside that; the proxy handshake uses the transfer's TLS provider until the `--proxy-*` TLS options land (BL-362) | Accepted | 2026-09-27 |
 | [0062](ADR-0062-form-parts-from-standard-input-read-it-once-across-urls.md) | `-F name=@-` and `-F name=<-` read standard input once: the first URL matches curl, a later part or URL sends an empty part with a matching `Content-Length` and exit 0, where curl declares the first length and exits 26 | Accepted | 2026-09-27 |
 | [0063](ADR-0063-write-out-json-is-hand-written-from-typed-variable-values.md) | `%{json}` and `%{header_json}` are hand-written from typed variable values: curl's key order, `null` for a missing text value, curl's escaping, and `curl_version` from this tool's own `-V` library text | Accepted | 2026-09-27 |
+| [0064](ADR-0064-variable-content-is-bytes-and-expands-through-utf-8-option-values.md) | `--variable` content is bytes, expanded through UTF-8 option values (non-UTF-8 bytes expanded unencoded become U+FFFD); `%name` reads the process environment; a `name@file` open failure is worded as the Windows curl words it | Accepted | 2026-09-27 |
 
 ## Template
 
