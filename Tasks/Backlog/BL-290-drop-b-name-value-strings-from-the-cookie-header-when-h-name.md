@@ -1,5 +1,5 @@
 ---
-id: BL-287
+id: BL-290
 title: Drop -b name=value strings from the Cookie header when -H names Cookie
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-287 — Drop -b name=value strings from the Cookie header when -H names Cookie
+# BL-290 — Drop -b name=value strings from the Cookie header when -H names Cookie
 
 ## Goal
 
