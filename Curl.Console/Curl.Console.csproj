@@ -28,6 +28,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Curl.Console.UnitTests" />
+    <InternalsVisibleTo Include="Curl.Conformance.UnitTests" />
   </ItemGroup>
 
   <ItemGroup>

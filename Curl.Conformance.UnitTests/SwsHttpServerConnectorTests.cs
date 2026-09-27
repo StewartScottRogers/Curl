@@ -28,6 +28,17 @@ public sealed class SwsHttpServerConnectorTests
     }
 
     [TestMethod]
+    [DataRow("data crlf=\"headers\"", "HTTP/1.1 200 OK\r\nA: b\r\n\r\nbody\n")]
+    [DataRow("data crlf=\"yes\"", "HTTP/1.1 200 OK\r\nA: b\r\n\r\nbody\r\n")]
+    [DataRow("data crlf=\"yes\" nonewline=\"yes\"", "HTTP/1.1 200 OK\r\nA: b\r\n\r\nbody\r")]
+    public async Task Get_ReceivesDataWithTheLineEndingsPreproForces(string openingTag, string expected)
+    {
+        IConnection connection = await ConnectAsync(new SwsHttpServerConnector(Case(Reply(openingTag, "HTTP/1.1 200 OK\nA: b\n\nbody\n"))));
+
+        Assert.AreEqual(expected, await ExchangeAsync(connection, Get));
+    }
+
+    [TestMethod]
     [DataRow("/12340002", "second\n")]
     [DataRow("/want/12340002?query=1", "second\n")]
     [DataRow("/12340000", "first\n")]
@@ -354,6 +365,19 @@ public sealed class SwsHttpServerConnectorTests
         Assert.IsNull(connection.RemoteEndPoint);
         await connection.FlushAsync(CancellationToken.None);
         await connection.DisposeAsync();
+    }
+
+    [TestMethod]
+    public async Task Abandon_MakesConnectingReadingAndWritingThrow()
+    {
+        SwsHttpServerConnector server = new(Case(Reply("data", "first\n")));
+        IConnection connection = await ConnectAsync(server);
+
+        server.Abandon();
+
+        await Assert.ThrowsExactlyAsync<IOException>(async () => await server.ConnectAsync(Target, CancellationToken.None));
+        await Assert.ThrowsExactlyAsync<IOException>(async () => await connection.ReadAsync(new byte[1], CancellationToken.None));
+        await Assert.ThrowsExactlyAsync<IOException>(async () => await connection.WriteAsync(new byte[1], CancellationToken.None));
     }
 
     [TestMethod]

@@ -45,6 +45,8 @@ internal sealed class SwsHttpServerConnection : IConnection
 
     private readonly TimeProvider timeProvider;
 
+    private readonly SwsServerAbandonment abandonment;
+
     private readonly long openedAt;
 
     private readonly List<byte> unservedRequestBytes = [];
@@ -67,13 +69,14 @@ internal sealed class SwsHttpServerConnection : IConnection
 
     private bool disconnected;
 
-    public SwsHttpServerConnection(SwsHttpReplySelector replySelector, SwsServerCommands serverCommands, TimeSpan waitAfterReply, SwsServerRecording recording, TimeProvider timeProvider)
+    public SwsHttpServerConnection(SwsHttpReplySelector replySelector, SwsServerCommands serverCommands, TimeSpan waitAfterReply, SwsServerRecording recording, TimeProvider timeProvider, SwsServerAbandonment abandonment)
     {
         this.replySelector = replySelector;
         this.serverCommands = serverCommands;
         this.waitAfterReply = waitAfterReply;
         this.recording = recording;
         this.timeProvider = timeProvider;
+        this.abandonment = abandonment;
         openedAt = timeProvider.GetTimestamp();
     }
 
@@ -86,13 +89,17 @@ internal sealed class SwsHttpServerConnection : IConnection
     private TimeSpan UpgradedTrafficClosesAt =>
         (serverBusyUntil > lastUpgradedTrafficAt ? serverBusyUntil : lastUpgradedTrafficAt) + UpgradedTrafficQuietTime;
 
-    public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken) =>
-        pendingSends.Count > 0
+    public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
+    {
+        abandonment.ThrowIfAbandoned();
+        return pendingSends.Count > 0
             ? await ReadSentAsync(buffer, cancellationToken)
             : await ReadWithNothingSentAsync(buffer, cancellationToken);
+    }
 
     public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
     {
+        abandonment.ThrowIfAbandoned();
         if (upgradedTrafficOpen)
         {
             RecordUpgradedTraffic(buffer.Span);

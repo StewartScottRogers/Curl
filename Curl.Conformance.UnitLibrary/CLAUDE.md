@@ -4,7 +4,7 @@ The harness that runs curl's own upstream test cases (`tests/data/test*`) agains
 Curl, in process, as data-driven MSTest cases. It follows ADR-0013
 (`Documentation/Planning/Decisions/ADR-0013-upstream-test-cases-run-as-data-driven-mstest.md`).
 
-Today it holds the test-file parser and the test-file expander. `UpstreamTestCaseParser.Parse` reads one test file's
+Today it holds the test-file parser, the test-file expander, the `sws` emulation and the case runner. `UpstreamTestCaseParser.Parse` reads one test file's
 bytes line by line, the way upstream's `getpart.pm` does (`UpstreamTestFileTag` recognises
 tag lines), into an `UpstreamTestCase` whose `UpstreamTestSection` parts keep their bodies
 and attributes as written, or into an `UpstreamTestCaseParseFailure` naming the section and
@@ -62,6 +62,24 @@ containing `swsbounce` the next request gets that part plus one; both states are
 connections. A `CONNECT host:port HTTP/x.y` request with no number in its path is answered
 from `<connect>` / `<connectN>`, and the connection stays open for the tunnelled request.
 Otherwise a read with no reply waiting returns 0, because in memory nothing else can arrive.
+
+`UpstreamCaseRunner.RunAsync` runs one case end to end (ADR-0013, decision 4): it expands
+the file for an `UpstreamCurlPlatform` (the features Curl reports and its null device),
+asks `UpstreamCaseScreening` whether the harness can run it (a `<tool>` case, a server other
+than `http`, `file` or `none`, a missing feature, a variable with no value, an unsupported
+`<servercmd>` or strip line each skip it with a reason, and so does a file part naming a file
+outside the case's log directory), writes `<client><file>` parts into
+the case's log directory, splits `<client><command>` with `UpstreamCommandLineSplitter` as
+the shell `runtests.pl` uses would, and runs curl through an `UpstreamCurlInvocation` against
+the `sws` emulation and `UnreachableDatagramConnector`, under a time limit from an injected
+`TimeProvider` (a run past it cannot be stopped, since curl's runner takes no cancellation
+token, so the case fails and the run is abandoned). `UpstreamCaseVerification` compares the `UpstreamCaseRun` against
+`<verify>` (protocol after `<strip>` / `<strippart>`, run as `UpstreamPerlSubstitution`s
+compiled by `UpstreamRegex`; stdout; stderr; exit code; `<verify><file>`), and
+`UpstreamFirstDifference` names the first differing byte and line. The result is an
+`UpstreamCaseOutcome` (passed, failed or skipped, with its detail), which
+`UpstreamCaseRatchet.Judge` turns into the `UpstreamCaseVerdict` a test row reports, given
+whether the case is on the passing list.
 
 What it is to hold in full, per ADR-0013 decision 2:
 
