@@ -158,6 +158,14 @@ namespace Curl.Protocol.Http;
 /// and a body sent again by a retry is not reported below the count already reported
 /// (<see cref="HttpTransferProgress" />, ADR-0045, ADR-0065).
 /// </para>
+/// <para>
+/// Every report carries <see cref="TransferTimings" /> on <see cref="ITransferContext.TimeProvider" />:
+/// the start of this method, the connector's timings, the moment before the first request byte,
+/// the moment the request was sent, the first response byte
+/// (<see cref="HttpFirstByteTimingConnection" />) and the report's end. A failed connect reports
+/// one timestamp, taken as it failed, for all but the start and the connect, as curl 8.21.0
+/// does (measured, ADR-0073).
+/// </para>
 /// </remarks>
 public sealed class HttpProtocolHandler(
     IConnector connector,
@@ -191,6 +199,7 @@ public sealed class HttpProtocolHandler(
     {
         ArgumentNullException.ThrowIfNull(context);
 
+        long started = context.TimeProvider.GetTimestamp();
         HttpRequestOptions options = context.Http ?? new HttpRequestOptions();
         HttpRequestFraming framing = HttpRequestFraming.Of(options, [.. options.Headers.Select(HttpCustomHeader.Parse)], context.NoBody, context.Upload, context.ResumeFrom);
         HttpAuthRequest authRequest = new(
@@ -205,6 +214,7 @@ public sealed class HttpProtocolHandler(
         using HttpTransferDeadline deadline = new(context);
         HttpRequestPlan plan = new(context, options, framing, authRequest, Authenticator.CreateAuthorization(authRequest, []))
         {
+            Started = started,
             Deadline = deadline,
             Progress = new HttpTransferProgress(context.Progress),
             ForwardProxy = forwardProxy,
@@ -266,8 +276,7 @@ public sealed class HttpProtocolHandler(
         ConnectResult connect = await plan.Deadline.ConnectAsync(connector, TargetOf(plan)).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
         {
-            TransferResult failure = TransferResult.Failure(connect.ExitCode, connect.ErrorMessage!);
-            return plan.Options.ForwardProxy is null ? failure : failure with { Report = new TransferReport { UsedProxy = true } };
+            return TransferResult.Failure(connect.ExitCode, connect.ErrorMessage!) with { Report = FailedConnectReport(plan) };
         }
 
         plan.Progress.ReportTransferStarted();
@@ -285,6 +294,22 @@ public sealed class HttpProtocolHandler(
         return outcome.Retry is { } reconnect
             ? await ConnectAndExchangeAsync(reconnect, outcome.Result.Report).ConfigureAwait(false)
             : outcome.Result;
+    }
+
+    /// <summary>
+    /// Reports a connect that failed: whether it went to a forward proxy, and the transfer's
+    /// timings with <c>%{time_pretransfer}</c>, <c>%{time_posttransfer}</c> and
+    /// <c>%{time_starttransfer}</c> taken when it failed, as curl 8.21.0 takes them after a
+    /// refused connect or a failed resolve (measured, ADR-0073).
+    /// </summary>
+    private static TransferReport FailedConnectReport(HttpRequestPlan plan)
+    {
+        long failed = plan.Context.TimeProvider.GetTimestamp();
+        return new TransferReport
+        {
+            UsedProxy = plan.Options.ForwardProxy is not null,
+            Timings = new TransferTimings(plan.Started, null, failed, failed, failed, failed),
+        };
     }
 
     /// <summary>
@@ -321,11 +346,15 @@ public sealed class HttpProtocolHandler(
             IsUpload = framing.IsUpload,
             Progress = plan.Progress,
         };
+        HttpFirstByteTimingConnection timedConnection = new(connection, context.TimeProvider);
         HttpExchange exchange = new(connect, connection, framing.Method, request.Length, upload, earlier, newConnection)
         {
             UsedProxy = options.ForwardProxy is not null,
+            Started = plan.Started,
+            TimeProvider = context.TimeProvider,
+            ResponseConnection = timedConnection,
         };
-        IConnection responseConnection = framing.AwaitsContinue ? new HttpContinueWaitConnection(connection) : connection;
+        IConnection responseConnection = framing.AwaitsContinue ? new HttpContinueWaitConnection(timedConnection) : timedConnection;
         HttpResponseBodyReader body = new(responseConnection)
         {
             PassesTransferCoding = options.Raw,
@@ -337,9 +366,11 @@ public sealed class HttpProtocolHandler(
         try
         {
             ThrowIfRefused(framing);
+            exchange.RequestReady = context.TimeProvider.GetTimestamp();
             await HttpConnectionSend.WriteAsync(connection, request, cancellationToken).ConfigureAwait(false);
             await HttpConnectionSend.FlushAsync(connection, cancellationToken).ConfigureAwait(false);
             bool bodyLeftUnsent = await SendBodyAsync(context.TimeProvider, framing, responseConnection, upload, cancellationToken).ConfigureAwait(false);
+            exchange.RequestSent = context.TimeProvider.GetTimestamp();
             exchange.Head = await new HttpResponseHeadReader(responseConnection).ReadAsync(cancellationToken).ConfigureAwait(false);
             exchange.RedirectUrl = HttpRedirectLocation.Find(context.Url, exchange.Head);
             StoreCookies(context, exchange.Head);
@@ -662,9 +693,38 @@ public sealed class HttpProtocolHandler(
         internal string? RedirectUrl { get; set; }
 
         /// <summary>
-        /// Builds the report: what the connect and request told, and what the final head told
-        /// once it was read. The request size counts the body bytes sent as well as the head,
-        /// as curl 8.21.0's <c>%{size_request}</c> does (BL-175 Notes).
+        /// Gets the moment the transfer began, the report's <see cref="TransferTimings.Started" />.
+        /// </summary>
+        internal required long Started { get; init; }
+
+        /// <summary>
+        /// Gets the clock every timestamp of the exchange is taken on.
+        /// </summary>
+        internal required TimeProvider TimeProvider { get; init; }
+
+        /// <summary>
+        /// Gets the connection the response is read through, which records when its first
+        /// byte arrived.
+        /// </summary>
+        internal required HttpFirstByteTimingConnection ResponseConnection { get; init; }
+
+        /// <summary>
+        /// Gets or sets the moment the first request byte was about to be sent,
+        /// <see langword="null" /> until then.
+        /// </summary>
+        internal long? RequestReady { get; set; }
+
+        /// <summary>
+        /// Gets or sets the moment the last request byte was sent, <see langword="null" />
+        /// until then.
+        /// </summary>
+        internal long? RequestSent { get; set; }
+
+        /// <summary>
+        /// Builds the report: what the connect and request told, their timings with the
+        /// transfer's end taken now, and what the final head told once it was read. The request
+        /// size counts the body bytes sent as well as the head, as curl 8.21.0's
+        /// <c>%{size_request}</c> does (BL-175 Notes).
         /// </summary>
         /// <param name="downloadSize">The body bytes the output accepted.</param>
         /// <returns>The report.</returns>
@@ -683,6 +743,13 @@ public sealed class HttpProtocolHandler(
                 LocalEndPoint = connect.LocalEndPoint,
                 PeerCertificates = connect.PeerCertificates,
                 RemoteEndPoint = connection.RemoteEndPoint as IPEndPoint,
+                Timings = new TransferTimings(
+                    Started,
+                    connect.Timings,
+                    RequestReady,
+                    RequestSent,
+                    ResponseConnection.FirstByteReceived,
+                    TimeProvider.GetTimestamp()),
             };
             return Head is null ? report : WithHead(report, Head) with { RedirectUrl = RedirectUrl };
         }
@@ -743,6 +810,12 @@ public sealed class HttpProtocolHandler(
         public required HttpTransferDeadline Deadline { get; init; }
 
         /// <summary>
+        /// Gets the moment the transfer began, shared by every request it sends: the origin
+        /// of every <c>%{time_*}</c> (<see cref="TransferTimings.Started" />).
+        /// </summary>
+        public required long Started { get; init; }
+
+        /// <summary>
         /// Gets where the transfer's progress is reported, shared by every request it sends.
         /// </summary>
         public required HttpTransferProgress Progress { get; init; }
@@ -776,6 +849,7 @@ public sealed class HttpProtocolHandler(
         private HttpRequestPlan With(HttpRequestFraming framing, string? authorization) =>
             new(Context, Options, framing, AuthRequest, authorization)
             {
+                Started = Started,
                 Deadline = Deadline,
                 Progress = Progress,
                 ForwardProxy = ForwardProxy,
