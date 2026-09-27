@@ -35,7 +35,7 @@ An Accepted ADR decides how handlers and connectors report connection, TLS, head
 - Plan item: X7 in the Phase 1 HTTP plan (2026-09-26); plan keys in this file were replaced by their task IDs.
 - Recorded ADR-0046 (next free number after ADR-0045). Measured curl 8.21.0 (mingw, Schannel) `-v`, `--trace` and `--trace-ascii` against `python -m http.server` on 127.0.0.1:18163, plus `-v https://example.com/`, `-v -d hi` and a refused connect; the commands and bytes are in the ADR's Context. The measurements fixed the event boundaries: the request head is one header-out event, each response header line its own header-in event.
 - Decision: a sibling `ITransferEvents` on `ITransferContext.Events`, not an extension of ADR-0045's `ITransferProgress` (different consumers and options; counts are idempotent, bytes are not). Connection and TLS events are structured records rendered by `Curl.Output`; everything else is `ReportInfo` text. The connector reports through a new `ConnectTarget.Events`, because `Trying` and connect-failure lines happen inside the connect.
-- Filed BL-311 (add the sink to `Curl.Protocol.Abstractions`) and added it to BL-228's and BL-229's `depends-on`, since the formatters need its types. Carrying `Events` across redirect hops is noted in the ADR beside BL-310.
+- Filed BL-313 (add the sink to `Curl.Protocol.Abstractions`) and added it to BL-228's and BL-229's `depends-on`, since the formatters need its types. Carrying `Events` across redirect hops is noted in the ADR beside BL-310.
 - Pipeline `docs` was worked directly rather than through `align-and-document`: the whole deliverable is one ADR and an index row, and no `.cs` or project file changed, so the `verify` skill is not required.
 
 ## Log

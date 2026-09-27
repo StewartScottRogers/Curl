@@ -1,5 +1,5 @@
 ---
-id: BL-311
+id: BL-313
 title: Add the transfer event sink to ITransferContext and ConnectTarget in Curl.Protocol.Abstractions
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-311 — Add the transfer event sink to ITransferContext and ConnectTarget in Curl.Protocol.Abstractions
+# BL-313 — Add the transfer event sink to ITransferContext and ConnectTarget in Curl.Protocol.Abstractions
 
 ## Goal
 
