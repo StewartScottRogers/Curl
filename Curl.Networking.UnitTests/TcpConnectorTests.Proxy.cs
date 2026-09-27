@@ -209,19 +209,6 @@ public sealed partial class TcpConnectorTests
         Assert.AreSame(failure, result);
     }
 
-    [TestMethod]
-    public async Task ConnectAsync_ThroughAnHttpsProxy_ThrowsNotSupportedExceptionAndNeverResolves()
-    {
-        const ProxyKind kind = ProxyKind.Https;
-        var resolver = new FakeDnsResolver(ProxyAddress);
-        var connector = new TcpConnector(resolver, new FakeTcpDialer(), new FakeTlsProvider(), new ManualTimeProvider());
-
-        await Assert.ThrowsExactlyAsync<NotSupportedException>(
-            async () => await connector.ConnectAsync(PlainTarget with { Proxy = HttpProxy with { Kind = kind } }, CancellationToken.None));
-
-        Assert.IsEmpty(resolver.ResolvedHosts);
-    }
-
     private static TcpConnector CreateProxyConnector(ScriptedConnection proxyConnection, FakeTlsProvider tlsProvider) =>
         new(
             new FakeDnsResolver(ProxyAddress),

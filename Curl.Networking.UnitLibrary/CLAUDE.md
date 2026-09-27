@@ -56,7 +56,8 @@ user name and password with a credential), resolves locally for SOCKS5 and sends
 SOCKS5h. Every read takes exactly the reply's bytes, so the tunnel's bytes stay on the
 connection. A refused or cut-short handshake is exit 97 with curl's message; GSSAPI is offered
 but not implemented, so a proxy that picks it fails with the message the reference build's SSPI
-printed. HTTPS proxies throw `NotSupportedException` until their task lands.
+printed. Through an HTTPS proxy (`Https`, BL-266) TLS runs to the proxy host first, then the same CONNECT
+over it, then TLS to the target inside that; each handshake failure is the TLS provider's result.
 
 `TcpConnector` applies `--resolve` through `ResolveOverrides` and `--connect-to` through
 `ConnectToMappings`, both built from the verbatim option values and parsed as curl 8.21.0

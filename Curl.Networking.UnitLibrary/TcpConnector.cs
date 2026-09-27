@@ -69,6 +69,18 @@ public sealed class TcpConnector(
     /// <c>Too large response headers: &lt;n&gt; &gt; 307200</c> for a longer header block.
     /// </para>
     /// <para>
+    /// When <see cref="ConnectTarget.Proxy" /> is an HTTPS proxy (<see cref="ProxyKind.Https" />),
+    /// the connector resolves and dials the proxy with the same exit 5 and exit 7 failures,
+    /// runs TLS to it through the <see cref="ITlsProvider" />, verified against the proxy host,
+    /// then sends the same CONNECT over that TLS and, when <see cref="ConnectTarget.UseTls" />
+    /// is set, runs a second handshake to <see cref="ConnectTarget.Host" /> inside it, as curl
+    /// 8.21.0 does. A failed handshake to the proxy or to the target is the provider's result
+    /// as it is, and a refused CONNECT fails as through an HTTP proxy.
+    /// <see cref="ConnectTimings.TlsHandshakeCompleted" /> and
+    /// <see cref="ConnectResult.PeerCertificates" /> are the target's handshake's only, so an
+    /// http target has none (measured: <c>%{time_appconnect}</c> is <c>0</c>).
+    /// </para>
+    /// <para>
     /// When <see cref="ConnectTarget.Proxy" /> is a SOCKS proxy (<see cref="ProxyKind.Socks4" />,
     /// <see cref="ProxyKind.Socks4a" />, <see cref="ProxyKind.Socks5" /> or
     /// <see cref="ProxyKind.Socks5Hostname" />), the connector resolves and dials the proxy the
@@ -106,10 +118,6 @@ public sealed class TcpConnector(
     /// are the <see cref="ITlsProvider" />'s, and empty without TLS.
     /// </para>
     /// </remarks>
-    /// <exception cref="NotSupportedException">
-    /// <see cref="ConnectTarget.Proxy" /> is an HTTPS proxy, which this connector does not
-    /// tunnel through yet.
-    /// </exception>
     public async ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(target);
@@ -165,11 +173,6 @@ public sealed class TcpConnector(
         long started,
         CancellationToken cancellationToken)
     {
-        if (proxy.Kind == ProxyKind.Https)
-        {
-            throw new NotSupportedException($"Tunnelling through a {proxy.Kind} proxy is not implemented yet.");
-        }
-
         var addresses = await ResolveAsync(proxy.Host, proxy.Port, cancellationToken).ConfigureAwait(false);
         if (addresses.Count == 0)
         {
@@ -188,9 +191,36 @@ public sealed class TcpConnector(
                 $"Failed to connect to {target.Host}:{target.Port} over proxy {proxy.Host} after {elapsedMilliseconds} ms: Could not connect to server");
         }
 
-        return proxy.Kind is ProxyKind.Http or ProxyKind.Http10
-            ? await OpenTunnelAsync(dialed, target, destination, proxy, started, nameResolved, cancellationToken).ConfigureAwait(false)
-            : await OpenSocksTunnelAsync(dialed, target, destination, proxy, new ConnectTimings(started, nameResolved, 0, null), cancellationToken).ConfigureAwait(false);
+        return proxy.Kind switch
+        {
+            ProxyKind.Http or ProxyKind.Http10 => await OpenTunnelAsync(dialed, target, destination, proxy, started, nameResolved, cancellationToken).ConfigureAwait(false),
+            ProxyKind.Https => await OpenTunnelOverTlsAsync(dialed, target, destination, proxy, started, nameResolved, cancellationToken).ConfigureAwait(false),
+            _ => await OpenSocksTunnelAsync(dialed, target, destination, proxy, new ConnectTimings(started, nameResolved, 0, null), cancellationToken).ConfigureAwait(false),
+        };
+    }
+
+    private async ValueTask<ConnectResult> OpenTunnelOverTlsAsync(
+        DialedTcpConnection dialed,
+        ConnectTarget target,
+        ConnectDestination destination,
+        ProxyEndpoint proxy,
+        long started,
+        long nameResolved,
+        CancellationToken cancellationToken)
+    {
+        // curl 8.21.0 verifies the proxy against its own host name and reports a failed
+        // handshake to it with the same exit code and message as one to a target (measured).
+        // It verifies with the --proxy-* TLS options, not -k or --cacert; until they are
+        // parsed (BL-361) the transfer's provider runs this handshake too (ADR-0060).
+        var securedProxy = await tlsProvider.AuthenticateAsClientAsync(dialed.Connection, proxy.Host, cancellationToken).ConfigureAwait(false);
+        if (securedProxy.Connection is not { } proxyConnection)
+        {
+            return securedProxy;
+        }
+
+        // CONNECT and the target's TLS run over the proxy's TLS; the socket's local end point stays.
+        var securedDialed = new DialedTcpConnection(proxyConnection, dialed.LocalEndPoint);
+        return await OpenTunnelAsync(securedDialed, target, destination, proxy, started, nameResolved, cancellationToken).ConfigureAwait(false);
     }
 
     private async ValueTask<ConnectResult> OpenSocksTunnelAsync(
