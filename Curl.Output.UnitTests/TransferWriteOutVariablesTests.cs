@@ -63,6 +63,7 @@ public sealed class TransferWriteOutVariablesTests
         Assert.AreEqual(
             "000|000|000|0|GET|||file://C:/Windows/win.ini|0|0|0|92|0|0||-1||-1|0||file:///C:/Windows/win.ini|0|file",
             RenderAll(variables));
+        Assert.IsFalse(variables.TransferFailed);
     }
 
     [TestMethod]
@@ -77,6 +78,7 @@ public sealed class TransferWriteOutVariablesTests
             "000|000|000|0|GET|||http://127.0.0.1:1/x|0|0|0|0|0|0||-1||-1|7|" + message + "|http://127.0.0.1:1/x|0|http",
             RenderAll(variables));
         Assert.AreEqual("0", Get(variables, "num_headers"));
+        Assert.IsTrue(variables.TransferFailed);
     }
 
     [TestMethod]

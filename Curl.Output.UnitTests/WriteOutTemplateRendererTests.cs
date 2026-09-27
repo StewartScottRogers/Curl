@@ -228,7 +228,7 @@ public sealed class WriteOutTemplateRendererTests
     public async Task RenderAsync_FailingWrite_StillClosesTheOpenedFile()
     {
         RecordingFileOpener files = new();
-        WriteOutTemplateRenderer renderer = new(files, writesLineFeedAsCrLf: true);
+        WriteOutTemplateRenderer renderer = new(files, writesLineFeedAsCrLf: true, TimeProvider.System);
         using MemoryStream standardOutput = new();
         using FailingStream standardError = new();
 
@@ -242,7 +242,7 @@ public sealed class WriteOutTemplateRendererTests
     [TestMethod]
     public async Task RenderAsync_StreamsThatCompleteLater_RenderTheSameBytes()
     {
-        WriteOutTemplateRenderer renderer = new(new YieldingFileOpener(), writesLineFeedAsCrLf: true);
+        WriteOutTemplateRenderer renderer = new(new YieldingFileOpener(), writesLineFeedAsCrLf: true, TimeProvider.System);
         using YieldingStream standardOutput = new();
         using YieldingStream standardError = new();
 
@@ -309,15 +309,67 @@ public sealed class WriteOutTemplateRendererTests
     }
 
     [TestMethod]
+    public async Task RenderAsync_OnErrorAfterSuccess_StopsThere()
+    {
+        // curl -w "a\n%{onerror}b%{stderr}c" file:///c:/Windows/win.ini wrote "a\r\n" and nothing to standard error.
+        Harness harness = new(writesLineFeedAsCrLf: true);
+
+        await harness.RenderAsync("a\\n%{onerror}b%{stderr}c");
+
+        Assert.AreEqual("a\r\n", harness.StandardOutputText);
+        Assert.AreEqual(string.Empty, harness.StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RenderAsync_OnErrorAfterFailure_RendersNothingAndCarriesOn()
+    {
+        // curl -w "a%{onerror}b%{onerror}c" file:///c:/nonexist wrote "abc" and exited 37.
+        Harness harness = new(writesLineFeedAsCrLf: true);
+        harness.Variables.TransferFailed = true;
+
+        await harness.RenderAsync("a%{onerror}b%{onerror}c");
+
+        Assert.AreEqual("abc", harness.StandardOutputText);
+    }
+
+    [TestMethod]
+    public async Task RenderAsync_Time_RendersTheFormattedTime()
+    {
+        // curl -w "[%time{%Y}]Q" wrote "[2026]Q"; %time{%Y]%{url} closes at the url's brace and prints nothing.
+        Harness harness = new(writesLineFeedAsCrLf: true);
+
+        await harness.RenderAsync("[%time{%Y-%m-%dT%H:%M:%S.%f%z}]Q|%time{%Y]%{url}|");
+
+        Assert.AreEqual("[2026-09-27T03:30:08.545957+0000]Q||", harness.StandardOutputText);
+    }
+
+    [TestMethod]
+    public async Task RenderAsync_UnclosedTime_IsWrittenAsItStands()
+    {
+        // curl -w "[%time{%Y]" wrote "[%time{%Y]".
+        Harness harness = new(writesLineFeedAsCrLf: true);
+
+        await harness.RenderAsync("[%time{%Y]");
+
+        Assert.AreEqual("[%time{%Y]", harness.StandardOutputText);
+    }
+
+    [TestMethod]
+    public void Constructor_NullTimeProvider_Throws()
+    {
+        Assert.ThrowsExactly<ArgumentNullException>(() => new WriteOutTemplateRenderer(new RecordingFileOpener(), writesLineFeedAsCrLf: true, null!));
+    }
+
+    [TestMethod]
     public void Constructor_NullFileOpener_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => new WriteOutTemplateRenderer(null!, writesLineFeedAsCrLf: true));
+        Assert.ThrowsExactly<ArgumentNullException>(() => new WriteOutTemplateRenderer(null!, writesLineFeedAsCrLf: true, TimeProvider.System));
     }
 
     [TestMethod]
     public async Task RenderAsync_NullArgument_Throws()
     {
-        WriteOutTemplateRenderer renderer = new(new RecordingFileOpener(), writesLineFeedAsCrLf: true);
+        WriteOutTemplateRenderer renderer = new(new RecordingFileOpener(), writesLineFeedAsCrLf: true, TimeProvider.System);
         DictionaryVariableSource variables = new();
         using MemoryStream stream = new();
 
@@ -333,6 +385,8 @@ public sealed class WriteOutTemplateRendererTests
 
         public RecordingFileOpener Files { get; } = new();
 
+        public FixedTimeProvider Clock { get; } = new(new DateTimeOffset(2026, 9, 27, 3, 30, 8, TimeSpan.Zero).AddTicks(5_459_570));
+
         public MemoryStream StandardOutput { get; } = new();
 
         public MemoryStream StandardError { get; } = new();
@@ -343,7 +397,7 @@ public sealed class WriteOutTemplateRendererTests
 
         public Task RenderAsync(string template)
         {
-            WriteOutTemplateRenderer renderer = new(Files, writesLineFeedAsCrLf);
+            WriteOutTemplateRenderer renderer = new(Files, writesLineFeedAsCrLf, Clock);
             return renderer.RenderAsync(template, Variables, StandardOutput, StandardError);
         }
     }
@@ -353,6 +407,8 @@ public sealed class WriteOutTemplateRendererTests
         public Dictionary<string, string> Values { get; } = new(StringComparer.Ordinal);
 
         public Dictionary<string, string> Headers { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+        public bool TransferFailed { get; set; }
 
         public bool TryGetVariableText(string name, [NotNullWhen(true)] out string? text)
         {

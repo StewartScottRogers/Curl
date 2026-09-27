@@ -112,6 +112,9 @@ public sealed class TransferWriteOutVariables(
     private long TotalMicroseconds => MicrosecondsSinceStart(Timings?.Completed);
 
     /// <inheritdoc/>
+    public bool TransferFailed => !result.IsSuccess;
+
+    /// <inheritdoc/>
     public bool TryGetVariableText(string name, [NotNullWhen(true)] out string? text)
     {
         ArgumentNullException.ThrowIfNull(name);

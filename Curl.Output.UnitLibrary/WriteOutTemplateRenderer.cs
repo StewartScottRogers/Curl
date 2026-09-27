@@ -17,6 +17,11 @@ namespace Curl.Output;
 /// <see cref="UnknownVariableWarning"/> to standard error and nothing to the output.
 /// </para>
 /// <para>
+/// <c>%{onerror}</c> ends the rendering there when the transfer succeeded, and renders
+/// nothing when it failed (<see cref="IWriteOutVariableSource.TransferFailed"/>).
+/// <c>%time{format}</c> renders the current time through <see cref="WriteOutTimeFormatter"/>.
+/// </para>
+/// <para>
 /// A file that cannot be opened leaves the output where it was. A header name of 256 bytes
 /// or more renders nothing, and a file name of 512 bytes or more is not opened, as curl's
 /// fixed buffers do. Text is written as UTF-8.
@@ -29,12 +34,14 @@ namespace Curl.Output;
 /// </remarks>
 /// <param name="fileOpener">Opens the <c>%output{file}</c> targets.</param>
 /// <param name="writesLineFeedAsCrLf"><see langword="true"/> to write each line feed as CR LF, as the Windows curl does.</param>
-public sealed class WriteOutTemplateRenderer(IWriteOutFileOpener fileOpener, bool writesLineFeedAsCrLf)
+/// <param name="timeProvider">Supplies the time <c>%time{format}</c> renders.</param>
+public sealed class WriteOutTemplateRenderer(IWriteOutFileOpener fileOpener, bool writesLineFeedAsCrLf, TimeProvider timeProvider)
 {
     private const int HeaderNameBufferBytes = 256;
     private const int FileNameBufferBytes = 512;
 
     private readonly IWriteOutFileOpener fileOpener = fileOpener ?? throw new ArgumentNullException(nameof(fileOpener));
+    private readonly TimeProvider timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
 
     /// <summary>
     /// The warning line, without its line terminator, curl writes to standard error for a
@@ -96,6 +103,7 @@ public sealed class WriteOutTemplateRenderer(IWriteOutFileOpener fileOpener, boo
         private const string VariableOpening = "%{";
         private const string HeaderOpening = "%header{";
         private const string OutputOpening = "%output{";
+        private const string TimeOpening = "%time{";
         private const string AppendMarker = ">>";
 
         private readonly StringBuilder pending = new();
@@ -167,6 +175,10 @@ public sealed class WriteOutTemplateRenderer(IWriteOutFileOpener fileOpener, boo
             {
                 await RenderOutputAsync().ConfigureAwait(false);
             }
+            else if (IsAt(TimeOpening))
+            {
+                RenderTime();
+            }
             else
             {
                 pending.Append(template, position, 2);
@@ -213,6 +225,9 @@ public sealed class WriteOutTemplateRenderer(IWriteOutFileOpener fileOpener, boo
                 case "stderr":
                     await SwitchTargetAsync(standardError, null).ConfigureAwait(false);
                     break;
+                case "onerror":
+                    StopUnlessTransferFailed();
+                    break;
                 default:
                     await RenderTransferVariableAsync(name).ConfigureAwait(false);
                     break;
@@ -229,6 +244,26 @@ public sealed class WriteOutTemplateRenderer(IWriteOutFileOpener fileOpener, boo
 
             await FlushAsync().ConfigureAwait(false);
             await standardError.WriteAsync(renderer.Encode(UnknownVariableWarning(name) + "\n"), cancellationToken).ConfigureAwait(false);
+        }
+
+        private void StopUnlessTransferFailed()
+        {
+            if (!variables.TransferFailed)
+            {
+                position = template.Length;
+            }
+        }
+
+        private void RenderTime()
+        {
+            position += TimeOpening.Length;
+            if (!TryReadToClosingBrace(out string format))
+            {
+                pending.Append(TimeOpening);
+                return;
+            }
+
+            pending.Append(WriteOutTimeFormatter.Format(format, renderer.timeProvider));
         }
 
         private void RenderHeader()
