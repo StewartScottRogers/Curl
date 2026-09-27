@@ -13,7 +13,8 @@ namespace Curl.Core.Multipart;
 /// <param name="Content">
 /// The text of a <see cref="MultipartFormPartKind.Text" /> part; the path of the file of a
 /// <see cref="MultipartFormPartKind.FileUpload" /> or <see cref="MultipartFormPartKind.FileContent" />
-/// part; ignored for a <see cref="MultipartFormPartKind.Multipart" /> part.
+/// part, where <see cref="StandardInputPath" /> names standard input; ignored for a
+/// <see cref="MultipartFormPartKind.Multipart" /> part.
 /// </param>
 /// <param name="ContentType">The <c>;type=</c> value; <see langword="null" /> lets the builder choose, as curl does.</param>
 /// <param name="FileName">
@@ -31,6 +32,17 @@ public sealed record MultipartFormPart(
     IReadOnlyList<string> Headers,
     IReadOnlyList<MultipartFormPart> Parts)
 {
+    /// <summary>The path, <c>-</c>, that makes a file part read standard input, as <c>-F name=@-</c> and <c>-F name=&lt;-</c> do.</summary>
+    public const string StandardInputPath = "-";
+
+    /// <summary>
+    /// Gets a value indicating whether the part is a <see cref="MultipartFormPartKind.FileUpload" />
+    /// or <see cref="MultipartFormPartKind.FileContent" /> part whose body is standard input.
+    /// </summary>
+    public bool ReadsStandardInput =>
+        Kind is MultipartFormPartKind.FileUpload or MultipartFormPartKind.FileContent
+        && string.Equals(Content, StandardInputPath, StringComparison.Ordinal);
+
     /// <summary>
     /// Gets the <c>;encoder=</c> value, unchecked: <c>binary</c>, <c>8bit</c>, <c>7bit</c>,
     /// <c>base64</c> or <c>quoted-printable</c> in any case encodes the part's body and names the

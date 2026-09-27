@@ -27,6 +27,13 @@ namespace Curl.Core.Multipart;
 /// describes. A file part whose encoder changes or checks its bytes is read whole while
 /// building; one sent <c>binary</c> or <c>8bit</c> is streamed like any other. See ADR-0041.
 /// </para>
+/// <para>
+/// A file part whose path is <see cref="MultipartFormPart.StandardInputPath" /> reads standard
+/// input whole while building, as curl 8.21.0's <c>tool_formparse.c</c> buffers it, so the
+/// body keeps its <c>Content-Length</c>. Standard input is read where it stands and never
+/// closed; a second such part gets whatever the first left, which after a whole read is
+/// nothing, as curl sends it when standard input is a pipe.
+/// </para>
 /// </remarks>
 /// <param name="fileSystem">Opens the files of file parts.</param>
 /// <param name="textEncoding">
@@ -38,7 +45,16 @@ namespace Curl.Core.Multipart;
 /// Makes each multipart's boundary, the outermost first and then each nested one in the
 /// order it is reached; production passes <see cref="MultipartBoundary.CreateRandom" />.
 /// </param>
-public sealed class MultipartFormBodyBuilder(IFileSystem fileSystem, Encoding textEncoding, Func<string> createBoundary)
+/// <param name="standardInput">
+/// The stream <c>@-</c> and <c>&lt;-</c> parts read, which the caller owns; <see langword="null" />
+/// leaves such a part opening the path <c>-</c> through <paramref name="fileSystem" />, as it did
+/// before standard input could be given.
+/// </param>
+public sealed class MultipartFormBodyBuilder(
+    IFileSystem fileSystem,
+    Encoding textEncoding,
+    Func<string> createBoundary,
+    Stream? standardInput = null)
 {
     /// <summary>The message curl 8.21.0 gives, with exit 26, for a form file it cannot open.</summary>
     public const string OpenFailedMessage = "Failed to open/read local data from file/application";
@@ -146,7 +162,18 @@ public sealed class MultipartFormBodyBuilder(IFileSystem fileSystem, Encoding te
         return name is null || encoder is not null;
     }
 
-    private async ValueTask<TransferResult?> AddFilePartAsync(
+    /// <summary>Adds a file part, read from standard input when its path is <c>-</c> and there is one, otherwise opened.</summary>
+    private ValueTask<TransferResult?> AddFilePartAsync(
+        MultipartBodySegments segments,
+        MultipartFormPart part,
+        string? disposition,
+        MultipartPartEncoder? encoder,
+        CancellationToken cancellationToken) =>
+        part.ReadsStandardInput && standardInput is not null
+            ? AddStandardInputPartAsync(segments, part, disposition, encoder, standardInput, cancellationToken)
+            : AddOpenedFilePartAsync(segments, part, disposition, encoder, cancellationToken);
+
+    private async ValueTask<TransferResult?> AddOpenedFilePartAsync(
         MultipartBodySegments segments,
         MultipartFormPart part,
         string? disposition,
@@ -207,6 +234,30 @@ public sealed class MultipartFormBodyBuilder(IFileSystem fileSystem, Encoding te
         }
     }
 
+    /// <summary>Reads <paramref name="input" /> whole and adds it, encoded when the part names an encoder.</summary>
+    private static async ValueTask<TransferResult?> AddStandardInputPartAsync(
+        MultipartBodySegments segments,
+        MultipartFormPart part,
+        string? disposition,
+        MultipartPartEncoder? encoder,
+        Stream input,
+        CancellationToken cancellationToken)
+    {
+        using MemoryStream copy = new();
+        try
+        {
+            await input.CopyToAsync(copy, cancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException)
+        {
+            return TransferResult.Failure(CurlExitCode.ReadError, ReadFailedMessage);
+        }
+
+        segments.AddText(MultipartPartHeaders.Format(part, disposition, null, encoder?.Name, out _));
+        AddData(segments, copy.ToArray(), encoder);
+        return null;
+    }
+
     private void AddTextPart(MultipartBodySegments segments, MultipartFormPart part, string? disposition, MultipartPartEncoder? encoder)
     {
         segments.AddText(MultipartPartHeaders.Format(part, disposition, null, encoder?.Name, out _));
@@ -217,6 +268,18 @@ public sealed class MultipartFormBodyBuilder(IFileSystem fileSystem, Encoding te
         }
 
         AddEncodedData(segments, textEncoding.GetBytes(part.Content), dataLengthIsKnown: true, encoder);
+    }
+
+    /// <summary>Adds <paramref name="data" />, whose length is known, encoded when there is an encoder.</summary>
+    private static void AddData(MultipartBodySegments segments, byte[] data, MultipartPartEncoder? encoder)
+    {
+        if (encoder is null)
+        {
+            segments.AddStream(new MemoryStream(data, writable: false), data.Length);
+            return;
+        }
+
+        AddEncodedData(segments, data, dataLengthIsKnown: true, encoder);
     }
 
     private static void AddEncodedData(MultipartBodySegments segments, byte[] data, bool dataLengthIsKnown, MultipartPartEncoder encoder)

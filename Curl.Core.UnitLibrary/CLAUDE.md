@@ -55,7 +55,9 @@ building so `Content-Length` is known, then streamed; an unopenable file is exit
 anything is sent. The text encoding and the boundary source are injected. A part's
 `Encoder` (`;encoder=`) goes through `MultipartPartEncoder`: `binary`/`8bit` files still
 stream, `base64`, `quoted-printable` and `7bit` are encoded whole in memory, and an unknown
-name is exit 43 (ADR-0041). It is not yet wired into `Curl.Console`.
+name is exit 43 (ADR-0041). An `@-` or `<-` part reads the standard-input `Stream` the
+builder is given whole, never closing it, so the body keeps its `Content-Length`; without
+one it opens the path `-` as before (BL-275). It is not yet wired into `Curl.Console`.
 
 `Globbing\UrlGlob` is curl 8.21.0's URL globbing (ADR-0032): `TryParse` reads `{a,b}` sets
 and `[1-10]`, `[01-10]`, `[a-z:2]` ranges as `tool_urlglob.c` does, failing with exit 3 and

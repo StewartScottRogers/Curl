@@ -102,10 +102,18 @@ internal static class MultipartPartHeaders
     {
         MultipartFormPartKind.Multipart => MultipartContentTypeDefault,
         MultipartFormPartKind.Text => ContentTypeForName(fileName),
-        _ => ContentTypeForName(fileName)
-            ?? ContentTypeForName(part.Content)
-            ?? (fileName is null ? null : FileContentTypeDefault),
+        _ => ContentTypeForName(fileName) ?? FileFallbackContentType(part, fileName),
     };
+
+    /// <summary>
+    /// The content type of a file part whose file name's extension gave none: its path's, or
+    /// <c>application/octet-stream</c> when it has a file name. Standard input goes to libcurl as a
+    /// callback part, not a file part, so, as with text, it gets neither.
+    /// </summary>
+    private static string? FileFallbackContentType(MultipartFormPart part, string? fileName) =>
+        part.ReadsStandardInput
+            ? null
+            : ContentTypeForName(part.Content) ?? (fileName is null ? null : FileContentTypeDefault);
 
     private static string? ContentTypeForName(string? name) =>
         name is null
