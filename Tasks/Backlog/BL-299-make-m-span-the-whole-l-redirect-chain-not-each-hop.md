@@ -1,5 +1,5 @@
 ---
-id: BL-297
+id: BL-299
 title: Make -m span the whole -L redirect chain, not each hop
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-297 — Make -m span the whole -L redirect chain, not each hop
+# BL-299 — Make -m span the whole -L redirect chain, not each hop
 
 ## Goal
 
@@ -19,7 +19,7 @@ completed:
 ## Context
 
 - Found in BL-174. `HttpTransferDeadline` (Curl.Protocol.Http.UnitLibrary) starts the `-m` clock when `HttpProtocolHandler.ExecuteAsync` is called, and `RedirectFollower` (Curl.Core.UnitLibrary) calls the handler once per hop, passing `MaxTime` unchanged (RedirectFollower.cs, the context copy), so each hop gets a fresh `-m`. curl's `-m` limits the whole operation (https://curl.se/docs/manpage.html#-m).
-- ADR-0039 records the per-handler design and names this gap.
+- ADR-0040 records the per-handler design and names this gap.
 - Likely approach: the follower passes each hop the time left (`MaxTime` minus the elapsed time on `TimeProvider`), and a hop started with none left fails with exit 28. Measure curl 8.21.0 (`/mingw64/bin/curl`) against a loopback redirect chain whose second hop stalls, and pin the N and M it prints.
 
 ## Acceptance criteria
