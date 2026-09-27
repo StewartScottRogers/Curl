@@ -1,5 +1,5 @@
 ---
-id: BL-312
+id: BL-314
 title: Record the ADR for sanitizing -o names on Windows as curl does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-312 — Record the ADR for sanitizing -o names on Windows as curl does
+# BL-314 — Record the ADR for sanitizing -o names on Windows as curl does
 
 ## Goal
 

@@ -45,10 +45,10 @@ Decisions (Decided by Claude under Stewart's delegation):
 - The platform is a parameter, not `OperatingSystem.IsWindows()` read inside, so both branches are tested on any OS; the caller (BL-240, the `Curl.Console` wiring) passes `OperatingSystem.IsWindows()`. Runs only on Windows, as curl does (`#if defined(_WIN32) || defined(MSDOS)`).
 - `UrlGlob` now records whether it came from `TryParse` or `Unglobbed`, so under `-g` the name is returned as written, matching the measured `-g` case.
 - Rejected: sanitizing inside `SubstituteGlobValues` (hides a platform step behind a name that says substitution); sanitizing only substituted values (measurement shows curl sanitizes the whole name); a length limit (none measured).
-- The ADR could not be written here: `Documentation/Planning/Decisions` is in BL-163's `touches` (in Doing on another lane). Filed BL-312 to record it from these Notes.
+- The ADR could not be written here: `Documentation/Planning/Decisions` is in BL-163's `touches` (in Doing on another lane). Filed BL-314 to record it from these Notes.
 
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
-- 2026-09-26: Doing -> Done. On Windows, -o names resolved through UrlGlobMatch.ResolveOutputFileName are sanitized as curl 8.21.0 does; ADR follow-up BL-312
+- 2026-09-26: Doing -> Done. On Windows, -o names resolved through UrlGlobMatch.ResolveOutputFileName are sanitized as curl 8.21.0 does; ADR follow-up BL-314
