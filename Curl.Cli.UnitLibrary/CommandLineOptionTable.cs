@@ -44,7 +44,7 @@ namespace Curl.Cli;
 /// <c>--no-data-ascii</c>, <c>--no-data-binary</c>, <c>--no-data-raw</c>, <c>--no-data-urlencode</c>, <c>--no-json</c>,
 /// <c>--no-form</c>, <c>--no-form-string</c>,
 /// <c>--no-url-query</c>, <c>--no-max-redirs</c>, <c>--no-config</c>, <c>--no-http1.0</c>, <c>--no-http1.1</c>, <c>--no-http2</c>,
-/// <c>--no-http2-prior-knowledge</c>, <c>--no-http3</c>, <c>--no-http3-only</c>, <c>--no-request-target</c>, <c>--no-anyauth</c>,
+/// <c>--no-http2-prior-knowledge</c>, <c>--no-http3</c>, <c>--no-http3-only</c>, <c>--no-request-target</c>, <c>--no-ipfs-gateway</c>, <c>--no-anyauth</c>,
 /// <c>--no-oauth2-bearer</c>, <c>--no-proxy</c>, <c>--no-proxy-user</c>, <c>--no-noproxy</c>, <c>--no-socks4</c>, <c>--no-socks4a</c>,
 /// <c>--no-socks5</c>, <c>--no-socks5-hostname</c>, <c>--no-write-out</c>, <c>--no-output-dir</c>, <c>--no-trace</c>, <c>--no-trace-ascii</c>, <c>--no-stderr</c>, <c>--no-retry</c>, <c>--no-retry-delay</c>, <c>--no-retry-max-time</c>, <c>--no-limit-rate</c>,
 /// <c>--no-speed-limit</c> and <c>--no-speed-time</c> (each also with <c>=x</c>) exit 2 with
@@ -164,6 +164,7 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("path-as-is", null, (options, on) => options.PathAsIs = on),
         CommandLineOption.NegatableFlag("http0.9", null, (options, on) => options.AllowHttp09Reply = on),
         CommandLineOption.Text("request-target", null, (options, target) => options.RequestTarget = target),
+        CommandLineOption.Text("ipfs-gateway", null, (options, gateway) => options.IpfsGateway = gateway),
         CommandLineOption.Flag("http1.0", '0', options => options.SelectHttpVersion(HttpVersionPreference.Http10)),
         CommandLineOption.Flag("http1.1", null, options => options.SelectHttpVersion(HttpVersionPreference.Http11)),
         CommandLineOption.UnsupportedFlag("http2"),

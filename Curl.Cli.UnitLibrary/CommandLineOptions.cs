@@ -646,6 +646,14 @@ public sealed class CommandLineOptions
     public string? RequestTarget { get; internal set; }
 
     /// <summary>
+    /// The last <c>--ipfs-gateway</c>, verbatim, for <c>Curl.Core</c>'s <c>IpfsGatewayRewriter</c>;
+    /// <see langword="null"/> when not given. An empty value is refused as blank; any other value is
+    /// accepted, because curl 8.21.0 checks the gateway only when it rewrites an <c>ipfs://</c> or
+    /// <c>ipns://</c> URL, not while it reads the options.
+    /// </summary>
+    public string? IpfsGateway { get; internal set; }
+
+    /// <summary>
     /// The HTTP version the last <c>-0</c> / <c>--http1.0</c> or <c>--http1.1</c> asked for;
     /// <see langword="null"/> when neither was given, which means curl's default, HTTP/1.1.
     /// </summary>
