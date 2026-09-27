@@ -31,3 +31,4 @@ An ADR in `Documentation/Planning/Decisions` records that `--resolve` and `--con
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-27: Backlog -> Doing.
