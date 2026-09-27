@@ -1,5 +1,5 @@
 ---
-id: BL-368
+id: BL-371
 title: Print %{url_effective} with the path curl adds to a URL that has none
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-368 — Print %{url_effective} with the path curl adds to a URL that has none
+# BL-371 — Print %{url_effective} with the path curl adds to a URL that has none
 
 ## Goal
 

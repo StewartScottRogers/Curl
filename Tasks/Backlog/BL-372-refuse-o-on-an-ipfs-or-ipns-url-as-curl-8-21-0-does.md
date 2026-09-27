@@ -1,5 +1,5 @@
 ---
-id: BL-369
+id: BL-372
 title: Refuse -O on an ipfs:// or ipns:// URL as curl 8.21.0 does
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-369 — Refuse -O on an ipfs:// or ipns:// URL as curl 8.21.0 does
+# BL-372 — Refuse -O on an ipfs:// or ipns:// URL as curl 8.21.0 does
 
 ## Goal
 
