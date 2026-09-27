@@ -282,6 +282,7 @@ public sealed class DiskDataFileReaderTests
 
     /// <summary>curl 8.21.0 on Windows, 2026-09-26: <c>-z &lt;a directory&gt;</c> reports 0x00000005.</summary>
     [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
     public void TryReadModificationTime_ForPlatformWindowsDirectory_IsAccessDenied()
     {
         using ScratchDirectory scratch = new();
@@ -300,6 +301,7 @@ public sealed class DiskDataFileReaderTests
     /// <param name="device">The DOS device named after <c>-z</c>.</param>
     /// <param name="expectedReason">The reason curl reports.</param>
     [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
     [DataRow("con", "CreateFile failed: GetLastError 0x00000057")]
     [DataRow("nul", "GetFileTime failed: GetLastError 0x00000057")]
     public void TryReadModificationTime_ForPlatformWindowsDosDevice_ReportsTheCallThatFailed(string device, string expectedReason)
@@ -317,6 +319,7 @@ public sealed class DiskDataFileReaderTests
     /// <param name="relativePath">The value after <c>-z</c>, under a scratch directory unless empty.</param>
     /// <param name="expectedReason">The reason curl reports, or <see langword="null"/> for none.</param>
     [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
     [DataRow("", "CreateFile failed: GetLastError 0x00000003")]
     [DataRow("nodir/x", "CreateFile failed: GetLastError 0x00000003")]
     [DataRow("file/x", "CreateFile failed: GetLastError 0x00000003")]
@@ -334,6 +337,7 @@ public sealed class DiskDataFileReaderTests
     }
 
     [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
     public void TryReadModificationTime_ForPlatformWindowsFile_IsItsLastWriteTime()
     {
         using ScratchDirectory scratch = new();
