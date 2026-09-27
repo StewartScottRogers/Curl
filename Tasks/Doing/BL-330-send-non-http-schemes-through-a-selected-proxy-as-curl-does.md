@@ -33,3 +33,4 @@ A non-HTTP transfer (for example `ftp://`, `dict://`, `gopher://`) with `-x` or 
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
