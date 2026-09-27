@@ -118,4 +118,12 @@ public sealed record TransferReport
     /// <see langword="null" /> when the handler recorded none.
     /// </summary>
     public TransferTimings? Timings { get; init; }
+
+    /// <summary>
+    /// Gets the DER encoding of every certificate the server sent in the TLS handshake,
+    /// its own first, copied from <see cref="ConnectResult.PeerCertificates" />, the source
+    /// of <c>%{certs}</c> and <c>%{num_certs}</c> (ADR-0047); empty for a transfer without
+    /// TLS.
+    /// </summary>
+    public IReadOnlyList<ReadOnlyMemory<byte>> PeerCertificates { get; init; } = [];
 }

@@ -31,6 +31,17 @@ public sealed class TransferReportTests
         Assert.IsNull(report.LocalEndPoint);
         Assert.IsNull(report.RemoteEndPoint);
         Assert.IsNull(report.Timings);
+        Assert.IsEmpty(report.PeerCertificates);
+    }
+
+    [TestMethod]
+    public void New_WithPeerCertificates_CarriesThem()
+    {
+        ReadOnlyMemory<byte>[] certificates = [new byte[] { 0x30, 0x00 }];
+
+        var report = new TransferReport { PeerCertificates = certificates };
+
+        Assert.AreSame(certificates, report.PeerCertificates);
     }
 
     [TestMethod]

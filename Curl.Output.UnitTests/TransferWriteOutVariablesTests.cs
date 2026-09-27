@@ -207,7 +207,7 @@ public sealed class TransferWriteOutVariablesTests
     [DataRow("urle.bogus")]
     [DataRow("url.")]
     [DataRow("referer")]
-    [DataRow("num_certs")]
+    [DataRow("num_cert")]
     [DataRow("HTTP_CODE")]
     [DataRow(" http_code")]
     [DataRow("")]
@@ -441,6 +441,35 @@ public sealed class TransferWriteOutVariablesTests
         TransferWriteOutVariables variables = new(TransferResult.Success(0), "http://[::1", 0, "http://[::1", "http", Clock);
 
         Assert.AreEqual("|||||||||", RenderUrlParts(variables, "url."));
+    }
+
+    [TestMethod]
+    [DataRow("file:///Z:/bl284tmp/wo.txt", "file")]
+    [DataRow("http://127.0.0.1:18284/wo.txt", "http")]
+    public void TryGetVariableText_CertificatesWithoutTls_AreZeroAndNothing(string url, string scheme)
+    {
+        // curl -s -o out.bin -w "[%{num_certs}][%{certs}]" for file:// and http:// (BL-284's Notes).
+        TransferWriteOutVariables variables = new(TransferResult.Success(0) with { Report = new TransferReport() }, url, 0, url, scheme, Clock);
+
+        Assert.AreEqual("[0][]", $"[{Get(variables, "num_certs")}][{Get(variables, "certs")}]");
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_CertificatesWithoutReport_AreZeroAndNothing()
+    {
+        TransferWriteOutVariables variables = new(TransferResult.Success(0), LoopbackUrl, 0, LoopbackUrl, "http", Clock);
+
+        Assert.AreEqual("[0][]", $"[{Get(variables, "num_certs")}][{Get(variables, "certs")}]");
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_CertificatesOfLoopbackHttpsTransfer_MatchCurl()
+    {
+        // curl -k -s -o NUL -w "%{num_certs}\n%{certs}" https://127.0.0.1:18304/ (BL-303's Notes).
+        TransferWriteOutVariables variables = WithReport(new TransferReport { PeerCertificates = LoopbackChain.Certificates });
+
+        Assert.AreEqual("3", Get(variables, "num_certs"));
+        Assert.AreEqual(LoopbackChain.CertsText, Get(variables, "certs"));
     }
 
     [TestMethod]

@@ -61,6 +61,14 @@ public sealed class ConnectResult
     public int ProxyConnectResponseCode { get; private init; }
 
     /// <summary>
+    /// Gets the DER encoding of every certificate the server sent in the TLS handshake,
+    /// its own certificate first and the rest in the order sent, the source of
+    /// <c>%{certs}</c> and <c>%{num_certs}</c> (ADR-0047); empty for a connection without
+    /// TLS or a failed connect.
+    /// </summary>
+    public IReadOnlyList<ReadOnlyMemory<byte>> PeerCertificates { get; private init; } = [];
+
+    /// <summary>
     /// Creates the result of a successful connect that recorded no timings, endpoint or
     /// CONNECT code.
     /// </summary>
@@ -86,6 +94,10 @@ public sealed class ConnectResult
     /// <param name="proxyConnectResponseCode">
     /// The status code of the proxy's reply to a tunnelling CONNECT; <c>0</c> when there was none.
     /// </param>
+    /// <param name="peerCertificates">
+    /// The DER encoding of every certificate the server sent, its own first; <see langword="null" />
+    /// or empty when there was no TLS handshake.
+    /// </param>
     /// <returns>A result whose <see cref="ExitCode" /> is <see cref="CurlExitCode.Ok" />.</returns>
     /// <exception cref="ArgumentNullException">
     /// <paramref name="connection" /> is <see langword="null" />, which would leave a
@@ -95,7 +107,8 @@ public sealed class ConnectResult
         IConnection connection,
         ConnectTimings? timings,
         IPEndPoint? localEndPoint = null,
-        int proxyConnectResponseCode = 0)
+        int proxyConnectResponseCode = 0,
+        IReadOnlyList<ReadOnlyMemory<byte>>? peerCertificates = null)
     {
         ArgumentNullException.ThrowIfNull(connection);
 
@@ -104,6 +117,7 @@ public sealed class ConnectResult
             Timings = timings,
             LocalEndPoint = localEndPoint,
             ProxyConnectResponseCode = proxyConnectResponseCode,
+            PeerCertificates = peerCertificates ?? [],
         };
     }
 
