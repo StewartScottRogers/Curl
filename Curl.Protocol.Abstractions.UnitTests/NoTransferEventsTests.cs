@@ -20,6 +20,8 @@ public sealed class NoTransferEventsTests
 
     private static readonly ConnectionReusedEvent Reused = new()
     {
+        Scheme = "https",
+        IsProxy = true,
         HostName = "example.com",
         Port = 443,
         ConnectionNumber = 1,
@@ -65,6 +67,8 @@ public sealed class NoTransferEventsTests
     [TestMethod]
     public void ConnectionReusedEvent_Built_RoundTripsEveryValue()
     {
+        Assert.AreEqual("https", Reused.Scheme);
+        Assert.IsTrue(Reused.IsProxy);
         Assert.AreEqual("example.com", Reused.HostName);
         Assert.AreEqual(443, Reused.Port);
         Assert.AreEqual(1L, Reused.ConnectionNumber);

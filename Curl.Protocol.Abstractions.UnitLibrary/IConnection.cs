@@ -50,4 +50,19 @@ public interface IConnection : IAsyncDisposable
     /// <param name="cancellationToken">Cancels the flush.</param>
     /// <returns>A task that completes when the buffer has drained.</returns>
     ValueTask FlushAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Marks the connection as able to carry another request once this one is disposed:
+    /// the response has been read to its end and the protocol says the connection persists
+    /// (ADR-0050).
+    /// </summary>
+    /// <remarks>
+    /// The caller still disposes the connection. A pooled connection returns to its pool on
+    /// dispose when it was marked, and closes otherwise; every other implementation ignores
+    /// the mark, which is what the default does, so forgetting to call this closes the
+    /// connection rather than wrongly reusing it.
+    /// </remarks>
+    void MarkReusable()
+    {
+    }
 }

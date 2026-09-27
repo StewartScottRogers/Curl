@@ -69,6 +69,20 @@ public sealed class ConnectResult
     public IReadOnlyList<ReadOnlyMemory<byte>> PeerCertificates { get; private init; } = [];
 
     /// <summary>
+    /// Gets a value indicating whether the connection was taken from a pool rather than
+    /// opened for this connect, which makes the transfer's <c>%{num_connects}</c> <c>0</c>
+    /// (ADR-0050); <see langword="false" /> for a new connection or a failed connect.
+    /// </summary>
+    public bool IsReused { get; private init; }
+
+    /// <summary>
+    /// Gets curl's number for the connection, the <c>N</c> of <c>#N</c> in <c>-v</c>,
+    /// counted from <c>0</c> in the order connections are opened (ADR-0050); <c>0</c> when
+    /// the connector does not number connections or the connect failed.
+    /// </summary>
+    public long ConnectionNumber { get; private init; }
+
+    /// <summary>
     /// Creates the result of a successful connect that recorded no timings, endpoint or
     /// CONNECT code.
     /// </summary>
@@ -98,6 +112,12 @@ public sealed class ConnectResult
     /// The DER encoding of every certificate the server sent, its own first; <see langword="null" />
     /// or empty when there was no TLS handshake.
     /// </param>
+    /// <param name="isReused">
+    /// <see langword="true" /> when the connection was taken from a pool rather than opened.
+    /// </param>
+    /// <param name="connectionNumber">
+    /// curl's number for the connection, counted from <c>0</c>; <c>0</c> when not numbered.
+    /// </param>
     /// <returns>A result whose <see cref="ExitCode" /> is <see cref="CurlExitCode.Ok" />.</returns>
     /// <exception cref="ArgumentNullException">
     /// <paramref name="connection" /> is <see langword="null" />, which would leave a
@@ -108,7 +128,9 @@ public sealed class ConnectResult
         ConnectTimings? timings,
         IPEndPoint? localEndPoint = null,
         int proxyConnectResponseCode = 0,
-        IReadOnlyList<ReadOnlyMemory<byte>>? peerCertificates = null)
+        IReadOnlyList<ReadOnlyMemory<byte>>? peerCertificates = null,
+        bool isReused = false,
+        long connectionNumber = 0)
     {
         ArgumentNullException.ThrowIfNull(connection);
 
@@ -118,6 +140,8 @@ public sealed class ConnectResult
             LocalEndPoint = localEndPoint,
             ProxyConnectResponseCode = proxyConnectResponseCode,
             PeerCertificates = peerCertificates ?? [],
+            IsReused = isReused,
+            ConnectionNumber = connectionNumber,
         };
     }
 

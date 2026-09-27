@@ -58,6 +58,17 @@ public sealed record ConnectTarget(string Host, int Port, bool UseTls)
     /// </remarks>
     public ITransferEvents Events { get; init; } = NoTransferEvents.Instance;
 
+    /// <summary>
+    /// Gets the scheme that keys this target in a connection pool, such as <c>http</c> or
+    /// <c>https</c>, or <see langword="null" />, the default, when the connection is never
+    /// pooled and never served from a pool (ADR-0050).
+    /// </summary>
+    /// <remarks>
+    /// Only a handler that hands connections back with <see cref="IConnection.MarkReusable" />
+    /// sets it; every other protocol leaves it <see langword="null" />.
+    /// </remarks>
+    public string? PoolScheme { get; init; }
+
     private static string RequireHost(string host)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(host, nameof(Host));

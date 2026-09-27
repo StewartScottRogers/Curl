@@ -114,6 +114,22 @@ public sealed class ConnectTargetTests
     }
 
     [TestMethod]
+    public void PoolScheme_WhenNotSet_IsNull()
+    {
+        var target = new ConnectTarget("example.com", 443, true);
+
+        Assert.IsNull(target.PoolScheme);
+    }
+
+    [TestMethod]
+    public void PoolScheme_WhenSetWithInitializer_RoundTrips()
+    {
+        var target = new ConnectTarget("example.com", 443, true) { PoolScheme = "https" };
+
+        Assert.AreEqual("https", target.PoolScheme);
+    }
+
+    [TestMethod]
     public void Events_WhenNotSet_IsNoTransferEvents()
     {
         var target = new ConnectTarget("example.com", 443, true);

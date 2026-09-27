@@ -118,6 +118,41 @@ public sealed class ConnectResultTests
     }
 
     [TestMethod]
+    public void Connected_WithoutReuseArguments_IsNotReusedAndNumberedZero()
+    {
+        var shortResult = ConnectResult.Connected(new UnusedConnection());
+        var longResult = ConnectResult.Connected(new UnusedConnection(), null, null, 0, null);
+
+        Assert.IsFalse(shortResult.IsReused);
+        Assert.AreEqual(0L, shortResult.ConnectionNumber);
+        Assert.IsFalse(longResult.IsReused);
+        Assert.AreEqual(0L, longResult.ConnectionNumber);
+    }
+
+    [TestMethod]
+    public void Connected_WithReuseArguments_CarriesThemAsGiven()
+    {
+        var result = ConnectResult.Connected(
+            new UnusedConnection(),
+            null,
+            isReused: true,
+            connectionNumber: 7);
+
+        Assert.IsTrue(result.IsReused);
+        Assert.AreEqual(7L, result.ConnectionNumber);
+    }
+
+    [TestMethod]
+    public void MarkReusable_OnConnectionThatDoesNotOverrideIt_DoesNotThrow()
+    {
+        IConnection connection = new UnusedConnection();
+
+        connection.MarkReusable();
+
+        Assert.IsFalse(connection.IsSecure);
+    }
+
+    [TestMethod]
     public void Connected_WithTimingsAndNullConnection_ThrowsArgumentNullException()
     {
         IConnection? connection = null;
@@ -137,6 +172,8 @@ public sealed class ConnectResultTests
         Assert.IsNull(result.Timings);
         Assert.IsNull(result.LocalEndPoint);
         Assert.AreEqual(0, result.ProxyConnectResponseCode);
+        Assert.IsFalse(result.IsReused);
+        Assert.AreEqual(0L, result.ConnectionNumber);
     }
 
     private sealed class UnusedConnection : IConnection
