@@ -391,13 +391,25 @@ public sealed class DiskDataFileReaderTests
     }
 
     [TestMethod]
-    public void TryReadModificationTime_ForProcessMissingFile_IsFileNotFound()
+    [OSCondition(OperatingSystems.Windows)]
+    public void TryReadModificationTime_ForProcessMissingFileOnWindows_IsFileNotFoundWithNoReason()
     {
         bool read = DiskDataFileReader.ForProcess.TryReadModificationTime(
             Path.Combine(AppContext.BaseDirectory, "no-such-file.bl246"), out _, out string? failureReason);
 
         Assert.IsFalse(read);
         Assert.IsNull(failureReason);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public void TryReadModificationTime_ForProcessMissingFileOffWindows_IsNoSuchFileOrDirectory()
+    {
+        bool read = DiskDataFileReader.ForProcess.TryReadModificationTime(
+            Path.Combine(AppContext.BaseDirectory, "no-such-file.bl246"), out _, out string? failureReason);
+
+        Assert.IsFalse(read);
+        Assert.AreEqual("No such file or directory", failureReason);
     }
 
     [TestMethod]
