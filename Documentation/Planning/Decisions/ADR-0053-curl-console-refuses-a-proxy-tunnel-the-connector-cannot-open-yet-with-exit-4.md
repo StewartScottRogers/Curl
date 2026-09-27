@@ -1,6 +1,7 @@
 # ADR-0053 — Curl.Console refuses a proxy tunnel the connector cannot open yet, with exit 4
 
-- **Status:** Accepted
+- **Status:** Retired 2026-09-27: BL-328 removed the guard once BL-213 (SOCKS) and BL-266
+  (HTTPS proxies) let the connector open every tunnel
 - **Date:** 2026-09-27
 - **Decided by Claude under Stewart's delegation** (root `CLAUDE.md`, "Decisions"; recorded
   by BL-238, 2026-09-27).
