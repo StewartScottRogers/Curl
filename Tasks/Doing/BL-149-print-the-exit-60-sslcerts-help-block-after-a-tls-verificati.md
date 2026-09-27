@@ -47,3 +47,4 @@ After the `curl: (60) <message>` line, `Curl.Console` writes to standard error t
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
