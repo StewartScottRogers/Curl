@@ -677,6 +677,20 @@ public sealed class FileUrlPathTests
         Assert.AreEqual(fromThree, fromTwo);
     }
 
+    // FileUrlPath is a record so that two parses compare by value; a with expression is
+    // part of that surface and copies both forms of the path unchanged.
+    [TestMethod]
+    public void With_NoChanges_CopiesAnEqualPath()
+    {
+        bool parsed = FileUrlPath.TryParse(new Uri("file:///C:/dir/hello.txt"), out var path);
+
+        Assert.IsTrue(parsed);
+        Assert.IsNotNull(path);
+        FileUrlPath copy = path with { };
+        Assert.AreNotSame(path, copy);
+        Assert.AreEqual(path, copy);
+    }
+
     // The letter's case does not matter: file://d:/nope.txt was measured at exit 37, which
     // is a failed open of a path and not the exit 3 a rejected host would give.
     [TestMethod]

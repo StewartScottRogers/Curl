@@ -219,52 +219,101 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
             return headerFailure;
         }
 
-        if (context.NoBody)
-        {
-            return TransferResult.Success(0);
-        }
+        return context.NoBody
+            ? TransferResult.Success(0)
+            : await DownloadBodyAsync(context, source, opened.Length).ConfigureAwait(false);
+    }
 
+    /// <summary>
+    /// Applies <c>-C</c>/<c>--continue-at</c> or <c>-r</c>/<c>--range</c> to the opened
+    /// source, then moves the window of it they select.
+    /// </summary>
+    /// <param name="context">The transfer being performed.</param>
+    /// <param name="source">The opened source, which this method does not dispose.</param>
+    /// <param name="length">The length of the opened file.</param>
+    /// <returns>The outcome of the download.</returns>
+    private static ValueTask<TransferResult> DownloadBodyAsync(
+        ITransferContext context,
+        Stream source,
+        long length)
+    {
         if (!TryResolveWindow(
             context,
-            opened.Length,
+            length,
             out long start,
             out long count,
             out string resumeErrorMessage))
         {
-            return TransferResult.Failure(CurlExitCode.BadDownloadResume, resumeErrorMessage);
+            return ValueTask.FromResult(
+                TransferResult.Failure(CurlExitCode.BadDownloadResume, resumeErrorMessage));
         }
 
-        if (start > 0)
+        if (!TrySeekToStart(source, start))
         {
-            // A character device or a FIFO - file:///dev/stdin - opens as a stream that
-            // cannot seek, and Seek would throw NotSupportedException out of a handler that
-            // promises to return every transfer failure. curl 8.21.0's lib/file.c answers a
-            // failed lseek with exit 36, so this does too.
-            if (!source.CanSeek)
-            {
-                return TransferResult.Failure(
+            return ValueTask.FromResult(
+                TransferResult.Failure(
                     CurlExitCode.BadDownloadResume,
-                    FileTransferMessages.ResumeFailed);
-            }
-
-            source.Seek(start, SeekOrigin.Begin);
+                    FileTransferMessages.ResumeFailed));
         }
 
-        return await CopyAsync(
-                source,
-                context.Output,
-                ChunkSize,
-                ChunkSize,
-                count,
-                context.MaxFileSize is > 0 and long maxFileSize ? maxFileSize : long.MaxValue,
-                static chunk => chunk,
-                static (_, transferred) => TransferResult.Success(transferred),
-                static (offered, accepted, transferred) => TransferResult.Failure(
-                    CurlExitCode.WriteError,
-                    FileTransferMessages.OutputWriteFailed(offered, accepted),
-                    transferred),
-                context.CancellationToken)
-            .ConfigureAwait(false);
+        return CopyWindowAsync(context, source, count);
+    }
+
+    /// <summary>
+    /// Moves <paramref name="count" /> bytes from the source's current position to the
+    /// output, stopping at <c>--max-filesize</c>.
+    /// </summary>
+    /// <param name="context">The transfer being performed.</param>
+    /// <param name="source">The opened source, already at the first byte to send.</param>
+    /// <param name="count">How many bytes to send.</param>
+    /// <returns>The outcome of the download.</returns>
+    private static ValueTask<TransferResult> CopyWindowAsync(
+        ITransferContext context,
+        Stream source,
+        long count)
+    {
+        return CopyAsync(
+            source,
+            context.Output,
+            ChunkSize,
+            ChunkSize,
+            count,
+            context.MaxFileSize is > 0 and long maxFileSize ? maxFileSize : long.MaxValue,
+            static chunk => chunk,
+            static (_, transferred) => TransferResult.Success(transferred),
+            static (offered, accepted, transferred) => TransferResult.Failure(
+                CurlExitCode.WriteError,
+                FileTransferMessages.OutputWriteFailed(offered, accepted),
+                transferred),
+            context.CancellationToken);
+    }
+
+    /// <summary>
+    /// Moves the source to the first byte to send, when that is not its beginning.
+    /// </summary>
+    /// <param name="source">The opened source.</param>
+    /// <param name="start">The first byte position to send.</param>
+    /// <returns>
+    /// <see langword="false" /> when the source must be moved and cannot seek.
+    /// </returns>
+    private static bool TrySeekToStart(Stream source, long start)
+    {
+        if (start <= 0)
+        {
+            return true;
+        }
+
+        // A character device or a FIFO - file:///dev/stdin - opens as a stream that
+        // cannot seek, and Seek would throw NotSupportedException out of a handler that
+        // promises to return every transfer failure. curl 8.21.0's lib/file.c answers a
+        // failed lseek with exit 36, so this does too.
+        if (!source.CanSeek)
+        {
+            return false;
+        }
+
+        source.Seek(start, SeekOrigin.Begin);
+        return true;
     }
 
     /// <summary>
@@ -688,12 +737,25 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
         TimeCondition? condition,
         DateTimeOffset? lastWriteTimeUtc)
     {
-        if (condition is null || lastWriteTimeUtc is not { } knownLastWriteTimeUtc)
-        {
-            return true;
-        }
+        return condition is null
+            || lastWriteTimeUtc is not { } knownLastWriteTimeUtc
+            || MeetsKnownTimeCondition(condition, knownLastWriteTimeUtc);
+    }
 
-        long fileSeconds = WholeSeconds(knownLastWriteTimeUtc);
+    /// <summary>
+    /// Compares a known file timestamp with a time condition, in whole seconds.
+    /// </summary>
+    /// <param name="condition">The condition to apply.</param>
+    /// <param name="lastWriteTimeUtc">The file's last-modified timestamp.</param>
+    /// <returns>
+    /// <see langword="true" /> when the body should be transferred, including when either
+    /// side truncates to the Unix epoch, which curl reads as unknown.
+    /// </returns>
+    private static bool MeetsKnownTimeCondition(
+        TimeCondition condition,
+        DateTimeOffset lastWriteTimeUtc)
+    {
+        long fileSeconds = WholeSeconds(lastWriteTimeUtc);
         long conditionSeconds = WholeSeconds(condition.Value);
 
         if (fileSeconds == UnixEpochWholeSeconds || conditionSeconds == UnixEpochWholeSeconds)

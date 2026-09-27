@@ -8,25 +8,6 @@ namespace Curl.Protocol.File;
 /// The path half of a <c>file://</c> URL, in both of the forms curl needs it: as written
 /// in the URL, and as handed to the operating system.
 /// </summary>
-/// <param name="UrlPath">
-/// The path as curl reports it, still percent-encoded: every <c>\</c> already turned into
-/// <c>/</c> and, unless <c>--path-as-is</c> is in force, its dot segments removed. This is
-/// the text curl echoes in its exit 37 message — <c>file:///C:/dir/../nosuch.txt</c> is
-/// quoted as <c>C:/nosuch.txt</c> — so it is built from the encoded text rather than
-/// reconstructed from the decoded form. Every well-formed <c>%xx</c> escape it keeps is
-/// written with uppercase hexadecimal digits, as curl 8.21.0 quotes it:
-/// <c>file:///C:/dir/a%2eb/x</c> is quoted as <c>C:/dir/a%2Eb/x</c>. A malformed escape
-/// — <c>%2</c>, <c>%GG</c>, <c>%g2</c>, a trailing <c>%</c> — is kept exactly as written.
-/// A non-ASCII character written unescaped is encoded as its UTF-8 bytes, so
-/// <c>file:///C:/dir/é</c> is quoted as <c>C:/dir/%C3%A9</c>; printable ASCII is never
-/// encoded.
-/// </param>
-/// <param name="OsPath">
-/// The percent-decoded operating-system path handed to
-/// <see cref="Abstractions.IFileSystem" />: <c>UrlPath</c> decoded, with the platform's
-/// directory separators. It holds a <c>.</c> or <c>..</c> segment only when the URL was
-/// parsed with <c>pathAsIs</c>.
-/// </param>
 /// <remarks>
 /// <para>
 /// Parsing works from <see cref="Uri.OriginalString" />, never
@@ -43,8 +24,42 @@ namespace Curl.Protocol.File;
 /// never reach this type, because <see cref="Uri" /> throws before it is called.
 /// </para>
 /// </remarks>
-public sealed record FileUrlPath(string UrlPath, string OsPath)
+public sealed record FileUrlPath
 {
+    /// <summary>
+    /// Holds the two forms of an already parsed path.
+    /// </summary>
+    /// <param name="urlPath">The path as curl reports it; see <see cref="UrlPath" />.</param>
+    /// <param name="osPath">The path handed to the operating system; see <see cref="OsPath" />.</param>
+    private FileUrlPath(string urlPath, string osPath)
+    {
+        UrlPath = urlPath;
+        OsPath = osPath;
+    }
+
+    /// <summary>
+    /// The path as curl reports it, still percent-encoded: every <c>\</c> already turned into
+    /// <c>/</c> and, unless <c>--path-as-is</c> is in force, its dot segments removed. This is
+    /// the text curl echoes in its exit 37 message — <c>file:///C:/dir/../nosuch.txt</c> is
+    /// quoted as <c>C:/nosuch.txt</c> — so it is built from the encoded text rather than
+    /// reconstructed from the decoded form. Every well-formed <c>%xx</c> escape it keeps is
+    /// written with uppercase hexadecimal digits, as curl 8.21.0 quotes it:
+    /// <c>file:///C:/dir/a%2eb/x</c> is quoted as <c>C:/dir/a%2Eb/x</c>. A malformed escape
+    /// — <c>%2</c>, <c>%GG</c>, <c>%g2</c>, a trailing <c>%</c> — is kept exactly as written.
+    /// A non-ASCII character written unescaped is encoded as its UTF-8 bytes, so
+    /// <c>file:///C:/dir/é</c> is quoted as <c>C:/dir/%C3%A9</c>; printable ASCII is never
+    /// encoded.
+    /// </summary>
+    public string UrlPath { get; }
+
+    /// <summary>
+    /// The percent-decoded operating-system path handed to
+    /// <see cref="Abstractions.IFileSystem" />: <c>UrlPath</c> decoded, with the platform's
+    /// directory separators. It holds a <c>.</c> or <c>..</c> segment only when the URL was
+    /// parsed with <c>pathAsIs</c>.
+    /// </summary>
+    public string OsPath { get; }
+
     /// <summary>
     /// The only scheme this type parses, compared ordinally and ignoring case.
     /// </summary>
@@ -420,25 +435,44 @@ public sealed record FileUrlPath(string UrlPath, string OsPath)
 
         foreach (string segment in segments)
         {
-            string dots = SpellDotsPlainly(segment);
-
-            if (dots == "..")
-            {
-                RemoveLastKept(kept);
-            }
-            else if (dots != ".")
-            {
-                kept.Add(segment);
-            }
+            KeepOrDropSegment(kept, segment);
         }
 
-        if (SpellDotsPlainly(segments[^1]) is "." or "..")
+        if (IsDotSegment(segments[^1]))
         {
             kept.Add(string.Empty);
         }
 
         return (rooted ? "/" : string.Empty) + string.Join('/', kept);
     }
+
+    /// <summary>
+    /// Applies one segment to the segments kept so far: a <c>..</c> removes the last kept
+    /// segment, a <c>.</c> is dropped, and anything else is kept.
+    /// </summary>
+    /// <param name="kept">The segments kept so far.</param>
+    /// <param name="segment">One still-encoded path segment.</param>
+    private static void KeepOrDropSegment(List<string> kept, string segment)
+    {
+        string dots = SpellDotsPlainly(segment);
+
+        if (dots == "..")
+        {
+            RemoveLastKept(kept);
+        }
+        else if (dots != ".")
+        {
+            kept.Add(segment);
+        }
+    }
+
+    /// <summary>
+    /// Tells whether a segment is <c>.</c> or <c>..</c>, its dots plain or encoded.
+    /// </summary>
+    /// <param name="segment">One still-encoded path segment.</param>
+    /// <returns><see langword="true" /> for a dot segment.</returns>
+    private static bool IsDotSegment(string segment) =>
+        SpellDotsPlainly(segment) is "." or "..";
 
     /// <summary>
     /// Rewrites each <c>%2e</c> escape, in either case, as the <c>.</c> it encodes, so
