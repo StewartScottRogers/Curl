@@ -43,3 +43,4 @@ This is a docs-only task: no `.cs` file changes. The contract is BL-134.
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
