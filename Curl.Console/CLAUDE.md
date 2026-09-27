@@ -138,12 +138,20 @@ Under `-R`/`--remote-time` a successful transfer to an `-o` file whose result ca
 (`PhysicalFileSystem` in production), even when no body was written, as curl does. A
 failed stamp is ignored for now; curl's warning lines for it are BL-139.
 
-After each successful transfer, and after one `-f` failed with exit 22, standard error gets the opening of curl's progress meter
-(`ProgressMeterLines`): `** Resuming transfer from byte position N` when it resumed past
-byte zero, the two header lines, and the all-zero status line - every byte curl 8.21.0
-writes for a `file://` transfer. It is not written under `-s`, `--no-progress-meter` or
-`-#`, nor for a body on standard output when that is a terminal. Live counters, the bar
-form and the meter after any other failed transfer are not modelled yet (BL-130 to BL-132).
+After each successful transfer, after one `-f` failed with exit 22, and after one that failed
+once its handler reported it past connect or open (BL-130), standard error gets curl's progress
+meter: `** Resuming transfer from byte position N` when it resumed past byte zero, the two
+header lines (`ProgressMeterLines`), the status lines, and one newline. The status lines come
+from `TransferProgressRecorder`, the transfer's `ITransferProgress` sink, which draws them on the
+runner's `TimeProvider` as curl 8.21.0's `progress_calc` and `progress_meter` do, with the fields
+`ProgressMeterFields` formats (`max6out`, `time2str`): the all-zero line when the transfer
+starts, a line for a byte report a second or more after the last speed sample, and, when the
+handler reported any bytes, three done lines after a success or one more update after a failure.
+A handler that reports no bytes, as `file://`'s does not, leaves only the zero line - every byte
+curl writes for a `file://` transfer. The meter is written after the transfer, so its bytes are
+curl's but a terminal does not see it move (BL-131 Notes). It is not written under `-s`,
+`--no-progress-meter` or `-#`, nor for a body on standard output when that is a terminal. The
+bar form is BL-132.
 
 With `-w`, each transfer's template is rendered by `Curl.Output`'s `WriteOutTemplateRenderer`
 after its failure lines, after a failure as after a success (a `-D` or resumed `-o` file that

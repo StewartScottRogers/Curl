@@ -203,7 +203,7 @@ public sealed class CurlCompositionTests
 
             Assert.AreEqual(0, exitCode);
             Assert.AreEqual(
-                string.Concat(ProgressMeterLines.Opening(null).Select(line => line + Environment.NewLine)),
+                string.Concat(ProgressMeterLines.HeaderLines(null).Append(ProgressMeterLines.ZeroStatusLine).Select(line => line + Environment.NewLine)),
                 Encoding.UTF8.GetString(standardError.ToArray()));
         }
         finally

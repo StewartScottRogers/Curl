@@ -35,7 +35,7 @@ public sealed class TransferContextFactoryTests
     {
         using MemoryStream standardInput = new();
         using MemoryStream output = new();
-        TransferStartedRecorder progress = new();
+        TransferProgressRecorder progress = new(new ManualTimeProvider());
 
         TransferContext context = new TransferContextFactory(standardInput)
             .Create(Parse("file:///C:/x.txt"), CurlUrl.Parse("file:///C:/x.txt"), output, null, null, null, progress: progress);
