@@ -164,7 +164,7 @@ namespace Curl.Protocol.Http;
 /// the moment the request was sent, the first response byte
 /// (<see cref="HttpFirstByteTimingConnection" />) and the report's end. A failed connect reports
 /// one timestamp, taken as it failed, for all but the start and the connect, as curl 8.21.0
-/// does (measured, ADR-0073).
+/// does (measured, ADR-0075).
 /// </para>
 /// </remarks>
 public sealed class HttpProtocolHandler(
@@ -300,7 +300,7 @@ public sealed class HttpProtocolHandler(
     /// Reports a connect that failed: whether it went to a forward proxy, and the transfer's
     /// timings with <c>%{time_pretransfer}</c>, <c>%{time_posttransfer}</c> and
     /// <c>%{time_starttransfer}</c> taken when it failed, as curl 8.21.0 takes them after a
-    /// refused connect or a failed resolve (measured, ADR-0073).
+    /// refused connect or a failed resolve (measured, ADR-0075).
     /// </summary>
     private static TransferReport FailedConnectReport(HttpRequestPlan plan)
     {

@@ -6,7 +6,7 @@ namespace Curl.Protocol.Http;
 
 /// <summary>
 /// The <see cref="TransferTimings" /> the handler reports, taken where curl 8.21.0 takes them
-/// (measured, BL-287 Notes, ADR-0073), on <see cref="SteppingTimeProvider" /> so every
+/// (measured, BL-287 Notes, ADR-0075), on <see cref="SteppingTimeProvider" /> so every
 /// timestamp is distinct and in the order it was taken.
 /// </summary>
 public sealed partial class HttpProtocolHandlerTests
