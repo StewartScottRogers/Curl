@@ -211,7 +211,7 @@ public sealed class TcpConnector(
         // curl 8.21.0 verifies the proxy against its own host name and reports a failed
         // handshake to it with the same exit code and message as one to a target (measured).
         // It verifies with the --proxy-* TLS options, not -k or --cacert; until they are
-        // parsed (BL-361) the transfer's provider runs this handshake too (ADR-0060).
+        // parsed (BL-362) the transfer's provider runs this handshake too (ADR-0061).
         var securedProxy = await tlsProvider.AuthenticateAsClientAsync(dialed.Connection, proxy.Host, cancellationToken).ConfigureAwait(false);
         if (securedProxy.Connection is not { } proxyConnection)
         {

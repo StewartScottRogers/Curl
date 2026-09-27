@@ -33,7 +33,7 @@ The `--proxy-*` TLS options are not parsed yet.
 2. The proxy handshake runs through the same injected `ITlsProvider` as the target's, so
    the proxy is verified with the transfer's TLS settings. This differs from curl only
    when `-k`, `--cacert` or `--capath` is given. A separate proxy provider seam waits for
-   BL-361, which parses the `--proxy-*` TLS options and wires both ends at once
+   BL-362, which parses the `--proxy-*` TLS options and wires both ends at once
    (`Curl.Console`'s composition tests pin `TcpConnector`'s single `ITlsProvider` field,
    so the seam and its wiring belong in one change).
 3. `ConnectTimings.TlsHandshakeCompleted` and `ConnectResult.PeerCertificates` come only
@@ -42,5 +42,5 @@ The `--proxy-*` TLS options are not parsed yet.
 ## Consequences
 
 - No `ProxyKind` makes `TcpConnector` throw `NotSupportedException`.
-- BL-328 can remove the console's exit 4 for HTTPS proxies; BL-361 gives the proxy its own
+- BL-328 can remove the console's exit 4 for HTTPS proxies; BL-362 gives the proxy its own
   TLS options.
