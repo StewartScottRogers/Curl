@@ -46,6 +46,24 @@ public sealed class UpstreamCaseVerificationTests
     }
 
     [TestMethod]
+    public void FindFirstDifference_Base64ReplyData_IsComparedDecoded()
+    {
+        string sections = "<reply>\n<data base64=\"yes\">\naGk=\n</data>\n</reply>\n";
+
+        Assert.IsNull(Verify(sections, Run(outputFile: "hi")));
+    }
+
+    [TestMethod]
+    public void FindFirstDifference_StripPatternThatRunsTooLong_NamesIt()
+    {
+        string sections = "<verify>\n<protocol>\nx\n</protocol>\n<strip>\n^(a+)+$\n</strip>\n</verify>\n";
+
+        string? difference = Verify(sections, Run(received: new string('a', 40) + "!\n"));
+
+        Assert.AreEqual("the strip pattern ^(a+)+$ took longer than 1 seconds", difference);
+    }
+
+    [TestMethod]
     public void FindFirstDifference_ReplyDataMarkedNocheck_IsNotCompared()
     {
         Assert.IsNull(Verify("<reply>\n<data nocheck=\"yes\">\nx\n</data>\n</reply>\n", Run()));

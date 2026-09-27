@@ -45,11 +45,13 @@ sws's part-number rules for authentication, `swsbounce` and `CONNECT` are not em
 the file for an `UpstreamCurlPlatform` (the features Curl reports and its null device),
 asks `UpstreamCaseScreening` whether the harness can run it (a `<tool>` case, a server other
 than `http`, `file` or `none`, a missing feature, a variable with no value, an unsupported
-`<servercmd>` or strip line each skip it with a reason), writes `<client><file>` parts into
+`<servercmd>` or strip line each skip it with a reason, and so does a file part naming a file
+outside the case's log directory), writes `<client><file>` parts into
 the case's log directory, splits `<client><command>` with `UpstreamCommandLineSplitter` as
 the shell `runtests.pl` uses would, and runs curl through an `UpstreamCurlInvocation` against
 the `sws` emulation and `UnreachableDatagramConnector`, under a time limit from an injected
-`TimeProvider`. `UpstreamCaseVerification` compares the `UpstreamCaseRun` against
+`TimeProvider` (a run past it cannot be stopped, since curl's runner takes no cancellation
+token, so the case fails and the run is abandoned). `UpstreamCaseVerification` compares the `UpstreamCaseRun` against
 `<verify>` (protocol after `<strip>` / `<strippart>`, run as `UpstreamPerlSubstitution`s
 compiled by `UpstreamRegex`; stdout; stderr; exit code; `<verify><file>`), and
 `UpstreamFirstDifference` names the first differing byte and line. The result is an

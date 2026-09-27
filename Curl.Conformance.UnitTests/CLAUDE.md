@@ -37,4 +37,9 @@ skipped cases are not runnable).
 The whole conformance run of 2013 cases takes about 3 seconds and opens no socket: every
 connection goes to the in-memory `sws` emulation, and UDP to `UnreachableDatagramConnector`.
 
-No sockets and no network, like every other `.UnitTests` project.
+No sockets and no network, like every other `.UnitTests` project. Unlike the rule in
+`.claude/rules/testing.md`, the runner's tests and the conformance method touch the file
+system without `TestCategory("Integration")`: a case's `%LOGDIR` files and curl's `--output`
+are real files, as upstream's are, and ADR-0013 puts the ratchet in the fast suite. Every file
+stays under the test output's `log/` folder, and a case naming a file outside its own log
+directory is skipped.

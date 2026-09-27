@@ -57,21 +57,7 @@ internal sealed class SwsHttpReplySelector(UpstreamTestCase testCase, bool close
             return [];
         }
 
-        byte[] served = UpstreamTestPartBodies.Served(part);
-        byte[] bytes = part.Attributes.ContainsKey("base64") ? DecodeBase64(served) : served;
+        byte[] bytes = UpstreamTestPartBodies.Decoded(part);
         return part.Attributes.ContainsKey("nonewline") && bytes.Length > 0 ? bytes[..^1] : bytes;
-    }
-
-    // sws sends nothing when a part does not decode.
-    private static byte[] DecodeBase64(ReadOnlySpan<byte> content)
-    {
-        try
-        {
-            return Convert.FromBase64String(Encoding.Latin1.GetString(content));
-        }
-        catch (FormatException)
-        {
-            return [];
-        }
     }
 }

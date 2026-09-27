@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace Curl.Conformance;
 
 /// <summary>
@@ -68,10 +70,32 @@ public sealed class UpstreamCaseScreeningTests
     [DataRow("<client>\n<server>\nhttp\nftp\n</server>\n<command>\na\n</command>\n</client>\n", "the harness does not emulate the ftp server")]
     [DataRow("<client>\n<name>\nno command\n</name>\n</client>\n", "the case has no <client><command>")]
     [DataRow("<client>\n<command type=\"perl\">\nx\n</command>\n</client>\n", "the harness does not run a perl command")]
-    [DataRow("<client>\n<command>\nhttp://h/ | cat\n</command>\n</client>\n", "the command needs a shell for its unquoted |")]
+    [DataRow("<client>\n<command>\nhttp://h/ | cat\n</command>\n</client>\n", "the command needs a shell for its |")]
     public void FindSkipReason_ClientTheHarnessCannotRun_IsTheReason(string sections, string expected)
     {
         Assert.AreEqual(expected, Screen(sections));
+    }
+
+    [TestMethod]
+    public void FindFileOutsideLogDirectory_EveryFileInside_ReturnsNull()
+    {
+        string logDirectory = Rooted("log");
+        string sections = $"<client>\n<file name=\"{logDirectory}/in\">\n</file>\n</client>\n<verify>\n<file1 name=\"{logDirectory}/sub/out\">\n</file1>\n</verify>\n";
+
+        Assert.IsNull(UpstreamCaseScreening.FindFileOutsideLogDirectory(ParsedTestCase.From(sections), logDirectory));
+    }
+
+    [TestMethod]
+    [DataRow("<client>\n<file name=\"{0}/in\">\n</file>\n</client>\n", "<client><file> names {0}/in, outside the case's log directory")]
+    [DataRow("<verify>\n<file2 name=\"{0}/log/../out\">\n</file2>\n</verify>\n", "<verify><file2> names {0}/log/../out, outside the case's log directory")]
+    [DataRow("<verify>\n<file name=\"{0}/logs/out\">\n</file>\n</verify>\n", "<verify><file> names {0}/logs/out, outside the case's log directory")]
+    public void FindFileOutsideLogDirectory_FileOutside_IsTheReason(string sections, string expected)
+    {
+        string parent = Rooted("parent");
+
+        string? reason = UpstreamCaseScreening.FindFileOutsideLogDirectory(ParsedTestCase.From(string.Format(CultureInfo.InvariantCulture, sections, parent)), parent + "/log");
+
+        Assert.AreEqual(string.Format(CultureInfo.InvariantCulture, expected, parent), reason);
     }
 
     private static string? Screen(string sections) =>

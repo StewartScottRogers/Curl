@@ -138,9 +138,12 @@ public sealed class UpstreamCaseRunnerTests
     [TestMethod]
     public async Task RunAsync_CurlThatNeverFinishes_FailsAfterTheTimeLimit()
     {
-        UpstreamCaseRunner runner = new(_ => new TaskCompletionSource<int>().Task, UpstreamCurlPlatform.Unix, TimeProvider.System, TimeSpan.FromMilliseconds(1));
+        ExpiringTimeProvider time = new();
+        UpstreamCaseRunner runner = new(_ => new TaskCompletionSource<int>().Task, UpstreamCurlPlatform.Unix, time, TimeSpan.FromMilliseconds(1));
 
-        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<command>\na\n</command>\n</client>\n</testcase>\n");
+        Task<UpstreamCaseOutcome> running = RunAsync(runner, "<testcase>\n<client>\n<command>\na\n</command>\n</client>\n</testcase>\n");
+        time.ExpireEveryTimer();
+        UpstreamCaseOutcome outcome = await running;
 
         Assert.AreEqual(UpstreamCaseOutcomeKind.Failed, outcome.Kind);
         Assert.AreEqual("curl did not finish within 0.001 seconds", outcome.Detail);
@@ -212,5 +215,36 @@ public sealed class UpstreamCaseRunnerTests
         }
 
         await File.WriteAllBytesAsync(outputFile, reply.ToArray());
+    }
+
+    // A clock that never moves on its own: every timer made from it fires when the test says so.
+    private sealed class ExpiringTimeProvider : TimeProvider
+    {
+        private readonly List<(TimerCallback Callback, object? State)> timers = [];
+
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+        {
+            timers.Add((callback, state));
+            return new InertTimer();
+        }
+
+        public void ExpireEveryTimer()
+        {
+            foreach ((TimerCallback callback, object? state) in timers.ToArray())
+            {
+                callback(state);
+            }
+        }
+    }
+
+    private sealed class InertTimer : ITimer
+    {
+        public bool Change(TimeSpan dueTime, TimeSpan period) => true;
+
+        public void Dispose()
+        {
+        }
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }

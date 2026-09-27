@@ -10,7 +10,8 @@ namespace Curl.Conformance;
 /// </summary>
 /// <remarks>
 /// Shell syntax that would do more than quote - an unquoted <c>|</c>, <c>;</c>, <c>&amp;</c>,
-/// <c>&lt;</c>, <c>&gt;</c>, <c>$</c> or <c>`</c> - is not carried out; it is reported in
+/// <c>&lt;</c>, <c>&gt;</c>, <c>$</c> or <c>`</c>, or an unescaped <c>$</c> or <c>`</c> inside
+/// double quotes - is not carried out; it is reported in
 /// <see cref="UpstreamCommandLine.UnsupportedShellSyntax"/> so the case can be skipped with a
 /// reason. An unclosed quote runs to the end of the command. Each argument's bytes, carried as
 /// Latin-1, are decoded as UTF-8, the encoding the test files are written in.
@@ -20,6 +21,8 @@ internal static class UpstreamCommandLineSplitter
     private const string UnsupportedUnquoted = "|;&<>$`";
 
     private const string EscapableInDoubleQuotes = "\"\\$`";
+
+    private const string ExpandedInDoubleQuotes = "$`";
 
     /// <summary>Splits one command.</summary>
     /// <param name="command">The command, after the test file's expansion, one character per byte.</param>
@@ -95,13 +98,23 @@ internal static class UpstreamCommandLineSplitter
         {
             while (index < command.Length && command[index] != '"')
             {
-                bool escapes = command[index] == '\\' && index + 1 < command.Length && EscapableInDoubleQuotes.Contains(command[index + 1], StringComparison.Ordinal);
-                index += escapes ? 1 : 0;
-                word.Append(command[index++]);
+                ReadDoubleQuotedCharacter();
             }
 
             index++;
         }
+
+        private void ReadDoubleQuotedCharacter()
+        {
+            bool escapes = EscapesInDoubleQuotes();
+            unsupported ??= !escapes && ExpandedInDoubleQuotes.Contains(command[index], StringComparison.Ordinal) ? command[index] : null;
+            index += escapes ? 1 : 0;
+            word.Append(command[index++]);
+        }
+
+        // Whether the character at index is a backslash that escapes the next one inside double quotes.
+        private bool EscapesInDoubleQuotes() =>
+            command[index] == '\\' && index + 1 < command.Length && EscapableInDoubleQuotes.Contains(command[index + 1], StringComparison.Ordinal);
 
         private void AppendNext()
         {

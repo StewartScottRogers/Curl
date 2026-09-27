@@ -75,7 +75,8 @@ public sealed class UpstreamCaseRunner(
             return UpstreamCaseOutcome.Skipped(parsed.Failure.Message);
         }
 
-        return UpstreamCaseScreening.FindSkipReason(expansion, parsed.TestCase, platform.Features) is { } reason
+        return (UpstreamCaseScreening.FindSkipReason(expansion, parsed.TestCase, platform.Features)
+                ?? UpstreamCaseScreening.FindFileOutsideLogDirectory(parsed.TestCase, logDirectory)) is { } reason
             ? UpstreamCaseOutcome.Skipped(reason)
             : await RunScreenedAsync(parsed.TestCase, testNumber, logDirectoryVariable).ConfigureAwait(false);
     }
@@ -98,9 +99,12 @@ public sealed class UpstreamCaseRunner(
         string outputFile = logDirectory + "/curl.out";
         WriteClientFiles(testCase);
         SwsHttpServerConnector server = new(testCase);
-        using MemoryStream standardOutput = new();
-        using MemoryStream standardError = new();
-        using MemoryStream standardInput = new(StandardInput(testCase));
+        // Not disposed: CurlCommandRunner.RunAsync takes no cancellation token, so a run past the
+        // time limit cannot be stopped and goes on writing to these after the case has failed.
+        // A memory stream holds nothing but its buffer, which the collector takes once curl ends.
+        MemoryStream standardOutput = new();
+        MemoryStream standardError = new();
+        MemoryStream standardInput = new(StandardInput(testCase));
         UpstreamCurlInvocation invocation = new(Arguments(testCase, outputFile), standardOutput, standardError, standardInput, server, new UnreachableDatagramConnector());
         (int exitCode, string? failure) = await RunCurlAsync(invocation).ConfigureAwait(false);
         if (failure is not null)

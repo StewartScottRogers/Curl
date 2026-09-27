@@ -10,7 +10,7 @@ internal sealed class UpstreamCommandLine(IReadOnlyList<string> arguments, char?
 
     /// <summary>
     /// The first unquoted <c>|</c>, <c>;</c>, <c>&amp;</c>, <c>&lt;</c>, <c>&gt;</c>, <c>$</c> or
-    /// <c>`</c>, which a shell would act on and the harness does not; <see langword="null"/> when there is none.
+    /// <c>`</c>, or unescaped <c>$</c> or <c>`</c> inside double quotes, which a shell would act on and the harness does not; <see langword="null"/> when there is none.
     /// </summary>
     public char? UnsupportedShellSyntax { get; } = unsupportedShellSyntax;
 }

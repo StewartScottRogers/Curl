@@ -37,6 +37,19 @@ internal static class UpstreamTestPartBodies
         };
 
     /// <summary>
+    /// The body of a <c>&lt;data&gt;</c>-like part as sws's <c>getpart</c> reads it: <see cref="Served"/>,
+    /// then base64-decoded when the part has a <c>base64</c> attribute; a body that does not decode
+    /// reads as empty, as sws then sends nothing.
+    /// </summary>
+    /// <param name="part">The part.</param>
+    /// <returns>The body, before <c>nonewline</c>.</returns>
+    public static byte[] Decoded(UpstreamTestSection part)
+    {
+        byte[] served = Served(part);
+        return part.Attributes.ContainsKey("base64") ? DecodeBase64(served) : served;
+    }
+
+    /// <summary>
     /// The body with the <c>crlf</c> attribute applied the way the comparison of an output applies
     /// it: header lines under <c>crlf="headers"</c>, every line under any other value that is set.
     /// </summary>
@@ -54,4 +67,16 @@ internal static class UpstreamTestPartBodies
     /// <returns>The body, cut or not.</returns>
     public static byte[] WithoutFinalNewline(byte[] body, UpstreamTestSection part) =>
         part.IsAttributeSet("nonewline") ? UpstreamTestSectionLineEndings.CutFinalNewline(body) : body;
+
+    private static byte[] DecodeBase64(byte[] content)
+    {
+        try
+        {
+            return Convert.FromBase64String(Encoding.Latin1.GetString(content));
+        }
+        catch (FormatException)
+        {
+            return [];
+        }
+    }
 }

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -47,7 +48,14 @@ internal static class UpstreamCaseVerification
             () => CheckNotExists(testCase),
             () => CompareExitCode(testCase, run.ExitCode),
         ];
-        return checks.Select(check => check()).FirstOrDefault(difference => difference is not null);
+        try
+        {
+            return checks.Select(check => check()).FirstOrDefault(difference => difference is not null);
+        }
+        catch (RegexMatchTimeoutException exception)
+        {
+            return $"the strip pattern {exception.Pattern} took longer than {exception.MatchTimeout.TotalSeconds.ToString(CultureInfo.InvariantCulture)} seconds";
+        }
     }
 
     private static string? CompareProtocol(UpstreamTestCase testCase, byte[] received)
@@ -79,7 +87,7 @@ internal static class UpstreamCaseVerification
         UpstreamTestSection[] checks = new[] { "datacheck", "datacheck1", "datacheck2", "datacheck3", "datacheck4", "datacheck5", "datacheck6", "datacheck7", "datacheck8", "datacheck9" }
             .Select(name => testCase.Find("reply", name)).OfType<UpstreamTestSection>().ToArray();
         UpstreamTestSection[] parts = checks.Length > 0 ? checks : new[] { data }.OfType<UpstreamTestSection>().ToArray();
-        return parts.SelectMany(part => UpstreamTestPartBodies.WithoutFinalNewline(UpstreamTestPartBodies.Served(part), part)).ToArray();
+        return parts.SelectMany(part => UpstreamTestPartBodies.WithoutFinalNewline(UpstreamTestPartBodies.Decoded(part), part)).ToArray();
     }
 
     private static string? CompareOutput(UpstreamTestCase testCase, string name, string stripPartName, byte[] output) =>

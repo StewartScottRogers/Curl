@@ -23,26 +23,12 @@ public sealed class UpstreamConformanceTests
     private static readonly IReadOnlySet<int> PassingCases =
         UpstreamCaseRatchet.ReadPassingList(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, UpstreamCaseRatchet.PassingListFileName)));
 
-    private static readonly string[] ProxyVariables =
-        ["http_proxy", "HTTP_PROXY", "https_proxy", "HTTPS_PROXY", "all_proxy", "ALL_PROXY", "no_proxy", "NO_PROXY"];
-
     /// <summary>One row per vendored <c>test*</c> file, in test-number order.</summary>
     public static IEnumerable<TestDataRow<int>> UpstreamCases =>
         Directory.GetFiles(UpstreamTestDataFolder, "test*")
             .Select(path => int.Parse(Path.GetFileName(path)["test".Length..], NumberStyles.None, CultureInfo.InvariantCulture))
             .Order()
             .Select(number => new TestDataRow<int>(number) { DisplayName = $"test{number}" });
-
-    /// <summary>Clears the proxy variables, as <c>runtests.pl</c> does, so a developer's proxy never reaches a case.</summary>
-    /// <param name="context">Unused.</param>
-    [ClassInitialize]
-    public static void ClearProxyVariables(TestContext context)
-    {
-        foreach (string variable in ProxyVariables)
-        {
-            Environment.SetEnvironmentVariable(variable, null);
-        }
-    }
 
     [TestMethod]
     [TestCategory("Conformance")]

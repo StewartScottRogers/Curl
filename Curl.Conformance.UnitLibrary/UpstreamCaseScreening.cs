@@ -62,6 +62,24 @@ internal static class UpstreamCaseScreening
         return checks.Select(check => check()).FirstOrDefault(reason => reason is not null);
     }
 
+    /// <summary>
+    /// Finds a <c>&lt;client&gt;</c> or <c>&lt;verify&gt;</c> file part that names a file outside the
+    /// case's log directory, which the harness would write or read anywhere on the disk and never
+    /// clean up.
+    /// </summary>
+    /// <param name="testCase">The expanded case, which <see cref="FindSkipReason"/> let run.</param>
+    /// <param name="logDirectory">The case's log directory, <c>%LOGDIR</c>.</param>
+    /// <returns>A sentence saying why the case is skipped, or <see langword="null"/> when every file is inside it.</returns>
+    public static string? FindFileOutsideLogDirectory(UpstreamTestCase testCase, string logDirectory)
+    {
+        string inside = Path.TrimEndingDirectorySeparator(Path.GetFullPath(logDirectory)) + Path.DirectorySeparatorChar;
+        return new[] { "client", "verify" }
+            .SelectMany(section => FileParts.SelectMany(name => testCase.FindAll(section, name)))
+            .FirstOrDefault(part => !Path.GetFullPath(part.GetAttribute("name")!).StartsWith(inside, StringComparison.OrdinalIgnoreCase)) is { } outside
+            ? $"<{outside.Section}><{outside.Name}> names {outside.GetAttribute("name")}, outside the case's log directory"
+            : null;
+    }
+
     private static string? UnresolvedVariable(UpstreamTestFileExpansion expansion) =>
         expansion.UnknownVariables.Count > 0
             ? $"the harness has no value for {string.Join(", ", expansion.UnknownVariables)}"
@@ -110,7 +128,7 @@ internal static class UpstreamCaseScreening
         }
 
         return UpstreamCommandLineSplitter.Split(UpstreamTestPartBodies.Text(command)).UnsupportedShellSyntax is { } syntax
-            ? $"the command needs a shell for its unquoted {syntax}"
+            ? $"the command needs a shell for its {syntax}"
             : null;
     }
 

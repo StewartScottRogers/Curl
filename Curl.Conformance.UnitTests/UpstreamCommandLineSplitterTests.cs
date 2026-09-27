@@ -19,7 +19,7 @@ public sealed class UpstreamCommandLineSplitterTests
     [DataRow("a\\", new[] { "a" })]
     [DataRow("\"a\\", new[] { "a\\" })]
     [DataRow("'open", new[] { "open" })]
-    [DataRow("'|;&<>$`' \"|;&<>`\"", new[] { "|;&<>$`", "|;&<>`" })]
+    [DataRow("'|;&<>$`' \"|;&<>\"", new[] { "|;&<>$`", "|;&<>" })]
     [DataRow("", new string[0])]
     public void Split_SplitsAsTheShellDoes(string command, string[] expected)
     {
@@ -37,7 +37,9 @@ public sealed class UpstreamCommandLineSplitterTests
     [DataRow("a > b > c", '>')]
     [DataRow("$HOME", '$')]
     [DataRow("`id` |", '`')]
-    public void Split_ReportsTheFirstUnquotedShellSyntax(string command, char expected)
+    [DataRow("\"a $HOME\"", '$')]
+    [DataRow("\"\\$a `id`\"", '`')]
+    public void Split_ReportsTheFirstShellSyntaxAShellWouldActOn(string command, char expected)
     {
         UpstreamCommandLine line = UpstreamCommandLineSplitter.Split(command);
 
