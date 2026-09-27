@@ -37,3 +37,4 @@ The default config file is found by curl's per-OS search order through an inject
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
 - 2026-09-27: Doing -> Backlog. Lanes cleaned up and cut from 6 to 3; the run had only just resumed and left no work.
+- 2026-09-27: Backlog -> Doing.
