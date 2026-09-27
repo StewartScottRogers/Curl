@@ -1,5 +1,5 @@
 ---
-id: BL-356
+id: BL-357
 title: Cover TcpDialer.DialAsync and UdpDatagramChannel send and receive in the fast run
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-356 — Cover TcpDialer.DialAsync and UdpDatagramChannel send and receive in the fast run
+# BL-357 — Cover TcpDialer.DialAsync and UdpDatagramChannel send and receive in the fast run
 
 ## Goal
 
