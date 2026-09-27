@@ -15,10 +15,14 @@ namespace Curl.Core;
 /// <remarks>
 /// <para>
 /// The text is <c>[scheme:/[/[/]]][user[:password]@]host[:port][/path]</c>. The scheme,
-/// compared without regard to case, names the <see cref="ProxyKind" />: <c>http</c> (and no
-/// scheme) is <see cref="ProxyKind.Http" /> on port 80, <c>https</c> is
-/// <see cref="ProxyKind.Https" /> on 443, and <c>socks4</c>, <c>socks4a</c>, <c>socks5</c>
-/// and <c>socks5h</c> are the SOCKS kinds on 1080. The user information is split at the
+/// compared without regard to case, names the <see cref="ProxyKind" />: <c>http</c> is
+/// <see cref="ProxyKind.Http" /> on port 80, <c>https</c> is <see cref="ProxyKind.Https" />
+/// on 443, <c>socks</c> and <c>socks4</c> are <see cref="ProxyKind.Socks4" />, and
+/// <c>socks4a</c>, <c>socks5</c> and <c>socks5h</c> are the other SOCKS kinds, all on 1080.
+/// Text with no scheme is the kind the caller names - <see cref="ProxyKind.Http" /> for
+/// <c>-x</c> and the environment, the option's kind for <c>--socks4</c>, <c>--socks4a</c>,
+/// <c>--socks5</c> and <c>--socks5-hostname</c> - on that kind's default port; a scheme in
+/// the text wins over the option's kind. The user information is split at the
 /// first <c>@</c> and the first <c>:</c> and percent-decoded; a malformed escape is kept
 /// as written. The path, query and fragment are ignored.
 /// </para>
@@ -57,6 +61,7 @@ public static class ProxyUrlParser
         {
             ["http"] = (ProxyKind.Http, 80),
             ["https"] = (ProxyKind.Https, 443),
+            ["socks"] = (ProxyKind.Socks4, 1080),
             ["socks4"] = (ProxyKind.Socks4, 1080),
             ["socks4a"] = (ProxyKind.Socks4a, 1080),
             ["socks5"] = (ProxyKind.Socks5, 1080),
@@ -74,6 +79,25 @@ public static class ProxyUrlParser
     public static bool TryParse(
         string proxyText,
         [NotNullWhen(true)] out ProxyEndpoint? proxy,
+        [NotNullWhen(false)] out TransferResult? failure) =>
+        TryParse(proxyText, ProxyKind.Http, out proxy, out failure);
+
+    /// <summary>
+    /// Parses <paramref name="proxyText" /> into the proxy to connect to, reading text with no
+    /// scheme as a proxy of <paramref name="kindWithoutScheme" />.
+    /// </summary>
+    /// <param name="proxyText">The proxy text; never empty, since empty text means no proxy.</param>
+    /// <param name="kindWithoutScheme">
+    /// The kind of proxy the text names when it has no scheme: the kind of the option that gave it.
+    /// </param>
+    /// <param name="proxy">The proxy; <see langword="null" /> when parsing failed.</param>
+    /// <param name="failure">The failure; <see langword="null" /> when parsing succeeded.</param>
+    /// <returns><see langword="true" /> when <paramref name="proxy" /> was produced.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="proxyText" /> is <see langword="null" />.</exception>
+    public static bool TryParse(
+        string proxyText,
+        ProxyKind kindWithoutScheme,
+        [NotNullWhen(true)] out ProxyEndpoint? proxy,
         [NotNullWhen(false)] out TransferResult? failure)
     {
         ArgumentNullException.ThrowIfNull(proxyText);
@@ -88,7 +112,7 @@ public static class ProxyUrlParser
             return false;
         }
 
-        if (!TryKind(scheme, out (ProxyKind Kind, int DefaultPort) kind))
+        if (!TryKind(scheme, kindWithoutScheme, out (ProxyKind Kind, int DefaultPort) kind))
         {
             failure = TransferResult.Failure(CurlExitCode.CouldntConnect, $"Unsupported proxy scheme for '{proxyText}'");
             return false;
@@ -249,9 +273,16 @@ public static class ProxyUrlParser
         return host.AsSpan().ContainsAny(ForbiddenHostCharacters) ? BadHostnameReason : null;
     }
 
-    private static bool TryKind(string? scheme, out (ProxyKind Kind, int DefaultPort) kind)
+    private static bool TryKind(string? scheme, ProxyKind kindWithoutScheme, out (ProxyKind Kind, int DefaultPort) kind)
     {
-        kind = (ProxyKind.Http, 80);
+        kind = (kindWithoutScheme, DefaultPort(kindWithoutScheme));
         return scheme is null || KindsByScheme.TryGetValue(scheme, out kind);
     }
+
+    private static int DefaultPort(ProxyKind kind) => kind switch
+    {
+        ProxyKind.Http or ProxyKind.Http10 => 80,
+        ProxyKind.Https => 443,
+        _ => 1080,
+    };
 }

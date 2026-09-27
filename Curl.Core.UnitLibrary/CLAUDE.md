@@ -43,8 +43,10 @@ to the URL parser. It is not yet wired into `Curl.Console`.
 through the `Func<string, string?>` it is constructed with, asking for curl's exact names;
 production passes `Environment.GetEnvironmentVariable`, and tests pass a dictionary, never
 the real environment. `NoProxyMatcher` is the `--noproxy`/`NO_PROXY` list, and
-`ProxyUrlParser` turns proxy text into an endpoint or curl's exit 5 or 7 failure. It is not
-yet wired into `Curl.Console` (BL-238).
+`ProxyUrlParser` turns proxy text into an endpoint or curl's exit 5 or 7 failure. Text with
+no scheme is the kind of the option that gave it (`-x` is HTTP, `--socks5` is SOCKS5, the
+environment is always HTTP) and `socks://` is SOCKS4 (BL-269). It is not yet wired into
+`Curl.Console` (BL-238).
 
 `Multipart\MultipartFormBodyBuilder` turns `MultipartFormPart`s into the `multipart/form-data`
 `StreamBody` curl 8.21.0 sends for `-F`, byte for byte (ADR-0027): headers chosen as

@@ -15,6 +15,8 @@ public sealed class ProxyUrlParserTests
     [DataRow("127.0.0.1", ProxyKind.Http, "127.0.0.1", 80)]
     [DataRow("http://127.0.0.1", ProxyKind.Http, "127.0.0.1", 80)]
     [DataRow("https://127.0.0.1", ProxyKind.Https, "127.0.0.1", 443)]
+    [DataRow("socks://127.0.0.1", ProxyKind.Socks4, "127.0.0.1", 1080)]
+    [DataRow("SOCKS://127.0.0.1:1111", ProxyKind.Socks4, "127.0.0.1", 1111)]
     [DataRow("socks4://127.0.0.1", ProxyKind.Socks4, "127.0.0.1", 1080)]
     [DataRow("socks4a://127.0.0.1", ProxyKind.Socks4a, "127.0.0.1", 1080)]
     [DataRow("socks5://127.0.0.1", ProxyKind.Socks5, "127.0.0.1", 1080)]
@@ -44,6 +46,36 @@ public sealed class ProxyUrlParserTests
         Assert.IsTrue(ProxyUrlParser.TryParse(text, out ProxyEndpoint? proxy, out TransferResult? failure));
         Assert.IsNull(failure);
         Assert.AreEqual(new ProxyEndpoint(kind, host, port, null), proxy);
+    }
+
+    [TestMethod]
+    [DataRow(ProxyKind.Http, 80)]
+    [DataRow(ProxyKind.Http10, 80)]
+    [DataRow(ProxyKind.Https, 443)]
+    [DataRow(ProxyKind.Socks4, 1080)]
+    [DataRow(ProxyKind.Socks4a, 1080)]
+    [DataRow(ProxyKind.Socks5, 1080)]
+    [DataRow(ProxyKind.Socks5Hostname, 1080)]
+    public void TryParse_NoSchemeWithAnOptionKind_IsThatKindOnItsDefaultPort(ProxyKind kind, int port)
+    {
+        Assert.IsTrue(ProxyUrlParser.TryParse("127.0.0.1", kind, out ProxyEndpoint? proxy, out TransferResult? failure));
+        Assert.IsNull(failure);
+        Assert.AreEqual(new ProxyEndpoint(kind, "127.0.0.1", port, null), proxy);
+    }
+
+    [TestMethod]
+    public void TryParse_SchemeWithAnOptionKind_IsTheSchemesKind()
+    {
+        // Measured: --socks5 http://127.0.0.1:P speaks HTTP to the proxy.
+        Assert.IsTrue(ProxyUrlParser.TryParse("http://127.0.0.1:1111", ProxyKind.Socks5, out ProxyEndpoint? proxy, out _));
+        Assert.AreEqual(new ProxyEndpoint(ProxyKind.Http, "127.0.0.1", 1111, null), proxy);
+    }
+
+    [TestMethod]
+    public void TryParse_NoSchemeWithAnOptionKindAndAPort_KeepsThePort()
+    {
+        Assert.IsTrue(ProxyUrlParser.TryParse("127.0.0.1:1111", ProxyKind.Socks4, out ProxyEndpoint? proxy, out _));
+        Assert.AreEqual(new ProxyEndpoint(ProxyKind.Socks4, "127.0.0.1", 1111, null), proxy);
     }
 
     [TestMethod]

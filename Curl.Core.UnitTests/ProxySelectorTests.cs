@@ -170,6 +170,47 @@ public sealed class ProxySelectorTests
     }
 
     [TestMethod]
+    public void TrySelect_Socks5OptionWithoutAScheme_IsASocks5ProxyOnPort1080()
+    {
+        var selector = new ProxySelector(CaseSensitive());
+
+        Assert.IsTrue(selector.TrySelect(
+            new Uri("http://a.test:2222/"), "127.0.0.1", ProxyKind.Socks5, null, out ProxyEndpoint? proxy, out _));
+
+        Assert.AreEqual(new ProxyEndpoint(ProxyKind.Socks5, "127.0.0.1", 1080, null), proxy);
+    }
+
+    [TestMethod]
+    public void TrySelect_Socks4OptionWithAnHttpScheme_IsAnHttpProxy()
+    {
+        var selector = new ProxySelector(CaseSensitive());
+
+        Assert.IsTrue(selector.TrySelect(
+            new Uri("http://a.test:2222/"), "http://127.0.0.1:1111", ProxyKind.Socks4, null, out ProxyEndpoint? proxy, out _));
+
+        Assert.AreEqual(new ProxyEndpoint(ProxyKind.Http, "127.0.0.1", 1111, null), proxy);
+    }
+
+    [TestMethod]
+    public void TrySelect_OptionKindWithoutAnOption_DoesNotApplyToTheEnvironment()
+    {
+        var selector = new ProxySelector(CaseSensitive(("http_proxy", "127.0.0.1:1111")));
+
+        Assert.IsTrue(selector.TrySelect(
+            new Uri("http://a.test:2222/"), null, ProxyKind.Socks5, null, out ProxyEndpoint? proxy, out _));
+
+        Assert.AreEqual(new ProxyEndpoint(ProxyKind.Http, "127.0.0.1", 1111, null), proxy);
+    }
+
+    [TestMethod]
+    public void TrySelect_SocksSchemeInTheEnvironment_IsASocks4Proxy()
+    {
+        ProxyEndpoint? proxy = Select("http://a.test:2222/", CaseSensitive(("all_proxy", "socks://127.0.0.1")));
+
+        Assert.AreEqual(new ProxyEndpoint(ProxyKind.Socks4, "127.0.0.1", 1080, null), proxy);
+    }
+
+    [TestMethod]
     public void TrySelect_UnusableProxyText_IsItsFailure()
     {
         var selector = new ProxySelector(CaseSensitive(("http_proxy", "foo://127.0.0.1:1111")));

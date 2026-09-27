@@ -4,8 +4,8 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Core;
 
 /// <summary>
-/// Chooses the proxy curl 8.21.0 would use for a URL from <c>-x</c>/<c>--proxy</c>,
-/// <c>--noproxy</c> and the proxy environment variables, which it reads through an injected
+/// Chooses the proxy curl 8.21.0 would use for a URL from <c>-x</c>/<c>--proxy</c> or a SOCKS
+/// option such as <c>--socks5</c>, <c>--noproxy</c> and the proxy environment variables, which it reads through an injected
 /// function so no test touches the real environment.
 /// </summary>
 /// <remarks>
@@ -35,7 +35,7 @@ public sealed class ProxySelector(Func<string, string?> readEnvironmentVariable)
     private readonly Func<string, string?> readEnvironmentVariable =
         readEnvironmentVariable ?? throw new ArgumentNullException(nameof(readEnvironmentVariable));
 
-    /// <summary>Chooses the proxy for <paramref name="url" />.</summary>
+    /// <summary>Chooses the proxy for <paramref name="url" />, reading <c>-x</c> text with no scheme as HTTP.</summary>
     /// <param name="url">The URL being fetched.</param>
     /// <param name="proxyOption">The <c>-x</c>/<c>--proxy</c> text; <see langword="null" /> when not given.</param>
     /// <param name="noProxyOption">The <c>--noproxy</c> list; <see langword="null" /> when not given.</param>
@@ -51,6 +51,38 @@ public sealed class ProxySelector(Func<string, string?> readEnvironmentVariable)
         string? proxyOption,
         string? noProxyOption,
         out ProxyEndpoint? proxy,
+        [NotNullWhen(false)] out TransferResult? failure) =>
+        TrySelect(url, proxyOption, ProxyKind.Http, noProxyOption, out proxy, out failure);
+
+    /// <summary>
+    /// Chooses the proxy for <paramref name="url" />, reading proxy option text with no scheme
+    /// as a proxy of <paramref name="proxyOptionKind" />.
+    /// </summary>
+    /// <param name="url">The URL being fetched.</param>
+    /// <param name="proxyOption">
+    /// The text of the proxy option that won - <c>-x</c>/<c>--proxy</c>, <c>--socks4</c>,
+    /// <c>--socks4a</c>, <c>--socks5</c> or <c>--socks5-hostname</c>; <see langword="null" />
+    /// when none was given.
+    /// </param>
+    /// <param name="proxyOptionKind">
+    /// The kind that option names: <see cref="ProxyKind.Http" /> for <c>-x</c>, the SOCKS kind
+    /// for a SOCKS option. A scheme in the text wins over it, and it never applies to proxy
+    /// text read from the environment.
+    /// </param>
+    /// <param name="noProxyOption">The <c>--noproxy</c> list; <see langword="null" /> when not given.</param>
+    /// <param name="proxy">The proxy to use; <see langword="null" /> for a direct connection or a failure.</param>
+    /// <param name="failure">
+    /// The failure the transfer ends with when the chosen proxy text cannot be used
+    /// (<see cref="ProxyUrlParser" />); <see langword="null" /> otherwise.
+    /// </param>
+    /// <returns><see langword="true" /> unless the chosen proxy text is unusable.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="url" /> is <see langword="null" />.</exception>
+    public bool TrySelect(
+        Uri url,
+        string? proxyOption,
+        ProxyKind proxyOptionKind,
+        string? noProxyOption,
+        out ProxyEndpoint? proxy,
         [NotNullWhen(false)] out TransferResult? failure)
     {
         ArgumentNullException.ThrowIfNull(url);
@@ -63,13 +95,15 @@ public sealed class ProxySelector(Func<string, string?> readEnvironmentVariable)
             return true;
         }
 
-        string? proxyText = proxyOption ?? ReadProxyFor(url.Scheme);
+        (string? proxyText, ProxyKind kindWithoutScheme) = proxyOption is null
+            ? (ReadProxyFor(url.Scheme), ProxyKind.Http)
+            : (proxyOption, proxyOptionKind);
         if (string.IsNullOrEmpty(proxyText))
         {
             return true;
         }
 
-        return ProxyUrlParser.TryParse(proxyText, out proxy, out failure);
+        return ProxyUrlParser.TryParse(proxyText, kindWithoutScheme, out proxy, out failure);
     }
 
     /// <summary>
