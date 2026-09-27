@@ -14,7 +14,7 @@
          arrived - each read waits at most one second, so a body that never comes
          ends the read instead of hanging it;
       2. records the raw request bytes;
-      3. sends the canned response and closes the connection.
+      3. sends that connection's canned response and closes the connection.
 
     It then writes four files to OutDirectory:
 
@@ -35,6 +35,9 @@
     \xHH (two hex digits). After decoding, each character becomes one byte (Latin-1),
     so a character above U+00FF is an error. The response is sent exactly as given;
     the script adds nothing. Defaults to an empty 200 with Content-Length: 0.
+    Give several, one per connection, to answer a followed redirect's hops
+    differently: connection N gets the Nth, and every connection past the last gets
+    the last.
 
 .PARAMETER CurlArgs
     The arguments passed to curl, one per element. Each is quoted for the Windows
@@ -69,7 +72,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)] [ValidateRange(1, 65535)] [int] $Port,
-    [string] $Response = 'HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n',
+    [string[]] $Response = @('HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n'),
     [Parameter(Mandatory = $true)] [string[]] $CurlArgs,
     [Parameter(Mandatory = $true)] [string] $OutDirectory,
     [ValidateRange(1, 1000)] [int] $Connections = 1,
@@ -152,7 +155,7 @@ function ConvertTo-CommandLineArgument {
 # The server runs in its own runspace so curl can run in this one. It returns one
 # byte array per connection served.
 $serveConnections = {
-    param($Listener, [byte[]] $ResponseBytes, [int] $ConnectionCount, [int] $DelayMilliseconds)
+    param($Listener, $ResponseBytes, [int] $ConnectionCount, [int] $DelayMilliseconds)
 
     Set-StrictMode -Version Latest
     $ErrorActionPreference = 'Stop'
@@ -199,8 +202,9 @@ $serveConnections = {
             }
             $requests.Add($received.ToArray())
             if ($DelayMilliseconds -gt 0) { [System.Threading.Thread]::Sleep($DelayMilliseconds) }
+            [byte[]] $response = $ResponseBytes[[Math]::Min($served, $ResponseBytes.Count - 1)]
             try {
-                $stream.Write($ResponseBytes, 0, $ResponseBytes.Length)
+                $stream.Write($response, 0, $response.Length)
                 $stream.Flush()
             } catch [System.IO.IOException] {
                 # curl already closed its end; the request is still worth recording.
@@ -213,7 +217,8 @@ $serveConnections = {
 }
 
 if ([string]::IsNullOrEmpty($Curl)) { $Curl = Get-ReferenceCurlPath }
-$responseBytes = ConvertFrom-EscapedResponse -Text $Response
+$responseBytes = New-Object System.Collections.Generic.List[byte[]]
+foreach ($text in $Response) { $responseBytes.Add((ConvertFrom-EscapedResponse -Text $text)) }
 $OutDirectory = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine((Get-Location).ProviderPath, $OutDirectory))
 New-Item -ItemType Directory -Path $OutDirectory -Force | Out-Null
 
