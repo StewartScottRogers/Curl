@@ -220,6 +220,15 @@ internal sealed class CurlCommandRunner(
     internal const string UrlRejectedPrefix = "URL rejected: ";
 
     /// <summary>
+    /// The longest percent-decoded host, in bytes, curl 8.21.0 connects to; a longer one
+    /// fails with <see cref="TooLongHostnameMessage" /> before any connection.
+    /// </summary>
+    internal const int MaximumHostLength = 65535;
+
+    /// <summary>curl 8.21.0's message for a host longer than <see cref="MaximumHostLength" />.</summary>
+    internal const string TooLongHostnameMessage = "Too long hostname (maximum is 65535)";
+
+    /// <summary>
     /// The line curl 8.21.0's own write callback prints, with no <c>(23)</c>, when standard
     /// output is closed or its reader has gone and the body fits its stdio buffer; measured on
     /// <c>telnet</c> and <c>file</c> transfers.
@@ -1213,6 +1222,11 @@ internal sealed class CurlCommandRunner(
             out CurlUrlRejection rejection))
         {
             return TransferResult.Failure(CurlExitCode.UrlMalformat, UrlRejectedPrefix + rejection.ToCurlMessage());
+        }
+
+        if (Encoding.UTF8.GetByteCount(transferUrl.Host) > MaximumHostLength)
+        {
+            return TransferResult.Failure(CurlExitCode.UrlMalformat, TooLongHostnameMessage);
         }
 
         if (!TryParseRange(options.Range, out ByteRange? range))

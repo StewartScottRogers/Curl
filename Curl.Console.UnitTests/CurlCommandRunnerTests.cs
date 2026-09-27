@@ -126,6 +126,54 @@ public sealed class CurlCommandRunnerTests
         Assert.IsEmpty(http.Contexts);
     }
 
+    // curl 8.21.0 (Schannel) exits 3 with this line for a 65536-byte host, and tries to
+    // resolve a 65535-byte one; the length is the percent-decoded host's (measured
+    // 2026-09-27, BL-327; upstream test399).
+    [TestMethod]
+    [DataRow(65536, "")]
+    [DataRow(65534, "%61a")]
+    public async Task RunAsync_HostLongerThan65535Bytes_PrintsTooLongHostnameAndReturns3WithoutConnecting(
+        int letters,
+        string suffix)
+    {
+        RecordingProtocolHandler http = RecordingProtocolHandler.WritingPath("http");
+
+        int exitCode = await RunAsync(["-sS", $"http://{new string('a', letters)}{suffix}/399"], http);
+
+        Assert.AreEqual(3, exitCode);
+        Assert.AreEqual("curl: (3) Too long hostname (maximum is 65535)" + NewLine, StandardErrorText);
+        Assert.IsEmpty(http.Contexts);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_Host65535BytesLong_ReachesTheHandler()
+    {
+        RecordingProtocolHandler http = RecordingProtocolHandler.WritingPath("http");
+
+        int exitCode = await RunAsync(["-sS", $"http://{new string('a', 65534)}%61/399"], http);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.HasCount(1, http.Contexts);
+    }
+
+    // curl 8.21.0 (Schannel) prints these lines and exits 3 before any transfer (measured
+    // 2026-09-27, BL-327; upstream test2092).
+    [TestMethod]
+    public async Task RunAsync_GlobRangeEndingAtLongMaxValue_PrintsRangeOverflowAndReturns3WithoutConnecting()
+    {
+        const string Url = "127.0.0.1:8990/[0-1][9223372036854775806-9223372036854775807]/2092";
+        RecordingProtocolHandler http = RecordingProtocolHandler.WritingPath("http");
+
+        int exitCode = await RunAsync([Url], http);
+
+        Assert.AreEqual(3, exitCode);
+        Assert.AreEqual(
+            "curl: (3) range end/step overflow in position 62:" + NewLine + Url + NewLine
+            + new string(' ', 61) + "^" + NewLine,
+            StandardErrorText);
+        Assert.IsEmpty(http.Contexts);
+    }
+
     [TestMethod]
     public async Task RunAsync_FailureThenSuccess_ReturnsLastTransfersExitCode()
     {
