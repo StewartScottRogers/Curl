@@ -1,5 +1,5 @@
 ---
-id: BL-348
+id: BL-350
 title: Count TFTP -m from ITransferContext.OperationStarted
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-348 — Count TFTP -m from ITransferContext.OperationStarted
+# BL-350 — Count TFTP -m from ITransferContext.OperationStarted
 
 ## Goal
 

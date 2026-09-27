@@ -59,7 +59,7 @@ completed: 2026-09-27
   100% line and branch, 0 failing members.
 - Review (code-reviewer): no must-fix. The TFTP handler honours `MaxTime` but not
   `OperationStarted`, so a redirect to `tftp://` still restarts `-m`; the remarks and
-  ADR-0040 now say so, and BL-348 is filed to fix it.
+  ADR-0040 now say so, and BL-350 is filed to fix it.
 - Seen, already filed: `RedirectFollower.NextHop` does not carry `ITransferContext.Proxy`
   (BL-329 chooses the proxy again per hop).
 
