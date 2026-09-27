@@ -18,7 +18,7 @@ On Windows, `curl -z con` prints `Warning: Failed to get filetime: CreateFile fa
 
 ## Context
 
-- ADR-0037, ADR-0070 (BL-288): the Windows lookup opens the file with `File.OpenHandle` (`GENERIC_READ`), which succeeds for both devices; `File.GetLastWriteTimeUtc(handle)` then fails with `ERROR_INVALID_FUNCTION` (HResult 0x80070001) for each, so today both print `CreateFile failed: GetLastError 0x00000001`.
+- ADR-0037, ADR-0071 (BL-288): the Windows lookup opens the file with `File.OpenHandle` (`GENERIC_READ`), which succeeds for both devices; `File.GetLastWriteTimeUtc(handle)` then fails with `ERROR_INVALID_FUNCTION` (HResult 0x80070001) for each, so today both print `CreateFile failed: GetLastError 0x00000001`.
 - curl opens with `CreateFile(filename, FILE_READ_ATTRIBUTES, share all, OPEN_EXISTING)` then calls `GetFileTime` (`src/tool_filetime.c`, curl-8_21_0 tag). `File.GetAttributes("con")` fails with 0x80070057 on .NET 10, but a directory must still fail as 0x00000005, so it cannot replace the open.
 - Likely route: `[LibraryImport]` of kernel32 `CreateFileW` and `GetFileTime` behind the existing `readLastWriteTimeUtc` seam; keep it native-AOT compatible and record the choice in an ADR. No package is needed.
 

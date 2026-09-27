@@ -56,7 +56,7 @@ match that build too.
     access, so curl uses their time. The two illegal-date lines follow every filetime line.
   - 300-character name -> `File name too long`; symlink loop -> `Too many levels of symbolic
     links`; dangling symlink -> `No such file or directory`.
-- **Decision (ADR-0070):** off Windows the lookup stands in for `stat` with `File.GetAttributes` +
+- **Decision (ADR-0071):** off Windows the lookup stands in for `stat` with `File.GetAttributes` +
   `File.GetLastWriteTimeUtc(path)`, and maps exceptions to `strerror` texts. .NET reports
   `ENOTDIR` as `DirectoryNotFoundException` (probed on Linux), so a file among the ancestors, or a
   trailing separator after a file, is reported as `Not a directory` by the lookup itself.
@@ -67,8 +67,8 @@ match that build too.
   (0x80070001) for each, probed on .NET 10.0.401, so nothing separates curl's `CreateFile failed:
   GetLastError 0x00000057` (con) from `GetFileTime failed: GetLastError 0x00000057` (nul). Filed as
   BL-378 (P/Invoke `CreateFileW` + `GetFileTime`). Symlink loops/dangling links off Windows filed as
-  BL-377.
-- **Touches:** added `Documentation/Planning/Decisions` for ADR-0070 and the ADR-0037 status line;
+  BL-379.
+- **Touches:** added `Documentation/Planning/Decisions` for ADR-0071 and the ADR-0037 status line;
   no task in Doing names it.
 - **Quality gate:** `CommandLineParser.ParseShortBundle` already measured complexity 12 in
   `Measure-CodeQuality.ps1` before this task; its loop body moved into
