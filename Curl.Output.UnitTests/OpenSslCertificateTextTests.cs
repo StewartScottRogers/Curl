@@ -29,7 +29,10 @@ public sealed class OpenSslCertificateTextTests
             OpenSslCertificateText.ServerCertificate(leaf).ToArray());
     }
 
+    // Linux (OpenSSL) and macOS (Security framework) refuse to load a certificate whose name
+    // holds an odd-length BMPString, so the [NONE] fallback is only reachable on Windows.
     [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
     public void ServerCertificate_NamesOpenSslCannotPrint_PrintNone()
     {
         using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
