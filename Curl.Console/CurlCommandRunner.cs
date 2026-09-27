@@ -204,6 +204,13 @@ internal sealed class CurlCommandRunner(
             return (int)parsed.Refusal.ExitCode;
         }
 
+        if (parsed.Options.VersionRequested)
+        {
+            await WriteVersionLinesAsync().ConfigureAwait(false);
+
+            return (int)CurlExitCode.Ok;
+        }
+
         CurlExitCode exitCode = await TransferAllAsync(parsed.Options).ConfigureAwait(false);
         await WriteErrorLinesAsync(parsed.WarningLinesAfterTransfers).ConfigureAwait(false);
 
@@ -676,6 +683,24 @@ internal sealed class CurlCommandRunner(
         {
             await WriteErrorLineAsync(line).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// Writes <see cref="CurlVersionText" />'s lines for the running system to standard output as
+    /// UTF-8, each followed by <see cref="Environment.NewLine" />, for <c>-V</c> / <c>--version</c>.
+    /// </summary>
+    /// <returns>A task that completes when the lines are flushed.</returns>
+    private async Task WriteVersionLinesAsync()
+    {
+        StringBuilder text = new();
+        foreach (string line in CurlVersionText.Lines(runsOnWindows, OperatingSystem.IsMacOS()))
+        {
+            text.Append(line).Append(Environment.NewLine);
+        }
+
+        byte[] bytes = Encoding.UTF8.GetBytes(text.ToString());
+        await standardOutput.WriteAsync(bytes).ConfigureAwait(false);
+        await standardOutput.FlushAsync().ConfigureAwait(false);
     }
 
     /// <summary>
