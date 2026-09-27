@@ -3,7 +3,7 @@ namespace Curl.Core.Multipart;
 /// <summary>
 /// One part of a <c>multipart/form-data</c> request body, as <see cref="MultipartFormBodyBuilder" />
 /// takes it: the part's name, where its body comes from, and the <c>;type=</c>,
-/// <c>;filename=</c> and <c>;headers=</c> given with it.
+/// <c>;filename=</c>, <c>;headers=</c> and <c>;encoder=</c> given with it.
 /// </summary>
 /// <param name="Name">
 /// The field name; <see langword="null" /> sends the part with no <c>name=</c> in its
@@ -29,4 +29,15 @@ public sealed record MultipartFormPart(
     string? ContentType,
     string? FileName,
     IReadOnlyList<string> Headers,
-    IReadOnlyList<MultipartFormPart> Parts);
+    IReadOnlyList<MultipartFormPart> Parts)
+{
+    /// <summary>
+    /// Gets the <c>;encoder=</c> value, unchecked: <c>binary</c>, <c>8bit</c>, <c>7bit</c>,
+    /// <c>base64</c> or <c>quoted-printable</c> in any case encodes the part's body and names the
+    /// encoding in its <c>Content-Transfer-Encoding</c>, and any other name fails the build with
+    /// exit 43, as curl 8.21.0 does. <see langword="null" />, the default, sends the body as it
+    /// is. Ignored for a <see cref="MultipartFormPartKind.Multipart" /> part, which the <c>-F</c>
+    /// syntax never gives an encoder.
+    /// </summary>
+    public string? Encoder { get; init; }
+}

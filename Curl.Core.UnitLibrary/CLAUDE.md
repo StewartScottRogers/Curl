@@ -52,8 +52,10 @@ environment is always HTTP) and `socks://` is SOCKS4 (BL-269). It is not yet wir
 `StreamBody` curl 8.21.0 sends for `-F`, byte for byte (ADR-0027): headers chosen as
 libcurl's `Curl_mime_prepare_headers` chooses them, files opened through `IFileSystem` while
 building so `Content-Length` is known, then streamed; an unopenable file is exit 26 before
-anything is sent. The text encoding and the boundary source are injected. It is not yet
-wired into `Curl.Console`.
+anything is sent. The text encoding and the boundary source are injected. A part's
+`Encoder` (`;encoder=`) goes through `MultipartPartEncoder`: `binary`/`8bit` files still
+stream, `base64`, `quoted-printable` and `7bit` are encoded whole in memory, and an unknown
+name is exit 43 (ADR-0041). It is not yet wired into `Curl.Console`.
 
 `Globbing\UrlGlob` is curl 8.21.0's URL globbing (ADR-0032): `TryParse` reads `{a,b}` sets
 and `[1-10]`, `[01-10]`, `[a-z:2]` ranges as `tool_urlglob.c` does, failing with exit 3 and
