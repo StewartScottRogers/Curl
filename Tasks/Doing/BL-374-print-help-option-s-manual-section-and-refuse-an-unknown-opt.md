@@ -39,3 +39,4 @@ FILES` for `--xattr`, the last option). Measured: `curl --help -v` and `curl --h
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
