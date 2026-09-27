@@ -240,6 +240,10 @@ internal sealed class CurlCommandRunner(
             if (showsErrors && result.ErrorMessage is not null)
             {
                 await WriteErrorLineAsync(FormatErrorLine(result)).ConfigureAwait(false);
+                if (result.ExitCode == CurlExitCode.PeerFailedVerification)
+                {
+                    await WriteCertificateHelpBlockAsync().ConfigureAwait(false);
+                }
             }
 
             if (EndsTheRun(options, result))
@@ -263,6 +267,28 @@ internal sealed class CurlCommandRunner(
         ReferenceEquals(result, CannotOpenForResumeFailure)
         || ReferenceEquals(result, CannotOpenHeaderFileFailure)
         || (options.FailEarly && !result.IsSuccess);
+
+    /// <summary>
+    /// Writes the five lines curl 8.21.0's command-line tool prints on standard error after
+    /// the <c>curl: (60)</c> line (its <c>CURL_CA_CERT_ERRORMSG</c>), identical in the Schannel
+    /// and OpenSSL builds (ADR-0009), each followed by <see cref="Environment.NewLine" />.
+    /// Printed only where the error line is, so <c>-s</c> without <c>-S</c> prints neither.
+    /// </summary>
+    /// <returns>A task that completes when the lines are flushed.</returns>
+    private async Task WriteCertificateHelpBlockAsync()
+    {
+        string newLine = Environment.NewLine;
+        string text =
+            "More details here: https://curl.se/docs/sslcerts.html" + newLine
+            + newLine
+            + "curl failed to verify the legitimacy of the server and therefore could not" + newLine
+            + "establish a secure connection to it. To learn more about this situation and" + newLine
+            + "how to fix it, please visit the webpage mentioned above." + newLine;
+
+        byte[] bytes = Encoding.UTF8.GetBytes(text);
+        await standardError.WriteAsync(bytes).ConfigureAwait(false);
+        await standardError.FlushAsync().ConfigureAwait(false);
+    }
 
     /// <summary>
     /// Tells whether failure lines are printed: always, unless <c>-s</c> was given without <c>-S</c>.
