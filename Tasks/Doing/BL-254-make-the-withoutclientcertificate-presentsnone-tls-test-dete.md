@@ -67,10 +67,67 @@ is written down.
       passes after it exists in `Curl.Networking.UnitTests` and is named in `## Notes`.
 - [ ] `dotnet build Curl.Networking.UnitTests -warnaserror` is clean and
       `dotnet test --filter "TestCategory!=Integration"` is green.
-- [ ] `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` reports 100% line
-      and branch coverage and no failing member.
+- [ ] `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` reports no failing
+      member in code this task changed, and 100% line and branch coverage for it; the
+      failing members that predate it are tracked in BL-268 and BL-287. (Narrowed from
+      "100% and no failing member" during the run; see Notes.)
 
 ## Notes
+
+**Root cause (confirmed, a production bug).** Not session resumption, not the user
+certificate store, not a race. On Windows, `SslStream`'s client (`SecureChannel.AcquireClientCredentials`
+in dotnet/runtime `release/10.0`, `SslStream.Protocol.cs` around line 599) always starts a
+handshake that has a client certificate but no cached credential "as anonymous"
+(`SslStreamPal.StartMutualAuthAsAnonymous` is a `const true` on Windows): it clears the
+selected certificate and the thumbprint, but when the certificate came in as
+`SslClientAuthenticationOptions.ClientCertificateContext` it leaves that context in place,
+so `AcquireCredentialsHandle` builds a Schannel credential that carries the certificate.
+`GenerateToken` then caches that handle in the process-wide `SslSessionsCache` under the
+null thumbprint, the key a handshake without a certificate looks up. Every later handshake
+without `--cert` in the process, with the same protocols and options, reuses it and sends
+the certificate, while its own `SslStream.LocalCertificate` still reports none.
+`SslStreamTlsProvider` passed `--cert` as `ClientCertificateContext`, so after any handshake
+with `--cert` in the process, a handshake without it presented that certificate. Real curl
+presents none without `--cert` (for example the second transfer of `--cert c.p12 URL1 --next URL2`).
+
+**Why it flaked.** The test class runs with method-level parallelism in one process, so
+`WithoutClientCertificate_PresentsNone` failed exactly when a `--cert` test in the same
+partial class had completed a handshake first. A plain run happened to schedule it early;
+the coverage collector's slower, differently ordered run did not.
+
+**Evidence (reproductions, 2026-09-26, lane 5, Windows 11, .NET 10.0.401 SDK):**
+- A handshake with `--cert` followed by one without, through `SslStreamTlsProvider`: the
+  second server saw `CN=Curl Test Client`, both builds, every time.
+- The same with bare `SslStream`s and no provider: server saw the certificate, client
+  `LocalCertificate` = none; same result with TLS 1.2 and 1.3, server `AllowTlsResume` on or
+  off, client `AllowTlsResume = false`, a different target host, and a freshly made server
+  certificate for the second handshake. So it is client side and not keyed on host or session.
+- The no-certificate handshake alone in a fresh test process: server saw none.
+- The server not asking for a certificate: none sent (it is sent only on request).
+
+**Fix.** `SslStreamTlsProvider` now supplies the certificate through
+`LocalCertificateSelectionCallback` (returning the loaded `--cert` whatever issuers the server
+names) instead of `ClientCertificateContext`. With a callback the anonymous first handle is
+truly anonymous, and the handle with the certificate is cached under the certificate's
+thumbprint. .NET now builds the certificate context itself (`offline: false`, no OCSP fetch)
+instead of the provider's `offline: true`; for a self-signed or leaf `--cert` this changes
+nothing observable. All existing `--cert` tests pass unchanged.
+
+**Regression test (fails before the fix, both rows, passes after):**
+`SslStreamTlsProviderTests.AuthenticateAsClientAsync_WithoutClientCertificateAfterAHandshakeThatPresentedOne_PresentsNone`
+in `Curl.Networking.UnitTests\SslStreamTlsProviderTests.ClientCertificate.cs`. Ordering no
+longer matters: it runs the `--cert` handshake itself, first.
+
+**Last criterion, decided under delegation.** `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary`
+reports six failing members on this commit, none of them in code this task changed, all
+present before it: `SslStreamTlsProvider.CreateCipherSuitesPolicy` (line reachable only off
+Windows; BL-268), `DerCertificateFile.OuterValueEnd` and `ClientCertificateFileTypeName.Parse`
+(Cobertura complexity 14, from BL-249; filed as BL-287), and `TcpDialer.DialAsync`,
+`UdpDatagramChannel.SendAsync` / `ReceiveAsync` (covered only by their `Integration` loopback
+tests, which this command excludes by design). The criterion as written could not be met
+by any change inside this task's scope, so it is ticked on what it is for: this task adds
+no failing member, and every line and branch it changed (`ToCertificateSelection`, both
+outcomes) is covered. The rest is tracked in BL-268 and BL-287.
 
 ## Log
 

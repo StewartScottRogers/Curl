@@ -178,7 +178,7 @@ public sealed class SslStreamTlsProvider : ITlsProvider
             TargetHost = targetHost,
             EnabledSslProtocols = ToSslProtocols(_options.MinimumVersion),
             CertificateChainPolicy = chainPolicy,
-            ClientCertificateContext = ToCertificateContext(clientCertificate),
+            LocalCertificateSelectionCallback = ToCertificateSelection(clientCertificate),
             CipherSuitesPolicy = cipherSuitesPolicy,
             RemoteCertificateValidationCallback = (_, _, chain, errors) =>
             {
@@ -294,9 +294,14 @@ public sealed class SslStreamTlsProvider : ITlsProvider
                 _options.PrivateKeyType);
     }
 
-    // Offline: the chain is built from the certificate alone, without fetching issuers.
-    private static SslStreamCertificateContext? ToCertificateContext(X509Certificate2? clientCertificate) =>
-        clientCertificate is null ? null : SslStreamCertificateContext.Create(clientCertificate, null, offline: true);
+    // Selected by callback, not given as ClientCertificateContext: on Windows SslStream opens
+    // a handshake that has a certificate context with a credential handle that carries it,
+    // then caches that handle as the one for "no certificate", so every later handshake
+    // without --cert in the process presented it (BL-254). A callback leaves that first
+    // handle anonymous, and the certificate is sent only when the server asks for one,
+    // whatever issuers it names, as curl sends --cert.
+    private static LocalCertificateSelectionCallback? ToCertificateSelection(X509Certificate2? clientCertificate) =>
+        clientCertificate is null ? null : (_, _, _, _, _) => clientCertificate;
 
     private string SslConnectError(Exception failure) => _matchesSchannelBuild
         ? TlsFailureMessages.SchannelSslConnectError(failure)
