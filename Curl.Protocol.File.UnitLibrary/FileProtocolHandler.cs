@@ -166,6 +166,11 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
                 FileTransferMessages.CouldNotOpenForReading(path.UrlPath));
         }
 
+        // curl 8.21.0 draws its meter for a download that got past the open and failed
+        // later (exit 63, exit 36) and never for one whose open failed (exit 37), measured
+        // in BL-129. No byte counts follow: curl's file:// status line stays at zero.
+        context.Progress.ReportTransferStarted();
+
         Stream source = opened.Content;
 
         TransferResult result;
@@ -357,6 +362,11 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
         // curl 8.21.0's lib/file.c tests the value of the resume offset, not whether one
         // was supplied: -C 0 truncates exactly as no -C at all does, so only a positive
         // offset appends.
+        // An upload is started before its destination opens: curl 8.21.0 draws the meter
+        // even when the destination will not open (exit 23), measured in BL-129, because
+        // lib/file.c opens it in the transfer phase rather than at connect.
+        context.Progress.ReportTransferStarted();
+
         FileWriteMode mode = context.ResumeFrom is > 0
             ? FileWriteMode.Append
             : FileWriteMode.Truncate;
