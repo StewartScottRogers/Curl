@@ -32,3 +32,4 @@ A `dict://`, `gopher://`, `mqtt://` or `telnet://` transfer whose connect the pe
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
