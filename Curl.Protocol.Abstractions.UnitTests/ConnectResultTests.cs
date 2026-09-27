@@ -91,6 +91,7 @@ public sealed class ConnectResultTests
         Assert.AreSame(timings, result.Timings);
         Assert.IsNull(result.LocalEndPoint);
         Assert.AreEqual(0, result.ProxyConnectResponseCode);
+        Assert.IsEmpty(result.PeerCertificates);
     }
 
     [TestMethod]
@@ -104,6 +105,16 @@ public sealed class ConnectResultTests
         Assert.AreSame(timings, result.Timings);
         Assert.AreSame(localEndPoint, result.LocalEndPoint);
         Assert.AreEqual(200, result.ProxyConnectResponseCode);
+    }
+
+    [TestMethod]
+    public void Connected_WithPeerCertificates_CarriesThemInOrder()
+    {
+        ReadOnlyMemory<byte>[] certificates = [new byte[] { 0x30, 0x01 }, new byte[] { 0x30, 0x02 }];
+
+        var result = ConnectResult.Connected(new UnusedConnection(), null, null, 0, certificates);
+
+        Assert.AreSame(certificates, result.PeerCertificates);
     }
 
     [TestMethod]
@@ -122,6 +133,7 @@ public sealed class ConnectResultTests
     {
         var result = ConnectResult.Failed(CurlExitCode.CouldntConnect, "failed");
 
+        Assert.IsEmpty(result.PeerCertificates);
         Assert.IsNull(result.Timings);
         Assert.IsNull(result.LocalEndPoint);
         Assert.AreEqual(0, result.ProxyConnectResponseCode);
