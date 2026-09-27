@@ -136,6 +136,13 @@ public sealed class SslStreamTlsProvider : ITlsProvider
     /// <see langword="null" />, since the provider resolves nothing. <see cref="TcpConnector" />
     /// keeps only the handshake's completion and supplies the rest itself.
     /// </para>
+    /// <para>
+    /// A success also carries <see cref="ConnectResult.PeerCertificates" />: the server's
+    /// certificate and then the others it sent, in the order sent, as curl's Schannel build
+    /// lists them for <c>%{certs}</c> (ADR-0053). They are taken in the validation callback,
+    /// whether or not the certificate is verified, since <see cref="SslStream" /> hands the
+    /// rest of what the server sent to that callback alone.
+    /// </para>
     /// </remarks>
     public async ValueTask<ConnectResult> AuthenticateAsClientAsync(
         IConnection plaintext,
@@ -173,6 +180,7 @@ public sealed class SslStreamTlsProvider : ITlsProvider
         }
 
         string? verificationFailure = null;
+        ReadOnlyMemory<byte>[] peerCertificates = [];
         var authenticationOptions = new SslClientAuthenticationOptions
         {
             TargetHost = targetHost,
@@ -180,8 +188,9 @@ public sealed class SslStreamTlsProvider : ITlsProvider
             CertificateChainPolicy = chainPolicy,
             LocalCertificateSelectionCallback = ToCertificateSelection(clientCertificate),
             CipherSuitesPolicy = cipherSuitesPolicy,
-            RemoteCertificateValidationCallback = (_, _, chain, errors) =>
+            RemoteCertificateValidationCallback = (_, certificate, chain, errors) =>
             {
+                peerCertificates = ListPeerCertificates(certificate, chain);
                 verificationFailure = VerifyPeer(errors, chain, targetHost, anchorsBesideSystemStore);
                 return verificationFailure is null;
             },
@@ -195,7 +204,8 @@ public sealed class SslStreamTlsProvider : ITlsProvider
             await sslStream.AuthenticateAsClientAsync(authenticationOptions, cancellationToken).ConfigureAwait(false);
             return ConnectResult.Connected(
                 new SslStreamConnection(sslStream, plaintext, clientCertificate),
-                new ConnectTimings(handshakeStarted, null, handshakeStarted, _timeProvider.GetTimestamp()));
+                new ConnectTimings(handshakeStarted, null, handshakeStarted, _timeProvider.GetTimestamp()),
+                peerCertificates: peerCertificates);
         }
         catch (Exception exception)
         {
@@ -246,6 +256,35 @@ public sealed class SslStreamTlsProvider : ITlsProvider
         return _matchesSchannelBuild
             ? TlsFailureMessages.SchannelPeerFailedVerification(errors, _options.CaCertificateFile is not null)
             : TlsFailureMessages.OpenSslPeerFailedVerification(errors, chain, targetHost);
+    }
+
+    /// <summary>
+    /// Lists what the server sent, as curl's Schannel build does: the server's own
+    /// certificate first, then the chain's extra store, which is where
+    /// <see cref="SslStream" /> puts the other certificates the server sent, in the order
+    /// sent. A copy of the server's own certificate there is not listed twice.
+    /// </summary>
+    /// <param name="certificate">The server's certificate, <see langword="null" /> when it sent none.</param>
+    /// <param name="chain">The chain built for it, <see langword="null" /> when there is none.</param>
+    /// <returns>The DER encodings; empty when the server sent no certificate.</returns>
+    internal static ReadOnlyMemory<byte>[] ListPeerCertificates(X509Certificate? certificate, X509Chain? chain)
+    {
+        if (certificate is null)
+        {
+            return [];
+        }
+
+        var serverCertificate = certificate.GetRawCertData();
+        var sent = new List<ReadOnlyMemory<byte>> { serverCertificate };
+        foreach (var other in chain?.ChainPolicy.ExtraStore ?? [])
+        {
+            if (!other.RawData.AsSpan().SequenceEqual(serverCertificate))
+            {
+                sent.Add(other.RawData);
+            }
+        }
+
+        return [.. sent];
     }
 
     // ADR-0011: the Schannel build refuses --ciphers and ignores --tls13-ciphers; the

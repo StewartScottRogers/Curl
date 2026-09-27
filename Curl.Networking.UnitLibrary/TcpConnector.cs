@@ -89,7 +89,8 @@ public sealed class TcpConnector(
     /// from the <see cref="ITlsProvider" />'s own timings, or when it returned if it recorded
     /// none. <see cref="ConnectResult.LocalEndPoint" /> is the local end point
     /// <see cref="ITcpDialer" /> reports; the remote end point is the connection's
-    /// <see cref="IConnection.RemoteEndPoint" />.
+    /// <see cref="IConnection.RemoteEndPoint" />. <see cref="ConnectResult.PeerCertificates" />
+    /// are the <see cref="ITlsProvider" />'s, and empty without TLS.
     /// </para>
     /// </remarks>
     /// <exception cref="NotSupportedException">
@@ -249,7 +250,8 @@ public sealed class TcpConnector(
             securedConnection,
             timings with { TlsHandshakeCompleted = handshakeCompleted },
             dialed.LocalEndPoint,
-            proxyConnectResponseCode);
+            proxyConnectResponseCode,
+            secured.PeerCertificates);
     }
 
     private async ValueTask<DialedTcpConnection?> DialFirstReachableAsync(

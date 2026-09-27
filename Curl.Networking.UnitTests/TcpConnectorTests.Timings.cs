@@ -60,6 +60,30 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_WithUseTls_CarriesThePeerCertificatesTheProviderReported()
+    {
+        ReadOnlyMemory<byte>[] certificates = [new byte[] { 0x30, 0x01 }, new byte[] { 0x30, 0x02 }];
+        var tlsProvider = new FakeTlsProvider { PeerCertificatesToReturn = certificates };
+        var dialer = new FakeTcpDialer { DialOutcome = _ => new FakeConnection() };
+        var connector = new TcpConnector(new FakeDnsResolver(Loopback), dialer, tlsProvider, new SteppingTimeProvider(100));
+
+        var result = await connector.ConnectAsync(new ConnectTarget("example.com", 443, UseTls: true), CancellationToken.None);
+
+        Assert.AreSame(certificates, result.PeerCertificates);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WithoutUseTls_ReportsNoPeerCertificates()
+    {
+        var dialer = new FakeTcpDialer { DialOutcome = _ => new FakeConnection() };
+        var connector = new TcpConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider(), new SteppingTimeProvider(100));
+
+        var result = await connector.ConnectAsync(new ConnectTarget("example.com", 80, UseTls: false), CancellationToken.None);
+
+        Assert.IsEmpty(result.PeerCertificates);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_ThroughAProxy_RecordsConnectWhenTheTunnelIsOpenAndTheProxyConnectionsEndPoints()
     {
         var proxyConnection = new ScriptedConnection(Encoding.Latin1.GetBytes("HTTP/1.1 200 Connection established\r\n\r\n"));

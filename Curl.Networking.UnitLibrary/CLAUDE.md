@@ -39,7 +39,10 @@ the console's to print. No type here constructs an `HttpClient`.
 `TcpConnector` fills `ConnectResult.Timings` and `LocalEndPoint` per ADR-0030: it takes
 `Started`, `NameResolved` and `Connected` from its `TimeProvider`, the local end point from
 the `DialedTcpConnection` that `ITcpDialer` returns, and `TlsHandshakeCompleted` from the
-timings `SslStreamTlsProvider` reports on its own `TimeProvider`.
+timings `SslStreamTlsProvider` reports on its own `TimeProvider`. Per ADR-0053 the provider
+also reports `ConnectResult.PeerCertificates`, the DER of every certificate the server sent
+(its own first, then the validation callback's `ChainPolicy.ExtraStore` in the order sent),
+and `TcpConnector` passes them on.
 
 `TcpConnector` tunnels through `ConnectTarget.Proxy` when it is an HTTP proxy
 (`ProxyKind.Http`, `Http10`) per ADR-0023: `HttpProxyTunnel` writes curl 8.21.0's CONNECT

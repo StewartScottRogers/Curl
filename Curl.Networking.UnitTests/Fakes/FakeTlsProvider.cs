@@ -26,6 +26,9 @@ public sealed class FakeTlsProvider : ITlsProvider
     /// </summary>
     public ConnectTimings? TimingsToReturn { get; init; }
 
+    /// <summary>Gets or sets the peer certificates a successful handshake reports.</summary>
+    public IReadOnlyList<ReadOnlyMemory<byte>> PeerCertificatesToReturn { get; init; } = [];
+
     /// <summary>Gets the plaintext connection last passed in, if any.</summary>
     public IConnection? ReceivedPlaintext { get; private set; }
 
@@ -45,6 +48,9 @@ public sealed class FakeTlsProvider : ITlsProvider
         ReceivedPlaintext = plaintext;
         ReceivedTargetHost = targetHost;
 
-        return ValueTask.FromResult(FailureToReturn ?? ConnectResult.Connected(SecuredConnection, TimingsToReturn));
+        return ValueTask.FromResult(FailureToReturn ?? ConnectResult.Connected(
+            SecuredConnection,
+            TimingsToReturn,
+            peerCertificates: PeerCertificatesToReturn));
     }
 }
