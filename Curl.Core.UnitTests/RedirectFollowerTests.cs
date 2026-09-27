@@ -412,6 +412,8 @@ public sealed class RedirectFollowerTests
         Assert.AreEqual($"Protocol \"{scheme}\" is disabled (in redirect)", result.ErrorMessage);
         Assert.HasCount(1, handler.Contexts);
         Assert.AreEqual(0, result.Report!.RedirectCount);
+        // Measured against curl 8.21.0 on 2026-09-27 (BL-289): -w '[%{redirect_url}]' writes [].
+        Assert.IsNull(result.Report.RedirectUrl);
     }
 
     [TestMethod]
@@ -427,6 +429,8 @@ public sealed class RedirectFollowerTests
 
         Assert.AreEqual(CurlExitCode.UnsupportedProtocol, result.ExitCode);
         Assert.AreEqual("The redirect target URL could not be parsed: Unsupported URL scheme", result.ErrorMessage);
+        // Measured against curl 8.21.0 (BL-289): -w '[%{redirect_url}]' writes [].
+        Assert.IsNull(result.Report!.RedirectUrl);
     }
 
     [TestMethod]
@@ -448,6 +452,8 @@ public sealed class RedirectFollowerTests
         Assert.AreEqual($"The redirect target URL could not be parsed: {reason}", result.ErrorMessage);
         Assert.HasCount(1, handler.Contexts);
         Assert.AreEqual(0, result.Report!.RedirectCount);
+        // Measured against curl 8.21.0 (BL-289): -w '[%{redirect_url}]' writes [].
+        Assert.IsNull(result.Report.RedirectUrl);
     }
 
     [TestMethod]
@@ -459,6 +465,8 @@ public sealed class RedirectFollowerTests
         TransferResult result = await Follow(handler, Context(Location()), new RedirectPolicy { MaxRedirects = 0 });
 
         Assert.AreEqual(CurlExitCode.TooManyRedirects, result.ExitCode);
+        // Measured against curl 8.21.0 (BL-289): the limit refusal keeps it, [http://[bad].
+        Assert.AreEqual("http://[bad", result.Report!.RedirectUrl);
     }
 
     [TestMethod]

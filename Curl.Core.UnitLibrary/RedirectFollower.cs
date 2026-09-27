@@ -109,7 +109,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
                 return chain.Merge(result);
             }
 
-            if (StopBeforeHop(context, http, target, chain.RedirectCount, policy, result, out CurlUrl? next, out HopProxy hopProxy) is { } stop)
+            if (StopBeforeHop(context, http, target, chain, policy, result, out CurlUrl? next, out HopProxy hopProxy) is { } stop)
             {
                 return chain.Merge(stop);
             }
@@ -132,15 +132,16 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
         ITransferContext first,
         HttpRequestOptions http,
         string target,
-        int followed,
+        RedirectChain chain,
         RedirectPolicy policy,
         TransferResult result,
         out CurlUrl? next,
         out HopProxy hopProxy)
     {
         hopProxy = default;
-        if (Refusal(target, first.PathAsIs, followed, policy, out next) is { } refusal)
+        if (Refusal(target, first.PathAsIs, chain.RedirectCount, policy, out next) is { } refusal)
         {
+            chain.Refused(refusal.KeepsRedirectUrl);
             return TransferResult.Failure(refusal.ExitCode, refusal.Message, result.BytesTransferred);
         }
 
@@ -172,7 +173,13 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
             ? url
             : null;
 
-    private static (CurlExitCode ExitCode, string Message)? Refusal(
+    /// <summary>
+    /// Why <paramref name="target" /> is not followed, or <see langword="null" /> when it is.
+    /// Only the limit refusal keeps <see cref="TransferReport.RedirectUrl" />: curl 8.21.0 writes
+    /// an empty <c>%{redirect_url}</c> after refusing a target that does not parse or whose
+    /// scheme it refuses (measured, BL-289).
+    /// </summary>
+    private static (CurlExitCode ExitCode, string Message, bool KeepsRedirectUrl)? Refusal(
         string target,
         bool pathAsIs,
         int followed,
@@ -182,27 +189,27 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
         next = null;
         if (policy.MaxRedirects >= 0 && followed >= policy.MaxRedirects)
         {
-            return (CurlExitCode.TooManyRedirects, $"Maximum ({policy.MaxRedirects}) redirects followed");
+            return (CurlExitCode.TooManyRedirects, $"Maximum ({policy.MaxRedirects}) redirects followed", true);
         }
 
         if (!CurlUrl.TryParse(target, pathAsIs, out next))
         {
-            return (CurlExitCode.UrlMalformat, $"The redirect target URL could not be parsed: {UnparsableUrlReason(target)}");
+            return (CurlExitCode.UrlMalformat, $"The redirect target URL could not be parsed: {UnparsableUrlReason(target)}", false);
         }
 
         return SchemeRefusal(next.Scheme, policy);
     }
 
-    private static (CurlExitCode ExitCode, string Message)? SchemeRefusal(string scheme, RedirectPolicy policy)
+    private static (CurlExitCode ExitCode, string Message, bool KeepsRedirectUrl)? SchemeRefusal(string scheme, RedirectPolicy policy)
     {
         if (!SchemesCurlParses.Contains(scheme))
         {
-            return (CurlExitCode.UnsupportedProtocol, "The redirect target URL could not be parsed: Unsupported URL scheme");
+            return (CurlExitCode.UnsupportedProtocol, "The redirect target URL could not be parsed: Unsupported URL scheme", false);
         }
 
         return policy.AllowedSchemes.Contains(scheme)
             ? null
-            : (CurlExitCode.UnsupportedProtocol, $"Protocol \"{scheme}\" is disabled (in redirect)");
+            : (CurlExitCode.UnsupportedProtocol, $"Protocol \"{scheme}\" is disabled (in redirect)", false);
     }
 
     private static string UnparsableUrlReason(string target)
@@ -326,6 +333,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
         private long headerSize;
         private long requestSize;
         private int connectionCount;
+        private bool redirectUrlCleared;
 
         public int RedirectCount { get; private set; }
 
@@ -349,6 +357,12 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
             RedirectCount++;
         }
 
+        /// <summary>
+        /// Records that the last hop's redirect target was refused, clearing its
+        /// <see cref="TransferReport.RedirectUrl" /> unless <paramref name="keepsRedirectUrl" />.
+        /// </summary>
+        public void Refused(bool keepsRedirectUrl) => redirectUrlCleared = !keepsRedirectUrl;
+
         public TransferResult Merge(TransferResult outcome)
         {
             TransferReport report = lastReport ?? new TransferReport();
@@ -357,6 +371,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
                 Report = report with
                 {
                     EffectiveUrl = effectiveUrl,
+                    RedirectUrl = redirectUrlCleared ? null : report.RedirectUrl,
                     RedirectCount = RedirectCount,
                     HeaderSize = headerSize,
                     RequestSize = requestSize,
