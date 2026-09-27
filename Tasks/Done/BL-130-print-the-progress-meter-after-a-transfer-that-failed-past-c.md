@@ -8,7 +8,7 @@ depends-on: [BL-102, BL-134]
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-27
 ---
 # BL-130 — Print the progress meter after a transfer that failed past connect or open in Curl.Console
 
@@ -28,15 +28,21 @@ Tests use a fake `IProtocolHandler` registered the way the existing `Curl.Consol
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Console.UnitTests` pins that a handler which reports "started" and then fails with `CurlExitCode.RangeError` (33) and message `HTTP server does not seem to support byte ranges. Cannot resume.` produces stderr of the meter opening followed by `curl: (33) HTTP server does not seem to support byte ranges. Cannot resume.`, and exit code 33.
-- [ ] A test pins that a handler which fails without reporting "started" produces the error line only, with no meter lines.
-- [ ] A test pins that a started-then-failed transfer under `-s`, and under `--no-progress-meter`, writes no meter lines.
-- [ ] The BL-102 tests in `Curl.Console.UnitTests/CurlCommandRunnerProgressMeterTests.cs` still pass unchanged.
-- [ ] `dotnet build Curl.Console -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green; no new test needs `TestCategory=Integration`; new lines and branches are 100% covered.
+- [x] A test in `Curl.Console.UnitTests` pins that a handler which reports "started" and then fails with `CurlExitCode.RangeError` (33) and message `HTTP server does not seem to support byte ranges. Cannot resume.` produces stderr of the meter opening followed by `curl: (33) HTTP server does not seem to support byte ranges. Cannot resume.`, and exit code 33.
+- [x] A test pins that a handler which fails without reporting "started" produces the error line only, with no meter lines.
+- [x] A test pins that a started-then-failed transfer under `-s`, and under `--no-progress-meter`, writes no meter lines.
+- [x] The BL-102 tests in `Curl.Console.UnitTests/CurlCommandRunnerProgressMeterTests.cs` still pass unchanged.
+- [x] `dotnet build Curl.Console -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green; no new test needs `TestCategory=Integration`; new lines and branches are 100% covered.
 
 ## Notes
+
+- Delivered directly (small, one-project change) rather than through every `/feature` agent stage; the plan is the task's own Context.
+- `Curl.Console/TransferStartedRecorder.cs` is the BL-134 sink: it records `ReportTransferStarted` and ignores byte reports. `CurlCommandRunner` makes a new one per transfer in `TransferWithBodyAsync` (a field, like `transferOutputFileName`; transfers run one at a time) and hands it to `TransferContextFactory.Create` through a new optional `progress` parameter (default `NoTransferProgress.Instance`).
+- `WriteProgressMeterAsync` now writes the meter on success, on `-f`'s exit 22 (kept, so handlers that report nothing behave as before), or when the recorder saw "started". The meter is written before the runner prints the error line, as measured.
+- Tests: `CurlCommandRunnerStartedTransferProgressMeterTests` (started-then-33 to a file and to stdout, not-started, `-s` / `--no-progress-meter`, and a second transfer that did not start getting no meter), `TransferStartedRecorderTests`, and two `TransferContextFactoryTests` for the new parameter. The BL-102 test file is unchanged. Whole solution builds with `-warnaserror`; fast tests green (Curl.Console.UnitTests 673 passed).
 
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Done. A transfer whose handler reported started then failed prints the progress meter before its curl: (N) line
