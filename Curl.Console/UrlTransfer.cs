@@ -17,6 +17,14 @@ namespace Curl.Console;
 /// </remarks>
 internal sealed class UrlTransfer
 {
+    /// <summary>
+    /// The <c>-o</c> value that sends the body to standard output rather than a file, with or
+    /// without <c>--output-dir</c>, as curl 8.21.0 does: <c>--output-dir d -o -</c> wrote the body
+    /// to standard output, created no <c>d</c> and left <c>%{filename_effective}</c> empty
+    /// (measured 2026-09-27, BL-349 Notes).
+    /// </summary>
+    internal const string StandardOutputFileName = "-";
+
     /// <summary>Creates the transfer of one URL <paramref name="match" /> names.</summary>
     /// <param name="options">The accepted command line.</param>
     /// <param name="urlIndex">The position of the command-line URL the glob came from.</param>
@@ -32,7 +40,9 @@ internal sealed class UrlTransfer
         UrlIndex = urlIndex;
         TransferId = transferId;
         Url = match.Url;
-        OutputFileName = output?.FileName is { } fileName ? match.ResolveOutputFileName(fileName, sanitizesForWindows) : null;
+        OutputFileName = output?.FileName is { } fileName and not StandardOutputFileName
+            ? match.ResolveOutputFileName(fileName, sanitizesForWindows)
+            : null;
         UsesRemoteName = output?.UsesRemoteName ?? false;
     }
 
@@ -47,7 +57,7 @@ internal sealed class UrlTransfer
 
     /// <summary>
     /// Gets the <c>-o</c> file name with each <c>#N</c> substituted and, on Windows, sanitized;
-    /// <see langword="null" /> without <c>-o</c>.
+    /// <see langword="null" /> without <c>-o</c> or with <c>-o -</c> (<see cref="StandardOutputFileName" />).
     /// </summary>
     internal string? OutputFileName { get; }
 

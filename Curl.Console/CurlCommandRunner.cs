@@ -819,13 +819,13 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// Tells whether the URL at <paramref name="index" /> saves its body to a file: an <c>-o</c>
-    /// name or the remote name.
+    /// name other than <c>-</c>, or the remote name.
     /// </summary>
     /// <param name="options">The accepted command line.</param>
     /// <param name="index">The URL's position on the command line.</param>
     /// <returns><see langword="true" /> when the body goes to a file.</returns>
     private static bool WritesToFile(CommandLineOptions options, int index) =>
-        UrlOutputOf(options, index) is { FileName: not null } or { UsesRemoteName: true };
+        UrlOutputOf(options, index) is { FileName: not null and not UrlTransfer.StandardOutputFileName } or { UsesRemoteName: true };
 
     /// <summary>
     /// Tells whether any URL after the one at <paramref name="index" /> sends its body to

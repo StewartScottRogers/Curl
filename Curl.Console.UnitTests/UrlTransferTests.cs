@@ -54,6 +54,15 @@ public sealed class UrlTransferTests
         Assert.IsFalse(transfer.WritesToFile);
     }
 
+    [TestMethod]
+    public void Constructor_OutputNameDash_WritesToStandardOutput()
+    {
+        UrlTransfer transfer = new(Parse("--output-dir", "d", "-o", "-", "http://h/{a,b}"), 0, 0, SecondMatch("http://h/{a,b}"), sanitizesForWindows: true);
+
+        Assert.IsNull(transfer.OutputFileName);
+        Assert.IsFalse(transfer.WritesToFile);
+    }
+
     private static UrlGlobMatch SecondMatch(string url)
     {
         Assert.IsTrue(UrlGlob.TryParse(url, out UrlGlob? glob, out TransferResult? _));
