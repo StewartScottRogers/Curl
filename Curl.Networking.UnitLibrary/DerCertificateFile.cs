@@ -93,7 +93,13 @@ internal static class DerCertificateFile
             return 2L + first;
         }
 
-        var octets = first - LongFormLength;
+        return LongFormValueEnd(contents, first - LongFormLength);
+    }
+
+    // Where an outer value with a long-form length of the given number of octets ends;
+    // null for an indefinite or over-long length.
+    private static long? LongFormValueEnd(byte[] contents, int octets)
+    {
         if (octets is 0 or > MaximumLengthOctets)
         {
             return null;
