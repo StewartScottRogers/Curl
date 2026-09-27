@@ -19,7 +19,7 @@ public sealed class TelnetProtocolHandlerTelnetOptionTests
 
     private const string GenericUnknownOptionMessage = "An unknown option was passed in to libcurl";
 
-    private static readonly Uri TelnetUrl = new("telnet://example.test/");
+    private static readonly CurlUrl TelnetUrl = CurlUrl.Parse("telnet://example.test/");
 
     [TestMethod]
     public async Task ExecuteAsync_TerminalTypeAskedFor_SendsWillTtypeOffersAndTheLowerCaseOptionsValue()

@@ -61,6 +61,33 @@ public sealed class DictProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ContextWithProxy_TunnelsToTheOriginOnPort2628ThroughThatProxy()
+    {
+        var connector = new RecordingConnector(ConnectResult.Connected(new ScriptedConnection()));
+        var proxy = new ProxyEndpoint(ProxyKind.Http, "proxy.example", 3128, null);
+        var context = new TransferContext
+        {
+            Url = CurlUrl.Parse("dict://example.com/d:x"),
+            Output = new MemoryStream(),
+            Proxy = proxy,
+        };
+
+        await new DictProtocolHandler(connector).ExecuteAsync(context);
+
+        Assert.AreEqual(new ConnectTarget("example.com", 2628, false) { Proxy = proxy }, connector.Targets.Single());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ContextWithoutProxy_ConnectsDirectly()
+    {
+        var connector = new RecordingConnector(ConnectResult.Connected(new ScriptedConnection()));
+
+        await new DictProtocolHandler(connector).ExecuteAsync(Context("dict://example.com/d:x", new MemoryStream()));
+
+        Assert.IsNull(connector.Targets.Single().Proxy);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ConnectFails_ReturnsTheFailureUnchangedAndWritesNothing()
     {
         var connector = new RecordingConnector(ConnectResult.Failed(CurlExitCode.CouldntConnect, "m"));
@@ -228,7 +255,7 @@ public sealed class DictProtocolHandlerTests
         var connection = new ScriptedConnection();
         var context = new TransferContext
         {
-            Url = new Uri("dict://h/d:word"),
+            Url = CurlUrl.Parse("dict://h/d:word"),
             Output = new MemoryStream(),
             CancellationToken = new CancellationToken(canceled: true),
         };
@@ -301,7 +328,7 @@ public sealed class DictProtocolHandlerTests
     }
 
     private static TransferContext Context(string url, Stream output) =>
-        new() { Url = new Uri(url), Output = output };
+        new() { Url = CurlUrl.Parse(url), Output = output };
 
     private static async Task<string> SentForAsync(string path) =>
         Encoding.Latin1.GetString(await SentBytesForAsync(path));

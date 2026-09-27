@@ -114,6 +114,40 @@ public sealed class ConnectTargetTests
     }
 
     [TestMethod]
+    public void PoolScheme_WhenNotSet_IsNull()
+    {
+        var target = new ConnectTarget("example.com", 443, true);
+
+        Assert.IsNull(target.PoolScheme);
+    }
+
+    [TestMethod]
+    public void PoolScheme_WhenSetWithInitializer_RoundTrips()
+    {
+        var target = new ConnectTarget("example.com", 443, true) { PoolScheme = "https" };
+
+        Assert.AreEqual("https", target.PoolScheme);
+    }
+
+    [TestMethod]
+    public void Events_WhenNotSet_IsNoTransferEvents()
+    {
+        var target = new ConnectTarget("example.com", 443, true);
+
+        Assert.AreSame(NoTransferEvents.Instance, target.Events);
+    }
+
+    [TestMethod]
+    public void Events_WhenSetWithInitializer_RoundTrips()
+    {
+        var events = new StubTransferEvents();
+
+        var target = new ConnectTarget("example.com", 443, true) { Events = events };
+
+        Assert.AreSame(events, target.Events);
+    }
+
+    [TestMethod]
     public void With_AnyChange_CannotBypassHostAndPortChecks()
     {
         var target = new ConnectTarget("example.com", 443, true);

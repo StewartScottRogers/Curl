@@ -272,7 +272,7 @@ public sealed class TransferRetrierTests
     [DataRow("file:///Z:/f")]
     public async Task RunAsync_TransientStatusFromAnotherScheme_IsFinal(string url)
     {
-        Run run = await Retry(new RetryPolicy { Retries = 1 }, new Uri(url), Http(503), Http(200));
+        Run run = await Retry(new RetryPolicy { Retries = 1 }, CurlUrl.Parse(url), Http(503), Http(200));
 
         Assert.AreEqual(1, run.Attempts);
     }
@@ -282,7 +282,7 @@ public sealed class TransferRetrierTests
     {
         TransferResult redirected = Http(503) with { Report = Report(503) with { EffectiveUrl = "https://127.0.0.1/next" } };
 
-        Run run = await Retry(new RetryPolicy { Retries = 1 }, new Uri("ftp://127.0.0.1/f"), redirected, Http(200));
+        Run run = await Retry(new RetryPolicy { Retries = 1 }, CurlUrl.Parse("ftp://127.0.0.1/f"), redirected, Http(200));
 
         Assert.AreEqual(2, run.Attempts);
     }
@@ -315,7 +315,7 @@ public sealed class TransferRetrierTests
         FakeTimeProvider clock = new(Start);
         TransferRetrier retrier = new(Script([first, Http(200)], out _));
 
-        await retrier.RunAsync(Context(new Uri(Url), clock), new RetryPolicy { Retries = 1 }, (attempt, _) => retried.Add(attempt));
+        await retrier.RunAsync(Context(CurlUrl.Parse(Url), clock), new RetryPolicy { Retries = 1 }, (attempt, _) => retried.Add(attempt));
 
         Assert.HasCount(1, retried);
         Assert.AreSame(first, retried[0]);
@@ -327,7 +327,7 @@ public sealed class TransferRetrierTests
         using CancellationTokenSource cancel = new();
         await cancel.CancelAsync();
         TransferRetrier retrier = new(Script([Http(503), Http(200)], out Func<int> attempts));
-        TransferContext context = new() { Url = new Uri(Url), Output = Stream.Null, TimeProvider = new FakeTimeProvider(Start), CancellationToken = cancel.Token };
+        TransferContext context = new() { Url = CurlUrl.Parse(Url), Output = Stream.Null, TimeProvider = new FakeTimeProvider(Start), CancellationToken = cancel.Token };
 
         await Assert.ThrowsAsync<OperationCanceledException>(async () => await retrier.RunAsync(context, new RetryPolicy { Retries = 1 }, (_, _) => { }));
 
@@ -338,7 +338,7 @@ public sealed class TransferRetrierTests
     public async Task RunAsync_NullArguments_Throw()
     {
         TransferRetrier retrier = new(Script([Http(200)], out _));
-        TransferContext context = Context(new Uri(Url), new FakeTimeProvider(Start));
+        TransferContext context = Context(CurlUrl.Parse(Url), new FakeTimeProvider(Start));
 
         await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await retrier.RunAsync(null!, new RetryPolicy(), (_, _) => { }));
         await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await retrier.RunAsync(context, null!, (_, _) => { }));
@@ -346,9 +346,9 @@ public sealed class TransferRetrierTests
     }
 
     private static Task<Run> Retry(RetryPolicy policy, params TransferResult[] attempts) =>
-        Retry(policy, new Uri(Url), attempts);
+        Retry(policy, CurlUrl.Parse(Url), attempts);
 
-    private static async Task<Run> Retry(RetryPolicy policy, Uri url, params TransferResult[] attempts)
+    private static async Task<Run> Retry(RetryPolicy policy, CurlUrl url, params TransferResult[] attempts)
     {
         FakeTimeProvider clock = new(Start);
         List<string> warnings = [];
@@ -366,7 +366,7 @@ public sealed class TransferRetrierTests
         return _ => ValueTask.FromResult(attempts[next++]);
     }
 
-    private static TransferContext Context(Uri url, TimeProvider clock) =>
+    private static TransferContext Context(CurlUrl url, TimeProvider clock) =>
         new() { Url = url, Output = Stream.Null, TimeProvider = clock };
 
     private static TransferResult Http(int status, string? retryAfter = null) =>

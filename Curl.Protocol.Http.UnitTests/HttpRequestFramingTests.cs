@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Protocol.Http.Fakes;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 
 namespace Curl.Protocol.Http;
@@ -36,6 +37,57 @@ public sealed class HttpRequestFramingTests
         Assert.IsFalse(framing.IsChunked);
         Assert.IsFalse(framing.AddsExpect);
         Assert.IsFalse(framing.AwaitsContinue);
+    }
+
+    [TestMethod]
+    public void Of_FileUpload_IsPutWithWhatIsLeftOfTheFileAsItsLength()
+    {
+        // curl -T f.txt (5 bytes) sent PUT with Content-Length: 5 and no Expect (BL-184 Notes).
+        MemoryStream upload = new("xxhello"u8.ToArray()) { Position = 2 };
+
+        HttpRequestFraming framing = HttpRequestFraming.Of(new HttpRequestOptions(), [], upload: upload);
+
+        Assert.AreEqual("PUT", framing.Method);
+        Assert.AreSame(upload, ((StreamBody)framing.Body!).Content);
+        Assert.AreEqual(5L, framing.KnownLength);
+        Assert.IsTrue(framing.IsUpload);
+        Assert.IsFalse(framing.IsChunked);
+        Assert.IsFalse(framing.AddsExpect);
+    }
+
+    [TestMethod]
+    public void Of_StandardInputUpload_IsChunkedAndWaitsForContinue()
+    {
+        // curl -T - sent Transfer-Encoding: chunked and Expect: 100-continue (BL-184 Notes).
+        HttpRequestFraming framing = HttpRequestFraming.Of(
+            new HttpRequestOptions(),
+            [],
+            upload: new FailingReadStream([], 1, new IOException("End.")));
+
+        Assert.AreEqual("PUT", framing.Method);
+        Assert.IsNull(framing.KnownLength);
+        Assert.IsTrue(framing.IsChunked);
+        Assert.IsTrue(framing.AddsExpect);
+        Assert.IsTrue(framing.AwaitsContinue);
+        Assert.IsTrue(framing.WithoutExpect().IsUpload);
+    }
+
+    [TestMethod]
+    public void Of_UploadWithCustomMethodAndBody_SendsTheUploadWithTheCustomMethod()
+    {
+        HttpRequestOptions options = new() { CustomMethod = "POST", Body = new BytesBody("x"u8.ToArray(), "a/b") };
+
+        HttpRequestFraming framing = HttpRequestFraming.Of(options, [], upload: new MemoryStream([1, 2]));
+
+        Assert.AreEqual("POST", framing.Method);
+        Assert.AreEqual(2L, framing.KnownLength);
+        Assert.IsTrue(framing.IsUpload);
+    }
+
+    [TestMethod]
+    public void Of_Body_IsNoUpload()
+    {
+        Assert.IsFalse(Of(new HttpRequestOptions { Body = new BytesBody("x"u8.ToArray(), "a/b") }).IsUpload);
     }
 
     [TestMethod]

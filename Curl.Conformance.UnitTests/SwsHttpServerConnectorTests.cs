@@ -28,6 +28,17 @@ public sealed class SwsHttpServerConnectorTests
     }
 
     [TestMethod]
+    [DataRow("data crlf=\"headers\"", "HTTP/1.1 200 OK\r\nA: b\r\n\r\nbody\n")]
+    [DataRow("data crlf=\"yes\"", "HTTP/1.1 200 OK\r\nA: b\r\n\r\nbody\r\n")]
+    [DataRow("data crlf=\"yes\" nonewline=\"yes\"", "HTTP/1.1 200 OK\r\nA: b\r\n\r\nbody\r")]
+    public async Task Get_ReceivesDataWithTheLineEndingsPreproForces(string openingTag, string expected)
+    {
+        IConnection connection = await ConnectAsync(new SwsHttpServerConnector(Case(Reply(openingTag, "HTTP/1.1 200 OK\nA: b\n\nbody\n"))));
+
+        Assert.AreEqual(expected, await ExchangeAsync(connection, Get));
+    }
+
+    [TestMethod]
     [DataRow("/12340002", "second\n")]
     [DataRow("/want/12340002?query=1", "second\n")]
     [DataRow("/12340000", "first\n")]
@@ -357,6 +368,19 @@ public sealed class SwsHttpServerConnectorTests
     }
 
     [TestMethod]
+    public async Task Abandon_MakesConnectingReadingAndWritingThrow()
+    {
+        SwsHttpServerConnector server = new(Case(Reply("data", "first\n")));
+        IConnection connection = await ConnectAsync(server);
+
+        server.Abandon();
+
+        await Assert.ThrowsExactlyAsync<IOException>(async () => await server.ConnectAsync(Target, CancellationToken.None));
+        await Assert.ThrowsExactlyAsync<IOException>(async () => await connection.ReadAsync(new byte[1], CancellationToken.None));
+        await Assert.ThrowsExactlyAsync<IOException>(async () => await connection.WriteAsync(new byte[1], CancellationToken.None));
+    }
+
+    [TestMethod]
     public void Constructor_RejectsANullCase()
     {
         Assert.ThrowsExactly<ArgumentNullException>(() => new SwsHttpServerConnector(null!));
@@ -385,6 +409,22 @@ public sealed class SwsHttpServerConnectorTests
         clock.Advance(TimeSpan.FromMilliseconds(100));
         Assert.AreEqual(FortyFiveBytes[40..], await third);
         Assert.AreEqual(string.Empty, await ReadOnceAsync(connection), "the connection stays open with nothing more to read");
+    }
+
+    [TestMethod]
+    public async Task WriteDelay_WhenTheTimerFiresEarly_WaitsForTheWriteInsteadOfReadingNothing()
+    {
+        ManualTimeProvider clock = new() { TimersFireEarlyBy = TimeSpan.FromMilliseconds(1) };
+        IConnection connection = await ConnectAsync(new SwsHttpServerConnector(Case(Reply("data", FortyFiveBytes), Reply("servercmd", "writedelay: 100\n")), clock));
+        await WriteAsync(connection, Get);
+        await ReadOnceAsync(connection);
+
+        Task<string> second = ReadOnceAsync(connection);
+        clock.Advance(TimeSpan.FromMilliseconds(99));
+        Assert.IsFalse(second.IsCompleted, "a timer that fired at 99 ms does not end the read with 0 bytes");
+        clock.Advance(TimeSpan.FromMilliseconds(1));
+
+        Assert.AreEqual(FortyFiveBytes[20..40], await second);
     }
 
     [TestMethod]

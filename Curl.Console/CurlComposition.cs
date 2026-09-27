@@ -72,20 +72,35 @@ internal static class CurlComposition
     /// Creates the network transports for one run: a <see cref="TcpConnector" /> over a
     /// <see cref="SystemDnsResolver" />, a <see cref="TcpDialer" /> and an
     /// <see cref="SslStreamTlsProvider" />, and a <see cref="UdpDatagramConnector" />. Both
-    /// connectors share the one resolver and <see cref="TimeProvider.System" />. TLS uses
+    /// connectors and the TLS provider share the one resolver and <see cref="TimeProvider.System" />. TLS uses
     /// the <see cref="TlsClientOptions" /> mapped from <paramref name="options" /> by
     /// <see cref="TlsClientOptionsMapping.FromCommandLine" />, one set shared by every URL on
-    /// the command line.
+    /// the command line. The CONNECT request that tunnels through an HTTP proxy carries the
+    /// <see cref="HttpProxyTunnelOptions" /> <see cref="CreateProxyTunnelOptions" /> maps from
+    /// <paramref name="options" />.
     /// </summary>
     /// <param name="options">The parsed command line.</param>
     /// <returns>The connectors and the pieces they were built from.</returns>
-    internal static CurlTransports CreateTransports(CommandLineOptions options)
+    internal static CurlTransports CreateTransports(CommandLineOptions options) =>
+        CreateTransports(options, TimeProvider.System);
+
+    /// <summary>
+    /// Creates the network transports as <see cref="CreateTransports(CommandLineOptions)" /> does,
+    /// on <paramref name="timeProvider" /> instead of <see cref="TimeProvider.System" />: the
+    /// <see cref="TcpConnector" />, the <see cref="SslStreamTlsProvider" /> and the
+    /// <see cref="UdpDatagramConnector" /> all time on it, so the handshake timestamps the TLS
+    /// provider reports are on the connector's clock (ADR-0030).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <param name="timeProvider">The clock every transport times on.</param>
+    /// <returns>The connectors and the pieces they were built from.</returns>
+    internal static CurlTransports CreateTransports(CommandLineOptions options, TimeProvider timeProvider)
     {
         SystemDnsResolver dnsResolver = new();
-        TimeProvider timeProvider = TimeProvider.System;
         TcpDialer tcpDialer = new();
         TlsClientOptions tlsClientOptions = TlsClientOptionsMapping.FromCommandLine(options);
-        SslStreamTlsProvider tlsProvider = new(tlsClientOptions);
+        SslStreamTlsProvider tlsProvider = new(tlsClientOptions, timeProvider);
+        HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(options);
 
         return new CurlTransports(
             dnsResolver,
@@ -93,9 +108,28 @@ internal static class CurlComposition
             tcpDialer,
             tlsClientOptions,
             tlsProvider,
-            new TcpConnector(dnsResolver, tcpDialer, tlsProvider, timeProvider),
+            proxyTunnelOptions,
+            new TcpConnector(dnsResolver, tcpDialer, tlsProvider, timeProvider, proxyTunnelOptions),
             new UdpDatagramConnector(dnsResolver, timeProvider));
     }
+
+    /// <summary>
+    /// Maps the command line to what the CONNECT request through an HTTP proxy carries: the
+    /// <c>-A</c> value as its <c>User-Agent</c>, no <c>User-Agent</c> header for <c>-A ""</c>,
+    /// <c>curl/8.21.0</c> without <c>-A</c>; and the proxy credential encoded as the server
+    /// credential is (<see cref="CredentialEncoding.ForPlatform" />, ADR-0022).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns>The tunnel's options.</returns>
+    internal static HttpProxyTunnelOptions CreateProxyTunnelOptions(CommandLineOptions options) =>
+        new(
+            options.UserAgent switch
+            {
+                null => HttpProxyTunnelOptions.Default.UserAgent,
+                "" => null,
+                string userAgent => userAgent,
+            },
+            CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()));
 
     /// <summary>
     /// Creates the runner that parses a command line and performs its transfers against
@@ -111,7 +145,7 @@ internal static class CurlComposition
     /// Whether standard output is a terminal, where the progress meter of a transfer with no
     /// <c>-o</c> is hidden, as curl hides it.
     /// </param>
-    /// <returns>The runner, which writes curl's progress meter.</returns>
+    /// <returns>The runner, which writes curl's progress meter and reads the default config file (<c>.curlrc</c>) where <see cref="DefaultConfigFileSearch.ForProcess" /> finds it.</returns>
     internal static CurlCommandRunner CreateRunner(
         Stream standardOutput,
         Stream standardError,
@@ -127,7 +161,9 @@ internal static class CurlComposition
             OperatingSystem.IsWindows(),
             TerminalColumns.Resolve(),
             writesProgressMeter: true,
-            standardOutputIsTerminal);
+            standardOutputIsTerminal,
+            outputPaths: new PhysicalOutputPaths(),
+            defaultConfigFileSearch: DefaultConfigFileSearch.ForProcess);
 
     /// <summary>
     /// Creates the runner with the production handler set built around the given
@@ -139,21 +175,27 @@ internal static class CurlComposition
     /// <param name="standardInput">What a <c>telnet</c> transfer sends to the server.</param>
     /// <param name="connector">Connects the TCP protocols.</param>
     /// <param name="datagramConnector">Opens the UDP channels TFTP uses.</param>
+    /// <param name="proxySelector">
+    /// Chooses each transfer's proxy, or <see langword="null" /> for one that reads no
+    /// environment variables.
+    /// </param>
     /// <returns>The runner.</returns>
     internal static CurlCommandRunner CreateRunner(
         Stream standardOutput,
         Stream standardError,
         Stream standardInput,
         IConnector connector,
-        IDatagramConnector datagramConnector) =>
+        IDatagramConnector datagramConnector,
+        ProxySelector? proxySelector = null) =>
         new(
-            options => CreateTransferDispatch(connector, datagramConnector, CookieEngine.FromCommandLine(options)),
+            options => CreateTransferDispatch(connector, datagramConnector, CookieEngine.FromCommandLine(options), proxySelector),
             new PhysicalFileSystem(),
             new PhysicalFileSystem(),
             standardOutput,
             standardError,
             standardInput,
-            OperatingSystem.IsWindows());
+            OperatingSystem.IsWindows(),
+            outputPaths: new PhysicalOutputPaths());
 
     /// <summary>
     /// Creates the dispatcher over the production handler set, connecting through
@@ -169,29 +211,37 @@ internal static class CurlComposition
     /// <paramref name="transports" />, its HTTP handler keeping cookies in
     /// <paramref name="cookies" />; the TLS provider's <see cref="SslStreamTlsProvider.Warnings" />
     /// as the lines printed before each transfer, as curl 8.21.0 prints its <c>--capath</c>
-    /// warnings once per URL; and <paramref name="cookies" /> for the runner to load and save.
+    /// warnings once per URL; <paramref name="cookies" /> for the runner to load and save; and a
+    /// <see cref="ProxySelector" /> reading the process's proxy environment variables.
     /// </summary>
     /// <param name="transports">The run's connectors.</param>
     /// <param name="cookies">The run's cookies, or <see langword="null" /> without <c>-b</c> or <c>-c</c>.</param>
-    /// <returns>The dispatcher, the warning lines and the cookies.</returns>
+    /// <returns>The dispatcher, the warning lines, the cookies and the proxy selector.</returns>
     internal static TransferDispatch CreateTransferDispatch(CurlTransports transports, CookieEngine? cookies = null) =>
         new(
             new ProtocolDispatcher(CreateProtocolHandlers(transports.TcpConnector, transports.UdpDatagramConnector, cookies?.HandlerStore)),
             transports.TlsProvider.Warnings,
-            cookies);
+            cookies,
+            new ProxySelector(Environment.GetEnvironmentVariable));
 
     /// <summary>
     /// Creates what one run transfers through over the given connectors instead of the real
     /// network: the production handler set, its HTTP handler keeping cookies in
-    /// <paramref name="cookies" />, no warning lines, and <paramref name="cookies" />.
+    /// <paramref name="cookies" />, no warning lines, <paramref name="cookies" /> and <paramref name="proxySelector" />.
     /// </summary>
     /// <param name="connector">Connects the TCP protocols.</param>
     /// <param name="datagramConnector">Opens the UDP channels TFTP uses.</param>
     /// <param name="cookies">The run's cookies, or <see langword="null" /> without <c>-b</c> or <c>-c</c>.</param>
-    /// <returns>The dispatcher, no warning lines and the cookies.</returns>
+    /// <param name="proxySelector">Chooses each transfer's proxy, or <see langword="null" /> for one that reads no environment variables.</param>
+    /// <returns>The dispatcher, no warning lines, the cookies and the proxy selector.</returns>
     private static TransferDispatch CreateTransferDispatch(
         IConnector connector,
         IDatagramConnector datagramConnector,
-        CookieEngine? cookies) =>
-        new(new ProtocolDispatcher(CreateProtocolHandlers(connector, datagramConnector, cookies?.HandlerStore)), [], cookies);
+        CookieEngine? cookies,
+        ProxySelector? proxySelector) =>
+        new(
+            new ProtocolDispatcher(CreateProtocolHandlers(connector, datagramConnector, cookies?.HandlerStore)),
+            [],
+            cookies,
+            proxySelector);
 }

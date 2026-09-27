@@ -1,9 +1,12 @@
+using Curl.Protocol.Abstractions;
+
 namespace Curl.Protocol.File;
 
 /// <summary>
 /// Pins the <c>file://</c> URL path split against curl 8.21.0. Every expectation below
-/// was measured against that build; where .NET's <see cref="Uri" /> disagrees with curl,
-/// curl wins.
+/// was measured against that build. A URL <see cref="CurlUrl" /> rejects never reaches
+/// <see cref="FileUrlPath" />, so the hosts curl refuses are pinned here against
+/// <see cref="CurlUrl.TryParse(string, bool, out CurlUrl)" />.
 /// </summary>
 [TestClass]
 public sealed class FileUrlPathTests
@@ -18,7 +21,7 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_NonFileScheme_ReturnsFalse()
     {
-        var url = new Uri("http://example.com/x");
+        var url = CurlUrl.Parse("http://example.com/x");
 
         bool parsed = FileUrlPath.TryParse(url, out _);
 
@@ -29,7 +32,7 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_UppercaseScheme_IsAccepted()
     {
-        var url = new Uri("FILE:///C:/x");
+        var url = CurlUrl.Parse("FILE:///C:/x");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
@@ -42,7 +45,7 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_EmptyHostAndDriveLetter_ReturnsBothFormsOfThePath()
     {
-        var url = new Uri("file:///C:/dir/hello.txt");
+        var url = CurlUrl.Parse("file:///C:/dir/hello.txt");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
@@ -57,7 +60,7 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_PercentTwentyEscape_DecodesToASpaceInTheOperatingSystemPathOnly()
     {
-        var url = new Uri("file:///C:/dir/my%20file.txt");
+        var url = CurlUrl.Parse("file:///C:/dir/my%20file.txt");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
@@ -70,7 +73,7 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_PercentTwentyFiveEscape_DecodesToASinglePercent()
     {
-        var url = new Uri("file:///C:/a%25b.txt");
+        var url = CurlUrl.Parse("file:///C:/a%25b.txt");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
@@ -85,7 +88,7 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_TruncatedEscape_IsLeftLiteral()
     {
-        var url = new Uri("file:///C:/a%2");
+        var url = CurlUrl.Parse("file:///C:/a%2");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
@@ -98,7 +101,7 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_NonHexadecimalEscape_IsLeftLiteral()
     {
-        var url = new Uri("file:///C:/a%GGb");
+        var url = CurlUrl.Parse("file:///C:/a%GGb");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
@@ -111,7 +114,7 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_TrailingPercent_IsLeftLiteral()
     {
-        var url = new Uri("file:///C:/a%");
+        var url = CurlUrl.Parse("file:///C:/a%");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
@@ -126,7 +129,7 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_PercentTwoFEscape_DecodesToASeparator()
     {
-        var url = new Uri("file:///C:/dir%2Fhello.txt");
+        var url = CurlUrl.Parse("file:///C:/dir%2Fhello.txt");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
@@ -139,7 +142,7 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_LocalhostHost_IsAcceptedAndDropped()
     {
-        var url = new Uri("file://localhost/C:/x");
+        var url = CurlUrl.Parse("file://localhost/C:/x");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
@@ -152,7 +155,7 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_UppercaseLocalhostHost_IsAcceptedAndDropped()
     {
-        var url = new Uri("file://LOCALHOST/C:/x");
+        var url = CurlUrl.Parse("file://LOCALHOST/C:/x");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
@@ -165,7 +168,7 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_LoopbackAddressHost_IsAcceptedAndDropped()
     {
-        var url = new Uri("file://127.0.0.1/C:/x");
+        var url = CurlUrl.Parse("file://127.0.0.1/C:/x");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
@@ -176,11 +179,9 @@ public sealed class FileUrlPathTests
     }
 
     [TestMethod]
-    public void TryParse_NamedHost_ReturnsFalse()
+    public void CurlUrlTryParse_NamedHost_ReturnsFalse()
     {
-        var url = new Uri("file://example.com/x");
-
-        bool parsed = FileUrlPath.TryParse(url, out _);
+        bool parsed = CurlUrl.TryParse("file://example.com/x", pathAsIs: false, out _);
 
         Assert.IsFalse(parsed);
     }
@@ -188,41 +189,33 @@ public sealed class FileUrlPathTests
     // Even the IPv6 spelling of loopback is rejected: curl accepts only the empty host,
     // localhost and 127.0.0.1.
     [TestMethod]
-    public void TryParse_IpVersionSixLoopbackHost_ReturnsFalse()
+    public void CurlUrlTryParse_IpVersionSixLoopbackHost_ReturnsFalse()
     {
-        var url = new Uri("file://[::1]/x");
-
-        bool parsed = FileUrlPath.TryParse(url, out _);
+        bool parsed = CurlUrl.TryParse("file://[::1]/x", pathAsIs: false, out _);
 
         Assert.IsFalse(parsed);
     }
 
     [TestMethod]
-    public void TryParse_NonLoopbackAddressHost_ReturnsFalse()
+    public void CurlUrlTryParse_NonLoopbackAddressHost_ReturnsFalse()
     {
-        var url = new Uri("file://127.0.0.2/x");
-
-        bool parsed = FileUrlPath.TryParse(url, out _);
+        bool parsed = CurlUrl.TryParse("file://127.0.0.2/x", pathAsIs: false, out _);
 
         Assert.IsFalse(parsed);
     }
 
     [TestMethod]
-    public void TryParse_SchemeAndEmptyAuthorityOnly_ReturnsFalse()
+    public void CurlUrlTryParse_SchemeAndEmptyAuthorityOnly_ReturnsFalse()
     {
-        var url = new Uri("file://");
-
-        bool parsed = FileUrlPath.TryParse(url, out _);
+        bool parsed = CurlUrl.TryParse("file://", pathAsIs: false, out _);
 
         Assert.IsFalse(parsed);
     }
 
     [TestMethod]
-    public void TryParse_AcceptedHostWithNoPath_ReturnsFalse()
+    public void CurlUrlTryParse_AcceptedHostWithNoPath_ReturnsFalse()
     {
-        var url = new Uri("file://localhost");
-
-        bool parsed = FileUrlPath.TryParse(url, out _);
+        bool parsed = CurlUrl.TryParse("file://localhost", pathAsIs: false, out _);
 
         Assert.IsFalse(parsed);
     }
@@ -231,7 +224,7 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_RootPath_KeepsTheLeadingSlash()
     {
-        var url = new Uri("file:///");
+        var url = CurlUrl.Parse("file:///");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
@@ -244,7 +237,7 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_LowercaseDriveLetter_LosesTheLeadingSlash()
     {
-        var url = new Uri("file:///c:/Windows/win.ini");
+        var url = CurlUrl.Parse("file:///c:/Windows/win.ini");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
@@ -255,12 +248,12 @@ public sealed class FileUrlPathTests
     }
 
     // The bar spelling loses its leading slash like a colon does, but the bar itself is
-    // NOT rewritten to a colon. Uri.LocalPath rewrites it; curl 8.21.0 does not, and this
-    // test is the reason parsing works from Uri.OriginalString.
+    // NOT rewritten to a colon: curl 8.21.0 keeps it, and this test is the reason parsing
+    // works from CurlUrl.OriginalString.
     [TestMethod]
     public void TryParse_DriveLetterSpelledWithABar_LosesTheLeadingSlashAndKeepsTheBar()
     {
-        var url = new Uri("file:///c|/Windows/win.ini");
+        var url = CurlUrl.Parse("file:///c|/Windows/win.ini");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
@@ -273,7 +266,7 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_PathWithoutADriveLetter_KeepsTheLeadingSlash()
     {
-        var url = new Uri("file:///Windows/win.ini");
+        var url = CurlUrl.Parse("file:///Windows/win.ini");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
@@ -287,7 +280,7 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_SingleSlashAfterScheme_IsAccepted()
     {
-        var url = new Uri("file:/C:/x");
+        var url = CurlUrl.Parse("file:/C:/x");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
@@ -302,7 +295,7 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_FourSlashUncPath_KeepsBothLeadingSlashes()
     {
-        var url = new Uri("file:////localhost/C$/x");
+        var url = CurlUrl.Parse("file:////localhost/C$/x");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
@@ -315,7 +308,7 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_FiveSlashPath_KeepsThreeLeadingSlashes()
     {
-        var url = new Uri("file://///localhost/x");
+        var url = CurlUrl.Parse("file://///localhost/x");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
@@ -328,7 +321,7 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_Query_IsDropped()
     {
-        var url = new Uri("file:///C:/x?a=1");
+        var url = CurlUrl.Parse("file:///C:/x?a=1");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
@@ -341,7 +334,7 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_Fragment_IsDropped()
     {
-        var url = new Uri("file:///C:/x#frag");
+        var url = CurlUrl.Parse("file:///C:/x#frag");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
@@ -356,7 +349,7 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_BackslashDotDotSegments_ResolveBeforeTheOpen()
     {
-        var url = new Uri(@"file:///C:/dir\..\secret.txt");
+        var url = CurlUrl.Parse(@"file:///C:/dir\..\secret.txt");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
@@ -371,7 +364,7 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_BackslashBeforeDotDot_BecomesASeparatorBeforeTheDotDotIsResolved()
     {
-        var url = new Uri(@"file:///C:/a\../b");
+        var url = CurlUrl.Parse(@"file:///C:/a\../b");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
@@ -384,7 +377,7 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_SingleDotSegments_AreRemoved()
     {
-        var url = new Uri("file:///C:/./a/./b.txt");
+        var url = CurlUrl.Parse("file:///C:/./a/./b.txt");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
@@ -400,7 +393,7 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_DotDotAboveTheDrive_StopsAtTheDrive()
     {
-        var url = new Uri("file:///C:/../../Windows/win.ini");
+        var url = CurlUrl.Parse("file:///C:/../../Windows/win.ini");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
@@ -412,11 +405,11 @@ public sealed class FileUrlPathTests
 
     // A drive letter not followed by a slash is not a root, so the .. removes it: curl
     // 8.21.0 quotes file://localhost/Q:dir/../x as /x. The three-slash spelling is the
-    // same to curl, but Uri throws on it.
+    // same to curl; TryParse_SpellingUriRefused_QuotesThePathCurlQuotes covers it.
     [TestMethod]
     public void TryParse_DriveLetterWithoutASlash_IsRemovedByDotDotLikeAnySegment()
     {
-        var url = new Uri("file://localhost/Q:dir/../x");
+        var url = CurlUrl.Parse("file://localhost/Q:dir/../x");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
@@ -427,11 +420,11 @@ public sealed class FileUrlPathTests
     }
 
     // curl 8.21.0 quotes file://localhost/C: as C: — a drive with nothing after it is
-    // still a root. Uri throws on the three-slash spelling, file:///C:.
+    // still a root. TryParse_SpellingUriRefused_QuotesThePathCurlQuotes covers file:///C:.
     [TestMethod]
     public void TryParse_BareDrive_IsKeptWhole()
     {
-        var url = new Uri("file://localhost/C:");
+        var url = CurlUrl.Parse("file://localhost/C:");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
@@ -439,6 +432,41 @@ public sealed class FileUrlPathTests
         Assert.IsNotNull(path);
         Assert.AreEqual("C:", path.UrlPath);
         Assert.AreEqual("C:", path.OsPath);
+    }
+
+    // The spellings System.Uri refused (ADR-0010). Measured 2026-09-27 against curl 8.21.0
+    // with curl -sS -o /dev/null URL: file://C: and file:///C: print
+    // "curl: (37) Could not open file C:" and file:///Q:dir/../x prints
+    // "curl: (37) Could not open file /x".
+    [TestMethod]
+    [DataRow("file://C:", "C:")]
+    [DataRow("file:///C:", "C:")]
+    [DataRow("file:///Q:dir/../x", "/x")]
+    public void TryParse_SpellingUriRefused_QuotesThePathCurlQuotes(string text, string urlPath)
+    {
+        var url = CurlUrl.Parse(text);
+
+        bool parsed = FileUrlPath.TryParse(url, out var path);
+
+        Assert.IsTrue(parsed);
+        Assert.IsNotNull(path);
+        Assert.AreEqual(urlPath, path.UrlPath);
+        Assert.AreEqual(NativePath(urlPath), path.OsPath);
+    }
+
+    // curl 8.21.0 exits 0 for file:///C:%2FWindows/win.ini and writes C:\Windows\win.ini:
+    // the escaped slash ends the drive, and the drive's leading slash still goes.
+    [TestMethod]
+    public void TryParse_DriveFollowedByAnEscapedSlash_OpensThePathTheEscapeSpells()
+    {
+        var url = CurlUrl.Parse("file:///C:%2FWindows/win.ini");
+
+        bool parsed = FileUrlPath.TryParse(url, out var path);
+
+        Assert.IsTrue(parsed);
+        Assert.IsNotNull(path);
+        Assert.AreEqual("C:%2FWindows/win.ini", path.UrlPath);
+        Assert.AreEqual(NativePath("C:/Windows/win.ini"), path.OsPath);
     }
 
     // Each row was quoted by curl 8.21.0 in its exit 37 message exactly as expected here.
@@ -458,7 +486,7 @@ public sealed class FileUrlPathTests
     [DataRow(@"file:///C:\dir\..\nosuch.txt", "C:/nosuch.txt")]
     public void TryParse_DotSegments_AreRemovedAsCurlQuotesThem(string urlText, string expected)
     {
-        var url = new Uri(urlText);
+        var url = CurlUrl.Parse(urlText);
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
@@ -477,7 +505,7 @@ public sealed class FileUrlPathTests
     [DataRow("file:///C:/dir/%2e", "C:/dir/")]
     public void TryParse_EncodedDotSegments_AreRemovedLikePlainOnes(string urlText, string expected)
     {
-        var url = new Uri(urlText);
+        var url = CurlUrl.Parse(urlText);
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
@@ -491,7 +519,7 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_EscapedBackslash_IsNotASeparatorForDotSegmentRemoval()
     {
-        var url = new Uri("file:///C:/dir%5c..%5cx");
+        var url = CurlUrl.Parse("file:///C:/dir%5c..%5cx");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
@@ -504,9 +532,9 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_PathAsIsFalse_RemovesDotSegments()
     {
-        var url = new Uri("file:///C:/dir/../x");
+        var url = CurlUrl.Parse("file:///C:/dir/../x");
 
-        bool parsed = FileUrlPath.TryParse(url, pathAsIs: false, out var path);
+        bool parsed = FileUrlPath.TryParse(url, out var path);
 
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
@@ -519,9 +547,9 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_PathAsIs_KeepsDotDotButStillConvertsBackslashes()
     {
-        var url = new Uri(@"file:///C:/dir\..\x");
+        var url = CurlUrl.Parse(@"file:///C:/dir\..\x", pathAsIs: true);
 
-        bool parsed = FileUrlPath.TryParse(url, pathAsIs: true, out var path);
+        bool parsed = FileUrlPath.TryParse(url, out var path);
 
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
@@ -532,9 +560,9 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_PathAsIs_KeepsSingleDotSegments()
     {
-        var url = new Uri("file:///C:/dir/./x");
+        var url = CurlUrl.Parse("file:///C:/dir/./x", pathAsIs: true);
 
-        bool parsed = FileUrlPath.TryParse(url, pathAsIs: true, out var path);
+        bool parsed = FileUrlPath.TryParse(url, out var path);
 
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
@@ -552,7 +580,7 @@ public sealed class FileUrlPathTests
     [DataRow("file:///C:/dir/a%2Eb", "C:/dir/a%2Eb")]
     public void TryParse_LowercaseEscape_IsQuotedWithUppercaseHexDigits(string url, string expected)
     {
-        bool parsed = FileUrlPath.TryParse(new Uri(url), out var path);
+        bool parsed = FileUrlPath.TryParse(CurlUrl.Parse(url), out var path);
 
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
@@ -562,9 +590,9 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_PathAsIsLowercaseEncodedDots_AreQuotedWithUppercaseHexDigits()
     {
-        var url = new Uri("file:///C:/dir/%2e%2e/x");
+        var url = CurlUrl.Parse("file:///C:/dir/%2e%2e/x", pathAsIs: true);
 
-        bool parsed = FileUrlPath.TryParse(url, pathAsIs: true, out var path);
+        bool parsed = FileUrlPath.TryParse(url, out var path);
 
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
@@ -584,7 +612,7 @@ public sealed class FileUrlPathTests
     [DataRow("file:///C:/dir/a%%2eb", "C:/dir/a%%2Eb")]
     public void TryParse_MalformedEscape_IsQuotedExactlyAsWritten(string url, string expected)
     {
-        bool parsed = FileUrlPath.TryParse(new Uri(url), out var path);
+        bool parsed = FileUrlPath.TryParse(CurlUrl.Parse(url), out var path);
 
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
@@ -606,7 +634,7 @@ public sealed class FileUrlPathTests
         string url,
         string expected)
     {
-        bool parsed = FileUrlPath.TryParse(new Uri(url), out var path);
+        bool parsed = FileUrlPath.TryParse(CurlUrl.Parse(url), out var path);
 
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
@@ -617,7 +645,7 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_UnescapedNonAsciiCharacter_IsKeptInTheOperatingSystemPath()
     {
-        var url = new Uri("file:///C:/nodir/a\u00E9b");
+        var url = CurlUrl.Parse("file:///C:/nodir/a\u00E9b");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
@@ -631,7 +659,7 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_NonAsciiBesideAsciiAndAnEscape_EncodesOnlyTheNonAsciiCharacter()
     {
-        var url = new Uri("file:///C:/dir/../a\"%e9\u00E9b");
+        var url = CurlUrl.Parse("file:///C:/dir/../a\"%e9\u00E9b");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
@@ -640,20 +668,13 @@ public sealed class FileUrlPathTests
         Assert.AreEqual("C:/a\"%E9%C3%A9b", path.UrlPath);
     }
 
-    [TestMethod]
-    public void TryParse_PathAsIsNullUrl_ThrowsArgumentNullException()
-    {
-        Assert.ThrowsExactly<ArgumentNullException>(
-            () => FileUrlPath.TryParse(null!, pathAsIs: true, out _));
-    }
-
     // file://C:/dir/hello.txt is not a host named "C:" — curl 8.21.0 reads the authority
     // as the head of the path, transfers the file and exits 0. It therefore has to parse
     // to exactly what the three-slash spelling parses to.
     [TestMethod]
     public void TryParse_DriveLetterAuthority_KeepsItAsTheHeadOfThePath()
     {
-        var url = new Uri("file://C:/dir/hello.txt");
+        var url = CurlUrl.Parse("file://C:/dir/hello.txt");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
@@ -666,8 +687,8 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_DriveLetterAuthority_MatchesTheEmptyAuthorityForm()
     {
-        var twoSlashes = new Uri("file://C:/dir/hello.txt");
-        var threeSlashes = new Uri("file:///C:/dir/hello.txt");
+        var twoSlashes = CurlUrl.Parse("file://C:/dir/hello.txt");
+        var threeSlashes = CurlUrl.Parse("file:///C:/dir/hello.txt");
 
         bool parsedTwo = FileUrlPath.TryParse(twoSlashes, out var fromTwo);
         bool parsedThree = FileUrlPath.TryParse(threeSlashes, out var fromThree);
@@ -682,7 +703,7 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void With_NoChanges_CopiesAnEqualPath()
     {
-        bool parsed = FileUrlPath.TryParse(new Uri("file:///C:/dir/hello.txt"), out var path);
+        bool parsed = FileUrlPath.TryParse(CurlUrl.Parse("file:///C:/dir/hello.txt"), out var path);
 
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
@@ -696,7 +717,7 @@ public sealed class FileUrlPathTests
     [TestMethod]
     public void TryParse_LowercaseDriveLetterAuthority_KeepsItAsTheHeadOfThePath()
     {
-        var url = new Uri("file://d:/nope.txt");
+        var url = CurlUrl.Parse("file://d:/nope.txt");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
@@ -707,12 +728,12 @@ public sealed class FileUrlPathTests
     }
 
     // file://D|/nope.txt was measured at exit 37 quoting the path D|/nope.txt, bar and
-    // all. Uri.LocalPath would have rewritten the bar to a colon; curl does not, so the
-    // bar has to survive both halves of the pair.
+    // all. curl does not rewrite the bar to a colon, so the bar has to survive both
+    // halves of the pair.
     [TestMethod]
     public void TryParse_BarDriveLetterAuthority_KeepsTheBarUnrewritten()
     {
-        var url = new Uri("file://D|/nope.txt");
+        var url = CurlUrl.Parse("file://D|/nope.txt");
 
         bool parsed = FileUrlPath.TryParse(url, out var path);
 
@@ -723,21 +744,18 @@ public sealed class FileUrlPathTests
     }
 
     // The drive-letter exception is exactly two characters wide, a letter and then a colon
-    // or a bar: everything here was measured at exit 3 instead. The fourth authority curl
-    // rejects the same way, ab:, cannot be written as a test at all — new Uri("file://ab:/x")
-    // throws UriFormatException ("The hostname could not be parsed") long before this
-    // parser sees it, so there is no Uri to hand over.
+    // or a bar: everything here was measured at exit 3 instead, and CurlUrl rejects each
+    // before a handler runs.
     [TestMethod]
     [DataRow("file://c/x")]
     [DataRow("file://zz/x")]
     [DataRow("file://1/x")]
+    [DataRow("file://ab:/x")]
     [DataRow("file://example.com/x")]
-    public void TryParse_AuthorityThatIsNeitherADriveNorAnAcceptedHost_ReturnsFalse(
+    public void CurlUrlTryParse_AuthorityThatIsNeitherADriveNorAnAcceptedHost_ReturnsFalse(
         string candidate)
     {
-        var url = new Uri(candidate);
-
-        bool parsed = FileUrlPath.TryParse(url, out _);
+        bool parsed = CurlUrl.TryParse(candidate, pathAsIs: false, out _);
 
         Assert.IsFalse(parsed);
     }

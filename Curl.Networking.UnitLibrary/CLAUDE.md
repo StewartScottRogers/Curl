@@ -39,7 +39,10 @@ the console's to print. No type here constructs an `HttpClient`.
 `TcpConnector` fills `ConnectResult.Timings` and `LocalEndPoint` per ADR-0030: it takes
 `Started`, `NameResolved` and `Connected` from its `TimeProvider`, the local end point from
 the `DialedTcpConnection` that `ITcpDialer` returns, and `TlsHandshakeCompleted` from the
-timings `SslStreamTlsProvider` reports on its own `TimeProvider`.
+timings `SslStreamTlsProvider` reports on its own `TimeProvider`. Per ADR-0054 the provider
+also reports `ConnectResult.PeerCertificates`, the DER of every certificate the server sent
+(its own first, then the validation callback's `ChainPolicy.ExtraStore` in the order sent),
+and `TcpConnector` passes them on.
 
 `TcpConnector` tunnels through `ConnectTarget.Proxy` when it is an HTTP proxy
 (`ProxyKind.Http`, `Http10`) per ADR-0023: `HttpProxyTunnel` writes curl 8.21.0's CONNECT
@@ -47,6 +50,14 @@ request (its `User-Agent` and credential encoding from `HttpProxyTunnelOptions`)
 the reply one byte at a time, so the tunnel's bytes stay on the connection; TLS then runs
 over the tunnel for an https target. HTTPS and SOCKS proxies throw `NotSupportedException`
 until their tasks land.
+
+`TcpConnector` applies `--resolve` through `ResolveOverrides` and `--connect-to` through
+`ConnectToMappings`, both built from the verbatim option values and parsed as curl 8.21.0
+parses them (measured; BL-214). The first `--connect-to` mapping matching the URL's host
+and port gives the `ConnectDestination` that is resolved, dialled and named in the CONNECT
+request; TLS still verifies the URL's host. A `--resolve` entry for the host and port being
+resolved, the proxy's included, answers in place of `IDnsResolver`. An entry or a matching
+mapping that does not parse fails the connect with exit 49 and curl's message.
 
 Everything else takes the Abstractions contracts (`IDnsResolver`, `ITlsProvider`,
 `IConnection`, `IDatagramChannel`) or `ITcpDialer`, plus an injected `TimeProvider`, so the tests in

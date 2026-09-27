@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Gopher;
 
@@ -15,10 +16,9 @@ namespace Curl.Protocol.Gopher;
 /// fewer gives an empty selector. The fragment is never sent.
 /// </para>
 /// <para>
-/// The path is taken from <see cref="Uri.OriginalString" />, as UTF-8 bytes, rather than
-/// <see cref="Uri.PathAndQuery" />, because .NET unescapes encoded unreserved characters
-/// such as <c>%31</c> and has no query component for <c>gopher</c>, and either would move
-/// which two characters are removed.
+/// The path is read from <see cref="CurlUrl.OriginalString" />, as UTF-8 bytes, and its
+/// dot segments are removed here, counting only literal dots, so the two characters
+/// removed are the two written after the authority.
 /// </para>
 /// </remarks>
 internal static class GopherSelector
@@ -41,7 +41,7 @@ internal static class GopherSelector
     /// The decoded selector bytes, or <see langword="null" /> when it decodes to a NUL
     /// byte, which curl refuses with exit 3.
     /// </returns>
-    internal static byte[]? FromUrl(Uri url)
+    internal static byte[]? FromUrl(CurlUrl url)
     {
         byte[] pathAndQuery = Encoding.UTF8.GetBytes(ReadPathAndQuery(url.OriginalString.Trim()));
         if (pathAndQuery.Length <= PrefixLength)

@@ -183,5 +183,5 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     private static TransferContext EncodingContext(Stream output, HttpRequestOptions options, Stream? headerOutput = null) =>
-        new() { Url = new Uri(LoopbackUrl), Output = output, HeaderOutput = headerOutput, Http = options };
+        new() { Url = CurlUrl.Parse(LoopbackUrl), Output = output, HeaderOutput = headerOutput, Http = options };
 }

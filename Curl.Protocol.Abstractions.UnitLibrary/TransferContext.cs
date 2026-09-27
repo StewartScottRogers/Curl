@@ -15,7 +15,7 @@ public sealed class TransferContext : ITransferContext
         UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.OtherRead;
 
     /// <inheritdoc />
-    public required Uri Url { get; init; }
+    public required CurlUrl Url { get; init; }
 
     /// <inheritdoc />
     public required Stream Output { get; init; }
@@ -72,10 +72,22 @@ public sealed class TransferContext : ITransferContext
     public TimeSpan? MaxTime { get; init; }
 
     /// <inheritdoc />
+    public long? OperationStarted { get; init; }
+
+    /// <inheritdoc />
+    public ProxyEndpoint? Proxy { get; init; }
+
+    /// <inheritdoc />
     public HttpRequestOptions? Http { get; init; }
 
     /// <inheritdoc />
     public TimeProvider TimeProvider { get; init; } = TimeProvider.System;
+
+    /// <inheritdoc />
+    public ITransferEvents Events { get; init; } = NoTransferEvents.Instance;
+
+    /// <inheritdoc />
+    public ITransferProgress Progress { get; init; } = NoTransferProgress.Instance;
 
     /// <inheritdoc />
     public CancellationToken CancellationToken { get; init; }

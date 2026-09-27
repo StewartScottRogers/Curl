@@ -25,6 +25,13 @@ public sealed record TransferReport
     public int ProxyConnectResponseCode { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether the transfer was set to go through a proxy, forwarded
+    /// or tunnelled, even when connecting to it failed, the source of <c>%{proxy_used}</c>;
+    /// <see langword="false" /> for a direct transfer (ADR-0058).
+    /// </summary>
+    public bool UsedProxy { get; init; }
+
+    /// <summary>
     /// Gets the protocol version of the last response's status line, the source of
     /// <c>%{http_version}</c>; <see langword="null" /> for a non-HTTP transfer or before
     /// any response.
@@ -42,6 +49,16 @@ public sealed record TransferReport
     /// received, duplicates kept; empty when there was none.
     /// </summary>
     public IReadOnlyList<KeyValuePair<string, string>> ResponseHeaders { get; init; } = [];
+
+    /// <summary>
+    /// Gets every header line a handler synthesised for the header stream that curl's
+    /// header API does not hold, such as the <c>Content-Length</c>,
+    /// <c>Accept-ranges</c> and <c>Last-Modified</c> lines of a <c>file://</c> transfer,
+    /// name and value in the order written; empty when there was none. They count
+    /// towards <c>%{num_headers}</c> but, unlike <see cref="ResponseHeaders" />, are
+    /// never found by <c>%header{}</c>. See ADR-0052.
+    /// </summary>
+    public IReadOnlyList<KeyValuePair<string, string>> PseudoHeaders { get; init; } = [];
 
     /// <summary>
     /// Gets the last response's <c>Content-Type</c> value, the source of
@@ -118,4 +135,12 @@ public sealed record TransferReport
     /// <see langword="null" /> when the handler recorded none.
     /// </summary>
     public TransferTimings? Timings { get; init; }
+
+    /// <summary>
+    /// Gets the DER encoding of every certificate the server sent in the TLS handshake,
+    /// its own first, copied from <see cref="ConnectResult.PeerCertificates" />, the source
+    /// of <c>%{certs}</c> and <c>%{num_certs}</c> (ADR-0054); empty for a transfer without
+    /// TLS.
+    /// </summary>
+    public IReadOnlyList<ReadOnlyMemory<byte>> PeerCertificates { get; init; } = [];
 }

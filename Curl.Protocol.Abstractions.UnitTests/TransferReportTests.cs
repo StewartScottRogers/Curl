@@ -16,9 +16,11 @@ public sealed class TransferReportTests
 
         Assert.AreEqual(0, report.ResponseCode);
         Assert.AreEqual(0, report.ProxyConnectResponseCode);
+        Assert.IsFalse(report.UsedProxy);
         Assert.IsNull(report.HttpVersion);
         Assert.IsNull(report.Method);
         Assert.IsEmpty(report.ResponseHeaders);
+        Assert.IsEmpty(report.PseudoHeaders);
         Assert.IsNull(report.ContentType);
         Assert.IsNull(report.RedirectUrl);
         Assert.IsNull(report.EffectiveUrl);
@@ -31,6 +33,17 @@ public sealed class TransferReportTests
         Assert.IsNull(report.LocalEndPoint);
         Assert.IsNull(report.RemoteEndPoint);
         Assert.IsNull(report.Timings);
+        Assert.IsEmpty(report.PeerCertificates);
+    }
+
+    [TestMethod]
+    public void New_WithPeerCertificates_CarriesThem()
+    {
+        ReadOnlyMemory<byte>[] certificates = [new byte[] { 0x30, 0x00 }];
+
+        var report = new TransferReport { PeerCertificates = certificates };
+
+        Assert.AreSame(certificates, report.PeerCertificates);
     }
 
     [TestMethod]
@@ -41,6 +54,7 @@ public sealed class TransferReportTests
             new("Set-Cookie", "a=1"),
             new("Set-Cookie", "b=2"),
         ];
+        KeyValuePair<string, string>[] pseudoHeaders = [new("Accept-ranges", "bytes")];
         var localEndPoint = new IPEndPoint(IPAddress.Loopback, 54321);
         var remoteEndPoint = new IPEndPoint(IPAddress.Loopback, 80);
         var timings = new TransferTimings(0, null, 1, 2, 3, 4);
@@ -49,9 +63,11 @@ public sealed class TransferReportTests
         {
             ResponseCode = 302,
             ProxyConnectResponseCode = 200,
+            UsedProxy = true,
             HttpVersion = new Version(1, 1),
             Method = "POST",
             ResponseHeaders = headers,
+            PseudoHeaders = pseudoHeaders,
             ContentType = "text/html",
             RedirectUrl = "http://example.com/next",
             EffectiveUrl = "http://example.com/",
@@ -68,9 +84,11 @@ public sealed class TransferReportTests
 
         Assert.AreEqual(302, report.ResponseCode);
         Assert.AreEqual(200, report.ProxyConnectResponseCode);
+        Assert.IsTrue(report.UsedProxy);
         Assert.AreEqual(new Version(1, 1), report.HttpVersion);
         Assert.AreEqual("POST", report.Method);
         Assert.AreSame(headers, report.ResponseHeaders);
+        Assert.AreSame(pseudoHeaders, report.PseudoHeaders);
         Assert.AreEqual("text/html", report.ContentType);
         Assert.AreEqual("http://example.com/next", report.RedirectUrl);
         Assert.AreEqual("http://example.com/", report.EffectiveUrl);

@@ -55,7 +55,7 @@ public sealed class FileProtocolHandlerTests
     /// </summary>
     private const string DestinationWriteFailedMessage = "Failed sending data to the peer";
 
-    private static Uri FileUrl => new("file:///C:/dir/my%20file.txt");
+    private static CurlUrl FileUrl => CurlUrl.Parse("file:///C:/dir/my%20file.txt");
 
     private static string OsPath => NativePath("C:/dir/my file.txt");
 
@@ -215,7 +215,7 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         var context = new TransferContext
         {
-            Url = new Uri("file:///C:/dir/../nosuch.txt"),
+            Url = CurlUrl.Parse("file:///C:/dir/../nosuch.txt"),
             Output = new ChunkRecordingStream(),
         };
         var handler = new FileProtocolHandler(fileSystem);
@@ -235,7 +235,7 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         var context = new TransferContext
         {
-            Url = new Uri("file:///C:/dir/../nosuch.txt"),
+            Url = CurlUrl.Parse("file:///C:/dir/../nosuch.txt", pathAsIs: true),
             Output = new ChunkRecordingStream(),
             PathAsIs = true,
         };
@@ -278,10 +278,10 @@ public sealed class FileProtocolHandlerTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_RejectedHost_ReportsUrlMalformat()
+    public async Task ExecuteAsync_NotAFileUrl_ReportsUrlMalformat()
     {
         var fileSystem = new FakeFileSystem();
-        var context = new TransferContext { Output = new ChunkRecordingStream(), Url = new Uri("file://example.com/x") };
+        var context = new TransferContext { Output = new ChunkRecordingStream(), Url = CurlUrl.Parse("http://example.com/x") };
         var handler = new FileProtocolHandler(fileSystem);
 
         var result = await handler.ExecuteAsync(context);
@@ -290,13 +290,14 @@ public sealed class FileProtocolHandlerTests
         Assert.AreEqual("URL rejected: Bad file:// URL", result.ErrorMessage);
     }
 
-    // A host curl will not accept has to be refused before any open: an unsupported URL
-    // must not turn into a file system access.
+    // A URL this handler cannot read has to be refused before any open: it must not turn
+    // into a file system access. CurlUrl already refuses a host curl will not accept, so a
+    // URL of another scheme stands in for one.
     [TestMethod]
-    public async Task ExecuteAsync_RejectedHost_NeverTouchesTheFileSystem()
+    public async Task ExecuteAsync_NotAFileUrl_NeverTouchesTheFileSystem()
     {
         var fileSystem = new FakeFileSystem();
-        var context = new TransferContext { Output = new ChunkRecordingStream(), Url = new Uri("file://example.com/x") };
+        var context = new TransferContext { Output = new ChunkRecordingStream(), Url = CurlUrl.Parse("http://example.com/x") };
         var handler = new FileProtocolHandler(fileSystem);
 
         await handler.ExecuteAsync(context);
@@ -2528,20 +2529,22 @@ public sealed class FileProtocolHandlerTests
         Assert.IsEmpty(headers.ToArray());
     }
 
-    // A drive-letter authority is path text, so this reaches the open and fails there with
-    // exit 37 rather than being rejected as a host with exit 3. Two caveats. The bare
-    // file://C: the measured rule implies cannot be written as a test at all: new Uri throws
-    // UriFormatException ("A Dos path must be rooted") before the parser is reached, exactly
-    // as it does for file://ab:/x, so file://C:/ is the nearest expressible form. And the
-    // exit 37 itself is inference from the drive-letter rule rather than an observation -
-    // this URL was never run against curl 8.21.0.
+    // A drive-letter authority is path text, so these reach the open and fail there with
+    // exit 37 rather than being rejected as a host with exit 3. Measured 2026-09-27 against
+    // curl 8.21.0 with curl -sS -o /dev/null URL: file://C: and file:///C: print
+    // "curl: (37) Could not open file C:", file:///Q:dir/../x prints
+    // "curl: (37) Could not open file /x". file://C:/ is inferred from the same rule.
     [TestMethod]
-    public async Task ExecuteAsync_DriveLetterAuthorityWithNoFileName_ReportsExitThirtySeven()
+    [DataRow("file://C:", "C:")]
+    [DataRow("file:///C:", "C:")]
+    [DataRow("file:///Q:dir/../x", "/x")]
+    [DataRow("file://C:/", "C:/")]
+    public async Task ExecuteAsync_DriveLetterPathThatCannotBeOpened_ReportsExitThirtySeven(string url, string quoted)
     {
         var fileSystem = new FakeFileSystem();
         var context = new TransferContext
         {
-            Url = new Uri("file://C:/"),
+            Url = CurlUrl.Parse(url),
             Output = new ChunkRecordingStream(),
         };
         var handler = new FileProtocolHandler(fileSystem);
@@ -2549,7 +2552,28 @@ public sealed class FileProtocolHandlerTests
         var result = await handler.ExecuteAsync(context);
 
         Assert.AreEqual(CurlExitCode.FileCouldntReadFile, result.ExitCode);
-        Assert.AreEqual("Could not open file C:/", result.ErrorMessage);
+        Assert.AreEqual("Could not open file " + quoted, result.ErrorMessage);
+    }
+
+    // curl 8.21.0 exits 0 for file:///C:%2FWindows/win.ini and writes C:\Windows\win.ini
+    // (measured 2026-09-27): the escape decodes to the separator the drive needs.
+    [TestMethod]
+    public async Task ExecuteAsync_DriveFollowedByAnEscapedSlash_SendsTheFileTheEscapeSpells()
+    {
+        var fileSystem = new FakeFileSystem();
+        fileSystem.AddFile(NativePath("C:/Windows/win.ini"), Content);
+        var output = new ChunkRecordingStream();
+        var context = new TransferContext
+        {
+            Url = CurlUrl.Parse("file:///C:%2FWindows/win.ini"),
+            Output = output,
+        };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        var result = await handler.ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(Content, output.ToArray());
     }
 
     // -R/--remote-time: curl 8.21.0 applies a file:// source's modification time to the

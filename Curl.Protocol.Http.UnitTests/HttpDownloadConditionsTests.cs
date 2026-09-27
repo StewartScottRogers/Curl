@@ -133,7 +133,7 @@ public sealed class HttpDownloadConditionsTests
         bool noBody = false) =>
         new()
         {
-            Url = new Uri("http://127.0.0.1/f"),
+            Url = CurlUrl.Parse("http://127.0.0.1/f"),
             Output = Stream.Null,
             ResumeFrom = resumeFrom,
             Range = range,

@@ -9,7 +9,7 @@ namespace Curl.Protocol.Abstractions;
 [TestClass]
 public sealed class HttpAuthRequestTests
 {
-    private static readonly Uri OriginUrl = new("http://example.com/path?q=1");
+    private static readonly CurlUrl OriginUrl = CurlUrl.Parse("http://example.com/path?q=1");
 
     [TestMethod]
     public void Constructor_RoundTripsEveryMember()
@@ -41,7 +41,7 @@ public sealed class HttpAuthRequestTests
     [TestMethod]
     public void With_SettingEveryProperty_ReturnsCopyWithNewValuesAndLeavesOriginalUnchanged()
     {
-        var newUrl = new Uri("http://proxy.example:3128/");
+        var newUrl = CurlUrl.Parse("http://proxy.example:3128/");
         var newCredential = new NetworkCredential("proxyuser", "proxypass");
         var original = new HttpAuthRequest(
             "GET", OriginUrl, "/path?q=1", null, "token", HttpAuthSchemes.Bearer, IsProxy: false);

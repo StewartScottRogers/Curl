@@ -37,6 +37,20 @@ internal sealed class FakeTimeProvider(DateTimeOffset start) : TimeProvider
     }
 
     /// <inheritdoc />
+    /// <remarks>One tick per <see cref="TimeSpan" /> tick.</remarks>
+    public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+
+    /// <inheritdoc />
+    /// <remarks>The ticks the clock has moved since <c>start</c>, so elapsed time follows the timers.</remarks>
+    public override long GetTimestamp()
+    {
+        lock (gate)
+        {
+            return elapsed.Ticks;
+        }
+    }
+
+    /// <inheritdoc />
     /// <remarks>The timer fires once, at once; a period is not supported.</remarks>
     public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
     {

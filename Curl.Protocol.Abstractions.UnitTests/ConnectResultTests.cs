@@ -91,6 +91,7 @@ public sealed class ConnectResultTests
         Assert.AreSame(timings, result.Timings);
         Assert.IsNull(result.LocalEndPoint);
         Assert.AreEqual(0, result.ProxyConnectResponseCode);
+        Assert.IsEmpty(result.PeerCertificates);
     }
 
     [TestMethod]
@@ -104,6 +105,51 @@ public sealed class ConnectResultTests
         Assert.AreSame(timings, result.Timings);
         Assert.AreSame(localEndPoint, result.LocalEndPoint);
         Assert.AreEqual(200, result.ProxyConnectResponseCode);
+    }
+
+    [TestMethod]
+    public void Connected_WithPeerCertificates_CarriesThemInOrder()
+    {
+        ReadOnlyMemory<byte>[] certificates = [new byte[] { 0x30, 0x01 }, new byte[] { 0x30, 0x02 }];
+
+        var result = ConnectResult.Connected(new UnusedConnection(), null, null, 0, certificates);
+
+        Assert.AreSame(certificates, result.PeerCertificates);
+    }
+
+    [TestMethod]
+    public void Connected_WithoutReuseArguments_IsNotReusedAndNumberedZero()
+    {
+        var shortResult = ConnectResult.Connected(new UnusedConnection());
+        var longResult = ConnectResult.Connected(new UnusedConnection(), null, null, 0, null);
+
+        Assert.IsFalse(shortResult.IsReused);
+        Assert.AreEqual(0L, shortResult.ConnectionNumber);
+        Assert.IsFalse(longResult.IsReused);
+        Assert.AreEqual(0L, longResult.ConnectionNumber);
+    }
+
+    [TestMethod]
+    public void Connected_WithReuseArguments_CarriesThemAsGiven()
+    {
+        var result = ConnectResult.Connected(
+            new UnusedConnection(),
+            null,
+            isReused: true,
+            connectionNumber: 7);
+
+        Assert.IsTrue(result.IsReused);
+        Assert.AreEqual(7L, result.ConnectionNumber);
+    }
+
+    [TestMethod]
+    public void MarkReusable_OnConnectionThatDoesNotOverrideIt_DoesNotThrow()
+    {
+        IConnection connection = new UnusedConnection();
+
+        connection.MarkReusable();
+
+        Assert.IsFalse(connection.IsSecure);
     }
 
     [TestMethod]
@@ -122,9 +168,12 @@ public sealed class ConnectResultTests
     {
         var result = ConnectResult.Failed(CurlExitCode.CouldntConnect, "failed");
 
+        Assert.IsEmpty(result.PeerCertificates);
         Assert.IsNull(result.Timings);
         Assert.IsNull(result.LocalEndPoint);
         Assert.AreEqual(0, result.ProxyConnectResponseCode);
+        Assert.IsFalse(result.IsReused);
+        Assert.AreEqual(0L, result.ConnectionNumber);
     }
 
     private sealed class UnusedConnection : IConnection

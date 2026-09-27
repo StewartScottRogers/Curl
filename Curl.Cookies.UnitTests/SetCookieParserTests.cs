@@ -1,3 +1,5 @@
+using Curl.Protocol.Abstractions;
+
 namespace Curl.Cookies;
 
 /// <summary>
@@ -233,7 +235,7 @@ public sealed class SetCookieParserTests
     {
         string header = leadingSpace + "x=v; Path=/" + new string('p', pathLength);
 
-        Cookie? cookie = SetCookieParser.Parse(header, new Uri("http://localhost/"), DateTimeOffset.FromUnixTimeSeconds(Now));
+        Cookie? cookie = SetCookieParser.Parse(header, CurlUrl.Parse("http://localhost/"), DateTimeOffset.FromUnixTimeSeconds(Now));
 
         Assert.AreEqual(kept, cookie is not null);
     }
@@ -270,7 +272,7 @@ public sealed class SetCookieParserTests
     [TestMethod]
     public void Parse_NullArguments_Throw()
     {
-        Uri uri = new("http://localhost/");
+        CurlUrl uri = CurlUrl.Parse("http://localhost/");
 
         Assert.ThrowsExactly<ArgumentNullException>(() => SetCookieParser.Parse(null!, uri, DateTimeOffset.UnixEpoch));
         Assert.ThrowsExactly<ArgumentNullException>(() => SetCookieParser.Parse("a=1", null!, DateTimeOffset.UnixEpoch));
@@ -286,7 +288,7 @@ public sealed class SetCookieParserTests
 
     /// <summary>Parses the header as curl received it in the measurement, after <c>Set-Cookie:</c> and one space.</summary>
     private static Cookie? Parse(string url, string header) =>
-        SetCookieParser.Parse(" " + header, new Uri(url), DateTimeOffset.FromUnixTimeSeconds(Now));
+        SetCookieParser.Parse(" " + header, CurlUrl.Parse(url), DateTimeOffset.FromUnixTimeSeconds(Now));
 
     /// <summary>The fields curl's jar line carries, in its order, joined by <c>|</c> instead of tabs.</summary>
     private static string JarLine(Cookie cookie)

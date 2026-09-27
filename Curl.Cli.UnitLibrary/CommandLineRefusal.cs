@@ -335,18 +335,37 @@ public sealed class CommandLineRefusal
     /// <returns>The refusal.</returns>
     internal static CommandLineRefusal ConfigFileOptionRefused(string spelledOption, string file, int lineNumber, string option, CommandLineRefusal lineRefusal, bool errorsHidden)
     {
+        return new(
+            lineRefusal.ExitCode,
+            ConfigFileLineErrorLines(file, lineNumber, option, lineRefusal, errorsHidden),
+            spelledOption,
+            lineRefusal.Reason == UnknownOptionReason ? "found an unknown config option" : lineRefusal.Reason);
+    }
+
+    /// <summary>
+    /// The error lines curl 8.21.0 prints when line <paramref name="lineNumber"/> of a config file is
+    /// refused: the line refusal's own error lines, then
+    /// <c>curl: &lt;file&gt;:&lt;line&gt; config file option '&lt;option&gt;' &lt;reason&gt;</c>, then, when the
+    /// line failed to read a file, <c>curl: cannot read config from '&lt;file&gt;'</c>; the two lines of its
+    /// own wrapped at 79 columns and hidden when <paramref name="errorsHidden"/>.
+    /// </summary>
+    /// <param name="file">The file name as curl shows it.</param>
+    /// <param name="lineNumber">The line's number, counting only lines that are neither blank nor comments.</param>
+    /// <param name="option">The option as written on the line.</param>
+    /// <param name="lineRefusal">Why the line was refused.</param>
+    /// <param name="errorsHidden"><see langword="true"/> when <c>-s</c> without <c>-S</c> is in effect after the line.</param>
+    /// <returns>The lines, without terminators.</returns>
+    internal static IReadOnlyList<string> ConfigFileLineErrorLines(string file, int lineNumber, string option, CommandLineRefusal lineRefusal, bool errorsHidden)
+    {
         IReadOnlyList<string> readErrorLines = lineRefusal.ExitCode == CurlExitCode.ReadError
             ? ErrorMessageLines(errorsHidden, CannotReadConfigMessage(file))
             : [];
-        return new(
-            lineRefusal.ExitCode,
-            [
-                .. lineRefusal.ErrorLines,
-                .. ErrorMessageLines(errorsHidden, $"{file}:{lineNumber} config file option '{option}' {lineRefusal.Reason}"),
-                .. readErrorLines,
-            ],
-            spelledOption,
-            lineRefusal.Reason == UnknownOptionReason ? "found an unknown config option" : lineRefusal.Reason);
+        return
+        [
+            .. lineRefusal.ErrorLines,
+            .. ErrorMessageLines(errorsHidden, $"{file}:{lineNumber} config file option '{option}' {lineRefusal.Reason}"),
+            .. readErrorLines,
+        ];
     }
 
     private static string CannotReadConfigMessage(string file) => $"cannot read config from '{file}'";

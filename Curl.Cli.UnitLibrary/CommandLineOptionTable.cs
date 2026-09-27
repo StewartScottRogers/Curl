@@ -69,6 +69,7 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("trace-time", null, (options, on) => options.TraceTime = on),
         CommandLineOption.Value("stderr", null, SetStandardErrorFile),
         CommandLineOption.FileName("output", 'o', (options, file) => options.AddOutputFile(file)),
+        CommandLineOption.Value("upload-file", 'T', AddUploadFile),
         CommandLineOption.NegatableFlag("remote-name", 'O', (options, on) => options.PairRemoteName(on)),
         CommandLineOption.NegatableFlag("remote-name-all", null, (options, on) => options.RemoteNameAll = on),
         CommandLineOption.NegatableFlag("remote-header-name", 'J', (options, on) => options.RemoteHeaderName = on),
@@ -151,6 +152,7 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("fail-with-body", null, SetFailWithBody),
         CommandLineOption.NegatableFlag("fail-early", null, (options, on) => options.FailEarly = on),
         CommandLineOption.Value("config", 'K', ApplyConfigFile),
+        CommandLineOption.NegatableFlag("disable", 'q', IgnoreDisable),
         CommandLineOption.NegatableFlag("version", 'V', (options, on) => options.VersionRequested = on),
         CommandLineOption.NegatableFlag("compressed", null, (options, on) => options.Compressed = on),
         CommandLineOption.NegatableFlag("raw", null, (options, on) => options.Raw = on),
@@ -186,6 +188,16 @@ public static class CommandLineOptionTable
     public static IReadOnlyList<CommandLineOption> Rows => RowsInTableOrder;
 
     /// <summary>
+    /// Does nothing: <c>-q</c> / <c>--disable</c> acts only as the first argument, where
+    /// <see cref="CommandLineParser"/> reads it before any row, to skip the default config file. Anywhere
+    /// else, <c>--no-disable</c> and a <c>disable</c> line in a config file included, curl 8.21.0 accepts
+    /// and ignores it (measured 2026-09-27: <c>curl -s -q -V</c> and <c>curl -Vq</c> still read <c>.curlrc</c>).
+    /// </summary>
+    private static void IgnoreDisable(CommandLineOptions options, bool on)
+    {
+    }
+
+    /// <summary>
     /// Applies the <c>-K</c> / <c>--config</c> file the value names with <see cref="ConfigFileApplier"/>,
     /// after curl's warning for a file name that looks like a flag. An empty value is not refused as
     /// blank: curl 8.21.0 tries to read the empty file name and reports it unreadable (exit 26).
@@ -204,6 +216,18 @@ public static class CommandLineOptionTable
     {
         CommandLineOption.WarnWhenFileNameLooksLikeFlag(options, file);
         options.StandardErrorFile = file;
+        return null;
+    }
+
+    /// <summary>
+    /// Adds a <c>-T</c> / <c>--upload-file</c> value after curl's warning for a file name that looks like
+    /// a flag. An empty value is not refused as blank: curl 8.21.0 takes <c>-T ""</c> as no upload for
+    /// its URL (measured 2026-09-27).
+    /// </summary>
+    private static CommandLineRefusal? AddUploadFile(CommandLineOptions options, string file, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        CommandLineOption.WarnWhenFileNameLooksLikeFlag(options, file);
+        options.AddUploadFile(file);
         return null;
     }
 

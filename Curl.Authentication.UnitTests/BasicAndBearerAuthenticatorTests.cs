@@ -107,5 +107,5 @@ public sealed class BasicAndBearerAuthenticatorTests
     }
 
     private static HttpAuthRequest Request(NetworkCredential? credential, string? token, HttpAuthSchemes allowed) =>
-        new("GET", new Uri("http://127.0.0.1/"), "/", credential, token, allowed, IsProxy: false);
+        new("GET", CurlUrl.Parse("http://127.0.0.1/"), "/", credential, token, allowed, IsProxy: false);
 }

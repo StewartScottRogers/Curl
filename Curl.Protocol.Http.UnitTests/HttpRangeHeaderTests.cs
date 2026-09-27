@@ -34,5 +34,5 @@ public sealed class HttpRangeHeaderTests
     }
 
     private static TransferContext RangeContext(long? resumeFrom = null, ByteRange? range = null) =>
-        new() { Url = new Uri("http://127.0.0.1/f"), Output = Stream.Null, ResumeFrom = resumeFrom, Range = range };
+        new() { Url = CurlUrl.Parse("http://127.0.0.1/f"), Output = Stream.Null, ResumeFrom = resumeFrom, Range = range };
 }

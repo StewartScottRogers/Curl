@@ -47,7 +47,7 @@ public sealed class ProxySelector(Func<string, string?> readEnvironmentVariable)
     /// <returns><see langword="true" /> unless the chosen proxy text is unusable.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="url" /> is <see langword="null" />.</exception>
     public bool TrySelect(
-        Uri url,
+        CurlUrl url,
         string? proxyOption,
         string? noProxyOption,
         out ProxyEndpoint? proxy,
@@ -78,7 +78,7 @@ public sealed class ProxySelector(Func<string, string?> readEnvironmentVariable)
     /// <returns><see langword="true" /> unless the chosen proxy text is unusable.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="url" /> is <see langword="null" />.</exception>
     public bool TrySelect(
-        Uri url,
+        CurlUrl url,
         string? proxyOption,
         ProxyKind proxyOptionKind,
         string? noProxyOption,
@@ -89,7 +89,7 @@ public sealed class ProxySelector(Func<string, string?> readEnvironmentVariable)
 
         proxy = null;
         failure = null;
-        if (url.Scheme == Uri.UriSchemeFile
+        if (url.Scheme == "file"
             || NoProxyMatcher.Matches(HostName(url), noProxyOption ?? ReadNoProxy()))
         {
             return true;
@@ -108,19 +108,9 @@ public sealed class ProxySelector(Func<string, string?> readEnvironmentVariable)
 
     /// <summary>
     /// Returns the URL's host as curl compares it with an exemption list: an IPv6 address
-    /// loses its brackets and zone.
+    /// loses its brackets (<see cref="CurlUrl.Host" /> never carries the zone).
     /// </summary>
-    private static string HostName(Uri url)
-    {
-        string host = url.Host;
-        if (!host.StartsWith('['))
-        {
-            return host;
-        }
-
-        int end = host.IndexOfAny(['%', ']']);
-        return host[1..end];
-    }
+    private static string HostName(CurlUrl url) => url.Host.StartsWith('[') ? url.Host[1..^1] : url.Host;
 
     private string? ReadNoProxy() => Read("no_proxy") ?? Read("NO_PROXY");
 
@@ -128,7 +118,7 @@ public sealed class ProxySelector(Func<string, string?> readEnvironmentVariable)
     {
         string lowerName = scheme + "_proxy";
         string? proxyText = Read(lowerName);
-        if (proxyText is null && scheme != Uri.UriSchemeHttp)
+        if (proxyText is null && scheme != "http")
         {
             proxyText = Read(lowerName.ToUpperInvariant());
         }

@@ -2,7 +2,9 @@ namespace Curl.Console;
 
 /// <summary>
 /// Wraps a <c>Warning: </c> line exactly as curl 8.21.0's <c>warnf</c> (<c>voutf</c> in
-/// <c>src/tool_msgs.c</c>) does, at the terminal width <see cref="TerminalColumns" /> resolves.
+/// <c>src/tool_msgs.c</c>) does, at the terminal width <see cref="TerminalColumns" /> resolves;
+/// <see cref="WrapNoteText" /> wraps a <c>Note: </c> line as its <c>notef</c> does, through the
+/// same <c>voutf</c>.
 /// </summary>
 /// <remarks>
 /// The text after <see cref="Prefix" /> may take <c>columns - 9</c> characters a line. While
@@ -15,6 +17,9 @@ internal static class WarningLineWrapper
 {
     /// <summary>The prefix curl writes before each piece of a warning.</summary>
     internal const string Prefix = "Warning: ";
+
+    /// <summary>The prefix curl writes before each piece of a note.</summary>
+    internal const string NotePrefix = "Note: ";
 
     /// <summary>
     /// Wraps <paramref name="line" /> when it starts with <see cref="Prefix" />; any other
@@ -35,20 +40,39 @@ internal static class WarningLineWrapper
     /// Each piece prefixed with <see cref="Prefix" />, without terminators. When
     /// <paramref name="columns" /> is no wider than the prefix the text stays whole.
     /// </returns>
-    internal static IReadOnlyList<string> WrapText(string text, int columns)
+    internal static IReadOnlyList<string> WrapText(string text, int columns) =>
+        WrapPrefixed(Prefix, text, columns);
+
+    /// <summary>
+    /// Wraps the text of a note, the part after <see cref="NotePrefix" />, into prefixed lines,
+    /// by the same rule as <see cref="WrapText" /> with the text taking <c>columns - 6</c>
+    /// characters a line. Measured with the local curl 8.21.0 on 2026-09-27 (BL-243).
+    /// </summary>
+    /// <param name="text">The note text, without <see cref="NotePrefix" />.</param>
+    /// <param name="columns">The terminal width, from <see cref="TerminalColumns" />.</param>
+    /// <returns>Each piece prefixed with <see cref="NotePrefix" />, without terminators.</returns>
+    internal static IReadOnlyList<string> WrapNoteText(string text, int columns) =>
+        WrapPrefixed(NotePrefix, text, columns);
+
+    /// <summary>Wraps <paramref name="text" /> into lines each starting with <paramref name="prefix" />, as <c>voutf</c> does.</summary>
+    /// <param name="prefix">The prefix written before each piece.</param>
+    /// <param name="text">The text, without the prefix.</param>
+    /// <param name="columns">The terminal width.</param>
+    /// <returns>The prefixed pieces; the text stays whole when <paramref name="columns" /> is no wider than the prefix.</returns>
+    private static IReadOnlyList<string> WrapPrefixed(string prefix, string text, int columns)
     {
-        int width = columns - Prefix.Length;
+        int width = columns - prefix.Length;
         List<string> lines = [];
         int start = 0;
 
         while (width > 0 && text.Length - start > width)
         {
             int pieceLength = CutIndex(text, start, width) + 1;
-            lines.Add(Prefix + text.Substring(start, pieceLength));
+            lines.Add(prefix + text.Substring(start, pieceLength));
             start += pieceLength;
         }
 
-        lines.Add(Prefix + text[start..]);
+        lines.Add(prefix + text[start..]);
 
         return lines;
     }

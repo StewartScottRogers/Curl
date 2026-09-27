@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Globalization;
 using System.Text;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Http;
 
@@ -41,7 +42,7 @@ internal static class HttpRedirectLocation
     /// The resolved target, or <see langword="null" /> when the status is not 3xx or no
     /// <c>Location</c> header has a value.
     /// </returns>
-    internal static string? Find(Uri requestUrl, HttpResponseHead head)
+    internal static string? Find(CurlUrl requestUrl, HttpResponseHead head)
     {
         if (head.StatusLine.StatusCode is < 300 or >= 400)
         {
@@ -58,7 +59,7 @@ internal static class HttpRedirectLocation
     /// <param name="requestUrl">The URL the request was sent to.</param>
     /// <param name="location">The non-empty <c>Location</c> value, without surrounding blanks.</param>
     /// <returns>The target URL as curl reports it.</returns>
-    internal static string Resolve(Uri requestUrl, string location)
+    internal static string Resolve(CurlUrl requestUrl, string location)
     {
         if (HasScheme(location))
         {
@@ -72,8 +73,7 @@ internal static class HttpRedirectLocation
         }
 
         (string path, string query, string fragment) = Split(reference);
-        string origin = requestUrl.GetLeftPart(UriPartial.Authority);
-        return origin + TargetPath(requestUrl.AbsolutePath, path) + TargetQuery(requestUrl.Query, path, query) + fragment;
+        return HttpUrlText.Origin(requestUrl) + TargetPath(HttpUrlText.Path(requestUrl), path) + TargetQuery(HttpUrlText.Query(requestUrl), path, query) + fragment;
     }
 
     private static bool IsNonEmptyLocation(HttpResponseHeader header) =>
@@ -94,7 +94,8 @@ internal static class HttpRedirectLocation
     /// </summary>
     private static string NormalizeAbsolute(string url)
     {
-        if (!Uri.TryCreate(url, UriKind.Absolute, out _))
+        // curl follows with CURLU_ALLOW_SPACE, so a space does not make the target invalid.
+        if (!CurlUrl.TryParse(url.Replace(" ", "%20", StringComparison.Ordinal), pathAsIs: false, out _))
         {
             return url;
         }

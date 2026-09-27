@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using Curl.Protocol.Abstractions;
 
@@ -10,10 +11,9 @@ namespace Curl.Protocol.Mqtt;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <see cref="Uri.AbsolutePath" /> keeps escapes as written and re-escapes any <c>%</c>
-/// not followed by two hex digits as <c>%25</c>, so every <c>%</c> it returns starts a
-/// valid escape, and a stray one such as <c>%zz</c> decodes back to itself, as curl leaves
-/// it.
+/// <see cref="CurlUrl.AbsolutePath" /> keeps the path as written, so a <c>%</c> not
+/// followed by two hexadecimal digits, such as <c>%zz</c>, is copied as it is, as curl
+/// leaves it.
 /// </para>
 /// </remarks>
 internal static class MqttTopic
@@ -29,7 +29,7 @@ internal static class MqttTopic
     /// <exception cref="MqttTransferException">
     /// The path names no topic, or the topic is over 65535 bytes; both are exit 3.
     /// </exception>
-    internal static byte[] Decode(Uri url)
+    internal static byte[] Decode(CurlUrl url)
     {
         string path = url.AbsolutePath;
         if (path.Length <= 1)
@@ -49,19 +49,25 @@ internal static class MqttTopic
     private static byte[] PercentDecode(byte[] encoded)
     {
         List<byte> decoded = new(encoded.Length);
-        for (int index = 0; index < encoded.Length; index++)
+        int index = 0;
+        while (index < encoded.Length)
         {
-            if (encoded[index] == (byte)'%')
-            {
-                decoded.Add(Convert.FromHexString(Encoding.ASCII.GetString(encoded, index + 1, 2))[0]);
-                index += 2;
-            }
-            else
-            {
-                decoded.Add(encoded[index]);
-            }
+            decoded.Add(DecodeAt(encoded, ref index));
         }
 
         return [.. decoded];
+    }
+
+    private static byte DecodeAt(byte[] encoded, ref int index)
+    {
+        if (encoded[index] == '%'
+            && index + 2 < encoded.Length
+            && byte.TryParse(encoded.AsSpan(index + 1, 2), NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out byte escaped))
+        {
+            index += 3;
+            return escaped;
+        }
+
+        return encoded[index++];
     }
 }

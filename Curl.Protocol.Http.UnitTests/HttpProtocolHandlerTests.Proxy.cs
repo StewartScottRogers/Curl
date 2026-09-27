@@ -42,11 +42,63 @@ public sealed partial class HttpProtocolHandlerTests
             Assert.AreEqual(expected, connection.Written, $"Chunk size {chunkSize}");
             Assert.AreEqual("ok", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
             Assert.AreEqual(new ConnectTarget("127.0.0.1", 18183, false), connector.Targets.Single(), $"Chunk size {chunkSize}");
+            Assert.IsTrue(result.Report!.UsedProxy, $"Chunk size {chunkSize}");
             HttpAuthRequest proxyRequest = authenticator.Calls.Single(call => call.Request.IsProxy).Request;
             Assert.AreEqual(
-                new HttpAuthRequest("GET", new Uri("http://Example.com/a/b?c=d"), "/a/b?c=d", LoopbackProxy.Credential, null, HttpAuthSchemes.Basic, true),
+                new HttpAuthRequest("GET", CurlUrl.Parse("http://Example.com/a/b?c=d"), "/a/b?c=d", LoopbackProxy.Credential, null, HttpAuthSchemes.Basic, true),
                 proxyRequest,
                 $"Chunk size {chunkSize}");
+        }
+    }
+
+    /// <summary>
+    /// Measured: <c>curl -sS -x http://127.0.0.1:18332 ftp://example.com/f.txt</c> forwards the
+    /// <c>ftp</c> URL to the proxy as an HTTP GET with <c>:21</c> on <c>Host</c>, and the proxy's
+    /// <c>200</c> body <c>hello</c> is the output, exit 0 (BL-330 Notes, ADR-0056).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_FtpThroughProxy_ForwardsAGetAndWritesTheProxysBody()
+    {
+        const string expected = "GET ftp://example.com/f.txt HTTP/1.1\r\nHost: example.com:21\r\nUser-Agent: curl/8.21.0\r\n"
+            + "Accept: */*\r\nProxy-Connection: Keep-Alive\r\n\r\n";
+        ProxyEndpoint proxy = new(ProxyKind.Http, "127.0.0.1", 18332, null);
+        foreach (int chunkSize in ChunkSizes)
+        {
+            TurnTakingConnection connection = new(chunkSize, "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello");
+            QueueConnector connector = QueueConnector.For(connection);
+            MemoryStream output = new();
+
+            TransferResult result = await new HttpProtocolHandler(connector, new OriginAndProxyAuthenticator(null, null, null))
+                .ExecuteAsync(ProxyContext("ftp://example.com/f.txt", output, new HttpRequestOptions { ForwardProxy = proxy }));
+
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Assert.AreEqual(expected, connection.Written, $"Chunk size {chunkSize}");
+            Assert.AreEqual("hello", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
+            Assert.AreEqual(new ConnectTarget("127.0.0.1", 18332, false), connector.Targets.Single(), $"Chunk size {chunkSize}");
+        }
+    }
+
+    /// <summary>
+    /// Measured: <c>curl -x http://127.0.0.1:18296 --proxy-header "X-P: 1" -H "X-A: 1"
+    /// http://example.com/</c> sends the <c>--proxy-header</c> value after the <c>-H</c> value
+    /// (BL-296 Notes).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_HttpThroughProxyWithProxyHeaders_SendsThemAfterTheCustomHeaders()
+    {
+        const string expected = "GET http://example.com/ HTTP/1.1\r\nHost: example.com\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+            + "Proxy-Connection: Keep-Alive\r\nX-A: 1\r\nX-P: 1\r\n\r\n";
+        foreach (int chunkSize in ChunkSizes)
+        {
+            TurnTakingConnection connection = new(chunkSize, ProxyOkHead + "ok");
+            QueueConnector connector = QueueConnector.For(connection);
+            HttpRequestOptions options = new() { ForwardProxy = LoopbackProxy, Headers = ["X-A: 1"], ProxyHeaders = ["X-P: 1"] };
+
+            TransferResult result = await new HttpProtocolHandler(connector, new OriginAndProxyAuthenticator(null, null, null))
+                .ExecuteAsync(ProxyContext("http://example.com/", new MemoryStream(), options));
+
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Assert.AreEqual(expected, connection.Written, $"Chunk size {chunkSize}");
         }
     }
 
@@ -67,7 +119,7 @@ public sealed partial class HttpProtocolHandlerTests
             OriginAndProxyAuthenticator authenticator = new("Basic YTpi", null, "Basic dTpw");
             TransferContext context = new()
             {
-                Url = new Uri("http://x:y@EXample.com:80/A%20b?q#frag"),
+                Url = CurlUrl.Parse("http://x:y@EXample.com:80/A%20b?q#frag"),
                 Output = new MemoryStream(),
                 Credentials = new NetworkCredential("a", "b"),
                 Http = new HttpRequestOptions { ForwardProxy = LoopbackProxy },
@@ -124,7 +176,7 @@ public sealed partial class HttpProtocolHandlerTests
             TurnTakingConnection connection = new(chunkSize, ProxyOkHead);
             QueueConnector connector = QueueConnector.For(connection);
             HttpRequestOptions options = new() { ForwardProxy = new ProxyEndpoint(ProxyKind.Http10, "127.0.0.1", 18183, null) };
-            TransferContext context = new() { Url = new Uri("http://example.com/h"), Output = new MemoryStream(), NoBody = true, Http = options };
+            TransferContext context = new() { Url = CurlUrl.Parse("http://example.com/h"), Output = new MemoryStream(), NoBody = true, Http = options };
 
             TransferResult result = await Handler(connector).ExecuteAsync(context);
 
@@ -181,7 +233,8 @@ public sealed partial class HttpProtocolHandlerTests
     /// <summary>
     /// An <c>https</c> URL, <c>-p</c>, or a SOCKS proxy is tunnelled through by the connector:
     /// the handler asks it for the origin with <see cref="ConnectTarget.Proxy" /> set and sends
-    /// the origin form, with no proxy header and no proxy authorization asked for.
+    /// the origin form, with no proxy header, no <c>--proxy-header</c> value and no proxy
+    /// authorization asked for.
     /// </summary>
     [TestMethod]
     [DataRow("https://example.com/a?b", ProxyKind.Http, false, "example.com", 443, true, DisplayName = "https URL via HTTP proxy")]
@@ -203,7 +256,7 @@ public sealed partial class HttpProtocolHandlerTests
             TurnTakingConnection connection = new(chunkSize, ProxyOkHead + "ok");
             QueueConnector connector = QueueConnector.For(connection);
             OriginAndProxyAuthenticator authenticator = new(null, null, "Basic dTpw");
-            HttpRequestOptions options = new() { ForwardProxy = proxy, ProxyTunnel = proxyTunnel };
+            HttpRequestOptions options = new() { ForwardProxy = proxy, ProxyTunnel = proxyTunnel, ProxyHeaders = ["X-P: 1"] };
 
             TransferResult result = await new HttpProtocolHandler(connector, authenticator)
                 .ExecuteAsync(ProxyContext(url, new MemoryStream(), options));
@@ -212,9 +265,48 @@ public sealed partial class HttpProtocolHandlerTests
             Assert.AreEqual(expected, connection.Written, $"Chunk size {chunkSize}");
             Assert.AreEqual(new ConnectTarget(host, port, useTls) { Proxy = proxy }, connector.Targets.Single(), $"Chunk size {chunkSize}");
             Assert.IsFalse(authenticator.Calls.Any(call => call.Request.IsProxy), $"Chunk size {chunkSize}");
+            Assert.IsTrue(result.Report!.UsedProxy, $"Chunk size {chunkSize}");
         }
     }
 
+    /// <summary>
+    /// Measured: <c>curl -s -w "%{proxy_used}" http://127.0.0.1:18081/</c> prints <c>0</c> for
+    /// a direct transfer (BL-302 Notes).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_WithoutProxy_ReportsNoProxyUsed()
+    {
+        TurnTakingConnection connection = new(int.MaxValue, ProxyOkHead + "ok");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new OriginAndProxyAuthenticator(null, null, null))
+            .ExecuteAsync(ProxyContext("http://127.0.0.1:18081/", new MemoryStream(), new HttpRequestOptions()));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.IsFalse(result.Report!.UsedProxy);
+    }
+
+    /// <summary>
+    /// Measured: <c>curl -s -x http://127.0.0.1:1 -w "%{proxy_used} %{exitcode}"
+    /// http://example.test/</c> prints <c>1 7</c>, and the same through <c>socks5://127.0.0.1:1</c>:
+    /// the proxy counts as used even when connecting to it fails (BL-302 Notes).
+    /// </summary>
+    [TestMethod]
+    [DataRow(ProxyKind.Http, DisplayName = "forwarding HTTP proxy")]
+    [DataRow(ProxyKind.Socks5, DisplayName = "tunnelling SOCKS5 proxy")]
+    public async Task ExecuteAsync_ProxyConnectFails_ReportsTheProxyUsed(ProxyKind kind)
+    {
+        const string message = "Failed to connect to 127.0.0.1 port 1 after 0 ms: Could not connect to server";
+        QueueConnector connector = new(ConnectResult.Failed(CurlExitCode.CouldntConnect, message));
+        HttpRequestOptions options = new() { ForwardProxy = new ProxyEndpoint(kind, "127.0.0.1", 1, null) };
+
+        TransferResult result = await new HttpProtocolHandler(connector, new OriginAndProxyAuthenticator(null, null, null))
+            .ExecuteAsync(ProxyContext("http://example.test/", new MemoryStream(), options));
+
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.AreEqual(message, result.ErrorMessage);
+        Assert.IsTrue(result.Report!.UsedProxy);
+    }
+
     private static TransferContext ProxyContext(string url, Stream output, HttpRequestOptions options) =>
-        new() { Url = new Uri(url), Output = output, Http = options };
+        new() { Url = CurlUrl.Parse(url), Output = output, Http = options };
 }

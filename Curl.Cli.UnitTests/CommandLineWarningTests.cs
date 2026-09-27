@@ -29,4 +29,28 @@ public sealed class CommandLineWarningTests
     {
         Assert.AreEqual("Warning: Got more output options than URLs", CommandLineWarning.MoreOutputOptionsThanUrls);
     }
+
+    [TestMethod]
+    public void PostRequestedWithHead_IsCurlsExactTwoLines()
+    {
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "Warning: You can only select one HTTP request method! You asked for both POST ",
+                "Warning: (-d, --data) and HEAD (-I, --head).",
+            },
+            CommandLineWarning.PostRequestedWithHead.ToArray());
+    }
+
+    [TestMethod]
+    public void PostRequestedWithGet_IsCurlsExactTwoLines()
+    {
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "Warning: You can only select one HTTP request method! You asked for both POST ",
+                "Warning: (-d, --data) and GET (-G, --get).",
+            },
+            CommandLineWarning.PostRequestedWithGet.ToArray());
+    }
 }

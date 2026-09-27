@@ -4,11 +4,12 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Console;
 
 /// <summary>
-/// The write-only stream behind one <c>-o</c> / <c>--output</c> file, which opens the file
-/// on the first write rather than up front, as curl 8.21.0 does.
+/// The write-only stream behind one output file - an <c>-o</c> name, or a remote name from
+/// <c>-O</c> or <c>-J</c>, under any <c>--output-dir</c> - which opens the file on the first
+/// write rather than up front, as curl 8.21.0 does.
 /// </summary>
 /// <param name="fileSystem">Opens the file.</param>
-/// <param name="path">The file to open: the <c>-o</c> value, after <see cref="WindowsOutputFileNameSanitizer" /> on Windows.</param>
+/// <param name="path">The file to open, as the runner resolved it: rewritten by <see cref="WindowsOutputFileNameSanitizer" /> on Windows and put under <c>--output-dir</c>.</param>
 /// <param name="writeMode">
 /// <see cref="FileWriteMode.Truncate" /> for a whole transfer;
 /// <see cref="FileWriteMode.Append" /> when <c>-C</c> / <c>--continue-at</c> resumes it, as
@@ -53,6 +54,15 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
 
     private Stream? file;
     private long? failedWriteLength;
+
+    /// <summary>
+    /// Gets the file this stream writes: the path it was created with, until
+    /// <see cref="TryOpenUnderNameAsync" /> renames it for <c>-J</c>.
+    /// </summary>
+    internal string Path { get; private set; } = path;
+
+    /// <summary>Gets a value indicating whether the file has been opened.</summary>
+    internal bool IsOpen => file is not null;
 
     /// <summary>
     /// Gets curl's <c>Warning: Failed to open the file &lt;path&gt;: &lt;reason&gt;</c> line once an
@@ -113,7 +123,7 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
         if (target is null)
         {
             failedWriteLength ??= buffer.Length;
-            throw new IOException($"Could not create the output file {path}.");
+            throw new IOException($"Could not create the output file {Path}.");
         }
 
         await target.WriteAsync(buffer, cancellationToken).ConfigureAwait(false);
@@ -154,11 +164,57 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
     internal async ValueTask<bool> TryOpenNowAsync()
     {
         FileOpenResult opened = await fileSystem
-            .OpenForWriteAsync(path, writeMode, CreateMode, CancellationToken.None)
+            .OpenForWriteAsync(Path, writeMode, CreateMode, CancellationToken.None)
             .ConfigureAwait(false);
         file = opened.Content;
 
         return opened.IsOpen;
+    }
+
+    /// <summary>
+    /// Renames the file to the <c>-J</c> name a <c>Content-Disposition</c> header gave and opens
+    /// it now, as curl 8.21.0 does when it reads that header; a failure makes the transfer's
+    /// result curl's <c>client returned ERROR on write of N bytes</c>, N being the header line's
+    /// length, and sets <see cref="OpenFailureWarning" />.
+    /// </summary>
+    /// <param name="newPath">The file to open.</param>
+    /// <param name="headerLineLength">The length of the <c>Content-Disposition</c> line, CR LF included.</param>
+    /// <param name="cancellationToken">Cancels the open.</param>
+    /// <returns><see langword="true" /> when the file is open.</returns>
+    /// <remarks>
+    /// An empty name fails as curl's <c>fopen("")</c> does, with <c>No such file or directory</c>,
+    /// without asking the file system.
+    /// </remarks>
+    internal async ValueTask<bool> TryOpenUnderNameAsync(string newPath, int headerLineLength, CancellationToken cancellationToken)
+    {
+        Path = newPath;
+        if (newPath.Length == 0)
+        {
+            FailOpen(OutputFileOpenWarning.For(newPath, FileAccessStatus.NotFound), headerLineLength);
+
+            return false;
+        }
+
+        if (await TryOpenAsync(cancellationToken).ConfigureAwait(false) is null)
+        {
+            failedWriteLength = headerLineLength;
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Records that the file could not be opened for a reason found before the open, such as a
+    /// <c>-J</c> name that is already taken.
+    /// </summary>
+    /// <param name="warning">The warning line curl prints for it, or <see langword="null" /> for none.</param>
+    /// <param name="writeLength">The length curl's <c>client returned ERROR on write of N bytes</c> reports.</param>
+    internal void FailOpen(string? warning, int writeLength)
+    {
+        OpenFailureWarning = warning;
+        failedWriteLength = writeLength;
     }
 
     /// <inheritdoc />
@@ -187,13 +243,13 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
     private async ValueTask<Stream?> TryOpenAsync(CancellationToken cancellationToken)
     {
         FileOpenResult opened = await fileSystem
-            .OpenForWriteAsync(path, writeMode, CreateMode, cancellationToken)
+            .OpenForWriteAsync(Path, writeMode, CreateMode, cancellationToken)
             .ConfigureAwait(false);
         file = opened.Content;
 
         if (!opened.IsOpen)
         {
-            OpenFailureWarning = OutputFileOpenWarning.For(path, opened.Status);
+            OpenFailureWarning = OutputFileOpenWarning.For(Path, opened.Status);
         }
 
         return file;

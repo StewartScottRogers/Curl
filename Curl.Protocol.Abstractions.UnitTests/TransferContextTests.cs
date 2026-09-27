@@ -9,7 +9,7 @@ namespace Curl.Protocol.Abstractions;
 [TestClass]
 public sealed class TransferContextTests
 {
-    private static readonly Uri AnyUrl = new("tftp://example.com/file");
+    private static readonly CurlUrl AnyUrl = CurlUrl.Parse("tftp://example.com/file");
 
     [TestMethod]
     public void TransferContext_OnlyRequiredMembersSet_ReportsNotGivenForEveryOption()
@@ -35,8 +35,12 @@ public sealed class TransferContextTests
         Assert.AreEqual((UnixFileMode)0b110_100_100, context.CreateFileMode);
         Assert.IsNull(context.ConnectTimeout);
         Assert.IsNull(context.MaxTime);
+        Assert.IsNull(context.OperationStarted);
+        Assert.IsNull(context.Proxy);
         Assert.IsNull(context.Http);
         Assert.AreSame(TimeProvider.System, context.TimeProvider);
+        Assert.AreSame(NoTransferEvents.Instance, context.Events);
+        Assert.AreSame(NoTransferProgress.Instance, context.Progress);
         Assert.AreEqual(CancellationToken.None, context.CancellationToken);
     }
 
@@ -55,7 +59,10 @@ public sealed class TransferContextTests
         var credentials = new NetworkCredential("bob", "secret");
         string[] telnetOptions = ["TTYPE=vt100", "XDISPLOC=host:0"];
         var timeProvider = new StubTimeProvider();
+        var proxy = new ProxyEndpoint(ProxyKind.Http, "proxy.example", 3128, null);
         var http = new HttpRequestOptions { CustomMethod = "PATCH" };
+        var events = new StubTransferEvents();
+        var progress = new StubTransferProgress();
 
         var context = new TransferContext
         {
@@ -78,8 +85,12 @@ public sealed class TransferContextTests
             CreateFileMode = UnixFileMode.UserRead,
             ConnectTimeout = TimeSpan.FromSeconds(3),
             MaxTime = TimeSpan.FromMilliseconds(12500),
+            OperationStarted = 42,
+            Proxy = proxy,
             Http = http,
             TimeProvider = timeProvider,
+            Events = events,
+            Progress = progress,
             CancellationToken = cancellation.Token,
         };
 
@@ -103,8 +114,12 @@ public sealed class TransferContextTests
         Assert.AreEqual(UnixFileMode.UserRead, context.CreateFileMode);
         Assert.AreEqual(TimeSpan.FromSeconds(3), context.ConnectTimeout);
         Assert.AreEqual(TimeSpan.FromMilliseconds(12500), context.MaxTime);
+        Assert.AreEqual(42L, context.OperationStarted);
+        Assert.AreSame(proxy, context.Proxy);
         Assert.AreSame(http, context.Http);
         Assert.AreSame(timeProvider, context.TimeProvider);
+        Assert.AreSame(events, context.Events);
+        Assert.AreSame(progress, context.Progress);
         Assert.AreEqual(cancellation.Token, context.CancellationToken);
     }
 

@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.Net;
+using Curl.Core.Fakes;
 using Curl.Protocol.Abstractions;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 
@@ -35,7 +37,7 @@ public sealed class RedirectFollowerTests
         TransferResult redirect = Redirect(301, Next);
         ScriptedHandler handler = new(redirect);
 
-        TransferResult result = await Follow(handler, new TransferContext { Url = new Uri(First), Output = Stream.Null });
+        TransferResult result = await Follow(handler, new TransferContext { Url = CurlUrl.Parse(First), Output = Stream.Null });
 
         Assert.AreSame(redirect, result);
     }
@@ -63,7 +65,7 @@ public sealed class RedirectFollowerTests
         Assert.AreEqual(5, result.BytesTransferred);
         CollectionAssert.AreEqual(
             new[] { First, "http://127.0.0.1:18203/b", Next },
-            handler.Contexts.Select(context => context.Url.AbsoluteUri).ToArray());
+            handler.Contexts.Select(context => context.Url.OriginalString).ToArray());
         Assert.AreEqual(2, result.Report!.RedirectCount);
         Assert.AreEqual(Next, result.Report.EffectiveUrl);
         Assert.AreEqual(200, result.Report.ResponseCode);
@@ -427,7 +429,7 @@ public sealed class RedirectFollowerTests
         TransferResult result = await Follow(handler, Context(Location()));
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        Assert.AreEqual(target, handler.Contexts[1].Url.AbsoluteUri);
+        Assert.AreEqual(target, handler.Contexts[1].Url.OriginalString);
     }
 
     [TestMethod]
@@ -546,7 +548,7 @@ public sealed class RedirectFollowerTests
         ScriptedHandler handler = new(Redirect(302, Next), Ok(200, 0));
         TransferContext first = new()
         {
-            Url = new Uri(First),
+            Url = CurlUrl.Parse(First),
             Output = Stream.Null,
             PathAsIs = true,
             Http = Location(),
@@ -558,6 +560,62 @@ public sealed class RedirectFollowerTests
     }
 
     [TestMethod]
+    public async Task FollowAsync_MaxTimeRunsOutOnTheSecondHop_EndsTheChainWithExit28AtMaxTimeSinceTheFirstRequest()
+    {
+        // curl -sS -L -m 2 against a first hop that answers 302 after 1.5 s and a second hop
+        // that never answers: curl: (28) Operation timed out after 2006 milliseconds with 0
+        // bytes received, %{num_redirects} 1 (BL-299 Notes).
+        FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
+        ClockedHandler handler = new(TimeSpan.FromMilliseconds(1500), Redirect(302, Next));
+        TransferContext limited = new()
+        {
+            Url = CurlUrl.Parse(First),
+            Output = Stream.Null,
+            Http = Location(),
+            MaxTime = TimeSpan.FromSeconds(2),
+            TimeProvider = time,
+        };
+
+        TransferResult result = await Follow(handler, limited);
+
+        Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
+        Assert.AreEqual("Operation timed out after 2000 milliseconds with 0 bytes received", result.ErrorMessage);
+        Assert.AreEqual(1, result.Report!.RedirectCount);
+        Assert.AreEqual(TimeSpan.FromSeconds(2), TimeSpan.FromTicks(time.GetTimestamp()));
+        CollectionAssert.AreEqual(new[] { TimeSpan.FromMilliseconds(1500), TimeSpan.FromMilliseconds(500) }, time.Waits.ToArray());
+    }
+
+    [TestMethod]
+    public async Task FollowAsync_NextHop_CarriesTheChainStartAsOperationStarted()
+    {
+        ScriptedHandler handler = new(Redirect(302, "http://127.0.0.1:18203/b"), Redirect(302, Next), Ok(200, 0));
+        TransferContext first = Context(Location(), timeProvider: new MillisecondTimeProvider());
+
+        await Follow(handler, first);
+
+        Assert.IsNull(handler.Contexts[0].OperationStarted);
+        Assert.IsNotNull(handler.Contexts[1].OperationStarted);
+        Assert.AreEqual(handler.Contexts[1].OperationStarted, handler.Contexts[2].OperationStarted);
+    }
+
+    [TestMethod]
+    public async Task FollowAsync_OperationAlreadyStarted_NextHopKeepsThatStart()
+    {
+        ScriptedHandler handler = new(Redirect(302, Next), Ok(200, 0));
+        TransferContext first = new()
+        {
+            Url = CurlUrl.Parse(First),
+            Output = Stream.Null,
+            Http = Location(),
+            OperationStarted = 42,
+        };
+
+        await Follow(handler, first);
+
+        Assert.AreEqual(42L, handler.Contexts[1].OperationStarted);
+    }
+
+    [TestMethod]
     public async Task FollowAsync_NextHop_CarriesEveryOtherOptionUnchanged()
     {
         ScriptedHandler handler = new(Redirect(307, Next), Ok(200, 0));
@@ -566,7 +624,7 @@ public sealed class RedirectFollowerTests
         MemoryStream headers = new();
         TransferContext first = new()
         {
-            Url = new Uri(First),
+            Url = CurlUrl.Parse(First),
             Output = output,
             ResumeFrom = 4,
             Range = ByteRange.Bounded(1, 2),
@@ -621,7 +679,7 @@ public sealed class RedirectFollowerTests
         Stream? uploadStream = null) =>
         new()
         {
-            Url = new Uri(url),
+            Url = CurlUrl.Parse(url),
             Output = Stream.Null,
             Http = http,
             PostData = postData ? new byte[] { 1 } : null,
@@ -631,7 +689,7 @@ public sealed class RedirectFollowerTests
             TimeProvider = timeProvider ?? TimeProvider.System,
         };
 
-    private static Task<TransferResult> Follow(ScriptedHandler handler, ITransferContext context, RedirectPolicy? policy = null) =>
+    private static Task<TransferResult> Follow(IProtocolHandler handler, ITransferContext context, RedirectPolicy? policy = null) =>
         new RedirectFollower(new ProtocolDispatcher([handler]))
             .FollowAsync(context, policy ?? new RedirectPolicy())
             .AsTask();
@@ -688,6 +746,37 @@ public sealed class RedirectFollowerTests
             }
 
             return ValueTask.FromResult(script[Math.Min(Contexts.Count, script.Length) - 1]);
+        }
+    }
+
+    /// <summary>
+    /// Serves http as a server that takes <c>firstDelay</c> to answer the first request with
+    /// <c>firstResult</c> and never answers any later one, holding each later hop to
+    /// <c>-m</c> counted from <see cref="ITransferContext.OperationStarted" /> as the HTTP
+    /// handler does, and failing it with the HTTP handler's exit 28 message.
+    /// </summary>
+    private sealed class ClockedHandler(TimeSpan firstDelay, TransferResult firstResult) : IProtocolHandler
+    {
+        private int calls;
+
+        public IReadOnlyCollection<string> SupportedSchemes => ["http"];
+
+        public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context)
+        {
+            TimeProvider time = context.TimeProvider;
+            long started = context.OperationStarted ?? time.GetTimestamp();
+            if (calls++ == 0)
+            {
+                await Task.Delay(firstDelay, time);
+                return firstResult;
+            }
+
+            await Task.Delay(context.MaxTime!.Value - time.GetElapsedTime(started), time);
+            long elapsed = (long)time.GetElapsedTime(started).TotalMilliseconds;
+            return TransferResult.Failure(
+                CurlExitCode.OperationTimedOut,
+                string.Create(CultureInfo.InvariantCulture, $"Operation timed out after {elapsed} milliseconds with 0 bytes received"),
+                0);
         }
     }
 

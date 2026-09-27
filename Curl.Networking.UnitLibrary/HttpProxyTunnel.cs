@@ -16,15 +16,16 @@ namespace Curl.Networking;
 internal static class HttpProxyTunnel
 {
     /// <summary>
-    /// Builds the CONNECT request for <paramref name="target" /> through <paramref name="proxy" />.
+    /// Builds the CONNECT request for <paramref name="host" /> and <paramref name="port" /> through <paramref name="proxy" />.
     /// </summary>
-    /// <param name="target">The host and port the tunnel reaches.</param>
+    /// <param name="host">The host the tunnel reaches: the URL's, or the one a <c>--connect-to</c> mapping gives (measured).</param>
+    /// <param name="port">The port the tunnel reaches.</param>
     /// <param name="proxy">The proxy, whose kind picks HTTP/1.0 or HTTP/1.1 and whose credential becomes <c>Proxy-Authorization</c>.</param>
     /// <param name="options">The <c>User-Agent</c> and the credential encoding.</param>
     /// <returns>The request bytes, headers in curl's order, ending with the empty line.</returns>
-    public static byte[] BuildConnectRequest(ConnectTarget target, ProxyEndpoint proxy, HttpProxyTunnelOptions options)
+    public static byte[] BuildConnectRequest(string host, int port, ProxyEndpoint proxy, HttpProxyTunnelOptions options)
     {
-        var authority = FormatAuthority(target);
+        var authority = FormatAuthority(host, port);
         var version = proxy.Kind == ProxyKind.Http10 ? "HTTP/1.0" : "HTTP/1.1";
         var request = new StringBuilder()
             .Append(CultureInfo.InvariantCulture, $"CONNECT {authority} {version}\r\n")
@@ -119,10 +120,10 @@ internal static class HttpProxyTunnel
     private static bool IsEmptyLine(List<byte> header, int lineStart) =>
         header.Count - lineStart == 1 || (header.Count - lineStart == 2 && header[lineStart] == '\r');
 
-    private static string FormatAuthority(ConnectTarget target) =>
-        target.Host.Contains(':', StringComparison.Ordinal) && !target.Host.StartsWith('[')
-            ? $"[{target.Host}]:{target.Port}"
-            : $"{target.Host}:{target.Port}";
+    private static string FormatAuthority(string host, int port) =>
+        host.Contains(':', StringComparison.Ordinal) && !host.StartsWith('[')
+            ? $"[{host}]:{port}"
+            : $"{host}:{port}";
 
     private static int ParseStatusCode(List<byte> header)
     {

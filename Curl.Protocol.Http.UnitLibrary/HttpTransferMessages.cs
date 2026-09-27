@@ -140,6 +140,21 @@ internal static class HttpTransferMessages
     internal const string ChunkedUploadNeedsHttp11 = "Chunky upload is not supported by HTTP 1.0";
 
     /// <summary>
+    /// The exit 18 message for a <c>-T</c> upload whose <c>-C</c> offset is at or past the
+    /// source's length (measured, BL-332 Notes).
+    /// </summary>
+    internal const string FileAlreadyCompletelyUploaded = "File already completely uploaded";
+
+    /// <summary>
+    /// Formats the exit 26 message for a <c>-T</c> upload of an empty source resumed from a
+    /// <c>-C</c> offset (measured, BL-332 Notes).
+    /// </summary>
+    /// <param name="offset">The <c>-C</c> offset.</param>
+    /// <returns>The message, such as <c>Unable to resume from offset 3</c>.</returns>
+    internal static string UnableToResumeFrom(long offset) =>
+        string.Create(CultureInfo.InvariantCulture, $"Unable to resume from offset {offset}");
+
+    /// <summary>
     /// Formats the exit 63 message for a body that grew past the <c>--max-filesize</c> limit,
     /// after as many bytes as the limit allows were written.
     /// </summary>
@@ -241,7 +256,7 @@ internal static class HttpTransferMessages
     /// Formats the exit 28 message for a connect that the connect timeout or <c>-m</c> ended
     /// (measured, BL-174 Notes).
     /// </summary>
-    /// <param name="elapsedMilliseconds">Milliseconds since the transfer started.</param>
+    /// <param name="elapsedMilliseconds">Milliseconds since this request started.</param>
     /// <returns>The message, such as <c>Connection timed out after 1015 milliseconds</c>.</returns>
     internal static string ConnectionTimedOut(long elapsedMilliseconds) =>
         string.Create(CultureInfo.InvariantCulture, $"Connection timed out after {elapsedMilliseconds} milliseconds");
@@ -250,7 +265,9 @@ internal static class HttpTransferMessages
     /// Formats the exit 28 message for a transfer <c>-m</c> ended after it connected
     /// (measured, BL-174 Notes).
     /// </summary>
-    /// <param name="elapsedMilliseconds">Milliseconds since the transfer started.</param>
+    /// <param name="elapsedMilliseconds">
+    /// Milliseconds since the operation started: the first request of a redirect chain.
+    /// </param>
     /// <param name="received">The body bytes received so far.</param>
     /// <param name="expected">
     /// The body's Content-Length when the body being read has one, or <see langword="null" />.
@@ -302,4 +319,16 @@ internal static class HttpTransferMessages
     /// </returns>
     internal static string BodyStreamEndedEarly(long read, long needed) =>
         string.Create(CultureInfo.InvariantCulture, $"client mime read EOF fail, only {read}/{needed} of needed bytes read");
+
+    /// <summary>
+    /// Formats the exit 26 message for a <c>-T</c> upload source that failed a read, or ended,
+    /// before its known length was sent (measured, BL-184 Notes).
+    /// </summary>
+    /// <param name="read">How many upload bytes were read before the source stopped.</param>
+    /// <param name="needed">The upload's known length.</param>
+    /// <returns>
+    /// The message, such as <c>client read function EOF fail, only 65432/100000 of needed bytes read</c>.
+    /// </returns>
+    internal static string UploadEndedEarly(long read, long needed) =>
+        string.Create(CultureInfo.InvariantCulture, $"client read function EOF fail, only {read}/{needed} of needed bytes read");
 }

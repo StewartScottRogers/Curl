@@ -22,5 +22,5 @@ before it is written. Refusal and warning lines carry no line terminator; the co
 the newline.
 
 `UploadUrl` is pure string work: it never reads the file system, and it never parses,
-validates or normalises the URL. That is the URL layer's job, run where `UploadUrl` is
-called (ADR-0004).
+validates or normalises the URL (ADR-0004). `UploadTransferUrl` does that with `CurlUrl`
+after calling it, and still reads no file (ADR-0051).

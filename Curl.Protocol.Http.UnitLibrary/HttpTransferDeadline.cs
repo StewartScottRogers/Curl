@@ -6,8 +6,10 @@ namespace Curl.Protocol.Http;
 /// Holds one HTTP transfer to curl's two time limits on the transfer's
 /// <see cref="ITransferContext.TimeProvider" />: <c>-m</c>/<c>--max-time</c> for the whole
 /// transfer, and <c>--connect-timeout</c> (300 seconds when not given, or given as 0) for each
-/// connect within it. <c>-m 0</c>, like no <c>-m</c>, sets no limit. Both are measured from
-/// the moment the deadline is created, and a limit that passes cancels
+/// connect within it. <c>-m 0</c>, like no <c>-m</c>, sets no limit. <c>-m</c> is measured
+/// from <see cref="ITransferContext.OperationStarted" />, so a redirect chain shares one
+/// limit, or from the moment the deadline is created when that is not set; the connect
+/// timeout always from the moment the deadline is created. A limit that passes cancels
 /// <see cref="Token" /> (or the connect's token), which the handler turns into exit 28 with
 /// the message curl 8.21.0 prints (measured, BL-174 Notes).
 /// </summary>
@@ -22,6 +24,8 @@ internal sealed class HttpTransferDeadline : IDisposable
     private readonly TimeProvider timeProvider;
 
     private readonly long startedAt;
+
+    private readonly long operationStartedAt;
 
     private readonly CancellationToken transferCancellation;
 
@@ -40,11 +44,10 @@ internal sealed class HttpTransferDeadline : IDisposable
     {
         timeProvider = context.TimeProvider;
         startedAt = timeProvider.GetTimestamp();
+        operationStartedAt = context.OperationStarted ?? startedAt;
         transferCancellation = context.CancellationToken;
         connectTimeout = context.ConnectTimeout is { } given && given > TimeSpan.Zero ? given : DefaultConnectTimeout;
-        maxTimeElapsed = context.MaxTime is { } maxTime && maxTime > TimeSpan.Zero
-            ? new CancellationTokenSource(maxTime, timeProvider)
-            : null;
+        maxTimeElapsed = MaxTimeElapsed(context.MaxTime);
         transfer = maxTimeElapsed is null
             ? CancellationTokenSource.CreateLinkedTokenSource(transferCancellation)
             : CancellationTokenSource.CreateLinkedTokenSource(transferCancellation, maxTimeElapsed.Token);
@@ -65,9 +68,16 @@ internal sealed class HttpTransferDeadline : IDisposable
 
     /// <summary>
     /// Gets how many whole milliseconds have passed since the deadline was created, as the
-    /// timeout messages print it.
+    /// connect timeout message prints it: curl counts it from the start of this request.
     /// </summary>
     internal long ElapsedMilliseconds => (long)timeProvider.GetElapsedTime(startedAt).TotalMilliseconds;
+
+    /// <summary>
+    /// Gets how many whole milliseconds have passed since the operation started, as the
+    /// operation timeout message prints it: curl counts it from the first request of a
+    /// redirect chain (measured, BL-299 Notes).
+    /// </summary>
+    internal long OperationElapsedMilliseconds => (long)timeProvider.GetElapsedTime(operationStartedAt).TotalMilliseconds;
 
     /// <summary>
     /// Connects through <paramref name="connector" />, ending the connect with exit 28 and
@@ -90,6 +100,17 @@ internal sealed class HttpTransferDeadline : IDisposable
         {
             return ConnectResult.Failed(CurlExitCode.OperationTimedOut, HttpTransferMessages.ConnectionTimedOut(ElapsedMilliseconds));
         }
+    }
+
+    private CancellationTokenSource? MaxTimeElapsed(TimeSpan? maxTime)
+    {
+        if (maxTime is not { } limit || limit <= TimeSpan.Zero)
+        {
+            return null;
+        }
+
+        TimeSpan left = limit - timeProvider.GetElapsedTime(operationStartedAt, startedAt);
+        return new CancellationTokenSource(left > TimeSpan.Zero ? left : TimeSpan.Zero, timeProvider);
     }
 
     /// <inheritdoc />

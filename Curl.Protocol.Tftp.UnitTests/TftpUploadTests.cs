@@ -227,7 +227,7 @@ public sealed class TftpUploadTests
         await new TftpProtocolHandler(new RecordingDatagramConnector(DatagramOpenResult.Opened(channel)))
             .ExecuteAsync(new TransferContext
             {
-                Url = new Uri("tftp://h/dest.txt"),
+                Url = CurlUrl.Parse("tftp://h/dest.txt"),
                 Output = output ?? new MemoryStream(),
                 Upload = upload,
             });

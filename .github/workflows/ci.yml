@@ -4,7 +4,8 @@ name: CI
 
 on:
   push:
-    branches-ignore: [gource]
+    # factory/* holds lanes' partial work, which is not expected to pass.
+    branches-ignore: [gource, 'factory/**']
   pull_request:
   workflow_dispatch:
 

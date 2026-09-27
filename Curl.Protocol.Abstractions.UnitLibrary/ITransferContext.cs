@@ -7,10 +7,10 @@ namespace Curl.Protocol.Abstractions;
 public interface ITransferContext
 {
     /// <summary>
-    /// Gets the URL being transferred, as given on the command line and parsed into a
-    /// <see cref="System.Uri" />.
+    /// Gets the URL being transferred, as given on the command line and parsed as curl
+    /// parses it (<see cref="CurlUrl" />).
     /// </summary>
-    Uri Url { get; }
+    CurlUrl Url { get; }
 
     /// <summary>
     /// Gets the stream that received data is written to.
@@ -207,6 +207,33 @@ public interface ITransferContext
     TimeSpan? MaxTime { get; }
 
     /// <summary>
+    /// Gets the <see cref="TimeProvider.GetTimestamp" /> value on <see cref="TimeProvider" />
+    /// at which the whole operation began, or <see langword="null" /> when it begins with
+    /// this call.
+    /// </summary>
+    /// <remarks>
+    /// <c>-m</c> limits the whole operation, so a handler honouring <see cref="MaxTime" />
+    /// should count it from here, and print the operation's elapsed time from here, as curl
+    /// counts from its <c>t_startop</c>. The HTTP handler does; the TFTP handler still
+    /// counts <c>-m</c> from its own call. <c>Curl.Core</c>'s redirect
+    /// follower sets it on every hop after the first, so a <c>-L</c> chain shares one
+    /// <c>-m</c> (ADR-0040).
+    /// </remarks>
+    long? OperationStarted { get; }
+
+    /// <summary>
+    /// Gets the proxy selected for this transfer, or <see langword="null" /> when the
+    /// transfer connects directly.
+    /// </summary>
+    /// <remarks>
+    /// It is scheme-neutral: a handler that connects over TCP passes it to
+    /// <see cref="ConnectTarget" /> for its control connection, and the connector opens the
+    /// tunnel (ADR-0056). <see cref="HttpRequestOptions.ForwardProxy" /> is still the HTTP
+    /// handler's input; both are set from the one selection, so they cannot disagree.
+    /// </remarks>
+    ProxyEndpoint? Proxy { get; }
+
+    /// <summary>
     /// Gets the HTTP-only options, or <see langword="null" /> when no HTTP option was
     /// given.
     /// </summary>
@@ -222,6 +249,27 @@ public interface ITransferContext
     /// without a real delay.
     /// </summary>
     TimeProvider TimeProvider { get; }
+
+    /// <summary>
+    /// Gets where the handler and its connector report transfer events for <c>-v</c>,
+    /// <c>--trace</c> and <c>--trace-ascii</c>. Never <see langword="null" />.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="NoTransferEvents.Instance" /> when nobody is listening. A handler that
+    /// connects passes it on as <see cref="ConnectTarget.Events" /> (ADR-0046).
+    /// </remarks>
+    ITransferEvents Events { get; }
+
+    /// <summary>
+    /// Gets where the handler reports how far the transfer has got, for the progress meter.
+    /// Never <see langword="null" />.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="NoTransferProgress.Instance" /> when nobody is listening. A handler calls
+    /// <see cref="ITransferProgress.ReportTransferStarted" /> once it is past connect or open,
+    /// and may report running byte totals (ADR-0045).
+    /// </remarks>
+    ITransferProgress Progress { get; }
 
     /// <summary>
     /// Gets the token that cancels this transfer.

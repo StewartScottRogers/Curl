@@ -201,6 +201,33 @@ public sealed class GopherProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ContextWithProxy_TunnelsToTheOriginOnPort70ThroughThatProxy()
+    {
+        FakeConnector connector = FakeConnector.For(new ScriptedConnection());
+        var proxy = new ProxyEndpoint(ProxyKind.Http, "proxy.example", 3128, null);
+        var context = new TransferContext
+        {
+            Url = CurlUrl.Parse("gopher://example.com/"),
+            Output = new MemoryStream(),
+            Proxy = proxy,
+        };
+
+        await new GopherProtocolHandler(connector).ExecuteAsync(context);
+
+        CollectionAssert.AreEqual(new[] { new ConnectTarget("example.com", 70, false) { Proxy = proxy } }, connector.Targets);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ContextWithoutProxy_ConnectsDirectly()
+    {
+        FakeConnector connector = FakeConnector.For(new ScriptedConnection());
+
+        await new GopherProtocolHandler(connector).ExecuteAsync(Context("gopher://example.com/"));
+
+        Assert.IsNull(connector.Targets.Single().Proxy);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ExplicitPort_ConnectsToThatPort()
     {
         FakeConnector connector = FakeConnector.For(new ScriptedConnection());
@@ -354,7 +381,7 @@ public sealed class GopherProtocolHandlerTests
         ScriptedConnection connection = new(MeasuredReply);
         TransferContext context = new()
         {
-            Url = new Uri("gopher://h/"),
+            Url = CurlUrl.Parse("gopher://h/"),
             Output = new MemoryStream(),
             CancellationToken = cancellation.Token,
         };
@@ -375,5 +402,5 @@ public sealed class GopherProtocolHandlerTests
     }
 
     private static TransferContext Context(string url, Stream? output = null) =>
-        new() { Url = new Uri(url), Output = output ?? new MemoryStream() };
+        new() { Url = CurlUrl.Parse(url), Output = output ?? new MemoryStream() };
 }

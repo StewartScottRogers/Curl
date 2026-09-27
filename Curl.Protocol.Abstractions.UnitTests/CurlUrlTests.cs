@@ -30,6 +30,42 @@ public sealed class CurlUrlTests
     }
 
     [TestMethod]
+    public void Parse_WithAUrlCurlAccepts_ReturnsItParsed()
+    {
+        CurlUrl url = CurlUrl.Parse("http://example.com/a/../b");
+
+        Assert.AreEqual("/b", url.AbsolutePath);
+    }
+
+    [TestMethod]
+    public void Parse_WithPathAsIs_KeepsTheDotSegments()
+    {
+        CurlUrl url = CurlUrl.Parse("http://example.com/a/../b", pathAsIs: true);
+
+        Assert.AreEqual("/a/../b", url.AbsolutePath);
+    }
+
+    [TestMethod]
+    public void Parse_WithAUrlCurlRejects_ThrowsFormatException()
+    {
+        var exception = Assert.ThrowsExactly<FormatException>(() => CurlUrl.Parse("http://exa mple.com/"));
+
+        Assert.AreEqual("curl rejects the URL \"http://exa mple.com/\".", exception.Message);
+    }
+
+    [TestMethod]
+    public void Equals_WithTheSameTextParsedTwice_IsTrue()
+    {
+        Assert.AreEqual(CurlUrl.Parse("http://example.com/a"), CurlUrl.Parse("http://example.com/a"));
+    }
+
+    [TestMethod]
+    public void Equals_WithTheSameTextParsedWithAndWithoutPathAsIs_IsFalse()
+    {
+        Assert.AreNotEqual(CurlUrl.Parse("http://example.com/a/../b"), CurlUrl.Parse("http://example.com/a/../b", pathAsIs: true));
+    }
+
+    [TestMethod]
     public void TryParse_WhenRejected_ReturnsFalseAndNull()
     {
         bool parsed = CurlUrl.TryParse("http://a b/", pathAsIs: false, out CurlUrl? url);

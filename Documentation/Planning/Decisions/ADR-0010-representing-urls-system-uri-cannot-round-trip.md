@@ -176,6 +176,35 @@ against curl 8.21.0 (`/mingw64/bin/curl`, the Windows reference, ADR-0018) with
   are `null` when the separator is absent, as `curl_url_get` distinguishes them;
   `Port` is -1 for a scheme with no default port, as `Uri.Port` is.
 
+### Switch decisions taken under BL-294
+
+Decided by Claude under Stewart's delegation (BL-294, 2026-09-27). Measured against curl
+8.21.0 (`/mingw64/bin/curl`, ADR-0018); the commands and results are in BL-294's Notes.
+
+- **`CurlUrl` is a record.** Two values are equal when every part is, as two `Uri`
+  values for the same text were; tests compare contexts and requests by value.
+  `CurlUrl.Parse` is the throwing twin of `TryParse`, for text known to be a URL.
+- **The HTTP request target follows curl, not `Uri`.** curl sent `http://h/ä?ö=1` as
+  `GET /%E4?`, the raw byte `0xF6`, `=1`: bytes above `0x7F` are percent-encoded in the
+  path and sent as they are in the query. `Uri.PathAndQuery` encoded both. Curl now
+  encodes the path's UTF-8 and sends the query's UTF-8 bytes unencoded
+  (`HttpUrlText`). The bytes curl had were the console's code page; Curl uses UTF-8,
+  for the reason given above for `IdnHost`.
+- **The host keeps its case.** The `Host` line already did; the connect target, the
+  cookie host and redirect origins now use `CurlUrl.Host`/`IdnHost` as written, where
+  `Uri` lower-cased them. DNS names are case-insensitive, and curl does the same.
+- **A `file://` host curl rejects ends with the generic exit-3 line.** `CurlUrl`
+  rejects `file://example.com/x` before the `file` handler runs, so Curl prints
+  `URL rejected: Malformed input to a URL function`, as BL-294's acceptance criteria
+  require. curl prints `URL rejected: Bad file:// URL` for it, and
+  `Unsupported number of slashes following scheme` for `http:////h/`; carrying curl's
+  specific reason out of `CurlUrl.TryParse` is follow-up work (see BL-294's Notes).
+  `FileUrlPath` no longer checks the host itself: every `file` `CurlUrl` has an empty,
+  `localhost`, `127.0.0.1` or drive-letter authority.
+- **The `dict` and `mqtt` decoders copy a stray `%`.** `Uri.AbsolutePath` turned one
+  into `%25`; `CurlUrl.AbsolutePath` keeps it as typed, so each decoder now decodes a
+  `%` only before two hexadecimal digits, as curl's `Curl_urldecode` does.
+
 ## The options compared
 
 ### Option 1 — Replace: a curl-style URL type

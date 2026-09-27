@@ -63,13 +63,13 @@ public sealed class HttpRequestBodyWriterTests
     [TestMethod]
     public async Task WriteAsync_StreamOfKnownLength_ReadsNoFurtherThanItsLength()
     {
-        FailingReadStream stream = new(new byte[HttpRequestBodyWriter.ReadSize + 10], int.MaxValue, new IOException("Not reached."));
+        FailingReadStream stream = new(new byte[HttpRequestBodyWriter.UploadBufferSize + 10], int.MaxValue, new IOException("Not reached."));
 
-        (string written, long count) = await WriteAsync(new StreamBody(stream, HttpRequestBodyWriter.ReadSize + 5, "a/b"), false);
+        (string written, long count) = await WriteAsync(new StreamBody(stream, HttpRequestBodyWriter.UploadBufferSize + 5, "a/b"), false);
 
-        Assert.AreEqual(HttpRequestBodyWriter.ReadSize + 5, written.Length);
-        Assert.AreEqual(HttpRequestBodyWriter.ReadSize + 5L, count);
-        CollectionAssert.AreEqual(new[] { HttpRequestBodyWriter.ReadSize, 5 }, stream.RequestedReads);
+        Assert.AreEqual(HttpRequestBodyWriter.UploadBufferSize + 5, written.Length);
+        Assert.AreEqual(HttpRequestBodyWriter.UploadBufferSize + 5L, count);
+        CollectionAssert.AreEqual(new[] { HttpRequestBodyWriter.UploadBufferSize, 5 }, stream.RequestedReads);
     }
 
     [TestMethod]
@@ -87,6 +87,58 @@ public sealed class HttpRequestBodyWriterTests
         Assert.AreEqual("client mime read EOF fail, only 207/100207 of needed bytes read", failure.Message);
         Assert.AreEqual(207L, writer.BytesWritten);
         Assert.HasCount(207, connection.Written);
+    }
+
+    [TestMethod]
+    [DataRow(0, 100000, DisplayName = "every byte locked: 0/100000")]
+    [DataRow(65432, 100000, DisplayName = "locked from 70000: 65432/100000")]
+    [DataRow(130968, 200000, DisplayName = "locked from 140000: 130968/200000")]
+    public async Task WriteAsync_UploadFailsARead_FailsWithExit26AndTheMeasuredClientReadFunctionMessage(int readable, int length)
+    {
+        // curl -T big.bin with a locked tail and a 104-byte head (BL-184 Notes).
+        FailingReadStream stream = new(new byte[readable], int.MaxValue, new IOException("Lock violation."), length);
+        HttpRequestBodyWriter writer = new(new ScriptedConnection([], 1)) { SharedHeadLength = 104, IsUpload = true };
+
+        HttpTransferException failure = await Assert.ThrowsExactlyAsync<HttpTransferException>(
+            async () => await writer.WriteAsync(new StreamBody(stream, length, string.Empty), false, CancellationToken.None));
+
+        Assert.AreEqual(CurlExitCode.ReadError, failure.ExitCode);
+        Assert.AreEqual($"client read function EOF fail, only {readable}/{length} of needed bytes read", failure.Message);
+    }
+
+    [TestMethod]
+    public async Task WriteAsync_HeadSharesTheBuffer_FirstReadTakesWhatTheHeadLeaves()
+    {
+        FailingReadStream stream = new(new byte[200000], int.MaxValue, new IOException("Not reached."), 200000);
+        HttpRequestBodyWriter writer = new(new ScriptedConnection([], 1)) { SharedHeadLength = 104 };
+
+        await writer.WriteAsync(new StreamBody(stream, 200000, "a/b"), false, CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { 65432, 65536, 65536, 3496 }, stream.RequestedReads);
+        Assert.AreEqual(104, writer.SharedHeadLength);
+    }
+
+    [TestMethod]
+    public async Task WriteAsync_ChunkedWithSharedHead_ReadsWhatTheHeadAndChunkFramingLeave()
+    {
+        // curl -H Expect: -T - with 200000 bytes and a 108-byte head sent chunks 65416, 65524, 65524, 3536.
+        FailingReadStream stream = new(new byte[200000], int.MaxValue, new IOException("End."));
+        HttpRequestBodyWriter writer = new(new ScriptedConnection([], 1)) { SharedHeadLength = 108 };
+
+        await writer.WriteAsync(new StreamBody(stream, null, string.Empty), true, CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { 65416, 65524, 65524, 65524, 65524 }, stream.RequestedReads);
+    }
+
+    [TestMethod]
+    public async Task WriteAsync_HeadFillsTheBuffer_FirstReadIsAWholeOne()
+    {
+        FailingReadStream stream = new(new byte[3], int.MaxValue, new IOException("End."));
+        HttpRequestBodyWriter writer = new(new ScriptedConnection([], 1)) { SharedHeadLength = HttpRequestBodyWriter.UploadBufferSize };
+
+        await writer.WriteAsync(new StreamBody(stream, null, string.Empty), true, CancellationToken.None);
+
+        Assert.AreEqual(HttpRequestBodyWriter.UploadBufferSize - HttpRequestBodyWriter.ChunkFramingReserve, stream.RequestedReads[0]);
     }
 
     [TestMethod]

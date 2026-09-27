@@ -10,7 +10,8 @@ namespace Curl.Conformance;
 /// request's <c>Authorization:</c> header and by a previous reply's <c>swsbounce</c>; part 0 is
 /// <c>&lt;reply&gt;&lt;data&gt;</c> and part N is <c>&lt;dataN&gt;</c>, or <c>&lt;connect&gt;</c> and
 /// <c>&lt;connectN&gt;</c> for a <c>CONNECT host:port</c> request. The part is read as sws's
-/// <c>getpart</c> reads it: base64-decoded when it has a <c>base64</c> attribute, with its last
+/// <c>getpart</c> reads it after <c>runtests.pl</c>'s <c>prepro</c> has forced the line endings
+/// its <c>crlf</c> attribute asks for: base64-decoded when it has a <c>base64</c> attribute, with its last
 /// byte cut when it has <c>nonewline</c>.
 /// </summary>
 /// <remarks>
@@ -130,20 +131,7 @@ internal sealed class SwsHttpReplySelector(UpstreamTestCase testCase, SwsServerC
             return [];
         }
 
-        byte[] bytes = part.Attributes.ContainsKey("base64") ? DecodeBase64(part.Content.Span) : part.Content.ToArray();
+        byte[] bytes = UpstreamTestPartBodies.Decoded(part);
         return part.Attributes.ContainsKey("nonewline") && bytes.Length > 0 ? bytes[..^1] : bytes;
-    }
-
-    // sws sends nothing when a part does not decode.
-    private static byte[] DecodeBase64(ReadOnlySpan<byte> content)
-    {
-        try
-        {
-            return Convert.FromBase64String(Encoding.Latin1.GetString(content));
-        }
-        catch (FormatException)
-        {
-            return [];
-        }
     }
 }

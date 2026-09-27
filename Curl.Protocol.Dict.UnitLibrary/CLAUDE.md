@@ -14,7 +14,9 @@ Never construct a `Socket`, `SslStream` or `HttpClient` here. The seam is
 `IConnector` (ADR-0005): `DictProtocolHandler` takes one in its constructor and
 asks it for the `IConnection` to each URL's host and port (2628 by default), so
 the tests in the matching `.UnitTests` project drive this code from a scripted
-byte stream with no network.
+byte stream with no network. A transfer proxy (`ITransferContext.Proxy`) goes
+into that `ConnectTarget`, and the connector tunnels through it (ADR-0056); the
+handler holds no proxy code.
 
 ## Layout
 

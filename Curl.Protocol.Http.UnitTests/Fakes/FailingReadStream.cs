@@ -7,7 +7,11 @@ namespace Curl.Protocol.Http.Fakes;
 /// <param name="content">The bytes read before the failure.</param>
 /// <param name="readSize">The most bytes one read returns; 1 or more.</param>
 /// <param name="failure">What the first read past <paramref name="content" /> throws.</param>
-public sealed class FailingReadStream(byte[] content, int readSize, Exception failure) : Stream
+/// <param name="length">
+/// The length the stream reports, which makes it seekable as a file on disk is; or
+/// <see langword="null" /> for a stream that cannot seek, as standard input.
+/// </param>
+public sealed class FailingReadStream(byte[] content, int readSize, Exception failure, long? length = null) : Stream
 {
     private int offset;
 
@@ -20,18 +24,18 @@ public sealed class FailingReadStream(byte[] content, int readSize, Exception fa
     public override bool CanRead => true;
 
     /// <inheritdoc />
-    public override bool CanSeek => false;
+    public override bool CanSeek => length is not null;
 
     /// <inheritdoc />
     public override bool CanWrite => false;
 
     /// <inheritdoc />
-    public override long Length => throw new NotSupportedException();
+    public override long Length => length ?? throw new NotSupportedException();
 
     /// <inheritdoc />
     public override long Position
     {
-        get => throw new NotSupportedException();
+        get => length is null ? throw new NotSupportedException() : offset;
         set => throw new NotSupportedException();
     }
 

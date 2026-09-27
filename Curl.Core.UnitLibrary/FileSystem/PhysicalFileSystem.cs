@@ -22,10 +22,12 @@ namespace Curl.Core.FileSystem;
 /// lets out is the <see cref="OperationCanceledException" /> of a cancelled token.
 /// </para>
 /// <para>
-/// A read open is seekable for a regular file. A character device or a FIFO - such as
-/// <c>/dev/stdin</c> - opens as a stream that cannot seek, reporting a length of zero,
-/// just as curl's <c>fstat</c> of one does; the handler answers an offset on such a
-/// source with exit 36 rather than seeking it.
+/// A read open is seekable for a regular file. A handle the operating system cannot seek -
+/// a FIFO, a pipe behind <c>/dev/stdin</c>, or <c>NUL</c> on Windows - opens as a stream
+/// that cannot seek, reporting a length of zero, just as curl's <c>fstat</c> of one does;
+/// the handler answers an offset on such a source with exit 36 rather than seeking it.
+/// <c>/dev/null</c> on Linux and macOS accepts <c>lseek</c>, so it opens seekable, still
+/// with the length zero its <c>fstat</c> reports.
 /// </para>
 /// <para>
 /// On Windows a device such as <c>NUL</c> has no last-write time the operating system

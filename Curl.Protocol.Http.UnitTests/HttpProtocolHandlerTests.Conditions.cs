@@ -412,5 +412,5 @@ public sealed partial class HttpProtocolHandlerTests
     private static TransferContext ConditionContext(int port, Stream output) =>
         new() { Url = ConditionUrl(port), Output = output };
 
-    private static Uri ConditionUrl(int port) => new($"http://127.0.0.1:{port}/f");
+    private static CurlUrl ConditionUrl(int port) => CurlUrl.Parse($"http://127.0.0.1:{port}/f");
 }

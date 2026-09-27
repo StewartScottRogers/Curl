@@ -13,6 +13,8 @@ handler with `ConnectTarget.UseTls` true)
 
 **Seam:** `IConnector` (ADR-0005). The handler asks it for one connection per transfer
 and disposes that connection itself; it never takes an `IConnection` in its constructor.
+A transfer proxy (`ITransferContext.Proxy`) goes into that `ConnectTarget`, and the
+connector tunnels through it (ADR-0056); the handler holds no proxy code.
 
 This library may reference `Curl.Protocol.Abstractions.UnitLibrary` and nothing
 else horizontal. Referencing another protocol library is a build break, and

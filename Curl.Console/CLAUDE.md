@@ -14,7 +14,13 @@ given and must never reference a protocol library directly.
 
 `Program.Main` only opens the standard streams, builds the composition and hands the
 arguments to `CurlCommandRunner`, which parses them, runs each URL and prints curl's
-`curl: (N) <message>` lines. `-o` files open on the first write through
+`curl: (N) <message>` lines. The parse reads the default config file first, where
+`DefaultConfigFileSearch.ForProcess` finds it (the composition passes it; a runner given none
+reads no `.curlrc`, which keeps tests off the real home directory), unless the first argument
+starts with `-q` or is `--disable`; `-K` files apply where they stand. Both are read through
+the injected `IDataFileReader`. Under `-v` or a `--trace` option an accepted command line then
+prints `Note: Read config file from '<path>'`, wrapped as a warning is and shown even with
+`-s` (BL-243; the refused-command-line cases are BL-352). `-o` files open on the first write through
 `DeferredOutputFileStream`, which is how curl's exit 23 message comes out right. The
 parser's warning lines are written to standard error before anything else.
 Every `Warning: ` line is wrapped by `WarningLineWrapper` as curl's `warnf` wraps it, at the
@@ -23,6 +29,20 @@ console, else 79).
 On Windows each `-o` name is first rewritten by `WindowsOutputFileNameSanitizer`
 (`"*<>?|` and control characters become `_`, as curl 8.21.0 does), and that name is the
 one opened, sized for `-C -` and named in every message.
+
+Each URL's output comes from `CommandLineOptions.UrlOutputs`: an `-o` name, or for `-O` /
+`--remote-name-all` the name `RemoteFileName` takes from the URL path (last non-empty
+segment, still percent-encoded; none gives `curl_response` and curl's
+`Warning: No remote filename` line unless `-s`). On Windows a remote name also goes through
+`WindowsOutputFileNameSanitizer.SanitizeRemoteName` (`:` becomes `_`, DOS device names are
+renamed). `--output-dir` is put in front of either with `/`, as typed. `--create-dirs` makes
+each leading directory through `IOutputPaths` (`PhysicalOutputPaths` in production) before the
+transfer; one that cannot be made prints `curl: Error creating directory <dir>` and stops the
+run with exit 23. Under `-J` a remote-named file's header output goes through
+`RemoteHeaderNameStream`, which opens the file under the first `Content-Disposition`
+`filename=` (`ContentDispositionFileName`) of a 2xx or 3xx response before the lines go on; a
+name already taken is refused with `File exists` and exit 23. Measured on curl 8.21.0
+(BL-239 Notes).
 
 `TransferContextFactory` builds each transfer's context from the parsed options; the
 context carries the parsed `-r` range (`ByteRangeParser`; text that names
@@ -55,6 +75,30 @@ then the body output before the next, so `-i -D -` prints every header line twic
 as curl 8.21.0 does. `-I` also sets the context's `NoBody`, and `-f` / `--fail-with-body`
 become `HttpRequestOptions.Fail`. Under `--fail-early` the first failed transfer stops the
 run with its own exit code.
+
+A `-d` / `--data*` / `--json` body to be posted (no `-G`) with `-I` (HEAD) or `--no-head` (GET) is
+refused at transfer setup, not while parsing, as curl 8.21.0 refuses it in `tool_operate`: after
+the parse is accepted and `-V` is handled, and before any dispatch is built, `RunAsync` writes
+`CommandLineWarning.PostRequestedWithHead` or `PostRequestedWithGet` (nothing under `-s`, even
+with `-S`), with no `curl: try` line, and exits 2, whatever order the options came in (BL-255).
+
+The Nth `-T` / `--upload-file` value uploads to the Nth URL (ADR-0051). Its URL is resolved
+by `UploadTransferUrl` before anything else of that transfer: one it cannot parse is exit 3
+with no warning lines. The `-T` file is opened through the runner's `IFileSystem` after the
+before-transfer warning lines and becomes the context's `Upload`; one that cannot be opened
+prints `curl: cannot open '<file>'` and the try-help line even under `-s`, is exit 26, and
+stops the run. `-T -` and `-T .` upload standard input. `%{url_effective}` prints the
+resolved URL.
+
+Each transfer's proxy is chosen by `TransferProxySelection`, after the URL, range and `-F`
+body are checked: `Curl.Core`'s `ProxySelector` (held by `TransferDispatch`, reading the
+process's proxy environment variables in production and none in tests unless given) picks it
+from `-x` or a `--socks` option, `--noproxy` and the variables; `-U` replaces its credential;
+it goes into `HttpRequestOptions.ForwardProxy` with `-p` as `ProxyTunnel`. Proxy text curl
+cannot use ends the transfer with the selector's exit 5 or 7, and a SOCKS proxy, or an HTTPS
+proxy for `https` or under `-p` or `-L`, ends an `http`/`https` transfer with exit 4 until the connector opens those tunnels
+(ADR-0053, BL-328). Other schemes do not read the proxy yet (BL-330), and redirect hops keep
+the first URL's proxy (BL-329). Measured on curl 8.21.0 (BL-238 Notes).
 
 Every transfer goes through `Curl.Core`'s `RedirectFollower`. `-L` becomes
 `HttpRequestOptions.FollowRedirects`, and `RedirectPolicyMapping` turns `--max-redirs`,

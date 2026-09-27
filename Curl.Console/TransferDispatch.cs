@@ -17,10 +17,16 @@ namespace Curl.Console;
 /// The run's cookies, which the dispatcher's HTTP handler reads and writes, or
 /// <see langword="null" /> when neither <c>-b</c> nor <c>-c</c> was given.
 /// </param>
+/// <param name="proxySelector">
+/// Chooses each transfer's proxy from <c>-x</c>, <c>--noproxy</c> and the proxy environment
+/// variables it reads; <see langword="null" /> for one that reads no variables, so only the
+/// command line names a proxy.
+/// </param>
 internal sealed class TransferDispatch(
     ProtocolDispatcher dispatcher,
     IReadOnlyList<string> warningLinesBeforeEachTransfer,
-    CookieEngine? cookies = null)
+    CookieEngine? cookies = null,
+    ProxySelector? proxySelector = null)
 {
     /// <summary>
     /// Creates the dispatch with no warning lines.
@@ -46,4 +52,10 @@ internal sealed class TransferDispatch(
     /// or <c>-c</c>.
     /// </summary>
     internal CookieEngine? Cookies { get; } = cookies;
+
+    /// <summary>
+    /// Gets the selector that chooses each transfer's proxy from <c>-x</c>, <c>--noproxy</c> and
+    /// the proxy environment variables it reads.
+    /// </summary>
+    internal ProxySelector ProxySelector { get; } = proxySelector ?? new ProxySelector(_ => null);
 }

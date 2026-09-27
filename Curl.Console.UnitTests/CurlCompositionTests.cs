@@ -168,6 +168,27 @@ public sealed class CurlCompositionTests
     }
 
     [TestMethod]
+    public void CreateTransports_NoTimeProviderGiven_SslStreamTlsProviderTimesOnTimeProviderSystem()
+    {
+        CurlTransports transports = CurlComposition.CreateTransports(NoOptions());
+
+        Assert.AreSame(TimeProvider.System, CapturedDependency<TimeProvider>(transports.TlsProvider));
+    }
+
+    [TestMethod]
+    public void CreateTransports_GivenTimeProvider_SslStreamTlsProviderSharesTheTcpConnectorsTimeProvider()
+    {
+        TimeProvider timeProvider = new ReplacementTimeProvider();
+
+        CurlTransports transports = CurlComposition.CreateTransports(NoOptions(), timeProvider);
+
+        Assert.AreSame(timeProvider, transports.TimeProvider);
+        Assert.AreSame(timeProvider, CapturedDependency<TimeProvider>(transports.TcpConnector));
+        Assert.AreSame(timeProvider, CapturedDependency<TimeProvider>(transports.TlsProvider));
+        Assert.AreSame(timeProvider, CapturedDependency<TimeProvider>(transports.UdpDatagramConnector));
+    }
+
+    [TestMethod]
     public void CreateTransports_TcpConnector_ReceivesTcpDialerAndSecureSslStreamTlsProvider()
     {
         CurlTransports transports = CurlComposition.CreateTransports(NoOptions());
@@ -311,4 +332,6 @@ public sealed class CurlCompositionTests
             .Single(candidate => candidate.FieldType == typeof(T));
         return (T)field.GetValue(owner)!;
     }
+
+    private sealed class ReplacementTimeProvider : TimeProvider;
 }

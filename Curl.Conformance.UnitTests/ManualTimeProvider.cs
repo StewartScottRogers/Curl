@@ -8,6 +8,12 @@ internal sealed class ManualTimeProvider : TimeProvider
 {
     private readonly List<ManualTimer> timers = [];
 
+    /// <summary>
+    /// How much earlier than asked a timer due later than this fires, as a coarse system timer
+    /// can fire before the stopwatch reaches its due time; zero unless a test sets it.
+    /// </summary>
+    public TimeSpan TimersFireEarlyBy { get; init; }
+
     /// <summary>How far the clock has moved since it was created.</summary>
     public TimeSpan Now { get; private set; }
 
@@ -20,7 +26,7 @@ internal sealed class ManualTimeProvider : TimeProvider
     /// <inheritdoc />
     public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
     {
-        ManualTimer timer = new(this, callback, state, Now + dueTime);
+        ManualTimer timer = new(this, callback, state, Now + (dueTime > TimersFireEarlyBy ? dueTime - TimersFireEarlyBy : dueTime));
         timers.Add(timer);
         return timer;
     }

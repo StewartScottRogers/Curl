@@ -36,7 +36,7 @@ public sealed partial class HttpProtocolHandlerTests
                 .ExecuteAsync(CookieContext(CookieUrl, options));
 
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
-            Assert.AreEqual((new Uri(CookieUrl), false, CookieTime), store.Requests.Single(), $"Chunk size {chunkSize}");
+            Assert.AreEqual((CurlUrl.Parse(CookieUrl), false, CookieTime), store.Requests.Single(), $"Chunk size {chunkSize}");
             Assert.IsEmpty(store.Responses, $"Chunk size {chunkSize}");
         }
     }
@@ -62,7 +62,7 @@ public sealed partial class HttpProtocolHandlerTests
         await CookieHandler(QueueConnector.For(Connection(EmptyOkHead, 65536)), store)
             .ExecuteAsync(CookieContext("https://example.com/p"));
 
-        Assert.AreEqual((new Uri("https://example.com/p"), true, CookieTime), store.Requests.Single());
+        Assert.AreEqual((CurlUrl.Parse("https://example.com/p"), true, CookieTime), store.Requests.Single());
     }
 
     /// <summary>
@@ -84,8 +84,8 @@ public sealed partial class HttpProtocolHandlerTests
                 .ExecuteAsync(CookieContext(CookieUrl, options));
 
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
-            (Uri uri, IReadOnlyList<string> setCookies, DateTimeOffset now) = store.Responses.Single();
-            Assert.AreEqual(new Uri(CookieUrl), uri, $"Chunk size {chunkSize}");
+            (CurlUrl uri, IReadOnlyList<string> setCookies, DateTimeOffset now) = store.Responses.Single();
+            Assert.AreEqual(CurlUrl.Parse(CookieUrl), uri, $"Chunk size {chunkSize}");
             CollectionAssert.AreEqual(new[] { "b=2; Path=/", "a=1" }, setCookies.ToArray(), $"Chunk size {chunkSize}");
             Assert.AreEqual(CookieTime, now, $"Chunk size {chunkSize}");
         }
@@ -144,7 +144,7 @@ public sealed partial class HttpProtocolHandlerTests
     private static TransferContext CookieContext(string url, HttpRequestOptions? options = null) =>
         new()
         {
-            Url = new Uri(url),
+            Url = CurlUrl.Parse(url),
             Output = new MemoryStream(),
             Http = options,
             TimeProvider = new FakeTimeProvider(CookieTime),

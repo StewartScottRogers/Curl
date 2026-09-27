@@ -22,14 +22,26 @@ namespace Curl.Networking;
 /// The <c>User-Agent</c> and credential encoding of the CONNECT request that tunnels through
 /// an HTTP proxy; <see langword="null" /> for <see cref="HttpProxyTunnelOptions.Default" />.
 /// </param>
+/// <param name="resolveOverrides">
+/// The <c>--resolve</c> entries, consulted for a <c>host:port</c> before
+/// <paramref name="dnsResolver" />; <see langword="null" /> for <see cref="ResolveOverrides.None" />.
+/// </param>
+/// <param name="connectToMappings">
+/// The <c>--connect-to</c> mappings, which change the host and port resolved and dialled
+/// but not the host TLS verifies; <see langword="null" /> for <see cref="ConnectToMappings.None" />.
+/// </param>
 public sealed class TcpConnector(
     IDnsResolver dnsResolver,
     ITcpDialer tcpDialer,
     ITlsProvider tlsProvider,
     TimeProvider timeProvider,
-    HttpProxyTunnelOptions? proxyTunnelOptions = null) : IConnector
+    HttpProxyTunnelOptions? proxyTunnelOptions = null,
+    ResolveOverrides? resolveOverrides = null,
+    ConnectToMappings? connectToMappings = null) : IConnector
 {
     private readonly HttpProxyTunnelOptions _proxyTunnelOptions = proxyTunnelOptions ?? HttpProxyTunnelOptions.Default;
+    private readonly ResolveOverrides _resolveOverrides = resolveOverrides ?? ResolveOverrides.None;
+    private readonly ConnectToMappings _connectToMappings = connectToMappings ?? ConnectToMappings.None;
 
     /// <inheritdoc />
     /// <remarks>
@@ -57,6 +69,18 @@ public sealed class TcpConnector(
     /// <c>Too large response headers: &lt;n&gt; &gt; 307200</c> for a longer header block.
     /// </para>
     /// <para>
+    /// Before anything is resolved, a <c>--resolve</c> entry that did not parse, or a
+    /// <c>--connect-to</c> mapping that matches the target and whose destination does not
+    /// parse, fails with exit 49 and curl 8.21.0's message (see <see cref="ResolveOverrides" />
+    /// and <see cref="ConnectToMappings" />). A matching mapping's host and port are resolved,
+    /// dialled and, through an HTTP proxy, named in the CONNECT request; exit 6 then names the
+    /// mapped host and exit 7 reads <c>Failed to connect to &lt;host&gt;:&lt;port&gt; via
+    /// &lt;mapped host&gt;:&lt;mapped port&gt; after &lt;n&gt; ms: Could not connect to
+    /// server</c> (measured). TLS still verifies <see cref="ConnectTarget.Host" />. A
+    /// <c>--resolve</c> entry answers for the host and port being resolved, the proxy's
+    /// included, in place of the <see cref="IDnsResolver" />.
+    /// </para>
+    /// <para>
     /// A success carries <see cref="ConnectResult.Timings" />, taken from the injected
     /// <see cref="TimeProvider" />: <see cref="ConnectTimings.Started" /> when this method
     /// begins, <see cref="ConnectTimings.NameResolved" /> when the host (or proxy) has
@@ -65,7 +89,8 @@ public sealed class TcpConnector(
     /// from the <see cref="ITlsProvider" />'s own timings, or when it returned if it recorded
     /// none. <see cref="ConnectResult.LocalEndPoint" /> is the local end point
     /// <see cref="ITcpDialer" /> reports; the remote end point is the connection's
-    /// <see cref="IConnection.RemoteEndPoint" />.
+    /// <see cref="IConnection.RemoteEndPoint" />. <see cref="ConnectResult.PeerCertificates" />
+    /// are the <see cref="ITlsProvider" />'s, and empty without TLS.
     /// </para>
     /// </remarks>
     /// <exception cref="NotSupportedException">
@@ -77,35 +102,52 @@ public sealed class TcpConnector(
         ArgumentNullException.ThrowIfNull(target);
 
         var started = timeProvider.GetTimestamp();
-        if (target.Proxy is { } proxy)
+        var destination = _connectToMappings.Map(target.Host, target.Port);
+        if ((_resolveOverrides.ParseError ?? destination.ParseError) is { } parseError)
         {
-            return await ConnectThroughHttpProxyAsync(target, proxy, started, cancellationToken).ConfigureAwait(false);
+            return ConnectResult.Failed(CurlExitCode.SetoptOptionSyntax, parseError);
         }
 
-        var addresses = await dnsResolver.ResolveAsync(target.Host, cancellationToken).ConfigureAwait(false);
+        return target.Proxy is { } proxy
+            ? await ConnectThroughHttpProxyAsync(target, destination, proxy, started, cancellationToken).ConfigureAwait(false)
+            : await ConnectDirectlyAsync(target, destination, started, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async ValueTask<ConnectResult> ConnectDirectlyAsync(
+        ConnectTarget target,
+        ConnectDestination destination,
+        long started,
+        CancellationToken cancellationToken)
+    {
+        var addresses = await ResolveAsync(destination.Host, destination.Port, cancellationToken).ConfigureAwait(false);
         if (addresses.Count == 0)
         {
             return ConnectResult.Failed(
                 CurlExitCode.CouldntResolveHost,
-                $"Could not resolve host: {target.Host}");
+                $"Could not resolve host: {destination.Host}");
         }
 
         var nameResolved = timeProvider.GetTimestamp();
-        var dialed = await DialFirstReachableAsync(addresses, target.Port, cancellationToken).ConfigureAwait(false);
+        var dialed = await DialFirstReachableAsync(addresses, destination.Port, cancellationToken).ConfigureAwait(false);
         if (dialed is null)
         {
             var elapsedMilliseconds = (long)timeProvider.GetElapsedTime(nameResolved).TotalMilliseconds;
+            var via = destination.IsMapped ? $" via {destination.Host}:{destination.Port}" : string.Empty;
             return ConnectResult.Failed(
                 CurlExitCode.CouldntConnect,
-                $"Failed to connect to {target.Host}:{target.Port} after {elapsedMilliseconds} ms: Could not connect to server");
+                $"Failed to connect to {target.Host}:{target.Port}{via} after {elapsedMilliseconds} ms: Could not connect to server");
         }
 
         var timings = new ConnectTimings(started, nameResolved, timeProvider.GetTimestamp(), null);
         return await SecureWhenAskedAsync(dialed, target, timings, 0, cancellationToken).ConfigureAwait(false);
     }
 
+    private async ValueTask<IReadOnlyList<IPAddress>> ResolveAsync(string host, int port, CancellationToken cancellationToken) =>
+        _resolveOverrides.Find(host, port) ?? await dnsResolver.ResolveAsync(host, cancellationToken).ConfigureAwait(false);
+
     private async ValueTask<ConnectResult> ConnectThroughHttpProxyAsync(
         ConnectTarget target,
+        ConnectDestination destination,
         ProxyEndpoint proxy,
         long started,
         CancellationToken cancellationToken)
@@ -115,7 +157,7 @@ public sealed class TcpConnector(
             throw new NotSupportedException($"Tunnelling through a {proxy.Kind} proxy is not implemented yet.");
         }
 
-        var addresses = await dnsResolver.ResolveAsync(proxy.Host, cancellationToken).ConfigureAwait(false);
+        var addresses = await ResolveAsync(proxy.Host, proxy.Port, cancellationToken).ConfigureAwait(false);
         if (addresses.Count == 0)
         {
             return ConnectResult.Failed(
@@ -133,19 +175,20 @@ public sealed class TcpConnector(
                 $"Failed to connect to {target.Host}:{target.Port} over proxy {proxy.Host} after {elapsedMilliseconds} ms: Could not connect to server");
         }
 
-        return await OpenTunnelAsync(dialed, target, proxy, started, nameResolved, cancellationToken).ConfigureAwait(false);
+        return await OpenTunnelAsync(dialed, target, destination, proxy, started, nameResolved, cancellationToken).ConfigureAwait(false);
     }
 
     private async ValueTask<ConnectResult> OpenTunnelAsync(
         DialedTcpConnection dialed,
         ConnectTarget target,
+        ConnectDestination destination,
         ProxyEndpoint proxy,
         long started,
         long nameResolved,
         CancellationToken cancellationToken)
     {
         var connection = dialed.Connection;
-        var (reply, exception) = await RequestTunnelAsync(connection, target, proxy, cancellationToken).ConfigureAwait(false);
+        var (reply, exception) = await RequestTunnelAsync(connection, destination, proxy, cancellationToken).ConfigureAwait(false);
         if (exception is not null || !reply.OpensTunnel)
         {
             // The proxy connection is disposed whether CONNECT failed or could not be sent or read.
@@ -161,13 +204,13 @@ public sealed class TcpConnector(
 
     private async ValueTask<(HttpProxyTunnelReply Reply, ExceptionDispatchInfo? Exception)> RequestTunnelAsync(
         IConnection connection,
-        ConnectTarget target,
+        ConnectDestination destination,
         ProxyEndpoint proxy,
         CancellationToken cancellationToken)
     {
         try
         {
-            await connection.WriteAsync(HttpProxyTunnel.BuildConnectRequest(target, proxy, _proxyTunnelOptions), cancellationToken).ConfigureAwait(false);
+            await connection.WriteAsync(HttpProxyTunnel.BuildConnectRequest(destination.Host, destination.Port, proxy, _proxyTunnelOptions), cancellationToken).ConfigureAwait(false);
             await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
             return (await HttpProxyTunnel.ReadReplyAsync(connection, cancellationToken).ConfigureAwait(false), null);
         }
@@ -207,7 +250,8 @@ public sealed class TcpConnector(
             securedConnection,
             timings with { TlsHandshakeCompleted = handshakeCompleted },
             dialed.LocalEndPoint,
-            proxyConnectResponseCode);
+            proxyConnectResponseCode,
+            secured.PeerCertificates);
     }
 
     private async ValueTask<DialedTcpConnection?> DialFirstReachableAsync(

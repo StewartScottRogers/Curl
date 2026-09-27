@@ -294,7 +294,7 @@ public sealed class TftpUploadRetransmissionTests
     private TransferContext Context(TimeSpan? connectTimeout = null, TimeSpan? maxTime = null) =>
         new()
         {
-            Url = new Uri("tftp://h/dest.txt"),
+            Url = CurlUrl.Parse("tftp://h/dest.txt"),
             Output = new MemoryStream(),
             Upload = new MemoryStream(Upload),
             ConnectTimeout = connectTimeout,

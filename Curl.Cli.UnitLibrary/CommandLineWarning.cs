@@ -159,6 +159,26 @@ public static class CommandLineWarning
             $"You can only select one HTTP request method! You asked for both {RequestMethodNames[(int)requested]} and {RequestMethodNames[(int)selected]}.");
 
     /// <summary>
+    /// The two lines curl prints, at transfer setup rather than while reading the command line, when
+    /// <c>-I</c> / <c>--head</c> selected <c>HEAD</c> and a <c>-d</c> / <c>--data*</c> or <c>--json</c> body
+    /// is to be posted (no <c>-G</c>), after which it ends with exit 2. curl wraps the text at 79
+    /// columns, so the first line ends in a space. Measured with <c>curl -I -d x http://127.0.0.1:1/</c>
+    /// (curl 8.21.0, Windows, 2026-09-27); <c>-d x -I</c> and <c>-I --json x</c> print the same.
+    /// </summary>
+    public static IReadOnlyList<string> PostRequestedWithHead { get; } =
+        OnlyOneRequestMethod(SelectedHttpMethod.Post, SelectedHttpMethod.Head);
+
+    /// <summary>
+    /// The two lines curl prints, at transfer setup rather than while reading the command line, when
+    /// <c>--no-head</c> selected <c>GET</c> and a <c>-d</c> / <c>--data*</c> or <c>--json</c> body is to be
+    /// posted (no <c>-G</c>), after which it ends with exit 2. curl wraps the text at 79 columns, so the
+    /// first line ends in a space. Measured with <c>curl --no-head -d x http://127.0.0.1:1/</c>
+    /// (curl 8.21.0, Windows, 2026-09-27); <c>-d x --no-head</c> prints the same.
+    /// </summary>
+    public static IReadOnlyList<string> PostRequestedWithGet { get; } =
+        OnlyOneRequestMethod(SelectedHttpMethod.Post, SelectedHttpMethod.Get);
+
+    /// <summary>
     /// The line curl prints when <c>-0</c> / <c>--http1.0</c> or <c>--http1.1</c> asks for a different HTTP
     /// version from the one an earlier of them asked for: <c>Warning: Overrides previous HTTP version option</c>.
     /// Asking for the same version again does not warn. Measured with <c>curl --http1.1 -0</c>,

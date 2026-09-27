@@ -207,7 +207,7 @@ public sealed class TransferWriteOutVariablesTests
     [DataRow("urle.bogus")]
     [DataRow("url.")]
     [DataRow("referer")]
-    [DataRow("num_certs")]
+    [DataRow("num_cert")]
     [DataRow("HTTP_CODE")]
     [DataRow(" http_code")]
     [DataRow("")]
@@ -233,6 +233,23 @@ public sealed class TransferWriteOutVariablesTests
         Assert.AreEqual("one", variables.FindFirstHeaderValue("X-DUP"));
         Assert.AreEqual("a b", variables.FindFirstHeaderValue("x-lf"));
         Assert.IsNull(variables.FindFirstHeaderValue(" x-dup"));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_PseudoHeaders_CountTowardsNumHeadersButAreNeverFound()
+    {
+        // curl -s -o NUL -w "[%header{Content-Length}][%{num_headers}]" file:///C:/bl285tmp/a.txt
+        // printed [][3] (BL-285); a response header alongside them is counted too.
+        TransferReport report = new()
+        {
+            ResponseHeaders = [new("X-A", "1")],
+            PseudoHeaders = [new("Content-Length", "12"), new("Accept-ranges", "bytes"), new("Last-Modified", "Wed, 24 Jun 2026 12:34:56 GMT")],
+        };
+        TransferWriteOutVariables variables = WithReport(report);
+
+        Assert.AreEqual("4", Get(variables, "num_headers"));
+        Assert.IsNull(variables.FindFirstHeaderValue("Content-Length"));
+        Assert.AreEqual("1", variables.FindFirstHeaderValue("X-A"));
     }
 
     [TestMethod]
@@ -383,12 +400,26 @@ public sealed class TransferWriteOutVariablesTests
     [TestMethod]
     public void TryGetVariableText_UrlPartsOfFileUrl_MatchCurl()
     {
-        // curl -s -o out.bin -w "..." file:///Z:/bl284tmp/wo.txt (BL-284's Notes); url_effective is file://Z:/bl284tmp/wo.txt.
+        // A file URL without a drive letter parses alike on every platform's curl.
+        TransferWriteOutVariables variables = new(
+            TransferResult.Success(3), "file:///tmp/wo.txt", 0, "file:///tmp/wo.txt", "file", Clock);
+
+        Assert.AreEqual("file|||||0|/tmp/wo.txt|||", RenderUrlParts(variables, "url."));
+        Assert.AreEqual("file|||||0|/tmp/wo.txt|||", RenderUrlParts(variables, "urle."));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_UrlPartsOfDriveLetterFileUrl_MatchPlatformCurl()
+    {
+        // Windows: curl -s -o out.bin -w "..." file:///Z:/bl284tmp/wo.txt (BL-284's Notes); url_effective
+        // is file://Z:/bl284tmp/wo.txt. Linux and macOS: curl's urlapi.c rejects a drive letter in a
+        // file URL (CURLUE_BAD_FILE_URL), so every part is empty (BL-322's Notes).
         TransferWriteOutVariables variables = new(
             TransferResult.Success(3), "file:///Z:/bl284tmp/wo.txt", 0, "file://Z:/bl284tmp/wo.txt", "file", Clock);
+        string expected = OperatingSystem.IsWindows() ? "file|||||0|Z:/bl284tmp/wo.txt|||" : "|||||||||";
 
-        Assert.AreEqual("file|||||0|Z:/bl284tmp/wo.txt|||", RenderUrlParts(variables, "url."));
-        Assert.AreEqual("file|||||0|Z:/bl284tmp/wo.txt|||", RenderUrlParts(variables, "urle."));
+        Assert.AreEqual(expected, RenderUrlParts(variables, "url."));
+        Assert.AreEqual(expected, RenderUrlParts(variables, "urle."));
     }
 
     [TestMethod]
@@ -441,6 +472,63 @@ public sealed class TransferWriteOutVariablesTests
         TransferWriteOutVariables variables = new(TransferResult.Success(0), "http://[::1", 0, "http://[::1", "http", Clock);
 
         Assert.AreEqual("|||||||||", RenderUrlParts(variables, "url."));
+    }
+
+    [TestMethod]
+    [DataRow("file:///Z:/bl284tmp/wo.txt", "file")]
+    [DataRow("http://127.0.0.1:18284/wo.txt", "http")]
+    public void TryGetVariableText_CertificatesWithoutTls_AreZeroAndNothing(string url, string scheme)
+    {
+        // curl -s -o out.bin -w "[%{num_certs}][%{certs}]" for file:// and http:// (BL-284's Notes).
+        TransferWriteOutVariables variables = new(TransferResult.Success(0) with { Report = new TransferReport() }, url, 0, url, scheme, Clock);
+
+        Assert.AreEqual("[0][]", $"[{Get(variables, "num_certs")}][{Get(variables, "certs")}]");
+    }
+
+    [TestMethod]
+    [DataRow("file:///Z:/bl284tmp/wo.txt", "file")]
+    [DataRow("http://127.0.0.1:18081/", "http")]
+    public void TryGetVariableText_ProxyUsedWithoutProxy_IsZero(string url, string scheme)
+    {
+        // curl -s -w "%{proxy_used}" for file:// and a direct http:// transfer (BL-284's and BL-302's Notes).
+        TransferWriteOutVariables variables = new(TransferResult.Success(0) with { Report = new TransferReport() }, url, 0, url, scheme, Clock);
+
+        Assert.AreEqual("0", Get(variables, "proxy_used"));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_ProxyUsedWithoutReport_IsZero()
+    {
+        TransferWriteOutVariables variables = new(TransferResult.Success(0), LoopbackUrl, 0, LoopbackUrl, "http", Clock);
+
+        Assert.AreEqual("0", Get(variables, "proxy_used"));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_ProxyUsedThroughProxy_IsOne()
+    {
+        // curl -s -x http://127.0.0.1:18080 -w "%{proxy_used}" http://example.test/, forwarded and with -p (BL-302's Notes).
+        TransferWriteOutVariables variables = WithReport(new TransferReport { UsedProxy = true });
+
+        Assert.AreEqual("1", Get(variables, "proxy_used"));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_CertificatesWithoutReport_AreZeroAndNothing()
+    {
+        TransferWriteOutVariables variables = new(TransferResult.Success(0), LoopbackUrl, 0, LoopbackUrl, "http", Clock);
+
+        Assert.AreEqual("[0][]", $"[{Get(variables, "num_certs")}][{Get(variables, "certs")}]");
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_CertificatesOfLoopbackHttpsTransfer_MatchCurl()
+    {
+        // curl -k -s -o NUL -w "%{num_certs}\n%{certs}" https://127.0.0.1:18304/ (BL-303's Notes).
+        TransferWriteOutVariables variables = WithReport(new TransferReport { PeerCertificates = LoopbackChain.Certificates });
+
+        Assert.AreEqual("3", Get(variables, "num_certs"));
+        Assert.AreEqual(LoopbackChain.CertsText, Get(variables, "certs"));
     }
 
     [TestMethod]

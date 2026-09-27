@@ -229,5 +229,5 @@ public sealed class DigestAuthenticatorTests
     }
 
     private static HttpAuthRequest Request(NetworkCredential? credential, string target, HttpAuthSchemes allowed) =>
-        new("GET", new Uri("http://127.0.0.1" + target), target, credential, null, allowed, IsProxy: false);
+        new("GET", CurlUrl.Parse("http://127.0.0.1" + target), target, credential, null, allowed, IsProxy: false);
 }

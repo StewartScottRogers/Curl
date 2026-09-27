@@ -65,6 +65,45 @@ public sealed class CurlCommandRunnerTests
         Assert.IsEmpty(dict.Contexts);
     }
 
+    // System.Uri refused file://C:, so it ended with exit 3 before any handler ran. curl
+    // 8.21.0 on Windows prints "curl: (37) Could not open file C:" (measured 2026-09-27);
+    // outside Windows it rejects a drive letter with exit 3, and CurlUrl does the same.
+    [TestMethod]
+    public async Task RunAsync_BareDriveLetterFileUrl_ReachesTheFileHandlerAndReturns37()
+    {
+        InMemoryFileSystem files = new();
+        files.UnreadablePaths.Add("C:");
+
+        int exitCode = await RunAsync(["-sS", "file://C:"], new FileProtocolHandler(files));
+
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.AreEqual(37, exitCode);
+            Assert.AreEqual("curl: (37) Could not open file C:" + NewLine, StandardErrorText);
+            CollectionAssert.AreEqual(new[] { "C:" }, files.ReadPaths.ToArray());
+        }
+        else
+        {
+            Assert.AreEqual(3, exitCode);
+            Assert.IsEmpty(files.ReadPaths);
+        }
+    }
+
+    // curl 8.21.0 rejects both with exit 3 and "URL rejected: Bad file:// URL" (measured
+    // 2026-09-27); Curl prints its generic exit 3 line for them (ADR-0010).
+    [TestMethod]
+    [DataRow("file://user:pass@localhost/x")]
+    [DataRow("file://ab:/x")]
+    public async Task RunAsync_FileUrlCurlRejects_Returns3WithoutOpeningAnything(string url)
+    {
+        InMemoryFileSystem files = new();
+
+        int exitCode = await RunAsync(["-sS", url], new FileProtocolHandler(files));
+
+        Assert.AreEqual(3, exitCode);
+        Assert.IsEmpty(files.ReadPaths);
+    }
+
     [TestMethod]
     public async Task RunAsync_FailureThenSuccess_ReturnsLastTransfersExitCode()
     {
@@ -337,7 +376,7 @@ public sealed class CurlCommandRunnerTests
         Assert.AreEqual(1024, context.TftpBlockSize);
         Assert.IsTrue(context.TftpNoOptions);
         Assert.AreEqual(UnixFileMode.UserRead | UnixFileMode.UserWrite, context.CreateFileMode);
-        Assert.AreEqual(new Uri("file:///a"), context.Url);
+        Assert.AreEqual(CurlUrl.Parse("file:///a"), context.Url);
     }
 
     [TestMethod]

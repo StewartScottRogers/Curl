@@ -9,20 +9,22 @@ namespace Curl.Protocol.Http;
 /// Formats the head of an HTTP/1.1 or HTTP/1.0 request - the request line, the headers and the empty
 /// line after them - byte for byte as curl 8.21.0 sends it for <c>-X</c>, <c>-H</c>,
 /// <c>-A</c>, <c>-e</c>, <c>-I</c>, <c>--compressed</c>, an <c>Authorization</c> value, a
-/// <c>Cookie</c> value, a request body, a forward proxy, <c>-r</c>, <c>-C</c> and <c>-z</c>. Every
-/// rule was measured (BL-172, BL-175, BL-177, BL-178, BL-180, BL-181, BL-182 and BL-183 Notes).
+/// <c>Cookie</c> value, a request body, a forward proxy, <c>--proxy-header</c>, <c>-r</c>, <c>-C</c> and <c>-z</c>. Every
+/// rule was measured (BL-172, BL-175, BL-177, BL-178, BL-180, BL-181, BL-182, BL-183, BL-296 and BL-332 Notes).
 /// </summary>
 /// <remarks>
 /// The request line ends in <c>HTTP/1.0</c> for <c>-0</c> and in <c>HTTP/1.1</c> otherwise;
 /// the headers are the same for both. curl's own headers come first, in the order <c>Host</c>, <c>Proxy-Authorization</c>,
-/// <c>Authorization</c>, <c>Range</c>, <c>User-Agent</c>, <c>Accept</c>, <c>Accept-Encoding</c> (for
+/// <c>Authorization</c>, <c>Range</c>, <c>Content-Range</c> (for a <c>-T</c> upload resumed with
+/// <c>-C</c>, <see cref="HttpUploadResume" />), <c>User-Agent</c>, <c>Accept</c>, <c>Accept-Encoding</c> (for
 /// <c>--compressed</c>), <c>Referer</c>, <c>Proxy-Connection: Keep-Alive</c> (through a forward
 /// proxy), each left out when an <c>-H</c> value names it, then the cookie store's
 /// <c>Cookie</c>, then <c>If-Modified-Since</c> or <c>If-Unmodified-Since</c> for <c>-z</c>, also
 /// left out when an <c>-H</c> value names it; <c>Cookie</c> and <c>Proxy-Authorization</c> are sent even when an <c>-H</c>
 /// value names them. Through a forward proxy the request target is the absolute form,
 /// <c>http://host[:port]/path?query</c>, with no user information or fragment. The <c>-H</c> values follow in
-/// command-line order. A custom <c>Host</c> is the exception: it takes the <c>Host</c> slot. A request with a body ends with <c>Content-Length</c> (or
+/// command-line order, then, through a forward proxy only, the <c>--proxy-header</c> values under the
+/// same rules; of curl's own headers they override only <c>Proxy-Connection</c> (BL-296 Notes). A custom <c>Host</c> is the exception: it takes the <c>Host</c> slot. A request with a body ends with <c>Content-Length</c> (or
 /// <c>Transfer-Encoding: chunked</c> when the length is unknown), <c>Content-Type</c> and
 /// <c>Expect: 100-continue</c> as <see cref="HttpRequestFraming" /> decides, each again left
 /// out when an <c>-H</c> value names it. Text is sent one byte per character (Latin-1), as curl
@@ -64,7 +66,8 @@ internal static class HttpRequestHeadFormatter
     /// </param>
     /// <param name="forwardProxy">
     /// <see langword="true" /> when the request is sent to a forward proxy rather than the
-    /// origin: its target is the absolute form and <c>Proxy-Connection: Keep-Alive</c> is sent.
+    /// origin: its target is the absolute form unless <c>--request-target</c> replaces it, <c>Proxy-Connection: Keep-Alive</c> is sent and so
+    /// are the <c>--proxy-header</c> values.
     /// </param>
     /// <param name="proxyAuthorization">
     /// The <c>Proxy-Authorization</c> value the authenticator gave, or <see langword="null" />
@@ -84,7 +87,7 @@ internal static class HttpRequestHeadFormatter
     /// </param>
     /// <returns>The head's bytes, ending in the empty line.</returns>
     internal static byte[] Format(
-        Uri url,
+        CurlUrl url,
         HttpRequestOptions? options,
         bool noBody = false,
         string? authorization = null,
@@ -97,6 +100,7 @@ internal static class HttpRequestHeadFormatter
     {
         options ??= new HttpRequestOptions();
         HttpCustomHeader[] customHeaders = [.. options.Headers.Select(HttpCustomHeader.Parse)];
+        HttpCustomHeader[] proxyHeaders = forwardProxy ? [.. options.ProxyHeaders.Select(HttpCustomHeader.Parse)] : [];
         framing = FramingOf(framing, options, customHeaders, noBody);
         StringBuilder head = new();
         AppendRequestLine(head, framing.Method, url, forwardProxy, options);
@@ -109,11 +113,13 @@ internal static class HttpRequestHeadFormatter
         AppendAlways(head, "Proxy-Authorization", proxyAuthorization);
         AppendUnlessOverridden(head, customHeaders, "Authorization", authorization);
         AppendUnlessOverridden(head, customHeaders, "Range", range);
+        AppendUnlessOverridden(head, customHeaders, "Content-Range", framing.ContentRange);
         AppendClientHeaders(head, customHeaders, options);
-        AppendUnlessOverridden(head, customHeaders, "Proxy-Connection", forwardProxy ? "Keep-Alive" : null);
+        AppendUnlessOverridden(head, [.. customHeaders, .. proxyHeaders], "Proxy-Connection", forwardProxy ? "Keep-Alive" : null);
         AppendAlways(head, "Cookie", cookie);
         AppendTimeCondition(head, customHeaders, timeCondition);
         AppendCustomHeaders(head, customHeaders, hostLine is not null);
+        AppendCustomHeaders(head, proxyHeaders, hostLine is not null);
         AppendBodyHeaders(head, customHeaders, framing);
         head.Append("\r\n");
         return Encoding.Latin1.GetBytes(head.ToString());
@@ -127,11 +133,28 @@ internal static class HttpRequestHeadFormatter
         framing ?? HttpRequestFraming.Of(options, customHeaders, noBody);
 
     /// <summary>
-    /// Appends the request line: the method, the target - the absolute form for a forward
-    /// proxy, the path and query otherwise - and the version.
+    /// Appends the request line: the method, the target (<see cref="TargetOf" />) and the
+    /// version.
     /// </summary>
-    private static void AppendRequestLine(StringBuilder head, string method, Uri url, bool forwardProxy, HttpRequestOptions options) =>
-        head.Append(method).Append(' ').Append(forwardProxy ? AbsoluteForm(url) : url.PathAndQuery).Append(VersionOf(options)).Append("\r\n");
+    private static void AppendRequestLine(StringBuilder head, string method, CurlUrl url, bool forwardProxy, HttpRequestOptions options) =>
+        head.Append(method).Append(' ').Append(TargetOf(url, forwardProxy, options)).Append(VersionOf(options)).Append("\r\n");
+
+    /// <summary>
+    /// Gives the request line's target: <see cref="HttpRequestOptions.RequestTarget" />
+    /// verbatim when given, its UTF-8 bytes one character each as
+    /// <see cref="HttpUrlText.RequestTarget" /> writes a query; otherwise the absolute form
+    /// for a forward proxy and the path and query for the origin. curl 8.21.0 was measured
+    /// (BL-186 Notes) sending <c>--request-target</c> in place of both forms.
+    /// </summary>
+    private static string TargetOf(CurlUrl url, bool forwardProxy, HttpRequestOptions options)
+    {
+        if (options.RequestTarget is { } target)
+        {
+            return Encoding.Latin1.GetString(Encoding.UTF8.GetBytes(target));
+        }
+
+        return forwardProxy ? AbsoluteForm(url) : HttpUrlText.RequestTarget(url);
+    }
 
     /// <summary>
     /// Gives the request line's version: <c>HTTP/1.0</c> for <c>-0</c>, <c>HTTP/1.1</c> otherwise.
@@ -170,9 +193,9 @@ internal static class HttpRequestHeadFormatter
     /// Formats the <c>Host</c> line: the first <c>-H</c> value naming <c>Host</c> with its
     /// name written <c>Host:</c>, or none when that value is exactly <c>Host:</c>, or else
     /// the URL's host as written, bracketed if IPv6, with its port unless it is the
-    /// scheme's default.
+    /// default of an <c>http</c> or <c>https</c> URL (<see cref="HttpUrlText.HostHeaderAuthority" />).
     /// </summary>
-    private static string? FormatHostLine(Uri url, HttpCustomHeader[] customHeaders)
+    private static string? FormatHostLine(CurlUrl url, HttpCustomHeader[] customHeaders)
     {
         foreach (HttpCustomHeader header in customHeaders)
         {
@@ -182,34 +205,14 @@ internal static class HttpRequestHeadFormatter
             }
         }
 
-        return $"Host: {HostAndPort(url)}";
+        return $"Host: {HttpUrlText.HostHeaderAuthority(url)}";
     }
 
     /// <summary>
     /// Formats the absolute-form request target a forward proxy is sent: the scheme, the host
     /// and port as the <c>Host</c> line has them, then the path and query.
     /// </summary>
-    private static string AbsoluteForm(Uri url) => $"{url.Scheme}://{HostAndPort(url)}{url.PathAndQuery}";
-
-    /// <summary>
-    /// Formats the URL's host as written, with its port unless it is the scheme's default.
-    /// </summary>
-    private static string HostAndPort(Uri url)
-    {
-        string port = url.IsDefaultPort ? string.Empty : string.Create(CultureInfo.InvariantCulture, $":{url.Port}");
-        return HostAsWritten(url) + port;
-    }
-
-    /// <summary>
-    /// Returns the URL's host in the letter case it was written in, which curl keeps and
-    /// <see cref="Uri.Host" /> lower-cases.
-    /// </summary>
-    private static string HostAsWritten(Uri url)
-    {
-        string host = url.Host;
-        int start = url.OriginalString.IndexOf(host, StringComparison.OrdinalIgnoreCase);
-        return start < 0 ? host : url.OriginalString.Substring(start, host.Length);
-    }
+    private static string AbsoluteForm(CurlUrl url) => $"{url.Scheme}://{HttpUrlText.HostAndPort(url)}{HttpUrlText.RequestTarget(url)}";
 
     private static void AppendUnlessOverridden(StringBuilder head, HttpCustomHeader[] customHeaders, string name, string? value)
     {
@@ -233,8 +236,8 @@ internal static class HttpRequestHeadFormatter
     }
 
     /// <summary>
-    /// Appends each <c>-H</c> value that sends a line, in order, leaving out every
-    /// <c>Host:</c> line when a <c>Host</c> line was already written.
+    /// Appends each <c>-H</c> or <c>--proxy-header</c> value that sends a line, in order,
+    /// leaving out every <c>Host:</c> line when a <c>Host</c> line was already written.
     /// </summary>
     private static void AppendCustomHeaders(StringBuilder head, HttpCustomHeader[] customHeaders, bool hostLineWritten)
     {
@@ -250,7 +253,8 @@ internal static class HttpRequestHeadFormatter
     /// <summary>
     /// Appends the body's framing headers: <c>Content-Length</c> unless the body is sent
     /// chunked, <c>Transfer-Encoding: chunked</c> when its length is unknown, its
-    /// <c>Content-Type</c>, and curl's own <c>Expect: 100-continue</c>.
+    /// <c>Content-Type</c> unless it is a <c>-T</c> upload, and curl's own
+    /// <c>Expect: 100-continue</c>.
     /// </summary>
     private static void AppendBodyHeaders(StringBuilder head, HttpCustomHeader[] customHeaders, HttpRequestFraming framing)
     {
@@ -262,7 +266,7 @@ internal static class HttpRequestHeadFormatter
         string? contentLength = framing.IsChunked ? null : framing.KnownLength.GetValueOrDefault().ToString(CultureInfo.InvariantCulture);
         AppendUnlessOverridden(head, customHeaders, "Content-Length", contentLength);
         AppendUnlessOverridden(head, customHeaders, "Transfer-Encoding", framing.KnownLength is null ? "chunked" : null);
-        AppendUnlessOverridden(head, customHeaders, "Content-Type", body.ContentType);
+        AppendUnlessOverridden(head, customHeaders, "Content-Type", framing.IsUpload ? null : body.ContentType);
         AppendUnlessOverridden(head, customHeaders, "Expect", framing.AddsExpect ? "100-continue" : null);
     }
 }

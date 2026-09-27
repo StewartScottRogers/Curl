@@ -31,6 +31,11 @@ namespace Curl.Core;
 /// <see cref="ITransferContext.Credentials" />, no bearer token and no <c>-H</c>
 /// <c>Authorization:</c> or <c>Cookie:</c> header, unless <c>--location-trusted</c>.
 /// </para>
+/// <para>
+/// Every hop after the first carries the chain's start as
+/// <see cref="ITransferContext.OperationStarted" />, so <c>-m</c> limits the whole chain, as
+/// curl's does, rather than each hop (measured, BL-299 Notes).
+/// </para>
 /// </remarks>
 /// <param name="dispatcher">The dispatcher that performs each hop.</param>
 public sealed class RedirectFollower(ProtocolDispatcher dispatcher)
@@ -74,6 +79,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher)
         RedirectPolicy policy)
     {
         RedirectChain chain = new(context.TimeProvider);
+        long operationStarted = context.OperationStarted ?? context.TimeProvider.GetTimestamp();
         long? uploadStart = SeekableStart(context.Upload);
         ITransferContext hop = context;
         bool bodyDropped = false;
@@ -86,7 +92,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher)
                 return chain.Merge(result);
             }
 
-            if (Refusal(target, chain.RedirectCount, policy, out Uri? next) is { } refusal)
+            if (Refusal(target, context.PathAsIs, chain.RedirectCount, policy, out CurlUrl? next) is { } refusal)
             {
                 return chain.Merge(TransferResult.Failure(refusal.ExitCode, refusal.Message, result.BytesTransferred));
             }
@@ -94,7 +100,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher)
             bodyDropped |= DropsBody(result.Report!.ResponseCode, hop, policy);
             RewindUpload(context.Upload, uploadStart, bodyDropped);
             // No refusal means the target parsed, so next is set.
-            hop = NextHop(context, next!, http, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!));
+            hop = NextHop(context, next!, http, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted);
             chain.Followed(target);
         }
     }
@@ -106,9 +112,10 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher)
 
     private static (CurlExitCode ExitCode, string Message)? Refusal(
         string target,
+        bool pathAsIs,
         int followed,
         RedirectPolicy policy,
-        out Uri? next)
+        out CurlUrl? next)
     {
         next = null;
         if (policy.MaxRedirects >= 0 && followed >= policy.MaxRedirects)
@@ -116,7 +123,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher)
             return (CurlExitCode.TooManyRedirects, $"Maximum ({policy.MaxRedirects}) redirects followed");
         }
 
-        if (!Uri.TryCreate(target, UriKind.Absolute, out next))
+        if (!CurlUrl.TryParse(target, pathAsIs, out next))
         {
             return (CurlExitCode.UrlMalformat, $"The redirect target URL could not be parsed: {UnparsableUrlReason(target)}");
         }
@@ -181,7 +188,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher)
         }
     }
 
-    private static bool IsSameOrigin(Uri first, Uri next) =>
+    private static bool IsSameOrigin(CurlUrl first, CurlUrl next) =>
         string.Equals(first.Scheme, next.Scheme, StringComparison.Ordinal)
         && string.Equals(first.Host, next.Host, StringComparison.OrdinalIgnoreCase)
         && first.Port == next.Port;
@@ -204,10 +211,11 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher)
 
     private static TransferContext NextHop(
         ITransferContext first,
-        Uri url,
+        CurlUrl url,
         HttpRequestOptions http,
         bool bodyDropped,
-        bool sendCredentials) =>
+        bool sendCredentials,
+        long operationStarted) =>
         new()
         {
             Url = url,
@@ -229,6 +237,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher)
             PathAsIs = first.PathAsIs,
             ConnectTimeout = first.ConnectTimeout,
             MaxTime = first.MaxTime,
+            OperationStarted = operationStarted,
             Http = HopHttp(http, bodyDropped, sendCredentials),
             TimeProvider = first.TimeProvider,
             CancellationToken = first.CancellationToken,

@@ -26,14 +26,16 @@ namespace Curl.Cli;
 /// and a command line that asks for a form and a <c>-d</c> body both is refused once read, with
 /// <see cref="CommandLineRefusal.FormAndDataBoth"/>.
 /// A <c>-K</c> / <c>--config</c> file is read through the same reader and its lines applied in
-/// place of the option (see <see cref="ConfigFileApplier"/>).
+/// place of the option (see <see cref="ConfigFileApplier"/>). Only the overload taking a
+/// <see cref="DefaultConfigFileSearch"/> reads the default config file (<c>.curlrc</c>) first; the others
+/// never do, so what they return does not depend on the machine they run on.
 /// <c>-V</c> / <c>--version</c> on the command line ends parsing where it stands, even inside a bundle,
 /// with <see cref="CommandLineParseResult.VersionRequested(CommandLineOptions)"/>: the arguments after it
 /// are neither read nor refused, no password is asked for and no URL is needed, as in curl 8.21.0
 /// (<c>curl -V --bogus</c> prints the version; <c>curl --bogus -V</c> is refused).
 /// </summary>
 /// <remarks>
-/// It does not implement <c>.curlrc</c>, <c>--variable</c> or <c>--next</c>, and it
+/// It does not implement <c>--variable</c> or <c>--next</c>, and it
 /// neither validates URLs nor opens files itself. Checked against the local curl 8.21.0 on
 /// 2026-09-26; options per <see href="https://curl.se/docs/manpage.html"/>.
 /// </remarks>
@@ -88,19 +90,57 @@ public static class CommandLineParser
     /// Never throws for non-null arguments, unless reading standard input for <c>-d @-</c> fails.
     /// </returns>
     /// <exception cref="ArgumentNullException">An argument is <see langword="null"/>.</exception>
-    public static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader)
+    public static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader) =>
+        Parse(arguments, pathExists, passwordPrompt, dataFileReader, []);
+
+    /// <summary>
+    /// Parses <paramref name="arguments"/> as the four-argument overload does, after first reading
+    /// curl's default config file (<c>.curlrc</c>) where <paramref name="defaultConfigFileSearch"/> finds
+    /// it, as curl 8.21.0 does, unless the first argument starts with <c>-q</c> or is exactly
+    /// <c>--disable</c>. See <see cref="ConfigFileApplier.ApplyDefaultFile"/> for how it is read.
+    /// </summary>
+    /// <param name="arguments">The arguments; a <see langword="null"/> element reads as an empty argument.</param>
+    /// <param name="pathExists">Reports whether a file or directory exists at a path.</param>
+    /// <param name="passwordPrompt">Asks for the password of a <c>-u</c> user given without one; called at most once.</param>
+    /// <param name="dataFileReader">Reads the default config file, and every file an option names.</param>
+    /// <param name="defaultConfigFileSearch">Lists where to look for the default config file; <see cref="DefaultConfigFileSearch.ForProcess"/> for this process.</param>
+    /// <returns>
+    /// As the four-argument overload returns, with the default config file's options applied before the
+    /// command line's and <see cref="CommandLineOptions.DefaultConfigFile"/> naming it. An empty command
+    /// line is accepted when the file names a URL.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">An argument is <see langword="null"/>.</exception>
+    public static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, DefaultConfigFileSearch defaultConfigFileSearch)
+    {
+        ArgumentNullException.ThrowIfNull(defaultConfigFileSearch);
+
+        return Parse(arguments, pathExists, passwordPrompt, dataFileReader, defaultConfigFileSearch.CandidatePaths());
+    }
+
+    private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, IReadOnlyList<string> defaultConfigFileCandidates)
     {
         ArgumentNullException.ThrowIfNull(arguments);
         ArgumentNullException.ThrowIfNull(pathExists);
         ArgumentNullException.ThrowIfNull(passwordPrompt);
         ArgumentNullException.ThrowIfNull(dataFileReader);
 
-        if (arguments.Count == 0)
+        CommandLineOptions options = new();
+        if (!SkipsDefaultConfigFile(arguments))
         {
-            return CommandLineParseResult.Refused(CommandLineRefusal.EmptyCommandLine(), []);
+            ConfigFileApplier.ApplyDefaultFile(options, defaultConfigFileCandidates, pathExists, dataFileReader);
         }
 
-        CommandLineOptions options = new();
+        return arguments.Count == 0 && options.Urls.Count == 0
+            ? CommandLineParseResult.Refused(CommandLineRefusal.EmptyCommandLine(), options.WarningLines)
+            : ParseArguments(options, arguments, pathExists, passwordPrompt, dataFileReader);
+    }
+
+    /// <summary>
+    /// Reads <paramref name="arguments"/> into <paramref name="options"/>, which may already hold the
+    /// default config file's settings, stopping at the first refusal or at <c>-V</c>.
+    /// </summary>
+    private static CommandLineParseResult ParseArguments(CommandLineOptions options, IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader)
+    {
         ArgumentReader reader = new(arguments, pathExists, dataFileReader);
         while (reader.TryTakeNext(out string argument))
         {
@@ -121,6 +161,15 @@ public static class CommandLineParser
         options.ReadMissingPasswords(passwordPrompt);
         return Finish(options);
     }
+
+    /// <summary>
+    /// Whether curl 8.21.0 skips its default config file: when the first argument starts with <c>-q</c>
+    /// (so <c>-q</c>, <c>-qs</c> and <c>-qV</c> all do) or is exactly <c>--disable</c> (not <c>--disable=x</c>
+    /// or <c>--no-disable</c>), as its <c>operate</c> checks; measured 2026-09-27.
+    /// </summary>
+    private static bool SkipsDefaultConfigFile(IReadOnlyList<string> arguments) =>
+        arguments.Count > 0
+        && ((arguments[0] ?? string.Empty).StartsWith("-q", StringComparison.Ordinal) || arguments[0] == "--disable");
 
     /// <summary>
     /// Checks the command line once it is all read: refused when it names no URL, or when it asks for

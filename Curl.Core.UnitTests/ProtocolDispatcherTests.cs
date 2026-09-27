@@ -80,7 +80,7 @@ public sealed class ProtocolDispatcherTests
     }
 
     private static TransferContext CreateContext(string url) =>
-        new() { Url = new Uri(url), Output = Stream.Null };
+        new() { Url = CurlUrl.Parse(url), Output = Stream.Null };
 
     private sealed class RecordingHandler(TransferResult result, params string[] schemes)
         : IProtocolHandler

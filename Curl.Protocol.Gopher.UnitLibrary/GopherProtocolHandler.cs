@@ -67,7 +67,7 @@ public sealed class GopherProtocolHandler : IProtocolHandler
         ArgumentNullException.ThrowIfNull(context);
 
         ConnectResult connected = await connector
-            .ConnectAsync(CreateTarget(context.Url), context.CancellationToken)
+            .ConnectAsync(CreateTarget(context), context.CancellationToken)
             .ConfigureAwait(false);
         if (connected.Connection is not { } connection)
         {
@@ -90,8 +90,14 @@ public sealed class GopherProtocolHandler : IProtocolHandler
         }
     }
 
-    private static ConnectTarget CreateTarget(Uri url) =>
-        new(url.IdnHost, url.IsDefaultPort ? DefaultPort : url.Port, url.Scheme == "gophers");
+    private static ConnectTarget CreateTarget(ITransferContext context)
+    {
+        CurlUrl url = context.Url;
+        return new(url.IdnHost, url.IsDefaultPort ? DefaultPort : url.Port, url.Scheme == "gophers")
+        {
+            Proxy = context.Proxy,
+        };
+    }
 
     private static async ValueTask<bool> TrySendAsync(
         IConnection connection,

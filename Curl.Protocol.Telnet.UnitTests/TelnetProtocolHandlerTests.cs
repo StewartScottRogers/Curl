@@ -18,7 +18,7 @@ public sealed class TelnetProtocolHandlerTests
     /// </summary>
     private const string Offers = "FF FB 00 FF FD 00 FF FB 03 FF FD 03";
 
-    private static readonly Uri TelnetUrl = new("telnet://example.test/");
+    private static readonly CurlUrl TelnetUrl = CurlUrl.Parse("telnet://example.test/");
 
     [TestMethod]
     public void SupportedSchemes_IsTelnetOnly()
@@ -58,9 +58,37 @@ public sealed class TelnetProtocolHandlerTests
         var connector = new RecordingConnector(ConnectResult.Connected(new ScriptedConnection()));
 
         await new TelnetProtocolHandler(connector).ExecuteAsync(
-            Context(new Uri("telnet://[::1]:2323/"), new MemoryStream()));
+            Context(CurlUrl.Parse("telnet://[::1]:2323/"), new MemoryStream()));
 
         Assert.AreEqual(new ConnectTarget("::1", 2323, false), connector.Targets.Single());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ContextWithProxy_TunnelsToTheOriginOnPort23ThroughThatProxy()
+    {
+        var connector = new RecordingConnector(ConnectResult.Connected(new ScriptedConnection()));
+        var proxy = new ProxyEndpoint(ProxyKind.Http, "proxy.example", 3128, null);
+        var context = new TransferContext
+        {
+            Url = CurlUrl.Parse("telnet://example.com/"),
+            Output = new MemoryStream(),
+            Upload = new MemoryStream(),
+            Proxy = proxy,
+        };
+
+        await new TelnetProtocolHandler(connector).ExecuteAsync(context);
+
+        Assert.AreEqual(new ConnectTarget("example.com", 23, false) { Proxy = proxy }, connector.Targets.Single());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ContextWithoutProxy_ConnectsDirectly()
+    {
+        var connector = new RecordingConnector(ConnectResult.Connected(new ScriptedConnection()));
+
+        await new TelnetProtocolHandler(connector).ExecuteAsync(Context(TelnetUrl, new MemoryStream()));
+
+        Assert.IsNull(connector.Targets.Single().Proxy);
     }
 
     [TestMethod]
@@ -395,7 +423,7 @@ public sealed class TelnetProtocolHandlerTests
         Assert.IsTrue(connection.IsDisposed);
     }
 
-    private static TransferContext Context(Uri url, Stream output) =>
+    private static TransferContext Context(CurlUrl url, Stream output) =>
         new() { Url = url, Output = output, Upload = new MemoryStream() };
 
     private static ScriptedRead Read(string hex) => new(Hex(hex));

@@ -87,6 +87,33 @@ public sealed class MqttProtocolHandlerTests
         CollectionAssert.AreEqual(new[] { new ConnectTarget("h", 8883, true) }, connector.Targets);
     }
 
+    /// <summary>
+    /// curl 8.21.0 measured by BL-330: <c>curl -x proxy mqtt://example.com/t</c> sends
+    /// <c>CONNECT example.com:1883</c> to the proxy; the connector writes it (ADR-0056).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_ContextWithProxy_TunnelsToTheOriginOnPort1883ThroughThatProxy()
+    {
+        FakeConnector connector = FakeConnector.For(new ScriptedConnection());
+        var proxy = new ProxyEndpoint(ProxyKind.Http, "proxy.example", 3128, null);
+
+        await RunAsync(
+            connector,
+            new TransferContext { Url = CurlUrl.Parse("mqtt://example.com/t"), Output = new RecordingStream(), Proxy = proxy });
+
+        CollectionAssert.AreEqual(new[] { new ConnectTarget("example.com", 1883, false) { Proxy = proxy } }, connector.Targets);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ContextWithoutProxy_ConnectsDirectly()
+    {
+        FakeConnector connector = FakeConnector.For(new ScriptedConnection());
+
+        await RunAsync(connector, "mqtt://h/t", new RecordingStream());
+
+        Assert.IsNull(connector.Targets.Single().Proxy);
+    }
+
     [TestMethod]
     public async Task ExecuteAsync_UrlNamesPort_ConnectsToThatPort()
     {
@@ -630,7 +657,7 @@ public sealed class MqttProtocolHandlerTests
         MqttProtocolHandler handler = new(FakeConnector.For(connection), () => FixedSuffix);
         TransferContext context = new()
         {
-            Url = new Uri("mqtt://h/t"),
+            Url = CurlUrl.Parse("mqtt://h/t"),
             Output = new RecordingStream(),
             CancellationToken = new CancellationToken(canceled: true),
         };
@@ -653,7 +680,7 @@ public sealed class MqttProtocolHandlerTests
             FakeConnector.For(connection),
             new TransferContext
             {
-                Url = new Uri("mqtt://h/bedroom/dimmer"),
+                Url = CurlUrl.Parse("mqtt://h/bedroom/dimmer"),
                 Output = output,
                 PostData = Encoding.ASCII.GetBytes("75"),
             });
@@ -757,7 +784,7 @@ public sealed class MqttProtocolHandlerTests
             FakeConnector.For(connection),
             new TransferContext
             {
-                Url = new Uri("mqtt://h/t"),
+                Url = CurlUrl.Parse("mqtt://h/t"),
                 Output = new RecordingStream(),
                 Credentials = new NetworkCredential("al", "pw"),
             });
@@ -843,7 +870,7 @@ public sealed class MqttProtocolHandlerTests
             FakeConnector.For(connection),
             new TransferContext
             {
-                Url = new Uri("mqtt://h/t"),
+                Url = CurlUrl.Parse("mqtt://h/t"),
                 Output = output,
                 PostData = Encoding.ASCII.GetBytes("x"),
             });
@@ -902,7 +929,7 @@ public sealed class MqttProtocolHandlerTests
             FakeConnector.For(connection),
             new TransferContext
             {
-                Url = new Uri("mqtt://h/t"),
+                Url = CurlUrl.Parse("mqtt://h/t"),
                 Output = new RecordingStream(),
                 PostData = new byte[268435451 - 3],
             });
@@ -943,7 +970,7 @@ public sealed class MqttProtocolHandlerTests
     private static byte[] Concat(params byte[][] parts) => [.. parts.SelectMany(part => part)];
 
     private static TransferContext Context(string url, Stream output) =>
-        new() { Url = new Uri(url), Output = output };
+        new() { Url = CurlUrl.Parse(url), Output = output };
 
     private Task<TransferResult> PublishAsync(
         ScriptedConnection connection,
@@ -954,7 +981,7 @@ public sealed class MqttProtocolHandlerTests
             FakeConnector.For(connection),
             new TransferContext
             {
-                Url = new Uri(url),
+                Url = CurlUrl.Parse(url),
                 Output = new RecordingStream(),
                 PostData = Encoding.ASCII.GetBytes(payload),
                 Credentials = credentials,

@@ -17,7 +17,7 @@ public sealed class TransferContextFactoryTests
         using MemoryStream standardInput = new();
         using MemoryStream output = new();
         using MemoryStream headerOutput = new();
-        Uri url = new("file:///C:/x.txt");
+        CurlUrl url = CurlUrl.Parse("file:///C:/x.txt");
         ByteRange range = ByteRange.Bounded(2, 5);
 
         TransferContext context = new TransferContextFactory(standardInput)
@@ -37,7 +37,7 @@ public sealed class TransferContextFactoryTests
         using MemoryStream output = new();
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse("file:///C:/x.txt"), new Uri("file:///C:/x.txt"), output, null, null, null);
+            .Create(Parse("file:///C:/x.txt"), CurlUrl.Parse("file:///C:/x.txt"), output, null, null, null);
 
         Assert.IsNull(context.HeaderOutput);
         Assert.IsNull(context.Range);
@@ -76,7 +76,7 @@ public sealed class TransferContextFactoryTests
             "tftp://example.com/x");
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(options, new Uri("tftp://example.com/x"), output, null, null, null);
+            .Create(options, CurlUrl.Parse("tftp://example.com/x"), output, null, null, null);
 
         Assert.AreEqual(100L, context.MaxFileSize);
         Assert.AreEqual("a=b", System.Text.Encoding.ASCII.GetString(context.PostData!.Value.Span));
@@ -102,7 +102,7 @@ public sealed class TransferContextFactoryTests
             "-X", "PATCH", "-H", "X: 1", "-A", "a/1", "-e", "http://r/", "-d", "a=b", "http://example.com/");
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(options, new Uri("http://example.com/"), output, null, null, null);
+            .Create(options, CurlUrl.Parse("http://example.com/"), output, null, null, null);
 
         Assert.AreEqual("PATCH", context.Http!.CustomMethod);
         CollectionAssert.AreEqual(new[] { "X: 1" }, context.Http.Headers.ToArray());
@@ -120,7 +120,7 @@ public sealed class TransferContextFactoryTests
         using MemoryStream output = new();
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse("telnet://example.com/"), new Uri("telnet://example.com/"), output, null, null, null);
+            .Create(Parse("telnet://example.com/"), CurlUrl.Parse("telnet://example.com/"), output, null, null, null);
 
         Assert.AreSame(standardInput, context.Upload);
     }
@@ -134,7 +134,7 @@ public sealed class TransferContextFactoryTests
         using MemoryStream output = new();
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse(url), new Uri(url), output, null, null, null);
+            .Create(Parse(url), CurlUrl.Parse(url), output, null, null, null);
 
         Assert.IsNull(context.Upload);
     }

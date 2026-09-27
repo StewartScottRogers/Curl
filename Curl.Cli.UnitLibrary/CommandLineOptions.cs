@@ -16,6 +16,7 @@ public sealed class CommandLineOptions
 {
     private readonly List<string> urls = [];
     private readonly List<UrlOutput> urlOutputs = [];
+    private readonly List<string> uploadFiles = [];
     private readonly List<string> telnetOptions = [];
     private readonly List<string> resolveEntries = [];
     private readonly List<string> connectToEntries = [];
@@ -33,6 +34,13 @@ public sealed class CommandLineOptions
     /// <c>--url</c> values interleaved as they were given.
     /// </summary>
     public IReadOnlyList<string> Urls => urls;
+
+    /// <summary>
+    /// The <c>-T</c> / <c>--upload-file</c> values in command-line order, each unchanged: the Nth is
+    /// uploaded to the Nth URL of <see cref="Urls"/>, wherever each was given, and a URL past the end
+    /// uploads nothing, as curl 8.21.0 pairs them. An empty value keeps its place and uploads nothing.
+    /// </summary>
+    public IReadOnlyList<string> UploadFiles => uploadFiles;
 
     /// <summary>
     /// <see langword="true"/> when <c>-g</c> / <c>--globoff</c> was given and no <c>--no-globoff</c>
@@ -635,15 +643,25 @@ public sealed class CommandLineOptions
     /// The HTTP request method <c>-I</c> / <c>--head</c> (<see cref="SelectedHttpMethod.Head"/>),
     /// <c>--no-head</c> (<see cref="SelectedHttpMethod.Get"/>) or <c>-F</c> / <c>--form</c> and
     /// <c>--form-string</c> (<see cref="SelectedHttpMethod.MultipartFormPost"/>) selected first; once one
-    /// is selected, selecting another is refused, as curl 8.21.0 does.
+    /// is selected, selecting another is refused, as curl 8.21.0 does. <see cref="SelectedHttpMethod.None"/>
+    /// when none of them was given. Transfer setup reads it to refuse a <see cref="PostData"/> body
+    /// sent with <c>HEAD</c> or <c>GET</c>.
     /// </summary>
-    internal SelectedHttpMethod HttpMethodSelected { get; set; }
+    public SelectedHttpMethod HttpMethodSelected { get; internal set; }
 
     /// <summary>
     /// <see langword="true"/> when <c>-s</c> / <c>--silent</c> has been read and <c>-S</c> /
     /// <c>--show-error</c> has not, so far: curl then hides error messages.
     /// </summary>
     internal bool ErrorsHidden => Silent && !ShowError;
+
+    /// <summary>
+    /// The path of the default config file (<c>.curlrc</c>) read before the command line when every
+    /// line of it was applied; <see langword="null"/> when none was found, when <c>-q</c> /
+    /// <c>--disable</c> came first, or when a line of it was refused. curl 8.21.0 names it with
+    /// <c>-v</c> as <c>Note: Read config file from '&lt;path&gt;'</c>.
+    /// </summary>
+    public string? DefaultConfigFile { get; internal set; }
 
     /// <summary>
     /// How many <c>-K</c> / <c>--config</c> files are being read right now, one inside another; curl
@@ -760,6 +778,13 @@ public sealed class CommandLineOptions
         }
     }
 
+    /// <summary>
+    /// Appends <paramref name="lines"/> to <see cref="WarningLines"/> as they are: error lines curl
+    /// prints while reading its default config file, already hidden, or not, by the caller.
+    /// </summary>
+    /// <param name="lines">The lines, without line terminators.</param>
+    internal void AddErrorLines(IReadOnlyList<string> lines) => warningLines.AddRange(lines);
+
     /// <summary>Appends <paramref name="url"/> to <see cref="Urls"/>, unchanged and unvalidated.</summary>
     /// <param name="url">A positional argument or a <c>--url</c> value.</param>
     internal void AddUrl(string url)
@@ -767,6 +792,10 @@ public sealed class CommandLineOptions
         urls.Add(url);
         (urlOutputs.Find(output => output.Url is null) ?? AddUrlOutput()).Url = url;
     }
+
+    /// <summary>Appends <paramref name="uploadFile"/> to <see cref="UploadFiles"/>; nothing is opened.</summary>
+    /// <param name="uploadFile">A <c>-T</c> / <c>--upload-file</c> value, which may be empty.</param>
+    internal void AddUploadFile(string uploadFile) => uploadFiles.Add(uploadFile);
 
     /// <summary>
     /// Pairs <paramref name="outputFile"/> with the next URL in <see cref="UrlOutputs"/>; nothing is

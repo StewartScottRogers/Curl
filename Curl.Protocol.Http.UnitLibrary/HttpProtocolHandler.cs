@@ -109,17 +109,29 @@ namespace Curl.Protocol.Http;
 /// curl 8.21.0 (BL-183 Notes).
 /// </para>
 /// <para>
+/// An <c>ftp</c> URL is served the same way when forwarded through such a proxy, as libcurl
+/// hands <c>ftp</c> to its HTTP code when not tunnelling (ADR-0056, rule 3): a GET for the
+/// absolute <c>ftp://</c> URI with the port always on <c>Host</c> (<c>Host: example.com:21</c>),
+/// and the proxy's reply is the response. <c>ftp</c> is not among
+/// <see cref="SupportedSchemes" />: <c>Curl.Console</c> routes an <c>ftp</c> URL here only
+/// when it is forwarded (BL-344). Measured on curl 8.21.0 (BL-330 Notes).
+/// </para>
+/// <para>
 /// <see cref="ITransferContext.MaxTime" /> limits the whole transfer, authentication retry
-/// included, and <see cref="ITransferContext.ConnectTimeout" /> (300 seconds when not given)
+/// included, counted from <see cref="ITransferContext.OperationStarted" /> when a redirect
+/// chain set it, and <see cref="ITransferContext.ConnectTimeout" /> (300 seconds when not given)
 /// each connect (<see cref="HttpTransferDeadline" />). A limit that passes during a connect
 /// ends it with exit 28 and <c>Connection timed out after N milliseconds</c>; <c>-m</c> passing
 /// after it ends the transfer with exit 28 and <c>Operation timed out after N milliseconds with
 /// M bytes received</c>, or <c>M out of T bytes</c> while a Content-Length body is read. A
-/// connection that fails a write ends the transfer with exit 55. Measured on curl 8.21.0
-/// (BL-174 Notes).
+/// connection that fails a write ends the transfer with exit 55. The connect message's N
+/// counts from this call, the operation message's from the operation's start. Measured on
+/// curl 8.21.0 (BL-174 and BL-299 Notes).
 /// </para>
 /// <para>
-/// <see cref="ITransferContext.ResumeFrom" /> above zero sends <c>Range: bytes=N-</c>, and else
+/// <see cref="ITransferContext.ResumeFrom" /> above zero resumes a <c>-T</c> upload from that
+/// offset with a <c>Content-Range</c> (<see cref="HttpUploadResume" />, BL-332 Notes); for a
+/// request without a body it sends <c>Range: bytes=N-</c>, and else
 /// <see cref="ITransferContext.Range" /> sends its range, for a request without a body
 /// (<see cref="HttpRangeHeader" />); <see cref="ITransferContext.TimeCondition" /> sends
 /// <c>If-Modified-Since</c> or <c>If-Unmodified-Since</c>. Once the final head is written,
@@ -164,11 +176,11 @@ public sealed class HttpProtocolHandler(
         ArgumentNullException.ThrowIfNull(context);
 
         HttpRequestOptions options = context.Http ?? new HttpRequestOptions();
-        HttpRequestFraming framing = HttpRequestFraming.Of(options, [.. options.Headers.Select(HttpCustomHeader.Parse)], context.NoBody);
+        HttpRequestFraming framing = HttpRequestFraming.Of(options, [.. options.Headers.Select(HttpCustomHeader.Parse)], context.NoBody, context.Upload, context.ResumeFrom);
         HttpAuthRequest authRequest = new(
             framing.Method,
             context.Url,
-            context.Url.PathAndQuery,
+            options.RequestTarget ?? HttpUrlText.RequestTarget(context.Url),
             context.Credentials,
             options.BearerToken,
             options.AuthSchemes,
@@ -188,8 +200,8 @@ public sealed class HttpProtocolHandler(
     /// Builds the connect target for <paramref name="url" />: its host without IPv6
     /// brackets, its port, and TLS for <c>https</c>.
     /// </summary>
-    private static ConnectTarget TargetOf(Uri url) =>
-        new(url.DnsSafeHost, url.Port, string.Equals(url.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase));
+    private static ConnectTarget TargetOf(CurlUrl url) =>
+        new(url.IdnHost, url.Port, url.Scheme == "https");
 
     /// <summary>
     /// Builds the connect target for <paramref name="plan" />: the forward proxy itself, with
@@ -203,10 +215,10 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Gives the proxy the request is forwarded through in absolute form: an HTTP-kind proxy,
-    /// for an <c>http</c> URL, without <c>-p</c>. Every other proxy is tunnelled through by
+    /// for an <c>http</c> or <c>ftp</c> URL, without <c>-p</c>. Every other proxy is tunnelled through by
     /// the connector, and <see langword="null" /> is returned for it.
     /// </summary>
-    private static ProxyEndpoint? ForwardProxyOf(Uri url, HttpRequestOptions options) =>
+    private static ProxyEndpoint? ForwardProxyOf(CurlUrl url, HttpRequestOptions options) =>
         options.ForwardProxy is { Kind: ProxyKind.Http or ProxyKind.Http10 or ProxyKind.Https } proxy
             && !options.ProxyTunnel
             && !TargetOf(url).UseTls
@@ -237,7 +249,8 @@ public sealed class HttpProtocolHandler(
         ConnectResult connect = await plan.Deadline.ConnectAsync(connector, TargetOf(plan)).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
         {
-            return TransferResult.Failure(connect.ExitCode, connect.ErrorMessage!);
+            TransferResult failure = TransferResult.Failure(connect.ExitCode, connect.ErrorMessage!);
+            return plan.Options.ForwardProxy is null ? failure : failure with { Report = new TransferReport { UsedProxy = true } };
         }
 
         HttpAttemptOutcome outcome;
@@ -283,8 +296,15 @@ public sealed class HttpProtocolHandler(
             HttpRangeHeader.ValueFor(context, framing.Body is not null),
             context.TimeCondition,
             framing);
-        HttpRequestBodyWriter upload = new(connection);
-        HttpExchange exchange = new(connect, connection, framing.Method, request.Length, upload, earlier, newConnection);
+        HttpRequestBodyWriter upload = new(connection)
+        {
+            SharedHeadLength = framing.AwaitsContinue ? 0 : request.Length,
+            IsUpload = framing.IsUpload,
+        };
+        HttpExchange exchange = new(connect, connection, framing.Method, request.Length, upload, earlier, newConnection)
+        {
+            UsedProxy = options.ForwardProxy is not null,
+        };
         IConnection responseConnection = framing.AwaitsContinue ? new HttpContinueWaitConnection(connection) : connection;
         HttpResponseBodyReader body = new(responseConnection)
         {
@@ -320,7 +340,7 @@ public sealed class HttpProtocolHandler(
         }
         catch (OperationCanceledException) when (plan.Deadline.EndedByLimit)
         {
-            string message = HttpTransferMessages.OperationTimedOut(plan.Deadline.ElapsedMilliseconds, body.BytesWritten, body.ExpectedLength);
+            string message = HttpTransferMessages.OperationTimedOut(plan.Deadline.OperationElapsedMilliseconds, body.BytesWritten, body.ExpectedLength);
             TransferResult timedOut = TransferResult.Failure(CurlExitCode.OperationTimedOut, message, body.BytesWritten)
                 with
             { Report = exchange.Report(body.BytesWritten) };
@@ -333,14 +353,22 @@ public sealed class HttpProtocolHandler(
     }
 
     /// <summary>
-    /// Fails an HTTP/1.0 request whose body length is unknown before any byte of it is sent,
-    /// with exit 25, as curl 8.21.0 does once connected (measured, BL-180 Notes).
+    /// Fails a request before any byte of it is sent, as curl 8.21.0 does once connected: a
+    /// <c>-T</c> upload whose <c>-C</c> offset cannot be resumed from (exit 18 or 26, measured,
+    /// BL-332 Notes), and an HTTP/1.0 request whose body length is unknown (exit 25, measured,
+    /// BL-180 Notes).
     /// </summary>
     /// <exception cref="HttpTransferException">
+    /// <see cref="HttpRequestFraming.ResumeFailure" /> or
     /// <see cref="HttpRequestFraming.RefusesUnknownLength" /> is set.
     /// </exception>
     private static void ThrowIfRefused(HttpRequestFraming framing)
     {
+        if (framing.ResumeFailure is { } resumeFailure)
+        {
+            throw resumeFailure;
+        }
+
         if (framing.RefusesUnknownLength)
         {
             throw new HttpTransferException(CurlExitCode.UploadFailed, HttpTransferMessages.ChunkedUploadNeedsHttp11);
@@ -600,6 +628,12 @@ public sealed class HttpProtocolHandler(
         internal HttpResponseHead? Head { get; set; }
 
         /// <summary>
+        /// Gets a value indicating whether the transfer goes through a proxy, forwarded or
+        /// tunnelled, the report's <see cref="TransferReport.UsedProxy" />.
+        /// </summary>
+        internal bool UsedProxy { get; init; }
+
+        /// <summary>
         /// Gets or sets the final head's <c>Location</c> resolved against the request URL,
         /// <see langword="null" /> until the head is read or when it names none.
         /// </summary>
@@ -623,7 +657,9 @@ public sealed class HttpProtocolHandler(
                 HeaderSize = earlier?.HeaderSize ?? 0,
                 ConnectionCount = (earlier?.ConnectionCount ?? 0) + (newConnection ? 1 : 0),
                 ProxyConnectResponseCode = connect.ProxyConnectResponseCode,
+                UsedProxy = UsedProxy,
                 LocalEndPoint = connect.LocalEndPoint,
+                PeerCertificates = connect.PeerCertificates,
                 RemoteEndPoint = connection.RemoteEndPoint as IPEndPoint,
             };
             return Head is null ? report : WithHead(report, Head) with { RedirectUrl = RedirectUrl };
