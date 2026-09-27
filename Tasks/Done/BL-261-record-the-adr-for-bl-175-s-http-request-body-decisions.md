@@ -8,7 +8,7 @@ depends-on: [BL-175]
 touches: [Documentation/Planning/Decisions]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-261 — Record the ADR for BL-175's HTTP request body decisions
 
@@ -27,12 +27,17 @@ An ADR, marked "Decided by Claude under Stewart's delegation", records the four 
 
 ## Acceptance criteria
 
-- [ ] A new ADR under `Documentation/Planning/Decisions` states the four decisions above, each with the measured curl behaviour it follows, and is marked "Decided by Claude under Stewart's delegation".
-- [ ] The ADR's alternatives section says why each alternative lost.
+- [x] A new ADR under `Documentation/Planning/Decisions` states the four decisions above, each with the measured curl behaviour it follows, and is marked "Decided by Claude under Stewart's delegation".
+- [x] The ADR's alternatives section says why each alternative lost.
 
 ## Notes
+
+- Written directly rather than through `align-and-document`: a single new ADR whose content is fixed by BL-175's Notes. Numbered ADR-0036, the next free number after the rebase onto lanes that took 0034 and 0035, and indexed in `Documentation/Planning/Decisions/README.md`.
+- Checked against `HttpRequestBodyWriter`: a failed read (`IOException`) returns 0, the chunked body still gets its last chunk, and a known length throws exit 26 through `ThrowIfShort`.
+- No `.cs` or project file changed, so the `verify` skill was not needed; `dotnet build` and the fast tests were run anyway as the shift requires.
 
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. ADR-0036 records BL-175's four HTTP request body decisions with measured curl behaviour and rejected alternatives
