@@ -69,6 +69,7 @@ choices do not need one.
 | [0052](ADR-0052-handler-synthesised-header-lines-are-reported-as-pseudo-headers.md) | Handler-synthesised header lines are reported as pseudo-headers: `TransferReport.PseudoHeaders` counts towards `%{num_headers}` but is never found by `%header{}`; `file://` reports its three | Accepted | 2026-09-27 |
 | [0053](ADR-0053-curl-console-refuses-a-proxy-tunnel-the-connector-cannot-open-yet-with-exit-4.md) | Curl.Console refuses a proxy tunnel the connector cannot open yet, with exit 4: SOCKS proxies, and HTTPS proxies for `https` or under `-p` or `-L`, until BL-213 and BL-266 land (BL-328) | Accepted | 2026-09-27 |
 | [0054](ADR-0054-the-peer-certificate-chain-is-captured-in-the-tls-provider-and-printed-by-a-port-of-curls-certinfo.md) | The peer certificate chain is captured in the TLS provider's validation callback, carried as DER on `ConnectResult.PeerCertificates` and `TransferReport.PeerCertificates`, and printed for `%{certs}` by `PeerCertificateText`, a port of curl's `Curl_extract_certinfo` | Accepted | 2026-09-27 |
+| [0055](ADR-0055-t-uploads-over-http-are-sent-as-put-in-curl-s-64-kib-upload-buffer.md) | `-T` uploads over HTTP are sent as PUT, read in curl's 64 KiB upload buffer: `Content-Length` for a file, chunked for stdin, no `Content-Type`, the first read sharing the buffer with the head, exit 26 `client read function EOF fail` | Accepted | 2026-09-27 |
 
 ## Template
 
