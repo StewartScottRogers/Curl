@@ -43,11 +43,11 @@ This is a docs-only task: no `.cs` file changes. The contract is BL-134.
 - Written in the session rather than through `align-and-document`: a single new ADR plus an index row, no names or code to align.
 - ADR number: ADR-0045, the next free number on 2026-09-26 (ADR-0009 was taken since filing, and ADR-0044 by BL-178 on another lane during the rebase).
 - Decisions (ADR-0045, decided by Claude under Stewart's delegation): `ITransferProgress` with `ReportTransferStarted()`, `ReportDownloaded(long bytesSoFar, long? expectedTotal)`, `ReportUploaded(long bytesSoFar, long? expectedTotal)`; running totals, not deltas; `ITransferContext.Progress` with no default interface implementation, so a direct implementer must choose; `TransferContext.Progress` defaults to `NoTransferProgress.Instance`.
-- Found: `RedirectFollower.NextHop` copies every context member into a new `TransferContext` by hand, and the default means the compiler will not catch a missing `Progress`. Filed BL-306 (touches `Curl.Core.UnitLibrary`, `Curl.Core.UnitTests`, depends on BL-134) rather than widening BL-134.
+- Found: `RedirectFollower.NextHop` copies every context member into a new `TransferContext` by hand, and the default means the compiler will not catch a missing `Progress`. Filed BL-310 (touches `Curl.Core.UnitLibrary`, `Curl.Core.UnitTests`, depends on BL-134) rather than widening BL-134.
 - Added BL-134's task file to `touches` to point its Context at ADR-0045 and correct a stale fact (`FakeTransferContext.cs` no longer exists). No task in Doing names it.
 
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
-- 2026-09-26: Doing -> Done. ADR-0045 decides ITransferProgress on ITransferContext.Progress with NoTransferProgress as the default; BL-306 filed for redirect hops
+- 2026-09-26: Doing -> Done. ADR-0045 decides ITransferProgress on ITransferContext.Progress with NoTransferProgress as the default; BL-310 filed for redirect hops

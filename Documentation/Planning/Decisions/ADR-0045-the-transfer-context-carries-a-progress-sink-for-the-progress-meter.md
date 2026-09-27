@@ -90,7 +90,7 @@ Adding the interface, `NoTransferProgress` and the member is BL-134. The console
 of it is BL-130 (meter after a failure), BL-131 (live counters) and BL-132 (the `-#`
 bar). `RedirectFollower.NextHop` copies context members into each new hop by hand, and
 the default means the compiler will not catch a missing copy, so carrying `Progress`
-across redirect hops is its own task, BL-306.
+across redirect hops is its own task, BL-310.
 
 ## Consequences
 
@@ -107,7 +107,7 @@ Costs and caveats:
 
 - `ITransferContext` grows by another member that no handler reads yet.
 - A class that copies a context by hand (today only `RedirectFollower.NextHop`) drops
-  the sink silently unless it copies `Progress`; BL-306 fixes the one that exists.
+  the sink silently unless it copies `Progress`; BL-310 fixes the one that exists.
 - Handlers report running totals, so a handler that retries or rewinds an upload (a
   followed PUT, ADR-0033) must decide what "so far" means for the retry; this ADR
   leaves that to the handler task that first rewinds while reporting.

@@ -24,7 +24,7 @@ Where the code goes:
 
 - The new interface and its do-nothing implementation: new files in `Curl.Protocol.Abstractions.UnitLibrary/`, namespace `Curl.Protocol.Abstractions`, with XML doc comments like the neighbouring `ITransferContext.cs`.
 - The new member: `Curl.Protocol.Abstractions.UnitLibrary/ITransferContext.cs`, and an `init` property on `TransferContext.cs` defaulting to the do-nothing instance (the pattern ADR-0008 used for `ConnectTimeout` and `MaxTime`).
-- `ITransferContext.Progress` has no default interface implementation (ADR-0045). At BL-133's run (2026-09-26) only `TransferContext` implements `ITransferContext` (`Curl.Protocol.File.UnitTests/Fakes/FakeTransferContext.cs` no longer exists); if another implementer has appeared (grep `: ITransferContext`), it needs the member too. Copying the sink across redirect hops in `RedirectFollower.NextHop` is BL-306, not this task.
+- `ITransferContext.Progress` has no default interface implementation (ADR-0045). At BL-133's run (2026-09-26) only `TransferContext` implements `ITransferContext` (`Curl.Protocol.File.UnitTests/Fakes/FakeTransferContext.cs` no longer exists); if another implementer has appeared (grep `: ITransferContext`), it needs the member too. Copying the sink across redirect hops in `RedirectFollower.NextHop` is BL-310, not this task.
 
 No handler reports anything yet; `file://` is BL-129. The sink does not read time. No package may be added.
 
