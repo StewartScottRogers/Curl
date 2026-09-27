@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: [BL-150]
-touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
+touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Documentation/Planning/Decisions]
 requirement: none
 created: 2026-09-27
-completed:
+completed: 2026-09-27
 ---
 # BL-368 — Match the Schannel build's exit 35 and exit 60 text for expired, incomplete and revocation-unknown chains
 
@@ -33,15 +33,23 @@ In the Schannel build, `SslStreamTlsProvider` reports an expired, not-yet-valid 
 
 ## Acceptance criteria
 
-- [ ] Named tests in `Curl.Networking.UnitTests` pin each measured line above for the Schannel build, with its exit code.
-- [ ] The revocation decision is recorded in an ADR, and a test pins the chosen behaviour.
-- [ ] `dotnet build Curl.Networking.UnitLibrary -warnaserror` is clean and `dotnet test Curl.Networking.UnitTests --filter "TestCategory!=Integration"` passes, with `TlsFailureMessages` at 100% line and branch coverage.
+- [x] Named tests in `Curl.Networking.UnitTests` pin each measured line above for the Schannel build, with its exit code.
+- [x] The revocation decision is recorded in an ADR, and a test pins the chosen behaviour.
+- [x] `dotnet build Curl.Networking.UnitLibrary -warnaserror` is clean and `dotnet test Curl.Networking.UnitTests --filter "TestCategory!=Integration"` passes, with `TlsFailureMessages` at 100% line and branch coverage.
 
 ## Notes
 
 - Filed by BL-150.
+- Added `Documentation/Planning/Decisions` to `touches` for ADR-0086; no task in Doing names it.
+- Delivered directly (small change in one library): `TlsFailureMessages.SchannelPeerFailedVerification` with `--cacert` now names the first of NotTimeValid, PartialChain, UntrustedRoot, RevocationStatusUnknown (curl's `schannel_verify.c` order); anything else, or no chain, stays the untrusted-root line.
+- Without `--cacert`, a chain whose only problem is NotTimeValid (and no name mismatch) is exit 35 `SEC_E_CERT_EXPIRED` (`TlsFailureMessages.IsSchannelCertificateExpired`, `SchannelCertificateExpired`). Choice: only when time is the sole fault, so an untrusted self-signed expired certificate stays exit 60 untrusted root (not measured; the conservative reading). Schannel uses SEC_E_CERT_EXPIRED for not-yet-valid too. `VerifyPeer` now returns `(CurlExitCode, string)?` so the exit code can be 35.
+- Revocation decided in ADR-0086 (Decided by Claude under Stewart's delegation): the Schannel build checks revocation (`X509RevocationMode.Online`, root excluded) for a `--cacert` chain; new `TlsClientOptions.SkipRevocationCheck` is `--ssl-no-revoke`. The OpenSSL build never checks.
+- Not pinned by a handshake test: `--cacert root.pem` against example.com (needs the network; .NET may report UntrustedRoot rather than PartialChain there) and the system-store expired case (the system store cannot trust a test root), which is pinned through `VerifyPeer` with a built chain instead.
+- CN fallback for an IP-only subjectAltName filed separately as BL-415; parsing `--ssl-no-revoke` filed as BL-414.
+- Tests: Curl.Networking.UnitTests 666 passed, 6 skipped; `TlsFailureMessages`, `SslStreamTlsProvider` and `TlsClientOptions` at 100% line and branch. Whole solution build clean, fast tests green.
 
 ## Log
 
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Done. Schannel build reports not-time-valid, incomplete and revocation-unknown --cacert chains with curl's exit 60 text, and an expired system-store certificate as exit 35 SEC_E_CERT_EXPIRED
