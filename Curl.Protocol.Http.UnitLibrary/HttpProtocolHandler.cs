@@ -91,6 +91,16 @@ namespace Curl.Protocol.Http;
 /// through, and the request goes in origin form over the connection it returns. Measured on
 /// curl 8.21.0 (BL-183 Notes).
 /// </para>
+/// <para>
+/// <see cref="ITransferContext.MaxTime" /> limits the whole transfer, authentication retry
+/// included, and <see cref="ITransferContext.ConnectTimeout" /> (300 seconds when not given)
+/// each connect (<see cref="HttpTransferDeadline" />). A limit that passes during a connect
+/// ends it with exit 28 and <c>Connection timed out after N milliseconds</c>; <c>-m</c> passing
+/// after it ends the transfer with exit 28 and <c>Operation timed out after N milliseconds with
+/// M bytes received</c>, or <c>M out of T bytes</c> while a Content-Length body is read. A
+/// connection that fails a write ends the transfer with exit 55. Measured on curl 8.21.0
+/// (BL-174 Notes).
+/// </para>
 /// </remarks>
 public sealed class HttpProtocolHandler(
     IConnector connector,
@@ -135,8 +145,10 @@ public sealed class HttpProtocolHandler(
             options.AuthSchemes,
             IsProxy: false);
         ProxyEndpoint? forwardProxy = ForwardProxyOf(context.Url, options);
+        using HttpTransferDeadline deadline = new(context);
         HttpRequestPlan plan = new(context, options, framing, authRequest, Authenticator.CreateAuthorization(authRequest, []))
         {
+            Deadline = deadline,
             ForwardProxy = forwardProxy,
             ProxyAuthorization = forwardProxy is null ? null : ProxyAuthorizationFor(authRequest, forwardProxy),
         };
@@ -193,9 +205,7 @@ public sealed class HttpProtocolHandler(
     /// </param>
     private async ValueTask<TransferResult> ConnectAndExchangeAsync(HttpRequestPlan plan, TransferReport? earlier)
     {
-        ITransferContext context = plan.Context;
-        ConnectResult connect = await connector.ConnectAsync(TargetOf(plan), context.CancellationToken)
-            .ConfigureAwait(false);
+        ConnectResult connect = await plan.Deadline.ConnectAsync(connector, TargetOf(plan)).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
         {
             return TransferResult.Failure(connect.ExitCode, connect.ErrorMessage!);
@@ -233,7 +243,7 @@ public sealed class HttpProtocolHandler(
         ITransferContext context = plan.Context;
         HttpRequestOptions options = plan.Options;
         HttpRequestFraming framing = plan.Framing;
-        CancellationToken cancellationToken = context.CancellationToken;
+        CancellationToken cancellationToken = plan.Deadline.Token;
         byte[] request = HttpRequestHeadFormatter.Format(
             context.Url,
             options,
@@ -242,9 +252,6 @@ public sealed class HttpProtocolHandler(
             CookieHeaderFor(context),
             plan.ForwardProxy is not null,
             plan.ProxyAuthorization);
-        await connection.WriteAsync(request, cancellationToken).ConfigureAwait(false);
-        await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
-
         HttpRequestBodyWriter upload = new(connection);
         HttpExchange exchange = new(connect, connection, framing.Method, request.Length, upload, earlier, newConnection);
         IConnection responseConnection = framing.AwaitsContinue ? new HttpContinueWaitConnection(connection) : connection;
@@ -252,7 +259,9 @@ public sealed class HttpProtocolHandler(
         string? retryAuthorization = null;
         try
         {
-            await SendBodyAsync(context, framing, responseConnection, upload).ConfigureAwait(false);
+            await HttpConnectionSend.WriteAsync(connection, request, cancellationToken).ConfigureAwait(false);
+            await HttpConnectionSend.FlushAsync(connection, cancellationToken).ConfigureAwait(false);
+            await SendBodyAsync(context.TimeProvider, framing, responseConnection, upload, cancellationToken).ConfigureAwait(false);
             exchange.Head = await new HttpResponseHeadReader(responseConnection).ReadAsync(cancellationToken).ConfigureAwait(false);
             exchange.RedirectUrl = HttpRedirectLocation.Find(context.Url, exchange.Head);
             StoreCookies(context, exchange.Head);
@@ -273,6 +282,14 @@ public sealed class HttpProtocolHandler(
                 with
             { Report = exchange.Report(body.BytesWritten) };
             return new HttpAttemptOutcome(failed, null, KeepsAlive: false);
+        }
+        catch (OperationCanceledException) when (plan.Deadline.EndedByLimit)
+        {
+            string message = HttpTransferMessages.OperationTimedOut(plan.Deadline.ElapsedMilliseconds, body.BytesWritten, body.ExpectedLength);
+            TransferResult timedOut = TransferResult.Failure(CurlExitCode.OperationTimedOut, message, body.BytesWritten)
+                with
+            { Report = exchange.Report(body.BytesWritten) };
+            return new HttpAttemptOutcome(timedOut, null, KeepsAlive: false);
         }
 
         TransferResult result = TransferResult.Success(body.BytesWritten) with { Report = exchange.Report(body.BytesWritten) };
@@ -348,10 +365,11 @@ public sealed class HttpProtocolHandler(
     /// answered with a final status instead.
     /// </summary>
     private static async ValueTask SendBodyAsync(
-        ITransferContext context,
+        TimeProvider timeProvider,
         HttpRequestFraming framing,
         IConnection responseConnection,
-        HttpRequestBodyWriter upload)
+        HttpRequestBodyWriter upload,
+        CancellationToken cancellationToken)
     {
         if (framing.Body is not { } requestBody)
         {
@@ -359,12 +377,12 @@ public sealed class HttpProtocolHandler(
         }
 
         if (responseConnection is HttpContinueWaitConnection waiting
-            && !await waiting.WaitForContinueAsync(context.TimeProvider, context.CancellationToken).ConfigureAwait(false))
+            && !await waiting.WaitForContinueAsync(timeProvider, cancellationToken).ConfigureAwait(false))
         {
             return;
         }
 
-        await upload.WriteAsync(requestBody, framing.IsChunked, context.CancellationToken).ConfigureAwait(false);
+        await upload.WriteAsync(requestBody, framing.IsChunked, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -524,6 +542,12 @@ public sealed class HttpProtocolHandler(
         public string? Authorization { get; } = Authorization;
 
         /// <summary>
+        /// Gets the time limits the transfer runs under, whose token cancels every read and
+        /// write of the exchange.
+        /// </summary>
+        public required HttpTransferDeadline Deadline { get; init; }
+
+        /// <summary>
         /// Gets the proxy the request is forwarded through in absolute form, or
         /// <see langword="null" /> when it goes to the origin, directly or through a tunnel.
         /// </summary>
@@ -543,6 +567,7 @@ public sealed class HttpProtocolHandler(
         public HttpRequestPlan WithAuthorization(string authorization) =>
             new(Context, Options, Framing, AuthRequest, authorization)
             {
+                Deadline = Deadline,
                 ForwardProxy = ForwardProxy,
                 ProxyAuthorization = ProxyAuthorization,
             };

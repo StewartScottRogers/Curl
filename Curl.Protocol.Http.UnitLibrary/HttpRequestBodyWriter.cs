@@ -40,7 +40,8 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     /// <param name="cancellationToken">Cancels the writes and reads.</param>
     /// <returns>A task that completes when the body has been written.</returns>
     /// <exception cref="HttpTransferException">
-    /// A stream of known length failed a read or ended before its length was read (exit 26).
+    /// A stream of known length failed a read or ended before its length was read (exit 26),
+    /// or the connection failed a write (exit 55).
     /// </exception>
     internal async ValueTask WriteAsync(HttpRequestBody body, bool isChunked, CancellationToken cancellationToken)
     {
@@ -55,10 +56,10 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
 
         if (isChunked)
         {
-            await connection.WriteAsync(LastChunk, cancellationToken).ConfigureAwait(false);
+            await HttpConnectionSend.WriteAsync(connection, LastChunk, cancellationToken).ConfigureAwait(false);
         }
 
-        await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
+        await HttpConnectionSend.FlushAsync(connection, cancellationToken).ConfigureAwait(false);
     }
 
     private async ValueTask WriteStreamAsync(StreamBody body, bool isChunked, CancellationToken cancellationToken)
@@ -118,13 +119,13 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
         if (isChunked)
         {
             byte[] size = Encoding.ASCII.GetBytes(string.Create(CultureInfo.InvariantCulture, $"{piece.Length:x}\r\n"));
-            await connection.WriteAsync(size, cancellationToken).ConfigureAwait(false);
+            await HttpConnectionSend.WriteAsync(connection, size, cancellationToken).ConfigureAwait(false);
         }
 
-        await connection.WriteAsync(piece, cancellationToken).ConfigureAwait(false);
+        await HttpConnectionSend.WriteAsync(connection, piece, cancellationToken).ConfigureAwait(false);
         if (isChunked)
         {
-            await connection.WriteAsync("\r\n"u8.ToArray(), cancellationToken).ConfigureAwait(false);
+            await HttpConnectionSend.WriteAsync(connection, "\r\n"u8.ToArray(), cancellationToken).ConfigureAwait(false);
         }
 
         BytesWritten += piece.Length;

@@ -43,6 +43,13 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     internal ReadOnlyMemory<byte> TrailerBytes => decoder?.TrailerBytes ?? ReadOnlyMemory<byte>.Empty;
 
     /// <summary>
+    /// Gets the Content-Length of the body being read, once reading has started and the body
+    /// is framed by one rather than by chunked coding or the peer closing; otherwise
+    /// <see langword="null" />. It is the <c>out of</c> size of curl's exit 28 message.
+    /// </summary>
+    internal long? ExpectedLength { get; private set; }
+
+    /// <summary>
     /// Determines whether a response carries a body: not for <c>-I</c>, and not for a
     /// 204 or 304 status, whatever its Content-Length says.
     /// </summary>
@@ -96,6 +103,7 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
         bool isChunked = HttpTransferEncoding.IsChunked(head.Headers);
         long? contentLength = HttpContentLength.Find(head.Headers);
         contentDecoder = decodeContent ? HttpContentDecoder.For(head.Headers) : null;
+        ExpectedLength = isChunked ? null : contentLength;
         try
         {
             await CopyFramedAsync(head.BodyPrefix, isChunked, contentLength, output, cancellationToken).ConfigureAwait(false);
