@@ -638,6 +638,7 @@ public sealed class HttpProtocolHandler(
                 ConnectionCount = (earlier?.ConnectionCount ?? 0) + (newConnection ? 1 : 0),
                 ProxyConnectResponseCode = connect.ProxyConnectResponseCode,
                 LocalEndPoint = connect.LocalEndPoint,
+                PeerCertificates = connect.PeerCertificates,
                 RemoteEndPoint = connection.RemoteEndPoint as IPEndPoint,
             };
             return Head is null ? report : WithHead(report, Head) with { RedirectUrl = RedirectUrl };

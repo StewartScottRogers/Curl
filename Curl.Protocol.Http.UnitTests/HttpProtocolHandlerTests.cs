@@ -199,6 +199,29 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ConnectWithPeerCertificates_ReportsTheSameChainInOrder()
+    {
+        ReadOnlyMemory<byte>[] chain = [new byte[] { 0x30, 0x01 }, new byte[] { 0x30, 0x02 }];
+        QueueConnector connector = new(ConnectResult.Connected(Connection(Head + "hello", 65536), null, peerCertificates: chain));
+
+        TransferResult result = await Handler(connector).ExecuteAsync(Context("https://example.com/", new MemoryStream()));
+
+        IReadOnlyList<ReadOnlyMemory<byte>> reported = result.Report!.PeerCertificates;
+        Assert.AreEqual(2, reported.Count);
+        CollectionAssert.AreEqual(chain[0].ToArray(), reported[0].ToArray());
+        CollectionAssert.AreEqual(chain[1].ToArray(), reported[1].ToArray());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_PlainHttp_ReportsNoPeerCertificates()
+    {
+        TransferResult result = await Handler(QueueConnector.For(Connection(Head + "hello", 65536)))
+            .ExecuteAsync(Context("http://example.com/", new MemoryStream()));
+
+        Assert.AreEqual(0, result.Report!.PeerCertificates.Count);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_SeveralContentTypes_ReportsTheLast()
     {
         TransferResult result = await Handler(QueueConnector.For(Connection("HTTP/1.0 200 OK\r\ncontent-type: a\r\nCONTENT-TYPE: b\r\n\r\n", 65536)))
