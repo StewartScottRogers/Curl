@@ -44,3 +44,4 @@ the way sws does, so HTTP authentication and proxy cases get the reply upstream 
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
