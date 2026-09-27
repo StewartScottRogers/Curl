@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.File.UnitLibrary, Curl.Protocol.File.UnitTests]
 requirement: none
 created: 2026-09-27
-completed:
+completed: 2026-09-27
 ---
 # BL-428 — Keep the leading slash of a /X: path in FileUrlPath off Windows
 
@@ -27,16 +27,23 @@ Off Windows, `FileUrlPath` keeps the leading `/` of a URL path that starts `/X:`
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Protocol.File.UnitTests/FileUrlPathTests.cs` parses `file:///C:%2FWindows/win.ini` with drive letters off and asserts `UrlPath` is `/C:%2FWindows/win.ini` and `OsPath` starts with the directory separator (`/C:/Windows/win.ini` with `/` separators); it runs on every OS.
-- [ ] A test parses `file://localhost/Q:dir/x` with drive letters off and asserts the path keeps its leading `/` (`/Q:dir/x`); it runs on every OS.
-- [ ] A test with drive letters on still strips the slash (`file:///C:/Windows/win.ini` gives `C:/Windows/win.ini`), and every existing `FileUrlPathTests` test passes unchanged in intent.
-- [ ] `dotnet build Curl.Protocol.File.UnitLibrary -warnaserror` and `dotnet build Curl.Protocol.File.UnitTests -warnaserror` are clean.
-- [ ] `dotnet test --filter "TestCategory!=Integration"` is green.
-- [ ] `FileUrlPath` has 100% line and branch coverage from `Curl.Protocol.File.UnitTests`.
+- [x] A test in `Curl.Protocol.File.UnitTests/FileUrlPathTests.cs` parses `file:///C:%2FWindows/win.ini` with drive letters off and asserts `UrlPath` is `/C:%2FWindows/win.ini` and `OsPath` starts with the directory separator (`/C:/Windows/win.ini` with `/` separators); it runs on every OS.
+- [x] A test parses `file://localhost/Q:dir/x` with drive letters off and asserts the path keeps its leading `/` (`/Q:dir/x`); it runs on every OS.
+- [x] A test with drive letters on still strips the slash (`file:///C:/Windows/win.ini` gives `C:/Windows/win.ini`), and every existing `FileUrlPathTests` test passes unchanged in intent.
+- [x] `dotnet build Curl.Protocol.File.UnitLibrary -warnaserror` and `dotnet build Curl.Protocol.File.UnitTests -warnaserror` are clean.
+- [x] `dotnet test --filter "TestCategory!=Integration"` is green.
+- [x] `FileUrlPath` has 100% line and branch coverage from `Curl.Protocol.File.UnitTests`.
 
 ## Notes
+
+- Checked upstream: curl 8.21.0 `lib/file.c`, `file_connect`, strips the slash only inside `#ifdef DOS_FILESYSTEM`. Stated in the `FileUrlPath` remarks and the new tests' comment.
+- Delivered directly rather than through the full `/feature` agent stages: a one-branch change whose shape the task's Context already fixes.
+- Choice: `internal static bool TryParse(CurlUrl, bool driveLetters, out FileUrlPath)`, mirroring `CurlUrl.TryParse`'s internal `driveLetters` overload; the public entry point passes `OperatingSystem.IsWindows()`. Kept internal so the public surface does not grow, which needed `InternalsVisibleTo Curl.Protocol.File.UnitTests` in the library's csproj (inside `touches`). No ADR: the behaviour is the one the task specifies, not a new decision.
+- Tests: `TryParse_DriveLettersOff_KeepsTheLeadingSlash` and `TryParse_DriveLettersOn_DropsTheLeadingSlash` (both URLs, every OS) and `TryParse_DriveLettersOnWithAWrittenSlash_DropsTheLeadingSlash` (Windows only, because `CurlUrl` rejects `file:///C:/…` elsewhere). File tests 306/306; `FileUrlPath` 100% line and branch.
+- Follow-up filed: BL-429. The same upstream block rewrites `X|` to `X:` (`actual_path[2] = ':'`), which contradicts the "`|` spelling is kept" remark and a Windows-only test.
 
 ## Log
 
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Done. FileUrlPath keeps the leading slash of /X: and /X| paths off Windows, as curl's OpenSSL build does

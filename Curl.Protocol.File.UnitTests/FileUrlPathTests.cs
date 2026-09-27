@@ -11,7 +11,9 @@ namespace Curl.Protocol.File;
 /// <remarks>
 /// curl accepts a Windows drive letter in a <c>file://</c> URL only on Windows (ADR-0010),
 /// so a test whose subject is the drive letter runs only there; the non-Windows rejection
-/// is pinned in <c>Curl.Protocol.Abstractions.UnitTests</c>. Every other test uses a
+/// is pinned in <c>Curl.Protocol.Abstractions.UnitTests</c>. The exceptions are the tests
+/// that pass <c>driveLetters</c> explicitly with a URL every build accepts: they pin
+/// both platforms' slash rule on every OS. Every other test uses a
 /// drive-less path, which every curl build accepts. The drive-less expectations follow
 /// the same rules curl 8.21.0 was measured applying on Windows with a <c>C:</c> path.
 /// </remarks>
@@ -480,6 +482,62 @@ public sealed class FileUrlPathTests
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
         Assert.AreEqual("C:%2FWindows/win.ini", path.UrlPath);
+        Assert.AreEqual(NativePath("C:/Windows/win.ini"), path.OsPath);
+    }
+
+    // curl 8.21.0 strips the slash in front of a drive only inside #ifdef DOS_FILESYSTEM
+    // in lib/file.c (file_connect), so the Linux and macOS builds open these URLs as the
+    // absolute paths /C:/Windows/win.ini and /Q:dir/x. CurlUrl accepts both off Windows
+    // because neither drive is followed by a written slash.
+    [TestMethod]
+    [DataRow("file:///C:%2FWindows/win.ini", "/C:%2FWindows/win.ini", "/C:/Windows/win.ini")]
+    [DataRow("file://localhost/Q:dir/x", "/Q:dir/x", "/Q:dir/x")]
+    public void TryParse_DriveLettersOff_KeepsTheLeadingSlash(
+        string text,
+        string urlPath,
+        string osPath)
+    {
+        var url = CurlUrl.Parse(text);
+
+        bool parsed = FileUrlPath.TryParse(url, driveLetters: false, out var path);
+
+        Assert.IsTrue(parsed);
+        Assert.IsNotNull(path);
+        Assert.AreEqual(urlPath, path.UrlPath);
+        Assert.AreEqual(NativePath(osPath), path.OsPath);
+        Assert.StartsWith(Path.DirectorySeparatorChar.ToString(), path.OsPath);
+    }
+
+    [TestMethod]
+    [DataRow("file:///C:%2FWindows/win.ini", "C:%2FWindows/win.ini", "C:/Windows/win.ini")]
+    [DataRow("file://localhost/Q:dir/x", "Q:dir/x", "Q:dir/x")]
+    public void TryParse_DriveLettersOn_DropsTheLeadingSlash(
+        string text,
+        string urlPath,
+        string osPath)
+    {
+        var url = CurlUrl.Parse(text);
+
+        bool parsed = FileUrlPath.TryParse(url, driveLetters: true, out var path);
+
+        Assert.IsTrue(parsed);
+        Assert.IsNotNull(path);
+        Assert.AreEqual(urlPath, path.UrlPath);
+        Assert.AreEqual(NativePath(osPath), path.OsPath);
+    }
+
+    // Only the Windows build accepts a drive followed by a written slash.
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public void TryParse_DriveLettersOnWithAWrittenSlash_DropsTheLeadingSlash()
+    {
+        var url = CurlUrl.Parse("file:///C:/Windows/win.ini");
+
+        bool parsed = FileUrlPath.TryParse(url, driveLetters: true, out var path);
+
+        Assert.IsTrue(parsed);
+        Assert.IsNotNull(path);
+        Assert.AreEqual("C:/Windows/win.ini", path.UrlPath);
         Assert.AreEqual(NativePath("C:/Windows/win.ini"), path.OsPath);
     }
 
