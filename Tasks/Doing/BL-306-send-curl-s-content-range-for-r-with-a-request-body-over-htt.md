@@ -34,3 +34,4 @@ A request with a body and `-r` sends the `Content-Range` curl 8.21.0 sends, in i
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-27: Backlog -> Doing.
