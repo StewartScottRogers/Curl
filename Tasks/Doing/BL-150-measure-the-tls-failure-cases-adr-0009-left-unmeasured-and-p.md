@@ -54,3 +54,4 @@ Every TLS failure case listed below is measured against the reference curl build
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-27: Backlog -> Doing.
