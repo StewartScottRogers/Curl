@@ -1,5 +1,5 @@
 ---
-id: BL-397
+id: BL-399
 title: Carry a refused connect to the TransferResult in Dict, Gopher, Mqtt and Telnet
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-397 — Carry a refused connect to the TransferResult in Dict, Gopher, Mqtt and Telnet
+# BL-399 — Carry a refused connect to the TransferResult in Dict, Gopher, Mqtt and Telnet
 
 ## Goal
 

@@ -34,7 +34,7 @@ A connect that failed because every address refused it reaches `TransferResult` 
 - `TcpConnector.DialFirstReachableAsync` now returns the `SocketError` of the last failed dial; `DialFailure` returns `Refused` when it is `ConnectionRefused`. Direct and proxy dials both use it.
 - Choice: "refused" means the *last* address tried refused, not every address. That is what curl reads: `retrycheck` tests `CURLINFO_OS_ERRNO`, which holds the errno of the last failed connect attempt. It satisfies the criterion (every address refused -> the last did). Matching curl directly is not a judgement call, so no ADR was written (the Decisions README reserves ADRs for choices a reasonable person would make differently).
 - `HttpProtocolHandler.ConnectAndExchangeAsync` copies the flag onto the failed `TransferResult`. BL-390 consumes it in `TransferRetrier`.
-- Filed BL-397 for Dict, Gopher, Mqtt and Telnet. Ftp does not connect through `IConnector` yet and Tftp uses a datagram channel, so neither is in it.
+- Filed BL-399 for Dict, Gopher, Mqtt and Telnet. Ftp does not connect through `IConnector` yet and Tftp uses a datagram channel, so neither is in it.
 - Quality: `Measure-CodeQuality.ps1 -IncludeIntegration` reports Networking, Abstractions and Http at 100% line and branch with 0 failing members. (Without `-IncludeIntegration`, `TcpDialer` and `UdpDatagramChannel`, unchanged here, are reached only by Integration tests.)
 
 ## Log
