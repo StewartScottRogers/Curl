@@ -81,7 +81,7 @@
 .PARAMETER Ftp
     Serve one FTP session instead of HTTP responses: send a greeting, then read curl's
     commands one line at a time and answer each from a table of replies, opening a
-    passive data connection for EPSV, PASV, RETR and LIST. request.bin then holds every
+    passive data connection for EPSV, PASV, RETR, LIST, STOR and APPE. request.bin then holds every
     command line curl sent on the control connection, and transcript.txt holds both
     directions, each line prefixed "> " (curl) or "< " (server). Response,
     Connections, ResponseDelayMilliseconds and Reset are ignored.
@@ -90,14 +90,19 @@
     with the data port, PASV 227 with 127.0.0.1 and the data port, TYPE 200, SIZE 213
     with FtpData's length, MDTM 213 20260927123456, CWD 250, REST 350 (remembering the
     offset), RETR 150 then FtpData from the last REST offset over the data connection
-    then 226 (LIST the same), QUIT 221 (and the session ends), and 502 for any other
-    command. A data connection curl closes early (a range read) is not an error.
+    then 226 (LIST the same), STOR 150 then every byte curl sends over the data
+    connection until it closes it then 226 (APPE the same), QUIT 221 (and the session
+    ends), and 502 for any other command. A data connection curl closes early (a range
+    read) is not an error. The bytes received on STOR's and APPE's data connections are
+    written to upload.bin, and each upload adds one "= <n> bytes received on the data
+    connection: <bytes>" line to transcript.txt (BL-439).
 
 .PARAMETER FtpReply
     Overrides for the FTP reply table, each 'VERB=reply' with the same backslash escapes
     as Response, e.g. 'PASS=430 Access denied'. The reply is sent as given with CRLF
     appended. VERB is a command name in capitals, GREETING for the greeting, or RETRDONE
-    for the reply sent after RETR's or LIST's data. An overridden EPSV, PASV, RETR or LIST sends only
+    for the reply sent after RETR's or LIST's data, or STORDONE for the reply sent after
+    STOR's or APPE's data. An overridden EPSV, PASV, RETR, LIST, STOR or APPE sends only
     the reply: no data connection is offered. The reply CLOSE closes the control
     connection instead of answering, e.g. 'PWD=CLOSE'.
 
@@ -292,10 +297,11 @@ $serveConnections = {
 }
 
 # The -Ftp server: one control connection, answered a line at a time, with a passive
-# data listener for RETR. It returns the control bytes curl sent, as one array, and
-# writes the two-way transcript into $Transcript.
+# data listener for RETR, LIST, STOR and APPE. It returns the control bytes curl sent, as
+# one array, writes the two-way transcript into $Transcript, and the bytes uploaded on
+# STOR and APPE data connections into $UploadedData.
 $serveFtpSession = {
-    param($Listener, [hashtable] $Overrides, [byte[]] $DataBytes, [System.Text.StringBuilder] $Transcript)
+    param($Listener, [hashtable] $Overrides, [byte[]] $DataBytes, [System.Text.StringBuilder] $Transcript, [System.IO.MemoryStream] $UploadedData)
 
     Set-StrictMode -Version Latest
     $ErrorActionPreference = 'Stop'
@@ -378,6 +384,27 @@ $serveFtpSession = {
                         $done = if ($Overrides.ContainsKey('RETRDONE')) { $Overrides['RETRDONE'] } else { '226 Transfer complete' }
                         Send-Reply -Stream $stream -Reply $done
                     }
+                    { $_ -eq 'STOR' -or $_ -eq 'APPE' } {
+                        Send-Reply -Stream $stream -Reply '150 Opening BINARY mode data connection'
+                        $accept = $dataListener.AcceptTcpClientAsync()
+                        if (-not $accept.Wait(5000)) { throw "curl sent $verb but opened no data connection within five seconds." }
+                        $dataClient = $accept.Result
+                        $uploaded = New-Object System.IO.MemoryStream
+                        try {
+                            $dataStream = $dataClient.GetStream()
+                            $dataStream.ReadTimeout = 5000
+                            $dataStream.CopyTo($uploaded)
+                        } catch [System.IO.IOException] {
+                            # Five seconds without a byte, or a reset: keep what arrived.
+                        } finally {
+                            $dataClient.Close()
+                        }
+                        [byte[]] $uploadedBytes = $uploaded.ToArray()
+                        $UploadedData.Write($uploadedBytes, 0, $uploadedBytes.Length)
+                        [void] $Transcript.Append("= $($uploadedBytes.Length) bytes received on the data connection: $($latin1.GetString($uploadedBytes))`r`n")
+                        $done = if ($Overrides.ContainsKey('STORDONE')) { $Overrides['STORDONE'] } else { '226 Transfer complete' }
+                        Send-Reply -Stream $stream -Reply $done
+                    }
                     'QUIT' { Send-Reply -Stream $stream -Reply '221 Bye'; break }
                     default { Send-Reply -Stream $stream -Reply '502 Command not implemented' }
                 }
@@ -404,6 +431,7 @@ foreach ($entry in $FtpReply) {
     $ftpOverrides[$entry.Substring(0, $separator).ToUpperInvariant()] = [System.Text.Encoding]::GetEncoding(28591).GetString((ConvertFrom-EscapedResponse -Text $entry.Substring($separator + 1)))
 }
 $transcript = New-Object System.Text.StringBuilder
+$uploadedData = New-Object System.IO.MemoryStream
 $OutDirectory = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine((Get-Location).ProviderPath, $OutDirectory))
 New-Item -ItemType Directory -Path $OutDirectory -Force | Out-Null
 
@@ -412,7 +440,7 @@ $listener.Start()
 $server = [System.Management.Automation.PowerShell]::Create()
 try {
     if ($Ftp) {
-        [void] $server.AddScript($serveFtpSession).AddArgument($listener).AddArgument($ftpOverrides).AddArgument([byte[]] (ConvertFrom-EscapedResponse -Text $FtpData)).AddArgument($transcript)
+        [void] $server.AddScript($serveFtpSession).AddArgument($listener).AddArgument($ftpOverrides).AddArgument([byte[]] (ConvertFrom-EscapedResponse -Text $FtpData)).AddArgument($transcript).AddArgument($uploadedData)
     } else {
         [void] $server.AddScript($serveConnections).AddArgument($listener).AddArgument($responseBytes).AddArgument($Connections).AddArgument($ResponseDelayMilliseconds).AddArgument([bool] $Reset).AddArgument($RespondAfterBodyBytes)
     }
@@ -475,6 +503,7 @@ foreach ($request in $requests) {
 [System.IO.File]::WriteAllText((Join-Path $OutDirectory 'exitcode.txt'), [string] $exitCode, [System.Text.Encoding]::ASCII)
 if ($Ftp) {
     [System.IO.File]::WriteAllText((Join-Path $OutDirectory 'transcript.txt'), $transcript.ToString(), [System.Text.Encoding]::GetEncoding(28591))
+    [System.IO.File]::WriteAllBytes((Join-Path $OutDirectory 'upload.bin'), $uploadedData.ToArray())
 }
 
 Write-Host "curl exited $exitCode; fixtures written to $OutDirectory"
