@@ -19,7 +19,8 @@ namespace Curl.Output;
 /// <para>
 /// <c>%{onerror}</c> ends the rendering there when the transfer succeeded, and renders
 /// nothing when it failed (<see cref="IWriteOutVariableSource.TransferFailed"/>).
-/// <c>%time{format}</c> renders the current time through <see cref="WriteOutTimeFormatter"/>.
+/// <c>%time{format}</c> renders the current time through <see cref="WriteOutTimeFormatter"/>,
+/// in the <see cref="WriteOutTimeDialect"/> the renderer was given.
 /// </para>
 /// <para>
 /// A file that cannot be opened leaves the output where it was. A header name of 256 bytes
@@ -34,14 +35,34 @@ namespace Curl.Output;
 /// </remarks>
 /// <param name="fileOpener">Opens the <c>%output{file}</c> targets.</param>
 /// <param name="writesLineFeedAsCrLf"><see langword="true"/> to write each line feed as CR LF, as the Windows curl does.</param>
+/// <param name="timeDialect">The C runtime whose <c>strftime</c> <c>%time{format}</c> follows: the Windows one, or glibc for Linux and macOS.</param>
 /// <param name="timeProvider">Supplies the time <c>%time{format}</c> renders.</param>
-public sealed class WriteOutTemplateRenderer(IWriteOutFileOpener fileOpener, bool writesLineFeedAsCrLf, TimeProvider timeProvider)
+public sealed class WriteOutTemplateRenderer(
+    IWriteOutFileOpener fileOpener,
+    bool writesLineFeedAsCrLf,
+    WriteOutTimeDialect timeDialect,
+    TimeProvider timeProvider)
 {
     private const int HeaderNameBufferBytes = 256;
     private const int FileNameBufferBytes = 512;
 
     private readonly IWriteOutFileOpener fileOpener = fileOpener ?? throw new ArgumentNullException(nameof(fileOpener));
+    private readonly WriteOutTimeDialect timeDialect = timeDialect;
     private readonly TimeProvider timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+
+    /// <summary>
+    /// Creates a renderer whose <c>%time{format}</c> follows the Windows C runtime
+    /// (<see cref="WriteOutTimeDialect.WindowsCRuntime"/>) on every platform. <c>Curl.Console</c>
+    /// still calls this one; BL-383 makes it pass the platform's dialect instead.
+    /// </summary>
+    /// <param name="fileOpener">Opens the <c>%output{file}</c> targets.</param>
+    /// <param name="writesLineFeedAsCrLf"><see langword="true"/> to write each line feed as CR LF, as the Windows curl does.</param>
+    /// <param name="timeProvider">Supplies the time <c>%time{format}</c> renders.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="fileOpener"/> or <paramref name="timeProvider"/> is <see langword="null"/>.</exception>
+    public WriteOutTemplateRenderer(IWriteOutFileOpener fileOpener, bool writesLineFeedAsCrLf, TimeProvider timeProvider)
+        : this(fileOpener, writesLineFeedAsCrLf, WriteOutTimeDialect.WindowsCRuntime, timeProvider)
+    {
+    }
 
     /// <summary>
     /// The warning line, without its line terminator, curl writes to standard error for a
@@ -263,7 +284,7 @@ public sealed class WriteOutTemplateRenderer(IWriteOutFileOpener fileOpener, boo
                 return;
             }
 
-            pending.Append(WriteOutTimeFormatter.Format(format, renderer.timeProvider));
+            pending.Append(WriteOutTimeFormatter.Format(format, renderer.timeDialect, renderer.timeProvider));
         }
 
         private void RenderHeader()
