@@ -1,0 +1,49 @@
+using System.Net.Security;
+using System.Security.Authentication;
+using System.Security.Cryptography.X509Certificates;
+
+namespace Curl.Protocol.Abstractions;
+
+/// <summary>
+/// The facts a completed TLS handshake negotiated, reported through
+/// <see cref="ITransferEvents.ReportTlsHandshake" /> (ADR-0046).
+/// </summary>
+/// <remarks>
+/// Which of these <c>-v</c> prints depends on the platform's curl build: the Schannel
+/// build prints only the ALPN lines, the OpenSSL build also the version, cipher and
+/// certificate fields (ADR-0009).
+/// </remarks>
+public sealed record TlsHandshakeEvent
+{
+    /// <summary>
+    /// Gets the negotiated TLS protocol version.
+    /// </summary>
+    public required SslProtocols ProtocolVersion { get; init; }
+
+    /// <summary>
+    /// Gets the negotiated cipher suite, or <see langword="null" /> when the platform does
+    /// not report it.
+    /// </summary>
+    public required TlsCipherSuite? CipherSuite { get; init; }
+
+    /// <summary>
+    /// Gets the application protocol the server accepted through ALPN, or
+    /// <see langword="null" /> when none was negotiated.
+    /// </summary>
+    public required string? NegotiatedApplicationProtocol { get; init; }
+
+    /// <summary>
+    /// Gets the application protocols offered through ALPN, in the order offered.
+    /// </summary>
+    public required IReadOnlyList<string> OfferedApplicationProtocols { get; init; }
+
+    /// <summary>
+    /// Gets the server's certificate, or <see langword="null" /> when none was presented.
+    /// </summary>
+    public required X509Certificate2? ServerCertificate { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether the server's certificate was verified.
+    /// </summary>
+    public required bool CertificateVerified { get; init; }
+}

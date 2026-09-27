@@ -114,6 +114,24 @@ public sealed class ConnectTargetTests
     }
 
     [TestMethod]
+    public void Events_WhenNotSet_IsNoTransferEvents()
+    {
+        var target = new ConnectTarget("example.com", 443, true);
+
+        Assert.AreSame(NoTransferEvents.Instance, target.Events);
+    }
+
+    [TestMethod]
+    public void Events_WhenSetWithInitializer_RoundTrips()
+    {
+        var events = new StubTransferEvents();
+
+        var target = new ConnectTarget("example.com", 443, true) { Events = events };
+
+        Assert.AreSame(events, target.Events);
+    }
+
+    [TestMethod]
     public void With_AnyChange_CannotBypassHostAndPortChecks()
     {
         var target = new ConnectTarget("example.com", 443, true);

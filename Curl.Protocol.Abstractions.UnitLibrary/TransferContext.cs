@@ -84,5 +84,8 @@ public sealed class TransferContext : ITransferContext
     public TimeProvider TimeProvider { get; init; } = TimeProvider.System;
 
     /// <inheritdoc />
+    public ITransferEvents Events { get; init; } = NoTransferEvents.Instance;
+
+    /// <inheritdoc />
     public CancellationToken CancellationToken { get; init; }
 }

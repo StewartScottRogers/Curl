@@ -251,6 +251,16 @@ public interface ITransferContext
     TimeProvider TimeProvider { get; }
 
     /// <summary>
+    /// Gets where the handler and its connector report transfer events for <c>-v</c>,
+    /// <c>--trace</c> and <c>--trace-ascii</c>. Never <see langword="null" />.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="NoTransferEvents.Instance" /> when nobody is listening. A handler that
+    /// connects passes it on as <see cref="ConnectTarget.Events" /> (ADR-0046).
+    /// </remarks>
+    ITransferEvents Events { get; }
+
+    /// <summary>
     /// Gets the token that cancels this transfer.
     /// </summary>
     CancellationToken CancellationToken { get; }

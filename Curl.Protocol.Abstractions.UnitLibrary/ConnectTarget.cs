@@ -47,6 +47,17 @@ public sealed record ConnectTarget(string Host, int Port, bool UseTls)
     /// </remarks>
     public ProxyEndpoint? Proxy { get; init; }
 
+    /// <summary>
+    /// Gets where the connector reports connection and TLS events, in the order they
+    /// happen; <see cref="NoTransferEvents.Instance" />, the default, when nobody is
+    /// listening.
+    /// </summary>
+    /// <remarks>
+    /// A handler sets it from <see cref="ITransferContext.Events" />, so no connector
+    /// learns about the transfer context (ADR-0046).
+    /// </remarks>
+    public ITransferEvents Events { get; init; } = NoTransferEvents.Instance;
+
     private static string RequireHost(string host)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(host, nameof(Host));
