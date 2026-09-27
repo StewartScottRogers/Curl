@@ -41,7 +41,7 @@ request ends: `auth_required` ends one with no `Authorization:` in it at its hea
 `no-expect` does the same for one with `Expect: 100-continue`, and `skip: N` takes N off its
 `Content-Length` (past zero, the request never ends, as sws's `size_t` wraps). Bytes past
 such an early end start the next request; `upgrade` ends a request with `Upgrade:` in it at its
-headers too. `SwsHttpServerConnection` carries out the rest (ADR-0040): each reply goes out in
+headers too. `SwsHttpServerConnection` carries out the rest (ADR-0042): each reply goes out in
 writes of up to 20 bytes (`SwsServerSend`), each readable when sws would write it, with
 `writedelay: N` ms after each and `<postcmd>` `wait N` seconds (`SwsPostReplyCommands`) after
 the last, timed on the `TimeProvider` given to the connector; `idle` answers nothing, and a read

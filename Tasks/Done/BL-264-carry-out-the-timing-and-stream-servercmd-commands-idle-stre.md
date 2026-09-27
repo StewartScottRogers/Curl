@@ -41,7 +41,7 @@ each of `idle`, `stream`, `delay: N`, `writedelay: N`, `connection-monitor`, `up
 ## Notes
 
 - Read `tests/server/sws.c` at `curl-8_21_0` for each command before pinning it; the findings and
-  the design are in ADR-0040 (decided by Claude under Stewart's delegation).
+  the design are in ADR-0042 (decided by Claude under Stewart's delegation).
 - Carried out: `idle`, `stream`, `writedelay: N`, `connection-monitor`, `upgrade` and `<postcmd>`
   `wait N`. Each connection keeps a timeline of sends (`SwsServerSend`, writes of up to 20
   bytes as sws writes them) timed on a `TimeProvider` the connector now takes (a second
@@ -53,7 +53,7 @@ each of `idle`, `stream`, `delay: N`, `writedelay: N`, `connection-monitor`, `up
   the first close that records `[DISCONNECT]` (pinned by a two-connection test).
 - Simplification (default taken): the monitor is armed when a request is served, not when its
   request line is parsed, so a client closing mid-request does not record `[DISCONNECT]`.
-- Added `Documentation/Planning/Decisions` to `touches` for ADR-0040; no task in Doing names it.
+- Added `Documentation/Planning/Decisions` to `touches` for ADR-0042 (renumbered from 0040 on rebase: the HTTP timeout ADR took 0040); no task in Doing names it.
 - Tests use a hand-written `ManualTimeProvider` in the test project. Conformance library at
   100% line and branch, 0 failing members, per `Measure-CodeQuality.ps1`; 254 conformance tests.
 
