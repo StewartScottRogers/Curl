@@ -55,6 +55,46 @@ internal static class ConfigFileApplier
         return refusal;
     }
 
+    /// <summary>
+    /// Reads the first of <paramref name="candidatePaths"/> that can be read as curl's default config
+    /// file (<c>.curlrc</c>) and applies its lines to <paramref name="options"/>, as curl 8.21.0 does before
+    /// reading the command line. A refused line stops the file, as in a <c>-K</c> file, but refuses
+    /// nothing: its error lines (<c>curl: &lt;file&gt;:&lt;n&gt; config file option '&lt;option&gt;' &lt;reason&gt;</c>,
+    /// hidden when an earlier line turned <c>-s</c> on) go to the warning lines and the command line is
+    /// read as usual. The file does not count against <see cref="CommandLineRefusal.MaximumConfigFileDepth"/>.
+    /// </summary>
+    /// <param name="options">The options being filled in.</param>
+    /// <param name="candidatePaths">The paths to try, in order, from <see cref="DefaultConfigFileSearch.CandidatePaths"/>.</param>
+    /// <param name="pathExists">The parse's path-existence check, handed on to each line.</param>
+    /// <param name="dataFileReader">Reads the file, and every file a line names.</param>
+    internal static void ApplyDefaultFile(CommandLineOptions options, IReadOnlyList<string> candidatePaths, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        foreach (string path in candidatePaths)
+        {
+            if (dataFileReader.TryReadFile(path, out byte[] contents))
+            {
+                ApplyDefaultFileLines(options, path, contents, pathExists, dataFileReader);
+                return;
+            }
+        }
+    }
+
+    private static void ApplyDefaultFileLines(CommandLineOptions options, string path, byte[] contents, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        foreach (ConfigFileLine line in ConfigFileSyntax.ReadLines(path, contents))
+        {
+            options.AddWarningLinesUnlessSilent(line.WarningLines);
+            CommandLineRefusal? lineRefusal = CommandLineParser.ApplyConfigFileLine(options, line.Option, line.Parameter, pathExists, dataFileReader);
+            if (lineRefusal is not null)
+            {
+                options.AddErrorLines(CommandLineRefusal.ConfigFileLineErrorLines(path, line.Number, line.Option, lineRefusal, options.ErrorsHidden));
+                return;
+            }
+        }
+
+        options.DefaultConfigFile = path;
+    }
+
     private static CommandLineRefusal? ApplyLines(CommandLineOptions options, string shownName, byte[] contents, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
     {
         foreach (ConfigFileLine line in ConfigFileSyntax.ReadLines(shownName, contents))

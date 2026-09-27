@@ -646,6 +646,14 @@ public sealed class CommandLineOptions
     internal bool ErrorsHidden => Silent && !ShowError;
 
     /// <summary>
+    /// The path of the default config file (<c>.curlrc</c>) read before the command line when every
+    /// line of it was applied; <see langword="null"/> when none was found, when <c>-q</c> /
+    /// <c>--disable</c> came first, or when a line of it was refused. curl 8.21.0 names it with
+    /// <c>-v</c> as <c>Note: Read config file from '&lt;path&gt;'</c>.
+    /// </summary>
+    public string? DefaultConfigFile { get; internal set; }
+
+    /// <summary>
     /// How many <c>-K</c> / <c>--config</c> files are being read right now, one inside another; curl
     /// refuses to open one more once <see cref="CommandLineRefusal.MaximumConfigFileDepth"/> are open.
     /// </summary>
@@ -759,6 +767,13 @@ public sealed class CommandLineOptions
             warningLines.AddRange(lines);
         }
     }
+
+    /// <summary>
+    /// Appends <paramref name="lines"/> to <see cref="WarningLines"/> as they are: error lines curl
+    /// prints while reading its default config file, already hidden, or not, by the caller.
+    /// </summary>
+    /// <param name="lines">The lines, without line terminators.</param>
+    internal void AddErrorLines(IReadOnlyList<string> lines) => warningLines.AddRange(lines);
 
     /// <summary>Appends <paramref name="url"/> to <see cref="Urls"/>, unchanged and unvalidated.</summary>
     /// <param name="url">A positional argument or a <c>--url</c> value.</param>
