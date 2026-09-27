@@ -35,3 +35,4 @@ BL-131 made `Curl.Console` draw the progress meter's status lines from the handl
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
