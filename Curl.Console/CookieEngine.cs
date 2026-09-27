@@ -9,7 +9,7 @@ namespace Curl.Console;
 /// <summary>
 /// The cookies of one run, as curl 8.21.0's tool sets them up from <c>-b</c>, <c>-c</c> and
 /// <c>-j</c>: one <see cref="CookieStore" /> shared by every URL, the <c>-b</c> files loaded into
-/// it before the first transfer, and the <c>-c</c> jar written from it after each HTTP transfer.
+/// it before the first <c>http</c> or <c>https</c> transfer, and the <c>-c</c> jar written from it after each HTTP transfer.
 /// </summary>
 /// <remarks>
 /// Measured on curl 8.21.0 (mingw, Schannel) against a loopback recorder on 2026-09-26 (BL-237
@@ -26,6 +26,9 @@ internal sealed class CookieEngine
     /// <summary>The <c>-c</c> value that writes the jar to standard output.</summary>
     private const string StandardOutputJar = "-";
 
+    /// <summary>The <c>-b</c> file name that reads the cookies from standard input.</summary>
+    private const string StandardInputCookieFile = "-";
+
     private readonly CookieStore store = new();
 
     private readonly List<string> cookieFiles = [];
@@ -33,6 +36,8 @@ internal sealed class CookieEngine
     private readonly string? cookieJar;
 
     private readonly bool discardSessionCookies;
+
+    private bool cookieFilesLoaded;
 
     private CookieEngine(CommandLineOptions options)
     {
@@ -57,16 +62,33 @@ internal sealed class CookieEngine
         options.Cookies.Count > 0 || options.CookieJar is not null ? new CookieEngine(options) : null;
 
     /// <summary>
-    /// Loads every <c>-b</c> file, in command-line order, dropping session cookies under <c>-j</c>;
-    /// a file that cannot be opened loads nothing and is not an error, as in curl.
+    /// Loads every <c>-b</c> file, in command-line order, dropping session cookies under <c>-j</c>,
+    /// the first time it is called; later calls load nothing. A file that cannot be opened loads
+    /// nothing and is not an error, as in curl. <c>-b -</c> reads standard input to its end, so a
+    /// second <c>-b -</c> finds it empty (measured on curl 8.21.0 on 2026-09-27, BL-316 Notes).
     /// </summary>
     /// <param name="fileSystem">Opens the files.</param>
+    /// <param name="standardInput">What <c>-b -</c> reads; it is left open.</param>
     /// <param name="now">The time that decides which loaded cookies have expired.</param>
     /// <returns>A task that completes when every file is loaded.</returns>
-    internal async Task LoadCookieFilesAsync(IFileSystem fileSystem, DateTimeOffset now)
+    internal async Task LoadCookieFilesAsync(IFileSystem fileSystem, Stream standardInput, DateTimeOffset now)
     {
+        if (cookieFilesLoaded)
+        {
+            return;
+        }
+
+        cookieFilesLoaded = true;
         foreach (string cookieFile in cookieFiles)
         {
+            if (cookieFile == StandardInputCookieFile)
+            {
+                using StreamReader reader = new(standardInput, Encoding.Latin1, detectEncodingFromByteOrderMarks: false, leaveOpen: true);
+                using StringReader text = new(await reader.ReadToEndAsync().ConfigureAwait(false));
+                store.LoadCookieFile(text, discardSessionCookies, now);
+                continue;
+            }
+
             await store.LoadCookieFileAsync(fileSystem, cookieFile, discardSessionCookies, now, CancellationToken.None)
                 .ConfigureAwait(false);
         }

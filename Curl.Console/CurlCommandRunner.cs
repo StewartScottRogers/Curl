@@ -192,7 +192,8 @@ namespace Curl.Console;
 /// </para>
 /// <para>
 /// With <c>-b</c> or <c>-c</c>, the <see cref="TransferDispatch.Cookies" /> load their <c>-b</c>
-/// files before the first transfer, and the <c>-c</c> jar is written after each <c>http</c> or
+/// files, <c>-b -</c> from standard input, before the first <c>http</c> or <c>https</c> transfer
+/// (<see cref="LoadCookieFilesAsync" />), and the <c>-c</c> jar is written after each <c>http</c> or
 /// <c>https</c> transfer's <c>-w</c> output (<see cref="WriteCookieJarAsync" />), as curl 8.21.0
 /// does (measured 2026-09-26, BL-237).
 /// </para>
@@ -510,11 +511,6 @@ internal sealed class CurlCommandRunner(
     private async Task<CurlExitCode> TransferAllAsync(CommandLineOptions options)
     {
         TransferDispatch dispatch = createTransferDispatch(options);
-        if (dispatch.Cookies is { } cookies)
-        {
-            await cookies.LoadCookieFilesAsync(fileSystem, timeProvider.GetUtcNow()).ConfigureAwait(false);
-        }
-
         try
         {
             return await TransferEachUrlAsync(dispatch, options).ConfigureAwait(false);
@@ -679,6 +675,7 @@ internal sealed class CurlCommandRunner(
             return (UploadUrlMalformedFailure, givenUrl, transferUrl);
         }
 
+        await LoadCookieFilesAsync(dispatch, options, transferUrl).ConfigureAwait(false);
         TransferResult result = await TransferWithHeaderOutputAsync(dispatch, options, transfer, transferUrl, uploadFile)
             .ConfigureAwait(false);
         return (result, givenUrl, transferUrl);
@@ -963,6 +960,25 @@ internal sealed class CurlCommandRunner(
         Stream liveStandardOutput = deferringStandardOutput.HasWriteFailed ? Stream.Null : deferringStandardOutput;
         Stream jarStandardOutput = standardOutputIsBinary ? liveStandardOutput : new LineFeedToCrLfStream(liveStandardOutput);
         await cookies.WriteCookieJarAsync(fileSystem, jarStandardOutput, timeProvider.GetUtcNow()).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Loads the run's <c>-b</c> files before its first <c>http</c> or <c>https</c> transfer and
+    /// not before any other: curl 8.21.0 reads <c>-b -</c> from standard input only then, so a
+    /// <c>telnet</c> transfer or <c>file</c> upload before it gets standard input and the
+    /// <c>-b -</c> after it finds it empty, and a <c>-T -</c> upload in the same transfer finds it
+    /// empty (measured 2026-09-27, BL-316 Notes).
+    /// </summary>
+    /// <param name="dispatch">What the run transfers through, with its cookies.</param>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="transferUrl">The URL about to be transferred.</param>
+    /// <returns>A task that completes when the files are loaded.</returns>
+    private async Task LoadCookieFilesAsync(TransferDispatch dispatch, CommandLineOptions options, string transferUrl)
+    {
+        if (dispatch.Cookies is { } cookies && IsHttpUrl(QueryUrl.Append(transferUrl, options)))
+        {
+            await cookies.LoadCookieFilesAsync(fileSystem, standardInput, timeProvider.GetUtcNow()).ConfigureAwait(false);
+        }
     }
 
     /// <summary>
