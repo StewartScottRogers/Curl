@@ -33,3 +33,4 @@ On Linux and macOS, `curl -z <dangling symbolic link>` prints `Warning: Failed t
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
