@@ -8,7 +8,7 @@ depends-on: [BL-145]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-250 — Expand the %b64[...]b64% and %hex[...]hex% test-file macros
 
@@ -30,12 +30,12 @@ The test-case preprocessing expands `%b64[...]b64%` to the base64 encoding of it
 
 ## Acceptance criteria
 
-- [ ] Tests in `Curl.Conformance.UnitTests` show `%b64[%HTTPPORT %9a]b64%` expanding to the base64 of the
+- [x] Tests in `Curl.Conformance.UnitTests` show `%b64[%HTTPPORT %9a]b64%` expanding to the base64 of the
       substituted port, a space and byte 0x9a, and `%hex[%00%01%FF]hex%` expanding to bytes 00 01 FF.
-- [ ] Text that is not a complete macro is left as written (tested).
-- [ ] 100% line and branch coverage of `Curl.Conformance.UnitLibrary`, complexity at most 10 per
+- [x] Text that is not a complete macro is left as written (tested).
+- [x] 100% line and branch coverage of `Curl.Conformance.UnitLibrary`, complexity at most 10 per
       method, per `Measure-CodeQuality.ps1`.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -45,7 +45,12 @@ The test-case preprocessing expands `%b64[...]b64%` to the base64 encoding of it
   `Expand_DecodesHexAndKeepsOtherCharactersAsWritten`, `Expand_LeavesAnUnclosedInstructionAsWritten`.
   Running this task should only need to verify those, tick the boxes and move it to Done.
 
+- 2026-09-26: Verified on lane 2 with no code change. The three BL-145 tests pass (Curl.Conformance.UnitTests
+  212/212); `Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitLibrary` reports 100% line, 100% branch,
+  0 failing members, worst CRAP 10; `dotnet build` has 0 errors and the fast suite is green.
+
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. %b64[...]b64% and %hex[...]hex% expand in test-file preprocessing (delivered by BL-145, verified)
