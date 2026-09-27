@@ -76,7 +76,7 @@ Filed as a follow-up by BL-065.
   fixed one CS0051 (internal enum as a public test parameter) and verified.
 - Coverage: every new/changed line and branch in the library is covered; the one
   uncovered line in `SslStreamTlsProvider.cs` (272) is the pre-existing Linux-only cipher path.
-- Follow-up filed: BL-281, parse `--cert-type`, `--key-type`, `--pass` in Curl.Cli and map them.
+- Follow-up filed: BL-286, parse `--cert-type`, `--key-type`, `--pass` in Curl.Cli and map them.
 - Tests: Curl.Networking.UnitTests 357 passed, 6 skipped (pre-existing OpenSSL-on-Linux cases).
 
 ## Log

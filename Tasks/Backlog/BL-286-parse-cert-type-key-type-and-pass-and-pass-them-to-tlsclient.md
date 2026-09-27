@@ -1,5 +1,5 @@
 ---
-id: BL-281
+id: BL-286
 title: Parse --cert-type, --key-type and --pass and pass them to TlsClientOptions
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-281 — Parse --cert-type, --key-type and --pass and pass them to TlsClientOptions
+# BL-286 — Parse --cert-type, --key-type and --pass and pass them to TlsClientOptions
 
 ## Goal
 
