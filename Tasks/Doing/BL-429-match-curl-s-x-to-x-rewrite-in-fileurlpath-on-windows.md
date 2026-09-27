@@ -34,3 +34,4 @@ On Windows, `FileUrlPath` treats a `/X|…` drive the way the curl 8.21.0 Schann
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
