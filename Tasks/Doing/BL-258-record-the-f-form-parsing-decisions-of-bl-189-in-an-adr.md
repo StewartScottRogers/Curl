@@ -35,3 +35,4 @@ An ADR in `Documentation/Planning/Decisions` records the four behaviour decision
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-27: Backlog -> Doing.
