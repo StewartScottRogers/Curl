@@ -88,8 +88,10 @@
 
     The default replies are: greeting 220, USER 331, PASS 230, PWD 257 "/", EPSV 229
     with the data port, PASV 227 with 127.0.0.1 and the data port, TYPE 200, SIZE 213
-    with FtpData's length, CWD 250, RETR 150 then FtpData over the data connection then
-    226 (LIST the same), QUIT 221 (and the session ends), and 502 for any other command.
+    with FtpData's length, MDTM 213 20260927123456, CWD 250, REST 350 (remembering the
+    offset), RETR 150 then FtpData from the last REST offset over the data connection
+    then 226 (LIST the same), QUIT 221 (and the session ends), and 502 for any other
+    command. A data connection curl closes early (a range read) is not an error.
 
 .PARAMETER FtpReply
     Overrides for the FTP reply table, each 'VERB=reply' with the same backslash escapes
@@ -302,6 +304,7 @@ $serveFtpSession = {
     $dataListener = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Loopback, 0)
     $dataListener.Start()
     $dataPort = ([System.Net.IPEndPoint] $dataListener.LocalEndpoint).Port
+    $restOffset = [long] 0
 
     function Send-Reply {
         param($Stream, [string] $Reply)
@@ -350,6 +353,11 @@ $serveFtpSession = {
                     'CWD' { Send-Reply -Stream $stream -Reply '250 OK' }
                     'TYPE' { Send-Reply -Stream $stream -Reply '200 Type set' }
                     'SIZE' { Send-Reply -Stream $stream -Reply "213 $($DataBytes.Length)" }
+                    'MDTM' { Send-Reply -Stream $stream -Reply '213 20260927123456' }
+                    'REST' {
+                        $restOffset = [long] ($command -split ' ', 2)[1]
+                        Send-Reply -Stream $stream -Reply "350 Restarting at $restOffset"
+                    }
                     'EPSV' { Send-Reply -Stream $stream -Reply "229 Entering Extended Passive Mode (|||$dataPort|)" }
                     'PASV' { Send-Reply -Stream $stream -Reply "227 Entering Passive Mode (127,0,0,1,$([Math]::Floor($dataPort / 256)),$($dataPort % 256))" }
                     { $_ -eq 'RETR' -or $_ -eq 'LIST' } {
@@ -359,8 +367,11 @@ $serveFtpSession = {
                         $dataClient = $accept.Result
                         try {
                             $dataStream = $dataClient.GetStream()
-                            $dataStream.Write($DataBytes, 0, $DataBytes.Length)
+                            $start = [int] [Math]::Max(0, [Math]::Min($restOffset, $DataBytes.Length))
+                            $dataStream.Write($DataBytes, $start, $DataBytes.Length - $start)
                             $dataStream.Flush()
+                        } catch [System.IO.IOException] {
+                            # curl closed the data connection early, as it does once a range is read.
                         } finally {
                             $dataClient.Close()
                         }
