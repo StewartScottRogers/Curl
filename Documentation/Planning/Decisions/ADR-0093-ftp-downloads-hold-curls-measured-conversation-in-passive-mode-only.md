@@ -50,9 +50,9 @@ and messages are pinned in `FtpProtocolHandlerTests`.
 ## Consequences
 
 `curl ftp://host/path/file` downloads as curl does, with curl's exit codes. Uploads, `ftps`,
-active mode, `--disable-epsv`, `--ftp-method`, `-l`, `-Q`, `-r`, `-C` and `-I` are not
-implemented; the handler ignores `Range`, `ResumeFrom`, `Upload` and `NoBody` today and
-downloads the whole file, which must be fixed before it is registered. Meanwhile `Curl.Console` still routes non-proxied `ftp://` to
+active mode, `--disable-epsv`, `--ftp-method`, `-l` and `-Q` are not implemented; the
+handler ignores `Upload` today. `-r`, `-C` and `-I` are honoured since BL-438 (see the
+addendum below). Meanwhile `Curl.Console` still routes non-proxied `ftp://` to
 `ForwardedFtpProtocolHandler` until the handler is registered there (separate task).
 
 ## Alternatives considered
@@ -61,3 +61,68 @@ downloads the whole file, which must be fixed before it is registered. Meanwhile
   the bytes a server sees.
 - **Leave directory listings to a later task.** A trailing `/` would then need an invented
   message; `LIST` is measured and costs two commands.
+
+## Addendum (BL-438, 2026-09-27): `-r`, `-C` and `-I`
+
+Decided by Claude under Stewart's delegation. Measured with curl 8.21.0 (Git for Windows'
+mingw64 build) on 2026-09-27, with `Record-CurlExchange.ps1 -Ftp -FtpData 0123456789`
+against `ftp://127.0.0.1:port/dir/f.txt`. The recorder now answers `REST` with `350`,
+serves the data from the last `REST` offset, answers `MDTM` with `213 20260927123456`, and
+tolerates curl closing the data connection early. Every case below is pinned in
+`FtpProtocolHandlerRangeTests`.
+
+| Case | Commands after `SIZE` (`213 10`) | Output | Exit |
+| --- | --- | --- | --- |
+| `-r 0-4` | `RETR`, `ABOR`, `QUIT` | `01234` | 0 |
+| `-r 3-4` | `REST 3`, `RETR`, `ABOR`, `QUIT` | `34` | 0 |
+| `-r 5-` | `REST 5`, `RETR`, `QUIT` | `56789` | 0 |
+| `-r -3` | `REST 7`, `RETR`, `ABOR`, `QUIT` | `789` | 0 |
+| `-r -10` | `REST 0`, `RETR`, `ABOR`, `QUIT` | whole file | 0 |
+| `-r -3`, `SIZE` refused | `REST -3`, `RETR`, `ABOR`, `QUIT` | first 3 bytes served | 0 |
+| `-r 0-20` | `RETR`, `ABOR`, `QUIT` | whole file | 0 |
+| `-r 10-12` | `ABOR`, `QUIT` | nothing | 0 |
+| `-r 10-`, `-C 10` | `QUIT` | nothing | 0 |
+| `-r -20` | `ABOR`, `QUIT` | nothing | 36 `Offset (-20) was beyond file size (10)` |
+| `-C 20` | `QUIT` | nothing | 36 `Offset (20) was beyond file size (10)` |
+| `-C 5` | `REST 5`, `RETR`, `QUIT` | `56789` | 0 |
+| `-C 5`, `SIZE` refused | `REST 5`, `RETR`, `QUIT` | `56789` | 0 |
+| `-C -`, `-o` holding 5 bytes | `REST 5`, `RETR`, `QUIT` | appended `56789` | 0 |
+| `-C -`, `-o` absent | `RETR`, `QUIT` | whole file | 0 |
+| `-C 5` or `-r 5-`, `REST` answered `502` | nothing more, no `QUIT` | nothing | 31 `Could not use REST` |
+| `-r 3-4`, `451` after the data | `REST 3`, `RETR`, `ABOR`, `QUIT` | `34` | 0 |
+| `-r 5-` or `-C 5`, `451` after the data | `REST 5`, `RETR`, `QUIT` | `56789` | 18 `server did not report OK, got 451` |
+| `-r 0-14`, `SIZE` 20, 10 bytes served | `RETR`, no `ABOR`, no `QUIT` | 10 bytes | 18 `end of response with 5 bytes missing` |
+| `-r 0-30`, `SIZE` 20, 10 bytes served | as above | 10 bytes | 18 `end of response with 10 bytes missing` |
+| `-C 5` or `-r 2-`, `SIZE` 20, short | `REST`, `RETR`, no `QUIT` | what arrived | 18 `transfer closed with N bytes remaining to read` |
+
+So curl keeps two numbers: an offset, sent with `REST` only when the requested one is not
+zero (after a negative suffix offset is resolved against `SIZE`), and a byte limit, set by
+`-r first-last` (`last - first + 1`) and `-r -n` (`n`) but not by `-r first-` or `-C`. A
+limit stops the read at the limit, sends `ABOR` whose reply is read and not checked, and
+reports a short transfer as `end of response with N bytes missing`, where N is the
+smaller of the limit and the bytes left by `SIZE`, less what arrived. Without a limit the
+BL-431 rules apply unchanged, with `SIZE` less the offset as the expected count.
+`FtpDownloadWindow` holds the two numbers; a `-r` wins over `-C` when a hand-built context
+carries both, as curl's range handling overwrites the resume offset. The `-C -` offset is
+resolved by `Curl.Console` from the output file, so the handler sees `-C 5` or `-C 0`.
+
+`-I` opens no data connection. On a file it sends `MDTM`, `TYPE I`, `SIZE` and `REST 0`
+after the `CWD`s, then `QUIT`, and writes to the header output (curl's stdout for `-I`):
+
+```
+Last-Modified: Sun, 27 Sep 2026 12:34:56 GMT\r\n   for a 213 MDTM with a YYYYMMDDHHMMSS time
+Content-Length: 10\r\n                             for a 213 SIZE
+Accept-ranges: bytes\r\n                           for a 350 REST 0
+```
+
+each line left out when its reply is anything else (`MDTM` `550` or `213 garbage`, `SIZE`
+`502`, `REST` `502`), exit 0. A `550` to `SIZE` is exit 78 and a refused `TYPE` exit 17,
+each after `QUIT` and after the `Last-Modified` line already written. On a directory URL
+curl sends `QUIT` straight after the `CWD`s and writes nothing, exit 0.
+
+Not measured, and decided by the nearest measured rule: a `-r` on a directory listing is
+ignored (`LIST` has no `REST`); an `MDTM` time that is 14 digits but no real date (month
+13) writes no `Last-Modified` line, where curl's own date parser may differ; a header line
+the header output refuses is exit 23 `client returned ERROR on write of N bytes`, the
+`file://` text, after `QUIT`; a failure sending `ABOR` or reading its reply is ignored, as
+it is for `QUIT`.

@@ -50,6 +50,34 @@ internal static class FtpTransferMessages
     /// <summary>The exit 78 message for a <c>550</c> reply to <c>SIZE</c>.</summary>
     internal const string FileDoesNotExist = "The file does not exist";
 
+    /// <summary>The exit 31 message for a <c>REST</c> answered with anything but <c>350</c>.</summary>
+    internal const string CouldNotUseRest = "Could not use REST";
+
+    /// <summary>
+    /// The exit 36 message for a <c>-C</c> offset past the <c>SIZE</c> count, or a
+    /// <c>-r -n</c> suffix longer than it.
+    /// </summary>
+    /// <param name="offset">The requested offset, negative for a suffix.</param>
+    /// <param name="size">The <c>SIZE</c> count.</param>
+    /// <returns>The message to report.</returns>
+    internal static string OffsetBeyondFileSize(long offset, long size) =>
+        Format($"Offset ({offset}) was beyond file size ({size})");
+
+    /// <summary>
+    /// The exit 18 message for a ranged download whose data connection closed short of
+    /// the bytes the range and the <c>SIZE</c> count expected.
+    /// </summary>
+    /// <param name="missing">The bytes still expected.</param>
+    /// <returns>The message to report.</returns>
+    internal static string EndOfResponseWithBytesMissing(long missing) =>
+        Format($"end of response with {missing} bytes missing");
+
+    /// <summary>The exit 23 message for an <c>-I</c> header line the header output refused.</summary>
+    /// <param name="passed">The length of the refused line.</param>
+    /// <returns>The message to report.</returns>
+    internal static string HeaderWriteFailed(int passed) =>
+        Format($"client returned ERROR on write of {passed} bytes");
+
     /// <summary>The exit 8 message for a greeting other than <c>220</c>.</summary>
     /// <param name="code">The greeting's code.</param>
     /// <returns>The message to report.</returns>

@@ -24,8 +24,11 @@ namespace Curl.Protocol.Ftp;
 /// <para>
 /// When <see cref="ITransferContext.Proxy" /> is set both connections are tunnelled
 /// through it; the connector opens the tunnels (ADR-0056). A failed connect is returned as
-/// the connector reported it. Uploads, <c>ftps</c>, active mode and every FTP-only option
-/// are not implemented yet. Cancellation leaves as an exception.
+/// the connector reported it. <see cref="ITransferContext.Range" />,
+/// <see cref="ITransferContext.ResumeFrom" /> and <see cref="ITransferContext.NoBody" />
+/// are honoured as curl 8.21.0 honours <c>-r</c>, <c>-C</c> and <c>-I</c> (BL-438).
+/// Uploads, <c>ftps</c>, active mode and every FTP-only option are not implemented yet.
+/// Cancellation leaves as an exception.
 /// </para>
 /// </remarks>
 public sealed class FtpProtocolHandler(IConnector connector) : IProtocolHandler
