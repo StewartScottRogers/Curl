@@ -3,8 +3,9 @@ using Curl.Core;
 namespace Curl.Console;
 
 /// <summary>
-/// What <see cref="CurlCommandRunner" /> transfers through for one run: the dispatcher, and
-/// the warning lines curl prints before each transfer for options the build ignores.
+/// What <see cref="CurlCommandRunner" /> transfers through for one run: the dispatcher, the
+/// warning lines curl prints before each transfer for options the build ignores, and the run's
+/// cookies.
 /// </summary>
 /// <param name="dispatcher">Performs each transfer with the handler for its scheme.</param>
 /// <param name="warningLinesBeforeEachTransfer">
@@ -12,9 +13,14 @@ namespace Curl.Console;
 /// such as the Schannel build's two <c>--capath</c> lines (ADR-0009); each without its line
 /// ending. Empty when no option raises one.
 /// </param>
+/// <param name="cookies">
+/// The run's cookies, which the dispatcher's HTTP handler reads and writes, or
+/// <see langword="null" /> when neither <c>-b</c> nor <c>-c</c> was given.
+/// </param>
 internal sealed class TransferDispatch(
     ProtocolDispatcher dispatcher,
-    IReadOnlyList<string> warningLinesBeforeEachTransfer)
+    IReadOnlyList<string> warningLinesBeforeEachTransfer,
+    CookieEngine? cookies = null)
 {
     /// <summary>
     /// Creates the dispatch with no warning lines.
@@ -33,4 +39,11 @@ internal sealed class TransferDispatch(
     /// is given; each without its line ending.
     /// </summary>
     internal IReadOnlyList<string> WarningLinesBeforeEachTransfer { get; } = warningLinesBeforeEachTransfer;
+
+    /// <summary>
+    /// Gets the run's cookies: the <c>-b</c> files to load before the first transfer and the
+    /// <c>-c</c> jar to write after each HTTP transfer; <see langword="null" /> without <c>-b</c>
+    /// or <c>-c</c>.
+    /// </summary>
+    internal CookieEngine? Cookies { get; } = cookies;
 }

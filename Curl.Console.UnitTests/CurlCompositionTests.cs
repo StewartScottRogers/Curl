@@ -218,6 +218,16 @@ public sealed class CurlCompositionTests
     }
 
     [TestMethod]
+    public void CreateTransferDispatch_Cookies_GivesTheRunnerTheRunsCookies()
+    {
+        CookieEngine cookies = CookieEngine.FromCommandLine(Parse("-c", "jar.txt", "http://example.com/"))!;
+
+        TransferDispatch dispatch = CurlComposition.CreateTransferDispatch(CurlComposition.CreateTransports(NoOptions()), cookies);
+
+        Assert.AreSame(cookies, dispatch.Cookies);
+    }
+
+    [TestMethod]
     public void CreateTransferDispatch_CaPath_WarnsAsThePlatformsCurlBuildDoes()
     {
         CurlTransports transports = CurlComposition.CreateTransports(Parse("--capath", ".", "https://example.com/"));

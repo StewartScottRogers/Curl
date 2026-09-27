@@ -23,7 +23,9 @@ namespace Curl.Console;
 /// the network handlers' TLS settings, and the warnings for the ones the build ignores,
 /// come from them.
 /// </param>
-/// <param name="outputFileSystem">Opens the <c>-o</c> / <c>--output</c> files.</param>
+/// <param name="fileSystem">
+/// Opens the <c>-o</c> / <c>--output</c> files, the <c>-b</c> cookie files and the <c>-c</c> jar.
+/// </param>
 /// <param name="outputFileTimeSetter">
 /// Stamps an <c>-o</c> file with the source's modification time under <c>-R</c> /
 /// <c>--remote-time</c>.
@@ -152,10 +154,16 @@ namespace Curl.Console;
 /// the template's standard output is binary once any transfer of the run sends its body to
 /// standard output, including a later one (see <see cref="IsStandardOutputBinaryForWriteOut" />).
 /// </para>
+/// <para>
+/// With <c>-b</c> or <c>-c</c>, the <see cref="TransferDispatch.Cookies" /> load their <c>-b</c>
+/// files before the first transfer, and the <c>-c</c> jar is written after each <c>http</c> or
+/// <c>https</c> transfer's <c>-w</c> output (<see cref="WriteCookieJarAsync" />), as curl 8.21.0
+/// does (measured 2026-09-26, BL-237).
+/// </para>
 /// </remarks>
 internal sealed class CurlCommandRunner(
     Func<CommandLineOptions, TransferDispatch> createTransferDispatch,
-    IFileSystem outputFileSystem,
+    IFileSystem fileSystem,
     IFileTimeSetter outputFileTimeSetter,
     Stream standardOutput,
     Stream standardError,
@@ -286,6 +294,10 @@ internal sealed class CurlCommandRunner(
         CurlExitCode exitCode = CurlExitCode.Ok;
         TransferDispatch dispatch = createTransferDispatch(options);
         bool showsErrors = ShowsErrors(options);
+        if (dispatch.Cookies is { } cookies)
+        {
+            await cookies.LoadCookieFilesAsync(fileSystem, timeProvider.GetUtcNow()).ConfigureAwait(false);
+        }
 
         bool bodyWrittenToStandardOutput = false;
 
@@ -305,6 +317,7 @@ internal sealed class CurlCommandRunner(
             bool standardOutputIsBinary = IsStandardOutputBinaryForWriteOut(
                 options, index, bodyWrittenToStandardOutput, endsTheRun);
             await WriteOutAsync(options, index, result, standardOutputIsBinary).ConfigureAwait(false);
+            await WriteCookieJarAsync(dispatch, options, index, standardOutputIsBinary).ConfigureAwait(false);
 
             if (endsTheRun)
             {
@@ -404,6 +417,40 @@ internal sealed class CurlCommandRunner(
             .RenderAsync(template, variables, writeOutStandardOutput, writeOutStandardError)
             .ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Writes the run's <c>-c</c> jar after the transfer of the URL at <paramref name="index" />,
+    /// when there is a jar and the URL is <c>http</c> or <c>https</c>, whatever the transfer's
+    /// outcome: curl 8.21.0 writes it after every HTTP transfer, after its <c>-w</c> output, and
+    /// not after a <c>file</c> or <c>dict</c> one (measured 2026-09-26, BL-237 Notes). The jar
+    /// file is replaced each time; <c>-c -</c> prints the jar once per HTTP transfer, in the mode
+    /// standard output is in, and not at all once standard output has failed.
+    /// </summary>
+    /// <param name="dispatch">What the run transfers through, with its cookies.</param>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="index">The URL's position on the command line.</param>
+    /// <param name="standardOutputIsBinary">Whether standard output keeps its line feeds.</param>
+    /// <returns>A task that completes when the jar is written.</returns>
+    private async Task WriteCookieJarAsync(TransferDispatch dispatch, CommandLineOptions options, int index, bool standardOutputIsBinary)
+    {
+        if (dispatch.Cookies is not { } cookies || !IsHttpUrl(QueryUrl.Append(options.Urls[index], options)))
+        {
+            return;
+        }
+
+        Stream liveStandardOutput = deferringStandardOutput.HasWriteFailed ? Stream.Null : deferringStandardOutput;
+        Stream jarStandardOutput = standardOutputIsBinary ? liveStandardOutput : new LineFeedToCrLfStream(liveStandardOutput);
+        await cookies.WriteCookieJarAsync(fileSystem, jarStandardOutput, timeProvider.GetUtcNow()).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Tells whether <paramref name="requestUrl" /> is an absolute <c>http</c> or <c>https</c> URL.
+    /// </summary>
+    /// <param name="requestUrl">The URL, with any <c>-G</c> / <c>--url-query</c> query.</param>
+    /// <returns><see langword="true" /> for an HTTP URL.</returns>
+    private static bool IsHttpUrl(string requestUrl) =>
+        Uri.TryCreate(requestUrl, UriKind.Absolute, out Uri? uri)
+        && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
 
     /// <summary>
     /// The scheme <c>%{scheme}</c> prints: the URL's, in lower case, or <see langword="null" />
@@ -542,7 +589,7 @@ internal sealed class CurlCommandRunner(
         string? outputFile,
         string headerFile)
     {
-        FileOpenResult opened = await outputFileSystem
+        FileOpenResult opened = await fileSystem
             .OpenForWriteAsync(
                 headerFile,
                 index == 0 ? FileWriteMode.Truncate : FileWriteMode.Append,
@@ -764,7 +811,7 @@ internal sealed class CurlCommandRunner(
             return options.ResumeFrom;
         }
 
-        FileOpenResult existing = await outputFileSystem
+        FileOpenResult existing = await fileSystem
             .OpenForReadAsync(outputFile, CancellationToken.None)
             .ConfigureAwait(false);
 
@@ -869,7 +916,7 @@ internal sealed class CurlCommandRunner(
     {
         bool resumes = resumeFrom is > 0;
         DeferredOutputFileStream output = new(
-            outputFileSystem, outputFile, resumes ? FileWriteMode.Append : FileWriteMode.Truncate);
+            fileSystem, outputFile, resumes ? FileWriteMode.Append : FileWriteMode.Truncate);
         await using (output.ConfigureAwait(false))
         {
             if (resumes && !await output.TryOpenNowAsync().ConfigureAwait(false))

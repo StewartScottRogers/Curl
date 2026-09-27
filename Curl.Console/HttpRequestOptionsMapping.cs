@@ -8,7 +8,8 @@ namespace Curl.Console;
 /// Maps the HTTP request options of a parsed command line onto the
 /// <see cref="HttpRequestOptions" /> an HTTP handler reads: <c>-X</c>, <c>-H</c>, <c>-A</c>,
 /// <c>-e</c>, the <c>-d</c> family, <c>--json</c>, <c>-G</c>, <c>-f</c>, <c>--fail-with-body</c>
-/// and <c>-L</c>, with the <c>-F</c> body the caller built.
+/// <c>-L</c>, and the authentication options <c>--basic</c>, <c>--digest</c>, <c>--anyauth</c> and
+/// <c>--oauth2-bearer</c>, with the <c>-F</c> body the caller built.
 /// </summary>
 /// <remarks>
 /// Measured with curl 8.21.0 (mingw, Schannel) against a loopback recorder on 2026-09-26
@@ -44,7 +45,8 @@ internal static class HttpRequestOptionsMapping
     /// <see cref="CommandLineOptions.PostData" /> as a <see cref="BytesBody" />, unless
     /// <see cref="CommandLineOptions.DataInQuery" /> moved it into the query; and
     /// <see cref="CommandLineOptions.FailMode" /> as <see cref="HttpRequestOptions.Fail" />; and
-    /// <see cref="CommandLineOptions.FollowRedirects" /> as <see cref="HttpRequestOptions.FollowRedirects" />.
+    /// <see cref="CommandLineOptions.FollowRedirects" /> as <see cref="HttpRequestOptions.FollowRedirects" />; and
+    /// <see cref="CommandLineOptions.AuthSchemes" /> and <see cref="CommandLineOptions.BearerToken" /> verbatim.
     /// </returns>
     internal static HttpRequestOptions FromCommandLine(CommandLineOptions options, HttpRequestBody? formBody = null) =>
         new()
@@ -56,6 +58,8 @@ internal static class HttpRequestOptionsMapping
             Body = formBody ?? PostDataBodyOf(options),
             Fail = options.FailMode,
             FollowRedirects = options.FollowRedirects,
+            AuthSchemes = options.AuthSchemes,
+            BearerToken = options.BearerToken,
         };
 
     /// <summary>
