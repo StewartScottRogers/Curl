@@ -43,6 +43,8 @@ public sealed class CommandLineOptionTableTests
     [DataRow("user", 'u', true)]
     [DataRow("telnet-option", 't', true)]
     [DataRow("tftp-blksize", null, true)]
+    [DataRow("resolve", null, true)]
+    [DataRow("connect-to", null, true)]
     [DataRow("tftp-no-options", null, false)]
     [DataRow("create-file-mode", null, true)]
     [DataRow("insecure", 'k', false)]

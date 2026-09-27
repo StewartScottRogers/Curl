@@ -97,6 +97,8 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("proxytunnel", 'p', (options, on) => options.ProxyTunnel = on),
         CommandLineOption.Value("telnet-option", 't', AcceptingEmpty((options, telnetOption) => options.AddTelnetOption(telnetOption))),
         CommandLineOption.Value("tftp-blksize", null, SetTftpBlockSize),
+        CommandLineOption.Value("resolve", null, AcceptingEmpty((options, entry) => options.AddResolveEntry(entry))),
+        CommandLineOption.Value("connect-to", null, AcceptingEmpty((options, entry) => options.AddConnectToEntry(entry))),
         CommandLineOption.NegatableFlag("tftp-no-options", null, (options, on) => options.TftpNoOptions = on),
         CommandLineOption.Value("create-file-mode", null, SetCreateFileMode),
         CommandLineOption.NegatableFlag("insecure", 'k', (options, on) => options.Insecure = on),

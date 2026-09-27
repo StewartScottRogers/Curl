@@ -17,6 +17,8 @@ public sealed class CommandLineOptions
     private readonly List<string> urls = [];
     private readonly List<UrlOutput> urlOutputs = [];
     private readonly List<string> telnetOptions = [];
+    private readonly List<string> resolveEntries = [];
+    private readonly List<string> connectToEntries = [];
     private readonly List<string> headers = [];
     private readonly List<CommandLineCookie> cookies = [];
     private readonly List<string> warningLines = [];
@@ -235,6 +237,21 @@ public sealed class CommandLineOptions
 
     /// <summary>Every <c>-t</c> / <c>--telnet-option</c> value, verbatim and unvalidated, in command-line order.</summary>
     public IReadOnlyList<string> TelnetOptions => telnetOptions;
+
+    /// <summary>
+    /// Every <c>--resolve</c> value (<c>[+]host:port:addr[,addr]...</c>, or <c>-host:port</c> to drop an
+    /// entry), verbatim and unvalidated, in command-line order. curl 8.21.0 checks the syntax only when a
+    /// transfer starts, failing it with exit code 49 (<c>Could not parse CURLOPT_RESOLVE entry</c>), so the
+    /// parser never refuses one.
+    /// </summary>
+    public IReadOnlyList<string> ResolveEntries => resolveEntries;
+
+    /// <summary>
+    /// Every <c>--connect-to</c> value (<c>host1:port1:host2:port2</c>, any part possibly empty), verbatim
+    /// and unvalidated, in command-line order. curl 8.21.0 reads an entry only when a transfer starts, so
+    /// the parser never refuses one.
+    /// </summary>
+    public IReadOnlyList<string> ConnectToEntries => connectToEntries;
 
     /// <summary>
     /// The <c>--tftp-blksize</c> value as given, unclamped, except that a value past
@@ -773,6 +790,14 @@ public sealed class CommandLineOptions
     /// <summary>Appends <paramref name="telnetOption"/> to <see cref="TelnetOptions"/>, unchanged and unvalidated.</summary>
     /// <param name="telnetOption">A <c>-t</c> / <c>--telnet-option</c> value, possibly empty.</param>
     internal void AddTelnetOption(string telnetOption) => telnetOptions.Add(telnetOption);
+
+    /// <summary>Appends <paramref name="entry"/> to <see cref="ResolveEntries"/>, unchanged and unvalidated.</summary>
+    /// <param name="entry">A <c>--resolve</c> value, possibly empty.</param>
+    internal void AddResolveEntry(string entry) => resolveEntries.Add(entry);
+
+    /// <summary>Appends <paramref name="entry"/> to <see cref="ConnectToEntries"/>, unchanged and unvalidated.</summary>
+    /// <param name="entry">A <c>--connect-to</c> value, possibly empty.</param>
+    internal void AddConnectToEntry(string entry) => connectToEntries.Add(entry);
 
     /// <summary>Appends <paramref name="cookie"/> to <see cref="Cookies"/>, unchanged and unvalidated.</summary>
     /// <param name="cookie">A <c>-b</c> / <c>--cookie</c> value, possibly empty.</param>
