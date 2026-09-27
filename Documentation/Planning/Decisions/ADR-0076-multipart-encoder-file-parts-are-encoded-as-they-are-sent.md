@@ -3,6 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-09-27
 - **Supersedes:** the file-part decision of ADR-0041
+- **Superseded in part by:** ADR-0093 (the unseekable `7bit` file part)
 
 Decided by Claude under Stewart's delegation (task BL-301, 2026-09-27).
 
