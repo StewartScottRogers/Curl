@@ -77,6 +77,58 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_OperationStartedEarlier_CountsMaxTimeAndTheMessageFromTheOperationStart()
+    {
+        // curl -sS -L -m 2 against a first hop that answers 302 after 1.5 s and a second hop
+        // that never answers: curl: (28) Operation timed out after 2006 milliseconds with 0
+        // bytes received (BL-299 Notes).
+        FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
+        long operationStarted = time.GetTimestamp();
+        time.Advance(TimeSpan.FromMilliseconds(1500));
+        StalledConnection connection = new([], 65536);
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse("http://127.0.0.1:18299/b"),
+            Output = new MemoryStream(),
+            TimeProvider = time,
+            MaxTime = TimeSpan.FromSeconds(2),
+            OperationStarted = operationStarted,
+        };
+
+        Task<TransferResult> transfer = Handler(QueueConnector.For(connection)).ExecuteAsync(context).AsTask();
+        await connection.Stalled;
+        time.Advance(TimeSpan.FromMilliseconds(499));
+        Assert.IsFalse(transfer.IsCompleted, "Ended before -m passed since the operation started.");
+        time.Advance(TimeSpan.FromMilliseconds(1));
+        TransferResult result = await transfer;
+
+        Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
+        Assert.AreEqual("Operation timed out after 2000 milliseconds with 0 bytes received", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_MaxTimeSpentBeforeTheCall_EndsTheConnectAtOnceCountingFromTheCall()
+    {
+        // curl counts the connect message from the start of this request (t_startsingle).
+        FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
+        long operationStarted = time.GetTimestamp();
+        time.Advance(TimeSpan.FromSeconds(3));
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse("http://10.255.255.1/"),
+            Output = new MemoryStream(),
+            TimeProvider = time,
+            MaxTime = TimeSpan.FromSeconds(2),
+            OperationStarted = operationStarted,
+        };
+
+        TransferResult result = await new HttpProtocolHandler(new StalledConnector(), new SilentAuthenticator()).ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
+        Assert.AreEqual("Connection timed out after 0 milliseconds", result.ErrorMessage);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_MaxTimeZero_SetsNoLimitAndCancellationStillEndsTheTransfer()
     {
         // curl -m 0 sets no limit.

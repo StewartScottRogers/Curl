@@ -47,13 +47,36 @@ Good:
 
 Costs and caveats:
 
-- `-m` runs per handler call. `Curl.Core`'s `RedirectFollower` calls the handler once per
-  hop, so a `-L` chain gets `-m` per hop rather than for the whole chain as curl does. Filed
-  as follow-up work.
+- `-m` spans a `-L` chain only because `RedirectFollower` passes the chain's start on
+  (see the amendment below); a caller that calls the handler several times for one
+  operation must do the same. The TFTP handler does not read `OperationStarted` yet, so a
+  redirect to `tftp://` restarts `-m` for that hop.
 - DNS resolution happens inside the connector, so a slow lookup reports curl's connect
   message rather than `Resolving timed out after N milliseconds`.
 - A connector that throws `OperationCanceledException` on its own would be reported as a
   timeout.
+
+## Amendment, 2026-09-27 (BL-299): one `-m` for the whole redirect chain
+
+Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions").
+
+curl 8.21.0 (mingw, Schannel) was measured with `curl -sS -L -m 2` against a loopback
+server whose first hop answers 302 after 1.5 seconds and whose second hop never answers:
+exit 28, `Operation timed out after 2006 milliseconds with 0 bytes received`,
+`%{num_redirects}` 1 (BL-299 Notes). `-m` and the operation message's N both count from
+the first request (curl's `t_startop`); the connect message's N counts from the current
+request (`t_startsingle`).
+
+- `ITransferContext.OperationStarted` carries the timestamp, on the transfer's
+  `TimeProvider`, at which the whole operation began; `null` means it begins with this call.
+- `RedirectFollower` takes the timestamp when a chain starts (or keeps one it was given)
+  and sets it on every hop after the first. `MaxTime` itself is passed unchanged.
+- `HttpTransferDeadline` runs `-m` for what is left of it since `OperationStarted`, none
+  left meaning cancelled at once, and prints the operation message's N from there. The
+  connect timeout and the connect message still count from the handler call.
+
+Rejected: passing each hop `MaxTime` minus the elapsed time. It limits the chain but prints
+the hop's elapsed time as N, not curl's.
 
 ## Alternatives considered
 

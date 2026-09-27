@@ -241,7 +241,7 @@ internal static class HttpTransferMessages
     /// Formats the exit 28 message for a connect that the connect timeout or <c>-m</c> ended
     /// (measured, BL-174 Notes).
     /// </summary>
-    /// <param name="elapsedMilliseconds">Milliseconds since the transfer started.</param>
+    /// <param name="elapsedMilliseconds">Milliseconds since this request started.</param>
     /// <returns>The message, such as <c>Connection timed out after 1015 milliseconds</c>.</returns>
     internal static string ConnectionTimedOut(long elapsedMilliseconds) =>
         string.Create(CultureInfo.InvariantCulture, $"Connection timed out after {elapsedMilliseconds} milliseconds");
@@ -250,7 +250,9 @@ internal static class HttpTransferMessages
     /// Formats the exit 28 message for a transfer <c>-m</c> ended after it connected
     /// (measured, BL-174 Notes).
     /// </summary>
-    /// <param name="elapsedMilliseconds">Milliseconds since the transfer started.</param>
+    /// <param name="elapsedMilliseconds">
+    /// Milliseconds since the operation started: the first request of a redirect chain.
+    /// </param>
     /// <param name="received">The body bytes received so far.</param>
     /// <param name="expected">
     /// The body's Content-Length when the body being read has one, or <see langword="null" />.

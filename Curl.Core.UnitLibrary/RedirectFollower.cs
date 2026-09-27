@@ -31,6 +31,11 @@ namespace Curl.Core;
 /// <see cref="ITransferContext.Credentials" />, no bearer token and no <c>-H</c>
 /// <c>Authorization:</c> or <c>Cookie:</c> header, unless <c>--location-trusted</c>.
 /// </para>
+/// <para>
+/// Every hop after the first carries the chain's start as
+/// <see cref="ITransferContext.OperationStarted" />, so <c>-m</c> limits the whole chain, as
+/// curl's does, rather than each hop (measured, BL-299 Notes).
+/// </para>
 /// </remarks>
 /// <param name="dispatcher">The dispatcher that performs each hop.</param>
 public sealed class RedirectFollower(ProtocolDispatcher dispatcher)
@@ -74,6 +79,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher)
         RedirectPolicy policy)
     {
         RedirectChain chain = new(context.TimeProvider);
+        long operationStarted = context.OperationStarted ?? context.TimeProvider.GetTimestamp();
         long? uploadStart = SeekableStart(context.Upload);
         ITransferContext hop = context;
         bool bodyDropped = false;
@@ -94,7 +100,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher)
             bodyDropped |= DropsBody(result.Report!.ResponseCode, hop, policy);
             RewindUpload(context.Upload, uploadStart, bodyDropped);
             // No refusal means the target parsed, so next is set.
-            hop = NextHop(context, next!, http, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!));
+            hop = NextHop(context, next!, http, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted);
             chain.Followed(target);
         }
     }
@@ -208,7 +214,8 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher)
         CurlUrl url,
         HttpRequestOptions http,
         bool bodyDropped,
-        bool sendCredentials) =>
+        bool sendCredentials,
+        long operationStarted) =>
         new()
         {
             Url = url,
@@ -230,6 +237,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher)
             PathAsIs = first.PathAsIs,
             ConnectTimeout = first.ConnectTimeout,
             MaxTime = first.MaxTime,
+            OperationStarted = operationStarted,
             Http = HopHttp(http, bodyDropped, sendCredentials),
             TimeProvider = first.TimeProvider,
             CancellationToken = first.CancellationToken,

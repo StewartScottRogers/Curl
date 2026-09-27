@@ -118,13 +118,15 @@ namespace Curl.Protocol.Http;
 /// </para>
 /// <para>
 /// <see cref="ITransferContext.MaxTime" /> limits the whole transfer, authentication retry
-/// included, and <see cref="ITransferContext.ConnectTimeout" /> (300 seconds when not given)
+/// included, counted from <see cref="ITransferContext.OperationStarted" /> when a redirect
+/// chain set it, and <see cref="ITransferContext.ConnectTimeout" /> (300 seconds when not given)
 /// each connect (<see cref="HttpTransferDeadline" />). A limit that passes during a connect
 /// ends it with exit 28 and <c>Connection timed out after N milliseconds</c>; <c>-m</c> passing
 /// after it ends the transfer with exit 28 and <c>Operation timed out after N milliseconds with
 /// M bytes received</c>, or <c>M out of T bytes</c> while a Content-Length body is read. A
-/// connection that fails a write ends the transfer with exit 55. Measured on curl 8.21.0
-/// (BL-174 Notes).
+/// connection that fails a write ends the transfer with exit 55. The connect message's N
+/// counts from this call, the operation message's from the operation's start. Measured on
+/// curl 8.21.0 (BL-174 and BL-299 Notes).
 /// </para>
 /// <para>
 /// <see cref="ITransferContext.ResumeFrom" /> above zero sends <c>Range: bytes=N-</c>, and else
@@ -332,7 +334,7 @@ public sealed class HttpProtocolHandler(
         }
         catch (OperationCanceledException) when (plan.Deadline.EndedByLimit)
         {
-            string message = HttpTransferMessages.OperationTimedOut(plan.Deadline.ElapsedMilliseconds, body.BytesWritten, body.ExpectedLength);
+            string message = HttpTransferMessages.OperationTimedOut(plan.Deadline.OperationElapsedMilliseconds, body.BytesWritten, body.ExpectedLength);
             TransferResult timedOut = TransferResult.Failure(CurlExitCode.OperationTimedOut, message, body.BytesWritten)
                 with
             { Report = exchange.Report(body.BytesWritten) };
