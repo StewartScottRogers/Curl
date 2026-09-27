@@ -1,0 +1,21 @@
+03:25:30.912000 *   Trying 127.0.0.1:18292...
+03:25:30.937000 * Established connection to 127.0.0.1 (127.0.0.1 port 18292) from 127.0.0.1 port 57089 
+03:25:30.937000 * using HTTP/1.x
+03:25:30.937000 => Send header, 84 bytes (0x54)
+0000: GET /f.txt HTTP/1.1
+0015: Host: 127.0.0.1:18292
+002c: User-Agent: curl/8.21.0
+0045: Accept: */*
+0052: 
+03:25:30.937000 * Request completely sent off
+03:25:30.951000 <= Recv header, 17 bytes (0x11)
+0000: HTTP/1.1 200 OK
+03:25:30.952000 <= Recv header, 26 bytes (0x1a)
+0000: Content-Type: text/plain
+03:25:30.952000 <= Recv header, 19 bytes (0x13)
+0000: Content-Length: 6
+03:25:30.952000 <= Recv header, 2 bytes (0x2)
+0000: 
+03:25:30.952000 <= Recv data, 6 bytes (0x6)
+0000: hello.
+03:25:30.952000 * Connection #0 to host 127.0.0.1:18292 left intact

@@ -21,8 +21,8 @@ namespace Curl.Output;
 /// <remarks>
 /// A port of the <c>-v</c> branch of <c>tool_debug_cb</c> in curl's <c>src/tool_cb_dbg.c</c>.
 /// A run of body events with nothing between them is one data line carrying the first
-/// event's byte count, as curl prints it. TLS facts are worded as the Schannel build words
-/// them: only the ALPN lines. TLS record bytes print nothing, as in curl's Schannel build.
+/// event's byte count, as curl prints it. The structured events are worded by
+/// <see cref="TransferEventInfoText"/>. TLS record bytes print nothing, as in curl's Schannel build.
 /// </remarks>
 public sealed class VerboseTransferEventWriter(Stream output, bool writesDataLines) : ITransferEvents
 {
@@ -49,29 +49,22 @@ public sealed class VerboseTransferEventWriter(Stream output, bool writesDataLin
     /// <inheritdoc />
     public void ReportConnectionOpened(ConnectionOpenedEvent opened)
     {
-        WriteTextLine(
-            $"Established connection to {opened.HostName} ({opened.RemoteEndPoint.Address} port {opened.RemoteEndPoint.Port}) " +
-            $"from {opened.LocalEndPoint.Address} port {opened.LocalEndPoint.Port} ");
+        WriteTextLine(TransferEventInfoText.ConnectionOpened(opened));
     }
 
     /// <inheritdoc />
     public void ReportConnectionReused(ConnectionReusedEvent reused)
     {
-        WriteTextLine($"Reusing existing {reused.Scheme}: connection with {(reused.IsProxy ? "proxy" : "host")} {reused.HostName}");
+        WriteTextLine(TransferEventInfoText.ConnectionReused(reused));
     }
 
     /// <inheritdoc />
     public void ReportTlsHandshake(TlsHandshakeEvent handshake)
     {
-        if (handshake.OfferedApplicationProtocols.Count == 0)
+        foreach (string line in TransferEventInfoText.TlsHandshake(handshake))
         {
-            return;
+            WriteTextLine(line);
         }
-
-        WriteTextLine("ALPN: curl offers " + string.Join(',', handshake.OfferedApplicationProtocols));
-        WriteTextLine(handshake.NegotiatedApplicationProtocol is { } accepted
-            ? "ALPN: server accepted " + accepted
-            : "ALPN: server did not agree on a protocol. Uses default.");
     }
 
     /// <inheritdoc />
