@@ -22,7 +22,8 @@ namespace Curl.Output;
 /// <c>time_pretransfer</c>, <c>time_posttransfer</c>, <c>time_starttransfer</c>,
 /// <c>time_redirect</c>, <c>time_total</c>, <c>time_queue</c>, <c>speed_download</c>,
 /// <c>speed_upload</c>, <c>ssl_verify_result</c>, <c>proxy_ssl_verify_result</c>,
-/// <c>tls_earlydata</c>, <c>num_retries</c>, <c>ftp_entry_path</c>, and
+/// <c>tls_earlydata</c>, <c>num_retries</c>, <c>ftp_entry_path</c>, <c>num_certs</c>,
+/// <c>certs</c>, and
 /// <c>url.&lt;part&gt;</c> and <c>urle.&lt;part&gt;</c> for the parts <c>scheme</c>,
 /// <c>user</c>, <c>password</c>, <c>options</c>, <c>host</c>, <c>port</c>, <c>path</c>,
 /// <c>query</c>, <c>fragment</c> and <c>zoneid</c>. Any other name is reported unknown.
@@ -31,6 +32,12 @@ namespace Curl.Output;
 /// <c>url.</c> parts come from the URL as given and <c>urle.</c> parts from the
 /// <c>url_effective</c> URL, each parsed with <see cref="CurlUrl"/>; a part the URL does
 /// not have, or a URL that does not parse, prints nothing. See BL-304.
+/// </para>
+/// <para>
+/// <c>num_certs</c> counts <see cref="TransferReport.PeerCertificates"/> and <c>certs</c>
+/// prints each with <see cref="PeerCertificateText"/>, one after another; a transfer
+/// without TLS has none, so <c>0</c> and nothing, as measured on 2026-09-26 against curl
+/// 8.21.0 (mingw, Schannel) for file:// and http://. See ADR-0054 and BL-303.
 /// </para>
 /// <para>
 /// <c>time_queue</c> is the handler's start, the moment the transfer left the queue, so
@@ -135,6 +142,8 @@ public sealed class TransferWriteOutVariables(
         ["tls_earlydata"] = _ => "0",
         ["num_retries"] = _ => "0",
         ["ftp_entry_path"] = _ => string.Empty,
+        ["num_certs"] = variables => FormatNumber(variables.report.PeerCertificates.Count),
+        ["certs"] = variables => string.Concat(variables.report.PeerCertificates.Select(PeerCertificateText.Format)),
     });
 
     private static readonly char[] HeaderValueWhitespace = [' ', '\t'];

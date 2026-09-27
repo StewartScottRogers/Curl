@@ -68,6 +68,7 @@ choices do not need one.
 | [0051](ADR-0051-t-urls-are-resolved-before-the-transfer-and-the-t-file-opened-after-its-warnings.md) | `-T` URLs are resolved before the transfer, and the `-T` file opened after its warnings: `-T` values pair with URLs in order, `UploadTransferUrl` appends, parses with `CurlUrl` and normalises, exit 3 before any warning, exit 26 with `cannot open` lines even under `-s` | Accepted | 2026-09-27 |
 | [0052](ADR-0052-handler-synthesised-header-lines-are-reported-as-pseudo-headers.md) | Handler-synthesised header lines are reported as pseudo-headers: `TransferReport.PseudoHeaders` counts towards `%{num_headers}` but is never found by `%header{}`; `file://` reports its three | Accepted | 2026-09-27 |
 | [0053](ADR-0053-curl-console-refuses-a-proxy-tunnel-the-connector-cannot-open-yet-with-exit-4.md) | Curl.Console refuses a proxy tunnel the connector cannot open yet, with exit 4: SOCKS proxies, and HTTPS proxies for `https` or under `-p` or `-L`, until BL-213 and BL-266 land (BL-328) | Accepted | 2026-09-27 |
+| [0054](ADR-0054-the-peer-certificate-chain-is-captured-in-the-tls-provider-and-printed-by-a-port-of-curls-certinfo.md) | The peer certificate chain is captured in the TLS provider's validation callback, carried as DER on `ConnectResult.PeerCertificates` and `TransferReport.PeerCertificates`, and printed for `%{certs}` by `PeerCertificateText`, a port of curl's `Curl_extract_certinfo` | Accepted | 2026-09-27 |
 
 ## Template
 
