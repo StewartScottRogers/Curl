@@ -1,5 +1,5 @@
 ---
-id: BL-307
+id: BL-309
 title: Clear the six failing Curl.Protocol.File.UnitLibrary quality members
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-307 — Clear the six failing Curl.Protocol.File.UnitLibrary quality members
+# BL-309 — Clear the six failing Curl.Protocol.File.UnitLibrary quality members
 
 ## Goal
 

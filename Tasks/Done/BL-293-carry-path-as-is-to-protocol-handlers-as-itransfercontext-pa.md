@@ -47,11 +47,11 @@ handler honours it.
   `FileProtocolHandlerTests.ExecuteAsync_PathAsIsDotDotSourceNotFound_QuotesThePathWithTheDotDotKept` beside the existing
   dot-dot-removed test.
 - `RedirectFollower.NextHop` (`Curl.Core.UnitLibrary`) does not copy the flag yet; that project was held by BL-275 in Doing,
-  so it is filed as BL-306 rather than added to this task's `touches`.
+  so it is filed as BL-308 rather than added to this task's `touches`.
 - Quality: `Curl.Console` and `Curl.Protocol.Abstractions.UnitLibrary` measure 100/100 with 0 failing members.
   `Curl.Protocol.File.UnitLibrary` has 6 failing members, all pre-existing and in code this task did not change
   (three methods over complexity 10, three compiler-generated `FileUrlPath` record members); the line this task changed is
-  covered. The third criterion is read as "no failing member introduced"; the six are filed as BL-307.
+  covered. The third criterion is read as "no failing member introduced"; the six are filed as BL-309.
 
 ## Log
 

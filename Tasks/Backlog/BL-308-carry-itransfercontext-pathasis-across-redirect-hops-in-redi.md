@@ -1,5 +1,5 @@
 ---
-id: BL-306
+id: BL-308
 title: Carry ITransferContext.PathAsIs across redirect hops in RedirectFollower
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-306 — Carry ITransferContext.PathAsIs across redirect hops in RedirectFollower
+# BL-308 — Carry ITransferContext.PathAsIs across redirect hops in RedirectFollower
 
 ## Goal
 
