@@ -296,6 +296,21 @@ public sealed class CurlCompositionProxyTests
     }
 
     [TestMethod]
+    public async Task RunAsync_ProxyTunnelWithProxyHeaderAndHeader_ConnectRequestCarriesOnlyTheProxyHeader()
+    {
+        // curl -s -x http://127.0.0.1:18336 -p --proxy-header "X-P: 1" -H "X-A: 1" http://example.com/ (BL-347 Notes)
+        ScriptedConnector server = new([Latin1(ConnectionEstablished), Latin1(Hello)]);
+        string[] arguments = ["-sS", "-p", "--proxy-header", "X-P: 1", "-H", "X-A: 1", "-x", "127.0.0.1:18238", "http://example.com/a"];
+
+        Run run = await RunThroughTcpConnectorAsync(server, TunnelOptionsFor(arguments), arguments);
+
+        Assert.AreEqual(0, run.ExitCode);
+        Assert.StartsWith(
+            "CONNECT example.com:80 HTTP/1.1\r\nHost: example.com:80\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\nX-P: 1\r\n\r\nGET /a HTTP/1.1\r\n",
+            Latin1(server.Written));
+    }
+
+    [TestMethod]
     public async Task RunAsync_ProxyTunnelWithEmptyUserAgentOption_ConnectRequestHasNoUserAgent()
     {
         ScriptedConnector server = new([Latin1(ConnectionEstablished), Latin1(Hello)]);

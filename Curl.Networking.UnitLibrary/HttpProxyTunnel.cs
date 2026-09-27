@@ -21,30 +21,47 @@ internal static class HttpProxyTunnel
     /// <param name="host">The host the tunnel reaches: the URL's, or the one a <c>--connect-to</c> mapping gives (measured).</param>
     /// <param name="port">The port the tunnel reaches.</param>
     /// <param name="proxy">The proxy, whose kind picks HTTP/1.0 or HTTP/1.1 and whose credential becomes <c>Proxy-Authorization</c>.</param>
-    /// <param name="options">The <c>User-Agent</c> and the credential encoding.</param>
-    /// <returns>The request bytes, headers in curl's order, ending with the empty line.</returns>
+    /// <param name="options">The <c>User-Agent</c>, the credential encoding and the <c>--proxy-header</c> values.</param>
+    /// <returns>
+    /// The request bytes: curl's own headers in its order, each left out when a
+    /// <c>--proxy-header</c> value names it, then the proxy header lines, ending with the
+    /// empty line (BL-347 Notes).
+    /// </returns>
     public static byte[] BuildConnectRequest(string host, int port, ProxyEndpoint proxy, HttpProxyTunnelOptions options)
     {
         var authority = FormatAuthority(host, port);
         var version = proxy.Kind == ProxyKind.Http10 ? "HTTP/1.0" : "HTTP/1.1";
+        HttpProxyTunnelHeader[] proxyHeaders = [.. options.ProxyHeaders.Select(HttpProxyTunnelHeader.Parse)];
         var request = new StringBuilder()
-            .Append(CultureInfo.InvariantCulture, $"CONNECT {authority} {version}\r\n")
-            .Append(CultureInfo.InvariantCulture, $"Host: {authority}\r\n");
+            .Append(CultureInfo.InvariantCulture, $"CONNECT {authority} {version}\r\n");
 
-        if (proxy.Credential is { } credential)
+        AppendUnlessNamed(request, proxyHeaders, "Host", authority);
+        AppendUnlessNamed(request, proxyHeaders, "Proxy-Authorization", FormatBasicCredential(proxy, options));
+        AppendUnlessNamed(request, proxyHeaders, "User-Agent", options.UserAgent);
+        AppendUnlessNamed(request, proxyHeaders, "Proxy-Connection", "Keep-Alive");
+        foreach (var sentLine in proxyHeaders.Select(header => header.SentLine).OfType<string>())
         {
-            var userAndPassword = options.CredentialEncoding.GetBytes($"{credential.UserName}:{credential.Password}");
-            request.Append(CultureInfo.InvariantCulture, $"Proxy-Authorization: Basic {Convert.ToBase64String(userAndPassword)}\r\n");
+            request.Append(sentLine).Append("\r\n");
         }
 
-        if (options.UserAgent is { } userAgent)
-        {
-            request.Append(CultureInfo.InvariantCulture, $"User-Agent: {userAgent}\r\n");
-        }
-
-        request.Append("Proxy-Connection: Keep-Alive\r\n\r\n");
+        request.Append("\r\n");
         return Encoding.Latin1.GetBytes(request.ToString());
     }
+
+    // Appends "name: value" unless value is null or a --proxy-header value names the header.
+    private static void AppendUnlessNamed(StringBuilder request, HttpProxyTunnelHeader[] proxyHeaders, string name, string? value)
+    {
+        if (value is not null && !proxyHeaders.Any(header => header.Names(name)))
+        {
+            request.Append(CultureInfo.InvariantCulture, $"{name}: {value}\r\n");
+        }
+    }
+
+    // "Basic " and the proxy credential base64-encoded, or null when the proxy has none.
+    private static string? FormatBasicCredential(ProxyEndpoint proxy, HttpProxyTunnelOptions options) =>
+        proxy.Credential is { } credential
+            ? $"Basic {Convert.ToBase64String(options.CredentialEncoding.GetBytes($"{credential.UserName}:{credential.Password}"))}"
+            : null;
 
     /// <summary>
     /// The most bytes one line of the reply may hold, its CR and LF included, before curl

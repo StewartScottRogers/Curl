@@ -53,7 +53,7 @@ and `TcpConnector` passes them on.
 
 `TcpConnector` tunnels through `ConnectTarget.Proxy` when it is an HTTP proxy
 (`ProxyKind.Http`, `Http10`) per ADR-0023: `HttpProxyTunnel` writes curl 8.21.0's CONNECT
-request (its `User-Agent` and credential encoding from `HttpProxyTunnelOptions`) and reads
+request (its `User-Agent`, credential encoding and `--proxy-header` values from `HttpProxyTunnelOptions`, ADR-0077) and reads
 the reply one byte at a time, so the tunnel's bytes stay on the connection; TLS then runs
 over the tunnel for an https target. Through a SOCKS proxy (`Socks4`, `Socks4a`, `Socks5`,
 `Socks5Hostname`) `SocksProxyTunnel` runs curl 8.21.0's handshake, measured byte for byte

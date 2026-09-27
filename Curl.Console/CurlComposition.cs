@@ -125,8 +125,9 @@ internal static class CurlComposition
     /// <summary>
     /// Maps the command line to what the CONNECT request through an HTTP proxy carries: the
     /// <c>-A</c> value as its <c>User-Agent</c>, no <c>User-Agent</c> header for <c>-A ""</c>,
-    /// <c>curl/8.21.0</c> without <c>-A</c>; and the proxy credential encoded as the server
-    /// credential is (<see cref="CredentialEncoding.ForPlatform" />, ADR-0022).
+    /// <c>curl/8.21.0</c> without <c>-A</c>; the proxy credential encoded as the server
+    /// credential is (<see cref="CredentialEncoding.ForPlatform" />, ADR-0022); and the
+    /// <c>--proxy-header</c> values verbatim, never the <c>-H</c> ones (ADR-0077).
     /// </summary>
     /// <param name="options">The parsed command line.</param>
     /// <returns>The tunnel's options.</returns>
@@ -138,7 +139,10 @@ internal static class CurlComposition
                 "" => null,
                 string userAgent => userAgent,
             },
-            CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()));
+            CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()))
+        {
+            ProxyHeaders = options.ProxyHeaders,
+        };
 
     /// <summary>
     /// Creates the runner that parses a command line and performs its transfers against

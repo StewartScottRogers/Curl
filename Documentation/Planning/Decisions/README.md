@@ -91,6 +91,7 @@ choices do not need one.
 | [0074](ADR-0074-one-curl-date-parser-lives-in-curl-protocol-abstractions.md) | One port of libcurl's `parsedate`, `CurlDateParser` in `Curl.Protocol.Abstractions`, reads `-z` dates and cookie `Expires`; `Curl.Cli` caps it into a `DateTimeOffset`, and `-z` refuses a year before 1583 | Accepted | 2026-09-27 |
 | [0075](ADR-0075-the-http-handler-takes-the-transfer-timings-and-a-failed-connect-ends-them.md) | `HttpProtocolHandler` reports `TransferTimings` (start, connect, request ready and sent, first response byte, end), and a failed connect ends pretransfer, posttransfer and starttransfer as it fails, as curl 8.21.0 does; a failed connect's lookup time is a follow-up | Accepted | 2026-09-27 |
 | [0076](ADR-0076-multipart-encoder-file-parts-are-encoded-as-they-are-sent.md) | Multipart `;encoder=` file parts are encoded as they are sent: `base64` and `quoted-printable` files stream through `EncodedReadStream`, a seekable `7bit` file is checked once while building and then streamed, and an unseekable `7bit` file is still read whole | Accepted | 2026-09-27 |
+| [0077](ADR-0077-proxy-headers-reach-the-connect-request-through-httpproxytunneloptions.md) | `--proxy-header` values reach the CONNECT request on `HttpProxyTunnelOptions.ProxyHeaders`, replace the curl CONNECT headers they name and follow them as measured on curl 8.21.0; `-H` values never do | Accepted | 2026-09-27 |
 
 ## Template
 

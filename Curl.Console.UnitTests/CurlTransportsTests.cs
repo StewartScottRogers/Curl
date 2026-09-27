@@ -86,6 +86,15 @@ public sealed class CurlTransportsTests
     }
 
     [TestMethod]
+    public void CreateTransports_WithProxyHeadersAndHeaders_TunnelOptionsCarryOnlyTheProxyHeaders()
+    {
+        CurlTransports transports = CurlComposition.CreateTransports(
+            Options("--proxy-header", "X-P: 1", "-H", "X-A: 1", "--proxy-header", "X-Q: 2", "gophers://example.com/"));
+
+        CollectionAssert.AreEqual(new[] { "X-P: 1", "X-Q: 2" }, transports.ProxyTunnelOptions.ProxyHeaders.ToArray());
+    }
+
+    [TestMethod]
     public void CreateTransports_TunnelOptionsCredentialEncoding_IsForPlatform()
     {
         CurlTransports transports = CurlComposition.CreateTransports(NoOptions());

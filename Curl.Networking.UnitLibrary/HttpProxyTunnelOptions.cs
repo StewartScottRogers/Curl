@@ -4,7 +4,8 @@ namespace Curl.Networking;
 
 /// <summary>
 /// What <see cref="TcpConnector" /> puts in the CONNECT request that opens a tunnel
-/// through an HTTP proxy: the <c>User-Agent</c> and the encoding of the proxy credential.
+/// through an HTTP proxy: the <c>User-Agent</c>, the encoding of the proxy credential and
+/// the <c>--proxy-header</c> values (ADR-0077).
 /// </summary>
 /// <param name="UserAgent">
 /// The <c>User-Agent</c> header value, as <c>-A</c>/<c>--user-agent</c> sets it for the
@@ -22,4 +23,11 @@ public sealed record HttpProxyTunnelOptions(string? UserAgent, Encoding Credenti
     /// curl/8.21.0</c> and UTF-8 credentials.
     /// </summary>
     public static HttpProxyTunnelOptions Default { get; } = new("curl/8.21.0", Encoding.UTF8);
+
+    /// <summary>
+    /// Gets the <c>--proxy-header</c> values, verbatim and in command-line order: each one
+    /// that names a header replaces curl's own CONNECT header of that name, and each one
+    /// that sends a line is appended after curl's own headers (BL-347). Empty by default.
+    /// </summary>
+    public IReadOnlyList<string> ProxyHeaders { get; init; } = [];
 }
