@@ -45,7 +45,7 @@ public sealed class UdpDatagramConnector : IDatagramConnector
 
     /// <inheritdoc />
     /// <remarks>
-    /// The messages are curl 8.21.0's, cut to 255 characters as curl cuts them (ADR-0071):
+    /// The messages are curl 8.21.0's, cut to 255 characters as curl cuts them (ADR-0072):
     /// <c>Could not resolve host: &lt;host&gt;</c> for
     /// exit 6, and <c>Failed to connect to &lt;host&gt;:&lt;port&gt; after &lt;n&gt; ms:
     /// Could not connect to server</c> for exit 7 when no resolved address can have a

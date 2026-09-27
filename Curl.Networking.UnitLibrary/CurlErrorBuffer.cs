@@ -2,7 +2,7 @@ namespace Curl.Networking;
 
 /// <summary>
 /// curl's error buffer: libcurl formats a failure message into 256 bytes
-/// (<c>CURL_ERROR_SIZE</c>), so a message that names a long host is cut to 255 (ADR-0071).
+/// (<c>CURL_ERROR_SIZE</c>), so a message that names a long host is cut to 255 (ADR-0072).
 /// </summary>
 internal static class CurlErrorBuffer
 {

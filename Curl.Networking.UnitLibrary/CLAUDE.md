@@ -77,7 +77,7 @@ mapping that does not parse fails the connect with exit 49 and curl's message.
 `SystemDnsResolver` reports a host `Dns` refuses as over 255 characters as not resolved, so it
 is exit 6 (exit 5 for a proxy) as in curl 8.21.0, which accepts hosts up to 65535 bytes. Every
 `Could not resolve host:` and `Could not resolve proxy:` message goes through `CurlErrorBuffer`,
-which cuts it to 255 characters as curl's 256-byte error buffer does (ADR-0071).
+which cuts it to 255 characters as curl's 256-byte error buffer does (ADR-0072).
 
 `PoolingConnector` wraps another `IConnector` and keeps connections for reuse per ADR-0050.
 Every connection it returns is a `PooledConnection`; one marked with `MarkReusable` goes back
