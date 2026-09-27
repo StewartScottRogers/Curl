@@ -1,5 +1,5 @@
 ---
-id: BL-306
+id: BL-312
 title: Record the ADR that --resolve and --connect-to are kept verbatim by the parser and checked at transfer time
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-306 — Record the ADR that --resolve and --connect-to are kept verbatim by the parser and checked at transfer time
+# BL-312 — Record the ADR that --resolve and --connect-to are kept verbatim by the parser and checked at transfer time
 
 ## Goal
 
