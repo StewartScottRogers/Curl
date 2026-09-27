@@ -89,12 +89,41 @@ public sealed class IpfsGatewayRewriterTests
     [TestMethod]
     [DataRow("http://127.0.0.1:1/?a=b")]
     [DataRow("file:///C:/x")]
+    [DataRow("file:///x")]
+    [DataRow("file://localhost/x")]
+    [DataRow("FILE:///x")]
     [DataRow("http://[::1]:1/")]
-    [DataRow("foo://h:1/")]
-    [DataRow("http://h:1/ x")]
+    [DataRow("https://[::1]/")]
     public void TryRewrite_UnusableGatewayOption_IsMalformedTargetUrl(string gateway)
     {
         AssertMalformed(CreateRewriter(), "ipfs://cid/x", gateway);
+    }
+
+    [TestMethod]
+    [DataRow(":::")]
+    [DataRow("foo://h:1/")]
+    [DataRow("http://h:1/ x")]
+    [DataRow("garbage ::")]
+    [DataRow("http://")]
+    [DataRow("http://:1/")]
+    [DataRow("http://u@/")]
+    [DataRow("ftp://")]
+    [DataRow("file://")]
+    [DataRow("file://h/x")]
+    [DataRow("http://h:99999/")]
+    public void TryRewrite_MalformedGatewayOption_IsMalformedGatewayOption(string gateway)
+    {
+        Assert.IsFalse(CreateRewriter().TryRewrite(CurlUrl.Parse("ipfs://cid/x"), gateway, out string? gatewayUrl, out IpfsGatewayFailure? failure));
+        Assert.IsNull(gatewayUrl);
+        Assert.AreSame(IpfsGatewayFailure.MalformedGatewayOption, failure);
+    }
+
+    [TestMethod]
+    public void MalformedGatewayOption_IsExitFortyThreeWithCurlsMessage()
+    {
+        Assert.AreEqual(CurlExitCode.BadFunctionArgument, IpfsGatewayFailure.MalformedGatewayOption.ExitCode);
+        Assert.AreEqual(43, (int)IpfsGatewayFailure.MalformedGatewayOption.ExitCode);
+        Assert.AreEqual("--ipfs-gateway was given a malformed URL", IpfsGatewayFailure.MalformedGatewayOption.Message);
     }
 
     [TestMethod]
@@ -149,6 +178,9 @@ public sealed class IpfsGatewayRewriterTests
     [DataRow("")]
     [DataRow("http://127.0.0.1:2/?q")]
     [DataRow("foo://h:1/")]
+    [DataRow(":::")]
+    [DataRow("http://")]
+    [DataRow("file:///x")]
     [DataRow("http://127.0.0.1:1/ ")]
     [DataRow("  http://127.0.0.1:1")]
     [DataRow("127.0.0.1:1")]
