@@ -1,5 +1,6 @@
 using System.Text;
 
+using Curl.Cli;
 using Curl.Core;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
@@ -217,6 +218,88 @@ public sealed class CurlCompositionProxyTests
         Assert.AreEqual(0, server.Targets.Count);
     }
 
+    [TestMethod]
+    public async Task RunAsync_ProxyTunnelWithUserAgentOption_ConnectRequestCarriesIt()
+    {
+        ScriptedConnector server = new([Latin1(ConnectionEstablished), Latin1(Hello)]);
+        string[] arguments = ["-sS", "-p", "-A", "agent/1.0", "-x", "127.0.0.1:18238", "http://example.com/a"];
+
+        Run run = await RunThroughTcpConnectorAsync(server, TunnelOptionsFor(arguments), arguments);
+
+        Assert.AreEqual(0, run.ExitCode);
+        Assert.StartsWith(
+            "CONNECT example.com:80 HTTP/1.1\r\nHost: example.com:80\r\nUser-Agent: agent/1.0\r\nProxy-Connection: Keep-Alive\r\n\r\n",
+            Latin1(server.Written));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_ProxyTunnelWithEmptyUserAgentOption_ConnectRequestHasNoUserAgent()
+    {
+        ScriptedConnector server = new([Latin1(ConnectionEstablished), Latin1(Hello)]);
+        string[] arguments = ["-sS", "-p", "-A", "", "-x", "127.0.0.1:18238", "http://example.com/a"];
+
+        Run run = await RunThroughTcpConnectorAsync(server, TunnelOptionsFor(arguments), arguments);
+
+        Assert.AreEqual(0, run.ExitCode);
+        Assert.StartsWith(
+            "CONNECT example.com:80 HTTP/1.1\r\nHost: example.com:80\r\nProxy-Connection: Keep-Alive\r\n\r\n",
+            Latin1(server.Written));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_HttpProxyAndProxyUserForADictUrl_ConnectTargetCarriesTheProxy()
+    {
+        RecordingConnector connector = new(CurlExitCode.CouldntConnect, "refused");
+
+        await RunAsync(connector, new Dictionary<string, string>(), ["-sS", "-x", "http://proxy:3128", "-U", "user:pass", "dict://example.com/d:x"]);
+
+        ConnectTarget target = connector.Targets.Single();
+        Assert.AreEqual(new ConnectTarget("example.com", 2628, false), target with { Proxy = null });
+        ProxyEndpoint proxy = target.Proxy!;
+        Assert.AreEqual((ProxyKind.Http, "proxy", 3128), (proxy.Kind, proxy.Host, proxy.Port));
+        Assert.AreEqual(("user", "pass"), (proxy.Credential!.UserName, proxy.Credential.Password));
+    }
+
+    [TestMethod]
+    [DataRow("dict://example.com/d:x")]
+    [DataRow("http://example.com/a")]
+    public async Task RunAsync_NoProxyOption_ConnectTargetCarriesNoProxy(string url)
+    {
+        RecordingConnector connector = new(CurlExitCode.CouldntConnect, "refused");
+
+        await RunAsync(connector, new Dictionary<string, string>(), ["-sS", url]);
+
+        Assert.IsNull(connector.Targets.Single().Proxy);
+    }
+
+    [TestMethod]
+    [DataRow("dict://example.com/d:x", false, 2628)]
+    [DataRow("dict://example.com/d:x", true, 2628)]
+    [DataRow("https://example.com/a", false, 443)]
+    [DataRow("https://example.com/a", true, 443)]
+    [DataRow("http://example.com/a", true, 80)]
+    public async Task RunAsync_ProxyOptionForATunnelledUrl_ConnectTargetCarriesTheProxy(string url, bool proxyTunnel, int port)
+    {
+        RecordingConnector connector = new(CurlExitCode.CouldntConnect, "refused");
+        string[] arguments = proxyTunnel ? ["-sS", "-p", "-x", "http://proxy:3128", url] : ["-sS", "-x", "http://proxy:3128", url];
+
+        await RunAsync(connector, new Dictionary<string, string>(), arguments);
+
+        ConnectTarget target = connector.Targets.Single();
+        Assert.AreEqual(("example.com", port), (target.Host, target.Port));
+        Assert.AreEqual(("proxy", 3128), (target.Proxy!.Host, target.Proxy.Port));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_ProxyOptionWithoutProxyTunnelForAnHttpUrl_ConnectsToTheProxyWithoutATunnel()
+    {
+        RecordingConnector connector = new(CurlExitCode.CouldntConnect, "refused");
+
+        await RunAsync(connector, new Dictionary<string, string>(), ["-sS", "-x", "http://proxy:3128", "http://example.com/a"]);
+
+        Assert.AreEqual(new ConnectTarget("proxy", 3128, false), connector.Targets.Single());
+    }
+
     private static Task<Run> RunAsync(ScriptedConnector server, params string[] arguments) =>
         RunAsync((IConnector)server, new Dictionary<string, string>(), arguments);
 
@@ -224,10 +307,17 @@ public sealed class CurlCompositionProxyTests
         RunAsync((IConnector)server, environment, arguments);
 
     private static Task<Run> RunThroughTcpConnectorAsync(ScriptedConnector server, params string[] arguments) =>
+        RunThroughTcpConnectorAsync(server, null, arguments);
+
+    private static Task<Run> RunThroughTcpConnectorAsync(ScriptedConnector server, HttpProxyTunnelOptions? proxyTunnelOptions, string[] arguments) =>
         RunAsync(
-            new TcpConnector(new LoopbackDnsResolver(), new ScriptedTcpDialer(server), new PassThroughTlsProvider(), TimeProvider.System),
+            new TcpConnector(new LoopbackDnsResolver(), new ScriptedTcpDialer(server), new PassThroughTlsProvider(), TimeProvider.System, proxyTunnelOptions),
             new Dictionary<string, string>(),
             arguments);
+
+    /// <summary>The tunnel options the production composition maps from <paramref name="arguments" />.</summary>
+    private static HttpProxyTunnelOptions TunnelOptionsFor(string[] arguments) =>
+        CurlComposition.CreateProxyTunnelOptions(CommandLineParser.Parse(arguments, _ => true).Options!);
 
     /// <summary>
     /// Runs <paramref name="arguments" /> through the production composition over

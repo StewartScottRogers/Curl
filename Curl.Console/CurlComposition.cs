@@ -75,7 +75,9 @@ internal static class CurlComposition
     /// connectors share the one resolver and <see cref="TimeProvider.System" />. TLS uses
     /// the <see cref="TlsClientOptions" /> mapped from <paramref name="options" /> by
     /// <see cref="TlsClientOptionsMapping.FromCommandLine" />, one set shared by every URL on
-    /// the command line.
+    /// the command line. The CONNECT request that tunnels through an HTTP proxy carries the
+    /// <see cref="HttpProxyTunnelOptions" /> <see cref="CreateProxyTunnelOptions" /> maps from
+    /// <paramref name="options" />.
     /// </summary>
     /// <param name="options">The parsed command line.</param>
     /// <returns>The connectors and the pieces they were built from.</returns>
@@ -86,6 +88,7 @@ internal static class CurlComposition
         TcpDialer tcpDialer = new();
         TlsClientOptions tlsClientOptions = TlsClientOptionsMapping.FromCommandLine(options);
         SslStreamTlsProvider tlsProvider = new(tlsClientOptions);
+        HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(options);
 
         return new CurlTransports(
             dnsResolver,
@@ -93,9 +96,28 @@ internal static class CurlComposition
             tcpDialer,
             tlsClientOptions,
             tlsProvider,
-            new TcpConnector(dnsResolver, tcpDialer, tlsProvider, timeProvider),
+            proxyTunnelOptions,
+            new TcpConnector(dnsResolver, tcpDialer, tlsProvider, timeProvider, proxyTunnelOptions),
             new UdpDatagramConnector(dnsResolver, timeProvider));
     }
+
+    /// <summary>
+    /// Maps the command line to what the CONNECT request through an HTTP proxy carries: the
+    /// <c>-A</c> value as its <c>User-Agent</c>, no <c>User-Agent</c> header for <c>-A ""</c>,
+    /// <c>curl/8.21.0</c> without <c>-A</c>; and the proxy credential encoded as the server
+    /// credential is (<see cref="CredentialEncoding.ForPlatform" />, ADR-0022).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns>The tunnel's options.</returns>
+    internal static HttpProxyTunnelOptions CreateProxyTunnelOptions(CommandLineOptions options) =>
+        new(
+            options.UserAgent switch
+            {
+                null => HttpProxyTunnelOptions.Default.UserAgent,
+                "" => null,
+                string userAgent => userAgent,
+            },
+            CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()));
 
     /// <summary>
     /// Creates the runner that parses a command line and performs its transfers against
