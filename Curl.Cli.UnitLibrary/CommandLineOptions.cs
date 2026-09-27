@@ -16,6 +16,7 @@ public sealed class CommandLineOptions
 {
     private readonly List<string> urls = [];
     private readonly List<UrlOutput> urlOutputs = [];
+    private readonly List<string> uploadFiles = [];
     private readonly List<string> telnetOptions = [];
     private readonly List<string> resolveEntries = [];
     private readonly List<string> connectToEntries = [];
@@ -33,6 +34,13 @@ public sealed class CommandLineOptions
     /// <c>--url</c> values interleaved as they were given.
     /// </summary>
     public IReadOnlyList<string> Urls => urls;
+
+    /// <summary>
+    /// The <c>-T</c> / <c>--upload-file</c> values in command-line order, each unchanged: the Nth is
+    /// uploaded to the Nth URL of <see cref="Urls"/>, wherever each was given, and a URL past the end
+    /// uploads nothing, as curl 8.21.0 pairs them. An empty value keeps its place and uploads nothing.
+    /// </summary>
+    public IReadOnlyList<string> UploadFiles => uploadFiles;
 
     /// <summary>
     /// <see langword="true"/> when <c>-g</c> / <c>--globoff</c> was given and no <c>--no-globoff</c>
@@ -782,6 +790,10 @@ public sealed class CommandLineOptions
         urls.Add(url);
         (urlOutputs.Find(output => output.Url is null) ?? AddUrlOutput()).Url = url;
     }
+
+    /// <summary>Appends <paramref name="uploadFile"/> to <see cref="UploadFiles"/>; nothing is opened.</summary>
+    /// <param name="uploadFile">A <c>-T</c> / <c>--upload-file</c> value, which may be empty.</param>
+    internal void AddUploadFile(string uploadFile) => uploadFiles.Add(uploadFile);
 
     /// <summary>
     /// Pairs <paramref name="outputFile"/> with the next URL in <see cref="UrlOutputs"/>; nothing is

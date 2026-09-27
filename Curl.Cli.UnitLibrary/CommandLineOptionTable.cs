@@ -69,6 +69,7 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("trace-time", null, (options, on) => options.TraceTime = on),
         CommandLineOption.Value("stderr", null, SetStandardErrorFile),
         CommandLineOption.FileName("output", 'o', (options, file) => options.AddOutputFile(file)),
+        CommandLineOption.Value("upload-file", 'T', AddUploadFile),
         CommandLineOption.NegatableFlag("remote-name", 'O', (options, on) => options.PairRemoteName(on)),
         CommandLineOption.NegatableFlag("remote-name-all", null, (options, on) => options.RemoteNameAll = on),
         CommandLineOption.NegatableFlag("remote-header-name", 'J', (options, on) => options.RemoteHeaderName = on),
@@ -215,6 +216,18 @@ public static class CommandLineOptionTable
     {
         CommandLineOption.WarnWhenFileNameLooksLikeFlag(options, file);
         options.StandardErrorFile = file;
+        return null;
+    }
+
+    /// <summary>
+    /// Adds a <c>-T</c> / <c>--upload-file</c> value after curl's warning for a file name that looks like
+    /// a flag. An empty value is not refused as blank: curl 8.21.0 takes <c>-T ""</c> as no upload for
+    /// its URL (measured 2026-09-27).
+    /// </summary>
+    private static CommandLineRefusal? AddUploadFile(CommandLineOptions options, string file, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        CommandLineOption.WarnWhenFileNameLooksLikeFlag(options, file);
+        options.AddUploadFile(file);
         return null;
     }
 
