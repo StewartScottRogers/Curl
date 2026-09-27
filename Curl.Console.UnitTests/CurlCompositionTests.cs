@@ -314,14 +314,10 @@ public sealed class CurlCompositionTests
 
         TransferDispatch dispatch = CurlComposition.CreateTransferDispatch(transports);
 
-        // ADR-0009: the Schannel build ignores --capath with these two lines; the OpenSSL
-        // build honours it and prints nothing.
+        // ADR-0009: the Schannel build ignores --capath with this warning, which the runner
+        // wraps at the terminal width; the OpenSSL build honours it and prints nothing.
         string[] expected = OperatingSystem.IsWindows()
-            ?
-            [
-                "Warning: ignoring setting the CA path for the proxy, not supported by libcurl ",
-                "Warning: with Schannel",
-            ]
+            ? ["Warning: ignoring setting the CA path for the proxy, not supported by libcurl with Schannel"]
             : [];
         CollectionAssert.AreEqual(expected, dispatch.WarningLinesBeforeEachTransfer.ToArray());
     }

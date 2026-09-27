@@ -10,8 +10,9 @@ namespace Curl.Console;
 /// <param name="dispatcher">Performs each transfer with the handler for its scheme.</param>
 /// <param name="warningLinesBeforeEachTransfer">
 /// The lines written to standard error before every URL's transfer unless <c>-s</c> is given,
-/// such as the Schannel build's two <c>--capath</c> lines (ADR-0009); each without its line
-/// ending. Empty when no option raises one.
+/// such as the Schannel build's <c>--capath</c> warning (ADR-0009); each without its line
+/// ending, and a <c>Warning: </c> line unwrapped, since the runner wraps it at the terminal
+/// width. Empty when no option raises one.
 /// </param>
 /// <param name="cookies">
 /// The run's cookies, which the dispatcher's HTTP handler reads and writes, or

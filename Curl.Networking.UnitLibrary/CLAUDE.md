@@ -24,8 +24,8 @@ build the platform usually runs, the Schannel build on Windows and the OpenSSL b
 elsewhere; its internal constructor names the build so tests pin both on any platform.
 The builds differ in message text, in which `--cacert` files are exit 77, and in `--capath`
 (`TlsClientOptions.CaCertificateDirectory`): the OpenSSL build trusts its certificates, the
-Schannel build ignores it and reports the two warning lines in `SslStreamTlsProvider.Warnings`
-for the console to print. With `--cert` (`TlsClientOptions.ClientCertificate`, split into
+Schannel build ignores it and reports its one warning, unwrapped, in `SslStreamTlsProvider.Warnings`
+for the console to print wrapped at the terminal width (two lines at curl's default 79 columns). With `--cert` (`TlsClientOptions.ClientCertificate`, split into
 file and passphrase by `ClientCertificateArgument` as curl splits it) it presents a client
 certificate that `ClientCertificateLoader` loads: PKCS#12 in the Schannel build, PEM with
 `--key` (`TlsClientOptions.PrivateKey`) in the OpenSSL build. Per ADR-0066 the Schannel build

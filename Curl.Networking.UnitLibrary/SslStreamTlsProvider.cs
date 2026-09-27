@@ -27,12 +27,11 @@ public sealed class SslStreamTlsProvider : ITlsProvider
 {
     private const string PemCertificateBegin = "-----BEGIN CERTIFICATE-----";
 
-    // The two lines curl 8.21.0's Schannel build writes for --capath (ADR-0009), the first
-    // with its trailing space.
+    // The one warning curl 8.21.0's Schannel build writes for --capath (ADR-0009), unwrapped:
+    // the console wraps it at the terminal width, into two lines at curl's default 79 columns.
     private static readonly string[] SchannelCaCertificateDirectoryWarnings =
     [
-        "Warning: ignoring setting the CA path for the proxy, not supported by libcurl ",
-        "Warning: with Schannel",
+        "Warning: ignoring setting the CA path for the proxy, not supported by libcurl with Schannel",
     ];
 
     // Held in a field so the delegate is made once, not cached behind a branch in every constructor.
@@ -128,7 +127,7 @@ public sealed class SslStreamTlsProvider : ITlsProvider
 
     /// <summary>
     /// Gets the lines curl writes to standard error, unless <c>-s</c> is given, for options
-    /// this build ignores: the Schannel build's two <c>--capath</c> lines when
+    /// this build ignores: the Schannel build's one <c>--capath</c> warning, unwrapped, when
     /// <see cref="TlsClientOptions.CaCertificateDirectory" /> is set, otherwise none. Each
     /// line is without its line ending.
     /// </summary>

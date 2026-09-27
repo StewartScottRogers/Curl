@@ -89,19 +89,18 @@ public sealed partial class SslStreamTlsProviderTests
     {
         var provider = new SslStreamTlsProvider(new TlsClientOptions(CaCertificateDirectory: _caFileDirectory));
 
-        Assert.HasCount(OperatingSystem.IsWindows() ? 2 : 0, provider.Warnings);
+        Assert.HasCount(OperatingSystem.IsWindows() ? 1 : 0, provider.Warnings);
     }
 
     [TestMethod]
-    public void Warnings_WithCaCertificateDirectoryInTheSchannelBuild_AreTheTwoLinesSchannelCurlPrints()
+    public void Warnings_WithCaCertificateDirectoryInTheSchannelBuild_AreTheOneUnwrappedLineSchannelCurlWarns()
     {
         var provider = new SslStreamTlsProvider(new TlsClientOptions(CaCertificateDirectory: _caFileDirectory), SchannelBuild);
 
         CollectionAssert.AreEqual(
             new[]
             {
-                "Warning: ignoring setting the CA path for the proxy, not supported by libcurl ",
-                "Warning: with Schannel",
+                "Warning: ignoring setting the CA path for the proxy, not supported by libcurl with Schannel",
             },
             provider.Warnings.ToArray());
     }
