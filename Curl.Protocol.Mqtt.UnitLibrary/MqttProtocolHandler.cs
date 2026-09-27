@@ -108,7 +108,7 @@ public sealed class MqttProtocolHandler : IProtocolHandler
         ArgumentNullException.ThrowIfNull(context);
 
         ConnectResult connected = await connector
-            .ConnectAsync(CreateTarget(context.Url), context.CancellationToken)
+            .ConnectAsync(CreateTarget(context.Url, context.Proxy), context.CancellationToken)
             .ConfigureAwait(false);
         if (connected.Connection is not { } connection)
         {
@@ -136,12 +136,15 @@ public sealed class MqttProtocolHandler : IProtocolHandler
         }
     }
 
-    private static ConnectTarget CreateTarget(CurlUrl url)
+    private static ConnectTarget CreateTarget(CurlUrl url, ProxyEndpoint? proxy)
     {
         bool useTls = url.Scheme == "mqtts";
         int defaultPort = useTls ? MqttsDefaultPort : MqttDefaultPort;
 
-        return new ConnectTarget(url.IdnHost, url.IsDefaultPort ? defaultPort : url.Port, useTls);
+        return new ConnectTarget(url.IdnHost, url.IsDefaultPort ? defaultPort : url.Port, useTls)
+        {
+            Proxy = proxy,
+        };
     }
 
     private static string CreateRandomClientIdentifierSuffix() =>

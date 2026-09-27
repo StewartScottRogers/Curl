@@ -8,7 +8,7 @@ depends-on: [BL-337]
 touches: [Curl.Protocol.Mqtt.UnitLibrary, Curl.Protocol.Mqtt.UnitTests]
 requirement: none
 created: 2026-09-27
-completed:
+completed: 2026-09-27
 ---
 # BL-342 — Tunnel mqtt:// through the transfer proxy
 
@@ -24,13 +24,18 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] A test with a fake `IConnector` shows the handler's `ConnectTarget` carries `context.Proxy` and the origin host with port 1883.
-- [ ] A test shows a context without a proxy still connects directly (`ConnectTarget.Proxy == null`).
-- [ ] 100% line and branch coverage of the changed code; `dotnet build` clean, fast tests green.
+- [x] A test with a fake `IConnector` shows the handler's `ConnectTarget` carries `context.Proxy` and the origin host with port 1883.
+- [x] A test shows a context without a proxy still connects directly (`ConnectTarget.Proxy == null`).
+- [x] 100% line and branch coverage of the changed code; `dotnet build` clean, fast tests green.
 
 ## Notes
+
+- `MqttProtocolHandler.CreateTarget` now takes `context.Proxy` and sets `ConnectTarget.Proxy`; the connector writes the CONNECT (ADR-0056), so the handler holds no proxy code. `mqtts://` gets the same `Proxy` with `UseTls` true, matching the pattern of the other TCP schemes.
+- Tests: `ExecuteAsync_ContextWithProxy_TunnelsToTheOriginOnPort1883ThroughThatProxy`, `ExecuteAsync_ContextWithoutProxy_ConnectsDirectly`. Curl.Protocol.Mqtt.UnitLibrary at 100% line and branch coverage; 72 MQTT tests green, full fast suite green.
+- Library `CLAUDE.md` updated to say the proxy flows into `ConnectTarget`.
 
 ## Log
 
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Done. mqtt:// and mqtts:// tunnel through ITransferContext.Proxy via the connector

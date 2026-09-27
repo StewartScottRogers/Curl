@@ -87,6 +87,33 @@ public sealed class MqttProtocolHandlerTests
         CollectionAssert.AreEqual(new[] { new ConnectTarget("h", 8883, true) }, connector.Targets);
     }
 
+    /// <summary>
+    /// curl 8.21.0 measured by BL-330: <c>curl -x proxy mqtt://example.com/t</c> sends
+    /// <c>CONNECT example.com:1883</c> to the proxy; the connector writes it (ADR-0056).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_ContextWithProxy_TunnelsToTheOriginOnPort1883ThroughThatProxy()
+    {
+        FakeConnector connector = FakeConnector.For(new ScriptedConnection());
+        var proxy = new ProxyEndpoint(ProxyKind.Http, "proxy.example", 3128, null);
+
+        await RunAsync(
+            connector,
+            new TransferContext { Url = CurlUrl.Parse("mqtt://example.com/t"), Output = new RecordingStream(), Proxy = proxy });
+
+        CollectionAssert.AreEqual(new[] { new ConnectTarget("example.com", 1883, false) { Proxy = proxy } }, connector.Targets);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ContextWithoutProxy_ConnectsDirectly()
+    {
+        FakeConnector connector = FakeConnector.For(new ScriptedConnection());
+
+        await RunAsync(connector, "mqtt://h/t", new RecordingStream());
+
+        Assert.IsNull(connector.Targets.Single().Proxy);
+    }
+
     [TestMethod]
     public async Task ExecuteAsync_UrlNamesPort_ConnectsToThatPort()
     {

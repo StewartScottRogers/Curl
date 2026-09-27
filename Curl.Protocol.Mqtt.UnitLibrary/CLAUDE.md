@@ -12,7 +12,9 @@ one transfer; `MqttPackets` builds every packet sent.
 handler with `ConnectTarget.UseTls` true)
 
 **Seam:** `IConnector` (ADR-0005). The handler asks it for one connection per transfer
-and disposes that connection itself. The client identifier's random eight characters
+and disposes that connection itself. A transfer proxy (`ITransferContext.Proxy`) goes into that
+`ConnectTarget`, and the connector tunnels through it (ADR-0056); the handler holds no
+proxy code. The client identifier's random eight characters
 come from a constructor parameter, so tests fix them.
 
 This library may reference `Curl.Protocol.Abstractions.UnitLibrary` and nothing
