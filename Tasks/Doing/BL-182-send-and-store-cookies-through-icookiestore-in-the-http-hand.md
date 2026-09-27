@@ -34,3 +34,4 @@ When an `ICookieStore` is supplied the handler sends its Cookie header and hands
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
