@@ -9,8 +9,8 @@ namespace Curl.Protocol.Http;
 /// Every rule was measured (BL-175 Notes).
 /// </summary>
 /// <remarks>
-/// A request with a body is a POST unless <c>-X</c> names another method; one without is a
-/// GET, or a HEAD for <c>-I</c>. The body is sent
+/// A request with a <c>-d</c> or <c>-F</c> body is a POST, and one with a <c>-T</c> upload a
+/// PUT, unless <c>-X</c> names another method; one without is a GET, or a HEAD for <c>-I</c>. The body is sent
 /// chunked when its length is unknown or an <c>-H</c> value asks for
 /// <c>Transfer-Encoding: chunked</c>, and with <c>Content-Length</c> otherwise. curl adds
 /// <c>Expect: 100-continue</c> when the length is unknown or above
@@ -34,7 +34,8 @@ internal sealed class HttpRequestFraming
         bool isChunked,
         bool addsExpect,
         bool awaitsContinue,
-        bool refusesUnknownLength = false)
+        bool refusesUnknownLength = false,
+        bool isUpload = false)
     {
         Method = method;
         Body = body;
@@ -43,6 +44,7 @@ internal sealed class HttpRequestFraming
         AddsExpect = addsExpect;
         AwaitsContinue = awaitsContinue;
         RefusesUnknownLength = refusesUnknownLength;
+        IsUpload = isUpload;
     }
 
     /// <summary>
@@ -87,6 +89,14 @@ internal sealed class HttpRequestFraming
     internal bool RefusesUnknownLength { get; }
 
     /// <summary>
+    /// Gets a value indicating whether the body is the <c>-T</c>/<c>--upload-file</c> source on
+    /// <see cref="ITransferContext.Upload" />: sent as PUT with no <c>Content-Type</c>, and
+    /// failing a short read with curl's <c>client read function</c> message rather than its
+    /// <c>client mime read</c> one (measured, BL-184 Notes).
+    /// </summary>
+    internal bool IsUpload { get; }
+
+    /// <summary>
     /// Makes the same framing without curl's own <c>Expect: 100-continue</c> line and without
     /// the wait for <c>100 Continue</c>: the request curl 8.21.0 resends after a
     /// <c>417 Expectation Failed</c>. An <c>-H</c> <c>Expect</c> line is still sent, but the
@@ -94,7 +104,7 @@ internal sealed class HttpRequestFraming
     /// </summary>
     /// <returns>The framing of the resent request.</returns>
     internal HttpRequestFraming WithoutExpect() =>
-        new(Method, Body, KnownLength, IsChunked, addsExpect: false, awaitsContinue: false, RefusesUnknownLength);
+        new(Method, Body, KnownLength, IsChunked, addsExpect: false, awaitsContinue: false, RefusesUnknownLength, IsUpload);
 
     /// <summary>
     /// Decides the framing for a request with <paramref name="options" />.
@@ -106,15 +116,38 @@ internal sealed class HttpRequestFraming
     /// body a HEAD unless <c>-X</c> names another method. curl refuses <c>-I</c> with a body
     /// on the command line, so a body keeps its POST here.
     /// </param>
+    /// <param name="upload">
+    /// The <c>-T</c> source (<see cref="ITransferContext.Upload" />), or <see langword="null" />.
+    /// It is sent as PUT unless <c>-X</c> names another method, and takes the place of any
+    /// <see cref="HttpRequestOptions.Body" />: curl's command line refuses the two together.
+    /// Its length is what is left of it from its position when it can seek, and unknown
+    /// otherwise, as for standard input (measured, BL-184 Notes).
+    /// </param>
     /// <returns>The framing.</returns>
-    internal static HttpRequestFraming Of(HttpRequestOptions options, HttpCustomHeader[] customHeaders, bool noBody = false)
+    internal static HttpRequestFraming Of(HttpRequestOptions options, HttpCustomHeader[] customHeaders, bool noBody = false, Stream? upload = null)
     {
+        if (upload is not null)
+        {
+            return OfUpload(options, upload, customHeaders);
+        }
+
         if (options.Body is not { } body)
         {
             return new HttpRequestFraming(options.CustomMethod ?? (noBody ? "HEAD" : "GET"), null, null, false, false, false);
         }
 
         return OfBody(options.CustomMethod ?? "POST", body, customHeaders, options.Version == HttpVersionPreference.Http10);
+    }
+
+    /// <summary>
+    /// Decides the framing for a request that sends the <c>-T</c> source
+    /// <paramref name="upload" />: PUT unless <c>-X</c> names another method, of the length
+    /// left from the stream's position when it can seek and of unknown length otherwise.
+    /// </summary>
+    private static HttpRequestFraming OfUpload(HttpRequestOptions options, Stream upload, HttpCustomHeader[] customHeaders)
+    {
+        StreamBody body = new(upload, upload.CanSeek ? upload.Length - upload.Position : null, string.Empty);
+        return OfBody(options.CustomMethod ?? "PUT", body, customHeaders, options.Version == HttpVersionPreference.Http10, isUpload: true);
     }
 
     /// <summary>
@@ -127,7 +160,8 @@ internal sealed class HttpRequestFraming
     /// <see langword="true" /> for <c>-0</c>: curl adds no <c>Expect</c> of its own and refuses a
     /// body of unknown length that no <c>-H</c> value asks to send chunked.
     /// </param>
-    private static HttpRequestFraming OfBody(string method, HttpRequestBody body, HttpCustomHeader[] customHeaders, bool isHttp10)
+    /// <param name="isUpload">Whether <paramref name="body" /> is the <c>-T</c> source.</param>
+    private static HttpRequestFraming OfBody(string method, HttpRequestBody body, HttpCustomHeader[] customHeaders, bool isHttp10, bool isUpload = false)
     {
         long? length = body is BytesBody bytes ? bytes.Content.Length : ((StreamBody)body).Length;
         bool wantsExpect = WantsExpect(length, isHttp10);
@@ -142,7 +176,8 @@ internal sealed class HttpRequestFraming
             isChunked,
             wantsExpect && !namesExpect,
             awaitsContinue,
-            RefusesUnknownLengthOf(length, asksForChunked, isHttp10));
+            RefusesUnknownLengthOf(length, asksForChunked, isHttp10),
+            isUpload);
     }
 
     /// <summary>

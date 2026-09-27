@@ -302,4 +302,16 @@ internal static class HttpTransferMessages
     /// </returns>
     internal static string BodyStreamEndedEarly(long read, long needed) =>
         string.Create(CultureInfo.InvariantCulture, $"client mime read EOF fail, only {read}/{needed} of needed bytes read");
+
+    /// <summary>
+    /// Formats the exit 26 message for a <c>-T</c> upload source that failed a read, or ended,
+    /// before its known length was sent (measured, BL-184 Notes).
+    /// </summary>
+    /// <param name="read">How many upload bytes were read before the source stopped.</param>
+    /// <param name="needed">The upload's known length.</param>
+    /// <returns>
+    /// The message, such as <c>client read function EOF fail, only 65432/100000 of needed bytes read</c>.
+    /// </returns>
+    internal static string UploadEndedEarly(long read, long needed) =>
+        string.Create(CultureInfo.InvariantCulture, $"client read function EOF fail, only {read}/{needed} of needed bytes read");
 }

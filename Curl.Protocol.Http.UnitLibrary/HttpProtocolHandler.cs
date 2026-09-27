@@ -164,7 +164,7 @@ public sealed class HttpProtocolHandler(
         ArgumentNullException.ThrowIfNull(context);
 
         HttpRequestOptions options = context.Http ?? new HttpRequestOptions();
-        HttpRequestFraming framing = HttpRequestFraming.Of(options, [.. options.Headers.Select(HttpCustomHeader.Parse)], context.NoBody);
+        HttpRequestFraming framing = HttpRequestFraming.Of(options, [.. options.Headers.Select(HttpCustomHeader.Parse)], context.NoBody, context.Upload);
         HttpAuthRequest authRequest = new(
             framing.Method,
             context.Url,
@@ -283,7 +283,11 @@ public sealed class HttpProtocolHandler(
             HttpRangeHeader.ValueFor(context, framing.Body is not null),
             context.TimeCondition,
             framing);
-        HttpRequestBodyWriter upload = new(connection);
+        HttpRequestBodyWriter upload = new(connection)
+        {
+            SharedHeadLength = framing.AwaitsContinue ? 0 : request.Length,
+            IsUpload = framing.IsUpload,
+        };
         HttpExchange exchange = new(connect, connection, framing.Method, request.Length, upload, earlier, newConnection);
         IConnection responseConnection = framing.AwaitsContinue ? new HttpContinueWaitConnection(connection) : connection;
         HttpResponseBodyReader body = new(responseConnection)

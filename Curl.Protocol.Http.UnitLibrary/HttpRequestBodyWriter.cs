@@ -10,20 +10,32 @@ namespace Curl.Protocol.Http;
 /// sizes and a closing <c>0</c> chunk (BL-175 Notes).
 /// </summary>
 /// <remarks>
-/// A <see cref="StreamBody" /> is read <see cref="ReadSize" /> bytes at a time, and each
-/// read becomes one chunk when the body is chunked. A stream of known length is read up to
-/// that length and no further; if a read fails or the stream ends first, the transfer ends
-/// with exit 26. A stream of unknown length ends at its end or at its first failed read, as
-/// curl's body reader treats both.
+/// A <see cref="StreamBody" /> is read into curl's <see cref="UploadBufferSize" />-byte upload
+/// buffer, and each read becomes one chunk when the body is chunked. The first read shares
+/// the buffer with the request head (<see cref="SharedHeadLength" />), and a chunked read
+/// leaves <see cref="ChunkFramingReserve" /> bytes of it for the chunk's framing, so a body
+/// is read in the same pieces curl reads it in (measured, BL-184 Notes). A stream of known
+/// length is read up to that length and no further; if a read fails or the stream ends
+/// first, the transfer ends with exit 26. A stream of unknown length ends at its end or at
+/// its first failed read, as curl's body reader treats both.
 /// </remarks>
 /// <param name="connection">The connection the request head was written to.</param>
 internal sealed class HttpRequestBodyWriter(IConnection connection)
 {
     /// <summary>
-    /// The most bytes read from a <see cref="StreamBody" /> at a time: curl's 64 KiB upload
-    /// buffer.
+    /// The size of curl's upload buffer, 64 KiB: the most bytes read from a
+    /// <see cref="StreamBody" /> at a time.
     /// </summary>
-    internal const int ReadSize = 65536;
+    internal const int UploadBufferSize = 65536;
+
+    /// <summary>
+    /// The bytes of the upload buffer curl keeps back from each chunked read for the chunk's
+    /// size line and closing CRLF: a stdin upload is sent in chunks of 65524 bytes (measured,
+    /// BL-184 Notes).
+    /// </summary>
+    internal const int ChunkFramingReserve = 12;
+
+    private bool headSent;
 
     private static readonly byte[] LastChunk = "0\r\n\r\n"u8.ToArray();
 
@@ -31,6 +43,20 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     /// Gets how many body bytes have been written, chunk framing excluded.
     /// </summary>
     internal long BytesWritten { get; private set; }
+
+    /// <summary>
+    /// Gets the length of the request head that shares the upload buffer with the first read:
+    /// the whole head when the body follows it at once, 0 when the head went out alone to wait
+    /// for <c>100 Continue</c>. A head that fills the buffer leaves the first read a whole one.
+    /// </summary>
+    internal int SharedHeadLength { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether the body is a <c>-T</c> upload, whose short read curl
+    /// reports as <c>client read function EOF fail</c> rather than
+    /// <c>client mime read EOF fail</c> (measured, BL-184 Notes).
+    /// </summary>
+    internal bool IsUpload { get; init; }
 
     /// <summary>
     /// Writes <paramref name="body" /> and flushes the connection.
@@ -64,16 +90,17 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
 
     private async ValueTask WriteStreamAsync(StreamBody body, bool isChunked, CancellationToken cancellationToken)
     {
-        byte[] buffer = new byte[ReadSize];
+        byte[] buffer = new byte[UploadBufferSize];
         while (true)
         {
-            long remaining = body.Length is { } length ? length - BytesWritten : ReadSize;
+            int room = NextReadRoom(isChunked);
+            long remaining = body.Length is { } length ? length - BytesWritten : room;
             if (remaining == 0)
             {
                 return;
             }
 
-            int read = await ReadAsync(body.Content, buffer.AsMemory(0, (int)Math.Min(remaining, ReadSize)), cancellationToken)
+            int read = await ReadAsync(body.Content, buffer.AsMemory(0, (int)Math.Min(remaining, room)), cancellationToken)
                 .ConfigureAwait(false);
             if (read == 0)
             {
@@ -83,6 +110,19 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
 
             await WritePieceAsync(buffer.AsMemory(0, read), isChunked, cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// Returns how many bytes the next read may take: what the upload buffer has left once the
+    /// head still sharing it and, for a chunk, <see cref="ChunkFramingReserve" /> are taken
+    /// out. Only the first read shares the buffer with the head.
+    /// </summary>
+    private int NextReadRoom(bool isChunked)
+    {
+        int reserve = isChunked ? ChunkFramingReserve : 0;
+        int room = UploadBufferSize - (headSent ? 0 : SharedHeadLength) - reserve;
+        headSent = true;
+        return room > 0 ? room : UploadBufferSize - reserve;
     }
 
     /// <summary>
@@ -105,7 +145,10 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     {
         if (length is { } needed)
         {
-            throw new HttpTransferException(CurlExitCode.ReadError, HttpTransferMessages.BodyStreamEndedEarly(BytesWritten, needed));
+            string message = IsUpload
+                ? HttpTransferMessages.UploadEndedEarly(BytesWritten, needed)
+                : HttpTransferMessages.BodyStreamEndedEarly(BytesWritten, needed);
+            throw new HttpTransferException(CurlExitCode.ReadError, message);
         }
     }
 
