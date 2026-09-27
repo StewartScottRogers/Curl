@@ -33,3 +33,4 @@ Curl publishes native binaries for all three platforms (BL-028) and matches the 
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
