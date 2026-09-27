@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Authentication;
 using Curl.Core;
+using Curl.Protocol.Abstractions;
 using Curl.Protocol.Http;
 
 namespace Curl.Console;
@@ -225,6 +226,21 @@ public sealed class CurlCommandRunnerRemoteNameTests
         int exitCode = await RunAsync([Disposition("attachment; filename=\"x.txt\"")], "-OJ", Host + "/u.txt");
 
         Assert.AreEqual(23, exitCode);
+        Assert.AreEqual(
+            "Warning: Failed to open the file x.txt: File exists" + NewLine
+            + "curl: (23) client returned ERROR on write of 51 bytes" + NewLine,
+            StandardErrorText);
+        Assert.AreEqual(0, outputFiles.Written.Count);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RemoteHeaderNameTakenJustBeforeTheOpen_WarnsAndExits23WithoutOverwriting()
+    {
+        outputFiles.BeforeCreateNew = path => outputFiles.ExistingPaths.Add(path);
+
+        int exitCode = await RunAsync([Disposition("attachment; filename=\"x.txt\"")], "-OJ", Host + "/u.txt");
+
+        Assert.AreEqual((int)CurlExitCode.WriteError, exitCode);
         Assert.AreEqual(
             "Warning: Failed to open the file x.txt: File exists" + NewLine
             + "curl: (23) client returned ERROR on write of 51 bytes" + NewLine,

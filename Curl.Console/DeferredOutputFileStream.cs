@@ -53,6 +53,7 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
         | UnixFileMode.OtherRead | UnixFileMode.OtherWrite;
 
     private Stream? file;
+    private FileWriteMode openMode = writeMode;
     private long? failedWriteLength;
     private long lengthWhenOpened;
 
@@ -165,7 +166,7 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
     internal async ValueTask<bool> TryOpenNowAsync()
     {
         FileOpenResult opened = await fileSystem
-            .OpenForWriteAsync(Path, writeMode, CreateMode, CancellationToken.None)
+            .OpenForWriteAsync(Path, openMode, CreateMode, CancellationToken.None)
             .ConfigureAwait(false);
         Adopt(opened.Content);
 
@@ -183,12 +184,21 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
     /// <param name="cancellationToken">Cancels the open.</param>
     /// <returns><see langword="true" /> when the file is open.</returns>
     /// <remarks>
+    /// <para>
+    /// The file is opened <see cref="FileWriteMode.CreateNew" />, as curl opens it with
+    /// <c>O_EXCL</c>: a file already under that name - even one another process created a
+    /// moment ago - is kept, and the open fails with curl's
+    /// <c>Warning: Failed to open the file x.txt: File exists</c>.
+    /// </para>
+    /// <para>
     /// An empty name fails as curl's <c>fopen("")</c> does, with <c>No such file or directory</c>,
     /// without asking the file system.
+    /// </para>
     /// </remarks>
     internal async ValueTask<bool> TryOpenUnderNameAsync(string newPath, int headerLineLength, CancellationToken cancellationToken)
     {
         Path = newPath;
+        openMode = FileWriteMode.CreateNew;
         if (newPath.Length == 0)
         {
             FailOpen(OutputFileOpenWarning.For(newPath, FileAccessStatus.NotFound), headerLineLength);
@@ -208,7 +218,7 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
 
     /// <summary>
     /// Records that the file could not be opened for a reason found before the open, such as a
-    /// <c>-J</c> name that is already taken.
+    /// <c>-J</c> name arriving for a file a <c>-C</c> resume already opened.
     /// </summary>
     /// <param name="warning">The warning line curl prints for it, or <see langword="null" /> for none.</param>
     /// <param name="writeLength">The length curl's <c>client returned ERROR on write of N bytes</c> reports.</param>
@@ -265,14 +275,15 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
     }
 
     /// <summary>
-    /// Opens the file in its write mode, with <see cref="CreateMode" />.
+    /// Opens the file in its write mode - <see cref="FileWriteMode.CreateNew" /> once it has a
+    /// <c>-J</c> name - with <see cref="CreateMode" />.
     /// </summary>
     /// <param name="cancellationToken">Cancels the open.</param>
     /// <returns>The open file, or <see langword="null" /> when it could not be opened.</returns>
     private async ValueTask<Stream?> TryOpenAsync(CancellationToken cancellationToken)
     {
         FileOpenResult opened = await fileSystem
-            .OpenForWriteAsync(Path, writeMode, CreateMode, cancellationToken)
+            .OpenForWriteAsync(Path, openMode, CreateMode, cancellationToken)
             .ConfigureAwait(false);
         Adopt(opened.Content);
 

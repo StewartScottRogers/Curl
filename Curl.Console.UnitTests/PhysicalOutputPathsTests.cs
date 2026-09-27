@@ -19,21 +19,6 @@ public sealed class PhysicalOutputPathsTests
     public void DeleteRoot() => Directory.Delete(root, recursive: true);
 
     [TestMethod]
-    public void FileExists_File_IsTrue()
-    {
-        string file = Path.Combine(root, "f.txt");
-        File.WriteAllText(file, "x");
-
-        Assert.IsTrue(outputPaths.FileExists(file));
-    }
-
-    [TestMethod]
-    public void FileExists_Directory_IsFalse() => Assert.IsFalse(outputPaths.FileExists(root));
-
-    [TestMethod]
-    public void FileExists_Nothing_IsFalse() => Assert.IsFalse(outputPaths.FileExists(Path.Combine(root, "none")));
-
-    [TestMethod]
     public void TryCreateDirectory_Missing_CreatesIt()
     {
         string directory = Path.Combine(root, "d");

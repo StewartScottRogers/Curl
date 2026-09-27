@@ -23,6 +23,7 @@ public sealed class OutputFileOpenWarningTests
     [DataRow(FileAccessStatus.AccessDenied, "Permission denied")]
     [DataRow(FileAccessStatus.IsDirectory, "Permission denied")]
     [DataRow(FileAccessStatus.IoError, "Invalid argument")]
+    [DataRow(FileAccessStatus.AlreadyExists, "File exists")]
     public void ReasonFor_EachStatus_IsCurlsStrerrorText(FileAccessStatus status, string expected)
     {
         Assert.AreEqual(expected, OutputFileOpenWarning.ReasonFor(status));

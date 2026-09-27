@@ -11,14 +11,18 @@ namespace Curl.Console;
 /// in <see cref="UnwritablePaths" /> fails to open for writing with <see cref="UnwritableStatus" />.
 /// Each last-write time set is recorded in <see cref="LastWriteTimesSet" />, with whether the
 /// path's written stream was still open at the time; setting one fails with
-/// <see cref="FileTimeErrorCode" /> when that is not zero. As <see cref="IOutputPaths" />, a
-/// file exists when its path is in <see cref="ExistingPaths" /> (kept apart from
-/// <see cref="ExistingContent" />, which only feeds reads), and every directory is created, into
+/// <see cref="FileTimeErrorCode" /> when that is not zero. A <see cref="FileWriteMode.CreateNew" />
+/// open fails with <c>AlreadyExists</c> for a path in <see cref="ExistingPaths" /> (kept apart from
+/// <see cref="ExistingContent" />, which only feeds reads); a path added to it by
+/// <see cref="BeforeCreateNew" /> just before the open counts too. As <see cref="IOutputPaths" />,
+/// every directory is created, into
 /// <see cref="CreatedDirectories" />, except those in <see cref="UncreatableDirectories" />.
 /// </summary>
 internal sealed class InMemoryFileSystem : IFileSystem, IFileTimeSetter, IOutputPaths
 {
     public HashSet<string> ExistingPaths { get; } = [];
+
+    public Action<string>? BeforeCreateNew { get; set; }
 
     public HashSet<string> UncreatableDirectories { get; } = [];
 
@@ -75,6 +79,16 @@ internal sealed class InMemoryFileSystem : IFileSystem, IFileTimeSetter, IOutput
             return ValueTask.FromResult(FileOpenResult.Failed(UnwritableStatus));
         }
 
+        if (mode == FileWriteMode.CreateNew)
+        {
+            BeforeCreateNew?.Invoke(path);
+        }
+
+        if (mode == FileWriteMode.CreateNew && ExistingPaths.Contains(path))
+        {
+            return ValueTask.FromResult(FileOpenResult.Failed(FileAccessStatus.AlreadyExists));
+        }
+
         MemoryStream stream = WriteFailingPaths.Contains(path) ? new FailingWriteStream() : new MemoryStream();
         if (mode == FileWriteMode.Append && ExistingContent.TryGetValue(path, out byte[]? existing))
         {
@@ -94,8 +108,6 @@ internal sealed class InMemoryFileSystem : IFileSystem, IFileTimeSetter, IOutput
 
         return errorCode == 0;
     }
-
-    public bool FileExists(string path) => ExistingPaths.Contains(path);
 
     public bool TryCreateDirectory(string path)
     {

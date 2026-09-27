@@ -80,8 +80,8 @@ namespace Curl.Console;
 /// <see cref="TimeProvider.System" /> when not given.
 /// </param>
 /// <param name="outputPaths">
-/// Tells whether a <c>-J</c> name is already taken and creates the <c>--create-dirs</c>
-/// directories; a <see cref="PhysicalOutputPaths" /> when not given.
+/// Creates the <c>--create-dirs</c> directories; a <see cref="PhysicalOutputPaths" /> when
+/// not given.
 /// </param>
 /// <param name="configFileReader">
 /// Reads the default config file (<c>.curlrc</c>), each <c>-K</c> / <c>--config</c> file, and every
@@ -1821,7 +1821,7 @@ internal sealed class CurlCommandRunner(
         OutputFileTarget target,
         DeferredOutputFileStream output) =>
         target.TakesContentDispositionName
-            ? chosen => new RemoteHeaderNameStream(output, chosen, OutputPaths, name => RemoteNamePath(options, name))
+            ? chosen => new RemoteHeaderNameStream(output, chosen, name => RemoteNamePath(options, name))
             : null;
 
     /// <summary>
