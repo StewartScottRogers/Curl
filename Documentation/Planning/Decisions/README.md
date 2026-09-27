@@ -102,6 +102,7 @@ choices do not need one.
 | [0085](ADR-0085-v-words-a-tls-handshake-as-the-platforms-curl-build-with-openssl-facts-on-the-event.md) | `-v` and the trace dumps word a TLS handshake as the `TlsBackend` they are given (Schannel on Windows, OpenSSL elsewhere by default); OpenSSL-only facts (group, signature type, verify code, chain) are optional properties of `TlsHandshakeEvent`, and names, dates and key sizes are ported from OpenSSL in `Curl.Output` | Accepted | 2026-09-27 |
 | [0086](ADR-0086-a-repeated-transfer-started-report-starts-the-next-redirect-hops-status-line.md) | A repeated "transfer started" report starts the next redirect hop's status line; exit 47 draws the refused hop as a followed one | Accepted | 2026-09-27 |
 | [0087](ADR-0087-c-dash-with-t-resumes-an-http-upload-from-an-unknown-offset.md) | `-C -` with `-T` sets `ITransferContext.ResumeUploadFromUnknownOffset`; HTTP sends the whole source with `Content-Range: bytes 0-(L-1)/L` | Accepted | 2026-09-27 |
+| [0088](ADR-0088-a-socket-error-mid-handshake-is-curls-recv-failure-line.md) | A socket error during the TLS handshake is curl's `Recv failure:` line with each build's text for it (`Connection was reset` / `was aborted` in Schannel, `Connection reset by peer` in OpenSSL); others use the socket error's own message | Accepted | 2026-09-27 |
 
 ## Template
 
