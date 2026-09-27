@@ -8,7 +8,7 @@ depends-on: [BL-133]
 touches: [Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Protocol.File.UnitTests]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-27
 ---
 # BL-134 — Add the transfer progress sink to ITransferContext in Curl.Protocol.Abstractions
 
@@ -30,15 +30,22 @@ No handler reports anything yet; `file://` is BL-129. The sink does not read tim
 
 ## Acceptance criteria
 
-- [ ] The interface, members and default named in BL-133's ADR exist in `Curl.Protocol.Abstractions.UnitLibrary` with exactly those names.
-- [ ] A test in `Curl.Protocol.Abstractions.UnitTests/TransferContextTests.cs` pins that a `TransferContext` built with only `Url` and `Output` returns the do-nothing sink, and one pins that an initialised sink is returned as given.
-- [ ] A test in `Curl.Protocol.Abstractions.UnitTests` calls every member of the do-nothing sink and pins that none throws.
-- [ ] `dotnet build Curl.Protocol.Abstractions.UnitLibrary -warnaserror` and `dotnet build Curl.Protocol.File.UnitTests -warnaserror` are clean, and `dotnet test --filter "TestCategory!=Integration"` is green for the whole solution; no new test needs `TestCategory=Integration`.
-- [ ] Every new line and branch in `Curl.Protocol.Abstractions.UnitLibrary` is covered by `Curl.Protocol.Abstractions.UnitTests` (the solution's 100% line and branch gate).
+- [x] The interface, members and default named in BL-133's ADR exist in `Curl.Protocol.Abstractions.UnitLibrary` with exactly those names.
+- [x] A test in `Curl.Protocol.Abstractions.UnitTests/TransferContextTests.cs` pins that a `TransferContext` built with only `Url` and `Output` returns the do-nothing sink, and one pins that an initialised sink is returned as given.
+- [x] A test in `Curl.Protocol.Abstractions.UnitTests` calls every member of the do-nothing sink and pins that none throws.
+- [x] `dotnet build Curl.Protocol.Abstractions.UnitLibrary -warnaserror` and `dotnet build Curl.Protocol.File.UnitTests -warnaserror` are clean, and `dotnet test --filter "TestCategory!=Integration"` is green for the whole solution; no new test needs `TestCategory=Integration`.
+- [x] Every new line and branch in `Curl.Protocol.Abstractions.UnitLibrary` is covered by `Curl.Protocol.Abstractions.UnitTests` (the solution's 100% line and branch gate).
 
 ## Notes
+
+- Implemented exactly ADR-0045, mirroring the `ITransferEvents`/`NoTransferEvents` pattern (ADR-0046): `ITransferProgress` (`ReportTransferStarted`, `ReportDownloaded`, `ReportUploaded`), sealed `NoTransferProgress` with a private constructor and `Instance`, `ITransferContext.Progress` with no default implementation, and `TransferContext.Progress` as an `init` property defaulting to `NoTransferProgress.Instance`.
+- `grep ": ITransferContext"` found only `TransferContext`, so no other implementer needed the member; `Curl.Protocol.File.UnitTests` needed no change.
+- Tests: `TransferContextTests` pins the default and the pass-through (new `StubTransferProgress`, like `StubTransferEvents`); `NoTransferProgressTests.EveryMember_Called_DoesNotThrow` calls every member with and without an expected total. The new library lines (constructor via `Instance`, three empty members, the property getter) are all executed by these tests and have no branches.
+- Verified 2026-09-27: both `-warnaserror` builds clean, `dotnet format --verify-no-changes` clean on both Abstractions projects, whole-solution fast tests green (Abstractions 383 passed).
+
 
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Done. ITransferContext.Progress exists, defaulting to NoTransferProgress.Instance per ADR-0045
