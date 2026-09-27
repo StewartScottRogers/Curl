@@ -1,5 +1,7 @@
 using System.ComponentModel;
+using System.Net;
 using System.Net.Security;
+using System.Net.Sockets;
 using System.Security.Authentication;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
@@ -41,7 +43,7 @@ public sealed class TlsFailureMessagesTests
     }
 
     [TestMethod]
-    public void SchannelSslConnectError_WithNoSecurityStatus_SaysTheHandshakeWasNotReceived()
+    public void SchannelSslConnectError_WhenTheServerClosesMidHandshake_IsTheMeasuredHandshakeNotReceivedLine()
     {
         var message = TlsFailureMessages.SchannelSslConnectError(
             new IOException("Received an unexpected EOF or 0 bytes from the transport stream."));
@@ -63,16 +65,27 @@ public sealed class TlsFailureMessagesTests
         Assert.AreEqual("TLS connect error: error:0A00042E:SSL routines::tlsv1 alert protocol version", message);
     }
 
+    // What SslStream throws when the server closes after the ClientHello (BL-150).
     [TestMethod]
-    public void OpenSslSslConnectError_WithNoOpenSslErrorString_UsesTheInnermostMessage()
+    public void OpenSslSslConnectError_WhenTheServerClosesMidHandshake_IsTheMeasuredUnexpectedEofLine()
     {
-        var exception = new AuthenticationException(
-            "Authentication failed, see inner exception.",
-            new IOException("Received an unexpected EOF or 0 bytes from the transport stream."));
+        var exception = new IOException("Received an unexpected EOF or 0 bytes from the transport stream.");
 
         var message = TlsFailureMessages.OpenSslSslConnectError(exception);
 
-        Assert.AreEqual("TLS connect error: Received an unexpected EOF or 0 bytes from the transport stream.", message);
+        Assert.AreEqual("TLS connect error: error:0A000126:SSL routines::unexpected eof while reading", message);
+    }
+
+    [TestMethod]
+    public void OpenSslSslConnectError_WithNoOpenSslErrorStringAndNoEndOfStream_UsesTheInnermostMessage()
+    {
+        var exception = new AuthenticationException(
+            "Authentication failed, see inner exception.",
+            new IOException("Unable to read data from the transport connection.", new SocketException(10054)));
+
+        var message = TlsFailureMessages.OpenSslSslConnectError(exception);
+
+        Assert.AreEqual($"TLS connect error: {new SocketException(10054).Message}", message);
     }
 
     [TestMethod]
@@ -82,20 +95,146 @@ public sealed class TlsFailureMessagesTests
     {
         var message = TlsFailureMessages.SchannelPeerFailedVerification(
             SslPolicyErrors.RemoteCertificateChainErrors | SslPolicyErrors.RemoteCertificateNameMismatch,
+            null,
+            "localhost",
             hasCaCertificateFile);
 
         Assert.AreEqual(expected, message);
     }
 
     [TestMethod]
-    [DataRow(false)]
-    [DataRow(true)]
-    public void SchannelPeerFailedVerification_WithOnlyANameMismatch_IsTheMeasuredCertFindExtensionLine(bool hasCaCertificateFile)
+    [DataRow("wrong.host.badssl.com")]
+    [DataRow("140.82.112.4")]
+    public void SchannelPeerFailedVerification_WithOnlyANameMismatchAndNoCaCertificateFile_IsTheMeasuredWrongPrincipalLine(string targetHost)
     {
         var message = TlsFailureMessages.SchannelPeerFailedVerification(
-            SslPolicyErrors.RemoteCertificateNameMismatch, hasCaCertificateFile);
+            SslPolicyErrors.RemoteCertificateNameMismatch, null, targetHost, hasCaCertificateFile: false);
+
+        Assert.AreEqual(
+            "schannel: SNI or certificate check failed: SEC_E_WRONG_PRINCIPAL (0x80090322) - The target principal name is incorrect.",
+            message);
+    }
+
+    [TestMethod]
+    public void SchannelPeerFailedVerification_WithOnlyANameMismatchOnAHostNameAndACaCertificateFile_IsTheMeasuredCertGetNameStringLine()
+    {
+        using var chain = BuildLeafChain(null);
+
+        var message = TlsFailureMessages.SchannelPeerFailedVerification(
+            SslPolicyErrors.RemoteCertificateNameMismatch, chain, "other", hasCaCertificateFile: true);
+
+        Assert.AreEqual(
+            "schannel: CertGetNameString() failed to match connection hostname (other) against server certificate names",
+            message);
+    }
+
+    [TestMethod]
+    [DataRow("127.0.0.1")]
+    [DataRow("::1")]
+    public void SchannelPeerFailedVerification_WithOnlyANameMismatchOnAnIpAddressAgainstNoAlternativeNames_IsTheMeasuredCertFindExtensionLine(
+        string targetHost)
+    {
+        using var chain = BuildLeafChain(null);
+
+        var message = TlsFailureMessages.SchannelPeerFailedVerification(
+            SslPolicyErrors.RemoteCertificateNameMismatch, chain, targetHost, hasCaCertificateFile: true);
 
         Assert.AreEqual("schannel: CertFindExtension() returned no extension.", message);
+    }
+
+    [TestMethod]
+    [DataRow("127.0.0.1")]
+    [DataRow("::1")]
+    public void SchannelPeerFailedVerification_WithOnlyANameMismatchOnAnIpAddressAgainstAlternativeNames_IsLibcurlsExit60Text(
+        string targetHost)
+    {
+        using var chain = BuildLeafChain(names => names.AddIpAddress(IPAddress.Parse("10.9.9.9")));
+
+        var message = TlsFailureMessages.SchannelPeerFailedVerification(
+            SslPolicyErrors.RemoteCertificateNameMismatch, chain, targetHost, hasCaCertificateFile: true);
+
+        Assert.AreEqual("SSL peer certificate or SSH remote key was not OK", message);
+    }
+
+    [TestMethod]
+    [DataRow("localhost", "hostname 'localhost'")]
+    [DataRow("10.1.2.3", "ipv4 address '10.1.2.3'")]
+    [DataRow("fd00::1", "ipv6 address '[fd00::1]'")]
+    public void OpenSslPeerFailedVerification_WithANameMismatchAgainstDnsAlternativeNames_IsTheMeasuredNoAlternativeNameLine(
+        string targetHost,
+        string target)
+    {
+        using var chain = BuildLeafChain(names =>
+        {
+            names.AddDnsName("foo.test");
+            names.AddDnsName("bar.test");
+        });
+
+        var message = TlsFailureMessages.OpenSslPeerFailedVerification(
+            SslPolicyErrors.RemoteCertificateNameMismatch, chain, targetHost);
+
+        Assert.AreEqual($"SSL: no alternative certificate subject name matches target {target}", message);
+    }
+
+    [TestMethod]
+    [DataRow("localhost", "hostname 'localhost'")]
+    [DataRow("10.1.2.3", "ipv4 address '10.1.2.3'")]
+    [DataRow("fd00::1", "ipv6 address '[fd00::1]'")]
+    public void OpenSslPeerFailedVerification_WithANameMismatchAgainstIpAlternativeNames_IsTheMeasuredNoAlternativeNameLine(
+        string targetHost,
+        string target)
+    {
+        using var chain = BuildLeafChain(names =>
+        {
+            names.AddIpAddress(IPAddress.Parse("10.9.9.9"));
+            names.AddIpAddress(IPAddress.Parse("fd00::9"));
+        });
+
+        var message = TlsFailureMessages.OpenSslPeerFailedVerification(
+            SslPolicyErrors.RemoteCertificateNameMismatch, chain, targetHost);
+
+        Assert.AreEqual($"SSL: no alternative certificate subject name matches target {target}", message);
+    }
+
+    [TestMethod]
+    [DataRow("otherhost", "otherhost")]
+    [DataRow("10.1.2.3", "10.1.2.3")]
+    [DataRow("fd00::1", "[fd00::1]")]
+    public void OpenSslPeerFailedVerification_WithANameMismatchAgainstNoAlternativeNames_IsTheMeasuredSubjectNameLine(
+        string targetHost,
+        string shownHost)
+    {
+        using var chain = BuildLeafChain(null);
+
+        var message = TlsFailureMessages.OpenSslPeerFailedVerification(
+            SslPolicyErrors.RemoteCertificateNameMismatch, chain, targetHost);
+
+        Assert.AreEqual($"SSL: certificate subject name 'localhost' does not match target hostname '{shownHost}'", message);
+    }
+
+    // curl matches the common name when subjectAltName names no DNS name and no IP address.
+    [TestMethod]
+    public void OpenSslPeerFailedVerification_WithANameMismatchAgainstOnlyAnEmailAlternativeName_IsTheSubjectNameLine()
+    {
+        using var chain = BuildLeafChain(names => names.AddEmailAddress("someone@example.test"));
+
+        var message = TlsFailureMessages.OpenSslPeerFailedVerification(
+            SslPolicyErrors.RemoteCertificateNameMismatch, chain, "otherhost");
+
+        Assert.AreEqual("SSL: certificate subject name 'localhost' does not match target hostname 'otherhost'", message);
+    }
+
+    // BL-150, measured: an untrusted or expired certificate that also names another host
+    // is reported by its name.
+    [TestMethod]
+    public void OpenSslPeerFailedVerification_WithChainErrorsAndANameMismatch_ReportsTheNameMismatch()
+    {
+        using var chain = BuildLeafChain(null);
+
+        var message = TlsFailureMessages.OpenSslPeerFailedVerification(
+            SslPolicyErrors.RemoteCertificateChainErrors | SslPolicyErrors.RemoteCertificateNameMismatch, chain, "other");
+
+        Assert.AreEqual("SSL: certificate subject name 'localhost' does not match target hostname 'other'", message);
     }
 
     [TestMethod]
@@ -172,6 +311,25 @@ public sealed class TlsFailureMessagesTests
     public void OpenSslCaCertificateFileUnusable_IsTheMeasuredLine()
     {
         Assert.AreEqual("error adding trust anchors from file: bad.pem", TlsFailureMessages.OpenSslCaCertificateFileUnusable("bad.pem"));
+    }
+
+    // A CN=localhost certificate, with the subjectAltName entries the callback adds, or
+    // none, and the chain built for it.
+    private static X509Chain BuildLeafChain(Action<SubjectAlternativeNameBuilder>? addAlternativeNames)
+    {
+        using var key = RSA.Create(2048);
+        var request = new CertificateRequest("CN=localhost", key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        if (addAlternativeNames is not null)
+        {
+            var names = new SubjectAlternativeNameBuilder();
+            addAlternativeNames(names);
+            request.CertificateExtensions.Add(names.Build());
+        }
+
+        using var leaf = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+        var chain = CreateChain();
+        chain.Build(leaf);
+        return chain;
     }
 
     private static X509Chain CreateChain()

@@ -198,6 +198,21 @@ public sealed partial class SslStreamTlsProviderTests
         Assert.AreEqual("SSL certificate OpenSSL verify result: self-signed certificate (18)", result.Result.ErrorMessage);
     }
 
+    // BL-150, measured: the OpenSSL build checks the name before the chain, the Schannel
+    // build the chain before the name.
+    [TestMethod]
+    [DataRow(SchannelBuild, "schannel: SEC_E_UNTRUSTED_ROOT (0x80090325) - The certificate chain was issued by an authority that is not trusted.")]
+    [DataRow(OpenSslBuild, "SSL: no alternative certificate subject name matches target hostname 'wrong.example'")]
+    public async Task AuthenticateAsClientAsync_WithUntrustedCertificateNotNamingTheTargetHost_ReportsWhatTheBuildChecksFirst(
+        bool matchesSchannelBuild,
+        string expected)
+    {
+        var result = await HandshakeAsync(new TlsClientOptions(), "wrong.example", SslProtocols.None, matchesSchannelBuild);
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
+        Assert.AreEqual(expected, result.Result.ErrorMessage);
+    }
+
     [TestMethod]
     public async Task AuthenticateAsClientAsync_WithCertificateNotNamingTheTargetHost_FailsWithPeerFailedVerification()
     {
@@ -295,8 +310,13 @@ public sealed partial class SslStreamTlsProviderTests
         await result.Result.Connection!.DisposeAsync();
     }
 
+    // BL-150 measured both builds against a server that reads the ClientHello and closes.
     [TestMethod]
-    public async Task AuthenticateAsClientAsync_WhenTheServerClosesMidHandshake_FailsWithSslConnectError()
+    [DataRow(SchannelBuild, "schannel: failed to receive handshake, SSL/TLS connection failed")]
+    [DataRow(OpenSslBuild, "TLS connect error: error:0A000126:SSL routines::unexpected eof while reading")]
+    public async Task AuthenticateAsClientAsync_WhenTheServerClosesMidHandshake_ReportsTheMeasuredLine(
+        bool matchesSchannelBuild,
+        string expected)
     {
         var (client, server) = InMemoryDuplexStream.CreatePair();
         var closeAfterClientHello = Task.Run(async () =>
@@ -304,13 +324,14 @@ public sealed partial class SslStreamTlsProviderTests
             await server.ReadExactlyAsync(new byte[1], CancellationToken.None);
             await server.DisposeAsync();
         });
-        var provider = new SslStreamTlsProvider(new TlsClientOptions(Insecure: true));
+        var provider = new SslStreamTlsProvider(new TlsClientOptions(Insecure: true), matchesSchannelBuild);
 
         var result = await provider.AuthenticateAsClientAsync(
             new StreamConnection(client, ServerEndPoint), CertificateHost, CancellationToken.None);
 
         await closeAfterClientHello;
         Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
+        Assert.AreEqual(expected, result.ErrorMessage);
         Assert.IsTrue(client.IsDisposed);
     }
 
@@ -378,7 +399,7 @@ public sealed partial class SslStreamTlsProviderTests
     }
 
     [TestMethod]
-    public async Task AuthenticateAsClientAsync_WithCaCertificateFileButAnotherHostNameInTheSchannelBuild_ReportsCertFindExtension()
+    public async Task AuthenticateAsClientAsync_WithCaCertificateFileButAnotherHostNameInTheSchannelBuild_ReportsTheHostNameCertGetNameStringDidNotMatch()
     {
         var caFile = WriteCaFile("server.pem", s_serverCertificate.ExportCertificatePem());
 
@@ -386,12 +407,14 @@ public sealed partial class SslStreamTlsProviderTests
             new TlsClientOptions(CaCertificateFile: caFile), "wrong.example", SslProtocols.None, SchannelBuild);
 
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
-        Assert.AreEqual("schannel: CertFindExtension() returned no extension.", result.Result.ErrorMessage);
+        Assert.AreEqual(
+            "schannel: CertGetNameString() failed to match connection hostname (wrong.example) against server certificate names",
+            result.Result.ErrorMessage);
         Assert.IsTrue(result.PlaintextDisposed);
     }
 
     [TestMethod]
-    public async Task AuthenticateAsClientAsync_WithCaCertificateFileButAnotherHostNameInTheOpenSslBuild_ReportsTheSubjectNameMismatch()
+    public async Task AuthenticateAsClientAsync_WithCaCertificateFileButAnotherHostNameInTheOpenSslBuild_ReportsNoAlternativeNameMatches()
     {
         var caFile = WriteCaFile("server.pem", s_serverCertificate.ExportCertificatePem());
 
@@ -400,7 +423,7 @@ public sealed partial class SslStreamTlsProviderTests
 
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual(
-            "SSL: certificate subject name 'localhost' does not match target hostname 'wrong.example'",
+            "SSL: no alternative certificate subject name matches target hostname 'wrong.example'",
             result.Result.ErrorMessage);
     }
 
@@ -628,7 +651,7 @@ public sealed partial class SslStreamTlsProviderTests
     }
 
     [TestMethod]
-    public async Task AuthenticateAsClientAsync_WithCaCertificateDirectoryHoldingTheServerCertificateButAnotherHostNameInTheOpenSslBuild_ReportsTheSubjectNameMismatch()
+    public async Task AuthenticateAsClientAsync_WithCaCertificateDirectoryHoldingTheServerCertificateButAnotherHostNameInTheOpenSslBuild_ReportsNoAlternativeNameMatches()
     {
         var caDirectory = WriteCaDirectory(("server.pem", s_serverCertificate.ExportCertificatePem()));
 
@@ -637,8 +660,25 @@ public sealed partial class SslStreamTlsProviderTests
 
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual(
-            "SSL: certificate subject name 'localhost' does not match target hostname 'wrong.example'",
+            "SSL: no alternative certificate subject name matches target hostname 'wrong.example'",
             result.Result.ErrorMessage);
+    }
+
+    // BL-150, measured: the Schannel build ignores --capath beside --cacert as it does alone.
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithCaCertificateDirectoryAndAnUnrelatedCaCertificateFileInTheSchannelBuild_TrustsTheFileAlone()
+    {
+        var caFile = WriteCaFile("unrelated.pem", CreateUnrelatedAuthorityPem());
+        var caDirectory = WriteCaDirectory(("server.pem", s_serverCertificate.ExportCertificatePem()));
+
+        var result = await HandshakeAsync(
+            new TlsClientOptions(CaCertificateFile: caFile, CaCertificateDirectory: caDirectory),
+            CertificateHost,
+            SslProtocols.None,
+            SchannelBuild);
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
+        Assert.AreEqual("schannel: the certificate or certificate chain is based on an untrusted root", result.Result.ErrorMessage);
     }
 
     [TestMethod]

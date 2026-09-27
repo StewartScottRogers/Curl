@@ -1,6 +1,8 @@
 using System.Collections.Frozen;
 using System.ComponentModel;
+using System.Net;
 using System.Net.Security;
+using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
 
 namespace Curl.Networking;
@@ -22,13 +24,26 @@ internal static class TlsFailureMessages
     private const string SchannelCaCertificateFileAnchorsNothing =
         "schannel: the certificate or certificate chain is based on an untrusted root";
 
-    private const string SchannelNameMismatch = "schannel: CertFindExtension() returned no extension.";
+    // The Schannel build with --cacert checks the name itself (BL-150, measured): an IP
+    // literal against a certificate with no subjectAltName extension, an IP literal against
+    // one with it (no message of its own, so libcurl's text for exit 60), and a host name.
+    private const string SchannelIpAddressWithoutAlternativeNames = "schannel: CertFindExtension() returned no extension.";
+
+    private const string SchannelIpAddressNotAmongAlternativeNames = "SSL peer certificate or SSH remote key was not OK";
+
+    // Without --cacert, Schannel checks the name and says so with its own status.
+    private const string SchannelWrongPrincipal =
+        "schannel: SNI or certificate check failed: SEC_E_WRONG_PRINCIPAL (0x80090322) - The target principal name is incorrect.";
 
     // What curl's Schannel build reports when the connection closes during the handshake,
     // where there is no security status to name.
     private const string SchannelHandshakeNotReceived = "schannel: failed to receive handshake, SSL/TLS connection failed";
 
     private const string OpenSslErrorStringPrefix = "error:";
+
+    // What the OpenSSL build reports when the server closes mid-handshake (BL-150, measured);
+    // .NET sees the end of the stream before OpenSSL does, so no exception carries it.
+    private const string OpenSslUnexpectedEof = "error:0A000126:SSL routines::unexpected eof while reading";
 
     // The SEC_E_* names curl's Schannel build prints for a security status; any other is
     // "Unknown error", as curl's own table falls back to.
@@ -59,37 +74,73 @@ internal static class TlsFailureMessages
     /// did not verify.
     /// </summary>
     /// <param name="errors">What the verification found wrong.</param>
+    /// <param name="chain">The chain built for the server certificate, if one was presented.</param>
+    /// <param name="targetHost">The host the certificate was checked against, IPv6 without brackets.</param>
     /// <param name="hasCaCertificateFile">
     /// <see langword="true" /> when <c>--cacert</c> replaced the system store.
     /// </param>
     /// <returns>The message curl prints.</returns>
-    public static string SchannelPeerFailedVerification(SslPolicyErrors errors, bool hasCaCertificateFile)
+    /// <remarks>
+    /// A chain failure is reported before a name mismatch. Without <c>--cacert</c> a name
+    /// mismatch is Schannel's <c>SEC_E_WRONG_PRINCIPAL</c>; with it, curl's own check names
+    /// the host, or for an IP literal whether the certificate has a subjectAltName extension.
+    /// </remarks>
+    public static string SchannelPeerFailedVerification(
+        SslPolicyErrors errors,
+        X509Chain? chain,
+        string targetHost,
+        bool hasCaCertificateFile)
     {
-        if (errors == SslPolicyErrors.RemoteCertificateNameMismatch)
+        if (errors != SslPolicyErrors.RemoteCertificateNameMismatch)
         {
-            return SchannelNameMismatch;
+            return hasCaCertificateFile ? SchannelCaCertificateFileAnchorsNothing : SchannelUntrustedRoot;
         }
 
-        return hasCaCertificateFile ? SchannelCaCertificateFileAnchorsNothing : SchannelUntrustedRoot;
+        if (!hasCaCertificateFile)
+        {
+            return SchannelWrongPrincipal;
+        }
+
+        if (ToIpAddressFamily(targetHost) is null)
+        {
+            return $"schannel: CertGetNameString() failed to match connection hostname ({targetHost}) against server certificate names";
+        }
+
+        return FindAlternativeNames(chain!.ChainElements[0].Certificate) is null
+            ? SchannelIpAddressWithoutAlternativeNames
+            : SchannelIpAddressNotAmongAlternativeNames;
     }
 
     /// <summary>
-    /// The OpenSSL build's message for exit 60: the chain did not verify, reported as
-    /// OpenSSL's verify result, or it did and the host name did not match.
+    /// The OpenSSL build's message for exit 60: the host name did not match, or it did and
+    /// the chain did not verify, reported as OpenSSL's verify result.
     /// </summary>
     /// <param name="errors">What the verification found wrong.</param>
     /// <param name="chain">The chain built for the server certificate, if one was presented.</param>
-    /// <param name="targetHost">The host the certificate was checked against.</param>
+    /// <param name="targetHost">The host the certificate was checked against, IPv6 without brackets.</param>
     /// <returns>The message curl prints.</returns>
+    /// <remarks>
+    /// curl checks the name first, so a name mismatch is reported even when the chain also
+    /// failed (BL-150, measured). A certificate with DNS or IP subjectAltName entries is
+    /// matched against those alone, and the message names the kind of target; one without
+    /// is matched against its common name.
+    /// </remarks>
     public static string OpenSslPeerFailedVerification(SslPolicyErrors errors, X509Chain? chain, string targetHost)
     {
-        if (errors == SslPolicyErrors.RemoteCertificateNameMismatch)
+        if (!errors.HasFlag(SslPolicyErrors.RemoteCertificateNameMismatch))
         {
-            var subjectName = chain!.ChainElements[0].Certificate.GetNameInfo(X509NameType.SimpleName, forIssuer: false);
-            return $"SSL: certificate subject name '{subjectName}' does not match target hostname '{targetHost}'";
+            return $"SSL certificate OpenSSL verify result: {OpenSslVerifyError(chain)}";
         }
 
-        return $"SSL certificate OpenSSL verify result: {OpenSslVerifyError(chain)}";
+        var certificate = chain!.ChainElements[0].Certificate;
+        var shownHost = ToIpAddressFamily(targetHost) == AddressFamily.InterNetworkV6 ? $"[{targetHost}]" : targetHost;
+        if (HasDnsOrIpAlternativeNames(certificate))
+        {
+            return $"SSL: no alternative certificate subject name matches target {DescribeTarget(targetHost)} '{shownHost}'";
+        }
+
+        var subjectName = certificate.GetNameInfo(X509NameType.SimpleName, forIssuer: false);
+        return $"SSL: certificate subject name '{subjectName}' does not match target hostname '{shownHost}'";
     }
 
     /// <summary>
@@ -117,8 +168,10 @@ internal static class TlsFailureMessages
     /// </summary>
     /// <param name="exception">What the handshake threw.</param>
     /// <returns>
-    /// The message curl prints; when no OpenSSL error string is in the exception, the
-    /// innermost exception's message stands in for it.
+    /// The message curl prints. When no OpenSSL error string is in the exception, a bare
+    /// <see cref="IOException" /> innermost, which is how <see cref="SslStream" /> reports
+    /// the server closing mid-handshake, is OpenSSL's unexpected-EOF error string; any other
+    /// innermost exception's message stands in for one.
     /// </returns>
     public static string OpenSslSslConnectError(Exception exception)
     {
@@ -133,7 +186,9 @@ internal static class TlsFailureMessages
             innermost = current;
         }
 
-        return $"TLS connect error: {innermost.Message}";
+        return innermost.GetType() == typeof(IOException)
+            ? $"TLS connect error: {OpenSslUnexpectedEof}"
+            : $"TLS connect error: {innermost.Message}";
     }
 
     /// <summary>
@@ -368,6 +423,28 @@ internal static class TlsFailureMessages
         return outOfDate.NotBefore > chain.ChainPolicy.VerificationTime
             ? "certificate is not yet valid (9)"
             : "certificate has expired (10)";
+    }
+
+    private static AddressFamily? ToIpAddressFamily(string host) =>
+        IPAddress.TryParse(host, out var address) ? address.AddressFamily : null;
+
+    private static string DescribeTarget(string host) => ToIpAddressFamily(host) switch
+    {
+        null => "hostname",
+        AddressFamily.InterNetworkV6 => "ipv6 address",
+        _ => "ipv4 address",
+    };
+
+    private static X509SubjectAlternativeNameExtension? FindAlternativeNames(X509Certificate2 certificate) =>
+        certificate.Extensions.OfType<X509SubjectAlternativeNameExtension>().FirstOrDefault();
+
+    // curl's OpenSSL build falls back to the common name only when the subjectAltName
+    // extension holds no DNS name and no IP address.
+    private static bool HasDnsOrIpAlternativeNames(X509Certificate2 certificate)
+    {
+        var alternativeNames = FindAlternativeNames(certificate);
+        return alternativeNames is not null
+            && (alternativeNames.EnumerateDnsNames().Any() || alternativeNames.EnumerateIPAddresses().Any());
     }
 
     private static T? FindInnerException<T>(Exception exception)

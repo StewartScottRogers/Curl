@@ -254,7 +254,7 @@ public sealed class SslStreamTlsProvider : ITlsProvider
         }
 
         return _matchesSchannelBuild
-            ? TlsFailureMessages.SchannelPeerFailedVerification(errors, _options.CaCertificateFile is not null)
+            ? TlsFailureMessages.SchannelPeerFailedVerification(errors, chain, targetHost, _options.CaCertificateFile is not null)
             : TlsFailureMessages.OpenSslPeerFailedVerification(errors, chain, targetHost);
     }
 
