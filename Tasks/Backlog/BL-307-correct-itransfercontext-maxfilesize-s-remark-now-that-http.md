@@ -1,5 +1,5 @@
 ---
-id: BL-301
+id: BL-307
 title: Correct ITransferContext.MaxFileSize's remark now that HTTP enforces it
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-301 — Correct ITransferContext.MaxFileSize's remark now that HTTP enforces it
+# BL-307 — Correct ITransferContext.MaxFileSize's remark now that HTTP enforces it
 
 ## Goal
 
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-- Found in BL-178. `Curl.Protocol.Abstractions.UnitLibrary/ITransferContext.cs` says "Only the `file://` handler enforces it; no other handler reads it yet." Since BL-178, `HttpProtocolHandler` enforces it as well: exit 63 `Maximum file size exceeded` for a Content-Length over the limit, and `Exceeded the maximum allowed file size (N) with N bytes` for a body that grows past it (ADR-0041).
+- Found in BL-178. `Curl.Protocol.Abstractions.UnitLibrary/ITransferContext.cs` says "Only the `file://` handler enforces it; no other handler reads it yet." Since BL-178, `HttpProtocolHandler` enforces it as well: exit 63 `Maximum file size exceeded` for a Content-Length over the limit, and `Exceeded the maximum allowed file size (N) with N bytes` for a body that grows past it (ADR-0044).
 - BL-178 could not make the edit because BL-292 was in Doing and touches this project.
 
 ## Acceptance criteria
