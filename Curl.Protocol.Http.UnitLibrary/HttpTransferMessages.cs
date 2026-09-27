@@ -6,7 +6,7 @@ namespace Curl.Protocol.Http;
 /// <summary>
 /// Every failure message sending an HTTP/1.x request body or reading a response head or
 /// body reports, as curl 8.21.0 prints it. Each was measured against a loopback server
-/// (BL-169, BL-170, BL-171, BL-174, BL-175, BL-176) except <see cref="ReceiveFailed" /> and
+/// (BL-169, BL-170, BL-171, BL-174, BL-175, BL-176, BL-178) except <see cref="ReceiveFailed" /> and
 /// <see cref="SendFailed" />, which are the texts <c>curl_easy_strerror</c> gives exits 56 and
 /// 55.
 /// </summary>
@@ -122,6 +122,28 @@ internal static class HttpTransferMessages
     /// <c>deflate</c> data too because the BCL does not report zlib's own text (ADR-0031).
     /// </summary>
     internal const string BadContentEncoding = "Unrecognized or bad HTTP Content or Transfer-Encoding";
+
+    /// <summary>
+    /// The exit 33 message for a <c>-C</c> resume the response does not honour.
+    /// </summary>
+    internal const string ResumeNotSupported = "HTTP server does not seem to support byte ranges. Cannot resume.";
+
+    /// <summary>
+    /// The exit 63 message for a Content-Length over the <c>--max-filesize</c> limit.
+    /// </summary>
+    internal const string MaximumFileSizeExceeded = "Maximum file size exceeded";
+
+    /// <summary>
+    /// Formats the exit 63 message for a body that grew past the <c>--max-filesize</c> limit,
+    /// after as many bytes as the limit allows were written.
+    /// </summary>
+    /// <param name="maxFileSize">The limit.</param>
+    /// <param name="received">The body bytes written.</param>
+    /// <returns>
+    /// The message, such as <c>Exceeded the maximum allowed file size (10) with 10 bytes</c>.
+    /// </returns>
+    internal static string FileSizeLimitExceeded(long maxFileSize, long received) =>
+        string.Create(CultureInfo.InvariantCulture, $"Exceeded the maximum allowed file size ({maxFileSize}) with {received} bytes");
 
     /// <summary>
     /// Formats the exit 22 message for a final status of 400 or above under <c>-f</c> or

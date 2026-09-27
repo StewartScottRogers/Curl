@@ -101,6 +101,18 @@ namespace Curl.Protocol.Http;
 /// connection that fails a write ends the transfer with exit 55. Measured on curl 8.21.0
 /// (BL-174 Notes).
 /// </para>
+/// <para>
+/// <see cref="ITransferContext.ResumeFrom" /> above zero sends <c>Range: bytes=N-</c>, and else
+/// <see cref="ITransferContext.Range" /> sends its range, for a request without a body
+/// (<see cref="HttpRangeHeader" />); <see cref="ITransferContext.TimeCondition" /> sends
+/// <c>If-Modified-Since</c> or <c>If-Unmodified-Since</c>. Once the final head is written,
+/// <see cref="HttpDownloadConditions" /> ends the transfer with exit 63 for a Content-Length over
+/// <see cref="ITransferContext.MaxFileSize" /> and with exit 33 for a resume the response does not
+/// honour, and delivers no body for a 416 to a resume or an unmet <c>-z</c> condition. A body
+/// that grows past the limit ends the transfer with exit 63 after as many bytes as it allows.
+/// A successful result carries the <c>Last-Modified</c> time (<see cref="HttpLastModified" />).
+/// Measured on curl 8.21.0 (BL-178 Notes, ADR-0041).
+/// </para>
 /// </remarks>
 public sealed class HttpProtocolHandler(
     IConnector connector,
@@ -251,12 +263,15 @@ public sealed class HttpProtocolHandler(
             plan.Authorization,
             CookieHeaderFor(context),
             plan.ForwardProxy is not null,
-            plan.ProxyAuthorization);
+            plan.ProxyAuthorization,
+            HttpRangeHeader.ValueFor(context, framing.Body is not null),
+            context.TimeCondition);
         HttpRequestBodyWriter upload = new(connection);
         HttpExchange exchange = new(connect, connection, framing.Method, request.Length, upload, earlier, newConnection);
         IConnection responseConnection = framing.AwaitsContinue ? new HttpContinueWaitConnection(connection) : connection;
         HttpResponseBodyReader body = new(responseConnection);
         string? retryAuthorization = null;
+        HttpBodyDelivery delivery = HttpBodyDelivery.Deliver;
         try
         {
             await HttpConnectionSend.WriteAsync(connection, request, cancellationToken).ConfigureAwait(false);
@@ -270,10 +285,8 @@ public sealed class HttpProtocolHandler(
             HttpFailMode fail = retryAuthorization is null ? options.Fail : HttpFailMode.None;
             ThrowIfFailing(fail, HttpFailMode.Fail, exchange.Head);
             bool discardsBody = retryAuthorization is not null || (options.FollowRedirects && exchange.RedirectUrl is not null);
-            Stream bodyOutput = discardsBody ? Stream.Null : context.Output;
-            await body.CopyAsync(exchange.Head, context.NoBody, bodyOutput, DecodesContent(options, discardsBody), cancellationToken)
-                .ConfigureAwait(false);
-            await WriteHeadersAsync(context.HeaderOutput, body.TrailerBytes, cancellationToken).ConfigureAwait(false);
+            delivery = DeliveryOf(plan, exchange.Head, discardsBody);
+            await ReadBodyAsync(plan, exchange.Head, body, delivery, discardsBody, cancellationToken).ConfigureAwait(false);
             ThrowIfFailing(fail, HttpFailMode.FailWithBody, exchange.Head);
         }
         catch (HttpTransferException failure)
@@ -292,8 +305,60 @@ public sealed class HttpProtocolHandler(
             return new HttpAttemptOutcome(timedOut, null, KeepsAlive: false);
         }
 
-        TransferResult result = TransferResult.Success(body.BytesWritten) with { Report = exchange.Report(body.BytesWritten) };
+        TransferResult result = Succeeded(delivery, exchange.Head!, exchange.Report(body.BytesWritten));
         return new HttpAttemptOutcome(result, retryAuthorization, HttpConnectionPersistence.KeepsAlive(exchange.Head, context.NoBody));
+    }
+
+    /// <summary>
+    /// Applies <c>--max-filesize</c> to the head's Content-Length, then decides what becomes of
+    /// a body that is not being discarded (<see cref="HttpDownloadConditions" />).
+    /// </summary>
+    /// <exception cref="HttpTransferException">
+    /// The Content-Length is over the limit (exit 63), or a resume was not honoured (exit 33).
+    /// </exception>
+    private static HttpBodyDelivery DeliveryOf(HttpRequestPlan plan, HttpResponseHead head, bool discardsBody)
+    {
+        HttpDownloadConditions.ThrowIfContentLengthExceeds(plan.Context.MaxFileSize, head);
+        return discardsBody ? HttpBodyDelivery.Deliver : HttpDownloadConditions.Decide(plan.Context, plan.Framing.Body is not null, head);
+    }
+
+    /// <summary>
+    /// Reads the body into the transfer's output, or into nothing when it is discarded, held to
+    /// the <c>--max-filesize</c> limit unless discarded, then writes a chunked body's trailers;
+    /// or reads nothing when <paramref name="delivery" /> says there is no body to deliver.
+    /// </summary>
+    private static async ValueTask ReadBodyAsync(
+        HttpRequestPlan plan,
+        HttpResponseHead head,
+        HttpResponseBodyReader body,
+        HttpBodyDelivery delivery,
+        bool discardsBody,
+        CancellationToken cancellationToken)
+    {
+        if (delivery != HttpBodyDelivery.Deliver)
+        {
+            return;
+        }
+
+        ITransferContext context = plan.Context;
+        Stream bodyOutput = discardsBody ? Stream.Null : context.Output;
+        body.MaximumBodySize = discardsBody ? null : HttpDownloadConditions.LimitOf(context.MaxFileSize);
+        await body.CopyAsync(head, context.NoBody, bodyOutput, DecodesContent(plan.Options, discardsBody), cancellationToken)
+            .ConfigureAwait(false);
+        await WriteHeadersAsync(context.HeaderOutput, body.TrailerBytes, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Builds a successful exchange's result, carrying the <c>Last-Modified</c> time for
+    /// <c>-R</c>: an unmet <c>-z</c> condition is marked so and reported as a 304, as curl
+    /// 8.21.0's <c>%{response_code}</c> does for a response whose <c>Last-Modified</c> fails it.
+    /// </summary>
+    private static TransferResult Succeeded(HttpBodyDelivery delivery, HttpResponseHead head, TransferReport report)
+    {
+        DateTimeOffset? lastModified = HttpLastModified.Find(head);
+        return delivery == HttpBodyDelivery.TimeConditionUnmet
+            ? TransferResult.TimeConditionNotMet(lastModified) with { Report = report with { ResponseCode = 304 } }
+            : TransferResult.Success(report.DownloadSize, lastModified) with { Report = report };
     }
 
     /// <summary>

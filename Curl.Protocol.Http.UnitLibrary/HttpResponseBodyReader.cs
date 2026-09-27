@@ -43,6 +43,13 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     internal ReadOnlyMemory<byte> TrailerBytes => decoder?.TrailerBytes ?? ReadOnlyMemory<byte>.Empty;
 
     /// <summary>
+    /// Gets or sets the most body bytes the output may be given, <c>--max-filesize</c>'s limit,
+    /// or <see langword="null" /> for no limit. A body that grows past it has as many bytes
+    /// written as the limit allows, then fails with exit 63.
+    /// </summary>
+    internal long? MaximumBodySize { get; set; }
+
+    /// <summary>
     /// Gets the Content-Length of the body being read, once reading has started and the body
     /// is framed by one rather than by chunked coding or the peer closing; otherwise
     /// <see langword="null" />. It is the <c>out of</c> size of curl's exit 28 message.
@@ -86,7 +93,8 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     /// before the body was whole (exit 18), the output failed a write (exit 23), a read
     /// failed or the chunked framing is malformed (exit 56), the Transfer-Encoding names a
     /// coding curl does not decode or a decoded Content-Encoding is unrecognized or corrupt
-    /// (exit 61), or a trailer line is too long (exit 100).
+    /// (exit 61), the body grew past <see cref="MaximumBodySize" /> (exit 63), or a trailer line
+    /// is too long (exit 100).
     /// </exception>
     internal async ValueTask CopyAsync(
         HttpResponseHead head,
@@ -214,7 +222,29 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
             ? output.WriteAsync(bytes, cancellationToken)
             : contentDecoder.WriteAsync(output, bytes, cancellationToken);
 
+    /// <summary>
+    /// Gets how many more body bytes <see cref="MaximumBodySize" /> allows.
+    /// </summary>
+    private long RoomLeft => MaximumBodySize is { } limit ? limit - BytesWritten : long.MaxValue;
+
+    /// <summary>
+    /// Writes <paramref name="bytes" />, or as many as <see cref="MaximumBodySize" /> allows and
+    /// then fails with exit 63.
+    /// </summary>
     private async ValueTask<int> WriteAsync(Stream output, ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken)
+    {
+        if (bytes.Length > RoomLeft)
+        {
+            await WriteWithinLimitAsync(output, bytes[..(int)RoomLeft], cancellationToken).ConfigureAwait(false);
+            throw new HttpTransferException(
+                CurlExitCode.FilesizeExceeded,
+                HttpTransferMessages.FileSizeLimitExceeded(MaximumBodySize.GetValueOrDefault(), BytesWritten));
+        }
+
+        return await WriteWithinLimitAsync(output, bytes, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async ValueTask<int> WriteWithinLimitAsync(Stream output, ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken)
     {
         if (bytes.IsEmpty)
         {
