@@ -43,3 +43,4 @@ each of `idle`, `stream`, `delay: N`, `writedelay: N`, `connection-monitor`, `up
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
