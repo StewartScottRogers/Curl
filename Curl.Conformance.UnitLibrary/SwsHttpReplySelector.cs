@@ -40,13 +40,13 @@ internal sealed class SwsHttpReplySelector(UpstreamTestCase testCase, bool close
     {
         if (SwsHttpRequestLine.FindPath(request) is not { } path)
         {
-            return new SwsHttpReply(Encoding.Latin1.GetBytes(NotFoundDocument), true);
+            return new SwsHttpReply(Encoding.Latin1.GetBytes(NotFoundDocument), true, false);
         }
 
         int partNumber = SwsHttpRequestLine.PartNumber(path);
         byte[] bytes = ReadPart(partNumber == 0 ? "data" : $"data{partNumber}");
         bool closesConnection = closesAfterEveryReply || bytes.Length == 0 || bytes.AsSpan().IndexOf("swsclose"u8) >= 0;
-        return new SwsHttpReply(bytes, closesConnection);
+        return new SwsHttpReply(bytes, closesConnection, true);
     }
 
     private byte[] ReadPart(string name)

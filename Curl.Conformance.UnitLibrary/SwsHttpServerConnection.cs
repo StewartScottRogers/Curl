@@ -6,39 +6,100 @@ namespace Curl.Conformance;
 /// <summary>
 /// One client connection to the sws emulation. Every complete request the client writes is
 /// answered at once, and the reply waits to be read; the bytes written are recorded while
-/// the server still has the connection open.
+/// the server still reads them.
 /// </summary>
 /// <remarks>
+/// <para>
+/// A reply is sent in writes of up to 20 bytes, as <c>sws_send_doc</c> sends it, each
+/// readable from the moment sws would write it: <c>writedelay: N</c> puts N milliseconds after
+/// every write, and <c>&lt;postcmd&gt;</c> <c>wait N</c> keeps sws busy N seconds after the
+/// reply, so a close, or the next reply, comes that much later. Times are read from the
+/// injected <see cref="TimeProvider"/>, and a read waits on it for bytes not yet sent.
+/// </para>
+/// <para>
 /// Once the server has closed its side, reads drain the replies already sent and then return
 /// 0, and writes are accepted and dropped unrecorded, as a socket write into a closed
 /// connection can succeed without the server ever reading it. A read with no reply waiting
-/// also returns 0: in memory the client is the only writer, so nothing else could arrive.
+/// also returns 0: in memory the client is the only writer, so nothing else could arrive;
+/// except after <c>idle</c>, where it waits until cancelled, after <c>stream</c>, where it
+/// reads the streamed text without end, and on an upgraded connection, where it waits for the
+/// server to close it one second after the client last wrote.
+/// </para>
 /// </remarks>
-internal sealed class SwsHttpServerConnection(SwsHttpReplySelector replySelector, SwsServerCommands serverCommands, List<byte> recording) : IConnection
+internal sealed class SwsHttpServerConnection : IConnection
 {
+    private const int BytesPerWrite = 20;
+
+    private static readonly byte[] StreamedText = "a string to stream 01234567890\n"u8.ToArray();
+
+    // sws reads an upgraded connection until a select() of one second finds nothing to read.
+    private static readonly TimeSpan UpgradedTrafficQuietTime = TimeSpan.FromSeconds(1);
+
+    private readonly SwsHttpReplySelector replySelector;
+
+    private readonly SwsServerCommands serverCommands;
+
+    private readonly TimeSpan waitAfterReply;
+
+    private readonly SwsServerRecording recording;
+
+    private readonly TimeProvider timeProvider;
+
+    private readonly long openedAt;
+
     private readonly List<byte> unservedRequestBytes = [];
 
-    private byte[] unreadReplyBytes = [];
+    private readonly List<SwsServerSend> pendingSends = [];
 
-    private bool serverClosed;
+    private TimeSpan serverBusyUntil;
+
+    private bool readsRequests = true;
+
+    private bool idling;
+
+    private bool streaming;
+
+    private int streamedOffset;
+
+    private bool upgradedTrafficOpen;
+
+    private TimeSpan lastUpgradedTrafficAt;
+
+    private bool disconnected;
+
+    public SwsHttpServerConnection(SwsHttpReplySelector replySelector, SwsServerCommands serverCommands, TimeSpan waitAfterReply, SwsServerRecording recording, TimeProvider timeProvider)
+    {
+        this.replySelector = replySelector;
+        this.serverCommands = serverCommands;
+        this.waitAfterReply = waitAfterReply;
+        this.recording = recording;
+        this.timeProvider = timeProvider;
+        openedAt = timeProvider.GetTimestamp();
+    }
 
     public bool IsSecure => false;
 
     public EndPoint? RemoteEndPoint => null;
 
-    public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
-    {
-        int count = Math.Min(buffer.Length, unreadReplyBytes.Length);
-        unreadReplyBytes.AsSpan(0, count).CopyTo(buffer.Span);
-        unreadReplyBytes = unreadReplyBytes[count..];
-        return ValueTask.FromResult(count);
-    }
+    private TimeSpan Now => timeProvider.GetElapsedTime(openedAt);
+
+    private TimeSpan UpgradedTrafficClosesAt =>
+        (serverBusyUntil > lastUpgradedTrafficAt ? serverBusyUntil : lastUpgradedTrafficAt) + UpgradedTrafficQuietTime;
+
+    public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken) =>
+        pendingSends.Count > 0
+            ? await ReadSentAsync(buffer, cancellationToken)
+            : await ReadWithNothingSentAsync(buffer, cancellationToken);
 
     public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
     {
-        if (!serverClosed)
+        if (upgradedTrafficOpen)
         {
-            recording.AddRange(buffer.Span);
+            RecordUpgradedTraffic(buffer.Span);
+        }
+        else if (readsRequests)
+        {
+            recording.Record(buffer.Span);
             unservedRequestBytes.AddRange(buffer.Span);
             ServeCompleteRequests();
         }
@@ -48,17 +109,185 @@ internal sealed class SwsHttpServerConnection(SwsHttpReplySelector replySelector
 
     public ValueTask FlushAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public ValueTask DisposeAsync()
+    {
+        RecordDisconnectOnce();
+        return ValueTask.CompletedTask;
+    }
+
+    // Waits for the first send, then reads it and every later one already sent, up to a close.
+    private async ValueTask<int> ReadSentAsync(Memory<byte> buffer, CancellationToken cancellationToken)
+    {
+        await WaitUntilAsync(pendingSends[0].SentAt, cancellationToken);
+        int count = 0;
+        while (count < buffer.Length && pendingSends.Count > 0 && !pendingSends[0].IsClose && pendingSends[0].SentAt <= Now)
+        {
+            count += ReadFirstSend(buffer.Span[count..]);
+        }
+
+        return count;
+    }
+
+    private int ReadFirstSend(Span<byte> destination)
+    {
+        SwsServerSend first = pendingSends[0];
+        int count = Math.Min(destination.Length, first.Bytes.Length);
+        first.Bytes.AsSpan(0, count).CopyTo(destination);
+        if (count == first.Bytes.Length)
+        {
+            pendingSends.RemoveAt(0);
+        }
+        else
+        {
+            pendingSends[0] = new SwsServerSend(first.Bytes[count..], first.SentAt, false);
+        }
+
+        return count;
+    }
+
+    private async ValueTask<int> ReadWithNothingSentAsync(Memory<byte> buffer, CancellationToken cancellationToken)
+    {
+        if (streaming)
+        {
+            return ReadStreamedText(buffer.Span);
+        }
+
+        if (upgradedTrafficOpen)
+        {
+            return await WaitForUpgradedTrafficToCloseAsync(cancellationToken);
+        }
+
+        return idling ? await WaitUntilCancelledAsync(cancellationToken) : 0;
+    }
+
+    private int ReadStreamedText(Span<byte> destination)
+    {
+        for (int index = 0; index < destination.Length; index++)
+        {
+            destination[index] = StreamedText[(streamedOffset + index) % StreamedText.Length];
+        }
+
+        streamedOffset = (streamedOffset + destination.Length) % StreamedText.Length;
+        return destination.Length;
+    }
+
+    // A write while waiting moves the close later, so the wait starts again from it.
+    private async ValueTask<int> WaitForUpgradedTrafficToCloseAsync(CancellationToken cancellationToken)
+    {
+        while (Now < UpgradedTrafficClosesAt)
+        {
+            await WaitUntilAsync(UpgradedTrafficClosesAt, cancellationToken);
+        }
+
+        CloseUpgradedTraffic();
+        return 0;
+    }
+
+    // A task nothing completes, so the wait only ends, cancelled, with the token.
+    private static Task<int> WaitUntilCancelledAsync(CancellationToken cancellationToken) =>
+        new TaskCompletionSource<int>().Task.WaitAsync(cancellationToken);
+
+    private async ValueTask WaitUntilAsync(TimeSpan moment, CancellationToken cancellationToken)
+    {
+        TimeSpan remaining = moment - Now;
+        if (remaining > TimeSpan.Zero)
+        {
+            await Task.Delay(remaining, timeProvider, cancellationToken);
+        }
+    }
+
+    private void RecordUpgradedTraffic(ReadOnlySpan<byte> traffic)
+    {
+        if (Now >= UpgradedTrafficClosesAt)
+        {
+            CloseUpgradedTraffic();
+            return;
+        }
+
+        recording.Record(traffic);
+        lastUpgradedTrafficAt = Now;
+    }
+
+    private void CloseUpgradedTraffic()
+    {
+        upgradedTrafficOpen = false;
+        pendingSends.Add(new SwsServerSend([], Now, true));
+        RecordDisconnectOnce();
+    }
 
     private void ServeCompleteRequests()
     {
         int requestLength;
-        while (!serverClosed && (requestLength = SwsHttpRequestFraming.FindRequestLength(unservedRequestBytes.ToArray(), serverCommands)) >= 0)
+        bool upgradesConnection = false;
+        while (readsRequests && (requestLength = SwsHttpRequestFraming.FindRequestLength(unservedRequestBytes.ToArray(), serverCommands, out upgradesConnection)) >= 0)
         {
             SwsHttpReply reply = replySelector.Select(unservedRequestBytes.GetRange(0, requestLength).ToArray());
             unservedRequestBytes.RemoveRange(0, requestLength);
-            unreadReplyBytes = [.. unreadReplyBytes, .. reply.Bytes];
-            serverClosed = reply.ClosesConnection;
+            Serve(reply, upgradesConnection);
+        }
+    }
+
+    // sws's 404 document is sent before any <servercmd> is read, so none applies to it.
+    private void Serve(SwsHttpReply reply, bool upgradesConnection)
+    {
+        if (!reply.IsFromTestCase)
+        {
+            Send(reply.Bytes, TimeSpan.Zero, TimeSpan.Zero, true);
+            return;
+        }
+
+        if (serverCommands.MonitorsConnections)
+        {
+            recording.ArmDisconnectMonitor();
+        }
+
+        idling = serverCommands.ReplyMode == SwsReplyMode.Idle;
+        streaming = serverCommands.ReplyMode == SwsReplyMode.Stream;
+        if (serverCommands.ReplyMode == SwsReplyMode.Normal)
+        {
+            Send(reply.Bytes, TimeSpan.FromMilliseconds(Math.Max(0, serverCommands.MillisecondsAfterEachWrite)), waitAfterReply, reply.ClosesConnection);
+        }
+
+        // Streaming never reads again; an upgraded connection reads traffic, not requests.
+        readsRequests &= !(streaming || upgradesConnection);
+        upgradedTrafficOpen = upgradesConnection && !reply.ClosesConnection && serverCommands.ReplyMode == SwsReplyMode.Normal;
+        lastUpgradedTrafficAt = Now;
+    }
+
+    // The bytes go in writes of up to 20, each followed by the write delay; a close waits for the
+    // last write's delay and for the <postcmd> wait.
+    private void Send(byte[] bytes, TimeSpan delayAfterEachWrite, TimeSpan waitAfterLastWrite, bool closes)
+    {
+        TimeSpan writtenAt = serverBusyUntil > Now ? serverBusyUntil : Now;
+        int offset = 0;
+        do
+        {
+            int count = Math.Min(BytesPerWrite, bytes.Length - offset);
+            if (count > 0)
+            {
+                pendingSends.Add(new SwsServerSend(bytes[offset..(offset + count)], writtenAt, false));
+            }
+
+            offset += count;
+            writtenAt += delayAfterEachWrite;
+        }
+        while (offset < bytes.Length);
+
+        serverBusyUntil = writtenAt + waitAfterLastWrite;
+        if (closes)
+        {
+            readsRequests = false;
+            pendingSends.Add(new SwsServerSend([], serverBusyUntil, true));
+            RecordDisconnectOnce();
+        }
+    }
+
+    private void RecordDisconnectOnce()
+    {
+        if (!disconnected)
+        {
+            disconnected = true;
+            recording.RecordDisconnect();
         }
     }
 }

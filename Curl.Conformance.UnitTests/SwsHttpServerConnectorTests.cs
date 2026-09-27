@@ -13,6 +13,10 @@ public sealed class SwsHttpServerConnectorTests
 {
     private const string Get = "GET /1234 HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n";
 
+    private const string UpgradeRequest = "GET /1234 HTTP/1.1\r\nUpgrade: websocket\r\nContent-Length: 5\r\n\r\n";
+
+    private const string FortyFiveBytes = "aaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbcccc\n";
+
     private static readonly ConnectTarget Target = new("127.0.0.1", 8990, false);
 
     [TestMethod]
@@ -290,26 +294,23 @@ public sealed class SwsHttpServerConnectorTests
     }
 
     [TestMethod]
-    [DataRow("idle\n", "idle")]
-    [DataRow("stream\n", "stream")]
-    [DataRow("connection-monitor\n", "connection-monitor")]
-    [DataRow("upgrade\n", "upgrade")]
-    [DataRow("delay: +5\n", "delay")]
-    [DataRow("delay:-1\n", "delay")]
-    [DataRow("writedelay: 1000\r\n", "writedelay")]
-    public void UnsupportedServerCommand_IsReportedByName(string serverCommands, string name)
+    [DataRow("delay: +5\n")]
+    [DataRow("delay:-1\n")]
+    [DataRow("delay:\t1000\r\n")]
+    public void Delay_IsReportedAsUnsupported(string serverCommands)
     {
         SwsHttpServerConnector server = new(Case(Reply("data", "first\n"), Reply("servercmd", serverCommands)));
 
-        CollectionAssert.AreEqual(new[] { name }, server.UnsupportedServerCommands.ToArray());
+        CollectionAssert.AreEqual(new[] { "delay" }, server.UnsupportedServerCommands.ToArray());
     }
 
     [TestMethod]
     [DataRow("")]
     [DataRow("swsclose\n")]
     [DataRow("Testnum 1234\npipe: 3\n")]
-    [DataRow("skip: many\nskip:\ndelay: -\n")]
+    [DataRow("skip: many\nskip:\ndelay: -\nwritedelay: x\n")]
     [DataRow("auth_required\nno-expect\nskip: 100\nskip:-1\n")]
+    [DataRow("idle\nstream\nconnection-monitor\nupgrade\nwritedelay: 1000\n")]
     public void ServerCommandsThatAreCarriedOutOrUnknown_AreNotReported(string serverCommands)
     {
         SwsHttpServerConnector server = new(Case(Reply("data", "first\n"), Reply("servercmd", serverCommands)));
@@ -318,11 +319,11 @@ public sealed class SwsHttpServerConnectorTests
     }
 
     [TestMethod]
-    public void ServerCommands_AreReportedInFileOrder()
+    public void UnsupportedServerCommands_AreReportedOncePerLineInFileOrder()
     {
-        SwsHttpServerConnector server = new(Case(Reply("servercmd", "writedelay: 1\n\nidle\nauth_required\ndelay: 2\n")));
+        SwsHttpServerConnector server = new(Case(Reply("servercmd", "delay: 1\n\nidle\nauth_required\ndelay: 2\n")));
 
-        CollectionAssert.AreEqual(new[] { "writedelay", "idle", "delay" }, server.UnsupportedServerCommands.ToArray());
+        CollectionAssert.AreEqual(new[] { "delay", "delay" }, server.UnsupportedServerCommands.ToArray());
     }
 
     [TestMethod]
@@ -361,6 +362,293 @@ public sealed class SwsHttpServerConnectorTests
         Assert.ThrowsExactly<ArgumentNullException>(() => new SwsHttpServerConnector(null!));
     }
 
+    [TestMethod]
+    public void Constructor_RejectsANullTimeProvider()
+    {
+        Assert.ThrowsExactly<ArgumentNullException>(() => new SwsHttpServerConnector(Case(Reply("data", "first\n")), null!));
+    }
+
+    [TestMethod]
+    public async Task WriteDelay_SendsTheReplyInWritesOf20BytesWithTheDelayAfterEach()
+    {
+        ManualTimeProvider clock = new();
+        IConnection connection = await ConnectAsync(new SwsHttpServerConnector(Case(Reply("data", FortyFiveBytes), Reply("servercmd", "writedelay: 100\n")), clock));
+        await WriteAsync(connection, Get);
+
+        Assert.AreEqual(FortyFiveBytes[..20], await ReadOnceAsync(connection), "the first write is sent at once");
+        Task<string> second = ReadOnceAsync(connection);
+        clock.Advance(TimeSpan.FromMilliseconds(99));
+        Assert.IsFalse(second.IsCompleted, "the second write waits out the first write's delay");
+        clock.Advance(TimeSpan.FromMilliseconds(1));
+        Assert.AreEqual(FortyFiveBytes[20..40], await second);
+        Task<string> third = ReadOnceAsync(connection);
+        clock.Advance(TimeSpan.FromMilliseconds(100));
+        Assert.AreEqual(FortyFiveBytes[40..], await third);
+        Assert.AreEqual(string.Empty, await ReadOnceAsync(connection), "the connection stays open with nothing more to read");
+    }
+
+    [TestMethod]
+    public async Task WriteDelay_WithAClosingReply_ClosesAfterTheLastWritesDelay()
+    {
+        ManualTimeProvider clock = new();
+        IConnection connection = await ConnectAsync(new SwsHttpServerConnector(Case(Reply("data", "reply swsclose\n"), Reply("servercmd", "writedelay: 100\n")), clock));
+        await WriteAsync(connection, Get);
+
+        Assert.AreEqual("reply swsclose\n", await ReadOnceAsync(connection));
+        Task<string> close = ReadOnceAsync(connection);
+        clock.Advance(TimeSpan.FromMilliseconds(99));
+        Assert.IsFalse(close.IsCompleted);
+        clock.Advance(TimeSpan.FromMilliseconds(1));
+        Assert.AreEqual(string.Empty, await close);
+    }
+
+    [TestMethod]
+    [DataRow("writedelay: 0\n")]
+    [DataRow("writedelay: -5\n")]
+    [DataRow("writedelay: 100\nwritedelay: 0\n")]
+    public async Task WriteDelay_OfZeroOrLess_SendsTheWholeReplyAtOnce(string serverCommands)
+    {
+        IConnection connection = await ConnectAsync(new SwsHttpServerConnector(Case(Reply("data", FortyFiveBytes), Reply("servercmd", serverCommands)), new ManualTimeProvider()));
+        await WriteAsync(connection, Get);
+
+        Assert.AreEqual(FortyFiveBytes, await ReadOnceAsync(connection));
+    }
+
+    [TestMethod]
+    public async Task PostcmdWait_HoldsTheCloseBackThatManySeconds()
+    {
+        ManualTimeProvider clock = new();
+        IConnection connection = await ConnectAsync(new SwsHttpServerConnector(Case(Reply("data", "reply swsclose\n"), Reply("postcmd", "wait 2\n")), clock));
+        await WriteAsync(connection, Get);
+
+        Assert.AreEqual("reply swsclose\n", await ReadOnceAsync(connection));
+        Task<string> close = ReadOnceAsync(connection);
+        clock.Advance(TimeSpan.FromSeconds(2) - TimeSpan.FromTicks(1));
+        Assert.IsFalse(close.IsCompleted);
+        clock.Advance(TimeSpan.FromTicks(1));
+        Assert.AreEqual(string.Empty, await close);
+    }
+
+    [TestMethod]
+    [DataRow("wait 1\n", 1)]
+    [DataRow("wait 1\nwait 2\n", 3)]
+    [DataRow("  wait\t2\r\n", 2)]
+    [DataRow("wait -3\nwait 1\n", 1)]
+    [DataRow("sleep 5\nwait\nwait x\nwait10 1\nWAIT 4\nwait 1\n", 1)]
+    public async Task PostcmdWait_HoldsTheNextReplyBackThatManySeconds(string postCommands, int seconds)
+    {
+        ManualTimeProvider clock = new();
+        IConnection connection = await ConnectAsync(new SwsHttpServerConnector(Case(Reply("data", "first\n"), Reply("postcmd", postCommands)), clock));
+        await WriteAsync(connection, Get);
+        Assert.AreEqual("first\n", await ReadOnceAsync(connection));
+        await WriteAsync(connection, Get);
+
+        Task<string> next = ReadOnceAsync(connection);
+        clock.Advance(TimeSpan.FromSeconds(seconds) - TimeSpan.FromTicks(1));
+        Assert.IsFalse(next.IsCompleted);
+        clock.Advance(TimeSpan.FromTicks(1));
+        Assert.AreEqual("first\n", await next);
+    }
+
+    [TestMethod]
+    public async Task PostcmdWait_DoesNotHoldBackTheNotFoundDocument()
+    {
+        IConnection connection = await ConnectAsync(new SwsHttpServerConnector(Case(Reply("data", "first\n"), Reply("postcmd", "wait 5\n"), Reply("servercmd", "writedelay: 100\n")), new ManualTimeProvider()));
+
+        StringAssert.EndsWith(await ExchangeAsync(connection, "GARBAGE\r\n\r\n"), "</BODY></HTML>\n");
+    }
+
+    [TestMethod]
+    public async Task Idle_AnswersNothingAndAReadWaitsUntilCancelled()
+    {
+        SwsHttpServerConnector server = new(Case(Reply("data", "first\n"), Reply("servercmd", "idle\n")));
+        IConnection connection = await ConnectAsync(server);
+        using CancellationTokenSource cancellation = new();
+        await WriteAsync(connection, Get);
+        await WriteAsync(connection, Get);
+
+        Task<string> read = ReadOnceAsync(connection, cancellation.Token);
+        Assert.IsFalse(read.IsCompleted);
+        await cancellation.CancelAsync();
+
+        await Assert.ThrowsExactlyAsync<TaskCanceledException>(() => read);
+        Assert.AreEqual(Get + Get, Text(server.ReceivedBytes), "idle keeps reading requests");
+    }
+
+    [TestMethod]
+    public async Task Idle_DoesNotApplyToAMalformedRequest()
+    {
+        IConnection connection = await ConnectAsync(new SwsHttpServerConnector(Case(Reply("data", "first\n"), Reply("servercmd", "idle\n"))));
+
+        StringAssert.StartsWith(await ExchangeAsync(connection, "GARBAGE\r\n\r\n"), "HTTP/1.1 404 Not Found\r\n");
+    }
+
+    [TestMethod]
+    public async Task Stream_SendsTheStreamedTextWithoutEndAndReadsNoMore()
+    {
+        SwsHttpServerConnector server = new(Case(Reply("data", "first\n"), Reply("servercmd", "idle\nstream\n")));
+        IConnection connection = await ConnectAsync(server);
+        await WriteAsync(connection, Get);
+
+        string streamed = await ReadOnceAsync(connection, 20) + await ReadOnceAsync(connection, 20) + await ReadOnceAsync(connection, 20);
+        await WriteAsync(connection, Get);
+
+        Assert.AreEqual(string.Concat(Enumerable.Repeat("a string to stream 01234567890\n", 2))[..60], streamed);
+        Assert.AreEqual(Get, Text(server.ReceivedBytes), "sws reads nothing more while it streams");
+    }
+
+    [TestMethod]
+    public async Task ConnectionMonitor_RecordsADisconnectWhenTheClientCloses()
+    {
+        SwsHttpServerConnector server = new(Case(Reply("data", "first\n"), Reply("servercmd", "connection-monitor\n")));
+        IConnection connection = await ConnectAsync(server);
+        await ExchangeAsync(connection, Get);
+
+        await connection.DisposeAsync();
+        await connection.DisposeAsync();
+
+        Assert.AreEqual(Get + "[DISCONNECT]\n", Text(server.ReceivedBytes));
+    }
+
+    [TestMethod]
+    public async Task ConnectionMonitor_RecordsADisconnectWhenTheServerCloses()
+    {
+        SwsHttpServerConnector server = new(Case(Reply("data", "reply swsclose\n"), Reply("servercmd", "connection-monitor\n")));
+        IConnection connection = await ConnectAsync(server);
+
+        await ExchangeAsync(connection, Get);
+        Assert.AreEqual(Get + "[DISCONNECT]\n", Text(server.ReceivedBytes));
+        await connection.DisposeAsync();
+
+        Assert.AreEqual(Get + "[DISCONNECT]\n", Text(server.ReceivedBytes));
+    }
+
+    [TestMethod]
+    [DataRow("connection-monitor\n", "")]
+    [DataRow("", "GET /1234 HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")]
+    public async Task ConnectionMonitor_RecordsNothingWithoutARequestOrWithoutTheCommand(string serverCommands, string request)
+    {
+        SwsHttpServerConnector server = new(Case(Reply("data", "first\n"), Reply("servercmd", serverCommands)));
+        IConnection connection = await ConnectAsync(server);
+        await ExchangeAsync(connection, request);
+
+        await connection.DisposeAsync();
+
+        Assert.AreEqual(request, Text(server.ReceivedBytes));
+    }
+
+    [TestMethod]
+    public async Task ConnectionMonitor_IsOneFlagForTheServer_SoOnlyTheFirstCloseAfterARequestIsRecorded()
+    {
+        SwsHttpServerConnector server = new(Case(Reply("data", "first\n"), Reply("servercmd", "connection-monitor\n")));
+        IConnection first = await ConnectAsync(server);
+        IConnection second = await ConnectAsync(server);
+        await ExchangeAsync(first, Get);
+        await ExchangeAsync(second, Get);
+
+        await first.DisposeAsync();
+        await second.DisposeAsync();
+
+        Assert.AreEqual(Get + Get + "[DISCONNECT]\n", Text(server.ReceivedBytes));
+    }
+
+    [TestMethod]
+    public async Task Upgrade_AnswersAtTheHeadersThenRecordsTrafficUntilTheClientIsQuietForASecond()
+    {
+        ManualTimeProvider clock = new();
+        SwsHttpServerConnector server = new(Case(Reply("data", "switched\n"), Reply("servercmd", "upgrade\n")), clock);
+        IConnection connection = await ConnectAsync(server);
+        await WriteAsync(connection, UpgradeRequest + "abc");
+
+        Assert.AreEqual("switched\n", await ReadOnceAsync(connection), "the body is not waited for");
+        Task<string> close = ReadOnceAsync(connection);
+        clock.Advance(TimeSpan.FromMilliseconds(500));
+        await WriteAsync(connection, "def");
+        clock.Advance(TimeSpan.FromMilliseconds(500));
+        Assert.IsFalse(close.IsCompleted, "the write at 500 ms moves the close to 1500 ms");
+        clock.Advance(TimeSpan.FromMilliseconds(500));
+        Assert.AreEqual(string.Empty, await close);
+        await WriteAsync(connection, "ghi");
+
+        Assert.AreEqual(UpgradeRequest + "abcdef", Text(server.ReceivedBytes));
+    }
+
+    [TestMethod]
+    public async Task Upgrade_WriteAfterAQuietSecond_FindsTheConnectionClosed()
+    {
+        ManualTimeProvider clock = new();
+        SwsHttpServerConnector server = new(Case(Reply("data", "switched\n"), Reply("servercmd", "upgrade\nconnection-monitor\n")), clock);
+        IConnection connection = await ConnectAsync(server);
+        await WriteAsync(connection, UpgradeRequest);
+        Assert.AreEqual("switched\n", await ReadOnceAsync(connection));
+
+        clock.Advance(TimeSpan.FromSeconds(1));
+        await WriteAsync(connection, "late");
+
+        Assert.AreEqual(string.Empty, await ReadOnceAsync(connection));
+        Assert.AreEqual(UpgradeRequest + "[DISCONNECT]\n", Text(server.ReceivedBytes));
+    }
+
+    [TestMethod]
+    public async Task Upgrade_QuietSecondStartsAfterThePostReplyWait()
+    {
+        ManualTimeProvider clock = new();
+        IConnection connection = await ConnectAsync(new SwsHttpServerConnector(Case(Reply("data", "switched\n"), Reply("servercmd", "upgrade\n"), Reply("postcmd", "wait 2\n")), clock));
+        await WriteAsync(connection, UpgradeRequest);
+        Assert.AreEqual("switched\n", await ReadOnceAsync(connection));
+
+        Task<string> close = ReadOnceAsync(connection);
+        clock.Advance(TimeSpan.FromSeconds(3) - TimeSpan.FromTicks(1));
+        Assert.IsFalse(close.IsCompleted);
+        clock.Advance(TimeSpan.FromTicks(1));
+
+        Assert.AreEqual(string.Empty, await close);
+    }
+
+    [TestMethod]
+    public async Task Upgrade_WithAClosingReply_ClosesWithoutReadingTraffic()
+    {
+        SwsHttpServerConnector server = new(Case(Reply("data", "switched swsclose\n"), Reply("servercmd", "upgrade\n")));
+        IConnection connection = await ConnectAsync(server);
+
+        Assert.AreEqual("switched swsclose\n", await ExchangeAsync(connection, UpgradeRequest));
+        await WriteAsync(connection, "traffic");
+
+        Assert.AreEqual(UpgradeRequest, Text(server.ReceivedBytes));
+    }
+
+    [TestMethod]
+    public async Task Upgrade_WithStream_Streams()
+    {
+        SwsHttpServerConnector server = new(Case(Reply("data", "switched\n"), Reply("servercmd", "upgrade\nstream\n")));
+        IConnection connection = await ConnectAsync(server);
+        await WriteAsync(connection, UpgradeRequest);
+
+        Assert.AreEqual("a string", await ReadOnceAsync(connection, 8));
+        await WriteAsync(connection, "traffic");
+        Assert.AreEqual(UpgradeRequest, Text(server.ReceivedBytes));
+    }
+
+    [TestMethod]
+    [DataRow("", "Upgrade: websocket\r\n")]
+    [DataRow("upgrade\n", "upgrade: websocket\r\n")]
+    public async Task Upgrade_NotAllowedOrNotAskedFor_ReadsTheBody(string serverCommands, string headers)
+    {
+        IConnection connection = await ConnectAsync(new SwsHttpServerConnector(Case(Reply("data", "posted\n"), Reply("servercmd", serverCommands))));
+
+        Assert.AreEqual(string.Empty, await ExchangeAsync(connection, $"POST /1234 HTTP/1.1\r\n{headers}Content-Length: 3\r\n\r\n"));
+        Assert.AreEqual("posted\n", await ExchangeAsync(connection, "abc"));
+    }
+
+    [TestMethod]
+    public async Task Upgrade_WithAuthRequiredAndNoAuthorization_IsAnOrdinaryRequestEndedAtItsHeaders()
+    {
+        IConnection connection = await ConnectAsync(new SwsHttpServerConnector(Case(Reply("data", "denied\n"), Reply("data2", "second\n"), Reply("servercmd", "upgrade\nauth_required\n"))));
+
+        Assert.AreEqual("denied\n", await ExchangeAsync(connection, UpgradeRequest));
+        Assert.AreEqual("second\n", await ExchangeAsync(connection, "GET /12340002 HTTP/1.1\r\n\r\n"), "the connection still reads requests");
+    }
+
     private static UpstreamTestCase Case(params string[] replyParts)
     {
         string file = "<testcase>\n<reply>\n" + string.Concat(replyParts) + "</reply>\n</testcase>\n";
@@ -380,6 +668,16 @@ public sealed class SwsHttpServerConnectorTests
     {
         await WriteAsync(connection, request);
         return await ReadAllAsync(connection);
+    }
+
+    private static async Task<string> ReadOnceAsync(IConnection connection, CancellationToken cancellationToken = default) =>
+        await ReadOnceAsync(connection, 1024, cancellationToken);
+
+    private static async Task<string> ReadOnceAsync(IConnection connection, int bufferSize, CancellationToken cancellationToken = default)
+    {
+        byte[] buffer = new byte[bufferSize];
+        int count = await connection.ReadAsync(buffer, cancellationToken);
+        return Encoding.Latin1.GetString(buffer, 0, count);
     }
 
     private static ValueTask WriteAsync(IConnection connection, string text) =>
