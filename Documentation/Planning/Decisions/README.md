@@ -81,6 +81,7 @@ choices do not need one.
 | [0064](ADR-0064-variable-content-is-bytes-and-expands-through-utf-8-option-values.md) | `--variable` content is bytes, expanded through UTF-8 option values (non-UTF-8 bytes expanded unencoded become U+FFFD); `%name` reads the process environment; a `name@file` open failure is worded as the Windows curl words it | Accepted | 2026-09-27 |
 | [0065](ADR-0065-http-progress-reports-only-the-delivered-body-and-never-goes-back-on-a-retry.md) | The HTTP handler reports "started" once the first connection is made, counts only the body the output receives and the body sent, and never reports a count below one already reported, so a retry that resends a body holds the counter | Accepted | 2026-09-27 |
 | [0066](ADR-0066-a-schannel-cert-store-path-is-parsed-as-curl-parses-it-and-opened-through-x509store.md) | A Schannel `--cert` store path (`CurrentUser\MY\<thumbprint>`) is parsed as curl's `get_cert_location` parses it and opened through `X509Store` behind `IClientCertificateStore`; `CurrentUser` and `LocalMachine` open, the six other locations report the open failure | Accepted | 2026-09-27 |
+| [0067](ADR-0067-command-line-header-text-becomes-bytes-in-the-platform-curls-encoding-inside-the-http-formatter.md) | Command-line text in the request head (`-H`, `--proxy-header`) becomes bytes in the platform curl's encoding (the ANSI code page with best fit on Windows, UTF-8 on Linux and macOS), encoded by the HTTP formatter with the `Encoding` `Curl.Console` puts on `HttpRequestOptions` | Accepted | 2026-09-27 |
 
 ## Template
 
