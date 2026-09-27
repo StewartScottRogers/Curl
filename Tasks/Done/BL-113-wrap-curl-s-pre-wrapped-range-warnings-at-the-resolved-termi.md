@@ -8,7 +8,7 @@ depends-on: [BL-092]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-27
 ---
 # BL-113 — Wrap curl's pre-wrapped range warnings at the resolved terminal width
 
@@ -34,12 +34,12 @@ updated (see Notes).
 
 ## Acceptance criteria
 
-- [ ] `CommandLineWarning.RangeHasNoDash` and `RangeHasInvalidCharacter` are each one
+- [x] `CommandLineWarning.RangeHasNoDash` and `RangeHasInvalidCharacter` are each one
       unwrapped line: `Warning: A specified range MUST include at least one dash (-). Appending one for you`
       and `Warning: Invalid character is found in given range. A specified range MUST have only digits in 'start'-'stop'. The server's response to this request is uncertain.`
-- [ ] `Curl.Cli.UnitTests` tests pin both texts, and every parser test that expected the
+- [x] `Curl.Cli.UnitTests` tests pin both texts, and every parser test that expected the
       pre-cut lines is updated.
-- [ ] In `Curl.Console.UnitTests/CurlCommandRunnerTransferOptionTests.cs`, the three tests
+- [x] In `Curl.Console.UnitTests/CurlCommandRunnerTransferOptionTests.cs`, the three tests
       `RunAsync_RangeWithInvalidCharacter_PrintsTheWarningThenExit33`,
       `RunAsync_RangeWithNoDash_PrintsTheWarningBeforeAnyTransferOutput` and
       `RunAsync_RefusedCommandLine_PrintsTheWarningBeforeTheRefusal` expect the runner's
@@ -51,7 +51,7 @@ updated (see Notes).
       `Warning: request is uncertain.` (each trailing space kept) - and pass. The `Lines`
       helper is changed or replaced so it compiles against the new property type. No file
       under `Curl.Console` changes.
-- [ ] `dotnet build -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
+- [x] `dotnet build -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
 
 ## Notes
 
@@ -66,6 +66,20 @@ updated (see Notes).
 - Re-planned 2026-09-26: `touches` now includes `Curl.Console.UnitTests`, and a criterion
   names the three console tests and the literal 79-column lines they must expect.
 
+- 2026-09-27 (lane 2): Delivered. Delivered directly rather than through the full `/feature`
+  agent stages: the change is two string constants plus test expectations, planned in full by the
+  task itself. `RangeHasNoDash` and `RangeHasInvalidCharacter` stay `IReadOnlyList<string>`, now
+  one element each, like the other one-line warnings in `CommandLineWarning`
+  (`FailWithBodyDeselectsFail`), so `CommandLineOptionTable` is unchanged. The console test
+  helper `Lines` now takes `params string[]` literal lines. `Parse_RangeWarning_IsHiddenOnlyBySilentReadBeforeIt`
+  now expects 1 warning line where it expected 3 and 2.
+- Measured curl 8.21.0 (Windows, Schannel) 2026-09-27 with `COLUMNS=200` and `COLUMNS=40`
+  `curl -r abc --bogus x` and `curl -r 5 --bogus x`: one line each at 200; six and three lines at
+  40. Pinned by the new `RunAsync_RangeWarningsAt200Columns_AreEachOneLine` and
+  `RunAsync_RangeWarningsAt40Columns_AreWrappedAsCurlWrapsThem`.
+- Follow-up filed: BL-389, the same fix for the `-z` date and request-method warnings, which are
+  still pre-cut at 79 columns.
+
 ## Log
 
 - 2026-09-26: Created.
@@ -73,3 +87,4 @@ updated (see Notes).
 - 2026-09-26: Doing -> Blocked. Needs Curl.Console.UnitTests added to touches: three CurlCommandRunnerTransferOptionTests build expected stderr from the unwrapped range warnings and fail at 79 columns; re-plan to include it
 - 2026-09-26: Blocked -> Backlog. Re-planned: touches adds Curl.Console.UnitTests; a criterion names the three CurlCommandRunnerTransferOptionTests and the literal 79-column lines they must expect.
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Done. The -r range warnings wrap as curl 8.21.0 wraps them at any terminal width (pinned at 40, 79 and 200 columns)
