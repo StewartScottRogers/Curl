@@ -79,9 +79,7 @@ public sealed class OpenSslCertificateTextTests
     [TestMethod]
     public void CertificateLevel_KeyNotDescribed_IsNull()
     {
-        using var key = ECDsa.Create(ECCurve.NamedCurves.brainpoolP160r1);
-        using var certificate = new CertificateRequest("CN=x", key, HashAlgorithmName.SHA256)
-            .CreateSelfSigned(DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch.AddDays(1));
+        using var certificate = CertificateWithBrainpoolP160r1Key();
 
         Assert.IsNull(OpenSslCertificateText.CertificateLevel(0, certificate));
     }
@@ -128,6 +126,23 @@ public sealed class OpenSslCertificateTextTests
 
         Assert.IsNull(OpenSslCertificateText.PublicKeyText(withoutParameters));
         Assert.IsNull(OpenSslCertificateText.PublicKeyText(withExplicitCurve));
+    }
+
+    // A certificate whose key is on brainpoolP160r1, a curve OpenSslCertificateText does not
+    // describe. The key is written by hand and signed with a P-256 key, because macOS cannot
+    // generate a brainpool key (BL-426).
+    private static X509Certificate2 CertificateWithBrainpoolP160r1Key()
+    {
+        AsnWriter curve = new(AsnEncodingRules.DER);
+        curve.WriteObjectIdentifier("1.3.36.3.3.2.8.1.1.1");
+        var uncompressedPoint = new byte[41];
+        uncompressedPoint[0] = 0x04;
+        PublicKey publicKey = new(new Oid("1.2.840.10045.2.1"), new AsnEncodedData(curve.Encode()), new AsnEncodedData(uncompressedPoint));
+
+        using var signingKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        X500DistinguishedName name = new("CN=x");
+        return new CertificateRequest(name, publicKey, HashAlgorithmName.SHA256)
+            .Create(name, X509SignatureGenerator.CreateForECDsa(signingKey), DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch.AddDays(1), [1]);
     }
 
     // Signs with an algorithm, 1.2.3.4, that OpenSSL has no name for.

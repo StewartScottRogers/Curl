@@ -1,3 +1,4 @@
+using System.Formats.Asn1;
 using System.Net;
 using System.Net.Security;
 using System.Security.Authentication;
@@ -325,9 +326,7 @@ public sealed class VerboseTransferEventWriterTests
     [TestMethod]
     public void ReportTlsHandshake_OpenSslChainKeyNotDescribed_SkipsItsLevelLine()
     {
-        using var key = ECDsa.Create(ECCurve.NamedCurves.brainpoolP160r1);
-        using var undescribed = new CertificateRequest("CN=x", key, HashAlgorithmName.SHA256)
-            .CreateSelfSigned(DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch.AddDays(1));
+        using var undescribed = CertificateWithBrainpoolP160r1Key();
 
         new VerboseTransferEventWriter(output, writesDataLines: true, TlsBackend.OpenSsl).ReportTlsHandshake(Handshake([], null) with
         {
@@ -470,6 +469,23 @@ public sealed class VerboseTransferEventWriterTests
         writer.ReportResponseHeader("\r\n"u8);
 
         Assert.AreEqual("< HTTP/1.1 200 OK\r\n< < \r\n", Written());
+    }
+
+    // A certificate whose key is on brainpoolP160r1, a curve OpenSslCertificateText does not
+    // describe. The key is written by hand and signed with a P-256 key, because macOS cannot
+    // generate a brainpool key (BL-426).
+    private static X509Certificate2 CertificateWithBrainpoolP160r1Key()
+    {
+        AsnWriter curve = new(AsnEncodingRules.DER);
+        curve.WriteObjectIdentifier("1.3.36.3.3.2.8.1.1.1");
+        var uncompressedPoint = new byte[41];
+        uncompressedPoint[0] = 0x04;
+        PublicKey publicKey = new(new Oid("1.2.840.10045.2.1"), new AsnEncodedData(curve.Encode()), new AsnEncodedData(uncompressedPoint));
+
+        using var signingKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        X500DistinguishedName name = new("CN=x");
+        return new CertificateRequest(name, publicKey, HashAlgorithmName.SHA256)
+            .Create(name, X509SignatureGenerator.CreateForECDsa(signingKey), DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch.AddDays(1), [1]);
     }
 
     private static ConnectionOpenedEvent Opened(IPEndPoint remote, int localPort)
