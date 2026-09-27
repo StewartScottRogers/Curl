@@ -107,19 +107,33 @@ public sealed class PhysicalFileSystemTests
         AssertFailed(FileAccessStatus.NotFound, result);
     }
 
-    // A character device opens, but as a handle that cannot seek and has no length: the
-    // shape file:///dev/stdin arrives in, which the handler must not seek.
+    // On Windows the null device opens, but as a handle that cannot seek and has no length:
+    // the shape file:///dev/stdin arrives in, which the handler must not seek.
     [TestMethod]
-    public async Task OpenForReadAsync_NullDevice_OpensANonSeekableHandleOfLengthZero()
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task OpenForReadAsync_WindowsNullDevice_OpensANonSeekableHandleOfLengthZero()
     {
-        string nullDevice = OperatingSystem.IsWindows() ? "NUL" : "/dev/null";
-
-        var result = await new PhysicalFileSystem().OpenForReadAsync(nullDevice, CancellationToken.None);
+        var result = await new PhysicalFileSystem().OpenForReadAsync("NUL", CancellationToken.None);
 
         Assert.AreEqual(FileAccessStatus.Ok, result.Status);
         Assert.IsNotNull(result.Content);
         await using var content = result.Content;
         Assert.IsFalse(content.CanSeek);
+        Assert.AreEqual(0L, result.Length);
+    }
+
+    // On Linux and macOS lseek(2) succeeds on /dev/null, so .NET reports it seekable, and its
+    // fstat size is zero - the same size curl's fstat reads, so an offset past it still fails.
+    [TestMethod]
+    [OSCondition(OperatingSystems.Linux | OperatingSystems.OSX | OperatingSystems.FreeBSD)]
+    public async Task OpenForReadAsync_UnixNullDevice_OpensASeekableHandleOfLengthZero()
+    {
+        var result = await new PhysicalFileSystem().OpenForReadAsync("/dev/null", CancellationToken.None);
+
+        Assert.AreEqual(FileAccessStatus.Ok, result.Status);
+        Assert.IsNotNull(result.Content);
+        await using var content = result.Content;
+        Assert.IsTrue(content.CanSeek);
         Assert.AreEqual(0L, result.Length);
     }
 
