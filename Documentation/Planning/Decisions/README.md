@@ -54,6 +54,7 @@ choices do not need one.
 | [0037](ADR-0037-a-z-value-that-is-not-a-date-is-read-as-a-file-through-idatafilereader.md) | A `-z` value that is not a date is read as a file through `IDataFileReader`, with curl's Windows filetime warning | Accepted | 2026-09-26 |
 | [0038](ADR-0038-w-time-follows-the-windows-c-runtime-strftime-and-onerror-reads-transfer-failed.md) | `-w %time{…}` follows the Windows C runtime's `strftime` with en-US names, and `%{onerror}` reads `IWriteOutVariableSource.TransferFailed` | Accepted | 2026-09-26 |
 | [0039](ADR-0039-a-64-bit-numeric-option-value-saturates-where-commandlineoptions-holds-less.md) | A 64-bit numeric option value saturates where `CommandLineOptions` holds less: `--tftp-blksize` and `--max-redirs` at 2^31-1, the timeouts at the longest `TimeSpan` | Accepted | 2026-09-26 |
+| [0040](ADR-0040-http-enforces-max-time-and-connect-timeout-in-the-handler.md) | The HTTP handler enforces `-m` and `--connect-timeout` itself on the transfer's clock, and maps failed sends to exit 55 | Accepted | 2026-09-26 |
 
 ## Template
 
