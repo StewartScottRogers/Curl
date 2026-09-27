@@ -155,6 +155,7 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("fail-with-body", null, SetFailWithBody),
         CommandLineOption.NegatableFlag("fail-early", null, (options, on) => options.FailEarly = on),
         CommandLineOption.Value("config", 'K', ApplyConfigFile),
+        CommandLineOption.Value("variable", null, VariableDefinition.Apply),
         CommandLineOption.NegatableFlag("disable", 'q', IgnoreDisable),
         CommandLineOption.NegatableFlag("version", 'V', (options, on) => options.VersionRequested = on),
         CommandLineOption.NegatableFlag("compressed", null, (options, on) => options.Compressed = on),

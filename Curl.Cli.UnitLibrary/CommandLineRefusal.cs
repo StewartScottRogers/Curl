@@ -368,6 +368,55 @@ public sealed class CommandLineRefusal
         ];
     }
 
+    /// <summary>
+    /// Refuses an option whose <c>--expand-</c> value could not be expanded, or a <c>--variable</c> that
+    /// imports an environment variable that is not set: <paramref name="errorMessage"/> as a <c>curl: </c>
+    /// error line (hidden when <paramref name="errorsHidden"/>), then
+    /// <c>curl: option &lt;spelled&gt;: variable expansion failure</c> and the try-help line.
+    /// </summary>
+    /// <remarks>
+    /// Measured with the local curl 8.21.0 on 2026-09-27: <c>--expand-data '{{a:bogus}}'</c> prints
+    /// <c>curl: unknown variable function in ':bogus'</c> first, <c>--variable %UNSET</c> prints
+    /// <c>curl: Variable 'UNSET' import fail, not set</c>, and <c>--expand-silent x</c> prints no error line.
+    /// </remarks>
+    /// <param name="spelledOption">The whole argument as typed, such as <c>--expand-data</c> or <c>--variable</c>.</param>
+    /// <param name="errorMessage">The error message curl prints first, without its <c>curl: </c>; <see langword="null"/> when there is none.</param>
+    /// <param name="errorsHidden"><see langword="true"/> when <c>-s</c> without <c>-S</c> was read before the refused option.</param>
+    /// <returns>The refusal, exit code <see cref="CurlExitCode.FailedInit"/>.</returns>
+    internal static CommandLineRefusal VariableExpansionFailure(string spelledOption, string? errorMessage, bool errorsHidden) =>
+        new(
+            CurlExitCode.FailedInit,
+            errorMessage is null ? [] : ErrorMessageLines(errorsHidden, errorMessage),
+            spelledOption,
+            "variable expansion failure");
+
+    /// <summary>
+    /// Refuses a <c>--variable</c> whose <c>[start-end]</c> byte range is malformed or runs backwards:
+    /// <c>curl: option &lt;spelled&gt;: syntax error in --variable argument</c> and the try-help line.
+    /// </summary>
+    /// <param name="spelledOption">The whole argument as typed.</param>
+    /// <returns>The refusal, exit code <see cref="CurlExitCode.FailedInit"/>.</returns>
+    internal static CommandLineRefusal VariableSyntaxError(string spelledOption) =>
+        Create(spelledOption, "syntax error in --variable argument");
+
+    /// <summary>
+    /// Refuses a <c>--variable name@file</c> whose file cannot be opened:
+    /// <c>curl: Failed to open &lt;file&gt;: &lt;reason&gt;</c> (hidden when <paramref name="errorsHidden"/>),
+    /// <c>curl: option &lt;spelled&gt;: error encountered when reading a file</c> and the try-help line, with
+    /// exit code <see cref="CurlExitCode.ReadError"/> (26).
+    /// </summary>
+    /// <param name="spelledOption">The whole argument as typed.</param>
+    /// <param name="file">The file name after <c>@</c>, possibly empty.</param>
+    /// <param name="reason">The C library's reason, such as <c>No such file or directory</c>.</param>
+    /// <param name="errorsHidden"><see langword="true"/> when <c>-s</c> without <c>-S</c> was read before the refused option.</param>
+    /// <returns>The refusal.</returns>
+    internal static CommandLineRefusal VariableFileUnreadable(string spelledOption, string file, string reason, bool errorsHidden) =>
+        new(
+            CurlExitCode.ReadError,
+            ErrorMessageLines(errorsHidden, $"Failed to open {file}: {reason}"),
+            spelledOption,
+            ReadErrorReason);
+
     private static string CannotReadConfigMessage(string file) => $"cannot read config from '{file}'";
 
     /// <summary>An error message's lines as curl prints them, or none when errors are hidden.</summary>

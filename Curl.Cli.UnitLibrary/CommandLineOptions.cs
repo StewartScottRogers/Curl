@@ -24,6 +24,7 @@ public sealed class CommandLineOptions
     private readonly List<CommandLineCookie> cookies = [];
     private readonly List<string> warningLines = [];
     private readonly List<FormPartSpecification> formParts = [];
+    private readonly Dictionary<string, byte[]> variables = new(StringComparer.Ordinal);
     private readonly Stack<FormPartSpecification> openMultiparts = new();
     private string? userAwaitingPassword;
     private string? proxyUserAwaitingPassword;
@@ -810,6 +811,28 @@ public sealed class CommandLineOptions
     /// </summary>
     /// <param name="lines">The lines, without line terminators.</param>
     internal void AddErrorLines(IReadOnlyList<string> lines) => warningLines.AddRange(lines);
+
+    /// <summary>
+    /// Sets the <c>--variable</c> <paramref name="name"/> to <paramref name="content"/>, replacing any earlier
+    /// content, and adds curl 8.21.0's <c>Note: Overwriting variable '&lt;name&gt;'</c> line when it had some
+    /// and <c>-v</c>, <c>--trace</c> or <c>--trace-ascii</c> is in effect, <c>-s</c> or not (measured 2026-09-27).
+    /// </summary>
+    /// <param name="name">The variable's name: letters, digits and underscores, case-sensitive.</param>
+    /// <param name="content">The variable's bytes.</param>
+    internal void SetVariable(string name, byte[] content)
+    {
+        if (variables.ContainsKey(name) && Trace != TraceKind.None)
+        {
+            AddErrorLines(WrappedMessage.Lines("Note: ", $"Overwriting variable '{name}'"));
+        }
+
+        variables[name] = content;
+    }
+
+    /// <summary>Looks up the bytes of the <c>--variable</c> <paramref name="name"/>.</summary>
+    /// <param name="name">The variable's name, case-sensitive.</param>
+    /// <returns>The variable's bytes; <see langword="null"/> when no variable has that name.</returns>
+    internal byte[]? FindVariable(string name) => variables.GetValueOrDefault(name);
 
     /// <summary>Appends <paramref name="url"/> to <see cref="Urls"/>, unchanged and unvalidated.</summary>
     /// <param name="url">A positional argument or a <c>--url</c> value.</param>
