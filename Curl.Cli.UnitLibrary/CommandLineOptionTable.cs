@@ -36,7 +36,7 @@ namespace Curl.Cli;
 /// <c>--no-post301</c>, <c>--no-post302</c>, <c>--no-post303</c>, <c>--no-show-headers</c>, <c>--no-include</c>, <c>--no-head</c>,
 /// <c>--no-fail</c>, <c>--no-fail-with-body</c>, <c>--no-fail-early</c>, <c>--no-compressed</c>, <c>--no-raw</c>, <c>--no-tr-encoding</c>,
 /// <c>--no-ignore-content-length</c>, <c>--no-path-as-is</c>, <c>--no-http0.9</c>, <c>--no-basic</c>, <c>--no-digest</c>, <c>--no-ntlm</c>, <c>--no-negotiate</c>, <c>--no-proxytunnel</c>, <c>--no-remote-name</c>,
-/// <c>--no-remote-name-all</c>, <c>--no-remote-header-name</c>, <c>--no-create-dirs</c>, <c>--no-junk-session-cookies</c> and <c>--no-version</c> are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
+/// <c>--no-remote-name-all</c>, <c>--no-remote-header-name</c>, <c>--no-create-dirs</c>, <c>--no-junk-session-cookies</c>, <c>--no-globoff</c> and <c>--no-version</c> are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
 /// silent and <c>--no-silent -s</c> is. <c>--no-silent=x</c> is accepted, its value ignored.
 /// <c>--no-tlsv1.2</c>, <c>--no-tlsv1.3</c>, <c>--no-url</c>, <c>--no-output</c> (even as the last
 /// argument), <c>--no-output=x</c>, <c>--no-data</c>, <c>--no-dump-header</c>, <c>--no-range</c>, <c>--no-time-cond</c>,
@@ -57,6 +57,7 @@ public static class CommandLineOptionTable
     private static readonly CommandLineOption[] RowsInTableOrder =
     [
         CommandLineOption.Text("url", null, (options, url) => options.AddUrl(url)),
+        CommandLineOption.NegatableFlag("globoff", 'g', (options, on) => options.GlobOff = on),
         CommandLineOption.NegatableFlag("silent", 's', (options, on) => options.Silent = on),
         CommandLineOption.NegatableFlag("show-error", 'S', (options, on) => options.ShowError = on),
         CommandLineOption.NegatableFlag("progress-meter", null, (options, on) => options.ProgressMeterOff = !on),

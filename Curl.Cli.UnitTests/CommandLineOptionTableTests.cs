@@ -32,6 +32,7 @@ public sealed class CommandLineOptionTableTests
 
     [TestMethod]
     [DataRow("url", null, true)]
+    [DataRow("globoff", 'g', false)]
     [DataRow("silent", 's', false)]
     [DataRow("show-error", 'S', false)]
     [DataRow("progress-meter", null, false)]

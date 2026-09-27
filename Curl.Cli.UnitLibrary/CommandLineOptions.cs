@@ -33,6 +33,13 @@ public sealed class CommandLineOptions
     public IReadOnlyList<string> Urls => urls;
 
     /// <summary>
+    /// <see langword="true"/> when <c>-g</c> / <c>--globoff</c> was given and no <c>--no-globoff</c>
+    /// came after it: take each URL as written, with <c>UrlGlob.Unglobbed</c>, instead of expanding
+    /// <c>{a,b}</c> sets and <c>[1-3]</c> ranges with <c>UrlGlob.TryParse</c>.
+    /// </summary>
+    public bool GlobOff { get; internal set; }
+
+    /// <summary>
     /// <see langword="true"/> when <c>-V</c> / <c>--version</c> was given on the command line. Parsing
     /// stops there, as curl 8.21.0's does, so every option after it is unread; the console prints
     /// <see cref="CurlVersionText"/>'s lines and exits 0 instead of transferring. A <c>version</c>
