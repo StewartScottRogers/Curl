@@ -89,19 +89,41 @@ public sealed class CurlCommandRunnerTests
         }
     }
 
-    // curl 8.21.0 rejects both with exit 3 and "URL rejected: Bad file:// URL" (measured
-    // 2026-09-27); Curl prints its generic exit 3 line for them (ADR-0010).
+    // curl 8.21.0 rejects each with exit 3 and "URL rejected: Bad file:// URL" (measured
+    // 2026-09-27).
     [TestMethod]
     [DataRow("file://user:pass@localhost/x")]
     [DataRow("file://ab:/x")]
-    public async Task RunAsync_FileUrlCurlRejects_Returns3WithoutOpeningAnything(string url)
+    [DataRow("file://example.com/x")]
+    public async Task RunAsync_FileUrlCurlRejects_PrintsBadFileUrlAndReturns3WithoutOpeningAnything(string url)
     {
         InMemoryFileSystem files = new();
 
         int exitCode = await RunAsync(["-sS", url], new FileProtocolHandler(files));
 
         Assert.AreEqual(3, exitCode);
+        Assert.AreEqual("curl: (3) URL rejected: Bad file:// URL" + NewLine, StandardErrorText);
         Assert.IsEmpty(files.ReadPaths);
+    }
+
+    // Each line is curl 8.21.0's for the same URL, measured with /mingw64/bin/curl -gsS on
+    // 2026-09-27 (BL-324).
+    [TestMethod]
+    [DataRow("http:////h/", "Unsupported number of slashes following scheme")]
+    [DataRow("http://u@/", "No host part in the URL")]
+    [DataRow("http://h:99999/", "Port number was not a decimal number between 0 and 65535")]
+    [DataRow("http://[::g]/", "Bad IPv6 address")]
+    [DataRow("http://a!b/", "Bad hostname")]
+    [DataRow("http://h/a b", "Malformed input to a URL function")]
+    public async Task RunAsync_UrlCurlRejects_PrintsCurlsReasonAndReturns3(string url, string reason)
+    {
+        RecordingProtocolHandler http = RecordingProtocolHandler.WritingPath("http");
+
+        int exitCode = await RunAsync(["-gsS", url], http);
+
+        Assert.AreEqual(3, exitCode);
+        Assert.AreEqual("curl: (3) URL rejected: " + reason + NewLine, StandardErrorText);
+        Assert.IsEmpty(http.Contexts);
     }
 
     [TestMethod]

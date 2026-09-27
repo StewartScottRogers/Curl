@@ -70,7 +70,7 @@ public sealed class CurlCommandRunnerTransferWarningTests
 
         Assert.AreEqual(3, exitCode);
         Assert.AreEqual(
-            ExpectedWarnings + "curl: (3) " + CurlCommandRunner.MalformedUrlMessage + Environment.NewLine,
+            ExpectedWarnings + "curl: (3) URL rejected: Malformed input to a URL function" + Environment.NewLine,
             StandardErrorText);
     }
 

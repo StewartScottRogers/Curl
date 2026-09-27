@@ -214,10 +214,10 @@ internal sealed class CurlCommandRunner(
     Func<string, string?>? readEnvironmentVariable = null)
 {
     /// <summary>
-    /// curl 8.21.0's message for a URL that cannot be parsed at all, measured on
-    /// <c>dict://exa mple.com/d:x</c>.
+    /// What curl 8.21.0 prints before its URL parser's reason when it rejects a transfer
+    /// URL, as in <c>URL rejected: Bad file:// URL</c>.
     /// </summary>
-    internal const string MalformedUrlMessage = "URL rejected: Malformed input to a URL function";
+    internal const string UrlRejectedPrefix = "URL rejected: ";
 
     /// <summary>
     /// The line curl 8.21.0's own write callback prints, with no <c>(23)</c>, when standard
@@ -1206,9 +1206,13 @@ internal sealed class CurlCommandRunner(
     {
         RedirectFollower follower = new(dispatch.Dispatcher);
 
-        if (!CurlUrl.TryParse(QueryUrl.Append(url, options), options.PathAsIs, out CurlUrl? transferUrl))
+        if (!CurlUrl.TryParse(
+            QueryUrl.Append(url, options),
+            options.PathAsIs,
+            out CurlUrl? transferUrl,
+            out CurlUrlRejection rejection))
         {
-            return TransferResult.Failure(CurlExitCode.UrlMalformat, MalformedUrlMessage);
+            return TransferResult.Failure(CurlExitCode.UrlMalformat, UrlRejectedPrefix + rejection.ToCurlMessage());
         }
 
         if (!TryParseRange(options.Range, out ByteRange? range))
