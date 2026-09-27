@@ -272,8 +272,9 @@ public sealed class SslStreamTlsProvider : ITlsProvider
         return (new CipherSuitesPolicy(suites), null);
     }
 
-    // The Schannel build reads the key from the PKCS#12 file and ignores --key; only the
-    // Windows build of curl keeps a drive letter's colon in the --cert value.
+    // The Schannel build reads the key from the PKCS#12 file and ignores --key and
+    // --key-type; only the Windows build of curl keeps a drive letter's colon in the --cert
+    // value. --pass, when given, is the passphrase in place of the one in --cert.
     private (X509Certificate2? Certificate, ConnectResult? Failure) LoadClientCertificate()
     {
         if (_options.ClientCertificate is null)
@@ -281,10 +282,16 @@ public sealed class SslStreamTlsProvider : ITlsProvider
             return (null, null);
         }
 
-        var (path, passphrase) = ClientCertificateArgument.Split(_options.ClientCertificate, _matchesSchannelBuild);
+        var (path, splitPassphrase) = ClientCertificateArgument.Split(_options.ClientCertificate, _matchesSchannelBuild);
+        var passphrase = _options.Passphrase ?? splitPassphrase;
         return _matchesSchannelBuild
-            ? ClientCertificateLoader.LoadAsSchannelBuild(path, passphrase)
-            : ClientCertificateLoader.LoadAsOpenSslBuild(path, passphrase, _options.PrivateKey);
+            ? ClientCertificateLoader.LoadAsSchannelBuild(path, passphrase, _options.CertificateType)
+            : ClientCertificateLoader.LoadAsOpenSslBuild(
+                path,
+                passphrase,
+                _options.PrivateKey,
+                _options.CertificateType,
+                _options.PrivateKeyType);
     }
 
     // Offline: the chain is built from the certificate alone, without fetching issuers.

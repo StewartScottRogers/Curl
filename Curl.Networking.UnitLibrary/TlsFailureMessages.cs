@@ -216,9 +216,101 @@ internal static class TlsFailureMessages
     /// passphrase does not open it.
     /// </summary>
     /// <param name="privateKeyFile">The <c>--key</c> file, or the certificate file without one.</param>
+    /// <param name="privateKeyType">The <c>--key-type</c> value as given, or <c>PEM</c> without one.</param>
     /// <returns>The message curl prints.</returns>
-    public static string OpenSslPrivateKeyUnusable(string privateKeyFile) =>
-        $"unable to set private key file: '{privateKeyFile}' type PEM";
+    public static string OpenSslPrivateKeyUnusable(string privateKeyFile, string privateKeyType) =>
+        $"unable to set private key file: '{privateKeyFile}' type {privateKeyType}";
+
+    /// <summary>
+    /// The Schannel build's message for exit 58 when <c>--cert-type</c> names any type but
+    /// <c>P12</c>.
+    /// </summary>
+    /// <param name="clientCertificateFile">The certificate file, as split from <c>--cert</c>.</param>
+    /// <returns>The message curl prints.</returns>
+    public static string SchannelClientCertificateTypeIncompatible(string clientCertificateFile) =>
+        $"schannel: certificate format compatibility error for {clientCertificateFile}";
+
+    /// <summary>OpenSSL's error string for a path that is a directory.</summary>
+    public const string OpenSslIsADirectory = "error:80000015:system library::Is a directory";
+
+    /// <summary>OpenSSL's error string for a file it may not read.</summary>
+    public const string OpenSslPermissionDenied = "error:8000000D:system library::Permission denied";
+
+    /// <summary>OpenSSL's error string for an empty DER certificate file.</summary>
+    public const string OpenSslAsn1Lib = "error:0A08000D:SSL routines::ASN1 lib";
+
+    /// <summary>
+    /// OpenSSL's error string for a DER file whose outer length runs past its end.
+    /// </summary>
+    public const string OpenSslNotEnoughData = "error:0680008E:asn1 encoding routines::not enough data";
+
+    /// <summary>
+    /// OpenSSL's error string for a DER file that is whole but is not a certificate.
+    /// </summary>
+    public const string OpenSslWrongTag = "error:068000A8:asn1 encoding routines::wrong tag";
+
+    /// <summary>
+    /// The OpenSSL build's message for exit 58: the <c>--cert</c> file did not load as a DER
+    /// certificate (<c>--cert-type DER</c>).
+    /// </summary>
+    /// <param name="clientCertificateFile">The certificate file, as split from <c>--cert</c>.</param>
+    /// <param name="openSslError">The OpenSSL error string for why it did not load.</param>
+    /// <returns>The message curl prints.</returns>
+    public static string OpenSslDerClientCertificateNotLoaded(string clientCertificateFile, string openSslError) =>
+        $"could not load ASN1 client certificate from {clientCertificateFile}, OpenSSL error {openSslError}, (no key found, wrong passphrase, or wrong file format?)";
+
+    /// <summary>
+    /// The OpenSSL build's message for exit 58 when the <c>--cert-type P12</c> file cannot be
+    /// opened.
+    /// </summary>
+    /// <param name="clientCertificateFile">The certificate file, as split from <c>--cert</c>.</param>
+    /// <returns>The message curl prints.</returns>
+    public static string OpenSslPkcs12NotOpened(string clientCertificateFile) =>
+        $"could not open PKCS12 file '{clientCertificateFile}'";
+
+    /// <summary>
+    /// The OpenSSL build's message for exit 58 when the <c>--cert-type P12</c> file is a
+    /// directory, is empty or is not PKCS#12.
+    /// </summary>
+    /// <param name="clientCertificateFile">The certificate file, as split from <c>--cert</c>.</param>
+    /// <returns>The message curl prints.</returns>
+    public static string OpenSslPkcs12NotRead(string clientCertificateFile) =>
+        $"error reading PKCS12 file '{clientCertificateFile}'";
+
+    /// <summary>
+    /// The OpenSSL build's message for exit 58 when the passphrase, or its absence, does not
+    /// open the <c>--cert-type P12</c> file.
+    /// </summary>
+    public const string OpenSslPkcs12PassphraseBad =
+        "could not parse PKCS12 file, check password, OpenSSL error error:11800071:PKCS12 routines::mac verify failure";
+
+    /// <summary>
+    /// The OpenSSL build's message for exit 43: <c>--cert-type</c> names no type it knows.
+    /// </summary>
+    /// <param name="certificateType">The <c>--cert-type</c> value as given.</param>
+    /// <returns>The message curl prints.</returns>
+    public static string OpenSslClientCertificateTypeUnsupported(string certificateType) =>
+        $"not supported file type '{certificateType}' for certificate";
+
+    /// <summary>The OpenSSL build's message for exit 58: <c>--cert-type ENG</c>.</summary>
+    public const string OpenSslClientCertificateEngineNotSet = "crypto engine not set, cannot load certificate";
+
+    /// <summary>The OpenSSL build's message for exit 58: <c>--cert-type PROV</c>.</summary>
+    public const string OpenSslClientCertificateProviderNotSet = "crypto provider not set, cannot load certificate";
+
+    /// <summary>
+    /// The OpenSSL build's message for exit 43: <c>--key-type</c> names no type it knows.
+    /// </summary>
+    public const string OpenSslPrivateKeyTypeUnsupported = "not supported file type for private key";
+
+    /// <summary>The OpenSSL build's message for exit 58: <c>--key-type ENG</c>.</summary>
+    public const string OpenSslPrivateKeyEngineNotSet = "crypto engine not set, cannot load private key";
+
+    /// <summary>The OpenSSL build's message for exit 58: <c>--key-type PROV</c>.</summary>
+    public const string OpenSslPrivateKeyProviderNotSet = "crypto provider not set, cannot load private key";
+
+    /// <summary>The OpenSSL build's message for exit 58: <c>--key-type P12</c>.</summary>
+    public const string OpenSslPrivateKeyTypePkcs12Refused = "file type P12 for private key not supported";
 
     /// <summary>
     /// The Schannel build's message for exit 59: it refuses every <c>--ciphers</c> value
