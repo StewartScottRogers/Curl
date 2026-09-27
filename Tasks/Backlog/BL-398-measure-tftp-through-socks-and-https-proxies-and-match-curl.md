@@ -1,5 +1,5 @@
 ---
-id: BL-396
+id: BL-398
 title: Measure tftp:// through SOCKS and HTTPS proxies and match curl
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-396 — Measure tftp:// through SOCKS and HTTPS proxies and match curl
+# BL-398 — Measure tftp:// through SOCKS and HTTPS proxies and match curl
 
 ## Goal
 

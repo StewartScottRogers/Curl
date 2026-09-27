@@ -1,5 +1,5 @@
 ---
-id: BL-395
+id: BL-397
 title: Give the TFTP handler the proxy connector in Curl.Console so tftp:// sends its MASQUE request
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-395 — Give the TFTP handler the proxy connector in Curl.Console so tftp:// sends its MASQUE request
+# BL-397 — Give the TFTP handler the proxy connector in Curl.Console so tftp:// sends its MASQUE request
 
 ## Goal
 
