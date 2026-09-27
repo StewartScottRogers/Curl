@@ -52,10 +52,10 @@ the way sws does, so HTTP authentication and proxy cases get the reply upstream 
   always part 0 before authorization; and `req->open = persistent` at the end of
   `sws_send_doc` overrides the close for an HTTP/1.0 `CONNECT` and for `Connection: close`,
   so neither closes the connection.
-- Decision recorded in ADR-0043 (decided by Claude under Stewart's delegation): the emulation
+- Decision recorded in ADR-0047 (decided by Claude under Stewart's delegation): the emulation
   serves one case, so every request is taken to name it; the Negotiate counter and the bounce
   live in the selector, shared by the connector's connections.
-- Added `Documentation/Planning/Decisions` to `touches` for ADR-0043 and its README row; no
+- Added `Documentation/Planning/Decisions` to `touches` for ADR-0047 and its README row; no
   task in Doing names it.
 - Code review (code-reviewer agent) found that sws's header loop returns before the
   authorization rules for a `Transfer-Encoding: chunked` request and at an unreadable

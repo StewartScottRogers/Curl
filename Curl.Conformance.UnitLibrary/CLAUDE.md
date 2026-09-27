@@ -53,7 +53,7 @@ has been quiet for one second, then closes. `delay: N` alone is listed in
 `UnsupportedServerCommands`, so a case using it can be skipped with a reason: sws applies it
 only when it accepts a connection while another's request is part-read, which needs its
 single-threaded interleaving of connections, not modelled here, and no case at `curl-8_21_0`
-uses it. `SwsHttpReplySelector` then moves the part number as sws does (ADR-0043): the first
+uses it. `SwsHttpReplySelector` then moves the part number as sws does (ADR-0047): the first
 of `Authorization: Negotiate` (a counter from the first such request's part, plus one each
 time), `Digest` (+1000), NTLM type 3 (+1002), NTLM type 1 (+1001) and, from part 1000 up,
 `Basic` (+1) found anywhere in the request applies, except to a chunked request or one with an
