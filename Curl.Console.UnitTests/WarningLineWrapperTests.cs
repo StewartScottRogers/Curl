@@ -24,6 +24,22 @@ public sealed class WarningLineWrapperTests
     }
 
     [TestMethod]
+    public void WrapNoteText_MeasuredConfigFileNoteAtDefault79Columns_IsCurlsTwoLines()
+    {
+        IReadOnlyList<string> lines = WarningLineWrapper.WrapNoteText(
+            @"Read config file from 'C:\Users\Stewart Rogers\AppData\Local\Temp\bl243\.curlrc'",
+            79);
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                @"Note: Read config file from 'C:\Users\Stewart ",
+                @"Note: Rogers\AppData\Local\Temp\bl243\.curlrc'",
+            },
+            lines.ToArray());
+    }
+
+    [TestMethod]
     public void WrapText_MeasuredWarningAtColumns200_IsCurlsOneLine()
     {
         IReadOnlyList<string> lines = WarningLineWrapper.WrapText(MeasuredText, 200);

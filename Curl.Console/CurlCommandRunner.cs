@@ -79,7 +79,25 @@ namespace Curl.Console;
 /// Tells whether a <c>-J</c> name is already taken and creates the <c>--create-dirs</c>
 /// directories; a <see cref="PhysicalOutputPaths" /> when not given.
 /// </param>
+/// <param name="configFileReader">
+/// Reads the default config file (<c>.curlrc</c>), each <c>-K</c> / <c>--config</c> file, and every
+/// file an option names, such as a <c>-d @file</c>; <see cref="DiskDataFileReader.ForProcess" /> when
+/// not given.
+/// </param>
+/// <param name="defaultConfigFileSearch">
+/// Lists where to look for the default config file, read before the command line unless the first
+/// argument starts with <c>-q</c> or is <c>--disable</c>; the composition passes
+/// <see cref="DefaultConfigFileSearch.ForProcess" />. When not given, no default config file is read.
+/// </param>
 /// <remarks>
+/// <para>
+/// The command line is parsed after the default config file, so its options apply first and the
+/// command line's after them; a <c>-K</c> file's options apply where the <c>-K</c> stands, as in
+/// curl 8.21.0 (measured 2026-09-27, BL-243). When a default config file was read and <c>-v</c> or a
+/// <c>--trace</c> option is on, the accepted command line's warning lines are followed by curl's
+/// <c>Note: Read config file from '&lt;path&gt;'</c>, wrapped as a warning is but with its own
+/// prefix, whether or not <c>-s</c> was given, before a <c>-V</c> version or the first transfer.
+/// </para>
 /// <para>
 /// URLs are transferred in command-line order; a failure does not stop the rest, and the
 /// exit code is the last transfer's, as curl's is. The exceptions are <c>--fail-early</c>,
@@ -179,7 +197,9 @@ internal sealed class CurlCommandRunner(
     MultipartFormBodyBuilder? formBodyBuilder = null,
     IWriteOutFileOpener? writeOutFileOpener = null,
     TimeProvider? timeProvider = null,
-    IOutputPaths? outputPaths = null)
+    IOutputPaths? outputPaths = null,
+    IDataFileReader? configFileReader = null,
+    DefaultConfigFileSearch? defaultConfigFileSearch = null)
 {
     /// <summary>
     /// curl 8.21.0's message for a URL that cannot be parsed at all, measured on
@@ -199,6 +219,9 @@ internal sealed class CurlCommandRunner(
     /// for appending, measured on <c>-C 3 -o</c> naming a directory.
     /// </summary>
     internal const string WriteReceivedDataFailedMessage = "Failed writing received data to disk/application";
+
+    /// <summary>The <see cref="DefaultConfigFileSearch" /> used when the runner is given none: it lists no path.</summary>
+    private static readonly DefaultConfigFileSearch NoDefaultConfigFile = new(_ => null, false, null, null);
 
     /// <summary>The <c>-D</c> value that sends the header lines to standard output.</summary>
     private const string StandardOutputHeaderFile = "-";
@@ -292,7 +315,7 @@ internal sealed class CurlCommandRunner(
     /// <returns>The process exit code.</returns>
     internal async Task<int> RunAsync(IReadOnlyList<string> arguments)
     {
-        CommandLineParseResult parsed = CommandLineParser.Parse(arguments);
+        CommandLineParseResult parsed = ParseCommandLine(arguments);
         await WriteErrorLinesAsync(parsed.WarningLines).ConfigureAwait(false);
 
         if (!parsed.IsAccepted)
@@ -301,6 +324,8 @@ internal sealed class CurlCommandRunner(
 
             return (int)parsed.Refusal.ExitCode;
         }
+
+        await WriteDefaultConfigFileNoteAsync(parsed.Options).ConfigureAwait(false);
 
         if (parsed.Options.VersionRequested)
         {
@@ -314,6 +339,21 @@ internal sealed class CurlCommandRunner(
 
         return (int)exitCode;
     }
+
+    /// <summary>
+    /// Parses <paramref name="arguments" /> after the default config file, reading the config files
+    /// with the runner's reader, checking paths on disk and asking the console for a missing
+    /// <c>-u</c> password.
+    /// </summary>
+    /// <param name="arguments">The command-line arguments, without the program name.</param>
+    /// <returns>The parse result.</returns>
+    private CommandLineParseResult ParseCommandLine(IReadOnlyList<string> arguments) =>
+        CommandLineParser.Parse(
+            arguments,
+            Path.Exists,
+            ConsolePasswordPrompt.ForProcessConsole,
+            configFileReader ?? DiskDataFileReader.ForProcess,
+            defaultConfigFileSearch ?? NoDefaultConfigFile);
 
     /// <summary>
     /// Transfers every URL in order and reports each failure.
@@ -1369,16 +1409,41 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
+    /// Writes curl 8.21.0's <c>Note: Read config file from '&lt;path&gt;'</c> for the default config
+    /// file, wrapped at <c>terminalColumns</c>, when one was read and <c>-v</c> or a <c>--trace</c>
+    /// option is on; <c>-s</c> does not hide it (measured 2026-09-27, BL-243).
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <returns>A task that completes when the note, if any, is flushed.</returns>
+    private async Task WriteDefaultConfigFileNoteAsync(CommandLineOptions options)
+    {
+        if (options.DefaultConfigFile is { } path && options.Trace != TraceKind.None)
+        {
+            await WriteErrorPiecesAsync(WarningLineWrapper.WrapNoteText($"Read config file from '{path}'", terminalColumns))
+                .ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
     /// Writes <paramref name="line" /> to standard error as UTF-8, wrapped at
     /// <c>terminalColumns</c> by <see cref="WarningLineWrapper" /> when it is a
     /// <c>Warning: </c> line, each piece followed by <see cref="Environment.NewLine" />.
     /// </summary>
     /// <param name="line">The line, without a terminator.</param>
     /// <returns>A task that completes when the line is flushed.</returns>
-    private async Task WriteErrorLineAsync(string line)
+    private Task WriteErrorLineAsync(string line) =>
+        WriteErrorPiecesAsync(WarningLineWrapper.WrapLine(line, terminalColumns));
+
+    /// <summary>
+    /// Writes <paramref name="pieces" /> to standard error as UTF-8, each followed by
+    /// <see cref="Environment.NewLine" />, in one write.
+    /// </summary>
+    /// <param name="pieces">The lines, already wrapped, without terminators.</param>
+    /// <returns>A task that completes when the lines are flushed.</returns>
+    private async Task WriteErrorPiecesAsync(IReadOnlyList<string> pieces)
     {
         StringBuilder text = new();
-        foreach (string piece in WarningLineWrapper.WrapLine(line, terminalColumns))
+        foreach (string piece in pieces)
         {
             text.Append(piece).Append(Environment.NewLine);
         }

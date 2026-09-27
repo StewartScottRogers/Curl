@@ -111,7 +111,7 @@ internal static class CurlComposition
     /// Whether standard output is a terminal, where the progress meter of a transfer with no
     /// <c>-o</c> is hidden, as curl hides it.
     /// </param>
-    /// <returns>The runner, which writes curl's progress meter.</returns>
+    /// <returns>The runner, which writes curl's progress meter and reads the default config file (<c>.curlrc</c>) where <see cref="DefaultConfigFileSearch.ForProcess" /> finds it.</returns>
     internal static CurlCommandRunner CreateRunner(
         Stream standardOutput,
         Stream standardError,
@@ -128,7 +128,8 @@ internal static class CurlComposition
             TerminalColumns.Resolve(),
             writesProgressMeter: true,
             standardOutputIsTerminal,
-            outputPaths: new PhysicalOutputPaths());
+            outputPaths: new PhysicalOutputPaths(),
+            defaultConfigFileSearch: DefaultConfigFileSearch.ForProcess);
 
     /// <summary>
     /// Creates the runner with the production handler set built around the given

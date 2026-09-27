@@ -14,7 +14,13 @@ given and must never reference a protocol library directly.
 
 `Program.Main` only opens the standard streams, builds the composition and hands the
 arguments to `CurlCommandRunner`, which parses them, runs each URL and prints curl's
-`curl: (N) <message>` lines. `-o` files open on the first write through
+`curl: (N) <message>` lines. The parse reads the default config file first, where
+`DefaultConfigFileSearch.ForProcess` finds it (the composition passes it; a runner given none
+reads no `.curlrc`, which keeps tests off the real home directory), unless the first argument
+starts with `-q` or is `--disable`; `-K` files apply where they stand. Both are read through
+the injected `IDataFileReader`. Under `-v` or a `--trace` option an accepted command line then
+prints `Note: Read config file from '<path>'`, wrapped as a warning is and shown even with
+`-s` (BL-243; the refused-command-line cases are BL-351). `-o` files open on the first write through
 `DeferredOutputFileStream`, which is how curl's exit 23 message comes out right. The
 parser's warning lines are written to standard error before anything else.
 Every `Warning: ` line is wrapped by `WarningLineWrapper` as curl's `warnf` wraps it, at the
