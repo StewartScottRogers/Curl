@@ -8,7 +8,7 @@ depends-on: [BL-215, BL-336]
 touches: [Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Console.UnitTests, Record-CurlExchange.ps1, Documentation/Planning/Decisions/ADR-0050-connections-are-reused-across-requests-and-urls-through-a-pooling-connector.md]
 requirement: none
 created: 2026-09-27
-completed:
+completed: 2026-09-27
 ---
 # BL-360 — Report 'with proxy' when a forward-proxy connection is reused
 
@@ -29,12 +29,12 @@ When a connection to a forward (non-tunnelled) HTTP proxy is reused, `-v` prints
 
 ## Acceptance criteria
 
-- [ ] `ConnectTarget` exposes a forward-proxy marker, defaulting to `false`, with a test in `Curl.Protocol.Abstractions.UnitTests` pinning the default.
-- [ ] Tests in `Curl.Networking.UnitTests` pin `ConnectionReusedEvent.IsProxy` `true` on reuse of a forward-proxy target, and `false` on reuse of a direct target and of a tunnelled target (`ConnectTarget.Proxy` set).
-- [ ] A test in `Curl.Protocol.Http.UnitTests` pins that `HttpProtocolHandler` marks the target as a forward proxy when `-x` names an HTTP proxy without `-p` for an `http://` URL, and does not mark it for a direct request or a tunnelled one.
-- [ ] ADR-0050 records the marker's design and the curl 8.21.0 measurement for the tunnelled twice-URL case.
-- [ ] `dotnet build -warnaserror` is clean for the changed projects; `dotnet test --filter "TestCategory!=Integration"` passes; no new test needs `TestCategory=Integration`.
-- [ ] `Measure-CodeQuality.ps1` reports 100% line and branch coverage for `Curl.Protocol.Abstractions.UnitLibrary`, `Curl.Networking.UnitLibrary` and `Curl.Protocol.Http.UnitLibrary`.
+- [x] `ConnectTarget` exposes a forward-proxy marker, defaulting to `false`, with a test in `Curl.Protocol.Abstractions.UnitTests` pinning the default.
+- [x] Tests in `Curl.Networking.UnitTests` pin `ConnectionReusedEvent.IsProxy` `true` on reuse of a forward-proxy target, and `false` on reuse of a direct target and of a tunnelled target (`ConnectTarget.Proxy` set).
+- [x] A test in `Curl.Protocol.Http.UnitTests` pins that `HttpProtocolHandler` marks the target as a forward proxy when `-x` names an HTTP proxy without `-p` for an `http://` URL, and does not mark it for a direct request or a tunnelled one.
+- [x] ADR-0050 records the marker's design and the curl 8.21.0 measurement for the tunnelled twice-URL case.
+- [x] `dotnet build -warnaserror` is clean for the changed projects; `dotnet test --filter "TestCategory!=Integration"` passes; no new test needs `TestCategory=Integration`.
+- [x] `Measure-CodeQuality.ps1` reports 100% line and branch coverage for `Curl.Protocol.Abstractions.UnitLibrary`, `Curl.Networking.UnitLibrary` and `Curl.Protocol.Http.UnitLibrary`.
 
 ## Notes
 
@@ -65,6 +65,17 @@ When a connection to a forward (non-tunnelled) HTTP proxy is reused, `-v` prints
   BL-244 (in Doing) touches it, so per the lane rules this task waits until BL-244 is done.
   Also added to `touches`: `Record-CurlExchange.ps1` (the measurement needed keep-alive and
   CONNECT) and ADR-0050 (acceptance criterion); no Doing task named either.
+- 2026-09-27, lane 2 (second attempt, after BL-244 was done). The first attempt's stashed
+  work was not reachable from this lane, so the same design was reimplemented from the notes
+  above. The `Record-CurlExchange.ps1` extension was not redone: the measurement above is
+  already recorded, and the ADR says the extension was not kept. Also fixed
+  `CurlCompositionProxyTests.RunAsync_NoProxyOptionNamingTheHost_ConnectsDirectly`, which
+  compared a direct target against the `ForwardProxy` constant only because they used to be
+  equal; it now pins the direct target. Direct and tunnelled targets in
+  `HttpProtocolHandlerTests.cs:77` and `HttpProtocolHandlerTests.Proxy.cs:266` pin the
+  marker's absence by record equality. `Measure-CodeQuality.ps1`: 100/100 line and branch
+  for all three libraries; its one flagged member, `SslStreamTlsProvider.VerifyPeer`
+  (complexity 12), was there already and is untouched.
 
 ## Log
 
@@ -72,3 +83,4 @@ When a connection to a forward (non-tunnelled) HTTP proxy is reused, `-v` prints
 - 2026-09-27: Backlog -> Doing.
 - 2026-09-27: Doing -> Backlog. Needs Curl.Console.UnitTests (7 forward-proxy ConnectTarget expectations), which BL-244 in Doing touches; resume once BL-244 is done (see Notes)
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Done. A reused forward-proxy or tunnelled connection is reported 'with proxy <proxy host>' under -v, as curl 8.21.0 prints it
