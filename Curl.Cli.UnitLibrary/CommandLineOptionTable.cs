@@ -36,7 +36,7 @@ namespace Curl.Cli;
 /// <c>--no-post301</c>, <c>--no-post302</c>, <c>--no-post303</c>, <c>--no-show-headers</c>, <c>--no-include</c>, <c>--no-head</c>,
 /// <c>--no-fail</c>, <c>--no-fail-with-body</c>, <c>--no-fail-early</c>, <c>--no-compressed</c>, <c>--no-raw</c>, <c>--no-tr-encoding</c>,
 /// <c>--no-ignore-content-length</c>, <c>--no-path-as-is</c>, <c>--no-basic</c>, <c>--no-digest</c>, <c>--no-proxytunnel</c>, <c>--no-remote-name</c>,
-/// <c>--no-remote-name-all</c>, <c>--no-remote-header-name</c>, <c>--no-create-dirs</c> and <c>--no-junk-session-cookies</c> are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
+/// <c>--no-remote-name-all</c>, <c>--no-remote-header-name</c>, <c>--no-create-dirs</c>, <c>--no-junk-session-cookies</c> and <c>--no-version</c> are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
 /// silent and <c>--no-silent -s</c> is. <c>--no-silent=x</c> is accepted, its value ignored.
 /// <c>--no-tlsv1.2</c>, <c>--no-tlsv1.3</c>, <c>--no-url</c>, <c>--no-output</c> (even as the last
 /// argument), <c>--no-output=x</c>, <c>--no-data</c>, <c>--no-dump-header</c>, <c>--no-range</c>, <c>--no-time-cond</c>,
@@ -132,6 +132,7 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("fail-with-body", null, SetFailWithBody),
         CommandLineOption.NegatableFlag("fail-early", null, (options, on) => options.FailEarly = on),
         CommandLineOption.Value("config", 'K', ApplyConfigFile),
+        CommandLineOption.NegatableFlag("version", 'V', (options, on) => options.VersionRequested = on),
         CommandLineOption.NegatableFlag("compressed", null, (options, on) => options.Compressed = on),
         CommandLineOption.NegatableFlag("raw", null, (options, on) => options.Raw = on),
         CommandLineOption.NegatableFlag("tr-encoding", null, (options, on) => options.TransferEncoding = on),

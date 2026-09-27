@@ -69,6 +69,15 @@ public sealed class CommandLineParseResult
         return new(options, null, options.WarningLines, warningLinesAfterTransfers);
     }
 
+    /// <summary>
+    /// Creates the result for a command line whose parsing <c>-V</c> / <c>--version</c> ended: accepted,
+    /// with the warning lines met before it and none after the transfers, because there are none.
+    /// </summary>
+    /// <param name="options">The options read up to and including <c>-V</c>.</param>
+    /// <returns>A result whose <see cref="IsAccepted"/> is <see langword="true"/> and whose options ask for the version.</returns>
+    internal static CommandLineParseResult VersionRequested(CommandLineOptions options) =>
+        new(options, null, options.WarningLines, []);
+
     /// <summary>Creates the result for a refused command line.</summary>
     /// <param name="refusal">The first refusal met.</param>
     /// <param name="warningLines">The warning lines met before the refusal.</param>

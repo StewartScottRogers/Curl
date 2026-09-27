@@ -27,6 +27,10 @@ namespace Curl.Cli;
 /// <see cref="CommandLineRefusal.FormAndDataBoth"/>.
 /// A <c>-K</c> / <c>--config</c> file is read through the same reader and its lines applied in
 /// place of the option (see <see cref="ConfigFileApplier"/>).
+/// <c>-V</c> / <c>--version</c> on the command line ends parsing where it stands, even inside a bundle,
+/// with <see cref="CommandLineParseResult.VersionRequested(CommandLineOptions)"/>: the arguments after it
+/// are neither read nor refused, no password is asked for and no URL is needed, as in curl 8.21.0
+/// (<c>curl -V --bogus</c> prints the version; <c>curl --bogus -V</c> is refused).
 /// </summary>
 /// <remarks>
 /// It does not implement <c>.curlrc</c>, <c>--variable</c> or <c>--next</c>, and it
@@ -106,6 +110,11 @@ public static class CommandLineParser
             if (refusal is not null)
             {
                 return CommandLineParseResult.Refused(refusal, options.WarningLines);
+            }
+
+            if (options.VersionRequested)
+            {
+                return CommandLineParseResult.VersionRequested(options);
             }
         }
 
@@ -235,14 +244,23 @@ public static class CommandLineParser
                 return ApplyRestOfBundle(options, option, argument, argument[(letter + 1)..], reader);
             }
 
-            CommandLineRefusal? refusal = option.Apply(options, string.Empty, argument, reader.PathExists, reader.DataFileReader);
-            if (refusal is not null)
+            if (ApplyFlagLetterEndsBundle(options, option, argument, reader, out CommandLineRefusal? refusal))
             {
                 return refusal;
             }
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Applies a flag letter of a bundle and says whether the bundle ends there: on a refusal, or
+    /// after <c>-V</c>, which ends the bundle as it ends the command line (<c>curl -Vo</c> prints the version).
+    /// </summary>
+    private static bool ApplyFlagLetterEndsBundle(CommandLineOptions options, CommandLineOption option, string argument, ArgumentReader reader, out CommandLineRefusal? refusal)
+    {
+        refusal = option.Apply(options, string.Empty, argument, reader.PathExists, reader.DataFileReader);
+        return refusal is not null || options.VersionRequested;
     }
 
     /// <summary>
@@ -276,6 +294,9 @@ public static class CommandLineParser
     {
         ArgumentReader reader = new(parameter is null ? [] : [parameter], pathExists, dataFileReader);
         CommandLineRefusal? refusal = ParseConfigFileOption(options, option, reader);
+
+        // curl 8.21.0 ignores version in a -K file: a file of "version" alone reports no URL.
+        options.VersionRequested = false;
         return refusal is null && !string.IsNullOrEmpty(parameter) && reader.TryTakeNext(out _)
             ? CommandLineRefusal.UnusedConfigFileParameter(option)
             : refusal;

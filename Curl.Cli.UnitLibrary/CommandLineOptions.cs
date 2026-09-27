@@ -32,6 +32,14 @@ public sealed class CommandLineOptions
     /// </summary>
     public IReadOnlyList<string> Urls => urls;
 
+    /// <summary>
+    /// <see langword="true"/> when <c>-V</c> / <c>--version</c> was given on the command line. Parsing
+    /// stops there, as curl 8.21.0's does, so every option after it is unread; the console prints
+    /// <see cref="CurlVersionText"/>'s lines and exits 0 instead of transferring. A <c>version</c>
+    /// line in a <c>-K</c> file does not set it: curl ignores it there.
+    /// </summary>
+    public bool VersionRequested { get; internal set; }
+
     /// <summary><see langword="true"/> when <c>-s</c> / <c>--silent</c> was given and no <c>--no-silent</c> came after it.</summary>
     public bool Silent { get; internal set; }
 
