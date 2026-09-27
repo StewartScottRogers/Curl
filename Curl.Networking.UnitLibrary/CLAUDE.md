@@ -24,7 +24,10 @@ Schannel build ignores it and reports the two warning lines in `SslStreamTlsProv
 for the console to print. With `--cert` (`TlsClientOptions.ClientCertificate`, split into
 file and passphrase by `ClientCertificateArgument` as curl splits it) it presents a client
 certificate that `ClientCertificateLoader` loads: PKCS#12 in the Schannel build, PEM with
-`--key` (`TlsClientOptions.PrivateKey`) in the OpenSSL build. A certificate that does not
+`--key` (`TlsClientOptions.PrivateKey`) in the OpenSSL build. Per ADR-0066 the Schannel build
+first reads the value as a store path (`CurrentUser\MY\<thumbprint>`, parsed by
+`ClientCertificateStorePath`) and finds the certificate in the store `IClientCertificateStore`
+opens (`SystemClientCertificateStore`, through `X509Store`, in production; a fake in tests). A certificate that does not
 load is exit 58; in the OpenSSL build a key that does not load is exit 43, as curl reports
 it. `--ciphers` and `--tls13-ciphers` (`TlsClientOptions.Ciphers`, `Tls13Ciphers`) follow
 ADR-0011: the Schannel build refuses `--ciphers` with exit 59 and ignores `--tls13-ciphers`;

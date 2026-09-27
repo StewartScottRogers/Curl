@@ -219,6 +219,28 @@ internal static class TlsFailureMessages
         $"schannel: Failed to get certificate location or file for {clientCertificateFile}";
 
     /// <summary>
+    /// The Schannel build's message for exit 58 when the store a <c>--cert</c> store path
+    /// names does not open, measured 2026-09-27 for <c>CurrentUser\NOSUCHSTORE\…</c>.
+    /// </summary>
+    /// <param name="storeLocationFlag">The location's <c>CERT_SYSTEM_STORE_*</c> flag, printed in lowercase hex.</param>
+    /// <param name="storeName">The store name as written.</param>
+    /// <returns>The message curl prints.</returns>
+    public static string SchannelCertificateStoreNotOpened(int storeLocationFlag, string storeName) =>
+        $"schannel: Failed to open cert store {storeLocationFlag:x} {storeName}, last error is 0x00000002";
+
+    /// <summary>
+    /// The Schannel build's message for exit 58 when no certificate in the store has the
+    /// <c>--cert</c> store path's thumbprint, measured 2026-09-27.
+    /// </summary>
+    public const string SchannelClientCertificateNotInStore = "schannel: client cert not found in cert store";
+
+    /// <summary>
+    /// curl's own text for exit 58, printed when the failure has no message of its own, as
+    /// for a <c>--cert</c> store path whose thumbprint is not hex (measured 2026-09-27).
+    /// </summary>
+    public const string SslCertProblem = "Problem with the local SSL certificate";
+
+    /// <summary>
     /// The Schannel build's message for exit 58 when the <c>--cert</c> file is empty.
     /// </summary>
     /// <param name="clientCertificateFile">The certificate file, as split from <c>--cert</c>.</param>

@@ -41,6 +41,8 @@ public sealed class SslStreamTlsProvider : ITlsProvider
 
     private readonly TimeProvider _timeProvider;
 
+    private readonly IClientCertificateStore _certificateStore;
+
     /// <summary>
     /// Creates the provider for the curl build this platform usually runs: Schannel on
     /// Windows, OpenSSL elsewhere, timing its handshakes on <see cref="TimeProvider.System" />.
@@ -89,9 +91,30 @@ public sealed class SslStreamTlsProvider : ITlsProvider
     /// </param>
     /// <param name="timeProvider">Takes the timestamps in a successful handshake's timings.</param>
     internal SslStreamTlsProvider(TlsClientOptions options, bool matchesSchannelBuild, TimeProvider timeProvider)
+        : this(options, matchesSchannelBuild, timeProvider, new SystemClientCertificateStore())
+    {
+    }
+
+    /// <summary>
+    /// Creates the provider for a named curl build with the clock its handshakes are timed on
+    /// and the certificate stores a Schannel <c>--cert</c> store path is looked up in.
+    /// </summary>
+    /// <param name="options">The settings applied to every handshake.</param>
+    /// <param name="matchesSchannelBuild">
+    /// <see langword="true" /> to behave like curl's Schannel build, <see langword="false" />
+    /// like its OpenSSL build.
+    /// </param>
+    /// <param name="timeProvider">Takes the timestamps in a successful handshake's timings.</param>
+    /// <param name="certificateStore">Opens the store a Schannel <c>--cert</c> store path names.</param>
+    internal SslStreamTlsProvider(
+        TlsClientOptions options,
+        bool matchesSchannelBuild,
+        TimeProvider timeProvider,
+        IClientCertificateStore certificateStore)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+        _certificateStore = certificateStore ?? throw new ArgumentNullException(nameof(certificateStore));
         _matchesSchannelBuild = matchesSchannelBuild;
         Warnings = matchesSchannelBuild && options.CaCertificateDirectory is not null
             ? SchannelCaCertificateDirectoryWarnings
@@ -311,9 +334,10 @@ public sealed class SslStreamTlsProvider : ITlsProvider
         return (new CipherSuitesPolicy(suites), null);
     }
 
-    // The Schannel build reads the key from the PKCS#12 file and ignores --key and
-    // --key-type; only the Windows build of curl keeps a drive letter's colon in the --cert
-    // value. --pass, when given, is the passphrase in place of the one in --cert.
+    // The Schannel build reads the certificate and its key from a Windows certificate store
+    // or a PKCS#12 file and ignores --key and --key-type; only the Windows build of curl
+    // keeps a drive letter's colon in the --cert value. --pass, when given, is the
+    // passphrase in place of the one in --cert.
     private (X509Certificate2? Certificate, ConnectResult? Failure) LoadClientCertificate()
     {
         if (_options.ClientCertificate is null)
@@ -324,7 +348,7 @@ public sealed class SslStreamTlsProvider : ITlsProvider
         var (path, splitPassphrase) = ClientCertificateArgument.Split(_options.ClientCertificate, _matchesSchannelBuild);
         var passphrase = _options.Passphrase ?? splitPassphrase;
         return _matchesSchannelBuild
-            ? ClientCertificateLoader.LoadAsSchannelBuild(path, passphrase, _options.CertificateType)
+            ? ClientCertificateLoader.LoadAsSchannelBuild(path, passphrase, _options.CertificateType, _certificateStore)
             : ClientCertificateLoader.LoadAsOpenSslBuild(
                 path,
                 passphrase,
