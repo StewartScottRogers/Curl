@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-251 — Honour -e ';auto' as --referer's autoreferer suffix
 
@@ -31,18 +31,35 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Cli.UnitTests` parses `-e "http://r.example/x;auto"` and asserts `Referer == "http://r.example/x"` and `AutoReferer == true`.
-- [ ] A test parses `-e ";auto"` and asserts `Referer` is `null` and `AutoReferer == true`.
-- [ ] A test parses `--referer ";auto"` (long form) with the same result as the short form.
-- [ ] Existing `-e` tests still pass unchanged: a plain `-e http://r.example/x` yields that `Referer` and `AutoReferer == false`; `-e ""` still yields an empty `Referer` and `AutoReferer == false`.
-- [ ] `CommandLineOptions.AutoReferer` has an XML doc comment saying it makes a followed redirect send the previous URL as `Referer`, per curl 8.21.0.
-- [ ] `dotnet build Curl.Cli.UnitLibrary -warnaserror` is clean.
-- [ ] `dotnet test --filter "TestCategory!=Integration"` passes; no new test needs `TestCategory=Integration`.
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1` reports 100% line and branch coverage for `Curl.Cli.UnitLibrary`, and no method above complexity 10 or CRAP 30.
+- [x] A test in `Curl.Cli.UnitTests` parses `-e "http://r.example/x;auto"` and asserts `Referer == "http://r.example/x"` and `AutoReferer == true`.
+- [x] A test parses `-e ";auto"` and asserts `Referer` is `null` and `AutoReferer == true`.
+- [x] A test parses `--referer ";auto"` (long form) with the same result as the short form.
+- [x] Existing `-e` tests still pass unchanged: a plain `-e http://r.example/x` yields that `Referer` and `AutoReferer == false`; `-e ""` still yields an empty `Referer` and `AutoReferer == false`.
+- [x] `CommandLineOptions.AutoReferer` has an XML doc comment saying it makes a followed redirect send the previous URL as `Referer`, per curl 8.21.0.
+- [x] `dotnet build Curl.Cli.UnitLibrary -warnaserror` is clean.
+- [x] `dotnet test --filter "TestCategory!=Integration"` passes; no new test needs `TestCategory=Integration`.
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1` reports 100% line and branch coverage for `Curl.Cli.UnitLibrary`, and no method above complexity 10 or CRAP 30.
 
 ## Notes
+
+- Delivered directly rather than through the full `/feature` agent chain: the change is one
+  setter and one property in `Curl.Cli.UnitLibrary`, fully specified by this task.
+- `CommandLineOptionTable.SetReferer` matches `;auto` only as an ordinal, case-sensitive
+  suffix (curl 8.21.0's `tool_getparam.c` compares the last five bytes). `;Auto` and
+  `;auto/x` are kept verbatim with `AutoReferer` off; tests pin both.
+- Each `-e` sets `AutoReferer` afresh, so a later `-e` without the suffix turns it off, as
+  curl's `config->autoreferer = FALSE` branch does. Pinned by a test.
+- `-e ""` keeps an empty `Referer` as the task's criteria require (curl frees it; both send
+  no header, since an empty referer is not sent downstream).
+- The old `Parse_Referer_KeepsTheValueAsGiven` rows for `;auto` asserted the verbatim value
+  this task replaces; they are now `Parse_Referer_KeepsTheValueAsGivenWithoutAutoReferer`
+  (plain, long form, empty, `;Auto`, `;auto/x`) plus the new `;auto` tests.
+- Measure-CodeQuality: `Curl.Cli.UnitLibrary` 100/100, worst CRAP 10. The script exits
+  non-zero for pre-existing gaps in `Curl.Networking` and `Curl.Protocol.File`, outside
+  this task's `touches`.
 
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. -e 'URL;auto' and -e ';auto' strip the suffix and set CommandLineOptions.AutoReferer
