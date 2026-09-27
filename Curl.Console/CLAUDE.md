@@ -150,8 +150,18 @@ handler reported any bytes, three done lines after a success or one more update 
 A handler that reports no bytes, as `file://`'s does not, leaves only the zero line - every byte
 curl writes for a `file://` transfer. The meter is written after the transfer, so its bytes are
 curl's but a terminal does not see it move (BL-131 Notes). It is not written under `-s`,
-`--no-progress-meter` or `-#`, nor for a body on standard output when that is a terminal. The
-bar form is BL-132.
+`--no-progress-meter` or `-#`, nor for a body on standard output when that is a terminal.
+
+Under `-#` (and not `-s`, `--no-progress-meter` or a body on a terminal) the recorder passes
+every report on to a `ProgressBarRecorder` instead, which draws curl 8.21.0's bar as
+`tool_progress_cb` does: `\r`, `#` padded to the width less seven, and ` %5.1f%`, drawn when
+the position moves, at most every 100 ms below 100%, with `fly`'s `-=O=-` animation while
+the size is unknown. The width is `terminalColumns`, clamped to 20..400; the `-C` offset
+counts towards the position and the total. A successful transfer whose handler reported no
+bytes gets one last call with its byte count, which is how a `file://` transfer ends on a
+full bar. The bar is written after the transfer. Its newline, written when the handler
+reported the transfer started, comes after the failure lines and before the `-w` output, as
+in curl. No `** Resuming` line is written under `-#` (ADR-0082, BL-132 Notes).
 
 With `-w`, each transfer's template is rendered by `Curl.Output`'s `WriteOutTemplateRenderer`
 after its failure lines, after a failure as after a success (a `-D` or resumed `-o` file that

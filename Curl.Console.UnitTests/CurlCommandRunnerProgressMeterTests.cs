@@ -92,11 +92,13 @@ public sealed class CurlCommandRunnerProgressMeterTests
     }
 
     [TestMethod]
-    public async Task RunAsync_ProgressBar_WritesNoMeter()
+    public async Task RunAsync_ProgressBar_WritesNoMeterLines()
     {
-        await RunAsync(["-#", "-o", "o1", SourceUrl]);
+        outputFiles.ExistingContent["o2"] = Encoding.ASCII.GetBytes("01234");
 
-        Assert.AreEqual(string.Empty, StandardErrorText);
+        await RunAsync(["-#", "-C", "5", "-o", "o2", SourceUrl]);
+
+        StringAssert.DoesNotMatch(StandardErrorText, new System.Text.RegularExpressions.Regex("% Total|Dload|Resuming"));
     }
 
     [TestMethod]

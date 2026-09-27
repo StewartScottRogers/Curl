@@ -161,4 +161,22 @@ public sealed class TransferProgressRecorderTests
 
         Assert.AreEqual(" 50  7.99E  50  3.99E   0      1  3.99E      1   00:02   00:01   00:01  4.00E", line);
     }
+
+    [TestMethod]
+    public void Reports_WithAProgressBar_PassEachReportOnToTheBar()
+    {
+        ProgressBarRecorder bar = new(clock, 0, 79);
+        TransferProgressRecorder recorder = new(clock, bar);
+
+        recorder.ReportTransferStarted();
+        clock.Advance(100);
+        recorder.ReportUploaded(5, 10);
+        clock.Advance(100);
+        recorder.ReportDownloaded(10, 10);
+
+        Assert.IsTrue(recorder.HasTransferStarted);
+        Assert.AreEqual(
+            "\r" + new string('#', 36).PadRight(72) + "  50.0%" + "\r" + new string('#', 54).PadRight(72) + "  75.0%",
+            bar.Drawn);
+    }
 }

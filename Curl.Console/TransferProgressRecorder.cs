@@ -9,6 +9,8 @@ namespace Curl.Console;
 /// failed transfer still prints the progress meter (task BL-130), and draws the meter's
 /// status lines from the byte reports on the clock it is given, when and
 /// as curl 8.21.0's <c>progress_calc</c> and <c>progress_meter</c> draw them (task BL-131).
+/// Under <c>-#</c> it also passes every report on to the transfer's
+/// <see cref="ProgressBarRecorder" /> (task BL-132).
 /// </summary>
 /// <remarks>
 /// The first draw is made when the recorder is made, with every counter zero, so it is
@@ -34,6 +36,8 @@ internal sealed class TransferProgressRecorder : ITransferProgress
     private const int DoneDrawCount = 3;
 
     private readonly TimeProvider timeProvider;
+
+    private readonly ProgressBarRecorder? progressBar;
 
     private readonly long start;
 
@@ -68,9 +72,11 @@ internal sealed class TransferProgressRecorder : ITransferProgress
     /// transfer starts now, and the first status line, every counter zero, is drawn.
     /// </summary>
     /// <param name="timeProvider">The clock every draw reads.</param>
-    internal TransferProgressRecorder(TimeProvider timeProvider)
+    /// <param name="progressBar">The <c>-#</c> bar every report is passed on to, or <see langword="null" /> without one.</param>
+    internal TransferProgressRecorder(TimeProvider timeProvider, ProgressBarRecorder? progressBar = null)
     {
         this.timeProvider = timeProvider;
+        this.progressBar = progressBar;
         start = timeProvider.GetTimestamp();
         Draw(done: false);
     }
@@ -87,7 +93,11 @@ internal sealed class TransferProgressRecorder : ITransferProgress
     internal string StatusLines => statusLines.ToString();
 
     /// <inheritdoc />
-    public void ReportTransferStarted() => HasTransferStarted = true;
+    public void ReportTransferStarted()
+    {
+        HasTransferStarted = true;
+        progressBar?.ReportTransferStarted();
+    }
 
     /// <inheritdoc />
     public void ReportDownloaded(long bytesSoFar, long? expectedTotal)
@@ -96,6 +106,7 @@ internal sealed class TransferProgressRecorder : ITransferProgress
         downloadTotal = expectedTotal;
         bytesReported = true;
         Draw(done: false);
+        progressBar?.ReportDownloaded(bytesSoFar, expectedTotal);
     }
 
     /// <inheritdoc />
@@ -105,6 +116,7 @@ internal sealed class TransferProgressRecorder : ITransferProgress
         uploadTotal = expectedTotal;
         bytesReported = true;
         Draw(done: false);
+        progressBar?.ReportUploaded(bytesSoFar, expectedTotal);
     }
 
     /// <summary>

@@ -155,7 +155,9 @@ namespace Curl.Console;
 /// <see cref="TransferProgressRecorder" /> drew from the handler's byte reports), preceded by curl's
 /// <c>** Resuming transfer from byte position N</c> line when it resumed past byte zero.
 /// The meter is on standard error and the body is not, so writing it after the transfer
-/// leaves the bytes of each stream as curl's.
+/// leaves the bytes of each stream as curl's. Under <c>-#</c> the bar
+/// <see cref="ProgressBarRecorder" /> drew is written in the meter's place, with no resuming line,
+/// and its newline follows the transfer's failure lines (ADR-0082).
 /// </para>
 /// <para>
 /// Every transfer goes through <see cref="RedirectFollower" /> with the
@@ -364,10 +366,16 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// Records whether the current transfer's handler reported it past connect or open, and
-    /// the status lines its byte reports draw, for <see cref="WriteProgressMeterAsync" />; a new
+    /// the status lines its byte reports draw, for <see cref="WriteProgressAsync" />; a new
     /// one, on the runner's clock, for each transfer. The first is only a placeholder.
     /// </summary>
     private TransferProgressRecorder transferProgress = new(TimeProvider.System);
+
+    /// <summary>
+    /// The current transfer's <c>-#</c> bar, which <see cref="transferProgress" /> passes every
+    /// report on to; <see langword="null" /> when the bar is not shown. Cleared before each transfer.
+    /// </summary>
+    private ProgressBarRecorder? progressBar;
 
     /// <summary>
     /// The <c>%{conn_id}</c> the next transfer that connects takes, counted per run from zero.
@@ -567,12 +575,18 @@ internal sealed class CurlCommandRunner(
         UrlTransfer transfer)
     {
         transferOutputFileName = null;
+        progressBar = null;
         (TransferResult result, string givenUrl, string transferUrl) = await TransferUrlAsync(dispatch, options, transfer)
             .ConfigureAwait(false);
 
         if (ShowsErrors(options) && result.ErrorMessage is not null && !IsIpfsGatewayFailure(result))
         {
             await WriteFailureLinesAsync(result).ConfigureAwait(false);
+        }
+
+        if (progressBar is { HasBeenCalled: true })
+        {
+            await WriteErrorLineAsync(string.Empty).ConfigureAwait(false);
         }
 
         bool endsTheRun = EndsTheRun(options, result);
@@ -1344,16 +1358,16 @@ internal sealed class CurlCommandRunner(
             return proxyFailure;
         }
 
-        transferProgress = new TransferProgressRecorder(timeProvider);
         string? outputFile = await ResolveOutputFileAsync(options, transfer, url).ConfigureAwait(false);
         if (outputFile is null)
         {
+            StartTransferProgress(options, options.ResumeFrom, toStandardOutput: true);
             TransferContext context = transferContextFactory.Create(
                 options, url, deferringStandardOutput, range, options.ResumeFrom, headerOutput, formBody, upload, proxy, progress: transferProgress);
             TransferResult standardOutputResult =
                 await TransferToStandardOutputAsync(follower, options, context).ConfigureAwait(false);
 
-            return await WriteProgressMeterAsync(options, standardOutputResult, options.ResumeFrom, toStandardOutput: true)
+            return await WriteProgressAsync(options, standardOutputResult, options.ResumeFrom, toStandardOutput: true)
                 .ConfigureAwait(false);
         }
 
@@ -1364,12 +1378,13 @@ internal sealed class CurlCommandRunner(
         }
 
         long? resumeFrom = await ResolveResumeFromAsync(options, outputFile).ConfigureAwait(false);
+        StartTransferProgress(options, resumeFrom, toStandardOutput: false);
         OutputFileTarget target = new(outputFile, TakesContentDispositionName(options, transfer));
         TransferResult fileResult = await TransferToOutputFileAsync(
                 follower, options, url, target, range, resumeFrom, headerOutput, formBody, upload, proxy)
             .ConfigureAwait(false);
 
-        return await WriteProgressMeterAsync(options, fileResult, resumeFrom, toStandardOutput: false)
+        return await WriteProgressAsync(options, fileResult, resumeFrom, toStandardOutput: false)
             .ConfigureAwait(false);
     }
 
@@ -1466,10 +1481,29 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
-    /// Writes curl's progress meter for a finished transfer, when
+    /// Makes the current transfer's progress sink, on the runner's clock, with a
+    /// <see cref="ProgressBarRecorder" /> for <see cref="progressBar" /> when
+    /// <see cref="ShowsProgressBar" /> says the bar is shown.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="resumeFrom">The resolved <c>-C</c> offset, or <see langword="null" />.</param>
+    /// <param name="toStandardOutput">Whether the transfer writes its body to standard output.</param>
+    private void StartTransferProgress(CommandLineOptions options, long? resumeFrom, bool toStandardOutput)
+    {
+        progressBar = ShowsProgressBar(options, toStandardOutput)
+            ? new ProgressBarRecorder(timeProvider, resumeFrom ?? 0, terminalColumns)
+            : null;
+        transferProgress = new TransferProgressRecorder(timeProvider, progressBar);
+    }
+
+    /// <summary>
+    /// Writes curl's progress for a finished transfer. Under <c>-#</c>, when
+    /// <see cref="progressBar" /> is set, that is everything the bar drew, the last call of a
+    /// successful transfer included, and no newline: curl writes that after the transfer's
+    /// failure lines (task BL-132). Otherwise it is the progress meter, when
     /// <see cref="ShowsProgressMeter" /> says it is shown: its header lines, then the status
     /// lines <see cref="transferProgress" /> drew, each starting with a carriage return, then
-    /// one newline, as curl 8.21.0 does (task BL-131). The meter is written after the
+    /// one newline, as curl 8.21.0 does (task BL-131). Either is written after the
     /// transfer, so its bytes are curl's but a terminal does not see it move.
     /// </summary>
     /// <param name="options">The accepted command line.</param>
@@ -1482,12 +1516,20 @@ internal sealed class CurlCommandRunner(
     /// <param name="resumeFrom">The resolved <c>-C</c> offset, or <see langword="null" />.</param>
     /// <param name="toStandardOutput">Whether the transfer wrote its body to standard output.</param>
     /// <returns><paramref name="result" />, unchanged.</returns>
-    private async Task<TransferResult> WriteProgressMeterAsync(
+    private async Task<TransferResult> WriteProgressAsync(
         CommandLineOptions options,
         TransferResult result,
         long? resumeFrom,
         bool toStandardOutput)
     {
+        if (progressBar is not null)
+        {
+            progressBar.Finish(result.IsSuccess, result.BytesTransferred);
+            await WriteErrorTextAsync(progressBar.Drawn).ConfigureAwait(false);
+
+            return result;
+        }
+
         if ((result.IsSuccess || result.ExitCode == CurlExitCode.HttpReturnedError || transferProgress.HasTransferStarted)
             && ShowsProgressMeter(options, toStandardOutput))
         {
@@ -1500,19 +1542,37 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
-    /// Tells whether a transfer's progress meter is shown: only when this runner writes it,
-    /// never under <c>-s</c> or <c>--no-progress-meter</c>, never under <c>-#</c> (whose bar
-    /// form is not modelled), and not for a body written to standard output when that is a
-    /// terminal, as curl 8.21.0 does.
+    /// Tells whether a transfer's progress meter is shown: when <see cref="ShowsProgress" />
+    /// says progress is shown and <c>-#</c> did not ask for the bar instead.
     /// </summary>
     /// <param name="options">The accepted command line.</param>
     /// <param name="toStandardOutput">Whether the transfer wrote its body to standard output.</param>
     /// <returns><see langword="true" /> when the meter is shown.</returns>
     private bool ShowsProgressMeter(CommandLineOptions options, bool toStandardOutput) =>
+        ShowsProgress(options, toStandardOutput) && !options.ProgressBar;
+
+    /// <summary>
+    /// Tells whether a transfer's <c>-#</c> bar is shown: when <see cref="ShowsProgress" />
+    /// says progress is shown and <c>-#</c> asked for the bar.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="toStandardOutput">Whether the transfer writes its body to standard output.</param>
+    /// <returns><see langword="true" /> when the bar is shown.</returns>
+    private bool ShowsProgressBar(CommandLineOptions options, bool toStandardOutput) =>
+        ShowsProgress(options, toStandardOutput) && options.ProgressBar;
+
+    /// <summary>
+    /// Tells whether a transfer shows progress, the meter or the <c>-#</c> bar: only when this
+    /// runner writes it, never under <c>-s</c> or <c>--no-progress-meter</c>, and not for a body
+    /// written to standard output when that is a terminal, as curl 8.21.0 does.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="toStandardOutput">Whether the transfer writes its body to standard output.</param>
+    /// <returns><see langword="true" /> when progress is shown.</returns>
+    private bool ShowsProgress(CommandLineOptions options, bool toStandardOutput) =>
         writesProgressMeter
         && !options.Silent
         && !options.ProgressMeterOff
-        && !options.ProgressBar
         && !(toStandardOutput && standardOutputIsTerminal);
 
     /// <summary>
@@ -1852,6 +1912,17 @@ internal sealed class CurlCommandRunner(
     /// <returns>A task that completes when the line is flushed.</returns>
     private Task WriteErrorLineAsync(string line) =>
         WriteErrorPiecesAsync(WarningLineWrapper.WrapLine(line, terminalColumns));
+
+    /// <summary>
+    /// Writes <paramref name="text" /> to standard error as UTF-8, with no terminator added.
+    /// </summary>
+    /// <param name="text">The text.</param>
+    /// <returns>A task that completes when the text is flushed.</returns>
+    private async Task WriteErrorTextAsync(string text)
+    {
+        await standardError.WriteAsync(Encoding.UTF8.GetBytes(text)).ConfigureAwait(false);
+        await standardError.FlushAsync().ConfigureAwait(false);
+    }
 
     /// <summary>
     /// Writes <paramref name="pieces" /> to standard error as UTF-8, each followed by
