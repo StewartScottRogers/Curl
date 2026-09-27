@@ -2,7 +2,8 @@ namespace Curl.Conformance;
 
 /// <summary>
 /// Pins the upstream test data vendored under <c>UpstreamTestData/</c> (ADR-0013, decision 3):
-/// every <c>tests/data/test*</c> file of curl 8.21.0 and curl's <c>COPYING</c> notice are
+/// every <c>tests/data/test*</c> file of curl 8.21.0, stored here as <c>test*.rawhttp</c>, and curl's
+/// <c>COPYING</c> notice are
 /// copied beside the tests, so no case ever has to download anything.
 /// </summary>
 [TestClass]
@@ -16,7 +17,7 @@ public sealed class UpstreamTestDataTests
     [TestMethod]
     public void UpstreamTestData_CopiedBesideTheTests_HoldsEveryTestFileFromTheTag()
     {
-        string[] testFiles = Directory.GetFiles(UpstreamTestDataFolder, "test*");
+        string[] testFiles = Directory.GetFiles(UpstreamTestDataFolder, "test*.rawhttp");
 
         Assert.HasCount(VendoredTestFileCount, testFiles);
     }

@@ -13,6 +13,7 @@ namespace Curl.Conformance;
 public sealed class UpstreamConformanceTests
 {
     private static readonly TimeSpan TimeLimit = TimeSpan.FromSeconds(10);
+    private const string UpstreamTestFileExtension = ".rawhttp";
 
     // The runner fails a slow curl run itself after TimeLimit; this bounds the rest of the case
     // (expansion, screening, verification) so no row can hold up the fast suite, whatever it does.
@@ -27,10 +28,11 @@ public sealed class UpstreamConformanceTests
     private static readonly IReadOnlySet<int> PassingCases =
         UpstreamCaseRatchet.ReadPassingList(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, UpstreamCaseRatchet.PassingListFileName)));
 
-    /// <summary>One row per vendored <c>test*</c> file, in test-number order.</summary>
+    /// <summary>One row per vendored <c>test*.rawhttp</c> file, in test-number order.</summary>
     public static IEnumerable<TestDataRow<int>> UpstreamCases =>
-        Directory.GetFiles(UpstreamTestDataFolder, "test*")
-            .Select(path => int.Parse(Path.GetFileName(path)["test".Length..], NumberStyles.None, CultureInfo.InvariantCulture))
+        Directory.GetFiles(UpstreamTestDataFolder, $"test*{UpstreamTestFileExtension}")
+            .Select(path => Path.GetFileNameWithoutExtension(path))
+            .Select(name => int.Parse(name["test".Length..], NumberStyles.None, CultureInfo.InvariantCulture))
             .Order()
             .Select(number => new TestDataRow<int>(number) { DisplayName = $"test{number}" });
 
@@ -39,7 +41,7 @@ public sealed class UpstreamConformanceTests
     [DynamicData(nameof(UpstreamCases))]
     public async Task UpstreamCase_RunThroughCurl_HoldsTheRatchet(int testNumber)
     {
-        byte[] testFile = await File.ReadAllBytesAsync(Path.Combine(UpstreamTestDataFolder, $"test{testNumber}"));
+        byte[] testFile = await File.ReadAllBytesAsync(Path.Combine(UpstreamTestDataFolder, $"test{testNumber}{UpstreamTestFileExtension}"));
         DirectoryInfo logDirectory = Directory.CreateDirectory(Path.Combine(LogFolder, $"test{testNumber}-{Guid.NewGuid():N}"));
         UpstreamCaseOutcome outcome;
         try

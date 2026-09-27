@@ -14,7 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="UpstreamTestData\test*;UpstreamTestData\COPYING;PassingUpstreamCases.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="UpstreamTestData\test*.rawhttp;UpstreamTestData\COPYING;PassingUpstreamCases.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
