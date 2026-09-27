@@ -31,10 +31,10 @@ completed: 2026-09-27
 ## Notes
 
 - Resumed from `factory/BL-303-wip` (cherry-picked without committing). The earlier run's
-  ADR was numbered 0047, which another lane had taken; renumbered to ADR-0053 and every
+  ADR was numbered 0047, then 0053, both of which other lanes had taken; renumbered to ADR-0054 and every
   reference updated. Its follow-up for the HTTP handler was written as BL-314, an ID another
-  lane also took; filed as BL-328 instead.
-- Plan as delivered (ADR-0053): `SslStreamTlsProvider` lists the DER of the server's
+  lane also took; filed as BL-331 instead.
+- Plan as delivered (ADR-0054): `SslStreamTlsProvider` lists the DER of the server's
   certificate and then `ChainPolicy.ExtraStore` (what the server sent, in order) in its
   validation callback; `ConnectResult.PeerCertificates` carries it, `TcpConnector` passes it
   on, `TransferReport.PeerCertificates` holds it; `Curl.Output.PeerCertificateText` (with
@@ -52,7 +52,7 @@ completed: 2026-09-27
   `TcpDialer.DialAsync` and `UdpDatagramChannel` Send/Receive are covered only by their
   `Integration` tests, and `CreateCipherSuitesPolicy`'s non-Windows line is BL-268. Every
   member this task added or changed is at 100%.
-- Until BL-328 lands, a real https:// transfer still prints `0` and nothing: the HTTP
+- Until BL-331 lands, a real https:// transfer still prints `0` and nothing: the HTTP
   handler does not yet copy the chain into its report.
 
 ## Log

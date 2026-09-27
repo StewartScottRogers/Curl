@@ -132,7 +132,7 @@ public sealed record TransferReport
     /// <summary>
     /// Gets the DER encoding of every certificate the server sent in the TLS handshake,
     /// its own first, copied from <see cref="ConnectResult.PeerCertificates" />, the source
-    /// of <c>%{certs}</c> and <c>%{num_certs}</c> (ADR-0053); empty for a transfer without
+    /// of <c>%{certs}</c> and <c>%{num_certs}</c> (ADR-0054); empty for a transfer without
     /// TLS.
     /// </summary>
     public IReadOnlyList<ReadOnlyMemory<byte>> PeerCertificates { get; init; } = [];

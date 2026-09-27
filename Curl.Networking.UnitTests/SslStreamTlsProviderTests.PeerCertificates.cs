@@ -10,7 +10,7 @@ namespace Curl.Networking;
 
 /// <summary>
 /// Pins the <see cref="ConnectResult.PeerCertificates" /> a successful handshake reports:
-/// the server's certificate first, then the others it sent, in the order sent (ADR-0053).
+/// the server's certificate first, then the others it sent, in the order sent (ADR-0054).
 /// </summary>
 public sealed partial class SslStreamTlsProviderTests
 {

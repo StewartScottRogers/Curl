@@ -139,7 +139,7 @@ public sealed class SslStreamTlsProvider : ITlsProvider
     /// <para>
     /// A success also carries <see cref="ConnectResult.PeerCertificates" />: the server's
     /// certificate and then the others it sent, in the order sent, as curl's Schannel build
-    /// lists them for <c>%{certs}</c> (ADR-0053). They are taken in the validation callback,
+    /// lists them for <c>%{certs}</c> (ADR-0054). They are taken in the validation callback,
     /// whether or not the certificate is verified, since <see cref="SslStream" /> hands the
     /// rest of what the server sent to that callback alone.
     /// </para>

@@ -1,5 +1,5 @@
 ---
-id: BL-328
+id: BL-331
 title: Copy ConnectResult.PeerCertificates into the HTTP handler's TransferReport
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-328 — Copy ConnectResult.PeerCertificates into the HTTP handler's TransferReport
+# BL-331 — Copy ConnectResult.PeerCertificates into the HTTP handler's TransferReport
 
 ## Goal
 
@@ -19,7 +19,7 @@ completed:
 
 ## Context
 
-- ADR-0053 (BL-303): `SslStreamTlsProvider` captures the chain as DER on `ConnectResult.PeerCertificates`, `TcpConnector` passes it on, and `%{num_certs}`/`%{certs}` print `TransferReport.PeerCertificates`. Each TLS handler must copy it into its report; BL-303 could not touch `Curl.Protocol.Http.UnitLibrary`.
+- ADR-0054 (BL-303): `SslStreamTlsProvider` captures the chain as DER on `ConnectResult.PeerCertificates`, `TcpConnector` passes it on, and `%{num_certs}`/`%{certs}` print `TransferReport.PeerCertificates`. Each TLS handler must copy it into its report; BL-303 could not touch `Curl.Protocol.Http.UnitLibrary`.
 - Copy it where `HttpProtocolHandler` already copies `LocalEndPoint = connect.LocalEndPoint` (`HttpProtocolHandler.cs`, around line 626). On a redirect or reconnect, the report carries the last connection's chain, as curl reports the last transfer's certinfo.
 
 ## Acceptance criteria

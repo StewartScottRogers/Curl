@@ -43,7 +43,7 @@ remote certificate's store), not the chain Windows builds.
    (`IReadOnlyList<ReadOnlyMemory<byte>>`, empty without TLS), carried through by
    `TcpConnector`, and `TransferReport.PeerCertificates`, which each handler copies from
    the `ConnectResult` it connected with, as it copies `LocalEndPoint`. The HTTP handler's
-   copy is BL-328; this task could not touch `Curl.Protocol.Http.UnitLibrary`, which another task
+   copy is BL-331; this task could not touch `Curl.Protocol.Http.UnitLibrary`, which another task
    held. Every later TLS handler copies it the same way.
 3. **How it is printed.** `Curl.Output.PeerCertificateText` is a port of
    `Curl_extract_certinfo` and the parser under it (`DerReader` for `getASN1Element`,
@@ -68,7 +68,7 @@ remote certificate's store), not the chain Windows builds.
   certificate the port reads as curl does, with no dependency beyond the base class library.
 - The chain is captured on every TLS connection, whether or not `-w` asks for it; it is a
   few kilobytes of bytes already in memory.
-- Each TLS handler must copy the chain into its report; until BL-328, https:// prints `0`
+- Each TLS handler must copy the chain into its report; until BL-331, https:// prints `0`
   and nothing.
 - The OpenSSL build prints the same records through `Curl_ossl_certchain`, which uses
   OpenSSL's own printers and differs in detail. This port matches the Schannel build, the

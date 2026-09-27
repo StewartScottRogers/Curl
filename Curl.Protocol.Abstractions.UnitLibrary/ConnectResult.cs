@@ -63,7 +63,7 @@ public sealed class ConnectResult
     /// <summary>
     /// Gets the DER encoding of every certificate the server sent in the TLS handshake,
     /// its own certificate first and the rest in the order sent, the source of
-    /// <c>%{certs}</c> and <c>%{num_certs}</c> (ADR-0053); empty for a connection without
+    /// <c>%{certs}</c> and <c>%{num_certs}</c> (ADR-0054); empty for a connection without
     /// TLS or a failed connect.
     /// </summary>
     public IReadOnlyList<ReadOnlyMemory<byte>> PeerCertificates { get; private init; } = [];
