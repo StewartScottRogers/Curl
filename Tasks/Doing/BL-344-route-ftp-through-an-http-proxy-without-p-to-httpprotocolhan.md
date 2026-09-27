@@ -36,3 +36,4 @@ completed:
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
 - 2026-09-27: Doing -> Backlog. Needs Curl.Console.UnitTests for its tests, which BL-295 (in Doing) also touches; retry once BL-295 is no longer in Doing.
+- 2026-09-27: Backlog -> Doing.
