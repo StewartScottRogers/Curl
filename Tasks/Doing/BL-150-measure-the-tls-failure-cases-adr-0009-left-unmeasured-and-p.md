@@ -56,3 +56,4 @@ Every TLS failure case listed below is measured against the reference curl build
 - 2026-09-26: Created.
 - 2026-09-27: Backlog -> Doing.
 - 2026-09-27: Doing -> Backlog. Lane handed over mid-run while the factory's restart logic was fixed; the run had only just resumed and left no work.
+- 2026-09-27: Backlog -> Doing.
