@@ -34,8 +34,8 @@ completed:
      written under it?);
   3. `curl -o - -w "%{http_code}\n" <url>` on Windows, with a body containing `\n` and a
      `\r\n`, to see whether standard output is in text or binary mode for the body and
-     for `-w` (see ADR-0040,
-     `Documentation/Planning/Decisions/ADR-0040-w-standard-output-line-feeds-follow-curls-stdout-mode-when-its-buffer-is-written.md`).
+     for `-w` (see ADR-0081,
+     `Documentation/Planning/Decisions/ADR-0081-w-standard-output-line-feeds-follow-curls-stdout-mode-when-its-buffer-is-written.md`).
   Record each command, its stdout bytes (hex where line endings matter), stderr and exit
   code in this task's Notes before writing code.
 - If the measurement shows a behaviour choice not already covered by an ADR (for example

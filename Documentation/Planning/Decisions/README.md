@@ -95,6 +95,7 @@ choices do not need one.
 | [0078](ADR-0078-w-time-on-linux-and-macos-follows-glibc-strftime-in-the-c-locale.md) | `-w %time{…}` on Linux and macOS follows glibc's `strftime` in the C locale after curl's own `%f %s %z %Z %%` rewrite; `WriteOutTemplateRenderer` takes a `WriteOutTimeDialect`, and `Curl.Console` passing it is BL-387 | Accepted | 2026-09-27 |
 | [0079](ADR-0079-resolve-and-connect-to-are-kept-verbatim-by-the-parser-and-checked-at-transfer-time.md) | `--resolve` and `--connect-to` values are kept verbatim, in order, in `CommandLineOptions.ResolveEntries` / `ConnectToEntries`; the parser refuses only a missing value and the `--no-` spellings, and the syntax is checked at transfer time (exit 49), as curl 8.21.0 does | Accepted | 2026-09-27 |
 | [0080](ADR-0080-retry-after-reads-the-three-rfc-9110-http-date-forms.md) | `RetryAfterHeader` reads the three RFC 9110 HTTP-date forms (RFC 1123, RFC 850, asctime) with `DateTimeOffset.TryParseExact` and any other text as delay-seconds, not libcurl's lenient `parsedate`; moving it onto `CurlDateParser` (ADR-0074) is BL-393 | Accepted | 2026-09-27 |
+| [0081](ADR-0081-w-standard-output-line-feeds-follow-curls-stdout-mode-when-its-buffer-is-written.md) | `-w` standard output line feeds follow curl's stdout mode when its buffer is written: the renderer writes LF, and on Windows the runner writes standard error, and standard output while it is in text mode, through `LineFeedToCrLfStream` (numbered ADR-0040 until BL-326) | Accepted | 2026-09-26 |
 
 ## Template
 

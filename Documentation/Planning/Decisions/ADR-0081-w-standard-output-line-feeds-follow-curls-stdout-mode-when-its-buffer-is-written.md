@@ -1,7 +1,7 @@
-# ADR-0040 — -w standard output line feeds follow curl's stdout mode when its buffer is written
+# ADR-0081 — -w standard output line feeds follow curl's stdout mode when its buffer is written
 
 - **Status:** Accepted
-- **Date:** 2026-09-26
+- **Date:** 2026-09-26 (numbered ADR-0040 until 2026-09-27, when BL-326 renumbered it: ADR-0040 was already taken)
 
 Decided by Claude under Stewart's delegation (task BL-235, 2026-09-26).
 
