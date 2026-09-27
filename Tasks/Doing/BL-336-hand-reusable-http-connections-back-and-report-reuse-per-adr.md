@@ -42,3 +42,4 @@ completed:
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
 - 2026-09-27: Doing -> Backlog. Lane handed over mid-run while the factory's restart logic was fixed; partial work saved on branch factory/BL-336-wip, a stash commit: start with git cherry-pick --no-commit -m 1 factory/BL-336-wip and carry on from it.
+- 2026-09-27: Backlog -> Doing.
