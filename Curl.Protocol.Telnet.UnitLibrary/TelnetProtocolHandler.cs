@@ -97,7 +97,10 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
         ArgumentNullException.ThrowIfNull(context);
 
         CurlUrl url = context.Url;
-        var target = new ConnectTarget(url.IdnHost, url.IsDefaultPort ? DefaultPort : url.Port, false);
+        var target = new ConnectTarget(url.IdnHost, url.IsDefaultPort ? DefaultPort : url.Port, false)
+        {
+            Proxy = context.Proxy,
+        };
         ConnectResult connect = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
         {

@@ -64,6 +64,34 @@ public sealed class TelnetProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ContextWithProxy_TunnelsToTheOriginOnPort23ThroughThatProxy()
+    {
+        var connector = new RecordingConnector(ConnectResult.Connected(new ScriptedConnection()));
+        var proxy = new ProxyEndpoint(ProxyKind.Http, "proxy.example", 3128, null);
+        var context = new TransferContext
+        {
+            Url = CurlUrl.Parse("telnet://example.com/"),
+            Output = new MemoryStream(),
+            Upload = new MemoryStream(),
+            Proxy = proxy,
+        };
+
+        await new TelnetProtocolHandler(connector).ExecuteAsync(context);
+
+        Assert.AreEqual(new ConnectTarget("example.com", 23, false) { Proxy = proxy }, connector.Targets.Single());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ContextWithoutProxy_ConnectsDirectly()
+    {
+        var connector = new RecordingConnector(ConnectResult.Connected(new ScriptedConnection()));
+
+        await new TelnetProtocolHandler(connector).ExecuteAsync(Context(TelnetUrl, new MemoryStream()));
+
+        Assert.IsNull(connector.Targets.Single().Proxy);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ConnectFails_ReturnsTheFailureUnchangedAndWritesNothing()
     {
         var connector = new RecordingConnector(

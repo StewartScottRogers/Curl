@@ -8,7 +8,7 @@ depends-on: [BL-337]
 touches: [Curl.Protocol.Telnet.UnitLibrary, Curl.Protocol.Telnet.UnitTests]
 requirement: none
 created: 2026-09-27
-completed:
+completed: 2026-09-27
 ---
 # BL-341 — Tunnel telnet:// through the transfer proxy
 
@@ -24,13 +24,18 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] A test with a fake `IConnector` shows the handler's `ConnectTarget` carries `context.Proxy` and the origin host with port 23.
-- [ ] A test shows a context without a proxy still connects directly (`ConnectTarget.Proxy == null`).
-- [ ] 100% line and branch coverage of the changed code; `dotnet build` clean, fast tests green.
+- [x] A test with a fake `IConnector` shows the handler's `ConnectTarget` carries `context.Proxy` and the origin host with port 23.
+- [x] A test shows a context without a proxy still connects directly (`ConnectTarget.Proxy == null`).
+- [x] 100% line and branch coverage of the changed code; `dotnet build` clean, fast tests green.
 
 ## Notes
+
+- Same shape as BL-340 (gopher): `ExecuteAsync` sets `ConnectTarget.Proxy = context.Proxy`; the connector owns CONNECT and the refused-tunnel exit 7 (ADR-0023, ADR-0056), so no proxy code and no new ADR here.
+- Tests: `ExecuteAsync_ContextWithProxy_TunnelsToTheOriginOnPort23ThroughThatProxy` and `ExecuteAsync_ContextWithoutProxy_ConnectsDirectly` in `TelnetProtocolHandlerTests`. The change is one branch-free initializer, covered by both.
+- `CLAUDE.md` of the library now states the proxy goes into the `ConnectTarget`.
 
 ## Log
 
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Done. telnet:// tunnels through ITransferContext.Proxy via the connector's CONNECT
