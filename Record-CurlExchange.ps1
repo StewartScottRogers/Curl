@@ -58,6 +58,12 @@
     Use it to make a hop take a known time, as when measuring how -m counts across a
     followed redirect.
 
+.PARAMETER Reset
+    Instead of reading a request and answering it, reset each connection as soon as it
+    is accepted: the socket closes with a zero linger time, so Windows sends a TCP RST
+    rather than a FIN. Use it to measure what curl prints when the server resets the
+    connection, as during a TLS handshake (BL-369). request.bin is then empty.
+
 .PARAMETER Curl
     The curl executable to run. Defaults to the reference build ADR-0009 and ADR-0018
     name, curl 8.21.0 from Git for Windows' mingw64 directory, found beside git.exe.
@@ -77,6 +83,7 @@ param(
     [Parameter(Mandatory = $true)] [string] $OutDirectory,
     [ValidateRange(1, 1000)] [int] $Connections = 1,
     [ValidateRange(0, 600000)] [int] $ResponseDelayMilliseconds = 0,
+    [switch] $Reset,
     [string] $Curl
 )
 
@@ -155,7 +162,7 @@ function ConvertTo-CommandLineArgument {
 # The server runs in its own runspace so curl can run in this one. It returns one
 # byte array per connection served.
 $serveConnections = {
-    param($Listener, $ResponseBytes, [int] $ConnectionCount, [int] $DelayMilliseconds)
+    param($Listener, $ResponseBytes, [int] $ConnectionCount, [int] $DelayMilliseconds, [bool] $ResetConnections)
 
     Set-StrictMode -Version Latest
     $ErrorActionPreference = 'Stop'
@@ -185,6 +192,13 @@ $serveConnections = {
             $client = $Listener.AcceptTcpClient()
         } catch {
             break  # The listener was stopped: curl exited without opening this connection.
+        }
+        if ($ResetConnections) {
+            # A zero linger time makes Close send RST instead of FIN.
+            $client.LingerState = New-Object System.Net.Sockets.LingerOption($true, 0)
+            $client.Close()
+            $requests.Add([byte[]] @())
+            continue
         }
         try {
             $stream = $client.GetStream()
@@ -226,7 +240,7 @@ $listener = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Lo
 $listener.Start()
 $server = [System.Management.Automation.PowerShell]::Create()
 try {
-    [void] $server.AddScript($serveConnections).AddArgument($listener).AddArgument($responseBytes).AddArgument($Connections).AddArgument($ResponseDelayMilliseconds)
+    [void] $server.AddScript($serveConnections).AddArgument($listener).AddArgument($responseBytes).AddArgument($Connections).AddArgument($ResponseDelayMilliseconds).AddArgument([bool] $Reset)
     $serverRun = $server.BeginInvoke()
 
     $startInfo = New-Object System.Diagnostics.ProcessStartInfo
