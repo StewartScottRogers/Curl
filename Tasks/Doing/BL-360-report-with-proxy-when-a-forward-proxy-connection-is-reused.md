@@ -41,3 +41,4 @@ When a connection to a forward (non-tunnelled) HTTP proxy is reused, `-v` prints
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
