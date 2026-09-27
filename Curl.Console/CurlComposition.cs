@@ -139,15 +139,20 @@ internal static class CurlComposition
     /// <param name="standardInput">What a <c>telnet</c> transfer sends to the server.</param>
     /// <param name="connector">Connects the TCP protocols.</param>
     /// <param name="datagramConnector">Opens the UDP channels TFTP uses.</param>
+    /// <param name="proxySelector">
+    /// Chooses each transfer's proxy, or <see langword="null" /> for one that reads no
+    /// environment variables.
+    /// </param>
     /// <returns>The runner.</returns>
     internal static CurlCommandRunner CreateRunner(
         Stream standardOutput,
         Stream standardError,
         Stream standardInput,
         IConnector connector,
-        IDatagramConnector datagramConnector) =>
+        IDatagramConnector datagramConnector,
+        ProxySelector? proxySelector = null) =>
         new(
-            options => CreateTransferDispatch(connector, datagramConnector, CookieEngine.FromCommandLine(options)),
+            options => CreateTransferDispatch(connector, datagramConnector, CookieEngine.FromCommandLine(options), proxySelector),
             new PhysicalFileSystem(),
             new PhysicalFileSystem(),
             standardOutput,
@@ -169,29 +174,37 @@ internal static class CurlComposition
     /// <paramref name="transports" />, its HTTP handler keeping cookies in
     /// <paramref name="cookies" />; the TLS provider's <see cref="SslStreamTlsProvider.Warnings" />
     /// as the lines printed before each transfer, as curl 8.21.0 prints its <c>--capath</c>
-    /// warnings once per URL; and <paramref name="cookies" /> for the runner to load and save.
+    /// warnings once per URL; <paramref name="cookies" /> for the runner to load and save; and a
+    /// <see cref="ProxySelector" /> reading the process's proxy environment variables.
     /// </summary>
     /// <param name="transports">The run's connectors.</param>
     /// <param name="cookies">The run's cookies, or <see langword="null" /> without <c>-b</c> or <c>-c</c>.</param>
-    /// <returns>The dispatcher, the warning lines and the cookies.</returns>
+    /// <returns>The dispatcher, the warning lines, the cookies and the proxy selector.</returns>
     internal static TransferDispatch CreateTransferDispatch(CurlTransports transports, CookieEngine? cookies = null) =>
         new(
             new ProtocolDispatcher(CreateProtocolHandlers(transports.TcpConnector, transports.UdpDatagramConnector, cookies?.HandlerStore)),
             transports.TlsProvider.Warnings,
-            cookies);
+            cookies,
+            new ProxySelector(Environment.GetEnvironmentVariable));
 
     /// <summary>
     /// Creates what one run transfers through over the given connectors instead of the real
     /// network: the production handler set, its HTTP handler keeping cookies in
-    /// <paramref name="cookies" />, no warning lines, and <paramref name="cookies" />.
+    /// <paramref name="cookies" />, no warning lines, <paramref name="cookies" /> and <paramref name="proxySelector" />.
     /// </summary>
     /// <param name="connector">Connects the TCP protocols.</param>
     /// <param name="datagramConnector">Opens the UDP channels TFTP uses.</param>
     /// <param name="cookies">The run's cookies, or <see langword="null" /> without <c>-b</c> or <c>-c</c>.</param>
-    /// <returns>The dispatcher, no warning lines and the cookies.</returns>
+    /// <param name="proxySelector">Chooses each transfer's proxy, or <see langword="null" /> for one that reads no environment variables.</param>
+    /// <returns>The dispatcher, no warning lines, the cookies and the proxy selector.</returns>
     private static TransferDispatch CreateTransferDispatch(
         IConnector connector,
         IDatagramConnector datagramConnector,
-        CookieEngine? cookies) =>
-        new(new ProtocolDispatcher(CreateProtocolHandlers(connector, datagramConnector, cookies?.HandlerStore)), [], cookies);
+        CookieEngine? cookies,
+        ProxySelector? proxySelector) =>
+        new(
+            new ProtocolDispatcher(CreateProtocolHandlers(connector, datagramConnector, cookies?.HandlerStore)),
+            [],
+            cookies,
+            proxySelector);
 }

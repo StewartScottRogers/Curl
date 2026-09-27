@@ -37,6 +37,10 @@ internal static class HttpRequestOptionsMapping
     /// The <c>-F</c> / <c>--form-string</c> body built for this transfer, or <see langword="null" />
     /// without <c>-F</c>; the parser refuses <c>-F</c> with a <c>-d</c> family body, so at most one is given.
     /// </param>
+    /// <param name="proxy">
+    /// The proxy chosen for this transfer (<see cref="TransferProxySelection" />), or
+    /// <see langword="null" /> to connect directly.
+    /// </param>
     /// <returns>
     /// The options: <see cref="CommandLineOptions.RequestMethod" />,
     /// <see cref="CommandLineOptions.UserAgent" /> and <see cref="CommandLineOptions.Referer" />
@@ -46,9 +50,14 @@ internal static class HttpRequestOptionsMapping
     /// <see cref="CommandLineOptions.DataInQuery" /> moved it into the query; and
     /// <see cref="CommandLineOptions.FailMode" /> as <see cref="HttpRequestOptions.Fail" />; and
     /// <see cref="CommandLineOptions.FollowRedirects" /> as <see cref="HttpRequestOptions.FollowRedirects" />; and
-    /// <see cref="CommandLineOptions.AuthSchemes" /> and <see cref="CommandLineOptions.BearerToken" /> verbatim.
+    /// <see cref="CommandLineOptions.AuthSchemes" /> and <see cref="CommandLineOptions.BearerToken" /> verbatim; and
+    /// <paramref name="proxy" /> as <see cref="HttpRequestOptions.ForwardProxy" /> with
+    /// <see cref="CommandLineOptions.ProxyTunnel" /> as <see cref="HttpRequestOptions.ProxyTunnel" />.
     /// </returns>
-    internal static HttpRequestOptions FromCommandLine(CommandLineOptions options, HttpRequestBody? formBody = null) =>
+    internal static HttpRequestOptions FromCommandLine(
+        CommandLineOptions options,
+        HttpRequestBody? formBody = null,
+        ProxyEndpoint? proxy = null) =>
         new()
         {
             CustomMethod = options.RequestMethod,
@@ -60,6 +69,8 @@ internal static class HttpRequestOptionsMapping
             FollowRedirects = options.FollowRedirects,
             AuthSchemes = options.AuthSchemes,
             BearerToken = options.BearerToken,
+            ForwardProxy = proxy,
+            ProxyTunnel = options.ProxyTunnel,
         };
 
     /// <summary>

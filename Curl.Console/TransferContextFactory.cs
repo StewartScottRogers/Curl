@@ -31,6 +31,7 @@ internal sealed class TransferContextFactory(Stream standardInput)
     /// The <c>-T</c> source, or <see langword="null" /> without <c>-T</c>, when a <c>telnet</c>
     /// transfer uploads standard input and any other uploads nothing.
     /// </param>
+    /// <param name="proxy">The proxy chosen for this transfer (<see cref="TransferProxySelection" />), or <see langword="null" /> to connect directly.</param>
     /// <returns>
     /// The context. Its <see cref="TransferContext.NoBody" /> is <c>-I</c>, and its
     /// <see cref="TransferContext.HeaderOutput" /> is <see cref="HeaderOutputOf" />'s.
@@ -43,7 +44,8 @@ internal sealed class TransferContextFactory(Stream standardInput)
         long? resumeFrom,
         Stream? headerOutput,
         HttpRequestBody? formBody = null,
-        Stream? upload = null) =>
+        Stream? upload = null,
+        ProxyEndpoint? proxy = null) =>
         new()
         {
             Url = url,
@@ -64,7 +66,7 @@ internal sealed class TransferContextFactory(Stream standardInput)
             ConnectTimeout = options.ConnectTimeout,
             MaxTime = options.MaxTime,
             TimeCondition = options.TimeCondition,
-            Http = HttpRequestOptionsMapping.FromCommandLine(options, formBody),
+            Http = HttpRequestOptionsMapping.FromCommandLine(options, formBody, proxy),
         };
 
     /// <summary>

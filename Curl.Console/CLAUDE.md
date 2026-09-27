@@ -64,6 +64,16 @@ prints `curl: cannot open '<file>'` and the try-help line even under `-s`, is ex
 stops the run. `-T -` and `-T .` upload standard input. `%{url_effective}` prints the
 resolved URL.
 
+Each transfer's proxy is chosen by `TransferProxySelection`, after the URL, range and `-F`
+body are checked: `Curl.Core`'s `ProxySelector` (held by `TransferDispatch`, reading the
+process's proxy environment variables in production and none in tests unless given) picks it
+from `-x` or a `--socks` option, `--noproxy` and the variables; `-U` replaces its credential;
+it goes into `HttpRequestOptions.ForwardProxy` with `-p` as `ProxyTunnel`. Proxy text curl
+cannot use ends the transfer with the selector's exit 5 or 7, and a SOCKS proxy, or an HTTPS
+proxy for `https` or under `-p` or `-L`, ends an `http`/`https` transfer with exit 4 until the connector opens those tunnels
+(ADR-0053, BL-328). Other schemes do not read the proxy yet (BL-330), and redirect hops keep
+the first URL's proxy (BL-329). Measured on curl 8.21.0 (BL-238 Notes).
+
 Every transfer goes through `Curl.Core`'s `RedirectFollower`. `-L` becomes
 `HttpRequestOptions.FollowRedirects`, and `RedirectPolicyMapping` turns `--max-redirs`,
 `--post301`/`--post302`/`--post303` and `--location-trusted` into its `RedirectPolicy`. Every

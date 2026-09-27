@@ -805,7 +805,8 @@ internal sealed class CurlCommandRunner(
 
         if (options.FormParts.Count == 0)
         {
-            return await TransferWithBodyAsync(follower, options, transferUrl, outputFile, range, headerOutput, null, upload)
+            return await TransferWithBodyAsync(
+                    follower, dispatch.ProxySelector, options, transferUrl, outputFile, range, headerOutput, null, upload)
                 .ConfigureAwait(false);
         }
 
@@ -819,7 +820,8 @@ internal sealed class CurlCommandRunner(
 
         await using (form.Body.Content.ConfigureAwait(false))
         {
-            return await TransferWithBodyAsync(follower, options, transferUrl, outputFile, range, headerOutput, form.Body, upload)
+            return await TransferWithBodyAsync(
+                    follower, dispatch.ProxySelector, options, transferUrl, outputFile, range, headerOutput, form.Body, upload)
                 .ConfigureAwait(false);
         }
     }
@@ -827,9 +829,12 @@ internal sealed class CurlCommandRunner(
     /// <summary>
     /// Performs one checked transfer, sending <paramref name="formBody" /> when given, to
     /// <paramref name="outputFile" /> when one is given and to standard output otherwise, and
-    /// writes the progress meter after it.
+    /// writes the progress meter after it. The transfer goes through the proxy
+    /// <see cref="TransferProxySelection" /> chooses; when it refuses one, the transfer ends with
+    /// its failure and nothing is sent.
     /// </summary>
     /// <param name="follower">Performs the transfer with the handler for its scheme, following redirects under <c>-L</c>.</param>
+    /// <param name="proxySelector">Chooses the transfer's proxy from <c>-x</c>, <c>--noproxy</c> and the proxy environment variables.</param>
     /// <param name="options">The accepted command line.</param>
     /// <param name="url">The URL, with any <c>-G</c> / <c>--url-query</c> query.</param>
     /// <param name="outputFile">The matching <c>-o</c> value, or <see langword="null" />.</param>
@@ -840,6 +845,7 @@ internal sealed class CurlCommandRunner(
     /// <returns>The transfer's result.</returns>
     private async Task<TransferResult> TransferWithBodyAsync(
         RedirectFollower follower,
+        ProxySelector proxySelector,
         CommandLineOptions options,
         CurlUrl url,
         string? outputFile,
@@ -848,10 +854,15 @@ internal sealed class CurlCommandRunner(
         HttpRequestBody? formBody,
         Stream? upload)
     {
+        if (!TransferProxySelection.TrySelect(proxySelector, options, url, out ProxyEndpoint? proxy, out TransferResult? proxyFailure))
+        {
+            return proxyFailure;
+        }
+
         if (outputFile is null)
         {
             TransferContext context = transferContextFactory.Create(
-                options, url, deferringStandardOutput, range, options.ResumeFrom, headerOutput, formBody, upload);
+                options, url, deferringStandardOutput, range, options.ResumeFrom, headerOutput, formBody, upload, proxy);
             TransferResult standardOutputResult =
                 await TransferToStandardOutputAsync(follower, options, context).ConfigureAwait(false);
 
@@ -862,7 +873,7 @@ internal sealed class CurlCommandRunner(
         string outputFileName = runsOnWindows ? WindowsOutputFileNameSanitizer.Sanitize(outputFile) : outputFile;
         long? resumeFrom = await ResolveResumeFromAsync(options, outputFileName).ConfigureAwait(false);
         TransferResult fileResult = await TransferToOutputFileAsync(
-                follower, options, url, outputFileName, range, resumeFrom, headerOutput, formBody, upload)
+                follower, options, url, outputFileName, range, resumeFrom, headerOutput, formBody, upload, proxy)
             .ConfigureAwait(false);
 
         return await WriteProgressMeterAsync(options, fileResult, resumeFrom, toStandardOutput: false)
@@ -972,6 +983,7 @@ internal sealed class CurlCommandRunner(
     /// <param name="headerOutput">Where the <c>-D</c> header lines go, or <see langword="null" /> without <c>-D</c>.</param>
     /// <param name="formBody">The <c>-F</c> body, or <see langword="null" /> without <c>-F</c>.</param>
     /// <param name="upload">The <c>-T</c> source, or <see langword="null" /> without <c>-T</c>.</param>
+    /// <param name="proxy">The proxy chosen for the transfer, or <see langword="null" /> to connect directly.</param>
     /// <returns>
     /// The transfer's result. A transfer that resumes past byte zero opens the file for
     /// appending before it starts, as curl 8.21.0 does; when that open fails the result is
@@ -987,10 +999,11 @@ internal sealed class CurlCommandRunner(
         long? resumeFrom,
         Stream? headerOutput,
         HttpRequestBody? formBody,
-        Stream? upload)
+        Stream? upload,
+        ProxyEndpoint? proxy)
     {
         TransferResult completed = await TransferIntoOutputFileAsync(
-                follower, options, url, outputFile, range, resumeFrom, headerOutput, formBody, upload)
+                follower, options, url, outputFile, range, resumeFrom, headerOutput, formBody, upload, proxy)
             .ConfigureAwait(false);
 
         if (options.RemoteTime && completed.IsSuccess && completed.SourceLastWriteTimeUtc is { } sourceLastWriteTimeUtc)
@@ -1041,6 +1054,7 @@ internal sealed class CurlCommandRunner(
     /// <param name="headerOutput">Where the <c>-D</c> header lines go, or <see langword="null" /> without <c>-D</c>.</param>
     /// <param name="formBody">The <c>-F</c> body, or <see langword="null" /> without <c>-F</c>.</param>
     /// <param name="upload">The <c>-T</c> source, or <see langword="null" /> without <c>-T</c>.</param>
+    /// <param name="proxy">The proxy chosen for the transfer, or <see langword="null" /> to connect directly.</param>
     /// <returns>The transfer's result, as <see cref="TransferToOutputFileAsync" /> describes it.</returns>
     private async Task<TransferResult> TransferIntoOutputFileAsync(
         RedirectFollower follower,
@@ -1051,7 +1065,8 @@ internal sealed class CurlCommandRunner(
         long? resumeFrom,
         Stream? headerOutput,
         HttpRequestBody? formBody,
-        Stream? upload)
+        Stream? upload,
+        ProxyEndpoint? proxy)
     {
         bool resumes = resumeFrom is > 0;
         DeferredOutputFileStream output = new(
@@ -1064,7 +1079,7 @@ internal sealed class CurlCommandRunner(
             }
 
             TransferContext context = transferContextFactory.Create(
-                options, url, output, range, resumeFrom, headerOutput, formBody, upload);
+                options, url, output, range, resumeFrom, headerOutput, formBody, upload, proxy);
             TransferResult fileResult = await follower
                 .FollowAsync(context, RedirectPolicyMapping.FromCommandLine(options))
                 .ConfigureAwait(false);
