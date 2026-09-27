@@ -1,5 +1,5 @@
 ---
-id: BL-310
+id: BL-316
 title: Read -b - cookies from standard input in Curl.Console
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-310 — Read -b - cookies from standard input in Curl.Console
+# BL-316 — Read -b - cookies from standard input in Curl.Console
 
 ## Goal
 

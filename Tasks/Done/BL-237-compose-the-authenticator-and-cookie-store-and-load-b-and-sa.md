@@ -44,7 +44,7 @@ completed: 2026-09-26
 - Digest separators: the mingw build writes WDigest's format with no blanks; ADR-0025 already chose curl's own Digest format (`", "`) on every platform, so the Console test pins the measured response hash with ADR-0025's separators. No new ADR was needed.
 - Decision (unattended default): `-b` files are loaded once, before the first transfer, as this task's Goal says, although libcurl reloads them per transfer. With one shared store the result is the same unless a server overwrites a file cookie in URL 1 and URL 2 expects the file's value back; not modelled.
 - A jar before a malformed URL (`dict://exa mple.com/x`) is not written; an `http` URL that fails before dispatch (bad `-r`, unreadable `-F` file) still writes it. Only the scheme was measured, not those pre-dispatch failures.
-- Follow-up filed: BL-310 (`-b -` reads cookies from standard input).
+- Follow-up filed: BL-316 (`-b -` reads cookies from standard input).
 
 ## Log
 
