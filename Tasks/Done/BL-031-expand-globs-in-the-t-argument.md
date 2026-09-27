@@ -63,7 +63,7 @@ here; the engine serves URL globbing too and deserves its own task.
 - Choice (sensible default): "dispatches" in the criteria is met by the ordered
   `ResolveTransferTargets` sequence the dispatcher will walk. Wiring it into
   `CurlCommandRunner` needs `Curl.Console`, which BL-328 (in Doing) touches, so that step is
-  filed as BL-364 (depends on BL-031 and BL-240, where URL globbing is wired) rather than
+  filed as BL-366 (depends on BL-031 and BL-240, where URL globbing is wired) rather than
   widening this task. No ADR: every behaviour here was measured, not chosen.
 - Measured on curl 8.21.0 (`/mingw64/bin/curl`, Schannel), 2026-09-27, with
   `curl -s -S -w '%{url_effective}
@@ -82,4 +82,4 @@ here; the engine serves URL globbing too and deserves its own task.
 
 - 2026-09-26: Created.
 - 2026-09-27: Backlog -> Doing.
-- 2026-09-27: Doing -> Done. Curl.Cli.UploadFileGlob expands a -T argument's {a,b} and [1-3] globs into one upload per match in curl 8.21.0's order, each resolved through UploadTransferUrl/UploadUrl; -g takes it literally; Console wiring filed as BL-364
+- 2026-09-27: Doing -> Done. Curl.Cli.UploadFileGlob expands a -T argument's {a,b} and [1-3] globs into one upload per match in curl 8.21.0's order, each resolved through UploadTransferUrl/UploadUrl; -g takes it literally; Console wiring filed as BL-366

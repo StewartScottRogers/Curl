@@ -1,5 +1,5 @@
 ---
-id: BL-364
+id: BL-366
 title: Dispatch one upload per -T glob match in Curl.Console
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: FR-005
 created: 2026-09-27
 completed:
 ---
-# BL-364 — Dispatch one upload per -T glob match in Curl.Console
+# BL-366 — Dispatch one upload per -T glob match in Curl.Console
 
 ## Goal
 
