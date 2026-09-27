@@ -6,9 +6,8 @@ namespace Curl.Protocol.Http;
 /// what is left of it, or 0 once it is used up.
 /// </summary>
 /// <remarks>
-/// <see cref="System.IO.Compression.GZipStream" />, <see cref="System.IO.Compression.ZLibStream" />,
-/// <see cref="System.IO.Compression.DeflateStream" /> and
-/// <see cref="System.IO.Compression.BrotliStream" /> each read their source only when they
+/// <see cref="System.IO.Compression.GZipStream" />, <see cref="System.IO.Compression.ZLibStream" />
+/// and <see cref="System.IO.Compression.DeflateStream" /> each read their source only when they
 /// need more input, and a read of 0 makes them return 0 without ending the stream for good,
 /// so a later read decodes the next piece. The tests in
 /// <c>HttpContentDecoderTests</c> feed every coding one byte at a time to hold that
@@ -20,6 +19,12 @@ internal sealed class HttpContentInput : Stream
     /// Gets or sets the encoded bytes not yet read.
     /// </summary>
     internal ReadOnlyMemory<byte> Pending { get; set; }
+
+    /// <summary>
+    /// Gets how many times the stream has been read. A decompression stream that has reached
+    /// the end of its stream reads its source no more.
+    /// </summary>
+    internal int ReadCount { get; private set; }
 
     /// <inheritdoc />
     public override bool CanRead => true;
@@ -46,6 +51,7 @@ internal sealed class HttpContentInput : Stream
     /// <inheritdoc />
     public override int Read(Span<byte> buffer)
     {
+        ReadCount++;
         int count = Math.Min(buffer.Length, Pending.Length);
         Pending.Span[..count].CopyTo(buffer);
         Pending = Pending[count..];

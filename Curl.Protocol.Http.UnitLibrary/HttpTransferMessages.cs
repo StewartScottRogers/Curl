@@ -124,6 +124,12 @@ internal static class HttpTransferMessages
     internal const string BadContentEncoding = "Unrecognized or bad HTTP Content or Transfer-Encoding";
 
     /// <summary>
+    /// The exit 23 message for a <c>--compressed</c> body with bytes after the end of its
+    /// gzip, zlib or Brotli stream (measured, BL-281 Notes).
+    /// </summary>
+    internal const string ReceivedDataWriteFailed = "Failed writing received data to disk/application";
+
+    /// <summary>
     /// The exit 33 message for a <c>-C</c> resume the response does not honour.
     /// </summary>
     internal const string ResumeNotSupported = "HTTP server does not seem to support byte ranges. Cannot resume.";

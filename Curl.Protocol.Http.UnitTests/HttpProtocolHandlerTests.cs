@@ -785,6 +785,34 @@ public sealed partial class HttpProtocolHandlerTests
         }
     }
 
+    /// <summary>
+    /// Measured with curl 8.21.0 <c>-s -S --compressed</c> (BL-281 Notes): a gzip body
+    /// followed by <c>41 42</c>, both inside Content-Length, writes <c>hello</c> and gives
+    /// <c>curl: (23) Failed writing received data to disk/application</c>.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_CompressedBodyWithBytesAfterItsStream_WritesTheStreamThenReturnsExit23()
+    {
+        foreach (int chunkSize in ChunkSizes)
+        {
+            MemoryStream output = new();
+            TransferContext context = new()
+            {
+                Url = CurlUrl.Parse("http://example.com/"),
+                Output = output,
+                Http = new HttpRequestOptions { Compressed = true },
+            };
+            string response = "HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nContent-Length: 27\r\n\r\n"
+                + Latin1(HttpContentDecoderTests.Bytes(HttpContentDecoderTests.Gzip + "4142"));
+
+            TransferResult result = await Handler(QueueConnector.For(Connection(response, chunkSize))).ExecuteAsync(context);
+
+            Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode, $"Chunk size {chunkSize}");
+            Assert.AreEqual("Failed writing received data to disk/application", result.ErrorMessage, $"Chunk size {chunkSize}");
+            Assert.AreEqual("hello", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
+        }
+    }
+
     private static TransferContext FollowContext(string url, Stream output, Stream? headerOutput = null) =>
         new()
         {
