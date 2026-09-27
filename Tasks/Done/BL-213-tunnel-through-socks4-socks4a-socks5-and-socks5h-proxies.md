@@ -74,9 +74,9 @@ A Python loopback server scripted per case (read N bytes / send hex / close / an
 | `-x socks5://127.0.0.1:1` | | | 7 `Failed to connect to 127.0.0.1:8080 over proxy 127.0.0.1 after 2040 ms: Could not connect to server` |
 | `-x socks4://nosuch.invalid:1` | | | 5 `Could not resolve proxy: nosuch.invalid` |
 
-### Decisions (defaults taken; the ADR is BL-354)
+### Decisions (defaults taken; the ADR is BL-355)
 
-- The ADR could not be written here: `Documentation/Planning/Decisions` is in BL-302's `touches` (in Doing), so rather than send this task back to Backlog for one document, BL-354 is filed to record the decisions below in an ADR.
+- The ADR could not be written here: `Documentation/Planning/Decisions` is in BL-302's `touches` (in Doing), so rather than send this task back to Backlog for one document, BL-355 is filed to record the decisions below in an ADR.
 - GSSAPI is offered in the SOCKS5 greeting because the reference build offers it (so the bytes match), but is not implemented; a proxy that picks it fails with the SSPI message measured above.
 - SOCKS4 sends the first IPv4 address resolved; with none, exit 97 naming the first address. SOCKS5 sends the first address, either family. A host is an address literal only if `IPAddress.TryParse` accepts it and, for IPv4, it prints back the same (so `1` is a name). Names and credentials are UTF-8.
 - An exception while the handshake is written or read disposes the proxy connection and propagates, as the HTTP CONNECT path does.

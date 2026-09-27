@@ -1,5 +1,5 @@
 ---
-id: BL-354
+id: BL-355
 title: Record the SOCKS handshake decisions in an ADR
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-354 — Record the SOCKS handshake decisions in an ADR
+# BL-355 — Record the SOCKS handshake decisions in an ADR
 
 ## Goal
 
