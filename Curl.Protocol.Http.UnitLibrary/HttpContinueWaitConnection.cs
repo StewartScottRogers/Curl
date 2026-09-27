@@ -11,10 +11,10 @@ namespace Curl.Protocol.Http;
 /// <remarks>
 /// curl 8.21.0 sends the body when <c>100 Continue</c> arrives or when the wait runs out
 /// with nothing received, and leaves it unsent when a final status arrives first (BL-175
-/// Notes). The read the wait started keeps running after the wait runs out, so a
-/// <c>417</c> that arrives while the body is sent is seen in time to stop sending it
-/// (<see cref="SendUnlessExpectationFailedAsync" />, BL-319 Notes); the next read waits for
-/// it. Disposing this does nothing: the connection it wraps belongs to the handler.
+/// Notes). The read the wait started keeps running after the wait runs out, so a status of
+/// 300 or above that arrives while the body is sent is seen in time to stop sending it
+/// (<see cref="SendUnlessStoppedAsync" />, BL-319 and BL-395 Notes); the next read waits
+/// for it. Disposing this does nothing: the connection it wraps belongs to the handler.
 /// </remarks>
 /// <param name="connection">The connection the request head was written to.</param>
 internal sealed class HttpContinueWaitConnection(IConnection connection) : IConnection
@@ -64,26 +64,29 @@ internal sealed class HttpContinueWaitConnection(IConnection connection) : IConn
 
     /// <summary>
     /// Gets a value indicating whether the first status line received, after the wait ran out,
-    /// is a <c>417 Expectation Failed</c>.
+    /// has a status of 300 or above, which stops curl 8.21.0 sending the body: a
+    /// <c>417 Expectation Failed</c> (BL-319 Notes) or any other redirect or error
+    /// (<c>HTTP error before end of send, stop sending</c>, BL-395 Notes). A 1xx or 2xx lets
+    /// the body go on.
     /// </summary>
-    internal bool ExpectationFailed => statusLineRead is { IsCompletedSuccessfully: true } && firstStatusCode == 417;
+    internal bool StopsSending => statusLineRead is { IsCompletedSuccessfully: true } && firstStatusCode >= 300;
 
     /// <summary>
-    /// Writes one piece of the body, unless a <c>417</c> arrives first: a write still under
-    /// way when it arrives is cancelled, as curl 8.21.0 stops sending there (measured,
-    /// BL-319 Notes).
+    /// Writes one piece of the body, unless a status of 300 or above arrives first: a write
+    /// still under way when it arrives is cancelled, as curl 8.21.0 stops sending there
+    /// (measured, BL-319 and BL-395 Notes).
     /// </summary>
     /// <param name="bytes">The piece to send.</param>
     /// <param name="cancellationToken">Cancels the write.</param>
     /// <returns>
     /// <see langword="true" /> when the piece was written; <see langword="false" /> when a
-    /// <c>417</c> arrived before it was.
+    /// status of 300 or above arrived before it was.
     /// </returns>
     /// <exception cref="HttpTransferException">The connection failed the write (exit 55).</exception>
     /// <exception cref="OperationCanceledException"><paramref name="cancellationToken" /> was cancelled.</exception>
-    internal async ValueTask<bool> SendUnlessExpectationFailedAsync(ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken)
+    internal async ValueTask<bool> SendUnlessStoppedAsync(ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken)
     {
-        if (ExpectationFailed)
+        if (StopsSending)
         {
             return false;
         }
@@ -91,7 +94,7 @@ internal sealed class HttpContinueWaitConnection(IConnection connection) : IConn
         using CancellationTokenSource sending = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         Task sent = HttpConnectionSend.WriteAsync(connection, bytes, sending.Token).AsTask();
         await Task.WhenAny(sent, statusLineRead!).ConfigureAwait(false);
-        if (!sent.IsCompleted && ExpectationFailed)
+        if (!sent.IsCompleted && StopsSending)
         {
             await sending.CancelAsync().ConfigureAwait(false);
         }

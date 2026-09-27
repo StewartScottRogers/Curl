@@ -450,7 +450,7 @@ public sealed class HttpProtocolHandler(
             HeldHead = request,
             IsUpload = framing.IsUpload,
             Progress = plan.Progress,
-            ExpectationWatch = responseConnection as HttpContinueWaitConnection,
+            EarlyResponseWatch = responseConnection as HttpContinueWaitConnection,
         };
         HttpExchange exchange = new(connect, connection, framing.Method, request.Length, upload, earlier, newConnection)
         {
@@ -517,9 +517,9 @@ public sealed class HttpProtocolHandler(
             : new HttpAttemptOutcome(failed, null, KeepsAlive: false);
 
     /// <summary>
-    /// Decides whether the connection can carry another request: not after a body a
-    /// <c>417</c> cut short, which curl 8.21.0 shuts the connection on (measured, BL-319
-    /// Notes), nor after a 101, nor when the body was left unread; and else as
+    /// Decides whether the connection can carry another request: not after a body a status of
+    /// 300 or above cut short, which curl 8.21.0 shuts the connection on (measured, BL-319 and
+    /// BL-395 Notes), nor after a 101, nor when the body was left unread; and else as
     /// <see cref="HttpConnectionPersistence" /> says (ADR-0050).
     /// </summary>
     private static bool KeepsAlive(HttpRequestPlan plan, HttpResponseHead head, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpBodyDelivery delivery) =>

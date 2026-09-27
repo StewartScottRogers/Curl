@@ -20,9 +20,9 @@ namespace Curl.Protocol.Http;
 /// its first failed read, as curl's body reader treats both. A read that throws
 /// <see cref="RequestBodyReadFailedException" /> is the exception: it fails the transfer with
 /// exit 26 and the exception's message, and a chunked body gets no closing chunk. Under
-/// <see cref="ExpectationWatch" /> every piece, a <see cref="BytesBody" /> cut into the same
-/// buffer-sized pieces, is raced against a <c>417</c>, and sending stops at the first piece the
-/// <c>417</c> beats (<see cref="CutShort" />, measured, BL-319 Notes).
+/// <see cref="EarlyResponseWatch" /> every piece, a <see cref="BytesBody" /> cut into the same
+/// buffer-sized pieces, is raced against a status of 300 or above, and sending stops at the first piece that
+/// status beats (<see cref="CutShort" />, measured, BL-319 and BL-395 Notes).
 /// </remarks>
 /// <param name="connection">The connection the request head was written to.</param>
 internal sealed class HttpRequestBodyWriter(IConnection connection)
@@ -92,14 +92,14 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
 
     /// <summary>
     /// Gets the connection that waited for <c>100 Continue</c> and so watches for a
-    /// <c>417</c> while the body is sent, or <see langword="null" /> when the request waited
-    /// for nothing and the body is sent whole.
+    /// status of 300 or above while the body is sent, or <see langword="null" /> when the
+    /// request waited for nothing and the body is sent whole.
     /// </summary>
-    internal HttpContinueWaitConnection? ExpectationWatch { get; init; }
+    internal HttpContinueWaitConnection? EarlyResponseWatch { get; init; }
 
     /// <summary>
     /// Gets a value indicating whether sending stopped before the end of the body because a
-    /// <c>417</c> arrived first.
+    /// status of 300 or above arrived first.
     /// </summary>
     internal bool CutShort { get; private set; }
 
@@ -182,12 +182,12 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     }
 
     /// <summary>
-    /// Writes a body of bytes: whole, or under <see cref="ExpectationWatch" /> in the pieces
+    /// Writes a body of bytes: whole, or under <see cref="EarlyResponseWatch" /> in the pieces
     /// curl's upload buffer holds, until they are all sent or one is cut short.
     /// </summary>
     private async ValueTask WriteBytesAsync(ReadOnlyMemory<byte> content, bool isChunked, CancellationToken cancellationToken)
     {
-        if (ExpectationWatch is null)
+        if (EarlyResponseWatch is null)
         {
             await WritePieceAsync(content, isChunked, cancellationToken).ConfigureAwait(false);
             return;
@@ -279,12 +279,12 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
             return;
         }
 
-        if (ExpectationWatch is not { } watch)
+        if (EarlyResponseWatch is not { } watch)
         {
             await WriteHeldHeadAsync(cancellationToken).ConfigureAwait(false);
             await WriteFramedAsync(piece, isChunked, cancellationToken).ConfigureAwait(false);
         }
-        else if (!await watch.SendUnlessExpectationFailedAsync(Framed(piece, isChunked), cancellationToken).ConfigureAwait(false))
+        else if (!await watch.SendUnlessStoppedAsync(Framed(piece, isChunked), cancellationToken).ConfigureAwait(false))
         {
             CutShort = true;
             unsent = piece.ToArray();
