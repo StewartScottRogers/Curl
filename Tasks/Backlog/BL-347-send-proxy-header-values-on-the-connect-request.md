@@ -1,5 +1,5 @@
 ---
-id: BL-335
+id: BL-347
 title: Send --proxy-header values on the CONNECT request
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-335 — Send --proxy-header values on the CONNECT request
+# BL-347 — Send --proxy-header values on the CONNECT request
 
 ## Goal
 

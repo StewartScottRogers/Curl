@@ -1,5 +1,5 @@
 ---
-id: BL-334
+id: BL-346
 title: Parse --proxy-header and carry it into HttpRequestOptions.ProxyHeaders
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-334 — Parse --proxy-header and carry it into HttpRequestOptions.ProxyHeaders
+# BL-346 — Parse --proxy-header and carry it into HttpRequestOptions.ProxyHeaders
 
 ## Goal
 

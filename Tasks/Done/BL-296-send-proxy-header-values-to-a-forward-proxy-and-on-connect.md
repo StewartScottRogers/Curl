@@ -32,7 +32,7 @@ completed: 2026-09-27
 ## Notes
 
 - Delivered: `HttpRequestOptions.ProxyHeaders` (Abstractions, default empty); `HttpRequestHeadFormatter.Format` parses them with `HttpCustomHeader` only when `forwardProxy` is true, lets them (like `-H`) remove or replace curl's `Proxy-Connection: Keep-Alive`, and appends them after the `-H` values and before the body headers under `AppendCustomHeaders`' rules. Tests: `HttpRequestOptionsTests` (default and round trip), `HttpRequestHeadFormatterTests.Format_ForwardProxyWithProxyHeaders_SendsMeasuredHead` (6 rows), `Format_ForwardProxyWithProxyHeadersAndBody_SendsThemBeforeTheBodyHeaders`, `Format_ProxyHeadersWithoutForwardProxy_SendsNone`, `HttpProtocolHandlerTests.ExecuteAsync_HttpThroughProxyWithProxyHeaders_SendsThemAfterTheCustomHeaders`; the tunnelled-proxy test now sets `ProxyHeaders` and still expects an origin-form head without them.
-- Scope: the Goal leaves the CLI and CONNECT wiring to the tasks that own those projects, so the title's "and on CONNECT" is filed as BL-335 (Networking tunnel) and the command-line parsing as BL-334 (Cli, Console). No design decision beyond measured behaviour was needed, so no ADR.
+- Scope: the Goal leaves the CLI and CONNECT wiring to the tasks that own those projects, so the title's "and on CONNECT" is filed as BL-347 (Networking tunnel) and the command-line parsing as BL-346 (Cli, Console). No design decision beyond measured behaviour was needed, so no ADR.
 - Measured with `Record-CurlExchange.ps1 -Port 18296` against curl 8.21.0 (mingw, Schannel), 2026-09-27; `-x http://127.0.0.1:18296` unless noted, `http://example.com/`:
   - `--proxy-header "X-P: 1" -H "X-A: 1"` -> `Host`, `User-Agent`, `Accept`, `Proxy-Connection: Keep-Alive`, `X-A: 1`, `X-P: 1`.
   - `--proxy-header "Proxy-Connection: close"` -> curl's `Proxy-Connection` dropped; `--proxy-header "Proxy-Connection: close" -H "X-A: 1"` -> `... Accept`, `X-A: 1`, `Proxy-Connection: close` (sent in the proxy-header slot).
@@ -50,4 +50,4 @@ completed: 2026-09-27
 
 - 2026-09-26: Created.
 - 2026-09-27: Backlog -> Doing.
-- 2026-09-27: Doing -> Done. --proxy-header values (HttpRequestOptions.ProxyHeaders) reach a forward-proxy request head after the -H values, byte-equal to curl 8.21.0; CLI and CONNECT filed as BL-334, BL-335
+- 2026-09-27: Doing -> Done. --proxy-header values (HttpRequestOptions.ProxyHeaders) reach a forward-proxy request head after the -H values, byte-equal to curl 8.21.0; CLI and CONNECT filed as BL-346, BL-347
