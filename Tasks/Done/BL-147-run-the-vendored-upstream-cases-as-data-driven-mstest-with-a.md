@@ -77,6 +77,17 @@ the upstream pass rate is a number anyone can recompute.
     silently drop a passing case.
 - Refactored `UpstreamFirstDifference.Escape` and `UpstreamPerlSubstitution.Parse`, which
   Cobertura measured at complexity 14 and 12, to at most 10.
+- Code review after the first commit, all acted on: a timed-out run cannot be cancelled
+  (`CurlCommandRunner.RunAsync` takes no token and `Curl.Console` code is outside `touches`),
+  so its memory streams are no longer disposed under it; a file part outside the case's log
+  directory now skips the case; `$` and a backtick inside double quotes now count as shell
+  syntax; `<reply><data base64>` is decoded before comparison; a strip pattern that times out
+  is the case's difference instead of an exception; the timeout test uses a fake
+  `TimeProvider`; the no-op clearing of proxy variables was removed (the conformance
+  composition never reads them). Pass counts unchanged (137 / 324 / 1552).
+- Decided: the conformance tests touch the file system but stay out of `Integration`, because
+  ADR-0013 and this task put the ratchet in the fast suite and upstream's cases need real
+  `%LOGDIR` files; recorded in `Curl.Conformance.UnitTests/CLAUDE.md`.
 
 ## Log
 
