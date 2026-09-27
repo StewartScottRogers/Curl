@@ -49,6 +49,7 @@ choices do not need one.
 | [0032](ADR-0032-url-globs-expand-as-curl-8-21-0s-tool-expands-them.md) | URL globs expand as curl 8.21.0's tool expands them: measured messages and columns, lazy expansion, `#N` as `glob_match_url` | Accepted | 2026-09-26 |
 | [0033](ADR-0033-a-followed-put-redirect-rewinds-a-seekable-upload-and-passes-stdin-on-as-it-is.md) | A followed PUT redirect rewinds a seekable `-T` upload and passes standard input on as it is | Accepted | 2026-09-26 |
 | [0034](ADR-0034-http-authentication-retries-a-401-once-as-curl-8-21-0-does.md) | HTTP authentication retries a 401 once, as curl 8.21.0 does | Accepted | 2026-09-26 |
+| [0035](ADR-0035-w-times-print-microseconds-since-the-start-and-speeds-divide-by-time-total.md) | `-w` times print microseconds since the start, and speeds divide by `time_total` | Accepted | 2026-09-26 |
 
 ## Template
 

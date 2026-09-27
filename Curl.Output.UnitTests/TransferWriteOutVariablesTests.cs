@@ -12,6 +12,15 @@ public sealed class TransferWriteOutVariablesTests
 {
     private const string LoopbackUrl = "http://127.0.0.1:18225/a?b";
 
+    /// <summary>A clock whose timestamps are microseconds, so a test writes curl's microsecond values directly.</summary>
+    private static readonly TimeProvider Clock = new MicrosecondTimeProvider();
+
+    private static readonly string[] TimeAndSpeedVariableOrder =
+    [
+        "time_namelookup", "time_connect", "time_appconnect", "time_pretransfer", "time_posttransfer",
+        "time_starttransfer", "time_redirect", "time_total", "speed_download", "speed_upload",
+    ];
+
     [TestMethod]
     public void TryGetVariableText_RedirectResponseNotFollowed_MatchesCurl()
     {
@@ -37,7 +46,7 @@ public sealed class TransferWriteOutVariablesTests
             LocalEndPoint = new IPEndPoint(IPAddress.Loopback, 50123),
             RemoteEndPoint = new IPEndPoint(IPAddress.Loopback, 18225),
         };
-        TransferWriteOutVariables variables = new(TransferResult.Success(5) with { Report = report }, LoopbackUrl, 0, LoopbackUrl, "http");
+        TransferWriteOutVariables variables = new(TransferResult.Success(5) with { Report = report }, LoopbackUrl, 0, LoopbackUrl, "http", Clock);
 
         Assert.AreEqual(
             "302|302|000|1.1|GET|text/plain; charset=utf-8|http://127.0.0.1:18225/next?q=1|http://127.0.0.1:18225/a?b|0|111|82|5|0|1|127.0.0.1|50123|127.0.0.1|18225|0||http://127.0.0.1:18225/a?b|0|http",
@@ -49,7 +58,7 @@ public sealed class TransferWriteOutVariablesTests
     {
         // curl -s -o NUL -w "..." file:///C:/Windows/win.ini: nothing learned beyond the bytes.
         TransferWriteOutVariables variables = new(
-            TransferResult.Success(92), "file:///C:/Windows/win.ini", 0, "file://C:/Windows/win.ini", "file");
+            TransferResult.Success(92), "file:///C:/Windows/win.ini", 0, "file://C:/Windows/win.ini", "file", Clock);
 
         Assert.AreEqual(
             "000|000|000|0|GET|||file://C:/Windows/win.ini|0|0|0|92|0|0||-1||-1|0||file:///C:/Windows/win.ini|0|file",
@@ -62,7 +71,7 @@ public sealed class TransferWriteOutVariablesTests
         // curl -s -o NUL -w "..." http://127.0.0.1:1/x exited 7.
         const string message = "Failed to connect to 127.0.0.1:1 after 2043 ms: Could not connect to server";
         TransferWriteOutVariables variables = new(
-            TransferResult.Failure(CurlExitCode.CouldntConnect, message), "http://127.0.0.1:1/x", 0, "http://127.0.0.1:1/x", "http");
+            TransferResult.Failure(CurlExitCode.CouldntConnect, message), "http://127.0.0.1:1/x", 0, "http://127.0.0.1:1/x", "http", Clock);
 
         Assert.AreEqual(
             "000|000|000|0|GET|||http://127.0.0.1:1/x|0|0|0|0|0|0||-1||-1|7|" + message + "|http://127.0.0.1:1/x|0|http",
@@ -75,7 +84,7 @@ public sealed class TransferWriteOutVariablesTests
     {
         // curl -w "%{scheme}" nope://x/ printed nothing and exited 1.
         TransferWriteOutVariables variables = new(
-            TransferResult.Failure(CurlExitCode.UnsupportedProtocol, "Protocol \"nope\" not supported"), "nope://x/", 0, "nope://x/", null);
+            TransferResult.Failure(CurlExitCode.UnsupportedProtocol, "Protocol \"nope\" not supported"), "nope://x/", 0, "nope://x/", null, Clock);
 
         Assert.AreEqual(string.Empty, Get(variables, "scheme"));
         Assert.AreEqual("1", Get(variables, "exitcode"));
@@ -91,7 +100,7 @@ public sealed class TransferWriteOutVariablesTests
             "FILE:///C:/Windows/nosuch.ini",
             1,
             "file://C:/Windows/nosuch.ini",
-            "file");
+            "file", Clock);
 
         Assert.AreEqual("1", Get(variables, "urlnum"));
         Assert.AreEqual("FILE:///C:/Windows/nosuch.ini", Get(variables, "url"));
@@ -105,7 +114,7 @@ public sealed class TransferWriteOutVariablesTests
         // curl -s -f -o NUL -d abcdef -w "..." against a 404: exit 22, code 404, method POST, size_upload 6.
         TransferReport report = new() { ResponseCode = 404, HttpVersion = new Version(1, 1), Method = "POST", UploadSize = 6, RequestSize = 155, HeaderSize = 45 };
         TransferResult result = TransferResult.Failure(CurlExitCode.HttpReturnedError, "The requested URL returned error: 404") with { Report = report };
-        TransferWriteOutVariables variables = new(result, "http://127.0.0.1:18225/p", 0, "http://127.0.0.1:18225/p", "http");
+        TransferWriteOutVariables variables = new(result, "http://127.0.0.1:18225/p", 0, "http://127.0.0.1:18225/p", "http", Clock);
 
         Assert.AreEqual("404", Get(variables, "http_code"));
         Assert.AreEqual("POST", Get(variables, "method"));
@@ -126,7 +135,7 @@ public sealed class TransferWriteOutVariablesTests
             "http://example.invalid/",
             0,
             "http://example.invalid/",
-            "http");
+            "http", Clock);
 
         Assert.AreEqual("000", Get(variables, "http_code"));
         Assert.AreEqual("407", Get(variables, "http_connect"));
@@ -185,7 +194,7 @@ public sealed class TransferWriteOutVariablesTests
     public void TryGetVariableText_ReportSizes_WinOverBytesTransferred()
     {
         TransferWriteOutVariables variables = new(
-            TransferResult.Success(999) with { Report = new TransferReport { DownloadSize = 7 } }, LoopbackUrl, 0, LoopbackUrl, "http");
+            TransferResult.Success(999) with { Report = new TransferReport { DownloadSize = 7 } }, LoopbackUrl, 0, LoopbackUrl, "http", Clock);
 
         Assert.AreEqual("7", Get(variables, "size_download"));
     }
@@ -222,9 +231,98 @@ public sealed class TransferWriteOutVariablesTests
     [TestMethod]
     public void FindFirstHeaderValue_NoReport_FindsNothing()
     {
-        TransferWriteOutVariables variables = new(TransferResult.Success(0), LoopbackUrl, 0, LoopbackUrl, "http");
+        TransferWriteOutVariables variables = new(TransferResult.Success(0), LoopbackUrl, 0, LoopbackUrl, "http", Clock);
 
         Assert.IsNull(variables.FindFirstHeaderValue("content-length"));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_TimedPost_MatchesCurl()
+    {
+        // curl -s -o NUL -d <5000 bytes> -w "..." http://127.0.0.1:18226/ against a 200 with a
+        // 20000-byte body printed ns=0.000065 c=0.005721 a=0.000000 pre=0.006038 post=0.006038
+        // st=0.057008 r=0.000000 t=0.057123 sd=350170 su=87542. curl divides by the time of its
+        // last progress update, 0.057115 here, which is not reported; time_total is used instead.
+        TransferReport report = new()
+        {
+            DownloadSize = 20000,
+            UploadSize = 5000,
+            Timings = new TransferTimings(
+                Started: 1_000_000,
+                Connect: new ConnectTimings(Started: 1_000_010, NameResolved: 1_000_065, Connected: 1_005_721, TlsHandshakeCompleted: null),
+                RequestReady: 1_006_038,
+                RequestSent: 1_006_038,
+                FirstByteReceived: 1_057_008,
+                Completed: 1_057_115),
+        };
+
+        Assert.AreEqual(
+            "0.000065|0.005721|0.000000|0.006038|0.006038|0.057008|0.000000|0.057115|350170|87542",
+            RenderTimesAndSpeeds(WithReport(report)));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_NoTimings_PrintsZeroes()
+    {
+        // curl -s -o NUL -w "..." file:///tmp/bl226.bin (100000 bytes) printed zero for both speeds.
+        TransferWriteOutVariables variables = new(TransferResult.Success(100000), "file:///tmp/bl226.bin", 0, "file:///tmp/bl226.bin", "file", Clock);
+
+        Assert.AreEqual(
+            "0.000000|0.000000|0.000000|0.000000|0.000000|0.000000|0.000000|0.000000|0|0",
+            RenderTimesAndSpeeds(variables));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_TlsAfterRedirect_PrintsSecondsPastOneAndTheRedirectTime()
+    {
+        TransferReport report = new()
+        {
+            DownloadSize = 3_000_000,
+            Timings = new TransferTimings(
+                Started: 0,
+                Connect: new ConnectTimings(Started: 1_500_000, NameResolved: null, Connected: 1_600_000, TlsHandshakeCompleted: 1_700_001),
+                RequestReady: 1_700_002,
+                RequestSent: 1_700_003,
+                FirstByteReceived: 1_800_000,
+                Completed: 2_000_000)
+            {
+                RedirectDuration = TimeSpan.FromMicroseconds(1_500_000),
+            },
+        };
+
+        Assert.AreEqual(
+            "0.000000|1.600000|1.700001|1.700002|1.700003|1.800000|1.500000|2.000000|1500000|0",
+            RenderTimesAndSpeeds(WithReport(report)));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_EventAtTheStart_PrintsOneMicrosecond()
+    {
+        // Curl_pgrsTime makes every event that happened at least one microsecond after the start.
+        TransferReport report = new()
+        {
+            DownloadSize = 5,
+            Timings = new TransferTimings(Started: 42, Connect: null, RequestReady: 42, RequestSent: null, FirstByteReceived: null, Completed: 42),
+        };
+
+        Assert.AreEqual(
+            "0.000000|0.000000|0.000000|0.000001|0.000000|0.000000|0.000000|0.000001|5000000|0",
+            RenderTimesAndSpeeds(WithReport(report)));
+    }
+
+    [TestMethod]
+    [DataRow(2_000_000L, "4611686018427387")]
+    [DataRow(999_999L, "9223372036854775807")]
+    public void TryGetVariableText_SizeTooLargeToScale_DividesAsTrspeed(long totalMicroseconds, string expected)
+    {
+        // trspeed: size / whole seconds from one second on, the largest value below it.
+        TransferReport report = new()
+        {
+            DownloadSize = long.MaxValue / 1000,
+            Timings = new TransferTimings(Started: 0, Connect: null, RequestReady: null, RequestSent: null, FirstByteReceived: null, Completed: totalMicroseconds),
+        };
+
+        Assert.AreEqual(expected, Get(WithReport(report), "speed_download"));
     }
 
     [TestMethod]
@@ -232,9 +330,10 @@ public sealed class TransferWriteOutVariablesTests
     {
         TransferResult result = TransferResult.Success(0);
 
-        Assert.ThrowsExactly<ArgumentNullException>(() => new TransferWriteOutVariables(null!, LoopbackUrl, 0, LoopbackUrl, "http"));
-        Assert.ThrowsExactly<ArgumentNullException>(() => new TransferWriteOutVariables(result, null!, 0, LoopbackUrl, "http"));
-        Assert.ThrowsExactly<ArgumentNullException>(() => new TransferWriteOutVariables(result, LoopbackUrl, 0, null!, "http"));
+        Assert.ThrowsExactly<ArgumentNullException>(() => new TransferWriteOutVariables(null!, LoopbackUrl, 0, LoopbackUrl, "http", Clock));
+        Assert.ThrowsExactly<ArgumentNullException>(() => new TransferWriteOutVariables(result, null!, 0, LoopbackUrl, "http", Clock));
+        Assert.ThrowsExactly<ArgumentNullException>(() => new TransferWriteOutVariables(result, LoopbackUrl, 0, null!, "http", Clock));
+        Assert.ThrowsExactly<ArgumentNullException>(() => new TransferWriteOutVariables(result, LoopbackUrl, 0, LoopbackUrl, "http", null!));
     }
 
     [TestMethod]
@@ -256,7 +355,7 @@ public sealed class TransferWriteOutVariablesTests
 
     private static TransferWriteOutVariables WithReport(TransferReport report)
     {
-        return new TransferWriteOutVariables(TransferResult.Success(0) with { Report = report }, LoopbackUrl, 0, LoopbackUrl, "http");
+        return new TransferWriteOutVariables(TransferResult.Success(0) with { Report = report }, LoopbackUrl, 0, LoopbackUrl, "http", Clock);
     }
 
     private static string RenderAll(TransferWriteOutVariables variables)
@@ -264,9 +363,19 @@ public sealed class TransferWriteOutVariablesTests
         return string.Join('|', MeasuredVariableOrder.Select(name => Get(variables, name)));
     }
 
+    private static string RenderTimesAndSpeeds(TransferWriteOutVariables variables)
+    {
+        return string.Join('|', TimeAndSpeedVariableOrder.Select(name => Get(variables, name)));
+    }
+
     private static string Get(TransferWriteOutVariables variables, string name)
     {
         Assert.IsTrue(variables.TryGetVariableText(name, out string? text), name);
         return text;
+    }
+
+    private sealed class MicrosecondTimeProvider : TimeProvider
+    {
+        public override long TimestampFrequency => 1_000_000;
     }
 }

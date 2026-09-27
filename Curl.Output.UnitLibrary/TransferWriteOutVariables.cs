@@ -17,8 +17,19 @@ namespace Curl.Output;
 /// <c>url_effective</c>, <c>num_redirects</c>, <c>size_header</c>, <c>size_request</c>,
 /// <c>size_download</c>, <c>size_upload</c>, <c>num_connects</c>, <c>num_headers</c>,
 /// <c>local_ip</c>, <c>local_port</c>, <c>remote_ip</c>, <c>remote_port</c>,
-/// <c>exitcode</c>, <c>errormsg</c>, <c>url</c>, <c>urlnum</c> and <c>scheme</c>. Any
-/// other name is reported unknown.
+/// <c>exitcode</c>, <c>errormsg</c>, <c>url</c>, <c>urlnum</c>, <c>scheme</c>,
+/// <c>time_namelookup</c>, <c>time_connect</c>, <c>time_appconnect</c>,
+/// <c>time_pretransfer</c>, <c>time_posttransfer</c>, <c>time_starttransfer</c>,
+/// <c>time_redirect</c>, <c>time_total</c>, <c>speed_download</c> and
+/// <c>speed_upload</c>. Any other name is reported unknown.
+/// </para>
+/// <para>
+/// A <c>time_*</c> value is the seconds from <see cref="TransferTimings.Started"/> to its
+/// event, in whole microseconds printed with six decimals; an event that happened is at
+/// least one microsecond after the start, and one that did not, or a transfer with no
+/// <see cref="TransferReport.Timings"/>, prints <c>0.000000</c>. A <c>speed_*</c> value is
+/// the bytes per second over <c>time_total</c>, truncated to a whole number, and <c>0</c>
+/// without timings. See ADR-0035.
 /// </para>
 /// <para>
 /// What was not learned prints as curl prints it: a status code as <c>000</c>, the HTTP
@@ -33,14 +44,18 @@ namespace Curl.Output;
 /// <param name="urlNumber">The zero-based position of the URL among the transfers, printed by <c>%{urlnum}</c>.</param>
 /// <param name="requestUrl">The URL handed to the protocol handler, printed by <c>%{url_effective}</c> when the report names no other.</param>
 /// <param name="scheme">The lower-case scheme of the handler that ran, or <see langword="null"/> when no handler supports the URL; printed by <c>%{scheme}</c>.</param>
+/// <param name="timeProvider">The provider whose <see cref="TimeProvider.GetTimestamp"/> took the report's <see cref="TransferTimings"/>, used to turn them into durations.</param>
 public sealed class TransferWriteOutVariables(
     TransferResult result,
     string url,
     int urlNumber,
     string requestUrl,
-    string? scheme) : IWriteOutVariableSource
+    string? scheme,
+    TimeProvider timeProvider) : IWriteOutVariableSource
 {
     private const int UnknownPort = -1;
+
+    private const long MicrosecondsPerSecond = 1_000_000;
 
     private static readonly Dictionary<string, Func<TransferWriteOutVariables, string>> VariableFormatters = new(StringComparer.Ordinal)
     {
@@ -68,6 +83,16 @@ public sealed class TransferWriteOutVariables(
         ["url"] = variables => variables.url,
         ["urlnum"] = variables => FormatNumber(variables.urlNumber),
         ["scheme"] = variables => variables.scheme ?? string.Empty,
+        ["time_namelookup"] = variables => FormatSeconds(variables.MicrosecondsSinceStart(variables.Timings?.Connect?.NameResolved)),
+        ["time_connect"] = variables => FormatSeconds(variables.MicrosecondsSinceStart(variables.Timings?.Connect?.Connected)),
+        ["time_appconnect"] = variables => FormatSeconds(variables.MicrosecondsSinceStart(variables.Timings?.Connect?.TlsHandshakeCompleted)),
+        ["time_pretransfer"] = variables => FormatSeconds(variables.MicrosecondsSinceStart(variables.Timings?.RequestReady)),
+        ["time_posttransfer"] = variables => FormatSeconds(variables.MicrosecondsSinceStart(variables.Timings?.RequestSent)),
+        ["time_starttransfer"] = variables => FormatSeconds(variables.MicrosecondsSinceStart(variables.Timings?.FirstByteReceived)),
+        ["time_redirect"] = variables => FormatSeconds(ToMicroseconds(variables.Timings?.RedirectDuration ?? TimeSpan.Zero)),
+        ["time_total"] = variables => FormatSeconds(variables.TotalMicroseconds),
+        ["speed_download"] = variables => FormatNumber(ComputeBytesPerSecond(variables.DownloadSize, variables.TotalMicroseconds)),
+        ["speed_upload"] = variables => FormatNumber(ComputeBytesPerSecond(variables.report.UploadSize, variables.TotalMicroseconds)),
     };
 
     private static readonly char[] HeaderValueWhitespace = [' ', '\t'];
@@ -78,8 +103,13 @@ public sealed class TransferWriteOutVariables(
     private readonly string requestUrl = requestUrl ?? throw new ArgumentNullException(nameof(requestUrl));
     private readonly int urlNumber = urlNumber;
     private readonly string? scheme = scheme;
+    private readonly TimeProvider timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
 
     private long DownloadSize => result.Report?.DownloadSize ?? result.BytesTransferred;
+
+    private TransferTimings? Timings => report.Timings;
+
+    private long TotalMicroseconds => MicrosecondsSinceStart(Timings?.Completed);
 
     /// <inheritdoc/>
     public bool TryGetVariableText(string name, [NotNullWhen(true)] out string? text)
@@ -109,6 +139,50 @@ public sealed class TransferWriteOutVariables(
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// The whole microseconds from the start to <paramref name="timestamp"/>, at least one
+    /// as curl's <c>Curl_pgrsTime</c> makes it; zero when the event did not happen.
+    /// </summary>
+    private long MicrosecondsSinceStart(long? timestamp)
+    {
+        return timestamp is long reached
+            ? Math.Max(1, ToMicroseconds(timeProvider.GetElapsedTime(Timings!.Started, reached)))
+            : 0;
+    }
+
+    private static long ToMicroseconds(TimeSpan duration)
+    {
+        return duration.Ticks / TimeSpan.TicksPerMicrosecond;
+    }
+
+    /// <summary>Prints microseconds as seconds with six decimals, as curl's <c>-w</c> prints a time.</summary>
+    private static string FormatSeconds(long microseconds)
+    {
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"{microseconds / MicrosecondsPerSecond}.{microseconds % MicrosecondsPerSecond:D6}");
+    }
+
+    /// <summary>
+    /// Bytes per second as curl's <c>trspeed</c> computes it: truncated, without overflowing
+    /// for a size too large to multiply by a million. <paramref name="microseconds"/> of zero
+    /// means no timings, which prints <c>0</c>.
+    /// </summary>
+    private static long ComputeBytesPerSecond(long size, long microseconds)
+    {
+        if (microseconds == 0)
+        {
+            return 0;
+        }
+
+        if (size < long.MaxValue / MicrosecondsPerSecond)
+        {
+            return size * MicrosecondsPerSecond / microseconds;
+        }
+
+        return microseconds >= MicrosecondsPerSecond ? size / (microseconds / MicrosecondsPerSecond) : long.MaxValue;
     }
 
     private static string FormatStatusCode(int code)
