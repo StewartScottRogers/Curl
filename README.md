@@ -9,6 +9,15 @@
 the best quality your screen can show - 8K, 4K or HD - with a 4K MP4 and an 8K still to
 download. Ctrl-click (⌘-click on a Mac) to open it in its own tab.*
 
+### Code coverage
+
+[![Code coverage: lines and branches covered across every production library - click for the full report](https://github.com/StewartScottRogers/Curl/raw/gource/coverage/badge.svg)](https://stewartscottrogers.github.io/Curl/coverage/)
+
+*Every production library is held to 100% line and branch coverage, cyclomatic complexity
+of at most 10 and a CRAP score of at most 30. The [full report](https://stewartscottrogers.github.io/Curl/coverage/)
+shows each library against those gates and every member outside one, measured on Windows
+and regenerated on the same schedule as the video above.*
+
 ## What this is
 
 Curl is a port of the open-source [curl](https://curl.se) command-line tool to C# on
