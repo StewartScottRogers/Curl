@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-010, BL-012, BL-292]
-touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Core.UnitLibrary, Curl.Core.UnitTests, Documentation/Product/Requirements.md]
+touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Core.UnitLibrary, Curl.Core.UnitTests, Documentation/Product/Requirements.md, Curl.Console, Curl.Console.UnitTests, Documentation/Planning/Decisions]
 requirement: FR-005
 created: 2026-09-26
-completed:
+completed: 2026-09-27
 ---
 # BL-030 — Wire `UploadUrl` into the transfer dispatcher
 
@@ -55,20 +55,20 @@ https://curl.se/libcurl/c/libcurl-errors.html, checked against curl 8.21.0.
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Cli.UnitTests` shows pairwise resolution: `-T a -T b http://h/1/ http://h/2/`
+- [x] A test in `Curl.Cli.UnitTests` shows pairwise resolution: `-T a -T b http://h/1/ http://h/2/`
       dispatches `a` to `http://h/1/a` and `b` to `http://h/2/b`, in that order.
-- [ ] A test shows `-T - http://h/d/` and `-T . http://h/d/` dispatch to `http://h/d/`
+- [x] A test shows `-T - http://h/d/` and `-T . http://h/d/` dispatch to `http://h/d/`
       unchanged.
-- [ ] A test shows `-T nosuchfile 'http://h/d ir/'` returns `CurlExitCode.UrlMalformat`
+- [x] A test shows `-T nosuchfile 'http://h/d ir/'` returns `CurlExitCode.UrlMalformat`
       (3), and that the upload source was never opened (the injected `IFileSystem`
       records no open call).
-- [ ] A test shows `-T nosuchfile http://h/d/` returns `CurlExitCode.ReadError` (26).
-- [ ] A test shows `-T local.txt http:/host` yields the effective URL
+- [x] A test shows `-T nosuchfile http://h/d/` returns `CurlExitCode.ReadError` (26).
+- [x] A test shows `-T local.txt http:/host` yields the effective URL
       `http://host/local.txt`, and `-T local.txt host/dir/` yields
       `http://host/dir/local.txt`.
-- [ ] The FR-005 row in `Documentation/Product/Requirements.md` no longer lists
+- [x] The FR-005 row in `Documentation/Product/Requirements.md` no longer lists
       resolving a `/`-ending `-T` URL, or wiring it in, as an open gap.
-- [ ] `dotnet build Curl.Cli.UnitLibrary -warnaserror` is clean and
+- [x] `dotnet build Curl.Cli.UnitLibrary -warnaserror` is clean and
       `dotnet test --filter "TestCategory!=Integration"` is green; no test needs
       `TestCategory=Integration`.
 
@@ -76,8 +76,36 @@ https://curl.se/libcurl/c/libcurl-errors.html, checked against curl 8.21.0.
 
 Globbing of the `-T` argument is BL-031 and is out of scope here.
 
+- 2026-09-27 (lane 2): The Context's premise changed since filing. `CommandLineParser` exists, and
+  the transfer dispatcher is `CurlCommandRunner` in `Curl.Console`, not in `Curl.Cli`; only the
+  `-T` option itself was missing. So the task went ahead instead of to Blocked.
+- `touches` widened to `Curl.Console`, `Curl.Console.UnitTests` (the dispatcher and its tests
+  live there) and `Documentation/Planning/Decisions` (ADR-0051). No task in Doing named any of
+  them (BL-214: Networking; BL-320: Authentication).
+- Delivered: `-T`/`--upload-file` row and `CommandLineOptions.UploadFiles` (Cli);
+  `UploadTransferUrl.TryResolve` (Cli) appends with `UploadUrl`, parses with `CurlUrl` and writes
+  the URL back normalised; `CurlCommandRunner` resolves before anything else of the transfer,
+  opens the `-T` file through `IFileSystem` after the warning lines and passes it (or standard
+  input for `-`/`.`) as `ITransferContext.Upload` via `TransferContextFactory`.
+- Criterion 1: the dispatch tests are in `Curl.Console.UnitTests/CurlCommandRunnerUploadTests.cs`
+  (the dispatcher's project); the parse-level pairing test is in
+  `Curl.Cli.UnitTests/CommandLineUploadFileOptionTests.cs`. The "no open call" check uses a new
+  `ReadPaths` record on the Console tests' `InMemoryFileSystem`.
+- Measured on curl 8.21.0 (mingw, Schannel), 2026-09-27; full table in ADR-0051. Notable: the
+  malformed `-T` URL message is `URL using bad/illegal format or missing URL`, not the transfer's
+  `URL rejected: ...`; it comes before the `--capath` warning lines and `%{url_effective}` is
+  empty. A missing `-T` file prints `curl: cannot open '<file>'` and the try-help line even under
+  `-s`, exits 26 and stops the run. `-T ''` keeps its pairing slot and uploads nothing.
+- Choices (defaults, recorded in ADR-0051): the rebuilt URL drops a typed default port (curl keeps
+  `:80`) and writes `CurlUrl.Host` decoded - text-only differences in `%{url_effective}`, since
+  `CurlUrl` has no whole-URL writer. Sending the body over HTTP stays BL-184.
+- Gates: `dotnet build -warnaserror` clean; fast tests 5689 passed, 0 failed;
+  `Measure-CodeQuality.ps1` 100% line and branch, 0 failing members for `Curl.Cli.UnitLibrary` and
+  `Curl.Console` (`TransferAllAsync` hit complexity 14 until the per-URL step was extracted).
+
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Depends on BL-292 as well: ADR-0010 accepted `CurlUrl` as the URL representation (BL-010).
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Done. -T/--upload-file pairs with URLs in order, resolves and normalises its URL (exit 3) before opening the file (exit 26), and hands the file or stdin to the transfer as Upload
