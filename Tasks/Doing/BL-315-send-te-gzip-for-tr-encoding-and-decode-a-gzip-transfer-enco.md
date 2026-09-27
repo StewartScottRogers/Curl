@@ -34,3 +34,4 @@ With `--tr-encoding`, the HTTP handler sends `TE: gzip` and `Connection: TE` and
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-27: Backlog -> Doing.
