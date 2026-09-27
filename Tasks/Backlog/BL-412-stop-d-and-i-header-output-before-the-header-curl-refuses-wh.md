@@ -1,5 +1,5 @@
 ---
-id: BL-404
+id: BL-412
 title: Stop -D and -i header output before the header curl refuses while reading the head
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-404 — Stop -D and -i header output before the header curl refuses while reading the head
+# BL-412 — Stop -D and -i header output before the header curl refuses while reading the head
 
 ## Goal
 

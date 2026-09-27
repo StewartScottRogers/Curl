@@ -33,13 +33,13 @@ With `--compressed`, a response whose Content-Encoding headers list more than fi
   - six codings in one header, and three plus three in two headers: refused.
   - six with `Content-Length: 0`, and six with no Content-Length (body to the close): refused, so the limit is checked while the headers are read, not at the first body byte.
   - six unrecognized (`foo`), and `gzip,br,deflate,x-gzip,IDENTITY,foo`: refused; every coding counts, whatever it is.
-  - `-I`: refused; `-D -` and `-I` write the head lines before the Content-Encoding header, then fail (filed as BL-404).
+  - `-I`: refused; `-D -` and `-I` write the head lines before the Content-Encoding header, then fail (filed as BL-412).
   - 404 with `-f`: 61, not 22; 302 with `-L`: 61, one connection, the redirect is not followed.
   - `Content-Length: x` before the Content-Encoding: exit 8 `Invalid Content-Length: value` (also with `-I`); after it: 61. `Transfer-Encoding: foo` before it: 61 `Unsolicited Transfer-Encoding (foo) found`; after it: the limit's 61. Headers are read in order.
   - accepted, exit 0, body `hello`: five codings; five with empty items (`identity,,identity, ,identity,identity,identity,`); `--raw --compressed` with six; six without `--compressed`; 204 and 304 with six (empty output); `--tr-encoding` with one Transfer-Encoding plus five Content-Encoding codings (the two limits are separate).
 - Implementation: `HttpContentDecoder.MaximumCodings` and `IndexPastCodingLimit` find the Content-Encoding header that takes the count past five; `HttpResponseBodyReader.ThrowIfTooManyContentCodings` runs `HttpResponseBodyFraming.Of` over the headers before it (so an earlier invalid Content-Length or refused Transfer-Encoding wins) and throws exit 61; `HttpProtocolHandler.ExchangeAsync` calls it right after the head is written to header output, before `-f`, retries and redirects. No design choice was open: every behaviour pinned is measured, so no ADR.
 - Pinned in `HttpProtocolHandlerTests.ContentEncodingLimit.cs` with 1-byte and 65536-byte reads (20 cases).
-- Known gap left: header output still carries the whole head before the failure; BL-404 filed for it.
+- Known gap left: header output still carries the whole head before the failure; BL-412 filed for it.
 - `Measure-CodeQuality.ps1` also reports `DiskWriteOutFileOpener.TryOpen` in `Curl.Console` uncovered; that is outside this task's `touches` and not from this change.
 
 ## Log
