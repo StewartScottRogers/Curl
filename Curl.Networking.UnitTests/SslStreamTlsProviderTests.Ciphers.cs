@@ -113,7 +113,8 @@ public sealed partial class SslStreamTlsProviderTests
     {
         AssertCipherSuitesPolicyIsSupported();
 
-        var negotiated = await NegotiateAsync(new TlsClientOptions(Insecure: true, Ciphers: ciphers), SslProtocols.Tls12);
+        var negotiated = await NegotiateAsync(
+            new TlsClientOptions(Insecure: true, Ciphers: ciphers), SslProtocols.Tls12, s_tls12ServerSuites);
 
         Assert.AreEqual(expected, negotiated);
     }
@@ -128,7 +129,8 @@ public sealed partial class SslStreamTlsProviderTests
         AssertCipherSuitesPolicyIsSupported();
         await AssertTls13IsAvailableAsync();
 
-        var negotiated = await NegotiateAsync(new TlsClientOptions(Insecure: true, Tls13Ciphers: tls13Ciphers), SslProtocols.Tls13);
+        var negotiated = await NegotiateAsync(
+            new TlsClientOptions(Insecure: true, Tls13Ciphers: tls13Ciphers), SslProtocols.Tls13, serverSuites: null);
 
         Assert.AreEqual(expected, negotiated);
     }
@@ -141,8 +143,20 @@ public sealed partial class SslStreamTlsProviderTests
         }
     }
 
-    // The suite the server side agreed, after the OpenSSL build's handshake.
-    private static async Task<TlsCipherSuite> NegotiateAsync(TlsClientOptions options, SslProtocols serverProtocols)
+    // Every TLS 1.2 suite the data rows expect, offered together so the client's list alone
+    // decides which is negotiated. .NET's default server list on Linux holds only AEAD suites,
+    // so without this the CBC row's ECDHE-RSA-AES256-SHA is never on offer there.
+    private static readonly TlsCipherSuite[] s_tls12ServerSuites =
+    [
+        TlsCipherSuite.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+        TlsCipherSuite.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+        TlsCipherSuite.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+    ];
+
+    // The suite the server side agreed, after the OpenSSL build's handshake. The server offers
+    // serverSuites when given, and its platform default otherwise.
+    private static async Task<TlsCipherSuite> NegotiateAsync(
+        TlsClientOptions options, SslProtocols serverProtocols, TlsCipherSuite[]? serverSuites)
     {
         var (client, server) = InMemoryDuplexStream.CreatePair();
         await using var serverStream = new SslStream(server);
@@ -150,6 +164,7 @@ public sealed partial class SslStreamTlsProviderTests
         {
             ServerCertificate = s_serverCertificate,
             EnabledSslProtocols = serverProtocols,
+            CipherSuitesPolicy = serverSuites is null || OperatingSystem.IsWindows() ? null : new CipherSuitesPolicy(serverSuites),
         });
         var provider = new SslStreamTlsProvider(options, OpenSslBuild);
 
