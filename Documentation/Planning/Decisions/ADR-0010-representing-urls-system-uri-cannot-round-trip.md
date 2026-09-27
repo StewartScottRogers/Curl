@@ -146,6 +146,36 @@ Read from the source on 2026-09-26, when this ADR was accepted:
   it past the command line (BL-293).
 - `new Uri(` appears about 160 times in the tests, not 77.
 
+### Parser decisions taken under BL-292
+
+Decided by Claude under Stewart's delegation (BL-292, 2026-09-26). Each was measured
+against curl 8.21.0 (`/mingw64/bin/curl`, the Windows reference, ADR-0018) with
+`-w '%{url_effective} %{url.*}'`; the commands and results are in BL-292's Notes.
+
+- **Schemes are guessed.** A URL typed without `scheme://` gets the scheme curl guesses
+  from its host (`ftp.`, `dict.`, `ldap.`, `imap.`, `smtp.`, `pop3.`, else `http`), as
+  libcurl does for every transfer. `CurlCommandRunner` guesses nothing today; it starts
+  to when BL-294 switches it to `CurlUrl.TryParse`.
+- **Unknown schemes parse.** `foo://h/` is a `CurlUrl`; curl ends it with exit 1, not 3,
+  so refusing it stays the dispatcher's job.
+- **Backslashes.** When the text after the scheme's colon starts with `//`, every `\`
+  before the first `?` or `#` becomes `/`, for every scheme. After a single slash, or
+  with no scheme, they stay. This was measured on Windows only; whether the Linux build
+  does the same is not recorded.
+- **Drive letters follow the platform.** `CurlUrl.TryParse` applies curl's Windows rules
+  (`file:///C:/x` has the path `C:/x`) on Windows and rejects a `file` drive letter
+  elsewhere, as `lib/urlapi.c` does outside Windows.
+- **IDN.** `IdnHost` converts a host that is not ASCII with `IdnMapping`, reading it as
+  UTF-8. The mingw build appears to read the host bytes in the ANSI code page instead
+  (it resolved `ex%C3%A5mple.com` as `xn--exmple-qha90c.com`, not `xn--exmple-jua.com`), which is a property of that
+  build's console, not of curl's URL rules, so Curl does not copy it. A host
+  `IdnMapping` cannot convert is kept as decoded, because curl accepted `a%80b`; bytes
+  that are not UTF-8 decode to U+FFFD, so `a%80b` and `a%FFb` both become `a`, U+FFFD, `b`,
+  where curl keeps the raw bytes.
+- **`Query` and `Fragment`** hold the text after `?` and `#` without the separator, and
+  are `null` when the separator is absent, as `curl_url_get` distinguishes them;
+  `Port` is -1 for a scheme with no default port, as `Uri.Port` is.
+
 ## The options compared
 
 ### Option 1 — Replace: a curl-style URL type
