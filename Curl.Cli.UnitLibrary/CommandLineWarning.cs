@@ -92,7 +92,25 @@ public static class CommandLineWarning
     ];
 
     /// <summary>
-    /// The two lines curl prints for a <c>-z</c>/<c>--time-cond</c> value that is not a date, after
+    /// The line curl prints when it cannot read the modification time of the file a
+    /// <c>-z</c>/<c>--time-cond</c> value that is not a date names, for any reason but the file not
+    /// existing; <see cref="TimeConditionIsNotADate"/> follows it. Measured with
+    /// <c>curl -z "" -o NUL file:///Z:/.../global.json</c> (curl 8.21.0, Windows, 2026-09-26):
+    /// <c>Warning: Failed to get filetime: CreateFile failed: GetLastError 0x00000003</c>.
+    /// </summary>
+    /// <param name="reason">The failure <see cref="IDataFileReader.TryReadModificationTime"/> reported.</param>
+    /// <returns>The warning line.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="reason"/> is <see langword="null"/>.</exception>
+    public static string FailedToGetFileTime(string reason)
+    {
+        ArgumentNullException.ThrowIfNull(reason);
+
+        return $"Warning: Failed to get filetime: {reason}";
+    }
+
+    /// <summary>
+    /// The two lines curl prints for a <c>-z</c>/<c>--time-cond</c> value that is neither a date nor a
+    /// file whose modification time can be read, after
     /// which it carries on with no time condition. curl wraps the text at 79 columns, so the first
     /// line ends in a space. Measured with <c>curl -z notadate -o NUL file:///Z:/.../global.json</c>
     /// (curl 8.21.0, Windows, 2026-09-26): these two lines, then the transfer, exit 0.

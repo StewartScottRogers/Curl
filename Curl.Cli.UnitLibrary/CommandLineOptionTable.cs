@@ -568,25 +568,52 @@ public static class CommandLineOptionTable
     /// asks for the resource only when it is not newer than the date
     /// (<see cref="TimeConditionKind.IfUnmodifiedSince"/>); a leading <c>+</c>, a leading <c>=</c> or
     /// none asks for it only when it is newer (<see cref="TimeConditionKind.IfModifiedSince"/>). The
-    /// rest is read by <see cref="CurlDateParser"/>. A value that is not a date, empty included, is
-    /// never refused: it clears any earlier condition and adds
-    /// <see cref="CommandLineWarning.TimeConditionIsNotADate"/> unless <c>-s</c> / <c>--silent</c> has
-    /// been read. curl first tries such a value as a file name whose modification time it uses; that
-    /// is not done here yet.
+    /// rest is read by <see cref="CurlDateParser"/>; when it is not a date it is taken as a file name,
+    /// and that file's modification time, read through <paramref name="dataFileReader"/>, is the date.
+    /// A value that is neither, empty included, is never refused: it clears any earlier condition and
+    /// adds <see cref="CommandLineWarning.TimeConditionIsNotADate"/>, after
+    /// <see cref="CommandLineWarning.FailedToGetFileTime"/> when the lookup failed other than as file
+    /// not found, unless <c>-s</c> / <c>--silent</c> has been read.
     /// </summary>
     private static CommandLineRefusal? SetTimeCondition(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
     {
         TimeConditionKind kind = value.StartsWith('-') ? TimeConditionKind.IfUnmodifiedSince : TimeConditionKind.IfModifiedSince;
         string date = value.StartsWith('-') || value.StartsWith('+') || value.StartsWith('=') ? value[1..] : value;
-        if (CurlDateParser.TryParse(date, out DateTimeOffset instant))
+        if (TryReadTimeConditionDate(date, dataFileReader, out DateTimeOffset instant, out string? failureReason))
         {
             options.TimeCondition = new TimeCondition(instant, kind);
             return null;
         }
 
-        options.TimeCondition = null;
-        options.AddWarningLinesUnlessSilent(CommandLineWarning.TimeConditionIsNotADate);
+        DisableTimeCondition(options, failureReason);
         return null;
+    }
+
+    /// <summary>
+    /// Clears any <c>-z</c> condition and warns as curl 8.21.0 does for a value that is neither a date
+    /// nor a readable file: the filetime line first when the lookup failed with a
+    /// <paramref name="failureReason"/>, then the two illegal-date lines.
+    /// </summary>
+    private static void DisableTimeCondition(CommandLineOptions options, string? failureReason)
+    {
+        options.TimeCondition = null;
+        if (failureReason is not null)
+        {
+            options.AddWarningLinesUnlessSilent([CommandLineWarning.FailedToGetFileTime(failureReason)]);
+        }
+
+        options.AddWarningLinesUnlessSilent(CommandLineWarning.TimeConditionIsNotADate);
+    }
+
+    /// <summary>
+    /// Reads a <c>-z</c> date, without its prefix, as a date or, failing that, as the name of a file
+    /// whose modification time is the date, as curl 8.21.0's tool does.
+    /// </summary>
+    private static bool TryReadTimeConditionDate(string date, IDataFileReader dataFileReader, out DateTimeOffset instant, out string? failureReason)
+    {
+        failureReason = null;
+        return CurlDateParser.TryParse(date, out instant)
+            || dataFileReader.TryReadModificationTime(date, out instant, out failureReason);
     }
 
     /// <summary>

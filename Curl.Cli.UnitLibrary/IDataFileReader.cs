@@ -2,8 +2,10 @@ namespace Curl.Cli;
 
 /// <summary>
 /// Reads the file a <c>-d @file</c> / <c>--data @file</c>, <c>-H @file</c> / <c>--header @file</c> or
-/// <c>-K file</c> / <c>--config file</c> value names, or standard input for <c>@-</c> and <c>-K -</c>, for <see cref="CommandLineParser"/>; injected so the parser never touches the disk or
-/// the console and tests can supply the bytes.
+/// <c>-K file</c> / <c>--config file</c> value names, or standard input for <c>@-</c> and <c>-K -</c>,
+/// and the modification time of the file a <c>-z</c> / <c>--time-cond</c> value names when it is not
+/// a date, for <see cref="CommandLineParser"/>; injected so the parser never touches the disk or the
+/// console and tests can supply the bytes and times.
 /// </summary>
 public interface IDataFileReader
 {
@@ -17,4 +19,18 @@ public interface IDataFileReader
     /// <returns>Every byte read; empty when standard input is empty or absent.</returns>
     /// <exception cref="IOException">Standard input could not be read.</exception>
     byte[] ReadStandardInput();
+
+    /// <summary>
+    /// Reads the modification time of the file at <paramref name="path"/>, as curl 8.21.0's tool does
+    /// for a <c>-z</c> / <c>--time-cond</c> value that is not a date.
+    /// </summary>
+    /// <param name="path">The <c>-z</c> value after any <c>-</c>, <c>+</c> or <c>=</c> prefix, possibly empty.</param>
+    /// <param name="modificationTime">The file's modification time, to the whole second, when it was read; otherwise <see langword="default"/>.</param>
+    /// <param name="failureReason">
+    /// When the lookup failed other than because the file does not exist, the reason curl prints after
+    /// <c>Warning: Failed to get filetime: </c>, such as <c>CreateFile failed: GetLastError 0x00000005</c>;
+    /// otherwise <see langword="null"/>.
+    /// </param>
+    /// <returns><see langword="true"/> when the modification time was read.</returns>
+    bool TryReadModificationTime(string path, out DateTimeOffset modificationTime, out string? failureReason);
 }
