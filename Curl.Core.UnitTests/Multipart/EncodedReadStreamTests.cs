@@ -1,4 +1,5 @@
 using System.Text;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Core.Multipart;
 
@@ -68,7 +69,7 @@ public sealed class EncodedReadStreamTests
     {
         using EncodedReadStream stream = MultipartPartEncoder.Find("7bit")!.EncodeWhileReading(new MemoryStream([0x41, 0xE9]), 2);
 
-        MultipartDataRefusedException refused = Assert.ThrowsExactly<MultipartDataRefusedException>(() => stream.ReadByte());
+        RequestBodyReadFailedException refused = Assert.ThrowsExactly<RequestBodyReadFailedException>(() => stream.ReadByte());
 
         Assert.IsInstanceOfType<IOException>(refused);
         Assert.AreEqual(MultipartFormBodyBuilder.ReadFailedMessage, refused.Message);

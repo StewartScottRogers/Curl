@@ -1,4 +1,5 @@
 using System.Buffers;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Core.Multipart;
 
@@ -63,7 +64,7 @@ internal sealed class MultipartPartEncoder
     /// <summary>Encodes <paramref name="data" /> as it is read, never holding it whole.</summary>
     /// <param name="data">The part's data, which the returned stream now owns.</param>
     /// <param name="dataLength">The data's size in bytes, or <see langword="null" /> when unknown.</param>
-    /// <returns>The encoded data, whose reads throw <see cref="MultipartDataRefusedException" /> at data the encoder refuses.</returns>
+    /// <returns>The encoded data, whose reads throw <see cref="RequestBodyReadFailedException" /> at data the encoder refuses.</returns>
     internal EncodedReadStream EncodeWhileReading(Stream data, long? dataLength) =>
         new(data, createEncoding, EncodedLength(dataLength));
 

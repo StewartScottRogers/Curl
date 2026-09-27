@@ -285,28 +285,41 @@ public sealed class MultipartFormBodyBuilderEncoderTests
     }
 
     [TestMethod]
-    public async Task ASevenBitFileThatCannotSeekIsReadWholeAndLeavesTheLengthUnknown()
+    public async Task ASevenBitFileThatCannotSeekIsNotReadWhileBuildingAndLeavesTheLengthUnknown()
     {
         const string B = "------------------------0000000000000000000000";
-        FormFileSystem files = new FormFileSystem().WithUnseekableFile("pipe", "hi").WithUnseekableFile("high", "x").WithFile("high", [0xE9]);
+        FormFileSystem files = new FormFileSystem().WithUnseekableFile("pipe", "hi");
         MultipartFormBuildResult result = await BuildAsync(
             files,
             B,
             new MultipartFormPart("f", MultipartFormPartKind.FileContent, "pipe", null, null, NoHeaders, NoParts) { Encoder = "7bit" });
-        MultipartFormBuildResult refused = await BuildAsync(
-            files,
-            B,
-            new MultipartFormPart("f", MultipartFormPartKind.FileContent, "high", null, null, NoHeaders, NoParts) { Encoder = "7bit" });
 
-        Assert.IsTrue(files.Opened[0].IsDisposed, "A pipe cannot be read twice, so it is read whole.");
+        FormFileSystem.TrackedStream pipe = files.Opened.Single();
+        Assert.AreEqual(0, pipe.Position, "A pipe cannot be read twice, so nothing is read while building.");
+        Assert.IsFalse(pipe.IsDisposed, "The pipe is streamed, not read into memory.");
         string expected = $"--{B}\r\nContent-Disposition: form-data; name=\"f\"\r\nContent-Transfer-Encoding: 7bit\r\n\r\nhi\r\n--{B}--\r\n";
         await AssertBodyAsync(result, expected, null, "7bit pipe");
-        Assert.AreEqual(CurlExitCode.ReadError, refused.Failure!.ExitCode);
-        Assert.AreEqual(MultipartFormBodyBuilder.ReadFailedMessage, refused.Failure.ErrorMessage);
     }
 
     [TestMethod]
-    public async Task ASevenBitFileThatCannotSeekOrBeReadIsReadError()
+    public async Task ASevenBitFileThatCannotSeekFailsTheReadThatReachesARefusedByte()
+    {
+        // curl 8.21.0 meets the byte only while sending: exit 26, "read error getting mime data".
+        FormFileSystem files = new FormFileSystem().WithUnseekableFile("high", "x").WithFile("high", [0x41, 0xE9]);
+        MultipartFormBuildResult result = await BuildAsync(
+            files,
+            "------------------------0000000000000000000000",
+            new MultipartFormPart("f", MultipartFormPartKind.FileContent, "high", null, null, NoHeaders, NoParts) { Encoder = "7bit" });
+
+        Assert.IsTrue(result.IsBuilt);
+        RequestBodyReadFailedException refused = await Assert.ThrowsExactlyAsync<RequestBodyReadFailedException>(
+            () => result.Body.Content.CopyToAsync(Stream.Null, TestContext.CancellationToken));
+        Assert.AreEqual(MultipartFormBodyBuilder.ReadFailedMessage, refused.Message);
+        await result.Body.Content.DisposeAsync();
+    }
+
+    [TestMethod]
+    public async Task ASevenBitFileThatCannotSeekOrBeReadFailsTheBodysRead()
     {
         FormFileSystem files = new FormFileSystem().WithUnseekableFile("dev", "u").WithUnreadableFile("dev");
         MultipartFormBuildResult result = await BuildAsync(
@@ -314,8 +327,9 @@ public sealed class MultipartFormBodyBuilderEncoderTests
             "------------------------0000000000000000000000",
             new MultipartFormPart("f", MultipartFormPartKind.FileContent, "dev", null, null, NoHeaders, NoParts) { Encoder = "7bit" });
 
-        Assert.AreEqual(CurlExitCode.ReadError, result.Failure!.ExitCode);
-        Assert.AreEqual(MultipartFormBodyBuilder.ReadFailedMessage, result.Failure.ErrorMessage);
+        Assert.IsTrue(result.IsBuilt);
+        await Assert.ThrowsExactlyAsync<IOException>(() => result.Body.Content.CopyToAsync(Stream.Null, TestContext.CancellationToken));
+        await result.Body.Content.DisposeAsync();
         Assert.IsTrue(files.Opened.Single().IsDisposed);
     }
 

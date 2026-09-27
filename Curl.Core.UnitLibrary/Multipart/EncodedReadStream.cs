@@ -1,4 +1,5 @@
 using System.Buffers;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Core.Multipart;
 
@@ -11,7 +12,7 @@ namespace Curl.Core.Multipart;
 /// It seeks when its source seeks, by starting the encoding again from where the source stood
 /// when the stream was made and reading forward, which is what lets
 /// <see cref="ConcatenatedReadStream" /> send a body again after a 307 or 308. A read that
-/// reaches data the encoder refuses throws <see cref="MultipartDataRefusedException" />.
+/// reaches data the encoder refuses throws <see cref="RequestBodyReadFailedException" />.
 /// </remarks>
 internal sealed class EncodedReadStream : Stream
 {
@@ -152,7 +153,7 @@ internal sealed class EncodedReadStream : Stream
         outputOffset = 0;
         if (!encoding.TryEncode(input.AsSpan(0, inputCount), sourceEnded, output, out int consumed))
         {
-            throw new MultipartDataRefusedException();
+            throw new RequestBodyReadFailedException(MultipartFormBodyBuilder.ReadFailedMessage);
         }
 
         inputCount -= consumed;
