@@ -35,3 +35,4 @@ URLs pass through BL-204, BL-207 and BL-210 before dispatch in `Curl.Console`.
 
 - 2026-09-26: Created.
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Backlog. Lane handed over mid-run while the factory's restart logic was fixed; the run had only just resumed and left no work.

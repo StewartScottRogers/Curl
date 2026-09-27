@@ -130,13 +130,16 @@ param(
     [int]$Lane = 0,
     [string]$Branch = '',
     [string]$LogRoot = '',
-    [string]$ShiftStamp = ''
+    [string]$ShiftStamp = '',
+    # The lane's worktree. Lanes run the coordinator's copy of this script, so a lane adopted
+    # with its worktree left as it was still runs the current code.
+    [string]$LaneDir = ''
 )
 
 # Continue, not Stop: native stderr from git or dotnet must never kill an unattended shift.
 $ErrorActionPreference = 'Continue'
 
-$Root = $PSScriptRoot
+$Root = if ($LaneDir) { $LaneDir.Trim('"') } else { $PSScriptRoot }
 # The board script and every Claude run use this checkout, never one inherited from a
 # Claude Code session that happened to start the shift.
 $env:CLAUDE_PROJECT_DIR = $Root
@@ -187,7 +190,9 @@ function Start-Detached {
     # new tab in the same herdr workspace when inside herdr, else a new console window.
     # Returns @{ Process = <Process> } or @{ Tab = '<tab id>' }.
     param([string]$Label, [string]$Dir, [string[]]$ScriptArgs)
-    $script = Join-Path $Dir 'RunDarkFactory.ps1'
+    # Always this copy of the script; a lane is told its worktree with -LaneDir.
+    $script = $PSCommandPath
+    if ((Resolve-Path $Dir).Path -ne (Resolve-Path $PSScriptRoot).Path) { $ScriptArgs = @($ScriptArgs) + @('-LaneDir', "`"$Dir`"") }
     $herdr = Get-HerdrBin
     if ($herdr) {
         $create = @('tab', 'create', '--cwd', $Dir, '--label', $Label, '--no-focus')
