@@ -101,4 +101,7 @@ cancels and disposes local UDP sockets without sending anything.
 the in-memory `Fakes/InMemoryDuplexStream` pair, with a self-signed certificate made in
 the test, so TLS is tested without a socket. The tests that send
 bytes are the loopback tests in `TcpDialerTests` and `UdpDatagramChannelTests`, tagged
-`[TestCategory("Integration")]`.
+`[TestCategory("Integration")]`. Per ADR-0083 the three members only those tests can reach,
+`TcpDialer.DialAsync`, `UdpDatagramChannel.SendAsync` and `UdpDatagramChannel.ReceiveAsync`,
+carry `[ExcludeFromCodeCoverage]`, so the fast-run coverage gate holds without the network.
+Keep them thin: logic added there is not measured.

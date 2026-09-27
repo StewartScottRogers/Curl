@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Sockets;
 
@@ -65,6 +66,11 @@ public sealed class UdpDatagramChannel : IDatagramChannel
     public EndPoint LocalEndPoint => _socket.LocalEndPoint!;
 
     /// <inheritdoc />
+    /// <remarks>
+    /// Excluded from coverage per ADR-0083: sending puts a datagram on a socket, so the
+    /// loopback round trip in the Integration run measures it.
+    /// </remarks>
+    [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin socket adapter, measured by the Integration run.")]
     public async ValueTask SendAsync(ReadOnlyMemory<byte> datagram, EndPoint destination, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(destination);
@@ -74,6 +80,11 @@ public sealed class UdpDatagramChannel : IDatagramChannel
 
     /// <inheritdoc />
     /// <exception cref="OperationCanceledException"><paramref name="cancellationToken" /> was cancelled.</exception>
+    /// <remarks>
+    /// Excluded from coverage per ADR-0083: returning a datagram needs one to arrive on the
+    /// socket, so the loopback round trip in the Integration run measures it.
+    /// </remarks>
+    [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin socket adapter, measured by the Integration run.")]
     public async ValueTask<DatagramReceived> ReceiveAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
         var anySource = new IPEndPoint(AnyAddressOf(_socket.AddressFamily), 0);

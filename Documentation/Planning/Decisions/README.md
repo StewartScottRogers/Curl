@@ -97,6 +97,7 @@ choices do not need one.
 | [0080](ADR-0080-retry-after-reads-the-three-rfc-9110-http-date-forms.md) | `RetryAfterHeader` reads the three RFC 9110 HTTP-date forms (RFC 1123, RFC 850, asctime) with `DateTimeOffset.TryParseExact` and any other text as delay-seconds, not libcurl's lenient `parsedate`; moving it onto `CurlDateParser` (ADR-0074) is BL-393 | Accepted | 2026-09-27 |
 | [0081](ADR-0081-w-standard-output-line-feeds-follow-curls-stdout-mode-when-its-buffer-is-written.md) | `-w` standard output line feeds follow curl's stdout mode when its buffer is written: the renderer writes LF, and on Windows the runner writes standard error, and standard output while it is in text mode, through `LineFeedToCrLfStream` (numbered ADR-0040 until BL-326) | Accepted | 2026-09-26 |
 | [0082](ADR-0082-the-progress-bar-replays-curls-callback-from-the-handlers-reports.md) | The `-#` bar is drawn by `ProgressBarRecorder`, which replays curl 8.21.0's `tool_progress_cb` from the handler's progress reports; a successful transfer that reported no bytes gets one last call with its byte count, as `file://` does in curl; the width is the runner's `terminalColumns` | Accepted | 2026-09-27 |
+| [0083](ADR-0083-thin-socket-adapters-are-measured-by-the-integration-run.md) | `TcpDialer.DialAsync`, `UdpDatagramChannel.SendAsync` and `ReceiveAsync` are excluded from fast-run coverage and measured by the Integration run | Accepted | 2026-09-27 |
 
 ## Template
 
