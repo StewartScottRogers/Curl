@@ -34,3 +34,4 @@ A dated PSL snapshot is an embedded resource in `Curl.Cookies.UnitLibrary`, with
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-27: Backlog -> Doing.
