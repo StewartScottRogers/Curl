@@ -51,14 +51,14 @@ Constraints: the BL-134 sink is the input (extend the console-side sink BL-130 a
 - **When a line is drawn** (`progress_calc` returns TRUE): always on the first call; otherwise only after a new sample (1000 ms since the latest), or when the request is done (`req.done`), when a done transfer with no current speed yet overwrites the latest sample instead; and not twice in the same whole second (`lastshow`) unless done. Calls come from `Curl_pgrsCheck` / `Curl_pgrsUpdate` in `transfer.c` (`Curl_sendrecv`) and `multi.c` (the performing and done states), and `Curl_pgrsDone` (`multi_done`) forces a final update then writes `"
 "`. A completed transfer gets several done draws in a row - the measurement shows three for a 10-byte HTTP download, each with a fresh clock reading, which is why `244`, `241`, `238` fall. A failed transfer reaches only `Curl_pgrsDone`, with `req.done` false, which draws only a second after the latest sample.
 
-### Decisions (Claude, under Stewart's delegation; the ADR is BL-382)
+### Decisions (Claude, under Stewart's delegation; the ADR is BL-384)
 
 - **The meter is still written after the transfer**, from the lines `TransferProgressRecorder` drew as the reports came in. Standard error's bytes are curl's; only a terminal differs, seeing the lines at the end rather than moving. Drawing live would need synchronous writes to standard error from inside the handler's reports; the redirected, byte-identical case is what scripts see, so live drawing on a terminal is filed as BL-383.
 - **Three done draws after a success, one ordinary update after a failure**, and **none when the handler reported no bytes**: the three is the measured count; a handler that reports no bytes (`file://`, which curl completes without the network transfer loop) keeps BL-102's measured single zero line.
 - **The `lastshow` same-second check is not modelled**: every draw of a running transfer here follows a new sample taken 1000 ms or more after the one before, so the whole second always differs and the branch could never be taken (and could not be covered).
 - The zero line is drawn when the recorder is made, before any report, as curl draws it at the first update after `Curl_pgrsStartNow`.
 - `ProgressMeterLines.Opening` became `HeaderLines` (no zero line): the status lines now come from the recorder. `TransferStartedRecorder` became `TransferProgressRecorder`, as it now records byte counts and draws lines (the one console-side sink, extended as the task asked).
-- `Documentation/Planning/Decisions` was not added to `touches`: BL-256, in Doing on another lane, names it, and adding it would send this finished task back to Backlog for one file. The ADR is filed as BL-382 instead.
+- `Documentation/Planning/Decisions` was not added to `touches`: BL-256, in Doing on another lane, names it, and adding it would send this finished task back to Backlog for one file. The ADR is filed as BL-384 instead.
 
 ### Verified 2026-09-27
 

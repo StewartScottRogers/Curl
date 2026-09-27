@@ -1,5 +1,5 @@
 ---
-id: BL-382
+id: BL-384
 title: Record the ADR for how Curl.Console draws the progress meter's status lines
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-382 — Record the ADR for how Curl.Console draws the progress meter's status lines
+# BL-384 — Record the ADR for how Curl.Console draws the progress meter's status lines
 
 ## Goal
 
