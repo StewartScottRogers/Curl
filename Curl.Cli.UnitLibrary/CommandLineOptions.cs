@@ -170,7 +170,7 @@ public sealed class CommandLineOptions
 
     /// <summary>
     /// The HTTP authentication schemes to allow for the origin, as curl 8.21.0's tool asks libcurl
-    /// for them: <c>--basic</c> and <c>--digest</c> add their scheme and their <c>--no-</c> spellings
+    /// for them: <c>--basic</c>, <c>--digest</c>, <c>--ntlm</c> and <c>--negotiate</c> add their scheme and their <c>--no-</c> spellings
     /// remove it; <c>--anyauth</c> replaces the set with every scheme; <c>--oauth2-bearer</c> adds
     /// Bearer. <see cref="HttpAuthSchemes.Bearer"/> is only ever allowed with a
     /// <see cref="BearerToken"/>, so <c>--anyauth</c> alone gives <see cref="HttpAuthSchemes.Any"/>.
@@ -184,7 +184,10 @@ public sealed class CommandLineOptions
     /// <c>-u u:p --oauth2-bearer tok --basic</c> sends nothing, then <c>Bearer tok</c>;
     /// <c>-u u:p --anyauth --basic</c> and <c>-u u:p --anyauth</c> send nothing, then
     /// <c>Basic dTpw</c>; <c>--oauth2-bearer tok --anyauth</c> sends nothing, then <c>Bearer tok</c>;
-    /// <c>--oauth2-bearer tok --no-basic</c> sends <c>Bearer tok</c> at once. See ADR-0026.
+    /// <c>--oauth2-bearer tok --no-basic</c> sends <c>Bearer tok</c> at once. Against a plain 200
+    /// (2026-09-26): <c>-u u:p --ntlm</c> sends an NTLM type-1 message at once; <c>-u u:p --negotiate</c>,
+    /// <c>--basic --ntlm</c> and <c>--ntlm --negotiate</c> send nothing; <c>--ntlm --no-ntlm</c> and
+    /// <c>--negotiate --no-negotiate</c> send <c>Basic dTpw</c>. See ADR-0026.
     /// </remarks>
     public HttpAuthSchemes AuthSchemes
     {
@@ -728,7 +731,8 @@ public sealed class CommandLineOptions
 
     /// <summary>
     /// Adds <paramref name="scheme"/> to, or for its <c>--no-</c> spelling removes it from, the
-    /// schemes <c>--basic</c>, <c>--digest</c>, <c>--anyauth</c> and <c>--oauth2-bearer</c> asked for.
+    /// schemes <c>--basic</c>, <c>--digest</c>, <c>--ntlm</c>, <c>--negotiate</c>, <c>--anyauth</c> and
+    /// <c>--oauth2-bearer</c> asked for.
     /// </summary>
     /// <param name="scheme">The scheme the option names.</param>
     /// <param name="on"><see langword="false"/> for the <c>--no-</c> spelling.</param>
