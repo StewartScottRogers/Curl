@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: protocol
 depends-on: [BL-335, BL-173]
-touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
+touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-27
 completed:
@@ -37,9 +37,43 @@ completed:
 
 ## Notes
 
+- 2026-09-27, lane 3: restored the lane-2 WIP (`factory/BL-336-wip`) and finished it. In
+  `Curl.Protocol.Http` it builds clean with `-warnaserror` and all 853 fast tests pass,
+  including `HttpProtocolHandlerTests.ConnectionReuse.cs`, which covers every acceptance
+  criterion above. Coverage (`Measure-CodeQuality.ps1`) not yet measured, because the
+  whole-solution test run fails (next bullet). The code is left uncommitted for the shift
+  to stash; if the stash is lost, `factory/BL-336-wip` plus the fixes below rebuild it.
+- `Curl.Console.UnitTests` added to `touches`: setting `ConnectTarget.PoolScheme` fails 9
+  tests in `CurlCompositionTests.cs` and `CurlCompositionHttpTests.cs` that compare whole
+  `ConnectTarget`s (for example `CreateRunner_TcpSchemeUrl_ReachesConnectorAtDefaultPortWithSchemesTls`,
+  `RunAsync_HttpUrl_SendsCurlsDefaultGetAndWritesTheBodyToStandardOutput`). The expected
+  targets need `PoolScheme = "http"`/`"https"` (the URL's scheme, including behind a
+  forward proxy). BL-240 in Doing touches `Curl.Console.UnitTests`, so this task goes back
+  to Backlog until it is done.
+- Fixes on top of the WIP: `CurlExitCode.FilesizeExceeded` (not `FileSizeExceeded`);
+  `TransferContext` is a class, not a record, so `ReuseContext` takes `maxFileSize` and
+  `http` parameters instead of `with`.
+- Measured with curl 8.21.0 (Schannel, mingw64) against a local server on 127.0.0.1:18977
+  that answers `/a` with `Content-Length: 2` keep-alive, closes the connection on the next
+  request, then answers `/b` on a new connection with `Connection: close`:
+  `curl -v http://127.0.0.1:18977/a http://127.0.0.1:18977/b` prints, after
+  `* Request completely sent off` for `/b`:
+  `* Connection died, retrying a fresh connect (retry count: 1)`,
+  `* shutting down connection #0`,
+  `* Issue another request to this URL: 'http://127.0.0.1:18977/b'`,
+  `* Hostname 127.0.0.1 was found in DNS cache`, a new `Trying`, and at the end
+  `* shutting down connection #1`. The tests pin these lines byte for byte.
+- Same server, `curl -s -o /dev/null -w "%{num_connects} %{size_request}
+" .../a .../b`
+  prints `1 80` then `1 160`: the retried transfer counts one connect and the request
+  bytes of both attempts. So the retry adds to the dead attempt's report (the WIP's
+  `RetryEarlier`, which dropped the dead attempt's bytes, is removed) and the test pins
+  `2 * ReuseRequest.Length`.
+
 ## Log
 
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
 - 2026-09-27: Doing -> Backlog. Lane handed over mid-run while the factory's restart logic was fixed; partial work saved on branch factory/BL-336-wip, a stash commit: start with git cherry-pick --no-commit -m 1 factory/BL-336-wip and carry on from it.
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Backlog. Needs Curl.Console.UnitTests (9 ConnectTarget assertions need PoolScheme), which BL-240 in Doing touches; code is complete and uncommitted for the shift to stash
