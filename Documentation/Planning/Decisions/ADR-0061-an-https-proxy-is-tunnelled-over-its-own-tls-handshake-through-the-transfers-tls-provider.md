@@ -1,6 +1,6 @@
 # ADR-0061 — An HTTPS proxy is tunnelled over its own TLS handshake, through the transfer's TLS provider until the --proxy-* options land
 
-- **Status:** Accepted
+- **Status:** Accepted; item 2 superseded by ADR-0095 (BL-362)
 - **Date:** 2026-09-27
 
 Decided by Claude under Stewart's delegation (task BL-266, 2026-09-27).
