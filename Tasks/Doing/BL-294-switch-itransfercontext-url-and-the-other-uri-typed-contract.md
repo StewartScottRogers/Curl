@@ -51,3 +51,4 @@ for a transfer URL any more.
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-27: Backlog -> Doing.
