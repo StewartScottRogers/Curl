@@ -68,7 +68,7 @@ for a transfer URL any more.
   case (one test's expected connect host changed from `example.com` to `Example.com`
   for `HTTPS://Example.com:8443/`, not an exit code or output byte); a rejected
   `file://` host now prints the generic exit-3 line, as criterion 3 asks - curl's
-  specific reason is follow-up BL-320.
+  specific reason is follow-up BL-324.
 - `FileUrlPath` lost its host check and its empty-path check: `CurlUrl` rejects every
   other host and reads a scheme only before `:/`, so both were unreachable. The
   FileUrlPath tests for rejected hosts now pin `CurlUrl.TryParse` returning false.

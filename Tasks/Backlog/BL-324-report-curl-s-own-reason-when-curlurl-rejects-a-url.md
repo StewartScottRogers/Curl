@@ -1,5 +1,5 @@
 ---
-id: BL-320
+id: BL-324
 title: Report curl's own reason when CurlUrl rejects a URL
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-320 — Report curl's own reason when CurlUrl rejects a URL
+# BL-324 — Report curl's own reason when CurlUrl rejects a URL
 
 ## Goal
 
