@@ -193,17 +193,42 @@ Decided by Claude under Stewart's delegation (BL-294, 2026-09-27). Measured agai
 - **The host keeps its case.** The `Host` line already did; the connect target, the
   cookie host and redirect origins now use `CurlUrl.Host`/`IdnHost` as written, where
   `Uri` lower-cased them. DNS names are case-insensitive, and curl does the same.
-- **A `file://` host curl rejects ends with the generic exit-3 line.** `CurlUrl`
-  rejects `file://example.com/x` before the `file` handler runs, so Curl prints
-  `URL rejected: Malformed input to a URL function`, as BL-294's acceptance criteria
-  require. curl prints `URL rejected: Bad file:// URL` for it, and
-  `Unsupported number of slashes following scheme` for `http:////h/`; carrying curl's
-  specific reason out of `CurlUrl.TryParse` is follow-up work (see BL-294's Notes).
+- **A `file://` host curl rejects ends with exit 3 before the handler runs.** `CurlUrl`
+  rejects `file://example.com/x` before the `file` handler runs. BL-294 printed the
+  generic `URL rejected: Malformed input to a URL function` for it; BL-324 replaced that
+  with curl's own reason (below).
   `FileUrlPath` no longer checks the host itself: every `file` `CurlUrl` has an empty,
   `localhost`, `127.0.0.1` or drive-letter authority.
 - **The `dict` and `mqtt` decoders copy a stray `%`.** `Uri.AbsolutePath` turned one
   into `%25`; `CurlUrl.AbsolutePath` keeps it as typed, so each decoder now decodes a
   `%` only before two hexadecimal digits, as curl's `Curl_urldecode` does.
+
+### Rejection reasons decided under BL-324
+
+Decided by Claude under Stewart's delegation (BL-324, 2026-09-27). Measured against curl
+8.21.0 (`/mingw64/bin/curl -gsS`, ADR-0018); the URLs and lines are in BL-324's Notes.
+
+- **`CurlUrl` says why it rejects a text.** `CurlUrl.TryParse(text, pathAsIs, out url,
+  out rejection)` sets a `CurlUrlRejection`, one value per `CURLUcode` curl's parser
+  returns for the classes `CurlUrlParser` has, and `ToCurlMessage()` gives the text
+  `curl_url_strerror` has for it. The three-argument `TryParse` is unchanged.
+- **The exit-3 line carries curl's reason.** `CurlCommandRunner` prints
+  `curl: (3) URL rejected: ` and that text, so `file://example.com/x` prints
+  `Bad file:// URL` and `http:////h/` prints
+  `Unsupported number of slashes following scheme`, as curl does.
+- **Each class maps as curl was measured to map it:** a space or control character, or
+  more than 8,000,000 bytes, is `Malformed input to a URL function`; four or more
+  slashes after the scheme is `Unsupported number of slashes following scheme`; an
+  empty authority or host (`http://`, `http://u@/`, `http://:80/`) is
+  `No host part in the URL`; a port that is not 0 to 65535, a colon with nothing after
+  it in a URL without a scheme, and anything but `:` after `]` is
+  `Port number was not a decimal number between 0 and 65535`; an unclosed `[`, or a
+  bracketed host that is not IPv6 or has an empty zone id, is `Bad IPv6 address`; a
+  zone id longer than 15 characters, a host of only dots, and a character curl refuses
+  in a name is `Bad hostname`; and every `file` URL rejection is `Bad file:// URL`.
+  The length limit and the drive-letter refusal outside Windows cannot be measured on
+  this build; they follow `lib/urlapi.c` at 8.21.0 (`CURLUE_MALFORMED_INPUT` and
+  `CURLUE_BAD_FILE_URL`).
 
 ## The options compared
 
