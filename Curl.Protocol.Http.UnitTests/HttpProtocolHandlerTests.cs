@@ -96,6 +96,20 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.AreEqual(0L, output.Length);
         Assert.AreEqual(0L, headerOutput.Length);
         Assert.IsFalse(result.Report!.UsedProxy);
+        Assert.IsFalse(result.IsConnectionRefused);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ConnectRefused_ReturnsCouldntConnectMarkedRefused()
+    {
+        const string message = "Failed to connect to 127.0.0.1:1 after 0 ms: Could not connect to server";
+
+        TransferResult result = await Handler(new QueueConnector(ConnectResult.Refused(message)))
+            .ExecuteAsync(Context("http://127.0.0.1:1/", new MemoryStream()));
+
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.AreEqual(message, result.ErrorMessage);
+        Assert.IsTrue(result.IsConnectionRefused);
     }
 
     [TestMethod]

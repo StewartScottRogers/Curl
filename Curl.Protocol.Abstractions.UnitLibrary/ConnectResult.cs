@@ -7,8 +7,8 @@ namespace Curl.Protocol.Abstractions;
 /// an open connection, or the curl exit code and message that say why there is none.
 /// </summary>
 /// <remarks>
-/// A result is built only through the two <c>Connected</c> overloads and
-/// <see cref="Failed(CurlExitCode, string)" />, so a success always carries a connection
+/// A result is built only through the two <c>Connected</c> overloads,
+/// <see cref="Failed(CurlExitCode, string)" /> and <see cref="Refused(string)" />, so a success always carries a connection
 /// and a failure always carries an exit code other than <see cref="CurlExitCode.Ok" />.
 /// </remarks>
 public sealed class ConnectResult
@@ -81,6 +81,14 @@ public sealed class ConnectResult
     /// the connector does not number connections or the connect failed.
     /// </summary>
     public long ConnectionNumber { get; private init; }
+
+    /// <summary>
+    /// Gets a value indicating whether the connect failed because the peer refused the last
+    /// address tried (<c>ECONNREFUSED</c>, curl's <c>CURLINFO_OS_ERRNO</c>), the only
+    /// exit 7 <c>--retry-connrefused</c> retries; <see langword="false" /> for a success
+    /// and for every other failure. Set only by <see cref="Refused(string)" />.
+    /// </summary>
+    public bool IsConnectionRefused { get; private init; }
 
     /// <summary>
     /// Creates the result of a successful connect that recorded no timings, endpoint or
@@ -170,4 +178,17 @@ public sealed class ConnectResult
 
         return new ConnectResult(null, exitCode, errorMessage);
     }
+
+    /// <summary>
+    /// Creates the result of a TCP connect whose last attempt the peer refused
+    /// (<c>ECONNREFUSED</c>): exit 7 with <see cref="IsConnectionRefused" /> set, the one
+    /// exit 7 curl's <c>--retry-connrefused</c> retries.
+    /// </summary>
+    /// <param name="errorMessage">The message curl prints for the failure.</param>
+    /// <returns>
+    /// A result with no <see cref="Connection" /> whose <see cref="ExitCode" /> is
+    /// <see cref="CurlExitCode.CouldntConnect" />.
+    /// </returns>
+    public static ConnectResult Refused(string errorMessage) =>
+        new(null, CurlExitCode.CouldntConnect, errorMessage) { IsConnectionRefused = true };
 }

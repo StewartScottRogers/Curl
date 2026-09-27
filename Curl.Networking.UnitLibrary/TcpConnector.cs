@@ -150,13 +150,13 @@ public sealed class TcpConnector(
         }
 
         var nameResolved = timeProvider.GetTimestamp();
-        var dialed = await DialFirstReachableAsync(addresses, destination.Port, cancellationToken).ConfigureAwait(false);
+        var (dialed, lastDialError) = await DialFirstReachableAsync(addresses, destination.Port, cancellationToken).ConfigureAwait(false);
         if (dialed is null)
         {
             var elapsedMilliseconds = (long)timeProvider.GetElapsedTime(nameResolved).TotalMilliseconds;
             var via = destination.IsMapped ? $" via {destination.Host}:{destination.Port}" : string.Empty;
-            return ConnectResult.Failed(
-                CurlExitCode.CouldntConnect,
+            return DialFailure(
+                lastDialError,
                 $"Failed to connect to {target.Host}:{target.Port}{via} after {elapsedMilliseconds} ms: Could not connect to server");
         }
 
@@ -183,12 +183,12 @@ public sealed class TcpConnector(
         }
 
         var nameResolved = timeProvider.GetTimestamp();
-        var dialed = await DialFirstReachableAsync(addresses, proxy.Port, cancellationToken).ConfigureAwait(false);
+        var (dialed, lastDialError) = await DialFirstReachableAsync(addresses, proxy.Port, cancellationToken).ConfigureAwait(false);
         if (dialed is null)
         {
             var elapsedMilliseconds = (long)timeProvider.GetElapsedTime(nameResolved).TotalMilliseconds;
-            return ConnectResult.Failed(
-                CurlExitCode.CouldntConnect,
+            return DialFailure(
+                lastDialError,
                 $"Failed to connect to {target.Host}:{target.Port} over proxy {proxy.Host} after {elapsedMilliseconds} ms: Could not connect to server");
         }
 
@@ -338,23 +338,39 @@ public sealed class TcpConnector(
             secured.PeerCertificates);
     }
 
-    private async ValueTask<DialedTcpConnection?> DialFirstReachableAsync(
+    /// <summary>
+    /// Dials each address in turn and returns the first connection, or <see langword="null" />
+    /// with the <see cref="SocketError" /> of the last attempt, which curl keeps as
+    /// <c>CURLINFO_OS_ERRNO</c>.
+    /// </summary>
+    private async ValueTask<(DialedTcpConnection? Dialed, SocketError LastError)> DialFirstReachableAsync(
         IReadOnlyList<IPAddress> addresses,
         int port,
         CancellationToken cancellationToken)
     {
+        var lastError = SocketError.Success;
         foreach (var address in addresses)
         {
             try
             {
-                return await tcpDialer.DialAsync(new IPEndPoint(address, port), cancellationToken).ConfigureAwait(false);
+                return (await tcpDialer.DialAsync(new IPEndPoint(address, port), cancellationToken).ConfigureAwait(false), SocketError.Success);
             }
-            catch (SocketException)
+            catch (SocketException exception)
             {
                 // curl moves on to the next address; only when every one fails is it exit 7.
+                lastError = exception.SocketErrorCode;
             }
         }
 
-        return null;
+        return (null, lastError);
     }
+
+    /// <summary>
+    /// The exit 7 for a dial that reached no address: marked refused when the last attempt
+    /// was refused, as <c>--retry-connrefused</c> reads curl's <c>CURLINFO_OS_ERRNO</c>.
+    /// </summary>
+    private static ConnectResult DialFailure(SocketError lastError, string errorMessage) =>
+        lastError == SocketError.ConnectionRefused
+            ? ConnectResult.Refused(errorMessage)
+            : ConnectResult.Failed(CurlExitCode.CouldntConnect, errorMessage);
 }

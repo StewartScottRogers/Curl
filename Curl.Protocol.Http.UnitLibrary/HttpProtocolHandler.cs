@@ -281,7 +281,11 @@ public sealed class HttpProtocolHandler(
         ConnectResult connect = await plan.Deadline.ConnectAsync(connector, TargetOf(plan)).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
         {
-            return TransferResult.Failure(connect.ExitCode, connect.ErrorMessage!) with { Report = FailedConnectReport(plan) };
+            return TransferResult.Failure(connect.ExitCode, connect.ErrorMessage!) with
+            {
+                Report = FailedConnectReport(plan),
+                IsConnectionRefused = connect.IsConnectionRefused,
+            };
         }
 
         plan.Progress.ReportTransferStarted();

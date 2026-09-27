@@ -81,6 +81,45 @@ public sealed partial class TcpConnectorTests
             "Failed to connect to 127.0.0.1:1 after 2013 ms: Could not connect to server",
             result.ErrorMessage);
         Assert.IsNull(result.Connection);
+        Assert.IsTrue(result.IsConnectionRefused);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WhenTheLastAddressFailsForAnotherReason_IsNotMarkedRefused()
+    {
+        // curl 8.21.0 (Schannel): curl --retry 1 --retry-connrefused http://0.0.0.0:1/ -> exit 7,
+        // not retried, because CURLINFO_OS_ERRNO is not ECONNREFUSED (measured 2026-09-27, BL-317).
+        var refused = IPAddress.Parse("192.0.2.1");
+        var dialer = new FakeTcpDialer
+        {
+            DialOutcome = endPoint => throw new System.Net.Sockets.SocketException(endPoint.Address.Equals(refused)
+                ? (int)System.Net.Sockets.SocketError.ConnectionRefused
+                : (int)System.Net.Sockets.SocketError.AddressNotAvailable),
+        };
+        var connector = CreateConnector(new FakeDnsResolver(refused, IPAddress.Any), dialer, new FakeTlsProvider());
+
+        var result = await connector.ConnectAsync(new ConnectTarget("0.0.0.0", 1, UseTls: false), CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.IsFalse(result.IsConnectionRefused);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WhenTheLastAddressRefusesAfterAnotherFailure_IsMarkedRefused()
+    {
+        var unavailable = IPAddress.Parse("192.0.2.1");
+        var dialer = new FakeTcpDialer
+        {
+            DialOutcome = endPoint => throw new System.Net.Sockets.SocketException(endPoint.Address.Equals(unavailable)
+                ? (int)System.Net.Sockets.SocketError.AddressNotAvailable
+                : (int)System.Net.Sockets.SocketError.ConnectionRefused),
+        };
+        var connector = CreateConnector(new FakeDnsResolver(unavailable, Loopback), dialer, new FakeTlsProvider());
+
+        var result = await connector.ConnectAsync(new ConnectTarget("example.com", 1, UseTls: false), CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.IsTrue(result.IsConnectionRefused);
     }
 
     [TestMethod]

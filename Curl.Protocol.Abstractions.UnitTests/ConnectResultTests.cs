@@ -176,6 +176,24 @@ public sealed class ConnectResultTests
         Assert.AreEqual(0L, result.ConnectionNumber);
     }
 
+    [TestMethod]
+    public void Failed_Always_IsNotConnectionRefused()
+    {
+        Assert.IsFalse(ConnectResult.Failed(CurlExitCode.CouldntConnect, "failed").IsConnectionRefused);
+        Assert.IsFalse(ConnectResult.Connected(new UnusedConnection()).IsConnectionRefused);
+    }
+
+    [TestMethod]
+    public void Refused_Always_IsCouldntConnectMarkedRefusedWithNoConnection()
+    {
+        var result = ConnectResult.Refused("Failed to connect to 127.0.0.1:1 after 0 ms: Could not connect to server");
+
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.AreEqual("Failed to connect to 127.0.0.1:1 after 0 ms: Could not connect to server", result.ErrorMessage);
+        Assert.IsTrue(result.IsConnectionRefused);
+        Assert.IsNull(result.Connection);
+    }
+
     private sealed class UnusedConnection : IConnection
     {
         public bool IsSecure => false;

@@ -146,4 +146,12 @@ public sealed class TransferResultTests
         Assert.AreEqual(7L, result.BytesTransferred);
         Assert.AreEqual("failed", result.ErrorMessage);
     }
+
+    [TestMethod]
+    public void IsConnectionRefused_OnEveryFactory_IsFalseUntilSetWithWith()
+    {
+        Assert.IsFalse(TransferResult.Success(0).IsConnectionRefused);
+        Assert.IsFalse(TransferResult.Failure(CurlExitCode.CouldntConnect, "failed").IsConnectionRefused);
+        Assert.IsTrue((TransferResult.Failure(CurlExitCode.CouldntConnect, "failed") with { IsConnectionRefused = true }).IsConnectionRefused);
+    }
 }

@@ -76,6 +76,7 @@ public sealed partial class TcpConnectorTests
         Assert.AreEqual(
             "Failed to connect to example.com:8080 over proxy localhost after 2268 ms: Could not connect to server",
             result.ErrorMessage);
+        Assert.IsTrue(result.IsConnectionRefused);
         CollectionAssert.AreEqual(new[] { new IPEndPoint(ProxyAddress, 1) }, dialer.DialedEndPoints);
     }
 
@@ -152,6 +153,7 @@ public sealed partial class TcpConnectorTests
         Assert.AreEqual(
             "Failed to connect to ::1:8080 over proxy localhost after 0 ms: Could not connect to server",
             result.ErrorMessage);
+        Assert.IsTrue(result.IsConnectionRefused);
     }
 
     [TestMethod]
