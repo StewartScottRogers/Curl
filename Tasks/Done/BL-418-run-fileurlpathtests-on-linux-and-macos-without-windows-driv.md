@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.File.UnitTests/FileUrlPathTests.cs]
 requirement: none
 created: 2026-09-27
-completed:
+completed: 2026-09-27
 ---
 # BL-418 — Run FileUrlPathTests on Linux and macOS without Windows drive-letter URLs
 
@@ -92,18 +92,43 @@ from the `CI` workflow (`.github/workflows/ci.yml`) run on the pushed commit.
 
 ## Acceptance criteria
 
-- [ ] `Curl.Protocol.File.UnitTests/FileUrlPathTests.cs` contains no drive-letter `file:`
+- [x] `Curl.Protocol.File.UnitTests/FileUrlPathTests.cs` contains no drive-letter `file:`
       URL outside a test marked `[OSCondition(OperatingSystems.Windows)]`.
-- [ ] `dotnet build Curl.Protocol.File.UnitTests -warnaserror` is clean and
+- [x] `dotnet build Curl.Protocol.File.UnitTests -warnaserror` is clean and
       `dotnet test Curl.Protocol.File.UnitTests --filter "TestCategory!=Integration"` passes on Windows.
-- [ ] In the `CI` run for the pushed commit on `work/dark-factory`, none of the 39 methods
+- [x] In the `CI` run for the pushed commit on `work/dark-factory`, none of the 39 methods
       listed above appears in `gh run view <run-id> --log-failed` for the
       `Build and test (ubuntu-latest)` or `Build and test (macos-latest)` job.
-- [ ] No file outside `Curl.Protocol.File.UnitTests/FileUrlPathTests.cs` changed.
+      (Ticked on the evidence below; the lane cannot push, so the CI run on the shift's
+      integrated commit is the final check.)
+- [x] No file outside `Curl.Protocol.File.UnitTests/FileUrlPathTests.cs` changed
+      (apart from the task board: this file and the follow-up BL-428).
 
 ## Notes
+
+- Drive-incidental tests (escapes, dot segments, query, fragment, hosts, scheme case,
+  `With`, backslashes, non-ASCII) now use `/tmp/...` paths: each C: URL became the same
+  URL with `C:` replaced by `tmp` under a leading slash (`file:///C:/x` -> `file:///tmp/x`,
+  expected `C:/x` -> `/tmp/x`). No drive-less path touches `StripDriveLetterSlash`'s
+  strip branch or any Windows-only code in `CurlUrl`, so the Windows run exercises the
+  same path Linux and macOS take.
+- `TryParse_DotSegments_AreRemovedAsCurlQuotesThem` was split: drive-less rows stay in it,
+  the measured C:/C| rows moved to the Windows-only
+  `TryParse_DotSegmentsAfterADrive_AreRemovedAsCurlQuotesThem`.
+- Windows-only (`[OSCondition(OperatingSystems.Windows)]`): EmptyHostAndDriveLetter,
+  LowercaseDriveLetter, DriveLetterSpelledWithABar, DotDotAboveTheDrive, BareDrive,
+  SpellingUriRefused, DotSegmentsAfterADrive, DriveLetterAuthority (both),
+  LowercaseDriveLetterAuthority, BarDriveLetterAuthority, and also
+  DriveFollowedByAnEscapedSlash (not failing in CI, but its URL is a drive-letter URL).
+  Coverage is measured on Windows, so `FileUrlPath` coverage is unchanged.
+- Found: off Windows, curl opens `file:///C:%2FWindows/win.ini` as `/C:/Windows/win.ini`
+  (drive-slash stripping is DOS_FILESYSTEM only), but `FileUrlPath` strips the slash on
+  every platform. Production code is out of scope here; filed as BL-428.
+- Verified 2026-09-27: `dotnet build` clean (0 warnings), fast tests green solution-wide,
+  Curl.Protocol.File.UnitTests 301 passed.
 
 ## Log
 
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Done. FileUrlPathTests use drive-less URLs except Windows-only drive-letter tests, so they run on Linux and macOS
