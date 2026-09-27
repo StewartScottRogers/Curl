@@ -35,3 +35,4 @@ A dated PSL snapshot is an embedded resource in `Curl.Cookies.UnitLibrary`, with
 
 - 2026-09-26: Created.
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Backlog. Lane 2 could not integrate: fast tests failed after rebasing onto the other lanes' work. The work is on branch factory/BL-222-lane-2-20260927-011505; start with git cherry-pick --no-commit factory/BL-222-lane-2-20260927-011505 and fix it.
