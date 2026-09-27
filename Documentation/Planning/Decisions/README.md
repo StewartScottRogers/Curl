@@ -100,6 +100,7 @@ choices do not need one.
 | [0083](ADR-0083-thin-socket-adapters-are-measured-by-the-integration-run.md) | `TcpDialer.DialAsync`, `UdpDatagramChannel.SendAsync` and `ReceiveAsync` are excluded from fast-run coverage and measured by the Integration run | Accepted | 2026-09-27 |
 | [0084](ADR-0084-socks-handshakes-follow-the-schannel-build-of-curl-8-21-0.md) | The SOCKS handshakes follow curl 8.21.0's Schannel build: the SOCKS5 greeting offers GSSAPI without implementing it, SOCKS4 sends the first IPv4 address and SOCKS5 the first address, a literal is what `IPAddress.TryParse` accepts and prints back, text is UTF-8, and a throwing handshake disposes the proxy connection | Accepted | 2026-09-27 |
 | [0085](ADR-0085-v-words-a-tls-handshake-as-the-platforms-curl-build-with-openssl-facts-on-the-event.md) | `-v` and the trace dumps word a TLS handshake as the `TlsBackend` they are given (Schannel on Windows, OpenSSL elsewhere by default); OpenSSL-only facts (group, signature type, verify code, chain) are optional properties of `TlsHandshakeEvent`, and names, dates and key sizes are ported from OpenSSL in `Curl.Output` | Accepted | 2026-09-27 |
+| [0086](ADR-0086-a-repeated-transfer-started-report-starts-the-next-redirect-hops-status-line.md) | A repeated "transfer started" report starts the next redirect hop's status line; exit 47 draws the refused hop as a followed one | Accepted | 2026-09-27 |
 
 ## Template
 

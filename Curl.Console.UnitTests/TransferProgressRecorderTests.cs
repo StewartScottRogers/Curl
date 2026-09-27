@@ -89,6 +89,37 @@ public sealed class TransferProgressRecorderTests
     }
 
     [TestMethod]
+    public void FinishRedirectHop_WithNoBytesReported_DrawsTheZeroLineTwiceMore()
+    {
+        TransferProgressRecorder recorder = new(clock);
+        recorder.ReportTransferStarted();
+
+        recorder.FinishRedirectHop();
+
+        Assert.AreEqual(Zero + Zero + Zero, recorder.StatusLines);
+    }
+
+    [TestMethod]
+    public void ReportTransferStarted_Repeated_EndsTheHopAndStartsTheNextFromZero()
+    {
+        TransferProgressRecorder recorder = new(clock);
+        recorder.ReportTransferStarted();
+        clock.Advance(40);
+        recorder.ReportDownloaded(10, 10);
+
+        recorder.ReportTransferStarted();
+        clock.Advance(40);
+        recorder.ReportDownloaded(10, 10);
+        recorder.Finish(succeeded: true);
+
+        Assert.AreEqual(
+            Zero + TenOfTenIn40Milliseconds + TenOfTenIn40Milliseconds + Environment.NewLine
+                + Zero + TenOfTenIn40Milliseconds + TenOfTenIn40Milliseconds + TenOfTenIn40Milliseconds,
+            recorder.StatusLines);
+        Assert.IsTrue(recorder.HasTransferStarted);
+    }
+
+    [TestMethod]
     public void Finish_FailedWithinASecondOfTheLastSample_DrawsNothingMore()
     {
         TransferProgressRecorder recorder = new(clock);

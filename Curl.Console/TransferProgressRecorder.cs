@@ -10,7 +10,8 @@ namespace Curl.Console;
 /// status lines from the byte reports on the clock it is given, when and
 /// as curl 8.21.0's <c>progress_calc</c> and <c>progress_meter</c> draw them (task BL-131).
 /// Under <c>-#</c> it also passes every report on to the transfer's
-/// <see cref="ProgressBarRecorder" /> (task BL-132).
+/// <see cref="ProgressBarRecorder" /> (task BL-132). Under <c>-L</c> each hop of the chain is
+/// drawn on a status line of its own (task BL-277, ADR-0086).
 /// </summary>
 /// <remarks>
 /// The first draw is made when the recorder is made, with every counter zero, so it is
@@ -19,6 +20,13 @@ namespace Curl.Console;
 /// makes once the transfer is done. curl also skips a draw in the same whole second as the
 /// last one, which cannot happen here: every draw of a running transfer follows a new sample,
 /// taken a second or more after the one before.
+/// <para>
+/// <c>RedirectFollower</c> hands every hop the same sink, and the handler of each hop reports
+/// "transfer started" once for it, so a repeated <see cref="ReportTransferStarted" /> is the
+/// next hop starting: the hop before it is finished with <see cref="RedirectDoneDrawCount" />
+/// draws and ended with a newline, and the new hop's counters start again from zero at a new
+/// zero line, as curl 8.21.0 draws them (measured 2026-09-27, BL-277 Notes).
+/// </para>
 /// </remarks>
 internal sealed class TransferProgressRecorder : ITransferProgress
 {
@@ -35,17 +43,25 @@ internal sealed class TransferProgressRecorder : ITransferProgress
     /// </summary>
     private const int DoneDrawCount = 3;
 
+    /// <summary>
+    /// How many times curl 8.21.0 draws the status line once a hop that answered with a
+    /// redirect is done, whether <c>-L</c> follows it or <c>--max-redirs</c> refuses it with
+    /// exit 47: two, after the zero line, whatever bytes it reported. Measured on a
+    /// <c>302</c> with an empty body (BL-277 Notes).
+    /// </summary>
+    private const int RedirectDoneDrawCount = 2;
+
     private readonly TimeProvider timeProvider;
 
     private readonly ProgressBarRecorder? progressBar;
-
-    private readonly long start;
 
     private readonly long[] sampleBytes = new long[SpeedSampleCount];
 
     private readonly long[] sampleTimes = new long[SpeedSampleCount];
 
     private readonly StringBuilder statusLines = new();
+
+    private long start;
 
     private int sampleCount;
 
@@ -77,8 +93,7 @@ internal sealed class TransferProgressRecorder : ITransferProgress
     {
         this.timeProvider = timeProvider;
         this.progressBar = progressBar;
-        start = timeProvider.GetTimestamp();
-        Draw(done: false);
+        StartHop();
     }
 
     /// <summary>
@@ -88,13 +103,22 @@ internal sealed class TransferProgressRecorder : ITransferProgress
 
     /// <summary>
     /// Gets the status lines drawn so far, each starting with the carriage return curl writes
-    /// before it and none ending in a newline, as curl writes them to standard error.
+    /// before it, as curl writes them to standard error. A newline
+    /// (<see cref="Environment.NewLine" />) ends each hop but the last, which the caller ends.
     /// </summary>
     internal string StatusLines => statusLines.ToString();
 
     /// <inheritdoc />
+    /// <remarks>A repeat is the next redirect hop starting, which starts a new status line.</remarks>
     public void ReportTransferStarted()
     {
+        if (HasTransferStarted)
+        {
+            FinishRedirectHop();
+            statusLines.Append(Environment.NewLine);
+            StartHop();
+        }
+
         HasTransferStarted = true;
         progressBar?.ReportTransferStarted();
     }
@@ -138,6 +162,35 @@ internal sealed class TransferProgressRecorder : ITransferProgress
         {
             Draw(succeeded);
         }
+    }
+
+    /// <summary>
+    /// Makes the draws curl makes as a hop that answered with a redirect ends: the one before
+    /// the next hop, or the one <c>--max-redirs</c> refuses to follow with exit 47.
+    /// </summary>
+    internal void FinishRedirectHop()
+    {
+        for (int draw = 0; draw < RedirectDoneDrawCount; draw++)
+        {
+            Draw(done: true);
+        }
+    }
+
+    /// <summary>
+    /// Starts a hop now: every counter and speed sample back at zero, and the zero status line
+    /// drawn.
+    /// </summary>
+    private void StartHop()
+    {
+        start = timeProvider.GetTimestamp();
+        sampleCount = 0;
+        downloaded = 0;
+        downloadTotal = null;
+        uploaded = 0;
+        uploadTotal = null;
+        currentSpeed = 0;
+        bytesReported = false;
+        Draw(done: false);
     }
 
     /// <summary>

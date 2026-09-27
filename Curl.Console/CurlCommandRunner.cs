@@ -1556,7 +1556,8 @@ internal sealed class CurlCommandRunner(
     /// failure lines (task BL-132). Otherwise it is the progress meter, when
     /// <see cref="ShowsProgressMeter" /> says it is shown: its header lines, then the status
     /// lines <see cref="transferProgress" /> drew, each starting with a carriage return, then
-    /// one newline, as curl 8.21.0 does (task BL-131). Either is written after the
+    /// one newline, as curl 8.21.0 does (task BL-131); under <c>-L</c>, one such line per hop
+    /// (task BL-277). Either is written after the
     /// transfer, so its bytes are curl's but a terminal does not see it move.
     /// </summary>
     /// <param name="options">The accepted command line.</param>
@@ -1586,12 +1587,30 @@ internal sealed class CurlCommandRunner(
         if ((result.IsSuccess || result.ExitCode == CurlExitCode.HttpReturnedError || transferProgress.HasTransferStarted)
             && ShowsProgressMeter(options, toStandardOutput))
         {
-            transferProgress.Finish(result.IsSuccess);
+            FinishTransferProgress(result);
             await WriteErrorLinesAsync([.. TakeProgressMeterHeaderLines(resumeFrom), transferProgress.StatusLines])
                 .ConfigureAwait(false);
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Makes the draws curl 8.21.0 makes as <see cref="transferProgress" />'s transfer ends: a
+    /// redirect hop's when <c>--max-redirs</c> refused to follow its redirect (exit 47), which
+    /// curl draws like a followed hop (task BL-277), and the finished transfer's otherwise.
+    /// </summary>
+    /// <param name="result">The transfer's result.</param>
+    private void FinishTransferProgress(TransferResult result)
+    {
+        if (result.ExitCode == CurlExitCode.TooManyRedirects)
+        {
+            transferProgress.FinishRedirectHop();
+        }
+        else
+        {
+            transferProgress.Finish(result.IsSuccess);
+        }
     }
 
     /// <summary>
