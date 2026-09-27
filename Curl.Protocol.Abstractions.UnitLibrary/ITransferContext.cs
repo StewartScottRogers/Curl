@@ -219,8 +219,7 @@ public interface ITransferContext
     /// <remarks>
     /// <c>-m</c> limits the whole operation, so a handler honouring <see cref="MaxTime" />
     /// should count it from here, and print the operation's elapsed time from here, as curl
-    /// counts from its <c>t_startop</c>. The HTTP handler does; the TFTP handler still
-    /// counts <c>-m</c> from its own call. <c>Curl.Core</c>'s redirect
+    /// counts from its <c>t_startop</c>. The HTTP and TFTP handlers do. <c>Curl.Core</c>'s redirect
     /// follower sets it on every hop after the first, so a <c>-L</c> chain shares one
     /// <c>-m</c> (ADR-0040).
     /// </remarks>

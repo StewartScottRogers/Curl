@@ -69,6 +69,20 @@ public sealed class TftpUploadRetransmissionTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_SilentServerMaxTime2OperationStarted1500MillisecondsEarlier_OperationTimedOutAfter500MillisecondsReporting2000()
+    {
+        var channel = Channel();
+
+        var result = await Run(
+            channel,
+            Context(maxTime: TimeSpan.FromSeconds(2), operationStarted: -TimeSpan.FromMilliseconds(1500).Ticks));
+
+        Assert.AreEqual(TimeSpan.FromMilliseconds(500), clock.Now);
+        Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
+        Assert.AreEqual("Operation timed out after 2000 milliseconds with 0 bytes received", result.ErrorMessage);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_SilentAfterAck0NoLimits_ResendsData1At6And12And18ThenTimesOutAt24()
     {
         var channel = Channel(Ack(0));
@@ -291,7 +305,7 @@ public sealed class TftpUploadRetransmissionTests
     private FallsSilentDatagramChannel Channel(params (byte[] Datagram, EndPoint Source)[] script) =>
         new(ServerEndPoint, clock, script);
 
-    private TransferContext Context(TimeSpan? connectTimeout = null, TimeSpan? maxTime = null) =>
+    private TransferContext Context(TimeSpan? connectTimeout = null, TimeSpan? maxTime = null, long? operationStarted = null) =>
         new()
         {
             Url = CurlUrl.Parse("tftp://h/dest.txt"),
@@ -299,6 +313,7 @@ public sealed class TftpUploadRetransmissionTests
             Upload = new MemoryStream(Upload),
             ConnectTimeout = connectTimeout,
             MaxTime = maxTime,
+            OperationStarted = operationStarted,
             TimeProvider = clock,
         };
 }

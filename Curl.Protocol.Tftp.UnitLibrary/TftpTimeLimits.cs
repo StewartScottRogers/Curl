@@ -4,26 +4,37 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Protocol.Tftp;
 
 /// <summary>
-/// The time limits of one TFTP transfer, counted from its start on
-/// <see cref="ITransferContext.TimeProvider" />: the retry schedule each phase runs on,
-/// the wait for a datagram until the next re-send is due, and the failure
-/// <see cref="ITransferContext.MaxTime" /> passing ends the transfer with.
+/// The time limits of one TFTP transfer on <see cref="ITransferContext.TimeProvider" />:
+/// the retry schedule each phase runs on, the wait for a datagram until the next re-send
+/// is due, and the failure <see cref="ITransferContext.MaxTime" /> passing ends the
+/// transfer with.
 /// </summary>
 /// <param name="context">The transfer being performed.</param>
 /// <param name="startTimestamp">
 /// The <see cref="ITransferContext.TimeProvider" /> timestamp the transfer started at,
-/// which <see cref="ITransferContext.MaxTime" /> and the connect timeout count from.
+/// which the connect timeout and the re-send schedule count from.
 /// </param>
 /// <remarks>
 /// A <see cref="ITransferContext.ConnectTimeout" /> or <see cref="ITransferContext.MaxTime" />
 /// of zero or less is no limit, as curl treats <c>--connect-timeout 0</c> and <c>-m 0</c>.
+/// <see cref="ITransferContext.MaxTime" /> counts from
+/// <see cref="ITransferContext.OperationStarted" /> when it is set, so a <c>-L</c> chain
+/// that ends on a <c>tftp://</c> hop shares one <c>-m</c>, and the timeout message prints
+/// the operation's elapsed time, as curl 8.21.0 does (measured, BL-350 Notes).
 /// </remarks>
 internal sealed class TftpTimeLimits(ITransferContext context, long startTimestamp)
 {
     /// <summary>The connect timeout curl applies when none is given.</summary>
     private static readonly TimeSpan DefaultConnectTimeout = TimeSpan.FromSeconds(300);
 
-    private readonly TimeSpan? maxTime = Positive(context.MaxTime);
+    /// <summary>How long the operation ran before this transfer started.</summary>
+    private readonly TimeSpan timeBeforeStart = TimeBeforeStart(context, startTimestamp);
+
+    /// <summary>
+    /// The elapsed time, counted from this transfer's start, at which
+    /// <see cref="ITransferContext.MaxTime" /> passes; <see langword="null" /> for no limit.
+    /// </summary>
+    private readonly TimeSpan? maxTime = Positive(context.MaxTime) - TimeBeforeStart(context, startTimestamp);
 
     /// <summary>
     /// Derives the schedule the request is sent on from the time left: the connect
@@ -90,7 +101,7 @@ internal sealed class TftpTimeLimits(ITransferContext context, long startTimesta
     /// <param name="bytesTransferred">The bytes the result reports as transferred.</param>
     /// <returns>
     /// Exit 28 with <c>Operation timed out after N milliseconds with M bytes received</c>,
-    /// or <see langword="null" /> when the maximum time has not passed or none is set.
+    /// N counted from the operation's start, or <see langword="null" /> when the maximum time has not passed or none is set.
     /// </returns>
     internal TransferResult? FailureIfMaxTimePassed(long bytesReceived, long bytesTransferred)
     {
@@ -100,10 +111,13 @@ internal sealed class TftpTimeLimits(ITransferContext context, long startTimesta
                 CurlExitCode.OperationTimedOut,
                 string.Create(
                     CultureInfo.InvariantCulture,
-                    $"Operation timed out after {(long)elapsed.TotalMilliseconds} milliseconds with {bytesReceived} bytes received"),
+                    $"Operation timed out after {(long)(timeBeforeStart + elapsed).TotalMilliseconds} milliseconds with {bytesReceived} bytes received"),
                 bytesTransferred)
             : null;
     }
+
+    private static TimeSpan TimeBeforeStart(ITransferContext context, long startTimestamp) =>
+        context.TimeProvider.GetElapsedTime(context.OperationStarted ?? startTimestamp, startTimestamp);
 
     private static TimeSpan? Positive(TimeSpan? limit) => limit > TimeSpan.Zero ? limit : null;
 
