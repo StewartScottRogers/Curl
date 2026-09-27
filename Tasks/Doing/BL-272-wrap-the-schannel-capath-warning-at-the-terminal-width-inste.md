@@ -47,3 +47,4 @@ always as the two lines curl prints at 79 columns.
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-27: Backlog -> Doing.
