@@ -23,6 +23,12 @@ public sealed class TransferRetryWarningTests
         Assert.AreEqual(expected, TransferRetryWarning.For(TransferRetryReason.Timeout, TimeSpan.FromMilliseconds(milliseconds), retriesLeft));
 
     [TestMethod]
+    [DataRow(1000, 2L, "Warning: Problem : connection refused. Retrying in 1 second. 2 retries left.")]
+    [DataRow(2000, 1L, "Warning: Problem : connection refused. Retrying in 2 seconds. 1 retry left.")]
+    public void For_ConnectionRefused_MatchesMeasuredLine(int milliseconds, long retriesLeft, string expected) =>
+        Assert.AreEqual(expected, TransferRetryWarning.For(TransferRetryReason.ConnectionRefused, TimeSpan.FromMilliseconds(milliseconds), retriesLeft));
+
+    [TestMethod]
     [DataRow(1000, 2L, "Warning: Problem : FTP error. Retrying in 1 second. 2 retries left.")]
     [DataRow(2000, 1L, "Warning: Problem : FTP error. Retrying in 2 seconds. 1 retry left.")]
     public void For_FtpError_MatchesMeasuredLine(int milliseconds, long retriesLeft, string expected) =>

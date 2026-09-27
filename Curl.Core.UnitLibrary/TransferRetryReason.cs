@@ -13,6 +13,12 @@ public enum TransferRetryReason
     Timeout,
 
     /// <summary>
+    /// The peer refused the connect (exit 7) and <c>--retry-connrefused</c> was given:
+    /// <c>: connection refused</c>.
+    /// </summary>
+    ConnectionRefused,
+
+    /// <summary>
     /// An HTTP or HTTPS server answered 408, 429, 500, 502, 503, 504, 522 or 524:
     /// <c>: HTTP error</c>.
     /// </summary>

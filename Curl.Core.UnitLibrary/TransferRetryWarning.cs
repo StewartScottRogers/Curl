@@ -32,13 +32,7 @@ public static class TransferRetryWarning
     public static string For(TransferRetryReason reason, TimeSpan wait, long retriesLeft)
     {
         long milliseconds = (long)wait.TotalMilliseconds;
-        string problem = reason switch
-        {
-            TransferRetryReason.Timeout => ": timeout",
-            TransferRetryReason.HttpError => ": HTTP error",
-            TransferRetryReason.FtpError => ": FTP error",
-            _ => "(retrying all errors)",
-        };
+        string problem = Problem(reason);
         string fraction = milliseconds % 1000 == 0
             ? string.Empty
             : string.Create(CultureInfo.InvariantCulture, $".{milliseconds % 1000:D3}");
@@ -48,4 +42,15 @@ public static class TransferRetryWarning
             CultureInfo.InvariantCulture,
             $"Warning: Problem {problem}. Retrying in {milliseconds / 1000}{fraction} {seconds}. {retriesLeft} {retries} left.");
     }
+
+    /// <summary>The words curl prints after <c>Problem</c> for <paramref name="reason" />.</summary>
+    private static string Problem(TransferRetryReason reason) =>
+        reason switch
+        {
+            TransferRetryReason.Timeout => ": timeout",
+            TransferRetryReason.ConnectionRefused => ": connection refused",
+            TransferRetryReason.HttpError => ": HTTP error",
+            TransferRetryReason.FtpError => ": FTP error",
+            _ => "(retrying all errors)",
+        };
 }

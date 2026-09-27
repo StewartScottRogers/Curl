@@ -36,4 +36,12 @@ public sealed record RetryPolicy
     /// transfer is still retried only for a transient HTTP status.
     /// </summary>
     public bool RetryAllErrors { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether a connect the peer refused (exit 7 with
+    /// <see cref="Curl.Protocol.Abstractions.TransferResult.IsConnectionRefused" />) is
+    /// retried, per <c>--retry-connrefused</c>; any other exit 7 is still retried only under
+    /// <see cref="RetryAllErrors" />.
+    /// </summary>
+    public bool RetryConnectionRefused { get; init; }
 }

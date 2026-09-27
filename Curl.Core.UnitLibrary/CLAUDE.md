@@ -36,7 +36,8 @@ effective URL, summed header/request/connection counts, timings from the first h
 
 `TransferRetrier` runs a transfer again under `--retry` (`RetryPolicy`: `--retry`,
 `--retry-delay`) after curl 8.21.0's transient failures: exit 28, 6, 5 or 12
-(`: timeout`), or an http(s) status 408, 429, 500, 502, 503, 504, 522 or 524 on a
+(`: timeout`), under `--retry-connrefused` an exit 7 whose `TransferResult.IsConnectionRefused`
+is set (`: connection refused`; any other exit 7 only under `--retry-all-errors`), or an http(s) status 408, 429, 500, 502, 503, 504, 522 or 524 on a
 success or a `-f` exit 22 (`: HTTP error`). It waits a `Retry-After`
 (`RetryAfterHeader`, capped at six hours) when one asks for a wait, else the fixed
 delay, else curl's backoff (1 s doubling to 10 min, advanced only when used), with

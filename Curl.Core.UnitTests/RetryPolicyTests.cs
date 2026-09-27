@@ -16,6 +16,7 @@ public sealed class RetryPolicyTests
         Assert.AreEqual(TimeSpan.Zero, policy.Delay);
         Assert.AreEqual(TimeSpan.Zero, policy.MaxTime);
         Assert.IsFalse(policy.RetryAllErrors);
+        Assert.IsFalse(policy.RetryConnectionRefused);
     }
 
     [TestMethod]

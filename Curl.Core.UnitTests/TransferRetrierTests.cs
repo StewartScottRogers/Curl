@@ -412,6 +412,91 @@ public sealed class TransferRetrierTests
     }
 
     [TestMethod]
+    public async Task RunAsync_RetryConnectionRefusedOnRefusedConnect_BacksOffWithConnectionRefusedWarnings()
+    {
+        Run run = await Retry(
+            new RetryPolicy { Retries = 2, RetryConnectionRefused = true },
+            Refused(),
+            Refused(),
+            Refused());
+
+        CollectionAssert.AreEqual(Seconds(1, 2), run.Waits);
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "Warning: Problem : connection refused. Retrying in 1 second. 2 retries left.",
+                "Warning: Problem : connection refused. Retrying in 2 seconds. 1 retry left.",
+            },
+            run.Warnings);
+        Assert.AreEqual(3, run.Attempts);
+        Assert.AreEqual(CurlExitCode.CouldntConnect, run.Result.ExitCode);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RetryConnectionRefusedOnRefusedThenSuccess_ReturnsTheSuccess()
+    {
+        Run run = await Retry(new RetryPolicy { Retries = 2, RetryConnectionRefused = true }, Refused(), Http(200));
+
+        Assert.AreEqual(2, run.Attempts);
+        Assert.IsTrue(run.Result.IsSuccess);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RetryConnectionRefusedOnConnectNotRefused_IsFinal()
+    {
+        Run run = await Retry(
+            new RetryPolicy { Retries = 2, RetryConnectionRefused = true },
+            Failed(CurlExitCode.CouldntConnect),
+            Http(200));
+
+        Assert.AreEqual(1, run.Attempts);
+        Assert.IsEmpty(run.Warnings);
+        Assert.AreEqual(CurlExitCode.CouldntConnect, run.Result.ExitCode);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RefusedConnectWithoutRetryConnectionRefused_IsFinal()
+    {
+        Run run = await Retry(new RetryPolicy { Retries = 2 }, Refused(), Http(200));
+
+        Assert.AreEqual(1, run.Attempts);
+        Assert.IsEmpty(run.Warnings);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RetryConnectionRefusedOnRefusalFlagWithAnotherExitCode_IsFinal()
+    {
+        Run run = await Retry(
+            new RetryPolicy { Retries = 2, RetryConnectionRefused = true },
+            Failed(CurlExitCode.SslConnectError) with { IsConnectionRefused = true },
+            Http(200));
+
+        Assert.AreEqual(1, run.Attempts);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RetryConnectionRefusedAndAllErrorsOnConnectNotRefused_RetriesAllErrors()
+    {
+        Run run = await Retry(
+            new RetryPolicy { Retries = 1, RetryConnectionRefused = true, RetryAllErrors = true },
+            Failed(CurlExitCode.CouldntConnect),
+            Http(200));
+
+        CollectionAssert.AreEqual(new[] { "Warning: Problem (retrying all errors). Retrying in 1 second. 1 retry left." }, run.Warnings);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RetryConnectionRefusedAndAllErrorsOnRefusedConnect_KeepsTheConnectionRefusedReason()
+    {
+        Run run = await Retry(
+            new RetryPolicy { Retries = 1, RetryConnectionRefused = true, RetryAllErrors = true },
+            Refused(),
+            Http(200));
+
+        CollectionAssert.AreEqual(new[] { "Warning: Problem : connection refused. Retrying in 1 second. 1 retry left." }, run.Warnings);
+    }
+
+    [TestMethod]
     public async Task RunAsync_RetryAllErrorsOnFailWith404_Retries()
     {
         Run run = await Retry(
@@ -596,6 +681,9 @@ public sealed class TransferRetrierTests
 
     private static TransferResult Failed(CurlExitCode exitCode, int status = 0) =>
         TransferResult.Failure(exitCode, "failed") with { Report = status == 0 ? null : Report(status) };
+
+    private static TransferResult Refused() =>
+        Failed(CurlExitCode.CouldntConnect) with { IsConnectionRefused = true };
 
     private static TransferReport Report(int status, string? retryAfter = null) =>
         new()

@@ -10,7 +10,9 @@ namespace Curl.Core;
 /// <remarks>
 /// <para>
 /// A transfer is retried when it failed with exit 28, 6, 5 or 12
-/// (<see cref="TransferRetryReason.Timeout" />); when an http:// or https:// transfer
+/// (<see cref="TransferRetryReason.Timeout" />); under <c>--retry-connrefused</c>, when it
+/// failed with exit 7 because the peer refused the connect
+/// (<see cref="TransferRetryReason.ConnectionRefused" />); when an http:// or https:// transfer
 /// succeeded, or failed with exit 22 under <c>-f</c>, with status 408, 429, 500, 502, 503,
 /// 504, 522 or 524 (<see cref="TransferRetryReason.HttpError" />); when any other failure of
 /// an ftp:// or ftps:// transfer carries a 4xx <see cref="TransferReport.ResponseCode" />
@@ -125,11 +127,27 @@ public sealed class TransferRetrier(Func<ITransferContext, ValueTask<TransferRes
         maxTime != TimeSpan.Zero && retryAfter != TimeSpan.Zero && elapsed + retryAfter > maxTime;
 
     private static TransferRetryReason? RetryReason(RetryPolicy policy, CurlUrl url, TransferResult result) =>
-        TransientReason(url, result)
+        TransientReason(policy, url, result)
         ?? (policy.RetryAllErrors && !result.IsSuccess ? TransferRetryReason.AllErrors : null);
 
-    private static TransferRetryReason? TransientReason(CurlUrl url, TransferResult result) =>
-        TimeoutFailures.Contains(result.ExitCode) ? TransferRetryReason.Timeout : ProtocolErrorReason(url, result);
+    private static TransferRetryReason? TransientReason(RetryPolicy policy, CurlUrl url, TransferResult result)
+    {
+        if (TimeoutFailures.Contains(result.ExitCode))
+        {
+            return TransferRetryReason.Timeout;
+        }
+
+        return IsRetriedRefusal(policy, result) ? TransferRetryReason.ConnectionRefused : ProtocolErrorReason(url, result);
+    }
+
+    /// <summary>
+    /// Whether the transfer failed with exit 7 because the peer refused the connect and
+    /// <c>--retry-connrefused</c> was given; any other exit 7 is left to <c>--retry-all-errors</c>.
+    /// </summary>
+    private static bool IsRetriedRefusal(RetryPolicy policy, TransferResult result) =>
+        policy.RetryConnectionRefused
+        && result.ExitCode == CurlExitCode.CouldntConnect
+        && result.IsConnectionRefused;
 
     private static TransferRetryReason? ProtocolErrorReason(CurlUrl url, TransferResult result)
     {
