@@ -24,6 +24,15 @@ internal static class TlsFailureMessages
     private const string SchannelCaCertificateFileAnchorsNothing =
         "schannel: the certificate or certificate chain is based on an untrusted root";
 
+    // With --cacert curl's Schannel build builds the chain itself and names the first of
+    // these trust errors it finds, in this order (BL-150, measured; BL-368).
+    private const string SchannelChainNotTimeValid =
+        "schannel: this certificate or one of the certificates in the certificate chain is not time valid";
+
+    private const string SchannelChainIncomplete = "schannel: the certificate chain is incomplete";
+
+    private const string SchannelRevocationStatusUnknown = "schannel: the revocation status is unknown";
+
     // The Schannel build with --cacert checks the name itself (BL-150, measured): an IP
     // literal against a certificate with no subjectAltName extension, an IP literal against
     // one with it (no message of its own, so libcurl's text for exit 60), and a host name.
@@ -81,9 +90,13 @@ internal static class TlsFailureMessages
     /// </param>
     /// <returns>The message curl prints.</returns>
     /// <remarks>
-    /// A chain failure is reported before a name mismatch. Without <c>--cacert</c> a name
-    /// mismatch is Schannel's <c>SEC_E_WRONG_PRINCIPAL</c>; with it, curl's own check names
-    /// the host, or for an IP literal whether the certificate has a subjectAltName extension.
+    /// A chain failure is reported before a name mismatch. With <c>--cacert</c> it names the
+    /// first of a certificate out of its validity period, an incomplete chain, an untrusted
+    /// root and an unknown revocation status; without it, every chain failure that reaches
+    /// exit 60 is an untrusted root (see <see cref="IsSchannelCertificateExpired" /> for the
+    /// one that does not). Without <c>--cacert</c> a name mismatch is Schannel's
+    /// <c>SEC_E_WRONG_PRINCIPAL</c>; with it, curl's own check names the host, or for an IP
+    /// literal whether the certificate has a subjectAltName extension.
     /// </remarks>
     public static string SchannelPeerFailedVerification(
         SslPolicyErrors errors,
@@ -93,7 +106,7 @@ internal static class TlsFailureMessages
     {
         if (errors != SslPolicyErrors.RemoteCertificateNameMismatch)
         {
-            return hasCaCertificateFile ? SchannelCaCertificateFileAnchorsNothing : SchannelUntrustedRoot;
+            return hasCaCertificateFile ? SchannelCaCertificateFileChainError(chain) : SchannelUntrustedRoot;
         }
 
         if (!hasCaCertificateFile)
@@ -110,6 +123,27 @@ internal static class TlsFailureMessages
             ? SchannelIpAddressWithoutAlternativeNames
             : SchannelIpAddressNotAmongAlternativeNames;
     }
+
+    /// <summary>
+    /// The Schannel build's message for exit 35 when the system store's check finds the
+    /// server certificate out of its validity period, measured against
+    /// <c>https://expired.badssl.com/</c>: Schannel fails the handshake itself with
+    /// <c>SEC_E_CERT_EXPIRED</c>, which it also returns for a certificate not yet valid.
+    /// </summary>
+    public const string SchannelCertificateExpired =
+        "schannel: next InitializeSecurityContext failed: SEC_E_CERT_EXPIRED (0x80090328) - The received certificate has expired.";
+
+    /// <summary>
+    /// Whether the Schannel build, checking against the system store, fails the handshake
+    /// with <see cref="SchannelCertificateExpired" /> (exit 35) rather than exit 60: the
+    /// chain is trusted and the host name matches, but a certificate in it is out of its
+    /// validity period.
+    /// </summary>
+    /// <param name="errors">What the verification found wrong.</param>
+    /// <param name="chain">The chain built for the server certificate, if one was presented.</param>
+    /// <returns><see langword="true" /> when being out of date is the only thing wrong.</returns>
+    public static bool IsSchannelCertificateExpired(SslPolicyErrors errors, X509Chain? chain) =>
+        errors == SslPolicyErrors.RemoteCertificateChainErrors && ChainStatus(chain) == X509ChainStatusFlags.NotTimeValid;
 
     /// <summary>
     /// The OpenSSL build's message for exit 60: the host name did not match, or it did and
@@ -421,9 +455,32 @@ internal static class TlsFailureMessages
             return "unable to get local issuer certificate (20)";
         }
 
-        var status = chain.ChainStatus.Aggregate(X509ChainStatusFlags.NoError, (all, next) => all | next.Status);
-        return status == X509ChainStatusFlags.NotTimeValid ? OpenSslValidityError(chain) : OpenSslTrustError(chain);
+        return ChainStatus(chain) == X509ChainStatusFlags.NotTimeValid ? OpenSslValidityError(chain) : OpenSslTrustError(chain);
     }
+
+    // curl's Schannel build checks the chain's trust errors in this order. An untrusted root
+    // is also what anything else, or no chain at all, is reported as.
+    private static string SchannelCaCertificateFileChainError(X509Chain? chain)
+    {
+        var status = ChainStatus(chain);
+        if (status.HasFlag(X509ChainStatusFlags.NotTimeValid))
+        {
+            return SchannelChainNotTimeValid;
+        }
+
+        if (status.HasFlag(X509ChainStatusFlags.PartialChain))
+        {
+            return SchannelChainIncomplete;
+        }
+
+        var untrustedOrUnknown = status & (X509ChainStatusFlags.UntrustedRoot | X509ChainStatusFlags.RevocationStatusUnknown);
+        return untrustedOrUnknown == X509ChainStatusFlags.RevocationStatusUnknown
+            ? SchannelRevocationStatusUnknown
+            : SchannelCaCertificateFileAnchorsNothing;
+    }
+
+    private static X509ChainStatusFlags ChainStatus(X509Chain? chain) =>
+        chain?.ChainStatus.Aggregate(X509ChainStatusFlags.NoError, (all, next) => all | next.Status) ?? X509ChainStatusFlags.NoError;
 
     private static string OpenSslTrustError(X509Chain chain)
     {

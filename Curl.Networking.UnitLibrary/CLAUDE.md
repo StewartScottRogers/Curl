@@ -15,7 +15,11 @@ UDP `Socket`. `SslStreamTlsProvider` (behind `ITlsProvider`, configured by
 `TlsClientOptions`) is the only type that constructs an `SslStream`; it runs the
 handshake over the plaintext `IConnection` through the internal `ConnectionStream`
 adapter and returns an `SslStreamConnection`. With `--cacert` (`TlsClientOptions.CaCertificateFile`)
-it trusts only the certificates in that PEM file. Per ADR-0009 it behaves like the curl
+it trusts only the certificates in that PEM file; there the Schannel build also checks
+revocation below the root unless `TlsClientOptions.SkipRevocationCheck` (`--ssl-no-revoke`)
+is set, and names the first of a certificate out of date, an incomplete chain, an untrusted
+root and an unknown revocation status (ADR-0086, BL-368). Against the system store a
+certificate that is only out of date is exit 35 with `SEC_E_CERT_EXPIRED`. Per ADR-0009 it behaves like the curl
 build the platform usually runs, the Schannel build on Windows and the OpenSSL build
 elsewhere; its internal constructor names the build so tests pin both on any platform.
 The builds differ in message text, in which `--cacert` files are exit 77, and in `--capath`

@@ -687,9 +687,11 @@ public sealed partial class SslStreamTlsProviderTests
         var provider = new SslStreamTlsProvider(new TlsClientOptions(), OpenSslBuild);
         var anchors = new X509Certificate2Collection { s_serverCertificate };
 
-        var message = provider.VerifyPeer(SslPolicyErrors.RemoteCertificateNotAvailable, null, CertificateHost, anchors);
+        var failure = provider.VerifyPeer(SslPolicyErrors.RemoteCertificateNotAvailable, null, CertificateHost, anchors);
 
-        Assert.AreEqual("SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)", message);
+        Assert.AreEqual(
+            (CurlExitCode.PeerFailedVerification, "SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)"),
+            failure);
     }
 
     [TestMethod]
@@ -699,9 +701,11 @@ public sealed partial class SslStreamTlsProviderTests
         var anchors = new X509Certificate2Collection { s_serverCertificate };
         using var chain = new X509Chain();
 
-        var message = provider.VerifyPeer(SslPolicyErrors.RemoteCertificateChainErrors, chain, CertificateHost, anchors);
+        var failure = provider.VerifyPeer(SslPolicyErrors.RemoteCertificateChainErrors, chain, CertificateHost, anchors);
 
-        Assert.AreEqual("SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)", message);
+        Assert.AreEqual(
+            (CurlExitCode.PeerFailedVerification, "SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)"),
+            failure);
     }
 
     private string WriteUnusableCaFile(string content) => content switch

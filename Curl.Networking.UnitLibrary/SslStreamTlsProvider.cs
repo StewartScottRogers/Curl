@@ -157,7 +157,12 @@ public sealed class SslStreamTlsProvider : ITlsProvider
     /// <para>
     /// The target host is passed to the handshake for server name indication and is the
     /// name the certificate is checked against. A certificate that fails the check is
-    /// exit 60 (<see cref="CurlExitCode.PeerFailedVerification" />); any other failure,
+    /// exit 60 (<see cref="CurlExitCode.PeerFailedVerification" />), except that the
+    /// Schannel build reports a certificate that is only out of date, checked against the
+    /// system store, as exit 35 with Schannel's <c>SEC_E_CERT_EXPIRED</c>. With
+    /// <see cref="TlsClientOptions.CaCertificateFile" /> the Schannel build also checks
+    /// revocation, unless <see cref="TlsClientOptions.SkipRevocationCheck" /> is set, and an
+    /// unknown revocation status is exit 60 (ADR-0086). Any other failure,
     /// such as no TLS version both sides allow or the server closing mid-handshake, is
     /// exit 35 (<see cref="CurlExitCode.SslConnectError" />). A
     /// <see cref="TlsClientOptions.CaCertificateFile" /> that cannot be read is exit 77
@@ -225,7 +230,7 @@ public sealed class SslStreamTlsProvider : ITlsProvider
             return ConnectResult.Failed(CurlExitCode.SslCacertBadfile, CaCertificateFileUnusable(_options.CaCertificateFile!));
         }
 
-        string? verificationFailure = null;
+        (CurlExitCode ExitCode, string Message)? verificationFailure = null;
         ReadOnlyMemory<byte>[] peerCertificates = [];
         var authenticationOptions = new SslClientAuthenticationOptions
         {
@@ -262,8 +267,8 @@ public sealed class SslStreamTlsProvider : ITlsProvider
         await DisposeAfterFailedHandshakeAsync(sslStream, plaintext).ConfigureAwait(false);
         RethrowIfCancellation(failure);
 
-        return verificationFailure is not null
-            ? ConnectResult.Failed(CurlExitCode.PeerFailedVerification, verificationFailure)
+        return verificationFailure is { } rejected
+            ? ConnectResult.Failed(rejected.ExitCode, rejected.Message)
             : ConnectResult.Failed(CurlExitCode.SslConnectError, SslConnectError(failure));
     }
 
@@ -277,8 +282,12 @@ public sealed class SslStreamTlsProvider : ITlsProvider
     /// Roots trusted in addition to the system store, from <c>--capath</c> without
     /// <c>--cacert</c>.
     /// </param>
-    /// <returns><see langword="null" /> to accept the certificate, otherwise the exit 60 message.</returns>
-    internal string? VerifyPeer(
+    /// <returns>
+    /// <see langword="null" /> to accept the certificate, otherwise the exit code and message:
+    /// exit 60, except in the Schannel build without <c>--cacert</c>, where a certificate
+    /// that is only out of date fails the handshake itself, exit 35.
+    /// </returns>
+    internal (CurlExitCode ExitCode, string Message)? VerifyPeer(
         SslPolicyErrors errors,
         X509Chain? chain,
         string targetHost,
@@ -299,9 +308,16 @@ public sealed class SslStreamTlsProvider : ITlsProvider
             return null;
         }
 
-        return _matchesSchannelBuild
-            ? TlsFailureMessages.SchannelPeerFailedVerification(errors, chain, targetHost, _options.CaCertificateFile is not null)
-            : TlsFailureMessages.OpenSslPeerFailedVerification(errors, chain, targetHost);
+        if (!_matchesSchannelBuild)
+        {
+            return (CurlExitCode.PeerFailedVerification, TlsFailureMessages.OpenSslPeerFailedVerification(errors, chain, targetHost));
+        }
+
+        var hasCaCertificateFile = _options.CaCertificateFile is not null;
+        return !hasCaCertificateFile && TlsFailureMessages.IsSchannelCertificateExpired(errors, chain)
+            ? (CurlExitCode.SslConnectError, TlsFailureMessages.SchannelCertificateExpired)
+            : (CurlExitCode.PeerFailedVerification,
+                TlsFailureMessages.SchannelPeerFailedVerification(errors, chain, targetHost, hasCaCertificateFile));
     }
 
     /// <summary>
@@ -398,8 +414,9 @@ public sealed class SslStreamTlsProvider : ITlsProvider
 
     // The chain policy replaces the system store, from --cacert; null verifies against the
     // system store, with the --capath roots trusted beside it when there is no --cacert.
-    // Revocation is not checked, as it is not without --cacert, so a private CA with no
-    // revocation endpoint still verifies.
+    // With --cacert the Schannel build checks revocation below the root unless
+    // SkipRevocationCheck is set, so a private CA with no revocation endpoint fails with
+    // exit 60 as in curl (ADR-0086); the OpenSSL build never checks it.
     private (X509ChainPolicy? ChainPolicy, X509Certificate2Collection AnchorsBesideSystemStore) ReadTrustAnchors()
     {
         if (_options.Insecure)
@@ -416,7 +433,9 @@ public sealed class SslStreamTlsProvider : ITlsProvider
         var chainPolicy = new X509ChainPolicy
         {
             TrustMode = X509ChainTrustMode.CustomRootTrust,
-            RevocationMode = X509RevocationMode.NoCheck,
+            RevocationMode = _matchesSchannelBuild && !_options.SkipRevocationCheck
+                ? X509RevocationMode.Online
+                : X509RevocationMode.NoCheck,
         };
         chainPolicy.CustomTrustStore.AddRange(ReadCaCertificateFile(_options.CaCertificateFile));
         chainPolicy.CustomTrustStore.AddRange(directoryAnchors);

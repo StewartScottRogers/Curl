@@ -302,6 +302,103 @@ public sealed class TlsFailureMessagesTests
     }
 
     [TestMethod]
+    public void SchannelPeerFailedVerification_WithACaCertificateFileAndAnExpiredTrustedCertificate_IsTheMeasuredNotTimeValidLine()
+    {
+        using var expired = CreateAuthority(DateTimeOffset.UtcNow.AddDays(-10), DateTimeOffset.UtcNow.AddDays(-5));
+        using var chain = CreateTrustingChain(expired);
+        chain.Build(expired);
+
+        var message = TlsFailureMessages.SchannelPeerFailedVerification(
+            SslPolicyErrors.RemoteCertificateChainErrors, chain, "localhost", hasCaCertificateFile: true);
+
+        Assert.AreEqual(
+            "schannel: this certificate or one of the certificates in the certificate chain is not time valid", message);
+    }
+
+    [TestMethod]
+    public void SchannelPeerFailedVerification_WithACaCertificateFileAndAChainMissingItsIssuer_IsTheMeasuredIncompleteLine()
+    {
+        using var authority = CreateAuthority(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+        using var leaf = CreateLeaf(authority);
+        using var chain = CreateChain();
+        chain.Build(leaf);
+
+        var message = TlsFailureMessages.SchannelPeerFailedVerification(
+            SslPolicyErrors.RemoteCertificateChainErrors, chain, "localhost", hasCaCertificateFile: true);
+
+        Assert.AreEqual("schannel: the certificate chain is incomplete", message);
+    }
+
+    [TestMethod]
+    public void SchannelPeerFailedVerification_WithACaCertificateFileAndATrustedChainOfUnknownRevocationStatus_IsTheMeasuredRevocationLine()
+    {
+        using var authority = CreateAuthority(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+        using var leaf = CreateLeaf(authority);
+        using var chain = CreateTrustingChain(authority);
+        chain.ChainPolicy.RevocationMode = X509RevocationMode.Online;
+        chain.Build(leaf);
+
+        var message = TlsFailureMessages.SchannelPeerFailedVerification(
+            SslPolicyErrors.RemoteCertificateChainErrors, chain, "localhost", hasCaCertificateFile: true);
+
+        Assert.AreEqual("schannel: the revocation status is unknown", message);
+    }
+
+    // curl checks an untrusted root before the revocation status.
+    [TestMethod]
+    public void SchannelPeerFailedVerification_WithACaCertificateFileAndAnUntrustedChainOfUnknownRevocationStatus_IsTheUntrustedRootLine()
+    {
+        using var authority = CreateAuthority(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+        using var leaf = CreateLeaf(authority);
+        using var chain = CreateChain();
+        chain.ChainPolicy.RevocationMode = X509RevocationMode.Online;
+        chain.ChainPolicy.ExtraStore.Add(authority);
+        chain.Build(leaf);
+
+        var message = TlsFailureMessages.SchannelPeerFailedVerification(
+            SslPolicyErrors.RemoteCertificateChainErrors, chain, "localhost", hasCaCertificateFile: true);
+
+        Assert.AreEqual("schannel: the certificate or certificate chain is based on an untrusted root", message);
+    }
+
+    [TestMethod]
+    public void IsSchannelCertificateExpired_WithATrustedButExpiredCertificate_IsTrue()
+    {
+        using var expired = CreateAuthority(DateTimeOffset.UtcNow.AddDays(-10), DateTimeOffset.UtcNow.AddDays(-5));
+        using var chain = CreateTrustingChain(expired);
+        chain.Build(expired);
+
+        Assert.IsTrue(TlsFailureMessages.IsSchannelCertificateExpired(SslPolicyErrors.RemoteCertificateChainErrors, chain));
+    }
+
+    [TestMethod]
+    public void IsSchannelCertificateExpired_WithAnExpiredCertificateNamingAnotherHost_IsFalse()
+    {
+        using var expired = CreateAuthority(DateTimeOffset.UtcNow.AddDays(-10), DateTimeOffset.UtcNow.AddDays(-5));
+        using var chain = CreateTrustingChain(expired);
+        chain.Build(expired);
+
+        Assert.IsFalse(TlsFailureMessages.IsSchannelCertificateExpired(
+            SslPolicyErrors.RemoteCertificateChainErrors | SslPolicyErrors.RemoteCertificateNameMismatch, chain));
+    }
+
+    [TestMethod]
+    public void IsSchannelCertificateExpired_WithAnUntrustedExpiredCertificate_IsFalse()
+    {
+        using var expired = CreateAuthority(DateTimeOffset.UtcNow.AddDays(-10), DateTimeOffset.UtcNow.AddDays(-5));
+        using var chain = CreateChain();
+        chain.Build(expired);
+
+        Assert.IsFalse(TlsFailureMessages.IsSchannelCertificateExpired(SslPolicyErrors.RemoteCertificateChainErrors, chain));
+    }
+
+    [TestMethod]
+    public void IsSchannelCertificateExpired_WithNoChain_IsFalse()
+    {
+        Assert.IsFalse(TlsFailureMessages.IsSchannelCertificateExpired(SslPolicyErrors.RemoteCertificateChainErrors, null));
+    }
+
+    [TestMethod]
     public void SchannelCaCertificateFileUnusable_IsTheMeasuredLine()
     {
         Assert.AreEqual("schannel: failed to open CA file 'dir.pem'", TlsFailureMessages.SchannelCaCertificateFileUnusable("dir.pem"));
