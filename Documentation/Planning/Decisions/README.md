@@ -60,6 +60,7 @@ choices do not need one.
 | [0043](ADR-0043-w-variables-with-a-fixed-value-print-it-and-those-without-a-source-stay-unknown.md) | `-w` variables with a fixed value print it (`ssl_verify_result`, `proxy_ssl_verify_result`, `tls_earlydata`, `num_retries`, `ftp_entry_path`), `time_queue` is the handler's start, and those without a source stay unknown until BL-302 to BL-305 | Accepted | 2026-09-26 |
 | [0044](ADR-0044-http-honours-range-resume-time-condition-and-max-filesize.md) | How the HTTP handler honours `-r`, `-C`, `-z` and `--max-filesize`: header placement, no `Range` with a request body, RFC 9110 dates for `Last-Modified`, an unmet `-z` reported as 304 | Accepted | 2026-09-26 |
 | [0045](ADR-0045-the-transfer-context-carries-a-progress-sink-for-the-progress-meter.md) | The transfer context carries a progress sink for the progress meter: `ITransferProgress` on `ITransferContext.Progress`, `NoTransferProgress` by default, no clock in the sink | Accepted | 2026-09-26 |
+| [0046](ADR-0046-the-transfer-context-carries-a-transfer-event-sink-for-v-and-trace.md) | The transfer context carries a transfer event sink for `-v` and `--trace`: `ITransferEvents` on `ITransferContext.Events` and `ConnectTarget.Events`, a sibling of the progress sink, `NoTransferEvents` by default | Accepted | 2026-09-26 |
 
 ## Template
 
