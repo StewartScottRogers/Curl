@@ -1,5 +1,5 @@
 ---
-id: BL-331
+id: BL-348
 title: Refuse a taken -J name with an exclusive create instead of a check before the open
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-331 — Refuse a taken -J name with an exclusive create instead of a check before the open
+# BL-348 — Refuse a taken -J name with an exclusive create instead of a check before the open
 
 ## Goal
 

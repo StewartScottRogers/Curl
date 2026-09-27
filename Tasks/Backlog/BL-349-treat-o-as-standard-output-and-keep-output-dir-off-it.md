@@ -1,5 +1,5 @@
 ---
-id: BL-332
+id: BL-349
 title: Treat -o - as standard output, and keep --output-dir off it
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-332 — Treat -o - as standard output, and keep --output-dir off it
+# BL-349 — Treat -o - as standard output, and keep --output-dir off it
 
 ## Goal
 
