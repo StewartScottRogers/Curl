@@ -32,3 +32,4 @@ An `-o` name after `#N` substitution is sanitized on Windows as curl 8.21.0 sani
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
