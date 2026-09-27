@@ -176,6 +176,29 @@ public sealed record CurlUrl
             : throw new FormatException($"curl rejects the URL \"{text}\".");
 
     /// <summary>
+    /// Parses <paramref name="text" /> as <see cref="TryParse(string, bool, out CurlUrl)" />
+    /// does, and says why curl rejects it when it does.
+    /// </summary>
+    /// <param name="text">The URL as typed.</param>
+    /// <param name="pathAsIs">
+    /// <see langword="true" /> to keep <c>.</c> and <c>..</c> path segments, as curl's
+    /// <c>--path-as-is</c> does.
+    /// </param>
+    /// <param name="url">The parsed URL, or <see langword="null" /> when curl rejects the text.</param>
+    /// <param name="rejection">
+    /// Why curl rejects the text, or <see cref="CurlUrlRejection.None" /> when it accepts it;
+    /// <see cref="CurlUrlRejectionMessages.ToCurlMessage" /> gives the text curl prints.
+    /// </param>
+    /// <returns><see langword="true" /> when curl accepts the text.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="text" /> is <see langword="null" />.</exception>
+    public static bool TryParse(
+        string text,
+        bool pathAsIs,
+        [NotNullWhen(true)] out CurlUrl? url,
+        out CurlUrlRejection rejection) =>
+        TryParse(text, pathAsIs, OperatingSystem.IsWindows(), out url, out rejection);
+
+    /// <summary>
     /// Parses <paramref name="text" /> with the drive-letter rules of the chosen platform,
     /// so both can be tested on either.
     /// </summary>
@@ -183,11 +206,23 @@ public sealed record CurlUrl
         string text,
         bool pathAsIs,
         bool driveLetters,
-        [NotNullWhen(true)] out CurlUrl? url)
+        [NotNullWhen(true)] out CurlUrl? url) =>
+        TryParse(text, pathAsIs, driveLetters, out url, out _);
+
+    /// <summary>
+    /// Parses <paramref name="text" /> with the drive-letter rules of the chosen platform,
+    /// and says why curl rejects it when it does.
+    /// </summary>
+    internal static bool TryParse(
+        string text,
+        bool pathAsIs,
+        bool driveLetters,
+        [NotNullWhen(true)] out CurlUrl? url,
+        out CurlUrlRejection rejection)
     {
         ArgumentNullException.ThrowIfNull(text);
 
-        url = CurlUrlParser.Parse(text, pathAsIs, driveLetters);
+        url = CurlUrlParser.Parse(text, pathAsIs, driveLetters, out rejection);
 
         return url is not null;
     }

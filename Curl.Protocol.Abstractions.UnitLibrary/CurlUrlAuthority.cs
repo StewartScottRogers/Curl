@@ -25,13 +25,20 @@ internal sealed record CurlUrlAuthority(
 
     private const int MaximumPort = 65535;
 
+    /// <summary>What <see cref="PortColon" /> returns for a <c>[</c> with no <c>]</c>.</summary>
+    private const int UnclosedBracket = -2;
+
+    /// <summary>What <see cref="PortColon" /> returns for a <c>]</c> followed by anything but <c>:</c>.</summary>
+    private const int TextAfterBracket = -3;
+
     /// <summary>
     /// Parses an authority, rejecting what curl rejects.
     /// </summary>
     /// <param name="text">The authority: everything between the slashes after the scheme and the first <c>/</c>, <c>?</c> or <c>#</c>.</param>
     /// <param name="scheme">The scheme written, or <see langword="null" /> when the URL has none yet.</param>
+    /// <param name="rejection">Why curl rejects the authority, or <see cref="CurlUrlRejection.None" />.</param>
     /// <returns>The authority, or <see langword="null" /> when curl rejects it.</returns>
-    public static CurlUrlAuthority? Parse(string text, string? scheme)
+    public static CurlUrlAuthority? Parse(string text, string? scheme, out CurlUrlRejection rejection)
     {
         int at = text.IndexOf('@');
         CurlUrlAuthority login = at < 0
@@ -39,8 +46,14 @@ internal sealed record CurlUrlAuthority(
             : SplitLogin(text[..at], CurlUrlScheme.HasLoginOptions(scheme));
         string hostAndPort = text[(at + 1)..];
 
-        if (!TrySplitPort(hostAndPort, scheme is not null, out string host, out int? port)
-            || !CurlUrlHost.TryNormalize(host, out string normalizedHost, out string idnHost, out string? zoneId))
+        rejection = SplitPort(hostAndPort, scheme is not null, out string host, out int? port);
+        if (rejection == CurlUrlRejection.None && host.Length == 0)
+        {
+            rejection = CurlUrlRejection.NoHost;
+        }
+
+        if (rejection != CurlUrlRejection.None
+            || !CurlUrlHost.TryNormalize(host, out string normalizedHost, out string idnHost, out string? zoneId, out rejection))
         {
             return null;
         }
@@ -97,31 +110,39 @@ internal sealed record CurlUrlAuthority(
     /// Splits the port from the host as curl's <c>Curl_parse_port</c> does. A colon with
     /// nothing after it is ignored when the URL has a scheme and rejected when it has not.
     /// </summary>
-    private static bool TrySplitPort(string hostAndPort, bool hasScheme, out string host, out int? port)
+    /// <returns>Why curl rejects the host and port, or <see cref="CurlUrlRejection.None" />.</returns>
+    private static CurlUrlRejection SplitPort(string hostAndPort, bool hasScheme, out string host, out int? port)
     {
         host = hostAndPort;
         port = null;
 
         int colon = PortColon(hostAndPort);
-        if (colon == -2)
+        if (colon == UnclosedBracket)
         {
-            return false;
+            return CurlUrlRejection.BadIPv6;
+        }
+
+        if (colon == TextAfterBracket)
+        {
+            return CurlUrlRejection.BadPortNumber;
         }
 
         if (colon < 0)
         {
-            return true;
+            return CurlUrlRejection.None;
         }
 
         host = hostAndPort[..colon];
         string portText = hostAndPort[(colon + 1)..];
+        bool accepted = portText.Length == 0 ? hasScheme : TryParsePort(portText, out port);
 
-        return portText.Length == 0 ? hasScheme : TryParsePort(portText, out port);
+        return accepted ? CurlUrlRejection.None : CurlUrlRejection.BadPortNumber;
     }
 
     /// <summary>
-    /// Finds the colon before the port: -1 when there is none, and -2 when a bracketed
-    /// IPv6 address is unclosed or followed by anything but a colon.
+    /// Finds the colon before the port: -1 when there is none,
+    /// <see cref="UnclosedBracket" /> when a bracketed IPv6 address is unclosed, and
+    /// <see cref="TextAfterBracket" /> when one is followed by anything but a colon.
     /// </summary>
     private static int PortColon(string hostAndPort)
     {
@@ -133,7 +154,7 @@ internal sealed record CurlUrlAuthority(
         int close = hostAndPort.IndexOf(']');
         if (close < 0)
         {
-            return -2;
+            return UnclosedBracket;
         }
 
         int afterClose = close + 1;
@@ -142,7 +163,7 @@ internal sealed record CurlUrlAuthority(
             return -1;
         }
 
-        return hostAndPort[afterClose] == ':' ? afterClose : -2;
+        return hostAndPort[afterClose] == ':' ? afterClose : TextAfterBracket;
     }
 
     private static bool TryParsePort(string text, out int? port)
