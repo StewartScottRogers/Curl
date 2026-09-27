@@ -34,3 +34,4 @@ The cookie store refuses a cookie whose Domain is a public suffix, using the emb
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-27: Backlog -> Doing.
