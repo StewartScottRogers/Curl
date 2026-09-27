@@ -20,7 +20,7 @@ public sealed class HttpProxyTunnelTests
     {
         // curl -p -x 127.0.0.1:18261 http://example.com/
         var request = HttpProxyTunnel.BuildConnectRequest(
-            new ConnectTarget("example.com", 80, UseTls: false),
+            "example.com", 80,
             HttpProxy,
             HttpProxyTunnelOptions.Default);
 
@@ -36,7 +36,7 @@ public sealed class HttpProxyTunnelTests
         var proxy = HttpProxy with { Credential = new NetworkCredential("user", "p@ss") };
 
         var request = HttpProxyTunnel.BuildConnectRequest(
-            new ConnectTarget("example.com", 8443, UseTls: true),
+            "example.com", 8443,
             proxy,
             HttpProxyTunnelOptions.Default);
 
@@ -51,7 +51,7 @@ public sealed class HttpProxyTunnelTests
         var proxy = HttpProxy with { Credential = new NetworkCredential("é", "p") };
 
         var request = HttpProxyTunnel.BuildConnectRequest(
-            new ConnectTarget("example.com", 80, UseTls: false),
+            "example.com", 80,
             proxy,
             HttpProxyTunnelOptions.Default with { CredentialEncoding = Encoding.Latin1 });
 
@@ -63,7 +63,7 @@ public sealed class HttpProxyTunnelTests
     {
         // curl -p -x 127.0.0.1:18263 http://[::1]:81/
         var request = HttpProxyTunnel.BuildConnectRequest(
-            new ConnectTarget("::1", 81, UseTls: false),
+            "::1", 81,
             HttpProxy,
             HttpProxyTunnelOptions.Default);
 
@@ -76,7 +76,7 @@ public sealed class HttpProxyTunnelTests
     public void BuildConnectRequest_ForAnAlreadyBracketedTarget_LeavesItAsItIs()
     {
         var request = HttpProxyTunnel.BuildConnectRequest(
-            new ConnectTarget("[::1]", 81, UseTls: false),
+            "[::1]", 81,
             HttpProxy,
             HttpProxyTunnelOptions.Default);
 
@@ -88,7 +88,7 @@ public sealed class HttpProxyTunnelTests
     {
         // curl --proxy1.0 127.0.0.1:18264 -p http://example.com/
         var request = HttpProxyTunnel.BuildConnectRequest(
-            new ConnectTarget("example.com", 80, UseTls: false),
+            "example.com", 80,
             HttpProxy with { Kind = ProxyKind.Http10 },
             HttpProxyTunnelOptions.Default);
 
@@ -102,7 +102,7 @@ public sealed class HttpProxyTunnelTests
     {
         // curl -p -x 127.0.0.1:18266 -A Agent/1 http://example.com/
         var request = HttpProxyTunnel.BuildConnectRequest(
-            new ConnectTarget("example.com", 80, UseTls: false),
+            "example.com", 80,
             HttpProxy,
             HttpProxyTunnelOptions.Default with { UserAgent = "Agent/1" });
 
@@ -115,7 +115,7 @@ public sealed class HttpProxyTunnelTests
     public void BuildConnectRequest_WithNoUserAgent_OmitsTheHeader()
     {
         var request = HttpProxyTunnel.BuildConnectRequest(
-            new ConnectTarget("example.com", 80, UseTls: false),
+            "example.com", 80,
             HttpProxy,
             HttpProxyTunnelOptions.Default with { UserAgent = null });
 

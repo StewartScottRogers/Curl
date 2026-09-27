@@ -48,6 +48,14 @@ the reply one byte at a time, so the tunnel's bytes stay on the connection; TLS 
 over the tunnel for an https target. HTTPS and SOCKS proxies throw `NotSupportedException`
 until their tasks land.
 
+`TcpConnector` applies `--resolve` through `ResolveOverrides` and `--connect-to` through
+`ConnectToMappings`, both built from the verbatim option values and parsed as curl 8.21.0
+parses them (measured; BL-214). The first `--connect-to` mapping matching the URL's host
+and port gives the `ConnectDestination` that is resolved, dialled and named in the CONNECT
+request; TLS still verifies the URL's host. A `--resolve` entry for the host and port being
+resolved, the proxy's included, answers in place of `IDnsResolver`. An entry or a matching
+mapping that does not parse fails the connect with exit 49 and curl's message.
+
 Everything else takes the Abstractions contracts (`IDnsResolver`, `ITlsProvider`,
 `IConnection`, `IDatagramChannel`) or `ITcpDialer`, plus an injected `TimeProvider`, so the tests in
 `Curl.Networking.UnitTests` drive every branch with fakes and no network.
