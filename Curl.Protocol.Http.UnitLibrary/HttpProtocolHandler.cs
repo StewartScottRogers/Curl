@@ -180,7 +180,7 @@ public sealed class HttpProtocolHandler(
         HttpAuthRequest authRequest = new(
             framing.Method,
             context.Url,
-            HttpUrlText.RequestTarget(context.Url),
+            options.RequestTarget ?? HttpUrlText.RequestTarget(context.Url),
             context.Credentials,
             options.BearerToken,
             options.AuthSchemes,

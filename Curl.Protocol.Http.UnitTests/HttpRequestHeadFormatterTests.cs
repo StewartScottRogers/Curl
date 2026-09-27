@@ -527,6 +527,45 @@ public sealed class HttpRequestHeadFormatterTests
             options);
     }
 
+    /// <summary>
+    /// Measured: <c>curl --request-target /x/../y?z http://127.0.0.1:18189/a</c> sends the
+    /// target as given, dot segments and all (BL-186 Notes).
+    /// </summary>
+    [TestMethod]
+    public void Format_RequestTarget_ReplacesThePathAndQueryVerbatim()
+    {
+        AssertHead(
+            "GET /x/../y?z HTTP/1.1\r\nHost: 127.0.0.1:18189\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
+            CurlUrl.Parse("http://127.0.0.1:18189/a"),
+            new HttpRequestOptions { RequestTarget = "/x/../y?z" });
+    }
+
+    /// <summary>
+    /// Measured: <c>curl -x http://127.0.0.1:18190 --request-target * -X OPTIONS
+    /// http://example.com/a</c> sends <c>OPTIONS * HTTP/1.1</c> to the proxy: the target
+    /// replaces the absolute form too (BL-186 Notes).
+    /// </summary>
+    [TestMethod]
+    public void Format_RequestTargetThroughForwardProxy_ReplacesTheAbsoluteForm()
+    {
+        HttpRequestOptions options = new() { CustomMethod = "OPTIONS", RequestTarget = "*" };
+
+        byte[] head = HttpRequestHeadFormatter.Format(CurlUrl.Parse("http://example.com/a"), options, forwardProxy: true);
+
+        Assert.AreEqual(
+            "OPTIONS * HTTP/1.1\r\nHost: example.com\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\n\r\n",
+            Encoding.Latin1.GetString(head));
+    }
+
+    [TestMethod]
+    public void Format_RequestTargetAboveAscii_SendsItsUtf8Bytes()
+    {
+        byte[] head = HttpRequestHeadFormatter.Format(CurlUrl.Parse(Url), new HttpRequestOptions { RequestTarget = "/ä" });
+
+        byte[] expected = [.. "GET /"u8, 0xC3, 0xA4, .. " HTTP/1.1\r\n"u8];
+        CollectionAssert.AreEqual(expected, head[..expected.Length]);
+    }
+
     private static void AssertHead(string expected, CurlUrl url, HttpRequestOptions? options)
     {
         Assert.AreEqual(expected, Encoding.Latin1.GetString(HttpRequestHeadFormatter.Format(url, options)));

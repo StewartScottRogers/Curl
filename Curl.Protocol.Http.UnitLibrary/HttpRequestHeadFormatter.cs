@@ -66,7 +66,7 @@ internal static class HttpRequestHeadFormatter
     /// </param>
     /// <param name="forwardProxy">
     /// <see langword="true" /> when the request is sent to a forward proxy rather than the
-    /// origin: its target is the absolute form, <c>Proxy-Connection: Keep-Alive</c> is sent and so
+    /// origin: its target is the absolute form unless <c>--request-target</c> replaces it, <c>Proxy-Connection: Keep-Alive</c> is sent and so
     /// are the <c>--proxy-header</c> values.
     /// </param>
     /// <param name="proxyAuthorization">
@@ -133,11 +133,28 @@ internal static class HttpRequestHeadFormatter
         framing ?? HttpRequestFraming.Of(options, customHeaders, noBody);
 
     /// <summary>
-    /// Appends the request line: the method, the target - the absolute form for a forward
-    /// proxy, the path and query otherwise - and the version.
+    /// Appends the request line: the method, the target (<see cref="TargetOf" />) and the
+    /// version.
     /// </summary>
     private static void AppendRequestLine(StringBuilder head, string method, CurlUrl url, bool forwardProxy, HttpRequestOptions options) =>
-        head.Append(method).Append(' ').Append(forwardProxy ? AbsoluteForm(url) : HttpUrlText.RequestTarget(url)).Append(VersionOf(options)).Append("\r\n");
+        head.Append(method).Append(' ').Append(TargetOf(url, forwardProxy, options)).Append(VersionOf(options)).Append("\r\n");
+
+    /// <summary>
+    /// Gives the request line's target: <see cref="HttpRequestOptions.RequestTarget" />
+    /// verbatim when given, its UTF-8 bytes one character each as
+    /// <see cref="HttpUrlText.RequestTarget" /> writes a query; otherwise the absolute form
+    /// for a forward proxy and the path and query for the origin. curl 8.21.0 was measured
+    /// (BL-186 Notes) sending <c>--request-target</c> in place of both forms.
+    /// </summary>
+    private static string TargetOf(CurlUrl url, bool forwardProxy, HttpRequestOptions options)
+    {
+        if (options.RequestTarget is { } target)
+        {
+            return Encoding.Latin1.GetString(Encoding.UTF8.GetBytes(target));
+        }
+
+        return forwardProxy ? AbsoluteForm(url) : HttpUrlText.RequestTarget(url);
+    }
 
     /// <summary>
     /// Gives the request line's version: <c>HTTP/1.0</c> for <c>-0</c>, <c>HTTP/1.1</c> otherwise.
