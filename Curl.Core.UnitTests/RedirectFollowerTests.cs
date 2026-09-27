@@ -206,6 +206,48 @@ public sealed class RedirectFollowerTests
     }
 
     [TestMethod]
+    [DataRow(307)]
+    [DataRow(308)]
+    public async Task FollowAsync_SeekableStreamBodyAnswered307Or308_ResendsItFromItsStart(int status)
+    {
+        // curl -L --max-redirs 1 -F a=b -F f=@file.txt, 307 or 308: both POSTs carry the
+        // same 297-byte multipart body, boundary and all (BL-298 Notes).
+        ScriptedHandler handler = new(Redirect(status, Next), Ok(200, 0));
+        StreamBody body = new(new MemoryStream([1, 2, 3]), 3, "multipart/form-data; boundary=b");
+
+        await Follow(handler, Context(Location() with { Body = body }));
+
+        Assert.HasCount(2, handler.StreamBodies);
+        CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, handler.StreamBodies[0]);
+        CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, handler.StreamBodies[1]);
+    }
+
+    [TestMethod]
+    public async Task FollowAsync_NonSeekableStreamBodyAnswered307_ResendsWhatIsLeftOfIt()
+    {
+        ScriptedHandler handler = new(Redirect(307, Next), Ok(200, 0));
+        StreamBody body = new(new NonSeekableStream([1, 2, 3]), null, "multipart/form-data; boundary=b");
+
+        await Follow(handler, Context(Location() with { Body = body }));
+
+        Assert.HasCount(2, handler.StreamBodies);
+        Assert.IsEmpty(handler.StreamBodies[1]);
+    }
+
+    [TestMethod]
+    public async Task FollowAsync_StreamBodyAnswered302_DropsItWithoutRewinding()
+    {
+        ScriptedHandler handler = new(Redirect(302, Next), Ok(200, 0));
+        MemoryStream content = new([1, 2, 3]);
+
+        await Follow(handler, Context(Location() with { Body = new StreamBody(content, 3, "multipart/form-data; boundary=b") }));
+
+        Assert.HasCount(1, handler.StreamBodies);
+        Assert.IsNull(handler.Contexts[1].Http!.Body);
+        Assert.AreEqual(3L, content.Position);
+    }
+
+    [TestMethod]
     public async Task FollowAsync_CustomMethodPostAnswered301_KeepsMethodDropsBody()
     {
         // curl -L --max-redirs 1 -X POST -d x=1, 301: "POST /next" with no body.
@@ -735,6 +777,8 @@ public sealed class RedirectFollowerTests
 
         public List<byte[]> Uploads { get; } = [];
 
+        public List<byte[]> StreamBodies { get; } = [];
+
         public ValueTask<TransferResult> ExecuteAsync(ITransferContext context)
         {
             Contexts.Add(context);
@@ -743,6 +787,13 @@ public sealed class RedirectFollowerTests
                 using MemoryStream sent = new();
                 upload.CopyTo(sent);
                 Uploads.Add(sent.ToArray());
+            }
+
+            if (context.Http?.Body is StreamBody body)
+            {
+                using MemoryStream sent = new();
+                body.Content.CopyTo(sent);
+                StreamBodies.Add(sent.ToArray());
             }
 
             return ValueTask.FromResult(script[Math.Min(Contexts.Count, script.Length) - 1]);

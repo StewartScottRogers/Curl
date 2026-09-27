@@ -40,9 +40,9 @@ public sealed class ConcatenatedReadStreamTests
     }
 
     [TestMethod]
-    public void TheStreamIsReadOnlyAndForwardOnly()
+    public void ASegmentThatCannotSeekMakesTheStreamReadOnlyAndForwardOnly()
     {
-        using ConcatenatedReadStream stream = new([Segment()]);
+        using ConcatenatedReadStream stream = new([Segment(1), new NonSeekableStream()]);
 
         Assert.IsTrue(stream.CanRead);
         Assert.IsFalse(stream.CanSeek);
@@ -54,6 +54,100 @@ public sealed class ConcatenatedReadStreamTests
         Assert.ThrowsExactly<NotSupportedException>(() => stream.SetLength(0));
         Assert.ThrowsExactly<NotSupportedException>(() => stream.Write([1], 0, 1));
         stream.Flush();
+    }
+
+    [TestMethod]
+    public void SeekableSegmentsMakeASeekableReadOnlyStream()
+    {
+        using ConcatenatedReadStream stream = new([Segment(1), Segment(2)]);
+
+        Assert.IsTrue(stream.CanSeek);
+        Assert.IsFalse(stream.CanWrite);
+        Assert.ThrowsExactly<NotSupportedException>(() => stream.SetLength(0));
+        Assert.ThrowsExactly<NotSupportedException>(() => stream.Write([1], 0, 1));
+    }
+
+    [TestMethod]
+    public void LengthAndPositionCountFromWhereEachSegmentStartedAt()
+    {
+        MemoryStream second = Segment(9, 2, 3);
+        second.Position = 1;
+        using ConcatenatedReadStream stream = new([Segment(1), second]);
+
+        Assert.AreEqual(3L, stream.Length);
+        Assert.AreEqual(0L, stream.Position);
+        Assert.AreEqual(1, stream.ReadByte());
+        Assert.AreEqual(2, stream.ReadByte());
+        Assert.AreEqual(2L, stream.Position);
+    }
+
+    [TestMethod]
+    public void RewindingAfterAWholeReadReadsTheSameBytesAgain()
+    {
+        MemoryStream second = Segment(9, 2, 3);
+        second.Position = 1;
+        using ConcatenatedReadStream stream = new([Segment(1), Segment(), second]);
+        using MemoryStream first = new();
+        stream.CopyTo(first);
+
+        stream.Position = 0;
+
+        using MemoryStream again = new();
+        stream.CopyTo(again);
+        CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, first.ToArray());
+        CollectionAssert.AreEqual(first.ToArray(), again.ToArray());
+    }
+
+    [TestMethod]
+    public void SettingThePositionIntoALaterSegmentReadsFromThere()
+    {
+        using ConcatenatedReadStream stream = new([Segment(1, 2), Segment(3, 4)]);
+        stream.ReadByte();
+
+        stream.Position = 3;
+
+        Assert.AreEqual(4, stream.ReadByte());
+        Assert.AreEqual(-1, stream.ReadByte());
+    }
+
+    [TestMethod]
+    public void SettingThePositionPastTheEndReadsNothing()
+    {
+        using ConcatenatedReadStream stream = new([Segment(1)]);
+
+        stream.Position = 5;
+
+        Assert.AreEqual(-1, stream.ReadByte());
+        Assert.AreEqual(1L, stream.Position);
+    }
+
+    [TestMethod]
+    public void ANegativePositionIsRefused()
+    {
+        using ConcatenatedReadStream stream = new([Segment(1)]);
+
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => stream.Position = -1);
+    }
+
+    [TestMethod]
+    [DataRow(1L, SeekOrigin.Begin, 1L)]
+    [DataRow(1L, SeekOrigin.Current, 2L)]
+    [DataRow(-1L, SeekOrigin.End, 2L)]
+    public void SeekMovesRelativeToItsOrigin(long offset, SeekOrigin origin, long expected)
+    {
+        using ConcatenatedReadStream stream = new([Segment(1, 2), Segment(3)]);
+        stream.ReadByte();
+
+        Assert.AreEqual(expected, stream.Seek(offset, origin));
+        Assert.AreEqual(expected, stream.Position);
+    }
+
+    [TestMethod]
+    public void SeekFromAnUnknownOriginIsRefused()
+    {
+        using ConcatenatedReadStream stream = new([Segment(1)]);
+
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => stream.Seek(0, (SeekOrigin)3));
     }
 
     [TestMethod]
@@ -70,4 +164,10 @@ public sealed class ConcatenatedReadStreamTests
     }
 
     private static MemoryStream Segment(params byte[] bytes) => new(bytes, writable: false);
+
+    /// <summary>A readable stream that cannot seek, as a pipe is.</summary>
+    private sealed class NonSeekableStream : MemoryStream
+    {
+        public override bool CanSeek => false;
+    }
 }

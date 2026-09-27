@@ -24,7 +24,9 @@ namespace Curl.Core;
 /// A POST body is dropped, making the request a GET, on 301 and 302 unless
 /// <c>--post301</c> or <c>--post302</c>, and on 303 unless <c>--post303</c>; 303 also drops a
 /// <c>-T</c> upload. A <c>-X</c> method is kept, as curl keeps it. Once dropped, a body
-/// stays dropped for every later hop.
+/// stays dropped for every later hop. A body that is kept - a <c>-T</c> upload or a <c>-F</c>
+/// <see cref="StreamBody" /> - is sent again from its start when its stream seeks, as curl
+/// 8.21.0 sends the same multipart body, boundary and all, after a 307 or 308 (BL-298 Notes).
 /// </para>
 /// <para>
 /// A hop whose host, port or scheme differs from the first URL's gets no
@@ -81,6 +83,8 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher)
         RedirectChain chain = new(context.TimeProvider);
         long operationStarted = context.OperationStarted ?? context.TimeProvider.GetTimestamp();
         long? uploadStart = SeekableStart(context.Upload);
+        Stream? bodyContent = StreamBodyContent(http);
+        long? bodyStart = SeekableStart(bodyContent);
         ITransferContext hop = context;
         bool bodyDropped = false;
         while (true)
@@ -98,7 +102,8 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher)
             }
 
             bodyDropped |= DropsBody(result.Report!.ResponseCode, hop, policy);
-            RewindUpload(context.Upload, uploadStart, bodyDropped);
+            Rewind(context.Upload, uploadStart, bodyDropped);
+            Rewind(bodyContent, bodyStart, bodyDropped);
             // No refusal means the target parsed, so next is set.
             hop = NextHop(context, next!, http, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted);
             chain.Followed(target);
@@ -179,12 +184,14 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher)
     private static long? SeekableStart(Stream? upload) =>
         upload is { CanSeek: true } ? upload.Position : null;
 
-    private static void RewindUpload(Stream? upload, long? start, bool bodyDropped)
+    private static Stream? StreamBodyContent(HttpRequestOptions http) => (http.Body as StreamBody)?.Content;
+
+    private static void Rewind(Stream? content, long? start, bool bodyDropped)
     {
         if (!bodyDropped && start is { } position)
         {
-            // A seekable upload's start was only recorded when the upload exists.
-            upload!.Position = position;
+            // A seekable stream's start was only recorded when the stream exists.
+            content!.Position = position;
         }
     }
 
