@@ -36,3 +36,4 @@ The resolver honours `--resolve` entries and the connector honours `--connect-to
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-27: Backlog -> Doing.
