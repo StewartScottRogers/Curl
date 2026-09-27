@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-- Found by BL-226, which formats the `-w` times from `TransferTimings` (ADR-0033, "Consequences"). The formatting is right; the timestamps are not taken where curl takes them.
+- Found by BL-226, which formats the `-w` times from `TransferTimings` (ADR-0035, "Consequences"). The formatting is right; the timestamps are not taken where curl takes them.
 - Measured on curl 8.21.0 (mingw, Schannel), 2026-09-26: `curl -s -o NUL -w "ns=%{time_namelookup}|c=%{time_connect}|pre=%{time_pretransfer}|post=%{time_posttransfer}|st=%{time_starttransfer}|t=%{time_total}" http://127.0.0.1:1/` printed `ns=0.000067|c=0.000000|pre=2.027121|post=2.027122|st=2.027122|t=2.027127`, exit 7. A literal `127.0.0.1` to a live loopback server printed `ns=0.000065`.
 - Today `ConnectTimings.NameResolved` is `null` for a literal address (ADR-0030) and a refused connect reports no timings, so these print `0.000000`. Decide, with an ADR, whether the connector records a resolution for a literal and whether a failed transfer reports its timings.
 

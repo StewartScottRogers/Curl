@@ -37,8 +37,8 @@ Content-Length: 20000
   - The same without `-d` to `http://localhost:18227/` printed `...|t=0.251240|sd=79607|su=0`.
   - `file:///tmp/bl226.bin` (100000 bytes) printed all times at most microseconds and `sd=0|su=0`; `http://127.0.0.1:1/` (exit 7) printed `ns=0.000067|c=0.000000|a=0.000000|pre=2.027121|post=2.027122|st=2.027122|r=0.000000|t=2.027127|sd=0|su=0`.
   - Times: microseconds printed `%lu.%06lu`. Speeds: whole bytes per second, `size*1000000/us` truncated (350170 = 20000/0.057115, curl's last progress update, just before `time_total`).
-- Decisions (ADR-0033, decided by Claude under Stewart's delegation): `TransferWriteOutVariables` takes a `TimeProvider` as its last constructor argument (nobody outside the tests constructs it yet; BL-235 wires it); times are truncated microseconds since `TransferTimings.Started`, at least 1 µs for an event that happened (`Curl_pgrsTime`); speeds divide by `time_total` with curl's `trspeed` overflow rules; no timings print `0.000000` and `0`.
-- Added `Documentation` to `touches` for ADR-0033 and its index row; no task in Doing names it.
+- Decisions (ADR-0035, decided by Claude under Stewart's delegation): `TransferWriteOutVariables` takes a `TimeProvider` as its last constructor argument (nobody outside the tests constructs it yet; BL-235 wires it); times are truncated microseconds since `TransferTimings.Started`, at least 1 µs for an event that happened (`Curl_pgrsTime`); speeds divide by `time_total` with curl's `trspeed` overflow rules; no timings print `0.000000` and `0`.
+- Added `Documentation` to `touches` for ADR-0035 and its index row; no task in Doing names it.
 - Filed BL-286: curl takes a namelookup time for a literal address and pretransfer/starttransfer times after a refused connect; our handlers do not. That is where timestamps are taken, not formatting.
 - Quality: `Measure-CodeQuality.ps1 -Library Curl.Output.UnitLibrary` reports 100% line, 100% branch, 69 members, 0 failing, worst CRAP 10.
 
