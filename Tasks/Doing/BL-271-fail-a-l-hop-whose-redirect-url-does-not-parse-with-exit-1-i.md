@@ -32,3 +32,4 @@ Under `-L`, a 3xx whose `TransferReport.RedirectUrl` is not a valid URL (for exa
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
