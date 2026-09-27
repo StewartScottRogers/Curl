@@ -32,7 +32,7 @@ completed: 2026-09-27
 - Delivered: `CurlComposition.CreateTcpConnector(options, dnsResolver, tcpDialer, tlsProvider, timeProvider, proxyTunnelOptions)` builds the run's `TcpConnector` with `ResolveOverrides.Parse(options.ResolveEntries)` and `new ConnectToMappings(options.ConnectToEntries)`; `CreateTransports` uses it. No design decision needed, so no ADR: parsing and exit 49 behaviour were already measured and pinned in BL-214.
 - Test fake choice: the overrides act inside `TcpConnector`, below the `IConnector` a `RecordingConnector` stands in for, so a `RecordingConnector` would only ever see the URL's host. `CurlCompositionConnectOverrideTests` instead runs the composed `TcpConnector` over `ScriptedTcpDialer`, whose `ScriptedConnector` records each address and port actually dialed - the same recording, one layer lower. Six tests: `--resolve` address, `--connect-to` port, both combined (resolve entry for the mapped host wins over the URL host's), neither, and exit 49 for a bad `--resolve` and a bad `--connect-to` port.
 - Verified: `dotnet build -warnaserror` clean; fast tests green solution-wide (Curl.Console.UnitTests 809 passed); `dotnet format --verify-no-changes` clean for both projects; `Measure-CodeQuality.ps1 -Library Curl.Console -IncludeIntegration` 100% line, 100% branch, 0 failing members, worst CRAP 10. Without `-IncludeIntegration` the only failing member is `DiskWriteOutFileOpener.TryOpen`, Integration-only by design (BL-280), unchanged here.
-- Follow-up: BL-412 - `UdpDatagramConnector` (TFTP) takes no overrides, so `--resolve`/`--connect-to` do not reach TFTP yet.
+- Follow-up: BL-413 - `UdpDatagramConnector` (TFTP) takes no overrides, so `--resolve`/`--connect-to` do not reach TFTP yet.
 
 ## Log
 

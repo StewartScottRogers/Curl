@@ -1,5 +1,5 @@
 ---
-id: BL-412
+id: BL-413
 title: Apply --resolve and --connect-to to the UDP connector TFTP uses
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-412 — Apply --resolve and --connect-to to the UDP connector TFTP uses
+# BL-413 — Apply --resolve and --connect-to to the UDP connector TFTP uses
 
 ## Goal
 
