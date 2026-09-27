@@ -1,5 +1,5 @@
 ---
-id: BL-328
+id: BL-332
 title: Resume an HTTP -T upload from -C with the measured Content-Range
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-328 — Resume an HTTP -T upload from -C with the measured Content-Range
+# BL-332 — Resume an HTTP -T upload from -C with the measured Content-Range
 
 ## Goal
 
@@ -18,7 +18,7 @@ An HTTP `-T` upload with `-C <offset>` (or `-C -`) skips the offset and sends th
 
 ## Context
 
-- BL-184 sends `ITransferContext.Upload` as PUT from the stream's current position and ignores `ITransferContext.ResumeFrom` (ADR-0052, Consequences).
+- BL-184 sends `ITransferContext.Upload` as PUT from the stream's current position and ignores `ITransferContext.ResumeFrom` (ADR-0055, Consequences).
 - Measure first with `/mingw64/bin/curl` (curl 8.21.0, the Windows reference, ADR-0009) against a loopback server: `-C 3 -T f.txt`, and `-C - -T f.txt`, which asks the server with a HEAD for the size it has. Record the commands and bytes in Notes before pinning them.
 - Start in `HttpRequestFraming.OfUpload` and `HttpRequestHeadFormatter`.
 - Filed from BL-184.

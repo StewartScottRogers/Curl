@@ -1,5 +1,5 @@
 ---
-id: BL-329
+id: BL-333
 title: Hold the HTTP request head until the first upload read succeeds
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-329 — Hold the HTTP request head until the first upload read succeeds
+# BL-333 — Hold the HTTP request head until the first upload read succeeds
 
 ## Goal
 
@@ -18,7 +18,7 @@ When the first read of an HTTP upload fails, the handler sends no request bytes 
 
 ## Context
 
-- Measured in BL-184 (ADR-0052): `curl -T big.bin` with every byte of the 100000-byte file locked sent nothing to the server and exited 26 `client read function EOF fail, only 0/100000 of needed bytes read`; curl holds the head in its upload buffer with the first body read. The handler writes and flushes the head first, so a server sees the head.
+- Measured in BL-184 (ADR-0055): `curl -T big.bin` with every byte of the 100000-byte file locked sent nothing to the server and exited 26 `client read function EOF fail, only 0/100000 of needed bytes read`; curl holds the head in its upload buffer with the first body read. The handler writes and flushes the head first, so a server sees the head.
 - Only when the request does not wait for `100 Continue`: then curl sends the head alone.
 - Start in `HttpProtocolHandler` (the head write and `SendBodyAsync`) and `HttpRequestBodyWriter`.
 - Filed from BL-184.
