@@ -66,6 +66,7 @@ choices do not need one.
 | [0049](ADR-0049-the-public-suffix-list-is-an-embedded-dated-snapshot-refreshed-by-a-script.md) | The Public Suffix List is an embedded, dated snapshot refreshed by a script: `Curl.Cookies.UnitLibrary/PublicSuffixList/public_suffix_list.dat`, parsed by hand, MPL-2.0 notice kept with it, refreshed by `Update-PublicSuffixList.ps1` | Accepted | 2026-09-27 |
 | [0050](ADR-0050-connections-are-reused-across-requests-and-urls-through-a-pooling-connector.md) | Connections are reused across requests and URLs through a pooling connector: `IConnection.MarkReusable`, a key of scheme, host, port, TLS and proxy, five idle connections per run, reuse reported on `ConnectResult` for `%{num_connects}` and `-v` | Accepted | 2026-09-27 |
 | [0051](ADR-0051-t-urls-are-resolved-before-the-transfer-and-the-t-file-opened-after-its-warnings.md) | `-T` URLs are resolved before the transfer, and the `-T` file opened after its warnings: `-T` values pair with URLs in order, `UploadTransferUrl` appends, parses with `CurlUrl` and normalises, exit 3 before any warning, exit 26 with `cannot open` lines even under `-s` | Accepted | 2026-09-27 |
+| [0052](ADR-0052-handler-synthesised-header-lines-are-reported-as-pseudo-headers.md) | Handler-synthesised header lines are reported as pseudo-headers: `TransferReport.PseudoHeaders` counts towards `%{num_headers}` but is never found by `%header{}`; `file://` reports its three | Accepted | 2026-09-27 |
 
 ## Template
 

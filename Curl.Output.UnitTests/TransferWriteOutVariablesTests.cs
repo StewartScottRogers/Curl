@@ -236,6 +236,23 @@ public sealed class TransferWriteOutVariablesTests
     }
 
     [TestMethod]
+    public void TryGetVariableText_PseudoHeaders_CountTowardsNumHeadersButAreNeverFound()
+    {
+        // curl -s -o NUL -w "[%header{Content-Length}][%{num_headers}]" file:///C:/bl285tmp/a.txt
+        // printed [][3] (BL-285); a response header alongside them is counted too.
+        TransferReport report = new()
+        {
+            ResponseHeaders = [new("X-A", "1")],
+            PseudoHeaders = [new("Content-Length", "12"), new("Accept-ranges", "bytes"), new("Last-Modified", "Wed, 24 Jun 2026 12:34:56 GMT")],
+        };
+        TransferWriteOutVariables variables = WithReport(report);
+
+        Assert.AreEqual("4", Get(variables, "num_headers"));
+        Assert.IsNull(variables.FindFirstHeaderValue("Content-Length"));
+        Assert.AreEqual("1", variables.FindFirstHeaderValue("X-A"));
+    }
+
+    [TestMethod]
     public void FindFirstHeaderValue_NoReport_FindsNothing()
     {
         TransferWriteOutVariables variables = new(TransferResult.Success(0), LoopbackUrl, 0, LoopbackUrl, "http", Clock);

@@ -44,6 +44,16 @@ public sealed record TransferReport
     public IReadOnlyList<KeyValuePair<string, string>> ResponseHeaders { get; init; } = [];
 
     /// <summary>
+    /// Gets every header line a handler synthesised for the header stream that curl's
+    /// header API does not hold, such as the <c>Content-Length</c>,
+    /// <c>Accept-ranges</c> and <c>Last-Modified</c> lines of a <c>file://</c> transfer,
+    /// name and value in the order written; empty when there was none. They count
+    /// towards <c>%{num_headers}</c> but, unlike <see cref="ResponseHeaders" />, are
+    /// never found by <c>%header{}</c>. See ADR-0052.
+    /// </summary>
+    public IReadOnlyList<KeyValuePair<string, string>> PseudoHeaders { get; init; } = [];
+
+    /// <summary>
     /// Gets the last response's <c>Content-Type</c> value, the source of
     /// <c>%{content_type}</c>; <see langword="null" /> when absent.
     /// </summary>

@@ -108,7 +108,8 @@ public sealed class TransferWriteOutVariables(
         ["size_download"] = variables => FormatNumber(variables.DownloadSize),
         ["size_upload"] = variables => FormatNumber(variables.report.UploadSize),
         ["num_connects"] = variables => FormatNumber(variables.report.ConnectionCount),
-        ["num_headers"] = variables => FormatNumber(variables.report.ResponseHeaders.Count),
+        ["num_headers"] = variables => FormatNumber(
+            variables.report.ResponseHeaders.Count + variables.report.PseudoHeaders.Count),
         ["local_ip"] = variables => FormatAddress(variables.report.LocalEndPoint),
         ["local_port"] = variables => FormatPort(variables.report.LocalEndPoint),
         ["remote_ip"] = variables => FormatAddress(variables.report.RemoteEndPoint),
