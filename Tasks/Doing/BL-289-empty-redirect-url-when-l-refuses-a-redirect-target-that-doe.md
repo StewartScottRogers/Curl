@@ -36,3 +36,4 @@ Under `-L`, when `RedirectFollower` refuses a redirect target because it does no
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-27: Backlog -> Doing.
