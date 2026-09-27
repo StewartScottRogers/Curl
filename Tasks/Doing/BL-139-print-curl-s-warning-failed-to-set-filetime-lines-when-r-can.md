@@ -93,3 +93,4 @@ When `-R`/`--remote-time` cannot set the `-o` file's time, `curl` prints the two
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
