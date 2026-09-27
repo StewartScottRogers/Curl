@@ -4,7 +4,7 @@ title: Report the FTP server's last reply code as TransferReport.ResponseCode
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-431]
 touches: [Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests]
 requirement: none
 created: 2026-09-27
@@ -29,7 +29,10 @@ An FTP transfer's `TransferReport.ResponseCode` is the last reply code the serve
 
 ## Notes
 
+- 2026-09-27 (lane 1): there is no FTP handler to set the code on. `Curl.Protocol.Ftp.UnitLibrary` holds only its `.csproj` and `CLAUDE.md`, and `Curl.Console/ForwardedFtpProtocolHandler.cs` fails every non-proxied `ftp://` transfer with exit 1. Building the handler is a whole protocol, not this task, so it is filed as BL-431 and this task waits on it.
+
 ## Log
 
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Backlog. Waits on BL-431: no FTP handler exists yet to report a reply code from
