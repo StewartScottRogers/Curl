@@ -80,7 +80,7 @@ internal static class TlsFailureMessages
 
     // A socket error during the handshake is curl's "Recv failure: " and the error as each
     // build names it: its own Winsock table in the Schannel build, strerror in the OpenSSL
-    // build (BL-369, measured; ADR-0087). Any other socket error's own message stands in.
+    // build (BL-369, measured; ADR-0088). Any other socket error's own message stands in.
     private static readonly FrozenDictionary<SocketError, string> SchannelSocketErrorTexts = new Dictionary<SocketError, string>
     {
         [SocketError.ConnectionReset] = "Connection was reset",
