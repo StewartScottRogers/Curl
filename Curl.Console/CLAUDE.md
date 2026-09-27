@@ -56,6 +56,14 @@ as curl 8.21.0 does. `-I` also sets the context's `NoBody`, and `-f` / `--fail-w
 become `HttpRequestOptions.Fail`. Under `--fail-early` the first failed transfer stops the
 run with its own exit code.
 
+The Nth `-T` / `--upload-file` value uploads to the Nth URL (ADR-0051). Its URL is resolved
+by `UploadTransferUrl` before anything else of that transfer: one it cannot parse is exit 3
+with no warning lines. The `-T` file is opened through the runner's `IFileSystem` after the
+before-transfer warning lines and becomes the context's `Upload`; one that cannot be opened
+prints `curl: cannot open '<file>'` and the try-help line even under `-s`, is exit 26, and
+stops the run. `-T -` and `-T .` upload standard input. `%{url_effective}` prints the
+resolved URL.
+
 Every transfer goes through `Curl.Core`'s `RedirectFollower`. `-L` becomes
 `HttpRequestOptions.FollowRedirects`, and `RedirectPolicyMapping` turns `--max-redirs`,
 `--post301`/`--post302`/`--post303` and `--location-trusted` into its `RedirectPolicy`. Every
