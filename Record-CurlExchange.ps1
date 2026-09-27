@@ -50,6 +50,11 @@
     How many connections to serve. Default 1. Use more for a run that makes several
     requests, such as several URLs or a followed redirect.
 
+.PARAMETER ResponseDelayMilliseconds
+    How long to wait after reading each request before sending the response. Default 0.
+    Use it to make a hop take a known time, as when measuring how -m counts across a
+    followed redirect.
+
 .PARAMETER Curl
     The curl executable to run. Defaults to the reference build ADR-0009 and ADR-0018
     name, curl 8.21.0 from Git for Windows' mingw64 directory, found beside git.exe.
@@ -68,6 +73,7 @@ param(
     [Parameter(Mandatory = $true)] [string[]] $CurlArgs,
     [Parameter(Mandatory = $true)] [string] $OutDirectory,
     [ValidateRange(1, 1000)] [int] $Connections = 1,
+    [ValidateRange(0, 600000)] [int] $ResponseDelayMilliseconds = 0,
     [string] $Curl
 )
 
@@ -146,7 +152,7 @@ function ConvertTo-CommandLineArgument {
 # The server runs in its own runspace so curl can run in this one. It returns one
 # byte array per connection served.
 $serveConnections = {
-    param($Listener, [byte[]] $ResponseBytes, [int] $ConnectionCount)
+    param($Listener, [byte[]] $ResponseBytes, [int] $ConnectionCount, [int] $DelayMilliseconds)
 
     Set-StrictMode -Version Latest
     $ErrorActionPreference = 'Stop'
@@ -192,6 +198,7 @@ $serveConnections = {
                 $received.Write($buffer, 0, $count)
             }
             $requests.Add($received.ToArray())
+            if ($DelayMilliseconds -gt 0) { [System.Threading.Thread]::Sleep($DelayMilliseconds) }
             try {
                 $stream.Write($ResponseBytes, 0, $ResponseBytes.Length)
                 $stream.Flush()
@@ -214,7 +221,7 @@ $listener = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Lo
 $listener.Start()
 $server = [System.Management.Automation.PowerShell]::Create()
 try {
-    [void] $server.AddScript($serveConnections).AddArgument($listener).AddArgument($responseBytes).AddArgument($Connections)
+    [void] $server.AddScript($serveConnections).AddArgument($listener).AddArgument($responseBytes).AddArgument($Connections).AddArgument($ResponseDelayMilliseconds)
     $serverRun = $server.BeginInvoke()
 
     $startInfo = New-Object System.Diagnostics.ProcessStartInfo
