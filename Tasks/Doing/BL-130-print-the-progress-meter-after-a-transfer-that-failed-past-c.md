@@ -39,3 +39,4 @@ Tests use a fake `IProtocolHandler` registered the way the existing `Curl.Consol
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-27: Backlog -> Doing.
