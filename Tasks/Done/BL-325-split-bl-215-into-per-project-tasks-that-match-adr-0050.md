@@ -28,7 +28,7 @@ The connection-reuse work of ADR-0050 is filed as one task per project, and BL-2
 
 ## Notes
 
-- Filed BL-332 (`Curl.Protocol.Abstractions`: `MarkReusable`, `PoolScheme`, `IsReused`, `ConnectionNumber`, `ConnectionReusedEvent.Scheme`/`IsProxy`; depends on BL-164 and BL-313, which creates `ConnectionReusedEvent`), BL-333 (`Curl.Protocol.Http`; depends on BL-332, BL-173) and BL-334 (`Curl.Console`; depends on BL-332, BL-215). BL-215 now depends on BL-332 and keeps its `Curl.Networking`-only `touches`.
+- Filed BL-335 (`Curl.Protocol.Abstractions`: `MarkReusable`, `PoolScheme`, `IsReused`, `ConnectionNumber`, `ConnectionReusedEvent.Scheme`/`IsProxy`; depends on BL-164 and BL-313, which creates `ConnectionReusedEvent`), BL-336 (`Curl.Protocol.Http`; depends on BL-335, BL-173) and BL-334 (`Curl.Console`; depends on BL-335, BL-215). BL-215 now depends on BL-335 and keeps its `Curl.Networking`-only `touches`.
 - Choice: filed the tasks in-session with the board script instead of through `task-planner`, since the ADR's "Who does what" already fixes the split; the result is the same set of board files.
 - Formatting the reuse line from `ConnectionReusedEvent` stays with BL-228 (`Curl.Output`), as ADR-0050 says; no Output task was filed.
 
@@ -36,4 +36,4 @@ The connection-reuse work of ADR-0050 is filed as one task per project, and BL-2
 
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
-- 2026-09-27: Doing -> Done. ADR-0050 work is filed per project: BL-332 contract first, then BL-215, BL-333 and BL-334
+- 2026-09-27: Doing -> Done. ADR-0050 work is filed per project: BL-335 contract first, then BL-215, BL-336 and BL-334

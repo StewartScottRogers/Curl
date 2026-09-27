@@ -1,16 +1,16 @@
 ---
-id: BL-333
+id: BL-336
 title: Hand reusable HTTP connections back and report reuse per ADR-0050 in Curl.Protocol.Http
 priority: Low
 assignee: Claude
 pipeline: protocol
-depends-on: [BL-332, BL-173]
+depends-on: [BL-335, BL-173]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-333 — Hand reusable HTTP connections back and report reuse per ADR-0050 in Curl.Protocol.Http
+# BL-336 — Hand reusable HTTP connections back and report reuse per ADR-0050 in Curl.Protocol.Http
 
 ## Goal
 

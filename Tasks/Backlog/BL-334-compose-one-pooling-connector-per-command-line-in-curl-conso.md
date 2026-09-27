@@ -4,7 +4,7 @@ title: Compose one pooling connector per command line in Curl.Console
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-332, BL-215]
+depends-on: [BL-335, BL-215]
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-27
@@ -19,7 +19,7 @@ completed:
 ## Context
 
 - ADR-0050, section "A pooling connector owns the pool, one per command line". If the ADR and this task disagree, the ADR wins.
-- `PoolingConnector` is built by BL-215 in `Curl.Networking.UnitLibrary`; the contract comes from BL-332.
+- `PoolingConnector` is built by BL-215 in `Curl.Networking.UnitLibrary`; the contract comes from BL-335.
 - Disposing the pool at the end of the run writes nothing (curl's `-v` shows nothing after the last `left intact`).
 - `--next`, `-Z`/`--parallel` and `--no-keepalive` are not part of this task.
 

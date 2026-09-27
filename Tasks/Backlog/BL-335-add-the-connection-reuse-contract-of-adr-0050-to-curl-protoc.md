@@ -1,5 +1,5 @@
 ---
-id: BL-332
+id: BL-335
 title: Add the connection-reuse contract of ADR-0050 to Curl.Protocol.Abstractions
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-332 — Add the connection-reuse contract of ADR-0050 to Curl.Protocol.Abstractions
+# BL-335 — Add the connection-reuse contract of ADR-0050 to Curl.Protocol.Abstractions
 
 ## Goal
 
@@ -23,7 +23,7 @@ completed:
 - `ConnectTarget.PoolScheme` is `string?`, `init`, default `null` (never pooled).
 - `ConnectResult` gains `bool IsReused` and `long ConnectionNumber`, set through the `Connected` factory; defaults `false` and `0`.
 - `ConnectionReusedEvent` is created by BL-313 (ADR-0046); this task adds `Scheme` and `IsProxy` to it, hence the dependency.
-- This is the contract task for the ADR-0050 work: BL-215 (`Curl.Networking`), BL-333 (`Curl.Protocol.Http`) and BL-334 (`Curl.Console`) depend on it. No package may be added.
+- This is the contract task for the ADR-0050 work: BL-215 (`Curl.Networking`), BL-336 (`Curl.Protocol.Http`) and BL-334 (`Curl.Console`) depend on it. No package may be added.
 
 ## Acceptance criteria
 
