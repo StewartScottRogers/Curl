@@ -38,7 +38,7 @@ accepted with curl's meaning instead of being reported as not a date.
 ## Notes
 
 - Filed from BL-138 as the one `curl_getdate` spelling range it does not support.
-- Decision (ADR-0072): clamp in the parser, not widen `TimeCondition`. An instant after the last
+- Decision (ADR-0073): clamp in the parser, not widen `TimeCondition`. An instant after the last
   whole second a `DateTimeOffset` holds reads as 9999-12-31 23:59:59 UTC; for `file://` and any
   `Last-Modified` comparison that compares exactly as curl's 64-bit instant does, and no shared
   contract changes. Pinned by `CurlDateParserTests.TryParse_InstantAfterYear9999_IsTheLastWholeSecondOfYear9999`
@@ -49,13 +49,13 @@ accepted with curl's meaning instead of being reported as not a date.
   the same (checked with `dotnet run --project Curl.Console`).
 - The low end is not clamped: `00000101` (year 0) is not a date to curl (both directions transfer;
   its 1583 floor, BL-256), so it stays refused (`TryParse_InstantBeforeYear1_IsRefused`).
-- Added `Documentation/Planning/Decisions` to `touches` for ADR-0072 and its index row; no task in
+- Added `Documentation/Planning/Decisions` to `touches` for ADR-0073 and its index row; no task in
   Doing names it.
-- Follow-up: BL-380, the HTTP `If-Modified-Since` header for such a date (clamped header vs curl's,
+- Follow-up: BL-381, the HTTP `If-Modified-Since` header for such a date (clamped header vs curl's,
   unmeasured).
 
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-27: Backlog -> Doing.
-- 2026-09-27: Doing -> Done. -z dates after the year 9999 are accepted as curl 8.21.0 accepts them, read as 9999-12-31 23:59:59 UTC (ADR-0072), with no warning
+- 2026-09-27: Doing -> Done. -z dates after the year 9999 are accepted as curl 8.21.0 accepts them, read as 9999-12-31 23:59:59 UTC (ADR-0073), with no warning

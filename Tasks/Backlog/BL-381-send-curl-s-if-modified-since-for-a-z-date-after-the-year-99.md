@@ -1,5 +1,5 @@
 ---
-id: BL-380
+id: BL-381
 title: Send curl's If-Modified-Since for a -z date after the year 9999
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: FR-009
 created: 2026-09-27
 completed:
 ---
-# BL-380 — Send curl's If-Modified-Since for a -z date after the year 9999
+# BL-381 — Send curl's If-Modified-Since for a -z date after the year 9999
 
 ## Goal
 
@@ -19,7 +19,7 @@ fails), instead of `If-Modified-Since: Fri, 31 Dec 9999 23:59:59 GMT`.
 
 ## Context
 
-- BL-247 / ADR-0072: `CurlDateParser` reads a `-z` date after the year 9999 as
+- BL-247 / ADR-0073: `CurlDateParser` reads a `-z` date after the year 9999 as
   9999-12-31 23:59:59 UTC, because `TimeCondition.Value` is a `DateTimeOffset`. That is exact for
   every comparison against a file or `Last-Modified` time, but the HTTP request header shows the
   clamped date.
@@ -41,7 +41,7 @@ fails), instead of `If-Modified-Since: Fri, 31 Dec 9999 23:59:59 GMT`.
 ## Notes
 
 - Filed from BL-247. If curl's behaviour depends on the real year (3001 vs 99999999), this needs
-  `TimeCondition` widened; record that in an ADR superseding ADR-0072.
+  `TimeCondition` widened; record that in an ADR superseding ADR-0073.
 
 ## Log
 
