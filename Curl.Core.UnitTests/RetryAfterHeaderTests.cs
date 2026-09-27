@@ -38,6 +38,23 @@ public sealed class RetryAfterHeaderTests
     public void ParseSeconds_HttpDate_ReadsSecondsFromNowCappedAtSixHours(string value, long expected) =>
         Assert.AreEqual(expected, RetryAfterHeader.ParseSeconds(value, Now));
 
+    /// <summary>
+    /// Dates outside RFC 9110 that curl 8.21.0's <c>Curl_getdate_capped</c> still reads, measured
+    /// on 2026-09-27 with each date four seconds ahead (BL-393's notes): each waited until the date.
+    /// <c>5 Sep</c> has no year, so curl read it as 5 delay-seconds.
+    /// </summary>
+    [TestMethod]
+    [DataRow("27 Sep 2026 05:26:18", 4L)]
+    [DataRow("Sep 27 2026 05:26:18", 4L)]
+    [DataRow("20260927 05:26:18", 4L)]
+    [DataRow("Sun, 27 Sep 2026 05:26:18 +0000", 4L)]
+    [DataRow("2026 Sep 27 05:26:18 UTC", 4L)]
+    [DataRow("27 Sep 2026 06:26:18 +0100", 4L)]
+    [DataRow("1 Jan 2000", 0L)]
+    [DataRow("5 Sep", 5L)]
+    public void ParseSeconds_LenientDate_ReadsAsCurlGetdateDoes(string value, long expected) =>
+        Assert.AreEqual(expected, RetryAfterHeader.ParseSeconds(value, Now));
+
     [TestMethod]
     public void ParseSeconds_NullValue_Throws() =>
         Assert.ThrowsExactly<ArgumentNullException>(() => RetryAfterHeader.ParseSeconds(null!, Now));

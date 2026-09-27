@@ -1,4 +1,5 @@
 using System.Globalization;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Core;
 
@@ -7,26 +8,20 @@ namespace Curl.Core;
 /// <c>http_header_r</c> does, into the number of seconds to wait.
 /// </summary>
 /// <remarks>
-/// Leading blanks are skipped. A date (the three HTTP-date forms: RFC 1123, RFC 850 and
-/// asctime) is read first and gives the seconds from now until it, or zero when it has
-/// passed. Anything else is read as the digits it starts with, <c>3abc</c> and <c>2.5</c>
-/// giving 3 and 2; no digits, a sign, or a number too large for a 64-bit integer give
-/// zero. The result is capped at 21600 seconds (six hours). Zero means the header asks for
-/// nothing. Measured with curl 8.21.0 on 2026-09-26; the commands are in BL-208's notes.
-/// Only the three RFC 9110 date forms are read, not everything libcurl's lenient
-/// <c>parsedate</c> reads; ADR-0080 records why.
+/// Leading blanks are skipped. A date is read first, with <see cref="CurlDateParser" />, the
+/// port of the <c>Curl_getdate_capped</c> libcurl uses, so every date curl reads is read: the
+/// three HTTP-date forms and lenient ones such as <c>27 Sep 2026 05:26:19</c> or
+/// <c>20260927 05:26:19</c>. A date gives the seconds from now until it, or zero when it has
+/// passed. Anything else is read as the digits it starts with, <c>3abc</c>, <c>2.5</c> and
+/// <c>5 Sep</c> giving 3, 2 and 5; no digits, a sign, or a number too large for a 64-bit
+/// integer give zero. The result is capped at 21600 seconds (six hours). Zero means the header
+/// asks for nothing. Measured with curl 8.21.0 on 2026-09-26 and 2026-09-27; the commands are
+/// in BL-208's and BL-393's notes, and ADR-0094 records the decision.
 /// </remarks>
 public static class RetryAfterHeader
 {
     /// <summary>libcurl's undocumented ceiling on a <c>Retry-After</c> wait: six hours, in seconds.</summary>
     public const long MaxSeconds = 21600;
-
-    private static readonly string[] HttpDateFormats =
-    [
-        "ddd, dd MMM yyyy HH:mm:ss 'GMT'",
-        "dddd, dd-MMM-yy HH:mm:ss 'GMT'",
-        "ddd MMM d HH:mm:ss yyyy",
-    ];
 
     /// <summary>
     /// Reads <paramref name="value" /> into whole seconds to wait.
@@ -39,13 +34,8 @@ public static class RetryAfterHeader
         ArgumentNullException.ThrowIfNull(value);
 
         string text = value.TrimStart(' ', '\t');
-        long seconds = DateTimeOffset.TryParseExact(
-            text,
-            HttpDateFormats,
-            CultureInfo.InvariantCulture,
-            DateTimeStyles.AllowWhiteSpaces | DateTimeStyles.AssumeUniversal,
-            out DateTimeOffset date)
-            ? Math.Max(0, (long)(date - now).TotalSeconds)
+        long seconds = CurlDateParser.TryParse(text, out long unixSeconds)
+            ? Math.Max(0, unixSeconds - now.ToUnixTimeSeconds())
             : LeadingNumber(text);
         return Math.Min(seconds, MaxSeconds);
     }

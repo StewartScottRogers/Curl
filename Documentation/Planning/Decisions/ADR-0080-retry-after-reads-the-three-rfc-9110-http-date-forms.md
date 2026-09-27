@@ -1,6 +1,6 @@
 # ADR-0080 — `Retry-After` reads the three RFC 9110 HTTP-date forms
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR-0094](ADR-0094-retry-after-reads-dates-with-curldateparser.md)
 - **Date:** 2026-09-27
 
 Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"). The
