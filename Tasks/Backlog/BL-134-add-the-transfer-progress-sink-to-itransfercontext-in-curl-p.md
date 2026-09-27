@@ -18,13 +18,13 @@ completed:
 
 ## Context
 
-BL-133 records the ADR (the next free ADR number under `Documentation/Planning/Decisions/`, ADR-0009 at filing time) that names the sink interface, its members, the `ITransferContext` member and the do-nothing default. Implement exactly what that ADR says; if it and this task disagree, the ADR wins. The purpose is to let `Curl.Console` print the meter after a transfer that failed past connect/open (BL-130), show curl 8.21.0's live status line (BL-131), and draw the `-#` bar (BL-132).
+BL-133 recorded ADR-0045 (`Documentation/Planning/Decisions/ADR-0045-the-transfer-context-carries-a-progress-sink-for-the-progress-meter.md`), which names `ITransferProgress` (`ReportTransferStarted()`, `ReportDownloaded(long bytesSoFar, long? expectedTotal)`, `ReportUploaded(long bytesSoFar, long? expectedTotal)`), `NoTransferProgress.Instance`, and `ITransferContext.Progress`. Implement exactly what that ADR says; if it and this task disagree, the ADR wins. The purpose is to let `Curl.Console` print the meter after a transfer that failed past connect/open (BL-130), show curl 8.21.0's live status line (BL-131), and draw the `-#` bar (BL-132).
 
 Where the code goes:
 
 - The new interface and its do-nothing implementation: new files in `Curl.Protocol.Abstractions.UnitLibrary/`, namespace `Curl.Protocol.Abstractions`, with XML doc comments like the neighbouring `ITransferContext.cs`.
 - The new member: `Curl.Protocol.Abstractions.UnitLibrary/ITransferContext.cs`, and an `init` property on `TransferContext.cs` defaulting to the do-nothing instance (the pattern ADR-0008 used for `ConnectTimeout` and `MaxTime`).
-- `Curl.Protocol.File.UnitTests/Fakes/FakeTransferContext.cs` implements `ITransferContext`, so it must gain the member (a settable property defaulting to the do-nothing instance), as it did in commit 337addb for ADR-0008. No other class implements `ITransferContext` at filing time (grep `: ITransferContext`); if one has appeared, it needs the same one-line addition.
+- `ITransferContext.Progress` has no default interface implementation (ADR-0045). At BL-133's run (2026-09-26) only `TransferContext` implements `ITransferContext` (`Curl.Protocol.File.UnitTests/Fakes/FakeTransferContext.cs` no longer exists); if another implementer has appeared (grep `: ITransferContext`), it needs the member too. Copying the sink across redirect hops in `RedirectFollower.NextHop` is BL-306, not this task.
 
 No handler reports anything yet; `file://` is BL-129. The sink does not read time. No package may be added.
 

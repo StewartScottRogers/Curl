@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: docs
 depends-on: [BL-102]
-touches: [Documentation/Planning/Decisions]
+touches: [Documentation/Planning/Decisions, Tasks/Backlog/BL-134-add-the-transfer-progress-sink-to-itransfercontext-in-curl-p.md]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-133 — Record the ADR that gives ITransferContext a progress sink for the progress meter
 
@@ -33,14 +33,21 @@ This is a docs-only task: no `.cs` file changes. The contract is BL-134.
 
 ## Acceptance criteria
 
-- [ ] A new ADR file exists under `Documentation/Planning/Decisions/` with Status `Accepted`, naming the interface, each of its members with its parameters, the `ITransferContext` member, and the do-nothing default `TransferContext` uses.
-- [ ] The ADR's Context quotes the two curl 8.21.0 measurements above (the 10-byte status-line sequence and the exit 33 after the meter) with the date and curl version.
-- [ ] The ADR states that the sink does not read time, that time is measured by `Curl.Console` through the injected `TimeProvider`, and that `file://` reports "started" but no byte counts.
-- [ ] `Documentation/Planning/Decisions/README.md` lists the new ADR if that file keeps an index.
+- [x] A new ADR file exists under `Documentation/Planning/Decisions/` with Status `Accepted`, naming the interface, each of its members with its parameters, the `ITransferContext` member, and the do-nothing default `TransferContext` uses.
+- [x] The ADR's Context quotes the two curl 8.21.0 measurements above (the 10-byte status-line sequence and the exit 33 after the meter) with the date and curl version.
+- [x] The ADR states that the sink does not read time, that time is measured by `Curl.Console` through the injected `TimeProvider`, and that `file://` reports "started" but no byte counts.
+- [x] `Documentation/Planning/Decisions/README.md` lists the new ADR if that file keeps an index.
 
 ## Notes
+
+- Written in the session rather than through `align-and-document`: a single new ADR plus an index row, no names or code to align.
+- ADR number: ADR-0045, the next free number on 2026-09-26 (ADR-0009 was taken since filing, and ADR-0044 by BL-178 on another lane during the rebase).
+- Decisions (ADR-0045, decided by Claude under Stewart's delegation): `ITransferProgress` with `ReportTransferStarted()`, `ReportDownloaded(long bytesSoFar, long? expectedTotal)`, `ReportUploaded(long bytesSoFar, long? expectedTotal)`; running totals, not deltas; `ITransferContext.Progress` with no default interface implementation, so a direct implementer must choose; `TransferContext.Progress` defaults to `NoTransferProgress.Instance`.
+- Found: `RedirectFollower.NextHop` copies every context member into a new `TransferContext` by hand, and the default means the compiler will not catch a missing `Progress`. Filed BL-306 (touches `Curl.Core.UnitLibrary`, `Curl.Core.UnitTests`, depends on BL-134) rather than widening BL-134.
+- Added BL-134's task file to `touches` to point its Context at ADR-0045 and correct a stale fact (`FakeTransferContext.cs` no longer exists). No task in Doing names it.
 
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. ADR-0045 decides ITransferProgress on ITransferContext.Progress with NoTransferProgress as the default; BL-306 filed for redirect hops
