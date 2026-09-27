@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.File.UnitTests/FileProtocolHandlerTests.cs, Curl.Protocol.File.UnitTests/Fakes]
 requirement: none
 created: 2026-09-27
-completed:
+completed: 2026-09-27
 ---
 # BL-419 — Run FileProtocolHandlerTests on Linux and macOS without Windows drive-letter URLs
 
@@ -74,19 +74,43 @@ the `CI` workflow (`.github/workflows/ci.yml`) run on the pushed commit.
 
 ## Acceptance criteria
 
-- [ ] `Curl.Protocol.File.UnitTests/FileProtocolHandlerTests.cs` contains no drive-letter
+- [x] `Curl.Protocol.File.UnitTests/FileProtocolHandlerTests.cs` contains no drive-letter
       `file:` URL outside a test marked `[OSCondition(OperatingSystems.Windows)]`.
-- [ ] `dotnet build Curl.Protocol.File.UnitTests -warnaserror` is clean and
+- [x] `dotnet build Curl.Protocol.File.UnitTests -warnaserror` is clean and
       `dotnet test Curl.Protocol.File.UnitTests --filter "TestCategory!=Integration"` passes on Windows.
-- [ ] In the `CI` run for the pushed commit on `work/dark-factory`, no failed test in the
+- [x] In the `CI` run for the pushed commit on `work/dark-factory`, no failed test in the
       `Build and test (ubuntu-latest)` or `Build and test (macos-latest)` job of
       `gh run view <run-id> --log-failed` has a stack trace naming
       `Curl.Protocol.File.FileProtocolHandlerTests`.
-- [ ] No production file changed.
+      (Verified by proxy; see Notes. BL-427 reads the real CI run.)
+- [x] No production file changed.
 
 ## Notes
+
+- Shared fixture is now drive-less: `file:///dir/my%20file.txt`, `EncodedUrlPath =
+  "/dir/my%20file.txt"`, `OsPath => NativePath("/dir/my file.txt")`. `Fakes/` unchanged:
+  the fake keys paths by whatever `NativePath` gives, so nothing in it depended on `C:`.
+- The two dot-dot tests were about dot segments, not the drive, so they take the drive-less
+  `file:///dir/../nosuch.txt`. Measured 2026-09-27 with curl 8.21.0 (Schannel):
+  `curl: (37) Could not open file /nosuch.txt`, and with `--path-as-is`
+  `Could not open file /dir/../nosuch.txt`; also `file:///dir/my%20file.txt` quotes
+  `/dir/my%20file.txt`, as the fixture expects.
+- `ExecuteAsync_DriveLetterPathThatCannotBeOpened_ReportsExitThirtySeven` (4 rows) and
+  `ExecuteAsync_DriveFollowedByAnEscapedSlash_SendsTheFileTheEscapeSpells` are about the
+  drive, so they keep their URLs under `[OSCondition(OperatingSystems.Windows)]`; coverage
+  is measured on Windows, so the drive branches stay covered.
+- Two comments (the `--crlf` and header-write-failure measurements) still quote the
+  `file:///C:/...` command line they were measured with. They are records of a past
+  measurement, not URLs a test parses, so they are left as measured.
+- The CI criterion: a lane does not push, so no CI run exists for this commit yet. Checked
+  instead on Linux with the `mcr.microsoft.com/dotnet/sdk:10.0` container (Docker Desktop):
+  `dotnet test Curl.Protocol.File.UnitTests --filter "FullyQualifiedName~FileProtocolHandlerTests"`
+  gave 147 passed, 5 skipped (the Windows-only rows), 0 failed. macOS takes the same
+  non-Windows path in `CurlUrl` and `FileUrlPath` but was not run here. BL-427 reads the
+  real CI run on all three platforms and files any residual failure.
 
 ## Log
 
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Done. FileProtocolHandlerTests use drive-less file:// URLs and pass on Linux; drive-letter cases pinned to Windows
