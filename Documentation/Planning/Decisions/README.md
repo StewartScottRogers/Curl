@@ -93,6 +93,7 @@ choices do not need one.
 | [0076](ADR-0076-multipart-encoder-file-parts-are-encoded-as-they-are-sent.md) | Multipart `;encoder=` file parts are encoded as they are sent: `base64` and `quoted-printable` files stream through `EncodedReadStream`, a seekable `7bit` file is checked once while building and then streamed, and an unseekable `7bit` file is still read whole | Accepted | 2026-09-27 |
 | [0077](ADR-0077-proxy-headers-reach-the-connect-request-through-httpproxytunneloptions.md) | `--proxy-header` values reach the CONNECT request on `HttpProxyTunnelOptions.ProxyHeaders`, replace the curl CONNECT headers they name and follow them as measured on curl 8.21.0; `-H` values never do | Accepted | 2026-09-27 |
 | [0078](ADR-0078-w-time-on-linux-and-macos-follows-glibc-strftime-in-the-c-locale.md) | `-w %time{…}` on Linux and macOS follows glibc's `strftime` in the C locale after curl's own `%f %s %z %Z %%` rewrite; `WriteOutTemplateRenderer` takes a `WriteOutTimeDialect`, and `Curl.Console` passing it is BL-387 | Accepted | 2026-09-27 |
+| [0079](ADR-0079-resolve-and-connect-to-are-kept-verbatim-by-the-parser-and-checked-at-transfer-time.md) | `--resolve` and `--connect-to` values are kept verbatim, in order, in `CommandLineOptions.ResolveEntries` / `ConnectToEntries`; the parser refuses only a missing value and the `--no-` spellings, and the syntax is checked at transfer time (exit 49), as curl 8.21.0 does | Accepted | 2026-09-27 |
 
 ## Template
 
