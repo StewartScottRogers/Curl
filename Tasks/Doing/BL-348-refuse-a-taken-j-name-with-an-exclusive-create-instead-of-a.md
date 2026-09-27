@@ -67,3 +67,4 @@ A `-J` (`--remote-header-name`) download refuses a name that is already taken th
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
