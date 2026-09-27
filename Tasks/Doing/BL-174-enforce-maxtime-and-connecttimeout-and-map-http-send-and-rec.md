@@ -36,3 +36,4 @@ The HTTP handler ends a transfer at `MaxTime` with curl's exit 28 message and ma
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
