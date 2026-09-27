@@ -29,7 +29,7 @@ public sealed class CurlCompositionHttpTests
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual($"GET /a?b HTTP/1.1\r\n{Head}\r\n", Latin1(server.Written));
         Assert.AreEqual("hello", standardOutput);
-        Assert.AreEqual(new ConnectTarget("127.0.0.1", 18231, false), server.Targets.Single());
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 18231, false) { PoolScheme = "http" }, server.Targets.Single());
     }
 
     [TestMethod]
@@ -42,7 +42,7 @@ public sealed class CurlCompositionHttpTests
             "GET /s HTTP/1.1\r\nHost: localhost:18232\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
             Latin1(server.Written));
         Assert.AreEqual("hello", standardOutput);
-        Assert.AreEqual(new ConnectTarget("localhost", 18232, true), server.Targets.Single());
+        Assert.AreEqual(new ConnectTarget("localhost", 18232, true) { PoolScheme = "https" }, server.Targets.Single());
     }
 
     [TestMethod]

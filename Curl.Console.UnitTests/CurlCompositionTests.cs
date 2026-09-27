@@ -54,24 +54,25 @@ public sealed class CurlCompositionTests
     }
 
     [TestMethod]
-    [DataRow("gophers://h/", 70, true)]
-    [DataRow("mqtts://h/", 8883, true)]
-    [DataRow("gopher://h/", 70, false)]
-    [DataRow("mqtt://h/", 1883, false)]
-    [DataRow("dict://h/d:x", 2628, false)]
-    [DataRow("telnet://h/", 23, false)]
-    [DataRow("http://h/", 80, false)]
-    [DataRow("https://h/", 443, true)]
+    [DataRow("gophers://h/", 70, true, null)]
+    [DataRow("mqtts://h/", 8883, true, null)]
+    [DataRow("gopher://h/", 70, false, null)]
+    [DataRow("mqtt://h/", 1883, false, null)]
+    [DataRow("dict://h/d:x", 2628, false, null)]
+    [DataRow("telnet://h/", 23, false, null)]
+    [DataRow("http://h/", 80, false, "http")]
+    [DataRow("https://h/", 443, true, "https")]
     public async Task CreateRunner_TcpSchemeUrl_ReachesConnectorAtDefaultPortWithSchemesTls(
         string url,
         int port,
-        bool useTls)
+        bool useTls,
+        string? poolScheme)
     {
         RecordingConnector connector = new(CurlExitCode.CouldntConnect, ConnectFailure);
 
         await RunWithFakeConnectorsAsync(url, connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, ConnectFailure));
 
-        Assert.AreEqual(new ConnectTarget("h", port, useTls), connector.Targets.Single());
+        Assert.AreEqual(new ConnectTarget("h", port, useTls) { PoolScheme = poolScheme }, connector.Targets.Single());
     }
 
     [TestMethod]

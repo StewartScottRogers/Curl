@@ -35,6 +35,8 @@ public sealed class CurlCompositionProxyTests
 
     private static readonly ConnectTarget Proxy = new("127.0.0.1", 18238, false);
 
+    private static readonly ConnectTarget ForwardProxy = Proxy with { PoolScheme = "http" };
+
     [TestMethod]
     public async Task RunAsync_HttpUrlWithProxyOption_ForwardsTheRequestInAbsoluteFormToTheProxy()
     {
@@ -44,7 +46,7 @@ public sealed class CurlCompositionProxyTests
 
         Assert.AreEqual(0, run.ExitCode);
         Assert.AreEqual(ForwardedGet, Latin1(server.Written));
-        Assert.AreEqual(Proxy, server.Targets.Single());
+        Assert.AreEqual(ForwardProxy, server.Targets.Single());
         Assert.AreEqual("hello", run.StandardOutput);
     }
 
@@ -82,7 +84,7 @@ public sealed class CurlCompositionProxyTests
 
         Assert.AreEqual(0, run.ExitCode);
         Assert.AreEqual(ForwardedGet, Latin1(server.Written));
-        Assert.AreEqual(Proxy, server.Targets.Single());
+        Assert.AreEqual(ForwardProxy, server.Targets.Single());
     }
 
     [TestMethod]
@@ -96,7 +98,7 @@ public sealed class CurlCompositionProxyTests
         Assert.AreEqual(
             "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18238\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
             Latin1(server.Written));
-        Assert.AreEqual(Proxy, server.Targets.Single());
+        Assert.AreEqual(ForwardProxy, server.Targets.Single());
     }
 
     [TestMethod]
@@ -113,7 +115,7 @@ public sealed class CurlCompositionProxyTests
             "GET http://a.test/ HTTP/1.1\r\nHost: a.test\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\n\r\n"
             + "GET / HTTP/1.1\r\nHost: b.test:18329\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
             Latin1(server.Written));
-        Assert.AreEqual(Proxy, server.Targets[0]);
+        Assert.AreEqual(ForwardProxy, server.Targets[0]);
         Assert.AreEqual(("b.test", 18329, false, (ProxyEndpoint?)null), RouteOf(server.Targets[1]));
     }
 
@@ -128,7 +130,7 @@ public sealed class CurlCompositionProxyTests
         Run run = await RunAsync(server, environment, "-sS", "-L", "http://a.test/");
 
         Assert.AreEqual(0, run.ExitCode);
-        Assert.AreEqual(Proxy, server.Targets[0]);
+        Assert.AreEqual(ForwardProxy, server.Targets[0]);
         Assert.AreEqual(("b.test", 18329, true, (ProxyEndpoint?)null), RouteOf(server.Targets[1]));
         StringAssert.EndsWith(Latin1(server.Written), "GET / HTTP/1.1\r\nHost: b.test:18329\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n");
     }
@@ -266,7 +268,7 @@ public sealed class CurlCompositionProxyTests
 
         Assert.AreEqual(0, run.ExitCode);
         Assert.AreEqual(ForwardedGet, Latin1(server.Written));
-        Assert.AreEqual(new ConnectTarget("127.0.0.1", 18238, true), server.Targets.Single());
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 18238, true) { PoolScheme = "http" }, server.Targets.Single());
     }
 
     [TestMethod]
@@ -375,7 +377,7 @@ public sealed class CurlCompositionProxyTests
 
         await RunAsync(connector, new Dictionary<string, string>(), ["-sS", "-x", "http://proxy:3128", "http://example.com/a"]);
 
-        Assert.AreEqual(new ConnectTarget("proxy", 3128, false), connector.Targets.Single());
+        Assert.AreEqual(new ConnectTarget("proxy", 3128, false) { PoolScheme = "http" }, connector.Targets.Single());
     }
 
     [TestMethod]
@@ -390,7 +392,7 @@ public sealed class CurlCompositionProxyTests
             "GET ftp://example.com/f.txt HTTP/1.1\r\nHost: example.com:21\r\n"
             + "User-Agent: curl/8.21.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\n\r\n",
             Latin1(server.Written));
-        Assert.AreEqual(Proxy, server.Targets.Single());
+        Assert.AreEqual(ForwardProxy, server.Targets.Single());
         Assert.AreEqual("hello", run.StandardOutput);
     }
 
