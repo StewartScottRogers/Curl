@@ -33,3 +33,4 @@ On Windows, `curl -z con` prints `Warning: Failed to get filetime: CreateFile fa
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
