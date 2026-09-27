@@ -28,6 +28,7 @@
     <File Path="hrdrClaudeNative.cmd" />
     <File Path="Measure-CodeQuality.ps1" />
     <File Path="Record-CurlExchange.ps1" />
+    <File Path="Update-PublicSuffixList.ps1" />
     <File Path="RunDarkFactory.ps1" />
     <File Path="RunDarkFactory.cmd" />
     <File Path=".github/gource/make-captions.py" />

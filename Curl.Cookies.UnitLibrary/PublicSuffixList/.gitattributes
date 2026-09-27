@@ -1,0 +1,2 @@
+# Keep the Public Suffix List snapshot byte for byte as upstream publishes it (ADR-0049).
+public_suffix_list.dat -text

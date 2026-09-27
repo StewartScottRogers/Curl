@@ -4,4 +4,10 @@
     <ProjectReference Include="..\Curl.Protocol.Abstractions.UnitLibrary\Curl.Protocol.Abstractions.UnitLibrary.csproj" />
   </ItemGroup>
 
+  <!-- ADR-0049: the dated Public Suffix List snapshot, refreshed by Update-PublicSuffixList.ps1.
+       Manifest name: Curl.Cookies.PublicSuffixList.public_suffix_list.dat -->
+  <ItemGroup>
+    <EmbeddedResource Include="PublicSuffixList\public_suffix_list.dat" LogicalName="Curl.Cookies.PublicSuffixList.public_suffix_list.dat" />
+  </ItemGroup>
+
 </Project>
