@@ -77,3 +77,4 @@ is written down.
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
 - 2026-09-26: Doing -> Backlog. Run ended without finishing (shift stopped). Partial work on branch factory/BL-254-wip, a stash commit: start with git cherry-pick --no-commit -m 1 factory/BL-254-wip. The flaky WithoutClientCertificate_PresentsNone test also failed a lane's integration run tonight.
+- 2026-09-26: Backlog -> Doing.
