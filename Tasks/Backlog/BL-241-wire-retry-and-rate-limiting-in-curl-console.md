@@ -32,6 +32,7 @@ completed:
 - `-Y`/`--speed-limit` and `-y`/`--speed-time` are parsed by BL-196 but no task implements the low-speed abort (exit 28); file one if it is still missing when this runs.
 - Plan item: W12 in the Phase 1 HTTP plan (2026-09-26); plan keys in this file were replaced by their task IDs.
 - From BL-208 (2026-09-26): wrap the transfer in `Curl.Core.TransferRetrier` with a `RetryPolicy` from `--retry`/`--retry-delay`. Its callback gets each retried attempt and the unwrapped warning line. Measured on curl 8.21.0: each failed attempt's `curl: (N) ...` line is printed before its warning; `-s`/`-sS` print no warning; the warning is wrapped at the terminal width like every `Warning:` line (`WarningLineWrapper`); every attempt's body is written to stdout (`--retry 1` on a 503 printed the body twice); and the exit code is the last attempt's (0 for a 503 without `-f`). The `-o` file handling between attempts (curl truncates it) still needs measuring.
+- From BL-317 (2026-09-27): `RetryPolicy` also takes `MaxTime` (`--retry-max-time`) and `RetryAllErrors` (`--retry-all-errors`), and `TransferRetrier.RunAsync` takes a fourth callback, `retriesAbandoned`, with the `Retry-After`-past-max-time warning to print (unless silenced) instead of retrying. `--retry-connrefused` waits on BL-390.
 
 ## Log
 
