@@ -38,7 +38,7 @@ Trace formatters render `--trace` and `--trace-ascii` dumps, with `--trace-time`
   - The stamp prints the injected clock's microseconds. The Windows build's measured stamps all end in `000` because its clock has millisecond resolution, not because curl formats milliseconds; the Linux and macOS builds print real microseconds. A script cannot depend on the digits, so the clock decides them.
   - `ReportTlsData` writes nothing, as `-v` does and as curl's Schannel build never emits `SSL data` dumps (ADR-0046's table).
   - Whether stamps are written is a constructor flag, `writesTimestamps`, beside the clock, so `Curl.Console` (BL-242) passes `TimeProvider.System` either way.
-- Follow-up filed: BL-357, `-v --trace-time` stamps the `-v` lines too (measured, not in this task's scope).
+- Follow-up filed: BL-358, `-v --trace-time` stamps the `-v` lines too (measured, not in this task's scope).
 - Verified: `dotnet build -warnaserror` clean, fast tests green solution-wide (Output 248 passed), `dotnet format --verify-no-changes` clean for both projects, `Measure-CodeQuality.ps1 -Library Curl.Output.UnitLibrary` 100% line, 100% branch, 0 failing members, worst CRAP 10.
 
 ## Log

@@ -1,5 +1,5 @@
 ---
-id: BL-357
+id: BL-358
 title: Stamp -v lines with --trace-time
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-357 — Stamp -v lines with --trace-time
+# BL-358 — Stamp -v lines with --trace-time
 
 ## Goal
 
