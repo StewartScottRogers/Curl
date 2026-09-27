@@ -157,6 +157,15 @@ Each project folder may contain its own `CLAUDE.md` with project-specific rules;
   added — hand-roll the small piece needed, or stop and ask. Test projects use
   MSTest, the framework in the .NET SDK; no third-party test, mocking or assertion
   library is permitted.
+- **Tests pass on Windows, Linux and macOS.** CI runs the fast tests on all three, and
+  a red Linux or macOS job blocks the dark factory's merge to `master`, but lanes only
+  test on Windows - so write every test to be platform-neutral. No drive-letter URL
+  (`file:///C:/...`) or other Windows-only path, error text, certificate or key outside
+  a test marked `[OSCondition(OperatingSystems.Windows)]`; off Windows curl rejects a
+  drive letter in a `file://` URL, so such a test fails there with exit 3. Use a
+  drive-less URL such as `file:///dir/x` unless the drive letter is what the test is
+  about. Where curl's answer differs by platform, pin each platform's answer in its own
+  test (`[OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]` for the other).
 - Nullable reference types enabled, warnings treated as errors.
 - File-scoped namespaces; namespace matches folder path.
 - Central package management through `Directory.Packages.props`; never put a `Version` attribute on a `PackageReference` in a project file.
