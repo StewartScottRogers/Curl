@@ -33,6 +33,17 @@ effective URL, summed header/request/connection counts, timings from the first h
 `RedirectDuration`). Without `-L` it returns the dispatcher's result unchanged. It is not
 yet wired into `Curl.Console`.
 
+`TransferRetrier` runs a transfer again under `--retry` (`RetryPolicy`: `--retry`,
+`--retry-delay`) after curl 8.21.0's transient failures: exit 28, 6, 5 or 12
+(`: timeout`), or an http(s) status 408, 429, 500, 502, 503, 504, 522 or 524 on a
+success or a `-f` exit 22 (`: HTTP error`). It waits a `Retry-After`
+(`RetryAfterHeader`, capped at six hours) when one asks for a wait, else the fixed
+delay, else curl's backoff (1 s doubling to 10 min, advanced only when used), with
+`Task.Delay` on the context's `TimeProvider`, and hands each retried attempt and its
+`TransferRetryWarning` line (`Warning: Problem : HTTP error. Retrying in 1 second. 3
+retries left.`) to the caller, which prints and wraps it and readies the output. It is
+not yet wired into `Curl.Console` (BL-241).
+
 `UrlSchemeGuesser` gives a URL typed without a scheme the one curl 8.21.0 guesses: the
 scheme its host prefix implies (`ftp.`, `dict.`, `ldap.`, `imap.`, `smtp.`, `pop3.`, any
 case), otherwise `http`. It only prepends `<scheme>://`; rejecting a malformed URL is left

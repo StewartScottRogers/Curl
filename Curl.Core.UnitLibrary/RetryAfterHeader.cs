@@ -1,0 +1,63 @@
+using System.Globalization;
+
+namespace Curl.Core;
+
+/// <summary>
+/// Reads an HTTP <c>Retry-After</c> header value the way libcurl 8.21.0's
+/// <c>http_header_r</c> does, into the number of seconds to wait.
+/// </summary>
+/// <remarks>
+/// Leading blanks are skipped. A date (the three HTTP-date forms: RFC 1123, RFC 850 and
+/// asctime) is read first and gives the seconds from now until it, or zero when it has
+/// passed. Anything else is read as the digits it starts with, <c>3abc</c> and <c>2.5</c>
+/// giving 3 and 2; no digits, a sign, or a number too large for a 64-bit integer give
+/// zero. The result is capped at 21600 seconds (six hours). Zero means the header asks for
+/// nothing. Measured with curl 8.21.0 on 2026-09-26; the commands are in BL-208's notes.
+/// </remarks>
+public static class RetryAfterHeader
+{
+    /// <summary>libcurl's undocumented ceiling on a <c>Retry-After</c> wait: six hours, in seconds.</summary>
+    public const long MaxSeconds = 21600;
+
+    private static readonly string[] HttpDateFormats =
+    [
+        "ddd, dd MMM yyyy HH:mm:ss 'GMT'",
+        "dddd, dd-MMM-yy HH:mm:ss 'GMT'",
+        "ddd MMM d HH:mm:ss yyyy",
+    ];
+
+    /// <summary>
+    /// Reads <paramref name="value" /> into whole seconds to wait.
+    /// </summary>
+    /// <param name="value">The header value, as received.</param>
+    /// <param name="now">The current time, from the transfer's <see cref="TimeProvider" />.</param>
+    /// <returns>The seconds to wait, zero to <see cref="MaxSeconds" />; zero when the value asks for no wait.</returns>
+    public static long ParseSeconds(string value, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+
+        string text = value.TrimStart(' ', '\t');
+        long seconds = DateTimeOffset.TryParseExact(
+            text,
+            HttpDateFormats,
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.AllowWhiteSpaces | DateTimeStyles.AssumeUniversal,
+            out DateTimeOffset date)
+            ? Math.Max(0, (long)(date - now).TotalSeconds)
+            : LeadingNumber(text);
+        return Math.Min(seconds, MaxSeconds);
+    }
+
+    private static long LeadingNumber(string text)
+    {
+        int length = 0;
+        while (length < text.Length && char.IsAsciiDigit(text[length]))
+        {
+            length++;
+        }
+
+        return long.TryParse(text.AsSpan(0, length), NumberStyles.None, CultureInfo.InvariantCulture, out long number)
+            ? number
+            : 0;
+    }
+}
