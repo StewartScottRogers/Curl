@@ -1,5 +1,3 @@
-using Microsoft.Win32.SafeHandles;
-
 namespace Curl.Cli;
 
 /// <summary>
@@ -9,7 +7,7 @@ namespace Curl.Cli;
 /// </summary>
 /// <param name="readAllBytes">Reads every byte of a file, throwing as <see cref="File.ReadAllBytes(string)"/> does.</param>
 /// <param name="openStandardInput">Opens standard input for reading.</param>
-/// <param name="readLastWriteTimeUtc">Reads a file's last write time in UTC, throwing as <see cref="File.OpenHandle"/> or <see cref="File.GetAttributes(string)"/> does when the file cannot be found.</param>
+/// <param name="readLastWriteTimeUtc">Reads a file's last write time in UTC, throwing as <see cref="File.GetAttributes(string)"/> does when the file cannot be found, or a <see cref="FileTimeLookupException"/> naming the Windows call that failed.</param>
 /// <param name="reportsWindowsErrors">
 /// Whether a failed modification-time lookup is reported as curl's Windows build reports it
 /// (<c>CreateFile failed: GetLastError 0x0000000N</c>, nothing for file not found); when
@@ -45,7 +43,7 @@ public sealed class DiskDataFileReader(Func<string, byte[]> readAllBytes, Func<S
     /// <param name="isWindows">Whether to behave as curl's Windows build.</param>
     /// <returns>The reader.</returns>
     public static DiskDataFileReader ForPlatform(bool isWindows) =>
-        new(File.ReadAllBytes, Console.OpenStandardInput, isWindows ? ReadLastWriteTimeUtcByOpening : ReadLastWriteTimeUtcByStat, isWindows);
+        new(File.ReadAllBytes, Console.OpenStandardInput, isWindows ? WindowsFileTimeReader.ReadLastWriteTimeUtc : ReadLastWriteTimeUtcByStat, isWindows);
 
     /// <inheritdoc/>
     public bool TryReadFile(string path, out byte[] contents)
@@ -90,9 +88,10 @@ public sealed class DiskDataFileReader(Func<string, byte[]> readAllBytes, Func<S
     }
 
     /// <summary>
-    /// curl's Windows build opens the file with <c>CreateFile</c> and, for any error but
-    /// <c>ERROR_FILE_NOT_FOUND</c>, names the error code, which .NET carries in the exception's
-    /// <see cref="Exception.HResult"/>. An empty or malformed path, which .NET refuses before asking
+    /// curl's Windows build opens the file with <c>CreateFile</c>, reads its time with
+    /// <c>GetFileTime</c> and, for any error but <c>ERROR_FILE_NOT_FOUND</c>, names the call that
+    /// failed (<see cref="FileTimeLookupException.FailedCall"/>, else <c>CreateFile</c>) and the error
+    /// code, which the exception carries in its <see cref="Exception.HResult"/>. An empty or malformed path, which .NET refuses before asking
     /// Windows, and a failure carrying no Windows error code read as <c>ERROR_PATH_NOT_FOUND</c>, as
     /// curl 8.21.0 reports <c>-z ""</c>.
     /// </summary>
@@ -104,8 +103,9 @@ public sealed class DiskDataFileReader(Func<string, byte[]> readAllBytes, Func<S
         int errorCode = exception is not ArgumentException && (exception.HResult & unchecked((int)0xFFFF0000)) == Win32HResultFacility
             ? exception.HResult & 0xFFFF
             : ErrorPathNotFound;
+        string failedCall = exception is FileTimeLookupException lookupFailure ? lookupFailure.FailedCall : "CreateFile";
         return errorCode != ErrorFileNotFound
-            ? $"CreateFile failed: GetLastError 0x{errorCode:x8}"
+            ? $"{failedCall} failed: GetLastError 0x{errorCode:x8}"
             : null;
     }
 
@@ -130,11 +130,6 @@ public sealed class DiskDataFileReader(Func<string, byte[]> readAllBytes, Func<S
         return pathStart < 0 ? message : message[..pathStart];
     }
 
-    private static DateTime ReadLastWriteTimeUtcByOpening(string path)
-    {
-        using SafeFileHandle handle = File.OpenHandle(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-        return File.GetLastWriteTimeUtc(handle);
-    }
 
     /// <summary>
     /// Stands in for <c>stat</c>: <see cref="File.GetAttributes(string)"/> fails as it does, except that

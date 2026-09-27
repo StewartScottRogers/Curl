@@ -1,6 +1,6 @@
 # ADR-0037 — A `-z` value that is not a date is read as a file through `IDataFileReader`
 
-- **Status:** Accepted; its non-Windows behaviour is replaced by [ADR-0071](ADR-0071-a-failed-z-file-lookup-off-windows-stands-in-for-stat-and-prints-its-strerror-text.md)
+- **Status:** Accepted; its non-Windows behaviour is replaced by [ADR-0071](ADR-0071-a-failed-z-file-lookup-off-windows-stands-in-for-stat-and-prints-its-strerror-text.md), and its Windows lookup (`File.OpenHandle`) by [ADR-0088](ADR-0088-the-windows-z-file-lookup-calls-createfile-and-getfiletime-as-curl-does.md)
 - **Date:** 2026-09-26
 
 Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions").

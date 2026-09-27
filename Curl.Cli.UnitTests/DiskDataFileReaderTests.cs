@@ -191,6 +191,82 @@ public sealed class DiskDataFileReaderTests
         Assert.AreEqual("CreateFile failed: GetLastError 0x00000005", failureReason);
     }
 
+    /// <summary>
+    /// curl 8.21.0 (Schannel build) on Windows, 2026-09-26: <c>-z con</c> fails in <c>CreateFile</c>
+    /// and <c>-z nul</c> in <c>GetFileTime</c>, both with 0x00000057.
+    /// </summary>
+    /// <param name="device">The DOS device named after <c>-z</c>.</param>
+    /// <param name="expectedReason">The reason curl reports.</param>
+    [TestMethod]
+    [DataRow("con", "CreateFile failed: GetLastError 0x00000057")]
+    [DataRow("nul", "GetFileTime failed: GetLastError 0x00000057")]
+    public void TryReadModificationTime_ForPlatformWindowsDosDevice_ReportsTheCallThatFailed(string device, string expectedReason)
+    {
+        bool read = DiskDataFileReader.ForPlatform(isWindows: true).TryReadModificationTime(device, out _, out string? failureReason);
+
+        Assert.IsFalse(read);
+        Assert.AreEqual(expectedReason, failureReason);
+    }
+
+    /// <summary>
+    /// curl 8.21.0 on Windows, 2026-09-26 (ADR-0037): <c>-z ""</c>, <c>-z nodir/x</c> and
+    /// <c>-z &lt;file&gt;/x</c> report 0x00000003, <c>-z "x*y"</c> 0x0000007b, and a missing file nothing.
+    /// </summary>
+    /// <param name="relativePath">The value after <c>-z</c>, under a scratch directory unless empty.</param>
+    /// <param name="expectedReason">The reason curl reports, or <see langword="null"/> for none.</param>
+    [TestMethod]
+    [DataRow("", "CreateFile failed: GetLastError 0x00000003")]
+    [DataRow("nodir/x", "CreateFile failed: GetLastError 0x00000003")]
+    [DataRow("file/x", "CreateFile failed: GetLastError 0x00000003")]
+    [DataRow("x*y", "CreateFile failed: GetLastError 0x0000007b")]
+    [DataRow("missing", null)]
+    public void TryReadModificationTime_ForPlatformWindowsUnreadable_ReportsCurlsReason(string relativePath, string? expectedReason)
+    {
+        using ScratchDirectory scratch = new();
+        string path = relativePath.Length == 0 ? relativePath : Path.Combine(scratch.Path, relativePath);
+
+        bool read = DiskDataFileReader.ForPlatform(isWindows: true).TryReadModificationTime(path, out _, out string? failureReason);
+
+        Assert.IsFalse(read);
+        Assert.AreEqual(expectedReason, failureReason);
+    }
+
+    [TestMethod]
+    public void TryReadModificationTime_ForPlatformWindowsFile_IsItsLastWriteTime()
+    {
+        using ScratchDirectory scratch = new();
+        string path = Path.Combine(scratch.Path, "file");
+        DateTimeOffset lastWrite = new(File.GetLastWriteTimeUtc(path), TimeSpan.Zero);
+
+        bool read = DiskDataFileReader.ForPlatform(isWindows: true).TryReadModificationTime(path, out DateTimeOffset modificationTime, out string? failureReason);
+
+        Assert.IsTrue(read);
+        Assert.AreEqual(DateTimeOffset.FromUnixTimeSeconds(lastWrite.ToUnixTimeSeconds()), modificationTime);
+        Assert.IsNull(failureReason);
+    }
+
+    [TestMethod]
+    public void TryReadModificationTime_LookupFailedInANamedCall_NamesThatCall()
+    {
+        DiskDataFileReader reader = new(_ => [], () => Stream.Null, _ => throw new FileTimeLookupException("GetFileTime", 0x57), true);
+
+        bool read = reader.TryReadModificationTime("x", out _, out string? failureReason);
+
+        Assert.IsFalse(read);
+        Assert.AreEqual("GetFileTime failed: GetLastError 0x00000057", failureReason);
+    }
+
+    [TestMethod]
+    public void FileTimeLookupException_Always_CarriesTheCallAndTheWindowsErrorCode()
+    {
+        FileTimeLookupException exception = new("CreateFile", 0x20);
+
+        Assert.AreEqual("CreateFile", exception.FailedCall);
+        Assert.AreEqual(0x20, exception.ErrorCode);
+        Assert.AreEqual(unchecked((int)0x80070020), exception.HResult);
+        Assert.AreEqual("CreateFile failed: GetLastError 0x00000020", exception.Message);
+    }
+
     [TestMethod]
     public void TryReadModificationTime_UnexpectedFailure_IsNotSwallowed()
     {
