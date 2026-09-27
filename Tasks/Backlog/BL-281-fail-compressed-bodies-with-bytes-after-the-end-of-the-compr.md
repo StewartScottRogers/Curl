@@ -35,3 +35,4 @@ With `--compressed`, a gzip, deflate or br body that carries bytes after the end
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-27: Doing -> Backlog. Lanes cleaned up and cut from 6 to 3; the run had only just resumed and left no work.

@@ -35,3 +35,4 @@ completed:
 - 2026-09-26: Created.
 - 2026-09-26: Filed by BL-284.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-27: Doing -> Backlog. Lanes cleaned up and cut from 6 to 3 mid-run; partial work saved on branch factory/BL-303-wip: start with git cherry-pick --no-commit factory/BL-303-wip and carry on from it.
