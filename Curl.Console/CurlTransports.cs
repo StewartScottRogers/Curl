@@ -11,6 +11,8 @@ namespace Curl.Console;
 /// <param name="TcpDialer">Opens the plaintext TCP connections <see cref="TcpConnector" /> dials.</param>
 /// <param name="TlsClientOptions">The settings <see cref="TlsProvider" /> applies to every handshake.</param>
 /// <param name="TlsProvider">Upgrades a TCP connection to TLS with <see cref="System.Net.Security.SslStream" />.</param>
+/// <param name="ProxyTlsClientOptions">The settings <see cref="ProxyTlsProvider" /> applies to the handshake to an HTTPS proxy.</param>
+/// <param name="ProxyTlsProvider">Runs the handshake to an HTTPS proxy with <see cref="System.Net.Security.SslStream" />.</param>
 /// <param name="ProxyTunnelOptions">
 /// The <c>User-Agent</c> and credential encoding of the CONNECT request <see cref="TcpConnector" />
 /// sends to tunnel through an HTTP proxy.
@@ -28,6 +30,8 @@ internal sealed record CurlTransports(
     TcpDialer TcpDialer,
     TlsClientOptions TlsClientOptions,
     SslStreamTlsProvider TlsProvider,
+    TlsClientOptions ProxyTlsClientOptions,
+    SslStreamTlsProvider ProxyTlsProvider,
     HttpProxyTunnelOptions ProxyTunnelOptions,
     TcpConnector TcpConnector,
     UdpDatagramConnector UdpDatagramConnector,

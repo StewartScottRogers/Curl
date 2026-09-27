@@ -53,6 +53,34 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_ThroughAnHttpsProxyWithAProxyTlsProvider_RunsTheProxyHandshakeOnItAndTheTargetsOnTheOther()
+    {
+        // curl -s -S -k -x https://localhost:18462 https://example.com/ against a self-signed proxy -> exit 60,
+        // and --proxy-insecure in place of -k reaches CONNECT (curl 8.21.0, 2026-09-27, BL-362):
+        // the proxy is verified with its own settings, never the target's.
+        var proxyTls = new ScriptedConnection(Encoding.Latin1.GetBytes(EstablishedReply));
+        var targetTls = new FakeConnection { IsSecure = true };
+        var proxyTlsProvider = new SequencedTlsProvider(ConnectResult.Connected(proxyTls));
+        var tlsProvider = new SequencedTlsProvider(ConnectResult.Connected(targetTls));
+        var connector = new TcpConnector(
+            new FakeDnsResolver(ProxyAddress),
+            new FakeTcpDialer { DialOutcome = _ => new ScriptedConnection([]) },
+            tlsProvider,
+            new ManualTimeProvider(),
+            proxyTlsProvider: proxyTlsProvider);
+
+        var result = await connector.ConnectAsync(
+            new ConnectTarget("example.com", 443, UseTls: true) { Proxy = HttpsProxy },
+            CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreSame(targetTls, result.Connection);
+        CollectionAssert.AreEqual(new[] { "localhost" }, proxyTlsProvider.ReceivedTargetHosts);
+        CollectionAssert.AreEqual(new[] { "example.com" }, tlsProvider.ReceivedTargetHosts);
+        CollectionAssert.AreEqual(new IConnection[] { proxyTls }, tlsProvider.ReceivedPlaintexts);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_ThroughAnHttpsProxyToAnHttpTarget_ReturnsTheTunnelWithoutASecondHandshake()
     {
         // curl -s -S -o /dev/null --proxy-insecure -p -x https://localhost:18411 http://example.com/

@@ -84,7 +84,10 @@ internal static class CurlComposition
     /// connectors and the TLS provider share the one resolver and <see cref="TimeProvider.System" />. TLS uses
     /// the <see cref="TlsClientOptions" /> mapped from <paramref name="options" /> by
     /// <see cref="TlsClientOptionsMapping.FromCommandLine" />, one set shared by every URL on
-    /// the command line. The CONNECT request that tunnels through an HTTP proxy carries the
+    /// the command line. The handshake to an HTTPS proxy runs through a second
+    /// <see cref="SslStreamTlsProvider" /> on the same clock, with the <see cref="TlsClientOptions" />
+    /// <see cref="TlsClientOptionsMapping.ProxyFromCommandLine" /> maps from the <c>--proxy-*</c>
+    /// TLS options, so <c>-k</c> and <c>--cacert</c> never reach the proxy. The CONNECT request that tunnels through an HTTP proxy carries the
     /// <see cref="HttpProxyTunnelOptions" /> <see cref="CreateProxyTunnelOptions" /> maps from
     /// <paramref name="options" />, and the TCP connector applies the <c>--resolve</c> and
     /// <c>--connect-to</c> values (<see cref="CreateTcpConnector" />). One
@@ -112,8 +115,10 @@ internal static class CurlComposition
         TcpDialer tcpDialer = new();
         TlsClientOptions tlsClientOptions = TlsClientOptionsMapping.FromCommandLine(options);
         SslStreamTlsProvider tlsProvider = new(tlsClientOptions, timeProvider);
+        TlsClientOptions proxyTlsClientOptions = TlsClientOptionsMapping.ProxyFromCommandLine(options);
+        SslStreamTlsProvider proxyTlsProvider = new(proxyTlsClientOptions, timeProvider);
         HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(options);
-        TcpConnector tcpConnector = CreateTcpConnector(options, dnsResolver, tcpDialer, tlsProvider, timeProvider, proxyTunnelOptions);
+        TcpConnector tcpConnector = CreateTcpConnector(options, dnsResolver, tcpDialer, tlsProvider, timeProvider, proxyTunnelOptions, proxyTlsProvider);
 
         return new CurlTransports(
             dnsResolver,
@@ -121,6 +126,8 @@ internal static class CurlComposition
             tcpDialer,
             tlsClientOptions,
             tlsProvider,
+            proxyTlsClientOptions,
+            proxyTlsProvider,
             proxyTunnelOptions,
             tcpConnector,
             new UdpDatagramConnector(dnsResolver, timeProvider),
@@ -140,6 +147,9 @@ internal static class CurlComposition
     /// <param name="tlsProvider">Upgrades a connection whose target asks for TLS.</param>
     /// <param name="timeProvider">The clock the connector times on.</param>
     /// <param name="proxyTunnelOptions">What the CONNECT request through an HTTP proxy carries.</param>
+    /// <param name="proxyTlsProvider">
+    /// Runs the handshake to an HTTPS proxy; <see langword="null" /> for <paramref name="tlsProvider" />.
+    /// </param>
     /// <returns>The connector.</returns>
     internal static TcpConnector CreateTcpConnector(
         CommandLineOptions options,
@@ -147,7 +157,8 @@ internal static class CurlComposition
         ITcpDialer tcpDialer,
         ITlsProvider tlsProvider,
         TimeProvider timeProvider,
-        HttpProxyTunnelOptions proxyTunnelOptions) =>
+        HttpProxyTunnelOptions proxyTunnelOptions,
+        ITlsProvider? proxyTlsProvider = null) =>
         new(
             dnsResolver,
             tcpDialer,
@@ -155,7 +166,8 @@ internal static class CurlComposition
             timeProvider,
             proxyTunnelOptions,
             ResolveOverrides.Parse(options.ResolveEntries),
-            new ConnectToMappings(options.ConnectToEntries));
+            new ConnectToMappings(options.ConnectToEntries),
+            proxyTlsProvider);
 
     /// <summary>
     /// Maps the command line to what the CONNECT request through an HTTP proxy carries: the
@@ -261,9 +273,11 @@ internal static class CurlComposition
     /// Creates what one run transfers through: the production handler set, every TCP handler
     /// connecting through <paramref name="transports" />' one
     /// <see cref="CurlTransports.PoolingConnector" />, its HTTP handler keeping cookies in
-    /// <paramref name="cookies" />; the TLS provider's <see cref="SslStreamTlsProvider.Warnings" />
-    /// as the lines printed before each transfer, as curl 8.21.0 prints its <c>--capath</c>
-    /// warnings once per URL; <paramref name="cookies" /> for the runner to load and save; a
+    /// <paramref name="cookies" />; the proxy TLS provider's <see cref="SslStreamTlsProvider.Warnings" />
+    /// as the lines printed before each transfer, as curl 8.21.0 prints its one Schannel warning,
+    /// about the proxy's CA path, once per URL for <c>--capath</c>, <c>--proxy-capath</c> or both
+    /// (measured, proxy or not), and the proxy's CA path is <c>--proxy-capath</c> or else
+    /// <c>--capath</c>; <paramref name="cookies" /> for the runner to load and save; a
     /// <see cref="ProxySelector" /> reading the process's proxy environment variables; and the
     /// pooling connector as the connection pool the runner disposes when the run ends (ADR-0050).
     /// </summary>
@@ -273,7 +287,7 @@ internal static class CurlComposition
     internal static TransferDispatch CreateTransferDispatch(CurlTransports transports, CookieEngine? cookies = null) =>
         new(
             new ProtocolDispatcher(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, cookies?.HandlerStore)),
-            transports.TlsProvider.Warnings,
+            transports.ProxyTlsProvider.Warnings,
             cookies,
             new ProxySelector(Environment.GetEnvironmentVariable),
             transports.PoolingConnector);

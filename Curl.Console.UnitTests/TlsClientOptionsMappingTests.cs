@@ -130,10 +130,48 @@ public sealed class TlsClientOptionsMappingTests
     /// <summary>
     /// Parses <paramref name="arguments" /> as if every path exists, then maps the result.
     /// </summary>
-    private static TlsClientOptions Map(params string[] arguments)
+    [TestMethod]
+    public void ProxyFromCommandLine_TargetTlsOptionsOnly_VerifiesTheProxyAgainstTheSystemStore()
+    {
+        // curl -s -S -k -x https://localhost:18462 https://example.com/ and the same with
+        // --cacert <the proxy's certificate> both fail with exit 60 (curl 8.21.0, 2026-09-27, BL-362).
+        Assert.AreEqual(new TlsClientOptions(), MapProxy("-k", "--cacert", "x.pem", "--tlsv1.3", "--ssl-no-revoke", Url));
+    }
+
+    [TestMethod]
+    public void ProxyFromCommandLine_ProxyInsecureAndProxyCacert_SetsInsecureAndCaCertificateFile()
+    {
+        Assert.AreEqual(
+            new TlsClientOptions(Insecure: true, CaCertificateFile: "proxy.pem"),
+            MapProxy("--proxy-insecure", "--proxy-cacert", "proxy.pem", Url));
+    }
+
+    [TestMethod]
+    public void ProxyFromCommandLine_ProxyCapathAndCapath_TakesProxyCapath()
+    {
+        Assert.AreEqual(
+            new TlsClientOptions(CaCertificateDirectory: "proxy-certs"),
+            MapProxy("--capath", "certs", "--proxy-capath", "proxy-certs", Url));
+    }
+
+    [TestMethod]
+    public void ProxyFromCommandLine_CapathWithoutProxyCapath_FallsBackToCapath()
+    {
+        // curl --capath <dir> -x https://localhost:18462 https://example.com/ warns
+        // "ignoring setting the CA path for the proxy" as --proxy-capath does (curl 8.21.0, 2026-09-27).
+        Assert.AreEqual(new TlsClientOptions(CaCertificateDirectory: "certs"), MapProxy("--capath", "certs", Url));
+    }
+
+    private static TlsClientOptions Map(params string[] arguments) =>
+        TlsClientOptionsMapping.FromCommandLine(Parse(arguments));
+
+    private static TlsClientOptions MapProxy(params string[] arguments) =>
+        TlsClientOptionsMapping.ProxyFromCommandLine(Parse(arguments));
+
+    private static CommandLineOptions Parse(string[] arguments)
     {
         CommandLineParseResult parsed = CommandLineParser.Parse(arguments, _ => true);
         Assert.IsTrue(parsed.IsAccepted);
-        return TlsClientOptionsMapping.FromCommandLine(parsed.Options);
+        return parsed.Options;
     }
 }

@@ -6,7 +6,7 @@ namespace Curl.Console;
 
 /// <summary>
 /// Maps the TLS options of a parsed command line onto the <see cref="TlsClientOptions" />
-/// <see cref="SslStreamTlsProvider" /> applies to every handshake.
+/// an <see cref="SslStreamTlsProvider" /> applies: the target's, and an HTTPS proxy's.
 /// </summary>
 internal static class TlsClientOptionsMapping
 {
@@ -47,6 +47,27 @@ internal static class TlsClientOptionsMapping
             options.PrivateKeyType,
             options.Passphrase,
             options.SkipRevocationCheck);
+
+    /// <summary>
+    /// Maps the proxy TLS options of a parsed command line onto the <see cref="TlsClientOptions" />
+    /// the handshake to an HTTPS proxy applies, as curl 8.21.0 keeps them apart from the target's
+    /// (measured, ADR-0061): <c>-k</c> and <c>--cacert</c> never reach the proxy.
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns>
+    /// <see cref="CommandLineOptions.ProxyInsecure" /> as <see cref="TlsClientOptions.Insecure" />,
+    /// <see cref="CommandLineOptions.ProxyCaCertificateFile" /> as
+    /// <see cref="TlsClientOptions.CaCertificateFile" />, and
+    /// <see cref="CommandLineOptions.ProxyCaCertificateDirectory" />, or
+    /// <see cref="CommandLineOptions.CaCertificateDirectory" /> without it, as
+    /// <see cref="TlsClientOptions.CaCertificateDirectory" />, since curl falls back to
+    /// <c>--capath</c> for the proxy; every other setting is its default.
+    /// </returns>
+    internal static TlsClientOptions ProxyFromCommandLine(CommandLineOptions options) =>
+        new(
+            Insecure: options.ProxyInsecure,
+            CaCertificateFile: options.ProxyCaCertificateFile,
+            CaCertificateDirectory: options.ProxyCaCertificateDirectory ?? options.CaCertificateDirectory);
 
     /// <summary>
     /// Maps a minimum TLS version from the command line onto the one the TLS provider applies.

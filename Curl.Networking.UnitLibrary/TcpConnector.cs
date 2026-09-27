@@ -30,6 +30,11 @@ namespace Curl.Networking;
 /// The <c>--connect-to</c> mappings, which change the host and port resolved and dialled
 /// but not the host TLS verifies; <see langword="null" /> for <see cref="ConnectToMappings.None" />.
 /// </param>
+/// <param name="proxyTlsProvider">
+/// Runs the handshake to an HTTPS proxy (<see cref="ProxyKind.Https" />), as curl verifies the
+/// proxy with the <c>--proxy-*</c> TLS options and the target with <c>-k</c> and <c>--cacert</c>;
+/// <see langword="null" /> for <paramref name="tlsProvider" />.
+/// </param>
 public sealed class TcpConnector(
     IDnsResolver dnsResolver,
     ITcpDialer tcpDialer,
@@ -37,8 +42,10 @@ public sealed class TcpConnector(
     TimeProvider timeProvider,
     HttpProxyTunnelOptions? proxyTunnelOptions = null,
     ResolveOverrides? resolveOverrides = null,
-    ConnectToMappings? connectToMappings = null) : IConnector
+    ConnectToMappings? connectToMappings = null,
+    ITlsProvider? proxyTlsProvider = null) : IConnector
 {
+    private readonly ITlsProvider _proxyTlsProvider = proxyTlsProvider ?? tlsProvider;
     private readonly HttpProxyTunnelOptions _proxyTunnelOptions = proxyTunnelOptions ?? HttpProxyTunnelOptions.Default;
     private readonly ResolveOverrides _resolveOverrides = resolveOverrides ?? ResolveOverrides.None;
     private readonly ConnectToMappings _connectToMappings = connectToMappings ?? ConnectToMappings.None;
@@ -72,7 +79,7 @@ public sealed class TcpConnector(
     /// <para>
     /// When <see cref="ConnectTarget.Proxy" /> is an HTTPS proxy (<see cref="ProxyKind.Https" />),
     /// the connector resolves and dials the proxy with the same exit 5 and exit 7 failures,
-    /// runs TLS to it through the <see cref="ITlsProvider" />, verified against the proxy host,
+    /// runs TLS to it through the proxy's <see cref="ITlsProvider" />, verified against the proxy host,
     /// then sends the same CONNECT over that TLS and, when <see cref="ConnectTarget.UseTls" />
     /// is set, runs a second handshake to <see cref="ConnectTarget.Host" /> inside it, as curl
     /// 8.21.0 does. A failed handshake to the proxy or to the target is the provider's result
@@ -221,9 +228,9 @@ public sealed class TcpConnector(
     {
         // curl 8.21.0 verifies the proxy against its own host name and reports a failed
         // handshake to it with the same exit code and message as one to a target (measured).
-        // It verifies with the --proxy-* TLS options, not -k or --cacert; until they are
-        // parsed (BL-362) the transfer's provider runs this handshake too (ADR-0061).
-        var securedProxy = await tlsProvider.AuthenticateAsClientAsync(dialed.Connection, proxy.Host, cancellationToken).ConfigureAwait(false);
+        // It verifies with the --proxy-* TLS options, not -k or --cacert, so the proxy's own
+        // provider runs this handshake (ADR-0061).
+        var securedProxy = await _proxyTlsProvider.AuthenticateAsClientAsync(dialed.Connection, proxy.Host, cancellationToken).ConfigureAwait(false);
         if (securedProxy.Connection is not { } proxyConnection)
         {
             return securedProxy;

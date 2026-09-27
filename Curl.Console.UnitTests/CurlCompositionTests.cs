@@ -253,9 +253,53 @@ public sealed class CurlCompositionTests
         CurlTransports transports = CurlComposition.CreateTransports(NoOptions());
 
         Assert.AreSame(transports.TcpDialer, CapturedDependency<ITcpDialer>(transports.TcpConnector));
-        Assert.AreSame(transports.TlsProvider, CapturedDependency<ITlsProvider>(transports.TcpConnector));
+        Assert.AreSame(transports.TlsProvider, CapturedDependency<ITlsProvider>(transports.TcpConnector, "<tlsProvider>"));
         Assert.AreSame(transports.TlsClientOptions, CapturedDependency<TlsClientOptions>(transports.TlsProvider));
         Assert.IsFalse(transports.TlsClientOptions.Insecure);
+    }
+
+    [TestMethod]
+    public void CreateTransports_InsecureAndCaCertificate_ProxyTlsProviderStillVerifiesAgainstTheSystemStore()
+    {
+        // curl -s -S -k -x https://localhost:18462 https://example.com/ against a self-signed proxy -> exit 60,
+        // and the same with --cacert <the proxy's certificate> (curl 8.21.0, 2026-09-27, BL-362).
+        CommandLineOptions options = Parse("-k", "--cacert", "x.pem", "https://example.com/");
+
+        CurlTransports transports = CurlComposition.CreateTransports(options);
+
+        Assert.AreEqual(new TlsClientOptions(), transports.ProxyTlsClientOptions);
+        Assert.AreSame(transports.ProxyTlsProvider, CapturedDependency<ITlsProvider>(transports.TcpConnector, "_proxyTlsProvider"));
+        Assert.AreSame(transports.ProxyTlsClientOptions, CapturedDependency<TlsClientOptions>(transports.ProxyTlsProvider));
+    }
+
+    [TestMethod]
+    public void CreateTransports_ProxyInsecureAndProxyCacert_TcpConnectorsProxyTlsProviderIsMadeFromThemNotFromTheTargets()
+    {
+        // curl -s -S --proxy-insecure (or --proxy-cacert <the proxy's certificate>) -x https://localhost:18462
+        // https://example.com/ reaches CONNECT: curl: (7) CONNECT tunnel failed, response 407 (curl 8.21.0, 2026-09-27).
+        CommandLineOptions options = Parse(
+            "--cacert", "x.pem", "--proxy-insecure", "--proxy-cacert", "proxy.pem", "--proxy-capath", "proxy-certs", "https://example.com/");
+
+        CurlTransports transports = CurlComposition.CreateTransports(options);
+
+        Assert.AreEqual(
+            new TlsClientOptions(Insecure: true, CaCertificateFile: "proxy.pem", CaCertificateDirectory: "proxy-certs"),
+            transports.ProxyTlsClientOptions);
+        Assert.AreEqual(new TlsClientOptions(CaCertificateFile: "x.pem"), transports.TlsClientOptions);
+        Assert.AreNotSame(transports.TlsProvider, transports.ProxyTlsProvider);
+        Assert.AreSame(transports.ProxyTlsProvider, CapturedDependency<ITlsProvider>(transports.TcpConnector, "_proxyTlsProvider"));
+        Assert.AreSame(transports.TlsProvider, CapturedDependency<ITlsProvider>(transports.TcpConnector, "<tlsProvider>"));
+        Assert.AreSame(transports.ProxyTlsClientOptions, CapturedDependency<TlsClientOptions>(transports.ProxyTlsProvider));
+    }
+
+    [TestMethod]
+    public void CreateTransports_GivenTimeProvider_ProxyTlsProviderTimesOnIt()
+    {
+        TimeProvider timeProvider = new ReplacementTimeProvider();
+
+        CurlTransports transports = CurlComposition.CreateTransports(NoOptions(), timeProvider);
+
+        Assert.AreSame(timeProvider, CapturedDependency<TimeProvider>(transports.ProxyTlsProvider));
     }
 
     [TestMethod]
@@ -287,14 +331,14 @@ public sealed class CurlCompositionTests
     }
 
     [TestMethod]
-    public void CreateTransferDispatch_ProductionTransports_WarnsWithTheTlsProvidersWarnings()
+    public void CreateTransferDispatch_ProductionTransports_WarnsWithTheProxyTlsProvidersWarnings()
     {
         CurlTransports transports = CurlComposition.CreateTransports(NoOptions());
 
         TransferDispatch dispatch = CurlComposition.CreateTransferDispatch(transports);
 
         Assert.IsNotNull(dispatch.Dispatcher);
-        Assert.AreSame(transports.TlsProvider.Warnings, dispatch.WarningLinesBeforeEachTransfer);
+        Assert.AreSame(transports.ProxyTlsProvider.Warnings, dispatch.WarningLinesBeforeEachTransfer);
     }
 
     [TestMethod]
@@ -447,6 +491,21 @@ public sealed class CurlCompositionTests
         FieldInfo field = owner.GetType()
             .GetFields(BindingFlags.Instance | BindingFlags.NonPublic)
             .Single(candidate => candidate.FieldType == typeof(T));
+        return (T)field.GetValue(owner)!;
+    }
+
+    /// <summary>
+    /// Reads the dependency of type <typeparamref name="T" /> that <paramref name="owner" /> holds
+    /// in the private field whose name contains <paramref name="fieldNameFragment" />, for an owner
+    /// that holds more than one of that type: a captured primary-constructor parameter's field is
+    /// named <c>&lt;parameter&gt;P</c>.
+    /// </summary>
+    private static T CapturedDependency<T>(object owner, string fieldNameFragment)
+        where T : class
+    {
+        FieldInfo field = owner.GetType()
+            .GetFields(BindingFlags.Instance | BindingFlags.NonPublic)
+            .Single(candidate => candidate.FieldType == typeof(T) && candidate.Name.Contains(fieldNameFragment, StringComparison.Ordinal));
         return (T)field.GetValue(owner)!;
     }
 
