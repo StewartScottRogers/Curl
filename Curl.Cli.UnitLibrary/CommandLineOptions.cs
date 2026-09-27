@@ -227,8 +227,10 @@ public sealed class CommandLineOptions
     public IReadOnlyList<string> TelnetOptions => telnetOptions;
 
     /// <summary>
-    /// The <c>--tftp-blksize</c> value as given, unclamped; <see langword="null"/> when not given.
-    /// The TFTP handler clamps it to 8-65464.
+    /// The <c>--tftp-blksize</c> value as given, unclamped, except that a value past
+    /// <see cref="int.MaxValue"/> (accepted where a C <c>long</c> is 64 bits) is recorded as
+    /// <see cref="int.MaxValue"/>; <see langword="null"/> when not given. The TFTP handler clamps
+    /// it to 8-65464, so the two mean the same.
     /// </summary>
     public int? TftpBlockSize { get; internal set; }
 
@@ -307,14 +309,18 @@ public sealed class CommandLineOptions
     public long? MaxFileSize { get; internal set; }
 
     /// <summary>
-    /// The <c>--connect-timeout</c> limit, to the millisecond; <see langword="null"/> when not
-    /// given. Zero is recorded as given and means no limit, as it does to curl. The last value wins.
+    /// The <c>--connect-timeout</c> limit, to the millisecond, at most about 29,000 years (see
+    /// <see cref="CommandLineNumber.ParseSeconds"/>); <see langword="null"/> when not given.
+    /// Past about 49.7 days it is longer than a .NET timer accepts, so cap it before waiting on
+    /// it. Zero is recorded as given and means no limit, as it does to curl. The last value wins.
     /// </summary>
     public TimeSpan? ConnectTimeout { get; internal set; }
 
     /// <summary>
-    /// The <c>-m</c> / <c>--max-time</c> limit on the whole transfer, to the millisecond;
-    /// <see langword="null"/> when not given. Zero is recorded as given and means no limit, as it
+    /// The <c>-m</c> / <c>--max-time</c> limit on the whole transfer, to the millisecond, at most
+    /// about 29,000 years (see <see cref="CommandLineNumber.ParseSeconds"/>); <see langword="null"/>
+    /// when not given. Past about 49.7 days it is longer than a .NET timer accepts, so cap it
+    /// before waiting on it. Zero is recorded as given and means no limit, as it
     /// does to curl. The last value wins.
     /// </summary>
     public TimeSpan? MaxTime { get; internal set; }
@@ -408,7 +414,9 @@ public sealed class CommandLineOptions
 
     /// <summary>
     /// The <c>--max-redirs</c> limit on redirects followed: 50 when not given, as in curl 8.21.0,
-    /// and <c>-1</c> for no limit. The last value wins.
+    /// and <c>-1</c> for no limit. A limit past <see cref="int.MaxValue"/> (accepted where a C
+    /// <c>long</c> is 64 bits) is recorded as <see cref="int.MaxValue"/>, which no transfer reaches
+    /// either. The last value wins.
     /// </summary>
     public int MaxRedirects { get; internal set; } = 50;
 

@@ -32,6 +32,7 @@ The HTTP handler ends a transfer at `MaxTime` with curl's exit 28 message and ma
 ## Notes
 
 - Plan item: H6 in the Phase 1 HTTP plan (2026-09-26); plan keys in this file were replaced by their task IDs.
+- From BL-257 (2026-09-26): on Linux and macOS `MaxTime` and `ConnectTimeout` can be up to the longest `TimeSpan` (ADR-0039). .NET timers (`CancellationTokenSource`, `CancelAfter`, `Task.Delay`) refuse more than about 49.7 days (`uint.MaxValue - 1` ms), so never hand either value to a timer uncapped; cap the wait, as `TftpTimeLimits` does with its resend time.
 
 ## Log
 

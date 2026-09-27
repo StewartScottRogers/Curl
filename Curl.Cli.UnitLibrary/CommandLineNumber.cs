@@ -4,8 +4,9 @@ namespace Curl.Cli;
 
 /// <summary>
 /// Reads a numeric option value the way curl 8.21.0 does. A decimal value is an optional
-/// leading <c>-</c>, then one or more ASCII digits and nothing else, fitting in an
-/// <see cref="int"/>; an octal value is one or more digits <c>0</c>-<c>7</c> and nothing
+/// leading <c>-</c>, then one or more ASCII digits and nothing else, no larger than the
+/// C <c>LONG_MAX</c> it is given, which <see cref="CommandLineOptionTable"/> sets to
+/// <see cref="PlatformLongMaximum"/>; an octal value is one or more digits <c>0</c>-<c>7</c> and nothing
 /// else, with no sign at all. Whitespace, a leading <c>+</c>, hexadecimal and fractions are
 /// refused.
 /// </summary>
@@ -26,37 +27,77 @@ namespace Curl.Cli;
 /// <c>--tftp-blksize -1</c> is "expected a positive numerical parameter", and
 /// <c>--tftp-blksize -0</c> is accepted.
 /// </para>
+/// <para>
+/// A C <c>long</c> is 32 bits on Windows and 64 bits on Linux and macOS, so the ceiling of a
+/// <c>long</c>-valued option follows the platform (ADR-0019): measured on 2026-09-26 against the
+/// OpenSSL curl 8.18.0 in WSL (Ubuntu), <c>--tftp-blksize</c> and <c>--max-redirs</c> accept
+/// <c>9223372036854775807</c> and refuse <c>9223372036854775808</c>, and <c>--connect-timeout</c>
+/// and <c>-m</c> accept <c>9223372036854774</c> whole seconds and refuse <c>9223372036854775</c>.
+/// Each reader takes the ceiling as an argument so both platforms' readings can be tested on one
+/// host; <see cref="CommandLineOptionTable"/> passes <see cref="PlatformLongMaximum"/>.
+/// </para>
 /// </remarks>
 public static class CommandLineNumber
 {
     /// <summary>
-    /// The most whole seconds curl 8.21.0 on Windows accepts for <c>--connect-timeout</c> and
-    /// <c>-m</c>: its 32-bit <c>LONG_MAX</c> divided by 1000, less one.
+    /// The largest <see cref="TimeSpan"/> in whole milliseconds; a longer duration is read as
+    /// about <see cref="TimeSpan.MaxValue"/>.
     /// </summary>
-    public const long MaximumWholeSeconds = (int.MaxValue / 1000) - 1;
+    private const long MaximumDurationMilliseconds = long.MaxValue / TimeSpan.TicksPerMillisecond;
+
+    /// <summary>
+    /// Gets the C <c>LONG_MAX</c> of the curl this process stands in for:
+    /// <see cref="LongMaximumFor"/> the operating system it runs on.
+    /// </summary>
+    public static long PlatformLongMaximum { get; } = LongMaximumFor(OperatingSystem.IsWindows());
+
+    /// <summary>
+    /// Gets the most whole seconds the curl this process stands in for accepts for
+    /// <c>--connect-timeout</c> and <c>-m</c>: <see cref="MaximumWholeSecondsFor"/>
+    /// <see cref="PlatformLongMaximum"/>.
+    /// </summary>
+    public static long MaximumWholeSeconds { get; } = MaximumWholeSecondsFor(PlatformLongMaximum);
+
+    /// <summary>
+    /// Gets a C <c>LONG_MAX</c>: 2^31-1 on Windows, where a <c>long</c> is 32 bits, and 2^63-1
+    /// on Linux and macOS, where it is 64 bits.
+    /// </summary>
+    /// <param name="isWindows">Whether the platform is Windows.</param>
+    /// <returns><see cref="int.MaxValue"/> on Windows; otherwise <see cref="long.MaxValue"/>.</returns>
+    public static long LongMaximumFor(bool isWindows) => isWindows ? int.MaxValue : long.MaxValue;
+
+    /// <summary>
+    /// Gets the most whole seconds curl accepts for <c>--connect-timeout</c> and <c>-m</c> where
+    /// a C <c>long</c> holds at most <paramref name="longMaximum"/>: that divided by 1000, less
+    /// one. That is 2147482 on Windows and 9223372036854774 on Linux and macOS.
+    /// </summary>
+    /// <param name="longMaximum">The platform's C <c>LONG_MAX</c>.</param>
+    /// <returns>The most whole seconds accepted.</returns>
+    public static long MaximumWholeSecondsFor(long longMaximum) => (longMaximum / 1000) - 1;
 
     /// <summary>
     /// Reads <paramref name="value"/> as a number that is zero or more. <c>-0</c> reads as zero.
     /// </summary>
     /// <param name="spelledOption">The whole argument as typed, for naming it in a refusal.</param>
     /// <param name="value">The option's value.</param>
+    /// <param name="longMaximum">The platform's C <c>LONG_MAX</c>, the largest number accepted.</param>
     /// <param name="number">The number read; zero when the value is refused.</param>
     /// <returns>
     /// <see langword="null"/> when the value was read; <see cref="CommandLineRefusal.ExpectedProperNumericalParameter"/>
-    /// when it is malformed or too large; <see cref="CommandLineRefusal.ExpectedPositiveNumericalParameter"/>
+    /// when it is malformed or larger than <paramref name="longMaximum"/>; <see cref="CommandLineRefusal.ExpectedPositiveNumericalParameter"/>
     /// when it is negative.
     /// </returns>
     /// <exception cref="ArgumentNullException">
     /// <paramref name="spelledOption"/> or <paramref name="value"/> is <see langword="null"/>.
     /// </exception>
-    public static CommandLineRefusal? ParseNonNegative(string spelledOption, string value, out int number)
+    public static CommandLineRefusal? ParseNonNegative(string spelledOption, string value, long longMaximum, out long number)
     {
         ArgumentNullException.ThrowIfNull(spelledOption);
         ArgumentNullException.ThrowIfNull(value);
 
         number = 0;
         bool negative = value.StartsWith('-');
-        if (!TryReadDigits(value.AsSpan(negative ? 1 : 0), out int magnitude))
+        if (!TryReadDigits(value.AsSpan(negative ? 1 : 0), longMaximum, out long magnitude))
         {
             return CommandLineRefusal.ExpectedProperNumericalParameter(spelledOption);
         }
@@ -73,10 +114,11 @@ public static class CommandLineNumber
     /// <summary>
     /// Reads <paramref name="value"/> as a whole number of at least <c>-1</c>, as curl 8.21.0 reads
     /// <c>--max-redirs</c>, where <c>-1</c> means no limit: an optional <c>-</c> then decimal digits,
-    /// at most <see cref="int.MaxValue"/>. <c>-0</c> reads as zero and <c>-01</c> as <c>-1</c>.
+    /// at most <paramref name="longMaximum"/>. <c>-0</c> reads as zero and <c>-01</c> as <c>-1</c>.
     /// </summary>
     /// <param name="spelledOption">The whole argument as typed, for naming it in a refusal.</param>
     /// <param name="value">The option's value.</param>
+    /// <param name="longMaximum">The platform's C <c>LONG_MAX</c>, the largest number accepted.</param>
     /// <param name="number">The number read; zero when the value is refused.</param>
     /// <returns>
     /// <see langword="null"/> when the value was read; otherwise
@@ -86,14 +128,14 @@ public static class CommandLineNumber
     /// <exception cref="ArgumentNullException">
     /// <paramref name="spelledOption"/> or <paramref name="value"/> is <see langword="null"/>.
     /// </exception>
-    public static CommandLineRefusal? ParseMinusOneOrMore(string spelledOption, string value, out int number)
+    public static CommandLineRefusal? ParseMinusOneOrMore(string spelledOption, string value, long longMaximum, out long number)
     {
         ArgumentNullException.ThrowIfNull(spelledOption);
         ArgumentNullException.ThrowIfNull(value);
 
         number = 0;
         bool negative = value.StartsWith('-');
-        if (!TryReadDigits(value.AsSpan(negative ? 1 : 0), out int magnitude) || (negative && magnitude > 1))
+        if (!TryReadDigits(value.AsSpan(negative ? 1 : 0), longMaximum, out long magnitude) || (negative && magnitude > 1))
         {
             return CommandLineRefusal.ExpectedProperNumericalParameter(spelledOption);
         }
@@ -244,31 +286,37 @@ public static class CommandLineNumber
     /// Measured against the local curl 8.21.0 (Windows, where a C <c>long</c> is 32 bits) on
     /// 2026-09-26, through the milliseconds <c>--libcurl</c> writes: <c>3.14</c> is 3140,
     /// <c>1.123456789012</c> is 1123 and <c>0.0001</c> is 0. At most
-    /// <see cref="MaximumWholeSeconds"/> whole seconds are accepted. A fraction of more than ten
-    /// digits, or one larger than <c>21474836</c>, drops its last digits until it is neither,
-    /// before the milliseconds are taken from it.
+    /// <see cref="MaximumWholeSecondsFor"/> <paramref name="longMaximum"/> whole seconds are
+    /// accepted. A fraction of more than ten digits, or one larger than <c>21474836</c>, drops its
+    /// last digits until it is neither, before the milliseconds are taken from it; where a
+    /// <c>long</c> is 64 bits curl drops them only past ten digits, which leaves the same
+    /// milliseconds, so the one rule serves both (WSL curl 8.18.0: <c>1.12345678901234</c> is
+    /// 1123). A duration longer than a <see cref="TimeSpan"/> holds, possible only where a
+    /// <c>long</c> is 64 bits, is read as the longest whole milliseconds one holds, about 29,000
+    /// years.
     /// </remarks>
     /// <param name="spelledOption">The whole argument as typed, for naming it in a refusal.</param>
     /// <param name="value">The option's value.</param>
+    /// <param name="longMaximum">The platform's C <c>LONG_MAX</c>, from which the most whole seconds follow.</param>
     /// <param name="duration">The duration read; zero when the value is refused.</param>
     /// <returns>
     /// <see langword="null"/> when the value was read;
     /// <see cref="CommandLineRefusal.ExpectedProperNumericalParameter"/> when it does not start with
     /// a digit (so a sign, a space or a leading <c>.</c>) or its whole seconds are more than
-    /// <see cref="MaximumWholeSeconds"/>; <see cref="CommandLineRefusal.TooLargeNumber"/> when a
+    /// <see cref="MaximumWholeSecondsFor"/> <paramref name="longMaximum"/>; <see cref="CommandLineRefusal.TooLargeNumber"/> when a
     /// <c>.</c> is not followed by digits that fit in a <see cref="long"/>.
     /// </returns>
     /// <exception cref="ArgumentNullException">
     /// <paramref name="spelledOption"/> or <paramref name="value"/> is <see langword="null"/>.
     /// </exception>
-    public static CommandLineRefusal? ParseSeconds(string spelledOption, string value, out TimeSpan duration)
+    public static CommandLineRefusal? ParseSeconds(string spelledOption, string value, long longMaximum, out TimeSpan duration)
     {
         ArgumentNullException.ThrowIfNull(spelledOption);
         ArgumentNullException.ThrowIfNull(value);
 
         duration = TimeSpan.Zero;
         ReadOnlySpan<char> rest = value;
-        if (TryReadLeadingDigits(ref rest, out long wholeSeconds) != LeadingDigits.Read || wholeSeconds > MaximumWholeSeconds)
+        if (TryReadLeadingDigits(ref rest, out long wholeSeconds) != LeadingDigits.Read || wholeSeconds > MaximumWholeSecondsFor(longMaximum))
         {
             return CommandLineRefusal.ExpectedProperNumericalParameter(spelledOption);
         }
@@ -286,7 +334,8 @@ public static class CommandLineNumber
             milliseconds = FractionInMilliseconds(fractionDigits, lengthBefore - rest.Length);
         }
 
-        duration = TimeSpan.FromMilliseconds((wholeSeconds * 1000) + milliseconds);
+        // At most 9223372036854774 whole seconds and 999 milliseconds, so the sum fits in a long.
+        duration = TimeSpan.FromMilliseconds(Math.Min((wholeSeconds * 1000) + milliseconds, MaximumDurationMilliseconds));
         return null;
     }
 
@@ -388,25 +437,17 @@ public static class CommandLineNumber
         return true;
     }
 
-    private static bool TryReadDigits(ReadOnlySpan<char> digits, out int magnitude)
+    private static bool TryReadDigits(ReadOnlySpan<char> digits, long longMaximum, out long magnitude)
     {
-        magnitude = 0;
-        if (digits.IsEmpty || digits.ContainsAnyExceptInRange('0', '9'))
+        if (digits.IsEmpty
+            || digits.ContainsAnyExceptInRange('0', '9')
+            || !long.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture, out magnitude)
+            || magnitude > longMaximum)
         {
+            magnitude = 0;
             return false;
         }
 
-        long total = 0;
-        foreach (char digit in digits)
-        {
-            total = (total * 10) + (digit - '0');
-            if (total > int.MaxValue)
-            {
-                return false;
-            }
-        }
-
-        magnitude = (int)total;
         return true;
     }
 

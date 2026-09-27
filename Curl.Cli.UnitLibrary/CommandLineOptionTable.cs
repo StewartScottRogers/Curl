@@ -433,10 +433,11 @@ public static class CommandLineOptionTable
 
     private static CommandLineRefusal? SetTftpBlockSize(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
     {
-        CommandLineRefusal? refusal = CommandLineNumber.ParseNonNegative(spelledOption, value, out int blockSize);
+        CommandLineRefusal? refusal = CommandLineNumber.ParseNonNegative(spelledOption, value, CommandLineNumber.PlatformLongMaximum, out long blockSize);
         if (refusal is null)
         {
-            options.TftpBlockSize = blockSize;
+            // TFTP clamps the block size to 65464, so any size past int.MaxValue means the same.
+            options.TftpBlockSize = (int)Math.Min(blockSize, int.MaxValue);
         }
 
         return refusal;
@@ -563,7 +564,7 @@ public static class CommandLineOptionTable
 
     private static CommandLineRefusal? SetConnectTimeout(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
     {
-        CommandLineRefusal? refusal = CommandLineNumber.ParseSeconds(spelledOption, value, out TimeSpan duration);
+        CommandLineRefusal? refusal = CommandLineNumber.ParseSeconds(spelledOption, value, CommandLineNumber.PlatformLongMaximum, out TimeSpan duration);
         if (refusal is null)
         {
             options.ConnectTimeout = duration;
@@ -574,7 +575,7 @@ public static class CommandLineOptionTable
 
     private static CommandLineRefusal? SetMaxTime(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
     {
-        CommandLineRefusal? refusal = CommandLineNumber.ParseSeconds(spelledOption, value, out TimeSpan duration);
+        CommandLineRefusal? refusal = CommandLineNumber.ParseSeconds(spelledOption, value, CommandLineNumber.PlatformLongMaximum, out TimeSpan duration);
         if (refusal is null)
         {
             options.MaxTime = duration;
@@ -648,10 +649,11 @@ public static class CommandLineOptionTable
 
     private static CommandLineRefusal? SetMaxRedirects(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
     {
-        CommandLineRefusal? refusal = CommandLineNumber.ParseMinusOneOrMore(spelledOption, value, out int limit);
+        CommandLineRefusal? refusal = CommandLineNumber.ParseMinusOneOrMore(spelledOption, value, CommandLineNumber.PlatformLongMaximum, out long limit);
         if (refusal is null)
         {
-            options.MaxRedirects = limit;
+            // No transfer follows int.MaxValue redirects, so any limit past it means the same.
+            options.MaxRedirects = (int)Math.Min(limit, int.MaxValue);
         }
 
         return refusal;

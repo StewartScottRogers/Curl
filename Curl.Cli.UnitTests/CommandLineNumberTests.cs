@@ -4,7 +4,8 @@ namespace Curl.Cli;
 
 /// <summary>
 /// Pins how a numeric option value is read: an optional leading minus, then one or more
-/// ASCII digits and nothing else, fitting in an <see cref="int"/>. Anything malformed is
+/// ASCII digits and nothing else, no larger than the platform's C <c>LONG_MAX</c>: 2^31-1 on
+/// Windows, 2^63-1 on Linux and macOS (ADR-0019), each reading tested here by passing its ceiling. Anything malformed is
 /// refused as "expected a proper numerical parameter", a negative value as "expected a
 /// positive numerical parameter", both naming the option as it was spelled and leaving
 /// the number at zero. An octal value is unsigned digits 0-7 up to a maximum: past the
@@ -20,10 +21,14 @@ public sealed class CommandLineNumberTests
 
     private const int Octal777 = 0b111_111_111;
 
+    private static readonly long WindowsLongMaximum = CommandLineNumber.LongMaximumFor(isWindows: true);
+
+    private static readonly long UnixLongMaximum = CommandLineNumber.LongMaximumFor(isWindows: false);
+
     [TestMethod]
     public void ParseNonNegative_Abc_RefusesAsNotProperNumerical()
     {
-        CommandLineRefusal? refusal = CommandLineNumber.ParseNonNegative(BlockSizeOption, "abc", out int number);
+        CommandLineRefusal? refusal = CommandLineNumber.ParseNonNegative(BlockSizeOption, "abc", WindowsLongMaximum, out long number);
 
         Assert.IsNotNull(refusal);
         Assert.AreEqual(CurlExitCode.FailedInit, refusal.ExitCode);
@@ -47,7 +52,7 @@ public sealed class CommandLineNumberTests
     [DataRow("５")]
     public void ParseNonNegative_Malformed_RefusesAsNotProperNumerical(string value)
     {
-        CommandLineRefusal? refusal = CommandLineNumber.ParseNonNegative(BlockSizeOption, value, out int number);
+        CommandLineRefusal? refusal = CommandLineNumber.ParseNonNegative(BlockSizeOption, value, WindowsLongMaximum, out long number);
 
         Assert.IsNotNull(refusal);
         Assert.AreEqual(CurlExitCode.FailedInit, refusal.ExitCode);
@@ -62,7 +67,7 @@ public sealed class CommandLineNumberTests
     [DataRow("-5")]
     public void ParseNonNegative_Negative_RefusesAsNotPositiveNumerical(string value)
     {
-        CommandLineRefusal? refusal = CommandLineNumber.ParseNonNegative(BlockSizeOption, value, out int number);
+        CommandLineRefusal? refusal = CommandLineNumber.ParseNonNegative(BlockSizeOption, value, WindowsLongMaximum, out long number);
 
         Assert.IsNotNull(refusal);
         Assert.AreEqual(CurlExitCode.FailedInit, refusal.ExitCode);
@@ -77,18 +82,108 @@ public sealed class CommandLineNumberTests
     [DataRow("007", 7)]
     [DataRow("-0", 0)]
     [DataRow("2147483647", int.MaxValue)]
-    public void ParseNonNegative_Valid_ReturnsNumber(string value, int expected)
+    public void ParseNonNegative_Valid_ReturnsNumber(string value, long expected)
     {
-        CommandLineRefusal? refusal = CommandLineNumber.ParseNonNegative(BlockSizeOption, value, out int number);
+        CommandLineRefusal? refusal = CommandLineNumber.ParseNonNegative(BlockSizeOption, value, WindowsLongMaximum, out long number);
 
         Assert.IsNull(refusal);
         Assert.AreEqual(expected, number);
     }
 
     [TestMethod]
+    public void ParseNonNegative_TwoToThe31UnderWindowsCeiling_RefusesAsNotProperNumerical()
+    {
+        CommandLineRefusal? refusal = CommandLineNumber.ParseNonNegative(BlockSizeOption, "2147483648", WindowsLongMaximum, out long number);
+
+        Assert.IsNotNull(refusal);
+        CollectionAssert.AreEqual(
+            new[] { "curl: option --tftp-blksize: expected a proper numerical parameter", CommandLineRefusal.TryHelpLine },
+            refusal.StandardErrorLines.ToArray());
+        Assert.AreEqual(0L, number);
+    }
+
+    [TestMethod]
+    [DataRow("2147483648", 2147483648L)]
+    [DataRow("9223372036854775807", long.MaxValue)]
+    public void ParseNonNegative_PastIntUnderUnixCeiling_ReturnsNumber(string value, long expected)
+    {
+        CommandLineRefusal? refusal = CommandLineNumber.ParseNonNegative(BlockSizeOption, value, UnixLongMaximum, out long number);
+
+        Assert.IsNull(refusal);
+        Assert.AreEqual(expected, number);
+    }
+
+    [TestMethod]
+    [DataRow("9223372036854775808")]
+    [DataRow("99999999999999999999")]
+    public void ParseNonNegative_PastLongUnderUnixCeiling_RefusesAsNotProperNumerical(string value)
+    {
+        CommandLineRefusal? refusal = CommandLineNumber.ParseNonNegative(BlockSizeOption, value, UnixLongMaximum, out long number);
+
+        Assert.IsNotNull(refusal);
+        CollectionAssert.AreEqual(
+            new[] { "curl: option --tftp-blksize: expected a proper numerical parameter", CommandLineRefusal.TryHelpLine },
+            refusal.StandardErrorLines.ToArray());
+        Assert.AreEqual(0L, number);
+    }
+
+    [TestMethod]
+    [DataRow("2147483648", 2147483648L)]
+    [DataRow("9223372036854775807", long.MaxValue)]
+    [DataRow("-1", -1L)]
+    public void ParseMinusOneOrMore_UnderUnixCeiling_ReturnsNumber(string value, long expected)
+    {
+        CommandLineRefusal? refusal = CommandLineNumber.ParseMinusOneOrMore("--max-redirs", value, UnixLongMaximum, out long number);
+
+        Assert.IsNull(refusal);
+        Assert.AreEqual(expected, number);
+    }
+
+    [TestMethod]
+    [DataRow("9223372036854775808")]
+    [DataRow("-9223372036854775808")]
+    public void ParseMinusOneOrMore_PastLongUnderUnixCeiling_RefusesAsNotProperNumerical(string value)
+    {
+        CommandLineRefusal? refusal = CommandLineNumber.ParseMinusOneOrMore("--max-redirs", value, UnixLongMaximum, out long number);
+
+        Assert.IsNotNull(refusal);
+        CollectionAssert.AreEqual(
+            new[] { "curl: option --max-redirs: expected a proper numerical parameter", CommandLineRefusal.TryHelpLine },
+            refusal.StandardErrorLines.ToArray());
+        Assert.AreEqual(0L, number);
+    }
+
+    [TestMethod]
+    public void ParseMinusOneOrMore_TwoToThe31UnderWindowsCeiling_RefusesAsNotProperNumerical()
+    {
+        CommandLineRefusal? refusal = CommandLineNumber.ParseMinusOneOrMore("--max-redirs", "2147483648", WindowsLongMaximum, out long number);
+
+        Assert.IsNotNull(refusal);
+        Assert.AreEqual(0L, number);
+    }
+
+    [TestMethod]
+    public void LongMaximumFor_Windows_IsTwoToThe31MinusOne()
+    {
+        Assert.AreEqual(2147483647L, CommandLineNumber.LongMaximumFor(isWindows: true));
+    }
+
+    [TestMethod]
+    public void LongMaximumFor_LinuxAndMacOS_IsTwoToThe63MinusOne()
+    {
+        Assert.AreEqual(9223372036854775807L, CommandLineNumber.LongMaximumFor(isWindows: false));
+    }
+
+    [TestMethod]
+    public void PlatformLongMaximum_IsTheCeilingOfThisOperatingSystem()
+    {
+        Assert.AreEqual(CommandLineNumber.LongMaximumFor(OperatingSystem.IsWindows()), CommandLineNumber.PlatformLongMaximum);
+    }
+
+    [TestMethod]
     public void ParseNonNegative_SpelledWithEquals_NamesWholeArgument()
     {
-        CommandLineRefusal? refusal = CommandLineNumber.ParseNonNegative("--tftp-blksize=abc", "abc", out int number);
+        CommandLineRefusal? refusal = CommandLineNumber.ParseNonNegative("--tftp-blksize=abc", "abc", WindowsLongMaximum, out long number);
 
         Assert.IsNotNull(refusal);
         CollectionAssert.AreEqual(
@@ -101,7 +196,7 @@ public sealed class CommandLineNumberTests
     public void ParseNonNegative_NullSpelledOption_ThrowsArgumentNull()
     {
         ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(
-            () => CommandLineNumber.ParseNonNegative(null!, "5", out _));
+            () => CommandLineNumber.ParseNonNegative(null!, "5", WindowsLongMaximum, out _));
 
         Assert.AreEqual("spelledOption", exception.ParamName);
     }
@@ -110,7 +205,7 @@ public sealed class CommandLineNumberTests
     public void ParseNonNegative_NullValue_ThrowsArgumentNull()
     {
         ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(
-            () => CommandLineNumber.ParseNonNegative(BlockSizeOption, null!, out _));
+            () => CommandLineNumber.ParseNonNegative(BlockSizeOption, null!, WindowsLongMaximum, out _));
 
         Assert.AreEqual("value", exception.ParamName);
     }
@@ -119,7 +214,7 @@ public sealed class CommandLineNumberTests
     public void ParseMinusOneOrMore_NullSpelledOption_ThrowsArgumentNull()
     {
         ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(
-            () => CommandLineNumber.ParseMinusOneOrMore(null!, "5", out _));
+            () => CommandLineNumber.ParseMinusOneOrMore(null!, "5", WindowsLongMaximum, out _));
 
         Assert.AreEqual("spelledOption", exception.ParamName);
     }
@@ -128,7 +223,7 @@ public sealed class CommandLineNumberTests
     public void ParseMinusOneOrMore_NullValue_ThrowsArgumentNull()
     {
         ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(
-            () => CommandLineNumber.ParseMinusOneOrMore("--max-redirs", null!, out _));
+            () => CommandLineNumber.ParseMinusOneOrMore("--max-redirs", null!, WindowsLongMaximum, out _));
 
         Assert.AreEqual("value", exception.ParamName);
     }
@@ -136,7 +231,7 @@ public sealed class CommandLineNumberTests
     [TestMethod]
     public void ParseMinusOneOrMore_Refused_LeavesNumberZero()
     {
-        CommandLineRefusal? refusal = CommandLineNumber.ParseMinusOneOrMore("--max-redirs", "-2", out int number);
+        CommandLineRefusal? refusal = CommandLineNumber.ParseMinusOneOrMore("--max-redirs", "-2", WindowsLongMaximum, out long number);
 
         Assert.IsNotNull(refusal);
         Assert.AreEqual(0, number);

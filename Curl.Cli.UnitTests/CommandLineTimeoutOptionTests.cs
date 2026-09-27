@@ -20,6 +20,10 @@ public sealed class CommandLineTimeoutOptionTests
 
     private const string TooLarge = "too large number";
 
+    private static readonly long WindowsLongMaximum = CommandLineNumber.LongMaximumFor(isWindows: true);
+
+    private static readonly long UnixLongMaximum = CommandLineNumber.LongMaximumFor(isWindows: false);
+
     [TestMethod]
     public void Parse_NeitherOption_LeavesBothNotGiven()
     {
@@ -88,13 +92,11 @@ public sealed class CommandLineTimeoutOptionTests
     [DataRow("--connect-timeout", "abc", ProperNumber)]
     [DataRow("--connect-timeout", "-1", ProperNumber)]
     [DataRow("--connect-timeout", "99999999999999999999", ProperNumber)]
-    [DataRow("--connect-timeout", "2147483", ProperNumber)]
     [DataRow("--connect-timeout", "", ProperNumber)]
     [DataRow("--connect-timeout", "1.", TooLarge)]
     [DataRow("-m", "abc", ProperNumber)]
     [DataRow("-m", "-1", ProperNumber)]
     [DataRow("-m", "99999999999999999999", ProperNumber)]
-    [DataRow("-m", "2147483", ProperNumber)]
     [DataRow("-m", "", ProperNumber)]
     [DataRow("-m", "1.", TooLarge)]
     [DataRow("--max-time", "abc", ProperNumber)]
@@ -107,6 +109,99 @@ public sealed class CommandLineTimeoutOptionTests
         CollectionAssert.AreEqual(
             new[] { $"curl: option {spelling}: {reason}", TryHelp },
             result.Refusal.StandardErrorLines.ToArray());
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    [DataRow("--connect-timeout")]
+    [DataRow("-m")]
+    public void Parse_OnWindows_MoreThanMaximumWholeSeconds_IsRefused(string spelling)
+    {
+        CommandLineParseResult result = CommandLineParser.Parse([spelling, "2147483", Url]);
+
+        Assert.IsFalse(result.IsAccepted);
+        CollectionAssert.AreEqual(
+            new[] { $"curl: option {spelling}: {ProperNumber}", TryHelp },
+            result.Refusal.StandardErrorLines.ToArray());
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public void Parse_OnLinuxOrMacOS_SecondsPastTheWindowsMaximum_AreRecorded()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--connect-timeout", "2147483", "-m", "9223372036854774", Url]);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual(TimeSpan.FromSeconds(2147483), result.Options.ConnectTimeout);
+        Assert.AreEqual(TimeSpan.FromMilliseconds(long.MaxValue / TimeSpan.TicksPerMillisecond), result.Options.MaxTime);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public void Parse_OnLinuxOrMacOS_MoreThanMaximumWholeSeconds_IsRefused()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["-m", "9223372036854775", Url]);
+
+        Assert.IsFalse(result.IsAccepted);
+        CollectionAssert.AreEqual(
+            new[] { $"curl: option -m: {ProperNumber}", TryHelp },
+            result.Refusal.StandardErrorLines.ToArray());
+    }
+
+    [TestMethod]
+    public void MaximumWholeSecondsFor_WindowsCeiling_Is2147482()
+    {
+        Assert.AreEqual(2147482L, CommandLineNumber.MaximumWholeSecondsFor(WindowsLongMaximum));
+    }
+
+    [TestMethod]
+    public void MaximumWholeSecondsFor_LinuxAndMacOSCeiling_Is9223372036854774()
+    {
+        Assert.AreEqual(9223372036854774L, CommandLineNumber.MaximumWholeSecondsFor(UnixLongMaximum));
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public void MaximumWholeSeconds_OnWindows_IsTheWindowsValue()
+    {
+        Assert.AreEqual(2147482L, CommandLineNumber.MaximumWholeSeconds);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public void MaximumWholeSeconds_OnLinuxOrMacOS_IsThe64BitValue()
+    {
+        Assert.AreEqual(9223372036854774L, CommandLineNumber.MaximumWholeSeconds);
+    }
+
+    [TestMethod]
+    [DataRow("2147483", 2147483000L)]
+    [DataRow("922337203685.476", 922337203685476L)]
+    public void ParseSeconds_UnderUnixCeiling_KeepsWholeMilliseconds(string value, long expectedMilliseconds)
+    {
+        Assert.IsNull(CommandLineNumber.ParseSeconds("-m", value, UnixLongMaximum, out TimeSpan duration));
+        Assert.AreEqual(TimeSpan.FromMilliseconds(expectedMilliseconds), duration);
+    }
+
+    [TestMethod]
+    [DataRow("922337203686")]
+    [DataRow("9223372036854774.999")]
+    public void ParseSeconds_UnderUnixCeilingLongerThanATimeSpan_IsTheLongestTimeSpan(string value)
+    {
+        Assert.IsNull(CommandLineNumber.ParseSeconds("-m", value, UnixLongMaximum, out TimeSpan duration));
+        Assert.AreEqual(TimeSpan.FromMilliseconds(long.MaxValue / TimeSpan.TicksPerMillisecond), duration);
+    }
+
+    [TestMethod]
+    [DataRow("9223372036854775")]
+    [DataRow("9223372036854775807")]
+    public void ParseSeconds_UnderUnixCeilingMoreThanMaximumWholeSeconds_IsRefused(string value)
+    {
+        CommandLineRefusal? refusal = CommandLineNumber.ParseSeconds("-m", value, UnixLongMaximum, out TimeSpan duration);
+
+        Assert.IsNotNull(refusal);
+        CollectionAssert.AreEqual(new[] { $"curl: option -m: {ProperNumber}", TryHelp }, refusal.StandardErrorLines.ToArray());
+        Assert.AreEqual(TimeSpan.Zero, duration);
     }
 
     [TestMethod]
@@ -142,7 +237,7 @@ public sealed class CommandLineTimeoutOptionTests
     [DataRow("2147482.999", 2147482999L)]
     public void ParseSeconds_ReadableValue_KeepsWholeMilliseconds(string value, long expectedMilliseconds)
     {
-        Assert.IsNull(CommandLineNumber.ParseSeconds("-m", value, out TimeSpan duration));
+        Assert.IsNull(CommandLineNumber.ParseSeconds("-m", value, WindowsLongMaximum, out TimeSpan duration));
         Assert.AreEqual(TimeSpan.FromMilliseconds(expectedMilliseconds), duration);
     }
 
@@ -158,7 +253,7 @@ public sealed class CommandLineTimeoutOptionTests
     [DataRow("1.9999999999999999999", TooLarge)]
     public void ParseSeconds_UnreadableValue_IsRefusedWithZero(string value, string reason)
     {
-        CommandLineRefusal? refusal = CommandLineNumber.ParseSeconds("--connect-timeout", value, out TimeSpan duration);
+        CommandLineRefusal? refusal = CommandLineNumber.ParseSeconds("--connect-timeout", value, WindowsLongMaximum, out TimeSpan duration);
 
         Assert.IsNotNull(refusal);
         CollectionAssert.AreEqual(
@@ -172,9 +267,9 @@ public sealed class CommandLineTimeoutOptionTests
     {
         Assert.AreEqual(
             "spelledOption",
-            Assert.ThrowsExactly<ArgumentNullException>(() => CommandLineNumber.ParseSeconds(null!, "1", out _)).ParamName);
+            Assert.ThrowsExactly<ArgumentNullException>(() => CommandLineNumber.ParseSeconds(null!, "1", WindowsLongMaximum, out _)).ParamName);
         Assert.AreEqual(
             "value",
-            Assert.ThrowsExactly<ArgumentNullException>(() => CommandLineNumber.ParseSeconds("-m", null!, out _)).ParamName);
+            Assert.ThrowsExactly<ArgumentNullException>(() => CommandLineNumber.ParseSeconds("-m", null!, WindowsLongMaximum, out _)).ParamName);
     }
 }
