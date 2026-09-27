@@ -109,6 +109,14 @@ namespace Curl.Protocol.Http;
 /// curl 8.21.0 (BL-183 Notes).
 /// </para>
 /// <para>
+/// An <c>ftp</c> URL is served the same way when forwarded through such a proxy, as libcurl
+/// hands <c>ftp</c> to its HTTP code when not tunnelling (ADR-0056, rule 3): a GET for the
+/// absolute <c>ftp://</c> URI with the port always on <c>Host</c> (<c>Host: example.com:21</c>),
+/// and the proxy's reply is the response. <c>ftp</c> is not among
+/// <see cref="SupportedSchemes" />: <c>Curl.Console</c> routes an <c>ftp</c> URL here only
+/// when it is forwarded (BL-344). Measured on curl 8.21.0 (BL-330 Notes).
+/// </para>
+/// <para>
 /// <see cref="ITransferContext.MaxTime" /> limits the whole transfer, authentication retry
 /// included, and <see cref="ITransferContext.ConnectTimeout" /> (300 seconds when not given)
 /// each connect (<see cref="HttpTransferDeadline" />). A limit that passes during a connect
@@ -203,7 +211,7 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Gives the proxy the request is forwarded through in absolute form: an HTTP-kind proxy,
-    /// for an <c>http</c> URL, without <c>-p</c>. Every other proxy is tunnelled through by
+    /// for an <c>http</c> or <c>ftp</c> URL, without <c>-p</c>. Every other proxy is tunnelled through by
     /// the connector, and <see langword="null" /> is returned for it.
     /// </summary>
     private static ProxyEndpoint? ForwardProxyOf(CurlUrl url, HttpRequestOptions options) =>

@@ -174,7 +174,7 @@ internal static class HttpRequestHeadFormatter
     /// Formats the <c>Host</c> line: the first <c>-H</c> value naming <c>Host</c> with its
     /// name written <c>Host:</c>, or none when that value is exactly <c>Host:</c>, or else
     /// the URL's host as written, bracketed if IPv6, with its port unless it is the
-    /// scheme's default.
+    /// default of an <c>http</c> or <c>https</c> URL (<see cref="HttpUrlText.HostHeaderAuthority" />).
     /// </summary>
     private static string? FormatHostLine(CurlUrl url, HttpCustomHeader[] customHeaders)
     {
@@ -186,7 +186,7 @@ internal static class HttpRequestHeadFormatter
             }
         }
 
-        return $"Host: {HttpUrlText.HostAndPort(url)}";
+        return $"Host: {HttpUrlText.HostHeaderAuthority(url)}";
     }
 
     /// <summary>

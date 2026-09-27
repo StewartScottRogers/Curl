@@ -51,6 +51,16 @@ internal static class HttpUrlText
         url.IsDefaultPort ? url.Host : string.Create(CultureInfo.InvariantCulture, $"{url.Host}:{url.Port}");
 
     /// <summary>
+    /// Gives the host and port the <c>Host</c> line carries: <see cref="HostAndPort" /> for
+    /// <c>http</c> and <c>https</c>, and the host with its port always for any other scheme,
+    /// which reaches this handler only when forwarded through an HTTP proxy. curl 8.21.0 was
+    /// measured sending <c>Host: example.com:21</c> for <c>ftp://example.com/f.txt</c>
+    /// (BL-330 Notes).
+    /// </summary>
+    internal static string HostHeaderAuthority(CurlUrl url) =>
+        url.Scheme is "http" or "https" ? HostAndPort(url) : string.Create(CultureInfo.InvariantCulture, $"{url.Host}:{url.Port}");
+
+    /// <summary>
     /// Gives the scheme, <c>://</c>, the user information with its <c>@</c> when the URL has
     /// one, and <see cref="HostAndPort" />: the part a relative redirect keeps.
     /// </summary>

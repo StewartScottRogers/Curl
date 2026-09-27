@@ -42,4 +42,15 @@ public sealed class HttpUrlTextTests
     {
         Assert.AreEqual(expected, HttpUrlText.Origin(CurlUrl.Parse(url)));
     }
+
+    [TestMethod]
+    [DataRow("http://h/", "h", DisplayName = "http default port dropped")]
+    [DataRow("https://h:443/", "h", DisplayName = "https default port dropped")]
+    [DataRow("http://h:8080/", "h:8080", DisplayName = "http other port kept")]
+    [DataRow("ftp://example.com/f.txt", "example.com:21", DisplayName = "ftp default port kept")]
+    [DataRow("ftp://[::1]:2121/", "[::1]:2121", DisplayName = "ftp IPv6 bracketed")]
+    public void HostHeaderAuthority_GivesTheHostAndPortTheHostLineCarries(string url, string expected)
+    {
+        Assert.AreEqual(expected, HttpUrlText.HostHeaderAuthority(CurlUrl.Parse(url)));
+    }
 }

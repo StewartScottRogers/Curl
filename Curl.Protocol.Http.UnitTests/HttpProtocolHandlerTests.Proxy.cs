@@ -51,6 +51,33 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     /// <summary>
+    /// Measured: <c>curl -sS -x http://127.0.0.1:18332 ftp://example.com/f.txt</c> forwards the
+    /// <c>ftp</c> URL to the proxy as an HTTP GET with <c>:21</c> on <c>Host</c>, and the proxy's
+    /// <c>200</c> body <c>hello</c> is the output, exit 0 (BL-330 Notes, ADR-0056).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_FtpThroughProxy_ForwardsAGetAndWritesTheProxysBody()
+    {
+        const string expected = "GET ftp://example.com/f.txt HTTP/1.1\r\nHost: example.com:21\r\nUser-Agent: curl/8.21.0\r\n"
+            + "Accept: */*\r\nProxy-Connection: Keep-Alive\r\n\r\n";
+        ProxyEndpoint proxy = new(ProxyKind.Http, "127.0.0.1", 18332, null);
+        foreach (int chunkSize in ChunkSizes)
+        {
+            TurnTakingConnection connection = new(chunkSize, "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello");
+            QueueConnector connector = QueueConnector.For(connection);
+            MemoryStream output = new();
+
+            TransferResult result = await new HttpProtocolHandler(connector, new OriginAndProxyAuthenticator(null, null, null))
+                .ExecuteAsync(ProxyContext("ftp://example.com/f.txt", output, new HttpRequestOptions { ForwardProxy = proxy }));
+
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Assert.AreEqual(expected, connection.Written, $"Chunk size {chunkSize}");
+            Assert.AreEqual("hello", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
+            Assert.AreEqual(new ConnectTarget("127.0.0.1", 18332, false), connector.Targets.Single(), $"Chunk size {chunkSize}");
+        }
+    }
+
+    /// <summary>
     /// Measured: <c>curl -x http://127.0.0.1:18296 --proxy-header "X-P: 1" -H "X-A: 1"
     /// http://example.com/</c> sends the <c>--proxy-header</c> value after the <c>-H</c> value
     /// (BL-296 Notes).
