@@ -359,10 +359,18 @@ public sealed class CommandLineOptions
     public string? UserAgent { get; internal set; }
 
     /// <summary>
-    /// The <c>-e</c> / <c>--referer</c> value, verbatim, empty included, and <c>;auto</c> kept as given;
-    /// <see langword="null"/> when not given. The last value wins.
+    /// The <c>-e</c> / <c>--referer</c> value, verbatim, empty included, with a trailing <c>;auto</c>
+    /// removed; <see langword="null"/> when not given, or when the value was <c>;auto</c> alone. The
+    /// last value wins.
     /// </summary>
     public string? Referer { get; internal set; }
+
+    /// <summary>
+    /// Whether the last <c>-e</c> / <c>--referer</c> value ended in <c>;auto</c>: when on, a followed
+    /// redirect sends the previous URL as <c>Referer</c>, per curl 8.21.0. A later value without the
+    /// suffix turns it off again.
+    /// </summary>
+    public bool AutoReferer { get; internal set; }
 
     /// <summary>
     /// Every <c>-b</c> / <c>--cookie</c> value, cookie strings and cookie file names alike, in

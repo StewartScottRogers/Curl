@@ -115,7 +115,7 @@ public static class CommandLineOptionTable
         CommandLineOption.Text("request", 'X', (options, method) => options.RequestMethod = method),
         CommandLineOption.Value("header", 'H', AddHeaders),
         CommandLineOption.Value("user-agent", 'A', AcceptingEmpty((options, userAgent) => options.UserAgent = userAgent)),
-        CommandLineOption.Value("referer", 'e', AcceptingEmpty((options, referer) => options.Referer = referer)),
+        CommandLineOption.Value("referer", 'e', AcceptingEmpty(SetReferer)),
         CommandLineOption.Value("cookie", 'b', AcceptingEmpty((options, cookie) => options.AddCookie(cookie))),
         CommandLineOption.Text("cookie-jar", 'c', (options, file) => options.CookieJar = file),
         CommandLineOption.NegatableFlag("junk-session-cookies", 'j', (options, on) => options.JunkSessionCookies = on),
@@ -186,6 +186,26 @@ public static class CommandLineOptionTable
             set(options, value);
             return null;
         };
+
+    /// <summary>
+    /// Sets the <c>-e</c> / <c>--referer</c> value as curl 8.21.0 does: a value ending in <c>;auto</c>
+    /// turns <see cref="CommandLineOptions.AutoReferer"/> on and leaves the text before the suffix as the
+    /// referer, or none when that text is empty; any other value, empty included, is kept verbatim and
+    /// turns the autoreferer off.
+    /// </summary>
+    private static void SetReferer(CommandLineOptions options, string value)
+    {
+        const string AutoRefererSuffix = ";auto";
+        options.AutoReferer = value.EndsWith(AutoRefererSuffix, StringComparison.Ordinal);
+        if (!options.AutoReferer)
+        {
+            options.Referer = value;
+            return;
+        }
+
+        string referer = value[..^AutoRefererSuffix.Length];
+        options.Referer = referer.Length == 0 ? null : referer;
+    }
 
     /// <summary>
     /// Appends a <c>-d</c> / <c>--data</c> or <c>--data-ascii</c> value to the body: the value's own text, empty included, or,
