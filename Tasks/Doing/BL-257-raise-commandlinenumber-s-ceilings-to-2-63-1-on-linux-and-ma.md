@@ -55,3 +55,4 @@ from curl 8.21.0's `src/tool_paramhlp.c` if no Linux curl is reachable; record w
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
