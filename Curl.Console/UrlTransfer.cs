@@ -10,7 +10,7 @@ namespace Curl.Console;
 /// </summary>
 /// <remarks>
 /// Every URL a glob expands to shares its command-line URL's <c>-o</c> or remote-name entry,
-/// its <c>-T</c> file and its <c>%{urlnum}</c>, while each takes the next <c>%{xfer_id}</c>, as
+/// its <c>-T</c> argument and its <c>%{urlnum}</c>, while each takes the next <c>%{xfer_id}</c>, as
 /// curl 8.21.0 does: <c>-o 'o#1' file:///{a,b}.txt file:///a.txt -o last</c> printed urlnum
 /// <c>0 0 1</c>, xfer_id <c>0 1 2</c> and wrote <c>oa</c>, <c>ob</c> and <c>last</c> (measured
 /// 2026-09-27, BL-240 Notes).
@@ -30,16 +30,26 @@ internal sealed class UrlTransfer
     /// <param name="urlIndex">The position of the command-line URL the glob came from.</param>
     /// <param name="transferId">The run-wide zero-based number of this transfer.</param>
     /// <param name="match">The URL the glob expanded to, with its glob values.</param>
+    /// <param name="uploadFile">
+    /// The <c>-T</c> file this transfer uploads, one match of the <c>-T</c> glob; <see langword="null" /> for no upload.
+    /// </param>
     /// <param name="sanitizesForWindows">
     /// Whether the <c>-o</c> name is sanitized as curl's Windows build does, after each
     /// <c>#N</c> is substituted (<see cref="UrlGlobMatch.ResolveOutputFileName" />).
     /// </param>
-    internal UrlTransfer(CommandLineOptions options, int urlIndex, long transferId, UrlGlobMatch match, bool sanitizesForWindows)
+    internal UrlTransfer(
+        CommandLineOptions options,
+        int urlIndex,
+        long transferId,
+        UrlGlobMatch match,
+        string? uploadFile,
+        bool sanitizesForWindows)
     {
         UrlOutput? output = urlIndex < options.UrlOutputs.Count ? options.UrlOutputs[urlIndex] : null;
         UrlIndex = urlIndex;
         TransferId = transferId;
         Url = match.Url;
+        UploadFile = uploadFile;
         OutputFileName = output?.FileName is { } fileName and not StandardOutputFileName
             ? match.ResolveOutputFileName(fileName, sanitizesForWindows)
             : null;
@@ -54,6 +64,12 @@ internal sealed class UrlTransfer
 
     /// <summary>Gets the URL as the glob expanded it, before any scheme is guessed or IPFS gateway applied.</summary>
     internal string Url { get; }
+
+    /// <summary>
+    /// Gets the <c>-T</c> file this transfer uploads, one match of its command-line URL's <c>-T</c> glob;
+    /// <see langword="null" /> for no upload.
+    /// </summary>
+    internal string? UploadFile { get; }
 
     /// <summary>
     /// Gets the <c>-o</c> file name with each <c>#N</c> substituted and, on Windows, sanitized;

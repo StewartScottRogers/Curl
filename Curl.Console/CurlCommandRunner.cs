@@ -537,7 +537,8 @@ internal sealed class CurlCommandRunner(
         CurlExitCode exitCode = CurlExitCode.Ok;
         for (int index = 0; index < options.Urls.Count; index++)
         {
-            if (!TryParseGlob(options, index, out UrlGlob? glob, out TransferResult? globFailure))
+            if (!TryParseUploadFiles(options, index, out IReadOnlyList<string?>? uploadFiles, out TransferResult? globFailure)
+                || !TryParseGlob(options, index, out UrlGlob? glob, out globFailure))
             {
                 await WriteGlobFailureLinesAsync(options, globFailure).ConfigureAwait(false);
                 return globFailure.ExitCode;
@@ -550,19 +551,90 @@ internal sealed class CurlCommandRunner(
                     .ConfigureAwait(false);
             }
 
-            foreach (UrlGlobMatch match in glob.Expand())
+            (exitCode, bool runEnded) = await TransferEachMatchAsync(dispatch, options, index, uploadFiles, glob, exitCode)
+                .ConfigureAwait(false);
+            if (runEnded)
             {
-                UrlTransfer transfer = new(options, index, nextTransferId++, match, runsOnWindows);
-                TransferResult result = await TransferAndReportAsync(dispatch, options, transfer).ConfigureAwait(false);
-                exitCode = result.ExitCode;
-                if (EndsTheRun(options, result))
-                {
-                    return exitCode;
-                }
+                return exitCode;
             }
         }
 
         return exitCode;
+    }
+
+    /// <summary>
+    /// Transfers the command-line URL at <paramref name="index" /> once for every pair of an upload
+    /// file and a URL its glob expands to, the upload files the outer loop, as curl 8.21.0 does:
+    /// <c>-T '{local.txt,sub/in.txt}' 'http://h/{x,y}/'</c> sent x/local.txt, y/local.txt, x/in.txt
+    /// and then y/in.txt (measured 2026-09-27, BL-031 Notes).
+    /// </summary>
+    /// <param name="dispatch">What the run transfers through.</param>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="index">The URL's position on the command line.</param>
+    /// <param name="uploadFiles">The upload files, or one <see langword="null" /> for no upload.</param>
+    /// <param name="glob">The URL's glob.</param>
+    /// <param name="exitCode">The exit code so far, returned when nothing is transferred.</param>
+    /// <returns>The last transfer's exit code, and whether a transfer <see cref="EndsTheRun" /> names ended the run.</returns>
+    private async Task<(CurlExitCode ExitCode, bool RunEnded)> TransferEachMatchAsync(
+        TransferDispatch dispatch,
+        CommandLineOptions options,
+        int index,
+        IReadOnlyList<string?> uploadFiles,
+        UrlGlob glob,
+        CurlExitCode exitCode)
+    {
+        foreach (string? uploadFile in uploadFiles)
+        {
+            foreach (UrlGlobMatch match in glob.Expand())
+            {
+                UrlTransfer transfer = new(options, index, nextTransferId++, match, uploadFile, runsOnWindows);
+                TransferResult result = await TransferAndReportAsync(dispatch, options, transfer).ConfigureAwait(false);
+                exitCode = result.ExitCode;
+                if (EndsTheRun(options, result))
+                {
+                    return (exitCode, true);
+                }
+            }
+        }
+
+        return (exitCode, false);
+    }
+
+    /// <summary>
+    /// Expands the <c>-T</c> value paired with the URL at <paramref name="index" /> with
+    /// <see cref="UploadFileGlob" />: one upload file per match, or under <c>-g</c> / <c>--globoff</c>
+    /// the value as written. curl 8.21.0 reads it before the URL, and a malformed one is exit 3 with
+    /// the glob's message about the <c>-T</c> text (measured 2026-09-27, BL-031 Notes).
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="index">The URL's position on the command line.</param>
+    /// <param name="uploadFiles">
+    /// The upload files in curl's order, or one <see langword="null" /> when the URL has no upload;
+    /// <see langword="null" /> when the <c>-T</c> value is not a well-formed glob.
+    /// </param>
+    /// <param name="failure">The exit 3 failure with curl's message; <see langword="null" /> on success.</param>
+    /// <returns><see langword="true" /> when <paramref name="uploadFiles" /> was produced.</returns>
+    private static bool TryParseUploadFiles(
+        CommandLineOptions options,
+        int index,
+        [NotNullWhen(true)] out IReadOnlyList<string?>? uploadFiles,
+        [NotNullWhen(false)] out TransferResult? failure)
+    {
+        if (UploadFileOf(options, index) is not { } uploadFile)
+        {
+            uploadFiles = [null];
+            failure = null;
+            return true;
+        }
+
+        if (!UploadFileGlob.TryParse(uploadFile, options.GlobOff, out UploadFileGlob? glob, out failure))
+        {
+            uploadFiles = null;
+            return false;
+        }
+
+        uploadFiles = [.. glob.ExpandUploadFiles()];
+        return true;
     }
 
     /// <summary>
@@ -670,7 +742,7 @@ internal sealed class CurlCommandRunner(
             return (await ReportIpfsGatewayFailureAsync(options, transfer, ipfsFailure).ConfigureAwait(false), givenUrl, string.Empty);
         }
 
-        string? uploadFile = UploadFileOf(options, transfer.UrlIndex);
+        string? uploadFile = transfer.UploadFile;
         string transferUrl = UrlSchemeGuesser.AddGuessedScheme(givenUrl);
         if (uploadFile is not null && !UploadTransferUrl.TryResolve(transferUrl, uploadFile, out transferUrl))
         {

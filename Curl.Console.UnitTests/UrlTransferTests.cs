@@ -15,7 +15,7 @@ public sealed class UrlTransferTests
     [TestMethod]
     public void Constructor_OutputNameWithHash_SubstitutesTheGlobValue()
     {
-        UrlTransfer transfer = new(Parse("-o", "o#1", "http://h/{a,b}"), 0, 1, SecondMatch("http://h/{a,b}"), sanitizesForWindows: false);
+        UrlTransfer transfer = new(Parse("-o", "o#1", "http://h/{a,b}"), 0, 1, SecondMatch("http://h/{a,b}"), uploadFile: null, sanitizesForWindows: false);
 
         Assert.AreEqual("http://h/b", transfer.Url);
         Assert.AreEqual(0, transfer.UrlIndex);
@@ -28,7 +28,7 @@ public sealed class UrlTransferTests
     [TestMethod]
     public void Constructor_OutputNameOnWindows_IsSanitizedAfterSubstitution()
     {
-        UrlTransfer transfer = new(Parse("-o", "#1?", "http://h/{a,b}"), 0, 0, SecondMatch("http://h/{a,b}"), sanitizesForWindows: true);
+        UrlTransfer transfer = new(Parse("-o", "#1?", "http://h/{a,b}"), 0, 0, SecondMatch("http://h/{a,b}"), uploadFile: null, sanitizesForWindows: true);
 
         Assert.AreEqual("b_", transfer.OutputFileName);
     }
@@ -36,7 +36,7 @@ public sealed class UrlTransferTests
     [TestMethod]
     public void Constructor_RemoteName_WritesToFileWithoutAnOutputName()
     {
-        UrlTransfer transfer = new(Parse("-O", "http://h/{a,b}"), 0, 0, SecondMatch("http://h/{a,b}"), sanitizesForWindows: false);
+        UrlTransfer transfer = new(Parse("-O", "http://h/{a,b}"), 0, 0, SecondMatch("http://h/{a,b}"), uploadFile: null, sanitizesForWindows: false);
 
         Assert.IsNull(transfer.OutputFileName);
         Assert.IsTrue(transfer.UsesRemoteName);
@@ -46,7 +46,7 @@ public sealed class UrlTransferTests
     [TestMethod]
     public void Constructor_UrlWithoutOutputEntry_WritesToStandardOutput()
     {
-        UrlTransfer transfer = new(Parse("-o", "first", "http://h/x", "http://h/{a,b}"), 1, 2, SecondMatch("http://h/{a,b}"), sanitizesForWindows: false);
+        UrlTransfer transfer = new(Parse("-o", "first", "http://h/x", "http://h/{a,b}"), 1, 2, SecondMatch("http://h/{a,b}"), uploadFile: null, sanitizesForWindows: false);
 
         Assert.AreEqual(1, transfer.UrlIndex);
         Assert.IsNull(transfer.OutputFileName);
@@ -57,7 +57,7 @@ public sealed class UrlTransferTests
     [TestMethod]
     public void Constructor_OutputNameDash_WritesToStandardOutput()
     {
-        UrlTransfer transfer = new(Parse("--output-dir", "d", "-o", "-", "http://h/{a,b}"), 0, 0, SecondMatch("http://h/{a,b}"), sanitizesForWindows: true);
+        UrlTransfer transfer = new(Parse("--output-dir", "d", "-o", "-", "http://h/{a,b}"), 0, 0, SecondMatch("http://h/{a,b}"), uploadFile: null, sanitizesForWindows: true);
 
         Assert.IsNull(transfer.OutputFileName);
         Assert.IsFalse(transfer.WritesToFile);

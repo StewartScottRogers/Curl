@@ -33,6 +33,7 @@ public sealed class CurlCommandRunnerUploadTests
         files.ExistingContent["a"] = Encoding.ASCII.GetBytes("A");
         files.ExistingContent["b"] = Encoding.ASCII.GetBytes("B");
         files.ExistingContent["local.txt"] = Encoding.ASCII.GetBytes("local");
+        files.ExistingContent["sub/in.txt"] = Encoding.ASCII.GetBytes("in");
         files.UnreadablePaths.Add("nosuchfile");
     }
 
@@ -184,6 +185,57 @@ public sealed class CurlCommandRunnerUploadTests
         await RunAsync("-T", "a", "-D", "headers", "http://h/1/");
 
         CollectionAssert.AreEqual(Encoding.ASCII.GetBytes("A"), dispatched.Single().Upload);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_UploadGlob_UploadsEachMatchToItsOwnUrlInOrder()
+    {
+        int exitCode = await RunAsync("-T", "{local.txt,sub/in.txt}", "http://h/g/");
+
+        Assert.AreEqual(0, exitCode);
+        Assert.HasCount(2, dispatched);
+        Assert.AreEqual("http://h/g/local.txt", dispatched[0].Url);
+        CollectionAssert.AreEqual(Encoding.ASCII.GetBytes("local"), dispatched[0].Upload);
+        Assert.AreEqual("http://h/g/in.txt", dispatched[1].Url);
+        CollectionAssert.AreEqual(Encoding.ASCII.GetBytes("in"), dispatched[1].Upload);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_UploadGlobWithUrlGlob_TakesTheUploadFilesAsTheOuterLoop()
+    {
+        await RunAsync("-T", "{local.txt,sub/in.txt}", "http://h/{x,y}/");
+
+        CollectionAssert.AreEqual(
+            new[] { "http://h/x/local.txt", "http://h/y/local.txt", "http://h/x/in.txt", "http://h/y/in.txt" },
+            dispatched.Select(transfer => transfer.Url).ToArray());
+    }
+
+    [TestMethod]
+    public async Task RunAsync_MalformedUploadGlob_Exits3WithTheGlobMessageAboutTheUploadText()
+    {
+        int exitCode = await RunAsync("-T", "f[3-1].txt", "http://h/g/");
+
+        Assert.AreEqual((int)CurlExitCode.UrlMalformat, exitCode);
+        Assert.IsEmpty(dispatched);
+        Assert.IsEmpty(files.ReadPaths);
+        Assert.AreEqual(
+            "curl: (3) bad range in position 7:" + NewLine + "f[3-1].txt" + NewLine + "      ^" + NewLine,
+            Encoding.UTF8.GetString(standardError.ToArray()));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_GlobOffUploadGlob_TriesTheOneLiteralFile()
+    {
+        files.UnreadablePaths.Add("{local.txt,sub/in.txt}");
+
+        int exitCode = await RunAsync("-g", "-T", "{local.txt,sub/in.txt}", "http://h/g/");
+
+        Assert.AreEqual((int)CurlExitCode.ReadError, exitCode);
+        Assert.IsEmpty(dispatched);
+        CollectionAssert.AreEqual(new[] { "{local.txt,sub/in.txt}" }, files.ReadPaths.ToArray());
+        StringAssert.StartsWith(
+            Encoding.UTF8.GetString(standardError.ToArray()),
+            "curl: cannot open '{local.txt,sub/in.txt}'" + NewLine);
     }
 
     private RecordingProtocolHandler CreateHandler() =>
