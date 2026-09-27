@@ -36,3 +36,4 @@ An Accepted ADR decides how a handler hands back a reusable `IConnection` and wh
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-27: Backlog -> Doing.
