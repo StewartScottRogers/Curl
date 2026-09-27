@@ -1,5 +1,5 @@
 ---
-id: BL-308
+id: BL-315
 title: Send TE: gzip for --tr-encoding and decode a gzip Transfer-Encoding in the HTTP handler
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-308 — Send TE: gzip for --tr-encoding and decode a gzip Transfer-Encoding in the HTTP handler
+# BL-315 — Send TE: gzip for --tr-encoding and decode a gzip Transfer-Encoding in the HTTP handler
 
 ## Goal
 

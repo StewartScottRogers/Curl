@@ -24,14 +24,14 @@ The handler's request line, headers and body handling match curl 8.21.0 for `Ver
 
 ## Acceptance criteria
 
-- [x] For each of the four options the request bytes and the output are measured on curl 8.21.0 and pinned in a test. (`--tr-encoding`: measured and recorded below; implementing and pinning it moved to BL-308 - see Notes.)
+- [x] For each of the four options the request bytes and the output are measured on curl 8.21.0 and pinned in a test. (`--tr-encoding`: measured and recorded below; implementing and pinning it moved to BL-315 - see Notes.)
 - [x] `Raw` writes chunked and encoded bodies undecoded; `IgnoreContentLength` reads to close.
 - [x] `dotnet build Curl.Protocol.Http.UnitLibrary -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes and no new test needs `TestCategory=Integration`; `Measure-CodeQuality.ps1` reports 100% line and branch coverage and no failing member for `Curl.Protocol.Http`. Tests use the fakes in `Curl.Protocol.Http.UnitTests/Fakes` (added by BL-169), never a socket; every parser test also runs with 1-byte chunks.
 
 ## Notes
 
 - Plan item: H12 in the Phase 1 HTTP plan (2026-09-26); plan keys in this file were replaced by their task IDs.
-- **Scope split (decided by Claude, unattended run).** `HttpRequestOptions` already carries `Version`, `Raw` and `IgnoreContentLength`, but has no member for `--tr-encoding`, so the handler cannot see it. Adding one means editing `Curl.Protocol.Abstractions.UnitLibrary`, which BL-293 (in Doing) touches. Rather than park all four options behind BL-293, this task delivers the three that need nothing outside its `touches` and files BL-308 (depends on BL-180, touches Abstractions and Http) for `--tr-encoding`, with the measured request bytes in its Context. BL-236 now also depends on BL-308.
+- **Scope split (decided by Claude, unattended run).** `HttpRequestOptions` already carries `Version`, `Raw` and `IgnoreContentLength`, but has no member for `--tr-encoding`, so the handler cannot see it. Adding one means editing `Curl.Protocol.Abstractions.UnitLibrary`, which BL-293 (in Doing) touches. Rather than park all four options behind BL-293, this task delivers the three that need nothing outside its `touches` and files BL-315 (depends on BL-180, touches Abstractions and Http) for `--tr-encoding`, with the measured request bytes in its Context. BL-236 now also depends on BL-315.
 - No ADR: every behaviour below is measured curl 8.21.0 behaviour, not a design choice.
 
 ### Measurements (curl 8.21.0 mingw `/mingw64/bin/curl`, `Record-CurlExchange.ps1 -Port 18180`, URL `http://127.0.0.1:18180/a`; the server sends the response and closes)
@@ -69,4 +69,4 @@ The handler's request line, headers and body handling match curl 8.21.0 for `Ver
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
-- 2026-09-26: Doing -> Done. -0 sends HTTP/1.0 (exit 25 for an unknown-length body), --raw writes chunked bodies undecoded to close, --ignore-content-length reads to close; --tr-encoding moved to BL-308
+- 2026-09-26: Doing -> Done. -0 sends HTTP/1.0 (exit 25 for an unknown-length body), --raw writes chunked bodies undecoded to close, --ignore-content-length reads to close; --tr-encoding moved to BL-315
