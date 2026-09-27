@@ -48,3 +48,4 @@ Under `-v`, the cookie store reports each cookie it adds and each one it drops a
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
