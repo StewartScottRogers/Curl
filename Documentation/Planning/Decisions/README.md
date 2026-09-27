@@ -87,6 +87,7 @@ choices do not need one.
 | [0070](ADR-0070-compressed-bodies-with-bytes-after-their-stream-end-exit-23-found-by-checksum-trailer.md) | With `--compressed`, bytes after the end of a gzip member, zlib stream or Brotli stream (a second gzip member included) fail with exit 23 after the stream is written, as curl 8.21.0 does; Brotli uses `BrotliDecoder`, gzip and zlib find their end from the checksum trailer (`HttpContentChecksumTrailer`); bytes after raw deflate are dropped | Accepted | 2026-09-27 |
 | [0071](ADR-0071-a-failed-z-file-lookup-off-windows-stands-in-for-stat-and-prints-its-strerror-text.md) | A failed `-z` file lookup off Windows stands in for `stat` (`File.GetAttributes`) and prints curl's `strerror` text, file not found included; symbolic links and the Windows `con`/`nul` devices are follow-ups | Accepted | 2026-09-27 |
 | [0072](ADR-0072-failure-messages-naming-a-host-are-cut-to-curls-255-byte-error-buffer.md) | A host `Dns` refuses as over 255 characters is not resolved (exit 6, or 5 for a proxy), and resolve failures naming a host are cut to 255 characters (`CurlErrorBuffer`), as curl 8.21.0's 256-byte error buffer cuts them; the general cut in `Curl.Console` is BL-380 | Accepted | 2026-09-27 |
+| [0073](ADR-0073-a-z-date-after-the-year-9999-reads-as-the-last-second-of-9999.md) | A `-z` date after the year 9999, which curl reads in a 64-bit `time_t`, reads as 9999-12-31 23:59:59 UTC in `CurlDateParser`; `TimeCondition` stays a `DateTimeOffset`, and a date before year 1 is still refused | Accepted | 2026-09-27 |
 
 ## Template
 

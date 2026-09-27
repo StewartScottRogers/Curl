@@ -79,12 +79,28 @@ public sealed class CurlDateParserTests
 
     /// <summary>
     /// curl 8.21.0 accepts <c>1 Jan 099999999</c>, computing the instant in a 64-bit
-    /// <c>time_t</c>; a <see cref="DateTimeOffset"/> cannot hold it, so it is refused here.
+    /// <c>time_t</c>; a <see cref="DateTimeOffset"/> cannot hold it, so it reads as the last whole
+    /// second one can (ADR-0073).
     /// </summary>
     [TestMethod]
-    public void TryParse_YearBeyondDateTimeOffset_IsRefused()
+    [DataRow("1 Jan 099999999")]
+    [DataRow("31 Dec 9999 23:00 -1400")]
+    public void TryParse_InstantAfterYear9999_IsTheLastWholeSecondOfYear9999(string text)
     {
-        Assert.IsFalse(CurlDateParser.TryParse("1 Jan 099999999", out _));
+        bool parsed = CurlDateParser.TryParse(text, out DateTimeOffset value);
+
+        Assert.IsTrue(parsed);
+        Assert.AreEqual(new DateTimeOffset(9999, 12, 31, 23, 59, 59, TimeSpan.Zero), value);
+    }
+
+    /// <summary>
+    /// <c>00000101</c> is 1 January of year 0, before any <see cref="DateTimeOffset"/>; curl 8.21.0
+    /// treats it as not a date (measured 2026-09-27), so it is refused.
+    /// </summary>
+    [TestMethod]
+    public void TryParse_InstantBeforeYear1_IsRefused()
+    {
+        Assert.IsFalse(CurlDateParser.TryParse("00000101", out _));
     }
 
     /// <summary><c>curl_getdate</c> returns the epoch for the instant one second before it, -1 being its failure value.</summary>

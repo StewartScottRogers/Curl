@@ -70,6 +70,22 @@ public sealed class CommandLineTimeConditionOptionTests
     }
 
     /// <summary>
+    /// curl 8.21.0, <c>curl -z "1 Jan 099999999" file:///...</c>: no warning, and a 2026 file is
+    /// not new enough, so the date is read as the last second of year 9999 (ADR-0073).
+    /// </summary>
+    [TestMethod]
+    public void Parse_TimeCondDateAfterYear9999_IsIfModifiedSinceTheLastSecondOfYear9999WithNoWarning()
+    {
+        CommandLineParseResult result = Parse(["-z", "1 Jan 099999999", Url], new RecordingDataFileReader());
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual(
+            new TimeCondition(new DateTimeOffset(9999, 12, 31, 23, 59, 59, TimeSpan.Zero), TimeConditionKind.IfModifiedSince),
+            result.Options.TimeCondition);
+        Assert.IsEmpty(result.WarningLines);
+    }
+
+    /// <summary>
     /// curl 8.21.0, <c>curl -z notadate -o NUL file:///Z:/repos/Curl.lanes/lane-3/global.json</c>:
     /// these two lines on standard error, then the transfer, exit 0. <c>-z -notadate</c> prints the same.
     /// </summary>

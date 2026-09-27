@@ -142,9 +142,11 @@ public static class CurlDateParser
     /// before the Unix epoch reads as the epoch, as <c>curl_getdate</c> returns it.
     /// </para>
     /// <para>
-    /// Where this differs from curl: an instant outside the years 0001–9999, which curl computes in a
-    /// 64-bit <c>time_t</c>, is refused. Checked against the local curl 8.21.0 on 2026-09-26 by
-    /// bracketing the modification time of a <c>file://</c> source around the expected instant.
+    /// An instant after the year 9999, which curl computes in a 64-bit <c>time_t</c>, is read as the
+    /// last whole second a <see cref="DateTimeOffset"/> holds, 9999-12-31 23:59:59 UTC, which compares
+    /// with any file time the same way curl's instant does (ADR-0073); an instant before year 1 is
+    /// refused. Checked against the local curl 8.21.0 on 2026-09-26 by bracketing the modification
+    /// time of a <c>file://</c> source around the expected instant.
     /// </para>
     /// </remarks>
     /// <param name="text">The date text, after any <c>-z</c> direction prefix has been removed.</param>
@@ -412,14 +414,15 @@ public static class CurlDateParser
         }
 
         /// <summary>
-        /// <c>curl_getdate</c> returns -1 for a failure, so it moves a real -1 to 0; an instant a
-        /// <see cref="DateTimeOffset"/> cannot hold is refused.
+        /// <c>curl_getdate</c> returns -1 for a failure, so it moves a real -1 to 0. An instant after
+        /// the last whole second a <see cref="DateTimeOffset"/> holds reads as that second (ADR-0073);
+        /// one before year 1 is refused, as curl refuses every year before 1583.
         /// </summary>
         private static bool TryFromCurlGetDateSeconds(long seconds, out DateTimeOffset value)
         {
             long curlSeconds = seconds == -1 ? 0 : seconds;
-            bool representable = curlSeconds >= DateTimeOffset.MinValue.ToUnixTimeSeconds() && curlSeconds <= DateTimeOffset.MaxValue.ToUnixTimeSeconds();
-            value = representable ? DateTimeOffset.FromUnixTimeSeconds(curlSeconds) : default;
+            bool representable = curlSeconds >= DateTimeOffset.MinValue.ToUnixTimeSeconds();
+            value = representable ? DateTimeOffset.FromUnixTimeSeconds(Math.Min(curlSeconds, DateTimeOffset.MaxValue.ToUnixTimeSeconds())) : default;
             return representable;
         }
 
