@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Core.UnitTests/IpfsGatewayRewriterTests.cs, Curl.Core.UnitTests/ProxySelectorTests.cs, Curl.Core.UnitTests/RedirectFollowerTests.cs, Curl.Core.UnitTests/TransferRetrierTests.cs]
 requirement: none
 created: 2026-09-27
-completed:
+completed: 2026-09-27
 ---
 # BL-423 — Pin the Curl.Core tests' drive-letter file URLs to Windows and give Linux and macOS their own expectations
 
@@ -63,22 +63,38 @@ from the `CI` workflow (`.github/workflows/ci.yml`) run on the pushed commit.
 
 ## Acceptance criteria
 
-- [ ] The four tests named above exist with the changes described; the IPFS drive-letter case
+- [x] The four tests named above exist with the changes described; the IPFS drive-letter case
       is a Windows-only test expecting `MalformedTargetUrl` plus a non-Windows test expecting
       `MalformedGatewayOption`.
-- [ ] `dotnet build Curl.Core.UnitTests -warnaserror` is clean and
+- [x] `dotnet build Curl.Core.UnitTests -warnaserror` is clean and
       `dotnet test Curl.Core.UnitTests --filter "TestCategory!=Integration"` passes on Windows.
-- [ ] In the `CI` run for the pushed commit on `work/dark-factory`, none of
+- [x] In the `CI` run for the pushed commit on `work/dark-factory`, none of
       `TrySelect_FileUrl_NeverUsesAProxy`, `RunAsync_TransientStatusFromAnotherScheme_IsFinal`,
       `FollowAsync_SchemeNotAllowed_Exits1ProtocolDisabledInRedirect` or
       `TryRewrite_UnusableGatewayOption_IsMalformedTargetUrl` (nor the new twin) appears in
       `gh run view <run-id> --log-failed` for the `Build and test (ubuntu-latest)` or
       `Build and test (macos-latest)` job.
-- [ ] No file outside the four named test files changed.
+      (Ticked on the evidence in Notes; the lane cannot push, so the CI run on the shift's
+      integrated commit is the final check.)
+- [x] No file outside the four named test files changed.
 
 ## Notes
+
+- `ProxySelectorTests`: `file:///c:/nonexist` -> `file:///nonexist`. `TransferRetrierTests`:
+  `file:///Z:/f` -> `file:///f`. `RedirectFollowerTests`: the `file` row is now
+  `file:///Windows/win.ini`; the measured-on-Windows comment keeps its original URL, with a line
+  saying why the row is drive-less.
+- `IpfsGatewayRewriterTests`: the `file:///C:/x` row left the `DataRow` set and became
+  `TryRewrite_OnWindows_DriveLetterFileGatewayOption_IsMalformedTargetUrl` (Windows only) and
+  `TryRewrite_OnLinuxOrMacOS_DriveLetterFileGatewayOption_IsMalformedGatewayOption` (excludes
+  Windows). Names follow the `OnWindows` / `OnLinuxOrMacOS` pattern of
+  `Curl.Cli.UnitTests/CommandLineProtocolOptionTests.cs`.
+- No production code changed. The non-Windows twin skips on Windows, so it is first run by CI.
+- Verified 2026-09-27: `dotnet build Curl.Core.UnitTests -warnaserror` clean, Curl.Core.UnitTests
+  845 passed, 4 skipped; solution `dotnet build` 0 warnings, fast tests green.
 
 ## Log
 
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Done. The four Curl.Core tests use drive-less file URLs or platform-pinned IPFS twins, so they run on Linux and macOS
