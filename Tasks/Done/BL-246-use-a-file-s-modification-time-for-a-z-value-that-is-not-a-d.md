@@ -54,8 +54,8 @@ does, when the value is not a date.
 - Plan (run directly rather than through the full /feature subagent chain: one option, one
   library and its tests). The seam is a new `IDataFileReader.TryReadModificationTime(path, out
   time, out failureReason)`, not a new applier parameter, so only `SetTimeCondition` changes.
-  Decision and alternatives in ADR-0034 (Decided by Claude under Stewart's delegation).
-- Added `Documentation/Planning/Decisions` to `touches` for ADR-0034 and its index row; no task
+  Decision and alternatives in ADR-0037 (Decided by Claude under Stewart's delegation).
+- Added `Documentation/Planning/Decisions` to `touches` for ADR-0037 and its index row; no task
   in Doing names it.
 - Measured on curl 8.21.0 (mingw, Schannel, Windows), 2026-09-26, `curl -z <v> -o NUL
   file:///Z:/repos/Curl.lanes/lane-4/global.json`, every case exit 0 with the transfer:
@@ -69,7 +69,7 @@ does, when the value is not a date.
   `CommandLineTimeConditionOptionTests`, and the 3/5/0x20/0x7b reasons from the matching .NET
   exceptions in `DiskDataFileReaderTests`. The time is truncated to the whole second (curl's
   `time_t`).
-- Left for BL-286: the non-Windows `stat`/`strerror` lines (unmeasured, so off Windows every
+- Left for BL-288: the non-Windows `stat`/`strerror` lines (unmeasured, so off Windows every
   failure reads as file not found) and the `con`/`nul` device cases.
 - Quality: `Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary` 100% line, 100% branch,
   0 failing of 572 members (the fallback was split into `TryReadTimeConditionDate` and
