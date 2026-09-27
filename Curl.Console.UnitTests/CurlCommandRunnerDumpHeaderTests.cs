@@ -146,9 +146,63 @@ public sealed class CurlCommandRunnerDumpHeaderTests
         Assert.IsEmpty(file.Contexts);
     }
 
+    [TestMethod]
+    public async Task RunAsync_DumpHeaderToFailingStandardOutput_PrintsFailedWritingHeadersThenTheWriteError()
+    {
+        FailingWriteStream closedStandardOutput = new();
+
+        int exitCode = await RunAsync(["-sS", "-D", "-", "-o", "body.txt", SourceUrl], fileHandler, standardOutput: closedStandardOutput);
+
+        Assert.AreEqual((int)CurlExitCode.WriteError, exitCode);
+        Assert.AreEqual(
+            "curl: Failed writing headers to -" + NewLine
+            + "curl: (23) client returned ERROR on write of 20 bytes" + NewLine,
+            StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_DumpHeaderToFileWhoseWriteFails_PrintsFailedWritingHeadersToTheFileAsGiven()
+    {
+        outputFiles.WriteFailingPaths.Add("CONIN$");
+
+        int exitCode = await RunAsync(["-sS", "-D", "CONIN$", "-o", "body.txt", SourceUrl], fileHandler);
+
+        Assert.AreEqual((int)CurlExitCode.WriteError, exitCode);
+        Assert.AreEqual(
+            "curl: Failed writing headers to CONIN$" + NewLine
+            + "curl: (23) client returned ERROR on write of 20 bytes" + NewLine,
+            StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_DumpHeaderToStandardOutputWhoseFlushFails_PrintsFailedWritingHeaders()
+    {
+        FailingWriteStream closedStandardOutput = new() { WritesToFail = 0, FailsFlush = true };
+
+        int exitCode = await RunAsync(["-D", "-", "-o", "body.txt", SourceUrl], fileHandler, standardOutput: closedStandardOutput);
+
+        Assert.AreEqual(23, exitCode);
+        Assert.StartsWith("curl: Failed writing headers to -" + NewLine, StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_DumpHeaderWriteFailsUnderSilent_PrintsNothingAndExits23()
+    {
+        FailingWriteStream closedStandardOutput = new();
+
+        int exitCode = await RunAsync(["-s", "-D", "-", "-o", "body.txt", SourceUrl], fileHandler, standardOutput: closedStandardOutput);
+
+        Assert.AreEqual(23, exitCode);
+        Assert.AreEqual(string.Empty, StandardErrorText);
+    }
+
     private string WrittenText(string path) => Encoding.ASCII.GetString(outputFiles.Written[path].ToArray());
 
-    private Task<int> RunAsync(IReadOnlyList<string> arguments, IProtocolHandler handler, bool runsOnWindows = false) =>
-        new CurlCommandRunner(_ => new TransferDispatch(new ProtocolDispatcher([handler])), outputFiles, outputFiles, standardOutput, standardError, new MemoryStream(), runsOnWindows)
+    private Task<int> RunAsync(
+        IReadOnlyList<string> arguments,
+        IProtocolHandler handler,
+        bool runsOnWindows = false,
+        Stream? standardOutput = null) =>
+        new CurlCommandRunner(_ => new TransferDispatch(new ProtocolDispatcher([handler])), outputFiles, outputFiles, standardOutput ?? this.standardOutput, standardError, new MemoryStream(), runsOnWindows)
             .RunAsync(arguments);
 }

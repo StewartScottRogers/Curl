@@ -32,6 +32,8 @@ internal sealed class InMemoryFileSystem : IFileSystem, IFileTimeSetter, IOutput
 
     public HashSet<string> UnwritablePaths { get; } = [];
 
+    public HashSet<string> WriteFailingPaths { get; } = [];
+
     public FileAccessStatus UnwritableStatus { get; init; } = FileAccessStatus.NotFound;
 
     public Dictionary<string, MemoryStream> Written { get; } = [];
@@ -73,7 +75,7 @@ internal sealed class InMemoryFileSystem : IFileSystem, IFileTimeSetter, IOutput
             return ValueTask.FromResult(FileOpenResult.Failed(UnwritableStatus));
         }
 
-        MemoryStream stream = new();
+        MemoryStream stream = WriteFailingPaths.Contains(path) ? new FailingWriteStream() : new MemoryStream();
         if (mode == FileWriteMode.Append && ExistingContent.TryGetValue(path, out byte[]? existing))
         {
             stream.Write(existing);

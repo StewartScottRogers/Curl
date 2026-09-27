@@ -1063,11 +1063,15 @@ internal sealed class CurlCommandRunner(
     {
         string? headerFile = options.DumpHeaderFile;
 
-        if (headerFile is null || headerFile == StandardOutputHeaderFile)
+        if (headerFile is null)
         {
-            Stream? headerOutput = headerFile is null ? null : deferringStandardOutput;
+            return await TransferAsync(dispatch, options, url, uploadFile, transfer, null).ConfigureAwait(false);
+        }
 
-            return await TransferAsync(dispatch, options, url, uploadFile, transfer, headerOutput).ConfigureAwait(false);
+        if (headerFile == StandardOutputHeaderFile)
+        {
+            return await TransferReportingHeaderWriteFailureAsync(dispatch, options, url, uploadFile, transfer, headerFile, standardOutput)
+                .ConfigureAwait(false);
         }
 
         return await TransferWithHeaderFileAsync(dispatch, options, url, uploadFile, transfer, headerFile)
@@ -1112,8 +1116,44 @@ internal sealed class CurlCommandRunner(
 
         await using (headerStream.ConfigureAwait(false))
         {
-            return await TransferAsync(dispatch, options, url, uploadFile, transfer, headerStream).ConfigureAwait(false);
+            return await TransferReportingHeaderWriteFailureAsync(dispatch, options, url, uploadFile, transfer, headerFile, headerStream)
+                .ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// Performs the transfer with its header lines going to <paramref name="destination" />
+    /// through a <see cref="DumpHeaderOutputStream" />, and when a header write failed prints
+    /// curl's <c>curl: Failed writing headers to &lt;file&gt;</c> line, naming the <c>-D</c>
+    /// value as given, unless <c>-s</c> was given without <c>-S</c>; curl 8.21.0 prints it
+    /// before the transfer's <c>curl: (23)</c> line (measured 2026-09-26, BL-111 Notes).
+    /// </summary>
+    /// <param name="dispatch">Performs the transfer with the handler for its scheme, after its warning lines.</param>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="url">The URL to transfer.</param>
+    /// <param name="uploadFile">The URL's <c>-T</c> file, or <see langword="null" /> when it uploads nothing.</param>
+    /// <param name="transfer">The transfer, which names its output.</param>
+    /// <param name="headerFile">The <c>-D</c> value, as given.</param>
+    /// <param name="destination">Standard output for <c>-D -</c>, otherwise the opened <c>-D</c> file.</param>
+    /// <returns>The transfer's result.</returns>
+    private async Task<TransferResult> TransferReportingHeaderWriteFailureAsync(
+        TransferDispatch dispatch,
+        CommandLineOptions options,
+        string url,
+        string? uploadFile,
+        UrlTransfer transfer,
+        string headerFile,
+        Stream destination)
+    {
+        DumpHeaderOutputStream headerOutput = new(destination);
+        TransferResult result = await TransferAsync(dispatch, options, url, uploadFile, transfer, headerOutput).ConfigureAwait(false);
+
+        if (headerOutput.HasWriteFailed && ShowsErrors(options))
+        {
+            await WriteErrorLineAsync($"curl: Failed writing headers to {headerFile}").ConfigureAwait(false);
+        }
+
+        return result;
     }
 
     /// <summary>
