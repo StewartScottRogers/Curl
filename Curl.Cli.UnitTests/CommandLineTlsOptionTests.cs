@@ -28,6 +28,7 @@ public sealed class CommandLineTlsOptionTests
 
         Assert.IsTrue(result.IsAccepted);
         Assert.IsFalse(result.Options.Insecure);
+        Assert.IsFalse(result.Options.SkipRevocationCheck);
         Assert.IsNull(result.Options.CaCertificateFile);
         Assert.IsNull(result.Options.CaCertificateDirectory);
         Assert.IsNull(result.Options.ClientCertificate);
@@ -46,6 +47,24 @@ public sealed class CommandLineTlsOptionTests
 
         Assert.IsTrue(result.IsAccepted);
         Assert.IsTrue(result.Options.Insecure);
+    }
+
+    [TestMethod]
+    public void Parse_SslNoRevoke_SetsSkipRevocationCheck()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--ssl-no-revoke", Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsTrue(result.Options.SkipRevocationCheck);
+    }
+
+    [TestMethod]
+    public void Parse_SslNoRevokeThenNoSslNoRevoke_ChecksRevocation()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--ssl-no-revoke", "--no-ssl-no-revoke", Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsFalse(result.Options.SkipRevocationCheck);
     }
 
     [TestMethod]

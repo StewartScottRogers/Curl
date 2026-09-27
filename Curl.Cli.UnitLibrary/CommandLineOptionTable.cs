@@ -109,6 +109,7 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("tftp-no-options", null, (options, on) => options.TftpNoOptions = on),
         CommandLineOption.Value("create-file-mode", null, SetCreateFileMode),
         CommandLineOption.NegatableFlag("insecure", 'k', (options, on) => options.Insecure = on),
+        CommandLineOption.NegatableFlag("ssl-no-revoke", null, (options, on) => options.SkipRevocationCheck = on),
         CommandLineOption.Value("cacert", null, SetCaCertificateFile),
         CommandLineOption.FileName("capath", null, (options, directory) => options.CaCertificateDirectory = directory),
         CommandLineOption.FileName("cert", 'E', (options, certificate) => options.ClientCertificate = certificate),

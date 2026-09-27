@@ -388,6 +388,12 @@ public sealed class CommandLineOptions
     public bool Insecure { get; internal set; }
 
     /// <summary>
+    /// <see langword="true"/> when <c>--ssl-no-revoke</c> was given and no <c>--no-ssl-no-revoke</c> came after it:
+    /// the Schannel build skips the certificate revocation check. curl accepts it in every build; the OpenSSL build ignores it.
+    /// </summary>
+    public bool SkipRevocationCheck { get; internal set; }
+
+    /// <summary>
     /// The <c>--cacert</c> file, verbatim; <see langword="null"/> when not given. The parser has
     /// already refused a value at which nothing exists, and records a directory here unchanged.
     /// The last value wins.
