@@ -44,6 +44,8 @@ Python `ThreadingHTTPServer` speaking HTTP/1.1 with `Content-Length`, and agains
 | `--max-filesize 3` against a 6-byte body (exit 63) | `* Maximum file size exceeded`, `* closing connection #0`, a new connection for the next URL | `1`, `1` |
 | `http://127.0.0.1:18231/a` then `http://localhost:18231/b` | No reuse: the host name differs | `1`, `1` |
 | `-x http://127.0.0.1:18231 http://a.example/x http://b.example/y` | `* Reusing existing http: connection with proxy 127.0.0.1` - a forward proxy connection serves both origins | `1`, `0` |
+| `-x http://127.0.0.1:18231 -p http://a.example/x http://a.example/y` (BL-360) | `* Reusing existing http: connection with proxy 127.0.0.1` - a tunnelled reuse names the proxy, not the origin | `1`, `0` |
+| `-x http://127.0.0.1:18231 -p http://a.example/x http://b.example/y` (BL-360) | No reuse: a tunnel serves only its own origin; `Connection #1` | `1`, `1` |
 | `--no-keepalive` with two URLs to one host | Reuses exactly as without it | `1`, `0` |
 | Eleven ports in turn, then the first again | From the sixth: `* Connection pool is full, closing the oldest of 6/5` and `* shutting down connection #0`, printed after the body and before `left intact`; the last URL does not find port 18231's connection | all `1` |
 | A reused connection, `-w` connect times | `time_namelookup`, `time_connect` and `time_appconnect` print `0.000000`; `local_port` and `remote_ip` are the first transfer's | `0` |
@@ -97,6 +99,7 @@ of these:
 | Port | `ConnectTarget.Port`. |
 | TLS | `ConnectTarget.UseTls`, and the `TlsClientOptions` the inner connector's `SslStreamTlsProvider` holds: verification (`-k`), minimum version, CA file and directory, client certificate, key, key and certificate types, passphrase, and the cipher lists. Today that is one record per run, so one `PoolingConnector` per run keys it implicitly. When `--next` or a pinned public key (`--pinnedpubkey`) lets it vary within a run, the `TlsClientOptions` record, compared by value, joins the key. |
 | Proxy | `ConnectTarget.Proxy`: kind, host, port and credential, the credential compared by user name, password and domain rather than by `NetworkCredential` reference. A tunnel therefore serves only its own origin. |
+| Forward proxy | `ConnectTarget.IsForwardProxy` (BL-360), so a connection to a forward proxy never serves a direct request to the proxy's own host and port, nor the other way round. |
 
 A forward proxy (an `http` URL through an HTTP proxy without `-p`) is connected with the
 proxy itself as `Host` and `Port` and no `Proxy` (`HttpProtocolHandler.TargetOf`), so one
@@ -179,6 +182,25 @@ BL-215 builds `PoolingConnector`, `PooledConnection`, the key and the limit in
 `ConnectResult.IsReused` and `ConnectResult.ConnectionNumber` in
 `Curl.Protocol.Abstractions.UnitLibrary`, the handler's use of them, and the composition
 change in `Curl.Console` lie outside BL-215's `touches` and need their own tasks.
+
+### Amendment (BL-360): reporting `with proxy`
+
+**Decided by Claude under Stewart's delegation** (root `CLAUDE.md`, "Decisions"), 2026-09-27.
+
+A forward proxy target used to be indistinguishable from a direct one: the handler connects
+to the proxy as `ConnectTarget.Host` and `Port` and leaves `Proxy` unset, so the pool always
+reported `IsProxy = false`. `ConnectTarget` gains `bool IsForwardProxy` (`init`, default
+`false`); `HttpProtocolHandler` sets it on the forward proxy target, and it joins the pool key.
+The pool reports a reuse with `IsProxy = IsForwardProxy || Proxy is not null`, naming
+`Proxy.Host` and `Proxy.Port` for a tunnel and `Host` and `Port` otherwise.
+
+The task first expected a tunnelled reuse to name the origin host. curl 8.21.0, measured
+with `Record-CurlExchange.ps1` locally extended to answer CONNECT and keep the connection
+alive (the extension was not kept), prints
+`with proxy 127.0.0.1` for two URLs on one origin through `-p` (table above), so the
+measurement is what is pinned. An `init` flag was chosen over a new `ProxyEndpoint`-typed
+property or a target kind enum: it is the smallest change that says what the pool needs, and
+every existing `ConnectTarget` keeps its meaning by default.
 
 ## Consequences
 
