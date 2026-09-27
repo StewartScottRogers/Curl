@@ -81,8 +81,8 @@ Other: 302 with `Transfer-Encoding: foo` under `-L --max-redirs 0` → exit 47, 
 
 ### Follow-ups filed
 
-- BL-359: the same limit of five for Content-Encoding (`Reject response exceeding limit of 5 content encodings`, measured), which Curl does not enforce.
-- BL-360: bytes after the end of a gzip stream (`hello` + exit 23 `Failed writing received data to disk/application`, measured under `--tr-encoding`).
+- BL-364: the same limit of five for Content-Encoding (`Reject response exceeding limit of 5 content encodings`, measured), which Curl does not enforce.
+- BL-365: bytes after the end of a gzip stream (`hello` + exit 23 `Failed writing received data to disk/application`, measured under `--tr-encoding`).
 
 ## Log
 

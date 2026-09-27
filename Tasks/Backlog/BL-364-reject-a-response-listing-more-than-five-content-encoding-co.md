@@ -1,5 +1,5 @@
 ---
-id: BL-359
+id: BL-364
 title: Reject a response listing more than five Content-Encoding codings under --compressed, as curl 8.21.0 does
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-359 — Reject a response listing more than five Content-Encoding codings under --compressed, as curl 8.21.0 does
+# BL-364 — Reject a response listing more than five Content-Encoding codings under --compressed, as curl 8.21.0 does
 
 ## Goal
 

@@ -1,5 +1,5 @@
 ---
-id: BL-360
+id: BL-365
 title: Match curl 8.21.0 on bytes after the end of a gzip stream in a decoded body
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-360 — Match curl 8.21.0 on bytes after the end of a gzip stream in a decoded body
+# BL-365 — Match curl 8.21.0 on bytes after the end of a gzip stream in a decoded body
 
 ## Goal
 
