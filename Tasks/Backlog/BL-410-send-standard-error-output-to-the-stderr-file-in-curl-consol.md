@@ -1,5 +1,5 @@
 ---
-id: BL-404
+id: BL-410
 title: Send standard error output to the --stderr file in Curl.Console
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-404 — Send standard error output to the --stderr file in Curl.Console
+# BL-410 — Send standard error output to the --stderr file in Curl.Console
 
 ## Goal
 

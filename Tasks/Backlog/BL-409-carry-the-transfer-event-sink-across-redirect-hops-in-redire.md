@@ -1,5 +1,5 @@
 ---
-id: BL-403
+id: BL-409
 title: Carry the transfer event sink across redirect hops in RedirectFollower
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-403 — Carry the transfer event sink across redirect hops in RedirectFollower
+# BL-409 — Carry the transfer event sink across redirect hops in RedirectFollower
 
 ## Goal
 

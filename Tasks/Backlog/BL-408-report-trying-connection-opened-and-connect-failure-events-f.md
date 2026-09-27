@@ -1,5 +1,5 @@
 ---
-id: BL-402
+id: BL-408
 title: Report Trying, connection opened and connect failure events from TcpConnector
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-402 — Report Trying, connection opened and connect failure events from TcpConnector
+# BL-408 — Report Trying, connection opened and connect failure events from TcpConnector
 
 ## Goal
 

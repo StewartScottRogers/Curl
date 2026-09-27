@@ -1,5 +1,5 @@
 ---
-id: BL-405
+id: BL-411
 title: Interleave the progress meter with -v lines as curl does
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-405 — Interleave the progress meter with -v lines as curl does
+# BL-411 — Interleave the progress meter with -v lines as curl does
 
 ## Goal
 

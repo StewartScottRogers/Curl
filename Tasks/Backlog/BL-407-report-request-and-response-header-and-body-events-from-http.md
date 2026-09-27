@@ -1,5 +1,5 @@
 ---
-id: BL-401
+id: BL-407
 title: Report request and response header and body events from HttpProtocolHandler
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-401 — Report request and response header and body events from HttpProtocolHandler
+# BL-407 — Report request and response header and body events from HttpProtocolHandler
 
 ## Goal
 
