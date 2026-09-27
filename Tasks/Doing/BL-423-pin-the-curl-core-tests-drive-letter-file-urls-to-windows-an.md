@@ -81,3 +81,4 @@ from the `CI` workflow (`.github/workflows/ci.yml`) run on the pushed commit.
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
