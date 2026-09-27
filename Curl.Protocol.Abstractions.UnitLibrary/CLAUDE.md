@@ -39,3 +39,10 @@ a failed read open is exit 37 (`CURLE_FILE_COULDNT_READ_FILE`) and a failed writ
 open is exit 23 (`CURLE_WRITE_ERROR`)
 (<https://curl.se/libcurl/c/libcurl-errors.html>, checked against curl 8.21.0). An
 exception that escapes instead turns that exit code into an unhandled crash.
+
+## A body read fails the transfer only through `RequestBodyReadFailedException`
+
+A request body's stream that throws a plain `IOException` has reached its end, as curl takes
+a failed file read. Only `RequestBodyReadFailedException` fails the send: the handler stops
+with exit 26 and the exception's message. `Curl.Core`'s `EncodedReadStream` throws it with
+`read error getting mime data` at a byte a multipart encoder refuses (ADR-0093).
