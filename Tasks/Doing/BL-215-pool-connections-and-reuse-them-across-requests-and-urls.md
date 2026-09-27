@@ -34,3 +34,4 @@ A connection pool implements the BL-164 ADR so a reusable connection serves the 
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-27: Backlog -> Doing.
