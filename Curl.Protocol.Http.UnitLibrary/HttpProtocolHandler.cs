@@ -111,7 +111,7 @@ namespace Curl.Protocol.Http;
 /// honour, and delivers no body for a 416 to a resume or an unmet <c>-z</c> condition. A body
 /// that grows past the limit ends the transfer with exit 63 after as many bytes as it allows.
 /// A successful result carries the <c>Last-Modified</c> time (<see cref="HttpLastModified" />).
-/// Measured on curl 8.21.0 (BL-178 Notes, ADR-0041).
+/// Measured on curl 8.21.0 (BL-178 Notes, ADR-0044).
 /// </para>
 /// </remarks>
 public sealed class HttpProtocolHandler(

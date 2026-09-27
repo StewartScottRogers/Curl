@@ -16,7 +16,7 @@ internal static class HttpRangeHeader
     /// <param name="context">The transfer.</param>
     /// <param name="sendsBody">
     /// <see langword="true" /> when the request has a body, for which curl sends a
-    /// <c>Content-Range</c> instead; Curl sends neither (ADR-0041).
+    /// <c>Content-Range</c> instead; Curl sends neither (ADR-0044).
     /// </param>
     /// <returns>The value, or <see langword="null" /> to send no <c>Range</c>.</returns>
     internal static string? ValueFor(ITransferContext context, bool sendsBody)

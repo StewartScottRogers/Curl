@@ -1,7 +1,7 @@
 namespace Curl.Protocol.Http;
 
 /// <summary>
-/// Pins <see cref="HttpLastModified" /> to the three HTTP-date forms (ADR-0041).
+/// Pins <see cref="HttpLastModified" /> to the three HTTP-date forms (ADR-0044).
 /// </summary>
 [TestClass]
 public sealed class HttpLastModifiedTests

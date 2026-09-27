@@ -12,7 +12,7 @@ namespace Curl.Protocol.Http;
 /// accept: IMF-fixdate (<c>Sun, 06 Nov 1994 08:49:37 GMT</c>), RFC 850
 /// (<c>Sunday, 06-Nov-94 08:49:37 GMT</c>) and asctime (<c>Sun Nov  6 08:49:37 1994</c>). A value
 /// in none of them is an unknown time, as curl 8.21.0 treats <c>Last-Modified: garbage</c>
-/// (measured, BL-178 Notes, ADR-0041). The last <c>Last-Modified</c> header wins, as in curl.
+/// (measured, BL-178 Notes, ADR-0044). The last <c>Last-Modified</c> header wins, as in curl.
 /// </remarks>
 internal static class HttpLastModified
 {
