@@ -54,6 +54,7 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
 
     private Stream? file;
     private long? failedWriteLength;
+    private long lengthWhenOpened;
 
     /// <summary>
     /// Gets the file this stream writes: the path it was created with, until
@@ -166,7 +167,7 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
         FileOpenResult opened = await fileSystem
             .OpenForWriteAsync(Path, writeMode, CreateMode, CancellationToken.None)
             .ConfigureAwait(false);
-        file = opened.Content;
+        Adopt(opened.Content);
 
         return opened.IsOpen;
     }
@@ -236,6 +237,34 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
     }
 
     /// <summary>
+    /// Cuts the file back to the length it had when it was opened, before <c>--retry</c> runs
+    /// the transfer again, as curl 8.21.0 does (<c>ftruncate</c> to the length at open): a
+    /// retried 503 written with <c>-o</c> left one copy of the body, not two (measured
+    /// 2026-09-27, BL-241 Notes). A file not yet opened, or one that cannot seek, is left as
+    /// it is.
+    /// </summary>
+    internal void TruncateForRetry()
+    {
+        if (file is { CanSeek: true } opened)
+        {
+            opened.Flush();
+            opened.SetLength(lengthWhenOpened);
+            opened.Position = lengthWhenOpened;
+        }
+    }
+
+    /// <summary>
+    /// Takes <paramref name="opened" /> as the file, and remembers its length for
+    /// <see cref="TruncateForRetry" />.
+    /// </summary>
+    /// <param name="opened">The file just opened, or <see langword="null" /> when the open failed.</param>
+    private void Adopt(Stream? opened)
+    {
+        file = opened;
+        lengthWhenOpened = opened is { CanSeek: true } ? opened.Length : 0;
+    }
+
+    /// <summary>
     /// Opens the file in its write mode, with <see cref="CreateMode" />.
     /// </summary>
     /// <param name="cancellationToken">Cancels the open.</param>
@@ -245,7 +274,7 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
         FileOpenResult opened = await fileSystem
             .OpenForWriteAsync(Path, writeMode, CreateMode, cancellationToken)
             .ConfigureAwait(false);
-        file = opened.Content;
+        Adopt(opened.Content);
 
         if (!opened.IsOpen)
         {

@@ -44,6 +44,31 @@ public sealed class TransferContextFactoryTests
     }
 
     [TestMethod]
+    public void Create_ClockGiven_IsTheContextsTimeProvider()
+    {
+        using MemoryStream standardInput = new();
+        using MemoryStream output = new();
+        ManualTimeProvider clock = new();
+
+        TransferContext context = new TransferContextFactory(standardInput, clock)
+            .Create(Parse("file:///C:/x.txt"), CurlUrl.Parse("file:///C:/x.txt"), output, null, null, null);
+
+        Assert.AreSame(clock, context.TimeProvider);
+    }
+
+    [TestMethod]
+    public void Create_NoClock_IsTheSystemClock()
+    {
+        using MemoryStream standardInput = new();
+        using MemoryStream output = new();
+
+        TransferContext context = new TransferContextFactory(standardInput)
+            .Create(Parse("file:///C:/x.txt"), CurlUrl.Parse("file:///C:/x.txt"), output, null, null, null);
+
+        Assert.AreSame(TimeProvider.System, context.TimeProvider);
+    }
+
+    [TestMethod]
     public void Create_NoProgress_IsNoTransferProgress()
     {
         using MemoryStream standardInput = new();

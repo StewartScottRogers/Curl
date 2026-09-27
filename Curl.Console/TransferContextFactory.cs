@@ -12,7 +12,12 @@ namespace Curl.Console;
 /// <see cref="ITransferContext.Upload" />, because curl's telnet "sends what it reads on
 /// stdin" (ADR-0006). Every other scheme's upload is <see langword="null" />.
 /// </param>
-internal sealed class TransferContextFactory(Stream standardInput)
+/// <param name="timeProvider">
+/// Every context's <see cref="TransferContext.TimeProvider" />, the runner's clock, which
+/// <see cref="Curl.Core.TransferRetrier" /> waits on; <see langword="null" /> for
+/// <see cref="TimeProvider.System" />.
+/// </param>
+internal sealed class TransferContextFactory(Stream standardInput, TimeProvider? timeProvider = null)
 {
     /// <summary>The one scheme whose transfer uploads standard input.</summary>
     private const string TelnetScheme = "telnet";
@@ -87,6 +92,7 @@ internal sealed class TransferContextFactory(Stream standardInput)
             Proxy = proxy,
             Http = HttpRequestOptionsMapping.FromCommandLine(options, formBody, proxy),
             Progress = progress ?? NoTransferProgress.Instance,
+            TimeProvider = timeProvider ?? TimeProvider.System,
         };
 
     /// <summary>

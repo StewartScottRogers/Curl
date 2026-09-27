@@ -256,8 +256,8 @@ internal sealed class CurlCommandRunner(
     /// <summary>The <c>-D</c> value that sends the header lines to standard output.</summary>
     private const string StandardOutputHeaderFile = "-";
 
-    /// <summary>Builds each transfer's context; gives a <c>telnet</c> transfer standard input.</summary>
-    private readonly TransferContextFactory transferContextFactory = new(standardInput);
+    /// <summary>Builds each transfer's context on the runner's clock; gives a <c>telnet</c> transfer standard input.</summary>
+    private readonly TransferContextFactory transferContextFactory = new(standardInput, timeProvider);
 
     /// <summary>Builds each transfer's <c>-F</c> body; reads <c>@-</c> and <c>&lt;-</c> parts from standard input.</summary>
     private readonly MultipartFormBodyBuilder formBodyBuilder = formBodyBuilder
@@ -392,6 +392,12 @@ internal sealed class CurlCommandRunner(
     /// Whether a transfer of this run has sent, or was set up to send, its body to standard output.
     /// </summary>
     private bool bodyWrittenToStandardOutput;
+
+    /// <summary>
+    /// Whether the current transfer has written the progress meter's header lines, which curl
+    /// 8.21.0 writes once however many times <c>--retry</c> runs the transfer.
+    /// </summary>
+    private bool progressMeterHeaderWritten;
 
     /// <summary>
     /// Runs <paramref name="arguments" /> to completion.
@@ -576,6 +582,7 @@ internal sealed class CurlCommandRunner(
     {
         transferOutputFileName = null;
         progressBar = null;
+        progressMeterHeaderWritten = false;
         (TransferResult result, string givenUrl, string transferUrl) = await TransferUrlAsync(dispatch, options, transfer)
             .ConfigureAwait(false);
 
@@ -1362,10 +1369,21 @@ internal sealed class CurlCommandRunner(
         if (outputFile is null)
         {
             StartTransferProgress(options, options.ResumeFrom, toStandardOutput: true);
-            TransferContext context = transferContextFactory.Create(
-                options, url, deferringStandardOutput, range, options.ResumeFrom, headerOutput, formBody, upload, proxy, progress: transferProgress);
-            TransferResult standardOutputResult =
-                await TransferToStandardOutputAsync(follower, options, context).ConfigureAwait(false);
+            TransferResult standardOutputResult = await TransferToStandardOutputAsync(
+                    follower,
+                    options,
+                    () => transferContextFactory.Create(
+                        options,
+                        url,
+                        RateLimited(options, deferringStandardOutput),
+                        range,
+                        options.ResumeFrom,
+                        headerOutput,
+                        formBody,
+                        upload,
+                        proxy,
+                        progress: transferProgress))
+                .ConfigureAwait(false);
 
             return await WriteProgressAsync(options, standardOutputResult, options.ResumeFrom, toStandardOutput: true)
                 .ConfigureAwait(false);
@@ -1534,11 +1552,26 @@ internal sealed class CurlCommandRunner(
             && ShowsProgressMeter(options, toStandardOutput))
         {
             transferProgress.Finish(result.IsSuccess);
-            await WriteErrorLinesAsync([.. ProgressMeterLines.HeaderLines(resumeFrom), transferProgress.StatusLines])
+            await WriteErrorLinesAsync([.. TakeProgressMeterHeaderLines(resumeFrom), transferProgress.StatusLines])
                 .ConfigureAwait(false);
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Gets the progress meter's header lines the first time the current transfer writes its
+    /// meter, and none after: curl 8.21.0 writes them once however many times <c>--retry</c>
+    /// runs the transfer (measured 2026-09-27, BL-241 Notes).
+    /// </summary>
+    /// <param name="resumeFrom">The resolved <c>-C</c> offset, or <see langword="null" />.</param>
+    /// <returns>The header lines, or none when they were already written.</returns>
+    private IReadOnlyList<string> TakeProgressMeterHeaderLines(long? resumeFrom)
+    {
+        IReadOnlyList<string> headerLines = progressMeterHeaderWritten ? [] : ProgressMeterLines.HeaderLines(resumeFrom);
+        progressMeterHeaderWritten = true;
+
+        return headerLines;
     }
 
     /// <summary>
@@ -1772,10 +1805,23 @@ internal sealed class CurlCommandRunner(
                 return await ReportCannotOpenForResumeAsync(options, output.Path).ConfigureAwait(false);
             }
 
-            TransferContext context = transferContextFactory.Create(
-                options, url, output, range, resumeFrom, headerOutput, formBody, upload, proxy, watchHeaderOutput, transferProgress);
-            TransferResult fileResult = await follower
-                .FollowAsync(context, RedirectPolicyMapping.FromCommandLine(options))
+            TransferResult fileResult = await FollowRetryingAsync(
+                    follower,
+                    options,
+                    () => transferContextFactory.Create(
+                        options,
+                        url,
+                        RateLimited(options, output),
+                        range,
+                        resumeFrom,
+                        headerOutput,
+                        formBody,
+                        upload,
+                        proxy,
+                        watchHeaderOutput,
+                        transferProgress),
+                    resumeFrom,
+                    output)
                 .ConfigureAwait(false);
             TransferResult completed = await output.CompleteAsync(fileResult).ConfigureAwait(false);
 
@@ -1811,7 +1857,10 @@ internal sealed class CurlCommandRunner(
     /// </summary>
     /// <param name="follower">Performs the transfer with the handler for its scheme, following redirects under <c>-L</c>.</param>
     /// <param name="options">The accepted command line, whose redirect options the follower applies.</param>
-    /// <param name="context">The transfer, whose output is standard output.</param>
+    /// <param name="createAttemptContext">
+    /// Creates the context of each attempt, whose output is standard output, on the current
+    /// <see cref="transferProgress" />.
+    /// </param>
     /// <returns>
     /// <see cref="StandardOutputWriteFailure" /> when the handler succeeded but standard
     /// output failed, which is curl's failed flush at the end of the transfer; otherwise the
@@ -1821,16 +1870,118 @@ internal sealed class CurlCommandRunner(
     private async Task<TransferResult> TransferToStandardOutputAsync(
         RedirectFollower follower,
         CommandLineOptions options,
-        TransferContext context)
+        Func<TransferContext> createAttemptContext)
     {
         deferringStandardOutput.ClearWriteFailure();
-        TransferResult result = await follower
-            .FollowAsync(context, RedirectPolicyMapping.FromCommandLine(options))
+        TransferResult result = await FollowRetryingAsync(follower, options, createAttemptContext, options.ResumeFrom, null)
             .ConfigureAwait(false);
         await deferringStandardOutput.FlushAsync().ConfigureAwait(false);
 
         return result.IsSuccess && deferringStandardOutput.HasWriteFailed ? StandardOutputWriteFailure : result;
     }
+
+    /// <summary>
+    /// Performs one transfer through <paramref name="follower" />, run again by
+    /// <see cref="TransferRetrier" /> under <c>--retry</c> (<see cref="RetryPolicyMapping" />),
+    /// each attempt on a context of its own.
+    /// </summary>
+    /// <param name="follower">Performs each attempt, following redirects under <c>-L</c>.</param>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="createAttemptContext">
+    /// Creates an attempt's context, on the current <see cref="transferProgress" />; called
+    /// once before the first attempt and again after each retried one's lines are written.
+    /// </param>
+    /// <param name="resumeFrom">The resolved <c>-C</c> offset, or <see langword="null" />.</param>
+    /// <param name="outputFile">
+    /// The <c>-o</c> file, cut back before each retry; <see langword="null" /> when the body goes
+    /// to standard output, where every attempt's body stays, as curl 8.21.0 leaves it.
+    /// </param>
+    /// <returns>The result of the attempt not retried.</returns>
+    private async Task<TransferResult> FollowRetryingAsync(
+        RedirectFollower follower,
+        CommandLineOptions options,
+        Func<TransferContext> createAttemptContext,
+        long? resumeFrom,
+        DeferredOutputFileStream? outputFile)
+    {
+        RedirectPolicy redirectPolicy = RedirectPolicyMapping.FromCommandLine(options);
+        TransferContext? firstContext = createAttemptContext();
+        Task retryLinesWritten = Task.CompletedTask;
+        TransferRetrier retrier = new(async _ =>
+        {
+            await retryLinesWritten.ConfigureAwait(false);
+            TransferContext context = firstContext ?? createAttemptContext();
+            firstContext = null;
+            return await follower.FollowAsync(context, redirectPolicy).ConfigureAwait(false);
+        });
+
+        TransferResult result = await retrier
+            .RunAsync(
+                firstContext,
+                RetryPolicyMapping.FromCommandLine(options),
+                (attempt, warning) => retryLinesWritten = WriteRetryLinesAsync(options, attempt, warning, resumeFrom, outputFile),
+                (_, warning) => retryLinesWritten = WriteRetryWarningAsync(options, warning))
+            .ConfigureAwait(false);
+        await retryLinesWritten.ConfigureAwait(false);
+
+        return result;
+    }
+
+    /// <summary>
+    /// Writes what curl 8.21.0 prints for an attempt <c>--retry</c> runs again, and readies the
+    /// next attempt: the attempt's progress, its failure lines unless <c>-s</c> was given
+    /// without <c>-S</c>, then the retry warning unless <c>-s</c> was given, whether or not with
+    /// <c>-S</c> (measured 2026-09-27, BL-241 Notes). The <c>-o</c> file is then cut back and the
+    /// next attempt gets fresh progress.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="attempt">The attempt's result.</param>
+    /// <param name="warning">The retry warning, unwrapped.</param>
+    /// <param name="resumeFrom">The resolved <c>-C</c> offset, or <see langword="null" />.</param>
+    /// <param name="outputFile">The <c>-o</c> file, or <see langword="null" /> for standard output.</param>
+    /// <returns>A task that completes when the lines are written.</returns>
+    private async Task WriteRetryLinesAsync(
+        CommandLineOptions options,
+        TransferResult attempt,
+        string warning,
+        long? resumeFrom,
+        DeferredOutputFileStream? outputFile)
+    {
+        bool toStandardOutput = outputFile is null;
+        await WriteProgressAsync(options, attempt, resumeFrom, toStandardOutput).ConfigureAwait(false);
+        if (ShowsErrors(options) && attempt.ErrorMessage is not null)
+        {
+            await WriteFailureLinesAsync(attempt).ConfigureAwait(false);
+        }
+
+        await WriteRetryWarningAsync(options, warning).ConfigureAwait(false);
+        outputFile?.TruncateForRetry();
+        StartTransferProgress(options, resumeFrom, toStandardOutput);
+    }
+
+    /// <summary>
+    /// Writes a <see cref="TransferRetrier" /> warning line, wrapped as every <c>Warning: </c>
+    /// line is, unless <c>-s</c> was given: curl 8.21.0 prints none under <c>-s</c> or
+    /// <c>-sS</c>.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="warning">The warning, unwrapped.</param>
+    /// <returns>A task that completes when the line is written, or at once under <c>-s</c>.</returns>
+    private Task WriteRetryWarningAsync(CommandLineOptions options, string warning) =>
+        options.Silent ? Task.CompletedTask : WriteErrorLineAsync(warning);
+
+    /// <summary>
+    /// Holds <paramref name="output" /> at the <c>--limit-rate</c> with a
+    /// <see cref="RateLimitedStream" /> on the runner's clock; a rate of zero, like no rate,
+    /// sets no limit, as it does to curl.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="output">The attempt's body output.</param>
+    /// <returns>The limited stream, or <paramref name="output" /> when there is no limit.</returns>
+    private Stream RateLimited(CommandLineOptions options, Stream output) =>
+        options.LimitRate is > 0 and long bytesPerSecond
+            ? new RateLimitedStream(output, bytesPerSecond, timeProvider)
+            : output;
 
     /// <summary>
     /// Writes each of <paramref name="lines" /> to standard error, in order.
