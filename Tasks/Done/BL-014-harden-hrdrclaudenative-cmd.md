@@ -5,11 +5,12 @@ priority: Low
 assignee: Claude
 pipeline: direct
 depends-on: []
+touches: [hrdrClaudeNative.cmd]
 requirement: none
 created: 2026-09-25
-completed:
+completed: 2026-09-27
 ---
-# BL-014 — Harden `hrdrClaudeNative.cmd`
+# BL-014 â€” Harden `hrdrClaudeNative.cmd`
 
 ## Goal
 
@@ -24,9 +25,9 @@ script unless asked, so moving this task to `Backlog` counts as the asking.
 
 ## Acceptance criteria
 
-- [ ] The script checks the exit code of `npm install -g @anthropic-ai/claude-code`
+- [x] The script checks the exit code of `npm install -g @anthropic-ai/claude-code`
       and stops with a clear message when it is non-zero.
-- [ ] The PowerShell `--cwd` and `--label` arguments are quoted so a path containing
+- [x] The PowerShell `--cwd` and `--label` arguments are quoted so a path containing
       `'` works.
 
 ## Notes
@@ -34,3 +35,6 @@ script unless asked, so moving this task to `Backlog` counts as the asking.
 ## Log
 
 - 2026-09-25: Migrated from the Icebox of Documentation/Planning/Backlog.md as IB-001, renumbered BL-014 so the board has one ID sequence.
+- 2026-09-27: Deferred -> Backlog. Stewart asked for it to be done now (2026-09-27).
+- 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Done. hrdrClaudeNative.cmd stops with npm's exit code when the Claude Code install fails, and reads paths and labels from the environment so an apostrophe no longer breaks them.

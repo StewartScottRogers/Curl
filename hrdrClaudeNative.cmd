@@ -159,6 +159,10 @@ if not errorlevel 1 goto :claude_update
 
 echo       installing Claude Code via npm ...
 call "%NPM%" install -g @anthropic-ai/claude-code
+if errorlevel 1 (
+    set "ERRMSG=npm could not install Claude Code ^(exit code !ERRORLEVEL!^). Check your network connection and npm's output above, then retry."
+    goto :die
+)
 goto :claude_ready
 
 :claude_update
@@ -287,8 +291,11 @@ REM  Choose a friendly, incrementing tab label ("Claude", "Claude 2", ...) by
 REM  counting the claude agents herdr already tracks. The agent itself is
 REM  identified by detection (herdr's integration hook), not by this label, so the
 REM  label is display-only. PowerShell parses herdr's JSON API output for the count.
+REM  Every value handed to PowerShell here and below is read from the environment
+REM  ($env:HERDR, $env:REPO_DIR, ...) rather than pasted into a quoted string, so a
+REM  path or label containing an apostrophe cannot end the string early.
 set "CLAUDE_COUNT=0"
-for /f "usebackq delims=" %%N in (`powershell -NoProfile -Command "@((& '%HERDR%' agent list | ConvertFrom-Json).result.agents | Where-Object { $_.agent -eq 'claude' }).Count"`) do set "CLAUDE_COUNT=%%N"
+for /f "usebackq delims=" %%N in (`powershell -NoProfile -Command "@((& $env:HERDR agent list | ConvertFrom-Json).result.agents | Where-Object { $_.agent -eq 'claude' }).Count"`) do set "CLAUDE_COUNT=%%N"
 set /a LABEL_N=CLAUDE_COUNT+1
 REM  Put the containing folder's name in the tab caption so Claude tabs opened on
 REM  different checkouts/folders are easy to tell apart. %%~nxI is the last path
@@ -302,7 +309,7 @@ REM  cwd/env options moved onto pane/tab creation. So we create a labelled tab
 REM  anchored to the repo (with CLAUDE_MODEL forwarded into its environment) and
 REM  read the new pane's id out of the JSON response.
 set "PANE_ID="
-for /f "usebackq delims=" %%P in (`powershell -NoProfile -Command "(& '%HERDR%' tab create --cwd '%REPO_DIR%' --env CLAUDE_MODEL=%CLAUDE_MODEL% --label '%AGENT_LABEL%' --focus | ConvertFrom-Json).result.root_pane.pane_id"`) do set "PANE_ID=%%P"
+for /f "usebackq delims=" %%P in (`powershell -NoProfile -Command "(& $env:HERDR tab create --cwd $env:REPO_DIR --env ('CLAUDE_MODEL=' + $env:CLAUDE_MODEL) --label $env:AGENT_LABEL --focus | ConvertFrom-Json).result.root_pane.pane_id"`) do set "PANE_ID=%%P"
 if not defined PANE_ID (
     set "ERRMSG=herdr could not create a pane for Claude."
     goto :die
