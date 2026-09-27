@@ -73,6 +73,11 @@ public sealed class ScriptedConnection : IConnection
     /// <summary>Gets a value indicating whether the connection has been disposed.</summary>
     public bool IsDisposed { get; private set; }
 
+    /// <summary>
+    /// Gets a value indicating whether <see cref="MarkReusable" /> has been called.
+    /// </summary>
+    public bool IsMarkedReusable { get; private set; }
+
     /// <inheritdoc />
     public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
@@ -101,6 +106,9 @@ public sealed class ScriptedConnection : IConnection
 
     /// <inheritdoc />
     public ValueTask FlushAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
+
+    /// <inheritdoc />
+    public void MarkReusable() => IsMarkedReusable = true;
 
     /// <inheritdoc />
     public ValueTask DisposeAsync()
