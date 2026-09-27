@@ -33,3 +33,4 @@ Under `-L`, standard error carries curl 8.21.0's progress-meter lines for every 
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-27: Backlog -> Doing.
