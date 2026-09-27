@@ -32,3 +32,4 @@ A `help` line in a `-K` file makes the parse report the usage page (or the named
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
