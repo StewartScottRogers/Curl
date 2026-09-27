@@ -18,7 +18,8 @@
       next-id  The next free task ID.
       new      Create a task in Backlog from TASK-TEMPLATE.md.
       move     Move a task to another state, appending a Log line.
-      archive  Move finished tasks into Done\<yyyy-MM-dd_HHmm>\.
+      archive  Move finished tasks into Done\<yyyy-MM-dd_HHmm>\. With -WhenDoneIsLong,
+               move all of them, but only once Done holds more than 20.
       dedupe   Renumber tasks that share an ID with another. A task file that exists
                at -Since (a git ref; the shared branch before this lane's work) keeps
                its ID; the others get the next free IDs, and the old ID is rewritten in
@@ -80,7 +81,11 @@ param(
     [string] $Requirement = 'none',
 
     [ValidateRange(0, 3650)]
-    [int] $OlderThanDays = 7
+    [int] $OlderThanDays = 7,
+
+    # For 'archive': archive all of Done, whatever its age, but only once Done holds
+    # more than $DoneListLimit tasks; otherwise do nothing.
+    [switch] $WhenDoneIsLong
 )
 
 $ErrorActionPreference = 'Stop'
@@ -90,6 +95,9 @@ if ($env:CLAUDE_PROJECT_DIR) { $RepoRoot = $env:CLAUDE_PROJECT_DIR }
 else { $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path }
 $Board = [IO.Path]::GetFullPath((Join-Path $RepoRoot 'Tasks'))
 $DoneFolder = Join-Path $Board 'Done'
+# The most finished tasks Done may hold before 'archive -WhenDoneIsLong' clears it:
+# few enough that Stewart can read Done in 'status' at a glance.
+$DoneListLimit = 20
 $Template = Join-Path $PSScriptRoot 'TASK-TEMPLATE.md'
 $States = @('Backlog', 'Doing', 'Blocked', 'Deferred', 'Done')
 $Today = (Get-Date).ToString('yyyy-MM-dd')
@@ -457,10 +465,18 @@ switch ($Command) {
 
     'archive' {
         $tasks = Get-Tasks
+        $finished = @($tasks | Where-Object { $_.State -eq 'Done' -and -not $_.Archived })
+        if ($WhenDoneIsLong) {
+            if ($finished.Count -le $DoneListLimit) {
+                Write-Output ('Done holds {0} task(s); it is archived once it holds more than {1}.' -f $finished.Count, $DoneListLimit)
+                break
+            }
+            $OlderThanDays = 0
+        }
         $cutoff = (Get-Date).Date.AddDays(-$OlderThanDays)
         $due = @()
 
-        foreach ($task in @($tasks | Where-Object { $_.State -eq 'Done' -and -not $_.Archived })) {
+        foreach ($task in $finished) {
             $completed = [datetime]::MinValue
             $parsed = [datetime]::TryParseExact($task.Completed, 'yyyy-MM-dd',
                 [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::None, [ref]$completed)

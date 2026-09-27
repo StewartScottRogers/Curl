@@ -1105,6 +1105,15 @@ function Invoke-Integrate {
                 Invoke-Git @('commit', '-q', '-m', "chore(tasks): renumber task IDs another lane took first`n`n$($dedupe -join "`n")") | Out-Null
                 foreach ($line in $dedupe) { Write-Trace $Id 'renum' $line 'DarkYellow' }
             }
+            # Keep Done short enough for Stewart to read at a glance. Only the lane holding
+            # this lock archives, on top of every other lane's work, so two lanes never
+            # move the same finished tasks into different folders.
+            $archived = (Invoke-Board @('archive', '-WhenDoneIsLong')) | Where-Object { $_ -match '^Archived ' }
+            if ($archived) {
+                Invoke-Git @('add', '-A', '--', 'Tasks/Done') | Out-Null
+                Invoke-Git @('commit', '-q', '-m', "chore(tasks): archive Done once it grew past the short list`n`n$archived") | Out-Null
+                Write-Trace $Id 'archive' $archived
+            }
             if ($State -eq 'Done') {
                 $red = Test-Green
                 if ($red) { return "$red after rebasing onto the other lanes' work" }
