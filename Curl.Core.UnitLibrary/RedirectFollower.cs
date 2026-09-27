@@ -314,6 +314,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
             Http = HopHttp(http, hopProxy.ForwardProxy, bodyDropped, sendCredentials),
             TimeProvider = first.TimeProvider,
             CancellationToken = first.CancellationToken,
+            Progress = first.Progress,
         };
 
     /// <summary>

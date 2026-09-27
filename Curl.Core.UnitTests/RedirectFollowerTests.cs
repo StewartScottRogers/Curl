@@ -718,6 +718,25 @@ public sealed class RedirectFollowerTests
     }
 
     [TestMethod]
+    public async Task FollowAsync_NextHop_ReportsToTheFirstHopsProgressSink()
+    {
+        ScriptedHandler handler = new(Redirect(302, Next), Ok(200, 0));
+        RecordingTransferProgress progress = new();
+        TransferContext first = new()
+        {
+            Url = CurlUrl.Parse(First),
+            Output = Stream.Null,
+            Http = Location(),
+            Progress = progress,
+        };
+
+        await Follow(handler, first);
+
+        Assert.HasCount(2, handler.Contexts);
+        Assert.AreSame(progress, handler.Contexts[1].Progress);
+    }
+
+    [TestMethod]
     public async Task FollowAsync_NoHopProxySelector_EveryHopKeepsTheFirstUrlsProxy()
     {
         ProxyEndpoint socks = new(ProxyKind.Socks5, "127.0.0.1", 1080, null);
@@ -922,6 +941,22 @@ public sealed class RedirectFollowerTests
     /// <summary>
     /// A time source whose timestamps count milliseconds.
     /// </summary>
+    /// <summary>
+    /// An <see cref="ITransferProgress" /> that counts the reports it receives, standing in
+    /// for <c>Curl.Console</c>'s progress meter so a test can tell its instance apart from
+    /// <see cref="NoTransferProgress.Instance" />.
+    /// </summary>
+    private sealed class RecordingTransferProgress : ITransferProgress
+    {
+        public int ReportCount { get; private set; }
+
+        public void ReportTransferStarted() => ReportCount++;
+
+        public void ReportDownloaded(long bytesSoFar, long? expectedTotal) => ReportCount++;
+
+        public void ReportUploaded(long bytesSoFar, long? expectedTotal) => ReportCount++;
+    }
+
     private sealed class MillisecondTimeProvider : TimeProvider
     {
         public override long TimestampFrequency => 1000;
