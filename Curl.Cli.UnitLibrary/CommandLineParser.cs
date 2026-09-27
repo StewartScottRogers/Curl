@@ -354,30 +354,44 @@ public static class CommandLineParser
 
         for (int letter = 1; letter < argument.Length; letter++)
         {
-            if (!CommandLineOptionTable.TryFindShort(argument[letter], out CommandLineOption? option))
-            {
-                return CommandLineRefusal.UnknownOption(argument);
-            }
-
-            options.FirstOptionOfArgument = letter == 1;
-
-            if (option.TakesSubject)
-            {
-                return ApplySubjectLetter(options, option, argument, letter, reader);
-            }
-
-            if (option.TakesValue)
-            {
-                return ApplyRestOfBundle(options, option, argument, argument[(letter + 1)..], reader);
-            }
-
-            if (ApplyFlagLetterEndsBundle(options, option, argument, reader, out CommandLineRefusal? refusal))
+            if (ApplyBundleLetterEndsBundle(options, argument, letter, reader, out CommandLineRefusal? refusal))
             {
                 return refusal;
             }
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Applies the option letter at <paramref name="letter"/> in a short-option bundle. Returns
+    /// <see langword="true"/> when the bundle ends there: an unknown letter, a letter that takes the
+    /// rest of the bundle or the next argument, or a flag that ends it; <paramref name="refusal"/> is
+    /// then its outcome.
+    /// </summary>
+    private static bool ApplyBundleLetterEndsBundle(CommandLineOptions options, string argument, int letter, ArgumentReader reader, out CommandLineRefusal? refusal)
+    {
+        if (!CommandLineOptionTable.TryFindShort(argument[letter], out CommandLineOption? option))
+        {
+            refusal = CommandLineRefusal.UnknownOption(argument);
+            return true;
+        }
+
+        options.FirstOptionOfArgument = letter == 1;
+
+        if (option.TakesSubject)
+        {
+            refusal = ApplySubjectLetter(options, option, argument, letter, reader);
+            return true;
+        }
+
+        if (option.TakesValue)
+        {
+            refusal = ApplyRestOfBundle(options, option, argument, argument[(letter + 1)..], reader);
+            return true;
+        }
+
+        return ApplyFlagLetterEndsBundle(options, option, argument, reader, out refusal);
     }
 
     /// <summary>
