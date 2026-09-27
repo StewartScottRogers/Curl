@@ -13,6 +13,8 @@ namespace Curl.Core;
 /// giving 3 and 2; no digits, a sign, or a number too large for a 64-bit integer give
 /// zero. The result is capped at 21600 seconds (six hours). Zero means the header asks for
 /// nothing. Measured with curl 8.21.0 on 2026-09-26; the commands are in BL-208's notes.
+/// Only the three RFC 9110 date forms are read, not everything libcurl's lenient
+/// <c>parsedate</c> reads; ADR-0080 records why.
 /// </remarks>
 public static class RetryAfterHeader
 {
