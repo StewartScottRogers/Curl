@@ -31,6 +31,31 @@ public sealed class TransferContextFactoryTests
     }
 
     [TestMethod]
+    public void Create_Progress_IsTheSinkGiven()
+    {
+        using MemoryStream standardInput = new();
+        using MemoryStream output = new();
+        TransferStartedRecorder progress = new();
+
+        TransferContext context = new TransferContextFactory(standardInput)
+            .Create(Parse("file:///C:/x.txt"), CurlUrl.Parse("file:///C:/x.txt"), output, null, null, null, progress: progress);
+
+        Assert.AreSame(progress, context.Progress);
+    }
+
+    [TestMethod]
+    public void Create_NoProgress_IsNoTransferProgress()
+    {
+        using MemoryStream standardInput = new();
+        using MemoryStream output = new();
+
+        TransferContext context = new TransferContextFactory(standardInput)
+            .Create(Parse("file:///C:/x.txt"), CurlUrl.Parse("file:///C:/x.txt"), output, null, null, null);
+
+        Assert.AreSame(NoTransferProgress.Instance, context.Progress);
+    }
+
+    [TestMethod]
     public void Create_NoOptions_LeavesEveryOptionAtItsDefault()
     {
         using MemoryStream standardInput = new();

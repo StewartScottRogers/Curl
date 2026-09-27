@@ -41,6 +41,10 @@ internal sealed class TransferContextFactory(Stream standardInput)
     /// <see cref="RemoteHeaderNameStream" /> must read each header line before it goes anywhere;
     /// <see langword="null" /> to use that output as it is.
     /// </param>
+    /// <param name="progress">
+    /// Where the handler reports how far the transfer got, or <see langword="null" /> for
+    /// <see cref="NoTransferProgress.Instance" />.
+    /// </param>
     /// <returns>
     /// The context. Its <see cref="TransferContext.NoBody" /> is <c>-I</c>, and its
     /// <see cref="TransferContext.HeaderOutput" /> is <see cref="HeaderOutputOf" />'s, wrapped by
@@ -56,7 +60,8 @@ internal sealed class TransferContextFactory(Stream standardInput)
         HttpRequestBody? formBody = null,
         Stream? upload = null,
         ProxyEndpoint? proxy = null,
-        Func<Stream?, Stream>? watchHeaderOutput = null) =>
+        Func<Stream?, Stream>? watchHeaderOutput = null,
+        ITransferProgress? progress = null) =>
         new()
         {
             Url = url,
@@ -81,6 +86,7 @@ internal sealed class TransferContextFactory(Stream standardInput)
             TimeCondition = options.TimeCondition,
             Proxy = proxy,
             Http = HttpRequestOptionsMapping.FromCommandLine(options, formBody, proxy),
+            Progress = progress ?? NoTransferProgress.Instance,
         };
 
     /// <summary>

@@ -362,6 +362,12 @@ internal sealed class CurlCommandRunner(
     private string? transferOutputFileName;
 
     /// <summary>
+    /// Records whether the current transfer's handler reported it past connect or open, for
+    /// <see cref="WriteProgressMeterAsync" />; a new one for each transfer.
+    /// </summary>
+    private TransferStartedRecorder transferStarted = new();
+
+    /// <summary>
     /// The <c>%{conn_id}</c> the next transfer that connects takes, counted per run from zero.
     /// </summary>
     private long nextConnectionId;
@@ -1296,11 +1302,12 @@ internal sealed class CurlCommandRunner(
             return proxyFailure;
         }
 
+        transferStarted = new TransferStartedRecorder();
         string? outputFile = await ResolveOutputFileAsync(options, transfer, url).ConfigureAwait(false);
         if (outputFile is null)
         {
             TransferContext context = transferContextFactory.Create(
-                options, url, deferringStandardOutput, range, options.ResumeFrom, headerOutput, formBody, upload, proxy);
+                options, url, deferringStandardOutput, range, options.ResumeFrom, headerOutput, formBody, upload, proxy, progress: transferStarted);
             TransferResult standardOutputResult =
                 await TransferToStandardOutputAsync(follower, options, context).ConfigureAwait(false);
 
@@ -1422,9 +1429,10 @@ internal sealed class CurlCommandRunner(
     /// </summary>
     /// <param name="options">The accepted command line.</param>
     /// <param name="result">
-    /// The transfer's result; the meter follows a success, and a <c>-f</c> failure
-    /// (<see cref="CurlExitCode.HttpReturnedError" />), which curl 8.21.0 reports after the
-    /// meter's opening lines.
+    /// The transfer's result; the meter follows a success, a <c>-f</c> failure
+    /// (<see cref="CurlExitCode.HttpReturnedError" />), and any failure after the handler
+    /// reported the transfer past connect or open (<see cref="transferStarted" />), which
+    /// curl 8.21.0 reports after the meter's opening lines (task BL-130).
     /// </param>
     /// <param name="resumeFrom">The resolved <c>-C</c> offset, or <see langword="null" />.</param>
     /// <param name="toStandardOutput">Whether the transfer wrote its body to standard output.</param>
@@ -1435,7 +1443,7 @@ internal sealed class CurlCommandRunner(
         long? resumeFrom,
         bool toStandardOutput)
     {
-        if ((result.IsSuccess || result.ExitCode == CurlExitCode.HttpReturnedError)
+        if ((result.IsSuccess || result.ExitCode == CurlExitCode.HttpReturnedError || transferStarted.HasTransferStarted)
             && ShowsProgressMeter(options, toStandardOutput))
         {
             await WriteErrorLinesAsync(ProgressMeterLines.Opening(resumeFrom)).ConfigureAwait(false);
@@ -1658,7 +1666,7 @@ internal sealed class CurlCommandRunner(
             }
 
             TransferContext context = transferContextFactory.Create(
-                options, url, output, range, resumeFrom, headerOutput, formBody, upload, proxy, watchHeaderOutput);
+                options, url, output, range, resumeFrom, headerOutput, formBody, upload, proxy, watchHeaderOutput, transferStarted);
             TransferResult fileResult = await follower
                 .FollowAsync(context, RedirectPolicyMapping.FromCommandLine(options))
                 .ConfigureAwait(false);
