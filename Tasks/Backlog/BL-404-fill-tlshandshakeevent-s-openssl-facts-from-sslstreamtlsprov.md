@@ -1,5 +1,5 @@
 ---
-id: BL-400
+id: BL-404
 title: Report TlsHandshakeEvent, with its OpenSSL facts, from SslStreamTlsProvider
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-400 — Report TlsHandshakeEvent, with its OpenSSL facts, from SslStreamTlsProvider
+# BL-404 — Report TlsHandshakeEvent, with its OpenSSL facts, from SslStreamTlsProvider
 
 ## Goal
 
@@ -21,7 +21,7 @@ the transfer's `ITransferEvents`, filling `PeerCertificateChain` and
 
 ## Context
 
-- BL-356 and ADR-0083 added the optional OpenSSL facts to
+- BL-356 and ADR-0085 added the optional OpenSSL facts to
   `Curl.Protocol.Abstractions.UnitLibrary/TlsHandshakeEvent.cs` and the wording in
   `Curl.Output.UnitLibrary/OpenSslHandshakeText.cs`; nothing reports the event yet
   (`grep ReportTlsHandshake` finds only Output and the sinks).

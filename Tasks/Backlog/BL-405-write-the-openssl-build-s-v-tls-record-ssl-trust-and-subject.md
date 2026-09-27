@@ -1,5 +1,5 @@
 ---
-id: BL-401
+id: BL-405
 title: Write the OpenSSL build's -v TLS record, SSL Trust and subjectAltName lines
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-401 — Write the OpenSSL build's -v TLS record, SSL Trust and subjectAltName lines
+# BL-405 — Write the OpenSSL build's -v TLS record, SSL Trust and subjectAltName lines
 
 ## Goal
 
@@ -22,7 +22,7 @@ build of curl 8.21.0 prints around a handshake that BL-356 left out: the TLS rec
 
 ## Context
 
-- ADR-0083 lists these as left out: `ReportTlsData` writes nothing, the handshake event
+- ADR-0085 lists these as left out: `ReportTlsData` writes nothing, the handshake event
   carries no host name or proxy flag, and the `SSL Trust` lines come from the connect
   options (`--cacert`, `-k`), not the handshake.
 - Measured lines and source references are in BL-356's Notes (`lib/vtls/openssl.c`

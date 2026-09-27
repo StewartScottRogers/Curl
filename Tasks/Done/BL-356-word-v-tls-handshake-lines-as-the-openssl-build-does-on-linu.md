@@ -81,7 +81,7 @@ On Linux and macOS, `VerboseTransferEventWriter` renders a `TlsHandshakeEvent` a
   Needs an ADR ("Decided by Claude under Stewart's delegation").
   `Curl.Protocol.Abstractions.UnitLibrary` and its tests added to `touches` for this;
   BL-391 (in Doing) touches them, so this waits until it is done.
-- 2026-09-27, lane 1 — delivered as planned; decisions in ADR-0083 ("Decided by Claude
+- 2026-09-27, lane 1 — delivered as planned; decisions in ADR-0085 ("Decided by Claude
   under Stewart's delegation").
   - `TlsHandshakeEvent` gained optional `NegotiatedGroupName`, `PeerSignatureTypeName`,
     `CertificateVerifyResult` (OpenSSL `X509_V_` code) and `PeerCertificateChain`.
@@ -96,7 +96,7 @@ On Linux and macOS, `VerboseTransferEventWriter` renders a `TlsHandshakeEvent` a
     the measured exchange 1 above with the measured certificate copied to
     `Curl.Output.UnitTests/Fixtures/openssl-verbose-localhost.pem`; exchange 3's
     `SSL connection using TLSv1.2 / ECDHE-RSA-AES256-GCM-SHA384 / x25519 / RSASSA-PSS`
-    is pinned too. The `SSL Trust` line is not this event's (BL-401).
+    is pinned too. The `SSL Trust` line is not this event's (BL-405).
   - Name printing checked against Git for Windows' OpenSSL 3.5.7:
     `openssl x509 -nameopt oneline,-esc_msb,-space_eq,sep_semi_plus_space` printed
     `C=GB; ST=Some + O=Multi; L=" Leading, and; special \"q\" back #x"; O="#hash<gt>"; ...; OU="trail "`,
@@ -107,14 +107,14 @@ On Linux and macOS, `VerboseTransferEventWriter` renders a `TlsHandshakeEvent` a
     negotiate them).
   - Defaults taken: unknown key types and curves get no `Certificate level` line; an
     unprintable issuer prints `[NONE]` like the subject; `Documentation/Planning/Decisions`
-    added to `touches` for ADR-0083 (no task in Doing names it).
+    added to `touches` for ADR-0085 (no task in Doing names it).
   - Quality: Curl.Output.UnitLibrary 100% line, 100% branch, 0 failing members (worst
     CRAP 10); Curl.Protocol.Abstractions.UnitLibrary 100%/100%, its one failing member
     (`CurlUrlHost.TryNormalize`, complexity 12) predates this task. Tests: Output 335,
     Abstractions 503, whole fast suite green. `dotnet format` reports only the
     repository-wide ENDOFLINE diagnostics that existing files also have.
-  - Follow-ups filed: BL-400 (report the event, with these facts, from
-    `SslStreamTlsProvider`), BL-401 (TLS record, `SSL Trust`, `subjectAltName` and
+  - Follow-ups filed: BL-404 (report the event, with these facts, from
+    `SslStreamTlsProvider`), BL-405 (TLS record, `SSL Trust`, `subjectAltName` and
     `Proxy certificate:` lines).
 
 ## Log
