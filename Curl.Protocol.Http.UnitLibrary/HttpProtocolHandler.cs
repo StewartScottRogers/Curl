@@ -20,8 +20,7 @@ namespace Curl.Protocol.Http;
 /// in answer to a 401's <c>WWW-Authenticate</c> challenges.
 /// </param>
 /// <param name="cookieStore">
-/// The cookies to send and store, or <see langword="null" /> when cookies are off. Held for
-/// the cookie task (BL-182); this handler sends and stores no cookie yet.
+/// The cookies to send and store, or <see langword="null" /> when cookies are off.
 /// </param>
 /// <remarks>
 /// <para>
@@ -72,6 +71,13 @@ namespace Curl.Protocol.Http;
 /// (<see cref="HttpConnectionPersistence" />), in which case on a new one. A 401 that is not
 /// retried is the result, exit 0, or exit 22 under <c>-f</c>; the 401 a retry answers never
 /// fails the transfer. Measured on curl 8.21.0 (BL-181 Notes, ADR-0034).
+/// </para>
+/// <para>
+/// With a cookie store, every request, an authentication retry included, asks it afresh for
+/// the <c>Cookie</c> value (sent over TLS for <c>https</c>, at the time from
+/// <see cref="ITransferContext.TimeProvider" />), and every final response head read, a 3xx
+/// or a 401 included, hands its <c>Set-Cookie</c> values to it in received order, before the
+/// head is written. Measured on curl 8.21.0 (BL-182 Notes).
 /// </para>
 /// </remarks>
 public sealed class HttpProtocolHandler(
@@ -180,7 +186,7 @@ public sealed class HttpProtocolHandler(
         HttpRequestOptions options = plan.Options;
         HttpRequestFraming framing = plan.Framing;
         CancellationToken cancellationToken = context.CancellationToken;
-        byte[] request = HttpRequestHeadFormatter.Format(context.Url, options, context.NoBody, plan.Authorization);
+        byte[] request = HttpRequestHeadFormatter.Format(context.Url, options, context.NoBody, plan.Authorization, CookieHeaderFor(context));
         await connection.WriteAsync(request, cancellationToken).ConfigureAwait(false);
         await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
 
@@ -194,6 +200,7 @@ public sealed class HttpProtocolHandler(
             await SendBodyAsync(context, framing, responseConnection, upload).ConfigureAwait(false);
             exchange.Head = await new HttpResponseHeadReader(responseConnection).ReadAsync(cancellationToken).ConfigureAwait(false);
             exchange.RedirectUrl = HttpRedirectLocation.Find(context.Url, exchange.Head);
+            StoreCookies(context, exchange.Head);
             await WriteHeadersAsync(context.HeaderOutput, exchange.Head.HeadBytes, cancellationToken).ConfigureAwait(false);
             retryAuthorization = RetryAuthorization(plan, exchange.Head);
             HttpFailMode fail = retryAuthorization is null ? options.Fail : HttpFailMode.None;
@@ -218,6 +225,26 @@ public sealed class HttpProtocolHandler(
     }
 
     /// <summary>
+    /// Asks the cookie store for the <c>Cookie</c> value to send to the transfer's URL, or
+    /// gives <see langword="null" /> when cookies are off.
+    /// </summary>
+    private string? CookieHeaderFor(ITransferContext context) =>
+        CookieStore?.GetCookieHeader(context.Url, TargetOf(context.Url).UseTls, context.TimeProvider.GetUtcNow());
+
+    /// <summary>
+    /// Hands the <c>Set-Cookie</c> values of <paramref name="head" />, in received order, to
+    /// the cookie store, when cookies are on and the head has any.
+    /// </summary>
+    private void StoreCookies(ITransferContext context, HttpResponseHead head)
+    {
+        string[] setCookies = ValuesOf(head, "Set-Cookie");
+        if (CookieStore is { } store && setCookies.Length > 0)
+        {
+            store.StoreFromResponse(context.Url, setCookies, context.TimeProvider.GetUtcNow());
+        }
+    }
+
+    /// <summary>
     /// Decides whether a response is answered with one more request, and with what
     /// <c>Authorization</c> value: only a 401, only when the request that drew it sent none
     /// (a credential sent up front and refused ends the transfer, as in curl 8.21.0), only
@@ -231,7 +258,7 @@ public sealed class HttpProtocolHandler(
             return null;
         }
 
-        string[] challenges = ChallengesOf(head);
+        string[] challenges = ValuesOf(head, "WWW-Authenticate");
         return challenges.Length == 0 ? null : Authenticator.CreateAuthorization(plan.AuthRequest, challenges);
     }
 
@@ -243,11 +270,12 @@ public sealed class HttpProtocolHandler(
         plan.Authorization is null && head.StatusLine.StatusCode == 401 && plan.Framing.Body is not StreamBody;
 
     /// <summary>
-    /// Gets the <c>WWW-Authenticate</c> values of <paramref name="head" />, in order.
+    /// Gets the values of every <paramref name="name" /> header of <paramref name="head" />,
+    /// in received order.
     /// </summary>
-    private static string[] ChallengesOf(HttpResponseHead head) =>
+    private static string[] ValuesOf(HttpResponseHead head, string name) =>
         [.. head.Headers
-            .Where(header => string.Equals(header.Name, "WWW-Authenticate", StringComparison.OrdinalIgnoreCase))
+            .Where(header => string.Equals(header.Name, name, StringComparison.OrdinalIgnoreCase))
             .Select(header => header.Value)];
 
     /// <summary>

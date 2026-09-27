@@ -8,14 +8,16 @@ namespace Curl.Protocol.Http;
 /// <summary>
 /// Formats the head of an HTTP/1.1 request - the request line, the headers and the empty
 /// line after them - byte for byte as curl 8.21.0 sends it for <c>-X</c>, <c>-H</c>,
-/// <c>-A</c>, <c>-e</c>, <c>-I</c>, <c>--compressed</c>, an <c>Authorization</c> value and a
-/// request body. Every rule was measured (BL-172, BL-175, BL-177 and BL-181 Notes).
+/// <c>-A</c>, <c>-e</c>, <c>-I</c>, <c>--compressed</c>, an <c>Authorization</c> value, a
+/// <c>Cookie</c> value and a request body. Every rule was measured (BL-172, BL-175, BL-177,
+/// BL-181 and BL-182 Notes).
 /// </summary>
 /// <remarks>
 /// curl's own headers come first, in the order <c>Host</c>, <c>Authorization</c>, <c>User-Agent</c>,
 /// <c>Accept</c>, <c>Accept-Encoding</c> (for <c>--compressed</c>), <c>Referer</c>, each
-/// left out when an <c>-H</c> value names it; the <c>-H</c> values follow in command-line
-/// order. A custom <c>Host</c> is the exception: it takes the <c>Host</c> slot. A request with a body ends with <c>Content-Length</c> (or
+/// left out when an <c>-H</c> value names it, then the cookie store's <c>Cookie</c>, which is
+/// sent even when an <c>-H</c> value names <c>Cookie</c>; the <c>-H</c> values follow in
+/// command-line order. A custom <c>Host</c> is the exception: it takes the <c>Host</c> slot. A request with a body ends with <c>Content-Length</c> (or
 /// <c>Transfer-Encoding: chunked</c> when the length is unknown), <c>Content-Type</c> and
 /// <c>Expect: 100-continue</c> as <see cref="HttpRequestFraming" /> decides, each again left
 /// out when an <c>-H</c> value names it. Text is sent one byte per character (Latin-1), as curl
@@ -52,8 +54,11 @@ internal static class HttpRequestHeadFormatter
     /// The <c>Authorization</c> value the authenticator gave, or <see langword="null" /> to
     /// send none.
     /// </param>
+    /// <param name="cookie">
+    /// The <c>Cookie</c> value the cookie store gave, or <see langword="null" /> to send none.
+    /// </param>
     /// <returns>The head's bytes, ending in the empty line.</returns>
-    internal static byte[] Format(Uri url, HttpRequestOptions? options, bool noBody = false, string? authorization = null)
+    internal static byte[] Format(Uri url, HttpRequestOptions? options, bool noBody = false, string? authorization = null, string? cookie = null)
     {
         options ??= new HttpRequestOptions();
         HttpCustomHeader[] customHeaders = [.. options.Headers.Select(HttpCustomHeader.Parse)];
@@ -71,6 +76,7 @@ internal static class HttpRequestHeadFormatter
         AppendUnlessOverridden(head, customHeaders, "Accept", "*/*");
         AppendUnlessOverridden(head, customHeaders, "Accept-Encoding", options.Compressed ? AcceptEncoding : null);
         AppendUnlessOverridden(head, customHeaders, "Referer", options.Referer);
+        AppendCookie(head, cookie);
         AppendCustomHeaders(head, customHeaders, hostLine is not null);
         AppendBodyHeaders(head, customHeaders, framing);
         head.Append("\r\n");
@@ -113,6 +119,18 @@ internal static class HttpRequestHeadFormatter
         if (!string.IsNullOrEmpty(value) && !customHeaders.Any(header => header.Names(name)))
         {
             head.Append(name).Append(": ").Append(value).Append("\r\n");
+        }
+    }
+
+    /// <summary>
+    /// Appends the cookie store's <c>Cookie</c> line, whatever the <c>-H</c> values name, as
+    /// curl 8.21.0 sends its cookie engine's line beside a custom <c>Cookie</c> (BL-182 Notes).
+    /// </summary>
+    private static void AppendCookie(StringBuilder head, string? cookie)
+    {
+        if (!string.IsNullOrEmpty(cookie))
+        {
+            head.Append("Cookie: ").Append(cookie).Append("\r\n");
         }
     }
 

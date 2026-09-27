@@ -311,6 +311,57 @@ public sealed class HttpRequestHeadFormatterTests
         Assert.AreEqual(expected, Encoding.Latin1.GetString(head));
     }
 
+    /// <summary>
+    /// Measured (BL-182 Notes): with a cookie jar, curl sends <c>Cookie</c> after
+    /// <c>Referer</c> and before the <c>-H</c> values and the body's headers, and still sends
+    /// it when an <c>-H</c> value names <c>Cookie</c>. The <c>--compressed</c> row sends
+    /// <c>Accept-Encoding</c> without <c>zstd</c> (ADR-0020).
+    /// </summary>
+    [TestMethod]
+    [DataRow(
+        new[] { "X-A: 1" },
+        null,
+        "GET / HTTP/1.1\r\nHost: 127.0.0.1:18082\r\nAuthorization: Basic dTpw\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nAccept-Encoding: deflate, gzip, br\r\nReferer: ref\r\nCookie: j=k\r\nX-A: 1\r\n\r\n",
+        DisplayName = "-u -e --compressed -H")]
+    [DataRow(
+        new[] { "Cookie: c=d" },
+        null,
+        "GET / HTTP/1.1\r\nHost: 127.0.0.1:18082\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nCookie: j=k\r\nCookie: c=d\r\n\r\n",
+        DisplayName = "-H Cookie: c=d")]
+    [DataRow(
+        new[] { "Cookie:" },
+        null,
+        "GET / HTTP/1.1\r\nHost: 127.0.0.1:18082\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nCookie: j=k\r\n\r\n",
+        DisplayName = "-H Cookie:")]
+    [DataRow(
+        new string[0],
+        "x=1",
+        "POST / HTTP/1.1\r\nHost: 127.0.0.1:18082\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nCookie: j=k\r\nContent-Length: 3\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n",
+        DisplayName = "-d x=1")]
+    public void Format_Cookie_SendsItAfterRefererAndBeforeTheCustomHeaders(string[] headers, string? body, string expected)
+    {
+        bool full = headers.Contains("X-A: 1");
+        HttpRequestOptions options = new()
+        {
+            Headers = headers,
+            Referer = full ? "ref" : null,
+            Compressed = full,
+            Body = body is null ? null : new BytesBody(Encoding.Latin1.GetBytes(body), "application/x-www-form-urlencoded"),
+        };
+
+        byte[] head = HttpRequestHeadFormatter.Format(new Uri("http://127.0.0.1:18082/"), options, authorization: full ? "Basic dTpw" : null, cookie: "j=k");
+
+        Assert.AreEqual(expected, Encoding.Latin1.GetString(head));
+    }
+
+    [TestMethod]
+    public void Format_EmptyCookie_SendsNoCookieHeader()
+    {
+        byte[] head = HttpRequestHeadFormatter.Format(new Uri(Url), null, cookie: string.Empty);
+
+        Assert.AreEqual("GET / HTTP/1.1\r\n" + DefaultHeaders + "\r\n", Encoding.Latin1.GetString(head));
+    }
+
     private static void AssertHead(string expected, Uri url, HttpRequestOptions? options)
     {
         Assert.AreEqual(expected, Encoding.Latin1.GetString(HttpRequestHeadFormatter.Format(url, options)));
