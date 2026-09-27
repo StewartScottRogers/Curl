@@ -63,6 +63,116 @@ public sealed class VerboseTransferEventWriterTests
     }
 
     [TestMethod]
+    public void HttpExchangeWithTraceTime_StampsEachLineStartAsCurl()
+    {
+        // Measured 2026-09-27, curl 8.21.0 (mingw, Schannel): Record-CurlExchange.ps1 -Port 18358
+        // -Response 'HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 6\r\n\r\nhello\n'
+        // -CurlArgs @('-s','-v','--trace-time','-d','abc','http://127.0.0.1:18358/f.txt','-o','NUL').
+        VerboseTransferEventWriter writer = new(
+            output,
+            writesDataLines: true,
+            writesTimestamps: true,
+            new QueuedTimeProvider(
+                At(1, 442),
+                At(1, 443),
+                At(1, 443),
+                At(1, 443),
+                At(1, 447),
+                At(1, 447),
+                At(1, 494),
+                At(1, 494),
+                At(1, 494),
+                At(1, 494),
+                At(1, 494),
+                At(1, 494)));
+
+        writer.ReportInfo("  Trying 127.0.0.1:18358...");
+        writer.ReportConnectionOpened(Opened(new IPEndPoint(IPAddress.Loopback, 18358), 62241));
+        writer.ReportInfo("using HTTP/1.x");
+        writer.ReportRequestHeader(
+            "POST /f.txt HTTP/1.1\r\nHost: 127.0.0.1:18358\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"u8 +
+            "Content-Length: 3\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n"u8);
+        writer.ReportDataSent("abc"u8);
+        writer.ReportInfo("upload completely sent off: 3 bytes");
+        writer.ReportResponseHeader("HTTP/1.1 200 OK\r\n"u8);
+        writer.ReportResponseHeader("Content-Type: text/plain\r\n"u8);
+        writer.ReportResponseHeader("Content-Length: 6\r\n"u8);
+        writer.ReportResponseHeader("\r\n"u8);
+        writer.ReportDataReceived("hello\n"u8);
+        writer.ReportInfo("Connection #0 to host 127.0.0.1:18358 left intact");
+
+        Assert.AreEqual(
+            "12:02:01.442000 *   Trying 127.0.0.1:18358...\r\n" +
+            "12:02:01.443000 * Established connection to 127.0.0.1 (127.0.0.1 port 18358) from 127.0.0.1 port 62241 \r\n" +
+            "12:02:01.443000 * using HTTP/1.x\r\n" +
+            "12:02:01.443000 > POST /f.txt HTTP/1.1\r\r\n" +
+            "12:02:01.443000 > Host: 127.0.0.1:18358\r\r\n" +
+            "12:02:01.443000 > User-Agent: curl/8.21.0\r\r\n" +
+            "12:02:01.443000 > Accept: */*\r\r\n" +
+            "12:02:01.443000 > Content-Length: 3\r\r\n" +
+            "12:02:01.443000 > Content-Type: application/x-www-form-urlencoded\r\r\n" +
+            "12:02:01.443000 > \r\r\n" +
+            "12:02:01.447000 } [3 bytes data]\r\n" +
+            "12:02:01.447000 * upload completely sent off: 3 bytes\r\n" +
+            "12:02:01.494000 < HTTP/1.1 200 OK\r\r\n" +
+            "12:02:01.494000 < Content-Type: text/plain\r\r\n" +
+            "12:02:01.494000 < Content-Length: 6\r\r\n" +
+            "12:02:01.494000 < \r\r\n" +
+            "12:02:01.494000 { [6 bytes data]\r\n" +
+            "12:02:01.494000 * Connection #0 to host 127.0.0.1:18358 left intact\r\n",
+            WrittenAsWindowsStandardError());
+    }
+
+    [TestMethod]
+    public void ResponseHeaderContinuingAnOpenLine_GetsNoStamp()
+    {
+        VerboseTransferEventWriter writer = new(
+            output,
+            writesDataLines: true,
+            writesTimestamps: true,
+            new QueuedTimeProvider(At(1, 1), At(2, 2)),
+            TlsBackend.Schannel);
+
+        writer.ReportResponseHeader("HTTP/1.1 2"u8);
+        writer.ReportResponseHeader("00 OK\r\n"u8);
+        writer.ReportResponseHeader("\r\n"u8);
+
+        Assert.AreEqual("12:02:01.001000 < HTTP/1.1 200 OK\r\n12:02:02.002000 < \r\n", Written());
+    }
+
+    [TestMethod]
+    public void RequestHeaderContinuingAnOpenLine_StampsOnlyTheLinesItStarts()
+    {
+        VerboseTransferEventWriter writer = new(
+            output,
+            writesDataLines: true,
+            writesTimestamps: true,
+            new QueuedTimeProvider(At(1, 1), At(2, 2)),
+            TlsBackend.Schannel);
+
+        writer.ReportRequestHeader("GET / HT"u8);
+        writer.ReportRequestHeader("TP/1.1\r\nAccept: */*\r\n"u8);
+
+        Assert.AreEqual("12:02:01.001000 > GET / HTTP/1.1\r\n12:02:02.002000 > Accept: */*\r\n", Written());
+    }
+
+    [TestMethod]
+    public void DataRunWithTraceTime_ReadsTheClockOnlyForTheLineItWrites()
+    {
+        VerboseTransferEventWriter writer = new(
+            output,
+            writesDataLines: true,
+            writesTimestamps: true,
+            new QueuedTimeProvider(At(1, 1)),
+            TlsBackend.Schannel);
+
+        writer.ReportDataReceived("abc"u8);
+        writer.ReportDataReceived("de"u8);
+
+        Assert.AreEqual("12:02:01.001000 { [3 bytes data]\n", Written());
+    }
+
+    [TestMethod]
     public void HttpsExchange_RendersAsCurl()
     {
         VerboseTransferEventWriter writer = new(output, writesDataLines: true, TlsBackend.Schannel);
@@ -392,6 +502,11 @@ public sealed class VerboseTransferEventWriterTests
     }
 
     // curl's standard error is in text mode on Windows, so every line feed is written as CR LF.
+    private static DateTimeOffset At(int second, int millisecond)
+    {
+        return new DateTimeOffset(2026, 9, 27, 12, 2, second, millisecond, TimeSpan.Zero);
+    }
+
     private string WrittenAsWindowsStandardError()
     {
         return Written().Replace("\n", "\r\n", StringComparison.Ordinal);

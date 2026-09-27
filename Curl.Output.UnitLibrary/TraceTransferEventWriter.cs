@@ -184,8 +184,6 @@ public sealed class TraceTransferEventWriter(
             return string.Empty;
         }
 
-        DateTimeOffset now = timeProvider.GetLocalNow();
-        long microseconds = now.Ticks / TimeSpan.TicksPerMicrosecond % 1_000_000;
-        return string.Create(CultureInfo.InvariantCulture, $"{now:HH:mm:ss}.{microseconds:D6} ");
+        return TraceTimeStamp.Read(timeProvider);
     }
 }
