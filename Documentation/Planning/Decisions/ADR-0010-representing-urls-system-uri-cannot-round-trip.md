@@ -1,7 +1,7 @@
 # ADR-0010 — Representing URLs `System.Uri` cannot round-trip: replace, wrap or pre-parse
 
-- **Status:** Proposed
-- **Date:** 2026-09-26
+- **Status:** Accepted - option 1, replace. Decided by Claude under Stewart's delegation.
+- **Date:** 2026-09-26 (proposed under BL-128, accepted under BL-010)
 
 ## Context
 
@@ -9,7 +9,9 @@
 a `System.Uri`, and so is `TransferContext.Url`, its one production implementation.
 ADR-0003's "Known limitation" section records, against curl 8.21.0, the URLs `Uri`
 alters or refuses, and task BL-010 adds two more. This ADR compares three ways to
-represent them, so that the decision in BL-010 can be made. It decides nothing itself.
+represent them. It was drafted under BL-128 as a proposal; BL-010 accepted option 1 and
+rewrote the Decision section below. The Context is as drafted, with one addendum,
+"What changed between the draft and the decision".
 
 ### How a URL reaches a handler today
 
@@ -90,9 +92,61 @@ the message for that spelling is "The hostname could not be parsed", as the comm
 
 ## Decision
 
-Not made. This ADR sets out the three options; Stewart chooses between them under
-BL-010, and the accepted choice will be recorded then, by accepting this ADR with its
-Decision section rewritten or by a new ADR that supersedes it.
+**Option 1, replace.** Decided by Claude under Stewart's delegation (BL-010,
+2026-09-26), taking BL-128's recommendation. `ITransferContext.Url` becomes `CurlUrl`, a
+base-class-library-only URL type in `Curl.Protocol.Abstractions.UnitLibrary` that parses
+as curl 8.21.0's URL API does, keeps the text as typed, and carries a path-as-is switch.
+`System.Uri` leaves the transfer path entirely: `CurlCommandRunner` parses with
+`CurlUrl.TryParse` instead of `Uri.TryCreate`, and every contract member that carries a
+transfer URL as a `Uri` (`TransferContext.Url`, `HttpAuthRequest.Url`, the `ICookieStore`
+parameters) changes with it. Each case in the table below is represented as the
+"Replace" column says.
+
+Why, beyond the recommendation's reasons:
+
+- Only option 1 matches curl for every recorded case and every scheme. The standing
+  rule is to stay a drop-in replacement, and the other two knowingly leave cases
+  wrong: pre-parse cannot carry `file://C:`, `file:///C:` or `file:///Q:dir/../x`;
+  wrap leaves `--path-as-is` and `%2F` wrong for HTTP.
+- Since the draft, the HTTP handler, cookies, redirects and proxy selection have all
+  started reading `Uri` (see the addendum). That makes the change bigger than the draft
+  estimated, but it also makes the problem real for HTTP rather than hypothetical, and
+  it only grows with each handler written against `Uri`.
+- Wrap's apparent saving is mostly the parser, and a curl-compatible parser is needed
+  anyway for BL-030 (`-T` URL resolution and normalisation) and for `--path-as-is` in
+  the HTTP request line (BL-186).
+
+To keep each step small, `CurlUrl` also offers the `Uri` members handlers read today
+(`Scheme`, `Host`, `IdnHost`, `Port`, `IsDefaultPort`, `AbsolutePath`,
+`OriginalString`), with curl's meaning, so the contract switch is mostly mechanical.
+
+Implementation, filed under BL-010:
+
+| Task | Does |
+| --- | --- |
+| BL-292 | Adds `CurlUrl` and its parser to `Curl.Protocol.Abstractions.UnitLibrary`, tested against every case below. Additive. |
+| BL-293 | Carries `--path-as-is` to handlers as `ITransferContext.PathAsIs`; the `file` handler honours it. |
+| BL-294 | Switches `ITransferContext.Url` and the other `Uri`-typed contract members to `CurlUrl`, in every project that reads them. Depends on BL-292. |
+| BL-295 | Opens the `file://` spellings `Uri` refused and unskips `file://C:`. Depends on BL-293 and BL-294. |
+
+BL-030 now depends on BL-292, and BL-186 on BL-293 and BL-294.
+
+### What changed between the draft and the decision
+
+Read from the source on 2026-09-26, when this ADR was accepted:
+
+- `Curl.Protocol.Http.UnitLibrary` is no longer empty: `HttpProtocolHandler`,
+  `HttpRedirectLocation` and `HttpRequestHeadFormatter` read the `Uri`.
+- `Curl.Core.UnitLibrary`'s `ProxySelector` and `RedirectFollower`, and
+  `Curl.Cookies.UnitLibrary`'s `CookieOrigin`, `CookieStore` and `SetCookieParser`,
+  read it too; `HttpAuthRequest.Url` and `ICookieStore` carry a `Uri` on the contract.
+- `CurlCommandRunner` still calls `Uri.TryCreate`, now after appending `--url-query`,
+  and a `TransferContextFactory` builds the context.
+- `--path-as-is` is now parsed into `CommandLineOptions.PathAsIs`, but nothing carries
+  it past the command line (BL-293).
+- `new Uri(` appears about 160 times in the tests, not 77.
+
+## The options compared
 
 ### Option 1 — Replace: a curl-style URL type
 
@@ -229,7 +283,7 @@ Option 1, replace, for these reasons:
 
 If the cost of Option 1 is too high for the current phase, Option 2 is the fallback,
 with the wrapper's text as the source of truth and the `Uri` read only for host and
-port. The decision is Stewart's, under BL-010.
+port. BL-010 took this recommendation; see the Decision section.
 
 Sources: <https://curl.se/docs/url-syntax.html>, <https://curl.se/docs/manpage.html>
 (`--path-as-is`) and <https://curl.se/libcurl/c/curl_url_get.html>. The curl behaviour
