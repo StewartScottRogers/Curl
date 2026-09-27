@@ -35,6 +35,11 @@ public sealed class SslStreamTlsProvider : ITlsProvider
         "Warning: with Schannel",
     ];
 
+    // Held in a field so the delegate is made once, not cached behind a branch in every constructor.
+    private static readonly Func<SslStream, SslClientAuthenticationOptions, CancellationToken, Task> SslStreamAuthenticateAsClientAsync =
+        static (sslStream, authenticationOptions, cancellationToken) =>
+            sslStream.AuthenticateAsClientAsync(authenticationOptions, cancellationToken);
+
     private readonly TlsClientOptions _options;
 
     private readonly bool _matchesSchannelBuild;
@@ -128,6 +133,24 @@ public sealed class SslStreamTlsProvider : ITlsProvider
     /// line is without its line ending.
     /// </summary>
     public IReadOnlyList<string> Warnings { get; }
+
+    /// <summary>
+    /// Gets the factory that builds the OpenSSL build's <see cref="CipherSuitesPolicy" /> from
+    /// the suites <c>--ciphers</c> and <c>--tls13-ciphers</c> select, returning
+    /// <see langword="null" /> where the platform cannot apply them. Defaults to
+    /// <see cref="Networking.CipherSuitesPolicyFactory.ForThisPlatform" />; tests replace it.
+    /// </summary>
+    internal ICipherSuitesPolicyFactory CipherSuitesPolicyFactory { get; init; } =
+        Networking.CipherSuitesPolicyFactory.ForThisPlatform;
+
+    /// <summary>
+    /// Gets the step that runs the client handshake on the <see cref="SslStream" /> with the
+    /// options the provider built. Defaults to
+    /// <see cref="SslStream.AuthenticateAsClientAsync(SslClientAuthenticationOptions, CancellationToken)" />;
+    /// tests replace it to see the options.
+    /// </summary>
+    internal Func<SslStream, SslClientAuthenticationOptions, CancellationToken, Task> AuthenticateSslStreamAsClientAsync { get; init; } =
+        SslStreamAuthenticateAsClientAsync;
 
     /// <inheritdoc />
     /// <remarks>
@@ -224,7 +247,7 @@ public sealed class SslStreamTlsProvider : ITlsProvider
         try
         {
             var handshakeStarted = _timeProvider.GetTimestamp();
-            await sslStream.AuthenticateAsClientAsync(authenticationOptions, cancellationToken).ConfigureAwait(false);
+            await AuthenticateSslStreamAsClientAsync(sslStream, authenticationOptions, cancellationToken).ConfigureAwait(false);
             return ConnectResult.Connected(
                 new SslStreamConnection(sslStream, plaintext, clientCertificate),
                 new ConnectTimings(handshakeStarted, null, handshakeStarted, _timeProvider.GetTimestamp()),
@@ -312,7 +335,8 @@ public sealed class SslStreamTlsProvider : ITlsProvider
 
     // ADR-0011: the Schannel build refuses --ciphers and ignores --tls13-ciphers; the
     // OpenSSL build offers what they name. CipherSuitesPolicy cannot be constructed on
-    // Windows, where only the tests run the OpenSSL build, so there it cannot apply them.
+    // Windows, where only the tests run the OpenSSL build, so there the factory builds none
+    // and the build cannot apply them.
     private (CipherSuitesPolicy? Policy, string? FailureMessage) CreateCipherSuitesPolicy()
     {
         if (_matchesSchannelBuild)
@@ -326,12 +350,10 @@ public sealed class SslStreamTlsProvider : ITlsProvider
             return (null, failureMessage);
         }
 
-        if (OperatingSystem.IsWindows())
-        {
-            return (null, OpenSslCipherSuites.Unapplied(_options.Ciphers, _options.Tls13Ciphers));
-        }
-
-        return (new CipherSuitesPolicy(suites), null);
+        var policy = CipherSuitesPolicyFactory.Create(suites);
+        return policy is null
+            ? (null, OpenSslCipherSuites.Unapplied(_options.Ciphers, _options.Tls13Ciphers))
+            : (policy, null);
     }
 
     // The Schannel build reads the certificate and its key from a Windows certificate store

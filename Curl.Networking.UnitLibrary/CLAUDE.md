@@ -34,7 +34,11 @@ ADR-0011: the Schannel build refuses `--ciphers` with exit 59 and ignores `--tls
 the OpenSSL build turns both into one `CipherSuitesPolicy` through `OpenSslCipherSuites`,
 the hand-written OpenSSL-name table, and a list naming no known suite is exit 59. On
 Windows `CipherSuitesPolicy` cannot be constructed, so there the OpenSSL build (reached
-only from tests) reports exit 59 instead of throwing.
+only from tests) reports exit 59 instead of throwing. The provider builds the policy through
+`ICipherSuitesPolicyFactory` (`CipherSuitesPolicyFactory.ForThisPlatform` in production, whose
+`[UnsupportedOSPlatformGuard]` property satisfies CA1416) and runs the handshake through its
+`AuthenticateSslStreamAsClientAsync` step; both are internal `init` seams, so the tests follow
+the policy into `SslClientAuthenticationOptions` on Windows too (BL-268).
 The messages for its exit 35, exit 43, exit 58, exit 59, exit 60 and exit 77 live in
 `TlsFailureMessages` and nowhere else; the `More details here` block after an exit 60 is
 the console's to print. No type here constructs an `HttpClient`.
