@@ -51,6 +51,30 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     /// <summary>
+    /// Measured: <c>curl -x http://127.0.0.1:18296 --proxy-header "X-P: 1" -H "X-A: 1"
+    /// http://example.com/</c> sends the <c>--proxy-header</c> value after the <c>-H</c> value
+    /// (BL-296 Notes).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_HttpThroughProxyWithProxyHeaders_SendsThemAfterTheCustomHeaders()
+    {
+        const string expected = "GET http://example.com/ HTTP/1.1\r\nHost: example.com\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+            + "Proxy-Connection: Keep-Alive\r\nX-A: 1\r\nX-P: 1\r\n\r\n";
+        foreach (int chunkSize in ChunkSizes)
+        {
+            TurnTakingConnection connection = new(chunkSize, ProxyOkHead + "ok");
+            QueueConnector connector = QueueConnector.For(connection);
+            HttpRequestOptions options = new() { ForwardProxy = LoopbackProxy, Headers = ["X-A: 1"], ProxyHeaders = ["X-P: 1"] };
+
+            TransferResult result = await new HttpProtocolHandler(connector, new OriginAndProxyAuthenticator(null, null, null))
+                .ExecuteAsync(ProxyContext("http://example.com/", new MemoryStream(), options));
+
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Assert.AreEqual(expected, connection.Written, $"Chunk size {chunkSize}");
+        }
+    }
+
+    /// <summary>
     /// Measured: <c>curl -x http://127.0.0.1:18183 -U u:p -u a:b
     /// "http://x:y@EXample.com:80/A%20b?q#frag"</c> sends <c>Proxy-Authorization</c> before
     /// <c>Authorization</c>, and drops the user information, the default port and the fragment
@@ -181,7 +205,8 @@ public sealed partial class HttpProtocolHandlerTests
     /// <summary>
     /// An <c>https</c> URL, <c>-p</c>, or a SOCKS proxy is tunnelled through by the connector:
     /// the handler asks it for the origin with <see cref="ConnectTarget.Proxy" /> set and sends
-    /// the origin form, with no proxy header and no proxy authorization asked for.
+    /// the origin form, with no proxy header, no <c>--proxy-header</c> value and no proxy
+    /// authorization asked for.
     /// </summary>
     [TestMethod]
     [DataRow("https://example.com/a?b", ProxyKind.Http, false, "example.com", 443, true, DisplayName = "https URL via HTTP proxy")]
@@ -203,7 +228,7 @@ public sealed partial class HttpProtocolHandlerTests
             TurnTakingConnection connection = new(chunkSize, ProxyOkHead + "ok");
             QueueConnector connector = QueueConnector.For(connection);
             OriginAndProxyAuthenticator authenticator = new(null, null, "Basic dTpw");
-            HttpRequestOptions options = new() { ForwardProxy = proxy, ProxyTunnel = proxyTunnel };
+            HttpRequestOptions options = new() { ForwardProxy = proxy, ProxyTunnel = proxyTunnel, ProxyHeaders = ["X-P: 1"] };
 
             TransferResult result = await new HttpProtocolHandler(connector, authenticator)
                 .ExecuteAsync(ProxyContext(url, new MemoryStream(), options));

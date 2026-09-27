@@ -9,8 +9,8 @@ namespace Curl.Protocol.Http;
 /// Formats the head of an HTTP/1.1 or HTTP/1.0 request - the request line, the headers and the empty
 /// line after them - byte for byte as curl 8.21.0 sends it for <c>-X</c>, <c>-H</c>,
 /// <c>-A</c>, <c>-e</c>, <c>-I</c>, <c>--compressed</c>, an <c>Authorization</c> value, a
-/// <c>Cookie</c> value, a request body, a forward proxy, <c>-r</c>, <c>-C</c> and <c>-z</c>. Every
-/// rule was measured (BL-172, BL-175, BL-177, BL-178, BL-180, BL-181, BL-182 and BL-183 Notes).
+/// <c>Cookie</c> value, a request body, a forward proxy, <c>--proxy-header</c>, <c>-r</c>, <c>-C</c> and <c>-z</c>. Every
+/// rule was measured (BL-172, BL-175, BL-177, BL-178, BL-180, BL-181, BL-182, BL-183 and BL-296 Notes).
 /// </summary>
 /// <remarks>
 /// The request line ends in <c>HTTP/1.0</c> for <c>-0</c> and in <c>HTTP/1.1</c> otherwise;
@@ -22,7 +22,8 @@ namespace Curl.Protocol.Http;
 /// left out when an <c>-H</c> value names it; <c>Cookie</c> and <c>Proxy-Authorization</c> are sent even when an <c>-H</c>
 /// value names them. Through a forward proxy the request target is the absolute form,
 /// <c>http://host[:port]/path?query</c>, with no user information or fragment. The <c>-H</c> values follow in
-/// command-line order. A custom <c>Host</c> is the exception: it takes the <c>Host</c> slot. A request with a body ends with <c>Content-Length</c> (or
+/// command-line order, then, through a forward proxy only, the <c>--proxy-header</c> values under the
+/// same rules; of curl's own headers they override only <c>Proxy-Connection</c> (BL-296 Notes). A custom <c>Host</c> is the exception: it takes the <c>Host</c> slot. A request with a body ends with <c>Content-Length</c> (or
 /// <c>Transfer-Encoding: chunked</c> when the length is unknown), <c>Content-Type</c> and
 /// <c>Expect: 100-continue</c> as <see cref="HttpRequestFraming" /> decides, each again left
 /// out when an <c>-H</c> value names it. Text is sent one byte per character (Latin-1), as curl
@@ -64,7 +65,8 @@ internal static class HttpRequestHeadFormatter
     /// </param>
     /// <param name="forwardProxy">
     /// <see langword="true" /> when the request is sent to a forward proxy rather than the
-    /// origin: its target is the absolute form and <c>Proxy-Connection: Keep-Alive</c> is sent.
+    /// origin: its target is the absolute form, <c>Proxy-Connection: Keep-Alive</c> is sent and so
+    /// are the <c>--proxy-header</c> values.
     /// </param>
     /// <param name="proxyAuthorization">
     /// The <c>Proxy-Authorization</c> value the authenticator gave, or <see langword="null" />
@@ -97,6 +99,7 @@ internal static class HttpRequestHeadFormatter
     {
         options ??= new HttpRequestOptions();
         HttpCustomHeader[] customHeaders = [.. options.Headers.Select(HttpCustomHeader.Parse)];
+        HttpCustomHeader[] proxyHeaders = forwardProxy ? [.. options.ProxyHeaders.Select(HttpCustomHeader.Parse)] : [];
         framing = FramingOf(framing, options, customHeaders, noBody);
         StringBuilder head = new();
         AppendRequestLine(head, framing.Method, url, forwardProxy, options);
@@ -110,10 +113,11 @@ internal static class HttpRequestHeadFormatter
         AppendUnlessOverridden(head, customHeaders, "Authorization", authorization);
         AppendUnlessOverridden(head, customHeaders, "Range", range);
         AppendClientHeaders(head, customHeaders, options);
-        AppendUnlessOverridden(head, customHeaders, "Proxy-Connection", forwardProxy ? "Keep-Alive" : null);
+        AppendUnlessOverridden(head, [.. customHeaders, .. proxyHeaders], "Proxy-Connection", forwardProxy ? "Keep-Alive" : null);
         AppendAlways(head, "Cookie", cookie);
         AppendTimeCondition(head, customHeaders, timeCondition);
         AppendCustomHeaders(head, customHeaders, hostLine is not null);
+        AppendCustomHeaders(head, proxyHeaders, hostLine is not null);
         AppendBodyHeaders(head, customHeaders, framing);
         head.Append("\r\n");
         return Encoding.Latin1.GetBytes(head.ToString());
@@ -213,8 +217,8 @@ internal static class HttpRequestHeadFormatter
     }
 
     /// <summary>
-    /// Appends each <c>-H</c> value that sends a line, in order, leaving out every
-    /// <c>Host:</c> line when a <c>Host</c> line was already written.
+    /// Appends each <c>-H</c> or <c>--proxy-header</c> value that sends a line, in order,
+    /// leaving out every <c>Host:</c> line when a <c>Host</c> line was already written.
     /// </summary>
     private static void AppendCustomHeaders(StringBuilder head, HttpCustomHeader[] customHeaders, bool hostLineWritten)
     {

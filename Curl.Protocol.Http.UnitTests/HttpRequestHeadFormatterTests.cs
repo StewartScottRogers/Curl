@@ -404,6 +404,87 @@ public sealed class HttpRequestHeadFormatterTests
     }
 
     /// <summary>
+    /// Measured through <c>-x http://127.0.0.1:18296</c> (BL-296 Notes): <c>--proxy-header</c>
+    /// values follow the <c>-H</c> values under the same rules, and override only curl's
+    /// <c>Proxy-Connection</c>; a <c>Host</c> line already written keeps theirs out.
+    /// </summary>
+    [TestMethod]
+    [DataRow(
+        new[] { "X-A: 1" },
+        new[] { "X-P: 1" },
+        "Host: example.com\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\nX-A: 1\r\nX-P: 1\r\n",
+        DisplayName = "-H then --proxy-header")]
+    [DataRow(
+        new[] { "X-A: 1" },
+        new[] { "Proxy-Connection: close" },
+        "Host: example.com\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nX-A: 1\r\nProxy-Connection: close\r\n",
+        DisplayName = "--proxy-header Proxy-Connection replaces curl's")]
+    [DataRow(
+        new[] { "Proxy-Connection: close" },
+        new[] { "X-P: 1" },
+        "Host: example.com\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nProxy-Connection: close\r\nX-P: 1\r\n",
+        DisplayName = "-H Proxy-Connection still replaces curl's")]
+    [DataRow(
+        new string[0],
+        new[] { "User-Agent: pu", "X-E:", "X-S;", "Host: ph" },
+        "Host: example.com\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\nUser-Agent: pu\r\nX-S:\r\n",
+        DisplayName = "--proxy-header forms, no override but Proxy-Connection")]
+    [DataRow(
+        new[] { "Host:" },
+        new[] { "Host: ph" },
+        "User-Agent: curl/8.21.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\nHost: ph\r\n",
+        DisplayName = "--proxy-header Host sent when -H Host: removes curl's")]
+    [DataRow(
+        new string[0],
+        new[] { "Proxy-Connection:", "Authorization: z" },
+        "Host: example.com\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nAuthorization: z\r\n",
+        DisplayName = "--proxy-header Proxy-Connection: removes curl's")]
+    public void Format_ForwardProxyWithProxyHeaders_SendsMeasuredHead(string[] headers, string[] proxyHeaders, string expectedHeaders)
+    {
+        HttpRequestOptions options = new() { Headers = headers, ProxyHeaders = proxyHeaders };
+
+        byte[] head = HttpRequestHeadFormatter.Format(CurlUrl.Parse("http://example.com/"), options, forwardProxy: true);
+
+        Assert.AreEqual("GET http://example.com/ HTTP/1.1\r\n" + expectedHeaders + "\r\n", Encoding.Latin1.GetString(head));
+    }
+
+    /// <summary>
+    /// Measured: <c>curl -x http://127.0.0.1:18296 --proxy-header "Content-Type: x"
+    /// --proxy-header "Content-Length: 9" -d xy http://example.com/</c> sends both before
+    /// curl's own body headers, which they do not override (BL-296 Notes).
+    /// </summary>
+    [TestMethod]
+    public void Format_ForwardProxyWithProxyHeadersAndBody_SendsThemBeforeTheBodyHeaders()
+    {
+        const string expected = "POST http://example.com/ HTTP/1.1\r\nHost: example.com\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+            + "Proxy-Connection: Keep-Alive\r\nContent-Type: x\r\nContent-Length: 9\r\nContent-Length: 2\r\n"
+            + "Content-Type: application/x-www-form-urlencoded\r\n\r\n";
+        HttpRequestOptions options = new()
+        {
+            ProxyHeaders = ["Content-Type: x", "Content-Length: 9"],
+            Body = new BytesBody("xy"u8.ToArray(), "application/x-www-form-urlencoded"),
+        };
+
+        byte[] head = HttpRequestHeadFormatter.Format(CurlUrl.Parse("http://example.com/"), options, forwardProxy: true);
+
+        Assert.AreEqual(expected, Encoding.Latin1.GetString(head));
+    }
+
+    /// <summary>
+    /// Measured: <c>curl --proxy-header "X-P: 1" http://127.0.0.1:18296/</c> sends the default
+    /// head: a request to the origin never carries <c>--proxy-header</c> values, and none of
+    /// them overrides a header curl sends there.
+    /// </summary>
+    [TestMethod]
+    public void Format_ProxyHeadersWithoutForwardProxy_SendsNone()
+    {
+        AssertHead(
+            "GET / HTTP/1.1\r\n" + DefaultHeaders + "\r\n",
+            CurlUrl.Parse(Url),
+            new HttpRequestOptions { ProxyHeaders = ["X-P: 1", "Host: ph", "User-Agent: x"] });
+    }
+
+    /// <summary>
     /// Measured: <c>curl -x http://127.0.0.1:18183 -H "Host: other" -b a=b -e r --compressed
     /// http://example.com/h</c> sends <c>Proxy-Connection</c> after <c>Referer</c> and before
     /// <c>Cookie</c>; <c>Accept-Encoding</c> leaves out <c>zstd</c> (ADR-0020).
