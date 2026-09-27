@@ -35,7 +35,7 @@ completed: 2026-09-26
 - Measured with curl 8.21.0 (mingw, Schannel) on 2026-09-26, en-US, US Mountain Standard Time:
   - `curl -s -o NUL -w "[%time{%<c>}]" file:///c:/Windows/win.ini` for every letter: the Microsoft C runtime set (`a A b B c d H I j m M p s S U w W x X y Y %`) plus curl's own `f z Z`; anything else (`%C %D %e %F %n %t %T %u %V %Ey %#f %#s`, a trailing `%`) makes the whole `%time{}` print nothing. The `#` flag drops leading zeros, gives long dates for `%#c`/`%#x`, and the zone name for `%#z`/`%#Z`. 255 bytes print, 256 print nothing. `%%f` prints `%f`. `%time{%Y]` with no brace prints as written.
   - `a%{onerror}b%{stderr}c` on win.ini printed `a` (stderr empty); `a%{onerror}b%{onerror}c` on a missing file printed `abc`, exit 37.
-- Decision (ADR-0038): Windows dialect with fixed en-US names and layouts, because `Curl.Console` is `InvariantGlobalization` and the invariant layouts match no curl. The glibc dialect for Linux/macOS is filed as BL-289.
+- Decision (ADR-0038): Windows dialect with fixed en-US names and layouts, because `Curl.Console` is `InvariantGlobalization` and the invariant layouts match no curl. The glibc dialect for Linux/macOS is filed as BL-290.
 - Result: 87 Curl.Output tests pass; `Measure-CodeQuality.ps1 -Library Curl.Output.UnitLibrary` reports 100% line, 100% branch, 0 failing members, worst CRAP 10.
 
 ## Log

@@ -1,5 +1,5 @@
 ---
-id: BL-289
+id: BL-290
 title: Render -w %time{format} in the glibc strftime dialect on Linux and macOS
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-289 — Render -w %time{format} in the glibc strftime dialect on Linux and macOS
+# BL-290 — Render -w %time{format} in the glibc strftime dialect on Linux and macOS
 
 ## Goal
 
