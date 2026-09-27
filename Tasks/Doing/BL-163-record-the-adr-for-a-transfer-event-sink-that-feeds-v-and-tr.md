@@ -37,3 +37,4 @@ An Accepted ADR decides how handlers and connectors report connection, TLS, head
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
