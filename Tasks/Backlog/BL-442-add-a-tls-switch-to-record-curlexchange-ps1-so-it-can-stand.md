@@ -1,5 +1,5 @@
 ---
-id: BL-440
+id: BL-442
 title: Add a -Tls switch to Record-CurlExchange.ps1 so it can stand in for an HTTPS proxy
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-440 — Add a -Tls switch to Record-CurlExchange.ps1 so it can stand in for an HTTPS proxy
+# BL-442 — Add a -Tls switch to Record-CurlExchange.ps1 so it can stand in for an HTTPS proxy
 
 ## Goal
 

@@ -55,7 +55,7 @@ Decisions (ADR-0096, decided by Claude under Stewart's delegation):
 
 Scope:
 - `touches` gained ADR-0096 and the ADR README (no task in Doing names them).
-- The HTTPS measurement used a temporary copy of `Record-CurlExchange.ps1` in `%TEMP%` with an `SslStream` wrapper, not the committed script: BL-439 (in Doing) touches it. BL-440 files the `-Tls` switch properly.
+- The HTTPS measurement used a temporary copy of `Record-CurlExchange.ps1` in `%TEMP%` with an `SslStream` wrapper, not the committed script: BL-439 (in Doing) touches it. BL-442 files the `-Tls` switch properly.
 - `Curl.Console` still builds `TftpProtocolHandler` without a proxy connector (BL-397), so in the product an HTTP or HTTPS proxy gives exit 7 `bind()` without sending the request; SOCKS is fully matched now.
 - BL-441 filed: a forward-proxy `UseTls` target appears to handshake through the target's TLS provider in `TcpConnector`, not ADR-0095's proxy provider.
 
