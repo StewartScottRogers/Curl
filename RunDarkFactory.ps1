@@ -56,6 +56,17 @@
     waiting runner. After resetting the limit by hand, `RunDarkFactory.cmd -Wake` does
     the same without waiting for the next probe.
 
+    Better still, a shift ends before the tokens run out. Every run logs how much of the
+    5-hour and the weekly usage window is used; once either reaches -StopAtUsage (85%)
+    no lane claims another task, the tasks already running finish, integrate and push,
+    and the shift ends clean. The next shift (-Continuous) starts at once and waits for
+    the 5-hour window to reset before starting its lanes; a used-up weekly window raises
+    the alarm instead, since it can be days from resetting.
+
+    At the end of every shift the coordinator merges the branch into master through a
+    pull request, by Stewart's standing permission - only when the CI workflow passed on
+    Windows, Linux and macOS for the exact commit being merged.
+
     The reset time comes from the run's rate_limit_event. Time spent waiting is added
     to the shift, so -Hours is always working time. With lanes, every lane waits on its
     own and the coordinator makes the announcements, once for all of them.
@@ -119,6 +130,11 @@ param(
     [switch]$Wake,
     # With lanes: when a shift ends and the board still has ready work, start the next one.
     [switch]$Continuous,
+    # Stop claiming new tasks once this share of the 5-hour or the weekly usage window is
+    # used, so the tasks already running finish, integrate and push before the tokens run
+    # out. The next shift waits for a fresh 5-hour window; a used-up weekly window raises
+    # the alarm instead. 1 means never stop early.
+    [ValidateRange(0.1, 1)][double]$StopAtUsage = 0.85,
     # How many tasks run at once, each in its own worktree and window. 1 is the classic
     # single-runner shift in this checkout.
     [ValidateRange(1, 8)][int]$Lanes = 1,
@@ -470,6 +486,40 @@ function Format-SpokenSpan {
 function ConvertTo-Unix { param([datetime]$When) return ([DateTimeOffset]$When).ToUnixTimeSeconds() }
 function ConvertFrom-Unix { param([long]$Seconds) return [DateTimeOffset]::FromUnixTimeSeconds($Seconds).LocalDateTime }
 
+function Get-UsageReading {
+    # The newest usage reading a run logged: the share of the 5-hour and the weekly window
+    # used, and when each resets. A window whose reset has passed reads 0. -ThisShift looks
+    # only at this shift's runs, so a lane never stops on a reading from before a reset
+    # that was lifted early. $null when no run has logged a reading.
+    param([switch]$ThisShift)
+    $filter = if ($ThisShift) { "*-$Stamp*.jsonl" } else { '*.jsonl' }
+    $files = Get-ChildItem $LogDir -Filter $filter -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 10
+    foreach ($f in $files) {
+        $line = Select-String -LiteralPath $f.FullName -Pattern '"five_hour":\{"utilization":' | Select-Object -Last 1
+        if (-not $line) { continue }
+        $text = $line.Line
+        if ($text -notmatch '"five_hour":\{"utilization":([0-9.]+),"resetsAt":(\d+)') { continue }
+        $reading = [pscustomobject]@{ FiveHour = [double]$Matches[1]; FiveHourResets = ConvertFrom-Unix ([long]$Matches[2]); Week = 0.0; WeekResets = [datetime]::MinValue }
+        if ($text -match '"seven_day":\{"utilization":([0-9.]+),"resetsAt":(\d+)') {
+            $reading.Week = [double]$Matches[1]; $reading.WeekResets = ConvertFrom-Unix ([long]$Matches[2])
+        }
+        if ($reading.FiveHourResets -le (Get-Date)) { $reading.FiveHour = 0.0 }
+        if ($reading.WeekResets -le (Get-Date)) { $reading.Week = 0.0 }
+        return $reading
+    }
+    return $null
+}
+
+function Get-UsageStop {
+    # Why no new task should be claimed now - the weekly or the 5-hour window is at least
+    # -StopAtUsage used - or '' when there is room or this shift has no reading yet.
+    $u = Get-UsageReading -ThisShift
+    if (-not $u) { return '' }
+    if ($u.Week -ge $StopAtUsage) { return "weekly tokens $([math]::Round($u.Week * 100))% used, reset $($u.WeekResets.ToString('ddd HH:mm'))" }
+    if ($u.FiveHour -ge $StopAtUsage) { return "session tokens $([math]::Round($u.FiveHour * 100))% used, reset $($u.FiveHourResets.ToString('HH:mm'))" }
+    return ''
+}
+
 function Get-OutOfTokensUntil {
     # When the last run was refused for the account's usage limit, the local time the
     # limit resets; otherwise $null. The run's rate_limit_event gives it exactly; the
@@ -625,6 +675,21 @@ function Wait-ForNewSession {
     return ((Get-Date) - $began)
 }
 
+function Wait-ForFreshSession {
+    # A shift starts on a fresh session: while the 5-hour window is at least -StopAtUsage
+    # used, announce its reset and wait for it. Returns '', or - when it is the weekly
+    # window that is used up, days from resetting - why Stewart must be called instead.
+    $u = Get-UsageReading
+    if (-not $u) { return '' }
+    if ($u.Week -ge $StopAtUsage) {
+        return "WEEKLY TOKENS $([math]::Round($u.Week * 100))% USED  they reset $($u.WeekResets.ToString('dddd d MMM HH:mm')); start the factory again then, or with fewer lanes"
+    }
+    if ($u.FiveHour -lt $StopAtUsage) { return '' }
+    Write-Trace '-' 'tokens' "session tokens $([math]::Round($u.FiveHour * 100))% used; this shift starts on the new session at $($u.FiveHourResets.ToString('HH:mm'))" 'Yellow'
+    [void](Wait-ForNewSession -Id '-' -Until $u.FiveHourResets)
+    return ''
+}
+
 if ($Wake) {
     # Tells every runner of the newest shift that is waiting for tokens to carry on now.
     $file = Get-ChildItem $LogDir -Filter 'limit-*.txt' -ErrorAction SilentlyContinue | Sort-Object LastWriteTime | Select-Object -Last 1
@@ -716,6 +781,41 @@ function Invoke-Requeue {
 # ---------------------------------------------------------------------------- git
 
 function Get-Dirty { return @(git -C $Root status --porcelain) | Where-Object { $_ } }
+
+function Invoke-MergeToMaster {
+    # Stewart's standing permission (2026-09-27): at the end of a shift, merge the branch
+    # into master through a pull request - only when the CI workflow passed, on every
+    # platform, for the exact commit being merged. Returns a line for the trace.
+    param([string]$Branch)
+    if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { return 'not merged: gh is not installed' }
+    git -C $Root fetch -q origin master $Branch 2>&1 | Out-Null
+    if ([int](git -C $Root rev-list --count "origin/master..origin/$Branch") -eq 0) { return "nothing on $Branch to merge" }
+    $head = (git -C $Root rev-parse "origin/$Branch").Trim()
+    $short = $head.Substring(0, 7)
+    # CI on the last push takes a few minutes; wait for the run on this exact commit.
+    $deadline = (Get-Date).AddMinutes(30)
+    $run = $null
+    while ($true) {
+        $run = @(gh run list --workflow CI --branch $Branch --commit $head --limit 1 --json status,conclusion 2>$null | ConvertFrom-Json)
+        if ($run.Count -and $run[0].status -eq 'completed') { break }
+        if ((Get-Date) -ge $deadline) { return "not merged: CI did not finish on $short within 30 min" }
+        Start-Sleep -Seconds 30
+    }
+    if ($run[0].conclusion -ne 'success') { return "not merged: CI $($run[0].conclusion) on $short" }
+    $open = @(gh pr list --head $Branch --base master --state open --json number --limit 1 2>$null | ConvertFrom-Json)
+    if ($open.Count) { $number = $open[0].number }
+    else {
+        $bodyFile = Join-Path $LogDir "pr-body-$Stamp.md"
+        $robot = [char]::ConvertFromUtf32(0x1F916)
+        [IO.File]::WriteAllText($bodyFile, "Dark factory shift $Stamp. CI passed on Windows, Linux and macOS for $short.`n`n$robot Generated with [Claude Code](https://claude.com/claude-code)`n", (New-Object Text.UTF8Encoding($false)))
+        $url = gh pr create --base master --head $Branch --title "Dark factory shift $Stamp" --body-file $bodyFile 2>$null
+        if ("$url" -notmatch '/pull/(\d+)') { return 'not merged: could not open the pull request' }
+        $number = $Matches[1]
+    }
+    gh pr merge $number --merge 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) { return "not merged: gh pr merge refused pull request #$number" }
+    return "merged $short into master (pull request #$number)"
+}
 
 function Save-StrayChanges {
     param([string]$Id)
@@ -1269,6 +1369,12 @@ if ($Lanes -gt 1 -and -not $Lane) {
         if (@($adopt.Keys | Where-Object { $_ -gt $Lanes }).Count) { $Lanes = ($adopt.Keys | Measure-Object -Maximum).Maximum }
     }
 
+    # The previous shift stopped claiming work near the end of its session; this one starts
+    # on a fresh session, and the wait does not count against -Hours.
+    $weekly = Wait-ForFreshSession
+    if ($weekly) { Write-Trace '-' 'shift' $weekly 'Red'; Invoke-Alarm -Reasons @($weekly); exit 2 }
+    $shiftEnd = (Get-Date).AddHours($Hours)
+
     Write-Trace '-' 'shift' "start  $Lanes lanes  branch=$branch model=$Model until $($shiftEnd.ToString('HH:mm'))" 'Cyan'
     New-Item -ItemType Directory -Force -Path $LanesDir | Out-Null
     New-Item -ItemType Directory -Force -Path (Join-Path $LogDir "lanes-$Stamp") | Out-Null
@@ -1340,6 +1446,7 @@ if ($Lanes -gt 1 -and -not $Lane) {
         }
     }
     Write-Trace '-' 'shift' "end  $Lanes lanes" 'Cyan'
+    Write-Trace '-' 'merge' (Invoke-MergeToMaster -Branch $branch) 'Cyan'
     $reasons = @($stalls) + @(Get-WaitingOnStewart)
     # -Continuous: while the board still has ready work, the next shift starts itself, so
     # the factory keeps going without anyone - Stewart or a Claude session - to restart it.
@@ -1410,6 +1517,8 @@ while ($true) {
         if ((Get-Date) -gt $shiftEnd) { $stopWhy = 'time up'; break }
         if ($MaxTasks -gt 0 -and ($done + $blocked + $stalls.Count) -ge $MaxTasks) { $stopWhy = 'max tasks'; break }
         if ($failStreak -ge 2) { $stopWhy = 'runs failing'; break }
+        $low = Get-UsageStop
+        if ($low) { $stopWhy = "tokens low: $low"; break }
     }
 
     if ($resuming) {

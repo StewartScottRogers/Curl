@@ -46,7 +46,12 @@ One standing exception: the `gource` branch holds only the latest showcase rende
 force-pushed on every render by `.github/workflows/gource.yml` (owned by the
 `showcase-publisher` agent). That force push, to that branch only, needs no confirmation.
 
-Ask first for: a force push or any rewrite of already-pushed history, a merge to `master`,
+A second standing exception (Stewart, 2026-09-27): at the end of every dark factory
+shift, `RunDarkFactory.ps1` merges its branch into `master` through a pull request, but
+only when the `CI` workflow passed on Windows, Linux and macOS for the exact commit being
+merged. That merge needs no confirmation; a red or unfinished CI run means no merge.
+
+Ask first for: a force push or any rewrite of already-pushed history, any other merge to `master`,
 a tag or a release, creating a repository or changing its visibility, and deleting a
 branch. Irreversible GitHub actions are run directly and not through the subagent, which
 by design refuses authorization relayed to it in a prompt.
@@ -83,7 +88,10 @@ new session and reruns the cut-off task. See the script's header for the details
 
 When Claude starts a shift it always passes `-NewTab`, e.g.
 `RunDarkFactory.cmd -NewTab -Lanes 3 -Continuous`; `-Continuous` makes a shift that
-ends with work still ready start the next one itself. Inside herdr (`HERDR_ENV=1`) that opens the shift
+ends with work still ready start the next one itself. A shift ends before the tokens run
+out: once 85% of the 5-hour or weekly usage window is used (`-StopAtUsage`), lanes claim
+nothing new, finish what they hold and push; the next shift waits for a fresh 5-hour
+window, and a used-up weekly window raises the alarm. Inside herdr (`HERDR_ENV=1`) that opens the shift
 and each of its lanes as herdr tabs in the current workspace; outside herdr, as console
 windows. Never start one with `Start-Process` or a bare background command: Stewart
 watches shifts in herdr. Stop a shift by closing its tabs (or killing its process tree).
