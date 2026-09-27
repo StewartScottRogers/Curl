@@ -44,3 +44,4 @@ In the Schannel build, `SslStreamTlsProvider` reports an expired, not-yet-valid 
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
