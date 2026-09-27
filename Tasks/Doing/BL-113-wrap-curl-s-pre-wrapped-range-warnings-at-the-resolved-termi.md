@@ -72,3 +72,4 @@ updated (see Notes).
 - 2026-09-26: Backlog -> Doing.
 - 2026-09-26: Doing -> Blocked. Needs Curl.Console.UnitTests added to touches: three CurlCommandRunnerTransferOptionTests build expected stderr from the unwrapped range warnings and fail at 79 columns; re-plan to include it
 - 2026-09-26: Blocked -> Backlog. Re-planned: touches adds Curl.Console.UnitTests; a criterion names the three CurlCommandRunnerTransferOptionTests and the literal 79-column lines they must expect.
+- 2026-09-27: Backlog -> Doing.
