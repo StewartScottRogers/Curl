@@ -31,7 +31,11 @@ internal sealed class TransferContextFactory(Stream standardInput)
     /// The <c>-T</c> source, or <see langword="null" /> without <c>-T</c>, when a <c>telnet</c>
     /// transfer uploads standard input and any other uploads nothing.
     /// </param>
-    /// <param name="proxy">The proxy chosen for this transfer (<see cref="TransferProxySelection" />), or <see langword="null" /> to connect directly.</param>
+    /// <param name="proxy">
+    /// The proxy chosen for this transfer (<see cref="TransferProxySelection" />), or
+    /// <see langword="null" /> to connect directly; it becomes both
+    /// <see cref="TransferContext.Proxy" /> and <see cref="Curl.Protocol.Abstractions.HttpRequestOptions.ForwardProxy" />.
+    /// </param>
     /// <param name="watchHeaderOutput">
     /// Wraps the header output <see cref="HeaderOutputOf" /> chose, for <c>-J</c>, whose
     /// <see cref="RemoteHeaderNameStream" /> must read each header line before it goes anywhere;
@@ -75,6 +79,7 @@ internal sealed class TransferContextFactory(Stream standardInput)
             ConnectTimeout = options.ConnectTimeout,
             MaxTime = options.MaxTime,
             TimeCondition = options.TimeCondition,
+            Proxy = proxy,
             Http = HttpRequestOptionsMapping.FromCommandLine(options, formBody, proxy),
         };
 

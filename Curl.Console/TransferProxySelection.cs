@@ -9,27 +9,34 @@ namespace Curl.Console;
 /// <summary>
 /// Chooses the proxy one transfer goes through from <c>-x</c> or a <c>--socks</c> option,
 /// <c>--noproxy</c>, <c>-U</c> and the proxy environment variables, and refuses a proxy the
-/// HTTP handler would have the connector tunnel through when the connector cannot yet.
+/// connector would have to tunnel through when it cannot yet.
 /// </summary>
 /// <remarks>
 /// <para>
 /// <see cref="ProxySelector" /> picks the proxy (ADR-0024); <c>-U</c>/<c>--proxy-user</c> then
 /// replaces its credential, as curl 8.21.0 lets <c>-U</c> win over the proxy URL's user
-/// information. The chosen proxy reaches <see cref="Curl.Protocol.Abstractions.HttpRequestOptions.ForwardProxy" />, where
-/// the HTTP handler forwards a plain <c>http</c> request itself and hands every other route to
-/// the connector's CONNECT tunnel (BL-183, BL-212).
+/// information. The chosen proxy reaches both <see cref="ITransferContext.Proxy" />, which a
+/// handler connecting over TCP hands to the connector's tunnel (ADR-0056), and
+/// <see cref="Curl.Protocol.Abstractions.HttpRequestOptions.ForwardProxy" />, where the HTTP
+/// handler forwards a plain <c>http</c> request itself and hands every other route to the
+/// connector's CONNECT tunnel (BL-183, BL-212). A <c>file</c> transfer never uses a proxy: it is
+/// not selected at all, so even proxy text curl cannot use is ignored, as curl 8.21.0 ignores
+/// <c>-x foo://h:1</c> for a <c>file://</c> URL (measured 2026-09-27, BL-338 Notes).
 /// </para>
 /// <para>
 /// The connector tunnels only through <see cref="ProxyKind.Http" /> and
 /// <see cref="ProxyKind.Http10" /> proxies so far (SOCKS is BL-213, HTTPS proxies BL-266). An
-/// <c>http</c> or <c>https</c> transfer that would, or under <c>-L</c> could, need any other tunnel ends with exit 4,
-/// <c>Unsupported proxy '&lt;host&gt;:&lt;port&gt;', Curl cannot tunnel through a &lt;kind&gt;
-/// proxy yet</c>, instead of reaching the connector (ADR-0053). Other schemes do not read the
-/// proxy yet and connect directly.
+/// <c>http</c> or <c>https</c> transfer that would, or under <c>-L</c> could, need any other
+/// tunnel, and a transfer of any other networked scheme through any other proxy, ends with
+/// exit 4, <c>Unsupported proxy '&lt;host&gt;:&lt;port&gt;', Curl cannot tunnel through a
+/// &lt;kind&gt; proxy yet</c>, instead of reaching the connector (ADR-0053, ADR-0056 rule 6).
 /// </para>
 /// </remarks>
 internal static class TransferProxySelection
 {
+    /// <summary>The one scheme that never uses a proxy.</summary>
+    private const string FileScheme = "file";
+
     /// <summary>
     /// Chooses the proxy for <paramref name="url" />.
     /// </summary>
@@ -38,7 +45,7 @@ internal static class TransferProxySelection
     /// <param name="url">The URL being transferred.</param>
     /// <param name="proxy">
     /// The proxy, with the <c>-U</c> credential when one was given; <see langword="null" /> for a
-    /// direct connection or a failure.
+    /// direct connection, a <c>file</c> URL or a failure.
     /// </param>
     /// <param name="failure">
     /// The selector's failure for proxy text curl cannot use, or the exit 4 failure for a tunnel
@@ -53,6 +60,12 @@ internal static class TransferProxySelection
         [NotNullWhen(false)] out TransferResult? failure)
     {
         proxy = null;
+        failure = null;
+        if (url.Scheme == FileScheme)
+        {
+            return true;
+        }
+
         if (!selector.TrySelect(url, options.Proxy?.Address, KindWithoutSchemeOf(options.Proxy), options.NoProxy, out ProxyEndpoint? selected, out failure))
         {
             return false;
@@ -89,16 +102,13 @@ internal static class TransferProxySelection
             : null;
 
     /// <summary>
-    /// Tells whether an <c>http</c> or <c>https</c> transfer through <paramref name="proxy" />
-    /// needs a tunnel the connector cannot open yet: through any proxy but an HTTP one, unless the
-    /// handler forwards every request itself.
+    /// Tells whether a transfer through <paramref name="proxy" /> needs a tunnel the connector
+    /// cannot open yet: through any proxy but an HTTP one, unless the HTTP handler forwards every
+    /// request of a plain <c>http</c> URL itself.
     /// </summary>
     private static bool NeedsTunnelNotBuiltYet(ProxyEndpoint proxy, CurlUrl url, CommandLineOptions options) =>
-        IsHttpScheme(url.Scheme)
-        && !IsHttpProxy(proxy.Kind)
+        !IsHttpProxy(proxy.Kind)
         && !IsForwardedOverTls(proxy.Kind, url.Scheme, options);
-
-    private static bool IsHttpScheme(string scheme) => scheme is "http" or "https";
 
     private static bool IsHttpProxy(ProxyKind kind) => kind is ProxyKind.Http or ProxyKind.Http10;
 

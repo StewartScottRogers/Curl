@@ -175,6 +175,8 @@ public sealed class CurlCompositionProxyTests
     [DataRow(new[] { "-x", "https://127.0.0.1:18238", "https://example.com/a" }, "127.0.0.1:18238", "Https", DisplayName = "https proxy, https URL")]
     [DataRow(new[] { "-p", "-x", "https://127.0.0.1:18238", "http://example.com/a" }, "127.0.0.1:18238", "Https", DisplayName = "https proxy, -p")]
     [DataRow(new[] { "-L", "-x", "https://127.0.0.1:18238", "http://example.com/a" }, "127.0.0.1:18238", "Https", DisplayName = "https proxy, -L")]
+    [DataRow(new[] { "--socks5", "127.0.0.1:1", "dict://example.com/d:x" }, "127.0.0.1:1", "Socks5", DisplayName = "--socks5, dict URL")]
+    [DataRow(new[] { "-x", "https://127.0.0.1:18238", "gopher://example.com/" }, "127.0.0.1:18238", "Https", DisplayName = "https proxy, gopher URL")]
     public async Task RunAsync_TunnelTheConnectorCannotOpenYet_ExitsFourWithoutConnecting(string[] arguments, string proxy, string kind)
     {
         ScriptedConnector server = new([Latin1(Hello)]);
@@ -201,15 +203,18 @@ public sealed class CurlCompositionProxyTests
     }
 
     [TestMethod]
-    public async Task RunAsync_SocksProxyForAnotherScheme_ConnectsDirectly()
+    public async Task RunAsync_SocksProxyEnvironmentVariableForAnotherScheme_ExitsFourWithoutConnecting()
     {
         ScriptedConnector server = new([Latin1("hello")]);
         Dictionary<string, string> environment = new() { ["all_proxy"] = "socks5://127.0.0.1:1" };
 
         Run run = await RunAsync(server, environment, "-sS", "telnet://127.0.0.1:18238");
 
-        Assert.AreEqual(0, run.ExitCode);
-        Assert.AreEqual(Proxy, server.Targets.Single());
+        Assert.AreEqual(4, run.ExitCode);
+        Assert.AreEqual(
+            $"curl: (4) Unsupported proxy '127.0.0.1:1', Curl cannot tunnel through a Socks5 proxy yet{Environment.NewLine}",
+            run.StandardError);
+        Assert.AreEqual(0, server.Targets.Count);
     }
 
     private static Task<Run> RunAsync(ScriptedConnector server, params string[] arguments) =>

@@ -25,7 +25,9 @@ in Backlog. Wiring the selector without a guard would let `curl --socks5 h http:
 connector cannot open - through any SOCKS proxy, or through an HTTPS proxy for an `https` URL,
 under `-p`, or under `-L` (a redirect hop to `https` keeps the first URL's proxy, BL-329) - with exit 4 (`CURLE_NOT_BUILT_IN`) and
 `Unsupported proxy '<host>:<port>', Curl cannot tunnel through a <kind> proxy yet`, before
-anything is connected. Other schemes do not read the proxy yet and are not refused (BL-330).
+anything is connected. Since ADR-0056 (rule 6, BL-338) every other networked scheme is refused the
+same way through any SOCKS or HTTPS proxy, because its handler hands `ITransferContext.Proxy` to
+the connector's tunnel; `file` never uses a proxy and is never refused.
 
 Exit 4 is the code libcurl itself uses when a proxy kind is missing from the build
 (`Unsupported proxy '...', libcurl is built without the HTTPS-proxy support.` in `url.c`), so a
@@ -38,6 +40,8 @@ BL-328 removes the guard once BL-213 and BL-266 land.
 - No proxy option makes the executable crash; the unsupported tunnels fail cleanly.
 - Until BL-328, `--socks*`, `socks*://` and tunnelled HTTPS proxies differ from curl 8.21.0,
   which supports them.
+- The guard covers `dict`, `gopher`, `telnet` and every other non-`file` scheme too (ADR-0056),
+  so no scheme reaches `TcpConnector` with a proxy it cannot tunnel through.
 
 ## Alternatives considered
 
