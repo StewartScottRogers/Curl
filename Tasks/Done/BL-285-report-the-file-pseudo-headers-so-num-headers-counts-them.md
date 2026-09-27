@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.File.UnitLibrary, Curl.Protocol.File.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Output.UnitLibrary, Curl.Output.UnitTests]
+touches: [Curl.Protocol.File.UnitLibrary, Curl.Protocol.File.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Output.UnitLibrary, Curl.Output.UnitTests, Documentation/Planning/Decisions]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-27
 ---
 # BL-285 — Report the file:// pseudo-headers so %{num_headers} counts them
 
@@ -24,8 +24,8 @@ The file:// handler returns a `TransferReport` whose `ResponseHeaders` hold the 
 
 ## Acceptance criteria
 
-- [ ] A file:// transfer's `%{num_headers}` is 3 and its `%header{Content-Length}` empty, as measured on curl 8.21.0, pinned in a file-handler test.
-- [ ] `dotnet build -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes and no new test needs `TestCategory=Integration`; `Measure-CodeQuality.ps1` reports 100% line and branch coverage and no failing member for `Curl.Protocol.File`.
+- [x] A file:// transfer's `%{num_headers}` is 3 and its `%header{Content-Length}` empty, as measured on curl 8.21.0, pinned in a file-handler test.
+- [x] `dotnet build -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes and no new test needs `TestCategory=Integration`; `Measure-CodeQuality.ps1` reports 100% line and branch coverage and no failing member for `Curl.Protocol.File`.
 
 ## Notes
 
@@ -84,9 +84,19 @@ No change to `Curl.Protocol.Http.UnitLibrary`, which BL-178 holds.
 names them) and `Curl.Output.UnitLibrary/UnitTests`, which BL-284 in Doing names, so the task
 goes back to Backlog until BL-284 finishes.
 
+### Delivered 2026-09-27
+
+- `TransferReport.PseudoHeaders` added; `%{num_headers}` is `ResponseHeaders.Count + PseudoHeaders.Count`; `%header{}` still reads `ResponseHeaders` only. Recorded as ADR-0051.
+- `FileTransferMessages.PseudoHeaders` gives the pairs; `PseudoHeaderLines` is now built from them, so written and reported headers cannot drift.
+- `FileProtocolHandler.WithPseudoHeaders` attaches the report after the header stage, on success and on a body failure (the measured `-C 100` exit 36 case). The report also sets `DownloadSize` to the bytes transferred, because a report replaces `BytesTransferred` as the source of `%{size_download}` - without it `file://` `%{size_download}` would have dropped to 0.
+- **Default taken:** a header output that fails mid-block (exit 23) reports no pseudo-headers. Not measured; the conservative choice, pinned in `ExecuteAsync_HeaderOutputFails_ReportsNoHeaders`.
+- **Touches widened** to `Documentation/Planning/Decisions` for ADR-0051 and its index row; no task in Doing names it.
+- Tests: `FileProtocolHandlerPseudoHeaderTests` (9 cases, every measured row of the table above), `TransferWriteOutVariablesTests.TryGetVariableText_PseudoHeaders_CountTowardsNumHeadersButAreNeverFound`, and `TransferReportTests` default/init. `Measure-CodeQuality.ps1`: File, Output and Abstractions 100% line and branch, 0 failing members.
+
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
 - 2026-09-26: Doing -> Backlog. Needs Curl.Output.UnitLibrary (and Curl.Protocol.Abstractions.UnitLibrary) for a PseudoHeaders report member; Curl.Output.UnitLibrary is held by BL-284 in Doing
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Done. file:// reports its pseudo-headers, so %{num_headers} is 3 and %header{Content-Length} empty as on curl 8.21.0
