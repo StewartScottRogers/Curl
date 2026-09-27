@@ -41,3 +41,4 @@ When `ITransferContext.Upload` is set (`-T`), `FtpProtocolHandler` sends curl 8.
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
