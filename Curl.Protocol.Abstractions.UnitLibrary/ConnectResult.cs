@@ -7,8 +7,8 @@ namespace Curl.Protocol.Abstractions;
 /// an open connection, or the curl exit code and message that say why there is none.
 /// </summary>
 /// <remarks>
-/// A result is built only through the two <c>Connected</c> overloads,
-/// <see cref="Failed(CurlExitCode, string)" /> and <see cref="Refused(string)" />, so a success always carries a connection
+/// A result is built only through the two <c>Connected</c> overloads and the two
+/// <c>Failed</c> and two <c>Refused</c> overloads, so a success always carries a connection
 /// and a failure always carries an exit code other than <see cref="CurlExitCode.Ok" />.
 /// </remarks>
 public sealed class ConnectResult
@@ -42,7 +42,8 @@ public sealed class ConnectResult
 
     /// <summary>
     /// Gets the points in time the connector recorded while it connected, or
-    /// <see langword="null" /> when it recorded none or the connect failed.
+    /// <see langword="null" /> when it recorded none. A failed connect carries them only
+    /// when built with timings, as <c>TcpConnector</c> builds a failed dial (ADR-0091).
     /// </summary>
     public ConnectTimings? Timings { get; private init; }
 
@@ -166,7 +167,28 @@ public sealed class ConnectResult
     /// <paramref name="exitCode" /> is <see cref="CurlExitCode.Ok" />, which is not a
     /// failure; use <see cref="Connected(IConnection)" /> instead.
     /// </exception>
-    public static ConnectResult Failed(CurlExitCode exitCode, string errorMessage)
+    public static ConnectResult Failed(CurlExitCode exitCode, string errorMessage) =>
+        Failed(exitCode, errorMessage, null);
+
+    /// <summary>
+    /// Creates the result of a failed resolve, connect or TLS handshake, with the points in
+    /// time the connector recorded before it failed.
+    /// </summary>
+    /// <param name="exitCode">
+    /// The curl exit code, such as <see cref="CurlExitCode.CouldntResolveHost" /> (6) or
+    /// <see cref="CurlExitCode.CouldntConnect" /> (7).
+    /// </param>
+    /// <param name="errorMessage">The message curl prints for the failure.</param>
+    /// <param name="timings">
+    /// The points in time recorded before the failure, with <see cref="ConnectTimings.Connected" />
+    /// <see langword="null" />; or <see langword="null" /> when none were recorded.
+    /// </param>
+    /// <returns>A result with no <see cref="Connection" />.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="exitCode" /> is <see cref="CurlExitCode.Ok" />, which is not a
+    /// failure; use <see cref="Connected(IConnection)" /> instead.
+    /// </exception>
+    public static ConnectResult Failed(CurlExitCode exitCode, string errorMessage, ConnectTimings? timings)
     {
         if (exitCode == CurlExitCode.Ok)
         {
@@ -176,7 +198,7 @@ public sealed class ConnectResult
                 "A failed connect cannot report CurlExitCode.Ok; use ConnectResult.Connected instead.");
         }
 
-        return new ConnectResult(null, exitCode, errorMessage);
+        return new ConnectResult(null, exitCode, errorMessage) { Timings = timings };
     }
 
     /// <summary>
@@ -190,5 +212,22 @@ public sealed class ConnectResult
     /// <see cref="CurlExitCode.CouldntConnect" />.
     /// </returns>
     public static ConnectResult Refused(string errorMessage) =>
-        new(null, CurlExitCode.CouldntConnect, errorMessage) { IsConnectionRefused = true };
+        Refused(errorMessage, null);
+
+    /// <summary>
+    /// Creates the result of a TCP connect whose last attempt the peer refused, as
+    /// <see cref="Refused(string)" />, with the points in time the connector recorded before
+    /// the dial failed.
+    /// </summary>
+    /// <param name="errorMessage">The message curl prints for the failure.</param>
+    /// <param name="timings">
+    /// The points in time recorded before the failure, with <see cref="ConnectTimings.Connected" />
+    /// <see langword="null" />; or <see langword="null" /> when none were recorded.
+    /// </param>
+    /// <returns>
+    /// A result with no <see cref="Connection" /> whose <see cref="ExitCode" /> is
+    /// <see cref="CurlExitCode.CouldntConnect" />.
+    /// </returns>
+    public static ConnectResult Refused(string errorMessage, ConnectTimings? timings) =>
+        new(null, CurlExitCode.CouldntConnect, errorMessage) { IsConnectionRefused = true, Timings = timings };
 }

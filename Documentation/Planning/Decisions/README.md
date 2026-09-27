@@ -105,6 +105,7 @@ choices do not need one.
 | [0088](ADR-0088-a-socket-error-mid-handshake-is-curls-recv-failure-line.md) | A socket error during the TLS handshake is curl's `Recv failure:` line with each build's text for it (`Connection was reset` / `was aborted` in Schannel, `Connection reset by peer` in OpenSSL); others use the socket error's own message | Accepted | 2026-09-27 |
 | [0089](ADR-0089-a-z-time-past-windows-gmtime-fails-the-http-transfer-with-exit-43.md) | On Windows an HTTP transfer whose `-z` time is after 3001-01-01 20:59:59 UTC (the C runtime's `gmtime` limit) fails once connected with exit 43 `Invalid TIMEVALUE` and sends nothing, as curl 8.21.0's Schannel build does; elsewhere the header is written as before | Accepted | 2026-09-27 |
 | [0090](ADR-0090-the-z-stat-lookup-off-windows-follows-a-final-symbolic-link.md) | The `-z` `stat` lookup off Windows follows a final symbolic link with `File.ResolveLinkTarget`: a missing target is `No such file or directory` (or `Not a directory`), a loop `Too many levels of symbolic links`, an existing target gives its time | Accepted | 2026-09-27 |
+| [0091](ADR-0091-a-failed-dial-carries-the-connectors-start-and-lookup-timings.md) | A dial that reaches no address carries `TcpConnector`'s `Started` and `NameResolved` with `ConnectTimings.Connected` (now nullable) `null`, and the HTTP handler's failed-connect report copies them, so `%{time_namelookup}` prints the lookup time and `%{time_connect}` stays `0` after a refused connect, as curl 8.21.0 does | Accepted | 2026-09-27 |
 
 ## Template
 

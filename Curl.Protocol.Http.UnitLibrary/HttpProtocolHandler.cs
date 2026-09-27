@@ -298,7 +298,7 @@ public sealed class HttpProtocolHandler(
         {
             return TransferResult.Failure(connect.ExitCode, connect.ErrorMessage!) with
             {
-                Report = FailedConnectReport(plan),
+                Report = FailedConnectReport(plan, connect),
                 IsConnectionRefused = connect.IsConnectionRefused,
             };
         }
@@ -321,15 +321,17 @@ public sealed class HttpProtocolHandler(
     /// Reports a connect that failed: whether it went to a forward proxy, and the transfer's
     /// timings with <c>%{time_pretransfer}</c>, <c>%{time_posttransfer}</c> and
     /// <c>%{time_starttransfer}</c> taken when it failed, as curl 8.21.0 takes them after a
-    /// refused connect or a failed resolve (measured, ADR-0075).
+    /// refused connect or a failed resolve (measured, ADR-0075), and whatever connect timings
+    /// the connector recorded before it failed, so a refused dial still reports
+    /// <c>%{time_namelookup}</c> (measured, ADR-0091).
     /// </summary>
-    private static TransferReport FailedConnectReport(HttpRequestPlan plan)
+    private static TransferReport FailedConnectReport(HttpRequestPlan plan, ConnectResult connect)
     {
         long failed = plan.Context.TimeProvider.GetTimestamp();
         return new TransferReport
         {
             UsedProxy = plan.Options.ForwardProxy is not null,
-            Timings = new TransferTimings(plan.Started, null, failed, failed, failed, failed),
+            Timings = new TransferTimings(plan.Started, connect.Timings, failed, failed, failed, failed),
         };
     }
 

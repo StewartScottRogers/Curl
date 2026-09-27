@@ -118,6 +118,14 @@ public sealed class TcpConnector(
     /// <see cref="IConnection.RemoteEndPoint" />. <see cref="ConnectResult.PeerCertificates" />
     /// are the <see cref="ITlsProvider" />'s, and empty without TLS.
     /// </para>
+    /// <para>
+    /// A dial that reached no address, to the host or to the proxy, carries
+    /// <see cref="ConnectTimings.Started" /> and <see cref="ConnectTimings.NameResolved" /> with
+    /// <see cref="ConnectTimings.Connected" /> <see langword="null" />, as curl 8.21.0 reports
+    /// <c>%{time_namelookup}</c> but a <c>%{time_connect}</c> of <c>0</c> after a refused
+    /// connect (measured, ADR-0091). A failed resolve, a bad <c>--resolve</c> or <c>--connect-to</c>
+    /// entry and a failed tunnel carry none; a failed handshake is the provider's result as it is.
+    /// </para>
     /// </remarks>
     public async ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
     {
@@ -157,6 +165,7 @@ public sealed class TcpConnector(
             var via = destination.IsMapped ? $" via {destination.Host}:{destination.Port}" : string.Empty;
             return DialFailure(
                 lastDialError,
+                new ConnectTimings(started, nameResolved, null, null),
                 $"Failed to connect to {target.Host}:{target.Port}{via} after {elapsedMilliseconds} ms: Could not connect to server");
         }
 
@@ -189,6 +198,7 @@ public sealed class TcpConnector(
             var elapsedMilliseconds = (long)timeProvider.GetElapsedTime(nameResolved).TotalMilliseconds;
             return DialFailure(
                 lastDialError,
+                new ConnectTimings(started, nameResolved, null, null),
                 $"Failed to connect to {target.Host}:{target.Port} over proxy {proxy.Host} after {elapsedMilliseconds} ms: Could not connect to server");
         }
 
@@ -367,10 +377,12 @@ public sealed class TcpConnector(
 
     /// <summary>
     /// The exit 7 for a dial that reached no address: marked refused when the last attempt
-    /// was refused, as <c>--retry-connrefused</c> reads curl's <c>CURLINFO_OS_ERRNO</c>.
+    /// was refused, as <c>--retry-connrefused</c> reads curl's <c>CURLINFO_OS_ERRNO</c>. It
+    /// carries the start and lookup timestamps, as curl 8.21.0 still reports
+    /// <c>%{time_namelookup}</c> after a refused connect (measured, ADR-0091).
     /// </summary>
-    private static ConnectResult DialFailure(SocketError lastError, string errorMessage) =>
+    private static ConnectResult DialFailure(SocketError lastError, ConnectTimings timings, string errorMessage) =>
         lastError == SocketError.ConnectionRefused
-            ? ConnectResult.Refused(errorMessage)
-            : ConnectResult.Failed(CurlExitCode.CouldntConnect, errorMessage);
+            ? ConnectResult.Refused(errorMessage, timings)
+            : ConnectResult.Failed(CurlExitCode.CouldntConnect, errorMessage, timings);
 }

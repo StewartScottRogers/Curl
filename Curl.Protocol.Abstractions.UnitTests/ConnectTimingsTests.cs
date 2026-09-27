@@ -19,12 +19,21 @@ public sealed class ConnectTimingsTests
     }
 
     [TestMethod]
-    public void New_ForALiteralAddressOverPlainText_LeavesResolveAndHandshakeNull()
+    public void New_WithoutResolveOrHandshake_LeavesThemNull()
     {
         var timings = new ConnectTimings(10, null, 30, null);
 
         Assert.IsNull(timings.NameResolved);
         Assert.IsNull(timings.TlsHandshakeCompleted);
+    }
+
+    [TestMethod]
+    public void New_ForAFailedDial_LeavesConnectedNull()
+    {
+        var timings = new ConnectTimings(10, 20, null, null);
+
+        Assert.AreEqual(20L, timings.NameResolved);
+        Assert.IsNull(timings.Connected);
     }
 
     [TestMethod]

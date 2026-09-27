@@ -11,7 +11,8 @@ namespace Curl.Protocol.Abstractions;
 /// </param>
 /// <param name="Connect">
 /// The connector's timings, copied from <see cref="ConnectResult.Timings" />;
-/// <see langword="null" /> when no connection was opened.
+/// <see langword="null" /> when the connector recorded none. A failed connect may carry them
+/// with <see cref="ConnectTimings.Connected" /> <see langword="null" /> (ADR-0091).
 /// </param>
 /// <param name="RequestReady">
 /// Taken when the connection is ready and the first request byte is about to be sent,

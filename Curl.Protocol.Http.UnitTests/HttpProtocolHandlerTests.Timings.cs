@@ -60,6 +60,21 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.IsFalse(result.Report.UsedProxy);
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_ConnectRefusedAfterALookup_ReportsTheConnectorsStartAndLookupWithNoConnect()
+    {
+        // curl 8.21.0, http://127.0.0.1:1/: exit 7, ns=0.000048|c=0.000000 (measured 2026-09-27, BL-382).
+        var connectTimings = new ConnectTimings(105, 106, null, null);
+        TransferResult result = await Handler(new QueueConnector(ConnectResult.Refused("refused", connectTimings)))
+            .ExecuteAsync(TimedContext("http://127.0.0.1:1/", new SteppingTimeProvider(100)));
+
+        TransferTimings timings = result.Report!.Timings!;
+        Assert.AreSame(connectTimings, timings.Connect);
+        Assert.AreEqual(106L, timings.Connect!.NameResolved);
+        Assert.IsNull(timings.Connect.Connected);
+        Assert.IsTrue(result.IsConnectionRefused);
+    }
+
     private static TransferContext TimedContext(string url, TimeProvider timeProvider) =>
         new() { Url = CurlUrl.Parse(url), Output = new MemoryStream(), TimeProvider = timeProvider };
 }

@@ -13,11 +13,13 @@ namespace Curl.Protocol.Abstractions;
 /// </param>
 /// <param name="NameResolved">
 /// Taken when name resolution finishes, the source of <c>%{time_namelookup}</c>;
-/// <see langword="null" /> when the host was a literal address and nothing was resolved.
+/// <see langword="null" /> when the connector recorded none. <c>TcpConnector</c> sets it for a
+/// literal address too, the moment the address was taken as resolved (ADR-0030).
 /// </param>
 /// <param name="Connected">
 /// Taken when the TCP connect to the host or proxy completes, or for a tunnel when the
-/// tunnel is open; the source of <c>%{time_connect}</c>.
+/// tunnel is open; the source of <c>%{time_connect}</c>. <see langword="null" /> when the
+/// connect failed, so a refused dial reports <c>%{time_connect}</c> as <c>0</c> (ADR-0091).
 /// </param>
 /// <param name="TlsHandshakeCompleted">
 /// Taken when the TLS handshake completes, the source of <c>%{time_appconnect}</c>;
@@ -26,5 +28,5 @@ namespace Curl.Protocol.Abstractions;
 public sealed record ConnectTimings(
     long Started,
     long? NameResolved,
-    long Connected,
+    long? Connected,
     long? TlsHandshakeCompleted);
