@@ -40,7 +40,9 @@ public sealed class ConsolePasswordPromptTests
     [TestMethod]
     public void ForProcessConsole_IsOneSharedInstance()
     {
-        Assert.AreSame(ConsolePasswordPrompt.ForProcessConsole, ConsolePasswordPrompt.ForProcessConsole);
+        var first = ConsolePasswordPrompt.ForProcessConsole;
+        var second = ConsolePasswordPrompt.ForProcessConsole;
+        Assert.AreSame(first, second);
     }
 
     [TestMethod]
