@@ -61,3 +61,4 @@ the upstream pass rate is a number anyone can recompute.
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
 - 2026-09-26: Doing -> Backlog. Lane 6 finished it, but a test in Curl.Conformance.UnitTests hung the fast-test run for 30+ minutes during integration (2026-09-26 20:29), stopping every lane. Work on branch factory/BL-147-wip; start with git cherry-pick --no-commit factory/BL-147-wip, find and fix the hang (every test must finish in seconds), then carry on.
+- 2026-09-26: Backlog -> Doing.
