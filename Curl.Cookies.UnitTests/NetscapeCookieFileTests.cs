@@ -246,7 +246,7 @@ public sealed class NetscapeCookieFileTests
         string line = CookieLineOfLength("len", lengthBeforeLineFeed - (lineEnd.Length - 1)) + lineEnd;
         string file = line + "127.0.0.1\tFALSE\t/\tFALSE\t0\tafter\t1" + lineEnd;
 
-        IReadOnlyList<Cookie> cookies = NetscapeCookieFile.Read(new StringReader(file));
+        IReadOnlyList<Cookie> cookies = NetscapeCookieFile.Read(new StringReader(file), Now);
 
         Assert.AreEqual(expectedNames, string.Join(' ', cookies.Reverse().Select(cookie => cookie.Name)));
     }
@@ -259,7 +259,7 @@ public sealed class NetscapeCookieFileTests
     {
         string file = "127.0.0.1\tFALSE\t/\tFALSE\t0\tbefore\t1\n" + CookieLineOfLength("len", length);
 
-        IReadOnlyList<Cookie> cookies = NetscapeCookieFile.Read(new StringReader(file));
+        IReadOnlyList<Cookie> cookies = NetscapeCookieFile.Read(new StringReader(file), Now);
 
         Assert.AreEqual(expectedNames, string.Join(' ', cookies.Reverse().Select(cookie => cookie.Name)));
     }
@@ -267,7 +267,7 @@ public sealed class NetscapeCookieFileTests
     [TestMethod]
     public void Read_EmptyText_ReadsNothing()
     {
-        Assert.IsEmpty(NetscapeCookieFile.Read(new StringReader(string.Empty)));
+        Assert.IsEmpty(NetscapeCookieFile.Read(new StringReader(string.Empty), Now));
     }
 
     [TestMethod]
@@ -275,13 +275,13 @@ public sealed class NetscapeCookieFileTests
     {
         Assert.AreEqual(
             new Cookie("n", "v", "example.test", true, "/p", true, true, 1234),
-            NetscapeCookieFile.ParseLine("#HttpOnly_.example.test\tTRUE\t/p\tTRUE\t1234\tn\tv"));
+            NetscapeCookieFile.ParseLine("#HttpOnly_.example.test\tTRUE\t/p\tTRUE\t1234\tn\tv", Now));
     }
 
     [TestMethod]
     public void ParseLine_TooFewFieldsForAMadeUpPath_IsRefused()
     {
-        Assert.IsNull(NetscapeCookieFile.ParseLine("h\tFALSE"));
+        Assert.IsNull(NetscapeCookieFile.ParseLine("h\tFALSE", Now));
     }
 
     [TestMethod]
@@ -297,12 +297,226 @@ public sealed class NetscapeCookieFileTests
     [TestMethod]
     public void NullArguments_Throw()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => NetscapeCookieFile.Read(null!));
-        Assert.ThrowsExactly<ArgumentNullException>(() => NetscapeCookieFile.ParseLine(null!));
+        Assert.ThrowsExactly<ArgumentNullException>(() => NetscapeCookieFile.Read(null!, Now));
+        Assert.ThrowsExactly<ArgumentNullException>(() => NetscapeCookieFile.ParseLine(null!, Now));
         Assert.ThrowsExactly<ArgumentNullException>(() => NetscapeCookieFile.Write(null!, []));
         Assert.ThrowsExactly<ArgumentNullException>(() => NetscapeCookieFile.Write(new StringWriter(), null!));
         Assert.ThrowsExactly<ArgumentNullException>(() => NetscapeCookieFile.FormatLine(null!));
     }
+
+    /// <summary>
+    /// Measured (BL-273): <c>curl -b in2.txt -c jar2.txt http://127.0.0.1:18273/x/y</c> at 1790486502. A
+    /// <c>Set-Cookie:</c> line, in any case and followed by any blanks, is a header with no request: <c>Domain</c>,
+    /// even an IP address, includes subdomains; <c>Expires</c> is capped at 400 days and <c>Max-Age</c> counts
+    /// from the load; expired ones are gone; a line without <c>Domain</c> is left out of the jar; a line
+    /// starting with a space is a malformed Netscape line.
+    /// </summary>
+    [TestMethod]
+    public void WriteCookieJar_SetCookieLines_MatchesCurlsJarByteForByte()
+    {
+        DateTimeOffset loaded = DateTimeOffset.FromUnixTimeSeconds(1_790_486_502);
+        CookieStore store = new();
+        store.LoadCookieFile(new StringReader(In2Txt), discardSessionCookies: false, loaded);
+
+        Assert.AreEqual(
+            Header
+            + ".127.0.0.1\tTRUE\t/\tFALSE\t0\tii\tnet\r\n"
+            + "127.0.0.1\tFALSE\t/\tFALSE\t0\thh\tnet\r\n"
+            + "127.0.0.1\tFALSE\t/\tFALSE\t0\tgg\tnet\r\n"
+            + ".127.0.0.1\tTRUE\t/\tFALSE\t0\tgg\t7\r\n"
+            + ".127.0.0.1\tTRUE\t/x\tFALSE\t0\tff\t6\r\n"
+            + ".127.0.0.1\tTRUE\t/\tFALSE\t1790486602\tcc\t3\r\n"
+            + ".127.0.0.1\tTRUE\t/\tFALSE\t1825046520\tbb\t2\r\n"
+            + ".127.0.0.1\tTRUE\t/\tFALSE\t1825046520\ta\t1\r\n",
+            WriteJar(store, loaded));
+    }
+
+    /// <summary>
+    /// Measured (BL-273): the same run sent this <c>Cookie</c> header. A cookie without <c>Domain</c> goes to
+    /// every host and one without <c>Path</c> to every path, sorting after the cookies that have them.
+    /// </summary>
+    [TestMethod]
+    public void GetCookieHeader_SetCookieLines_SendsWhatCurlSent()
+    {
+        DateTimeOffset loaded = DateTimeOffset.FromUnixTimeSeconds(1_790_486_502);
+        CookieStore store = new();
+        store.LoadCookieFile(new StringReader(In2Txt), discardSessionCookies: false, loaded);
+
+        Assert.AreEqual(
+            "ff=6; lower=l1; ii=net; hh=net; gg=net; gg=7; cc=3; bb=2; a=1; __Secure-s=10; hh=8; q=13",
+            store.GetCookieHeader(new Uri("http://127.0.0.1:18273/x/y"), secure: false, loaded));
+    }
+
+    /// <summary>
+    /// Measured (BL-273): <c>curl -b in.txt -c jar.txt http://127.0.0.1:18273/</c>, the file mixing a
+    /// Netscape line with <c>Set-Cookie:</c> lines. Only the cookies with a <c>Domain</c> reach the jar;
+    /// <c>Set-Cookie2:</c> and a line with no <c>=</c> are skipped; <c>Secure</c> is kept.
+    /// </summary>
+    [TestMethod]
+    public void LoadCookieFile_NetscapeAndSetCookieLines_KeepsWhatCurlKeeps()
+    {
+        DateTimeOffset loaded = DateTimeOffset.FromUnixTimeSeconds(1_790_486_461);
+        CookieStore store = new();
+        store.LoadCookieFile(
+            new StringReader(
+                "example.com\tFALSE\t/\tFALSE\t0\tnet1\tv1\n"
+                + "Set-Cookie: plain=p1\n"
+                + "set-cookie:   lower=l1; Path=/x\n"
+                + "SET-COOKIE: dom=d1; Domain=.example.com; Path=/\n"
+                + "Set-Cookie: exp=e1; Expires=Wed, 01 Jan 2031 00:00:00 GMT\n"
+                + "Set-Cookie: old=o1; Expires=Wed, 01 Jan 2001 00:00:00 GMT\n"
+                + "Set-Cookie: sec=s1; Secure; HttpOnly; domain=127.0.0.1\n"
+                + "Set-Cookie: ma=m1; Max-Age=100\n"
+                + "Set-Cookie: far=f1; Expires=Wed, 01 Jan 2099 00:00:00 GMT\n"
+                + "Set-Cookie:nospace=n1; domain=127.0.0.1; path=/\n"
+                + "Set-Cookie2: two=t2\n"
+                + "Set-Cookie: bad\n"),
+            discardSessionCookies: false,
+            loaded);
+
+        Assert.AreEqual(
+            "nospace=n1; sec=s1; plain=p1; far=f1; exp=e1; ma=m1",
+            store.GetCookieHeader(new Uri("http://127.0.0.1:18273/"), secure: false, loaded));
+        Assert.AreEqual(
+            Header
+            + ".127.0.0.1\tTRUE\t/\tFALSE\t0\tnospace\tn1\r\n"
+            + "#HttpOnly_.127.0.0.1\tTRUE\t/\tTRUE\t0\tsec\ts1\r\n"
+            + ".example.com\tTRUE\t/\tFALSE\t0\tdom\td1\r\n"
+            + "example.com\tFALSE\t/\tFALSE\t0\tnet1\tv1\r\n",
+            WriteJar(store, loaded));
+    }
+
+    /// <summary>
+    /// Measured (BL-273): <c>curl -b in3.txt -c jar3.txt http://127.0.0.1:18273/</c>. A <c>Set-Cookie:</c>
+    /// line without <c>Path</c> is not the namesake of one with the path <c>/</c>, sorts after it, and is
+    /// written with <c>/</c>; two lines with neither <c>Domain</c> nor <c>Path</c> are namesakes.
+    /// </summary>
+    [TestMethod]
+    public void LoadCookieFile_SetCookieLinesWithoutPath_KeepAnEmptyPath()
+    {
+        CookieStore store = Load(
+            "Set-Cookie: yy=1; domain=127.0.0.1; path=/\n"
+            + "Set-Cookie: zz=2; domain=127.0.0.1\n"
+            + "Set-Cookie: nn=3; domain=127.0.0.1\n"
+            + "127.0.0.1\tTRUE\t/\tFALSE\t0\tnn\tnet\n"
+            + "127.0.0.1\tTRUE\t/\tFALSE\t0\tmm\tnet\n"
+            + "Set-Cookie: mm=4; domain=127.0.0.1\n"
+            + "Set-Cookie: kk=5\n"
+            + "Set-Cookie: kk=6\n"
+            + "Set-Cookie: jj=5; path=/\n"
+            + "Set-Cookie: jj=6\n",
+            discardSessionCookies: false);
+
+        Assert.AreEqual(
+            "mm=net; nn=net; yy=1; jj=5; mm=4; nn=3; zz=2; jj=6; kk=6",
+            store.GetCookieHeader(new Uri("http://127.0.0.1:18273/"), secure: false, Now));
+        Assert.AreEqual(
+            Header
+            + ".127.0.0.1\tTRUE\t/\tFALSE\t0\tmm\t4\r\n"
+            + ".127.0.0.1\tTRUE\t/\tFALSE\t0\tmm\tnet\r\n"
+            + ".127.0.0.1\tTRUE\t/\tFALSE\t0\tnn\tnet\r\n"
+            + ".127.0.0.1\tTRUE\t/\tFALSE\t0\tnn\t3\r\n"
+            + ".127.0.0.1\tTRUE\t/\tFALSE\t0\tzz\t2\r\n"
+            + ".127.0.0.1\tTRUE\t/\tFALSE\t0\tyy\t1\r\n",
+            WriteJar(store, Now));
+    }
+
+    /// <summary>
+    /// Measured (BL-273): <c>curl -b in4.txt</c> sends only <c>__Host-b=1</c>: a <c>__Host-</c> cookie from a
+    /// <c>Set-Cookie:</c> line needs <c>Path=/</c> and no <c>Domain</c>.
+    /// </summary>
+    [TestMethod]
+    public void LoadCookieFile_HostPrefixedSetCookieLines_KeepsOnlyTheOneWithPathSlash()
+    {
+        CookieStore store = Load(
+            "Set-Cookie: __Host-a=1; Secure\n"
+            + "Set-Cookie: __Host-b=1; Secure; Path=/\n"
+            + "Set-Cookie: __Host-c=1; Secure; Path=/; domain=127.0.0.1\n",
+            discardSessionCookies: false);
+
+        Assert.AreEqual("__Host-b=1", store.GetCookieHeader(new Uri("http://127.0.0.1:18273/"), secure: false, Now));
+    }
+
+    /// <summary>
+    /// Measured (BL-273): <c>curl -b in5.txt -c jar5.txt --resolve foo.test:18273:127.0.0.1</c>, twice to
+    /// <c>http://foo.test:18273/</c>, the response setting <c>s=2</c> and <c>t=2</c>. <c>Secure</c> cookies from
+    /// <c>Set-Cookie:</c> lines without <c>Path</c> do not stop an insecure origin setting their names.
+    /// </summary>
+    [TestMethod]
+    public void StoreFromResponse_SecureSetCookieLinesWithoutPath_DoNotBlockInsecureNamesakes()
+    {
+        CookieStore store = Load("Set-Cookie: s=1; Secure\nSet-Cookie: t=1; Secure; domain=foo.test\n", discardSessionCookies: false);
+        Uri foo = new("http://foo.test:18273/");
+
+        store.StoreFromResponse(foo, ["s=2", "t=2"], Now);
+
+        Assert.AreEqual("t=2; s=2", store.GetCookieHeader(foo, secure: false, Now));
+        Assert.AreEqual(
+            Header
+            + "foo.test\tFALSE\t/\tFALSE\t0\tt\t2\r\n"
+            + "foo.test\tFALSE\t/\tFALSE\t0\ts\t2\r\n"
+            + ".foo.test\tTRUE\t/\tTRUE\t0\tt\t1\r\n",
+            WriteJar(store, Now));
+    }
+
+    /// <summary>
+    /// Measured (BL-273): the same run with <c>in6.txt</c>, both lines given <c>Path=/</c>. The one with a
+    /// <c>Domain</c> now blocks <c>t=2</c>; the one without still does not block <c>s=2</c>.
+    /// </summary>
+    [TestMethod]
+    public void StoreFromResponse_SecureSetCookieLineWithoutDomain_DoesNotBlockAnInsecureNamesake()
+    {
+        CookieStore store = Load("Set-Cookie: s=1; Secure; Path=/\nSet-Cookie: t=1; Secure; domain=foo.test; Path=/\n", discardSessionCookies: false);
+        Uri foo = new("http://foo.test:18273/");
+
+        store.StoreFromResponse(foo, ["s=2", "t=2"], Now);
+
+        Assert.AreEqual("s=2", store.GetCookieHeader(foo, secure: false, Now));
+        Assert.AreEqual(
+            Header
+            + "foo.test\tFALSE\t/\tFALSE\t0\ts\t2\r\n"
+            + ".foo.test\tTRUE\t/\tTRUE\t0\tt\t1\r\n",
+            WriteJar(store, Now));
+    }
+
+    /// <summary>
+    /// Measured (BL-273): <c>curl -b in7.txt -c jar7.txt --resolve bar.test:18273:127.0.0.1 http://bar.test:18273/</c>,
+    /// the response setting <c>t=2</c>: a <c>Secure</c> namesake on an unrelated domain does not block it.
+    /// </summary>
+    [TestMethod]
+    public void StoreFromResponse_SecureNamesakeOnAnotherDomain_DoesNotBlockIt()
+    {
+        CookieStore store = Load("Set-Cookie: t=1; Secure; domain=foo.test; Path=/\n", discardSessionCookies: false);
+
+        store.StoreFromResponse(new Uri("http://bar.test:18273/"), ["t=2"], Now);
+
+        Assert.AreEqual(
+            Header
+            + "bar.test\tFALSE\t/\tFALSE\t0\tt\t2\r\n"
+            + ".foo.test\tTRUE\t/\tTRUE\t0\tt\t1\r\n",
+            WriteJar(store, Now));
+    }
+
+    /// <summary>The measured <c>in2.txt</c> (BL-273).</summary>
+    private const string In2Txt =
+        "Set-Cookie: a=1; domain=127.0.0.1; Expires=Wed, 01 Jan 2031 00:00:00 GMT\n"
+        + "Set-Cookie: bb=2; domain=127.0.0.1; Expires=Wed, 01 Jan 2099 00:00:00 GMT\n"
+        + "Set-Cookie: cc=3; domain=127.0.0.1; Max-Age=100\n"
+        + "Set-Cookie: dd=4; domain=127.0.0.1; Max-Age=0\n"
+        + "Set-Cookie: ee=5; domain=127.0.0.1; Expires=Wed, 01 Jan 2001 00:00:00 GMT\n"
+        + "Set-Cookie: ff=6; domain=127.0.0.1; path=/x/\n"
+        + "sEt-CoOkIe:\t lower=l1; Path=/x\n"
+        + "Set-Cookie: gg=7; domain=127.0.0.1\n"
+        + "127.0.0.1\tFALSE\t/\tFALSE\t0\tgg\tnet\n"
+        + "Set-Cookie: hh=8\n"
+        + "127.0.0.1\tFALSE\t/\tFALSE\t0\thh\tnet\n"
+        + "Set-Cookie: __Host-h=9\n"
+        + "Set-Cookie: __Secure-s=10; Secure\n"
+        + "Set-Cookie: ii=11; domain=127.0.0.1; path=/\n"
+        + "127.0.0.1\tTRUE\t/\tFALSE\t0\tii\tnet\n"
+        + " Set-Cookie: sp=12\n"
+        + "Set-Cookie:  \n"
+        + "Set-Cookie: q=13\r\n";
 
     /// <summary>The measured <c>in.txt</c>.</summary>
     private const string InTxt =
