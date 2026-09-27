@@ -38,7 +38,7 @@ completed: 2026-09-27
   - `curl -q http://127.0.0.1:18244/a` sent neither header.
   - `curl -v http://127.0.0.1:18245/a` began stderr with `Note: Read config file from 'C:\Users\Stewart ` / `Note: Rogers\AppData\Local\Temp\bl243\.curlrc'` (wrapped at 79 columns like a warning, `Note: ` on each piece), then the `*` verbose lines.
   - The note also appears under `-s -v`, under `--trace-ascii` alone, after `Warning: -v, --verbose overrides an earlier trace option`, and before `-V` output; not with `-v --no-verbose` and not without `-v` or a trace option.
-  - For a refused command line curl prints it too (after the refusal lines for an unknown option read after `-v`; before them for no URL). A refused `CommandLineParseResult` carries no options, so that needs `Curl.Cli`: filed as BL-351.
+  - For a refused command line curl prints it too (after the refusal lines for an unknown option read after `-v`; before them for no URL). A refused `CommandLineParseResult` carries no options, so that needs `Curl.Cli`: filed as BL-352.
 - Tests: `CurlCommandRunnerConfigFileTests` (13 cases) and `WarningLineWrapperTests.WrapNoteText_MeasuredConfigFileNoteAtDefault79Columns_IsCurlsTwoLines`. `WarningLineWrapper` gained `WrapNoteText`, the same `voutf` rule with the `Note: ` prefix.
 - Gates: `Measure-CodeQuality.ps1 -Library Curl.Console`: 100% line, 100% branch, 0 failing members (238).
 

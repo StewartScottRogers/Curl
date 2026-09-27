@@ -1,5 +1,5 @@
 ---
-id: BL-351
+id: BL-352
 title: Print the .curlrc note before or after a refused command line as curl does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-351 — Print the .curlrc note before or after a refused command line as curl does
+# BL-352 — Print the .curlrc note before or after a refused command line as curl does
 
 ## Goal
 

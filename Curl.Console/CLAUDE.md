@@ -20,7 +20,7 @@ reads no `.curlrc`, which keeps tests off the real home directory), unless the f
 starts with `-q` or is `--disable`; `-K` files apply where they stand. Both are read through
 the injected `IDataFileReader`. Under `-v` or a `--trace` option an accepted command line then
 prints `Note: Read config file from '<path>'`, wrapped as a warning is and shown even with
-`-s` (BL-243; the refused-command-line cases are BL-351). `-o` files open on the first write through
+`-s` (BL-243; the refused-command-line cases are BL-352). `-o` files open on the first write through
 `DeferredOutputFileStream`, which is how curl's exit 23 message comes out right. The
 parser's warning lines are written to standard error before anything else.
 Every `Warning: ` line is wrapped by `WarningLineWrapper` as curl's `warnf` wraps it, at the
