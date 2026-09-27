@@ -8,7 +8,7 @@ depends-on: [BL-178]
 touches: [Curl.Protocol.Abstractions.UnitLibrary]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-27
 ---
 # BL-307 — Correct ITransferContext.MaxFileSize's remark now that HTTP enforces it
 
@@ -23,12 +23,16 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] The `MaxFileSize` remarks name `file://` and `http`/`https` as the handlers that enforce it, and give both HTTP exit-63 messages.
-- [ ] `dotnet build -warnaserror` is clean.
+- [x] The `MaxFileSize` remarks name `file://` and `http`/`https` as the handlers that enforce it, and give both HTTP exit-63 messages.
+- [x] `dotnet build -warnaserror` is clean.
 
 ## Notes
+
+- Made the one-remark edit in the session rather than through `align-and-document`: a single doc comment, checked against `HttpDownloadConditions.ThrowIfContentLengthExceeds` (Content-Length over the limit, nothing written) and `HttpResponseBodyReader.WriteAsync` (writes up to the limit, then exit 63 with the byte count).
+- `dotnet build -warnaserror`: 0 warnings, 0 errors; fast tests all green.
 
 ## Log
 
 - 2026-09-26: Created.
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Done. ITransferContext.MaxFileSize remarks name file:// and http/https as enforcing it, with both HTTP exit-63 messages
