@@ -649,6 +649,114 @@ public sealed class SwsHttpServerConnectorTests
         Assert.AreEqual("second\n", await ExchangeAsync(connection, "GET /12340002 HTTP/1.1\r\n\r\n"), "the connection still reads requests");
     }
 
+    [TestMethod]
+    [DataRow("/1234", "Authorization: Digest username=\"a\"\r\n", "data1000")]
+    [DataRow("/12340002", "Authorization: Digest username=\"a\"\r\n", "data1002")]
+    [DataRow("/1234", "Authorization: NTLM TlRMTVNTUAABAAAA\r\n", "data1001")]
+    [DataRow("/1234", "Authorization: NTLM TlRMTVNTUAADAAAA\r\n", "data1002")]
+    [DataRow("/1234", "Proxy-Authorization: NTLM TlRMTVNTUAABAAAA\r\n", "data1001")]
+    [DataRow("/1234", "Authorization: NTLM TlRMTVNTUAACAAAA\r\n", "data")]
+    [DataRow("/12341000", "Authorization: Basic dXNlcjpwYXNz\r\n", "data1001")]
+    [DataRow("/1234", "Authorization: Basic dXNlcjpwYXNz\r\n", "data")]
+    [DataRow("/1234", "Authorization: Negotiate YII=\r\n", "data1")]
+    [DataRow("/1234", "Authorization: Negotiate YII=\r\nX: Authorization: Digest\r\n", "data1")]
+    [DataRow("/1234", "Authorization: Digest a\r\nX: Authorization: NTLM TlRMTVNTUAADAAAA\r\n", "data1000")]
+    [DataRow("/1234", "Authorization: NTLM TlRMTVNTUAADAAAA\r\nX: Authorization: NTLM TlRMTVNTUAAB\r\n", "data1002")]
+    public async Task Authorization_SelectsThePartAsSwsDoes(string path, string headers, string expected)
+    {
+        IConnection connection = await ConnectAsync(new SwsHttpServerConnector(PartNamedCase("data", "data1", "data1000", "data1001", "data1002")));
+
+        Assert.AreEqual(expected + "\n", await ExchangeAsync(connection, $"GET {path} HTTP/1.1\r\n{headers}\r\n"));
+    }
+
+    [TestMethod]
+    [DataRow("", "Transfer-Encoding: chunked\r\nAuthorization: Digest a\r\n\r\n0\r\n\r\n", "data")]
+    [DataRow("", "Authorization: Digest a\r\ntransfer-encoding: CHUNKED\r\n\r\n0\r\n\r\n", "data")]
+    [DataRow("", "Content-Length: abc\r\nAuthorization: Digest a\r\n\r\n", "data")]
+    [DataRow("", "Content-Length: 2\r\nContent-Length: abc\r\nAuthorization: Digest a\r\n\r\nhi", "data1000")]
+    [DataRow("", "Content-Length: 0\r\nContent-Length: abc\r\nAuthorization: Digest a\r\n\r\n", "data")]
+    [DataRow("skip: 2\n", "Content-Length: 2\r\nContent-Length: abc\r\nAuthorization: Digest a\r\n\r\n", "data")]
+    [DataRow("no-expect\n", "Content-Length: 2\r\nExpect: 100-continue\r\nContent-Length: abc\r\nAuthorization: Digest a\r\n\r\n", "data")]
+    [DataRow("", "Content-Length: 2\r\nExpect: 100-continue\r\nContent-Length: abc\r\nAuthorization: Digest a\r\n\r\nhi", "data1000")]
+    public async Task Authorization_IsNotReachedWhereSwsStopsReadingTheHeaders(string serverCommands, string headers, string expected)
+    {
+        IConnection connection = await ConnectAsync(new SwsHttpServerConnector(Case(Reply("data", "data\n"), Reply("data1000", "data1000\n"), Reply("servercmd", serverCommands))));
+
+        Assert.AreEqual(expected + "\n", await ExchangeAsync(connection, $"POST /1234 HTTP/1.1\r\n{headers}"));
+    }
+
+    [TestMethod]
+    public async Task Negotiate_CountsUpFromTheFirstNegotiateRequestsPart_AcrossConnections()
+    {
+        SwsHttpServerConnector server = new(PartNamedCase("data", "data3", "data4", "data5"));
+        const string Negotiate = "Authorization: Negotiate YII=\r\n\r\n";
+
+        Assert.AreEqual("data3\n", await ExchangeAsync(await ConnectAsync(server), "GET /12340002 HTTP/1.1\r\n" + Negotiate));
+        Assert.AreEqual("data4\n", await ExchangeAsync(await ConnectAsync(server), "GET /1234 HTTP/1.1\r\n" + Negotiate));
+        Assert.AreEqual("data5\n", await ExchangeAsync(await ConnectAsync(server), "GET /12340007 HTTP/1.1\r\n" + Negotiate));
+    }
+
+    [TestMethod]
+    public async Task Swsbounce_GivesTheNextRequestThePreviousPartPlusOne_AcrossConnections()
+    {
+        SwsHttpServerConnector server = new(Case(
+            Reply("data", "plain\n"),
+            Reply("data1000", "swsbounce\n"),
+            Reply("data1001", "bounced swsbounce\n"),
+            Reply("data1002", "bounced twice\n")));
+
+        IConnection first = await ConnectAsync(server);
+        Assert.AreEqual("swsbounce\n", await ExchangeAsync(first, "GET /1234 HTTP/1.1\r\nAuthorization: Digest a\r\n\r\n"));
+        Assert.AreEqual("bounced swsbounce\n", await ExchangeAsync(await ConnectAsync(server), Get));
+        Assert.AreEqual("bounced twice\n", await ExchangeAsync(first, Get));
+        Assert.AreEqual("plain\n", await ExchangeAsync(first, Get), "a reply without swsbounce ends the bounce");
+    }
+
+    [TestMethod]
+    public async Task Swsbounce_EndsAtTheNotFoundDocument()
+    {
+        SwsHttpServerConnector server = new(Case(Reply("data", "swsbounce\n"), Reply("data1", "bounced\n")));
+
+        Assert.AreEqual("swsbounce\n", await ExchangeAsync(await ConnectAsync(server), Get));
+        StringAssert.StartsWith(await ExchangeAsync(await ConnectAsync(server), "GARBAGE\r\n\r\n"), "HTTP/1.1 404 Not Found");
+        Assert.AreEqual("swsbounce\n", await ExchangeAsync(await ConnectAsync(server), Get));
+    }
+
+    [TestMethod]
+    [DataRow("CONNECT test.remote.example.com.1234:8990 HTTP/1.1\r\n\r\n", "connect")]
+    [DataRow("CONNECT test.1234:8990 HTTP/1.0\r\n\r\n", "connect")]
+    [DataRow("CONNECT [::1]:8990 HTTP/1.1\r\n\r\n", "connect")]
+    [DataRow("CONNECT test.1234:8990 HTTP/1.1\r\nProxy-Authorization: NTLM TlRMTVNTUAABAAAA\r\n\r\n", "connect1001")]
+    [DataRow("CONNECT test.1234:8990 HTTP/1.1\r\nProxy-Authorization: NTLM TlRMTVNTUAADAAAA\r\n\r\n", "connect1002")]
+    [DataRow("CONNECT host/12340002 HTTP/1.1\r\n\r\n", "data2")]
+    [DataRow("CONNECT host:8990/1234 HTTP/1.1\r\n\r\n", "data")]
+    [DataRow("CONNECTS test.1234:8990 HTTP/1.1\r\n\r\n", "data")]
+    [DataRow("CONNECT test 1234 HTTP/1.1\r\n\r\n", "data")]
+    [DataRow("connect test.1234:8990 HTTP/1.1\r\n\r\n", "data")]
+    public async Task Connect_IsAnsweredFromTheConnectPart(string request, string expected)
+    {
+        IConnection connection = await ConnectAsync(new SwsHttpServerConnector(PartNamedCase("data", "data2", "connect", "connect1001", "connect1002")));
+
+        Assert.AreEqual(expected + "\n", await ExchangeAsync(connection, request));
+    }
+
+    [TestMethod]
+    public async Task Connect_KeepsTheConnectionOpenForTheTunnelledRequest()
+    {
+        SwsHttpServerConnector server = new(PartNamedCase("data2", "connect"));
+        IConnection connection = await ConnectAsync(server);
+        const string Connect = "CONNECT test.1234:8990 HTTP/1.1\r\n\r\n";
+        const string Tunnelled = "GET /12340002 HTTP/1.1\r\n\r\n";
+
+        Assert.AreEqual("connect\n", await ExchangeAsync(connection, Connect));
+        Assert.AreEqual("data2\n", await ExchangeAsync(connection, Tunnelled));
+        Assert.AreEqual(Connect + Tunnelled, Text(server.ReceivedBytes));
+    }
+
+    // Each part's content is its own name and a line feed.
+    private static UpstreamTestCase PartNamedCase(params string[] partNames) =>
+        Case([.. partNames.Select(name => Reply(name, name + "\n"))]);
+
     private static UpstreamTestCase Case(params string[] replyParts)
     {
         string file = "<testcase>\n<reply>\n" + string.Concat(replyParts) + "</reply>\n</testcase>\n";

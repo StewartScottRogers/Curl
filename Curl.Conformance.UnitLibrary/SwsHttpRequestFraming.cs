@@ -49,6 +49,42 @@ internal static class SwsHttpRequestFraming
         return upgradesConnection ? headersEnd + 4 : FindBodyEnd(received, headersEnd + 4, headerLines, serverCommands);
     }
 
+    /// <summary>
+    /// Whether sws reads a complete request's headers through to its <c>Authorization:</c>
+    /// rules: it returns before them at a <c>Transfer-Encoding: chunked</c> header, and at a
+    /// <c>Content-Length</c> it cannot read while it has no length yet.
+    /// </summary>
+    /// <param name="request">The request's bytes, headers and body.</param>
+    /// <param name="serverCommands">The test case's <c>&lt;servercmd&gt;</c> commands.</param>
+    /// <returns>Whether the authorization rules apply to the request.</returns>
+    public static bool ReachesAuthorizationRules(ReadOnlySpan<byte> request, SwsServerCommands serverCommands)
+    {
+        long bodyLength = 0;
+        foreach (string line in Encoding.Latin1.GetString(request[..request.IndexOf("\r\n\r\n"u8)]).Split("\r\n"))
+        {
+            if (IsHeader(line, ChunkedPrefix) || (bodyLength == 0 && IsHeader(line, ContentLengthPrefix) && ParseContentLength(line[ContentLengthPrefix.Length..]) < 0))
+            {
+                return false;
+            }
+
+            bodyLength = BodyLengthAfter(line, bodyLength, serverCommands);
+        }
+
+        return true;
+    }
+
+    // sws's req->cl after one header line: the first readable Content-Length less skip: N, and
+    // zero again after Expect: 100-continue under no-expect.
+    private static long BodyLengthAfter(string line, long bodyLength, SwsServerCommands serverCommands)
+    {
+        if (bodyLength == 0 && IsHeader(line, ContentLengthPrefix))
+        {
+            return ContentLengthLessSkipped(line, serverCommands.SkippedBodyBytes);
+        }
+
+        return serverCommands.IgnoresExpectedBody && IsHeader(line, ExpectContinuePrefix) ? 0 : bodyLength;
+    }
+
     // auth_required is checked first and ends the request without an upgrade; then "Upgrade:"
     // anywhere in what has been received, matched case-sensitively as sws's strstr does.
     private static bool UpgradesConnection(ReadOnlySpan<byte> received, SwsServerCommands serverCommands) =>

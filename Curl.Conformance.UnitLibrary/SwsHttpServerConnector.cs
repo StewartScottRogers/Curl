@@ -14,7 +14,12 @@ namespace Curl.Conformance;
 /// <c>Content-Length</c>, as the <c>&lt;servercmd&gt;</c> commands <c>auth_required</c>,
 /// <c>no-expect</c>, <c>skip: N</c> and <c>upgrade</c> change it, and answered with <c>&lt;data&gt;</c>, or with <c>&lt;dataN&gt;</c>
 /// when the path's last segment is a number over 10000 whose last four digits are N (so
-/// <c>/10002</c> gets <c>&lt;data2&gt;</c>). The connection stays open for the next request
+/// <c>/10002</c> gets <c>&lt;data2&gt;</c>). An <c>Authorization:</c> header moves the part
+/// number as sws's does (Digest to <c>&lt;data1000&gt;</c>, NTLM type 1 and 3 to
+/// <c>&lt;data1001&gt;</c> and <c>&lt;data1002&gt;</c>, Basic from 1000 up by one, Negotiate
+/// counting up), a reply containing <c>swsbounce</c> gives the next request the part after it,
+/// and a <c>CONNECT host:port</c> request is answered from <c>&lt;connect&gt;</c> or
+/// <c>&lt;connectN&gt;</c>. The connection stays open for the next request
 /// until a reply containing <c>swsclose</c>, an empty reply, or <c>swsclose</c> in
 /// <c>&lt;servercmd&gt;</c> closes it.
 /// </para>
@@ -58,7 +63,7 @@ public sealed class SwsHttpServerConnector : IConnector
         serverCommands = SwsServerCommands.Read(ReplyPart(testCase, "servercmd"));
         waitAfterReply = SwsPostReplyCommands.ReadWaitAfterReply(ReplyPart(testCase, "postcmd"));
         UnsupportedServerCommands = serverCommands.UnsupportedCommands;
-        replySelector = new SwsHttpReplySelector(testCase, serverCommands.ClosesAfterEveryReply);
+        replySelector = new SwsHttpReplySelector(testCase, serverCommands);
         this.timeProvider = timeProvider;
     }
 

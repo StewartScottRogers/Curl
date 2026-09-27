@@ -53,9 +53,15 @@ has been quiet for one second, then closes. `delay: N` alone is listed in
 `UnsupportedServerCommands`, so a case using it can be skipped with a reason: sws applies it
 only when it accepts a connection while another's request is part-read, which needs its
 single-threaded interleaving of connections, not modelled here, and no case at `curl-8_21_0`
-uses it. sws's part-number rules for authentication, `swsbounce` and `CONNECT` are not
-emulated yet (BL-265). Otherwise a read with no reply waiting returns 0, because in memory
-nothing else can arrive.
+uses it. `SwsHttpReplySelector` then moves the part number as sws does (ADR-0043): the first
+of `Authorization: Negotiate` (a counter from the first such request's part, plus one each
+time), `Digest` (+1000), NTLM type 3 (+1002), NTLM type 1 (+1001) and, from part 1000 up,
+`Basic` (+1) found anywhere in the request applies, except to a chunked request or one with an
+unreadable `Content-Length`, which sws stops reading before the rules; after a reply
+containing `swsbounce` the next request gets that part plus one; both states are kept across
+connections. A `CONNECT host:port HTTP/x.y` request with no number in its path is answered
+from `<connect>` / `<connectN>`, and the connection stays open for the tunnelled request.
+Otherwise a read with no reply waiting returns 0, because in memory nothing else can arrive.
 
 What it is to hold in full, per ADR-0013 decision 2:
 
