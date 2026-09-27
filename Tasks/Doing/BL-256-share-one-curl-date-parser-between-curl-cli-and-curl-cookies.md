@@ -34,3 +34,4 @@ One port of libcurl's `parsedate` serves both `-z` (`Curl.Cli`) and cookie `Expi
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-27: Backlog -> Doing.
