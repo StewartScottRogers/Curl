@@ -501,6 +501,12 @@ public sealed class CommandLineOptions
     public HttpVersionPreference? HttpVersion { get; private set; }
 
     /// <summary>
+    /// <see langword="true"/> when <c>--http0.9</c> was given and no <c>--no-http0.9</c> came after it:
+    /// accept an HTTP/0.9 reply, one with no status line, instead of refusing it.
+    /// </summary>
+    public bool AllowHttp09Reply { get; internal set; }
+
+    /// <summary>
     /// The HTTP request method <c>-I</c> / <c>--head</c> (<see cref="SelectedHttpMethod.Head"/>),
     /// <c>--no-head</c> (<see cref="SelectedHttpMethod.Get"/>) or <c>-F</c> / <c>--form</c> and
     /// <c>--form-string</c> (<see cref="SelectedHttpMethod.MultipartFormPost"/>) selected first; once one

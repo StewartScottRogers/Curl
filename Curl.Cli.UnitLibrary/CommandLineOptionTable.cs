@@ -35,7 +35,7 @@ namespace Curl.Cli;
 /// <c>--no-progress-meter</c>, <c>--no-progress-bar</c>, <c>--no-get</c>, <c>--no-location</c>, <c>--no-location-trusted</c>,
 /// <c>--no-post301</c>, <c>--no-post302</c>, <c>--no-post303</c>, <c>--no-show-headers</c>, <c>--no-include</c>, <c>--no-head</c>,
 /// <c>--no-fail</c>, <c>--no-fail-with-body</c>, <c>--no-fail-early</c>, <c>--no-compressed</c>, <c>--no-raw</c>, <c>--no-tr-encoding</c>,
-/// <c>--no-ignore-content-length</c>, <c>--no-path-as-is</c>, <c>--no-basic</c>, <c>--no-digest</c>, <c>--no-proxytunnel</c>, <c>--no-remote-name</c>,
+/// <c>--no-ignore-content-length</c>, <c>--no-path-as-is</c>, <c>--no-http0.9</c>, <c>--no-basic</c>, <c>--no-digest</c>, <c>--no-proxytunnel</c>, <c>--no-remote-name</c>,
 /// <c>--no-remote-name-all</c>, <c>--no-remote-header-name</c>, <c>--no-create-dirs</c>, <c>--no-junk-session-cookies</c> and <c>--no-version</c> are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
 /// silent and <c>--no-silent -s</c> is. <c>--no-silent=x</c> is accepted, its value ignored.
 /// <c>--no-tlsv1.2</c>, <c>--no-tlsv1.3</c>, <c>--no-url</c>, <c>--no-output</c> (even as the last
@@ -138,6 +138,7 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("tr-encoding", null, (options, on) => options.TransferEncoding = on),
         CommandLineOption.NegatableFlag("ignore-content-length", null, (options, on) => options.IgnoreContentLength = on),
         CommandLineOption.NegatableFlag("path-as-is", null, (options, on) => options.PathAsIs = on),
+        CommandLineOption.NegatableFlag("http0.9", null, (options, on) => options.AllowHttp09Reply = on),
         CommandLineOption.Text("request-target", null, (options, target) => options.RequestTarget = target),
         CommandLineOption.Flag("http1.0", '0', options => options.SelectHttpVersion(HttpVersionPreference.Http10)),
         CommandLineOption.Flag("http1.1", null, options => options.SelectHttpVersion(HttpVersionPreference.Http11)),
