@@ -4,7 +4,7 @@ title: Wire scheme guessing, URL globbing and the IPFS rewrite in Curl.Console
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-204, BL-207, BL-210, BL-230]
+depends-on: [BL-204, BL-207, BL-210, BL-230, BL-351]
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-26
@@ -29,6 +29,7 @@ URLs pass through BL-204, BL-207 and BL-210 before dispatch in `Curl.Console`.
 ## Notes
 
 - Plan item: W11 in the Phase 1 HTTP plan (2026-09-26); plan keys in this file were replaced by their task IDs.
+- BL-351 added as a dependency by BL-210 (2026-09-27): the IPFS rewrite needs the `--ipfs-gateway` value, which Curl.Cli does not parse yet.
 
 ## Log
 
