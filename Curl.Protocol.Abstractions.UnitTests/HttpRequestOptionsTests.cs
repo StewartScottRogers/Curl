@@ -16,6 +16,7 @@ public sealed class HttpRequestOptionsTests
 
         Assert.IsNull(options.CustomMethod);
         Assert.IsEmpty(options.Headers);
+        Assert.IsEmpty(options.ProxyHeaders);
         Assert.IsNull(options.UserAgent);
         Assert.IsNull(options.Referer);
         Assert.IsNull(options.Body);
@@ -36,6 +37,7 @@ public sealed class HttpRequestOptionsTests
     public void HttpRequestOptions_EveryMemberSet_RoundTripsEveryValue()
     {
         string[] headers = ["X-One: 1", "Accept:"];
+        string[] proxyHeaders = ["X-Proxy: 1"];
         var body = new BytesBody(new byte[] { 0x61 }, "application/x-www-form-urlencoded");
         var proxy = new ProxyEndpoint(ProxyKind.Socks5Hostname, "proxy.example", 1080, new NetworkCredential("u", "p"));
 
@@ -43,6 +45,7 @@ public sealed class HttpRequestOptionsTests
         {
             CustomMethod = "PATCH",
             Headers = headers,
+            ProxyHeaders = proxyHeaders,
             UserAgent = "",
             Referer = "https://example.com/from",
             Body = body,
@@ -61,6 +64,7 @@ public sealed class HttpRequestOptionsTests
 
         Assert.AreEqual("PATCH", options.CustomMethod);
         Assert.AreSame(headers, options.Headers);
+        Assert.AreSame(proxyHeaders, options.ProxyHeaders);
         Assert.AreEqual(string.Empty, options.UserAgent);
         Assert.AreEqual("https://example.com/from", options.Referer);
         Assert.AreSame(body, options.Body);

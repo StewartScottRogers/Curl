@@ -26,6 +26,14 @@ public sealed record HttpRequestOptions
     public IReadOnlyList<string> Headers { get; init; } = [];
 
     /// <summary>
+    /// Gets each <c>--proxy-header</c> value verbatim, in command-line order; empty when
+    /// none was given. A request sent to a forward proxy carries them after the
+    /// <c>-H</c> values; a request sent to the origin, directly or through a tunnel, never
+    /// does.
+    /// </summary>
+    public IReadOnlyList<string> ProxyHeaders { get; init; } = [];
+
+    /// <summary>
     /// Gets the value from <c>-A</c>/<c>--user-agent</c>: <see langword="null" /> sends
     /// curl's own <c>User-Agent</c>, and the empty string sends none.
     /// </summary>
