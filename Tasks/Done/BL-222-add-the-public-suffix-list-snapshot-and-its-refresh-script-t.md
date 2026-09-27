@@ -8,7 +8,7 @@ depends-on: [BL-156]
 touches: [Curl.Cookies.UnitLibrary, Curl.slnx, Update-PublicSuffixList.ps1]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-27
 ---
 # BL-222 — Add the Public Suffix List snapshot and its refresh script to Curl.Cookies
 
@@ -23,13 +23,15 @@ A dated PSL snapshot is an embedded resource in `Curl.Cookies.UnitLibrary`, with
 
 ## Acceptance criteria
 
-- [ ] The resource and attribution sit where the BL-156 ADR says; `dotnet build Curl.Cookies.UnitLibrary -warnaserror` is clean.
-- [ ] `Update-PublicSuffixList.ps1` downloads the list, writes the resource with the date, is ASCII-only, and is listed in the `Scripts` folder of `Curl.slnx`.
+- [x] The resource and attribution sit where the BL-156 ADR says; `dotnet build Curl.Cookies.UnitLibrary -warnaserror` is clean.
+- [x] `Update-PublicSuffixList.ps1` downloads the list, writes the resource with the date, is ASCII-only, and is listed in the `Scripts` folder of `Curl.slnx`.
 
 ## Notes
 
 - Split out of plan item BL-223 so the data and script land separately from the matching logic.
 - Plan item: Q4a in the Phase 1 HTTP plan (2026-09-26); plan keys in this file were replaced by their task IDs.
+- 2026-09-27 (lane 1): reapplied lane 2's commit 2055d53 unchanged. Its integration failed only on the Networking intermediate-certificate TLS test, since fixed by BL-354; nothing in Curl.Cookies caused it. Snapshot dated 2026-09-27; `Update-PublicSuffixList.ps1` verified ASCII-only; `dotnet build` clean and all fast tests pass.
+- The snapshot folder carries a `.gitattributes` with `-text` so git keeps the upstream bytes unchanged (ADR-0049 says unmodified apart from the dated line).
 
 ## Log
 
@@ -37,3 +39,4 @@ A dated PSL snapshot is an embedded resource in `Curl.Cookies.UnitLibrary`, with
 - 2026-09-27: Backlog -> Doing.
 - 2026-09-27: Doing -> Backlog. Lane 2 could not integrate: fast tests failed after rebasing onto the other lanes' work. The work is on branch factory/BL-222-lane-2-20260927-011505; start with git cherry-pick --no-commit factory/BL-222-lane-2-20260927-011505 and fix it.
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Done. The dated PSL snapshot is embedded in Curl.Cookies with its MPL-2.0 attribution, and Update-PublicSuffixList.ps1 refreshes it
