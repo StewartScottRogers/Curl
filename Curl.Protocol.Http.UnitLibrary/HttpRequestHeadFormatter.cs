@@ -10,13 +10,13 @@ namespace Curl.Protocol.Http;
 /// line after them - byte for byte as curl 8.21.0 sends it for <c>-X</c>, <c>-H</c>,
 /// <c>-A</c>, <c>-e</c>, <c>-I</c>, <c>--compressed</c>, <c>--tr-encoding</c>, an <c>Authorization</c> value, a
 /// <c>Cookie</c> value, a request body, a forward proxy, <c>--proxy-header</c>, <c>-r</c>, <c>-C</c> and <c>-z</c>. Every
-/// rule was measured (BL-172, BL-175, BL-177, BL-178, BL-180, BL-181, BL-182, BL-183, BL-296, BL-315 and BL-332 Notes).
+/// rule was measured (BL-172, BL-175, BL-177, BL-178, BL-180, BL-181, BL-182, BL-183, BL-296, BL-306, BL-315 and BL-332 Notes).
 /// </summary>
 /// <remarks>
 /// The request line ends in <c>HTTP/1.0</c> for <c>-0</c> and in <c>HTTP/1.1</c> otherwise;
 /// the headers are the same for both. curl's own headers come first, in the order <c>Host</c>, <c>Proxy-Authorization</c>,
 /// <c>Authorization</c>, <c>Range</c>, <c>Content-Range</c> (for a <c>-T</c> upload resumed with
-/// <c>-C</c>, <see cref="HttpUploadResume" />), <c>User-Agent</c>, <c>Accept</c>, <c>TE: gzip</c> (for
+/// <c>-C</c>, or <c>-r</c> on a <c>-d</c> body or a <c>-T</c> upload, <see cref="HttpRequestFraming.ContentRange" />), <c>User-Agent</c>, <c>Accept</c>, <c>TE: gzip</c> (for
 /// <c>--tr-encoding</c>), <c>Accept-Encoding</c> (for <c>--compressed</c>), <c>Referer</c>, <c>Proxy-Connection: Keep-Alive</c> (through a forward
 /// proxy), each left out when an <c>-H</c> value names it, then the cookie store's
 /// <c>Cookie</c>, then <c>If-Modified-Since</c> or <c>If-Unmodified-Since</c> for <c>-z</c>, also

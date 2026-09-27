@@ -92,9 +92,9 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_RangeWithARequestBody_SendsNoRange()
+    public async Task ExecuteAsync_RangeWithARequestBody_SendsContentRangeAfterHost()
     {
-        const string expected = "POST /f HTTP/1.1\r\nHost: 127.0.0.1:18834\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+        const string expected = "POST /f HTTP/1.1\r\nHost: 127.0.0.1:18834\r\nContent-Range: bytes 0-9/1\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
             + "If-Modified-Since: Sun, 06 Nov 1994 08:49:37 GMT\r\nContent-Length: 1\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\nx";
         TransferContext context = new TransferContext
         {
@@ -103,6 +103,42 @@ public sealed partial class HttpProtocolHandlerTests
             Range = ByteRange.Bounded(0, 9),
             TimeCondition = new TimeCondition(ConditionTime, TimeConditionKind.IfModifiedSince),
             Http = new HttpRequestOptions { Body = new BytesBody("x"u8.ToArray(), "application/x-www-form-urlencoded") },
+        };
+
+        TransferResult result = await Handler(QueueConnector.For(Connection(Partial + "hello", 65536, expected))).ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_RangeWithAPutBody_SendsContentRangeAfterHost()
+    {
+        const string expected = "PUT /f HTTP/1.1\r\nHost: 127.0.0.1:18835\r\nContent-Range: bytes 100-/5\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+            + "Content-Length: 5\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\nhello";
+        TransferContext context = new TransferContext
+        {
+            Url = ConditionUrl(18835),
+            Output = new MemoryStream(),
+            Range = ByteRange.FromOffset(100),
+            Http = new HttpRequestOptions { CustomMethod = "PUT", Body = new BytesBody("hello"u8.ToArray(), "application/x-www-form-urlencoded") },
+        };
+
+        TransferResult result = await Handler(QueueConnector.For(Connection(Partial + "hello", 65536, expected))).ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_RangeWithABodyAndACustomContentRange_SendsTheCustomOneInItsPlace()
+    {
+        const string expected = "POST /f HTTP/1.1\r\nHost: 127.0.0.1:18836\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nContent-Range: foo\r\n"
+            + "Content-Length: 1\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\nx";
+        TransferContext context = new TransferContext
+        {
+            Url = ConditionUrl(18836),
+            Output = new MemoryStream(),
+            Range = ByteRange.Bounded(0, 9),
+            Http = new HttpRequestOptions { Headers = ["Content-Range: foo"], Body = new BytesBody("x"u8.ToArray(), "application/x-www-form-urlencoded") },
         };
 
         TransferResult result = await Handler(QueueConnector.For(Connection(Partial + "hello", 65536, expected))).ExecuteAsync(context);

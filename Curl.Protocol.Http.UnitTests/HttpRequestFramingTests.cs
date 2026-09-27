@@ -218,6 +218,61 @@ public sealed class HttpRequestFramingTests
         Assert.IsTrue(framing.IsChunked);
     }
 
+    [TestMethod]
+    [DataRow(0L, 9L, 1, "bytes 0-9/1", DisplayName = "-d x -r 0-9")]
+    [DataRow(0L, 9L, 5, "bytes 0-9/5", DisplayName = "-d hello -r 0-9")]
+    public void Of_RangeOnADataBody_SendsTheRangeOverTheBodyLength(long first, long last, int length, string expected)
+    {
+        HttpRequestOptions options = new() { Body = new BytesBody(new byte[length], "a/b") };
+
+        HttpRequestFraming framing = HttpRequestFraming.Of(options, [], range: ByteRange.Bounded(first, last));
+
+        Assert.AreEqual(expected, framing.ContentRange);
+        Assert.AreEqual(expected, framing.WithoutExpect().ContentRange);
+    }
+
+    [TestMethod]
+    public void Of_NoRange_SendsNoContentRange() =>
+        Assert.IsNull(Of(new HttpRequestOptions { Body = new BytesBody("x"u8.ToArray(), "a/b") }).ContentRange);
+
+    [TestMethod]
+    public void Of_RangeOnAFormBody_SendsNoContentRange()
+    {
+        HttpRequestOptions options = new() { Body = new StreamBody(Stream.Null, 149, "multipart/form-data; boundary=b") };
+
+        Assert.IsNull(HttpRequestFraming.Of(options, [], range: ByteRange.Bounded(0, 9)).ContentRange);
+    }
+
+    [TestMethod]
+    public void Of_RangeWithoutABody_SendsNoContentRange() =>
+        Assert.IsNull(HttpRequestFraming.Of(new HttpRequestOptions(), [], range: ByteRange.Bounded(0, 9)).ContentRange);
+
+    [TestMethod]
+    public void Of_RangeOnAnUpload_SendsTheRangeOverTheUploadLength()
+    {
+        HttpRequestFraming framing = HttpRequestFraming.Of(new HttpRequestOptions(), [], upload: new MemoryStream(new byte[87]), range: ByteRange.Bounded(0, 9));
+
+        Assert.AreEqual("bytes 0-9/87", framing.ContentRange);
+    }
+
+    [TestMethod]
+    public void Of_RangeOnAnUploadOfUnknownLength_SendsMinusOneForTheLength()
+    {
+        using FailingReadStream upload = new([], 1, new IOException());
+
+        HttpRequestFraming framing = HttpRequestFraming.Of(new HttpRequestOptions(), [], upload: upload, range: ByteRange.Bounded(0, 9));
+
+        Assert.AreEqual("bytes 0-9/-1", framing.ContentRange);
+    }
+
+    [TestMethod]
+    public void Of_ResumedUploadWithARange_SendsTheResumeContentRange()
+    {
+        HttpRequestFraming framing = HttpRequestFraming.Of(new HttpRequestOptions(), [], upload: new MemoryStream(new byte[10]), resumeFrom: 4, range: ByteRange.Bounded(0, 1));
+
+        Assert.AreEqual("bytes 4-9/10", framing.ContentRange);
+    }
+
     private static HttpRequestFraming Of(HttpRequestOptions options) =>
         HttpRequestFraming.Of(options, [.. options.Headers.Select(HttpCustomHeader.Parse)]);
 }
