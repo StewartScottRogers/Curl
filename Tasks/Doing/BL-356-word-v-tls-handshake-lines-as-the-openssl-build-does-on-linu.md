@@ -87,3 +87,4 @@ On Linux and macOS, `VerboseTransferEventWriter` renders a `TlsHandshakeEvent` a
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
 - 2026-09-27: Doing -> Backlog. Needs Curl.Protocol.Abstractions.UnitLibrary (TlsHandshakeEvent lacks group, signature type, verify code, chain), which BL-391 in Doing touches
+- 2026-09-27: Backlog -> Doing.
