@@ -363,6 +363,35 @@ public sealed class CurlCompositionProxyTests
         Assert.AreEqual(new ConnectTarget("proxy", 3128, false), connector.Targets.Single());
     }
 
+    [TestMethod]
+    public async Task RunAsync_HttpProxyWithoutProxyTunnelForAnFtpUrl_ForwardsAnHttpGetToTheProxy()
+    {
+        ScriptedConnector server = new([Latin1(Hello)]);
+
+        Run run = await RunAsync(server, "-sS", "-x", "http://127.0.0.1:18238", "ftp://example.com/f.txt");
+
+        Assert.AreEqual(0, run.ExitCode);
+        Assert.AreEqual(
+            "GET ftp://example.com/f.txt HTTP/1.1\r\nHost: example.com:21\r\n"
+            + "User-Agent: curl/8.21.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\n\r\n",
+            Latin1(server.Written));
+        Assert.AreEqual(Proxy, server.Targets.Single());
+        Assert.AreEqual("hello", run.StandardOutput);
+    }
+
+    [TestMethod]
+    [DataRow(new[] { "-sS", "-p", "-x", "http://127.0.0.1:18238", "ftp://example.com/f.txt" }, DisplayName = "-p")]
+    [DataRow(new[] { "-sS", "ftp://example.com/f.txt" }, DisplayName = "no proxy")]
+    public async Task RunAsync_FtpUrlNotForwardedThroughAnHttpProxy_IsNotSentToTheHttpHandler(string[] arguments)
+    {
+        RecordingConnector connector = new(CurlExitCode.CouldntConnect, "refused");
+
+        Run run = await RunAsync(connector, new Dictionary<string, string>(), arguments);
+
+        Assert.AreEqual((int)CurlExitCode.UnsupportedProtocol, run.ExitCode);
+        Assert.IsEmpty(connector.Targets);
+    }
+
     private static Task<Run> RunAsync(ScriptedConnector server, params string[] arguments) =>
         RunAsync((IConnector)server, new Dictionary<string, string>(), arguments);
 

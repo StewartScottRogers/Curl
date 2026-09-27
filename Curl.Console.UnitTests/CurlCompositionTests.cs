@@ -47,6 +47,7 @@ public sealed class CurlCompositionTests
             ["mqtts"] = typeof(MqttProtocolHandler),
             ["http"] = typeof(HttpProtocolHandler),
             ["https"] = typeof(HttpProtocolHandler),
+            ["ftp"] = typeof(ForwardedFtpProtocolHandler),
         };
         CollectionAssert.AreEquivalent(expected.ToList(), served.ToList());
         _ = new ProtocolDispatcher(handlers);

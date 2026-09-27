@@ -28,7 +28,10 @@ internal static class CurlComposition
     /// and <c>mqtts</c>, and <c>http</c> and <c>https</c> over <paramref name="connector" />,
     /// the last two answering authentication with <see cref="CreateHttpAuthenticator" />'s
     /// authenticator and keeping cookies in <paramref name="cookieStore" />; and <c>tftp</c> over
-    /// <paramref name="datagramConnector" />. Each scheme is claimed by exactly one handler.
+    /// <paramref name="datagramConnector" />; and <c>ftp</c>, which
+    /// <see cref="ForwardedFtpProtocolHandler" /> hands to the HTTP handler when it is forwarded
+    /// through an HTTP proxy without <c>-p</c> (ADR-0056, rule 3). Each scheme is claimed by
+    /// exactly one handler.
     /// </summary>
     /// <param name="connector">Connects the TCP protocols, with TLS for <c>gophers</c> and <c>mqtts</c>.</param>
     /// <param name="datagramConnector">Opens the UDP channels TFTP uses.</param>
@@ -39,7 +42,11 @@ internal static class CurlComposition
     internal static IReadOnlyList<IProtocolHandler> CreateProtocolHandlers(
         IConnector connector,
         IDatagramConnector datagramConnector,
-        ICookieStore? cookieStore = null) =>
+        ICookieStore? cookieStore = null)
+    {
+        HttpProtocolHandler http = new(connector, CreateHttpAuthenticator(), cookieStore);
+
+        return
         [
             new FileProtocolHandler(new PhysicalFileSystem()),
             new DictProtocolHandler(connector),
@@ -47,8 +54,10 @@ internal static class CurlComposition
             new TelnetProtocolHandler(connector),
             new TftpProtocolHandler(datagramConnector),
             new MqttProtocolHandler(connector),
-            new HttpProtocolHandler(connector, CreateHttpAuthenticator(), cookieStore),
+            http,
+            new ForwardedFtpProtocolHandler(http),
         ];
+    }
 
     /// <summary>
     /// Creates the HTTP authenticator: a <see cref="RankedHttpAuthenticator" /> that answers the
