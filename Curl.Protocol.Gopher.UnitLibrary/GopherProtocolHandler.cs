@@ -71,7 +71,7 @@ public sealed class GopherProtocolHandler : IProtocolHandler
             .ConfigureAwait(false);
         if (connected.Connection is not { } connection)
         {
-            return new TransferResult(connected.ExitCode, 0, connected.ErrorMessage);
+            return new TransferResult(connected.ExitCode, 0, connected.ErrorMessage) { IsConnectionRefused = connected.IsConnectionRefused };
         }
 
         await using (connection.ConfigureAwait(false))

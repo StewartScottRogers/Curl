@@ -60,7 +60,7 @@ public sealed class DictProtocolHandler(IConnector connector) : IProtocolHandler
         ConnectResult connect = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
         {
-            return new TransferResult(connect.ExitCode, 0, connect.ErrorMessage);
+            return new TransferResult(connect.ExitCode, 0, connect.ErrorMessage) { IsConnectionRefused = connect.IsConnectionRefused };
         }
 
         await using (connection.ConfigureAwait(false))
