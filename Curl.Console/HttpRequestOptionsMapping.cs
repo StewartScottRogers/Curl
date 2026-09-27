@@ -8,8 +8,10 @@ namespace Curl.Console;
 /// Maps the HTTP request options of a parsed command line onto the
 /// <see cref="HttpRequestOptions" /> an HTTP handler reads: <c>-X</c>, <c>-H</c>, <c>-A</c>,
 /// <c>-e</c>, the <c>-d</c> family, <c>--json</c>, <c>-G</c>, <c>-f</c>, <c>--fail-with-body</c>
-/// <c>-L</c>, and the authentication options <c>--basic</c>, <c>--digest</c>, <c>--anyauth</c> and
-/// <c>--oauth2-bearer</c>, with the <c>-F</c> body the caller built.
+/// <c>-L</c>, the authentication options <c>--basic</c>, <c>--digest</c>, <c>--anyauth</c> and
+/// <c>--oauth2-bearer</c>, and the transfer-encoding options <c>-0</c> / <c>--http1.0</c>,
+/// <c>--http1.1</c>, <c>--compressed</c>, <c>--tr-encoding</c>, <c>--raw</c> and
+/// <c>--ignore-content-length</c>, with the <c>-F</c> body the caller built.
 /// </summary>
 /// <remarks>
 /// Measured with curl 8.21.0 (mingw, Schannel) against a loopback recorder on 2026-09-26
@@ -51,6 +53,10 @@ internal static class HttpRequestOptionsMapping
     /// <see cref="CommandLineOptions.FailMode" /> as <see cref="HttpRequestOptions.Fail" />; and
     /// <see cref="CommandLineOptions.FollowRedirects" /> as <see cref="HttpRequestOptions.FollowRedirects" />; and
     /// <see cref="CommandLineOptions.AuthSchemes" /> and <see cref="CommandLineOptions.BearerToken" /> verbatim; and
+    /// <see cref="CommandLineOptions.HttpVersion" /> as <see cref="HttpRequestOptions.Version" />, HTTP/1.1 when
+    /// neither <c>-0</c> nor <c>--http1.1</c> was given; and <see cref="CommandLineOptions.Compressed" />,
+    /// <see cref="CommandLineOptions.TransferEncoding" />, <see cref="CommandLineOptions.Raw" /> and
+    /// <see cref="CommandLineOptions.IgnoreContentLength" /> verbatim; and
     /// <paramref name="proxy" /> as <see cref="HttpRequestOptions.ForwardProxy" /> with
     /// <see cref="CommandLineOptions.ProxyTunnel" /> as <see cref="HttpRequestOptions.ProxyTunnel" />.
     /// </returns>
@@ -69,6 +75,11 @@ internal static class HttpRequestOptionsMapping
             FollowRedirects = options.FollowRedirects,
             AuthSchemes = options.AuthSchemes,
             BearerToken = options.BearerToken,
+            Version = options.HttpVersion ?? HttpVersionPreference.Http11,
+            Compressed = options.Compressed,
+            TransferEncoding = options.TransferEncoding,
+            Raw = options.Raw,
+            IgnoreContentLength = options.IgnoreContentLength,
             ForwardProxy = proxy,
             ProxyTunnel = options.ProxyTunnel,
         };

@@ -77,6 +77,10 @@ the `-G` / `--url-query` query with `QueryUrl` before the URL is parsed. `http` 
 `RankedHttpAuthenticator` (Basic and Bearer, and Digest with a random client nonce, all in the
 platform's credential encoding), which answers the scheme `-u`, `--basic`, `--digest`,
 `--anyauth` and `--oauth2-bearer` allow (`HttpRequestOptions.AuthSchemes` and `BearerToken`).
+`-0` / `--http1.0` and `--http1.1` set `HttpRequestOptions.Version` (the last one wins, HTTP/1.1
+when neither is given), and `--compressed`, `--tr-encoding`, `--raw` and `--ignore-content-length`
+are copied as they are (BL-236); `CurlCommandRunnerTransferEncodingTests` pins each one's request
+bytes and output as BL-177, BL-180 and BL-315 measured them.
 With `-b` or `-c` the handler also gets the run's `CookieEngine`: one `CookieStore` shared by
 every URL, the `-b` files loaded before the first transfer (session cookies dropped under
 `-j`, a missing file ignored), the `-b name=value` strings sent after the stored cookies, and
