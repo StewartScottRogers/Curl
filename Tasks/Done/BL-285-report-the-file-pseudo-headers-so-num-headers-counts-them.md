@@ -38,10 +38,10 @@ File `C:/bl285tmp/a.txt` holding `hello world
 | --- | --- |
 | `curl -s -o NUL -D - -w "[%header{Content-Length}][%header{Accept-ranges}][%header{Last-Modified}][%{num_headers}]
 %{header_json}
-" URL` | headers `Content-Length: 12
-Accept-ranges: bytes
-Last-Modified: <date> GMT
-
+" URL` | headers `Content-Length: 12
+Accept-ranges: bytes
+Last-Modified: <date> GMT
+
 `, then `[][][][3]
 {
 }
@@ -86,11 +86,11 @@ goes back to Backlog until BL-284 finishes.
 
 ### Delivered 2026-09-27
 
-- `TransferReport.PseudoHeaders` added; `%{num_headers}` is `ResponseHeaders.Count + PseudoHeaders.Count`; `%header{}` still reads `ResponseHeaders` only. Recorded as ADR-0051.
+- `TransferReport.PseudoHeaders` added; `%{num_headers}` is `ResponseHeaders.Count + PseudoHeaders.Count`; `%header{}` still reads `ResponseHeaders` only. Recorded as ADR-0052.
 - `FileTransferMessages.PseudoHeaders` gives the pairs; `PseudoHeaderLines` is now built from them, so written and reported headers cannot drift.
 - `FileProtocolHandler.WithPseudoHeaders` attaches the report after the header stage, on success and on a body failure (the measured `-C 100` exit 36 case). The report also sets `DownloadSize` to the bytes transferred, because a report replaces `BytesTransferred` as the source of `%{size_download}` - without it `file://` `%{size_download}` would have dropped to 0.
 - **Default taken:** a header output that fails mid-block (exit 23) reports no pseudo-headers. Not measured; the conservative choice, pinned in `ExecuteAsync_HeaderOutputFails_ReportsNoHeaders`.
-- **Touches widened** to `Documentation/Planning/Decisions` for ADR-0051 and its index row; no task in Doing names it.
+- **Touches widened** to `Documentation/Planning/Decisions` for ADR-0052 and its index row; no task in Doing names it.
 - Tests: `FileProtocolHandlerPseudoHeaderTests` (9 cases, every measured row of the table above), `TransferWriteOutVariablesTests.TryGetVariableText_PseudoHeaders_CountTowardsNumHeadersButAreNeverFound`, and `TransferReportTests` default/init. `Measure-CodeQuality.ps1`: File, Output and Abstractions 100% line and branch, 0 failing members.
 
 ## Log
