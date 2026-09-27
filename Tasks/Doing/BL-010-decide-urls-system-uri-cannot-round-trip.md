@@ -56,3 +56,4 @@ file it as a separate task assigned to Claude and add it to `depends-on`.
 - 2026-09-26: Waits on BL-128, a proposed ADR Stewart asked for before deciding.
 - 2026-09-26: Stewart delegated the decision to Claude; reassigned. Still waits on BL-128.
 - 2026-09-26: First acceptance criterion corrected: "A Dos path must be rooted" is thrown for `file://C:` only; `file://ab:/x` throws "The hostname could not be parsed" (BL-135).
+- 2026-09-26: Backlog -> Doing.
