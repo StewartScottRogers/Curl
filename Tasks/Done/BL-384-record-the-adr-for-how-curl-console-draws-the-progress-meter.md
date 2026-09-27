@@ -8,7 +8,7 @@ depends-on: [BL-131]
 touches: [Documentation/Planning/Decisions]
 requirement: none
 created: 2026-09-27
-completed:
+completed: 2026-09-27
 ---
 # BL-384 — Record the ADR for how Curl.Console draws the progress meter's status lines
 
@@ -27,12 +27,15 @@ BL-131 made `Curl.Console` draw the progress meter's status lines from the handl
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Planning/Decisions/ADR-NNNN-*.md` (next free number) states the four decisions above, each with its reason, and is marked "Decided by Claude under Stewart's delegation".
-- [ ] `Documentation/Planning/Decisions/README.md` lists it.
+- [x] `Documentation/Planning/Decisions/ADR-NNNN-*.md` (next free number) states the four decisions above, each with its reason, and is marked "Decided by Claude under Stewart's delegation".
+- [x] `Documentation/Planning/Decisions/README.md` lists it.
 
 ## Notes
+
+- ADR-0092 is the next free number (ADR-0091 was the highest on 2026-09-27). The four decisions and their reasons are copied from BL-131's Notes, not re-decided. Docs only, no `.cs` or project file changed.
 
 ## Log
 
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Done. ADR-0092 records BL-131's four progress-meter decisions and is listed in the Decisions README
