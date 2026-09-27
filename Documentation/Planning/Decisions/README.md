@@ -53,6 +53,7 @@ choices do not need one.
 | [0036](ADR-0036-http-request-bodies-are-framed-and-counted-as-curl-8-21-0-frames-them.md) | HTTP request bodies are framed and counted as curl 8.21.0 frames them: `--json` headers after every `-H`, a failed read ends a chunked body, an early final status is the response, `RequestSize` includes the body | Accepted | 2026-09-26 |
 | [0037](ADR-0037-a-z-value-that-is-not-a-date-is-read-as-a-file-through-idatafilereader.md) | A `-z` value that is not a date is read as a file through `IDataFileReader`, with curl's Windows filetime warning | Accepted | 2026-09-26 |
 | [0038](ADR-0038-w-time-follows-the-windows-c-runtime-strftime-and-onerror-reads-transfer-failed.md) | `-w %time{…}` follows the Windows C runtime's `strftime` with en-US names, and `%{onerror}` reads `IWriteOutVariableSource.TransferFailed` | Accepted | 2026-09-26 |
+| [0039](ADR-0039-a-64-bit-numeric-option-value-saturates-where-commandlineoptions-holds-less.md) | A 64-bit numeric option value saturates where `CommandLineOptions` holds less: `--tftp-blksize` and `--max-redirs` at 2^31-1, the timeouts at the longest `TimeSpan` | Accepted | 2026-09-26 |
 
 ## Template
 
