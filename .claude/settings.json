@@ -57,6 +57,17 @@
             "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/format-cs.ps1"
           }
         ]
+      },
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/whisper-milestone.ps1",
+            "async": true,
+            "timeout": 180
+          }
+        ]
       }
     ]
   }

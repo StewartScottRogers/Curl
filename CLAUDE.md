@@ -91,6 +91,10 @@ Leave its tasks in `Doing` and its lane worktrees as they are: the next shift ad
 stopped lane and resumes its task from the work in place. While a shift runs, its
 coordinator restarts any lane whose process dies, and lanes wait out the usage limit and
 carry on when tokens return - nobody needs to restart them.
+
+Every session, lanes included, whispers milestones to Stewart through the PostToolUse hook
+`.claude/hooks/whisper-milestone.ps1`: a task moved to Done, a commit made, a branch
+deleted - quietly, in Windows' Zira voice, one phrase at a time.
 ## Repository layout
 Flat and linear. Every project is a directory immediately under the repository root.
 There is no `src/` and no `tests/`; do not create them.
