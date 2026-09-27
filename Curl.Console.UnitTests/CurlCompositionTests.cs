@@ -128,6 +128,36 @@ public sealed class CurlCompositionTests
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
+    public async Task CreateRunner_WriteOutOutputFile_OpensItOnDisk()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"curl-bl280-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        string source = Path.Combine(directory, "source.bin");
+        string target = Path.Combine(directory, "w.txt");
+        await System.IO.File.WriteAllBytesAsync(source, [1]);
+
+        try
+        {
+            using MemoryStream standardOutput = new();
+            using MemoryStream standardError = new();
+            using MemoryStream standardInput = new();
+
+            int exitCode = await CurlComposition
+                .CreateRunner(standardOutput, standardError, standardInput, standardOutputIsTerminal: true)
+                .RunAsync([new Uri(source).AbsoluteUri, "-w", $"%output{{{target}}}F\\n"]);
+
+            Assert.AreEqual(0, exitCode);
+            string expected = OperatingSystem.IsWindows() ? "F\r\n" : "F\n";
+            Assert.AreEqual(expected, await System.IO.File.ReadAllTextAsync(target));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [TestMethod]
     public async Task CreateRunner_FileUrlToStandardOutputThatIsNotATerminal_WritesTheProgressMeter()
     {
         string path = Path.Combine(Path.GetTempPath(), $"curl-bl102-{Guid.NewGuid():N}.bin");
