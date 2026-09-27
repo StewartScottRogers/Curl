@@ -64,6 +64,16 @@ public sealed class CommandLineDefaultConfigFileTests
     }
 
     [TestMethod]
+    public void Parse_EmptyCommandLineWithHelpInDefaultConfigFile_ReportsTheUsagePageThenRefuses()
+    {
+        // curl (no arguments) with help in .curlrc: the usage page, then the try-help line; exit 2 (2026-09-27).
+        CommandLineParseResult result = Parse([], "help\n");
+
+        CollectionAssert.AreEqual(new string?[] { null }, result.ConfigFileHelpSubjects.ToArray());
+        CollectionAssert.AreEqual(new[] { TryHelp }, result.Refusal!.StandardErrorLines.ToArray());
+    }
+
+    [TestMethod]
     public void Parse_EmptyCommandLineWithNoDefaultConfigFile_IsRefusedWithTryHelpAlone()
     {
         CommandLineParseResult result = Parse([], new RecordingDataFileReader());

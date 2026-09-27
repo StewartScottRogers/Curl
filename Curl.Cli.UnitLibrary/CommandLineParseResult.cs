@@ -9,13 +9,14 @@ namespace Curl.Cli;
 /// </summary>
 public sealed class CommandLineParseResult
 {
-    private CommandLineParseResult(CommandLineOptions? options, CommandLineRefusal? refusal, IReadOnlyList<string> warningLines, IReadOnlyList<string> warningLinesAfterTransfers, string? notedDefaultConfigFile)
+    private CommandLineParseResult(CommandLineOptions? options, CommandLineRefusal? refusal, IReadOnlyList<string> warningLines, IReadOnlyList<string> warningLinesAfterTransfers, string? notedDefaultConfigFile, IReadOnlyList<string?> configFileHelpSubjects)
     {
         Options = options;
         Refusal = refusal;
         WarningLines = warningLines;
         WarningLinesAfterTransfers = warningLinesAfterTransfers;
         NotedDefaultConfigFile = notedDefaultConfigFile;
+        ConfigFileHelpSubjects = configFileHelpSubjects;
     }
 
     /// <summary>
@@ -68,6 +69,17 @@ public sealed class CommandLineParseResult
     public string? NotedDefaultConfigFile { get; }
 
     /// <summary>
+    /// The subjects of the <c>help</c> / <c>-h</c> lines read from <c>-K</c> files and the default config
+    /// file, in the order read, accepted or refused; a <see langword="null"/> entry asks for the usage
+    /// page; empty when there were none. curl 8.21.0 prints each page on standard output as it reads the
+    /// line and carries on, so the console layer prints these pages with <see cref="CurlHelpText"/>
+    /// before anything else: <c>curl -K cfg</c> with <c>help</c> in <c>cfg</c> prints the usage page and
+    /// then <c>curl: (2) no URL specified</c>, and <c>curl -K cfg -V</c> prints the page and then the
+    /// version (measured 2026-09-27, BL-375).
+    /// </summary>
+    public IReadOnlyList<string?> ConfigFileHelpSubjects { get; }
+
+    /// <summary>
     /// Creates the result for an accepted command line, with the warning lines its options
     /// collected and the ones curl prints after the transfers.
     /// </summary>
@@ -79,7 +91,7 @@ public sealed class CommandLineParseResult
             options.HasMoreOutputOptionsThanUrls && !options.Silent
                 ? [CommandLineWarning.MoreOutputOptionsThanUrls]
                 : [];
-        return new(options, null, options.WarningLines, warningLinesAfterTransfers, NotedDefaultConfigFileOf(options));
+        return new(options, null, options.WarningLines, warningLinesAfterTransfers, NotedDefaultConfigFileOf(options), options.ConfigFileHelpSubjects);
     }
 
     /// <summary>
@@ -93,23 +105,23 @@ public sealed class CommandLineParseResult
     /// version, the manual or help.
     /// </returns>
     internal static CommandLineParseResult InformationRequested(CommandLineOptions options) =>
-        new(options, null, options.WarningLines, [], NotedDefaultConfigFileOf(options));
+        new(options, null, options.WarningLines, [], NotedDefaultConfigFileOf(options), options.ConfigFileHelpSubjects);
 
     /// <summary>Creates the result for a command line refused once reading it had begun.</summary>
     /// <param name="refusal">The first refusal met.</param>
     /// <param name="options">The options read before the refusal, whose warning lines it keeps.</param>
     /// <returns>A result whose <see cref="IsAccepted"/> is <see langword="false"/>.</returns>
     internal static CommandLineParseResult Refused(CommandLineRefusal refusal, CommandLineOptions options) =>
-        new(null, refusal, options.WarningLines, [], NotedDefaultConfigFileOf(options));
+        new(null, refusal, options.WarningLines, [], NotedDefaultConfigFileOf(options), options.ConfigFileHelpSubjects);
 
     /// <summary>
     /// Creates the result for <see cref="CommandLineRefusal.EmptyCommandLine"/>, which names no
     /// default config file: curl refuses it before reading the command line, so it prints no note.
     /// </summary>
-    /// <param name="warningLines">The warning lines the default config file produced.</param>
+    /// <param name="options">The options the default config file filled in, whose warning lines and help subjects it keeps.</param>
     /// <returns>A result whose <see cref="IsAccepted"/> is <see langword="false"/>.</returns>
-    internal static CommandLineParseResult RefusedEmpty(IReadOnlyList<string> warningLines) =>
-        new(null, CommandLineRefusal.EmptyCommandLine(), warningLines, [], null);
+    internal static CommandLineParseResult RefusedEmpty(CommandLineOptions options) =>
+        new(null, CommandLineRefusal.EmptyCommandLine(), options.WarningLines, [], null, options.ConfigFileHelpSubjects);
 
     /// <summary>
     /// <see cref="CommandLineOptions.DefaultConfigFile"/> when <c>-v</c> or a <c>--trace</c> option is

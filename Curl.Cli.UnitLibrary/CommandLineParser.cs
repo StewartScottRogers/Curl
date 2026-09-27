@@ -137,7 +137,7 @@ public static class CommandLineParser
         }
 
         return arguments.Count == 0 && options.Urls.Count == 0
-            ? CommandLineParseResult.RefusedEmpty(options.WarningLines)
+            ? CommandLineParseResult.RefusedEmpty(options)
             : ParseArguments(options, arguments, pathExists, passwordPrompt, dataFileReader);
     }
 
@@ -459,8 +459,8 @@ public static class CommandLineParser
         CommandLineRefusal? refusal = ParseConfigFileOption(options, option, reader);
 
         // curl 8.21.0 ignores version and manual in a -K file: a file of either alone reports no URL.
-        // It prints the usage page for help there and carries on; that is task BL-375.
-        options.ForgetInformationRequests();
+        // It prints the page for help there and carries on, so the console prints that page first.
+        options.MoveConfigFileInformationRequests();
         return refusal is null && !string.IsNullOrEmpty(parameter) && reader.TryTakeNext(out _)
             ? CommandLineRefusal.UnusedConfigFileParameter(option)
             : refusal;

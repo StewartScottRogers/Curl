@@ -11,7 +11,7 @@ namespace Curl.Cli;
 /// page); <c>-h</c> in a bundle counts only as its last letter (<c>-vh</c> prints the usage page, while
 /// <c>-hv</c> reports no URL and <c>-hv &lt;url&gt;</c> transfers without <c>-v</c>). <c>--no-help</c> is
 /// refused as not reversible; <c>--no-manual</c> is accepted and does nothing. A <c>manual</c> line in a
-/// <c>-K</c> file is ignored; so, for now, is a <c>help</c> line (task BL-375).
+/// <c>-K</c> file is ignored, while a <c>help</c> line there is reported in <see cref="CommandLineParseResult.ConfigFileHelpSubjects"/> and parsing carries on.
 /// </summary>
 [TestClass]
 public sealed class CommandLineHelpAndManualOptionTests
@@ -150,23 +150,85 @@ public sealed class CommandLineHelpAndManualOptionTests
     [TestMethod]
     [DataRow("manual")]
     [DataRow("-M")]
-    [DataRow("help")]
-    [DataRow("help = \"all\"")]
-    [DataRow("-h")]
-    public void Parse_HelpOrManualInConfigFile_IsIgnored(string line)
+    [DataRow("version")]
+    [DataRow("-V")]
+    public void Parse_VersionOrManualInConfigFile_IsIgnored(string line)
     {
-        RecordingDataFileReader reader = new();
-        reader.Files["hk.txt"] = Encoding.UTF8.GetBytes(line + "\n");
+        CommandLineParseResult withUrl = ParseWithConfigFile(line, "file:///nx");
+        CommandLineParseResult alone = ParseWithConfigFile(line);
 
-        CommandLineParseResult withUrl = CommandLineParser.Parse(["-K", "hk.txt", "file:///nx"], _ => false, new NoPasswordPrompt(), reader);
-        CommandLineParseResult alone = CommandLineParser.Parse(["-K", "hk.txt"], _ => false, new NoPasswordPrompt(), reader);
+        Assert.IsTrue(withUrl.IsAccepted);
+        Assert.IsFalse(withUrl.Options.ManualRequested);
+        Assert.IsFalse(withUrl.Options.VersionRequested);
+        Assert.IsEmpty(withUrl.ConfigFileHelpSubjects);
+        Assert.IsFalse(alone.IsAccepted);
+        Assert.AreEqual("curl: (2) no URL specified", alone.Refusal.StandardErrorLines[0]);
+    }
+
+    [TestMethod]
+    [DataRow("help", null)]
+    [DataRow("--help", null)]
+    [DataRow("-h", null)]
+    [DataRow("help = \"all\"", "all")]
+    [DataRow("help all", "all")]
+    public void Parse_HelpInConfigFile_ReportsItsPageAndCarriesOn(string line, string? subject)
+    {
+        // curl -K cfg: the page on standard output, then curl: (2) no URL specified; exit 2 (2026-09-27).
+        CommandLineParseResult withUrl = ParseWithConfigFile(line, "file:///nx");
+        CommandLineParseResult alone = ParseWithConfigFile(line);
 
         Assert.IsTrue(withUrl.IsAccepted);
         Assert.IsFalse(withUrl.Options.HelpRequested);
         Assert.IsNull(withUrl.Options.HelpSubject);
-        Assert.IsFalse(withUrl.Options.ManualRequested);
+        CollectionAssert.AreEqual(new[] { subject }, withUrl.ConfigFileHelpSubjects.ToArray());
         Assert.IsFalse(alone.IsAccepted);
         Assert.AreEqual("curl: (2) no URL specified", alone.Refusal.StandardErrorLines[0]);
+        CollectionAssert.AreEqual(new[] { subject }, alone.ConfigFileHelpSubjects.ToArray());
+    }
+
+    [TestMethod]
+    public void Parse_HelpInConfigFileThenVersion_ReportsThePageAndAsksForTheVersion()
+    {
+        CommandLineParseResult result = ParseWithConfigFile("--help", "-V");
+
+        Assert.IsTrue(result.Options!.VersionRequested);
+        CollectionAssert.AreEqual(new string?[] { null }, result.ConfigFileHelpSubjects.ToArray());
+    }
+
+    [TestMethod]
+    public void Parse_HelpInConfigFileThenUnknownOption_ReportsThePageAndRefuses()
+    {
+        CommandLineParseResult result = ParseWithConfigFile("-h\nbogus-QRC", "file:///nx");
+
+        Assert.IsFalse(result.IsAccepted);
+        CollectionAssert.AreEqual(new string?[] { null }, result.ConfigFileHelpSubjects.ToArray());
+    }
+
+    [TestMethod]
+    public void Parse_HelpLinesInConfigFiles_AreReportedInTheOrderRead()
+    {
+        RecordingDataFileReader reader = new();
+        reader.Files["a.cfg"] = Encoding.UTF8.GetBytes("help\nhelp = http\n");
+        reader.Files["b.cfg"] = Encoding.UTF8.GetBytes("help all\n");
+
+        CommandLineParseResult result = CommandLineParser.Parse(["-K", "a.cfg", "-K", "b.cfg", "file:///nx"], _ => false, new NoPasswordPrompt(), reader);
+
+        CollectionAssert.AreEqual(new[] { null, "http", "all" }, result.ConfigFileHelpSubjects.ToArray());
+    }
+
+    [TestMethod]
+    public void Parse_NoConfigFileHelp_ReportsNoPages()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["-h"]);
+
+        Assert.IsEmpty(result.ConfigFileHelpSubjects);
+    }
+
+    private static CommandLineParseResult ParseWithConfigFile(string lines, params string[] after)
+    {
+        RecordingDataFileReader reader = new();
+        reader.Files["hk.txt"] = Encoding.UTF8.GetBytes(lines + "\n");
+        return CommandLineParser.Parse(["-K", "hk.txt", .. after], _ => false, new NoPasswordPrompt(), reader);
     }
 
     private sealed class NoPasswordPrompt : IPasswordPrompt

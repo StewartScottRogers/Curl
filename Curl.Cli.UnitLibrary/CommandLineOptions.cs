@@ -24,6 +24,7 @@ public sealed class CommandLineOptions
     private readonly List<string> proxyHeaders = [];
     private readonly List<CommandLineCookie> cookies = [];
     private readonly List<string> warningLines = [];
+    private readonly List<string?> configFileHelpSubjects = [];
     private readonly List<FormPartSpecification> formParts = [];
     private readonly Dictionary<string, byte[]> variables = new(StringComparer.Ordinal);
     private readonly Stack<FormPartSpecification> openMultiparts = new();
@@ -63,8 +64,8 @@ public sealed class CommandLineOptions
     /// <see langword="true"/> when <c>-h</c> / <c>--help</c> was given on the command line. Parsing stops
     /// there, as curl 8.21.0's does, so every option after it is unread; the console prints
     /// <see cref="CurlHelpText"/>'s lines for <see cref="HelpSubject"/> and exits 0 instead of transferring.
-    /// A <c>help</c> line in a <c>-K</c> file does not set it (curl prints the usage page there and carries
-    /// on, which task BL-375 matches).
+    /// A <c>help</c> line in a <c>-K</c> file does not set it: curl prints that page and carries on, so it
+    /// goes to <see cref="ConfigFileHelpSubjects"/> instead.
     /// </summary>
     public bool HelpRequested { get; private set; }
 
@@ -97,9 +98,25 @@ public sealed class CommandLineOptions
         HelpSubject = subject.Length == 0 ? null : subject;
     }
 
-    /// <summary>Forgets any request for information, as curl does for one made in a <c>-K</c> file.</summary>
-    internal void ForgetInformationRequests()
+    /// <summary>
+    /// The subjects of the <c>help</c> / <c>-h</c> lines read from <c>-K</c> files, in the order read;
+    /// a <see langword="null"/> entry asks for the usage page. curl 8.21.0 prints each page on standard
+    /// output as it reads the line and carries on parsing, so the console prints these pages before
+    /// anything else (measured 2026-09-27, BL-375).
+    /// </summary>
+    internal IReadOnlyList<string?> ConfigFileHelpSubjects => configFileHelpSubjects;
+
+    /// <summary>
+    /// Moves a help request made by a <c>-K</c> file line to <see cref="ConfigFileHelpSubjects"/>, and
+    /// forgets any request for information, as curl does for one made in a <c>-K</c> file.
+    /// </summary>
+    internal void MoveConfigFileInformationRequests()
     {
+        if (HelpRequested)
+        {
+            configFileHelpSubjects.Add(HelpSubject);
+        }
+
         VersionRequested = false;
         HelpRequested = false;
         HelpSubject = null;
