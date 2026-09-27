@@ -49,7 +49,7 @@ streams file parts.
 - Unlike curl, the `7bit` failure happens before a connection is made, so the server never sees
   the partial request curl sends; stdout, stderr and the exit code are the same.
 - A large file under `base64`, `quoted-printable` or `7bit` is held in memory, encoded, from
-  building until it is sent. Streaming those encoders is BL-299.
+  building until it is sent. Streaming those encoders is BL-301.
 - An encoder on a `Multipart` part is ignored: the `-F` syntax never gives a nested multipart
   one.
 
@@ -58,6 +58,6 @@ streams file parts.
 - **Encode while streaming, as curl does.** Keeps memory flat for large files, but needs a
   streaming base64 and quoted-printable encoder with look-ahead, and a `7bit` refusal met while
   sending reaches the HTTP body writer as a read failure it reports as `client mime read EOF
-  fail`, not curl's message. Left for BL-299.
+  fail`, not curl's message. Left for BL-301.
 - **Pre-scan a `7bit` file, then stream it.** Correct for a seekable file but not for a pipe,
   and it still leaves `base64` and `quoted-printable` to solve.

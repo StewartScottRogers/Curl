@@ -1,5 +1,5 @@
 ---
-id: BL-299
+id: BL-301
 title: Stream base64, quoted-printable and 7bit multipart file parts instead of reading them whole
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-299 — Stream base64, quoted-printable and 7bit multipart file parts instead of reading them whole
+# BL-301 — Stream base64, quoted-printable and 7bit multipart file parts instead of reading them whole
 
 ## Goal
 
@@ -18,7 +18,7 @@ A multipart file part under `;encoder=base64`, `quoted-printable` or `7bit` is e
 
 ## Context
 
-- Found while delivering BL-274 (2026-09-26): ADR-0040 reads such a file whole while building, which holds a large file in memory once. curl 8.21.0 (`lib/mime.c`, `encoder_base64_read`, `encoder_qp_read`, `encoder_7bit_read`) encodes while reading.
+- Found while delivering BL-274 (2026-09-26): ADR-0041 reads such a file whole while building, which holds a large file in memory once. curl 8.21.0 (`lib/mime.c`, `encoder_base64_read`, `encoder_qp_read`, `encoder_7bit_read`) encodes while reading.
 - A `7bit` byte above 127 would then surface while sending; keep exit 26 and `read error getting mime data`, which may need the HTTP body writer to report a read failure other than as the end of the stream.
 
 ## Acceptance criteria

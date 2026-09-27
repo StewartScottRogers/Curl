@@ -30,7 +30,7 @@ completed: 2026-09-26
 
 ## Notes
 
-- touches: added `Documentation/Planning/Decisions` for ADR-0040 and its README row; no task in Doing names it.
+- touches: added `Documentation/Planning/Decisions` for ADR-0041 and its README row; no task in Doing names it.
 - Measured 2026-09-26 with `Record-CurlExchange.ps1 -CurlArgs -s,-S,-F,<spec>,http://127.0.0.1:<port>/` against `/mingw64/bin/curl` 8.21.0 (Schannel, code page 1252), `data.txt` = the UTF-8 `DataText` in `MultipartFormBodyBuilderEncoderTests`:
   - `t=hello = world é;encoder=base64` -> `Content-Transfer-Encoding: base64`, body `aGVsbG8gPSB3b3JsZCDp`, Content-Length 203; `8bit` 196, `binary` 198 (bytes as they are); `t=hi there;encoder=7bit` 189.
   - `f=@data.txt;encoder=base64` -> four 76-column CRLF lines, Content-Length 500; `8bit` 424, `binary` 426.
@@ -38,10 +38,10 @@ completed: 2026-09-26
   - `7bit` with a byte above 127 (text or file) -> exit 26, `curl: (26) read error getting mime data`.
   - `encoder=bogus` and `encoder=` -> exit 43, `curl: (43) A libcurl function was given a bad argument`; `encoder=BASE64` sends `base64`; own `Content-Transfer-Encoding` header replaces the generated one, body still encoded (182).
   - `-F a=@missing -F "b=x;encoder=bogus"` exits 26; the reverse order exits 43: parts fail in order.
-- Decision (ADR-0040, decided by Claude under Stewart's delegation): transforming encoders read a file whole while building; `binary`/`8bit` still stream; a `7bit` refusal is reported after every other part is built.
+- Decision (ADR-0041, decided by Claude under Stewart's delegation): transforming encoders read a file whole while building; `binary`/`8bit` still stream; a `7bit` refusal is reported after every other part is built.
 - Default taken: `MultipartFormPart.Encoder` is an `init` property rather than a new positional parameter, so existing constructions are untouched.
 - Quality: `Measure-CodeQuality.ps1 -Library Curl.Core.UnitLibrary` -> 100% line, 100% branch, 0 failing members, worst CRAP 10.
-- Follow-ups filed: BL-298 (map `FormPartSpecification.Encoder` in `Curl.Console`), BL-299 (stream the transforming encoders).
+- Follow-ups filed: BL-300 (map `FormPartSpecification.Encoder` in `Curl.Console`), BL-301 (stream the transforming encoders).
 
 ## Log
 
