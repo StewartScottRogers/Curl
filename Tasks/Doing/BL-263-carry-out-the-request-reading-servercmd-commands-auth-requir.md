@@ -39,3 +39,4 @@ request - `auth_required`, `no-expect` and `skip: N` - and stops listing them in
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
