@@ -70,25 +70,13 @@ public static class UpstreamTestSectionLineEndings
     {
         StringBuilder result = new(body.Length);
         bool previousWasHeader = false;
-        foreach (string line in SplitAfterLineFeeds(Encoding.Latin1.GetString(body)))
+        foreach (string line in UpstreamTestLines.SplitAfterLineFeeds(Encoding.Latin1.GetString(body)))
         {
             (string transformed, previousWasHeader) = transform(line, previousWasHeader);
             result.Append(transformed);
         }
 
         return Encoding.Latin1.GetBytes(result.ToString());
-    }
-
-    private static IEnumerable<string> SplitAfterLineFeeds(string text)
-    {
-        int start = 0;
-        while (start < text.Length)
-        {
-            int lineFeed = text.IndexOf('\n', start);
-            int end = lineFeed < 0 ? text.Length : lineFeed + 1;
-            yield return text[start..end];
-            start = end;
-        }
     }
 
     private static string EndWithCrlf(string line) =>

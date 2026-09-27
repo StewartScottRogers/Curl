@@ -38,6 +38,8 @@ public sealed class SwsHttpServerConnector : IConnector
 {
     private readonly SwsServerRecording recording = new();
 
+    private readonly SwsServerAbandonment abandonment = new();
+
     private readonly SwsHttpReplySelector replySelector;
 
     private readonly SwsServerCommands serverCommands;
@@ -82,12 +84,23 @@ public sealed class SwsHttpServerConnector : IConnector
     /// </summary>
     public ReadOnlyMemory<byte> ReceivedBytes => recording.Bytes;
 
-    /// <summary>Opens a new in-memory connection to the server; it never fails.</summary>
+    /// <summary>
+    /// Gives up on the server once the harness no longer waits for the run using it: from then
+    /// on connecting, and reading or writing on any connection it opened, throws
+    /// <see cref="IOException"/>, so a run that outlived its time limit stops at its next exchange.
+    /// </summary>
+    public void Abandon() => abandonment.Abandon();
+
+    /// <summary>Opens a new in-memory connection to the server; it fails only after <see cref="Abandon"/>.</summary>
     /// <param name="target">Ignored: every host and port reaches the same server.</param>
     /// <param name="cancellationToken">Not observed; the connection opens at once.</param>
     /// <returns>A connected result.</returns>
-    public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken) =>
-        ValueTask.FromResult(ConnectResult.Connected(new SwsHttpServerConnection(replySelector, serverCommands, waitAfterReply, recording, timeProvider)));
+    /// <exception cref="IOException">The server has been abandoned.</exception>
+    public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
+    {
+        abandonment.ThrowIfAbandoned();
+        return ValueTask.FromResult(ConnectResult.Connected(new SwsHttpServerConnection(replySelector, serverCommands, waitAfterReply, recording, timeProvider, abandonment)));
+    }
 
     private static ReadOnlySpan<byte> ReplyPart(UpstreamTestCase testCase, string name) =>
         (testCase.Find("reply", name)?.Content ?? ReadOnlyMemory<byte>.Empty).Span;
