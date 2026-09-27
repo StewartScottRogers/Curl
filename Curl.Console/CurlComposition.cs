@@ -72,7 +72,7 @@ internal static class CurlComposition
     /// Creates the network transports for one run: a <see cref="TcpConnector" /> over a
     /// <see cref="SystemDnsResolver" />, a <see cref="TcpDialer" /> and an
     /// <see cref="SslStreamTlsProvider" />, and a <see cref="UdpDatagramConnector" />. Both
-    /// connectors share the one resolver and <see cref="TimeProvider.System" />. TLS uses
+    /// connectors and the TLS provider share the one resolver and <see cref="TimeProvider.System" />. TLS uses
     /// the <see cref="TlsClientOptions" /> mapped from <paramref name="options" /> by
     /// <see cref="TlsClientOptionsMapping.FromCommandLine" />, one set shared by every URL on
     /// the command line. The CONNECT request that tunnels through an HTTP proxy carries the
@@ -81,13 +81,25 @@ internal static class CurlComposition
     /// </summary>
     /// <param name="options">The parsed command line.</param>
     /// <returns>The connectors and the pieces they were built from.</returns>
-    internal static CurlTransports CreateTransports(CommandLineOptions options)
+    internal static CurlTransports CreateTransports(CommandLineOptions options) =>
+        CreateTransports(options, TimeProvider.System);
+
+    /// <summary>
+    /// Creates the network transports as <see cref="CreateTransports(CommandLineOptions)" /> does,
+    /// on <paramref name="timeProvider" /> instead of <see cref="TimeProvider.System" />: the
+    /// <see cref="TcpConnector" />, the <see cref="SslStreamTlsProvider" /> and the
+    /// <see cref="UdpDatagramConnector" /> all time on it, so the handshake timestamps the TLS
+    /// provider reports are on the connector's clock (ADR-0030).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <param name="timeProvider">The clock every transport times on.</param>
+    /// <returns>The connectors and the pieces they were built from.</returns>
+    internal static CurlTransports CreateTransports(CommandLineOptions options, TimeProvider timeProvider)
     {
         SystemDnsResolver dnsResolver = new();
-        TimeProvider timeProvider = TimeProvider.System;
         TcpDialer tcpDialer = new();
         TlsClientOptions tlsClientOptions = TlsClientOptionsMapping.FromCommandLine(options);
-        SslStreamTlsProvider tlsProvider = new(tlsClientOptions);
+        SslStreamTlsProvider tlsProvider = new(tlsClientOptions, timeProvider);
         HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(options);
 
         return new CurlTransports(
