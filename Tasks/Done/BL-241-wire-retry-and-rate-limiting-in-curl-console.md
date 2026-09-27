@@ -46,7 +46,7 @@ completed: 2026-09-27
   - `--limit-rate 0` sets no limit, as `CommandLineOptions.LimitRate` documents for curl.
   - Tests run on a new `ImmediateTimerTimeProvider` (test project): the repository has no `FakeTimeProvider` in `Curl.Console.UnitTests`, and `ManualTimeProvider` there has no timers. Timers due in a minute or more never fire, so HTTP's 300-second default connect timeout does not end the test transfers.
 - `DiskWriteOutFileOpener.TryOpen` is covered only by Integration tests (BL-280), so `Measure-CodeQuality.ps1 -Library Curl.Console` without `-IncludeIntegration` reports it; with `-IncludeIntegration` Curl.Console is 100% line and branch, 0 failing members, worst CRAP 10.
-- Filed BL-397 for the `-Y`/`-y` low-speed abort, which nothing implemented yet.
+- Filed BL-400 for the `-Y`/`-y` low-speed abort, which nothing implemented yet.
 
 ## Log
 

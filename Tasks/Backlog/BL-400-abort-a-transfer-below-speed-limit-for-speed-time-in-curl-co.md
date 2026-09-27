@@ -1,5 +1,5 @@
 ---
-id: BL-397
+id: BL-400
 title: Abort a transfer below --speed-limit for --speed-time in Curl.Console
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-397 — Abort a transfer below --speed-limit for --speed-time in Curl.Console
+# BL-400 — Abort a transfer below --speed-limit for --speed-time in Curl.Console
 
 ## Goal
 
