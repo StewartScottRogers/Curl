@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation/Planning/Decisions]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-27
 ---
 # BL-258 — Record the -F form-parsing decisions of BL-189 in an ADR
 
@@ -28,7 +28,7 @@ An ADR in `Documentation/Planning/Decisions` records the four behaviour decision
 
 ## Acceptance criteria
 
-- [ ] A new ADR in `Documentation/Planning/Decisions`, numbered after the highest existing one and listed in that folder's `README.md`, states the four decisions above, each with its reason, and is marked "Decided by Claude under Stewart's delegation".
+- [x] A new ADR in `Documentation/Planning/Decisions`, numbered after the highest existing one and listed in that folder's `README.md`, states the four decisions above, each with its reason, and is marked "Decided by Claude under Stewart's delegation".
 
 ## Notes
 
@@ -36,3 +36,4 @@ An ADR in `Documentation/Planning/Decisions` records the four behaviour decision
 
 - 2026-09-26: Created.
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Done. ADR-0068 records BL-189's four -F parsing decisions and is listed in the Decisions README
