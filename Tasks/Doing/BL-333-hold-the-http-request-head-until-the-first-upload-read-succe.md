@@ -34,3 +34,4 @@ When the first read of an HTTP upload fails, the handler sends no request bytes 
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
