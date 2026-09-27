@@ -86,7 +86,8 @@ internal static class CurlComposition
     /// <see cref="TlsClientOptionsMapping.FromCommandLine" />, one set shared by every URL on
     /// the command line. The CONNECT request that tunnels through an HTTP proxy carries the
     /// <see cref="HttpProxyTunnelOptions" /> <see cref="CreateProxyTunnelOptions" /> maps from
-    /// <paramref name="options" />.
+    /// <paramref name="options" />, and the TCP connector applies the <c>--resolve</c> and
+    /// <c>--connect-to</c> values (<see cref="CreateTcpConnector" />).
     /// </summary>
     /// <param name="options">The parsed command line.</param>
     /// <returns>The connectors and the pieces they were built from.</returns>
@@ -118,9 +119,39 @@ internal static class CurlComposition
             tlsClientOptions,
             tlsProvider,
             proxyTunnelOptions,
-            new TcpConnector(dnsResolver, tcpDialer, tlsProvider, timeProvider, proxyTunnelOptions),
+            CreateTcpConnector(options, dnsResolver, tcpDialer, tlsProvider, timeProvider, proxyTunnelOptions),
             new UdpDatagramConnector(dnsResolver, timeProvider));
     }
+
+    /// <summary>
+    /// Creates the run's <see cref="TcpConnector" /> over the given pieces, with the
+    /// <c>--resolve</c> entries parsed by <see cref="ResolveOverrides.Parse" /> and the
+    /// <c>--connect-to</c> mappings of <paramref name="options" />, so a transfer dials the
+    /// mapped host and port at the overridden addresses. An entry that does not parse fails
+    /// each transfer with exit 49 when it connects, as curl 8.21.0 fails it.
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <param name="dnsResolver">Resolves a host no <c>--resolve</c> entry answers for.</param>
+    /// <param name="tcpDialer">Opens each plaintext connection.</param>
+    /// <param name="tlsProvider">Upgrades a connection whose target asks for TLS.</param>
+    /// <param name="timeProvider">The clock the connector times on.</param>
+    /// <param name="proxyTunnelOptions">What the CONNECT request through an HTTP proxy carries.</param>
+    /// <returns>The connector.</returns>
+    internal static TcpConnector CreateTcpConnector(
+        CommandLineOptions options,
+        IDnsResolver dnsResolver,
+        ITcpDialer tcpDialer,
+        ITlsProvider tlsProvider,
+        TimeProvider timeProvider,
+        HttpProxyTunnelOptions proxyTunnelOptions) =>
+        new(
+            dnsResolver,
+            tcpDialer,
+            tlsProvider,
+            timeProvider,
+            proxyTunnelOptions,
+            ResolveOverrides.Parse(options.ResolveEntries),
+            new ConnectToMappings(options.ConnectToEntries));
 
     /// <summary>
     /// Maps the command line to what the CONNECT request through an HTTP proxy carries: the
