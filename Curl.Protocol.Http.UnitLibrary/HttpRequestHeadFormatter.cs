@@ -77,6 +77,11 @@ internal static class HttpRequestHeadFormatter
     /// <param name="timeCondition">
     /// The <c>-z</c> condition, or <see langword="null" /> to send no conditional header.
     /// </param>
+    /// <param name="framing">
+    /// The request's framing, or <see langword="null" /> to decide it from
+    /// <paramref name="options" />; the resend after a 417 passes
+    /// <see cref="HttpRequestFraming.WithoutExpect" />.
+    /// </param>
     /// <returns>The head's bytes, ending in the empty line.</returns>
     internal static byte[] Format(
         Uri url,
@@ -87,13 +92,14 @@ internal static class HttpRequestHeadFormatter
         bool forwardProxy = false,
         string? proxyAuthorization = null,
         string? range = null,
-        TimeCondition? timeCondition = null)
+        TimeCondition? timeCondition = null,
+        HttpRequestFraming? framing = null)
     {
         options ??= new HttpRequestOptions();
         HttpCustomHeader[] customHeaders = [.. options.Headers.Select(HttpCustomHeader.Parse)];
-        HttpRequestFraming framing = HttpRequestFraming.Of(options, customHeaders, noBody);
+        framing = FramingOf(framing, options, customHeaders, noBody);
         StringBuilder head = new();
-        head.Append(framing.Method).Append(' ').Append(forwardProxy ? AbsoluteForm(url) : url.PathAndQuery).Append(VersionOf(options)).Append("\r\n");
+        AppendRequestLine(head, framing.Method, url, forwardProxy, options);
         string? hostLine = FormatHostLine(url, customHeaders);
         if (hostLine is not null)
         {
@@ -112,6 +118,20 @@ internal static class HttpRequestHeadFormatter
         head.Append("\r\n");
         return Encoding.Latin1.GetBytes(head.ToString());
     }
+
+    /// <summary>
+    /// Gives <paramref name="framing" />, or the framing <see cref="HttpRequestFraming.Of" />
+    /// decides from <paramref name="options" /> when none was passed.
+    /// </summary>
+    private static HttpRequestFraming FramingOf(HttpRequestFraming? framing, HttpRequestOptions options, HttpCustomHeader[] customHeaders, bool noBody) =>
+        framing ?? HttpRequestFraming.Of(options, customHeaders, noBody);
+
+    /// <summary>
+    /// Appends the request line: the method, the target - the absolute form for a forward
+    /// proxy, the path and query otherwise - and the version.
+    /// </summary>
+    private static void AppendRequestLine(StringBuilder head, string method, Uri url, bool forwardProxy, HttpRequestOptions options) =>
+        head.Append(method).Append(' ').Append(forwardProxy ? AbsoluteForm(url) : url.PathAndQuery).Append(VersionOf(options)).Append("\r\n");
 
     /// <summary>
     /// Gives the request line's version: <c>HTTP/1.0</c> for <c>-0</c>, <c>HTTP/1.1</c> otherwise.

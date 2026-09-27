@@ -87,6 +87,16 @@ internal sealed class HttpRequestFraming
     internal bool RefusesUnknownLength { get; }
 
     /// <summary>
+    /// Makes the same framing without curl's own <c>Expect: 100-continue</c> line and without
+    /// the wait for <c>100 Continue</c>: the request curl 8.21.0 resends after a
+    /// <c>417 Expectation Failed</c>. An <c>-H</c> <c>Expect</c> line is still sent, but the
+    /// body follows the head at once (measured, BL-260 Notes).
+    /// </summary>
+    /// <returns>The framing of the resent request.</returns>
+    internal HttpRequestFraming WithoutExpect() =>
+        new(Method, Body, KnownLength, IsChunked, addsExpect: false, awaitsContinue: false, RefusesUnknownLength);
+
+    /// <summary>
     /// Decides the framing for a request with <paramref name="options" />.
     /// </summary>
     /// <param name="options">The HTTP options.</param>
