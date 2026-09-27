@@ -64,6 +64,14 @@
     rather than a FIN. Use it to measure what curl prints when the server resets the
     connection, as during a TLS handshake (BL-369). request.bin is then empty.
 
+.PARAMETER RespondAfterBodyBytes
+    Instead of reading the whole request, send the response as soon as the header block
+    and this many body bytes have arrived, then go on reading (and recording) whatever
+    curl still sends until it stops for two seconds or closes its end. Default -1: off.
+    Each read then waits up to five seconds, so curl's one-second wait for
+    100 Continue does not end the read early. Use it to measure a response that arrives
+    while the body is being sent (BL-319, BL-395).
+
 .PARAMETER StandardInput
     What curl reads from standard input, with the same backslash escapes as Response.
     It is written in full and then standard input is closed. Default empty: standard
@@ -116,6 +124,7 @@ param(
     [ValidateRange(1, 1000)] [int] $Connections = 1,
     [ValidateRange(0, 600000)] [int] $ResponseDelayMilliseconds = 0,
     [switch] $Reset,
+    [ValidateRange(-1, [int]::MaxValue)] [int] $RespondAfterBodyBytes = -1,
     [string] $StandardInput = '',
     [switch] $Ftp,
     [string[]] $FtpReply = @(),
@@ -198,7 +207,7 @@ function ConvertTo-CommandLineArgument {
 # The server runs in its own runspace so curl can run in this one. It returns one
 # byte array per connection served.
 $serveConnections = {
-    param($Listener, $ResponseBytes, [int] $ConnectionCount, [int] $DelayMilliseconds, [bool] $ResetConnections)
+    param($Listener, $ResponseBytes, [int] $ConnectionCount, [int] $DelayMilliseconds, [bool] $ResetConnections, [int] $EarlyResponseBodyBytes)
 
     Set-StrictMode -Version Latest
     $ErrorActionPreference = 'Stop'
@@ -210,6 +219,7 @@ $serveConnections = {
         $headerEnd = $text.IndexOf("`r`n`r`n")
         if ($headerEnd -lt 0) { return $false }
         $bodyStart = $headerEnd + 4
+        if ($EarlyResponseBodyBytes -ge 0) { return ($Length - $bodyStart) -ge $EarlyResponseBodyBytes }
         $headers = $text.Substring(0, $headerEnd)
         $contentLength = [regex]::Match($headers, '(?im)^Content-Length:[ \t]*(\d+)[ \t]*$')
         if ($contentLength.Success) {
@@ -238,7 +248,7 @@ $serveConnections = {
         }
         try {
             $stream = $client.GetStream()
-            $stream.ReadTimeout = 1000
+            $stream.ReadTimeout = if ($EarlyResponseBodyBytes -ge 0) { 5000 } else { 1000 }
             $buffer = New-Object byte[] 65536
             $received = New-Object System.IO.MemoryStream
             while (-not (Test-RequestComplete -Received $received.GetBuffer() -Length ([int] $received.Length))) {
@@ -250,7 +260,6 @@ $serveConnections = {
                 if ($count -le 0) { break }
                 $received.Write($buffer, 0, $count)
             }
-            $requests.Add($received.ToArray())
             if ($DelayMilliseconds -gt 0) { [System.Threading.Thread]::Sleep($DelayMilliseconds) }
             [byte[]] $response = $ResponseBytes[[Math]::Min($served, $ResponseBytes.Count - 1)]
             try {
@@ -259,6 +268,20 @@ $serveConnections = {
             } catch [System.IO.IOException] {
                 # curl already closed its end; the request is still worth recording.
             }
+            if ($EarlyResponseBodyBytes -ge 0) {
+                # Answered mid-body: record whatever curl goes on sending until it stops.
+                $stream.ReadTimeout = 2000
+                while ($true) {
+                    try {
+                        $count = $stream.Read($buffer, 0, $buffer.Length)
+                    } catch [System.IO.IOException] {
+                        break
+                    }
+                    if ($count -le 0) { break }
+                    $received.Write($buffer, 0, $count)
+                }
+            }
+            $requests.Add($received.ToArray())
         } finally {
             $client.Close()
         }
@@ -380,7 +403,7 @@ try {
     if ($Ftp) {
         [void] $server.AddScript($serveFtpSession).AddArgument($listener).AddArgument($ftpOverrides).AddArgument([byte[]] (ConvertFrom-EscapedResponse -Text $FtpData)).AddArgument($transcript)
     } else {
-        [void] $server.AddScript($serveConnections).AddArgument($listener).AddArgument($responseBytes).AddArgument($Connections).AddArgument($ResponseDelayMilliseconds).AddArgument([bool] $Reset)
+        [void] $server.AddScript($serveConnections).AddArgument($listener).AddArgument($responseBytes).AddArgument($Connections).AddArgument($ResponseDelayMilliseconds).AddArgument([bool] $Reset).AddArgument($RespondAfterBodyBytes)
     }
     $serverRun = $server.BeginInvoke()
 
