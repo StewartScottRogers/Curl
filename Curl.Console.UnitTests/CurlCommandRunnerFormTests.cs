@@ -157,6 +157,46 @@ public sealed class CurlCommandRunnerFormTests
         Assert.AreEqual("hello", Encoding.Latin1.GetString(standardOutput.ToArray()));
     }
 
+    /// <summary>
+    /// The part curl 8.21.0 sent on 2026-09-26 for <c>-F "t=hi;encoder=base64"</c>
+    /// (<c>MultipartFormBodyBuilderEncoderTests</c>, 187 bytes), under this class's boundary.
+    /// </summary>
+    [TestMethod]
+    public async Task RunAsync_FormBase64Encoder_SendsTheBase64EncodedPart()
+    {
+        int exitCode = await RunAsync("-sS", "-F", "t=hi;encoder=base64", Url);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(
+            "POST / HTTP/1.1\r\n"
+            + "Host: 127.0.0.1:18233\r\n"
+            + "User-Agent: curl/8.21.0\r\n"
+            + "Accept: */*\r\n"
+            + "Content-Length: 187\r\n"
+            + "Content-Type: multipart/form-data; boundary=" + Boundary + "\r\n"
+            + "\r\n"
+            + "--" + Boundary + "\r\n"
+            + "Content-Disposition: form-data; name=\"t\"\r\n"
+            + "Content-Transfer-Encoding: base64\r\n"
+            + "\r\n"
+            + "aGk=\r\n"
+            + "--" + Boundary + "--\r\n",
+            Encoding.Latin1.GetString(server.Written));
+    }
+
+    /// <summary>Measured on 2026-09-27 with curl 8.21.0 (mingw, Schannel): <c>curl -sS -F "t=hi;encoder=bogus" http://127.0.0.1:1/</c>.</summary>
+    [TestMethod]
+    public async Task RunAsync_FormUnknownEncoder_Exits43WithoutConnecting()
+    {
+        int exitCode = await RunAsync("-sS", "-F", "t=hi;encoder=bogus", Url);
+
+        Assert.AreEqual(43, exitCode);
+        Assert.AreEqual(
+            $"curl: (43) A libcurl function was given a bad argument{Environment.NewLine}",
+            Encoding.UTF8.GetString(standardError.ToArray()));
+        Assert.IsEmpty(server.Targets);
+    }
+
     private static string MeasuredRedirectRequest(string path) =>
         $"POST {path} HTTP/1.1\r\n"
         + "Host: 127.0.0.1:18298\r\n"

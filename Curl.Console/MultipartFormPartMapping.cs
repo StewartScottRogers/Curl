@@ -10,8 +10,8 @@ namespace Curl.Console;
 /// <c>Curl.Cli</c> references <c>Curl.Core</c> (ADR-0027).
 /// </summary>
 /// <remarks>
-/// Every field is copied as parsed. <see cref="FormPartSpecification.Encoder" /> is not carried:
-/// the builder does not apply <c>;encoder=</c> yet (BL-274).
+/// Every field is copied as parsed, <see cref="FormPartSpecification.Encoder" /> included: the
+/// builder applies <c>;encoder=</c> and rejects an unknown name (ADR-0041).
 /// </remarks>
 internal static class MultipartFormPartMapping
 {
@@ -29,7 +29,10 @@ internal static class MultipartFormPartMapping
             part.ContentType,
             part.FileName,
             part.Headers,
-            FromCommandLine(part.Parts));
+            FromCommandLine(part.Parts))
+        {
+            Encoder = part.Encoder,
+        };
 
     private static MultipartFormPartKind KindOf(FormPartKind kind) =>
         kind switch
