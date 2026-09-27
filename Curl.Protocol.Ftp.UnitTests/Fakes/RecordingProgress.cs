@@ -19,8 +19,9 @@ public sealed class RecordingProgress : ITransferProgress
     /// <inheritdoc />
     public void ReportDownloaded(long bytesSoFar, long? expectedTotal) => Downloaded.Add((bytesSoFar, expectedTotal));
 
+    /// <summary>Gets every upload report, in order.</summary>
+    public List<(long BytesSoFar, long? ExpectedTotal)> Uploaded { get; } = [];
+
     /// <inheritdoc />
-    public void ReportUploaded(long bytesSoFar, long? expectedTotal)
-    {
-    }
+    public void ReportUploaded(long bytesSoFar, long? expectedTotal) => Uploaded.Add((bytesSoFar, expectedTotal));
 }

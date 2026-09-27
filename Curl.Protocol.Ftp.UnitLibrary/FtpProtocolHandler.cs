@@ -4,7 +4,8 @@ namespace Curl.Protocol.Ftp;
 
 /// <summary>
 /// Serves the <c>ftp</c> scheme: logs in, enters passive mode and downloads the file the
-/// URL names, or lists the directory a URL ending in <c>/</c> names, as curl 8.21.0 does.
+/// URL names, lists the directory a URL ending in <c>/</c> names, or with <c>-T</c>
+/// uploads to the file the URL names, as curl 8.21.0 does.
 /// </summary>
 /// <param name="connector">
 /// Supplies the control connection to the URL's host and port (21 unless the URL names
@@ -16,7 +17,7 @@ namespace Curl.Protocol.Ftp;
 /// The login is <c>anonymous</c> with the password <c>ftp@example.com</c>, curl's
 /// defaults, unless <see cref="ITransferContext.Credentials" /> names a user. The whole
 /// conversation, and which failure ends with which exit code, is described on
-/// <see cref="FtpDownloadSession" />; every step was measured against curl 8.21.0 with
+/// <see cref="FtpSession" />; every step was measured against curl 8.21.0 with
 /// <c>Record-CurlExchange.ps1 -Ftp</c> (BL-431). A refused login is exit 67
 /// (<see cref="CurlExitCode.LoginDenied" />) with <c>Access denied: 430</c> for a
 /// <c>430</c> reply.
@@ -26,8 +27,10 @@ namespace Curl.Protocol.Ftp;
 /// through it; the connector opens the tunnels (ADR-0056). A failed connect is returned as
 /// the connector reported it. <see cref="ITransferContext.Range" />,
 /// <see cref="ITransferContext.ResumeFrom" /> and <see cref="ITransferContext.NoBody" />
-/// are honoured as curl 8.21.0 honours <c>-r</c>, <c>-C</c> and <c>-I</c> (BL-438).
-/// Uploads, <c>ftps</c>, active mode and every FTP-only option are not implemented yet.
+/// are honoured as curl 8.21.0 honours <c>-r</c>, <c>-C</c> and <c>-I</c> (BL-438), and
+/// <see cref="ITransferContext.Upload" /> is sent with <c>STOR</c>, or <c>APPE</c> when
+/// <c>-C</c> resumes it (BL-439). <c>ftps</c>, active mode and every FTP-only option are
+/// not implemented yet.
 /// Cancellation leaves as an exception.
 /// </para>
 /// </remarks>
@@ -76,13 +79,13 @@ public sealed class FtpProtocolHandler(IConnector connector) : IProtocolHandler
 
         await using (connection.ConfigureAwait(false))
         {
-            return await DownloadAsync(connection, context).ConfigureAwait(false);
+            return await TransferAsync(connection, context).ConfigureAwait(false);
         }
     }
 
-    private async ValueTask<TransferResult> DownloadAsync(IConnection control, ITransferContext context)
+    private async ValueTask<TransferResult> TransferAsync(IConnection control, ITransferContext context)
     {
-        var session = new FtpDownloadSession(connector, new FtpControlChannel(control, context.CancellationToken), context);
+        var session = new FtpSession(connector, new FtpControlChannel(control, context.CancellationToken), context);
         await using (session.ConfigureAwait(false))
         {
             return await session.RunAsync().ConfigureAwait(false);

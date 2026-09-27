@@ -49,10 +49,9 @@ and messages are pinned in `FtpProtocolHandlerTests`.
 
 ## Consequences
 
-`curl ftp://host/path/file` downloads as curl does, with curl's exit codes. Uploads, `ftps`,
-active mode, `--disable-epsv`, `--ftp-method`, `-l` and `-Q` are not implemented; the
-handler ignores `Upload` today. `-r`, `-C` and `-I` are honoured since BL-438 (see the
-addendum below). Meanwhile `Curl.Console` still routes non-proxied `ftp://` to
+`curl ftp://host/path/file` downloads as curl does, with curl's exit codes. `ftps`,
+active mode, `--disable-epsv`, `--ftp-method`, `-l` and `-Q` are not implemented. `-r`, `-C`
+and `-I` are honoured since BL-438, and `-T` uploads since BL-439 (see the addenda below). Meanwhile `Curl.Console` still routes non-proxied `ftp://` to
 `ForwardedFtpProtocolHandler` until the handler is registered there (separate task).
 
 ## Alternatives considered
@@ -126,3 +125,52 @@ ignored (`LIST` has no `REST`); an `MDTM` time that is 14 digits but no real dat
 the header output refuses is exit 23 `client returned ERROR on write of N bytes`, the
 `file://` text, after `QUIT`; a failure sending `ABOR` or reading its reply is ignored, as
 it is for `QUIT`.
+
+## Addendum (BL-439, 2026-09-27): `-T` uploads
+
+Decided by Claude under Stewart's delegation. Measured with curl 8.21.0 (Git for Windows'
+mingw64 build) on 2026-09-27, uploading the twelve bytes `hello world\n` with
+`Record-CurlExchange.ps1 -Ftp`. The recorder now answers `STOR` and `APPE` with `150`,
+accepts the passive data connection, records every byte curl sends on it (to `upload.bin`
+and the transcript) until curl closes it, then answers `226` (or the `STORDONE` override).
+Every case below is pinned in `FtpProtocolHandlerUploadTests`.
+
+The conversation is the download's up to `TYPE I` - login, `PWD`, one `CWD` per directory,
+`EPSV` (then `PASV`), `TYPE I` - and shares its code (`FtpSession`) and its failure rules;
+then `STOR <file>`, the upload written to the data connection, the data connection closed
+(which tells the server the file has ended), the end-of-transfer reply, and `QUIT`. A
+directory URL (`-T up.txt ftp://host/dir/`) reaches the handler with the file name already
+appended by `Curl.Console` (`UploadUrl`), so it stores `up.txt` in `dir`.
+
+| Case | Commands after `TYPE I` | Bytes on the data connection | Exit |
+| --- | --- | --- | --- |
+| `-T up.txt .../dir/sub/file.txt` | `STOR file.txt`, `QUIT` (after `CWD dir`, `CWD sub`) | all 12 | 0 |
+| `-T empty.txt .../dir/e.txt` | `STOR e.txt`, `QUIT` | none | 0 |
+| `STOR` answered `553` (or `550`) | `STOR`, `QUIT` | none | 25 `Failed FTP upload: 553` |
+| `CWD` answered `550` | nothing after `CWD`, then `QUIT`; no `MKD` | none | 9 `Server denied you to change to the given directory` |
+| `451` after the data | `STOR`, `QUIT` | all 12 | 18 `server did not report OK, got 451` |
+| `250` after the data | `STOR`, `QUIT` | all 12 | 0 |
+| `-C 5` | `APPE`, `QUIT` (no `SIZE`) | the last 7 | 0 |
+| `-C 12`, `-C 20` | `QUIT` | none | 0 (curl notes "File already completely uploaded") |
+| `-C 5 -T empty.txt` | `APPE`, `QUIT` | none | 0 |
+| `-C 5 -T -`, `-C 20 -T -` | `APPE`, `QUIT` | all 12: nothing skipped from standard input | 0 |
+| `-C -`, `SIZE` `213 3` | `SIZE`, `APPE`, `QUIT` | the last 9 | 0 |
+| `-C -`, `SIZE` `213 0` or `550` | `SIZE`, `STOR`, `QUIT` | all 12 | 0 |
+| `-C -`, `SIZE` `213 12` or `213 20` | `SIZE`, `QUIT` | none | 0 |
+| `-C - -T -`, `SIZE` `213 20` | `SIZE`, `APPE`, `QUIT` | all 12 | 0 |
+| `-T - .../dir/` (no file name) | nothing after `PWD`, no `QUIT` | none | 3 `Uploading to a URL without a filename` |
+
+So a non-zero offset (`-C N`, or the `SIZE` count for `-C -`, which `Curl.Console` passes
+as `ResumeUploadFromUnknownOffset`) sends `APPE` instead of `STOR`, having skipped that
+many bytes of a source that can seek; when the offset reaches the end of a non-empty
+source that can seek, curl sends `QUIT` straight after `TYPE I` and succeeds with nothing
+sent. An empty source and a source that cannot seek skip nothing. `FtpUploadOffset` holds
+that rule. Any reply of 400 or more to `STOR` or `APPE` is exit 25; any lower one lets the
+upload go ahead, as curl's own check is `>= 400`.
+
+Not measured, and decided by the nearest measured rule: a failed read of the upload source
+ends the upload as its end does, as the HTTP handler treats a failed read (curl's read
+callback); a failed write to the data connection is exit 55 `Failure when sending data to
+the peer`, with no `QUIT`, as a failed receive ends a download; `-I` with `-T` uploads, as
+the upload is checked first. `--crlf` (`ConvertLineEndings`) and `-a`/`--append` are not
+honoured on FTP uploads yet.

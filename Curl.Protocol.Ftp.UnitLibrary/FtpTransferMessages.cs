@@ -32,6 +32,9 @@ internal static class FtpTransferMessages
     /// <summary>The exit 3 message for a path that decodes to a control character.</summary>
     internal const string PathHasControlCharacters = "path contains control characters";
 
+    /// <summary>The exit 3 message for a <c>-T</c> upload to a URL ending in <c>/</c> (BL-439).</summary>
+    internal const string UploadWithoutFileName = "Uploading to a URL without a filename";
+
     /// <summary>The exit 67 message for a <c>332</c> reply to <c>PASS</c>.</summary>
     internal const string AccountRequested = "ACCT requested but none available";
 
@@ -71,6 +74,13 @@ internal static class FtpTransferMessages
     /// <returns>The message to report.</returns>
     internal static string EndOfResponseWithBytesMissing(long missing) =>
         Format($"end of response with {missing} bytes missing");
+
+    /// <summary>
+    /// The exit 25 message for a <c>STOR</c> or <c>APPE</c> answered with 400 or more (BL-439).
+    /// </summary>
+    /// <param name="code">The reply's code.</param>
+    /// <returns>The message to report.</returns>
+    internal static string UploadRefused(int code) => Format($"Failed FTP upload: {code}");
 
     /// <summary>The exit 23 message for an <c>-I</c> header line the header output refused.</summary>
     /// <param name="passed">The length of the refused line.</param>

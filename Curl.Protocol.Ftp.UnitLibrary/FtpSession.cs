@@ -3,8 +3,8 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Protocol.Ftp;
 
 /// <summary>
-/// One <c>ftp://</c> download over an open control connection: the conversation curl
-/// 8.21.0 holds, from the greeting to <c>QUIT</c>.
+/// One <c>ftp://</c> download or upload over an open control connection: the conversation
+/// curl 8.21.0 holds, from the greeting to <c>QUIT</c>.
 /// </summary>
 /// <param name="connector">Opens the data connection to the port the server offers.</param>
 /// <param name="control">The control connection, already open.</param>
@@ -28,6 +28,16 @@ namespace Curl.Protocol.Ftp;
 /// sends nothing more. ADR-0093's BL-438 addendum records the measurements.
 /// </para>
 /// <para>
+/// With <see cref="ITransferContext.Upload" /> set the conversation after <c>PWD</c> is
+/// the <c>CWD</c>s, <c>EPSV</c> (or <c>PASV</c>), <c>TYPE I</c>, <c>STOR</c>, the upload
+/// written to the data connection and closed, and <c>QUIT</c>. <c>-C</c> sends
+/// <c>APPE</c> instead of <c>STOR</c> through <see cref="FtpUploadOffset" />, after
+/// <c>SIZE</c> for <c>-C -</c>. A URL with no file name is exit 3 before the first
+/// <c>CWD</c>, a refused <c>STOR</c> or <c>APPE</c> exit 25, and an end-of-transfer reply
+/// other than <c>226</c> or <c>250</c> exit 18. ADR-0093's BL-439 addendum records the
+/// measurements.
+/// </para>
+/// <para>
 /// Each failure ends the session with curl's exit code and message, and sends
 /// <c>QUIT</c> first exactly where curl was measured to: not after a refused login, a
 /// bad greeting, a path with a control character, an unreadable <c>227</c> reply, or a
@@ -36,7 +46,7 @@ namespace Curl.Protocol.Ftp;
 /// given, CR and LF included, as curl sends them.
 /// </para>
 /// </remarks>
-internal sealed class FtpDownloadSession(IConnector connector, FtpControlChannel control, ITransferContext context)
+internal sealed class FtpSession(IConnector connector, FtpControlChannel control, ITransferContext context)
     : IAsyncDisposable
 {
     private const string AnonymousUser = "anonymous";
@@ -53,7 +63,7 @@ internal sealed class FtpDownloadSession(IConnector connector, FtpControlChannel
 
     private long? expectedSize;
 
-    private long bytesWritten;
+    private long bytesTransferred;
 
     /// <summary>
     /// Holds the whole conversation. The data connection it opens stays open until the
@@ -65,7 +75,7 @@ internal sealed class FtpDownloadSession(IConnector connector, FtpControlChannel
         try
         {
             return await GreetAndLogInAsync().ConfigureAwait(false)
-                ?? await RetrieveFromPathAsync().ConfigureAwait(false);
+                ?? await TransferPathAsync().ConfigureAwait(false);
         }
         catch (FtpControlConversationFailedException lost)
         {
@@ -121,7 +131,7 @@ internal sealed class FtpDownloadSession(IConnector connector, FtpControlChannel
             pass.Code == 332 ? FtpTransferMessages.AccountRequested : FtpTransferMessages.AccessDenied(pass.Code));
     }
 
-    private async ValueTask<TransferResult> RetrieveFromPathAsync()
+    private async ValueTask<TransferResult> TransferPathAsync()
     {
         await ExchangeAsync("PWD").ConfigureAwait(false);
         if (FtpUrlPath.Parse(context.Url.AbsolutePath) is not { } path)
@@ -129,6 +139,13 @@ internal sealed class FtpDownloadSession(IConnector connector, FtpControlChannel
             return TransferResult.Failure(CurlExitCode.UrlMalformat, FtpTransferMessages.PathHasControlCharacters);
         }
 
+        return context.Upload is { } upload
+            ? await UploadAsync(path, upload).ConfigureAwait(false)
+            : await RetrieveFromPathAsync(path).ConfigureAwait(false);
+    }
+
+    private async ValueTask<TransferResult> RetrieveFromPathAsync(FtpUrlPath path)
+    {
         return await ChangeDirectoriesAsync(path.Directories).ConfigureAwait(false)
             ?? (context.NoBody
                 ? await ReportHeadAsync(path.FileName).ConfigureAwait(false)
@@ -148,6 +165,111 @@ internal sealed class FtpDownloadSession(IConnector connector, FtpControlChannel
             ?? await ReadSizeAsync(fileName, listing).ConfigureAwait(false)
             ?? await PositionAsync().ConfigureAwait(false)
             ?? await RetrieveAsync(listing ? "LIST" : "RETR " + fileName, listing).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Uploads <paramref name="upload" /> to the file <paramref name="path" /> names: exit 3,
+    /// with no <c>QUIT</c>, when it names none.
+    /// </summary>
+    private async ValueTask<TransferResult> UploadAsync(FtpUrlPath path, Stream upload)
+    {
+        if (path.FileName.Length == 0)
+        {
+            return TransferResult.Failure(CurlExitCode.UrlMalformat, FtpTransferMessages.UploadWithoutFileName);
+        }
+
+        return await ChangeDirectoriesAsync(path.Directories).ConfigureAwait(false)
+            ?? await OpenDataConnectionAsync().ConfigureAwait(false)
+            ?? await SetTypeAsync(false).ConfigureAwait(false)
+            ?? await StoreAsync(path.FileName, upload).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sends <c>STOR</c> from offset 0, or skips the <c>-C</c> offset and sends <c>APPE</c>;
+    /// an offset that covers the whole upload sends nothing more than <c>QUIT</c> and succeeds.
+    /// </summary>
+    private async ValueTask<TransferResult> StoreAsync(string fileName, Stream upload)
+    {
+        long offset = context.ResumeUploadFromUnknownOffset
+            ? await ReadRemoteSizeAsync(fileName).ConfigureAwait(false)
+            : context.ResumeFrom ?? 0;
+        if (offset <= 0)
+        {
+            return await SendUploadAsync("STOR " + fileName, upload).ConfigureAwait(false);
+        }
+
+        return FtpUploadOffset.TrySkip(upload, offset)
+            ? await SendUploadAsync("APPE " + fileName, upload).ConfigureAwait(false)
+            : await QuitAndSucceedAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Asks the server for the size of the file <c>-C -</c> resumes: the count a <c>213</c>
+    /// reply carries, or 0 for any other reply, which uploads the whole source with <c>STOR</c>.
+    /// </summary>
+    private async ValueTask<long> ReadRemoteSizeAsync(string fileName) =>
+        SizeOf(await ExchangeAsync("SIZE " + fileName).ConfigureAwait(false)) ?? 0;
+
+    /// <summary>
+    /// Sends <paramref name="command" /> and, unless it is answered with 400 or more (exit 25
+    /// after <c>QUIT</c>), writes the upload to the data connection, closes it and reads the
+    /// end-of-transfer reply.
+    /// </summary>
+    private async ValueTask<TransferResult> SendUploadAsync(string command, Stream upload)
+    {
+        FtpReply opened = await ExchangeAsync(command).ConfigureAwait(false);
+        if (opened.Code >= 400)
+        {
+            return await QuitAndFailAsync(CurlExitCode.UploadFailed, FtpTransferMessages.UploadRefused(opened.Code)).ConfigureAwait(false);
+        }
+
+        context.Progress.ReportTransferStarted();
+        return await CopyUploadAsync(upload).ConfigureAwait(false)
+            ?? await ReadTransferCompleteAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Copies the upload to the data connection and closes it, which tells the server the
+    /// file has ended. A failed read ends the upload as the end of the source does, as curl
+    /// takes it; a failed write is exit 55.
+    /// </summary>
+    private async ValueTask<TransferResult?> CopyUploadAsync(Stream upload)
+    {
+        IConnection data = dataConnection!;
+        long? expected = upload.CanSeek ? Math.Max(0, upload.Length - upload.Position) : null;
+        byte[] buffer = new byte[ReadBufferSize];
+        int read;
+        while ((read = await ReadUploadAsync(upload, buffer).ConfigureAwait(false)) > 0)
+        {
+            try
+            {
+                await data.WriteAsync(buffer.AsMemory(0, read), context.CancellationToken).ConfigureAwait(false);
+                await data.FlushAsync(context.CancellationToken).ConfigureAwait(false);
+            }
+            catch (IOException)
+            {
+                return TransferResult.Failure(CurlExitCode.SendError, FtpTransferMessages.SendFailed, bytesTransferred);
+            }
+
+            bytesTransferred += read;
+            context.Progress.ReportUploaded(bytesTransferred, expected);
+        }
+
+        dataConnection = null;
+        await data.DisposeAsync().ConfigureAwait(false);
+        return null;
+    }
+
+    private async ValueTask<int> ReadUploadAsync(Stream upload, byte[] buffer)
+    {
+        try
+        {
+            return await upload.ReadAsync(buffer, context.CancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException)
+        {
+            return 0;
+        }
     }
 
     /// <summary>
@@ -271,13 +393,18 @@ internal sealed class FtpDownloadSession(IConnector connector, FtpControlChannel
             return await QuitAndFailAsync(CurlExitCode.RemoteFileNotFound, FtpTransferMessages.FileDoesNotExist).ConfigureAwait(false);
         }
 
-        if (size.Code == 213 && long.TryParse(size.LastLine.AsSpan(3), System.Globalization.NumberStyles.AllowLeadingWhite, System.Globalization.CultureInfo.InvariantCulture, out long bytes))
-        {
-            fileSize = bytes;
-        }
-
+        fileSize = SizeOf(size);
         return null;
     }
+
+    /// <summary>
+    /// Reads the byte count a <c>213</c> reply to <c>SIZE</c> carries, or
+    /// <see langword="null" /> for any other reply or an unreadable count.
+    /// </summary>
+    private static long? SizeOf(FtpReply size) =>
+        size.Code == 213 && long.TryParse(size.LastLine.AsSpan(3), System.Globalization.NumberStyles.AllowLeadingWhite, System.Globalization.CultureInfo.InvariantCulture, out long bytes)
+            ? bytes
+            : null;
 
     /// <summary>
     /// Applies the window before <c>RETR</c>: works out how many bytes to expect and, for
@@ -380,7 +507,7 @@ internal sealed class FtpDownloadSession(IConnector connector, FtpControlChannel
             }
             catch (IOException)
             {
-                return TransferResult.Failure(CurlExitCode.RecvError, FtpTransferMessages.ReceiveFailed, bytesWritten);
+                return TransferResult.Failure(CurlExitCode.RecvError, FtpTransferMessages.ReceiveFailed, bytesTransferred);
             }
 
             if (read == 0)
@@ -396,11 +523,11 @@ internal sealed class FtpDownloadSession(IConnector connector, FtpControlChannel
             catch (IOException exception)
             {
                 int accepted = exception is OutputWriteFailedException failed ? failed.BytesAccepted : 0;
-                return TransferResult.Failure(CurlExitCode.WriteError, FtpTransferMessages.OutputWriteFailed(wanted, accepted), bytesWritten);
+                return TransferResult.Failure(CurlExitCode.WriteError, FtpTransferMessages.OutputWriteFailed(wanted, accepted), bytesTransferred);
             }
 
-            bytesWritten += wanted;
-            context.Progress.ReportDownloaded(bytesWritten, expectedSize);
+            bytesTransferred += wanted;
+            context.Progress.ReportDownloaded(bytesTransferred, expectedSize);
         }
 
         return null;
@@ -410,11 +537,11 @@ internal sealed class FtpDownloadSession(IConnector connector, FtpControlChannel
     /// Gets whether the window's byte limit has been written, so curl stops reading the
     /// data connection.
     /// </summary>
-    private bool IsWindowRead() => window.MaxDownload is { } max && bytesWritten >= max;
+    private bool IsWindowRead() => window.MaxDownload is { } max && bytesTransferred >= max;
 
     /// <summary>The bytes of a read of <paramref name="read" /> bytes that lie within the window.</summary>
     private int CountWithinWindow(int read) =>
-        window.MaxDownload is { } max ? (int)Math.Min(read, max - bytesWritten) : read;
+        window.MaxDownload is { } max ? (int)Math.Min(read, max - bytesTransferred) : read;
 
     /// <summary>
     /// Ends a download that had a byte limit: exit 18 with no <c>QUIT</c> when the data
@@ -423,21 +550,21 @@ internal sealed class FtpDownloadSession(IConnector connector, FtpControlChannel
     /// </summary>
     private async ValueTask<TransferResult> EndRangeAsync()
     {
-        if (expectedSize is { } expected && bytesWritten < expected)
+        if (expectedSize is { } expected && bytesTransferred < expected)
         {
-            return TransferResult.Failure(CurlExitCode.PartialFile, FtpTransferMessages.EndOfResponseWithBytesMissing(expected - bytesWritten), bytesWritten);
+            return TransferResult.Failure(CurlExitCode.PartialFile, FtpTransferMessages.EndOfResponseWithBytesMissing(expected - bytesTransferred), bytesTransferred);
         }
 
         await EndAsync().ConfigureAwait(false);
-        return TransferResult.Success(bytesWritten);
+        return TransferResult.Success(bytesTransferred);
     }
 
     private async ValueTask<TransferResult> ReadTransferCompleteAsync()
     {
         FtpReply complete = await ReadReplyAsync(FtpTransferMessages.ControlConnectionLooksDead).ConfigureAwait(false);
-        if (expectedSize is { } expected && bytesWritten < expected)
+        if (expectedSize is { } expected && bytesTransferred < expected)
         {
-            return TransferResult.Failure(CurlExitCode.PartialFile, FtpTransferMessages.ClosedWithBytesRemaining(expected - bytesWritten), bytesWritten);
+            return TransferResult.Failure(CurlExitCode.PartialFile, FtpTransferMessages.ClosedWithBytesRemaining(expected - bytesTransferred), bytesTransferred);
         }
 
         if (complete.Code is not (226 or 250))
@@ -446,13 +573,13 @@ internal sealed class FtpDownloadSession(IConnector connector, FtpControlChannel
         }
 
         await QuitAsync().ConfigureAwait(false);
-        return TransferResult.Success(bytesWritten);
+        return TransferResult.Success(bytesTransferred);
     }
 
     private async ValueTask<TransferResult> QuitAndFailAsync(CurlExitCode exitCode, string message)
     {
         await QuitAsync().ConfigureAwait(false);
-        return TransferResult.Failure(exitCode, message, bytesWritten);
+        return TransferResult.Failure(exitCode, message, bytesTransferred);
     }
 
     private async ValueTask<TransferResult> QuitAndSucceedAsync()
@@ -478,7 +605,7 @@ internal sealed class FtpDownloadSession(IConnector connector, FtpControlChannel
     private async ValueTask<TransferResult> EndAndFailAsync(CurlExitCode exitCode, string message)
     {
         await EndAsync().ConfigureAwait(false);
-        return TransferResult.Failure(exitCode, message, bytesWritten);
+        return TransferResult.Failure(exitCode, message, bytesTransferred);
     }
 
     private ValueTask QuitAsync() => SendIgnoringReplyAsync("QUIT");
@@ -540,5 +667,5 @@ internal sealed class FtpDownloadSession(IConnector connector, FtpControlChannel
     }
 
     private FtpControlConversationFailedException Failed(CurlExitCode exitCode, string message) =>
-        new(TransferResult.Failure(exitCode, message, bytesWritten));
+        new(TransferResult.Failure(exitCode, message, bytesTransferred));
 }
