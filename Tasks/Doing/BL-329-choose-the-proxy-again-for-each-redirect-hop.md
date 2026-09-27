@@ -32,3 +32,4 @@ Under `-L`, each redirect hop uses the proxy curl 8.21.0 chooses for the hop's o
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
