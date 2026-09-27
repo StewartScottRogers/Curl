@@ -238,8 +238,8 @@ public sealed class HttpProtocolHandler(
         new(url.IdnHost, url.Port, url.Scheme == "https");
 
     /// <summary>
-    /// Builds the connect target for <paramref name="plan" />: the forward proxy itself, with
-    /// TLS for an HTTPS proxy; or else the URL's host, tunnelled through the transfer's proxy
+    /// Builds the connect target for <paramref name="plan" />: the forward proxy itself, marked
+    /// <see cref="ConnectTarget.IsForwardProxy" />, with TLS for an HTTPS proxy; or else the URL's host, tunnelled through the transfer's proxy
     /// when it has one. Either is pooled under <c>https</c> for an <c>https</c> URL and
     /// <c>http</c> otherwise, so a forward proxy connection serves every origin behind it, and
     /// carries the transfer's events for the connector to report through (ADR-0050).
@@ -248,7 +248,7 @@ public sealed class HttpProtocolHandler(
     {
         ConnectTarget urlTarget = TargetOf(plan.Context.Url);
         ConnectTarget target = plan.ForwardProxy is { } proxy
-            ? new ConnectTarget(proxy.Host, proxy.Port, proxy.Kind == ProxyKind.Https)
+            ? new ConnectTarget(proxy.Host, proxy.Port, proxy.Kind == ProxyKind.Https) { IsForwardProxy = true }
             : urlTarget with { Proxy = plan.Options.ForwardProxy };
         return target with { PoolScheme = urlTarget.UseTls ? "https" : "http", Events = plan.Context.Events };
     }

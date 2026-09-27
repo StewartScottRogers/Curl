@@ -35,7 +35,7 @@ public sealed class CurlCompositionProxyTests
 
     private static readonly ConnectTarget Proxy = new("127.0.0.1", 18238, false);
 
-    private static readonly ConnectTarget ForwardProxy = Proxy with { PoolScheme = "http" };
+    private static readonly ConnectTarget ForwardProxy = Proxy with { PoolScheme = "http", IsForwardProxy = true };
 
     [TestMethod]
     public async Task RunAsync_HttpUrlWithProxyOption_ForwardsTheRequestInAbsoluteFormToTheProxy()
@@ -98,7 +98,7 @@ public sealed class CurlCompositionProxyTests
         Assert.AreEqual(
             "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18238\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
             Latin1(server.Written));
-        Assert.AreEqual(ForwardProxy, server.Targets.Single());
+        Assert.AreEqual(Proxy with { PoolScheme = "http" }, server.Targets.Single());
     }
 
     [TestMethod]
@@ -268,7 +268,7 @@ public sealed class CurlCompositionProxyTests
 
         Assert.AreEqual(0, run.ExitCode);
         Assert.AreEqual(ForwardedGet, Latin1(server.Written));
-        Assert.AreEqual(new ConnectTarget("127.0.0.1", 18238, true) { PoolScheme = "http" }, server.Targets.Single());
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 18238, true) { PoolScheme = "http", IsForwardProxy = true }, server.Targets.Single());
     }
 
     [TestMethod]
@@ -377,7 +377,7 @@ public sealed class CurlCompositionProxyTests
 
         await RunAsync(connector, new Dictionary<string, string>(), ["-sS", "-x", "http://proxy:3128", "http://example.com/a"]);
 
-        Assert.AreEqual(new ConnectTarget("proxy", 3128, false) { PoolScheme = "http" }, connector.Targets.Single());
+        Assert.AreEqual(new ConnectTarget("proxy", 3128, false) { PoolScheme = "http", IsForwardProxy = true }, connector.Targets.Single());
     }
 
     [TestMethod]

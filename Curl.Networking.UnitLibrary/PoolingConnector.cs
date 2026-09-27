@@ -52,7 +52,9 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
     /// and <see cref="ConnectResult.PeerCertificates" />, and no
     /// <see cref="ConnectResult.Timings" />. Otherwise it asks the inner connector, returns a
     /// failure as it is, and numbers a success. A target without
-    /// <see cref="ConnectTarget.PoolScheme" /> is never served from the pool.
+    /// <see cref="ConnectTarget.PoolScheme" /> is never served from the pool. A reuse is
+    /// reported <c>with proxy</c> for a forward-proxy target and for a tunnelled one, which
+    /// names the proxy's host, as curl 8.21.0 prints it (BL-360).
     /// </remarks>
     public async ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
     {
@@ -194,9 +196,9 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
         target.Events.ReportConnectionReused(new ConnectionReusedEvent
         {
             Scheme = target.PoolScheme!,
-            IsProxy = false,
-            HostName = target.Host,
-            Port = target.Port,
+            IsProxy = target.IsForwardProxy || target.Proxy is not null,
+            HostName = target.Proxy?.Host ?? target.Host,
+            Port = target.Proxy?.Port ?? target.Port,
             ConnectionNumber = entry.ConnectionNumber,
         });
 

@@ -86,14 +86,16 @@ which cuts it to 255 characters as curl's 256-byte error buffer does (ADR-0072).
 `PoolingConnector` wraps another `IConnector` and keeps connections for reuse per ADR-0050.
 Every connection it returns is a `PooledConnection`; one marked with `MarkReusable` goes back
 to the pool on dispose, anything else closes. `ConnectionPoolKey` (with
-`ConnectionPoolProxyKey`) is the key: `PoolScheme`, host ignoring case, port, TLS choice and
-tunnelling proxy with its credential by value; a target without `PoolScheme` is never pooled.
+`ConnectionPoolProxyKey`) is the key: `PoolScheme`, host ignoring case, port, TLS choice,
+`IsForwardProxy` and tunnelling proxy with its credential by value; a target without `PoolScheme` is never pooled.
 The pool holds at most five idle connections in total, closing the oldest with curl's
 `Connection pool is full` and `shutting down connection #N` lines on the returning target's
 `Events`, and drops one idle longer than 118 seconds on its `TimeProvider`. It numbers
 connections from `0` (`ConnectResult.ConnectionNumber`) and returns a reused one with
-`IsReused`, its original local end point and certificates, and no timings. It reports
-`ConnectionReusedEvent.IsProxy` as `false`, since a forward-proxy target does not say it is one.
+`IsReused`, its original local end point and certificates, and no timings. A reused
+connection is reported `with proxy` (`ConnectionReusedEvent.IsProxy`) when the target is a
+forward proxy (`ConnectTarget.IsForwardProxy`) or tunnels through one, naming the proxy's host
+and port for a tunnel, as curl 8.21.0 prints it (BL-360).
 
 Everything else takes the Abstractions contracts (`IDnsResolver`, `ITlsProvider`,
 `IConnection`, `IDatagramChannel`) or `ITcpDialer`, plus an injected `TimeProvider`, so the tests in

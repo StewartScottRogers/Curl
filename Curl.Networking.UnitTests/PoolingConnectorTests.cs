@@ -102,6 +102,50 @@ public sealed class PoolingConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_ReusingAForwardProxyConnection_ReportsItWithProxy()
+    {
+        await using var pool = CreatePool();
+        var events = new RecordingTransferEvents();
+        var forwardProxy = Target(host: "proxy.example", port: 3128) with { IsForwardProxy = true };
+        await ReturnToPoolAsync(pool, forwardProxy);
+
+        await pool.ConnectAsync(forwardProxy with { Events = events }, CancellationToken.None);
+
+        Assert.AreEqual(
+            new ConnectionReusedEvent
+            {
+                Scheme = "http",
+                IsProxy = true,
+                HostName = "proxy.example",
+                Port = 3128,
+                ConnectionNumber = 0,
+            },
+            events.Reused.Single());
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_ReusingATunnelledConnection_ReportsItWithTheTunnellingProxy()
+    {
+        await using var pool = CreatePool();
+        var events = new RecordingTransferEvents();
+        var tunnelled = Target(proxy: Proxy("proxy.example", "user", "secret"));
+        await ReturnToPoolAsync(pool, tunnelled);
+
+        await pool.ConnectAsync(tunnelled with { Events = events }, CancellationToken.None);
+
+        Assert.AreEqual(
+            new ConnectionReusedEvent
+            {
+                Scheme = "http",
+                IsProxy = true,
+                HostName = "proxy.example",
+                Port = 3128,
+                ConnectionNumber = 0,
+            },
+            events.Reused.Single());
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_ForTheSameHostInAnotherCase_ReusesTheConnection()
     {
         await using var pool = CreatePool();
@@ -132,6 +176,7 @@ public sealed class PoolingConnectorTests
     [DataRow("port")]
     [DataRow("tls")]
     [DataRow("direct")]
+    [DataRow("forward proxy")]
     [DataRow("proxy kind")]
     [DataRow("proxy host")]
     [DataRow("proxy port")]
@@ -327,6 +372,7 @@ public sealed class PoolingConnectorTests
             "port" => new ConnectTarget(pooled.Host, 8080, pooled.UseTls) { PoolScheme = pooled.PoolScheme, Proxy = pooled.Proxy },
             "tls" => pooled with { UseTls = true },
             "direct" => pooled with { Proxy = null },
+            "forward proxy" => pooled with { IsForwardProxy = true },
             "proxy kind" => pooled with { Proxy = pooled.Proxy! with { Kind = ProxyKind.Socks5 } },
             "proxy host" => pooled with { Proxy = Proxy("other-proxy.example", "user", "secret") },
             "proxy port" => pooled with { Proxy = Proxy("proxy.example", "user", "secret", port: 8888) },

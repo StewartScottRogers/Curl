@@ -5,7 +5,7 @@ namespace Curl.Networking;
 /// <summary>
 /// What two <see cref="ConnectTarget" />s must share for a connection opened for one to
 /// carry a request for the other (ADR-0050): the pool scheme, the host compared ignoring
-/// case, the port, the TLS choice and the tunnelling proxy.
+/// case, the port, the TLS choice, whether the host is a forward proxy, and the tunnelling proxy.
 /// </summary>
 /// <remarks>
 /// The host is compared as given, never as resolved, so <c>localhost</c> and
@@ -16,12 +16,14 @@ namespace Curl.Networking;
 /// <param name="Host">The target's host, upper-cased so the comparison ignores case.</param>
 /// <param name="Port">The target's port.</param>
 /// <param name="UseTls">The target's TLS choice.</param>
+/// <param name="IsForwardProxy">The target's <see cref="ConnectTarget.IsForwardProxy" />.</param>
 /// <param name="Proxy">The tunnelling proxy, or <see langword="null" /> for a direct connection.</param>
 internal sealed record ConnectionPoolKey(
     string Scheme,
     string Host,
     int Port,
     bool UseTls,
+    bool IsForwardProxy,
     ConnectionPoolProxyKey? Proxy)
 {
     /// <summary>
@@ -38,5 +40,6 @@ internal sealed record ConnectionPoolKey(
                 target.Host.ToUpperInvariant(),
                 target.Port,
                 target.UseTls,
+                target.IsForwardProxy,
                 ConnectionPoolProxyKey.Of(target.Proxy));
 }
