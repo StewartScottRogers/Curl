@@ -113,8 +113,12 @@ public sealed record FileUrlPath
     /// path of the form <c>/X:…</c> or <c>/X|…</c>, where <c>X</c> is a single ASCII
     /// letter, loses its leading slash, so <c>file:///c:/Windows/win.ini</c> becomes an
     /// absolute Windows path and <c>file:///C:%2FWindows/win.ini</c> opens
-    /// <c>C:\Windows\win.ini</c>, as curl 8.21.0 does; the <c>|</c> spelling is kept,
-    /// because curl does not translate it. On every other platform the slash stays, so
+    /// <c>C:\Windows\win.ini</c>, as curl 8.21.0 does. The <c>|</c> is kept in both
+    /// <c>UrlPath</c> and <c>OsPath</c>, never rewritten to <c>:</c>: measured against the
+    /// curl 8.21.0 Schannel build, <c>file:///c|/Windows/win.ini</c> exits 37 with
+    /// <c>Could not open file c|/Windows/win.ini</c> even though that file exists, because
+    /// the <c>X|</c> to <c>X:</c> rewrite in <c>lib/file.c</c> only fires on a path that
+    /// still starts with <c>/</c>, and the slash is gone by then. On every other platform the slash stays, so
     /// the same URL opens the absolute path <c>/C:/Windows/win.ini</c>, because curl
     /// 8.21.0 strips it only inside <c>#ifdef DOS_FILESYSTEM</c> in <c>lib/file.c</c>.
     /// <strong>Quote:</strong> <c>UrlPath</c> is that text with each unescaped non-ASCII

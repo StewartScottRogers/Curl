@@ -259,8 +259,12 @@ public sealed class FileUrlPathTests
     }
 
     // The bar spelling loses its leading slash like a colon does, but the bar itself is
-    // NOT rewritten to a colon: curl 8.21.0 keeps it, and this test is the reason parsing
-    // works from CurlUrl.OriginalString.
+    // NOT rewritten to a colon. Measured against curl 8.21.0 (Windows, Schannel) with
+    // Record-CurlExchange.ps1: `curl -sS -o NUL file:///c|/Windows/win.ini` exits 37 with
+    // "curl: (37) Could not open file c|/Windows/win.ini" although C:\Windows\win.ini
+    // exists, while the same URL spelled c: exits 0. The X| to X: rewrite in lib/file.c
+    // only fires on a path that still starts with a slash, and on Windows the URL parser
+    // has already dropped it, so curl opens c|\Windows\win.ini and fails.
     [TestMethod]
     [OSCondition(OperatingSystems.Windows)]
     public void TryParse_DriveLetterSpelledWithABar_LosesTheLeadingSlashAndKeepsTheBar()
