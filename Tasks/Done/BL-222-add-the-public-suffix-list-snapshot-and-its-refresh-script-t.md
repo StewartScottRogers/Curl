@@ -8,7 +8,7 @@ depends-on: [BL-156]
 touches: [Curl.Cookies.UnitLibrary, Curl.slnx, Update-PublicSuffixList.ps1]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-27
 ---
 # BL-222 — Add the Public Suffix List snapshot and its refresh script to Curl.Cookies
 
@@ -23,8 +23,8 @@ A dated PSL snapshot is an embedded resource in `Curl.Cookies.UnitLibrary`, with
 
 ## Acceptance criteria
 
-- [ ] The resource and attribution sit where the BL-156 ADR says; `dotnet build Curl.Cookies.UnitLibrary -warnaserror` is clean.
-- [ ] `Update-PublicSuffixList.ps1` downloads the list, writes the resource with the date, is ASCII-only, and is listed in the `Scripts` folder of `Curl.slnx`.
+- [x] The resource and attribution sit where the BL-156 ADR says; `dotnet build Curl.Cookies.UnitLibrary -warnaserror` is clean.
+- [x] `Update-PublicSuffixList.ps1` downloads the list, writes the resource with the date, is ASCII-only, and is listed in the `Scripts` folder of `Curl.slnx`.
 
 ## Notes
 
@@ -35,3 +35,4 @@ A dated PSL snapshot is an embedded resource in `Curl.Cookies.UnitLibrary`, with
 
 - 2026-09-26: Created.
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Done. The dated PSL snapshot is embedded in Curl.Cookies with its MPL-2.0 attribution, and Update-PublicSuffixList.ps1 refreshes it
