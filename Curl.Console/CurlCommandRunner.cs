@@ -400,6 +400,13 @@ internal sealed class CurlCommandRunner(
     private bool progressMeterHeaderWritten;
 
     /// <summary>
+    /// Whether the current transfer is a <c>-T</c> upload under <c>-C -</c>, whose meter curl
+    /// 8.21.0 heads with <c>** Resuming transfer from byte position -1</c> whatever the
+    /// <c>-o</c> file holds (task BL-416).
+    /// </summary>
+    private bool uploadResumesFromUnknownOffset;
+
+    /// <summary>
     /// Where this run's <c>-v</c>, <c>--trace</c> and <c>--trace-ascii</c> output goes, opened once the
     /// first command-line URL has parsed as a glob and closed after the last transfer.
     /// </summary>
@@ -1394,6 +1401,7 @@ internal sealed class CurlCommandRunner(
         HttpRequestBody? formBody,
         Stream? upload)
     {
+        uploadResumesFromUnknownOffset = options.ResumeFromOutputSize && upload is not null;
         if (!TransferProxySelection.TrySelect(proxySelector, options, url, out ProxyEndpoint? proxy, out TransferResult? proxyFailure))
         {
             return proxyFailure;
@@ -1618,11 +1626,16 @@ internal sealed class CurlCommandRunner(
     /// meter, and none after: curl 8.21.0 writes them once however many times <c>--retry</c>
     /// runs the transfer (measured 2026-09-27, BL-241 Notes).
     /// </summary>
-    /// <param name="resumeFrom">The resolved <c>-C</c> offset, or <see langword="null" />.</param>
+    /// <param name="resumeFrom">
+    /// The resolved <c>-C</c> offset, or <see langword="null" />; a <c>-T</c> upload under
+    /// <c>-C -</c> (<see cref="uploadResumesFromUnknownOffset" />) names
+    /// <see cref="ProgressMeterLines.UnknownUploadOffset" /> instead.
+    /// </param>
     /// <returns>The header lines, or none when they were already written.</returns>
     private IReadOnlyList<string> TakeProgressMeterHeaderLines(long? resumeFrom)
     {
-        IReadOnlyList<string> headerLines = progressMeterHeaderWritten ? [] : ProgressMeterLines.HeaderLines(resumeFrom);
+        long? meterResumeFrom = uploadResumesFromUnknownOffset ? ProgressMeterLines.UnknownUploadOffset : resumeFrom;
+        IReadOnlyList<string> headerLines = progressMeterHeaderWritten ? [] : ProgressMeterLines.HeaderLines(meterResumeFrom);
         progressMeterHeaderWritten = true;
 
         return headerLines;

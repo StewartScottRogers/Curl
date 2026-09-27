@@ -150,7 +150,8 @@ handler and connector report; `--stderr` is not wired yet (BL-242 Notes name the
 
 After each successful transfer, after one `-f` failed with exit 22, and after one that failed
 once its handler reported it past connect or open (BL-130), standard error gets curl's progress
-meter: `** Resuming transfer from byte position N` when it resumed past byte zero, the two
+meter: `** Resuming transfer from byte position N` when it resumed past byte zero (N is `-1`
+for a `-T` upload under `-C -`, whatever the `-o` file holds, BL-416), the two
 header lines (`ProgressMeterLines`), the status lines, and one newline. The status lines come
 from `TransferProgressRecorder`, the transfer's `ITransferProgress` sink, which draws them on the
 runner's `TimeProvider` as curl 8.21.0's `progress_calc` and `progress_meter` do, with the fields

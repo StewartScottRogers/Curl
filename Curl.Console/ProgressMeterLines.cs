@@ -40,16 +40,23 @@ internal static class ProgressMeterLines
         "** Resuming transfer from byte position " + resumeFrom.ToString(CultureInfo.InvariantCulture);
 
     /// <summary>
+    /// The offset curl 8.21.0 resumes a <c>-T</c> upload from under <c>-C -</c>: -1, the
+    /// server's to know, which its resuming line names (measured 2026-09-27, BL-351 Notes).
+    /// </summary>
+    internal const long UnknownUploadOffset = -1;
+
+    /// <summary>
     /// The lines curl writes before the meter's first status line, in the order it writes
     /// them, each without a terminator.
     /// </summary>
     /// <param name="resumeFrom">
-    /// The resolved <c>-C</c> offset, or <see langword="null" /> without <c>-C</c>. Past zero,
+    /// The resolved <c>-C</c> offset, <see cref="UnknownUploadOffset" /> for a <c>-T</c> upload
+    /// under <c>-C -</c>, or <see langword="null" /> without <c>-C</c>. Past zero, or unknown,
     /// <see cref="ResumingLine" /> comes first.
     /// </param>
     /// <returns>The lines.</returns>
     internal static IReadOnlyList<string> HeaderLines(long? resumeFrom) =>
-        resumeFrom is > 0 and long position
+        resumeFrom is (> 0 or UnknownUploadOffset) and long position
             ? [ResumingLine(position), FirstHeaderLine, SecondHeaderLine]
             : [FirstHeaderLine, SecondHeaderLine];
 }

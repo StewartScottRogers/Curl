@@ -15,6 +15,8 @@ public sealed class CurlCommandRunnerProgressMeterTests
 {
     private const string SourceUrl = "file:///C:/source.txt";
 
+    private const string UploadUrl = "http://h/up/";
+
     private static readonly string NewLine = Environment.NewLine;
 
     private static readonly string Meter =
@@ -59,6 +61,41 @@ public sealed class CurlCommandRunnerProgressMeterTests
         await RunAsync(["-C", "-", "-o", "o2", SourceUrl]);
 
         Assert.AreEqual("** Resuming transfer from byte position 4" + NewLine + Meter, StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_ContinueAtDashWithUpload_WritesResumingFromMinusOneBeforeTheMeter()
+    {
+        outputFiles.ExistingContent["f.txt"] = Encoding.ASCII.GetBytes("abc");
+
+        int exitCode = await RunAsync(["-C", "-", "-T", "f.txt", UploadUrl], handler: RecordingProtocolHandler.WritingPath("http"));
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual("** Resuming transfer from byte position -1" + NewLine + Meter, StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_ContinueAtDashWithUploadAndExistingOutputFile_StillWritesResumingFromMinusOne()
+    {
+        outputFiles.ExistingContent["f.txt"] = Encoding.ASCII.GetBytes("abc");
+        outputFiles.ExistingContent["o3"] = Encoding.ASCII.GetBytes("xyz");
+
+        int exitCode = await RunAsync(
+            ["-C", "-", "-T", "f.txt", "-o", "o3", UploadUrl],
+            handler: RecordingProtocolHandler.WritingPath("http"));
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual("** Resuming transfer from byte position -1" + NewLine + Meter, StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_ContinueAt0WithUpload_WritesTheMeterWithoutTheResumingLine()
+    {
+        outputFiles.ExistingContent["f.txt"] = Encoding.ASCII.GetBytes("abc");
+
+        await RunAsync(["-C", "0", "-T", "f.txt", UploadUrl], handler: RecordingProtocolHandler.WritingPath("http"));
+
+        Assert.AreEqual(Meter, StandardErrorText);
     }
 
     [TestMethod]
