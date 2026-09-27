@@ -31,13 +31,19 @@ public sealed partial class SslStreamTlsProviderTests
         await IgnoreFailureAsync(serverTask);
     }
 
+    // Integration: on Windows the server's certificate context writes the intermediate into
+    // the current user's CA store, so the test depends on that store and changes it. Each run
+    // names its authorities afresh, so a copy left by a crashed run or another checkout
+    // running at the same time can never be taken for this run's issuer while the chain builds.
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task AuthenticateAsClientAsync_WhenTheServerSendsAnIntermediate_ReportsItAfterTheServersCertificate()
     {
+        var runName = Guid.NewGuid().ToString("N");
         using var rootKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-        using var root = CreateAuthority("CN=BL303 Test Root", rootKey, null, null);
+        using var root = CreateAuthority($"CN=BL303 Test Root {runName}", rootKey, null, null);
         using var intermediateKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-        using var intermediate = CreateAuthority("CN=BL303 Intermediate", intermediateKey, root, rootKey);
+        using var intermediate = CreateAuthority($"CN=BL303 Intermediate {runName}", intermediateKey, root, rootKey);
         using var leaf = CreateServerCertificate(intermediate, intermediateKey);
         try
         {
