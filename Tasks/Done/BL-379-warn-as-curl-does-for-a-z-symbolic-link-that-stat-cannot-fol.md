@@ -30,7 +30,7 @@ On Linux and macOS, `curl -z <dangling symbolic link>` prints `Warning: Failed t
 
 ## Notes
 
-- Decision recorded in ADR-0089 (Decided by Claude under Stewart's delegation): after
+- Decision recorded in ADR-0090 (Decided by Claude under Stewart's delegation): after
   `File.GetAttributes` succeeds, the off-Windows lookup resolves the final link target with
   `File.ResolveLinkTarget(Path.GetFullPath(path), true)`. A missing target is
   `No such file or directory` (or `Not a directory` when a file stands in its path), a plain
@@ -43,7 +43,7 @@ On Linux and macOS, `curl -z <dangling symbolic link>` prints `Warning: Failed t
   skipped locally.
 - The two disk delegates moved into static fields: the compiler's method-group delegate cache at
   a second `new(File.ReadAllBytes, ...)` site showed as half-covered branches.
-- Touches widened to `Documentation/Planning/Decisions` for ADR-0089, its README row and
+- Touches widened to `Documentation/Planning/Decisions` for ADR-0090, its README row and
   ADR-0071's follow-up pointer; no task in Doing names it.
 
 ## Log
