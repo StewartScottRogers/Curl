@@ -34,3 +34,4 @@ URLs pass through BL-204, BL-207 and BL-210 before dispatch in `Curl.Console`.
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-27: Backlog -> Doing.
