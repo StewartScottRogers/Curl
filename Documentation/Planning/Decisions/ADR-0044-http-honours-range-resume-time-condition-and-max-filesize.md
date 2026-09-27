@@ -22,9 +22,13 @@ them.
 - **`-C` wins over `-r`.** curl refuses the two together on the command line (exit 2), so a
   handler never sees both from `Curl.Console`. If a caller passes both, the resume is sent.
   `-C 0` is no resume, as measured: no `Range` and no resume check.
-- **A request with a body sends no `Range`.** curl sends `Content-Range: bytes A-B/N` instead for
-  `-d` with `-r`. Curl sends neither for now; the upload range is filed as follow-up work
-  rather than widening BL-178.
+- **A request with a body sends `Content-Range` instead of `Range`** (BL-306, measured there).
+  A `-d` body or a `-T` upload with `-r` sends `Content-Range: bytes R/L` in the `Range` slot,
+  after `Host` and before `User-Agent`: R is the range in its form (`0-9`, `100-`, `-500`) and L
+  the body's length, or `-1` when it is unknown (`-T -`). `-X PUT` makes no difference. A `-F`
+  form sends neither header, as curl sends none for a multipart post. An `-H Content-Range`
+  value replaces curl's, in the `-H` position. A resumed `-T` upload's own `Content-Range`
+  (ADR-0057) takes the place of the range's.
 - **`Last-Modified` is read in the three HTTP-date forms** RFC 9110 obliges a recipient to
   accept (IMF-fixdate, RFC 850, asctime), written by hand with `DateTimeOffset.TryParseExact`.
   curl's own date parser accepts more spellings. A value in none of the three is an unknown
@@ -50,7 +54,9 @@ Good:
 
 Costs and caveats:
 
-- `-d` with `-r` does not send curl's `Content-Range`. This is follow-up work.
+- The range is sent as `ByteRangeParser` reads it, not as typed: curl sends `-r 0-9,20-29`
+  verbatim (`Content-Range: bytes 0-9,20-29/1`, measured in BL-306), Curl sends `bytes 0-9/1`,
+  and `Range` has the same gap.
 - A `Last-Modified` in a spelling curl accepts but RFC 9110 does not list is treated as unknown,
   so the body is delivered where curl might skip it.
 
