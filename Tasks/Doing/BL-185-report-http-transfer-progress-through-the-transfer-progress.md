@@ -33,3 +33,4 @@ The HTTP handler reports transfer start, totals and counters through the progres
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-27: Backlog -> Doing.
