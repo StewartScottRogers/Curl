@@ -1,5 +1,5 @@
 ---
-id: BL-351
+id: BL-353
 title: Parse --ipfs-gateway in Curl.Cli with curl's option-time checks
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-351 — Parse --ipfs-gateway in Curl.Cli with curl's option-time checks
+# BL-353 — Parse --ipfs-gateway in Curl.Cli with curl's option-time checks
 
 ## Goal
 

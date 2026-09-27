@@ -88,4 +88,4 @@ constructed with. No gateway is `IpfsGatewayFailure.GatewayDetectionFailed` (exi
 `IPFS automatic gateway detection failed`); an unusable gateway or path is
 `MalformedTargetUrl` (exit 3, `malformed target URL`); both are tool messages, printed as
 `curl: <message>` with no `(<code>)`. It is not yet wired into `Curl.Console` (BL-240), and
-`--ipfs-gateway` is not yet parsed (BL-351).
+`--ipfs-gateway` is not yet parsed (BL-353).

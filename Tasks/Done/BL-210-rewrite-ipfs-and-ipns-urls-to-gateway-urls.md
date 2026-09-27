@@ -40,7 +40,7 @@ completed: 2026-09-27
   - `curl: malformed target URL`, exit 3: gateway with a query, IPv6 host, no host (`file:///C:/x`), unknown scheme from the environment, no scheme from the environment or file, empty `IPFS_GATEWAY`, surrounding spaces, and a path decoding to a byte below 0x20.
   - The path is decoded and re-encoded: space `" # % < > ? \ ^ \` |` and 0x7F-0xFF become `%XX`, everything else printable is literal (full 0x20-0x7E and 0x80-0xFF sweeps pinned).
 - Defaults taken (rule 1), none measured because they are unreachable or platform-bound: raw non-ASCII in a `CurlUrl` path is encoded as UTF-8 (the mingw build received the console code page, so `/é` gave `%E9`, which is argv encoding, not the rewrite); an empty `IPFS_PATH` reads `/gateway`; a gateway whose scheme is `ipfs`/`ipns` is malformed. No ADR: every pinned behaviour is curl's measured one, not a design choice.
-- Option-time checks on `--ipfs-gateway` (blank -> exit 2, malformed or unknown scheme -> exit 43, `--ipfs-gateway was given a malformed URL`) belong to Curl.Cli, outside `touches`: filed as BL-351 and added to BL-240's `depends-on`.
+- Option-time checks on `--ipfs-gateway` (blank -> exit 2, malformed or unknown scheme -> exit 43, `--ipfs-gateway was given a malformed URL`) belong to Curl.Cli, outside `touches`: filed as BL-353 and added to BL-240's `depends-on`.
 - Gates: `dotnet build -warnaserror` clean; fast tests green (Curl.Core.UnitTests 754 passed, 3 skipped); `Measure-CodeQuality.ps1 -Library Curl.Core.UnitLibrary`: 100% line, 100% branch, 0 failing members, worst CRAP 10.
 
 ## Log
