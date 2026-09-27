@@ -6,7 +6,7 @@ namespace Curl.Console;
 
 /// <summary>
 /// Maps the HTTP request options of a parsed command line onto the
-/// <see cref="HttpRequestOptions" /> an HTTP handler reads: <c>-X</c>, <c>-H</c>, <c>-A</c>,
+/// <see cref="HttpRequestOptions" /> an HTTP handler reads: <c>-X</c>, <c>--request-target</c>, <c>-H</c>, <c>-A</c>,
 /// <c>-e</c>, the <c>-d</c> family, <c>--json</c>, <c>-G</c>, <c>-f</c>, <c>--fail-with-body</c>
 /// <c>-L</c>, the authentication options <c>--basic</c>, <c>--digest</c>, <c>--anyauth</c> and
 /// <c>--oauth2-bearer</c>, and the transfer-encoding options <c>-0</c> / <c>--http1.0</c>,
@@ -45,6 +45,7 @@ internal static class HttpRequestOptionsMapping
     /// </param>
     /// <returns>
     /// The options: <see cref="CommandLineOptions.RequestMethod" />,
+    /// <see cref="CommandLineOptions.RequestTarget" />,
     /// <see cref="CommandLineOptions.UserAgent" /> and <see cref="CommandLineOptions.Referer" />
     /// verbatim; the <c>-H</c> headers followed by the ones <c>--json</c> adds; and
     /// <see cref="CommandLineOptions.ProxyHeaders" /> verbatim; and
@@ -68,6 +69,7 @@ internal static class HttpRequestOptionsMapping
         new()
         {
             CustomMethod = options.RequestMethod,
+            RequestTarget = options.RequestTarget,
             Headers = HeadersOf(options),
             ProxyHeaders = options.ProxyHeaders,
             UserAgent = options.UserAgent,

@@ -68,7 +68,7 @@ no range ends the transfer with exit 33 before it is dispatched), the `-C` offse
 `--max-filesize` limit. `-C -` resumes from the size of the URL's `-o` file, and a transfer
 that resumes past byte zero opens that file for appending before it starts, as curl does.
 Every context also carries `Http`, which `HttpRequestOptionsMapping` fills from `-X`,
-`-H`, `-A`, `-e`, the `-d` family and `--json`: `--json` appends `Content-Type: application/json` and
+`--request-target` (sent verbatim as the request-line target), `-H`, `-A`, `-e`, the `-d` family and `--json`: `--json` appends `Content-Type: application/json` and
 `Accept: application/json` after the `-H` headers unless a `-H` header already starts with
 that name (case-insensitive), and a body is a `BytesBody` sent as
 `application/x-www-form-urlencoded` unless `-G` moved it into the query. The runner appends
