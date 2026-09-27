@@ -17,7 +17,7 @@ public sealed class FileProtocolHandlerTests
     /// The path as written in the URL, still percent-encoded. curl's exit 37 message
     /// echoes this form, not the decoded one.
     /// </summary>
-    private const string EncodedUrlPath = "C:/dir/my%20file.txt";
+    private const string EncodedUrlPath = "/dir/my%20file.txt";
 
     /// <summary>
     /// The chunk size curl uses for a <c>file://</c> download body, measured at 16 kilobytes.
@@ -55,9 +55,9 @@ public sealed class FileProtocolHandlerTests
     /// </summary>
     private const string DestinationWriteFailedMessage = "Failed sending data to the peer";
 
-    private static CurlUrl FileUrl => CurlUrl.Parse("file:///C:/dir/my%20file.txt");
+    private static CurlUrl FileUrl => CurlUrl.Parse("file:///dir/my%20file.txt");
 
-    private static string OsPath => NativePath("C:/dir/my file.txt");
+    private static string OsPath => NativePath("/dir/my file.txt");
 
     private static byte[] Content => Encoding.ASCII.GetBytes("Hello file");
 
@@ -207,7 +207,7 @@ public sealed class FileProtocolHandlerTests
         Assert.AreEqual($"Could not open file {EncodedUrlPath}", result.ErrorMessage);
     }
 
-    // curl 8.21.0 prints "curl: (37) Could not open file C:/nosuch.txt" for this URL: the
+    // curl 8.21.0 prints "curl: (37) Could not open file /nosuch.txt" for this URL: the
     // message quotes the path after its dot segments are removed, not as written.
     [TestMethod]
     public async Task ExecuteAsync_DotDotSourceNotFound_QuotesThePathWithTheDotDotRemoved()
@@ -215,7 +215,7 @@ public sealed class FileProtocolHandlerTests
         var fileSystem = new FakeFileSystem();
         var context = new TransferContext
         {
-            Url = CurlUrl.Parse("file:///C:/dir/../nosuch.txt"),
+            Url = CurlUrl.Parse("file:///dir/../nosuch.txt"),
             Output = new ChunkRecordingStream(),
         };
         var handler = new FileProtocolHandler(fileSystem);
@@ -223,19 +223,20 @@ public sealed class FileProtocolHandlerTests
         var result = await handler.ExecuteAsync(context);
 
         Assert.AreEqual(CurlExitCode.FileCouldntReadFile, result.ExitCode);
-        Assert.AreEqual("Could not open file C:/nosuch.txt", result.ErrorMessage);
+        Assert.AreEqual("Could not open file /nosuch.txt", result.ErrorMessage);
     }
 
     // curl 8.21.0 with --path-as-is prints "curl: (37) Could not open file
     // Z:/.../dir/../nosuch" for file:///Z:/.../dir/../nosuch, where without it the quoted
-    // path is Z:/.../nosuch (measured in BL-293): the dot segments are kept.
+    // path is Z:/.../nosuch (measured in BL-293): the dot segments are kept. Drive-less, as
+    // below, it prints "Could not open file /dir/../nosuch.txt" (measured 2026-09-27).
     [TestMethod]
     public async Task ExecuteAsync_PathAsIsDotDotSourceNotFound_QuotesThePathWithTheDotDotKept()
     {
         var fileSystem = new FakeFileSystem();
         var context = new TransferContext
         {
-            Url = CurlUrl.Parse("file:///C:/dir/../nosuch.txt", pathAsIs: true),
+            Url = CurlUrl.Parse("file:///dir/../nosuch.txt", pathAsIs: true),
             Output = new ChunkRecordingStream(),
             PathAsIs = true,
         };
@@ -244,7 +245,7 @@ public sealed class FileProtocolHandlerTests
         var result = await handler.ExecuteAsync(context);
 
         Assert.AreEqual(CurlExitCode.FileCouldntReadFile, result.ExitCode);
-        Assert.AreEqual("Could not open file C:/dir/../nosuch.txt", result.ErrorMessage);
+        Assert.AreEqual("Could not open file /dir/../nosuch.txt", result.ErrorMessage);
     }
 
     // Exit 78 is the remote-protocol "file not found"; file:// never reports it, however
@@ -2534,7 +2535,9 @@ public sealed class FileProtocolHandlerTests
     // curl 8.21.0 with curl -sS -o /dev/null URL: file://C: and file:///C: print
     // "curl: (37) Could not open file C:", file:///Q:dir/../x prints
     // "curl: (37) Could not open file /x". file://C:/ is inferred from the same rule.
+    // Windows only: curl's other builds reject a drive letter with exit 3 (ADR-0010).
     [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
     [DataRow("file://C:", "C:")]
     [DataRow("file:///C:", "C:")]
     [DataRow("file:///Q:dir/../x", "/x")]
@@ -2556,8 +2559,10 @@ public sealed class FileProtocolHandlerTests
     }
 
     // curl 8.21.0 exits 0 for file:///C:%2FWindows/win.ini and writes C:\Windows\win.ini
-    // (measured 2026-09-27): the escape decodes to the separator the drive needs.
+    // (measured 2026-09-27): the escape decodes to the separator the drive needs. Windows
+    // only: curl's other builds reject a drive letter with exit 3 (ADR-0010).
     [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
     public async Task ExecuteAsync_DriveFollowedByAnEscapedSlash_SendsTheFileTheEscapeSpells()
     {
         var fileSystem = new FakeFileSystem();
