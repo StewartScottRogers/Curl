@@ -37,3 +37,4 @@ An Accepted ADR records that the Public Suffix List is an embedded, dated snapsh
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-27: Backlog -> Doing.
