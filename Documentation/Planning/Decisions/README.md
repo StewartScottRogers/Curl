@@ -62,6 +62,7 @@ choices do not need one.
 | [0045](ADR-0045-the-transfer-context-carries-a-progress-sink-for-the-progress-meter.md) | The transfer context carries a progress sink for the progress meter: `ITransferProgress` on `ITransferContext.Progress`, `NoTransferProgress` by default, no clock in the sink | Accepted | 2026-09-26 |
 | [0046](ADR-0046-the-transfer-context-carries-a-transfer-event-sink-for-v-and-trace.md) | The transfer context carries a transfer event sink for `-v` and `--trace`: `ITransferEvents` on `ITransferContext.Events` and `ConnectTarget.Events`, a sibling of the progress sink, `NoTransferEvents` by default | Accepted | 2026-09-26 |
 | [0047](ADR-0047-the-sws-emulation-selects-reply-parts-by-authorization-swsbounce-and-connect-for-one-case.md) | The sws emulation selects reply parts by `Authorization:`, `swsbounce` and `CONNECT` as sws does, taking every request to name its one case | Accepted | 2026-09-26 |
+| [0048](ADR-0048-o-names-are-sanitized-on-windows-by-a-separate-step-only-when-globbing.md) | `-o` names are sanitized on Windows by a separate step, only when globbing: `WindowsOutputFileNameSanitizer`, run by `UrlGlobMatch.ResolveOutputFileName` when the caller passes `sanitizesForWindows`, never under `-g` | Accepted | 2026-09-27 |
 
 ## Template
 
