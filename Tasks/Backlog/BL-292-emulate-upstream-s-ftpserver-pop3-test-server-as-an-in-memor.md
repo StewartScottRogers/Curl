@@ -1,5 +1,5 @@
 ---
-id: BL-281
+id: BL-292
 title: Emulate upstream's ftpserver POP3 test server as an in-memory connector
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-281 — Emulate upstream's ftpserver POP3 test server as an in-memory connector
+# BL-292 — Emulate upstream's ftpserver POP3 test server as an in-memory connector
 
 ## Goal
 

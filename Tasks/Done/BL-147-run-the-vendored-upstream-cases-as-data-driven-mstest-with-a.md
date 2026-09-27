@@ -55,7 +55,7 @@ the upstream pass rate is a number anyone can recompute.
 
 - Emulations for FTP, IMAP, POP3, SMTP, TFTP and the other servers are follow-up tasks, filed
   once this runner exists (ADR-0013, decision 7). Filed 2026-09-26 for the four servers that
-  skip the most cases: BL-278 (FTP), BL-279 (SMTP), BL-280 (IMAP), BL-281 (POP3).
+  skip the most cases: BL-289 (FTP), BL-290 (SMTP), BL-291 (IMAP), BL-292 (POP3).
 - Result on 2026-09-26 (Windows, Schannel feature set): 2013 cases; 137 pass and are listed,
   324 fail, 1552 skipped. Pass rate 137 / 461 runnable = 29.7%. The pass set was identical
   across three consecutive runs. Largest skip reasons: an unsupported `<servercmd>` or strip

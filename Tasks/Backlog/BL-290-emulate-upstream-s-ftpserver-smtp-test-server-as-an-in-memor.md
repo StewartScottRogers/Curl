@@ -1,5 +1,5 @@
 ---
-id: BL-279
+id: BL-290
 title: Emulate upstream's ftpserver SMTP test server as an in-memory connector
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-279 — Emulate upstream's ftpserver SMTP test server as an in-memory connector
+# BL-290 — Emulate upstream's ftpserver SMTP test server as an in-memory connector
 
 ## Goal
 

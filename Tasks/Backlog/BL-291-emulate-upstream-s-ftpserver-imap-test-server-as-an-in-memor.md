@@ -1,5 +1,5 @@
 ---
-id: BL-280
+id: BL-291
 title: Emulate upstream's ftpserver IMAP test server as an in-memory connector
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-280 — Emulate upstream's ftpserver IMAP test server as an in-memory connector
+# BL-291 — Emulate upstream's ftpserver IMAP test server as an in-memory connector
 
 ## Goal
 
