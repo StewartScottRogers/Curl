@@ -1,5 +1,5 @@
 ---
-id: BL-358
+id: BL-360
 title: Report 'with proxy' when a forward-proxy connection is reused
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-358 — Report 'with proxy' when a forward-proxy connection is reused
+# BL-360 — Report 'with proxy' when a forward-proxy connection is reused
 
 ## Goal
 
