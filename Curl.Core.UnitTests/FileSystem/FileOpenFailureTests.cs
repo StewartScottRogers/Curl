@@ -87,4 +87,24 @@ public sealed class FileOpenFailureTests
 
         Assert.AreEqual(FileAccessStatus.IoError, status);
     }
+
+    [TestMethod]
+    public void Win32ErrorCodeOf_FileNotFoundException_IsErrorFileNotFound()
+    {
+        Assert.AreEqual(2, FileOpenFailure.Win32ErrorCodeOf(new FileNotFoundException()));
+    }
+
+    [TestMethod]
+    public void Win32ErrorCodeOf_UnauthorizedAccessException_IsErrorAccessDenied()
+    {
+        Assert.AreEqual(5, FileOpenFailure.Win32ErrorCodeOf(new UnauthorizedAccessException()));
+    }
+
+    [TestMethod]
+    public void Win32ErrorCodeOf_ExceptionWithoutWin32HResult_IsItsHResult()
+    {
+        var exception = new NotSupportedException();
+
+        Assert.AreEqual(exception.HResult, FileOpenFailure.Win32ErrorCodeOf(exception));
+    }
 }

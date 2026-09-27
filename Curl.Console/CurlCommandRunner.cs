@@ -575,12 +575,38 @@ internal sealed class CurlCommandRunner(
 
         if (options.RemoteTime && completed.IsSuccess && completed.SourceLastWriteTimeUtc is { } sourceLastWriteTimeUtc)
         {
-            // curl 8.21.0 prints a warning when the time cannot be set; that line is not
-            // modelled yet, so a failure is ignored.
-            _ = outputFileTimeSetter.TrySetLastWriteTimeUtc(outputFile, sourceLastWriteTimeUtc);
+            await StampOutputFileTimeAsync(options, outputFile, sourceLastWriteTimeUtc).ConfigureAwait(false);
         }
 
         return completed;
+    }
+
+    /// <summary>
+    /// Sets <paramref name="outputFile" />'s last-write time to the source's for <c>-R</c>, and
+    /// when that fails prints <see cref="RemoteTimeFailureWarning" />'s line unless <c>-s</c>
+    /// was given; the transfer's exit code is unchanged either way.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="outputFile">The closed <c>-o</c> file.</param>
+    /// <param name="sourceLastWriteTimeUtc">The source's last-write time.</param>
+    /// <returns>A task that completes when the time is set or the warning written.</returns>
+    /// <remarks>
+    /// curl 8.21.0 (Windows, measured 2026-09-26) mutes the warning under <c>-s</c> and under
+    /// <c>-s -S</c> alike: <c>-S</c> brings back error messages, not warnings. The line is the
+    /// Windows form on every platform, for the reason <see cref="RemoteTimeFailureWarning" />
+    /// gives.
+    /// </remarks>
+    private async Task StampOutputFileTimeAsync(
+        CommandLineOptions options,
+        string outputFile,
+        DateTimeOffset sourceLastWriteTimeUtc)
+    {
+        if (!outputFileTimeSetter.TrySetLastWriteTimeUtc(outputFile, sourceLastWriteTimeUtc, out int errorCode)
+            && !options.Silent)
+        {
+            await WriteErrorLineAsync(RemoteTimeFailureWarning.For(sourceLastWriteTimeUtc, errorCode))
+                .ConfigureAwait(false);
+        }
     }
 
     /// <summary>

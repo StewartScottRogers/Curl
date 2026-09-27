@@ -122,9 +122,10 @@ public sealed class PhysicalFileSystem : IFileSystem, IFileTimeSetter
     /// <remarks>
     /// Every exception <see cref="FileOpenFailure.IsOpenFailure(Exception)" /> names, such as
     /// the <see cref="FileNotFoundException" /> of a missing file, is reported as
-    /// <see langword="false" />.
+    /// <see langword="false" />, with the error code
+    /// <see cref="FileOpenFailure.Win32ErrorCodeOf(Exception)" /> reads from it.
     /// </remarks>
-    public bool TrySetLastWriteTimeUtc(string path, DateTimeOffset lastWriteTimeUtc)
+    public bool TrySetLastWriteTimeUtc(string path, DateTimeOffset lastWriteTimeUtc, out int errorCode)
     {
         try
         {
@@ -132,9 +133,11 @@ public sealed class PhysicalFileSystem : IFileSystem, IFileTimeSetter
         }
         catch (Exception exception) when (FileOpenFailure.IsOpenFailure(exception))
         {
+            errorCode = FileOpenFailure.Win32ErrorCodeOf(exception);
             return false;
         }
 
+        errorCode = 0;
         return true;
     }
 

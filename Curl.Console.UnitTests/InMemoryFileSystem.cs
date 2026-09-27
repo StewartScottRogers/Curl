@@ -10,7 +10,8 @@ namespace Curl.Console;
 /// path's <see cref="ExistingContent" /> under <see cref="FileWriteMode.Append" />, and a path
 /// in <see cref="UnwritablePaths" /> fails to open for writing with <see cref="UnwritableStatus" />.
 /// Each last-write time set is recorded in <see cref="LastWriteTimesSet" />, with whether the
-/// path's written stream was still open at the time.
+/// path's written stream was still open at the time; setting one fails with
+/// <see cref="FileTimeErrorCode" /> when that is not zero.
 /// </summary>
 internal sealed class InMemoryFileSystem : IFileSystem, IFileTimeSetter
 {
@@ -31,6 +32,8 @@ internal sealed class InMemoryFileSystem : IFileSystem, IFileTimeSetter
     public List<FileWriteMode> WriteModes { get; } = [];
 
     public List<(string Path, DateTimeOffset LastWriteTimeUtc, bool WhileOpen)> LastWriteTimesSet { get; } = [];
+
+    public int FileTimeErrorCode { get; init; }
 
     public ValueTask<FileOpenResult> OpenForReadAsync(string path, CancellationToken cancellationToken)
     {
@@ -69,11 +72,12 @@ internal sealed class InMemoryFileSystem : IFileSystem, IFileTimeSetter
         return ValueTask.FromResult(FileOpenResult.Opened(stream, 0, null));
     }
 
-    public bool TrySetLastWriteTimeUtc(string path, DateTimeOffset lastWriteTimeUtc)
+    public bool TrySetLastWriteTimeUtc(string path, DateTimeOffset lastWriteTimeUtc, out int errorCode)
     {
         bool whileOpen = Written.TryGetValue(path, out MemoryStream? stream) && stream.CanWrite;
         LastWriteTimesSet.Add((path, lastWriteTimeUtc, whileOpen));
+        errorCode = FileTimeErrorCode;
 
-        return true;
+        return errorCode == 0;
     }
 }
