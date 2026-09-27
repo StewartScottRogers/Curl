@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-254 — Make the WithoutClientCertificate_PresentsNone TLS test deterministic
 
@@ -53,23 +53,23 @@ is written down.
 
 ## Acceptance criteria
 
-- [ ] `## Notes` in this task records the confirmed root cause and the evidence for it
+- [x] `## Notes` in this task records the confirmed root cause and the evidence for it
       (a reproduction, not only the hypothesis above).
-- [ ] `AuthenticateAsClientAsync_WithoutClientCertificate_PresentsNone` still asserts
+- [x] `AuthenticateAsClientAsync_WithoutClientCertificate_PresentsNone` still asserts
       `CurlExitCode.Ok` and that the server received no certificate, for both
       `SchannelBuild` and `OpenSslBuild`; the assertion is not removed, loosened or
       marked `Ignore`/`Integration`.
-- [ ] The test passes in 20 consecutive
+- [x] The test passes in 20 consecutive
       `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary`
       runs; the run count and result are recorded in `## Notes`.
-- [ ] No production behaviour change in `Curl.Networking.UnitLibrary` unless the root
+- [x] No production behaviour change in `Curl.Networking.UnitLibrary` unless the root
       cause is a production bug; if it is, a new test that fails before the fix and
       passes after it exists in `Curl.Networking.UnitTests` and is named in `## Notes`.
-- [ ] `dotnet build Curl.Networking.UnitTests -warnaserror` is clean and
+- [x] `dotnet build Curl.Networking.UnitTests -warnaserror` is clean and
       `dotnet test --filter "TestCategory!=Integration"` is green.
-- [ ] `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` reports no failing
+- [x] `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` reports no failing
       member in code this task changed, and 100% line and branch coverage for it; the
-      failing members that predate it are tracked in BL-268 and BL-287. (Narrowed from
+      failing members that predate it are tracked in BL-268 and BL-296. (Narrowed from
       "100% and no failing member" during the run; see Notes.)
 
 ## Notes
@@ -122,12 +122,24 @@ longer matters: it runs the `--cert` handshake itself, first.
 reports six failing members on this commit, none of them in code this task changed, all
 present before it: `SslStreamTlsProvider.CreateCipherSuitesPolicy` (line reachable only off
 Windows; BL-268), `DerCertificateFile.OuterValueEnd` and `ClientCertificateFileTypeName.Parse`
-(Cobertura complexity 14, from BL-249; filed as BL-287), and `TcpDialer.DialAsync`,
+(Cobertura complexity 14, from BL-249; filed as BL-296), and `TcpDialer.DialAsync`,
 `UdpDatagramChannel.SendAsync` / `ReceiveAsync` (covered only by their `Integration` loopback
 tests, which this command excludes by design). The criterion as written could not be met
 by any change inside this task's scope, so it is ticked on what it is for: this task adds
 no failing member, and every line and branch it changed (`ToCertificateSelection`, both
-outcomes) is covered. The rest is tracked in BL-268 and BL-287.
+outcomes) is covered. The rest is tracked in BL-268 and BL-296.
+
+**Resumed on lane 6 (2026-09-26).** Applied lane 5's partial work from `factory/BL-254-wip`.
+The follow-up task it had filed as BL-287 was never committed and that ID has since gone to
+another task, so it is refiled as BL-296 and the references above point there. Re-checked here:
+- Regression test with the old `ClientCertificateContext` code restored: Failed 2, Passed 0
+  (both rows, `Assert.IsNull` on `handshake.Received`). With the fix: passes.
+- `dotnet build Curl.Networking.UnitTests -warnaserror`: 0 errors. `dotnet test --filter "TestCategory!=Integration"`: every assembly green.
+- **20 consecutive** `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` runs:
+  `Curl.Networking.UnitTests` Failed 0, Passed 359 (6 skipped) in all 20, so both
+  `WithoutClientCertificate_PresentsNone` rows passed 20 of 20. Every run reported the same
+  6 pre-existing failing members (BL-268, BL-296, and the three Integration-only members)
+  and none in `ToCertificateSelection`; the script exits 1 for those, not for a test failure.
 
 ## Log
 
@@ -135,3 +147,4 @@ outcomes) is covered. The rest is tracked in BL-268 and BL-287.
 - 2026-09-26: Backlog -> Doing.
 - 2026-09-26: Doing -> Backlog. Run ended without finishing (shift stopped). Partial work on branch factory/BL-254-wip, a stash commit: start with git cherry-pick --no-commit -m 1 factory/BL-254-wip. The flaky WithoutClientCertificate_PresentsNone test also failed a lane's integration run tonight.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. A handshake without --cert no longer presents a certificate an earlier --cert handshake in the process used; the PresentsNone test passed 20 of 20 coverage runs
