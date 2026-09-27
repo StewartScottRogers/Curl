@@ -1,8 +1,10 @@
 using System.Globalization;
 using System.Text;
+using Curl.Authentication;
 using Curl.Cli;
 using Curl.Core;
 using Curl.Core.FileSystem;
+using Curl.Core.Multipart;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Console;
@@ -54,6 +56,12 @@ namespace Curl.Console;
 /// <param name="standardOutputIsTerminal">
 /// Whether standard output is a terminal, where curl hides the meter of a transfer with no
 /// <c>-o</c>.
+/// </param>
+/// <param name="formBodyBuilder">
+/// Builds each transfer's <c>-F</c> / <c>--form-string</c> body; when not given, one reading the
+/// real disk, encoding text in the platform's encoding (ADR-0027: the one
+/// <see cref="CredentialEncoding.ForPlatform" /> gives) and drawing random boundaries with
+/// <see cref="MultipartBoundary.CreateRandom" />.
 /// </param>
 /// <remarks>
 /// <para>
@@ -118,6 +126,12 @@ namespace Curl.Console;
 /// after the file is closed. As in curl 8.21.0 the time is applied even when the transfer
 /// wrote no body, as for an unmet <c>-z</c>. A transfer to standard output has no file to stamp.
 /// </para>
+/// <para>
+/// With <c>-F</c> / <c>--form-string</c> each URL gets its own multipart body, built after the
+/// URL and range are checked and before anything is sent, and closed when the transfer ends. A
+/// form file that cannot be opened ends that transfer with the builder's exit 26 and no
+/// connection, as curl 8.21.0 does.
+/// </para>
 /// </remarks>
 internal sealed class CurlCommandRunner(
     Func<CommandLineOptions, TransferDispatch> createTransferDispatch,
@@ -129,7 +143,8 @@ internal sealed class CurlCommandRunner(
     bool runsOnWindows,
     int terminalColumns = TerminalColumns.Default,
     bool writesProgressMeter = false,
-    bool standardOutputIsTerminal = false)
+    bool standardOutputIsTerminal = false,
+    MultipartFormBodyBuilder? formBodyBuilder = null)
 {
     /// <summary>
     /// curl 8.21.0's message for a URL that cannot be parsed at all, measured on
@@ -155,6 +170,13 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>Builds each transfer's context; gives a <c>telnet</c> transfer standard input.</summary>
     private readonly TransferContextFactory transferContextFactory = new(standardInput);
+
+    /// <summary>Builds each transfer's <c>-F</c> body.</summary>
+    private readonly MultipartFormBodyBuilder formBodyBuilder = formBodyBuilder
+        ?? new MultipartFormBodyBuilder(
+            new PhysicalFileSystem(),
+            CredentialEncoding.ForPlatform(runsOnWindows),
+            MultipartBoundary.CreateRandom);
 
     /// <summary>
     /// The result of a transfer whose write to standard output failed. It is compared by
@@ -432,7 +454,8 @@ internal sealed class CurlCommandRunner(
     /// <param name="headerOutput">Where the <c>-D</c> header lines go, or <see langword="null" /> without <c>-D</c>.</param>
     /// <returns>
     /// The transfer's result; <see cref="ByteRangeParser.NotDeliveredFailure" />, with nothing
-    /// transferred, when the <c>-r</c> text names no range, as curl 8.21.0 reports it.
+    /// transferred, when the <c>-r</c> text names no range, as curl 8.21.0 reports it; the
+    /// <c>-F</c> body's build failure, with nothing transferred, when a form file cannot be opened.
     /// </returns>
     private async Task<TransferResult> TransferAsync(
         TransferDispatch dispatch,
@@ -458,10 +481,53 @@ internal sealed class CurlCommandRunner(
             return ByteRangeParser.NotDeliveredFailure;
         }
 
+        if (options.FormParts.Count == 0)
+        {
+            return await TransferWithBodyAsync(follower, options, uri, outputFile, range, headerOutput, null)
+                .ConfigureAwait(false);
+        }
+
+        MultipartFormBuildResult form = await formBodyBuilder
+            .BuildAsync(MultipartFormPartMapping.FromCommandLine(options.FormParts), CancellationToken.None)
+            .ConfigureAwait(false);
+        if (!form.IsBuilt)
+        {
+            return form.Failure;
+        }
+
+        await using (form.Body.Content.ConfigureAwait(false))
+        {
+            return await TransferWithBodyAsync(follower, options, uri, outputFile, range, headerOutput, form.Body)
+                .ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Performs one checked transfer, sending <paramref name="formBody" /> when given, to
+    /// <paramref name="outputFile" /> when one is given and to standard output otherwise, and
+    /// writes the progress meter after it.
+    /// </summary>
+    /// <param name="follower">Performs the transfer with the handler for its scheme, following redirects under <c>-L</c>.</param>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="uri">The URL, with any <c>-G</c> / <c>--url-query</c> query.</param>
+    /// <param name="outputFile">The matching <c>-o</c> value, or <see langword="null" />.</param>
+    /// <param name="range">The parsed <c>-r</c> range, or <see langword="null" />.</param>
+    /// <param name="headerOutput">Where the <c>-D</c> header lines go, or <see langword="null" /> without <c>-D</c>.</param>
+    /// <param name="formBody">The <c>-F</c> body, or <see langword="null" /> without <c>-F</c>.</param>
+    /// <returns>The transfer's result.</returns>
+    private async Task<TransferResult> TransferWithBodyAsync(
+        RedirectFollower follower,
+        CommandLineOptions options,
+        Uri uri,
+        string? outputFile,
+        ByteRange? range,
+        Stream? headerOutput,
+        HttpRequestBody? formBody)
+    {
         if (outputFile is null)
         {
             TransferContext context = transferContextFactory.Create(
-                options, uri, deferringStandardOutput, range, options.ResumeFrom, headerOutput);
+                options, uri, deferringStandardOutput, range, options.ResumeFrom, headerOutput, formBody);
             TransferResult standardOutputResult =
                 await TransferToStandardOutputAsync(follower, options, context).ConfigureAwait(false);
 
@@ -472,7 +538,7 @@ internal sealed class CurlCommandRunner(
         string outputFileName = runsOnWindows ? WindowsOutputFileNameSanitizer.Sanitize(outputFile) : outputFile;
         long? resumeFrom = await ResolveResumeFromAsync(options, outputFileName).ConfigureAwait(false);
         TransferResult fileResult = await TransferToOutputFileAsync(
-                follower, options, uri, outputFileName, range, resumeFrom, headerOutput)
+                follower, options, uri, outputFileName, range, resumeFrom, headerOutput, formBody)
             .ConfigureAwait(false);
 
         return await WriteProgressMeterAsync(options, fileResult, resumeFrom, toStandardOutput: false)
@@ -580,6 +646,7 @@ internal sealed class CurlCommandRunner(
     /// <param name="range">The parsed <c>-r</c> range, or <see langword="null" />.</param>
     /// <param name="resumeFrom">The resolved <c>-C</c> offset, or <see langword="null" />.</param>
     /// <param name="headerOutput">Where the <c>-D</c> header lines go, or <see langword="null" /> without <c>-D</c>.</param>
+    /// <param name="formBody">The <c>-F</c> body, or <see langword="null" /> without <c>-F</c>.</param>
     /// <returns>
     /// The transfer's result. A transfer that resumes past byte zero opens the file for
     /// appending before it starts, as curl 8.21.0 does; when that open fails the result is
@@ -593,10 +660,11 @@ internal sealed class CurlCommandRunner(
         string outputFile,
         ByteRange? range,
         long? resumeFrom,
-        Stream? headerOutput)
+        Stream? headerOutput,
+        HttpRequestBody? formBody)
     {
         TransferResult completed = await TransferIntoOutputFileAsync(
-                follower, options, uri, outputFile, range, resumeFrom, headerOutput)
+                follower, options, uri, outputFile, range, resumeFrom, headerOutput, formBody)
             .ConfigureAwait(false);
 
         if (options.RemoteTime && completed.IsSuccess && completed.SourceLastWriteTimeUtc is { } sourceLastWriteTimeUtc)
@@ -645,6 +713,7 @@ internal sealed class CurlCommandRunner(
     /// <param name="range">The parsed <c>-r</c> range, or <see langword="null" />.</param>
     /// <param name="resumeFrom">The resolved <c>-C</c> offset, or <see langword="null" />.</param>
     /// <param name="headerOutput">Where the <c>-D</c> header lines go, or <see langword="null" /> without <c>-D</c>.</param>
+    /// <param name="formBody">The <c>-F</c> body, or <see langword="null" /> without <c>-F</c>.</param>
     /// <returns>The transfer's result, as <see cref="TransferToOutputFileAsync" /> describes it.</returns>
     private async Task<TransferResult> TransferIntoOutputFileAsync(
         RedirectFollower follower,
@@ -653,7 +722,8 @@ internal sealed class CurlCommandRunner(
         string outputFile,
         ByteRange? range,
         long? resumeFrom,
-        Stream? headerOutput)
+        Stream? headerOutput,
+        HttpRequestBody? formBody)
     {
         bool resumes = resumeFrom is > 0;
         DeferredOutputFileStream output = new(
@@ -665,7 +735,7 @@ internal sealed class CurlCommandRunner(
                 return await ReportCannotOpenForResumeAsync(options, outputFile).ConfigureAwait(false);
             }
 
-            TransferContext context = transferContextFactory.Create(options, uri, output, range, resumeFrom, headerOutput);
+            TransferContext context = transferContextFactory.Create(options, uri, output, range, resumeFrom, headerOutput, formBody);
             TransferResult fileResult = await follower
                 .FollowAsync(context, RedirectPolicyMapping.FromCommandLine(options))
                 .ConfigureAwait(false);

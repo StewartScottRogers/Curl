@@ -8,7 +8,7 @@ namespace Curl.Console;
 /// Maps the HTTP request options of a parsed command line onto the
 /// <see cref="HttpRequestOptions" /> an HTTP handler reads: <c>-X</c>, <c>-H</c>, <c>-A</c>,
 /// <c>-e</c>, the <c>-d</c> family, <c>--json</c>, <c>-G</c>, <c>-f</c>, <c>--fail-with-body</c>
-/// and <c>-L</c>.
+/// and <c>-L</c>, with the <c>-F</c> body the caller built.
 /// </summary>
 /// <remarks>
 /// Measured with curl 8.21.0 (mingw, Schannel) against a loopback recorder on 2026-09-26
@@ -32,26 +32,37 @@ internal static class HttpRequestOptionsMapping
     /// Copies the HTTP request options from <paramref name="options" />.
     /// </summary>
     /// <param name="options">The parsed command line.</param>
+    /// <param name="formBody">
+    /// The <c>-F</c> / <c>--form-string</c> body built for this transfer, or <see langword="null" />
+    /// without <c>-F</c>; the parser refuses <c>-F</c> with a <c>-d</c> family body, so at most one is given.
+    /// </param>
     /// <returns>
     /// The options: <see cref="CommandLineOptions.RequestMethod" />,
     /// <see cref="CommandLineOptions.UserAgent" /> and <see cref="CommandLineOptions.Referer" />
     /// verbatim; the <c>-H</c> headers followed by the ones <c>--json</c> adds; and
+    /// <paramref name="formBody" /> when given, otherwise
     /// <see cref="CommandLineOptions.PostData" /> as a <see cref="BytesBody" />, unless
     /// <see cref="CommandLineOptions.DataInQuery" /> moved it into the query; and
     /// <see cref="CommandLineOptions.FailMode" /> as <see cref="HttpRequestOptions.Fail" />; and
     /// <see cref="CommandLineOptions.FollowRedirects" /> as <see cref="HttpRequestOptions.FollowRedirects" />.
     /// </returns>
-    internal static HttpRequestOptions FromCommandLine(CommandLineOptions options) =>
+    internal static HttpRequestOptions FromCommandLine(CommandLineOptions options, HttpRequestBody? formBody = null) =>
         new()
         {
             CustomMethod = options.RequestMethod,
             Headers = HeadersOf(options),
             UserAgent = options.UserAgent,
             Referer = options.Referer,
-            Body = options.PostData is { } data && !options.DataInQuery ? new BytesBody(data, FormUrlEncoded) : null,
+            Body = formBody ?? PostDataBodyOf(options),
             Fail = options.FailMode,
             FollowRedirects = options.FollowRedirects,
         };
+
+    /// <summary>
+    /// The <c>-d</c> family body, or <see langword="null" /> when there is none or <c>-G</c> moved it into the query.
+    /// </summary>
+    private static BytesBody? PostDataBodyOf(CommandLineOptions options) =>
+        options.PostData is { } data && !options.DataInQuery ? new BytesBody(data, FormUrlEncoded) : null;
 
     /// <summary>
     /// The <c>-H</c> headers, then the <c>--json</c> ones no <c>-H</c> header already names.
