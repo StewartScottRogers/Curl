@@ -379,6 +379,91 @@ public sealed class CommandLineTlsOptionTests
             result.WarningLines.ToArray());
     }
 
+    [TestMethod]
+    public void Parse_NoProxyTlsOptions_LeavesThemNotGiven()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["-k", "--cacert", "ca.pem", "--capath", "certs", Url], EveryPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsFalse(result.Options.ProxyInsecure);
+        Assert.IsNull(result.Options.ProxyCaCertificateFile);
+        Assert.IsNull(result.Options.ProxyCaCertificateDirectory);
+    }
+
+    [TestMethod]
+    public void Parse_ProxyInsecure_SetsProxyInsecureOnly()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--proxy-insecure", Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsTrue(result.Options.ProxyInsecure);
+        Assert.IsFalse(result.Options.Insecure);
+    }
+
+    [TestMethod]
+    public void Parse_ProxyInsecureThenNoProxyInsecure_VerifiesTheProxy()
+    {
+        // curl -s -S --proxy-insecure --no-proxy-insecure -x https://localhost:18462 https://example.com/
+        // against a self-signed proxy -> exit 60, as without either (curl 8.21.0, 2026-09-27).
+        CommandLineParseResult result = CommandLineParser.Parse(["--proxy-insecure", "--no-proxy-insecure", Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsFalse(result.Options.ProxyInsecure);
+    }
+
+    [TestMethod]
+    public void Parse_ProxyCacertThatExists_RecordsProxyCaCertificateFileOnly()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--proxy-cacert", "proxy.pem", Url], EveryPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual("proxy.pem", result.Options.ProxyCaCertificateFile);
+        Assert.IsNull(result.Options.CaCertificateFile);
+    }
+
+    [TestMethod]
+    [DataRow("nosuch.pem")]
+    [DataRow("")]
+    public void Parse_ProxyCacertThatDoesNotExist_RefusesNamingProxyCacert(string file)
+    {
+        // curl --proxy-cacert nosuch.pem -x http://127.0.0.1:1 http://127.0.0.1:1/ (and '') -> exit 2 (curl 8.21.0, 2026-09-27).
+        CommandLineParseResult result = CommandLineParser.Parse(["--proxy-cacert", file, Url], NoPathExists);
+
+        AssertRefused(
+            result,
+            $"curl: The file '{file}' provided to --proxy-cacert does not exist",
+            "curl: option --proxy-cacert: is badly used here");
+    }
+
+    [TestMethod]
+    public void Parse_ProxyCapath_RecordsProxyCaCertificateDirectoryOnly()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--proxy-capath", "certs", Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual("certs", result.Options.ProxyCaCertificateDirectory);
+        Assert.IsNull(result.Options.CaCertificateDirectory);
+    }
+
+    [TestMethod]
+    public void Parse_EmptyProxyCapath_RefusesAsBlank()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--proxy-capath", "", Url], NoPathExists);
+
+        AssertRefused(result, "curl: option --proxy-capath: blank argument where content is expected");
+    }
+
+    [TestMethod]
+    public void Parse_ProxyCapathGivenFlagLikeValue_AcceptsWithFileNameWarning()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--proxy-capath", "-x", Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        CollectionAssert.AreEqual(
+            new[] { "Warning: The filename argument '-x' looks like a flag." },
+            result.WarningLines.ToArray());
+    }
+
     private static void AssertRefused(CommandLineParseResult result, params string[] expectedLinesBeforeTryHelp)
     {
         Assert.IsFalse(result.IsAccepted);

@@ -31,7 +31,7 @@ namespace Curl.Cli;
 /// <para>
 /// <c>--no-</c> negation, measured with the local curl 8.21.0 on 2026-09-26
 /// (<c>curl &lt;arguments&gt; http://127.0.0.1:1/</c>, reading standard error and the exit code):
-/// <c>--no-silent</c>, <c>--no-show-error</c>, <c>--no-insecure</c>, <c>--no-tftp-no-options</c>, <c>--no-remote-time</c>,
+/// <c>--no-silent</c>, <c>--no-show-error</c>, <c>--no-insecure</c>, <c>--no-proxy-insecure</c>, <c>--no-tftp-no-options</c>, <c>--no-remote-time</c>,
 /// <c>--no-progress-meter</c>, <c>--no-progress-bar</c>, <c>--no-get</c>, <c>--no-location</c>, <c>--no-location-trusted</c>,
 /// <c>--no-post301</c>, <c>--no-post302</c>, <c>--no-post303</c>, <c>--no-show-headers</c>, <c>--no-include</c>, <c>--no-head</c>,
 /// <c>--no-fail</c>, <c>--no-fail-with-body</c>, <c>--no-fail-early</c>, <c>--no-compressed</c>, <c>--no-raw</c>, <c>--no-tr-encoding</c>,
@@ -110,8 +110,11 @@ public static class CommandLineOptionTable
         CommandLineOption.Value("create-file-mode", null, SetCreateFileMode),
         CommandLineOption.NegatableFlag("insecure", 'k', (options, on) => options.Insecure = on),
         CommandLineOption.NegatableFlag("ssl-no-revoke", null, (options, on) => options.SkipRevocationCheck = on),
-        CommandLineOption.Value("cacert", null, SetCaCertificateFile),
+        CommandLineOption.Value("cacert", null, SettingCaCertificateFile("--cacert", (options, file) => options.CaCertificateFile = file)),
         CommandLineOption.FileName("capath", null, (options, directory) => options.CaCertificateDirectory = directory),
+        CommandLineOption.NegatableFlag("proxy-insecure", null, (options, on) => options.ProxyInsecure = on),
+        CommandLineOption.Value("proxy-cacert", null, SettingCaCertificateFile("--proxy-cacert", (options, file) => options.ProxyCaCertificateFile = file)),
+        CommandLineOption.FileName("proxy-capath", null, (options, directory) => options.ProxyCaCertificateDirectory = directory),
         CommandLineOption.FileName("cert", 'E', (options, certificate) => options.ClientCertificate = certificate),
         CommandLineOption.FileName("key", null, (options, key) => options.PrivateKey = key),
         CommandLineOption.Text("cert-type", null, (options, type) => options.ClientCertificateType = type),
@@ -541,22 +544,27 @@ public static class CommandLineOptionTable
     }
 
     /// <summary>
-    /// Records a <c>--cacert</c> value when a file or directory exists at it, and otherwise refuses
-    /// it with curl 8.21.0's three lines. An empty value is checked like any other, so it is refused
-    /// as a missing file, not as blank. A directory passes here; curl fails it later, at handshake.
-    /// A value that looks like a flag gets curl's filename warning first, whether or not it exists.
+    /// Records a <c>--cacert</c> or <c>--proxy-cacert</c> value through <paramref name="set"/> when a
+    /// file or directory exists at it, and otherwise refuses it with curl 8.21.0's three lines, which
+    /// name <paramref name="longOption"/> (measured for both). An empty value is checked like any
+    /// other, so it is refused as a missing file, not as blank. A directory passes here; curl fails it
+    /// later, at handshake. A value that looks like a flag gets curl's filename warning first, whether
+    /// or not it exists.
     /// </summary>
-    private static CommandLineRefusal? SetCaCertificateFile(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
-    {
-        CommandLineOption.WarnWhenFileNameLooksLikeFlag(options, value);
-        if (!pathExists(value))
+    /// <param name="longOption">The option as curl names it in the refusal, <c>--cacert</c> or <c>--proxy-cacert</c>.</param>
+    /// <param name="set">Records the accepted file.</param>
+    private static CommandLineOptionApplier SettingCaCertificateFile(string longOption, Action<CommandLineOptions, string> set) =>
+        (options, value, spelledOption, pathExists, _) =>
         {
-            return CommandLineRefusal.FileDoesNotExist(spelledOption, "--cacert", value);
-        }
+            CommandLineOption.WarnWhenFileNameLooksLikeFlag(options, value);
+            if (!pathExists(value))
+            {
+                return CommandLineRefusal.FileDoesNotExist(spelledOption, longOption, value);
+            }
 
-        options.CaCertificateFile = value;
-        return null;
-    }
+            set(options, value);
+            return null;
+        };
 
     /// <summary>
     /// Records a <c>-r</c>/<c>--range</c> value the way curl 8.21.0 keeps it. It is refused when

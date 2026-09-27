@@ -404,6 +404,21 @@ public sealed class CommandLineOptions
     public string? CaCertificateDirectory { get; internal set; }
 
     /// <summary>
+    /// <see langword="true"/> when <c>--proxy-insecure</c> was given and no <c>--no-proxy-insecure</c> came
+    /// after it: skip verification of an HTTPS proxy's certificate. <c>-k</c> never reaches the proxy.
+    /// </summary>
+    public bool ProxyInsecure { get; internal set; }
+
+    /// <summary>
+    /// The <c>--proxy-cacert</c> file, verbatim, checked as <c>--cacert</c> is; <see langword="null"/> when
+    /// not given. It verifies an HTTPS proxy only, and <c>--cacert</c> never does. The last value wins.
+    /// </summary>
+    public string? ProxyCaCertificateFile { get; internal set; }
+
+    /// <summary>The <c>--proxy-capath</c> directory, verbatim and unchecked; <see langword="null"/> when not given. The last value wins.</summary>
+    public string? ProxyCaCertificateDirectory { get; internal set; }
+
+    /// <summary>
     /// The <c>-E</c> / <c>--cert</c> value, verbatim, with <c>certificate[:password]</c> not yet split;
     /// <see langword="null"/> when not given. The last value wins.
     /// </summary>
