@@ -39,3 +39,4 @@ The HTTP handler sends Range for `ByteRange`/`ResumeFrom`, If-Modified-Since/If-
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
