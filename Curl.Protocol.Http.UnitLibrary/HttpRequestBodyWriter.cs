@@ -17,7 +17,9 @@ namespace Curl.Protocol.Http;
 /// is read in the same pieces curl reads it in (measured, BL-184 Notes). A stream of known
 /// length is read up to that length and no further; if a read fails or the stream ends
 /// first, the transfer ends with exit 26. A stream of unknown length ends at its end or at
-/// its first failed read, as curl's body reader treats both. Under
+/// its first failed read, as curl's body reader treats both. A read that throws
+/// <see cref="RequestBodyReadFailedException" /> is the exception: it fails the transfer with
+/// exit 26 and the exception's message, and a chunked body gets no closing chunk. Under
 /// <see cref="ExpectationWatch" /> every piece, a <see cref="BytesBody" /> cut into the same
 /// buffer-sized pieces, is raced against a <c>417</c>, and sending stops at the first piece the
 /// <c>417</c> beats (<see cref="CutShort" />, measured, BL-319 Notes).
@@ -110,7 +112,8 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     /// <returns>A task that completes when the body has been written.</returns>
     /// <exception cref="HttpTransferException">
     /// A stream of known length failed a read or ended before its length was read (exit 26),
-    /// or the connection failed a write (exit 55).
+    /// a read threw <see cref="RequestBodyReadFailedException" /> (exit 26), or the connection
+    /// failed a write (exit 55).
     /// </exception>
     internal async ValueTask WriteAsync(HttpRequestBody body, bool isChunked, CancellationToken cancellationToken)
     {
@@ -237,13 +240,20 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
 
     /// <summary>
     /// Reads from the body stream, taking a failed read as the end of the stream, as curl
-    /// does.
+    /// does, except a <see cref="RequestBodyReadFailedException" />, which fails the transfer
+    /// with exit 26 and its message, as curl fails a multipart part its encoder refuses
+    /// (measured, BL-385 Notes).
     /// </summary>
+    /// <exception cref="HttpTransferException">The read threw a <see cref="RequestBodyReadFailedException" />.</exception>
     private static async ValueTask<int> ReadAsync(Stream stream, Memory<byte> buffer, CancellationToken cancellationToken)
     {
         try
         {
             return await stream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+        }
+        catch (RequestBodyReadFailedException failed)
+        {
+            throw new HttpTransferException(CurlExitCode.ReadError, failed.Message);
         }
         catch (IOException)
         {
