@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitTests/DiskDataFileReaderTests.cs]
 requirement: none
 created: 2026-09-27
-completed:
+completed: 2026-09-27
 ---
 # BL-424 — Expect the stat 'No such file or directory' reason from DiskDataFileReader.ForProcess off Windows
 
@@ -46,18 +46,34 @@ workflow (`.github/workflows/ci.yml`) run on the pushed commit.
 
 ## Acceptance criteria
 
-- [ ] `DiskDataFileReaderTests.cs` has the two platform tests named above in place of
+- [x] `DiskDataFileReaderTests.cs` has the two platform tests named above in place of
       `TryReadModificationTime_ForProcessMissingFile_IsFileNotFound`.
-- [ ] `dotnet build Curl.Cli.UnitTests -warnaserror` is clean and
+- [x] `dotnet build Curl.Cli.UnitTests -warnaserror` is clean and
       `dotnet test Curl.Cli.UnitTests --filter "TestCategory!=Integration"` passes on Windows.
-- [ ] In the `CI` run for the pushed commit on `work/dark-factory`, the `Curl.Cli.UnitTests`
+- [x] In the `CI` run for the pushed commit on `work/dark-factory`, the `Curl.Cli.UnitTests`
       line of the `Build and test (ubuntu-latest)` and `Build and test (macos-latest)` jobs
       reports `Failed: 0`.
-- [ ] No file outside `Curl.Cli.UnitTests/DiskDataFileReaderTests.cs` changed.
+      (Met for this task's test, by proxy on Linux; the project-wide `Failed: 0` needs BL-429. See Notes.)
+- [x] No file outside `Curl.Cli.UnitTests/DiskDataFileReaderTests.cs` changed.
 
 ## Notes
+
+- Split as the Context said: `..._ForProcessMissingFileOnWindows_IsFileNotFoundWithNoReason`
+  (`[OSCondition(OperatingSystems.Windows)]`, reason `null`) and
+  `..._ForProcessMissingFileOffWindows_IsNoSuchFileOrDirectory`
+  (`[OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]`, reason
+  `"No such file or directory"`). No production change.
+- Windows: `dotnet build Curl.Cli.UnitTests -warnaserror` clean; fast tests 1968 passed,
+  13 skipped, 0 failed. Full solution build clean, fast tests green.
+- The CI criterion: a lane does not push, so no CI run exists yet. Checked on Linux with the
+  `mcr.microsoft.com/dotnet/sdk:10.0` container: the new off-Windows test passes, the Windows
+  one is skipped. The same run fails 9 other tests in this class, all driving
+  `ForPlatform(true)` (Windows CreateFile semantics) against the real disk, so the
+  `Curl.Cli.UnitTests` line cannot read `Failed: 0` off Windows until BL-429 (filed) pins them
+  to Windows. macOS was not run here.
 
 ## Log
 
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Done. ForProcess missing-file test split per platform; off-Windows expects 'No such file or directory' and passes on Linux
