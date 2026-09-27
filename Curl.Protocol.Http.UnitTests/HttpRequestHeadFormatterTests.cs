@@ -293,6 +293,24 @@ public sealed class HttpRequestHeadFormatterTests
             Encoding.Latin1.GetString(head));
     }
 
+    /// <summary>
+    /// Measured (BL-181 Notes): <c>curl -u u:p</c> sends <c>Authorization</c> straight after
+    /// <c>Host</c>, a custom <c>Host</c> included, and an <c>-H Authorization</c> value
+    /// replaces it in the custom headers' place.
+    /// </summary>
+    [TestMethod]
+    [DataRow(null, "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18181\r\nAuthorization: Basic dTpw\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n", DisplayName = "-u u:p")]
+    [DataRow("Host: h", "GET /a HTTP/1.1\r\nHost: h\r\nAuthorization: Basic dTpw\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n", DisplayName = "-u u:p -H Host")]
+    [DataRow("Authorization: X y", "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18181\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nAuthorization: X y\r\n\r\n", DisplayName = "-u u:p -H Authorization")]
+    public void Format_Authorization_SendsItAfterHost(string? header, string expected)
+    {
+        HttpRequestOptions options = new() { Headers = header is null ? [] : [header] };
+
+        byte[] head = HttpRequestHeadFormatter.Format(new Uri("http://127.0.0.1:18181/a"), options, authorization: "Basic dTpw");
+
+        Assert.AreEqual(expected, Encoding.Latin1.GetString(head));
+    }
+
     private static void AssertHead(string expected, Uri url, HttpRequestOptions? options)
     {
         Assert.AreEqual(expected, Encoding.Latin1.GetString(HttpRequestHeadFormatter.Format(url, options)));

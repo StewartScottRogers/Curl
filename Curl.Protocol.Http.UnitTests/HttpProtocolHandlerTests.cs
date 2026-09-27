@@ -12,7 +12,7 @@ namespace Curl.Protocol.Http;
 /// replayed with 1-byte reads and with one read, and must come out the same.
 /// </summary>
 [TestClass]
-public sealed class HttpProtocolHandlerTests
+public sealed partial class HttpProtocolHandlerTests
 {
     private const string RootRequest = "GET / HTTP/1.1\r\nHost: example.com\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
 

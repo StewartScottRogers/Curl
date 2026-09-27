@@ -8,11 +8,11 @@ namespace Curl.Protocol.Http;
 /// <summary>
 /// Formats the head of an HTTP/1.1 request - the request line, the headers and the empty
 /// line after them - byte for byte as curl 8.21.0 sends it for <c>-X</c>, <c>-H</c>,
-/// <c>-A</c>, <c>-e</c>, <c>-I</c>, <c>--compressed</c> and a request body. Every rule was
-/// measured (BL-172, BL-175 and BL-177 Notes).
+/// <c>-A</c>, <c>-e</c>, <c>-I</c>, <c>--compressed</c>, an <c>Authorization</c> value and a
+/// request body. Every rule was measured (BL-172, BL-175, BL-177 and BL-181 Notes).
 /// </summary>
 /// <remarks>
-/// curl's own headers come first, in the order <c>Host</c>, <c>User-Agent</c>,
+/// curl's own headers come first, in the order <c>Host</c>, <c>Authorization</c>, <c>User-Agent</c>,
 /// <c>Accept</c>, <c>Accept-Encoding</c> (for <c>--compressed</c>), <c>Referer</c>, each
 /// left out when an <c>-H</c> value names it; the <c>-H</c> values follow in command-line
 /// order. A custom <c>Host</c> is the exception: it takes the <c>Host</c> slot. A request with a body ends with <c>Content-Length</c> (or
@@ -48,8 +48,12 @@ internal static class HttpRequestHeadFormatter
     /// <see langword="true" /> for <c>-I</c>/<c>--head</c>, which sends HEAD unless
     /// <c>-X</c> names another method.
     /// </param>
+    /// <param name="authorization">
+    /// The <c>Authorization</c> value the authenticator gave, or <see langword="null" /> to
+    /// send none.
+    /// </param>
     /// <returns>The head's bytes, ending in the empty line.</returns>
-    internal static byte[] Format(Uri url, HttpRequestOptions? options, bool noBody = false)
+    internal static byte[] Format(Uri url, HttpRequestOptions? options, bool noBody = false, string? authorization = null)
     {
         options ??= new HttpRequestOptions();
         HttpCustomHeader[] customHeaders = [.. options.Headers.Select(HttpCustomHeader.Parse)];
@@ -62,6 +66,7 @@ internal static class HttpRequestHeadFormatter
             head.Append(hostLine).Append("\r\n");
         }
 
+        AppendUnlessOverridden(head, customHeaders, "Authorization", authorization);
         AppendUnlessOverridden(head, customHeaders, "User-Agent", options.UserAgent ?? DefaultUserAgent);
         AppendUnlessOverridden(head, customHeaders, "Accept", "*/*");
         AppendUnlessOverridden(head, customHeaders, "Accept-Encoding", options.Compressed ? AcceptEncoding : null);

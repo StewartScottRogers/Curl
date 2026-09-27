@@ -16,8 +16,8 @@ namespace Curl.Protocol.Http;
 /// <see cref="ConnectTarget.UseTls" />; the handler does no TLS of its own (ADR-0005).
 /// </param>
 /// <param name="authenticator">
-/// Answers authentication challenges. Held for the authentication task (BL-181); this
-/// handler sends no <c>Authorization</c> header of its own yet.
+/// Gives the <c>Authorization</c> value each request is sent with, before any response and
+/// in answer to a 401's <c>WWW-Authenticate</c> challenges.
 /// </param>
 /// <param name="cookieStore">
 /// The cookies to send and store, or <see langword="null" /> when cookies are off. Held for
@@ -63,6 +63,16 @@ namespace Curl.Protocol.Http;
 /// (ADR-0020) and, unless <see cref="HttpRequestOptions.Raw" /> is set, decodes the body as
 /// its Content-Encoding says (<see cref="HttpContentDecoder" />, BL-177 Notes).
 /// </para>
+/// <para>
+/// The first request carries the authenticator's answer to no challenge, placed after
+/// <c>Host</c> (<c>Basic dTpw</c> for <c>-u u:p</c>). A 401 to a request that carried none
+/// is answered once more when the authenticator answers its challenges and the body, if any,
+/// is bytes that can be sent again: the 401's head and trailers are written, its body is read
+/// and discarded, and the retry goes out on the same connection unless the 401 closes it
+/// (<see cref="HttpConnectionPersistence" />), in which case on a new one. A 401 that is not
+/// retried is the result, exit 0, or exit 22 under <c>-f</c>; the 401 a retry answers never
+/// fails the transfer. Measured on curl 8.21.0 (BL-181 Notes, ADR-0032).
+/// </para>
 /// </remarks>
 public sealed class HttpProtocolHandler(
     IConnector connector,
@@ -96,17 +106,18 @@ public sealed class HttpProtocolHandler(
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        ConnectResult connect = await connector.ConnectAsync(TargetOf(context.Url), context.CancellationToken)
-            .ConfigureAwait(false);
-        if (connect.Connection is not { } connection)
-        {
-            return TransferResult.Failure(connect.ExitCode, connect.ErrorMessage!);
-        }
-
-        await using (connection.ConfigureAwait(false))
-        {
-            return await ExchangeAsync(context, connect, connection).ConfigureAwait(false);
-        }
+        HttpRequestOptions options = context.Http ?? new HttpRequestOptions();
+        HttpRequestFraming framing = HttpRequestFraming.Of(options, [.. options.Headers.Select(HttpCustomHeader.Parse)], context.NoBody);
+        HttpAuthRequest authRequest = new(
+            framing.Method,
+            context.Url,
+            context.Url.PathAndQuery,
+            context.Credentials,
+            options.BearerToken,
+            options.AuthSchemes,
+            IsProxy: false);
+        HttpRequestPlan plan = new(context, options, framing, authRequest, Authenticator.CreateAuthorization(authRequest, []));
+        return await ConnectAndExchangeAsync(plan, earlier: null).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -117,56 +128,136 @@ public sealed class HttpProtocolHandler(
         new(url.DnsSafeHost, url.Port, string.Equals(url.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
-    /// Sends the request on <paramref name="connection" /> and reads the response into the
-    /// transfer's outputs.
+    /// Opens a connection and sends <paramref name="plan" /> on it, then its authentication
+    /// retry if the response asks for one: on the same connection when it stays open, or on
+    /// a new one when it closes.
     /// </summary>
-    private static async ValueTask<TransferResult> ExchangeAsync(
-        ITransferContext context,
-        ConnectResult connect,
-        IConnection connection)
+    /// <param name="plan">The request to send.</param>
+    /// <param name="earlier">
+    /// The report of the exchange that was answered with a 401, or <see langword="null" />
+    /// for the first.
+    /// </param>
+    private async ValueTask<TransferResult> ConnectAndExchangeAsync(HttpRequestPlan plan, TransferReport? earlier)
     {
+        ITransferContext context = plan.Context;
+        ConnectResult connect = await connector.ConnectAsync(TargetOf(context.Url), context.CancellationToken)
+            .ConfigureAwait(false);
+        if (connect.Connection is not { } connection)
+        {
+            return TransferResult.Failure(connect.ExitCode, connect.ErrorMessage!);
+        }
+
+        HttpAttemptOutcome outcome;
+        await using (connection.ConfigureAwait(false))
+        {
+            outcome = await ExchangeAsync(plan, connect, connection, earlier, newConnection: true).ConfigureAwait(false);
+            if (outcome.RetryAuthorization is { } authorization && outcome.KeepsAlive)
+            {
+                HttpRequestPlan retry = plan.WithAuthorization(authorization);
+                outcome = await ExchangeAsync(retry, connect, connection, outcome.Result.Report, newConnection: false).ConfigureAwait(false);
+            }
+        }
+
+        return outcome.RetryAuthorization is { } reconnectAuthorization
+            ? await ConnectAndExchangeAsync(plan.WithAuthorization(reconnectAuthorization), outcome.Result.Report).ConfigureAwait(false)
+            : outcome.Result;
+    }
+
+    /// <summary>
+    /// Sends the request on <paramref name="connection" /> and reads the response into the
+    /// transfer's outputs; or, when the response is a 401 this handler retries, writes its
+    /// head and trailers, reads and discards its body, and returns the retry's
+    /// <c>Authorization</c> value.
+    /// </summary>
+    private async ValueTask<HttpAttemptOutcome> ExchangeAsync(
+        HttpRequestPlan plan,
+        ConnectResult connect,
+        IConnection connection,
+        TransferReport? earlier,
+        bool newConnection)
+    {
+        ITransferContext context = plan.Context;
+        HttpRequestOptions options = plan.Options;
+        HttpRequestFraming framing = plan.Framing;
         CancellationToken cancellationToken = context.CancellationToken;
-        HttpRequestOptions options = context.Http ?? new HttpRequestOptions();
-        HttpRequestFraming framing = HttpRequestFraming.Of(options, [.. options.Headers.Select(HttpCustomHeader.Parse)], context.NoBody);
-        byte[] request = HttpRequestHeadFormatter.Format(context.Url, options, context.NoBody);
+        byte[] request = HttpRequestHeadFormatter.Format(context.Url, options, context.NoBody, plan.Authorization);
         await connection.WriteAsync(request, cancellationToken).ConfigureAwait(false);
         await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
 
         HttpRequestBodyWriter upload = new(connection);
-        HttpExchange exchange = new(connect, connection, framing.Method, request.Length, upload);
+        HttpExchange exchange = new(connect, connection, framing.Method, request.Length, upload, earlier, newConnection);
         IConnection responseConnection = framing.AwaitsContinue ? new HttpContinueWaitConnection(connection) : connection;
         HttpResponseBodyReader body = new(responseConnection);
+        string? retryAuthorization = null;
         try
         {
             await SendBodyAsync(context, framing, responseConnection, upload).ConfigureAwait(false);
             exchange.Head = await new HttpResponseHeadReader(responseConnection).ReadAsync(cancellationToken).ConfigureAwait(false);
             exchange.RedirectUrl = HttpRedirectLocation.Find(context.Url, exchange.Head);
             await WriteHeadersAsync(context.HeaderOutput, exchange.Head.HeadBytes, cancellationToken).ConfigureAwait(false);
-            ThrowIfFailing(options.Fail, HttpFailMode.Fail, exchange.Head);
-            bool followsRedirect = options.FollowRedirects && exchange.RedirectUrl is not null;
-            Stream bodyOutput = followsRedirect ? Stream.Null : context.Output;
-            await body.CopyAsync(exchange.Head, context.NoBody, bodyOutput, DecodesContent(options, followsRedirect), cancellationToken)
+            retryAuthorization = RetryAuthorization(plan, exchange.Head);
+            HttpFailMode fail = retryAuthorization is null ? options.Fail : HttpFailMode.None;
+            ThrowIfFailing(fail, HttpFailMode.Fail, exchange.Head);
+            bool discardsBody = retryAuthorization is not null || (options.FollowRedirects && exchange.RedirectUrl is not null);
+            Stream bodyOutput = discardsBody ? Stream.Null : context.Output;
+            await body.CopyAsync(exchange.Head, context.NoBody, bodyOutput, DecodesContent(options, discardsBody), cancellationToken)
                 .ConfigureAwait(false);
             await WriteHeadersAsync(context.HeaderOutput, body.TrailerBytes, cancellationToken).ConfigureAwait(false);
-            ThrowIfFailing(options.Fail, HttpFailMode.FailWithBody, exchange.Head);
+            ThrowIfFailing(fail, HttpFailMode.FailWithBody, exchange.Head);
         }
         catch (HttpTransferException failure)
         {
-            return TransferResult.Failure(failure.ExitCode, failure.Message, body.BytesWritten)
+            TransferResult failed = TransferResult.Failure(failure.ExitCode, failure.Message, body.BytesWritten)
                 with
             { Report = exchange.Report(body.BytesWritten) };
+            return new HttpAttemptOutcome(failed, null, KeepsAlive: false);
         }
 
-        return TransferResult.Success(body.BytesWritten) with { Report = exchange.Report(body.BytesWritten) };
+        TransferResult result = TransferResult.Success(body.BytesWritten) with { Report = exchange.Report(body.BytesWritten) };
+        return new HttpAttemptOutcome(result, retryAuthorization, HttpConnectionPersistence.KeepsAlive(exchange.Head, context.NoBody));
     }
 
     /// <summary>
-    /// Decides whether the body is decoded: for <c>--compressed</c> without <c>--raw</c>, and
-    /// not for a 3xx body that <c>-L</c> reads and discards, which curl 8.21.0 does not
-    /// decode (measured, BL-177 Notes).
+    /// Decides whether a response is answered with one more request, and with what
+    /// <c>Authorization</c> value: only a 401, only when the request that drew it sent none
+    /// (a credential sent up front and refused ends the transfer, as in curl 8.21.0), only
+    /// when its body can be sent again, and only when the authenticator answers the
+    /// response's <c>WWW-Authenticate</c> challenges.
     /// </summary>
-    private static bool DecodesContent(HttpRequestOptions options, bool followsRedirect) =>
-        options.Compressed && !options.Raw && !followsRedirect;
+    private string? RetryAuthorization(HttpRequestPlan plan, HttpResponseHead head)
+    {
+        if (!MayRetry(plan, head))
+        {
+            return null;
+        }
+
+        string[] challenges = ChallengesOf(head);
+        return challenges.Length == 0 ? null : Authenticator.CreateAuthorization(plan.AuthRequest, challenges);
+    }
+
+    /// <summary>
+    /// Decides whether <paramref name="head" /> may be answered with a retry at all: a 401 to
+    /// a request that sent no <c>Authorization</c> and whose body is not a stream.
+    /// </summary>
+    private static bool MayRetry(HttpRequestPlan plan, HttpResponseHead head) =>
+        plan.Authorization is null && head.StatusLine.StatusCode == 401 && plan.Framing.Body is not StreamBody;
+
+    /// <summary>
+    /// Gets the <c>WWW-Authenticate</c> values of <paramref name="head" />, in order.
+    /// </summary>
+    private static string[] ChallengesOf(HttpResponseHead head) =>
+        [.. head.Headers
+            .Where(header => string.Equals(header.Name, "WWW-Authenticate", StringComparison.OrdinalIgnoreCase))
+            .Select(header => header.Value)];
+
+    /// <summary>
+    /// Decides whether the body is decoded: for <c>--compressed</c> without <c>--raw</c>, and
+    /// not for a body that is read and discarded - a 3xx body <c>-L</c> follows past, which
+    /// curl 8.21.0 does not decode (measured, BL-177 Notes), or a 401 body an authentication
+    /// retry follows.
+    /// </summary>
+    private static bool DecodesContent(HttpRequestOptions options, bool discardsBody) =>
+        options.Compressed && !options.Raw && !discardsBody;
 
     /// <summary>
     /// Sends the request body, if there is one: at once, or once
@@ -241,12 +332,29 @@ public sealed class HttpProtocolHandler(
     /// What one exchange has learned so far, turned into a <see cref="TransferReport" /> when
     /// the transfer ends, successfully or not.
     /// </summary>
+    /// <param name="connect">The connect that opened the connection.</param>
+    /// <param name="connection">The connection the exchange runs on.</param>
+    /// <param name="method">The request's method.</param>
+    /// <param name="headSize">The request head's size in bytes.</param>
+    /// <param name="upload">The writer that sends the request body.</param>
+    /// <param name="earlier">
+    /// The report of the exchange an authentication retry answers, whose request and header
+    /// sizes and connections this one's report adds to, as curl 8.21.0's
+    /// <c>%{size_request}</c>, <c>%{size_header}</c> and <c>%{num_connects}</c> do (BL-181
+    /// Notes); <see langword="null" /> for the first exchange.
+    /// </param>
+    /// <param name="newConnection">
+    /// <see langword="true" /> when this exchange opened its connection, rather than reusing
+    /// the one <paramref name="earlier" /> used.
+    /// </param>
     private sealed class HttpExchange(
         ConnectResult connect,
         IConnection connection,
         string method,
         int headSize,
-        HttpRequestBodyWriter upload)
+        HttpRequestBodyWriter upload,
+        TransferReport? earlier,
+        bool newConnection)
     {
         /// <summary>
         /// Gets or sets the final response head, <see langword="null" /> until it is read.
@@ -271,10 +379,11 @@ public sealed class HttpProtocolHandler(
             TransferReport report = new()
             {
                 Method = method,
-                RequestSize = headSize + upload.BytesWritten,
+                RequestSize = (earlier?.RequestSize ?? 0) + headSize + upload.BytesWritten,
                 UploadSize = upload.BytesWritten,
                 DownloadSize = downloadSize,
-                ConnectionCount = 1,
+                HeaderSize = earlier?.HeaderSize ?? 0,
+                ConnectionCount = (earlier?.ConnectionCount ?? 0) + (newConnection ? 1 : 0),
                 ProxyConnectResponseCode = connect.ProxyConnectResponseCode,
                 LocalEndPoint = connect.LocalEndPoint,
                 RemoteEndPoint = connection.RemoteEndPoint as IPEndPoint,
@@ -289,10 +398,82 @@ public sealed class HttpProtocolHandler(
                 HttpVersion = head.StatusLine.Version,
                 ResponseHeaders = [.. head.Headers.Select(header => KeyValuePair.Create(header.Name, header.Value))],
                 ContentType = head.Headers.LastOrDefault(IsContentType)?.Value,
-                HeaderSize = head.HeadBytes.Length,
+                HeaderSize = report.HeaderSize + head.HeadBytes.Length,
             };
 
         private static bool IsContentType(HttpResponseHeader header) =>
             string.Equals(header.Name, "Content-Type", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// One request as the handler sends it: the transfer, its options and framing, what the
+    /// authenticator is asked about, and the <c>Authorization</c> value it is sent with.
+    /// </summary>
+    /// <param name="Context">The transfer.</param>
+    /// <param name="Options">The transfer's HTTP options, defaults when it has none.</param>
+    /// <param name="Framing">The request's method and body framing.</param>
+    /// <param name="AuthRequest">The request as the authenticator is asked about it.</param>
+    /// <param name="Authorization">
+    /// The <c>Authorization</c> value to send, or <see langword="null" /> to send none.
+    /// </param>
+    private sealed class HttpRequestPlan(
+        ITransferContext Context,
+        HttpRequestOptions Options,
+        HttpRequestFraming Framing,
+        HttpAuthRequest AuthRequest,
+        string? Authorization)
+    {
+        /// <summary>Gets the transfer.</summary>
+        public ITransferContext Context { get; } = Context;
+
+        /// <summary>Gets the transfer's HTTP options, defaults when it has none.</summary>
+        public HttpRequestOptions Options { get; } = Options;
+
+        /// <summary>Gets the request's method and body framing.</summary>
+        public HttpRequestFraming Framing { get; } = Framing;
+
+        /// <summary>Gets the request as the authenticator is asked about it.</summary>
+        public HttpAuthRequest AuthRequest { get; } = AuthRequest;
+
+        /// <summary>
+        /// Gets the <c>Authorization</c> value to send, or <see langword="null" /> to send none.
+        /// </summary>
+        public string? Authorization { get; } = Authorization;
+
+        /// <summary>
+        /// Makes the same request sent with <paramref name="authorization" /> instead.
+        /// </summary>
+        /// <param name="authorization">The <c>Authorization</c> value the retry is sent with.</param>
+        /// <returns>The retry's plan.</returns>
+        public HttpRequestPlan WithAuthorization(string authorization) =>
+            new(Context, Options, Framing, AuthRequest, authorization);
+    }
+
+    /// <summary>
+    /// How one exchange ended: its result, and whether an authentication retry follows.
+    /// </summary>
+    /// <param name="Result">The result, with the report so far.</param>
+    /// <param name="RetryAuthorization">
+    /// The <c>Authorization</c> value to retry with, or <see langword="null" /> when the
+    /// result is final.
+    /// </param>
+    /// <param name="KeepsAlive">
+    /// <see langword="true" /> when the retry may be sent on the same connection.
+    /// </param>
+    private sealed class HttpAttemptOutcome(TransferResult Result, string? RetryAuthorization, bool KeepsAlive)
+    {
+        /// <summary>Gets the result, with the report so far.</summary>
+        public TransferResult Result { get; } = Result;
+
+        /// <summary>
+        /// Gets the <c>Authorization</c> value to retry with, or <see langword="null" /> when
+        /// the result is final.
+        /// </summary>
+        public string? RetryAuthorization { get; } = RetryAuthorization;
+
+        /// <summary>
+        /// Gets a value indicating whether the retry may be sent on the same connection.
+        /// </summary>
+        public bool KeepsAlive { get; } = KeepsAlive;
     }
 }
