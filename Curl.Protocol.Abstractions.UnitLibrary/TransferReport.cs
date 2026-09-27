@@ -76,8 +76,8 @@ public sealed record TransferReport
     public long HeaderSize { get; init; }
 
     /// <summary>
-    /// Gets the bytes of every request header block sent, body excluded, the source of
-    /// <c>%{size_request}</c>.
+    /// Gets the bytes of every request sent, each request header block and the body bytes
+    /// sent after it, the source of <c>%{size_request}</c>.
     /// </summary>
     public long RequestSize { get; init; }
 
