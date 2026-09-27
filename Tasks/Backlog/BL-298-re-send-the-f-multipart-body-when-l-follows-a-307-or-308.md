@@ -1,5 +1,5 @@
 ---
-id: BL-297
+id: BL-298
 title: Re-send the -F multipart body when -L follows a 307 or 308
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-297 — Re-send the -F multipart body when -L follows a 307 or 308
+# BL-298 — Re-send the -F multipart body when -L follows a 307 or 308
 
 ## Goal
 
