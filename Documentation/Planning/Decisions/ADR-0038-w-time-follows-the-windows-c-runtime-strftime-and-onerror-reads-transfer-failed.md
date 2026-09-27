@@ -2,6 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-09-26
+- **Extended by:** ADR-0078, the glibc dialect for Linux and macOS
 
 Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions").
 
@@ -51,8 +52,7 @@ exited 37.
   per `%time{…}`, as curl reads the clock once per directive.
 - `IWriteOutVariableSource` gains `TransferFailed`; `TransferWriteOutVariables` answers it
   from `TransferResult.IsSuccess`.
-- The glibc dialect the Linux and macOS builds print is not implemented yet; it is filed
-  as its own task.
+- The glibc dialect the Linux and macOS builds print is ADR-0078's.
 
 ## Consequences
 

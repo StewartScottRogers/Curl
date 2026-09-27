@@ -22,7 +22,7 @@ namespace Curl.Output;
 /// directive glibc does not know is copied as it stands, padded to its width and upper
 /// cased under <c>^</c>. <c>%s</c> that curl did not rewrite (<c>%-s</c>, …) reads the UTC
 /// time as local standard time, as glibc's <c>mktime</c> does, and <c>%Z</c> that curl did
-/// not rewrite is <c>GMT</c>. Measured on 2026-09-27; see ADR-0076.
+/// not rewrite is <c>GMT</c>. Measured on 2026-09-27; see ADR-0078.
 /// </para>
 /// </remarks>
 internal static class GlibcTimeFormat

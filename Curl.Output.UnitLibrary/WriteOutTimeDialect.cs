@@ -2,7 +2,7 @@ namespace Curl.Output;
 
 /// <summary>
 /// The C runtime whose <c>strftime</c> a curl build hands <c>-w</c> <c>%time{format}</c> to,
-/// which decides what the format prints (ADR-0038, ADR-0076).
+/// which decides what the format prints (ADR-0038, ADR-0078).
 /// </summary>
 public enum WriteOutTimeDialect
 {
