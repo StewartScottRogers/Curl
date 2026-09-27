@@ -32,3 +32,4 @@ A `417 Expectation Failed` reply to a request that carried `Expect: 100-continue
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
