@@ -47,3 +47,4 @@ names (its `CURLUcode` message) instead of always `Malformed input to a URL func
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
