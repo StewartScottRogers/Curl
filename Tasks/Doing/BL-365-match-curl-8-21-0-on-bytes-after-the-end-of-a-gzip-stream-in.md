@@ -32,3 +32,4 @@ A decoded gzip body (Content-Encoding under `--compressed`, or Transfer-Encoding
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
