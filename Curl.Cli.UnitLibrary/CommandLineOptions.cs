@@ -58,6 +58,53 @@ public sealed class CommandLineOptions
     /// </summary>
     public bool VersionRequested { get; internal set; }
 
+    /// <summary>
+    /// <see langword="true"/> when <c>-h</c> / <c>--help</c> was given on the command line. Parsing stops
+    /// there, as curl 8.21.0's does, so every option after it is unread; the console prints
+    /// <see cref="CurlHelpText"/>'s lines for <see cref="HelpSubject"/> and exits 0 instead of transferring.
+    /// A <c>help</c> line in a <c>-K</c> file does not set it (curl prints the usage page there and carries
+    /// on, which task BL-369 matches).
+    /// </summary>
+    public bool HelpRequested { get; private set; }
+
+    /// <summary>
+    /// The subject <c>--help</c> was given: its attached value, or else the argument after it, whatever
+    /// it looks like; <see langword="null"/> when there was none or it was empty, which asks for the
+    /// usage page. Set only with <see cref="HelpRequested"/>.
+    /// </summary>
+    public string? HelpSubject { get; private set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>-M</c> / <c>--manual</c> was given on the command line and no
+    /// <c>--no-manual</c> came after it. Parsing stops there, as curl 8.21.0's does; the console prints
+    /// <see cref="CurlManual"/>'s lines and exits 0 instead of transferring. A <c>manual</c> line in a
+    /// <c>-K</c> file does not set it: curl ignores it there.
+    /// </summary>
+    public bool ManualRequested { get; internal set; }
+
+    /// <summary>
+    /// Whether an option has asked for information instead of a transfer (<see cref="VersionRequested"/>,
+    /// <see cref="HelpRequested"/> or <see cref="ManualRequested"/>), which ends parsing where it stands.
+    /// </summary>
+    internal bool InformationRequested => VersionRequested || HelpRequested || ManualRequested;
+
+    /// <summary>Records <c>--help</c> and its subject, an empty one read as none.</summary>
+    /// <param name="subject">The subject as given, empty when there was none.</param>
+    internal void RequestHelp(string subject)
+    {
+        HelpRequested = true;
+        HelpSubject = subject.Length == 0 ? null : subject;
+    }
+
+    /// <summary>Forgets any request for information, as curl does for one made in a <c>-K</c> file.</summary>
+    internal void ForgetInformationRequests()
+    {
+        VersionRequested = false;
+        HelpRequested = false;
+        HelpSubject = null;
+        ManualRequested = false;
+    }
+
     /// <summary><see langword="true"/> when <c>-s</c> / <c>--silent</c> was given and no <c>--no-silent</c> came after it.</summary>
     public bool Silent { get; internal set; }
 

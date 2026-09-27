@@ -1,0 +1,59 @@
+http: HTTP and HTTPS protocol
+     --alt-svc <filename>          Enable alt-svc with this cache file
+     --anyauth                     Pick any authentication method
+     --aws-sigv4 <provider1[:prvdr2[:reg[:srv]]]>  AWS V4 signature auth
+     --compressed                  Request compressed response
+ -b, --cookie <data|filename>      Send cookies from string/load from file
+ -c, --cookie-jar <filename>       Save cookies to <filename> after operation
+ -d, --data <data>                 HTTP POST data
+     --data-ascii <data>           HTTP POST ASCII data
+     --data-binary <data>          HTTP POST binary data
+     --data-raw <data>             HTTP POST data, '@' allowed
+     --data-urlencode <data>       HTTP POST data URL encoded
+     --digest                      HTTP Digest Authentication
+     --dump-ca-embed            Write the embedded CA bundle to standard output
+ -D, --dump-header <filename>      Write the received headers to <filename>
+     --etag-compare <file>         Load ETag from file
+     --etag-save <file>            Parse incoming ETag and save to a file
+     --expect100-timeout <seconds>  How long to wait for 100-continue
+ -f, --fail                        Fail fast with no output on HTTP errors
+     --fail-with-body              Fail on HTTP errors but save the body
+     --follow                      Follow redirects per spec
+ -F, --form <name=content>         Specify multipart MIME data
+     --form-escape                 Escape form fields using backslash
+     --form-string <name=string>   Specify multipart MIME data
+ -G, --get                         Put the post data in the URL and use GET
+     --haproxy-clientip <ip>       Set address in HAProxy PROXY
+     --haproxy-protocol            Send HAProxy PROXY protocol v1 header
+ -I, --head                        Show document info only
+ -H, --header <header/@file>       Pass custom header(s) to server
+     --hsts <filename>             Enable HSTS with this cache file
+     --http0.9                     Allow HTTP/0.9 responses
+ -0, --http1.0                     Use HTTP/1.0
+     --http1.1                     Use HTTP/1.1
+     --http2                       Use HTTP/2
+     --http2-prior-knowledge       Use HTTP/2 without HTTP/1.1 Upgrade
+     --http3                       Use HTTP/3
+     --http3-only                  Use HTTP/3 only
+     --ignore-content-length       Ignore the size of the remote resource
+     --json <data>                 HTTP POST JSON
+ -j, --junk-session-cookies        Ignore session cookies read from file
+ -L, --location                    Follow redirects
+     --location-trusted          As --location, but send secrets to other hosts
+     --max-redirs <num>            Maximum number of redirects allowed
+     --negotiate                   Use HTTP Negotiate (SPNEGO) authentication
+     --no-alpn                     Disable the ALPN TLS extension
+     --ntlm                        HTTP NTLM authentication
+     --post301                     Do not switch to GET after a 301 redirect
+     --post302                     Do not switch to GET after a 302 redirect
+     --post303                     Do not switch to GET after a 303 redirect
+     --proxy-http2                 Use HTTP/2 with HTTPS proxy
+     --proxy-http3                 Use HTTP/3 with HTTPS proxy
+ -r, --range <range>               Retrieve only the bytes within RANGE
+     --raw                         Do HTTP raw; no transfer decoding
+ -e, --referer <URL>               Referrer URL
+     --request-target <path>       Specify the target for this request
+ -z, --time-cond <time>            Transfer based on a time condition
+     --tr-encoding                 Request compressed transfer encoding
+     --url-query <data>            Add a URL query part
+ -A, --user-agent <name>           Send User-Agent <name> to server

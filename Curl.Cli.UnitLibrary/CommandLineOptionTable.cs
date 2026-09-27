@@ -158,6 +158,8 @@ public static class CommandLineOptionTable
         CommandLineOption.Value("variable", null, VariableDefinition.Apply),
         CommandLineOption.NegatableFlag("disable", 'q', IgnoreDisable),
         CommandLineOption.NegatableFlag("version", 'V', (options, on) => options.VersionRequested = on),
+        CommandLineOption.Subject("help", 'h', (options, subject) => options.RequestHelp(subject)),
+        CommandLineOption.NegatableFlag("manual", 'M', (options, on) => options.ManualRequested = on),
         CommandLineOption.NegatableFlag("compressed", null, (options, on) => options.Compressed = on),
         CommandLineOption.NegatableFlag("raw", null, (options, on) => options.Raw = on),
         CommandLineOption.NegatableFlag("tr-encoding", null, (options, on) => options.TransferEncoding = on),

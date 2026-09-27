@@ -1,0 +1,25 @@
+ftp: FTP protocol
+ -a, --append                            Append to target file when uploading
+     --crlf                              Convert LF to CRLF in upload
+     --disable-eprt                      Inhibit using EPRT or LPRT
+     --disable-epsv                      Inhibit using EPSV
+ -D, --dump-header <filename>          Write the received headers to <filename>
+     --ftp-account <data>                Account data string
+     --ftp-alternative-to-user <command>  String to replace USER [name]
+     --ftp-create-dirs                   Create the remote dirs if not present
+     --ftp-method <method>               Control CWD usage
+     --ftp-pasv                          Send PASV/EPSV instead of PORT
+ -P, --ftp-port <address>                Send PORT instead of PASV
+     --ftp-pret                          Send PRET before PASV
+     --ftp-skip-pasv-ip                  Skip the IP address for PASV
+     --ftp-ssl-ccc                       Send CCC after authenticating
+     --ftp-ssl-ccc-mode <active/passive>  Set CCC mode
+     --ftp-ssl-control                Require TLS for login, clear for transfer
+ -I, --head                              Show document info only
+     --ignore-content-length             Ignore the size of the remote resource
+ -l, --list-only                         List only mode
+ -Q, --quote <command>                Send command(s) to server before transfer
+ -r, --range <range>                     Retrieve only the bytes within RANGE
+ -X, --request <method>                  Specify request method to use
+ -z, --time-cond <time>                  Transfer based on a time condition
+ -B, --use-ascii                         Use ASCII/text transfer

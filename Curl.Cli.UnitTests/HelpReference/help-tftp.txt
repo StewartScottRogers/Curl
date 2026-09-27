@@ -1,0 +1,4 @@
+tftp: TFTP protocol
+     --tftp-blksize <value>  Set TFTP BLKSIZE option
+     --tftp-no-options       Do not send any TFTP options
+ -B, --use-ascii             Use ASCII/text transfer

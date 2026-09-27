@@ -1,0 +1,65 @@
+tls: TLS/SSL related
+     --ca-native                   Load CA certs from the OS
+     --cacert <file>               CA certificate to verify peer against
+     --capath <dir>                CA directory to verify peer against
+ -E, --cert <certificate[:password]>  Client certificate file and password
+     --cert-status                 Verify server cert status OCSP-staple
+     --cert-type <type>            Certificate type (DER/PEM/ENG/PROV/P12)
+     --ciphers <list>              TLS 1.2 (1.1, 1.0) ciphers to use
+     --crlfile <file>              Certificate Revocation list
+     --curves <list>               (EC) TLS key exchange algorithms to request
+     --doh-cert-status             Verify DoH server cert status OCSP-staple
+     --doh-insecure                Allow insecure DoH server connections
+     --dump-ca-embed            Write the embedded CA bundle to standard output
+     --ech <config>                Configure ECH
+     --engine <name>               Crypto engine to use
+     --ftp-ssl-ccc                 Send CCC after authenticating
+     --ftp-ssl-ccc-mode <active/passive>  Set CCC mode
+     --ftp-ssl-control             Require TLS for login, clear for transfer
+ -k, --insecure                    Allow insecure server connections
+     --key <key>                   Private key filename
+     --key-type <type>             Private key file type (DER/PEM/ENG)
+     --no-alpn                     Disable the ALPN TLS extension
+     --no-sessionid                Disable SSL session-ID reusing
+     --pass <phrase>               Passphrase for the private key
+     --pinnedpubkey <hashes>       Public key to verify peer against
+     --proxy-ca-native             Load CA certs from the OS to verify proxy
+     --proxy-cacert <file>         CA certificates to verify proxy against
+     --proxy-capath <dir>          CA directory to verify proxy against
+     --proxy-cert <cert[:passwd]>  Set client certificate for proxy
+     --proxy-cert-type <type>      Client certificate type for HTTPS proxy
+     --proxy-ciphers <list>        TLS 1.2 (1.1, 1.0) ciphers to use for proxy
+     --proxy-crlfile <file>        Set a CRL list for proxy
+     --proxy-digest                Digest auth with the proxy
+     --proxy-insecure              Skip HTTPS proxy cert verification
+     --proxy-key <key>             Private key for HTTPS proxy
+     --proxy-key-type <type>       Private key file type for proxy
+     --proxy-pass <phrase>         Passphrase for private key for HTTPS proxy
+     --proxy-pinnedpubkey <hashes>  FILE/HASHES public key to verify proxy with
+     --proxy-service-name <name>   SPNEGO proxy service name
+     --proxy-ssl-allow-beast       Allow this security flaw for HTTPS proxy
+     --proxy-ssl-auto-client-cert  Auto client certificate for proxy
+     --proxy-tls13-ciphers <list>  TLS 1.3 proxy cipher suites
+     --proxy-tlsauthtype <type>    TLS authentication type for HTTPS proxy
+     --proxy-tlspassword <string>  TLS password for HTTPS proxy
+     --proxy-tlsuser <name>        TLS username for HTTPS proxy
+     --proxy-tlsv1                 TLSv1 for HTTPS proxy
+     --sigalgs <list>              TLS signature algorithms to use
+     --ssl                         Try enabling TLS
+     --ssl-allow-beast             Allow security flaw to improve interop
+     --ssl-auto-client-cert        Use auto client certificate (Schannel)
+     --ssl-no-revoke               Disable cert revocation checks (Schannel)
+     --ssl-reqd                    Require SSL/TLS
+     --ssl-revoke-best-effort      Ignore missing cert CRL dist points
+     --ssl-sessions <filename>  Load/save SSL session tickets from/to this file
+     --tls-earlydata               Allow use of TLSv1.3 early data (0RTT)
+     --tls-max <VERSION>           Maximum allowed TLS version
+     --tls13-ciphers <list>        TLS 1.3 cipher suites to use
+     --tlsauthtype <type>          TLS authentication type
+     --tlspassword <string>        TLS password
+     --tlsuser <name>              TLS username
+ -1, --tlsv1                       TLSv1.0 or greater
+     --tlsv1.0                     TLSv1.0 or greater
+     --tlsv1.1                     TLSv1.1 or greater
+     --tlsv1.2                     TLSv1.2 or greater
+     --tlsv1.3                     TLSv1.3 or greater

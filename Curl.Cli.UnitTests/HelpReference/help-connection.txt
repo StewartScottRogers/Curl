@@ -1,0 +1,34 @@
+connection: Manage connections
+     --abstract-unix-socket <path>     Connect via abstract Unix domain socket
+     --connect-timeout <seconds>       Maximum time allowed to connect
+     --connect-to <HOST1:PORT1:HOST2:PORT2>  Connect to host2 instead of host1
+ -C, --continue-at <offset>            Resumed transfer offset
+     --happy-eyeballs-timeout-ms <ms>  Time for IPv6 before IPv4
+     --interface <name>                Use network interface
+     --ip-tos <string>                 Set IP Type of Service or Traffic Class
+ -4, --ipv4                            Resolve names to IPv4 addresses
+ -6, --ipv6                            Resolve names to IPv6 addresses
+     --keepalive-cnt <integer>         Maximum number of keepalive probes
+     --keepalive-time <seconds>        Interval time for keepalive probes
+     --limit-rate <speed>              Limit transfer speed to RATE
+     --local-port <range>              Use a local port number within RANGE
+     --max-filesize <bytes>            Maximum file size to download
+ -m, --max-time <seconds>              Maximum time allowed for transfer
+     --mptcp                           Enable Multipath TCP
+     --no-keepalive                    Disable TCP keepalive on the connection
+ -Z, --parallel                        Perform transfers in parallel
+     --parallel-immediate              Do not wait for multiplexing
+     --parallel-max <num>            Maximum concurrency for parallel transfers
+     --parallel-max-host <num>         Maximum connections to a single host
+     --proto <protocols>               Enable/disable PROTOCOLS
+     --proto-default <protocol>       Use PROTOCOL for any URL missing a scheme
+     --proto-redir <protocols>         Enable/disable PROTOCOLS on redirect
+     --rate <max request rate>         Request rate for serial transfers
+ -X, --request <method>                Specify request method to use
+     --resolve <[+]host:port:addr[,addr]...>  Resolve host+port to address
+ -Y, --speed-limit <speed>             Stop transfers slower than this
+ -y, --speed-time <seconds>         Trigger 'speed-limit' abort after this time
+     --tcp-fastopen                    Use TCP Fast Open
+     --tcp-nodelay                     Set TCP_NODELAY
+     --unix-socket <path>              Connect through this Unix domain socket
+     --vlan-priority <priority>        Set VLAN priority

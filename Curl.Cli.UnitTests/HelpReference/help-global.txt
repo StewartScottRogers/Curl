@@ -1,0 +1,18 @@
+global: Global options
+     --fail-early               Fail on first transfer error
+     --libcurl <file>           Generate libcurl code for this command line
+ -Z, --parallel                 Perform transfers in parallel
+     --parallel-immediate       Do not wait for multiplexing
+     --parallel-max <num>       Maximum concurrency for parallel transfers
+     --parallel-max-host <num>  Maximum connections to a single host
+ -#, --progress-bar             Display transfer progress as a bar
+     --rate <max request rate>  Request rate for serial transfers
+ -S, --show-error               Show error even when -s is used
+     --stderr <file>            Where to redirect stderr
+     --styled-output            Enable styled output for HTTP headers
+     --trace <file>             Write a debug trace to FILE
+     --trace-ascii <file>       Like --trace, but without hex output
+     --trace-config <string>    Details to log in trace/verbose output
+     --trace-ids                Transfer + connection ids in verbose output
+     --trace-time               Add time stamps to trace/verbose output
+ -v, --verbose                  Make the operation more talkative

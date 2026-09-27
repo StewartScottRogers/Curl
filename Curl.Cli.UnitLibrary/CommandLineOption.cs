@@ -7,13 +7,14 @@ namespace Curl.Cli;
 /// </summary>
 public sealed class CommandLineOption
 {
-    private CommandLineOption(string longName, char? shortName, bool takesValue, CommandLineOptionApplier apply, CommandLineOptionApplier? negate = null)
+    private CommandLineOption(string longName, char? shortName, bool takesValue, CommandLineOptionApplier apply, CommandLineOptionApplier? negate = null, bool takesSubject = false)
     {
         LongName = longName;
         ShortName = shortName;
         TakesValue = takesValue;
         Apply = apply;
         Negate = negate;
+        TakesSubject = takesSubject;
     }
 
     /// <summary>The long name without its leading <c>--</c>, matched exactly and case-sensitively.</summary>
@@ -24,6 +25,13 @@ public sealed class CommandLineOption
 
     /// <summary><see langword="true"/> when the option takes a value; <see langword="false"/> for a flag.</summary>
     public bool TakesValue { get; }
+
+    /// <summary>
+    /// <see langword="true"/> for a row built with <see cref="Subject"/>: it takes no value of its own
+    /// but reads the attached value, or else the next argument when there is one, as its subject,
+    /// and as the letter of a bundle it counts only when it is the bundle's last letter.
+    /// </summary>
+    public bool TakesSubject { get; }
 
     /// <summary>
     /// Checks the value and sets the option on <see cref="CommandLineOptions"/>, or returns the
@@ -227,5 +235,36 @@ public sealed class CommandLineOption
         ArgumentNullException.ThrowIfNull(apply);
 
         return new CommandLineOption(longName, shortName, takesValue: true, apply);
+    }
+
+    /// <summary>
+    /// Creates a row for an option that is not reversible and reads an optional subject, as curl 8.21.0
+    /// reads <c>-h</c> / <c>--help</c>: the attached value (<c>--help=all</c>), or else the next argument
+    /// when there is one, whatever it looks like (<c>--help -v</c>), or an empty subject when there is
+    /// none. As a letter inside a bundle it counts only when it is the last one: <c>-vh</c> asks for
+    /// help, while <c>-hv</c> is read as nothing at all, the letters after it included (measured
+    /// 2026-09-27: <c>curl -hv</c> reports no URL, and <c>curl -hv &lt;url&gt;</c> transfers without
+    /// <c>-v</c>).
+    /// </summary>
+    /// <param name="longName">The long name without its leading <c>--</c>.</param>
+    /// <param name="shortName">The short letter, or <see langword="null"/> when there is none.</param>
+    /// <param name="set">Records the request and its subject, empty when none was given.</param>
+    /// <returns>The row.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="longName"/> or <paramref name="set"/> is <see langword="null"/>.</exception>
+    public static CommandLineOption Subject(string longName, char? shortName, Action<CommandLineOptions, string> set)
+    {
+        ArgumentNullException.ThrowIfNull(longName);
+        ArgumentNullException.ThrowIfNull(set);
+
+        return new CommandLineOption(
+            longName,
+            shortName,
+            takesValue: false,
+            (options, subject, _, _, _) =>
+            {
+                set(options, subject);
+                return null;
+            },
+            takesSubject: true);
     }
 }

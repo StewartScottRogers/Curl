@@ -1,0 +1,10 @@
+deprecated: Legacy
+     --egd-file <file>     EGD socket path for random data
+     --false-start         Enable TLS False Start
+     --krb <level>         Enable Kerberos with security <level>
+     --metalink            Process given URLs as metalink XML file
+     --no-npn              Disable the NPN TLS extension
+     --ntlm-wb             HTTP NTLM authentication with winbind
+     --random-file <file>  File for reading random data from
+ -2, --sslv2               SSLv2
+ -3, --sslv3               SSLv3

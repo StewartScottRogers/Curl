@@ -1,0 +1,13 @@
+upload: Upload, sending data
+     --create-file-mode <mode>    File mode for created files
+ -d, --data <data>                HTTP POST data
+     --data-ascii <data>          HTTP POST ASCII data
+     --data-binary <data>         HTTP POST binary data
+     --data-raw <data>            HTTP POST data, '@' allowed
+     --data-urlencode <data>      HTTP POST data URL encoded
+ -F, --form <name=content>        Specify multipart MIME data
+     --form-escape                Escape form fields using backslash
+     --form-string <name=string>  Specify multipart MIME data
+     --json <data>                HTTP POST JSON
+ -T, --upload-file <file>         Transfer local FILE to destination
+     --url-query <data>           Add a URL query part

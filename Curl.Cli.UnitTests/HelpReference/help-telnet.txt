@@ -1,0 +1,2 @@
+telnet: TELNET protocol
+ -t, --telnet-option <opt=val>  Set telnet option
