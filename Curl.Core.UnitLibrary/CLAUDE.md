@@ -79,3 +79,13 @@ writes to: as written under `-g`, otherwise substituted and, when the caller pas
 `OperatingSystem.IsWindows()`, sanitized by `WindowsOutputFileNameSanitizer` as curl's
 Windows build does (control characters and `| < > " ? *` become `_`; BL-283). It is not
 yet wired into `Curl.Console` (BL-240).
+
+`IpfsGatewayRewriter` turns an `ipfs://<cid>/<path>` or `ipns://<name>/<path>` URL into the
+gateway URL curl 8.21.0 fetches: gateway from `--ipfs-gateway`, else `IPFS_GATEWAY`, else
+the first line of `$IPFS_PATH/gateway` or `$HOME/.ipfs/gateway` (never `USERPROFILE`). It
+reads the environment and the file only through the two `Func<string, string?>` it is
+constructed with. No gateway is `IpfsGatewayFailure.GatewayDetectionFailed` (exit 37,
+`IPFS automatic gateway detection failed`); an unusable gateway or path is
+`MalformedTargetUrl` (exit 3, `malformed target URL`); both are tool messages, printed as
+`curl: <message>` with no `(<code>)`. It is not yet wired into `Curl.Console` (BL-240), and
+`--ipfs-gateway` is not yet parsed (BL-351).
