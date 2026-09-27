@@ -1,5 +1,5 @@
 ---
-id: BL-414
+id: BL-416
 title: Print curl's '** Resuming transfer from byte position -1' for a -T upload with -C -
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-414 — Print curl's '** Resuming transfer from byte position -1' for a -T upload with -C -
+# BL-416 — Print curl's '** Resuming transfer from byte position -1' for a -T upload with -C -
 
 ## Goal
 

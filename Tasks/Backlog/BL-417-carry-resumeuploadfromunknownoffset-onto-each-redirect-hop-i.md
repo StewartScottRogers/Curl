@@ -1,5 +1,5 @@
 ---
-id: BL-415
+id: BL-417
 title: Carry ResumeUploadFromUnknownOffset onto each redirect hop in RedirectFollower
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-415 — Carry ResumeUploadFromUnknownOffset onto each redirect hop in RedirectFollower
+# BL-417 — Carry ResumeUploadFromUnknownOffset onto each redirect hop in RedirectFollower
 
 ## Goal
 

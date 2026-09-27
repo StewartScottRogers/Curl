@@ -44,11 +44,11 @@ abcdefghij`. No HEAD was sent: curl 8.21.0 turns an upload's `-C -` into offset 
   - `-C - -T f.txt -o out.txt` with a 3-byte out.txt (18352): the same bytes - `-o` plays no part in an upload's `-C -`.
   - `-C - -T empty.txt` (18353): `Content-Range: bytes 0--1/0`, `Content-Length: 0`, no failure.
   - `-C - -T -` (18354, stdin): `Content-Range: bytes 0--2/-1`, chunked, `Expect: 100-continue`.
-  - Every run wrote `** Resuming transfer from byte position -1` to stderr first; filed as BL-414.
+  - Every run wrote `** Resuming transfer from byte position -1` to stderr first; filed as BL-416.
 - Plan (decided, ADR-0087): `ITransferContext.ResumeUploadFromUnknownOffset`, set by `TransferContextFactory` for `-C -` with a `-T` source (extracted to `ResumesUploadFromUnknownOffset` to keep `Create` at complexity 10); `HttpRequestFraming.Of` passes it to `HttpUploadResume.Of`, which sends the whole source with `bytes 0-(L-1)/L` and ignores `ResumeFrom`. Other handlers ignore the flag.
 - `touches` gained `Documentation/Planning/Decisions` for ADR-0087 and the ADR-0057 cross-reference; no task in Doing names it.
 - Coverage: `Curl.Protocol.Abstractions.UnitLibrary` and `Curl.Protocol.Http.UnitLibrary` 0 failing members. `Curl.Console` 0 failing members from this change; the one listed, `DiskWriteOutFileOpener.TryOpen`, predates it and is covered only by `[TestCategory("Integration")]` tests by design (BL-280).
-- Follow-ups: BL-414 (the `-1` resume line on stderr), BL-415 (`RedirectFollower` does not carry the flag to the next hop).
+- Follow-ups: BL-416 (the `-1` resume line on stderr), BL-417 (`RedirectFollower` does not carry the flag to the next hop).
 
 ## Log
 
