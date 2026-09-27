@@ -37,9 +37,6 @@ A dated PSL snapshot is an embedded resource in `Curl.Cookies.UnitLibrary`, with
 
 - 2026-09-26: Created.
 - 2026-09-27: Backlog -> Doing.
-<<<<<<<< HEAD:Tasks/Done/2026-09-27_1215/BL-222-add-the-public-suffix-list-snapshot-and-its-refresh-script-t.md
 - 2026-09-27: Doing -> Backlog. Lane 2 could not integrate: fast tests failed after rebasing onto the other lanes' work. The work is on branch factory/BL-222-lane-2-20260927-011505; start with git cherry-pick --no-commit factory/BL-222-lane-2-20260927-011505 and fix it.
 - 2026-09-27: Backlog -> Doing.
-========
->>>>>>>> origin/master:Tasks/Done/BL-222-add-the-public-suffix-list-snapshot-and-its-refresh-script-t.md
 - 2026-09-27: Doing -> Done. The dated PSL snapshot is embedded in Curl.Cookies with its MPL-2.0 attribution, and Update-PublicSuffixList.ps1 refreshes it
