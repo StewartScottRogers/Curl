@@ -32,3 +32,4 @@ The file:// handler returns a `TransferReport` whose `ResponseHeaders` hold the 
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
