@@ -231,7 +231,7 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
             {
                 ReadOnlyMemory<byte> data = decoder.DecodeNext(bytes, out int consumed);
                 bytes = bytes[consumed..];
-                await WriteAsync(output, data, cancellationToken).ConfigureAwait(false);
+                await WriteChunkDataAsync(output, data, cancellationToken).ConfigureAwait(false);
             }
 
             if (decoder.IsComplete)
@@ -246,6 +246,23 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
             }
 
             bytes = buffer.AsMemory(0, read);
+        }
+    }
+
+    /// <summary>
+    /// Writes one piece of chunk data. Bytes after the end of a decoded coding's stream fail
+    /// with exit 23 and the chunked message, as curl 8.21.0 reports them inside chunks
+    /// (measured, BL-365 Notes); every other failure keeps its own message.
+    /// </summary>
+    private async ValueTask WriteChunkDataAsync(Stream output, ReadOnlyMemory<byte> data, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await WriteAsync(output, data, cancellationToken).ConfigureAwait(false);
+        }
+        catch (HttpTransferException exception) when (exception.Message == HttpTransferMessages.ReceivedDataWriteFailed)
+        {
+            throw new HttpTransferException(exception.ExitCode, HttpTransferMessages.ChunkedStreamReadFailed);
         }
     }
 

@@ -20,6 +20,12 @@ public sealed partial class HttpProtocolHandlerTests
 
     private const string BrotliHello = "0B028068656C6C6F03";
 
+    private const string RawDeflateHello = "CB48CDC9C90700";
+
+    private const string GzipWorld = "1F8B08000000000004002BCF2FCA4901004311773A05000000";
+
+    private const string WriteFailed = "Failed writing received data to disk/application";
+
     private const string GzipOfGzipHello =
         "1F8B0800000000000400" + "93EFE66000011686D31E674F9E6467685B2660C60A1400005D6C48CB19000000";
 
@@ -39,6 +45,7 @@ public sealed partial class HttpProtocolHandlerTests
     [DataRow("HTTP/1.1 200 OK\r\nTransfer-Encoding: identity, identity, identity, identity, chunked\r\n\r\n5\r\nhello\r\n0\r\n\r\n", "hello", DisplayName = "Five codings with chunked")]
     [DataRow("HTTP/1.1 200 OK\r\nContent-Length: 0\r\nTransfer-Encoding: gzip\r\n\r\n", "", DisplayName = "Empty gzip body")]
     [DataRow("HTTP/1.1 200 OK\r\nContent-Length: 0\r\nTransfer-Encoding: foo\r\n\r\n", "", DisplayName = "Empty body with an unknown coding")]
+    [DataRow("HTTP/1.1 200 OK\r\nTransfer-Encoding: deflate\r\n\r\n{raw}XYZ", "hello", DisplayName = "Bytes after a raw deflate stream dropped")]
     public async Task ExecuteAsync_TransferEncoding_SendsTeAndDecodesTheBody(string response, string body)
     {
         foreach (int chunkSize in ChunkSizes)
@@ -76,6 +83,41 @@ public sealed partial class HttpProtocolHandlerTests
             Assert.AreEqual(CurlExitCode.BadContentEncoding, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(message, result.ErrorMessage, $"Chunk size {chunkSize}");
             Assert.AreEqual(0L, output.Length, $"Chunk size {chunkSize}");
+        }
+    }
+
+    /// <summary>
+    /// Measured (BL-365 Notes): bytes after the end of a gzip member, a zlib stream or a Brotli
+    /// stream, a second gzip member included, write the first stream's <c>hello</c> and then fail
+    /// with exit 23, under <c>--tr-encoding</c> as under <c>--compressed</c>; inside chunks the
+    /// message is the chunked one.
+    /// </summary>
+    [TestMethod]
+    [DataRow("HTTP/1.1 200 OK\r\nTransfer-Encoding: gzip\r\n\r\n{gz}XYZ", false, WriteFailed, DisplayName = "TE gzip, then XYZ, to the close")]
+    [DataRow("HTTP/1.1 200 OK\r\nContent-Length: 28\r\nTransfer-Encoding: gzip\r\n\r\n{gz}XYZ", false, WriteFailed, DisplayName = "TE gzip, then XYZ, Content-Length")]
+    [DataRow("HTTP/1.1 200 OK\r\nTransfer-Encoding: gzip\r\n\r\n{gz}{world}", false, WriteFailed, DisplayName = "TE gzip, then a second member")]
+    [DataRow("HTTP/1.1 200 OK\r\nTransfer-Encoding: deflate\r\n\r\n{zlib}XYZ", false, WriteFailed, DisplayName = "TE deflate, then XYZ")]
+    [DataRow("HTTP/1.1 200 OK\r\nTransfer-Encoding: br\r\n\r\n{br}XYZ", false, WriteFailed, DisplayName = "TE br, then XYZ")]
+    [DataRow("HTTP/1.1 200 OK\r\nTransfer-Encoding: gzip, chunked\r\n\r\n1C\r\n{gz}XYZ\r\n0\r\n\r\n", false, "Failed reading the chunked-encoded stream", DisplayName = "TE gzip, chunked, then XYZ")]
+    [DataRow("HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\n\r\n{gz}XYZ", true, WriteFailed, DisplayName = "CE gzip, then XYZ")]
+    [DataRow("HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\n\r\n{gz}{world}", true, WriteFailed, DisplayName = "CE gzip, then a second member")]
+    [DataRow("HTTP/1.1 200 OK\r\nContent-Encoding: deflate\r\n\r\n{zlib}XYZ", true, WriteFailed, DisplayName = "CE deflate, then XYZ")]
+    [DataRow("HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nTransfer-Encoding: chunked\r\n\r\n1C\r\n{gz}XYZ\r\n0\r\n\r\n", true, "Failed reading the chunked-encoded stream", DisplayName = "CE gzip, chunked, then XYZ")]
+    [DataRow("HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nTransfer-Encoding: chunked\r\n\r\n19\r\n{gz}\r\n3\r\nXYZ\r\n0\r\n\r\n", true, "Failed reading the chunked-encoded stream", DisplayName = "CE gzip, chunked, then XYZ in its own chunk")]
+    public async Task ExecuteAsync_DecodedBodyWithBytesAfterItsStream_WritesTheStreamThenFailsWithExit23(string response, bool compressed, string message)
+    {
+        HttpRequestOptions options = new() { TransferEncoding = !compressed, Compressed = compressed };
+        string expected = compressed ? "GET /a HTTP/1.1\r\n" + LoopbackHeaders + "Accept-Encoding: deflate, gzip, br\r\n\r\n" : TrEncodingGet;
+        foreach (int chunkSize in ChunkSizes)
+        {
+            MemoryStream output = new();
+
+            TransferResult result = await Handler(QueueConnector.For(Connection(Encoded(response), chunkSize, expected)))
+                .ExecuteAsync(EncodingContext(output, options));
+
+            Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode, $"Chunk size {chunkSize}");
+            Assert.AreEqual(message, result.ErrorMessage, $"Chunk size {chunkSize}");
+            Assert.AreEqual("hello", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
         }
     }
 
@@ -160,11 +202,14 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     /// <summary>
-    /// Replaces <c>{gz}</c>, <c>{zlib}</c> and <c>{br}</c> with the encoded <c>hello</c> the
-    /// measurement sent, one character per byte.
+    /// Replaces <c>{gz}</c>, <c>{zlib}</c>, <c>{raw}</c> and <c>{br}</c> with the encoded
+    /// <c>hello</c> the measurement sent, and <c>{world}</c> with a gzip member of <c>world</c>,
+    /// one character per byte.
     /// </summary>
     private static string Encoded(string text) =>
         text.Replace("{gz}", Latin1(HttpContentDecoderTests.Bytes(GzipHello)), StringComparison.Ordinal)
+            .Replace("{world}", Latin1(HttpContentDecoderTests.Bytes(GzipWorld)), StringComparison.Ordinal)
+            .Replace("{raw}", Latin1(HttpContentDecoderTests.Bytes(RawDeflateHello)), StringComparison.Ordinal)
             .Replace("{zlib}", Latin1(HttpContentDecoderTests.Bytes(ZlibHello)), StringComparison.Ordinal)
             .Replace("{br}", Latin1(HttpContentDecoderTests.Bytes(BrotliHello)), StringComparison.Ordinal);
 }
