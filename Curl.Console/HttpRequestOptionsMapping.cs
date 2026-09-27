@@ -47,6 +47,7 @@ internal static class HttpRequestOptionsMapping
     /// The options: <see cref="CommandLineOptions.RequestMethod" />,
     /// <see cref="CommandLineOptions.UserAgent" /> and <see cref="CommandLineOptions.Referer" />
     /// verbatim; the <c>-H</c> headers followed by the ones <c>--json</c> adds; and
+    /// <see cref="CommandLineOptions.ProxyHeaders" /> verbatim; and
     /// <paramref name="formBody" /> when given, otherwise
     /// <see cref="CommandLineOptions.PostData" /> as a <see cref="BytesBody" />, unless
     /// <see cref="CommandLineOptions.DataInQuery" /> moved it into the query; and
@@ -68,6 +69,7 @@ internal static class HttpRequestOptionsMapping
         {
             CustomMethod = options.RequestMethod,
             Headers = HeadersOf(options),
+            ProxyHeaders = options.ProxyHeaders,
             UserAgent = options.UserAgent,
             Referer = options.Referer,
             Body = formBody ?? PostDataBodyOf(options),

@@ -124,13 +124,14 @@ public sealed class TransferContextFactoryTests
         using MemoryStream standardInput = new();
         using MemoryStream output = new();
         CommandLineOptions options = Parse(
-            "-X", "PATCH", "-H", "X: 1", "-A", "a/1", "-e", "http://r/", "-d", "a=b", "http://example.com/");
+            "-X", "PATCH", "-H", "X: 1", "--proxy-header", "X-P: 1", "--proxy-header", "X-Q: 2", "-A", "a/1", "-e", "http://r/", "-d", "a=b", "http://example.com/");
 
         TransferContext context = new TransferContextFactory(standardInput)
             .Create(options, CurlUrl.Parse("http://example.com/"), output, null, null, null);
 
         Assert.AreEqual("PATCH", context.Http!.CustomMethod);
         CollectionAssert.AreEqual(new[] { "X: 1" }, context.Http.Headers.ToArray());
+        CollectionAssert.AreEqual(new[] { "X-P: 1", "X-Q: 2" }, context.Http.ProxyHeaders.ToArray());
         Assert.AreEqual("a/1", context.Http.UserAgent);
         Assert.AreEqual("http://r/", context.Http.Referer);
         BytesBody body = (BytesBody)context.Http.Body!;
