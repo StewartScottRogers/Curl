@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using Curl.Protocol.Abstractions;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
@@ -34,13 +35,25 @@ namespace Curl.Core;
 /// <c>Authorization:</c> or <c>Cookie:</c> header, unless <c>--location-trusted</c>.
 /// </para>
 /// <para>
+/// Every hop after the first goes through the proxy <see cref="HopProxySelector" /> chooses for
+/// that hop's own URL, set as both <see cref="ITransferContext.Proxy" /> and
+/// <see cref="HttpRequestOptions.ForwardProxy" />, as curl 8.21.0 chooses again for each hop: a
+/// redirect to a <c>--noproxy</c> host, or from <c>http</c> to <c>https</c> with only
+/// <c>http_proxy</c> set, goes direct (measured, BL-329 Notes). A selector failure ends the
+/// chain with that failure. Without a selector, every hop keeps the first URL's proxy.
+/// </para>
+/// <para>
 /// Every hop after the first carries the chain's start as
 /// <see cref="ITransferContext.OperationStarted" />, so <c>-m</c> limits the whole chain, as
 /// curl's does, rather than each hop (measured, BL-299 Notes).
 /// </para>
 /// </remarks>
 /// <param name="dispatcher">The dispatcher that performs each hop.</param>
-public sealed class RedirectFollower(ProtocolDispatcher dispatcher)
+/// <param name="selectHopProxy">
+/// Chooses the proxy for each hop after the first, or <see langword="null" /> to keep the first
+/// URL's proxy for every hop.
+/// </param>
+public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySelector? selectHopProxy = null)
 {
     private static readonly HashSet<string> SchemesCurlParses = new(
         [
@@ -96,18 +109,62 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher)
                 return chain.Merge(result);
             }
 
-            if (Refusal(target, context.PathAsIs, chain.RedirectCount, policy, out CurlUrl? next) is { } refusal)
+            if (StopBeforeHop(context, http, target, chain.RedirectCount, policy, result, out CurlUrl? next, out HopProxy hopProxy) is { } stop)
             {
-                return chain.Merge(TransferResult.Failure(refusal.ExitCode, refusal.Message, result.BytesTransferred));
+                return chain.Merge(stop);
             }
 
             bodyDropped |= DropsBody(result.Report!.ResponseCode, hop, policy);
             Rewind(context.Upload, uploadStart, bodyDropped);
             Rewind(bodyContent, bodyStart, bodyDropped);
-            // No refusal means the target parsed, so next is set.
-            hop = NextHop(context, next!, http, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted);
+            // No stop means the target parsed, so next is set.
+            hop = NextHop(context, next!, http, hopProxy, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted);
             chain.Followed(target);
         }
+    }
+
+    /// <summary>
+    /// The failure that ends the chain instead of following <paramref name="target" />: a
+    /// <see cref="Refusal" />, or the hop proxy selector's failure; <see langword="null" />, with
+    /// <paramref name="next" /> and <paramref name="hopProxy" /> set, when the hop goes ahead.
+    /// </summary>
+    private TransferResult? StopBeforeHop(
+        ITransferContext first,
+        HttpRequestOptions http,
+        string target,
+        int followed,
+        RedirectPolicy policy,
+        TransferResult result,
+        out CurlUrl? next,
+        out HopProxy hopProxy)
+    {
+        hopProxy = default;
+        if (Refusal(target, first.PathAsIs, followed, policy, out next) is { } refusal)
+        {
+            return TransferResult.Failure(refusal.ExitCode, refusal.Message, result.BytesTransferred);
+        }
+
+        // No refusal means the target parsed, so next is set.
+        return TrySelectHopProxy(first, http, next!, out hopProxy, out TransferResult? failure) ? null : failure;
+    }
+
+    private bool TrySelectHopProxy(
+        ITransferContext first,
+        HttpRequestOptions http,
+        CurlUrl url,
+        out HopProxy hopProxy,
+        [NotNullWhen(false)] out TransferResult? failure)
+    {
+        if (selectHopProxy is null)
+        {
+            hopProxy = new HopProxy(first.Proxy, http.ForwardProxy);
+            failure = null;
+            return true;
+        }
+
+        bool selected = selectHopProxy(url, out ProxyEndpoint? proxy, out failure);
+        hopProxy = new HopProxy(proxy, proxy);
+        return selected;
     }
 
     private static string? RedirectTarget(TransferResult result) =>
@@ -200,9 +257,9 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher)
         && string.Equals(first.Host, next.Host, StringComparison.OrdinalIgnoreCase)
         && first.Port == next.Port;
 
-    private static HttpRequestOptions HopHttp(HttpRequestOptions http, bool bodyDropped, bool sendCredentials)
+    private static HttpRequestOptions HopHttp(HttpRequestOptions http, ProxyEndpoint? forwardProxy, bool bodyDropped, bool sendCredentials)
     {
-        HttpRequestOptions hopHttp = bodyDropped ? http with { Body = null } : http;
+        HttpRequestOptions hopHttp = http with { Body = bodyDropped ? null : http.Body, ForwardProxy = forwardProxy };
         return sendCredentials
             ? hopHttp
             : hopHttp with
@@ -220,6 +277,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher)
         ITransferContext first,
         CurlUrl url,
         HttpRequestOptions http,
+        HopProxy hopProxy,
         bool bodyDropped,
         bool sendCredentials,
         long operationStarted) =>
@@ -245,10 +303,17 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher)
             ConnectTimeout = first.ConnectTimeout,
             MaxTime = first.MaxTime,
             OperationStarted = operationStarted,
-            Http = HopHttp(http, bodyDropped, sendCredentials),
+            Proxy = hopProxy.Proxy,
+            Http = HopHttp(http, hopProxy.ForwardProxy, bodyDropped, sendCredentials),
             TimeProvider = first.TimeProvider,
             CancellationToken = first.CancellationToken,
         };
+
+    /// <summary>
+    /// The proxy one hop connects through (<see cref="ITransferContext.Proxy" />) and the one its
+    /// HTTP request is forwarded to (<see cref="HttpRequestOptions.ForwardProxy" />).
+    /// </summary>
+    private readonly record struct HopProxy(ProxyEndpoint? Proxy, ProxyEndpoint? ForwardProxy);
 
     /// <summary>
     /// What the hops of one chain add up to, merged into the last hop's report.

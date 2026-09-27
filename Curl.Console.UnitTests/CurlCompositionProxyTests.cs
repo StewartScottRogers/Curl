@@ -100,6 +100,40 @@ public sealed class CurlCompositionProxyTests
     }
 
     [TestMethod]
+    public async Task RunAsync_RedirectToANoProxyHost_SendsTheSecondRequestDirectly()
+    {
+        // Measured (BL-329 Notes): curl 8.21.0 sends "GET http://a.test/" to the proxy, then
+        // "GET / HTTP/1.1" with "Host: b.test:18329" straight to b.test.
+        ScriptedConnector server = new([Latin1(RedirectTo("http://b.test:18329/")), Latin1(Hello)]);
+
+        Run run = await RunAsync(server, "-sS", "-L", "-x", "127.0.0.1:18238", "--noproxy", "b.test", "http://a.test/");
+
+        Assert.AreEqual(0, run.ExitCode);
+        Assert.AreEqual(
+            "GET http://a.test/ HTTP/1.1\r\nHost: a.test\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\n\r\n"
+            + "GET / HTTP/1.1\r\nHost: b.test:18329\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
+            Latin1(server.Written));
+        Assert.AreEqual(Proxy, server.Targets[0]);
+        Assert.AreEqual(("b.test", 18329, false, (ProxyEndpoint?)null), RouteOf(server.Targets[1]));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RedirectFromHttpToHttpsWithOnlyHttpProxySet_ConnectsToTheHttpsHostDirectly()
+    {
+        // Measured (BL-329 Notes): with only http_proxy set, curl 8.21.0 forwards the http
+        // request to the proxy, then opens TLS straight to b.test with no CONNECT.
+        ScriptedConnector server = new([Latin1(RedirectTo("https://b.test:18329/")), Latin1(Hello)]);
+        Dictionary<string, string> environment = new() { ["http_proxy"] = "http://127.0.0.1:18238" };
+
+        Run run = await RunAsync(server, environment, "-sS", "-L", "http://a.test/");
+
+        Assert.AreEqual(0, run.ExitCode);
+        Assert.AreEqual(Proxy, server.Targets[0]);
+        Assert.AreEqual(("b.test", 18329, true, (ProxyEndpoint?)null), RouteOf(server.Targets[1]));
+        StringAssert.EndsWith(Latin1(server.Written), "GET / HTTP/1.1\r\nHost: b.test:18329\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n");
+    }
+
+    [TestMethod]
     public async Task RunAsync_ProxyTunnelOption_SendsConnectThenTheRequestThroughTheTunnel()
     {
         ScriptedConnector server = new([Latin1(ConnectionEstablished), Latin1(Hello)]);
@@ -374,6 +408,12 @@ public sealed class CurlCompositionProxyTests
 
         return new Run(exitCode, Latin1(standardOutput.ToArray()), Latin1(standardError.ToArray()));
     }
+
+    private static string RedirectTo(string location) =>
+        $"HTTP/1.1 302 Found\r\nLocation: {location}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+
+    private static (string Host, int Port, bool UseTls, ProxyEndpoint? Proxy) RouteOf(ConnectTarget target) =>
+        (target.Host, target.Port, target.UseTls, target.Proxy);
 
     private static string Latin1(byte[] bytes) => Encoding.Latin1.GetString(bytes);
 

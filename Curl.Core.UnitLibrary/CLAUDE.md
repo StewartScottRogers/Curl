@@ -30,8 +30,9 @@ successful 3xx hop's `TransferReport.RedirectUrl` under a `RedirectPolicy`
 rewriting POST to GET and dropping credentials to another host, port or scheme as curl
 8.21.0 does, and returns the last hop's result with one merged report (redirect count,
 effective URL, summed header/request/connection counts, timings from the first hop with
-`RedirectDuration`). Without `-L` it returns the dispatcher's result unchanged. It is not
-yet wired into `Curl.Console`.
+`RedirectDuration`). Without `-L` it returns the dispatcher's result unchanged. Given a
+`HopProxySelector`, it chooses each hop's proxy again from that hop's own URL, as curl
+8.21.0 does (BL-329); without one, every hop keeps the first URL's proxy.
 
 `TransferRetrier` runs a transfer again under `--retry` (`RetryPolicy`: `--retry`,
 `--retry-delay`) after curl 8.21.0's transient failures: exit 28, 6, 5 or 12

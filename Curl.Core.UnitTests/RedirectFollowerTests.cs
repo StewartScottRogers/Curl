@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Net;
 using Curl.Core.Fakes;
@@ -703,9 +704,75 @@ public sealed class RedirectFollowerTests
         Assert.AreEqual(first.CreateFileMode, second.CreateFileMode);
         Assert.AreEqual(first.ConnectTimeout, second.ConnectTimeout);
         Assert.AreEqual(first.MaxTime, second.MaxTime);
-        Assert.AreSame(first.Http, second.Http);
+        Assert.AreEqual(first.Http, second.Http);
         Assert.AreSame(first.TimeProvider, second.TimeProvider);
         Assert.AreEqual(first.CancellationToken, second.CancellationToken);
+    }
+
+    [TestMethod]
+    public async Task FollowAsync_NoHopProxySelector_EveryHopKeepsTheFirstUrlsProxy()
+    {
+        ProxyEndpoint socks = new(ProxyKind.Socks5, "127.0.0.1", 1080, null);
+        ProxyEndpoint forward = new(ProxyKind.Http, "127.0.0.1", 3128, null);
+        ScriptedHandler handler = new(Redirect(302, Next), Ok(200, 0));
+        TransferContext first = new()
+        {
+            Url = CurlUrl.Parse(First),
+            Output = Stream.Null,
+            Proxy = socks,
+            Http = Location() with { ForwardProxy = forward },
+        };
+
+        await Follow(handler, first);
+
+        Assert.AreSame(socks, handler.Contexts[1].Proxy);
+        Assert.AreSame(forward, handler.Contexts[1].Http!.ForwardProxy);
+    }
+
+    [TestMethod]
+    public async Task FollowAsync_HopProxySelector_ChoosesEachHopsProxyFromItsOwnUrl()
+    {
+        ProxyEndpoint first = new(ProxyKind.Http, "127.0.0.1", 3128, null);
+        ProxyEndpoint third = new(ProxyKind.Socks5, "127.0.0.1", 1080, null);
+        Dictionary<string, ProxyEndpoint?> proxies = new() { ["http://b.test/"] = null, ["https://c.test/"] = third };
+        List<string> asked = [];
+        ScriptedHandler handler = new(Redirect(302, "http://b.test/"), Redirect(302, "https://c.test/"), Ok(200, 0));
+        HopProxySelector selector = (CurlUrl url, out ProxyEndpoint? proxy, [NotNullWhen(false)] out TransferResult? failure) =>
+        {
+            asked.Add(url.OriginalString);
+            proxy = proxies[url.OriginalString];
+            failure = null;
+            return true;
+        };
+
+        TransferResult result = await FollowWith(selector, handler, Context(Location() with { ForwardProxy = first }));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(new[] { "http://b.test/", "https://c.test/" }, asked);
+        Assert.IsNull(handler.Contexts[1].Proxy);
+        Assert.IsNull(handler.Contexts[1].Http!.ForwardProxy);
+        Assert.AreSame(third, handler.Contexts[2].Proxy);
+        Assert.AreSame(third, handler.Contexts[2].Http!.ForwardProxy);
+    }
+
+    [TestMethod]
+    public async Task FollowAsync_HopProxySelectorFails_EndsTheChainWithItsFailure()
+    {
+        TransferResult refused = TransferResult.Failure(CurlExitCode.CouldntResolveProxy, "bad proxy");
+        ScriptedHandler handler = new(Redirect(302, Next), Ok(200, 0));
+        HopProxySelector selector = (CurlUrl url, out ProxyEndpoint? proxy, [NotNullWhen(false)] out TransferResult? failure) =>
+        {
+            proxy = null;
+            failure = refused;
+            return false;
+        };
+
+        TransferResult result = await FollowWith(selector, handler, Context(Location()));
+
+        Assert.AreEqual(CurlExitCode.CouldntResolveProxy, result.ExitCode);
+        Assert.AreEqual("bad proxy", result.ErrorMessage);
+        Assert.HasCount(1, handler.Contexts);
+        Assert.AreEqual(0, result.Report!.RedirectCount);
     }
 
     private static HttpRequestOptions Location() => new() { FollowRedirects = true };
@@ -734,6 +801,11 @@ public sealed class RedirectFollowerTests
     private static Task<TransferResult> Follow(IProtocolHandler handler, ITransferContext context, RedirectPolicy? policy = null) =>
         new RedirectFollower(new ProtocolDispatcher([handler]))
             .FollowAsync(context, policy ?? new RedirectPolicy())
+            .AsTask();
+
+    private static Task<TransferResult> FollowWith(HopProxySelector selector, IProtocolHandler handler, ITransferContext context) =>
+        new RedirectFollower(new ProtocolDispatcher([handler]), selector)
+            .FollowAsync(context, new RedirectPolicy())
             .AsTask();
 
     private static TransferResult Redirect(

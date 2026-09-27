@@ -1213,7 +1213,10 @@ internal sealed class CurlCommandRunner(
         UrlTransfer transfer,
         Stream? headerOutput)
     {
-        RedirectFollower follower = new(dispatch.Dispatcher);
+        RedirectFollower follower = new(
+            dispatch.Dispatcher,
+            (CurlUrl hopUrl, out ProxyEndpoint? hopProxy, [NotNullWhen(false)] out TransferResult? hopFailure) =>
+                TransferProxySelection.TrySelect(dispatch.ProxySelector, options, hopUrl, out hopProxy, out hopFailure));
 
         if (!CurlUrl.TryParse(
             QueryUrl.Append(url, options),
