@@ -111,6 +111,17 @@
     same backslash escapes as Response.
     Default empty.
 
+.PARAMETER Tls
+    Answer each connection over TLS 1.2 instead of plain TCP, so the recorder can stand
+    in for an HTTPS server or an HTTPS proxy (BL-398, BL-442). The certificate served
+    is a throwaway self-signed RSA 2048 certificate for CN=127.0.0.1 (subject
+    alternative name IP 127.0.0.1), made for this run and valid for one day; curl needs
+    -k (or --proxy-insecure for a proxy) to accept it. request.bin, and the Response
+    matching, hold the decrypted bytes, not the TLS records. The certificate is never
+    added to a certificate store, and its key container is deleted when the run ends.
+    A connection whose handshake fails is recorded as empty. Cannot be combined with
+    -Ftp; -Reset resets the connection before any handshake.
+
 .PARAMETER Curl
     The curl executable to run. Defaults to the reference build ADR-0009 and ADR-0018
     name, curl 8.21.0 from Git for Windows' mingw64 directory, found beside git.exe.
@@ -136,6 +147,7 @@ param(
     [switch] $Ftp,
     [string[]] $FtpReply = @(),
     [string] $FtpData = '',
+    [switch] $Tls,
     [string] $Curl
 )
 
@@ -214,7 +226,7 @@ function ConvertTo-CommandLineArgument {
 # The server runs in its own runspace so curl can run in this one. It returns one
 # byte array per connection served.
 $serveConnections = {
-    param($Listener, $ResponseBytes, [int] $ConnectionCount, [int] $DelayMilliseconds, [bool] $ResetConnections, [int] $EarlyResponseBodyBytes)
+    param($Listener, $ResponseBytes, [int] $ConnectionCount, [int] $DelayMilliseconds, [bool] $ResetConnections, [int] $EarlyResponseBodyBytes, $TlsCertificate)
 
     Set-StrictMode -Version Latest
     $ErrorActionPreference = 'Stop'
@@ -255,6 +267,17 @@ $serveConnections = {
         }
         try {
             $stream = $client.GetStream()
+            if ($null -ne $TlsCertificate) {
+                $stream = New-Object System.Net.Security.SslStream($stream, $false)
+                $stream.ReadTimeout = 5000
+                try {
+                    $stream.AuthenticateAsServer($TlsCertificate, $false, [System.Security.Authentication.SslProtocols]::Tls12, $false)
+                } catch {
+                    # curl refused the certificate or hung up mid-handshake: nothing was sent.
+                    $requests.Add([byte[]] @())
+                    continue
+                }
+            }
             $stream.ReadTimeout = if ($EarlyResponseBodyBytes -ge 0) { 5000 } else { 1000 }
             $buffer = New-Object byte[] 65536
             $received = New-Object System.IO.MemoryStream
@@ -421,6 +444,30 @@ $serveFtpSession = {
     return , @(, $received.ToArray())
 }
 
+function New-ThrowawayTlsCertificate {
+    # Schannel will not serve the ephemeral key CreateSelfSigned returns, so the
+    # certificate is reloaded from its PFX export. Loaded without PersistKeySet, its key
+    # container is deleted when the certificate is reset; no store is touched.
+    $rsa = New-Object System.Security.Cryptography.RSACng(2048)
+    try {
+        $request = New-Object System.Security.Cryptography.X509Certificates.CertificateRequest('CN=127.0.0.1', $rsa, [System.Security.Cryptography.HashAlgorithmName]::SHA256, [System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
+        $alternativeNames = New-Object System.Security.Cryptography.X509Certificates.SubjectAlternativeNameBuilder
+        $alternativeNames.AddIpAddress([System.Net.IPAddress]::Loopback)
+        $request.CertificateExtensions.Add($alternativeNames.Build())
+        $now = [System.DateTimeOffset]::UtcNow
+        $selfSigned = $request.CreateSelfSigned($now.AddMinutes(-5), $now.AddDays(1))
+        try {
+            $pfx = $selfSigned.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Pfx)
+        } finally {
+            $selfSigned.Reset()
+        }
+    } finally {
+        $rsa.Dispose()
+    }
+    return New-Object System.Security.Cryptography.X509Certificates.X509Certificate2(, $pfx)
+}
+
+if ($Tls -and $Ftp) { throw '-Tls cannot be combined with -Ftp.' }
 if ([string]::IsNullOrEmpty($Curl)) { $Curl = Get-ReferenceCurlPath }
 $responseBytes = New-Object System.Collections.Generic.List[byte[]]
 foreach ($text in $Response) { $responseBytes.Add((ConvertFrom-EscapedResponse -Text $text)) }
@@ -435,6 +482,7 @@ $uploadedData = New-Object System.IO.MemoryStream
 $OutDirectory = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine((Get-Location).ProviderPath, $OutDirectory))
 New-Item -ItemType Directory -Path $OutDirectory -Force | Out-Null
 
+$tlsCertificate = if ($Tls) { New-ThrowawayTlsCertificate } else { $null }
 $listener = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Loopback, $Port)
 $listener.Start()
 $server = [System.Management.Automation.PowerShell]::Create()
@@ -442,7 +490,7 @@ try {
     if ($Ftp) {
         [void] $server.AddScript($serveFtpSession).AddArgument($listener).AddArgument($ftpOverrides).AddArgument([byte[]] (ConvertFrom-EscapedResponse -Text $FtpData)).AddArgument($transcript).AddArgument($uploadedData)
     } else {
-        [void] $server.AddScript($serveConnections).AddArgument($listener).AddArgument($responseBytes).AddArgument($Connections).AddArgument($ResponseDelayMilliseconds).AddArgument([bool] $Reset).AddArgument($RespondAfterBodyBytes)
+        [void] $server.AddScript($serveConnections).AddArgument($listener).AddArgument($responseBytes).AddArgument($Connections).AddArgument($ResponseDelayMilliseconds).AddArgument([bool] $Reset).AddArgument($RespondAfterBodyBytes).AddArgument($tlsCertificate)
     }
     $serverRun = $server.BeginInvoke()
 
@@ -490,6 +538,8 @@ try {
 } finally {
     $listener.Stop()
     $server.Dispose()
+    # Reset deletes the key container the PFX import created.
+    if ($null -ne $tlsCertificate) { $tlsCertificate.Reset() }
 }
 
 $requestBytes = New-Object System.IO.MemoryStream
