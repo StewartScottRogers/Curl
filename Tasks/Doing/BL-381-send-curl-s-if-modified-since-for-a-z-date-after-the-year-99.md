@@ -46,3 +46,4 @@ fails), instead of `If-Modified-Since: Fri, 31 Dec 9999 23:59:59 GMT`.
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
