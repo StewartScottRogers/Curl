@@ -46,7 +46,8 @@ public sealed class TcpConnector(
     /// <inheritdoc />
     /// <remarks>
     /// <para>
-    /// The messages are curl 8.21.0's: <c>Could not resolve host: &lt;host&gt;</c> for
+    /// The messages are curl 8.21.0's, cut to 255 characters as curl cuts them (ADR-0071):
+    /// <c>Could not resolve host: &lt;host&gt;</c> for
     /// exit 6, and <c>Failed to connect to &lt;host&gt;:&lt;port&gt; after &lt;n&gt; ms:
     /// Could not connect to server</c> for exit 7, where <c>n</c> is the time spent
     /// dialing as measured by the injected <see cref="TimeProvider" />. When
@@ -145,7 +146,7 @@ public sealed class TcpConnector(
         {
             return ConnectResult.Failed(
                 CurlExitCode.CouldntResolveHost,
-                $"Could not resolve host: {destination.Host}");
+                CurlErrorBuffer.Truncate($"Could not resolve host: {destination.Host}"));
         }
 
         var nameResolved = timeProvider.GetTimestamp();
@@ -178,7 +179,7 @@ public sealed class TcpConnector(
         {
             return ConnectResult.Failed(
                 CurlExitCode.CouldntResolveProxy,
-                $"Could not resolve proxy: {proxy.Host}");
+                CurlErrorBuffer.Truncate($"Could not resolve proxy: {proxy.Host}"));
         }
 
         var nameResolved = timeProvider.GetTimestamp();

@@ -37,6 +37,22 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_WhenAProxyOf300BytesDoesNotResolve_FailsWithCouldntResolveProxyCutTo255Characters()
+    {
+        // curl -x http://<300 a's>:3128 http://example.com/ -> curl: (5) Could not resolve proxy: <first 230 a's>
+        // (measured 2026-09-27 against curl 8.21.0, Schannel, BL-377).
+        var proxyHost = new string('a', 300);
+        var connector = new TcpConnector(new SystemDnsResolver(), new FakeTcpDialer(), new FakeTlsProvider(), new ManualTimeProvider());
+
+        var result = await connector.ConnectAsync(
+            PlainTarget with { Proxy = new ProxyEndpoint(ProxyKind.Http, proxyHost, 3128, null) },
+            CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.CouldntResolveProxy, result.ExitCode);
+        Assert.AreEqual("Could not resolve proxy: " + new string('a', 230), result.ErrorMessage);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_WhenTheProxyRefuses_FailsWithCouldntConnectNamingTargetAndProxy()
     {
         // curl -p -x localhost:1 http://example.com:8080/ ->

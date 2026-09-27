@@ -121,5 +121,5 @@ internal static class SocksProxyTunnel
     /// <param name="host">The host.</param>
     /// <returns>A failed <see cref="ConnectResult" />.</returns>
     public static ConnectResult? CouldNotResolve(string host) =>
-        ConnectResult.Failed(CurlExitCode.CouldntResolveHost, $"Could not resolve host: {host}");
+        ConnectResult.Failed(CurlExitCode.CouldntResolveHost, CurlErrorBuffer.Truncate($"Could not resolve host: {host}"));
 }

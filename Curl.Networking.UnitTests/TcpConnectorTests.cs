@@ -26,6 +26,23 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_WithHostOf300Bytes_FailsWithCouldntResolveHostCutTo255Characters()
+    {
+        // curl 8.21.0 (Schannel): curl http://<300 a's>/ -> exit 6,
+        // curl: (6) Could not resolve host: <first 231 a's> (measured 2026-09-27, BL-377).
+        var dialer = new FakeTcpDialer();
+        var connector = new TcpConnector(new SystemDnsResolver(), dialer, new FakeTlsProvider(), new ManualTimeProvider());
+
+        var result = await connector.ConnectAsync(
+            new ConnectTarget(new string('a', 300), 80, UseTls: false),
+            CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
+        Assert.AreEqual("Could not resolve host: " + new string('a', 231), result.ErrorMessage);
+        Assert.IsEmpty(dialer.DialedEndPoints);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_WhenResolverReturnsNoAddresses_FailsWithCouldntResolveHostAndNeverDials()
     {
         var resolver = new FakeDnsResolver();
