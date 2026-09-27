@@ -41,7 +41,9 @@ namespace Curl.Console;
 /// <param name="standardInput">
 /// The raw standard input stream, given to a <c>telnet</c> transfer as its
 /// <see cref="ITransferContext.Upload" />, because curl's telnet "sends what it reads on
-/// stdin" (ADR-0006). Every other scheme's upload is <see langword="null" />.
+/// stdin" (ADR-0006), to a <c>-T -</c> upload, and to the default
+/// <see cref="MultipartFormBodyBuilder" /> for <c>-F name=@-</c> and <c>-F name=&lt;-</c> parts
+/// (ADR-0061). Every other scheme's upload is <see langword="null" />.
 /// </param>
 /// <param name="runsOnWindows">
 /// Whether the process runs on Windows, where each <c>-o</c> name is rewritten by
@@ -229,12 +231,13 @@ internal sealed class CurlCommandRunner(
     /// <summary>Builds each transfer's context; gives a <c>telnet</c> transfer standard input.</summary>
     private readonly TransferContextFactory transferContextFactory = new(standardInput);
 
-    /// <summary>Builds each transfer's <c>-F</c> body.</summary>
+    /// <summary>Builds each transfer's <c>-F</c> body; reads <c>@-</c> and <c>&lt;-</c> parts from standard input.</summary>
     private readonly MultipartFormBodyBuilder formBodyBuilder = formBodyBuilder
         ?? new MultipartFormBodyBuilder(
             new PhysicalFileSystem(),
             CredentialEncoding.ForPlatform(runsOnWindows),
-            MultipartBoundary.CreateRandom);
+            MultipartBoundary.CreateRandom,
+            standardInput);
 
     /// <summary>The <see cref="IOutputPaths" /> used when the runner is given none.</summary>
     private static readonly PhysicalOutputPaths DiskOutputPaths = new();

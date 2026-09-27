@@ -197,6 +197,87 @@ public sealed class CurlCommandRunnerFormTests
         Assert.IsEmpty(server.Targets);
     }
 
+    /// <summary>
+    /// The body BL-275 pinned from curl 8.21.0 for <c>printf 'hello\nworld' | curl -F a=@- URL</c>
+    /// (<c>MultipartFormBodyBuilderStandardInputTests</c>, 173 bytes), built by the runner's own
+    /// builder, with its random 46-character boundary, from the standard input the runner is given.
+    /// </summary>
+    [TestMethod]
+    public async Task RunAsync_FormUploadFromStandardInput_SendsStandardInputAsAPartNamedDash()
+    {
+        int exitCode = await RunWithStandardInputAsync(server, "-sS", "-F", "a=@-", Url);
+
+        Assert.AreEqual(0, exitCode);
+        string written = Encoding.Latin1.GetString(server.Written);
+        string boundary = SentBoundary(written);
+        Assert.AreEqual(46, boundary.Length);
+        Assert.AreEqual(
+            "POST / HTTP/1.1\r\n"
+            + "Host: 127.0.0.1:18233\r\n"
+            + "User-Agent: curl/8.21.0\r\n"
+            + "Accept: */*\r\n"
+            + "Content-Length: 173\r\n"
+            + "Content-Type: multipart/form-data; boundary=" + boundary + "\r\n"
+            + "\r\n"
+            + "--" + boundary + "\r\n"
+            + "Content-Disposition: form-data; name=\"a\"; filename=\"-\"\r\n"
+            + "\r\n"
+            + "hello\nworld\r\n"
+            + "--" + boundary + "--\r\n",
+            written);
+    }
+
+    /// <summary>
+    /// curl 8.21.0 sends piped standard input to the first URL of <c>-F "a=&lt;-" URL1 URL2</c>
+    /// and an empty part to the second, which it declares with the first body's length and fails
+    /// with exit 26 (BL-311 Context). ADR-0061 matches the first URL and sends the second a
+    /// consistent body with the empty part.
+    /// </summary>
+    [TestMethod]
+    public async Task RunAsync_FormContentFromStandardInputOnTwoUrls_SendsTheInputOnceThenAnEmptyPart()
+    {
+        ScriptedConnector twoResponses = new(
+        [
+            Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"),
+            Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"),
+        ]);
+
+        int exitCode = await RunWithStandardInputAsync(twoResponses, "-sS", "-F", "a=<-", Url, Url);
+
+        Assert.AreEqual(0, exitCode);
+        string written = Encoding.Latin1.GetString(twoResponses.Written);
+        int secondRequest = written.IndexOf("POST", 1, StringComparison.Ordinal);
+        Assert.AreEqual(
+            "Content-Length: 159\r\n" + FormBody(SentBoundary(written), "hello\nworld"),
+            written[written.IndexOf("Content-Length", StringComparison.Ordinal)..secondRequest]);
+        string second = written[secondRequest..];
+        Assert.AreEqual(
+            "Content-Length: 148\r\n" + FormBody(SentBoundary(second), string.Empty),
+            second[second.IndexOf("Content-Length", StringComparison.Ordinal)..]);
+    }
+
+    private static string FormBody(string boundary, string content) =>
+        "Content-Type: multipart/form-data; boundary=" + boundary + "\r\n"
+        + "\r\n"
+        + "--" + boundary + "\r\nContent-Disposition: form-data; name=\"a\"\r\n\r\n"
+        + content
+        + "\r\n--" + boundary + "--\r\n";
+
+    private static string SentBoundary(string written) =>
+        written.Split("boundary=")[1].Split("\r\n")[0];
+
+    private Task<int> RunWithStandardInputAsync(ScriptedConnector connector, params string[] arguments) =>
+        new CurlCommandRunner(
+                _ => new TransferDispatch(new ProtocolDispatcher(
+                    CurlComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused")))),
+                files,
+                files,
+                standardOutput,
+                standardError,
+                new MemoryStream(Encoding.ASCII.GetBytes("hello\nworld")),
+                runsOnWindows: false)
+            .RunAsync(arguments);
+
     private static string MeasuredRedirectRequest(string path) =>
         $"POST {path} HTTP/1.1\r\n"
         + "Host: 127.0.0.1:18298\r\n"
