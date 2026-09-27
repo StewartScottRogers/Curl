@@ -46,4 +46,32 @@ public sealed record TlsHandshakeEvent
     /// Gets a value indicating whether the server's certificate was verified.
     /// </summary>
     public required bool CertificateVerified { get; init; }
+
+    /// <summary>
+    /// Gets OpenSSL's name for the key-exchange group the handshake used, such as
+    /// <c>X25519MLKEM768</c> or <c>x25519</c>, or <see langword="null" /> when the platform
+    /// does not report it (ADR-0083).
+    /// </summary>
+    public string? NegotiatedGroupName { get; init; }
+
+    /// <summary>
+    /// Gets OpenSSL's short name for the signature type the server signed the handshake
+    /// with, such as <c>RSASSA-PSS</c>, or <see langword="null" /> when the platform does
+    /// not report it (ADR-0083).
+    /// </summary>
+    public string? PeerSignatureTypeName { get; init; }
+
+    /// <summary>
+    /// Gets the certificate verification result as an OpenSSL <c>X509_V_</c> code, such as
+    /// <c>0</c> for verified or <c>18</c> for a self-signed certificate, or
+    /// <see langword="null" /> when the platform does not report one (ADR-0083).
+    /// </summary>
+    public long? CertificateVerifyResult { get; init; }
+
+    /// <summary>
+    /// Gets the server's certificate chain, the server's own certificate first: the verified
+    /// chain when verification succeeded, else the chain as the server sent it. Empty when
+    /// the platform does not report it (ADR-0083).
+    /// </summary>
+    public IReadOnlyList<X509Certificate2> PeerCertificateChain { get; init; } = [];
 }
