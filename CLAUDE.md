@@ -131,6 +131,11 @@ Each project folder may contain its own `CLAUDE.md` with project-specific rules;
   of the code as it is now, and intent is written as intent. A misaligned name or document
   is a defect, because it is how an agent reading this repository comes to believe
   something false. The `align-and-document` agent owns this.
+- **No Python, committed or throwaway.** Scripts, one-liners, file edits and loopback
+  test servers are PowerShell (or a C# file-based app, `dotnet run tool.cs`). Measure real
+  curl with `Record-CurlExchange.ps1` - it runs the loopback server, records the request
+  bytes, stdout, stderr and exit code - and extend it when it falls short, rather than
+  writing a server of your own. Edit files with the Edit tool, not generated scripts.
 - **Base class library only.** Write against `System.*`. Sockets, TLS, HTTP, DNS,
   compression, JSON and argument handling are all in the BCL already, and
   `Curl.Console` publishes native AOT, where every dependency is a trim risk. The

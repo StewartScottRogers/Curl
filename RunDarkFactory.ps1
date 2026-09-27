@@ -733,6 +733,8 @@ wait for input; nobody will reply.
 Run /task-run {ID}.
 
 Rules for this unattended run, in addition to CLAUDE.md:
+0. No Python, not even a one-liner: PowerShell for scripts and checks, the Edit tool
+   for edits, and Record-CurlExchange.ps1 to measure real curl (extend it if needed).
 1. Where a choice has a sensible default, take it and record the choice and why under
    the task's Notes.
 2. Design and behaviour decisions are yours: Stewart has delegated them (CLAUDE.md,
@@ -780,6 +782,8 @@ Run /task-run {ID}. The shift has already claimed {ID}: it is in Tasks/Doing. Sk
 claim step, do not move it to Doing again, and do not take any other task.
 
 Rules for this unattended run, in addition to CLAUDE.md:
+0. No Python, not even a one-liner: PowerShell for scripts and checks, the Edit tool
+   for edits, and Record-CurlExchange.ps1 to measure real curl (extend it if needed).
 1. Where a choice has a sensible default, take it and record the choice and why under
    the task's Notes.
 2. Design and behaviour decisions are yours: Stewart has delegated them (CLAUDE.md,
@@ -844,7 +848,9 @@ $Forbidden = @(
     'git push origin master', 'git push origin HEAD:master', 'git merge',
     'git tag', 'git branch -D', 'git branch -d', 'git reset --hard',
     'dotnet add package', 'dotnet remove package',
-    'gh pr merge', 'gh release', 'gh repo'
+    'gh pr merge', 'gh release', 'gh repo',
+    # No Python (CLAUDE.md): PowerShell, the Edit tool and Record-CurlExchange.ps1 instead.
+    'python', 'python3', 'py'
 )
 # A lane's run also never touches the remote or the branch: the shift owns both.
 $LaneForbidden = $Forbidden + @('git push', 'git pull', 'git fetch', 'git rebase', 'git checkout', 'git switch', 'git worktree', 'git stash')
