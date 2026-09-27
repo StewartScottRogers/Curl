@@ -34,7 +34,7 @@ An Accepted ADR decides how a handler hands back a reusable `IConnection` and wh
 - Plan item: X8 in the Phase 1 HTTP plan (2026-09-26); plan keys in this file were replaced by their task IDs.
 - 2026-09-27: Delivered as ADR-0050 (`Documentation/Planning/Decisions/ADR-0050-connections-are-reused-across-requests-and-urls-through-a-pooling-connector.md`), with behaviour measured on curl 8.21.0 (mingw, Schannel) against local HTTP/1.1 servers and a forward proxy.
 - Measured: the `-v` line is `* Reusing existing http: connection with host <name>` (or `with proxy <name>`), not "Re-using existing connection" as the Context says; the ADR pins the measured text. The pool holds five connections in total; `--no-keepalive` does not stop reuse.
-- Follow-ups filed: BL-324 (two ADRs share number 0040), BL-325 (BL-215 touches only `Curl.Networking`, but ADR-0050 also needs Abstractions, Http and Console changes).
+- Follow-ups filed: BL-326 (two ADRs share number 0040), BL-325 (BL-215 touches only `Curl.Networking`, but ADR-0050 also needs Abstractions, Http and Console changes).
 - ADR-0046 line 99 still shows the old reuse-line wording; left as is because accepted ADRs are not edited, and ADR-0050 records the correction.
 
 ## Log

@@ -1,5 +1,5 @@
 ---
-id: BL-324
+id: BL-326
 title: Renumber the second ADR-0040 so every ADR number is unique
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-324 — Renumber the second ADR-0040 so every ADR number is unique
+# BL-326 — Renumber the second ADR-0040 so every ADR number is unique
 
 ## Goal
 
