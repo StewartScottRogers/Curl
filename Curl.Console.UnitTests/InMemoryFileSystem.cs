@@ -11,10 +11,19 @@ namespace Curl.Console;
 /// in <see cref="UnwritablePaths" /> fails to open for writing with <see cref="UnwritableStatus" />.
 /// Each last-write time set is recorded in <see cref="LastWriteTimesSet" />, with whether the
 /// path's written stream was still open at the time; setting one fails with
-/// <see cref="FileTimeErrorCode" /> when that is not zero.
+/// <see cref="FileTimeErrorCode" /> when that is not zero. As <see cref="IOutputPaths" />, a
+/// file exists when its path is in <see cref="ExistingPaths" /> (kept apart from
+/// <see cref="ExistingContent" />, which only feeds reads), and every directory is created, into
+/// <see cref="CreatedDirectories" />, except those in <see cref="UncreatableDirectories" />.
 /// </summary>
-internal sealed class InMemoryFileSystem : IFileSystem, IFileTimeSetter
+internal sealed class InMemoryFileSystem : IFileSystem, IFileTimeSetter, IOutputPaths
 {
+    public HashSet<string> ExistingPaths { get; } = [];
+
+    public HashSet<string> UncreatableDirectories { get; } = [];
+
+    public List<string> CreatedDirectories { get; } = [];
+
     public byte[] ReadContent { get; init; } = [];
 
     public Dictionary<string, byte[]> ExistingContent { get; } = [];
@@ -82,5 +91,19 @@ internal sealed class InMemoryFileSystem : IFileSystem, IFileTimeSetter
         errorCode = FileTimeErrorCode;
 
         return errorCode == 0;
+    }
+
+    public bool FileExists(string path) => ExistingPaths.Contains(path);
+
+    public bool TryCreateDirectory(string path)
+    {
+        if (UncreatableDirectories.Contains(path))
+        {
+            return false;
+        }
+
+        CreatedDirectories.Add(path);
+
+        return true;
     }
 }

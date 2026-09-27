@@ -98,7 +98,7 @@ public sealed class CurlCommandRunnerTransferWarningTests
         Assert.AreEqual(23, exitCode);
         Assert.AreEqual(
             "curl: Failed to open hd.txt" + Environment.NewLine
-            + "curl: (23) " + CurlCommandRunner.CannotOpenForResumeMessage + Environment.NewLine,
+            + "curl: (23) " + CurlCommandRunner.WriteReceivedDataFailedMessage + Environment.NewLine,
             StandardErrorText);
     }
 

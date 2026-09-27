@@ -49,6 +49,51 @@ internal static class WindowsOutputFileNameSanitizer
         + "\"*<>?|");
 
     /// <summary>
+    /// The DOS device names curl 8.21.0 renames in a remote name, matched in any case:
+    /// <c>CONIN$</c> and <c>CONOUT$</c> are not among them.
+    /// </summary>
+    private static readonly string[] ReservedDeviceNames =
+    [
+        "CON", "PRN", "AUX", "NUL", "CLOCK$",
+        "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+    ];
+
+    /// <summary>
+    /// Rewrites a file name taken from the URL (<c>-O</c>) or from <c>Content-Disposition</c>
+    /// (<c>-J</c>) the way curl 8.21.0 does on Windows, where no path is allowed: each character
+    /// <see cref="Sanitize" /> replaces and each <c>:</c> becomes <c>_</c>, then a reserved device
+    /// name is renamed: <c>_</c> is put before one that is the whole name and replaces the first
+    /// <c>.</c> after one that starts it.
+    /// </summary>
+    /// <param name="fileName">
+    /// The name, without a directory: it holds no <c>/</c> or <c>\</c>, since both
+    /// <see cref="RemoteFileName" /> and <see cref="ContentDispositionFileName" /> keep only what
+    /// follows the last one.
+    /// </param>
+    /// <returns>The name curl opens, before any <c>--output-dir</c> is put in front of it.</returns>
+    /// <remarks>
+    /// Measured on 2026-09-27 (BL-239 Notes), <c>curl -sS -O http://127.0.0.1:18239/&lt;name&gt;</c>:
+    /// <c>a:b.txt</c> writes <c>a_b.txt</c>, <c>a*b.txt</c> writes <c>a_b.txt</c>, <c>con</c> writes
+    /// <c>_con</c>, <c>COM1</c> writes <c>_COM1</c>, <c>clock$</c> writes <c>_clock$</c>,
+    /// <c>con.txt</c> writes <c>con_txt</c>, <c>lpt9.txt</c> writes <c>lpt9_txt</c>, <c>aux.x.y</c>
+    /// writes <c>aux_x.y</c>; <c>a.con</c>, <c>nul%20</c> and <c>CON%3Ax</c> are kept.
+    /// </remarks>
+    internal static string SanitizeRemoteName(string fileName)
+    {
+        string sanitized = Sanitize(fileName).Replace(':', '_');
+        int dot = sanitized.IndexOf('.', StringComparison.Ordinal);
+        string stem = dot < 0 ? sanitized : sanitized[..dot];
+
+        if (!ReservedDeviceNames.Contains(stem, StringComparer.OrdinalIgnoreCase))
+        {
+            return sanitized;
+        }
+
+        return dot < 0 ? "_" + sanitized : stem + "_" + sanitized[(dot + 1)..];
+    }
+
+    /// <summary>
     /// Replaces each character curl 8.21.0 does not keep in an <c>-o</c> name with <c>_</c>.
     /// </summary>
     /// <param name="fileName">The <c>-o</c> value, as typed.</param>

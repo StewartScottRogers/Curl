@@ -32,9 +32,15 @@ internal sealed class TransferContextFactory(Stream standardInput)
     /// transfer uploads standard input and any other uploads nothing.
     /// </param>
     /// <param name="proxy">The proxy chosen for this transfer (<see cref="TransferProxySelection" />), or <see langword="null" /> to connect directly.</param>
+    /// <param name="watchHeaderOutput">
+    /// Wraps the header output <see cref="HeaderOutputOf" /> chose, for <c>-J</c>, whose
+    /// <see cref="RemoteHeaderNameStream" /> must read each header line before it goes anywhere;
+    /// <see langword="null" /> to use that output as it is.
+    /// </param>
     /// <returns>
     /// The context. Its <see cref="TransferContext.NoBody" /> is <c>-I</c>, and its
-    /// <see cref="TransferContext.HeaderOutput" /> is <see cref="HeaderOutputOf" />'s.
+    /// <see cref="TransferContext.HeaderOutput" /> is <see cref="HeaderOutputOf" />'s, wrapped by
+    /// <paramref name="watchHeaderOutput" /> when given.
     /// </returns>
     internal TransferContext Create(
         CommandLineOptions options,
@@ -45,12 +51,15 @@ internal sealed class TransferContextFactory(Stream standardInput)
         Stream? headerOutput,
         HttpRequestBody? formBody = null,
         Stream? upload = null,
-        ProxyEndpoint? proxy = null) =>
+        ProxyEndpoint? proxy = null,
+        Func<Stream?, Stream>? watchHeaderOutput = null) =>
         new()
         {
             Url = url,
             Output = output,
-            HeaderOutput = HeaderOutputOf(options, output, headerOutput),
+            HeaderOutput = watchHeaderOutput is null
+                ? HeaderOutputOf(options, output, headerOutput)
+                : watchHeaderOutput(HeaderOutputOf(options, output, headerOutput)),
             NoBody = options.NoBody,
             Range = range,
             ResumeFrom = resumeFrom,

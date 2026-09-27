@@ -24,6 +24,20 @@ On Windows each `-o` name is first rewritten by `WindowsOutputFileNameSanitizer`
 (`"*<>?|` and control characters become `_`, as curl 8.21.0 does), and that name is the
 one opened, sized for `-C -` and named in every message.
 
+Each URL's output comes from `CommandLineOptions.UrlOutputs`: an `-o` name, or for `-O` /
+`--remote-name-all` the name `RemoteFileName` takes from the URL path (last non-empty
+segment, still percent-encoded; none gives `curl_response` and curl's
+`Warning: No remote filename` line unless `-s`). On Windows a remote name also goes through
+`WindowsOutputFileNameSanitizer.SanitizeRemoteName` (`:` becomes `_`, DOS device names are
+renamed). `--output-dir` is put in front of either with `/`, as typed. `--create-dirs` makes
+each leading directory through `IOutputPaths` (`PhysicalOutputPaths` in production) before the
+transfer; one that cannot be made prints `curl: Error creating directory <dir>` and stops the
+run with exit 23. Under `-J` a remote-named file's header output goes through
+`RemoteHeaderNameStream`, which opens the file under the first `Content-Disposition`
+`filename=` (`ContentDispositionFileName`) of a 2xx or 3xx response before the lines go on; a
+name already taken is refused with `File exists` and exit 23. Measured on curl 8.21.0
+(BL-239 Notes).
+
 `TransferContextFactory` builds each transfer's context from the parsed options; the
 context carries the parsed `-r` range (`ByteRangeParser`; text that names
 no range ends the transfer with exit 33 before it is dispatched), the `-C` offset and the

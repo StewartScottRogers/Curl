@@ -127,7 +127,8 @@ internal static class CurlComposition
             OperatingSystem.IsWindows(),
             TerminalColumns.Resolve(),
             writesProgressMeter: true,
-            standardOutputIsTerminal);
+            standardOutputIsTerminal,
+            outputPaths: new PhysicalOutputPaths());
 
     /// <summary>
     /// Creates the runner with the production handler set built around the given
@@ -158,7 +159,8 @@ internal static class CurlComposition
             standardOutput,
             standardError,
             standardInput,
-            OperatingSystem.IsWindows());
+            OperatingSystem.IsWindows(),
+            outputPaths: new PhysicalOutputPaths());
 
     /// <summary>
     /// Creates the dispatcher over the production handler set, connecting through

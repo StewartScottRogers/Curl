@@ -24,6 +24,15 @@ internal static class OutputFileOpenWarning
         $"Warning: Failed to open the file {path}: {ReasonFor(status)}";
 
     /// <summary>
+    /// Builds the warning line for a <c>-J</c> name that is already taken, which curl 8.21.0
+    /// refuses to overwrite (measured 2026-09-27, BL-239 Notes), without a line terminator.
+    /// </summary>
+    /// <param name="path">The file that exists.</param>
+    /// <returns>The warning line.</returns>
+    internal static string ForExistingFile(string path) =>
+        $"Warning: Failed to open the file {path}: File exists";
+
+    /// <summary>
     /// The <c>strerror</c> text curl prints for <paramref name="status" />:
     /// <c>No such file or directory</c> for a missing parent directory,
     /// <c>Permission denied</c> for a refusal or a directory, and <c>Invalid argument</c>
