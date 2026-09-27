@@ -140,6 +140,21 @@ internal static class HttpTransferMessages
     internal const string ChunkedUploadNeedsHttp11 = "Chunky upload is not supported by HTTP 1.0";
 
     /// <summary>
+    /// The exit 18 message for a <c>-T</c> upload whose <c>-C</c> offset is at or past the
+    /// source's length (measured, BL-332 Notes).
+    /// </summary>
+    internal const string FileAlreadyCompletelyUploaded = "File already completely uploaded";
+
+    /// <summary>
+    /// Formats the exit 26 message for a <c>-T</c> upload of an empty source resumed from a
+    /// <c>-C</c> offset (measured, BL-332 Notes).
+    /// </summary>
+    /// <param name="offset">The <c>-C</c> offset.</param>
+    /// <returns>The message, such as <c>Unable to resume from offset 3</c>.</returns>
+    internal static string UnableToResumeFrom(long offset) =>
+        string.Create(CultureInfo.InvariantCulture, $"Unable to resume from offset {offset}");
+
+    /// <summary>
     /// Formats the exit 63 message for a body that grew past the <c>--max-filesize</c> limit,
     /// after as many bytes as the limit allows were written.
     /// </summary>

@@ -129,7 +129,9 @@ namespace Curl.Protocol.Http;
 /// curl 8.21.0 (BL-174 and BL-299 Notes).
 /// </para>
 /// <para>
-/// <see cref="ITransferContext.ResumeFrom" /> above zero sends <c>Range: bytes=N-</c>, and else
+/// <see cref="ITransferContext.ResumeFrom" /> above zero resumes a <c>-T</c> upload from that
+/// offset with a <c>Content-Range</c> (<see cref="HttpUploadResume" />, BL-332 Notes); for a
+/// request without a body it sends <c>Range: bytes=N-</c>, and else
 /// <see cref="ITransferContext.Range" /> sends its range, for a request without a body
 /// (<see cref="HttpRangeHeader" />); <see cref="ITransferContext.TimeCondition" /> sends
 /// <c>If-Modified-Since</c> or <c>If-Unmodified-Since</c>. Once the final head is written,
@@ -174,7 +176,7 @@ public sealed class HttpProtocolHandler(
         ArgumentNullException.ThrowIfNull(context);
 
         HttpRequestOptions options = context.Http ?? new HttpRequestOptions();
-        HttpRequestFraming framing = HttpRequestFraming.Of(options, [.. options.Headers.Select(HttpCustomHeader.Parse)], context.NoBody, context.Upload);
+        HttpRequestFraming framing = HttpRequestFraming.Of(options, [.. options.Headers.Select(HttpCustomHeader.Parse)], context.NoBody, context.Upload, context.ResumeFrom);
         HttpAuthRequest authRequest = new(
             framing.Method,
             context.Url,
@@ -347,14 +349,22 @@ public sealed class HttpProtocolHandler(
     }
 
     /// <summary>
-    /// Fails an HTTP/1.0 request whose body length is unknown before any byte of it is sent,
-    /// with exit 25, as curl 8.21.0 does once connected (measured, BL-180 Notes).
+    /// Fails a request before any byte of it is sent, as curl 8.21.0 does once connected: a
+    /// <c>-T</c> upload whose <c>-C</c> offset cannot be resumed from (exit 18 or 26, measured,
+    /// BL-332 Notes), and an HTTP/1.0 request whose body length is unknown (exit 25, measured,
+    /// BL-180 Notes).
     /// </summary>
     /// <exception cref="HttpTransferException">
+    /// <see cref="HttpRequestFraming.ResumeFailure" /> or
     /// <see cref="HttpRequestFraming.RefusesUnknownLength" /> is set.
     /// </exception>
     private static void ThrowIfRefused(HttpRequestFraming framing)
     {
+        if (framing.ResumeFailure is { } resumeFailure)
+        {
+            throw resumeFailure;
+        }
+
         if (framing.RefusesUnknownLength)
         {
             throw new HttpTransferException(CurlExitCode.UploadFailed, HttpTransferMessages.ChunkedUploadNeedsHttp11);

@@ -35,7 +35,7 @@ internal sealed class HttpRequestFraming
         bool addsExpect,
         bool awaitsContinue,
         bool refusesUnknownLength = false,
-        bool isUpload = false)
+        HttpUploadResume? upload = null)
     {
         Method = method;
         Body = body;
@@ -44,7 +44,7 @@ internal sealed class HttpRequestFraming
         AddsExpect = addsExpect;
         AwaitsContinue = awaitsContinue;
         RefusesUnknownLength = refusesUnknownLength;
-        IsUpload = isUpload;
+        Upload = upload;
     }
 
     /// <summary>
@@ -94,7 +94,25 @@ internal sealed class HttpRequestFraming
     /// failing a short read with curl's <c>client read function</c> message rather than its
     /// <c>client mime read</c> one (measured, BL-184 Notes).
     /// </summary>
-    internal bool IsUpload { get; }
+    internal bool IsUpload => Upload is not null;
+
+    /// <summary>
+    /// Gets the <c>Content-Range</c> value a <c>-T</c> upload resumed with <c>-C</c> sends, or
+    /// <see langword="null" /> to send none (<see cref="HttpUploadResume" />).
+    /// </summary>
+    internal string? ContentRange => Upload?.ContentRange;
+
+    /// <summary>
+    /// Gets the failure a <c>-T</c> upload resumed with <c>-C</c> ends with once connected,
+    /// before anything is sent, or <see langword="null" /> when it can be sent
+    /// (<see cref="HttpUploadResume" />).
+    /// </summary>
+    internal HttpTransferException? ResumeFailure => Upload?.Failure;
+
+    /// <summary>
+    /// Gets the resumed <c>-T</c> source, or <see langword="null" /> when the body is not one.
+    /// </summary>
+    private HttpUploadResume? Upload { get; }
 
     /// <summary>
     /// Makes the same framing without curl's own <c>Expect: 100-continue</c> line and without
@@ -104,7 +122,7 @@ internal sealed class HttpRequestFraming
     /// </summary>
     /// <returns>The framing of the resent request.</returns>
     internal HttpRequestFraming WithoutExpect() =>
-        new(Method, Body, KnownLength, IsChunked, addsExpect: false, awaitsContinue: false, RefusesUnknownLength, IsUpload);
+        new(Method, Body, KnownLength, IsChunked, addsExpect: false, awaitsContinue: false, RefusesUnknownLength, Upload);
 
     /// <summary>
     /// Decides the framing for a request with <paramref name="options" />.
@@ -123,12 +141,16 @@ internal sealed class HttpRequestFraming
     /// Its length is what is left of it from its position when it can seek, and unknown
     /// otherwise, as for standard input (measured, BL-184 Notes).
     /// </param>
+    /// <param name="resumeFrom">
+    /// The <c>-C</c> offset (<see cref="ITransferContext.ResumeFrom" />) the upload resumes from,
+    /// or <see langword="null" />; <see cref="HttpUploadResume" /> applies it.
+    /// </param>
     /// <returns>The framing.</returns>
-    internal static HttpRequestFraming Of(HttpRequestOptions options, HttpCustomHeader[] customHeaders, bool noBody = false, Stream? upload = null)
+    internal static HttpRequestFraming Of(HttpRequestOptions options, HttpCustomHeader[] customHeaders, bool noBody = false, Stream? upload = null, long? resumeFrom = null)
     {
         if (upload is not null)
         {
-            return OfUpload(options, upload, customHeaders);
+            return OfUpload(options, HttpUploadResume.Of(upload, resumeFrom), upload, customHeaders);
         }
 
         if (options.Body is not { } body)
@@ -142,12 +164,12 @@ internal sealed class HttpRequestFraming
     /// <summary>
     /// Decides the framing for a request that sends the <c>-T</c> source
     /// <paramref name="upload" />: PUT unless <c>-X</c> names another method, of the length
-    /// left from the stream's position when it can seek and of unknown length otherwise.
+    /// left to send after the <c>-C</c> offset (<paramref name="resume" />).
     /// </summary>
-    private static HttpRequestFraming OfUpload(HttpRequestOptions options, Stream upload, HttpCustomHeader[] customHeaders)
+    private static HttpRequestFraming OfUpload(HttpRequestOptions options, HttpUploadResume resume, Stream upload, HttpCustomHeader[] customHeaders)
     {
-        StreamBody body = new(upload, upload.CanSeek ? upload.Length - upload.Position : null, string.Empty);
-        return OfBody(options.CustomMethod ?? "PUT", body, customHeaders, options.Version == HttpVersionPreference.Http10, isUpload: true);
+        StreamBody body = new(upload, resume.Length, string.Empty);
+        return OfBody(options.CustomMethod ?? "PUT", body, customHeaders, options.Version == HttpVersionPreference.Http10, resume);
     }
 
     /// <summary>
@@ -160,8 +182,10 @@ internal sealed class HttpRequestFraming
     /// <see langword="true" /> for <c>-0</c>: curl adds no <c>Expect</c> of its own and refuses a
     /// body of unknown length that no <c>-H</c> value asks to send chunked.
     /// </param>
-    /// <param name="isUpload">Whether <paramref name="body" /> is the <c>-T</c> source.</param>
-    private static HttpRequestFraming OfBody(string method, HttpRequestBody body, HttpCustomHeader[] customHeaders, bool isHttp10, bool isUpload = false)
+    /// <param name="upload">
+    /// The resumed <c>-T</c> source when <paramref name="body" /> is it, or <see langword="null" />.
+    /// </param>
+    private static HttpRequestFraming OfBody(string method, HttpRequestBody body, HttpCustomHeader[] customHeaders, bool isHttp10, HttpUploadResume? upload = null)
     {
         long? length = body is BytesBody bytes ? bytes.Content.Length : ((StreamBody)body).Length;
         bool wantsExpect = WantsExpect(length, isHttp10);
@@ -177,7 +201,7 @@ internal sealed class HttpRequestFraming
             wantsExpect && !namesExpect,
             awaitsContinue,
             RefusesUnknownLengthOf(length, asksForChunked, isHttp10),
-            isUpload);
+            upload);
     }
 
     /// <summary>
