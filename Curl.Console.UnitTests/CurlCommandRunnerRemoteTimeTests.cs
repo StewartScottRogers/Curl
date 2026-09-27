@@ -14,7 +14,7 @@ namespace Curl.Console;
 [TestClass]
 public sealed class CurlCommandRunnerRemoteTimeTests
 {
-    private const string SourceUrl = "file:///C:/source.txt";
+    private const string SourceUrl = "file:///source.txt";
 
     private static readonly DateTimeOffset SourceLastWriteTimeUtc = new(2020, 1, 2, 10, 4, 5, TimeSpan.Zero);
 

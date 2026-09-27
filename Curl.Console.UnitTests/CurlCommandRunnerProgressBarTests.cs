@@ -15,7 +15,7 @@ namespace Curl.Console;
 [TestClass]
 public sealed class CurlCommandRunnerProgressBarTests
 {
-    private const string FileUrl = "file:///C:/ten.bin";
+    private const string FileUrl = "file:///ten.bin";
 
     private const string HttpUrl = "http://127.0.0.1:8765/big.bin";
 

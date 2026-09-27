@@ -14,7 +14,7 @@ namespace Curl.Console;
 [TestClass]
 public sealed class CurlCommandRunnerTransferOptionTests
 {
-    private const string SourceUrl = "file:///C:/source.txt";
+    private const string SourceUrl = "file:///source.txt";
 
     private static readonly string NewLine = Environment.NewLine;
 

@@ -12,7 +12,7 @@ namespace Curl.Console;
 [TestClass]
 public sealed class CurlCommandRunnerDumpHeaderTests
 {
-    private const string SourceUrl = "file:///C:/source.txt";
+    private const string SourceUrl = "file:///source.txt";
 
     private const string HeaderLines = "Content-Length: 10\r\nAccept-ranges: bytes\r\n\r\n";
 

@@ -13,7 +13,7 @@ namespace Curl.Console;
 [TestClass]
 public sealed class CurlCommandRunnerProgressMeterTests
 {
-    private const string SourceUrl = "file:///C:/source.txt";
+    private const string SourceUrl = "file:///source.txt";
 
     private const string UploadUrl = "http://h/up/";
 
@@ -176,12 +176,12 @@ public sealed class CurlCommandRunnerProgressMeterTests
     public async Task RunAsync_FailedTransfer_WritesOnlyItsErrorLine()
     {
         RecordingProtocolHandler missingSource =
-            RecordingProtocolHandler.Failing("file", CurlExitCode.FileCouldntReadFile, "Could not open file C:/source.txt");
+            RecordingProtocolHandler.Failing("file", CurlExitCode.FileCouldntReadFile, "Could not open file /source.txt");
 
         int exitCode = await RunAsync(["-o", "o1", SourceUrl], handler: missingSource);
 
         Assert.AreEqual(37, exitCode);
-        Assert.AreEqual("curl: (37) Could not open file C:/source.txt" + NewLine, StandardErrorText);
+        Assert.AreEqual("curl: (37) Could not open file /source.txt" + NewLine, StandardErrorText);
     }
 
     [TestMethod]
