@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: [BL-228]
-touches: [Curl.Output.UnitLibrary, Curl.Output.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests]
+touches: [Curl.Output.UnitLibrary, Curl.Output.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Documentation/Planning/Decisions]
 requirement: none
 created: 2026-09-27
-completed:
+completed: 2026-09-27
 ---
 # BL-356 — Word -v TLS handshake lines as the OpenSSL build does on Linux and macOS
 
@@ -23,8 +23,8 @@ On Linux and macOS, `VerboseTransferEventWriter` renders a `TlsHandshakeEvent` a
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Output.UnitTests` pins the OpenSSL-build `-v` TLS lines for one measured HTTPS exchange, with the command and bytes recorded in Notes; the Schannel tests in `VerboseTransferEventWriterTests` still pass.
-- [ ] `dotnet build -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes; `Measure-CodeQuality.ps1` reports 100% line and branch coverage and no failing member for `Curl.Output`.
+- [x] A test in `Curl.Output.UnitTests` pins the OpenSSL-build `-v` TLS lines for one measured HTTPS exchange, with the command and bytes recorded in Notes; the Schannel tests in `VerboseTransferEventWriterTests` still pass.
+- [x] `dotnet build -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes; `Measure-CodeQuality.ps1` reports 100% line and branch coverage and no failing member for `Curl.Output`.
 
 ## Notes
 
@@ -81,6 +81,41 @@ On Linux and macOS, `VerboseTransferEventWriter` renders a `TlsHandshakeEvent` a
   Needs an ADR ("Decided by Claude under Stewart's delegation").
   `Curl.Protocol.Abstractions.UnitLibrary` and its tests added to `touches` for this;
   BL-391 (in Doing) touches them, so this waits until it is done.
+- 2026-09-27, lane 1 — delivered as planned; decisions in ADR-0083 ("Decided by Claude
+  under Stewart's delegation").
+  - `TlsHandshakeEvent` gained optional `NegotiatedGroupName`, `PeerSignatureTypeName`,
+    `CertificateVerifyResult` (OpenSSL `X509_V_` code) and `PeerCertificateChain`.
+  - `TlsBackend` (`Schannel`, `OpenSsl`) is a constructor argument of
+    `VerboseTransferEventWriter` and `TraceTransferEventWriter`; their old constructors use
+    `PlatformTlsBackend.ForProcess` = `ForPlatform(OperatingSystem.IsWindows())`. The
+    Schannel tests now pass `TlsBackend.Schannel` explicitly.
+  - New in Output: `OpenSslHandshakeText`, `OpenSslCertificateText`,
+    `OpenSslDistinguishedNameText` (port of OpenSSL 3.5 `X509_NAME_print_ex` with curl's
+    flags), `OpenSslSecurityBits` (port of `ossl_ifc_ffc_compute_security_bits`).
+  - Pinned test: `VerboseTransferEventWriterTests.ReportTlsHandshake_OpenSslSelfSignedExchange_RendersAsCurlsOpenSslBuild`,
+    the measured exchange 1 above with the measured certificate copied to
+    `Curl.Output.UnitTests/Fixtures/openssl-verbose-localhost.pem`; exchange 3's
+    `SSL connection using TLSv1.2 / ECDHE-RSA-AES256-GCM-SHA384 / x25519 / RSASSA-PSS`
+    is pinned too. The `SSL Trust` line is not this event's (BL-401).
+  - Name printing checked against Git for Windows' OpenSSL 3.5.7:
+    `openssl x509 -nameopt oneline,-esc_msb,-space_eq,sep_semi_plus_space` printed
+    `C=GB; ST=Some + O=Multi; L=" Leading, and; special \"q\" back #x"; O="#hash<gt>"; ...; OU="trail "`,
+    `1.2.3.4=unknown`, `CN=café \01ctl`, and for `LoopbackChain.pem`'s leaf
+    `CN=localhost; O=Café Ünïcode; serialNumber=42; title=Dr; UID=u1; L=Salford` and
+    `notAfter=Nov  1 05:24:52 2027 GMT`. Cipher names from
+    `openssl ciphers -stdname DEFAULT` (PSK and SRP suites left out; .NET cannot
+    negotiate them).
+  - Defaults taken: unknown key types and curves get no `Certificate level` line; an
+    unprintable issuer prints `[NONE]` like the subject; `Documentation/Planning/Decisions`
+    added to `touches` for ADR-0083 (no task in Doing names it).
+  - Quality: Curl.Output.UnitLibrary 100% line, 100% branch, 0 failing members (worst
+    CRAP 10); Curl.Protocol.Abstractions.UnitLibrary 100%/100%, its one failing member
+    (`CurlUrlHost.TryNormalize`, complexity 12) predates this task. Tests: Output 335,
+    Abstractions 503, whole fast suite green. `dotnet format` reports only the
+    repository-wide ENDOFLINE diagnostics that existing files also have.
+  - Follow-ups filed: BL-400 (report the event, with these facts, from
+    `SslStreamTlsProvider`), BL-401 (TLS record, `SSL Trust`, `subjectAltName` and
+    `Proxy certificate:` lines).
 
 ## Log
 
@@ -88,3 +123,4 @@ On Linux and macOS, `VerboseTransferEventWriter` renders a `TlsHandshakeEvent` a
 - 2026-09-27: Backlog -> Doing.
 - 2026-09-27: Doing -> Backlog. Needs Curl.Protocol.Abstractions.UnitLibrary (TlsHandshakeEvent lacks group, signature type, verify code, chain), which BL-391 in Doing touches
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Done. -v and the trace dumps word a TLS handshake as curl's OpenSSL build on Linux and macOS: version, cipher, group, certificate block, chain levels and verify result
