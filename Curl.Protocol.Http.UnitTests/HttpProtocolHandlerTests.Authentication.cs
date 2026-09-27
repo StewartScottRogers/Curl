@@ -272,7 +272,7 @@ public sealed partial class HttpProtocolHandlerTests
 
     /// <summary>
     /// A stream body has been read by the time the 401 arrives and cannot be sent again, so
-    /// the 401 is the result (BL-181 Notes, ADR-0032).
+    /// the 401 is the result (BL-181 Notes, ADR-0034).
     /// </summary>
     [TestMethod]
     public async Task ExecuteAsync_ChallengeToAStreamBody_ReturnsThe401()

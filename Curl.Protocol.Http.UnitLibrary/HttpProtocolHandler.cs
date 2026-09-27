@@ -71,7 +71,7 @@ namespace Curl.Protocol.Http;
 /// and discarded, and the retry goes out on the same connection unless the 401 closes it
 /// (<see cref="HttpConnectionPersistence" />), in which case on a new one. A 401 that is not
 /// retried is the result, exit 0, or exit 22 under <c>-f</c>; the 401 a retry answers never
-/// fails the transfer. Measured on curl 8.21.0 (BL-181 Notes, ADR-0032).
+/// fails the transfer. Measured on curl 8.21.0 (BL-181 Notes, ADR-0034).
 /// </para>
 /// </remarks>
 public sealed class HttpProtocolHandler(
