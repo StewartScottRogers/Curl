@@ -35,3 +35,4 @@ With a forward proxy the handler connects to the proxy and sends an absolute-for
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
