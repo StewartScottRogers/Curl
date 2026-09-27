@@ -59,6 +59,14 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     internal bool IsUpload { get; init; }
 
     /// <summary>
+    /// Gets where the body bytes sent so far are reported, with the body's length when it is
+    /// known: once before the first byte and after each piece sent.
+    /// </summary>
+    internal HttpTransferProgress Progress { get; init; } = HttpTransferProgress.Silent;
+
+    private long? expectedLength;
+
+    /// <summary>
     /// Writes <paramref name="body" /> and flushes the connection.
     /// </summary>
     /// <param name="body">The body.</param>
@@ -71,6 +79,8 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     /// </exception>
     internal async ValueTask WriteAsync(HttpRequestBody body, bool isChunked, CancellationToken cancellationToken)
     {
+        expectedLength = body is BytesBody known ? known.Content.Length : ((StreamBody)body).Length;
+        Progress.ReportUploaded(BytesWritten, expectedLength);
         if (body is BytesBody bytes)
         {
             await WritePieceAsync(bytes.Content, isChunked, cancellationToken).ConfigureAwait(false);
@@ -172,5 +182,6 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
         }
 
         BytesWritten += piece.Length;
+        Progress.ReportUploaded(BytesWritten, expectedLength);
     }
 }

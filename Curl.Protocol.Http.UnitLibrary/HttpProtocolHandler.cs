@@ -149,6 +149,15 @@ namespace Curl.Protocol.Http;
 /// A successful result carries the <c>Last-Modified</c> time (<see cref="HttpLastModified" />).
 /// Measured on curl 8.21.0 (BL-178 Notes, ADR-0044).
 /// </para>
+/// <para>
+/// <see cref="ITransferContext.Progress" /> is told the transfer started once the first
+/// connection is established, so a connect failure is never reported as started; the response
+/// body bytes the output accepts, with the Content-Length as the expected total, or none when
+/// the body has none; and the request body bytes sent, with the body's length when known. A body
+/// read and discarded (a 3xx under <c>-L</c>, or a response a retry answers) is not reported,
+/// and a body sent again by a retry is not reported below the count already reported
+/// (<see cref="HttpTransferProgress" />, ADR-0045, ADR-0065).
+/// </para>
 /// </remarks>
 public sealed class HttpProtocolHandler(
     IConnector connector,
@@ -197,6 +206,7 @@ public sealed class HttpProtocolHandler(
         HttpRequestPlan plan = new(context, options, framing, authRequest, Authenticator.CreateAuthorization(authRequest, []))
         {
             Deadline = deadline,
+            Progress = new HttpTransferProgress(context.Progress),
             ForwardProxy = forwardProxy,
             ProxyAuthorization = forwardProxy is null ? null : ProxyAuthorizationFor(authRequest, forwardProxy),
         };
@@ -260,6 +270,8 @@ public sealed class HttpProtocolHandler(
             return plan.Options.ForwardProxy is null ? failure : failure with { Report = new TransferReport { UsedProxy = true } };
         }
 
+        plan.Progress.ReportTransferStarted();
+
         HttpAttemptOutcome outcome;
         await using (connection.ConfigureAwait(false))
         {
@@ -307,6 +319,7 @@ public sealed class HttpProtocolHandler(
         {
             SharedHeadLength = framing.AwaitsContinue ? 0 : request.Length,
             IsUpload = framing.IsUpload,
+            Progress = plan.Progress,
         };
         HttpExchange exchange = new(connect, connection, framing.Method, request.Length, upload, earlier, newConnection)
         {
@@ -417,6 +430,7 @@ public sealed class HttpProtocolHandler(
         ITransferContext context = plan.Context;
         Stream bodyOutput = discardsBody ? Stream.Null : context.Output;
         body.MaximumBodySize = discardsBody ? null : HttpDownloadConditions.LimitOf(context.MaxFileSize);
+        body.Progress = discardsBody ? HttpTransferProgress.Silent : plan.Progress;
         await body.CopyAsync(head, context.NoBody, bodyOutput, DecodesContent(plan.Options, discardsBody), plan.Options.TransferEncoding && !discardsBody, cancellationToken)
             .ConfigureAwait(false);
         await WriteHeadersAsync(context.HeaderOutput, body.TrailerBytes, cancellationToken).ConfigureAwait(false);
@@ -729,6 +743,11 @@ public sealed class HttpProtocolHandler(
         public required HttpTransferDeadline Deadline { get; init; }
 
         /// <summary>
+        /// Gets where the transfer's progress is reported, shared by every request it sends.
+        /// </summary>
+        public required HttpTransferProgress Progress { get; init; }
+
+        /// <summary>
         /// Gets the proxy the request is forwarded through in absolute form, or
         /// <see langword="null" /> when it goes to the origin, directly or through a tunnel.
         /// </summary>
@@ -758,6 +777,7 @@ public sealed class HttpProtocolHandler(
             new(Context, Options, framing, AuthRequest, authorization)
             {
                 Deadline = Deadline,
+                Progress = Progress,
                 ForwardProxy = ForwardProxy,
                 ProxyAuthorization = ProxyAuthorization,
             };

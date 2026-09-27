@@ -75,6 +75,13 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     internal long? ExpectedLength { get; private set; }
 
     /// <summary>
+    /// Gets or sets where the body bytes the output has accepted are reported, with
+    /// <see cref="ExpectedLength" /> as the expected total: once when reading starts and after
+    /// each write.
+    /// </summary>
+    internal HttpTransferProgress Progress { get; set; } = HttpTransferProgress.Silent;
+
+    /// <summary>
     /// Determines whether a response carries a body: not for <c>-I</c>, and not for a
     /// 204 or 304 status, whatever its Content-Length says.
     /// </summary>
@@ -137,6 +144,7 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
         IEnumerable<string> transferCodings = decodeTransfer ? framing.TransferCodings : [];
         contentDecoder = HttpContentDecoder.ForCodings(contentCodings.Concat(transferCodings));
         ExpectedLength = framing.ContentLength;
+        Progress.ReportDownloaded(BytesWritten, ExpectedLength);
         try
         {
             await CopyFramedAsync(head.BodyPrefix, framing.IsChunked, framing.ContentLength, output, cancellationToken).ConfigureAwait(false);
@@ -290,6 +298,7 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
         }
 
         BytesWritten += bytes.Length;
+        Progress.ReportDownloaded(BytesWritten, ExpectedLength);
         return bytes.Length;
     }
 }
