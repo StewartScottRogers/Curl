@@ -31,3 +31,4 @@ Every ADR under `Documentation/Planning/Decisions/` has a number no other ADR us
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
