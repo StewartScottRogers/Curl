@@ -7,8 +7,8 @@ namespace Curl.Cli;
 /// <c>tool_help</c> over <see cref="CurlHelpTable"/>: the usage page with no subject, every option for
 /// <c>all</c>, the category list for <c>category</c>, one category's options for its name, and the
 /// category list after <c>Unknown category provided, ...</c> for anything else. Subjects match in any
-/// case. A subject starting with <c>-</c> asks for one option's manual section instead, which this class
-/// does not print (task BL-374). The option columns depend on the terminal width curl's
+/// case. A subject starting with <c>-</c> asks for one option's manual section instead, which
+/// <see cref="CurlOptionManualSection"/> prints. The option columns depend on the terminal width curl's
 /// <c>get_terminal_columns</c> gives (79 when nothing sets one). The lines carry no line terminator; the
 /// console layer chooses the newline (CRLF on Windows, as the mingw reference writes).
 /// </summary>
@@ -68,7 +68,7 @@ public static class CurlHelpText
         ArgumentOutOfRangeException.ThrowIfLessThan(columns, 1);
         if (IsOptionSubject(subject))
         {
-            throw new ArgumentException("An option subject asks for a manual section, which this class does not print.", nameof(subject));
+            throw new ArgumentException("An option subject asks for a manual section, which CurlOptionManualSection prints.", nameof(subject));
         }
 
         if (string.IsNullOrEmpty(subject))
