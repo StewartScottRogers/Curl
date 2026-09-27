@@ -63,6 +63,7 @@ choices do not need one.
 | [0046](ADR-0046-the-transfer-context-carries-a-transfer-event-sink-for-v-and-trace.md) | The transfer context carries a transfer event sink for `-v` and `--trace`: `ITransferEvents` on `ITransferContext.Events` and `ConnectTarget.Events`, a sibling of the progress sink, `NoTransferEvents` by default | Accepted | 2026-09-26 |
 | [0047](ADR-0047-the-sws-emulation-selects-reply-parts-by-authorization-swsbounce-and-connect-for-one-case.md) | The sws emulation selects reply parts by `Authorization:`, `swsbounce` and `CONNECT` as sws does, taking every request to name its one case | Accepted | 2026-09-26 |
 | [0048](ADR-0048-o-names-are-sanitized-on-windows-by-a-separate-step-only-when-globbing.md) | `-o` names are sanitized on Windows by a separate step, only when globbing: `WindowsOutputFileNameSanitizer`, run by `UrlGlobMatch.ResolveOutputFileName` when the caller passes `sanitizesForWindows`, never under `-g` | Accepted | 2026-09-27 |
+| [0049](ADR-0049-the-public-suffix-list-is-an-embedded-dated-snapshot-refreshed-by-a-script.md) | The Public Suffix List is an embedded, dated snapshot refreshed by a script: `Curl.Cookies.UnitLibrary/PublicSuffixList/public_suffix_list.dat`, parsed by hand, MPL-2.0 notice kept with it, refreshed by `Update-PublicSuffixList.ps1` | Accepted | 2026-09-27 |
 
 ## Template
 
