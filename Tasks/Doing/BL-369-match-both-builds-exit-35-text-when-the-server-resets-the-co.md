@@ -37,3 +37,4 @@ When the server resets the TCP connection during the TLS handshake (rather than 
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
