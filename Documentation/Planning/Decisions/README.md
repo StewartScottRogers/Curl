@@ -47,6 +47,7 @@ choices do not need one.
 | [0030](ADR-0030-connect-timings-are-taken-by-the-connector-with-the-handshake-from-the-tls-provider.md) | Connect timings are taken by the connector, with the handshake's end from the TLS provider; the dialer reports the local end point | Accepted | 2026-09-26 |
 | [0031](ADR-0031-corrupt-compressed-bodies-report-curls-generic-exit-61-text-where-zlib-text-is-unavailable.md) | Corrupt `--compressed` bodies report curl's generic exit 61 text where zlib's own text is unavailable | Accepted | 2026-09-26 |
 | [0032](ADR-0032-url-globs-expand-as-curl-8-21-0s-tool-expands-them.md) | URL globs expand as curl 8.21.0's tool expands them: measured messages and columns, lazy expansion, `#N` as `glob_match_url` | Accepted | 2026-09-26 |
+| [0033](ADR-0033-a-followed-put-redirect-rewinds-a-seekable-upload-and-passes-stdin-on-as-it-is.md) | A followed PUT redirect rewinds a seekable `-T` upload and passes standard input on as it is | Accepted | 2026-09-26 |
 
 ## Template
 
