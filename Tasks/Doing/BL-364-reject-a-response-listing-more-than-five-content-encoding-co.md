@@ -32,3 +32,4 @@ With `--compressed`, a response whose Content-Encoding headers list more than fi
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
