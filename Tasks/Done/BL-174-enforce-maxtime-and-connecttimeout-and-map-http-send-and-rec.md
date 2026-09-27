@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: protocol
 depends-on: [BL-173, BL-123]
-touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
+touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Documentation/Planning/Decisions]
 requirement: none
 created: 2026-09-26
-completed:
+completed: 2026-09-26
 ---
 # BL-174 — Enforce MaxTime and ConnectTimeout and map HTTP send and receive failures
 
@@ -25,9 +25,9 @@ The HTTP handler ends a transfer at `MaxTime` with curl's exit 28 message and ma
 
 ## Acceptance criteria
 
-- [ ] On `FakeTimeProvider`, a stalled response returns `CurlExitCode.OperationTimedOut` (28) with the measured message and correct N and M.
-- [ ] A send failure returns `SendError` (55) and a receive failure `RecvError` (56), each with the measured message.
-- [ ] `dotnet build Curl.Protocol.Http.UnitLibrary -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes and no new test needs `TestCategory=Integration`; `Measure-CodeQuality.ps1` reports 100% line and branch coverage and no failing member for `Curl.Protocol.Http`. Tests use the fakes in `Curl.Protocol.Http.UnitTests/Fakes` (added by BL-169), never a socket; every parser test also runs with 1-byte chunks.
+- [x] On `FakeTimeProvider`, a stalled response returns `CurlExitCode.OperationTimedOut` (28) with the measured message and correct N and M.
+- [x] A send failure returns `SendError` (55) and a receive failure `RecvError` (56), each with the measured message.
+- [x] `dotnet build Curl.Protocol.Http.UnitLibrary -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes and no new test needs `TestCategory=Integration`; `Measure-CodeQuality.ps1` reports 100% line and branch coverage and no failing member for `Curl.Protocol.Http`. Tests use the fakes in `Curl.Protocol.Http.UnitTests/Fakes` (added by BL-169), never a socket; every parser test also runs with 1-byte chunks.
 
 ## Notes
 
@@ -38,3 +38,4 @@ The HTTP handler ends a transfer at `MaxTime` with curl's exit 28 message and ma
 
 - 2026-09-26: Created.
 - 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. HTTP ends a transfer at -m and a connect at --connect-timeout with curl's exit 28 messages, and maps send failures to 55 and receive failures to 56
