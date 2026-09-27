@@ -27,6 +27,23 @@ public sealed record TransferResult(
     public bool IsSuccess => ExitCode == CurlExitCode.Ok;
 
     /// <summary>
+    /// Gets a value indicating whether the transfer succeeded without delivering a body
+    /// because its <c>-z</c>/<c>--time-cond</c> condition was not met; <see langword="false" />
+    /// for every other result, a zero-byte download included. curl 8.21.0 creates no
+    /// <c>-o</c> file for such a transfer and leaves an existing one's content untouched.
+    /// </summary>
+    public bool TimeConditionUnmet { get; init; }
+
+    /// <summary>
+    /// Gets what the transfer learned beyond <see cref="ExitCode" /> and
+    /// <see cref="BytesTransferred" />, for <c>-w</c>/<c>--write-out</c> and
+    /// <c>-L</c>/<c>--location</c>; <see langword="null" /> when the handler reported
+    /// nothing more. A failed transfer may carry one too. A handler fills it with
+    /// <c>with</c>: <c>TransferResult.Success(n) with { Report = report }</c>. See ADR-0015.
+    /// </summary>
+    public TransferReport? Report { get; init; }
+
+    /// <summary>
     /// Creates a successful result.
     /// </summary>
     /// <param name="bytesTransferred">The number of payload bytes moved.</param>
@@ -39,6 +56,21 @@ public sealed record TransferResult(
         long bytesTransferred,
         DateTimeOffset? sourceLastWriteTimeUtc = null) =>
         new(CurlExitCode.Ok, bytesTransferred, null, sourceLastWriteTimeUtc);
+
+    /// <summary>
+    /// Creates a successful result that delivered no body because the transfer's
+    /// <see cref="ITransferContext.TimeCondition" /> was not met.
+    /// </summary>
+    /// <param name="sourceLastWriteTimeUtc">
+    /// The modification time of the resource that was checked, or <see langword="null" />
+    /// when it is unknown; <c>-R</c>/<c>--remote-time</c> still applies it.
+    /// </param>
+    /// <returns>
+    /// A successful <see cref="TransferResult" /> with no bytes moved and
+    /// <see cref="TimeConditionUnmet" /> set.
+    /// </returns>
+    public static TransferResult TimeConditionNotMet(DateTimeOffset? sourceLastWriteTimeUtc = null) =>
+        new(CurlExitCode.Ok, 0, null, sourceLastWriteTimeUtc) { TimeConditionUnmet = true };
 
     /// <summary>
     /// Creates a failed result, whose <see cref="SourceLastWriteTimeUtc" /> is always

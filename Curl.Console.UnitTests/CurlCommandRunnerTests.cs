@@ -130,7 +130,8 @@ public sealed class CurlCommandRunnerTests
         InMemoryFileSystem files = new() { ReadContent = new byte[92] };
         files.UnwritablePaths.Add("C:/nonexist/dir/x");
         CurlCommandRunner runner = new(
-            _ => new ProtocolDispatcher([new FileProtocolHandler(files)]),
+            _ => new TransferDispatch(new ProtocolDispatcher([new FileProtocolHandler(files)])),
+            files,
             files,
             standardOutput,
             standardError,
@@ -162,7 +163,8 @@ public sealed class CurlCommandRunnerTests
         InMemoryFileSystem files = new() { ReadContent = new byte[92], UnwritableStatus = FileAccessStatus.AccessDenied };
         files.UnwritablePaths.Add("C:/Windows/System32/bl087.txt");
         CurlCommandRunner runner = new(
-            _ => new ProtocolDispatcher([new FileProtocolHandler(files)]),
+            _ => new TransferDispatch(new ProtocolDispatcher([new FileProtocolHandler(files)])),
+            files,
             files,
             standardOutput,
             standardError,
@@ -223,6 +225,34 @@ public sealed class CurlCommandRunnerTests
         Assert.IsEmpty(fileSystem.Written["empty.txt"].ToArray());
     }
 
+    // curl 8.21.0, curl -z "1 Jan 2030" -o out.txt file:///... (measured 2026-09-26): the
+    // unmet condition exits 0 and creates no out.txt.
+    [TestMethod]
+    public async Task RunAsync_UnmetTimeCondition_CreatesNoOutputFile()
+    {
+        RecordingProtocolHandler unmet = new("file", _ => ValueTask.FromResult(TransferResult.TimeConditionNotMet()));
+
+        int exitCode = await RunAsync(["-o", "out.txt", "file:///source"], unmet);
+
+        Assert.AreEqual((int)CurlExitCode.Ok, exitCode);
+        Assert.IsFalse(fileSystem.Written.ContainsKey("out.txt"));
+        Assert.IsEmpty(fileSystem.WriteModes);
+    }
+
+    // The same with an existing out.txt holding "old": curl leaves its content as it was.
+    [TestMethod]
+    public async Task RunAsync_UnmetTimeConditionWithExistingOutputFile_KeepsItsContent()
+    {
+        RecordingProtocolHandler unmet = new("file", _ => ValueTask.FromResult(TransferResult.TimeConditionNotMet()));
+        fileSystem.ExistingContent["out.txt"] = Encoding.ASCII.GetBytes("old");
+
+        int exitCode = await RunAsync(["-o", "out.txt", "file:///source"], unmet);
+
+        Assert.AreEqual((int)CurlExitCode.Ok, exitCode);
+        Assert.IsFalse(fileSystem.Written.ContainsKey("out.txt"));
+        Assert.AreEqual("old", Encoding.ASCII.GetString(fileSystem.ExistingContent["out.txt"]));
+    }
+
     [TestMethod]
     public async Task RunAsync_EmptyTransferToUncreatableOutputFile_ReturnsExit23WithNoLine()
     {
@@ -263,12 +293,16 @@ public sealed class CurlCommandRunnerTests
     }
 
     [TestMethod]
-    public async Task RunAsync_EmptyCommandLine_TransfersNothingAndReturns0()
+    public async Task RunAsync_EmptyCommandLine_PrintsOnlyTheTryHelpLineRunsNoHandlerAndReturns2()
     {
-        int exitCode = await RunAsync([]);
+        RecordingProtocolHandler file = RecordingProtocolHandler.WritingPath("file");
 
-        Assert.AreEqual(0, exitCode);
-        Assert.AreEqual(0, standardError.Length);
+        int exitCode = await RunAsync([], file);
+
+        Assert.AreEqual(2, exitCode);
+        Assert.AreEqual(0, standardOutput.Length);
+        Assert.AreEqual(CommandLineRefusal.TryHelpLine + NewLine, StandardErrorText);
+        Assert.IsEmpty(file.Contexts);
     }
 
     [TestMethod]
@@ -321,6 +355,30 @@ public sealed class CurlCommandRunnerTests
         Assert.IsFalse(context.TftpNoOptions);
         Assert.AreEqual(TransferContext.DefaultCreateFileMode, context.CreateFileMode);
         Assert.AreEqual("/a", StandardOutputText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_ConnectTimeoutAndMaxTime_ReachTheHandlersContext()
+    {
+        RecordingProtocolHandler tftp = RecordingProtocolHandler.WritingPath("tftp");
+
+        await RunAsync(["--connect-timeout", "10", "-m", "20", "tftp://127.0.0.1/f"], tftp);
+
+        ITransferContext context = tftp.Contexts.Single();
+        Assert.AreEqual(TimeSpan.FromSeconds(10), context.ConnectTimeout);
+        Assert.AreEqual(TimeSpan.FromSeconds(20), context.MaxTime);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_NoConnectTimeoutOrMaxTime_ContextCarriesNull()
+    {
+        RecordingProtocolHandler tftp = RecordingProtocolHandler.WritingPath("tftp");
+
+        await RunAsync(["tftp://127.0.0.1/f"], tftp);
+
+        ITransferContext context = tftp.Contexts.Single();
+        Assert.IsNull(context.ConnectTimeout);
+        Assert.IsNull(context.MaxTime);
     }
 
     [TestMethod]
@@ -473,8 +531,9 @@ public sealed class CurlCommandRunnerTests
             _ =>
             {
                 calls++;
-                return new ProtocolDispatcher([]);
+                return new TransferDispatch(new ProtocolDispatcher([]));
             },
+            fileSystem,
             fileSystem,
             standardOutput,
             standardError,
@@ -529,14 +588,14 @@ public sealed class CurlCommandRunnerTests
     }
 
     private Task<int> RunAsync(IReadOnlyList<string> arguments, params IProtocolHandler[] handlers) =>
-        new CurlCommandRunner(_ => new ProtocolDispatcher(handlers), fileSystem, standardOutput, standardError, standardInput, runsOnWindows: false)
+        new CurlCommandRunner(_ => new TransferDispatch(new ProtocolDispatcher(handlers)), fileSystem, fileSystem, standardOutput, standardError, standardInput, runsOnWindows: false)
             .RunAsync(arguments);
 
     private Task<int> RunWithStandardOutputAsync(
         Stream output,
         IReadOnlyList<string> arguments,
         params IProtocolHandler[] handlers) =>
-        new CurlCommandRunner(_ => new ProtocolDispatcher(handlers), fileSystem, output, standardError, standardInput, runsOnWindows: false)
+        new CurlCommandRunner(_ => new TransferDispatch(new ProtocolDispatcher(handlers)), fileSystem, fileSystem, output, standardError, standardInput, runsOnWindows: false)
             .RunAsync(arguments);
 
     private Task<int> RunToUncreatableOutputFileAsync(params string[] options)
@@ -544,7 +603,8 @@ public sealed class CurlCommandRunnerTests
         InMemoryFileSystem files = new() { ReadContent = new byte[92] };
         files.UnwritablePaths.Add("Z:/nonexist/x");
         CurlCommandRunner runner = new(
-            _ => new ProtocolDispatcher([new FileProtocolHandler(files)]),
+            _ => new TransferDispatch(new ProtocolDispatcher([new FileProtocolHandler(files)])),
+            files,
             files,
             standardOutput,
             standardError,

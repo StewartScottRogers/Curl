@@ -112,6 +112,81 @@ public sealed class CommandLineNegationTests
     }
 
     [TestMethod]
+    public void Parse_GetThenNoGet_KeepsDataInTheBody()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["-G", "--no-get", Url]);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsFalse(result.Options.DataInQuery);
+    }
+
+    [TestMethod]
+    public void Parse_NoGetThenGet_MovesDataIntoTheQuery()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--no-get", "--get", Url]);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsTrue(result.Options.DataInQuery);
+    }
+
+    [TestMethod]
+    public void Parse_NoGetWithAttachedValue_IgnoresTheValue()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["-G", "--no-get=x", Url]);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsFalse(result.Options.DataInQuery);
+    }
+
+    [TestMethod]
+    public void Parse_NoDataAscii_IsRefusedAsNotReversible() =>
+        AssertRefused(CommandLineParser.Parse(["--no-data-ascii", Url]), "curl: option --no-data-ascii: " + CannotBeReversed);
+
+    [TestMethod]
+    public void Parse_NoDataAsciiWithAttachedValue_IsRefusedAsNotReversible() =>
+        AssertRefused(CommandLineParser.Parse(["--no-data-ascii=x", Url]), "curl: option --no-data-ascii=x: " + CannotBeReversed);
+
+    [TestMethod]
+    public void Parse_NoDataBinary_IsRefusedAsNotReversible() =>
+        AssertRefused(CommandLineParser.Parse(["--no-data-binary", Url]), "curl: option --no-data-binary: " + CannotBeReversed);
+
+    [TestMethod]
+    public void Parse_NoDataBinaryWithAttachedValue_IsRefusedAsNotReversible() =>
+        AssertRefused(CommandLineParser.Parse(["--no-data-binary=x", Url]), "curl: option --no-data-binary=x: " + CannotBeReversed);
+
+    [TestMethod]
+    public void Parse_NoDataRaw_IsRefusedAsNotReversible() =>
+        AssertRefused(CommandLineParser.Parse(["--no-data-raw", Url]), "curl: option --no-data-raw: " + CannotBeReversed);
+
+    [TestMethod]
+    public void Parse_NoDataRawWithAttachedValue_IsRefusedAsNotReversible() =>
+        AssertRefused(CommandLineParser.Parse(["--no-data-raw=x", Url]), "curl: option --no-data-raw=x: " + CannotBeReversed);
+
+    [TestMethod]
+    public void Parse_NoDataUrlencode_IsRefusedAsNotReversible() =>
+        AssertRefused(CommandLineParser.Parse(["--no-data-urlencode", Url]), "curl: option --no-data-urlencode: " + CannotBeReversed);
+
+    [TestMethod]
+    public void Parse_NoDataUrlencodeWithAttachedValue_IsRefusedAsNotReversible() =>
+        AssertRefused(CommandLineParser.Parse(["--no-data-urlencode=x", Url]), "curl: option --no-data-urlencode=x: " + CannotBeReversed);
+
+    [TestMethod]
+    public void Parse_NoJson_IsRefusedAsNotReversible() =>
+        AssertRefused(CommandLineParser.Parse(["--no-json", Url]), "curl: option --no-json: " + CannotBeReversed);
+
+    [TestMethod]
+    public void Parse_NoJsonWithAttachedValue_IsRefusedAsNotReversible() =>
+        AssertRefused(CommandLineParser.Parse(["--no-json=x", Url]), "curl: option --no-json=x: " + CannotBeReversed);
+
+    [TestMethod]
+    public void Parse_NoUrlQuery_IsRefusedAsNotReversible() =>
+        AssertRefused(CommandLineParser.Parse(["--no-url-query", Url]), "curl: option --no-url-query: " + CannotBeReversed);
+
+    [TestMethod]
+    public void Parse_NoUrlQueryWithAttachedValue_IsRefusedAsNotReversible() =>
+        AssertRefused(CommandLineParser.Parse(["--no-url-query=x", Url]), "curl: option --no-url-query=x: " + CannotBeReversed);
+
+    [TestMethod]
     [DataRow("--no-bogus")]
     [DataRow("--no-")]
     [DataRow("--no-no-silent")]

@@ -55,4 +55,18 @@ public sealed class TimeConditionTests
 
         Assert.AreNotEqual(earlier, later);
     }
+
+    [TestMethod]
+    public void With_SettingEveryProperty_ReturnsCopyWithNewValuesAndLeavesOriginalUnchanged()
+    {
+        var original = new TimeCondition(Instant, TimeConditionKind.IfModifiedSince);
+        var later = Instant.AddDays(1);
+
+        var copy = original with { Value = later, Kind = TimeConditionKind.IfUnmodifiedSince };
+
+        Assert.AreEqual(later, copy.Value);
+        Assert.AreEqual(TimeConditionKind.IfUnmodifiedSince, copy.Kind);
+        Assert.AreEqual(Instant, original.Value);
+        Assert.AreEqual(TimeConditionKind.IfModifiedSince, original.Kind);
+    }
 }

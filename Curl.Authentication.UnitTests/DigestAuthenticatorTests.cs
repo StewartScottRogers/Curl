@@ -1,0 +1,233 @@
+using System.Net;
+using System.Text;
+using Curl.Protocol.Abstractions;
+
+namespace Curl.Authentication;
+
+/// <summary>
+/// Pins <see cref="DigestAuthenticator" /> to the RFC 7616 section 3.9 examples and to the
+/// Authorization values curl 8.21.0 (the OpenSSL build, <c>curlimages/curl:8.21.0</c>)
+/// sent to a loopback server, each reproduced with its cnonce injected (BL-217 Notes).
+/// </summary>
+[TestClass]
+public sealed class DigestAuthenticatorTests
+{
+    private const string MeasuredTarget = "/dir/index.html?x=1";
+
+    // The RFC prints the MD5 response with a typo (...eebdec3); this is the value its errata
+    // and an independent computation (Python's hashlib) give.
+    [TestMethod]
+    [DataRow("MD5", "8ca523f5e9506fed4657c9700eebdbec", DisplayName = "RFC 7616 3.9.1, MD5")]
+    [DataRow("SHA-256", "753927fa0e85d155564e2e272a28d1802ca10daf4496794697cf8db5856cb6c1", DisplayName = "RFC 7616 3.9.1, SHA-256")]
+    public void CreateAuthorization_Rfc7616Section391_GivesTheExampleResponse(string algorithm, string response)
+    {
+        string challenge = "Digest realm=\"http-auth@example.org\", qop=\"auth, auth-int\", algorithm=" + algorithm
+            + ", nonce=\"7ypf/xlj9XXwfDPEoM4URrv/xwf94BcCAzFZH4GiTo0v\", opaque=\"FQhe/qaU925kfnzjCev0ciny7QMkPqMAFRtzCUYo5tdS\"";
+
+        string? value = Answer("Mufasa", "Circle of Life", "/dir/index.html", "f2/wE4q74E6zIJEtWaHKaf5wv/H5QzzpXusqGemxURZJ", challenge);
+
+        Assert.AreEqual(
+            "Digest username=\"Mufasa\", realm=\"http-auth@example.org\", nonce=\"7ypf/xlj9XXwfDPEoM4URrv/xwf94BcCAzFZH4GiTo0v\", "
+            + "uri=\"/dir/index.html\", cnonce=\"f2/wE4q74E6zIJEtWaHKaf5wv/H5QzzpXusqGemxURZJ\", nc=00000001, qop=auth, "
+            + "response=\"" + response + "\", opaque=\"FQhe/qaU925kfnzjCev0ciny7QMkPqMAFRtzCUYo5tdS\", algorithm=" + algorithm,
+            value);
+    }
+
+    // The RFC prints a wrong username hash and response for this example; these are the
+    // values its errata and an independent computation (Python's hashlib) give, and the
+    // username hash is what curl 8.18.0 (Ubuntu, OpenSSL) sent for this user in UTF-8.
+    [TestMethod]
+    public void CreateAuthorization_Rfc7616Section392_GivesTheCorrectedExampleValues()
+    {
+        string challenge = "Digest realm=\"api@example.org\", qop=\"auth\", algorithm=SHA-512-256, "
+            + "nonce=\"5TsQWLVdgBdmrQ0XsxbDODV+57QdFR34I9HAbC/RVvkK\", opaque=\"HRPCssKJSGjCrkzDg8OhwpzCiGPChXYjwrI2QmXDnsOS\", "
+            + "charset=UTF-8, userhash=true";
+
+        string? value = Answer("Jäsøn Doe", "Secret, or not?", "/doe.json", "NTg6RKcb9boFIAS3KrFK9BGeh+iDa/sm6jUMp2wds69v", challenge);
+
+        Assert.AreEqual(
+            "Digest username=\"793263caabb707a56211940d90411ea4a575adeccb7e360aeb624ed06ece9b0b\", realm=\"api@example.org\", "
+            + "nonce=\"5TsQWLVdgBdmrQ0XsxbDODV+57QdFR34I9HAbC/RVvkK\", uri=\"/doe.json\", "
+            + "cnonce=\"NTg6RKcb9boFIAS3KrFK9BGeh+iDa/sm6jUMp2wds69v\", nc=00000001, qop=auth, "
+            + "response=\"3798d4131c277846293534c3edc11bd8a5e4cdcbff78b05db9d95eeb1cec68a5\", "
+            + "opaque=\"HRPCssKJSGjCrkzDg8OhwpzCiGPChXYjwrI2QmXDnsOS\", algorithm=SHA-512-256, userhash=true",
+            value);
+    }
+
+    [TestMethod]
+    [DataRow(
+        "Mufasa", "Circle Of Life", "AqQxeIb4+11xINQp",
+        "Digest realm=\"testrealm@host.com\", qop=\"auth,auth-int\", nonce=\"dcd98b7102dd2f0e8b11d0f600bfb0c093\", opaque=\"5ccc069c403ebaf9f0171e9517f40e41\"",
+        "Digest username=\"Mufasa\", realm=\"testrealm@host.com\", nonce=\"dcd98b7102dd2f0e8b11d0f600bfb0c093\", uri=\"/dir/index.html?x=1\", cnonce=\"AqQxeIb4+11xINQp\", nc=00000001, qop=auth, response=\"1c3c228af43ad1467439331b0d52e7a2\", opaque=\"5ccc069c403ebaf9f0171e9517f40e41\"",
+        DisplayName = "MD5, qop auth")]
+    [DataRow(
+        "Mufasa", "Circle of Life", "KJ/mlVGS7TUHDJjH",
+        "Digest realm=\"http-auth@example.org\", qop=\"auth, auth-int\", algorithm=SHA-256, nonce=\"7ypf/xlj9XXwfDPEoM4URrv/xwf94BcCAzFZH4GiTo0v\", opaque=\"FQhe/qaU925kfnzjCev0ciny7QMkPqMAFRtzCUYo5tdS\"",
+        "Digest username=\"Mufasa\", realm=\"http-auth@example.org\", nonce=\"7ypf/xlj9XXwfDPEoM4URrv/xwf94BcCAzFZH4GiTo0v\", uri=\"/dir/index.html?x=1\", cnonce=\"KJ/mlVGS7TUHDJjH\", nc=00000001, qop=auth, response=\"d39ad8a3303d6b3c571c3f062683f015709d5171f3f2572f50c6e432d6d68e36\", opaque=\"FQhe/qaU925kfnzjCev0ciny7QMkPqMAFRtzCUYo5tdS\", algorithm=SHA-256",
+        DisplayName = "SHA-256")]
+    [DataRow(
+        "Jason", "pw", "nnmPKDzp1C4nRhKe",
+        "Digest realm=\"api@example.org\", qop=\"auth\", algorithm=SHA-512-256-sess, nonce=\"5TsQ\", opaque=\"HRPC\"",
+        "Digest username=\"Jason\", realm=\"api@example.org\", nonce=\"5TsQ\", uri=\"/dir/index.html?x=1\", cnonce=\"nnmPKDzp1C4nRhKe\", nc=00000001, qop=auth, response=\"8cf7176057726560e946de2bdca341e7a0ef5646cd03f4ed181ebb615134198c\", opaque=\"HRPC\", algorithm=SHA-512-256-sess",
+        DisplayName = "SHA-512-256-sess")]
+    [DataRow(
+        "u", "p", "S9m65TsQDYXSNo9z",
+        "Digest realm=\"r\", nonce=\"abc\", algorithm=md5-sess, qop=\"auth-int\"",
+        "Digest username=\"u\", realm=\"r\", nonce=\"abc\", uri=\"/dir/index.html?x=1\", cnonce=\"S9m65TsQDYXSNo9z\", nc=00000001, qop=auth-int, response=\"d93b6bff3c1f2b0c012c7594732e680e\", algorithm=md5-sess",
+        DisplayName = "MD5-sess in lowercase, qop auth-int")]
+    [DataRow(
+        "u\"x", "p", "unused",
+        "Digest realm=\"a\\\"b\", nonce=\"n1\", opaque=\"o\\p\"",
+        "Digest username=\"u\\\"x\", realm=\"a\\\"b\", nonce=\"n1\", uri=\"/dir/index.html?x=1\", response=\"e0ac26db0d236b990bc9bf1f9ff702ba\", opaque=\"op\"",
+        DisplayName = "No qop; escapes read and written")]
+    [DataRow(
+        "u", "p", "unused",
+        "Digest realm=r r ,nonce=abc,qop=auth ,stale=TRUE",
+        "Digest username=\"u\", realm=\"r r \", nonce=\"abc\", uri=\"/dir/index.html?x=1\", response=\"0860136914065042c1164ec0c92f5711\"",
+        DisplayName = "Unquoted values keep trailing blanks; 'auth ' is not auth")]
+    [DataRow(
+        "u", "p", "unused",
+        "Digest realm=\"r\", nonce=\"abc\", algorithm=MD5",
+        "Digest username=\"u\", realm=\"r\", nonce=\"abc\", uri=\"/dir/index.html?x=1\", response=\"dc5a3b958ac976e76d201db0685bb919\", algorithm=MD5",
+        DisplayName = "MD5 named, no qop")]
+    [DataRow(
+        "u", "p", "kAoiW3PrGlPIJtmR",
+        "Basic realm=\"x\", Digest realm=\"r\", nonce=\"abc\", qop=\"auth\"",
+        "Digest username=\"u\", realm=\"r\", nonce=\"abc\", uri=\"/dir/index.html?x=1\", cnonce=\"kAoiW3PrGlPIJtmR\", nc=00000001, qop=auth, response=\"7e065a1df64f0d9b757f3b805eeb998a\"",
+        DisplayName = "Digest after Basic in one header")]
+    public void CreateAuthorization_MeasuredChallenge_MatchesCurl(string user, string password, string clientNonce, string challenge, string expected)
+    {
+        Assert.AreEqual(expected, Answer(user, password, MeasuredTarget, clientNonce, challenge));
+    }
+
+    // Measured with the user name passed to curl as the Latin-1 bytes 4A E4 73 F8 6E 20 44 6F 65.
+    [TestMethod]
+    public void CreateAuthorization_MeasuredSha512Slash256UserHash_MatchesCurl()
+    {
+        DigestAuthenticator authenticator = new(Encoding.Latin1, () => "SRYUJbi5FSpCCXuX");
+        HttpAuthRequest request = Request(new NetworkCredential("Jäsøn Doe", "Secret, or not?"), MeasuredTarget, HttpAuthSchemes.Digest);
+
+        string? value = authenticator.CreateAuthorization(
+            request,
+            ["Digest realm=\"api@example.org\", qop=\"auth\", algorithm=SHA-512-256, nonce=\"5TsQWLVdgBdmrQ0XsxbDODV+57QdFR34I9HAbC/RVvkK\", opaque=\"HRPCssKJSGjCrkzDg8OhwpzCiGPChXYjwrI2QmXDnsOS\", charset=UTF-8, userhash=true"]);
+
+        Assert.AreEqual(
+            "Digest username=\"e72804befc95fc9e20d714739a58cba0e7e586547dea2d1806e3a34049ad6fcc\", realm=\"api@example.org\", nonce=\"5TsQWLVdgBdmrQ0XsxbDODV+57QdFR34I9HAbC/RVvkK\", uri=\"/dir/index.html?x=1\", cnonce=\"SRYUJbi5FSpCCXuX\", nc=00000001, qop=auth, response=\"35050cfffb7fdc67ac0d998e6eb6fc62e3cfb1870f47aa3ad49de4312cdecb06\", opaque=\"HRPCssKJSGjCrkzDg8OhwpzCiGPChXYjwrI2QmXDnsOS\", algorithm=SHA-512-256, userhash=true",
+            value);
+    }
+
+    [TestMethod]
+    public void CreateAuthorization_NonAsciiAndControlBytes_ArePercentEscapedAsCurlDoes()
+    {
+        string? value = Answer(
+            "Jé", "p", "/a%20b/?q=1", "/u5QvFQ91P+JYapd", "Digest realm=\"ré\tx\", nonce=\"n\u0001\", qop=\"AUTH\"");
+
+        Assert.AreEqual(
+            "Digest username=\"J%C3%A9\", realm=\"r%E9%09x\", nonce=\"n%01\", uri=\"/a%20b/?q=1\", cnonce=\"/u5QvFQ91P+JYapd\", nc=00000001, qop=auth, response=\"e1c2a9f4e7fb40960b16a0ca47f2cb2e\"",
+            value);
+    }
+
+    [TestMethod]
+    public void CreateAuthorization_UserHashWithoutRealm_HashesAnEmptyRealm()
+    {
+        string? value = Answer(
+            "u", "p", "/x", "ka9a7qWpSXQL7Jd0", "Digest nonce=\"abc\", qop=\"auth-int, auth\", userhash=TRUE, algorithm=sha-256-SESS");
+
+        Assert.AreEqual(
+            "Digest username=\"27e14d2b41b03178ea220560f2cedd22275da3e1b3570f9d5957b7b7d96e850c\", realm=\"\", nonce=\"abc\", uri=\"/x\", cnonce=\"ka9a7qWpSXQL7Jd0\", nc=00000001, qop=auth, response=\"795fb2a1774eb8ae2b22a3f2f5e70cd45618f8cf0bc83ff47f3ebe5038ba2d80\", algorithm=sha-256-SESS, userhash=true",
+            value);
+    }
+
+    [TestMethod]
+    public void CreateAuthorization_TwoDigestHeaders_AnswersTheFirst()
+    {
+        string? value = Answer("u", "p", MeasuredTarget, "unused", "Digest realm=\"first\", nonce=\"n1\"", "Digest realm=\"second\", nonce=\"n2\"");
+
+        Assert.AreEqual(
+            "Digest username=\"u\", realm=\"first\", nonce=\"n1\", uri=\"/dir/index.html?x=1\", response=\"fed44a67fd705927925e252c6e8d370c\"",
+            value);
+    }
+
+    [TestMethod]
+    [DataRow("Digest realm=\"r\", nonce=\"abc\", algorithm=SHA-1", DisplayName = "Unknown algorithm (measured)")]
+    [DataRow("Digest realm=\"r\", nonce=\"abc\", algorithm=MD5-sess", DisplayName = "-sess without qop (measured)")]
+    [DataRow("Digest realm=\"r\"", DisplayName = "No nonce (measured)")]
+    [DataRow("Digest", DisplayName = "Scheme name alone")]
+    [DataRow("Digest,nonce=\"abc\"", DisplayName = "No blank after the scheme name")]
+    [DataRow("Basic realm=\"r\"", DisplayName = "No Digest challenge")]
+    [DataRow("Digestive nonce=\"abc\"", DisplayName = "A longer scheme name")]
+    public void CreateAuthorization_ChallengeCurlRejects_SendsNothing(string challenge)
+    {
+        Assert.IsNull(Answer("u", "p", "/", "unused", challenge));
+    }
+
+    [TestMethod]
+    public void CreateAuthorization_RejectedFirstDigest_IgnoresALaterOne()
+    {
+        Assert.IsNull(Answer("u", "p", "/", "unused", "Digest realm=\"r\"", "Digest nonce=\"abc\""));
+    }
+
+    [TestMethod]
+    public void CreateAuthorization_ALongerSchemeNameFirst_AnswersTheDigestInTheNextHeader()
+    {
+        string? value = Answer("u", "p", "/", "unused", "Digestive nonce=\"abc\"", "  Digest\tnonce=\"b\"");
+
+        StringAssert.StartsWith(value, "Digest username=\"u\", realm=\"\", nonce=\"b\", uri=\"/\", response=\"");
+    }
+
+    [TestMethod]
+    [DataRow(HttpAuthSchemes.Basic, DisplayName = "--basic")]
+    [DataRow(HttpAuthSchemes.Bearer, DisplayName = "--oauth2-bearer")]
+    [DataRow(HttpAuthSchemes.None, DisplayName = "No scheme")]
+    public void CreateAuthorization_DigestNotAllowed_SendsNothing(HttpAuthSchemes allowed)
+    {
+        DigestAuthenticator authenticator = new(Encoding.UTF8, () => "c");
+        HttpAuthRequest request = Request(new NetworkCredential("u", "p"), "/", allowed);
+
+        Assert.IsNull(authenticator.CreateAuthorization(request, ["Digest nonce=\"abc\""]));
+    }
+
+    [TestMethod]
+    public void CreateAuthorization_NoCredential_SendsNothing()
+    {
+        DigestAuthenticator authenticator = new(Encoding.UTF8, () => "c");
+
+        Assert.IsNull(authenticator.CreateAuthorization(Request(null, "/", HttpAuthSchemes.Digest), ["Digest nonce=\"abc\""]));
+    }
+
+    [TestMethod]
+    public void CreateAuthorization_BeforeAnyChallenge_SendsNothing()
+    {
+        Assert.IsNull(Answer("u", "p", "/", "unused"));
+    }
+
+    [TestMethod]
+    public void CreateAuthorization_WindowsCodePage_HashesTheCredentialInIt()
+    {
+        DigestAuthenticator authenticator = new(CodePagesEncodingProvider.Instance.GetEncoding(1252)!, () => "c");
+
+        string? value = authenticator.CreateAuthorization(
+            Request(new NetworkCredential("é", "p"), "/", HttpAuthSchemes.Any), ["Digest nonce=\"abc\""]);
+
+        StringAssert.StartsWith(value, "Digest username=\"%E9\"");
+    }
+
+    [TestMethod]
+    public void CreateAuthorization_NullArguments_Throw()
+    {
+        DigestAuthenticator authenticator = new(Encoding.UTF8, () => "c");
+
+        Assert.ThrowsExactly<ArgumentNullException>(() => authenticator.CreateAuthorization(null!, []));
+        Assert.ThrowsExactly<ArgumentNullException>(
+            () => authenticator.CreateAuthorization(Request(null, "/", HttpAuthSchemes.Digest), null!));
+    }
+
+    private static string? Answer(string user, string password, string target, string clientNonce, params string[] challenges)
+    {
+        DigestAuthenticator authenticator = new(Encoding.UTF8, () => clientNonce);
+        return authenticator.CreateAuthorization(Request(new NetworkCredential(user, password), target, HttpAuthSchemes.Digest), challenges);
+    }
+
+    private static HttpAuthRequest Request(NetworkCredential? credential, string target, HttpAuthSchemes allowed) =>
+        new("GET", new Uri("http://127.0.0.1" + target), target, credential, null, allowed, IsProxy: false);
+}

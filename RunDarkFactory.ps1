@@ -23,6 +23,35 @@
 
     Speech is Windows' built-in System.Speech. The key press restores volume and mute.
 
+    KEEPING THE BOARD MOVING
+
+    Runs decide design and behaviour questions themselves (Stewart delegated them; see
+    CLAUDE.md "Decisions") and block only for a new package or a threshold change. A
+    task that waits on other tasks goes back to Backlog with them in `depends-on`, and a
+    run that needs a project outside `touches` widens it. Before each claim the shift
+    also requeues any Blocked task whose reason names only tasks that are now Done.
+
+    OUT OF TOKENS
+
+    When the account's usage limit refuses a run, that is not a stall. The task stays
+    claimed, the shift waits for the new session and then runs the same task again,
+    telling it to carry on from the partial work. Stewart is told three times, each
+    with a coloured notice, a chime and one spoken sentence (screen only under
+    -QuietAlarm), never the escalating alarm:
+
+      at once              out of tokens, when the new session starts and how long until then
+      -LimitWarnSeconds    before the reset: the new session is about to start
+      on resuming          the new session has started, and which task it resumed
+
+    If the limit is lifted early, the shift carries on at once: every -LimitProbeMinutes
+    the coordinator (or lone runner) asks Claude for one word, and an answer wakes every
+    waiting runner. After resetting the limit by hand, `RunDarkFactory.cmd -Wake` does
+    the same without waiting for the next probe.
+
+    The reset time comes from the run's rate_limit_event. Time spent waiting is added
+    to the shift, so -Hours is always working time. With lanes, every lane waits on its
+    own and the coordinator makes the announcements, once for all of them.
+
     PARALLEL LANES (-Lanes 2 or more)
 
     The shift runs that many lanes at once, each an independent task runner in its own
@@ -50,6 +79,7 @@
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -Lanes 4
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestAlarm
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestAlarm -AlarmScale 0.1
+    powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestOutOfTokens
 #>
 [CmdletBinding()]
 param(
@@ -71,6 +101,14 @@ param(
     [ValidateRange(0, 100)][int]$AlarmMaxVolume = 100,
     # Banner only: no chime, siren, speech or volume change. For nights.
     [switch]$QuietAlarm,
+    # Rehearse the out-of-tokens notices with a pretend reset 90 seconds away, and exit.
+    [switch]$TestOutOfTokens,
+    # How long before the usage limit resets to say the new session is about to start.
+    [ValidateRange(0, 3600)][int]$LimitWarnSeconds = 60,
+    # While waiting for tokens, how often to check whether the limit was lifted early. 0 = never.
+    [ValidateRange(0, 600)][int]$LimitProbeMinutes = 10,
+    # Wake a shift that is waiting for tokens (after resetting the limit), and exit.
+    [switch]$Wake,
     # How many tasks run at once, each in its own worktree and window. 1 is the classic
     # single-runner shift in this checkout.
     [ValidateRange(1, 8)][int]$Lanes = 1,
@@ -101,6 +139,8 @@ $TraceFile = Join-Path $LogDir "DarkFactory-$Stamp$LaneTag.log"
 # is itself one of those folders, so its lanes directory is its parent.
 $LanesDir = if ($Lane) { Split-Path $Root -Parent } else { "$Root.lanes" }
 $LockFile = Join-Path $LanesDir 'integrate.lock'
+# Every runner of a shift records usage-limit hits here; the coordinator reads it.
+$LimitFile = Join-Path $LogDir "limit-$Stamp.txt"
 
 # ---------------------------------------------------------------------------- trace
 
@@ -391,6 +431,204 @@ if ($TestAlarm) {
     exit 0
 }
 
+# ---------------------------------------------------------------------------- usage limit
+
+function Format-Span {
+    # 2 h 55 min, or 40 min, rounded up to the minute.
+    param([TimeSpan]$Span)
+    $mins = [int][math]::Max(0, [math]::Ceiling($Span.TotalMinutes))
+    if ($mins -ge 60) { return "$([math]::Floor($mins / 60)) h $($mins % 60) min" }
+    return "$mins min"
+}
+
+function Format-SpokenSpan {
+    # 2 hours 55 minutes, or 1 minute, rounded up to the minute.
+    param([TimeSpan]$Span)
+    $mins = [int][math]::Max(1, [math]::Ceiling($Span.TotalMinutes))
+    $h = [int][math]::Floor($mins / 60); $m = $mins % 60
+    $parts = @()
+    if ($h) { $parts += if ($h -eq 1) { '1 hour' } else { "$h hours" } }
+    if ($m) { $parts += if ($m -eq 1) { '1 minute' } else { "$m minutes" } }
+    return $parts -join ' '
+}
+
+function ConvertTo-Unix { param([datetime]$When) return ([DateTimeOffset]$When).ToUnixTimeSeconds() }
+function ConvertFrom-Unix { param([long]$Seconds) return [DateTimeOffset]::FromUnixTimeSeconds($Seconds).LocalDateTime }
+
+function Get-OutOfTokensUntil {
+    # When the last run was refused for the account's usage limit, the local time the
+    # limit resets; otherwise $null. The run's rate_limit_event gives it exactly; the
+    # result's text is the fallback: "You've hit your session limit · resets 12:50pm".
+    if ($script:LimitResetAt) { return $script:LimitResetAt }
+    $text = if ($script:RunResult) { "$($script:RunResult.result)" } else { '' }
+    if ($text -notmatch '(?i)hit your .*limit|usage limit|limit reached') { return $null }
+    if ($text -match '\|(\d{10})') { return (ConvertFrom-Unix ([long]$Matches[1])) }
+    if ($text -match '(?i)resets\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)') {
+        $hour = [int]$Matches[1] % 12
+        if ($Matches[3] -ieq 'pm') { $hour += 12 }
+        $min = if ($Matches[2]) { [int]$Matches[2] } else { 0 }
+        $at = (Get-Date).Date.AddHours($hour).AddMinutes($min)
+        if ($at -lt (Get-Date).AddMinutes(-10)) { $at = $at.AddDays(1) }
+        return $at
+    }
+    # Refused, but no reset time given: look again in half an hour.
+    return (Get-Date).AddMinutes(30)
+}
+
+function Add-LimitMark {
+    # Lanes write at the same moment when the limit hits them all; retry a busy file.
+    param([string]$Line)
+    foreach ($try in 1..10) {
+        try { Add-Content -Path $LimitFile -Value $Line -Encoding UTF8 -ErrorAction Stop; return }
+        catch { Start-Sleep -Milliseconds 200 }
+    }
+}
+
+function Show-LimitNotice {
+    # A one-off notice, not the alarm: a coloured block, a chime and one spoken sentence.
+    param([string]$Headline, [string]$Detail, [string]$Spoken, [string]$Color)
+    $bar = '=' * 78
+    foreach ($l in @($bar, "  $Headline", "  $Detail", $bar)) { Write-Host $l.PadRight(78) -ForegroundColor Black -BackgroundColor $Color }
+    Write-Trace '-' 'TOKENS' "$Headline  $Detail" $Color
+    if ($QuietAlarm) { return }
+    Invoke-Chime
+    $voice = Get-Voice
+    if ($voice) {
+        $voice.SpeakAsyncCancelAll()
+        $voice.Volume = 100
+        $voice.Rate = 0
+        [void]$voice.SpeakAsync($Spoken)
+    }
+}
+
+$script:Notice = @{ Reset = 0L; Warned = $false; Resumed = $false }
+
+function Test-WaitingForSession { return ($script:Notice.Reset -and -not $script:Notice.Resumed) }
+
+function Update-LimitNotice {
+    # Tells Stewart about the usage limit once per stage however many lanes hit it: out of
+    # tokens, the new session about to start, and the new session in use. Runners record
+    # "reset <unix>" and "resumed <unix> <ID>" in the limit file; whoever Stewart watches -
+    # the coordinator, or a lone runner - calls this to announce them.
+    if (-not (Test-Path $LimitFile)) { return }
+    $lines = @(Get-Content $LimitFile -ErrorAction SilentlyContinue)
+    $resets = @($lines | Where-Object { $_ -match '^reset \d+$' } | ForEach-Object { [long]($_ -split ' ')[1] })
+    if (-not $resets.Count) { return }
+    $latest = [long]($resets | Measure-Object -Maximum).Maximum
+    $reset = ConvertFrom-Unix $latest
+    $at = $reset.ToString('HH:mm')
+    $n = $script:Notice
+    if ($n.Reset -ne $latest) {
+        $n.Reset = $latest; $n.Warned = $false; $n.Resumed = $false
+        $left = $reset - (Get-Date)
+        Show-LimitNotice 'OUT OF TOKENS' "Out of tokens at $(Get-Date -Format 'HH:mm'). New session starts at $at, in $(Format-Span $left)." `
+            "Stewart, the dark factory is out of tokens. The new session starts at $($reset.ToString('h:mm tt')), in $(Format-SpokenSpan $left)." 'Yellow'
+    }
+    $resumed = @($lines | Where-Object { $_ -match "^resumed $latest \S+$" } | ForEach-Object { ($_ -split ' ')[2] })
+    if (-not $n.Resumed -and $resumed.Count) {
+        $n.Resumed = $true; $n.Warned = $true
+        Show-LimitNotice 'NEW SESSION STARTED' "Started using the new session at $(Get-Date -Format 'HH:mm'); resuming $($resumed[0])." `
+            "Stewart, the new session has started. The dark factory is working again." 'Green'
+        try { $Host.UI.RawUI.WindowTitle = if ($Lanes -gt 1) { "Dark factory - $Lanes lanes" } else { 'Dark factory - running' } } catch { }
+        return
+    }
+    if ($n.Resumed) { return }
+    $left = $reset - (Get-Date)
+    if (-not $n.Warned -and $left.TotalSeconds -le $LimitWarnSeconds) {
+        $n.Warned = $true
+        Show-LimitNotice 'NEW SESSION SOON' "The new session starts at $at, in $(Format-Span $left)." `
+            "Stewart, the new session will be ready in about $(Format-SpokenSpan $left)." 'Cyan'
+    }
+    try { $Host.UI.RawUI.WindowTitle = "Dark factory - out of tokens, new session at $at (in $(Format-Span $left))" } catch { }
+}
+
+function Test-WakeRequested {
+    # True once "wake <unix>" for this reset is in the limit file: tokens came back early,
+    # because Stewart reset the limit or the probe found the account answering again.
+    param([long]$Unix)
+    if (-not (Test-Path $LimitFile)) { return $false }
+    return [bool](@(Get-Content $LimitFile -ErrorAction SilentlyContinue) -contains "wake $Unix")
+}
+
+$script:NextProbe = [datetime]::MinValue
+function Invoke-LimitProbe {
+    # While the shift waits, asks Claude for one word every -LimitProbeMinutes. A refused
+    # probe costs nothing; one that is answered means the limit was lifted early, and
+    # every waiting runner is woken.
+    if (-not (Test-WaitingForSession) -or $LimitProbeMinutes -le 0 -or (Get-Date) -lt $script:NextProbe) { return }
+    $script:NextProbe = (Get-Date).AddMinutes($LimitProbeMinutes)
+    $reset = $script:Notice.Reset
+    if (Test-WakeRequested $reset) { return }
+    try {
+        $psi = New-Object System.Diagnostics.ProcessStartInfo
+        $psi.FileName = $env:ComSpec
+        $psi.Arguments = "/d /c claude -p --model $Model --output-format stream-json --verbose --max-turns 1 2>nul"
+        $psi.WorkingDirectory = $Root
+        $psi.UseShellExecute = $false
+        $psi.RedirectStandardInput = $true
+        $psi.RedirectStandardOutput = $true
+        $p = [System.Diagnostics.Process]::Start($psi)
+        $p.StandardInput.Write('Reply with the single word OK.')
+        $p.StandardInput.Close()
+        $read = $p.StandardOutput.ReadToEndAsync()
+        if (-not $p.WaitForExit(120000)) { & taskkill /T /F /PID $p.Id 2>&1 | Out-Null; return }
+        $out = $read.Result
+    } catch { return }
+    $answered = $out -match '"type":"result"' -and $out -notmatch '"status":"rejected"' -and $out -notmatch '"is_error":true'
+    if ($answered) {
+        Add-LimitMark "wake $reset"
+        Write-Trace '-' 'TOKENS' 'probe answered: tokens are back before the reset; waking the lanes' 'Green'
+    }
+}
+
+function Wait-ForNewSession {
+    # Holds this runner until just after the usage limit resets, and returns how long it
+    # waited so the shift can add it back. A lone runner announces as it waits; a lane
+    # leaves the announcing to the coordinator.
+    param([string]$Id, [datetime]$Until)
+    $began = Get-Date
+    $unix = ConvertTo-Unix $Until
+    Add-LimitMark "reset $unix"
+    Write-Trace $Id 'tokens' "out of tokens; waiting for the new session at $($Until.ToString('HH:mm'))" 'Yellow'
+    # A little past the reset, so the first request lands in the new session.
+    $resume = $Until.AddSeconds(20)
+    $nextTrace = (Get-Date).AddMinutes(30)
+    while ((Get-Date) -lt $resume) {
+        if (Test-WakeRequested $unix) { Write-Trace $Id 'wake' 'tokens are back before the reset' 'Green'; break }
+        if ($Lane) { try { $Host.UI.RawUI.WindowTitle = "Dark factory - lane $Lane out of tokens until $($Until.ToString('HH:mm'))" } catch { } }
+        else { Update-LimitNotice; Invoke-LimitProbe }
+        if ((Get-Date) -ge $nextTrace) {
+            Write-Trace $Id 'wait' "new session in $(Format-Span ($Until - (Get-Date)))" 'DarkGray'
+            $nextTrace = (Get-Date).AddMinutes(30)
+        }
+        Start-Sleep -Seconds 1
+    }
+    Add-LimitMark "resumed $unix $Id"
+    Write-Trace $Id 'resume' 'new session; running the task again' 'Green'
+    if ($Lane) { try { $Host.UI.RawUI.WindowTitle = "Dark factory - lane $Lane" } catch { } }
+    else { Update-LimitNotice }
+    return ((Get-Date) - $began)
+}
+
+if ($Wake) {
+    # Tells every runner of the newest shift that is waiting for tokens to carry on now.
+    $file = Get-ChildItem $LogDir -Filter 'limit-*.txt' -ErrorAction SilentlyContinue | Sort-Object LastWriteTime | Select-Object -Last 1
+    $resets = if ($file) { @(Get-Content $file.FullName | Where-Object { $_ -match '^reset \d+$' }) } else { @() }
+    if (-not $resets.Count) { Write-Host 'No shift is waiting for tokens.'; exit 0 }
+    $script:LimitFile = $file.FullName
+    $LimitFile = $file.FullName
+    Add-LimitMark "wake $(($resets[-1] -split ' ')[1])"
+    Write-Host "Woke the shift waiting in $($file.Name)."
+    exit 0
+}
+
+if ($TestOutOfTokens) {
+    New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
+    [void](Wait-ForNewSession -Id 'TEST' -Until (Get-Date).AddSeconds(90))
+    if ($script:Voice) { Start-Sleep -Seconds 6 }
+    exit 0
+}
+
 # ---------------------------------------------------------------------------- board
 
 function Invoke-Board {
@@ -438,6 +676,28 @@ function Get-WaitingOnStewart {
     return $reasons
 }
 
+function Test-TaskDone {
+    param([string]$Id)
+    return [bool](Get-ChildItem (Join-Path $Root 'Tasks\Done') -Recurse -Filter "$Id-*.md" -ErrorAction SilentlyContinue)
+}
+
+function Invoke-Requeue {
+    # Moves back to Backlog every Blocked task whose blocker was only other tasks that are
+    # now all Done: a last Log line that names BL-### IDs and is not a question for
+    # Stewart. Returns the IDs it moved.
+    $moved = @()
+    foreach ($f in Get-ChildItem (Join-Path $Root 'Tasks\Blocked') -Filter 'BL-*.md' -ErrorAction SilentlyContinue) {
+        $id = $f.Name.Substring(0, 6)
+        $reason = Get-LastLogLine $id
+        if ($reason -match 'Stewart') { continue }
+        $waits = @([regex]::Matches($reason, 'BL-\d{3}') | ForEach-Object { $_.Value } | Where-Object { $_ -ne $id } | Select-Object -Unique)
+        if (-not $waits.Count -or @($waits | Where-Object { -not (Test-TaskDone $_) }).Count) { continue }
+        Invoke-Board @('move', '-Id', $id, '-To', 'Backlog', '-Reason', "Unblocked: $($waits -join ', ') now Done") | Out-Null
+        if ((Get-TaskState $id) -eq 'Backlog') { $moved += $id; Write-Trace $id 'requeue' "unblocked: $($waits -join ', ') Done" 'Cyan' }
+    }
+    return $moved
+}
+
 # ---------------------------------------------------------------------------- git
 
 function Get-Dirty { return @(git -C $Root status --porcelain) | Where-Object { $_ } }
@@ -460,22 +720,37 @@ Run /task-run {ID}.
 Rules for this unattended run, in addition to CLAUDE.md:
 1. Where a choice has a sensible default, take it and record the choice and why under
    the task's Notes.
-2. Where only Stewart can decide (a new package, a threshold change, a deliberate
-   divergence from upstream curl, a truly ambiguous requirement, anything CLAUDE.md
-   reserves for him), do not guess: move the task to Blocked with a -Reason that starts
-   "Stewart:" and asks the question in one line.
-3. When the task reaches Done with dotnet build clean and the fast tests green, commit
+2. Design and behaviour decisions are yours: Stewart has delegated them (CLAUDE.md,
+   "Decisions"). Decide by his standing rules - match the platform's curl, measure real
+   curl before pinning output, BCL only - record the decision and why in an ADR marked
+   "Decided by Claude under Stewart's delegation", and carry on. Only a new package or
+   a quality-threshold change goes to Blocked, with a -Reason that starts "Stewart:" and
+   asks the question in one line.
+3. If the only thing stopping the task is other work - an existing task, or one you
+   file with the board script - add those IDs to its `depends-on` and move it to
+   Backlog, not Blocked, with a -Reason naming them. The board starts it again once
+   they are Done.
+4. When the task reaches Done with dotnet build clean and the fast tests green, commit
    by logical unit (Conventional Commits, including the task file) and push the current
    branch yourself with git, per the standing authorization in CLAUDE.md. Never push to
    master, never force push, never merge.
-4. If the task ends Blocked, commit only the task board change and push it. Leave any
-   unfinished code uncommitted; the shift stashes it.
-5. The task must not be left in Doing.
+5. If the task ends Blocked or back in Backlog, commit only the task board change and
+   push it. Leave any unfinished code uncommitted; the shift stashes it.
+6. The task must not be left in Doing.
 
 End your reply with exactly one line, either
 FACTORY: DONE {ID} <what now works>
 or
 FACTORY: BLOCKED {ID} <the blocker>
+'@
+
+# Put in front of either prompt when a task runs again after the usage limit.
+$ResumeNote = @'
+RESUMING. The previous run of {ID} was cut off when the account ran out of tokens, before
+the task was finished. Whatever that run had done is still here: read git status, git log
+and the task file before changing anything, and carry on from that work rather than
+starting over.
+
 '@
 
 # A lane's run: the shift has claimed the task already, and the shift - not the run -
@@ -492,19 +767,28 @@ claim step, do not move it to Doing again, and do not take any other task.
 Rules for this unattended run, in addition to CLAUDE.md:
 1. Where a choice has a sensible default, take it and record the choice and why under
    the task's Notes.
-2. Where only Stewart can decide (a new package, a threshold change, a deliberate
-   divergence from upstream curl, a truly ambiguous requirement, anything CLAUDE.md
-   reserves for him), do not guess: move the task to Blocked with a -Reason that starts
-   "Stewart:" and asks the question in one line.
+2. Design and behaviour decisions are yours: Stewart has delegated them (CLAUDE.md,
+   "Decisions"). Decide by his standing rules - match the platform's curl, measure real
+   curl before pinning output, BCL only - record the decision and why in an ADR marked
+   "Decided by Claude under Stewart's delegation", and carry on. Only a new package or
+   a quality-threshold change goes to Blocked, with a -Reason that starts "Stewart:" and
+   asks the question in one line.
 3. Stay inside the projects and files the task's `touches` field names. If the work
-   truly needs another project, move the task to Blocked with a -Reason saying which
-   and why, so it can be re-planned; do not edit it.
-4. When the task reaches Done with dotnet build clean and the fast tests green, commit
+   truly needs another one, read the `touches` of every task in Tasks/Doing. When none
+   of them names it, add it to this task's `touches`, say why under Notes, and carry
+   on. When one does, add it anyway and move the task to Backlog with a -Reason naming
+   the project and that task; the board will not offer it again until they no longer
+   overlap.
+4. If the only thing stopping the task is other work - an existing task, or one you
+   file with the board script - add those IDs to its `depends-on` and move it to
+   Backlog, not Blocked, with a -Reason naming them. The board starts it again once
+   they are Done. Blocked is only for what needs Stewart.
+5. When the task reaches Done with dotnet build clean and the fast tests green, commit
    by logical unit (Conventional Commits, including the task file). Do NOT push, pull,
    rebase, merge or switch branches: the shift integrates your commits.
-5. If the task ends Blocked, commit only the task board change. Leave any unfinished
-   code uncommitted; the shift stashes it.
-6. The task must not be left in Doing.
+6. If the task ends Blocked or back in Backlog, commit only the task board change.
+   Leave any unfinished code uncommitted; the shift stashes it.
+7. The task must not be left in Doing.
 
 End your reply with exactly one line, either
 FACTORY: DONE {ID} <what now works>
@@ -625,6 +909,10 @@ function Write-Event {
                 Write-Trace $Id $verb $outcome $color
             }
         }
+        'rate_limit_event' {
+            $info = $Evt.rate_limit_info
+            if ($info.status -eq 'rejected' -and $info.resetsAt) { $script:LimitResetAt = ConvertFrom-Unix ([long]$info.resetsAt) }
+        }
         'result' {
             $mins = [math]::Round($Evt.duration_ms / 60000, 1)
             $script:RunResult = $Evt
@@ -636,14 +924,17 @@ function Write-Event {
 function Invoke-TaskRun {
     # One headless Claude run in this checkout. By default it is the task run; a lane
     # passes its own prompt and deny list, and a log suffix for the resolver's run.
-    param([string]$Id, [string]$Text = '', [string[]]$Deny = $null, [string]$Suffix = '', [int]$Minutes = 0)
+    # -Resume is the task run again after the usage limit cut the last one off.
+    param([string]$Id, [string]$Text = '', [string[]]$Deny = $null, [string]$Suffix = '', [int]$Minutes = 0, [switch]$Resume)
     if (-not $Text) { $Text = if ($Lane) { $LanePrompt } else { $Prompt } }
+    if ($Resume) { $Text = $ResumeNote + $Text; $Suffix += '-resumed' }
     if ($null -eq $Deny) { $Deny = if ($Lane) { $LaneForbidden } else { $Forbidden } }
     if ($Minutes -le 0) { $Minutes = $TaskMinutes }
     $Text = $Text.Replace('{ID}', $Id).Replace('{LANE}', "$Lane").Replace('{BRANCH}', $Branch)
     $raw = Join-Path $LogDir "$Id-$Stamp$LaneTag$Suffix.jsonl"
     $err = Join-Path $LogDir "$Id-$Stamp$LaneTag$Suffix.err.txt"
     $script:RunResult = $null
+    $script:LimitResetAt = $null
     $script:ToolLabels = @{}
 
     $psi = New-Object System.Diagnostics.ProcessStartInfo
@@ -733,6 +1024,12 @@ function Invoke-Claim {
     try {
         foreach ($attempt in 1..5) {
             if (-not (Sync-Lane)) { Start-Sleep -Seconds 10; continue }
+            $requeued = @(Invoke-Requeue)
+            if ($requeued.Count) {
+                Invoke-Git @('add', '-A', 'Tasks') | Out-Null
+                Invoke-Git @('commit', '-q', '-m', "chore(tasks): requeue $($requeued -join ', ') - blockers Done") | Out-Null
+                if (-not (Invoke-Git @('push', '-q', 'origin', "HEAD:$Branch"))) { continue }
+            }
             $boardArgs = @('next')
             if ($Skip.Count) { $boardArgs += @('-Skip', ($Skip -join ',')) }
             $next = (Invoke-Board $boardArgs) -join "`n"
@@ -798,16 +1095,19 @@ function Invoke-Integrate {
 
 function Invoke-Park {
     # Work that will not integrate is kept on a branch of its own, and the task goes to
-    # Blocked on the shared branch so Stewart sees it.
+    # back to Backlog on the shared branch, so a later run picks it up from that branch and
+    # fixes what broke. Integration trouble is Claude's to solve, not Stewart's.
     param([string]$Id, [string]$Why)
     $park = "factory/$Id-lane-$Lane-$Stamp"
+    # A local branch too: lanes may not fetch, but every worktree sees local branches.
+    Invoke-Git @('branch', '-f', $park, 'HEAD') | Out-Null
     Invoke-Git @('push', '-q', 'origin', "HEAD:refs/heads/$park") | Out-Null
     $lock = Enter-Lock
     try {
         foreach ($attempt in 1..3) {
             if (-not (Sync-Lane)) { continue }
             if ((Get-TaskState $Id) -ne 'Doing') { return }
-            Invoke-Board @('move', '-Id', $Id, '-To', 'Blocked', '-Reason', "Stewart: lane $Lane could not integrate: $Why. The work is on branch $park.") | Out-Null
+            Invoke-Board @('move', '-Id', $Id, '-To', 'Backlog', '-Reason', "Lane $Lane could not integrate: $Why. The work is on branch $park; start with git cherry-pick --no-commit $park and fix it.") | Out-Null
             Invoke-Git @('add', '-A', 'Tasks') | Out-Null
             Invoke-Git @('commit', '-q', '-m', "chore(tasks): block $Id - $Why") | Out-Null
             if (Invoke-Git @('push', '-q', 'origin', "HEAD:$Branch")) { return }
@@ -865,12 +1165,19 @@ if ($Lanes -gt 1 -and -not $Lane) {
     # after the shift's length plus one task's time limit.
     $summaries = Join-Path $LogDir "lanes-$Stamp"
     $giveUp = $shiftEnd.AddMinutes($TaskMinutes + 30)
+    $tick = Get-Date
     while ((Get-Date) -lt $giveUp) {
+        # The coordinator announces the usage limit for every lane, and lanes waiting for a
+        # new session add that wait to their shift, so the coordinator waits longer too.
+        Update-LimitNotice
+        Invoke-LimitProbe
+        if (Test-WaitingForSession) { $giveUp = $giveUp.Add((Get-Date) - $tick) }
+        $tick = Get-Date
         $finished = @(Get-ChildItem $summaries -Filter 'lane-*.txt' -ErrorAction SilentlyContinue).Count
         if ($finished -ge $Lanes) { break }
         $running = @($procs | Where-Object { $_.Tab -or -not $_.Process.HasExited }).Count
         if ($running -eq 0) { break }
-        Start-Sleep -Seconds 30
+        Start-Sleep -Seconds 5
     }
 
     git -C $Root pull -q --ff-only origin $branch 2>&1 | Out-Null
@@ -905,21 +1212,36 @@ if ($Lane) {
 
 Write-Trace '-' 'shift' "start  branch=$branch model=$Model until $($shiftEnd.ToString('HH:mm'))" 'Cyan'
 
-$done = 0; $blocked = 0; $stalls = @(); $failStreak = 0; $attempted = @{}
+$done = 0; $blocked = 0; $requeued = 0; $stalls = @(); $failStreak = 0; $attempted = @{}
 $stopWhy = ''
+# The task to run again once the usage limit resets; it is still claimed.
+$resumeId = ''
 
 while ($true) {
   try {
-    if ((Get-Date) -gt $shiftEnd) { $stopWhy = 'time up'; break }
-    if ($MaxTasks -gt 0 -and ($done + $blocked + $stalls.Count) -ge $MaxTasks) { $stopWhy = 'max tasks'; break }
-    if ($failStreak -ge 2) { $stopWhy = 'runs failing'; break }
+    # A task cut off by the usage limit is finished first, whatever else says stop.
+    $resuming = [bool]$resumeId
+    if (-not $resuming) {
+        if ((Get-Date) -gt $shiftEnd) { $stopWhy = 'time up'; break }
+        if ($MaxTasks -gt 0 -and ($done + $blocked + $stalls.Count) -ge $MaxTasks) { $stopWhy = 'max tasks'; break }
+        if ($failStreak -ge 2) { $stopWhy = 'runs failing'; break }
+    }
 
-    if ($Lane) {
+    if ($resuming) {
+        $id = $resumeId
+        $resumeId = ''
+    } elseif ($Lane) {
         $claim = Invoke-Claim -Skip @($attempted.Keys)
         if ($claim.None) { $stopWhy = 'nothing ready'; break }
         if ($claim.Wait) { Write-Trace '-' 'wait' $claim.Why 'DarkGray'; Start-Sleep -Seconds 60; continue }
         $id = $claim.Id
     } else {
+        $requeued = @(Invoke-Requeue)
+        if ($requeued.Count) {
+            git -C $Root add -A Tasks 2>&1 | Out-Null
+            git -C $Root commit -q -m "chore(tasks): requeue $($requeued -join ', ') - blockers Done" 2>&1 | Out-Null
+            git -C $Root push -q 2>&1 | Out-Null
+        }
         $next = (Invoke-Board @('next')) -join "`n"
         if ($next -notmatch '(?m)^(BL-\d{3})\s') { $stopWhy = 'nothing ready'; break }
         $id = $Matches[1]
@@ -927,9 +1249,21 @@ while ($true) {
     }
     $attempted[$id] = $true
 
-    Write-Trace $id 'claim' (Get-Short (Get-TaskTitle $id)) 'Cyan'
-    $run = Invoke-TaskRun $id
+    if (-not $resuming) { Write-Trace $id 'claim' (Get-Short (Get-TaskTitle $id)) 'Cyan' }
+    $run = Invoke-TaskRun $id -Resume:$resuming
     $state = Get-TaskState $id
+
+    # Out of tokens is not a stall. The task keeps its claim and its partial work - nothing
+    # is stashed or blocked - the shift waits for the new session and runs it again, and
+    # the wait is added to the shift so it costs no working time.
+    $until = if ($run.TimedOut) { $null } else { Get-OutOfTokensUntil }
+    if ($until -and $state -in 'Doing', 'Backlog') {
+        $waited = Wait-ForNewSession -Id $id -Until $until
+        $shiftEnd = $shiftEnd.Add($waited)
+        Write-Trace '-' 'shift' "waited $(Format-Span $waited) for tokens; shift now ends $($shiftEnd.ToString('HH:mm'))" 'Cyan'
+        $resumeId = $id
+        continue
+    }
 
     if ($state -eq 'Doing') {
         $why = if ($run.TimedOut) { "timed out after $TaskMinutes min" } else { "run ended in Doing, exit $($run.ExitCode)" }
@@ -942,12 +1276,12 @@ while ($true) {
     }
     Save-StrayChanges $id
 
-    if ($Lane -and $state -in 'Done', 'Blocked') {
+    if ($Lane -and $state -in 'Done', 'Blocked', 'Backlog') {
         $problem = Invoke-Integrate -Id $id -State $state
         if ($problem) {
-            Write-Trace $id 'PARKED' $problem 'Red'
+            Write-Trace $id 'PARKED' "$problem; back to Backlog" 'Yellow'
             Invoke-Park -Id $id -Why $problem
-            $state = 'Blocked'
+            $state = 'Parked'
         } else {
             Write-Trace $id 'push' "integrated into $branch"
         }
@@ -960,6 +1294,11 @@ while ($true) {
         $blocked++
         if ($null -eq $script:RunResult -or $run.TimedOut) { $failStreak++ } else { $failStreak = 0 }
         Write-Trace $id 'BLOCKED' (Get-Short (Get-LastLogLine $id)) 'Yellow'
+    } elseif ($state -in 'Backlog', 'Parked') {
+        # Waiting on other tasks, a widened touches, or work that would not integrate: back
+        # in the queue for a later run, not a stall.
+        $requeued++; $failStreak = 0
+        Write-Trace $id 'REQUEUE' (Get-Short (Get-LastLogLine $id)) 'Yellow'
     } else {
         $failStreak++
         $stalls += "$id STALLED  ended in $state, exit $($run.ExitCode)"
@@ -973,12 +1312,12 @@ while ($true) {
   }
 }
 
-Write-Trace '-' 'shift' "end ($stopWhy)  done=$done blocked=$blocked stalled=$($stalls.Count)" 'Cyan'
+Write-Trace '-' 'shift' "end ($stopWhy)  done=$done blocked=$blocked requeued=$requeued stalled=$($stalls.Count)" 'Cyan'
 if ($stopWhy -eq 'runs failing') { $stalls = @('FACTORY STALLED - two runs in a row failed; check logs\') + $stalls }
 
 if ($Lane) {
     # The coordinator raises one alarm for every lane; a lane only reports.
-    Write-LaneSummary (@("SUMMARY lane $Lane ended ($stopWhy): done=$done blocked=$blocked stalled=$($stalls.Count)") + $stalls)
+    Write-LaneSummary (@("SUMMARY lane $Lane ended ($stopWhy): done=$done blocked=$blocked requeued=$requeued stalled=$($stalls.Count)") + $stalls)
     try { $Host.UI.RawUI.WindowTitle = "Dark factory - lane $Lane finished" } catch { }
     exit 0
 }

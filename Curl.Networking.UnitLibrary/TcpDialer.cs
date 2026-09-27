@@ -1,19 +1,17 @@
 using System.Net;
 using System.Net.Sockets;
 
-using Curl.Protocol.Abstractions;
-
 namespace Curl.Networking;
 
 /// <summary>
 /// The production <see cref="ITcpDialer" />: connects a TCP <see cref="Socket" /> and
 /// returns it as a <see cref="StreamConnection" /> over a <see cref="NetworkStream" />
-/// that owns the socket.
+/// that owns the socket, with the local end point the socket was bound to.
 /// </summary>
 public sealed class TcpDialer : ITcpDialer
 {
     /// <inheritdoc />
-    public async ValueTask<IConnection> DialAsync(IPEndPoint endPoint, CancellationToken cancellationToken)
+    public async ValueTask<DialedTcpConnection> DialAsync(IPEndPoint endPoint, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(endPoint);
 
@@ -30,6 +28,8 @@ public sealed class TcpDialer : ITcpDialer
 
         socket.NoDelay = true;
 
-        return new StreamConnection(new NetworkStream(socket, ownsSocket: true), endPoint);
+        var localEndPoint = (IPEndPoint)socket.LocalEndPoint!;
+
+        return new DialedTcpConnection(new StreamConnection(new NetworkStream(socket, ownsSocket: true), endPoint), localEndPoint);
     }
 }

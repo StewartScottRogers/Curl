@@ -171,16 +171,9 @@ public sealed class TftpUploadTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_ShortDatagramWrongAckLateOptionAckAndUnexpectedOpcode_AreIgnored()
+    public async Task ExecuteAsync_UnexpectedOpcode_IsIgnored()
     {
-        var channel = Channel(
-            ([0, 4], TransferEndPoint),
-            Ack(5),
-            Ack(0),
-            OptionAcknowledgement("blksize\08\0"),
-            ([0, 3, 0, 1], TransferEndPoint),
-            Ack(0),
-            Ack(1));
+        var channel = Channel(Ack(0), ([0, 3, 0, 1], TransferEndPoint), Ack(1));
 
         var result = await Run(channel, new MemoryStream("abc"u8.ToArray()));
 
@@ -188,6 +181,46 @@ public sealed class TftpUploadTests
         Assert.AreEqual(3, result.BytesTransferred);
         Assert.HasCount(2, channel.Sent);
         CollectionAssert.AreEqual(Data(1, "abc"), channel.Sent[1].Datagram);
+    }
+
+    /// <summary>
+    /// curl 8.21.0, 1000 bytes, server answering DATA 1 with <c>OACK blksize 8</c>: the next
+    /// DATA was block 1 again, carrying bytes 512-519, then block 2 with bytes 520-527; the
+    /// bytes already sent are not re-read.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_OptionAckAfterData1_RestartsAtBlock1WithTheNextBytesInTheAcknowledgedBlockSize()
+    {
+        var content = Encoding.ASCII.GetBytes(new string('a', 512) + "bcdefghijk");
+        var channel = Channel(Ack(0), OptionAcknowledgement("blksize\08\0"), Ack(1), Ack(2));
+
+        var result = await Run(channel, new MemoryStream(content));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(522, result.BytesTransferred);
+        Assert.HasCount(4, channel.Sent);
+        CollectionAssert.AreEqual(Data(1, new string('a', 512)), channel.Sent[1].Datagram);
+        CollectionAssert.AreEqual(Data(1, "bcdefghi"), channel.Sent[2].Datagram);
+        CollectionAssert.AreEqual(Data(2, "jk"), channel.Sent[3].Datagram);
+        Assert.AreEqual(TransferEndPoint, channel.Sent[2].Destination);
+    }
+
+    /// <summary>
+    /// curl 8.21.0, 3 bytes, server answering DATA 1 with <c>OACK blksize 8</c>: curl sent an
+    /// empty DATA 1, and ACK 1 ended the upload with exit 0.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_OptionAckAfterTheLastBlock_SendsAnEmptyData1()
+    {
+        var channel = Channel(Ack(0), OptionAcknowledgement("blksize\08\0"), Ack(1));
+
+        var result = await Run(channel, new MemoryStream("abc"u8.ToArray()));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(3, result.BytesTransferred);
+        Assert.HasCount(3, channel.Sent);
+        CollectionAssert.AreEqual(Data(1, "abc"), channel.Sent[1].Datagram);
+        CollectionAssert.AreEqual(Data(1, string.Empty), channel.Sent[2].Datagram);
     }
 
     private static async Task<TransferResult> Run(IDatagramChannel channel, Stream upload, Stream? output = null) =>

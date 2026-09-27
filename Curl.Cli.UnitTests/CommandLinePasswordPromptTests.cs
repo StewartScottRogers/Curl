@@ -129,14 +129,86 @@ public sealed class CommandLinePasswordPromptTests
     }
 
     [TestMethod]
-    public void Parse_EmptyCommandLine_NeverPrompts()
+    public void Parse_EmptyCommandLine_IsRefusedWithoutPrompting()
     {
         RecordingPasswordPrompt prompt = new("unused");
 
         CommandLineParseResult result = Parse([], prompt);
 
-        Assert.IsTrue(result.IsAccepted);
+        Assert.IsFalse(result.IsAccepted);
         Assert.IsEmpty(prompt.Prompts);
+    }
+
+    [TestMethod]
+    public void Parse_UserWithoutColonAndBearerToken_NeverPrompts()
+    {
+        RecordingPasswordPrompt prompt = new("unused");
+
+        CommandLineParseResult result = Parse(["-u", "bob", "--oauth2-bearer", "tok", "http://example.com/"], prompt);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual("bob", result.Options.Credentials!.UserName);
+        Assert.AreEqual(string.Empty, result.Options.Credentials.Password);
+        Assert.IsEmpty(prompt.Prompts);
+    }
+
+    [TestMethod]
+    [DataRow("-U", "bob", "bob")]
+    [DataRow("--proxy-user", "bob", "bob")]
+    [DataRow("-U", "", "")]
+    [DataRow("-U", "bob;opt", "bob")]
+    public void Parse_ProxyUserWithoutColon_RecordsThePromptedProxyPassword(string spelledOption, string user, string shownUser)
+    {
+        RecordingPasswordPrompt prompt = new("secret");
+
+        CommandLineParseResult result = Parse([spelledOption, user, "http://example.com/"], prompt);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual(user, result.Options.ProxyCredentials!.UserName);
+        Assert.AreEqual("secret", result.Options.ProxyCredentials.Password);
+        Assert.IsNull(result.Options.Credentials);
+        CollectionAssert.AreEqual(new[] { $"Enter proxy password for user '{shownUser}':" }, prompt.Prompts);
+    }
+
+    [TestMethod]
+    [DataRow("bob:pw", "bob", "pw")]
+    [DataRow(";opt", ";opt", "")]
+    public void Parse_ProxyUserThatCurlDoesNotPromptFor_NeverPrompts(string value, string expectedUser, string expectedPassword)
+    {
+        RecordingPasswordPrompt prompt = new("unused");
+
+        CommandLineParseResult result = Parse(["-U", value, "http://example.com/"], prompt);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual(expectedUser, result.Options.ProxyCredentials!.UserName);
+        Assert.AreEqual(expectedPassword, result.Options.ProxyCredentials.Password);
+        Assert.IsEmpty(prompt.Prompts);
+    }
+
+    [TestMethod]
+    public void Parse_ProxyUserAndUserWithoutColon_PromptsForTheHostFirst()
+    {
+        RecordingPasswordPrompt prompt = new("secret");
+
+        CommandLineParseResult result = Parse(["-U", "p", "-u", "h", "http://example.com/"], prompt);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual("secret", result.Options.Credentials!.Password);
+        Assert.AreEqual("secret", result.Options.ProxyCredentials!.Password);
+        CollectionAssert.AreEqual(
+            new[] { "Enter host password for user 'h':", "Enter proxy password for user 'p':" },
+            prompt.Prompts);
+    }
+
+    [TestMethod]
+    public void Parse_ProxyUserWithoutColonAndNoUrl_PromptsThenRefusesForNoUrl()
+    {
+        RecordingPasswordPrompt prompt = new("secret");
+
+        CommandLineParseResult result = Parse(["-U", "p"], prompt);
+
+        Assert.IsFalse(result.IsAccepted);
+        CollectionAssert.AreEqual(new[] { "Enter proxy password for user 'p':" }, prompt.Prompts);
     }
 
     [TestMethod]

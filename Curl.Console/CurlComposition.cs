@@ -1,3 +1,4 @@
+using Curl.Authentication;
 using Curl.Cli;
 using Curl.Core;
 using Curl.Core.FileSystem;
@@ -6,6 +7,7 @@ using Curl.Protocol.Abstractions;
 using Curl.Protocol.Dict;
 using Curl.Protocol.File;
 using Curl.Protocol.Gopher;
+using Curl.Protocol.Http;
 using Curl.Protocol.Mqtt;
 using Curl.Protocol.Telnet;
 using Curl.Protocol.Tftp;
@@ -21,8 +23,10 @@ internal static class CurlComposition
 {
     /// <summary>
     /// Creates the protocol handlers the executable registers: <c>file</c> over the real
-    /// disk; <c>dict</c>, <c>gopher</c> and <c>gophers</c>, <c>telnet</c>, and <c>mqtt</c>
-    /// and <c>mqtts</c> over <paramref name="connector" />; and <c>tftp</c> over
+    /// disk; <c>dict</c>, <c>gopher</c> and <c>gophers</c>, <c>telnet</c>, <c>mqtt</c>
+    /// and <c>mqtts</c>, and <c>http</c> and <c>https</c> over <paramref name="connector" />,
+    /// the last two answering authentication with a <see cref="BasicAndBearerAuthenticator" />
+    /// in the platform's credential encoding and keeping no cookies; and <c>tftp</c> over
     /// <paramref name="datagramConnector" />. Each scheme is claimed by exactly one handler.
     /// </summary>
     /// <param name="connector">Connects the TCP protocols, with TLS for <c>gophers</c> and <c>mqtts</c>.</param>
@@ -38,6 +42,9 @@ internal static class CurlComposition
             new TelnetProtocolHandler(connector),
             new TftpProtocolHandler(datagramConnector),
             new MqttProtocolHandler(connector),
+            new HttpProtocolHandler(
+                connector,
+                new BasicAndBearerAuthenticator(CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()))),
         ];
 
     /// <summary>
@@ -45,9 +52,9 @@ internal static class CurlComposition
     /// <see cref="SystemDnsResolver" />, a <see cref="TcpDialer" /> and an
     /// <see cref="SslStreamTlsProvider" />, and a <see cref="UdpDatagramConnector" />. Both
     /// connectors share the one resolver and <see cref="TimeProvider.System" />. TLS uses
-    /// the <see cref="TlsClientOptions" /> mapped from <paramref name="options" />'s
-    /// <c>-k</c>, <c>--cacert</c>, <c>--tlsv1.2</c> and <c>--tlsv1.3</c>, one set shared
-    /// by every URL on the command line.
+    /// the <see cref="TlsClientOptions" /> mapped from <paramref name="options" /> by
+    /// <see cref="TlsClientOptionsMapping.FromCommandLine" />, one set shared by every URL on
+    /// the command line.
     /// </summary>
     /// <param name="options">The parsed command line.</param>
     /// <returns>The connectors and the pieces they were built from.</returns>
@@ -79,16 +86,27 @@ internal static class CurlComposition
     /// <param name="standardOutput">Where a transfer without <c>-o</c> writes its bytes.</param>
     /// <param name="standardError">Where the <c>curl: (N) message</c> lines go.</param>
     /// <param name="standardInput">What a <c>telnet</c> transfer sends to the server.</param>
-    /// <returns>The runner.</returns>
-    internal static CurlCommandRunner CreateRunner(Stream standardOutput, Stream standardError, Stream standardInput) =>
+    /// <param name="standardOutputIsTerminal">
+    /// Whether standard output is a terminal, where the progress meter of a transfer with no
+    /// <c>-o</c> is hidden, as curl hides it.
+    /// </param>
+    /// <returns>The runner, which writes curl's progress meter.</returns>
+    internal static CurlCommandRunner CreateRunner(
+        Stream standardOutput,
+        Stream standardError,
+        Stream standardInput,
+        bool standardOutputIsTerminal) =>
         new(
-            options => CreateDispatcher(CreateTransports(options)),
+            options => CreateTransferDispatch(CreateTransports(options)),
+            new PhysicalFileSystem(),
             new PhysicalFileSystem(),
             standardOutput,
             standardError,
             standardInput,
             OperatingSystem.IsWindows(),
-            TerminalColumns.Resolve());
+            TerminalColumns.Resolve(),
+            writesProgressMeter: true,
+            standardOutputIsTerminal);
 
     /// <summary>
     /// Creates the runner with the production handler set built around the given
@@ -108,7 +126,8 @@ internal static class CurlComposition
         IConnector connector,
         IDatagramConnector datagramConnector) =>
         new(
-            _ => new ProtocolDispatcher(CreateProtocolHandlers(connector, datagramConnector)),
+            _ => new TransferDispatch(new ProtocolDispatcher(CreateProtocolHandlers(connector, datagramConnector))),
+            new PhysicalFileSystem(),
             new PhysicalFileSystem(),
             standardOutput,
             standardError,
@@ -123,4 +142,15 @@ internal static class CurlComposition
     /// <returns>The dispatcher.</returns>
     internal static ProtocolDispatcher CreateDispatcher(CurlTransports transports) =>
         new(CreateProtocolHandlers(transports.TcpConnector, transports.UdpDatagramConnector));
+
+    /// <summary>
+    /// Creates what one run transfers through: the dispatcher from
+    /// <see cref="CreateDispatcher(CurlTransports)" />, and the TLS provider's
+    /// <see cref="SslStreamTlsProvider.Warnings" /> as the lines printed before each transfer,
+    /// as curl 8.21.0 prints its <c>--capath</c> warnings once per URL.
+    /// </summary>
+    /// <param name="transports">The run's connectors.</param>
+    /// <returns>The dispatcher and the warning lines.</returns>
+    internal static TransferDispatch CreateTransferDispatch(CurlTransports transports) =>
+        new(CreateDispatcher(transports), transports.TlsProvider.Warnings);
 }

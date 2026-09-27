@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Security;
+using System.Security.Cryptography.X509Certificates;
 
 using Curl.Protocol.Abstractions;
 
@@ -8,11 +9,15 @@ namespace Curl.Networking;
 /// <summary>
 /// The secure <see cref="IConnection" /> <see cref="SslStreamTlsProvider" /> returns: reads
 /// and writes go through the authenticated <see cref="SslStream" />, which runs over the
-/// plaintext connection this one owns.
+/// plaintext connection this one owns, as it owns the client certificate presented.
 /// </summary>
 /// <param name="sslStream">The authenticated stream, left open on its inner stream.</param>
 /// <param name="plaintext">The connection underneath, disposed with this one.</param>
-internal sealed class SslStreamConnection(SslStream sslStream, IConnection plaintext) : IConnection
+/// <param name="clientCertificate">
+/// The <c>--cert</c> certificate presented, disposed with this one so a key the platform
+/// stored for it is removed; <see langword="null" /> when none was.
+/// </param>
+internal sealed class SslStreamConnection(SslStream sslStream, IConnection plaintext, X509Certificate2? clientCertificate) : IConnection
 {
     /// <summary>Gets <see langword="true" />: traffic is encrypted.</summary>
     public bool IsSecure => true;
@@ -37,5 +42,6 @@ internal sealed class SslStreamConnection(SslStream sslStream, IConnection plain
     {
         await sslStream.DisposeAsync().ConfigureAwait(false);
         await plaintext.DisposeAsync().ConfigureAwait(false);
+        clientCertificate?.Dispose();
     }
 }

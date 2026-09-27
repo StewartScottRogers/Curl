@@ -1,8 +1,8 @@
 namespace Curl.Protocol.Abstractions;
 
 /// <summary>
-/// What an <see cref="IConnector" /> is asked to connect to: a host, a port, and whether
-/// to wrap the connection in TLS.
+/// What an <see cref="IConnector" /> is asked to connect to: a host, a port, whether to
+/// wrap the connection in TLS, and optionally the proxy to tunnel through (ADR-0014).
 /// </summary>
 /// <param name="Host">
 /// The host name or address literal from the transfer's URL, or a host the protocol
@@ -34,6 +34,18 @@ public sealed record ConnectTarget(string Host, int Port, bool UseTls)
     /// Gets the TCP port to connect to, from 1 to 65535.
     /// </summary>
     public int Port { get; } = RequirePort(Port);
+
+    /// <summary>
+    /// Gets the proxy to tunnel through to <see cref="Host" /> and <see cref="Port" />, or
+    /// <see langword="null" />, the default, to connect directly.
+    /// </summary>
+    /// <remarks>
+    /// When set, the connector connects to the proxy, opens a tunnel to <see cref="Host" />
+    /// and <see cref="Port" /> through it (CONNECT for the HTTP kinds, the SOCKS handshake
+    /// for the SOCKS kinds), then applies TLS over the tunnel when <see cref="UseTls" /> is
+    /// <see langword="true" />.
+    /// </remarks>
+    public ProxyEndpoint? Proxy { get; init; }
 
     private static string RequireHost(string host)
     {

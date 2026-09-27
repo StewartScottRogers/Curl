@@ -176,8 +176,8 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
         }
 
         // -R/--remote-time is applied by whoever owns the output file, so a successful
-        // download hands the source's timestamp back in whole seconds, the resolution
-        // curl 8.21.0 applies it at. A failure carries none.
+        // download, an unmet -z included, hands the source's timestamp back in whole
+        // seconds, the resolution curl 8.21.0 applies it at. A failure carries none.
         return result.IsSuccess
             ? result with { SourceLastWriteTimeUtc = TruncateToWholeSeconds(opened.LastWriteTimeUtc) }
             : result;
@@ -211,7 +211,7 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     {
         if (!MeetsTimeCondition(context.TimeCondition, opened.LastWriteTimeUtc))
         {
-            return TransferResult.Success(0);
+            return TransferResult.TimeConditionNotMet();
         }
 
         if (await WriteHeadersAsync(context, opened).ConfigureAwait(false) is { } headerFailure)
@@ -259,9 +259,9 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
                 context.MaxFileSize is > 0 and long maxFileSize ? maxFileSize : long.MaxValue,
                 static chunk => chunk,
                 static (_, transferred) => TransferResult.Success(transferred),
-                static (offered, transferred) => TransferResult.Failure(
+                static (offered, accepted, transferred) => TransferResult.Failure(
                     CurlExitCode.WriteError,
-                    FileTransferMessages.OutputWriteFailed(offered),
+                    FileTransferMessages.OutputWriteFailed(offered, accepted),
                     transferred),
                 context.CancellationToken)
             .ConfigureAwait(false);
@@ -363,7 +363,7 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
                             (skip + consumed) / UploadChunkSize * UploadChunkSize,
                             length))
                     : TransferResult.Success(transferred),
-                static (_, transferred) => new TransferResult(
+                static (_, _, transferred) => new TransferResult(
                     CurlExitCode.SendError,
                     transferred,
                     FileTransferMessages.DestinationWriteFailed),
@@ -404,8 +404,9 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     /// success.
     /// </param>
     /// <param name="reportWriteFailure">
-    /// Builds the outcome of a failed write, from the size of the chunk offered and the
-    /// bytes written before it.
+    /// Builds the outcome of a failed write, from the size of the chunk offered, how many
+    /// of its bytes the destination accepted before failing, and the bytes written before
+    /// that chunk.
     /// </param>
     /// <param name="cancellationToken">Cancels the copy.</param>
     /// <returns>
@@ -424,7 +425,7 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
         long maxWritten,
         Func<ReadOnlyMemory<byte>, ReadOnlyMemory<byte>> convertChunk,
         Func<long, long, TransferResult> reportReadFailure,
-        Func<long, long, TransferResult> reportWriteFailure,
+        Func<long, long, long, TransferResult> reportWriteFailure,
         CancellationToken cancellationToken)
     {
         byte[] buffer = new byte[chunkSize];
@@ -456,9 +457,10 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
 
             // At the limit exactly, the next chunk writes nothing at all, not an empty write.
             if (allowed > 0
-                && !await TryWriteAsync(destination, chunk[..allowed], cancellationToken).ConfigureAwait(false))
+                && await TryWriteAsync(destination, chunk[..allowed], cancellationToken).ConfigureAwait(false)
+                    is { } accepted)
             {
-                return reportWriteFailure(allowed, transferred);
+                return reportWriteFailure(allowed, accepted, transferred);
             }
 
             consumed += read;
@@ -516,14 +518,18 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
     }
 
     /// <summary>
-    /// Writes one chunk, reporting a failure as <see langword="false" /> rather than an
-    /// exception.
+    /// Writes one chunk, reporting a failure as a count rather than an exception.
     /// </summary>
     /// <param name="destination">The stream to write to.</param>
     /// <param name="buffer">The bytes to write.</param>
     /// <param name="cancellationToken">Cancels the write.</param>
-    /// <returns><see langword="false" /> when the write failed.</returns>
-    private static async ValueTask<bool> TryWriteAsync(
+    /// <returns>
+    /// <see langword="null" /> when the write succeeded; otherwise how many of its bytes the
+    /// destination accepted before failing, which is
+    /// <see cref="OutputWriteFailedException.BytesAccepted" /> when the destination reported
+    /// it and 0 for any other failure.
+    /// </returns>
+    private static async ValueTask<int?> TryWriteAsync(
         Stream destination,
         ReadOnlyMemory<byte> buffer,
         CancellationToken cancellationToken)
@@ -532,7 +538,7 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
         {
             await destination.WriteAsync(buffer, cancellationToken).ConfigureAwait(false);
 
-            return true;
+            return null;
         }
         catch (OperationCanceledException)
         {
@@ -540,11 +546,15 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
             // is OperationCanceledException and not TaskCanceledException.
             cancellationToken.ThrowIfCancellationRequested();
 
-            return false;
+            return 0;
+        }
+        catch (OutputWriteFailedException failure)
+        {
+            return failure.BytesAccepted;
         }
         catch (IOException)
         {
-            return false;
+            return 0;
         }
     }
 
@@ -638,7 +648,7 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
         {
             byte[] bytes = Encoding.ASCII.GetBytes(line);
 
-            if (!await TryWriteAsync(headerOutput, bytes, context.CancellationToken).ConfigureAwait(false))
+            if (await TryWriteAsync(headerOutput, bytes, context.CancellationToken).ConfigureAwait(false) is not null)
             {
                 return TransferResult.Failure(
                     CurlExitCode.WriteError,

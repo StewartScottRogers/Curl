@@ -5,7 +5,8 @@ using Curl.Networking;
 namespace Curl.Console;
 
 /// <summary>
-/// Pins how <c>-k</c>, <c>--cacert</c>, <c>--tlsv1.2</c> and <c>--tlsv1.3</c> become the
+/// Pins how <c>-k</c>, <c>--cacert</c>, <c>--capath</c>, <c>--cert</c>, <c>--key</c>,
+/// <c>--ciphers</c>, <c>--tls13-ciphers</c>, <c>--tlsv1.2</c> and <c>--tlsv1.3</c> become the
 /// <see cref="TlsClientOptions" /> the TLS provider applies. No test here opens a socket or
 /// reads a certificate file.
 /// </summary>
@@ -30,6 +31,40 @@ public sealed class TlsClientOptionsMappingTests
     public void FromCommandLine_CaCertificateFile_CopiesThePathVerbatim()
     {
         Assert.AreEqual(new TlsClientOptions(CaCertificateFile: "x.pem"), Map("--cacert", "x.pem", Url));
+    }
+
+    [TestMethod]
+    public void FromCommandLine_CaCertificateDirectory_CopiesThePathVerbatim()
+    {
+        Assert.AreEqual(new TlsClientOptions(CaCertificateDirectory: "certs"), Map("--capath", "certs", Url));
+    }
+
+    [TestMethod]
+    public void FromCommandLine_ClientCertificate_CopiesTheValueWithItsPassphraseVerbatim()
+    {
+        Assert.AreEqual(new TlsClientOptions(ClientCertificate: "client.p12:secret"), Map("--cert", "client.p12:secret", Url));
+    }
+
+    [TestMethod]
+    public void FromCommandLine_PrivateKey_CopiesThePathVerbatim()
+    {
+        Assert.AreEqual(new TlsClientOptions(PrivateKey: "client.key"), Map("--key", "client.key", Url));
+    }
+
+    [TestMethod]
+    public void FromCommandLine_Ciphers_CopiesTheListVerbatim()
+    {
+        Assert.AreEqual(
+            new TlsClientOptions(Ciphers: "ECDHE-RSA-AES128-GCM-SHA256:BOGUS"),
+            Map("--ciphers", "ECDHE-RSA-AES128-GCM-SHA256:BOGUS", Url));
+    }
+
+    [TestMethod]
+    public void FromCommandLine_Tls13Ciphers_CopiesTheListVerbatim()
+    {
+        Assert.AreEqual(
+            new TlsClientOptions(Tls13Ciphers: "TLS_AES_128_GCM_SHA256"),
+            Map("--tls13-ciphers", "TLS_AES_128_GCM_SHA256", Url));
     }
 
     [TestMethod]

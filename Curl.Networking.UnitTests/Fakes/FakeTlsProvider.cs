@@ -20,6 +20,12 @@ public sealed class FakeTlsProvider : ITlsProvider
     /// </summary>
     public ConnectResult? FailureToReturn { get; init; }
 
+    /// <summary>
+    /// Gets or sets the timings a successful handshake reports; <see langword="null" />
+    /// means it reports none.
+    /// </summary>
+    public ConnectTimings? TimingsToReturn { get; init; }
+
     /// <summary>Gets the plaintext connection last passed in, if any.</summary>
     public IConnection? ReceivedPlaintext { get; private set; }
 
@@ -39,6 +45,6 @@ public sealed class FakeTlsProvider : ITlsProvider
         ReceivedPlaintext = plaintext;
         ReceivedTargetHost = targetHost;
 
-        return ValueTask.FromResult(FailureToReturn ?? ConnectResult.Connected(SecuredConnection));
+        return ValueTask.FromResult(FailureToReturn ?? ConnectResult.Connected(SecuredConnection, TimingsToReturn));
     }
 }

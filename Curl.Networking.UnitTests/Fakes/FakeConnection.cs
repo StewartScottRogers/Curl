@@ -13,8 +13,8 @@ public sealed class FakeConnection : IConnection
     /// <summary>Gets or sets the value <see cref="IsSecure" /> reports.</summary>
     public bool IsSecure { get; init; }
 
-    /// <inheritdoc />
-    public EndPoint? RemoteEndPoint => null;
+    /// <summary>Gets or sets the value <see cref="RemoteEndPoint" /> reports; none by default.</summary>
+    public EndPoint? RemoteEndPoint { get; init; }
 
     /// <inheritdoc />
     public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken) =>

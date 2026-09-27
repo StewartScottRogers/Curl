@@ -7,7 +7,7 @@ namespace Curl.Cli;
 /// </summary>
 public sealed class CommandLineOption
 {
-    private CommandLineOption(string longName, char? shortName, bool takesValue, CommandLineOptionApplier apply, Action<CommandLineOptions>? negate = null)
+    private CommandLineOption(string longName, char? shortName, bool takesValue, CommandLineOptionApplier apply, CommandLineOptionApplier? negate = null)
     {
         LongName = longName;
         ShortName = shortName;
@@ -28,17 +28,18 @@ public sealed class CommandLineOption
     /// <summary>
     /// Checks the value and sets the option on <see cref="CommandLineOptions"/>, or returns the
     /// refusal. The parser passes every value unchanged, empty included; the applier decides
-    /// whether an empty value is refused. A flag's applier always returns <see langword="null"/>.
+    /// whether an empty value is refused. A flag's applier returns <see langword="null"/> unless the
+    /// row was built with <see cref="NegatableFlagThatCanRefuse"/>.
     /// </summary>
     public CommandLineOptionApplier Apply { get; }
 
     /// <summary>
-    /// Turns the flag off for <c>--no-&lt;long name&gt;</c>, or <see langword="null"/> when curl
-    /// 8.21.0 refuses the <c>--no-</c> spelling of this option with
-    /// <see cref="CommandLineRefusal.CannotBeReversed(string)"/>. Only a row built with
-    /// <see cref="NegatableFlag"/> has one.
+    /// Turns the flag off for <c>--no-&lt;long name&gt;</c>, or refuses to, called like
+    /// <see cref="Apply"/> with an empty value; <see langword="null"/> when curl 8.21.0 refuses the
+    /// <c>--no-</c> spelling of this option with <see cref="CommandLineRefusal.CannotBeReversed(string)"/>.
+    /// Only a row built with <see cref="NegatableFlag"/> or <see cref="NegatableFlagThatCanRefuse"/> has one.
     /// </summary>
-    public Action<CommandLineOptions>? Negate { get; }
+    public CommandLineOptionApplier? Negate { get; }
 
     /// <summary>
     /// Creates a row for an option that takes no value and whose <c>--no-</c> spelling curl refuses
@@ -59,6 +60,24 @@ public sealed class CommandLineOption
             set(options);
             return null;
         });
+    }
+
+    /// <summary>
+    /// Creates a row for an option that takes no value and that this build knows but cannot honour:
+    /// every spelling of it, with or without an attached value, is refused with
+    /// <see cref="CommandLineRefusal.InstalledLibcurlDoesNotSupport(string)"/>, and its <c>--no-</c>
+    /// spelling with <see cref="CommandLineRefusal.CannotBeReversed(string)"/>, as the Windows curl 8.21.0
+    /// refuses <c>--http2</c> and <c>--no-http2</c> (ADR-0017).
+    /// </summary>
+    /// <param name="longName">The long name without its leading <c>--</c>.</param>
+    /// <returns>The row.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="longName"/> is <see langword="null"/>.</exception>
+    public static CommandLineOption UnsupportedFlag(string longName)
+    {
+        ArgumentNullException.ThrowIfNull(longName);
+
+        return new CommandLineOption(longName, shortName: null, takesValue: false, (_, _, spelledOption, _, _) =>
+            CommandLineRefusal.InstalledLibcurlDoesNotSupport(spelledOption));
     }
 
     /// <summary>
@@ -87,7 +106,38 @@ public sealed class CommandLineOption
                 set(options, true);
                 return null;
             },
-            options => set(options, false));
+            (options, _, _, _, _) =>
+            {
+                set(options, false);
+                return null;
+            });
+    }
+
+    /// <summary>
+    /// Creates a row for a flag like <see cref="NegatableFlag"/>, except that turning it on or off can
+    /// be refused, as curl 8.21.0 refuses <c>-I</c> after <c>--no-head</c>. The positive spelling passes
+    /// <see langword="true"/> to <paramref name="setOrRefuse"/>, the <c>--no-</c> spelling
+    /// <see langword="false"/>, each with the argument as typed for naming it in a refusal.
+    /// </summary>
+    /// <param name="longName">The long name without its leading <c>--</c> or <c>--no-</c>.</param>
+    /// <param name="shortName">The short letter, or <see langword="null"/> when there is none. It is never negated.</param>
+    /// <param name="setOrRefuse">
+    /// Sets the flag on, or off, on the options being filled in and returns <see langword="null"/>, or
+    /// returns the refusal.
+    /// </param>
+    /// <returns>The row.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="longName"/> or <paramref name="setOrRefuse"/> is <see langword="null"/>.</exception>
+    public static CommandLineOption NegatableFlagThatCanRefuse(string longName, char? shortName, Func<CommandLineOptions, bool, string, CommandLineRefusal?> setOrRefuse)
+    {
+        ArgumentNullException.ThrowIfNull(longName);
+        ArgumentNullException.ThrowIfNull(setOrRefuse);
+
+        return new CommandLineOption(
+            longName,
+            shortName,
+            takesValue: false,
+            (options, _, spelledOption, _, _) => setOrRefuse(options, true, spelledOption),
+            (options, _, spelledOption, _, _) => setOrRefuse(options, false, spelledOption));
     }
 
     /// <summary>

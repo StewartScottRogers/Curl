@@ -83,4 +83,48 @@ public sealed class ConnectTargetTests
         Assert.AreEqual(21, secure.Port);
         Assert.IsTrue(secure.UseTls);
     }
+
+    [TestMethod]
+    public void Proxy_WhenNotSet_IsNull()
+    {
+        var target = new ConnectTarget("example.com", 443, true);
+
+        Assert.IsNull(target.Proxy);
+    }
+
+    [TestMethod]
+    public void Proxy_WhenSetWithInitializer_RoundTrips()
+    {
+        var proxy = new ProxyEndpoint(ProxyKind.Socks5Hostname, "proxy.example", 1080, null);
+
+        var target = new ConnectTarget("example.com", 443, true) { Proxy = proxy };
+
+        Assert.AreSame(proxy, target.Proxy);
+        Assert.AreEqual("example.com", target.Host);
+        Assert.AreEqual(443, target.Port);
+    }
+
+    [TestMethod]
+    public void Equals_ForTargetsDifferingOnlyInProxy_ReturnsFalse()
+    {
+        var direct = new ConnectTarget("example.com", 443, true);
+        var proxied = direct with { Proxy = new ProxyEndpoint(ProxyKind.Http, "proxy.example", 3128, null) };
+
+        Assert.AreNotEqual(direct, proxied);
+    }
+
+    [TestMethod]
+    public void With_AnyChange_CannotBypassHostAndPortChecks()
+    {
+        var target = new ConnectTarget("example.com", 443, true);
+
+        var copy = target with { UseTls = false, Proxy = null };
+
+        // Host and Port have no init accessor, so the only way to a new value is the
+        // positional constructor, which validates it.
+        Assert.IsNull(typeof(ConnectTarget).GetProperty(nameof(ConnectTarget.Host))!.SetMethod);
+        Assert.IsNull(typeof(ConnectTarget).GetProperty(nameof(ConnectTarget.Port))!.SetMethod);
+        Assert.AreEqual("example.com", copy.Host);
+        Assert.AreEqual(443, copy.Port);
+    }
 }

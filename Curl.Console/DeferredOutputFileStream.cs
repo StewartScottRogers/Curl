@@ -25,6 +25,9 @@ namespace Curl.Console;
 /// A successful transfer that wrote nothing still creates an empty file, in
 /// <see cref="CompleteAsync" />; when that open fails the result is exit 23 with no
 /// message, which is what curl 8.21.0 prints under <c>-sS</c> (measured 2026-09-26).
+/// A result with <see cref="TransferResult.TimeConditionUnmet" /> set is the exception: it
+/// creates no file and leaves an existing one untouched, as curl 8.21.0 does for an unmet
+/// <c>-z</c>/<c>--time-cond</c>.
 /// </para>
 /// <para>
 /// Either failed open also sets <see cref="OpenFailureWarning" />, the warning curl prints
@@ -123,8 +126,8 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
     /// <returns>
     /// curl's <c>client returned ERROR on write of N bytes</c> when the file could not be
     /// created, N being the size of the first write that failed; exit 23 with no message
-    /// when a successful transfer wrote nothing
-    /// and the empty file could not be created; otherwise <paramref name="result" />.
+    /// when a successful transfer wrote nothing, was not skipped by an unmet time
+    /// condition, and the empty file could not be created; otherwise <paramref name="result" />.
     /// </returns>
     internal async ValueTask<TransferResult> CompleteAsync(TransferResult result)
     {
@@ -135,7 +138,7 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
                 "client returned ERROR on write of " + length.ToString(CultureInfo.InvariantCulture) + " bytes");
         }
 
-        bool createsEmptyFile = file is null && result.IsSuccess;
+        bool createsEmptyFile = file is null && result.IsSuccess && !result.TimeConditionUnmet;
 
         return createsEmptyFile && await TryOpenAsync(CancellationToken.None).ConfigureAwait(false) is null
             ? new TransferResult(CurlExitCode.WriteError, 0)

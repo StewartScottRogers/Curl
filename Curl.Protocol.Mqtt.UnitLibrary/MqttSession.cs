@@ -16,9 +16,11 @@ namespace Curl.Protocol.Mqtt;
 /// <para>
 /// A received PUBLISH is written as curl writes it: its whole body after the fixed header -
 /// the two-byte topic length, the topic, then the payload - with nothing parsed out. Each
-/// one is gathered whole before it is written, so one PUBLISH is one write to the output
-/// however the peer split it; one cut short by the peer closing is written as far as it
-/// got, as curl's is, before the transfer fails with exit 18.
+/// one is gathered whole, however the peer split it, then written in slices of at most
+/// 4096 bytes, so one PUBLISH of up to 4096 bytes is one write to the output; that is how
+/// curl's writes measured on loopback, where each of its 4096-byte reads came back full.
+/// One cut short by the peer closing is written as far as it got, as curl's is, before the
+/// transfer fails with exit 18.
 /// </para>
 /// <para>
 /// A packet with no body moves the session as curl's does, however odd the result: a
@@ -34,6 +36,12 @@ namespace Curl.Protocol.Mqtt;
 /// </remarks>
 internal sealed class MqttSession(IConnection connection, Stream output, CancellationToken cancellationToken)
 {
+    /// <summary>
+    /// The most bytes one write to the output carries: the size of the buffer curl 8.21.0's
+    /// <c>mqtt_read_publish</c> reads a PUBLISH body into, one read per write.
+    /// </summary>
+    private const int OutputWriteSize = 4096;
+
     private readonly MqttPacketReader reader = new(connection, cancellationToken);
 
     /// <summary>
@@ -211,25 +219,44 @@ internal sealed class MqttSession(IConnection connection, Stream output, Cancell
         await WriteOutputAsync(body.ToArray()).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Writes bytes to the output in slices of at most <see cref="OutputWriteSize" />, as
+    /// curl passes a PUBLISH body on in reads of at most its 4096-byte buffer.
+    /// </summary>
     private async ValueTask WriteOutputAsync(byte[] bytes)
     {
-        if (bytes.Length == 0)
+        for (int offset = 0; offset < bytes.Length; offset += OutputWriteSize)
         {
-            return;
+            await WriteOutputSliceAsync(bytes.AsMemory(offset, Math.Min(OutputWriteSize, bytes.Length - offset)))
+                .ConfigureAwait(false);
         }
+    }
 
+    /// <summary>
+    /// Writes one slice, reporting a failure with how many of its bytes the output accepted:
+    /// <see cref="OutputWriteFailedException.BytesAccepted" /> when the output reported it,
+    /// and 0 for any other <see cref="IOException" />.
+    /// </summary>
+    private async ValueTask WriteOutputSliceAsync(ReadOnlyMemory<byte> slice)
+    {
         try
         {
-            await output.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
+            await output.WriteAsync(slice, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OutputWriteFailedException failure)
+        {
+            throw new MqttTransferException(
+                CurlExitCode.WriteError,
+                MqttTransferMessages.OutputWriteFailed(slice.Length, failure.BytesAccepted));
         }
         catch (IOException)
         {
             throw new MqttTransferException(
                 CurlExitCode.WriteError,
-                MqttTransferMessages.OutputWriteFailed(bytes.Length));
+                MqttTransferMessages.OutputWriteFailed(slice.Length, 0));
         }
 
-        BytesWritten += bytes.Length;
+        BytesWritten += slice.Length;
     }
 
     private async ValueTask SendAsync(byte[] packet)

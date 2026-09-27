@@ -11,6 +11,16 @@ namespace Curl.Cli;
 /// </remarks>
 public static class CommandLineWarning
 {
+    /// <summary>How curl 8.21.0 names each <see cref="SelectedHttpMethod"/>, indexed by its value.</summary>
+    private static readonly string[] RequestMethodNames =
+    [
+        string.Empty,
+        "GET (-G, --get)",
+        "HEAD (-I, --head)",
+        "multipart formpost (-F, --form)",
+        "POST (-d, --data)",
+    ];
+
     /// <summary>
     /// The warning for a file name that looks like a flag, which curl still takes as the file
     /// name: <c>Warning: The filename argument '&lt;value&gt;' looks like a flag.</c>
@@ -23,6 +33,39 @@ public static class CommandLineWarning
         ArgumentNullException.ThrowIfNull(fileName);
 
         return $"Warning: The filename argument '{fileName}' looks like a flag.";
+    }
+
+    /// <summary>
+    /// The warning for a <c>-w @file</c> or <c>-w @-</c> whose file or standard input holds no bytes,
+    /// which clears the template: <c>Warning: Failed to read &lt;file&gt;</c>, naming standard input
+    /// <c>&lt;stdin&gt;</c>. Measured with <c>curl -w @empty.txt --bogus</c> and
+    /// <c>curl -w @- --bogus &lt;/dev/null</c> (curl 8.21.0, Windows, 2026-09-26); a file holding only
+    /// a line break or a NUL is not warned about.
+    /// </summary>
+    /// <param name="fileName">The file name after the <c>@</c>, or <c>&lt;stdin&gt;</c>.</param>
+    /// <returns>The warning line.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="fileName"/> is <see langword="null"/>.</exception>
+    public static string FailedToRead(string fileName)
+    {
+        ArgumentNullException.ThrowIfNull(fileName);
+
+        return $"Warning: Failed to read {fileName}";
+    }
+
+    /// <summary>
+    /// The warning for a <c>-H</c> / <c>--header</c> value holding neither a colon nor a semicolon,
+    /// which curl still sends as given: <c>Warning: The provided HTTP header '&lt;value&gt;' does not look like a header?</c>.
+    /// Measured with <c>curl -H foo http://127.0.0.1:1/</c> (curl 8.21.0, Windows, 2026-09-26); <c>-H ''</c>
+    /// warns with empty quotes, and the lines of a <c>-H @file</c> are never warned about.
+    /// </summary>
+    /// <param name="header">The value exactly as given.</param>
+    /// <returns>The warning line.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="header"/> is <see langword="null"/>.</exception>
+    public static string HeaderDoesNotLookLikeAHeader(string header)
+    {
+        ArgumentNullException.ThrowIfNull(header);
+
+        return $"Warning: The provided HTTP header '{header}' does not look like a header?";
     }
 
     /// <summary>
@@ -46,6 +89,85 @@ public static class CommandLineWarning
         "Warning: Invalid character is found in given range. A specified range MUST ",
         "Warning: have only digits in 'start'-'stop'. The server's response to this ",
         "Warning: request is uncertain.",
+    ];
+
+    /// <summary>
+    /// The line curl prints when it cannot read the modification time of the file a
+    /// <c>-z</c>/<c>--time-cond</c> value that is not a date names, for any reason but the file not
+    /// existing; <see cref="TimeConditionIsNotADate"/> follows it. Measured with
+    /// <c>curl -z "" -o NUL file:///Z:/.../global.json</c> (curl 8.21.0, Windows, 2026-09-26):
+    /// <c>Warning: Failed to get filetime: CreateFile failed: GetLastError 0x00000003</c>.
+    /// </summary>
+    /// <param name="reason">The failure <see cref="IDataFileReader.TryReadModificationTime"/> reported.</param>
+    /// <returns>The warning line.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="reason"/> is <see langword="null"/>.</exception>
+    public static string FailedToGetFileTime(string reason)
+    {
+        ArgumentNullException.ThrowIfNull(reason);
+
+        return $"Warning: Failed to get filetime: {reason}";
+    }
+
+    /// <summary>
+    /// The two lines curl prints for a <c>-z</c>/<c>--time-cond</c> value that is neither a date nor a
+    /// file whose modification time can be read, after
+    /// which it carries on with no time condition. curl wraps the text at 79 columns, so the first
+    /// line ends in a space. Measured with <c>curl -z notadate -o NUL file:///Z:/.../global.json</c>
+    /// (curl 8.21.0, Windows, 2026-09-26): these two lines, then the transfer, exit 0.
+    /// </summary>
+    public static IReadOnlyList<string> TimeConditionIsNotADate { get; } =
+    [
+        "Warning: Illegal date format for -z, --time-cond (and not a filename). ",
+        "Warning: Disabling time condition. See curl_getdate(3) for valid date syntax.",
+    ];
+
+    /// <summary>
+    /// The line curl prints when <c>--fail-with-body</c> replaces an earlier <c>-f</c> / <c>--fail</c>.
+    /// Measured with <c>curl -f --fail-with-body http://127.0.0.1:1/</c> (curl 8.21.0, Windows, 2026-09-26).
+    /// </summary>
+    public static IReadOnlyList<string> FailWithBodyDeselectsFail { get; } =
+    [
+        "Warning: --fail-with-body deselects --fail here",
+    ];
+
+    /// <summary>
+    /// The line curl prints when <c>-f</c> / <c>--fail</c> replaces an earlier <c>--fail-with-body</c>;
+    /// it names <c>--fail</c> even when <c>-f</c> was typed. Measured with
+    /// <c>curl --fail-with-body -f http://127.0.0.1:1/</c> (curl 8.21.0, Windows, 2026-09-26).
+    /// </summary>
+    public static IReadOnlyList<string> FailDeselectsFailWithBody { get; } =
+    [
+        "Warning: --fail deselects --fail-with-body here",
+    ];
+
+    /// <summary>
+    /// The lines curl prints when an option asks for an HTTP request method after another option has
+    /// selected a different one: <c>Warning: You can only select one HTTP request method! You asked for
+    /// both &lt;requested&gt; and &lt;selected&gt;.</c>, wrapped at 79 columns as curl wraps it, each method
+    /// named as curl 8.21.0 names it: <c>GET (-G, --get)</c>, <c>HEAD (-I, --head)</c>,
+    /// <c>multipart formpost (-F, --form)</c> or <c>POST (-d, --data)</c>. Measured with
+    /// <c>curl --no-head -I</c>, <c>curl -I --no-head</c>, <c>curl -F a=b -I</c>, <c>curl -I -F a=b</c>,
+    /// <c>curl --no-head -F a=b</c>, <c>curl -F a=b --no-head</c>, <c>curl -F a=b -d x</c> and
+    /// <c>curl -F a=b -d x -G</c> against <c>http://127.0.0.1:1/</c> (curl 8.21.0, Windows, 2026-09-26).
+    /// </summary>
+    /// <param name="requested">The method the later option asks for.</param>
+    /// <param name="selected">The method already selected.</param>
+    /// <returns>The warning's lines.</returns>
+    internal static IReadOnlyList<string> OnlyOneRequestMethod(SelectedHttpMethod requested, SelectedHttpMethod selected) =>
+        WrappedMessage.Lines(
+            "Warning: ",
+            $"You can only select one HTTP request method! You asked for both {RequestMethodNames[(int)requested]} and {RequestMethodNames[(int)selected]}.");
+
+    /// <summary>
+    /// The line curl prints when <c>-0</c> / <c>--http1.0</c> or <c>--http1.1</c> asks for a different HTTP
+    /// version from the one an earlier of them asked for: <c>Warning: Overrides previous HTTP version option</c>.
+    /// Asking for the same version again does not warn. Measured with <c>curl --http1.1 -0</c>,
+    /// <c>curl -0 --http1.1 -0</c> (two warnings), <c>curl -0 -0</c> and <c>curl --http1.1 --http1.1</c>
+    /// (none) against <c>http://127.0.0.1:1/</c> (curl 8.21.0, Windows, 2026-09-26).
+    /// </summary>
+    public static IReadOnlyList<string> OverridesPreviousHttpVersion { get; } =
+    [
+        "Warning: Overrides previous HTTP version option",
     ];
 
     /// <summary>

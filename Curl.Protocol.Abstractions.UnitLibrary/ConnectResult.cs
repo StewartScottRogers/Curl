@@ -1,3 +1,5 @@
+using System.Net;
+
 namespace Curl.Protocol.Abstractions;
 
 /// <summary>
@@ -5,7 +7,7 @@ namespace Curl.Protocol.Abstractions;
 /// an open connection, or the curl exit code and message that say why there is none.
 /// </summary>
 /// <remarks>
-/// A result is built only through <see cref="Connected(IConnection)" /> and
+/// A result is built only through the two <c>Connected</c> overloads and
 /// <see cref="Failed(CurlExitCode, string)" />, so a success always carries a connection
 /// and a failure always carries an exit code other than <see cref="CurlExitCode.Ok" />.
 /// </remarks>
@@ -39,22 +41,70 @@ public sealed class ConnectResult
     public string? ErrorMessage { get; }
 
     /// <summary>
-    /// Creates the result of a successful connect.
+    /// Gets the points in time the connector recorded while it connected, or
+    /// <see langword="null" /> when it recorded none or the connect failed.
+    /// </summary>
+    public ConnectTimings? Timings { get; private init; }
+
+    /// <summary>
+    /// Gets the local address and port of the socket the connector opened, the source of
+    /// <c>%{local_ip}</c> and <c>%{local_port}</c>; <see langword="null" /> when unknown or
+    /// the connect failed.
+    /// </summary>
+    public IPEndPoint? LocalEndPoint { get; private init; }
+
+    /// <summary>
+    /// Gets the status code of the proxy's reply to the CONNECT that opened a tunnel, the
+    /// source of <c>%{http_connect}</c>; <c>0</c> when there was no CONNECT or the connect
+    /// failed.
+    /// </summary>
+    public int ProxyConnectResponseCode { get; private init; }
+
+    /// <summary>
+    /// Creates the result of a successful connect that recorded no timings, endpoint or
+    /// CONNECT code.
     /// </summary>
     /// <param name="connection">The open connection.</param>
     /// <returns>
     /// A result whose <see cref="ExitCode" /> is <see cref="CurlExitCode.Ok" /> and whose
-    /// <see cref="ErrorMessage" /> is <see langword="null" />.
+    /// <see cref="ErrorMessage" />, <see cref="Timings" /> and <see cref="LocalEndPoint" />
+    /// are <see langword="null" />.
     /// </returns>
     /// <exception cref="ArgumentNullException">
     /// <paramref name="connection" /> is <see langword="null" />, which would leave a
     /// success with nothing to talk over.
     /// </exception>
-    public static ConnectResult Connected(IConnection connection)
+    public static ConnectResult Connected(IConnection connection) =>
+        Connected(connection, null);
+
+    /// <summary>
+    /// Creates the result of a successful connect, with what the connector measured.
+    /// </summary>
+    /// <param name="connection">The open connection.</param>
+    /// <param name="timings">The points in time the connector recorded, or <see langword="null" />.</param>
+    /// <param name="localEndPoint">The local address and port of the socket, or <see langword="null" />.</param>
+    /// <param name="proxyConnectResponseCode">
+    /// The status code of the proxy's reply to a tunnelling CONNECT; <c>0</c> when there was none.
+    /// </param>
+    /// <returns>A result whose <see cref="ExitCode" /> is <see cref="CurlExitCode.Ok" />.</returns>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="connection" /> is <see langword="null" />, which would leave a
+    /// success with nothing to talk over.
+    /// </exception>
+    public static ConnectResult Connected(
+        IConnection connection,
+        ConnectTimings? timings,
+        IPEndPoint? localEndPoint = null,
+        int proxyConnectResponseCode = 0)
     {
         ArgumentNullException.ThrowIfNull(connection);
 
-        return new ConnectResult(connection, CurlExitCode.Ok, null);
+        return new ConnectResult(connection, CurlExitCode.Ok, null)
+        {
+            Timings = timings,
+            LocalEndPoint = localEndPoint,
+            ProxyConnectResponseCode = proxyConnectResponseCode,
+        };
     }
 
     /// <summary>

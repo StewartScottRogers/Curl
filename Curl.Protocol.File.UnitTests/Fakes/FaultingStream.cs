@@ -1,3 +1,5 @@
+using Curl.Protocol.Abstractions;
+
 namespace Curl.Protocol.File.Fakes;
 
 /// <summary>
@@ -18,6 +20,7 @@ public sealed class FaultingStream : Stream, IRecordingStream
     private readonly bool readable;
     private readonly bool writable;
     private readonly bool seekable;
+    private readonly int? bytesAcceptedOnFailure;
     private int reads;
     private int writes;
 
@@ -27,7 +30,8 @@ public sealed class FaultingStream : Stream, IRecordingStream
         int failingWriteNumber,
         bool readable,
         bool writable,
-        bool seekable)
+        bool seekable,
+        int? bytesAcceptedOnFailure = null)
     {
         this.inner = inner;
         this.failingReadNumber = failingReadNumber;
@@ -35,6 +39,7 @@ public sealed class FaultingStream : Stream, IRecordingStream
         this.readable = readable;
         this.writable = writable;
         this.seekable = seekable;
+        this.bytesAcceptedOnFailure = bytesAcceptedOnFailure;
     }
 
     /// <inheritdoc />
@@ -122,6 +127,28 @@ public sealed class FaultingStream : Stream, IRecordingStream
             readable: false,
             writable: true,
             seekable: false);
+    }
+
+    /// <summary>
+    /// Creates a non-seekable writable stream whose <paramref name="writeNumber" />th
+    /// write throws <see cref="OutputWriteFailedException" /> reporting
+    /// <paramref name="bytesAccepted" />, as the console's standard output does.
+    /// </summary>
+    /// <param name="writeNumber">The one-based write that fails.</param>
+    /// <param name="bytesAccepted">The count the exception reports.</param>
+    /// <returns>The stream.</returns>
+    public static FaultingStream FailingOnWriteAccepting(int writeNumber, int bytesAccepted)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(writeNumber);
+
+        return new FaultingStream(
+            new MemoryStream(),
+            failingReadNumber: 0,
+            writeNumber,
+            readable: false,
+            writable: true,
+            seekable: false,
+            bytesAccepted);
     }
 
     /// <summary>
@@ -251,7 +278,9 @@ public sealed class FaultingStream : Stream, IRecordingStream
 
         if (writes == failingWriteNumber)
         {
-            throw new IOException($"Simulated failure on write {writes}.");
+            throw bytesAcceptedOnFailure is { } accepted
+                ? new OutputWriteFailedException(accepted, $"Simulated failure on write {writes}.")
+                : new IOException($"Simulated failure on write {writes}.");
         }
 
         inner.Write(buffer);

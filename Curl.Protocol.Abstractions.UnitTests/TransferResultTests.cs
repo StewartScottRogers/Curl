@@ -63,4 +63,87 @@ public sealed class TransferResultTests
 
         Assert.IsNull(result.SourceLastWriteTimeUtc);
     }
+
+    [TestMethod]
+    public void With_SettingEveryProperty_ReturnsCopyWithNewValuesAndLeavesOriginalUnchanged()
+    {
+        var original = TransferResult.Success(10, SourceTime);
+        var laterTime = SourceTime.AddHours(1);
+
+        var copy = original with
+        {
+            ExitCode = CurlExitCode.WriteError,
+            BytesTransferred = 3,
+            ErrorMessage = "failed",
+            SourceLastWriteTimeUtc = laterTime,
+        };
+
+        Assert.AreEqual(CurlExitCode.WriteError, copy.ExitCode);
+        Assert.AreEqual(3L, copy.BytesTransferred);
+        Assert.AreEqual("failed", copy.ErrorMessage);
+        Assert.AreEqual(laterTime, copy.SourceLastWriteTimeUtc);
+        Assert.AreEqual(CurlExitCode.Ok, original.ExitCode);
+        Assert.AreEqual(10L, original.BytesTransferred);
+        Assert.IsNull(original.ErrorMessage);
+        Assert.AreEqual(SourceTime, original.SourceLastWriteTimeUtc);
+    }
+
+    [TestMethod]
+    public void TimeConditionNotMet_WithATimestamp_IsASuccessThatCarriesItAndMovedNothing()
+    {
+        var result = TransferResult.TimeConditionNotMet(SourceTime);
+
+        Assert.IsTrue(result.IsSuccess);
+        Assert.IsTrue(result.TimeConditionUnmet);
+        Assert.AreEqual(SourceTime, result.SourceLastWriteTimeUtc);
+        Assert.AreEqual(0L, result.BytesTransferred);
+        Assert.IsNull(result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public void TimeConditionNotMet_WithoutATimestamp_LeavesSourceLastWriteTimeUtcNull()
+    {
+        var result = TransferResult.TimeConditionNotMet();
+
+        Assert.IsTrue(result.TimeConditionUnmet);
+        Assert.IsNull(result.SourceLastWriteTimeUtc);
+    }
+
+    [TestMethod]
+    public void TimeConditionUnmet_OnEveryOtherFactoryAndTheConstructor_IsFalse()
+    {
+        Assert.IsFalse(TransferResult.Success(0).TimeConditionUnmet);
+        Assert.IsFalse(TransferResult.Failure(CurlExitCode.ReadError, "failed").TimeConditionUnmet);
+        Assert.IsFalse(new TransferResult(CurlExitCode.Ok, 0).TimeConditionUnmet);
+    }
+
+    [TestMethod]
+    public void With_SettingSourceLastWriteTimeUtc_KeepsTimeConditionUnmet()
+    {
+        var result = TransferResult.TimeConditionNotMet() with { SourceLastWriteTimeUtc = SourceTime };
+
+        Assert.IsTrue(result.TimeConditionUnmet);
+        Assert.AreEqual(SourceTime, result.SourceLastWriteTimeUtc);
+    }
+
+    [TestMethod]
+    public void Report_OnEveryFactoryAndTheConstructor_IsNull()
+    {
+        Assert.IsNull(TransferResult.Success(0).Report);
+        Assert.IsNull(TransferResult.TimeConditionNotMet().Report);
+        Assert.IsNull(TransferResult.Failure(CurlExitCode.ReadError, "failed").Report);
+        Assert.IsNull(new TransferResult(CurlExitCode.Ok, 0).Report);
+    }
+
+    [TestMethod]
+    public void With_SettingReport_CarriesItAndKeepsThePositionalValues()
+    {
+        var report = new TransferReport { ResponseCode = 404 };
+
+        var result = TransferResult.Failure(CurlExitCode.HttpReturnedError, "failed", 7) with { Report = report };
+
+        Assert.AreSame(report, result.Report);
+        Assert.AreEqual(7L, result.BytesTransferred);
+        Assert.AreEqual("failed", result.ErrorMessage);
+    }
 }

@@ -7,7 +7,8 @@ namespace Curl.Protocol.Abstractions;
 public interface ITransferContext
 {
     /// <summary>
-    /// Gets the URL being transferred, after any scheme rewriting has been applied.
+    /// Gets the URL being transferred, as given on the command line and parsed into a
+    /// <see cref="System.Uri" />.
     /// </summary>
     Uri Url { get; }
 
@@ -170,6 +171,38 @@ public interface ITransferContext
     /// Windows ignores it.
     /// </remarks>
     UnixFileMode CreateFileMode { get; }
+
+    /// <summary>
+    /// Gets the longest time the connection phase may take, per <c>--connect-timeout</c>,
+    /// or <see langword="null" /> when none was given.
+    /// </summary>
+    /// <remarks>
+    /// It limits only the connection phase; once the connection is made it no longer
+    /// applies. The value arrives as given, and a handler that does not use it ignores it
+    /// (ADR-0008).
+    /// </remarks>
+    TimeSpan? ConnectTimeout { get; }
+
+    /// <summary>
+    /// Gets the longest time the whole transfer may take, per <c>-m</c>/<c>--max-time</c>,
+    /// or <see langword="null" /> when none was given.
+    /// </summary>
+    /// <remarks>
+    /// It limits the whole transfer, connection phase included. The value arrives as
+    /// given, and a handler that does not use it ignores it (ADR-0008).
+    /// </remarks>
+    TimeSpan? MaxTime { get; }
+
+    /// <summary>
+    /// Gets the HTTP-only options, or <see langword="null" /> when no HTTP option was
+    /// given.
+    /// </summary>
+    /// <remarks>
+    /// An HTTP handler treats <see langword="null" /> exactly as
+    /// <c>new HttpRequestOptions()</c>, every member at its default; every other handler
+    /// ignores it (ADR-0014).
+    /// </remarks>
+    HttpRequestOptions? Http { get; }
 
     /// <summary>
     /// Gets the time source. Injected so that timeout and retry behaviour is testable

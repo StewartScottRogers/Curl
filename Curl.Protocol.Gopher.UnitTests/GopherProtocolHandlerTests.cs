@@ -16,6 +16,9 @@ public sealed class GopherProtocolHandlerTests
     /// <summary>The reply the measured server sent: one info line and the terminator.</summary>
     private static readonly byte[] MeasuredReply = "iHello\tfake\t(NULL)\t0\r\n.\r\n"u8.ToArray();
 
+    /// <summary>The line end each measured server line closed with.</summary>
+    private static readonly byte[] CarriageReturnLineFeed = "\r\n"u8.ToArray();
+
     [TestMethod]
     public void SupportedSchemes_IsExactlyGopherAndGophers()
     {
@@ -296,7 +299,7 @@ public sealed class GopherProtocolHandlerTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_OutputWriteFails_ReturnsWriteError()
+    public async Task ExecuteAsync_OutputWriteFailsWithPlainIOException_ReportsReturnedZero()
     {
         ScriptedConnection connection = new(MeasuredReply);
         WriteRefusingStream output = new();
@@ -309,6 +312,37 @@ public sealed class GopherProtocolHandlerTests
                 CurlExitCode.WriteError,
                 0,
                 $"Failure writing output to destination, passed {MeasuredReply.Length} returned 0"),
+            result);
+    }
+
+    // Measured 2026-09-26 against curl 8.21.0 (BL-117): a loopback server sent count lines
+    // of size bytes, 5 ms apart, to curl -sS gopher://127.0.0.1:<port>/0/x 2>&1 >&-.
+    // Each line arrives as one read; curl's 4096-byte stdio buffer takes whole lines until
+    // one overflows it, and returned M is the room left then.
+    [TestMethod]
+    [DataRow(100, 100, 40, 96, DisplayName = "100 x 100: passed 100 returned 96")]
+    [DataRow(300, 100, 13, 196, DisplayName = "300 x 100: passed 300 returned 196")]
+    [DataRow(1000, 20, 4, 96, DisplayName = "1000 x 20: passed 1000 returned 96")]
+    [DataRow(30, 400, 136, 16, DisplayName = "30 x 400: passed 30 returned 16")]
+    [DataRow(5000, 5, 0, 0, DisplayName = "5000 x 5: passed 5000 returned 0")]
+    public async Task ExecuteAsync_OutputFailsWhenStdioBufferOverflows_ReportsMeasuredPassedAndReturned(
+        int size,
+        int count,
+        int linesBuffered,
+        int returned)
+    {
+        byte[] line = [.. Enumerable.Repeat((byte)'x', size - 2), .. CarriageReturnLineFeed];
+        ScriptedConnection connection = new([.. Enumerable.Repeat(line, count)]);
+        BufferOverflowRefusingStream output = new(4096);
+
+        TransferResult result = await new GopherProtocolHandler(FakeConnector.For(connection))
+            .ExecuteAsync(Context("gopher://h/0/x", output));
+
+        Assert.AreEqual(
+            new TransferResult(
+                CurlExitCode.WriteError,
+                (long)linesBuffered * size,
+                $"Failure writing output to destination, passed {size} returned {returned}"),
             result);
     }
 

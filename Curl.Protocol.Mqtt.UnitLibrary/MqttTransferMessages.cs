@@ -53,15 +53,18 @@ internal static class MqttTransferMessages
     internal const string TooLarge = "A value or data field grew larger than allowed";
 
     /// <summary>
-    /// The exit 23 message for an output that stopped accepting bytes, as curl words it
-    /// when a write takes none of what it was offered.
+    /// The exit 23 message for an output that stopped accepting bytes.
     /// </summary>
-    /// <param name="passed">The number of bytes offered to the output.</param>
+    /// <param name="passed">The number of bytes offered to the output in the failed write.</param>
+    /// <param name="returned">
+    /// How many of those bytes the output accepted before failing: 0 unless it reported
+    /// more.
+    /// </param>
     /// <returns>The message to report.</returns>
-    internal static string OutputWriteFailed(int passed) =>
+    internal static string OutputWriteFailed(int passed, int returned) =>
         string.Create(
             CultureInfo.InvariantCulture,
-            $"Failure writing output to destination, passed {passed} returned 0");
+            $"Failure writing output to destination, passed {passed} returned {returned}");
 
     /// <summary>
     /// The exit 8 message for a user name over 65535 bytes.

@@ -1,0 +1,119 @@
+---
+id: BL-118
+title: Measure and report the accepted byte count in MQTT's failed output write message
+priority: Low
+assignee: Claude
+pipeline: feature
+depends-on: [BL-114]
+touches: [Curl.Protocol.Mqtt.UnitLibrary, Curl.Protocol.Mqtt.UnitTests]
+requirement: none
+created: 2026-09-26
+completed: 2026-09-26
+---
+# BL-118 — Measure and report the accepted byte count in MQTT's failed output write message
+
+## Goal
+
+An `mqtt://` subscription whose output fails prints the same
+`curl: (23) Failure writing output to destination, passed N returned M` line as curl
+8.21.0 for the measured cases, with `M` taken from
+`OutputWriteFailedException.BytesAccepted` (BL-114) instead of a literal 0.
+
+## Context
+
+BL-099 measured only `file://` and `telnet://`; there is no MQTT measurement yet, so
+**measure with curl 8.21.0 first**. The telnet rows from BL-099's Notes ("Measurements,
+2026-09-26") show what a stream of small writes produced there:
+
+| size x count | curl 8.21.0 stderr | exit | ours |
+| --- | --- | --- | --- |
+| 100 x 100 | `curl: (23) Failure writing output to destination, passed 100 returned 96` | 23 | `... passed 100 returned 0` |
+| 30 x 400 | `curl: (23) Failure writing output to destination, passed 30 returned 16` | 23 | `... passed 30 returned 0` |
+| 5000 x 5 | `curl: (23) Failure writing output to destination, passed 4096 returned 0` | 23 | `... passed 10000 returned 0` |
+
+BL-099's rule: `M` is the room left in curl's 4096-byte stdio buffer when the overflowing
+write arrives. MQTT may differ; that is what the measurement is for.
+
+Measure with `/mingw64/bin/curl` (curl 8.21.0, x86_64-w64-mingw32) from Git Bash: a Python
+loopback broker that answers CONNECT with CONNACK and SUBSCRIBE with SUBACK, then sends
+`count` QoS 0 PUBLISH packets on the subscribed topic with `size`-byte payloads, 5 ms
+apart, and closes; `curl -sS mqtt://127.0.0.1:<port>/t 2>&1 >&- </dev/null`, for size x
+count of 100 x 100, 300 x 100, 1000 x 20, 30 x 400 and 5000 x 5. Record each command, its
+exact standard error and exit code, and ours (`dotnet run --project Curl.Console`, same
+command line) in this task's `Notes` before changing code. Also record in `Notes` which
+bytes each PUBLISH puts on standard output in curl (for example whether the topic is
+written as well as the payload, and in how many writes), since that decides `N`.
+
+Where the literal lives: `Curl.Protocol.Mqtt.UnitLibrary/MqttTransferMessages.cs`,
+`OutputWriteFailed(int passed)` (around line 61), called from
+`MqttSession.WriteOutputAsync` (around line 229), which catches `IOException` from
+`output.WriteAsync` and passes only `bytes.Length`. Carry
+`OutputWriteFailedException.BytesAccepted` (from `Curl.Protocol.Abstractions.UnitLibrary`)
+into the message; a plain `IOException` gives 0. If the measurement shows `N` differs from
+ours for a reason inside `Curl.Protocol.Mqtt.UnitLibrary` (for example how PUBLISH output
+is split into writes), match it here; anything needing a project outside `touches`
+becomes a follow-up task. Keep every method within cyclomatic complexity 10 and the
+library at 100% line and branch coverage.
+
+## Acceptance criteria
+
+- [x] `Notes` records, for curl 8.21.0, each of the five commands above with its exact
+      standard error and exit code, and ours before the change.
+- [x] `Curl.Protocol.Mqtt.UnitTests` has one test per measured row: a fake `IConnection`
+      delivers the broker's packets, a fake output stream throws
+      `OutputWriteFailedException` with the `BytesAccepted` that row needs, and the
+      result is `CurlExitCode.WriteError` with the message after `curl: (23) ` byte for
+      byte.
+- [x] A test whose output stream throws a plain `IOException` still gets `returned 0`.
+- [x] No literal `returned 0` remains in `MqttTransferMessages.cs`.
+- [x] `dotnet build Curl.Protocol.Mqtt.UnitLibrary -warnaserror` is clean and
+      `dotnet test --filter "TestCategory!=Integration"` is green.
+
+## Notes
+
+### Measurements, 2026-09-26
+
+Broker: a Python loopback broker (CONNACK, SUBACK, then `count` QoS 0 PUBLISH packets on
+topic `t` with `size`-byte payloads, 5 ms apart, then close). Command, from Git Bash:
+`curl -sS mqtt://127.0.0.1:<port>/t 2>&1 >&- </dev/null`, with `/mingw64/bin/curl`
+(curl 8.21.0) and with ours (`Curl.Console/bin/Debug/net10.0/curl.exe`, same line).
+
+| size x count | curl 8.21.0 stderr | exit | ours before | ours after |
+| --- | --- | --- | --- | --- |
+| 100 x 100 | `curl: (23) Failure writing output to destination, passed 103 returned 79` | 23 | `... passed 103 returned 0` | matches curl |
+| 300 x 100 | `curl: (23) Failure writing output to destination, passed 303 returned 157` | 23 | `... passed 303 returned 0` | matches curl |
+| 1000 x 20 | `curl: (23) Failure writing output to destination, passed 1003 returned 84` | 23 | `... passed 1003 returned 0` | matches curl |
+| 30 x 400 | `curl: (23) Failure writing output to destination, passed 33 returned 4` | 23 | `... passed 33 returned 0` | matches curl |
+| 5000 x 5 | `curl: (23) Failure writing output to destination, passed 4096 returned 0` | 23 | `... passed 5003 returned 0` | matches curl |
+
+Every exit was 23 on both sides.
+
+What curl writes per PUBLISH (checked with `-o` on 3 x 2): the whole body after the fixed
+header - `00 01 't'` then the payload - so `N` is `size + 3`. A body over 4096 bytes is
+written in pieces of at most 4096 (curl's `mqtt_read_publish` reads into a 4 KiB buffer
+and writes each read), hence `passed 4096` for 5000 x 5. `M` follows BL-099's rule: the
+room left in the 4096-byte stdio buffer (4096 mod 103 = 79, mod 303 = 157, mod 1003 = 84,
+mod 33 = 4; a 4096-byte write into an empty buffer returns 0).
+
+### Choices
+
+- `MqttSession` still gathers a PUBLISH body whole, then writes it in slices of at most
+  4096 bytes, rather than writing each network read as curl does. Why: it keeps output
+  writes deterministic however the peer splits packets, and it gives the same writes as
+  curl on every measured row (loopback reads came back full). A peer that dribbles a
+  PUBLISH in small reads would see curl write smaller pieces; not measured, not matched.
+- `M` is `OutputWriteFailedException.BytesAccepted`; any other `IOException` gives 0,
+  as BL-116 did for `file://`.
+- Tests: `RecordingStream` gained `FailingWriteNumber` and `BytesAcceptedOnFailure`; the
+  five rows are one `DataRow` test each, plus a test pinning the 4096 + 907 slices.
+  The existing `ExecuteAsync_OutputRefusesWrite_IsWriteError` covers the plain
+  `IOException` -> `returned 0` case. Mqtt library coverage: 100% line, 100% branch.
+
+## Log
+
+- 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Blocked. Stewart: dark factory run ended in Doing, exit 1; see logs\BL-118-20260926-083111-L3.jsonl
+- 2026-09-26: Blocked -> Backlog. Not blocked: the 2026-09-26 shift ran out of tokens (usage limit), which it misfiled as a stall
+- 2026-09-26: Backlog -> Doing.
+- 2026-09-26: Doing -> Done. mqtt:// failed output writes report curl's passed N returned M, with PUBLISH bodies written in 4096-byte slices; all five measured rows match curl 8.21.0

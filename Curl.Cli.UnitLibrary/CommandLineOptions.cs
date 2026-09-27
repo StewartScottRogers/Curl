@@ -1,6 +1,7 @@
 using System.Net;
 using System.Security.Authentication;
 using System.Text;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Cli;
 
@@ -14,10 +15,16 @@ namespace Curl.Cli;
 public sealed class CommandLineOptions
 {
     private readonly List<string> urls = [];
-    private readonly List<string> outputFiles = [];
+    private readonly List<UrlOutput> urlOutputs = [];
     private readonly List<string> telnetOptions = [];
+    private readonly List<string> headers = [];
+    private readonly List<CommandLineCookie> cookies = [];
     private readonly List<string> warningLines = [];
+    private readonly List<FormPartSpecification> formParts = [];
+    private readonly Stack<FormPartSpecification> openMultiparts = new();
     private string? userAwaitingPassword;
+    private string? proxyUserAwaitingPassword;
+    private HttpAuthSchemes wantedAuthSchemes;
 
     /// <summary>
     /// The URLs to transfer, in command-line order: positional arguments and
@@ -25,23 +32,124 @@ public sealed class CommandLineOptions
     /// </summary>
     public IReadOnlyList<string> Urls => urls;
 
+    /// <summary>
+    /// <see langword="true"/> when <c>-V</c> / <c>--version</c> was given on the command line. Parsing
+    /// stops there, as curl 8.21.0's does, so every option after it is unread; the console prints
+    /// <see cref="CurlVersionText"/>'s lines and exits 0 instead of transferring. A <c>version</c>
+    /// line in a <c>-K</c> file does not set it: curl ignores it there.
+    /// </summary>
+    public bool VersionRequested { get; internal set; }
+
     /// <summary><see langword="true"/> when <c>-s</c> / <c>--silent</c> was given and no <c>--no-silent</c> came after it.</summary>
     public bool Silent { get; internal set; }
 
     /// <summary><see langword="true"/> when <c>-S</c> / <c>--show-error</c> was given and no <c>--no-show-error</c> came after it.</summary>
     public bool ShowError { get; internal set; }
 
-    /// <summary>The <c>-o</c> / <c>--output</c> file names, in command-line order.</summary>
-    public IReadOnlyList<string> OutputFiles => outputFiles;
+    /// <summary>
+    /// <see langword="true"/> when <c>--no-progress-meter</c> was given and no <c>--progress-meter</c>
+    /// came after it. In curl 8.21.0 it turns the meter off whatever its form, so it outranks
+    /// <see cref="ProgressBar"/> in either order.
+    /// </summary>
+    public bool ProgressMeterOff { get; internal set; }
 
     /// <summary>
-    /// The <c>-d</c> / <c>--data</c> value as UTF-8 bytes; <see langword="null"/> when not given.
-    /// An empty value is empty data, not a refusal. When given more than once the values are joined
-    /// in command-line order, each one after the first preceded by a single <c>&amp;</c> when the body
-    /// so far is not empty, as in curl 8.21.0. A value <c>@file</c> (or <c>@-</c>) contributes the
-    /// file's (or standard input's) bytes with every carriage return, line feed and NUL removed.
+    /// <see langword="true"/> when <c>-#</c> / <c>--progress-bar</c> was given and no
+    /// <c>--no-progress-bar</c> came after it: the meter, when shown, is the bar form.
+    /// </summary>
+    public bool ProgressBar { get; internal set; }
+
+    /// <summary>
+    /// The <c>-o</c> / <c>--output</c> file name of each entry of <see cref="UrlOutputs"/>, in the same
+    /// order and up to the last entry that has one, <see langword="null"/> for an entry before it that
+    /// has none: the Nth element is the <c>-o</c> file paired with the Nth URL, and a URL past the end
+    /// has none. Empty when no <c>-o</c> was given.
+    /// </summary>
+    public IReadOnlyList<string?> OutputFiles =>
+        urlOutputs[..(urlOutputs.FindLastIndex(output => output.FileName is not null) + 1)].ConvertAll(output => output.FileName);
+
+    /// <summary>
+    /// Where each URL's body goes, one <see cref="UrlOutput"/> per URL or output option, in the order
+    /// curl 8.21.0 pairs them: the Nth URL with the Nth <c>-o</c>, <c>-O</c> or kept
+    /// <c>--no-remote-name</c>. Entries past the last URL have no <see cref="UrlOutput.Url"/>.
+    /// </summary>
+    public IReadOnlyList<UrlOutput> UrlOutputs => urlOutputs;
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--remote-name-all</c> was given and no <c>--no-remote-name-all</c>
+    /// came after it. It applies to each URL or output option read while it is on, not to earlier ones.
+    /// </summary>
+    public bool RemoteNameAll { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>-J</c> / <c>--remote-header-name</c> was given and no
+    /// <c>--no-remote-header-name</c> came after it: a remote-named file takes its name from the
+    /// <c>Content-Disposition</c> header when there is one.
+    /// </summary>
+    public bool RemoteHeaderName { get; internal set; }
+
+    /// <summary>
+    /// The <c>--output-dir</c> directory, verbatim and unchecked; <see langword="null"/> when not given.
+    /// The last value wins.
+    /// </summary>
+    public string? OutputDirectory { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--create-dirs</c> was given and no <c>--no-create-dirs</c> came
+    /// after it: missing directories in an output path are created.
+    /// </summary>
+    public bool CreateDirectories { get; internal set; }
+
+    /// <summary>
+    /// The <c>-w</c> / <c>--write-out</c> template, unexpanded; <see langword="null"/> when not given or
+    /// when the last <c>-w @file</c> named an empty file. The last value wins. An <c>@file</c> or
+    /// <c>@-</c> value is the file's (or standard input's) text with every carriage return, line feed and
+    /// NUL removed, as curl 8.21.0 reads it.
+    /// </summary>
+    public string? WriteOut { get; internal set; }
+
+    /// <summary>
+    /// The request body built from every <c>-d</c> / <c>--data</c>, <c>--data-ascii</c>, <c>--data-binary</c>,
+    /// <c>--data-raw</c>, <c>--data-urlencode</c> and <c>--json</c> value, as bytes; <see langword="null"/>
+    /// when none was given. An empty value is empty data, not a refusal. The pieces are joined in
+    /// command-line order, as in curl 8.21.0: a <c>--json</c> piece is appended as it is, and any other
+    /// piece after a single <c>&amp;</c> when the body so far is not empty. Text is taken as UTF-8.
+    /// A <c>-d</c> or <c>--data-ascii</c> value <c>@file</c> (or <c>@-</c>) contributes the file's (or
+    /// standard input's) bytes with every carriage return, line feed and NUL removed; a
+    /// <c>--data-binary</c> or <c>--json</c> one contributes them unchanged; <c>--data-raw</c> never
+    /// reads a file. With <see cref="DataInQuery"/> the body is sent as the URL query instead
+    /// (see <see cref="QueryUrl"/>).
     /// </summary>
     public ReadOnlyMemory<byte>? PostData { get; private set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--json</c> was given at least once: curl 8.21.0 then sends
+    /// <c>Content-Type: application/json</c> and <c>Accept: application/json</c>, even when a later
+    /// <c>-d</c> adds to the body.
+    /// </summary>
+    public bool SendsJson { get; private set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>-G</c> / <c>--get</c> was given and no <c>--no-get</c> came after it:
+    /// the request is a GET and <see cref="PostData"/>, when given, is sent as the URL query
+    /// (see <see cref="QueryUrl"/>).
+    /// </summary>
+    public bool DataInQuery { get; internal set; }
+
+    /// <summary>
+    /// The <c>--url-query</c> values joined in command-line order with a <c>&amp;</c> between each
+    /// two, even when one is empty, as curl 8.21.0 does; <see langword="null"/> when not given.
+    /// Each value is encoded as <c>--data-urlencode</c> encodes it, except that one starting with
+    /// <c>+</c> is kept verbatim without its <c>+</c>. Appended to the URL by <see cref="QueryUrl"/>.
+    /// </summary>
+    public string? UrlQuery { get; private set; }
+
+    /// <summary>
+    /// The <c>-D</c> / <c>--dump-header</c> file, verbatim and unchecked; <see langword="null"/> when
+    /// not given. <c>-</c> means standard output. Nothing is opened or created here. The last value
+    /// wins, as in curl 8.21.0.
+    /// </summary>
+    public string? DumpHeaderFile { get; internal set; }
 
     /// <summary>
     /// The <c>-u</c> / <c>--user</c> value split at its first colon into user name and password;
@@ -51,6 +159,69 @@ public sealed class CommandLineOptions
     /// (<c>-u ;opt</c>) is a user name with an empty password, as in curl 8.21.0.
     /// </summary>
     public NetworkCredential? Credentials { get; private set; }
+
+    /// <summary>
+    /// The <c>-U</c> / <c>--proxy-user</c> value split at its first colon into user name and
+    /// password, for the proxy; <see langword="null"/> when not given. A user with no password is
+    /// asked for as <see cref="Credentials"/> is, with curl 8.21.0's proxy prompt. An empty value is
+    /// accepted: curl 8.21.0 asks for the password of the user <c>''</c>.
+    /// </summary>
+    public NetworkCredential? ProxyCredentials { get; private set; }
+
+    /// <summary>
+    /// The HTTP authentication schemes to allow for the origin, as curl 8.21.0's tool asks libcurl
+    /// for them: <c>--basic</c> and <c>--digest</c> add their scheme and their <c>--no-</c> spellings
+    /// remove it; <c>--anyauth</c> replaces the set with every scheme; <c>--oauth2-bearer</c> adds
+    /// Bearer. <see cref="HttpAuthSchemes.Bearer"/> is only ever allowed with a
+    /// <see cref="BearerToken"/>, so <c>--anyauth</c> alone gives <see cref="HttpAuthSchemes.Any"/>.
+    /// When nothing is left, which is also when no scheme option was given, the set is
+    /// <see cref="HttpAuthSchemes.Basic"/>, libcurl's default.
+    /// </summary>
+    /// <remarks>
+    /// Measured with the reference curl 8.21.0 (<c>Record-CurlExchange.ps1</c>, a 401 offering Bearer
+    /// and Basic, 2026-09-26): <c>-u u:p --no-basic</c> and <c>-u u:p --digest --no-digest</c> send
+    /// <c>Basic dTpw</c> at once; <c>-u u:p --basic --no-basic --digest</c> sends nothing;
+    /// <c>-u u:p --oauth2-bearer tok --basic</c> sends nothing, then <c>Bearer tok</c>;
+    /// <c>-u u:p --anyauth --basic</c> and <c>-u u:p --anyauth</c> send nothing, then
+    /// <c>Basic dTpw</c>; <c>--oauth2-bearer tok --anyauth</c> sends nothing, then <c>Bearer tok</c>;
+    /// <c>--oauth2-bearer tok --no-basic</c> sends <c>Bearer tok</c> at once. See ADR-0026.
+    /// </remarks>
+    public HttpAuthSchemes AuthSchemes
+    {
+        get
+        {
+            HttpAuthSchemes allowed = BearerToken is null ? wantedAuthSchemes & ~HttpAuthSchemes.Bearer : wantedAuthSchemes;
+            return allowed == HttpAuthSchemes.None ? HttpAuthSchemes.Basic : allowed;
+        }
+    }
+
+    /// <summary>
+    /// The last <c>--oauth2-bearer</c> token; <see langword="null"/> when not given. An empty value is
+    /// refused as blank. While it is set, a <c>-u</c> user with no password is not prompted for.
+    /// </summary>
+    public string? BearerToken { get; private set; }
+
+    /// <summary>
+    /// The last <c>-x</c> / <c>--proxy</c>, <c>--socks4</c>, <c>--socks4a</c>, <c>--socks5</c> or
+    /// <c>--socks5-hostname</c> value, with the kind of proxy that option names; <see langword="null"/>
+    /// when none was given. curl 8.21.0 keeps one proxy: the last of these options wins, value and kind
+    /// together, and a scheme in the value outranks the option's kind. An empty <c>-x ''</c> is kept:
+    /// it asks for no proxy at all, the environment's included.
+    /// </summary>
+    public CommandLineProxy? Proxy { get; private set; }
+
+    /// <summary>
+    /// The last <c>--noproxy</c> value, verbatim: the hosts to reach without a proxy. Empty is
+    /// accepted. <see langword="null"/> when not given. Matching hosts against it is the proxy
+    /// selector's job.
+    /// </summary>
+    public string? NoProxy { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>-p</c> / <c>--proxytunnel</c> was given and no
+    /// <c>--no-proxytunnel</c> came after it: tunnel through an HTTP proxy with CONNECT.
+    /// </summary>
+    public bool ProxyTunnel { get; internal set; }
 
     /// <summary>Every <c>-t</c> / <c>--telnet-option</c> value, verbatim and unvalidated, in command-line order.</summary>
     public IReadOnlyList<string> TelnetOptions => telnetOptions;
@@ -136,16 +307,223 @@ public sealed class CommandLineOptions
     public long? MaxFileSize { get; internal set; }
 
     /// <summary>
+    /// The <c>--connect-timeout</c> limit, to the millisecond; <see langword="null"/> when not
+    /// given. Zero is recorded as given and means no limit, as it does to curl. The last value wins.
+    /// </summary>
+    public TimeSpan? ConnectTimeout { get; internal set; }
+
+    /// <summary>
+    /// The <c>-m</c> / <c>--max-time</c> limit on the whole transfer, to the millisecond;
+    /// <see langword="null"/> when not given. Zero is recorded as given and means no limit, as it
+    /// does to curl. The last value wins.
+    /// </summary>
+    public TimeSpan? MaxTime { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>-R</c> / <c>--remote-time</c> was given and no
+    /// <c>--no-remote-time</c> came after it: give the output file the remote file's time.
+    /// </summary>
+    public bool RemoteTime { get; internal set; }
+
+    /// <summary>
+    /// The <c>-z</c> / <c>--time-cond</c> condition: the date read by <see cref="CurlDateParser"/> and
+    /// its direction; <see langword="null"/> when not given, or when the last value was not a date,
+    /// which curl 8.21.0 warns about and then transfers unconditionally. The last value wins.
+    /// </summary>
+    public TimeCondition? TimeCondition { get; internal set; }
+
+    /// <summary>
+    /// The <c>-X</c> / <c>--request</c> method, verbatim and never empty; <see langword="null"/> when
+    /// not given. The last value wins.
+    /// </summary>
+    public string? RequestMethod { get; internal set; }
+
+    /// <summary>
+    /// The <c>-H</c> / <c>--header</c> values in command-line order, each verbatim, empty included,
+    /// with an <c>@file</c> value replaced by the file's non-empty lines in file order.
+    /// </summary>
+    public IReadOnlyList<string> Headers => headers;
+
+    /// <summary>
+    /// The multipart form <c>-F</c> / <c>--form</c> and <c>--form-string</c> values describe, one
+    /// top-level part per value in command-line order, parts given between <c>name=(</c> and <c>=)</c>
+    /// inside the part that opened them; empty when neither option was given. A multipart part still
+    /// open when the command line ends is simply closed there.
+    /// </summary>
+    public IReadOnlyList<FormPartSpecification> FormParts => formParts;
+
+    /// <summary>
+    /// The <c>-A</c> / <c>--user-agent</c> value, verbatim; empty when given empty, which curl 8.21.0
+    /// sends as no <c>User-Agent</c> header at all; <see langword="null"/> when not given. The last value wins.
+    /// </summary>
+    public string? UserAgent { get; internal set; }
+
+    /// <summary>
+    /// The <c>-e</c> / <c>--referer</c> value, verbatim, empty included, and <c>;auto</c> kept as given;
+    /// <see langword="null"/> when not given. The last value wins.
+    /// </summary>
+    public string? Referer { get; internal set; }
+
+    /// <summary>
+    /// Every <c>-b</c> / <c>--cookie</c> value, cookie strings and cookie file names alike, in
+    /// command-line order. Empty is accepted, as a file name.
+    /// </summary>
+    public IReadOnlyList<CommandLineCookie> Cookies => cookies;
+
+    /// <summary>
+    /// The last <c>-c</c> / <c>--cookie-jar</c> value, verbatim and never empty: the file to write
+    /// every cookie to after the transfer (<c>-</c> for standard output). <see langword="null"/>
+    /// when not given.
+    /// </summary>
+    public string? CookieJar { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>-j</c> / <c>--junk-session-cookies</c> was given and no
+    /// <c>--no-junk-session-cookies</c> came after it: drop the session cookies read from a
+    /// <c>-b</c> file.
+    /// </summary>
+    public bool JunkSessionCookies { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>-L</c> / <c>--location</c> or <c>--location-trusted</c> was
+    /// given and no <c>--no-location</c> or <c>--no-location-trusted</c> came after it: follow redirects.
+    /// </summary>
+    public bool FollowRedirects { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--location-trusted</c> was given and no <c>--no-location-trusted</c>
+    /// came after it: send the <c>-u</c> credentials and any <c>Authorization</c> header to every host
+    /// a redirect leads to, not only the first. <c>-L</c> and <c>--no-location</c> leave it as it is,
+    /// as in curl 8.21.0.
+    /// </summary>
+    public bool SendCredentialsToRedirectHosts { get; internal set; }
+
+    /// <summary>
+    /// The <c>--max-redirs</c> limit on redirects followed: 50 when not given, as in curl 8.21.0,
+    /// and <c>-1</c> for no limit. The last value wins.
+    /// </summary>
+    public int MaxRedirects { get; internal set; } = 50;
+
+    /// <summary><see langword="true"/> when <c>--post301</c> was given and no <c>--no-post301</c> came after it: keep a POST a POST after a 301.</summary>
+    public bool KeepPostAfter301 { get; internal set; }
+
+    /// <summary><see langword="true"/> when <c>--post302</c> was given and no <c>--no-post302</c> came after it: keep a POST a POST after a 302.</summary>
+    public bool KeepPostAfter302 { get; internal set; }
+
+    /// <summary><see langword="true"/> when <c>--post303</c> was given and no <c>--no-post303</c> came after it: keep a POST a POST after a 303.</summary>
+    public bool KeepPostAfter303 { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when the last of <c>-i</c> / <c>--show-headers</c> / <c>--include</c>,
+    /// <c>-I</c> / <c>--head</c> and their <c>--no-</c> spellings turned it on: write the response
+    /// headers to the output before the body.
+    /// </summary>
+    public bool ShowHeaders { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>-I</c> / <c>--head</c> was given and no <c>--no-head</c> came
+    /// after it: ask for the headers only (a <c>HEAD</c> request over HTTP). It maps onto the
+    /// transfer's <c>NoBody</c>.
+    /// </summary>
+    public bool NoBody { get; internal set; }
+
+    /// <summary>
+    /// How an HTTP error response ends the transfer: <see cref="HttpFailMode.Fail"/> for <c>-f</c> /
+    /// <c>--fail</c>, <see cref="HttpFailMode.FailWithBody"/> for <c>--fail-with-body</c>, whichever came
+    /// last; <see cref="HttpFailMode.None"/> when neither was given or <c>--no-fail</c> or
+    /// <c>--no-fail-with-body</c> came after it. Either <c>--no-</c> spelling turns off both, as in
+    /// curl 8.21.0.
+    /// </summary>
+    public HttpFailMode FailMode { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--fail-early</c> was given and no <c>--no-fail-early</c> came after
+    /// it: stop at the first transfer that fails instead of going on to the next URL.
+    /// </summary>
+    public bool FailEarly { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--compressed</c> was given and no <c>--no-compressed</c> came after
+    /// it: ask for a compressed response and decompress it.
+    /// </summary>
+    public bool Compressed { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--raw</c> was given and no <c>--no-raw</c> came after it: pass
+    /// content and transfer encodings through undecoded.
+    /// </summary>
+    public bool Raw { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--tr-encoding</c> was given and no <c>--no-tr-encoding</c> came
+    /// after it: ask for a compressed transfer encoding and decode it.
+    /// </summary>
+    public bool TransferEncoding { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--ignore-content-length</c> was given and no
+    /// <c>--no-ignore-content-length</c> came after it: ignore the response's <c>Content-Length</c>.
+    /// </summary>
+    public bool IgnoreContentLength { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--path-as-is</c> was given and no <c>--no-path-as-is</c> came after
+    /// it: send the URL path without squashing <c>/../</c> and <c>/./</c>.
+    /// </summary>
+    public bool PathAsIs { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--request-target</c>, sent in place of the URL's path in the request line;
+    /// <see langword="null"/> when not given. An empty value is refused as blank.
+    /// </summary>
+    public string? RequestTarget { get; internal set; }
+
+    /// <summary>
+    /// The HTTP version the last <c>-0</c> / <c>--http1.0</c> or <c>--http1.1</c> asked for;
+    /// <see langword="null"/> when neither was given, which means curl's default, HTTP/1.1.
+    /// </summary>
+    public HttpVersionPreference? HttpVersion { get; private set; }
+
+    /// <summary>
+    /// The HTTP request method <c>-I</c> / <c>--head</c> (<see cref="SelectedHttpMethod.Head"/>),
+    /// <c>--no-head</c> (<see cref="SelectedHttpMethod.Get"/>) or <c>-F</c> / <c>--form</c> and
+    /// <c>--form-string</c> (<see cref="SelectedHttpMethod.MultipartFormPost"/>) selected first; once one
+    /// is selected, selecting another is refused, as curl 8.21.0 does.
+    /// </summary>
+    internal SelectedHttpMethod HttpMethodSelected { get; set; }
+
+    /// <summary>
     /// <see langword="true"/> when <c>-s</c> / <c>--silent</c> has been read and <c>-S</c> /
     /// <c>--show-error</c> has not, so far: curl then hides error messages.
     /// </summary>
     internal bool ErrorsHidden => Silent && !ShowError;
 
     /// <summary>
+    /// How many <c>-K</c> / <c>--config</c> files are being read right now, one inside another; curl
+    /// refuses to open one more once <see cref="CommandLineRefusal.MaximumConfigFileDepth"/> are open.
+    /// </summary>
+    internal int OpenConfigFileCount { get; set; }
+
+    /// <summary>
     /// The warning lines met while reading the command line, in command-line order, without
     /// line terminators. <see cref="CommandLineParser"/> hands them to <see cref="CommandLineParseResult.WarningLines"/>.
     /// </summary>
     internal IReadOnlyList<string> WarningLines => warningLines;
+
+    /// <summary>
+    /// Sets <see cref="HttpVersion"/>, first adding <see cref="CommandLineWarning.OverridesPreviousHttpVersion"/>,
+    /// unless <c>-s</c> came first, when an earlier option asked for a different version, as curl 8.21.0 does.
+    /// </summary>
+    /// <param name="version">The version the option asks for.</param>
+    internal void SelectHttpVersion(HttpVersionPreference version)
+    {
+        if (HttpVersion is not null && HttpVersion != version)
+        {
+            AddWarningLinesUnlessSilent(CommandLineWarning.OverridesPreviousHttpVersion);
+        }
+
+        HttpVersion = version;
+    }
 
     /// <summary>
     /// Appends <paramref name="lines"/> to <see cref="WarningLines"/> unless <c>-s</c> /
@@ -164,11 +542,62 @@ public sealed class CommandLineOptions
 
     /// <summary>Appends <paramref name="url"/> to <see cref="Urls"/>, unchanged and unvalidated.</summary>
     /// <param name="url">A positional argument or a <c>--url</c> value.</param>
-    internal void AddUrl(string url) => urls.Add(url);
+    internal void AddUrl(string url)
+    {
+        urls.Add(url);
+        (urlOutputs.Find(output => output.Url is null) ?? AddUrlOutput()).Url = url;
+    }
 
-    /// <summary>Appends <paramref name="outputFile"/> to <see cref="OutputFiles"/>; nothing is opened or created.</summary>
+    /// <summary>
+    /// Pairs <paramref name="outputFile"/> with the next URL in <see cref="UrlOutputs"/>; nothing is
+    /// opened or created.
+    /// </summary>
     /// <param name="outputFile">A <c>-o</c> / <c>--output</c> value.</param>
-    internal void AddOutputFile(string outputFile) => outputFiles.Add(outputFile);
+    internal void AddOutputFile(string outputFile)
+    {
+        UrlOutput output = urlOutputs.Find(output => !output.HasOutputOption) ?? AddUrlOutput();
+        output.FileName = outputFile;
+        output.HasOutputOption = true;
+    }
+
+    /// <summary>
+    /// Pairs <c>-O</c> / <c>--remote-name</c> (<paramref name="on"/> <see langword="true"/>) or
+    /// <c>--no-remote-name</c> with the next URL in <see cref="UrlOutputs"/>. When no entry is left
+    /// without an output option and <see cref="RemoteNameAll"/> is off, <c>--no-remote-name</c> is
+    /// dropped, as curl 8.21.0 drops it: <c>--no-remote-name --no-remote-name u</c> gives no warning
+    /// about more output options than URLs.
+    /// </summary>
+    /// <param name="on"><see langword="false"/> for the <c>--no-</c> spelling.</param>
+    internal void PairRemoteName(bool on)
+    {
+        UrlOutput? output = urlOutputs.Find(output => !output.HasOutputOption);
+        if (output is null)
+        {
+            if (!on && !RemoteNameAll)
+            {
+                return;
+            }
+
+            output = AddUrlOutput();
+        }
+
+        output.UsesRemoteName = on;
+        output.HasOutputOption = true;
+    }
+
+    /// <summary>
+    /// <see langword="true"/> when an output option has no URL to pair with, so curl 8.21.0 warns
+    /// with <see cref="CommandLineWarning.MoreOutputOptionsThanUrls"/>.
+    /// </summary>
+    internal bool HasMoreOutputOptionsThanUrls =>
+        urlOutputs.Exists(output => output.HasOutputOption && output.Url is null);
+
+    private UrlOutput AddUrlOutput()
+    {
+        UrlOutput output = new(RemoteNameAll);
+        urlOutputs.Add(output);
+        return output;
+    }
 
     /// <summary>
     /// Appends the UTF-8 bytes of <paramref name="data"/> to <see cref="PostData"/>, after a single
@@ -188,40 +617,167 @@ public sealed class CommandLineOptions
         PostData = PostData is { } body ? [.. body.Span, .. separator, .. data] : data;
     }
 
+    /// <summary>
+    /// Appends <paramref name="data"/> to <see cref="PostData"/> with no separator and sets
+    /// <see cref="SendsJson"/>, as curl 8.21.0 does for <c>--json</c>.
+    /// </summary>
+    /// <param name="data">The bytes of one <c>--json</c> value, possibly empty.</param>
+    internal void AppendJsonData(byte[] data)
+    {
+        PostData = PostData is { } body ? [.. body.Span, .. data] : data;
+        SendsJson = true;
+    }
+
+    /// <summary>
+    /// Appends <paramref name="query"/> to <see cref="UrlQuery"/>, after a <c>&amp;</c> when
+    /// <see cref="UrlQuery"/> is already set, even to empty text.
+    /// </summary>
+    /// <param name="query">One encoded <c>--url-query</c> value, possibly empty.</param>
+    internal void AppendUrlQuery(string query) =>
+        UrlQuery = UrlQuery is null ? query : $"{UrlQuery}&{query}";
+
     /// <summary>Sets <see cref="Credentials"/> from <paramref name="userAndPassword"/>, split at its first colon.</summary>
     /// <param name="userAndPassword">A <c>-u</c> / <c>--user</c> value, possibly empty.</param>
     internal void SetCredentials(string userAndPassword)
     {
+        Credentials = SplitAtFirstColon(userAndPassword);
+        userAwaitingPassword = UserWhosePasswordIsMissing(userAndPassword);
+    }
+
+    /// <summary>Sets <see cref="ProxyCredentials"/> from <paramref name="userAndPassword"/>, split at its first colon.</summary>
+    /// <param name="userAndPassword">A <c>-U</c> / <c>--proxy-user</c> value, possibly empty.</param>
+    internal void SetProxyCredentials(string userAndPassword)
+    {
+        ProxyCredentials = SplitAtFirstColon(userAndPassword);
+        proxyUserAwaitingPassword = UserWhosePasswordIsMissing(userAndPassword);
+    }
+
+    private static NetworkCredential SplitAtFirstColon(string userAndPassword)
+    {
         int colon = userAndPassword.IndexOf(':', StringComparison.Ordinal);
-        Credentials = colon < 0
+        return colon < 0
             ? new NetworkCredential(userAndPassword, string.Empty)
             : new NetworkCredential(userAndPassword[..colon], userAndPassword[(colon + 1)..]);
-        userAwaitingPassword = colon < 0 && !userAndPassword.StartsWith(';') ? userAndPassword : null;
     }
 
     /// <summary>
-    /// When the last <c>-u</c> / <c>--user</c> value named a user with no password, asks
-    /// <paramref name="passwordPrompt"/> for it with curl 8.21.0's prompt,
-    /// <c>Enter host password for user '&lt;user&gt;':</c>, the user being the value up to its first
-    /// <c>;</c> (curl's login options are not shown), and records the answer as the
-    /// <see cref="Credentials"/> password. Does nothing otherwise.
+    /// The value itself when it names a user with no password, which curl 8.21.0 prompts for: no
+    /// colon, and not starting with <c>;</c>. <see langword="null"/> otherwise.
     /// </summary>
-    /// <param name="passwordPrompt">Asks for the password.</param>
-    internal void ReadMissingPassword(IPasswordPrompt passwordPrompt)
+    private static string? UserWhosePasswordIsMissing(string userAndPassword) =>
+        !userAndPassword.Contains(':', StringComparison.Ordinal) && !userAndPassword.StartsWith(';') ? userAndPassword : null;
+
+    /// <summary>
+    /// Asks <paramref name="passwordPrompt"/> for each password the command line left out, with
+    /// curl 8.21.0's prompts, host first: when the last <c>-u</c> / <c>--user</c> value named a user
+    /// with no password and no <c>--oauth2-bearer</c> was given,
+    /// <c>Enter host password for user '&lt;user&gt;':</c>, recorded as the <see cref="Credentials"/>
+    /// password; then, when the last <c>-U</c> / <c>--proxy-user</c> value named a user with no
+    /// password, <c>Enter proxy password for user '&lt;user&gt;':</c>, recorded as the
+    /// <see cref="ProxyCredentials"/> password. The user shown is the value up to its first
+    /// <c>;</c> (curl's login options are not shown). Does nothing when no password is missing.
+    /// </summary>
+    /// <remarks>
+    /// Measured with the local curl 8.21.0 on 2026-09-26: <c>-u u --oauth2-bearer tok</c> never
+    /// prompts; <c>-U p -u h</c> prompts for <c>'h'</c>'s host password first.
+    /// </remarks>
+    /// <param name="passwordPrompt">Asks for the passwords.</param>
+    internal void ReadMissingPasswords(IPasswordPrompt passwordPrompt)
     {
-        if (userAwaitingPassword is not { } user)
+        if (userAwaitingPassword is { } user && BearerToken is null)
         {
-            return;
+            Credentials = new NetworkCredential(user, ReadPassword(passwordPrompt, "host", user));
+            userAwaitingPassword = null;
         }
 
+        if (proxyUserAwaitingPassword is { } proxyUser)
+        {
+            ProxyCredentials = new NetworkCredential(proxyUser, ReadPassword(passwordPrompt, "proxy", proxyUser));
+            proxyUserAwaitingPassword = null;
+        }
+    }
+
+    private static string ReadPassword(IPasswordPrompt passwordPrompt, string kind, string user)
+    {
         int loginOptions = user.IndexOf(';', StringComparison.Ordinal);
         string shownUser = loginOptions < 0 ? user : user[..loginOptions];
-        string password = passwordPrompt.ReadPassword($"Enter host password for user '{shownUser}':");
-        Credentials = new NetworkCredential(user, password);
-        userAwaitingPassword = null;
+        return passwordPrompt.ReadPassword($"Enter {kind} password for user '{shownUser}':");
     }
+
+    /// <summary>
+    /// Adds <paramref name="scheme"/> to, or for its <c>--no-</c> spelling removes it from, the
+    /// schemes <c>--basic</c>, <c>--digest</c>, <c>--anyauth</c> and <c>--oauth2-bearer</c> asked for.
+    /// </summary>
+    /// <param name="scheme">The scheme the option names.</param>
+    /// <param name="on"><see langword="false"/> for the <c>--no-</c> spelling.</param>
+    internal void WantAuthScheme(HttpAuthSchemes scheme, bool on) =>
+        wantedAuthSchemes = on ? wantedAuthSchemes | scheme : wantedAuthSchemes & ~scheme;
+
+    /// <summary>Replaces every scheme asked for so far with every scheme there is, for <c>--anyauth</c>.</summary>
+    internal void WantEveryAuthScheme() =>
+        wantedAuthSchemes = HttpAuthSchemes.Any | HttpAuthSchemes.Bearer;
+
+    /// <summary>
+    /// Records an <c>--oauth2-bearer</c> token as <see cref="BearerToken"/> and adds
+    /// <see cref="HttpAuthSchemes.Bearer"/> to the schemes asked for, as curl 8.21.0's tool does.
+    /// </summary>
+    /// <param name="token">The non-empty token.</param>
+    internal void SetBearerToken(string token)
+    {
+        BearerToken = token;
+        WantAuthScheme(HttpAuthSchemes.Bearer, on: true);
+    }
+
+    /// <summary>
+    /// Records a <c>-x</c> / <c>--proxy</c> value, or a <c>--socks4</c>, <c>--socks4a</c>, <c>--socks5</c>
+    /// or <c>--socks5-hostname</c> one, as <see cref="Proxy"/>, replacing any earlier one.
+    /// </summary>
+    /// <param name="address">The value as given, possibly empty.</param>
+    /// <param name="kindWithoutScheme">The kind the option names, used when the value has no scheme.</param>
+    internal void SetProxy(string address, ProxyKind kindWithoutScheme) =>
+        Proxy = new CommandLineProxy(address, kindWithoutScheme);
 
     /// <summary>Appends <paramref name="telnetOption"/> to <see cref="TelnetOptions"/>, unchanged and unvalidated.</summary>
     /// <param name="telnetOption">A <c>-t</c> / <c>--telnet-option</c> value, possibly empty.</param>
     internal void AddTelnetOption(string telnetOption) => telnetOptions.Add(telnetOption);
+
+    /// <summary>Appends <paramref name="cookie"/> to <see cref="Cookies"/>, unchanged and unvalidated.</summary>
+    /// <param name="cookie">A <c>-b</c> / <c>--cookie</c> value, possibly empty.</param>
+    internal void AddCookie(string cookie) => cookies.Add(new CommandLineCookie(cookie));
+
+    /// <summary>Appends <paramref name="header"/> to <see cref="Headers"/>, unchanged and unvalidated.</summary>
+    /// <param name="header">A <c>-H</c> / <c>--header</c> value, or one line of its <c>@file</c>.</param>
+    internal void AddHeader(string header) => headers.Add(header);
+
+    /// <summary>
+    /// Appends <paramref name="part"/> to the innermost multipart part still open, or to
+    /// <see cref="FormParts"/> when none is.
+    /// </summary>
+    /// <param name="part">The part to append.</param>
+    internal void AddFormPart(FormPartSpecification part)
+    {
+        if (openMultiparts.TryPeek(out FormPartSpecification? multipart))
+        {
+            multipart.AddPart(part);
+        }
+        else
+        {
+            formParts.Add(part);
+        }
+    }
+
+    /// <summary>
+    /// Appends <paramref name="multipart"/> as <see cref="AddFormPart"/> does and opens it, so the
+    /// parts that follow go inside it until <see cref="TryCloseMultipart"/>.
+    /// </summary>
+    /// <param name="multipart">A <see cref="FormPartKind.Multipart"/> part.</param>
+    internal void OpenMultipart(FormPartSpecification multipart)
+    {
+        AddFormPart(multipart);
+        openMultiparts.Push(multipart);
+    }
+
+    /// <summary>Closes the innermost multipart part still open.</summary>
+    /// <returns><see langword="true"/> when one was closed; <see langword="false"/> when none is open.</returns>
+    internal bool TryCloseMultipart() => openMultiparts.TryPop(out _);
 }

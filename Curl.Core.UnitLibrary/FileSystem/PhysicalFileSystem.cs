@@ -4,7 +4,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Core.FileSystem;
 
 /// <summary>
-/// The real-disk <see cref="IFileSystem" />: opens local files with
+/// The real-disk <see cref="IFileSystem" /> and <see cref="IFileTimeSetter" />: opens local files with
 /// <see cref="FileStream" /> and reports every failed open as a
 /// <see cref="FileAccessStatus" />, never as an exception.
 /// </summary>
@@ -43,7 +43,7 @@ namespace Curl.Core.FileSystem;
 /// it is ignored and the option has no effect.
 /// </para>
 /// </remarks>
-public sealed class PhysicalFileSystem : IFileSystem
+public sealed class PhysicalFileSystem : IFileSystem, IFileTimeSetter
 {
     private const int BufferSize = 4096;
 
@@ -116,6 +116,26 @@ public sealed class PhysicalFileSystem : IFileSystem
             : OptionsFor(fileMode, FileAccess.Write, FileShare.Read);
 
         return ValueTask.FromResult(Open(path, options));
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Every exception <see cref="FileOpenFailure.IsOpenFailure(Exception)" /> names, such as
+    /// the <see cref="FileNotFoundException" /> of a missing file, is reported as
+    /// <see langword="false" />.
+    /// </remarks>
+    public bool TrySetLastWriteTimeUtc(string path, DateTimeOffset lastWriteTimeUtc)
+    {
+        try
+        {
+            File.SetLastWriteTimeUtc(path, lastWriteTimeUtc.UtcDateTime);
+        }
+        catch (Exception exception) when (FileOpenFailure.IsOpenFailure(exception))
+        {
+            return false;
+        }
+
+        return true;
     }
 
     /// <summary>

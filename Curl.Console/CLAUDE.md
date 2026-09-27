@@ -24,10 +24,47 @@ On Windows each `-o` name is first rewritten by `WindowsOutputFileNameSanitizer`
 (`"*<>?|` and control characters become `_`, as curl 8.21.0 does), and that name is the
 one opened, sized for `-C -` and named in every message.
 
-Each transfer's context carries the parsed `-r` range (`ByteRangeParser`; text that names
+`TransferContextFactory` builds each transfer's context from the parsed options; the
+context carries the parsed `-r` range (`ByteRangeParser`; text that names
 no range ends the transfer with exit 33 before it is dispatched), the `-C` offset and the
 `--max-filesize` limit. `-C -` resumes from the size of the URL's `-o` file, and a transfer
 that resumes past byte zero opens that file for appending before it starts, as curl does.
+Every context also carries `Http`, which `HttpRequestOptionsMapping` fills from `-X`,
+`-H`, `-A`, `-e`, the `-d` family and `--json`: `--json` appends `Content-Type: application/json` and
+`Accept: application/json` after the `-H` headers unless a `-H` header already starts with
+that name (case-insensitive), and a body is a `BytesBody` sent as
+`application/x-www-form-urlencoded` unless `-G` moved it into the query. The runner appends
+the `-G` / `--url-query` query with `QueryUrl` before the URL is parsed. `http` and
+`https` are served by `HttpProtocolHandler`, registered in `CurlComposition` with a
+`BasicAndBearerAuthenticator` in the platform's credential encoding and no cookie store.
+`-D -` sends the handler's header lines to standard output; any other `-D` name is opened
+(unsanitized, truncated for the first URL and appended for the rest) before the transfer,
+and one that cannot be opened prints `curl: Failed to open <file>` and stops the run with
+exit 23. `-i` and `-I` send the header lines to the body output too (standard output or the
+`-o` file); with `-D` as well, `HeaderLineTeeStream` writes each line to the `-D` output and
+then the body output before the next, so `-i -D -` prints every header line twice in a row,
+as curl 8.21.0 does. `-I` also sets the context's `NoBody`, and `-f` / `--fail-with-body`
+become `HttpRequestOptions.Fail`. Under `--fail-early` the first failed transfer stops the
+run with its own exit code.
+
+Every transfer goes through `Curl.Core`'s `RedirectFollower`. `-L` becomes
+`HttpRequestOptions.FollowRedirects`, and `RedirectPolicyMapping` turns `--max-redirs`,
+`--post301`/`--post302`/`--post303` and `--location-trusted` into its `RedirectPolicy`. Every
+hop writes to the same body and header outputs, so `-L -i` prints every response's head and
+only the last body, and one redirect past `--max-redirs` exits 47 with
+`curl: (47) Maximum (N) redirects followed`, as measured on curl 8.21.0 (BL-234).
+
+Under `-R`/`--remote-time` a successful transfer to an `-o` file whose result carries
+`SourceLastWriteTimeUtc` stamps the closed file with it through `IFileTimeSetter`
+(`PhysicalFileSystem` in production), even when no body was written, as curl does. A
+failed stamp is ignored for now; curl's warning lines for it are BL-139.
+
+After each successful transfer, and after one `-f` failed with exit 22, standard error gets the opening of curl's progress meter
+(`ProgressMeterLines`): `** Resuming transfer from byte position N` when it resumed past
+byte zero, the two header lines, and the all-zero status line - every byte curl 8.21.0
+writes for a `file://` transfer. It is not written under `-s`, `--no-progress-meter` or
+`-#`, nor for a body on standard output when that is a terminal. Live counters, the bar
+form and the meter after any other failed transfer are not modelled yet (BL-130 to BL-132).
 
 A URL with no `-o` writes through `StandardOutputFailureDeferringStream`, which
 models curl's 4096-byte stdio buffer: a failed standard output is reported as

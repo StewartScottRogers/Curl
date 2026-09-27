@@ -15,8 +15,38 @@ UDP `Socket`. `SslStreamTlsProvider` (behind `ITlsProvider`, configured by
 `TlsClientOptions`) is the only type that constructs an `SslStream`; it runs the
 handshake over the plaintext `IConnection` through the internal `ConnectionStream`
 adapter and returns an `SslStreamConnection`. With `--cacert` (`TlsClientOptions.CaCertificateFile`)
-it trusts only the certificates in that PEM file. The messages for its exit 35, exit 60 and
-exit 77 live in `TlsFailureMessages` and nowhere else. No type here constructs an `HttpClient`.
+it trusts only the certificates in that PEM file. Per ADR-0009 it behaves like the curl
+build the platform usually runs, the Schannel build on Windows and the OpenSSL build
+elsewhere; its internal constructor names the build so tests pin both on any platform.
+The builds differ in message text, in which `--cacert` files are exit 77, and in `--capath`
+(`TlsClientOptions.CaCertificateDirectory`): the OpenSSL build trusts its certificates, the
+Schannel build ignores it and reports the two warning lines in `SslStreamTlsProvider.Warnings`
+for the console to print. With `--cert` (`TlsClientOptions.ClientCertificate`, split into
+file and passphrase by `ClientCertificateArgument` as curl splits it) it presents a client
+certificate that `ClientCertificateLoader` loads: PKCS#12 in the Schannel build, PEM with
+`--key` (`TlsClientOptions.PrivateKey`) in the OpenSSL build. A certificate that does not
+load is exit 58; in the OpenSSL build a key that does not load is exit 43, as curl reports
+it. `--ciphers` and `--tls13-ciphers` (`TlsClientOptions.Ciphers`, `Tls13Ciphers`) follow
+ADR-0011: the Schannel build refuses `--ciphers` with exit 59 and ignores `--tls13-ciphers`;
+the OpenSSL build turns both into one `CipherSuitesPolicy` through `OpenSslCipherSuites`,
+the hand-written OpenSSL-name table, and a list naming no known suite is exit 59. On
+Windows `CipherSuitesPolicy` cannot be constructed, so there the OpenSSL build (reached
+only from tests) reports exit 59 instead of throwing.
+The messages for its exit 35, exit 43, exit 58, exit 59, exit 60 and exit 77 live in
+`TlsFailureMessages` and nowhere else; the `More details here` block after an exit 60 is
+the console's to print. No type here constructs an `HttpClient`.
+
+`TcpConnector` fills `ConnectResult.Timings` and `LocalEndPoint` per ADR-0030: it takes
+`Started`, `NameResolved` and `Connected` from its `TimeProvider`, the local end point from
+the `DialedTcpConnection` that `ITcpDialer` returns, and `TlsHandshakeCompleted` from the
+timings `SslStreamTlsProvider` reports on its own `TimeProvider`.
+
+`TcpConnector` tunnels through `ConnectTarget.Proxy` when it is an HTTP proxy
+(`ProxyKind.Http`, `Http10`) per ADR-0023: `HttpProxyTunnel` writes curl 8.21.0's CONNECT
+request (its `User-Agent` and credential encoding from `HttpProxyTunnelOptions`) and reads
+the reply one byte at a time, so the tunnel's bytes stay on the connection; TLS then runs
+over the tunnel for an https target. HTTPS and SOCKS proxies throw `NotSupportedException`
+until their tasks land.
 
 Everything else takes the Abstractions contracts (`IDnsResolver`, `ITlsProvider`,
 `IConnection`, `IDatagramChannel`) or `ITcpDialer`, plus an injected `TimeProvider`, so the tests in

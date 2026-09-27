@@ -67,6 +67,66 @@ public sealed class ConnectResultTests
             result.ErrorMessage);
     }
 
+    [TestMethod]
+    public void Connected_WithConnectionOnly_LeavesTimingsEndPointAndConnectCodeAtTheirDefaults()
+    {
+        var result = ConnectResult.Connected(new UnusedConnection());
+
+        Assert.IsNull(result.Timings);
+        Assert.IsNull(result.LocalEndPoint);
+        Assert.AreEqual(0, result.ProxyConnectResponseCode);
+    }
+
+    [TestMethod]
+    public void Connected_WithTimingsOnly_CarriesThemAndDefaultsTheRest()
+    {
+        var connection = new UnusedConnection();
+        var timings = new ConnectTimings(100, 150, 200, null);
+
+        var result = ConnectResult.Connected(connection, timings);
+
+        Assert.AreSame(connection, result.Connection);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.IsNull(result.ErrorMessage);
+        Assert.AreSame(timings, result.Timings);
+        Assert.IsNull(result.LocalEndPoint);
+        Assert.AreEqual(0, result.ProxyConnectResponseCode);
+    }
+
+    [TestMethod]
+    public void Connected_WithEveryMeasurement_CarriesThemAll()
+    {
+        var timings = new ConnectTimings(100, null, 200, 300);
+        var localEndPoint = new IPEndPoint(IPAddress.Loopback, 54321);
+
+        var result = ConnectResult.Connected(new UnusedConnection(), timings, localEndPoint, 200);
+
+        Assert.AreSame(timings, result.Timings);
+        Assert.AreSame(localEndPoint, result.LocalEndPoint);
+        Assert.AreEqual(200, result.ProxyConnectResponseCode);
+    }
+
+    [TestMethod]
+    public void Connected_WithTimingsAndNullConnection_ThrowsArgumentNullException()
+    {
+        IConnection? connection = null;
+
+        var exception = Assert.ThrowsExactly<ArgumentNullException>(
+            () => ConnectResult.Connected(connection!, new ConnectTimings(0, null, 0, null)));
+
+        Assert.AreEqual("connection", exception.ParamName);
+    }
+
+    [TestMethod]
+    public void Failed_Always_LeavesTimingsEndPointAndConnectCodeAtTheirDefaults()
+    {
+        var result = ConnectResult.Failed(CurlExitCode.CouldntConnect, "failed");
+
+        Assert.IsNull(result.Timings);
+        Assert.IsNull(result.LocalEndPoint);
+        Assert.AreEqual(0, result.ProxyConnectResponseCode);
+    }
+
     private sealed class UnusedConnection : IConnection
     {
         public bool IsSecure => false;

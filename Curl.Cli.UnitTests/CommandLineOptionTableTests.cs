@@ -34,8 +34,11 @@ public sealed class CommandLineOptionTableTests
     [DataRow("url", null, true)]
     [DataRow("silent", 's', false)]
     [DataRow("show-error", 'S', false)]
+    [DataRow("progress-meter", null, false)]
+    [DataRow("progress-bar", '#', false)]
     [DataRow("output", 'o', true)]
     [DataRow("data", 'd', true)]
+    [DataRow("dump-header", 'D', true)]
     [DataRow("user", 'u', true)]
     [DataRow("telnet-option", 't', true)]
     [DataRow("tftp-blksize", null, true)]
@@ -50,6 +53,14 @@ public sealed class CommandLineOptionTableTests
     [DataRow("tlsv1.3", null, false)]
     [DataRow("ciphers", null, true)]
     [DataRow("tls13-ciphers", null, true)]
+    [DataRow("remote-time", 'R', false)]
+    [DataRow("request", 'X', true)]
+    [DataRow("header", 'H', true)]
+    [DataRow("user-agent", 'A', true)]
+    [DataRow("referer", 'e', true)]
+    [DataRow("cookie", 'b', true)]
+    [DataRow("cookie-jar", 'c', true)]
+    [DataRow("junk-session-cookies", 'j', false)]
     public void Rows_FirstTableOption_HasItsShortNameAndArity(string longName, char? shortName, bool takesValue)
     {
         CommandLineOption option = CommandLineOptionTable.Rows.Single(row => row.LongName == longName);

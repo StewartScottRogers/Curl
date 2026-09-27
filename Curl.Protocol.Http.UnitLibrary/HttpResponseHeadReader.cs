@@ -1,0 +1,86 @@
+using Curl.Protocol.Abstractions;
+
+namespace Curl.Protocol.Http;
+
+/// <summary>
+/// Reads the head of an HTTP/1.0 or HTTP/1.1 response from an <see cref="IConnection" />:
+/// the status line and headers, reading past any 1xx informational responses to the final
+/// one, and failing with the exit code and message curl 8.21.0 reports.
+/// </summary>
+/// <remarks>
+/// Lines may end in a carriage return and line feed or in a line feed alone, and a line that
+/// starts with a blank continues the header before it. A peer that closes before a final
+/// head's status line is whole, or inside a 1xx head, is an empty reply (exit 52); one that
+/// closes among the final response's headers ends the head there, which curl 8.21.0 treats
+/// as a complete response.
+/// </remarks>
+/// <param name="connection">The connection the request was sent on.</param>
+internal sealed class HttpResponseHeadReader(IConnection connection)
+{
+    private readonly HttpLineReader lines = new(connection);
+
+    private readonly HttpResponseHeadBuilder builder = new();
+
+    /// <summary>
+    /// Reads the response head.
+    /// </summary>
+    /// <param name="cancellationToken">Cancels every read.</param>
+    /// <returns>The final response's head.</returns>
+    /// <exception cref="HttpTransferException">
+    /// The response is not HTTP/1.x (exit 1), a head line is malformed (exit 8), the peer
+    /// closed before a final head (exit 52), a read failed or the heads grew too large in
+    /// total (exit 56), or one line grew too large (exit 100).
+    /// </exception>
+    internal async ValueTask<HttpResponseHead> ReadAsync(CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            HttpStatusLine statusLine = await ReadStatusLineAsync(cancellationToken).ConfigureAwait(false);
+            bool closed = await ReadHeaderLinesAsync(cancellationToken).ConfigureAwait(false);
+            if (!statusLine.IsInformational)
+            {
+                return builder.Build(statusLine, closed ? [] : lines.TakeRemaining());
+            }
+
+            if (closed)
+            {
+                throw EmptyReply();
+            }
+        }
+    }
+
+    private static HttpTransferException EmptyReply() =>
+        new(CurlExitCode.GotNothing, HttpTransferMessages.EmptyReply);
+
+    private async ValueTask<HttpStatusLine> ReadStatusLineAsync(CancellationToken cancellationToken)
+    {
+        byte[] bytes = await lines.ReadLineAsync(true, cancellationToken).ConfigureAwait(false) ?? throw EmptyReply();
+        HttpLine line = HttpLine.Split(bytes);
+        HttpStatusLine statusLine = HttpStatusLine.Parse(line.Content);
+        builder.StartHead(line);
+        return statusLine;
+    }
+
+    /// <summary>
+    /// Reads header lines through the head's empty line, or until the peer closes.
+    /// </summary>
+    /// <param name="cancellationToken">Cancels every read.</param>
+    /// <returns><see langword="true" /> when the peer closed before the empty line.</returns>
+    private async ValueTask<bool> ReadHeaderLinesAsync(CancellationToken cancellationToken)
+    {
+        while (await lines.ReadLineAsync(false, cancellationToken).ConfigureAwait(false) is { } bytes)
+        {
+            HttpLine line = HttpLine.Split(bytes);
+            if (line.IsEmpty)
+            {
+                builder.EndHead(line);
+                return false;
+            }
+
+            builder.AddLine(line);
+        }
+
+        builder.EndHeadAtClose();
+        return true;
+    }
+}

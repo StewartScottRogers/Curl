@@ -8,6 +8,7 @@ using Curl.Protocol.Abstractions;
 using Curl.Protocol.Dict;
 using Curl.Protocol.File;
 using Curl.Protocol.Gopher;
+using Curl.Protocol.Http;
 using Curl.Protocol.Mqtt;
 using Curl.Protocol.Telnet;
 using Curl.Protocol.Tftp;
@@ -44,6 +45,8 @@ public sealed class CurlCompositionTests
             ["tftp"] = typeof(TftpProtocolHandler),
             ["mqtt"] = typeof(MqttProtocolHandler),
             ["mqtts"] = typeof(MqttProtocolHandler),
+            ["http"] = typeof(HttpProtocolHandler),
+            ["https"] = typeof(HttpProtocolHandler),
         };
         CollectionAssert.AreEquivalent(expected.ToList(), served.ToList());
         _ = new ProtocolDispatcher(handlers);
@@ -56,6 +59,8 @@ public sealed class CurlCompositionTests
     [DataRow("mqtt://h/", 1883, false)]
     [DataRow("dict://h/d:x", 2628, false)]
     [DataRow("telnet://h/", 23, false)]
+    [DataRow("http://h/", 80, false)]
+    [DataRow("https://h/", 443, true)]
     public async Task CreateRunner_TcpSchemeUrl_ReachesConnectorAtDefaultPortWithSchemesTls(
         string url,
         int port,
@@ -108,12 +113,40 @@ public sealed class CurlCompositionTests
             using MemoryStream standardError = new();
             using MemoryStream standardInput = new();
 
-            int exitCode = await CurlComposition.CreateRunner(standardOutput, standardError, standardInput)
+            int exitCode = await CurlComposition
+                .CreateRunner(standardOutput, standardError, standardInput, standardOutputIsTerminal: true)
                 .RunAsync([new Uri(path).AbsoluteUri]);
 
             Assert.AreEqual(0, exitCode);
             CollectionAssert.AreEqual(content, standardOutput.ToArray());
             Assert.AreEqual(0, standardError.Length);
+        }
+        finally
+        {
+            System.IO.File.Delete(path);
+        }
+    }
+
+    [TestMethod]
+    public async Task CreateRunner_FileUrlToStandardOutputThatIsNotATerminal_WritesTheProgressMeter()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"curl-bl102-{Guid.NewGuid():N}.bin");
+        await System.IO.File.WriteAllBytesAsync(path, [1, 2, 3]);
+
+        try
+        {
+            using MemoryStream standardOutput = new();
+            using MemoryStream standardError = new();
+            using MemoryStream standardInput = new();
+
+            int exitCode = await CurlComposition
+                .CreateRunner(standardOutput, standardError, standardInput, standardOutputIsTerminal: false)
+                .RunAsync([new Uri(path).AbsoluteUri]);
+
+            Assert.AreEqual(0, exitCode);
+            Assert.AreEqual(
+                string.Concat(ProgressMeterLines.Opening(null).Select(line => line + Environment.NewLine)),
+                Encoding.UTF8.GetString(standardError.ToArray()));
         }
         finally
         {
@@ -171,6 +204,55 @@ public sealed class CurlCompositionTests
         ProtocolDispatcher dispatcher = CurlComposition.CreateDispatcher(CurlComposition.CreateTransports(NoOptions()));
 
         Assert.IsNotNull(dispatcher);
+    }
+
+    [TestMethod]
+    public void CreateTransferDispatch_ProductionTransports_WarnsWithTheTlsProvidersWarnings()
+    {
+        CurlTransports transports = CurlComposition.CreateTransports(NoOptions());
+
+        TransferDispatch dispatch = CurlComposition.CreateTransferDispatch(transports);
+
+        Assert.IsNotNull(dispatch.Dispatcher);
+        Assert.AreSame(transports.TlsProvider.Warnings, dispatch.WarningLinesBeforeEachTransfer);
+    }
+
+    [TestMethod]
+    public void CreateTransferDispatch_CaPath_WarnsAsThePlatformsCurlBuildDoes()
+    {
+        CurlTransports transports = CurlComposition.CreateTransports(Parse("--capath", ".", "https://example.com/"));
+
+        TransferDispatch dispatch = CurlComposition.CreateTransferDispatch(transports);
+
+        // ADR-0009: the Schannel build ignores --capath with these two lines; the OpenSSL
+        // build honours it and prints nothing.
+        string[] expected = OperatingSystem.IsWindows()
+            ?
+            [
+                "Warning: ignoring setting the CA path for the proxy, not supported by libcurl ",
+                "Warning: with Schannel",
+            ]
+            : [];
+        CollectionAssert.AreEqual(expected, dispatch.WarningLinesBeforeEachTransfer.ToArray());
+    }
+
+    [TestMethod]
+    public void CreateTransports_CaPathCertKeyAndCiphers_SslStreamTlsProviderReceivesMappedOptions()
+    {
+        CommandLineOptions options = Parse(
+            "--capath", "certs", "--cert", "c.p12:pw", "--key", "k.pem",
+            "--ciphers", "AES128-SHA", "--tls13-ciphers", "TLS_AES_128_GCM_SHA256", "https://example.com/");
+
+        CurlTransports transports = CurlComposition.CreateTransports(options);
+
+        TlsClientOptions expected = new(
+            CaCertificateDirectory: "certs",
+            ClientCertificate: "c.p12:pw",
+            PrivateKey: "k.pem",
+            Ciphers: "AES128-SHA",
+            Tls13Ciphers: "TLS_AES_128_GCM_SHA256");
+        Assert.AreEqual(expected, transports.TlsClientOptions);
+        Assert.AreSame(transports.TlsClientOptions, CapturedDependency<TlsClientOptions>(transports.TlsProvider));
     }
 
     /// <summary>

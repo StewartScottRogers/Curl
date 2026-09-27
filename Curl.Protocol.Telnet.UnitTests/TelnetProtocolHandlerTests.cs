@@ -330,6 +330,54 @@ public sealed class TelnetProtocolHandlerTests
     }
 
     [TestMethod]
+    [DataRow(100, 96)]
+    [DataRow(300, 196)]
+    [DataRow(1000, 96)]
+    [DataRow(30, 16)]
+    public async Task ExecuteAsync_OutputWriteFailsHavingAcceptedSome_ReportsTheBytesAccepted(int passed, int accepted)
+    {
+        var connection = new ScriptedConnection(new ScriptedRead(Line(passed)));
+
+        TransferResult result = await new TelnetProtocolHandler(new RecordingConnector(ConnectResult.Connected(connection)))
+            .ExecuteAsync(new TransferContext { Url = TelnetUrl, Output = new FaultingOutputStream(accepted) });
+
+        Assert.AreEqual(
+            new TransferResult(
+                CurlExitCode.WriteError,
+                0,
+                $"Failure writing output to destination, passed {passed} returned {accepted}"),
+            result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ServerOffersMoreThan4096Bytes_ReadsAndWritesAtMost4096()
+    {
+        var connection = new ScriptedConnection(new ScriptedRead([.. Line(5000), .. Line(5000)]));
+
+        TransferResult result = await new TelnetProtocolHandler(new RecordingConnector(ConnectResult.Connected(connection)))
+            .ExecuteAsync(new TransferContext { Url = TelnetUrl, Output = new FaultingOutputStream() });
+
+        Assert.AreEqual(4096, connection.ReadBufferLengths[0]);
+        Assert.AreEqual(
+            new TransferResult(CurlExitCode.WriteError, 0, "Failure writing output to destination, passed 4096 returned 0"),
+            result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ServerOffersMoreThan4096Bytes_WritesEveryByte()
+    {
+        byte[] sent = [.. Line(5000), .. Line(5000)];
+        var connection = new ScriptedConnection(new ScriptedRead(sent));
+        var output = new MemoryStream();
+
+        TransferResult result = await new TelnetProtocolHandler(new RecordingConnector(ConnectResult.Connected(connection)))
+            .ExecuteAsync(new TransferContext { Url = TelnetUrl, Output = output });
+
+        Assert.AreEqual(TransferResult.Success(10000), result);
+        CollectionAssert.AreEqual(sent, output.ToArray());
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_Cancelled_Throws()
     {
         var connection = new ScriptedConnection(Read("68 69"));
@@ -351,6 +399,9 @@ public sealed class TelnetProtocolHandlerTests
         new() { Url = url, Output = output, Upload = new MemoryStream() };
 
     private static ScriptedRead Read(string hex) => new(Hex(hex));
+
+    /// <summary>A line of <paramref name="size" /> bytes, CRLF included, as the BL-099 listener sent.</summary>
+    private static byte[] Line(int size) => [.. Enumerable.Repeat((byte)'x', size - 2), 0x0D, 0x0A];
 
     private static byte[] Hex(string hex) => Convert.FromHexString(hex.Replace(" ", string.Empty, StringComparison.Ordinal));
 
