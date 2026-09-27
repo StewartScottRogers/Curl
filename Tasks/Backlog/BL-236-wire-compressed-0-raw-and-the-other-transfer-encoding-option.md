@@ -4,7 +4,7 @@ title: Wire --compressed, -0, --raw and the other transfer-encoding options in C
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-177, BL-180, BL-191, BL-231]
+depends-on: [BL-177, BL-180, BL-191, BL-231, BL-308]
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-26
@@ -29,6 +29,8 @@ completed:
 ## Notes
 
 - Plan item: W7 in the Phase 1 HTTP plan (2026-09-26); plan keys in this file were replaced by their task IDs.
+
+- 2026-09-26: BL-180 left `--tr-encoding` to BL-308, which adds its `HttpRequestOptions` member; this task now waits on it too.
 
 ## Log
 
