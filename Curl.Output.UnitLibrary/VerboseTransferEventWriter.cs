@@ -18,13 +18,14 @@ namespace Curl.Output;
 /// standard output is not a terminal, or when the lines do not go to standard output or
 /// standard error; the caller decides.
 /// </param>
+/// <param name="tlsBackend">The curl build whose wording a TLS handshake gets (ADR-0085).</param>
 /// <remarks>
 /// A port of the <c>-v</c> branch of <c>tool_debug_cb</c> in curl's <c>src/tool_cb_dbg.c</c>.
 /// A run of body events with nothing between them is one data line carrying the first
 /// event's byte count, as curl prints it. The structured events are worded by
 /// <see cref="TransferEventInfoText"/>. TLS record bytes print nothing, as in curl's Schannel build.
 /// </remarks>
-public sealed class VerboseTransferEventWriter(Stream output, bool writesDataLines) : ITransferEvents
+public sealed class VerboseTransferEventWriter(Stream output, bool writesDataLines, TlsBackend tlsBackend) : ITransferEvents
 {
     private const byte LineFeed = (byte)'\n';
 
@@ -39,6 +40,18 @@ public sealed class VerboseTransferEventWriter(Stream output, bool writesDataLin
 
     // curl's traced_data: a data line has been written since the last non-data event.
     private bool dataLineWritten;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="VerboseTransferEventWriter"/> class that
+    /// words a TLS handshake as the running platform's curl build does
+    /// (<see cref="PlatformTlsBackend.ForProcess"/>).
+    /// </summary>
+    /// <param name="output">The stream the lines are written to, not owned.</param>
+    /// <param name="writesDataLines">Whether body bytes are shown as <c>[N bytes data]</c> lines.</param>
+    public VerboseTransferEventWriter(Stream output, bool writesDataLines)
+        : this(output, writesDataLines, PlatformTlsBackend.ForProcess)
+    {
+    }
 
     /// <inheritdoc />
     public void ReportInfo(string text)
@@ -61,7 +74,7 @@ public sealed class VerboseTransferEventWriter(Stream output, bool writesDataLin
     /// <inheritdoc />
     public void ReportTlsHandshake(TlsHandshakeEvent handshake)
     {
-        foreach (string line in TransferEventInfoText.TlsHandshake(handshake))
+        foreach (string line in TransferEventInfoText.TlsHandshake(handshake, tlsBackend))
         {
             WriteTextLine(line);
         }

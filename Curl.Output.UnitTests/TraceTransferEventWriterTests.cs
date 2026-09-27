@@ -149,7 +149,7 @@ public sealed class TraceTransferEventWriterTests
     [TestMethod]
     public void ReportTlsHandshake_WritesTheAlpnLines()
     {
-        new TraceTransferEventWriter(output, TraceDumpFormat.TextOnly, writesTimestamps: false, TimeProvider.System)
+        new TraceTransferEventWriter(output, TraceDumpFormat.TextOnly, writesTimestamps: false, TimeProvider.System, TlsBackend.Schannel)
             .ReportTlsHandshake(new TlsHandshakeEvent
             {
                 ProtocolVersion = SslProtocols.Tls13,
@@ -161,6 +161,25 @@ public sealed class TraceTransferEventWriterTests
             });
 
         Assert.AreEqual("* ALPN: curl offers http/1.1\n* ALPN: server accepted http/1.1\n", Written());
+    }
+
+    [TestMethod]
+    public void ReportTlsHandshake_OpenSsl_WritesTheOpenSslLines()
+    {
+        new TraceTransferEventWriter(output, TraceDumpFormat.TextOnly, writesTimestamps: false, TimeProvider.System, TlsBackend.OpenSsl)
+            .ReportTlsHandshake(new TlsHandshakeEvent
+            {
+                ProtocolVersion = SslProtocols.Tls13,
+                CipherSuite = null,
+                NegotiatedApplicationProtocol = "http/1.1",
+                OfferedApplicationProtocols = ["http/1.1"],
+                ServerCertificate = null,
+                CertificateVerified = false,
+            });
+
+        Assert.AreEqual(
+            "* ALPN: curl offers http/1.1\n* SSL connection using TLSv1.3 / (NONE) / [blank] / UNDEF\n* ALPN: server accepted http/1.1\n",
+            Written());
     }
 
     [TestMethod]

@@ -21,6 +21,7 @@ namespace Curl.Output;
 /// <c>HH:MM:SS.uuuuuu </c> in local time.
 /// </param>
 /// <param name="timeProvider">The clock read for each stamp, when an event arrives.</param>
+/// <param name="tlsBackend">The curl build whose wording a TLS handshake gets (ADR-0085).</param>
 /// <remarks>
 /// A port of the trace branch of <c>tool_debug_cb</c> and of <c>dump</c> in curl's
 /// <c>src/tool_cb_dbg.c</c>. Every body event is its own dump, unlike <c>-v</c>. The
@@ -31,13 +32,28 @@ public sealed class TraceTransferEventWriter(
     Stream output,
     TraceDumpFormat format,
     bool writesTimestamps,
-    TimeProvider timeProvider) : ITransferEvents
+    TimeProvider timeProvider,
+    TlsBackend tlsBackend) : ITransferEvents
 {
     private const byte CarriageReturn = 0x0D;
     private const byte LineFeed = 0x0A;
     private const char UnprintableByte = '.';
 
     private readonly int bytesPerLine = format == TraceDumpFormat.HexAndText ? 0x10 : 0x40;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="TraceTransferEventWriter"/> class that
+    /// words a TLS handshake as the running platform's curl build does
+    /// (<see cref="PlatformTlsBackend.ForProcess"/>).
+    /// </summary>
+    /// <param name="output">The stream the dump is written to, not owned.</param>
+    /// <param name="format">Whether the bytes are shown as hex and text or as text only.</param>
+    /// <param name="writesTimestamps">Whether each line that starts an event carries curl's <c>--trace-time</c> stamp.</param>
+    /// <param name="timeProvider">The clock read for each stamp, when an event arrives.</param>
+    public TraceTransferEventWriter(Stream output, TraceDumpFormat format, bool writesTimestamps, TimeProvider timeProvider)
+        : this(output, format, writesTimestamps, timeProvider, PlatformTlsBackend.ForProcess)
+    {
+    }
 
     /// <inheritdoc />
     public void ReportInfo(string text)
@@ -60,7 +76,7 @@ public sealed class TraceTransferEventWriter(
     /// <inheritdoc />
     public void ReportTlsHandshake(TlsHandshakeEvent handshake)
     {
-        foreach (string line in TransferEventInfoText.TlsHandshake(handshake))
+        foreach (string line in TransferEventInfoText.TlsHandshake(handshake, tlsBackend))
         {
             WriteInfoLine(line);
         }

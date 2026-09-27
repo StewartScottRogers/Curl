@@ -1,5 +1,8 @@
 using System.Net;
+using System.Net.Security;
 using System.Security.Authentication;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using Curl.Protocol.Abstractions;
 
@@ -62,7 +65,7 @@ public sealed class VerboseTransferEventWriterTests
     [TestMethod]
     public void HttpsExchange_RendersAsCurl()
     {
-        VerboseTransferEventWriter writer = new(output, writesDataLines: true);
+        VerboseTransferEventWriter writer = new(output, writesDataLines: true, TlsBackend.Schannel);
 
         writer.ReportInfo("  Trying 127.0.0.1:18229...");
         writer.ReportInfo("schannel: disabled automatic use of client certificate");
@@ -106,10 +109,130 @@ public sealed class VerboseTransferEventWriterTests
             WrittenAsWindowsStandardError());
     }
 
+    // curl 8.21.0 (x86_64-pc-linux-musl) OpenSSL/3.5.7: `curl -v -k -o /dev/null
+    // https://host.docker.internal:28356/` against openssl s_server with the self-signed
+    // Fixtures/openssl-verbose-localhost.pem, on 2026-09-27 (BL-356 Notes). The
+    // "SSL Trust: peer verification disabled" line curl prints after the ALPN offer comes
+    // from the connect options, not the handshake, and is not this event's to write.
+    [TestMethod]
+    public void ReportTlsHandshake_OpenSslSelfSignedExchange_RendersAsCurlsOpenSslBuild()
+    {
+        using var certificate = X509CertificateLoader.LoadCertificateFromFile(
+            Path.Combine(AppContext.BaseDirectory, "Fixtures", "openssl-verbose-localhost.pem"));
+        VerboseTransferEventWriter writer = new(output, writesDataLines: true, TlsBackend.OpenSsl);
+
+        writer.ReportTlsHandshake(Handshake(["h2", "http/1.1"], "http/1.1") with
+        {
+            CipherSuite = TlsCipherSuite.TLS_AES_256_GCM_SHA384,
+            NegotiatedGroupName = "X25519MLKEM768",
+            PeerSignatureTypeName = "RSASSA-PSS",
+            ServerCertificate = certificate,
+            PeerCertificateChain = [certificate],
+            CertificateVerifyResult = 18,
+        });
+        writer.ReportConnectionOpened(new ConnectionOpenedEvent
+        {
+            HostName = "host.docker.internal",
+            RemoteEndPoint = new IPEndPoint(IPAddress.Parse("192.168.65.254"), 28356),
+            LocalEndPoint = new IPEndPoint(IPAddress.Parse("172.17.0.3"), 40032),
+            ConnectionNumber = 0,
+        });
+
+        Assert.AreEqual(
+            "* ALPN: curl offers h2,http/1.1\n" +
+            "* SSL connection using TLSv1.3 / TLS_AES_256_GCM_SHA384 / X25519MLKEM768 / RSASSA-PSS\n" +
+            "* ALPN: server accepted http/1.1\n" +
+            "* Server certificate:\n" +
+            "*   subject: CN=localhost\n" +
+            "*   start date: Sep 27 15:58:54 2026 GMT\n" +
+            "*   expire date: Sep 27 15:58:54 2027 GMT\n" +
+            "*   issuer: CN=localhost\n" +
+            "*   Certificate level 0: Public key type RSA (2048/112 Bits/secBits), signed using sha256WithRSAEncryption\n" +
+            "* OpenSSL verify result: 12\n" +
+            "*  SSL certificate verification failed, continuing anyway!\n" +
+            "* Established connection to host.docker.internal (192.168.65.254 port 28356) from 172.17.0.3 port 40032 \n",
+            Written());
+    }
+
+    // The same server with `--tls-max 1.2 --no-alpn`: OpenSSL's own name for the cipher.
+    [TestMethod]
+    public void ReportTlsHandshake_OpenSslTls12WithoutAlpn_NamesTheCipherAsOpenSsl()
+    {
+        new VerboseTransferEventWriter(output, writesDataLines: true, TlsBackend.OpenSsl).ReportTlsHandshake(Handshake([], null) with
+        {
+            ProtocolVersion = SslProtocols.Tls12,
+            CipherSuite = TlsCipherSuite.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+            NegotiatedGroupName = "x25519",
+            PeerSignatureTypeName = "RSASSA-PSS",
+        });
+
+        Assert.AreEqual("* SSL connection using TLSv1.2 / ECDHE-RSA-AES256-GCM-SHA384 / x25519 / RSASSA-PSS\n", Written());
+    }
+
+    [TestMethod]
+    public void ReportTlsHandshake_OpenSslFactsUnknown_UsesCurlsFallbacks()
+    {
+        new VerboseTransferEventWriter(output, writesDataLines: true, TlsBackend.OpenSsl).ReportTlsHandshake(Handshake([], null) with
+        {
+            ProtocolVersion = SslProtocols.None,
+        });
+
+        Assert.AreEqual("* SSL connection using unknown / (NONE) / [blank] / UNDEF\n", Written());
+    }
+
+    [TestMethod]
+    [DataRow(0x0300, TlsCipherSuite.TLS_AES_128_GCM_SHA256, "TLSv1.1 / TLS_AES_128_GCM_SHA256")]
+    [DataRow(0x00C0, TlsCipherSuite.TLS_RSA_WITH_AES_128_CBC_SHA, "TLSv1 / AES128-SHA")]
+    [DataRow(0x0030, TlsCipherSuite.TLS_RSA_WITH_AES_256_CBC_SHA, "SSLv3 / AES256-SHA")]
+    public void ReportTlsHandshake_OpenSslOlderVersions_NamesThemAsOpenSsl(int version, TlsCipherSuite suite, string expected)
+    {
+        new VerboseTransferEventWriter(output, writesDataLines: true, TlsBackend.OpenSsl).ReportTlsHandshake(Handshake([], null) with
+        {
+            ProtocolVersion = (SslProtocols)version,
+            CipherSuite = suite,
+        });
+
+        Assert.AreEqual($"* SSL connection using {expected} / [blank] / UNDEF\n", Written());
+    }
+
+    [TestMethod]
+    [DataRow(true, "0", "SSL certificate verified via OpenSSL.")]
+    [DataRow(false, "1", " SSL certificate verification failed, continuing anyway!")]
+    public void ReportTlsHandshake_OpenSslNoVerifyCode_FallsBackOnWhetherItWasVerified(bool verified, string code, string verdict)
+    {
+        using var certificate = X509CertificateLoader.LoadCertificateFromFile(
+            Path.Combine(AppContext.BaseDirectory, "Fixtures", "openssl-verbose-localhost.pem"));
+
+        new VerboseTransferEventWriter(output, writesDataLines: true, TlsBackend.OpenSsl).ReportTlsHandshake(Handshake([], null) with
+        {
+            ServerCertificate = certificate,
+            CertificateVerified = verified,
+        });
+
+        StringAssert.EndsWith(Written(), $"*   issuer: CN=localhost\n* OpenSSL verify result: {code}\n* {verdict}\n");
+    }
+
+    [TestMethod]
+    public void ReportTlsHandshake_OpenSslChainKeyNotDescribed_SkipsItsLevelLine()
+    {
+        using var key = ECDsa.Create(ECCurve.NamedCurves.brainpoolP160r1);
+        using var undescribed = new CertificateRequest("CN=x", key, HashAlgorithmName.SHA256)
+            .CreateSelfSigned(DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch.AddDays(1));
+
+        new VerboseTransferEventWriter(output, writesDataLines: true, TlsBackend.OpenSsl).ReportTlsHandshake(Handshake([], null) with
+        {
+            ServerCertificate = undescribed,
+            PeerCertificateChain = [undescribed],
+            CertificateVerifyResult = 0,
+        });
+
+        StringAssert.EndsWith(Written(), "*   issuer: CN=x\n* OpenSSL verify result: 0\n* SSL certificate verified via OpenSSL.\n");
+    }
+
     [TestMethod]
     public void ReportTlsHandshake_ServerChoseNoProtocol_SaysItUsesTheDefault()
     {
-        new VerboseTransferEventWriter(output, writesDataLines: true).ReportTlsHandshake(Handshake(["http/1.1"], null));
+        new VerboseTransferEventWriter(output, writesDataLines: true, TlsBackend.Schannel).ReportTlsHandshake(Handshake(["http/1.1"], null));
 
         Assert.AreEqual(
             "* ALPN: curl offers http/1.1\r\n* ALPN: server did not agree on a protocol. Uses default.\r\n",
@@ -119,7 +242,7 @@ public sealed class VerboseTransferEventWriterTests
     [TestMethod]
     public void ReportTlsHandshake_SeveralProtocolsOffered_JoinsThemWithCommas()
     {
-        new VerboseTransferEventWriter(output, writesDataLines: true).ReportTlsHandshake(Handshake(["h2", "http/1.1"], "h2"));
+        new VerboseTransferEventWriter(output, writesDataLines: true, TlsBackend.Schannel).ReportTlsHandshake(Handshake(["h2", "http/1.1"], "h2"));
 
         Assert.AreEqual("* ALPN: curl offers h2,http/1.1\n* ALPN: server accepted h2\n", Written());
     }
@@ -127,7 +250,7 @@ public sealed class VerboseTransferEventWriterTests
     [TestMethod]
     public void ReportTlsHandshake_NothingOffered_WritesNothing()
     {
-        new VerboseTransferEventWriter(output, writesDataLines: true).ReportTlsHandshake(Handshake([], null));
+        new VerboseTransferEventWriter(output, writesDataLines: true, TlsBackend.Schannel).ReportTlsHandshake(Handshake([], null));
 
         Assert.AreEqual(string.Empty, Written());
     }

@@ -15,6 +15,13 @@ rewrite and glibc's `strftime` in the C locale (ADR-0078). The glibc one is chec
 against every row of `Curl.Output.UnitTests/Fixtures/glibc-time-format.json`, measured
 from real curl 8.21.0; change it only against a new measurement, added to that fixture.
 
+A TLS handshake is worded for `-v` and the trace dumps as the `TlsBackend` the writer is
+given (ADR-0085): Schannel's two ALPN lines, or the OpenSSL build's lines from
+`OpenSslHandshakeText`, `OpenSslCertificateText`, `OpenSslDistinguishedNameText` (a port
+of OpenSSL's `X509_NAME_print_ex` with curl's flags) and `OpenSslSecurityBits` (a port of
+`ossl_ifc_ffc_compute_security_bits`). Keep them ports: change them only against OpenSSL's
+or curl's source, or a measurement of the OpenSSL build of curl.
+
 Never construct a `Socket`, `SslStream` or `HttpClient` here. Take `IConnection`
 so the tests in the matching `.UnitTests` project can drive this code from a
 recorded byte stream with no network.
