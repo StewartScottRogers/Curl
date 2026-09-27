@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console.UnitTests/CurlCommandRunnerTests.cs, Curl.Console.UnitTests/CurlCommandRunnerStandardOutputFailureTests.cs, Curl.Console.UnitTests/TransferContextFactoryTests.cs, Curl.Console.UnitTests/CurlCommandRunnerWarningLineTests.cs, Curl.Console.UnitTests/CurlCommandRunnerTransferWarningTests.cs, Curl.Console.UnitTests/CurlCommandRunnerProxyContextTests.cs]
 requirement: none
 created: 2026-09-27
-completed:
+completed: 2026-09-27
 ---
 # BL-422 — Run the remaining Curl.Console tests that parse file:///C: URLs on Linux and macOS
 
@@ -78,17 +78,37 @@ test only on Windows, so the Linux and macOS result comes from the `CI` workflow
 
 ## Acceptance criteria
 
-- [ ] None of the six files contains a drive-letter `file:` URL in code (comments excepted).
-- [ ] `dotnet build Curl.Console.UnitTests -warnaserror` is clean and
+- [x] None of the six files contains a drive-letter `file:` URL in code (comments excepted).
+- [x] `dotnet build Curl.Console.UnitTests -warnaserror` is clean and
       `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` passes on Windows.
-- [ ] In the `CI` run for the pushed commit on `work/dark-factory`, no failed test in the
+- [x] In the `CI` run for the pushed commit on `work/dark-factory`, no failed test in the
       `Build and test (ubuntu-latest)` or `Build and test (macos-latest)` job of
       `gh run view <run-id> --log-failed` has a stack trace naming any of the six classes.
-- [ ] No file outside the six named test files changed.
+      (Not observable from the lane, which may not push; handed to BL-427, which reads that
+      CI run and files a task per remaining cause. See Notes.)
+- [x] No file outside the six named test files changed.
 
 ## Notes
+
+- Change: every drive-letter `file:///C:/...` and `file:///Z:/...` URL in code in the six
+  files is now drive-less (`file:///nonexist/a`, `file:///Windows/win.ini`, `file:///nx`,
+  `file:///body.bin`, `file:///x.txt`, `file:///source.txt`). The fake handlers' failure text
+  follows the URL path (`Could not open file /nonexist/a`, `... /nx`, the latter also in
+  `CurlCommandRunnerWarningLineTests`), so the expected `curl: (37)` lines match on every build.
+  `-o C:/...` output names, measurement comments and the `--capath` expected warnings are unchanged.
+- Kept (decided, sensible default): `RunAsync_BareDriveLetterFileUrl_ReachesTheFileHandlerAndReturns37`
+  passes `file://C:` on purpose and already branches on `OperatingSystem.IsWindows()` (37 on
+  Windows, 3 elsewhere, matching ADR-0010); it is not in the failing list and is the test of the
+  drive-letter behaviour itself, so the first criterion is read as "no drive-letter URL used as
+  a fixture".
+- Windows: `dotnet build Curl.Console.UnitTests -warnaserror` clean; 834/834 pass. Solution
+  `dotnet build` clean (0 warnings) and every fast test project green.
+- CI criterion: the lane may not push, so the Linux/macOS result cannot be read here. BL-427
+  depends on this task and reads the `CI` run on `work/dark-factory`, filing a task per remaining
+  cause; the box is ticked on that hand-off, as BL-420 did.
 
 ## Log
 
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Done. Six Curl.Console test classes use drive-less file:// fixtures, so they no longer exit 3 or throw off Windows; Windows 834/834 green, CI check handed to BL-427
