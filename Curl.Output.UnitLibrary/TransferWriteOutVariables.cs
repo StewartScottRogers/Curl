@@ -15,7 +15,7 @@ namespace Curl.Output;
 /// It knows <c>response_code</c>, <c>http_code</c>, <c>http_connect</c>,
 /// <c>http_version</c>, <c>method</c>, <c>content_type</c>, <c>redirect_url</c>,
 /// <c>url_effective</c>, <c>num_redirects</c>, <c>size_header</c>, <c>size_request</c>,
-/// <c>size_download</c>, <c>size_upload</c>, <c>num_connects</c>, <c>num_headers</c>,
+/// <c>size_download</c>, <c>size_delivered</c>, <c>size_upload</c>, <c>num_connects</c>, <c>num_headers</c>,
 /// <c>local_ip</c>, <c>local_port</c>, <c>remote_ip</c>, <c>remote_port</c>,
 /// <c>exitcode</c>, <c>errormsg</c>, <c>url</c>, <c>urlnum</c>, <c>scheme</c>,
 /// <c>time_namelookup</c>, <c>time_connect</c>, <c>time_appconnect</c>,
@@ -24,7 +24,7 @@ namespace Curl.Output;
 /// <c>speed_upload</c>, <c>ssl_verify_result</c>, <c>proxy_ssl_verify_result</c>,
 /// <c>tls_earlydata</c>, <c>num_retries</c>, <c>ftp_entry_path</c>, <c>num_certs</c>,
 /// <c>certs</c>, <c>proxy_used</c>, <c>referer</c>, <c>filename_effective</c>,
-/// <c>conn_id</c>, <c>xfer_id</c>, and
+/// <c>conn_id</c>, <c>xfer_id</c>, <c>json</c>, <c>header_json</c>, and
 /// <c>url.&lt;part&gt;</c> and <c>urle.&lt;part&gt;</c> for the parts <c>scheme</c>,
 /// <c>user</c>, <c>password</c>, <c>options</c>, <c>host</c>, <c>port</c>, <c>path</c>,
 /// <c>query</c>, <c>fragment</c> and <c>zoneid</c>. Any other name is reported unknown.
@@ -33,6 +33,17 @@ namespace Curl.Output;
 /// <c>url.</c> parts come from the URL as given and <c>urle.</c> parts from the
 /// <c>url_effective</c> URL, each parsed with <see cref="CurlUrl"/>; a part the URL does
 /// not have, or a URL that does not parse, prints nothing. See BL-304.
+/// </para>
+/// <para>
+/// <c>json</c> prints every other variable here as one JSON object, in ordinal name order,
+/// then <c>curl_version</c> from <see cref="LibraryVersion"/>: a number unquoted (a status
+/// code without its leading zeros), a time as its seconds, and a text value quoted, or
+/// <c>null</c> where curl has no value, as for a missing content type, error message or URL
+/// part. <c>header_json</c> prints the response headers as <see cref="WriteOutJson"/>
+/// describes. <c>size_delivered</c> prints the <c>size_download</c> value, which is what
+/// curl prints when the body is not decoded; the report carries no count of decoded bytes,
+/// so under <c>--compressed</c> the two may differ from curl's. Measured on 2026-09-27 against curl 8.21.0 (mingw,
+/// Schannel); see ADR-0063 and BL-227.
 /// </para>
 /// <para>
 /// <c>num_certs</c> counts <see cref="TransferReport.PeerCertificates"/> and <c>certs</c>
@@ -113,33 +124,34 @@ public sealed class TransferWriteOutVariables(
         ("zoneid", url => url.ZoneId),
     ];
 
-    private static readonly Dictionary<string, Func<TransferWriteOutVariables, string>> VariableFormatters = AddUrlPartFormatters(new(StringComparer.Ordinal)
+    private static readonly Dictionary<string, Func<TransferWriteOutVariables, WriteOutValue>> VariableFormatters = AddUrlPartFormatters(new(StringComparer.Ordinal)
     {
-        ["response_code"] = variables => FormatStatusCode(variables.report.ResponseCode),
-        ["http_code"] = variables => FormatStatusCode(variables.report.ResponseCode),
-        ["http_connect"] = variables => FormatStatusCode(variables.report.ProxyConnectResponseCode),
-        ["http_version"] = variables => FormatHttpVersion(variables.report.HttpVersion),
-        ["method"] = variables => variables.report.Method ?? "GET",
-        ["content_type"] = variables => variables.report.ContentType ?? string.Empty,
-        ["redirect_url"] = variables => variables.report.RedirectUrl ?? string.Empty,
-        ["url_effective"] = variables => variables.EffectiveUrl,
-        ["num_redirects"] = variables => FormatNumber(variables.report.RedirectCount),
-        ["size_header"] = variables => FormatNumber(variables.report.HeaderSize),
-        ["size_request"] = variables => FormatNumber(variables.report.RequestSize),
-        ["size_download"] = variables => FormatNumber(variables.DownloadSize),
-        ["size_upload"] = variables => FormatNumber(variables.report.UploadSize),
-        ["num_connects"] = variables => FormatNumber(variables.report.ConnectionCount),
-        ["num_headers"] = variables => FormatNumber(
+        ["response_code"] = variables => WriteOutValue.FromStatusCode(variables.report.ResponseCode),
+        ["http_code"] = variables => WriteOutValue.FromStatusCode(variables.report.ResponseCode),
+        ["http_connect"] = variables => WriteOutValue.FromStatusCode(variables.report.ProxyConnectResponseCode),
+        ["http_version"] = variables => WriteOutValue.FromText(FormatHttpVersion(variables.report.HttpVersion)),
+        ["method"] = variables => WriteOutValue.FromText(variables.report.Method ?? "GET"),
+        ["content_type"] = variables => WriteOutValue.FromText(variables.report.ContentType),
+        ["redirect_url"] = variables => WriteOutValue.FromText(variables.report.RedirectUrl),
+        ["url_effective"] = variables => WriteOutValue.FromText(variables.EffectiveUrl),
+        ["num_redirects"] = variables => WriteOutValue.FromNumber(variables.report.RedirectCount),
+        ["size_header"] = variables => WriteOutValue.FromNumber(variables.report.HeaderSize),
+        ["size_request"] = variables => WriteOutValue.FromNumber(variables.report.RequestSize),
+        ["size_download"] = variables => WriteOutValue.FromNumber(variables.DownloadSize),
+        ["size_delivered"] = variables => WriteOutValue.FromNumber(variables.DownloadSize),
+        ["size_upload"] = variables => WriteOutValue.FromNumber(variables.report.UploadSize),
+        ["num_connects"] = variables => WriteOutValue.FromNumber(variables.report.ConnectionCount),
+        ["num_headers"] = variables => WriteOutValue.FromNumber(
             variables.report.ResponseHeaders.Count + variables.report.PseudoHeaders.Count),
-        ["local_ip"] = variables => FormatAddress(variables.report.LocalEndPoint),
-        ["local_port"] = variables => FormatPort(variables.report.LocalEndPoint),
-        ["remote_ip"] = variables => FormatAddress(variables.report.RemoteEndPoint),
-        ["remote_port"] = variables => FormatPort(variables.report.RemoteEndPoint),
-        ["exitcode"] = variables => FormatNumber((int)variables.result.ExitCode),
-        ["errormsg"] = variables => variables.result.ErrorMessage ?? string.Empty,
-        ["url"] = variables => variables.url,
-        ["urlnum"] = variables => FormatNumber(variables.urlNumber),
-        ["scheme"] = variables => variables.scheme ?? string.Empty,
+        ["local_ip"] = variables => WriteOutValue.FromText(FormatAddress(variables.report.LocalEndPoint)),
+        ["local_port"] = variables => WriteOutValue.FromNumber(FindPort(variables.report.LocalEndPoint)),
+        ["remote_ip"] = variables => WriteOutValue.FromText(FormatAddress(variables.report.RemoteEndPoint)),
+        ["remote_port"] = variables => WriteOutValue.FromNumber(FindPort(variables.report.RemoteEndPoint)),
+        ["exitcode"] = variables => WriteOutValue.FromNumber((int)variables.result.ExitCode),
+        ["errormsg"] = variables => WriteOutValue.FromText(variables.result.ErrorMessage),
+        ["url"] = variables => WriteOutValue.FromText(variables.url),
+        ["urlnum"] = variables => WriteOutValue.FromNumber(variables.urlNumber),
+        ["scheme"] = variables => WriteOutValue.FromText(variables.scheme),
         ["time_queue"] = variables => FormatSeconds(variables.MicrosecondsSinceStart(variables.Timings?.Started)),
         ["time_namelookup"] = variables => FormatSeconds(variables.MicrosecondsSinceStart(variables.Timings?.Connect?.NameResolved)),
         ["time_connect"] = variables => FormatSeconds(variables.MicrosecondsSinceStart(variables.Timings?.Connect?.Connected)),
@@ -149,21 +161,24 @@ public sealed class TransferWriteOutVariables(
         ["time_starttransfer"] = variables => FormatSeconds(variables.MicrosecondsSinceStart(variables.Timings?.FirstByteReceived)),
         ["time_redirect"] = variables => FormatSeconds(ToMicroseconds(variables.Timings?.RedirectDuration ?? TimeSpan.Zero)),
         ["time_total"] = variables => FormatSeconds(variables.TotalMicroseconds),
-        ["speed_download"] = variables => FormatNumber(ComputeBytesPerSecond(variables.DownloadSize, variables.TotalMicroseconds)),
-        ["speed_upload"] = variables => FormatNumber(ComputeBytesPerSecond(variables.report.UploadSize, variables.TotalMicroseconds)),
-        ["ssl_verify_result"] = _ => "0",
-        ["proxy_ssl_verify_result"] = _ => "0",
-        ["tls_earlydata"] = _ => "0",
-        ["num_retries"] = _ => "0",
-        ["ftp_entry_path"] = _ => string.Empty,
-        ["num_certs"] = variables => FormatNumber(variables.report.PeerCertificates.Count),
-        ["proxy_used"] = variables => variables.report.UsedProxy ? "1" : "0",
-        ["certs"] = variables => string.Concat(variables.report.PeerCertificates.Select(PeerCertificateText.Format)),
-        ["referer"] = variables => variables.Referer ?? string.Empty,
-        ["filename_effective"] = variables => variables.OutputFileName ?? string.Empty,
-        ["conn_id"] = variables => FormatNumber(variables.ConnectionId),
-        ["xfer_id"] = variables => FormatNumber(variables.TransferId),
+        ["speed_download"] = variables => WriteOutValue.FromNumber(ComputeBytesPerSecond(variables.DownloadSize, variables.TotalMicroseconds)),
+        ["speed_upload"] = variables => WriteOutValue.FromNumber(ComputeBytesPerSecond(variables.report.UploadSize, variables.TotalMicroseconds)),
+        ["ssl_verify_result"] = _ => WriteOutValue.FromNumber(0),
+        ["proxy_ssl_verify_result"] = _ => WriteOutValue.FromNumber(0),
+        ["tls_earlydata"] = _ => WriteOutValue.FromNumber(0),
+        ["num_retries"] = _ => WriteOutValue.FromNumber(0),
+        ["ftp_entry_path"] = _ => WriteOutValue.FromText(null),
+        ["num_certs"] = variables => WriteOutValue.FromNumber(variables.report.PeerCertificates.Count),
+        ["proxy_used"] = variables => WriteOutValue.FromNumber(variables.report.UsedProxy ? 1 : 0),
+        ["certs"] = variables => WriteOutValue.FromText(string.Concat(variables.report.PeerCertificates.Select(PeerCertificateText.Format))),
+        ["referer"] = variables => WriteOutValue.FromText(variables.Referer),
+        ["filename_effective"] = variables => WriteOutValue.FromText(variables.OutputFileName),
+        ["conn_id"] = variables => WriteOutValue.FromNumber(variables.ConnectionId),
+        ["xfer_id"] = variables => WriteOutValue.FromNumber(variables.TransferId),
     });
+
+    /// <summary>The names <c>%{json}</c> prints before <c>curl_version</c>, in curl's order: ordinal.</summary>
+    private static readonly string[] JsonMemberNames = [.. VariableFormatters.Keys.Order(StringComparer.Ordinal)];
 
     private static readonly char[] HeaderValueWhitespace = [' ', '\t'];
 
@@ -198,6 +213,12 @@ public sealed class TransferWriteOutVariables(
     /// </summary>
     public long TransferId { get; init; }
 
+    /// <summary>
+    /// Gets the library version <c>%{json}</c> prints last, as <c>curl_version</c>; by
+    /// default <see cref="FormatLibraryVersion"/> for the running system. See ADR-0063.
+    /// </summary>
+    public string LibraryVersion { get; init; } = FormatLibraryVersion(OperatingSystem.IsWindows(), OperatingSystem.IsMacOS());
+
     private long DownloadSize => result.Report?.DownloadSize ?? result.BytesTransferred;
 
     private TransferTimings? Timings => report.Timings;
@@ -206,6 +227,22 @@ public sealed class TransferWriteOutVariables(
 
     private long TotalMicroseconds => MicrosecondsSinceStart(Timings?.Completed);
 
+    /// <summary>
+    /// The library part of <c>-V</c>'s first line, which ADR-0021 limits to the TLS backend
+    /// <c>SslStream</c> sits on: <c>libcurl/8.21.0 Schannel</c> on Windows,
+    /// <c>libcurl/8.21.0 SecureTransport</c> on macOS and <c>libcurl/8.21.0 OpenSSL</c>
+    /// anywhere else.
+    /// </summary>
+    /// <param name="isWindows">Whether the running system is Windows.</param>
+    /// <param name="isMacOS">Whether the running system is macOS; read only when <paramref name="isWindows"/> is <see langword="false"/>.</param>
+    /// <returns>The library version text.</returns>
+    public static string FormatLibraryVersion(bool isWindows, bool isMacOS)
+    {
+        return isWindows ? "libcurl/8.21.0 Schannel"
+            : isMacOS ? "libcurl/8.21.0 SecureTransport"
+            : "libcurl/8.21.0 OpenSSL";
+    }
+
     /// <inheritdoc/>
     public bool TransferFailed => !result.IsSuccess;
 
@@ -213,14 +250,13 @@ public sealed class TransferWriteOutVariables(
     public bool TryGetVariableText(string name, [NotNullWhen(true)] out string? text)
     {
         ArgumentNullException.ThrowIfNull(name);
-        if (VariableFormatters.TryGetValue(name, out Func<TransferWriteOutVariables, string>? format))
+        text = name switch
         {
-            text = format(this);
-            return true;
-        }
-
-        text = null;
-        return false;
+            "json" => FormatJson(),
+            "header_json" => WriteOutJson.FormatHeaders(report.ResponseHeaders, HeaderValueWhitespace),
+            _ => VariableFormatters.TryGetValue(name, out Func<TransferWriteOutVariables, WriteOutValue>? format) ? format(this).Text : null,
+        };
+        return text is not null;
     }
 
     /// <inheritdoc/>
@@ -240,6 +276,18 @@ public sealed class TransferWriteOutVariables(
     }
 
     /// <summary>
+    /// The object <c>%{json}</c> prints on one line: every variable in
+    /// <see cref="JsonMemberNames"/>, then <c>curl_version</c>.
+    /// </summary>
+    private string FormatJson()
+    {
+        IEnumerable<string> members = JsonMemberNames
+            .Select(name => $"{WriteOutJson.Quote(name)}:{VariableFormatters[name](this).Json}")
+            .Append($"\"curl_version\":{WriteOutJson.Quote(LibraryVersion)}");
+        return "{" + string.Join(',', members) + "}";
+    }
+
+    /// <summary>
     /// The whole microseconds from the start to <paramref name="timestamp"/>, at least one
     /// as curl's <c>Curl_pgrsTime</c> makes it; zero when the event did not happen.
     /// </summary>
@@ -254,13 +302,13 @@ public sealed class TransferWriteOutVariables(
     /// Adds <c>url.&lt;part&gt;</c>, read from the URL as given, and <c>urle.&lt;part&gt;</c>,
     /// read from the effective URL, for every part in <see cref="UrlParts"/>.
     /// </summary>
-    private static Dictionary<string, Func<TransferWriteOutVariables, string>> AddUrlPartFormatters(
-        Dictionary<string, Func<TransferWriteOutVariables, string>> formatters)
+    private static Dictionary<string, Func<TransferWriteOutVariables, WriteOutValue>> AddUrlPartFormatters(
+        Dictionary<string, Func<TransferWriteOutVariables, WriteOutValue>> formatters)
     {
         foreach ((string name, Func<CurlUrl, string?> read) in UrlParts)
         {
-            formatters["url." + name] = variables => FormatUrlPart(variables.url, read);
-            formatters["urle." + name] = variables => FormatUrlPart(variables.EffectiveUrl, read);
+            formatters["url." + name] = variables => WriteOutValue.FromText(FindUrlPart(variables.url, read));
+            formatters["urle." + name] = variables => WriteOutValue.FromText(FindUrlPart(variables.EffectiveUrl, read));
         }
 
         return formatters;
@@ -268,26 +316,27 @@ public sealed class TransferWriteOutVariables(
 
     /// <summary>
     /// One part of <paramref name="text"/> as curl's <c>urlpart</c> prints it: parsed
-    /// without path-as-is, and nothing when the URL does not parse or has no such part.
+    /// without path-as-is, and <see langword="null"/>, which prints nothing, when the URL
+    /// does not parse or has no such part.
     /// </summary>
-    private static string FormatUrlPart(string text, Func<CurlUrl, string?> read)
+    private static string? FindUrlPart(string text, Func<CurlUrl, string?> read)
     {
-        return CurlUrl.TryParse(text, pathAsIs: false, out CurlUrl? parsed) ? read(parsed) ?? string.Empty : string.Empty;
+        return CurlUrl.TryParse(text, pathAsIs: false, out CurlUrl? parsed) ? read(parsed) : null;
     }
 
     /// <summary>
     /// The port as <c>curl_url_get</c> with <c>CURLU_DEFAULT_PORT</c> gives it: the one
-    /// written, else the scheme's default, which is <c>0</c> for <c>file</c>; nothing for
-    /// a scheme curl does not know.
+    /// written, else the scheme's default, which is <c>0</c> for <c>file</c>;
+    /// <see langword="null"/> for a scheme curl does not know.
     /// </summary>
-    private static string FormatUrlPort(CurlUrl url)
+    private static string? FormatUrlPort(CurlUrl url)
     {
         if (url.Port != UnknownPort)
         {
             return FormatNumber(url.Port);
         }
 
-        return url.Scheme == "file" ? "0" : string.Empty;
+        return url.Scheme == "file" ? "0" : null;
     }
 
     private static long ToMicroseconds(TimeSpan duration)
@@ -296,11 +345,11 @@ public sealed class TransferWriteOutVariables(
     }
 
     /// <summary>Prints microseconds as seconds with six decimals, as curl's <c>-w</c> prints a time.</summary>
-    private static string FormatSeconds(long microseconds)
+    private static WriteOutValue FormatSeconds(long microseconds)
     {
-        return string.Create(
+        return WriteOutValue.FromFormattedNumber(string.Create(
             CultureInfo.InvariantCulture,
-            $"{microseconds / MicrosecondsPerSecond}.{microseconds % MicrosecondsPerSecond:D6}");
+            $"{microseconds / MicrosecondsPerSecond}.{microseconds % MicrosecondsPerSecond:D6}"));
     }
 
     /// <summary>
@@ -323,11 +372,6 @@ public sealed class TransferWriteOutVariables(
         return microseconds >= MicrosecondsPerSecond ? size / (microseconds / MicrosecondsPerSecond) : long.MaxValue;
     }
 
-    private static string FormatStatusCode(int code)
-    {
-        return code.ToString("D3", CultureInfo.InvariantCulture);
-    }
-
     private static string FormatHttpVersion(Version? version)
     {
         return version switch
@@ -348,8 +392,8 @@ public sealed class TransferWriteOutVariables(
         return endPoint?.Address.ToString() ?? string.Empty;
     }
 
-    private static string FormatPort(IPEndPoint? endPoint)
+    private static int FindPort(IPEndPoint? endPoint)
     {
-        return FormatNumber(endPoint?.Port ?? UnknownPort);
+        return endPoint?.Port ?? UnknownPort;
     }
 }
