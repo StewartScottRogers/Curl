@@ -27,6 +27,10 @@ internal sealed class TransferContextFactory(Stream standardInput)
     /// <param name="resumeFrom">The <c>-C</c> offset, already resolved for <c>-C -</c>.</param>
     /// <param name="headerOutput">Where the <c>-D</c> header lines go, or <see langword="null" /> without <c>-D</c>.</param>
     /// <param name="formBody">The <c>-F</c> body built for this transfer, or <see langword="null" /> without <c>-F</c>.</param>
+    /// <param name="upload">
+    /// The <c>-T</c> source, or <see langword="null" /> without <c>-T</c>, when a <c>telnet</c>
+    /// transfer uploads standard input and any other uploads nothing.
+    /// </param>
     /// <returns>
     /// The context. Its <see cref="TransferContext.NoBody" /> is <c>-I</c>, and its
     /// <see cref="TransferContext.HeaderOutput" /> is <see cref="HeaderOutputOf" />'s.
@@ -38,7 +42,8 @@ internal sealed class TransferContextFactory(Stream standardInput)
         ByteRange? range,
         long? resumeFrom,
         Stream? headerOutput,
-        HttpRequestBody? formBody = null) =>
+        HttpRequestBody? formBody = null,
+        Stream? upload = null) =>
         new()
         {
             Url = url,
@@ -48,7 +53,7 @@ internal sealed class TransferContextFactory(Stream standardInput)
             Range = range,
             ResumeFrom = resumeFrom,
             MaxFileSize = options.MaxFileSize,
-            Upload = string.Equals(url.Scheme, TelnetScheme, StringComparison.Ordinal) ? standardInput : null,
+            Upload = upload ?? (string.Equals(url.Scheme, TelnetScheme, StringComparison.Ordinal) ? standardInput : null),
             PostData = options.PostData,
             Credentials = options.Credentials,
             TelnetOptions = options.TelnetOptions,

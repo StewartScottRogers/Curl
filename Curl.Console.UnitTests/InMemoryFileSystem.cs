@@ -35,8 +35,11 @@ internal sealed class InMemoryFileSystem : IFileSystem, IFileTimeSetter
 
     public int FileTimeErrorCode { get; init; }
 
+    public List<string> ReadPaths { get; } = [];
+
     public ValueTask<FileOpenResult> OpenForReadAsync(string path, CancellationToken cancellationToken)
     {
+        ReadPaths.Add(path);
         if (UnreadablePaths.Contains(path))
         {
             return ValueTask.FromResult(FileOpenResult.Failed(FileAccessStatus.NotFound));
