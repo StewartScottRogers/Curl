@@ -127,6 +127,33 @@ public sealed class CurlCompositionTests
         }
     }
 
+    // IPFS_GATEWAY is set in this process only, to a gateway curl refuses (it has a query), so
+    // the run reads the variable and stops with exit 3 before any connection.
+    [TestMethod]
+    public async Task CreateRunner_IpfsUrl_ReadsTheGatewayFromTheProcessEnvironment()
+    {
+        string? saved = Environment.GetEnvironmentVariable(IpfsGatewayRewriter.GatewayVariableName);
+        Environment.SetEnvironmentVariable(IpfsGatewayRewriter.GatewayVariableName, "http://h/?q");
+
+        try
+        {
+            using MemoryStream standardOutput = new();
+            using MemoryStream standardError = new();
+            using MemoryStream standardInput = new();
+
+            int exitCode = await CurlComposition
+                .CreateRunner(standardOutput, standardError, standardInput, standardOutputIsTerminal: false)
+                .RunAsync(["-q", "ipfs://bafyabc"]);
+
+            Assert.AreEqual(3, exitCode);
+            Assert.StartsWith("curl: malformed target URL", Encoding.UTF8.GetString(standardError.ToArray()));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(IpfsGatewayRewriter.GatewayVariableName, saved);
+        }
+    }
+
     [TestMethod]
     [TestCategory("Integration")]
     public async Task CreateRunner_WriteOutOutputFile_OpensItOnDisk()

@@ -1,9 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text;
 using Curl.Authentication;
 using Curl.Cli;
 using Curl.Core;
 using Curl.Core.FileSystem;
+using Curl.Core.Globbing;
 using Curl.Core.Multipart;
 using Curl.Output;
 using Curl.Protocol.Abstractions;
@@ -90,6 +92,13 @@ namespace Curl.Console;
 /// Lists where to look for the default config file, read before the command line unless the first
 /// argument starts with <c>-q</c> or is <c>--disable</c>; the composition passes
 /// <see cref="DefaultConfigFileSearch.ForProcess" />. When not given, no default config file is read.
+/// </param>
+/// <param name="readEnvironmentVariable">
+/// Returns the value of the named environment variable, or <see langword="null" /> when it is not
+/// set; the <see cref="IpfsGatewayRewriter" /> reads <c>IPFS_GATEWAY</c>, <c>IPFS_PATH</c> and
+/// <c>HOME</c> through it, and the gateway file through the config-file reader. The composition
+/// passes <see cref="Environment.GetEnvironmentVariable(string)" />; when not given, no variable is
+/// set, which keeps tests off the real environment.
 /// </param>
 /// <remarks>
 /// <para>
@@ -201,7 +210,8 @@ internal sealed class CurlCommandRunner(
     TimeProvider? timeProvider = null,
     IOutputPaths? outputPaths = null,
     IDataFileReader? configFileReader = null,
-    DefaultConfigFileSearch? defaultConfigFileSearch = null)
+    DefaultConfigFileSearch? defaultConfigFileSearch = null,
+    Func<string, string?>? readEnvironmentVariable = null)
 {
     /// <summary>
     /// curl 8.21.0's message for a URL that cannot be parsed at all, measured on
@@ -224,6 +234,12 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>The <see cref="DefaultConfigFileSearch" /> used when the runner is given none: it lists no path.</summary>
     private static readonly DefaultConfigFileSearch NoDefaultConfigFile = new(_ => null, false, null, null);
+
+    /// <summary>
+    /// Gets what reads the config files, every file an option names, and the IPFS gateway file:
+    /// the reader the runner was given, else the disk.
+    /// </summary>
+    private IDataFileReader DataFileReader => configFileReader ?? DiskDataFileReader.ForProcess;
 
     /// <summary>The <c>-D</c> value that sends the header lines to standard output.</summary>
     private const string StandardOutputHeaderFile = "-";
@@ -297,6 +313,24 @@ internal sealed class CurlCommandRunner(
         TransferResult.Failure(CurlExitCode.UrlMalformat, UploadTransferUrl.MalformedUrlMessage);
 
     /// <summary>
+    /// The result of an <c>ipfs://</c> or <c>ipns://</c> URL for which no gateway is configured:
+    /// exit 37, whose <c>%{errormsg}</c> curl 8.21.0 prints as its generic text for the code
+    /// (measured 2026-09-27, BL-240 Notes). It is compared by reference, so that
+    /// <see cref="TransferAllAsync" /> stops before the remaining URLs, as curl does.
+    /// </summary>
+    private static readonly TransferResult IpfsGatewayDetectionFailure =
+        TransferResult.Failure(IpfsGatewayFailure.GatewayDetectionFailed.ExitCode, "Could not read a file:// file");
+
+    /// <summary>
+    /// The result of an <c>ipfs://</c> or <c>ipns://</c> URL whose gateway, or rewritten URL, curl
+    /// rejects: exit 3, whose <c>%{errormsg}</c> curl 8.21.0 prints as its generic text for the
+    /// code (measured 2026-09-27, BL-240 Notes). It is compared by reference, so that
+    /// <see cref="TransferAllAsync" /> stops before the remaining URLs, as curl does.
+    /// </summary>
+    private static readonly TransferResult IpfsMalformedTargetUrlFailure =
+        TransferResult.Failure(IpfsGatewayFailure.MalformedTargetUrl.ExitCode, "URL using bad/illegal format or missing URL");
+
+    /// <summary>
     /// The result of a transfer whose <c>-T</c> file could not be opened, measured on curl 8.21.0
     /// with <c>-T nosuchfile</c>: exit 26 with <see cref="MultipartFormBodyBuilder.OpenFailedMessage" />.
     /// It is compared by reference, so that <see cref="TransferAllAsync" /> stops before the
@@ -322,6 +356,17 @@ internal sealed class CurlCommandRunner(
     /// The <c>%{conn_id}</c> the next transfer that connects takes, counted per run from zero.
     /// </summary>
     private long nextConnectionId;
+
+    /// <summary>
+    /// The <c>%{xfer_id}</c> the next transfer takes, counted per run from zero, one for every URL
+    /// a glob expands to.
+    /// </summary>
+    private long nextTransferId;
+
+    /// <summary>
+    /// Whether a transfer of this run has sent, or was set up to send, its body to standard output.
+    /// </summary>
+    private bool bodyWrittenToStandardOutput;
 
     /// <summary>
     /// Runs <paramref name="arguments" /> to completion.
@@ -405,51 +450,45 @@ internal sealed class CurlCommandRunner(
             arguments,
             Path.Exists,
             ConsolePasswordPrompt.ForProcessConsole,
-            configFileReader ?? DiskDataFileReader.ForProcess,
+            DataFileReader,
             defaultConfigFileSearch ?? NoDefaultConfigFile);
 
     /// <summary>
-    /// Transfers every URL in order and reports each failure.
+    /// Transfers every URL in order, each command-line URL once for every URL its glob expands to,
+    /// and reports each failure.
     /// </summary>
     /// <param name="options">The accepted command line.</param>
     /// <returns>
     /// The last transfer's exit code, or <see cref="CurlExitCode.Ok" /> when there was none.
-    /// A transfer <see cref="EndsTheRun" /> names is the last: the URLs after it are not transferred.
+    /// A transfer <see cref="EndsTheRun" /> names is the last: the URLs after it are not
+    /// transferred. A URL that is not a well-formed glob also ends the run, with exit 3.
     /// </returns>
     private async Task<CurlExitCode> TransferAllAsync(CommandLineOptions options)
     {
-        CurlExitCode exitCode = CurlExitCode.Ok;
         TransferDispatch dispatch = createTransferDispatch(options);
-        bool showsErrors = ShowsErrors(options);
         if (dispatch.Cookies is { } cookies)
         {
             await cookies.LoadCookieFilesAsync(fileSystem, timeProvider.GetUtcNow()).ConfigureAwait(false);
         }
 
-        bool bodyWrittenToStandardOutput = false;
-
+        CurlExitCode exitCode = CurlExitCode.Ok;
         for (int index = 0; index < options.Urls.Count; index++)
         {
-            transferOutputFileName = null;
-            (TransferResult result, string transferUrl) = await TransferUrlAsync(dispatch, options, index)
-                .ConfigureAwait(false);
-            exitCode = result.ExitCode;
-
-            if (showsErrors && result.ErrorMessage is not null)
+            if (!TryParseGlob(options, index, out UrlGlob? glob, out TransferResult? globFailure))
             {
-                await WriteFailureLinesAsync(result).ConfigureAwait(false);
+                await WriteGlobFailureLinesAsync(options, globFailure).ConfigureAwait(false);
+                return globFailure.ExitCode;
             }
 
-            bool endsTheRun = EndsTheRun(options, result);
-            bodyWrittenToStandardOutput |= SendsBodyToStandardOutput(options, index, result);
-            bool standardOutputIsBinary = IsStandardOutputBinaryForWriteOut(
-                options, index, bodyWrittenToStandardOutput, endsTheRun);
-            await WriteOutAsync(options, index, transferUrl, result, TakeConnectionId(result), standardOutputIsBinary).ConfigureAwait(false);
-            await WriteCookieJarAsync(dispatch, options, transferUrl, standardOutputIsBinary).ConfigureAwait(false);
-
-            if (endsTheRun)
+            foreach (UrlGlobMatch match in glob.Expand())
             {
-                break;
+                UrlTransfer transfer = new(options, index, nextTransferId++, match, runsOnWindows);
+                TransferResult result = await TransferAndReportAsync(dispatch, options, transfer).ConfigureAwait(false);
+                exitCode = result.ExitCode;
+                if (EndsTheRun(options, result))
+                {
+                    return exitCode;
+                }
             }
         }
 
@@ -457,33 +496,196 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
-    /// Performs the transfer of the URL at <paramref name="index" />, first resolving the URL of a
-    /// <c>-T</c> upload with <see cref="UploadTransferUrl" />.
+    /// Reads the URL at <paramref name="index" /> as a glob, or under <c>-g</c> / <c>--globoff</c>
+    /// as the one URL it is.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="index">The URL's position on the command line.</param>
+    /// <param name="glob">The glob; <see langword="null" /> when the URL is not a well-formed one.</param>
+    /// <param name="failure">The exit 3 failure with curl's message; <see langword="null" /> on success.</param>
+    /// <returns><see langword="true" /> when <paramref name="glob" /> was produced.</returns>
+    private static bool TryParseGlob(
+        CommandLineOptions options,
+        int index,
+        [NotNullWhen(true)] out UrlGlob? glob,
+        [NotNullWhen(false)] out TransferResult? failure)
+    {
+        if (options.GlobOff)
+        {
+            glob = UrlGlob.Unglobbed(options.Urls[index]);
+            failure = null;
+            return true;
+        }
+
+        return UrlGlob.TryParse(options.Urls[index], out glob, out failure);
+    }
+
+    /// <summary>
+    /// Writes a bad glob's lines, <c>curl: (3) </c> and curl's message, one line per line of the
+    /// message, unless <c>-s</c> was given without <c>-S</c>, as curl 8.21.0 does (measured
+    /// 2026-09-27, BL-240 Notes).
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="failure">The glob's failure.</param>
+    /// <returns>A task that completes when the lines are flushed.</returns>
+    private async Task WriteGlobFailureLinesAsync(CommandLineOptions options, TransferResult failure)
+    {
+        if (ShowsErrors(options))
+        {
+            await WriteErrorLinesAsync(FormatErrorLine(failure).Split('\n')).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Performs one transfer, then writes its failure lines, its <c>-w</c> output and the
+    /// <c>-c</c> jar.
     /// </summary>
     /// <param name="dispatch">Performs the transfer with the handler for its scheme, after its warning lines.</param>
     /// <param name="options">The accepted command line.</param>
-    /// <param name="index">The URL's position on the command line.</param>
-    /// <returns>
-    /// The transfer's result, and the URL transferred: as typed, or for a <c>-T</c> upload as
-    /// resolved. <see cref="UploadUrlMalformedFailure" /> and an empty URL, with nothing else done,
-    /// when the <c>-T</c> URL cannot be parsed.
-    /// </returns>
-    private async Task<(TransferResult Result, string TransferUrl)> TransferUrlAsync(
+    /// <param name="transfer">The transfer.</param>
+    /// <returns>The transfer's result.</returns>
+    private async Task<TransferResult> TransferAndReportAsync(
         TransferDispatch dispatch,
         CommandLineOptions options,
-        int index)
+        UrlTransfer transfer)
     {
-        string? uploadFile = UploadFileOf(options, index);
-        string transferUrl = options.Urls[index];
-        if (uploadFile is not null && !UploadTransferUrl.TryResolve(transferUrl, uploadFile, out transferUrl))
+        transferOutputFileName = null;
+        (TransferResult result, string givenUrl, string transferUrl) = await TransferUrlAsync(dispatch, options, transfer)
+            .ConfigureAwait(false);
+
+        if (ShowsErrors(options) && result.ErrorMessage is not null && !IsIpfsGatewayFailure(result))
         {
-            return (UploadUrlMalformedFailure, transferUrl);
+            await WriteFailureLinesAsync(result).ConfigureAwait(false);
         }
 
-        TransferResult result = await TransferWithHeaderOutputAsync(dispatch, options, index, transferUrl, uploadFile)
-            .ConfigureAwait(false);
-        return (result, transferUrl);
+        bool endsTheRun = EndsTheRun(options, result);
+        bodyWrittenToStandardOutput |= SendsBodyToStandardOutput(transfer, result);
+        bool standardOutputIsBinary = IsStandardOutputBinaryForWriteOut(
+            options, transfer.UrlIndex, bodyWrittenToStandardOutput, endsTheRun);
+        await WriteOutAsync(options, transfer, givenUrl, transferUrl, result, standardOutputIsBinary).ConfigureAwait(false);
+        await WriteCookieJarAsync(dispatch, options, transferUrl, standardOutputIsBinary).ConfigureAwait(false);
+
+        return result;
     }
+
+    /// <summary>
+    /// Performs one transfer: rewrites an <c>ipfs://</c> or <c>ipns://</c> URL to its gateway URL,
+    /// gives a URL typed without a scheme the one <see cref="UrlSchemeGuesser" /> guesses, and
+    /// resolves the URL of a <c>-T</c> upload with <see cref="UploadTransferUrl" />.
+    /// </summary>
+    /// <param name="dispatch">Performs the transfer with the handler for its scheme, after its warning lines.</param>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="transfer">The transfer.</param>
+    /// <returns>
+    /// The transfer's result; the URL <c>%{url}</c> prints, the gateway URL for a rewritten IPFS
+    /// URL and otherwise the URL as the glob expanded it; and the URL transferred, with its
+    /// guessed scheme and, for a <c>-T</c> upload, as resolved. An IPFS URL that cannot be
+    /// rewritten, and a <c>-T</c> URL that cannot be parsed, return their failure and an empty
+    /// URL transferred, with nothing else done.
+    /// </returns>
+    private async Task<(TransferResult Result, string GivenUrl, string TransferUrl)> TransferUrlAsync(
+        TransferDispatch dispatch,
+        CommandLineOptions options,
+        UrlTransfer transfer)
+    {
+        if (!TryRewriteIpfsUrl(options, transfer.Url, out string givenUrl, out IpfsGatewayFailure? ipfsFailure))
+        {
+            return (await ReportIpfsGatewayFailureAsync(options, transfer, ipfsFailure).ConfigureAwait(false), givenUrl, string.Empty);
+        }
+
+        string? uploadFile = UploadFileOf(options, transfer.UrlIndex);
+        string transferUrl = UrlSchemeGuesser.AddGuessedScheme(givenUrl);
+        if (uploadFile is not null && !UploadTransferUrl.TryResolve(transferUrl, uploadFile, out transferUrl))
+        {
+            return (UploadUrlMalformedFailure, givenUrl, transferUrl);
+        }
+
+        TransferResult result = await TransferWithHeaderOutputAsync(dispatch, options, transfer, transferUrl, uploadFile)
+            .ConfigureAwait(false);
+        return (result, givenUrl, transferUrl);
+    }
+
+    /// <summary>
+    /// Rewrites <paramref name="url" /> to its IPFS gateway URL when it is an <c>ipfs://</c> or
+    /// <c>ipns://</c> URL, with <see cref="IpfsGatewayRewriter" />.
+    /// </summary>
+    /// <param name="options">The accepted command line, whose <c>--ipfs-gateway</c> comes first.</param>
+    /// <param name="url">The URL as the glob expanded it.</param>
+    /// <param name="rewrittenUrl">The gateway URL, or <paramref name="url" /> when it is not an IPFS URL or cannot be rewritten.</param>
+    /// <param name="failure">Why an IPFS URL could not be rewritten; <see langword="null" /> otherwise.</param>
+    /// <returns><see langword="false" /> only for an IPFS URL that could not be rewritten.</returns>
+    private bool TryRewriteIpfsUrl(
+        CommandLineOptions options,
+        string url,
+        out string rewrittenUrl,
+        [NotNullWhen(false)] out IpfsGatewayFailure? failure)
+    {
+        rewrittenUrl = url;
+        failure = null;
+        if (!CurlUrl.TryParse(url, pathAsIs: false, out CurlUrl? parsed) || !IpfsGatewayRewriter.IsIpfsUrl(parsed))
+        {
+            return true;
+        }
+
+        IpfsGatewayRewriter rewriter = new(readEnvironmentVariable ?? ReadNoEnvironmentVariable, ReadGatewayFileText);
+        if (!rewriter.TryRewrite(parsed, options.IpfsGateway, out string? gatewayUrl, out failure))
+        {
+            return false;
+        }
+
+        rewrittenUrl = gatewayUrl;
+        return true;
+    }
+
+    /// <summary>
+    /// Reads an IPFS gateway file as UTF-8 through <see cref="DataFileReader" />.
+    /// </summary>
+    /// <param name="path">The file's path.</param>
+    /// <returns>The file's text, or <see langword="null" /> when it cannot be read.</returns>
+    private string? ReadGatewayFileText(string path) =>
+        DataFileReader.TryReadFile(path, out byte[] contents) ? Encoding.UTF8.GetString(contents) : null;
+
+    /// <summary>
+    /// Reads the environment when the runner was given no function for it: no variable is set,
+    /// which keeps tests off the real environment.
+    /// </summary>
+    /// <param name="name">The variable's name.</param>
+    /// <returns>Always <see langword="null" />.</returns>
+    private static string? ReadNoEnvironmentVariable(string name) => null;
+
+    /// <summary>
+    /// Prints curl's lines for an IPFS URL that could not be rewritten, <c>curl: </c> and the
+    /// message, then the try-help line, whether or not <c>-s</c> was given, as curl 8.21.0 does
+    /// (measured 2026-09-27, BL-240 Notes). curl has named the <c>-o</c> file by then, so
+    /// <c>%{filename_effective}</c> prints it, under <c>--output-dir</c>, though nothing is opened.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="transfer">The transfer, which names its output.</param>
+    /// <param name="failure">Why the URL could not be rewritten.</param>
+    /// <returns>
+    /// <see cref="IpfsGatewayDetectionFailure" /> or <see cref="IpfsMalformedTargetUrlFailure" />.
+    /// </returns>
+    private async Task<TransferResult> ReportIpfsGatewayFailureAsync(
+        CommandLineOptions options,
+        UrlTransfer transfer,
+        IpfsGatewayFailure failure)
+    {
+        transferOutputFileName = transfer.OutputFileName is { } fileName ? InOutputDirectory(options, fileName) : null;
+        await WriteErrorLinesAsync(["curl: " + failure.Message, CommandLineRefusal.TryHelpLine]).ConfigureAwait(false);
+
+        return failure == IpfsGatewayFailure.GatewayDetectionFailed
+            ? IpfsGatewayDetectionFailure
+            : IpfsMalformedTargetUrlFailure;
+    }
+
+    /// <summary>
+    /// Tells whether <paramref name="result" /> is an IPFS URL's failure to be rewritten, which
+    /// prints its own lines, uses no connection and has no transfer number.
+    /// </summary>
+    /// <param name="result">The transfer's result.</param>
+    /// <returns><see langword="true" /> for <see cref="IpfsGatewayDetectionFailure" /> and <see cref="IpfsMalformedTargetUrlFailure" />.</returns>
+    private static bool IsIpfsGatewayFailure(TransferResult result) =>
+        ReferenceEquals(result, IpfsGatewayDetectionFailure) || ReferenceEquals(result, IpfsMalformedTargetUrlFailure);
 
     /// <summary>
     /// The <c>-T</c> file uploaded to the URL at <paramref name="index" />: the Nth <c>-T</c> value
@@ -516,16 +718,17 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
-    /// Tells whether the transfer of the URL at <paramref name="index" /> was set up to send its
-    /// body to standard output, which is when curl switches standard output to binary mode: it
-    /// has no <c>-o</c> or remote name, and its <c>-D</c> file, if any, could be opened.
+    /// Tells whether <paramref name="transfer" /> was set up to send its body to standard output,
+    /// which is when curl switches standard output to binary mode: it has no <c>-o</c> or remote
+    /// name, and its <c>-D</c> file, if any, could be opened. An IPFS URL that could not be
+    /// rewritten counts: curl 8.21.0 wrote its <c>-w</c> line feed as LF without <c>-o</c> and as
+    /// CR LF with one (measured 2026-09-27, BL-240 Notes).
     /// </summary>
-    /// <param name="options">The accepted command line.</param>
-    /// <param name="index">The URL's position on the command line.</param>
+    /// <param name="transfer">The transfer.</param>
     /// <param name="result">The transfer's result.</param>
     /// <returns><see langword="true" /> when the body went, or was to go, to standard output.</returns>
-    private static bool SendsBodyToStandardOutput(CommandLineOptions options, int index, TransferResult result) =>
-        !WritesToFile(options, index) && !ReferenceEquals(result, CannotOpenHeaderFileFailure);
+    private static bool SendsBodyToStandardOutput(UrlTransfer transfer, TransferResult result) =>
+        !transfer.WritesToFile && !ReferenceEquals(result, CannotOpenHeaderFileFailure);
 
     /// <summary>
     /// Gives the output entry of the URL at <paramref name="index" />.
@@ -594,8 +797,8 @@ internal sealed class CurlCommandRunner(
         || (!endsTheRun && LaterUrlWritesToStandardOutput(options, index));
 
     /// <summary>
-    /// Renders the <c>-w</c> template, when one was given, for the finished transfer of the URL
-    /// at <paramref name="index" />: its standard output goes where the body does, or nowhere once
+    /// Renders the <c>-w</c> template, when one was given, for the finished
+    /// <paramref name="transfer" />, after taking its connection number: its standard output goes where the body does, or nowhere once
     /// standard output has failed, while the rest of the template still renders, as curl 8.21.0
     /// prints <c>-w "A%{exitcode}%{stderr}B%{exitcode}\n"</c> to a closed standard output as
     /// <c>B23</c> on standard error (measured 2026-09-26); and on Windows
@@ -603,44 +806,49 @@ internal sealed class CurlCommandRunner(
     /// become CR LF.
     /// </summary>
     /// <param name="options">The accepted command line.</param>
-    /// <param name="index">The URL's position on the command line, printed by <c>%{urlnum}</c>.</param>
+    /// <param name="transfer">
+    /// The transfer, whose command-line position <c>%{urlnum}</c> prints and whose number
+    /// <c>%{xfer_id}</c> prints.
+    /// </param>
+    /// <param name="givenUrl">
+    /// The URL <c>%{url}</c> prints: as the glob expanded it, or the gateway URL of a rewritten IPFS URL.
+    /// </param>
     /// <param name="transferUrl">
-    /// The URL transferred: as typed, or for a <c>-T</c> upload as <see cref="UploadTransferUrl" />
-    /// resolved it, empty when it could not.
+    /// The URL transferred: with its guessed scheme, or for a <c>-T</c> upload as
+    /// <see cref="UploadTransferUrl" /> resolved it, empty when it could not.
     /// </param>
     /// <param name="result">The transfer's result.</param>
-    /// <param name="connectionId">
-    /// The process-wide number of the transfer's connection, printed by <c>%{conn_id}</c>, or
-    /// <see cref="NoConnectionId" />.
-    /// </param>
     /// <param name="standardOutputIsBinary">Whether standard output keeps its line feeds.</param>
     /// <returns>A task that completes when the template is rendered.</returns>
     /// <remarks>
-    /// Each URL is one transfer, so <c>%{xfer_id}</c> is <paramref name="index" />, as curl 8.21.0
-    /// printed <c>0</c> then <c>1</c> for two URLs (measured 2026-09-26, BL-284 Notes).
+    /// Every URL a glob expands to is a transfer of its own, so <c>%{xfer_id}</c> counts them while
+    /// <c>%{urlnum}</c> counts command-line URLs, as curl 8.21.0 printed xfer_id <c>0 1 2</c> and
+    /// urlnum <c>0 0 1</c> for <c>{a,b}</c> then a plain URL (measured 2026-09-27, BL-240 Notes).
+    /// An IPFS URL that could not be rewritten never became a transfer, so its <c>%{xfer_id}</c> and
+    /// <c>%{conn_id}</c> are <c>-1</c>.
     /// </remarks>
     private async Task WriteOutAsync(
         CommandLineOptions options,
-        int index,
+        UrlTransfer transfer,
+        string givenUrl,
         string transferUrl,
         TransferResult result,
-        long connectionId,
         bool standardOutputIsBinary)
     {
+        long connectionId = TakeConnectionId(result);
         if (options.WriteOut is not { } template)
         {
             return;
         }
 
-        string url = options.Urls[index];
         string requestUrl = QueryUrl.Append(transferUrl, options);
         TransferWriteOutVariables variables = new(
-            result, url, index, requestUrl, WriteOutScheme(requestUrl, result), timeProvider)
+            result, givenUrl, transfer.UrlIndex, requestUrl, WriteOutScheme(requestUrl, result), timeProvider)
         {
             Referer = options.Referer,
             OutputFileName = transferOutputFileName,
             ConnectionId = connectionId,
-            TransferId = index,
+            TransferId = IsIpfsGatewayFailure(result) ? NoTransferId : transfer.TransferId,
         };
 
         Stream liveStandardOutput = deferringStandardOutput.HasWriteFailed ? Stream.Null : deferringStandardOutput;
@@ -692,6 +900,9 @@ internal sealed class CurlCommandRunner(
     /// </summary>
     private const long NoConnectionId = -1;
 
+    /// <summary>The <c>%{xfer_id}</c> of what never became a transfer.</summary>
+    private const long NoTransferId = -1;
+
     /// <summary>
     /// Tells whether a transfer got as far as a connection of its own: every transfer does
     /// but one whose URL curl rejects before connecting, with exit 1 or 3. curl 8.21.0 printed
@@ -702,7 +913,8 @@ internal sealed class CurlCommandRunner(
     /// <param name="result">The transfer's result.</param>
     /// <returns><see langword="true" /> when the transfer numbers a connection.</returns>
     private static bool UsedAConnection(TransferResult result) =>
-        result.ExitCode is not (CurlExitCode.UnsupportedProtocol or CurlExitCode.UrlMalformat);
+        result.ExitCode is not (CurlExitCode.UnsupportedProtocol or CurlExitCode.UrlMalformat)
+        && !IsIpfsGatewayFailure(result);
 
     /// <summary>
     /// Gives a finished transfer its <c>%{conn_id}</c>: the next connection number when it
@@ -730,18 +942,30 @@ internal sealed class CurlCommandRunner(
     /// <summary>
     /// Tells whether a transfer's result stops the URLs after it: a resumed transfer whose
     /// <c>-o</c> file cannot be opened, a transfer whose <c>-D</c> or <c>-T</c> file cannot be
-    /// opened, and,
-    /// under <c>--fail-early</c>, any failed transfer, as curl 8.21.0 does.
+    /// opened or whose <c>--create-dirs</c> directory cannot be created, an IPFS URL that cannot
+    /// be rewritten, and, under <c>--fail-early</c>, any failed transfer, as curl 8.21.0 does.
     /// </summary>
     /// <param name="options">The accepted command line.</param>
     /// <param name="result">The transfer's result.</param>
     /// <returns><see langword="true" /> when no further URL is transferred.</returns>
     private static bool EndsTheRun(CommandLineOptions options, TransferResult result) =>
-        ReferenceEquals(result, CannotOpenForResumeFailure)
-        || ReferenceEquals(result, CannotOpenUploadFileFailure)
-        || ReferenceEquals(result, CannotOpenHeaderFileFailure)
-        || ReferenceEquals(result, CannotCreateDirectoryFailure)
-        || (options.FailEarly && !result.IsSuccess);
+        RunEndingFailures.Contains(result) || (options.FailEarly && !result.IsSuccess);
+
+    /// <summary>
+    /// The results, compared by reference, after which no further URL is transferred whatever
+    /// the options: a resumed <c>-o</c> file, a <c>-T</c> or <c>-D</c> file that cannot be opened,
+    /// a <c>--create-dirs</c> directory that cannot be created, and an IPFS URL that cannot be
+    /// rewritten.
+    /// </summary>
+    private static readonly HashSet<TransferResult> RunEndingFailures = new(ReferenceEqualityComparer.Instance)
+    {
+        CannotOpenForResumeFailure,
+        CannotOpenUploadFileFailure,
+        CannotOpenHeaderFileFailure,
+        CannotCreateDirectoryFailure,
+        IpfsGatewayDetectionFailure,
+        IpfsMalformedTargetUrlFailure,
+    };
 
     /// <summary>
     /// Writes the five lines curl 8.21.0's command-line tool prints on standard error after
@@ -793,14 +1017,14 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
-    /// Performs the transfer of the URL at <paramref name="index" /> with its <c>-o</c> file,
+    /// Performs <paramref name="transfer" /> with its <c>-o</c> file,
     /// sending its header lines where <c>-D</c> says: nowhere without <c>-D</c>, standard
     /// output for <c>-D -</c>, otherwise the named file.
     /// </summary>
     /// <param name="dispatch">Performs the transfer with the handler for its scheme, after its warning lines.</param>
     /// <param name="options">The accepted command line.</param>
-    /// <param name="index">The URL's position on the command line.</param>
-    /// <param name="url">The URL to transfer: as typed, or for a <c>-T</c> upload as <see cref="UploadTransferUrl" /> resolved it.</param>
+    /// <param name="transfer">The transfer, which names its output.</param>
+    /// <param name="url">The URL to transfer: with its guessed scheme, or for a <c>-T</c> upload as <see cref="UploadTransferUrl" /> resolved it.</param>
     /// <param name="uploadFile">The URL's <c>-T</c> file, or <see langword="null" /> when it uploads nothing.</param>
     /// <returns>
     /// The transfer's result; <see cref="CannotOpenHeaderFileFailure" />, with nothing
@@ -808,42 +1032,41 @@ internal sealed class CurlCommandRunner(
     /// </returns>
     /// <remarks>
     /// The <c>-D</c> file is opened before the transfer starts and closed after it, as curl
-    /// 8.21.0 does: truncated for the first URL and appended to for each one after it, and
+    /// 8.21.0 does: truncated for the first transfer and appended to for each one after it, even
+    /// one of the same glob (measured 2026-09-27, BL-240 Notes), and
     /// never renamed by <see cref="WindowsOutputFileNameSanitizer" />, which curl applies to
     /// <c>-o</c> names only.
     /// </remarks>
     private async Task<TransferResult> TransferWithHeaderOutputAsync(
         TransferDispatch dispatch,
         CommandLineOptions options,
-        int index,
+        UrlTransfer transfer,
         string url,
         string? uploadFile)
     {
-        UrlOutput? output = UrlOutputOf(options, index);
         string? headerFile = options.DumpHeaderFile;
 
         if (headerFile is null || headerFile == StandardOutputHeaderFile)
         {
             Stream? headerOutput = headerFile is null ? null : deferringStandardOutput;
 
-            return await TransferAsync(dispatch, options, url, uploadFile, output, headerOutput).ConfigureAwait(false);
+            return await TransferAsync(dispatch, options, url, uploadFile, transfer, headerOutput).ConfigureAwait(false);
         }
 
-        return await TransferWithHeaderFileAsync(dispatch, options, index, url, uploadFile, output, headerFile)
+        return await TransferWithHeaderFileAsync(dispatch, options, url, uploadFile, transfer, headerFile)
             .ConfigureAwait(false);
     }
 
     /// <summary>
-    /// Opens the <c>-D</c> file (truncated for the first URL, appended to after it), performs
+    /// Opens the <c>-D</c> file (truncated for the first transfer, appended to after it), performs
     /// the transfer with its header lines going there, and closes the file; reports the file
     /// when it cannot be opened.
     /// </summary>
     /// <param name="dispatch">Performs the transfer with the handler for its scheme, after its warning lines.</param>
     /// <param name="options">The accepted command line.</param>
-    /// <param name="index">The URL's position on the command line.</param>
     /// <param name="url">The URL to transfer.</param>
     /// <param name="uploadFile">The URL's <c>-T</c> file, or <see langword="null" /> when it uploads nothing.</param>
-    /// <param name="output">The URL's output entry, or <see langword="null" /> when it has none.</param>
+    /// <param name="transfer">The transfer, which names its output.</param>
     /// <param name="headerFile">The <c>-D</c> file name, used as given.</param>
     /// <returns>
     /// The transfer's result; <see cref="CannotOpenHeaderFileFailure" />, with nothing
@@ -852,16 +1075,15 @@ internal sealed class CurlCommandRunner(
     private async Task<TransferResult> TransferWithHeaderFileAsync(
         TransferDispatch dispatch,
         CommandLineOptions options,
-        int index,
         string url,
         string? uploadFile,
-        UrlOutput? output,
+        UrlTransfer transfer,
         string headerFile)
     {
         FileOpenResult opened = await fileSystem
             .OpenForWriteAsync(
                 headerFile,
-                index == 0 ? FileWriteMode.Truncate : FileWriteMode.Append,
+                transfer.TransferId == 0 ? FileWriteMode.Truncate : FileWriteMode.Append,
                 DeferredOutputFileStream.CreateMode,
                 CancellationToken.None)
             .ConfigureAwait(false);
@@ -873,7 +1095,7 @@ internal sealed class CurlCommandRunner(
 
         await using (headerStream.ConfigureAwait(false))
         {
-            return await TransferAsync(dispatch, options, url, uploadFile, output, headerStream).ConfigureAwait(false);
+            return await TransferAsync(dispatch, options, url, uploadFile, transfer, headerStream).ConfigureAwait(false);
         }
     }
 
@@ -895,7 +1117,7 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
-    /// Performs one transfer, to the file <paramref name="output" /> names when it names one and to
+    /// Performs one transfer, to the file <paramref name="transfer" /> names when it names one and to
     /// standard output otherwise.
     /// </summary>
     /// <param name="dispatch">Performs the transfer with the handler for its scheme, after its warning lines.</param>
@@ -909,9 +1131,9 @@ internal sealed class CurlCommandRunner(
     /// <c>.</c> upload standard input; any other is opened after the warning lines, and closed when
     /// the transfer ends.
     /// </param>
-    /// <param name="output">
-    /// The URL's output entry, or <see langword="null" /> when it has none; the file it names is
-    /// resolved by <see cref="ResolveOutputFileAsync" />.
+    /// <param name="transfer">
+    /// The transfer, which names its output; the file is resolved by
+    /// <see cref="ResolveOutputFileAsync" />.
     /// </param>
     /// <param name="headerOutput">Where the <c>-D</c> header lines go, or <see langword="null" /> without <c>-D</c>.</param>
     /// <returns>
@@ -927,7 +1149,7 @@ internal sealed class CurlCommandRunner(
         CommandLineOptions options,
         string url,
         string? uploadFile,
-        UrlOutput? output,
+        UrlTransfer transfer,
         Stream? headerOutput)
     {
         if (!options.Silent)
@@ -938,7 +1160,7 @@ internal sealed class CurlCommandRunner(
         if (uploadFile is null || UploadUrl.IsStandardInput(uploadFile))
         {
             Stream? standardInputUpload = uploadFile is null ? null : standardInput;
-            return await TransferUploadingAsync(dispatch, options, url, standardInputUpload, output, headerOutput)
+            return await TransferUploadingAsync(dispatch, options, url, standardInputUpload, transfer, headerOutput)
                 .ConfigureAwait(false);
         }
 
@@ -952,14 +1174,14 @@ internal sealed class CurlCommandRunner(
 
         await using (upload.ConfigureAwait(false))
         {
-            return await TransferUploadingAsync(dispatch, options, url, upload, output, headerOutput)
+            return await TransferUploadingAsync(dispatch, options, url, upload, transfer, headerOutput)
                 .ConfigureAwait(false);
         }
     }
 
     /// <summary>
     /// Performs one transfer that sends <paramref name="upload" /> when given, to
-    /// the file <paramref name="output" /> names when it names one and to standard output otherwise.
+    /// the file <paramref name="transfer" /> names when it names one and to standard output otherwise.
     /// </summary>
     /// <param name="dispatch">Performs the transfer with the handler for its scheme.</param>
     /// <param name="options">The accepted command line.</param>
@@ -971,7 +1193,7 @@ internal sealed class CurlCommandRunner(
     /// The <c>-T</c> source, or <see langword="null" /> without <c>-T</c>, when a <c>telnet</c>
     /// transfer still uploads standard input.
     /// </param>
-    /// <param name="output">The URL's output entry, or <see langword="null" /> when it has none.</param>
+    /// <param name="transfer">The transfer, which names its output.</param>
     /// <param name="headerOutput">Where the <c>-D</c> header lines go, or <see langword="null" /> without <c>-D</c>.</param>
     /// <returns>The transfer's result, as <see cref="TransferAsync" /> describes it.</returns>
     private async Task<TransferResult> TransferUploadingAsync(
@@ -979,7 +1201,7 @@ internal sealed class CurlCommandRunner(
         CommandLineOptions options,
         string url,
         Stream? upload,
-        UrlOutput? output,
+        UrlTransfer transfer,
         Stream? headerOutput)
     {
         RedirectFollower follower = new(dispatch.Dispatcher);
@@ -997,7 +1219,7 @@ internal sealed class CurlCommandRunner(
         if (options.FormParts.Count == 0)
         {
             return await TransferWithBodyAsync(
-                    follower, dispatch.ProxySelector, options, transferUrl, output, range, headerOutput, null, upload)
+                    follower, dispatch.ProxySelector, options, transferUrl, transfer, range, headerOutput, null, upload)
                 .ConfigureAwait(false);
         }
 
@@ -1012,7 +1234,7 @@ internal sealed class CurlCommandRunner(
         await using (form.Body.Content.ConfigureAwait(false))
         {
             return await TransferWithBodyAsync(
-                    follower, dispatch.ProxySelector, options, transferUrl, output, range, headerOutput, form.Body, upload)
+                    follower, dispatch.ProxySelector, options, transferUrl, transfer, range, headerOutput, form.Body, upload)
                 .ConfigureAwait(false);
         }
     }
@@ -1028,7 +1250,7 @@ internal sealed class CurlCommandRunner(
     /// <param name="proxySelector">Chooses the transfer's proxy from <c>-x</c>, <c>--noproxy</c> and the proxy environment variables.</param>
     /// <param name="options">The accepted command line.</param>
     /// <param name="url">The URL, with any <c>-G</c> / <c>--url-query</c> query.</param>
-    /// <param name="output">The URL's output entry, or <see langword="null" /> when it has none.</param>
+    /// <param name="transfer">The transfer, which names its output.</param>
     /// <param name="range">The parsed <c>-r</c> range, or <see langword="null" />.</param>
     /// <param name="headerOutput">Where the <c>-D</c> header lines go, or <see langword="null" /> without <c>-D</c>.</param>
     /// <param name="formBody">The <c>-F</c> body, or <see langword="null" /> without <c>-F</c>.</param>
@@ -1042,7 +1264,7 @@ internal sealed class CurlCommandRunner(
         ProxySelector proxySelector,
         CommandLineOptions options,
         CurlUrl url,
-        UrlOutput? output,
+        UrlTransfer transfer,
         ByteRange? range,
         Stream? headerOutput,
         HttpRequestBody? formBody,
@@ -1053,7 +1275,7 @@ internal sealed class CurlCommandRunner(
             return proxyFailure;
         }
 
-        string? outputFile = await ResolveOutputFileAsync(options, output, url).ConfigureAwait(false);
+        string? outputFile = await ResolveOutputFileAsync(options, transfer, url).ConfigureAwait(false);
         if (outputFile is null)
         {
             TransferContext context = transferContextFactory.Create(
@@ -1072,7 +1294,7 @@ internal sealed class CurlCommandRunner(
         }
 
         long? resumeFrom = await ResolveResumeFromAsync(options, outputFile).ConfigureAwait(false);
-        OutputFileTarget target = new(outputFile, TakesContentDispositionName(options, output));
+        OutputFileTarget target = new(outputFile, TakesContentDispositionName(options, transfer));
         TransferResult fileResult = await TransferToOutputFileAsync(
                 follower, options, url, target, range, resumeFrom, headerOutput, formBody, upload, proxy)
             .ConfigureAwait(false);
@@ -1094,23 +1316,24 @@ internal sealed class CurlCommandRunner(
     /// none), rewritten on Windows and put under <c>--output-dir</c>.
     /// </summary>
     /// <param name="options">The accepted command line.</param>
-    /// <param name="output">The URL's output entry, or <see langword="null" /> when it has none.</param>
+    /// <param name="transfer">The transfer, which names its output.</param>
     /// <param name="url">The URL.</param>
     /// <returns>The file, or <see langword="null" /> when the body goes to standard output.</returns>
     /// <remarks>
-    /// On Windows an <c>-o</c> name goes through <see cref="WindowsOutputFileNameSanitizer.Sanitize" />
-    /// and a remote name through <see cref="WindowsOutputFileNameSanitizer.SanitizeRemoteName" />;
+    /// The <c>-o</c> name comes from <see cref="UrlTransfer.OutputFileName" />, its <c>#N</c> already
+    /// substituted and, on Windows, sanitized; on Windows a remote name goes through
+    /// <see cref="WindowsOutputFileNameSanitizer.SanitizeRemoteName" />;
     /// the <c>--output-dir</c> text is kept as typed and joined with <c>/</c>, as curl 8.21.0 does
     /// (<c>--output-dir "o?d" -o x</c> fails on <c>o?d/x</c>, measured 2026-09-27, BL-239 Notes).
     /// </remarks>
-    private async Task<string?> ResolveOutputFileAsync(CommandLineOptions options, UrlOutput? output, CurlUrl url)
+    private async Task<string?> ResolveOutputFileAsync(CommandLineOptions options, UrlTransfer transfer, CurlUrl url)
     {
-        if (output?.FileName is { } fileName)
+        if (transfer.OutputFileName is { } fileName)
         {
-            return InOutputDirectory(options, runsOnWindows ? WindowsOutputFileNameSanitizer.Sanitize(fileName) : fileName);
+            return InOutputDirectory(options, fileName);
         }
 
-        if (output is not { UsesRemoteName: true })
+        if (!transfer.UsesRemoteName)
         {
             return null;
         }
@@ -1149,10 +1372,10 @@ internal sealed class CurlCommandRunner(
     /// curl 8.21.0 (<c>-J -o o.txt</c> writes <c>o.txt</c>, BL-239 Notes).
     /// </summary>
     /// <param name="options">The accepted command line.</param>
-    /// <param name="output">The URL's output entry.</param>
+    /// <param name="transfer">The transfer, which names its output.</param>
     /// <returns><see langword="true" /> when the header's name is used.</returns>
-    private static bool TakesContentDispositionName(CommandLineOptions options, UrlOutput? output) =>
-        options.RemoteHeaderName && output is { FileName: null };
+    private static bool TakesContentDispositionName(CommandLineOptions options, UrlTransfer transfer) =>
+        options.RemoteHeaderName && transfer.OutputFileName is null;
 
     /// <summary>
     /// Prints curl's <c>curl: Error creating directory &lt;dir&gt;</c> line for a

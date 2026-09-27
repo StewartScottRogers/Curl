@@ -3,9 +3,12 @@ using System.Buffers;
 namespace Curl.Console;
 
 /// <summary>
-/// Rewrites an <c>-o</c> / <c>--output</c> file name the way curl 8.21.0 does on Windows
-/// before it uses the name: each <c>"</c>, <c>*</c>, <c>&lt;</c>, <c>&gt;</c>, <c>?</c>,
-/// <c>|</c> and control character U+0001 to U+001F becomes <c>_</c>.
+/// Rewrites a file name the way curl 8.21.0 does on Windows before it uses the name: each
+/// <c>"</c>, <c>*</c>, <c>&lt;</c>, <c>&gt;</c>, <c>?</c>, <c>|</c> and control character
+/// U+0001 to U+001F becomes <c>_</c>. The runner applies it to remote names
+/// (<see cref="SanitizeRemoteName" />); an <c>-o</c> / <c>--output</c> name gets the same
+/// replacement from <c>Curl.Core</c>'s <c>WindowsOutputFileNameSanitizer</c>, through
+/// <c>UrlGlobMatch.ResolveOutputFileName</c> after its <c>#N</c> are substituted (BL-240).
 /// </summary>
 /// <remarks>
 /// <para>

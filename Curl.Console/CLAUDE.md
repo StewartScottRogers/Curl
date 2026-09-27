@@ -26,9 +26,27 @@ parser's warning lines are written to standard error before anything else.
 Every `Warning: ` line is wrapped by `WarningLineWrapper` as curl's `warnf` wraps it, at the
 width `TerminalColumns` resolves (`COLUMNS` from 21 to 9999, else the standard-error
 console, else 79).
-On Windows each `-o` name is first rewritten by `WindowsOutputFileNameSanitizer`
-(`"*<>?|` and control characters become `_`, as curl 8.21.0 does), and that name is the
-one opened, sized for `-C -` and named in every message.
+On Windows each `-o` name is first rewritten by `Curl.Core`'s `WindowsOutputFileNameSanitizer`
+(`"*<>?|` and control characters become `_`, as curl 8.21.0 does; not under `-g`, see below),
+and that name is the one opened, sized for `-C -` and named in every message.
+
+Before its transfers, each command-line URL is expanded as a glob by `Curl.Core`'s `UrlGlob`
+(`{a,b}`, `[1-3]`, ...; under `-g` the URL is taken as written), and every URL it expands to is
+one transfer, a `UrlTransfer`: all of them share the command-line URL's output entry, `-T` file
+and `%{urlnum}`, while `%{xfer_id}` counts transfers across the run. Each `#N` in the `-o` name
+takes glob N's value and, on Windows and not under `-g`, the result is sanitized
+(`UrlGlobMatch.ResolveOutputFileName`); a `-D` file is truncated by the first transfer and
+appended to by every later one, even of the same glob. A URL that is not a well-formed glob
+prints curl's `curl: (3) bad range in position N:` lines (not under `-s`) and ends the run with
+exit 3. An `ipfs://` or `ipns://` URL is then rewritten by `IpfsGatewayRewriter` from
+`--ipfs-gateway`, `IPFS_GATEWAY` or the gateway file (read through the runner's data-file
+reader; the environment comes from the runner's `readEnvironmentVariable`, the process's in
+production and none in tests unless given), and `%{url}` prints the gateway URL; one that
+cannot be rewritten prints `curl: <message>` and the try-help line even under `-s`, has
+`%{xfer_id}` and `%{conn_id}` `-1`, and ends the run with exit 37 or 3. A URL still without a
+scheme gets the one `UrlSchemeGuesser` guesses (`http`, or `ftp` for `ftp.` and so on), which
+`%{url_effective}` shows while `%{url}` keeps the URL as typed. Measured on curl 8.21.0
+(BL-240 Notes).
 
 Each URL's output comes from `CommandLineOptions.UrlOutputs`: an `-o` name, or for `-O` /
 `--remote-name-all` the name `RemoteFileName` takes from the URL path (last non-empty
@@ -67,7 +85,7 @@ outcome, and after no other scheme's (`-c -` prints it to standard output each t
 mode standard output is in). With nothing but `-b` strings, received cookies are not stored,
 as curl's cookie engine stays off. Measured on curl 8.21.0 (BL-237 Notes).
 `-D -` sends the handler's header lines to standard output; any other `-D` name is opened
-(unsanitized, truncated for the first URL and appended for the rest) before the transfer,
+(unsanitized, truncated for the first transfer and appended for the rest) before the transfer,
 and one that cannot be opened prints `curl: Failed to open <file>` and stops the run with
 exit 23. `-i` and `-I` send the header lines to the body output too (standard output or the
 `-o` file); with `-D` as well, `HeaderLineTeeStream` writes each line to the `-D` output and
