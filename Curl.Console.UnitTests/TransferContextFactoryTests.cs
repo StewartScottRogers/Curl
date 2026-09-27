@@ -165,6 +165,23 @@ public sealed class TransferContextFactoryTests
     }
 
     [TestMethod]
+    [DataRow("-", true, true)]
+    [DataRow("0", true, false)]
+    [DataRow("-", false, false)]
+    public void Create_ContinueAt_ResumesAnUploadFromAnUnknownOffsetOnlyForDashWithAnUpload(string continueAt, bool withUpload, bool expected)
+    {
+        using MemoryStream standardInput = new();
+        using MemoryStream output = new();
+        using MemoryStream upload = new();
+        CommandLineOptions options = Parse("-C", continueAt, "-T", "f.txt", "http://example.com/up");
+
+        TransferContext context = new TransferContextFactory(standardInput)
+            .Create(options, CurlUrl.Parse("http://example.com/up"), output, null, null, null, upload: withUpload ? upload : null);
+
+        Assert.AreEqual(expected, context.ResumeUploadFromUnknownOffset);
+    }
+
+    [TestMethod]
     public void Create_TelnetUrl_UploadsStandardInput()
     {
         using MemoryStream standardInput = new();

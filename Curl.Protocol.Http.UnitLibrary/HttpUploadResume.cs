@@ -15,7 +15,8 @@ namespace Curl.Protocol.Http;
 /// exit 18 <c>File already completely uploaded</c>, and one into an empty source with exit 26
 /// <c>Unable to resume from offset N</c>, each before a byte is sent. A source that cannot seek
 /// (standard input) is sent whole, and its unknown length counts as -1, so curl sends
-/// <c>Content-Range: bytes N-(N-2)/(N-1)</c>, such as <c>bytes 3-1/2</c>.
+/// <c>Content-Range: bytes N-(N-2)/(N-1)</c>, such as <c>bytes 3-1/2</c>. <c>-C -</c> sends the
+/// whole source from offset 0 with <c>Content-Range: bytes 0-(L-1)/L</c> (BL-351 Notes).
 /// </remarks>
 internal sealed class HttpUploadResume
 {
@@ -49,10 +50,20 @@ internal sealed class HttpUploadResume
     /// </summary>
     /// <param name="upload">The <c>-T</c> source, at the position its bytes start from.</param>
     /// <param name="resumeFrom">The <c>-C</c> offset, or <see langword="null" /> without <c>-C</c>.</param>
+    /// <param name="fromUnknownOffset">
+    /// <see langword="true" /> for <c>-C -</c> (<see cref="ITransferContext.ResumeUploadFromUnknownOffset" />),
+    /// which sends the whole source with <c>Content-Range: bytes 0-(L-1)/L</c>, even for an empty
+    /// source (<c>bytes 0--1/0</c>), and ignores <paramref name="resumeFrom" /> (measured, BL-351 Notes).
+    /// </param>
     /// <returns>The resumed upload.</returns>
-    internal static HttpUploadResume Of(Stream upload, long? resumeFrom)
+    internal static HttpUploadResume Of(Stream upload, long? resumeFrom, bool fromUnknownOffset = false)
     {
         long? length = upload.CanSeek ? upload.Length - upload.Position : null;
+        if (fromUnknownOffset)
+        {
+            return new HttpUploadResume(length, ContentRangeOf(0, length ?? -1), null);
+        }
+
         return resumeFrom is > 0 and long offset ? Resumed(upload, length, offset) : new HttpUploadResume(length, null, null);
     }
 

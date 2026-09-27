@@ -157,12 +157,16 @@ internal sealed class HttpRequestFraming
     /// The <c>-r</c> range (<see cref="ITransferContext.Range" />), or <see langword="null" />; a
     /// <c>-d</c> body or a <c>-T</c> upload sends it as <see cref="ContentRange" />.
     /// </param>
+    /// <param name="resumeFromUnknownOffset">
+    /// <see langword="true" /> for <c>-C -</c> (<see cref="ITransferContext.ResumeUploadFromUnknownOffset" />);
+    /// <see cref="HttpUploadResume" /> applies it in place of <paramref name="resumeFrom" />.
+    /// </param>
     /// <returns>The framing.</returns>
-    internal static HttpRequestFraming Of(HttpRequestOptions options, HttpCustomHeader[] customHeaders, bool noBody = false, Stream? upload = null, long? resumeFrom = null, ByteRange? range = null)
+    internal static HttpRequestFraming Of(HttpRequestOptions options, HttpCustomHeader[] customHeaders, bool noBody = false, Stream? upload = null, long? resumeFrom = null, ByteRange? range = null, bool resumeFromUnknownOffset = false)
     {
         if (upload is not null)
         {
-            return OfUpload(options, HttpUploadResume.Of(upload, resumeFrom), upload, customHeaders, range);
+            return OfUpload(options, HttpUploadResume.Of(upload, resumeFrom, resumeFromUnknownOffset), upload, customHeaders, range);
         }
 
         if (options.Body is not { } body)

@@ -55,7 +55,9 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// <see langword="null" /> for <see cref="NoTransferEvents.Instance" />.
     /// </param>
     /// <returns>
-    /// The context. Its <see cref="TransferContext.NoBody" /> is <c>-I</c>, and its
+    /// The context. Its <see cref="TransferContext.NoBody" /> is <c>-I</c>, its
+    /// <see cref="TransferContext.ResumeUploadFromUnknownOffset" /> is <c>-C -</c> with a
+    /// <c>-T</c> <paramref name="upload" />, and its
     /// <see cref="TransferContext.HeaderOutput" /> is <see cref="HeaderOutputOf" />'s, wrapped by
     /// <paramref name="watchHeaderOutput" /> when given.
     /// </returns>
@@ -82,6 +84,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             NoBody = options.NoBody,
             Range = range,
             ResumeFrom = resumeFrom,
+            ResumeUploadFromUnknownOffset = ResumesUploadFromUnknownOffset(options, upload),
             MaxFileSize = options.MaxFileSize,
             Upload = upload ?? (string.Equals(url.Scheme, TelnetScheme, StringComparison.Ordinal) ? standardInput : null),
             PostData = options.PostData,
@@ -100,6 +103,16 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             Events = EventsOrNone(events),
             TimeProvider = timeProvider ?? TimeProvider.System,
         };
+
+    /// <summary>
+    /// Tells whether <c>-C -</c> resumes the <c>-T</c> <paramref name="upload" /> from an offset
+    /// only the server knows, as curl 8.21.0's offset -1 does.
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <param name="upload">The <c>-T</c> source given to <see cref="Create" />, or <see langword="null" />.</param>
+    /// <returns><see langword="true" /> for <c>-C -</c> with a <c>-T</c> source.</returns>
+    private static bool ResumesUploadFromUnknownOffset(CommandLineOptions options, Stream? upload) =>
+        options.ResumeFromOutputSize && upload is not null;
 
     /// <summary>
     /// Gets <paramref name="events" />, or <see cref="NoTransferEvents.Instance" /> when it is <see langword="null" />.

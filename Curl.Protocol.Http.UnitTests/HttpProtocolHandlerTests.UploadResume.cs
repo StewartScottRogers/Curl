@@ -113,6 +113,58 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.AreEqual(head + body, Latin1(connection.Written));
     }
 
+    [TestMethod]
+    [DataRow(null, 18351)]
+    [DataRow(3L, 18352)]
+    public async Task ExecuteAsync_FileUploadResumedFromAnUnknownOffset_SendsItWholeWithTheMeasuredContentRange(long? resumeFrom, int port)
+    {
+        // curl -C - -T f.txt http://127.0.0.1:18351/up, and with -o naming a 3-byte file
+        // (port 18352): the upload's -C - is offset -1 whatever -o names (BL-351 Notes).
+        string expected = $"PUT /up HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nContent-Range: bytes 0-9/10\r\n"
+            + "User-Agent: curl/8.21.0\r\nAccept: */*\r\nContent-Length: 10\r\n\r\nabcdefghij";
+        ScriptedConnection connection = Connection(EmptyOk, 65536, expected);
+
+        TransferResult result = await Handler(QueueConnector.For(connection))
+            .ExecuteAsync(UnknownOffsetUploadContext($"http://127.0.0.1:{port}/up", ResumeUploadFileStream(), resumeFrom));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(10L, result.Report!.UploadSize);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_EmptyFileUploadResumedFromAnUnknownOffset_SendsTheMeasuredContentRange()
+    {
+        // curl -C - -T empty.txt http://127.0.0.1:18353/up
+        const string expected = "PUT /up HTTP/1.1\r\nHost: 127.0.0.1:18353\r\nContent-Range: bytes 0--1/0\r\n"
+            + "User-Agent: curl/8.21.0\r\nAccept: */*\r\nContent-Length: 0\r\n\r\n";
+        ScriptedConnection connection = Connection(EmptyOk, 65536, expected);
+
+        TransferResult result = await Handler(QueueConnector.For(connection))
+            .ExecuteAsync(UnknownOffsetUploadContext("http://127.0.0.1:18353/up", new MemoryStream(), null));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_StandardInputUploadResumedFromAnUnknownOffset_SendsTheMeasuredContentRange()
+    {
+        // curl -C - -T - http://127.0.0.1:18354/up: the unknown length counts as -1.
+        const string head = "PUT /up HTTP/1.1\r\nHost: 127.0.0.1:18354\r\nContent-Range: bytes 0--2/-1\r\n"
+            + "User-Agent: curl/8.21.0\r\nAccept: */*\r\nTransfer-Encoding: chunked\r\nExpect: 100-continue\r\n\r\n";
+        const string body = "a\r\nabcdefghij\r\n0\r\n\r\n";
+        FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
+        GatedConnection connection = new(Encoding.Latin1.GetBytes(EmptyOk), 65536, head.Length + body.Length);
+
+        Task<TransferResult> transfer = Handler(QueueConnector.For(connection))
+            .ExecuteAsync(UnknownOffsetUploadContext("http://127.0.0.1:18354/up", StandardInput(Encoding.Latin1.GetBytes(ResumeUploadFile)), null, time)).AsTask();
+        await time.TimerCreatedAsync(HttpContinueWaitConnection.ContinueWait);
+        time.Advance(HttpContinueWaitConnection.ContinueWait);
+        TransferResult result = await transfer;
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(head + body, Latin1(connection.Written));
+    }
+
     private static MemoryStream ResumeUploadFileStream() => new(Encoding.Latin1.GetBytes(ResumeUploadFile));
 
     private static TransferContext ResumedUploadContext(string url, Stream upload, long resumeFrom, TimeProvider? time = null, HttpRequestOptions? http = null) =>
@@ -123,6 +175,17 @@ public sealed partial class HttpProtocolHandlerTests
             Output = new MemoryStream(),
             Upload = upload,
             ResumeFrom = resumeFrom,
+            TimeProvider = time ?? TimeProvider.System,
+        };
+
+    private static TransferContext UnknownOffsetUploadContext(string url, Stream upload, long? resumeFrom, TimeProvider? time = null) =>
+        new()
+        {
+            Url = CurlUrl.Parse(url),
+            Output = new MemoryStream(),
+            Upload = upload,
+            ResumeFrom = resumeFrom,
+            ResumeUploadFromUnknownOffset = true,
             TimeProvider = time ?? TimeProvider.System,
         };
 }

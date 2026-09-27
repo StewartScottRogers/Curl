@@ -35,6 +35,18 @@ public interface ITransferContext
     long? ResumeFrom { get; }
 
     /// <summary>
+    /// Gets whether <c>-C -</c> asked a <c>-T</c> upload to resume from an offset the caller
+    /// cannot know: how much of the file the server already holds.
+    /// </summary>
+    /// <remarks>
+    /// curl 8.21.0 turns an upload's <c>-C -</c> into offset -1, whatever <c>-o</c> names, and
+    /// over HTTP sends the whole source with <c>Content-Range: bytes 0-(L-1)/L</c> for its
+    /// length L (measured, BL-351 Notes). When this is <see langword="true" />, a handler that
+    /// honours it ignores <see cref="ResumeFrom" />.
+    /// </remarks>
+    bool ResumeUploadFromUnknownOffset { get; }
+
+    /// <summary>
     /// Gets the byte range requested with <c>-r</c>/<c>--range</c>, or
     /// <see langword="null" /> when the whole resource was asked for.
     /// </summary>

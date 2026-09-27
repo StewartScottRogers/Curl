@@ -27,6 +27,9 @@ public sealed class TransferContext : ITransferContext
     public long? ResumeFrom { get; init; }
 
     /// <inheritdoc />
+    public bool ResumeUploadFromUnknownOffset { get; init; }
+
+    /// <inheritdoc />
     public ByteRange? Range { get; init; }
 
     /// <inheritdoc />

@@ -142,7 +142,9 @@ namespace Curl.Protocol.Http;
 /// </para>
 /// <para>
 /// <see cref="ITransferContext.ResumeFrom" /> above zero resumes a <c>-T</c> upload from that
-/// offset with a <c>Content-Range</c> (<see cref="HttpUploadResume" />, BL-332 Notes); for a
+/// offset with a <c>Content-Range</c> (<see cref="HttpUploadResume" />, BL-332 Notes), and
+/// <see cref="ITransferContext.ResumeUploadFromUnknownOffset" /> sends the whole upload with
+/// <c>Content-Range: bytes 0-(L-1)/L</c> (BL-351 Notes); for a
 /// request without a body it sends <c>Range: bytes=N-</c>, and else
 /// <see cref="ITransferContext.Range" /> sends its range, for a request without a body
 /// (<see cref="HttpRangeHeader" />); <see cref="ITransferContext.TimeCondition" /> sends
@@ -206,7 +208,7 @@ public sealed class HttpProtocolHandler(
 
         long started = context.TimeProvider.GetTimestamp();
         HttpRequestOptions options = context.Http ?? new HttpRequestOptions();
-        HttpRequestFraming framing = HttpRequestFraming.Of(options, [.. options.Headers.Select(HttpCustomHeader.Parse)], context.NoBody, context.Upload, context.ResumeFrom, context.Range);
+        HttpRequestFraming framing = HttpRequestFraming.Of(options, [.. options.Headers.Select(HttpCustomHeader.Parse)], context.NoBody, context.Upload, context.ResumeFrom, context.Range, context.ResumeUploadFromUnknownOffset);
         HttpAuthRequest authRequest = new(
             framing.Method,
             context.Url,
