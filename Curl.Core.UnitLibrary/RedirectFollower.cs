@@ -28,6 +28,10 @@ namespace Curl.Core;
 /// stays dropped for every later hop. A body that is kept - a <c>-T</c> upload or a <c>-F</c>
 /// <see cref="StreamBody" /> - is sent again from its start when its stream seeks, as curl
 /// 8.21.0 sends the same multipart body, boundary and all, after a 307 or 308 (BL-298 Notes).
+/// A kept <see cref="StreamBody" /> whose stream cannot seek - a file part read from a pipe or
+/// device - ends the chain at the next hop with exit 26, <c>read error getting mime data</c>,
+/// counting the redirect and leaving <c>%{redirect_url}</c> empty, as curl 8.21.0 does
+/// (measured, BL-359 Notes).
 /// </para>
 /// <para>
 /// A hop whose host, port or scheme differs from the first URL's gets no
@@ -109,12 +113,13 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
                 return chain.Merge(result);
             }
 
-            if (StopBeforeHop(context, http, target, chain, policy, result, out CurlUrl? next, out HopProxy hopProxy) is { } stop)
+            bodyDropped |= DropsBody(result.Report!.ResponseCode, hop, policy);
+            bool bodyCannotBeResent = CannotBeResent(bodyContent, bodyDropped);
+            if (StopBeforeHop(context, http, target, chain, policy, result, bodyCannotBeResent, out CurlUrl? next, out HopProxy hopProxy) is { } stop)
             {
                 return chain.Merge(stop);
             }
 
-            bodyDropped |= DropsBody(result.Report!.ResponseCode, hop, policy);
             Rewind(context.Upload, uploadStart, bodyDropped);
             Rewind(bodyContent, bodyStart, bodyDropped);
             // No stop means the target parsed, so next is set.
@@ -125,7 +130,9 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
 
     /// <summary>
     /// The failure that ends the chain instead of following <paramref name="target" />: a
-    /// <see cref="Refusal" />, or the hop proxy selector's failure; <see langword="null" />, with
+    /// <see cref="Refusal" />, the hop proxy selector's failure, or - when
+    /// <paramref name="bodyCannotBeResent" /> - curl's exit 26 for a multipart body it cannot
+    /// rewind, which counts the redirect as followed; <see langword="null" />, with
     /// <paramref name="next" /> and <paramref name="hopProxy" /> set, when the hop goes ahead.
     /// </summary>
     private TransferResult? StopBeforeHop(
@@ -135,6 +142,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
         RedirectChain chain,
         RedirectPolicy policy,
         TransferResult result,
+        bool bodyCannotBeResent,
         out CurlUrl? next,
         out HopProxy hopProxy)
     {
@@ -146,8 +154,31 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
         }
 
         // No refusal means the target parsed, so next is set.
-        return TrySelectHopProxy(first, http, next!, out hopProxy, out TransferResult? failure) ? null : failure;
+        if (!TrySelectHopProxy(first, http, next!, out hopProxy, out TransferResult? failure))
+        {
+            return failure;
+        }
+
+        return bodyCannotBeResent ? BodyRewindFailure(target, chain, result) : null;
     }
+
+    /// <summary>
+    /// curl 8.21.0's failure for a hop whose multipart body cannot be rewound: the redirect
+    /// counts as followed, <c>%{redirect_url}</c> is empty, and the exit is 26 (BL-359 Notes).
+    /// </summary>
+    private static TransferResult BodyRewindFailure(string target, RedirectChain chain, TransferResult result)
+    {
+        chain.Followed(target);
+        chain.Refused(keepsRedirectUrl: false);
+        return TransferResult.Failure(CurlExitCode.ReadError, "read error getting mime data", result.BytesTransferred);
+    }
+
+    /// <summary>
+    /// Whether the <c>-F</c> body is kept for the next hop but its stream, holding a file part
+    /// read from a pipe or device, cannot seek back to its start.
+    /// </summary>
+    private static bool CannotBeResent(Stream? bodyContent, bool bodyDropped) =>
+        !bodyDropped && bodyContent is { CanSeek: false };
 
     private bool TrySelectHopProxy(
         ITransferContext first,

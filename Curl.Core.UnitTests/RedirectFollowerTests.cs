@@ -224,15 +224,38 @@ public sealed class RedirectFollowerTests
     }
 
     [TestMethod]
-    public async Task FollowAsync_NonSeekableStreamBodyAnswered307_ResendsWhatIsLeftOfIt()
+    [DataRow(307)]
+    [DataRow(308)]
+    public async Task FollowAsync_NonSeekableStreamBodyAnswered307Or308_FailsTheNextHopWithReadError(int status)
     {
-        ScriptedHandler handler = new(Redirect(307, Next), Ok(200, 0));
+        // curl -sS -L --max-redirs 1 -w "[%{http_code}|%{num_redirects}|%{url_effective}|%{redirect_url}]"
+        // -F f=@\\.\pipe\name, 307: exit 26, "curl: (26) read error getting mime data",
+        // stdout [307|1|http://127.0.0.1:18380/next|] (BL-359 Notes).
+        ScriptedHandler handler = new(Redirect(status, Next), Ok(200, 0));
         StreamBody body = new(new NonSeekableStream([1, 2, 3]), null, "multipart/form-data; boundary=b");
 
-        await Follow(handler, Context(Location() with { Body = body }));
+        TransferResult result = await Follow(handler, Context(Location() with { Body = body }));
 
-        Assert.HasCount(2, handler.StreamBodies);
-        Assert.IsEmpty(handler.StreamBodies[1]);
+        Assert.HasCount(1, handler.Contexts);
+        Assert.AreEqual(CurlExitCode.ReadError, result.ExitCode);
+        Assert.AreEqual("read error getting mime data", result.ErrorMessage);
+        Assert.AreEqual(status, result.Report!.ResponseCode);
+        Assert.AreEqual(1, result.Report.RedirectCount);
+        Assert.AreEqual(Next, result.Report.EffectiveUrl);
+        Assert.IsNull(result.Report.RedirectUrl);
+    }
+
+    [TestMethod]
+    public async Task FollowAsync_NonSeekableStreamBodyAnswered302_DropsItAndFollows()
+    {
+        ScriptedHandler handler = new(Redirect(302, Next), Ok(200, 0));
+        StreamBody body = new(new NonSeekableStream([1, 2, 3]), null, "multipart/form-data; boundary=b");
+
+        TransferResult result = await Follow(handler, Context(Location() with { Body = body }));
+
+        Assert.IsTrue(result.IsSuccess);
+        Assert.HasCount(2, handler.Contexts);
+        Assert.IsNull(handler.Contexts[1].Http!.Body);
     }
 
     [TestMethod]
