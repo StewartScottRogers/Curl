@@ -33,3 +33,4 @@ A request with an `-H "Expect: 100-continue"` line that draws a 417 while its bo
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
