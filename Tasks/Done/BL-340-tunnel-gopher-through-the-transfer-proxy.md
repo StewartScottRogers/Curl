@@ -8,7 +8,7 @@ depends-on: [BL-337]
 touches: [Curl.Protocol.Gopher.UnitLibrary, Curl.Protocol.Gopher.UnitTests]
 requirement: none
 created: 2026-09-27
-completed:
+completed: 2026-09-27
 ---
 # BL-340 — Tunnel gopher:// through the transfer proxy
 
@@ -24,13 +24,20 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] A test with a fake `IConnector` shows the handler's `ConnectTarget` carries `context.Proxy` and the origin host with port 70.
-- [ ] A test shows a context without a proxy still connects directly (`ConnectTarget.Proxy == null`).
-- [ ] 100% line and branch coverage of the changed code; `dotnet build` clean, fast tests green.
+- [x] A test with a fake `IConnector` shows the handler's `ConnectTarget` carries `context.Proxy` and the origin host with port 70.
+- [x] A test shows a context without a proxy still connects directly (`ConnectTarget.Proxy == null`).
+- [x] 100% line and branch coverage of the changed code; `dotnet build` clean, fast tests green.
 
 ## Notes
+
+- Delivered directly rather than through the full `/feature` subagent stages, as BL-339 did for dict: the change is one property initializer (`Proxy = context.Proxy`) that ADR-0056 already designed, so a separate plan and review would add nothing. No new ADR needed.
+- `CreateTarget` now takes the `ITransferContext` so it can read both `Url` and `Proxy`. `gophers://` keeps `UseTls` true; TLS inside the tunnel is the connector's job.
+- Tests: `ExecuteAsync_ContextWithProxy_TunnelsToTheOriginOnPort70ThroughThatProxy` and `ExecuteAsync_ContextWithoutProxy_ConnectsDirectly` in `GopherProtocolHandlerTests`. The changed code has no branch; both tests execute it.
+- The CONNECT bytes and the `403` -> exit 7 path are the connector's (ADR-0023) and are not re-pinned here.
+- Handler XML remarks and the project `CLAUDE.md` now say the proxy is passed to the connector.
 
 ## Log
 
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Done. gopher:// connects through ITransferContext.Proxy when set, directly otherwise
