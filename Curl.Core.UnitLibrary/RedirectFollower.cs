@@ -1,3 +1,4 @@
+using System.Globalization;
 using Curl.Protocol.Abstractions;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 
@@ -13,7 +14,8 @@ namespace Curl.Core;
 /// <para>
 /// A hop is followed when it succeeded with a 3xx status and a redirect URL. Before
 /// following, the limit is checked (exit 47, <c>Maximum (N) redirects followed</c>), then
-/// the target's scheme: one this curl build cannot parse fails with exit 1,
+/// whether the target parses (exit 3, <c>The redirect target URL could not be parsed:
+/// Bad IPv6 address</c>, <c>Bad hostname</c> or the port reason), then the target's scheme: one this curl build cannot parse fails with exit 1,
 /// <c>The redirect target URL could not be parsed: Unsupported URL scheme</c>, and one
 /// <see cref="RedirectPolicy.AllowedSchemes" /> does not allow with exit 1,
 /// <c>Protocol "file" is disabled (in redirect)</c>.
@@ -84,15 +86,15 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher)
                 return chain.Merge(result);
             }
 
-            Uri next = new(target);
-            if (Refusal(next.Scheme, chain.RedirectCount, policy) is { } refusal)
+            if (Refusal(target, chain.RedirectCount, policy, out Uri? next) is { } refusal)
             {
                 return chain.Merge(TransferResult.Failure(refusal.ExitCode, refusal.Message, result.BytesTransferred));
             }
 
             bodyDropped |= DropsBody(result.Report!.ResponseCode, hop, policy);
             RewindUpload(context.Upload, uploadStart, bodyDropped);
-            hop = NextHop(context, next, http, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next));
+            // No refusal means the target parsed, so next is set.
+            hop = NextHop(context, next!, http, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!));
             chain.Followed(target);
         }
     }
@@ -102,13 +104,28 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher)
             ? url
             : null;
 
-    private static (CurlExitCode ExitCode, string Message)? Refusal(string scheme, int followed, RedirectPolicy policy)
+    private static (CurlExitCode ExitCode, string Message)? Refusal(
+        string target,
+        int followed,
+        RedirectPolicy policy,
+        out Uri? next)
     {
+        next = null;
         if (policy.MaxRedirects >= 0 && followed >= policy.MaxRedirects)
         {
             return (CurlExitCode.TooManyRedirects, $"Maximum ({policy.MaxRedirects}) redirects followed");
         }
 
+        if (!Uri.TryCreate(target, UriKind.Absolute, out next))
+        {
+            return (CurlExitCode.UrlMalformat, $"The redirect target URL could not be parsed: {UnparsableUrlReason(target)}");
+        }
+
+        return SchemeRefusal(next.Scheme, policy);
+    }
+
+    private static (CurlExitCode ExitCode, string Message)? SchemeRefusal(string scheme, RedirectPolicy policy)
+    {
         if (!SchemesCurlParses.Contains(scheme))
         {
             return (CurlExitCode.UnsupportedProtocol, "The redirect target URL could not be parsed: Unsupported URL scheme");
@@ -118,6 +135,27 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher)
             ? null
             : (CurlExitCode.UnsupportedProtocol, $"Protocol \"{scheme}\" is disabled (in redirect)");
     }
+
+    private static string UnparsableUrlReason(string target)
+    {
+        ReadOnlySpan<char> authority = target.AsSpan(target.IndexOf("//", StringComparison.Ordinal) + 2);
+        authority = authority[..IndexOrLength(authority, authority.IndexOfAny('/', '?', '#'))];
+        authority = authority[(authority.LastIndexOf('@') + 1)..];
+        if (authority.StartsWith("["))
+        {
+            return ProxyUrlParser.BadIPv6Reason;
+        }
+
+        int colon = authority.IndexOf(':');
+        return colon >= 0 && !IsPort(authority[(colon + 1)..])
+            ? ProxyUrlParser.BadPortReason
+            : ProxyUrlParser.BadHostnameReason;
+    }
+
+    private static int IndexOrLength(ReadOnlySpan<char> text, int index) => index < 0 ? text.Length : index;
+
+    private static bool IsPort(ReadOnlySpan<char> text) =>
+        int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out int port) && port <= 65535;
 
     private static bool DropsBody(int responseCode, ITransferContext hop, RedirectPolicy policy)
     {

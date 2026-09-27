@@ -385,6 +385,38 @@ public sealed class RedirectFollowerTests
     }
 
     [TestMethod]
+    [DataRow("http://[bad", "Bad IPv6 address")]
+    [DataRow("http://user@[::1/x", "Bad IPv6 address")]
+    [DataRow("http://%zz/", "Bad hostname")]
+    [DataRow("http://a:99999/", "Port number was not a decimal number between 0 and 65535")]
+    [DataRow("http://a:9x?q", "Port number was not a decimal number between 0 and 65535")]
+    public async Task FollowAsync_RedirectUrlThatDoesNotParse_Exits3RedirectTargetCouldNotBeParsed(string target, string reason)
+    {
+        // Measured against curl 8.21.0 on 2026-09-26: curl -sS -L, Location: http://[bad -> exit 3,
+        // "curl: (3) The redirect target URL could not be parsed: Bad IPv6 address"; http://%zz/ gives
+        // "Bad hostname" and http://a:99999/ the port reason.
+        ScriptedHandler handler = new(Redirect(302, target));
+
+        TransferResult result = await Follow(handler, Context(Location()));
+
+        Assert.AreEqual(CurlExitCode.UrlMalformat, result.ExitCode);
+        Assert.AreEqual($"The redirect target URL could not be parsed: {reason}", result.ErrorMessage);
+        Assert.HasCount(1, handler.Contexts);
+        Assert.AreEqual(0, result.Report!.RedirectCount);
+    }
+
+    [TestMethod]
+    public async Task FollowAsync_RedirectUrlThatDoesNotParseBeyondTheLimit_Exits47()
+    {
+        // curl -sS -L --max-redirs 0, Location: http://[bad -> exit 47, "Maximum (0) redirects followed".
+        ScriptedHandler handler = new(Redirect(302, "http://[bad"));
+
+        TransferResult result = await Follow(handler, Context(Location()), new RedirectPolicy { MaxRedirects = 0 });
+
+        Assert.AreEqual(CurlExitCode.TooManyRedirects, result.ExitCode);
+    }
+
+    [TestMethod]
     [DataRow("https://127.0.0.1/x")]
     [DataRow("ftp://127.0.0.1/x")]
     [DataRow("ftps://127.0.0.1/x")]
