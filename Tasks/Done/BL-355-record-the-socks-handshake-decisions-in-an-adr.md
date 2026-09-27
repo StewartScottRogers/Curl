@@ -8,7 +8,7 @@ depends-on: [BL-213]
 touches: [Documentation/Planning/Decisions, Curl.Networking.UnitLibrary]
 requirement: none
 created: 2026-09-27
-completed:
+completed: 2026-09-27
 ---
 # BL-355 — Record the SOCKS handshake decisions in an ADR
 
@@ -29,12 +29,17 @@ An ADR, marked "Decided by Claude under Stewart's delegation", records the behav
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Planning/Decisions` holds an ADR recording decisions 1 to 6 above with their reasons, marked "Decided by Claude under Stewart's delegation", and its row is in the index in `Documentation/Planning/Decisions/README.md`.
-- [ ] `Socks5Handshake`'s remarks and `Curl.Networking.UnitLibrary/CLAUDE.md` cite the ADR by number (this adds `Curl.Networking.UnitLibrary` to `touches`).
+- [x] `Documentation/Planning/Decisions` holds an ADR recording decisions 1 to 6 above with their reasons, marked "Decided by Claude under Stewart's delegation", and its row is in the index in `Documentation/Planning/Decisions/README.md`.
+- [x] `Socks5Handshake`'s remarks and `Curl.Networking.UnitLibrary/CLAUDE.md` cite the ADR by number (this adds `Curl.Networking.UnitLibrary` to `touches`).
 
 ## Notes
+
+- Written in-session rather than through align-and-document: one ADR, one index row and two one-line citations. Each decision was checked against the code (`SocksProxyTunnel.ParseAddressLiteral`, `Encoding.UTF8` in both handshakes, `TcpConnector.OpenSocksTunnelAsync` disposal) before recording.
+- ADR-0084 is the next free number in this checkout. Decision 4's reason is stated as a judgement, not a measurement: BL-213 measured only `127.0.0.1` and `::1` as literals.
+- Verified: `dotnet build -warnaserror` 0 errors; fast tests green in all 16 test projects (Networking 649 passed, 6 skipped).
 
 ## Log
 
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Done. ADR-0084 records the six SOCKS handshake decisions; Socks5Handshake and Networking CLAUDE.md cite it

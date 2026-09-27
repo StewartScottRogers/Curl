@@ -17,7 +17,7 @@ namespace Curl.Networking;
 /// name for the proxy to resolve. Both send an address literal as an address. GSSAPI is
 /// offered because curl offers it, but not implemented: a proxy that picks it fails with the
 /// message the reference build's SSPI printed against a loopback proxy with no Kerberos
-/// service name (measured; BL-213's Notes).
+/// service name (measured; BL-213's Notes). ADR-0084 records these choices.
 /// </remarks>
 internal static class Socks5Handshake
 {

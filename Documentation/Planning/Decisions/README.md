@@ -98,6 +98,7 @@ choices do not need one.
 | [0081](ADR-0081-w-standard-output-line-feeds-follow-curls-stdout-mode-when-its-buffer-is-written.md) | `-w` standard output line feeds follow curl's stdout mode when its buffer is written: the renderer writes LF, and on Windows the runner writes standard error, and standard output while it is in text mode, through `LineFeedToCrLfStream` (numbered ADR-0040 until BL-326) | Accepted | 2026-09-26 |
 | [0082](ADR-0082-the-progress-bar-replays-curls-callback-from-the-handlers-reports.md) | The `-#` bar is drawn by `ProgressBarRecorder`, which replays curl 8.21.0's `tool_progress_cb` from the handler's progress reports; a successful transfer that reported no bytes gets one last call with its byte count, as `file://` does in curl; the width is the runner's `terminalColumns` | Accepted | 2026-09-27 |
 | [0083](ADR-0083-thin-socket-adapters-are-measured-by-the-integration-run.md) | `TcpDialer.DialAsync`, `UdpDatagramChannel.SendAsync` and `ReceiveAsync` are excluded from fast-run coverage and measured by the Integration run | Accepted | 2026-09-27 |
+| [0084](ADR-0084-socks-handshakes-follow-the-schannel-build-of-curl-8-21-0.md) | The SOCKS handshakes follow curl 8.21.0's Schannel build: the SOCKS5 greeting offers GSSAPI without implementing it, SOCKS4 sends the first IPv4 address and SOCKS5 the first address, a literal is what `IPAddress.TryParse` accepts and prints back, text is UTF-8, and a throwing handshake disposes the proxy connection | Accepted | 2026-09-27 |
 
 ## Template
 
