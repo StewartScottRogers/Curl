@@ -10,7 +10,8 @@ namespace Curl.Console;
 /// when it prints curl's <c>Note: Read config file from</c> line, against curl 8.21.0 (mingw,
 /// Schannel) measured on 2026-09-27 (BL-243) with <c>CURL_HOME</c> naming a directory holding a
 /// <c>.curlrc</c> of <c>-H "X-From-Curlrc: yes"</c>, and a <c>-K</c> file of
-/// <c>header = "X-From-K: yes"</c>.
+/// <c>header = "X-From-K: yes"</c>; and where the note falls around a refused command line,
+/// measured the same way on 2026-09-27 (BL-352).
 /// </summary>
 [TestClass]
 public sealed class CurlCommandRunnerConfigFileTests
@@ -159,6 +160,84 @@ public sealed class CurlCommandRunnerConfigFileTests
         Assert.AreEqual(0, exitCode);
         Assert.IsEmpty(configFiles.PathsRead);
         Assert.AreEqual(string.Empty, StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_VerboseThenUnknownOption_PrintsTheRefusalThenTheNote()
+    {
+        int exitCode = await RunAsync(["-v", "--bogus", Url]);
+
+        Assert.AreEqual(2, exitCode);
+        Assert.AreEqual(
+            "curl: option --bogus: is unknown" + NewLine
+            + "curl: try 'curl --help' or 'curl --manual' for more information" + NewLine
+            + MeasuredNote,
+            StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_UnknownOptionThenVerbose_PrintsTheRefusalWithoutTheNote()
+    {
+        int exitCode = await RunAsync(["--bogus", "-v", Url]);
+
+        Assert.AreEqual(2, exitCode);
+        Assert.AreEqual(
+            "curl: option --bogus: is unknown" + NewLine
+            + "curl: try 'curl --help' or 'curl --manual' for more information" + NewLine,
+            StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_VerboseWithNoUrl_PrintsTheNoteThenTheRefusal()
+    {
+        int exitCode = await RunAsync(["-v"]);
+
+        Assert.AreEqual(2, exitCode);
+        Assert.AreEqual(
+            MeasuredNote
+            + "curl: (2) no URL specified" + NewLine
+            + "curl: try 'curl --help' or 'curl --manual' for more information" + NewLine,
+            StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_VerboseWithFormAndData_PrintsTheNoteThenTheWarning()
+    {
+        int exitCode = await RunAsync(["-v", "-F", "a=b", "-d", "x", Url]);
+
+        Assert.AreEqual(2, exitCode);
+        Assert.AreEqual(
+            MeasuredNote
+            + "Warning: You can only select one HTTP request method! You asked for both POST " + NewLine
+            + "Warning: (-d, --data) and multipart formpost (-F, --form)." + NewLine,
+            StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_VerboseThenUnreadableConfigFile_PrintsTheRefusalThenTheNote()
+    {
+        int exitCode = await RunAsync(["-v", "-K", FakeHome + @"
+x", Url]);
+
+        Assert.AreEqual(26, exitCode);
+        Assert.EndsWith(
+            "curl: option -K: error encountered when reading a file" + NewLine
+            + "curl: try 'curl --help' or 'curl --manual' for more information" + NewLine
+            + MeasuredNote,
+            StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_EmptyCommandLineWithVerboseCurlrc_PrintsTheTryHelpLineAlone()
+    {
+        configFiles.Files[CurlrcPath] = Encoding.ASCII.GetBytes("verbose\n");
+
+        int exitCode = await RunAsync([]);
+
+        Assert.AreEqual(2, exitCode);
+        Assert.AreEqual(
+            "curl: try 'curl --help' or 'curl --manual' for more information" + NewLine,
+            StandardErrorText);
     }
 
     private string[] SentHeaders() => [.. http.Contexts.Single().Http!.Headers];

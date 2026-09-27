@@ -23,6 +23,9 @@ public sealed class CommandLineRefusal
     /// <summary>The last line of every refusal, exactly as curl prints it.</summary>
     public const string TryHelpLine = "curl: try 'curl --help' or 'curl --manual' for more information";
 
+    /// <summary>The first line of <see cref="NoUrlSpecified"/>.</summary>
+    private const string NoUrlSpecifiedLine = "curl: (2) no URL specified";
+
     /// <summary>The reason curl gives for an option it does not know.</summary>
     private const string UnknownOptionReason = "is unknown";
 
@@ -40,12 +43,13 @@ public sealed class CommandLineRefusal
         StandardErrorLines = [.. errorLines, $"curl: option {spelledOption}: {reason}", TryHelpLine];
     }
 
-    private CommandLineRefusal(CurlExitCode exitCode, IReadOnlyList<string> errorLines, IReadOnlyList<string> standardErrorLines)
+    private CommandLineRefusal(CurlExitCode exitCode, IReadOnlyList<string> errorLines, IReadOnlyList<string> standardErrorLines, bool foundAtTransferSetup = false)
     {
         ExitCode = exitCode;
         ErrorLines = errorLines;
         Reason = string.Empty;
         StandardErrorLines = standardErrorLines;
+        FoundAtTransferSetup = foundAtTransferSetup;
     }
 
     private CommandLineRefusal(params string[] linesBeforeTryHelp)
@@ -63,13 +67,23 @@ public sealed class CommandLineRefusal
     public CurlExitCode ExitCode { get; }
 
     /// <summary>
-    /// The lines to write to standard error, without line terminators: two, none for
+    /// The lines to write to standard error, without line terminators: two, the warning's (or none) for
     /// <see cref="FormAndDataBoth"/>, one for <see cref="EmptyCommandLine"/>, or three for
     /// <see cref="FileDoesNotExist"/>, and for <see cref="ContinueAtExclusiveWithRange"/> and
     /// <see cref="DataFileUnreadable"/> when errors are not hidden, and more for a refusal met inside
     /// a <c>-K</c> file.
     /// </summary>
     public IReadOnlyList<string> StandardErrorLines { get; }
+
+    /// <summary>
+    /// <see langword="true"/> for the refusals curl 8.21.0 meets while setting up the transfers,
+    /// after it has read the whole command line and printed
+    /// <see cref="CommandLineParseResult.NotedDefaultConfigFile"/>'s note:
+    /// <see cref="NoUrlSpecified"/> and <see cref="FormAndDataBoth"/>. <see langword="false"/> for
+    /// every other refusal, which curl meets while reading the command line and prints before the
+    /// note (measured 2026-09-27, BL-352).
+    /// </summary>
+    public bool FoundAtTransferSetup { get; }
 
     /// <summary>
     /// The lines of <see cref="StandardErrorLines"/> curl prints as error messages before the
@@ -196,8 +210,9 @@ public sealed class CommandLineRefusal
     /// <summary>
     /// Refuses a command line that, once read, asks for a multipart form post (<c>-F</c> /
     /// <c>--form</c>) and a <c>-d</c> / <c>--data</c> body both. curl 8.21.0 prints only
-    /// <see cref="CommandLineWarning.OnlyOneRequestMethod"/> for it, which the parser adds to the
-    /// warning lines, so the refusal itself has no lines, not even <see cref="TryHelpLine"/>; it exits 2.
+    /// <see cref="CommandLineWarning.OnlyOneRequestMethod"/> for it, at transfer setup
+    /// (<see cref="FoundAtTransferSetup"/>), so those lines are the refusal's, with no
+    /// <see cref="TryHelpLine"/>; it exits 2.
     /// </summary>
     /// <remarks>
     /// Measured with the local curl 8.21.0 on 2026-09-26: <c>curl -F a=b -d x http://127.0.0.1:1/</c>
@@ -205,14 +220,22 @@ public sealed class CommandLineRefusal
     /// connecting; with <c>-s</c> anywhere they print nothing; with no URL, <c>no URL specified</c> is
     /// reported instead.
     /// </remarks>
-    /// <returns>A refusal with no lines.</returns>
-    public static CommandLineRefusal FormAndDataBoth() =>
-        new CommandLineRefusal(CurlExitCode.FailedInit, [], []);
+    /// <param name="warningLines">
+    /// The warning's lines, <see cref="CommandLineWarning.OnlyOneRequestMethod"/>; empty when <c>-s</c> hides them.
+    /// </param>
+    /// <returns>A refusal whose lines are <paramref name="warningLines"/>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="warningLines"/> is <see langword="null"/>.</exception>
+    public static CommandLineRefusal FormAndDataBoth(IReadOnlyList<string> warningLines)
+    {
+        ArgumentNullException.ThrowIfNull(warningLines);
+
+        return new(CurlExitCode.FailedInit, [], warningLines, foundAtTransferSetup: true);
+    }
 
     /// <summary>Refuses a command line that has arguments but names no URL.</summary>
-    /// <returns>A refusal whose first line is <c>curl: (2) no URL specified</c>.</returns>
+    /// <returns>A refusal whose first line is <c>curl: (2) no URL specified</c>, <see cref="FoundAtTransferSetup"/>.</returns>
     public static CommandLineRefusal NoUrlSpecified() =>
-        new("curl: (2) no URL specified");
+        new(CurlExitCode.FailedInit, [NoUrlSpecifiedLine], [NoUrlSpecifiedLine, TryHelpLine], foundAtTransferSetup: true);
 
     /// <summary>
     /// Refuses an option whose file does not exist, in curl's three lines:

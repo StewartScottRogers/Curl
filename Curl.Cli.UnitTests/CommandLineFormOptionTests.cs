@@ -427,7 +427,7 @@ public sealed class CommandLineFormOptionTests
     {
         CommandLineParseResult result = Parse([firstOption, firstValue, secondOption, secondValue, Url]);
 
-        AssertRefused(
+        AssertRefusedAtTransferSetup(
             result,
             [
                 "Warning: You can only select one HTTP request method! You asked for both POST ",
@@ -440,7 +440,7 @@ public sealed class CommandLineFormOptionTests
     {
         CommandLineParseResult result = Parse(["-F", "a=b", "-d", "x", "-G", Url]);
 
-        AssertRefused(
+        AssertRefusedAtTransferSetup(
             result,
             [
                 "Warning: You can only select one HTTP request method! You asked for both GET ",
@@ -455,7 +455,7 @@ public sealed class CommandLineFormOptionTests
     {
         CommandLineParseResult result = Parse(["-F", "a=b", "-d", "x", silent, Url]);
 
-        AssertRefused(result, []);
+        AssertRefusedAtTransferSetup(result, []);
     }
 
     [TestMethod]
@@ -507,6 +507,15 @@ public sealed class CommandLineFormOptionTests
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(warningLines, result.WarningLines.ToArray());
+        CollectionAssert.AreEqual(refusalLines, result.Refusal.StandardErrorLines.ToArray());
+    }
+
+    private static void AssertRefusedAtTransferSetup(CommandLineParseResult result, string[] refusalLines)
+    {
+        Assert.IsFalse(result.IsAccepted);
+        Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
+        Assert.IsTrue(result.Refusal.FoundAtTransferSetup);
+        Assert.IsEmpty(result.WarningLines);
         CollectionAssert.AreEqual(refusalLines, result.Refusal.StandardErrorLines.ToArray());
     }
 

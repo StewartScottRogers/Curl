@@ -397,12 +397,12 @@ internal sealed class CurlCommandRunner(
 
         if (!parsed.IsAccepted)
         {
-            await WriteErrorLinesAsync(parsed.Refusal.StandardErrorLines).ConfigureAwait(false);
+            await WriteRefusalAsync(parsed.Refusal, parsed.NotedDefaultConfigFile).ConfigureAwait(false);
 
             return (int)parsed.Refusal.ExitCode;
         }
 
-        await WriteDefaultConfigFileNoteAsync(parsed.Options).ConfigureAwait(false);
+        await WriteDefaultConfigFileNoteAsync(parsed.NotedDefaultConfigFile).ConfigureAwait(false);
 
         if (parsed.Options.VersionRequested)
         {
@@ -1764,15 +1764,39 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
-    /// Writes curl 8.21.0's <c>Note: Read config file from '&lt;path&gt;'</c> for the default config
-    /// file, wrapped at <c>terminalColumns</c>, when one was read and <c>-v</c> or a <c>--trace</c>
-    /// option is on; <c>-s</c> does not hide it (measured 2026-09-27, BL-243).
+    /// Writes a refused command line's lines and, where curl 8.21.0 prints it, the default config
+    /// file's note: before the lines for a refusal curl meets at transfer setup
+    /// (<see cref="CommandLineRefusal.FoundAtTransferSetup" />), after them for one it meets while
+    /// reading the command line (measured 2026-09-27, BL-352).
     /// </summary>
-    /// <param name="options">The accepted command line.</param>
-    /// <returns>A task that completes when the note, if any, is flushed.</returns>
-    private async Task WriteDefaultConfigFileNoteAsync(CommandLineOptions options)
+    /// <param name="refusal">The refusal.</param>
+    /// <param name="notedDefaultConfigFile">The default config file to announce, or <see langword="null" /> for none.</param>
+    /// <returns>A task that completes when everything is flushed.</returns>
+    private async Task WriteRefusalAsync(CommandLineRefusal refusal, string? notedDefaultConfigFile)
     {
-        if (options.DefaultConfigFile is { } path && options.Trace != TraceKind.None)
+        if (refusal.FoundAtTransferSetup)
+        {
+            await WriteDefaultConfigFileNoteAsync(notedDefaultConfigFile).ConfigureAwait(false);
+            await WriteErrorLinesAsync(refusal.StandardErrorLines).ConfigureAwait(false);
+        }
+        else
+        {
+            await WriteErrorLinesAsync(refusal.StandardErrorLines).ConfigureAwait(false);
+            await WriteDefaultConfigFileNoteAsync(notedDefaultConfigFile).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Writes curl 8.21.0's <c>Note: Read config file from '&lt;path&gt;'</c> for the default config
+    /// file, wrapped at <c>terminalColumns</c>, when there is one to announce
+    /// (<see cref="CommandLineParseResult.NotedDefaultConfigFile" />: one was read and <c>-v</c> or a
+    /// <c>--trace</c> option is on); <c>-s</c> does not hide it (measured 2026-09-27, BL-243).
+    /// </summary>
+    /// <param name="path">The default config file to announce, or <see langword="null" /> for none.</param>
+    /// <returns>A task that completes when the note, if any, is flushed.</returns>
+    private async Task WriteDefaultConfigFileNoteAsync(string? path)
+    {
+        if (path is not null)
         {
             await WriteErrorPiecesAsync(WarningLineWrapper.WrapNoteText($"Read config file from '{path}'", terminalColumns))
                 .ConfigureAwait(false);

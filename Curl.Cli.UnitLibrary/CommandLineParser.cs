@@ -137,7 +137,7 @@ public static class CommandLineParser
         }
 
         return arguments.Count == 0 && options.Urls.Count == 0
-            ? CommandLineParseResult.Refused(CommandLineRefusal.EmptyCommandLine(), options.WarningLines)
+            ? CommandLineParseResult.RefusedEmpty(options.WarningLines)
             : ParseArguments(options, arguments, pathExists, passwordPrompt, dataFileReader);
     }
 
@@ -155,7 +155,7 @@ public static class CommandLineParser
                 : ParseArgument(options, argument, reader);
             if (refusal is not null)
             {
-                return CommandLineParseResult.Refused(refusal, options.WarningLines);
+                return CommandLineParseResult.Refused(refusal, options);
             }
 
             if (options.InformationRequested)
@@ -185,7 +185,7 @@ public static class CommandLineParser
     {
         if (options.Urls.Count == 0)
         {
-            return CommandLineParseResult.Refused(CommandLineRefusal.NoUrlSpecified(), options.WarningLines);
+            return CommandLineParseResult.Refused(CommandLineRefusal.NoUrlSpecified(), options);
         }
 
         return options.HttpMethodSelected == SelectedHttpMethod.MultipartFormPost && options.PostData is not null
@@ -200,8 +200,10 @@ public static class CommandLineParser
     private static CommandLineParseResult RefuseFormAndDataBoth(CommandLineOptions options)
     {
         SelectedHttpMethod dataMethod = options.DataInQuery ? SelectedHttpMethod.Get : SelectedHttpMethod.Post;
-        options.AddWarningLinesUnlessSilent(CommandLineWarning.OnlyOneRequestMethod(dataMethod, SelectedHttpMethod.MultipartFormPost));
-        return CommandLineParseResult.Refused(CommandLineRefusal.FormAndDataBoth(), options.WarningLines);
+        IReadOnlyList<string> warningLines = options.Silent
+            ? []
+            : CommandLineWarning.OnlyOneRequestMethod(dataMethod, SelectedHttpMethod.MultipartFormPost);
+        return CommandLineParseResult.Refused(CommandLineRefusal.FormAndDataBoth(warningLines), options);
     }
 
     private static CommandLineRefusal? ParseArgument(CommandLineOptions options, string argument, ArgumentReader reader)
