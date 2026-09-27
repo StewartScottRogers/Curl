@@ -71,3 +71,4 @@ When a connection to a forward (non-tunnelled) HTTP proxy is reused, `-v` prints
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
 - 2026-09-27: Doing -> Backlog. Needs Curl.Console.UnitTests (7 forward-proxy ConnectTarget expectations), which BL-244 in Doing touches; resume once BL-244 is done (see Notes)
+- 2026-09-27: Backlog -> Doing.
