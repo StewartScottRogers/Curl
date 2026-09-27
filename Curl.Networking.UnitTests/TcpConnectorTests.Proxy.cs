@@ -210,13 +210,9 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
-    [DataRow(ProxyKind.Https)]
-    [DataRow(ProxyKind.Socks4)]
-    [DataRow(ProxyKind.Socks4a)]
-    [DataRow(ProxyKind.Socks5)]
-    [DataRow(ProxyKind.Socks5Hostname)]
-    public async Task ConnectAsync_ThroughAProxyKindNotYetTunnelled_ThrowsNotSupportedExceptionAndNeverResolves(ProxyKind kind)
+    public async Task ConnectAsync_ThroughAnHttpsProxy_ThrowsNotSupportedExceptionAndNeverResolves()
     {
+        const ProxyKind kind = ProxyKind.Https;
         var resolver = new FakeDnsResolver(ProxyAddress);
         var connector = new TcpConnector(resolver, new FakeTcpDialer(), new FakeTlsProvider(), new ManualTimeProvider());
 

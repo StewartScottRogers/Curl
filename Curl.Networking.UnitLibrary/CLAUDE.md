@@ -48,8 +48,15 @@ and `TcpConnector` passes them on.
 (`ProxyKind.Http`, `Http10`) per ADR-0023: `HttpProxyTunnel` writes curl 8.21.0's CONNECT
 request (its `User-Agent` and credential encoding from `HttpProxyTunnelOptions`) and reads
 the reply one byte at a time, so the tunnel's bytes stay on the connection; TLS then runs
-over the tunnel for an https target. HTTPS and SOCKS proxies throw `NotSupportedException`
-until their tasks land.
+over the tunnel for an https target. Through a SOCKS proxy (`Socks4`, `Socks4a`, `Socks5`,
+`Socks5Hostname`) `SocksProxyTunnel` runs curl 8.21.0's handshake, measured byte for byte
+(BL-213): `Socks4Handshake` resolves the target locally and sends its first IPv4 address,
+SOCKS4a sends the host as written; `Socks5Handshake` offers no authentication and GSSAPI (and
+user name and password with a credential), resolves locally for SOCKS5 and sends the name for
+SOCKS5h. Every read takes exactly the reply's bytes, so the tunnel's bytes stay on the
+connection. A refused or cut-short handshake is exit 97 with curl's message; GSSAPI is offered
+but not implemented, so a proxy that picks it fails with the message the reference build's SSPI
+printed. HTTPS proxies throw `NotSupportedException` until their task lands.
 
 `TcpConnector` applies `--resolve` through `ResolveOverrides` and `--connect-to` through
 `ConnectToMappings`, both built from the verbatim option values and parsed as curl 8.21.0

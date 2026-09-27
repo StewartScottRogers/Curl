@@ -69,6 +69,19 @@ public sealed class TcpConnector(
     /// <c>Too large response headers: &lt;n&gt; &gt; 307200</c> for a longer header block.
     /// </para>
     /// <para>
+    /// When <see cref="ConnectTarget.Proxy" /> is a SOCKS proxy (<see cref="ProxyKind.Socks4" />,
+    /// <see cref="ProxyKind.Socks4a" />, <see cref="ProxyKind.Socks5" /> or
+    /// <see cref="ProxyKind.Socks5Hostname" />), the connector resolves and dials the proxy the
+    /// same way, with the same exit 5 and exit 7 failures, runs curl 8.21.0's handshake for
+    /// the kind (<see cref="SocksProxyTunnel" />) and applies TLS over the tunnel when
+    /// <see cref="ConnectTarget.UseTls" /> is set. SOCKS4 and SOCKS5 resolve the target
+    /// locally, <c>--resolve</c> included, and fail with exit 6 when it does not resolve; a
+    /// handshake the proxy refuses or cuts short fails with exit 97
+    /// (<see cref="CurlExitCode.Proxy" />) and curl's message. The proxy connection is
+    /// disposed on every failure. <see cref="ConnectResult.ProxyConnectResponseCode" /> is
+    /// <c>0</c>.
+    /// </para>
+    /// <para>
     /// Before anything is resolved, a <c>--resolve</c> entry that did not parse, or a
     /// <c>--connect-to</c> mapping that matches the target and whose destination does not
     /// parse, fails with exit 49 and curl 8.21.0's message (see <see cref="ResolveOverrides" />
@@ -94,8 +107,8 @@ public sealed class TcpConnector(
     /// </para>
     /// </remarks>
     /// <exception cref="NotSupportedException">
-    /// <see cref="ConnectTarget.Proxy" /> is an HTTPS or SOCKS proxy, which this connector
-    /// does not tunnel through yet.
+    /// <see cref="ConnectTarget.Proxy" /> is an HTTPS proxy, which this connector does not
+    /// tunnel through yet.
     /// </exception>
     public async ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
     {
@@ -109,7 +122,7 @@ public sealed class TcpConnector(
         }
 
         return target.Proxy is { } proxy
-            ? await ConnectThroughHttpProxyAsync(target, destination, proxy, started, cancellationToken).ConfigureAwait(false)
+            ? await ConnectThroughProxyAsync(target, destination, proxy, started, cancellationToken).ConfigureAwait(false)
             : await ConnectDirectlyAsync(target, destination, started, cancellationToken).ConfigureAwait(false);
     }
 
@@ -145,14 +158,14 @@ public sealed class TcpConnector(
     private async ValueTask<IReadOnlyList<IPAddress>> ResolveAsync(string host, int port, CancellationToken cancellationToken) =>
         _resolveOverrides.Find(host, port) ?? await dnsResolver.ResolveAsync(host, cancellationToken).ConfigureAwait(false);
 
-    private async ValueTask<ConnectResult> ConnectThroughHttpProxyAsync(
+    private async ValueTask<ConnectResult> ConnectThroughProxyAsync(
         ConnectTarget target,
         ConnectDestination destination,
         ProxyEndpoint proxy,
         long started,
         CancellationToken cancellationToken)
     {
-        if (proxy.Kind is not (ProxyKind.Http or ProxyKind.Http10))
+        if (proxy.Kind == ProxyKind.Https)
         {
             throw new NotSupportedException($"Tunnelling through a {proxy.Kind} proxy is not implemented yet.");
         }
@@ -175,7 +188,31 @@ public sealed class TcpConnector(
                 $"Failed to connect to {target.Host}:{target.Port} over proxy {proxy.Host} after {elapsedMilliseconds} ms: Could not connect to server");
         }
 
-        return await OpenTunnelAsync(dialed, target, destination, proxy, started, nameResolved, cancellationToken).ConfigureAwait(false);
+        return proxy.Kind is ProxyKind.Http or ProxyKind.Http10
+            ? await OpenTunnelAsync(dialed, target, destination, proxy, started, nameResolved, cancellationToken).ConfigureAwait(false)
+            : await OpenSocksTunnelAsync(dialed, target, destination, proxy, new ConnectTimings(started, nameResolved, 0, null), cancellationToken).ConfigureAwait(false);
+    }
+
+    private async ValueTask<ConnectResult> OpenSocksTunnelAsync(
+        DialedTcpConnection dialed,
+        ConnectTarget target,
+        ConnectDestination destination,
+        ProxyEndpoint proxy,
+        ConnectTimings timings,
+        CancellationToken cancellationToken)
+    {
+        var connection = dialed.Connection;
+        var (failure, exception) = await RunSocksHandshakeAsync(connection, destination, proxy, cancellationToken).ConfigureAwait(false);
+        if (exception is not null || failure is not null)
+        {
+            // The proxy connection is disposed whether the handshake failed or could not be sent or read.
+            await connection.DisposeAsync().ConfigureAwait(false);
+            exception?.Throw();
+            return failure!;
+        }
+
+        // As through an HTTP proxy, %{time_connect} is when the tunnel is open.
+        return await SecureWhenAskedAsync(dialed, target, timings with { Connected = timeProvider.GetTimestamp() }, 0, cancellationToken).ConfigureAwait(false);
     }
 
     private async ValueTask<ConnectResult> OpenTunnelAsync(
@@ -217,6 +254,22 @@ public sealed class TcpConnector(
         catch (Exception exception)
         {
             return (default, ExceptionDispatchInfo.Capture(exception));
+        }
+    }
+
+    private async ValueTask<(ConnectResult? Failure, ExceptionDispatchInfo? Exception)> RunSocksHandshakeAsync(
+        IConnection connection,
+        ConnectDestination destination,
+        ProxyEndpoint proxy,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return (await SocksProxyTunnel.OpenAsync(connection, proxy, destination.Host, destination.Port, ResolveAsync, cancellationToken).ConfigureAwait(false), null);
+        }
+        catch (Exception exception)
+        {
+            return (null, ExceptionDispatchInfo.Capture(exception));
         }
     }
 
