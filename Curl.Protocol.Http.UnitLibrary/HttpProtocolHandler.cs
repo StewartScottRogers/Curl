@@ -63,6 +63,13 @@ namespace Curl.Protocol.Http;
 /// its Content-Encoding says (<see cref="HttpContentDecoder" />, BL-177 Notes).
 /// </para>
 /// <para>
+/// <see cref="HttpRequestOptions.TransferEncoding" /> (<c>--tr-encoding</c>) sends
+/// <c>TE: gzip</c> and <c>TE</c> in the <c>Connection</c> header, and decodes the body as its
+/// Transfer-Encoding says, <c>--raw</c> or not, before any Content-Encoding; a body with a
+/// Transfer-Encoding that is not chunked runs to close. A discarded body is framed the same way
+/// but not decoded (<see cref="HttpTransferEncoding.Requested" />, BL-315 Notes).
+/// </para>
+/// <para>
 /// <see cref="HttpVersionPreference.Http10" /> (<c>-0</c>) ends the request line in
 /// <c>HTTP/1.0</c>, adds no <c>Expect: 100-continue</c>, and fails a body of unknown length
 /// with exit 25 once connected, sending nothing. <see cref="HttpRequestOptions.Raw" /> writes a
@@ -310,6 +317,7 @@ public sealed class HttpProtocolHandler(
         {
             PassesTransferCoding = options.Raw,
             IgnoresContentLength = options.IgnoreContentLength,
+            DecodesTransferCoding = options.TransferEncoding,
         };
         HttpRequestPlan? retry = null;
         HttpBodyDelivery delivery = HttpBodyDelivery.Deliver;
@@ -348,7 +356,7 @@ public sealed class HttpProtocolHandler(
         }
 
         TransferResult result = Succeeded(delivery, exchange.Head!, exchange.Report(body.BytesWritten));
-        bool keepsAlive = HttpConnectionPersistence.KeepsAlive(exchange.Head, context.NoBody, options.Raw, options.IgnoreContentLength);
+        bool keepsAlive = HttpConnectionPersistence.KeepsAlive(exchange.Head, context.NoBody, options.Raw, options.IgnoreContentLength, options.TransferEncoding);
         return new HttpAttemptOutcome(result, retry, keepsAlive);
     }
 
@@ -409,7 +417,7 @@ public sealed class HttpProtocolHandler(
         ITransferContext context = plan.Context;
         Stream bodyOutput = discardsBody ? Stream.Null : context.Output;
         body.MaximumBodySize = discardsBody ? null : HttpDownloadConditions.LimitOf(context.MaxFileSize);
-        await body.CopyAsync(head, context.NoBody, bodyOutput, DecodesContent(plan.Options, discardsBody), cancellationToken)
+        await body.CopyAsync(head, context.NoBody, bodyOutput, DecodesContent(plan.Options, discardsBody), plan.Options.TransferEncoding && !discardsBody, cancellationToken)
             .ConfigureAwait(false);
         await WriteHeadersAsync(context.HeaderOutput, body.TrailerBytes, cancellationToken).ConfigureAwait(false);
     }
@@ -474,7 +482,7 @@ public sealed class HttpProtocolHandler(
         bodyLeftUnsent
             && head.StatusLine.StatusCode == 417
             && plan.Options.Fail != HttpFailMode.Fail
-            && HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, plan.Options.Raw, plan.Options.IgnoreContentLength);
+            && HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, plan.Options.Raw, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding);
 
     /// <summary>
     /// Decides whether a response is answered with one more request, and with what

@@ -56,6 +56,12 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     internal bool PassesTransferCoding { get; set; }
 
     /// <summary>
+    /// Gets or sets a value indicating whether the Transfer-Encoding is read as
+    /// <c>--tr-encoding</c> asks (<see cref="HttpResponseBodyFraming" />).
+    /// </summary>
+    internal bool DecodesTransferCoding { get; set; }
+
+    /// <summary>
     /// Gets or sets a value indicating whether the Content-Length is ignored and a body that is
     /// not chunked read until the peer closes, as <c>--ignore-content-length</c> asks.
     /// </summary>
@@ -98,6 +104,11 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     /// while <see cref="BytesWritten" /> still counts the encoded bytes, as curl's
     /// <c>%{size_download}</c> does.
     /// </param>
+    /// <param name="decodeTransfer">
+    /// <see langword="true" /> for <c>--tr-encoding</c> when the body is not discarded: the
+    /// Transfer-Encoding codings other than <c>chunked</c> are decoded, before any
+    /// Content-Encoding, and <see cref="BytesWritten" /> still counts the encoded bytes.
+    /// </param>
     /// <param name="cancellationToken">Cancels every read and write.</param>
     /// <returns>A task that completes when the whole body is written.</returns>
     /// <exception cref="HttpTransferException">
@@ -113,6 +124,7 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
         bool noBody,
         Stream output,
         bool decodeContent,
+        bool decodeTransfer,
         CancellationToken cancellationToken)
     {
         if (!HasBody(head, noBody))
@@ -120,8 +132,10 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
             return;
         }
 
-        HttpResponseBodyFraming framing = HttpResponseBodyFraming.Of(head.Headers, PassesTransferCoding, IgnoresContentLength);
-        contentDecoder = decodeContent ? HttpContentDecoder.For(head.Headers) : null;
+        HttpResponseBodyFraming framing = HttpResponseBodyFraming.Of(head.Headers, PassesTransferCoding, IgnoresContentLength, DecodesTransferCoding);
+        IEnumerable<string> contentCodings = decodeContent ? HttpContentDecoder.ContentCodings(head.Headers) : [];
+        IEnumerable<string> transferCodings = decodeTransfer ? framing.TransferCodings : [];
+        contentDecoder = HttpContentDecoder.ForCodings(contentCodings.Concat(transferCodings));
         ExpectedLength = framing.ContentLength;
         try
         {

@@ -13,6 +13,8 @@ namespace Curl.Protocol.Http;
 /// </remarks>
 internal readonly struct HttpCustomHeader
 {
+    private const string WhiteSpace = " \t\r\n\v\f";
+
     private readonly int separatorIndex;
 
     private HttpCustomHeader(string entry, int separatorIndex, string? sentLine)
@@ -34,6 +36,14 @@ internal readonly struct HttpCustomHeader
     internal string? SentLine { get; }
 
     /// <summary>
+    /// Gets the value of a <c>Name: value</c> entry without the white space around it, or
+    /// <see langword="null" /> when the entry sends no value: how curl 8.21.0 copies a custom
+    /// <c>Connection</c> value into the one it sends (BL-315 Notes).
+    /// </summary>
+    internal string? Value =>
+        SentLine == Entry ? Entry.AsSpan(separatorIndex + 1).Trim(WhiteSpace).ToString() : null;
+
+    /// <summary>
     /// Reads one <c>-H</c> value.
     /// </summary>
     /// <param name="entry">The value, verbatim.</param>
@@ -43,7 +53,7 @@ internal readonly struct HttpCustomHeader
         int colon = entry.IndexOf(':', StringComparison.Ordinal);
         if (colon >= 0)
         {
-            bool hasValue = !entry.AsSpan(colon + 1).TrimStart(" \t\r\n\v\f").IsEmpty;
+            bool hasValue = !entry.AsSpan(colon + 1).TrimStart(WhiteSpace).IsEmpty;
             return new HttpCustomHeader(entry, colon, colon > 0 && hasValue ? entry : null);
         }
 

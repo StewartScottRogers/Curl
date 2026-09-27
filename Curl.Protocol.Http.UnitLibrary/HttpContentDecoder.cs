@@ -12,7 +12,9 @@ namespace Curl.Protocol.Http;
 /// is skipped, <c>gzip</c>, <c>x-gzip</c>, <c>deflate</c> and <c>br</c> are decoded, last
 /// applied first, and any other coding is exit 61
 /// <see cref="HttpTransferMessages.UnrecognizedContentEncoding" /> once the first body byte
-/// arrives: an empty body with an unrecognized coding is no error, as measured.
+/// arrives: an empty body with an unrecognized coding is no error, as measured. For
+/// <c>--tr-encoding</c> the Transfer-Encoding codings other than <c>chunked</c> are decoded the
+/// same way, before the Content-Encoding ones, with the same messages (measured, BL-315 Notes).
 /// </remarks>
 internal sealed class HttpContentDecoder : IDisposable
 {
@@ -35,9 +37,33 @@ internal sealed class HttpContentDecoder : IDisposable
     /// </summary>
     /// <param name="headers">The final response's headers.</param>
     /// <returns>The decoder, or <see langword="null" /> when the body has no coding to decode.</returns>
-    internal static HttpContentDecoder? For(IReadOnlyList<HttpResponseHeader> headers)
+    internal static HttpContentDecoder? For(IReadOnlyList<HttpResponseHeader> headers) => ForCodings(ContentCodings(headers));
+
+    /// <summary>
+    /// Builds the decoder for <paramref name="codings" />, in the order the server applied
+    /// them: the Content-Encoding codings, then, for <c>--tr-encoding</c>, the Transfer-Encoding
+    /// codings other than <c>chunked</c> (BL-315 Notes). <c>identity</c> is skipped, and the
+    /// last applied is decoded first.
+    /// </summary>
+    /// <param name="codings">The codings, each without blanks.</param>
+    /// <returns>The decoder, or <see langword="null" /> when there is no coding to decode.</returns>
+    internal static HttpContentDecoder? ForCodings(IEnumerable<string> codings) =>
+        Of([.. codings.Where(coding => !Is(coding, "identity")).Select(CodingOf)]);
+
+    /// <summary>
+    /// Lists every Content-Encoding header's codings in order, without blanks or empty items.
+    /// </summary>
+    /// <param name="headers">The final response's headers.</param>
+    /// <returns>The codings.</returns>
+    internal static IEnumerable<string> ContentCodings(IReadOnlyList<HttpResponseHeader> headers) =>
+        headers
+            .Where(header => string.Equals(header.Name, HeaderName, StringComparison.OrdinalIgnoreCase))
+            .SelectMany(header => header.Value.Split(','))
+            .Select(item => item.Trim(Blanks))
+            .Where(item => item.Length > 0);
+
+    private static HttpContentDecoder? Of(HttpContentCoding?[] codings)
     {
-        HttpContentCoding?[] codings = [.. Codings(headers).Select(CodingOf)];
         if (codings.Length == 0)
         {
             return null;
@@ -49,17 +75,6 @@ internal sealed class HttpContentDecoder : IDisposable
                 [.. codings.Reverse().Select(coding => new HttpContentCodingDecoder(coding.GetValueOrDefault()))],
                 hasUnrecognizedCoding: false);
     }
-
-    /// <summary>
-    /// Lists every Content-Encoding header's codings in order, without blanks, empty items
-    /// or <c>identity</c>.
-    /// </summary>
-    private static IEnumerable<string> Codings(IReadOnlyList<HttpResponseHeader> headers) =>
-        headers
-            .Where(header => string.Equals(header.Name, HeaderName, StringComparison.OrdinalIgnoreCase))
-            .SelectMany(header => header.Value.Split(','))
-            .Select(item => item.Trim(Blanks))
-            .Where(item => item.Length > 0 && !Is(item, "identity"));
 
     /// <summary>
     /// Decodes the next encoded bytes and writes what they decode to, each piece as one write.

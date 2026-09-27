@@ -209,6 +209,18 @@ internal static class HttpTransferMessages
         $"Unsolicited Transfer-Encoding ({coding}) found";
 
     /// <summary>
+    /// The exit 61 message, under <c>--tr-encoding</c>, for a Transfer-Encoding that lists a
+    /// coding after <c>chunked</c>, in the same header or a later one (measured, BL-315 Notes).
+    /// </summary>
+    internal const string ChunkedNotLast = "Reject response due to 'chunked' not being the last Transfer-Encoding";
+
+    /// <summary>
+    /// The exit 61 message, under <c>--tr-encoding</c>, for a Transfer-Encoding that lists more
+    /// than five codings across its headers (measured, BL-315 Notes).
+    /// </summary>
+    internal const string TooManyTransferCodings = "Reject response exceeding limit of 5 transfer encodings";
+
+    /// <summary>
     /// Formats the exit 56 message for heads whose combined size passed
     /// <see cref="HttpResponseHeadBuilder.MaximumHeadSize" />.
     /// </summary>

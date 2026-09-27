@@ -23,8 +23,17 @@ internal static class HttpConnectionPersistence
     /// <see langword="true" /> for <c>--ignore-content-length</c>, which reads a body that is not
     /// chunked until the server closes.
     /// </param>
+    /// <param name="decodesTransferCoding">
+    /// <see langword="true" /> for <c>--tr-encoding</c>, which reads a body with a
+    /// Transfer-Encoding that is not chunked until the server closes.
+    /// </param>
     /// <returns><see langword="true" /> when the next request may be sent on the same connection.</returns>
-    internal static bool KeepsAlive(HttpResponseHead head, bool noBody, bool passesTransferCoding = false, bool ignoresContentLength = false)
+    internal static bool KeepsAlive(
+        HttpResponseHead head,
+        bool noBody,
+        bool passesTransferCoding = false,
+        bool ignoresContentLength = false,
+        bool decodesTransferCoding = false)
     {
         if (NamesConnectionOption(head, "close"))
         {
@@ -34,7 +43,7 @@ internal static class HttpConnectionPersistence
         bool persistentVersion = head.StatusLine.Version >= new Version(1, 1) || NamesConnectionOption(head, "keep-alive");
         return persistentVersion
             && !(HttpResponseBodyReader.HasBody(head, noBody)
-                && HttpResponseBodyFraming.Of(head.Headers, passesTransferCoding, ignoresContentLength).RunsToClose);
+                && HttpResponseBodyFraming.Of(head.Headers, passesTransferCoding, ignoresContentLength, decodesTransferCoding).RunsToClose);
     }
 
     private static bool NamesConnectionOption(HttpResponseHead head, string option) =>

@@ -51,6 +51,65 @@ public sealed class HttpResponseBodyFramingTests
         Assert.ThrowsExactly<HttpTransferException>(
             () => HttpResponseBodyFraming.Of(Headers("gzip", null), passesTransferCoding: false, ignoresContentLength: true));
 
+    [TestMethod]
+    [DataRow("gzip", "3", false, false, false, null, "gzip", DisplayName = "--tr-encoding gzip runs to close")]
+    [DataRow("gzip, chunked", "3", false, false, true, null, "gzip", DisplayName = "--tr-encoding gzip, chunked")]
+    [DataRow(null, "3", false, false, false, 3L, "", DisplayName = "--tr-encoding without Transfer-Encoding keeps Content-Length")]
+    [DataRow(null, "3", false, true, false, null, "", DisplayName = "--tr-encoding with --ignore-content-length")]
+    [DataRow("gzip, chunked", "3", true, false, false, null, "gzip", DisplayName = "--tr-encoding --raw passes chunked")]
+    [DataRow("chunked, chunked", null, false, false, true, null, "", DisplayName = "--tr-encoding ignores a repeated chunked")]
+    public void Of_TransferEncoding_DecidesHowTheBodyEndsAndWhatToDecode(
+        string? transferEncoding,
+        string? contentLength,
+        bool passesTransferCoding,
+        bool ignoresContentLength,
+        bool isChunked,
+        long? expectedLength,
+        string codings)
+    {
+        HttpResponseBodyFraming framing = HttpResponseBodyFraming.Of(
+            Headers(transferEncoding, contentLength),
+            passesTransferCoding,
+            ignoresContentLength,
+            decodesTransferCoding: true);
+
+        Assert.AreEqual(isChunked, framing.IsChunked);
+        Assert.AreEqual(expectedLength, framing.ContentLength);
+        Assert.AreEqual(codings, string.Join(", ", framing.TransferCodings));
+    }
+
+    [TestMethod]
+    public void Of_TransferEncodingAfterAnInvalidContentLength_ThrowsExit8()
+    {
+        HttpResponseHeader[] headers = [new("Content-Length", "abc"), new("Transfer-Encoding", "gzip")];
+
+        HttpTransferException thrown = Assert.ThrowsExactly<HttpTransferException>(
+            () => HttpResponseBodyFraming.Of(headers, passesTransferCoding: false, ignoresContentLength: false, decodesTransferCoding: true));
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, thrown.ExitCode);
+    }
+
+    [TestMethod]
+    public void Of_InvalidContentLengthAfterTransferEncoding_IsNotRead()
+    {
+        HttpResponseHeader[] headers = [new("Transfer-Encoding", "gzip"), new("Content-Length", "abc")];
+
+        HttpResponseBodyFraming framing = HttpResponseBodyFraming.Of(headers, passesTransferCoding: false, ignoresContentLength: false, decodesTransferCoding: true);
+
+        Assert.IsTrue(framing.RunsToClose);
+    }
+
+    [TestMethod]
+    public void Of_RefusedTransferEncodingAfterAnInvalidContentLength_ThrowsExit8()
+    {
+        HttpResponseHeader[] headers = [new("Content-Length", "abc"), new("Transfer-Encoding", "chunked, gzip")];
+
+        HttpTransferException thrown = Assert.ThrowsExactly<HttpTransferException>(
+            () => HttpResponseBodyFraming.Of(headers, passesTransferCoding: false, ignoresContentLength: true, decodesTransferCoding: true));
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, thrown.ExitCode);
+    }
+
     private static HttpResponseHeader[] Headers(string? transferEncoding, string? contentLength) =>
         [
             .. transferEncoding is null ? [] : new[] { new HttpResponseHeader("Transfer-Encoding", transferEncoding) },
