@@ -383,12 +383,26 @@ public sealed class TransferWriteOutVariablesTests
     [TestMethod]
     public void TryGetVariableText_UrlPartsOfFileUrl_MatchCurl()
     {
-        // curl -s -o out.bin -w "..." file:///Z:/bl284tmp/wo.txt (BL-284's Notes); url_effective is file://Z:/bl284tmp/wo.txt.
+        // A file URL without a drive letter parses alike on every platform's curl.
+        TransferWriteOutVariables variables = new(
+            TransferResult.Success(3), "file:///tmp/wo.txt", 0, "file:///tmp/wo.txt", "file", Clock);
+
+        Assert.AreEqual("file|||||0|/tmp/wo.txt|||", RenderUrlParts(variables, "url."));
+        Assert.AreEqual("file|||||0|/tmp/wo.txt|||", RenderUrlParts(variables, "urle."));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_UrlPartsOfDriveLetterFileUrl_MatchPlatformCurl()
+    {
+        // Windows: curl -s -o out.bin -w "..." file:///Z:/bl284tmp/wo.txt (BL-284's Notes); url_effective
+        // is file://Z:/bl284tmp/wo.txt. Linux and macOS: curl's urlapi.c rejects a drive letter in a
+        // file URL (CURLUE_BAD_FILE_URL), so every part is empty (BL-322's Notes).
         TransferWriteOutVariables variables = new(
             TransferResult.Success(3), "file:///Z:/bl284tmp/wo.txt", 0, "file://Z:/bl284tmp/wo.txt", "file", Clock);
+        string expected = OperatingSystem.IsWindows() ? "file|||||0|Z:/bl284tmp/wo.txt|||" : "|||||||||";
 
-        Assert.AreEqual("file|||||0|Z:/bl284tmp/wo.txt|||", RenderUrlParts(variables, "url."));
-        Assert.AreEqual("file|||||0|Z:/bl284tmp/wo.txt|||", RenderUrlParts(variables, "urle."));
+        Assert.AreEqual(expected, RenderUrlParts(variables, "url."));
+        Assert.AreEqual(expected, RenderUrlParts(variables, "urle."));
     }
 
     [TestMethod]
