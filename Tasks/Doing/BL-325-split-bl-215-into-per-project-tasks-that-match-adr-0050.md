@@ -31,3 +31,4 @@ The connection-reuse work of ADR-0050 is filed as one task per project, and BL-2
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
