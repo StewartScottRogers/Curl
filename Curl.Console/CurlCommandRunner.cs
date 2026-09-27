@@ -309,6 +309,18 @@ internal sealed class CurlCommandRunner(
     private readonly StandardOutputFailureDeferringStream deferringStandardOutput = new(standardOutput);
 
     /// <summary>
+    /// The file the current transfer saved its body to, under the name <c>-J</c> gave it if it
+    /// gave one, printed by <c>%{filename_effective}</c>; <see langword="null" /> while the
+    /// body goes to standard output. Cleared before each transfer.
+    /// </summary>
+    private string? transferOutputFileName;
+
+    /// <summary>
+    /// The <c>%{conn_id}</c> the next transfer that connects takes, counted per run from zero.
+    /// </summary>
+    private long nextConnectionId;
+
+    /// <summary>
     /// Runs <paramref name="arguments" /> to completion.
     /// </summary>
     /// <param name="arguments">The command-line arguments, without the program name.</param>
@@ -415,6 +427,7 @@ internal sealed class CurlCommandRunner(
 
         for (int index = 0; index < options.Urls.Count; index++)
         {
+            transferOutputFileName = null;
             (TransferResult result, string transferUrl) = await TransferUrlAsync(dispatch, options, index)
                 .ConfigureAwait(false);
             exitCode = result.ExitCode;
@@ -428,7 +441,7 @@ internal sealed class CurlCommandRunner(
             bodyWrittenToStandardOutput |= SendsBodyToStandardOutput(options, index, result);
             bool standardOutputIsBinary = IsStandardOutputBinaryForWriteOut(
                 options, index, bodyWrittenToStandardOutput, endsTheRun);
-            await WriteOutAsync(options, index, transferUrl, result, standardOutputIsBinary).ConfigureAwait(false);
+            await WriteOutAsync(options, index, transferUrl, result, TakeConnectionId(result), standardOutputIsBinary).ConfigureAwait(false);
             await WriteCookieJarAsync(dispatch, options, transferUrl, standardOutputIsBinary).ConfigureAwait(false);
 
             if (endsTheRun)
@@ -593,13 +606,22 @@ internal sealed class CurlCommandRunner(
     /// resolved it, empty when it could not.
     /// </param>
     /// <param name="result">The transfer's result.</param>
+    /// <param name="connectionId">
+    /// The process-wide number of the transfer's connection, printed by <c>%{conn_id}</c>, or
+    /// <see cref="NoConnectionId" />.
+    /// </param>
     /// <param name="standardOutputIsBinary">Whether standard output keeps its line feeds.</param>
     /// <returns>A task that completes when the template is rendered.</returns>
+    /// <remarks>
+    /// Each URL is one transfer, so <c>%{xfer_id}</c> is <paramref name="index" />, as curl 8.21.0
+    /// printed <c>0</c> then <c>1</c> for two URLs (measured 2026-09-26, BL-284 Notes).
+    /// </remarks>
     private async Task WriteOutAsync(
         CommandLineOptions options,
         int index,
         string transferUrl,
         TransferResult result,
+        long connectionId,
         bool standardOutputIsBinary)
     {
         if (options.WriteOut is not { } template)
@@ -610,7 +632,13 @@ internal sealed class CurlCommandRunner(
         string url = options.Urls[index];
         string requestUrl = QueryUrl.Append(transferUrl, options);
         TransferWriteOutVariables variables = new(
-            result, url, index, requestUrl, WriteOutScheme(requestUrl, result), timeProvider);
+            result, url, index, requestUrl, WriteOutScheme(requestUrl, result), timeProvider)
+        {
+            Referer = options.Referer,
+            OutputFileName = transferOutputFileName,
+            ConnectionId = connectionId,
+            TransferId = index,
+        };
 
         Stream liveStandardOutput = deferringStandardOutput.HasWriteFailed ? Stream.Null : deferringStandardOutput;
         Stream writeOutStandardOutput = standardOutputIsBinary
@@ -655,6 +683,32 @@ internal sealed class CurlCommandRunner(
     private static bool IsHttpUrl(string requestUrl) =>
         CurlUrl.TryParse(requestUrl, pathAsIs: false, out CurlUrl? url)
         && url.Scheme is "http" or "https";
+
+    /// <summary>
+    /// The <c>%{conn_id}</c> of a transfer that used no connection, as curl 8.21.0 prints it.
+    /// </summary>
+    private const long NoConnectionId = -1;
+
+    /// <summary>
+    /// Tells whether a transfer got as far as a connection of its own: every transfer does
+    /// but one whose URL curl rejects before connecting, with exit 1 or 3. curl 8.21.0 printed
+    /// <c>conn_id</c> <c>0</c> for a refused connection (exit 7) and <c>-1</c> for a rejected
+    /// URL (exit 3); no connection is reused, so each transfer that connects takes the next number
+    /// (measured 2026-09-26, BL-284 Notes).
+    /// </summary>
+    /// <param name="result">The transfer's result.</param>
+    /// <returns><see langword="true" /> when the transfer numbers a connection.</returns>
+    private static bool UsedAConnection(TransferResult result) =>
+        result.ExitCode is not (CurlExitCode.UnsupportedProtocol or CurlExitCode.UrlMalformat);
+
+    /// <summary>
+    /// Gives a finished transfer its <c>%{conn_id}</c>: the next connection number when it
+    /// <see cref="UsedAConnection" />, else <see cref="NoConnectionId" />.
+    /// </summary>
+    /// <param name="result">The transfer's result.</param>
+    /// <returns>The number <c>%{conn_id}</c> prints.</returns>
+    private long TakeConnectionId(TransferResult result) =>
+        UsedAConnection(result) ? nextConnectionId++ : NoConnectionId;
 
     /// <summary>
     /// The scheme <c>%{scheme}</c> prints: the URL's, in lower case, or <see langword="null" />
@@ -1253,6 +1307,7 @@ internal sealed class CurlCommandRunner(
                 proxy)
             .ConfigureAwait(false);
 
+        transferOutputFileName = output.Path;
         if (options.RemoteTime && completed.IsSuccess && completed.SourceLastWriteTimeUtc is { } sourceLastWriteTimeUtc)
         {
             await StampOutputFileTimeAsync(options, output.Path, sourceLastWriteTimeUtc).ConfigureAwait(false);
