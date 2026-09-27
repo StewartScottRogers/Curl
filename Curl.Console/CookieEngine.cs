@@ -163,7 +163,7 @@ internal sealed class CookieEngine
     {
         public string? GetCookieHeader(CurlUrl url, bool secure, DateTimeOffset now) => store.GetCookieHeader(url, secure, now);
 
-        public void StoreFromResponse(CurlUrl url, IReadOnlyList<string> setCookieHeaders, DateTimeOffset now)
+        public void StoreFromResponse(CurlUrl url, IReadOnlyList<string> setCookieHeaders, DateTimeOffset now, ITransferEvents events)
         {
         }
     }

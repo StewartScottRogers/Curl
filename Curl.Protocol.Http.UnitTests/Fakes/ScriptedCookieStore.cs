@@ -19,7 +19,7 @@ public sealed class ScriptedCookieStore(params string?[] cookieHeaders) : ICooki
     /// <summary>
     /// Gets every <see cref="StoreFromResponse" /> call made, in order.
     /// </summary>
-    public List<(CurlUrl Url, IReadOnlyList<string> SetCookieHeaders, DateTimeOffset Now)> Responses { get; } = [];
+    public List<(CurlUrl Url, IReadOnlyList<string> SetCookieHeaders, DateTimeOffset Now, ITransferEvents Events)> Responses { get; } = [];
 
     /// <inheritdoc />
     public string? GetCookieHeader(CurlUrl url, bool secure, DateTimeOffset now)
@@ -29,6 +29,6 @@ public sealed class ScriptedCookieStore(params string?[] cookieHeaders) : ICooki
     }
 
     /// <inheritdoc />
-    public void StoreFromResponse(CurlUrl url, IReadOnlyList<string> setCookieHeaders, DateTimeOffset now) =>
-        Responses.Add((url, setCookieHeaders, now));
+    public void StoreFromResponse(CurlUrl url, IReadOnlyList<string> setCookieHeaders, DateTimeOffset now, ITransferEvents events) =>
+        Responses.Add((url, setCookieHeaders, now, events));
 }

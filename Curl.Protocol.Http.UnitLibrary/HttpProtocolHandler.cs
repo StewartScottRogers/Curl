@@ -635,14 +635,15 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Hands the <c>Set-Cookie</c> values of <paramref name="head" />, in received order, to
-    /// the cookie store, when cookies are on and the head has any.
+    /// the cookie store, with the transfer's events for its <c>-v</c> lines, when cookies are
+    /// on and the head has any.
     /// </summary>
     private void StoreCookies(ITransferContext context, HttpResponseHead head)
     {
         string[] setCookies = ValuesOf(head, "Set-Cookie");
         if (CookieStore is { } store && setCookies.Length > 0)
         {
-            store.StoreFromResponse(context.Url, setCookies, context.TimeProvider.GetUtcNow());
+            store.StoreFromResponse(context.Url, setCookies, context.TimeProvider.GetUtcNow(), context.Events);
         }
     }
 

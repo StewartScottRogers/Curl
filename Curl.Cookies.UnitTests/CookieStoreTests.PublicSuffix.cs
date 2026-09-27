@@ -21,7 +21,7 @@ public sealed partial class CookieStoreTests
     {
         CookieStore store = new();
 
-        store.StoreFromResponse(CurlUrl.Parse($"http://{host}/"), [$"n=v; Path=/; {domainAttribute}"], Now);
+        store.StoreFromResponse(CurlUrl.Parse($"http://{host}/"), [$"n=v; Path=/; {domainAttribute}"], Now, NoTransferEvents.Instance);
 
         Assert.IsEmpty(store.Cookies);
     }
@@ -37,7 +37,7 @@ public sealed partial class CookieStoreTests
     {
         CookieStore store = new();
 
-        store.StoreFromResponse(CurlUrl.Parse($"http://{host}/"), [$"n=v; Path=/; {domainAttribute}"], Now);
+        store.StoreFromResponse(CurlUrl.Parse($"http://{host}/"), [$"n=v; Path=/; {domainAttribute}"], Now, NoTransferEvents.Instance);
 
         Assert.AreEqual(storedDomain, store.Cookies.Single().Domain);
     }
@@ -52,7 +52,7 @@ public sealed partial class CookieStoreTests
         CurlUrl url = CurlUrl.Parse($"http://{label}.{label}.{label}.{label}.{lastLabels}/");
         CookieStore store = new();
 
-        store.StoreFromResponse(url, ["n=v; Path=/"], Now);
+        store.StoreFromResponse(url, ["n=v; Path=/"], Now, NoTransferEvents.Instance);
 
         Assert.HasCount(storedCount, store.Cookies);
     }
@@ -66,7 +66,7 @@ public sealed partial class CookieStoreTests
     {
         CookieStore store = new();
 
-        store.StoreFromResponse(CurlUrl.Parse("http://www.example.xn--55qx5d.cn/"), ["n=v; Path=/; Domain=xn--55qx5d.cn"], Now);
+        store.StoreFromResponse(CurlUrl.Parse("http://www.example.xn--55qx5d.cn/"), ["n=v; Path=/; Domain=xn--55qx5d.cn"], Now, NoTransferEvents.Instance);
 
         Assert.IsEmpty(store.Cookies);
     }

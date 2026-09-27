@@ -78,7 +78,7 @@ public sealed partial class CookieStoreTests
     {
         CookieStore store = new();
         store.AddCookieString("x=1");
-        store.StoreFromResponse(Loopback, ["a=1"], Now);
+        store.StoreFromResponse(Loopback, ["a=1"], Now, NoTransferEvents.Instance);
         StringWriter writer = new() { NewLine = "\n" };
 
         store.WriteCookieJar(writer, Now);
@@ -115,7 +115,7 @@ public sealed partial class CookieStoreTests
         MemoryStream written = new();
         FakeFileSystem fileSystem = new() { WriteTarget = written };
         CookieStore store = new();
-        store.StoreFromResponse(Loopback, ["a=é"], Now);
+        store.StoreFromResponse(Loopback, ["a=é"], Now, NoTransferEvents.Instance);
 
         bool saved = await store.SaveCookieJarAsync(fileSystem, "jar.txt", Now, CancellationToken.None);
 
@@ -140,7 +140,7 @@ public sealed partial class CookieStoreTests
     {
         FakeFileSystem fileSystem = new() { WriteFailure = status };
         CookieStore store = new();
-        store.StoreFromResponse(Loopback, ["a=1"], Now);
+        store.StoreFromResponse(Loopback, ["a=1"], Now, NoTransferEvents.Instance);
 
         Assert.IsFalse(await store.SaveCookieJarAsync(fileSystem, "nodir\\x.txt", Now, CancellationToken.None));
     }
