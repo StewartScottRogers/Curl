@@ -55,6 +55,21 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     internal int SharedHeadLength { get; init; }
 
     /// <summary>
+    /// Gets the request head this writer sends, written and flushed by
+    /// <see cref="WriteHeldHeadAsync" /> or just before the first body bytes, so a body whose
+    /// first read fails sends no request bytes at all, as curl 8.21.0 holds the head in its
+    /// upload buffer with the first read (measured, BL-184 Notes). Empty when the head was
+    /// sent elsewhere.
+    /// </summary>
+    internal ReadOnlyMemory<byte> HeldHead
+    {
+        get => heldHead;
+        init => heldHead = value;
+    }
+
+    private ReadOnlyMemory<byte> heldHead;
+
+    /// <summary>
     /// Gets a value indicating whether the body is a <c>-T</c> upload, whose short read curl
     /// reports as <c>client read function EOF fail</c> rather than
     /// <c>client mime read EOF fail</c> (measured, BL-184 Notes).
@@ -110,11 +125,32 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
             await WriteStreamAsync((StreamBody)body, isChunked, cancellationToken).ConfigureAwait(false);
         }
 
+        await WriteHeldHeadAsync(cancellationToken).ConfigureAwait(false);
         if (isChunked && !CutShort)
         {
             await HttpConnectionSend.WriteAsync(connection, LastChunk, cancellationToken).ConfigureAwait(false);
         }
 
+        await HttpConnectionSend.FlushAsync(connection, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Writes and flushes <see cref="HeldHead" /> if it has not been sent yet; does nothing
+    /// after that.
+    /// </summary>
+    /// <param name="cancellationToken">Cancels the write and the flush.</param>
+    /// <returns>A task that completes when the head has been sent.</returns>
+    /// <exception cref="HttpTransferException">The connection failed the write (exit 55).</exception>
+    internal async ValueTask WriteHeldHeadAsync(CancellationToken cancellationToken)
+    {
+        if (heldHead.IsEmpty)
+        {
+            return;
+        }
+
+        ReadOnlyMemory<byte> head = heldHead;
+        heldHead = ReadOnlyMemory<byte>.Empty;
+        await HttpConnectionSend.WriteAsync(connection, head, cancellationToken).ConfigureAwait(false);
         await HttpConnectionSend.FlushAsync(connection, cancellationToken).ConfigureAwait(false);
     }
 
@@ -235,6 +271,7 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
 
         if (ExpectationWatch is not { } watch)
         {
+            await WriteHeldHeadAsync(cancellationToken).ConfigureAwait(false);
             await WriteFramedAsync(piece, isChunked, cancellationToken).ConfigureAwait(false);
         }
         else if (!await watch.SendUnlessExpectationFailedAsync(Framed(piece, isChunked), cancellationToken).ConfigureAwait(false))

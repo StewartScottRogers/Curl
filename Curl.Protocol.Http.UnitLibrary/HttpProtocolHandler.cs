@@ -354,6 +354,7 @@ public sealed class HttpProtocolHandler(
         HttpRequestBodyWriter upload = new(connection)
         {
             SharedHeadLength = framing.AwaitsContinue ? 0 : request.Length,
+            HeldHead = request,
             IsUpload = framing.IsUpload,
             Progress = plan.Progress,
             ExpectationWatch = responseConnection as HttpContinueWaitConnection,
@@ -377,8 +378,6 @@ public sealed class HttpProtocolHandler(
         {
             ThrowIfRefused(framing);
             exchange.RequestReady = context.TimeProvider.GetTimestamp();
-            await HttpConnectionSend.WriteAsync(connection, request, cancellationToken).ConfigureAwait(false);
-            await HttpConnectionSend.FlushAsync(connection, cancellationToken).ConfigureAwait(false);
             bool bodyLeftUnsent = await SendBodyAsync(context.TimeProvider, framing, responseConnection, upload, cancellationToken).ConfigureAwait(false);
             exchange.RequestSent = context.TimeProvider.GetTimestamp();
             exchange.Head = await new HttpResponseHeadReader(responseConnection).ReadAsync(cancellationToken).ConfigureAwait(false);
@@ -593,9 +592,11 @@ public sealed class HttpProtocolHandler(
         options.Compressed && !options.Raw && !discardsBody;
 
     /// <summary>
-    /// Sends the request body, if there is one: at once, or once
-    /// <paramref name="responseConnection" /> has waited for <c>100 Continue</c> and not been
-    /// answered with a final status instead.
+    /// Sends the request head and body, if there is one: the head alone when there is no body
+    /// or the request waits for <c>100 Continue</c>, and else with the body's first read, so a
+    /// body whose first read fails sends nothing (measured, BL-184 Notes); the body at once, or
+    /// once <paramref name="responseConnection" /> has waited for <c>100 Continue</c> and not
+    /// been answered with a final status instead.
     /// </summary>
     /// <returns>
     /// <see langword="true" /> when a final status arrived during the wait and the body was left
@@ -610,13 +611,17 @@ public sealed class HttpProtocolHandler(
     {
         if (framing.Body is not { } requestBody)
         {
+            await upload.WriteHeldHeadAsync(cancellationToken).ConfigureAwait(false);
             return false;
         }
 
-        if (responseConnection is HttpContinueWaitConnection waiting
-            && !await waiting.WaitForContinueAsync(timeProvider, cancellationToken).ConfigureAwait(false))
+        if (responseConnection is HttpContinueWaitConnection waiting)
         {
-            return true;
+            await upload.WriteHeldHeadAsync(cancellationToken).ConfigureAwait(false);
+            if (!await waiting.WaitForContinueAsync(timeProvider, cancellationToken).ConfigureAwait(false))
+            {
+                return true;
+            }
         }
 
         await upload.WriteAsync(requestBody, framing.IsChunked, cancellationToken).ConfigureAwait(false);

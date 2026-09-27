@@ -107,6 +107,20 @@ public sealed class HttpRequestBodyWriterTests
     }
 
     [TestMethod]
+    public async Task WriteAsync_HeldHead_SendsItOnceBeforeTheFirstBodyBytes()
+    {
+        FailingReadStream stream = new("hello"u8.ToArray(), 2, new IOException("Not reached."), 5);
+        ScriptedConnection connection = new([], 1);
+        HttpRequestBodyWriter writer = new(connection) { HeldHead = "HEAD\r\n\r\n"u8.ToArray() };
+
+        await writer.WriteAsync(new StreamBody(stream, 5, "a/b"), false, CancellationToken.None);
+        await writer.WriteHeldHeadAsync(CancellationToken.None);
+
+        Assert.AreEqual("HEAD\r\n\r\nhello", Encoding.Latin1.GetString(connection.Written));
+        Assert.IsTrue(writer.HeldHead.IsEmpty);
+    }
+
+    [TestMethod]
     public async Task WriteAsync_HeadSharesTheBuffer_FirstReadTakesWhatTheHeadLeaves()
     {
         FailingReadStream stream = new(new byte[200000], int.MaxValue, new IOException("Not reached."), 200000);
