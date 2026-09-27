@@ -392,6 +392,65 @@ public sealed class CommandLineOptions
     public TimeSpan? MaxTime { get; internal set; }
 
     /// <summary>
+    /// The <c>--retry</c> count: how many times a transient failure is retried, from 0 to the
+    /// platform's C <c>LONG_MAX</c> (<see cref="CommandLineNumber.PlatformLongMaximum"/>). Zero,
+    /// the default, retries nothing. The last value wins.
+    /// </summary>
+    public long RetryCount { get; internal set; }
+
+    /// <summary>
+    /// The <c>--retry-delay</c> wait between retries, to the millisecond, read as
+    /// <see cref="CommandLineNumber.ParseSeconds"/> reads <c>-m</c>; <see langword="null"/> when not
+    /// given, which leaves curl's own backoff in place. The last value wins.
+    /// </summary>
+    public TimeSpan? RetryDelay { get; internal set; }
+
+    /// <summary>
+    /// The <c>--retry-max-time</c> limit on the time spent retrying, to the millisecond, read as
+    /// <see cref="CommandLineNumber.ParseSeconds"/> reads <c>-m</c>; <see langword="null"/> when not
+    /// given. Zero is recorded as given and means no limit, as it does to curl. The last value wins.
+    /// </summary>
+    public TimeSpan? RetryMaxTime { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--retry-all-errors</c> was given and no
+    /// <c>--no-retry-all-errors</c> came after it: <c>--retry</c> retries after any error.
+    /// </summary>
+    public bool RetryAllErrors { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--retry-connrefused</c> was given and no
+    /// <c>--no-retry-connrefused</c> came after it: <c>--retry</c> counts a refused connection as
+    /// transient.
+    /// </summary>
+    public bool RetryConnectionRefused { get; internal set; }
+
+    /// <summary>
+    /// The <c>--limit-rate</c> ceiling in bytes per second, for both download and upload, read as
+    /// <see cref="CommandLineNumber.ParseSize"/> reads <c>--max-filesize</c> (<c>b</c>, <c>k</c>,
+    /// <c>m</c>, <c>g</c>, <c>t</c> and <c>p</c> in either case, and fractions);
+    /// <see langword="null"/> when not given. Zero is recorded as given and means no limit, as it
+    /// does to curl. The last value wins.
+    /// </summary>
+    public long? LimitRate { get; internal set; }
+
+    /// <summary>
+    /// The <c>-Y</c> / <c>--speed-limit</c> in bytes per second below which a transfer is too slow;
+    /// <see langword="null"/> when not given. Curl 8.21.0 aborts a transfer that stays slower than
+    /// this for <see cref="SpeedTimeSeconds"/>, or for 30 seconds when that is not given (measured
+    /// through <c>--libcurl</c>). The last value wins.
+    /// </summary>
+    public long? SpeedLimit { get; internal set; }
+
+    /// <summary>
+    /// The <c>-y</c> / <c>--speed-time</c> in whole seconds a transfer may stay slower than
+    /// <see cref="SpeedLimit"/>; <see langword="null"/> when not given. When it is given and
+    /// <see cref="SpeedLimit"/> is not, curl 8.21.0 uses a limit of 1 byte per second (measured
+    /// through <c>--libcurl</c>). The last value wins.
+    /// </summary>
+    public long? SpeedTimeSeconds { get; internal set; }
+
+    /// <summary>
     /// <see langword="true"/> when <c>-R</c> / <c>--remote-time</c> was given and no
     /// <c>--no-remote-time</c> came after it: give the output file the remote file's time.
     /// </summary>
