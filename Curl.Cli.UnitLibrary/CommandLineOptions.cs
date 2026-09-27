@@ -341,6 +341,24 @@ public sealed class CommandLineOptions
     public string? PrivateKey { get; internal set; }
 
     /// <summary>
+    /// The <c>--cert-type</c> value (for example <c>PEM</c>, <c>DER</c> or <c>P12</c>), verbatim; the TLS layer
+    /// compares it case-insensitively. <see langword="null"/> when not given. The last value wins.
+    /// </summary>
+    public string? ClientCertificateType { get; internal set; }
+
+    /// <summary>
+    /// The <c>--key-type</c> value (for example <c>PEM</c> or <c>DER</c>), verbatim; the TLS layer compares it
+    /// case-insensitively. <see langword="null"/> when not given. The last value wins.
+    /// </summary>
+    public string? PrivateKeyType { get; internal set; }
+
+    /// <summary>
+    /// The <c>--pass</c> passphrase for the private key, verbatim; <see langword="null"/> when not given.
+    /// The last value wins.
+    /// </summary>
+    public string? Passphrase { get; internal set; }
+
+    /// <summary>
     /// The lowest TLS version to accept: <see cref="SslProtocols.Tls12"/> for <c>--tlsv1.2</c> (1.2 or later),
     /// <see cref="SslProtocols.Tls13"/> for <c>--tlsv1.3</c> (1.3 or later); <see langword="null"/> when neither
     /// was given. When both are given the last one wins, as in curl 8.21.0.

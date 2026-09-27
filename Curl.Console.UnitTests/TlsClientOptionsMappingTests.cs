@@ -6,7 +6,7 @@ namespace Curl.Console;
 
 /// <summary>
 /// Pins how <c>-k</c>, <c>--cacert</c>, <c>--capath</c>, <c>--cert</c>, <c>--key</c>,
-/// <c>--ciphers</c>, <c>--tls13-ciphers</c>, <c>--tlsv1.2</c> and <c>--tlsv1.3</c> become the
+/// <c>--ciphers</c>, <c>--tls13-ciphers</c>, <c>--cert-type</c>, <c>--key-type</c>, <c>--pass</c>, <c>--tlsv1.2</c> and <c>--tlsv1.3</c> become the
 /// <see cref="TlsClientOptions" /> the TLS provider applies. No test here opens a socket or
 /// reads a certificate file.
 /// </summary>
@@ -49,6 +49,24 @@ public sealed class TlsClientOptionsMappingTests
     public void FromCommandLine_PrivateKey_CopiesThePathVerbatim()
     {
         Assert.AreEqual(new TlsClientOptions(PrivateKey: "client.key"), Map("--key", "client.key", Url));
+    }
+
+    [TestMethod]
+    public void FromCommandLine_CertType_CopiesItAsCertificateTypeVerbatim()
+    {
+        Assert.AreEqual(new TlsClientOptions(CertificateType: "p12"), Map("--cert-type", "p12", Url));
+    }
+
+    [TestMethod]
+    public void FromCommandLine_KeyType_CopiesItAsPrivateKeyTypeVerbatim()
+    {
+        Assert.AreEqual(new TlsClientOptions(PrivateKeyType: "DER"), Map("--key-type", "DER", Url));
+    }
+
+    [TestMethod]
+    public void FromCommandLine_Pass_CopiesItAsPassphraseVerbatim()
+    {
+        Assert.AreEqual(new TlsClientOptions(Passphrase: "secret"), Map("--pass", "secret", Url));
     }
 
     [TestMethod]

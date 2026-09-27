@@ -5,7 +5,8 @@ namespace Curl.Cli;
 
 /// <summary>
 /// Pins how the parser records the TLS options: <c>-k</c>/<c>--insecure</c>, <c>--cacert</c>,
-/// <c>--capath</c>, <c>-E</c>/<c>--cert</c>, <c>--key</c>, <c>--tlsv1.2</c>/<c>--tlsv1.3</c> (the
+/// <c>--capath</c>, <c>-E</c>/<c>--cert</c>, <c>--key</c>, <c>--cert-type</c>, <c>--key-type</c>,
+/// <c>--pass</c>, <c>--tlsv1.2</c>/<c>--tlsv1.3</c> (the
 /// last one given wins), <c>--ciphers</c> and <c>--tls13-ciphers</c>, and the refusals curl
 /// 8.21.0 prints for them, measured against the local curl 8.21.0 on 2026-09-26. The
 /// <c>--cacert</c> existence check runs against a fake, never the disk, except in the two
@@ -172,6 +173,72 @@ public sealed class CommandLineTlsOptionTests
     }
 
     [TestMethod]
+    public void Parse_CertType_RecordsClientCertificateTypeVerbatim()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--cert-type", "p12", Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual("p12", result.Options.ClientCertificateType);
+    }
+
+    [TestMethod]
+    public void Parse_CertTypeTwice_TheLastWins()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--cert-type", "DER", "--cert-type", "PEM", Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual("PEM", result.Options.ClientCertificateType);
+    }
+
+    [TestMethod]
+    public void Parse_KeyType_RecordsPrivateKeyTypeVerbatim()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--key-type", "der", Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual("der", result.Options.PrivateKeyType);
+    }
+
+    [TestMethod]
+    public void Parse_KeyTypeTwice_TheLastWins()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--key-type", "DER", "--key-type", "PEM", Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual("PEM", result.Options.PrivateKeyType);
+    }
+
+    [TestMethod]
+    public void Parse_Pass_RecordsPassphraseVerbatim()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--pass", "s3cret:with colon", Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual("s3cret:with colon", result.Options.Passphrase);
+    }
+
+    [TestMethod]
+    public void Parse_PassTwice_TheLastWins()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--pass", "first", "--pass", "second", Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual("second", result.Options.Passphrase);
+    }
+
+    [TestMethod]
+    [DataRow("--cert-type")]
+    [DataRow("--key-type")]
+    [DataRow("--pass")]
+    public void Parse_TypeOrPassGivenFlagLikeValue_AcceptsWithoutWarning(string spelledOption)
+    {
+        CommandLineParseResult result = CommandLineParser.Parse([spelledOption, "-x", Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsEmpty(result.WarningLines);
+    }
+
+    [TestMethod]
     public void Parse_Tlsv12_SetsMinimumTlsVersionTo12()
     {
         CommandLineParseResult result = CommandLineParser.Parse(["--tlsv1.2", Url], NoPathExists);
@@ -232,6 +299,9 @@ public sealed class CommandLineTlsOptionTests
     [DataRow("--key")]
     [DataRow("--ciphers")]
     [DataRow("--tls13-ciphers")]
+    [DataRow("--cert-type")]
+    [DataRow("--key-type")]
+    [DataRow("--pass")]
     public void Parse_EmptyTextValue_RefusesAsBlank(string spelledOption)
     {
         CommandLineParseResult result = CommandLineParser.Parse([spelledOption, "", Url], EveryPathExists);
