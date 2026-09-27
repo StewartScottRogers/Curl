@@ -34,3 +34,4 @@ An HTTP `-T` upload with `-C <offset>` (or `-C -`) skips the offset and sends th
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
