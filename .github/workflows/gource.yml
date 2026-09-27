@@ -65,6 +65,22 @@ jobs:
           sudo apt-get update -q
           sudo apt-get install -y -q gource ffmpeg xvfb
 
+      # render.sh's generators are C# file-based apps run with `dotnet run --file`, so the
+      # SDK global.json names must be present. The runner's preinstalled SDK is used when it
+      # satisfies global.json; otherwise Microsoft's install script fetches that exact SDK
+      # (no marketplace action: only actions/checkout is allowed here).
+      - name: Install the .NET SDK
+        if: steps.decide.outputs.render == 'yes'
+        run: |
+          if dotnet --version > /dev/null 2>&1; then
+            echo "preinstalled .NET SDK $(dotnet --version) satisfies global.json"
+          else
+            curl -fsSL https://dot.net/v1/dotnet-install.sh -o "$RUNNER_TEMP/dotnet-install.sh"
+            bash "$RUNNER_TEMP/dotnet-install.sh" --jsonfile global.json --install-dir "$HOME/.dotnet"
+            echo "DOTNET_ROOT=$HOME/.dotnet" >> "$GITHUB_ENV"
+            echo "$HOME/.dotnet" >> "$GITHUB_PATH"
+          fi
+
       - name: Render
         if: steps.decide.outputs.render == 'yes'
         run: bash .github/gource/render.sh "$RUNNER_TEMP/gource"
