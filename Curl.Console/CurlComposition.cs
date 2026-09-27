@@ -87,7 +87,9 @@ internal static class CurlComposition
     /// the command line. The CONNECT request that tunnels through an HTTP proxy carries the
     /// <see cref="HttpProxyTunnelOptions" /> <see cref="CreateProxyTunnelOptions" /> maps from
     /// <paramref name="options" />, and the TCP connector applies the <c>--resolve</c> and
-    /// <c>--connect-to</c> values (<see cref="CreateTcpConnector" />).
+    /// <c>--connect-to</c> values (<see cref="CreateTcpConnector" />). One
+    /// <see cref="PoolingConnector" /> over the TCP connector, on the same clock, is the run's
+    /// connection pool (ADR-0050).
     /// </summary>
     /// <param name="options">The parsed command line.</param>
     /// <returns>The connectors and the pieces they were built from.</returns>
@@ -111,6 +113,7 @@ internal static class CurlComposition
         TlsClientOptions tlsClientOptions = TlsClientOptionsMapping.FromCommandLine(options);
         SslStreamTlsProvider tlsProvider = new(tlsClientOptions, timeProvider);
         HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(options);
+        TcpConnector tcpConnector = CreateTcpConnector(options, dnsResolver, tcpDialer, tlsProvider, timeProvider, proxyTunnelOptions);
 
         return new CurlTransports(
             dnsResolver,
@@ -119,8 +122,9 @@ internal static class CurlComposition
             tlsClientOptions,
             tlsProvider,
             proxyTunnelOptions,
-            CreateTcpConnector(options, dnsResolver, tcpDialer, tlsProvider, timeProvider, proxyTunnelOptions),
-            new UdpDatagramConnector(dnsResolver, timeProvider));
+            tcpConnector,
+            new UdpDatagramConnector(dnsResolver, timeProvider),
+            new PoolingConnector(tcpConnector, timeProvider));
     }
 
     /// <summary>
@@ -244,31 +248,35 @@ internal static class CurlComposition
             outputPaths: new PhysicalOutputPaths());
 
     /// <summary>
-    /// Creates the dispatcher over the production handler set, connecting through
-    /// <paramref name="transports" /> and keeping no cookies.
+    /// Creates the dispatcher over the production handler set, connecting the TCP protocols
+    /// through <paramref name="transports" />' <see cref="CurlTransports.PoolingConnector" />
+    /// and keeping no cookies.
     /// </summary>
     /// <param name="transports">The run's connectors.</param>
     /// <returns>The dispatcher.</returns>
     internal static ProtocolDispatcher CreateDispatcher(CurlTransports transports) =>
-        new(CreateProtocolHandlers(transports.TcpConnector, transports.UdpDatagramConnector));
+        new(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector));
 
     /// <summary>
-    /// Creates what one run transfers through: the production handler set over
-    /// <paramref name="transports" />, its HTTP handler keeping cookies in
+    /// Creates what one run transfers through: the production handler set, every TCP handler
+    /// connecting through <paramref name="transports" />' one
+    /// <see cref="CurlTransports.PoolingConnector" />, its HTTP handler keeping cookies in
     /// <paramref name="cookies" />; the TLS provider's <see cref="SslStreamTlsProvider.Warnings" />
     /// as the lines printed before each transfer, as curl 8.21.0 prints its <c>--capath</c>
-    /// warnings once per URL; <paramref name="cookies" /> for the runner to load and save; and a
-    /// <see cref="ProxySelector" /> reading the process's proxy environment variables.
+    /// warnings once per URL; <paramref name="cookies" /> for the runner to load and save; a
+    /// <see cref="ProxySelector" /> reading the process's proxy environment variables; and the
+    /// pooling connector as the connection pool the runner disposes when the run ends (ADR-0050).
     /// </summary>
     /// <param name="transports">The run's connectors.</param>
     /// <param name="cookies">The run's cookies, or <see langword="null" /> without <c>-b</c> or <c>-c</c>.</param>
-    /// <returns>The dispatcher, the warning lines, the cookies and the proxy selector.</returns>
+    /// <returns>The dispatcher, the warning lines, the cookies, the proxy selector and the connection pool.</returns>
     internal static TransferDispatch CreateTransferDispatch(CurlTransports transports, CookieEngine? cookies = null) =>
         new(
-            new ProtocolDispatcher(CreateProtocolHandlers(transports.TcpConnector, transports.UdpDatagramConnector, cookies?.HandlerStore)),
+            new ProtocolDispatcher(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, cookies?.HandlerStore)),
             transports.TlsProvider.Warnings,
             cookies,
-            new ProxySelector(Environment.GetEnvironmentVariable));
+            new ProxySelector(Environment.GetEnvironmentVariable),
+            transports.PoolingConnector);
 
     /// <summary>
     /// Creates what one run transfers through over the given connectors instead of the real

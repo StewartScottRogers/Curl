@@ -12,6 +12,12 @@ calls - no container, no reflection, no assembly scanning, so native AOT sees ev
 type. `Curl.Core.UnitLibrary` dispatches through the `IProtocolHandler` instances it is
 given and must never reference a protocol library directly.
 
+`CurlComposition.CreateTransports` wraps the run's `TcpConnector` in one `PoolingConnector`,
+which every TCP handler connects through, so a later URL to the same pool key reuses an
+earlier URL's connection; `TransferDispatch` holds it as the run's `ConnectionPool`, and the
+runner disposes the dispatch, closing the pool without writing anything, once the transfers
+end, whatever their outcome (ADR-0050, BL-334).
+
 `Program.Main` only opens the standard streams, builds the composition and hands the
 arguments to `CurlCommandRunner`, which parses them, runs each URL and prints curl's
 `curl: (N) <message>` lines. The parse reads the default config file first, where

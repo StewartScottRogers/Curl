@@ -29,6 +29,7 @@ public sealed class CurlTransportsTests
             ProxyTunnelOptions = replacement.ProxyTunnelOptions with { UserAgent = "replaced" },
             TcpConnector = replacement.TcpConnector,
             UdpDatagramConnector = replacement.UdpDatagramConnector,
+            PoolingConnector = replacement.PoolingConnector,
         };
 
         Assert.AreSame(replacement.DnsResolver, copy.DnsResolver);
@@ -39,6 +40,7 @@ public sealed class CurlTransportsTests
         Assert.AreEqual("replaced", copy.ProxyTunnelOptions.UserAgent);
         Assert.AreSame(replacement.TcpConnector, copy.TcpConnector);
         Assert.AreSame(replacement.UdpDatagramConnector, copy.UdpDatagramConnector);
+        Assert.AreSame(replacement.PoolingConnector, copy.PoolingConnector);
         Assert.AreSame(TimeProvider.System, original.TimeProvider);
         Assert.IsFalse(original.TlsClientOptions.Insecure);
     }
@@ -59,6 +61,7 @@ public sealed class CurlTransportsTests
         Assert.AreSame(original.ProxyTunnelOptions, copy.ProxyTunnelOptions);
         Assert.AreSame(original.TcpConnector, copy.TcpConnector);
         Assert.AreSame(original.UdpDatagramConnector, copy.UdpDatagramConnector);
+        Assert.AreSame(original.PoolingConnector, copy.PoolingConnector);
     }
 
     [TestMethod]

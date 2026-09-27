@@ -500,7 +500,8 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// Transfers every URL in order, each command-line URL once for every URL its glob expands to,
-    /// and reports each failure.
+    /// and reports each failure, then disposes the run's <see cref="TransferDispatch" />, closing
+    /// its connection pool, whatever the outcome.
     /// </summary>
     /// <param name="options">The accepted command line.</param>
     /// <returns>
@@ -517,6 +518,7 @@ internal sealed class CurlCommandRunner(
         }
         finally
         {
+            await dispatch.DisposeAsync().ConfigureAwait(false);
             await transferEventOutput.DisposeAsync().ConfigureAwait(false);
         }
     }

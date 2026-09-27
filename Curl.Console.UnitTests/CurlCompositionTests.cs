@@ -308,6 +308,68 @@ public sealed class CurlCompositionTests
     }
 
     [TestMethod]
+    public void CreateTransports_PoolingConnector_WrapsTheTcpConnectorOnTheSameClock()
+    {
+        TimeProvider timeProvider = new ReplacementTimeProvider();
+
+        CurlTransports transports = CurlComposition.CreateTransports(NoOptions(), timeProvider);
+
+        Assert.AreSame(transports.TcpConnector, CapturedDependency<IConnector>(transports.PoolingConnector));
+        Assert.AreSame(timeProvider, CapturedDependency<TimeProvider>(transports.PoolingConnector));
+    }
+
+    [TestMethod]
+    public void CreateTransferDispatch_ProductionTransports_EveryTcpHandlerReceivesTheOnePoolingConnector()
+    {
+        CurlTransports transports = CurlComposition.CreateTransports(NoOptions());
+
+        TransferDispatch dispatch = CurlComposition.CreateTransferDispatch(transports);
+
+        IProtocolHandler[] handlers = [.. CapturedDependency<Dictionary<string, IProtocolHandler>>(dispatch.Dispatcher).Values.Distinct()];
+        IConnector[] connectors = [.. handlers.SelectMany(ConnectorsOf)];
+        string[] connectingHandlers = [.. handlers.Where(handler => ConnectorsOf(handler).Any()).Select(handler => handler.GetType().Name).Order()];
+        CollectionAssert.AreEqual(
+            new[] { "DictProtocolHandler", "ForwardedFtpProtocolHandler", "GopherProtocolHandler", "HttpProtocolHandler", "MqttProtocolHandler", "TelnetProtocolHandler" },
+            connectingHandlers);
+        Assert.IsTrue(connectors.All(connector => ReferenceEquals(connector, transports.PoolingConnector)));
+        Assert.AreSame(transports.PoolingConnector, dispatch.ConnectionPool);
+    }
+
+    [TestMethod]
+    public void CreateDispatcher_ProductionTransports_HttpHandlerReceivesThePoolingConnector()
+    {
+        CurlTransports transports = CurlComposition.CreateTransports(NoOptions());
+
+        ProtocolDispatcher dispatcher = CurlComposition.CreateDispatcher(transports);
+
+        IProtocolHandler http = CapturedDependency<Dictionary<string, IProtocolHandler>>(dispatcher)["http"];
+        Assert.AreSame(transports.PoolingConnector, ConnectorsOf(http).Single());
+    }
+
+    [TestMethod]
+    public async Task CreateTransferDispatch_TwoUrlsToOneHost_TheSecondReusesTheFirstsConnection()
+    {
+        ScriptedConnector server = new(
+            [Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\na"), Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\nb")]);
+        using MemoryStream standardOutput = new();
+
+        int exitCode = await new CurlCommandRunner(
+                options => CurlComposition.CreateTransferDispatch(
+                    CurlComposition.CreateTransports(options) with { PoolingConnector = new PoolingConnector(server, TimeProvider.System) }),
+                new InMemoryFileSystem(),
+                new InMemoryFileSystem(),
+                standardOutput,
+                new MemoryStream(),
+                new MemoryStream(),
+                runsOnWindows: false)
+            .RunAsync(["-sS", "http://h:18233/a", "http://h:18233/b"]);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual("ab", Encoding.Latin1.GetString(standardOutput.ToArray()));
+        Assert.AreEqual(new ConnectTarget("h", 18233, false) { PoolScheme = "http" }, server.Targets.Single());
+    }
+
+    [TestMethod]
     public void CreateTransferDispatch_CaPath_WarnsAsThePlatformsCurlBuildDoes()
     {
         CurlTransports transports = CurlComposition.CreateTransports(Parse("--capath", ".", "https://example.com/"));
@@ -386,6 +448,30 @@ public sealed class CurlCompositionTests
             .GetFields(BindingFlags.Instance | BindingFlags.NonPublic)
             .Single(candidate => candidate.FieldType == typeof(T));
         return (T)field.GetValue(owner)!;
+    }
+
+    /// <summary>
+    /// Reads every connector <paramref name="handler" /> holds in a private field, and those of
+    /// any handler it forwards to, so a test can check which connector each handler was given.
+    /// </summary>
+    private static IEnumerable<IConnector> ConnectorsOf(IProtocolHandler handler)
+    {
+        foreach (FieldInfo field in handler.GetType().GetFields(BindingFlags.Instance | BindingFlags.NonPublic))
+        {
+            switch (field.GetValue(handler))
+            {
+                case IConnector connector:
+                    yield return connector;
+                    break;
+                case IProtocolHandler forwardedTo:
+                    foreach (IConnector connector in ConnectorsOf(forwardedTo))
+                    {
+                        yield return connector;
+                    }
+
+                    break;
+            }
+        }
     }
 
     private sealed class ReplacementTimeProvider : TimeProvider;

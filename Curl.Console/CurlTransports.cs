@@ -17,6 +17,11 @@ namespace Curl.Console;
 /// </param>
 /// <param name="TcpConnector">Connects the TCP protocols, with TLS when the target asks for it.</param>
 /// <param name="UdpDatagramConnector">Opens the UDP channels the datagram protocols use.</param>
+/// <param name="PoolingConnector">
+/// The run's one connection pool over <see cref="TcpConnector" />: every TCP handler connects
+/// through it, so a later URL to the same pool key reuses an earlier URL's connection, and the
+/// run disposes it when it ends (ADR-0050).
+/// </param>
 internal sealed record CurlTransports(
     SystemDnsResolver DnsResolver,
     TimeProvider TimeProvider,
@@ -25,4 +30,5 @@ internal sealed record CurlTransports(
     SslStreamTlsProvider TlsProvider,
     HttpProxyTunnelOptions ProxyTunnelOptions,
     TcpConnector TcpConnector,
-    UdpDatagramConnector UdpDatagramConnector);
+    UdpDatagramConnector UdpDatagramConnector,
+    PoolingConnector PoolingConnector);

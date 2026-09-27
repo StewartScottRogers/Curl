@@ -23,11 +23,16 @@ namespace Curl.Console;
 /// variables it reads; <see langword="null" /> for one that reads no variables, so only the
 /// command line names a proxy.
 /// </param>
+/// <param name="connectionPool">
+/// The run's connection pool, which <see cref="DisposeAsync" /> closes once the run ends
+/// (ADR-0050), or <see langword="null" /> when the dispatcher's handlers keep none.
+/// </param>
 internal sealed class TransferDispatch(
     ProtocolDispatcher dispatcher,
     IReadOnlyList<string> warningLinesBeforeEachTransfer,
     CookieEngine? cookies = null,
-    ProxySelector? proxySelector = null)
+    ProxySelector? proxySelector = null,
+    IAsyncDisposable? connectionPool = null) : IAsyncDisposable
 {
     /// <summary>
     /// Creates the dispatch with no warning lines.
@@ -59,4 +64,17 @@ internal sealed class TransferDispatch(
     /// the proxy environment variables it reads.
     /// </summary>
     internal ProxySelector ProxySelector { get; } = proxySelector ?? new ProxySelector(_ => null);
+
+    /// <summary>
+    /// Gets the run's connection pool, or <see langword="null" /> when the dispatcher's handlers
+    /// keep none.
+    /// </summary>
+    internal IAsyncDisposable? ConnectionPool { get; } = connectionPool;
+
+    /// <summary>
+    /// Closes the run's <see cref="ConnectionPool" />, writing nothing, as curl closes its
+    /// connection cache after the last transfer; does nothing without one.
+    /// </summary>
+    /// <returns>A task that completes when every idle connection is closed.</returns>
+    public ValueTask DisposeAsync() => ConnectionPool?.DisposeAsync() ?? ValueTask.CompletedTask;
 }
