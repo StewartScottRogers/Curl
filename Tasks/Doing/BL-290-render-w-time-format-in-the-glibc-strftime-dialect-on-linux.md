@@ -33,3 +33,4 @@ On Linux and macOS, `-w "%time{format}"` prints what curl 8.21.0's OpenSSL build
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-27: Backlog -> Doing.
