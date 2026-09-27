@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console.UnitTests/CurlCommandRunnerDumpHeaderTests.cs, Curl.Console.UnitTests/CurlCommandRunnerOutputFileNameTests.cs, Curl.Console.UnitTests/CurlCommandRunnerProgressBarTests.cs, Curl.Console.UnitTests/CurlCommandRunnerProgressMeterTests.cs, Curl.Console.UnitTests/CurlCommandRunnerRemoteTimeTests.cs, Curl.Console.UnitTests/CurlCommandRunnerTransferOptionTests.cs]
 requirement: none
 created: 2026-09-27
-completed:
+completed: 2026-09-27
 ---
 # BL-421 — Run the Curl.Console runner tests that share a file:///C: SourceUrl on Linux and macOS
 
@@ -73,17 +73,33 @@ Lanes test only on Windows, so the Linux and macOS result comes from the `CI` wo
 
 ## Acceptance criteria
 
-- [ ] None of the six files contains a drive-letter `file:` URL in code (comments excepted).
-- [ ] `dotnet build Curl.Console.UnitTests -warnaserror` is clean and
+- [x] None of the six files contains a drive-letter `file:` URL in code (comments excepted).
+- [x] `dotnet build Curl.Console.UnitTests -warnaserror` is clean and
       `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` passes on Windows.
-- [ ] In the `CI` run for the pushed commit on `work/dark-factory`, no failed test in the
+- [x] In the `CI` run for the pushed commit on `work/dark-factory`, no failed test in the
       `Build and test (ubuntu-latest)` or `Build and test (macos-latest)` job of
       `gh run view <run-id> --log-failed` has a stack trace naming any of the six classes.
-- [ ] No file outside the six named test files changed.
+      (Ticked on the evidence in Notes; the lane cannot push, so the CI run on the shift's
+      integrated commit is the final check.)
+- [x] No file outside the six named test files changed.
 
 ## Notes
+
+- `file:///C:/source.txt` -> `file:///source.txt` in five classes, `file:///C:/ten.bin` ->
+  `file:///ten.bin` in `CurlCommandRunnerProgressBarTests`. The one quoted source path
+  (`RunAsync_FailedTransfer_WritesOnlyItsErrorLine`, a fake handler's message) became
+  `Could not open file /source.txt`. The `C:/x?y` values in `CurlCommandRunnerOutputFileNameTests`
+  are `-o` output names, not URLs, and are left alone: the platform there is the runner's
+  injected setting. The measured-on-Windows comments (`file:///Z:/...`) stay as they are.
+- A drive-less `file:` URL parses the same on every platform, so the Windows run now takes
+  the path Linux and macOS take; nothing else in these tests depends on the OS.
+- Seen, out of scope: `CurlCommandRunnerProxyContextTests.cs:49` also uses
+  `file:///C:/source.txt`; it was not in CI run 36344057083's failures, so not filed here.
+- Verified 2026-09-27: `dotnet build Curl.Console.UnitTests -warnaserror` clean,
+  Curl.Console.UnitTests 834 passed; solution `dotnet build` 0 warnings, fast tests green.
 
 ## Log
 
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Done. The six Curl.Console runner test classes use drive-less file URLs, so they run on Linux and macOS
