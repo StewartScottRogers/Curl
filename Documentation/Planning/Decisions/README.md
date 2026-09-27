@@ -73,6 +73,7 @@ choices do not need one.
 | [0056](ADR-0056-non-http-schemes-tunnel-through-the-selected-proxy-and-ftp-is-forwarded-as-an-http-get.md) | Non-HTTP schemes tunnel through the selected proxy and `ftp://` is forwarded as an HTTP GET: `ITransferContext.Proxy` set for every scheme but `file`, TCP handlers set `ConnectTarget.Proxy` whatever `-p` says, `ftp` without `-p` goes to the HTTP handler, `tftp` fails with exit 7 as the reference build does, the ADR-0053 guard covers every tunnelled scheme | Accepted | 2026-09-27 |
 | [0057](ADR-0057-a-t-upload-over-http-resumes-from-c-with-curls-content-range.md) | A `-T` upload over HTTP resumes from `-C` with curl's `Content-Range`: `bytes N-(L-1)/L` after skipping N bytes, exit 18 at or past the end, exit 26 for an empty source, standard input sent whole with `bytes N-(N-2)/(N-1)`, `-C -` left to BL-351 | Accepted | 2026-09-27 |
 | [0058](ADR-0058-proxy-used-is-reported-by-the-http-handler-when-the-transfer-is-set-to-go-through-a-proxy.md) | `%{proxy_used}` is `TransferReport.UsedProxy`, set by the HTTP handler whenever a proxy was selected, forwarded or tunnelled, even when connecting to it fails | Accepted | 2026-09-27 |
+| [0059](ADR-0059-the-connect-tunnel-takes-a-and-the-platform-credential-encoding-from-the-composition.md) | The CONNECT tunnel sends the `-A` value (none for `-A ""`, `curl/8.21.0` without it) and encodes the proxy credential as the platform curl does; the proxy itself stays on the transfer context, no decorator | Accepted | 2026-09-27 |
 
 ## Template
 
