@@ -56,6 +56,7 @@ choices do not need one.
 | [0039](ADR-0039-a-64-bit-numeric-option-value-saturates-where-commandlineoptions-holds-less.md) | A 64-bit numeric option value saturates where `CommandLineOptions` holds less: `--tftp-blksize` and `--max-redirs` at 2^31-1, the timeouts at the longest `TimeSpan` | Accepted | 2026-09-26 |
 | [0040](ADR-0040-http-enforces-max-time-and-connect-timeout-in-the-handler.md) | The HTTP handler enforces `-m` and `--connect-timeout` itself on the transfer's clock, and maps failed sends to exit 55 | Accepted | 2026-09-26 |
 | [0041](ADR-0041-multipart-encoder-parts-are-encoded-whole-while-the-body-is-built.md) | Multipart `;encoder=` parts are encoded whole while the body is built: `binary` and `8bit` files still stream, `base64`, `quoted-printable` and `7bit` are read and encoded in memory, and a `7bit` refusal is reported after every other part | Accepted | 2026-09-26 |
+| [0042](ADR-0042-the-sws-emulation-carries-out-timing-commands-on-an-injected-clock-and-leaves-delay-unsupported.md) | The sws emulation carries out `idle`, `stream`, `writedelay`, `connection-monitor`, `upgrade` and `<postcmd>` `wait` on an injected clock, and leaves `delay` unsupported | Accepted | 2026-09-26 |
 
 ## Template
 
