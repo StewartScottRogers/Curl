@@ -21,6 +21,7 @@ public sealed class CommandLineOptions
     private readonly List<string> resolveEntries = [];
     private readonly List<string> connectToEntries = [];
     private readonly List<string> headers = [];
+    private readonly List<string> proxyHeaders = [];
     private readonly List<CommandLineCookie> cookies = [];
     private readonly List<string> warningLines = [];
     private readonly List<FormPartSpecification> formParts = [];
@@ -548,6 +549,12 @@ public sealed class CommandLineOptions
     /// with an <c>@file</c> value replaced by the file's non-empty lines in file order.
     /// </summary>
     public IReadOnlyList<string> Headers => headers;
+
+    /// <summary>
+    /// The <c>--proxy-header</c> values in command-line order, each verbatim, empty included,
+    /// with an <c>@file</c> value replaced by the file's non-empty lines in file order.
+    /// </summary>
+    public IReadOnlyList<string> ProxyHeaders => proxyHeaders;
 
     /// <summary>
     /// The multipart form <c>-F</c> / <c>--form</c> and <c>--form-string</c> values describe, one
@@ -1102,6 +1109,10 @@ public sealed class CommandLineOptions
     /// <summary>Appends <paramref name="header"/> to <see cref="Headers"/>, unchanged and unvalidated.</summary>
     /// <param name="header">A <c>-H</c> / <c>--header</c> value, or one line of its <c>@file</c>.</param>
     internal void AddHeader(string header) => headers.Add(header);
+
+    /// <summary>Appends <paramref name="header"/> to <see cref="ProxyHeaders"/>, unchanged and unvalidated.</summary>
+    /// <param name="header">A <c>--proxy-header</c> value, or one line of its <c>@file</c>.</param>
+    internal void AddProxyHeader(string header) => proxyHeaders.Add(header);
 
     /// <summary>
     /// Appends <paramref name="part"/> to the innermost multipart part still open, or to

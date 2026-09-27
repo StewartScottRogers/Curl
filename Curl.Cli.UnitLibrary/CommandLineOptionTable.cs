@@ -40,7 +40,7 @@ namespace Curl.Cli;
 /// silent and <c>--no-silent -s</c> is. <c>--no-silent=x</c> is accepted, its value ignored.
 /// <c>--no-tlsv1.2</c>, <c>--no-tlsv1.3</c>, <c>--no-url</c>, <c>--no-output</c> (even as the last
 /// argument), <c>--no-output=x</c>, <c>--no-data</c>, <c>--no-dump-header</c>, <c>--no-range</c>, <c>--no-time-cond</c>,
-/// <c>--no-request</c>, <c>--no-cookie</c>, <c>--no-cookie-jar</c>, <c>--no-header</c> (and <c>--no-header=x</c>), <c>--no-user-agent</c>, <c>--no-referer</c>,
+/// <c>--no-request</c>, <c>--no-cookie</c>, <c>--no-cookie-jar</c>, <c>--no-header</c> (and <c>--no-header=x</c>), <c>--no-proxy-header</c>, <c>--no-user-agent</c>, <c>--no-referer</c>,
 /// <c>--no-data-ascii</c>, <c>--no-data-binary</c>, <c>--no-data-raw</c>, <c>--no-data-urlencode</c>, <c>--no-json</c>,
 /// <c>--no-form</c>, <c>--no-form-string</c>,
 /// <c>--no-url-query</c>, <c>--no-max-redirs</c>, <c>--no-config</c>, <c>--no-http1.0</c>, <c>--no-http1.1</c>, <c>--no-http2</c>,
@@ -137,6 +137,7 @@ public static class CommandLineOptionTable
         CommandLineOption.Value("time-cond", 'z', SetTimeCondition),
         CommandLineOption.Text("request", 'X', (options, method) => options.RequestMethod = method),
         CommandLineOption.Value("header", 'H', AddHeaders),
+        CommandLineOption.Value("proxy-header", null, AddProxyHeaders),
         CommandLineOption.Value("user-agent", 'A', AcceptingEmpty((options, userAgent) => options.UserAgent = userAgent)),
         CommandLineOption.Value("referer", 'e', AcceptingEmpty(SetReferer)),
         CommandLineOption.Value("cookie", 'b', AcceptingEmpty((options, cookie) => options.AddCookie(cookie))),
@@ -414,16 +415,38 @@ public static class CommandLineOptionTable
     /// returns and line feeds, so empty lines are skipped, and warning about none, as curl 8.21.0 does.
     /// A file that cannot be read is refused with <see cref="CommandLineRefusal.DataFileUnreadable"/>.
     /// </summary>
-    private static CommandLineRefusal? AddHeaders(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    private static CommandLineRefusal? AddHeaders(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader) =>
+        AddHeaderValue(options, value, spelledOption, dataFileReader, CommandLineWarning.HeaderDoesNotLookLikeAHeader, options.AddHeader);
+
+    /// <summary>
+    /// Adds a <c>--proxy-header</c> value to the proxy headers exactly as <see cref="AddHeaders"/> adds
+    /// a <c>-H</c> value, warning with <see cref="CommandLineWarning.ProxyHeaderDoesNotLookLikeAHeader(string)"/>
+    /// instead, as curl 8.21.0 does.
+    /// </summary>
+    private static CommandLineRefusal? AddProxyHeaders(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader) =>
+        AddHeaderValue(options, value, spelledOption, dataFileReader, CommandLineWarning.ProxyHeaderDoesNotLookLikeAHeader, options.AddProxyHeader);
+
+    /// <summary>
+    /// Adds one <c>-H</c> or <c>--proxy-header</c> value through <paramref name="addHeader"/>: verbatim,
+    /// after the <paramref name="notAHeaderWarning"/> line when it holds neither a colon nor a semicolon,
+    /// or, for <c>@file</c>, each non-empty line of the file, unwarned.
+    /// </summary>
+    private static CommandLineRefusal? AddHeaderValue(
+        CommandLineOptions options,
+        string value,
+        string spelledOption,
+        IDataFileReader dataFileReader,
+        Func<string, string> notAHeaderWarning,
+        Action<string> addHeader)
     {
         if (!value.StartsWith('@'))
         {
             if (!value.AsSpan().ContainsAny(':', ';'))
             {
-                options.AddWarningLinesUnlessSilent([CommandLineWarning.HeaderDoesNotLookLikeAHeader(value)]);
+                options.AddWarningLinesUnlessSilent([notAHeaderWarning(value)]);
             }
 
-            options.AddHeader(value);
+            addHeader(value);
             return null;
         }
 
@@ -432,7 +455,7 @@ public static class CommandLineOptionTable
         {
             foreach (string line in Encoding.UTF8.GetString(contents).Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
             {
-                options.AddHeader(line);
+                addHeader(line);
             }
         }
 
