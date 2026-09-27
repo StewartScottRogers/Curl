@@ -76,6 +76,7 @@ choices do not need one.
 | [0059](ADR-0059-the-connect-tunnel-takes-a-and-the-platform-credential-encoding-from-the-composition.md) | The CONNECT tunnel sends the `-A` value (none for `-A ""`, `curl/8.21.0` without it) and encodes the proxy credential as the platform curl does; the proxy itself stays on the transfer context, no decorator | Accepted | 2026-09-27 |
 | [0060](ADR-0060-referer-filename-effective-conn-id-and-xfer-id-come-from-curl-console.md) | `%{referer}`, `%{filename_effective}`, `%{conn_id}` and `%{xfer_id}` are set by `Curl.Console` on `TransferWriteOutVariables`; `conn_id` is `-1` for a URL rejected with exit 1 or 3 | Accepted | 2026-09-27 |
 | [0061](ADR-0061-an-https-proxy-is-tunnelled-over-its-own-tls-handshake-through-the-transfers-tls-provider.md) | An HTTPS proxy gets TLS to the proxy host, then the HTTP-proxy CONNECT inside it, then target TLS inside that; the proxy handshake uses the transfer's TLS provider until the `--proxy-*` TLS options land (BL-362) | Accepted | 2026-09-27 |
+| [0062](ADR-0062-form-parts-from-standard-input-read-it-once-across-urls.md) | `-F name=@-` and `-F name=<-` read standard input once: the first URL matches curl, a later part or URL sends an empty part with a matching `Content-Length` and exit 0, where curl declares the first length and exits 26 | Accepted | 2026-09-27 |
 
 ## Template
 
