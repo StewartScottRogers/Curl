@@ -42,6 +42,7 @@ public sealed partial class HttpProtocolHandlerTests
             Assert.AreEqual(expected, connection.Written, $"Chunk size {chunkSize}");
             Assert.AreEqual("ok", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
             Assert.AreEqual(new ConnectTarget("127.0.0.1", 18183, false), connector.Targets.Single(), $"Chunk size {chunkSize}");
+            Assert.IsTrue(result.Report!.UsedProxy, $"Chunk size {chunkSize}");
             HttpAuthRequest proxyRequest = authenticator.Calls.Single(call => call.Request.IsProxy).Request;
             Assert.AreEqual(
                 new HttpAuthRequest("GET", CurlUrl.Parse("http://Example.com/a/b?c=d"), "/a/b?c=d", LoopbackProxy.Credential, null, HttpAuthSchemes.Basic, true),
@@ -264,7 +265,46 @@ public sealed partial class HttpProtocolHandlerTests
             Assert.AreEqual(expected, connection.Written, $"Chunk size {chunkSize}");
             Assert.AreEqual(new ConnectTarget(host, port, useTls) { Proxy = proxy }, connector.Targets.Single(), $"Chunk size {chunkSize}");
             Assert.IsFalse(authenticator.Calls.Any(call => call.Request.IsProxy), $"Chunk size {chunkSize}");
+            Assert.IsTrue(result.Report!.UsedProxy, $"Chunk size {chunkSize}");
         }
+    }
+
+    /// <summary>
+    /// Measured: <c>curl -s -w "%{proxy_used}" http://127.0.0.1:18081/</c> prints <c>0</c> for
+    /// a direct transfer (BL-302 Notes).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_WithoutProxy_ReportsNoProxyUsed()
+    {
+        TurnTakingConnection connection = new(int.MaxValue, ProxyOkHead + "ok");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new OriginAndProxyAuthenticator(null, null, null))
+            .ExecuteAsync(ProxyContext("http://127.0.0.1:18081/", new MemoryStream(), new HttpRequestOptions()));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.IsFalse(result.Report!.UsedProxy);
+    }
+
+    /// <summary>
+    /// Measured: <c>curl -s -x http://127.0.0.1:1 -w "%{proxy_used} %{exitcode}"
+    /// http://example.test/</c> prints <c>1 7</c>, and the same through <c>socks5://127.0.0.1:1</c>:
+    /// the proxy counts as used even when connecting to it fails (BL-302 Notes).
+    /// </summary>
+    [TestMethod]
+    [DataRow(ProxyKind.Http, DisplayName = "forwarding HTTP proxy")]
+    [DataRow(ProxyKind.Socks5, DisplayName = "tunnelling SOCKS5 proxy")]
+    public async Task ExecuteAsync_ProxyConnectFails_ReportsTheProxyUsed(ProxyKind kind)
+    {
+        const string message = "Failed to connect to 127.0.0.1 port 1 after 0 ms: Could not connect to server";
+        QueueConnector connector = new(ConnectResult.Failed(CurlExitCode.CouldntConnect, message));
+        HttpRequestOptions options = new() { ForwardProxy = new ProxyEndpoint(kind, "127.0.0.1", 1, null) };
+
+        TransferResult result = await new HttpProtocolHandler(connector, new OriginAndProxyAuthenticator(null, null, null))
+            .ExecuteAsync(ProxyContext("http://example.test/", new MemoryStream(), options));
+
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.AreEqual(message, result.ErrorMessage);
+        Assert.IsTrue(result.Report!.UsedProxy);
     }
 
     private static TransferContext ProxyContext(string url, Stream output, HttpRequestOptions options) =>

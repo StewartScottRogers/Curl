@@ -95,6 +95,7 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.AreEqual(0L, result.BytesTransferred);
         Assert.AreEqual(0L, output.Length);
         Assert.AreEqual(0L, headerOutput.Length);
+        Assert.IsNull(result.Report);
     }
 
     [TestMethod]

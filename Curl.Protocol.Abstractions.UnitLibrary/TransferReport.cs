@@ -25,6 +25,13 @@ public sealed record TransferReport
     public int ProxyConnectResponseCode { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether the transfer was set to go through a proxy, forwarded
+    /// or tunnelled, even when connecting to it failed, the source of <c>%{proxy_used}</c>;
+    /// <see langword="false" /> for a direct transfer (ADR-0058).
+    /// </summary>
+    public bool UsedProxy { get; init; }
+
+    /// <summary>
     /// Gets the protocol version of the last response's status line, the source of
     /// <c>%{http_version}</c>; <see langword="null" /> for a non-HTTP transfer or before
     /// any response.

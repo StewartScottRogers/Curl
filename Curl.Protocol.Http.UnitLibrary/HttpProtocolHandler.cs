@@ -249,7 +249,8 @@ public sealed class HttpProtocolHandler(
         ConnectResult connect = await plan.Deadline.ConnectAsync(connector, TargetOf(plan)).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
         {
-            return TransferResult.Failure(connect.ExitCode, connect.ErrorMessage!);
+            TransferResult failure = TransferResult.Failure(connect.ExitCode, connect.ErrorMessage!);
+            return plan.Options.ForwardProxy is null ? failure : failure with { Report = new TransferReport { UsedProxy = true } };
         }
 
         HttpAttemptOutcome outcome;
@@ -300,7 +301,10 @@ public sealed class HttpProtocolHandler(
             SharedHeadLength = framing.AwaitsContinue ? 0 : request.Length,
             IsUpload = framing.IsUpload,
         };
-        HttpExchange exchange = new(connect, connection, framing.Method, request.Length, upload, earlier, newConnection);
+        HttpExchange exchange = new(connect, connection, framing.Method, request.Length, upload, earlier, newConnection)
+        {
+            UsedProxy = options.ForwardProxy is not null,
+        };
         IConnection responseConnection = framing.AwaitsContinue ? new HttpContinueWaitConnection(connection) : connection;
         HttpResponseBodyReader body = new(responseConnection)
         {
@@ -624,6 +628,12 @@ public sealed class HttpProtocolHandler(
         internal HttpResponseHead? Head { get; set; }
 
         /// <summary>
+        /// Gets a value indicating whether the transfer goes through a proxy, forwarded or
+        /// tunnelled, the report's <see cref="TransferReport.UsedProxy" />.
+        /// </summary>
+        internal bool UsedProxy { get; init; }
+
+        /// <summary>
         /// Gets or sets the final head's <c>Location</c> resolved against the request URL,
         /// <see langword="null" /> until the head is read or when it names none.
         /// </summary>
@@ -647,6 +657,7 @@ public sealed class HttpProtocolHandler(
                 HeaderSize = earlier?.HeaderSize ?? 0,
                 ConnectionCount = (earlier?.ConnectionCount ?? 0) + (newConnection ? 1 : 0),
                 ProxyConnectResponseCode = connect.ProxyConnectResponseCode,
+                UsedProxy = UsedProxy,
                 LocalEndPoint = connect.LocalEndPoint,
                 PeerCertificates = connect.PeerCertificates,
                 RemoteEndPoint = connection.RemoteEndPoint as IPEndPoint,

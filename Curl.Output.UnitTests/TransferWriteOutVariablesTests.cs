@@ -486,6 +486,34 @@ public sealed class TransferWriteOutVariablesTests
     }
 
     [TestMethod]
+    [DataRow("file:///Z:/bl284tmp/wo.txt", "file")]
+    [DataRow("http://127.0.0.1:18081/", "http")]
+    public void TryGetVariableText_ProxyUsedWithoutProxy_IsZero(string url, string scheme)
+    {
+        // curl -s -w "%{proxy_used}" for file:// and a direct http:// transfer (BL-284's and BL-302's Notes).
+        TransferWriteOutVariables variables = new(TransferResult.Success(0) with { Report = new TransferReport() }, url, 0, url, scheme, Clock);
+
+        Assert.AreEqual("0", Get(variables, "proxy_used"));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_ProxyUsedWithoutReport_IsZero()
+    {
+        TransferWriteOutVariables variables = new(TransferResult.Success(0), LoopbackUrl, 0, LoopbackUrl, "http", Clock);
+
+        Assert.AreEqual("0", Get(variables, "proxy_used"));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_ProxyUsedThroughProxy_IsOne()
+    {
+        // curl -s -x http://127.0.0.1:18080 -w "%{proxy_used}" http://example.test/, forwarded and with -p (BL-302's Notes).
+        TransferWriteOutVariables variables = WithReport(new TransferReport { UsedProxy = true });
+
+        Assert.AreEqual("1", Get(variables, "proxy_used"));
+    }
+
+    [TestMethod]
     public void TryGetVariableText_CertificatesWithoutReport_AreZeroAndNothing()
     {
         TransferWriteOutVariables variables = new(TransferResult.Success(0), LoopbackUrl, 0, LoopbackUrl, "http", Clock);

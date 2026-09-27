@@ -16,6 +16,7 @@ public sealed class TransferReportTests
 
         Assert.AreEqual(0, report.ResponseCode);
         Assert.AreEqual(0, report.ProxyConnectResponseCode);
+        Assert.IsFalse(report.UsedProxy);
         Assert.IsNull(report.HttpVersion);
         Assert.IsNull(report.Method);
         Assert.IsEmpty(report.ResponseHeaders);
@@ -62,6 +63,7 @@ public sealed class TransferReportTests
         {
             ResponseCode = 302,
             ProxyConnectResponseCode = 200,
+            UsedProxy = true,
             HttpVersion = new Version(1, 1),
             Method = "POST",
             ResponseHeaders = headers,
@@ -82,6 +84,7 @@ public sealed class TransferReportTests
 
         Assert.AreEqual(302, report.ResponseCode);
         Assert.AreEqual(200, report.ProxyConnectResponseCode);
+        Assert.IsTrue(report.UsedProxy);
         Assert.AreEqual(new Version(1, 1), report.HttpVersion);
         Assert.AreEqual("POST", report.Method);
         Assert.AreSame(headers, report.ResponseHeaders);
