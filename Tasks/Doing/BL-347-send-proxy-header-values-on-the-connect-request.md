@@ -34,3 +34,4 @@ The CONNECT request curl sends to an HTTP proxy (https URL, `-p`) carries the `-
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
