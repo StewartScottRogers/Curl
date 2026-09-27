@@ -33,3 +33,4 @@ A verbose formatter renders `* `, `> ` and `< ` lines from BL-163's transfer eve
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-27: Backlog -> Doing.
