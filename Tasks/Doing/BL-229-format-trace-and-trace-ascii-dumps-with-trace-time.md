@@ -33,3 +33,4 @@ Trace formatters render `--trace` and `--trace-ascii` dumps, with `--trace-time`
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-27: Backlog -> Doing.
