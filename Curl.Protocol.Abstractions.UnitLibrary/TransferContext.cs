@@ -87,5 +87,8 @@ public sealed class TransferContext : ITransferContext
     public ITransferEvents Events { get; init; } = NoTransferEvents.Instance;
 
     /// <inheritdoc />
+    public ITransferProgress Progress { get; init; } = NoTransferProgress.Instance;
+
+    /// <inheritdoc />
     public CancellationToken CancellationToken { get; init; }
 }

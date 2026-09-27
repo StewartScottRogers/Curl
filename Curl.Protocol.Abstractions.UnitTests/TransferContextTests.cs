@@ -40,6 +40,7 @@ public sealed class TransferContextTests
         Assert.IsNull(context.Http);
         Assert.AreSame(TimeProvider.System, context.TimeProvider);
         Assert.AreSame(NoTransferEvents.Instance, context.Events);
+        Assert.AreSame(NoTransferProgress.Instance, context.Progress);
         Assert.AreEqual(CancellationToken.None, context.CancellationToken);
     }
 
@@ -61,6 +62,7 @@ public sealed class TransferContextTests
         var proxy = new ProxyEndpoint(ProxyKind.Http, "proxy.example", 3128, null);
         var http = new HttpRequestOptions { CustomMethod = "PATCH" };
         var events = new StubTransferEvents();
+        var progress = new StubTransferProgress();
 
         var context = new TransferContext
         {
@@ -88,6 +90,7 @@ public sealed class TransferContextTests
             Http = http,
             TimeProvider = timeProvider,
             Events = events,
+            Progress = progress,
             CancellationToken = cancellation.Token,
         };
 
@@ -116,6 +119,7 @@ public sealed class TransferContextTests
         Assert.AreSame(http, context.Http);
         Assert.AreSame(timeProvider, context.TimeProvider);
         Assert.AreSame(events, context.Events);
+        Assert.AreSame(progress, context.Progress);
         Assert.AreEqual(cancellation.Token, context.CancellationToken);
     }
 

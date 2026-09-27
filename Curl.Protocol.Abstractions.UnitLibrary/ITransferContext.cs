@@ -261,6 +261,17 @@ public interface ITransferContext
     ITransferEvents Events { get; }
 
     /// <summary>
+    /// Gets where the handler reports how far the transfer has got, for the progress meter.
+    /// Never <see langword="null" />.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="NoTransferProgress.Instance" /> when nobody is listening. A handler calls
+    /// <see cref="ITransferProgress.ReportTransferStarted" /> once it is past connect or open,
+    /// and may report running byte totals (ADR-0045).
+    /// </remarks>
+    ITransferProgress Progress { get; }
+
+    /// <summary>
     /// Gets the token that cancels this transfer.
     /// </summary>
     CancellationToken CancellationToken { get; }
