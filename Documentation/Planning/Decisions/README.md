@@ -75,6 +75,7 @@ choices do not need one.
 | [0058](ADR-0058-proxy-used-is-reported-by-the-http-handler-when-the-transfer-is-set-to-go-through-a-proxy.md) | `%{proxy_used}` is `TransferReport.UsedProxy`, set by the HTTP handler whenever a proxy was selected, forwarded or tunnelled, even when connecting to it fails | Accepted | 2026-09-27 |
 | [0059](ADR-0059-the-connect-tunnel-takes-a-and-the-platform-credential-encoding-from-the-composition.md) | The CONNECT tunnel sends the `-A` value (none for `-A ""`, `curl/8.21.0` without it) and encodes the proxy credential as the platform curl does; the proxy itself stays on the transfer context, no decorator | Accepted | 2026-09-27 |
 | [0060](ADR-0060-referer-filename-effective-conn-id-and-xfer-id-come-from-curl-console.md) | `%{referer}`, `%{filename_effective}`, `%{conn_id}` and `%{xfer_id}` are set by `Curl.Console` on `TransferWriteOutVariables`; `conn_id` is `-1` for a URL rejected with exit 1 or 3 | Accepted | 2026-09-27 |
+| [0061](ADR-0061-an-https-proxy-is-tunnelled-over-its-own-tls-handshake-through-the-transfers-tls-provider.md) | An HTTPS proxy gets TLS to the proxy host, then the HTTP-proxy CONNECT inside it, then target TLS inside that; the proxy handshake uses the transfer's TLS provider until the `--proxy-*` TLS options land (BL-361) | Accepted | 2026-09-27 |
 
 ## Template
 
