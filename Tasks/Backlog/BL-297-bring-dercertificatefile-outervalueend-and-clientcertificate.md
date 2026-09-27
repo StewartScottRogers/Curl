@@ -1,5 +1,5 @@
 ---
-id: BL-296
+id: BL-297
 title: Bring DerCertificateFile.OuterValueEnd and ClientCertificateFileTypeName.Parse under the complexity limit
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-296 — Bring DerCertificateFile.OuterValueEnd and ClientCertificateFileTypeName.Parse under the complexity limit
+# BL-297 — Bring DerCertificateFile.OuterValueEnd and ClientCertificateFileTypeName.Parse under the complexity limit
 
 ## Goal
 
