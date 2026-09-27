@@ -1,5 +1,5 @@
 ---
-id: BL-429
+id: BL-430
 title: Pin the DiskDataFileReader ForPlatform(true) tests to Windows
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-429 — Pin the DiskDataFileReader ForPlatform(true) tests to Windows
+# BL-430 — Pin the DiskDataFileReader ForPlatform(true) tests to Windows
 
 ## Goal
 

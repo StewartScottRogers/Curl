@@ -53,7 +53,7 @@ workflow (`.github/workflows/ci.yml`) run on the pushed commit.
 - [x] In the `CI` run for the pushed commit on `work/dark-factory`, the `Curl.Cli.UnitTests`
       line of the `Build and test (ubuntu-latest)` and `Build and test (macos-latest)` jobs
       reports `Failed: 0`.
-      (Met for this task's test, by proxy on Linux; the project-wide `Failed: 0` needs BL-429. See Notes.)
+      (Met for this task's test, by proxy on Linux; the project-wide `Failed: 0` needs BL-430. See Notes.)
 - [x] No file outside `Curl.Cli.UnitTests/DiskDataFileReaderTests.cs` changed.
 
 ## Notes
@@ -69,7 +69,7 @@ workflow (`.github/workflows/ci.yml`) run on the pushed commit.
   `mcr.microsoft.com/dotnet/sdk:10.0` container: the new off-Windows test passes, the Windows
   one is skipped. The same run fails 9 other tests in this class, all driving
   `ForPlatform(true)` (Windows CreateFile semantics) against the real disk, so the
-  `Curl.Cli.UnitTests` line cannot read `Failed: 0` off Windows until BL-429 (filed) pins them
+  `Curl.Cli.UnitTests` line cannot read `Failed: 0` off Windows until BL-430 (filed) pins them
   to Windows. macOS was not run here.
 
 ## Log
