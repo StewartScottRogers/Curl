@@ -89,6 +89,35 @@ public sealed class FileOpenFailureTests
     }
 
     [TestMethod]
+    public void StatusFor_FileExistsIOException_IsAlreadyExists()
+    {
+        var status = FileOpenFailure.StatusFor(new IOException("exists", unchecked((int)0x80070050)), pathIsDirectory: false);
+
+        Assert.AreEqual(FileAccessStatus.AlreadyExists, status);
+    }
+
+    [TestMethod]
+    [DataRow(unchecked((int)0x80070050))]
+    [DataRow(unchecked((int)0x800700B7))]
+    [DataRow(17)]
+    public void IsFileExists_IOExceptionWithAnExistsCode_IsTrue(int hresult)
+    {
+        Assert.IsTrue(FileOpenFailure.IsFileExists(new IOException("exists", hresult)));
+    }
+
+    [TestMethod]
+    public void IsFileExists_IOExceptionWithAnotherCode_IsFalse()
+    {
+        Assert.IsFalse(FileOpenFailure.IsFileExists(new IOException("other", unchecked((int)0x80070020))));
+    }
+
+    [TestMethod]
+    public void IsFileExists_OtherExceptionWithAnExistsCode_IsFalse()
+    {
+        Assert.IsFalse(FileOpenFailure.IsFileExists(new InvalidOperationException("exists") { HResult = 17 }));
+    }
+
+    [TestMethod]
     public void Win32ErrorCodeOf_FileNotFoundException_IsErrorFileNotFound()
     {
         Assert.AreEqual(2, FileOpenFailure.Win32ErrorCodeOf(new FileNotFoundException()));
