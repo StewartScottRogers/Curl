@@ -78,6 +78,20 @@ internal static class TlsFailureMessages
         [unchecked((int)0x80090331)] = "SEC_E_ALGORITHM_MISMATCH",
     }.ToFrozenDictionary();
 
+    // A socket error during the handshake is curl's "Recv failure: " and the error as each
+    // build names it: its own Winsock table in the Schannel build, strerror in the OpenSSL
+    // build (BL-369, measured; ADR-0087). Any other socket error's own message stands in.
+    private static readonly FrozenDictionary<SocketError, string> SchannelSocketErrorTexts = new Dictionary<SocketError, string>
+    {
+        [SocketError.ConnectionReset] = "Connection was reset",
+        [SocketError.ConnectionAborted] = "Connection was aborted",
+    }.ToFrozenDictionary();
+
+    private static readonly FrozenDictionary<SocketError, string> OpenSslSocketErrorTexts = new Dictionary<SocketError, string>
+    {
+        [SocketError.ConnectionReset] = "Connection reset by peer",
+    }.ToFrozenDictionary();
+
     /// <summary>
     /// The Schannel build's message for exit 60: the server certificate or its host name
     /// did not verify.
@@ -179,12 +193,18 @@ internal static class TlsFailureMessages
 
     /// <summary>
     /// The Schannel build's message for exit 35: the handshake failed for a reason other
-    /// than verification, named by the security status Schannel returned.
+    /// than verification, named by the security status Schannel returned, or by the socket
+    /// error when the connection failed under it.
     /// </summary>
     /// <param name="exception">What the handshake threw.</param>
     /// <returns>The message curl prints.</returns>
     public static string SchannelSslConnectError(Exception exception)
     {
+        if (RecvFailure(exception, SchannelSocketErrorTexts) is { } recvFailure)
+        {
+            return recvFailure;
+        }
+
         var securityStatus = FindInnerException<Win32Exception>(exception);
         if (securityStatus is null)
         {
@@ -202,13 +222,19 @@ internal static class TlsFailureMessages
     /// </summary>
     /// <param name="exception">What the handshake threw.</param>
     /// <returns>
-    /// The message curl prints. When no OpenSSL error string is in the exception, a bare
-    /// <see cref="IOException" /> innermost, which is how <see cref="SslStream" /> reports
-    /// the server closing mid-handshake, is OpenSSL's unexpected-EOF error string; any other
-    /// innermost exception's message stands in for one.
+    /// The message curl prints. A socket error, such as the server resetting the connection,
+    /// is curl's <c>Recv failure</c> line. Otherwise, when no OpenSSL error string is in the
+    /// exception, a bare <see cref="IOException" /> innermost, which is how
+    /// <see cref="SslStream" /> reports the server closing mid-handshake, is OpenSSL's
+    /// unexpected-EOF error string; any other innermost exception's message stands in for one.
     /// </returns>
     public static string OpenSslSslConnectError(Exception exception)
     {
+        if (RecvFailure(exception, OpenSslSocketErrorTexts) is { } recvFailure)
+        {
+            return recvFailure;
+        }
+
         var innermost = exception;
         for (var current = exception; current is not null; current = current.InnerException)
         {
@@ -524,6 +550,14 @@ internal static class TlsFailureMessages
         var alternativeNames = FindAlternativeNames(certificate);
         return alternativeNames is not null
             && (alternativeNames.EnumerateDnsNames().Any() || alternativeNames.EnumerateIPAddresses().Any());
+    }
+
+    private static string? RecvFailure(Exception exception, FrozenDictionary<SocketError, string> socketErrorTexts)
+    {
+        var socketError = FindInnerException<SocketException>(exception);
+        return socketError is null
+            ? null
+            : $"Recv failure: {socketErrorTexts.GetValueOrDefault(socketError.SocketErrorCode, socketError.Message)}";
     }
 
     private static T? FindInnerException<T>(Exception exception)

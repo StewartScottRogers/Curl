@@ -81,12 +81,55 @@ public sealed class TlsFailureMessagesTests
     {
         var exception = new AuthenticationException(
             "Authentication failed, see inner exception.",
-            new IOException("Unable to read data from the transport connection.", new SocketException(10054)));
+            new InvalidOperationException("Some failure."));
 
         var message = TlsFailureMessages.OpenSslSslConnectError(exception);
 
-        Assert.AreEqual($"TLS connect error: {new SocketException(10054).Message}", message);
+        Assert.AreEqual("TLS connect error: Some failure.", message);
     }
+
+    // BL-369: what SslStream throws when the server resets the connection mid-handshake,
+    // measured against curl 8.21.0 in each build.
+    [TestMethod]
+    [DataRow(SocketError.ConnectionReset, "Recv failure: Connection was reset")]
+    [DataRow(SocketError.ConnectionAborted, "Recv failure: Connection was aborted")]
+    public void SchannelSslConnectError_WhenTheServerResetsMidHandshake_IsTheMeasuredRecvFailureLine(
+        SocketError socketError,
+        string expected)
+    {
+        var message = TlsFailureMessages.SchannelSslConnectError(ResetDuringHandshake(socketError));
+
+        Assert.AreEqual(expected, message);
+    }
+
+    [TestMethod]
+    public void OpenSslSslConnectError_WhenTheServerResetsMidHandshake_IsTheMeasuredRecvFailureLine()
+    {
+        var message = TlsFailureMessages.OpenSslSslConnectError(ResetDuringHandshake(SocketError.ConnectionReset));
+
+        Assert.AreEqual("Recv failure: Connection reset by peer", message);
+    }
+
+    [TestMethod]
+    [DataRow(SchannelBuild)]
+    [DataRow(OpenSslBuild)]
+    public void SslConnectError_WithASocketErrorCurlIsNotMeasuredFor_UsesTheSocketErrorsOwnMessage(bool schannelBuild)
+    {
+        var exception = ResetDuringHandshake(SocketError.NetworkDown);
+
+        var message = schannelBuild
+            ? TlsFailureMessages.SchannelSslConnectError(exception)
+            : TlsFailureMessages.OpenSslSslConnectError(exception);
+
+        Assert.AreEqual($"Recv failure: {new SocketException((int)SocketError.NetworkDown).Message}", message);
+    }
+
+    private const bool SchannelBuild = true;
+
+    private const bool OpenSslBuild = false;
+
+    private static IOException ResetDuringHandshake(SocketError socketError) =>
+        new("Unable to read data from the transport connection.", new SocketException((int)socketError));
 
     [TestMethod]
     [DataRow(false, "schannel: SEC_E_UNTRUSTED_ROOT (0x80090325) - The certificate chain was issued by an authority that is not trusted.")]

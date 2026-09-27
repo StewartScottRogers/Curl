@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Security;
+using System.Net.Sockets;
 using System.Security.Authentication;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
@@ -333,6 +334,25 @@ public sealed partial class SslStreamTlsProviderTests
         Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
         Assert.AreEqual(expected, result.ErrorMessage);
         Assert.IsTrue(client.IsDisposed);
+    }
+
+    // BL-369 measured both builds against a server that resets the connection mid-handshake.
+    [TestMethod]
+    [DataRow(SchannelBuild, SocketError.ConnectionReset, "Recv failure: Connection was reset")]
+    [DataRow(SchannelBuild, SocketError.ConnectionAborted, "Recv failure: Connection was aborted")]
+    [DataRow(OpenSslBuild, SocketError.ConnectionReset, "Recv failure: Connection reset by peer")]
+    public async Task AuthenticateAsClientAsync_WhenTheServerResetsMidHandshake_ReportsTheMeasuredLine(
+        bool matchesSchannelBuild,
+        SocketError socketError,
+        string expected)
+    {
+        var provider = new SslStreamTlsProvider(new TlsClientOptions(Insecure: true), matchesSchannelBuild);
+
+        var result = await provider.AuthenticateAsClientAsync(
+            new ResettingConnection(socketError), CertificateHost, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
+        Assert.AreEqual(expected, result.ErrorMessage);
     }
 
     [TestMethod]
