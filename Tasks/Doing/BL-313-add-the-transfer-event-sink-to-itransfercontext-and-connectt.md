@@ -36,3 +36,4 @@ BL-163 recorded ADR-0046 (`Documentation/Planning/Decisions/ADR-0046-the-transfe
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-27: Backlog -> Doing.
