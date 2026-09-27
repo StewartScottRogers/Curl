@@ -37,3 +37,4 @@ An ADR, marked "Decided by Claude under Stewart's delegation", records the behav
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
