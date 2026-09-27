@@ -58,10 +58,18 @@ which a byte stream cannot express. The tests in the matching `.UnitTests` proje
   `blksize` comes into force and the block count restarts, so the next DATA is block 1
   again, carrying the next bytes of the upload (nothing is re-read) at the new size.
   An OACK after the last block has gone sends an empty DATA 1.
-- Through an HTTP proxy (`ITransferContext.Proxy` of kind `Http` or `Http10`), no
-  datagram is sent: the optional `IConnector` connects to the proxy, the MASQUE
-  `connect-udp` request curl 8.21.0's Schannel build sends is written to it
-  (`TftpMasqueRequest`), and the transfer ends with exit 7
-  `bind() failed; Invalid arguments`, before the file name is checked (ADR-0056, rule 4;
-  measured by BL-330 and BL-345). Without that connector the request is not sent but the
-  result is the same. SOCKS and HTTPS proxies are not handled here yet.
+- Through an HTTP or HTTPS proxy (`ITransferContext.Proxy` of kind `Http`, `Http10` or
+  `Https`), no datagram is sent: the optional `IConnector` connects to the proxy (TLS for
+  `Https`, `IsForwardProxy` set), the MASQUE `connect-udp` request curl 8.21.0's Schannel
+  build sends is written to it (`TftpMasqueRequest`; `https://` in the request line for an
+  HTTPS proxy), and the proxy's reply header block decides the failure
+  (`TftpMasqueReply`): `101` or `2xx` is exit 7 `bind() failed; Invalid arguments`, any
+  other status exit 7 `CONNECT-UDP tunnel failed, response N` (0 for a first line that is
+  not a status line), a close before the header block ends exit 56
+  `Proxy CONNECT aborted`. All of it happens before the file name is checked (ADR-0056,
+  rule 4; ADR-0096; measured by BL-330, BL-345 and BL-398). Without that connector the
+  request is not sent and the result is exit 7 `bind() failed; Invalid arguments`.
+- Through a SOCKS proxy (`Socks4`, `Socks4a`, `Socks5`, `Socks5Hostname`) nothing is sent,
+  neither to the proxy nor to the server, and the transfer ends with exit 97
+  `Send failure: Socket is not connected`, before the file name is checked (ADR-0096;
+  measured by BL-398).

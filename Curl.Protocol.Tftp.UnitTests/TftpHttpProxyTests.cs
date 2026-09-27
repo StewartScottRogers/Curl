@@ -7,10 +7,11 @@ using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 namespace Curl.Protocol.Tftp;
 
 /// <summary>
-/// Pins <c>tftp://</c> through an HTTP proxy against curl 8.21.0's Schannel build
-/// (ADR-0056, rule 4), measured by BL-330 and BL-345 against a loopback listener: the
-/// MASQUE <c>connect-udp</c> request goes to the proxy, no datagram is sent, and the
-/// transfer ends with exit 7 <c>bind() failed; Invalid arguments</c>.
+/// Pins <c>tftp://</c> through a proxy against curl 8.21.0's Schannel build (ADR-0056,
+/// rule 4; ADR-0096), measured by BL-330, BL-345 and BL-398 against a loopback listener:
+/// through an HTTP or HTTPS proxy the MASQUE <c>connect-udp</c> request goes to the proxy,
+/// no datagram is sent, and the proxy's reply decides the exit 7 or 56 failure; through a
+/// SOCKS proxy nothing is sent and the transfer ends with exit 97.
 /// </summary>
 [TestClass]
 public sealed class TftpHttpProxyTests
@@ -42,7 +43,7 @@ public sealed class TftpHttpProxyTests
         CollectionAssert.AreEqual(ExpectedRequest, connection.Written);
         Assert.IsEmpty(datagramConnector.Opens);
         Assert.IsTrue(connection.IsDisposed);
-        Assert.AreEqual(new ConnectTarget("127.0.0.1", 18331, UseTls: false), proxyConnector.Targets.Single());
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 18331, UseTls: false) { IsForwardProxy = true }, proxyConnector.Targets.Single());
     }
 
     [TestMethod]
@@ -180,16 +181,134 @@ public sealed class TftpHttpProxyTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_SocksProxy_IsNotSentTheMasqueRequest()
+    [DataRow(ProxyKind.Socks4, "tftp://example.com/f")]
+    [DataRow(ProxyKind.Socks4a, "tftp://example.com/f")]
+    [DataRow(ProxyKind.Socks5, "tftp://example.com/f")]
+    [DataRow(ProxyKind.Socks5Hostname, "tftp://example.com/f")]
+    [DataRow(ProxyKind.Socks5, "tftp://example.com/")]
+    public async Task ExecuteAsync_SocksProxy_SendsNothingAndFailsWithSendFailure(ProxyKind kind, string url)
     {
+        // Measured (BL-398): curl -sS --socks5 127.0.0.1:18398 tftp://example.com/f, and
+        // --socks4, --socks4a, --socks5-hostname and a URL with no file name, all exit 97
+        // with nothing sent to the proxy.
         var datagramConnector = DatagramConnector();
         var proxyConnector = new RecordingConnector(ConnectResult.Connected(new RecordingConnection()));
 
-        await new TftpProtocolHandler(datagramConnector, proxyConnector)
-            .ExecuteAsync(Context("tftp://example.com/f", new ProxyEndpoint(ProxyKind.Socks5, "127.0.0.1", 1080, null)));
+        var result = await new TftpProtocolHandler(datagramConnector, proxyConnector)
+            .ExecuteAsync(Context(url, new ProxyEndpoint(kind, "127.0.0.1", 18398, null)));
 
+        Assert.AreEqual(CurlExitCode.Proxy, result.ExitCode);
+        Assert.AreEqual("Send failure: Socket is not connected", result.ErrorMessage);
         Assert.IsEmpty(proxyConnector.Targets);
-        Assert.HasCount(1, datagramConnector.Opens);
+        Assert.IsEmpty(datagramConnector.Opens);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_HttpsProxy_SendsMeasuredMasqueRequestOverTls()
+    {
+        // Measured (BL-398): curl -sS --proxy-insecure -x https://127.0.0.1:18398 tftp://example.com/f
+        // against a TLS loopback proxy answering 200.
+        var connection = new RecordingConnection();
+        var proxyConnector = new RecordingConnector(ConnectResult.Connected(connection));
+        var datagramConnector = DatagramConnector();
+
+        var result = await new TftpProtocolHandler(datagramConnector, proxyConnector)
+            .ExecuteAsync(Context("tftp://example.com/f", new ProxyEndpoint(ProxyKind.Https, "127.0.0.1", 18398, null)));
+
+        AssertBindFailed(result);
+        Assert.AreEqual(
+            "GET https://127.0.0.1:18398/.well-known/masque/udp/example.com/69/ HTTP/1.1\r\n" +
+            "Host: 127.0.0.1:18398\r\n" +
+            "User-Agent: curl/8.21.0\r\n" +
+            "Proxy-Connection: Keep-Alive\r\n" +
+            "Connection: Upgrade\r\n" +
+            "Upgrade: connect-udp\r\n" +
+            "Capsule-Protocol: ?1\r\n" +
+            "\r\n",
+            Encoding.ASCII.GetString(connection.Written));
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 18398, UseTls: true) { IsForwardProxy = true }, proxyConnector.Targets.Single());
+        Assert.IsEmpty(datagramConnector.Opens);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_HttpsProxyHandshakeFails_ReturnsConnectorsFailureUnchanged()
+    {
+        // Measured (BL-398): a proxy that never answers the TLS handshake is exit 35.
+        const string handshakeFailed = "schannel: failed to receive handshake, SSL/TLS connection failed";
+        var proxyConnector = new RecordingConnector(ConnectResult.Failed(CurlExitCode.SslConnectError, handshakeFailed));
+
+        var result = await new TftpProtocolHandler(DatagramConnector(), proxyConnector)
+            .ExecuteAsync(Context("tftp://example.com/f", new ProxyEndpoint(ProxyKind.Https, "127.0.0.1", 18398, null)));
+
+        Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
+        Assert.AreEqual(handshakeFailed, result.ErrorMessage);
+    }
+
+    [TestMethod]
+    [DataRow(ProxyKind.Http)]
+    [DataRow(ProxyKind.Https)]
+    public async Task ExecuteAsync_ProxyAnswers403_FailsWithTunnelFailedResponse403(ProxyKind kind)
+    {
+        // Measured (BL-398) through both an HTTP and an HTTPS proxy.
+        var connection = new RecordingConnection("HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n\r\n");
+
+        var result = await new TftpProtocolHandler(DatagramConnector(), new RecordingConnector(ConnectResult.Connected(connection)))
+            .ExecuteAsync(Context("tftp://example.com/f", new ProxyEndpoint(kind, "127.0.0.1", 18398, null)));
+
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.AreEqual("CONNECT-UDP tunnel failed, response 403", result.ErrorMessage);
+        Assert.IsTrue(connection.IsDisposed);
+    }
+
+    [TestMethod]
+    [DataRow("HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: connect-udp\r\nCapsule-Protocol: ?1\r\n\r\n", BindFailed)]
+    [DataRow("HTTP/1.1 204 No\r\n\r\n", BindFailed)]
+    [DataRow("HTTP/1.1 200 OK\n\n", BindFailed)]
+    [DataRow("HTTP/1.1 302 Found\r\nContent-Length: 0\r\n\r\n", "CONNECT-UDP tunnel failed, response 302")]
+    [DataRow("HTTP/1.1 407 Proxy Auth\r\nContent-Length: 0\r\n\r\n", "CONNECT-UDP tunnel failed, response 407")]
+    [DataRow("garbage\r\n\r\n", "CONNECT-UDP tunnel failed, response 0")]
+    [DataRow("HTTP/1.1 2000 OK\r\n\r\n", "CONNECT-UDP tunnel failed, response 0")]
+    [DataRow("HTTP/1.1 2x0 OK\r\n\r\n", "CONNECT-UDP tunnel failed, response 0")]
+    [DataRow("HTTP/1.1\r\n\r\n", "CONNECT-UDP tunnel failed, response 0")]
+    [DataRow("\r\n", "CONNECT-UDP tunnel failed, response 0")]
+    public async Task ExecuteAsync_ProxyReply_FailsAsMeasured(string reply, string expectedMessage)
+    {
+        // Measured (BL-398) for 101, 204, 302, 407 and "garbage"; a 101 or 2xx accepts the
+        // tunnel, anything else refuses it, and a first line that is not a status line is 0.
+        var connection = new RecordingConnection(reply + "unread");
+
+        var result = await new TftpProtocolHandler(DatagramConnector(), new RecordingConnector(ConnectResult.Connected(connection)))
+            .ExecuteAsync(Context("tftp://example.com/f", HttpProxy()));
+
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.AreEqual(expectedMessage, result.ErrorMessage);
+        Assert.AreEqual(reply.Length, connection.ReplyBytesRead);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ProxyClosesMidReply_FailsWithProxyConnectAborted()
+    {
+        var connection = new RecordingConnection("HTTP/1.1 200 OK\r\nX: y\r\n");
+
+        var result = await new TftpProtocolHandler(DatagramConnector(), new RecordingConnector(ConnectResult.Connected(connection)))
+            .ExecuteAsync(Context("tftp://example.com/f", HttpProxy()));
+
+        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Assert.AreEqual("Proxy CONNECT aborted", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ProxyClosesWithoutReply_FailsWithProxyConnectAborted()
+    {
+        // Measured (BL-398): curl -sS -x http://127.0.0.1:18398 tftp://example.com/f against
+        // a proxy that closes without replying.
+        var connection = new RecordingConnection("");
+
+        var result = await new TftpProtocolHandler(DatagramConnector(), new RecordingConnector(ConnectResult.Connected(connection)))
+            .ExecuteAsync(Context("tftp://example.com/f", HttpProxy()));
+
+        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Assert.AreEqual("Proxy CONNECT aborted", result.ErrorMessage);
     }
 
     private static void AssertBindFailed(TransferResult result)
