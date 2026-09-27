@@ -1,5 +1,5 @@
 ---
-id: BL-378
+id: BL-380
 title: Cut every curl: (N) message to curl's 255-byte error buffer in Curl.Console
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-378 — Cut every curl: (N) message to curl's 255-byte error buffer in Curl.Console
+# BL-380 — Cut every curl: (N) message to curl's 255-byte error buffer in Curl.Console
 
 ## Goal
 
@@ -18,7 +18,7 @@ Every `curl: (<code>) <message>` line Curl.Console prints cuts `<message>` to 25
 
 ## Context
 
-- Found under BL-377 (2026-09-27). ADR-0071 cuts only the resolve failures in `Curl.Networking`
+- Found under BL-377 (2026-09-27). ADR-0072 cuts only the resolve failures in `Curl.Networking`
   (`CurlErrorBuffer.Truncate`); a long URL, file name or other value in any other message is printed whole.
 - Measured 2026-09-27, curl 8.21.0 Schannel: `curl -sS http://<300 a's>/` prints `curl: (6) Could not resolve host: `
   and 231 `a`s (the message is 255 bytes). Measure one message that is not a resolve failure (for example a
@@ -29,7 +29,7 @@ Every `curl: (<code>) <message>` line Curl.Console prints cuts `<message>` to 25
 ## Acceptance criteria
 
 - [ ] A `Curl.Console.UnitTests` test pins that a message over 255 bytes, not a resolve failure, is printed cut to 255 bytes, with the measured curl 8.21.0 command and output in its comment.
-- [ ] ADR-0071's Consequences say where the general cut now lives.
+- [ ] ADR-0072's Consequences say where the general cut now lives.
 - [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes

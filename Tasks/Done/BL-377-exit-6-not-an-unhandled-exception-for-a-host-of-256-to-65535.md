@@ -42,8 +42,8 @@ completed: 2026-09-27
   256, 300 and 65535, offline through the real `Dns`).
 - The resolve messages in `TcpConnector` (host and proxy), `UdpDatagramConnector` and
   `SocksProxyTunnel.CouldNotResolve` are cut to 255 characters by the new internal `CurlErrorBuffer`
-  (ADR-0071). The general cut belongs in `Curl.Console`, which BL-329 held, so it is filed as BL-378.
-- Added `Documentation/Planning/Decisions` to `touches` for ADR-0071; no task in Doing names it.
+  (ADR-0072). The general cut belongs in `Curl.Console`, which BL-329 held, so it is filed as BL-380.
+- Added `Documentation/Planning/Decisions` to `touches` for ADR-0072; no task in Doing names it.
 - End to end: our `curl.exe -sS http://<300 a's>/` and curl 8.21.0 wrote byte-identical stderr, both exit 6.
 - Pipeline: the feature stages were run in the session rather than through subagents; the change is
   one catch, one internal helper and four call sites.

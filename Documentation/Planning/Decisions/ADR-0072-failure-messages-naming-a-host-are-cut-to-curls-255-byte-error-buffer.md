@@ -34,12 +34,12 @@ Hosts of up to 65535 bytes reach the resolver; `Dns.GetHostAddressesAsync` throw
 
 The messages that can realistically pass 255 bytes, the ones naming a host, now match curl
 byte for byte. Other long messages (a URL in a message, a file name) are not cut yet: the
-cut belongs where `curl: (<code>) ` is printed, in `Curl.Console`, which BL-378 moves it to.
+cut belongs where `curl: (<code>) ` is printed, in `Curl.Console`, which BL-380 moves it to.
 Cutting twice is harmless, so this cut can stay or go when that lands.
 
 ## Alternatives considered
 
 - **Cut in `Curl.Console`, once, for every message.** The right final home, but `Curl.Console`
-  was in use by another task (BL-329) when this was decided; filed as BL-378.
+  was in use by another task (BL-329) when this was decided; filed as BL-380.
 - **Check `host.Length > 255` before the lookup.** Duplicates the BCL's own limit; catching the
   exception it throws keeps the resolver in step with whatever `Dns` refuses.
