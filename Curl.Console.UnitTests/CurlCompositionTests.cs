@@ -47,7 +47,7 @@ public sealed class CurlCompositionTests
             ["mqtts"] = typeof(MqttProtocolHandler),
             ["http"] = typeof(HttpProtocolHandler),
             ["https"] = typeof(HttpProtocolHandler),
-            ["ftp"] = typeof(ForwardedFtpProtocolHandler),
+            ["ftp"] = typeof(RoutingFtpProtocolHandler),
         };
         CollectionAssert.AreEquivalent(expected.ToList(), served.ToList());
         _ = new ProtocolDispatcher(handlers);
@@ -373,7 +373,7 @@ public sealed class CurlCompositionTests
         IConnector[] connectors = [.. handlers.SelectMany(ConnectorsOf)];
         string[] connectingHandlers = [.. handlers.Where(handler => ConnectorsOf(handler).Any()).Select(handler => handler.GetType().Name).Order()];
         CollectionAssert.AreEqual(
-            new[] { "DictProtocolHandler", "ForwardedFtpProtocolHandler", "GopherProtocolHandler", "HttpProtocolHandler", "MqttProtocolHandler", "TelnetProtocolHandler" },
+            new[] { "DictProtocolHandler", "GopherProtocolHandler", "HttpProtocolHandler", "MqttProtocolHandler", "RoutingFtpProtocolHandler", "TelnetProtocolHandler" },
             connectingHandlers);
         Assert.IsTrue(connectors.All(connector => ReferenceEquals(connector, transports.PoolingConnector)));
         Assert.AreSame(transports.PoolingConnector, dispatch.ConnectionPool);

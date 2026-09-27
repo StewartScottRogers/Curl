@@ -7,6 +7,7 @@ using Curl.Networking;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Dict;
 using Curl.Protocol.File;
+using Curl.Protocol.Ftp;
 using Curl.Protocol.Gopher;
 using Curl.Protocol.Http;
 using Curl.Protocol.Mqtt;
@@ -29,9 +30,10 @@ internal static class CurlComposition
     /// the last two answering authentication with <see cref="CreateHttpAuthenticator" />'s
     /// authenticator and keeping cookies in <paramref name="cookieStore" />; and <c>tftp</c> over
     /// <paramref name="datagramConnector" />; and <c>ftp</c>, which
-    /// <see cref="ForwardedFtpProtocolHandler" /> hands to the HTTP handler when it is forwarded
-    /// through an HTTP proxy without <c>-p</c> (ADR-0056, rule 3). Each scheme is claimed by
-    /// exactly one handler.
+    /// <see cref="RoutingFtpProtocolHandler" /> hands to the HTTP handler when it is forwarded
+    /// through an HTTP proxy without <c>-p</c> (ADR-0056, rule 3) and otherwise to an
+    /// <see cref="FtpProtocolHandler" /> over <paramref name="connector" /> (ADR-0093). Each
+    /// scheme is claimed by exactly one handler.
     /// </summary>
     /// <param name="connector">Connects the TCP protocols, with TLS for <c>gophers</c> and <c>mqtts</c>.</param>
     /// <param name="datagramConnector">Opens the UDP channels TFTP uses.</param>
@@ -55,7 +57,7 @@ internal static class CurlComposition
             new TftpProtocolHandler(datagramConnector),
             new MqttProtocolHandler(connector),
             http,
-            new ForwardedFtpProtocolHandler(http),
+            new RoutingFtpProtocolHandler(http, new FtpProtocolHandler(connector)),
         ];
     }
 

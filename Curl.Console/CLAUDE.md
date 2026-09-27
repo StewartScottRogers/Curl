@@ -128,10 +128,10 @@ cannot use ends the transfer with the selector's exit 5 or 7, and a SOCKS proxy,
 proxy for `https` or under `-p` or `-L`, ends an `http`/`https` transfer with exit 4 until the connector opens those tunnels
 (ADR-0053, BL-328). Other schemes do not read the proxy yet (BL-330), and redirect hops keep
 the first URL's proxy (BL-329). Measured on curl 8.21.0 (BL-238 Notes).
-An `ftp` URL is claimed by `ForwardedFtpProtocolHandler`, which hands it to the HTTP handler
+An `ftp` URL is claimed by `RoutingFtpProtocolHandler`, which hands it to the HTTP handler
 when its proxy is `Http` or `Http10` and `-p` is not given, so it is forwarded to the proxy as
-`GET ftp://host/path` with `Host: host:21` (ADR-0056, rule 3); any other `ftp` transfer fails
-with exit 1 `Protocol "ftp" not supported` until an FTP handler exists (BL-344).
+`GET ftp://host/path` with `Host: host:21` (ADR-0056, rule 3; BL-344); any other `ftp` transfer
+goes to `FtpProtocolHandler` over the pooling connector (ADR-0093, BL-434).
 
 Every transfer goes through `Curl.Core`'s `RedirectFollower`. `-L` becomes
 `HttpRequestOptions.FollowRedirects`, and `RedirectPolicyMapping` turns `--max-redirs`,

@@ -51,8 +51,9 @@ and messages are pinned in `FtpProtocolHandlerTests`.
 
 `curl ftp://host/path/file` downloads as curl does, with curl's exit codes. `ftps`,
 active mode, `--disable-epsv`, `--ftp-method`, `-l` and `-Q` are not implemented. `-r`, `-C`
-and `-I` are honoured since BL-438, and `-T` uploads since BL-439 (see the addenda below). Meanwhile `Curl.Console` still routes non-proxied `ftp://` to
-`ForwardedFtpProtocolHandler` until the handler is registered there (separate task).
+and `-I` are honoured since BL-438, and `-T` uploads since BL-439 (see the addenda below). Since BL-434 `Curl.Console` registers the handler:
+`RoutingFtpProtocolHandler` hands an `ftp://` transfer forwarded through an HTTP proxy to the
+HTTP handler (ADR-0056, rule 3) and every other to `FtpProtocolHandler`.
 
 ## Alternatives considered
 

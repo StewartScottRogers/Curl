@@ -399,14 +399,17 @@ public sealed class CurlCompositionProxyTests
     [TestMethod]
     [DataRow(new[] { "-sS", "-p", "-x", "http://127.0.0.1:18238", "ftp://example.com/f.txt" }, DisplayName = "-p")]
     [DataRow(new[] { "-sS", "ftp://example.com/f.txt" }, DisplayName = "no proxy")]
-    public async Task RunAsync_FtpUrlNotForwardedThroughAnHttpProxy_IsNotSentToTheHttpHandler(string[] arguments)
+    public async Task RunAsync_FtpUrlNotForwardedThroughAnHttpProxy_ConnectsTheFtpHandlerToTheServer(string[] arguments)
     {
         RecordingConnector connector = new(CurlExitCode.CouldntConnect, "refused");
 
         Run run = await RunAsync(connector, new Dictionary<string, string>(), arguments);
 
-        Assert.AreEqual((int)CurlExitCode.UnsupportedProtocol, run.ExitCode);
-        Assert.IsEmpty(connector.Targets);
+        Assert.AreEqual((int)CurlExitCode.CouldntConnect, run.ExitCode);
+        ConnectTarget target = connector.Targets.Single();
+        Assert.AreEqual("example.com", target.Host);
+        Assert.AreEqual(21, target.Port);
+        Assert.IsFalse(target.IsForwardProxy);
     }
 
     private static Task<Run> RunAsync(ScriptedConnector server, params string[] arguments) =>
