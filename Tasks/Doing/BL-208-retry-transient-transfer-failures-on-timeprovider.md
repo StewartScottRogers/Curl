@@ -35,3 +35,4 @@ A retry policy re-runs a transfer for curl's transient failures with curl's back
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-26: Backlog -> Doing.
