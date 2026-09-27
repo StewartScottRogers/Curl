@@ -14,7 +14,7 @@ namespace Curl.Conformance;
 /// connection can succeed without the server ever reading it. A read with no reply waiting
 /// also returns 0: in memory the client is the only writer, so nothing else could arrive.
 /// </remarks>
-internal sealed class SwsHttpServerConnection(SwsHttpReplySelector replySelector, List<byte> recording) : IConnection
+internal sealed class SwsHttpServerConnection(SwsHttpReplySelector replySelector, SwsServerCommands serverCommands, List<byte> recording) : IConnection
 {
     private readonly List<byte> unservedRequestBytes = [];
 
@@ -53,7 +53,7 @@ internal sealed class SwsHttpServerConnection(SwsHttpReplySelector replySelector
     private void ServeCompleteRequests()
     {
         int requestLength;
-        while (!serverClosed && (requestLength = SwsHttpRequestFraming.FindRequestLength(unservedRequestBytes.ToArray())) >= 0)
+        while (!serverClosed && (requestLength = SwsHttpRequestFraming.FindRequestLength(unservedRequestBytes.ToArray(), serverCommands)) >= 0)
         {
             SwsHttpReply reply = replySelector.Select(unservedRequestBytes.GetRange(0, requestLength).ToArray());
             unservedRequestBytes.RemoveRange(0, requestLength);

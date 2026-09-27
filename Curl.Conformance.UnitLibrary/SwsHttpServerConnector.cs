@@ -11,14 +11,16 @@ namespace Curl.Conformance;
 /// <remarks>
 /// <para>
 /// Each request is read by its headers, then a body by <c>Transfer-Encoding: chunked</c> or
-/// <c>Content-Length</c>, and answered with <c>&lt;data&gt;</c>, or with <c>&lt;dataN&gt;</c>
+/// <c>Content-Length</c>, as the <c>&lt;servercmd&gt;</c> commands <c>auth_required</c>,
+/// <c>no-expect</c> and <c>skip: N</c> change it, and answered with <c>&lt;data&gt;</c>, or with <c>&lt;dataN&gt;</c>
 /// when the path's last segment is a number over 10000 whose last four digits are N (so
 /// <c>/10002</c> gets <c>&lt;data2&gt;</c>). The connection stays open for the next request
 /// until a reply containing <c>swsclose</c>, an empty reply, or <c>swsclose</c> in
 /// <c>&lt;servercmd&gt;</c> closes it.
 /// </para>
 /// <para>
-/// The other <c>&lt;servercmd&gt;</c> commands sws knows are not carried out; they are listed
+/// The other <c>&lt;servercmd&gt;</c> commands sws knows (<c>idle</c>, <c>stream</c>,
+/// <c>connection-monitor</c>, <c>upgrade</c>, <c>delay</c> and <c>writedelay</c>) are not carried out; they are listed
 /// in <see cref="UnsupportedServerCommands"/> so the caller can skip the case with a reason.
 /// </para>
 /// </remarks>
@@ -28,20 +30,22 @@ public sealed class SwsHttpServerConnector : IConnector
 
     private readonly SwsHttpReplySelector replySelector;
 
+    private readonly SwsServerCommands serverCommands;
+
     /// <summary>Creates a server that answers from <paramref name="testCase"/>'s <c>&lt;reply&gt;</c> section.</summary>
     /// <param name="testCase">The test case, parsed after <see cref="UpstreamTestFileExpander"/> has expanded it.</param>
     public SwsHttpServerConnector(UpstreamTestCase testCase)
     {
         ArgumentNullException.ThrowIfNull(testCase);
-        SwsServerCommands serverCommands = SwsServerCommands.Read((testCase.Find("reply", "servercmd")?.Content ?? ReadOnlyMemory<byte>.Empty).Span);
+        serverCommands = SwsServerCommands.Read((testCase.Find("reply", "servercmd")?.Content ?? ReadOnlyMemory<byte>.Empty).Span);
         UnsupportedServerCommands = serverCommands.UnsupportedCommands;
         replySelector = new SwsHttpReplySelector(testCase, serverCommands.ClosesAfterEveryReply);
     }
 
     /// <summary>
     /// The name of every <c>&lt;servercmd&gt;</c> command sws carries out that this emulation does
-    /// not, such as <c>auth_required</c>, <c>idle</c>, <c>stream</c>, <c>connection-monitor</c>,
-    /// <c>upgrade</c>, <c>no-expect</c>, <c>skip</c>, <c>delay</c> or <c>writedelay</c>, in file
+    /// not, which are <c>idle</c>, <c>stream</c>, <c>connection-monitor</c>, <c>upgrade</c>,
+    /// <c>delay</c> and <c>writedelay</c>, in file
     /// order; empty when every command is carried out. Lines sws does not recognise are ignored,
     /// as sws ignores them.
     /// </summary>
@@ -58,5 +62,5 @@ public sealed class SwsHttpServerConnector : IConnector
     /// <param name="cancellationToken">Not observed; the connection opens at once.</param>
     /// <returns>A connected result.</returns>
     public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken) =>
-        ValueTask.FromResult(ConnectResult.Connected(new SwsHttpServerConnection(replySelector, recording)));
+        ValueTask.FromResult(ConnectResult.Connected(new SwsHttpServerConnection(replySelector, serverCommands, recording)));
 }

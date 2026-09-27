@@ -36,8 +36,12 @@ four digits are N (`SwsHttpRequestLine`), decoding `base64` and applying `nonewl
 open until a reply containing `swsclose`, an empty or missing part, or `swsclose` in
 `<servercmd>`. `ReceivedBytes` records every byte the client wrote while the server had the
 connection open, across connections, for comparison with `<verify><protocol>`.
-`SwsServerCommands` reads `<servercmd>`; every other command sws knows is listed by name in
-`UnsupportedServerCommands` so the case can be skipped with a reason (BL-263, BL-264), and
+`SwsServerCommands` reads `<servercmd>`. Framing carries out the commands that change where a
+request ends: `auth_required` ends one with no `Authorization:` in it at its headers,
+`no-expect` does the same for one with `Expect: 100-continue`, and `skip: N` takes N off its
+`Content-Length` (past zero, the request never ends, as sws's `size_t` wraps). Bytes past
+such an early end start the next request. Every other command sws knows is listed by name in
+`UnsupportedServerCommands` so the case can be skipped with a reason (BL-264), and
 sws's part-number rules for authentication, `swsbounce` and `CONNECT` are not emulated yet
 (BL-265). A read with no reply waiting returns 0, because in memory nothing else can arrive.
 

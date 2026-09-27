@@ -11,7 +11,8 @@ substitution, `%if` evaluation and the inline instructions against upstream's `p
 `UpstreamTestDataTests`, which pin that the vendored `UpstreamTestData/` (curl 8.21.0's
 `tests/data/test*` files and `COPYING`; see its `README.md`) is copied beside the tests,
 and `SwsHttpServerConnectorTests`, which pin the in-memory `sws` emulation's request framing,
-reply-part selection, connection closing, `<servercmd>` reporting and byte recording against
+reply-part selection, connection closing, the `<servercmd>` commands that change framing
+(`auth_required`, `no-expect`, `skip`), `<servercmd>` reporting and byte recording against
 upstream's `sws.c`. What it is to hold in full, per ADR-0013:
 
 - the harness library's own tests;
