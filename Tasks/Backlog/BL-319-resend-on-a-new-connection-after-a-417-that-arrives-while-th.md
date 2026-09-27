@@ -1,5 +1,5 @@
 ---
-id: BL-316
+id: BL-319
 title: Resend on a new connection after a 417 that arrives while the body is being sent
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-26
 completed:
 ---
-# BL-316 — Resend on a new connection after a 417 that arrives while the body is being sent
+# BL-319 — Resend on a new connection after a 417 that arrives while the body is being sent
 
 ## Goal
 

@@ -52,7 +52,7 @@ ok`;
 
 One early run of the plain case logged `Got HTTP failure 417 while sending data` and resent on a
 new connection (`num_connects` 2) - a start-up race where the wait was no longer running; three
-reruns all took the `while waiting for a 100` path above. That path is filed as BL-316.
+reruns all took the `while waiting for a 100` path above. That path is filed as BL-319.
 
 ### What was built
 
@@ -70,7 +70,7 @@ reruns all took the `while waiting for a 100` path above. That path is filed as 
 ### Choices (sensible defaults, no ADR needed: every behaviour pinned is measured)
 
 - A 417 that arrives after the wait ran out is left as the result for now; curl's resend on a new
-  connection there is filed as BL-316 rather than widening this task.
+  connection there is filed as BL-319 rather than widening this task.
 - A stream body (`-T -`) is resent too: the 417 arrived before any of it was read, as measured.
 
 ## Log
