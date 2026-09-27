@@ -226,6 +226,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher)
             TftpNoOptions = first.TftpNoOptions,
             ConvertLineEndings = first.ConvertLineEndings,
             CreateFileMode = first.CreateFileMode,
+            PathAsIs = first.PathAsIs,
             ConnectTimeout = first.ConnectTimeout,
             MaxTime = first.MaxTime,
             Http = HopHttp(http, bodyDropped, sendCredentials),
