@@ -45,3 +45,4 @@ Live redraws take their byte counts and timing from the console-side sink and cl
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-27: Backlog -> Doing.
