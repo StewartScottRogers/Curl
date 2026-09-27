@@ -35,3 +35,4 @@ The connector performs SOCKS4, SOCKS4a, SOCKS5 and SOCKS5h handshakes for a SOCK
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-27: Backlog -> Doing.
