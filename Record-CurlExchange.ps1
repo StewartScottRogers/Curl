@@ -64,6 +64,12 @@
     rather than a FIN. Use it to measure what curl prints when the server resets the
     connection, as during a TLS handshake (BL-369). request.bin is then empty.
 
+.PARAMETER StandardInput
+    What curl reads from standard input, with the same backslash escapes as Response.
+    It is written in full and then standard input is closed. Default empty: standard
+    input is closed at once. Use it to measure an option that reads '-', such as
+    -b - (BL-316).
+
 .PARAMETER Curl
     The curl executable to run. Defaults to the reference build ADR-0009 and ADR-0018
     name, curl 8.21.0 from Git for Windows' mingw64 directory, found beside git.exe.
@@ -84,6 +90,7 @@ param(
     [ValidateRange(1, 1000)] [int] $Connections = 1,
     [ValidateRange(0, 600000)] [int] $ResponseDelayMilliseconds = 0,
     [switch] $Reset,
+    [string] $StandardInput = '',
     [string] $Curl
 )
 
@@ -252,8 +259,19 @@ try {
     $startInfo.RedirectStandardError = $true
     $startInfo.CreateNoWindow = $true
 
-    $curlProcess = [System.Diagnostics.Process]::Start($startInfo)
+    # The standard input writer takes the console's input encoding, whose UTF-8 byte order
+    # mark would reach curl ahead of StandardInput; Latin-1 has none. Windows PowerShell 5.1
+    # has no ProcessStartInfo.StandardInputEncoding to set instead.
+    $consoleInputEncoding = [System.Console]::InputEncoding
+    [System.Console]::InputEncoding = [System.Text.Encoding]::GetEncoding(28591)
     try {
+        $curlProcess = [System.Diagnostics.Process]::Start($startInfo)
+    } finally {
+        [System.Console]::InputEncoding = $consoleInputEncoding
+    }
+    try {
+        $standardInputBytes = ConvertFrom-EscapedResponse -Text $StandardInput
+        $curlProcess.StandardInput.BaseStream.Write($standardInputBytes, 0, $standardInputBytes.Length)
         $curlProcess.StandardInput.Close()
         $stdout = New-Object System.IO.MemoryStream
         $stderr = New-Object System.IO.MemoryStream
