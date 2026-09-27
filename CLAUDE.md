@@ -82,11 +82,15 @@ reset time, waits (the wait does not count against `-Hours`), warns a minute bef
 new session and reruns the cut-off task. See the script's header for the details.
 
 When Claude starts a shift it always passes `-NewTab`, e.g.
-`RunDarkFactory.cmd -NewTab -Lanes 4`. Inside herdr (`HERDR_ENV=1`) that opens the shift
+`RunDarkFactory.cmd -NewTab -Lanes 3 -Continuous`; `-Continuous` makes a shift that
+ends with work still ready start the next one itself. Inside herdr (`HERDR_ENV=1`) that opens the shift
 and each of its lanes as herdr tabs in the current workspace; outside herdr, as console
 windows. Never start one with `Start-Process` or a bare background command: Stewart
-watches shifts in herdr. Stop a shift by closing its tabs (or killing its process tree),
-then return any task left in `Doing` to `Backlog` with the board script.
+watches shifts in herdr. Stop a shift by closing its tabs (or killing its process tree).
+Leave its tasks in `Doing` and its lane worktrees as they are: the next shift adopts each
+stopped lane and resumes its task from the work in place. While a shift runs, its
+coordinator restarts any lane whose process dies, and lanes wait out the usage limit and
+carry on when tokens return - nobody needs to restart them.
 ## Repository layout
 Flat and linear. Every project is a directory immediately under the repository root.
 There is no `src/` and no `tests/`; do not create them.
