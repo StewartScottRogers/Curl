@@ -63,7 +63,7 @@ public sealed class CommandLineOptions
     /// there, as curl 8.21.0's does, so every option after it is unread; the console prints
     /// <see cref="CurlHelpText"/>'s lines for <see cref="HelpSubject"/> and exits 0 instead of transferring.
     /// A <c>help</c> line in a <c>-K</c> file does not set it (curl prints the usage page there and carries
-    /// on, which task BL-369 matches).
+    /// on, which task BL-375 matches).
     /// </summary>
     public bool HelpRequested { get; private set; }
 

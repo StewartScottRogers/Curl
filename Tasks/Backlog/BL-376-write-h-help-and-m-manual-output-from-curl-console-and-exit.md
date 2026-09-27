@@ -1,5 +1,5 @@
 ---
-id: BL-370
+id: BL-376
 title: Write -h/--help and -M/--manual output from Curl.Console and exit 0
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-370 — Write -h/--help and -M/--manual output from Curl.Console and exit 0
+# BL-376 — Write -h/--help and -M/--manual output from Curl.Console and exit 0
 
 ## Goal
 
@@ -20,8 +20,8 @@ completed:
 
 - BL-201 made `CommandLineParser` accept `-h`/`--help` and `-M`/`--manual` (parsing ends there, as for `-V`) and set `CommandLineOptions.HelpRequested`, `HelpSubject` and `ManualRequested`; `CurlHelpText.Lines(subject, columns)` and `CurlManual.Lines()` give the lines. Until this task lands, `CurlCommandRunner` treats such a command line as accepted with no URL.
 - Mirror the `VersionRequested` branch in `CurlCommandRunner`: write the lines to standard output with the platform newline (CRLF on Windows, as the mingw reference writes), and exit 0. The help columns come from `TerminalColumns.Resolve()`, which already follows curl's `get_terminal_columns`.
-- An option subject (`CurlHelpText.IsOptionSubject(subject)` is true, e.g. `--help -v`) is printed by BL-368's code. If BL-368 has not landed, write nothing for it, exit 0, and record that gap in Notes; do not call `CurlHelpText.Lines` for it, which throws.
-- ADR-0066 records the design.
+- An option subject (`CurlHelpText.IsOptionSubject(subject)` is true, e.g. `--help -v`) is printed by BL-374's code. If BL-374 has not landed, write nothing for it, exit 0, and record that gap in Notes; do not call `CurlHelpText.Lines` for it, which throws.
+- ADR-0069 records the design.
 
 ## Acceptance criteria
 

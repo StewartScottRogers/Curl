@@ -45,12 +45,12 @@ descriptions or categories.
    curl reads it). Both end parsing like `-V`; the result is
    `CommandLineParseResult.InformationRequested`.
 5. **Split into follow-ups.** `--help <option>` needs curl's full option list with letters and
-   negatability (BL-368); the `-K` file behaviour of `help` needs a print-and-carry-on result
-   (BL-369, ignored until then, as `manual` and `version` are by curl); writing the pages from
-   `Curl.Console` is BL-370, because `Curl.Console` was being changed by another lane.
+   negatability (BL-374); the `-K` file behaviour of `help` needs a print-and-carry-on result
+   (BL-375, ignored until then, as `manual` and `version` are by curl); writing the pages from
+   `Curl.Console` is BL-376, because `Curl.Console` was being changed by another lane.
 
 ## Consequences
 
 - A new curl version means refreshing `CurlHelpTable.cs`, `CurlManual.txt` and the
   `Curl.Cli.UnitTests/HelpReference` files from the new build, not editing text by hand.
-- Until BL-370 lands, `curl -h` through `Curl.Console` is accepted with no URL and prints nothing.
+- Until BL-376 lands, `curl -h` through `Curl.Console` is accepted with no URL and prints nothing.

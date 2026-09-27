@@ -11,7 +11,7 @@ namespace Curl.Cli;
 /// page); <c>-h</c> in a bundle counts only as its last letter (<c>-vh</c> prints the usage page, while
 /// <c>-hv</c> reports no URL and <c>-hv &lt;url&gt;</c> transfers without <c>-v</c>). <c>--no-help</c> is
 /// refused as not reversible; <c>--no-manual</c> is accepted and does nothing. A <c>manual</c> line in a
-/// <c>-K</c> file is ignored; so, for now, is a <c>help</c> line (task BL-369).
+/// <c>-K</c> file is ignored; so, for now, is a <c>help</c> line (task BL-375).
 /// </summary>
 [TestClass]
 public sealed class CommandLineHelpAndManualOptionTests

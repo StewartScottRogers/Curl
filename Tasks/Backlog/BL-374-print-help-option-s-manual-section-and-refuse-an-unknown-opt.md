@@ -1,5 +1,5 @@
 ---
-id: BL-368
+id: BL-374
 title: Print --help <option>'s manual section, and refuse an unknown option name as curl does
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-368 — Print --help <option>'s manual section, and refuse an unknown option name as curl does
+# BL-374 — Print --help <option>'s manual section, and refuse an unknown option name as curl does
 
 ## Goal
 
@@ -26,7 +26,7 @@ ALL OPTIONS
     <subject>`, and printed up to the next `
     -` (or `
 FILES` for `--xattr`, the last option). Measured: `curl --help -v` and `curl --help --no-verbose` print the `-v, --verbose` section; `curl --help --bogus` and `curl --help --` print the Incorrect-option line on standard error and exit 0.
-- BL-201 added `CurlManual.Lines()` (the embedded manual) and `CurlHelpText.IsOptionSubject`; `CurlHelpText.Lines` throws for an option subject today. The lookup needs curl's full option list with each option's letter and whether it is boolean and negatable, which `CommandLineOptionTable` does not hold for options it does not parse - add that list beside `CurlHelpTable` (ADR-0066).
+- BL-201 added `CurlManual.Lines()` (the embedded manual) and `CurlHelpText.IsOptionSubject`; `CurlHelpText.Lines` throws for an option subject today. The lookup needs curl's full option list with each option's letter and whether it is boolean and negatable, which `CommandLineOptionTable` does not hold for options it does not parse - add that list beside `CurlHelpTable` (ADR-0069).
 
 ## Acceptance criteria
 

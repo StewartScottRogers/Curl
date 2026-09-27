@@ -8,7 +8,7 @@ namespace Curl.Cli;
 /// <c>all</c>, the category list for <c>category</c>, one category's options for its name, and the
 /// category list after <c>Unknown category provided, ...</c> for anything else. Subjects match in any
 /// case. A subject starting with <c>-</c> asks for one option's manual section instead, which this class
-/// does not print (task BL-368). The option columns depend on the terminal width curl's
+/// does not print (task BL-374). The option columns depend on the terminal width curl's
 /// <c>get_terminal_columns</c> gives (79 when nothing sets one). The lines carry no line terminator; the
 /// console layer chooses the newline (CRLF on Windows, as the mingw reference writes).
 /// </summary>

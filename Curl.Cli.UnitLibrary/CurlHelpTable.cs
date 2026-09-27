@@ -4,7 +4,7 @@ namespace Curl.Cli;
 /// Every row curl 8.21.0 prints in its option help, in its order: the option as shown, its one-line
 /// description and its categories, copied from curl's generated <c>src/tool_listhelp.c</c> at tag
 /// <c>curl-8_21_0</c>. It lists all of curl's options, not only those <see cref="CommandLineOptionTable"/>
-/// parses, because curl's help lists them all (ADR-0066).
+/// parses, because curl's help lists them all (ADR-0069).
 /// </summary>
 internal static class CurlHelpTable
 {
