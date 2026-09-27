@@ -1,0 +1,347 @@
+using System.Net;
+
+using Curl.Networking.Fakes;
+using Curl.Protocol.Abstractions;
+
+namespace Curl.Networking;
+
+/// <summary>
+/// Drives <see cref="PoolingConnector" /> and <see cref="PooledConnection" /> through a fake
+/// inner connector: reuse for the same key, no reuse across keys, after close or while in use,
+/// the five-connection limit, the 118-second idle limit, and the connection numbers and reuse
+/// flag <c>%{num_connects}</c> is built from (ADR-0050).
+/// </summary>
+[TestClass]
+public sealed class PoolingConnectorTests
+{
+    private readonly FakeConnector _inner = new();
+    private readonly ManualTimeProvider _time = new();
+
+    [TestMethod]
+    public async Task ConnectAsync_WithNullTarget_ThrowsArgumentNullException()
+    {
+        await using var pool = CreatePool();
+
+        var exception = await Assert.ThrowsExactlyAsync<ArgumentNullException>(
+            async () => await pool.ConnectAsync(null!, CancellationToken.None));
+
+        Assert.AreEqual("target", exception.ParamName);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WithCancelledToken_ThrowsWithoutConnecting()
+    {
+        await using var pool = CreatePool();
+
+        await Assert.ThrowsExactlyAsync<OperationCanceledException>(
+            async () => await pool.ConnectAsync(Target(), new CancellationToken(canceled: true)));
+
+        Assert.IsEmpty(_inner.Targets);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WhenTheInnerConnectorFails_ReturnsItsResultAsItIs()
+    {
+        await using var pool = CreatePool();
+        var failure = ConnectResult.Failed(CurlExitCode.CouldntConnect, "Failed to connect");
+        _inner.Failure = failure;
+
+        var result = await pool.ConnectAsync(Target(), CancellationToken.None);
+
+        Assert.AreSame(failure, result);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_ForANewConnection_PassesTheInnerResultOnAndNumbersItFromZero()
+    {
+        await using var pool = CreatePool();
+        var target = Target();
+
+        var first = await pool.ConnectAsync(target, CancellationToken.None);
+        var second = await pool.ConnectAsync(target, CancellationToken.None);
+
+        Assert.IsInstanceOfType<PooledConnection>(first.Connection);
+        Assert.IsFalse(first.IsReused);
+        Assert.AreEqual(0L, first.ConnectionNumber);
+        Assert.AreEqual(1L, second.ConnectionNumber);
+        Assert.AreEqual(new ConnectTimings(1, null, 1, null), first.Timings);
+        Assert.AreEqual(new IPEndPoint(IPAddress.Loopback, 50001), first.LocalEndPoint);
+        Assert.AreEqual(200, first.ProxyConnectResponseCode);
+        CollectionAssert.AreEqual(new byte[] { 1 }, first.PeerCertificates[0].ToArray());
+        CollectionAssert.AreEqual(new[] { target, target }, _inner.Targets);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_AfterAConnectionMarkedReusableIsDisposed_ReusesItWithoutConnecting()
+    {
+        await using var pool = CreatePool();
+        var events = new RecordingTransferEvents();
+        await ReturnToPoolAsync(pool, Target());
+
+        var reused = await pool.ConnectAsync(Target() with { Events = events }, CancellationToken.None);
+
+        Assert.HasCount(1, _inner.Targets);
+        Assert.IsFalse(_inner.Opened[0].IsDisposed);
+        Assert.IsTrue(reused.IsReused);
+        Assert.AreEqual(0L, reused.ConnectionNumber);
+        Assert.IsNull(reused.Timings);
+        Assert.AreEqual(new IPEndPoint(IPAddress.Loopback, 50001), reused.LocalEndPoint);
+        Assert.AreEqual(0, reused.ProxyConnectResponseCode);
+        CollectionAssert.AreEqual(new byte[] { 1 }, reused.PeerCertificates[0].ToArray());
+        Assert.HasCount(1, events.Reused);
+        Assert.AreEqual(
+            new ConnectionReusedEvent
+            {
+                Scheme = "http",
+                IsProxy = false,
+                HostName = "origin.example",
+                Port = 80,
+                ConnectionNumber = 0,
+            },
+            events.Reused[0]);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_ForTheSameHostInAnotherCase_ReusesTheConnection()
+    {
+        await using var pool = CreatePool();
+        await ReturnToPoolAsync(pool, Target(host: "Origin.Example", scheme: "HTTP"));
+
+        var reused = await pool.ConnectAsync(Target(host: "origin.example", scheme: "http"), CancellationToken.None);
+
+        Assert.IsTrue(reused.IsReused);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_ThroughTheSameProxyWithAnEqualCredential_ReusesTheConnection()
+    {
+        await using var pool = CreatePool();
+        await ReturnToPoolAsync(pool, Target(proxy: Proxy("proxy.example", "user", "secret")));
+
+        var reused = await pool.ConnectAsync(
+            Target(proxy: Proxy("PROXY.example", "user", "secret")),
+            CancellationToken.None);
+
+        Assert.IsTrue(reused.IsReused);
+    }
+
+    [TestMethod]
+    [DataRow("scheme")]
+    [DataRow("host")]
+    [DataRow("address")]
+    [DataRow("port")]
+    [DataRow("tls")]
+    [DataRow("direct")]
+    [DataRow("proxy kind")]
+    [DataRow("proxy host")]
+    [DataRow("proxy port")]
+    [DataRow("proxy user")]
+    [DataRow("proxy password")]
+    [DataRow("proxy domain")]
+    [DataRow("proxy credential")]
+    public async Task ConnectAsync_ForADifferentKey_OpensANewConnection(string difference)
+    {
+        await using var pool = CreatePool();
+        var pooled = Target(proxy: Proxy("proxy.example", "user", "secret"));
+        await ReturnToPoolAsync(pool, pooled);
+
+        var other = await pool.ConnectAsync(Differing(pooled, difference), CancellationToken.None);
+
+        Assert.IsFalse(other.IsReused);
+        Assert.AreEqual(1L, other.ConnectionNumber);
+        Assert.HasCount(2, _inner.Targets);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WhileTheConnectionIsStillInUse_OpensANewConnection()
+    {
+        await using var pool = CreatePool();
+        var inUse = await pool.ConnectAsync(Target(), CancellationToken.None);
+
+        var other = await pool.ConnectAsync(Target(), CancellationToken.None);
+
+        Assert.IsFalse(other.IsReused);
+        Assert.AreNotSame(inUse.Connection, other.Connection);
+    }
+
+    [TestMethod]
+    public async Task DisposeAsync_OfAConnectionNotMarkedReusable_ClosesItAndTheNextConnectOpensANewOne()
+    {
+        await using var pool = CreatePool();
+        var first = await pool.ConnectAsync(Target(), CancellationToken.None);
+        await first.Connection!.DisposeAsync();
+
+        var second = await pool.ConnectAsync(Target(), CancellationToken.None);
+
+        Assert.IsTrue(_inner.Opened[0].IsDisposed);
+        Assert.IsFalse(second.IsReused);
+        Assert.HasCount(2, _inner.Targets);
+    }
+
+    [TestMethod]
+    public async Task DisposeAsync_OfAMarkedConnectionWithoutPoolScheme_ClosesItAndNeverPoolsIt()
+    {
+        await using var pool = CreatePool();
+        var target = new ConnectTarget("origin.example", 21, UseTls: false);
+        await ReturnToPoolAsync(pool, target);
+
+        var second = await pool.ConnectAsync(target, CancellationToken.None);
+
+        Assert.IsTrue(_inner.Opened[0].IsDisposed);
+        Assert.IsFalse(second.IsReused);
+    }
+
+    [TestMethod]
+    public async Task DisposeAsync_OfAPooledConnectionTwice_ReturnsItOnlyOnce()
+    {
+        await using var pool = CreatePool();
+        var first = await pool.ConnectAsync(Target(), CancellationToken.None);
+        first.Connection!.MarkReusable();
+        await first.Connection.DisposeAsync();
+        await first.Connection.DisposeAsync();
+
+        var reused = await pool.ConnectAsync(Target(), CancellationToken.None);
+        var other = await pool.ConnectAsync(Target(), CancellationToken.None);
+
+        Assert.IsTrue(reused.IsReused);
+        Assert.IsFalse(other.IsReused);
+    }
+
+    [TestMethod]
+    public async Task DisposeAsync_OfAReusedConnectionNotMarkedAgain_ClosesIt()
+    {
+        await using var pool = CreatePool();
+        await ReturnToPoolAsync(pool, Target());
+        var reused = await pool.ConnectAsync(Target(), CancellationToken.None);
+
+        await reused.Connection!.DisposeAsync();
+
+        Assert.IsTrue(_inner.Opened[0].IsDisposed);
+    }
+
+    [TestMethod]
+    public async Task DisposeAsync_OfTheSixthIdleConnection_ClosesTheOldestAndReportsItAsCurlDoes()
+    {
+        await using var pool = CreatePool();
+        for (var port = 1; port <= 5; port++)
+        {
+            await ReturnToPoolAsync(pool, Target(port: port));
+        }
+
+        var events = new RecordingTransferEvents();
+        await ReturnToPoolAsync(pool, Target(port: 6) with { Events = events });
+
+        CollectionAssert.AreEqual(
+            new[] { "Connection pool is full, closing the oldest of 6/5", "shutting down connection #0" },
+            events.Info);
+        Assert.IsTrue(_inner.Opened[0].IsDisposed);
+        Assert.IsFalse(_inner.Opened[1].IsDisposed);
+        Assert.IsFalse((await pool.ConnectAsync(Target(port: 1), CancellationToken.None)).IsReused);
+        Assert.IsTrue((await pool.ConnectAsync(Target(port: 2), CancellationToken.None)).IsReused);
+    }
+
+    [TestMethod]
+    public async Task DisposeAsync_OfTheFifthIdleConnection_KeepsEveryOneAndReportsNothing()
+    {
+        await using var pool = CreatePool();
+        var events = new RecordingTransferEvents();
+        for (var port = 1; port <= PoolingConnector.MaximumIdleConnections; port++)
+        {
+            await ReturnToPoolAsync(pool, Target(port: port) with { Events = events });
+        }
+
+        Assert.IsEmpty(events.Info);
+        Assert.IsFalse(_inner.Opened.Exists(connection => connection.IsDisposed));
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_AfterExactly118SecondsIdle_ReusesTheConnection()
+    {
+        await using var pool = CreatePool();
+        await ReturnToPoolAsync(pool, Target());
+        _time.Advance(118_000);
+
+        var reused = await pool.ConnectAsync(Target(), CancellationToken.None);
+
+        Assert.IsTrue(reused.IsReused);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_AfterMoreThan118SecondsIdle_ClosesTheConnectionAndOpensANewOne()
+    {
+        await using var pool = CreatePool();
+        await ReturnToPoolAsync(pool, Target());
+        _time.Advance(118_001);
+
+        var other = await pool.ConnectAsync(Target(), CancellationToken.None);
+
+        Assert.IsFalse(other.IsReused);
+        Assert.IsTrue(_inner.Opened[0].IsDisposed);
+    }
+
+    [TestMethod]
+    public async Task DisposeAsync_OfAConnectionAfterAnotherExpired_ClosesTheExpiredOne()
+    {
+        await using var pool = CreatePool();
+        await ReturnToPoolAsync(pool, Target(port: 1));
+        _time.Advance(118_001);
+
+        await ReturnToPoolAsync(pool, Target(port: 2));
+
+        Assert.IsTrue(_inner.Opened[0].IsDisposed);
+        Assert.IsFalse(_inner.Opened[1].IsDisposed);
+    }
+
+    [TestMethod]
+    public async Task DisposeAsync_OfThePool_ClosesEveryIdleConnectionAndEveryOneReturnedLater()
+    {
+        var pool = CreatePool();
+        await ReturnToPoolAsync(pool, Target(port: 1));
+        var inUse = await pool.ConnectAsync(Target(port: 2), CancellationToken.None);
+
+        await pool.DisposeAsync();
+        inUse.Connection!.MarkReusable();
+        await inUse.Connection.DisposeAsync();
+
+        Assert.IsTrue(_inner.Opened[0].IsDisposed);
+        Assert.IsTrue(_inner.Opened[1].IsDisposed);
+    }
+
+    private static ConnectTarget Target(
+        string host = "origin.example",
+        int port = 80,
+        bool useTls = false,
+        string scheme = "http",
+        ProxyEndpoint? proxy = null) =>
+        new(host, port, useTls) { PoolScheme = scheme, Proxy = proxy };
+
+    private static ProxyEndpoint Proxy(string host, string user, string password, int port = 3128, string domain = "") =>
+        new(ProxyKind.Http, host, port, new NetworkCredential(user, password, domain));
+
+    private static ConnectTarget Differing(ConnectTarget pooled, string difference) =>
+        difference switch
+        {
+            "scheme" => pooled with { PoolScheme = "https" },
+            "host" => new ConnectTarget("other.example", pooled.Port, pooled.UseTls) { PoolScheme = pooled.PoolScheme, Proxy = pooled.Proxy },
+            "address" => new ConnectTarget("127.0.0.1", pooled.Port, pooled.UseTls) { PoolScheme = pooled.PoolScheme, Proxy = pooled.Proxy },
+            "port" => new ConnectTarget(pooled.Host, 8080, pooled.UseTls) { PoolScheme = pooled.PoolScheme, Proxy = pooled.Proxy },
+            "tls" => pooled with { UseTls = true },
+            "direct" => pooled with { Proxy = null },
+            "proxy kind" => pooled with { Proxy = pooled.Proxy! with { Kind = ProxyKind.Socks5 } },
+            "proxy host" => pooled with { Proxy = Proxy("other-proxy.example", "user", "secret") },
+            "proxy port" => pooled with { Proxy = Proxy("proxy.example", "user", "secret", port: 8888) },
+            "proxy user" => pooled with { Proxy = Proxy("proxy.example", "other", "secret") },
+            "proxy password" => pooled with { Proxy = Proxy("proxy.example", "user", "other") },
+            "proxy domain" => pooled with { Proxy = Proxy("proxy.example", "user", "secret", domain: "CORP") },
+            _ => pooled with { Proxy = pooled.Proxy! with { Credential = null } },
+        };
+
+    private static async Task ReturnToPoolAsync(PoolingConnector pool, ConnectTarget target)
+    {
+        var result = await pool.ConnectAsync(target, CancellationToken.None);
+        result.Connection!.MarkReusable();
+        await result.Connection.DisposeAsync();
+    }
+
+    private PoolingConnector CreatePool() => new(_inner, _time);
+}

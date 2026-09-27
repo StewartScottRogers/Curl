@@ -1,0 +1,29 @@
+using System.Net;
+
+using Curl.Protocol.Abstractions;
+
+namespace Curl.Networking;
+
+/// <summary>
+/// One connection a <see cref="PoolingConnector" /> opened, with what it must report again
+/// when the connection is reused: its key, curl's number for it, its local end point and the
+/// server's certificates.
+/// </summary>
+/// <param name="Key">The key it is pooled under, or <see langword="null" /> when it is never pooled.</param>
+/// <param name="Connection">The connection the inner connector opened.</param>
+/// <param name="ConnectionNumber">curl's number for it, counted from <c>0</c>.</param>
+/// <param name="LocalEndPoint">The local address and port it was opened from, or <see langword="null" />.</param>
+/// <param name="PeerCertificates">The DER of every certificate the server sent when it was opened.</param>
+internal sealed record PoolEntry(
+    ConnectionPoolKey? Key,
+    IConnection Connection,
+    long ConnectionNumber,
+    IPEndPoint? LocalEndPoint,
+    IReadOnlyList<ReadOnlyMemory<byte>> PeerCertificates)
+{
+    /// <summary>
+    /// Gets or sets the timestamp, on the pool's <see cref="TimeProvider" />, at which the
+    /// connection last went idle.
+    /// </summary>
+    public long IdleSince { get; set; }
+}

@@ -66,6 +66,18 @@ request; TLS still verifies the URL's host. A `--resolve` entry for the host and
 resolved, the proxy's included, answers in place of `IDnsResolver`. An entry or a matching
 mapping that does not parse fails the connect with exit 49 and curl's message.
 
+`PoolingConnector` wraps another `IConnector` and keeps connections for reuse per ADR-0050.
+Every connection it returns is a `PooledConnection`; one marked with `MarkReusable` goes back
+to the pool on dispose, anything else closes. `ConnectionPoolKey` (with
+`ConnectionPoolProxyKey`) is the key: `PoolScheme`, host ignoring case, port, TLS choice and
+tunnelling proxy with its credential by value; a target without `PoolScheme` is never pooled.
+The pool holds at most five idle connections in total, closing the oldest with curl's
+`Connection pool is full` and `shutting down connection #N` lines on the returning target's
+`Events`, and drops one idle longer than 118 seconds on its `TimeProvider`. It numbers
+connections from `0` (`ConnectResult.ConnectionNumber`) and returns a reused one with
+`IsReused`, its original local end point and certificates, and no timings. It reports
+`ConnectionReusedEvent.IsProxy` as `false`, since a forward-proxy target does not say it is one.
+
 Everything else takes the Abstractions contracts (`IDnsResolver`, `ITlsProvider`,
 `IConnection`, `IDatagramChannel`) or `ITcpDialer`, plus an injected `TimeProvider`, so the tests in
 `Curl.Networking.UnitTests` drive every branch with fakes and no network.
