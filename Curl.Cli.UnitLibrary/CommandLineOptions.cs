@@ -18,6 +18,7 @@ public sealed class CommandLineOptions
     private readonly List<UrlOutput> urlOutputs = [];
     private readonly List<string> uploadFiles = [];
     private readonly List<string> telnetOptions = [];
+    private readonly List<string> quoteCommands = [];
     private readonly List<string> resolveEntries = [];
     private readonly List<string> connectToEntries = [];
     private readonly List<string> headers = [];
@@ -377,6 +378,31 @@ public sealed class CommandLineOptions
     /// <summary><see langword="true"/> when <c>--tftp-no-options</c> was given and no <c>--no-tftp-no-options</c> came after it.</summary>
     public bool TftpNoOptions { get; internal set; }
 
+    /// <summary><see langword="true"/> when <c>--disable-epsv</c> was given and no <c>--no-disable-epsv</c> came after it.</summary>
+    public bool FtpDisableEpsv { get; internal set; }
+
+    /// <summary>
+    /// <see langword="false"/> when <c>--no-ftp-skip-pasv-ip</c> was given and no <c>--ftp-skip-pasv-ip</c> came
+    /// after it; <see langword="true"/> otherwise, as curl 8.21.0 skips the <c>PASV</c> reply's address by default.
+    /// </summary>
+    public bool FtpSkipPasvIp { get; internal set; } = true;
+
+    /// <summary>
+    /// The last <c>--ftp-method</c> value, read without regard to case; <see cref="FtpFileMethod.MultiCwd"/> when
+    /// not given or when the last value was none of <c>multicwd</c>, <c>nocwd</c> and <c>singlecwd</c>.
+    /// </summary>
+    public FtpFileMethod FtpFileMethod { get; internal set; }
+
+    /// <summary><see langword="true"/> when <c>--ftp-create-dirs</c> was given and no <c>--no-ftp-create-dirs</c> came after it.</summary>
+    public bool FtpCreateDirectories { get; internal set; }
+
+    /// <summary><see langword="true"/> when <c>-l</c> / <c>--list-only</c> was given and no <c>--no-list-only</c> came after it.</summary>
+    public bool ListOnly { get; internal set; }
+
+    /// <summary>
+    /// Every <c>-Q</c> / <c>--quote</c> value, verbatim (prefix included, possibly empty) and in command-line order.
+    /// </summary>
+    public IReadOnlyList<string> QuoteCommands => quoteCommands;
     /// <summary>
     /// The <c>--create-file-mode</c> value, read as octal and at most <c>0777</c>;
     /// <see langword="null"/> when not given, where curl's default of <c>0644</c> applies.
@@ -1131,6 +1157,10 @@ public sealed class CommandLineOptions
     /// <summary>Appends <paramref name="telnetOption"/> to <see cref="TelnetOptions"/>, unchanged and unvalidated.</summary>
     /// <param name="telnetOption">A <c>-t</c> / <c>--telnet-option</c> value, possibly empty.</param>
     internal void AddTelnetOption(string telnetOption) => telnetOptions.Add(telnetOption);
+
+    /// <summary>Appends <paramref name="quoteCommand"/> to <see cref="QuoteCommands"/>, unchanged and unvalidated.</summary>
+    /// <param name="quoteCommand">A <c>-Q</c> / <c>--quote</c> value, possibly empty.</param>
+    internal void AddQuoteCommand(string quoteCommand) => quoteCommands.Add(quoteCommand);
 
     /// <summary>Appends <paramref name="entry"/> to <see cref="ResolveEntries"/>, unchanged and unvalidated.</summary>
     /// <param name="entry">A <c>--resolve</c> value, possibly empty.</param>

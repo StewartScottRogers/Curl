@@ -163,6 +163,63 @@ public interface ITransferContext
     bool TftpNoOptions { get; }
 
     /// <summary>
+    /// Gets a value indicating whether <c>--disable-epsv</c> was given, which stops an FTP
+    /// transfer trying <c>EPSV</c> before <c>PASV</c>; <see langword="false" /> when not given.
+    /// </summary>
+    /// <remarks>
+    /// <c>ftp://</c> is to read it (ADR-0006).
+    /// </remarks>
+    bool FtpDisableEpsv { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether an FTP transfer ignores the address in the server's
+    /// <c>PASV</c> reply and connects its data channel to the control channel's address;
+    /// <see langword="true" /> unless <c>--no-ftp-skip-pasv-ip</c> was given, as in curl 8.21.0.
+    /// </summary>
+    /// <remarks>
+    /// <c>ftp://</c> is to read it (ADR-0006).
+    /// </remarks>
+    bool FtpSkipPasvIp { get; }
+
+    /// <summary>
+    /// Gets how an FTP transfer reaches the file in the URL's path, per <c>--ftp-method</c>;
+    /// <see cref="FtpFileMethod.MultiCwd" /> when not given.
+    /// </summary>
+    /// <remarks>
+    /// <c>ftp://</c> is to read it (ADR-0006).
+    /// </remarks>
+    FtpFileMethod FtpFileMethod { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether <c>--ftp-create-dirs</c> was given, which creates the
+    /// missing directories of an FTP upload's path; <see langword="false" /> when not given.
+    /// </summary>
+    /// <remarks>
+    /// <c>ftp://</c> is to read it (ADR-0006).
+    /// </remarks>
+    bool FtpCreateDirectories { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether <c>-l</c>/<c>--list-only</c> was given, which lists a
+    /// directory by name only (<c>NLST</c> rather than <c>LIST</c>); <see langword="false" />
+    /// when not given.
+    /// </summary>
+    /// <remarks>
+    /// <c>ftp://</c> is to read it (ADR-0006).
+    /// </remarks>
+    bool ListOnly { get; }
+
+    /// <summary>
+    /// Gets every <c>-Q</c>/<c>--quote</c> value, verbatim and in command-line order; empty
+    /// when none was given.
+    /// </summary>
+    /// <remarks>
+    /// A value keeps its <c>-</c> (after the transfer), <c>+</c> (before the transfer) or
+    /// <c>*</c> (failure ignored) prefix: <c>ftp://</c> is to interpret them (ADR-0006).
+    /// </remarks>
+    IReadOnlyList<string> QuoteCommands { get; }
+
+    /// <summary>
     /// Gets a value indicating whether <c>--crlf</c> was given, which converts each line
     /// feed in an upload to a carriage return plus line feed; <see langword="false" /> when
     /// not given.

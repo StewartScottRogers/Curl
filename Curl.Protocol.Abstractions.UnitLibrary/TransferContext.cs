@@ -60,6 +60,24 @@ public sealed class TransferContext : ITransferContext
     public bool TftpNoOptions { get; init; }
 
     /// <inheritdoc />
+    public bool FtpDisableEpsv { get; init; }
+
+    /// <inheritdoc />
+    public bool FtpSkipPasvIp { get; init; } = true;
+
+    /// <inheritdoc />
+    public FtpFileMethod FtpFileMethod { get; init; }
+
+    /// <inheritdoc />
+    public bool FtpCreateDirectories { get; init; }
+
+    /// <inheritdoc />
+    public bool ListOnly { get; init; }
+
+    /// <inheritdoc />
+    public IReadOnlyList<string> QuoteCommands { get; init; } = [];
+
+    /// <inheritdoc />
     public bool ConvertLineEndings { get; init; }
 
     /// <inheritdoc />

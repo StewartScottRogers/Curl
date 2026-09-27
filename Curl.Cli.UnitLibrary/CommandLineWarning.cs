@@ -232,6 +232,18 @@ public static class CommandLineWarning
     ];
 
     /// <summary>
+    /// The lines curl prints for a <c>--ftp-method</c> value that is none of <c>multicwd</c>, <c>nocwd</c>
+    /// and <c>singlecwd</c> (in any case), after which it uses <c>multicwd</c>:
+    /// <c>Warning: unrecognized ftp file method '&lt;value&gt;', using default</c>, wrapped at 79 columns as
+    /// curl wraps it. Measured with <c>curl --ftp-method bogus http://127.0.0.1:1/</c>, <c>--ftp-method ''</c>
+    /// and a value long enough to wrap (curl 8.21.0, Windows, 2026-09-27): the warning, then the transfer.
+    /// </summary>
+    /// <param name="value">The value exactly as given.</param>
+    /// <returns>The warning's lines.</returns>
+    internal static IReadOnlyList<string> UnrecognizedFtpFileMethod(string value) =>
+        WrappedMessage.Lines("Warning: ", $"unrecognized ftp file method '{value}', using default");
+
+    /// <summary>
     /// The line curl prints when a command line gives more <c>-o</c>/<c>--output</c> values than
     /// URLs: <c>Warning: Got more output options than URLs</c>. curl 8.21.0 prints it once, however
     /// many values are left over, after the last transfer has ended, not while reading the command

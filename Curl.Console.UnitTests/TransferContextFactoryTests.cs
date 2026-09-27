@@ -99,6 +99,12 @@ public sealed class TransferContextFactoryTests
         Assert.IsEmpty(context.TelnetOptions);
         Assert.IsNull(context.TftpBlockSize);
         Assert.IsFalse(context.TftpNoOptions);
+        Assert.IsFalse(context.FtpDisableEpsv);
+        Assert.IsTrue(context.FtpSkipPasvIp);
+        Assert.AreEqual(FtpFileMethod.MultiCwd, context.FtpFileMethod);
+        Assert.IsFalse(context.FtpCreateDirectories);
+        Assert.IsFalse(context.ListOnly);
+        Assert.IsEmpty(context.QuoteCommands);
         Assert.AreEqual(TransferContext.DefaultCreateFileMode, context.CreateFileMode);
         Assert.IsNull(context.ConnectTimeout);
         Assert.IsNull(context.MaxTime);
@@ -118,6 +124,13 @@ public sealed class TransferContextFactoryTests
             "-t", "TTYPE=vt100",
             "--tftp-blksize", "1024",
             "--tftp-no-options",
+            "--disable-epsv",
+            "--no-ftp-skip-pasv-ip",
+            "--ftp-method", "singlecwd",
+            "--ftp-create-dirs",
+            "-l",
+            "-Q", "NOOP",
+            "-Q", "-DELE x",
             "--create-file-mode", "0600",
             "--connect-timeout", "3",
             "--path-as-is",
@@ -135,6 +148,12 @@ public sealed class TransferContextFactoryTests
         CollectionAssert.AreEqual(new[] { "TTYPE=vt100" }, context.TelnetOptions.ToArray());
         Assert.AreEqual(1024, context.TftpBlockSize);
         Assert.IsTrue(context.TftpNoOptions);
+        Assert.IsTrue(context.FtpDisableEpsv);
+        Assert.IsFalse(context.FtpSkipPasvIp);
+        Assert.AreEqual(FtpFileMethod.SingleCwd, context.FtpFileMethod);
+        Assert.IsTrue(context.FtpCreateDirectories);
+        Assert.IsTrue(context.ListOnly);
+        CollectionAssert.AreEqual(new[] { "NOOP", "-DELE x" }, context.QuoteCommands.ToArray());
         Assert.AreEqual(UnixFileMode.UserRead | UnixFileMode.UserWrite, context.CreateFileMode);
         Assert.AreEqual(TimeSpan.FromSeconds(3), context.ConnectTimeout);
         Assert.AreEqual(TimeSpan.FromSeconds(9), context.MaxTime);
