@@ -22,6 +22,18 @@ internal sealed class HttpResponseHeadReader(IConnection connection)
     private readonly HttpResponseHeadBuilder builder = new();
 
     /// <summary>
+    /// Gets a value indicating whether any byte of the response has arrived.
+    /// </summary>
+    internal bool HasReceived => lines.HasReceived;
+
+    /// <summary>
+    /// Gets a value indicating whether a <c>101 Switching Protocols</c> head was read before
+    /// the final one, after which the connection no longer speaks HTTP/1.1 and is never reused
+    /// (ADR-0050).
+    /// </summary>
+    internal bool SwitchedProtocols { get; private set; }
+
+    /// <summary>
     /// Reads the response head.
     /// </summary>
     /// <param name="cancellationToken">Cancels every read.</param>
@@ -57,6 +69,7 @@ internal sealed class HttpResponseHeadReader(IConnection connection)
         byte[] bytes = await lines.ReadLineAsync(true, cancellationToken).ConfigureAwait(false) ?? throw EmptyReply();
         HttpLine line = HttpLine.Split(bytes);
         HttpStatusLine statusLine = HttpStatusLine.Parse(line.Content);
+        SwitchedProtocols |= statusLine.StatusCode == 101;
         builder.StartHead(line);
         return statusLine;
     }

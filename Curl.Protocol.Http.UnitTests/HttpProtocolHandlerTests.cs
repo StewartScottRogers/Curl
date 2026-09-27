@@ -74,7 +74,7 @@ public sealed partial class HttpProtocolHandlerTests
         TransferResult result = await Handler(connector).ExecuteAsync(Context(url, new MemoryStream()));
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        Assert.AreEqual(new ConnectTarget(host, port, useTls), connector.Targets.Single());
+        Assert.AreEqual(new ConnectTarget(host, port, useTls) { PoolScheme = useTls ? "https" : "http" }, connector.Targets.Single());
     }
 
     [TestMethod]

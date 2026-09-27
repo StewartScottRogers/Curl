@@ -238,12 +238,18 @@ public sealed class HttpProtocolHandler(
     /// <summary>
     /// Builds the connect target for <paramref name="plan" />: the forward proxy itself, with
     /// TLS for an HTTPS proxy; or else the URL's host, tunnelled through the transfer's proxy
-    /// when it has one.
+    /// when it has one. Either is pooled under <c>https</c> for an <c>https</c> URL and
+    /// <c>http</c> otherwise, so a forward proxy connection serves every origin behind it, and
+    /// carries the transfer's events for the connector to report through (ADR-0050).
     /// </summary>
-    private static ConnectTarget TargetOf(HttpRequestPlan plan) =>
-        plan.ForwardProxy is { } proxy
+    private static ConnectTarget TargetOf(HttpRequestPlan plan)
+    {
+        ConnectTarget urlTarget = TargetOf(plan.Context.Url);
+        ConnectTarget target = plan.ForwardProxy is { } proxy
             ? new ConnectTarget(proxy.Host, proxy.Port, proxy.Kind == ProxyKind.Https)
-            : TargetOf(plan.Context.Url) with { Proxy = plan.Options.ForwardProxy };
+            : urlTarget with { Proxy = plan.Options.ForwardProxy };
+        return target with { PoolScheme = urlTarget.UseTls ? "https" : "http", Events = plan.Context.Events };
+    }
 
     /// <summary>
     /// Gives the proxy the request is forwarded through in absolute form: an HTTP-kind proxy,
@@ -267,10 +273,16 @@ public sealed class HttpProtocolHandler(
             []);
 
     /// <summary>
-    /// Opens a connection and sends <paramref name="plan" /> on it, then each retry a response
-    /// asks for - an authentication retry, or a resend without <c>Expect</c> - on the same
-    /// connection while it stays open, or on a new one when it closes.
+    /// Opens a connection, or takes a pooled one, and sends <paramref name="plan" /> on it, then
+    /// each retry a response asks for - an authentication retry, or a resend without
+    /// <c>Expect</c> - on the same connection while it stays open, or on a new one when it
+    /// closes. A pooled connection that dies before its response begins is closed and the
+    /// request sent again once on a fresh one, as curl 8.21.0 does (BL-336 Notes).
     /// </summary>
+    /// <remarks>
+    /// The connection is marked reusable when the last response on it persists, and the
+    /// end-of-transfer <c>-v</c> line is reported once it is disposed (ADR-0050).
+    /// </remarks>
     /// <param name="plan">The request to send.</param>
     /// <param name="earlier">
     /// The report of the exchange whose response asked for this retry, or
@@ -278,7 +290,8 @@ public sealed class HttpProtocolHandler(
     /// </param>
     private async ValueTask<TransferResult> ConnectAndExchangeAsync(HttpRequestPlan plan, TransferReport? earlier)
     {
-        ConnectResult connect = await plan.Deadline.ConnectAsync(connector, TargetOf(plan)).ConfigureAwait(false);
+        ConnectTarget target = TargetOf(plan);
+        ConnectResult connect = await plan.Deadline.ConnectAsync(connector, target).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
         {
             return TransferResult.Failure(connect.ExitCode, connect.ErrorMessage!) with
@@ -293,13 +306,10 @@ public sealed class HttpProtocolHandler(
         HttpAttemptOutcome outcome;
         await using (connection.ConfigureAwait(false))
         {
-            outcome = await ExchangeAsync(plan, connect, connection, earlier, newConnection: true).ConfigureAwait(false);
-            while (outcome.Retry is { } retry && outcome.KeepsAlive)
-            {
-                outcome = await ExchangeAsync(retry, connect, connection, outcome.Result.Report, newConnection: false).ConfigureAwait(false);
-            }
+            outcome = await ExchangeOnConnectionAsync(plan, connect, connection, earlier).ConfigureAwait(false);
         }
 
+        ReportConnectionEnd(plan.Context, target, connect, outcome);
         return outcome.Retry is { } reconnect
             ? await ConnectAndExchangeAsync(reconnect, outcome.Result.Report).ConfigureAwait(false)
             : outcome.Result;
@@ -320,6 +330,62 @@ public sealed class HttpProtocolHandler(
             Timings = new TransferTimings(plan.Started, null, failed, failed, failed, failed),
         };
     }
+
+    /// <summary>
+    /// Sends <paramref name="plan" /> on <paramref name="connection" />, then each retry that
+    /// may go on the same connection; then marks the connection reusable when the last
+    /// response persists, or reports that a pooled connection that died is being given up.
+    /// </summary>
+    private async ValueTask<HttpAttemptOutcome> ExchangeOnConnectionAsync(
+        HttpRequestPlan plan,
+        ConnectResult connect,
+        IConnection connection,
+        TransferReport? earlier)
+    {
+        HttpAttemptOutcome outcome = await ExchangeAsync(plan, connect, connection, earlier, newConnection: !connect.IsReused).ConfigureAwait(false);
+        while (outcome.Retry is { } retry && outcome.KeepsAlive)
+        {
+            outcome = await ExchangeAsync(retry, connect, connection, outcome.Result.Report, newConnection: false).ConfigureAwait(false);
+        }
+
+        if (outcome.KeepsAlive)
+        {
+            connection.MarkReusable();
+        }
+        else if (outcome.DiedBeforeResponse)
+        {
+            plan.Context.Events.ReportInfo(HttpConnectionInfoLines.ConnectionDiedRetrying);
+        }
+
+        return outcome;
+    }
+
+    /// <summary>
+    /// Reports what became of the connection once it is disposed, as curl 8.21.0's <c>-v</c>
+    /// does (ADR-0050): left intact when marked reusable, closed when the transfer failed, and
+    /// shut down otherwise - its response did not persist, or it died before its response, in
+    /// which case the line that the request goes out again follows.
+    /// </summary>
+    private static void ReportConnectionEnd(ITransferContext context, ConnectTarget target, ConnectResult connect, HttpAttemptOutcome outcome)
+    {
+        context.Events.ReportInfo(ConnectionEndLine(target, connect.ConnectionNumber, outcome));
+        if (outcome.DiedBeforeResponse)
+        {
+            context.Events.ReportInfo(HttpConnectionInfoLines.IssueAnotherRequest(context.Url));
+        }
+    }
+
+    /// <summary>
+    /// Gives curl 8.21.0's <c>-v</c> line for what became of connection <paramref name="number" />
+    /// (ADR-0050): left intact, closing, or shutting down.
+    /// </summary>
+    private static string ConnectionEndLine(ConnectTarget target, long number, HttpAttemptOutcome outcome) =>
+        outcome switch
+        {
+            { KeepsAlive: true } => HttpConnectionInfoLines.LeftIntact(number, target.Host, target.Port),
+            { DiedBeforeResponse: false, Result.ExitCode: not CurlExitCode.Ok } => HttpConnectionInfoLines.Closing(number),
+            _ => HttpConnectionInfoLines.ShuttingDown(number),
+        };
 
     /// <summary>
     /// Sends the request on <paramref name="connection" /> and reads the response into the
@@ -372,6 +438,7 @@ public sealed class HttpProtocolHandler(
             IgnoresContentLength = options.IgnoreContentLength,
             DecodesTransferCoding = options.TransferEncoding,
         };
+        HttpResponseHeadReader headReader = new(responseConnection);
         HttpRequestPlan? retry = null;
         HttpBodyDelivery delivery = HttpBodyDelivery.Deliver;
         try
@@ -380,7 +447,7 @@ public sealed class HttpProtocolHandler(
             exchange.RequestReady = context.TimeProvider.GetTimestamp();
             bool bodyLeftUnsent = await SendBodyAsync(context.TimeProvider, framing, responseConnection, upload, cancellationToken).ConfigureAwait(false);
             exchange.RequestSent = context.TimeProvider.GetTimestamp();
-            exchange.Head = await new HttpResponseHeadReader(responseConnection).ReadAsync(cancellationToken).ConfigureAwait(false);
+            exchange.Head = await headReader.ReadAsync(cancellationToken).ConfigureAwait(false);
             exchange.RedirectUrl = HttpRedirectLocation.Find(context.Url, exchange.Head);
             StoreCookies(context, exchange.Head);
             await WriteHeadersAsync(context.HeaderOutput, exchange.Head.HeadBytes, cancellationToken).ConfigureAwait(false);
@@ -397,7 +464,7 @@ public sealed class HttpProtocolHandler(
             TransferResult failed = TransferResult.Failure(failure.ExitCode, failure.Message, body.BytesWritten)
                 with
             { Report = exchange.Report(body.BytesWritten) };
-            return new HttpAttemptOutcome(failed, null, KeepsAlive: false);
+            return FailedOutcome(plan, failed, DiedBeforeResponse(plan, connect, headReader, failure));
         }
         catch (OperationCanceledException) when (plan.Deadline.EndedByLimit)
         {
@@ -409,17 +476,51 @@ public sealed class HttpProtocolHandler(
         }
 
         TransferResult result = Succeeded(delivery, exchange.Head!, exchange.Report(body.BytesWritten));
-        return new HttpAttemptOutcome(result, retry, KeepsAlive(plan, exchange.Head, upload));
+        return new HttpAttemptOutcome(result, retry, KeepsAlive(plan, exchange.Head, upload, headReader, delivery));
     }
+
+    /// <summary>
+    /// Builds the outcome of an exchange that failed: sent again once on a fresh connection when
+    /// its pooled connection <paramref name="diedBeforeResponse" />, and final otherwise.
+    /// </summary>
+    private static HttpAttemptOutcome FailedOutcome(HttpRequestPlan plan, TransferResult failed, bool diedBeforeResponse) =>
+        diedBeforeResponse
+            ? new HttpAttemptOutcome(failed, plan.OnFreshConnection(), KeepsAlive: false) { DiedBeforeResponse = true }
+            : new HttpAttemptOutcome(failed, null, KeepsAlive: false);
 
     /// <summary>
     /// Decides whether the connection can carry another request: not after a body a
     /// <c>417</c> cut short, which curl 8.21.0 shuts the connection on (measured, BL-319
-    /// Notes), and else as <see cref="HttpConnectionPersistence" /> says.
+    /// Notes), nor after a 101, nor when the body was left unread; and else as
+    /// <see cref="HttpConnectionPersistence" /> says (ADR-0050).
     /// </summary>
-    private static bool KeepsAlive(HttpRequestPlan plan, HttpResponseHead head, HttpRequestBodyWriter upload) =>
+    private static bool KeepsAlive(HttpRequestPlan plan, HttpResponseHead head, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpBodyDelivery delivery) =>
         !upload.CutShort
+            && delivery == HttpBodyDelivery.Deliver
+            && !headReader.SwitchedProtocols
             && HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, plan.Options.Raw, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding);
+
+    /// <summary>
+    /// Decides whether a failed exchange was on a pooled connection that died while idle, so
+    /// the request is sent again once on a fresh one, as curl 8.21.0 does (BL-336 Notes): the
+    /// connection was reused, it failed sending or receiving before any byte of the response
+    /// arrived, the request has not already been sent again for this reason, and its body, if
+    /// any, is bytes that can be sent again.
+    /// </summary>
+    private static bool DiedBeforeResponse(HttpRequestPlan plan, ConnectResult connect, HttpResponseHeadReader headReader, HttpTransferException failure) =>
+        !headReader.HasReceived
+            && failure.ExitCode is CurlExitCode.GotNothing or CurlExitCode.SendError or CurlExitCode.RecvError
+            && CanSendAgainOnFreshConnection(plan, connect);
+
+    /// <summary>
+    /// Decides whether <paramref name="plan" /> may be sent again on a fresh connection: it went
+    /// out on a pooled one, it has not already been sent again, and its body, if any, is bytes
+    /// that can be sent again.
+    /// </summary>
+    private static bool CanSendAgainOnFreshConnection(HttpRequestPlan plan, ConnectResult connect) =>
+        connect.IsReused
+            && !plan.SentOnFreshConnection
+            && plan.Framing.Body is not StreamBody;
 
     /// <summary>
     /// Fails a request before any byte of it is sent, as curl 8.21.0 does once connected: a
@@ -858,6 +959,12 @@ public sealed class HttpProtocolHandler(
         public string? ProxyAuthorization { get; init; }
 
         /// <summary>
+        /// Gets a value indicating whether the request is being sent again on a fresh connection
+        /// because a pooled one died before its response, which happens at most once.
+        /// </summary>
+        public bool SentOnFreshConnection { get; init; }
+
+        /// <summary>
         /// Makes the same request sent with <paramref name="authorization" /> instead.
         /// </summary>
         /// <param name="authorization">The <c>Authorization</c> value the retry is sent with.</param>
@@ -873,7 +980,16 @@ public sealed class HttpProtocolHandler(
         /// <returns>The resent request's plan.</returns>
         public HttpRequestPlan WithoutExpect(HttpRequestBody body) => With(Framing.WithoutExpect(body), Authorization);
 
+        /// <summary>
+        /// Makes the same request, marked as sent again on a fresh connection.
+        /// </summary>
+        /// <returns>The resent request's plan.</returns>
+        public HttpRequestPlan OnFreshConnection() => With(Framing, Authorization, sentOnFreshConnection: true);
+
         private HttpRequestPlan With(HttpRequestFraming framing, string? authorization) =>
+            With(framing, authorization, SentOnFreshConnection);
+
+        private HttpRequestPlan With(HttpRequestFraming framing, string? authorization, bool sentOnFreshConnection) =>
             new(Context, Options, framing, AuthRequest, authorization)
             {
                 Started = Started,
@@ -881,6 +997,7 @@ public sealed class HttpProtocolHandler(
                 Progress = Progress,
                 ForwardProxy = ForwardProxy,
                 ProxyAuthorization = ProxyAuthorization,
+                SentOnFreshConnection = sentOnFreshConnection,
             };
     }
 
@@ -892,10 +1009,17 @@ public sealed class HttpProtocolHandler(
     /// The request to send next, or <see langword="null" /> when the result is final.
     /// </param>
     /// <param name="KeepsAlive">
-    /// <see langword="true" /> when the retry may be sent on the same connection.
+    /// <see langword="true" /> when the response was read to its end and leaves the connection
+    /// open, so a retry may be sent on it and it is marked reusable.
     /// </param>
     private sealed class HttpAttemptOutcome(TransferResult Result, HttpRequestPlan? Retry, bool KeepsAlive)
     {
+        /// <summary>
+        /// Gets a value indicating whether the exchange ran on a pooled connection that died
+        /// before its response began, so <see cref="Retry" /> resends the request on a fresh one.
+        /// </summary>
+        public bool DiedBeforeResponse { get; init; }
+
         /// <summary>Gets the result, with the report so far.</summary>
         public TransferResult Result { get; } = Result;
 
