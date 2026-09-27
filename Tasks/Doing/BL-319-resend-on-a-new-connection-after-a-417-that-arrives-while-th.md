@@ -33,3 +33,4 @@ A `417 Expectation Failed` that arrives after the one-second `100 Continue` wait
 ## Log
 
 - 2026-09-26: Created.
+- 2026-09-27: Backlog -> Doing.
