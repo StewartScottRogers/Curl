@@ -74,8 +74,7 @@ public sealed class CommandLineRangeOptionTests
         CollectionAssert.AreEqual(
             new[]
             {
-                "Warning: A specified range MUST include at least one dash (-). Appending one ",
-                "Warning: for you",
+                "Warning: A specified range MUST include at least one dash (-). Appending one for you",
             },
             result.WarningLines.ToArray());
     }
@@ -95,9 +94,7 @@ public sealed class CommandLineRangeOptionTests
         CollectionAssert.AreEqual(
             new[]
             {
-                "Warning: Invalid character is found in given range. A specified range MUST ",
-                "Warning: have only digits in 'start'-'stop'. The server's response to this ",
-                "Warning: request is uncertain.",
+                "Warning: Invalid character is found in given range. A specified range MUST have only digits in 'start'-'stop'. The server's response to this request is uncertain.",
             },
             result.WarningLines.ToArray());
     }
@@ -107,8 +104,8 @@ public sealed class CommandLineRangeOptionTests
     [TestMethod]
     [DataRow(new[] { "-s", "-r", "abc", Url }, 0)]
     [DataRow(new[] { "-sS", "-r", "5", Url }, 0)]
-    [DataRow(new[] { "-r", "abc", "-s", Url }, 3)]
-    [DataRow(new[] { "-r", "5", "-s", Url }, 2)]
+    [DataRow(new[] { "-r", "abc", "-s", Url }, 1)]
+    [DataRow(new[] { "-r", "5", "-s", Url }, 1)]
     public void Parse_RangeWarning_IsHiddenOnlyBySilentReadBeforeIt(string[] arguments, int warningLineCount)
     {
         CommandLineParseResult result = CommandLineParser.Parse(arguments);

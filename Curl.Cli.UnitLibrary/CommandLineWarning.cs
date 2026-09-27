@@ -85,26 +85,23 @@ public static class CommandLineWarning
     }
 
     /// <summary>
-    /// The two lines curl prints for a <c>-r</c>/<c>--range</c> value that starts with a digit and
-    /// has no dash, which it reads as the range from that position to the end. curl wraps the
-    /// text at 79 columns, so the first line ends in a space.
+    /// The warning curl prints for a <c>-r</c>/<c>--range</c> value that starts with a digit and
+    /// has no dash, which it reads as the range from that position to the end, as one unwrapped
+    /// line; the console layer wraps it at the terminal width as curl does.
     /// </summary>
     public static IReadOnlyList<string> RangeHasNoDash { get; } =
     [
-        "Warning: A specified range MUST include at least one dash (-). Appending one ",
-        "Warning: for you",
+        "Warning: A specified range MUST include at least one dash (-). Appending one for you",
     ];
 
     /// <summary>
-    /// The three lines curl prints for a <c>-r</c>/<c>--range</c> value holding anything but
-    /// digits, dashes and commas, which it keeps unchanged. curl wraps the text at 79 columns, so
-    /// the first two lines end in a space.
+    /// The warning curl prints for a <c>-r</c>/<c>--range</c> value holding anything but digits,
+    /// dashes and commas, which it keeps unchanged, as one unwrapped line; the console layer wraps
+    /// it at the terminal width as curl does.
     /// </summary>
     public static IReadOnlyList<string> RangeHasInvalidCharacter { get; } =
     [
-        "Warning: Invalid character is found in given range. A specified range MUST ",
-        "Warning: have only digits in 'start'-'stop'. The server's response to this ",
-        "Warning: request is uncertain.",
+        "Warning: Invalid character is found in given range. A specified range MUST have only digits in 'start'-'stop'. The server's response to this request is uncertain.",
     ];
 
     /// <summary>
