@@ -74,6 +74,13 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
     private const string XDisplayLocationTooLongMessage = "Too long telnet XDISPLOC";
 
     /// <summary>
+    /// The exit 28 message for a session <c>-m</c> ends: curl 8.21.0's telnet loop checks
+    /// <c>-m</c> itself and words it so, not as the multi loop's <c>Operation timed out</c>
+    /// (measured 2026-09-28, BL-511 Notes).
+    /// </summary>
+    private const string TimedOutMessage = "Time-out";
+
+    /// <summary>
     /// The one scheme this handler serves, as curl 8.21.0's <c>--version</c> protocol list
     /// names it.
     /// </summary>
@@ -96,6 +103,7 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
     {
         ArgumentNullException.ThrowIfNull(context);
 
+        long startedAt = context.OperationStarted ?? context.TimeProvider.GetTimestamp();
         CurlUrl url = context.Url;
         var target = new ConnectTarget(url.IdnHost, url.IsDefaultPort ? DefaultPort : url.Port, false)
         {
@@ -107,6 +115,7 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
             return new TransferResult(connect.ExitCode, 0, connect.ErrorMessage) { IsConnectionRefused = connect.IsConnectionRefused };
         }
 
+        context.Progress.ReportTransferStarted();
         await using (connection.ConfigureAwait(false))
         {
             var optionValues = new TelnetOptionValues();
@@ -115,14 +124,15 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
                 context.TelnetOptions,
                 optionValues);
             return optionFailure
-                ?? await RunSessionAsync(connection, context, optionValues).ConfigureAwait(false);
+                ?? await RunSessionAsync(connection, context, optionValues, startedAt).ConfigureAwait(false);
         }
     }
 
     private static async Task<TransferResult> RunSessionAsync(
         IConnection connection,
         ITransferContext context,
-        TelnetOptionValues optionValues)
+        TelnetOptionValues optionValues,
+        long startedAt)
     {
         var sendLock = new SemaphoreSlim(1, 1);
         var uploadSendFailed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -133,7 +143,7 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
 
         try
         {
-            return await ReceiveUntilClosedAsync(connection, context, optionValues, sendLock, uploadSendFailed.Task)
+            return await ReceiveUntilClosedAsync(connection, context, optionValues, sendLock, uploadSendFailed.Task, startedAt)
                 .ConfigureAwait(false);
         }
         finally
@@ -159,7 +169,8 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
         ITransferContext context,
         TelnetOptionValues optionValues,
         SemaphoreSlim sendLock,
-        Task uploadSendFailed)
+        Task uploadSendFailed,
+        long startedAt)
     {
         CancellationToken cancellationToken = context.CancellationToken;
         var receiver = new TelnetReceiver(optionValues);
@@ -177,7 +188,16 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
                 return SendFailure(bytesWritten);
             }
 
-            int count = await read.ConfigureAwait(false);
+            int count;
+            try
+            {
+                count = await read.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (MaxTimePassed(context, startedAt))
+            {
+                return new TransferResult(CurlExitCode.OperationTimedOut, bytesWritten, TimedOutMessage);
+            }
+
             if (count == 0)
             {
                 return TransferResult.Success(bytesWritten);
@@ -192,6 +212,7 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
             }
 
             bytesWritten += data.Count;
+            context.Progress.ReportDownloaded(bytesWritten, null);
             if (!await TrySendAsync(connection, sendLock, replies.ToArray(), cancellationToken).ConfigureAwait(false))
             {
                 return SendFailure(bytesWritten);
@@ -203,6 +224,14 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
             }
         }
     }
+
+    /// <summary>
+    /// Tells whether <c>-m</c> is set and has passed on the transfer's clock since
+    /// <paramref name="startedAt" />, so a read the runner's <c>-m</c> watchdog cancelled ends with
+    /// curl's telnet message rather than the multi loop's (ADR-0117, Decision 4).
+    /// </summary>
+    private static bool MaxTimePassed(ITransferContext context, long startedAt) =>
+        context.MaxTime is { } limit && limit > TimeSpan.Zero && context.TimeProvider.GetElapsedTime(startedAt) >= limit;
 
     /// <summary>
     /// Reads from the server, taking a read the connection fails with
