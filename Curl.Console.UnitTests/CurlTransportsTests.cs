@@ -105,6 +105,24 @@ public sealed class CurlTransportsTests
         Assert.AreEqual(CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()), transports.ProxyTunnelOptions.CredentialEncoding);
     }
 
+    [TestMethod]
+    public void CreateTransports_WithoutSocketSwitches_DialsWithNoDelayAndKeepAlive()
+    {
+        CurlTransports transports = CurlComposition.CreateTransports(NoOptions());
+
+        Assert.AreEqual(new TcpSocketOptions(NoDelay: true, KeepAlive: true), transports.TcpDialer.SocketOptions);
+    }
+
+    [TestMethod]
+    [DataRow("--no-tcp-nodelay", false, true)]
+    [DataRow("--no-keepalive", true, false)]
+    public void CreateTransports_WithANoSocketSwitch_DialsWithThatOptionOff(string argument, bool noDelay, bool keepAlive)
+    {
+        CurlTransports transports = CurlComposition.CreateTransports(Options(argument, "gophers://example.com/"));
+
+        Assert.AreEqual(new TcpSocketOptions(noDelay, keepAlive), transports.TcpDialer.SocketOptions);
+    }
+
     private static CommandLineOptions NoOptions() => Options("gophers://example.com/");
 
     private static CommandLineOptions Options(params string[] arguments)
