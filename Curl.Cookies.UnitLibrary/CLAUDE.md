@@ -12,6 +12,10 @@ saving the jar through `IFileSystem`, refusing a received cookie set on a public
 Public Suffix List snapshot (`PublicSuffixList/public_suffix_list.dat`, ADR-0049; refresh it only with
 `Update-PublicSuffixList.ps1`), which `PublicSuffixList` reads as libpsl does; pin every rule to a measured curl run, never to the RFC.
 
+`CookieStore` is shared by every transfer of a run, concurrently under `-Z` (ADR-0127), so every member
+that reads or changes its cookies or `-b` strings does so under its one `Lock` (BL-755). Keep new members
+that way, and report `-v` lines and do file I/O outside the lock.
+
 Never construct a `Socket`, `SslStream` or `HttpClient` here. Take `IConnection`
 so the tests in the matching `.UnitTests` project can drive this code from a
 recorded byte stream with no network.
