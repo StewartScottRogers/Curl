@@ -84,3 +84,38 @@ reproduces itself.
   it; the certificate itself is already on the event.
 - **Deriving the verify code from `CertificateVerified` alone.** Lost: curl prints the
   exact code (`12`, hex, for a self-signed certificate), which only the TLS layer knows.
+
+## Amendment (BL-404, 2026-09-27): `SslStreamTlsProvider` reports the event
+
+Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions").
+
+- **Who reports it.** `SslStreamTlsProvider` reports a `TlsHandshakeEvent` after every
+  successful handshake through a four-argument `AuthenticateAsClientAsync` overload that
+  takes the `ITransferEvents`; the `ITlsProvider` overload reports to `NoTransferEvents`.
+  `TcpConnector` passes `ConnectTarget.Events` to any provider implementing the internal
+  `IHandshakeReportingTlsProvider`, so `ITlsProvider` in Abstractions is unchanged. The
+  HTTPS proxy's handshake is not reported, since `-v` does not yet word it as
+  `Proxy certificate:`.
+- **What it fills.** Version, cipher suite, the server's certificate, whether it verified,
+  `CertificateVerifyResult` and `PeerCertificateChain`: the chain .NET built when the chain
+  verified (errors cleared by a `--capath` root count as verified), else what the server
+  sent. No ALPN is offered, so none is reported. `SslStream` exposes neither the
+  key-exchange group nor the peer signature type; both stay `null` and print as
+  OpenSSL's fallbacks.
+- **The `X509_V_` mapping** (`OpenSslVerifyResult`), from what the validation callback saw:
+
+  | `SslStream` saw | Code |
+  | --- | --- |
+  | No certificate sent | `null` |
+  | No chain error (a host-name mismatch alone included: curl checks the name itself after OpenSSL verified) | `0` `X509_V_OK` |
+  | `NotTimeValid`, a certificate's start date still ahead | `9` `X509_V_ERR_CERT_NOT_YET_VALID` |
+  | `NotTimeValid` otherwise | `10` `X509_V_ERR_CERT_HAS_EXPIRED` |
+  | `UntrustedRoot`, chain of one | `18` `X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT` |
+  | `UntrustedRoot`, longer chain | `19` `X509_V_ERR_SELF_SIGNED_CERT_IN_CHAIN` |
+  | `PartialChain` | `20` `X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY` |
+  | Any other status | `null` |
+
+  A date error wins over a trust error because OpenSSL's `verify_chain` checks dates in
+  `internal_verify`, after `build_chain` reports the trust error, and
+  `SSL_get_verify_result` keeps the last error. This was read from OpenSSL's source, not
+  measured: this Windows checkout runs the Schannel build, which prints none of it.
