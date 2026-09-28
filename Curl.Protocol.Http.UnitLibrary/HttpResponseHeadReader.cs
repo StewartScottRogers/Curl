@@ -41,23 +41,39 @@ internal sealed class HttpResponseHeadReader(IConnection connection)
 
     /// <summary>
     /// Gets where each head line is reported once it is accepted: one
-    /// <see cref="ITransferEvents.ReportResponseHeader" /> per line as received, its line end
-    /// included - every status line, 1xx heads' included, every header line and each head's
-    /// empty line (ADR-0046) - except the final head's empty line, which is held until
-    /// <see cref="ReportHeldEmptyLine" />, since curl 8.21.0 prints the lines it decides at
-    /// the end of the head before it (measured, BL-449 Notes). An HTTP/1.0 status line is
+    /// <see cref="ITransferEvents.ReportResponseHeader" /> per line, its line end included -
+    /// every status line, 1xx heads' included, every header line and each head's empty line
+    /// (ADR-0046). A status line is reported as received. A header line is held until the
+    /// next line shows its header is whole, then reported after <see cref="HeaderReceived" />
+    /// is told of the header, since curl 8.21.0 prints the <c>-v</c> lines a header causes
+    /// before the header (measured, BL-468 Notes). The final head's empty line is held until
+    /// <see cref="ReportHeldLines" />, since curl 8.21.0 prints the lines it decides at the
+    /// end of the head before it (measured, BL-449 Notes). An HTTP/1.0 status line is
     /// preceded by <see cref="HttpConnectionInfoLines.AssumeCloseAfterBody" />.
     /// </summary>
     internal ITransferEvents Events { get; init; } = NoTransferEvents.Instance;
 
+    /// <summary>
+    /// Gets what is told of each header of every head, 1xx heads' included, once it is whole -
+    /// its continuation lines folded in - just before its lines are reported to
+    /// <see cref="Events" />; a header whose head fails before it is whole is never told.
+    /// </summary>
+    internal Action<HttpResponseHeader> HeaderReceived { get; init; } = static _ => { };
+
+    private readonly List<byte[]> heldHeaderLines = [];
+
+    private bool heldHeaderKeepsHttp10Alive;
+
     private byte[]? heldEmptyLine;
 
     /// <summary>
-    /// Reports the final head's empty line, held back by <see cref="ReadAsync" />, once; does
-    /// nothing when there is none held.
+    /// Reports the lines <see cref="ReadAsync" /> still holds, once: those of a header a
+    /// failure cut off before it was whole, then the final head's empty line. Does nothing when
+    /// none is held.
     /// </summary>
-    internal void ReportHeldEmptyLine()
+    internal void ReportHeldLines()
     {
+        ReportHeldHeaderLines();
         if (heldEmptyLine is { } bytes)
         {
             heldEmptyLine = null;
@@ -114,11 +130,11 @@ internal sealed class HttpResponseHeadReader(IConnection connection)
     }
 
     /// <summary>
-    /// Reads header lines through the head's empty line, or until the peer closes; the
-    /// empty line of a head that is not informational is held for
-    /// <see cref="ReportHeldEmptyLine" /> rather than reported. In an HTTP/1.0 head, a header
-    /// line that <see cref="HttpConnectionPersistence.KeepsHttp10Alive" /> is preceded by
-    /// <see cref="HttpConnectionInfoLines.Http10KeepAlive" />.
+    /// Reads header lines through the head's empty line, or until the peer closes, releasing
+    /// each header's held lines once the header is whole; the empty line of a head that is not
+    /// informational is held for <see cref="ReportHeldLines" /> rather than reported. In an
+    /// HTTP/1.0 head, a header line that <see cref="HttpConnectionPersistence.KeepsHttp10Alive" />
+    /// is preceded by <see cref="HttpConnectionInfoLines.Http10KeepAlive" />.
     /// </summary>
     /// <param name="statusLine">The head's status line.</param>
     /// <param name="cancellationToken">Cancels every read.</param>
@@ -133,25 +149,62 @@ internal sealed class HttpResponseHeadReader(IConnection connection)
             if (line.IsEmpty)
             {
                 builder.EndHead(line);
+                ReleaseHeldHeader();
                 heldEmptyLine = bytes;
                 if (informational)
                 {
-                    ReportHeldEmptyLine();
+                    ReportHeldLines();
                 }
 
                 return false;
             }
 
             builder.AddLine(line);
-            if (http10 && HttpConnectionPersistence.KeepsHttp10Alive(line.Content))
+            if (!line.IsContinuation)
             {
-                Events.ReportInfo(HttpConnectionInfoLines.Http10KeepAlive);
+                ReleaseHeldHeader();
+                heldHeaderKeepsHttp10Alive = http10 && HttpConnectionPersistence.KeepsHttp10Alive(line.Content);
             }
 
-            Events.ReportResponseHeader(bytes);
+            heldHeaderLines.Add(bytes);
         }
 
         builder.EndHeadAtClose();
+        ReleaseHeldHeader();
         return true;
+    }
+
+    /// <summary>
+    /// Tells <see cref="HeaderReceived" /> of the header the builder has just completed and
+    /// reports its held lines; does nothing when no header line is held.
+    /// </summary>
+    private void ReleaseHeldHeader()
+    {
+        if (heldHeaderLines.Count > 0)
+        {
+            HeaderReceived(builder.LastHeader);
+            ReportHeldHeaderLines();
+        }
+    }
+
+    /// <summary>
+    /// Reports the held header lines, preceded by
+    /// <see cref="HttpConnectionInfoLines.Http10KeepAlive" /> when the header keeps an HTTP/1.0
+    /// connection alive, and holds none after.
+    /// </summary>
+    private void ReportHeldHeaderLines()
+    {
+        if (heldHeaderKeepsHttp10Alive)
+        {
+            heldHeaderKeepsHttp10Alive = false;
+            Events.ReportInfo(HttpConnectionInfoLines.Http10KeepAlive);
+        }
+
+        foreach (byte[] held in heldHeaderLines)
+        {
+            Events.ReportResponseHeader(held);
+        }
+
+        heldHeaderLines.Clear();
     }
 }

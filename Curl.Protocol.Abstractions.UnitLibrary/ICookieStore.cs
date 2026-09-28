@@ -28,18 +28,26 @@ public interface ICookieStore
     string? GetCookieHeader(CurlUrl url, bool secure, DateTimeOffset now);
 
     /// <summary>
-    /// Stores the cookies from a response to a request for <paramref name="url" />.
+    /// Stores the cookie from one <c>Set-Cookie</c> header of a response to a request for
+    /// <paramref name="url" />, as the header arrives, so its <c>-v</c> line is reported before
+    /// the header line is.
     /// </summary>
     /// <param name="url">The URL of the request the response answered.</param>
-    /// <param name="setCookieHeaders">
-    /// The value of each <c>Set-Cookie</c> header, verbatim and in the order received.
+    /// <param name="setCookieHeader">The <c>Set-Cookie</c> header's value, verbatim.</param>
+    /// <param name="storedFromResponse">
+    /// How many cookies the store has already stored from this request's responses, as the
+    /// previous call returned it; 0 for the first <c>Set-Cookie</c> header. The store ignores the
+    /// header once this reaches its per-response limit.
     /// </param>
     /// <param name="now">
     /// The receive time that relative expiry (<c>Max-Age</c>) counts from.
     /// </param>
     /// <param name="events">
-    /// Where the store reports, as curl's <c>-v</c> lines, each cookie it adds, replaces or
+    /// Where the store reports, as curl's <c>-v</c> lines, the cookie it adds, replaces or
     /// drops; <see cref="NoTransferEvents.Instance" /> when nobody is listening.
     /// </param>
-    void StoreFromResponse(CurlUrl url, IReadOnlyList<string> setCookieHeaders, DateTimeOffset now, ITransferEvents events);
+    /// <returns>
+    /// <paramref name="storedFromResponse" />, plus one when this header's cookie was stored.
+    /// </returns>
+    int StoreFromResponse(CurlUrl url, string setCookieHeader, int storedFromResponse, DateTimeOffset now, ITransferEvents events);
 }

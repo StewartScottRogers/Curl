@@ -477,7 +477,12 @@ public sealed class HttpProtocolHandler(
             IgnoresContentLength = options.IgnoreContentLength,
             DecodesTransferCoding = options.TransferEncoding,
         };
-        HttpResponseHeadReader headReader = new(responseConnection) { Events = context.Events };
+        int cookiesStored = 0;
+        HttpResponseHeadReader headReader = new(responseConnection)
+        {
+            Events = context.Events,
+            HeaderReceived = header => cookiesStored = StoreCookie(context, header, cookiesStored),
+        };
         HttpRequestPlan? retry = null;
         HttpBodyDelivery delivery = HttpBodyDelivery.Deliver;
         ReportProtocolChosen(context.Events, newConnection);
@@ -492,7 +497,6 @@ public sealed class HttpProtocolHandler(
             HttpHeadRefusal? refusal = body.FindHeadRefusal(exchange.Head, context.NoBody, DecodesContent(options));
             exchange.Head = HeadCurlRead(exchange.Head, refusal);
             exchange.RedirectUrl = HttpRedirectLocation.Find(context.Url, exchange.Head);
-            StoreCookies(context, exchange.Head);
             await WriteHeadersAsync(context.HeaderOutput, exchange.Head.HeadBytes, cancellationToken).ConfigureAwait(false);
             ThrowIfHeaderRefused(refusal);
             ReportNoEndOfMessageIndicator(plan, exchange.Head, headReader);
@@ -501,14 +505,14 @@ public sealed class HttpProtocolHandler(
             ThrowIfFailing(fail, HttpFailMode.Fail, exchange.Head);
             bool discardsBody = retry is not null || (options.FollowRedirects && exchange.RedirectUrl is not null);
             ReportIgnoredBody(plan, exchange.Head, discardsBody);
-            headReader.ReportHeldEmptyLine();
+            headReader.ReportHeldLines();
             delivery = DeliveryOf(plan, exchange.Head, discardsBody);
             await ReadBodyAsync(plan, exchange.Head, body, delivery, discardsBody, cancellationToken).ConfigureAwait(false);
             ThrowIfFailing(fail, HttpFailMode.FailWithBody, exchange.Head);
         }
         catch (HttpTransferException failure)
         {
-            headReader.ReportHeldEmptyLine();
+            headReader.ReportHeldLines();
             ReportReceiveFailure(context.Events, failure);
             TransferResult failed = TransferResult.Failure(failure.ExitCode, failure.Message, body.BytesWritten)
                 with
@@ -517,7 +521,7 @@ public sealed class HttpProtocolHandler(
         }
         catch (OperationCanceledException) when (plan.Deadline.EndedByLimit)
         {
-            headReader.ReportHeldEmptyLine();
+            headReader.ReportHeldLines();
             string message = HttpTransferMessages.OperationTimedOut(plan.Deadline.OperationElapsedMilliseconds, body.BytesWritten, body.ExpectedLength);
             TransferResult timedOut = TransferResult.Failure(CurlExitCode.OperationTimedOut, message, body.BytesWritten)
                 with
@@ -789,18 +793,18 @@ public sealed class HttpProtocolHandler(
         CookieStore?.GetCookieHeader(context.Url, TargetOf(context.Url).UseTls, context.TimeProvider.GetUtcNow());
 
     /// <summary>
-    /// Hands the <c>Set-Cookie</c> values of <paramref name="head" />, in received order, to
-    /// the cookie store, with the transfer's events for its <c>-v</c> lines, when cookies are
-    /// on and the head has any.
+    /// Hands <paramref name="header" />, when it is a <c>Set-Cookie</c> header and cookies are
+    /// on, to the cookie store with the transfer's events for its <c>-v</c> lines, as it arrives
+    /// in any head of the response, 1xx heads' included (measured, BL-468 Notes).
     /// </summary>
-    private void StoreCookies(ITransferContext context, HttpResponseHead head)
-    {
-        string[] setCookies = ValuesOf(head, "Set-Cookie");
-        if (CookieStore is { } store && setCookies.Length > 0)
-        {
-            store.StoreFromResponse(context.Url, setCookies, context.TimeProvider.GetUtcNow(), context.Events);
-        }
-    }
+    /// <param name="context">The transfer.</param>
+    /// <param name="header">A whole header of the response.</param>
+    /// <param name="storedFromResponse">How many cookies the store has stored from this request's responses.</param>
+    /// <returns>The count the store gives back, or <paramref name="storedFromResponse" /> when the store is not asked.</returns>
+    private int StoreCookie(ITransferContext context, HttpResponseHeader header, int storedFromResponse) =>
+        CookieStore is { } store && string.Equals(header.Name, "Set-Cookie", StringComparison.OrdinalIgnoreCase)
+            ? store.StoreFromResponse(context.Url, header.Value, storedFromResponse, context.TimeProvider.GetUtcNow(), context.Events)
+            : storedFromResponse;
 
     /// <summary>
     /// Decides whether a response is answered with one more request, and which: the same

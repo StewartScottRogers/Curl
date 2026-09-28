@@ -27,6 +27,13 @@ internal sealed class HttpResponseHeadBuilder
     private string pendingTerminator = string.Empty;
 
     /// <summary>
+    /// Gets the header added last to the current head, its continuation lines folded in; valid
+    /// once <see cref="AddLine" />, <see cref="EndHead" /> or <see cref="EndHeadAtClose" /> has
+    /// completed a header of it.
+    /// </summary>
+    internal HttpResponseHeader LastHeader => headers[^1];
+
+    /// <summary>
     /// Starts the next response's head with its status line, dropping the previous head's
     /// headers but keeping its bytes.
     /// </summary>

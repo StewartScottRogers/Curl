@@ -216,6 +216,30 @@ public sealed class CookieStore : ICookieStore
         return [.. newestFirst.Order(SendingOrder.Instance)];
     }
 
+    /// <summary>
+    /// Stores the cookies from every <c>Set-Cookie</c> header of one response to a request for
+    /// <paramref name="url"/>, in order, as successive
+    /// <see cref="StoreFromResponse(CurlUrl, string, int, DateTimeOffset, ITransferEvents)"/> calls
+    /// counting from 0.
+    /// </summary>
+    /// <param name="url">The URL of the request the response answered.</param>
+    /// <param name="setCookieHeaders">The value of each <c>Set-Cookie</c> header, verbatim and in the order received.</param>
+    /// <param name="now">The receive time that relative expiry (<c>Max-Age</c>) counts from.</param>
+    /// <param name="events">Where the store reports, as curl's <c>-v</c> lines, each cookie it adds, replaces or drops.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="url"/>, <paramref name="setCookieHeaders"/> or <paramref name="events"/> is <see langword="null"/>.</exception>
+    public void StoreFromResponse(CurlUrl url, IReadOnlyList<string> setCookieHeaders, DateTimeOffset now, ITransferEvents events)
+    {
+        ArgumentNullException.ThrowIfNull(url);
+        ArgumentNullException.ThrowIfNull(setCookieHeaders);
+        ArgumentNullException.ThrowIfNull(events);
+
+        int stored = 0;
+        foreach (string header in setCookieHeaders)
+        {
+            stored = StoreFromResponse(url, header, stored, now, events);
+        }
+    }
+
     /// <inheritdoc/>
     /// <remarks>
     /// <para>
@@ -230,8 +254,8 @@ public sealed class CookieStore : ICookieStore
     /// segment starts the new cookie's path: curl will not let it overlay the secure one.
     /// </para>
     /// <para>
-    /// Once <see cref="MostCookiesStoredPerResponse"/> cookies have been stored or replaced, the rest of
-    /// the headers are ignored. A cookie that arrived already expired replaces its namesake and is then
+    /// Once <see cref="MostCookiesStoredPerResponse"/> cookies have been stored or replaced from the
+    /// response, the rest of its headers are ignored. A cookie that arrived already expired replaces its namesake and is then
     /// removed with every other expired cookie, so it deletes the namesake.
     /// </para>
     /// <para>
@@ -243,34 +267,30 @@ public sealed class CookieStore : ICookieStore
     /// where curl prints nothing; one past the limit is not reported.
     /// </para>
     /// </remarks>
-    /// <exception cref="ArgumentNullException"><paramref name="url"/>, <paramref name="setCookieHeaders"/> or <paramref name="events"/> is <see langword="null"/>.</exception>
-    public void StoreFromResponse(CurlUrl url, IReadOnlyList<string> setCookieHeaders, DateTimeOffset now, ITransferEvents events)
+    /// <exception cref="ArgumentNullException"><paramref name="url"/>, <paramref name="setCookieHeader"/> or <paramref name="events"/> is <see langword="null"/>.</exception>
+    public int StoreFromResponse(CurlUrl url, string setCookieHeader, int storedFromResponse, DateTimeOffset now, ITransferEvents events)
     {
         ArgumentNullException.ThrowIfNull(url);
-        ArgumentNullException.ThrowIfNull(setCookieHeaders);
+        ArgumentNullException.ThrowIfNull(setCookieHeader);
         ArgumentNullException.ThrowIfNull(events);
 
-        bool secureOrigin = CookieOrigin.IsSecure(url);
-        string host = CookieOrigin.HostOf(url);
-        int stored = 0;
-        foreach (string header in setCookieHeaders)
+        if (storedFromResponse >= MostCookiesStoredPerResponse)
         {
-            if (stored == MostCookiesStoredPerResponse)
-            {
-                break;
-            }
+            return storedFromResponse;
+        }
 
-            Cookie? cookie = ParseReportingRefusal(header, url, now, events);
-            if (cookie is not null && MayStore(cookie, host, secureOrigin, events))
-            {
-                string action = Store(cookie) ? "Replaced" : "Added";
-                events.ReportInfo(
-                    string.Create(CultureInfo.InvariantCulture, $"{action} cookie {cookie.Name}=\"{cookie.Value}\" for domain {cookie.Domain}, path {cookie.Path}, expire {cookie.ExpiresUnixSeconds}"));
-                stored++;
-            }
+        int stored = storedFromResponse;
+        Cookie? cookie = ParseReportingRefusal(setCookieHeader, url, now, events);
+        if (cookie is not null && MayStore(cookie, CookieOrigin.HostOf(url), CookieOrigin.IsSecure(url), events))
+        {
+            string action = Store(cookie) ? "Replaced" : "Added";
+            events.ReportInfo(
+                string.Create(CultureInfo.InvariantCulture, $"{action} cookie {cookie.Name}=\"{cookie.Value}\" for domain {cookie.Domain}, path {cookie.Path}, expire {cookie.ExpiresUnixSeconds}"));
+            stored++;
         }
 
         RemoveExpired(now);
+        return stored;
     }
 
     /// <summary>Reads <paramref name="header"/> with <see cref="SetCookieParser"/>, reporting the <c>-v</c> line curl prints when it refuses it.</summary>
