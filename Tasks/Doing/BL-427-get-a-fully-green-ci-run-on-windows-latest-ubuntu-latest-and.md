@@ -66,3 +66,4 @@ naming them. When every job is green, record the run ID in `## Log` and finish.
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
 - 2026-09-27: Doing -> Backlog. Waiting on BL-472 and BL-473 (last Linux/macOS CI failures in run 36376508151)
+- 2026-09-27: Backlog -> Doing.
