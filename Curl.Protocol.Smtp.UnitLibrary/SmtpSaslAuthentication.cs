@@ -42,6 +42,13 @@ internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAu
     private static readonly char[] MechanismSeparators = [' ', '\t'];
 
     /// <summary>
+    /// Gets a value indicating whether <see cref="AuthenticateAsync" /> ran an <c>AUTH</c>
+    /// exchange the server accepted, which is when curl adds <c>--mail-auth</c>'s
+    /// <c>AUTH=</c> to <c>MAIL FROM</c> (BL-544).
+    /// </summary>
+    public bool IsAuthenticated { get; private set; }
+
+    /// <summary>
     /// Authenticates when the <c>EHLO</c> reply offers <c>AUTH</c> and the transfer has
     /// something to authenticate with.
     /// </summary>
@@ -61,9 +68,9 @@ internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAu
             return null;
         }
 
-        bool authenticated = authenticator.ChooseMechanism(request, offered) is { } mechanism
+        IsAuthenticated = authenticator.ChooseMechanism(request, offered) is { } mechanism
             && await ExchangeAsync(authenticator.Begin(mechanism, request)).ConfigureAwait(false);
-        return authenticated ? null : TransferResult.Failure(CurlExitCode.LoginDenied, SmtpSessionMessages.LoginDenied);
+        return IsAuthenticated ? null : TransferResult.Failure(CurlExitCode.LoginDenied, SmtpSessionMessages.LoginDenied);
     }
 
     /// <summary>

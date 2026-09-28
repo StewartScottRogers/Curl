@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text;
 using Curl.Protocol.Abstractions;
 
@@ -70,21 +69,6 @@ internal sealed class SmtpCommandTransfer(SmtpControlChannel channel, ITransferC
         };
     }
 
-    private static bool IsAscii(string text) => Ascii.IsValid(text);
-
-    /// <summary>The host part as an IDNA A-label, or as given when it is ASCII or cannot be converted.</summary>
-    private static string ToAsciiHost(string host)
-    {
-        try
-        {
-            return IsAscii(host) ? host : new IdnMapping().GetAscii(host);
-        }
-        catch (ArgumentException)
-        {
-            return host;
-        }
-    }
-
     private async ValueTask<TransferResult> SendCommandsAsync(MailRequestOptions mail)
     {
         string? custom = string.IsNullOrEmpty(mail.CustomCommand) ? null : mail.CustomCommand;
@@ -108,12 +92,8 @@ internal sealed class SmtpCommandTransfer(SmtpControlChannel channel, ITransferC
 
     private string VerifyCommand(string recipient)
     {
-        string bare = recipient.StartsWith('<') ? recipient[1..] : recipient;
-        bare = bare.EndsWith('>') ? bare[..^1] : bare;
-        int at = bare.IndexOf('@', StringComparison.Ordinal);
-        string address = at < 0 ? bare : bare[..at] + "@" + ToAsciiHost(bare[(at + 1)..]);
-        bool utf8 = smtpUtf8Advertised && !IsAscii(bare);
-        return "VRFY " + address + (utf8 ? SmtpUtf8Keyword : string.Empty);
+        bool utf8 = smtpUtf8Advertised && SmtpMailbox.NeedsSmtpUtf8(recipient);
+        return "VRFY " + SmtpMailbox.Bare(recipient) + (utf8 ? SmtpUtf8Keyword : string.Empty);
     }
 
     private string CustomRecipientCommand(string custom, string recipient)

@@ -49,7 +49,12 @@ internal sealed class SmtpSession(
 
     private const string SmtpUtf8Keyword = "SMTPUTF8";
 
+    private const string SizeKeyword = "SIZE";
+
     private bool secure = implicitTls;
+
+    /// <summary>Whether an <c>AUTH</c> exchange succeeded, so <c>--mail-auth</c> is sent.</summary>
+    private bool authenticated;
 
     private IConnection? securedConnection;
 
@@ -92,18 +97,6 @@ internal sealed class SmtpSession(
     }
 
     /// <summary>
-    /// Whether a line of the <c>EHLO</c> reply starts, after its code, with <c>SMTPUTF8</c> in
-    /// capitals, as curl matches it.
-    /// </summary>
-    private static bool AdvertisesSmtpUtf8(SmtpReply ehlo) =>
-        ehlo.Lines.Any(line => line.Length >= 4 + SmtpUtf8Keyword.Length
-            && line.AsSpan(4, SmtpUtf8Keyword.Length).SequenceEqual(SmtpUtf8Keyword));
-
-    private static bool AdvertisesStartTls(SmtpReply ehlo) =>
-        ehlo.Lines.Any(line => line.Length >= 4 + StartTlsKeyword.Length
-            && line.AsSpan(4, StartTlsKeyword.Length).Equals(StartTlsKeyword, StringComparison.OrdinalIgnoreCase));
-
-    /// <summary>
     /// Sends the message when there is an upload and a recipient, and the commands
     /// otherwise, as curl chooses between them.
     /// </summary>
@@ -111,22 +104,28 @@ internal sealed class SmtpSession(
     {
         if (context.Upload is { } upload && context.Mail is { Recipients.Count: > 0 } mail)
         {
-            return new SmtpMailTransaction(channel, context).SendAsync(upload, mail);
+            var extensions = new SmtpMailExtensions(authenticated, Advertises(SizeKeyword), Advertises(SmtpUtf8Keyword));
+            return new SmtpMailTransaction(channel, context, extensions).SendAsync(upload, mail);
         }
 
-        return SendCommandsAsync();
+        return new SmtpCommandTransfer(channel, context, Advertises(SmtpUtf8Keyword)).SendAsync(context.Mail ?? new MailRequestOptions());
     }
 
-    private ValueTask<TransferResult> SendCommandsAsync()
+    /// <summary>Whether the last accepted <c>EHLO</c> advertised <paramref name="keyword" />; never after <c>HELO</c>.</summary>
+    private bool Advertises(string keyword) => capabilities?.Advertises(keyword) == true;
+
+    private async ValueTask<TransferResult?> AuthenticateAsync()
     {
-        bool smtpUtf8Advertised = capabilities is { } ehlo && AdvertisesSmtpUtf8(ehlo);
-        return new SmtpCommandTransfer(channel, context, smtpUtf8Advertised).SendAsync(context.Mail ?? new MailRequestOptions());
-    }
+        if (saslAuthenticator is null || capabilities is not { } ehlo)
+        {
+            return null;
+        }
 
-    private async ValueTask<TransferResult?> AuthenticateAsync() =>
-        saslAuthenticator is not null && capabilities is { } ehlo
-            ? await new SmtpSaslAuthentication(channel, saslAuthenticator, context).AuthenticateAsync(ehlo).ConfigureAwait(false)
-            : null;
+        var authentication = new SmtpSaslAuthentication(channel, saslAuthenticator, context);
+        TransferResult? failure = await authentication.AuthenticateAsync(ehlo).ConfigureAwait(false);
+        authenticated = authentication.IsAuthenticated;
+        return failure;
+    }
 
     private async ValueTask<TransferResult?> OpenAsync()
     {
@@ -165,7 +164,7 @@ internal sealed class SmtpSession(
             return null;
         }
 
-        if (!AdvertisesStartTls(ehlo))
+        if (!ehlo.Advertises(StartTlsKeyword))
         {
             return context.SslLevel == TransportSecurityLevel.Try
                 ? null

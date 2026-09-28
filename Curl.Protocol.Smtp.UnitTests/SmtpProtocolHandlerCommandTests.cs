@@ -81,9 +81,18 @@ public sealed class SmtpProtocolHandlerCommandTests
     [TestMethod]
     public async Task ExecuteAsync_NonAsciiRecipientWithoutSmtpUtf8Advertised_SendsNoSmtpUtf8()
     {
-        CommandRun run = await RunAsync("250-localhost\r\n250-smtputf8\r\n250 OK\r\n" + Verified + Bye, new MailRequestOptions { Recipients = ["jörg@x"] });
+        CommandRun run = await RunAsync("250-localhost\r\n250 8BITMIME\r\n" + Verified + Bye, new MailRequestOptions { Recipients = ["jörg@x"] });
 
         Assert.AreEqual(Ehlo + "VRFY jörg@x\r\n" + Quit, run.Sent);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_SmtpUtf8AdvertisedInLowerCase_CountsAsAdvertised()
+    {
+        // Measured (BL-544): EHLO=250-localhost\r\n250-smtputf8\r\n250 OK, --mail-rcpt jörg@x: VRFY jörg@x SMTPUTF8.
+        CommandRun run = await RunAsync("250-localhost\r\n250-smtputf8\r\n250 OK\r\n" + Verified + Bye, new MailRequestOptions { Recipients = ["jörg@x"] });
+
+        Assert.AreEqual(Ehlo + "VRFY jörg@x SMTPUTF8\r\n" + Quit, run.Sent);
     }
 
     [TestMethod]

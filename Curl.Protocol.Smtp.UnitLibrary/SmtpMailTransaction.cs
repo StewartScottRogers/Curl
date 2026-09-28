@@ -1,3 +1,4 @@
+using System.Globalization;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Smtp;
@@ -11,8 +12,16 @@ namespace Curl.Protocol.Smtp;
 /// <remarks>
 /// <list type="bullet">
 /// <item>An address is sent inside angle brackets after one leading <c>&lt;</c> and one
-/// trailing <c>&gt;</c> are taken off it, so <c>&lt;a@b</c> and <c>a@b</c> both go out as
+/// trailing <c>&gt;</c> are taken off it and its host is made an A-label
+/// (<see cref="SmtpMailbox" />), so <c>&lt;a@b</c> and <c>a@b</c> both go out as
 /// <c>&lt;a@b&gt;</c>; no <c>--mail-from</c> sends <c>MAIL FROM:&lt;&gt;</c>.</item>
+/// <item><c>MAIL FROM</c> adds, in this order, <c>AUTH=&lt;addr&gt;</c> for
+/// <c>--mail-auth</c> once <c>AUTH</c> succeeded, <c>SIZE=n</c> when <c>EHLO</c> advertised
+/// <c>SIZE</c> and the upload can seek and has bytes left, and <c>SMTPUTF8</c> when
+/// <c>EHLO</c> advertised it and the reverse path, the <c>AUTH=</c> address or a recipient is
+/// not all ASCII (BL-544).</item>
+/// <item>Under <c>--mail-rcpt-allowfails</c> a refused <c>RCPT</c> is passed over; only every
+/// recipient refused is exit 55, <c>RCPT failed: 551 (last error)</c>, with <c>QUIT</c>.</item>
 /// <item><c>MAIL</c> or any <c>RCPT</c> answered other than 2xx, or <c>DATA</c> answered
 /// other than 354, is exit 55, <c>MAIL failed: 550</c>; the reply to the end of the message
 /// other than 250 is exit 8, <c>Weird server reply</c>. Each still sends <c>QUIT</c>.</item>
@@ -25,7 +34,7 @@ namespace Curl.Protocol.Smtp;
 /// upload's length, or against nothing when the upload cannot seek.</item>
 /// </list>
 /// </remarks>
-internal sealed class SmtpMailTransaction(SmtpControlChannel channel, ITransferContext context)
+internal sealed class SmtpMailTransaction(SmtpControlChannel channel, ITransferContext context, SmtpMailExtensions extensions)
 {
     private const int ReadBufferSize = 65536;
 
@@ -49,8 +58,9 @@ internal sealed class SmtpMailTransaction(SmtpControlChannel channel, ITransferC
         TransferResult result;
         try
         {
-            result = await SendEnvelopeAsync(mail).ConfigureAwait(false)
-                ?? await SendMessageAsync(upload).ConfigureAwait(false);
+            long? size = RemainingLength(upload);
+            result = await SendEnvelopeAsync(mail, size).ConfigureAwait(false)
+                ?? await SendMessageAsync(upload, size).ConfigureAwait(false);
             await channel.QuitAsync().ConfigureAwait(false);
         }
         catch (SmtpReplyMissingException)
@@ -69,41 +79,85 @@ internal sealed class SmtpMailTransaction(SmtpControlChannel channel, ITransferC
         };
     }
 
-    private static string Bracket(string? address)
-    {
-        string bare = address ?? string.Empty;
-        bare = bare.StartsWith('<') ? bare[1..] : bare;
-        bare = bare.EndsWith('>') ? bare[..^1] : bare;
-        return "<" + bare + ">";
-    }
-
     private static TransferResult CommandFailed(string command, SmtpReply reply) =>
         TransferResult.Failure(CurlExitCode.SendError, SmtpSessionMessages.CommandFailed(command, reply.Code));
 
-    private async ValueTask<TransferResult?> SendEnvelopeAsync(MailRequestOptions mail)
+    /// <summary>The bytes left in <paramref name="upload" />, or <see langword="null" /> when it cannot seek.</summary>
+    private static long? RemainingLength(Stream upload) => upload.CanSeek ? Math.Max(0, upload.Length - upload.Position) : null;
+
+    /// <summary>
+    /// Writes <c>MAIL FROM</c> with the parameters curl adds, in curl's order: <c>AUTH=</c>
+    /// once authenticated, <c>SIZE=</c> when advertised and the size is known and not 0, and
+    /// <c>SMTPUTF8</c> when advertised and the reverse path, the <c>AUTH=</c> address or a
+    /// recipient is not all ASCII.
+    /// </summary>
+    private string MailCommand(MailRequestOptions mail, long? size)
     {
-        SmtpReply reply = await ExchangeAsync("MAIL FROM:" + Bracket(mail.From)).ConfigureAwait(false);
+        string? auth = extensions.Authenticated ? mail.Auth : null;
+        return "MAIL FROM:" + SmtpMailbox.Bracketed(mail.From)
+            + (auth is null ? string.Empty : " AUTH=" + SmtpMailbox.Bracketed(auth))
+            + SizeParameter(size)
+            + (extensions.SmtpUtf8Advertised && NeedsSmtpUtf8(mail, auth) ? " SMTPUTF8" : string.Empty);
+    }
+
+    private static bool NeedsSmtpUtf8(MailRequestOptions mail, string? auth) =>
+        SmtpMailbox.NeedsSmtpUtf8(mail.From) || SmtpMailbox.NeedsSmtpUtf8(auth) || mail.Recipients.Any(SmtpMailbox.NeedsSmtpUtf8);
+
+    private string SizeParameter(long? size) =>
+        extensions.SizeAdvertised && size is > 0 and long known
+            ? " SIZE=" + known.ToString(CultureInfo.InvariantCulture)
+            : string.Empty;
+
+    private async ValueTask<TransferResult?> SendEnvelopeAsync(MailRequestOptions mail, long? size)
+    {
+        SmtpReply reply = await ExchangeAsync(MailCommand(mail, size)).ConfigureAwait(false);
         if (!reply.IsCompletion)
         {
             return CommandFailed("MAIL", reply);
         }
 
-        foreach (string recipient in mail.Recipients)
+        if (await SendRecipientsAsync(mail).ConfigureAwait(false) is { } refused)
         {
-            reply = await ExchangeAsync("RCPT TO:" + Bracket(recipient)).ConfigureAwait(false);
-            if (!reply.IsCompletion)
-            {
-                return CommandFailed("RCPT", reply);
-            }
+            return refused;
         }
 
         reply = await ExchangeAsync("DATA").ConfigureAwait(false);
         return reply.Code == DataAccepted ? null : CommandFailed("DATA", reply);
     }
 
-    private async ValueTask<TransferResult> SendMessageAsync(Stream upload)
+    /// <summary>
+    /// Sends <c>RCPT TO</c> for each recipient. The first refusal stops the message, unless
+    /// <c>--mail-rcpt-allowfails</c> asks to carry on, when only every recipient refused does,
+    /// with the last refusal's code.
+    /// </summary>
+    private async ValueTask<TransferResult?> SendRecipientsAsync(MailRequestOptions mail)
     {
-        long? expected = upload.CanSeek ? Math.Max(0, upload.Length - upload.Position) : null;
+        bool anyAccepted = false;
+        int lastRefusal = 0;
+        foreach (string recipient in mail.Recipients)
+        {
+            SmtpReply reply = await ExchangeAsync("RCPT TO:" + SmtpMailbox.Bracketed(recipient)).ConfigureAwait(false);
+            if (reply.IsCompletion)
+            {
+                anyAccepted = true;
+            }
+            else if (mail.RecipientAllowFails)
+            {
+                lastRefusal = reply.Code;
+            }
+            else
+            {
+                return CommandFailed("RCPT", reply);
+            }
+        }
+
+        return anyAccepted
+            ? null
+            : TransferResult.Failure(CurlExitCode.SendError, SmtpSessionMessages.EveryRecipientRefused(lastRefusal));
+    }
+
+    private async ValueTask<TransferResult> SendMessageAsync(Stream upload, long? expected)
+    {
         var stuffer = new SmtpDotStuffer();
         byte[] buffer = new byte[ReadBufferSize];
         int read;

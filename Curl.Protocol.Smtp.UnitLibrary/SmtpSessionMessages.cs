@@ -38,6 +38,13 @@ internal static class SmtpSessionMessages
     internal static string CommandFailed(string command, int code) =>
         string.Create(CultureInfo.InvariantCulture, $"{command} failed: {code}");
 
+    /// <summary>
+    /// Under <c>--mail-rcpt-allowfails</c> every <c>RCPT</c> was refused, the last with
+    /// <paramref name="code" /> (exit 55, BL-544).
+    /// </summary>
+    internal static string EveryRecipientRefused(int code) =>
+        string.Create(CultureInfo.InvariantCulture, $"RCPT failed: {code} (last error)");
+
     /// <summary>The greeting was not a 2xx reply (exit 8).</summary>
     internal static string UnexpectedResponse(int code) =>
         string.Create(CultureInfo.InvariantCulture, $"Got unexpected smtp-server response: {code}");
