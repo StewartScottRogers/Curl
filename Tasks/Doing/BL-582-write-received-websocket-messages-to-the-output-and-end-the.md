@@ -43,3 +43,4 @@ The payload of each received data frame reaches the transfer's output exactly as
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
