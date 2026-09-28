@@ -32,3 +32,4 @@ With `-u` (or `--oauth2-bearer`), the SMTP handler authenticates after `EHLO` (a
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
