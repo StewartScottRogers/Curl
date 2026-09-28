@@ -529,7 +529,7 @@ public sealed class HttpProtocolHandler(
             ReportReceiveFailure(context.Events, failure);
             TransferResult failed = TransferResult.Failure(failure.ExitCode, failure.Message, body.BytesWritten)
                 with
-            { Report = exchange.Report(body.BytesWritten) };
+            { Report = exchange.Report(body) };
             return FailedOutcome(plan, failed, DiedBeforeResponse(plan, connect, headReader, failure));
         }
         catch (OperationCanceledException) when (plan.Deadline.EndedByLimit)
@@ -538,11 +538,11 @@ public sealed class HttpProtocolHandler(
             string message = HttpTransferMessages.OperationTimedOut(plan.Deadline.OperationElapsedMilliseconds, body.BytesWritten, body.ExpectedLength);
             TransferResult timedOut = TransferResult.Failure(CurlExitCode.OperationTimedOut, message, body.BytesWritten)
                 with
-            { Report = exchange.Report(body.BytesWritten) };
+            { Report = exchange.Report(body) };
             return new HttpAttemptOutcome(timedOut, null, KeepsAlive: false);
         }
 
-        TransferResult result = Succeeded(delivery, actedOn!, exchange.Report(body.BytesWritten));
+        TransferResult result = Succeeded(delivery, actedOn!, exchange.Report(body));
         return new HttpAttemptOutcome(result, retry, KeepsAlive(plan, actedOn, upload, headReader, delivery))
         {
             LeftIntactAfterServerClosed = LeftIntactAfterServerClosed(plan, actedOn, upload, headReader, delivery),
@@ -1155,16 +1155,20 @@ public sealed class HttpProtocolHandler(
         /// size counts the body bytes sent as well as the head, as curl 8.21.0's
         /// <c>%{size_request}</c> does (BL-175 Notes).
         /// </summary>
-        /// <param name="downloadSize">The body bytes the output accepted.</param>
+        /// <param name="body">
+        /// The body reader, whose bytes accepted before and after content decoding are
+        /// <c>%{size_download}</c> and <c>%{size_delivered}</c> (BL-516).
+        /// </param>
         /// <returns>The report.</returns>
-        internal TransferReport Report(long downloadSize)
+        internal TransferReport Report(HttpResponseBodyReader body)
         {
             TransferReport report = new()
             {
                 Method = method,
                 RequestSize = (earlier?.RequestSize ?? 0) + headSize + upload.BytesWritten,
                 UploadSize = upload.BytesWritten,
-                DownloadSize = downloadSize,
+                DownloadSize = body.BytesWritten,
+                DeliveredSize = body.BytesDelivered,
                 HeaderSize = earlier?.HeaderSize ?? 0,
                 ConnectionCount = (earlier?.ConnectionCount ?? 0) + (newConnection ? 1 : 0),
                 RedirectCount = RedirectCount,

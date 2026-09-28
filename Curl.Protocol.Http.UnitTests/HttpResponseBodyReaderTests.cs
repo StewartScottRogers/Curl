@@ -211,7 +211,20 @@ public sealed class HttpResponseBodyReaderTests
 
             Assert.AreEqual("hello", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
             Assert.AreEqual(25L, reader.BytesWritten, $"Chunk size {chunkSize}");
+            Assert.AreEqual(5L, reader.BytesDelivered, $"Chunk size {chunkSize}");
         }
+    }
+
+    /// <summary>
+    /// Measured (BL-516 Notes): with nothing decoded, curl's <c>%{size_delivered}</c> is its
+    /// <c>%{size_download}</c>.
+    /// </summary>
+    [TestMethod]
+    public async Task CopyAsync_NoDecodeContent_DeliversTheBytesWritten()
+    {
+        (HttpResponseBodyReader reader, _, _) = await CopyAsync("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello", 65536, noBody: false);
+
+        Assert.AreEqual(5L, reader.BytesDelivered);
     }
 
     /// <summary>

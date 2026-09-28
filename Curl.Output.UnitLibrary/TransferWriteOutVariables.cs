@@ -40,10 +40,16 @@ namespace Curl.Output;
 /// code without its leading zeros), a time as its seconds, and a text value quoted, or
 /// <c>null</c> where curl has no value, as for a missing content type, error message or URL
 /// part. <c>header_json</c> prints the response headers as <see cref="WriteOutJson"/>
-/// describes. <c>size_delivered</c> prints the <c>size_download</c> value, which is what
-/// curl prints when the body is not decoded; the report carries no count of decoded bytes,
-/// so under <c>--compressed</c> the two may differ from curl's. Measured on 2026-09-27 against curl 8.21.0 (mingw,
-/// Schannel); see ADR-0063 and BL-227.
+/// describes. Measured on 2026-09-27 against curl 8.21.0 (mingw, Schannel); see ADR-0063
+/// and BL-227.
+/// </para>
+/// <para>
+/// <c>size_download</c> prints <see cref="TransferReport.DownloadSize"/>, the body bytes
+/// after chunked framing is removed and before content decoding, and <c>size_delivered</c>
+/// prints <see cref="TransferReport.DeliveredSize"/>, the bytes after content decoding, or
+/// the <c>size_download</c> value when the report has no decoded count because nothing was
+/// decoded. Under <c>--compressed</c> a gzip body of 51 bytes that decodes to 501 prints
+/// <c>51 501</c>, as measured on 2026-09-28 against curl 8.21.0 (mingw, Schannel); see BL-516.
 /// </para>
 /// <para>
 /// <c>num_certs</c> counts <see cref="TransferReport.PeerCertificates"/> and <c>certs</c>
@@ -142,7 +148,7 @@ public sealed class TransferWriteOutVariables(
         ["size_header"] = variables => WriteOutValue.FromNumber(variables.report.HeaderSize),
         ["size_request"] = variables => WriteOutValue.FromNumber(variables.report.RequestSize),
         ["size_download"] = variables => WriteOutValue.FromNumber(variables.DownloadSize),
-        ["size_delivered"] = variables => WriteOutValue.FromNumber(variables.DownloadSize),
+        ["size_delivered"] = variables => WriteOutValue.FromNumber(variables.DeliveredSize),
         ["size_upload"] = variables => WriteOutValue.FromNumber(variables.report.UploadSize),
         ["num_connects"] = variables => WriteOutValue.FromNumber(variables.report.ConnectionCount),
         ["num_headers"] = variables => WriteOutValue.FromNumber(
@@ -224,6 +230,8 @@ public sealed class TransferWriteOutVariables(
     public string LibraryVersion { get; init; } = FormatLibraryVersion(OperatingSystem.IsWindows(), OperatingSystem.IsMacOS());
 
     private long DownloadSize => result.Report?.DownloadSize ?? result.BytesTransferred;
+
+    private long DeliveredSize => result.Report?.DeliveredSize ?? DownloadSize;
 
     private TransferTimings? Timings => report.Timings;
 

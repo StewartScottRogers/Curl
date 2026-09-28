@@ -42,6 +42,12 @@ internal sealed class HttpContentDecoder : IDisposable
     }
 
     /// <summary>
+    /// Gets how many decoded bytes the output has accepted, whole writes only: curl's
+    /// <c>%{size_delivered}</c> for a decoded body (BL-516).
+    /// </summary>
+    internal long BytesDelivered { get; private set; }
+
+    /// <summary>
     /// Builds the decoder the response's Content-Encoding headers call for.
     /// </summary>
     /// <param name="headers">The final response's headers.</param>
@@ -142,6 +148,7 @@ internal sealed class HttpContentDecoder : IDisposable
         if (layer == layers.Length)
         {
             await output.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
+            BytesDelivered += bytes.Length;
             return;
         }
 

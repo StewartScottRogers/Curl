@@ -36,6 +36,14 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     internal long BytesWritten { get; private set; }
 
     /// <summary>
+    /// Gets how many bytes the output has accepted after content decoding, curl's
+    /// <c>%{size_delivered}</c>: <see cref="BytesWritten" /> when nothing is decoded, and the
+    /// decoded count otherwise, so a gzip body of 51 bytes that decodes to 501 delivers 501
+    /// (measured, BL-516 Notes).
+    /// </summary>
+    internal long BytesDelivered => contentDecoder?.BytesDelivered ?? BytesWritten;
+
+    /// <summary>
     /// Gets a chunked body's trailer lines, each ending in a carriage return and line feed,
     /// which curl 8.21.0 writes to header output after the body; empty for any other body.
     /// After a failure it holds the trailer lines decoded before it.
@@ -205,7 +213,7 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     /// <see langword="true" /> for <c>--compressed</c> without <c>--raw</c>: the body is decoded
     /// as its Content-Encoding headers say (<see cref="HttpContentDecoder" />) before it is written,
     /// while <see cref="BytesWritten" /> still counts the encoded bytes, as curl's
-    /// <c>%{size_download}</c> does.
+    /// <c>%{size_download}</c> does, and <see cref="BytesDelivered" /> the decoded ones.
     /// </param>
     /// <param name="decodeTransfer">
     /// <see langword="true" /> for <c>--tr-encoding</c> when the body is not discarded: the
