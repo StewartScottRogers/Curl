@@ -32,7 +32,10 @@ rewriting POST to GET and dropping credentials to another host, port or scheme a
 effective URL, summed header/request/connection counts, timings from the first hop with
 `RedirectDuration`). Without `-L` it returns the dispatcher's result unchanged. Given a
 `HopProxySelector`, it chooses each hop's proxy again from that hop's own URL, as curl
-8.21.0 does (BL-329); without one, every hop keeps the first URL's proxy.
+8.21.0 does (BL-329); without one, every hop keeps the first URL's proxy. Under
+`HttpRequestOptions.AutoReferer` (`-e "...;auto"`) each hop is sent the previous URL, without
+user information or fragment, as its `Referer`, and the merged report's `Referer` is the last
+one sent, which `%{referer}` prints (ADR-0100, BL-361).
 
 `TransferRetrier` runs a transfer again under `--retry` (`RetryPolicy`: `--retry`,
 `--retry-delay`) after curl 8.21.0's transient failures: exit 28, 6, 5 or 12

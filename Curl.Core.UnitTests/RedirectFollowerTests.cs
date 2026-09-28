@@ -73,6 +73,49 @@ public sealed class RedirectFollowerTests
     }
 
     [TestMethod]
+    public async Task FollowAsync_AutoReferer_SendsEachHopThePreviousUrlWithoutUserOrFragmentAndReportsTheLast()
+    {
+        // curl -e ";auto" -L sends the previous URL, query kept, user and fragment dropped (BL-361 Notes).
+        ScriptedHandler handler = new(
+            Redirect(302, "https://h.example/b"),
+            Redirect(302, Next),
+            Ok(200, 0));
+
+        TransferResult result = await Follow(
+            handler, Context(Location() with { AutoReferer = true, Referer = "http://r/" }, url: "http://u:p@127.0.0.1:18203/a?q=1#f"));
+
+        CollectionAssert.AreEqual(
+            new[] { "http://r/", "http://127.0.0.1:18203/a?q=1", "https://h.example/b" },
+            handler.Contexts.Select(context => context.Http!.Referer).ToArray());
+        Assert.AreEqual("https://h.example/b", result.Report!.Referer);
+    }
+
+    [TestMethod]
+    public async Task FollowAsync_WithoutAutoReferer_SendsEveryHopTheGivenRefererAndReportsIt()
+    {
+        ScriptedHandler handler = new(Redirect(302, Next), Ok(200, 0));
+
+        TransferResult result = await Follow(handler, Context(Location() with { Referer = "http://r/" }));
+
+        CollectionAssert.AreEqual(
+            new[] { "http://r/", "http://r/" },
+            handler.Contexts.Select(context => context.Http!.Referer).ToArray());
+        Assert.AreEqual("http://r/", result.Report!.Referer);
+    }
+
+    [TestMethod]
+    public async Task FollowAsync_RefusedRedirect_ReportsTheRefererOfTheLastRequestSent()
+    {
+        ScriptedHandler handler = new(Redirect(302, Next), Redirect(302, "http://127.0.0.1:18203/c"));
+
+        TransferResult result = await Follow(
+            handler, Context(Location() with { AutoReferer = true }), new RedirectPolicy { MaxRedirects = 1 });
+
+        Assert.AreEqual(CurlExitCode.TooManyRedirects, result.ExitCode);
+        Assert.AreEqual(First, result.Report!.Referer);
+    }
+
+    [TestMethod]
     public async Task FollowAsync_NoRedirect_ReportsZeroRedirectsAndNoEffectiveUrl()
     {
         ScriptedHandler handler = new(Ok(200, 3));

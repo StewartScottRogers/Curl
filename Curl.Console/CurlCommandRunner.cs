@@ -1060,16 +1060,7 @@ internal sealed class CurlCommandRunner(
             return;
         }
 
-        string requestUrl = UrlRootPath.AddToEmptyPath(QueryUrl.Append(transferUrl, options));
-        TransferWriteOutVariables variables = new(
-            result, givenUrl, transfer.UrlIndex, requestUrl, WriteOutScheme(requestUrl, result), timeProvider)
-        {
-            Referer = options.Referer,
-            OutputFileName = transferOutputFileName,
-            ConnectionId = connectionId,
-            TransferId = HasNoTransferNumber(result) ? NoTransferId : transfer.TransferId,
-        };
-
+        TransferWriteOutVariables variables = WriteOutVariables(options, transfer, givenUrl, transferUrl, result, connectionId);
         Stream liveStandardOutput = deferringStandardOutput.HasWriteFailed ? Stream.Null : deferringStandardOutput;
         Stream writeOutStandardOutput = standardOutputIsBinary
             ? liveStandardOutput
@@ -1078,6 +1069,29 @@ internal sealed class CurlCommandRunner(
         await writeOutRenderer
             .RenderAsync(template, variables, writeOutStandardOutput, writeOutStandardError)
             .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The values <c>-w</c> prints for one transfer. <c>%{referer}</c> is the <c>Referer</c> the
+    /// last request was sent with - under <c>-e "...;auto" -L</c> the URL the last redirect came
+    /// from, as the redirect follower reports it - else the <c>-e</c> text (BL-361 Notes).
+    /// </summary>
+    private TransferWriteOutVariables WriteOutVariables(
+        CommandLineOptions options,
+        UrlTransfer transfer,
+        string givenUrl,
+        string transferUrl,
+        TransferResult result,
+        long connectionId)
+    {
+        string requestUrl = UrlRootPath.AddToEmptyPath(QueryUrl.Append(transferUrl, options));
+        return new(result, givenUrl, transfer.UrlIndex, requestUrl, WriteOutScheme(requestUrl, result), timeProvider)
+        {
+            Referer = result.Report?.Referer ?? options.Referer,
+            OutputFileName = transferOutputFileName,
+            ConnectionId = connectionId,
+            TransferId = HasNoTransferNumber(result) ? NoTransferId : transfer.TransferId,
+        };
     }
 
     /// <summary>

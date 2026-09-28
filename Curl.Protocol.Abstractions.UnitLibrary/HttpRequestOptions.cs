@@ -57,6 +57,13 @@ public sealed record HttpRequestOptions
     public string? Referer { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether a followed redirect sends the URL it came from as its
+    /// <c>Referer</c>, without user information or fragment, as <c>-e "...;auto"</c> asks
+    /// curl 8.21.0 to (BL-361 Notes).
+    /// </summary>
+    public bool AutoReferer { get; init; }
+
+    /// <summary>
     /// Gets the request body from the <c>-d</c> and <c>-F</c> families, already encoded,
     /// or <see langword="null" /> to send none.
     /// </summary>

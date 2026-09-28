@@ -49,6 +49,12 @@ namespace Curl.Core;
 /// chain with that failure. Without a selector, every hop keeps the first URL's proxy.
 /// </para>
 /// <para>
+/// Under <see cref="HttpRequestOptions.AutoReferer" /> (<c>-e "...;auto"</c>) every hop after the
+/// first is sent the previous hop's URL, without user information or fragment, as its
+/// <c>Referer</c>, and the merged report's <see cref="TransferReport.Referer" /> is the one the
+/// last request was sent with (measured, BL-361 Notes; ADR-0100).
+/// </para>
+/// <para>
 /// Every hop after the first carries the chain's start as
 /// <see cref="ITransferContext.OperationStarted" />, so <c>-m</c> limits the whole chain, as
 /// curl's does, rather than each hop (measured, BL-299 Notes).
@@ -119,7 +125,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
         while (true)
         {
             TransferResult result = await dispatcher.DispatchAsync(hop);
-            chain.Add(result.Report);
+            chain.Add(result.Report, hop.Http!.Referer);
             if (RedirectTarget(result) is not { } target)
             {
                 return chain.Merge(result);
@@ -135,7 +141,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
             Rewind(context.Upload, uploadStart, bodyDropped);
             Rewind(bodyContent, bodyStart, bodyDropped);
             // No stop means the target parsed, so next is set.
-            hop = NextHop(context, next!, http, hopProxy, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted);
+            hop = NextHop(context, hop.Url, next!, http, hopProxy, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted);
             chain.Followed(target);
         }
     }
@@ -310,9 +316,14 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
         && string.Equals(first.Host, next.Host, StringComparison.OrdinalIgnoreCase)
         && first.Port == next.Port;
 
-    private static HttpRequestOptions HopHttp(HttpRequestOptions http, ProxyEndpoint? forwardProxy, bool bodyDropped, bool sendCredentials)
+    private static HttpRequestOptions HopHttp(CurlUrl previousUrl, HttpRequestOptions http, ProxyEndpoint? forwardProxy, bool bodyDropped, bool sendCredentials)
     {
-        HttpRequestOptions hopHttp = http with { Body = bodyDropped ? null : http.Body, ForwardProxy = forwardProxy };
+        HttpRequestOptions hopHttp = http with
+        {
+            Body = bodyDropped ? null : http.Body,
+            ForwardProxy = forwardProxy,
+            Referer = http.AutoReferer ? AutoReferer(previousUrl) : http.Referer,
+        };
         return sendCredentials
             ? hopHttp
             : hopHttp with
@@ -322,12 +333,27 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
             };
     }
 
+    /// <summary>
+    /// The <c>Referer</c> <c>-e "...;auto"</c> sends on a followed hop: the URL the redirect came
+    /// from without user information or fragment, its query kept, as curl 8.21.0 sends
+    /// <c>http://127.0.0.1:18361/a?q=1</c> after <c>http://u:p@127.0.0.1:18361/a?q=1#f</c>
+    /// (measured, BL-361 Notes).
+    /// </summary>
+    private static string AutoReferer(CurlUrl url) =>
+        url.Query is null
+            ? $"{url.Scheme}://{HostAndPort(url)}{url.AbsolutePath}"
+            : $"{url.Scheme}://{HostAndPort(url)}{url.AbsolutePath}?{url.Query}";
+
+    private static string HostAndPort(CurlUrl url) =>
+        url.IsDefaultPort ? url.Host : string.Create(CultureInfo.InvariantCulture, $"{url.Host}:{url.Port}");
+
     private static bool IsCredentialHeader(string header) =>
         header.StartsWith("Authorization:", StringComparison.OrdinalIgnoreCase)
         || header.StartsWith("Cookie:", StringComparison.OrdinalIgnoreCase);
 
     private static TransferContext NextHop(
         ITransferContext first,
+        CurlUrl previousUrl,
         CurlUrl url,
         HttpRequestOptions http,
         HopProxy hopProxy,
@@ -358,7 +384,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
             MaxTime = first.MaxTime,
             OperationStarted = operationStarted,
             Proxy = hopProxy.Proxy,
-            Http = HopHttp(http, hopProxy.ForwardProxy, bodyDropped, sendCredentials),
+            Http = HopHttp(previousUrl, http, hopProxy.ForwardProxy, bodyDropped, sendCredentials),
             TimeProvider = first.TimeProvider,
             CancellationToken = first.CancellationToken,
             Progress = first.Progress,
@@ -377,6 +403,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
     private sealed class RedirectChain(TimeProvider timeProvider)
     {
         private TransferReport? lastReport;
+        private string? lastReferer;
         private long? firstStarted;
         private string? effectiveUrl;
         private long headerSize;
@@ -386,9 +413,10 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
 
         public int RedirectCount { get; private set; }
 
-        public void Add(TransferReport? report)
+        public void Add(TransferReport? report, string? referer)
         {
             lastReport = report;
+            lastReferer = referer;
             if (report is null)
             {
                 return;
@@ -422,6 +450,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
                     EffectiveUrl = effectiveUrl,
                     RedirectUrl = redirectUrlCleared ? null : report.RedirectUrl,
                     RedirectCount = RedirectCount,
+                    Referer = lastReferer,
                     HeaderSize = headerSize,
                     RequestSize = requestSize,
                     ConnectionCount = connectionCount,

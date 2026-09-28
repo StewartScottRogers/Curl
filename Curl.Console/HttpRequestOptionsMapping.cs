@@ -52,8 +52,8 @@ internal static class HttpRequestOptionsMapping
     /// <returns>
     /// The options: <see cref="CommandLineOptions.RequestMethod" />,
     /// <see cref="CommandLineOptions.RequestTarget" />,
-    /// <see cref="CommandLineOptions.UserAgent" /> and <see cref="CommandLineOptions.Referer" />
-    /// verbatim; the <c>-H</c> headers followed by the ones <c>--json</c> adds; and
+    /// <see cref="CommandLineOptions.UserAgent" />, <see cref="CommandLineOptions.Referer" /> and
+    /// <see cref="CommandLineOptions.AutoReferer" /> verbatim; the <c>-H</c> headers followed by the ones <c>--json</c> adds; and
     /// <see cref="CommandLineOptions.ProxyHeaders" /> verbatim; and
     /// <paramref name="formBody" /> when given, otherwise
     /// <see cref="CommandLineOptions.PostData" /> as a <see cref="BytesBody" />, unless
@@ -83,6 +83,7 @@ internal static class HttpRequestOptionsMapping
             CommandLineTextEncoding = commandLineTextEncoding ?? Encoding.Latin1,
             UserAgent = options.UserAgent,
             Referer = options.Referer,
+            AutoReferer = options.AutoReferer,
             Body = formBody ?? PostDataBodyOf(options),
             Fail = options.FailMode,
             FollowRedirects = options.FollowRedirects,
