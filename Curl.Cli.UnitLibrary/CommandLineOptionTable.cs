@@ -202,6 +202,7 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("fail-with-body", null, SetFailWithBody),
         CommandLineOption.NegatableFlag("fail-early", null, (options, on) => options.FailEarly = on),
         CommandLineOption.Value("config", 'K', ApplyConfigFile),
+        CommandLineOption.NextGroup("next", ':'),
         CommandLineOption.Value("variable", null, VariableDefinition.Apply),
         CommandLineOption.NegatableFlag("disable", 'q', IgnoreDisable),
         CommandLineOption.NegatableFlag("version", 'V', (options, on) => options.VersionRequested = on),
@@ -249,6 +250,42 @@ public static class CommandLineOptionTable
     /// parsed settings; those are <see cref="CommandLineOptions"/>.
     /// </summary>
     public static IReadOnlyList<CommandLineOption> Rows => RowsInTableOrder;
+
+    /// <summary>
+    /// The long names of the rows whose setting every option group of a command line shares, wherever
+    /// among the <c>-:</c> / <c>--next</c> groups it is given (<see cref="CommandLineGlobalState"/> holds
+    /// them), together with <c>config</c>, <c>next</c> and <c>disable</c>, which act on the command line
+    /// as a whole rather than set anything of one group. Every other row is per-group: each group
+    /// starts without it.
+    /// </summary>
+    /// <remarks>
+    /// curl 8.21.0's manual marks <c>--fail-early</c>, <c>-#</c>, <c>--progress-meter</c>, <c>-S</c>,
+    /// <c>--stderr</c>, <c>--styled-output</c>, <c>--trace</c>, <c>--trace-ascii</c>,
+    /// <c>--trace-time</c> and <c>-v</c> "global"; <c>-s</c>, <c>--variable</c>, <c>-V</c>, <c>-h</c>
+    /// and <c>-M</c> are global in its tool (<c>struct GlobalConfig</c>) without the mark. Measured
+    /// 2026-09-28 (BL-508 Notes): <c>-v</c> given only after <c>--next</c> shows the first group's
+    /// transfer too, while <c>-w</c>, <c>-o</c> and <c>-H</c> given before it do not reach the second group.
+    /// </remarks>
+    public static IReadOnlySet<string> GlobalOptionLongNames { get; } = FrozenSet.Create(
+        StringComparer.Ordinal,
+        "silent",
+        "show-error",
+        "progress-meter",
+        "progress-bar",
+        "verbose",
+        "trace",
+        "trace-ascii",
+        "trace-time",
+        "stderr",
+        "styled-output",
+        "fail-early",
+        "variable",
+        "version",
+        "help",
+        "manual",
+        "config",
+        "next",
+        "disable");
 
     /// <summary>
     /// Does nothing: <c>-q</c> / <c>--disable</c> acts only as the first argument, where

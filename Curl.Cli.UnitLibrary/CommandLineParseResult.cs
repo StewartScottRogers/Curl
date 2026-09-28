@@ -9,10 +9,12 @@ namespace Curl.Cli;
 /// </summary>
 public sealed class CommandLineParseResult
 {
-    private CommandLineParseResult(CommandLineOptions? options, CommandLineRefusal? refusal, IReadOnlyList<string> warningLines, IReadOnlyList<string> warningLinesAfterTransfers, string? notedDefaultConfigFile, IReadOnlyList<string?> configFileHelpSubjects, IReadOnlyList<StandardErrorRedirect> standardErrorRedirects)
+    private CommandLineParseResult(CommandLineOptions? options, IReadOnlyList<CommandLineOptions> groups, CommandLineRefusal? refusal, CommandLineRefusal? refusalAfterGroups, IReadOnlyList<string> warningLines, IReadOnlyList<string> warningLinesAfterTransfers, string? notedDefaultConfigFile, IReadOnlyList<string?> configFileHelpSubjects, IReadOnlyList<StandardErrorRedirect> standardErrorRedirects)
     {
         Options = options;
+        Groups = groups;
         Refusal = refusal;
+        RefusalAfterGroups = refusalAfterGroups;
         WarningLines = warningLines;
         WarningLinesAfterTransfers = warningLinesAfterTransfers;
         NotedDefaultConfigFile = notedDefaultConfigFile;
@@ -28,11 +30,33 @@ public sealed class CommandLineParseResult
     [MemberNotNullWhen(false, nameof(Refusal))]
     public bool IsAccepted => Options is not null;
 
-    /// <summary>The parsed options; <see langword="null"/> when the command line was refused.</summary>
+    /// <summary>
+    /// The parsed options of the first option group, the only one unless <c>-:</c> / <c>--next</c> started
+    /// more (see <see cref="Groups"/>); <see langword="null"/> when the command line was refused.
+    /// </summary>
     public CommandLineOptions? Options { get; }
+
+    /// <summary>
+    /// The option groups to run, in command-line order: <see cref="Options"/> first, then one for each
+    /// <c>-:</c> / <c>--next</c> that started a group, each with its own per-group options and URLs and
+    /// all sharing the global ones (<see cref="CommandLineOptionTable.GlobalOptionLongNames"/>). When
+    /// <see cref="RefusalAfterGroups"/> is set, the groups from the refused one on are left out. Empty
+    /// when the command line was refused.
+    /// </summary>
+    public IReadOnlyList<CommandLineOptions> Groups { get; }
 
     /// <summary>The first refusal met; <see langword="null"/> when the command line was accepted.</summary>
     public CommandLineRefusal? Refusal { get; }
+
+    /// <summary>
+    /// The refusal curl 8.21.0 meets setting up an option group after the first, once the groups
+    /// before it (<see cref="Groups"/>) have run: <see cref="CommandLineRefusal.NoUrlSpecified"/> for a
+    /// last group with no URL (<c>curl URL --next</c>) or <see cref="CommandLineRefusal.FormAndDataBoth"/>.
+    /// The console layer writes its lines and exits with its code after those groups' transfers
+    /// (measured 2026-09-28, BL-508 Notes). <see langword="null"/> when there is none, and always for a
+    /// refused command line.
+    /// </summary>
+    public CommandLineRefusal? RefusalAfterGroups { get; }
 
     /// <summary>
     /// The warning lines curl prints on standard error while reading the command line, in
@@ -47,7 +71,8 @@ public sealed class CommandLineParseResult
     /// The warning lines curl prints on standard error about the command line after the last
     /// transfer has ended, without line terminators; empty when there are none, and always empty
     /// for a refused command line, which never reaches a transfer. It holds
-    /// <see cref="CommandLineWarning.MoreOutputOptionsThanUrls"/> when an accepted command line has
+    /// <see cref="CommandLineWarning.MoreOutputOptionsThanUrls"/>, once for the first option group that
+    /// has one left over and once for each group of <see cref="Groups"/> after it, when an accepted command line has
     /// an <c>-o</c>, <c>-O</c> or kept <c>--no-remote-name</c> with no URL to pair with (an entry of
     /// <see cref="CommandLineOptions.UrlOutputs"/> with no URL)
     /// and <c>-s</c> / <c>--silent</c> is not in effect at its end. The console layer must write
@@ -94,15 +119,24 @@ public sealed class CommandLineParseResult
     /// Creates the result for an accepted command line, with the warning lines its options
     /// collected and the ones curl prints after the transfers.
     /// </summary>
-    /// <param name="options">The parsed options.</param>
+    /// <remarks>
+    /// curl 8.21.0 prints <see cref="CommandLineWarning.MoreOutputOptionsThanUrls"/> once for the first
+    /// group that has an output option left over and once more for each group after it: with three
+    /// groups, three times when it is the first, twice when it is the second (measured 2026-09-28,
+    /// BL-508 Notes).
+    /// </remarks>
+    /// <param name="options">The parsed options of the first group.</param>
+    /// <param name="groupCount">How many of <paramref name="options"/>' groups run, counted from the first.</param>
+    /// <param name="refusalAfterGroups">The refusal met setting up the group after them; <see langword="null"/> when there is none.</param>
     /// <returns>A result whose <see cref="IsAccepted"/> is <see langword="true"/>.</returns>
-    internal static CommandLineParseResult Accepted(CommandLineOptions options)
+    internal static CommandLineParseResult Accepted(CommandLineOptions options, int groupCount, CommandLineRefusal? refusalAfterGroups)
     {
-        IReadOnlyList<string> warningLinesAfterTransfers =
-            options.HasMoreOutputOptionsThanUrls && !options.Silent
-                ? [CommandLineWarning.MoreOutputOptionsThanUrls]
-                : [];
-        return new(options, null, options.WarningLines, warningLinesAfterTransfers, NotedDefaultConfigFileOf(options), options.ConfigFileHelpSubjects, options.StandardErrorRedirects);
+        CommandLineOptions[] groups = [.. options.Groups.Take(groupCount)];
+        int firstWithOutputLeftOver = Array.FindIndex(groups, group => group.HasMoreOutputOptionsThanUrls);
+        IReadOnlyList<string> warningLinesAfterTransfers = firstWithOutputLeftOver >= 0 && !options.Silent
+            ? [.. Enumerable.Repeat(CommandLineWarning.MoreOutputOptionsThanUrls, groups.Length - firstWithOutputLeftOver)]
+            : [];
+        return new(options, groups, null, refusalAfterGroups, options.WarningLines, warningLinesAfterTransfers, NotedDefaultConfigFileOf(options), options.ConfigFileHelpSubjects, options.StandardErrorRedirects);
     }
 
     /// <summary>
@@ -116,14 +150,14 @@ public sealed class CommandLineParseResult
     /// version, the manual or help.
     /// </returns>
     internal static CommandLineParseResult InformationRequested(CommandLineOptions options) =>
-        new(options, null, options.WarningLines, [], NotedDefaultConfigFileOf(options), options.ConfigFileHelpSubjects, options.StandardErrorRedirects);
+        new(options, options.Groups, null, null, options.WarningLines, [], NotedDefaultConfigFileOf(options), options.ConfigFileHelpSubjects, options.StandardErrorRedirects);
 
     /// <summary>Creates the result for a command line refused once reading it had begun.</summary>
     /// <param name="refusal">The first refusal met.</param>
     /// <param name="options">The options read before the refusal, whose warning lines it keeps.</param>
     /// <returns>A result whose <see cref="IsAccepted"/> is <see langword="false"/>.</returns>
     internal static CommandLineParseResult Refused(CommandLineRefusal refusal, CommandLineOptions options) =>
-        new(null, refusal, options.WarningLines, [], NotedDefaultConfigFileOf(options), options.ConfigFileHelpSubjects, options.StandardErrorRedirects);
+        new(null, [], refusal, null, options.WarningLines, [], NotedDefaultConfigFileOf(options), options.ConfigFileHelpSubjects, options.StandardErrorRedirects);
 
     /// <summary>
     /// Creates the result for <see cref="CommandLineRefusal.EmptyCommandLine"/>, which names no
@@ -132,7 +166,7 @@ public sealed class CommandLineParseResult
     /// <param name="options">The options the default config file filled in, whose warning lines and help subjects it keeps.</param>
     /// <returns>A result whose <see cref="IsAccepted"/> is <see langword="false"/>.</returns>
     internal static CommandLineParseResult RefusedEmpty(CommandLineOptions options) =>
-        new(null, CommandLineRefusal.EmptyCommandLine(), options.WarningLines, [], null, options.ConfigFileHelpSubjects, options.StandardErrorRedirects);
+        new(null, [], CommandLineRefusal.EmptyCommandLine(), null, options.WarningLines, [], null, options.ConfigFileHelpSubjects, options.StandardErrorRedirects);
 
     /// <summary>
     /// <see cref="CommandLineOptions.DefaultConfigFile"/> when <c>-v</c> or a <c>--trace</c> option is

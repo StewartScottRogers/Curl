@@ -37,10 +37,14 @@ namespace Curl.Cli;
 /// (<c>curl -V --bogus</c> prints the version; <c>curl --bogus -V</c> is refused). <c>-M</c> / <c>--manual</c>
 /// and <c>-h</c> / <c>--help</c> end it the same way, <c>--help</c> first reading its subject (see
 /// <see cref="CommandLineOption.Subject"/>), with <see cref="CommandLineParseResult.InformationRequested(CommandLineOptions)"/>.
+/// <c>-:</c> / <c>--next</c>, on the command line or as a <c>next</c> line of a config file, ends one
+/// option group and starts the next (see <see cref="CommandLineOptions.StartNextGroup"/>): every
+/// argument and config file line is read into the group being filled in, the options
+/// <see cref="CommandLineOptionTable.GlobalOptionLongNames"/> lists are shared by every group, and
+/// <see cref="CommandLineParseResult.Groups"/> returns the groups in order.
 /// </summary>
 /// <remarks>
-/// It does not implement <c>--next</c>, and it
-/// neither validates URLs nor opens files itself. Checked against the local curl 8.21.0 on
+/// It neither validates URLs nor opens files itself. Checked against the local curl 8.21.0 on
 /// 2026-09-26; options per <see href="https://curl.se/docs/manpage.html"/>.
 /// </remarks>
 public static class CommandLineParser
@@ -150,9 +154,10 @@ public static class CommandLineParser
         ArgumentReader reader = new(arguments, pathExists, dataFileReader);
         while (reader.TryTakeNext(out string argument))
         {
+            CommandLineOptions group = options.CurrentGroup;
             CommandLineRefusal? refusal = reader.OptionsEnded
-                ? AddPositionalUrl(options, argument)
-                : ParseArgument(options, argument, reader);
+                ? AddPositionalUrl(group, argument)
+                : ParseArgument(group, argument, reader);
             if (refusal is not null)
             {
                 return CommandLineParseResult.Refused(refusal, options);
@@ -164,7 +169,11 @@ public static class CommandLineParser
             }
         }
 
-        options.ReadMissingPasswords(passwordPrompt);
+        foreach (CommandLineOptions group in options.Groups)
+        {
+            group.ReadMissingPasswords(passwordPrompt);
+        }
+
         return Finish(options);
     }
 
@@ -178,32 +187,56 @@ public static class CommandLineParser
         && ((arguments[0] ?? string.Empty).StartsWith("-q", StringComparison.Ordinal) || arguments[0] == "--disable");
 
     /// <summary>
-    /// Checks the command line once it is all read: refused when it names no URL, or when it asks for
-    /// a multipart form post and a <c>-d</c> body both; otherwise accepted.
+    /// Checks each option group once the command line is all read, as curl 8.21.0 does while setting
+    /// up that group's transfers: a group is refused when it names no URL, or when it asks for a
+    /// multipart form post and a <c>-d</c> body both. A refused first group refuses the command line;
+    /// a later one is accepted with the groups before it and <see cref="CommandLineParseResult.RefusalAfterGroups"/>,
+    /// as curl runs those groups first (measured 2026-09-28, BL-508 Notes).
     /// </summary>
     private static CommandLineParseResult Finish(CommandLineOptions options)
     {
-        if (options.Urls.Count == 0)
+        CommandLineRefusal? refusal = TransferSetupRefusal(options);
+        if (refusal is not null)
         {
-            return CommandLineParseResult.Refused(CommandLineRefusal.NoUrlSpecified(), options);
+            return CommandLineParseResult.Refused(refusal, options);
         }
 
-        return options.HttpMethodSelected == SelectedHttpMethod.MultipartFormPost && options.PostData is not null
-            ? RefuseFormAndDataBoth(options)
-            : CommandLineParseResult.Accepted(options);
+        for (int group = 1; group < options.Groups.Count; group++)
+        {
+            refusal = TransferSetupRefusal(options.Groups[group]);
+            if (refusal is not null)
+            {
+                return CommandLineParseResult.Accepted(options, group, refusal);
+            }
+        }
+
+        return CommandLineParseResult.Accepted(options, options.Groups.Count, null);
+    }
+
+    /// <summary>The refusal curl 8.21.0 meets setting up <paramref name="group"/>'s transfers; <see langword="null"/> when there is none.</summary>
+    private static CommandLineRefusal? TransferSetupRefusal(CommandLineOptions group)
+    {
+        if (group.Urls.Count == 0)
+        {
+            return CommandLineRefusal.NoUrlSpecified();
+        }
+
+        return group.HttpMethodSelected == SelectedHttpMethod.MultipartFormPost && group.PostData is not null
+            ? RefuseFormAndDataBoth(group)
+            : null;
     }
 
     /// <summary>
     /// Refuses a multipart form post that also has a <c>-d</c> body, after curl's warning naming the
     /// body's method: <c>GET</c> when <c>-G</c> sends it as the query, else <c>POST</c>.
     /// </summary>
-    private static CommandLineParseResult RefuseFormAndDataBoth(CommandLineOptions options)
+    private static CommandLineRefusal RefuseFormAndDataBoth(CommandLineOptions group)
     {
-        SelectedHttpMethod dataMethod = options.DataInQuery ? SelectedHttpMethod.Get : SelectedHttpMethod.Post;
-        IReadOnlyList<string> warningLines = options.Silent
+        SelectedHttpMethod dataMethod = group.DataInQuery ? SelectedHttpMethod.Get : SelectedHttpMethod.Post;
+        IReadOnlyList<string> warningLines = group.Silent
             ? []
             : CommandLineWarning.OnlyOneRequestMethod(dataMethod, SelectedHttpMethod.MultipartFormPost);
-        return CommandLineParseResult.Refused(CommandLineRefusal.FormAndDataBoth(warningLines), options);
+        return CommandLineRefusal.FormAndDataBoth(warningLines);
     }
 
     private static CommandLineRefusal? ParseArgument(CommandLineOptions options, string argument, ArgumentReader reader)
@@ -459,7 +492,10 @@ public static class CommandLineParser
     internal static CommandLineRefusal? ApplyConfigFileLine(CommandLineOptions options, string option, string? parameter, Func<string, bool> pathExists, IDataFileReader dataFileReader)
     {
         ArgumentReader reader = new(parameter is null ? [] : [parameter], pathExists, dataFileReader);
-        CommandLineRefusal? refusal = ParseConfigFileOption(options, option, reader);
+        bool readingEnclosingConfigFile = options.ReadingConfigFile;
+        options.ReadingConfigFile = true;
+        CommandLineRefusal? refusal = ParseConfigFileOption(options.CurrentGroup, option, reader);
+        options.ReadingConfigFile = readingEnclosingConfigFile;
 
         // curl 8.21.0 ignores version and manual in a -K file: a file of either alone reports no URL.
         // It prints the page for help there and carries on, so the console prints that page first.

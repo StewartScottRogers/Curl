@@ -24,15 +24,64 @@ public sealed class CommandLineOptions
     private readonly List<string> headers = [];
     private readonly List<string> proxyHeaders = [];
     private readonly List<CommandLineCookie> cookies = [];
-    private readonly List<string> warningLines = [];
-    private readonly List<StandardErrorRedirect> standardErrorRedirects = [];
-    private readonly List<string?> configFileHelpSubjects = [];
     private readonly List<FormPartSpecification> formParts = [];
-    private readonly Dictionary<string, byte[]> variables = new(StringComparer.Ordinal);
+    private readonly CommandLineGlobalState globals;
     private readonly Stack<FormPartSpecification> openMultiparts = new();
     private string? userAwaitingPassword;
     private string? proxyUserAwaitingPassword;
     private HttpAuthSchemes wantedAuthSchemes;
+
+    /// <summary>
+    /// Creates the first option group of a command line, with nothing set, and so its own
+    /// global settings, which every group <see cref="StartNextGroup"/> adds after it shares.
+    /// </summary>
+    public CommandLineOptions()
+        : this(new CommandLineGlobalState())
+    {
+    }
+
+    /// <summary>Creates an option group with nothing of its own set, sharing <paramref name="globals"/>, and appends it to their groups.</summary>
+    private CommandLineOptions(CommandLineGlobalState globals)
+    {
+        this.globals = globals;
+        globals.Groups.Add(this);
+    }
+
+    /// <summary>
+    /// Every option group of the command line this group belongs to, in command-line order, this one
+    /// included: one more for each <c>-:</c> / <c>--next</c> that started a group (see
+    /// <see cref="CommandLineParseResult.Groups"/>).
+    /// </summary>
+    internal IReadOnlyList<CommandLineOptions> Groups => globals.Groups;
+
+    /// <summary>The group options are being read into now: the last of <see cref="Groups"/>.</summary>
+    internal CommandLineOptions CurrentGroup => globals.Groups[^1];
+
+    /// <summary>
+    /// <see langword="true"/> while <see cref="CommandLineParser"/> applies a line of a <c>-K</c> file or
+    /// of the default config file rather than a command-line argument.
+    /// </summary>
+    internal bool ReadingConfigFile { get => globals.ReadingConfigFile; set => globals.ReadingConfigFile = value; }
+
+    /// <summary>
+    /// Applies <c>-:</c> / <c>--next</c> read into this group, as curl 8.21.0 does: when this group has a
+    /// URL, starts a new group after it, whose per-group options start again from nothing while the
+    /// global ones stay shared, and which becomes the <see cref="CurrentGroup"/>. Without a URL it is
+    /// refused with <see cref="CommandLineRefusal.MissingUrlBeforeNext"/> on the command line, and
+    /// ignored in a config file, where curl starts no group (measured 2026-09-28, BL-508 Notes).
+    /// </summary>
+    /// <param name="spelledOption">The whole argument as typed, such as <c>--next</c> or <c>-s:</c>.</param>
+    /// <returns><see langword="null"/> when applied or ignored; otherwise the refusal.</returns>
+    internal CommandLineRefusal? StartNextGroup(string spelledOption)
+    {
+        if (Urls.Count > 0)
+        {
+            _ = new CommandLineOptions(globals);
+            return null;
+        }
+
+        return ReadingConfigFile ? null : CommandLineRefusal.MissingUrlBeforeNext(spelledOption, ErrorsHidden);
+    }
 
     /// <summary>
     /// The URLs to transfer, in command-line order: positional arguments and
@@ -60,7 +109,7 @@ public sealed class CommandLineOptions
     /// <see cref="CurlVersionText"/>'s lines and exits 0 instead of transferring. A <c>version</c>
     /// line in a <c>-K</c> file does not set it: curl ignores it there.
     /// </summary>
-    public bool VersionRequested { get; internal set; }
+    public bool VersionRequested { get => globals.VersionRequested; internal set => globals.VersionRequested = value; }
 
     /// <summary>
     /// <see langword="true"/> when <c>-h</c> / <c>--help</c> was given on the command line. Parsing stops
@@ -69,14 +118,14 @@ public sealed class CommandLineOptions
     /// A <c>help</c> line in a <c>-K</c> file does not set it: curl prints that page and carries on, so it
     /// goes to <see cref="ConfigFileHelpSubjects"/> instead.
     /// </summary>
-    public bool HelpRequested { get; private set; }
+    public bool HelpRequested { get => globals.HelpRequested; private set => globals.HelpRequested = value; }
 
     /// <summary>
     /// The subject <c>--help</c> was given: its attached value, or else the argument after it, whatever
     /// it looks like; <see langword="null"/> when there was none or it was empty, which asks for the
     /// usage page. Set only with <see cref="HelpRequested"/>.
     /// </summary>
-    public string? HelpSubject { get; private set; }
+    public string? HelpSubject { get => globals.HelpSubject; private set => globals.HelpSubject = value; }
 
     /// <summary>
     /// <see langword="true"/> when <c>-M</c> / <c>--manual</c> was given on the command line and no
@@ -84,7 +133,7 @@ public sealed class CommandLineOptions
     /// <see cref="CurlManual"/>'s lines and exits 0 instead of transferring. A <c>manual</c> line in a
     /// <c>-K</c> file does not set it: curl ignores it there.
     /// </summary>
-    public bool ManualRequested { get; internal set; }
+    public bool ManualRequested { get => globals.ManualRequested; internal set => globals.ManualRequested = value; }
 
     /// <summary>
     /// Whether an option has asked for information instead of a transfer (<see cref="VersionRequested"/>,
@@ -106,7 +155,7 @@ public sealed class CommandLineOptions
     /// output as it reads the line and carries on parsing, so the console prints these pages before
     /// anything else (measured 2026-09-27, BL-375).
     /// </summary>
-    internal IReadOnlyList<string?> ConfigFileHelpSubjects => configFileHelpSubjects;
+    internal IReadOnlyList<string?> ConfigFileHelpSubjects => globals.ConfigFileHelpSubjects;
 
     /// <summary>
     /// Moves a help request made by a <c>-K</c> file line to <see cref="ConfigFileHelpSubjects"/>, and
@@ -116,7 +165,7 @@ public sealed class CommandLineOptions
     {
         if (HelpRequested)
         {
-            configFileHelpSubjects.Add(HelpSubject);
+            globals.ConfigFileHelpSubjects.Add(HelpSubject);
         }
 
         VersionRequested = false;
@@ -126,23 +175,23 @@ public sealed class CommandLineOptions
     }
 
     /// <summary><see langword="true"/> when <c>-s</c> / <c>--silent</c> was given and no <c>--no-silent</c> came after it.</summary>
-    public bool Silent { get; internal set; }
+    public bool Silent { get => globals.Silent; internal set => globals.Silent = value; }
 
     /// <summary><see langword="true"/> when <c>-S</c> / <c>--show-error</c> was given and no <c>--no-show-error</c> came after it.</summary>
-    public bool ShowError { get; internal set; }
+    public bool ShowError { get => globals.ShowError; internal set => globals.ShowError = value; }
 
     /// <summary>
     /// <see langword="true"/> when <c>--no-progress-meter</c> was given and no <c>--progress-meter</c>
     /// came after it. In curl 8.21.0 it turns the meter off whatever its form, so it outranks
     /// <see cref="ProgressBar"/> in either order.
     /// </summary>
-    public bool ProgressMeterOff { get; internal set; }
+    public bool ProgressMeterOff { get => globals.ProgressMeterOff; internal set => globals.ProgressMeterOff = value; }
 
     /// <summary>
     /// <see langword="true"/> when <c>-#</c> / <c>--progress-bar</c> was given and no
     /// <c>--no-progress-bar</c> came after it: the meter, when shown, is the bar form.
     /// </summary>
-    public bool ProgressBar { get; internal set; }
+    public bool ProgressBar { get => globals.ProgressBar; internal set => globals.ProgressBar = value; }
 
     /// <summary>
     /// <see langword="true"/> when the last of <c>-N</c> / <c>--no-buffer</c> and <c>--buffer</c> was
@@ -155,14 +204,14 @@ public sealed class CommandLineOptions
     /// Which of <c>-v</c> / <c>--verbose</c>, <c>--trace</c> and <c>--trace-ascii</c> came last, or
     /// <see cref="TraceKind.None"/> when none did or <c>--no-verbose</c> came after it.
     /// </summary>
-    public TraceKind Trace { get; private set; }
+    public TraceKind Trace { get => globals.Trace; private set => globals.Trace = value; }
 
     /// <summary>
     /// The file the last <c>--trace</c> or <c>--trace-ascii</c> names, <c>-</c> for standard output, while
     /// <see cref="Trace"/> is <see cref="TraceKind.HexDump"/> or <see cref="TraceKind.AsciiDump"/>;
     /// otherwise <see langword="null"/>, as <c>-v</c> writes to standard error.
     /// </summary>
-    public string? TraceFile { get; private set; }
+    public string? TraceFile { get => globals.TraceFile; private set => globals.TraceFile = value; }
 
     /// <summary>
     /// How many times <c>-v</c> was given in a row, 0 to 4, as curl 8.21.0 counts it: the letters of
@@ -172,7 +221,7 @@ public sealed class CommandLineOptions
     /// curl adds transfer and connection IDs and times to its verbose lines, from 3 protocol
     /// details and from 4 every component's trace.
     /// </summary>
-    public int Verbosity { get; private set; }
+    public int Verbosity { get => globals.Verbosity; private set => globals.Verbosity = value; }
 
     /// <summary>
     /// <see langword="true"/> when every verbose or trace line starts with the time of day: set by
@@ -180,7 +229,7 @@ public sealed class CommandLineOptions
     /// by <c>--no-verbose</c> and by a <c>-v</c> or <c>--verbose</c> that is the first option of its
     /// argument (<c>--trace-time -v</c> shows no times; <c>--trace-time -sv</c> and <c>-v --trace-time</c> do).
     /// </summary>
-    public bool TraceTime { get; internal set; }
+    public bool TraceTime { get => globals.TraceTime; internal set => globals.TraceTime = value; }
 
     /// <summary>
     /// The file the last <c>--stderr</c> names, to which curl writes what it would write to standard
@@ -188,13 +237,13 @@ public sealed class CommandLineOptions
     /// kept, not refused: curl 8.21.0 fails to open it, warns and carries on writing to standard error,
     /// which the console layer does when it opens the file.
     /// </summary>
-    public string? StandardErrorFile { get; private set; }
+    public string? StandardErrorFile { get => globals.StandardErrorFile; private set => globals.StandardErrorFile = value; }
 
     /// <summary>
     /// Every <c>--stderr</c> read, in command-line order, each with the point where curl opens its
     /// file; empty when none was given. The last one's file is <see cref="StandardErrorFile"/>.
     /// </summary>
-    public IReadOnlyList<StandardErrorRedirect> StandardErrorRedirects => standardErrorRedirects;
+    public IReadOnlyList<StandardErrorRedirect> StandardErrorRedirects => globals.StandardErrorRedirects;
 
     /// <summary>
     /// The <c>-o</c> / <c>--output</c> file name of each entry of <see cref="UrlOutputs"/>, in the same
@@ -549,7 +598,7 @@ public sealed class CommandLineOptions
     /// <c>--no-styled-output</c>: never style header output. <see langword="true"/> otherwise, as curl styles
     /// headers written to a terminal by default. Parsed only until BL-736 styles header output.
     /// </summary>
-    public bool StyledOutput { get; internal set; } = true;
+    public bool StyledOutput { get => globals.StyledOutput; internal set => globals.StyledOutput = value; }
 
     /// <summary>
     /// The <c>--cacert</c> file, verbatim; <see langword="null"/> when not given. The parser has
@@ -894,7 +943,7 @@ public sealed class CommandLineOptions
     /// <see langword="true"/> when <c>--fail-early</c> was given and no <c>--no-fail-early</c> came after
     /// it: stop at the first transfer that fails instead of going on to the next URL.
     /// </summary>
-    public bool FailEarly { get; internal set; }
+    public bool FailEarly { get => globals.FailEarly; internal set => globals.FailEarly = value; }
 
     /// <summary>
     /// <see langword="true"/> when <c>--compressed</c> was given and no <c>--no-compressed</c> came after
@@ -974,19 +1023,19 @@ public sealed class CommandLineOptions
     /// <c>--disable</c> came first, or when a line of it was refused. curl 8.21.0 names it with
     /// <c>-v</c> as <c>Note: Read config file from '&lt;path&gt;'</c>.
     /// </summary>
-    public string? DefaultConfigFile { get; internal set; }
+    public string? DefaultConfigFile { get => globals.DefaultConfigFile; internal set => globals.DefaultConfigFile = value; }
 
     /// <summary>
     /// How many <c>-K</c> / <c>--config</c> files are being read right now, one inside another; curl
     /// refuses to open one more once <see cref="CommandLineRefusal.MaximumConfigFileDepth"/> are open.
     /// </summary>
-    internal int OpenConfigFileCount { get; set; }
+    internal int OpenConfigFileCount { get => globals.OpenConfigFileCount; set => globals.OpenConfigFileCount = value; }
 
     /// <summary>
     /// The warning lines met while reading the command line, in command-line order, without
     /// line terminators. <see cref="CommandLineParser"/> hands them to <see cref="CommandLineParseResult.WarningLines"/>.
     /// </summary>
-    internal IReadOnlyList<string> WarningLines => warningLines;
+    internal IReadOnlyList<string> WarningLines => globals.WarningLines;
 
     /// <summary>
     /// Sets <see cref="HttpVersion"/>, first adding <see cref="CommandLineWarning.OverridesPreviousHttpVersion"/>,
@@ -1008,7 +1057,7 @@ public sealed class CommandLineOptions
     /// (<c>--verbose</c>, or the <c>v</c> of <c>-v</c> and of <c>-vs</c>, but not of <c>-sv</c>); set by
     /// <see cref="CommandLineParser"/> before each option it applies.
     /// </summary>
-    internal bool FirstOptionOfArgument { get; set; }
+    internal bool FirstOptionOfArgument { get => globals.FirstOptionOfArgument; set => globals.FirstOptionOfArgument = value; }
 
     /// <summary>
     /// Applies <c>-v</c> / <c>--verbose</c>, or <c>--no-verbose</c> when <paramref name="on"/> is
@@ -1102,7 +1151,7 @@ public sealed class CommandLineOptions
     {
         if (!Silent)
         {
-            warningLines.AddRange(lines);
+            globals.WarningLines.AddRange(lines);
         }
     }
 
@@ -1111,7 +1160,7 @@ public sealed class CommandLineOptions
     /// prints while reading its default config file, already hidden, or not, by the caller.
     /// </summary>
     /// <param name="lines">The lines, without line terminators.</param>
-    internal void AddErrorLines(IReadOnlyList<string> lines) => warningLines.AddRange(lines);
+    internal void AddErrorLines(IReadOnlyList<string> lines) => globals.WarningLines.AddRange(lines);
 
     /// <summary>
     /// Makes <paramref name="file"/> the <see cref="StandardErrorFile"/> and appends a
@@ -1122,7 +1171,7 @@ public sealed class CommandLineOptions
     internal void RedirectStandardError(string file)
     {
         StandardErrorFile = file;
-        standardErrorRedirects.Add(new(file, warningLines.Count, Silent));
+        globals.StandardErrorRedirects.Add(new(file, globals.WarningLines.Count, Silent));
     }
 
     /// <summary>
@@ -1134,18 +1183,18 @@ public sealed class CommandLineOptions
     /// <param name="content">The variable's bytes.</param>
     internal void SetVariable(string name, byte[] content)
     {
-        if (variables.ContainsKey(name) && Trace != TraceKind.None)
+        if (globals.Variables.ContainsKey(name) && Trace != TraceKind.None)
         {
             AddErrorLines(WrappedMessage.Lines("Note: ", $"Overwriting variable '{name}'"));
         }
 
-        variables[name] = content;
+        globals.Variables[name] = content;
     }
 
     /// <summary>Looks up the bytes of the <c>--variable</c> <paramref name="name"/>.</summary>
     /// <param name="name">The variable's name, case-sensitive.</param>
     /// <returns>The variable's bytes; <see langword="null"/> when no variable has that name.</returns>
-    internal byte[]? FindVariable(string name) => variables.GetValueOrDefault(name);
+    internal byte[]? FindVariable(string name) => globals.Variables.GetValueOrDefault(name);
 
     /// <summary>Appends <paramref name="url"/> to <see cref="Urls"/>, unchanged and unvalidated.</summary>
     /// <param name="url">A positional argument or a <c>--url</c> value.</param>
@@ -1299,32 +1348,38 @@ public sealed class CommandLineOptions
     /// password, <c>Enter proxy password for user '&lt;user&gt;':</c>, recorded as the
     /// <see cref="ProxyCredentials"/> password. The user shown is the value up to its first
     /// <c>;</c> (curl's login options are not shown). Does nothing when no password is missing.
+    /// When the command line has more than one option group, each prompt ends
+    /// <c> on URL #&lt;n&gt;:</c> instead, <c>&lt;n&gt;</c> this group's number counting from 1, as
+    /// curl 8.21.0's <c>checkpasswd</c> builds it for every group but a lone one.
     /// </summary>
     /// <remarks>
     /// Measured with the local curl 8.21.0 on 2026-09-26: <c>-u u --oauth2-bearer tok</c> never
-    /// prompts; <c>-U p -u h</c> prompts for <c>'h'</c>'s host password first.
+    /// prompts; <c>-U p -u h</c> prompts for <c>'h'</c>'s host password first. The per-group prompt
+    /// text is read from curl's <c>tool_paramhlp.c</c>, as curl reads the password from the console
+    /// and not from standard input, which a recorded run cannot answer (BL-508 Notes).
     /// </remarks>
     /// <param name="passwordPrompt">Asks for the passwords.</param>
     internal void ReadMissingPasswords(IPasswordPrompt passwordPrompt)
     {
+        string urlNumber = Groups.Count == 1 ? string.Empty : $" on URL #{globals.Groups.IndexOf(this) + 1}";
         if (userAwaitingPassword is { } user && BearerToken is null)
         {
-            Credentials = new NetworkCredential(user, ReadPassword(passwordPrompt, "host", user));
+            Credentials = new NetworkCredential(user, ReadPassword(passwordPrompt, "host", user, urlNumber));
             userAwaitingPassword = null;
         }
 
         if (proxyUserAwaitingPassword is { } proxyUser)
         {
-            ProxyCredentials = new NetworkCredential(proxyUser, ReadPassword(passwordPrompt, "proxy", proxyUser));
+            ProxyCredentials = new NetworkCredential(proxyUser, ReadPassword(passwordPrompt, "proxy", proxyUser, urlNumber));
             proxyUserAwaitingPassword = null;
         }
     }
 
-    private static string ReadPassword(IPasswordPrompt passwordPrompt, string kind, string user)
+    private static string ReadPassword(IPasswordPrompt passwordPrompt, string kind, string user, string urlNumber)
     {
         int loginOptions = user.IndexOf(';', StringComparison.Ordinal);
         string shownUser = loginOptions < 0 ? user : user[..loginOptions];
-        return passwordPrompt.ReadPassword($"Enter {kind} password for user '{shownUser}':");
+        return passwordPrompt.ReadPassword($"Enter {kind} password for user '{shownUser}'{urlNumber}:");
     }
 
     /// <summary>

@@ -377,6 +377,27 @@ public sealed class CommandLineRefusal
             "is badly used here");
 
     /// <summary>
+    /// Refuses a <c>-:</c> / <c>--next</c> on the command line whose option group has no URL yet:
+    /// <c>curl: missing URL before --next</c> (hidden when <paramref name="errorsHidden"/>),
+    /// <c>curl: option &lt;spelled&gt;: is badly used here</c> and the try-help line.
+    /// </summary>
+    /// <remarks>
+    /// Measured with the local curl 8.21.0 on 2026-09-28 (BL-508 Notes): <c>curl --next URL</c>,
+    /// <c>curl URL --next --next URL</c> and <c>curl -: URL</c> (spelled <c>-:</c>) print all three
+    /// lines and exit 2 before any transfer; <c>curl -s --next URL</c> and <c>curl -s: URL</c> (spelled
+    /// <c>-s:</c>) print the last two; <c>-sS</c> prints all three.
+    /// </remarks>
+    /// <param name="spelledOption">The whole argument as typed.</param>
+    /// <param name="errorsHidden"><see langword="true"/> when <c>-s</c> without <c>-S</c> is in effect.</param>
+    /// <returns>The refusal.</returns>
+    internal static CommandLineRefusal MissingUrlBeforeNext(string spelledOption, bool errorsHidden) =>
+        new(
+            CurlExitCode.FailedInit,
+            ErrorMessageLines(errorsHidden, "missing URL before --next"),
+            spelledOption,
+            "is badly used here");
+
+    /// <summary>
     /// Refuses a line of a <c>-K</c> file whose parameter its option did not use (a flag given a
     /// parameter, as in <c>silent foo</c>), with the reason <c>had unsupported trailing garbage</c>.
     /// Only its reason and exit code are ever shown, through <see cref="ConfigFileOptionRefused"/>.

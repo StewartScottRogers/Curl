@@ -27,7 +27,7 @@ public sealed class CommandLineOption
     public bool ShortNameTurnsOff { get; }
 
     /// <summary>
-    /// <see langword="true"/> for a row built with <see cref="NoFunctionFlag"/>: as a letter of a
+    /// <see langword="true"/> for a row built with <see cref="NoFunctionFlag"/> or <see cref="NextGroup"/>: as a letter of a
     /// short-option bundle it ends the bundle, and the letters after it are read as nothing at all.
     /// </summary>
     public bool EndsBundle { get; }
@@ -83,6 +83,29 @@ public sealed class CommandLineOption
             set(options);
             return null;
         });
+    }
+
+    /// <summary>
+    /// Creates the row for <c>-:</c> / <c>--next</c>, which ends one option group and starts the next:
+    /// it takes no value (<c>--next=x</c> ignores the <c>x</c>), starts the next group through
+    /// <see cref="CommandLineOptions.StartNextGroup"/>, and as a letter of a bundle ends the bundle, so
+    /// <c>-:s x</c> reads only <c>-:</c> and takes <c>x</c> as the next group's URL (measured 2026-09-28,
+    /// BL-508 Notes). Its <c>--no-</c> spelling is refused as not reversible.
+    /// </summary>
+    /// <param name="longName">The long name without its leading <c>--</c>.</param>
+    /// <param name="shortName">The short letter.</param>
+    /// <returns>The row.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="longName"/> is <see langword="null"/>.</exception>
+    public static CommandLineOption NextGroup(string longName, char shortName)
+    {
+        ArgumentNullException.ThrowIfNull(longName);
+
+        return new CommandLineOption(
+            longName,
+            shortName,
+            takesValue: false,
+            (options, _, spelledOption, _, _) => options.StartNextGroup(spelledOption),
+            endsBundle: true);
     }
 
     /// <summary>
