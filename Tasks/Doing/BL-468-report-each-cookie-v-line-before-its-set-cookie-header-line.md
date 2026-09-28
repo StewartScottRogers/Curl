@@ -34,3 +34,4 @@ With cookies on, `HttpProtocolHandler` reports each `Added cookie ...` (and drop
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
