@@ -7,7 +7,7 @@ namespace Curl.Cli;
 /// </summary>
 public sealed class CommandLineOption
 {
-    private CommandLineOption(string longName, char? shortName, bool takesValue, CommandLineOptionApplier apply, CommandLineOptionApplier? negate = null, bool takesSubject = false, bool endsBundle = false)
+    private CommandLineOption(string longName, char? shortName, bool takesValue, CommandLineOptionApplier apply, CommandLineOptionApplier? negate = null, bool takesSubject = false, bool endsBundle = false, bool shortNameTurnsOff = false)
     {
         LongName = longName;
         ShortName = shortName;
@@ -16,7 +16,15 @@ public sealed class CommandLineOption
         Negate = negate;
         TakesSubject = takesSubject;
         EndsBundle = endsBundle;
+        ShortNameTurnsOff = shortNameTurnsOff;
     }
+
+    /// <summary>
+    /// <see langword="true"/> for a row built with <see cref="NegatableFlagTurnedOffByShortName"/>: its
+    /// short letter applies <see cref="Negate"/>, not <see cref="Apply"/>, as curl 8.21.0's <c>-N</c> means
+    /// <c>--no-buffer</c>.
+    /// </summary>
+    public bool ShortNameTurnsOff { get; }
 
     /// <summary>
     /// <see langword="true"/> for a row built with <see cref="NoFunctionFlag"/>: as a letter of a
@@ -173,6 +181,23 @@ public sealed class CommandLineOption
                 set(options, false);
                 return null;
             });
+    }
+
+    /// <summary>
+    /// Creates a row for a flag like <see cref="NegatableFlag"/>, except that its short letter turns
+    /// it off, as the <c>--no-</c> spelling does: curl 8.21.0 reads <c>-N</c> as <c>--no-buffer</c>,
+    /// while <c>--buffer</c> turns buffering back on.
+    /// </summary>
+    /// <param name="longName">The long name without its leading <c>--</c> or <c>--no-</c>.</param>
+    /// <param name="shortName">The short letter, which passes <see langword="false"/> to <paramref name="set"/>.</param>
+    /// <param name="set">Sets the flag on, or off, on the options being filled in.</param>
+    /// <returns>The row.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="longName"/> or <paramref name="set"/> is <see langword="null"/>.</exception>
+    public static CommandLineOption NegatableFlagTurnedOffByShortName(string longName, char shortName, Action<CommandLineOptions, bool> set)
+    {
+        CommandLineOption row = NegatableFlag(longName, shortName, set);
+
+        return new CommandLineOption(longName, shortName, takesValue: false, row.Apply, row.Negate, shortNameTurnsOff: true);
     }
 
     /// <summary>

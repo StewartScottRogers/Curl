@@ -145,6 +145,13 @@ public sealed class CommandLineOptions
     public bool ProgressBar { get; internal set; }
 
     /// <summary>
+    /// <see langword="true"/> when the last of <c>-N</c> / <c>--no-buffer</c> and <c>--buffer</c> was
+    /// <c>-N</c> or <c>--no-buffer</c>: every block of body bytes is flushed to its output as it is
+    /// written, as curl 8.21.0 flushes after each write. <see langword="false"/> otherwise.
+    /// </summary>
+    public bool NoBuffer { get; internal set; }
+
+    /// <summary>
     /// Which of <c>-v</c> / <c>--verbose</c>, <c>--trace</c> and <c>--trace-ascii</c> came last, or
     /// <see cref="TraceKind.None"/> when none did or <c>--no-verbose</c> came after it.
     /// </summary>
