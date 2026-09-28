@@ -30,6 +30,8 @@ completed:
 
 ## Notes
 
+- From BL-535: `CommandLineOptions.UploadFlags` is an `ImapUploadFlags` bit set (default `Seen`), not the raw text. Map it to `MailRequestOptions.UploadFlags` as the set flags' names in curl's fixed order: answered, deleted, draft, flagged, seen (measured, BL-535 Notes).
+
 ## Log
 
 - 2026-09-28: Created.
