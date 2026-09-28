@@ -36,3 +36,4 @@ With `--skip-existing`, a transfer whose `-o`/`-O` file already exists is not pe
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
