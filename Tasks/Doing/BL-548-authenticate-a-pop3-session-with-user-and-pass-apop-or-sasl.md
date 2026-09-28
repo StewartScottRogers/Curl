@@ -32,3 +32,4 @@ The POP3 handler logs in as curl 8.21.0 does: SASL `AUTH` through the injected a
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
