@@ -98,6 +98,7 @@ public sealed class TransferContextTests
         Assert.IsNull(context.Proxy);
         Assert.IsNull(context.Http);
         Assert.IsNull(context.Mail);
+        Assert.IsNull(context.Ssh);
         Assert.AreSame(TimeProvider.System, context.TimeProvider);
         Assert.AreSame(NoTransferEvents.Instance, context.Events);
         Assert.AreSame(NoTransferProgress.Instance, context.Progress);
@@ -123,6 +124,7 @@ public sealed class TransferContextTests
         var proxy = new ProxyEndpoint(ProxyKind.Http, "proxy.example", 3128, null);
         var http = new HttpRequestOptions { CustomMethod = "PATCH" };
         var mail = new MailRequestOptions { From = "a@example.com" };
+        var ssh = new SshOptions { Compression = true };
         var events = new StubTransferEvents();
         var progress = new StubTransferProgress();
 
@@ -159,6 +161,7 @@ public sealed class TransferContextTests
             Proxy = proxy,
             Http = http,
             Mail = mail,
+            Ssh = ssh,
             TimeProvider = timeProvider,
             Events = events,
             Progress = progress,
@@ -197,6 +200,7 @@ public sealed class TransferContextTests
         Assert.AreSame(proxy, context.Proxy);
         Assert.AreSame(http, context.Http);
         Assert.AreSame(mail, context.Mail);
+        Assert.AreSame(ssh, context.Ssh);
         Assert.AreSame(timeProvider, context.TimeProvider);
         Assert.AreSame(events, context.Events);
         Assert.AreSame(progress, context.Progress);

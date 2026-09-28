@@ -384,6 +384,18 @@ public interface ITransferContext
     MailRequestOptions? Mail { get; }
 
     /// <summary>
+    /// Gets the SSH-only options from <c>--key</c>, <c>--pubkey</c>, <c>--pass</c>,
+    /// <c>--hostpubmd5</c>, <c>--hostpubsha256</c>, <c>--compressed-ssh</c> and the
+    /// known-hosts check, or <see langword="null" /> for every scheme but <c>scp</c> and
+    /// <c>sftp</c>.
+    /// </summary>
+    /// <remarks>
+    /// The SSH handler treats <see langword="null" /> exactly as <c>new SshOptions()</c>,
+    /// every member at its default; every other handler ignores it (ADR-0122).
+    /// </remarks>
+    SshOptions? Ssh { get; }
+
+    /// <summary>
     /// Gets the time source. Injected so that timeout and retry behaviour is testable
     /// without a real delay.
     /// </summary>
