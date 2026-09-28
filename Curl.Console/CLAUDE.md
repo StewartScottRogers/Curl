@@ -139,10 +139,15 @@ cannot use ends the transfer with the selector's exit 5 or 7, and a SOCKS proxy,
 proxy for `https` or under `-p` or `-L`, ends an `http`/`https` transfer with exit 4 until the connector opens those tunnels
 (ADR-0053, BL-328). Other schemes do not read the proxy yet (BL-330), and redirect hops keep
 the first URL's proxy (BL-329). Measured on curl 8.21.0 (BL-238 Notes).
-An `ftp` URL is claimed by `RoutingFtpProtocolHandler`, which hands it to the HTTP handler
-when its proxy is `Http` or `Http10` and `-p` is not given, so it is forwarded to the proxy as
-`GET ftp://host/path` with `Host: host:21` (ADR-0056, rule 3; BL-344); any other `ftp` transfer
-goes to `FtpProtocolHandler` over the pooling connector (ADR-0093, BL-434).
+An `ftp` or `ftps` URL is claimed by `RoutingFtpProtocolHandler`, which hands an `ftp` one to
+the HTTP handler when its proxy is `Http` or `Http10` and `-p` is not given, so it is forwarded
+to the proxy as `GET ftp://host/path` with `Host: host:21` (ADR-0056, rule 3; BL-344); any
+other transfer, `ftps` through an HTTP proxy included (curl 8.21.0 tunnels it with
+`CONNECT host:990`, BL-458), goes to `FtpProtocolHandler` over the pooling connector
+(ADR-0093, BL-434). `CurlComposition.CreateFtpProtocolHandler` builds it with a
+`TcpConnectionListener` for `-P`, the run's TLS provider and DNS resolver, and a
+`SystemNetworkInterfaceLookup` (ADR-0102, ADR-0108, ADR-0110), and `TransferContextFactory`
+copies `-P`, `--disable-eprt`, `--ssl`/`--ssl-reqd` and `--ftp-ssl-control` into the context.
 
 Every transfer goes through `Curl.Core`'s `RedirectFollower`. `-L` becomes
 `HttpRequestOptions.FollowRedirects`, and `RedirectPolicyMapping` turns `--max-redirs`,

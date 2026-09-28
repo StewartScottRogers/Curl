@@ -32,14 +32,16 @@ internal static class CurlComposition
     /// authenticator and keeping cookies in <paramref name="cookieStore" />; and <c>tftp</c> over
     /// <paramref name="datagramConnector" />, sending its MASQUE request through an HTTP or HTTPS
     /// proxy over <paramref name="connector" /> with the proxy credential in the platform's
-    /// encoding (ADR-0056, rule 4); and <c>ftp</c>, which
-    /// <see cref="RoutingFtpProtocolHandler" /> hands to the HTTP handler when it is forwarded
-    /// through an HTTP proxy without <c>-p</c> (ADR-0056, rule 3) and otherwise to an
-    /// <see cref="FtpProtocolHandler" /> over <paramref name="connector" /> (ADR-0093). Each
-    /// scheme is claimed by exactly one handler.
+    /// encoding (ADR-0056, rule 4); and <c>ftp</c> and <c>ftps</c>, which
+    /// <see cref="RoutingFtpProtocolHandler" /> hands to the HTTP handler when an <c>ftp</c>
+    /// transfer is forwarded through an HTTP proxy without <c>-p</c> (ADR-0056, rule 3) and
+    /// otherwise to <see cref="CreateFtpProtocolHandler" />'s handler (ADR-0093, ADR-0102).
+    /// Each scheme is claimed by exactly one handler.
     /// </summary>
-    /// <param name="connector">Connects the TCP protocols, with TLS for <c>gophers</c> and <c>mqtts</c>.</param>
+    /// <param name="connector">Connects the TCP protocols, with TLS for <c>gophers</c>, <c>mqtts</c> and <c>ftps</c>.</param>
     /// <param name="datagramConnector">Opens the UDP channels TFTP uses.</param>
+    /// <param name="tlsProvider">Upgrades an FTP connection after an accepted <c>AUTH</c> or <c>PROT P</c>.</param>
+    /// <param name="dnsResolver">Resolves a host name given to <c>-P</c>.</param>
     /// <param name="cookieStore">
     /// The cookies the HTTP handler sends and stores, or <see langword="null" /> to keep none.
     /// </param>
@@ -47,6 +49,8 @@ internal static class CurlComposition
     internal static IReadOnlyList<IProtocolHandler> CreateProtocolHandlers(
         IConnector connector,
         IDatagramConnector datagramConnector,
+        ITlsProvider tlsProvider,
+        IDnsResolver dnsResolver,
         ICookieStore? cookieStore = null)
     {
         HttpProtocolHandler http = new(connector, CreateHttpAuthenticator(), cookieStore);
@@ -60,9 +64,24 @@ internal static class CurlComposition
             new TftpProtocolHandler(datagramConnector, connector, CredentialEncoding.ForPlatform(OperatingSystem.IsWindows())),
             new MqttProtocolHandler(connector),
             http,
-            new RoutingFtpProtocolHandler(http, new FtpProtocolHandler(connector)),
+            new RoutingFtpProtocolHandler(http, CreateFtpProtocolHandler(connector, tlsProvider, dnsResolver)),
         ];
     }
+
+    /// <summary>
+    /// Creates the FTP handler for <c>ftp</c> and <c>ftps</c> (ADR-0102): passive data
+    /// connections through <paramref name="connector" />, active ones (<c>-P</c>) on a
+    /// <see cref="TcpConnectionListener" />, a <c>-P</c> interface name looked up with
+    /// <see cref="SystemNetworkInterfaceLookup" /> (ADR-0110) and a <c>-P</c> host name
+    /// resolved with <paramref name="dnsResolver" /> (ADR-0108), and TLS from
+    /// <paramref name="tlsProvider" />.
+    /// </summary>
+    /// <param name="connector">Supplies the control connection and the passive data connection.</param>
+    /// <param name="tlsProvider">Upgrades a connection after an accepted <c>AUTH</c> or <c>PROT P</c>.</param>
+    /// <param name="dnsResolver">Resolves a host name given to <c>-P</c>.</param>
+    /// <returns>The handler.</returns>
+    internal static FtpProtocolHandler CreateFtpProtocolHandler(IConnector connector, ITlsProvider tlsProvider, IDnsResolver dnsResolver) =>
+        new(connector, new TcpConnectionListener(), tlsProvider, dnsResolver, new SystemNetworkInterfaceLookup());
 
     /// <summary>
     /// Creates the HTTP authenticator: a <see cref="RankedHttpAuthenticator" /> that answers the
@@ -278,7 +297,7 @@ internal static class CurlComposition
         IDatagramConnector datagramConnector,
         ProxySelector? proxySelector = null) =>
         new(
-            options => CreateTransferDispatch(connector, datagramConnector, CookieEngine.FromCommandLine(options), proxySelector),
+            options => CreateTransferDispatch(connector, datagramConnector, new SslStreamTlsProvider(TlsClientOptionsMapping.FromCommandLine(options), TimeProvider.System), CookieEngine.FromCommandLine(options), proxySelector),
             new PhysicalFileSystem(),
             new PhysicalFileSystem(),
             standardOutput,
@@ -306,7 +325,7 @@ internal static class CurlComposition
     /// <param name="transports">The run's connectors.</param>
     /// <returns>The dispatcher.</returns>
     internal static ProtocolDispatcher CreateDispatcher(CurlTransports transports) =>
-        new(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector));
+        new(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver));
 
     /// <summary>
     /// Creates what one run transfers through: the production handler set, every TCP handler
@@ -325,7 +344,7 @@ internal static class CurlComposition
     /// <returns>The dispatcher, the warning lines, the cookies, the proxy selector and the connection pool.</returns>
     internal static TransferDispatch CreateTransferDispatch(CurlTransports transports, CookieEngine? cookies = null) =>
         new(
-            new ProtocolDispatcher(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, cookies?.HandlerStore)),
+            new ProtocolDispatcher(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver, cookies?.HandlerStore)),
             transports.ProxyTlsProvider.Warnings,
             cookies,
             new ProxySelector(Environment.GetEnvironmentVariable),
@@ -338,16 +357,18 @@ internal static class CurlComposition
     /// </summary>
     /// <param name="connector">Connects the TCP protocols.</param>
     /// <param name="datagramConnector">Opens the UDP channels TFTP uses.</param>
+    /// <param name="tlsProvider">Upgrades an FTP connection after an accepted <c>AUTH</c> or <c>PROT P</c>.</param>
     /// <param name="cookies">The run's cookies, or <see langword="null" /> without <c>-b</c> or <c>-c</c>.</param>
     /// <param name="proxySelector">Chooses each transfer's proxy, or <see langword="null" /> for one that reads no environment variables.</param>
     /// <returns>The dispatcher, no warning lines, the cookies and the proxy selector.</returns>
     private static TransferDispatch CreateTransferDispatch(
         IConnector connector,
         IDatagramConnector datagramConnector,
+        ITlsProvider tlsProvider,
         CookieEngine? cookies,
         ProxySelector? proxySelector) =>
         new(
-            new ProtocolDispatcher(CreateProtocolHandlers(connector, datagramConnector, cookies?.HandlerStore)),
+            new ProtocolDispatcher(CreateProtocolHandlers(connector, datagramConnector, tlsProvider, new SystemDnsResolver(), cookies?.HandlerStore)),
             [],
             cookies,
             proxySelector);

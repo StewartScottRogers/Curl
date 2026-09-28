@@ -26,7 +26,7 @@ public sealed class CurlCommandRunnerHeaderEncodingTests
 
         int exitCode = await new CurlCommandRunner(
                 _ => new TransferDispatch(new ProtocolDispatcher(
-                    CurlComposition.CreateProtocolHandlers(server, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused")))),
+                    CurlComposition.CreateProtocolHandlers(server, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver()))),
                 new InMemoryFileSystem(),
                 new InMemoryFileSystem(),
                 new MemoryStream(),
@@ -46,7 +46,7 @@ public sealed class CurlCommandRunnerHeaderEncodingTests
 
         await new CurlCommandRunner(
                 _ => new TransferDispatch(new ProtocolDispatcher(
-                    CurlComposition.CreateProtocolHandlers(server, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused")))),
+                    CurlComposition.CreateProtocolHandlers(server, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver()))),
                 new InMemoryFileSystem(),
                 new InMemoryFileSystem(),
                 new MemoryStream(),

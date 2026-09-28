@@ -242,6 +242,8 @@ public sealed class CurlCommandRunnerCookieTests
         IReadOnlyList<IProtocolHandler> handlers = CurlComposition.CreateProtocolHandlers(
             connector,
             new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"),
+            new PassThroughTlsProvider(),
+            new LoopbackDnsResolver(),
             cookies?.HandlerStore);
 
         return new TransferDispatch(new ProtocolDispatcher(handlers), [], cookies);

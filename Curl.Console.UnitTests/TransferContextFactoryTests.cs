@@ -163,6 +163,73 @@ public sealed class TransferContextFactoryTests
     }
 
     [TestMethod]
+    public void Create_NoFtpActiveOrTlsOptions_IsPassiveWithEprtAndNoTls()
+    {
+        using MemoryStream standardInput = new();
+        using MemoryStream output = new();
+
+        TransferContext context = new TransferContextFactory(standardInput)
+            .Create(Parse("ftp://example.com/f"), CurlUrl.Parse("ftp://example.com/f"), output, null, null, null);
+
+        Assert.IsNull(context.FtpPort);
+        Assert.IsTrue(context.FtpUseEprt);
+        Assert.AreEqual(TransportSecurityLevel.None, context.SslLevel);
+        Assert.IsFalse(context.FtpSslControlOnly);
+    }
+
+    [TestMethod]
+    public void Create_FtpPort_IsCopiedVerbatim()
+    {
+        using MemoryStream standardInput = new();
+        using MemoryStream output = new();
+
+        TransferContext context = new TransferContextFactory(standardInput)
+            .Create(Parse("-P", "-", "ftp://example.com/f"), CurlUrl.Parse("ftp://example.com/f"), output, null, null, null);
+
+        Assert.AreEqual("-", context.FtpPort);
+    }
+
+    [TestMethod]
+    public void Create_DisableEprt_TurnsFtpUseEprtOff()
+    {
+        using MemoryStream standardInput = new();
+        using MemoryStream output = new();
+
+        TransferContext context = new TransferContextFactory(standardInput)
+            .Create(Parse("--disable-eprt", "ftp://example.com/f"), CurlUrl.Parse("ftp://example.com/f"), output, null, null, null);
+
+        Assert.IsFalse(context.FtpUseEprt);
+    }
+
+    [TestMethod]
+    [DataRow("--ssl", TransportSecurityLevel.Try)]
+    [DataRow("--ssl-reqd", TransportSecurityLevel.Required)]
+    public void Create_SslOption_IsTheSslLevel(string option, TransportSecurityLevel expected)
+    {
+        using MemoryStream standardInput = new();
+        using MemoryStream output = new();
+
+        TransferContext context = new TransferContextFactory(standardInput)
+            .Create(Parse(option, "ftp://example.com/f"), CurlUrl.Parse("ftp://example.com/f"), output, null, null, null);
+
+        Assert.AreEqual(expected, context.SslLevel);
+        Assert.IsFalse(context.FtpSslControlOnly);
+    }
+
+    [TestMethod]
+    public void Create_FtpSslControl_IsControlOnlyAndRequired()
+    {
+        using MemoryStream standardInput = new();
+        using MemoryStream output = new();
+
+        TransferContext context = new TransferContextFactory(standardInput)
+            .Create(Parse("--ftp-ssl-control", "ftp://example.com/f"), CurlUrl.Parse("ftp://example.com/f"), output, null, null, null);
+
+        Assert.IsTrue(context.FtpSslControlOnly);
+        Assert.AreEqual(TransportSecurityLevel.Required, context.SslLevel);
+    }
+
+    [TestMethod]
     public void Create_HttpRequestOptions_AreMappedOntoHttp()
     {
         using MemoryStream standardInput = new();
