@@ -4,8 +4,8 @@ title: Active mode (-P/--ftp-port) and ftps:// / AUTH TLS for FtpProtocolHandler
 priority: Low
 assignee: Claude
 pipeline: protocol
-depends-on: [BL-431]
-touches: [Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests]
+depends-on: [BL-431, BL-455]
+touches: [Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests, Record-CurlExchange.ps1, Documentation/Planning/Decisions]
 requirement: none
 created: 2026-09-27
 completed:
@@ -26,7 +26,7 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] An ADR under `Documentation/Planning/Decisions/`, marked "Decided by Claude under Stewart's delegation", records the scope of active mode and FTP TLS and the contract additions they need; the prerequisite tasks it names are filed and listed in this task's `depends-on`.
+- [x] An ADR under `Documentation/Planning/Decisions/`, marked "Decided by Claude under Stewart's delegation", records the scope of active mode and FTP TLS and the contract additions they need; the prerequisite tasks it names are filed and listed in this task's `depends-on`.
 - [ ] Named tests in `Curl.Protocol.Ftp.UnitTests` pin curl 8.21.0's command bytes for `-P -` (`EPRT`, then `PORT` when `EPRT` is refused) and the exit code and message when the server never connects back, as recorded with `Record-CurlExchange.ps1 -Ftp`.
 - [ ] Named tests pin the `ftps://` implicit-TLS conversation and the `AUTH TLS` command and the protection commands after it that curl 8.21.0 sends (as measured) for `ftp://` with `--ssl-reqd`, and the exit code when `AUTH TLS` is refused under `--ssl-reqd`, using a fake `ITlsProvider` so no test touches the network.
 - [ ] `dotnet build Curl.Protocol.Ftp.UnitLibrary -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes; no new test needs `TestCategory=Integration`.
@@ -34,7 +34,22 @@ completed:
 
 ## Notes
 
+- 2026-09-27 (lane 2): ADR-0101 records the scope (`-P` with `-` or an address literal and
+  an optional port range, `EPRT` then `PORT`, `--disable-eprt`; `ftps://`; `--ssl`,
+  `--ssl-reqd`, `--ftp-ssl-control` with `PBSZ`/`PROT`) and the contract additions:
+  `IConnectionListener`, `IConnection.LocalEndPoint` as a default interface member, and
+  four `ITransferContext` options. Filed: BL-455 (abstractions, prerequisite, added to
+  `depends-on`), BL-456 (networking listener), BL-457 (CLI parsing), BL-458 (console
+  wiring, depends on this task). Only BL-455 blocks the handler work: the handler gains a
+  constructor taking `IConnector`, `IConnectionListener` and `ITlsProvider`, and its tests
+  use fakes, so BL-456/457 run in parallel and BL-458 follows. Waiting on work, not on
+  Stewart, so the task goes to Backlog rather than Blocked (dark factory rule 4).
+- `touches` gained `Documentation/Planning/Decisions` (the ADR and its index row; no task
+  in Doing names it) and `Record-CurlExchange.ps1` (the recorder extension for active mode
+  and TLS, as Context says).
+
 ## Log
 
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Backlog. Waits on BL-455 (IConnectionListener and the FTP active-mode/TLS transfer options in Curl.Protocol.Abstractions), per ADR-0101
