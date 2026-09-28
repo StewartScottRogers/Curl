@@ -1,6 +1,6 @@
 # ADR-0017 — No HTTP/2 or HTTP/3 in Milestone 1: `--http2`, `--http2-prior-knowledge` and `--http3` are refused as the reference build refuses them
 
-- **Status:** Accepted
+- **Status:** Accepted; HTTP/2 half superseded by ADR-0141
 - **Date:** 2026-09-26
 
 Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions").
