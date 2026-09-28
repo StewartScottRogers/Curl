@@ -38,3 +38,4 @@ The CONNECT request sent to an HTTP proxy (`-p`, or an `https://` URL through `-
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
