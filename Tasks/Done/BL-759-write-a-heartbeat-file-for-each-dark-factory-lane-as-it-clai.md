@@ -8,7 +8,7 @@ depends-on: [BL-762]
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-28
 ---
 # BL-759 — Write a heartbeat file for each dark factory lane as it claims, runs and integrates
 
@@ -38,22 +38,32 @@ During a shift, every runner keeps a heartbeat file up to date: each lane, and t
 
 ## Acceptance criteria
 
-- [ ] `powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestHeartbeat` exits 0 and prints five JSON objects. Each parses with `ConvertFrom-Json` and has exactly the fields `lane`, `task`, `title`, `phase`, `step`, `taskStartedAt` and `heartbeatAt`.
+- [x] `powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestHeartbeat` exits 0 and prints five JSON objects. Each parses with `ConvertFrom-Json` and has exactly the fields `lane`, `task`, `title`, `phase`, `step`, `taskStartedAt` and `heartbeatAt`.
   - The phases are, in order, `starting`, `claim`, `run`, `integrate` and `finished`.
   - `task`, `title` and `taskStartedAt` are `null` outside a held task.
   - Times match `^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$`.
-- [ ] `[System.Management.Automation.Language.Parser]::ParseFile` reports no errors for `RunDarkFactory.ps1`.
-- [ ] Reading the diff shows a heartbeat written:
+- [x] `[System.Management.Automation.Language.Parser]::ParseFile` reports no errors for `RunDarkFactory.ps1`.
+- [x] Reading the diff shows a heartbeat written:
   - at each phase point listed in Context, including the token waits (`tokens`) and the nothing-can-start-yet wait (`wait`);
   - from `Invoke-TaskRun`'s loop at least every 60 s and on each new tool label;
   - by the single runner as lane `0`.
-- [ ] A heartbeat write that throws is caught and traced, and the lane carries on. A reader never sees a partial file, because of the temp-file-and-`Move-Item -Force` pattern.
-- [ ] The script's header comment has a short "LIVE BOARD" paragraph saying lanes write heartbeat files and where, and naming the ADR.
-- [ ] `git diff --stat` shows only `RunDarkFactory.ps1` changed outside `Tasks/`.
+- [x] A heartbeat write that throws is caught and traced, and the lane carries on. A reader never sees a partial file, because of the temp-file-and-`Move-Item -Force` pattern.
+- [x] The script's header comment has a short "LIVE BOARD" paragraph saying lanes write heartbeat files and where, and naming the ADR.
+- [x] `git diff --stat` shows only `RunDarkFactory.ps1` changed outside `Tasks/`.
 
 ## Notes
+
+- New "heartbeat" section near the top of `RunDarkFactory.ps1`: `Set-HeartbeatTask`, `Write-Heartbeat`, `Write-HeartbeatIfDue`, `Set-HeartbeatStep`, `Get-UtcStamp`. It sits before `Wait-ForNewSession` because that function now writes the `tokens` phase.
+- Who writes: every lane, and the single runner as lane 0. The coordinator of a multi-lane shift runs no task, so it writes none (it calls `Wait-ForNewSession` through `Wait-ForFreshSession`); nor does the `-TestOutOfTokens` rehearsal, which would otherwise leave a lane-0 file in the real log root.
+- Choices taken (sensible defaults):
+  - The file is one line (`ConvertTo-Json -Compress`), written with `[IO.File]::WriteAllText` (UTF-8, no BOM) to `lane-<n>.heartbeat.json.tmp`, then `Move-Item -Force` over the target.
+  - A phase change resets `step`; phases that are not a run carry a short explanation in `step` (the claim-wait reason, the new-session time, the lane's stop reason, "waiting for the integrate lock").
+  - The heartbeat is also refreshed every 60 s while waiting for tokens, for the integrate lock and in the API probe wait (split into 60 s sleeps), so a waiting lane is not flagged stale by the page's 10-minute rule. Before the integrate build and tests the step becomes `verify build and fast tests on the shared branch`.
+  - A resumed lane's `taskStartedAt` is the time its `lane-<n>.task` file was written, which is when it claimed the task, not the time it resumed.
+- Verified: `-TestHeartbeat` exits 0 and prints five one-line objects with exactly the seven fields, phases in order, nulls outside the task, UTC times matching the pattern. `ParseFile` reports 0 errors. `dotnet build` clean; fast tests 10,815 passed, 0 failed.
 
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Doing.
+- 2026-09-28: Doing -> Done. Every lane, and the single runner as lane 0, keeps lane-<n>.heartbeat.json current; -TestHeartbeat rehearses it
