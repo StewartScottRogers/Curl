@@ -37,3 +37,4 @@ With `-v` and `--resolve`, every transfer on the command line prints curl 8.21.0
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
