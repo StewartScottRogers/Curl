@@ -32,6 +32,15 @@ completed:
 
 ## Notes
 
+- From BL-541 (2026-09-28): `ISaslExchange.Respond`'s XML doc says a `null` answer makes
+  the handler cancel with `*`. The SMTP handler sends nothing and fails with 67, as curl
+  does for the built mechanisms (ADR-0133 decision 6). Reword that doc too: a `null`
+  answer is exit 67, and whether a cancel line is sent is each handler's decision.
+- The SMTP handler builds its `SaslRequest` in
+  `Curl.Protocol.Smtp.UnitLibrary/SmtpSaslAuthentication.cs` (`CreateRequest`). Adding a
+  required `Port` breaks that call, so this task also touches `Curl.Protocol.Smtp.UnitLibrary`
+  unless the member gets a default.
+
 ## Log
 
 - 2026-09-28: Created.
