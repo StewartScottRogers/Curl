@@ -167,6 +167,55 @@
     How long, in -Smtp mode, the server waits for curl's next line before it hangs up.
     Default 5000.
 
+.PARAMETER Imap
+    Serve one IMAP4rev1 session instead of HTTP responses (BL-531): send an untagged
+    greeting, then read curl's tagged commands one at a time and answer each with its
+    untagged data and a tagged completion that echoes curl's tag (A001 OK ...), from a
+    table of replies. A command line ending in a literal {n} is answered "+ Ready for
+    literal data" (nothing for a non-synchronizing {n+}) and its n bytes and the rest of
+    the command are read before the reply, so an APPEND upload is recorded whole.
+    request.bin then holds every byte curl sent, literals included, and transcript.txt
+    holds both directions, each line prefixed "> " (curl) or "< " (server). Response,
+    Connections, ResponseDelayMilliseconds and Reset are ignored. With -Tls it serves
+    implicit TLS from the first byte, as imaps:// expects.
+
+    The default replies (RFC 3501) are: greeting
+    * OK [CAPABILITY IMAP4rev1 STARTTLS AUTH=PLAIN AUTH=LOGIN] ready; CAPABILITY the same
+    list (STARTTLS left out once the session is TLS); LOGIN OK; AUTHENTICATE OK, after
+    the "+" continuations the mechanism needs (PLAIN without an initial response one,
+    LOGIN one per credential it still lacks), each continuation line curl sends recorded
+    like a command; SELECT and EXAMINE FLAGS, * 2 EXISTS, * 0 RECENT,
+    * OK [UIDVALIDITY 1] and * OK [UIDNEXT 3], then OK [READ-WRITE] or [READ-ONLY];
+    FETCH and UID FETCH * <n> FETCH (<item> {length}) carrying ImapMessage as a literal,
+    for the first message number curl named and echoing the item it asked for; LIST two
+    mailboxes, INBOX and Sent; SEARCH and UID SEARCH * SEARCH 1 2; APPEND OK once its
+    literal has arrived; NOOP OK; LOGOUT * BYE then OK (and the session ends); and BAD
+    for any other command. STARTTLS is answered OK and the session is then served over
+    TLS with the same throwaway certificate as -Tls (curl needs -k), with a
+    "= TLS handshake completed on the control connection" line in transcript.txt.
+
+.PARAMETER ImapReply
+    Overrides for the IMAP reply table, each 'COMMAND=reply' with the same backslash
+    escapes as Response, e.g. 'LOGIN=NO denied'. COMMAND is the command name in capitals,
+    'UID FETCH' or 'UID SEARCH' for a UID command, or GREETING for the greeting. The reply
+    is written without the tag: its last line is sent with curl's tag in front and any
+    lines before it, separated by \r\n, are sent as given, so
+    'SELECT=* 0 EXISTS\r\nOK [READ-WRITE] done' serves an empty mailbox. The greeting is
+    sent exactly as given. An overridden AUTHENTICATE sends only the reply, with no
+    continuations; an overridden STARTTLS whose last line starts OK still switches to
+    TLS; a literal is always read after its "+" continuation, whatever the reply. The
+    reply CLOSE and the use of several overrides for one COMMAND work as in FtpReply.
+
+.PARAMETER ImapMessage
+    The message FETCH and UID FETCH serve as a literal in -Imap mode, with the same
+    backslash escapes as Response. Default a four-line message ending in CRLF:
+    From: sender@example.com, To: recipient@example.com, Subject: Recorded, a blank line
+    and "Hello from the recorder.".
+
+.PARAMETER ImapIdleMilliseconds
+    How long, in -Imap mode, the server waits for curl's next line before it hangs up.
+    Default 5000.
+
 .PARAMETER Tls
     Answer each connection over TLS 1.2 instead of plain TCP, so the recorder can stand
     in for an HTTPS server or an HTTPS proxy (BL-398, BL-442). The certificate served
@@ -178,7 +227,7 @@
     A connection whose handshake fails is recorded as empty. -Reset resets the connection
     before any handshake. With -Ftp it serves implicit FTPS: the control connection is TLS
     from its first byte, as ftps:// expects (BL-437); with -Smtp, implicit SMTPS, as
-    smtps:// expects (BL-529).
+    smtps:// expects (BL-529); with -Imap, implicit IMAPS, as imaps:// expects (BL-531).
 
 .PARAMETER FtpIdleMilliseconds
     How long, in -Ftp mode, the server waits for curl's next command before it hangs up.
@@ -202,8 +251,8 @@
     written; there is no request.bin, since the script sees none of the traffic. Port,
     Response, Connections, ResponseDelayMilliseconds, Reset, HoldOpenMilliseconds,
     RespondAfterBodyBytes, FtpReply, FtpData, FtpIdleMilliseconds, SmtpReply,
-    SmtpIdleMilliseconds and ListenAddress are ignored, and Port need not be given.
-    Combining it with a server mode, -Ftp, -Smtp or -Tls, is refused. StandardInput and Curl work as in every other mode.
+    SmtpIdleMilliseconds, ImapReply, ImapMessage, ImapIdleMilliseconds and ListenAddress are ignored, and Port need not be given.
+    Combining it with a server mode, -Ftp, -Smtp, -Imap or -Tls, is refused. StandardInput and Curl work as in every other mode.
 
 .EXAMPLE
     .\Record-CurlExchange.ps1 -Port 18081 -Response 'HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello' -CurlArgs 'http://127.0.0.1:18081/a?b' -OutDirectory fixtures\default-get
@@ -223,6 +272,13 @@
 
     Serves one SMTP session that refuses the recipient; transcript.txt shows EHLO,
     MAIL FROM, RCPT TO and the 550, and request.bin the lines curl sent.
+
+.EXAMPLE
+    .\Record-CurlExchange.ps1 -Port 18143 -Imap -CurlArgs '-sS','-u','u:p','imap://127.0.0.1:18143/INBOX;UID=1' -OutDirectory fixtures\imap-fetch
+
+    Serves one IMAP session; transcript.txt shows CAPABILITY, AUTHENTICATE PLAIN, SELECT
+    INBOX, UID FETCH 1 BODY[] and LOGOUT with their tagged replies, and stdout.bin the
+    message curl printed.
 #>
 [CmdletBinding()]
 param(
@@ -243,6 +299,10 @@ param(
     [switch] $Smtp,
     [string[]] $SmtpReply = @(),
     [ValidateRange(1, 600000)] [int] $SmtpIdleMilliseconds = 5000,
+    [switch] $Imap,
+    [string[]] $ImapReply = @(),
+    [string] $ImapMessage = 'From: sender@example.com\r\nTo: recipient@example.com\r\nSubject: Recorded\r\n\r\nHello from the recorder.\r\n',
+    [ValidateRange(1, 600000)] [int] $ImapIdleMilliseconds = 5000,
     [switch] $Tls,
     [string] $Curl,
     [System.Net.IPAddress] $ListenAddress = [System.Net.IPAddress]::Loopback,
@@ -255,8 +315,8 @@ $ErrorActionPreference = 'Stop'
 # powershell -File binds '-sS','http://...' as the one string "-sS,http://..."; only then
 # is the invocation line empty, so only then is that string split back into its elements.
 if ([string]::IsNullOrEmpty($MyInvocation.Line) -and $CurlArgs.Count -eq 1) { $CurlArgs = $CurlArgs[0].Split(',') }
-if ($NoServer -and ($Ftp -or $Smtp -or $Tls)) { throw '-NoServer runs no server, so it cannot be combined with -Ftp, -Smtp or -Tls.' }
-if ($Ftp -and $Smtp) { throw '-Ftp and -Smtp each serve a whole session; give one of them.' }
+if ($NoServer -and ($Ftp -or $Smtp -or $Imap -or $Tls)) { throw '-NoServer runs no server, so it cannot be combined with -Ftp, -Smtp, -Imap or -Tls.' }
+if (@($Ftp, $Smtp, $Imap | Where-Object { $_ }).Count -gt 1) { throw '-Ftp, -Smtp and -Imap each serve a whole session; give one of them.' }
 if (-not $NoServer -and $Port -eq 0) { throw '-Port is required unless -NoServer is given: the URL in CurlArgs must name the port the server listens on.' }
 
 function Get-ReferenceCurlPath {
@@ -437,7 +497,7 @@ $serveConnections = {
     return , $requests.ToArray()
 }
 
-# Helpers both line-at-a-time sessions (-Ftp and -Smtp) dot-source into their runspace.
+# Helpers the line-at-a-time sessions (-Ftp, -Smtp and -Imap) dot-source into their runspace.
 # They pass as text, since a script block invoked in another runspace would run back in
 # this one, which is busy waiting for curl. They read $TlsCertificate and $Overrides
 # from the session that dot-sources them.
@@ -798,6 +858,203 @@ $serveSmtpSession = {
     return , @(, $received.ToArray())
 }
 
+# The -Imap server: one connection, answered a tagged command at a time, with literals
+# ({n}) read from curl after a "+" continuation and FETCH bodies sent as literals. It
+# returns every byte curl sent, as one array, and writes the two-way transcript into
+# $Transcript (BL-531).
+$serveImapSession = {
+    param($Listener, [hashtable] $Overrides, [byte[]] $MessageBytes, [System.Text.StringBuilder] $Transcript, $TlsCertificate, [bool] $ImplicitTls, [int] $IdleMilliseconds, [string] $SessionHelpers)
+
+    Set-StrictMode -Version Latest
+    $ErrorActionPreference = 'Stop'
+    . ([scriptblock]::Create($SessionHelpers))
+    $latin1 = [System.Text.Encoding]::GetEncoding(28591)
+    $received = New-Object System.IO.MemoryStream
+
+    function Send-Reply {
+        param($Stream, [string] $Reply)
+        $bytes = $latin1.GetBytes($Reply + "`r`n")
+        $Stream.Write($bytes, 0, $bytes.Length)
+        $Stream.Flush()
+        foreach ($line in ($Reply -split "`r`n")) { [void] $Transcript.Append("< $line`r`n") }
+    }
+
+    # One line from curl, recorded, without its line ending; $null once curl hangs up or
+    # stays silent for IdleMilliseconds.
+    function Read-Line {
+        param($Stream)
+        $line = New-Object System.IO.MemoryStream
+        while ($true) {
+            try {
+                $next = $Stream.ReadByte()
+            } catch [System.IO.IOException] {
+                return $null
+            }
+            if ($next -lt 0) { return $null }
+            $received.WriteByte([byte] $next)
+            $line.WriteByte([byte] $next)
+            if ($next -eq 10) { break }
+        }
+        $text = $latin1.GetString($line.ToArray()).TrimEnd("`r", "`n")
+        [void] $Transcript.Append("> $text`r`n")
+        return $text
+    }
+
+    # One command from curl: a line and, while it ends in a literal {n} (RFC 3501 4.3),
+    # the "+" continuation (none for a non-synchronizing {n+}), the n literal bytes and
+    # the line that follows them. Returns the first line; $null once curl hangs up.
+    function Read-Command {
+        param($Stream)
+        $first = Read-Line -Stream $Stream
+        $line = $first
+        while ($null -ne $line -and $line -match '\{(\d+)(\+?)\}$') {
+            $length = [int] $Matches[1]
+            if ($Matches[2] -ne '+') { Send-Reply -Stream $Stream -Reply '+ Ready for literal data' }
+            $literal = New-Object byte[] $length
+            $read = 0
+            while ($read -lt $length) {
+                try {
+                    $count = $Stream.Read($literal, $read, $length - $read)
+                } catch [System.IO.IOException] {
+                    return $null
+                }
+                if ($count -le 0) { return $null }
+                $read += $count
+            }
+            $received.Write($literal, 0, $length)
+            $literalText = $latin1.GetString($literal)
+            # A literal ending in CRLF adds no empty line of its own to the transcript.
+            if ($literalText.EndsWith("`r`n")) { $literalText = $literalText.Substring(0, $literalText.Length - 2) }
+            foreach ($literalLine in ($literalText -split "`r`n")) { [void] $Transcript.Append("> $literalLine`r`n") }
+            $line = Read-Line -Stream $Stream
+        }
+        if ($null -eq $line) { return $null }
+        return $first
+    }
+
+    # A reply for the command tagged $Tag: every line but the last sent as given, the
+    # last with the tag in front.
+    function Send-Tagged {
+        param($Stream, [string] $Tag, [string] $Reply)
+        $lines = @($Reply -split "`r`n")
+        $lines[$lines.Count - 1] = "$Tag " + $lines[$lines.Count - 1]
+        Send-Reply -Stream $Stream -Reply ($lines -join "`r`n")
+    }
+
+    function Get-CapabilityLine {
+        param([bool] $Secure)
+        # RFC 3501 6.2.1: STARTTLS is not offered again once the session is TLS.
+        if ($Secure) { return '* CAPABILITY IMAP4rev1 AUTH=PLAIN AUTH=LOGIN' }
+        return '* CAPABILITY IMAP4rev1 STARTTLS AUTH=PLAIN AUTH=LOGIN'
+    }
+
+    # The "+" continuations each mechanism needs before OK; $false once curl hangs up.
+    function Complete-Authentication {
+        param($Stream, [string] $Tag, [string] $Argument)
+        $words = @($Argument -split ' ')
+        $mechanism = $words[0].ToUpperInvariant()
+        $hasInitialResponse = $words.Count -gt 1
+        $challenges = switch ($mechanism) {
+            'PLAIN' { if ($hasInitialResponse) { @() } else { @('+ ') } }
+            'LOGIN' { if ($hasInitialResponse) { @('+ UGFzc3dvcmQ6') } else { @('+ VXNlcm5hbWU6', '+ UGFzc3dvcmQ6') } }
+            default { @() }
+        }
+        foreach ($challenge in $challenges) {
+            Send-Reply -Stream $Stream -Reply $challenge
+            if ($null -eq (Read-Line -Stream $Stream)) { return $false }
+        }
+        Send-Tagged -Stream $Stream -Tag $Tag -Reply 'OK Authenticated'
+        return $true
+    }
+
+    # The untagged FETCH response carrying the message as a literal, then the OK.
+    function Send-FetchReply {
+        param($Stream, [string] $Tag, [string] $Verb, [string] $Argument)
+        $fields = @($Argument -split ' ', 2)
+        $sequence = ($fields[0] -split '[:,]')[0]
+        if ($sequence -notmatch '^\d+$') { $sequence = '1' }
+        $item = if ($fields.Count -gt 1) { $fields[1].Trim('(', ')') } else { 'BODY[]' }
+        $uid = if ($Verb -eq 'UID FETCH') { "UID $sequence " } else { '' }
+        $message = $latin1.GetString($MessageBytes)
+        Send-Reply -Stream $Stream -Reply "* $sequence FETCH ($uid$item {$($MessageBytes.Length)}`r`n$message)"
+        Send-Tagged -Stream $Stream -Tag $Tag -Reply 'OK FETCH completed'
+    }
+
+    function Start-Tls {
+        param($Stream)
+        $secure = Wrap-Tls -Stream $Stream
+        $secure.ReadTimeout = $IdleMilliseconds
+        [void] $Transcript.Append("= TLS handshake completed on the control connection`r`n")
+        return $secure
+    }
+
+    try {
+        $client = $Listener.AcceptTcpClient()
+    } catch {
+        return , @(, $received.ToArray())
+    }
+    try {
+        $stream = $client.GetStream()
+        $secure = $ImplicitTls
+        if ($ImplicitTls) { $stream = Wrap-Tls -Stream $stream }
+        $stream.ReadTimeout = $IdleMilliseconds
+        $greeting = if ($Overrides.ContainsKey('GREETING')) { Get-Override -Verb 'GREETING' } else { '* OK [CAPABILITY IMAP4rev1 STARTTLS AUTH=PLAIN AUTH=LOGIN] ready' }
+        Send-Reply -Stream $stream -Reply $greeting
+        while ($true) {
+            $command = Read-Command -Stream $stream
+            if ($null -eq $command) { break }  # ImapIdleMilliseconds without a byte, or curl hung up.
+            $words = @($command -split ' ', 3)
+            $tag = $words[0]
+            $verb = if ($words.Count -gt 1) { $words[1].ToUpperInvariant() } else { '' }
+            $argument = if ($words.Count -gt 2) { $words[2] } else { '' }
+            if ($verb -eq 'UID' -and $argument -ne '') {
+                $uidWords = @($argument -split ' ', 2)
+                $verb = 'UID ' + $uidWords[0].ToUpperInvariant()
+                $argument = if ($uidWords.Count -gt 1) { $uidWords[1] } else { '' }
+            }
+            if ($Overrides.ContainsKey($verb)) {
+                $override = Get-Override -Verb $verb
+                if ($override -ceq 'CLOSE') { break }  # Hang up instead of replying.
+                Send-Tagged -Stream $stream -Tag $tag -Reply $override
+                if ($verb -eq 'LOGOUT') { break }
+                if ($verb -eq 'STARTTLS' -and ($override -split "`r`n")[-1].StartsWith('OK')) {
+                    $stream = Start-Tls -Stream $stream
+                    $secure = $true
+                }
+                continue
+            }
+            $continue = $true
+            switch ($verb) {
+                'CAPABILITY' { Send-Tagged -Stream $stream -Tag $tag -Reply ((Get-CapabilityLine -Secure $secure) + "`r`nOK CAPABILITY completed") }
+                'STARTTLS' {
+                    Send-Tagged -Stream $stream -Tag $tag -Reply 'OK Begin TLS negotiation now'
+                    $stream = Start-Tls -Stream $stream
+                    $secure = $true
+                }
+                'LOGIN' { Send-Tagged -Stream $stream -Tag $tag -Reply 'OK LOGIN completed' }
+                'AUTHENTICATE' { $continue = Complete-Authentication -Stream $stream -Tag $tag -Argument $argument }
+                'SELECT' { Send-Tagged -Stream $stream -Tag $tag -Reply "* FLAGS (\Answered \Flagged \Deleted \Seen \Draft)`r`n* 2 EXISTS`r`n* 0 RECENT`r`n* OK [UIDVALIDITY 1] UIDs valid`r`n* OK [UIDNEXT 3] Predicted next UID`r`nOK [READ-WRITE] SELECT completed" }
+                'EXAMINE' { Send-Tagged -Stream $stream -Tag $tag -Reply "* FLAGS (\Answered \Flagged \Deleted \Seen \Draft)`r`n* 2 EXISTS`r`n* 0 RECENT`r`n* OK [UIDVALIDITY 1] UIDs valid`r`n* OK [UIDNEXT 3] Predicted next UID`r`nOK [READ-ONLY] EXAMINE completed" }
+                'FETCH' { Send-FetchReply -Stream $stream -Tag $tag -Verb $verb -Argument $argument }
+                'UID FETCH' { Send-FetchReply -Stream $stream -Tag $tag -Verb $verb -Argument $argument }
+                'LIST' { Send-Tagged -Stream $stream -Tag $tag -Reply "* LIST (\HasNoChildren) `"/`" INBOX`r`n* LIST (\HasNoChildren) `"/`" Sent`r`nOK LIST completed" }
+                'SEARCH' { Send-Tagged -Stream $stream -Tag $tag -Reply "* SEARCH 1 2`r`nOK SEARCH completed" }
+                'UID SEARCH' { Send-Tagged -Stream $stream -Tag $tag -Reply "* SEARCH 1 2`r`nOK SEARCH completed" }
+                'APPEND' { Send-Tagged -Stream $stream -Tag $tag -Reply 'OK APPEND completed' }
+                'NOOP' { Send-Tagged -Stream $stream -Tag $tag -Reply 'OK NOOP completed' }
+                'LOGOUT' { Send-Tagged -Stream $stream -Tag $tag -Reply "* BYE Logging out`r`nOK LOGOUT completed"; $continue = $false }
+                default { Send-Tagged -Stream $stream -Tag $tag -Reply 'BAD Command not recognized' }
+            }
+            if (-not $continue) { break }
+        }
+    } catch [System.IO.IOException] {
+        # curl closed the connection mid-reply; what arrived is still recorded.
+    } finally {
+        $client.Close()
+    }
+    return , @(, $received.ToArray())
+}
+
 function New-ThrowawayTlsCertificate {
     # Schannel will not serve the ephemeral key CreateSelfSigned returns, so the
     # certificate is reloaded from its PFX export. Loaded without PersistKeySet, its key
@@ -839,12 +1096,13 @@ function ConvertTo-ReplyOverrides {
 }
 $ftpOverrides = ConvertTo-ReplyOverrides -Entries $FtpReply -ParameterName 'FtpReply'
 $smtpOverrides = ConvertTo-ReplyOverrides -Entries $SmtpReply -ParameterName 'SmtpReply'
+$imapOverrides = ConvertTo-ReplyOverrides -Entries $ImapReply -ParameterName 'ImapReply'
 $transcript = New-Object System.Text.StringBuilder
 $uploadedData = New-Object System.IO.MemoryStream
 $OutDirectory = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine((Get-Location).ProviderPath, $OutDirectory))
 New-Item -ItemType Directory -Path $OutDirectory -Force | Out-Null
 
-$tlsCertificate = if ($Tls -or $Ftp -or $Smtp) { New-ThrowawayTlsCertificate } else { $null }
+$tlsCertificate = if ($Tls -or $Ftp -or $Smtp -or $Imap) { New-ThrowawayTlsCertificate } else { $null }
 # -NoServer binds nothing: the caller's own server answers curl.
 $listener = $null
 $server = $null
@@ -860,6 +1118,8 @@ try {
         [void] $server.AddScript($serveFtpSession).AddArgument($listener).AddArgument($ftpOverrides).AddArgument([byte[]] (ConvertFrom-EscapedResponse -Text $FtpData)).AddArgument($transcript).AddArgument($uploadedData).AddArgument($tlsCertificate).AddArgument([bool] $Tls).AddArgument($FtpIdleMilliseconds).AddArgument($ListenAddress).AddArgument($sessionHelpers.ToString())
     } elseif ($Smtp) {
         [void] $server.AddScript($serveSmtpSession).AddArgument($listener).AddArgument($smtpOverrides).AddArgument($transcript).AddArgument($tlsCertificate).AddArgument([bool] $Tls).AddArgument($SmtpIdleMilliseconds).AddArgument($sessionHelpers.ToString())
+    } elseif ($Imap) {
+        [void] $server.AddScript($serveImapSession).AddArgument($listener).AddArgument($imapOverrides).AddArgument([byte[]] (ConvertFrom-EscapedResponse -Text $ImapMessage)).AddArgument($transcript).AddArgument($tlsCertificate).AddArgument([bool] $Tls).AddArgument($ImapIdleMilliseconds).AddArgument($sessionHelpers.ToString())
     } else {
         [void] $server.AddScript($serveConnections).AddArgument($listener).AddArgument($responseBytes).AddArgument($Connections).AddArgument($ResponseDelayMilliseconds).AddArgument([bool] $Reset).AddArgument($RespondAfterBodyBytes).AddArgument($tlsCertificate).AddArgument($HoldOpenMilliseconds)
     }
@@ -931,7 +1191,7 @@ if ($Ftp) {
     [System.IO.File]::WriteAllText((Join-Path $OutDirectory 'transcript.txt'), $transcript.ToString(), [System.Text.Encoding]::GetEncoding(28591))
     [System.IO.File]::WriteAllBytes((Join-Path $OutDirectory 'upload.bin'), $uploadedData.ToArray())
 }
-if ($Smtp) {
+if ($Smtp -or $Imap) {
     [System.IO.File]::WriteAllText((Join-Path $OutDirectory 'transcript.txt'), $transcript.ToString(), [System.Text.Encoding]::GetEncoding(28591))
 }
 
