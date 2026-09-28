@@ -34,3 +34,4 @@ A `Pop3ProtocolHandler` in `Curl.Protocol.Pop3.UnitLibrary` connects through `IC
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
