@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation/Planning/Decisions]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-28
 ---
 # BL-667 — Decide which hand-built libraries a protocol library may reference
 
@@ -24,13 +24,18 @@ An ADR states which non-protocol libraries holding hand-built pieces the BCL lac
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Planning/Decisions/ADR-<next free number>-<slug>.md` exists (number checked unused), Status Accepted, marked "Decided by Claude under Stewart's delegation", naming the allowed list of hand-built libraries, the reference rules for them (which may reference which; none references a protocol library, `Curl.Networking.UnitLibrary`, `Curl.Core.UnitLibrary` or `Curl.Console`), and that a new hand-built library joins the list by amending this ADR.
-- [ ] The ADR names `ProtocolIsolationTests` as the enforcement and BL-668 as the change to it, and states that each protocol library's `CLAUDE.md` names the hand-built libraries it references once it does.
-- [ ] `Documentation/Planning/Decisions/README.md` indexes the new ADR.
+- [x] `Documentation/Planning/Decisions/ADR-<next free number>-<slug>.md` exists (number checked unused), Status Accepted, marked "Decided by Claude under Stewart's delegation", naming the allowed list of hand-built libraries, the reference rules for them (which may reference which; none references a protocol library, `Curl.Networking.UnitLibrary`, `Curl.Core.UnitLibrary` or `Curl.Console`), and that a new hand-built library joins the list by amending this ADR.
+- [x] The ADR names `ProtocolIsolationTests` as the enforcement and BL-668 as the change to it, and states that each protocol library's `CLAUDE.md` names the hand-built libraries it references once it does.
+- [x] `Documentation/Planning/Decisions/README.md` indexes the new ADR.
 
 ## Notes
+
+- ADR-0120 written (number checked unused on every local branch). Allowed list: Abstractions plus Cryptography, Ntlm, Kerberos, Tls, Http2, Quic, Http3, as a layered acyclic graph. Choice: hand-built libraries may reference `Curl.Protocol.Abstractions.UnitLibrary` (contracts only, references nothing) so TLS, QUIC, Kerberos and the framers take `IConnection` and datagram seams instead of duplicating them; the table is an upper bound, so the narrower plans in BL-682, BL-685, BL-715 and BL-720 still fit. `Curl.Http3` does not reference `Curl.Quic`, as BL-720 plans.
+- ADR-0118 pointed at "BL-667's ADR"; now points at ADR-0120.
+- Docs only: no `.cs` or project file changed, so no build was needed for this task.
 
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Doing.
+- 2026-09-28: Doing -> Done. ADR-0120 lists the hand-built libraries protocols may reference and their own reference rules
