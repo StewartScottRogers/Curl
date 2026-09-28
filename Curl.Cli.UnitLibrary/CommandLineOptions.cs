@@ -238,6 +238,15 @@ public sealed class CommandLineOptions
     public bool CreateDirectories { get; internal set; }
 
     /// <summary>
+    /// <see langword="true"/> when the last of <c>--clobber</c> and <c>--no-clobber</c> was <c>--clobber</c>:
+    /// an existing output file is overwritten, even one a <c>-J</c> name picked. <see langword="false"/> for
+    /// <c>--no-clobber</c>: an existing output file is left alone and the body goes to the first free
+    /// <c>&lt;name&gt;.1</c> ... <c>&lt;name&gt;.99</c>, as curl 8.21.0 does. <see langword="null"/> when
+    /// neither was given: an <c>-o</c> or <c>-O</c> file is overwritten and a <c>-J</c> file is not.
+    /// </summary>
+    public bool? Clobber { get; internal set; }
+
+    /// <summary>
     /// The <c>-w</c> / <c>--write-out</c> template, unexpanded; <see langword="null"/> when not given or
     /// when the last <c>-w @file</c> named an empty file. The last value wins. An <c>@file</c> or
     /// <c>@-</c> value is the file's (or standard input's) text with every carriage return, line feed and
