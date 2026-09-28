@@ -301,6 +301,7 @@ public sealed class NetscapeCookieFileTests
     public void NullArguments_Throw()
     {
         Assert.ThrowsExactly<ArgumentNullException>(() => NetscapeCookieFile.Read(null!, Now));
+        Assert.ThrowsExactly<ArgumentNullException>(() => NetscapeCookieFile.Read(new StringReader(string.Empty), Now, null!));
         Assert.ThrowsExactly<ArgumentNullException>(() => NetscapeCookieFile.ParseLine(null!, Now));
         Assert.ThrowsExactly<ArgumentNullException>(() => NetscapeCookieFile.Write(null!, []));
         Assert.ThrowsExactly<ArgumentNullException>(() => NetscapeCookieFile.Write(new StringWriter(), null!));

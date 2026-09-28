@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Cookies;
 
@@ -13,7 +14,7 @@ namespace Curl.Cookies;
 /// A line is seven fields separated by tabs: domain, includes-subdomains, path, secure, expiry, name and
 /// value. The text is handled one character per byte, so a caller reads and writes the file as Latin-1
 /// to keep its bytes as they are. A line starting <c>Set-Cookie:</c> is instead read as a header, by
-/// <see cref="SetCookieParser.ParseFromCookieFile"/>.
+/// <see cref="SetCookieParser.ParseFromCookieFile(string, DateTimeOffset)"/>.
 /// </remarks>
 public static class NetscapeCookieFile
 {
@@ -41,21 +42,40 @@ public static class NetscapeCookieFile
     /// <summary>Reads every cookie in <paramref name="reader"/>, in the order written, skipping each line curl refuses.</summary>
     /// <remarks>
     /// Lines end at a line feed. A line longer than <see cref="LongestLine"/> ends the reading; each
-    /// shorter one is read by <see cref="ParseLine"/>.
+    /// shorter one is read by <see cref="ParseLine(string, DateTimeOffset)"/>.
     /// </remarks>
     /// <param name="reader">The file's text, one character per byte.</param>
     /// <param name="now">The time the file is read, which a <c>Set-Cookie:</c> line's <c>Max-Age</c> counts from.</param>
     /// <returns>The cookies read, oldest (first in the file) first. Expired cookies are included.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="reader"/> is <see langword="null"/>.</exception>
-    public static IReadOnlyList<Cookie> Read(TextReader reader, DateTimeOffset now)
+    public static IReadOnlyList<Cookie> Read(TextReader reader, DateTimeOffset now) => Read(reader, now, NoTransferEvents.Instance);
+
+    /// <summary>
+    /// Reads every cookie in <paramref name="reader"/> as <see cref="Read(TextReader, DateTimeOffset)"/> does,
+    /// reporting to <paramref name="events"/>, in file order, the <c>-v</c> line curl prints for each
+    /// <c>Set-Cookie:</c> line it refuses with one. A refused tab-separated line prints nothing (measured
+    /// 2026-09-27, BL-461 Notes).
+    /// </summary>
+    /// <param name="reader">The file's text, one character per byte.</param>
+    /// <param name="now">The time the file is read, which a <c>Set-Cookie:</c> line's <c>Max-Age</c> counts from.</param>
+    /// <param name="events">Where the refusal lines are reported.</param>
+    /// <returns>The cookies read, oldest (first in the file) first. Expired cookies are included.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="reader"/> or <paramref name="events"/> is <see langword="null"/>.</exception>
+    public static IReadOnlyList<Cookie> Read(TextReader reader, DateTimeOffset now, ITransferEvents events)
     {
         ArgumentNullException.ThrowIfNull(reader);
+        ArgumentNullException.ThrowIfNull(events);
 
         List<Cookie> cookies = [];
         StringBuilder line = new();
         while (TryReadLine(reader, line))
         {
-            Cookie? cookie = ParseLine(line.ToString(), now);
+            Cookie? cookie = ParseLine(line.ToString(), now, out string? refusal);
+            if (refusal is not null)
+            {
+                events.ReportInfo(refusal);
+            }
+
             if (cookie is not null)
             {
                 cookies.Add(cookie);
@@ -89,7 +109,7 @@ public static class NetscapeCookieFile
     /// <para>
     /// The line ends at its first carriage return. A line starting <c>Set-Cookie:</c>, in any case, is a
     /// header: the blanks after the colon are skipped and the rest is read by
-    /// <see cref="SetCookieParser.ParseFromCookieFile"/>. A line starting <c>#HttpOnly_</c> (that case only) is
+    /// <see cref="SetCookieParser.ParseFromCookieFile(string, DateTimeOffset)"/>. A line starting <c>#HttpOnly_</c> (that case only) is
     /// an <c>HttpOnly</c> cookie with the prefix removed; any other line starting <c>#</c> is a comment.
     /// The rest is split at every tab, empty fields included:
     /// </para>
@@ -115,15 +135,28 @@ public static class NetscapeCookieFile
     /// <param name="now">The time the file is read, which a <c>Set-Cookie:</c> line's <c>Max-Age</c> counts from.</param>
     /// <returns>The cookie, or <see langword="null"/> when curl would skip the line.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="line"/> is <see langword="null"/>.</exception>
-    public static Cookie? ParseLine(string line, DateTimeOffset now)
+    public static Cookie? ParseLine(string line, DateTimeOffset now) => ParseLine(line, now, out _);
+
+    /// <summary>
+    /// Reads one line as <see cref="ParseLine(string, DateTimeOffset)"/> does, and gives the <c>-v</c> line
+    /// curl prints when it refuses it: only a <c>Set-Cookie:</c> line has one, the one
+    /// <see cref="SetCookieParser.ParseFromCookieFile(string, DateTimeOffset, out string?)"/> gives.
+    /// </summary>
+    /// <param name="line">One line of the file, without its line feed.</param>
+    /// <param name="now">The time the file is read, which a <c>Set-Cookie:</c> line's <c>Max-Age</c> counts from.</param>
+    /// <param name="refusal">The <c>-v</c> line, without curl's <c>* </c>, or <see langword="null"/> when curl prints none.</param>
+    /// <returns>The cookie, or <see langword="null"/> when curl would skip the line.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="line"/> is <see langword="null"/>.</exception>
+    public static Cookie? ParseLine(string line, DateTimeOffset now, out string? refusal)
     {
         ArgumentNullException.ThrowIfNull(line);
 
+        refusal = null;
         int carriageReturn = line.IndexOf('\r');
         string text = carriageReturn < 0 ? line : line[..carriageReturn];
         if (text.StartsWith(SetCookiePrefix, StringComparison.OrdinalIgnoreCase))
         {
-            return SetCookieParser.ParseFromCookieFile(text[SetCookiePrefix.Length..].TrimStart(' ', '\t'), now);
+            return SetCookieParser.ParseFromCookieFile(text[SetCookiePrefix.Length..].TrimStart(' ', '\t'), now, out refusal);
         }
 
         bool isHttpOnly = text.StartsWith(HttpOnlyPrefix, StringComparison.Ordinal);

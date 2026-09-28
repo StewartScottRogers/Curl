@@ -98,7 +98,7 @@ public sealed class CookieStore : ICookieStore
 
     /// <summary>Loads a Netscape cookie file (<c>-b</c> naming a file) as curl does.</summary>
     /// <remarks>
-    /// Each cookie <see cref="NetscapeCookieFile.Read"/> accepts is stored in file order, replacing a
+    /// Each cookie <see cref="NetscapeCookieFile.Read(TextReader, DateTimeOffset)"/> accepts is stored in file order, replacing a
     /// namesake in its place as a received cookie does, except that under <c>-j</c>
     /// (<paramref name="discardSessionCookies"/>) a session cookie is skipped. Cookies that have expired by
     /// <paramref name="now"/> are then removed.
@@ -107,9 +107,22 @@ public sealed class CookieStore : ICookieStore
     /// <param name="discardSessionCookies"><see langword="true"/> for <c>-j</c> (<c>--junk-session-cookies</c>).</param>
     /// <param name="now">The time that decides which loaded cookies have expired.</param>
     /// <exception cref="ArgumentNullException"><paramref name="reader"/> is <see langword="null"/>.</exception>
-    public void LoadCookieFile(TextReader reader, bool discardSessionCookies, DateTimeOffset now)
+    public void LoadCookieFile(TextReader reader, bool discardSessionCookies, DateTimeOffset now) =>
+        LoadCookieFile(reader, discardSessionCookies, now, NoTransferEvents.Instance);
+
+    /// <summary>
+    /// Loads a Netscape cookie file as <see cref="LoadCookieFile(TextReader, bool, DateTimeOffset)"/> does,
+    /// reporting to <paramref name="events"/> the <c>-v</c> line curl prints for each <c>Set-Cookie:</c>
+    /// line it refuses with one (<see cref="NetscapeCookieFile.Read(TextReader, DateTimeOffset, ITransferEvents)"/>).
+    /// </summary>
+    /// <param name="reader">The file's text, one character per byte.</param>
+    /// <param name="discardSessionCookies"><see langword="true"/> for <c>-j</c> (<c>--junk-session-cookies</c>).</param>
+    /// <param name="now">The time that decides which loaded cookies have expired.</param>
+    /// <param name="events">Where the refusal lines are reported.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="reader"/> or <paramref name="events"/> is <see langword="null"/>.</exception>
+    public void LoadCookieFile(TextReader reader, bool discardSessionCookies, DateTimeOffset now, ITransferEvents events)
     {
-        foreach (Cookie cookie in NetscapeCookieFile.Read(reader, now))
+        foreach (Cookie cookie in NetscapeCookieFile.Read(reader, now, events))
         {
             if (!discardSessionCookies || !cookie.IsSessionCookie)
             {
@@ -121,14 +134,25 @@ public sealed class CookieStore : ICookieStore
     }
 
     /// <summary>
-    /// Loads the cookie file at <paramref name="path"/> with <see cref="LoadCookieFile"/>, reading its bytes
+    /// Loads the cookie file at <paramref name="path"/> with <see cref="LoadCookieFile(TextReader, bool, DateTimeOffset)"/>, reading its bytes
     /// as Latin-1. A file that cannot be opened loads nothing and is not an error, as in curl.
     /// </summary>
     /// <exception cref="ArgumentNullException"><paramref name="fileSystem"/> or <paramref name="path"/> is <see langword="null"/>.</exception>
-    public async Task LoadCookieFileAsync(IFileSystem fileSystem, string path, bool discardSessionCookies, DateTimeOffset now, CancellationToken cancellationToken)
+    public Task LoadCookieFileAsync(IFileSystem fileSystem, string path, bool discardSessionCookies, DateTimeOffset now, CancellationToken cancellationToken) =>
+        LoadCookieFileAsync(fileSystem, path, discardSessionCookies, now, NoTransferEvents.Instance, cancellationToken);
+
+    /// <summary>
+    /// Loads the cookie file at <paramref name="path"/> as
+    /// <see cref="LoadCookieFileAsync(IFileSystem, string, bool, DateTimeOffset, CancellationToken)"/> does,
+    /// reporting its refused <c>Set-Cookie:</c> lines to <paramref name="events"/> as
+    /// <see cref="LoadCookieFile(TextReader, bool, DateTimeOffset, ITransferEvents)"/> does.
+    /// </summary>
+    /// <exception cref="ArgumentNullException"><paramref name="fileSystem"/>, <paramref name="path"/> or <paramref name="events"/> is <see langword="null"/>.</exception>
+    public async Task LoadCookieFileAsync(IFileSystem fileSystem, string path, bool discardSessionCookies, DateTimeOffset now, ITransferEvents events, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(fileSystem);
         ArgumentNullException.ThrowIfNull(path);
+        ArgumentNullException.ThrowIfNull(events);
 
         FileOpenResult opened = await fileSystem.OpenForReadAsync(path, cancellationToken).ConfigureAwait(false);
         if (!opened.IsOpen)
@@ -143,7 +167,7 @@ public sealed class CookieStore : ICookieStore
         }
 
         using StringReader textReader = new(text);
-        LoadCookieFile(textReader, discardSessionCookies, now);
+        LoadCookieFile(textReader, discardSessionCookies, now, events);
     }
 
     /// <summary>Writes the <c>-c</c> jar as curl does: every cookie that has not expired by <paramref name="now"/>, newest first.</summary>

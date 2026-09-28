@@ -27,6 +27,9 @@ public static class SetCookieParser
     /// <summary>An <c>Expires</c> value this long or longer is ignored, as if it were absent.</summary>
     private const int ShortestIgnoredExpires = 80;
 
+    /// <summary>The characters that end a part's name: <c>;</c>, tab and <c>=</c>.</summary>
+    private const string NameEnds = ";\t=";
+
     /// <summary>curl caps a cookie's lifetime at 400 days from the time it is received.</summary>
     private const long LongestLifetimeSeconds = 400L * 24 * 60 * 60;
 
@@ -134,11 +137,31 @@ public static class SetCookieParser
     /// <param name="now">The time the file is read, which <c>Max-Age</c> counts from and the 400-day cap applies to.</param>
     /// <returns>The cookie; <see langword="null"/> when curl drops it.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="headerValue"/> is <see langword="null"/>.</exception>
-    public static Cookie? ParseFromCookieFile(string headerValue, DateTimeOffset now)
+    public static Cookie? ParseFromCookieFile(string headerValue, DateTimeOffset now) => ParseFromCookieFile(headerValue, now, out _);
+
+    /// <summary>
+    /// Reads <paramref name="headerValue"/> as <see cref="ParseFromCookieFile(string, DateTimeOffset)"/> does, and
+    /// gives the line curl 8.21.0 prints under <c>-v</c> when it drops the cookie. Measured on 2026-09-27
+    /// (BL-461).
+    /// </summary>
+    /// <remarks>
+    /// The lines are <see cref="Parse(string, CurlUrl, DateTimeOffset, out string?)"/>'s for the invalid octets
+    /// and for a first part with no <c>=</c> or a blank name; <c>Secure</c> and <c>Domain</c> never refuse a
+    /// cookie file line, and a first part with no name at all is skipped without a line.
+    /// </remarks>
+    /// <param name="headerValue">As for <see cref="ParseFromCookieFile(string, DateTimeOffset)"/>.</param>
+    /// <param name="now">As for <see cref="ParseFromCookieFile(string, DateTimeOffset)"/>.</param>
+    /// <param name="refusal">
+    /// The <c>-v</c> line, without curl's <c>* </c>, when curl drops the cookie with one; otherwise
+    /// <see langword="null"/>.
+    /// </param>
+    /// <returns>The cookie; <see langword="null"/> when curl drops it.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="headerValue"/> is <see langword="null"/>.</exception>
+    public static Cookie? ParseFromCookieFile(string headerValue, DateTimeOffset now, out string? refusal)
     {
         ArgumentNullException.ThrowIfNull(headerValue);
 
-        return ParseFor(headerValue, requestUrl: null, now, out _);
+        return ParseFor(headerValue, requestUrl: null, now, out refusal);
     }
 
     private static Cookie? ParseFor(string headerValue, CurlUrl? requestUrl, DateTimeOffset now, out string? refusal)
@@ -160,27 +183,53 @@ public static class SetCookieParser
     }
 
     /// <summary>Reads every part in turn; <see langword="false"/> as soon as one refuses the cookie.</summary>
+    /// <remarks>
+    /// A part that starts with no name at all - at a <c>;</c>, a tab, a <c>=</c> or the end - is skipped,
+    /// and the reading stops there unless a <c>;</c> follows at once: <c>a=b;=x; Path=/q</c> keeps the default
+    /// path. A header's first part is the exception, refused as <c>invalid cookie, dropped</c>; a cookie
+    /// file line skips it too, so <c>;a=b</c> there is the cookie <c>a=b</c> and <c>=v</c> is dropped
+    /// silently (measured 2026-09-27, BL-461 Notes).
+    /// </remarks>
     private static bool TryReadParts(string text, CookieUnderConstruction cookie)
     {
         int position = 0;
         bool isFirstPart = true;
         while (true)
         {
-            HeaderPart part = ReadPart(text, ref position);
-            if (!cookie.TryApplyPart(part, isFirstPart))
+            if (!SkipsNamelessPart(text, position, isFirstPart, cookie))
             {
-                return false;
+                HeaderPart part = ReadPart(text, ref position);
+                if (!cookie.TryApplyPart(part, isFirstPart))
+                {
+                    return false;
+                }
+
+                isFirstPart = false;
             }
 
-            isFirstPart = false;
-            if (position >= text.Length || text[position] != ';')
+            if (!IsSemicolonAt(text, position))
             {
-                return true;
+                return !isFirstPart;
             }
 
             position++;
         }
     }
+
+    /// <summary>
+    /// Tells whether the part at <paramref name="position"/> is skipped: it has no name - it starts at a <c>;</c>, a
+    /// tab, a <c>=</c> or the end - and is not a header's first part.
+    /// </summary>
+    private static bool SkipsNamelessPart(string text, int position, bool isFirstPart, CookieUnderConstruction cookie) =>
+        StartsNameless(text, position) && (!isFirstPart || cookie.IsFromCookieFile);
+
+    /// <summary>Tells whether the part at <paramref name="position"/> starts at a <c>;</c>, a tab, a <c>=</c> or the end.</summary>
+    private static bool StartsNameless(string text, int position) =>
+        position >= text.Length || NameEnds.Contains(text[position], StringComparison.Ordinal);
+
+    /// <summary>Tells whether a <c>;</c> is at <paramref name="position"/>.</summary>
+    private static bool IsSemicolonAt(string text, int position) =>
+        position < text.Length && text[position] == ';';
 
     /// <summary>
     /// Reads one part from <paramref name="position"/>, leaving <paramref name="position"/> on the
@@ -259,6 +308,9 @@ public static class SetCookieParser
 
         /// <summary>The <c>-v</c> line curl prints for the refusal; <see langword="null"/> when it prints none.</summary>
         public string? Refusal { get; private set; }
+
+        /// <summary>Gets whether the header is a line of a cookie file, which answered no request.</summary>
+        public bool IsFromCookieFile => requestUrl is null;
 
         /// <summary>Checks <paramref name="part"/>'s octets, then reads it as the cookie or as an attribute.</summary>
         public bool TryApplyPart(HeaderPart part, bool isFirstPart)
