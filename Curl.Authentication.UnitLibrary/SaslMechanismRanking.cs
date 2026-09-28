@@ -8,13 +8,19 @@ namespace Curl.Authentication;
 /// request can use (ADR-0121, ADR-0123).
 /// </summary>
 /// <remarks>
-/// GSSAPI, DIGEST-MD5, CRAM-MD5 and NTLM hold their places in the order but are not built
-/// yet (BL-537, BL-538), so they are treated as not offered.
+/// GSSAPI and NTLM hold their places in the order but are not built yet (BL-538), so they
+/// are treated as not offered.
 /// </remarks>
 internal static class SaslMechanismRanking
 {
     /// <summary>The SASL name of the EXTERNAL mechanism (RFC 4422 appendix A).</summary>
     internal const string External = "EXTERNAL";
+
+    /// <summary>The SASL name of the DIGEST-MD5 mechanism (RFC 2831).</summary>
+    internal const string DigestMd5 = "DIGEST-MD5";
+
+    /// <summary>The SASL name of the CRAM-MD5 mechanism (RFC 2195).</summary>
+    internal const string CramMd5 = "CRAM-MD5";
 
     /// <summary>The SASL name of the OAUTHBEARER mechanism (RFC 7628).</summary>
     internal const string OAuthBearer = "OAUTHBEARER";
@@ -33,14 +39,14 @@ internal static class SaslMechanismRanking
 
     // Each mechanism in curl's preference order, with whether the request can use it:
     // EXTERNAL only when AUTH=EXTERNAL names it and the password is empty; the bearer
-    // mechanisms only with a token; PLAIN and LOGIN only with a user and no token (measured,
-    // ADR-0123). The mechanisms not built yet are never usable.
+    // mechanisms only with a token; DIGEST-MD5, CRAM-MD5, PLAIN and LOGIN only with a user and
+    // no token (measured, ADR-0123, ADR-0139). The mechanisms not built yet are never usable.
     private static readonly (string Name, Func<SaslRequest, bool> CanUse)[] CurlPreferenceOrder =
     [
         (External, CanUseExternal),
         ("GSSAPI", NotBuilt),
-        ("DIGEST-MD5", NotBuilt),
-        ("CRAM-MD5", NotBuilt),
+        (DigestMd5, HasUserAndNoBearerToken),
+        (CramMd5, HasUserAndNoBearerToken),
         ("NTLM", NotBuilt),
         (OAuthBearer, HasBearerToken),
         (XOAuth2, HasBearerToken),

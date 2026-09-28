@@ -21,4 +21,15 @@ public sealed class DigestClientNonceTests
     {
         Assert.AreNotEqual(DigestClientNonce.CreateRandom(), DigestClientNonce.CreateRandom());
     }
+
+    [TestMethod]
+    public void CreateRandomHex_Called_Gives32LowerCaseHexDigits()
+    {
+        // Measured: cnonce="81eed5b913007ab96776b8224946a866" (SSPI), "dab6bbea0a329577a0c691f97f35a087" (OpenSSL).
+        string clientNonce = DigestClientNonce.CreateRandomHex();
+
+        Assert.AreEqual(32, clientNonce.Length);
+        Assert.IsTrue(clientNonce.All(character => char.IsAsciiHexDigitLower(character) || char.IsAsciiDigit(character)), clientNonce);
+        Assert.AreNotEqual(clientNonce, DigestClientNonce.CreateRandomHex());
+    }
 }

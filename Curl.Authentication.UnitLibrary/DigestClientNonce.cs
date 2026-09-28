@@ -12,4 +12,11 @@ public static class DigestClientNonce
     /// </summary>
     /// <returns>The client nonce.</returns>
     public static string CreateRandom() => Convert.ToBase64String(RandomNumberGenerator.GetBytes(12));
+
+    /// <summary>
+    /// Creates a SASL DIGEST-MD5 client nonce: 32 cryptographically random lower-case
+    /// hexadecimal digits, as curl sends in both its own code and through SSPI (ADR-0139).
+    /// </summary>
+    /// <returns>The client nonce.</returns>
+    public static string CreateRandomHex() => RandomNumberGenerator.GetHexString(32, lowercase: true);
 }
