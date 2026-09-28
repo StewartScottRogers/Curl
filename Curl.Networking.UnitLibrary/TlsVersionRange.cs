@@ -46,11 +46,13 @@ internal static class TlsVersionRange
             throw new ArgumentException($"The minimum TLS version {minimum} is above the ceiling {maximum}.", nameof(minimum));
         }
 
-        if (minimum == TlsVersion.SystemDefault && highest == TlsVersion.Tls13)
-        {
-            return SslProtocols.None;
-        }
+        return minimum == TlsVersion.SystemDefault && highest == TlsVersion.Tls13
+            ? SslProtocols.None
+            : EveryVersionBetween(lowest, highest);
+    }
 
+    private static SslProtocols EveryVersionBetween(TlsVersion lowest, TlsVersion highest)
+    {
         var offered = SslProtocols.None;
         for (var version = lowest; version <= highest; version++)
         {
