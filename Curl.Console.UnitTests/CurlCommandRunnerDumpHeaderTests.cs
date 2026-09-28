@@ -186,6 +186,21 @@ public sealed class CurlCommandRunnerDumpHeaderTests
     }
 
     [TestMethod]
+    public async Task RunAsync_DumpHeaderToFailingStandardOutputUnderVerbose_PrintsFailedWritingHeadersBeforeTheVerboseLine()
+    {
+        FailingWriteStream closedStandardOutput = new();
+
+        int exitCode = await RunAsync(["-v", "-D", "-", "-o", "body.txt", SourceUrl], fileHandler, standardOutput: closedStandardOutput);
+
+        Assert.AreEqual((int)CurlExitCode.WriteError, exitCode);
+        Assert.AreEqual(
+            "curl: Failed writing headers to -" + NewLine
+            + "* client returned ERROR on write of 20 bytes" + "\n"
+            + "curl: (23) client returned ERROR on write of 20 bytes" + NewLine,
+            StandardErrorText);
+    }
+
+    [TestMethod]
     public async Task RunAsync_DumpHeaderWriteFailsUnderSilent_PrintsNothingAndExits23()
     {
         FailingWriteStream closedStandardOutput = new();

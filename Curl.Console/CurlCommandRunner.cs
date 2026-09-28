@@ -1357,10 +1357,11 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// Performs the transfer with its header lines going to <paramref name="destination" />
-    /// through a <see cref="DumpHeaderOutputStream" />, and when a header write failed prints
-    /// curl's <c>curl: Failed writing headers to &lt;file&gt;</c> line, naming the <c>-D</c>
-    /// value as given, unless <c>-s</c> was given without <c>-S</c>; curl 8.21.0 prints it
-    /// before the transfer's <c>curl: (23)</c> line (measured 2026-09-26, BL-111 Notes).
+    /// through a <see cref="DumpHeaderOutputStream" />, which prints curl's
+    /// <c>curl: Failed writing headers to &lt;file&gt;</c> line to standard error the moment a
+    /// header write fails, naming the <c>-D</c> value as given, unless <c>-s</c> was given
+    /// without <c>-S</c>; curl 8.21.0 prints it before the handler's <c>-v</c> line and the
+    /// transfer's <c>curl: (23)</c> line (measured 2026-09-26, BL-111 Notes; BL-388).
     /// </summary>
     /// <param name="dispatch">Performs the transfer with the handler for its scheme, after its warning lines.</param>
     /// <param name="options">The accepted command line.</param>
@@ -1379,15 +1380,9 @@ internal sealed class CurlCommandRunner(
         string headerFile,
         Stream destination)
     {
-        DumpHeaderOutputStream headerOutput = new(destination);
-        TransferResult result = await TransferAsync(dispatch, options, url, uploadFile, transfer, headerOutput).ConfigureAwait(false);
+        DumpHeaderOutputStream headerOutput = new(destination, headerFile, ShowsErrors(options) ? standardError : null);
 
-        if (headerOutput.HasWriteFailed && ShowsErrors(options))
-        {
-            await WriteErrorLineAsync($"curl: Failed writing headers to {headerFile}").ConfigureAwait(false);
-        }
-
-        return result;
+        return await TransferAsync(dispatch, options, url, uploadFile, transfer, headerOutput).ConfigureAwait(false);
     }
 
     /// <summary>
