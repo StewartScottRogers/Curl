@@ -79,21 +79,34 @@ internal sealed class FtpSession(IConnector connector, FtpControlChannel control
     private long bytesTransferred;
 
     /// <summary>
+    /// The code of the last reply read before <c>QUIT</c>, <c>ABOR</c>'s included; 0 before
+    /// the greeting.
+    /// </summary>
+    private int lastReplyCode;
+
+    /// <summary>
     /// Holds the whole conversation. The data connection it opens stays open until the
     /// session is disposed.
     /// </summary>
-    /// <returns>The transfer's outcome.</returns>
+    /// <returns>
+    /// The transfer's outcome, its <see cref="TransferReport.ResponseCode" /> the code of
+    /// the last reply read before <c>QUIT</c>, as curl 8.21.0 reports
+    /// <c>%{response_code}</c> for FTP (BL-392).
+    /// </returns>
     public async ValueTask<TransferResult> RunAsync()
     {
+        TransferResult result;
         try
         {
-            return await GreetAndLogInAsync().ConfigureAwait(false)
+            result = await GreetAndLogInAsync().ConfigureAwait(false)
                 ?? await TransferPathAsync().ConfigureAwait(false);
         }
         catch (FtpControlConversationFailedException lost)
         {
-            return lost.Result;
+            result = lost.Result;
         }
+
+        return result with { Report = new TransferReport { ResponseCode = lastReplyCode } };
     }
 
     /// <summary>
@@ -653,9 +666,9 @@ internal sealed class FtpSession(IConnector connector, FtpControlChannel control
     /// </summary>
     private async ValueTask AbortRangeAsync()
     {
-        if (window.MaxDownload is not null)
+        if (window.MaxDownload is not null && await SendIgnoringReplyAsync("ABOR").ConfigureAwait(false) is { } aborted)
         {
-            await SendIgnoringReplyAsync("ABOR").ConfigureAwait(false);
+            lastReplyCode = aborted.Code;
         }
     }
 
@@ -699,26 +712,34 @@ internal sealed class FtpSession(IConnector connector, FtpControlChannel control
         return null;
     }
 
-    private ValueTask QuitAsync() => SendIgnoringReplyAsync("QUIT");
+    /// <summary>
+    /// Sends <c>QUIT</c>, whose reply curl 8.21.0 never reports as <c>%{response_code}</c>.
+    /// </summary>
+    private async ValueTask QuitAsync() => await SendIgnoringReplyAsync("QUIT").ConfigureAwait(false);
 
     /// <summary>
     /// Sends <paramref name="command" /> and reads one reply, ignoring whatever goes wrong:
     /// the transfer's outcome is already decided.
     /// </summary>
-    private async ValueTask SendIgnoringReplyAsync(string command)
+    /// <returns>
+    /// The reply, or <see langword="null" /> when the command could not be sent or no
+    /// complete reply of a readable size arrived.
+    /// </returns>
+    private async ValueTask<FtpReply?> SendIgnoringReplyAsync(string command)
     {
         if (!await control.TrySendAsync(command).ConfigureAwait(false))
         {
-            return;
+            return null;
         }
 
         try
         {
-            await control.ReadReplyAsync().ConfigureAwait(false);
+            return await control.ReadReplyAsync().ConfigureAwait(false);
         }
         catch (InvalidDataException)
         {
             // An oversized reply to ABOR or QUIT changes nothing.
+            return null;
         }
     }
 
@@ -754,6 +775,7 @@ internal sealed class FtpSession(IConnector connector, FtpControlChannel control
             throw Failed(CurlExitCode.RecvError, FtpTransferMessages.ResponseReadingFailed);
         }
 
+        lastReplyCode = reply.Code;
         return reply.Code == 421 ? throw Failed(CurlExitCode.OperationTimedOut, closingMessage) : reply;
     }
 

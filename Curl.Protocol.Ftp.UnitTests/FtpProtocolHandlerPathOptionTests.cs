@@ -98,7 +98,7 @@ public sealed class FtpProtocolHandlerPathOptionTests
 
         Assert.AreEqual(LogInSent + "PASV\r\n", Encoding.Latin1.GetString(control.Sent));
         Assert.AreEqual(new ConnectTarget("127.0.0.2", 49727, false), connector.Targets[1]);
-        Assert.AreEqual(TransferResult.Failure(CurlExitCode.CouldntConnect, "Failed to connect to 127.0.0.2 port 49727"), result);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.CouldntConnect, "Failed to connect to 127.0.0.2 port 49727"), result with { Report = null });
     }
 
     [TestMethod]

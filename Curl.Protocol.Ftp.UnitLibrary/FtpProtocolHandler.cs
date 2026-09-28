@@ -20,7 +20,9 @@ namespace Curl.Protocol.Ftp;
 /// <see cref="FtpSession" />; every step was measured against curl 8.21.0 with
 /// <c>Record-CurlExchange.ps1 -Ftp</c> (BL-431). A refused login is exit 67
 /// (<see cref="CurlExitCode.LoginDenied" />) with <c>Access denied: 430</c> for a
-/// <c>430</c> reply.
+/// <c>430</c> reply. Once logged in or refused, the result's
+/// <see cref="TransferReport.ResponseCode" /> is the code of the last reply read before
+/// <c>QUIT</c>, as curl 8.21.0 reports <c>%{response_code}</c> for FTP (BL-392).
 /// </para>
 /// <para>
 /// When <see cref="ITransferContext.Proxy" /> is set both connections are tunnelled
