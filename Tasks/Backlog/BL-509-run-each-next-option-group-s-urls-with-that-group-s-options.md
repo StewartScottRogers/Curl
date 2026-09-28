@@ -32,6 +32,11 @@ completed:
 
 ## Notes
 
+- From BL-508 (ADR-0125, BL-508 Notes): run `CommandLineParseResult.Groups` in order. The console
+  already prints `RefusalAfterGroups` after the transfers. curl 8.21.0 runs no group after one
+  that has an `-o` left over, and prints the "more output options than URLs" warning once for
+  that group and once for each group after it (`WarningLinesAfterTransfers` already counts them).
+
 ## Log
 
 - 2026-09-28: Created.
