@@ -8,7 +8,7 @@ depends-on: [BL-763]
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-28
 ---
 # BL-765 — Measure the dark factory's burn rate per lane and compute the lane target from both usage windows
 
@@ -60,7 +60,7 @@ A new `-TestAutoLanes` switch proves the logic on recorded readings, with no shi
 
 ## Acceptance criteria
 
-- [ ] `powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestAutoLanes` exits 0 and prints a `PASS` line for each case below and no `FAIL`. Every case uses `StopAtUsage 0.85` and `StopAtWeeklyUsage 0.97`, and weekly pacing is on unless stated.
+- [x] `powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestAutoLanes` exits 0 and prints a `PASS` line for each case below and no `FAIL`. Every case uses `StopAtUsage 0.85` and `StopAtWeeklyUsage 0.97`, and weekly pacing is on unless stated.
   - **five-hour-binds.** Samples at D 12:00, 12:15 and 12:30.
     - `FiveHour` is 0.20, 0.23 and 0.26, all resetting at D 15:30.
     - `Week` is 0.10, 0.10 and 0.11, resetting at D+3 12:30.
@@ -86,10 +86,10 @@ A new `-TestAutoLanes` switch proves the logic on recorded readings, with no shi
   - **max-ceiling.** Current 2, infinite pace, capacity 20, machine 16, maximum 2 gives `lanes 2 held (lane maximum 2)`.
   - **no-rate.** Current 2, `Pace` `$null`, capacity 6 gives `lanes 2 held (no burn rate yet)`.
   - **idle-lanes.** Samples whose `ActiveLanes` are all 0 give a `$null` 5-hour rate.
-- [ ] `RunDarkFactory.ps1` has a `[switch]$TestAutoLanes` documented in `param` like its neighbours, and a `-TestAutoLanes` line in the header's `.EXAMPLE` block.
-- [ ] None of the new functions reads a file, runs git, the board or Claude, or calls `Get-Date` (check by reading the diff).
-- [ ] `[System.Management.Automation.Language.Parser]::ParseFile` reports no errors for `RunDarkFactory.ps1`. `-TestAlarm -QuietAlarm` still shows its banner and exits.
-- [ ] `git diff --stat` shows only `RunDarkFactory.ps1` changed outside `Tasks/`.
+- [x] `RunDarkFactory.ps1` has a `[switch]$TestAutoLanes` documented in `param` like its neighbours, and a `-TestAutoLanes` line in the header's `.EXAMPLE` block.
+- [x] None of the new functions reads a file, runs git, the board or Claude, or calls `Get-Date` (check by reading the diff).
+- [x] `[System.Management.Automation.Language.Parser]::ParseFile` reports no errors for `RunDarkFactory.ps1`. `-TestAlarm -QuietAlarm` still shows its banner and exits.
+- [x] `git diff --stat` shows only `RunDarkFactory.ps1` changed outside `Tasks/`.
 
 ## Notes
 
@@ -97,8 +97,22 @@ A new `-TestAutoLanes` switch proves the logic on recorded readings, with no shi
   - five-hour-binds: 6 points / 0.5 h / 3 lanes = 4.0, then 59 / (4.0 x 3 h) = 4.92.
   - weekly-binds: weekly 4 / 2 h / 4 = 0.5, then 43 / (0.5 x 48 h) = 1.79. Its 5-hour target is 2 / 0.5 / 4 = 1.0, then 63 / (1.0 x 3) = 21.0.
   - reset case: 3 / 0.25 h / 3 = 4.0, then 80 / (4.0 x 4.52 h, from 15:59 to 20:30) = 4.43.
+- Delivered (2026-09-28): `New-UsageSample`, `Get-BurnRate`, `Get-PaceTarget`,
+  `Get-NextLaneCount` in a new `# ---- auto lanes` section after `Get-UsageStop`, plus a
+  helper `Get-WindowTarget` (one window's target: infinity for no rate or a due reset, 0
+  for a spent budget) that both pace targets share.
+- Choices taken: the window edge is inclusive (a sample exactly 30 or 180 minutes before
+  the newest counts), because the ADR's five-hour-binds and weekly-binds cases put the
+  oldest sample exactly on it. When both pace targets are equal the binding is
+  `5-hour pace`. `-TestAutoLanes` prints one line per check, so the two-check cases
+  (`hold-inside-band`, `capacity-ceiling`) carry a suffix, and five-hour-binds adds a
+  line proving its weekly rate is `$null`: 13 PASS lines.
+- Verified: `-TestAutoLanes` exits 0 with 13 PASS lines; ParseFile reports 0 errors; no
+  non-ASCII added; `-TestAlarm -QuietAlarm` shows its banner and exits 0; `dotnet build`
+  clean and fast tests green.
 
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Doing.
+- 2026-09-28: Doing -> Done. RunDarkFactory.ps1 computes per-lane burn rates, both pace targets and the one-lane step; -TestAutoLanes proves it
