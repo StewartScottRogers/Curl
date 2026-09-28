@@ -39,3 +39,4 @@ completed:
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
 - 2026-09-27: Doing -> Backlog. Orphaned by a stopped shift: no lane worktree or branch held its work; requeued.
+- 2026-09-27: Backlog -> Doing.
