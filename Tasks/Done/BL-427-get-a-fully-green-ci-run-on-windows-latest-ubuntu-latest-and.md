@@ -8,7 +8,7 @@ depends-on: [BL-418, BL-419, BL-420, BL-421, BL-422, BL-423, BL-424, BL-425, BL-
 touches: []
 requirement: none
 created: 2026-09-27
-completed:
+completed: 2026-09-27
 ---
 # BL-427 — Get a fully green CI run on windows-latest, ubuntu-latest and macos-latest
 
@@ -45,10 +45,10 @@ naming them. When every job is green, record the run ID in `## Log` and finish.
 
 ## Acceptance criteria
 
-- [ ] `gh run view <run-id> --json conclusion,jobs` for a `CI` run on `work/dark-factory` whose
+- [x] `gh run view <run-id> --json conclusion,jobs` for a `CI` run on `work/dark-factory` whose
       head commit contains BL-418 to BL-426 shows `conclusion: success` and every one of the three
       `Build and test` jobs `success`; the run ID is recorded in `## Log`.
-- [ ] That run's `Fast tests` step reports `Failed: 0` for every test assembly on all three jobs.
+- [x] That run's `Fast tests` step reports `Failed: 0` for every test assembly on all three jobs.
 
 ## Notes
 
@@ -60,6 +60,10 @@ naming them. When every job is green, record the run ID in `## Log` and finish.
   the platform-default TLS backend, which is OpenSSL off Windows -> BL-473. Filed rather than
   fixed here so this task stays a check, as its Context asks; moved to Backlog (not Blocked)
   because only other work stands in the way.
+- 2026-09-27: CI run 36383388283 (head 9d5d11de, which contains 46db192 with BL-418 to
+  BL-426, and the BL-472 and BL-473 fixes) concluded `success`, with all three `Build and
+  test` jobs `success`. Its `Fast tests` step printed 17 assembly summaries per job, 51 in
+  all, every one `Failed: 0` (checked with `gh run view 36383388283 --log`).
 
 ## Log
 
@@ -67,3 +71,5 @@ naming them. When every job is green, record the run ID in `## Log` and finish.
 - 2026-09-27: Backlog -> Doing.
 - 2026-09-27: Doing -> Backlog. Waiting on BL-472 and BL-473 (last Linux/macOS CI failures in run 36376508151)
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: CI run 36383388283 green on windows-latest, ubuntu-latest and macos-latest.
+- 2026-09-27: Doing -> Done. CI run 36383388283 is green on windows-latest, ubuntu-latest and macos-latest with Failed: 0 in every assembly
