@@ -8,7 +8,7 @@ depends-on: [BL-764, BL-765, BL-766, BL-767]
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-28
 ---
 # BL-768 — Run the dark factory with -Lanes Auto, scaling lanes one step at a time to the burn rate and ceilings
 
@@ -59,7 +59,7 @@ It starts from the last shift's lane count and never needs to know the Claude pl
 
 ## Acceptance criteria
 
-- [ ] `powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -AutoLanesReport -LogRoot Z:\repos\Curl.logs` exits 0 and prints these lines:
+- [x] `powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -AutoLanesReport -LogRoot Z:\repos\Curl.logs` exits 0 and prints these lines:
   - `machine cap`;
   - `capacity <n>`, where `<n>` matches `task-board.ps1 capacity` run on the same commit;
   - `5-hour rate`;
@@ -68,9 +68,9 @@ It starts from the last shift's lane count and never needs to know the Claude pl
   - one `lanes ... (...)` reason line.
 
   `git -C Z:\repos\Curl status --porcelain` and `git worktree list` are the same before and after.
-- [ ] `-TestAutoLanes` and `-TestMachineProbe` still exit 0.
-- [ ] `-Lanes auto -TestAlarm -QuietAlarm` and `-Lanes 16 -TestAlarm -QuietAlarm` pass parameter validation. `-Lanes 0` and `-Lanes 17` fail it.
-- [ ] Reading the diff shows each of these:
+- [x] `-TestAutoLanes` and `-TestMachineProbe` still exit 0.
+- [x] `-Lanes auto -TestAlarm -QuietAlarm` and `-Lanes 16 -TestAlarm -QuietAlarm` pass parameter validation. `-Lanes 0` and `-Lanes 17` fail it.
+- [x] Reading the diff shows each of these:
   - Auto always takes the coordinator path;
   - the probe runs only when `machine-lanes.json` is missing, incomplete or from different hardware;
   - capacity is read from the `auto-board` worktree, and the coordinator's checkout is not pulled mid-shift;
@@ -79,13 +79,38 @@ It starts from the last shift's lane count and never needs to know the Claude pl
   - `auto-lanes.json` is saved on change and at shift end;
   - `-Continuous` forwards `-Lanes Auto`;
   - every numeric use of `$Lanes` now uses the derived count.
-- [ ] With `-Lanes 3`, the coordinator path makes no probe, capacity or step calls (check by reading the diff).
-- [ ] `[System.Management.Automation.Language.Parser]::ParseFile` reports no errors for `RunDarkFactory.ps1`.
-- [ ] `git diff --stat` shows only `RunDarkFactory.ps1` changed outside `Tasks/`.
+- [x] With `-Lanes 3`, the coordinator path makes no probe, capacity or step calls (check by reading the diff).
+- [x] `[System.Management.Automation.Language.Parser]::ParseFile` reports no errors for `RunDarkFactory.ps1`.
+- [x] `git diff --stat` shows only `RunDarkFactory.ps1` changed outside `Tasks/`.
 
 ## Notes
+
+- The inline `-ProbeMachine` block became `Invoke-MachineProbe`, so the Auto coordinator
+  runs the same probe at shift start; `-ProbeMachine` calls it and exits as before.
+- One `Get-AutoLaneStep` does the rates (saved ones while the samples give none), pace and
+  next count for both the coordinator's step and `-AutoLanesReport`, so the report prints
+  exactly what a step would compute. The coordinator's `Invoke-AutoLaneStep` adds the
+  sampling, the holds (`tokens low: ...`, `shift time up`) and the one `Add-Lane` or
+  `Request-LaneRetire`.
+- `-AutoLanesReport` reads the board at this checkout's commit, or at `origin/<-Branch>`
+  when `-Branch` is given, because a lane's own branch is not on origin. It deletes the
+  `auto-board` worktree only when it created it, so a running shift's is left alone.
+- The first sample is taken at the first step (15 minutes in), not at shift start, when
+  no lane holds a task yet and the sample would drag the mean active lanes down; the saved
+  rates cover the gap.
+- Capacity at shift start falls back to `-MaxLanes` (no cap) when it cannot be read; mid-
+  shift, as specified, to the current lane count. Only the first failure is traced.
+- A step whose `Add-Lane` or `Request-LaneRetire` finds no lane traces that and saves
+  nothing; the count changes only when a lane actually moves.
+- Verified 2026-09-28 from lane 1: the report exits 0 with `capacity 17`, the same as
+  `task-board.ps1 capacity` on commit 1c49f3fa; with a sample `auto-lanes.json` (3 lanes,
+  4.0 and 0.5) it printed `lanes 3 -> 4 (weekly pace allows 4.5)`. The coordinator
+  checkout's status and the worktree list were identical before and after, and the
+  scratch `lane-1.lanes` folder was deleted. `-Lanes 0` and `-Lanes 17` fail validation;
+  `auto` and `16` pass. `dotnet build` clean, fast tests green.
 
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Doing.
+- 2026-09-28: Doing -> Done. RunDarkFactory -Lanes Auto sizes the shift: machine cap, cold start, a 15-minute one-lane step and -AutoLanesReport
