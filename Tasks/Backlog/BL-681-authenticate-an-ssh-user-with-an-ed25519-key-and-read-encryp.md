@@ -4,7 +4,7 @@ title: Authenticate an SSH user with an Ed25519 key and read encrypted openssh-k
 priority: High
 assignee: Claude
 pipeline: protocol
-depends-on: [BL-568, BL-672, BL-674, BL-668]
+depends-on: [BL-568, BL-672, BL-674, BL-668, BL-737]
 touches: [Curl.Protocol.Ssh.UnitLibrary, Curl.Protocol.Ssh.UnitTests]
 requirement: none
 created: 2026-09-28

@@ -4,7 +4,7 @@ title: Encrypt, decrypt and checksum with the Kerberos AES and RC4 encryption ty
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-685, BL-675, BL-676]
+depends-on: [BL-685, BL-675, BL-676, BL-737]
 touches: [Curl.Kerberos.UnitLibrary, Curl.Kerberos.UnitTests]
 requirement: none
 created: 2026-09-28
@@ -28,6 +28,8 @@ completed:
 - [ ] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1 -Library Curl.Kerberos.UnitLibrary` reports 100% line and branch coverage and no failing member.
 
 ## Notes
+
+- 2026-09-28 (BL-669): ADR-0118 puts AES-CBC-CTS in `Curl.Cryptography.UnitLibrary` as `AesCbcCts` (BL-737); use it rather than building CTS here. The RFC 3962 CTS vectors are pinned there; this task still checks the enctype-level vectors.
 
 ## Log
 

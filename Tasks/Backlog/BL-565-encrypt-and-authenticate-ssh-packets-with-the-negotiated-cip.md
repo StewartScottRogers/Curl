@@ -4,7 +4,7 @@ title: Encrypt and authenticate SSH packets with the negotiated cipher and MAC
 priority: High
 assignee: Claude
 pipeline: protocol
-depends-on: [BL-564]
+depends-on: [BL-564, BL-737, BL-668]
 touches: [Curl.Protocol.Ssh.UnitLibrary, Curl.Protocol.Ssh.UnitTests]
 requirement: none
 created: 2026-09-28
@@ -19,7 +19,7 @@ After `NEWKEYS`, packets are encrypted and authenticated with the ciphers and MA
 ## Context
 
 - Conformance audit 2026-09-28, row 35. Builds on BL-564's keys.
-- **BCL only.** `Aes` (CTR mode built on `EncryptEcb`), `AesGcm`, `HMACSHA256`, `HMACSHA512`, `CryptographicOperations.FixedTimeEquals` for MAC comparison. If `AesGcm` is unsupported on a CI platform, use the fallback BL-669's ADR names (standing rule, root `CLAUDE.md`, "Decisions", 2026-09-28: hand-built in `Curl.Cryptography.UnitLibrary`, never a package, never a task blocked for a missing primitive). Structure the packet layer so BL-679 and BL-680 add ciphers and MACs without reshaping it.
+- **BCL only.** `AesCtr` from `Curl.Cryptography.UnitLibrary` (BL-737, ADR-0118: CTR is built once there on the BCL's `Aes.EncryptEcb`, not in the SSH library), `AesGcm`, `HMACSHA256`, `HMACSHA512`, `CryptographicOperations.FixedTimeEquals` for MAC comparison. If `AesGcm` is unsupported on a CI platform, use the fallback BL-669's ADR names (standing rule, root `CLAUDE.md`, "Decisions", 2026-09-28: hand-built in `Curl.Cryptography.UnitLibrary`, never a package, never a task blocked for a missing primitive). Structure the packet layer so BL-679 and BL-680 add ciphers and MACs without reshaping it.
 - Test vectors: NIST SP 800-38A (CTR) and SP 800-38D (GCM) vectors for the primitives; round trips against the in-memory peer for the packet layer.
 
 ## Acceptance criteria
