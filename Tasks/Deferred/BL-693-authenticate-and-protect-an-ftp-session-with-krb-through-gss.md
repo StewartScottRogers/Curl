@@ -34,3 +34,4 @@ completed:
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Deferred. ADR-0142 (BL-525): --krb is deprecated with no function in curl 8.21.0 and 8.18.0, so FTP AUTH GSSAPI is not built; revisit only if a platform curl brings it back
