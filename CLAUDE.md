@@ -76,6 +76,14 @@ tell him afterwards. Still his, and still asked first: adding a package, changin
 threshold in `CodeMetricsConfig.txt`, and the irreversible git and GitHub actions listed
 above.
 
+The default answer to every question is the same (Stewart, 2026-09-28): do what a complete
+reimplementation of curl in C# needs. Nothing is left out, deferred or refused because it
+is hard or because the BCL has no primitive for it - QUIC and HTTP/3, SSH's Curve25519,
+Ed25519 and ChaCha20-Poly1305, Kerberos and the like are built by hand. Isolate each such
+hand-built piece in its own `Curl.<Area>.UnitLibrary` with its own `.UnitTests` project,
+held to the same quality gates. Hand-writing it is the answer, never a package, and never
+an ADR that decides a feature stays out.
+
 ## Dark factory
 `RunDarkFactory.cmd` works the board unattended: each ready task goes to a headless
 `/task-run`, and anything that needs Stewart ends in `Blocked` with an alarm at the end
