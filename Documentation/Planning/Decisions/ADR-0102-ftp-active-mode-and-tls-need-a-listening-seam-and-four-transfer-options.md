@@ -117,7 +117,8 @@ control connection open for `-FtpIdleMilliseconds`. `FtpProtocolHandler` now doe
   IPv4-mapped one announced as IPv4); `[v6]` and a bare IPv6 literal; `:port` and
   `:low-high` read as `atoi` reads them, and a range whose low end is above its high end
   (measured: `40000-39000`) or above 65535 means any port.
-- **Divergences, decided here.** A host or interface name is not resolved (no DNS seam
+- **Divergences, decided here.** (Superseded for names by ADR-0108: the handler now resolves
+  a `-P` name through an injected `IDnsResolver`.) A host or interface name is not resolved (no DNS seam
   reaches the handler): it ends with exit 6, `Could not resolve host: <name>`, and no
   `QUIT`, which is what curl was measured to do for a name that does not resolve
   (`nosuch.invalid`). curl 8.21.0 reads a bare `::1` oddly (it announced the control
