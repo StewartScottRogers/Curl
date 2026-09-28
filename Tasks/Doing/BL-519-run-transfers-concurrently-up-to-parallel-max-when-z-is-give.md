@@ -33,3 +33,4 @@ With `-Z`, `CurlCommandRunner` starts up to `--parallel-max` transfers at once a
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
