@@ -56,6 +56,36 @@ public sealed class CurlCommandRunnerTransferOptionTests
     }
 
     [TestMethod]
+    [DataRow("http", "abc")]
+    [DataRow("https", "-0")]
+    [DataRow("http", "3-1")]
+    public async Task RunAsync_HttpRangeThatNamesNoRange_DispatchesTheTextAsTyped(string scheme, string rangeText)
+    {
+        RecordingProtocolHandler http = RecordingProtocolHandler.WritingPath(scheme);
+
+        int exitCode = await RunAsync(["-s", "-r", rangeText, scheme + "://127.0.0.1/f"], http);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(string.Empty, StandardErrorText);
+        ITransferContext context = http.Contexts.Single();
+        Assert.AreEqual(rangeText, context.RangeText);
+        Assert.IsNull(context.Range);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RangeList_DispatchesTheTextAsTypedAndTheFirstRangeParsed()
+    {
+        RecordingProtocolHandler http = RecordingProtocolHandler.WritingPath("http");
+
+        int exitCode = await RunAsync(["-r", "0-9,20-29", "http://127.0.0.1/f"], http);
+
+        Assert.AreEqual(0, exitCode);
+        ITransferContext context = http.Contexts.Single();
+        Assert.AreEqual("0-9,20-29", context.RangeText);
+        Assert.AreEqual(ByteRange.Bounded(0, 9), context.Range);
+    }
+
+    [TestMethod]
     public async Task RunAsync_RangeWithInvalidCharacter_PrintsTheWarningThenExit33()
     {
         RecordingProtocolHandler file = RecordingProtocolHandler.WritingPath("file");

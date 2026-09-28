@@ -7,8 +7,9 @@ namespace Curl.Core;
 /// <summary>
 /// Turns the text of <c>-r</c>/<c>--range</c> into the one <see cref="ByteRange" /> a
 /// handler receives through <see cref="ITransferContext.Range" />, the way libcurl 8.21.0's
-/// <c>Curl_range</c> reads it. This is the one place range text is parsed; handlers never
-/// see the text.
+/// <c>Curl_range</c> reads it. This is the one place range text is parsed; a handler that
+/// serves one range reads the result, and the HTTP handler sends the text itself
+/// (<see cref="ITransferContext.RangeText" />), unparsed, as curl does.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -26,7 +27,9 @@ namespace Curl.Core;
 /// position), when a suffix is zero (<c>-0</c>), when the last position precedes the first
 /// (<c>3-1</c>), and for <c>0-9223372036854775807</c>, whose length does not fit. All of
 /// these were measured against curl 8.21.0 on 2026-09-26 over <c>file://</c>, which is what
-/// <c>Curl_range</c> serves; an HTTP handler that needs the text itself is not written yet.
+/// <c>Curl_range</c> serves. Over HTTP curl 8.21.0 parses nothing and sends every one of these
+/// as typed with exit 0, so <c>Curl.Console</c> does not refuse an <c>http</c> or <c>https</c>
+/// transfer's text (ADR-0044, BL-386 Notes).
 /// </para>
 /// </remarks>
 public static class ByteRangeParser

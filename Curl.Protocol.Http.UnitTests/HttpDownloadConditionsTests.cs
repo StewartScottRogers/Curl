@@ -106,7 +106,7 @@ public sealed class HttpDownloadConditionsTests
         Assert.AreEqual(
             HttpBodyDelivery.Deliver,
             HttpDownloadConditions.Decide(
-                Context(timeCondition: IfModifiedSince(), range: ByteRange.Bounded(0, 4)),
+                Context(timeCondition: IfModifiedSince(), rangeText: "0-4"),
                 sendsBody: false,
                 Head(200, "Last-Modified: Sat, 05 Nov 1994 08:49:37 GMT")));
 
@@ -128,7 +128,7 @@ public sealed class HttpDownloadConditionsTests
 
     private static TransferContext Context(
         long? resumeFrom = null,
-        ByteRange? range = null,
+        string? rangeText = null,
         TimeCondition? timeCondition = null,
         bool noBody = false) =>
         new()
@@ -136,7 +136,7 @@ public sealed class HttpDownloadConditionsTests
             Url = CurlUrl.Parse("http://127.0.0.1/f"),
             Output = Stream.Null,
             ResumeFrom = resumeFrom,
-            Range = range,
+            RangeText = rangeText,
             TimeCondition = timeCondition,
             NoBody = noBody,
         };

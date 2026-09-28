@@ -790,6 +790,7 @@ public sealed class RedirectFollowerTests
             Output = output,
             ResumeFrom = 4,
             Range = ByteRange.Bounded(1, 2),
+            RangeText = "1-2,5-6",
             MaxFileSize = 99,
             NoBody = true,
             TimeCondition = new TimeCondition(DateTimeOffset.UnixEpoch, TimeConditionKind.IfModifiedSince),
@@ -812,6 +813,7 @@ public sealed class RedirectFollowerTests
         Assert.AreSame(output, second.Output);
         Assert.AreEqual(first.ResumeFrom, second.ResumeFrom);
         Assert.AreEqual(first.Range, second.Range);
+        Assert.AreEqual(first.RangeText, second.RangeText);
         Assert.AreEqual(first.MaxFileSize, second.MaxFileSize);
         Assert.IsTrue(second.NoBody);
         Assert.AreEqual(first.TimeCondition, second.TimeCondition);

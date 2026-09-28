@@ -89,6 +89,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
                 : watchHeaderOutput(HeaderOutputOf(options, output, headerOutput)),
             NoBody = options.NoBody,
             Range = range,
+            RangeText = options.Range,
             ResumeFrom = resumeFrom,
             ResumeUploadFromUnknownOffset = ResumesUploadFromUnknownOffset(options, upload),
             MaxFileSize = options.MaxFileSize,

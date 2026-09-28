@@ -137,9 +137,10 @@ namespace Curl.Console;
 /// lines; they do not change the exit code.
 /// </para>
 /// <para>
-/// Each transfer carries the parsed <c>-r</c> range, the <c>-C</c> offset and the
+/// Each transfer carries the <c>-r</c> text and its parsed range, the <c>-C</c> offset and the
 /// <c>--max-filesize</c> limit. Range text that names no range ends the transfer with exit 33
-/// before it is dispatched. <c>-C -</c> resumes from the size of the URL's <c>-o</c> file,
+/// before it is dispatched, except on an <c>http</c> or <c>https</c> URL, where curl sends the
+/// text verbatim. <c>-C -</c> resumes from the size of the URL's <c>-o</c> file,
 /// and a transfer that resumes past byte zero appends to that file, opening it first.
 /// </para>
 /// <para>
@@ -1523,7 +1524,7 @@ internal sealed class CurlCommandRunner(
             return TransferResult.Failure(CurlExitCode.UrlMalformat, TooLongHostnameMessage);
         }
 
-        if (!TryParseRange(options.Range, out ByteRange? range))
+        if (!TryParseRange(options.Range, transferUrl, out ByteRange? range))
         {
             return ByteRangeParser.NotDeliveredFailure;
         }
@@ -1884,16 +1885,23 @@ internal sealed class CurlCommandRunner(
     /// Parses the <c>-r</c> / <c>--range</c> text, when there is any.
     /// </summary>
     /// <param name="rangeText">The text, or <see langword="null" /> when <c>-r</c> was not given.</param>
-    /// <param name="range">The range; <see langword="null" /> for the whole resource.</param>
+    /// <param name="url">The transfer's URL.</param>
+    /// <param name="range">
+    /// The range; <see langword="null" /> for the whole resource, and for text that names no
+    /// range on an <c>http</c> or <c>https</c> URL.
+    /// </param>
     /// <returns>
-    /// <see langword="false" /> when the text names no range, so the transfer must end with
-    /// <see cref="ByteRangeParser.NotDeliveredFailure" />.
+    /// <see langword="false" /> when the text names no range and the URL is not HTTP, so the
+    /// transfer must end with <see cref="ByteRangeParser.NotDeliveredFailure" />. curl 8.21.0
+    /// sends HTTP's range text verbatim and never refuses it (BL-386 Notes).
     /// </returns>
-    private static bool TryParseRange(string? rangeText, out ByteRange? range)
+    private static bool TryParseRange(string? rangeText, CurlUrl url, out ByteRange? range)
     {
         range = null;
 
-        return rangeText is null || ByteRangeParser.TryParse(rangeText, out range);
+        return rangeText is null
+            || ByteRangeParser.TryParse(rangeText, out range)
+            || url.Scheme is "http" or "https";
     }
 
     /// <summary>

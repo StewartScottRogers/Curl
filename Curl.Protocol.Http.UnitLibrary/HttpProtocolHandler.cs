@@ -146,7 +146,7 @@ namespace Curl.Protocol.Http;
 /// <see cref="ITransferContext.ResumeUploadFromUnknownOffset" /> sends the whole upload with
 /// <c>Content-Range: bytes 0-(L-1)/L</c> (BL-351 Notes); for a
 /// request without a body it sends <c>Range: bytes=N-</c>, and else
-/// <see cref="ITransferContext.Range" /> sends its range, for a request without a body
+/// <see cref="ITransferContext.RangeText" /> sends the <c>-r</c> text as typed, for a request without a body
 /// (<see cref="HttpRangeHeader" />); <see cref="ITransferContext.TimeCondition" /> sends
 /// <c>If-Modified-Since</c> or <c>If-Unmodified-Since</c>. Once the final head is written,
 /// <see cref="HttpDownloadConditions" /> ends the transfer with exit 63 for a Content-Length over
@@ -208,7 +208,7 @@ public sealed class HttpProtocolHandler(
 
         long started = context.TimeProvider.GetTimestamp();
         HttpRequestOptions options = context.Http ?? new HttpRequestOptions();
-        HttpRequestFraming framing = HttpRequestFraming.Of(options, HttpRequestHeadFormatter.CustomHeadersOf(options.Headers, options), context.NoBody, context.Upload, context.ResumeFrom, context.Range, context.ResumeUploadFromUnknownOffset);
+        HttpRequestFraming framing = HttpRequestFraming.Of(options, HttpRequestHeadFormatter.CustomHeadersOf(options.Headers, options), context.NoBody, context.Upload, context.ResumeFrom, context.RangeText, context.ResumeUploadFromUnknownOffset);
         HttpAuthRequest authRequest = new(
             framing.Method,
             context.Url,

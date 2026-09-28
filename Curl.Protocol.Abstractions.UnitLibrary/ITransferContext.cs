@@ -56,9 +56,25 @@ public interface ITransferContext
     /// transfer, before any handler runs, with <c>ByteRangeParser</c> in
     /// <c>Curl.Core.UnitLibrary</c>, which answers text that names no range with exit 33
     /// (<see cref="CurlExitCode.RangeError" />) and no handler call; so a handler sees at most
-    /// one <see cref="Abstractions.ByteRange" />, already validated.
+    /// one <see cref="Abstractions.ByteRange" />, already validated. An <c>http</c> or
+    /// <c>https</c> transfer is the exception: curl 8.21.0 does not parse the text for HTTP, so
+    /// it is never refused there, and this is <see langword="null" /> for text that names no
+    /// range; an HTTP handler reads <see cref="RangeText" /> instead.
     /// </remarks>
     ByteRange? Range { get; }
+
+    /// <summary>
+    /// Gets the <c>-r</c>/<c>--range</c> text exactly as given, or <see langword="null" />
+    /// when none was given.
+    /// </summary>
+    /// <remarks>
+    /// curl 8.21.0 sends it verbatim over HTTP, unparsed: <c>-r 0-9,20-29</c> sends
+    /// <c>Range: bytes=0-9,20-29</c>, and with <c>-d x</c> <c>Content-Range: bytes 0-9,20-29/1</c>;
+    /// <c>abc</c>, <c>1-2abc</c>, <c>-0</c> and <c>3-1</c> go out as typed too (measured,
+    /// BL-386 Notes). The HTTP handler reads it; a handler that serves one range reads
+    /// <see cref="Range" />.
+    /// </remarks>
+    string? RangeText { get; }
 
     /// <summary>
     /// Gets the largest body, in bytes, that <c>--max-filesize</c> allows a download to

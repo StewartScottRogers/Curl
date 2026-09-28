@@ -22,6 +22,7 @@ public sealed class TransferContextTests
         Assert.IsNull(context.ResumeFrom);
         Assert.IsFalse(context.ResumeUploadFromUnknownOffset);
         Assert.IsNull(context.Range);
+        Assert.IsNull(context.RangeText);
         Assert.IsNull(context.MaxFileSize);
         Assert.IsFalse(context.NoBody);
         Assert.IsNull(context.TimeCondition);
@@ -80,6 +81,7 @@ public sealed class TransferContextTests
             ResumeFrom = 42,
             ResumeUploadFromUnknownOffset = true,
             Range = range,
+            RangeText = "1-9,20-29",
             MaxFileSize = 1024,
             NoBody = true,
             TimeCondition = timeCondition,
@@ -115,6 +117,7 @@ public sealed class TransferContextTests
         Assert.AreEqual(42L, context.ResumeFrom);
         Assert.IsTrue(context.ResumeUploadFromUnknownOffset);
         Assert.AreEqual(range, context.Range);
+        Assert.AreEqual("1-9,20-29", context.RangeText);
         Assert.AreEqual(1024L, context.MaxFileSize);
         Assert.IsTrue(context.NoBody);
         Assert.AreEqual(timeCondition, context.TimeCondition);

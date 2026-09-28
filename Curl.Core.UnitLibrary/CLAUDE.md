@@ -22,7 +22,9 @@ into `Curl.Console`.
 
 `ByteRangeParser` is the one place `-r`/`--range` text becomes the `ByteRange` a handler
 receives on `ITransferContext.Range`, read as libcurl 8.21.0's `Curl_range` reads it; text
-that names no range is `NotDeliveredFailure`, exit 33. Handlers never parse range text.
+that names no range is `NotDeliveredFailure`, exit 33, except on an `http`/`https` URL, whose
+handler sends `ITransferContext.RangeText` verbatim as curl does (ADR-0044, BL-386). Handlers
+never parse range text.
 
 `RedirectFollower` wraps `ProtocolDispatcher` for `-L`/`--location`: it follows a
 successful 3xx hop's `TransferReport.RedirectUrl` under a `RedirectPolicy`
