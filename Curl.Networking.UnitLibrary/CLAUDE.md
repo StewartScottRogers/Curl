@@ -145,7 +145,7 @@ the in-memory `Fakes/InMemoryDuplexStream` pair, with a self-signed certificate 
 the test, so TLS is tested without a socket. `TcpConnectionListenerTests` and
 `TcpPendingConnectionTests` bind local TCP sockets without connecting to them. The tests that
 connect or send bytes are the loopback tests in `TcpDialerTests`, `UdpDatagramChannelTests`,
-`TcpConnectorTests.LocalEndPoint` and the accepting test in `TcpConnectionListenerTests`, tagged
+`TcpConnectorTests.LocalEndPoint` (plain and over TLS) and the accepting test in `TcpConnectionListenerTests`, tagged
 `[TestCategory("Integration")]`. Per ADR-0083 the four members only those tests can reach,
 `TcpDialer.DialAsync`, `TcpPendingConnection.AcceptStreamConnectionAsync` (behind the internal
 `AcceptConnectionAsync` seam), `UdpDatagramChannel.SendAsync` and `UdpDatagramChannel.ReceiveAsync`,
