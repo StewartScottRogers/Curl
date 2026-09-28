@@ -25,6 +25,7 @@ public sealed class CommandLineOptions
     private readonly List<string> proxyHeaders = [];
     private readonly List<CommandLineCookie> cookies = [];
     private readonly List<string> warningLines = [];
+    private readonly List<StandardErrorRedirect> standardErrorRedirects = [];
     private readonly List<string?> configFileHelpSubjects = [];
     private readonly List<FormPartSpecification> formParts = [];
     private readonly Dictionary<string, byte[]> variables = new(StringComparer.Ordinal);
@@ -180,7 +181,13 @@ public sealed class CommandLineOptions
     /// kept, not refused: curl 8.21.0 fails to open it, warns and carries on writing to standard error,
     /// which the console layer does when it opens the file.
     /// </summary>
-    public string? StandardErrorFile { get; internal set; }
+    public string? StandardErrorFile { get; private set; }
+
+    /// <summary>
+    /// Every <c>--stderr</c> read, in command-line order, each with the point where curl opens its
+    /// file; empty when none was given. The last one's file is <see cref="StandardErrorFile"/>.
+    /// </summary>
+    public IReadOnlyList<StandardErrorRedirect> StandardErrorRedirects => standardErrorRedirects;
 
     /// <summary>
     /// The <c>-o</c> / <c>--output</c> file name of each entry of <see cref="UrlOutputs"/>, in the same
@@ -987,6 +994,18 @@ public sealed class CommandLineOptions
     /// </summary>
     /// <param name="lines">The lines, without line terminators.</param>
     internal void AddErrorLines(IReadOnlyList<string> lines) => warningLines.AddRange(lines);
+
+    /// <summary>
+    /// Makes <paramref name="file"/> the <see cref="StandardErrorFile"/> and appends a
+    /// <see cref="StandardErrorRedirect"/> for it to <see cref="StandardErrorRedirects"/>, at the
+    /// warning lines met so far and with the <c>-s</c> in effect now.
+    /// </summary>
+    /// <param name="file">The file the <c>--stderr</c> names.</param>
+    internal void RedirectStandardError(string file)
+    {
+        StandardErrorFile = file;
+        standardErrorRedirects.Add(new(file, warningLines.Count, Silent));
+    }
 
     /// <summary>
     /// Sets the <c>--variable</c> <paramref name="name"/> to <paramref name="content"/>, replacing any earlier

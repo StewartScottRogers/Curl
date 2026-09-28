@@ -136,7 +136,8 @@ namespace Curl.Console;
 /// </para>
 /// <para>
 /// The parser's warning lines come first on standard error, whether or not the command line
-/// is accepted; a refused command line then prints the refusal's lines and transfers nothing.
+/// is accepted, each <c>--stderr</c> moving the lines after it to its file as curl's does while
+/// it parses; a refused command line then prints the refusal's lines and transfers nothing.
 /// An accepted command line's warning lines for after the transfers, such as curl's
 /// <c>Warning: Got more output options than URLs</c>, come last, after every transfer's
 /// lines; they do not change the exit code.
@@ -278,9 +279,15 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// Where every standard error line of the run goes: the stream the runner was given, until
-    /// <c>--stderr</c> replaces it with its file or standard output (<see cref="OpenStandardErrorFileAsync" />).
+    /// <c>--stderr</c> replaces it with its file or standard output (<see cref="RedirectStandardErrorAsync" />).
     /// </summary>
     private Stream standardError = standardError;
+
+    /// <summary>
+    /// The file the last successful <c>--stderr</c> opened, which the runner closes when a later one
+    /// replaces it or the run ends; <see langword="null" /> when none is open.
+    /// </summary>
+    private Stream? standardErrorFile;
 
     /// <summary>Builds each transfer's context on the runner's clock; gives a <c>telnet</c> transfer standard input and sends command-line header text in the platform's encoding (ADR-0067).</summary>
     private readonly TransferContextFactory transferContextFactory = new(standardInput, timeProvider, CredentialEncoding.ForPlatform(runsOnWindows));
@@ -494,8 +501,27 @@ internal sealed class CurlCommandRunner(
     internal async Task<int> RunAsync(IReadOnlyList<string> arguments)
     {
         CommandLineParseResult parsed = ParseCommandLine(arguments);
-        await WriteErrorLinesAsync(parsed.WarningLines).ConfigureAwait(false);
+        try
+        {
+            await WriteWarningLinesRedirectingStandardErrorAsync(parsed).ConfigureAwait(false);
 
+            return await RunParsedAsync(parsed).ConfigureAwait(false);
+        }
+        finally
+        {
+            await CloseStandardErrorFileAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Runs a parsed command line, for <see cref="RunAsync" />, once its warning lines are written
+    /// and standard error is where its <c>--stderr</c> options send it: a refused one prints the
+    /// refusal's lines, an accepted one the config-file note and then the run.
+    /// </summary>
+    /// <param name="parsed">The parse result.</param>
+    /// <returns>The process exit code.</returns>
+    private async Task<int> RunParsedAsync(CommandLineParseResult parsed)
+    {
         if (!parsed.IsAccepted)
         {
             await WriteRefusalAsync(parsed.Refusal, parsed.NotedDefaultConfigFile).ConfigureAwait(false);
@@ -505,61 +531,86 @@ internal sealed class CurlCommandRunner(
 
         await WriteDefaultConfigFileNoteAsync(parsed.NotedDefaultConfigFile).ConfigureAwait(false);
 
-        Stream? ownedStandardErrorFile = await OpenStandardErrorFileAsync(parsed.Options).ConfigureAwait(false);
-        try
-        {
-            return await RunAcceptedAsync(parsed.Options, parsed.WarningLinesAfterTransfers).ConfigureAwait(false);
-        }
-        finally
-        {
-            if (ownedStandardErrorFile is not null)
-            {
-                await ownedStandardErrorFile.DisposeAsync().ConfigureAwait(false);
-            }
-        }
+        return await RunAcceptedAsync(parsed.Options, parsed.WarningLinesAfterTransfers).ConfigureAwait(false);
     }
 
     /// <summary>
-    /// Sends everything the runner writes to standard error from here on where <c>--stderr</c>
-    /// says: <c>-</c> to standard output, any other name to that file, truncated. A file that
-    /// cannot be opened prints curl 8.21.0's doubled <see cref="StandardErrorFileOpenFailedPrefix" />
-    /// warning (not under <c>-s</c>) and leaves standard error where it was.
+    /// Writes the parser's warning lines, carrying out each <c>--stderr</c> at its place among them,
+    /// as curl 8.21.0 opens the file while it parses the option: the lines before it go where
+    /// standard error went until then, the lines after it where it sends them
+    /// (<see cref="RedirectStandardErrorAsync" />).
     /// </summary>
-    /// <param name="options">The accepted command line.</param>
-    /// <returns>The file opened, which the caller closes after the run; <see langword="null" /> when none was.</returns>
+    /// <param name="parsed">The parse result, accepted or refused.</param>
+    /// <returns>A task that completes when every warning line is flushed.</returns>
     /// <remarks>
-    /// curl opens the file while it parses the option, so its lines from the options before
-    /// <c>--stderr</c> stay on standard error and the rest go to the file. The parser keeps no
-    /// such order, so here every parser warning goes to standard error and everything after the
-    /// parse to the file; <c>-s</c> is the whole command line's, not the options' before it
-    /// (measured 2026-09-27, BL-410 Notes).
+    /// Measured 2026-09-27 (BL-410, BL-476): <c>--stderr se -H nocolon</c> writes the <c>-H</c>
+    /// warning to <c>se</c>, <c>-H nocolon --stderr se</c> to standard error, and
+    /// <c>--stderr a -H x --stderr b</c> to <c>a</c>, with the rest in <c>b</c>.
     /// </remarks>
-    private async Task<Stream?> OpenStandardErrorFileAsync(CommandLineOptions options)
+    private async Task WriteWarningLinesRedirectingStandardErrorAsync(CommandLineParseResult parsed)
     {
-        switch (options.StandardErrorFile)
+        int written = 0;
+        foreach (StandardErrorRedirect redirect in parsed.StandardErrorRedirects)
         {
-            case null:
-                return null;
-            case StandardOutputStandardErrorFile:
-                standardError = standardOutput;
-                return null;
+            await WriteErrorLinesAsync([.. parsed.WarningLines.Take(redirect.WarningLinesBefore).Skip(written)]).ConfigureAwait(false);
+            written = redirect.WarningLinesBefore;
+            await RedirectStandardErrorAsync(redirect).ConfigureAwait(false);
+        }
+
+        await WriteErrorLinesAsync([.. parsed.WarningLines.Skip(written)]).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sends everything the runner writes to standard error from here on where one <c>--stderr</c>
+    /// says: <c>-</c> to standard output, any other name to that file, truncated, closing the file an
+    /// earlier <c>--stderr</c> opened. A file that cannot be opened prints curl 8.21.0's doubled
+    /// <see cref="StandardErrorFileOpenFailedPrefix" /> warning, unless <c>-s</c> came before the
+    /// option, and leaves standard error where it was.
+    /// </summary>
+    /// <param name="redirect">The <c>--stderr</c> option.</param>
+    /// <returns>A task that completes when standard error has moved or the warning is flushed.</returns>
+    /// <remarks>
+    /// Measured 2026-09-27 (BL-410 Notes): <c>--stderr adir -s</c> prints the warning,
+    /// <c>-s --stderr adir</c> prints nothing, and <c>--stderr a --stderr adir</c> writes it to <c>a</c>.
+    /// </remarks>
+    private async Task RedirectStandardErrorAsync(StandardErrorRedirect redirect)
+    {
+        if (redirect.File == StandardOutputStandardErrorFile)
+        {
+            await CloseStandardErrorFileAsync().ConfigureAwait(false);
+            standardError = standardOutput;
+            return;
         }
 
         FileOpenResult opened = await fileSystem
-            .OpenForWriteAsync(options.StandardErrorFile, FileWriteMode.Truncate, DeferredOutputFileStream.CreateMode, CancellationToken.None)
+            .OpenForWriteAsync(redirect.File, FileWriteMode.Truncate, DeferredOutputFileStream.CreateMode, CancellationToken.None)
             .ConfigureAwait(false);
         if (opened.Content is not { } file)
         {
-            if (!options.Silent)
+            if (!redirect.Silent)
             {
-                await WriteErrorLineAsync(StandardErrorFileOpenFailedPrefix + options.StandardErrorFile).ConfigureAwait(false);
+                await WriteErrorLineAsync(StandardErrorFileOpenFailedPrefix + redirect.File).ConfigureAwait(false);
             }
 
-            return null;
+            return;
         }
 
+        await CloseStandardErrorFileAsync().ConfigureAwait(false);
         standardError = file;
-        return file;
+        standardErrorFile = file;
+    }
+
+    /// <summary>
+    /// Closes the file the last successful <c>--stderr</c> opened, if it is still open.
+    /// </summary>
+    /// <returns>A task that completes when the file is closed.</returns>
+    private async Task CloseStandardErrorFileAsync()
+    {
+        if (standardErrorFile is not null)
+        {
+            await standardErrorFile.DisposeAsync().ConfigureAwait(false);
+            standardErrorFile = null;
+        }
     }
 
     /// <summary>

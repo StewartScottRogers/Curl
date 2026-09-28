@@ -1,4 +1,5 @@
 using System.Text;
+using Curl.Cli;
 using Curl.Core;
 using Curl.Core.FileSystem;
 using Curl.Protocol.Abstractions;
@@ -10,7 +11,11 @@ namespace Curl.Console;
 /// on 2026-09-27 (BL-410 Notes): <c>--stderr se -v http://127.0.0.1:1/</c> wrote the <c>-v</c> lines
 /// and the <c>curl: (7)</c> line to <c>se</c>, truncated, and nothing to standard error;
 /// <c>--stderr -</c> wrote them to standard output; <c>--stderr ''</c> printed
-/// <c>Warning: Warning: Failed to open </c> and carried on to standard error.
+/// <c>Warning: Warning: Failed to open </c> and carried on to standard error. curl opens the file
+/// while it parses the option, so position decides where the parser's lines go (BL-476):
+/// <c>--stderr se -H nocolon</c> put the warning in <c>se</c>, <c>-H nocolon --stderr se</c> on
+/// standard error, <c>--stderr a -H nocolon --stderr b</c> in <c>a</c>, and <c>--stderr se -d @nosuch</c>
+/// the three refusal lines in <c>se</c> (exit 26); <c>--stderr adir -s</c> warned, <c>-s --stderr adir</c> did not.
 /// </summary>
 [TestClass]
 public sealed class CurlCommandRunnerStandardErrorFileTests
@@ -24,7 +29,12 @@ public sealed class CurlCommandRunnerStandardErrorFileTests
 
     private string StandardErrorText => Encoding.ASCII.GetString(standardError.ToArray());
 
+    private static readonly string NoColonWarning =
+        "Warning: The provided HTTP header 'nocolon' does not look like a header?" + Environment.NewLine;
+
     private string StandardOutputText => Encoding.ASCII.GetString(standardOutput.ToArray());
+
+    private string FileText(string path) => Encoding.ASCII.GetString(files.Written[path].ToArray());
 
     [TestMethod]
     public async Task RunAsync_StandardErrorFileWithVerbose_WritesTheVerboseAndFailureLinesToTheFile()
@@ -91,14 +101,86 @@ public sealed class CurlCommandRunnerStandardErrorFileTests
     }
 
     [TestMethod]
-    public async Task RunAsync_StandardErrorFileWithAParserWarning_KeepsTheWarningOnStandardError()
+    public async Task RunAsync_ParserWarningBeforeStandardErrorFile_KeepsTheWarningOnStandardError()
     {
-        // curl sends a warning to the file only when its option comes after --stderr; the parser
-        // keeps no order, so every parser warning stays on standard error (BL-410 Notes).
         await RunAsync(["-H", "nocolon", "--stderr", "se", "http://127.0.0.1:1/"]);
 
-        StringAssert.StartsWith(StandardErrorText, "Warning: The provided HTTP header 'nocolon' does not look like a header?");
-        Assert.IsTrue(files.Written.ContainsKey("se"));
+        Assert.AreEqual(NoColonWarning, StandardErrorText);
+        Assert.AreEqual(FailureLine, FileText("se"));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_ParserWarningAfterStandardErrorFile_WritesTheWarningToTheFile()
+    {
+        await RunAsync(["--stderr", "se", "-H", "nocolon", "http://127.0.0.1:1/"]);
+
+        Assert.AreEqual(string.Empty, StandardErrorText);
+        Assert.AreEqual(NoColonWarning + FailureLine, FileText("se"));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_ParserWarningBetweenTwoStandardErrorFiles_WritesTheWarningToTheFirstAndTheRestToTheSecond()
+    {
+        await RunAsync(["--stderr", "a", "-H", "nocolon", "--stderr", "b", "http://127.0.0.1:1/"]);
+
+        Assert.AreEqual(string.Empty, StandardErrorText);
+        Assert.AreEqual(NoColonWarning, FileText("a"));
+        Assert.AreEqual(FailureLine, FileText("b"));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_SecondStandardErrorFileThatCannotBeOpened_WarnsInTheFirstAndCarriesOnThere()
+    {
+        files.UnwritablePaths.Add("adir");
+
+        await RunAsync(["--stderr", "a", "--stderr", "adir", "http://127.0.0.1:1/"]);
+
+        Assert.AreEqual(string.Empty, StandardErrorText);
+        Assert.AreEqual("Warning: Warning: Failed to open adir" + Environment.NewLine + FailureLine, FileText("a"));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_StandardErrorDashAfterAFile_WritesTheRestToStandardOutput()
+    {
+        await RunAsync(["--stderr", "a", "-H", "nocolon", "--stderr", "-", "http://127.0.0.1:1/"]);
+
+        Assert.AreEqual(NoColonWarning, FileText("a"));
+        Assert.AreEqual(FailureLine, StandardOutputText);
+        Assert.AreEqual(string.Empty, StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RefusalAfterStandardErrorFile_WritesTheRefusalLinesToTheFile()
+    {
+        int exitCode = await RunAsync(["--stderr", "se", "-d", "@nosuch", "http://127.0.0.1:1/"]);
+
+        Assert.AreEqual(26, exitCode);
+        Assert.AreEqual(string.Empty, StandardErrorText);
+        Assert.AreEqual(
+            "curl: Failed to open nosuch" + Environment.NewLine
+            + "curl: option -d: error encountered when reading a file" + Environment.NewLine
+            + CommandLineRefusal.TryHelpLine + Environment.NewLine,
+            FileText("se"));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RefusalBeforeStandardErrorFile_WritesTheRefusalLinesToStandardErrorAndOpensNoFile()
+    {
+        int exitCode = await RunAsync(["-d", "@nosuch", "--stderr", "se", "http://127.0.0.1:1/"]);
+
+        Assert.AreEqual(26, exitCode);
+        StringAssert.StartsWith(StandardErrorText, "curl: Failed to open nosuch" + Environment.NewLine);
+        Assert.AreEqual(0, files.Written.Count);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_SilentAfterStandardErrorFileThatCannotBeOpened_StillWarns()
+    {
+        files.UnwritablePaths.Add("adir");
+
+        await RunAsync(["--stderr", "adir", "-s", "http://127.0.0.1:1/"]);
+
+        Assert.AreEqual("Warning: Warning: Failed to open adir" + Environment.NewLine, StandardErrorText);
     }
 
     [TestMethod]
@@ -130,6 +212,7 @@ public sealed class CurlCommandRunnerStandardErrorFileTests
                 standardOutput,
                 standardError,
                 new MemoryStream(),
-                runsOnWindows: true)
+                runsOnWindows: true,
+                configFileReader: new InMemoryDataFileReader())
             .RunAsync(arguments);
 }

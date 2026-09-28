@@ -243,7 +243,7 @@ public static class CommandLineOptionTable
     private static CommandLineRefusal? SetStandardErrorFile(CommandLineOptions options, string file, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
     {
         CommandLineOption.WarnWhenFileNameLooksLikeFlag(options, file);
-        options.StandardErrorFile = file;
+        options.RedirectStandardError(file);
         return null;
     }
 

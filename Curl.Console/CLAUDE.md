@@ -178,13 +178,15 @@ and standard error, with no warning, for a file that cannot be opened. On Window
 mode, CR LF. Measured on curl 8.21.0 (BL-242 Notes). The lines are only as complete as what the
 handler and connector report (BL-242 Notes name the follow-ups).
 
-`--stderr <file>` replaces the runner's standard error once the parse is accepted, after the
-parser's warning lines and the config-file note: every later line (`-v`, warnings, `curl: (N)`,
-the progress meter, `-w %{stderr}`) goes to the file, opened truncated even when nothing is
-written, or to standard output for `--stderr -`. A file that cannot be opened prints
-`Warning: Warning: Failed to open <file>` (not under `-s`) and standard error stays put. curl
-opens the file while parsing, so its lines from options before `--stderr` stay on standard
-error; the parser keeps no such order, so here every parser warning does (BL-410 Notes).
+`--stderr <file>` replaces the runner's standard error where it stands among the parser's
+warning lines, as curl opens the file while parsing: each `StandardErrorRedirect` in
+`CommandLineParseResult.StandardErrorRedirects` says how many warning lines came before it, so
+those go where standard error went until then and the rest, a refusal's lines, the config-file
+note and every later line (`-v`, warnings, `curl: (N)`, the progress meter, `-w %{stderr}`) go to
+the file, opened truncated even when nothing is written, or to standard output for
+`--stderr -`. A later `--stderr` closes the earlier file and takes over. A file that cannot be
+opened prints `Warning: Warning: Failed to open <file>` where standard error goes at that point,
+unless `-s` came before the option, and standard error stays put (BL-410, BL-476 Notes).
 
 After each successful transfer, after one `-f` failed with exit 22, and after one that failed
 once its handler reported it past connect or open (BL-130), standard error gets curl's progress
