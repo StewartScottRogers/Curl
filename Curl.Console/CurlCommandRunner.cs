@@ -546,7 +546,16 @@ internal sealed class CurlCommandRunner(
 
         await WriteDefaultConfigFileNoteAsync(parsed.NotedDefaultConfigFile).ConfigureAwait(false);
 
-        return await RunAcceptedAsync(parsed.Options, parsed.WarningLinesAfterTransfers).ConfigureAwait(false);
+        int exitCode = await RunAcceptedAsync(parsed.Options, parsed.WarningLinesAfterTransfers).ConfigureAwait(false);
+        if (parsed.RefusalAfterGroups is not { } refusalAfterGroups)
+        {
+            return exitCode;
+        }
+
+        // curl 8.21.0 refuses a later -:/--next group only once the groups before it have run
+        // (test686: "htdhdhdtp://localhost --next" exits 2). Running groups after the first is BL-509.
+        await WriteErrorLinesAsync(refusalAfterGroups.StandardErrorLines).ConfigureAwait(false);
+        return (int)refusalAfterGroups.ExitCode;
     }
 
     /// <summary>

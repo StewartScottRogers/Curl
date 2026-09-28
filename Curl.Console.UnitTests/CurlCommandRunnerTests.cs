@@ -54,6 +54,19 @@ public sealed class CurlCommandRunnerTests
     }
 
     [TestMethod]
+    public async Task RunAsync_NextWithNoUrlAfterIt_RunsTheFirstGroupThenRefusesNoUrl()
+    {
+        int exitCode = await RunAsync(["foo://x/", "--next"]);
+
+        Assert.AreEqual(2, exitCode);
+        Assert.AreEqual(
+            "curl: (1) Protocol \"foo\" not supported" + NewLine
+            + "curl: (2) no URL specified" + NewLine
+            + "curl: try 'curl --help' or 'curl --manual' for more information" + NewLine,
+            StandardErrorText);
+    }
+
+    [TestMethod]
     public async Task RunAsync_MalformedUrl_PrintsExit3LineAndReturns3()
     {
         RecordingProtocolHandler dict = RecordingProtocolHandler.WritingPath("dict");
