@@ -1,5 +1,5 @@
 ---
-id: BL-755
+id: BL-762
 title: Decide the live task board page's data sources and the board branch's status.json format
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-755 — Decide the live task board page's data sources and the board branch's status.json format
+# BL-762 — Decide the live task board page's data sources and the board branch's status.json format
 
 ## Goal
 

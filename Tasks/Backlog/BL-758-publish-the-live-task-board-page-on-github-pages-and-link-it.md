@@ -18,7 +18,7 @@ The live task board is served at https://stewartscottrogers.github.io/Curl/board
 
 ## Context
 
-- Stewart asked for a README link to the board near the showcase on 2026-09-28. The page is `.github/board/site/index.html` from BL-757, and where it is published is fixed by the ADR from BL-755.
+- Stewart asked for a README link to the board near the showcase on 2026-09-28. The page is `.github/board/site/index.html` from BL-757, and where it is published is fixed by the ADR from BL-762.
 - **Where Pages serves from:** the `gource` branch. `gource.yml` writes that branch two ways:
   - The `coverage` job commits `coverage/` onto it without force: a sparse, blob-less clone, a retry loop, then `gh api -X POST repos/$GITHUB_REPOSITORY/pages/builds`.
   - The `render` job force-pushes a fresh single-commit branch. It copies `.github/gource/site/index.html` from the workspace and carries `coverage/` over by downloading its files from `raw.githubusercontent.com`.

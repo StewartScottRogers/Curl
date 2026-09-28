@@ -18,7 +18,7 @@ A push to the `board` branch starts no workflow, and the Gource workflow does no
 
 ## Context
 
-- Stewart chose lane heartbeats on a dedicated, force-pushed `board` branch on 2026-09-28 (option 2; see BL-755 for the contract). The coordinator will push it about every 3 minutes during a shift.
+- Stewart chose lane heartbeats on a dedicated, force-pushed `board` branch on 2026-09-28 (option 2; see BL-762 for the contract). The coordinator will push it about every 3 minutes during a shift.
 - `.github/workflows/ci.yml` triggers on `push` with `branches-ignore: [gource, 'factory/**']`. Without a change, every heartbeat would start a Windows, Linux and macOS build.
 - `.github/workflows/gource.yml` triggers on `push` with `branches-ignore: [gource]`. Its `decide` job fingerprints every remote ref except `gource` and `HEAD`, using the `grep -v -E '^refs/remotes/origin/(gource|HEAD) '` filter. A changing `board` ref would therefore look like new work, and the workflow would re-render the 8K video every 30 minutes.
 - `.github/workflows/release.yml` triggers only on `v*` tags and on pull requests, so it needs no change.

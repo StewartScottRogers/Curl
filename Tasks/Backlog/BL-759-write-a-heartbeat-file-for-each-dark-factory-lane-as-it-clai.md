@@ -4,7 +4,7 @@ title: Write a heartbeat file for each dark factory lane as it claims, runs and 
 priority: High
 assignee: Claude
 pipeline: direct
-depends-on: [BL-755]
+depends-on: [BL-762]
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-09-28
@@ -18,7 +18,7 @@ During a shift, every runner keeps a heartbeat file up to date: each lane, and t
 
 ## Context
 
-- Stewart chose lane heartbeats on 2026-09-28 (option 2). The ADR from BL-755 fixes the lane object's fields, the phase names, the 60-second minimum refresh and the write-then-rename rule; follow it exactly.
+- Stewart chose lane heartbeats on 2026-09-28 (option 2). The ADR from BL-762 fixes the lane object's fields, the phase names, the 60-second minimum refresh and the write-then-rename rule; follow it exactly.
 - **Where things are in `RunDarkFactory.ps1`:**
   - `Get-LaneStatePath`/`Set-LaneState` (near line 1341) already write `lane-<n>.pid` and `lane-<n>.task` into `lanes-<stamp>`. Use `Get-LaneStatePath $Lane 'heartbeat.json'` for the path.
   - Phase points:

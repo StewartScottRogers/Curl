@@ -4,7 +4,7 @@ title: Show one live card per dark factory lane on the task board page, flagging
 priority: High
 assignee: Claude
 pipeline: direct
-depends-on: [BL-757, BL-755]
+depends-on: [BL-757, BL-762]
 touches: [.github/board]
 requirement: none
 created: 2026-09-28
@@ -19,7 +19,7 @@ The live task board page reads `status.json` from the `board` branch and shows o
 ## Context
 
 - Stewart chose this on 2026-09-28 (option 2).
-- **The contract:** the ADR from BL-755 fixes the `status.json` schema 1, the status API call (`GET https://api.github.com/repos/StewartScottRogers/Curl/contents/status.json?ref=board` with `Accept: application/vnd.github.raw+json`), the 10-minute staleness rules and the `?status=` and `?now=` overrides.
+- **The contract:** the ADR from BL-762 fixes the `status.json` schema 1, the status API call (`GET https://api.github.com/repos/StewartScottRogers/Curl/contents/status.json?ref=board` with `Accept: application/vnd.github.raw+json`), the 10-minute staleness rules and the `?status=` and `?now=` overrides.
 - **Where the cards go:** BL-757 built the page with a list of data sources and an empty `section#lanes`. Add the status as the second source, which makes the refresh interval 120 s by the page's own rule, and render into that section. Do not restructure the kanban code.
 - **Publishing does not need to exist yet.** BL-760 publishes the real file, and until the next shift runs after it lands, the `board` branch does not exist and the call answers 404. Build against fixtures.
 - **Local preview:** `dotnet run --file .github/gource/serve.cs -- .github/board 8000`.

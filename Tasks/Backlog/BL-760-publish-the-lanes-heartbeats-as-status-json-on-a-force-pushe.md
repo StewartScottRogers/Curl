@@ -19,7 +19,7 @@ During a shift, the dark factory's coordinator merges every lane's heartbeat fil
 ## Context
 
 - Stewart chose this design on 2026-09-28 by picking option 2. That approval covers force-pushing `board`, and this task writes it down as a standing exception so later sessions need not ask.
-- The ADR from BL-755 fixes the rest: the `status.json` schema 1, the one-writer rule, the plumbing push, the intervals and the `-HeartbeatMinutes` parameter. BL-759 writes the lane files as `<repo>.logs\lanes-<stamp>\lane-<n>.heartbeat.json`, and BL-756 keeps these pushes from starting CI or Gource.
+- The ADR from BL-762 fixes the rest: the `status.json` schema 1, the one-writer rule, the plumbing push, the intervals and the `-HeartbeatMinutes` parameter. BL-759 writes the lane files as `<repo>.logs\lanes-<stamp>\lane-<n>.heartbeat.json`, and BL-756 keeps these pushes from starting CI or Gource.
 - **Where the code goes in `RunDarkFactory.ps1`:**
   - The coordinator's wait loop (near line 1509, `while ((Get-Date) -lt $giveUp)`, ticking every 5 s) is where lanes are published.
   - The shift-end code after that loop publishes the final `"state": "ended"`.

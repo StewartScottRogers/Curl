@@ -4,7 +4,7 @@ title: Draw the task board as a live kanban page from one GitHub tree call
 priority: High
 assignee: Claude
 pipeline: direct
-depends-on: [BL-755]
+depends-on: [BL-762]
 touches: [.github/board]
 requirement: none
 created: 2026-09-28
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-- Stewart chose this on 2026-09-28 (option 1). The data sources, title rule, refresh budget, query overrides and file location are fixed by the ADR from BL-755; read it first and follow it.
+- Stewart chose this on 2026-09-28 (option 1). The data sources, title rule, refresh budget, query overrides and file location are fixed by the ADR from BL-762; read it first and follow it.
 - **Pipeline:** `direct`, because this is a static web page with no .NET project.
 - **Tooling:** no build step, no package, no framework, and no external script, stylesheet or font. Use plain HTML, CSS and JavaScript (`fetch`, `setTimeout`, DOM APIs). Inline the CSS and JS in `index.html`.
 - **API call:** `GET https://api.github.com/repos/StewartScottRogers/Curl/git/trees/work/dark-factory?recursive=1`. It answers with CORS open and a limit of 60 calls an hour, and is about 1.4 MB (measured 2026-09-28, see the ADR).
