@@ -64,11 +64,11 @@ default replies unless an `-ImapReply` is named. Every run sent `A001 CAPABILITY
   session is open. `ImapControlChannel` gained `ReadUntaggedAsync` (stop at the untagged
   `FETCH`, literal unread) and `ReadLiteralPieceAsync` (stream the literal), so a message
   of any size streams to the output instead of passing the 65535-byte line cap.
-- Unmeasurable choices are in ADR-0131: no `LOGOUT` after a failure inside the literal
+- Unmeasurable choices are in ADR-0132: no `LOGOUT` after a failure inside the literal
   (exit 18, 23), exit 56 when the server closes after the literal, a read failure
   mid-literal counts as the server closing, and non-fetch URLs keep closing with success
   until BL-556/BL-557.
-- `touches` gained `Documentation/Planning/Decisions` for ADR-0131 and its index row; no
+- `touches` gained `Documentation/Planning/Decisions` for ADR-0132 and its index row; no
   task in Doing names it (BL-519 touches Curl.Console, BL-549 Pop3).
 - Without credentials curl sends no `LOGIN`, so the fetch was measured unauthenticated;
   authentication is BL-554's.
