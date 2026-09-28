@@ -17,9 +17,16 @@ Namespace `Curl.Cryptography`. It holds:
 - `X25519` (public): RFC 7748 key agreement - `GeneratePrivateKey`, `ComputePublicKey`,
   and `TryComputeSharedSecret`, which returns `false` for the all-zero result of a
   low-order peer key.
+- `ChaCha20` (public): RFC 8439's block function (`ComputeBlock`) and stream cipher
+  (`ApplyKeyStream`), counter and nonce as parameters. A 12-byte nonce leaves RFC 8439's
+  32-bit counter; an 8-byte nonce gives the original 64-bit counter OpenSSH uses.
+- `Poly1305` (public): the one-time authenticator - `ComputeTag` and `Verify`, plus the
+  internal `Initialize`, `Absorb` and `Finish` steps the AEAD drives.
+- `AeadChaCha20Poly1305` (public, `IDisposable`): AEAD_CHACHA20_POLY1305 - `Encrypt` and
+  `TryDecrypt`, which returns `false` with the plaintext zeroed on a wrong tag.
 
-The remaining primitives land under their own tasks (BL-672 to BL-677, BL-737 to
-BL-745).
+The remaining primitives land under their own tasks (BL-672, BL-674 to BL-677, BL-737
+to BL-745).
 
 ## Rules
 
