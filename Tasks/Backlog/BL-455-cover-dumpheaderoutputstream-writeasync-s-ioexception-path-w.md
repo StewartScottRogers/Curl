@@ -1,5 +1,5 @@
 ---
-id: BL-453
+id: BL-455
 title: Cover DumpHeaderOutputStream.WriteAsync's IOException path without a failure-report output
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-453 — Cover DumpHeaderOutputStream.WriteAsync's IOException path without a failure-report output
+# BL-455 — Cover DumpHeaderOutputStream.WriteAsync's IOException path without a failure-report output
 
 ## Goal
 

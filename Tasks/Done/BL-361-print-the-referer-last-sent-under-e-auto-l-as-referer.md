@@ -60,7 +60,7 @@ completed: 2026-09-27
   sets each followed hop's `Referer` to the previous hop's URL as `scheme://host[:port]path[?query]`
   (port only when not the default); the merged report's new `TransferReport.Referer` is the
   `Referer` of the last dispatched request; `CurlCommandRunner.WriteOutVariables` (extracted from
-  `WriteOutAsync` to keep its complexity under the gate) prints it, else the `-e` text. ADR-0100
+  `WriteOutAsync` to keep its complexity under the gate) prints it, else the `-e` text. ADR-0101
   records it and amends ADR-0015, so `Documentation/Planning/Decisions` was added to `touches`
   (no task in Doing names it).
 - Pinned: `CurlCommandRunnerWriteOutTests.RunAsync_AutoReferer_PrintsTheRefererTheLastRequestWasSentWith`
@@ -72,7 +72,7 @@ completed: 2026-09-27
 - Gates: `dotnet build -warnaserror` clean; fast tests green (17 projects); `Measure-CodeQuality.ps1`
   100% line and branch for Curl.Protocol.Abstractions, Curl.Core and Curl.Output. Curl.Console's
   only failing members are pre-existing and untouched: `DiskWriteOutFileOpener.TryOpen` (BL-432)
-  and `DumpHeaderOutputStream.WriteAsync` (filed as BL-453). `dotnet format --verify-no-changes`
+  and `DumpHeaderOutputStream.WriteAsync` (filed as BL-455). `dotnet format --verify-no-changes`
   flags only pre-existing line endings in three files this task does not touch.
 
 ## Log
