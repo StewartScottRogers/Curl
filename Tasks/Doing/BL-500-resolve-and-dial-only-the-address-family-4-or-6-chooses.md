@@ -36,3 +36,4 @@ With `-4` the connector uses only IPv4 addresses and with `-6` only IPv6 address
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
