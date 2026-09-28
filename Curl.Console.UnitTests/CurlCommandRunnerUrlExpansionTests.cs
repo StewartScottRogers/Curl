@@ -302,6 +302,17 @@ public sealed class CurlCommandRunnerUrlExpansionTests
     }
 
     [TestMethod]
+    public async Task RunAsync_IpfsWithMalformedGatewayOption_PrintsCurlsLinesEvenSilentAndReturns43()
+    {
+        int exitCode = await RunAsync(
+            ["-s", "-w", "[%{errormsg}] [%{exitcode}]\\n", "--ipfs-gateway", ":::", "ipfs://cid/x"]);
+
+        Assert.AreEqual(43, exitCode);
+        Assert.AreEqual("curl: --ipfs-gateway was given a malformed URL" + NewLine + TryHelpLine, StandardErrorText);
+        Assert.AreEqual("[A libcurl function was given a bad argument] [43]\n", StandardOutputText);
+    }
+
+    [TestMethod]
     [DataRow("-O", "ipfs://bafyabc/n.txt")]
     [DataRow("-O", "ipfs://bafyabc")]
     [DataRow("-O", "ipns://k51/n.txt")]

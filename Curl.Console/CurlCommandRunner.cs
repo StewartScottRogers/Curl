@@ -371,6 +371,15 @@ internal sealed class CurlCommandRunner(
         TransferResult.Failure(IpfsGatewayFailure.MalformedTargetUrl.ExitCode, "URL using bad/illegal format or missing URL");
 
     /// <summary>
+    /// The result of an <c>ipfs://</c> or <c>ipns://</c> URL whose <c>--ipfs-gateway</c> is not a
+    /// URL curl can parse: exit 43, whose <c>%{errormsg}</c> curl 8.21.0 prints as its generic
+    /// text for the code (measured 2026-09-27, BL-403). It is compared by reference, so that
+    /// <see cref="TransferAllAsync" /> stops before the remaining URLs, as curl does.
+    /// </summary>
+    private static readonly TransferResult IpfsMalformedGatewayOptionFailure =
+        TransferResult.Failure(IpfsGatewayFailure.MalformedGatewayOption.ExitCode, "A libcurl function was given a bad argument");
+
+    /// <summary>
     /// The result of a transfer whose <c>-T</c> file could not be opened, measured on curl 8.21.0
     /// with <c>-T nosuchfile</c>: exit 26 with <see cref="MultipartFormBodyBuilder.OpenFailedMessage" />.
     /// It is compared by reference, so that <see cref="TransferAllAsync" /> stops before the
@@ -887,7 +896,8 @@ internal sealed class CurlCommandRunner(
     /// <param name="transfer">The transfer, which names its output.</param>
     /// <param name="failure">Why the URL could not be rewritten.</param>
     /// <returns>
-    /// <see cref="IpfsGatewayDetectionFailure" /> or <see cref="IpfsMalformedTargetUrlFailure" />.
+    /// <see cref="IpfsGatewayDetectionFailure" />, <see cref="IpfsMalformedGatewayOptionFailure" /> or
+    /// <see cref="IpfsMalformedTargetUrlFailure" />.
     /// </returns>
     private async Task<TransferResult> ReportIpfsGatewayFailureAsync(
         CommandLineOptions options,
@@ -897,8 +907,13 @@ internal sealed class CurlCommandRunner(
         transferOutputFileName = transfer.OutputFileName is { } fileName ? InOutputDirectory(options, fileName) : null;
         await WriteErrorLinesAsync(["curl: " + failure.Message, CommandLineRefusal.TryHelpLine]).ConfigureAwait(false);
 
-        return failure == IpfsGatewayFailure.GatewayDetectionFailed
-            ? IpfsGatewayDetectionFailure
+        if (failure == IpfsGatewayFailure.GatewayDetectionFailed)
+        {
+            return IpfsGatewayDetectionFailure;
+        }
+
+        return failure == IpfsGatewayFailure.MalformedGatewayOption
+            ? IpfsMalformedGatewayOptionFailure
             : IpfsMalformedTargetUrlFailure;
     }
 
@@ -907,9 +922,14 @@ internal sealed class CurlCommandRunner(
     /// prints its own lines, uses no connection and has no transfer number.
     /// </summary>
     /// <param name="result">The transfer's result.</param>
-    /// <returns><see langword="true" /> for <see cref="IpfsGatewayDetectionFailure" /> and <see cref="IpfsMalformedTargetUrlFailure" />.</returns>
+    /// <returns>
+    /// <see langword="true" /> for <see cref="IpfsGatewayDetectionFailure" />,
+    /// <see cref="IpfsMalformedGatewayOptionFailure" /> and <see cref="IpfsMalformedTargetUrlFailure" />.
+    /// </returns>
     private static bool IsIpfsGatewayFailure(TransferResult result) =>
-        ReferenceEquals(result, IpfsGatewayDetectionFailure) || ReferenceEquals(result, IpfsMalformedTargetUrlFailure);
+        ReferenceEquals(result, IpfsGatewayDetectionFailure)
+        || ReferenceEquals(result, IpfsMalformedGatewayOptionFailure)
+        || ReferenceEquals(result, IpfsMalformedTargetUrlFailure);
 
     /// <summary>
     /// Tells whether <paramref name="result" /> ended an IPFS URL before curl numbered its
@@ -1232,6 +1252,7 @@ internal sealed class CurlCommandRunner(
         CannotOpenHeaderFileFailure,
         CannotCreateDirectoryFailure,
         IpfsGatewayDetectionFailure,
+        IpfsMalformedGatewayOptionFailure,
         IpfsMalformedTargetUrlFailure,
         IpfsRemoteNameFailure,
     };
