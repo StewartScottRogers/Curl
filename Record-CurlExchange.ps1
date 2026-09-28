@@ -146,7 +146,9 @@
     250 advertising AUTH PLAIN LOGIN CRAM-MD5, STARTTLS (left out once the session is
     TLS), SIZE 1000000, 8BITMIME and SMTPUTF8; HELO 250; AUTH 235, after the 334
     continuations the mechanism needs (PLAIN without an initial response one, LOGIN one
-    per credential it still lacks, CRAM-MD5 one challenge), each continuation line curl
+    per credential it still lacks, CRAM-MD5 one challenge, DIGEST-MD5 a fixed RFC 2831
+    challenge for realm "localhost" and nonce "OA6MG9tEQGm2hh" and then an rspauth line
+    that is not checked), each continuation line curl
     sends recorded like a command; MAIL 250; RCPT 250; DATA 354, then every line up to
     and including the lone "." that ends the body, then 250; VRFY 250; EXPN 250; HELP
     214; NOOP 250; RSET 250; QUIT 221 (and the session ends); and 502 for any other
@@ -831,6 +833,11 @@ $serveSmtpSession = {
             'PLAIN' { if ($hasInitialResponse) { @() } else { @('334 ') } }
             'LOGIN' { if ($hasInitialResponse) { @('334 UGFzc3dvcmQ6') } else { @('334 VXNlcm5hbWU6', '334 UGFzc3dvcmQ6') } }
             'CRAM-MD5' { @('334 ' + [Convert]::ToBase64String($latin1.GetBytes('<1896.697170952@localhost>'))) }
+            'DIGEST-MD5' {
+                @(
+                    ('334 ' + [Convert]::ToBase64String($latin1.GetBytes('realm="localhost",nonce="OA6MG9tEQGm2hh",qop="auth",algorithm=md5-sess,charset=utf-8'))),
+                    ('334 ' + [Convert]::ToBase64String($latin1.GetBytes('rspauth=ea40f60335c427b5527b84dbabcdfffd'))))
+            }
             default { @() }
         }
         foreach ($challenge in $challenges) {
