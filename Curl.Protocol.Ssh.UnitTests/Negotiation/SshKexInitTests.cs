@@ -1,0 +1,92 @@
+using Curl.Protocol.Ssh.Fakes;
+
+namespace Curl.Protocol.Ssh.Negotiation;
+
+[TestClass]
+public sealed class SshKexInitTests
+{
+    private static readonly SshAlgorithmCatalogue EverythingImplemented = new(
+        SshAlgorithmPreferences.Full.KeyExchange
+            .Concat(SshAlgorithmPreferences.Full.ServerHostKey)
+            .Concat(SshAlgorithmPreferences.Full.Cipher)
+            .Concat(SshAlgorithmPreferences.Full.Mac)
+            .Concat(["zlib", "zlib@openssh.com", "none"]));
+
+    [TestMethod]
+    public void ForClient_EverythingImplemented_OffersThePresetBothWaysWithNoLanguagesAndNoGuess()
+    {
+        SshAlgorithmPreferences preset = SshAlgorithmPreferences.WindowsReference;
+
+        SshKexInit kexInit = SshKexInit.ForClient(preset, EverythingImplemented, new RepeatingRandomSource(0x42));
+
+        CollectionAssert.AreEqual(Enumerable.Repeat((byte)0x42, 16).ToArray(), kexInit.Cookie);
+        CollectionAssert.AreEqual(preset.KeyExchange.ToArray(), kexInit.KeyExchange.ToArray());
+        CollectionAssert.AreEqual(preset.ServerHostKey.ToArray(), kexInit.ServerHostKey.ToArray());
+        CollectionAssert.AreEqual(preset.Cipher.ToArray(), kexInit.CipherClientToServer.ToArray());
+        CollectionAssert.AreEqual(preset.Cipher.ToArray(), kexInit.CipherServerToClient.ToArray());
+        CollectionAssert.AreEqual(preset.Mac.ToArray(), kexInit.MacClientToServer.ToArray());
+        CollectionAssert.AreEqual(preset.Mac.ToArray(), kexInit.MacServerToClient.ToArray());
+        CollectionAssert.AreEqual(new[] { "none" }, kexInit.CompressionClientToServer.ToArray());
+        CollectionAssert.AreEqual(new[] { "none" }, kexInit.CompressionServerToClient.ToArray());
+        Assert.AreEqual(0, kexInit.LanguagesClientToServer.Count);
+        Assert.AreEqual(0, kexInit.LanguagesServerToClient.Count);
+        Assert.IsFalse(kexInit.FirstKexPacketFollows);
+    }
+
+    [TestMethod]
+    public void ToPayload_WindowsPreset_IsAsLongAsTheMeasuredKexInit()
+    {
+        SshKexInit kexInit = SshKexInit.ForClient(SshAlgorithmPreferences.WindowsReference, EverythingImplemented, new RepeatingRandomSource(0));
+
+        byte[] payload = kexInit.ToPayload();
+
+        Assert.AreEqual(1072, payload.Length, "the reference build's KEXINIT payload measured 1072 bytes");
+        Assert.AreEqual((byte)20, payload[0]);
+        CollectionAssert.AreEqual(new byte[] { 0, 0, 0, 0, 0 }, payload[^5..], "first_kex_packet_follows false, reserved 0");
+    }
+
+    [TestMethod]
+    public void ForClient_TodaysCatalogue_OffersOnlyTheSignalsAndNoCompression()
+    {
+        SshKexInit kexInit = SshKexInit.ForClient(SshAlgorithmPreferences.OpenSslReference, SshAlgorithmCatalogue.Implemented, new RepeatingRandomSource(0));
+
+        CollectionAssert.AreEqual(new[] { "ext-info-c", "kex-strict-c-v00@openssh.com" }, kexInit.KeyExchange.ToArray());
+        Assert.AreEqual(0, kexInit.ServerHostKey.Count);
+        Assert.AreEqual(0, kexInit.CipherClientToServer.Count);
+        Assert.AreEqual(0, kexInit.MacClientToServer.Count);
+        CollectionAssert.AreEqual(new[] { "none" }, kexInit.CompressionClientToServer.ToArray());
+    }
+
+    [TestMethod]
+    public void Parse_ReadsWhatToPayloadWrote()
+    {
+        SshKexInit sent = SshServerScript.OpenSshKexInit(kexInit => kexInit with
+        {
+            Cookie = [.. Enumerable.Range(1, 16).Select(value => (byte)value)],
+            LanguagesClientToServer = ["en"],
+            FirstKexPacketFollows = true,
+            Reserved = 7,
+        });
+
+        SshKexInit read = SshKexInit.Parse(sent.ToPayload());
+
+        CollectionAssert.AreEqual(sent.Cookie, read.Cookie);
+        CollectionAssert.AreEqual(sent.KeyExchange.ToArray(), read.KeyExchange.ToArray());
+        CollectionAssert.AreEqual(sent.ServerHostKey.ToArray(), read.ServerHostKey.ToArray());
+        CollectionAssert.AreEqual(sent.CipherServerToClient.ToArray(), read.CipherServerToClient.ToArray());
+        CollectionAssert.AreEqual(sent.MacServerToClient.ToArray(), read.MacServerToClient.ToArray());
+        CollectionAssert.AreEqual(sent.CompressionServerToClient.ToArray(), read.CompressionServerToClient.ToArray());
+        CollectionAssert.AreEqual(new[] { "en" }, read.LanguagesClientToServer.ToArray());
+        Assert.AreEqual(0, read.LanguagesServerToClient.Count);
+        Assert.IsTrue(read.FirstKexPacketFollows);
+        Assert.AreEqual(7u, read.Reserved);
+    }
+
+    [TestMethod]
+    public void Parse_TruncatedPayload_ThrowsInvalidData()
+    {
+        byte[] payload = SshServerScript.OpenSshKexInit().ToPayload();
+
+        Assert.ThrowsExactly<InvalidDataException>(() => SshKexInit.Parse(payload[..^1]));
+    }
+}
