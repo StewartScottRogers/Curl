@@ -30,7 +30,9 @@ internal static class CurlComposition
     /// and <c>mqtts</c>, and <c>http</c> and <c>https</c> over <paramref name="connector" />,
     /// the last two answering authentication with <see cref="CreateHttpAuthenticator" />'s
     /// authenticator and keeping cookies in <paramref name="cookieStore" />; and <c>tftp</c> over
-    /// <paramref name="datagramConnector" />; and <c>ftp</c>, which
+    /// <paramref name="datagramConnector" />, sending its MASQUE request through an HTTP or HTTPS
+    /// proxy over <paramref name="connector" /> with the proxy credential in the platform's
+    /// encoding (ADR-0056, rule 4); and <c>ftp</c>, which
     /// <see cref="RoutingFtpProtocolHandler" /> hands to the HTTP handler when it is forwarded
     /// through an HTTP proxy without <c>-p</c> (ADR-0056, rule 3) and otherwise to an
     /// <see cref="FtpProtocolHandler" /> over <paramref name="connector" /> (ADR-0093). Each
@@ -55,7 +57,7 @@ internal static class CurlComposition
             new DictProtocolHandler(connector),
             new GopherProtocolHandler(connector),
             new TelnetProtocolHandler(connector),
-            new TftpProtocolHandler(datagramConnector),
+            new TftpProtocolHandler(datagramConnector, connector, CredentialEncoding.ForPlatform(OperatingSystem.IsWindows())),
             new MqttProtocolHandler(connector),
             http,
             new RoutingFtpProtocolHandler(http, new FtpProtocolHandler(connector)),

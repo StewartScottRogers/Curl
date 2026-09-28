@@ -382,7 +382,7 @@ public sealed class CurlCompositionTests
         IConnector[] connectors = [.. handlers.SelectMany(ConnectorsOf)];
         string[] connectingHandlers = [.. handlers.Where(handler => ConnectorsOf(handler).Any()).Select(handler => handler.GetType().Name).Order()];
         CollectionAssert.AreEqual(
-            new[] { "DictProtocolHandler", "GopherProtocolHandler", "HttpProtocolHandler", "MqttProtocolHandler", "RoutingFtpProtocolHandler", "TelnetProtocolHandler" },
+            new[] { "DictProtocolHandler", "GopherProtocolHandler", "HttpProtocolHandler", "MqttProtocolHandler", "RoutingFtpProtocolHandler", "TelnetProtocolHandler", "TftpProtocolHandler" },
             connectingHandlers);
         Assert.IsTrue(connectors.All(connector => ReferenceEquals(connector, transports.PoolingConnector)));
         Assert.AreSame(transports.PoolingConnector, dispatch.ConnectionPool);
