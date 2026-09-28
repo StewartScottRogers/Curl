@@ -75,7 +75,11 @@ Per ADR-0109 a connect that fails after its options parse takes the next number 
 `NumberedConnectFailure`, as curl 8.21.0 numbers the connection it tried.
 Per ADR-0113 it keeps curl's DNS cache for its life (one command line): a host and port it
 resolved before, or one a `--resolve` entry answers, is answered without `IDnsResolver` and
-reported as `Hostname H was found in DNS cache` before `Trying`.
+reported as `Hostname H was found in DNS cache` before `Trying`. Per ADR-0114 every answer is
+then reported as `Host H:P was resolved.`, `IPv6: ...` and `IPv4: ...`, naming the host as
+cached (none for an IP address), and `LoadResolveEntries` loads the `--resolve` entries
+(`ResolveOverrides.Entries`, as `ResolveEntry`) into the cache with curl's `Added H:P:A to DNS
+cache` lines at a transfer's start; until a transfer calls it, the first connect loads them.
 
 `TcpConnector` tunnels through `ConnectTarget.Proxy` when it is an HTTP proxy
 (`ProxyKind.Http`, `Http10`) per ADR-0023: `HttpProxyTunnel` writes curl 8.21.0's CONNECT

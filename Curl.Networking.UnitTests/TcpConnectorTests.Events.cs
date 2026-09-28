@@ -163,8 +163,8 @@ public sealed partial class TcpConnectorTests
 
         await connector.ConnectAsync(new ConnectTarget("localhost", 1, UseTls: false) { Events = events }, CancellationToken.None);
 
-        Assert.AreEqual("  Trying [::1]:1...", events.Info[0]);
-        Assert.AreEqual("connect to ::1 port 1 from :: port 0 failed: Connection refused", events.Info[1]);
+        Assert.AreEqual("  Trying [::1]:1...", events.Info[3]);
+        Assert.AreEqual("connect to ::1 port 1 from :: port 0 failed: Connection refused", events.Info[4]);
     }
 
     [TestMethod]
@@ -192,7 +192,7 @@ public sealed partial class TcpConnectorTests
 
         await connector.ConnectAsync(new ConnectTarget("localhost", 443, UseTls: true) { Events = events }, CancellationToken.None);
 
-        CollectionAssert.AreEqual(new[] { "  Trying 127.0.0.1:443..." }, events.Info);
+        CollectionAssert.AreEqual(new[] { "Host localhost:443 was resolved.", "IPv6: (none)", "IPv4: 127.0.0.1", "  Trying 127.0.0.1:443..." }, events.Info);
         Assert.IsEmpty(events.Opened);
     }
 
@@ -206,7 +206,7 @@ public sealed partial class TcpConnectorTests
 
         await connector.ConnectAsync(PlainTarget with { Events = events }, CancellationToken.None);
 
-        CollectionAssert.AreEqual(new[] { "  Trying 192.0.2.10:3128..." }, events.Info);
+        CollectionAssert.AreEqual(new[] { "Host proxy.example:3128 was resolved.", "IPv6: (none)", "IPv4: 192.0.2.10", "  Trying 192.0.2.10:3128..." }, events.Info);
         Assert.AreEqual("proxy.example", events.Opened[0].HostName);
         Assert.AreEqual(new IPEndPoint(ProxyAddress, 3128), events.Opened[0].RemoteEndPoint);
     }

@@ -37,19 +37,23 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
-    public async Task ConnectAsync_ToANameAlreadyResolved_ReportsFoundInDnsCacheAndDialsTheCachedAddresses()
+    public async Task ConnectAsync_ToANameAlreadyResolved_ReportsFoundInDnsCacheAndTheResolvedLinesAndDialsTheCachedAddresses()
     {
         // curl -s -v http://localhost:47181/a http://localhost:47181/b ->
-        // * Hostname localhost was found in DNS cache before the second transfer's Trying lines.
+        // * Host localhost:47181 was resolved. / * IPv6: ::1 / * IPv4: 127.0.0.1 before the first
+        // Trying, and * Hostname localhost was found in DNS cache before the same three the second time.
         var resolver = new FakeDnsResolver(IPAddress.IPv6Loopback, Loopback);
         var dialer = new FakeTcpDialer { DialOutcome = _ => new FakeConnection() };
         var connector = CreateConnector(resolver, dialer, new FakeTlsProvider());
+        var first = new RecordingTransferEvents();
         var second = new RecordingTransferEvents();
 
-        await connector.ConnectAsync(new ConnectTarget("localhost", 47181, UseTls: false), CancellationToken.None);
+        await connector.ConnectAsync(new ConnectTarget("localhost", 47181, UseTls: false) { Events = first }, CancellationToken.None);
         await connector.ConnectAsync(new ConnectTarget("localhost", 47181, UseTls: false) { Events = second }, CancellationToken.None);
 
-        CollectionAssert.AreEqual(new[] { "Hostname localhost was found in DNS cache", "  Trying [::1]:47181..." }, second.Info);
+        string[] resolvedLines = ["Host localhost:47181 was resolved.", "IPv6: ::1", "IPv4: 127.0.0.1", "  Trying [::1]:47181..."];
+        CollectionAssert.AreEqual(resolvedLines, first.Info);
+        CollectionAssert.AreEqual(new[] { "Hostname localhost was found in DNS cache" }.Concat(resolvedLines).ToArray(), second.Info);
         CollectionAssert.AreEqual(new[] { "localhost" }, resolver.ResolvedHosts);
     }
 
@@ -67,7 +71,7 @@ public sealed partial class TcpConnectorTests
         await connector.ConnectAsync(new ConnectTarget("localhost", 47181, UseTls: false) { Events = otherHost }, CancellationToken.None);
         await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 1, UseTls: false) { Events = otherPort }, CancellationToken.None);
 
-        CollectionAssert.AreEqual(new[] { TryingLoopback }, otherHost.Info);
+        CollectionAssert.AreEqual(new[] { "Host localhost:47181 was resolved.", "IPv6: (none)", "IPv4: 127.0.0.1", TryingLoopback }, otherHost.Info);
         CollectionAssert.AreEqual(new[] { "  Trying 127.0.0.1:1..." }, otherPort.Info);
         CollectionAssert.AreEqual(new[] { "127.0.0.1", "localhost", "127.0.0.1" }, resolver.ResolvedHosts);
     }
@@ -106,23 +110,170 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
-    public async Task ConnectAsync_WithAResolveEntry_ReportsFoundInDnsCacheOnEveryConnectIncludingTheFirst()
+    public async Task ConnectAsync_WithAResolveEntry_ReportsItAddedAndFoundInDnsCacheOnEveryTransferIncludingTheFirst()
     {
         // curl -s -v --resolve foo.example:47181:127.0.0.1 http://foo.example:47181/a http://foo.example:47181/b
-        // -> * Hostname foo.example was found in DNS cache before each transfer's Trying.
-        var connector = new TcpConnector(
-            new FakeDnsResolver(), new FakeTcpDialer { DialOutcome = _ => new FakeConnection() }, new FakeTlsProvider(), new ManualTimeProvider(),
-            resolveOverrides: ResolveOverrides.Parse(["foo.example:47181:127.0.0.1"]));
+        // -> * Added foo.example:47181:127.0.0.1 to DNS cache, then * Hostname foo.example was found in
+        // DNS cache and the resolved lines before each transfer's Trying; the second transfer first
+        // reports * RESOLVE foo.example:47181 - old addresses discarded (measured 2026-09-27, BL-482).
+        var connector = CreateConnectorWithResolveEntries("foo.example:47181:127.0.0.1");
         var first = new RecordingTransferEvents();
         var second = new RecordingTransferEvents();
 
         await connector.ConnectAsync(new ConnectTarget("foo.example", 47181, UseTls: false) { Events = first }, CancellationToken.None);
+        connector.LoadResolveEntries(second);
         await connector.ConnectAsync(new ConnectTarget("foo.example", 47181, UseTls: false) { Events = second }, CancellationToken.None);
 
-        var expected = new[] { "Hostname foo.example was found in DNS cache", TryingLoopback };
-        CollectionAssert.AreEqual(expected, first.Info);
-        CollectionAssert.AreEqual(expected, second.Info);
+        string[] resolved =
+        [
+            "Added foo.example:47181:127.0.0.1 to DNS cache",
+            "Hostname foo.example was found in DNS cache",
+            "Host foo.example:47181 was resolved.",
+            "IPv6: (none)",
+            "IPv4: 127.0.0.1",
+            TryingLoopback,
+        ];
+        CollectionAssert.AreEqual(resolved, first.Info);
+        CollectionAssert.AreEqual(new[] { "RESOLVE foo.example:47181 - old addresses discarded" }.Concat(resolved).ToArray(), second.Info);
     }
+
+    [TestMethod]
+    public async Task ConnectAsync_WhenNoTransferLoadedTheResolveEntries_LoadsThemOnTheFirstConnectOnly()
+    {
+        // curl -s -v -L --resolve foo.example:47181:127.0.0.1 http://foo.example:47181/a, redirected
+        // to /b on a fresh connection -> no Added line before the second Hostname line (measured):
+        // only a transfer's start, through LoadResolveEntries, loads them again.
+        var connector = CreateConnectorWithResolveEntries("foo.example:47181:127.0.0.1");
+        var events = new RecordingTransferEvents();
+        var target = new ConnectTarget("foo.example", 47181, UseTls: false) { Events = events };
+
+        await connector.ConnectAsync(target, CancellationToken.None);
+        await connector.ConnectAsync(target with { Events = new RecordingTransferEvents() }, CancellationToken.None);
+        await connector.ConnectAsync(target, CancellationToken.None);
+
+        Assert.AreEqual(1, events.Info.Count(line => line.StartsWith("Added ", StringComparison.Ordinal)));
+        Assert.AreEqual(2, events.Info.Count(line => line == "Hostname foo.example was found in DNS cache"));
+    }
+
+    [TestMethod]
+    public async Task LoadResolveEntries_BeforeTheFirstConnect_ReportsTheEntriesAddedThereAndNotAgainInConnectAsync()
+    {
+        var connector = CreateConnectorWithResolveEntries("foo.example:47181:127.0.0.1");
+        var transferStart = new RecordingTransferEvents();
+        var connect = new RecordingTransferEvents();
+
+        connector.LoadResolveEntries(transferStart);
+        await connector.ConnectAsync(new ConnectTarget("foo.example", 47181, UseTls: false) { Events = connect }, CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { "Added foo.example:47181:127.0.0.1 to DNS cache" }, transferStart.Info);
+        Assert.AreEqual("Hostname foo.example was found in DNS cache", connect.Info[0]);
+    }
+
+    [TestMethod]
+    public void LoadResolveEntries_WithoutEvents_Throws()
+    {
+        var connector = CreateConnectorWithResolveEntries();
+
+        Assert.ThrowsExactly<ArgumentNullException>(() => connector.LoadResolveEntries(null!));
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WithSeveralAddressesInAResolveEntry_NamesThemVerbatimAndListsEachFamilyInOrder()
+    {
+        // curl -s -v --resolve foo.example:47181:127.0.0.1,127.0.0.2,[::1] http://foo.example:47181/a ->
+        // * Added foo.example:47181:127.0.0.1,127.0.0.2,[::1] to DNS cache ... * IPv6: ::1 / * IPv4: 127.0.0.1, 127.0.0.2
+        var connector = CreateConnectorWithResolveEntries("foo.example:47181:127.0.0.1,127.0.0.2,[::1]");
+        var events = new RecordingTransferEvents();
+
+        await connector.ConnectAsync(new ConnectTarget("foo.example", 47181, UseTls: false) { Events = events }, CancellationToken.None);
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "Added foo.example:47181:127.0.0.1,127.0.0.2,[::1] to DNS cache",
+                "Hostname foo.example was found in DNS cache",
+                "Host foo.example:47181 was resolved.",
+                "IPv6: ::1",
+                "IPv4: 127.0.0.1, 127.0.0.2",
+            },
+            events.Info.Take(5).ToArray());
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WithAWildcardResolveEntry_ReportsItNonPermanentAndTheWildcardAsTheResolvedHost()
+    {
+        // curl -s -v --resolve +*:47181:127.0.0.1 http://127.0.0.1:47181/b ->
+        // * Added *:47181:127.0.0.1 to DNS cache (non-permanent) / * RESOLVE *:47181 using wildcard /
+        // * Hostname 127.0.0.1 was found in DNS cache / * Host *:47181 was resolved. (measured)
+        var connector = CreateConnectorWithResolveEntries("+*:47181:127.0.0.1");
+        var events = new RecordingTransferEvents();
+
+        await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 47181, UseTls: false) { Events = events }, CancellationToken.None);
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "Added *:47181:127.0.0.1 to DNS cache (non-permanent)",
+                "RESOLVE *:47181 using wildcard",
+                "Hostname 127.0.0.1 was found in DNS cache",
+                "Host *:47181 was resolved.",
+                "IPv6: (none)",
+                "IPv4: 127.0.0.1",
+                TryingLoopback,
+            },
+            events.Info);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WithARemovalEntry_DropsTheKeySilentlySoTheNextTransferDiscardsNothingForIt()
+    {
+        // curl -s -v --resolve FOO.example:47181:127.0.0.1 --resolve -foo.example:47181
+        // --resolve bar.example:47181:127.0.0.1 http://127.0.0.1:47181/a http://Bar.Example:47181/b ->
+        // the second transfer discards bar.example only, and names the entry's host as written (measured).
+        var connector = CreateConnectorWithResolveEntries("FOO.example:47181:127.0.0.1", "-foo.example:47181", "bar.example:47181:127.0.0.1");
+        var first = new RecordingTransferEvents();
+        var second = new RecordingTransferEvents();
+
+        await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 47181, UseTls: false) { Events = first }, CancellationToken.None);
+        connector.LoadResolveEntries(second);
+        await connector.ConnectAsync(new ConnectTarget("Bar.Example", 47181, UseTls: false) { Events = second }, CancellationToken.None);
+
+        CollectionAssert.AreEqual(
+            new[] { "Added FOO.example:47181:127.0.0.1 to DNS cache", "Added bar.example:47181:127.0.0.1 to DNS cache", TryingLoopback },
+            first.Info);
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "Added FOO.example:47181:127.0.0.1 to DNS cache",
+                "RESOLVE bar.example:47181 - old addresses discarded",
+                "Added bar.example:47181:127.0.0.1 to DNS cache",
+                "Hostname Bar.Example was found in DNS cache",
+                "Host bar.example:47181 was resolved.",
+                "IPv6: (none)",
+                "IPv4: 127.0.0.1",
+                TryingLoopback,
+            },
+            second.Info);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WithAResolveEntryThatDoesNotParse_ReportsTheEntriesBeforeItAddedAndFailsWithExit49()
+    {
+        // curl -s -v --resolve Foo.Example:47181:127.0.0.1 --resolve bad http://127.0.0.1:47181/a ->
+        // * Added Foo.Example:47181:127.0.0.1 to DNS cache, then exit 49 (measured).
+        var connector = CreateConnectorWithResolveEntries("Foo.Example:47181:127.0.0.1", "bad");
+        var events = new RecordingTransferEvents();
+
+        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 47181, UseTls: false) { Events = events }, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.SetoptOptionSyntax, result.ExitCode);
+        CollectionAssert.AreEqual(new[] { "Added Foo.Example:47181:127.0.0.1 to DNS cache" }, events.Info);
+    }
+
+    private static TcpConnector CreateConnectorWithResolveEntries(params string[] entries) =>
+        new(
+            new FakeDnsResolver(Loopback), new FakeTcpDialer { DialOutcome = _ => new FakeConnection() }, new FakeTlsProvider(), new ManualTimeProvider(),
+            resolveOverrides: ResolveOverrides.Parse(entries));
 
     [TestMethod]
     public async Task ConnectAsync_WithAConnectToMapping_KeysTheDnsCacheOnTheMappedHostAndPort()

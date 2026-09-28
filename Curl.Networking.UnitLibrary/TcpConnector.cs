@@ -47,11 +47,14 @@ public sealed class TcpConnector(
     ConnectToMappings? connectToMappings = null,
     ITlsProvider? proxyTlsProvider = null) : IConnector
 {
+    private const string AnyHost = "*";
+
     private readonly ITlsProvider _proxyTlsProvider = proxyTlsProvider ?? tlsProvider;
     private readonly HttpProxyTunnelOptions _proxyTunnelOptions = proxyTunnelOptions ?? HttpProxyTunnelOptions.Default;
     private readonly ResolveOverrides _resolveOverrides = resolveOverrides ?? ResolveOverrides.None;
     private readonly ConnectToMappings _connectToMappings = connectToMappings ?? ConnectToMappings.None;
-    private readonly ConcurrentDictionary<string, IReadOnlyList<IPAddress>> _resolvedAddresses = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, DnsCacheEntry> _dnsCache = new(StringComparer.OrdinalIgnoreCase);
+    private int _resolveEntriesLoaded;
     private long _nextConnectionNumber;
 
     /// <inheritdoc />
@@ -150,7 +153,14 @@ public sealed class TcpConnector(
     /// connection it tried (ADR-0109). A host and port answered by a <c>--resolve</c> entry, or
     /// resolved before by this connector (to the host, the proxy or a SOCKS target), are
     /// answered from that cache and reported first as <c>Hostname &lt;host&gt; was found in DNS
-    /// cache</c>, as curl 8.21.0 reports them (measured, BL-481).
+    /// cache</c>, as curl 8.21.0 reports them (measured, BL-481). Every answer, cached or
+    /// looked up, is then reported as <c>Host &lt;name&gt;:&lt;port&gt; was resolved.</c>,
+    /// <c>IPv6: &lt;addresses&gt;</c> and <c>IPv4: &lt;addresses&gt;</c>, naming the host as it
+    /// was cached (a <c>--resolve</c> entry's as written, <c>*</c> for a wildcard) and each
+    /// family's addresses joined by <c>, </c> or <c>(none)</c>; a name that is an IP address
+    /// reports none of the three (measured, BL-482). Before anything else, a connect that no
+    /// transfer has preceded with <see cref="LoadResolveEntries" /> loads the <c>--resolve</c>
+    /// entries itself, with their <c>Added</c> lines, before a bad entry fails it.
     /// </para>
     /// </remarks>
     public async ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
@@ -158,6 +168,7 @@ public sealed class TcpConnector(
         ArgumentNullException.ThrowIfNull(target);
 
         var started = timeProvider.GetTimestamp();
+        LoadResolveEntriesUnlessLoaded(target.Events);
         var destination = _connectToMappings.Map(target.Host, target.Port);
         if ((_resolveOverrides.ParseError ?? destination.ParseError) is { } parseError)
         {
@@ -207,29 +218,111 @@ public sealed class TcpConnector(
     }
 
     /// <summary>
+    /// Loads the <c>--resolve</c> entries into the DNS cache, as curl 8.21.0 loads them at the
+    /// start of every transfer but not for a redirect it follows (measured, BL-482). Each
+    /// addition is reported on <paramref name="events" /> as <c>Added
+    /// &lt;host&gt;:&lt;port&gt;:&lt;addresses&gt; to DNS cache</c> (with <c> (non-permanent)</c>
+    /// for a <c>+</c> entry, and <c>RESOLVE *:&lt;port&gt; using wildcard</c> after a <c>*</c>
+    /// one), after <c>RESOLVE &lt;host&gt;:&lt;port&gt; - old addresses discarded</c> when the
+    /// key was cached; a removal drops the key without a line. When no transfer has called
+    /// this, <see cref="ConnectAsync" /> calls it on its target's events first.
+    /// </summary>
+    /// <param name="events">The transfer's events.</param>
+    public void LoadResolveEntries(ITransferEvents events)
+    {
+        ArgumentNullException.ThrowIfNull(events);
+
+        Interlocked.Exchange(ref _resolveEntriesLoaded, 1);
+        foreach (var entry in _resolveOverrides.Entries)
+        {
+            LoadResolveEntry(entry, events);
+        }
+    }
+
+    private void LoadResolveEntriesUnlessLoaded(ITransferEvents events)
+    {
+        if (Interlocked.CompareExchange(ref _resolveEntriesLoaded, 1, 0) == 0)
+        {
+            LoadResolveEntries(events);
+        }
+    }
+
+    private void LoadResolveEntry(ResolveEntry entry, ITransferEvents events)
+    {
+        var cacheKey = DnsCacheKey(entry.Host, entry.Port);
+        if (entry.IsRemoval)
+        {
+            _dnsCache.TryRemove(cacheKey, out _);
+            return;
+        }
+
+        if (_dnsCache.ContainsKey(cacheKey))
+        {
+            events.ReportInfo($"RESOLVE {entry.Host}:{entry.Port} - old addresses discarded");
+        }
+
+        _dnsCache[cacheKey] = new DnsCacheEntry(entry.Host, entry.Port, entry.Addresses);
+        events.ReportInfo($"Added {entry.Host}:{entry.Port}:{entry.AddressText} to DNS cache{(entry.IsPermanent ? string.Empty : " (non-permanent)")}");
+        if (entry.Host == AnyHost)
+        {
+            events.ReportInfo($"RESOLVE {AnyHost}:{entry.Port} using wildcard");
+        }
+    }
+
+    /// <summary>
     /// Resolves <paramref name="host" /> for <paramref name="port" /> as curl 8.21.0's DNS cache
-    /// does (BL-481): a <c>--resolve</c> entry, or a host and port this connector already
-    /// resolved, answers without <see cref="IDnsResolver" /> and is reported on
-    /// <paramref name="events" /> as <c>Hostname &lt;host&gt; was found in DNS cache</c>. A
-    /// host that did not resolve is not kept, so it is looked up again.
+    /// does (BL-481): a <c>--resolve</c> entry for the host or for <c>*</c>, or a host and port
+    /// this connector already resolved, answers without <see cref="IDnsResolver" /> and is
+    /// reported on <paramref name="events" /> as <c>Hostname &lt;host&gt; was found in DNS
+    /// cache</c>. A host that did not resolve is not kept, so it is looked up again. Every
+    /// answer is then reported as curl's resolved lines (<see cref="ReportResolved" />).
     /// </summary>
     private async ValueTask<IReadOnlyList<IPAddress>> ResolveAsync(string host, int port, ITransferEvents events, CancellationToken cancellationToken)
     {
-        var cacheKey = $"{host}:{port}";
-        if ((_resolveOverrides.Find(host, port) ?? _resolvedAddresses.GetValueOrDefault(cacheKey)) is { } cached)
+        var cacheKey = DnsCacheKey(host, port);
+        if ((_dnsCache.GetValueOrDefault(cacheKey) ?? _dnsCache.GetValueOrDefault(DnsCacheKey(AnyHost, port))) is { } cached)
         {
             events.ReportInfo($"Hostname {host} was found in DNS cache");
-            return cached;
+            ReportResolved(cached, events);
+            return cached.Addresses;
         }
 
         var addresses = await dnsResolver.ResolveAsync(host, cancellationToken).ConfigureAwait(false);
         if (addresses.Count > 0)
         {
-            _resolvedAddresses[cacheKey] = addresses;
+            var resolved = new DnsCacheEntry(host, port, addresses);
+            _dnsCache[cacheKey] = resolved;
+            ReportResolved(resolved, events);
         }
 
         return addresses;
     }
+
+    /// <summary>
+    /// Reports curl 8.21.0's <c>Host &lt;name&gt;:&lt;port&gt; was resolved.</c>,
+    /// <c>IPv6: &lt;addresses&gt;</c> and <c>IPv4: &lt;addresses&gt;</c> lines for a cache
+    /// entry, naming the entry's host as it was cached (a <c>--resolve</c> entry's as written,
+    /// <c>*</c> for a wildcard) and each family's addresses in order, joined by <c>, </c>, or
+    /// <c>(none)</c>. An entry named by an IP address reports none of them (measured, BL-482).
+    /// </summary>
+    private static void ReportResolved(DnsCacheEntry entry, ITransferEvents events)
+    {
+        if (IPAddress.TryParse(entry.Name, out _))
+        {
+            return;
+        }
+
+        events.ReportInfo($"Host {entry.Name}:{entry.Port} was resolved.");
+        events.ReportInfo($"IPv6: {JoinAddresses(entry.Addresses, AddressFamily.InterNetworkV6)}");
+        events.ReportInfo($"IPv4: {JoinAddresses(entry.Addresses, AddressFamily.InterNetwork)}");
+    }
+
+    private static string JoinAddresses(IReadOnlyList<IPAddress> addresses, AddressFamily family) =>
+        addresses.Where(address => address.AddressFamily == family).Select(address => address.ToString()).ToArray() is { Length: > 0 } inFamily
+            ? string.Join(", ", inFamily)
+            : "(none)";
+
+    private static string DnsCacheKey(string host, int port) => $"{host}:{port}";
 
     private async ValueTask<ConnectResult> ConnectThroughProxyAsync(
         ConnectTarget target,
@@ -540,4 +633,10 @@ public sealed class TcpConnector(
     /// the transfer talks over, which becomes the proxy's TLS stream through an HTTPS proxy.
     /// </summary>
     private sealed record DialedSocket(IConnection Connection, IPEndPoint LocalEndPoint, string HostName, IPEndPoint RemoteEndPoint);
+
+    /// <summary>
+    /// One key of curl's DNS cache: the host as it was cached (the name looked up, or a
+    /// <c>--resolve</c> entry's host as written), the port and the addresses.
+    /// </summary>
+    private sealed record DnsCacheEntry(string Name, int Port, IReadOnlyList<IPAddress> Addresses);
 }
