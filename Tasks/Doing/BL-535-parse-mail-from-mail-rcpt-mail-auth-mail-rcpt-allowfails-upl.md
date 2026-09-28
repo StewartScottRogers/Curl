@@ -32,3 +32,4 @@ The eight mail and SASL options parse into `CommandLineOptions` as curl 8.21.0 r
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
