@@ -121,6 +121,7 @@ choices do not need one.
 | [0104](ADR-0104-a-device-under-dev-is-sent-chunked-off-windows.md) | Off Windows a seekable `-F` file under `/dev/` (not `/dev/shm/`, `/dev/fd/` or `/dev/std*`) declares no length, so the body goes chunked as libcurl sends a device; on Windows a seekable file's length stands | Accepted | 2026-09-27 |
 | [0105](ADR-0105-a-failed-connect-reports-closing-connection-0.md) | The HTTP handler reports `closing connection #N` after every failed connect, with `N` from `ConnectResult.ConnectionNumber` (`0` for a failed connect), as curl 8.21.0 does after a refused dial, failed resolve or connect timeout | Accepted | 2026-09-27 |
 | [0106](ADR-0106-the-runner-watches-each-attempt-for-low-speed-and-cancels-it.md) | `Curl.Core`'s `LowSpeedWatchdog` checks each attempt's speed once a second as `Curl_speedcheck` does and cancels it through `ITransferContext.CancellationToken` after `-y` seconds below `-Y` (30 seconds, or 1 byte per second, when only one is given); the runner turns that into exit 28 and curl's message | Accepted | 2026-09-27 |
+| [0107](ADR-0107-ftp-active-mode-retries-a-non-local-port-address-in-the-handler.md) | FTP active mode retries a `-P` address that is not local once on the control connection's address in the handler, as curl 8.21.0's `ftp_port_bind_socket` does; `TcpConnectionListener` words `EADDRNOTAVAIL` as curl's `-v` line so the handler can tell it apart, and `EPRT`/`PORT` still announce the `-P` address | Accepted | 2026-09-27 |
 
 ## Template
 
