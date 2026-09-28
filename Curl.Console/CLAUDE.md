@@ -52,8 +52,8 @@ Before its transfers, each command-line URL is expanded as a glob by `Curl.Core`
 one transfer, a `UrlTransfer`: all of them share the command-line URL's output entry, `-T` file
 and `%{urlnum}`, while `%{xfer_id}` counts transfers across the run. Each `#N` in the `-o` name
 takes glob N's value and, on Windows and not under `-g`, the result is sanitized
-(`UrlGlobMatch.ResolveOutputFileName`); a `-D` file is truncated by the first transfer and
-appended to by every later one, even of the same glob. A URL that is not a well-formed glob
+(`UrlGlobMatch.ResolveOutputFileName`); a `-D` file is truncated by its option group's first
+transfer and appended to by every later one of the group, even of the same glob. A URL that is not a well-formed glob
 prints curl's `curl: (3) bad range in position N:` lines (not under `-s`) and ends the run with
 exit 3. An `ipfs://` or `ipns://` URL is then rewritten by `IpfsGatewayRewriter` from
 `--ipfs-gateway`, `IPFS_GATEWAY` or the gateway file (read through the runner's data-file
@@ -106,8 +106,8 @@ platform's credential encoding), which answers the scheme `-u`, `--basic`, `--di
 when neither is given), and `--compressed`, `--tr-encoding`, `--raw` and `--ignore-content-length`
 are copied as they are (BL-236); `CurlCommandRunnerTransferEncodingTests` pins each one's request
 bytes and output as BL-177, BL-180 and BL-315 measured them.
-With `-b` or `-c` the handler also gets the run's `CookieEngine`: one `CookieStore` shared by
-every URL, the `-b` files loaded before the first transfer (session cookies dropped under
+With `-b` or `-c` the handler also gets the option group's `CookieEngine`: one `CookieStore`
+shared by every URL of every group (`CurlComposition.SharingRunCookies`), the `-b` files loaded before the first transfer (session cookies dropped under
 `-j`, a missing file ignored), the `-b name=value` strings sent after the stored cookies (left out when an `-H` value names
 `Cookie`, BL-291), and
 the `-c` jar written after every `http`/`https` transfer, after its `-w` output, whatever its
@@ -126,9 +126,32 @@ run with its own exit code.
 
 A `-d` / `--data*` / `--json` body to be posted (no `-G`) with `-I` (HEAD) or `--no-head` (GET) is
 refused at transfer setup, not while parsing, as curl 8.21.0 refuses it in `tool_operate`: after
-the parse is accepted and `-V` is handled, and before any dispatch is built, `RunAsync` writes
+the parse is accepted and `-V` is handled, and before the group's dispatch is built, `RunAsync` writes
 `CommandLineWarning.PostRequestedWithHead` or `PostRequestedWithGet` (nothing under `-s`, even
-with `-S`), with no `curl: try` line, and exits 2, whatever order the options came in (BL-255).
+with `-S`), with no `curl: try` line, and exits 2, whatever order the options came in (BL-255);
+in a later option group, once the groups before it have run (BL-509).
+
+The `-:`/`--next` option groups (`CommandLineParseResult.Groups`) run in order, up to and
+including the first with an output option left over (ADR-0126, BL-509). Each group's URLs use
+that group's options through a `TransferDispatch` the factory builds for the group and the runner
+disposes when the group ends, so connections are not yet reused across groups (BL-754).
+`%{urlnum}` (`UrlTransfer.UrlNumber`), `%{xfer_id}` and `%{conn_id}` count on across groups, the
+`-v`/trace output stays open for the whole run, `--fail-early` stops every group, and the exit
+code is the last transfer's. Measured on curl 8.21.0 (BL-509 Notes).
+
+Under `-Z` (ADR-0127, BL-519) the same loops start each transfer, in command-line order across the
+groups, once fewer than `--parallel-max` are running (`ParallelTransferQueue`), without waiting for
+it; each group's dispatch stays open until the run ends. Each transfer keeps its own
+`RunningTransferState` (an `AsyncLocal`, set as it starts), and every write to standard output and
+standard error goes through one `WriteGate` (`WriteGateStream`), so a body chunk is never split and a
+finished transfer's error line and `-w` text are written together, in completion order. `ParallelRun`
+holds the exit code - the first failure's in completion order, not the last's - and, under
+`--fail-early`, cancels the running transfers through the context's token: each ends with
+`curl: (42) Transfer aborted due to critical error in another transfer`, each queued one is not
+started and ends with the first failure's code and `CurlEasyErrorText`'s text, and both are reported
+in command-line order after the run's other transfers. A result that ends a serial run without
+`--fail-early` (a bad glob, a `-T` or `-D` file that cannot be opened) stops further starts and lets
+the running transfers finish. Without `-Z` nothing changes.
 
 The Nth `-T` / `--upload-file` value uploads to the Nth URL (ADR-0051). Its URL is resolved
 by `UploadTransferUrl` before anything else of that transfer: one it cannot parse is exit 3

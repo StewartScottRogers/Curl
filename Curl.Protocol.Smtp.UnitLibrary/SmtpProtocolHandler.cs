@@ -18,9 +18,12 @@ namespace Curl.Protocol.Smtp;
 /// are described on <see cref="SmtpSession" />.
 /// </para>
 /// <para>
-/// Authentication (BL-541), the upload (BL-542) and the commands sent without one (BL-543)
-/// are not implemented yet: once the session is open the handler closes it with
-/// <c>QUIT</c> and reports success. Cancellation leaves as an exception.
+/// With <c>-T</c> and at least one <c>--mail-rcpt</c> the open session sends the message
+/// (<see cref="SmtpMailTransaction" />, BL-542), after authenticating with <c>AUTH</c> when
+/// the handler was given an <see cref="ISaslAuthenticator" /> (<see cref="SmtpSaslAuthentication" />,
+/// BL-541). Without an upload or without a recipient it sends <c>VRFY</c>, <c>EXPN</c>,
+/// <c>HELP</c> or the <c>-X</c> command and writes the replies to the output
+/// (<see cref="SmtpCommandTransfer" />, BL-543). Cancellation leaves as an exception.
 /// </para>
 /// </remarks>
 public sealed class SmtpProtocolHandler : IProtocolHandler
@@ -30,9 +33,14 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
 
     private static readonly string[] Schemes = ["smtp", ImplicitTlsScheme];
 
+    /// <summary>Names this machine in <c>EHLO</c> for a URL with an empty path.</summary>
+    private static readonly Func<string> MachineHostName = Dns.GetHostName;
+
     private readonly IConnector connector;
 
     private readonly ITlsProvider tlsProvider;
+
+    private readonly ISaslAuthenticator? saslAuthenticator;
 
     private readonly Func<string> localHostName;
 
@@ -46,7 +54,20 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
     /// <param name="tlsProvider">Upgrades the connection after an accepted <c>STARTTLS</c>.</param>
     /// <exception cref="ArgumentNullException">Any argument is <see langword="null" />.</exception>
     public SmtpProtocolHandler(IConnector connector, ITlsProvider tlsProvider)
-        : this(connector, tlsProvider, Dns.GetHostName)
+        : this(connector, tlsProvider, saslAuthenticator: null, MachineHostName)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a handler that serves <c>smtp</c> and <c>smtps</c> and authenticates with
+    /// <c>AUTH</c> through <paramref name="saslAuthenticator" /> (ADR-0121).
+    /// </summary>
+    /// <param name="connector">Supplies the connection.</param>
+    /// <param name="tlsProvider">Upgrades the connection after an accepted <c>STARTTLS</c>.</param>
+    /// <param name="saslAuthenticator">Chooses the SASL mechanism and answers its challenges.</param>
+    /// <exception cref="ArgumentNullException">Any argument is <see langword="null" />.</exception>
+    public SmtpProtocolHandler(IConnector connector, ITlsProvider tlsProvider, ISaslAuthenticator saslAuthenticator)
+        : this(connector, tlsProvider, saslAuthenticator ?? throw new ArgumentNullException(nameof(saslAuthenticator)), MachineHostName)
     {
     }
 
@@ -56,12 +77,21 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
     /// </summary>
     /// <param name="connector">Supplies the connection.</param>
     /// <param name="tlsProvider">Upgrades the connection after an accepted <c>STARTTLS</c>.</param>
+    /// <param name="saslAuthenticator">
+    /// Chooses the SASL mechanism, or <see langword="null" /> for a handler that never sends
+    /// <c>AUTH</c>.
+    /// </param>
     /// <param name="localHostName">Supplies the local machine's host name.</param>
-    /// <exception cref="ArgumentNullException">Any argument is <see langword="null" />.</exception>
-    internal SmtpProtocolHandler(IConnector connector, ITlsProvider tlsProvider, Func<string> localHostName)
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="connector" />, <paramref name="tlsProvider" /> or
+    /// <paramref name="localHostName" /> is <see langword="null" />.
+    /// </exception>
+    internal SmtpProtocolHandler(
+        IConnector connector, ITlsProvider tlsProvider, ISaslAuthenticator? saslAuthenticator, Func<string> localHostName)
     {
         this.connector = connector ?? throw new ArgumentNullException(nameof(connector));
         this.tlsProvider = tlsProvider ?? throw new ArgumentNullException(nameof(tlsProvider));
+        this.saslAuthenticator = saslAuthenticator;
         this.localHostName = localHostName ?? throw new ArgumentNullException(nameof(localHostName));
     }
 
@@ -107,7 +137,7 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
     private async ValueTask<TransferResult> RunSessionAsync(IConnection connection, ITransferContext context, string domain, bool implicitTls)
     {
         var session = new SmtpSession(
-            new SmtpControlChannel(connection, context.CancellationToken), tlsProvider, context, domain, implicitTls);
+            new SmtpControlChannel(connection, context.CancellationToken), tlsProvider, saslAuthenticator, context, domain, implicitTls);
         await using (session.ConfigureAwait(false))
         {
             return await session.RunAsync().ConfigureAwait(false);

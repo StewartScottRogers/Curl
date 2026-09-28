@@ -19,9 +19,10 @@ namespace Curl.Console;
 /// <c>curl: (N) &lt;message&gt;</c> line for each failure.
 /// </summary>
 /// <param name="createTransferDispatch">
-/// Builds, from the accepted command line, the dispatcher that performs each transfer with
-/// the handler for its scheme and the warning lines printed before each transfer; called
-/// once per run, and not at all for a refused command line. It takes the options because
+/// Builds, from one option group of the accepted command line, the dispatcher that performs each
+/// transfer with the handler for its scheme and the warning lines printed before each transfer;
+/// called once per <c>-:</c> / <c>--next</c> option group that runs, and not at all for a refused
+/// command line. It takes the options because
 /// the network handlers' TLS settings, and the warnings for the ones the build ignores,
 /// come from them.
 /// </param>
@@ -118,7 +119,9 @@ namespace Curl.Console;
 /// URLs are transferred in command-line order; a failure does not stop the rest, and the
 /// exit code is the last transfer's, as curl's is. The exceptions are <c>--fail-early</c>,
 /// under which the first failure stops the run with its own exit code, and a resumed transfer
-/// whose <c>-o</c> file cannot be opened: curl stops the run there with exit 23. The first <c>-o</c> receives the first
+/// whose <c>-o</c> file cannot be opened: curl stops the run there with exit 23. Under <c>-Z</c>
+/// up to <c>--parallel-max</c> transfers run at once and report in completion order, and the exit
+/// code is the first failure's (ADR-0127, <see cref="ParallelRun" />). The first <c>-o</c> receives the first
 /// URL, the second the second, and so on. A failure's line is printed unless <c>-s</c> was
 /// given without <c>-S</c>, and only when the failure carries a message. An <c>-o</c> file
 /// that cannot be created prints curl's <c>Warning: Failed to open the file</c> line first,
@@ -418,37 +421,37 @@ internal sealed class CurlCommandRunner(
     private readonly StandardOutputFailureDeferringStream deferringStandardOutput = new(standardOutput);
 
     /// <summary>
-    /// The file the current transfer saved its body to, under the name <c>-J</c> gave it if it
-    /// gave one, printed by <c>%{filename_effective}</c>; <see langword="null" /> while the
-    /// body goes to standard output. Cleared before each transfer.
+    /// The state of the transfer the current asynchronous flow is running, set as each transfer
+    /// starts, so that transfers running at once under <c>-Z</c> each see their own (ADR-0127).
     /// </summary>
-    private string? transferOutputFileName;
+    private readonly AsyncLocal<RunningTransferState?> runningTransfer = new();
+
+    /// <summary>Gets the state of the transfer the current asynchronous flow is running.</summary>
+    private RunningTransferState Running => runningTransfer.Value!;
 
     /// <summary>
-    /// The output file the current transfer opened, which <c>--remove-on-error</c> deletes when the
-    /// transfer fails; <see langword="null" /> while no file was opened. Cleared before each transfer.
+    /// The gate every write to standard output and standard error goes through once the transfers
+    /// start, so that transfers running at once under <c>-Z</c> never split each other's writes.
     /// </summary>
-    private string? transferOpenedOutputFile;
+    private readonly WriteGate writeGate = new();
+
+    /// <summary>Standard output through <see cref="writeGate" />, deferring a write failure as <see cref="deferringStandardOutput" /> does.</summary>
+    private Stream? gatedDeferringStandardOutput;
+
+    /// <summary>Gets standard output through <see cref="writeGate" />, deferring a write failure as <see cref="deferringStandardOutput" /> does.</summary>
+    private Stream GatedDeferringStandardOutput => gatedDeferringStandardOutput ??= writeGate.Guard(deferringStandardOutput);
+
+    /// <summary>The raw standard output through <see cref="writeGate" />, where <c>-D -</c> writes.</summary>
+    private Stream? gatedStandardOutput;
+
+    /// <summary>Gets the raw standard output through <see cref="writeGate" />, where <c>-D -</c> writes.</summary>
+    private Stream GatedStandardOutput => gatedStandardOutput ??= writeGate.Guard(standardOutput);
 
     /// <summary>
-    /// Records whether the current transfer's handler reported it past connect or open, and
-    /// the status lines its byte reports draw, for <see cref="WriteProgressAsync" />; a new
-    /// one, on the runner's clock, for each transfer. The first is only a placeholder.
+    /// The state of the running <c>-Z</c> run; <see langword="null" /> when the transfers run one at a
+    /// time, as they do without <c>-Z</c>.
     /// </summary>
-    private TransferProgressRecorder transferProgress = new(TimeProvider.System);
-
-    /// <summary>
-    /// The <c>-Y</c>/<c>-y</c> watchdog <see cref="StartLowSpeedWatchdog" /> started for the attempt
-    /// whose context was created last, until <see cref="FollowWatchingSpeedAsync" /> takes it;
-    /// <see langword="null" /> when the speed is not watched.
-    /// </summary>
-    private LowSpeedWatchdog? attemptLowSpeedWatchdog;
-
-    /// <summary>
-    /// The current transfer's <c>-#</c> bar, which <see cref="transferProgress" /> passes every
-    /// report on to; <see langword="null" /> when the bar is not shown. Cleared before each transfer.
-    /// </summary>
-    private ProgressBarRecorder? progressBar;
+    private ParallelRun? parallelRun;
 
     /// <summary>
     /// The result of the run's last transfer, which a later <c>-T</c> file that cannot be opened
@@ -476,23 +479,26 @@ internal sealed class CurlCommandRunner(
     private long nextTransferId;
 
     /// <summary>
+    /// The <c>%{xfer_id}</c> of the running <c>-:</c> / <c>--next</c> option group's first transfer,
+    /// which truncates the group's <c>-D</c> file: curl 8.21.0 opens each group's <c>-D</c> file anew, so
+    /// <c>-D h A --next -D h B</c> left only B's head in <c>h</c> (measured 2026-09-28, BL-509 Notes).
+    /// </summary>
+    private long firstTransferIdOfGroup;
+
+    /// <summary>
+    /// The <c>%{urlnum}</c> of the running option group's first command-line URL: the command-line
+    /// URLs of the groups before it, counted.
+    /// </summary>
+    private int firstUrlNumberOfGroup;
+
+    /// <summary>The option groups that run after the running one, in order; empty for the last.</summary>
+    private IReadOnlyList<CommandLineOptions> laterGroups = [];
+
+    /// <summary>
     /// Whether a transfer of this run has switched standard output to binary mode, as one set up to
     /// send its body to standard output, or to discard it under <c>--out-null</c>, does.
     /// </summary>
     private bool standardOutputSwitchedToBinary;
-
-    /// <summary>
-    /// Whether the current transfer has written the progress meter's header lines, which curl
-    /// 8.21.0 writes once however many times <c>--retry</c> runs the transfer.
-    /// </summary>
-    private bool progressMeterHeaderWritten;
-
-    /// <summary>
-    /// Whether the current transfer is a <c>-T</c> upload under <c>-C -</c>, whose meter curl
-    /// 8.21.0 heads with <c>** Resuming transfer from byte position -1</c> whatever the
-    /// <c>-o</c> file holds (task BL-416).
-    /// </summary>
-    private bool uploadResumesFromUnknownOffset;
 
     /// <summary>
     /// Where this run's <c>-v</c>, <c>--trace</c> and <c>--trace-ascii</c> output goes, opened once the
@@ -501,8 +507,8 @@ internal sealed class CurlCommandRunner(
     private TransferEventOutput transferEventOutput = TransferEventOutput.None;
 
     /// <summary>
-    /// The standard error <see cref="transferEventOutput" /> writes through, which
-    /// <see cref="transferProgress" /> holds once the handler reports the transfer done and
+    /// The standard error <see cref="transferEventOutput" /> writes through, which each transfer's
+    /// <see cref="RunningTransferState.Progress" /> holds once the handler reports the transfer done and
     /// <see cref="WriteProgressAsync" /> releases after the meter's end (task BL-411);
     /// <see langword="null" /> until it is opened.
     /// </summary>
@@ -546,7 +552,16 @@ internal sealed class CurlCommandRunner(
 
         await WriteDefaultConfigFileNoteAsync(parsed.NotedDefaultConfigFile).ConfigureAwait(false);
 
-        return await RunAcceptedAsync(parsed.Options, parsed.WarningLinesAfterTransfers).ConfigureAwait(false);
+        int exitCode = await RunAcceptedAsync(parsed.Options, parsed.Groups, parsed.WarningLinesAfterTransfers).ConfigureAwait(false);
+        if (parsed.RefusalAfterGroups is not { } refusalAfterGroups)
+        {
+            return exitCode;
+        }
+
+        // curl 8.21.0 refuses a later -:/--next group only once the groups before it have run
+        // (test686: "htdhdhdtp://localhost --next" exits 2).
+        await WriteErrorLinesAsync(refusalAfterGroups.StandardErrorLines).ConfigureAwait(false);
+        return (int)refusalAfterGroups.ExitCode;
     }
 
     /// <summary>
@@ -632,10 +647,14 @@ internal sealed class CurlCommandRunner(
     /// Runs an accepted command line, for <see cref="RunAsync" />, once standard error is where
     /// <c>--stderr</c> sends it.
     /// </summary>
-    /// <param name="options">The accepted command line.</param>
+    /// <param name="options">The accepted command line's first option group.</param>
+    /// <param name="groups">The option groups to run, <paramref name="options" /> first.</param>
     /// <param name="warningLinesAfterTransfers">The parser's warning lines printed after the transfers.</param>
     /// <returns>The process exit code.</returns>
-    private async Task<int> RunAcceptedAsync(CommandLineOptions options, IReadOnlyList<string> warningLinesAfterTransfers)
+    private async Task<int> RunAcceptedAsync(
+        CommandLineOptions options,
+        IReadOnlyList<CommandLineOptions> groups,
+        IReadOnlyList<string> warningLinesAfterTransfers)
     {
         if (InformationLines(options) is { } informationLines)
         {
@@ -651,20 +670,133 @@ internal sealed class CurlCommandRunner(
             return (int)CurlExitCode.Ok;
         }
 
-        if (RequestMethodConflictLines(options) is { } conflictLines)
+        if (await TransferAllGroupsAsync(groups).ConfigureAwait(false) is not { } exitCode)
         {
-            if (!options.Silent)
-            {
-                await WriteErrorLinesAsync(conflictLines).ConfigureAwait(false);
-            }
-
             return (int)CurlExitCode.FailedInit;
         }
 
-        CurlExitCode exitCode = await TransferAllAsync(options).ConfigureAwait(false);
         await WriteErrorLinesAsync(warningLinesAfterTransfers).ConfigureAwait(false);
 
         return (int)exitCode;
+    }
+
+    /// <summary>
+    /// Runs the <c>-:</c> / <c>--next</c> option groups in order, for <see cref="RunAcceptedAsync" />,
+    /// each command-line URL with its own group's options, then closes the run's
+    /// <see cref="transferEventOutput" />. <c>%{xfer_id}</c>, <c>%{conn_id}</c> and <c>%{urlnum}</c> count
+    /// on across the groups, and the exit code is the last transfer's, as curl 8.21.0 does: a failed
+    /// first group followed by a good one exits 0, a good one followed by a failed one exits with the
+    /// failure's code (measured 2026-09-28, BL-509 Notes).
+    /// </summary>
+    /// <param name="groups">The option groups to run.</param>
+    /// <returns>
+    /// The last transfer's exit code, under <c>-Z</c> the first failure's in completion order
+    /// (<see cref="EndParallelRunAsync" />), or <see cref="CurlExitCode.Ok" /> when there was none; or
+    /// <see langword="null" /> when a group's request methods conflict
+    /// (<see cref="RequestMethodConflictLines" />), whose lines are written and whose group and those
+    /// after it are not run, as curl 8.21.0 refuses it once the groups before it have run.
+    /// </returns>
+    /// <remarks>
+    /// No group runs after one that ends the run (<see cref="EndsTheRun" />, <c>--fail-early</c>
+    /// included) or one with an output option left over, whose run curl 8.21.0 ends there
+    /// (<c>-o nul -o nul2 A --next B</c> requested only A, BL-508 Notes).
+    /// </remarks>
+    private async Task<CurlExitCode?> TransferAllGroupsAsync(IReadOnlyList<CommandLineOptions> groups)
+    {
+        standardError = writeGate.Guard(standardError);
+        parallelRun = groups[0].Parallel ? new ParallelRun(groups[0].ParallelMax) : null;
+        try
+        {
+            CurlExitCode? exitCode = await TransferGroupsInOrderAsync(groups).ConfigureAwait(false);
+
+            return parallelRun is { } run ? await EndParallelRunAsync(run, exitCode).ConfigureAwait(false) : exitCode;
+        }
+        finally
+        {
+            await transferEventOutput.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Runs the option groups in order, for <see cref="TransferAllGroupsAsync" />: under <c>-Z</c> this
+    /// only starts their transfers, in command-line order, as slots free.
+    /// </summary>
+    /// <param name="groups">The option groups to run.</param>
+    /// <returns>The exit code <see cref="TransferAllGroupsAsync" /> describes, for a run without <c>-Z</c>.</returns>
+    private async Task<CurlExitCode?> TransferGroupsInOrderAsync(IReadOnlyList<CommandLineOptions> groups)
+    {
+        IReadOnlyList<CommandLineOptions> groupsThatRun = GroupsThatRun(groups);
+        CurlExitCode exitCode = CurlExitCode.Ok;
+        for (int group = 0; group < groupsThatRun.Count; group++)
+        {
+            if (!await AcceptsRequestMethodsAsync(groupsThatRun[group]).ConfigureAwait(false))
+            {
+                return null;
+            }
+
+            laterGroups = [.. groupsThatRun.Skip(group + 1)];
+            (exitCode, bool runEnded) = await TransferAllAsync(groupsThatRun[group], exitCode).ConfigureAwait(false);
+            if (runEnded)
+            {
+                break;
+            }
+        }
+
+        return exitCode;
+    }
+
+    /// <summary>
+    /// Ends a <c>-Z</c> run once every transfer has been started: waits for the running ones, writes
+    /// what <c>--fail-early</c> left to report, in command-line order, and closes the dispatches.
+    /// </summary>
+    /// <param name="run">The run.</param>
+    /// <param name="exitCode">
+    /// What <see cref="TransferGroupsInOrderAsync" /> returned: <see langword="null" /> for a group whose
+    /// request methods conflict.
+    /// </param>
+    /// <returns>
+    /// <see langword="null" /> when <paramref name="exitCode" /> is; otherwise the code of the first
+    /// transfer to fail, in completion order, or <see cref="CurlExitCode.Ok" /> (ADR-0127, decision 3).
+    /// </returns>
+    private static async Task<CurlExitCode?> EndParallelRunAsync(ParallelRun run, CurlExitCode? exitCode)
+    {
+        await run.EndAsync().ConfigureAwait(false);
+
+        return exitCode is null ? null : run.ExitCode;
+    }
+
+    /// <summary>
+    /// Tells whether an option group's request methods agree, writing
+    /// <see cref="RequestMethodConflictLines" />' lines, unless <c>-s</c>, when they do not.
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <returns><see langword="true" /> when the group can run.</returns>
+    private async Task<bool> AcceptsRequestMethodsAsync(CommandLineOptions options)
+    {
+        if (RequestMethodConflictLines(options) is not { } conflictLines)
+        {
+            return true;
+        }
+
+        if (!options.Silent)
+        {
+            await WriteErrorLinesAsync(conflictLines).ConfigureAwait(false);
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// The option groups that run: every one up to and including the first with an <c>-o</c>,
+    /// <c>-O</c> or kept <c>--no-remote-name</c> left over with no URL to pair with. An output entry is
+    /// only ever left without a URL by an output option, as a URL takes the first entry without one.
+    /// </summary>
+    /// <param name="groups">The option groups.</param>
+    /// <returns>The groups that run, in order.</returns>
+    private static IReadOnlyList<CommandLineOptions> GroupsThatRun(IReadOnlyList<CommandLineOptions> groups)
+    {
+        int firstWithOutputLeftOver = groups.ToList().FindIndex(group => group.UrlOutputs.Any(output => output.Url is null));
+        return firstWithOutputLeftOver < 0 ? groups : [.. groups.Take(firstWithOutputLeftOver + 1)];
     }
 
     /// <summary>
@@ -711,56 +843,79 @@ internal sealed class CurlCommandRunner(
             defaultConfigFileSearch ?? NoDefaultConfigFile);
 
     /// <summary>
-    /// Transfers every URL in order, each command-line URL once for every URL its glob expands to,
-    /// and reports each failure, then disposes the run's <see cref="TransferDispatch" />, closing
-    /// its connection pool, whatever the outcome.
+    /// Transfers every URL of one option group in order, each command-line URL once for every URL
+    /// its glob expands to, and reports each failure, then disposes the group's
+    /// <see cref="TransferDispatch" />, closing its connection pool, whatever the outcome.
     /// </summary>
-    /// <param name="options">The accepted command line.</param>
+    /// <param name="options">The option group.</param>
+    /// <param name="exitCode">The exit code so far, returned when nothing is transferred.</param>
     /// <returns>
-    /// The last transfer's exit code, or <see cref="CurlExitCode.Ok" /> when there was none.
-    /// A transfer <see cref="EndsTheRun" /> names is the last: the URLs after it are not
-    /// transferred. A URL that is not a well-formed glob also ends the run, with exit 3.
+    /// The last transfer's exit code, and whether the run ended: a transfer <see cref="EndsTheRun" />
+    /// names is the last, and the URLs after it are not transferred. A URL that is not a well-formed
+    /// glob also ends the run, with exit 3.
     /// </returns>
-    private async Task<CurlExitCode> TransferAllAsync(CommandLineOptions options)
+    private async Task<(CurlExitCode ExitCode, bool RunEnded)> TransferAllAsync(CommandLineOptions options, CurlExitCode exitCode)
     {
+        firstTransferIdOfGroup = nextTransferId;
         TransferDispatch dispatch = createTransferDispatch(options);
         try
         {
-            return await TransferEachUrlAsync(dispatch, options).ConfigureAwait(false);
+            return await TransferEachUrlAsync(dispatch, options, exitCode).ConfigureAwait(false);
         }
         finally
         {
-            await dispatch.DisposeAsync().ConfigureAwait(false);
-            await transferEventOutput.DisposeAsync().ConfigureAwait(false);
+            await CloseDispatchAsync(dispatch).ConfigureAwait(false);
+            firstUrlNumberOfGroup += options.Urls.Count;
         }
     }
 
     /// <summary>
-    /// Transfers every URL in order, for <see cref="TransferAllAsync" />, opening the run's
-    /// <see cref="transferEventOutput" /> once the first URL has parsed as a glob: curl 8.21.0
-    /// opens its trace file at the first event, and a URL that is not a well-formed glob makes
+    /// Closes an option group's dispatch once its transfers are over: at once without <c>-Z</c>, and
+    /// when the <c>-Z</c> run ends otherwise, since its transfers may still be running.
+    /// </summary>
+    /// <param name="dispatch">The group's dispatch.</param>
+    /// <returns>A task that completes when the dispatch is closed or left to the run.</returns>
+    private async Task CloseDispatchAsync(TransferDispatch dispatch)
+    {
+        if (parallelRun is { } run)
+        {
+            run.CloseAtEnd(dispatch);
+            return;
+        }
+
+        await dispatch.DisposeAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Transfers every URL of one option group in order, for <see cref="TransferAllAsync" />, opening
+    /// the run's <see cref="transferEventOutput" /> once the run's first URL has parsed as a glob: curl
+    /// 8.21.0 opens its trace file at the first event, and a URL that is not a well-formed glob makes
     /// none (measured 2026-09-27, BL-242 Notes).
     /// </summary>
-    /// <param name="dispatch">What the run transfers through.</param>
-    /// <param name="options">The accepted command line.</param>
-    /// <returns>The exit code <see cref="TransferAllAsync" /> returns.</returns>
-    private async Task<CurlExitCode> TransferEachUrlAsync(TransferDispatch dispatch, CommandLineOptions options)
+    /// <param name="dispatch">What the group transfers through.</param>
+    /// <param name="options">The option group.</param>
+    /// <param name="exitCode">The exit code so far, returned when nothing is transferred.</param>
+    /// <returns>The exit code and run end <see cref="TransferAllAsync" /> returns.</returns>
+    private async Task<(CurlExitCode ExitCode, bool RunEnded)> TransferEachUrlAsync(
+        TransferDispatch dispatch,
+        CommandLineOptions options,
+        CurlExitCode exitCode)
     {
-        CurlExitCode exitCode = CurlExitCode.Ok;
         for (int index = 0; index < options.Urls.Count; index++)
         {
             if (!TryParseUploadFiles(options, index, out IReadOnlyList<string?>? uploadFiles, out TransferResult? globFailure)
                 || !TryParseGlob(options, index, out UrlGlob? glob, out globFailure))
             {
                 await WriteGlobFailureLinesAsync(options, globFailure).ConfigureAwait(false);
-                return globFailure.ExitCode;
+                await RecordParallelRunEndAsync(globFailure).ConfigureAwait(false);
+                return (globFailure.ExitCode, true);
             }
 
-            if (index == 0)
+            if (eventStandardError is null)
             {
                 eventStandardError = new HoldableStream(standardError);
                 transferEventOutput = await TransferEventOutput
-                    .OpenAsync(options, fileSystem, deferringStandardOutput, eventStandardError, runsOnWindows, standardOutputIsTerminal, timeProvider)
+                    .OpenAsync(options, fileSystem, GatedDeferringStandardOutput, eventStandardError, runsOnWindows, standardOutputIsTerminal, timeProvider)
                     .ConfigureAwait(false);
             }
 
@@ -768,11 +923,11 @@ internal sealed class CurlCommandRunner(
                 .ConfigureAwait(false);
             if (runEnded)
             {
-                return exitCode;
+                return (exitCode, true);
             }
         }
 
-        return exitCode;
+        return (exitCode, false);
     }
 
     /// <summary>
@@ -800,10 +955,9 @@ internal sealed class CurlCommandRunner(
         {
             foreach (UrlGlobMatch match in glob.Expand())
             {
-                UrlTransfer transfer = new(options, index, nextTransferId++, match, uploadFile, runsOnWindows);
-                TransferResult result = await TransferAndReportAsync(dispatch, options, transfer).ConfigureAwait(false);
-                exitCode = result.ExitCode;
-                if (EndsTheRun(options, result))
+                UrlTransfer transfer = new(options, index, firstUrlNumberOfGroup + index, nextTransferId++, match, uploadFile, runsOnWindows);
+                (exitCode, bool runEnded) = await RunTransferAsync(dispatch, options, transfer, exitCode).ConfigureAwait(false);
+                if (runEnded)
                 {
                     return (exitCode, true);
                 }
@@ -892,6 +1046,180 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
+    /// Runs one transfer: to its end without <c>-Z</c>, and under it as <see cref="StartInParallelAsync" /> does.
+    /// </summary>
+    /// <param name="dispatch">Performs the transfer with the handler for its scheme, after its warning lines.</param>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="transfer">The transfer.</param>
+    /// <param name="exitCode">The exit code so far, kept under <c>-Z</c>, whose run decides its own.</param>
+    /// <returns>The exit code so far, and whether the run ended.</returns>
+    private async Task<(CurlExitCode ExitCode, bool RunEnded)> RunTransferAsync(
+        TransferDispatch dispatch,
+        CommandLineOptions options,
+        UrlTransfer transfer,
+        CurlExitCode exitCode)
+    {
+        if (parallelRun is { } run)
+        {
+            return (exitCode, await StartInParallelAsync(run, dispatch, options, transfer).ConfigureAwait(false));
+        }
+
+        TransferResult result = await TransferAndReportAsync(dispatch, options, transfer).ConfigureAwait(false);
+
+        return (result.ExitCode, EndsTheRun(options, result));
+    }
+
+    /// <summary>
+    /// Starts one transfer of a <c>-Z</c> run once fewer than <c>--parallel-max</c> are running, without
+    /// waiting for it to end (ADR-0127, decision 1). Once <c>--fail-early</c> has aborted the run the
+    /// transfer is not started, and its report is left for the end of the run.
+    /// </summary>
+    /// <param name="run">The run.</param>
+    /// <param name="dispatch">Performs the transfer with the handler for its scheme, after its warning lines.</param>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="transfer">The transfer.</param>
+    /// <returns>
+    /// <see langword="true" /> when a result that ends the run without <c>--fail-early</c> has stopped
+    /// every further start.
+    /// </returns>
+    private async Task<bool> StartInParallelAsync(
+        ParallelRun run,
+        TransferDispatch dispatch,
+        CommandLineOptions options,
+        UrlTransfer transfer)
+    {
+        await run.Queue.WaitForFreeSlotAsync().ConfigureAwait(false);
+        if (run.HasEnded)
+        {
+            return true;
+        }
+
+        RunningTransferState state = NewRunningTransferState(run.AbortToken);
+        if (run.IsAborted)
+        {
+            run.DeferReport(transfer.TransferId, () => ReportSkippedAsync(dispatch, options, transfer, state, run.FirstFailure!));
+            return false;
+        }
+
+        run.Queue.Add(TransferInParallelAsync(run, dispatch, options, transfer, state));
+        return false;
+    }
+
+    /// <summary>
+    /// Performs one transfer of a <c>-Z</c> run, then, holding the run's <see cref="writeGate" />,
+    /// records how it ended and writes its report (<see cref="EndParallelTransferAsync" />). A transfer
+    /// <c>--fail-early</c> cancels ends as <see cref="ParallelRun.AbortedResult" />.
+    /// </summary>
+    /// <param name="run">The run.</param>
+    /// <param name="dispatch">Performs the transfer with the handler for its scheme, after its warning lines.</param>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="transfer">The transfer.</param>
+    /// <param name="state">The transfer's state.</param>
+    /// <returns>A task that completes when the transfer and its report, if not deferred, are done.</returns>
+    private async Task TransferInParallelAsync(
+        ParallelRun run,
+        TransferDispatch dispatch,
+        CommandLineOptions options,
+        UrlTransfer transfer,
+        RunningTransferState state)
+    {
+        runningTransfer.Value = state;
+        (TransferResult Result, string GivenUrl, string TransferUrl) ended;
+        try
+        {
+            ended = await TransferUrlAsync(dispatch, options, transfer).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (state.AbortToken.IsCancellationRequested)
+        {
+            ended = (ParallelRun.AbortedResult, transfer.Url, UrlSchemeGuesser.AddGuessedScheme(transfer.Url));
+        }
+
+        await writeGate.RunExclusiveAsync(() => EndParallelTransferAsync(run, dispatch, options, transfer, state, ended))
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Ends one transfer of a <c>-Z</c> run, holding the run's <see cref="writeGate" />: once
+    /// <c>--fail-early</c> has aborted the run, the transfer counts as aborted and its report is left for
+    /// the end of the run, in command-line order; otherwise its end is recorded
+    /// (<see cref="ParallelRun.RecordEnd" />) and its report written at once, in completion order
+    /// (ADR-0127, decisions 2 to 4).
+    /// </summary>
+    /// <param name="run">The run.</param>
+    /// <param name="dispatch">What the transfer went through, with its cookies.</param>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="transfer">The transfer.</param>
+    /// <param name="state">The transfer's state.</param>
+    /// <param name="ended">The transfer's result and URLs, as <see cref="TransferUrlAsync" /> gives them.</param>
+    /// <returns>A task that completes when the report is written or left.</returns>
+    private Task EndParallelTransferAsync(
+        ParallelRun run,
+        TransferDispatch dispatch,
+        CommandLineOptions options,
+        UrlTransfer transfer,
+        RunningTransferState state,
+        (TransferResult Result, string GivenUrl, string TransferUrl) ended)
+    {
+        if (run.IsAborted)
+        {
+            run.DeferReport(
+                transfer.TransferId,
+                () => ReportAsync(dispatch, options, transfer, state, ParallelRun.AbortedResult, ended.GivenUrl, ended.TransferUrl));
+            return Task.CompletedTask;
+        }
+
+        run.RecordEnd(ended.Result, EndsTheRun(options, ended.Result), options.FailEarly);
+
+        return ReportAsync(dispatch, options, transfer, state, ended.Result, ended.GivenUrl, ended.TransferUrl);
+    }
+
+    /// <summary>
+    /// Writes the report of a transfer <c>--fail-early</c> kept from starting: it ends with the first
+    /// failure's code and curl's generic text for it (<see cref="CurlEasyErrorText" />), as curl 8.21.0
+    /// reports it (ADR-0127, rows 12 and 13).
+    /// </summary>
+    /// <param name="dispatch">What the transfer would have gone through, with its cookies.</param>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="transfer">The transfer.</param>
+    /// <param name="state">The transfer's state.</param>
+    /// <param name="firstFailure">The run's first failure.</param>
+    /// <returns>A task that completes when the report is written.</returns>
+    private Task ReportSkippedAsync(
+        TransferDispatch dispatch,
+        CommandLineOptions options,
+        UrlTransfer transfer,
+        RunningTransferState state,
+        TransferResult firstFailure)
+    {
+        TransferResult skipped = TransferResult.Failure(firstFailure.ExitCode, CurlEasyErrorText.Of(firstFailure.ExitCode));
+
+        return ReportAsync(dispatch, options, transfer, state, skipped, transfer.Url, UrlSchemeGuesser.AddGuessedScheme(transfer.Url));
+    }
+
+    /// <summary>
+    /// Records, under <c>-Z</c> and holding the run's <see cref="writeGate" />, a failure that ends the
+    /// run before its transfer starts, such as a URL that is not a well-formed glob.
+    /// </summary>
+    /// <param name="failure">The failure.</param>
+    /// <returns>A task that completes when it is recorded, at once without <c>-Z</c>.</returns>
+    private Task RecordParallelRunEndAsync(TransferResult failure) =>
+        parallelRun is { } run
+            ? writeGate.RunExclusiveAsync(() =>
+            {
+                run.RecordEnd(failure, endsTheRun: true, failEarly: false);
+                return Task.CompletedTask;
+            })
+            : Task.CompletedTask;
+
+    /// <summary>
+    /// Makes the state of a transfer starting now, in the running option group.
+    /// </summary>
+    /// <param name="abortToken">The token <c>--fail-early</c> aborts the transfer through, under <c>-Z</c>.</param>
+    /// <returns>The state.</returns>
+    private RunningTransferState NewRunningTransferState(CancellationToken abortToken) =>
+        new(firstTransferIdOfGroup, laterGroups, abortToken);
+
+    /// <summary>
     /// Performs one transfer, then writes its failure lines, its <c>-w</c> output and the
     /// <c>-c</c> jar.
     /// </summary>
@@ -904,19 +1232,43 @@ internal sealed class CurlCommandRunner(
         CommandLineOptions options,
         UrlTransfer transfer)
     {
-        transferOutputFileName = null;
-        transferOpenedOutputFile = null;
-        progressBar = null;
-        progressMeterHeaderWritten = false;
+        RunningTransferState state = NewRunningTransferState(CancellationToken.None);
+        runningTransfer.Value = state;
         (TransferResult result, string givenUrl, string transferUrl) = await TransferUrlAsync(dispatch, options, transfer)
             .ConfigureAwait(false);
+        await ReportAsync(dispatch, options, transfer, state, result, givenUrl, transferUrl).ConfigureAwait(false);
 
+        return result;
+    }
+
+    /// <summary>
+    /// Writes a finished transfer's report: its failure lines, the <c>-#</c> bar's newline, the
+    /// <c>--remove-on-error</c> removal, its <c>-w</c> output and the <c>-c</c> jar.
+    /// </summary>
+    /// <param name="dispatch">What the transfer went through, with its cookies.</param>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="transfer">The transfer.</param>
+    /// <param name="state">The transfer's state.</param>
+    /// <param name="result">The transfer's result.</param>
+    /// <param name="givenUrl">The URL <c>%{url}</c> prints.</param>
+    /// <param name="transferUrl">The URL transferred.</param>
+    /// <returns>A task that completes when the report is written.</returns>
+    private async Task ReportAsync(
+        TransferDispatch dispatch,
+        CommandLineOptions options,
+        UrlTransfer transfer,
+        RunningTransferState state,
+        TransferResult result,
+        string givenUrl,
+        string transferUrl)
+    {
+        runningTransfer.Value = state;
         if (ShowsErrors(options) && result.ErrorMessage is not null && !IsIpfsGatewayFailure(result))
         {
             await WriteFailureLinesAsync(result).ConfigureAwait(false);
         }
 
-        if (progressBar is { HasBeenCalled: true })
+        if (state.ProgressBar is { HasBeenCalled: true })
         {
             await WriteErrorLineAsync(string.Empty).ConfigureAwait(false);
         }
@@ -930,7 +1282,6 @@ internal sealed class CurlCommandRunner(
         await WriteCookieJarAsync(dispatch, options, transferUrl, standardOutputIsBinary).ConfigureAwait(false);
 
         previousTransferResult = result;
-        return result;
     }
 
     /// <summary>
@@ -948,7 +1299,7 @@ internal sealed class CurlCommandRunner(
     /// <returns>A task that completes when the file is dealt with.</returns>
     private async Task RemoveOutputFileOfFailedTransferAsync(CommandLineOptions options, TransferResult result)
     {
-        if (result.IsSuccess || !options.RemoveOnError || transferOpenedOutputFile is not { } openedFile)
+        if (result.IsSuccess || !options.RemoveOnError || Running.OpenedOutputFile is not { } openedFile)
         {
             return;
         }
@@ -1104,7 +1455,7 @@ internal sealed class CurlCommandRunner(
         UrlTransfer transfer,
         IpfsGatewayFailure failure)
     {
-        transferOutputFileName = transfer.OutputFileName is { } fileName ? InOutputDirectory(options, fileName) : null;
+        Running.OutputFileName = transfer.OutputFileName is { } fileName ? InOutputDirectory(options, fileName) : null;
         await WriteErrorLinesAsync(["curl: " + failure.Message, CommandLineRefusal.TryHelpLine]).ConfigureAwait(false);
 
         if (failure == IpfsGatewayFailure.GatewayDetectionFailed)
@@ -1209,12 +1560,26 @@ internal sealed class CurlCommandRunner(
     /// to binary mode: one that saves no file, sending its body to standard output or discarding
     /// it under <c>--out-null</c>.
     /// </summary>
-    /// <param name="options">The accepted command line.</param>
-    /// <param name="index">The URL's position on the command line.</param>
-    /// <returns><see langword="true" /> when a later URL saves no file.</returns>
-    private static bool LaterUrlSwitchesStandardOutputToBinary(CommandLineOptions options, int index)
+    /// <param name="options">The running option group.</param>
+    /// <param name="index">The URL's position in its option group.</param>
+    /// <returns>
+    /// <see langword="true" /> when a later URL of the group, or any URL of a later group, saves no
+    /// file: curl 8.21.0 wrote <c>-o NUL -w "%{exitcode}\n" A --next B</c>'s line feed as LF, and as
+    /// CR LF with <c>-o NUL</c> in the second group too (measured 2026-09-28, BL-509 Notes).
+    /// </returns>
+    private bool LaterUrlSwitchesStandardOutputToBinary(CommandLineOptions options, int index) =>
+        UrlFromSwitchesStandardOutputToBinary(options, index + 1)
+        || Running.LaterGroups.Any(group => UrlFromSwitchesStandardOutputToBinary(group, 0));
+
+    /// <summary>
+    /// Tells whether any URL of <paramref name="options" /> from <paramref name="first" /> on saves no file.
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <param name="first">The position of the first URL looked at.</param>
+    /// <returns><see langword="true" /> when one of those URLs saves no file.</returns>
+    private static bool UrlFromSwitchesStandardOutputToBinary(CommandLineOptions options, int first)
     {
-        for (int later = index + 1; later < options.Urls.Count; later++)
+        for (int later = first; later < options.Urls.Count; later++)
         {
             if (!WritesToFile(options, later))
             {
@@ -1322,10 +1687,10 @@ internal sealed class CurlCommandRunner(
         long connectionId)
     {
         string requestUrl = UrlEffective.Normalize(QueryUrl.Append(transferUrl, options), options.PathAsIs);
-        return new(result, givenUrl, transfer.UrlIndex, requestUrl, WriteOutScheme(requestUrl, result), timeProvider)
+        return new(result, givenUrl, transfer.UrlNumber, requestUrl, WriteOutScheme(requestUrl, result), timeProvider)
         {
             Referer = result.Report?.Referer ?? options.Referer,
-            OutputFileName = transferOutputFileName,
+            OutputFileName = Running.OutputFileName,
             ConnectionId = connectionId,
             TransferId = HasNoTransferNumber(result) ? NoTransferId : transfer.TransferId,
         };
@@ -1581,7 +1946,7 @@ internal sealed class CurlCommandRunner(
 
         if (headerFile == StandardOutputHeaderFile)
         {
-            return await TransferReportingHeaderWriteFailureAsync(dispatch, options, url, uploadFile, transfer, headerFile, standardOutput)
+            return await TransferReportingHeaderWriteFailureAsync(dispatch, options, url, uploadFile, transfer, headerFile, GatedStandardOutput)
                 .ConfigureAwait(false);
         }
 
@@ -1615,7 +1980,7 @@ internal sealed class CurlCommandRunner(
         FileOpenResult opened = await fileSystem
             .OpenForWriteAsync(
                 headerFile,
-                transfer.TransferId == 0 ? FileWriteMode.Truncate : FileWriteMode.Append,
+                transfer.TransferId == Running.FirstTransferIdOfGroup ? FileWriteMode.Truncate : FileWriteMode.Append,
                 DeferredOutputFileStream.CreateMode,
                 CancellationToken.None)
             .ConfigureAwait(false);
@@ -1848,7 +2213,7 @@ internal sealed class CurlCommandRunner(
         HttpRequestBody? formBody,
         Stream? upload)
     {
-        uploadResumesFromUnknownOffset = options.ResumeFromOutputSize && upload is not null;
+        Running.UploadResumesFromUnknownOffset = options.ResumeFromOutputSize && upload is not null;
         string? outputFile = await ResolveOutputFileAsync(options, transfer, url).ConfigureAwait(false);
         if (outputFile is not null
             && await CreateOutputDirectoriesOrSkipAsync(options, outputFile).ConfigureAwait(false) is { } unstarted)
@@ -1868,16 +2233,17 @@ internal sealed class CurlCommandRunner(
             Func<TransferContext> createAttemptContext = () => transferContextFactory.Create(
                 options,
                 url,
-                RateLimited(options, toStandardOutput ? FlushedEachWriteUnderNoBuffer(options, deferringStandardOutput) : Stream.Null),
+                RateLimited(options, toStandardOutput ? FlushedEachWriteUnderNoBuffer(options, GatedDeferringStandardOutput) : Stream.Null),
                 range,
                 options.ResumeFrom,
                 headerOutput,
                 formBody,
                 upload,
                 proxy,
-                progress: transferProgress,
+                progress: Running.Progress,
                 events: transferEventOutput.Events,
-                lowSpeedWatchdog: StartLowSpeedWatchdog(options));
+                lowSpeedWatchdog: StartLowSpeedWatchdog(options),
+                abortToken: Running.AbortToken);
             TransferResult result = toStandardOutput
                 ? await TransferToStandardOutputAsync(follower, options, createAttemptContext).ConfigureAwait(false)
                 : await FollowRetryingAsync(follower, options, createAttemptContext, options.ResumeFrom, null).ConfigureAwait(false);
@@ -1941,7 +2307,7 @@ internal sealed class CurlCommandRunner(
     /// <returns>A successful result with no bytes moved.</returns>
     private async Task<TransferResult> SkipExistingOutputFileAsync(CommandLineOptions options, string outputFile)
     {
-        transferOutputFileName = outputFile;
+        Running.OutputFileName = outputFile;
         if (options.Trace != TraceKind.None)
         {
             await WriteErrorPiecesAsync(WarningLineWrapper.WrapNoteText($"skips transfer, \"{outputFile}\" exists locally", terminalColumns))
@@ -2039,7 +2405,7 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// Makes the current transfer's progress sink, on the runner's clock, with a
-    /// <see cref="ProgressBarRecorder" /> for <see cref="progressBar" /> when
+    /// <see cref="ProgressBarRecorder" /> for its <see cref="RunningTransferState.ProgressBar" /> when
     /// <see cref="ShowsProgressBar" /> says the bar is shown, and
     /// <see cref="WriteProgressMeterLive" /> as its live writer when
     /// <see cref="ShowsProgressMeter" /> says the meter is.
@@ -2049,13 +2415,14 @@ internal sealed class CurlCommandRunner(
     /// <param name="toStandardOutput">Whether the transfer writes its body to standard output.</param>
     private void StartTransferProgress(CommandLineOptions options, long? resumeFrom, bool toStandardOutput)
     {
-        progressBar = ShowsProgressBar(options, toStandardOutput)
+        RunningTransferState state = Running;
+        state.ProgressBar = ShowsProgressBar(options, toStandardOutput)
             ? new ProgressBarRecorder(timeProvider, resumeFrom ?? 0, terminalColumns)
             : null;
-        transferProgress = new TransferProgressRecorder(
+        state.Progress = new TransferProgressRecorder(
             timeProvider,
-            progressBar,
-            ShowsProgressMeter(options, toStandardOutput) ? statusText => WriteProgressMeterLive(resumeFrom, statusText) : null,
+            state.ProgressBar,
+            ShowsProgressMeter(options, toStandardOutput) ? statusText => WriteProgressMeterLive(state, resumeFrom, statusText) : null,
             eventStandardError);
     }
 
@@ -2064,12 +2431,13 @@ internal sealed class CurlCommandRunner(
     /// runs, after the meter's header lines when they are not yet written, and flushes it. The
     /// write is synchronous because <see cref="ITransferProgress" /> reports are.
     /// </summary>
+    /// <param name="state">The transfer's state.</param>
     /// <param name="resumeFrom">The resolved <c>-C</c> offset, or <see langword="null" />.</param>
     /// <param name="statusText">The status lines, each starting with a carriage return.</param>
-    private void WriteProgressMeterLive(long? resumeFrom, string statusText)
+    private void WriteProgressMeterLive(RunningTransferState state, long? resumeFrom, string statusText)
     {
         StringBuilder text = new();
-        foreach (string headerLine in TakeProgressMeterHeaderLines(resumeFrom))
+        foreach (string headerLine in TakeProgressMeterHeaderLines(state, resumeFrom))
         {
             text.Append(headerLine).Append(Environment.NewLine);
         }
@@ -2079,12 +2447,12 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
-    /// Writes curl's progress for a finished transfer. Under <c>-#</c>, when
-    /// <see cref="progressBar" /> is set, that is everything the bar drew, the last call of a
+    /// Writes curl's progress for a finished transfer. Under <c>-#</c>, when the transfer's
+    /// <see cref="RunningTransferState.ProgressBar" /> is set, that is everything the bar drew, the last call of a
     /// successful transfer included, and no newline: curl writes that after the transfer's
     /// failure lines (task BL-132). Otherwise it is the progress meter, when
     /// <see cref="ShowsProgressMeter" /> says it is shown: its header lines, then the status
-    /// lines <see cref="transferProgress" /> drew, each starting with a carriage return, then
+    /// lines its <see cref="RunningTransferState.Progress" /> drew, each starting with a carriage return, then
     /// one newline, as curl 8.21.0 does (task BL-131); under <c>-L</c>, one such line per hop
     /// (task BL-277). The header lines and status lines <see cref="WriteProgressMeterLive" />
     /// already wrote while the transfer ran are not written again (task BL-383).
@@ -2093,7 +2461,7 @@ internal sealed class CurlCommandRunner(
     /// <param name="result">
     /// The transfer's result; the meter follows a success, a <c>-f</c> failure
     /// (<see cref="CurlExitCode.HttpReturnedError" />), and any failure after the handler
-    /// reported the transfer past connect or open (<see cref="transferProgress" />), which
+    /// reported the transfer past connect or open (<see cref="RunningTransferState.Progress" />), which
     /// curl 8.21.0 reports after the meter (task BL-130).
     /// </param>
     /// <param name="resumeFrom">The resolved <c>-C</c> offset, or <see langword="null" />.</param>
@@ -2105,7 +2473,8 @@ internal sealed class CurlCommandRunner(
         long? resumeFrom,
         bool toStandardOutput)
     {
-        if (progressBar is not null)
+        RunningTransferState state = Running;
+        if (state.ProgressBar is { } progressBar)
         {
             progressBar.Finish(result.IsSuccess, result.BytesTransferred);
             await WriteErrorTextAsync(progressBar.Drawn).ConfigureAwait(false);
@@ -2113,11 +2482,11 @@ internal sealed class CurlCommandRunner(
             return result;
         }
 
-        if ((result.IsSuccess || result.ExitCode == CurlExitCode.HttpReturnedError || transferProgress.HasTransferStarted)
+        if ((result.IsSuccess || result.ExitCode == CurlExitCode.HttpReturnedError || state.Progress.HasTransferStarted)
             && ShowsProgressMeter(options, toStandardOutput))
         {
-            FinishTransferProgress(result);
-            await WriteErrorLinesAsync([.. TakeProgressMeterHeaderLines(resumeFrom), transferProgress.TakeUnwrittenStatusLines()])
+            FinishTransferProgress(state.Progress, result);
+            await WriteErrorLinesAsync([.. TakeProgressMeterHeaderLines(state, resumeFrom), state.Progress.TakeUnwrittenStatusLines()])
                 .ConfigureAwait(false);
         }
 
@@ -2127,39 +2496,41 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
-    /// Makes the draws curl 8.21.0 makes as <see cref="transferProgress" />'s transfer ends: a
+    /// Makes the draws curl 8.21.0 makes as <paramref name="progress" />'s transfer ends: a
     /// redirect hop's when <c>--max-redirs</c> refused to follow its redirect (exit 47), which
     /// curl draws like a followed hop (task BL-277), and the finished transfer's otherwise.
     /// </summary>
+    /// <param name="progress">The transfer's progress sink.</param>
     /// <param name="result">The transfer's result.</param>
-    private void FinishTransferProgress(TransferResult result)
+    private static void FinishTransferProgress(TransferProgressRecorder progress, TransferResult result)
     {
         if (result.ExitCode == CurlExitCode.TooManyRedirects)
         {
-            transferProgress.FinishRedirectHop();
+            progress.FinishRedirectHop();
         }
         else
         {
-            transferProgress.Finish(result.IsSuccess);
+            progress.Finish(result.IsSuccess);
         }
     }
 
     /// <summary>
-    /// Gets the progress meter's header lines the first time the current transfer writes its
+    /// Gets the progress meter's header lines the first time the transfer writes its
     /// meter, and none after: curl 8.21.0 writes them once however many times <c>--retry</c>
     /// runs the transfer (measured 2026-09-27, BL-241 Notes).
     /// </summary>
+    /// <param name="state">The transfer's state.</param>
     /// <param name="resumeFrom">
     /// The resolved <c>-C</c> offset, or <see langword="null" />; a <c>-T</c> upload under
-    /// <c>-C -</c> (<see cref="uploadResumesFromUnknownOffset" />) names
+    /// <c>-C -</c> (<see cref="RunningTransferState.UploadResumesFromUnknownOffset" />) names
     /// <see cref="ProgressMeterLines.UnknownUploadOffset" /> instead.
     /// </param>
     /// <returns>The header lines, or none when they were already written.</returns>
-    private IReadOnlyList<string> TakeProgressMeterHeaderLines(long? resumeFrom)
+    private static IReadOnlyList<string> TakeProgressMeterHeaderLines(RunningTransferState state, long? resumeFrom)
     {
-        long? meterResumeFrom = uploadResumesFromUnknownOffset ? ProgressMeterLines.UnknownUploadOffset : resumeFrom;
-        IReadOnlyList<string> headerLines = progressMeterHeaderWritten ? [] : ProgressMeterLines.HeaderLines(meterResumeFrom);
-        progressMeterHeaderWritten = true;
+        long? meterResumeFrom = state.UploadResumesFromUnknownOffset ? ProgressMeterLines.UnknownUploadOffset : resumeFrom;
+        IReadOnlyList<string> headerLines = state.ProgressMeterHeaderWritten ? [] : ProgressMeterLines.HeaderLines(meterResumeFrom);
+        state.ProgressMeterHeaderWritten = true;
 
         return headerLines;
     }
@@ -2299,8 +2670,8 @@ internal sealed class CurlCommandRunner(
                 proxy)
             .ConfigureAwait(false);
 
-        transferOutputFileName = output.Path;
-        transferOpenedOutputFile = output.IsOpen ? output.Path : null;
+        Running.OutputFileName = output.Path;
+        Running.OpenedOutputFile = output.IsOpen ? output.Path : null;
         if (options.RemoteTime && completed.IsSuccess && completed.SourceLastWriteTimeUtc is { } sourceLastWriteTimeUtc)
         {
             await StampOutputFileTimeAsync(options, output.Path, sourceLastWriteTimeUtc).ConfigureAwait(false);
@@ -2418,9 +2789,10 @@ internal sealed class CurlCommandRunner(
                         upload,
                         proxy,
                         watchHeaderOutput,
-                        transferProgress,
+                        Running.Progress,
                         transferEventOutput.Events,
-                        StartLowSpeedWatchdog(options)),
+                        StartLowSpeedWatchdog(options),
+                        Running.AbortToken),
                     resumeFrom,
                     output)
                 .ConfigureAwait(false);
@@ -2459,8 +2831,8 @@ internal sealed class CurlCommandRunner(
     /// <param name="follower">Performs the transfer with the handler for its scheme, following redirects under <c>-L</c>.</param>
     /// <param name="options">The accepted command line, whose redirect options the follower applies.</param>
     /// <param name="createAttemptContext">
-    /// Creates the context of each attempt, whose output is standard output, on the current
-    /// <see cref="transferProgress" />.
+    /// Creates the context of each attempt, whose output is standard output, on the transfer's
+    /// current <see cref="RunningTransferState.Progress" />.
     /// </param>
     /// <returns>
     /// <see cref="StandardOutputWriteFailure" /> when the handler succeeded but standard
@@ -2476,7 +2848,7 @@ internal sealed class CurlCommandRunner(
         deferringStandardOutput.ClearWriteFailure();
         TransferResult result = await FollowRetryingAsync(follower, options, createAttemptContext, options.ResumeFrom, null)
             .ConfigureAwait(false);
-        await deferringStandardOutput.FlushAsync().ConfigureAwait(false);
+        await GatedDeferringStandardOutput.FlushAsync().ConfigureAwait(false);
 
         return result.IsSuccess && deferringStandardOutput.HasWriteFailed ? StandardOutputWriteFailure : result;
     }
@@ -2489,7 +2861,7 @@ internal sealed class CurlCommandRunner(
     /// <param name="follower">Performs each attempt, following redirects under <c>-L</c>.</param>
     /// <param name="options">The accepted command line.</param>
     /// <param name="createAttemptContext">
-    /// Creates an attempt's context, on the current <see cref="transferProgress" />; called
+    /// Creates an attempt's context, on the transfer's current <see cref="RunningTransferState.Progress" />; called
     /// once before the first attempt and again after each retried one's lines are written.
     /// </param>
     /// <param name="resumeFrom">The resolved <c>-C</c> offset, or <see langword="null" />.</param>
@@ -2537,7 +2909,7 @@ internal sealed class CurlCommandRunner(
     /// <param name="options">The accepted command line.</param>
     /// <returns>The started watchdog, or <see langword="null" /> when the speed is not watched.</returns>
     private LowSpeedWatchdog? StartLowSpeedWatchdog(CommandLineOptions options) =>
-        attemptLowSpeedWatchdog = LowSpeedWatchdog.StartFromCommandLine(options.SpeedLimit, options.SpeedTimeSeconds, timeProvider);
+        Running.AttemptLowSpeedWatchdog = LowSpeedWatchdog.StartFromCommandLine(options.SpeedLimit, options.SpeedTimeSeconds, timeProvider);
 
     /// <summary>
     /// Performs one attempt through <paramref name="follower" /> under the watchdog its context
@@ -2550,8 +2922,9 @@ internal sealed class CurlCommandRunner(
     /// <returns>The attempt's result, or the watchdog's failure.</returns>
     private async Task<TransferResult> FollowWatchingSpeedAsync(RedirectFollower follower, TransferContext context, RedirectPolicy redirectPolicy)
     {
-        using LowSpeedWatchdog? watchdog = attemptLowSpeedWatchdog;
-        attemptLowSpeedWatchdog = null;
+        RunningTransferState state = Running;
+        using LowSpeedWatchdog? watchdog = state.AttemptLowSpeedWatchdog;
+        state.AttemptLowSpeedWatchdog = null;
         try
         {
             return await follower.FollowAsync(context, redirectPolicy).ConfigureAwait(false);

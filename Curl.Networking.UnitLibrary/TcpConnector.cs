@@ -37,6 +37,11 @@ namespace Curl.Networking;
 /// proxy with the <c>--proxy-*</c> TLS options and the target with <c>-k</c> and <c>--cacert</c>;
 /// <see langword="null" /> for <paramref name="tlsProvider" />.
 /// </param>
+/// <param name="connectTimeout">
+/// The <c>--connect-timeout</c> limit on each connect, its resolve, dials, proxy tunnel and TLS
+/// handshakes together (ADR-0117); <see langword="null" />, zero or less for curl's default of
+/// 300 seconds.
+/// </param>
 public sealed class TcpConnector(
     IDnsResolver dnsResolver,
     ITcpDialer tcpDialer,
@@ -45,9 +50,18 @@ public sealed class TcpConnector(
     HttpProxyTunnelOptions? proxyTunnelOptions = null,
     ResolveOverrides? resolveOverrides = null,
     ConnectToMappings? connectToMappings = null,
-    ITlsProvider? proxyTlsProvider = null) : IConnector
+    ITlsProvider? proxyTlsProvider = null,
+    TimeSpan? connectTimeout = null) : IConnector
 {
     private const string AnyHost = "*";
+
+    /// <summary>
+    /// Gets curl's <c>DEFAULT_CONNECT_TIMEOUT</c>, 300 seconds: the connect timeout when no
+    /// <c>--connect-timeout</c>, or 0, was given.
+    /// </summary>
+    public static TimeSpan DefaultConnectTimeout { get; } = TimeSpan.FromSeconds(300);
+
+    private readonly TimeSpan _connectTimeout = ConnectTimeoutOrDefault(connectTimeout);
 
     private readonly ITlsProvider _proxyTlsProvider = proxyTlsProvider ?? tlsProvider;
     private readonly HttpProxyTunnelOptions _proxyTunnelOptions = proxyTunnelOptions ?? HttpProxyTunnelOptions.Default;
@@ -121,6 +135,13 @@ public sealed class TcpConnector(
     /// included, in place of the <see cref="IDnsResolver" />.
     /// </para>
     /// <para>
+    /// The resolve, dials, any tunnel and any TLS handshake run under one connect timeout
+    /// (<c>--connect-timeout</c>, or 300 seconds) on the injected <see cref="TimeProvider" />,
+    /// counted from when this method begins. When it passes, the connect fails with exit 28
+    /// (<see cref="CurlExitCode.OperationTimedOut" />) and curl 8.21.0's <c>Connection timed out
+    /// after &lt;n&gt; milliseconds</c>, for every scheme (measured, ADR-0117, BL-510).
+    /// </para>
+    /// <para>
     /// A success carries <see cref="ConnectResult.Timings" />, taken from the injected
     /// <see cref="TimeProvider" />: <see cref="ConnectTimings.Started" /> when this method
     /// begins, <see cref="ConnectTimings.NameResolved" /> when the host (or proxy) has
@@ -175,14 +196,45 @@ public sealed class TcpConnector(
             return ConnectResult.Failed(CurlExitCode.SetoptOptionSyntax, parseError);
         }
 
-        var result = target.Proxy is { } proxy
-            ? await ConnectThroughProxyAsync(target, destination, proxy, started, cancellationToken).ConfigureAwait(false)
-            : await ConnectDirectlyAsync(target, destination, started, cancellationToken).ConfigureAwait(false);
+        var result = await ConnectWithinTimeoutAsync(target, destination, started, cancellationToken).ConfigureAwait(false);
 
         return result.Connection is null
             ? NumberedConnectFailure.Of(result, TakeConnectionNumber())
             : result;
     }
+
+    /// <summary>
+    /// Runs the resolve, dials, any tunnel and any TLS handshake under the connect timeout on the
+    /// injected <see cref="TimeProvider" />, counted from <paramref name="started" /> (ADR-0117).
+    /// A cancellation that arrives once the limit has passed on the clock, whoever cancelled, is
+    /// curl 8.21.0's exit 28 <c>Connection timed out after &lt;n&gt; milliseconds</c>, also
+    /// reported on the target's events as its <c>-v</c> repeats it (measured, BL-510); any
+    /// earlier cancellation escapes.
+    /// </summary>
+    private async ValueTask<ConnectResult> ConnectWithinTimeoutAsync(
+        ConnectTarget target,
+        ConnectDestination destination,
+        long started,
+        CancellationToken cancellationToken)
+    {
+        using var timeout = new CancellationTokenSource(_connectTimeout, timeProvider);
+        using var limited = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
+        try
+        {
+            return target.Proxy is { } proxy
+                ? await ConnectThroughProxyAsync(target, destination, proxy, started, limited.Token).ConfigureAwait(false)
+                : await ConnectDirectlyAsync(target, destination, started, limited.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (timeProvider.GetElapsedTime(started) >= _connectTimeout)
+        {
+            var message = $"Connection timed out after {(long)timeProvider.GetElapsedTime(started).TotalMilliseconds} milliseconds";
+            target.Events.ReportInfo(message);
+            return ConnectResult.Failed(CurlExitCode.OperationTimedOut, message);
+        }
+    }
+
+    private static TimeSpan ConnectTimeoutOrDefault(TimeSpan? connectTimeout) =>
+        connectTimeout is { } given && given > TimeSpan.Zero ? given : DefaultConnectTimeout;
 
     private long TakeConnectionNumber() => Interlocked.Increment(ref _nextConnectionNumber) - 1;
 

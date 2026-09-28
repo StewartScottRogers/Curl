@@ -19,6 +19,8 @@
 #     least 30 minutes old;
 #   * at least once a day regardless;
 #   * whenever it is run by hand (workflow_dispatch).
+#   * never for a push to `board`: that branch holds only the dark factory's lane
+#     heartbeats, so it starts no run and its commits do not count as new commits.
 #
 # The `gource` branch holds one commit - the latest render - and is force-pushed on each
 # render so old videos never accumulate in the repository. That force push, to that
@@ -29,7 +31,7 @@ on:
   schedule:
     - cron: '17 * * * *'
   push:
-    branches-ignore: [gource]
+    branches-ignore: [gource, board]
   workflow_dispatch:
 
 permissions:
@@ -54,7 +56,7 @@ jobs:
         run: |
           git fetch --quiet origin '+refs/heads/*:refs/remotes/origin/*'
           fp=$(git for-each-ref --format='%(refname) %(objectname)' refs/remotes/origin \
-                 | grep -v -E '^refs/remotes/origin/(gource|HEAD) ' | sha1sum | cut -c1-40)
+                 | grep -v -E '^refs/remotes/origin/(gource|board|HEAD) ' | sha1sum | cut -c1-40)
           prev_fp=$(git show origin/gource:fingerprint.txt 2>/dev/null || true)
           prev_at=$(git show origin/gource:rendered-at.txt 2>/dev/null || echo 0)
           age=$(( $(date +%s) - prev_at ))

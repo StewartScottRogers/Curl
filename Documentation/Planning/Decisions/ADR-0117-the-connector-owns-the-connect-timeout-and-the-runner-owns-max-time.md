@@ -150,3 +150,18 @@ Costs and caveats:
 - **Retire HTTP's and TFTP's own enforcement.** Rejected for now: their measured output
   (the per-hop connect N, TFTP's re-send schedule) would be lost or have to move into the
   runner, for no behaviour gained.
+
+## Amendment (BL-510, 2026-09-28): `-m` also bounds the connector's limit
+
+Decided by Claude under Stewart's delegation.
+
+Measured on curl 8.21.0 (Schannel): `-v --connect-timeout 5 -m 1 http://10.255.255.1/` ends
+with exit 28 and `Connection timed out after 1000 milliseconds`, the connect message, as
+Decision 1 expects. Until BL-511's `MaxTimeWatchdog` lands, nothing but HTTP and TFTP enforces
+`-m`, so `CurlComposition.ConnectTimeoutOf` gives `TcpConnector` the smaller of the connect
+timeout (300 seconds when none or 0 was given) and a positive `-m`. The connector itself is as
+Decision 1 says: one limit, from the constructor, on its `TimeProvider`. For the first connect of
+an attempt the two agree to the millisecond; for a later connect (a redirect hop, FTP's data
+connection) the connector allows the whole `-m` again, and the runner's watchdog of Decision 2
+is what ends it on time. `TcpConnector.DefaultConnectTimeout` is curl's 300 seconds, public so the
+composition does not repeat it.

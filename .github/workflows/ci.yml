@@ -4,8 +4,9 @@ name: CI
 
 on:
   push:
-    # factory/* holds lanes' partial work, which is not expected to pass.
-    branches-ignore: [gource, 'factory/**']
+    # factory/* holds lanes' partial work, which is not expected to pass; board holds only
+    # the dark factory's lane heartbeats, force-pushed every few minutes, with no code to build.
+    branches-ignore: [gource, board, 'factory/**']
   pull_request:
   workflow_dispatch:
 

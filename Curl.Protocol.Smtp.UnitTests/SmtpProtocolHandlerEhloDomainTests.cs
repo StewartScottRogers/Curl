@@ -14,7 +14,7 @@ namespace Curl.Protocol.Smtp;
 [TestClass]
 public sealed class SmtpProtocolHandlerEhloDomainTests
 {
-    private const string Replies = "220 localhost ESMTP\r\n250 localhost\r\n221 Bye\r\n";
+    private const string Replies = "220 localhost ESMTP\r\n250 localhost\r\n" + SmtpRun.HelpReply + "221 Bye\r\n";
 
     [TestMethod]
     [DataRow("a%20b", "a b", DisplayName = "an escaped space")]
@@ -25,8 +25,8 @@ public sealed class SmtpProtocolHandlerEhloDomainTests
     {
         SmtpRun run = await SmtpRun.ExecuteAsync("smtp://127.0.0.1:18025/" + path, Scripted());
 
-        Assert.AreEqual("EHLO " + expectedDomain + "\r\nQUIT\r\n", run.Sent);
-        Assert.AreEqual(TransferResult.Success(0), run.Result);
+        Assert.AreEqual("EHLO " + expectedDomain + "\r\nHELP\r\nQUIT\r\n", run.Sent);
+        Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
     }
 
     [TestMethod]
@@ -35,7 +35,7 @@ public sealed class SmtpProtocolHandlerEhloDomainTests
         // -T - smtp://127.0.0.1:18025/: EHLO with the machine's host name.
         SmtpRun run = await SmtpRun.ExecuteAsync("smtp://127.0.0.1:18025/", Scripted());
 
-        Assert.AreEqual("EHLO " + SmtpRun.LocalHostName + "\r\nQUIT\r\n", run.Sent);
+        Assert.AreEqual("EHLO " + SmtpRun.LocalHostName + "\r\nHELP\r\nQUIT\r\n", run.Sent);
     }
 
     [TestMethod]
@@ -46,7 +46,7 @@ public sealed class SmtpProtocolHandlerEhloDomainTests
 
         await handler.ExecuteAsync(new TransferContext { Url = CurlUrl.Parse("smtp://127.0.0.1:18025/"), Output = Stream.Null });
 
-        Assert.AreEqual("EHLO " + Dns.GetHostName() + "\r\nQUIT\r\n", Encoding.Latin1.GetString(connection.Sent));
+        Assert.AreEqual("EHLO " + Dns.GetHostName() + "\r\nHELP\r\nQUIT\r\n", Encoding.Latin1.GetString(connection.Sent));
     }
 
     [TestMethod]

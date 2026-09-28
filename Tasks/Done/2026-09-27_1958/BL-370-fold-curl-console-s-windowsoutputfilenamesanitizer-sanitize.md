@@ -32,7 +32,7 @@ completed: 2026-09-27
   `<InternalsVisibleTo Include="curl" />` in `Curl.Core.UnitLibrary.csproj` (Console's
   assembly is named `curl`) over making the class public: no public API grows, and a public
   method would need an argument guard and a Core test for it, outside this task. That adds
-  `Curl.Core.UnitLibrary` to `touches`; no task in Doing named it (BL-354: Curl.Networking.UnitTests;
+  `Curl.Core.UnitLibrary` to `touches`; no task in Doing named it (BL-771: Curl.Networking.UnitTests;
   BL-436: FTP, Abstractions, Record-CurlExchange.ps1).
 - The folded behaviour is identical for remote names: Core's copy differs only in skipping a
   leading `\\?\`, and a remote name holds no `\`.

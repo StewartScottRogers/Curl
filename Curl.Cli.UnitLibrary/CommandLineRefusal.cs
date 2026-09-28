@@ -71,7 +71,7 @@ public sealed class CommandLineRefusal
     /// <summary>
     /// The lines to write to standard error, without line terminators: two, the warning's (or none) for
     /// <see cref="FormAndDataBoth"/>, one for <see cref="EmptyCommandLine"/>, or three for
-    /// <see cref="FileDoesNotExist"/>, and for <see cref="ContinueAtExclusiveWithRange"/> and
+    /// <see cref="FileDoesNotExist"/>, <see cref="ContinueAtExclusiveWithRange"/> and
     /// <see cref="DataFileUnreadable"/> when errors are not hidden, and more for a refusal met inside
     /// a <c>-K</c> file.
     /// </summary>
@@ -293,9 +293,14 @@ public sealed class CommandLineRefusal
     /// <param name="spelledOption">The whole argument as typed, such as <c>--cacert</c> or <c>--cacert=</c>.</param>
     /// <param name="longOption">The option's long name with its <c>--</c>, as curl names it in the first line.</param>
     /// <param name="file">The value given, possibly empty.</param>
-    /// <returns>A three-line refusal.</returns>
+    /// <param name="errorsHidden">
+    /// <see langword="true"/> when <c>-s</c> without <c>-S</c> was read before the refused option, which hides
+    /// the first line (measured with <c>-s --cacert nope</c> and <c>-s --knownhosts nope</c>, curl 8.21.0,
+    /// 2026-09-28).
+    /// </param>
+    /// <returns>A refusal of three lines, or two when <paramref name="errorsHidden"/>.</returns>
     /// <exception cref="ArgumentNullException">An argument is <see langword="null"/>.</exception>
-    public static CommandLineRefusal FileDoesNotExist(string spelledOption, string longOption, string file)
+    public static CommandLineRefusal FileDoesNotExist(string spelledOption, string longOption, string file, bool errorsHidden)
     {
         ArgumentNullException.ThrowIfNull(spelledOption);
         ArgumentNullException.ThrowIfNull(longOption);
@@ -303,7 +308,7 @@ public sealed class CommandLineRefusal
 
         return new CommandLineRefusal(
             CurlExitCode.FailedInit,
-            [$"curl: The file '{file}' provided to {longOption} does not exist"],
+            errorsHidden ? [] : [$"curl: The file '{file}' provided to {longOption} does not exist"],
             spelledOption,
             "is badly used here");
     }
@@ -373,6 +378,27 @@ public sealed class CommandLineRefusal
         new(
             CurlExitCode.FailedInit,
             ErrorMessageLines(errorsHidden, $"Max config file recursion level reached ({MaximumConfigFileDepth})"),
+            spelledOption,
+            "is badly used here");
+
+    /// <summary>
+    /// Refuses a <c>-:</c> / <c>--next</c> on the command line whose option group has no URL yet:
+    /// <c>curl: missing URL before --next</c> (hidden when <paramref name="errorsHidden"/>),
+    /// <c>curl: option &lt;spelled&gt;: is badly used here</c> and the try-help line.
+    /// </summary>
+    /// <remarks>
+    /// Measured with the local curl 8.21.0 on 2026-09-28 (BL-508 Notes): <c>curl --next URL</c>,
+    /// <c>curl URL --next --next URL</c> and <c>curl -: URL</c> (spelled <c>-:</c>) print all three
+    /// lines and exit 2 before any transfer; <c>curl -s --next URL</c> and <c>curl -s: URL</c> (spelled
+    /// <c>-s:</c>) print the last two; <c>-sS</c> prints all three.
+    /// </remarks>
+    /// <param name="spelledOption">The whole argument as typed.</param>
+    /// <param name="errorsHidden"><see langword="true"/> when <c>-s</c> without <c>-S</c> is in effect.</param>
+    /// <returns>The refusal.</returns>
+    internal static CommandLineRefusal MissingUrlBeforeNext(string spelledOption, bool errorsHidden) =>
+        new(
+            CurlExitCode.FailedInit,
+            ErrorMessageLines(errorsHidden, "missing URL before --next"),
             spelledOption,
             "is badly used here");
 

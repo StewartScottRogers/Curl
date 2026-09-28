@@ -14,6 +14,12 @@ namespace Curl.Cookies;
 /// cookie whose domain is a public suffix, by the embedded Public Suffix List snapshot. It loads Netscape cookie files (<c>-b</c>, <c>-j</c>), keeps
 /// <c>-b name=value</c> strings and writes the <c>-c</c> jar, as <see cref="NetscapeCookieFile"/> reads and
 /// writes them.
+/// <para>
+/// Every member may be called from several transfers at once, as a <c>-Z</c> run's transfers share one
+/// store (ADR-0127): each call that reads or changes the stored cookies or strings does so whole, under
+/// one lock, and <see cref="Cookies"/> is a copy taken under it. The <c>-v</c> lines are reported, and
+/// the jar is written, outside the lock.
+/// </para>
 /// </remarks>
 public sealed class CookieStore : ICookieStore
 {
@@ -39,8 +45,23 @@ public sealed class CookieStore : ICookieStore
     /// <summary>The <c>-b</c> arguments that hold a <c>=</c>, in the order given.</summary>
     private readonly List<string> cookieStrings = [];
 
-    /// <summary>The stored cookies, oldest first. A cookie that replaced a namesake sits where the namesake was.</summary>
-    public IReadOnlyList<Cookie> Cookies => cookies;
+    /// <summary>Held by every call that reads or changes <see cref="cookies"/> or <see cref="cookieStrings"/>.</summary>
+    private readonly Lock storeLock = new();
+
+    /// <summary>
+    /// A copy of the stored cookies, oldest first, taken at the call. A cookie that replaced a namesake sits
+    /// where the namesake was.
+    /// </summary>
+    public IReadOnlyList<Cookie> Cookies
+    {
+        get
+        {
+            lock (storeLock)
+            {
+                return [.. cookies];
+            }
+        }
+    }
 
     /// <inheritdoc/>
     /// <remarks>
@@ -64,19 +85,39 @@ public sealed class CookieStore : ICookieStore
     /// </para>
     /// </remarks>
     /// <exception cref="ArgumentNullException"><paramref name="url"/> is <see langword="null"/>.</exception>
-    public string? GetCookieHeader(CurlUrl url, bool secure, DateTimeOffset now)
+    public string? GetCookieHeader(CurlUrl url, bool secure, DateTimeOffset now) =>
+        GetCookieHeader(url, secure, now, cookieStrings);
+
+    /// <summary>
+    /// Builds the <c>Cookie</c> header value as <see cref="GetCookieHeader(CurlUrl, bool, DateTimeOffset)"/>
+    /// does, with <paramref name="cookieStrings"/> in place of the strings given to
+    /// <see cref="AddCookieString"/>: the <c>-b name=value</c> strings of one <c>-:</c> / <c>--next</c>
+    /// option group, whose stored cookies every group shares while its strings are its own, as curl
+    /// 8.21.0 sends them (measured 2026-09-28, BL-509 Notes).
+    /// </summary>
+    /// <param name="url">The request URL.</param>
+    /// <param name="secure">Whether the request goes over TLS.</param>
+    /// <param name="now">The time that decides which stored cookies have expired.</param>
+    /// <param name="cookieStrings">The strings sent after the stored cookies, verbatim, in order.</param>
+    /// <returns>The header value, or <see langword="null"/> when there is nothing to send.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="url"/> or <paramref name="cookieStrings"/> is <see langword="null"/>.</exception>
+    public string? GetCookieHeader(CurlUrl url, bool secure, DateTimeOffset now, IReadOnlyList<string> cookieStrings)
     {
         ArgumentNullException.ThrowIfNull(url);
+        ArgumentNullException.ThrowIfNull(cookieStrings);
 
-        RemoveExpired(now);
         string host = CookieOrigin.HostOf(url);
         bool secureContext = secure || CookieOrigin.IsLoopback(host);
         string path = url.AbsolutePath;
-        IEnumerable<Cookie> sent = InSendingOrder(cookies.Where(cookie => IsSentTo(cookie, host, path, secureContext)).Take(MostCookiesSent));
         StringBuilder header = new();
-        if (TryAppendCookies(header, sent) && cookieStrings.Count > 0)
+        lock (storeLock)
         {
-            header.Append(header.Length == 0 ? string.Empty : "; ").AppendJoin("; ", cookieStrings);
+            RemoveExpired(now);
+            IEnumerable<Cookie> sent = InSendingOrder(cookies.Where(cookie => IsSentTo(cookie, host, path, secureContext)).Take(MostCookiesSent));
+            if (TryAppendCookies(header, sent) && cookieStrings.Count > 0)
+            {
+                header.Append(header.Length == 0 ? string.Empty : "; ").AppendJoin("; ", cookieStrings);
+            }
         }
 
         return header.Length == 0 ? null : header.ToString();
@@ -93,7 +134,10 @@ public sealed class CookieStore : ICookieStore
     {
         ArgumentNullException.ThrowIfNull(cookieString);
 
-        cookieStrings.Add(cookieString);
+        lock (storeLock)
+        {
+            cookieStrings.Add(cookieString);
+        }
     }
 
     /// <summary>Loads a Netscape cookie file (<c>-b</c> naming a file) as curl does.</summary>
@@ -122,15 +166,16 @@ public sealed class CookieStore : ICookieStore
     /// <exception cref="ArgumentNullException"><paramref name="reader"/> or <paramref name="events"/> is <see langword="null"/>.</exception>
     public void LoadCookieFile(TextReader reader, bool discardSessionCookies, DateTimeOffset now, ITransferEvents events)
     {
-        foreach (Cookie cookie in NetscapeCookieFile.Read(reader, now, events))
+        IReadOnlyList<Cookie> loaded = NetscapeCookieFile.Read(reader, now, events);
+        lock (storeLock)
         {
-            if (!discardSessionCookies || !cookie.IsSessionCookie)
+            foreach (Cookie cookie in loaded.Where(cookie => !discardSessionCookies || !cookie.IsSessionCookie))
             {
                 Store(cookie);
             }
-        }
 
-        RemoveExpired(now);
+            RemoveExpired(now);
+        }
     }
 
     /// <summary>
@@ -184,8 +229,13 @@ public sealed class CookieStore : ICookieStore
     {
         ArgumentNullException.ThrowIfNull(writer);
 
-        RemoveExpired(now);
-        List<Cookie> newestFirst = [.. cookies];
+        List<Cookie> newestFirst;
+        lock (storeLock)
+        {
+            RemoveExpired(now);
+            newestFirst = [.. cookies];
+        }
+
         newestFirst.Reverse();
         NetscapeCookieFile.Write(writer, newestFirst);
     }
@@ -306,18 +356,48 @@ public sealed class CookieStore : ICookieStore
             return storedFromResponse;
         }
 
-        int stored = storedFromResponse;
         Cookie? cookie = ParseReportingRefusal(setCookieHeader, url, now, events);
-        if (cookie is not null && MayStore(cookie, CookieOrigin.HostOf(url), CookieOrigin.IsSecure(url), events))
+        string host = CookieOrigin.HostOf(url);
+        bool secureOrigin = CookieOrigin.IsSecure(url);
+        ReceivedCookieOutcome? outcome = null;
+        lock (storeLock)
         {
-            string action = Store(cookie) ? "Replaced" : "Added";
-            events.ReportInfo(
-                string.Create(CultureInfo.InvariantCulture, $"{action} cookie {cookie.Name}=\"{cookie.Value}\" for domain {cookie.Domain}, path {cookie.Path}, expire {cookie.ExpiresUnixSeconds}"));
-            stored++;
+            if (cookie is not null)
+            {
+                outcome = StoreReceived(cookie, host, secureOrigin);
+            }
+
+            RemoveExpired(now);
         }
 
-        RemoveExpired(now);
-        return stored;
+        if (outcome is not { } reported)
+        {
+            return storedFromResponse;
+        }
+
+        events.ReportInfo(reported.VerboseLine);
+        return reported.IsStored ? storedFromResponse + 1 : storedFromResponse;
+    }
+
+    /// <summary>What <see cref="StoreReceived"/> did with a received cookie, and the <c>-v</c> line curl prints for it.</summary>
+    private readonly record struct ReceivedCookieOutcome(bool IsStored, string VerboseLine);
+
+    /// <summary>
+    /// Stores a received cookie the host may set, in its namesake's place when there is one; called under
+    /// <see cref="storeLock"/>. The <c>-v</c> line is <c>Added</c> or <c>Replaced cookie …</c>, or the
+    /// refusal <see cref="RefusalOf"/> gives.
+    /// </summary>
+    private ReceivedCookieOutcome StoreReceived(Cookie cookie, string host, bool secureOrigin)
+    {
+        if (RefusalOf(cookie, host, secureOrigin) is string refusal)
+        {
+            return new ReceivedCookieOutcome(IsStored: false, refusal);
+        }
+
+        string action = Store(cookie) ? "Replaced" : "Added";
+        return new ReceivedCookieOutcome(
+            IsStored: true,
+            string.Create(CultureInfo.InvariantCulture, $"{action} cookie {cookie.Name}=\"{cookie.Value}\" for domain {cookie.Domain}, path {cookie.Path}, expire {cookie.ExpiresUnixSeconds}"));
     }
 
     /// <summary>Reads <paramref name="header"/> with <see cref="SetCookieParser"/>, reporting the <c>-v</c> line curl prints when it refuses it.</summary>
@@ -333,25 +413,20 @@ public sealed class CookieStore : ICookieStore
     }
 
     /// <summary>
-    /// The host may set the cookie's domain by the Public Suffix List, and the cookie does not overlay a
-    /// <c>Secure</c> one it may not; a cookie that fails either is reported to <paramref name="events"/>
-    /// with curl's <c>-v</c> line.
+    /// curl's <c>-v</c> line for a cookie the store refuses: one whose domain the host may not set by the
+    /// Public Suffix List, or one that would overlay a <c>Secure</c> cookie it may not.
     /// </summary>
-    private bool MayStore(Cookie cookie, string host, bool secureOrigin, ITransferEvents events)
+    /// <returns>The line, or <see langword="null"/> when the cookie may be stored.</returns>
+    private string? RefusalOf(Cookie cookie, string host, bool secureOrigin)
     {
         if (!PublicSuffixList.Embedded.IsCookieDomainAcceptable(host, cookie.Domain!))
         {
-            events.ReportInfo($"cookie '{cookie.Name}' dropped, domain '{host}' must not set cookies for '{cookie.Domain}'");
-            return false;
+            return $"cookie '{cookie.Name}' dropped, domain '{host}' must not set cookies for '{cookie.Domain}'";
         }
 
-        if (!secureOrigin && OverlaysSecureCookie(cookie))
-        {
-            events.ReportInfo($"cookie '{cookie.Name}' for domain '{cookie.Domain}' dropped, would overlay an existing cookie");
-            return false;
-        }
-
-        return true;
+        return !secureOrigin && OverlaysSecureCookie(cookie)
+            ? $"cookie '{cookie.Name}' for domain '{cookie.Domain}' dropped, would overlay an existing cookie"
+            : null;
     }
 
     /// <summary>Stores <paramref name="cookie"/>, in its namesake's place when there is one.</summary>

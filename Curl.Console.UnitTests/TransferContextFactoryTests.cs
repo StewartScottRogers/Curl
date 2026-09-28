@@ -1,4 +1,5 @@
 using Curl.Cli;
+using Curl.Core;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Console;
@@ -313,6 +314,48 @@ public sealed class TransferContextFactoryTests
     /// <summary>
     /// Parses <paramref name="arguments" /> as if every path exists and returns the accepted options.
     /// </summary>
+    [TestMethod]
+    public void Create_AbortTokenWithoutWatchdog_IsTheContextsToken()
+    {
+        using MemoryStream standardInput = new();
+        using MemoryStream output = new();
+        using CancellationTokenSource abort = new();
+
+        TransferContext context = new TransferContextFactory(standardInput)
+            .Create(Parse("file:///x.txt"), CurlUrl.Parse("file:///x.txt"), output, null, null, null, abortToken: abort.Token);
+
+        Assert.AreEqual(abort.Token, context.CancellationToken);
+    }
+
+    [TestMethod]
+    public void Create_WatchdogWithoutAbortToken_IsTheWatchdogsToken()
+    {
+        using MemoryStream standardInput = new();
+        using MemoryStream output = new();
+        using LowSpeedWatchdog watchdog = new(1, TimeSpan.FromHours(1), TimeProvider.System);
+
+        TransferContext context = new TransferContextFactory(standardInput)
+            .Create(Parse("file:///x.txt"), CurlUrl.Parse("file:///x.txt"), output, null, null, null, lowSpeedWatchdog: watchdog);
+
+        Assert.AreEqual(watchdog.Token, context.CancellationToken);
+    }
+
+    [TestMethod]
+    public void Create_WatchdogAndAbortToken_IsCancelledByTheAbort()
+    {
+        using MemoryStream standardInput = new();
+        using MemoryStream output = new();
+        using LowSpeedWatchdog watchdog = new(1, TimeSpan.FromHours(1), TimeProvider.System);
+        using CancellationTokenSource abort = new();
+
+        TransferContext context = new TransferContextFactory(standardInput)
+            .Create(Parse("file:///x.txt"), CurlUrl.Parse("file:///x.txt"), output, null, null, null, lowSpeedWatchdog: watchdog, abortToken: abort.Token);
+        abort.Cancel();
+
+        Assert.IsTrue(context.CancellationToken.IsCancellationRequested);
+        Assert.IsFalse(watchdog.Token.IsCancellationRequested);
+    }
+
     private static CommandLineOptions Parse(params string[] arguments)
     {
         CommandLineParseResult parsed = CommandLineParser.Parse(arguments, _ => true);

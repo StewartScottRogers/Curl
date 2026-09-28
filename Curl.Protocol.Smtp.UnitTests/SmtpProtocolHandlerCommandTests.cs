@@ -1,0 +1,312 @@
+using System.Text;
+using Curl.Protocol.Abstractions;
+using Curl.Protocol.Smtp.Fakes;
+
+namespace Curl.Protocol.Smtp;
+
+/// <summary>
+/// Pins what an SMTP session with no message to send does against curl 8.21.0: <c>VRFY</c>
+/// for each <c>--mail-rcpt</c>, the <c>-X</c> command for each <c>--mail-rcpt</c> or alone,
+/// <c>HELP</c> otherwise, the reply bytes written to the output, and the exit code, message,
+/// <c>%{size_download}</c> and <c>%{response_code}</c> of every refusal. Every case was
+/// recorded from real curl (the Schannel build) on 2026-09-28 with
+/// <c>Record-CurlExchange.ps1 -Smtp</c>, curl running
+/// <c>-sS -w [%{response_code} %{size_download} %{size_upload}] ... smtp://127.0.0.1:18125/</c>
+/// (BL-543 Notes). curl named its machine in <c>EHLO</c>; these tests use the path <c>dom</c>.
+/// </summary>
+[TestClass]
+public sealed class SmtpProtocolHandlerCommandTests
+{
+    private const string Url = "smtp://127.0.0.1:18125/dom";
+
+    private const string Greeting = "220 localhost ESMTP\r\n";
+
+    /// <summary>The recorder's <c>EHLO</c> reply, which advertises <c>SMTPUTF8</c>.</summary>
+    private const string EhloReply =
+        "250-localhost\r\n250-AUTH PLAIN LOGIN CRAM-MD5\r\n250-STARTTLS\r\n250-SIZE 1000000\r\n250-8BITMIME\r\n250 SMTPUTF8\r\n";
+
+    private const string Verified = "250 Recorder <recorder@localhost>\r\n";
+
+    private const string Bye = "221 Bye\r\n";
+
+    private const string Ehlo = "EHLO dom\r\n";
+
+    private const string Quit = "QUIT\r\n";
+
+    private const string CommandFailed550 = "Command failed: 550";
+
+    [TestMethod]
+    public async Task ExecuteAsync_OneRecipient_SendsVrfyAndWritesTheReply()
+    {
+        // --mail-rcpt a@b: 250 Recorder <recorder@localhost>, exit 0.
+        CommandRun run = await RunAsync(EhloReply + Verified + Bye, new MailRequestOptions { Recipients = ["a@b"] });
+
+        Assert.AreEqual(Ehlo + "VRFY a@b\r\n" + Quit, run.Sent);
+        Assert.AreEqual(Verified, run.Output);
+        AssertResult(run.Result, CurlExitCode.Ok, null, 250, 35);
+        CollectionAssert.AreEqual(new[] { (35L, (long?)null) }, run.Progress.Downloaded);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TwoRecipients_SendsVrfyForEach()
+    {
+        CommandRun run = await RunAsync(EhloReply + Verified + Verified + Bye, new MailRequestOptions { Recipients = ["a@b", "c@d"] });
+
+        Assert.AreEqual(Ehlo + "VRFY a@b\r\nVRFY c@d\r\n" + Quit, run.Sent);
+        Assert.AreEqual(Verified + Verified, run.Output);
+        AssertResult(run.Result, CurlExitCode.Ok, null, 250, 70);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_RecipientsInBracketsOrWithoutHost_AreVerifiedBare()
+    {
+        // --mail-rcpt <a@b> --mail-rcpt local: VRFY a@b, then VRFY local.
+        CommandRun run = await RunAsync(EhloReply + Verified + Verified + Bye, new MailRequestOptions { Recipients = ["<a@b>", "local"] });
+
+        Assert.AreEqual(Ehlo + "VRFY a@b\r\nVRFY local\r\n" + Quit, run.Sent);
+    }
+
+    [TestMethod]
+    [DataRow("jörg@example.com", "VRFY jörg@example.com SMTPUTF8", DisplayName = "non-ASCII local part")]
+    [DataRow("a@bücher.example", "VRFY a@xn--bcher-kva.example SMTPUTF8", DisplayName = "non-ASCII host")]
+    [DataRow("a@bü..x", "VRFY a@bü..x SMTPUTF8", DisplayName = "host no IDNA A-label exists for")]
+    public async Task ExecuteAsync_NonAsciiRecipientWithSmtpUtf8Advertised_SendsTheALabelAndSmtpUtf8(string recipient, string expected)
+    {
+        // Measured: jörg@example.com and a@bücher.example (curl sent ö as the one byte F6).
+        CommandRun run = await RunAsync(EhloReply + Verified + Bye, new MailRequestOptions { Recipients = [recipient] });
+
+        Assert.AreEqual(Ehlo + expected + "\r\n" + Quit, run.Sent);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_NonAsciiRecipientWithoutSmtpUtf8Advertised_SendsNoSmtpUtf8()
+    {
+        CommandRun run = await RunAsync("250-localhost\r\n250 8BITMIME\r\n" + Verified + Bye, new MailRequestOptions { Recipients = ["jörg@x"] });
+
+        Assert.AreEqual(Ehlo + "VRFY jörg@x\r\n" + Quit, run.Sent);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_SmtpUtf8AdvertisedInLowerCase_CountsAsAdvertised()
+    {
+        // Measured (BL-544): EHLO=250-localhost\r\n250-smtputf8\r\n250 OK, --mail-rcpt jörg@x: VRFY jörg@x SMTPUTF8.
+        CommandRun run = await RunAsync("250-localhost\r\n250-smtputf8\r\n250 OK\r\n" + Verified + Bye, new MailRequestOptions { Recipients = ["jörg@x"] });
+
+        Assert.AreEqual(Ehlo + "VRFY jörg@x SMTPUTF8\r\n" + Quit, run.Sent);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ExpnWithSmtpUtf8Advertised_AppendsSmtpUtf8AndWritesEveryLine()
+    {
+        // -X EXPN --mail-rcpt list, EXPN=250-Alice <a@b>\r\n250 Bob <c@d>.
+        const string expansion = "250-Alice <a@b>\r\n250 Bob <c@d>\r\n";
+
+        CommandRun run = await RunAsync(EhloReply + expansion + Bye, new MailRequestOptions { Recipients = ["list"], CustomCommand = "EXPN" });
+
+        Assert.AreEqual(Ehlo + "EXPN list SMTPUTF8\r\n" + Quit, run.Sent);
+        Assert.AreEqual(expansion, run.Output);
+        AssertResult(run.Result, CurlExitCode.Ok, null, 250, 32);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ExpnOnAHeloSession_SendsNoSmtpUtf8()
+    {
+        // -X EXPN --mail-rcpt list, EHLO=502 no: HELO, then EXPN list.
+        CommandRun run = await RunAsync("502 no\r\n250 localhost\r\n" + Verified + Bye, new MailRequestOptions { Recipients = ["list"], CustomCommand = "EXPN" });
+
+        Assert.AreEqual(Ehlo + "HELO dom\r\nEXPN list\r\n" + Quit, run.Sent);
+        AssertResult(run.Result, CurlExitCode.Ok, null, 250, 35);
+    }
+
+    [TestMethod]
+    [DataRow("expn", "list", "expn list", DisplayName = "-X expn: not EXPN in capitals, so no SMTPUTF8")]
+    [DataRow("VRFY", "<a@b>", "VRFY <a@b>", DisplayName = "-X VRFY: the recipient as given")]
+    [DataRow("NOOP", "a@b", "NOOP a@b", DisplayName = "-X NOOP")]
+    public async Task ExecuteAsync_CustomCommandWithRecipient_SendsTheCommandAndTheRecipientAsGiven(string command, string recipient, string expected)
+    {
+        CommandRun run = await RunAsync(EhloReply + Verified + Bye, new MailRequestOptions { Recipients = [recipient], CustomCommand = command });
+
+        Assert.AreEqual(Ehlo + expected + "\r\n" + Quit, run.Sent);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_CustomCommandWithTwoRecipients_SendsItForEach()
+    {
+        // -X NOOP --mail-rcpt a@b --mail-rcpt c@d: [250 16 0].
+        CommandRun run = await RunAsync(EhloReply + "250 OK\r\n250 OK\r\n" + Bye, new MailRequestOptions { Recipients = ["a@b", "c@d"], CustomCommand = "NOOP" });
+
+        Assert.AreEqual(Ehlo + "NOOP a@b\r\nNOOP c@d\r\n" + Quit, run.Sent);
+        Assert.AreEqual("250 OK\r\n250 OK\r\n", run.Output);
+        AssertResult(run.Result, CurlExitCode.Ok, null, 250, 16);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_NoRecipient_SendsHelpAndWritesEveryLine()
+    {
+        // HELP=214-Commands:\r\n214 HELO EHLO MAIL RCPT DATA.
+        const string help = "214-Commands:\r\n214 HELO EHLO MAIL RCPT DATA\r\n";
+
+        CommandRun run = await RunAsync(EhloReply + help + Bye, new MailRequestOptions());
+
+        Assert.AreEqual(Ehlo + "HELP\r\n" + Quit, run.Sent);
+        Assert.AreEqual(help, run.Output);
+        AssertResult(run.Result, CurlExitCode.Ok, null, 214, 45);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_NoMailOptions_SendsHelp()
+    {
+        CommandRun run = await RunAsync(EhloReply + SmtpRun.HelpReply + Bye, mail: null);
+
+        Assert.AreEqual(Ehlo + "HELP\r\n" + Quit, run.Sent);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_EmptyCustomCommand_SendsHelpOrVrfy()
+    {
+        CommandRun help = await RunAsync(EhloReply + SmtpRun.HelpReply + Bye, new MailRequestOptions { CustomCommand = string.Empty });
+        CommandRun verify = await RunAsync(EhloReply + Verified + Bye, new MailRequestOptions { Recipients = ["a@b"], CustomCommand = string.Empty });
+
+        Assert.AreEqual(Ehlo + "HELP\r\n" + Quit, help.Sent);
+        Assert.AreEqual(Ehlo + "VRFY a@b\r\n" + Quit, verify.Sent);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_CustomCommandWithoutRecipient_SendsItAlone()
+    {
+        // -X NOOP: 250 OK, exit 0.
+        CommandRun run = await RunAsync(EhloReply + "250 OK\r\n" + Bye, new MailRequestOptions { CustomCommand = "NOOP" });
+
+        Assert.AreEqual(Ehlo + "NOOP\r\n" + Quit, run.Sent);
+        Assert.AreEqual("250 OK\r\n", run.Output);
+        AssertResult(run.Result, CurlExitCode.Ok, null, 250, 8);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ReplyLinesEndingInLf_AreWrittenAsTheyCame()
+    {
+        // -X NOOP, NOOP=250-a\n250 b: stdout 250-a\n250 b\r\n, [250 13 0].
+        CommandRun run = await RunAsync(EhloReply + "250-a\n250 b\r\n" + Bye, new MailRequestOptions { CustomCommand = "NOOP" });
+
+        Assert.AreEqual("250-a\n250 b\r\n", run.Output);
+        AssertResult(run.Result, CurlExitCode.Ok, null, 250, 13);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_NoBody_WritesNothing()
+    {
+        // -I -X NOOP: nothing on stdout, [250 0 0].
+        CommandRun run = await RunAsync(EhloReply + "250 OK\r\n" + Bye, new MailRequestOptions { CustomCommand = "NOOP" }, noBody: true);
+
+        Assert.AreEqual(string.Empty, run.Output);
+        AssertResult(run.Result, CurlExitCode.Ok, null, 250, 0);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_VrfyRefused_FailsWithExit8AndStillQuits()
+    {
+        // VRFY=550 no such user: curl: (8) Command failed: 550, nothing on stdout.
+        CommandRun run = await RunAsync(EhloReply + "550 no such user\r\n" + Bye, new MailRequestOptions { Recipients = ["x@y"] });
+
+        Assert.AreEqual(Ehlo + "VRFY x@y\r\n" + Quit, run.Sent);
+        Assert.AreEqual(string.Empty, run.Output);
+        AssertResult(run.Result, CurlExitCode.WeirdServerReply, CommandFailed550, 550, 0);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_FirstRecipientRefused_TriesNoOther()
+    {
+        // --mail-rcpt a@b --mail-rcpt c@d, VRFY=550 no: [550 0 0], exit 8.
+        CommandRun run = await RunAsync(EhloReply + "550 no\r\n" + Bye, new MailRequestOptions { Recipients = ["a@b", "c@d"] });
+
+        Assert.AreEqual(Ehlo + "VRFY a@b\r\n" + Quit, run.Sent);
+        AssertResult(run.Result, CurlExitCode.WeirdServerReply, CommandFailed550, 550, 0);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_VrfyAnswered553_IsAcceptedAndWritten()
+    {
+        // VRFY=553 ambiguous: stdout 553 ambiguous, [553 15 0], exit 0.
+        CommandRun run = await RunAsync(EhloReply + "553 ambiguous\r\n" + Bye, new MailRequestOptions { Recipients = ["a@b"] });
+
+        Assert.AreEqual("553 ambiguous\r\n", run.Output);
+        AssertResult(run.Result, CurlExitCode.Ok, null, 553, 15);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_HelpAnswered553_Fails()
+    {
+        CommandRun run = await RunAsync(EhloReply + "553 ambiguous\r\n" + Bye, new MailRequestOptions());
+
+        Assert.AreEqual(string.Empty, run.Output);
+        AssertResult(run.Result, CurlExitCode.WeirdServerReply, "Command failed: 553", 553, 0);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_MultilineRefusal_WritesTheContinuationLinesBeforeFailing()
+    {
+        // HELP=550-first\r\n550 second: stdout 550-first\r\n, [550 11 0], exit 8.
+        CommandRun run = await RunAsync(EhloReply + "550-first\r\n550 second\r\n" + Bye, new MailRequestOptions());
+
+        Assert.AreEqual(Ehlo + "HELP\r\n" + Quit, run.Sent);
+        Assert.AreEqual("550-first\r\n", run.Output);
+        AssertResult(run.Result, CurlExitCode.WeirdServerReply, CommandFailed550, 550, 11);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_UnknownCustomCommand_FailsWithTheServersCode()
+    {
+        // -X "FOO bar": 502 Command not implemented, curl: (8) Command failed: 502.
+        CommandRun run = await RunAsync(EhloReply + "502 Command not implemented\r\n" + Bye, new MailRequestOptions { CustomCommand = "FOO bar" });
+
+        Assert.AreEqual(Ehlo + "FOO bar\r\n" + Quit, run.Sent);
+        AssertResult(run.Result, CurlExitCode.WeirdServerReply, "Command failed: 502", 502, 0);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ServerClosesMidReply_FailsWithExit56WithoutQuit()
+    {
+        CommandRun run = await RunAsync(EhloReply + "250-a\r\n", new MailRequestOptions { CustomCommand = "NOOP" });
+
+        Assert.AreEqual(Ehlo + "NOOP\r\n", run.Sent);
+        Assert.AreEqual("250-a\r\n", run.Output);
+        AssertResult(run.Result, CurlExitCode.RecvError, "response reading failed (errno: 0)", 250, 7);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_OverlongReplyLine_FailsWithExit100WithoutQuit()
+    {
+        CommandRun run = await RunAsync(EhloReply + "250 " + new string('x', 70000) + "\r\n", new MailRequestOptions { CustomCommand = "NOOP" });
+
+        Assert.AreEqual(Ehlo + "NOOP\r\n", run.Sent);
+        AssertResult(run.Result, CurlExitCode.TooLarge, "A value or data field grew larger than allowed", 250, 0);
+    }
+
+    private static void AssertResult(TransferResult result, CurlExitCode exitCode, string? message, int responseCode, long downloadSize)
+    {
+        Assert.AreEqual(exitCode, result.ExitCode);
+        Assert.AreEqual(message, result.ErrorMessage);
+        Assert.AreEqual(downloadSize, result.BytesTransferred);
+        Assert.AreEqual(responseCode, result.Report!.ResponseCode);
+    }
+
+    private static async Task<CommandRun> RunAsync(string replies, MailRequestOptions? mail, bool noBody = false)
+    {
+        var output = new MemoryStream();
+        var progress = new RecordingProgress();
+        var context = new TransferContext
+        {
+            Url = CurlUrl.Parse(Url),
+            Output = output,
+            Mail = mail,
+            NoBody = noBody,
+            Progress = progress,
+        };
+
+        SmtpRun run = await SmtpRun.ExecuteAsync(context, new ScriptedConnection(Encoding.Latin1.GetBytes(Greeting + replies)));
+
+        return new CommandRun(run.Result, run.Sent, Encoding.Latin1.GetString(output.ToArray()), progress);
+    }
+
+    private sealed record CommandRun(TransferResult Result, string Sent, string Output, RecordingProgress Progress);
+}

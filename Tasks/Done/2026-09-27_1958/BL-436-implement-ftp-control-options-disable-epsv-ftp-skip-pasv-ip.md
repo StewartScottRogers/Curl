@@ -34,7 +34,7 @@ completed: 2026-09-27
 
 ## Notes
 
-- Added the ADR-0093 file to `touches`: the acceptance criteria ask for its addendum, and no task in `Doing` (only BL-354, `Curl.Networking.UnitTests`) names it.
+- Added the ADR-0093 file to `touches`: the acceptance criteria ask for its addendum, and no task in `Doing` (only BL-771, `Curl.Networking.UnitTests`) names it.
 - Not split: the whole task fitted one run. `Curl.Protocol.Abstractions.UnitLibrary` needed no change; BL-435's properties were enough.
 - Recorder: `-FtpReply` overrides for one verb are now answered in turn (the last repeating), `{DATAPORT}`, `{DATAPORT_HI}` and `{DATAPORT_LO}` expand in replies, and `NLST` gets a data connection like `LIST`.
 - Measured findings worth knowing: `--ftp-create-dirs` applies to downloads too and never fails on `MKD` itself (only the `CWD` after it); `-l` drops a URL's file name and lists its directory; `+` quotes under `-I` go after `REST 0`; post-transfer (`-`) quotes run on every success path (empty listing, nothing left to resume, whole upload already there, after `ABOR`) and never after a failure; a refused quote before the transfer skips `QUIT`, after it sends `QUIT`.

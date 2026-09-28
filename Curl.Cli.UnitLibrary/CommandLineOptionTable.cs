@@ -36,7 +36,7 @@ namespace Curl.Cli;
 /// <c>--no-post301</c>, <c>--no-post302</c>, <c>--no-post303</c>, <c>--no-show-headers</c>, <c>--no-include</c>, <c>--no-head</c>,
 /// <c>--no-fail</c>, <c>--no-fail-with-body</c>, <c>--no-fail-early</c>, <c>--no-compressed</c>, <c>--no-raw</c>, <c>--no-tr-encoding</c>,
 /// <c>--no-ignore-content-length</c>, <c>--no-path-as-is</c>, <c>--no-http0.9</c>, <c>--no-basic</c>, <c>--no-digest</c>, <c>--no-ntlm</c>, <c>--no-negotiate</c>, <c>--no-proxytunnel</c>, <c>--no-remote-name</c>,
-/// <c>--no-remote-name-all</c>, <c>--no-remote-header-name</c>, <c>--no-create-dirs</c>, <c>--no-clobber</c> (measured 2026-09-28), <c>--no-skip-existing</c> and <c>--no-remove-on-error</c> (measured 2026-09-28), <c>--no-junk-session-cookies</c>, <c>--no-globoff</c>, <c>--no-version</c>, <c>--no-verbose</c>, <c>--no-trace-time</c>, <c>--no-retry-all-errors</c>, <c>--no-retry-connrefused</c>, <c>--no-disable-epsv</c>, <c>--no-epsv</c>, <c>--no-ftp-skip-pasv-ip</c>, <c>--no-ftp-create-dirs</c>, <c>--no-disable-eprt</c>, <c>--no-eprt</c>, <c>--no-ssl</c>, <c>--no-ftp-ssl</c>, <c>--no-ssl-reqd</c>, <c>--no-ftp-ssl-reqd</c>, <c>--no-ftp-ssl-control</c> and <c>--no-list-only</c> (measured 2026-09-27) and <c>--no-buffer</c> (measured 2026-09-28; <c>-N</c> is <c>--no-buffer</c>) are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
+/// <c>--no-remote-name-all</c>, <c>--no-remote-header-name</c>, <c>--no-create-dirs</c>, <c>--no-clobber</c> (measured 2026-09-28), <c>--no-skip-existing</c> and <c>--no-remove-on-error</c> (measured 2026-09-28), <c>--no-junk-session-cookies</c>, <c>--no-globoff</c>, <c>--no-version</c>, <c>--no-verbose</c>, <c>--no-trace-time</c>, <c>--no-retry-all-errors</c>, <c>--no-retry-connrefused</c>, <c>--no-disable-epsv</c>, <c>--no-epsv</c>, <c>--no-ftp-skip-pasv-ip</c>, <c>--no-ftp-create-dirs</c>, <c>--no-disable-eprt</c>, <c>--no-eprt</c>, <c>--no-ssl</c>, <c>--no-ftp-ssl</c>, <c>--no-ssl-reqd</c>, <c>--no-ftp-ssl-reqd</c>, <c>--no-ftp-ssl-control</c> and <c>--no-list-only</c> (measured 2026-09-27) <c>--no-buffer</c> (measured 2026-09-28; <c>-N</c> is <c>--no-buffer</c>), <c>--no-parallel</c> and <c>--no-parallel-immediate</c> (measured 2026-09-28) are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
 /// silent and <c>--no-silent -s</c> is. <c>--no-silent=x</c> is accepted, its value ignored.
 /// <c>--no-out-null</c> is accepted and, as in curl 8.21.0, discards its URL's body just as <c>--out-null</c> does
 /// (measured 2026-09-28, BL-495 Notes).
@@ -49,7 +49,7 @@ namespace Curl.Cli;
 /// <c>--no-http2-prior-knowledge</c>, <c>--no-http3</c>, <c>--no-http3-only</c>, <c>--no-request-target</c>, <c>--no-ipfs-gateway</c>, <c>--no-anyauth</c>,
 /// <c>--no-oauth2-bearer</c>, <c>--no-proxy</c>, <c>--no-proxy-user</c>, <c>--no-noproxy</c>, <c>--no-socks4</c>, <c>--no-socks4a</c>,
 /// <c>--no-socks5</c>, <c>--no-socks5-hostname</c>, <c>--no-write-out</c>, <c>--no-output-dir</c>, <c>--no-trace</c>, <c>--no-trace-ascii</c>, <c>--no-stderr</c>, <c>--no-retry</c>, <c>--no-retry-delay</c>, <c>--no-retry-max-time</c>, <c>--no-limit-rate</c>,
-/// <c>--no-speed-limit</c>, <c>--no-speed-time</c>, <c>--no-ftp-method</c>, <c>--no-ftp-port</c>, <c>--no-ftp-pasv</c> and <c>--no-quote</c> (each also with <c>=x</c>) exit 2 with
+/// <c>--no-speed-limit</c>, <c>--no-speed-time</c>, <c>--no-ftp-method</c>, <c>--no-ftp-port</c>, <c>--no-ftp-pasv</c>, <c>--no-quote</c>, <c>--no-parallel-max</c> and <c>--no-parallel-max-host</c> (each also with <c>=x</c>) exit 2 with
 /// <c>curl: option &lt;as typed&gt;: the given option cannot be reversed with a --no- prefix</c> and
 /// the try-help line. <c>--no-bogus</c>, <c>--no-</c>, <c>--no-no-silent</c> and <c>--no-Silent</c>
 /// exit 2 as unknown. A short letter is never negated.
@@ -114,6 +114,14 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("proxytunnel", 'p', (options, on) => options.ProxyTunnel = on),
         CommandLineOption.Value("telnet-option", 't', AcceptingEmpty((options, telnetOption) => options.AddTelnetOption(telnetOption))),
         CommandLineOption.Value("tftp-blksize", null, SetTftpBlockSize),
+        CommandLineOption.Text("mail-from", null, (options, address) => options.MailFrom = address),
+        CommandLineOption.Value("mail-rcpt", null, AcceptingEmpty((options, recipient) => options.AddMailRecipient(recipient))),
+        CommandLineOption.Text("mail-auth", null, (options, address) => options.MailAuth = address),
+        CommandLineOption.NegatableFlag("mail-rcpt-allowfails", null, (options, on) => options.MailRecipientAllowFails = on),
+        CommandLineOption.Value("upload-flags", null, SetUploadFlags),
+        CommandLineOption.Value("login-options", null, AcceptingEmpty((options, loginOptions) => options.LoginOptions = loginOptions)),
+        CommandLineOption.Text("sasl-authzid", null, (options, identity) => options.SaslAuthorizationIdentity = identity),
+        CommandLineOption.NegatableFlag("sasl-ir", null, (options, on) => options.SaslInitialResponse = on),
         CommandLineOption.Value("resolve", null, AcceptingEmpty((options, entry) => options.AddResolveEntry(entry))),
         CommandLineOption.Value("connect-to", null, AcceptingEmpty((options, entry) => options.AddConnectToEntry(entry))),
         CommandLineOption.NegatableFlag("tftp-no-options", null, (options, on) => options.TftpNoOptions = on),
@@ -144,16 +152,21 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("tcp-nodelay", null, (options, on) => options.TcpNoDelay = on),
         CommandLineOption.NegatableFlag("keepalive", null, (options, on) => options.TcpKeepAlive = on),
         CommandLineOption.NegatableFlag("styled-output", null, (options, on) => options.StyledOutput = on),
-        CommandLineOption.Value("cacert", null, SettingCaCertificateFile("--cacert", (options, file) => options.CaCertificateFile = file)),
+        CommandLineOption.Value("cacert", null, SettingExistingFile("--cacert", (options, file) => options.CaCertificateFile = file)),
         CommandLineOption.FileName("capath", null, (options, directory) => options.CaCertificateDirectory = directory),
         CommandLineOption.NegatableFlag("proxy-insecure", null, (options, on) => options.ProxyInsecure = on),
-        CommandLineOption.Value("proxy-cacert", null, SettingCaCertificateFile("--proxy-cacert", (options, file) => options.ProxyCaCertificateFile = file)),
+        CommandLineOption.Value("proxy-cacert", null, SettingExistingFile("--proxy-cacert", (options, file) => options.ProxyCaCertificateFile = file)),
         CommandLineOption.FileName("proxy-capath", null, (options, directory) => options.ProxyCaCertificateDirectory = directory),
         CommandLineOption.FileName("cert", 'E', (options, certificate) => options.ClientCertificate = certificate),
         CommandLineOption.FileName("key", null, (options, key) => options.PrivateKey = key),
         CommandLineOption.Text("cert-type", null, (options, type) => options.ClientCertificateType = type),
         CommandLineOption.Text("key-type", null, (options, type) => options.PrivateKeyType = type),
         CommandLineOption.Text("pass", null, (options, passphrase) => options.Passphrase = passphrase),
+        CommandLineOption.Text("pubkey", null, (options, file) => options.SshPublicKeyFile = file),
+        CommandLineOption.Value("knownhosts", null, SettingExistingFile("--knownhosts", (options, file) => options.SshKnownHostsFile = file)),
+        CommandLineOption.Value("hostpubmd5", null, SetHostPublicKeyMd5),
+        CommandLineOption.Text("hostpubsha256", null, (options, hash) => options.SshHostPublicKeySha256 = hash),
+        CommandLineOption.NegatableFlag("compressed-ssh", null, (options, on) => options.SshCompression = on),
         CommandLineOption.Flag("tlsv1", '1', options => options.MinimumTlsVersion = ObsoleteTlsProtocols.Tls10),
         CommandLineOption.Flag("tlsv1.0", null, options => options.MinimumTlsVersion = ObsoleteTlsProtocols.Tls10),
         CommandLineOption.Flag("tlsv1.1", null, options => options.MinimumTlsVersion = ObsoleteTlsProtocols.Tls11),
@@ -201,7 +214,12 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("fail", 'f', SetFail),
         CommandLineOption.NegatableFlag("fail-with-body", null, SetFailWithBody),
         CommandLineOption.NegatableFlag("fail-early", null, (options, on) => options.FailEarly = on),
+        CommandLineOption.NegatableFlag("parallel", 'Z', (options, on) => options.Parallel = on),
+        CommandLineOption.NegatableFlag("parallel-immediate", null, (options, on) => options.ParallelImmediate = on),
+        CommandLineOption.Value("parallel-max", null, SetParallelMax),
+        CommandLineOption.Value("parallel-max-host", null, SetParallelMaxHost),
         CommandLineOption.Value("config", 'K', ApplyConfigFile),
+        CommandLineOption.NextGroup("next", ':'),
         CommandLineOption.Value("variable", null, VariableDefinition.Apply),
         CommandLineOption.NegatableFlag("disable", 'q', IgnoreDisable),
         CommandLineOption.NegatableFlag("version", 'V', (options, on) => options.VersionRequested = on),
@@ -235,6 +253,19 @@ public static class CommandLineOptionTable
     /// <summary>The largest <c>--create-file-mode</c> curl 8.21.0 accepts: octal <c>0777</c>.</summary>
     private const int MaximumCreateFileMode = 0b111_111_111;
 
+    /// <summary>The length curl 8.21.0 requires of a <c>--hostpubmd5</c> value: 32, the hex digits of an MD5 hash.</summary>
+    private const int HostPublicKeyMd5Length = 32;
+
+    /// <summary>The names <c>--upload-flags</c> accepts, matched case-sensitively as curl 8.21.0 matches them.</summary>
+    private static readonly FrozenDictionary<string, ImapUploadFlags> UploadFlagsByName = new Dictionary<string, ImapUploadFlags>(StringComparer.Ordinal)
+    {
+        ["answered"] = ImapUploadFlags.Answered,
+        ["deleted"] = ImapUploadFlags.Deleted,
+        ["draft"] = ImapUploadFlags.Draft,
+        ["flagged"] = ImapUploadFlags.Flagged,
+        ["seen"] = ImapUploadFlags.Seen,
+    }.ToFrozenDictionary(StringComparer.Ordinal);
+
     /// <summary>The characters curl 8.21.0 expects in a range, and warns about any other.</summary>
     private static readonly SearchValues<char> RangeCharacters = SearchValues.Create("0123456789-,");
 
@@ -249,6 +280,46 @@ public static class CommandLineOptionTable
     /// parsed settings; those are <see cref="CommandLineOptions"/>.
     /// </summary>
     public static IReadOnlyList<CommandLineOption> Rows => RowsInTableOrder;
+
+    /// <summary>
+    /// The long names of the rows whose setting every option group of a command line shares, wherever
+    /// among the <c>-:</c> / <c>--next</c> groups it is given (<see cref="CommandLineGlobalState"/> holds
+    /// them), together with <c>config</c>, <c>next</c> and <c>disable</c>, which act on the command line
+    /// as a whole rather than set anything of one group. Every other row is per-group: each group
+    /// starts without it.
+    /// </summary>
+    /// <remarks>
+    /// curl 8.21.0's manual marks <c>--fail-early</c>, <c>-#</c>, <c>--progress-meter</c>, <c>-S</c>,
+    /// <c>--stderr</c>, <c>--styled-output</c>, <c>--trace</c>, <c>--trace-ascii</c>,
+    /// <c>--trace-time</c>, <c>-v</c>, <c>-Z</c>, <c>--parallel-immediate</c>, <c>--parallel-max</c> and <c>--parallel-max-host</c> "global"; <c>-s</c>, <c>--variable</c>, <c>-V</c>, <c>-h</c>
+    /// and <c>-M</c> are global in its tool (<c>struct GlobalConfig</c>) without the mark. Measured
+    /// 2026-09-28 (BL-508 Notes): <c>-v</c> given only after <c>--next</c> shows the first group's
+    /// transfer too, while <c>-w</c>, <c>-o</c> and <c>-H</c> given before it do not reach the second group.
+    /// </remarks>
+    public static IReadOnlySet<string> GlobalOptionLongNames { get; } = FrozenSet.Create(
+        StringComparer.Ordinal,
+        "silent",
+        "show-error",
+        "progress-meter",
+        "progress-bar",
+        "verbose",
+        "trace",
+        "trace-ascii",
+        "trace-time",
+        "stderr",
+        "styled-output",
+        "fail-early",
+        "parallel",
+        "parallel-immediate",
+        "parallel-max",
+        "parallel-max-host",
+        "variable",
+        "version",
+        "help",
+        "manual",
+        "config",
+        "next",
+        "disable");
 
     /// <summary>
     /// Does nothing: <c>-q</c> / <c>--disable</c> acts only as the first argument, where
@@ -304,6 +375,31 @@ public static class CommandLineOptionTable
             set(options, value);
             return null;
         };
+
+    /// <summary>
+    /// Applies an <c>--upload-flags</c> value to <see cref="CommandLineOptions.UploadFlags"/> as curl
+    /// 8.21.0's <c>parse_upload_flags</c> does: a comma list of <c>answered</c>, <c>deleted</c>,
+    /// <c>draft</c>, <c>flagged</c> and <c>seen</c>, matched case-sensitively, each setting its flag or,
+    /// after one leading <c>-</c>, clearing it. Any other item, an empty one included (so an empty value
+    /// or a stray comma), refuses the option as unknown (measured 2026-09-28, BL-535 Notes).
+    /// </summary>
+    private static CommandLineRefusal? SetUploadFlags(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        ImapUploadFlags flags = options.UploadFlags;
+        foreach (string item in value.Split(','))
+        {
+            bool clear = item.StartsWith('-');
+            if (!UploadFlagsByName.TryGetValue(clear ? item[1..] : item, out ImapUploadFlags named))
+            {
+                return CommandLineRefusal.UnknownOption(spelledOption);
+            }
+
+            flags = clear ? flags & ~named : flags | named;
+        }
+
+        options.UploadFlags = flags;
+        return null;
+    }
 
     /// <summary>
     /// Sets <see cref="CommandLineOptions.FtpFileMethod"/> from a <c>--ftp-method</c> value as curl 8.21.0
@@ -623,27 +719,48 @@ public static class CommandLineOptionTable
     }
 
     /// <summary>
-    /// Records a <c>--cacert</c> or <c>--proxy-cacert</c> value through <paramref name="set"/> when a
-    /// file or directory exists at it, and otherwise refuses it with curl 8.21.0's three lines, which
-    /// name <paramref name="longOption"/> (measured for both). An empty value is checked like any
-    /// other, so it is refused as a missing file, not as blank. A directory passes here; curl fails it
-    /// later, at handshake. A value that looks like a flag gets curl's filename warning first, whether
-    /// or not it exists.
+    /// Records a <c>--cacert</c>, <c>--proxy-cacert</c> or <c>--knownhosts</c> value through
+    /// <paramref name="set"/> when a file or directory exists at it, and otherwise refuses it with curl
+    /// 8.21.0's lines, which name <paramref name="longOption"/> (measured for all three); <c>-s</c> without
+    /// <c>-S</c>, read first, hides the first of them. An empty value is checked like any other, so it is
+    /// refused as a missing file, not as blank. A directory passes here; curl fails it later. A value that
+    /// looks like a flag gets curl's filename warning first, whether or not it exists.
     /// </summary>
-    /// <param name="longOption">The option as curl names it in the refusal, <c>--cacert</c> or <c>--proxy-cacert</c>.</param>
+    /// <param name="longOption">The option as curl names it in the refusal, such as <c>--cacert</c>.</param>
     /// <param name="set">Records the accepted file.</param>
-    private static CommandLineOptionApplier SettingCaCertificateFile(string longOption, Action<CommandLineOptions, string> set) =>
+    private static CommandLineOptionApplier SettingExistingFile(string longOption, Action<CommandLineOptions, string> set) =>
         (options, value, spelledOption, pathExists, _) =>
         {
             CommandLineOption.WarnWhenFileNameLooksLikeFlag(options, value);
             if (!pathExists(value))
             {
-                return CommandLineRefusal.FileDoesNotExist(spelledOption, longOption, value);
+                return CommandLineRefusal.FileDoesNotExist(spelledOption, longOption, value, options.ErrorsHidden);
             }
 
             set(options, value);
             return null;
         };
+
+    /// <summary>
+    /// Records a <c>--hostpubmd5</c> value, refusing an empty one as blank and any value that is not exactly
+    /// 32 characters long with <see cref="CommandLineRefusal.BadlyUsedHere"/>, as curl 8.21.0 does; it does
+    /// not check that the characters are hex digits (measured 2026-09-28, BL-562 Notes).
+    /// </summary>
+    private static CommandLineRefusal? SetHostPublicKeyMd5(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        if (value.Length == 0)
+        {
+            return CommandLineRefusal.BlankArgument(spelledOption);
+        }
+
+        if (value.Length != HostPublicKeyMd5Length)
+        {
+            return CommandLineRefusal.BadlyUsedHere(spelledOption);
+        }
+
+        options.SshHostPublicKeyMd5 = value;
+        return null;
+    }
 
     /// <summary>
     /// Records a <c>-r</c>/<c>--range</c> value the way curl 8.21.0 keeps it. It is refused when
@@ -845,6 +962,43 @@ public static class CommandLineOptionTable
 
         return refusal;
     }
+
+    /// <summary>
+    /// Reads <c>--parallel-max</c> as a number of zero or more, as curl 8.21.0 does (measured
+    /// 2026-09-28, BL-517 Notes: <c>-1</c> is refused as not positive, <c>0</c> and <c>301</c> are
+    /// accepted). As in curl's tool, zero means <see cref="CommandLineOptions.DefaultParallelMax"/> and a
+    /// value past <see cref="CommandLineOptions.LargestParallelLimit"/> means that limit.
+    /// </summary>
+    private static CommandLineRefusal? SetParallelMax(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        CommandLineRefusal? refusal = CommandLineNumber.ParseNonNegative(spelledOption, value, CommandLineNumber.PlatformLongMaximum, out long limit);
+        if (refusal is null)
+        {
+            options.ParallelMax = limit == 0 ? CommandLineOptions.DefaultParallelMax : ParallelLimitAtMostLargest(limit);
+        }
+
+        return refusal;
+    }
+
+    /// <summary>
+    /// Reads <c>--parallel-max-host</c> as a number of zero or more, as curl 8.21.0 does (measured
+    /// 2026-09-28, BL-517 Notes: <c>-1</c> is refused as not positive, <c>0</c> and <c>99999</c> are
+    /// accepted). Zero means no limit, and a value past <see cref="CommandLineOptions.LargestParallelLimit"/>
+    /// means that limit.
+    /// </summary>
+    private static CommandLineRefusal? SetParallelMaxHost(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        CommandLineRefusal? refusal = CommandLineNumber.ParseNonNegative(spelledOption, value, CommandLineNumber.PlatformLongMaximum, out long limit);
+        if (refusal is null)
+        {
+            options.ParallelMaxHost = ParallelLimitAtMostLargest(limit);
+        }
+
+        return refusal;
+    }
+
+    private static int ParallelLimitAtMostLargest(long limit) =>
+        (int)Math.Min(limit, CommandLineOptions.LargestParallelLimit);
 
     private static CommandLineRefusal? SetRetryCount(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
     {

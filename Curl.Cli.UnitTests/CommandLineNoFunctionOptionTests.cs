@@ -205,12 +205,12 @@ public sealed class CommandLineNoFunctionOptionTests
     }
 
     [TestMethod]
-    public void NoFunctionRows_EndTheBundleAndOnlyTheyDo()
+    public void NoFunctionRowsAndNext_EndTheBundleAndOnlyTheyDo()
     {
         string[] endingBundle = CommandLineOptionTable.Rows.Where(row => row.EndsBundle).Select(row => row.LongName).ToArray();
 
         CollectionAssert.AreEquivalent(
-            new[] { "sslv2", "sslv3", "metalink", "npn", "ntlm-wb", "false-start" },
+            new[] { "sslv2", "sslv3", "metalink", "npn", "ntlm-wb", "false-start", "next" },
             endingBundle);
     }
 
