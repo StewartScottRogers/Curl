@@ -20,7 +20,7 @@ revocation below the root unless `TlsClientOptions.SkipRevocationCheck` (`--ssl-
 is set, and names the first of a certificate out of date, an incomplete chain, an untrusted
 root and an unknown revocation status (ADR-0086, BL-368). There too the Schannel build accepts
 a certificate with no DNS subjectAltName whose CN matches the host, as `SchannelCommonNameCheck`
-matches it the way curl's `Curl_cert_hostcheck` does (ADR-0101, BL-415). Against the system store a
+matches it the way curl's `Curl_cert_hostcheck` does (ADR-0103, BL-415). Against the system store a
 certificate that is only out of date is exit 35 with `SEC_E_CERT_EXPIRED`. Per ADR-0009 it behaves like the curl
 build the platform usually runs, the Schannel build on Windows and the OpenSSL build
 elsewhere; its internal constructor names the build so tests pin both on any platform.

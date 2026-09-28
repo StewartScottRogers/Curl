@@ -1,5 +1,5 @@
 ---
-id: BL-454
+id: BL-460
 title: Refuse a CN match for a certificate with IP subjectAltNames in the OpenSSL build
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-454 — Refuse a CN match for a certificate with IP subjectAltNames in the OpenSSL build
+# BL-460 — Refuse a CN match for a certificate with IP subjectAltNames in the OpenSSL build
 
 ## Goal
 
@@ -18,7 +18,7 @@ In the OpenSSL build, a server certificate whose subjectAltName holds only IP ad
 
 ## Context
 
-- Found by BL-415 (ADR-0101): .NET's own name check accepts such a certificate on Windows (a handshake in the OpenSSL build with `--cacert`, target `localhost`, CN=localhost, SAN `127.0.0.1` only, returns exit 0). curl's OpenSSL build (`ossl_verifyhost`) falls back to the CN only when the subjectAltName holds no DNS and no IP entry, so it refuses it. Whether .NET on Linux and macOS also accepts it is not measured; measure it first (CI, or a test run there).
+- Found by BL-415 (ADR-0103): .NET's own name check accepts such a certificate on Windows (a handshake in the OpenSSL build with `--cacert`, target `localhost`, CN=localhost, SAN `127.0.0.1` only, returns exit 0). curl's OpenSSL build (`ossl_verifyhost`) falls back to the CN only when the subjectAltName holds no DNS and no IP entry, so it refuses it. Whether .NET on Linux and macOS also accepts it is not measured; measure it first (CI, or a test run there).
 - The check is `SslStreamTlsProvider.VerifyPeer` / the validation callback in `Curl.Networking.UnitLibrary`; the message is already `TlsFailureMessages.OpenSslPeerFailedVerification` once a `RemoteCertificateNameMismatch` is reported.
 - The OpenSSL build runs on Windows only in tests, so the gap matters only where .NET on Linux/macOS also accepts the certificate.
 - `SslStreamTlsProviderTests.CommonName.cs` has `CreateIpAddressOnlyCertificate` and the VerifyPeer test that already pins the message once a mismatch is reported.

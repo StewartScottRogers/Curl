@@ -34,7 +34,7 @@ In the Schannel build with `--cacert`, a server certificate whose subjectAltName
 - Filed by BL-368.
 - Delivered directly rather than through the full `/feature` stages: one private method in
   `SslStreamTlsProvider` and one new internal class, `SchannelCommonNameCheck`.
-- Design (ADR-0101): with `--cacert` the Schannel build drops `RemoteCertificateNameMismatch`
+- Design (ADR-0103): with `--cacert` the Schannel build drops `RemoteCertificateNameMismatch`
   when the target is a host name, the certificate has no DNS subjectAltName, and its CN
   (`GetNameInfo(DnsName)`, which is `CertGetNameString(CERT_NAME_DNS_TYPE)` on Windows)
   matches. Applied in the validation callback and in `VerifyPeer`, so the handshake event's
@@ -49,9 +49,9 @@ In the Schannel build with `--cacert`, a server certificate whose subjectAltName
   the mismatch. The `VerifyPeer` test hands the mismatch in directly so the new branch is
   covered on every platform.
 - Also found: in the OpenSSL build, .NET's check on Windows accepts this certificate where
-  curl's OpenSSL build refuses it. Filed as BL-454, not fixed here (the task says leave
+  curl's OpenSSL build refuses it. Filed as BL-460, not fixed here (the task says leave
   the OpenSSL path alone).
-- `touches` widened to `Documentation/Planning/Decisions` for ADR-0101 and its index line;
+- `touches` widened to `Documentation/Planning/Decisions` for ADR-0103 and its index line;
   no task in `Doing` names it.
 - Tests: `SchannelCommonNameCheckTests` (19 cases), and in
   `SslStreamTlsProviderTests.CommonName.cs` two handshakes and three `VerifyPeer` cases.
