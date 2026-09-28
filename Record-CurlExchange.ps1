@@ -42,8 +42,10 @@
 .PARAMETER CurlArgs
     The arguments passed to curl, one per element. Each is quoted for the Windows
     command line as needed, so an argument with spaces or quotes reaches curl intact.
-    Run the script from PowerShell (& or .\) to pass several; powershell -File hands a
-    comma-separated list to the script as one string.
+    powershell -File hands a comma-separated list to the script as one string, so under
+    -File a single CurlArgs string is split at its commas back into the list (BL-528).
+    To pass an argument that itself holds a comma, run the script from PowerShell
+    (& or .\) instead.
 
 .PARAMETER OutDirectory
     Where the four fixture files are written. Created if missing; existing fixture
@@ -158,16 +160,32 @@
     network, with -Curl wsl.exe and CurlArgs '-d','Ubuntu','--','curl',..., to measure
     the Linux (OpenSSL) build of curl, which cannot reach Windows' loopback (BL-474).
 
+.PARAMETER NoServer
+    Bind no port and serve nothing: run curl against a server the caller started, such
+    as a local OpenSSH sshd, an LDAP server or an SMB share, which a PowerShell loopback
+    server cannot speak (BL-528). Only stdout.bin, stderr.txt and exitcode.txt are
+    written; there is no request.bin, since the script sees none of the traffic. Port,
+    Response, Connections, ResponseDelayMilliseconds, Reset, HoldOpenMilliseconds,
+    RespondAfterBodyBytes, FtpReply, FtpData, FtpIdleMilliseconds and ListenAddress are
+    ignored, and Port need not be given. Combining it with a server mode, -Ftp or -Tls,
+    is refused. StandardInput and Curl work as in every other mode.
+
 .EXAMPLE
     .\Record-CurlExchange.ps1 -Port 18081 -Response 'HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello' -CurlArgs 'http://127.0.0.1:18081/a?b' -OutDirectory fixtures\default-get
 
     request.bin then holds
     GET /a?b HTTP/1.1\r\nHost: 127.0.0.1:18081\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n
     and stdout.bin holds hello.
+
+.EXAMPLE
+    .\Record-CurlExchange.ps1 -NoServer -CurlArgs '-sS','-k','sftp://tester:secret@127.0.0.1:2222/home/tester/a.txt' -OutDirectory fixtures\sftp-get
+
+    Runs curl against an sshd the caller already started on port 2222 and records only
+    what curl printed and its exit code.
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)] [ValidateRange(1, 65535)] [int] $Port,
+    [ValidateRange(0, 65535)] [int] $Port = 0,
     [string[]] $Response = @('HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n'),
     [Parameter(Mandatory = $true)] [string[]] $CurlArgs,
     [Parameter(Mandatory = $true)] [string] $OutDirectory,
@@ -183,11 +201,18 @@ param(
     [ValidateRange(1, 600000)] [int] $FtpIdleMilliseconds = 5000,
     [switch] $Tls,
     [string] $Curl,
-    [System.Net.IPAddress] $ListenAddress = [System.Net.IPAddress]::Loopback
+    [System.Net.IPAddress] $ListenAddress = [System.Net.IPAddress]::Loopback,
+    [switch] $NoServer
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+# powershell -File binds '-sS','http://...' as the one string "-sS,http://..."; only then
+# is the invocation line empty, so only then is that string split back into its elements.
+if ([string]::IsNullOrEmpty($MyInvocation.Line) -and $CurlArgs.Count -eq 1) { $CurlArgs = $CurlArgs[0].Split(',') }
+if ($NoServer -and ($Ftp -or $Tls)) { throw '-NoServer runs no server, so it cannot be combined with -Ftp or -Tls.' }
+if (-not $NoServer -and $Port -eq 0) { throw '-Port is required unless -NoServer is given: the URL in CurlArgs must name the port the server listens on.' }
 
 function Get-ReferenceCurlPath {
     $git = Get-Command git.exe -ErrorAction SilentlyContinue
@@ -608,16 +633,23 @@ $OutDirectory = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine((Get-Loc
 New-Item -ItemType Directory -Path $OutDirectory -Force | Out-Null
 
 $tlsCertificate = if ($Tls -or $Ftp) { New-ThrowawayTlsCertificate } else { $null }
-$listener = New-Object System.Net.Sockets.TcpListener($ListenAddress, $Port)
-$listener.Start()
-$server = [System.Management.Automation.PowerShell]::Create()
+# -NoServer binds nothing: the caller's own server answers curl.
+$listener = $null
+$server = $null
+if (-not $NoServer) {
+    $listener = New-Object System.Net.Sockets.TcpListener($ListenAddress, $Port)
+    $listener.Start()
+    $server = [System.Management.Automation.PowerShell]::Create()
+}
 try {
-    if ($Ftp) {
+    if ($NoServer) {
+        $serverRun = $null
+    } elseif ($Ftp) {
         [void] $server.AddScript($serveFtpSession).AddArgument($listener).AddArgument($ftpOverrides).AddArgument([byte[]] (ConvertFrom-EscapedResponse -Text $FtpData)).AddArgument($transcript).AddArgument($uploadedData).AddArgument($tlsCertificate).AddArgument([bool] $Tls).AddArgument($FtpIdleMilliseconds).AddArgument($ListenAddress)
     } else {
         [void] $server.AddScript($serveConnections).AddArgument($listener).AddArgument($responseBytes).AddArgument($Connections).AddArgument($ResponseDelayMilliseconds).AddArgument([bool] $Reset).AddArgument($RespondAfterBodyBytes).AddArgument($tlsCertificate).AddArgument($HoldOpenMilliseconds)
     }
-    $serverRun = $server.BeginInvoke()
+    if ($null -ne $server) { $serverRun = $server.BeginInvoke() }
 
     $startInfo = New-Object System.Diagnostics.ProcessStartInfo
     $startInfo.FileName = $Curl
@@ -656,15 +688,18 @@ try {
         $curlProcess.Dispose()
     }
 
-    # A connection curl did not open would block the server forever; stopping the
-    # listener ends the wait. Give an accepted connection a moment to finish first.
-    [void] $serverRun.AsyncWaitHandle.WaitOne(2000)
-    $listener.Stop()
-    $requests = $server.EndInvoke($serverRun)
-    if ($server.Streams.Error.Count -gt 0) { throw $server.Streams.Error[0] }
+    $requests = @()
+    if ($null -ne $server) {
+        # A connection curl did not open would block the server forever; stopping the
+        # listener ends the wait. Give an accepted connection a moment to finish first.
+        [void] $serverRun.AsyncWaitHandle.WaitOne(2000)
+        $listener.Stop()
+        $requests = $server.EndInvoke($serverRun)
+        if ($server.Streams.Error.Count -gt 0) { throw $server.Streams.Error[0] }
+    }
 } finally {
-    $listener.Stop()
-    $server.Dispose()
+    if ($null -ne $listener) { $listener.Stop() }
+    if ($null -ne $server) { $server.Dispose() }
     # Reset deletes the key container the PFX import created.
     if ($null -ne $tlsCertificate) { $tlsCertificate.Reset() }
 }
@@ -674,7 +709,7 @@ foreach ($request in $requests) {
     foreach ($bytes in $request) { $requestBytes.Write($bytes, 0, $bytes.Length) }
 }
 
-[System.IO.File]::WriteAllBytes((Join-Path $OutDirectory 'request.bin'), $requestBytes.ToArray())
+if (-not $NoServer) { [System.IO.File]::WriteAllBytes((Join-Path $OutDirectory 'request.bin'), $requestBytes.ToArray()) }
 [System.IO.File]::WriteAllBytes((Join-Path $OutDirectory 'stdout.bin'), $stdout.ToArray())
 [System.IO.File]::WriteAllBytes((Join-Path $OutDirectory 'stderr.txt'), $stderr.ToArray())
 [System.IO.File]::WriteAllText((Join-Path $OutDirectory 'exitcode.txt'), [string] $exitCode, [System.Text.Encoding]::ASCII)
