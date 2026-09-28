@@ -100,6 +100,12 @@ namespace Curl.Protocol.Http;
 /// sent from its start; a stream that cannot seek goes on from the first byte not sent. Under
 /// <c>-f</c>, or when the 417 closes the connection, sending stops just the same and the 417
 /// is the result. Measured on curl 8.21.0 (BL-319 Notes).
+/// That resend keeps an <c>-H</c> <c>Expect: 100-continue</c> line's wait, so it can draw
+/// another 417 and another resend. Every resend counts as a followed redirect in
+/// <see cref="TransferReport.RedirectCount" />, with or without <c>-L</c>, and one that would
+/// pass <see cref="HttpRequestOptions.MaxRedirects" /> is not sent: the 417's head is written
+/// and the transfer ends with exit 47, <c>Maximum (N) redirects followed</c>. Measured on curl
+/// 8.21.0 (BL-396 Notes).
 /// </para>
 /// <para>
 /// With a cookie store, every request, an authentication retry included, asks it afresh for
@@ -226,6 +232,7 @@ public sealed class HttpProtocolHandler(
             Progress = new HttpTransferProgress(context.Progress),
             ForwardProxy = forwardProxy,
             ProxyAuthorization = forwardProxy is null ? null : ProxyAuthorizationFor(authRequest, forwardProxy),
+            RedirectsFollowed = options.RedirectsFollowed,
         };
         return await ConnectAndExchangeAsync(plan, earlier: null).ConfigureAwait(false);
     }
@@ -459,6 +466,7 @@ public sealed class HttpProtocolHandler(
             Started = plan.Started,
             TimeProvider = context.TimeProvider,
             ResponseConnection = timedConnection,
+            RedirectCount = plan.RedirectsFollowed - options.RedirectsFollowed,
         };
         HttpResponseBodyReader body = new(responseConnection)
         {
@@ -720,8 +728,13 @@ public sealed class HttpProtocolHandler(
     /// request with the <c>Authorization</c> value <see cref="RetryAuthorization" /> gives, or
     /// else, for a 417 <see cref="RetriesWithoutExpect" /> accepts, the same request without
     /// <c>Expect</c> and with the body <paramref name="upload" /> rewinds; <see langword="null" />
-    /// when the response is the result.
+    /// when the response is the result. A resend after a 417 that arrived while the body was
+    /// being sent keeps an <c>-H</c> <c>Expect: 100-continue</c> wait, so it can draw another
+    /// (measured, BL-396 Notes).
     /// </summary>
+    /// <exception cref="HttpTransferException">
+    /// The resend would pass <see cref="HttpRequestOptions.MaxRedirects" /> (exit 47).
+    /// </exception>
     private HttpRequestPlan? RetryOf(HttpRequestPlan plan, HttpResponseHead head, bool bodyLeftUnsent, HttpRequestBodyWriter upload)
     {
         if (RetryAuthorization(plan, head) is { } authorization)
@@ -729,7 +742,30 @@ public sealed class HttpProtocolHandler(
             return plan.WithAuthorization(authorization);
         }
 
-        return RetriesWithoutExpect(plan, head, bodyLeftUnsent || upload.CutShort) ? plan.WithoutExpect(upload.Rewound(plan.Framing.Body!)) : null;
+        if (!RetriesWithoutExpect(plan, head, bodyLeftUnsent || upload.CutShort))
+        {
+            return null;
+        }
+
+        ThrowIfRedirectLimitReached(plan);
+        return plan.WithoutExpect(upload.Rewound(plan.Framing.Body!), keepsCustomWait: !bodyLeftUnsent);
+    }
+
+    /// <summary>
+    /// Ends the transfer with exit 47 when one more resend would pass
+    /// <see cref="HttpRequestOptions.MaxRedirects" />: curl 8.21.0 counts each resend after a
+    /// 417 as a followed redirect, with or without <c>-L</c>, sharing the count with the hops
+    /// <c>-L</c> followed before this request, and <c>--max-redirs 0</c> refuses even the first
+    /// (measured, BL-396 Notes). The 417's head is written first.
+    /// </summary>
+    /// <exception cref="HttpTransferException">The limit is reached (exit 47).</exception>
+    private static void ThrowIfRedirectLimitReached(HttpRequestPlan plan)
+    {
+        int limit = plan.Options.MaxRedirects;
+        if (limit >= 0 && plan.RedirectsFollowed >= limit)
+        {
+            throw new HttpTransferException(CurlExitCode.TooManyRedirects, HttpTransferMessages.MaximumRedirectsFollowed(limit));
+        }
     }
 
     /// <summary>
@@ -737,8 +773,7 @@ public sealed class HttpProtocolHandler(
     /// <c>Expect</c>, as curl 8.21.0 does (measured, BL-260 and BL-319 Notes): a 417 that
     /// arrived before the whole body was sent - while it waited for <c>100 Continue</c>, or
     /// while it was being sent once the wait ran out - on a connection the 417 leaves open, and
-    /// not under <c>-f</c>, which fails on the 417 itself. The resent request waits for
-    /// nothing, so it is never resent again.
+    /// not under <c>-f</c>, which fails on the 417 itself.
     /// </summary>
     private static bool RetriesWithoutExpect(HttpRequestPlan plan, HttpResponseHead head, bool bodyStopped) =>
         bodyStopped
@@ -940,6 +975,12 @@ public sealed class HttpProtocolHandler(
         internal required HttpFirstByteTimingConnection ResponseConnection { get; init; }
 
         /// <summary>
+        /// Gets how many resends after a 417 this transfer made before this exchange, the
+        /// report's <see cref="TransferReport.RedirectCount" /> (BL-396 Notes).
+        /// </summary>
+        internal int RedirectCount { get; init; }
+
+        /// <summary>
         /// Gets or sets the moment the first request byte was about to be sent,
         /// <see langword="null" /> until then.
         /// </summary>
@@ -969,6 +1010,7 @@ public sealed class HttpProtocolHandler(
                 DownloadSize = downloadSize,
                 HeaderSize = earlier?.HeaderSize ?? 0,
                 ConnectionCount = (earlier?.ConnectionCount ?? 0) + (newConnection ? 1 : 0),
+                RedirectCount = RedirectCount,
                 ProxyConnectResponseCode = connect.ProxyConnectResponseCode,
                 UsedProxy = UsedProxy,
                 LocalEndPoint = connect.LocalEndPoint,
@@ -1070,6 +1112,13 @@ public sealed class HttpProtocolHandler(
         public bool SentOnFreshConnection { get; init; }
 
         /// <summary>
+        /// Gets how many redirects the transfer has followed before this request: the chain's
+        /// count (<see cref="HttpRequestOptions.RedirectsFollowed" />) and one for each resend
+        /// after a 417, as curl 8.21.0 counts them (BL-396 Notes).
+        /// </summary>
+        public int RedirectsFollowed { get; init; }
+
+        /// <summary>
         /// Makes the same request sent with <paramref name="authorization" /> instead.
         /// </summary>
         /// <param name="authorization">The <c>Authorization</c> value the retry is sent with.</param>
@@ -1082,19 +1131,23 @@ public sealed class HttpProtocolHandler(
         /// <paramref name="body" />.
         /// </summary>
         /// <param name="body">The body to resend.</param>
-        /// <returns>The resent request's plan.</returns>
-        public HttpRequestPlan WithoutExpect(HttpRequestBody body) => With(Framing.WithoutExpect(body), Authorization);
+        /// <param name="keepsCustomWait">
+        /// <see langword="true" /> to keep an <c>-H</c> <c>Expect: 100-continue</c> wait.
+        /// </param>
+        /// <returns>The resent request's plan, one more redirect followed.</returns>
+        public HttpRequestPlan WithoutExpect(HttpRequestBody body, bool keepsCustomWait) =>
+            With(Framing.WithoutExpect(body, keepsCustomWait), Authorization, SentOnFreshConnection, RedirectsFollowed + 1);
 
         /// <summary>
         /// Makes the same request, marked as sent again on a fresh connection.
         /// </summary>
         /// <returns>The resent request's plan.</returns>
-        public HttpRequestPlan OnFreshConnection() => With(Framing, Authorization, sentOnFreshConnection: true);
+        public HttpRequestPlan OnFreshConnection() => With(Framing, Authorization, sentOnFreshConnection: true, RedirectsFollowed);
 
         private HttpRequestPlan With(HttpRequestFraming framing, string? authorization) =>
-            With(framing, authorization, SentOnFreshConnection);
+            With(framing, authorization, SentOnFreshConnection, RedirectsFollowed);
 
-        private HttpRequestPlan With(HttpRequestFraming framing, string? authorization, bool sentOnFreshConnection) =>
+        private HttpRequestPlan With(HttpRequestFraming framing, string? authorization, bool sentOnFreshConnection, int redirectsFollowed) =>
             new(Context, Options, framing, AuthRequest, authorization)
             {
                 Started = Started,
@@ -1103,6 +1156,7 @@ public sealed class HttpProtocolHandler(
                 ForwardProxy = ForwardProxy,
                 ProxyAuthorization = ProxyAuthorization,
                 SentOnFreshConnection = sentOnFreshConnection,
+                RedirectsFollowed = redirectsFollowed,
             };
     }
 

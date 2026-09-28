@@ -157,6 +157,34 @@ public sealed class RedirectFollowerTests
     }
 
     [TestMethod]
+    public async Task FollowAsync_HopResends_CountTowardTheChainsRedirects()
+    {
+        // curl counts each 417 resend as a followed redirect, sharing -L's count (BL-396 Notes).
+        TransferResult resent = Redirect(302, Next) with { Report = Redirect(302, Next).Report! with { RedirectCount = 2 } };
+        ScriptedHandler handler = new(resent, Ok(200, 0));
+
+        TransferResult result = await Follow(handler, Context(Location()));
+
+        Assert.AreEqual(0, handler.Contexts[0].Http!.RedirectsFollowed);
+        Assert.AreEqual(3, handler.Contexts[1].Http!.RedirectsFollowed);
+        Assert.AreEqual(3, result.Report!.RedirectCount);
+    }
+
+    [TestMethod]
+    public async Task FollowAsync_HopResendsReachTheLimit_Exits47BeforeTheNextHop()
+    {
+        TransferResult resent = Redirect(302, Next) with { Report = Redirect(302, Next).Report! with { RedirectCount = 3 } };
+        ScriptedHandler handler = new(resent);
+
+        TransferResult result = await Follow(handler, Context(Location()), new RedirectPolicy { MaxRedirects = 3 });
+
+        Assert.AreEqual(CurlExitCode.TooManyRedirects, result.ExitCode);
+        Assert.AreEqual("Maximum (3) redirects followed", result.ErrorMessage);
+        Assert.HasCount(1, handler.Contexts);
+        Assert.AreEqual(3, result.Report!.RedirectCount);
+    }
+
+    [TestMethod]
     public async Task FollowAsync_NegativeLimit_FollowsWithoutLimit()
     {
         TransferResult[] script = [.. Enumerable.Repeat(Redirect(302, Next), 60), Ok(200, 1)];
@@ -825,7 +853,7 @@ public sealed class RedirectFollowerTests
         Assert.AreEqual(first.CreateFileMode, second.CreateFileMode);
         Assert.AreEqual(first.ConnectTimeout, second.ConnectTimeout);
         Assert.AreEqual(first.MaxTime, second.MaxTime);
-        Assert.AreEqual(first.Http, second.Http);
+        Assert.AreEqual(first.Http with { RedirectsFollowed = 1 }, second.Http);
         Assert.AreSame(first.TimeProvider, second.TimeProvider);
         Assert.AreEqual(first.CancellationToken, second.CancellationToken);
     }

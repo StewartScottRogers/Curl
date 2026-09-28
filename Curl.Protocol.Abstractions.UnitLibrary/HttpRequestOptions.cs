@@ -76,6 +76,21 @@ public sealed record HttpRequestOptions
     public bool FollowRedirects { get; init; }
 
     /// <summary>
+    /// Gets the <c>--max-redirs</c> limit: 50 when not given, as in curl 8.21.0, and <c>-1</c>
+    /// for no limit. curl counts each resend after a <c>417 Expectation Failed</c> as a
+    /// followed redirect, with or without <c>-L</c>, so the handler ends a resend that would
+    /// pass it with exit 47 (measured, BL-396 Notes).
+    /// </summary>
+    public int MaxRedirects { get; init; } = 50;
+
+    /// <summary>
+    /// Gets how many redirects the transfer followed before this request: 0 for the first,
+    /// and the count so far for a hop <c>-L</c> follows, whose resends count against the same
+    /// <see cref="MaxRedirects" /> (BL-396 Notes).
+    /// </summary>
+    public int RedirectsFollowed { get; init; }
+
+    /// <summary>
     /// Gets how a status of 400 or above ends the transfer; <see cref="HttpFailMode.None" />
     /// when neither <c>-f</c> nor <c>--fail-with-body</c> was given.
     /// </summary>

@@ -120,17 +120,23 @@ internal sealed class HttpRequestFraming
     private HttpUploadResume? Upload { get; }
 
     /// <summary>
-    /// Makes the same framing without curl's own <c>Expect: 100-continue</c> line and without
-    /// the wait for <c>100 Continue</c>: the request curl 8.21.0 resends after a
-    /// <c>417 Expectation Failed</c>. An <c>-H</c> <c>Expect</c> line is still sent, but the
-    /// body follows the head at once (measured, BL-260 Notes).
+    /// Makes the same framing without curl's own <c>Expect: 100-continue</c> line: the request
+    /// curl 8.21.0 resends after a <c>417 Expectation Failed</c>. An <c>-H</c> <c>Expect</c>
+    /// line is still sent. After a 417 that arrived during the wait, the body follows the head
+    /// at once (measured, BL-260 Notes); after one that arrived while the body was being sent,
+    /// an <c>-H</c> <c>Expect: 100-continue</c> waits for <c>100 Continue</c> again (measured,
+    /// BL-396 Notes).
     /// </summary>
     /// <param name="body">
     /// The body to resend: <see cref="Body" />, or the stream it rewinds to (BL-319 Notes).
     /// </param>
+    /// <param name="keepsCustomWait">
+    /// <see langword="true" /> to keep the wait an <c>-H</c> <c>Expect: 100-continue</c> asks
+    /// for; curl's own line and its wait are dropped either way.
+    /// </param>
     /// <returns>The framing of the resent request.</returns>
-    internal HttpRequestFraming WithoutExpect(HttpRequestBody? body) =>
-        new(Method, body, KnownLength, IsChunked, addsExpect: false, awaitsContinue: false, RefusesUnknownLength, Upload, ContentRange);
+    internal HttpRequestFraming WithoutExpect(HttpRequestBody? body, bool keepsCustomWait = false) =>
+        new(Method, body, KnownLength, IsChunked, addsExpect: false, awaitsContinue: keepsCustomWait && AwaitsContinue && !AddsExpect, RefusesUnknownLength, Upload, ContentRange);
 
     /// <summary>
     /// Decides the framing for a request with <paramref name="options" />.

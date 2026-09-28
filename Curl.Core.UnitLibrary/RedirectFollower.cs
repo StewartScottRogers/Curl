@@ -55,6 +55,12 @@ namespace Curl.Core;
 /// last request was sent with (measured, BL-361 Notes; ADR-0101).
 /// </para>
 /// <para>
+/// Each hop's own <see cref="TransferReport.RedirectCount" /> - the HTTP handler's resends after
+/// a 417 - is added to the chain's count, and every hop after the first is sent that count as
+/// <see cref="HttpRequestOptions.RedirectsFollowed" />, so the resends and the followed hops share
+/// one <c>--max-redirs</c> limit, as curl 8.21.0's do (measured, BL-396 Notes).
+/// </para>
+/// <para>
 /// Every hop after the first carries the chain's start as
 /// <see cref="ITransferContext.OperationStarted" />, so <c>-m</c> limits the whole chain, as
 /// curl's does, rather than each hop (measured, BL-299 Notes).
@@ -140,9 +146,9 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
 
             Rewind(context.Upload, uploadStart, bodyDropped);
             Rewind(bodyContent, bodyStart, bodyDropped);
-            // No stop means the target parsed, so next is set.
-            hop = NextHop(context, hop.Url, next!, http, hopProxy, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted);
             chain.Followed(target);
+            // No stop means the target parsed, so next is set.
+            hop = NextHop(context, hop.Url, next!, http with { RedirectsFollowed = chain.RedirectCount }, hopProxy, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted);
         }
     }
 
@@ -427,6 +433,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
             headerSize += report.HeaderSize;
             requestSize += report.RequestSize;
             connectionCount += report.ConnectionCount;
+            RedirectCount += report.RedirectCount;
         }
 
         public void Followed(string url)

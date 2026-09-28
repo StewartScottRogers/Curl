@@ -26,4 +26,22 @@ public sealed class FakeTimeProviderTests
 
         Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => time.Advance(TimeSpan.FromTicks(-1)));
     }
+
+    [TestMethod]
+    public void TimerCreatedAsync_ForTheSecondTimer_CompletesOnlyOnceTwoAreCreated()
+    {
+        FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
+        TimeSpan second = TimeSpan.FromSeconds(1);
+        using ITimer first = time.CreateTimer(_ => { }, null, second, Timeout.InfiniteTimeSpan);
+        using ITimer other = time.CreateTimer(_ => { }, null, TimeSpan.FromSeconds(2), Timeout.InfiniteTimeSpan);
+
+        Task secondCreated = time.TimerCreatedAsync(second, 2);
+        bool completedEarly = secondCreated.IsCompleted;
+        using ITimer again = time.CreateTimer(_ => { }, null, second, Timeout.InfiniteTimeSpan);
+
+        Assert.IsFalse(completedEarly);
+        Assert.IsTrue(secondCreated.IsCompleted);
+        Assert.IsTrue(time.TimerCreatedAsync(second, 2).IsCompleted);
+        Assert.IsTrue(time.TimerCreatedAsync(second).IsCompleted);
+    }
 }

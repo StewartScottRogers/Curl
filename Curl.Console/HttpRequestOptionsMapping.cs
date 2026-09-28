@@ -60,6 +60,7 @@ internal static class HttpRequestOptionsMapping
     /// <see cref="CommandLineOptions.DataInQuery" /> moved it into the query; and
     /// <see cref="CommandLineOptions.FailMode" /> as <see cref="HttpRequestOptions.Fail" />; and
     /// <see cref="CommandLineOptions.FollowRedirects" /> as <see cref="HttpRequestOptions.FollowRedirects" />; and
+    /// <see cref="CommandLineOptions.MaxRedirects" /> as <see cref="HttpRequestOptions.MaxRedirects" />; and
     /// <see cref="CommandLineOptions.AuthSchemes" /> and <see cref="CommandLineOptions.BearerToken" /> verbatim; and
     /// <see cref="CommandLineOptions.HttpVersion" /> as <see cref="HttpRequestOptions.Version" />, HTTP/1.1 when
     /// neither <c>-0</c> nor <c>--http1.1</c> was given; and <see cref="CommandLineOptions.Compressed" />,
@@ -87,6 +88,7 @@ internal static class HttpRequestOptionsMapping
             Body = formBody ?? PostDataBodyOf(options),
             Fail = options.FailMode,
             FollowRedirects = options.FollowRedirects,
+            MaxRedirects = options.MaxRedirects,
             AuthSchemes = options.AuthSchemes,
             BearerToken = options.BearerToken,
             Version = options.HttpVersion ?? HttpVersionPreference.Http11,

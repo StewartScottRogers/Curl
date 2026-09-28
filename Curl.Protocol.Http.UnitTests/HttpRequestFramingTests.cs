@@ -274,6 +274,36 @@ public sealed class HttpRequestFramingTests
         Assert.AreEqual("bytes 4-9/10", framing.ContentRange);
     }
 
+    [TestMethod]
+    [DataRow(false, false, DisplayName = "-H Expect, 417 during the wait")]
+    [DataRow(true, true, DisplayName = "-H Expect, 417 while sending")]
+    public void WithoutExpect_CustomExpect_KeepsTheWaitOnlyWhenAsked(bool keepsCustomWait, bool expected)
+    {
+        // A resend after a 417 while sending waits again for an -H Expect (BL-396 Notes);
+        // one after a 417 during the wait does not (BL-260 Notes).
+        HttpRequestFraming framing = Of(new HttpRequestOptions { Headers = ["Expect: 100-continue"], Body = new BytesBody("hi"u8.ToArray(), "a/b") });
+
+        HttpRequestFraming resent = framing.WithoutExpect(framing.Body, keepsCustomWait);
+
+        Assert.IsFalse(resent.AddsExpect);
+        Assert.AreEqual(expected, resent.AwaitsContinue);
+    }
+
+    [TestMethod]
+    [DataRow(true, DisplayName = "curl's own Expect")]
+    [DataRow(false, DisplayName = "small body, no wait to keep")]
+    public void WithoutExpect_KeepingTheCustomWait_NeverWaitsWithoutAnHExpect(bool ownExpect)
+    {
+        // curl's own Expect is dropped with its wait; a small body never waited.
+        byte[] content = ownExpect ? new byte[HttpRequestFraming.ExpectContinueThreshold + 1] : "hi"u8.ToArray();
+        HttpRequestFraming framing = Of(new HttpRequestOptions { Body = new BytesBody(content, "a/b") });
+
+        HttpRequestFraming resent = framing.WithoutExpect(framing.Body, keepsCustomWait: true);
+
+        Assert.AreEqual(ownExpect, framing.AwaitsContinue);
+        Assert.IsFalse(resent.AwaitsContinue);
+    }
+
     private static HttpRequestFraming Of(HttpRequestOptions options) =>
         HttpRequestFraming.Of(options, [.. options.Headers.Select(HttpCustomHeader.Parse)]);
 }

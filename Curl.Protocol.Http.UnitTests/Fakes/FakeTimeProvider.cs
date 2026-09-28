@@ -18,7 +18,7 @@ public sealed class FakeTimeProvider(DateTimeOffset start) : TimeProvider
 
     private readonly List<TimeSpan> createdDueTimes = [];
 
-    private readonly List<(TimeSpan DueTime, TaskCompletionSource Created)> dueTimeWaiters = [];
+    private readonly List<(TimeSpan DueTime, int Count, TaskCompletionSource Created)> dueTimeWaiters = [];
 
     private TimeSpan elapsed;
 
@@ -38,17 +38,27 @@ public sealed class FakeTimeProvider(DateTimeOffset start) : TimeProvider
     /// </summary>
     /// <param name="dueTime">The due time the timer was created with.</param>
     /// <returns>The task.</returns>
-    public Task TimerCreatedAsync(TimeSpan dueTime)
+    public Task TimerCreatedAsync(TimeSpan dueTime) => TimerCreatedAsync(dueTime, 1);
+
+    /// <summary>
+    /// Returns a task that completes once <paramref name="count" /> timers due
+    /// <paramref name="dueTime" /> after their creation have been created, so a test can wait
+    /// for each of several waits in turn.
+    /// </summary>
+    /// <param name="dueTime">The due time the timers were created with.</param>
+    /// <param name="count">How many such timers to wait for; 1 or more.</param>
+    /// <returns>The task.</returns>
+    public Task TimerCreatedAsync(TimeSpan dueTime, int count)
     {
         lock (gate)
         {
-            if (createdDueTimes.Contains(dueTime))
+            if (createdDueTimes.Count(created => created == dueTime) >= count)
             {
                 return Task.CompletedTask;
             }
 
             TaskCompletionSource created = new(TaskCreationOptions.RunContinuationsAsynchronously);
-            dueTimeWaiters.Add((dueTime, created));
+            dueTimeWaiters.Add((dueTime, count, created));
             return created.Task;
         }
     }
@@ -71,7 +81,8 @@ public sealed class FakeTimeProvider(DateTimeOffset start) : TimeProvider
         {
             timers.Add(timer);
             createdDueTimes.Add(dueTime);
-            foreach ((TimeSpan _, TaskCompletionSource created) in dueTimeWaiters.Where(waiter => waiter.DueTime == dueTime))
+            int createdSoFar = createdDueTimes.Count(created => created == dueTime);
+            foreach ((TimeSpan _, int _, TaskCompletionSource created) in dueTimeWaiters.Where(waiter => waiter.DueTime == dueTime && waiter.Count <= createdSoFar))
             {
                 created.TrySetResult();
             }

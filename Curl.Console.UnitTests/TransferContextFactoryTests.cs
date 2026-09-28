@@ -184,6 +184,23 @@ public sealed class TransferContextFactoryTests
     }
 
     [TestMethod]
+    [DataRow(new string[0], 50)]
+    [DataRow(new[] { "--max-redirs", "3" }, 3)]
+    [DataRow(new[] { "--max-redirs", "-1" }, -1)]
+    public void Create_MaxRedirs_IsMappedOntoHttpForThe417Resend(string[] arguments, int expected)
+    {
+        using MemoryStream standardInput = new();
+        using MemoryStream output = new();
+        CommandLineOptions options = Parse([.. arguments, "http://example.com/"]);
+
+        TransferContext context = new TransferContextFactory(standardInput)
+            .Create(options, CurlUrl.Parse("http://example.com/"), output, null, null, null);
+
+        Assert.AreEqual(expected, context.Http!.MaxRedirects);
+        Assert.AreEqual(0, context.Http.RedirectsFollowed);
+    }
+
+    [TestMethod]
     [DataRow("-", true, true)]
     [DataRow("0", true, false)]
     [DataRow("-", false, false)]

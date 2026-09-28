@@ -188,6 +188,15 @@ internal static class HttpTransferMessages
         string.Create(CultureInfo.InvariantCulture, $"The requested URL returned error: {statusCode}");
 
     /// <summary>
+    /// Formats the exit 47 message for a <c>417</c> resend that would pass the
+    /// <c>--max-redirs</c> limit (measured, BL-396 Notes).
+    /// </summary>
+    /// <param name="maxRedirects">The limit.</param>
+    /// <returns>The message, such as <c>Maximum (50) redirects followed</c>.</returns>
+    internal static string MaximumRedirectsFollowed(int maxRedirects) =>
+        string.Create(CultureInfo.InvariantCulture, $"Maximum ({maxRedirects}) redirects followed");
+
+    /// <summary>
     /// Formats the exit 56 message for a chunk size line that does not start with a
     /// hexadecimal digit.
     /// </summary>
