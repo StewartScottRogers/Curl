@@ -2191,7 +2191,7 @@ internal sealed class CurlCommandRunner(
         Stream? upload,
         ProxyEndpoint? proxy)
     {
-        DeferredOutputFileStream output = CreateOutputFileStream(target.Path, resumeFrom);
+        DeferredOutputFileStream output = CreateOutputFileStream(options, target.Path, resumeFrom);
         TransferResult completed = await TransferIntoOutputFileAsync(
                 follower,
                 options,
@@ -2218,13 +2218,14 @@ internal sealed class CurlCommandRunner(
     /// <summary>
     /// Creates the stream that opens <paramref name="path" /> on its first write: for appending
     /// when the transfer resumes past byte zero, as curl opens the file <c>"ab"</c> then, and
-    /// truncated otherwise.
+    /// truncated otherwise, or kept and numbered under <c>--no-clobber</c>.
     /// </summary>
+    /// <param name="options">The accepted command line, whose <c>--clobber</c> choice the stream takes.</param>
     /// <param name="path">The output file.</param>
     /// <param name="resumeFrom">The resolved <c>-C</c> offset, or <see langword="null" />.</param>
     /// <returns>The stream, not yet opened.</returns>
-    private DeferredOutputFileStream CreateOutputFileStream(string path, long? resumeFrom) =>
-        new(fileSystem, path, resumeFrom is > 0 ? FileWriteMode.Append : FileWriteMode.Truncate);
+    private DeferredOutputFileStream CreateOutputFileStream(CommandLineOptions options, string path, long? resumeFrom) =>
+        new(fileSystem, path, resumeFrom is > 0 ? FileWriteMode.Append : FileWriteMode.Truncate, options.Clobber);
 
     /// <summary>
     /// Gives the wrapper that puts a <see cref="RemoteHeaderNameStream" /> in front of the

@@ -258,3 +258,11 @@ handle (`GetStdHandle` on Windows, descriptor 1 elsewhere), and a closed one a
 Under `-N` / `--no-buffer` the runner wraps a transfer's body output, standard output or an
 `-o` file, in a `FlushEachWriteStream`, which flushes after every write as curl 8.21.0 does;
 the bytes are unchanged (BL-491).
+
+Under `--no-clobber` `DeferredOutputFileStream` opens an `-o`, `-O` or `-J` file only when
+nothing is there (`FileWriteMode.CreateNew`); a name already taken moves on to `<name>.1`,
+`.2` ... `.99`, the first free one taking the body and `%{filename_effective}`. When none is
+free the transfer ends with exit 23 and `client returned ERROR on write of N bytes`, the
+warning names the file asked for (`File exists`), and `%{filename_effective}` names `.99`, as
+curl 8.21.0 does. `--clobber` overwrites even a `-J` name. A resumed (`-C`) file appends
+either way (BL-492 Notes).
