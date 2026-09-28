@@ -230,6 +230,27 @@ function Start-Detached {
     return @{ Process = (Start-Process -FilePath 'powershell.exe' -ArgumentList $argList -WorkingDirectory $Dir -PassThru) }
 }
 
+function Close-HerdrTab {
+    # Closes a herdr tab the factory opened, once nothing in it is worth reading: a tab
+    # left behind only says "idle" and looks like a lane that is still working. Its
+    # trace and summary are in logs\ either way. Closing this process's own tab ends it.
+    param([string]$Tab, [string]$Why)
+    $herdr = Get-HerdrBin
+    if (-not $herdr -or -not $Tab) { return }
+    Write-Trace '-' 'herdr' "closing tab $Tab ($Why)"
+    & $herdr tab close $Tab 2>&1 | Out-Null
+}
+
+function Close-OwnHerdrTab {
+    # Closes the tab this shift runs in, but only one Start-Detached opened (its label
+    # starts "Dark factory"): a shift Stewart started by hand in his own tab keeps it.
+    param([string]$Why)
+    $herdr = Get-HerdrBin
+    if (-not $herdr -or -not $env:HERDR_TAB_ID) { return }
+    $label = "$(((& $herdr tab get $env:HERDR_TAB_ID) -join "`n" | ConvertFrom-Json).result.tab.label)"
+    if ($label -like 'Dark factory*') { Close-HerdrTab $env:HERDR_TAB_ID $Why }
+}
+
 if ($NewTab) {
     # Hand this exact shift, minus -NewTab, to a tab or window of its own, and return.
     $forward = @()
@@ -1385,6 +1406,7 @@ if ($Lanes -gt 1 -and -not $Lane) {
           '-TaskMinutes', $TaskMinutes, '-Model', $Model, '-LogRoot', "`"$LogDir`"", '-ShiftStamp', $Stamp)
     }
     $procs = @()
+    $laneTabs = @{}
     foreach ($n in 1..$Lanes) {
         $dir = Join-Path $LanesDir "lane-$n"
         if ($adopt.ContainsKey($n)) {
@@ -1400,6 +1422,7 @@ if ($Lanes -gt 1 -and -not $Lane) {
         }
         $started = Start-Detached -Label "Dark factory lane $n" -Dir $dir -ScriptArgs (& $laneArgsFor $n)
         $procs += $started
+        $laneTabs[$n] = $started.Tab
         $where = if ($started.Tab) { "herdr tab $($started.Tab)" } else { "pid $($started.Process.Id)" }
         Write-Trace '-' 'lane' "lane $n started in $dir ($where)"
         Start-Sleep -Seconds 15
@@ -1429,8 +1452,10 @@ if ($Lanes -gt 1 -and -not $Lane) {
             $restarts[$n] = 1 + [int]$restarts[$n]
             Remove-Item (Get-LaneStatePath $n 'pid') -ErrorAction SilentlyContinue
             $held = Get-LaneState $n 'task'
+            Close-HerdrTab $laneTabs[$n] "lane $n died; its restart gets a new tab"
             $again = Start-Detached -Label "Dark factory lane $n" -Dir (Join-Path $LanesDir "lane-$n") -ScriptArgs (& $laneArgsFor $n)
             $procs += $again
+            $laneTabs[$n] = $again.Tab
             Write-Trace '-' 'lane' "lane $n had died; restarted ($($restarts[$n]) of 5)$(if ($held) { ", resuming $held" })" 'Yellow'
         }
         $running = @($procs | Where-Object { $_.Tab -or -not $_.Process.HasExited }).Count
@@ -1441,9 +1466,19 @@ if ($Lanes -gt 1 -and -not $Lane) {
     git -C $Root pull -q --ff-only origin $branch 2>&1 | Out-Null
     $stalls = @()
     foreach ($file in Get-ChildItem (Join-Path $LogDir "lanes-$Stamp") -Filter 'lane-*.txt' -ErrorAction SilentlyContinue) {
+        $laneStalls = @()
+        $laneSummary = ''
         foreach ($line in Get-Content $file.FullName) {
-            if ($line -match '^SUMMARY ') { Write-Trace '-' 'lane' ($line -replace '^SUMMARY ', '') 'Cyan' }
-            elseif ($line.Trim()) { $stalls += $line }
+            if ($line -match '^SUMMARY ') { $laneSummary = $line; Write-Trace '-' 'lane' ($line -replace '^SUMMARY ', '') 'Cyan' }
+            elseif ($line.Trim()) { $laneStalls += $line }
+        }
+        $stalls += $laneStalls
+        # A lane that ended cleanly has nothing left to read in its tab. One that blocked a
+        # task or stalled keeps its tab for Stewart; so does a lane that never wrote a
+        # summary (it has no file here and is never closed).
+        $n = [int]($file.BaseName -replace '^lane-', '')
+        if ($laneSummary -and -not $laneStalls.Count -and $laneSummary -notmatch 'blocked=[1-9]') {
+            Close-HerdrTab $laneTabs[$n] "lane $n ended cleanly"
         }
     }
     Write-Trace '-' 'shift' "end  $Lanes lanes" 'Cyan'
@@ -1458,10 +1493,13 @@ if ($Lanes -gt 1 -and -not $Lane) {
         if ($QuietAlarm) { $forward += '-QuietAlarm' }
         $next = Start-Detached -Label "Dark factory - $(Split-Path $Root -Leaf)" -Dir $Root -ScriptArgs $forward
         Write-Trace '-' 'shift' "work is still ready; next shift started ($(if ($next.Tab) { "herdr tab $($next.Tab)" } else { "pid $($next.Process.Id)" }))" 'Cyan'
+        # The next shift has its own tab; this one has only notes, and they are in the log.
+        if ($next.Tab) { Close-OwnHerdrTab 'shift handed over to the next one' }
         exit 0
     }
     if ($reasons.Count -gt 0) { Invoke-Alarm -Reasons $reasons; exit 2 }
     try { $Host.UI.RawUI.WindowTitle = 'Dark factory - shift complete' } catch { }
+    Close-OwnHerdrTab 'shift complete with nothing waiting on Stewart'
     exit 0
 }
 
