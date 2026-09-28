@@ -13,6 +13,7 @@ using Curl.Protocol.Ftp;
 using Curl.Protocol.Gopher;
 using Curl.Protocol.Http;
 using Curl.Protocol.Mqtt;
+using Curl.Protocol.Smtp;
 using Curl.Protocol.Telnet;
 using Curl.Protocol.Tftp;
 
@@ -28,7 +29,9 @@ internal static class CurlComposition
     /// <summary>
     /// Creates the protocol handlers the executable registers: <c>file</c> over the real
     /// disk; <c>dict</c>, <c>gopher</c> and <c>gophers</c>, <c>telnet</c>, <c>mqtt</c>
-    /// and <c>mqtts</c>, and <c>http</c> and <c>https</c> over <paramref name="connector" />,
+    /// and <c>mqtts</c>, <c>smtp</c> and <c>smtps</c> (authenticating with
+    /// <see cref="CreateSaslAuthenticator" />'s authenticator and upgrading with
+    /// <paramref name="tlsProvider" /> after <c>STARTTLS</c>), and <c>http</c> and <c>https</c> over <paramref name="connector" />,
     /// the last two answering authentication with <see cref="CreateHttpAuthenticator" />'s
     /// authenticator and keeping cookies in <paramref name="cookieStore" />; and <c>tftp</c> over
     /// <paramref name="datagramConnector" />, sending its MASQUE request through an HTTP or HTTPS
@@ -43,9 +46,12 @@ internal static class CurlComposition
     /// <see cref="EndPointReportingProtocolHandler" />, so every scheme's report carries the end
     /// points of the first connection its transfer opened (ADR-0119).
     /// </summary>
-    /// <param name="connector">Connects the TCP protocols, with TLS for <c>gophers</c>, <c>mqtts</c> and <c>ftps</c>.</param>
+    /// <param name="connector">Connects the TCP protocols, with TLS for <c>gophers</c>, <c>mqtts</c>, <c>smtps</c> and <c>ftps</c>.</param>
     /// <param name="datagramConnector">Opens the UDP channels TFTP uses.</param>
-    /// <param name="tlsProvider">Upgrades an FTP connection after an accepted <c>AUTH</c> or <c>PROT P</c>.</param>
+    /// <param name="tlsProvider">
+    /// Upgrades an FTP connection after an accepted <c>AUTH</c> or <c>PROT P</c>, and an SMTP
+    /// connection after an accepted <c>STARTTLS</c>.
+    /// </param>
     /// <param name="dnsResolver">Resolves a host name given to <c>-P</c>.</param>
     /// <param name="cookieStore">
     /// The cookies the HTTP handler sends and stores, or <see langword="null" /> to keep none.
@@ -71,6 +77,7 @@ internal static class CurlComposition
             new TelnetProtocolHandler(recordingConnector),
             new TftpProtocolHandler(recordingDatagramConnector, recordingConnector, CredentialEncoding.ForPlatform(OperatingSystem.IsWindows())),
             new MqttProtocolHandler(recordingConnector),
+            new SmtpProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator()),
             http,
             new RoutingFtpProtocolHandler(http, CreateFtpProtocolHandler(recordingConnector, tlsProvider, dnsResolver)),
         ];
