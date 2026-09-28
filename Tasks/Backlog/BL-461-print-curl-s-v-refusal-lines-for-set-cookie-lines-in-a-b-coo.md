@@ -1,5 +1,5 @@
 ---
-id: BL-460
+id: BL-461
 title: Print curl's -v refusal lines for Set-Cookie lines in a -b cookie file
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-460 — Print curl's -v refusal lines for Set-Cookie lines in a -b cookie file
+# BL-461 — Print curl's -v refusal lines for Set-Cookie lines in a -b cookie file
 
 ## Goal
 
