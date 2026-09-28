@@ -29,6 +29,12 @@ The payload of each received data frame reaches the transfer's output exactly as
 
 ## Notes
 
+- From BL-580 (measured 2026-09-28): a `101` followed at once by the server closing, with no
+  frame at all, ends with exit 52 `Empty reply from server` (the `-D` head is still written),
+  not 0. `WsProtocolHandler` currently returns success right after the `101`; the frame loop
+  built here replaces that, and `WsUpgradeResponse.Remaining` holds bytes that arrived with
+  the head.
+
 ## Log
 
 - 2026-09-28: Created.
