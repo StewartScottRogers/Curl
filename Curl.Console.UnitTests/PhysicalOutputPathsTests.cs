@@ -65,6 +65,56 @@ public sealed class PhysicalOutputPathsTests
     public void Exists_NothingThere_IsFalse() => Assert.IsFalse(outputPaths.Exists(Path.Combine(root, "missing")));
 
     [TestMethod]
+    public void TryDeleteFile_FileThere_DeletesIt()
+    {
+        string file = Path.Combine(root, "f");
+        File.WriteAllText(file, "x");
+
+        Assert.IsTrue(outputPaths.TryDeleteFile(file));
+        Assert.IsFalse(File.Exists(file));
+    }
+
+    [TestMethod]
+    public void TryDeleteFile_NothingThere_IsFalse() => Assert.IsFalse(outputPaths.TryDeleteFile(Path.Combine(root, "missing")));
+
+    [TestMethod]
+    public void TryDeleteFile_Directory_IsFalseAndLeavesIt()
+    {
+        Assert.IsFalse(outputPaths.TryDeleteFile(root));
+        Assert.IsTrue(Directory.Exists(root));
+    }
+
+    // Windows refuses to delete a file another handle holds open without FILE_SHARE_DELETE;
+    // elsewhere the unlink succeeds, so the refusal is only reachable there.
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public void TryDeleteFile_FileHeldOpen_IsFalseAndLeavesIt()
+    {
+        string file = Path.Combine(root, "held");
+        File.WriteAllText(file, "x");
+
+        bool deleted;
+        using (File.Open(file, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite))
+        {
+            deleted = outputPaths.TryDeleteFile(file);
+        }
+
+        Assert.IsFalse(deleted);
+        Assert.IsTrue(File.Exists(file));
+    }
+
+    [TestMethod]
+    public void IsDeleteFailure_TheExceptionsFileDeleteRaises_AreTrue()
+    {
+        Assert.IsTrue(PhysicalOutputPaths.IsDeleteFailure(new IOException()));
+        Assert.IsTrue(PhysicalOutputPaths.IsDeleteFailure(new UnauthorizedAccessException()));
+    }
+
+    [TestMethod]
+    public void IsDeleteFailure_AnyOtherException_IsFalse() =>
+        Assert.IsFalse(PhysicalOutputPaths.IsDeleteFailure(new InvalidOperationException()));
+
+    [TestMethod]
     public void IsCreateFailure_TheExceptionsCreateDirectoryRaises_AreTrue()
     {
         Assert.IsTrue(PhysicalOutputPaths.IsCreateFailure(new IOException()));

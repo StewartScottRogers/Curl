@@ -425,6 +425,12 @@ internal sealed class CurlCommandRunner(
     private string? transferOutputFileName;
 
     /// <summary>
+    /// The output file the current transfer opened, which <c>--remove-on-error</c> deletes when the
+    /// transfer fails; <see langword="null" /> while no file was opened. Cleared before each transfer.
+    /// </summary>
+    private string? transferOpenedOutputFile;
+
+    /// <summary>
     /// Records whether the current transfer's handler reported it past connect or open, and
     /// the status lines its byte reports draw, for <see cref="WriteProgressAsync" />; a new
     /// one, on the runner's clock, for each transfer. The first is only a placeholder.
@@ -898,6 +904,7 @@ internal sealed class CurlCommandRunner(
         UrlTransfer transfer)
     {
         transferOutputFileName = null;
+        transferOpenedOutputFile = null;
         progressBar = null;
         progressMeterHeaderWritten = false;
         (TransferResult result, string givenUrl, string transferUrl) = await TransferUrlAsync(dispatch, options, transfer)
@@ -913,6 +920,7 @@ internal sealed class CurlCommandRunner(
             await WriteErrorLineAsync(string.Empty).ConfigureAwait(false);
         }
 
+        await RemoveOutputFileOfFailedTransferAsync(options, result).ConfigureAwait(false);
         bool endsTheRun = EndsTheRun(options, result);
         bodyWrittenToStandardOutput |= SendsBodyToStandardOutput(transfer, result);
         bool standardOutputIsBinary = IsStandardOutputBinaryForWriteOut(
@@ -922,6 +930,37 @@ internal sealed class CurlCommandRunner(
 
         previousTransferResult = result;
         return result;
+    }
+
+    /// <summary>
+    /// Under <c>--remove-on-error</c>, deletes the output file a failed transfer opened, as curl
+    /// 8.21.0 does after the transfer's failure lines and before its <c>-w</c> output: under
+    /// <c>-v</c> or a <c>--trace</c> option, <c>-s</c> or not, standard error then gets
+    /// <c>Note: Removed output file: &lt;file&gt;</c>, wrapped as a note is, and a file that
+    /// cannot be deleted gets <c>Warning: Failed removing: &lt;file&gt;</c> unless <c>-s</c> was
+    /// given. A file the transfer never opened - a <c>-f</c> failure with no body written, a
+    /// failed connect - is left as it is, even one there before the transfer (measured
+    /// 2026-09-28, BL-494 Notes). The transfer's exit code and message are unchanged.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="result">The transfer's result.</param>
+    /// <returns>A task that completes when the file is dealt with.</returns>
+    private async Task RemoveOutputFileOfFailedTransferAsync(CommandLineOptions options, TransferResult result)
+    {
+        if (result.IsSuccess || !options.RemoveOnError || transferOpenedOutputFile is not { } openedFile)
+        {
+            return;
+        }
+
+        if (!OutputPaths.TryDeleteFile(openedFile))
+        {
+            await WriteWarningUnlessSilentAsync(options, $"Warning: Failed removing: {openedFile}").ConfigureAwait(false);
+        }
+        else if (options.Trace != TraceKind.None)
+        {
+            await WriteErrorPiecesAsync(WarningLineWrapper.WrapNoteText($"Removed output file: {openedFile}", terminalColumns))
+                .ConfigureAwait(false);
+        }
     }
 
     /// <summary>
@@ -2257,6 +2296,7 @@ internal sealed class CurlCommandRunner(
             .ConfigureAwait(false);
 
         transferOutputFileName = output.Path;
+        transferOpenedOutputFile = output.IsOpen ? output.Path : null;
         if (options.RemoteTime && completed.IsSuccess && completed.SourceLastWriteTimeUtc is { } sourceLastWriteTimeUtc)
         {
             await StampOutputFileTimeAsync(options, output.Path, sourceLastWriteTimeUtc).ConfigureAwait(false);
@@ -2477,7 +2517,7 @@ internal sealed class CurlCommandRunner(
                 firstContext,
                 RetryPolicyMapping.FromCommandLine(options),
                 (attempt, warning) => retryLinesWritten = WriteRetryLinesAsync(options, attempt, warning, resumeFrom, outputFile),
-                (_, warning) => retryLinesWritten = WriteRetryWarningAsync(options, warning))
+                (_, warning) => retryLinesWritten = WriteWarningUnlessSilentAsync(options, warning))
             .ConfigureAwait(false);
         await retryLinesWritten.ConfigureAwait(false);
 
@@ -2545,20 +2585,20 @@ internal sealed class CurlCommandRunner(
             await WriteFailureLinesAsync(attempt).ConfigureAwait(false);
         }
 
-        await WriteRetryWarningAsync(options, warning).ConfigureAwait(false);
+        await WriteWarningUnlessSilentAsync(options, warning).ConfigureAwait(false);
         outputFile?.TruncateForRetry();
         StartTransferProgress(options, resumeFrom, toStandardOutput);
     }
 
     /// <summary>
-    /// Writes a <see cref="TransferRetrier" /> warning line, wrapped as every <c>Warning: </c>
+    /// Writes a warning line, such as a <see cref="TransferRetrier" /> one, wrapped as every <c>Warning: </c>
     /// line is, unless <c>-s</c> was given: curl 8.21.0 prints none under <c>-s</c> or
     /// <c>-sS</c>.
     /// </summary>
     /// <param name="options">The accepted command line.</param>
     /// <param name="warning">The warning, unwrapped.</param>
     /// <returns>A task that completes when the line is written, or at once under <c>-s</c>.</returns>
-    private Task WriteRetryWarningAsync(CommandLineOptions options, string warning) =>
+    private Task WriteWarningUnlessSilentAsync(CommandLineOptions options, string warning) =>
         options.Silent ? Task.CompletedTask : WriteErrorLineAsync(warning);
 
     /// <summary>

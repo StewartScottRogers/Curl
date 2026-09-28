@@ -17,7 +17,9 @@ namespace Curl.Console;
 /// <see cref="BeforeCreateNew" /> just before the open counts too. As <see cref="IOutputPaths" />,
 /// every directory is created, into
 /// <see cref="CreatedDirectories" />, except those in <see cref="UncreatableDirectories" />, and a
-/// path exists when it is in <see cref="ExistingPaths" />.
+/// path exists when it is in <see cref="ExistingPaths" />. Deleting a file records the path in
+/// <see cref="DeleteAttempts" /> and, unless it is in <see cref="UndeletablePaths" />, drops it from
+/// <see cref="Written" /> and <see cref="ExistingPaths" />, succeeding when it had been written.
 /// </summary>
 internal sealed class InMemoryFileSystem : IFileSystem, IFileTimeSetter, IOutputPaths
 {
@@ -28,6 +30,10 @@ internal sealed class InMemoryFileSystem : IFileSystem, IFileTimeSetter, IOutput
     public HashSet<string> UncreatableDirectories { get; } = [];
 
     public List<string> CreatedDirectories { get; } = [];
+
+    public HashSet<string> UndeletablePaths { get; } = [];
+
+    public List<string> DeleteAttempts { get; } = [];
 
     public byte[] ReadContent { get; init; } = [];
 
@@ -123,4 +129,17 @@ internal sealed class InMemoryFileSystem : IFileSystem, IFileTimeSetter, IOutput
     }
 
     public bool Exists(string path) => ExistingPaths.Contains(path);
+
+    public bool TryDeleteFile(string path)
+    {
+        DeleteAttempts.Add(path);
+        if (UndeletablePaths.Contains(path))
+        {
+            return false;
+        }
+
+        ExistingPaths.Remove(path);
+
+        return Written.Remove(path);
+    }
 }
