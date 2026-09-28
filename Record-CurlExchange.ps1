@@ -145,6 +145,12 @@
     The curl executable to run. Defaults to the reference build ADR-0009 and ADR-0018
     name, curl 8.21.0 from Git for Windows' mingw64 directory, found beside git.exe.
 
+.PARAMETER ListenAddress
+    The address the server (and, with -Ftp, its passive data listener, named in PASV's
+    227 reply) binds. Default 127.0.0.1. Give the Windows host's address on the WSL
+    network, with -Curl wsl.exe and CurlArgs '-d','Ubuntu','--','curl',..., to measure
+    the Linux (OpenSSL) build of curl, which cannot reach Windows' loopback (BL-474).
+
 .EXAMPLE
     .\Record-CurlExchange.ps1 -Port 18081 -Response 'HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello' -CurlArgs 'http://127.0.0.1:18081/a?b' -OutDirectory fixtures\default-get
 
@@ -168,7 +174,8 @@ param(
     [string] $FtpData = '',
     [ValidateRange(1, 600000)] [int] $FtpIdleMilliseconds = 5000,
     [switch] $Tls,
-    [string] $Curl
+    [string] $Curl,
+    [System.Net.IPAddress] $ListenAddress = [System.Net.IPAddress]::Loopback
 )
 
 Set-StrictMode -Version Latest
@@ -344,13 +351,13 @@ $serveConnections = {
 # one array, writes the two-way transcript into $Transcript, and the bytes uploaded on
 # STOR and APPE data connections into $UploadedData.
 $serveFtpSession = {
-    param($Listener, [hashtable] $Overrides, [byte[]] $DataBytes, [System.Text.StringBuilder] $Transcript, [System.IO.MemoryStream] $UploadedData, $TlsCertificate, [bool] $ImplicitTls, [int] $ControlIdleMilliseconds)
+    param($Listener, [hashtable] $Overrides, [byte[]] $DataBytes, [System.Text.StringBuilder] $Transcript, [System.IO.MemoryStream] $UploadedData, $TlsCertificate, [bool] $ImplicitTls, [int] $ControlIdleMilliseconds, [System.Net.IPAddress] $ListenAddress)
 
     Set-StrictMode -Version Latest
     $ErrorActionPreference = 'Stop'
     $latin1 = [System.Text.Encoding]::GetEncoding(28591)
     $received = New-Object System.IO.MemoryStream
-    $dataListener = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Loopback, 0)
+    $dataListener = New-Object System.Net.Sockets.TcpListener($ListenAddress, 0)
     $dataListener.Start()
     $dataPort = ([System.Net.IPEndPoint] $dataListener.LocalEndpoint).Port
     $restOffset = [long] 0
@@ -488,7 +495,7 @@ $serveFtpSession = {
                         Send-Reply -Stream $stream -Reply "350 Restarting at $restOffset"
                     }
                     'EPSV' { Send-Reply -Stream $stream -Reply "229 Entering Extended Passive Mode (|||$dataPort|)" }
-                    'PASV' { Send-Reply -Stream $stream -Reply "227 Entering Passive Mode (127,0,0,1,$([Math]::Floor($dataPort / 256)),$($dataPort % 256))" }
+                    'PASV' { Send-Reply -Stream $stream -Reply "227 Entering Passive Mode ($($ListenAddress.ToString().Replace('.', ',')),$([Math]::Floor($dataPort / 256)),$($dataPort % 256))" }
                     { $_ -eq 'RETR' -or $_ -eq 'LIST' -or $_ -eq 'NLST' } {
                         Send-Reply -Stream $stream -Reply '150 Opening BINARY mode data connection'
                         $dataClient, $dataStream = Open-DataConnection -Verb $verb -ActiveEndPoint $activeEndPoint -Protect $protectData
@@ -580,12 +587,12 @@ $OutDirectory = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine((Get-Loc
 New-Item -ItemType Directory -Path $OutDirectory -Force | Out-Null
 
 $tlsCertificate = if ($Tls -or $Ftp) { New-ThrowawayTlsCertificate } else { $null }
-$listener = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Loopback, $Port)
+$listener = New-Object System.Net.Sockets.TcpListener($ListenAddress, $Port)
 $listener.Start()
 $server = [System.Management.Automation.PowerShell]::Create()
 try {
     if ($Ftp) {
-        [void] $server.AddScript($serveFtpSession).AddArgument($listener).AddArgument($ftpOverrides).AddArgument([byte[]] (ConvertFrom-EscapedResponse -Text $FtpData)).AddArgument($transcript).AddArgument($uploadedData).AddArgument($tlsCertificate).AddArgument([bool] $Tls).AddArgument($FtpIdleMilliseconds)
+        [void] $server.AddScript($serveFtpSession).AddArgument($listener).AddArgument($ftpOverrides).AddArgument([byte[]] (ConvertFrom-EscapedResponse -Text $FtpData)).AddArgument($transcript).AddArgument($uploadedData).AddArgument($tlsCertificate).AddArgument([bool] $Tls).AddArgument($FtpIdleMilliseconds).AddArgument($ListenAddress)
     } else {
         [void] $server.AddScript($serveConnections).AddArgument($listener).AddArgument($responseBytes).AddArgument($Connections).AddArgument($ResponseDelayMilliseconds).AddArgument([bool] $Reset).AddArgument($RespondAfterBodyBytes).AddArgument($tlsCertificate)
     }
