@@ -12,7 +12,7 @@ namespace Curl.Console;
 /// </summary>
 /// <param name="writesLineFeedAsCrLf">
 /// Whether each opened file is written in text mode, every line feed as CR LF through
-/// <see cref="LineFeedToCrLfStream" />, as curl 8.21.0 writes these files on Windows (ADR-0040).
+/// <see cref="LineFeedToCrLfStream" />, as curl 8.21.0 writes these files on Windows (ADR-0081).
 /// </param>
 internal sealed class DiskWriteOutFileOpener(bool writesLineFeedAsCrLf) : IWriteOutFileOpener
 {

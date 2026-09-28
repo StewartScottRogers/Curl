@@ -194,7 +194,7 @@ With `-w`, each transfer's template is rendered by `Curl.Output`'s `WriteOutTemp
 after its failure lines, after a failure as after a success (a `-D` or resumed `-o` file that
 cannot be opened included), with `TransferWriteOutVariables` as its values. On Windows the
 line feeds it writes to standard error, and to standard output while curl's standard output
-would still be in text mode, go through `LineFeedToCrLfStream` as CR LF (ADR-0040).
+would still be in text mode, go through `LineFeedToCrLfStream` as CR LF (ADR-0081).
 `%output{file}` targets go through the runner's `IWriteOutFileOpener`: `CurlComposition`
 passes `DiskWriteOutFileOpener`, which opens each file shared for writing (truncated, or
 appended for `%output{>>file}`), in text mode on Windows, and refuses one it cannot open;

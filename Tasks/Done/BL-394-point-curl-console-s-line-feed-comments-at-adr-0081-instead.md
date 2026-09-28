@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console]
 requirement: none
 created: 2026-09-27
-completed:
+completed: 2026-09-27
 ---
 # BL-394 — Point Curl.Console's line-feed comments at ADR-0081 instead of ADR-0040
 
@@ -25,12 +25,15 @@ Every comment in `Curl.Console` that cites the `-w` line-feed decision names ADR
 
 ## Acceptance criteria
 
-- [ ] `git grep -n "ADR-0040" -- Curl.Console` prints nothing, and both citations above read ADR-0081.
-- [ ] `dotnet build` is clean.
+- [x] `git grep -n "ADR-0040" -- Curl.Console` prints nothing, and both citations above read ADR-0081.
+- [x] `dotnet build` is clean.
 
 ## Notes
+
+- Two-line comment edit made directly (no align-and-document delegation needed). `git grep -n "ADR-0040" -- Curl.Console` now prints nothing; build 0 warnings, fast tests green.
 
 ## Log
 
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Done. Curl.Console's line-feed comments cite ADR-0081
