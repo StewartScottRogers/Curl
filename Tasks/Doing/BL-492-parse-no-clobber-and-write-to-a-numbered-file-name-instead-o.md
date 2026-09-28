@@ -37,3 +37,4 @@ With `--no-clobber`, an `-o`/`-O` target that already exists is left alone and t
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
