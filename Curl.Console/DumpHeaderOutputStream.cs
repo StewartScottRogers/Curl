@@ -1,3 +1,4 @@
+using System.Runtime.ExceptionServices;
 using System.Text;
 
 namespace Curl.Console;
@@ -83,20 +84,27 @@ internal sealed class DumpHeaderOutputStream(Stream destination, string headerFi
     /// <exception cref="IOException">The destination failed the write or its flush.</exception>
     public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
     {
+        // The report is awaited after the catch, not inside it: an await inside a catch that
+        // rethrows makes the compiler add a rethrow branch no exception can take.
+        ExceptionDispatchInfo failure;
         try
         {
             await destination.WriteAsync(buffer, cancellationToken).ConfigureAwait(false);
             await destination.FlushAsync(cancellationToken).ConfigureAwait(false);
-        }
-        catch (IOException)
-        {
-            if (failureReportOutput is not null)
-            {
-                await failureReportOutput.WriteAsync(FailureLine, cancellationToken).ConfigureAwait(false);
-                await failureReportOutput.FlushAsync(cancellationToken).ConfigureAwait(false);
-            }
 
-            throw;
+            return;
         }
+        catch (IOException exception)
+        {
+            failure = ExceptionDispatchInfo.Capture(exception);
+        }
+
+        if (failureReportOutput is not null)
+        {
+            await failureReportOutput.WriteAsync(FailureLine, cancellationToken).ConfigureAwait(false);
+            await failureReportOutput.FlushAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        failure.Throw();
     }
 }
