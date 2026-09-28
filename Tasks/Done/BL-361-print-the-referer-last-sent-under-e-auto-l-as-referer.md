@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: [BL-305]
-touches: [Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Core.UnitLibrary, Curl.Core.UnitTests, Curl.Output.UnitLibrary, Curl.Output.UnitTests, Curl.Console, Curl.Console.UnitTests]
+touches: [Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Core.UnitLibrary, Curl.Core.UnitTests, Curl.Output.UnitLibrary, Curl.Output.UnitTests, Curl.Console, Curl.Console.UnitTests, Documentation/Planning/Decisions]
 requirement: none
 created: 2026-09-27
-completed:
+completed: 2026-09-27
 ---
 # BL-361 — Print the referer last sent under -e ;auto -L as %{referer}
 
@@ -24,8 +24,8 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] The measured `%{referer}` for each case in Context is pinned in `CurlCommandRunnerWriteOutTests`, with the commands and bytes in this task's Notes.
-- [ ] `dotnet build -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports 100% line and branch coverage for every touched library.
+- [x] The measured `%{referer}` for each case in Context is pinned in `CurlCommandRunnerWriteOutTests`, with the commands and bytes in this task's Notes.
+- [x] `dotnet build -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports 100% line and branch coverage for every touched library.
 
 ## Notes
 
@@ -55,9 +55,30 @@ completed:
 
   The auto referer drops user info and fragment and keeps the query, as upstream test 2081 shows.
 
+- 2026-09-27, lane 3: delivered as suggested. `HttpRequestOptions.AutoReferer` (mapped from
+  `CommandLineOptions.AutoReferer` in `HttpRequestOptionsMapping`); `RedirectFollower.HopHttp`
+  sets each followed hop's `Referer` to the previous hop's URL as `scheme://host[:port]path[?query]`
+  (port only when not the default); the merged report's new `TransferReport.Referer` is the
+  `Referer` of the last dispatched request; `CurlCommandRunner.WriteOutVariables` (extracted from
+  `WriteOutAsync` to keep its complexity under the gate) prints it, else the `-e` text. ADR-0100
+  records it and amends ADR-0015, so `Documentation/Planning/Decisions` was added to `touches`
+  (no task in Doing names it).
+- Pinned: `CurlCommandRunnerWriteOutTests.RunAsync_AutoReferer_PrintsTheRefererTheLastRequestWasSentWith`
+  (the six rows of the table above, asserting stdout and every hop's sent `Referer`) and
+  `RunAsync_AutoRefererFromAUrlWithUserAndFragment_PrintsItWithoutThemButWithTheQuery`;
+  `RedirectFollowerTests` gains three tests for the hop referers and the reported one.
+- Defaults taken, unmeasured: a refused redirect reports the `Referer` of the last request actually
+  sent; a URL typed with its default port (`http://h:80/`) gives an auto referer without the port.
+- Gates: `dotnet build -warnaserror` clean; fast tests green (17 projects); `Measure-CodeQuality.ps1`
+  100% line and branch for Curl.Protocol.Abstractions, Curl.Core and Curl.Output. Curl.Console's
+  only failing members are pre-existing and untouched: `DiskWriteOutFileOpener.TryOpen` (BL-432)
+  and `DumpHeaderOutputStream.WriteAsync` (filed as BL-453). `dotnet format --verify-no-changes`
+  flags only pre-existing line endings in three files this task does not touch.
+
 ## Log
 
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
 - 2026-09-27: Doing -> Backlog. Needs Curl.Core.UnitLibrary/UnitTests (RedirectFollower must send the auto referer), which BL-385 in Doing touches; waits until they no longer overlap
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Done. -w %{referer} prints the Referer the last request was sent with; -e ';auto' -L now sends the previous URL as each hop's Referer
