@@ -34,3 +34,4 @@ For an `HTTP/1.0` response with `Connection: keep-alive` and neither a Content-L
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
