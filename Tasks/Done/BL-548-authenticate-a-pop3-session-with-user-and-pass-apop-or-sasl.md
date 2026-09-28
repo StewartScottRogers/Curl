@@ -78,7 +78,7 @@ No login failure sends `QUIT`.
 
 ### Decisions
 
-Recorded in ADR-0133 (decided by Claude under Stewart's delegation): a non-base64 challenge
+Recorded in ADR-0134 (decided by Claude under Stewart's delegation): a non-base64 challenge
 reaches the exchange empty; `+OK` succeeds once the initial response is sent (curl also
 refuses one between LOGIN's user name and password - the contract cannot tell); the last
 `AUTH=` counts; credentials go out as Latin-1. `Documentation/Planning/Decisions` was added
