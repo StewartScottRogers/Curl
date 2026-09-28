@@ -41,3 +41,4 @@ Under `-v`, a `Set-Cookie` header that `SetCookieParser` refuses is reported wit
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
