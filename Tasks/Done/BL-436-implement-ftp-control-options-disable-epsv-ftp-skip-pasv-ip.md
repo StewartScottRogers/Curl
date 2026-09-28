@@ -39,7 +39,7 @@ completed: 2026-09-27
 - Recorder: `-FtpReply` overrides for one verb are now answered in turn (the last repeating), `{DATAPORT}`, `{DATAPORT_HI}` and `{DATAPORT_LO}` expand in replies, and `NLST` gets a data connection like `LIST`.
 - Measured findings worth knowing: `--ftp-create-dirs` applies to downloads too and never fails on `MKD` itself (only the `CWD` after it); `-l` drops a URL's file name and lists its directory; `+` quotes under `-I` go after `REST 0`; post-transfer (`-`) quotes run on every success path (empty listing, nothing left to resume, whole upload already there, after `ABOR`) and never after a failure; a refused quote before the transfer skips `QUIT`, after it sends `QUIT`.
 - Not pinned: curl's exit 7 text for a `227` address it cannot reach (`Failed to connect to <control> via <data> after <n> ms: ...`) is timing-dependent and is the connector's message; the handler passes the connector's result through, as for every data connect failure.
-- Follow-up filed: BL-444, `multicwd` drops the leading `/` of a `//abs` path (a divergence that predates this task).
+- Follow-up filed: BL-446, `multicwd` drops the leading `/` of a `//abs` path (a divergence that predates this task).
 - New code: `FtpQuoteCommand`, `FtpQuoteCommands` (sorting `-Q` values), `FtpUrlPath.Parse(path, method)` with `ListArgument`, `FtpPassiveReply.TryParsePasv` with the address; tests in `FtpProtocolHandlerPathOptionTests` and `FtpProtocolHandlerQuoteTests` (57 new cases, 194 in the project), with a `MutableContext` fake.
 
 ## Log

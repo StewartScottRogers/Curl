@@ -1,5 +1,5 @@
 ---
-id: BL-444
+id: BL-446
 title: Send CWD / for an ftp:// path that starts with // under the default multicwd method
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-444 — Send CWD / for an ftp:// path that starts with // under the default multicwd method
+# BL-446 — Send CWD / for an ftp:// path that starts with // under the default multicwd method
 
 ## Goal
 
