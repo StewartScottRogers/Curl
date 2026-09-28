@@ -32,3 +32,4 @@ A redirect hop that keeps the `-T` upload carries `ITransferContext.ResumeUpload
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
