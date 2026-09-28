@@ -338,19 +338,22 @@ internal static class CurlComposition
     /// about the proxy's CA path, once per URL for <c>--capath</c>, <c>--proxy-capath</c> or both
     /// (measured, proxy or not), and the proxy's CA path is <c>--proxy-capath</c> or else
     /// <c>--capath</c>; <paramref name="cookies" /> for the runner to load and save; a
-    /// <see cref="ProxySelector" /> reading the process's proxy environment variables; and the
-    /// pooling connector as the connection pool the runner disposes when the run ends (ADR-0050).
+    /// <see cref="ProxySelector" /> reading the process's proxy environment variables; the
+    /// pooling connector as the connection pool the runner disposes when the run ends (ADR-0050);
+    /// and the TCP connector's <see cref="TcpConnector.LoadResolveEntries" />, which the runner
+    /// calls at the start of every transfer (BL-486).
     /// </summary>
     /// <param name="transports">The run's connectors.</param>
     /// <param name="cookies">The run's cookies, or <see langword="null" /> without <c>-b</c> or <c>-c</c>.</param>
-    /// <returns>The dispatcher, the warning lines, the cookies, the proxy selector and the connection pool.</returns>
+    /// <returns>The dispatcher, the warning lines, the cookies, the proxy selector, the connection pool and the <c>--resolve</c> loader.</returns>
     internal static TransferDispatch CreateTransferDispatch(CurlTransports transports, CookieEngine? cookies = null) =>
         new(
             new ProtocolDispatcher(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver, cookies?.HandlerStore)),
             transports.ProxyTlsProvider.Warnings,
             cookies,
             new ProxySelector(Environment.GetEnvironmentVariable),
-            transports.PoolingConnector);
+            transports.PoolingConnector,
+            transports.TcpConnector.LoadResolveEntries);
 
     /// <summary>
     /// Creates what one run transfers through over the given connectors instead of the real

@@ -16,7 +16,10 @@ given and must never reference a protocol library directly.
 which every TCP handler connects through, so a later URL to the same pool key reuses an
 earlier URL's connection; `TransferDispatch` holds it as the run's `ConnectionPool`, and the
 runner disposes the dispatch, closing the pool without writing anything, once the transfers
-end, whatever their outcome (ADR-0050, BL-334).
+end, whatever their outcome (ADR-0050, BL-334). It also holds the `TcpConnector`'s
+`LoadResolveEntries`, which the runner calls at the start of every URL's transfer, just before
+the `-b` files load, so `-v` prints the `--resolve` entries' `Added ... to DNS cache` lines for
+each URL; a `--retry` attempt and a followed redirect reload nothing, as in curl 8.21.0 (BL-486).
 
 `Program.Main` only opens the standard streams, builds the composition and hands the
 arguments to `CurlCommandRunner`, which parses them, runs each URL and prints curl's

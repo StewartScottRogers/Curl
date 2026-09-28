@@ -918,7 +918,9 @@ internal sealed class CurlCommandRunner(
     /// <summary>
     /// Performs one transfer: rewrites an <c>ipfs://</c> or <c>ipns://</c> URL to its gateway URL,
     /// gives a URL typed without a scheme the one <see cref="UrlSchemeGuesser" /> guesses, and
-    /// resolves the URL of a <c>-T</c> upload with <see cref="UploadTransferUrl" />.
+    /// resolves the URL of a <c>-T</c> upload with <see cref="UploadTransferUrl" />, then loads
+    /// the <c>--resolve</c> entries and the <c>-b</c> cookie files, in curl 8.21.0's order, before
+    /// the transfer itself.
     /// </summary>
     /// <param name="dispatch">Performs the transfer with the handler for its scheme, after its warning lines.</param>
     /// <param name="options">The accepted command line.</param>
@@ -952,6 +954,7 @@ internal sealed class CurlCommandRunner(
             return (UploadUrlMalformedFailure, givenUrl, transferUrl);
         }
 
+        dispatch.LoadResolveEntries(transferEventOutput.Events);
         await LoadCookieFilesAsync(dispatch, options, transferUrl).ConfigureAwait(false);
         TransferResult result = await TransferWithHeaderOutputAsync(dispatch, options, transfer, transferUrl, uploadFile)
             .ConfigureAwait(false);
