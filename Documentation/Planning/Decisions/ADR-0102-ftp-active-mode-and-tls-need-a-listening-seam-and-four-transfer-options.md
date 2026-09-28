@@ -86,3 +86,69 @@ certificate) to measure the cases before they are pinned.
   listener would have to know the connection's concrete type to find its address.
 - **One task doing everything.** It would touch five projects, three of them in use by
   other lanes, and serialise the whole shift behind it.
+
+## BL-437 addendum — what curl 8.21.0 was measured to do, and what the handler does
+
+- **Date:** 2026-09-27
+- **Decided by Claude under Stewart's delegation** (root `CLAUDE.md`, "Decisions").
+
+Measured against curl 8.21.0 (the Schannel build) with `Record-CurlExchange.ps1 -Ftp`,
+which BL-437 extended to dial back to the `EPRT`/`PORT` address, answer `AUTH` and serve
+TLS on the control and data connections (`-Tls` with `-Ftp` for `ftps://`), and hold the
+control connection open for `-FtpIdleMilliseconds`. `FtpProtocolHandler` now does the same:
+
+**Active mode.**
+
+- `EPRT |1|127.0.0.1|56703|` (`|2|::1|…|` for IPv6) goes where `EPSV` would, after the
+  `CWD`s and before `TYPE`. A refused `EPRT` (any reply but 2xx) is followed by a fresh
+  bind and `PORT 127,0,0,1,221,142`: curl binds a new port for `PORT`, and so does the
+  handler. `--disable-eprt` sends `PORT` only. `PORT` refused is exit 30,
+  `Failed to do PORT`, after `QUIT`.
+- A bind that fails (the one port given already in use) is exit 30,
+  `bind() failed, ran out of ports`, after `QUIT` and before `EPRT`; the handler reports the
+  listener's code and message after `QUIT`.
+- The server's connection is accepted after the transfer command is answered `125`/`150`.
+  If none arrives, curl waits 60 seconds whatever `--connect-timeout` says, then exits 12,
+  `Accept timeout occurred while waiting server connect`, after `QUIT`; the handler waits
+  60 seconds on `ITransferContext.TimeProvider`. A failed accept is its exit code after
+  `QUIT`. curl also watches the control connection during the wait; the handler only waits
+  for the accept.
+- `-P` values: `-` or nothing before the colon is the control connection's own address (an
+  IPv4-mapped one announced as IPv4); `[v6]` and a bare IPv6 literal; `:port` and
+  `:low-high` read as `atoi` reads them, and a range whose low end is above its high end
+  (measured: `40000-39000`) or above 65535 means any port.
+- **Divergences, decided here.** A host or interface name is not resolved (no DNS seam
+  reaches the handler): it ends with exit 6, `Could not resolve host: <name>`, and no
+  `QUIT`, which is what curl was measured to do for a name that does not resolve
+  (`nosuch.invalid`). curl 8.21.0 reads a bare `::1` oddly (it announced the control
+  address); the handler takes it as the IPv6 literal. On IPv6, a refused `EPRT`, or
+  `--disable-eprt`, leaves curl sending nothing and waiting until the server hangs up
+  (exit 56); the handler sends `QUIT` and ends with exit 30, `Failed to do PORT`. With
+  `-P -` and a control connection that reports no local address the handler ends with exit
+  30 after `QUIT`.
+
+**TLS.**
+
+- `ftps://` (port 990 unless given): the control connection is TLS from the start, no
+  `AUTH`; after `PASS`, `PBSZ 0` and `PROT P`, then `PWD`.
+- `ftp://` under `--ssl`, `--ftp-ssl-control` or `--ssl-reqd`: `AUTH SSL` right after the
+  `220` greeting, then `AUTH TLS` when that is refused; `234` or `334` starts the handshake.
+  Both refused: exit 64, `Requested SSL level failed`, with no `QUIT`, under
+  `--ssl-reqd` and `--ftp-ssl-control`; plaintext and no `PBSZ` under `--ssl`. A `230`
+  greeting skips `AUTH`.
+- After login over TLS: `PBSZ 0`, its reply not checked, then `PROT P`, or `PROT C` under
+  `--ftp-ssl-control`. Ranking, measured: `--ssl-reqd` over `--ftp-ssl-control` over
+  `--ssl`. A refused `PROT` is exit 64 with no `QUIT` under `--ssl-reqd` only; otherwise,
+  `ftps://` included, the data goes in plaintext.
+- After an accepted `PROT P` every data connection, passive or active, is secured with
+  `ITlsProvider` once the transfer command is answered. A failed data handshake is its exit
+  code with no `QUIT` (not measured: it is the same ending as a failed passive connect); a
+  failed control handshake is its exit code, measured as exit 60 for an untrusted
+  certificate.
+
+**Construction.** `FtpProtocolHandler(IConnector)` stays and serves `ftp` only: `-P` there
+ends with exit 30, `Failed to do PORT`, and an accepted `AUTH` with exit 64,
+`Requested SSL level failed`. `FtpProtocolHandler(IConnector, IConnectionListener,
+ITlsProvider)` serves `ftp` and `ftps`; BL-458 wires it in `Curl.Console`. `-P -` reads
+`IConnection.LocalEndPoint` from the connection the connector returned, so under `ftps://`
+the TLS connection must report it too.

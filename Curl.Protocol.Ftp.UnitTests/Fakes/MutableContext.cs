@@ -31,6 +31,18 @@ public sealed class MutableContext
 
     public bool NoBody { get; set; }
 
+    public string? FtpPort { get; set; }
+
+    public bool FtpUseEprt { get; set; } = true;
+
+    public TransportSecurityLevel SslLevel { get; set; }
+
+    public bool FtpSslControlOnly { get; set; }
+
+    public TimeProvider TimeProvider { get; set; } = TimeProvider.System;
+
+    public CancellationToken CancellationToken { get; set; }
+
     public Stream? HeaderOutput { get; set; }
 
     /// <summary>Gets the output the built context writes to, so a test can send headers there too.</summary>
@@ -56,6 +68,12 @@ public sealed class MutableContext
             Range = mutable.Range,
             NoBody = mutable.NoBody,
             HeaderOutput = mutable.HeaderOutput,
+            FtpPort = mutable.FtpPort,
+            FtpUseEprt = mutable.FtpUseEprt,
+            SslLevel = mutable.SslLevel,
+            FtpSslControlOnly = mutable.FtpSslControlOnly,
+            TimeProvider = mutable.TimeProvider,
+            CancellationToken = mutable.CancellationToken,
         };
     }
 }

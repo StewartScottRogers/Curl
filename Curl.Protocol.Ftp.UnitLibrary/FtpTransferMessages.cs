@@ -35,6 +35,24 @@ internal static class FtpTransferMessages
     /// <summary>The exit 3 message for a <c>-T</c> upload to a URL ending in <c>/</c> (BL-439).</summary>
     internal const string UploadWithoutFileName = "Uploading to a URL without a filename";
 
+    /// <summary>
+    /// The exit 30 message for an active-mode port the server refused, with <c>EPRT</c> and
+    /// then <c>PORT</c> (BL-437).
+    /// </summary>
+    internal const string FailedToDoPort = "Failed to do PORT";
+
+    /// <summary>
+    /// The exit 12 message for an active-mode data connection the server did not open
+    /// within curl's 60-second accept timeout (BL-437).
+    /// </summary>
+    internal const string AcceptTimeout = "Accept timeout occurred while waiting server connect";
+
+    /// <summary>
+    /// The exit 64 message for an <c>AUTH</c> refused under <c>--ssl-reqd</c> or
+    /// <c>--ftp-ssl-control</c>, or a <c>PROT P</c> refused under <c>--ssl-reqd</c> (BL-437).
+    /// </summary>
+    internal const string RequestedSslLevelFailed = "Requested SSL level failed";
+
     /// <summary>The exit 67 message for a <c>332</c> reply to <c>PASS</c>.</summary>
     internal const string AccountRequested = "ACCT requested but none available";
 
@@ -98,6 +116,12 @@ internal static class FtpTransferMessages
     /// <param name="code">The refusing reply's code.</param>
     /// <returns>The message to report.</returns>
     internal static string AccessDenied(int code) => Format($"Access denied: {code}");
+
+    /// <summary>
+    /// The exit 6 message for a <c>-P</c> address that is a host or interface name, which is
+    /// not resolved (BL-437): curl's words for a name that does not resolve.
+    /// </summary>
+    internal static string CouldNotResolveHost(string name) => "Could not resolve host: " + name;
 
     /// <summary>The exit 13 message when neither <c>EPSV</c> nor <c>PASV</c> was accepted.</summary>
     /// <param name="code">The code of the reply to <c>PASV</c>.</param>
