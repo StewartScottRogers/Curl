@@ -98,16 +98,17 @@ public sealed partial class CookieStoreTests
 
     /// <summary>
     /// Measured: of 52 cookies curl printed 50 <c>Added</c> lines and nothing for the rest. A header the parser
-    /// refuses is out of this store's reach (BL-367's Notes list the lines curl prints for those).
+    /// refuses is reported (BL-443) but not counted.
     /// </summary>
     [TestMethod]
-    public void StoreFromResponse_PastTheLimitOrRefusedByTheParser_ReportsNothingForThem()
+    public void StoreFromResponse_PastTheLimit_ReportsNothingForThem()
     {
         RecordingTransferEvents events = new();
 
         new CookieStore().StoreFromResponse(CoUk, ["noequals", .. Enumerable.Range(1, 52).Select(number => $"k{number}=v; Path=/")], Now, events);
 
-        Assert.HasCount(CookieStore.MostCookiesStoredPerResponse, events.Info);
+        Assert.HasCount(CookieStore.MostCookiesStoredPerResponse + 1, events.Info);
+        Assert.AreEqual("invalid cookie, dropped", events.Info[0]);
         Assert.AreEqual("Added cookie k50=\"v\" for domain www.example.co.uk, path /, expire 0", events.Info[^1]);
     }
 

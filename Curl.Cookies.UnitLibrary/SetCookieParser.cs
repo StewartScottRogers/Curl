@@ -64,8 +64,9 @@ public static class SetCookieParser
     /// <item>Any other attribute is ignored.</item>
     /// </list>
     /// <para>
-    /// A tab inside a trimmed value refuses the cookie; a part that ends at a tab ends the reading, the
-    /// rest ignored. A control character other than tab anywhere refuses the cookie. An expiry more
+    /// A part is checked before it is read: a control character other than tab in its name, or a tab or
+    /// other control character inside its trimmed value, refuses the cookie. A part that ends at a tab
+    /// ends the reading, the rest ignored and not checked. An expiry more
     /// than 400 days after <paramref name="now"/> becomes 400 days and 30 seconds after it, rounded down
     /// to the minute. A name starting <c>__Secure-</c> (that case only) must be <c>Secure</c>, and one
     /// starting <c>__Host-</c> must be <c>Secure</c>, have the path <c>/</c> and no host-name
@@ -80,12 +81,43 @@ public static class SetCookieParser
     /// <param name="now">The time the header was received, which <c>Max-Age</c> counts from.</param>
     /// <returns>The cookie; <see langword="null"/> when curl drops it.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="headerValue"/> or <paramref name="requestUrl"/> is <see langword="null"/>.</exception>
-    public static Cookie? Parse(string headerValue, CurlUrl requestUrl, DateTimeOffset now)
+    public static Cookie? Parse(string headerValue, CurlUrl requestUrl, DateTimeOffset now) => Parse(headerValue, requestUrl, now, out _);
+
+    /// <summary>
+    /// Reads <paramref name="headerValue"/> as <see cref="Parse(string, CurlUrl, DateTimeOffset)"/> does, and
+    /// gives the line curl 8.21.0 prints under <c>-v</c> when it drops the cookie. Measured on 2026-09-27
+    /// (BL-443).
+    /// </summary>
+    /// <remarks>
+    /// <list type="bullet">
+    /// <item><c>invalid octets in name, cookie dropped</c>: a control character other than tab in a part's name.</item>
+    /// <item><c>invalid octets in value, cookie dropped</c>: a tab or other control character inside a part's trimmed value.</item>
+    /// <item><c>invalid cookie, dropped</c>: the first part has no <c>=</c>, or an empty name.</item>
+    /// <item><c>skipped cookie because not 'secure'</c>: <c>Secure</c> from an origin that is not secure.</item>
+    /// <item><c>skipped cookie with bad tailmatch domain: </c> and the rest of the header from the
+    /// <c>Domain</c> value that failed to match, its leading blanks and one leading dot left out.</item>
+    /// </list>
+    /// <para>
+    /// curl prints nothing for a header longer than <see cref="LongestHeaderValue"/>, a name and value longer
+    /// than <see cref="LongestNameAndValue"/>, or a name whose <c>__Secure-</c> or <c>__Host-</c> prefix is
+    /// not satisfied, so <paramref name="refusal"/> is <see langword="null"/> for those.
+    /// </para>
+    /// </remarks>
+    /// <param name="headerValue">As for <see cref="Parse(string, CurlUrl, DateTimeOffset)"/>.</param>
+    /// <param name="requestUrl">As for <see cref="Parse(string, CurlUrl, DateTimeOffset)"/>.</param>
+    /// <param name="now">As for <see cref="Parse(string, CurlUrl, DateTimeOffset)"/>.</param>
+    /// <param name="refusal">
+    /// The <c>-v</c> line, without curl's <c>* </c>, when curl drops the cookie with one; otherwise
+    /// <see langword="null"/>.
+    /// </param>
+    /// <returns>The cookie; <see langword="null"/> when curl drops it.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="headerValue"/> or <paramref name="requestUrl"/> is <see langword="null"/>.</exception>
+    public static Cookie? Parse(string headerValue, CurlUrl requestUrl, DateTimeOffset now, out string? refusal)
     {
         ArgumentNullException.ThrowIfNull(headerValue);
         ArgumentNullException.ThrowIfNull(requestUrl);
 
-        return ParseFor(headerValue, requestUrl, now);
+        return ParseFor(headerValue, requestUrl, now, out refusal);
     }
 
     /// <summary>
@@ -93,7 +125,7 @@ public static class SetCookieParser
     /// no request, as curl 8.21.0 does.
     /// </summary>
     /// <remarks>
-    /// The rules are <see cref="Parse"/>'s, except where they need the request: <c>Secure</c> is always
+    /// The rules are <see cref="Parse(string, CurlUrl, DateTimeOffset)"/>'s, except where they need the request: <c>Secure</c> is always
     /// accepted; any <c>Domain</c> is accepted, loses one leading dot and includes subdomains, even an IP
     /// address; without one the domain is empty, and the cookie is sent to every host and never written
     /// to the jar; without a <c>Path</c> the path is empty, which sorts before <c>/</c> and matches every path.
@@ -106,18 +138,25 @@ public static class SetCookieParser
     {
         ArgumentNullException.ThrowIfNull(headerValue);
 
-        return ParseFor(headerValue, requestUrl: null, now);
+        return ParseFor(headerValue, requestUrl: null, now, out _);
     }
 
-    private static Cookie? ParseFor(string headerValue, CurlUrl? requestUrl, DateTimeOffset now)
+    private static Cookie? ParseFor(string headerValue, CurlUrl? requestUrl, DateTimeOffset now, out string? refusal)
     {
-        if (headerValue.Length > LongestHeaderValue || CookieFieldRules.ContainsRefusedControlCharacter(headerValue))
+        refusal = null;
+        if (headerValue.Length > LongestHeaderValue)
         {
             return null;
         }
 
-        CookieUnderConstruction cookie = new(requestUrl, now.ToUnixTimeSeconds());
-        return TryReadParts(headerValue, cookie) ? cookie.Finish() : null;
+        CookieUnderConstruction cookie = new(headerValue, requestUrl, now.ToUnixTimeSeconds());
+        if (!TryReadParts(headerValue, cookie))
+        {
+            refusal = cookie.Refusal;
+            return null;
+        }
+
+        return cookie.Finish();
     }
 
     /// <summary>Reads every part in turn; <see langword="false"/> as soon as one refuses the cookie.</summary>
@@ -127,13 +166,8 @@ public static class SetCookieParser
         bool isFirstPart = true;
         while (true)
         {
-            if (!TryReadPart(text, ref position, out HeaderPart part))
-            {
-                return false;
-            }
-
-            bool accepted = isFirstPart ? cookie.TrySetNameAndValue(part) : cookie.TryApplyAttribute(part);
-            if (!accepted)
+            HeaderPart part = ReadPart(text, ref position);
+            if (!cookie.TryApplyPart(part, isFirstPart))
             {
                 return false;
             }
@@ -150,44 +184,58 @@ public static class SetCookieParser
 
     /// <summary>
     /// Reads one part from <paramref name="position"/>, leaving <paramref name="position"/> on the
-    /// character that ended it; <see langword="false"/> when its value holds a tab.
+    /// character that ended it.
     /// </summary>
-    private static bool TryReadPart(string text, ref int position, out HeaderPart part)
+    private static HeaderPart ReadPart(string text, ref int position)
     {
         int nameEnd = text.IndexOfAny([';', '\t', '='], position);
         nameEnd = nameEnd < 0 ? text.Length : nameEnd;
         string name = text[position..nameEnd].Trim(' ');
         bool hasEquals = nameEnd < text.Length && text[nameEnd] == '=';
         position = nameEnd;
-        string value = hasEquals ? ReadValue(text, ref position) : string.Empty;
-        part = new HeaderPart(name, hasEquals, value);
-        return !value.Contains('\t', StringComparison.Ordinal);
+        if (!hasEquals)
+        {
+            return new HeaderPart(name, hasEquals: false, string.Empty, nameEnd);
+        }
+
+        string value = ReadValue(text, ref position, out int valueStart);
+        return new HeaderPart(name, hasEquals: true, value, valueStart);
     }
 
-    /// <summary>Reads from just after the <c>=</c> at <paramref name="position"/> up to the next <c>;</c>, trimmed.</summary>
-    private static string ReadValue(string text, ref int position)
+    /// <summary>
+    /// Reads from just after the <c>=</c> at <paramref name="position"/> up to the next <c>;</c>, trimmed;
+    /// <paramref name="valueStart"/> is where the trimmed value starts in <paramref name="text"/>.
+    /// </summary>
+    private static string ReadValue(string text, ref int position, out int valueStart)
     {
-        int valueStart = position + 1;
-        int valueEnd = text.IndexOf(';', valueStart);
+        int untrimmedStart = position + 1;
+        int valueEnd = text.IndexOf(';', untrimmedStart);
         position = valueEnd < 0 ? text.Length : valueEnd;
-        return text[valueStart..position].Trim(' ', '\t');
+        string withoutLeadingBlanks = text[untrimmedStart..position].TrimStart(' ', '\t');
+        valueStart = position - withoutLeadingBlanks.Length;
+        return withoutLeadingBlanks.TrimEnd(' ', '\t');
     }
 
-    /// <summary>One <c>;</c>-separated part: its trimmed name, whether <c>=</c> followed it, and its trimmed value.</summary>
-    private readonly struct HeaderPart(string name, bool hasEquals, string value)
+    /// <summary>
+    /// One <c>;</c>-separated part: its trimmed name, whether <c>=</c> followed it, its trimmed value, and
+    /// where that value starts in the header.
+    /// </summary>
+    private readonly struct HeaderPart(string name, bool hasEquals, string value, int valueStart)
     {
         public string Name { get; } = name;
 
         public bool HasEquals { get; } = hasEquals;
 
         public string Value { get; } = value;
+
+        public int ValueStart { get; } = valueStart;
     }
 
     /// <summary>
-    /// The fields read so far, as curl fills its <c>struct Cookie</c> while it parses; <paramref name="requestUrl"/>
-    /// is <see langword="null"/> for a line of a cookie file.
+    /// The fields read so far from <paramref name="headerValue"/>, as curl fills its <c>struct Cookie</c> while it
+    /// parses; <paramref name="requestUrl"/> is <see langword="null"/> for a line of a cookie file.
     /// </summary>
-    private sealed class CookieUnderConstruction(CurlUrl? requestUrl, long nowUnixSeconds)
+    private sealed class CookieUnderConstruction(string headerValue, CurlUrl? requestUrl, long nowUnixSeconds)
     {
         private readonly string? host = requestUrl is null ? null : CookieOrigin.HostOf(requestUrl);
 
@@ -209,21 +257,51 @@ public static class SetCookieParser
 
         private long expiresUnixSeconds;
 
-        public bool TrySetNameAndValue(HeaderPart part)
+        /// <summary>The <c>-v</c> line curl prints for the refusal; <see langword="null"/> when it prints none.</summary>
+        public string? Refusal { get; private set; }
+
+        /// <summary>Checks <paramref name="part"/>'s octets, then reads it as the cookie or as an attribute.</summary>
+        public bool TryApplyPart(HeaderPart part, bool isFirstPart)
+        {
+            if (CookieFieldRules.ContainsRefusedControlCharacter(part.Name))
+            {
+                return Refuse("invalid octets in name, cookie dropped");
+            }
+
+            if (part.Value.Contains('\t', StringComparison.Ordinal) || CookieFieldRules.ContainsRefusedControlCharacter(part.Value))
+            {
+                return Refuse("invalid octets in value, cookie dropped");
+            }
+
+            return isFirstPart ? TrySetNameAndValue(part) : TryApplyAttribute(part);
+        }
+
+        private bool Refuse(string refusal)
+        {
+            Refusal = refusal;
+            return false;
+        }
+
+        private bool TrySetNameAndValue(HeaderPart part)
         {
             name = part.Name;
             value = part.Value;
-            return part.HasEquals && name.Length > 0 && name.Length + value.Length <= LongestNameAndValue;
+            if (!part.HasEquals || name.Length == 0)
+            {
+                return Refuse("invalid cookie, dropped");
+            }
+
+            return name.Length + value.Length <= LongestNameAndValue;
         }
 
-        public bool TryApplyAttribute(HeaderPart part)
+        private bool TryApplyAttribute(HeaderPart part)
         {
             if (!part.HasEquals)
             {
                 return TryApplyFlag(part.Name);
             }
 
-            return part.Value.Length == 0 || TryApplyValuedAttribute(part.Name.ToLowerInvariant(), part.Value);
+            return part.Value.Length == 0 || TryApplyValuedAttribute(part.Name.ToLowerInvariant(), part);
         }
 
         private bool TryApplyFlag(string flag)
@@ -231,36 +309,41 @@ public static class SetCookieParser
             if (flag.Equals("secure", StringComparison.OrdinalIgnoreCase))
             {
                 isSecure = true;
-                return requestUrl is null || CookieOrigin.IsSecure(requestUrl);
+                return requestUrl is null || CookieOrigin.IsSecure(requestUrl) || Refuse("skipped cookie because not 'secure'");
             }
 
             isHttpOnly |= flag.Equals("httponly", StringComparison.OrdinalIgnoreCase);
             return true;
         }
 
-        private bool TryApplyValuedAttribute(string attribute, string attributeValue)
+        private bool TryApplyValuedAttribute(string attribute, HeaderPart part)
         {
             switch (attribute)
             {
                 case "path":
-                    path = CookieFieldRules.SanitizePath(attributeValue);
+                    path = CookieFieldRules.SanitizePath(part.Value);
                     return true;
                 case "domain":
-                    return TrySetDomain(attributeValue);
+                    return TrySetDomain(part);
                 case "max-age":
-                    expiresUnixSeconds = ExpiryFromMaxAge(attributeValue);
+                    expiresUnixSeconds = ExpiryFromMaxAge(part.Value);
                     return true;
                 case "expires":
-                    SetExpiryFromExpires(attributeValue);
+                    SetExpiryFromExpires(part.Value);
                     return true;
                 default:
                     return true;
             }
         }
 
-        private bool TrySetDomain(string attributeValue)
+        /// <summary>
+        /// Sets the domain, or refuses the cookie when the host may not set it; curl's refusal line then
+        /// prints the rest of the header from the domain, as its <c>%s</c> of a pointer into the line does.
+        /// </summary>
+        private bool TrySetDomain(HeaderPart part)
         {
-            string candidate = attributeValue.StartsWith('.') ? attributeValue[1..] : attributeValue;
+            int dotLength = part.Value.StartsWith('.') ? 1 : 0;
+            string candidate = part.Value[dotLength..];
             if (host is null)
             {
                 domain = candidate;
@@ -271,7 +354,7 @@ public static class SetCookieParser
             bool matches = hostIsIpAddress ? string.Equals(candidate, host, StringComparison.Ordinal) : CookieOrigin.IsDomainOrSubdomain(candidate, host);
             domain = candidate;
             includesSubdomains = !hostIsIpAddress;
-            return matches;
+            return matches || Refuse($"skipped cookie with bad tailmatch domain: {headerValue[(part.ValueStart + dotLength)..]}");
         }
 
         private long ExpiryFromMaxAge(string attributeValue)

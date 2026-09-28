@@ -238,8 +238,9 @@ public sealed class CookieStore : ICookieStore
     /// Each cookie stored is reported to <paramref name="events"/> as curl 8.21.0's <c>-v</c> line,
     /// <c>Added cookie n="v" for domain d, path p, expire e</c> (<c>Replaced</c> for one that replaced a
     /// namesake), and so is each one this store drops by the Public Suffix List or to protect a
-    /// <c>Secure</c> cookie. A header <see cref="SetCookieParser"/> refuses, and one past the limit, is
-    /// not reported.
+    /// <c>Secure</c> cookie. A header <see cref="SetCookieParser"/> refuses is reported with the line
+    /// <see cref="SetCookieParser.Parse(string, CurlUrl, DateTimeOffset, out string?)"/> gives, or not at all
+    /// where curl prints nothing; one past the limit is not reported.
     /// </para>
     /// </remarks>
     /// <exception cref="ArgumentNullException"><paramref name="url"/>, <paramref name="setCookieHeaders"/> or <paramref name="events"/> is <see langword="null"/>.</exception>
@@ -259,7 +260,7 @@ public sealed class CookieStore : ICookieStore
                 break;
             }
 
-            Cookie? cookie = SetCookieParser.Parse(header, url, now);
+            Cookie? cookie = ParseReportingRefusal(header, url, now, events);
             if (cookie is not null && MayStore(cookie, host, secureOrigin, events))
             {
                 string action = Store(cookie) ? "Replaced" : "Added";
@@ -270,6 +271,18 @@ public sealed class CookieStore : ICookieStore
         }
 
         RemoveExpired(now);
+    }
+
+    /// <summary>Reads <paramref name="header"/> with <see cref="SetCookieParser"/>, reporting the <c>-v</c> line curl prints when it refuses it.</summary>
+    private static Cookie? ParseReportingRefusal(string header, CurlUrl url, DateTimeOffset now, ITransferEvents events)
+    {
+        Cookie? cookie = SetCookieParser.Parse(header, url, now, out string? refusal);
+        if (refusal is not null)
+        {
+            events.ReportInfo(refusal);
+        }
+
+        return cookie;
     }
 
     /// <summary>

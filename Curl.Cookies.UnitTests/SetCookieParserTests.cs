@@ -277,6 +277,25 @@ public sealed class SetCookieParserTests
         Assert.ThrowsExactly<ArgumentNullException>(() => SetCookieParser.Parse(null!, uri, DateTimeOffset.UnixEpoch));
         Assert.ThrowsExactly<ArgumentNullException>(() => SetCookieParser.Parse("a=1", null!, DateTimeOffset.UnixEpoch));
         Assert.ThrowsExactly<ArgumentNullException>(() => SetCookieParser.ParseFromCookieFile(null!, DateTimeOffset.UnixEpoch));
+        Assert.ThrowsExactly<ArgumentNullException>(() => SetCookieParser.Parse(null!, uri, DateTimeOffset.UnixEpoch, out _));
+        Assert.ThrowsExactly<ArgumentNullException>(() => SetCookieParser.Parse("a=1", null!, DateTimeOffset.UnixEpoch, out _));
+    }
+
+    /// <summary>
+    /// Measured 2026-09-27 (BL-443): <c>curl -v -b file -c - http://127.0.0.1:&lt;port&gt;/</c> with a file of
+    /// <c>Set-Cookie: f=v; Pa&lt;TAB&gt;th=/; X=&lt;0x01&gt;</c> and <c>Set-Cookie: g=v; X=&lt;0x01&gt;</c> sent
+    /// <c>Cookie: f=v</c>: a control character after a part that a tab ended is never checked.
+    /// </summary>
+    [TestMethod]
+    public void ParseFromCookieFile_ControlCharacterAfterATabEndedPart_IsNeverChecked()
+    {
+        DateTimeOffset now = DateTimeOffset.FromUnixTimeSeconds(Now);
+
+        Cookie? read = SetCookieParser.ParseFromCookieFile("f=v; Pa\tth=/; X=\u0001", now);
+        Cookie? refused = SetCookieParser.ParseFromCookieFile("g=v; X=\u0001", now);
+
+        Assert.AreEqual("f", read?.Name);
+        Assert.IsNull(refused);
     }
 
     private static void AssertParsesAsCurlDid(string url, string header, string? expectedJarLine)
