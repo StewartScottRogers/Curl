@@ -35,3 +35,4 @@ A failed connect carries curl's number for the connection it tried, so `-v` prin
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
