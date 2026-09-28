@@ -64,9 +64,26 @@ public sealed class CookieStore : ICookieStore
     /// </para>
     /// </remarks>
     /// <exception cref="ArgumentNullException"><paramref name="url"/> is <see langword="null"/>.</exception>
-    public string? GetCookieHeader(CurlUrl url, bool secure, DateTimeOffset now)
+    public string? GetCookieHeader(CurlUrl url, bool secure, DateTimeOffset now) =>
+        GetCookieHeader(url, secure, now, cookieStrings);
+
+    /// <summary>
+    /// Builds the <c>Cookie</c> header value as <see cref="GetCookieHeader(CurlUrl, bool, DateTimeOffset)"/>
+    /// does, with <paramref name="cookieStrings"/> in place of the strings given to
+    /// <see cref="AddCookieString"/>: the <c>-b name=value</c> strings of one <c>-:</c> / <c>--next</c>
+    /// option group, whose stored cookies every group shares while its strings are its own, as curl
+    /// 8.21.0 sends them (measured 2026-09-28, BL-509 Notes).
+    /// </summary>
+    /// <param name="url">The request URL.</param>
+    /// <param name="secure">Whether the request goes over TLS.</param>
+    /// <param name="now">The time that decides which stored cookies have expired.</param>
+    /// <param name="cookieStrings">The strings sent after the stored cookies, verbatim, in order.</param>
+    /// <returns>The header value, or <see langword="null"/> when there is nothing to send.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="url"/> or <paramref name="cookieStrings"/> is <see langword="null"/>.</exception>
+    public string? GetCookieHeader(CurlUrl url, bool secure, DateTimeOffset now, IReadOnlyList<string> cookieStrings)
     {
         ArgumentNullException.ThrowIfNull(url);
+        ArgumentNullException.ThrowIfNull(cookieStrings);
 
         RemoveExpired(now);
         string host = CookieOrigin.HostOf(url);

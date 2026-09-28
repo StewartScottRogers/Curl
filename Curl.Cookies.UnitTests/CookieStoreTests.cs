@@ -268,6 +268,21 @@ public sealed partial class CookieStoreTests
         Assert.ThrowsExactly<ArgumentNullException>(() => new CookieStore().GetCookieHeader(null!, secure: false, Now));
 
     [TestMethod]
+    public void GetCookieHeader_GivenCookieStrings_SendsThemInPlaceOfTheAddedOnes()
+    {
+        CookieStore store = new();
+        store.StoreFromResponse(Www, ["s=1"], Now, NoTransferEvents.Instance);
+        store.AddCookieString("added=1");
+
+        Assert.AreEqual("s=1; x=y; z=w", store.GetCookieHeader(Www, secure: false, Now, ["x=y", "z=w"]));
+        Assert.AreEqual("s=1", store.GetCookieHeader(Www, secure: false, Now, []));
+    }
+
+    [TestMethod]
+    public void GetCookieHeader_NullCookieStrings_Throws() =>
+        Assert.ThrowsExactly<ArgumentNullException>(() => new CookieStore().GetCookieHeader(Www, secure: false, Now, null!));
+
+    [TestMethod]
     public void StoreFromResponse_NullUri_Throws() =>
         Assert.ThrowsExactly<ArgumentNullException>(() => new CookieStore().StoreFromResponse(null!, [], Now, NoTransferEvents.Instance));
 
