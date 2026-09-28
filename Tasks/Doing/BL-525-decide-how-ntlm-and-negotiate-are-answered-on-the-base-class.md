@@ -36,3 +36,4 @@ An ADR decides how Curl produces NTLM, Negotiate (SPNEGO), Kerberos and GSS-API 
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
