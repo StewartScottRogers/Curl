@@ -236,6 +236,14 @@ marking the failure as ignored. A refused quote before the transfer is exit 21 w
 Not measured, and decided by the nearest measured rule: curl's exit 7 message for a
 refused `227` address reads `Failed to connect to 127.0.0.1:<control port> via
 127.0.0.2:<data port> after <n> ms: Could not connect to server`; the handler reports
-the connector's message, as it does for every data connect failure. `multicwd` still
-skips empty segments, so `//abs/f.txt` sends `CWD abs` where curl sends `CWD /` and
-`CWD abs`; that divergence predates these options and is left to its own task.
+the connector's message, as it does for every data connect failure.
+
+`multicwd`, the default, measured with curl 8.21.0 on 2026-09-27 (BL-446) and pinned in
+`FtpProtocolHandlerPathOptionTests`: curl decodes the whole path, sends `CWD /` when it
+then starts with `/`, and one `CWD` per non-empty segment after that.
+
+| Path | `CWD` commands after `PWD` |
+| --- | --- |
+| `//abs/f.txt`, `///abs/f.txt`, `/%2Fabs/f.txt`, `//abs/` | `CWD /`, `CWD abs` |
+| `//f.txt` | `CWD /` |
+| `/a//b/f.txt`, `/a%2Fb/f.txt`, `/a/%2Fb/f.txt` | `CWD a`, `CWD b` |

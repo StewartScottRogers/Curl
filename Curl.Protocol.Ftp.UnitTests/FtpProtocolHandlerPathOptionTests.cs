@@ -198,6 +198,34 @@ public sealed class FtpProtocolHandlerPathOptionTests
     }
 
     [TestMethod]
+    [DataRow("//abs/f.txt", "CWD /\r\nCWD abs\r\n", DisplayName = "an absolute path changes to / first")]
+    [DataRow("///abs/f.txt", "CWD /\r\nCWD abs\r\n", DisplayName = "one / however many slashes start it")]
+    [DataRow("/%2Fabs/f.txt", "CWD /\r\nCWD abs\r\n", DisplayName = "an escaped slash that starts it is a /")]
+    [DataRow("//f.txt", "CWD /\r\n", DisplayName = "a file in the root directory")]
+    [DataRow("/a//b/f.txt", "CWD a\r\nCWD b\r\n", DisplayName = "an empty segment in the middle is skipped")]
+    [DataRow("/a%2Fb/f.txt", "CWD a\r\nCWD b\r\n", DisplayName = "an escaped slash splits the segment")]
+    [DataRow("/a/%2Fb/f.txt", "CWD a\r\nCWD b\r\n", DisplayName = "an escaped slash after a slash is an empty segment")]
+    public async Task ExecuteAsync_MultiCwd_SplitsTheDecodedPathAsCurlDoes(string path, string cwds)
+    {
+        // curl ftp://127.0.0.1:47361<path> (the default --ftp-method multicwd), BL-446
+        string cwdReplies = string.Concat(Enumerable.Repeat(Ok, cwds.Split("CWD").Length - 1));
+        FtpRun run = await RunAsync(path, LoggedIn + cwdReplies + Retrieved, _ => { });
+
+        Assert.AreEqual(LogInSent + cwds + RetrieveSent, run.Sent);
+        Assert.AreEqual(TransferResult.Success(3), run.Result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_MultiCwdListingOfAnAbsoluteDirectory_ChangesToRootFirst()
+    {
+        // curl ftp://127.0.0.1:47361//abs/, BL-446
+        FtpRun run = await RunAsync("//abs/", LoggedIn + Ok + Ok + Epsv + TypeSet + Opened + Complete + Bye, _ => { });
+
+        Assert.AreEqual(LogInSent + "CWD /\r\nCWD abs\r\nEPSV\r\nTYPE A\r\nLIST\r\nQUIT\r\n", run.Sent);
+        Assert.AreEqual("abc", run.OutputText);
+    }
+
+    [TestMethod]
     [DataRow("/a/b/f.txt", "a/b/f.txt", DisplayName = "a relative path")]
     [DataRow("//abs/x%20y/f.txt", "/abs/x y/f.txt", DisplayName = "an absolute path, decoded")]
     public async Task ExecuteAsync_NoCwd_NamesTheWholePathInEachCommand(string path, string name)

@@ -9,8 +9,9 @@ namespace Curl.Protocol.Ftp;
 /// carries.
 /// </summary>
 /// <param name="Directories">
-/// Each <c>CWD</c> argument, in order, percent-decoded: one per directory for
-/// <c>multicwd</c> (empty segments, as in <c>a//b</c>, skipped), the whole directory part
+/// Each <c>CWD</c> argument, in order, percent-decoded: for <c>multicwd</c> <c>/</c> when
+/// the decoded path starts with <c>/</c>, then one per directory (empty segments, as in
+/// <c>a//b</c>, skipped), the whole directory part
 /// for <c>singlecwd</c>, none for <c>nocwd</c>.
 /// </param>
 /// <param name="FileName">
@@ -28,9 +29,10 @@ namespace Curl.Protocol.Ftp;
 /// exactly as decoded: <c>caf%C3%A9</c> is sent as the bytes <c>63 61 66 C3 A9</c>.
 /// </para>
 /// <para>
-/// <c>singlecwd</c> and <c>nocwd</c> decode the whole path and then split it at its last
-/// <c>/</c>, as curl does; a directory part that is empty because the path starts with
-/// <c>//</c> is <c>/</c> (BL-436).
+/// Every method decodes the whole path before splitting it, as curl does, so <c>%2F</c>
+/// splits a segment. <c>singlecwd</c> and <c>nocwd</c> split it at its last <c>/</c>; a
+/// directory part that is empty because the path starts with <c>//</c> is <c>/</c>
+/// (BL-436). <c>multicwd</c> splits it at every <c>/</c> (BL-446).
 /// </para>
 /// </remarks>
 internal sealed record FtpUrlPath(IReadOnlyList<string> Directories, string FileName, string? ListArgument = null)
@@ -57,8 +59,15 @@ internal sealed record FtpUrlPath(IReadOnlyList<string> Directories, string File
         {
             FtpFileMethod.NoCwd => SplitForNoCwd(string.Join('/', decoded[1..])),
             FtpFileMethod.SingleCwd => SplitForSingleCwd(string.Join('/', decoded[1..])),
-            _ => new FtpUrlPath([.. decoded[..^1].Where(segment => segment.Length > 0)], decoded[^1]),
+            _ => SplitForMultiCwd(string.Join('/', decoded[1..])),
         };
+    }
+
+    private static FtpUrlPath SplitForMultiCwd(string path)
+    {
+        string[] segments = path.Split('/');
+        IEnumerable<string> directories = segments[..^1].Where(segment => segment.Length > 0);
+        return new FtpUrlPath([.. path.StartsWith('/') ? directories.Prepend("/") : directories], segments[^1]);
     }
 
     private static FtpUrlPath SplitForSingleCwd(string path)
