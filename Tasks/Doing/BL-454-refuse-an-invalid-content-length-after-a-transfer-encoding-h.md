@@ -33,3 +33,4 @@ Under `--tr-encoding`, a response whose invalid Content-Length comes after a Tra
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
