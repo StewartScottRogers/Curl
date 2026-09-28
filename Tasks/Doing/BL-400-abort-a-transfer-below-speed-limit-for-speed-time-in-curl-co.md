@@ -32,3 +32,4 @@ A transfer whose speed stays below `-Y`/`--speed-limit` bytes per second for `-y
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
