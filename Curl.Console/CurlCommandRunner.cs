@@ -266,6 +266,22 @@ internal sealed class CurlCommandRunner(
     /// <summary>The <c>-D</c> value that sends the header lines to standard output.</summary>
     private const string StandardOutputHeaderFile = "-";
 
+    /// <summary>The <c>--stderr</c> value that sends standard error to standard output.</summary>
+    private const string StandardOutputStandardErrorFile = "-";
+
+    /// <summary>
+    /// What curl 8.21.0 prints, before the file name, when the <c>--stderr</c> file cannot be opened:
+    /// its <c>warnf</c> prefix in front of a message that carries the prefix already (measured
+    /// 2026-09-27, BL-410 Notes).
+    /// </summary>
+    internal const string StandardErrorFileOpenFailedPrefix = "Warning: Warning: Failed to open ";
+
+    /// <summary>
+    /// Where every standard error line of the run goes: the stream the runner was given, until
+    /// <c>--stderr</c> replaces it with its file or standard output (<see cref="OpenStandardErrorFileAsync" />).
+    /// </summary>
+    private Stream standardError = standardError;
+
     /// <summary>Builds each transfer's context on the runner's clock; gives a <c>telnet</c> transfer standard input and sends command-line header text in the platform's encoding (ADR-0067).</summary>
     private readonly TransferContextFactory transferContextFactory = new(standardInput, timeProvider, CredentialEncoding.ForPlatform(runsOnWindows));
 
@@ -475,23 +491,89 @@ internal sealed class CurlCommandRunner(
 
         await WriteDefaultConfigFileNoteAsync(parsed.NotedDefaultConfigFile).ConfigureAwait(false);
 
-        if (InformationLines(parsed.Options) is { } informationLines)
+        Stream? ownedStandardErrorFile = await OpenStandardErrorFileAsync(parsed.Options).ConfigureAwait(false);
+        try
+        {
+            return await RunAcceptedAsync(parsed.Options, parsed.WarningLinesAfterTransfers).ConfigureAwait(false);
+        }
+        finally
+        {
+            if (ownedStandardErrorFile is not null)
+            {
+                await ownedStandardErrorFile.DisposeAsync().ConfigureAwait(false);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Sends everything the runner writes to standard error from here on where <c>--stderr</c>
+    /// says: <c>-</c> to standard output, any other name to that file, truncated. A file that
+    /// cannot be opened prints curl 8.21.0's doubled <see cref="StandardErrorFileOpenFailedPrefix" />
+    /// warning (not under <c>-s</c>) and leaves standard error where it was.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <returns>The file opened, which the caller closes after the run; <see langword="null" /> when none was.</returns>
+    /// <remarks>
+    /// curl opens the file while it parses the option, so its lines from the options before
+    /// <c>--stderr</c> stay on standard error and the rest go to the file. The parser keeps no
+    /// such order, so here every parser warning goes to standard error and everything after the
+    /// parse to the file; <c>-s</c> is the whole command line's, not the options' before it
+    /// (measured 2026-09-27, BL-410 Notes).
+    /// </remarks>
+    private async Task<Stream?> OpenStandardErrorFileAsync(CommandLineOptions options)
+    {
+        switch (options.StandardErrorFile)
+        {
+            case null:
+                return null;
+            case StandardOutputStandardErrorFile:
+                standardError = standardOutput;
+                return null;
+        }
+
+        FileOpenResult opened = await fileSystem
+            .OpenForWriteAsync(options.StandardErrorFile, FileWriteMode.Truncate, DeferredOutputFileStream.CreateMode, CancellationToken.None)
+            .ConfigureAwait(false);
+        if (opened.Content is not { } file)
+        {
+            if (!options.Silent)
+            {
+                await WriteErrorLineAsync(StandardErrorFileOpenFailedPrefix + options.StandardErrorFile).ConfigureAwait(false);
+            }
+
+            return null;
+        }
+
+        standardError = file;
+        return file;
+    }
+
+    /// <summary>
+    /// Runs an accepted command line, for <see cref="RunAsync" />, once standard error is where
+    /// <c>--stderr</c> sends it.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="warningLinesAfterTransfers">The parser's warning lines printed after the transfers.</param>
+    /// <returns>The process exit code.</returns>
+    private async Task<int> RunAcceptedAsync(CommandLineOptions options, IReadOnlyList<string> warningLinesAfterTransfers)
+    {
+        if (InformationLines(options) is { } informationLines)
         {
             await WriteStandardOutputLinesAsync(informationLines).ConfigureAwait(false);
 
             return (int)CurlExitCode.Ok;
         }
 
-        if (CurlHelpText.IsOptionSubject(parsed.Options.HelpSubject))
+        if (CurlHelpText.IsOptionSubject(options.HelpSubject))
         {
-            await WriteOptionManualSectionAsync(parsed.Options.HelpSubject!).ConfigureAwait(false);
+            await WriteOptionManualSectionAsync(options.HelpSubject!).ConfigureAwait(false);
 
             return (int)CurlExitCode.Ok;
         }
 
-        if (RequestMethodConflictLines(parsed.Options) is { } conflictLines)
+        if (RequestMethodConflictLines(options) is { } conflictLines)
         {
-            if (!parsed.Options.Silent)
+            if (!options.Silent)
             {
                 await WriteErrorLinesAsync(conflictLines).ConfigureAwait(false);
             }
@@ -499,8 +581,8 @@ internal sealed class CurlCommandRunner(
             return (int)CurlExitCode.FailedInit;
         }
 
-        CurlExitCode exitCode = await TransferAllAsync(parsed.Options).ConfigureAwait(false);
-        await WriteErrorLinesAsync(parsed.WarningLinesAfterTransfers).ConfigureAwait(false);
+        CurlExitCode exitCode = await TransferAllAsync(options).ConfigureAwait(false);
+        await WriteErrorLinesAsync(warningLinesAfterTransfers).ConfigureAwait(false);
 
         return (int)exitCode;
     }
