@@ -34,3 +34,4 @@ When the peer closes the connection right after a final head's `Set-Cookie` line
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
