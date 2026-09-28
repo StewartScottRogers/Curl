@@ -427,9 +427,9 @@ public sealed class VerboseTransferEventWriterTests
     }
 
     [TestMethod]
-    public void ReportTlsData_WritesNothing()
+    public void ReportTlsData_OnSchannel_WritesNothing()
     {
-        VerboseTransferEventWriter writer = new(output, writesDataLines: true);
+        VerboseTransferEventWriter writer = new(output, writesDataLines: true, TlsBackend.Schannel);
 
         writer.ReportTlsData([1, 2, 3], sent: true);
         writer.ReportTlsData([1, 2, 3], sent: false);
