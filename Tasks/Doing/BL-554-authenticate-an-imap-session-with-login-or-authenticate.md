@@ -32,3 +32,4 @@ The IMAP handler logs in as curl 8.21.0 does: `AUTHENTICATE <mech>` through the 
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
