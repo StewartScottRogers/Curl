@@ -34,3 +34,4 @@ On Linux and macOS, `curl -w "%time{%F %T}"` prints the date and time as the Lin
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
