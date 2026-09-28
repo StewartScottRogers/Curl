@@ -39,6 +39,11 @@ internal sealed class SmtpControlChannel(IConnection connection, CancellationTok
     public IConnection Connection => connection;
 
     /// <summary>
+    /// Gets the code of the last complete reply read, or 0 before the first.
+    /// </summary>
+    public int LastReplyCode { get; private set; }
+
+    /// <summary>
     /// Carries on over <paramref name="secured" />, the connection after <c>STARTTLS</c>
     /// upgraded it to TLS.
     /// </summary>
@@ -52,12 +57,20 @@ internal sealed class SmtpControlChannel(IConnection connection, CancellationTok
     /// </summary>
     /// <param name="command">The command line without its line end, such as <c>EHLO x</c>.</param>
     /// <returns>A task that completes once the command is sent or the send has failed.</returns>
-    public async ValueTask SendAsync(string command)
+    public ValueTask SendAsync(string command) => SendBytesAsync(Encoding.Latin1.GetBytes(command + "\r\n"));
+
+    /// <summary>
+    /// Sends <paramref name="bytes" /> as they are, such as a piece of the message after
+    /// <c>DATA</c>. A connection that fails with an <see cref="IOException" /> is left for the
+    /// next <see cref="ReadReplyAsync" /> to find closed.
+    /// </summary>
+    /// <param name="bytes">The bytes to send.</param>
+    /// <returns>A task that completes once the bytes are sent or the send has failed.</returns>
+    public async ValueTask SendBytesAsync(ReadOnlyMemory<byte> bytes)
     {
-        byte[] line = Encoding.Latin1.GetBytes(command + "\r\n");
         try
         {
-            await connection.WriteAsync(line, cancellationToken).ConfigureAwait(false);
+            await connection.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
             await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (IOException)
@@ -93,11 +106,29 @@ internal sealed class SmtpControlChannel(IConnection connection, CancellationTok
 
             if (isFinal)
             {
-                return new SmtpReply(int.Parse(line.AsSpan(0, 3), provider: null), lines);
+                LastReplyCode = int.Parse(line.AsSpan(0, 3), provider: null);
+                return new SmtpReply(LastReplyCode, lines);
             }
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Sends <c>QUIT</c> and reads its reply, ignoring whatever it says and a reply line that
+    /// is too long, as curl does once the session is open.
+    /// </summary>
+    /// <returns>A task that completes once the reply is read or the connection has closed.</returns>
+    public async ValueTask QuitAsync()
+    {
+        await SendAsync("QUIT").ConfigureAwait(false);
+        try
+        {
+            await ReadReplyAsync().ConfigureAwait(false);
+        }
+        catch (InvalidDataException)
+        {
+        }
     }
 
     private static bool StartsWithCode(string line) =>

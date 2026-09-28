@@ -3,8 +3,8 @@ using System.Globalization;
 namespace Curl.Protocol.Smtp;
 
 /// <summary>
-/// The messages curl 8.21.0 prints when an SMTP session fails to open, each measured with
-/// <c>Record-CurlExchange.ps1 -Smtp</c> (BL-540).
+/// The messages curl 8.21.0 prints when an SMTP session fails to open or to send its
+/// message, each measured with <c>Record-CurlExchange.ps1 -Smtp</c> (BL-540, BL-542).
 /// </summary>
 internal static class SmtpSessionMessages
 {
@@ -19,6 +19,16 @@ internal static class SmtpSessionMessages
 
     /// <summary><c>--ssl-reqd</c> and the <c>EHLO</c> reply did not advertise <c>STARTTLS</c> (exit 64).</summary>
     internal const string StartTlsNotSupported = "STARTTLS not supported.";
+
+    /// <summary>The reply to the end of the message was not 250 (exit 8, BL-542).</summary>
+    internal const string WeirdServerReply = "Weird server reply";
+
+    /// <summary>
+    /// <c>MAIL</c> or <c>RCPT</c> was answered with something other than 2xx, or <c>DATA</c>
+    /// with something other than 354 (exit 55, BL-542), such as <c>RCPT failed: 550</c>.
+    /// </summary>
+    internal static string CommandFailed(string command, int code) =>
+        string.Create(CultureInfo.InvariantCulture, $"{command} failed: {code}");
 
     /// <summary>The greeting was not a 2xx reply (exit 8).</summary>
     internal static string UnexpectedResponse(int code) =>

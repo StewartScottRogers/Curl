@@ -18,9 +18,11 @@ namespace Curl.Protocol.Smtp;
 /// are described on <see cref="SmtpSession" />.
 /// </para>
 /// <para>
-/// Authentication (BL-541), the upload (BL-542) and the commands sent without one (BL-543)
-/// are not implemented yet: once the session is open the handler closes it with
-/// <c>QUIT</c> and reports success. Cancellation leaves as an exception.
+/// With <c>-T</c> and at least one <c>--mail-rcpt</c> the open session sends the message
+/// (<see cref="SmtpMailTransaction" />, BL-542). Authentication (BL-541) and the commands
+/// sent without an upload or without a recipient (BL-543) are not implemented yet: then
+/// the handler closes the session with <c>QUIT</c> and reports success. Cancellation leaves
+/// as an exception.
 /// </para>
 /// </remarks>
 public sealed class SmtpProtocolHandler : IProtocolHandler

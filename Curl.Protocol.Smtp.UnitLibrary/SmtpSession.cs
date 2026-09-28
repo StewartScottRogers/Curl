@@ -26,6 +26,8 @@ namespace Curl.Protocol.Smtp;
 /// bytes is exit 100.</item>
 /// <item>No failure above sends <c>QUIT</c>. Once the session is open, <c>QUIT</c>'s reply is
 /// read and whatever it says is ignored, as curl ignores it.</item>
+/// <item>With <c>-T</c> and at least one <c>--mail-rcpt</c>, the open session sends the
+/// message through <see cref="SmtpMailTransaction" /> (BL-542).</item>
 /// </list>
 /// </remarks>
 internal sealed class SmtpSession(
@@ -44,9 +46,9 @@ internal sealed class SmtpSession(
     private IConnection? securedConnection;
 
     /// <summary>
-    /// Opens the session and closes it again with <c>QUIT</c>.
+    /// Opens the session, sends the message when there is one, and closes it with <c>QUIT</c>.
     /// </summary>
-    /// <returns>A success, or the failure that stopped the session opening.</returns>
+    /// <returns>A success, or the failure that stopped the session or its message.</returns>
     public async ValueTask<TransferResult> RunAsync()
     {
         try
@@ -65,7 +67,12 @@ internal sealed class SmtpSession(
             return TransferResult.Failure(CurlExitCode.TooLarge, SmtpSessionMessages.ReplyLineTooLarge);
         }
 
-        await QuitAsync().ConfigureAwait(false);
+        if (context.Upload is { } upload && context.Mail is { Recipients.Count: > 0 } mail)
+        {
+            return await new SmtpMailTransaction(channel, context).SendAsync(upload, mail).ConfigureAwait(false);
+        }
+
+        await channel.QuitAsync().ConfigureAwait(false);
         return TransferResult.Success(0);
     }
 
@@ -163,18 +170,6 @@ internal sealed class SmtpSession(
         channel.SwitchTo(connection);
         secure = true;
         return await GreetAsync().ConfigureAwait(false);
-    }
-
-    private async ValueTask QuitAsync()
-    {
-        await channel.SendAsync("QUIT").ConfigureAwait(false);
-        try
-        {
-            await channel.ReadReplyAsync().ConfigureAwait(false);
-        }
-        catch (InvalidDataException)
-        {
-        }
     }
 
     private async ValueTask<SmtpReply> ExchangeAsync(string command)
