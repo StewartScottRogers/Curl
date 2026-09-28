@@ -104,6 +104,8 @@ public sealed class TransferWriteOutVariables(
 {
     private const int UnknownPort = -1;
 
+    private const int UnreportedLocalPort = 0;
+
     private const long MicrosecondsPerSecond = 1_000_000;
 
     /// <summary>
@@ -144,7 +146,7 @@ public sealed class TransferWriteOutVariables(
         ["num_headers"] = variables => WriteOutValue.FromNumber(
             variables.report.ResponseHeaders.Count + variables.report.PseudoHeaders.Count),
         ["local_ip"] = variables => WriteOutValue.FromText(FormatAddress(variables.report.LocalEndPoint)),
-        ["local_port"] = variables => WriteOutValue.FromNumber(FindPort(variables.report.LocalEndPoint)),
+        ["local_port"] = variables => WriteOutValue.FromNumber(FindLocalPort(variables.report)),
         ["remote_ip"] = variables => WriteOutValue.FromText(FormatAddress(variables.report.RemoteEndPoint)),
         ["remote_port"] = variables => WriteOutValue.FromNumber(FindPort(variables.report.RemoteEndPoint)),
         ["exitcode"] = variables => WriteOutValue.FromNumber((int)variables.result.ExitCode),
@@ -395,5 +397,16 @@ public sealed class TransferWriteOutVariables(
     private static int FindPort(IPEndPoint? endPoint)
     {
         return endPoint?.Port ?? UnknownPort;
+    }
+
+    /// <summary>
+    /// The <c>%{local_port}</c> of <paramref name="report" />: its local end point's port;
+    /// <c>0</c> when a connection was made but has no local end to report, as curl 8.21.0
+    /// prints for its unconnected TFTP socket; <c>-1</c> when no connection was made
+    /// (measured, BL-515 Notes; ADR-0119).
+    /// </summary>
+    private static int FindLocalPort(TransferReport report)
+    {
+        return report.LocalEndPoint?.Port ?? (report.RemoteEndPoint is null ? UnknownPort : UnreportedLocalPort);
     }
 }

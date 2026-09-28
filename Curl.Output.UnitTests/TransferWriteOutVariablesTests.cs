@@ -183,6 +183,29 @@ public sealed class TransferWriteOutVariablesTests
     }
 
     [TestMethod]
+    public void TryGetVariableText_RemoteEndPointWithoutLocal_PrintsLocalPortZero()
+    {
+        // curl -s -w "%{local_ip} %{local_port} %{remote_ip} %{remote_port}" tftp://127.0.0.1:47519/f
+        // printed " 0 127.0.0.1 47519": a connection whose local end is not known (BL-515 Notes).
+        TransferWriteOutVariables variables = WithReport(new TransferReport { RemoteEndPoint = new IPEndPoint(IPAddress.Loopback, 47519) });
+
+        Assert.AreEqual(string.Empty, Get(variables, "local_ip"));
+        Assert.AreEqual("0", Get(variables, "local_port"));
+        Assert.AreEqual("127.0.0.1", Get(variables, "remote_ip"));
+        Assert.AreEqual("47519", Get(variables, "remote_port"));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_NoEndPoints_PrintsLocalPortMinusOne()
+    {
+        // curl -s -w "..." ftp://127.0.0.1:47518/f against a closed port printed " -1  -1" (BL-515 Notes).
+        TransferWriteOutVariables variables = WithReport(new TransferReport());
+
+        Assert.AreEqual("-1", Get(variables, "local_port"));
+        Assert.AreEqual("-1", Get(variables, "remote_port"));
+    }
+
+    [TestMethod]
     public void TryGetVariableText_FollowedRedirect_PrintsTheFollowersUrlAndCount()
     {
         TransferReport report = new() { EffectiveUrl = "http://127.0.0.1:18225/next", RedirectCount = 2 };
