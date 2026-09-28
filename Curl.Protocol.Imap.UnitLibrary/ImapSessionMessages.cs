@@ -38,6 +38,12 @@ internal static class ImapSessionMessages
     /// <summary>The URL's path is malformed as an IMAP URL (exit 3); curl prints its error text.</summary>
     internal const string MalformedUrl = "URL using bad/illegal format or missing URL";
 
+    /// <summary>
+    /// <c>AUTHENTICATE</c> failed, or no login could be attempted with what the transfer has
+    /// (exit 67); curl prints its error text.
+    /// </summary>
+    internal const string LoginDenied = "Login denied";
+
     /// <summary><c>SELECT</c> was answered other than <c>OK</c> (exit 67).</summary>
     internal const string SelectFailed = "Select failed";
 
@@ -54,6 +60,16 @@ internal static class ImapSessionMessages
 
     /// <summary>The untagged <c>FETCH</c> response announced no literal <c>{n}</c> (exit 8).</summary>
     internal const string FetchResponseUnparsed = "Failed to parse FETCH response.";
+
+    /// <summary>
+    /// <c>LOGIN</c> was answered other than <c>OK</c> (exit 67). curl formats its response
+    /// code with <c>%c</c>, so the message ends in a control character: 2 for <c>NO</c>,
+    /// <c>BAD</c> and the like, 3 for <c>PREAUTH</c>.
+    /// </summary>
+    /// <param name="status">How the <c>LOGIN</c> completed.</param>
+    /// <returns>The message, such as <c>Access denied. \u0002</c>.</returns>
+    internal static string AccessDenied(ImapResponseStatus status) =>
+        "Access denied. " + (status == ImapResponseStatus.Preauth ? '\u0003' : '\u0002');
 
     /// <summary>The server closed the connection <paramref name="missing" /> bytes short of the literal (exit 18).</summary>
     /// <param name="missing">The literal's bytes that never arrived.</param>

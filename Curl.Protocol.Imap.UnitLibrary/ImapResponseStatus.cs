@@ -14,4 +14,10 @@ internal enum ImapResponseStatus
 
     /// <summary>Anything else: <c>NO</c>, <c>BAD</c>, <c>BYE</c>, <c>ok</c> or a word curl does not know.</summary>
     NotOk,
+
+    /// <summary>
+    /// Not a completion: a <c>+</c> continuation, read only while <c>AUTHENTICATE</c> waits
+    /// for one (<see cref="ImapControlChannel.ReadResponseAsync" />).
+    /// </summary>
+    Continuation,
 }

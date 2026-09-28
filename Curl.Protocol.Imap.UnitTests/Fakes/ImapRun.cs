@@ -22,15 +22,29 @@ public sealed record ImapRun(
         params ConnectResult[] handshakes) =>
         ExecuteAsync(new TransferContext { Url = CurlUrl.Parse(url), Output = Stream.Null, SslLevel = sslLevel }, connection, handshakes);
 
+    public static Task<ImapRun> ExecuteAsync(
+        TransferContext context,
+        ScriptedConnection connection,
+        params ConnectResult[] handshakes) =>
+        ExecuteAsync(context, connection, null, handshakes);
+
+    /// <summary>
+    /// Runs <paramref name="context" /> through a handler built with
+    /// <paramref name="saslAuthenticator" />, or without one when it is <see langword="null" />.
+    /// </summary>
     public static async Task<ImapRun> ExecuteAsync(
         TransferContext context,
         ScriptedConnection connection,
+        ISaslAuthenticator? saslAuthenticator,
         params ConnectResult[] handshakes)
     {
         var connector = new QueuedConnector(ConnectResult.Connected(connection));
         var tls = new QueuedTlsProvider(handshakes);
+        ImapProtocolHandler handler = saslAuthenticator is null
+            ? new ImapProtocolHandler(connector, tls)
+            : new ImapProtocolHandler(connector, tls, saslAuthenticator);
 
-        TransferResult result = await new ImapProtocolHandler(connector, tls).ExecuteAsync(context);
+        TransferResult result = await handler.ExecuteAsync(context);
 
         return new ImapRun(result, connection, connector, tls);
     }

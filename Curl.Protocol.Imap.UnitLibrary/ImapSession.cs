@@ -27,6 +27,10 @@ namespace Curl.Protocol.Imap;
 /// as it reported it, then <c>CAPABILITY</c> again.</item>
 /// <item>A continuation, or a NUL byte in a line, is exit 8; the server closing before a
 /// response is complete is exit 56; a response line of 65536 bytes is exit 100.</item>
+/// <item>Then, unless the greeting was <c>PREAUTH</c>, the login
+/// <see cref="ImapAuthentication" /> describes, reading the capabilities <c>SASL-IR</c>,
+/// <c>LOGINDISABLED</c> and <c>AUTH=&lt;mech&gt;</c> in any case; login options curl rejects
+/// (<see cref="ImapLoginOptions" />) are exit 3 before the greeting is read.</item>
 /// <item>No failure above sends <c>LOGOUT</c>. Once the session is open, <c>LOGOUT</c>'s
 /// response is read and whatever it says, or the server hanging up, is ignored.</item>
 /// <item>Once the session is open, the URL's path is read as <see cref="ImapUrlPath" />
@@ -45,6 +49,7 @@ namespace Curl.Protocol.Imap;
 internal sealed class ImapSession(
     ImapControlChannel channel,
     ITlsProvider tlsProvider,
+    ISaslAuthenticator? saslAuthenticator,
     ITransferContext context,
     bool implicitTls) : IAsyncDisposable
 {
@@ -52,9 +57,14 @@ internal sealed class ImapSession(
 
     private const string StartTlsCommand = "STARTTLS";
 
+    private const string AuthCapabilityPrefix = "AUTH=";
+
     private static readonly char[] WordSeparators = [' ', '\t', '\r', '\n'];
 
     private readonly HashSet<string> capabilities = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>The SASL mechanisms the last <c>CAPABILITY</c> advertised, as curl resets them each time.</summary>
+    private readonly List<string> offeredMechanisms = [];
 
     private bool secure = implicitTls;
 
@@ -63,15 +73,23 @@ internal sealed class ImapSession(
     private IConnection? securedConnection;
 
     /// <summary>
-    /// Opens the session, fetches the message the URL names when it names one, and closes the
-    /// session again with <c>LOGOUT</c>.
+    /// Opens the session, logs in, fetches the message the URL names when it names one, and
+    /// closes the session again with <c>LOGOUT</c>. Login options curl rejects are exit 3
+    /// before anything is read or sent.
     /// </summary>
     /// <returns>A success, or the failure that stopped the session.</returns>
     public async ValueTask<TransferResult> RunAsync()
     {
+        if (ImapLoginOptions.Parse(context.Mail?.LoginOptions ?? context.Url.Options) is not { } loginOptions)
+        {
+            return TransferResult.Failure(CurlExitCode.UrlMalformat, ImapSessionMessages.MalformedUrl);
+        }
+
         try
         {
-            return await OpenAsync().ConfigureAwait(false) ?? await PerformAsync().ConfigureAwait(false);
+            return await OpenAsync().ConfigureAwait(false)
+                ?? await LoginAsync(loginOptions).ConfigureAwait(false)
+                ?? await PerformAsync().ConfigureAwait(false);
         }
         catch (ImapResponseMissingException)
         {
@@ -223,14 +241,27 @@ internal sealed class ImapSession(
         return await CapabilityAsync().ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Adds every word of <paramref name="capabilityResponse" />'s untagged lines to the
+    /// capabilities, and replaces the offered mechanisms with its <c>AUTH=&lt;mech&gt;</c> words.
+    /// </summary>
+    private void RecordCapabilities(ImapResponse capabilityResponse)
+    {
+        offeredMechanisms.Clear();
+        foreach (string untagged in capabilityResponse.Untagged)
+        {
+            string[] words = untagged[2..].Split(WordSeparators, StringSplitOptions.RemoveEmptyEntries);
+            capabilities.UnionWith(words);
+            offeredMechanisms.AddRange(
+                words.Where(word => word.Length > AuthCapabilityPrefix.Length && word.StartsWith(AuthCapabilityPrefix, StringComparison.OrdinalIgnoreCase))
+                    .Select(word => word[AuthCapabilityPrefix.Length..]));
+        }
+    }
+
     private async ValueTask<TransferResult?> CapabilityAsync()
     {
         ImapResponse response = await ExchangeAsync(CapabilityCommand, IsCapabilityResponse).ConfigureAwait(false);
-        foreach (string untagged in response.Untagged)
-        {
-            capabilities.UnionWith(untagged[2..].Split(WordSeparators, StringSplitOptions.RemoveEmptyEntries));
-        }
-
+        RecordCapabilities(response);
         if (secure || context.SslLevel == TransportSecurityLevel.None)
         {
             return null;
@@ -296,6 +327,16 @@ internal sealed class ImapSession(
         secure = true;
         return await CapabilityAsync().ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Logs in as <see cref="ImapAuthentication" /> describes, unless the greeting was
+    /// <c>PREAUTH</c>.
+    /// </summary>
+    private async ValueTask<TransferResult?> LoginAsync(ImapLoginOptions loginOptions) =>
+        preauthenticated
+            ? null
+            : await new ImapAuthentication(channel, saslAuthenticator, context)
+                .AuthenticateAsync(loginOptions, offeredMechanisms, capabilities).ConfigureAwait(false);
 
     /// <summary>
     /// Once the session is open: reads the URL's path, fetches the message it names when it

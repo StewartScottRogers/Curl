@@ -17,7 +17,8 @@ namespace Curl.Protocol.Imap;
 /// greeting is read as the response tagged <c>*</c>; a line ends at LF, with a CR before it
 /// kept; a line starting with the tag and a space completes the response; a line starting
 /// <c>* </c> is kept when the caller is interested in it and skipped otherwise; a
-/// continuation (<c>+ </c>, or <c>+</c> and one character) is refused; and any other line
+/// continuation (<c>+ </c>, or <c>+</c> and one character) is refused unless
+/// <c>AUTHENTICATE</c> is waiting for one; and any other line
 /// is skipped.
 /// </para>
 /// <para>
@@ -81,11 +82,24 @@ internal sealed class ImapControlChannel(IConnection connection, CancellationTok
     /// </summary>
     /// <param name="command">The command without its tag or line end, such as <c>CAPABILITY</c>.</param>
     /// <returns>A task that completes once the command is sent or the send has failed.</returns>
-    public async ValueTask SendCommandAsync(string command)
+    public ValueTask SendCommandAsync(string command)
     {
         commandId = unchecked((byte)(commandId + 1));
         Tag = string.Create(CultureInfo.InvariantCulture, $"A{commandId:D3}");
-        byte[] line = Encoding.Latin1.GetBytes(Tag + " " + command + "\r\n");
+        return SendLineAsync(Tag + " " + command);
+    }
+
+    /// <summary>
+    /// Sends <paramref name="text" /> untagged, followed by CRLF: an answer to an
+    /// <c>AUTHENTICATE</c> continuation. A connection that fails with an
+    /// <see cref="IOException" /> is left for the next <see cref="ReadResponseAsync" /> to
+    /// find closed.
+    /// </summary>
+    /// <param name="text">The line without its line end.</param>
+    /// <returns>A task that completes once the line is sent or the send has failed.</returns>
+    public async ValueTask SendLineAsync(string text)
+    {
+        byte[] line = Encoding.Latin1.GetBytes(text + "\r\n");
         try
         {
             await connection.WriteAsync(line, cancellationToken).ConfigureAwait(false);
@@ -102,6 +116,11 @@ internal sealed class ImapControlChannel(IConnection connection, CancellationTok
     /// <param name="isWanted">
     /// Whether an untagged line, starting <c>* </c>, belongs to the command waiting and is kept.
     /// </param>
+    /// <param name="acceptsContinuation">
+    /// Whether a continuation ends the read, as one does while <c>AUTHENTICATE</c> waits:
+    /// it is returned as an <see cref="ImapResponseStatus.Continuation" /> response whose one
+    /// untagged entry is the continuation line.
+    /// </param>
     /// <returns>
     /// The response, or <see langword="null" /> when the server closed the connection or a
     /// read failed with an <see cref="IOException" /> before it was complete.
@@ -110,9 +129,9 @@ internal sealed class ImapControlChannel(IConnection connection, CancellationTok
     /// A line reached 65536 bytes, its literals and line end included (exit 100).
     /// </exception>
     /// <exception cref="ImapWeirdResponseException">
-    /// A line held a NUL byte, or was a continuation (exit 8).
+    /// A line held a NUL byte, or was a continuation not accepted (exit 8).
     /// </exception>
-    public async ValueTask<ImapResponse?> ReadResponseAsync(Func<string, bool> isWanted)
+    public async ValueTask<ImapResponse?> ReadResponseAsync(Func<string, bool> isWanted, bool acceptsContinuation = false)
     {
         var untagged = new List<string>();
         while (await ReadLineAsync(0).ConfigureAwait(false) is { } line)
@@ -131,7 +150,9 @@ internal sealed class ImapControlChannel(IConnection connection, CancellationTok
             }
             else if (IsContinuation(line))
             {
-                throw new ImapWeirdResponseException(ImapSessionMessages.UnexpectedContinuation);
+                return acceptsContinuation
+                    ? new ImapResponse(ImapResponseStatus.Continuation, [line])
+                    : throw new ImapWeirdResponseException(ImapSessionMessages.UnexpectedContinuation);
             }
         }
 
