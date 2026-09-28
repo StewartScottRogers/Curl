@@ -14,10 +14,18 @@ namespace Curl.Protocol.Http;
 /// closes among the final response's headers ends the head there, which curl 8.21.0 treats
 /// as a complete response.
 /// </remarks>
-/// <param name="connection">The connection the request was sent on.</param>
-internal sealed class HttpResponseHeadReader(IConnection connection)
+internal sealed class HttpResponseHeadReader
 {
-    private readonly HttpLineReader lines = new(connection);
+    private readonly HttpLineReader lines;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="HttpResponseHeadReader" /> class.
+    /// </summary>
+    /// <param name="connection">The connection the request was sent on.</param>
+    internal HttpResponseHeadReader(IConnection connection)
+    {
+        lines = new(connection) { EndsBeforeRead = EndsAtRefusedHeader };
+    }
 
     private readonly HttpResponseHeadBuilder builder = new();
 
@@ -65,7 +73,10 @@ internal sealed class HttpResponseHeadReader(IConnection connection)
     /// Gets what finds the header of a final head that curl 8.21.0 refuses while it reads the
     /// head (<see cref="HttpResponseBodyReader.FindHeadRefusal" />), or <see langword="null" />
     /// when it refuses none. The final head's whole headers are held until the head ends or
-    /// fails so it can be asked once of them; then those before the refused header are released
+    /// fails so it can be asked once of them - and, before a read from the connection, of the
+    /// headers whole by then, when more are whole than it was last asked of, so a head the
+    /// peer holds open after a refused header ends there (<see cref="EndsAtRefusedHeader" />);
+    /// then those before the refused header are released
     /// and neither it nor any line after it is told to <see cref="HeaderReceived" /> or reported
     /// to <see cref="Events" />, the head's empty line included, since curl 8.21.0 stops reading
     /// the head at the refused header (measured, BL-475 Notes).
@@ -85,6 +96,10 @@ internal sealed class HttpResponseHeadReader(IConnection connection)
     private bool heldHeaderKeepsHttp10Alive;
 
     private bool holdsWholeHeaders;
+
+    private HttpStatusLine? headStatusLine;
+
+    private int wholeHeadersAsked;
 
     private byte[]? heldEmptyLine;
 
@@ -170,6 +185,45 @@ internal sealed class HttpResponseHeadReader(IConnection connection)
         return head;
     }
 
+    /// <summary>
+    /// Decides, before a read from the connection, whether the final head ends here because a
+    /// header already whole is refused: curl 8.21.0 refuses a header as soon as a byte of the
+    /// next line shows it is whole - a first byte that is not a blank, since a blank would fold
+    /// the next line into it - and does not wait for the rest of the head, while a refused
+    /// header with nothing after it yet waits for the peer (measured, BL-480 Notes). Asks
+    /// <see cref="FindRefusal" /> only when more headers are whole than it was last asked of,
+    /// so a head that arrives before its reader waits for it is never asked here, and each read
+    /// at most once. The head then ends as if the peer
+    /// had closed, and <see cref="ReadAsync" /> finds the refusal again in the head it builds.
+    /// </summary>
+    /// <param name="unfinishedLine">The bytes of the line after the last one read, so far.</param>
+    /// <returns><see langword="true" /> when a whole header of the final head is refused.</returns>
+    private bool EndsAtRefusedHeader(ReadOnlySpan<byte> unfinishedLine)
+    {
+        bool pendingIsWhole = ShowsPendingHeaderWhole(unfinishedLine);
+        int wholeHeaders = heldHeaders.Count + (pendingIsWhole ? 1 : 0);
+        if (!holdsWholeHeaders || wholeHeaders == wholeHeadersAsked)
+        {
+            return false;
+        }
+
+        wholeHeadersAsked = wholeHeaders;
+        List<HttpResponseHeader> headers = [.. heldHeaders.Select(held => held.Header)];
+        if (pendingIsWhole)
+        {
+            headers.Add(builder.PendingHeader);
+        }
+
+        return FindRefusal(new HttpResponseHead(headStatusLine!, headers, ReadOnlyMemory<byte>.Empty, ReadOnlyMemory<byte>.Empty)) is not null;
+    }
+
+    /// <summary>
+    /// Determines whether the unfinished line shows the header whose lines are held is whole:
+    /// it has begun, and not with a blank that would fold it into that header.
+    /// </summary>
+    private bool ShowsPendingHeaderWhole(ReadOnlySpan<byte> unfinishedLine) =>
+        heldHeaderLines.Count > 0 && unfinishedLine.Length > 0 && !HttpLine.IsBlank((char)unfinishedLine[0]);
+
     private static HttpTransferException EmptyReply() =>
         new(CurlExitCode.GotNothing, HttpTransferMessages.EmptyReply);
 
@@ -204,6 +258,7 @@ internal sealed class HttpResponseHeadReader(IConnection connection)
         bool informational = statusLine.IsInformational;
         bool http10 = statusLine.Version == new Version(1, 0);
         holdsWholeHeaders = !informational;
+        headStatusLine = statusLine;
         while (await lines.ReadLineAsync(false, cancellationToken).ConfigureAwait(false) is { } bytes)
         {
             HttpLine line = HttpLine.Split(bytes);

@@ -1,3 +1,4 @@
+using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Http.Fakes;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
@@ -177,6 +178,69 @@ public sealed partial class HttpProtocolHandlerTests
             Assert.AreEqual(message, result.ErrorMessage, $"Chunk size {chunkSize}");
             CollectionAssert.AreEqual(expected, HeadEvents(events), $"Chunk size {chunkSize}");
             Assert.AreEqual("HTTP/1.1 200 OK\r\nX-Before: 1\r\n", Latin1(headers.ToArray()), $"Chunk size {chunkSize}");
+        }
+    }
+
+    /// <summary>
+    /// Measured with <c>-s -v</c> against a server that sent this and held the connection open
+    /// (<c>Record-CurlExchange.ps1 -HoldOpenMilliseconds</c>, BL-480 Notes): curl 8.21.0 exited 8
+    /// within 60 ms, once a byte of the line after the refused header showed it whole, with
+    /// only the head lines before it.
+    /// </summary>
+    [TestMethod]
+    [DataRow("X-After: 1\r\n", DisplayName = "Whole line after it")]
+    [DataRow("X", DisplayName = "One byte after it")]
+    public async Task ExecuteAsync_PeerHoldsTheHeadOpenAfterTheRefusedHeader_FailsWithoutWaiting(string after)
+    {
+        string response = "HTTP/1.1 200 OK\r\nX-Before: 1\r\nContent-Length: x\r\n" + after;
+        foreach (int chunkSize in ChunkSizes)
+        {
+            RecordingTransferEvents events = new();
+            MemoryStream headers = new();
+            TransferContext context = RefusedHeaderContext(new MemoryStream(), headers, string.Empty, events);
+
+            TransferResult result = await Handler(QueueConnector.For(new StalledConnection(Encoding.Latin1.GetBytes(response), chunkSize)))
+                .ExecuteAsync(context).AsTask().WaitAsync(TimeSpan.FromSeconds(30));
+
+            Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode, $"Chunk size {chunkSize}");
+            Assert.AreEqual(InvalidContentLength, result.ErrorMessage, $"Chunk size {chunkSize}");
+            CollectionAssert.AreEqual(new[] { "< HTTP/1.1 200 OK\r\n", "< X-Before: 1\r\n" }, HeadEvents(events), $"Chunk size {chunkSize}");
+            Assert.AreEqual("HTTP/1.1 200 OK\r\nX-Before: 1\r\n", Latin1(headers.ToArray()), $"Chunk size {chunkSize}");
+        }
+    }
+
+    /// <summary>
+    /// Measured with <c>-s -v -m 3</c> the same way (BL-480 Notes): with nothing after the
+    /// refused header's line, or only a blank that could fold the next line into it, curl
+    /// 8.21.0 cannot tell the header is whole and waits, here until <c>-m</c> fails it with
+    /// <c>Operation timed out after 3010 milliseconds with 0 bytes received</c>.
+    /// </summary>
+    [TestMethod]
+    [DataRow("", DisplayName = "Nothing after it")]
+    [DataRow(" ", DisplayName = "A blank after it")]
+    public async Task ExecuteAsync_PeerHoldsTheHeadOpenRightAfterTheRefusedHeader_WaitsForMaxTime(string after)
+    {
+        string response = "HTTP/1.1 200 OK\r\nX-Before: 1\r\nContent-Length: x\r\n" + after;
+        foreach (int chunkSize in ChunkSizes)
+        {
+            FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
+            StalledConnection connection = new(Encoding.Latin1.GetBytes(response), chunkSize);
+            TransferContext context = new()
+            {
+                Url = CurlUrl.Parse("http://example.com/"),
+                Output = new MemoryStream(),
+                TimeProvider = time,
+                MaxTime = TimeSpan.FromSeconds(1),
+            };
+
+            Task<TransferResult> transfer = Handler(QueueConnector.For(connection)).ExecuteAsync(context).AsTask();
+            await connection.Stalled;
+            Assert.IsFalse(transfer.IsCompleted, $"Chunk size {chunkSize}: ended before -m passed.");
+            time.Advance(TimeSpan.FromSeconds(1));
+            TransferResult result = await transfer;
+
+            Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode, $"Chunk size {chunkSize}");
+            Assert.AreEqual("Operation timed out after 1000 milliseconds with 0 bytes received", result.ErrorMessage, $"Chunk size {chunkSize}");
         }
     }
 

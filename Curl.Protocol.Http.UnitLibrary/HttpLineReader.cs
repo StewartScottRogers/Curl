@@ -30,6 +30,20 @@ internal sealed class HttpLineReader(IConnection connection)
     internal bool HasReceived { get; private set; }
 
     /// <summary>
+    /// Gets what is asked, before each read from the connection, whether the lines end here
+    /// instead, as if the peer had closed; it is given the bytes of the unfinished line
+    /// received so far, possibly none. By default the lines never end early.
+    /// </summary>
+    internal StopBeforeRead EndsBeforeRead { get; init; } = static _ => false;
+
+    /// <summary>
+    /// Decides whether the lines end before the next read from the connection.
+    /// </summary>
+    /// <param name="unfinishedLine">The bytes of the unfinished line received so far.</param>
+    /// <returns><see langword="true" /> to end the lines as if the peer had closed.</returns>
+    internal delegate bool StopBeforeRead(ReadOnlySpan<byte> unfinishedLine);
+
+    /// <summary>
     /// Reads the next line, through its line feed.
     /// </summary>
     /// <param name="isStatusLine">
@@ -37,7 +51,10 @@ internal sealed class HttpLineReader(IConnection connection)
     /// <c>HTTP/</c>, before the line is whole, as curl does.
     /// </param>
     /// <param name="cancellationToken">Cancels every read.</param>
-    /// <returns>The line, or <see langword="null" /> when the peer closed first.</returns>
+    /// <returns>
+    /// The line, or <see langword="null" /> when the peer closed first or
+    /// <see cref="EndsBeforeRead" /> ended the lines.
+    /// </returns>
     /// <exception cref="HttpTransferException">
     /// The line reached <see cref="MaximumLineLength" /> (exit 100), a status line cannot
     /// begin <c>HTTP/</c> (exit 1), or a read failed (exit 56).
@@ -61,7 +78,7 @@ internal sealed class HttpLineReader(IConnection connection)
             }
 
             scanned = lineLength;
-            if (!await FillAsync(cancellationToken).ConfigureAwait(false))
+            if (EndsBeforeRead(buffer.AsSpan(start, lineLength)) || !await FillAsync(cancellationToken).ConfigureAwait(false))
             {
                 return null;
             }
