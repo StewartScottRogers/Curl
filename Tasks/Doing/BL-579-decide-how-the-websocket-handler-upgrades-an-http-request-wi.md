@@ -35,3 +35,4 @@ An ADR fixes how `Curl.Protocol.Ws.UnitLibrary` sends curl 8.21.0's upgrade requ
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
