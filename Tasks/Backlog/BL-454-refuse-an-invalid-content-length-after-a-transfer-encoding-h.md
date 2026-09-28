@@ -1,5 +1,5 @@
 ---
-id: BL-453
+id: BL-454
 title: Refuse an invalid Content-Length after a Transfer-Encoding header under --tr-encoding
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-453 — Refuse an invalid Content-Length after a Transfer-Encoding header under --tr-encoding
+# BL-454 — Refuse an invalid Content-Length after a Transfer-Encoding header under --tr-encoding
 
 ## Goal
 
