@@ -106,7 +106,7 @@ HTTP Digest stays where it already lives, `Curl.Authentication.UnitLibrary`'s
 
 - Namespace `Curl.Cryptography`, matching the project folder. The library references
   the BCL only, is AOT-compatible, and never opens a socket or a file: it takes and
-  returns bytes. Which libraries may reference it is BL-667's ADR.
+  returns bytes. Which libraries may reference it, and what it may reference, is ADR-0120.
 - One public type per primitive, named as its specification names it (the table's
   "public type" column). Where that name equals a `System.Security.Cryptography` type,
   the specification's own AEAD or scheme identifier prefixes it (`AeadAesCcm`,
