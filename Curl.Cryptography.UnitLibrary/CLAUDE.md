@@ -13,7 +13,14 @@ Namespace `Curl.Cryptography`. It holds:
 - `ConstantTime` (internal): the branch-free helpers (mask from bit, select, conditional
   swap, all-zero check) the primitives share.
 - `Field25519` (internal): GF(2^255 - 19) arithmetic on 16 limbs of 16 bits in a
-  caller's `Span<long>`; X25519 uses it and Ed25519 (BL-672) reuses it.
+  caller's `Span<long>`; X25519 uses it and Ed25519 reuses it.
+- `Edwards25519` (internal): edwards25519 points in extended coordinates - addition,
+  constant-time scalar multiplication, encoding, and RFC 8032 section 5.1.3 decoding.
+- `Scalar25519` (internal): scalars modulo the group order L - reduction of a SHA-512
+  output, `MultiplyAdd` for S, and the `IsBelowOrder` canonical-S check.
+- `Ed25519` (public): RFC 8032 section 5.1 signatures - `GeneratePrivateKey`,
+  `ComputePublicKey`, `Sign` and `Verify`, which is cofactorless and returns `false` for
+  S >= L or a public key that does not decode.
 - `X25519` (public): RFC 7748 key agreement - `GeneratePrivateKey`, `ComputePublicKey`,
   and `TryComputeSharedSecret`, which returns `false` for the all-zero result of a
   low-order peer key.
@@ -25,7 +32,7 @@ Namespace `Curl.Cryptography`. It holds:
 - `AeadChaCha20Poly1305` (public, `IDisposable`): AEAD_CHACHA20_POLY1305 - `Encrypt` and
   `TryDecrypt`, which returns `false` with the plaintext zeroed on a wrong tag.
 
-The remaining primitives land under their own tasks (BL-672, BL-674 to BL-677, BL-737
+The remaining primitives land under their own tasks (BL-674 to BL-677, BL-737
 to BL-745).
 
 ## Rules

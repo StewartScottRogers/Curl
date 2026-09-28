@@ -120,6 +120,56 @@ public sealed class Field25519Tests
     }
 
     [TestMethod]
+    public void Negate_One_IsThePrimeMinusOne()
+    {
+        Span<long> element = stackalloc long[Field25519.LimbCount];
+        byte[] result = new byte[Field25519.EncodedLength];
+        Field25519.SetSmall(element, 1);
+
+        Field25519.Negate(element, element);
+        Field25519.Encode(result, element);
+
+        Assert.AreEqual(PrimeMinusOneEncoding, Convert.ToHexStringLower(result));
+    }
+
+    [TestMethod]
+    public void PowerByPublicExponent_ThreeToTheFifth_Is243()
+    {
+        Span<long> element = stackalloc long[Field25519.LimbCount];
+        byte[] result = new byte[Field25519.EncodedLength];
+        Field25519.SetSmall(element, 3);
+
+        Field25519.PowerByPublicExponent(element, element, [5, 0]);
+        Field25519.Encode(result, element);
+
+        Assert.AreEqual("f3" + new string('0', 62), Convert.ToHexStringLower(result));
+    }
+
+    [TestMethod]
+    [DataRow(PrimeEncoding, "0000000000000000000000000000000000000000000000000000000000000000", true)]
+    [DataRow("0100000000000000000000000000000000000000000000000000000000000000", "0200000000000000000000000000000000000000000000000000000000000000", false)]
+    public void AreEqual_ComparesCanonicalValues(string left, string right, bool expected)
+    {
+        Span<long> leftElement = stackalloc long[Field25519.LimbCount];
+        Span<long> rightElement = stackalloc long[Field25519.LimbCount];
+        Field25519.Decode(leftElement, Convert.FromHexString(left));
+        Field25519.Decode(rightElement, Convert.FromHexString(right));
+
+        Assert.AreEqual(expected, Field25519.AreEqual(leftElement, rightElement));
+    }
+
+    [TestMethod]
+    [DataRow(PrimeMinusOneEncoding, 0u)]
+    [DataRow("f0ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f", 1u)]
+    public void Parity_IsTheLowestBitOfTheCanonicalValue(string encoded, uint expected)
+    {
+        Span<long> element = stackalloc long[Field25519.LimbCount];
+        Field25519.Decode(element, Convert.FromHexString(encoded));
+
+        Assert.AreEqual(expected, Field25519.Parity(element));
+    }
+
+    [TestMethod]
     public void Clear_ZeroesEveryLimb()
     {
         Span<long> element = stackalloc long[Field25519.LimbCount];

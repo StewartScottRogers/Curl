@@ -173,6 +173,84 @@ internal static class Field25519
         }
     }
 
+    /// <summary>Sets <paramref name="result" /> to -<paramref name="value" />.</summary>
+    public static void Negate(Span<long> result, ReadOnlySpan<long> value)
+    {
+        for (int index = 0; index < LimbCount; index++)
+        {
+            result[index] = -value[index];
+        }
+    }
+
+    /// <summary>
+    /// Sets <paramref name="result" /> to <paramref name="value" /> raised to
+    /// <paramref name="exponent" />, a little-endian integer, by square-and-multiply from
+    /// its top bit. The chain branches on the exponent's bits, so the exponent must be a
+    /// public constant (the square-root exponents of RFC 8032 section 5.1.3), never a
+    /// secret; the value may be anything.
+    /// </summary>
+    public static void PowerByPublicExponent(Span<long> result, ReadOnlySpan<long> value, ReadOnlySpan<byte> exponent)
+    {
+        Span<long> power = stackalloc long[LimbCount];
+        try
+        {
+            SetSmall(power, 1);
+            for (int bit = (8 * exponent.Length) - 1; bit >= 0; bit--)
+            {
+                Square(power, power);
+                if (((exponent[bit >> 3] >> (bit & 7)) & 1) != 0)
+                {
+                    Multiply(power, power, value);
+                }
+            }
+
+            power.CopyTo(result);
+        }
+        finally
+        {
+            Clear(power);
+        }
+    }
+
+    /// <summary>
+    /// Returns whether <paramref name="left" /> and <paramref name="right" /> are the same
+    /// field element, comparing their canonical encodings in fixed time.
+    /// </summary>
+    public static bool AreEqual(ReadOnlySpan<long> left, ReadOnlySpan<long> right)
+    {
+        Span<byte> leftEncoding = stackalloc byte[EncodedLength];
+        Span<byte> rightEncoding = stackalloc byte[EncodedLength];
+        try
+        {
+            Encode(leftEncoding, left);
+            Encode(rightEncoding, right);
+            return CryptographicOperations.FixedTimeEquals(leftEncoding, rightEncoding);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(leftEncoding);
+            CryptographicOperations.ZeroMemory(rightEncoding);
+        }
+    }
+
+    /// <summary>
+    /// Returns the lowest bit of the canonical value of <paramref name="element" />
+    /// (RFC 8032's "x mod 2", the sign of an x-coordinate), without a branch.
+    /// </summary>
+    public static uint Parity(ReadOnlySpan<long> element)
+    {
+        Span<byte> encoding = stackalloc byte[EncodedLength];
+        try
+        {
+            Encode(encoding, element);
+            return encoding[0] & 1u;
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(encoding);
+        }
+    }
+
     /// <summary>
     /// Swaps <paramref name="left" /> and <paramref name="right" /> when the lowest bit of
     /// <paramref name="bit" /> is <c>1</c>, by masking, touching every limb either way.
