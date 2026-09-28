@@ -33,3 +33,4 @@ Every comment in `Curl.Console` that cites the `-w` line-feed decision names ADR
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
