@@ -1,5 +1,5 @@
 ---
-id: BL-474
+id: BL-475
 title: Stop reading the head at a refused header: report and store nothing after it
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-474 — Stop reading the head at a refused header: report and store nothing after it
+# BL-475 — Stop reading the head at a refused header: report and store nothing after it
 
 ## Goal
 

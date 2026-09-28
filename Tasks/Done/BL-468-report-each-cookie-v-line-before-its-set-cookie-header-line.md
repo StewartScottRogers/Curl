@@ -40,7 +40,7 @@ With cookies on, `HttpProtocolHandler` reports each `Added cookie ...` (and drop
   - `ICookieStore.StoreFromResponse` now takes one header and a running count and returns the new count, so the store keeps curl's 50-cookies-per-response limit across per-header calls and stays stateless under `--parallel`. `CookieStore` keeps the list overload for its own tests as successive single-header calls. Removing expired cookies after each header matches the `Max-Age=0` measurement above.
   - `touches` widened to `Curl.Protocol.Abstractions.UnitLibrary`, `Curl.Cookies.UnitLibrary`, `Curl.Cookies.UnitTests` and `Curl.Console` for that contract change; no task in `Doing` named any of them (BL-466: Ftp + Decisions; BL-472: Console.UnitTests).
   - ADR-0014 still shows the original `StoreFromResponse(Uri, ...)` sketch; it is a historical record and in BL-466's `touches`, so left alone.
-- Follow-up filed: BL-474 (a refused header's later headers are still reported, and now their cookies stored).
+- Follow-up filed: BL-475 (a refused header's later headers are still reported, and now their cookies stored).
 - Verified: `dotnet build -warnaserror` clean; fast tests all green (Http 1121, Cookies 302, Console 931); `Measure-CodeQuality.ps1`: Http, Cookies, Abstractions 100/100 with no failing member. Console's two failing members (`DiskWriteOutFileOpener.TryOpen`, `DumpHeaderOutputStream.WriteAsync`) predate this task and are BL-432, BL-455, BL-462.
 
 ## Log
