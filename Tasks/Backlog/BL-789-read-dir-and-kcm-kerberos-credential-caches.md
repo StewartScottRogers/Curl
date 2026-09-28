@@ -1,5 +1,5 @@
 ---
-id: BL-787
+id: BL-789
 title: Read DIR and KCM Kerberos credential caches
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-787 — Read DIR and KCM Kerberos credential caches
+# BL-789 — Read DIR and KCM Kerberos credential caches
 
 ## Goal
 

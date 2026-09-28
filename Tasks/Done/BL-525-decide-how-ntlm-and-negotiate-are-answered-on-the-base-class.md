@@ -37,7 +37,7 @@ An ADR decides how Curl produces NTLM, Negotiate (SPNEGO), Kerberos and GSS-API 
 - Measured: `--negotiate -u :` with no ticket sends one request and exits 0 on both platforms. The Linux `NegotiateAuthentication` probe answered `Unsupported` for explicit credentials and `UnknownCredentials` for default ones (libgssapi present, no ticket, no gss-ntlmssp). No Linux machine without libgssapi was available, so its `Unsupported` there is from the runtime's documented fallback, not measured.
 - Found: `--krb` prints `Warning: --krb is deprecated and has no function anymore` in both curl 8.21.0 and 8.18.0. ADR-0142 puts it in ADR-0137's no-function class. I moved BL-693 (FTP `AUTH GSSAPI`) to Deferred for that reason. BL-630 will find the same warning when it measures.
 - Seam: `ISecurityContextFactory` / `ISecurityContext` in `Curl.Protocol.Abstractions.UnitLibrary`, placed there because protocol libraries may not reference `Curl.Authentication` (ADR-0120). BL-527 adds it. The library split is confirmed, and BL-667's ADR-0120 needs no amendment.
-- Filed BL-787 (`DIR:` and `KCM:` caches for the hand-built route). These are board operations under `Tasks/`, outside `touches`, done with the board script.
+- Filed BL-789 (`DIR:` and `KCM:` caches for the hand-built route). These are board operations under `Tasks/`, outside `touches`, done with the board script.
 
 ## Log
 

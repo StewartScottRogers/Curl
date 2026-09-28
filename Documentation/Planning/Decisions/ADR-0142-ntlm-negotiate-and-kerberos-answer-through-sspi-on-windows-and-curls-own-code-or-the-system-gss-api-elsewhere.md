@@ -96,7 +96,7 @@ legacy Microsoft OID, as MIT's library offers without `gss-ntlmssp`). `--service
 
 On the hand-built Kerberos route (only when no system library answers), the credential
 cache is found as MIT does: `KRB5CCNAME`, else `FILE:/tmp/krb5cc_<uid>`. It reads `FILE:`
-(BL-688), `DIR:` and `KCM:` (BL-787, filed by this task). `KEYRING:` is written only by
+(BL-688), `DIR:` and `KCM:` (BL-789, filed by this task). `KEYRING:` is written only by
 MIT's library and `API:` only by macOS's GSS framework, and where either exists G
 answers, so the hand-built route never meets them.
 
