@@ -33,3 +33,4 @@ A connection `TcpConnector` returns for a `ConnectTarget` with `UseTls` reports 
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
