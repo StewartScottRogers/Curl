@@ -22,6 +22,7 @@ completed:
 - `Curl.Console/TransferContextFactory.cs` maps `CommandLineOptions` to `TransferContext` (see `FtpDisableEpsv`); `Curl.Console/CurlComposition.cs` builds `new FtpProtocolHandler(connector)` and wraps it in `RoutingFtpProtocolHandler`, which serves only `ftp` today.
 - `ftps` through an HTTP proxy: check how curl 8.21.0 treats it before routing it (ADR-0056, rule 3) and record the answer under Notes.
 - `-V` lists protocols per ADR-0021; add `ftps` only as the platform's curl lists it.
+- BL-466 (ADR-0108) added `FtpProtocolHandler(IConnector, IConnectionListener, ITlsProvider, IDnsResolver)`: build the handler with that constructor and the composition's `IDnsResolver` (the one `TcpConnector` gets), so a `-P` host name resolves.
 
 ## Acceptance criteria
 
