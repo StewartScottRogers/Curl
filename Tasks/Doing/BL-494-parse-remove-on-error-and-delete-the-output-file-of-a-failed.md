@@ -36,3 +36,4 @@ With `--remove-on-error`, a transfer that fails removes the `-o`/`-O` file it wr
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
