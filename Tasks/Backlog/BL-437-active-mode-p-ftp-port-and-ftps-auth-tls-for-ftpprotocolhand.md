@@ -4,7 +4,7 @@ title: Active mode (-P/--ftp-port) and ftps:// / AUTH TLS for FtpProtocolHandler
 priority: Low
 assignee: Claude
 pipeline: protocol
-depends-on: [BL-431, BL-455]
+depends-on: [BL-431, BL-459]
 touches: [Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests, Record-CurlExchange.ps1, Documentation/Planning/Decisions]
 requirement: none
 created: 2026-09-27
@@ -34,13 +34,13 @@ completed:
 
 ## Notes
 
-- 2026-09-27 (lane 2): ADR-0101 records the scope (`-P` with `-` or an address literal and
+- 2026-09-27 (lane 2): ADR-0102 records the scope (`-P` with `-` or an address literal and
   an optional port range, `EPRT` then `PORT`, `--disable-eprt`; `ftps://`; `--ssl`,
   `--ssl-reqd`, `--ftp-ssl-control` with `PBSZ`/`PROT`) and the contract additions:
   `IConnectionListener`, `IConnection.LocalEndPoint` as a default interface member, and
-  four `ITransferContext` options. Filed: BL-455 (abstractions, prerequisite, added to
+  four `ITransferContext` options. Filed: BL-459 (abstractions, prerequisite, added to
   `depends-on`), BL-456 (networking listener), BL-457 (CLI parsing), BL-458 (console
-  wiring, depends on this task). Only BL-455 blocks the handler work: the handler gains a
+  wiring, depends on this task). Only BL-459 blocks the handler work: the handler gains a
   constructor taking `IConnector`, `IConnectionListener` and `ITlsProvider`, and its tests
   use fakes, so BL-456/457 run in parallel and BL-458 follows. Waiting on work, not on
   Stewart, so the task goes to Backlog rather than Blocked (dark factory rule 4).
@@ -52,4 +52,4 @@ completed:
 
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
-- 2026-09-27: Doing -> Backlog. Waits on BL-455 (IConnectionListener and the FTP active-mode/TLS transfer options in Curl.Protocol.Abstractions), per ADR-0101
+- 2026-09-27: Doing -> Backlog. Waits on BL-459 (IConnectionListener and the FTP active-mode/TLS transfer options in Curl.Protocol.Abstractions), per ADR-0102

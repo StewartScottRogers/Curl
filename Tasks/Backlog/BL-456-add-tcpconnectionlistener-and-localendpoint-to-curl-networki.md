@@ -4,7 +4,7 @@ title: Add TcpConnectionListener and LocalEndPoint to Curl.Networking for FTP ac
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-455]
+depends-on: [BL-459]
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-09-27
@@ -14,11 +14,11 @@ completed:
 
 ## Goal
 
-`Curl.Networking` has `TcpConnectionListener`, the production `IConnectionListener` of ADR-0101, and its TCP connections report `LocalEndPoint`, so an FTP transfer in active mode can listen on a port and accept the server's data connection.
+`Curl.Networking` has `TcpConnectionListener`, the production `IConnectionListener` of ADR-0102, and its TCP connections report `LocalEndPoint`, so an FTP transfer in active mode can listen on a port and accept the server's data connection.
 
 ## Context
 
-- ADR-0101, "Contract additions", item 2. The contract comes from BL-455.
+- ADR-0102, "Contract additions", item 2. The contract comes from BL-459.
 - `TcpConnector` in `Curl.Networking.UnitLibrary` shows how a socket becomes an `IConnection` and how failures become `ConnectResult.Failed` with curl's exit code and message.
 - The listener binds the `ListenTarget` address, trying each port of its range in turn; a range with no free port fails. Take curl 8.21.0's exit code and message for a failed bind (`CURLE_FTP_PORT_FAILED`, 30) from a measurement with `Record-CurlExchange.ps1 -Ftp`, or from `lib/ftp.c` if the case cannot be provoked, and say which under Notes.
 - Tests that open a loopback socket are fine as long as they stay fast and platform-neutral; mark any that cannot `TestCategory=Integration`.
@@ -33,7 +33,7 @@ completed:
 
 ## Notes
 
-Filed by BL-437 under ADR-0101. BL-458 depends on this task.
+Filed by BL-437 under ADR-0102. BL-458 depends on this task.
 
 ## Log
 

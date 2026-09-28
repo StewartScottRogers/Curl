@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-- ADR-0101, "Contract additions", item 4. The handler work is BL-437, the listener BL-456, the options BL-457.
+- ADR-0102, "Contract additions", item 4. The handler work is BL-437, the listener BL-456, the options BL-457.
 - `Curl.Console/TransferContextFactory.cs` maps `CommandLineOptions` to `TransferContext` (see `FtpDisableEpsv`); `Curl.Console/CurlComposition.cs` builds `new FtpProtocolHandler(connector)` and wraps it in `RoutingFtpProtocolHandler`, which serves only `ftp` today.
 - `ftps` through an HTTP proxy: check how curl 8.21.0 treats it before routing it (ADR-0056, rule 3) and record the answer under Notes.
 - `-V` lists protocols per ADR-0021; add `ftps` only as the platform's curl lists it.
@@ -32,7 +32,7 @@ completed:
 
 ## Notes
 
-Filed by BL-437 under ADR-0101.
+Filed by BL-437 under ADR-0102.
 
 ## Log
 
