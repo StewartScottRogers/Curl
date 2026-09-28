@@ -1,5 +1,5 @@
 ---
-id: BL-478
+id: BL-479
 title: Fail with the refused header's error when the head fails after it
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-478 — Fail with the refused header's error when the head fails after it
+# BL-479 — Fail with the refused header's error when the head fails after it
 
 ## Goal
 
