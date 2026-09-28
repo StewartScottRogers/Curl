@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation/Planning/Decisions]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-28
 ---
 # BL-762 — Decide the live task board page's data sources and the board branch's status.json format
 
@@ -74,16 +74,21 @@ An ADR records how the live task board page (BL-757, BL-761) gets its data, and 
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Planning/Decisions/ADR-<next free number>-<slug>.md` exists; the number was checked as unused at the time of writing, because lanes add ADRs concurrently. Its Status is Accepted and it is marked "Decided by Claude under Stewart's delegation", noting that Stewart chose the overall design (options 1 and 2) on 2026-09-28.
-- [ ] Its Context holds the 2026-09-28 API measurements above.
-- [ ] Its Decision states items 1 to 9, with the `status.json` schema reproduced exactly as a JSON example and a field table.
-- [ ] It lists the rejected alternatives for titles and for heartbeat pushing (each lane force-pushing its own file would overwrite the others' single-commit branch).
-- [ ] Its Consequences name BL-756, BL-757, BL-758, BL-759, BL-760 and BL-761.
-- [ ] `Documentation/Planning/Decisions/README.md` indexes the new ADR.
+- [x] `Documentation/Planning/Decisions/ADR-<next free number>-<slug>.md` exists; the number was checked as unused at the time of writing, because lanes add ADRs concurrently. Its Status is Accepted and it is marked "Decided by Claude under Stewart's delegation", noting that Stewart chose the overall design (options 1 and 2) on 2026-09-28.
+- [x] Its Context holds the 2026-09-28 API measurements above.
+- [x] Its Decision states items 1 to 9, with the `status.json` schema reproduced exactly as a JSON example and a field table.
+- [x] It lists the rejected alternatives for titles and for heartbeat pushing (each lane force-pushing its own file would overwrite the others' single-commit branch).
+- [x] Its Consequences name BL-756, BL-757, BL-758, BL-759, BL-760 and BL-761.
+- [x] `Documentation/Planning/Decisions/README.md` indexes the new ADR.
 
 ## Notes
+
+- Written as ADR-0129. 0127 and 0128 were the highest numbers in this checkout and in lanes 1 and 2 at writing time (fetch is denied to lanes, so origin could not be checked).
+- Written directly rather than through align-and-document: the task is one ADR whose content the task file already fixes; no `.cs` or project file changed, so verify is not required by the docs pipeline.
+- Detail added, with its reason in the ADR: fields may be added without a schema bump; renaming, removing or changing a field takes schema 2. Also listed a heartbeat commit on `work/dark-factory` as a rejected alternative.
 
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Doing.
+- 2026-09-28: Doing -> Done. ADR-0129 fixes the live board page's data sources and the board branch status.json schema 1
