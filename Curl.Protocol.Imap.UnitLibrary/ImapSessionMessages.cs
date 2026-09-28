@@ -58,6 +58,12 @@ internal static class ImapSessionMessages
     /// </summary>
     internal const string RemoteFileNotFound = "Remote file not found";
 
+    /// <summary>
+    /// A <c>LIST</c>, a <c>SEARCH</c> or the <c>-X</c> command completed other than <c>OK</c>
+    /// (exit 21); curl prints its error text.
+    /// </summary>
+    internal const string QuoteCommandFailed = "Quote command returned error";
+
     /// <summary>The untagged <c>FETCH</c> response announced no literal <c>{n}</c> (exit 8).</summary>
     internal const string FetchResponseUnparsed = "Failed to parse FETCH response.";
 

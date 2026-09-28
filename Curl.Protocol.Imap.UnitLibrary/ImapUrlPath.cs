@@ -132,8 +132,11 @@ internal sealed record ImapUrlPath(
     /// Percent-decodes <paramref name="text" /> as curl does, keeping a <c>%</c> not followed
     /// by two hexadecimal digits; each decoded byte becomes one Latin-1 character, so the
     /// bytes go back on the wire as they came. <see langword="null" /> when a byte is below 0x20.
+    /// The URL's query and the <c>-X</c> command are decoded the same way (BL-556).
     /// </summary>
-    private static string? Decode(string text)
+    /// <param name="text">The text as typed.</param>
+    /// <returns>The decoded text, or <see langword="null" /> when it holds a control byte.</returns>
+    internal static string? Decode(string text)
     {
         var decoded = new StringBuilder(text.Length);
         for (int index = 0; index < text.Length; index++)

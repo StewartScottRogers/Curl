@@ -167,26 +167,27 @@ internal sealed class ImapControlChannel(IConnection connection, CancellationTok
     /// </summary>
     /// <param name="isWanted">Whether an untagged line, starting <c>* </c>, is the one waited for.</param>
     /// <returns>
-    /// The untagged line without its LF, or <see langword="null" /> when the response
-    /// completed first, however it completed.
+    /// An <see cref="ImapResponseStatus.Untagged" /> response whose one entry is the untagged
+    /// line without its LF, or, when the response completed first, its completion with no
+    /// untagged entries.
     /// </returns>
     /// <exception cref="ImapResponseMissingException">The server closed the connection first.</exception>
     /// <exception cref="InvalidDataException">A line reached 65536 bytes (exit 100).</exception>
     /// <exception cref="ImapWeirdResponseException">
     /// A line held a NUL byte, or was a continuation (exit 8).
     /// </exception>
-    public async ValueTask<string?> ReadUntaggedAsync(Func<string, bool> isWanted)
+    public async ValueTask<ImapResponse> ReadUntaggedAsync(Func<string, bool> isWanted)
     {
         while (await ReadLineAsync(0).ConfigureAwait(false) is { } line)
         {
             if (line.StartsWith(Tag + " ", StringComparison.Ordinal))
             {
-                return null;
+                return new ImapResponse(StatusOf(line.AsSpan(Tag.Length + 1)), []);
             }
 
             if (line.StartsWith("* ", StringComparison.Ordinal) && isWanted(line))
             {
-                return line;
+                return new ImapResponse(ImapResponseStatus.Untagged, [line]);
             }
 
             if (IsContinuation(line))

@@ -11,8 +11,8 @@ namespace Curl.Protocol.Imap;
 /// <c>imaps://</c>, the command tags, <c>LOGOUT</c>, and the exit code and message of every
 /// failure. Every case was recorded from real curl (the Schannel build) on 2026-09-28 with
 /// <c>Record-CurlExchange.ps1 -Imap</c>, curl running <c>-sS imap://127.0.0.1:18143/</c>
-/// (BL-553 Notes). Real curl sends <c>LIST "" *</c> between the session opening and
-/// <c>LOGOUT</c>; listing is BL-556's, so here <c>LOGOUT</c> takes the tag <c>LIST</c> had.
+/// (BL-553 Notes). Between the session opening and <c>LOGOUT</c> curl sends <c>LIST "" *</c>,
+/// answered here with a bare <c>OK</c> (BL-556).
 /// </summary>
 [TestClass]
 public sealed class ImapProtocolHandlerSessionTests
@@ -31,9 +31,9 @@ public sealed class ImapProtocolHandlerSessionTests
     [TestMethod]
     public async Task ExecuteAsync_DefaultSession_SendsCapabilityThenLogout()
     {
-        ImapRun run = await RunAsync(Url, Greeting + CapabilityReply("A001") + LogoutReply("A002"));
+        ImapRun run = await RunAsync(Url, Greeting + CapabilityReply("A001") + ListReply("A002") + LogoutReply("A003"));
 
-        Assert.AreEqual(Capability + "A002 LOGOUT\r\n", run.Sent);
+        Assert.AreEqual(Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
         Assert.AreEqual(new ConnectTarget("127.0.0.1", 18143, false), run.Connector.Targets.Single());
         Assert.IsTrue(run.Connection.IsDisposed);
@@ -42,7 +42,7 @@ public sealed class ImapProtocolHandlerSessionTests
     [TestMethod]
     public async Task ExecuteAsync_UrlWithoutPort_ConnectsToPort143()
     {
-        ImapRun run = await RunAsync("imap://127.0.0.1/", Greeting + CapabilityReply("A001") + LogoutReply("A002"));
+        ImapRun run = await RunAsync("imap://127.0.0.1/", Greeting + CapabilityReply("A001") + ListReply("A002") + LogoutReply("A003"));
 
         Assert.AreEqual(new ConnectTarget("127.0.0.1", 143, false), run.Connector.Targets.Single());
     }
@@ -52,7 +52,7 @@ public sealed class ImapProtocolHandlerSessionTests
     {
         var proxy = new ProxyEndpoint(ProxyKind.Socks5, "proxy", 1080, null);
         var events = new RecordingTransferEvents();
-        var connection = new ScriptedConnection(Latin1(Greeting + CapabilityReply("A001") + LogoutReply("A002")));
+        var connection = new ScriptedConnection(Latin1(Greeting + CapabilityReply("A001") + ListReply("A002") + LogoutReply("A003")));
         var context = new TransferContext { Url = CurlUrl.Parse(Url), Output = Stream.Null, Proxy = proxy, Events = events };
 
         ImapRun run = await ImapRun.ExecuteAsync(context, connection);
@@ -67,9 +67,9 @@ public sealed class ImapProtocolHandlerSessionTests
     {
         // curl -k --ssl-reqd imaps://127.0.0.1:18143/ (recorder -Tls): CAPABILITY, LIST,
         // LOGOUT; a connection already TLS satisfies --ssl-reqd. Here without the port.
-        ImapRun run = await RunAsync("imaps://127.0.0.1/", Greeting + CapabilityReply("A001") + LogoutReply("A002"), Required);
+        ImapRun run = await RunAsync("imaps://127.0.0.1/", Greeting + CapabilityReply("A001") + ListReply("A002") + LogoutReply("A003"), Required);
 
-        Assert.AreEqual(Capability + "A002 LOGOUT\r\n", run.Sent);
+        Assert.AreEqual(Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(new ConnectTarget("127.0.0.1", 993, true), run.Connector.Targets.Single());
         Assert.IsEmpty(run.Tls.Handshakes);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
@@ -109,9 +109,9 @@ public sealed class ImapProtocolHandlerSessionTests
     {
         // GREETING=* PREAUTH ready: CAPABILITY, LIST, LOGOUT, exit 0; with --ssl too, where
         // STARTTLS is advertised but PREAUTH rules it out.
-        ImapRun run = await RunAsync(Url, "* PREAUTH ready\r\n" + CapabilityReply("A001") + LogoutReply("A002"), sslLevel);
+        ImapRun run = await RunAsync(Url, "* PREAUTH ready\r\n" + CapabilityReply("A001") + ListReply("A002") + LogoutReply("A003"), sslLevel);
 
-        Assert.AreEqual(Capability + "A002 LOGOUT\r\n", run.Sent);
+        Assert.AreEqual(Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
@@ -132,9 +132,9 @@ public sealed class ImapProtocolHandlerSessionTests
     [DataRow("* BYE going\r\nA001 OK done\r\n", DisplayName = "an untagged BYE")]
     public async Task ExecuteAsync_CapabilityAnsweredAnyway_CarriesOn(string capabilityReply)
     {
-        ImapRun run = await RunAsync(Url, Greeting + capabilityReply + LogoutReply("A002"));
+        ImapRun run = await RunAsync(Url, Greeting + capabilityReply + ListReply("A002") + LogoutReply("A003"));
 
-        Assert.AreEqual(Capability + "A002 LOGOUT\r\n", run.Sent);
+        Assert.AreEqual(Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
@@ -144,10 +144,10 @@ public sealed class ImapProtocolHandlerSessionTests
         // --ssl, STARTTLS=NO refused: no second CAPABILITY, LIST and LOGOUT in plaintext, exit 0.
         ImapRun run = await RunAsync(
             Url,
-            new ScriptedConnection(Latin1(Greeting + CapabilityReply("A001")), Latin1("A002 NO refused\r\n"), Latin1(LogoutReply("A003"))),
+            new ScriptedConnection(Latin1(Greeting + CapabilityReply("A001")), Latin1("A002 NO refused\r\n"), Latin1(ListReply("A003") + LogoutReply("A004"))),
             Try);
 
-        Assert.AreEqual(Capability + "A002 STARTTLS\r\nA003 LOGOUT\r\n", run.Sent);
+        Assert.AreEqual(Capability + "A002 STARTTLS\r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n", run.Sent);
         Assert.IsEmpty(run.Tls.Handshakes);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
@@ -182,9 +182,9 @@ public sealed class ImapProtocolHandlerSessionTests
     [TestMethod]
     public async Task ExecuteAsync_StartTlsNotAdvertisedUnderSsl_CarriesOnInPlaintext()
     {
-        ImapRun run = await RunAsync(Url, Greeting + "* CAPABILITY IMAP4rev1\r\nA001 OK done\r\n" + LogoutReply("A002"), Try);
+        ImapRun run = await RunAsync(Url, Greeting + "* CAPABILITY IMAP4rev1\r\nA001 OK done\r\n" + ListReply("A002") + LogoutReply("A003"), Try);
 
-        Assert.AreEqual(Capability + "A002 LOGOUT\r\n", run.Sent);
+        Assert.AreEqual(Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
@@ -193,7 +193,7 @@ public sealed class ImapProtocolHandlerSessionTests
     {
         // curl -k --ssl-reqd: STARTTLS, OK, the handshake, A003 CAPABILITY over TLS, then LIST
         // and LOGOUT; the tags carry on across the upgrade.
-        var secured = new ScriptedConnection(Latin1("* CAPABILITY IMAP4rev1 AUTH=PLAIN AUTH=LOGIN\r\nA003 OK CAPABILITY completed\r\n" + LogoutReply("A004")));
+        var secured = new ScriptedConnection(Latin1("* CAPABILITY IMAP4rev1 AUTH=PLAIN AUTH=LOGIN\r\nA003 OK CAPABILITY completed\r\n" + ListReply("A004") + LogoutReply("A005")));
         ImapRun run = await RunAsync(
             Url,
             new ScriptedConnection(Latin1(Greeting + CapabilityReply("A001") + "A002 OK Begin TLS negotiation now\r\n")),
@@ -201,7 +201,7 @@ public sealed class ImapProtocolHandlerSessionTests
             ConnectResult.Connected(secured));
 
         Assert.AreEqual(Capability + "A002 STARTTLS\r\n", run.Sent);
-        Assert.AreEqual("A003 CAPABILITY\r\nA004 LOGOUT\r\n", Encoding.Latin1.GetString(secured.Sent));
+        Assert.AreEqual("A003 CAPABILITY\r\nA004 LIST \"\" *\r\nA005 LOGOUT\r\n", Encoding.Latin1.GetString(secured.Sent));
         Assert.AreSame(run.Connection, run.Tls.Handshakes.Single().Plaintext);
         Assert.AreEqual("127.0.0.1", run.Tls.Handshakes.Single().TargetHost);
         Assert.IsTrue(secured.IsDisposed);
@@ -246,7 +246,7 @@ public sealed class ImapProtocolHandlerSessionTests
         // CAPABILITY=* CAPABILITY IMAP4rev1 {8}\r\nSTARTTLS\r\nOK done, --ssl-reqd: curl sent
         // STARTTLS. Here in three-byte reads, so the literal and every line are split.
         byte[] replies = Latin1(Greeting + "* CAPABILITY IMAP4rev1 {8}\r\nSTARTTLS\r\nA001 OK done\r\n" + "A002 OK go\r\n");
-        var secured = new ScriptedConnection(Latin1(CapabilityReply("A003") + LogoutReply("A004")));
+        var secured = new ScriptedConnection(Latin1(CapabilityReply("A003") + ListReply("A004") + LogoutReply("A005")));
 
         ImapRun run = await RunAsync(Url, new ScriptedConnection([.. replies.Chunk(3)]), Required, ConnectResult.Connected(secured));
 
@@ -261,7 +261,7 @@ public sealed class ImapProtocolHandlerSessionTests
         // CAPABILITY nor is refused, and the second literal after the first carries STARTTLS.
         const string Reply = "* CAPABILITY {14}\r\nA001 NO fake\r\n {1}\r\nx STARTTLS {0}\r\n\r\nA001 OK done\r\n";
         byte[] replies = Latin1(Greeting + Reply + "A002 OK go\r\n");
-        var secured = new ScriptedConnection(Latin1(CapabilityReply("A003") + LogoutReply("A004")));
+        var secured = new ScriptedConnection(Latin1(CapabilityReply("A003") + ListReply("A004") + LogoutReply("A005")));
 
         ImapRun run = await RunAsync(Url, new ScriptedConnection([.. replies.Chunk(5)]), Required, ConnectResult.Connected(secured));
 
@@ -297,14 +297,14 @@ public sealed class ImapProtocolHandlerSessionTests
     public async Task ExecuteAsync_StartTlsAnsweredWithAnUntaggedLine_StillUpgrades()
     {
         // STARTTLS=* 1 X\r\nOK go: measured under --ssl and --ssl-reqd, the handshake follows.
-        var secured = new ScriptedConnection(Latin1(CapabilityReply("A003") + LogoutReply("A004")));
+        var secured = new ScriptedConnection(Latin1(CapabilityReply("A003") + ListReply("A004") + LogoutReply("A005")));
         ImapRun run = await RunAsync(
             Url,
             new ScriptedConnection(Latin1(Greeting + CapabilityReply("A001")), Latin1("* 1 X\r\nA002 OK go\r\n")),
             Try,
             ConnectResult.Connected(secured));
 
-        Assert.AreEqual("A003 CAPABILITY\r\nA004 LOGOUT\r\n", Encoding.Latin1.GetString(secured.Sent));
+        Assert.AreEqual("A003 CAPABILITY\r\nA004 LIST \"\" *\r\nA005 LOGOUT\r\n", Encoding.Latin1.GetString(secured.Sent));
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
@@ -339,23 +339,23 @@ public sealed class ImapProtocolHandlerSessionTests
     }
 
     [TestMethod]
-    [DataRow("* BYE Logging out\r\nA002 OK LOGOUT completed\r\n", DisplayName = "the recorder's answer")]
+    [DataRow("* BYE Logging out\r\nA003 OK LOGOUT completed\r\n", DisplayName = "the recorder's answer")]
     [DataRow("", DisplayName = "LOGOUT=CLOSE")]
     [DataRow("+ go on\r\n", DisplayName = "a continuation")]
-    [DataRow("A002 NO", DisplayName = "an unfinished line")]
+    [DataRow("A003 NO", DisplayName = "an unfinished line")]
     public async Task ExecuteAsync_LogoutAnsweredAnyway_StillSucceeds(string logoutReply)
     {
         // LOGOUT=CLOSE measured: exit 0.
-        ImapRun run = await RunAsync(Url, Greeting + CapabilityReply("A001") + logoutReply);
+        ImapRun run = await RunAsync(Url, Greeting + CapabilityReply("A001") + ListReply("A002") + logoutReply);
 
-        Assert.AreEqual(Capability + "A002 LOGOUT\r\n", run.Sent);
+        Assert.AreEqual(Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_LogoutAnsweredWithAnOverlongLine_StillSucceeds()
     {
-        ImapRun run = await RunAsync(Url, Greeting + CapabilityReply("A001") + "* BYE " + new string('x', 70000) + "\r\n");
+        ImapRun run = await RunAsync(Url, Greeting + CapabilityReply("A001") + ListReply("A002") + "* BYE " + new string('x', 70000) + "\r\n");
 
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
@@ -413,6 +413,8 @@ public sealed class ImapProtocolHandlerSessionTests
     private static string CapabilityReply(string tag) =>
         "* CAPABILITY IMAP4rev1 STARTTLS AUTH=PLAIN AUTH=LOGIN\r\n" + tag + " OK CAPABILITY completed\r\n";
 
+    private static string ListReply(string tag) => tag + " OK LIST completed\r\n";
+
     private static string LogoutReply(string tag) => "* BYE Logging out\r\n" + tag + " OK LOGOUT completed\r\n";
 
     private static byte[] Latin1(string text) => Encoding.Latin1.GetBytes(text);
@@ -427,7 +429,7 @@ public sealed class ImapProtocolHandlerSessionTests
             Url,
             new ScriptedConnection(Latin1(Greeting + capabilityReply), Latin1("A002 OK go\r\n")),
             Required,
-            ConnectResult.Connected(new ScriptedConnection(Latin1(CapabilityReply("A003") + LogoutReply("A004")))));
+            ConnectResult.Connected(new ScriptedConnection(Latin1(CapabilityReply("A003") + ListReply("A004") + LogoutReply("A005")))));
 
     private static Task<ImapRun> RunAsync(string url, string replies, Transport sslLevel = Transport.None) =>
         ImapRun.ExecuteAsync(url, new ScriptedConnection(Latin1(replies)), sslLevel);

@@ -20,4 +20,10 @@ internal enum ImapResponseStatus
     /// for one (<see cref="ImapControlChannel.ReadResponseAsync" />).
     /// </summary>
     Continuation,
+
+    /// <summary>
+    /// Not a completion: the untagged line <see cref="ImapControlChannel.ReadUntaggedAsync" />
+    /// was waiting for, read before the response completed.
+    /// </summary>
+    Untagged,
 }

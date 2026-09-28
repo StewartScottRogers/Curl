@@ -20,7 +20,7 @@ public sealed class ImapProtocolHandlerResponseTests
 
     private const string CapabilityReply = "* CAPABILITY IMAP4rev1\r\nA001 OK done\r\n";
 
-    private const string LogoutReply = "* BYE Logging out\r\nA002 OK done\r\n";
+    private const string ListAndLogoutReply = "A002 OK LIST completed\r\n* BYE Logging out\r\nA003 OK done\r\n";
 
     private const string Capability = "A001 CAPABILITY\r\n";
 
@@ -29,11 +29,11 @@ public sealed class ImapProtocolHandlerResponseTests
     [TestMethod]
     public async Task ExecuteAsync_ResponsesSplitAcrossReads_AreReadWhole()
     {
-        byte[] replies = Latin1(Greeting + CapabilityReply + LogoutReply);
+        byte[] replies = Latin1(Greeting + CapabilityReply + ListAndLogoutReply);
 
         ImapRun run = await ImapRun.ExecuteAsync(Url, new ScriptedConnection([.. replies.Chunk(3)]));
 
-        Assert.AreEqual(Capability + "A002 LOGOUT\r\n", run.Sent);
+        Assert.AreEqual(Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
@@ -41,9 +41,9 @@ public sealed class ImapProtocolHandlerResponseTests
     public async Task ExecuteAsync_LinesThatAreNeitherTaggedUntaggedNorContinuations_AreSkipped()
     {
         // An LF alone ends a line; "xy", "+abc" and "A0011 OK" are none of the three.
-        ImapRun run = await RunAsync("xy\n* OK ready\n+abc\r\nA0011 OK\r\n" + CapabilityReply + LogoutReply);
+        ImapRun run = await RunAsync("xy\n* OK ready\n+abc\r\nA0011 OK\r\n" + CapabilityReply + ListAndLogoutReply);
 
-        Assert.AreEqual(Capability + "A002 LOGOUT\r\n", run.Sent);
+        Assert.AreEqual(Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
@@ -135,9 +135,9 @@ public sealed class ImapProtocolHandlerResponseTests
     public async Task ExecuteAsync_ResponseLineOf65535Bytes_IsRead()
     {
         // GREETING=* OK and 65528 x: 65533 characters and CRLF, exit 0.
-        ImapRun run = await RunAsync("* OK " + new string('x', 65528) + "\r\n" + CapabilityReply + LogoutReply);
+        ImapRun run = await RunAsync("* OK " + new string('x', 65528) + "\r\n" + CapabilityReply + ListAndLogoutReply);
 
-        Assert.AreEqual(Capability + "A002 LOGOUT\r\n", run.Sent);
+        Assert.AreEqual(Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 

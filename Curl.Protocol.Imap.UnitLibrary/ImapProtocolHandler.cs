@@ -19,9 +19,10 @@ namespace Curl.Protocol.Imap;
 /// each failure are described on <see cref="ImapSession" />.
 /// </para>
 /// <para>
-/// Listing, searching and custom commands (BL-556) and the upload (BL-557) are not
-/// implemented yet: a URL asking for one of those closes the open session with
-/// <c>LOGOUT</c> and reports success. Cancellation leaves as an exception.
+/// A URL naming no message sends <c>LIST</c>, one with a search query <c>SEARCH</c>, and
+/// <c>-X</c> its own command, each writing the untagged responses curl writes (BL-556). The
+/// upload (BL-557) is not implemented yet: it closes the open session with <c>LOGOUT</c> and
+/// reports success. Cancellation leaves as an exception.
 /// </para>
 /// </remarks>
 public sealed class ImapProtocolHandler : IProtocolHandler

@@ -292,26 +292,26 @@ public sealed class ImapProtocolHandlerFetchTests
     }
 
     [TestMethod]
-    [DataRow("", DisplayName = "no mailbox")]
-    [DataRow("INBOX", DisplayName = "a mailbox and no UID")]
-    [DataRow(";UID=1", DisplayName = "a UID and no mailbox")]
-    [DataRow("INBOX;SECTION=TEXT", DisplayName = "a SECTION and no UID")]
-    public async Task ExecuteAsync_UrlNamingNoMessage_LogsOutAndSucceeds(string path)
+    [DataRow("", "", DisplayName = "no mailbox")]
+    [DataRow("INBOX", "INBOX", DisplayName = "a mailbox and no UID")]
+    [DataRow(";UID=1", "", DisplayName = "a UID and no mailbox")]
+    [DataRow("INBOX;SECTION=TEXT", "INBOX", DisplayName = "a SECTION and no UID")]
+    public async Task ExecuteAsync_UrlNamingNoMessage_ListsInstead(string path, string listed)
     {
-        FetchRun run = await RunAsync(Host + path, Opening + "* BYE\r\nA002 OK bye\r\n");
+        FetchRun run = await RunAsync(Host + path, Opening + "A002 OK done\r\n");
 
-        Assert.AreEqual("A001 CAPABILITY\r\nA002 LOGOUT\r\n", run.Sent);
+        Assert.AreEqual($"A001 CAPABILITY\r\nA002 LIST \"{listed}\" *\r\nA003 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_CustomCommand_IsNotAFetch()
+    public async Task ExecuteAsync_CustomCommand_IsSentInsteadOfTheFetch()
     {
         var context = Context(Host + "INBOX;UID=1", mail: new MailRequestOptions { CustomCommand = "EXAMINE INBOX" });
 
-        FetchRun run = await RunAsync(context, new ScriptedConnection(Latin1(Opening + "A002 OK bye\r\n")));
+        FetchRun run = await RunAsync(context, new ScriptedConnection(Latin1(Opening + SelectReply + "A003 OK done\r\n")));
 
-        Assert.AreEqual("A001 CAPABILITY\r\nA002 LOGOUT\r\n", run.Sent);
+        Assert.AreEqual(SentThroughSelect + "A003 EXAMINE INBOX\r\nA004 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 

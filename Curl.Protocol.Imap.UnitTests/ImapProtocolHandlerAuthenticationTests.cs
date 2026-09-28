@@ -12,7 +12,7 @@ namespace Curl.Protocol.Imap;
 /// Every case was recorded from real curl (the Schannel build) on 2026-09-28 with
 /// <c>Record-CurlExchange.ps1 -Imap</c>, curl running
 /// <c>-sS -u u:p imap://127.0.0.1:port/INBOX;UID=1</c> (BL-554 Notes). The URL here names no
-/// message, so <c>LOGOUT</c> follows the login where curl sent <c>SELECT</c>.
+/// mailbox, so <c>LIST "" *</c> follows the login where curl sent <c>SELECT</c> (BL-556).
 /// </summary>
 [TestClass]
 public sealed class ImapProtocolHandlerAuthenticationTests
@@ -36,9 +36,9 @@ public sealed class ImapProtocolHandlerAuthenticationTests
         var sasl = new FakeSaslAuthenticator("PLAIN", PlainMessage);
 
         ImapRun run = await RunAsync(
-            Greeting + Caps("IMAP4rev1 STARTTLS AUTH=PLAIN AUTH=LOGIN") + "+ \r\nA002 OK Authenticated\r\n" + LogoutReply("A003"), sasl);
+            Greeting + Caps("IMAP4rev1 STARTTLS AUTH=PLAIN AUTH=LOGIN") + "+ \r\nA002 OK Authenticated\r\n" + ListReply("A003") + LogoutReply("A004"), sasl);
 
-        Assert.AreEqual(Capability + "A002 AUTHENTICATE PLAIN\r\nAHUAcA==\r\nA003 LOGOUT\r\n", run.Sent);
+        Assert.AreEqual(Capability + "A002 AUTHENTICATE PLAIN\r\nAHUAcA==\r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
         (SaslRequest request, string[] offered) = sasl.Choices.Single();
         CollectionAssert.AreEqual(new[] { "PLAIN", "LOGIN" }, offered);
@@ -55,7 +55,7 @@ public sealed class ImapProtocolHandlerAuthenticationTests
         var sasl = new FakeSaslAuthenticator("PLAIN", PlainMessage);
         var mail = new MailRequestOptions { SaslAuthorizationIdentity = "boss", BearerToken = "tok", ServiceName = "mail" };
 
-        await RunAsync(Greeting + Caps("AUTH=PLAIN") + "+ \r\nA002 OK done\r\n" + LogoutReply("A003"), sasl, mail: mail);
+        await RunAsync(Greeting + Caps("AUTH=PLAIN") + "+ \r\nA002 OK done\r\n" + ListReply("A003") + LogoutReply("A004"), sasl, mail: mail);
 
         SaslRequest request = sasl.Begun.Single();
         Assert.AreEqual("boss", request.AuthorizationIdentity);
@@ -70,9 +70,9 @@ public sealed class ImapProtocolHandlerAuthenticationTests
         var sasl = new FakeSaslAuthenticator("LOGIN", Latin1("u"), Latin1("p"));
 
         ImapRun run = await RunAsync(
-            Greeting + Caps("AUTH=LOGIN") + "+ VXNlcm5hbWU6\r\n+ UGFzc3dvcmQ6\r\nA002 OK Authenticated\r\n" + LogoutReply("A003"), sasl);
+            Greeting + Caps("AUTH=LOGIN") + "+ VXNlcm5hbWU6\r\n+ UGFzc3dvcmQ6\r\nA002 OK Authenticated\r\n" + ListReply("A003") + LogoutReply("A004"), sasl);
 
-        Assert.AreEqual(Capability + "A002 AUTHENTICATE LOGIN\r\ndQ==\r\ncA==\r\nA003 LOGOUT\r\n", run.Sent);
+        Assert.AreEqual(Capability + "A002 AUTHENTICATE LOGIN\r\ndQ==\r\ncA==\r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
         Assert.AreEqual("Password:", Encoding.Latin1.GetString(sasl.Challenges.Single()));
     }
@@ -86,7 +86,7 @@ public sealed class ImapProtocolHandlerAuthenticationTests
         var sasl = new FakeSaslAuthenticator("LOGIN", Latin1("u"), Latin1("p"));
 
         ImapRun run = await RunAsync(
-            Greeting + Caps("AUTH=LOGIN") + "+ \r\n" + challenge + "A002 OK done\r\n" + LogoutReply("A003"), sasl);
+            Greeting + Caps("AUTH=LOGIN") + "+ \r\n" + challenge + "A002 OK done\r\n" + ListReply("A003") + LogoutReply("A004"), sasl);
 
         Assert.AreEqual(TransferResult.Success(0), run.Result);
         Assert.IsEmpty(sasl.Challenges.Single());
@@ -98,9 +98,9 @@ public sealed class ImapProtocolHandlerAuthenticationTests
         var sasl = new FakeSaslAuthenticator("PLAIN", PlainMessage);
 
         ImapRun run = await RunAsync(
-            Greeting + Caps("AUTH=PLAIN") + "* 1 EXISTS\r\n+ \r\n* OK still\r\nA002 OK done\r\n" + LogoutReply("A003"), sasl);
+            Greeting + Caps("AUTH=PLAIN") + "* 1 EXISTS\r\n+ \r\n* OK still\r\nA002 OK done\r\n" + ListReply("A003") + LogoutReply("A004"), sasl);
 
-        Assert.AreEqual(Capability + "A002 AUTHENTICATE PLAIN\r\nAHUAcA==\r\nA003 LOGOUT\r\n", run.Sent);
+        Assert.AreEqual(Capability + "A002 AUTHENTICATE PLAIN\r\nAHUAcA==\r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
@@ -114,9 +114,9 @@ public sealed class ImapProtocolHandlerAuthenticationTests
         var sasl = new FakeSaslAuthenticator("PLAIN", PlainMessage);
         var mail = new MailRequestOptions { SaslInitialResponse = saslIr };
 
-        ImapRun run = await RunAsync(Greeting + Caps(capabilities) + "A002 OK Authenticated\r\n" + LogoutReply("A003"), sasl, mail: mail);
+        ImapRun run = await RunAsync(Greeting + Caps(capabilities) + "A002 OK Authenticated\r\n" + ListReply("A003") + LogoutReply("A004"), sasl, mail: mail);
 
-        Assert.AreEqual(Capability + "A002 AUTHENTICATE PLAIN AHUAcA==\r\nA003 LOGOUT\r\n", run.Sent);
+        Assert.AreEqual(Capability + "A002 AUTHENTICATE PLAIN AHUAcA==\r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
@@ -128,9 +128,9 @@ public sealed class ImapProtocolHandlerAuthenticationTests
         var mail = new MailRequestOptions { SaslInitialResponse = true, LoginOptions = "AUTH=LOGIN" };
 
         ImapRun run = await RunAsync(
-            Greeting + Caps("AUTH=PLAIN AUTH=LOGIN") + "+ UGFzc3dvcmQ6\r\nA002 OK Authenticated\r\n" + LogoutReply("A003"), sasl, mail: mail);
+            Greeting + Caps("AUTH=PLAIN AUTH=LOGIN") + "+ UGFzc3dvcmQ6\r\nA002 OK Authenticated\r\n" + ListReply("A003") + LogoutReply("A004"), sasl, mail: mail);
 
-        Assert.AreEqual(Capability + "A002 AUTHENTICATE LOGIN dQ==\r\ncA==\r\nA003 LOGOUT\r\n", run.Sent);
+        Assert.AreEqual(Capability + "A002 AUTHENTICATE LOGIN dQ==\r\ncA==\r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
@@ -140,9 +140,9 @@ public sealed class ImapProtocolHandlerAuthenticationTests
         var sasl = new FakeSaslAuthenticator("EXTERNAL", [], Array.Empty<byte>());
         var mail = new MailRequestOptions { SaslInitialResponse = true, LoginOptions = "AUTH=EXTERNAL" };
 
-        ImapRun run = await RunAsync(Greeting + Caps("AUTH=EXTERNAL") + "+ \r\nA002 OK done\r\n" + LogoutReply("A003"), sasl, mail: mail);
+        ImapRun run = await RunAsync(Greeting + Caps("AUTH=EXTERNAL") + "+ \r\nA002 OK done\r\n" + ListReply("A003") + LogoutReply("A004"), sasl, mail: mail);
 
-        Assert.AreEqual(Capability + "A002 AUTHENTICATE EXTERNAL =\r\n=\r\nA003 LOGOUT\r\n", run.Sent);
+        Assert.AreEqual(Capability + "A002 AUTHENTICATE EXTERNAL =\r\n=\r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
@@ -153,9 +153,9 @@ public sealed class ImapProtocolHandlerAuthenticationTests
         var mail = new MailRequestOptions { LoginOptions = "AUTH=EXTERNAL" };
 
         ImapRun run = await RunAsync(
-            Greeting + Caps("AUTH=PLAIN AUTH=EXTERNAL") + "+ \r\nA002 OK done\r\n" + LogoutReply("A003"), sasl, user: null, mail: mail);
+            Greeting + Caps("AUTH=PLAIN AUTH=EXTERNAL") + "+ \r\nA002 OK done\r\n" + ListReply("A003") + LogoutReply("A004"), sasl, user: null, mail: mail);
 
-        Assert.AreEqual(Capability + "A002 AUTHENTICATE EXTERNAL\r\n=\r\nA003 LOGOUT\r\n", run.Sent);
+        Assert.AreEqual(Capability + "A002 AUTHENTICATE EXTERNAL\r\n=\r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n", run.Sent);
         Assert.AreEqual("EXTERNAL", sasl.Choices.Single().Request.RequiredMechanism);
         CollectionAssert.AreEqual(new[] { "EXTERNAL" }, sasl.Choices.Single().Offered);
         Assert.AreEqual("EXTERNAL", sasl.Begun.Single().RequiredMechanism);
@@ -167,9 +167,9 @@ public sealed class ImapProtocolHandlerAuthenticationTests
         var sasl = new FakeSaslAuthenticator("EXTERNAL", []);
         var mail = new MailRequestOptions { LoginOptions = "AUTH=EXTERNAL" };
 
-        ImapRun run = await RunAsync(Greeting + Caps("AUTH=PLAIN") + LogoutReply("A002"), sasl, user: null, mail: mail);
+        ImapRun run = await RunAsync(Greeting + Caps("AUTH=PLAIN") + ListReply("A002") + LogoutReply("A003"), sasl, user: null, mail: mail);
 
-        Assert.AreEqual(Capability + "A002 LOGOUT\r\n", run.Sent);
+        Assert.AreEqual(Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
         Assert.IsEmpty(sasl.Choices);
     }
 
@@ -179,9 +179,9 @@ public sealed class ImapProtocolHandlerAuthenticationTests
         var sasl = new FakeSaslAuthenticator("PLAIN", PlainMessage);
         var mail = new MailRequestOptions { LoginOptions = "AUTH=EXTERNAL;AUTH=PLAIN" };
 
-        ImapRun run = await RunAsync(Greeting + Caps("AUTH=PLAIN AUTH=LOGIN") + "+ \r\nA002 OK done\r\n" + LogoutReply("A003"), sasl, mail: mail);
+        ImapRun run = await RunAsync(Greeting + Caps("AUTH=PLAIN AUTH=LOGIN") + "+ \r\nA002 OK done\r\n" + ListReply("A003") + LogoutReply("A004"), sasl, mail: mail);
 
-        Assert.AreEqual(Capability + "A002 AUTHENTICATE PLAIN\r\nAHUAcA==\r\nA003 LOGOUT\r\n", run.Sent);
+        Assert.AreEqual(Capability + "A002 AUTHENTICATE PLAIN\r\nAHUAcA==\r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n", run.Sent);
         Assert.HasCount(2, sasl.Choices);
         Assert.IsNull(sasl.Begun.Single().RequiredMechanism);
     }
@@ -193,9 +193,9 @@ public sealed class ImapProtocolHandlerAuthenticationTests
         var sasl = new FakeSaslAuthenticator("PLAIN", PlainMessage);
         var mail = new MailRequestOptions { LoginOptions = "AUTH=LOGIN;AUTH=PLAIN" };
 
-        ImapRun run = await RunAsync(Greeting + Caps("IMAP4rev1 AUTH=PLAIN") + "+ \r\nA002 OK Authenticated\r\n" + LogoutReply("A003"), sasl, mail: mail);
+        ImapRun run = await RunAsync(Greeting + Caps("IMAP4rev1 AUTH=PLAIN") + "+ \r\nA002 OK Authenticated\r\n" + ListReply("A003") + LogoutReply("A004"), sasl, mail: mail);
 
-        Assert.AreEqual(Capability + "A002 AUTHENTICATE PLAIN\r\nAHUAcA==\r\nA003 LOGOUT\r\n", run.Sent);
+        Assert.AreEqual(Capability + "A002 AUTHENTICATE PLAIN\r\nAHUAcA==\r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n", run.Sent);
     }
 
     [TestMethod]
@@ -208,11 +208,11 @@ public sealed class ImapProtocolHandlerAuthenticationTests
         var mail = new MailRequestOptions { LoginOptions = loginOptions };
 
         ImapRun run = await RunAsync(
-            Greeting + Caps("IMAP4rev1 STARTTLS AUTH=PLAIN AUTH=LOGIN") + "+ VXNlcm5hbWU6\r\n+ UGFzc3dvcmQ6\r\nA002 OK Authenticated\r\n" + LogoutReply("A003"),
+            Greeting + Caps("IMAP4rev1 STARTTLS AUTH=PLAIN AUTH=LOGIN") + "+ VXNlcm5hbWU6\r\n+ UGFzc3dvcmQ6\r\nA002 OK Authenticated\r\n" + ListReply("A003") + LogoutReply("A004"),
             sasl,
             mail: mail);
 
-        Assert.AreEqual(Capability + "A002 AUTHENTICATE LOGIN\r\ndQ==\r\ncA==\r\nA003 LOGOUT\r\n", run.Sent);
+        Assert.AreEqual(Capability + "A002 AUTHENTICATE LOGIN\r\ndQ==\r\ncA==\r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n", run.Sent);
         CollectionAssert.AreEqual(new[] { "LOGIN" }, sasl.Choices.Single().Offered);
     }
 
@@ -223,7 +223,7 @@ public sealed class ImapProtocolHandlerAuthenticationTests
         var sasl = new FakeSaslAuthenticator("PLAIN", PlainMessage);
 
         ImapRun run = await RunAsync(
-            Greeting + Caps("AUTH=PLAIN AUTH=LOGIN") + LogoutReply("A002"), sasl, url: "imap://u:p;AUTH=LOGIN@127.0.0.1:18143/");
+            Greeting + Caps("AUTH=PLAIN AUTH=LOGIN") + ListReply("A002") + LogoutReply("A003"), sasl, url: "imap://u:p;AUTH=LOGIN@127.0.0.1:18143/");
 
         CollectionAssert.AreEqual(new[] { "LOGIN" }, sasl.Choices.Single().Offered);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, LoginDenied), run.Result);
@@ -236,7 +236,7 @@ public sealed class ImapProtocolHandlerAuthenticationTests
         var mail = new MailRequestOptions { LoginOptions = "AUTH=PLAIN" };
 
         await RunAsync(
-            Greeting + Caps("AUTH=PLAIN AUTH=LOGIN") + "+ \r\nA002 OK done\r\n" + LogoutReply("A003"),
+            Greeting + Caps("AUTH=PLAIN AUTH=LOGIN") + "+ \r\nA002 OK done\r\n" + ListReply("A003") + LogoutReply("A004"),
             sasl,
             mail: mail,
             url: "imap://u:p;AUTH=LOGIN@127.0.0.1:18143/");
@@ -266,9 +266,9 @@ public sealed class ImapProtocolHandlerAuthenticationTests
         var mail = new MailRequestOptions { LoginOptions = loginOptions };
 
         ImapRun run = await RunAsync(
-            Greeting + Caps("IMAP4rev1 STARTTLS AUTH=PLAIN AUTH=LOGIN") + "A002 OK LOGIN completed\r\n" + LogoutReply("A003"), sasl, mail: mail);
+            Greeting + Caps("IMAP4rev1 STARTTLS AUTH=PLAIN AUTH=LOGIN") + "A002 OK LOGIN completed\r\n" + ListReply("A003") + LogoutReply("A004"), sasl, mail: mail);
 
-        Assert.AreEqual(Capability + "A002 LOGIN u p\r\nA003 LOGOUT\r\n", run.Sent);
+        Assert.AreEqual(Capability + "A002 LOGIN u p\r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
@@ -282,18 +282,18 @@ public sealed class ImapProtocolHandlerAuthenticationTests
         var sasl = new FakeSaslAuthenticator("PLAIN", PlainMessage);
         var mail = new MailRequestOptions { LoginOptions = loginOptions };
 
-        ImapRun run = await RunAsync(Greeting + Caps(capabilities) + "A002 OK LOGIN completed\r\n" + LogoutReply("A003"), sasl, mail: mail);
+        ImapRun run = await RunAsync(Greeting + Caps(capabilities) + "A002 OK LOGIN completed\r\n" + ListReply("A003") + LogoutReply("A004"), sasl, mail: mail);
 
-        Assert.AreEqual(Capability + "A002 LOGIN u p\r\nA003 LOGOUT\r\n", run.Sent);
+        Assert.AreEqual(Capability + "A002 LOGIN u p\r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_HandlerWithoutAuthenticator_SendsLoginWhateverIsOffered()
     {
-        ImapRun run = await RunAsync(Greeting + Caps("AUTH=PLAIN AUTH=LOGIN") + "A002 OK LOGIN completed\r\n" + LogoutReply("A003"), sasl: null);
+        ImapRun run = await RunAsync(Greeting + Caps("AUTH=PLAIN AUTH=LOGIN") + "A002 OK LOGIN completed\r\n" + ListReply("A003") + LogoutReply("A004"), sasl: null);
 
-        Assert.AreEqual(Capability + "A002 LOGIN u p\r\nA003 LOGOUT\r\n", run.Sent);
+        Assert.AreEqual(Capability + "A002 LOGIN u p\r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
@@ -303,9 +303,9 @@ public sealed class ImapProtocolHandlerAuthenticationTests
     [DataRow("u(1)", "%*]{", "\"u(1)\" \"%*]{\"", DisplayName = "every special")]
     public async Task ExecuteAsync_Login_QuotesUserAndPasswordAsCurlDoes(string user, string password, string arguments)
     {
-        ImapRun run = await RunAsync(Greeting + Caps("IMAP4rev1") + "A002 OK LOGIN completed\r\n" + LogoutReply("A003"), null, user, password);
+        ImapRun run = await RunAsync(Greeting + Caps("IMAP4rev1") + "A002 OK LOGIN completed\r\n" + ListReply("A003") + LogoutReply("A004"), null, user, password);
 
-        Assert.AreEqual(Capability + "A002 LOGIN " + arguments + "\r\nA003 LOGOUT\r\n", run.Sent);
+        Assert.AreEqual(Capability + "A002 LOGIN " + arguments + "\r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n", run.Sent);
     }
 
     [TestMethod]
@@ -376,9 +376,9 @@ public sealed class ImapProtocolHandlerAuthenticationTests
     {
         var sasl = new FakeSaslAuthenticator("PLAIN", PlainMessage);
 
-        ImapRun run = await RunAsync(Greeting + Caps("LOGINDISABLED AUTH=PLAIN") + "+ \r\nA002 OK done\r\n" + LogoutReply("A003"), sasl);
+        ImapRun run = await RunAsync(Greeting + Caps("LOGINDISABLED AUTH=PLAIN") + "+ \r\nA002 OK done\r\n" + ListReply("A003") + LogoutReply("A004"), sasl);
 
-        Assert.AreEqual(Capability + "A002 AUTHENTICATE PLAIN\r\nAHUAcA==\r\nA003 LOGOUT\r\n", run.Sent);
+        Assert.AreEqual(Capability + "A002 AUTHENTICATE PLAIN\r\nAHUAcA==\r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n", run.Sent);
     }
 
     [TestMethod]
@@ -388,9 +388,9 @@ public sealed class ImapProtocolHandlerAuthenticationTests
         var sasl = new FakeSaslAuthenticator("PLAIN", PlainMessage);
 
         ImapRun run = await RunAsync(
-            Greeting + "* CAPABILITY IMAP4rev1 AUTH=PLAIN\r\nA001 NO nope\r\n+ \r\nA002 OK Authenticated\r\n" + LogoutReply("A003"), sasl);
+            Greeting + "* CAPABILITY IMAP4rev1 AUTH=PLAIN\r\nA001 NO nope\r\n+ \r\nA002 OK Authenticated\r\n" + ListReply("A003") + LogoutReply("A004"), sasl);
 
-        Assert.AreEqual(Capability + "A002 AUTHENTICATE PLAIN\r\nAHUAcA==\r\nA003 LOGOUT\r\n", run.Sent);
+        Assert.AreEqual(Capability + "A002 AUTHENTICATE PLAIN\r\nAHUAcA==\r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n", run.Sent);
     }
 
     [TestMethod]
@@ -399,9 +399,9 @@ public sealed class ImapProtocolHandlerAuthenticationTests
         // no-user: CAPABILITY, then straight on.
         var sasl = new FakeSaslAuthenticator("PLAIN", PlainMessage);
 
-        ImapRun run = await RunAsync(Greeting + Caps("AUTH=PLAIN") + LogoutReply("A002"), sasl, user: null);
+        ImapRun run = await RunAsync(Greeting + Caps("AUTH=PLAIN") + ListReply("A002") + LogoutReply("A003"), sasl, user: null);
 
-        Assert.AreEqual(Capability + "A002 LOGOUT\r\n", run.Sent);
+        Assert.AreEqual(Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
         Assert.IsEmpty(sasl.Choices);
     }
 
@@ -411,9 +411,9 @@ public sealed class ImapProtocolHandlerAuthenticationTests
         // preauth: CAPABILITY, then straight on, with -u u:p.
         var sasl = new FakeSaslAuthenticator("PLAIN", PlainMessage);
 
-        ImapRun run = await RunAsync("* PREAUTH hi\r\n" + Caps("AUTH=PLAIN") + LogoutReply("A002"), sasl);
+        ImapRun run = await RunAsync("* PREAUTH hi\r\n" + Caps("AUTH=PLAIN") + ListReply("A002") + LogoutReply("A003"), sasl);
 
-        Assert.AreEqual(Capability + "A002 LOGOUT\r\n", run.Sent);
+        Assert.AreEqual(Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
         Assert.IsEmpty(sasl.Choices);
     }
 
@@ -459,7 +459,7 @@ public sealed class ImapProtocolHandlerAuthenticationTests
     {
         var sasl = new FakeSaslAuthenticator("LOGIN", Latin1("u"), Latin1("p"));
         var secured = new ScriptedConnection(Latin1(
-            "* CAPABILITY IMAP4rev1 AUTH=LOGIN\r\nA003 OK done\r\n+ \r\n+ \r\nA004 OK done\r\n" + LogoutReply("A005")));
+            "* CAPABILITY IMAP4rev1 AUTH=LOGIN\r\nA003 OK done\r\n+ \r\n+ \r\nA004 OK done\r\n" + ListReply("A005") + LogoutReply("A006")));
         var context = new TransferContext
         {
             Url = CurlUrl.Parse(Url),
@@ -475,7 +475,7 @@ public sealed class ImapProtocolHandlerAuthenticationTests
             ConnectResult.Connected(secured));
 
         CollectionAssert.AreEqual(new[] { "LOGIN" }, sasl.Choices.Single().Offered);
-        Assert.AreEqual("A003 CAPABILITY\r\nA004 AUTHENTICATE LOGIN\r\ndQ==\r\ncA==\r\nA005 LOGOUT\r\n", Encoding.Latin1.GetString(secured.Sent));
+        Assert.AreEqual("A003 CAPABILITY\r\nA004 AUTHENTICATE LOGIN\r\ndQ==\r\ncA==\r\nA005 LIST \"\" *\r\nA006 LOGOUT\r\n", Encoding.Latin1.GetString(secured.Sent));
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
@@ -487,6 +487,8 @@ public sealed class ImapProtocolHandlerAuthenticationTests
     }
 
     private static string Caps(string words) => "* CAPABILITY " + words + "\r\nA001 OK done\r\n";
+
+    private static string ListReply(string tag) => tag + " OK LIST completed\r\n";
 
     private static string LogoutReply(string tag) => "* BYE Logging out\r\n" + tag + " OK LOGOUT completed\r\n";
 
