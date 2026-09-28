@@ -81,3 +81,4 @@ it most likely does.
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
 - 2026-09-27: Doing -> Backlog. Needs Curl.Protocol.Abstractions.UnitLibrary, Curl.Core.UnitLibrary and Curl.Console to carry --max-redirs to the handler; BL-348 (Doing) touches all three
+- 2026-09-27: Backlog -> Doing.
