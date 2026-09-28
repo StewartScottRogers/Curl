@@ -58,7 +58,7 @@ What was built (ADR-0117 Decision 1, plus an amendment recorded in the ADR):
 - `ConnectTarget` and `Curl.Protocol.Abstractions` are unchanged, as the ADR said.
 - `touches` gained ADR-0117's file for the amendment; no task in Doing names it.
 - Found: dict, gopher, telnet and mqtt build their `ConnectTarget` without `Events`, so their `-v`
-  connect lines (the timeout line included) never print. Filed as BL-774; the console dict test
+  connect lines (the timeout line included) never print. Filed as BL-775; the console dict test
   pins exit 28 and the `curl: (28)` line only.
 
 ## Log

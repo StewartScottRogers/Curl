@@ -1,5 +1,5 @@
 ---
-id: BL-774
+id: BL-775
 title: Report the connect -v lines for dict, gopher, telnet and mqtt by passing the transfer's events to the connect target
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-774 — Report the connect -v lines for dict, gopher, telnet and mqtt by passing the transfer's events to the connect target
+# BL-775 — Report the connect -v lines for dict, gopher, telnet and mqtt by passing the transfer's events to the connect target
 
 ## Goal
 
