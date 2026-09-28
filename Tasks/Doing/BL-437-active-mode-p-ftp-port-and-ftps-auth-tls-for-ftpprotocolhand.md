@@ -53,3 +53,4 @@ completed:
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
 - 2026-09-27: Doing -> Backlog. Waits on BL-459 (IConnectionListener and the FTP active-mode/TLS transfer options in Curl.Protocol.Abstractions), per ADR-0102
+- 2026-09-27: Backlog -> Doing.
