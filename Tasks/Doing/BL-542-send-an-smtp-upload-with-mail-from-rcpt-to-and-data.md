@@ -34,3 +34,4 @@ With `-T <file>` (or `-T -`), the SMTP handler sends `MAIL FROM:<...>`, one `RCP
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
