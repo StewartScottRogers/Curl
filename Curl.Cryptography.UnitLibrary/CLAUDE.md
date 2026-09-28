@@ -8,10 +8,18 @@ One implementation, used on every platform, so Curl behaves the same everywhere.
 primitive the BCL offers with every parameter curl uses on all three platforms is taken
 from `System.Security.Cryptography` instead and never rebuilt here.
 
-Namespace `Curl.Cryptography`. Today it holds only `ConstantTime`, the internal
-branch-free helpers (mask from bit, select, conditional swap, all-zero check) the
-primitives share; each primitive lands under its own task (BL-671 to BL-677,
-BL-737 to BL-745).
+Namespace `Curl.Cryptography`. It holds:
+
+- `ConstantTime` (internal): the branch-free helpers (mask from bit, select, conditional
+  swap, all-zero check) the primitives share.
+- `Field25519` (internal): GF(2^255 - 19) arithmetic on 16 limbs of 16 bits in a
+  caller's `Span<long>`; X25519 uses it and Ed25519 (BL-672) reuses it.
+- `X25519` (public): RFC 7748 key agreement - `GeneratePrivateKey`, `ComputePublicKey`,
+  and `TryComputeSharedSecret`, which returns `false` for the all-zero result of a
+  low-order peer key.
+
+The remaining primitives land under their own tasks (BL-672 to BL-677, BL-737 to
+BL-745).
 
 ## Rules
 
