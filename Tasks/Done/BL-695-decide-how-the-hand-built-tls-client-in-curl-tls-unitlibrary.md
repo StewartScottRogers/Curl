@@ -8,7 +8,7 @@ depends-on: [BL-669]
 touches: [Documentation/Planning/Decisions]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-28
 ---
 # BL-695 — Decide how the hand-built TLS client in Curl.Tls.UnitLibrary is built and when Curl uses it
 
@@ -26,13 +26,22 @@ An ADR fixes how `Curl.Tls.UnitLibrary`, a hand-built TLS client, is structured 
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Planning/Decisions/ADR-<next free number>-<slug>.md` exists (number checked unused), Status Accepted, marked "Decided by Claude under Stewart's delegation", with the captured ClientHellos, the supported feature table, the class structure, the verification hand-off (no second verifier), and the routing rule between `SslStream` and the hand-built client.
-- [ ] Consequences name BL-696 to BL-708 and what each relies on from the ADR, and state that no TLS feature any official curl build offers is refused.
-- [ ] `Documentation/Planning/Decisions/README.md` indexes the new ADR.
+- [x] `Documentation/Planning/Decisions/ADR-<next free number>-<slug>.md` exists (number checked unused), Status Accepted, marked "Decided by Claude under Stewart's delegation", with the captured ClientHellos, the supported feature table, the class structure, the verification hand-off (no second verifier), and the routing rule between `SslStream` and the hand-built client.
+- [x] Consequences name BL-696 to BL-708 and what each relies on from the ADR, and state that no TLS feature any official curl build offers is refused.
+- [x] `Documentation/Planning/Decisions/README.md` indexes the new ADR.
 
 ## Notes
+
+- ADR-0140 (0139 was the highest in the folder). Plan summary: `SslStream` stays the default; the hand-built client runs every QUIC handshake and a TCP one only when a routing row (`--curves`, `--sigalgs`, `--tls-earlydata`, `--ssl-sessions`, `--ech`, SRP, `--cert-status`, `--no-sessionid`, `--ssl-allow-beast`, `--tls-max` 1.0/1.1) holds; one verifier behind `IServerCertificateVerifier`, implemented in Networking by the code `SslStream`'s callback runs today.
+- Captures: `Record-CurlExchange.ps1`'s plain server mode (not `-NoServer`, which sees no traffic) records the ClientHello in `request.bin` when the canned response is a TLS alert: the header read ends after its one-second wait. No script change was needed. Builds measured: WinGet curl 8.18.0 (curl.se official, LibreSSL 4.2.1, the installed version; 8.22.0 is current), mingw curl 8.21.0 Schannel, Ubuntu (WSL) curl 8.18.0 OpenSSL 3.5.5 through `-ListenAddress` and `--resolve`.
+- Choice: the default ClientHello is the platform curl's measured profile (Schannel on Windows, OpenSSL elsewhere), LibreSSL's for QUIC on Windows, so a server chooses as it would for the curl being replaced.
+- Choice: `--ssl-sessions` stores OpenSSL's `SSL_SESSION` DER as the opaque part, so session files interoperate with the OpenSSL build.
+- ECH is RFC 9849 (published 2026-03, https://www.rfc-editor.org/info/rfc9849/).
+- Filed: BL-783 (Camellia), BL-784 (ARIA and ARIA-GCM) — both amend ADR-0118's list and BL-702 now depends on them; BL-785 (decide where a hand-built Zstandard decoder lives), BL-786 (RFC 8879 certificate decompression, depends on BL-699 and BL-785).
+- Not done here: the exact QUIC ClientHello is left to BL-724 (needs an Initial capture and Initial-key removal).
 
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Doing.
+- 2026-09-28: Doing -> Done. ADR-0140 fixes the hand-built TLS client's structure, supported set, measured ClientHellos, single-verifier hand-off and the SslStream routing rule

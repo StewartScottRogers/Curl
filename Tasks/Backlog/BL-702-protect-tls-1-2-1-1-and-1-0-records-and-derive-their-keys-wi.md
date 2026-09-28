@@ -4,7 +4,7 @@ title: Protect TLS 1.2, 1.1 and 1.0 records and derive their keys with the TLS P
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-696, BL-673]
+depends-on: [BL-696, BL-673, BL-783, BL-784]
 touches: [Curl.Tls.UnitLibrary, Curl.Tls.UnitTests]
 requirement: none
 created: 2026-09-28
