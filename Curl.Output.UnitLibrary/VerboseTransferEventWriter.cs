@@ -28,7 +28,9 @@ namespace Curl.Output;
 /// A port of the <c>-v</c> branch of <c>tool_debug_cb</c> in curl's <c>src/tool_cb_dbg.c</c>.
 /// A run of body events with nothing between them is one data line carrying the first
 /// event's byte count, as curl prints it. The structured events are worded by
-/// <see cref="TransferEventInfoText"/>. TLS record bytes print nothing, as in curl's Schannel build.
+/// <see cref="TransferEventInfoText"/>. TLS messages, their bytes and the trust
+/// a connection is set up with print only as curl's OpenSSL build prints them; the Schannel
+/// build prints none of them.
 /// The lines of one request header event share one stamp, as curl reads its clock once per
 /// callback; a line that continues an open one gets neither stamp nor prefix.
 /// </remarks>
@@ -119,8 +121,47 @@ public sealed class VerboseTransferEventWriter(
     }
 
     /// <inheritdoc />
+    /// <remarks>
+    /// The OpenSSL build writes the bytes as a data line, <c>}</c> for sent and <c>{</c> for
+    /// received, as it writes body bytes; the Schannel build writes nothing.
+    /// </remarks>
     public void ReportTlsData(ReadOnlySpan<byte> bytes, bool sent)
     {
+        if (tlsBackend == TlsBackend.OpenSsl)
+        {
+            WriteDataLine(sent ? DataSentPrefix : DataReceivedPrefix, bytes.Length);
+        }
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// The OpenSSL build writes the message's line (<see cref="OpenSslMessageText"/>), when it
+    /// has one, then its bytes as <see cref="ReportTlsData"/> does; the Schannel build writes nothing.
+    /// </remarks>
+    public void ReportTlsMessage(TlsMessageEvent message)
+    {
+        if (tlsBackend == TlsBackend.OpenSsl && OpenSslMessageText.Line(message) is { } line)
+        {
+            WriteTextLine(line);
+        }
+
+        ReportTlsData(message.Bytes.Span, message.Sent);
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// The OpenSSL build writes its <c>SSL Trust</c> lines (<see cref="OpenSslTrustText"/>);
+    /// the Schannel build writes nothing.
+    /// </remarks>
+    public void ReportTlsTrust(TlsTrustEvent trust)
+    {
+        if (tlsBackend == TlsBackend.OpenSsl)
+        {
+            foreach (string line in OpenSslTrustText.Lines(trust))
+            {
+                WriteTextLine(line);
+            }
+        }
     }
 
     /// <inheritdoc />

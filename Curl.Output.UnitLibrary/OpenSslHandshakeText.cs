@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Net.Security;
 using System.Security.Authentication;
+using System.Security.Cryptography.X509Certificates;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Output;
@@ -75,14 +76,35 @@ internal static class OpenSslHandshakeText
         lines.AddRange(alpnLines.Skip(1));
         if (handshake.ServerCertificate is { } certificate)
         {
-            lines.AddRange(OpenSslCertificateText.ServerCertificate(certificate));
+            lines.AddRange(OpenSslCertificateText.PeerCertificate(certificate, handshake.IsProxy));
             lines.AddRange(handshake.PeerCertificateChain
                 .Select((chainCertificate, level) => OpenSslCertificateText.CertificateLevel(level, chainCertificate))
                 .OfType<string>());
-            lines.AddRange(VerifyResult(handshake));
+            if (HostNameMatches(handshake, certificate, lines))
+            {
+                lines.AddRange(VerifyResult(handshake));
+            }
         }
 
         return lines;
+    }
+
+    // ossl_verifyhost runs only when the host name is checked, and curl stops at a mismatch
+    // before the verify result.
+    private static bool HostNameMatches(TlsHandshakeEvent handshake, X509Certificate2 certificate, List<string> lines)
+    {
+        if (handshake.VerifiedHostName is not { } hostName)
+        {
+            return true;
+        }
+
+        var matched = OpenSslHostNameText.Matches(certificate, hostName, out var line);
+        if (line is not null)
+        {
+            lines.Add(line);
+        }
+
+        return matched;
     }
 
     private static string CipherName(TlsCipherSuite? suite)
