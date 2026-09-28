@@ -36,3 +36,4 @@ An ADR fixes how `Curl.Cryptography.UnitLibrary` provides every cryptographic pr
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
