@@ -13,7 +13,9 @@ namespace Curl.Core.Multipart;
 /// <c>Content-Length</c> is known before anything is sent and a file that cannot be opened
 /// fails the transfer before a connection is made, as curl's <c>stat</c> of each file does.
 /// The files are then streamed, not read into memory. A file whose stream cannot seek (a
-/// pipe or a device) makes the length unknown, and the body is sent chunked, as curl sends it.
+/// pipe or a device) declares the length curl's <c>stat</c> gives it, as
+/// <see cref="UnseekableFileLength" /> describes: on Windows a fixed length the sender cuts the
+/// body off at, whatever the pipe delivers; elsewhere none, so the body is sent chunked.
 /// </para>
 /// <para>
 /// The layout is libcurl 8.21.0's <c>lib/mime.c</c>: each part is preceded by
@@ -54,12 +56,21 @@ namespace Curl.Core.Multipart;
 /// leaves such a part opening the path <c>-</c> through <paramref name="fileSystem" />, as it did
 /// before standard input could be given.
 /// </param>
+/// <param name="unseekableFileLength">
+/// The length a file that cannot seek declares, from its path, or <see langword="null" /> for
+/// none, which sends the body chunked; <see langword="null" /> takes the platform curl's rule,
+/// <see cref="UnseekableFileLength.ForPlatform" />.
+/// </param>
 public sealed class MultipartFormBodyBuilder(
     IFileSystem fileSystem,
     Encoding textEncoding,
     Func<string> createBoundary,
-    Stream? standardInput = null)
+    Stream? standardInput = null,
+    Func<string, long?>? unseekableFileLength = null)
 {
+    private readonly Func<string, long?> unseekableFileLength =
+        unseekableFileLength ?? UnseekableFileLength.ForPlatform(OperatingSystem.IsWindows());
+
     /// <summary>The message curl 8.21.0 gives, with exit 26, for a form file it cannot open.</summary>
     public const string OpenFailedMessage = "Failed to open/read local data from file/application";
 
@@ -193,7 +204,8 @@ public sealed class MultipartFormBodyBuilder(
 
         Stream content = opened.Content!;
         segments.AddText(MultipartPartHeaders.Format(part, disposition, null, encoder?.Name, out _));
-        return await AddFileDataAsync(segments, content, content.CanSeek ? opened.Length : null, encoder, cancellationToken)
+        long? length = content.CanSeek ? opened.Length : unseekableFileLength(part.Content);
+        return await AddFileDataAsync(segments, content, length, encoder, cancellationToken)
             .ConfigureAwait(false);
     }
 

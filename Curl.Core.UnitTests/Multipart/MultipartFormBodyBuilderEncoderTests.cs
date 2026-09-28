@@ -362,9 +362,10 @@ public sealed class MultipartFormBodyBuilderEncoderTests
 
     private static FormFileSystem DataFiles() => new FormFileSystem().WithFile("data.txt", Encoding.UTF8.GetBytes(DataText));
 
+    /// <summary>Builds with no length for a file that cannot seek, as curl on Linux and macOS declares none.</summary>
     private async Task<MultipartFormBuildResult> BuildAsync(FormFileSystem files, string boundary, params MultipartFormPart[] parts)
     {
-        MultipartFormBodyBuilder builder = new(files, Windows1252, () => boundary);
+        MultipartFormBodyBuilder builder = new(files, Windows1252, () => boundary, standardInput: null, UnseekableFileLength.Unknown);
         return await builder.BuildAsync(parts, TestContext.CancellationToken);
     }
 
