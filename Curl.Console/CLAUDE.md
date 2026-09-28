@@ -123,7 +123,9 @@ by `UploadTransferUrl` before anything else of that transfer: one it cannot pars
 with no warning lines. The `-T` file is opened through the runner's `IFileSystem` after the
 before-transfer warning lines and becomes the context's `Upload`; one that cannot be opened
 prints `curl: cannot open '<file>'` and the try-help line even under `-s`, is exit 26, and
-stops the run. `-T -` and `-T .` upload standard input. `%{url_effective}` prints the
+stops the run, a `-T` glob match as much as a lone file. When the run's previous transfer
+failed, it reports that transfer's code instead, with the text `CurlEasyErrorText` gives it
+(`curl: (7) Could not connect to server`), as curl 8.21.0 does (BL-440 Notes). `-T -` and `-T .` upload standard input. `%{url_effective}` prints the
 resolved URL.
 
 Each transfer's proxy is chosen by `TransferProxySelection`, after the URL, range and `-F`

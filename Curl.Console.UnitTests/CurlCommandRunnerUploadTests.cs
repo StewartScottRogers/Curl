@@ -238,6 +238,74 @@ public sealed class CurlCommandRunnerUploadTests
             "curl: cannot open '{local.txt,sub/in.txt}'" + NewLine);
     }
 
+    [TestMethod]
+    [DataRow("http://h/g/")]
+    [DataRow("http://down/g/")]
+    public async Task RunAsync_UploadGlobWhoseFirstMatchCannotBeOpened_Exits26AndUploadsNoOtherMatch(string url)
+    {
+        int exitCode = await RunAsync("-T", "{nosuchfile,local.txt}", "-w", "%{url_effective} %{exitcode}\\n", url);
+
+        Assert.AreEqual((int)CurlExitCode.ReadError, exitCode);
+        Assert.IsEmpty(dispatched);
+        Assert.AreEqual(
+            "curl: cannot open 'nosuchfile'" + NewLine
+            + CommandLineRefusal.TryHelpLine + NewLine
+            + $"curl: (26) {MultipartFormBodyBuilder.OpenFailedMessage}{NewLine}",
+            Encoding.UTF8.GetString(standardError.ToArray()));
+        Assert.AreEqual($"{url}nosuchfile 26\n", Encoding.UTF8.GetString(standardOutput.ToArray()));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_UploadGlobWhoseLaterMatchCannotBeOpenedAfterASuccess_Exits26AndStopsTheRun()
+    {
+        int exitCode = await RunAsync(
+            "-T", "{local.txt,nosuchfile,sub/in.txt}", "-w", "%{url_effective} %{exitcode}\\n", "http://h/g/");
+
+        Assert.AreEqual((int)CurlExitCode.ReadError, exitCode);
+        Assert.AreEqual("http://h/g/local.txt", dispatched.Single().Url);
+        Assert.AreEqual(
+            "curl: cannot open 'nosuchfile'" + NewLine
+            + CommandLineRefusal.TryHelpLine + NewLine
+            + $"curl: (26) {MultipartFormBodyBuilder.OpenFailedMessage}{NewLine}",
+            Encoding.UTF8.GetString(standardError.ToArray()));
+        Assert.AreEqual(
+            "http://h/g/local.txt 0\nhttp://h/g/nosuchfile 26\n",
+            Encoding.UTF8.GetString(standardOutput.ToArray()));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_UploadGlobWhoseLaterMatchCannotBeOpenedAfterAFailure_ReportsThePreviousCodeWithCurlsText()
+    {
+        int exitCode = await RunAsync(
+            "-T", "{local.txt,nosuchfile,sub/in.txt}", "-w", "%{url_effective} %{exitcode} %{errormsg}\\n", "http://down/g/");
+
+        Assert.AreEqual((int)CurlExitCode.CouldntConnect, exitCode);
+        Assert.AreEqual("http://down/g/local.txt", dispatched.Single().Url);
+        Assert.AreEqual(
+            $"curl: (7) {DownMessage}{NewLine}"
+            + "curl: cannot open 'nosuchfile'" + NewLine
+            + CommandLineRefusal.TryHelpLine + NewLine
+            + $"curl: (7) Could not connect to server{NewLine}",
+            Encoding.UTF8.GetString(standardError.ToArray()));
+        Assert.AreEqual(
+            $"http://down/g/local.txt 7 {DownMessage}\nhttp://down/g/nosuchfile 7 Could not connect to server\n",
+            Encoding.UTF8.GetString(standardOutput.ToArray()));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_UploadFileThatCannotBeOpenedAfterAFailedUrl_ReportsThePreviousCode()
+    {
+        int exitCode = await RunAsync("-s", "-T", "local.txt", "-T", "nosuchfile", "http://down/a/", "http://h/b/", "http://h/c/");
+
+        Assert.AreEqual((int)CurlExitCode.CouldntConnect, exitCode);
+        Assert.AreEqual("http://down/a/local.txt", dispatched.Single().Url);
+        Assert.AreEqual(
+            "curl: cannot open 'nosuchfile'" + NewLine + CommandLineRefusal.TryHelpLine + NewLine,
+            Encoding.UTF8.GetString(standardError.ToArray()));
+    }
+
+    private const string DownMessage = "Failed to connect to down port 80 after 0 ms: Could not connect to server";
+
     private RecordingProtocolHandler CreateHandler() =>
         new("http", async context =>
         {
@@ -250,7 +318,9 @@ public sealed class CurlCommandRunnerUploadTests
             }
 
             dispatched.Add((UrlText(context.Url), upload));
-            return TransferResult.Success(0);
+            return context.Url.Host == "down"
+                ? TransferResult.Failure(CurlExitCode.CouldntConnect, DownMessage)
+                : TransferResult.Success(0);
         });
 
     private static string UrlText(CurlUrl url) =>

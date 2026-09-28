@@ -438,6 +438,20 @@ internal sealed class CurlCommandRunner(
     private ProgressBarRecorder? progressBar;
 
     /// <summary>
+    /// The result of the run's last transfer, which a later <c>-T</c> file that cannot be opened
+    /// reports when it failed (<see cref="CannotOpenUploadFileResult" />); <see langword="null" />
+    /// before the first.
+    /// </summary>
+    private TransferResult? previousTransferResult;
+
+    /// <summary>
+    /// The failure <see cref="CannotOpenUploadFileResult" /> made from a failed earlier transfer,
+    /// compared by reference, so that <see cref="EndsTheRun" /> stops the run after it as after
+    /// <see cref="CannotOpenUploadFileFailure" />; <see langword="null" /> until it makes one.
+    /// </summary>
+    private TransferResult? cannotOpenUploadFileAfterFailure;
+
+    /// <summary>
     /// The <c>%{conn_id}</c> the next transfer that connects takes, counted per run from zero.
     /// </summary>
     private long nextConnectionId;
@@ -846,6 +860,7 @@ internal sealed class CurlCommandRunner(
         await WriteOutAsync(options, transfer, givenUrl, transferUrl, result, standardOutputIsBinary).ConfigureAwait(false);
         await WriteCookieJarAsync(dispatch, options, transferUrl, standardOutputIsBinary).ConfigureAwait(false);
 
+        previousTransferResult = result;
         return result;
     }
 
@@ -1318,8 +1333,33 @@ internal sealed class CurlCommandRunner(
     /// <param name="options">The accepted command line.</param>
     /// <param name="result">The transfer's result.</param>
     /// <returns><see langword="true" /> when no further URL is transferred.</returns>
-    private static bool EndsTheRun(CommandLineOptions options, TransferResult result) =>
-        RunEndingFailures.Contains(result) || (options.FailEarly && !result.IsSuccess);
+    private bool EndsTheRun(CommandLineOptions options, TransferResult result) =>
+        RunEndingFailures.Contains(result)
+        || ReferenceEquals(result, cannotOpenUploadFileAfterFailure)
+        || (options.FailEarly && !result.IsSuccess);
+
+    /// <summary>
+    /// The result of a transfer whose <c>-T</c> file cannot be opened. curl 8.21.0 does not set
+    /// one of its own: it reports the run's previous transfer's code, with the text
+    /// <see cref="CurlEasyErrorText" /> gives it, when that transfer failed, and exit 26 when it
+    /// succeeded or there was none. <c>-T '{local.txt,nosuch}' http://127.0.0.1:1/g/</c> printed
+    /// <c>curl: (7) Could not connect to server</c> for <c>nosuch</c> and exited 7 (measured
+    /// 2026-09-27, BL-440 Notes). Either way the run ends.
+    /// </summary>
+    /// <returns>
+    /// <see cref="CannotOpenUploadFileFailure" />, or the previous transfer's failure code with
+    /// curl's text for it, kept in <see cref="cannotOpenUploadFileAfterFailure" />.
+    /// </returns>
+    private TransferResult CannotOpenUploadFileResult()
+    {
+        if (previousTransferResult is not { IsSuccess: false } previous)
+        {
+            return CannotOpenUploadFileFailure;
+        }
+
+        cannotOpenUploadFileAfterFailure = TransferResult.Failure(previous.ExitCode, CurlEasyErrorText.Of(previous.ExitCode));
+        return cannotOpenUploadFileAfterFailure;
+    }
 
     /// <summary>
     /// The results, compared by reference, after which no further URL is transferred whatever
@@ -1558,7 +1598,7 @@ internal sealed class CurlCommandRunner(
     /// The transfer's result; <see cref="ByteRangeParser.NotDeliveredFailure" />, with nothing
     /// transferred, when the <c>-r</c> text names no range, as curl 8.21.0 reports it; the
     /// <c>-F</c> body's build failure, with nothing transferred, when a form file cannot be opened;
-    /// <see cref="CannotOpenUploadFileFailure" />, with nothing transferred, when the <c>-T</c> file
+    /// <see cref="CannotOpenUploadFileResult" />, with nothing transferred, when the <c>-T</c> file
     /// cannot be opened, after curl's <c>curl: cannot open</c> and try-help lines, which curl 8.21.0
     /// prints even under <c>-s</c> (measured 2026-09-27, BL-030).
     /// </returns>
@@ -1587,7 +1627,7 @@ internal sealed class CurlCommandRunner(
         {
             await WriteErrorLinesAsync([$"curl: cannot open '{uploadFile}'", CommandLineRefusal.TryHelpLine])
                 .ConfigureAwait(false);
-            return CannotOpenUploadFileFailure;
+            return CannotOpenUploadFileResult();
         }
 
         await using (upload.ConfigureAwait(false))
