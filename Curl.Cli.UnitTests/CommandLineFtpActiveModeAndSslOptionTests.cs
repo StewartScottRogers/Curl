@@ -12,6 +12,9 @@ namespace Curl.Cli;
 /// with exit 64; the three flags are independent, so <c>--ssl-reqd --no-ssl</c> still fails and
 /// <c>--ssl --no-ssl-reqd</c> still tries; <c>--disable-eprt</c> and <c>--no-eprt</c> send <c>PORT</c>
 /// only, and the later of <c>--disable-eprt</c>, <c>--eprt</c> and their negations wins.
+/// <c>-P - --ftp-pasv</c> sends <c>EPSV</c> and <c>--ftp-pasv -P -</c> sends <c>EPRT</c> (the later wins);
+/// <c>--no-ftp-pasv</c> exits 2 as not reversible; the later of <c>--disable-epsv</c>, <c>--epsv</c> and
+/// their negations wins (<c>--no-epsv</c> sends <c>PASV</c>) - measured by BL-463 the same way.
 /// </summary>
 [TestClass]
 public sealed class CommandLineFtpActiveModeAndSslOptionTests
@@ -77,6 +80,59 @@ public sealed class CommandLineFtpActiveModeAndSslOptionTests
         CommandLineParseResult result = CommandLineParser.Parse(["--no-ftp-port", "-", Url]);
 
         AssertRefused(result, "curl: option --no-ftp-port: the given option cannot be reversed with a --no- prefix");
+    }
+
+    [TestMethod]
+    [DataRow("-P")]
+    [DataRow("--ftp-port")]
+    public void Parse_FtpPasvAfterFtpPort_ClearsTheAddressAsCurlDoes(string option)
+    {
+        CommandLineParseResult result = CommandLineParser.Parse([option, "-", "--ftp-pasv", Url]);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsNull(result.Options.FtpPort);
+    }
+
+    [TestMethod]
+    public void Parse_FtpPortAfterFtpPasv_TheLaterWinsAsCurlDoes()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--ftp-pasv", "-P", "-", Url]);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual("-", result.Options.FtpPort);
+    }
+
+    [TestMethod]
+    public void Parse_FtpPasvAlone_LeavesPassiveMode()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--ftp-pasv", Url]);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsNull(result.Options.FtpPort);
+    }
+
+    [TestMethod]
+    public void Parse_NegatedFtpPasv_IsRefusedAsNotReversible()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--no-ftp-pasv", Url]);
+
+        AssertRefused(result, "curl: option --no-ftp-pasv: the given option cannot be reversed with a --no- prefix");
+    }
+
+    [TestMethod]
+    [DataRow(new[] { "--epsv" }, false)]
+    [DataRow(new[] { "--no-epsv" }, true)]
+    [DataRow(new[] { "--disable-epsv", "--epsv" }, false)]
+    [DataRow(new[] { "--epsv", "--disable-epsv" }, true)]
+    [DataRow(new[] { "--disable-epsv", "--no-epsv" }, true)]
+    [DataRow(new[] { "--no-epsv", "--no-disable-epsv" }, false)]
+    [DataRow(new[] { "--no-disable-epsv", "--no-epsv" }, true)]
+    public void Parse_EpsvDisableEpsvAndTheirNegations_TheLaterWins(string[] flags, bool expectedDisabled)
+    {
+        CommandLineParseResult result = CommandLineParser.Parse([.. flags, Url]);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual(expectedDisabled, result.Options.FtpDisableEpsv);
     }
 
     [TestMethod]

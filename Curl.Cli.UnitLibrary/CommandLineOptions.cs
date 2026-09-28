@@ -378,7 +378,10 @@ public sealed class CommandLineOptions
     /// <summary><see langword="true"/> when <c>--tftp-no-options</c> was given and no <c>--no-tftp-no-options</c> came after it.</summary>
     public bool TftpNoOptions { get; internal set; }
 
-    /// <summary><see langword="true"/> when <c>--disable-epsv</c> was given and no <c>--no-disable-epsv</c> came after it.</summary>
+    /// <summary>
+    /// <see langword="true"/> when the last of <c>--disable-epsv</c>, <c>--epsv</c> and their <c>--no-</c>
+    /// spellings turned <c>EPSV</c> off (<c>--disable-epsv</c> or <c>--no-epsv</c>); <see langword="false"/> otherwise.
+    /// </summary>
     public bool FtpDisableEpsv { get; internal set; }
 
     /// <summary>
@@ -398,7 +401,7 @@ public sealed class CommandLineOptions
 
     /// <summary>
     /// The last <c>-P</c> / <c>--ftp-port</c> address, verbatim, for FTP active mode; <see langword="null"/>
-    /// when not given, for passive mode (ADR-0102).
+    /// when not given or when a later <c>--ftp-pasv</c> cleared it, for passive mode (ADR-0102).
     /// </summary>
     public string? FtpPort { get; internal set; }
 
