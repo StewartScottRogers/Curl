@@ -233,6 +233,20 @@ public static class CommandLineWarning
     ];
 
     /// <summary>
+    /// The line curl prints for <c>--ssl</c> or <c>--ftp-ssl</c>, which go on in plaintext when the
+    /// server refuses TLS: <c>Warning: &lt;option&gt; is an insecure option, consider --ssl-reqd instead</c>.
+    /// Measured with <c>curl --ssl</c>, <c>--ftp-ssl</c> and <c>--ssl=x</c> against <c>ftp://127.0.0.1:1/</c>
+    /// (curl 8.21.0, Windows, 2026-09-27): the long name only, whatever value is attached; once per
+    /// occurrence; none for <c>--no-ssl</c>.
+    /// </summary>
+    /// <param name="longName">The option's long name with its <c>--</c>: <c>--ssl</c> or <c>--ftp-ssl</c>.</param>
+    /// <returns>The warning's lines.</returns>
+    internal static IReadOnlyList<string> InsecureSsl(string longName) =>
+    [
+        $"Warning: {longName} is an insecure option, consider --ssl-reqd instead",
+    ];
+
+    /// <summary>
     /// The lines curl prints for a <c>--ftp-method</c> value that is none of <c>multicwd</c>, <c>nocwd</c>
     /// and <c>singlecwd</c> (in any case), after which it uses <c>multicwd</c>:
     /// <c>Warning: unrecognized ftp file method '&lt;value&gt;', using default</c>, wrapped at 79 columns as

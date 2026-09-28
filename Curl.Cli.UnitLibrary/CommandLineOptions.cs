@@ -396,6 +396,44 @@ public sealed class CommandLineOptions
     /// <summary><see langword="true"/> when <c>--ftp-create-dirs</c> was given and no <c>--no-ftp-create-dirs</c> came after it.</summary>
     public bool FtpCreateDirectories { get; internal set; }
 
+    /// <summary>
+    /// The last <c>-P</c> / <c>--ftp-port</c> address, verbatim, for FTP active mode; <see langword="null"/>
+    /// when not given, for passive mode (ADR-0102).
+    /// </summary>
+    public string? FtpPort { get; internal set; }
+
+    /// <summary>
+    /// <see langword="false"/> when the last of <c>--disable-eprt</c>, <c>--eprt</c> and their <c>--no-</c>
+    /// spellings turned <c>EPRT</c> off (<c>--disable-eprt</c> or <c>--no-eprt</c>); <see langword="true"/>
+    /// otherwise, as curl 8.21.0 sends <c>EPRT</c> before <c>PORT</c> by default.
+    /// </summary>
+    public bool FtpUseEprt { get; internal set; } = true;
+
+    /// <summary>
+    /// Whether a plaintext scheme upgrades to TLS: <see cref="TransportSecurityLevel.Required"/> when
+    /// <c>--ssl-reqd</c>/<c>--ftp-ssl-reqd</c> or <c>--ftp-ssl-control</c> is in effect,
+    /// <see cref="TransportSecurityLevel.Try"/> when only <c>--ssl</c>/<c>--ftp-ssl</c> is, and
+    /// <see cref="TransportSecurityLevel.None"/> otherwise. curl 8.21.0 keeps the three flags apart, so
+    /// <c>--no-ssl</c> does not undo <c>--ssl-reqd</c> (ADR-0102).
+    /// </summary>
+    public TransportSecurityLevel SslLevel =>
+        SslRequired || FtpSslControlOnly ? TransportSecurityLevel.Required
+        : SslTry ? TransportSecurityLevel.Try
+        : TransportSecurityLevel.None;
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--ftp-ssl-control</c> was given and no <c>--no-ftp-ssl-control</c> came
+    /// after it: TLS is required for the control connection only, and the data connections stay clear.
+    /// It outranks <c>--ssl-reqd</c> whichever comes first, as curl sets it last.
+    /// </summary>
+    public bool FtpSslControlOnly { get; internal set; }
+
+    /// <summary><see langword="true"/> when <c>--ssl</c> or <c>--ftp-ssl</c> was given and no <c>--no-ssl</c> or <c>--no-ftp-ssl</c> came after it.</summary>
+    internal bool SslTry { get; private set; }
+
+    /// <summary><see langword="true"/> when <c>--ssl-reqd</c> or <c>--ftp-ssl-reqd</c> was given and no <c>--no-</c> spelling of either came after it.</summary>
+    internal bool SslRequired { get; set; }
+
     /// <summary><see langword="true"/> when <c>-l</c> / <c>--list-only</c> was given and no <c>--no-list-only</c> came after it.</summary>
     public bool ListOnly { get; internal set; }
 
@@ -866,6 +904,21 @@ public sealed class CommandLineOptions
         }
 
         RaiseVerbosity();
+    }
+
+    /// <summary>
+    /// Turns <c>--ssl</c> / <c>--ftp-ssl</c> on or off. Turning it on warns, unless silent, as curl 8.21.0
+    /// warns that trying TLS and going on in plaintext is insecure.
+    /// </summary>
+    /// <param name="on"><see langword="true"/> for the option, <see langword="false"/> for its <c>--no-</c> spelling.</param>
+    /// <param name="longName">The option's long name with its <c>--</c>, named in the warning.</param>
+    internal void SetSslTry(bool on, string longName)
+    {
+        SslTry = on;
+        if (on)
+        {
+            AddWarningLinesUnlessSilent(CommandLineWarning.InsecureSsl(longName));
+        }
     }
 
     /// <summary>Takes <see cref="Verbosity"/> one step up, to at most 4, as one more <c>v</c> does.</summary>
