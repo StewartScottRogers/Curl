@@ -35,3 +35,4 @@ In the OpenSSL build, a server certificate whose subjectAltName holds only IP ad
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
