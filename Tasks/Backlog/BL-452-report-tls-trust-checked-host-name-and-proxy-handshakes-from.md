@@ -1,5 +1,5 @@
 ---
-id: BL-449
+id: BL-452
 title: Report TLS trust, checked host name and proxy handshakes from Curl.Networking
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-449 — Report TLS trust, checked host name and proxy handshakes from Curl.Networking
+# BL-452 — Report TLS trust, checked host name and proxy handshakes from Curl.Networking
 
 ## Goal
 

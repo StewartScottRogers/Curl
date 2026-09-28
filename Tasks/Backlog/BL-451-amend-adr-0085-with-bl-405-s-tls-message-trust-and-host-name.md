@@ -1,5 +1,5 @@
 ---
-id: BL-448
+id: BL-451
 title: Amend ADR-0085 with BL-405's TLS message, trust and host-name events
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-448 — Amend ADR-0085 with BL-405's TLS message, trust and host-name events
+# BL-451 — Amend ADR-0085 with BL-405's TLS message, trust and host-name events
 
 ## Goal
 
@@ -24,7 +24,7 @@ the decisions BL-405 made, and its Decision section no longer says those lines a
   copy them into an `## Amendment (BL-405, 2026-09-27)` section, as BL-404's amendment does.
 - The last bullet of ADR-0085's Decision section ("The handshake event carries no host
   name, ... are left to follow-up tasks") is now false for `Curl.Output`; reword it so it
-  says what is still left (producers: BL-449; `--trace`: BL-450).
+  says what is still left (producers: BL-452; `--trace`: BL-450).
 
 ## Acceptance criteria
 

@@ -126,7 +126,7 @@ build of curl 8.21.0 prints around a handshake that BL-356 left out: the TLS rec
     are not worded (not in the Linux build measured); IPv4 host detection counts dots (curl
     uses `inet_pton`).
   - ADR-0085 could not be amended here: `Documentation/Planning/Decisions` is in BL-380's
-    `touches` (in Doing). Filed as BL-448 rather than widening this task.
+    `touches` (in Doing). Filed as BL-451 rather than widening this task.
 - Delivered: `Curl.Protocol.Abstractions.UnitLibrary` — `TlsContentType`, `TlsMessageEvent`,
   `TlsTrustEvent`, the two `ITransferEvents` defaults, `TlsHandshakeEvent.IsProxy` and
   `.VerifiedHostName`. `Curl.Output.UnitLibrary` — `OpenSslMessageText`, `OpenSslTrustText`,
@@ -138,7 +138,7 @@ build of curl 8.21.0 prints around a handshake that BL-356 left out: the TLS rec
 - Quality: Curl.Output 100% line, 100% branch, 0 failing members (worst CRAP 10), 399
   tests; Curl.Protocol.Abstractions 100%/100%, 0 failing, 515 tests; whole fast suite
   green; `dotnet format` shows only the repository-wide ENDOFLINE diagnostics.
-- Follow-ups filed: BL-448 (ADR-0085 amendment), BL-449 (Networking reports trust, host
+- Follow-ups filed: BL-451 (ADR-0085 amendment), BL-452 (Networking reports trust, host
   name and proxy handshakes; ALPN-offer ordering), BL-450 (`--trace` wording).
 
 ## Log
