@@ -40,3 +40,4 @@ build writes to `--trace` and `--trace-ascii` for `ReportTlsMessage`, `ReportTls
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
