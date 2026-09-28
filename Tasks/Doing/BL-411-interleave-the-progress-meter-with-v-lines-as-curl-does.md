@@ -38,3 +38,4 @@ Without `-s`, `-v` lines and the progress meter appear on standard error in the 
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
 - 2026-09-27: Doing -> Backlog. Waits on BL-478: the HTTP handler must report the transfer done before its connection-end -v line
+- 2026-09-27: Backlog -> Doing.
