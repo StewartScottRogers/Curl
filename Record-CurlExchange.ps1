@@ -64,6 +64,13 @@
     rather than a FIN. Use it to measure what curl prints when the server resets the
     connection, as during a TLS handshake (BL-369). request.bin is then empty.
 
+.PARAMETER HoldOpenMilliseconds
+    After sending each response, keep the connection open instead of closing it, until
+    curl closes its end or this many milliseconds pass without a byte from curl, and
+    record anything curl sends meanwhile. Default 0: close at once. Use it to measure
+    what curl does with a response that stops without the peer closing, such as a head
+    that never ends (BL-480). The script always reports how long curl ran.
+
 .PARAMETER RespondAfterBodyBytes
     Instead of reading the whole request, send the response as soon as the header block
     and this many body bytes have arrived, then go on reading (and recording) whatever
@@ -167,6 +174,7 @@ param(
     [ValidateRange(1, 1000)] [int] $Connections = 1,
     [ValidateRange(0, 600000)] [int] $ResponseDelayMilliseconds = 0,
     [switch] $Reset,
+    [ValidateRange(0, 600000)] [int] $HoldOpenMilliseconds = 0,
     [ValidateRange(-1, [int]::MaxValue)] [int] $RespondAfterBodyBytes = -1,
     [string] $StandardInput = '',
     [switch] $Ftp,
@@ -253,7 +261,7 @@ function ConvertTo-CommandLineArgument {
 # The server runs in its own runspace so curl can run in this one. It returns one
 # byte array per connection served.
 $serveConnections = {
-    param($Listener, $ResponseBytes, [int] $ConnectionCount, [int] $DelayMilliseconds, [bool] $ResetConnections, [int] $EarlyResponseBodyBytes, $TlsCertificate)
+    param($Listener, $ResponseBytes, [int] $ConnectionCount, [int] $DelayMilliseconds, [bool] $ResetConnections, [int] $EarlyResponseBodyBytes, $TlsCertificate, [int] $HoldOpen)
 
     Set-StrictMode -Version Latest
     $ErrorActionPreference = 'Stop'
@@ -328,6 +336,19 @@ $serveConnections = {
             if ($EarlyResponseBodyBytes -ge 0) {
                 # Answered mid-body: record whatever curl goes on sending until it stops.
                 $stream.ReadTimeout = 2000
+                while ($true) {
+                    try {
+                        $count = $stream.Read($buffer, 0, $buffer.Length)
+                    } catch [System.IO.IOException] {
+                        break
+                    }
+                    if ($count -le 0) { break }
+                    $received.Write($buffer, 0, $count)
+                }
+            }
+            if ($HoldOpen -gt 0) {
+                # Held open: wait for curl to hang up, recording what it still sends.
+                $stream.ReadTimeout = $HoldOpen
                 while ($true) {
                     try {
                         $count = $stream.Read($buffer, 0, $buffer.Length)
@@ -594,7 +615,7 @@ try {
     if ($Ftp) {
         [void] $server.AddScript($serveFtpSession).AddArgument($listener).AddArgument($ftpOverrides).AddArgument([byte[]] (ConvertFrom-EscapedResponse -Text $FtpData)).AddArgument($transcript).AddArgument($uploadedData).AddArgument($tlsCertificate).AddArgument([bool] $Tls).AddArgument($FtpIdleMilliseconds).AddArgument($ListenAddress)
     } else {
-        [void] $server.AddScript($serveConnections).AddArgument($listener).AddArgument($responseBytes).AddArgument($Connections).AddArgument($ResponseDelayMilliseconds).AddArgument([bool] $Reset).AddArgument($RespondAfterBodyBytes).AddArgument($tlsCertificate)
+        [void] $server.AddScript($serveConnections).AddArgument($listener).AddArgument($responseBytes).AddArgument($Connections).AddArgument($ResponseDelayMilliseconds).AddArgument([bool] $Reset).AddArgument($RespondAfterBodyBytes).AddArgument($tlsCertificate).AddArgument($HoldOpenMilliseconds)
     }
     $serverRun = $server.BeginInvoke()
 
@@ -613,6 +634,7 @@ try {
     $consoleInputEncoding = [System.Console]::InputEncoding
     [System.Console]::InputEncoding = [System.Text.Encoding]::GetEncoding(28591)
     try {
+        $curlClock = [System.Diagnostics.Stopwatch]::StartNew()
         $curlProcess = [System.Diagnostics.Process]::Start($startInfo)
     } finally {
         [System.Console]::InputEncoding = $consoleInputEncoding
@@ -627,6 +649,7 @@ try {
         $stdoutCopy = $curlProcess.StandardOutput.BaseStream.CopyToAsync($stdout)
         $stderrCopy = $curlProcess.StandardError.BaseStream.CopyToAsync($stderr)
         $curlProcess.WaitForExit()
+        $curlClock.Stop()
         [System.Threading.Tasks.Task]::WaitAll(@($stdoutCopy, $stderrCopy))
         $exitCode = $curlProcess.ExitCode
     } finally {
@@ -660,4 +683,4 @@ if ($Ftp) {
     [System.IO.File]::WriteAllBytes((Join-Path $OutDirectory 'upload.bin'), $uploadedData.ToArray())
 }
 
-Write-Host "curl exited $exitCode; fixtures written to $OutDirectory"
+Write-Host "curl exited $exitCode after $($curlClock.ElapsedMilliseconds) ms; fixtures written to $OutDirectory"
