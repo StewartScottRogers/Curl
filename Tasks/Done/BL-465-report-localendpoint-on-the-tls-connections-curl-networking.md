@@ -8,7 +8,7 @@ depends-on: [BL-456]
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-09-27
-completed:
+completed: 2026-09-27
 ---
 # BL-465 — Report LocalEndPoint on the TLS connections Curl.Networking returns, so -P - works over ftps://
 
@@ -23,14 +23,17 @@ A connection `TcpConnector` returns for a `ConnectTarget` with `UseTls` reports 
 
 ## Acceptance criteria
 
-- [ ] A named test in `Curl.Networking.UnitTests` connects with `UseTls` to a loopback TLS server and asserts the returned connection's `LocalEndPoint` equals the socket's local endpoint.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] A named test in `Curl.Networking.UnitTests` connects with `UseTls` to a loopback TLS server and asserts the returned connection's `LocalEndPoint` equals the socket's local endpoint.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Filed by BL-437 (lane 3, 2026-09-27).
+- The production forwarding already landed with BL-456: `SslStreamConnection.LocalEndPoint` returns the plaintext connection's, and `PooledConnection` forwards its underlying one. No production change was needed; this task adds the loopback TLS test `TcpConnectorTests.ConnectAsync_WithTlsToALoopbackTlsServer_ReturnsAConnectionThatReportsItsSocketsLocalEndPoint` (Integration: real `TcpDialer`, real `SslStreamTlsProvider` with `-k`, a self-signed server certificate made in the test) that pins it end to end.
+- Pipeline: with no production code to plan or implement, the feature stages reduced to test, verify and document; the Networking `CLAUDE.md` now names the TLS case among the loopback tests.
 
 ## Log
 
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Done. A TLS connection TcpConnector returns reports its socket's LocalEndPoint, pinned by a loopback TLS test, so -P - works over ftps://
