@@ -12,7 +12,8 @@ namespace Curl.Cli;
 /// exit code, which is <see cref="CurlExitCode.FailedInit"/>
 /// (curl's <c>CURLE_FAILED_INIT</c>, exit 2; see <see href="https://curl.se/libcurl/c/libcurl-errors.html"/>)
 /// for every refusal but a file that cannot be read (<see cref="DataFileUnreadable"/>,
-/// <see cref="ConfigFileUnreadable"/>), which is <see cref="CurlExitCode.ReadError"/> (26).
+/// <see cref="ConfigFileUnreadable"/>), which is <see cref="CurlExitCode.ReadError"/> (26), and an unknown
+/// <c>--proto-default</c> scheme (<see cref="UnsupportedProtocol"/>), which is <see cref="CurlExitCode.UnsupportedProtocol"/> (1).
 /// It writes nothing itself; the console layer writes the lines and chooses the newline.
 /// </summary>
 /// <remarks>
@@ -62,7 +63,8 @@ public sealed class CommandLineRefusal
 
     /// <summary>
     /// The exit code curl returns for the refused command line: <see cref="CurlExitCode.FailedInit"/>,
-    /// or <see cref="CurlExitCode.ReadError"/> when a file could not be read.
+    /// <see cref="CurlExitCode.ReadError"/> when a file could not be read, or <see cref="CurlExitCode.UnsupportedProtocol"/>
+    /// for <see cref="UnsupportedProtocol"/>.
     /// </summary>
     public CurlExitCode ExitCode { get; }
 
@@ -169,6 +171,21 @@ public sealed class CommandLineRefusal
         Create(spelledOption, "is badly used here");
 
     /// <summary>
+    /// Refuses a <c>--proto-default</c> scheme curl does not know, with exit code
+    /// <see cref="CurlExitCode.UnsupportedProtocol"/> (1), whether or not <c>-s</c> came first
+    /// (measured with <c>curl --proto-default bogus</c>, curl 8.21.0, Windows, 2026-09-28).
+    /// </summary>
+    /// <param name="spelledOption">The whole argument as typed, such as <c>--proto-default</c>.</param>
+    /// <returns>A refusal reading <c>a specified protocol is unsupported by libcurl</c>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="spelledOption"/> is <see langword="null"/>.</exception>
+    public static CommandLineRefusal UnsupportedProtocol(string spelledOption)
+    {
+        ArgumentNullException.ThrowIfNull(spelledOption);
+
+        return new CommandLineRefusal(CurlExitCode.UnsupportedProtocol, [], spelledOption, "a specified protocol is unsupported by libcurl");
+    }
+
+    /// <summary>
     /// Refuses <c>-C</c>/<c>--continue-at</c> and <c>-r</c>/<c>--range</c> on one command line,
     /// naming whichever came second: <c>curl: --continue-at is mutually exclusive with --range</c>,
     /// <c>curl: option &lt;spelled&gt;: is badly used here</c> and the try-help line.
@@ -185,13 +202,44 @@ public sealed class CommandLineRefusal
     /// </param>
     /// <returns>A refusal of three lines, or two when <paramref name="errorsHidden"/>.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="spelledOption"/> is <see langword="null"/>.</exception>
-    public static CommandLineRefusal ContinueAtExclusiveWithRange(string spelledOption, bool errorsHidden)
+    public static CommandLineRefusal ContinueAtExclusiveWithRange(string spelledOption, bool errorsHidden) =>
+        ContinueAtExclusiveWith("--range", spelledOption, errorsHidden);
+
+    /// <summary>
+    /// Refuses <c>-C</c>/<c>--continue-at</c> and <c>--remove-on-error</c> on one command line,
+    /// naming whichever came second: <c>curl: --continue-at is mutually exclusive with --remove-on-error</c>,
+    /// <c>curl: option &lt;spelled&gt;: is badly used here</c> and the try-help line.
+    /// </summary>
+    /// <remarks>
+    /// Measured with the local curl 8.21.0 on 2026-09-28 (BL-494 Notes): <c>-C -</c> and <c>-C 0</c>
+    /// count as much as <c>-C 5</c>, a <c>--no-remove-on-error</c> after <c>--remove-on-error</c>
+    /// clears it, and the first line is hidden by <c>-s</c> without <c>-S</c> as
+    /// <see cref="ContinueAtExclusiveWithRange"/>'s is.
+    /// </remarks>
+    /// <param name="spelledOption">The whole argument as typed, for whichever option came second.</param>
+    /// <param name="errorsHidden">
+    /// <see langword="true"/> when <c>-s</c> without <c>-S</c> was read before the refused option.
+    /// </param>
+    /// <returns>A refusal of three lines, or two when <paramref name="errorsHidden"/>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="spelledOption"/> is <see langword="null"/>.</exception>
+    public static CommandLineRefusal ContinueAtExclusiveWithRemoveOnError(string spelledOption, bool errorsHidden) =>
+        ContinueAtExclusiveWith("--remove-on-error", spelledOption, errorsHidden);
+
+    /// <summary>
+    /// Refuses <c>-C</c>/<c>--continue-at</c> beside <paramref name="otherOption"/>, as
+    /// <see cref="ContinueAtExclusiveWithRange"/> describes.
+    /// </summary>
+    /// <param name="otherOption">The long option <c>-C</c> cannot be combined with, dashes included.</param>
+    /// <param name="spelledOption">The whole argument as typed, for whichever option came second.</param>
+    /// <param name="errorsHidden"><see langword="true"/> when <c>-s</c> without <c>-S</c> was read before the refused option.</param>
+    /// <returns>A refusal of three lines, or two when <paramref name="errorsHidden"/>.</returns>
+    private static CommandLineRefusal ContinueAtExclusiveWith(string otherOption, string spelledOption, bool errorsHidden)
     {
         ArgumentNullException.ThrowIfNull(spelledOption);
 
         return new CommandLineRefusal(
             CurlExitCode.FailedInit,
-            errorsHidden ? [] : ["curl: --continue-at is mutually exclusive with --range"],
+            errorsHidden ? [] : ["curl: --continue-at is mutually exclusive with " + otherOption],
             spelledOption,
             "is badly used here");
     }

@@ -117,6 +117,12 @@ public sealed class TransferContext : ITransferContext
     public HttpRequestOptions? Http { get; init; }
 
     /// <inheritdoc />
+    public MailRequestOptions? Mail { get; init; }
+
+    /// <inheritdoc />
+    public SshOptions? Ssh { get; init; }
+
+    /// <inheritdoc />
     public TimeProvider TimeProvider { get; init; } = TimeProvider.System;
 
     /// <inheritdoc />

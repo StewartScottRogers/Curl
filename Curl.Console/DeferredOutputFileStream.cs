@@ -15,6 +15,13 @@ namespace Curl.Console;
 /// <see cref="FileWriteMode.Append" /> when <c>-C</c> / <c>--continue-at</c> resumes it, as
 /// curl opens the file <c>"ab"</c> then.
 /// </param>
+/// <param name="clobber">
+/// The <c>--clobber</c> / <c>--no-clobber</c> choice: <see langword="false" /> opens a whole
+/// transfer's file only when nothing is there and otherwise takes the first free
+/// <c>&lt;path&gt;.1</c> ... <c>&lt;path&gt;.99</c>; <see langword="true" /> overwrites even a
+/// <c>-J</c> name; <see langword="null" />, the default, overwrites an <c>-o</c> or <c>-O</c> file
+/// and not a <c>-J</c> one.
+/// </param>
 /// <remarks>
 /// <para>
 /// Opening late is what gives curl's messages: when the file cannot be created, the
@@ -40,7 +47,7 @@ namespace Curl.Console;
 /// <see cref="Stream.WriteAsync(ReadOnlyMemory{byte}, CancellationToken)" />.
 /// </para>
 /// </remarks>
-internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string path, FileWriteMode writeMode) : Stream
+internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string path, FileWriteMode writeMode, bool? clobber = null) : Stream
 {
     /// <summary>
     /// The mode a newly created <c>-o</c> file receives on a POSIX system, before the umask:
@@ -51,6 +58,12 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
         UnixFileMode.UserRead | UnixFileMode.UserWrite
         | UnixFileMode.GroupRead | UnixFileMode.GroupWrite
         | UnixFileMode.OtherRead | UnixFileMode.OtherWrite;
+
+    /// <summary>
+    /// The highest number <c>--no-clobber</c> puts after a taken name: curl 8.21.0 tries
+    /// <c>.1</c> to <c>.99</c> (measured 2026-09-28).
+    /// </summary>
+    internal const int LastNumberedName = 99;
 
     private Stream? file;
     private FileWriteMode openMode = writeMode;
@@ -188,7 +201,9 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
     /// The file is opened <see cref="FileWriteMode.CreateNew" />, as curl opens it with
     /// <c>O_EXCL</c>: a file already under that name - even one another process created a
     /// moment ago - is kept, and the open fails with curl's
-    /// <c>Warning: Failed to open the file x.txt: File exists</c>.
+    /// <c>Warning: Failed to open the file x.txt: File exists</c>. <c>--no-clobber</c> takes the
+    /// first free numbered name instead, and <c>--clobber</c> overwrites it, as curl 8.21.0 does
+    /// (measured 2026-09-28, BL-492 Notes).
     /// </para>
     /// <para>
     /// An empty name fails as curl's <c>fopen("")</c> does, with <c>No such file or directory</c>,
@@ -198,7 +213,7 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
     internal async ValueTask<bool> TryOpenUnderNameAsync(string newPath, int headerLineLength, CancellationToken cancellationToken)
     {
         Path = newPath;
-        openMode = FileWriteMode.CreateNew;
+        openMode = clobber == true ? FileWriteMode.Truncate : FileWriteMode.CreateNew;
         if (newPath.Length == 0)
         {
             FailOpen(OutputFileOpenWarning.For(newPath, FileAccessStatus.NotFound), headerLineLength);
@@ -276,22 +291,65 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
 
     /// <summary>
     /// Opens the file in its write mode - <see cref="FileWriteMode.CreateNew" /> once it has a
-    /// <c>-J</c> name - with <see cref="CreateMode" />.
+    /// <c>-J</c> name, or under <c>--no-clobber</c> - with <see cref="CreateMode" />. Under
+    /// <c>--no-clobber</c> a name already taken moves on to <see cref="OpenFirstFreeNumberedNameAsync" />.
     /// </summary>
     /// <param name="cancellationToken">Cancels the open.</param>
     /// <returns>The open file, or <see langword="null" /> when it could not be opened.</returns>
+    /// <remarks>
+    /// The warning names the file asked for, not a numbered one, as curl 8.21.0's does (measured
+    /// 2026-09-28, BL-492 Notes).
+    /// </remarks>
     private async ValueTask<Stream?> TryOpenAsync(CancellationToken cancellationToken)
     {
-        FileOpenResult opened = await fileSystem
-            .OpenForWriteAsync(Path, openMode, CreateMode, cancellationToken)
-            .ConfigureAwait(false);
+        string requestedPath = Path;
+        FileWriteMode mode = clobber == false && openMode == FileWriteMode.Truncate ? FileWriteMode.CreateNew : openMode;
+        FileOpenResult opened = await OpenAsync(mode, cancellationToken).ConfigureAwait(false);
+        if (clobber == false && opened.Status == FileAccessStatus.AlreadyExists)
+        {
+            opened = await OpenFirstFreeNumberedNameAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         Adopt(opened.Content);
 
         if (!opened.IsOpen)
         {
-            OpenFailureWarning = OutputFileOpenWarning.For(Path, opened.Status);
+            OpenFailureWarning = OutputFileOpenWarning.For(requestedPath, opened.Status);
         }
 
         return file;
+    }
+
+    /// <summary>
+    /// Opens <see cref="Path" /> with <paramref name="mode" /> and <see cref="CreateMode" />.
+    /// </summary>
+    /// <param name="mode">How existing content is treated.</param>
+    /// <param name="cancellationToken">Cancels the open.</param>
+    /// <returns>The file system's answer.</returns>
+    private ValueTask<FileOpenResult> OpenAsync(FileWriteMode mode, CancellationToken cancellationToken) =>
+        fileSystem.OpenForWriteAsync(Path, mode, CreateMode, cancellationToken);
+
+    /// <summary>
+    /// Creates <c>&lt;path&gt;.1</c>, then <c>.2</c>, and so on while each is already taken, up to
+    /// <c>.99</c>, as curl 8.21.0's <c>--no-clobber</c> does: it stops before <c>.100</c>, whatever
+    /// its manual says (measured 2026-09-28, BL-492 Notes). <see cref="Path" /> is left on the last
+    /// name tried, which is what <c>%{filename_effective}</c> prints even when none was free.
+    /// </summary>
+    /// <param name="cancellationToken">Cancels the opens.</param>
+    /// <returns>The last open's answer.</returns>
+    private async ValueTask<FileOpenResult> OpenFirstFreeNumberedNameAsync(CancellationToken cancellationToken)
+    {
+        string takenPath = Path;
+        FileOpenResult opened;
+        int number = 0;
+        do
+        {
+            number++;
+            Path = takenPath + "." + number.ToString(CultureInfo.InvariantCulture);
+            opened = await OpenAsync(FileWriteMode.CreateNew, cancellationToken).ConfigureAwait(false);
+        }
+        while (opened.Status == FileAccessStatus.AlreadyExists && number < LastNumberedName);
+
+        return opened;
     }
 }

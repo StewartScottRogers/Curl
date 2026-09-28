@@ -36,9 +36,9 @@ namespace Curl.Cli;
 /// <c>--no-post301</c>, <c>--no-post302</c>, <c>--no-post303</c>, <c>--no-show-headers</c>, <c>--no-include</c>, <c>--no-head</c>,
 /// <c>--no-fail</c>, <c>--no-fail-with-body</c>, <c>--no-fail-early</c>, <c>--no-compressed</c>, <c>--no-raw</c>, <c>--no-tr-encoding</c>,
 /// <c>--no-ignore-content-length</c>, <c>--no-path-as-is</c>, <c>--no-http0.9</c>, <c>--no-basic</c>, <c>--no-digest</c>, <c>--no-ntlm</c>, <c>--no-negotiate</c>, <c>--no-proxytunnel</c>, <c>--no-remote-name</c>,
-/// <c>--no-remote-name-all</c>, <c>--no-remote-header-name</c>, <c>--no-create-dirs</c>, <c>--no-junk-session-cookies</c>, <c>--no-globoff</c>, <c>--no-version</c>, <c>--no-verbose</c>, <c>--no-trace-time</c>, <c>--no-retry-all-errors</c>, <c>--no-retry-connrefused</c>, <c>--no-disable-epsv</c>, <c>--no-epsv</c>, <c>--no-ftp-skip-pasv-ip</c>, <c>--no-ftp-create-dirs</c>, <c>--no-disable-eprt</c>, <c>--no-eprt</c>, <c>--no-ssl</c>, <c>--no-ftp-ssl</c>, <c>--no-ssl-reqd</c>, <c>--no-ftp-ssl-reqd</c>, <c>--no-ftp-ssl-control</c> and <c>--no-list-only</c> (measured 2026-09-27) are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
+/// <c>--no-remote-name-all</c>, <c>--no-remote-header-name</c>, <c>--no-create-dirs</c>, <c>--no-clobber</c> (measured 2026-09-28), <c>--no-skip-existing</c> and <c>--no-remove-on-error</c> (measured 2026-09-28), <c>--no-junk-session-cookies</c>, <c>--no-globoff</c>, <c>--no-version</c>, <c>--no-verbose</c>, <c>--no-trace-time</c>, <c>--no-retry-all-errors</c>, <c>--no-retry-connrefused</c>, <c>--no-disable-epsv</c>, <c>--no-epsv</c>, <c>--no-ftp-skip-pasv-ip</c>, <c>--no-ftp-create-dirs</c>, <c>--no-disable-eprt</c>, <c>--no-eprt</c>, <c>--no-ssl</c>, <c>--no-ftp-ssl</c>, <c>--no-ssl-reqd</c>, <c>--no-ftp-ssl-reqd</c>, <c>--no-ftp-ssl-control</c> and <c>--no-list-only</c> (measured 2026-09-27) and <c>--no-buffer</c> (measured 2026-09-28; <c>-N</c> is <c>--no-buffer</c>) are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
 /// silent and <c>--no-silent -s</c> is. <c>--no-silent=x</c> is accepted, its value ignored.
-/// <c>--no-tlsv1.2</c>, <c>--no-tlsv1.3</c>, <c>--no-url</c>, <c>--no-output</c> (even as the last
+/// <c>--no-tlsv1</c>, <c>--no-tlsv1.0</c>, <c>--no-tlsv1.1</c>, <c>--no-tlsv1.2</c>, <c>--no-tlsv1.3</c>, <c>--no-tls-max</c>, <c>--no-proxy-tlsv1</c>, <c>--no-url</c>, <c>--no-output</c> (even as the last
 /// argument), <c>--no-output=x</c>, <c>--no-data</c>, <c>--no-dump-header</c>, <c>--no-range</c>, <c>--no-time-cond</c>,
 /// <c>--no-request</c>, <c>--no-cookie</c>, <c>--no-cookie-jar</c>, <c>--no-header</c> (and <c>--no-header=x</c>), <c>--no-proxy-header</c>, <c>--no-user-agent</c>, <c>--no-referer</c>,
 /// <c>--no-data-ascii</c>, <c>--no-data-binary</c>, <c>--no-data-raw</c>, <c>--no-data-urlencode</c>, <c>--no-json</c>,
@@ -66,6 +66,7 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("show-error", 'S', (options, on) => options.ShowError = on),
         CommandLineOption.NegatableFlag("progress-meter", null, (options, on) => options.ProgressMeterOff = !on),
         CommandLineOption.NegatableFlag("progress-bar", '#', (options, on) => options.ProgressBar = on),
+        CommandLineOption.NegatableFlagTurnedOffByShortName("buffer", 'N', (options, on) => options.NoBuffer = !on),
         CommandLineOption.NegatableFlag("verbose", 'v', (options, on) => options.SetVerbose(on)),
         CommandLineOption.FileName("trace", null, (options, file) => options.SelectTraceDump(TraceKind.HexDump, file, "--trace")),
         CommandLineOption.FileName("trace-ascii", null, (options, file) => options.SelectTraceDump(TraceKind.AsciiDump, file, "--trace-ascii")),
@@ -78,6 +79,9 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("remote-header-name", 'J', (options, on) => options.RemoteHeaderName = on),
         CommandLineOption.Text("output-dir", null, (options, directory) => options.OutputDirectory = directory),
         CommandLineOption.NegatableFlag("create-dirs", null, (options, on) => options.CreateDirectories = on),
+        CommandLineOption.NegatableFlag("clobber", null, (options, on) => options.Clobber = on),
+        CommandLineOption.NegatableFlag("skip-existing", null, (options, on) => options.SkipExisting = on),
+        CommandLineOption.NegatableFlagThatCanRefuse("remove-on-error", null, SetRemoveOnError),
         CommandLineOption.Value("write-out", 'w', SetWriteOut),
         CommandLineOption.Value("data", 'd', AppendPostData),
         CommandLineOption.Value("data-ascii", null, AppendPostData),
@@ -147,8 +151,16 @@ public static class CommandLineOptionTable
         CommandLineOption.Text("cert-type", null, (options, type) => options.ClientCertificateType = type),
         CommandLineOption.Text("key-type", null, (options, type) => options.PrivateKeyType = type),
         CommandLineOption.Text("pass", null, (options, passphrase) => options.Passphrase = passphrase),
+        CommandLineOption.Flag("tlsv1", '1', options => options.MinimumTlsVersion = ObsoleteTlsProtocols.Tls10),
+        CommandLineOption.Flag("tlsv1.0", null, options => options.MinimumTlsVersion = ObsoleteTlsProtocols.Tls10),
+        CommandLineOption.Flag("tlsv1.1", null, options => options.MinimumTlsVersion = ObsoleteTlsProtocols.Tls11),
         CommandLineOption.Flag("tlsv1.2", null, options => options.MinimumTlsVersion = SslProtocols.Tls12),
         CommandLineOption.Flag("tlsv1.3", null, options => options.MinimumTlsVersion = SslProtocols.Tls13),
+        CommandLineOption.Value("tls-max", null, SetMaximumTlsVersion),
+        CommandLineOption.Flag("proxy-tlsv1", null, options => options.ProxyMinimumTlsVersion = ObsoleteTlsProtocols.Tls10),
+        CommandLineOption.Value("proto", null, (options, value, spelledOption, _, _) => SetAllowedProtocols(options, value, spelledOption, allowed => options.AllowedProtocols = allowed)),
+        CommandLineOption.Value("proto-redir", null, (options, value, spelledOption, _, _) => SetAllowedProtocols(options, value, spelledOption, allowed => options.AllowedRedirectProtocols = allowed)),
+        CommandLineOption.Value("proto-default", null, SetDefaultProtocol),
         CommandLineOption.Text("ciphers", null, (options, ciphers) => options.Ciphers = ciphers),
         CommandLineOption.Text("tls13-ciphers", null, (options, ciphers) => options.Tls13Ciphers = ciphers),
         CommandLineOption.Value("range", 'r', SetRange),
@@ -639,6 +651,74 @@ public static class CommandLineOptionTable
     /// value holding anything but digits, dashes and commas is kept verbatim with a warning.
     /// Parsing the text into a range is <c>ByteRangeParser</c>'s job, at transfer time.
     /// </summary>
+    /// <summary>
+    /// Records the <c>--tls-max</c> ceiling, or refuses with <see cref="CommandLineRefusal.BadlyUsedHere"/> for
+    /// any value but <c>default</c>, <c>1.0</c>, <c>1.1</c>, <c>1.2</c> and <c>1.3</c>, matched exactly and
+    /// case-sensitively as curl 8.21.0 does (<c>1.4</c>, <c>abc</c>, <c>DEFAULT</c>, <c>1</c>, <c>1.2 </c> and an
+    /// empty value are refused; measured 2026-09-28).
+    /// </summary>
+    private static CommandLineRefusal? SetMaximumTlsVersion(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        if (!MaximumTlsVersionsByName.TryGetValue(value, out SslProtocols? maximum))
+        {
+            return CommandLineRefusal.BadlyUsedHere(spelledOption);
+        }
+
+        options.MaximumTlsVersion = maximum;
+        return null;
+    }
+
+    /// <summary>
+    /// Records a <c>--proto</c> or <c>--proto-redir</c> value read by <see cref="CommandLineProtocolSet"/>,
+    /// warning (unless silent) about each name curl does not know, or refuses with
+    /// <see cref="CommandLineRefusal.BadlyUsedHere"/>, after those warnings, a value that allows no scheme.
+    /// </summary>
+    private static CommandLineRefusal? SetAllowedProtocols(CommandLineOptions options, string value, string spelledOption, Action<IReadOnlySet<string>> set)
+    {
+        List<string> warningLines = [];
+        IReadOnlySet<string>? allowed = CommandLineProtocolSet.Read(value, warningLines);
+        options.AddWarningLinesUnlessSilent(warningLines);
+        if (allowed is null)
+        {
+            return CommandLineRefusal.BadlyUsedHere(spelledOption);
+        }
+
+        set(allowed);
+        return null;
+    }
+
+    /// <summary>
+    /// Records the <c>--proto-default</c> scheme, lowercase, or refuses an empty value with
+    /// <see cref="CommandLineRefusal.BlankArgument"/> and a scheme curl does not know (<c>all</c> included) with
+    /// <see cref="CommandLineRefusal.UnsupportedProtocol"/>, as curl 8.21.0 does (measured 2026-09-28).
+    /// </summary>
+    private static CommandLineRefusal? SetDefaultProtocol(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        if (value.Length == 0)
+        {
+            return CommandLineRefusal.BlankArgument(spelledOption);
+        }
+
+        string? scheme = CommandLineProtocolSet.KnownScheme(value);
+        if (scheme is null)
+        {
+            return CommandLineRefusal.UnsupportedProtocol(spelledOption);
+        }
+
+        options.DefaultProtocol = scheme;
+        return null;
+    }
+
+    private static readonly FrozenDictionary<string, SslProtocols?> MaximumTlsVersionsByName =
+        new Dictionary<string, SslProtocols?>(StringComparer.Ordinal)
+        {
+            ["default"] = null,
+            ["1.0"] = ObsoleteTlsProtocols.Tls10,
+            ["1.1"] = ObsoleteTlsProtocols.Tls11,
+            ["1.2"] = SslProtocols.Tls12,
+            ["1.3"] = SslProtocols.Tls13,
+        }.ToFrozenDictionary(StringComparer.Ordinal);
+
     private static CommandLineRefusal? SetRange(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
     {
         if (options.ResumeFrom is not null || options.ResumeFromOutputSize)
@@ -683,13 +763,18 @@ public static class CommandLineOptionTable
     /// <summary>
     /// Records a <c>-C</c>/<c>--continue-at</c> value: <c>-</c> for "from the output file's size",
     /// or a byte offset read by <see cref="CommandLineNumber.ParseOffset"/>. It is refused when
-    /// <c>-r</c>/<c>--range</c> came first, before the value is looked at, as curl 8.21.0 does.
+    /// <c>-r</c>/<c>--range</c> or <c>--remove-on-error</c> came first, before the value is looked at, as curl 8.21.0 does.
     /// </summary>
     private static CommandLineRefusal? SetResumeFrom(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
     {
         if (options.Range is not null)
         {
             return CommandLineRefusal.ContinueAtExclusiveWithRange(spelledOption, options.ErrorsHidden);
+        }
+
+        if (options.RemoveOnError)
+        {
+            return CommandLineRefusal.ContinueAtExclusiveWithRemoveOnError(spelledOption, options.ErrorsHidden);
         }
 
         if (value == "-")
@@ -707,6 +792,22 @@ public static class CommandLineOptionTable
         }
 
         return refusal;
+    }
+
+    /// <summary>
+    /// Records <c>--remove-on-error</c> or <c>--no-remove-on-error</c>. Turning it on is refused when
+    /// <c>-C</c>/<c>--continue-at</c> came first, in any form, as curl 8.21.0 refuses it (measured
+    /// 2026-09-28, BL-494 Notes); turning it off never is.
+    /// </summary>
+    private static CommandLineRefusal? SetRemoveOnError(CommandLineOptions options, bool on, string spelledOption)
+    {
+        if (on && (options.ResumeFrom is not null || options.ResumeFromOutputSize))
+        {
+            return CommandLineRefusal.ContinueAtExclusiveWithRemoveOnError(spelledOption, options.ErrorsHidden);
+        }
+
+        options.RemoveOnError = on;
+        return null;
     }
 
     private static CommandLineRefusal? SetMaxFileSize(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)

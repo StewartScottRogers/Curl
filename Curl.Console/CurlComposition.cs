@@ -36,7 +36,11 @@ internal static class CurlComposition
     /// <see cref="RoutingFtpProtocolHandler" /> hands to the HTTP handler when an <c>ftp</c>
     /// transfer is forwarded through an HTTP proxy without <c>-p</c> (ADR-0056, rule 3) and
     /// otherwise to <see cref="CreateFtpProtocolHandler" />'s handler (ADR-0093, ADR-0102).
-    /// Each scheme is claimed by exactly one handler.
+    /// Each scheme is claimed by exactly one handler. Every handler connects through an
+    /// <see cref="EndPointRecordingConnector" /> and an <see cref="EndPointRecordingDatagramConnector" />
+    /// sharing one <see cref="ConnectionEndPointRecorder" />, and is wrapped in an
+    /// <see cref="EndPointReportingProtocolHandler" />, so every scheme's report carries the end
+    /// points of the first connection its transfer opened (ADR-0119).
     /// </summary>
     /// <param name="connector">Connects the TCP protocols, with TLS for <c>gophers</c>, <c>mqtts</c> and <c>ftps</c>.</param>
     /// <param name="datagramConnector">Opens the UDP channels TFTP uses.</param>
@@ -53,19 +57,24 @@ internal static class CurlComposition
         IDnsResolver dnsResolver,
         ICookieStore? cookieStore = null)
     {
-        HttpProtocolHandler http = new(connector, CreateHttpAuthenticator(), cookieStore);
+        ConnectionEndPointRecorder recorder = new();
+        EndPointRecordingConnector recordingConnector = new(connector, recorder);
+        EndPointRecordingDatagramConnector recordingDatagramConnector = new(datagramConnector, recorder);
+        HttpProtocolHandler http = new(recordingConnector, CreateHttpAuthenticator(), cookieStore);
 
-        return
+        IProtocolHandler[] handlers =
         [
             new FileProtocolHandler(new PhysicalFileSystem()),
-            new DictProtocolHandler(connector),
-            new GopherProtocolHandler(connector),
-            new TelnetProtocolHandler(connector),
-            new TftpProtocolHandler(datagramConnector, connector, CredentialEncoding.ForPlatform(OperatingSystem.IsWindows())),
-            new MqttProtocolHandler(connector),
+            new DictProtocolHandler(recordingConnector),
+            new GopherProtocolHandler(recordingConnector),
+            new TelnetProtocolHandler(recordingConnector),
+            new TftpProtocolHandler(recordingDatagramConnector, recordingConnector, CredentialEncoding.ForPlatform(OperatingSystem.IsWindows())),
+            new MqttProtocolHandler(recordingConnector),
             http,
-            new RoutingFtpProtocolHandler(http, CreateFtpProtocolHandler(connector, tlsProvider, dnsResolver)),
+            new RoutingFtpProtocolHandler(http, CreateFtpProtocolHandler(recordingConnector, tlsProvider, dnsResolver)),
         ];
+
+        return [.. handlers.Select(handler => new EndPointReportingProtocolHandler(handler, recorder))];
     }
 
     /// <summary>

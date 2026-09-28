@@ -85,8 +85,8 @@ namespace Curl.Console;
 /// <see cref="WriteOutTimeDialect.WindowsCRuntime" /> is used when not given.
 /// </param>
 /// <param name="outputPaths">
-/// Creates the <c>--create-dirs</c> directories; a <see cref="PhysicalOutputPaths" /> when
-/// not given.
+/// Creates the <c>--create-dirs</c> directories and checks for a <c>--skip-existing</c> file; a
+/// <see cref="PhysicalOutputPaths" /> when not given.
 /// </param>
 /// <param name="configFileReader">
 /// Reads the default config file (<c>.curlrc</c>), each <c>-K</c> / <c>--config</c> file, and every
@@ -423,6 +423,12 @@ internal sealed class CurlCommandRunner(
     /// body goes to standard output. Cleared before each transfer.
     /// </summary>
     private string? transferOutputFileName;
+
+    /// <summary>
+    /// The output file the current transfer opened, which <c>--remove-on-error</c> deletes when the
+    /// transfer fails; <see langword="null" /> while no file was opened. Cleared before each transfer.
+    /// </summary>
+    private string? transferOpenedOutputFile;
 
     /// <summary>
     /// Records whether the current transfer's handler reported it past connect or open, and
@@ -898,6 +904,7 @@ internal sealed class CurlCommandRunner(
         UrlTransfer transfer)
     {
         transferOutputFileName = null;
+        transferOpenedOutputFile = null;
         progressBar = null;
         progressMeterHeaderWritten = false;
         (TransferResult result, string givenUrl, string transferUrl) = await TransferUrlAsync(dispatch, options, transfer)
@@ -913,6 +920,7 @@ internal sealed class CurlCommandRunner(
             await WriteErrorLineAsync(string.Empty).ConfigureAwait(false);
         }
 
+        await RemoveOutputFileOfFailedTransferAsync(options, result).ConfigureAwait(false);
         bool endsTheRun = EndsTheRun(options, result);
         bodyWrittenToStandardOutput |= SendsBodyToStandardOutput(transfer, result);
         bool standardOutputIsBinary = IsStandardOutputBinaryForWriteOut(
@@ -922,6 +930,37 @@ internal sealed class CurlCommandRunner(
 
         previousTransferResult = result;
         return result;
+    }
+
+    /// <summary>
+    /// Under <c>--remove-on-error</c>, deletes the output file a failed transfer opened, as curl
+    /// 8.21.0 does after the transfer's failure lines and before its <c>-w</c> output: under
+    /// <c>-v</c> or a <c>--trace</c> option, <c>-s</c> or not, standard error then gets
+    /// <c>Note: Removed output file: &lt;file&gt;</c>, wrapped as a note is, and a file that
+    /// cannot be deleted gets <c>Warning: Failed removing: &lt;file&gt;</c> unless <c>-s</c> was
+    /// given. A file the transfer never opened - a <c>-f</c> failure with no body written, a
+    /// failed connect - is left as it is, even one there before the transfer (measured
+    /// 2026-09-28, BL-494 Notes). The transfer's exit code and message are unchanged.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="result">The transfer's result.</param>
+    /// <returns>A task that completes when the file is dealt with.</returns>
+    private async Task RemoveOutputFileOfFailedTransferAsync(CommandLineOptions options, TransferResult result)
+    {
+        if (result.IsSuccess || !options.RemoveOnError || transferOpenedOutputFile is not { } openedFile)
+        {
+            return;
+        }
+
+        if (!OutputPaths.TryDeleteFile(openedFile))
+        {
+            await WriteWarningUnlessSilentAsync(options, $"Warning: Failed removing: {openedFile}").ConfigureAwait(false);
+        }
+        else if (options.Trace != TraceKind.None)
+        {
+            await WriteErrorPiecesAsync(WarningLineWrapper.WrapNoteText($"Removed output file: {openedFile}", terminalColumns))
+                .ConfigureAwait(false);
+        }
     }
 
     /// <summary>
@@ -1790,7 +1829,9 @@ internal sealed class CurlCommandRunner(
     /// <param name="upload">The <c>-T</c> source, or <see langword="null" /> without <c>-T</c>.</param>
     /// <returns>
     /// The transfer's result; <see cref="CannotCreateDirectoryFailure" />, with nothing
-    /// transferred, when a <c>--create-dirs</c> directory cannot be created.
+    /// transferred, when a <c>--create-dirs</c> directory cannot be created; a success with
+    /// nothing transferred when <c>--skip-existing</c> finds the output file already there
+    /// (<see cref="SkipExistingOutputFileAsync" />). Both are decided before the proxy is chosen.
     /// </returns>
     private async Task<TransferResult> TransferWithBodyAsync(
         RedirectFollower follower,
@@ -1804,12 +1845,18 @@ internal sealed class CurlCommandRunner(
         Stream? upload)
     {
         uploadResumesFromUnknownOffset = options.ResumeFromOutputSize && upload is not null;
+        string? outputFile = await ResolveOutputFileAsync(options, transfer, url).ConfigureAwait(false);
+        if (outputFile is not null
+            && await CreateOutputDirectoriesOrSkipAsync(options, outputFile).ConfigureAwait(false) is { } unstarted)
+        {
+            return unstarted;
+        }
+
         if (!TransferProxySelection.TrySelect(proxySelector, options, url, out ProxyEndpoint? proxy, out TransferResult? proxyFailure))
         {
             return proxyFailure;
         }
 
-        string? outputFile = await ResolveOutputFileAsync(options, transfer, url).ConfigureAwait(false);
         if (outputFile is null)
         {
             StartTransferProgress(options, options.ResumeFrom, toStandardOutput: true);
@@ -1819,7 +1866,7 @@ internal sealed class CurlCommandRunner(
                     () => transferContextFactory.Create(
                         options,
                         url,
-                        RateLimited(options, deferringStandardOutput),
+                        RateLimited(options, FlushedEachWriteUnderNoBuffer(options, deferringStandardOutput)),
                         range,
                         options.ResumeFrom,
                         headerOutput,
@@ -1835,12 +1882,6 @@ internal sealed class CurlCommandRunner(
                 .ConfigureAwait(false);
         }
 
-        if (options.CreateDirectories
-            && OutputFileDirectories.CreateLeadingDirectories(OutputPaths, outputFile, runsOnWindows) is { } directory)
-        {
-            return await ReportCannotCreateDirectoryAsync(options, directory).ConfigureAwait(false);
-        }
-
         long? resumeFrom = await ResolveResumeFromAsync(options, outputFile).ConfigureAwait(false);
         StartTransferProgress(options, resumeFrom, toStandardOutput: false);
         OutputFileTarget target = new(outputFile, TakesContentDispositionName(options, transfer));
@@ -1853,10 +1894,58 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
-    /// Gets what checks <c>-J</c> names and creates <c>--create-dirs</c> directories: the one the
-    /// runner was given, else <see cref="DiskOutputPaths" />.
+    /// Gets what creates <c>--create-dirs</c> directories and checks for a <c>--skip-existing</c>
+    /// file: the one the runner was given, else <see cref="DiskOutputPaths" />.
     /// </summary>
     private IOutputPaths OutputPaths => outputPaths ?? DiskOutputPaths;
+
+    /// <summary>
+    /// Makes the <c>--create-dirs</c> directories for <paramref name="outputFile" />, then, under
+    /// <c>--skip-existing</c>, skips the transfer when the file is already there, in curl
+    /// 8.21.0's order.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="outputFile">The transfer's output file.</param>
+    /// <returns>
+    /// <see cref="CannotCreateDirectoryFailure" /> when a directory cannot be created, the
+    /// skipped transfer's success when the file exists, or <see langword="null" /> when the
+    /// transfer goes ahead.
+    /// </returns>
+    private async Task<TransferResult?> CreateOutputDirectoriesOrSkipAsync(CommandLineOptions options, string outputFile)
+    {
+        if (options.CreateDirectories
+            && OutputFileDirectories.CreateLeadingDirectories(OutputPaths, outputFile, runsOnWindows) is { } directory)
+        {
+            return await ReportCannotCreateDirectoryAsync(options, directory).ConfigureAwait(false);
+        }
+
+        return options.SkipExisting && OutputPaths.Exists(outputFile)
+            ? await SkipExistingOutputFileAsync(options, outputFile).ConfigureAwait(false)
+            : null;
+    }
+
+    /// <summary>
+    /// Skips a transfer under <c>--skip-existing</c> because its output file is already there, as
+    /// curl 8.21.0 does: nothing is connected, opened or written, no progress meter is drawn, and
+    /// the transfer succeeds with <c>%{filename_effective}</c> naming the file. Under <c>-v</c> or a
+    /// <c>--trace</c> option, <c>-s</c> or not, standard error gets
+    /// <c>Note: skips transfer, "&lt;file&gt;" exists locally</c>, wrapped as a note is
+    /// (measured 2026-09-28, BL-493 Notes).
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="outputFile">The output file that exists.</param>
+    /// <returns>A successful result with no bytes moved.</returns>
+    private async Task<TransferResult> SkipExistingOutputFileAsync(CommandLineOptions options, string outputFile)
+    {
+        transferOutputFileName = outputFile;
+        if (options.Trace != TraceKind.None)
+        {
+            await WriteErrorPiecesAsync(WarningLineWrapper.WrapNoteText($"skips transfer, \"{outputFile}\" exists locally", terminalColumns))
+                .ConfigureAwait(false);
+        }
+
+        return TransferResult.Success(0);
+    }
 
     /// <summary>
     /// Works out the file a transfer saves its body to: the <c>-o</c> name, or the remote name
@@ -2191,7 +2280,7 @@ internal sealed class CurlCommandRunner(
         Stream? upload,
         ProxyEndpoint? proxy)
     {
-        DeferredOutputFileStream output = CreateOutputFileStream(target.Path, resumeFrom);
+        DeferredOutputFileStream output = CreateOutputFileStream(options, target.Path, resumeFrom);
         TransferResult completed = await TransferIntoOutputFileAsync(
                 follower,
                 options,
@@ -2207,6 +2296,7 @@ internal sealed class CurlCommandRunner(
             .ConfigureAwait(false);
 
         transferOutputFileName = output.Path;
+        transferOpenedOutputFile = output.IsOpen ? output.Path : null;
         if (options.RemoteTime && completed.IsSuccess && completed.SourceLastWriteTimeUtc is { } sourceLastWriteTimeUtc)
         {
             await StampOutputFileTimeAsync(options, output.Path, sourceLastWriteTimeUtc).ConfigureAwait(false);
@@ -2218,13 +2308,14 @@ internal sealed class CurlCommandRunner(
     /// <summary>
     /// Creates the stream that opens <paramref name="path" /> on its first write: for appending
     /// when the transfer resumes past byte zero, as curl opens the file <c>"ab"</c> then, and
-    /// truncated otherwise.
+    /// truncated otherwise, or kept and numbered under <c>--no-clobber</c>.
     /// </summary>
+    /// <param name="options">The accepted command line, whose <c>--clobber</c> choice the stream takes.</param>
     /// <param name="path">The output file.</param>
     /// <param name="resumeFrom">The resolved <c>-C</c> offset, or <see langword="null" />.</param>
     /// <returns>The stream, not yet opened.</returns>
-    private DeferredOutputFileStream CreateOutputFileStream(string path, long? resumeFrom) =>
-        new(fileSystem, path, resumeFrom is > 0 ? FileWriteMode.Append : FileWriteMode.Truncate);
+    private DeferredOutputFileStream CreateOutputFileStream(CommandLineOptions options, string path, long? resumeFrom) =>
+        new(fileSystem, path, resumeFrom is > 0 ? FileWriteMode.Append : FileWriteMode.Truncate, options.Clobber);
 
     /// <summary>
     /// Gives the wrapper that puts a <see cref="RemoteHeaderNameStream" /> in front of the
@@ -2315,7 +2406,7 @@ internal sealed class CurlCommandRunner(
                     () => transferContextFactory.Create(
                         options,
                         url,
-                        RateLimited(options, output),
+                        RateLimited(options, FlushedEachWriteUnderNoBuffer(options, output)),
                         range,
                         resumeFrom,
                         headerOutput,
@@ -2426,7 +2517,7 @@ internal sealed class CurlCommandRunner(
                 firstContext,
                 RetryPolicyMapping.FromCommandLine(options),
                 (attempt, warning) => retryLinesWritten = WriteRetryLinesAsync(options, attempt, warning, resumeFrom, outputFile),
-                (_, warning) => retryLinesWritten = WriteRetryWarningAsync(options, warning))
+                (_, warning) => retryLinesWritten = WriteWarningUnlessSilentAsync(options, warning))
             .ConfigureAwait(false);
         await retryLinesWritten.ConfigureAwait(false);
 
@@ -2494,20 +2585,20 @@ internal sealed class CurlCommandRunner(
             await WriteFailureLinesAsync(attempt).ConfigureAwait(false);
         }
 
-        await WriteRetryWarningAsync(options, warning).ConfigureAwait(false);
+        await WriteWarningUnlessSilentAsync(options, warning).ConfigureAwait(false);
         outputFile?.TruncateForRetry();
         StartTransferProgress(options, resumeFrom, toStandardOutput);
     }
 
     /// <summary>
-    /// Writes a <see cref="TransferRetrier" /> warning line, wrapped as every <c>Warning: </c>
+    /// Writes a warning line, such as a <see cref="TransferRetrier" /> one, wrapped as every <c>Warning: </c>
     /// line is, unless <c>-s</c> was given: curl 8.21.0 prints none under <c>-s</c> or
     /// <c>-sS</c>.
     /// </summary>
     /// <param name="options">The accepted command line.</param>
     /// <param name="warning">The warning, unwrapped.</param>
     /// <returns>A task that completes when the line is written, or at once under <c>-s</c>.</returns>
-    private Task WriteRetryWarningAsync(CommandLineOptions options, string warning) =>
+    private Task WriteWarningUnlessSilentAsync(CommandLineOptions options, string warning) =>
         options.Silent ? Task.CompletedTask : WriteErrorLineAsync(warning);
 
     /// <summary>
@@ -2522,6 +2613,16 @@ internal sealed class CurlCommandRunner(
         options.LimitRate is > 0 and long bytesPerSecond
             ? new RateLimitedStream(output, bytesPerSecond, timeProvider)
             : output;
+
+    /// <summary>
+    /// Flushes <paramref name="output" /> after every write with a <see cref="FlushEachWriteStream" />
+    /// under <c>-N</c> / <c>--no-buffer</c>, as curl 8.21.0 flushes each write then.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="output">The attempt's body output.</param>
+    /// <returns>The flushing stream, or <paramref name="output" /> when buffering is on.</returns>
+    private static Stream FlushedEachWriteUnderNoBuffer(CommandLineOptions options, Stream output) =>
+        options.NoBuffer ? new FlushEachWriteStream(output) : output;
 
     /// <summary>
     /// Writes each of <paramref name="lines" /> to standard error, in order.

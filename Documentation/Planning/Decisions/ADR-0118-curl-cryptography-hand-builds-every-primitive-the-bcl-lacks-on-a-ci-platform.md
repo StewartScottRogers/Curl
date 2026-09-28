@@ -85,9 +85,11 @@ omitted because the BCL lacks it.
 | SHA-3 and SHAKE (`Sha3`, `Shake`) | FIPS 202 | ML-KEM (BL-743), ML-DSA (BL-744), Ed448 (BL-741) | Windows 11 25324+ / OpenSSL 1.1.1+ / **no** | BL-743 | NIST SHA-3 examples; CAVP byte-oriented vectors |
 | ML-KEM (`MlKem`) | FIPS 203 | TLS 1.3 `X25519MLKEM768`, `SecP256r1MLKEM768`, `SecP384r1MLKEM1024`, `MLKEM*` groups (BL-699, BL-709) | Insider builds / OpenSSL 3.5+ / **no** | BL-743 | NIST ACVP ML-KEM |
 | ML-DSA (`MlDsa`) | FIPS 204 | TLS 1.3 `mldsa44`, `mldsa65`, `mldsa87` (BL-699, BL-709) | Insider builds / OpenSSL 3.5+ / **no** | BL-744 | NIST ACVP ML-DSA |
-| DSA (`DsaSignature`) | FIPS 186-4, RFC 6979 | SSH `ssh-dss` (BL-560's ADR); TLS 1.2 `dsa_*` signatures (BL-703, BL-709) | yes / yes / **partial** (no key creation, no FIPS 186-3) | BL-745 | NIST CAVP FIPS 186-4 `SigVer`; RFC 6979 A.2 |
+| DSA (`DsaSignature`) | FIPS 186-4, RFC 6979 | SSH `ssh-dss` (ADR-0122, BL-564); TLS 1.2 `dsa_*` signatures (BL-703, BL-709) | yes / yes / **partial** (no key creation, no FIPS 186-3) | BL-745 | NIST CAVP FIPS 186-4 `SigVer`; RFC 6979 A.2 |
+| sntrup761 (`Sntrup761`) | NTRU Prime round 3 (2020), OpenSSH `sntrup761.c` | SSH `sntrup761x25519-sha512`, `sntrup761x25519-sha512@openssh.com` (ADR-0122, BL-748) | missing / missing / missing | BL-747 | Round-3 submission KAT (`kat_kem.rsp`) |
 
-BL-737 to BL-745 are filed by this decision; BL-671 to BL-677 were filed with it.
+BL-737 to BL-745 are filed by this decision; BL-671 to BL-677 were filed with it; the
+sntrup761 row and BL-747 were added by ADR-0122.
 
 ### Taken from the BCL
 
@@ -106,7 +108,7 @@ HTTP Digest stays where it already lives, `Curl.Authentication.UnitLibrary`'s
 
 - Namespace `Curl.Cryptography`, matching the project folder. The library references
   the BCL only, is AOT-compatible, and never opens a socket or a file: it takes and
-  returns bytes. Which libraries may reference it is BL-667's ADR.
+  returns bytes. Which libraries may reference it, and what it may reference, is ADR-0120.
 - One public type per primitive, named as its specification names it (the table's
   "public type" column). Where that name equals a `System.Security.Cryptography` type,
   the specification's own AEAD or scheme identifier prefixes it (`AeadAesCcm`,

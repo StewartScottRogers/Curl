@@ -21,6 +21,13 @@ end, whatever their outcome (ADR-0050, BL-334). It also holds the `TcpConnector`
 the `-b` files load, so `-v` prints the `--resolve` entries' `Added ... to DNS cache` lines for
 each URL; a `--retry` attempt and a followed redirect reload nothing, as in curl 8.21.0 (BL-486).
 
+`CurlComposition.CreateProtocolHandlers` gives every handler an `EndPointRecordingConnector` and
+an `EndPointRecordingDatagramConnector` sharing one `ConnectionEndPointRecorder`, and wraps
+each handler in an `EndPointReportingProtocolHandler`, which puts the end points of the
+transfer's first connection (FTP's control connection) on its report when the handler reported
+neither, so `%{local_ip}`, `%{local_port}`, `%{remote_ip}` and `%{remote_port}` work for every
+scheme without handler code; HTTP keeps its own (ADR-0119, BL-515).
+
 `Program.Main` only opens the standard streams, builds the composition and hands the
 arguments to `CurlCommandRunner`, which parses them, runs each URL and prints curl's
 `curl: (N) <message>` lines, each transfer's message cut to curl's 255-byte error buffer by
@@ -247,3 +254,32 @@ to a pipe whose reader has gone as a success. A console is still opened the .NET
 redirected standard output becomes an unbuffered `FileStream` over the process's own
 handle (`GetStdHandle` on Windows, descriptor 1 elsewhere), and a closed one a
 `ClosedStandardOutputStream` whose writes throw.
+
+Under `-N` / `--no-buffer` the runner wraps a transfer's body output, standard output or an
+`-o` file, in a `FlushEachWriteStream`, which flushes after every write as curl 8.21.0 does;
+the bytes are unchanged (BL-491).
+
+Under `--no-clobber` `DeferredOutputFileStream` opens an `-o`, `-O` or `-J` file only when
+nothing is there (`FileWriteMode.CreateNew`); a name already taken moves on to `<name>.1`,
+`.2` ... `.99`, the first free one taking the body and `%{filename_effective}`. When none is
+free the transfer ends with exit 23 and `client returned ERROR on write of N bytes`, the
+warning names the file asked for (`File exists`), and `%{filename_effective}` names `.99`, as
+curl 8.21.0 does. `--clobber` overwrites even a `-J` name. A resumed (`-C`) file appends
+either way (BL-492 Notes).
+
+Under `--skip-existing` a transfer whose `-o` or `-O` file (after `--output-dir` and
+`--create-dirs`) is already there, as a file or a directory (`IOutputPaths.Exists`), is not
+performed: no connection, no file opened, no progress meter, exit 0, and `-w` still runs with
+`%{http_code}` `000` and `%{filename_effective}` naming the file. Under `-v` or a `--trace`
+option, even with `-s`, standard error gets `Note: skips transfer, "<file>" exists locally`,
+wrapped as a note is. The check comes before the proxy is chosen, so a bad `-x` does not fail a
+skipped transfer; later URLs still run, as in curl 8.21.0 (BL-493 Notes).
+
+Under `--remove-on-error` a transfer that fails deletes the output file it opened, through
+`IOutputPaths.TryDeleteFile`, after its failure lines and progress-bar newline and before its
+`-w` output; the exit code and message stay the failure's. A file the transfer never opened - a
+`-f` failure that wrote no body, a failed connect - is left alone, even one there before. Under
+`-v` or a `--trace` option, even with `-s`, standard error gets `Note: Removed output file:
+<file>`, wrapped as a note is; a file that cannot be deleted (`NUL` included) gets `Warning:
+Failed removing: <file>` unless `-s`. `--remove-on-error` beside `-C` is refused while parsing,
+as in curl 8.21.0 (BL-494 Notes).

@@ -145,6 +145,13 @@ public sealed class CommandLineOptions
     public bool ProgressBar { get; internal set; }
 
     /// <summary>
+    /// <see langword="true"/> when the last of <c>-N</c> / <c>--no-buffer</c> and <c>--buffer</c> was
+    /// <c>-N</c> or <c>--no-buffer</c>: every block of body bytes is flushed to its output as it is
+    /// written, as curl 8.21.0 flushes after each write. <see langword="false"/> otherwise.
+    /// </summary>
+    public bool NoBuffer { get; internal set; }
+
+    /// <summary>
     /// Which of <c>-v</c> / <c>--verbose</c>, <c>--trace</c> and <c>--trace-ascii</c> came last, or
     /// <see cref="TraceKind.None"/> when none did or <c>--no-verbose</c> came after it.
     /// </summary>
@@ -229,6 +236,29 @@ public sealed class CommandLineOptions
     /// after it: missing directories in an output path are created.
     /// </summary>
     public bool CreateDirectories { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when the last of <c>--clobber</c> and <c>--no-clobber</c> was <c>--clobber</c>:
+    /// an existing output file is overwritten, even one a <c>-J</c> name picked. <see langword="false"/> for
+    /// <c>--no-clobber</c>: an existing output file is left alone and the body goes to the first free
+    /// <c>&lt;name&gt;.1</c> ... <c>&lt;name&gt;.99</c>, as curl 8.21.0 does. <see langword="null"/> when
+    /// neither was given: an <c>-o</c> or <c>-O</c> file is overwritten and a <c>-J</c> file is not.
+    /// </summary>
+    public bool? Clobber { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when the last of <c>--skip-existing</c> and <c>--no-skip-existing</c> was
+    /// <c>--skip-existing</c>: a transfer whose <c>-o</c> or <c>-O</c> file already exists is not
+    /// performed, as curl 8.21.0 skips it (BL-493).
+    /// </summary>
+    public bool SkipExisting { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when the last of <c>--remove-on-error</c> and <c>--no-remove-on-error</c> was
+    /// <c>--remove-on-error</c>: a transfer that fails removes the <c>-o</c> or <c>-O</c> file it opened, as
+    /// curl 8.21.0 does (BL-494). It cannot be combined with <c>-C</c>/<c>--continue-at</c>.
+    /// </summary>
+    public bool RemoveOnError { get; internal set; }
 
     /// <summary>
     /// The <c>-w</c> / <c>--write-out</c> template, unexpanded; <see langword="null"/> when not given or
@@ -572,11 +602,45 @@ public sealed class CommandLineOptions
     public string? Passphrase { get; internal set; }
 
     /// <summary>
-    /// The lowest TLS version to accept: <see cref="SslProtocols.Tls12"/> for <c>--tlsv1.2</c> (1.2 or later),
-    /// <see cref="SslProtocols.Tls13"/> for <c>--tlsv1.3</c> (1.3 or later); <see langword="null"/> when neither
-    /// was given. When both are given the last one wins, as in curl 8.21.0.
+    /// The lowest TLS version to accept: <see cref="ObsoleteTlsProtocols.Tls10"/> for <c>-1</c>/<c>--tlsv1</c>
+    /// and <c>--tlsv1.0</c> (1.0 or later), <see cref="ObsoleteTlsProtocols.Tls11"/> for <c>--tlsv1.1</c>,
+    /// <see cref="SslProtocols.Tls12"/> for <c>--tlsv1.2</c>, <see cref="SslProtocols.Tls13"/> for
+    /// <c>--tlsv1.3</c>; <see langword="null"/> when none was given. The last one given wins, as in curl 8.21.0.
     /// </summary>
     public SslProtocols? MinimumTlsVersion { get; internal set; }
+
+    /// <summary>
+    /// The highest TLS version to offer, from <c>--tls-max</c>: <see cref="ObsoleteTlsProtocols.Tls10"/> for
+    /// <c>1.0</c>, <see cref="ObsoleteTlsProtocols.Tls11"/> for <c>1.1</c>, <see cref="SslProtocols.Tls12"/> for
+    /// <c>1.2</c>, <see cref="SslProtocols.Tls13"/> for <c>1.3</c>; <see langword="null"/> when not given or given
+    /// as <c>default</c>. curl applies it to the origin and to an HTTPS proxy alike. The last value wins.
+    /// </summary>
+    public SslProtocols? MaximumTlsVersion { get; internal set; }
+
+    /// <summary>
+    /// The lowest TLS version to accept from an HTTPS proxy: <see cref="ObsoleteTlsProtocols.Tls10"/> (1.0 or
+    /// later) for <c>--proxy-tlsv1</c>; <see langword="null"/> when not given.
+    /// </summary>
+    public SslProtocols? ProxyMinimumTlsVersion { get; internal set; }
+
+    /// <summary>
+    /// The schemes <c>--proto</c> allows, lowercase, read by <see cref="CommandLineProtocolSet"/>;
+    /// <see langword="null"/> when not given, which allows every scheme. Each <c>--proto</c> starts again from
+    /// every scheme curl knows, so the last one given decides (curl 8.21.0, measured 2026-09-28).
+    /// </summary>
+    public IReadOnlySet<string>? AllowedProtocols { get; internal set; }
+
+    /// <summary>
+    /// The schemes <c>--proto-redir</c> allows a followed redirect to use, lowercase, read as
+    /// <see cref="AllowedProtocols"/> is; <see langword="null"/> when not given, which leaves curl's default.
+    /// </summary>
+    public IReadOnlySet<string>? AllowedRedirectProtocols { get; internal set; }
+
+    /// <summary>
+    /// The scheme <c>--proto-default</c> names for a URL given without one, lowercase; <see langword="null"/>
+    /// when not given. The last value wins.
+    /// </summary>
+    public string? DefaultProtocol { get; internal set; }
 
     /// <summary>The <c>--ciphers</c> list, verbatim; <see langword="null"/> when not given. The last value wins.</summary>
     public string? Ciphers { get; internal set; }

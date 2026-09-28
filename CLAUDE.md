@@ -97,7 +97,8 @@ new session and reruns the cut-off task. See the script's header for the details
 When Claude starts a shift it always passes `-NewTab`, e.g.
 `RunDarkFactory.cmd -NewTab -Lanes 3 -Continuous`; `-Continuous` makes a shift that
 ends with work still ready start the next one itself. A shift ends before the tokens run
-out: once 85% of the 5-hour or weekly usage window is used (`-StopAtUsage`), lanes claim
+out: once 85% of the 5-hour window (`-StopAtUsage`) or 97% of the weekly window
+(`-StopAtWeeklyUsage`) is used, lanes claim
 nothing new, finish what they hold and push; the next shift waits for a fresh 5-hour
 window, and a used-up weekly window raises the alarm. Inside herdr (`HERDR_ENV=1`) that opens the shift
 and each of its lanes as herdr tabs in the current workspace; outside herdr, as console

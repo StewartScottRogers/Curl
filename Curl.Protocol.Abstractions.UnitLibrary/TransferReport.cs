@@ -126,7 +126,9 @@ public sealed record TransferReport
     /// <summary>
     /// Gets the local address and port of the connection, copied from
     /// <see cref="ConnectResult.LocalEndPoint" />, the source of <c>%{local_ip}</c> and
-    /// <c>%{local_port}</c>; <see langword="null" /> when unknown.
+    /// <c>%{local_port}</c>; <see langword="null" /> when unknown. A handler that leaves both
+    /// end points <see langword="null" /> has them filled in by the composition from the
+    /// first connection the transfer opened (ADR-0119).
     /// </summary>
     public IPEndPoint? LocalEndPoint { get; init; }
 

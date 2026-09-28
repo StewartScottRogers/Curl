@@ -6,8 +6,9 @@ namespace Curl.Cli;
 /// <summary>
 /// Pins how the parser records the TLS options: <c>-k</c>/<c>--insecure</c>, <c>--cacert</c>,
 /// <c>--capath</c>, <c>-E</c>/<c>--cert</c>, <c>--key</c>, <c>--cert-type</c>, <c>--key-type</c>,
-/// <c>--pass</c>, <c>--tlsv1.2</c>/<c>--tlsv1.3</c> (the
-/// last one given wins), <c>--ciphers</c> and <c>--tls13-ciphers</c>, and the refusals curl
+/// <c>--pass</c>, the minimum versions <c>-1</c>/<c>--tlsv1</c>, <c>--tlsv1.0</c>, <c>--tlsv1.1</c>,
+/// <c>--tlsv1.2</c> and <c>--tlsv1.3</c> (the last one given wins), <c>--tls-max</c>, <c>--proxy-tlsv1</c>,
+/// <c>--ciphers</c> and <c>--tls13-ciphers</c>, and the refusals curl
 /// 8.21.0 prints for them, measured against the local curl 8.21.0 on 2026-09-26. The
 /// <c>--cacert</c> existence check runs against a fake, never the disk, except in the two
 /// <c>Integration</c> tests that pin the production check against real paths.
@@ -291,6 +292,130 @@ public sealed class CommandLineTlsOptionTests
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(SslProtocols.Tls13, result.Options.MinimumTlsVersion);
+    }
+
+    [TestMethod]
+    [DataRow("-1", ObsoleteTlsProtocols.Tls10)]
+    [DataRow("--tlsv1", ObsoleteTlsProtocols.Tls10)]
+    [DataRow("--tlsv1.0", ObsoleteTlsProtocols.Tls10)]
+    [DataRow("--tlsv1.1", ObsoleteTlsProtocols.Tls11)]
+    [DataRow("--tlsv1.2", SslProtocols.Tls12)]
+    [DataRow("--tlsv1.3", SslProtocols.Tls13)]
+    public void Parse_MinimumTlsVersionSpelling_SetsMinimumTlsVersion(string spelledOption, SslProtocols expected)
+    {
+        CommandLineParseResult result = CommandLineParser.Parse([spelledOption, Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual(expected, result.Options.MinimumTlsVersion);
+        Assert.IsNull(result.Options.ProxyMinimumTlsVersion);
+    }
+
+    [TestMethod]
+    public void Parse_OneInAShortBundle_SetsMinimumTlsVersionTo10()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["-s1S", Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsTrue(result.Options.Silent);
+        Assert.IsTrue(result.Options.ShowError);
+        Assert.AreEqual(ObsoleteTlsProtocols.Tls10, result.Options.MinimumTlsVersion);
+    }
+
+    [TestMethod]
+    public void Parse_Tlsv13ThenOne_TheLastWins()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--tlsv1.3", "-1", Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual(ObsoleteTlsProtocols.Tls10, result.Options.MinimumTlsVersion);
+    }
+
+    [TestMethod]
+    public void Parse_ProxyTlsv1_SetsProxyMinimumTlsVersionTo10AndLeavesTheOriginAlone()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--proxy-tlsv1", Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual(ObsoleteTlsProtocols.Tls10, result.Options.ProxyMinimumTlsVersion);
+        Assert.IsNull(result.Options.MinimumTlsVersion);
+    }
+
+    [TestMethod]
+    public void Parse_NoTlsVersionOptions_LeavesMaximumAndProxyMinimumNotGiven()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse([Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsNull(result.Options.MaximumTlsVersion);
+        Assert.IsNull(result.Options.ProxyMinimumTlsVersion);
+    }
+
+    [TestMethod]
+    [DataRow("1.0", ObsoleteTlsProtocols.Tls10)]
+    [DataRow("1.1", ObsoleteTlsProtocols.Tls11)]
+    [DataRow("1.2", SslProtocols.Tls12)]
+    [DataRow("1.3", SslProtocols.Tls13)]
+    public void Parse_TlsMaxVersion_SetsMaximumTlsVersion(string version, SslProtocols expected)
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--tls-max", version, Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual(expected, result.Options.MaximumTlsVersion);
+        Assert.IsNull(result.Options.MinimumTlsVersion);
+    }
+
+    [TestMethod]
+    public void Parse_TlsMaxAttachedValue_SetsMaximumTlsVersion()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--tls-max=1.2", Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual(SslProtocols.Tls12, result.Options.MaximumTlsVersion);
+    }
+
+    [TestMethod]
+    public void Parse_TlsMaxDefaultAfterAVersion_ClearsTheMaximum()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--tls-max", "1.2", "--tls-max", "default", Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsNull(result.Options.MaximumTlsVersion);
+    }
+
+    [TestMethod]
+    [DataRow("1.4")]
+    [DataRow("abc")]
+    [DataRow("DEFAULT")]
+    [DataRow("1")]
+    [DataRow("1.2 ")]
+    [DataRow("")]
+    public void Parse_TlsMaxUnknownVersion_RefusesAsBadlyUsed(string version)
+    {
+        // Measured with Record-CurlExchange.ps1 -NoServer against curl 8.21.0 (Schannel) on 2026-09-28.
+        CommandLineParseResult result = CommandLineParser.Parse(["--tls-max", version, Url], NoPathExists);
+
+        AssertRefused(result, "curl: option --tls-max: is badly used here");
+    }
+
+    [TestMethod]
+    public void Parse_TlsMaxWithNoValue_RefusesAsRequiringAParameter()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--tls-max"], NoPathExists);
+
+        AssertRefused(result, "curl: option --tls-max: requires parameter");
+    }
+
+    [TestMethod]
+    [DataRow("--no-tlsv1")]
+    [DataRow("--no-tlsv1.0")]
+    [DataRow("--no-tlsv1.1")]
+    [DataRow("--no-tls-max")]
+    [DataRow("--no-proxy-tlsv1")]
+    public void Parse_NegatedTlsVersionOption_RefusesAsNotReversible(string spelledOption)
+    {
+        CommandLineParseResult result = CommandLineParser.Parse([spelledOption, Url], NoPathExists);
+
+        AssertRefused(result, $"curl: option {spelledOption}: the given option cannot be reversed with a --no- prefix");
     }
 
     [TestMethod]
