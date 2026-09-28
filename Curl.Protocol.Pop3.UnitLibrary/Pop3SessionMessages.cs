@@ -2,7 +2,7 @@ namespace Curl.Protocol.Pop3;
 
 /// <summary>
 /// The messages curl 8.21.0 prints when a POP3 session fails, each measured with
-/// <c>Record-CurlExchange.ps1 -Pop3</c> (BL-547, BL-549).
+/// <c>Record-CurlExchange.ps1 -Pop3</c> (BL-547, BL-548, BL-549).
 /// </summary>
 internal static class Pop3SessionMessages
 {
@@ -26,4 +26,21 @@ internal static class Pop3SessionMessages
 
     /// <summary>The URL's message id decodes to a byte below 0x20 (exit 3, BL-549).</summary>
     internal const string UrlMalformed = "URL using bad/illegal format or missing URL";
+
+    /// <summary>
+    /// A SASL exchange failed, or no way of logging in was possible (exit 67, BL-548).
+    /// </summary>
+    internal const string LoginDenied = "Login denied";
+
+    /// <summary>
+    /// <c>USER</c> or <c>PASS</c> was refused; <c>{0}</c> is <c>-</c> for <c>-ERR</c>, <c>*</c>
+    /// for another <c>+</c> line (exit 67, BL-548).
+    /// </summary>
+    internal const string AccessDenied = "Access denied. {0}";
+
+    /// <summary>
+    /// <c>APOP</c> was refused; <c>{0}</c> is 45 for <c>-ERR</c>, 42 for another <c>+</c> line
+    /// (exit 67, BL-548).
+    /// </summary>
+    internal const string AuthenticationFailed = "Authentication failed: {0}";
 }

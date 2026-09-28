@@ -5,12 +5,16 @@ namespace Curl.Protocol.Pop3;
 
 /// <summary>
 /// One POP3 conversation on an open connection: the greeting, <c>CAPA</c>, the <c>STLS</c>
-/// upgrade <c>--ssl</c> and <c>--ssl-reqd</c> ask for, <c>LIST</c> or <c>RETR</c>, and
-/// <c>QUIT</c>, each step and each failure's exit code measured on curl 8.21.0 with
-/// <c>Record-CurlExchange.ps1 -Pop3</c> (BL-547, BL-549).
+/// upgrade <c>--ssl</c> and <c>--ssl-reqd</c> ask for, the login, <c>LIST</c> or <c>RETR</c>,
+/// and <c>QUIT</c>, each step and each failure's exit code measured on curl 8.21.0 with
+/// <c>Record-CurlExchange.ps1 -Pop3</c> (BL-547, BL-548, BL-549).
 /// </summary>
 /// <remarks>
 /// <list type="bullet">
+/// <item>Login options (<c>--login-options</c>, else the URL's) that curl refuses are exit 3
+/// before a byte is read or sent (<see cref="Pop3LoginOptions" />).</item>
+/// <item>After <c>CAPA</c> and any upgrade, the session logs in as <see cref="Pop3Login" />
+/// describes; a login failure sends no <c>QUIT</c>.</item>
 /// <item>A URL naming no message sends <c>LIST</c>, one naming <c>&lt;id&gt;</c> sends
 /// <c>RETR &lt;id&gt;</c> (<see cref="Pop3MessageId" />); an id with a control character is
 /// exit 3 after <c>CAPA</c>, and <c>QUIT</c> is still sent. An answer other than <c>+OK</c> is
@@ -39,7 +43,8 @@ internal sealed class Pop3Session(
     Pop3ControlChannel channel,
     ITlsProvider tlsProvider,
     ITransferContext context,
-    bool implicitTls) : IAsyncDisposable
+    bool implicitTls,
+    ISaslAuthenticator? saslAuthenticator = null) : IAsyncDisposable
 {
     private bool secure = implicitTls;
 
@@ -71,10 +76,15 @@ internal sealed class Pop3Session(
     /// </returns>
     public async ValueTask<TransferResult> RunAsync()
     {
+        if (Pop3LoginOptions.Read(context.Mail?.LoginOptions ?? context.Url.Options) is not { } loginOptions)
+        {
+            return TransferResult.Failure(CurlExitCode.UrlMalformat, Pop3SessionMessages.UrlMalformed);
+        }
+
         TransferResult result;
         try
         {
-            if (await OpenAsync().ConfigureAwait(false) is { } failure)
+            if (await OpenAsync(loginOptions).ConfigureAwait(false) is { } failure)
             {
                 return failure;
             }
@@ -107,7 +117,11 @@ internal sealed class Pop3Session(
         }
     }
 
-    private async ValueTask<TransferResult?> OpenAsync()
+    /// <summary>
+    /// Reads the greeting, asks for the capabilities, upgrades as <c>--ssl</c> asks, and logs
+    /// in (<see cref="Pop3Login" />).
+    /// </summary>
+    private async ValueTask<TransferResult?> OpenAsync(Pop3LoginOptions loginOptions)
     {
         Pop3Response greeting = await channel.ReadResponseAsync().ConfigureAwait(false);
         if (!greeting.IsOk)
@@ -116,7 +130,10 @@ internal sealed class Pop3Session(
         }
 
         ApopTimestamp = Pop3ApopTimestamp.Read(greeting.Line);
-        return await ReadCapabilitiesAsync().ConfigureAwait(false);
+        return await ReadCapabilitiesAsync().ConfigureAwait(false)
+            ?? await new Pop3Login(channel, saslAuthenticator, context)
+                .LogInAsync(loginOptions, Capabilities, ApopTimestamp)
+                .ConfigureAwait(false);
     }
 
     /// <summary>

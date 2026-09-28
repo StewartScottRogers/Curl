@@ -5,8 +5,9 @@ namespace Curl.Protocol.Pop3;
 /// <summary>
 /// Serves the <c>pop3</c> and <c>pop3s</c> schemes: connects, reads the greeting, asks for
 /// the capabilities with <c>CAPA</c>, upgrades with <c>STLS</c> as <c>--ssl</c> and
-/// <c>--ssl-reqd</c> ask, lists the maildrop with <c>LIST</c> or retrieves the URL's message
-/// with <c>RETR</c>, and closes with <c>QUIT</c>, as curl 8.21.0 does (BL-547, BL-549).
+/// <c>--ssl-reqd</c> ask, logs in with SASL <c>AUTH</c>, <c>APOP</c> or <c>USER</c>/<c>PASS</c>,
+/// lists the maildrop with <c>LIST</c> or retrieves the URL's message with <c>RETR</c>, and
+/// closes with <c>QUIT</c>, as curl 8.21.0 does (BL-547, BL-548, BL-549).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -17,9 +18,8 @@ namespace Curl.Protocol.Pop3;
 /// each failure are described on <see cref="Pop3Session" />.
 /// </para>
 /// <para>
-/// Authentication (BL-548) and custom commands, <c>-l</c> and <c>-I</c> (BL-550) are not
-/// implemented yet: the session lists or retrieves without logging in. Cancellation leaves
-/// as an exception.
+/// Custom commands, <c>-l</c> and <c>-I</c> (BL-550) are not implemented yet. Cancellation
+/// leaves as an exception.
 /// </para>
 /// </remarks>
 public sealed class Pop3ProtocolHandler : IProtocolHandler
@@ -33,6 +33,8 @@ public sealed class Pop3ProtocolHandler : IProtocolHandler
 
     private readonly ITlsProvider tlsProvider;
 
+    private readonly ISaslAuthenticator? saslAuthenticator;
+
     /// <summary>
     /// Initializes a handler that serves <c>pop3</c> and <c>pop3s</c>.
     /// </summary>
@@ -41,11 +43,18 @@ public sealed class Pop3ProtocolHandler : IProtocolHandler
     /// (ADR-0005). No <see cref="System.Net.Sockets.Socket" /> is ever constructed here.
     /// </param>
     /// <param name="tlsProvider">Upgrades the connection after an accepted <c>STLS</c>.</param>
-    /// <exception cref="ArgumentNullException">Any argument is <see langword="null" />.</exception>
-    public Pop3ProtocolHandler(IConnector connector, ITlsProvider tlsProvider)
+    /// <param name="saslAuthenticator">
+    /// Chooses and runs the SASL mechanism for <c>AUTH</c>, or <see langword="null" /> to log
+    /// in only with <c>APOP</c> or <c>USER</c>/<c>PASS</c> (ADR-0121).
+    /// </param>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="connector" /> or <paramref name="tlsProvider" /> is <see langword="null" />.
+    /// </exception>
+    public Pop3ProtocolHandler(IConnector connector, ITlsProvider tlsProvider, ISaslAuthenticator? saslAuthenticator = null)
     {
         this.connector = connector ?? throw new ArgumentNullException(nameof(connector));
         this.tlsProvider = tlsProvider ?? throw new ArgumentNullException(nameof(tlsProvider));
+        this.saslAuthenticator = saslAuthenticator;
     }
 
     /// <inheritdoc />
@@ -87,7 +96,7 @@ public sealed class Pop3ProtocolHandler : IProtocolHandler
     private async ValueTask<TransferResult> RunSessionAsync(IConnection connection, ITransferContext context, bool implicitTls)
     {
         var session = new Pop3Session(
-            new Pop3ControlChannel(connection, context.CancellationToken), tlsProvider, context, implicitTls);
+            new Pop3ControlChannel(connection, context.CancellationToken), tlsProvider, context, implicitTls, saslAuthenticator);
         await using (session.ConfigureAwait(false))
         {
             return await session.RunAsync().ConfigureAwait(false);
