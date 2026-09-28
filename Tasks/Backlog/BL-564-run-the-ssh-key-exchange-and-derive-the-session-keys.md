@@ -4,7 +4,7 @@ title: Run the SSH key exchange and derive the session keys
 priority: High
 assignee: Claude
 pipeline: protocol
-depends-on: [BL-563]
+depends-on: [BL-563, BL-739, BL-745]
 touches: [Curl.Protocol.Ssh.UnitLibrary, Curl.Protocol.Ssh.UnitTests]
 requirement: none
 created: 2026-09-28

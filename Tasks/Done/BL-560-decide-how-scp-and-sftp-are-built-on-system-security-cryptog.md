@@ -8,7 +8,7 @@ depends-on: [BL-498, BL-515]
 touches: [Documentation/Planning/Decisions]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-28
 ---
 # BL-560 — Decide how scp and sftp are built with every algorithm curl's SSH backends offer
 
@@ -27,16 +27,41 @@ An ADR fixes how `Curl.Protocol.Ssh.UnitLibrary` implements SSH-2 for `scp://` a
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Planning/Decisions/ADR-<next free number>-<slug>.md` exists (number checked unused), Status Accepted, marked "Decided by Claude under Stewart's delegation", with the measured reference facts in its Context.
-- [ ] The Decision lists every offered algorithm name per category, in order, marking the default-enabled ones, with each one's BCL type or hand-built primitive and the task that builds it; no algorithm curl's SSH backends offer is omitted.
-- [ ] It lists the key-file formats read (PEM PKCS#1/PKCS#8/SEC1, encrypted PEM, `openssh-key-v1` unencrypted and bcrypt-encrypted, for RSA, DSA, ECDSA and Ed25519), the class structure, and the test approach (an in-memory SSH peer in `Curl.Protocol.Ssh.UnitTests` built from the same primitives with fixed keys and an injected random source).
-- [ ] The Decision states that a primitive the BCL lacks is hand-built in `Curl.Cryptography.UnitLibrary`, never a package and never a blocked task.
-- [ ] Consequences list BL-561 to BL-578 and BL-678 to BL-681 and what each relies on from the ADR.
-- [ ] `Documentation/Planning/Decisions/README.md` indexes the new ADR.
+- [x] `Documentation/Planning/Decisions/ADR-<next free number>-<slug>.md` exists (number checked unused), Status Accepted, marked "Decided by Claude under Stewart's delegation", with the measured reference facts in its Context.
+- [x] The Decision lists every offered algorithm name per category, in order, marking the default-enabled ones, with each one's BCL type or hand-built primitive and the task that builds it; no algorithm curl's SSH backends offer is omitted.
+- [x] It lists the key-file formats read (PEM PKCS#1/PKCS#8/SEC1, encrypted PEM, `openssh-key-v1` unencrypted and bcrypt-encrypted, for RSA, DSA, ECDSA and Ed25519), the class structure, and the test approach (an in-memory SSH peer in `Curl.Protocol.Ssh.UnitTests` built from the same primitives with fixed keys and an injected random source).
+- [x] The Decision states that a primitive the BCL lacks is hand-built in `Curl.Cryptography.UnitLibrary`, never a package and never a blocked task.
+- [x] Consequences list BL-561 to BL-578 and BL-678 to BL-681 and what each relies on from the ADR.
+- [x] `Documentation/Planning/Decisions/README.md` indexes the new ADR.
 
 ## Notes
+
+- ADR-0122 (0122 was the next free number; 0121 is the highest in the folder).
+- Measured 2026-09-28 rather than with a real `sshd`: no `sshd` on the lane host, so each
+  curl was pointed at a listener that answers `SSH-2.0-OpenSSH_9.9\r\n` and records the
+  client's `KEXINIT` (`Record-CurlExchange.ps1 -Response ... -HoldOpenMilliseconds` on
+  Windows, `nc -l` in Docker for `curlimages/curl:8.21.0`, Ubuntu 24.04 libssh 0.10.6
+  and Fedora libssh 0.12.2). That captures every offered list exactly; the script needed
+  no extension.
+- Surprises the measurement found: the Windows (WinCNG) build offers no curve25519,
+  ECDH, ECDSA, Ed25519, AES-GCM, Blowfish, CAST-128 or RIPEMD-160, but does offer
+  `chacha20-poly1305@openssh.com`; both builds offer `hmac-sha1-etm@openssh.com` and the
+  `-cert-v01` host keys; `--compressed-ssh` offers `zlib,zlib@openssh.com,none` (BL-575's
+  goal had the first two swapped); an Ed25519 known-hosts entry makes the Windows build
+  exit 79 before connecting.
+- Decision: KEXINIT matches each platform's reference build exactly (`WindowsReference`,
+  `OpenSslReference`), and everything else libssh2 and libssh offer is built and
+  reachable through a `Full` preset. Recorded in ADR-0122.
+- Delivered in-session rather than through `align-and-document`: the decision rests on
+  the measurements taken here, and handing them over would only have copied them.
+- Filed BL-747 (sntrup761 primitive, added to ADR-0118's table), BL-748 (post-quantum
+  hybrid key exchanges), BL-749 (host-key certificates and `sk-` host keys), BL-750
+  (`hmac-sha1-etm`, `hmac-md5-etm`): algorithms no existing task covered.
+- Added BL-739 and BL-745 to BL-564's `depends-on`: its finite-field exchanges and
+  `ssh-dss` need them (ADR-0118), and it listed neither.
 
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Doing.
+- 2026-09-28: Doing -> Done. ADR-0122 fixes scp/sftp algorithms (measured KEXINIT per platform), key formats, structure and tests; BL-747..750 filed
