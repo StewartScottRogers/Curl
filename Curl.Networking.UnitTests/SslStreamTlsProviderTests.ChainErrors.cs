@@ -192,7 +192,8 @@ public sealed partial class SslStreamTlsProviderTests
 
     private static async Task<(ConnectResult Result, bool PlaintextDisposed)> HandshakeWithServerCertificateAsync(
         SslStreamTlsProvider provider,
-        X509Certificate2 serverCertificate)
+        X509Certificate2 serverCertificate,
+        string targetHost = CertificateHost)
     {
         var (client, server) = InMemoryDuplexStream.CreatePair();
         var serverTask = Task.Run(async () =>
@@ -203,7 +204,7 @@ public sealed partial class SslStreamTlsProviderTests
         });
 
         var result = await provider.AuthenticateAsClientAsync(
-            new StreamConnection(client, ServerEndPoint), CertificateHost, CancellationToken.None);
+            new StreamConnection(client, ServerEndPoint), targetHost, CancellationToken.None);
 
         var plaintextDisposed = client.IsDisposed;
         if (plaintextDisposed)

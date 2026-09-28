@@ -270,7 +270,8 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider
             RemoteCertificateValidationCallback = (_, certificate, chain, errors) =>
             {
                 peerCertificates = ListPeerCertificates(certificate, chain);
-                var anchoredErrors = WithoutChainErrorsWhenAnchored(errors, chain, anchorsBesideSystemStore);
+                var anchoredErrors = WithoutNameMismatchSchannelAccepts(
+                    WithoutChainErrorsWhenAnchored(errors, chain, anchorsBesideSystemStore), chain, targetHost);
                 peerVerification = ObservePeerVerification(anchoredErrors, chain, peerCertificates);
                 verificationFailure = VerifyPeer(anchoredErrors, chain, targetHost, []);
                 return verificationFailure is null;
@@ -329,7 +330,8 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider
             return null;
         }
 
-        errors = WithoutChainErrorsWhenAnchored(errors, chain, anchorsBesideSystemStore);
+        errors = WithoutNameMismatchSchannelAccepts(
+            WithoutChainErrorsWhenAnchored(errors, chain, anchorsBesideSystemStore), chain, targetHost);
         if (errors == SslPolicyErrors.None)
         {
             return null;
@@ -390,6 +392,17 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider
         X509Certificate2Collection anchorsBesideSystemStore) =>
         ChainLeadsToAnyOf(chain, anchorsBesideSystemStore)
             ? errors & ~SslPolicyErrors.RemoteCertificateChainErrors
+            : errors;
+
+    // With --cacert curl's Schannel build checks the name itself and, for a certificate
+    // with no DNS subjectAltName, matches the common name, which .NET's check does not
+    // (BL-415). Without --cacert Schannel's own check stands.
+    private SslPolicyErrors WithoutNameMismatchSchannelAccepts(SslPolicyErrors errors, X509Chain? chain, string targetHost) =>
+        _matchesSchannelBuild
+        && _options.CaCertificateFile is not null
+        && errors.HasFlag(SslPolicyErrors.RemoteCertificateNameMismatch)
+        && SchannelCommonNameCheck.CommonNameMatches(chain!.ChainElements[0].Certificate, targetHost)
+            ? errors & ~SslPolicyErrors.RemoteCertificateNameMismatch
             : errors;
 
     // Taken in the validation callback, whether or not -k lets the handshake go on, because
