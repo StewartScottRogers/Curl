@@ -1,5 +1,6 @@
 using System.Text;
 
+using Curl.Authentication;
 using Curl.Cli;
 using Curl.Core;
 using Curl.Networking;
@@ -310,6 +311,16 @@ public sealed class CurlCompositionProxyTests
         Assert.StartsWith(
             "CONNECT example.com:80 HTTP/1.1\r\nHost: example.com:80\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\nX-P: 1\r\n\r\nGET /a HTTP/1.1\r\n",
             Latin1(server.Written));
+    }
+
+    [TestMethod]
+    public void CreateProxyTunnelOptions_EncodesCommandLineTextInThePlatformEncoding()
+    {
+        HttpProxyTunnelOptions options = TunnelOptionsFor(["-p", "-x", "127.0.0.1:18238", "http://example.com/a"]);
+
+        Assert.AreEqual(
+            CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()).CodePage,
+            options.CommandLineTextEncoding.CodePage);
     }
 
     [TestMethod]

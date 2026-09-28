@@ -220,7 +220,8 @@ internal static class CurlComposition
     /// <c>-A</c> value as its <c>User-Agent</c>, no <c>User-Agent</c> header for <c>-A ""</c>,
     /// <c>curl/8.21.0</c> without <c>-A</c>; the proxy credential encoded as the server
     /// credential is (<see cref="CredentialEncoding.ForPlatform" />, ADR-0022); and the
-    /// <c>--proxy-header</c> values verbatim, never the <c>-H</c> ones (ADR-0077).
+    /// <c>--proxy-header</c> values verbatim, never the <c>-H</c> ones (ADR-0077); the
+    /// <c>-A</c> and <c>--proxy-header</c> text encoded in that same platform encoding (ADR-0067).
     /// </summary>
     /// <param name="options">The parsed command line.</param>
     /// <returns>The tunnel's options.</returns>
@@ -235,6 +236,7 @@ internal static class CurlComposition
             CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()))
         {
             ProxyHeaders = options.ProxyHeaders,
+            CommandLineTextEncoding = CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()),
         };
 
     /// <summary>

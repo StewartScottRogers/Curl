@@ -30,4 +30,11 @@ public sealed record HttpProxyTunnelOptions(string? UserAgent, Encoding Credenti
     /// that sends a line is appended after curl's own headers (BL-347). Empty by default.
     /// </summary>
     public IReadOnlyList<string> ProxyHeaders { get; init; } = [];
+
+    /// <summary>
+    /// Gets the encoding the <c>User-Agent</c> and <c>--proxy-header</c> text is turned into
+    /// bytes with, the platform curl's argument encoding (ADR-0067). Latin-1 by default,
+    /// where a character above U+00FF takes Latin-1's best fit or else <c>?</c>.
+    /// </summary>
+    public Encoding CommandLineTextEncoding { get; init; } = Encoding.Latin1;
 }

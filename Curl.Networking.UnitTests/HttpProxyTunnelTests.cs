@@ -59,6 +59,45 @@ public sealed class HttpProxyTunnelTests
     }
 
     [TestMethod]
+    public void BuildConnectRequest_WithWindows1252_SendsTheProxyHeaderInWindows1252()
+    {
+        // Measured with curl 8.21.0 (mingw, Windows-1252): € is sent as the byte 80 (BL-447).
+        var windows1252 = CodePagesEncodingProvider.Instance.GetEncoding(1252)!;
+
+        var request = HttpProxyTunnel.BuildConnectRequest(
+            "example.com", 80,
+            HttpProxy,
+            HttpProxyTunnelOptions.Default with { ProxyHeaders = ["X-A: €"], CommandLineTextEncoding = windows1252 });
+
+        CollectionAssert.IsSubsetOf(new byte[] { 0x80 }, request);
+        StringAssert.Contains(Encoding.Latin1.GetString(request), "\r\nX-A: \u0080\r\n");
+    }
+
+    [TestMethod]
+    public void BuildConnectRequest_WithUtf8_SendsTheProxyHeaderAndUserAgentInUtf8()
+    {
+        var request = HttpProxyTunnel.BuildConnectRequest(
+            "example.com", 80,
+            HttpProxy,
+            new HttpProxyTunnelOptions("é", Encoding.UTF8) { ProxyHeaders = ["X-A: é"], CommandLineTextEncoding = Encoding.UTF8 });
+
+        Assert.AreEqual(
+            "CONNECT example.com:80 HTTP/1.1\r\nHost: example.com:80\r\nUser-Agent: Ã©\r\nProxy-Connection: Keep-Alive\r\nX-A: Ã©\r\n\r\n",
+            Encoding.Latin1.GetString(request));
+    }
+
+    [TestMethod]
+    public void BuildConnectRequest_ByDefault_SendsTheProxyHeaderInLatin1()
+    {
+        var request = HttpProxyTunnel.BuildConnectRequest(
+            "example.com", 80,
+            HttpProxy,
+            HttpProxyTunnelOptions.Default with { ProxyHeaders = ["X-A: é"] });
+
+        StringAssert.Contains(Encoding.Latin1.GetString(request), "\r\nX-A: é\r\n");
+    }
+
+    [TestMethod]
     public void BuildConnectRequest_ForAnIPv6Target_BracketsTheAddress()
     {
         // curl -p -x 127.0.0.1:18263 http://[::1]:81/
