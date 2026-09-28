@@ -11,7 +11,7 @@ for `-C` (ADR-0093's BL-439 addendum), and honours `--disable-epsv`,
 (ADR-0093's BL-436 addendum). TLS: `ftps://` is TLS from the first byte, and `--ssl`,
 `--ssl-reqd` and `--ftp-ssl-control` upgrade `ftp://` with `AUTH`, then `PBSZ` and `PROT`
 (ADR-0102 and its BL-437 addendum). Still to come: a host or interface name in `-P`
-(BL-463) and the other FTP-only options.
+(BL-466) and the other FTP-only options.
 
 **URL schemes:** `ftp`, and `ftps` for a handler built with a listener and a TLS provider.
 

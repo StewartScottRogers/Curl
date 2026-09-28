@@ -1,5 +1,5 @@
 ---
-id: BL-462
+id: BL-465
 title: Report LocalEndPoint on the TLS connections Curl.Networking returns, so -P - works over ftps://
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-462 — Report LocalEndPoint on the TLS connections Curl.Networking returns, so -P - works over ftps://
+# BL-465 — Report LocalEndPoint on the TLS connections Curl.Networking returns, so -P - works over ftps://
 
 ## Goal
 

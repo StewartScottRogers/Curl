@@ -1,5 +1,5 @@
 ---
-id: BL-463
+id: BL-466
 title: Resolve a host or interface name given to -P/--ftp-port in FtpProtocolHandler
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-463 — Resolve a host or interface name given to -P/--ftp-port in FtpProtocolHandler
+# BL-466 — Resolve a host or interface name given to -P/--ftp-port in FtpProtocolHandler
 
 ## Goal
 

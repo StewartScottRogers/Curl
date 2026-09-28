@@ -57,12 +57,12 @@ completed: 2026-09-27
 - Defaults taken: the one-argument constructor stays for `Curl.Console` until BL-458 and
   serves `ftp` only (`-P` there is exit 30, an accepted `AUTH` exit 64); a `-P` host or
   interface name ends with exit 6 and no `QUIT` (curl's ending for a name that does not
-  resolve; resolving is BL-463); IPv6 with `EPRT` refused ends with exit 30 after `QUIT`
+  resolve; resolving is BL-466); IPv6 with `EPRT` refused ends with exit 30 after `QUIT`
   where curl hangs; a failed data TLS handshake ends without `QUIT` (unmeasured, same as a
   failed passive connect); curl's watch on the control connection during the accept wait
   is not reproduced.
-- Filed BL-462 (TLS connections from `TcpConnector` must report `LocalEndPoint`, or
-  `-P -` over `ftps://` ends with exit 30) and BL-463 (`-P` host and interface names).
+- Filed BL-465 (TLS connections from `TcpConnector` must report `LocalEndPoint`, or
+  `-P -` over `ftps://` ends with exit 30) and BL-466 (`-P` host and interface names).
 
 ## Log
 
