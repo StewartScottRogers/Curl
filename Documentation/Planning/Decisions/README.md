@@ -119,6 +119,7 @@ choices do not need one.
 | [0102](ADR-0102-ftp-active-mode-and-tls-need-a-listening-seam-and-four-transfer-options.md) | FTP active mode (`-P`) and TLS (`ftps://`, `--ssl`, `--ssl-reqd`) need an `IConnectionListener` seam, `IConnection.LocalEndPoint` and four transfer options, delivered by abstractions, networking, CLI and console tasks around BL-437 | Accepted | 2026-09-27 |
 | [0103](ADR-0103-the-schannel-build-matches-the-common-name-of-a-cacert-certificate-without-dns-names.md) | With `--cacert` the Schannel build accepts a certificate whose subjectAltName holds no DNS name when its CN matches the host as `Curl_cert_hostcheck` matches it (one left-most `*` label, never for an IP literal); without `--cacert`, and in the OpenSSL build, .NET's name check stands | Accepted | 2026-09-27 |
 | [0104](ADR-0104-a-device-under-dev-is-sent-chunked-off-windows.md) | Off Windows a seekable `-F` file under `/dev/` (not `/dev/shm/`, `/dev/fd/` or `/dev/std*`) declares no length, so the body goes chunked as libcurl sends a device; on Windows a seekable file's length stands | Accepted | 2026-09-27 |
+| [0105](ADR-0105-a-failed-connect-reports-closing-connection-0.md) | The HTTP handler reports `closing connection #N` after every failed connect, with `N` from `ConnectResult.ConnectionNumber` (`0` for a failed connect), as curl 8.21.0 does after a refused dial, failed resolve or connect timeout | Accepted | 2026-09-27 |
 
 ## Template
 

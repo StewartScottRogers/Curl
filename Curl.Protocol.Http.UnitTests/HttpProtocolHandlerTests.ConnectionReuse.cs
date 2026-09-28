@@ -240,6 +240,30 @@ public sealed partial class HttpProtocolHandlerTests
     /// completely sent off</c>, <c>HTTP 1.0, assume close after body</c> before an HTTP/1.0
     /// status line (measured, BL-449 Notes), and the connection's end.
     /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_ConnectRefused_ReportsClosingConnectionLast()
+    {
+        RecordingTransferEvents events = new();
+        QueueConnector connector = new(ConnectResult.Refused("Failed to connect to 127.0.0.1:1 after 0 ms: Could not connect to server"));
+
+        TransferResult result = await Handler(connector).ExecuteAsync(ReuseContext(events));
+
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.AreEqual("closing connection #0", events.Info[^1]);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ResolveFails_ReportsClosingConnection()
+    {
+        RecordingTransferEvents events = new();
+        QueueConnector connector = new(ConnectResult.Failed(CurlExitCode.CouldntResolveHost, "Could not resolve host: nonexistent.invalid"));
+
+        TransferResult result = await Handler(connector).ExecuteAsync(ReuseContext(events));
+
+        Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
+        CollectionAssert.AreEqual(new[] { "closing connection #0" }, events.Info);
+    }
+
     private static string[] InfoLines(string response, string connectionEnd) =>
         response.StartsWith("HTTP/1.0", StringComparison.Ordinal)
             ? [UsingHttp1, RequestSent, "HTTP 1.0, assume close after body", connectionEnd]
