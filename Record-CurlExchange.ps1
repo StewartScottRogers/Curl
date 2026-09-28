@@ -90,7 +90,7 @@
     with the data port, PASV 227 with 127.0.0.1 and the data port, TYPE 200, SIZE 213
     with FtpData's length, MDTM 213 20260927123456, CWD 250, REST 350 (remembering the
     offset), RETR 150 then FtpData from the last REST offset over the data connection
-    then 226 (LIST the same), STOR 150 then every byte curl sends over the data
+    then 226 (LIST and NLST the same), STOR 150 then every byte curl sends over the data
     connection until it closes it then 226 (APPE the same), QUIT 221 (and the session
     ends), and 502 for any other command. A data connection curl closes early (a range
     read) is not an error. The bytes received on STOR's and APPE's data connections are
@@ -102,9 +102,13 @@
     as Response, e.g. 'PASS=430 Access denied'. The reply is sent as given with CRLF
     appended. VERB is a command name in capitals, GREETING for the greeting, or RETRDONE
     for the reply sent after RETR's or LIST's data, or STORDONE for the reply sent after
-    STOR's or APPE's data. An overridden EPSV, PASV, RETR, LIST, STOR or APPE sends only
-    the reply: no data connection is offered. The reply CLOSE closes the control
-    connection instead of answering, e.g. 'PWD=CLOSE'.
+    STOR's or APPE's data. An overridden EPSV, PASV, RETR, LIST, NLST, STOR or APPE sends
+    only the reply: no data connection is offered. The reply CLOSE closes the control
+    connection instead of answering, e.g. 'PWD=CLOSE'. Several overrides for one VERB are
+    answered in the order given, one per command, the last repeating for the rest, e.g.
+    'CWD=550 No such directory' 'CWD=250 OK' (BL-436). In a reply, {DATAPORT} stands for
+    the data listener's port and {DATAPORT_HI} and {DATAPORT_LO} for its two PASV numbers,
+    e.g. 'PASV=227 Entering Passive Mode (127,0,0,2,{DATAPORT_HI},{DATAPORT_LO})'.
 
 .PARAMETER FtpData
     The file served by RETR, and the listing served by LIST, in -Ftp mode, with the
@@ -335,8 +339,21 @@ $serveFtpSession = {
     $dataPort = ([System.Net.IPEndPoint] $dataListener.LocalEndpoint).Port
     $restOffset = [long] 0
 
+    # Several overrides for one verb are used in turn; the last one repeats.
+    function Get-Override {
+        param([string] $Verb)
+        $replies = $Overrides[$Verb]
+        if ($replies.Count -gt 1) {
+            $reply = $replies[0]
+            $replies.RemoveAt(0)
+            return $reply
+        }
+        return $replies[0]
+    }
+
     function Send-Reply {
         param($Stream, [string] $Reply)
+        $Reply = $Reply.Replace('{DATAPORT_HI}', [string] [Math]::Floor($dataPort / 256)).Replace('{DATAPORT_LO}', [string] ($dataPort % 256)).Replace('{DATAPORT}', [string] $dataPort)
         $bytes = $latin1.GetBytes($Reply + "`r`n")
         $Stream.Write($bytes, 0, $bytes.Length)
         $Stream.Flush()
@@ -352,7 +369,7 @@ $serveFtpSession = {
         try {
             $stream = $client.GetStream()
             $stream.ReadTimeout = 5000
-            $greeting = if ($Overrides.ContainsKey('GREETING')) { $Overrides['GREETING'] } else { '220 Recorder ready' }
+            $greeting = if ($Overrides.ContainsKey('GREETING')) { Get-Override -Verb 'GREETING' } else { '220 Recorder ready' }
             Send-Reply -Stream $stream -Reply $greeting
             $line = New-Object System.IO.MemoryStream
             while ($true) {
@@ -370,8 +387,9 @@ $serveFtpSession = {
                 [void] $Transcript.Append("> $command`r`n")
                 $verb = ($command -split ' ', 2)[0].ToUpperInvariant()
                 if ($Overrides.ContainsKey($verb)) {
-                    if ($Overrides[$verb] -ceq 'CLOSE') { break }  # Hang up instead of replying.
-                    Send-Reply -Stream $stream -Reply $Overrides[$verb]
+                    $override = Get-Override -Verb $verb
+                    if ($override -ceq 'CLOSE') { break }  # Hang up instead of replying.
+                    Send-Reply -Stream $stream -Reply $override
                     if ($verb -eq 'QUIT') { break }
                     continue
                 }
@@ -389,7 +407,7 @@ $serveFtpSession = {
                     }
                     'EPSV' { Send-Reply -Stream $stream -Reply "229 Entering Extended Passive Mode (|||$dataPort|)" }
                     'PASV' { Send-Reply -Stream $stream -Reply "227 Entering Passive Mode (127,0,0,1,$([Math]::Floor($dataPort / 256)),$($dataPort % 256))" }
-                    { $_ -eq 'RETR' -or $_ -eq 'LIST' } {
+                    { $_ -eq 'RETR' -or $_ -eq 'LIST' -or $_ -eq 'NLST' } {
                         Send-Reply -Stream $stream -Reply '150 Opening BINARY mode data connection'
                         $accept = $dataListener.AcceptTcpClientAsync()
                         if (-not $accept.Wait(5000)) { throw "curl sent $verb but opened no data connection within five seconds." }
@@ -404,7 +422,7 @@ $serveFtpSession = {
                         } finally {
                             $dataClient.Close()
                         }
-                        $done = if ($Overrides.ContainsKey('RETRDONE')) { $Overrides['RETRDONE'] } else { '226 Transfer complete' }
+                        $done = if ($Overrides.ContainsKey('RETRDONE')) { Get-Override -Verb 'RETRDONE' } else { '226 Transfer complete' }
                         Send-Reply -Stream $stream -Reply $done
                     }
                     { $_ -eq 'STOR' -or $_ -eq 'APPE' } {
@@ -425,7 +443,7 @@ $serveFtpSession = {
                         [byte[]] $uploadedBytes = $uploaded.ToArray()
                         $UploadedData.Write($uploadedBytes, 0, $uploadedBytes.Length)
                         [void] $Transcript.Append("= $($uploadedBytes.Length) bytes received on the data connection: $($latin1.GetString($uploadedBytes))`r`n")
-                        $done = if ($Overrides.ContainsKey('STORDONE')) { $Overrides['STORDONE'] } else { '226 Transfer complete' }
+                        $done = if ($Overrides.ContainsKey('STORDONE')) { Get-Override -Verb 'STORDONE' } else { '226 Transfer complete' }
                         Send-Reply -Stream $stream -Reply $done
                     }
                     'QUIT' { Send-Reply -Stream $stream -Reply '221 Bye'; break }
@@ -475,7 +493,9 @@ $ftpOverrides = @{}
 foreach ($entry in $FtpReply) {
     $separator = $entry.IndexOf('=')
     if ($separator -lt 1) { throw "FtpReply '$entry' is not VERB=reply." }
-    $ftpOverrides[$entry.Substring(0, $separator).ToUpperInvariant()] = [System.Text.Encoding]::GetEncoding(28591).GetString((ConvertFrom-EscapedResponse -Text $entry.Substring($separator + 1)))
+    $overrideVerb = $entry.Substring(0, $separator).ToUpperInvariant()
+    if (-not $ftpOverrides.ContainsKey($overrideVerb)) { $ftpOverrides[$overrideVerb] = New-Object System.Collections.Generic.List[string] }
+    $ftpOverrides[$overrideVerb].Add([System.Text.Encoding]::GetEncoding(28591).GetString((ConvertFrom-EscapedResponse -Text $entry.Substring($separator + 1))))
 }
 $transcript = New-Object System.Text.StringBuilder
 $uploadedData = New-Object System.IO.MemoryStream
