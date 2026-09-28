@@ -36,3 +36,4 @@ An ADR fixes the shape of the three mail handlers before any is written: where S
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
