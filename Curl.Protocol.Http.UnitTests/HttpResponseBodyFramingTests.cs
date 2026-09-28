@@ -90,9 +90,20 @@ public sealed class HttpResponseBodyFramingTests
     }
 
     [TestMethod]
-    public void Of_InvalidContentLengthAfterTransferEncoding_IsNotRead()
+    public void Of_InvalidContentLengthAfterTransferEncoding_ThrowsExit8()
     {
         HttpResponseHeader[] headers = [new("Transfer-Encoding", "gzip"), new("Content-Length", "abc")];
+
+        HttpTransferException thrown = Assert.ThrowsExactly<HttpTransferException>(
+            () => HttpResponseBodyFraming.Of(headers, passesTransferCoding: false, ignoresContentLength: false, decodesTransferCoding: true));
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, thrown.ExitCode);
+    }
+
+    [TestMethod]
+    public void Of_ValidContentLengthAfterTransferEncoding_IsNotTrusted()
+    {
+        HttpResponseHeader[] headers = [new("Transfer-Encoding", "gzip"), new("Content-Length", "3")];
 
         HttpResponseBodyFraming framing = HttpResponseBodyFraming.Of(headers, passesTransferCoding: false, ignoresContentLength: false, decodesTransferCoding: true);
 

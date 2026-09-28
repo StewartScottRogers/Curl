@@ -38,6 +38,11 @@ public sealed partial class HttpProtocolHandlerTests
     [DataRow("HTTP/1.1 200 OK\r\nX-Fold: a\r\n b\r\nContent-Length: x\r\n\r\nhello", "", "HTTP/1.1 200 OK\r\nX-Fold: a b\r\n", DisplayName = "After a folded header")]
     [DataRow("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nContent-Length: x\r\nX-After: 1\r\n\r\n0\r\n\r\n", "", "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n", DisplayName = "After chunked")]
     [DataRow("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nContent-Length: x\r\nX-After: 1\r\n\r\n0\r\n\r\n", "--raw", "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n", DisplayName = "After chunked, with --raw")]
+    [DataRow("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nContent-Length: x\r\nX-After: 1\r\n\r\n0\r\n\r\n", "--tr-encoding", "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n", DisplayName = "After chunked, with --tr-encoding")]
+    [DataRow("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nContent-Length: x\r\nX-After: 1\r\n\r\n0\r\n\r\n", "--tr-encoding --raw", "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n", DisplayName = "After chunked, with --tr-encoding --raw")]
+    [DataRow("HTTP/1.1 200 OK\r\nTransfer-Encoding: identity\r\nContent-Length: 5,x\r\nX-After: 1\r\n\r\nhello", "--tr-encoding", "HTTP/1.1 200 OK\r\nTransfer-Encoding: identity\r\n", DisplayName = "After identity, with --tr-encoding")]
+    [DataRow("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nContent-Length: 3\r\nContent-Length: 4\r\nX-After: 1\r\n\r\n5\r\nhello\r\n0\r\n\r\n", "--tr-encoding", "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nContent-Length: 3\r\n", DisplayName = "Two disagreeing after chunked, with --tr-encoding")]
+    [DataRow("HTTP/1.1 200 OK\r\nContent-Length: 5\r\nTransfer-Encoding: chunked\r\nContent-Length: 6\r\nX-After: 1\r\n\r\n5\r\nhello\r\n0\r\n\r\n", "--tr-encoding", "HTTP/1.1 200 OK\r\nContent-Length: 5\r\nTransfer-Encoding: chunked\r\n", DisplayName = "Disagreeing before and after chunked, with --tr-encoding")]
     public async Task ExecuteAsync_InvalidContentLength_WritesTheHeadLinesBeforeIt(string response, string options, string headerOutput)
     {
         await AssertRefusedHeaderAsync(response, options, headerOutput, CurlExitCode.WeirdServerReply, InvalidContentLength);
@@ -94,16 +99,21 @@ public sealed partial class HttpProtocolHandlerTests
     [DataRow("HTTP/1.1 200 OK\r\nTransfer-Encoding: foo\r\nX-After: 1\r\n\r\n", "--raw", DisplayName = "Unsolicited Transfer-Encoding, with --raw")]
     public async Task ExecuteAsync_HeaderAcceptedByTheOptions_WritesTheWholeHeadAndTheBody(string head, string options)
     {
-        foreach (int chunkSize in ChunkSizes)
-        {
-            MemoryStream output = new();
+        await AssertAcceptedHeadAsync(head, "hello", "hello", options);
+    }
 
-            TransferResult result = await Handler(QueueConnector.For(Connection(head + "hello", chunkSize)))
-                .ExecuteAsync(RefusedHeaderContext(output, output, options));
-
-            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}: {result.ErrorMessage}");
-            Assert.AreEqual(head + "hello", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
-        }
+    /// <summary>
+    /// Measured with <c>-sS --tr-encoding -D -</c> (BL-454 Notes): a Content-Length after the
+    /// Transfer-Encoding header that is valid, too large to hold, or ignored is not used, and the
+    /// chunked body is decoded.
+    /// </summary>
+    [TestMethod]
+    [DataRow("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nContent-Length: 3\r\nX-After: 1\r\n\r\n", "--tr-encoding", DisplayName = "Valid, with --tr-encoding")]
+    [DataRow("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nContent-Length: 99999999999999999999\r\nX-After: 1\r\n\r\n", "--tr-encoding", DisplayName = "Too large, with --tr-encoding")]
+    [DataRow("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nContent-Length: x\r\nX-After: 1\r\n\r\n", "--tr-encoding --ignore-content-length", DisplayName = "Invalid, with --tr-encoding --ignore-content-length")]
+    public async Task ExecuteAsync_ContentLengthAfterChunkedAccepted_WritesTheWholeHeadAndTheDecodedBody(string head, string options)
+    {
+        await AssertAcceptedHeadAsync(head, "5\r\nhello\r\n0\r\n\r\n", "hello", options);
     }
 
     [TestMethod]
@@ -139,6 +149,20 @@ public sealed partial class HttpProtocolHandlerTests
                 new[] { KeyValuePair.Create("X-Before", "1"), KeyValuePair.Create("X-B2", "2") },
                 result.Report.ResponseHeaders.ToArray(),
                 $"Chunk size {chunkSize}");
+        }
+    }
+
+    private static async Task AssertAcceptedHeadAsync(string head, string body, string decodedBody, string options)
+    {
+        foreach (int chunkSize in ChunkSizes)
+        {
+            MemoryStream output = new();
+
+            TransferResult result = await Handler(QueueConnector.For(Connection(head + body, chunkSize)))
+                .ExecuteAsync(RefusedHeaderContext(output, output, options));
+
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}: {result.ErrorMessage}");
+            Assert.AreEqual(head + decodedBody, Latin1(output.ToArray()), $"Chunk size {chunkSize}");
         }
     }
 
