@@ -47,3 +47,4 @@ the transfer's `ITransferEvents`, filling `PeerCertificateChain` and
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
