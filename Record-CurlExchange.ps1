@@ -216,6 +216,52 @@
     How long, in -Imap mode, the server waits for curl's next line before it hangs up.
     Default 5000.
 
+.PARAMETER Pop3
+    Serve one POP3 session instead of HTTP responses (BL-530): send a greeting, then read
+    curl's command lines one at a time and answer each from a table of replies, as -Smtp
+    does. A multi-line reply ends with a lone "." line and every line of it that starts
+    with "." is dot-stuffed (RFC 1939 3). request.bin then holds every line curl sent and
+    transcript.txt holds both directions, each line prefixed "> " (curl) or "< " (server),
+    multi-line replies as sent, stuffing included. Response, Connections,
+    ResponseDelayMilliseconds and Reset are ignored. With -Tls it serves implicit TLS from
+    the first byte, as pop3s:// expects.
+
+    The default replies (RFC 1939, RFC 2449, RFC 5034) are: greeting
+    +OK POP3 ready <1896.697170952@localhost>, the timestamp APOP digests; CAPA a
+    multi-line list of USER, SASL PLAIN LOGIN, STLS (left out once the session is TLS),
+    TOP and UIDL; USER +OK; PASS +OK; APOP +OK; AUTH +OK, after the "+" continuations the
+    mechanism needs (PLAIN without an initial response one, LOGIN one per credential it
+    still lacks), each continuation line curl sends recorded like a command, and AUTH
+    without a mechanism a multi-line list of PLAIN and LOGIN; a maildrop of two copies of
+    Pop3Message, so STAT +OK 2 <both sizes>, LIST a multi-line listing of both and
+    LIST n the one line +OK n <size>; RETR n Pop3Message multi-line; TOP n k its headers,
+    the blank line and its first k body lines, multi-line; UIDL a multi-line listing of
+    uid-1 and uid-2 and UIDL n one line; DELE +OK; RSET +OK; NOOP +OK; QUIT +OK (and the
+    session ends); and -ERR for any other command. STLS is answered +OK and the session is
+    then served over TLS with the same throwaway certificate as -Tls (curl needs -k), with
+    a "= TLS handshake completed on the control connection" line in transcript.txt.
+
+.PARAMETER Pop3Reply
+    Overrides for the POP3 reply table, each 'VERB=reply' with the same backslash escapes
+    as Response, e.g. 'PASS=-ERR denied'. VERB is a command name in capitals or GREETING
+    for the greeting. The reply is sent exactly as given with CRLF appended, so a
+    multi-line reply is written with \r\n between its lines and ends in its own "."
+    line, e.g. 'LIST=+OK\r\n.' for an empty maildrop. An overridden AUTH sends only the
+    reply, with no continuations, and an overridden STLS whose reply starts +OK still
+    switches to TLS. The reply CLOSE and the use of several overrides for one VERB work
+    as in FtpReply.
+
+.PARAMETER Pop3Message
+    The message RETR and TOP serve, and whose length LIST and STAT report, in -Pop3 mode,
+    with the same backslash escapes as Response. It is dot-stuffed as it is sent. Default
+    a six-line message ending in CRLF: From: sender@example.com, To:
+    recipient@example.com, Subject: Recorded, a blank line, "Hello from the recorder."
+    and ".A line that starts with a dot.", which exercises the stuffing.
+
+.PARAMETER Pop3IdleMilliseconds
+    How long, in -Pop3 mode, the server waits for curl's next line before it hangs up.
+    Default 5000.
+
 .PARAMETER Tls
     Answer each connection over TLS 1.2 instead of plain TCP, so the recorder can stand
     in for an HTTPS server or an HTTPS proxy (BL-398, BL-442). The certificate served
@@ -227,7 +273,8 @@
     A connection whose handshake fails is recorded as empty. -Reset resets the connection
     before any handshake. With -Ftp it serves implicit FTPS: the control connection is TLS
     from its first byte, as ftps:// expects (BL-437); with -Smtp, implicit SMTPS, as
-    smtps:// expects (BL-529); with -Imap, implicit IMAPS, as imaps:// expects (BL-531).
+    smtps:// expects (BL-529); with -Imap, implicit IMAPS, as imaps:// expects (BL-531);
+    with -Pop3, implicit POP3S, as pop3s:// expects (BL-530).
 
 .PARAMETER FtpIdleMilliseconds
     How long, in -Ftp mode, the server waits for curl's next command before it hangs up.
@@ -251,8 +298,9 @@
     written; there is no request.bin, since the script sees none of the traffic. Port,
     Response, Connections, ResponseDelayMilliseconds, Reset, HoldOpenMilliseconds,
     RespondAfterBodyBytes, FtpReply, FtpData, FtpIdleMilliseconds, SmtpReply,
-    SmtpIdleMilliseconds, ImapReply, ImapMessage, ImapIdleMilliseconds and ListenAddress are ignored, and Port need not be given.
-    Combining it with a server mode, -Ftp, -Smtp, -Imap or -Tls, is refused. StandardInput and Curl work as in every other mode.
+    SmtpIdleMilliseconds, ImapReply, ImapMessage, ImapIdleMilliseconds, Pop3Reply,
+    Pop3Message, Pop3IdleMilliseconds and ListenAddress are ignored, and Port need not be given.
+    Combining it with a server mode, -Ftp, -Smtp, -Imap, -Pop3 or -Tls, is refused. StandardInput and Curl work as in every other mode.
 
 .EXAMPLE
     .\Record-CurlExchange.ps1 -Port 18081 -Response 'HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello' -CurlArgs 'http://127.0.0.1:18081/a?b' -OutDirectory fixtures\default-get
@@ -279,6 +327,12 @@
     Serves one IMAP session; transcript.txt shows CAPABILITY, AUTHENTICATE PLAIN, SELECT
     INBOX, UID FETCH 1 BODY[] and LOGOUT with their tagged replies, and stdout.bin the
     message curl printed.
+
+.EXAMPLE
+    .\Record-CurlExchange.ps1 -Port 18110 -Pop3 -CurlArgs '-sS','-u','u:p','pop3://127.0.0.1:18110/1' -OutDirectory fixtures\pop3-retr
+
+    Serves one POP3 session; transcript.txt shows CAPA, AUTH PLAIN, RETR 1 with the
+    dot-stuffed message and QUIT, and stdout.bin the message curl printed.
 #>
 [CmdletBinding()]
 param(
@@ -303,6 +357,10 @@ param(
     [string[]] $ImapReply = @(),
     [string] $ImapMessage = 'From: sender@example.com\r\nTo: recipient@example.com\r\nSubject: Recorded\r\n\r\nHello from the recorder.\r\n',
     [ValidateRange(1, 600000)] [int] $ImapIdleMilliseconds = 5000,
+    [switch] $Pop3,
+    [string[]] $Pop3Reply = @(),
+    [string] $Pop3Message = 'From: sender@example.com\r\nTo: recipient@example.com\r\nSubject: Recorded\r\n\r\nHello from the recorder.\r\n.A line that starts with a dot.\r\n',
+    [ValidateRange(1, 600000)] [int] $Pop3IdleMilliseconds = 5000,
     [switch] $Tls,
     [string] $Curl,
     [System.Net.IPAddress] $ListenAddress = [System.Net.IPAddress]::Loopback,
@@ -315,8 +373,8 @@ $ErrorActionPreference = 'Stop'
 # powershell -File binds '-sS','http://...' as the one string "-sS,http://..."; only then
 # is the invocation line empty, so only then is that string split back into its elements.
 if ([string]::IsNullOrEmpty($MyInvocation.Line) -and $CurlArgs.Count -eq 1) { $CurlArgs = $CurlArgs[0].Split(',') }
-if ($NoServer -and ($Ftp -or $Smtp -or $Imap -or $Tls)) { throw '-NoServer runs no server, so it cannot be combined with -Ftp, -Smtp, -Imap or -Tls.' }
-if (@($Ftp, $Smtp, $Imap | Where-Object { $_ }).Count -gt 1) { throw '-Ftp, -Smtp and -Imap each serve a whole session; give one of them.' }
+if ($NoServer -and ($Ftp -or $Smtp -or $Imap -or $Pop3 -or $Tls)) { throw '-NoServer runs no server, so it cannot be combined with -Ftp, -Smtp, -Imap, -Pop3 or -Tls.' }
+if (@($Ftp, $Smtp, $Imap, $Pop3 | Where-Object { $_ }).Count -gt 1) { throw '-Ftp, -Smtp, -Imap and -Pop3 each serve a whole session; give one of them.' }
 if (-not $NoServer -and $Port -eq 0) { throw '-Port is required unless -NoServer is given: the URL in CurlArgs must name the port the server listens on.' }
 
 function Get-ReferenceCurlPath {
@@ -497,7 +555,7 @@ $serveConnections = {
     return , $requests.ToArray()
 }
 
-# Helpers the line-at-a-time sessions (-Ftp, -Smtp and -Imap) dot-source into their runspace.
+# Helpers the line-at-a-time sessions (-Ftp, -Smtp, -Imap and -Pop3) dot-source into their runspace.
 # They pass as text, since a script block invoked in another runspace would run back in
 # this one, which is busy waiting for curl. They read $TlsCertificate and $Overrides
 # from the session that dot-sources them.
@@ -1055,6 +1113,192 @@ $serveImapSession = {
     return , @(, $received.ToArray())
 }
 
+# The -Pop3 server: one connection, answered a line at a time, with multi-line replies
+# ended by a lone "." and dot-stuffed. It returns every byte curl sent, as one array, and
+# writes the two-way transcript into $Transcript (BL-530).
+$servePop3Session = {
+    param($Listener, [hashtable] $Overrides, [byte[]] $MessageBytes, [System.Text.StringBuilder] $Transcript, $TlsCertificate, [bool] $ImplicitTls, [int] $IdleMilliseconds, [string] $SessionHelpers)
+
+    Set-StrictMode -Version Latest
+    $ErrorActionPreference = 'Stop'
+    . ([scriptblock]::Create($SessionHelpers))
+    $latin1 = [System.Text.Encoding]::GetEncoding(28591)
+    $received = New-Object System.IO.MemoryStream
+    $messageSize = $MessageBytes.Length
+
+    function Send-Reply {
+        param($Stream, [string] $Reply)
+        $bytes = $latin1.GetBytes($Reply + "`r`n")
+        $Stream.Write($bytes, 0, $bytes.Length)
+        $Stream.Flush()
+        foreach ($line in ($Reply -split "`r`n")) { [void] $Transcript.Append("< $line`r`n") }
+    }
+
+    # One line from curl, recorded, without its line ending; $null once curl hangs up or
+    # stays silent for IdleMilliseconds.
+    function Read-Line {
+        param($Stream)
+        $line = New-Object System.IO.MemoryStream
+        while ($true) {
+            try {
+                $next = $Stream.ReadByte()
+            } catch [System.IO.IOException] {
+                return $null
+            }
+            if ($next -lt 0) { return $null }
+            $received.WriteByte([byte] $next)
+            $line.WriteByte([byte] $next)
+            if ($next -eq 10) { break }
+        }
+        $text = $latin1.GetString($line.ToArray()).TrimEnd("`r", "`n")
+        [void] $Transcript.Append("> $text`r`n")
+        return $text
+    }
+
+    # A multi-line reply (RFC 1939 3): the status line, each content line with a leading
+    # "." doubled, then the lone "." that ends it.
+    function Send-MultiLine {
+        param($Stream, [string] $Status, [string[]] $Lines)
+        $stuffed = @($Lines | ForEach-Object { if ($_.StartsWith('.')) { '.' + $_ } else { $_ } })
+        Send-Reply -Stream $Stream -Reply ((@($Status) + $stuffed + '.') -join "`r`n")
+    }
+
+    # Pop3Message as lines, without the line ending of its last one.
+    function Get-MessageLines {
+        $text = $latin1.GetString($MessageBytes)
+        if ($text.EndsWith("`r`n")) { $text = $text.Substring(0, $text.Length - 2) }
+        if ($text.Length -eq 0) { return , @() }
+        return , @($text -split "`r`n")
+    }
+
+    # TOP's lines: the headers, the blank line and the first $BodyLines body lines.
+    function Get-TopLines {
+        param([int] $BodyLines)
+        $lines = Get-MessageLines
+        $blank = [array]::IndexOf($lines, '')
+        if ($blank -lt 0) { return , $lines }
+        $last = [Math]::Min($lines.Count - 1, $blank + $BodyLines)
+        return , @($lines[0..$last])
+    }
+
+    function Get-CapabilityLines {
+        param([bool] $Secure)
+        # RFC 2595 4: STLS is not offered again once the session is TLS.
+        if ($Secure) { return , @('USER', 'SASL PLAIN LOGIN', 'TOP', 'UIDL') }
+        return , @('USER', 'SASL PLAIN LOGIN', 'STLS', 'TOP', 'UIDL')
+    }
+
+    # The "+" continuations each mechanism needs before +OK; $false once curl hangs up.
+    function Complete-Authentication {
+        param($Stream, [string] $Argument)
+        $words = @($Argument -split ' ')
+        $mechanism = $words[0].ToUpperInvariant()
+        $hasInitialResponse = $words.Count -gt 1
+        $challenges = switch ($mechanism) {
+            'PLAIN' { if ($hasInitialResponse) { @() } else { @('+ ') } }
+            'LOGIN' { if ($hasInitialResponse) { @('+ UGFzc3dvcmQ6') } else { @('+ VXNlcm5hbWU6', '+ UGFzc3dvcmQ6') } }
+            default { @() }
+        }
+        foreach ($challenge in $challenges) {
+            Send-Reply -Stream $Stream -Reply $challenge
+            if ($null -eq (Read-Line -Stream $Stream)) { return $false }
+        }
+        Send-Reply -Stream $Stream -Reply '+OK Authenticated'
+        return $true
+    }
+
+    function Start-Tls {
+        param($Stream)
+        $secure = Wrap-Tls -Stream $Stream
+        $secure.ReadTimeout = $IdleMilliseconds
+        [void] $Transcript.Append("= TLS handshake completed on the control connection`r`n")
+        return $secure
+    }
+
+    try {
+        $client = $Listener.AcceptTcpClient()
+    } catch {
+        return , @(, $received.ToArray())
+    }
+    try {
+        $stream = $client.GetStream()
+        $secure = $ImplicitTls
+        if ($ImplicitTls) { $stream = Wrap-Tls -Stream $stream }
+        $stream.ReadTimeout = $IdleMilliseconds
+        $greeting = if ($Overrides.ContainsKey('GREETING')) { Get-Override -Verb 'GREETING' } else { '+OK POP3 ready <1896.697170952@localhost>' }
+        Send-Reply -Stream $stream -Reply $greeting
+        while ($true) {
+            $command = Read-Line -Stream $stream
+            if ($null -eq $command) { break }  # Pop3IdleMilliseconds without a byte, or curl hung up.
+            $verb = ($command -split ' ', 2)[0].ToUpperInvariant()
+            $argument = if ($command.Contains(' ')) { ($command -split ' ', 2)[1] } else { '' }
+            $arguments = @($argument -split ' ' | Where-Object { $_ -ne '' })
+            if ($Overrides.ContainsKey($verb)) {
+                $override = Get-Override -Verb $verb
+                if ($override -ceq 'CLOSE') { break }  # Hang up instead of replying.
+                Send-Reply -Stream $stream -Reply $override
+                if ($verb -eq 'QUIT') { break }
+                if ($verb -eq 'STLS' -and $override.StartsWith('+OK')) {
+                    $stream = Start-Tls -Stream $stream
+                    $secure = $true
+                }
+                continue
+            }
+            $continue = $true
+            switch ($verb) {
+                'CAPA' { Send-MultiLine -Stream $stream -Status '+OK Capability list follows' -Lines (Get-CapabilityLines -Secure $secure) }
+                'STLS' {
+                    Send-Reply -Stream $stream -Reply '+OK Begin TLS negotiation'
+                    $stream = Start-Tls -Stream $stream
+                    $secure = $true
+                }
+                'USER' { Send-Reply -Stream $stream -Reply '+OK User accepted' }
+                'PASS' { Send-Reply -Stream $stream -Reply '+OK Logged in' }
+                'APOP' { Send-Reply -Stream $stream -Reply '+OK Logged in' }
+                'AUTH' {
+                    if ($arguments.Count -eq 0) {
+                        Send-MultiLine -Stream $stream -Status '+OK SASL mechanisms follow' -Lines @('PLAIN', 'LOGIN')
+                    } else {
+                        $continue = Complete-Authentication -Stream $stream -Argument $argument
+                    }
+                }
+                'STAT' { Send-Reply -Stream $stream -Reply "+OK 2 $(2 * $messageSize)" }
+                'LIST' {
+                    if ($arguments.Count -gt 0) {
+                        Send-Reply -Stream $stream -Reply "+OK $($arguments[0]) $messageSize"
+                    } else {
+                        Send-MultiLine -Stream $stream -Status "+OK 2 messages ($(2 * $messageSize) octets)" -Lines @("1 $messageSize", "2 $messageSize")
+                    }
+                }
+                'RETR' { Send-MultiLine -Stream $stream -Status "+OK $messageSize octets" -Lines (Get-MessageLines) }
+                'TOP' {
+                    $bodyLines = 0
+                    if ($arguments.Count -gt 1) { [void] [int]::TryParse($arguments[1], [ref] $bodyLines) }
+                    Send-MultiLine -Stream $stream -Status '+OK Top of message follows' -Lines (Get-TopLines -BodyLines $bodyLines)
+                }
+                'UIDL' {
+                    if ($arguments.Count -gt 0) {
+                        Send-Reply -Stream $stream -Reply "+OK $($arguments[0]) uid-$($arguments[0])"
+                    } else {
+                        Send-MultiLine -Stream $stream -Status '+OK Unique-ID listing follows' -Lines @('1 uid-1', '2 uid-2')
+                    }
+                }
+                'DELE' { Send-Reply -Stream $stream -Reply '+OK Message deleted' }
+                'RSET' { Send-Reply -Stream $stream -Reply '+OK' }
+                'NOOP' { Send-Reply -Stream $stream -Reply '+OK' }
+                'QUIT' { Send-Reply -Stream $stream -Reply '+OK Bye'; $continue = $false }
+                default { Send-Reply -Stream $stream -Reply '-ERR Command not recognized' }
+            }
+            if (-not $continue) { break }
+        }
+    } catch [System.IO.IOException] {
+        # curl closed the connection mid-reply; what arrived is still recorded.
+    } finally {
+        $client.Close()
+    }
+    return , @(, $received.ToArray())
+}
+
 function New-ThrowawayTlsCertificate {
     # Schannel will not serve the ephemeral key CreateSelfSigned returns, so the
     # certificate is reloaded from its PFX export. Loaded without PersistKeySet, its key
@@ -1097,12 +1341,13 @@ function ConvertTo-ReplyOverrides {
 $ftpOverrides = ConvertTo-ReplyOverrides -Entries $FtpReply -ParameterName 'FtpReply'
 $smtpOverrides = ConvertTo-ReplyOverrides -Entries $SmtpReply -ParameterName 'SmtpReply'
 $imapOverrides = ConvertTo-ReplyOverrides -Entries $ImapReply -ParameterName 'ImapReply'
+$pop3Overrides = ConvertTo-ReplyOverrides -Entries $Pop3Reply -ParameterName 'Pop3Reply'
 $transcript = New-Object System.Text.StringBuilder
 $uploadedData = New-Object System.IO.MemoryStream
 $OutDirectory = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine((Get-Location).ProviderPath, $OutDirectory))
 New-Item -ItemType Directory -Path $OutDirectory -Force | Out-Null
 
-$tlsCertificate = if ($Tls -or $Ftp -or $Smtp -or $Imap) { New-ThrowawayTlsCertificate } else { $null }
+$tlsCertificate = if ($Tls -or $Ftp -or $Smtp -or $Imap -or $Pop3) { New-ThrowawayTlsCertificate } else { $null }
 # -NoServer binds nothing: the caller's own server answers curl.
 $listener = $null
 $server = $null
@@ -1120,6 +1365,8 @@ try {
         [void] $server.AddScript($serveSmtpSession).AddArgument($listener).AddArgument($smtpOverrides).AddArgument($transcript).AddArgument($tlsCertificate).AddArgument([bool] $Tls).AddArgument($SmtpIdleMilliseconds).AddArgument($sessionHelpers.ToString())
     } elseif ($Imap) {
         [void] $server.AddScript($serveImapSession).AddArgument($listener).AddArgument($imapOverrides).AddArgument([byte[]] (ConvertFrom-EscapedResponse -Text $ImapMessage)).AddArgument($transcript).AddArgument($tlsCertificate).AddArgument([bool] $Tls).AddArgument($ImapIdleMilliseconds).AddArgument($sessionHelpers.ToString())
+    } elseif ($Pop3) {
+        [void] $server.AddScript($servePop3Session).AddArgument($listener).AddArgument($pop3Overrides).AddArgument([byte[]] (ConvertFrom-EscapedResponse -Text $Pop3Message)).AddArgument($transcript).AddArgument($tlsCertificate).AddArgument([bool] $Tls).AddArgument($Pop3IdleMilliseconds).AddArgument($sessionHelpers.ToString())
     } else {
         [void] $server.AddScript($serveConnections).AddArgument($listener).AddArgument($responseBytes).AddArgument($Connections).AddArgument($ResponseDelayMilliseconds).AddArgument([bool] $Reset).AddArgument($RespondAfterBodyBytes).AddArgument($tlsCertificate).AddArgument($HoldOpenMilliseconds)
     }
@@ -1191,7 +1438,7 @@ if ($Ftp) {
     [System.IO.File]::WriteAllText((Join-Path $OutDirectory 'transcript.txt'), $transcript.ToString(), [System.Text.Encoding]::GetEncoding(28591))
     [System.IO.File]::WriteAllBytes((Join-Path $OutDirectory 'upload.bin'), $uploadedData.ToArray())
 }
-if ($Smtp -or $Imap) {
+if ($Smtp -or $Imap -or $Pop3) {
     [System.IO.File]::WriteAllText((Join-Path $OutDirectory 'transcript.txt'), $transcript.ToString(), [System.Text.Encoding]::GetEncoding(28591))
 }
 
