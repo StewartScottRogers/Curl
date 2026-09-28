@@ -105,8 +105,9 @@
     The shift sizes itself (ADR-0130) and never needs to know the Claude plan. Before any
     lane starts it reads the machine cap from <repo>.lanes\machine-lanes.json, running the
     machine probe first when that file is missing, incomplete or from other hardware, and
-    starts at the lane count <repo>.lanes\auto-lanes.json saved (2 the first time), capped
-    by the ceilings. Every 15 minutes, except while waiting for tokens, it samples usage,
+    starts at the lane count <repo>.lanes\auto-lanes.json saved, raised to -MinStartLanes
+    (default 3) when that is more, and capped by the ceilings. -MinStartLanes is only where
+    the shift starts, not a floor: Auto still retires below it when pace demands. Every 15 minutes, except while waiting for tokens, it samples usage,
     meters the burn rate per busy lane, paces to the 5-hour window and (unless
     -NoWeeklyPace) the weekly one, caps that by the board's capacity, the machine cap and
     -MaxLanes, and adds or retires at most one lane, tracing why: "lanes 3 -> 4 (5-hour
@@ -206,6 +207,9 @@ param(
     [ValidatePattern('^(?i:auto|[1-9]|1[0-6])$')][string]$Lanes = '1',
     # -Lanes Auto's lane maximum.
     [ValidateRange(1, 16)][int]$MaxLanes = 16,
+    # The fewest lanes a -Lanes Auto shift starts with (Stewart, 2026-09-28). A start, not a
+    # floor: the ceilings still cap it, and Auto still retires below it when pace demands.
+    [ValidateRange(1, 16)][int]$MinStartLanes = 3,
     # -Lanes Auto paces to the 5-hour window only: burn fast and stop at -StopAtWeeklyUsage
     # instead of spreading the weekly budget evenly until its reset.
     [switch]$NoWeeklyPace,
@@ -820,6 +824,19 @@ function Get-NextLaneCount {
     return [pscustomobject]@{ Lanes = $lanes; Changed = ($lanes -ne $Current); Desired = $desired; Reason = "$step ($limit)" }
 }
 
+function Get-AutoStartCount {
+    # Where an Auto shift starts: the lane count auto-lanes.json saved (none on the first
+    # Auto shift), raised to -MinStart, capped by the ceilings and at least 1. Why says which.
+    param($Saved, [int]$Capacity, [int]$MachineCap, [int]$MinStart = $MinStartLanes, [int]$Max = $MaxLanes)
+    $count = $MinStart
+    $why = 'first auto shift'
+    if ($Saved -and $Saved.lanes) { $count = [int]$Saved.lanes; $why = "last shift saved $count" }
+    if ($count -lt $MinStart) { $count = $MinStart; $why += ", raised to $count by -MinStartLanes" }
+    $ceiling = [math]::Min($Capacity, [math]::Min($MachineCap, $Max))
+    if ($count -gt $ceiling) { $count = [math]::Max(1, $ceiling); $why += ", capped at $count" }
+    return [pscustomobject]@{ Count = $count; Why = $why }
+}
+
 # Which lane scaling touches (ADR-0130 item 6), pure so -TestAutoLanes proves them.
 function Get-LaneToAdd {
     # The lowest lane number from 1 to -Max that is not active, or $null when all are.
@@ -894,7 +911,12 @@ if ($TestAutoLanes) {
         ,@('lane-to-retire 1,2,3 retiring 3', '2', "$(Get-LaneToRetire -Active 1, 2, 3 -Retiring 3)")
         ,@('lane-to-retire 1,2,3 retiring 1,2,3', 'null', "$(if ($null -eq (Get-LaneToRetire -Active 1, 2, 3 -Retiring 1, 2, 3)) { 'null' } else { 'a lane' })")
         ,@('lanes-finished 1,3 of 1,2', 'False', "$(Test-LanesFinished -Active 1, 3 -Finished 1, 2)")
-        ,@('lanes-finished 1,3 of 1,3', 'True', "$(Test-LanesFinished -Active 1, 3 -Finished 1, 3)"))
+        ,@('lanes-finished 1,3 of 1,3', 'True', "$(Test-LanesFinished -Active 1, 3 -Finished 1, 3)")
+        ,@('start saved 2', '3 (last shift saved 2, raised to 3 by -MinStartLanes)', "$((Get-AutoStartCount ([pscustomobject]@{ lanes = 2 }) 16 16 3 16) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
+        ,@('start saved 5', '5 (last shift saved 5)', "$((Get-AutoStartCount ([pscustomobject]@{ lanes = 5 }) 16 16 3 16) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
+        ,@('start first shift', '3 (first auto shift)', "$((Get-AutoStartCount $null 16 16 3 16) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
+        ,@('start min 4 ceiling 2', '2 (first auto shift, capped at 2)', "$((Get-AutoStartCount $null 2 16 4 16) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
+        ,@('start min 1 saved 1', '1 (last shift saved 1)', "$((Get-AutoStartCount ([pscustomobject]@{ lanes = 1 }) 16 16 1 16) | ForEach-Object { "$($_.Count) ($($_.Why))" })"))
     $failed = 0
     foreach ($case in $cases) {
         if ($case[1] -ceq $case[2]) { Write-Host "PASS $($case[0]): $($case[2])" -ForegroundColor Green }
@@ -1980,18 +2002,6 @@ function Remove-AutoBoard {
     git -C $Root worktree prune 2>&1 | Out-Null
 }
 
-function Get-AutoStartCount {
-    # Where an Auto shift starts: the lane count auto-lanes.json saved, or 2 on the first
-    # Auto shift, capped by the ceilings and at least 1. Why says which.
-    param($Saved, [int]$Capacity, [int]$MachineCap)
-    $count = 2
-    $why = 'first auto shift'
-    if ($Saved -and $Saved.lanes) { $count = [int]$Saved.lanes; $why = "last shift saved $count" }
-    $ceiling = [math]::Min($Capacity, [math]::Min($MachineCap, $MaxLanes))
-    if ($count -gt $ceiling) { $count = [math]::Max(1, $ceiling); $why += ", capped at $count" }
-    return [pscustomobject]@{ Count = $count; Why = $why }
-}
-
 function Get-AutoLaneStep {
     # One Auto step's computation from -Samples, newest last: both burn rates (the saved
     # ones while the samples give none), the pace target and the next lane count.
@@ -2373,7 +2383,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         # An Auto shift hands on Auto, not the count it ended at; the next one starts from
         # the count auto-lanes.json saved.
         $forward = @('-Lanes', $(if ($AutoLanes) { 'Auto' } else { $LaneCount }), '-Hours', $Hours, '-MaxTasks', $MaxTasks, '-TaskMinutes', $TaskMinutes, '-Model', $Model, '-Continuous')
-        if ($AutoLanes) { $forward += @('-MaxLanes', $MaxLanes) }
+        if ($AutoLanes) { $forward += @('-MaxLanes', $MaxLanes, '-MinStartLanes', $MinStartLanes) }
         if ($NoWeeklyPace) { $forward += '-NoWeeklyPace' }
         if ($QuietAlarm) { $forward += '-QuietAlarm' }
         $next = Start-Detached -Label "DF shift starting" -Dir $Root -ScriptArgs $forward

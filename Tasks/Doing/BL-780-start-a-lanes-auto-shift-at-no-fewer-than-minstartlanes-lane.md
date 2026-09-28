@@ -24,23 +24,23 @@ Stewart, 2026-09-28: a shift should start with at least three lanes. He chose a 
 count, not a hard floor: Auto must still be free to retire lanes below 3 when the burn
 rate says so, because a fixed floor ran him out of tokens on Max 5X (see ADR-0130).
 
-Today `Get-AutoLaneStart` in `RunDarkFactory.ps1` (around line 1984) starts at the saved
+Today `Get-AutoStartCount` in `RunDarkFactory.ps1` (around line 1984) starts at the saved
 count, or 2 on the first Auto shift. Only the start changes; `Get-NextLaneCount` and the
 15-minute step are untouched.
 
 ## Acceptance criteria
 
-- [ ] `RunDarkFactory.ps1` has `[ValidateRange(1, 16)][int]$MinStartLanes = 3`, documented
+- [x] `RunDarkFactory.ps1` has `[ValidateRange(1, 16)][int]$MinStartLanes = 3`, documented
       in the header's AUTO LANES section beside `-MaxLanes`.
-- [ ] `Get-AutoLaneStart` returns max(saved count or 3 on a first shift, `-MinStartLanes`),
+- [x] `Get-AutoStartCount` returns max(saved count or 3 on a first shift, `-MinStartLanes`),
       then applies the existing ceiling cap; its `Why` says when `-MinStartLanes` raised the
       count, e.g. `last shift saved 2, raised to 3 by -MinStartLanes`.
-- [ ] The script's own self-check cases cover: saved 2 -> 3; saved 5 -> 5; no saved file
+- [x] The script's own self-check cases cover: saved 2 -> 3; saved 5 -> 5; no saved file
       -> 3; `-MinStartLanes 4` with a ceiling of 2 -> 2; `-MinStartLanes 1` with saved 1 -> 1.
       Running them passes.
-- [ ] `-AutoLanesReport` prints the start count and its reason including the new rule.
-- [ ] ADR-0130 gains a dated amendment recording the start rule and that it is not a floor.
-- [ ] `-Lanes N` (a fixed count) ignores `-MinStartLanes`.
+- [x] `-AutoLanesReport` prints the start count and its reason including the new rule.
+- [x] ADR-0130 gains a dated amendment recording the start rule and that it is not a floor.
+- [x] `-Lanes N` (a fixed count) ignores `-MinStartLanes`.
 
 ## Notes
 
