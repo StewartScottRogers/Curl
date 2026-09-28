@@ -32,3 +32,4 @@ The five SSH options parse into `CommandLineOptions` as curl 8.21.0 reads them, 
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
