@@ -6,6 +6,8 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Curl.Core.UnitTests" />
+    <!-- Curl.Console's assembly: it is published as curl.exe. -->
+    <InternalsVisibleTo Include="curl" />
   </ItemGroup>
 
 </Project>

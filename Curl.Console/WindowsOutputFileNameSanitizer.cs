@@ -1,14 +1,13 @@
-using System.Buffers;
-
 namespace Curl.Console;
 
 /// <summary>
-/// Rewrites a file name the way curl 8.21.0 does on Windows before it uses the name: each
+/// Rewrites a remote file name the way curl 8.21.0 does on Windows before it uses the name
+/// (<see cref="SanitizeRemoteName" />), on top of <c>Curl.Core</c>'s
+/// <see cref="Curl.Core.Globbing.WindowsOutputFileNameSanitizer.Sanitize" />, which turns each
 /// <c>"</c>, <c>*</c>, <c>&lt;</c>, <c>&gt;</c>, <c>?</c>, <c>|</c> and control character
-/// U+0001 to U+001F becomes <c>_</c>. The runner applies it to remote names
-/// (<see cref="SanitizeRemoteName" />); an <c>-o</c> / <c>--output</c> name gets the same
-/// replacement from <c>Curl.Core</c>'s <c>WindowsOutputFileNameSanitizer</c>, through
-/// <c>UrlGlobMatch.ResolveOutputFileName</c> after its <c>#N</c> are substituted (BL-240).
+/// U+0001 to U+001F into <c>_</c>. An <c>-o</c> / <c>--output</c> name gets that replacement
+/// alone, through <c>UrlGlobMatch.ResolveOutputFileName</c> after its <c>#N</c> are
+/// substituted (BL-240); the measurements below are the ones that pinned it.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -45,12 +44,6 @@ namespace Curl.Console;
 /// </remarks>
 internal static class WindowsOutputFileNameSanitizer
 {
-    /// <summary>The characters curl 8.21.0 replaces with <c>_</c>.</summary>
-    private static readonly SearchValues<char> ReplacedCharacters = SearchValues.Create(
-        "\u0001\u0002\u0003\u0004\u0005\u0006\u0007\u0008\u0009\u000A\u000B\u000C\u000D\u000E\u000F"
-        + "\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001A\u001B\u001C\u001D\u001E\u001F"
-        + "\"*<>?|");
-
     /// <summary>
     /// The DOS device names curl 8.21.0 renames in a remote name, matched in any case:
     /// <c>CONIN$</c> and <c>CONOUT$</c> are not among them.
@@ -65,7 +58,7 @@ internal static class WindowsOutputFileNameSanitizer
     /// <summary>
     /// Rewrites a file name taken from the URL (<c>-O</c>) or from <c>Content-Disposition</c>
     /// (<c>-J</c>) the way curl 8.21.0 does on Windows, where no path is allowed: each character
-    /// <see cref="Sanitize" /> replaces and each <c>:</c> becomes <c>_</c>, then a reserved device
+    /// <see cref="Curl.Core.Globbing.WindowsOutputFileNameSanitizer.Sanitize" /> replaces and each <c>:</c> becomes <c>_</c>, then a reserved device
     /// name is renamed: <c>_</c> is put before one that is the whole name and replaces the first
     /// <c>.</c> after one that starts it.
     /// </summary>
@@ -84,7 +77,7 @@ internal static class WindowsOutputFileNameSanitizer
     /// </remarks>
     internal static string SanitizeRemoteName(string fileName)
     {
-        string sanitized = Sanitize(fileName).Replace(':', '_');
+        string sanitized = Curl.Core.Globbing.WindowsOutputFileNameSanitizer.Sanitize(fileName).Replace(':', '_');
         int dot = sanitized.IndexOf('.', StringComparison.Ordinal);
         string stem = dot < 0 ? sanitized : sanitized[..dot];
 
@@ -94,25 +87,5 @@ internal static class WindowsOutputFileNameSanitizer
         }
 
         return dot < 0 ? "_" + sanitized : stem + "_" + sanitized[(dot + 1)..];
-    }
-
-    /// <summary>
-    /// Replaces each character curl 8.21.0 does not keep in an <c>-o</c> name with <c>_</c>.
-    /// </summary>
-    /// <param name="fileName">The <c>-o</c> value, as typed.</param>
-    /// <returns>The name curl opens.</returns>
-    internal static string Sanitize(string fileName)
-    {
-        char[] characters = fileName.ToCharArray();
-
-        for (int index = 0; index < characters.Length; index++)
-        {
-            if (ReplacedCharacters.Contains(characters[index]))
-            {
-                characters[index] = '_';
-            }
-        }
-
-        return new string(characters);
     }
 }
