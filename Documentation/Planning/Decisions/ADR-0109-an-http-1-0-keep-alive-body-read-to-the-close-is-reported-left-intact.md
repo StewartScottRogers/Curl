@@ -1,6 +1,7 @@
 # ADR-0109 — An HTTP/1.0 keep-alive body read to the close is reported left intact
 
-- **Status:** Accepted
+- **Status:** Accepted; its second decision, not marking the connection reusable, is
+  superseded by ADR-0112
 - **Date:** 2026-09-27
 
 Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in BL-471.

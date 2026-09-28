@@ -354,7 +354,9 @@ public sealed class HttpProtocolHandler(
     /// <summary>
     /// Sends <paramref name="plan" /> on <paramref name="connection" />, then each retry that
     /// may go on the same connection; then marks the connection reusable when the last
-    /// response persists, or reports that a pooled connection that died is being given up.
+    /// response is reported left intact - it persists, or it is an HTTP/1.0 keep-alive body the
+    /// server closed, which the pool then finds dead as curl does (ADR-0112) - or reports that a
+    /// pooled connection that died is being given up.
     /// </summary>
     private async ValueTask<HttpAttemptOutcome> ExchangeOnConnectionAsync(
         HttpRequestPlan plan,
@@ -374,7 +376,7 @@ public sealed class HttpProtocolHandler(
             outcome = await ExchangeAsync(retry, connect, connection, outcome.Result.Report, newConnection: false).ConfigureAwait(false);
         }
 
-        if (outcome.KeepsAlive)
+        if (outcome.ReportsLeftIntact)
         {
             connection.MarkReusable();
         }
@@ -666,7 +668,8 @@ public sealed class HttpProtocolHandler(
     /// <summary>
     /// Decides whether the connection is reported left intact although the server closed it
     /// to end the body, as curl 8.21.0 does for an HTTP/1.0 keep-alive response with no length
-    /// (measured, BL-471 Notes; ADR-0109). It is not marked reusable: it is closed.
+    /// (measured, BL-471 Notes; ADR-0109). It is marked reusable, as curl pools it, and the pool
+    /// reports it dead before any reuse (ADR-0112).
     /// </summary>
     private static bool LeftIntactAfterServerClosed(HttpRequestPlan plan, HttpResponseHead head, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpBodyDelivery delivery) =>
         DeliveredWhole(upload, headReader, delivery)
@@ -1305,7 +1308,8 @@ public sealed class HttpProtocolHandler(
 
         /// <summary>
         /// Gets a value indicating whether the connection is reported left intact although the
-        /// server closed it to end the body (ADR-0109); it is not marked reusable.
+        /// server closed it to end the body (ADR-0109); it is marked reusable all the same, and
+        /// the pool finds it dead (ADR-0112).
         /// </summary>
         public bool LeftIntactAfterServerClosed { get; init; }
 

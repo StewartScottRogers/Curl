@@ -56,7 +56,10 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
     /// connection too (ADR-0109). A target without
     /// <see cref="ConnectTarget.PoolScheme" /> is never served from the pool. A reuse is
     /// reported <c>with proxy</c> for a forward-proxy target and for a tunnelled one, which
-    /// names the proxy's host, as curl 8.21.0 prints it (BL-360).
+    /// names the proxy's host, as curl 8.21.0 prints it (BL-360). An idle connection on which a
+    /// read found the server's close is not handed out: it is reported with curl 8.21.0's
+    /// <c>Connection N seems to be dead</c> and <c>shutting down connection #N</c>, closed,
+    /// and the next idle one with the key is tried (ADR-0112).
     /// </remarks>
     public async ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
     {
@@ -64,7 +67,7 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
         cancellationToken.ThrowIfCancellationRequested();
 
         var key = ConnectionPoolKey.Of(target);
-        var idle = await TakeIdleAsync(key);
+        var idle = await TakeIdleAsync(key, target.Events);
 
         return idle is null
             ? await OpenAsync(target, key, cancellationToken)
@@ -138,13 +141,27 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
         }
     }
 
-    private async ValueTask<PoolEntry?> TakeIdleAsync(ConnectionPoolKey? key)
+    private async ValueTask<PoolEntry?> TakeIdleAsync(ConnectionPoolKey? key, ITransferEvents events)
     {
         if (key is null)
         {
             return null;
         }
 
+        var match = await TakeMatchAsync(key);
+        while (match is { HasReadPeerClose: true })
+        {
+            events.ReportInfo($"Connection {match.ConnectionNumber} seems to be dead");
+            events.ReportInfo($"shutting down connection #{match.ConnectionNumber}");
+            await match.Connection.DisposeAsync();
+            match = await TakeMatchAsync(key);
+        }
+
+        return match;
+    }
+
+    private async ValueTask<PoolEntry?> TakeMatchAsync(ConnectionPoolKey key)
+    {
         List<PoolEntry> expired;
         PoolEntry? match;
 

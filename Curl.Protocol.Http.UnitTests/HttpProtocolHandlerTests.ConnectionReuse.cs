@@ -69,7 +69,7 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_Http10KeepAliveBodyRunsToTheClose_LeavesTheConnectionUnmarkedButReportsItLeftIntact()
+    public async Task ExecuteAsync_Http10KeepAliveBodyRunsToTheClose_MarksTheConnectionReusableAndReportsItLeftIntact()
     {
         foreach (int chunkSize in ChunkSizes)
         {
@@ -80,9 +80,47 @@ public sealed partial class HttpProtocolHandlerTests
                 .ExecuteAsync(ReuseContext(events));
 
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
-            Assert.IsFalse(connection.IsMarkedReusable, $"Chunk size {chunkSize}");
+            Assert.IsTrue(connection.IsMarkedReusable, $"Chunk size {chunkSize}");
             CollectionAssert.AreEqual(
                 InfoLines(AssumeClose + "|" + Http10KeepAlive, "Connection #0 to host 127.0.0.1:18977 left intact"),
+                events.Info,
+                $"Chunk size {chunkSize}");
+        }
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_SecondUrlAfterAnHttp10KeepAliveBodyRanToTheClose_ReportsThePooledConnectionDeadAndOpensConnection1()
+    {
+        // curl 8.21.0 -s -v http://127.0.0.1:P/a http://127.0.0.1:P/b, each answered
+        // HTTP/1.0 200 with Connection: keep-alive and body "hi", then closed (BL-477 Notes).
+        // curl's "Hostname ... was found in DNS cache" and "Trying" lines come from the TCP
+        // connector, which this test replaces.
+        const string response = "HTTP/1.0 200 OK\r\nConnection: keep-alive\r\n\r\nhi";
+        foreach (int chunkSize in ChunkSizes)
+        {
+            ScriptedConnection first = Connection(response, chunkSize);
+            ScriptedConnection second = Connection(response, chunkSize, ReuseRequest);
+            QueueConnector inner = new(ConnectResult.Connected(first, null), ConnectResult.Connected(second, null));
+            await using Networking.PoolingConnector pool = new(inner, TimeProvider.System);
+            HttpProtocolHandler handler = new(pool, new SilentAuthenticator());
+            RecordingTransferEvents events = new();
+            MemoryStream output = new();
+
+            TransferResult a = await handler.ExecuteAsync(new TransferContext { Url = CurlUrl.Parse("http://127.0.0.1:18977/a"), Output = output, Events = events });
+            TransferResult b = await handler.ExecuteAsync(ReuseContext(events, output));
+
+            Assert.AreEqual(CurlExitCode.Ok, a.ExitCode, $"Chunk size {chunkSize}");
+            Assert.AreEqual(CurlExitCode.Ok, b.ExitCode, $"Chunk size {chunkSize}");
+            Assert.AreEqual("hihi", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
+            Assert.IsTrue(first.IsDisposed, $"Chunk size {chunkSize}");
+            Assert.AreEqual(1, b.Report!.ConnectionCount, $"Chunk size {chunkSize}");
+            CollectionAssert.AreEqual(
+                new[]
+                {
+                    UsingHttp1, RequestSent, AssumeClose, Http10KeepAlive, "Connection #0 to host 127.0.0.1:18977 left intact",
+                    "Connection 0 seems to be dead", "shutting down connection #0",
+                    UsingHttp1, RequestSent, AssumeClose, Http10KeepAlive, "Connection #1 to host 127.0.0.1:18977 left intact",
+                },
                 events.Info,
                 $"Chunk size {chunkSize}");
         }

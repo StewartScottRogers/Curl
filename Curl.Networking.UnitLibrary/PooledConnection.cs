@@ -7,7 +7,8 @@ namespace Curl.Networking;
 /// <summary>
 /// The <see cref="IConnection" /> a <see cref="PoolingConnector" /> hands out: it forwards
 /// every read and write to the underlying connection, and on dispose returns that connection
-/// to the pool when <see cref="MarkReusable" /> was called, or closes it otherwise (ADR-0050).
+/// to the pool when <see cref="MarkReusable" /> was called, or closes it otherwise (ADR-0050),
+/// noting on the way whether a read found the server's close (ADR-0112).
 /// </summary>
 /// <remarks>
 /// One instance serves one lease. A connection taken from the pool again is handed out in a
@@ -43,8 +44,20 @@ public sealed class PooledConnection : IConnection
     public EndPoint? LocalEndPoint => _underlying.Connection.LocalEndPoint;
 
     /// <inheritdoc />
-    public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken) =>
-        _underlying.Connection.ReadAsync(buffer, cancellationToken);
+    /// <remarks>
+    /// A read into a non-empty buffer that returns zero records that the server closed the
+    /// connection, so the pool reports it dead rather than reusing it (ADR-0112).
+    /// </remarks>
+    public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
+    {
+        var read = await _underlying.Connection.ReadAsync(buffer, cancellationToken);
+        if (read == 0 && !buffer.IsEmpty)
+        {
+            _underlying.HasReadPeerClose = true;
+        }
+
+        return read;
+    }
 
     /// <inheritdoc />
     public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken) =>
