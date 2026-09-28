@@ -126,6 +126,24 @@ public sealed class CurlCommandRunnerCookieTests
         Assert.AreEqual($"GET / HTTP/1.1\r\n{Head}Cookie: s=v\r\n\r\n", Latin1(server.Written));
     }
 
+    /// <summary>
+    /// Measured 2026-09-27 with <c>curl -s -v -b sub\missing.txt http://127.0.0.1:&lt;port&gt;/</c>: the warning is
+    /// the first line on standard error, with the path as given, and the transfer goes on to exit 0 (BL-487 Notes).
+    /// </summary>
+    [TestMethod]
+    public async Task RunAsync_VerboseCookieFileThatCannotBeOpened_PrintsCurlsWarningFirst()
+    {
+        fileSystem.UnreadablePaths.Add("sub\\missing.txt");
+        ScriptedConnector server = Serve(SetsCookie);
+
+        int exitCode = await RunAsync(server, ["-s", "-v", "-b", "sub\\missing.txt", Url]);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.StartsWith(
+            "* WARNING: failed to open cookie file \"sub\\missing.txt\"\r\n* using HTTP/1.x\r\n",
+            Latin1(standardError.ToArray()));
+    }
+
     [TestMethod]
     public async Task RunAsync_CookieJarFile_WritesTheReceivedCookieInThePlatformsLineEndings()
     {

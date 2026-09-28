@@ -117,6 +117,26 @@ public sealed partial class CookieStoreTests
         Assert.AreEqual("f=v", store.GetCookieHeader(Loopback, secure: false, Now));
     }
 
+    /// <summary>
+    /// Measured on curl 8.21.0 (mingw, Schannel) on 2026-09-27 (BL-487 Notes): <c>curl -s -v -b &lt;path&gt;</c>
+    /// printed this line first on standard error, with the path exactly as given - absolute, relative, with either
+    /// slash, or naming a directory - and exited 0.
+    /// </summary>
+    [TestMethod]
+    [DataRow("sub\\missing.txt", DisplayName = "Relative, backslash")]
+    [DataRow("sub/missing.txt", DisplayName = "Relative, slash")]
+    [DataRow("adir", DisplayName = "A directory")]
+    public async Task LoadCookieFileAsync_CannotOpen_ReportsTheWarning(string path)
+    {
+        RecordingTransferEvents events = new();
+        CookieStore store = new();
+
+        await store.LoadCookieFileAsync(new FakeFileSystem(), path, discardSessionCookies: false, Now, events, CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { $"WARNING: failed to open cookie file \"{path}\"" }, events.Info);
+        Assert.IsEmpty(store.Cookies);
+    }
+
     [TestMethod]
     public async Task LoadCookieFile_NullEvents_Throw()
     {
