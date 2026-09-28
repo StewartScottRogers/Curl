@@ -37,3 +37,4 @@ When a command line opens a fresh connection to a host an earlier transfer on it
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
