@@ -36,3 +36,4 @@ When the peer closes a final head among its headers after a `Content-Length` hea
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
