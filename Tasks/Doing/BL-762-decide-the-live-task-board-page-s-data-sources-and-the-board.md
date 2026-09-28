@@ -86,3 +86,4 @@ An ADR records how the live task board page (BL-757, BL-761) gets its data, and 
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
