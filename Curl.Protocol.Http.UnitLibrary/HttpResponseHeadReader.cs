@@ -64,8 +64,8 @@ internal sealed class HttpResponseHeadReader(IConnection connection)
     /// <summary>
     /// Gets what finds the header of a final head that curl 8.21.0 refuses while it reads the
     /// head (<see cref="HttpResponseBodyReader.FindHeadRefusal" />), or <see langword="null" />
-    /// when it refuses none. The final head's whole headers are held until the head ends so it
-    /// can be asked once of the whole head; then those before the refused header are released
+    /// when it refuses none. The final head's whole headers are held until the head ends or
+    /// fails so it can be asked once of them; then those before the refused header are released
     /// and neither it nor any line after it is told to <see cref="HeaderReceived" /> or reported
     /// to <see cref="Events" />, the head's empty line included, since curl 8.21.0 stops reading
     /// the head at the refused header (measured, BL-475 Notes).
@@ -113,14 +113,25 @@ internal sealed class HttpResponseHeadReader(IConnection connection)
     /// <exception cref="HttpTransferException">
     /// The response is not HTTP/1.x (exit 1), a head line is malformed (exit 8), the peer
     /// closed before a final head (exit 52), a read failed or the heads grew too large in
-    /// total (exit 56), or one line grew too large (exit 100).
+    /// total (exit 56), or one line grew too large (exit 100) - unless a whole header of the
+    /// final head before the failure is refused, when the head is returned with its
+    /// <see cref="Refusal" /> instead.
     /// </exception>
     internal async ValueTask<HttpResponseHead> ReadAsync(CancellationToken cancellationToken)
     {
         while (true)
         {
             HttpStatusLine statusLine = await ReadStatusLineAsync(cancellationToken).ConfigureAwait(false);
-            bool closed = await ReadHeaderLinesAsync(statusLine, cancellationToken).ConfigureAwait(false);
+            bool closed;
+            try
+            {
+                closed = await ReadHeaderLinesAsync(statusLine, cancellationToken).ConfigureAwait(false);
+            }
+            catch (HttpTransferException failure)
+            {
+                return HeadBeforeRefusalOrThrow(statusLine, failure);
+            }
+
             if (!statusLine.IsInformational)
             {
                 EndedAtEmptyLine = !closed;
@@ -135,6 +146,28 @@ internal sealed class HttpResponseHeadReader(IConnection connection)
                 throw EmptyReply();
             }
         }
+    }
+
+    /// <summary>
+    /// Handles a head that failed before it ended: asks <see cref="FindRefusal" /> of the whole
+    /// headers held so far and, when it refuses one, releases those before it, drops the rest
+    /// and the header line the failure cut off, and gives the head as read, since curl 8.21.0
+    /// stops reading the head at the refused header and so never reaches the later failure
+    /// (measured, BL-479 Notes). A 1xx head holds no whole headers, so nothing in it is refused.
+    /// </summary>
+    /// <param name="statusLine">The failed head's status line.</param>
+    /// <param name="failure">What failed the head.</param>
+    /// <returns>The head, whose <see cref="Refusal" /> the caller fails with.</returns>
+    /// <exception cref="HttpTransferException"><paramref name="failure" />, when no held header is refused.</exception>
+    private HttpResponseHead HeadBeforeRefusalOrThrow(HttpStatusLine statusLine, HttpTransferException failure)
+    {
+        HttpResponseHead read = builder.Build(statusLine, []);
+        HttpResponseHead head = new(statusLine, [.. heldHeaders.Select(held => held.Header)], read.HeadBytes, ReadOnlyMemory<byte>.Empty);
+        Refusal = FindRefusal(head) ?? throw failure;
+        heldHeaderLines.Clear();
+        heldHeaderKeepsHttp10Alive = false;
+        ReleaseHeadBeforeRefusal();
+        return head;
     }
 
     private static HttpTransferException EmptyReply() =>

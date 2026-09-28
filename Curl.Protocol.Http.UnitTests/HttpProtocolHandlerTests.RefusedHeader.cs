@@ -152,6 +152,50 @@ public sealed partial class HttpProtocolHandlerTests
         }
     }
 
+    /// <summary>
+    /// Measured with <c>-s -v</c> and <c>-sS -D -</c> (BL-479 Notes): curl 8.21.0 stops reading
+    /// the head at the header it refuses, so a line after it that would fail the head is never
+    /// read. It fails with the refused header's error and reports and writes only the head
+    /// lines before that header.
+    /// </summary>
+    [TestMethod]
+    [DataRow("Content-Length: x\r\n", CurlExitCode.WeirdServerReply, InvalidContentLength, DisplayName = "Invalid Content-Length")]
+    [DataRow("Transfer-Encoding: bogus\r\n", CurlExitCode.BadContentEncoding, "Unsolicited Transfer-Encoding (bogus) found", DisplayName = "Unsolicited Transfer-Encoding")]
+    public async Task ExecuteAsync_HeadFailsAfterTheRefusedHeader_FailsWithTheRefusedHeadersError(string refusedHeader, CurlExitCode exitCode, string message)
+    {
+        string response = "HTTP/1.1 200 OK\r\nX-Before: 1\r\n" + refusedHeader + "X-After: 1\r\nno colon\r\n\r\n";
+        string[] expected = ["< HTTP/1.1 200 OK\r\n", "< X-Before: 1\r\n"];
+        foreach (int chunkSize in ChunkSizes)
+        {
+            RecordingTransferEvents events = new();
+            MemoryStream headers = new();
+            TransferContext context = RefusedHeaderContext(new MemoryStream(), headers, string.Empty, events);
+
+            TransferResult result = await Handler(QueueConnector.For(Connection(response, chunkSize))).ExecuteAsync(context);
+
+            Assert.AreEqual(exitCode, result.ExitCode, $"Chunk size {chunkSize}");
+            Assert.AreEqual(message, result.ErrorMessage, $"Chunk size {chunkSize}");
+            CollectionAssert.AreEqual(expected, HeadEvents(events), $"Chunk size {chunkSize}");
+            Assert.AreEqual("HTTP/1.1 200 OK\r\nX-Before: 1\r\n", Latin1(headers.ToArray()), $"Chunk size {chunkSize}");
+        }
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_HeadFailsWithNoHeaderRefused_FailsWithTheHeadsError()
+    {
+        foreach (int chunkSize in ChunkSizes)
+        {
+            RecordingTransferEvents events = new();
+            TransferContext context = RefusedHeaderContext(new MemoryStream(), null, string.Empty, events);
+
+            TransferResult result = await Handler(QueueConnector.For(Connection("HTTP/1.1 200 OK\r\nX-Before: 1\r\nno colon\r\n\r\n", chunkSize))).ExecuteAsync(context);
+
+            Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode, $"Chunk size {chunkSize}");
+            Assert.AreEqual("Header without colon", result.ErrorMessage, $"Chunk size {chunkSize}");
+            CollectionAssert.AreEqual(new[] { "< HTTP/1.1 200 OK\r\n", "< X-Before: 1\r\n" }, HeadEvents(events), $"Chunk size {chunkSize}");
+        }
+    }
+
     private static async Task AssertAcceptedHeadAsync(string head, string body, string decodedBody, string options)
     {
         foreach (int chunkSize in ChunkSizes)
@@ -183,7 +227,7 @@ public sealed partial class HttpProtocolHandlerTests
         }
     }
 
-    private static TransferContext RefusedHeaderContext(Stream output, Stream? headerOutput, string options)
+    private static TransferContext RefusedHeaderContext(Stream output, Stream? headerOutput, string options, ITransferEvents? events = null)
     {
         string[] flags = options.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         return new()
@@ -191,6 +235,7 @@ public sealed partial class HttpProtocolHandlerTests
             Url = CurlUrl.Parse("http://example.com/"),
             Output = output,
             HeaderOutput = headerOutput,
+            Events = events ?? NoTransferEvents.Instance,
             NoBody = flags.Contains("-I"),
             Http = new HttpRequestOptions
             {
