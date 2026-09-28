@@ -37,3 +37,4 @@ A long name, short letter or `-K` config option that is in `CurlOptionAliasTable
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Deferred. Duplicate of BL-497, which implemented ADR-0137's parser change with the same acceptance criteria
