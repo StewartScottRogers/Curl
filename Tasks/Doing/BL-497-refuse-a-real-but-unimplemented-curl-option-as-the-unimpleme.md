@@ -36,3 +36,4 @@ Every curl 8.21.0 long option that is in `CurlOptionAliasTable` but has no row i
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
