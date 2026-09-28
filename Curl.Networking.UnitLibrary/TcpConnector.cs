@@ -49,6 +49,7 @@ public sealed class TcpConnector(
     private readonly HttpProxyTunnelOptions _proxyTunnelOptions = proxyTunnelOptions ?? HttpProxyTunnelOptions.Default;
     private readonly ResolveOverrides _resolveOverrides = resolveOverrides ?? ResolveOverrides.None;
     private readonly ConnectToMappings _connectToMappings = connectToMappings ?? ConnectToMappings.None;
+    private long _nextConnectionNumber;
 
     /// <inheritdoc />
     /// <remarks>
@@ -133,6 +134,16 @@ public sealed class TcpConnector(
     /// connect (measured, ADR-0091). A failed resolve, a bad <c>--resolve</c> or <c>--connect-to</c>
     /// entry and a failed tunnel carry none; a failed handshake is the provider's result as it is.
     /// </para>
+    /// <para>
+    /// On <see cref="ConnectTarget.Events" /> it reports curl 8.21.0's <c>-v</c> lines for the
+    /// connect (ADR-0100): <c>  Trying &lt;address&gt;:&lt;port&gt;...</c> before each dial,
+    /// <c>connect to &lt;address&gt; port &lt;port&gt; from 0.0.0.0 port 0 failed:
+    /// &lt;reason&gt;</c> after each dial that fails (<see cref="ConnectFailureReason" />), and
+    /// the exit 7 message when none reached. A success is reported through
+    /// <see cref="ITransferEvents.ReportConnectionOpened" /> once the connection is ready, after
+    /// any tunnel and TLS handshake, naming the host dialled and numbering the connections this
+    /// connector opened from <c>0</c> (<see cref="ConnectResult.ConnectionNumber" />).
+    /// </para>
     /// </remarks>
     public async ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
     {
@@ -165,12 +176,13 @@ public sealed class TcpConnector(
         }
 
         var nameResolved = timeProvider.GetTimestamp();
-        var (dialed, lastDialError) = await DialFirstReachableAsync(addresses, destination.Port, cancellationToken).ConfigureAwait(false);
+        var (dialed, lastDialError) = await DialFirstReachableAsync(addresses, destination.Port, destination.Host, target.Events, cancellationToken).ConfigureAwait(false);
         if (dialed is null)
         {
             var elapsedMilliseconds = (long)timeProvider.GetElapsedTime(nameResolved).TotalMilliseconds;
             var via = destination.IsMapped ? $" via {destination.Host}:{destination.Port}" : string.Empty;
             return DialFailure(
+                target.Events,
                 lastDialError,
                 new ConnectTimings(started, nameResolved, null, null),
                 $"Failed to connect to {target.Host}:{target.Port}{via} after {elapsedMilliseconds} ms: Could not connect to server");
@@ -199,11 +211,12 @@ public sealed class TcpConnector(
         }
 
         var nameResolved = timeProvider.GetTimestamp();
-        var (dialed, lastDialError) = await DialFirstReachableAsync(addresses, proxy.Port, cancellationToken).ConfigureAwait(false);
+        var (dialed, lastDialError) = await DialFirstReachableAsync(addresses, proxy.Port, proxy.Host, target.Events, cancellationToken).ConfigureAwait(false);
         if (dialed is null)
         {
             var elapsedMilliseconds = (long)timeProvider.GetElapsedTime(nameResolved).TotalMilliseconds;
             return DialFailure(
+                target.Events,
                 lastDialError,
                 new ConnectTimings(started, nameResolved, null, null),
                 $"Failed to connect to {target.Host}:{target.Port} over proxy {proxy.Host} after {elapsedMilliseconds} ms: Could not connect to server");
@@ -218,7 +231,7 @@ public sealed class TcpConnector(
     }
 
     private async ValueTask<ConnectResult> OpenTunnelOverTlsAsync(
-        DialedTcpConnection dialed,
+        DialedSocket dialed,
         ConnectTarget target,
         ConnectDestination destination,
         ProxyEndpoint proxy,
@@ -237,12 +250,12 @@ public sealed class TcpConnector(
         }
 
         // CONNECT and the target's TLS run over the proxy's TLS; the socket's local end point stays.
-        var securedDialed = new DialedTcpConnection(proxyConnection, dialed.LocalEndPoint);
+        var securedDialed = dialed with { Connection = proxyConnection };
         return await OpenTunnelAsync(securedDialed, target, destination, proxy, started, nameResolved, cancellationToken).ConfigureAwait(false);
     }
 
     private async ValueTask<ConnectResult> OpenSocksTunnelAsync(
-        DialedTcpConnection dialed,
+        DialedSocket dialed,
         ConnectTarget target,
         ConnectDestination destination,
         ProxyEndpoint proxy,
@@ -264,7 +277,7 @@ public sealed class TcpConnector(
     }
 
     private async ValueTask<ConnectResult> OpenTunnelAsync(
-        DialedTcpConnection dialed,
+        DialedSocket dialed,
         ConnectTarget target,
         ConnectDestination destination,
         ProxyEndpoint proxy,
@@ -327,7 +340,7 @@ public sealed class TcpConnector(
             : ConnectResult.Failed(CurlExitCode.CouldntConnect, $"CONNECT tunnel failed, response {reply.StatusCode}");
 
     private async ValueTask<ConnectResult> SecureWhenAskedAsync(
-        DialedTcpConnection dialed,
+        DialedSocket dialed,
         ConnectTarget target,
         ConnectTimings timings,
         int proxyConnectResponseCode,
@@ -335,7 +348,7 @@ public sealed class TcpConnector(
     {
         if (!target.UseTls)
         {
-            return ConnectResult.Connected(dialed.Connection, timings, dialed.LocalEndPoint, proxyConnectResponseCode);
+            return Opened(dialed, target.Events, dialed.Connection, timings, proxyConnectResponseCode, peerCertificates: null);
         }
 
         var secured = await AuthenticateTargetAsync(dialed.Connection, target, cancellationToken).ConfigureAwait(false);
@@ -347,12 +360,45 @@ public sealed class TcpConnector(
         // A provider that measured its handshake is trusted for the moment it completed; for
         // one that did not, the moment it returned is that moment.
         var handshakeCompleted = secured.Timings?.TlsHandshakeCompleted ?? timeProvider.GetTimestamp();
-        return ConnectResult.Connected(
+        return Opened(
+            dialed,
+            target.Events,
             securedConnection,
             timings with { TlsHandshakeCompleted = handshakeCompleted },
-            dialed.LocalEndPoint,
             proxyConnectResponseCode,
             secured.PeerCertificates);
+    }
+
+    /// <summary>
+    /// Numbers a connection that is ready for the transfer, reports it opened as curl 8.21.0's
+    /// <c>Established connection</c> line, after any tunnel and TLS handshake (BL-228), and
+    /// returns it.
+    /// </summary>
+    private ConnectResult Opened(
+        DialedSocket dialed,
+        ITransferEvents events,
+        IConnection connection,
+        ConnectTimings timings,
+        int proxyConnectResponseCode,
+        IReadOnlyList<ReadOnlyMemory<byte>>? peerCertificates)
+    {
+        var connectionNumber = Interlocked.Increment(ref _nextConnectionNumber) - 1;
+        events.ReportConnectionOpened(new ConnectionOpenedEvent
+        {
+            HostName = dialed.HostName,
+            RemoteEndPoint = dialed.RemoteEndPoint,
+            LocalEndPoint = dialed.LocalEndPoint,
+            ConnectionNumber = connectionNumber,
+        });
+
+        return ConnectResult.Connected(
+            connection,
+            timings,
+            dialed.LocalEndPoint,
+            proxyConnectResponseCode,
+            peerCertificates,
+            isReused: false,
+            connectionNumber);
     }
 
     // A provider that can report its handshake reports it on the target's events (BL-404).
@@ -368,24 +414,32 @@ public sealed class TcpConnector(
     /// <summary>
     /// Dials each address in turn and returns the first connection, or <see langword="null" />
     /// with the <see cref="SocketError" /> of the last attempt, which curl keeps as
-    /// <c>CURLINFO_OS_ERRNO</c>.
+    /// <c>CURLINFO_OS_ERRNO</c>. Each attempt is reported on <paramref name="events" /> as
+    /// curl 8.21.0's <c>-v</c> reports it: <c>Trying</c> before it, and the
+    /// <c>connect to ... failed</c> line when it fails (measured, BL-408).
     /// </summary>
-    private async ValueTask<(DialedTcpConnection? Dialed, SocketError LastError)> DialFirstReachableAsync(
+    private async ValueTask<(DialedSocket? Dialed, SocketError LastError)> DialFirstReachableAsync(
         IReadOnlyList<IPAddress> addresses,
         int port,
+        string hostName,
+        ITransferEvents events,
         CancellationToken cancellationToken)
     {
         var lastError = SocketError.Success;
         foreach (var address in addresses)
         {
+            var remoteEndPoint = new IPEndPoint(address, port);
+            events.ReportInfo($"  Trying {remoteEndPoint}...");
             try
             {
-                return (await tcpDialer.DialAsync(new IPEndPoint(address, port), cancellationToken).ConfigureAwait(false), SocketError.Success);
+                var dialed = await tcpDialer.DialAsync(remoteEndPoint, cancellationToken).ConfigureAwait(false);
+                return (new DialedSocket(dialed.Connection, dialed.LocalEndPoint, hostName, remoteEndPoint), SocketError.Success);
             }
             catch (SocketException exception)
             {
                 // curl moves on to the next address; only when every one fails is it exit 7.
                 lastError = exception.SocketErrorCode;
+                events.ReportInfo(ConnectFailedLine(remoteEndPoint, exception));
             }
         }
 
@@ -393,13 +447,35 @@ public sealed class TcpConnector(
     }
 
     /// <summary>
-    /// The exit 7 for a dial that reached no address: marked refused when the last attempt
-    /// was refused, as <c>--retry-connrefused</c> reads curl's <c>CURLINFO_OS_ERRNO</c>. It
-    /// carries the start and lookup timestamps, as curl 8.21.0 still reports
+    /// curl 8.21.0's line for one failed dial, such as <c>connect to 127.0.0.1 port 1 from
+    /// 0.0.0.0 port 56585 failed: Connection refused</c>. A failed dial reports no local end
+    /// point, so it names the unspecified address of the family and port <c>0</c> (ADR-0100).
+    /// </summary>
+    private static string ConnectFailedLine(IPEndPoint remoteEndPoint, SocketException exception)
+    {
+        var unspecified = remoteEndPoint.AddressFamily == AddressFamily.InterNetworkV6 ? IPAddress.IPv6Any : IPAddress.Any;
+        var reason = ConnectFailureReason.Describe(exception, OperatingSystem.IsWindows());
+        return $"connect to {remoteEndPoint.Address} port {remoteEndPoint.Port} from {unspecified} port 0 failed: {reason}";
+    }
+
+    /// <summary>
+    /// The exit 7 for a dial that reached no address, its message also reported on
+    /// <paramref name="events" /> as curl's <c>-v</c> repeats it: marked refused when the last
+    /// attempt was refused, as <c>--retry-connrefused</c> reads curl's <c>CURLINFO_OS_ERRNO</c>.
+    /// It carries the start and lookup timestamps, as curl 8.21.0 still reports
     /// <c>%{time_namelookup}</c> after a refused connect (measured, ADR-0091).
     /// </summary>
-    private static ConnectResult DialFailure(SocketError lastError, ConnectTimings timings, string errorMessage) =>
-        lastError == SocketError.ConnectionRefused
+    private static ConnectResult DialFailure(ITransferEvents events, SocketError lastError, ConnectTimings timings, string errorMessage)
+    {
+        events.ReportInfo(errorMessage);
+        return lastError == SocketError.ConnectionRefused
             ? ConnectResult.Refused(errorMessage, timings)
             : ConnectResult.Failed(CurlExitCode.CouldntConnect, errorMessage, timings);
+    }
+
+    /// <summary>
+    /// A dialled TCP connection with the name and address it was dialled for: the connection
+    /// the transfer talks over, which becomes the proxy's TLS stream through an HTTPS proxy.
+    /// </summary>
+    private sealed record DialedSocket(IConnection Connection, IPEndPoint LocalEndPoint, string HostName, IPEndPoint RemoteEndPoint);
 }

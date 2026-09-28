@@ -57,6 +57,10 @@ and `TcpConnector` passes them on. Per ADR-0085's BL-404 amendment a successful 
 also reported as a `TlsHandshakeEvent` through the provider's four-argument overload
 (`IHandshakeReportingTlsProvider`), to which `TcpConnector` passes the target's `Events`; the
 event's `CertificateVerifyResult` is OpenSSL's `X509_V_` code as `OpenSslVerifyResult` maps it.
+Per ADR-0100 it also reports curl's `-v` connect lines on the target's `Events`: `Trying` before
+each dial, `connect to ... failed: <reason>` after each failed one (the reason from
+`ConnectFailureReason`), the exit 7 message, and `ReportConnectionOpened` once any tunnel and
+TLS handshake are done, numbering its connections from `0` in `ConnectResult.ConnectionNumber`.
 
 `TcpConnector` tunnels through `ConnectTarget.Proxy` when it is an HTTP proxy
 (`ProxyKind.Http`, `Http10`) per ADR-0023: `HttpProxyTunnel` writes curl 8.21.0's CONNECT
