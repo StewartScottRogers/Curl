@@ -180,7 +180,7 @@ public sealed class HttpChunkedDecoderTests
             HttpResponseBodyReader reader = new(connection);
 
             await Assert.ThrowsExactlyAsync<HttpTransferException>(
-                async () => await reader.CopyAsync(head, false, new FailingWriteStream(), false, CancellationToken.None));
+                async () => await reader.CopyAsync(head, false, new FailingWriteStream(), false, false, CancellationToken.None));
 
             Assert.AreEqual("X-T: 1\r\n", Latin1(reader.TrailerBytes.ToArray()), $"Chunk size {chunkSize}");
         }
@@ -193,7 +193,7 @@ public sealed class HttpChunkedDecoderTests
         HttpResponseHead head = await new HttpResponseHeadReader(connection).ReadAsync(CancellationToken.None);
         int readsForHead = connection.ReadCount;
 
-        await new HttpResponseBodyReader(connection).CopyAsync(head, false, new FailingWriteStream(), false, CancellationToken.None);
+        await new HttpResponseBodyReader(connection).CopyAsync(head, false, new FailingWriteStream(), false, false, CancellationToken.None);
 
         Assert.AreEqual(readsForHead + "5\r\nhello\r\n0\r\n\r\n".Length, connection.ReadCount);
     }
@@ -215,7 +215,7 @@ public sealed class HttpChunkedDecoderTests
         HttpResponseHead head = await new HttpResponseHeadReader(connection).ReadAsync(CancellationToken.None);
         FailingWriteStream output = new();
 
-        await new HttpResponseBodyReader(connection).CopyAsync(head, false, output, false, CancellationToken.None);
+        await new HttpResponseBodyReader(connection).CopyAsync(head, false, output, false, false, CancellationToken.None);
 
         CollectionAssert.AreEqual(data, output.ToArray());
     }
@@ -243,7 +243,7 @@ public sealed class HttpChunkedDecoderTests
         HttpResponseHead head = await new HttpResponseHeadReader(connection).ReadAsync(CancellationToken.None);
 
         HttpTransferException thrown = await Assert.ThrowsExactlyAsync<HttpTransferException>(
-            async () => await new HttpResponseBodyReader(connection).CopyAsync(head, false, new FailingWriteStream(), false, CancellationToken.None));
+            async () => await new HttpResponseBodyReader(connection).CopyAsync(head, false, new FailingWriteStream(), false, false, CancellationToken.None));
 
         Assert.AreEqual(CurlExitCode.RecvError, thrown.ExitCode);
         Assert.AreEqual("Failure when receiving data from the peer", thrown.Message);
@@ -267,7 +267,7 @@ public sealed class HttpChunkedDecoderTests
         ScriptedConnection connection = Connection(response, chunkSize);
         HttpResponseHead head = await new HttpResponseHeadReader(connection).ReadAsync(CancellationToken.None);
         HttpResponseBodyReader reader = new(connection);
-        await reader.CopyAsync(head, noBody, output, false, CancellationToken.None);
+        await reader.CopyAsync(head, noBody, output, false, false, CancellationToken.None);
         return (reader, output);
     }
 

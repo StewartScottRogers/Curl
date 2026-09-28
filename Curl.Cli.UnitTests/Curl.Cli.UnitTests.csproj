@@ -12,4 +12,8 @@
     <ProjectReference Include="..\Curl.Cli.UnitLibrary\Curl.Cli.UnitLibrary.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="HelpReference\*.txt" LogicalName="HelpReference.%(Filename)%(Extension)" />
+  </ItemGroup>
+
 </Project>

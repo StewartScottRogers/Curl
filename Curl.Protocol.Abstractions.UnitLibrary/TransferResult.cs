@@ -44,6 +44,15 @@ public sealed record TransferResult(
     public TransferReport? Report { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether the transfer failed with exit 7 because the peer
+    /// refused the connect (<see cref="ConnectResult.IsConnectionRefused" />), the only
+    /// exit 7 curl's <c>--retry-connrefused</c> retries; <see langword="false" /> for every
+    /// other result. A handler sets it with <c>with</c> from its failed
+    /// <see cref="ConnectResult" />.
+    /// </summary>
+    public bool IsConnectionRefused { get; init; }
+
+    /// <summary>
     /// Creates a successful result.
     /// </summary>
     /// <param name="bytesTransferred">The number of payload bytes moved.</param>

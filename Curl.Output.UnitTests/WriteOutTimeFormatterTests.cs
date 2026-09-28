@@ -1,7 +1,7 @@
 namespace Curl.Output;
 
 /// <summary>
-/// Pins <see cref="WriteOutTimeFormatter"/> to what curl 8.21.0 (mingw, Schannel) wrote for
+/// Pins <see cref="WriteOutTimeFormatter"/>'s <see cref="WriteOutTimeDialect.WindowsCRuntime"/> dialect to what curl 8.21.0 (mingw, Schannel) wrote for
 /// <c>-w "[%time{…}]"</c> on 2026-09-26; the commands are in BL-279's Notes.
 /// </summary>
 [TestClass]
@@ -25,7 +25,7 @@ public sealed class WriteOutTimeFormatterTests
     [DataRow("", "")]
     public void Format_MeasuredConversions_MatchCurl(string format, string expected)
     {
-        Assert.AreEqual(expected, WriteOutTimeFormatter.Format(format, Measured));
+        Assert.AreEqual(expected, WriteOutTimeFormatter.Format(format, WriteOutTimeDialect.WindowsCRuntime, Measured));
     }
 
     [TestMethod]
@@ -36,7 +36,7 @@ public sealed class WriteOutTimeFormatterTests
     [DataRow("%#z|%#Z", FixedTimeProvider.TimeZoneStandardName + "|" + FixedTimeProvider.TimeZoneStandardName)]
     public void Format_AlternateConversions_MatchCurl(string format, string expected)
     {
-        Assert.AreEqual(expected, WriteOutTimeFormatter.Format(format, Measured));
+        Assert.AreEqual(expected, WriteOutTimeFormatter.Format(format, WriteOutTimeDialect.WindowsCRuntime, Measured));
     }
 
     [TestMethod]
@@ -44,7 +44,7 @@ public sealed class WriteOutTimeFormatterTests
     [DataRow("%#d|%#H|%#I|%#j|%#m|%#M|%#S|%#U|%#W|%#y", "2|15|3|2|1|4|5|1|0|5")]
     public void Format_LeadingZeros_AreDroppedOnlyByTheAlternateFlag(string format, string expected)
     {
-        Assert.AreEqual(expected, WriteOutTimeFormatter.Format(format, LeadingZeros));
+        Assert.AreEqual(expected, WriteOutTimeFormatter.Format(format, WriteOutTimeDialect.WindowsCRuntime, LeadingZeros));
     }
 
     [TestMethod]
@@ -60,7 +60,7 @@ public sealed class WriteOutTimeFormatterTests
     [DataRow("x%#")]
     public void Format_ConversionTheRuntimeRejects_RendersNothing(string format)
     {
-        Assert.AreEqual(string.Empty, WriteOutTimeFormatter.Format(format, Measured));
+        Assert.AreEqual(string.Empty, WriteOutTimeFormatter.Format(format, WriteOutTimeDialect.WindowsCRuntime, Measured));
     }
 
     [TestMethod]
@@ -68,19 +68,25 @@ public sealed class WriteOutTimeFormatterTests
     {
         string format = new('a', 255);
 
-        Assert.AreEqual(format, WriteOutTimeFormatter.Format(format, Measured));
+        Assert.AreEqual(format, WriteOutTimeFormatter.Format(format, WriteOutTimeDialect.WindowsCRuntime, Measured));
     }
 
     [TestMethod]
     public void Format_ResultOf256Bytes_RendersNothing()
     {
-        Assert.AreEqual(string.Empty, WriteOutTimeFormatter.Format(new string('a', 256), Measured));
+        Assert.AreEqual(string.Empty, WriteOutTimeFormatter.Format(new string('a', 256), WriteOutTimeDialect.WindowsCRuntime, Measured));
     }
 
     [TestMethod]
     public void Format_NullArgument_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => WriteOutTimeFormatter.Format(null!, Measured));
-        Assert.ThrowsExactly<ArgumentNullException>(() => WriteOutTimeFormatter.Format("%Y", null!));
+        Assert.ThrowsExactly<ArgumentNullException>(() => WriteOutTimeFormatter.Format(null!, WriteOutTimeDialect.WindowsCRuntime, Measured));
+        Assert.ThrowsExactly<ArgumentNullException>(() => WriteOutTimeFormatter.Format("%Y", WriteOutTimeDialect.WindowsCRuntime, null!));
+    }
+
+    [TestMethod]
+    public void Format_UndefinedDialect_Throws()
+    {
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => WriteOutTimeFormatter.Format("%Y", (WriteOutTimeDialect)2, Measured));
     }
 }

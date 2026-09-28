@@ -27,19 +27,25 @@ public sealed class SslStreamTlsProvider : ITlsProvider
 {
     private const string PemCertificateBegin = "-----BEGIN CERTIFICATE-----";
 
-    // The two lines curl 8.21.0's Schannel build writes for --capath (ADR-0009), the first
-    // with its trailing space.
+    // The one warning curl 8.21.0's Schannel build writes for --capath (ADR-0009), unwrapped:
+    // the console wraps it at the terminal width, into two lines at curl's default 79 columns.
     private static readonly string[] SchannelCaCertificateDirectoryWarnings =
     [
-        "Warning: ignoring setting the CA path for the proxy, not supported by libcurl ",
-        "Warning: with Schannel",
+        "Warning: ignoring setting the CA path for the proxy, not supported by libcurl with Schannel",
     ];
+
+    // Held in a field so the delegate is made once, not cached behind a branch in every constructor.
+    private static readonly Func<SslStream, SslClientAuthenticationOptions, CancellationToken, Task> SslStreamAuthenticateAsClientAsync =
+        static (sslStream, authenticationOptions, cancellationToken) =>
+            sslStream.AuthenticateAsClientAsync(authenticationOptions, cancellationToken);
 
     private readonly TlsClientOptions _options;
 
     private readonly bool _matchesSchannelBuild;
 
     private readonly TimeProvider _timeProvider;
+
+    private readonly IClientCertificateStore _certificateStore;
 
     /// <summary>
     /// Creates the provider for the curl build this platform usually runs: Schannel on
@@ -89,9 +95,30 @@ public sealed class SslStreamTlsProvider : ITlsProvider
     /// </param>
     /// <param name="timeProvider">Takes the timestamps in a successful handshake's timings.</param>
     internal SslStreamTlsProvider(TlsClientOptions options, bool matchesSchannelBuild, TimeProvider timeProvider)
+        : this(options, matchesSchannelBuild, timeProvider, new SystemClientCertificateStore())
+    {
+    }
+
+    /// <summary>
+    /// Creates the provider for a named curl build with the clock its handshakes are timed on
+    /// and the certificate stores a Schannel <c>--cert</c> store path is looked up in.
+    /// </summary>
+    /// <param name="options">The settings applied to every handshake.</param>
+    /// <param name="matchesSchannelBuild">
+    /// <see langword="true" /> to behave like curl's Schannel build, <see langword="false" />
+    /// like its OpenSSL build.
+    /// </param>
+    /// <param name="timeProvider">Takes the timestamps in a successful handshake's timings.</param>
+    /// <param name="certificateStore">Opens the store a Schannel <c>--cert</c> store path names.</param>
+    internal SslStreamTlsProvider(
+        TlsClientOptions options,
+        bool matchesSchannelBuild,
+        TimeProvider timeProvider,
+        IClientCertificateStore certificateStore)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+        _certificateStore = certificateStore ?? throw new ArgumentNullException(nameof(certificateStore));
         _matchesSchannelBuild = matchesSchannelBuild;
         Warnings = matchesSchannelBuild && options.CaCertificateDirectory is not null
             ? SchannelCaCertificateDirectoryWarnings
@@ -100,18 +127,41 @@ public sealed class SslStreamTlsProvider : ITlsProvider
 
     /// <summary>
     /// Gets the lines curl writes to standard error, unless <c>-s</c> is given, for options
-    /// this build ignores: the Schannel build's two <c>--capath</c> lines when
+    /// this build ignores: the Schannel build's one <c>--capath</c> warning, unwrapped, when
     /// <see cref="TlsClientOptions.CaCertificateDirectory" /> is set, otherwise none. Each
     /// line is without its line ending.
     /// </summary>
     public IReadOnlyList<string> Warnings { get; }
+
+    /// <summary>
+    /// Gets the factory that builds the OpenSSL build's <see cref="CipherSuitesPolicy" /> from
+    /// the suites <c>--ciphers</c> and <c>--tls13-ciphers</c> select, returning
+    /// <see langword="null" /> where the platform cannot apply them. Defaults to
+    /// <see cref="Networking.CipherSuitesPolicyFactory.ForThisPlatform" />; tests replace it.
+    /// </summary>
+    internal ICipherSuitesPolicyFactory CipherSuitesPolicyFactory { get; init; } =
+        Networking.CipherSuitesPolicyFactory.ForThisPlatform;
+
+    /// <summary>
+    /// Gets the step that runs the client handshake on the <see cref="SslStream" /> with the
+    /// options the provider built. Defaults to
+    /// <see cref="SslStream.AuthenticateAsClientAsync(SslClientAuthenticationOptions, CancellationToken)" />;
+    /// tests replace it to see the options.
+    /// </summary>
+    internal Func<SslStream, SslClientAuthenticationOptions, CancellationToken, Task> AuthenticateSslStreamAsClientAsync { get; init; } =
+        SslStreamAuthenticateAsClientAsync;
 
     /// <inheritdoc />
     /// <remarks>
     /// <para>
     /// The target host is passed to the handshake for server name indication and is the
     /// name the certificate is checked against. A certificate that fails the check is
-    /// exit 60 (<see cref="CurlExitCode.PeerFailedVerification" />); any other failure,
+    /// exit 60 (<see cref="CurlExitCode.PeerFailedVerification" />), except that the
+    /// Schannel build reports a certificate that is only out of date, checked against the
+    /// system store, as exit 35 with Schannel's <c>SEC_E_CERT_EXPIRED</c>. With
+    /// <see cref="TlsClientOptions.CaCertificateFile" /> the Schannel build also checks
+    /// revocation, unless <see cref="TlsClientOptions.SkipRevocationCheck" /> is set, and an
+    /// unknown revocation status is exit 60 (ADR-0086). Any other failure,
     /// such as no TLS version both sides allow or the server closing mid-handshake, is
     /// exit 35 (<see cref="CurlExitCode.SslConnectError" />). A
     /// <see cref="TlsClientOptions.CaCertificateFile" /> that cannot be read is exit 77
@@ -179,7 +229,7 @@ public sealed class SslStreamTlsProvider : ITlsProvider
             return ConnectResult.Failed(CurlExitCode.SslCacertBadfile, CaCertificateFileUnusable(_options.CaCertificateFile!));
         }
 
-        string? verificationFailure = null;
+        (CurlExitCode ExitCode, string Message)? verificationFailure = null;
         ReadOnlyMemory<byte>[] peerCertificates = [];
         var authenticationOptions = new SslClientAuthenticationOptions
         {
@@ -201,7 +251,7 @@ public sealed class SslStreamTlsProvider : ITlsProvider
         try
         {
             var handshakeStarted = _timeProvider.GetTimestamp();
-            await sslStream.AuthenticateAsClientAsync(authenticationOptions, cancellationToken).ConfigureAwait(false);
+            await AuthenticateSslStreamAsClientAsync(sslStream, authenticationOptions, cancellationToken).ConfigureAwait(false);
             return ConnectResult.Connected(
                 new SslStreamConnection(sslStream, plaintext, clientCertificate),
                 new ConnectTimings(handshakeStarted, null, handshakeStarted, _timeProvider.GetTimestamp()),
@@ -216,8 +266,8 @@ public sealed class SslStreamTlsProvider : ITlsProvider
         await DisposeAfterFailedHandshakeAsync(sslStream, plaintext).ConfigureAwait(false);
         RethrowIfCancellation(failure);
 
-        return verificationFailure is not null
-            ? ConnectResult.Failed(CurlExitCode.PeerFailedVerification, verificationFailure)
+        return verificationFailure is { } rejected
+            ? ConnectResult.Failed(rejected.ExitCode, rejected.Message)
             : ConnectResult.Failed(CurlExitCode.SslConnectError, SslConnectError(failure));
     }
 
@@ -231,8 +281,12 @@ public sealed class SslStreamTlsProvider : ITlsProvider
     /// Roots trusted in addition to the system store, from <c>--capath</c> without
     /// <c>--cacert</c>.
     /// </param>
-    /// <returns><see langword="null" /> to accept the certificate, otherwise the exit 60 message.</returns>
-    internal string? VerifyPeer(
+    /// <returns>
+    /// <see langword="null" /> to accept the certificate, otherwise the exit code and message:
+    /// exit 60, except in the Schannel build without <c>--cacert</c>, where a certificate
+    /// that is only out of date fails the handshake itself, exit 35.
+    /// </returns>
+    internal (CurlExitCode ExitCode, string Message)? VerifyPeer(
         SslPolicyErrors errors,
         X509Chain? chain,
         string targetHost,
@@ -253,9 +307,16 @@ public sealed class SslStreamTlsProvider : ITlsProvider
             return null;
         }
 
-        return _matchesSchannelBuild
-            ? TlsFailureMessages.SchannelPeerFailedVerification(errors, _options.CaCertificateFile is not null)
-            : TlsFailureMessages.OpenSslPeerFailedVerification(errors, chain, targetHost);
+        if (!_matchesSchannelBuild)
+        {
+            return (CurlExitCode.PeerFailedVerification, TlsFailureMessages.OpenSslPeerFailedVerification(errors, chain, targetHost));
+        }
+
+        var hasCaCertificateFile = _options.CaCertificateFile is not null;
+        return !hasCaCertificateFile && TlsFailureMessages.IsSchannelCertificateExpired(errors, chain)
+            ? (CurlExitCode.SslConnectError, TlsFailureMessages.SchannelCertificateExpired)
+            : (CurlExitCode.PeerFailedVerification,
+                TlsFailureMessages.SchannelPeerFailedVerification(errors, chain, targetHost, hasCaCertificateFile));
     }
 
     /// <summary>
@@ -289,7 +350,8 @@ public sealed class SslStreamTlsProvider : ITlsProvider
 
     // ADR-0011: the Schannel build refuses --ciphers and ignores --tls13-ciphers; the
     // OpenSSL build offers what they name. CipherSuitesPolicy cannot be constructed on
-    // Windows, where only the tests run the OpenSSL build, so there it cannot apply them.
+    // Windows, where only the tests run the OpenSSL build, so there the factory builds none
+    // and the build cannot apply them.
     private (CipherSuitesPolicy? Policy, string? FailureMessage) CreateCipherSuitesPolicy()
     {
         if (_matchesSchannelBuild)
@@ -303,17 +365,16 @@ public sealed class SslStreamTlsProvider : ITlsProvider
             return (null, failureMessage);
         }
 
-        if (OperatingSystem.IsWindows())
-        {
-            return (null, OpenSslCipherSuites.Unapplied(_options.Ciphers, _options.Tls13Ciphers));
-        }
-
-        return (new CipherSuitesPolicy(suites), null);
+        var policy = CipherSuitesPolicyFactory.Create(suites);
+        return policy is null
+            ? (null, OpenSslCipherSuites.Unapplied(_options.Ciphers, _options.Tls13Ciphers))
+            : (policy, null);
     }
 
-    // The Schannel build reads the key from the PKCS#12 file and ignores --key and
-    // --key-type; only the Windows build of curl keeps a drive letter's colon in the --cert
-    // value. --pass, when given, is the passphrase in place of the one in --cert.
+    // The Schannel build reads the certificate and its key from a Windows certificate store
+    // or a PKCS#12 file and ignores --key and --key-type; only the Windows build of curl
+    // keeps a drive letter's colon in the --cert value. --pass, when given, is the
+    // passphrase in place of the one in --cert.
     private (X509Certificate2? Certificate, ConnectResult? Failure) LoadClientCertificate()
     {
         if (_options.ClientCertificate is null)
@@ -324,7 +385,7 @@ public sealed class SslStreamTlsProvider : ITlsProvider
         var (path, splitPassphrase) = ClientCertificateArgument.Split(_options.ClientCertificate, _matchesSchannelBuild);
         var passphrase = _options.Passphrase ?? splitPassphrase;
         return _matchesSchannelBuild
-            ? ClientCertificateLoader.LoadAsSchannelBuild(path, passphrase, _options.CertificateType)
+            ? ClientCertificateLoader.LoadAsSchannelBuild(path, passphrase, _options.CertificateType, _certificateStore)
             : ClientCertificateLoader.LoadAsOpenSslBuild(
                 path,
                 passphrase,
@@ -352,8 +413,9 @@ public sealed class SslStreamTlsProvider : ITlsProvider
 
     // The chain policy replaces the system store, from --cacert; null verifies against the
     // system store, with the --capath roots trusted beside it when there is no --cacert.
-    // Revocation is not checked, as it is not without --cacert, so a private CA with no
-    // revocation endpoint still verifies.
+    // With --cacert the Schannel build checks revocation below the root unless
+    // SkipRevocationCheck is set, so a private CA with no revocation endpoint fails with
+    // exit 60 as in curl (ADR-0086); the OpenSSL build never checks it.
     private (X509ChainPolicy? ChainPolicy, X509Certificate2Collection AnchorsBesideSystemStore) ReadTrustAnchors()
     {
         if (_options.Insecure)
@@ -370,7 +432,9 @@ public sealed class SslStreamTlsProvider : ITlsProvider
         var chainPolicy = new X509ChainPolicy
         {
             TrustMode = X509ChainTrustMode.CustomRootTrust,
-            RevocationMode = X509RevocationMode.NoCheck,
+            RevocationMode = _matchesSchannelBuild && !_options.SkipRevocationCheck
+                ? X509RevocationMode.Online
+                : X509RevocationMode.NoCheck,
         };
         chainPolicy.CustomTrustStore.AddRange(ReadCaCertificateFile(_options.CaCertificateFile));
         chainPolicy.CustomTrustStore.AddRange(directoryAnchors);

@@ -1,4 +1,5 @@
-using System.Text;
+using System.Buffers;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Core.Multipart;
 
@@ -10,41 +11,40 @@ namespace Curl.Core.Multipart;
 /// </summary>
 internal sealed class MultipartPartEncoder
 {
-    private const int MaximumLineLength = 76;
-
-    private const byte CarriageReturn = 0x0D;
-
-    private const byte LineFeed = 0x0A;
-
     private static readonly MultipartPartEncoder[] Encoders =
     [
-        new("binary", data => data, passesDataThrough: true, knowsEncodedLengthBeforehand: true),
-        new("8bit", data => data, passesDataThrough: true, knowsEncodedLengthBeforehand: true),
-        new("7bit", RefuseEightBitData, passesDataThrough: false, knowsEncodedLengthBeforehand: true),
-        new("base64", EncodeBase64, passesDataThrough: false, knowsEncodedLengthBeforehand: true),
-        new("quoted-printable", EncodeQuotedPrintable, passesDataThrough: false, knowsEncodedLengthBeforehand: false),
+        new("binary", () => new PassThroughDataEncoding(refusesEightBitData: false), dataLength => dataLength),
+        new("8bit", () => new PassThroughDataEncoding(refusesEightBitData: false), dataLength => dataLength),
+        new("7bit", () => new PassThroughDataEncoding(refusesEightBitData: true), dataLength => dataLength),
+        new("base64", () => new Base64DataEncoding(), dataLength => Base64DataEncoding.EncodedLength(dataLength)),
+        new("quoted-printable", () => new QuotedPrintableDataEncoding(), dataLength => dataLength == 0 ? 0 : null),
     ];
 
-    private readonly Func<byte[], byte[]?> encode;
+    private readonly Func<MultipartDataEncoding> createEncoding;
 
-    private readonly bool knowsEncodedLengthBeforehand;
+    private readonly Func<long, long?> encodedLength;
 
-    private MultipartPartEncoder(string name, Func<byte[], byte[]?> encode, bool passesDataThrough, bool knowsEncodedLengthBeforehand)
+    private MultipartPartEncoder(string name, Func<MultipartDataEncoding> createEncoding, Func<long, long?> encodedLength)
     {
         Name = name;
-        this.encode = encode;
-        PassesDataThrough = passesDataThrough;
-        this.knowsEncodedLengthBeforehand = knowsEncodedLengthBeforehand;
+        this.createEncoding = createEncoding;
+        this.encodedLength = encodedLength;
     }
 
     /// <summary>Gets the encoder's name as curl sends it in <c>Content-Transfer-Encoding</c>: lower case.</summary>
     internal string Name { get; }
 
     /// <summary>
-    /// Gets a value indicating whether the encoder sends every byte as it is, so a file part
-    /// using it can be streamed rather than read whole.
+    /// Gets a value indicating whether the encoder sends every byte as it is and refuses none,
+    /// so a file part using it is sent exactly as one with no encoder.
     /// </summary>
-    internal bool PassesDataThrough { get; }
+    internal bool PassesDataThrough => Name is "binary" or "8bit";
+
+    /// <summary>
+    /// Gets a value indicating whether the encoder can refuse data, as <c>7bit</c> refuses a byte
+    /// above 127, so a file part using it is checked before it is sent.
+    /// </summary>
+    internal bool CanRefuseData => Name == "7bit";
 
     /// <summary>Finds the encoder named <paramref name="name" />, compared without regard to case as curl compares.</summary>
     /// <param name="name">The <c>;encoder=</c> value.</param>
@@ -52,74 +52,28 @@ internal sealed class MultipartPartEncoder
     internal static MultipartPartEncoder? Find(string name) =>
         Array.Find(Encoders, encoder => encoder.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
 
-    /// <summary>Encodes <paramref name="data" />.</summary>
+    /// <summary>Encodes <paramref name="data" /> whole.</summary>
     /// <param name="data">The part's data.</param>
     /// <returns>The encoded bytes, or <see langword="null" /> when the encoder cannot carry the data.</returns>
-    internal byte[]? Encode(byte[] data) => encode(data);
+    internal byte[]? Encode(byte[] data)
+    {
+        ArrayBufferWriter<byte> output = new();
+        return createEncoding().TryEncode(data, isFinal: true, output, out _) ? output.WrittenSpan.ToArray() : null;
+    }
+
+    /// <summary>Encodes <paramref name="data" /> as it is read, never holding it whole.</summary>
+    /// <param name="data">The part's data, which the returned stream now owns.</param>
+    /// <param name="dataLength">The data's size in bytes, or <see langword="null" /> when unknown.</param>
+    /// <returns>The encoded data, whose reads throw <see cref="RequestBodyReadFailedException" /> at data the encoder refuses.</returns>
+    internal EncodedReadStream EncodeWhileReading(Stream data, long? dataLength) =>
+        new(data, createEncoding, EncodedLength(dataLength));
 
     /// <summary>
-    /// Tells whether curl knows the encoded size before it sends: always, when the data's own
-    /// size is known, except for <c>quoted-printable</c>, whose size curl learns only by encoding
-    /// and so leaves unknown for anything but empty data.
+    /// Gives the encoded size curl knows before it sends: the data's own size for the encoders
+    /// that send it as it is, the size of its 76-column lines for <c>base64</c>, and nothing for
+    /// <c>quoted-printable</c>, whose size curl learns only by encoding, unless the data is empty.
     /// </summary>
     /// <param name="dataLength">The data's size in bytes, or <see langword="null" /> when unknown.</param>
-    /// <returns><see langword="true" /> when the encoded size is known beforehand.</returns>
-    internal bool KnowsEncodedLength(long? dataLength) =>
-        dataLength is { } length && (knowsEncodedLengthBeforehand || length == 0);
-
-    private static byte[]? RefuseEightBitData(byte[] data) =>
-        data.AsSpan().IndexOfAnyInRange((byte)0x80, (byte)0xFF) < 0 ? data : null;
-
-    private static byte[] EncodeBase64(byte[] data) =>
-        Encoding.ASCII.GetBytes(Convert.ToBase64String(data, Base64FormattingOptions.InsertLineBreaks));
-
-    /// <summary>
-    /// Encodes as libcurl 8.21.0's <c>encoder_qp_read</c> does: printable ASCII other than
-    /// <c>=</c> is sent as it is, a CRLF pair as a line break, a space or tab as it is unless a
-    /// line break or the end of the data follows it, and anything else as <c>=XX</c>; a line
-    /// that would pass 76 columns ends with the soft break <c>=</c> CRLF first.
-    /// </summary>
-    private static byte[] EncodeQuotedPrintable(byte[] data)
-    {
-        StringBuilder encoded = new(data.Length);
-        int column = 0;
-        int index = 0;
-        while (index < data.Length)
-        {
-            (string piece, int consumed) = NextQuotedPrintablePiece(data, index);
-            if (piece[^1] != '\n' && NeedsSoftLineBreak(data, index + consumed, column + piece.Length))
-            {
-                (piece, consumed) = ("=\r\n", 0);
-            }
-
-            encoded.Append(piece);
-            column = piece[^1] == '\n' ? 0 : column + piece.Length;
-            index += consumed;
-        }
-
-        return Encoding.ASCII.GetBytes(encoded.ToString());
-    }
-
-    private static (string Piece, int Consumed) NextQuotedPrintablePiece(byte[] data, int index)
-    {
-        byte value = data[index];
-        if (IsPrintable(value) || (IsSpaceOrTab(value) && !IsLineEnd(data, index + 1)))
-        {
-            return (((char)value).ToString(), 1);
-        }
-
-        return value == CarriageReturn && IsLineEnd(data, index) ? ("\r\n", 2) : ($"={value:X2}", 1);
-    }
-
-    private static bool IsPrintable(byte value) => value is >= 0x21 and <= 0x7E and not (byte)'=';
-
-    private static bool IsSpaceOrTab(byte value) => value is (byte)' ' or (byte)'\t';
-
-    private static bool NeedsSoftLineBreak(byte[] data, int next, int columnAfter) =>
-        columnAfter > MaximumLineLength || (columnAfter == MaximumLineLength && !IsLineEnd(data, next));
-
-    /// <summary>Tells whether a CRLF pair or the end of the data is at <paramref name="index" />.</summary>
-    private static bool IsLineEnd(byte[] data, int index) =>
-        index >= data.Length
-        || (index + 1 < data.Length && data[index] == CarriageReturn && data[index + 1] == LineFeed);
+    /// <returns>The encoded size in bytes, or <see langword="null" /> when curl does not know it beforehand.</returns>
+    internal long? EncodedLength(long? dataLength) => dataLength is { } length ? encodedLength(length) : null;
 }

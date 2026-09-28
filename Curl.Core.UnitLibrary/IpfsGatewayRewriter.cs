@@ -33,6 +33,12 @@ namespace Curl.Core;
 /// IPv6 host, no host or a scheme curl does not know. The gateway's user information and
 /// fragment are ignored. Measured against curl 8.21.0 on 2026-09-27 (BL-210).
 /// </para>
+/// <para>
+/// An <c>--ipfs-gateway</c> that curl cannot parse at all (rejected text, a scheme curl
+/// does not know, or no host with a scheme other than <c>file</c>) is
+/// <see cref="IpfsGatewayFailure.MalformedGatewayOption" /> instead, exit 43; the same
+/// text from the environment or the file stays exit 3. Measured 2026-09-27 (BL-363).
+/// </para>
 /// </remarks>
 /// <param name="readEnvironmentVariable">
 /// Returns the value of the named environment variable, or <see langword="null" /> when it
@@ -94,15 +100,13 @@ public sealed class IpfsGatewayRewriter(
         }
 
         gatewayUrl = null;
-        string? gatewayText = gatewayOption is null ? ReadConfiguredGateway() : UrlSchemeGuesser.AddGuessedScheme(gatewayOption);
-        if (gatewayText is null)
+        if (!TryResolveGateway(gatewayOption, out CurlUrl? gateway, out failure))
         {
-            failure = IpfsGatewayFailure.GatewayDetectionFailed;
             return false;
         }
 
         failure = IpfsGatewayFailure.MalformedTargetUrl;
-        if (!TryParseGateway(gatewayText, out CurlUrl? gateway) || !TryBuildPath(gateway, url, out string? path))
+        if (!IsUsableGateway(gateway) || !TryBuildPath(gateway, url, out string? path))
         {
             return false;
         }
@@ -114,11 +118,43 @@ public sealed class IpfsGatewayRewriter(
         return true;
     }
 
+    /// <summary>
+    /// Finds the gateway, <c>--ipfs-gateway</c> or else the configured one, and parses it:
+    /// unparsable text is <see cref="IpfsGatewayFailure.MalformedGatewayOption" /> from the
+    /// option and <see cref="IpfsGatewayFailure.MalformedTargetUrl" /> otherwise.
+    /// </summary>
+    private bool TryResolveGateway(
+        string? gatewayOption,
+        [NotNullWhen(true)] out CurlUrl? gateway,
+        [NotNullWhen(false)] out IpfsGatewayFailure? failure)
+    {
+        gateway = null;
+        string? gatewayText = gatewayOption is null ? ReadConfiguredGateway() : UrlSchemeGuesser.AddGuessedScheme(gatewayOption);
+        if (gatewayText is null)
+        {
+            failure = IpfsGatewayFailure.GatewayDetectionFailed;
+            return false;
+        }
+
+        failure = gatewayOption is null ? IpfsGatewayFailure.MalformedTargetUrl : IpfsGatewayFailure.MalformedGatewayOption;
+        if (!TryParseGateway(gatewayText, out gateway))
+        {
+            return false;
+        }
+
+        failure = null;
+        return true;
+    }
+
+    /// <summary>
+    /// Parses <paramref name="gatewayText" /> as curl's <c>curl_url_set</c> does before it
+    /// looks at the parts: it needs a scheme curl knows and, but for <c>file</c>, a host.
+    /// </summary>
     private static bool TryParseGateway(string gatewayText, [NotNullWhen(true)] out CurlUrl? gateway)
     {
         if (UrlSchemeGuesser.HasScheme(gatewayText)
             && CurlUrl.TryParse(gatewayText, pathAsIs: false, out gateway)
-            && IsUsableGateway(gateway))
+            && (gateway.Scheme == "file" || (IsKnownScheme(gateway.Scheme) && gateway.Host.Length > 0)))
         {
             return true;
         }
@@ -130,8 +166,7 @@ public sealed class IpfsGatewayRewriter(
     private static bool IsUsableGateway(CurlUrl gateway) =>
         string.IsNullOrEmpty(gateway.Query)
         && gateway.Host.Length > 0
-        && !gateway.Host.StartsWith('[')
-        && IsKnownScheme(gateway.Scheme);
+        && !gateway.Host.StartsWith('[');
 
     /// <summary>
     /// Tells whether curl knows <paramref name="scheme" />: whether a URL with it and no port

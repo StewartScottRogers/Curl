@@ -45,4 +45,16 @@ public sealed class HttpConnectionPersistenceTests
 
         Assert.AreEqual(expected, HttpConnectionPersistence.KeepsAlive(head, false, passesTransferCoding, ignoresContentLength));
     }
+
+    [TestMethod]
+    [DataRow("HTTP/1.1 200 OK\r\nContent-Length: 4\r\nTransfer-Encoding: gzip\r\n\r\n", false, DisplayName = "gzip without chunked runs to the close")]
+    [DataRow("HTTP/1.1 200 OK\r\nTransfer-Encoding: gzip, chunked\r\n\r\n", true, DisplayName = "gzip, chunked stays open")]
+    [DataRow("HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\n", true, DisplayName = "No Transfer-Encoding stays open")]
+    public async Task KeepsAlive_TransferEncoding_ClosesWhenTheBodyIsNotChunked(string response, bool expected)
+    {
+        ScriptedConnection connection = new(Encoding.Latin1.GetBytes(response), 65536);
+        HttpResponseHead head = await new HttpResponseHeadReader(connection).ReadAsync(CancellationToken.None);
+
+        Assert.AreEqual(expected, HttpConnectionPersistence.KeepsAlive(head, false, decodesTransferCoding: true));
+    }
 }

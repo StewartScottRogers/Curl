@@ -35,7 +35,8 @@ internal sealed class HttpRequestFraming
         bool addsExpect,
         bool awaitsContinue,
         bool refusesUnknownLength = false,
-        HttpUploadResume? upload = null)
+        HttpUploadResume? upload = null,
+        string? contentRange = null)
     {
         Method = method;
         Body = body;
@@ -45,6 +46,7 @@ internal sealed class HttpRequestFraming
         AwaitsContinue = awaitsContinue;
         RefusesUnknownLength = refusesUnknownLength;
         Upload = upload;
+        ContentRange = contentRange;
     }
 
     /// <summary>
@@ -97,10 +99,13 @@ internal sealed class HttpRequestFraming
     internal bool IsUpload => Upload is not null;
 
     /// <summary>
-    /// Gets the <c>Content-Range</c> value a <c>-T</c> upload resumed with <c>-C</c> sends, or
-    /// <see langword="null" /> to send none (<see cref="HttpUploadResume" />).
+    /// Gets the <c>Content-Range</c> value the request sends, or <see langword="null" /> to send
+    /// none: a <c>-T</c> upload resumed with <c>-C</c> sends <see cref="HttpUploadResume" />'s, and
+    /// otherwise a <c>-d</c> body or a <c>-T</c> upload with <c>-r</c> sends
+    /// <see cref="HttpRangeHeader.ContentRangeFor" />'s. A <c>-F</c> form sends none, as curl sends
+    /// none for a multipart post (measured, BL-306 Notes).
     /// </summary>
-    internal string? ContentRange => Upload?.ContentRange;
+    internal string? ContentRange { get; }
 
     /// <summary>
     /// Gets the failure a <c>-T</c> upload resumed with <c>-C</c> ends with once connected,
@@ -120,9 +125,12 @@ internal sealed class HttpRequestFraming
     /// <c>417 Expectation Failed</c>. An <c>-H</c> <c>Expect</c> line is still sent, but the
     /// body follows the head at once (measured, BL-260 Notes).
     /// </summary>
+    /// <param name="body">
+    /// The body to resend: <see cref="Body" />, or the stream it rewinds to (BL-319 Notes).
+    /// </param>
     /// <returns>The framing of the resent request.</returns>
-    internal HttpRequestFraming WithoutExpect() =>
-        new(Method, Body, KnownLength, IsChunked, addsExpect: false, awaitsContinue: false, RefusesUnknownLength, Upload);
+    internal HttpRequestFraming WithoutExpect(HttpRequestBody? body) =>
+        new(Method, body, KnownLength, IsChunked, addsExpect: false, awaitsContinue: false, RefusesUnknownLength, Upload, ContentRange);
 
     /// <summary>
     /// Decides the framing for a request with <paramref name="options" />.
@@ -145,12 +153,20 @@ internal sealed class HttpRequestFraming
     /// The <c>-C</c> offset (<see cref="ITransferContext.ResumeFrom" />) the upload resumes from,
     /// or <see langword="null" />; <see cref="HttpUploadResume" /> applies it.
     /// </param>
+    /// <param name="range">
+    /// The <c>-r</c> range (<see cref="ITransferContext.Range" />), or <see langword="null" />; a
+    /// <c>-d</c> body or a <c>-T</c> upload sends it as <see cref="ContentRange" />.
+    /// </param>
+    /// <param name="resumeFromUnknownOffset">
+    /// <see langword="true" /> for <c>-C -</c> (<see cref="ITransferContext.ResumeUploadFromUnknownOffset" />);
+    /// <see cref="HttpUploadResume" /> applies it in place of <paramref name="resumeFrom" />.
+    /// </param>
     /// <returns>The framing.</returns>
-    internal static HttpRequestFraming Of(HttpRequestOptions options, HttpCustomHeader[] customHeaders, bool noBody = false, Stream? upload = null, long? resumeFrom = null)
+    internal static HttpRequestFraming Of(HttpRequestOptions options, HttpCustomHeader[] customHeaders, bool noBody = false, Stream? upload = null, long? resumeFrom = null, ByteRange? range = null, bool resumeFromUnknownOffset = false)
     {
         if (upload is not null)
         {
-            return OfUpload(options, HttpUploadResume.Of(upload, resumeFrom), upload, customHeaders);
+            return OfUpload(options, HttpUploadResume.Of(upload, resumeFrom, resumeFromUnknownOffset), upload, customHeaders, range);
         }
 
         if (options.Body is not { } body)
@@ -158,18 +174,19 @@ internal sealed class HttpRequestFraming
             return new HttpRequestFraming(options.CustomMethod ?? (noBody ? "HEAD" : "GET"), null, null, false, false, false);
         }
 
-        return OfBody(options.CustomMethod ?? "POST", body, customHeaders, options.Version == HttpVersionPreference.Http10);
+        return OfBody(options.CustomMethod ?? "POST", body, customHeaders, options.Version == HttpVersionPreference.Http10, range: DataRangeOf(body, range));
     }
 
     /// <summary>
     /// Decides the framing for a request that sends the <c>-T</c> source
     /// <paramref name="upload" />: PUT unless <c>-X</c> names another method, of the length
-    /// left to send after the <c>-C</c> offset (<paramref name="resume" />).
+    /// left to send after the <c>-C</c> offset (<paramref name="resume" />), with the <c>-r</c>
+    /// <paramref name="range" /> when there is one.
     /// </summary>
-    private static HttpRequestFraming OfUpload(HttpRequestOptions options, HttpUploadResume resume, Stream upload, HttpCustomHeader[] customHeaders)
+    private static HttpRequestFraming OfUpload(HttpRequestOptions options, HttpUploadResume resume, Stream upload, HttpCustomHeader[] customHeaders, ByteRange? range)
     {
         StreamBody body = new(upload, resume.Length, string.Empty);
-        return OfBody(options.CustomMethod ?? "PUT", body, customHeaders, options.Version == HttpVersionPreference.Http10, resume);
+        return OfBody(options.CustomMethod ?? "PUT", body, customHeaders, options.Version == HttpVersionPreference.Http10, resume, range);
     }
 
     /// <summary>
@@ -185,7 +202,11 @@ internal sealed class HttpRequestFraming
     /// <param name="upload">
     /// The resumed <c>-T</c> source when <paramref name="body" /> is it, or <see langword="null" />.
     /// </param>
-    private static HttpRequestFraming OfBody(string method, HttpRequestBody body, HttpCustomHeader[] customHeaders, bool isHttp10, HttpUploadResume? upload = null)
+    /// <param name="range">
+    /// The <c>-r</c> range to send as <c>Content-Range</c>, or <see langword="null" /> for none;
+    /// a resumed upload's own <c>Content-Range</c> takes its place.
+    /// </param>
+    private static HttpRequestFraming OfBody(string method, HttpRequestBody body, HttpCustomHeader[] customHeaders, bool isHttp10, HttpUploadResume? upload = null, ByteRange? range = null)
     {
         long? length = body is BytesBody bytes ? bytes.Content.Length : ((StreamBody)body).Length;
         bool wantsExpect = WantsExpect(length, isHttp10);
@@ -201,8 +222,26 @@ internal sealed class HttpRequestFraming
             wantsExpect && !namesExpect,
             awaitsContinue,
             RefusesUnknownLengthOf(length, asksForChunked, isHttp10),
-            upload);
+            upload,
+            ContentRangeOf(upload, range, length));
     }
+
+    /// <summary>
+    /// Gives the <c>-r</c> <paramref name="range" /> a request with <paramref name="body" /> on
+    /// <see cref="HttpRequestOptions.Body" /> sends as <c>Content-Range</c>: the range for a
+    /// <c>-d</c> body (a <see cref="BytesBody" />), and <see langword="null" /> for a <c>-F</c>
+    /// form, for which curl sends none (measured, BL-306 Notes).
+    /// </summary>
+    private static ByteRange? DataRangeOf(HttpRequestBody body, ByteRange? range) =>
+        body is BytesBody ? range : null;
+
+    /// <summary>
+    /// Formats the <c>Content-Range</c> value: the resumed <paramref name="upload" />'s when it
+    /// has one, else the <c>-r</c> <paramref name="range" /> over a body of
+    /// <paramref name="length" />, else <see langword="null" />.
+    /// </summary>
+    private static string? ContentRangeOf(HttpUploadResume? upload, ByteRange? range, long? length) =>
+        upload?.ContentRange ?? (range is null ? null : HttpRangeHeader.ContentRangeFor(range, length));
 
     /// <summary>
     /// Tells whether curl wants <c>Expect: 100-continue</c> for a body of

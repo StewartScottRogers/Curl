@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Sockets;
 
@@ -11,6 +12,11 @@ namespace Curl.Networking;
 public sealed class TcpDialer : ITcpDialer
 {
     /// <inheritdoc />
+    /// <remarks>
+    /// Excluded from coverage per ADR-0083: every line after the argument check needs a
+    /// connected TCP socket, so the loopback test in the Integration run measures it.
+    /// </remarks>
+    [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin socket adapter, measured by the Integration run.")]
     public async ValueTask<DialedTcpConnection> DialAsync(IPEndPoint endPoint, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(endPoint);

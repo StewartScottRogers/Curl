@@ -99,6 +99,18 @@ public sealed class DictProtocolHandlerTests
         Assert.AreEqual("m", result.ErrorMessage);
         Assert.AreEqual(0L, result.BytesTransferred);
         Assert.AreEqual(0L, output.Length);
+        Assert.IsFalse(result.IsConnectionRefused);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ConnectRefused_ReturnsExit7MarkedConnectionRefused()
+    {
+        var connector = new RecordingConnector(ConnectResult.Refused("m"));
+
+        TransferResult result = await new DictProtocolHandler(connector).ExecuteAsync(Context("dict://h/d:x", new MemoryStream()));
+
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.IsTrue(result.IsConnectionRefused);
     }
 
     [TestMethod]

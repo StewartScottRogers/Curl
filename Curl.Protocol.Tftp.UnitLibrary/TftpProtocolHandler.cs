@@ -1,3 +1,5 @@
+using System.Text;
+
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Tftp;
@@ -46,16 +48,52 @@ namespace Curl.Protocol.Tftp;
 /// server acknowledges the wrong block once too often (see <c>TftpDownload</c> and
 /// <c>TftpUpload</c>).
 /// </para>
+/// <para>
+/// Through an HTTP or HTTPS proxy (<see cref="ITransferContext.Proxy" /> of kind
+/// <see cref="ProxyKind.Http" />, <see cref="ProxyKind.Http10" /> or
+/// <see cref="ProxyKind.Https" />) no datagram is sent: the MASQUE <c>connect-udp</c>
+/// request curl 8.21.0's Schannel build sends is written to the proxy over
+/// <paramref name="proxyConnector" />, over TLS for an HTTPS proxy, and the proxy's reply
+/// decides the failure (<c>TftpMasqueReply</c>): exit 7 <c>bind() failed; Invalid
+/// arguments</c> when it accepts, exit 7 <c>CONNECT-UDP tunnel failed, response N</c> when it
+/// refuses, exit 56 <c>Proxy CONNECT aborted</c> when it closes first. This happens before
+/// the file name is checked (ADR-0056, rule 4; ADR-0096; measured). Without a
+/// <paramref name="proxyConnector" /> the request is not sent and the result is exit 7
+/// <c>bind() failed; Invalid arguments</c>. A proxy that cannot be reached is returned with
+/// the connector's code and message unchanged.
+/// </para>
+/// <para>
+/// Through a SOCKS proxy (any other kind) nothing is sent at all and the transfer ends with
+/// exit 97 <c>Send failure: Socket is not connected</c>, before the file name is checked:
+/// curl 8.21.0's Schannel build tries to send the SOCKS greeting on the unconnected UDP
+/// socket (ADR-0096; measured by BL-398).
+/// </para>
 /// </remarks>
-public sealed class TftpProtocolHandler(IDatagramConnector connector) : IProtocolHandler
+/// <param name="proxyConnector">
+/// Connects to the HTTP or HTTPS proxy the MASQUE request is sent to, or
+/// <see langword="null" /> to send none.
+/// </param>
+/// <param name="proxyCredentialEncoding">
+/// The encoding a proxy credential is base64-encoded from, the platform's (ADR-0059);
+/// UTF-8 when <see langword="null" />.
+/// </param>
+public sealed class TftpProtocolHandler(
+    IDatagramConnector connector,
+    IConnector? proxyConnector = null,
+    Encoding? proxyCredentialEncoding = null) : IProtocolHandler
 {
     /// <summary>The port a <c>tftp://</c> URL that names none is sent to.</summary>
     private const int DefaultPort = 69;
+
+    /// <summary>What curl 8.21.0's Schannel build reports for a <c>tftp://</c> URL through a SOCKS proxy (measured by BL-398).</summary>
+    private const string SocksProxyFailureMessage = "Send failure: Socket is not connected";
 
     private static readonly string[] Schemes = ["tftp"];
 
     private readonly IDatagramConnector connector =
         connector ?? throw new ArgumentNullException(nameof(connector));
+
+    private readonly Encoding proxyCredentialEncoding = proxyCredentialEncoding ?? Encoding.UTF8;
 
     /// <inheritdoc />
     public IReadOnlyCollection<string> SupportedSchemes => Schemes;
@@ -71,14 +109,26 @@ public sealed class TftpProtocolHandler(IDatagramConnector connector) : IProtoco
     {
         ArgumentNullException.ThrowIfNull(context);
         var startTimestamp = context.TimeProvider.GetTimestamp();
+        var port = context.Url.Port > 0 ? context.Url.Port : DefaultPort;
 
+        return context.Proxy switch
+        {
+            null => await TransferFileAsync(context, port, startTimestamp).ConfigureAwait(false),
+            { Kind: ProxyKind.Http or ProxyKind.Http10 or ProxyKind.Https } proxy =>
+                await FailThroughHttpProxyAsync(context, proxy, port).ConfigureAwait(false),
+            _ => TransferResult.Failure(CurlExitCode.Proxy, SocksProxyFailureMessage),
+        };
+    }
+
+    // Downloads or uploads the URL's file over a datagram channel to the server.
+    private async ValueTask<TransferResult> TransferFileAsync(ITransferContext context, int port, long startTimestamp)
+    {
         var fileName = Uri.UnescapeDataString(context.Url.AbsolutePath.TrimStart('/'));
         if (fileName.Length == 0)
         {
             return TransferResult.Failure(CurlExitCode.TftpIllegal, "Missing filename");
         }
 
-        var port = context.Url.Port > 0 ? context.Url.Port : DefaultPort;
         var opened = await connector
             .OpenAsync(context.Url.IdnHost, port, context.CancellationToken)
             .ConfigureAwait(false);
@@ -93,6 +143,32 @@ public sealed class TftpProtocolHandler(IDatagramConnector connector) : IProtoco
             return context.Upload is { } upload
                 ? await new TftpUpload(context, channel, upload, startTimestamp).RunAsync(fileName).ConfigureAwait(false)
                 : await new TftpDownload(context, channel, startTimestamp).RunAsync(fileName).ConfigureAwait(false);
+        }
+    }
+
+    // Sends the MASQUE request to the proxy, when there is a connector to reach it, and
+    // fails as curl 8.21.0 does once the proxy has replied.
+    private async ValueTask<TransferResult> FailThroughHttpProxyAsync(ITransferContext context, ProxyEndpoint proxy, int port)
+    {
+        if (proxyConnector is null)
+        {
+            return TransferResult.Failure(CurlExitCode.CouldntConnect, TftpMasqueReply.BindFailedMessage);
+        }
+
+        var target = new ConnectTarget(proxy.Host, proxy.Port, UseTls: proxy.Kind == ProxyKind.Https) { IsForwardProxy = true };
+        var connected = await proxyConnector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
+        if (connected.Connection is not { } connection)
+        {
+            return TransferResult.Failure(connected.ExitCode, connected.ErrorMessage!);
+        }
+
+        await using (connection.ConfigureAwait(false))
+        {
+            var request = TftpMasqueRequest.Build(
+                context.Url.IdnHost, port, proxy, context.Http?.UserAgent, proxyCredentialEncoding);
+            await connection.WriteAsync(request, context.CancellationToken).ConfigureAwait(false);
+            await connection.FlushAsync(context.CancellationToken).ConfigureAwait(false);
+            return await TftpMasqueReply.ReadAsync(connection, context.CancellationToken).ConfigureAwait(false);
         }
     }
 }

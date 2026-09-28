@@ -112,7 +112,7 @@ public sealed class PhysicalFileSystem : IFileSystem, IFileTimeSetter
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        FileMode fileMode = mode == FileWriteMode.Append ? FileMode.Append : FileMode.Create;
+        FileMode fileMode = FileModeFor(mode);
         FileStreamOptions options = setsUnixCreateMode
             ? WriteOptionsWithCreateMode(fileMode, createMode)
             : OptionsFor(fileMode, FileAccess.Write, FileShare.Read);
@@ -142,6 +142,21 @@ public sealed class PhysicalFileSystem : IFileSystem, IFileTimeSetter
         errorCode = 0;
         return true;
     }
+
+    /// <summary>
+    /// The <see cref="FileMode" /> a write open asks for.
+    /// </summary>
+    /// <param name="mode">How existing content is treated.</param>
+    /// <returns>
+    /// <see cref="FileMode.Append" />, <see cref="FileMode.CreateNew" /> - one exclusive
+    /// create, as curl's <c>O_EXCL</c> - or <see cref="FileMode.Create" /> for a truncating open.
+    /// </returns>
+    private static FileMode FileModeFor(FileWriteMode mode) => mode switch
+    {
+        FileWriteMode.Append => FileMode.Append,
+        FileWriteMode.CreateNew => FileMode.CreateNew,
+        _ => FileMode.Create,
+    };
 
     /// <summary>
     /// The options for a write open that also sets the mode a created file receives.

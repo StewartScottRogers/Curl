@@ -64,6 +64,16 @@ public sealed class CommandLineDefaultConfigFileTests
     }
 
     [TestMethod]
+    public void Parse_EmptyCommandLineWithHelpInDefaultConfigFile_ReportsTheUsagePageThenRefuses()
+    {
+        // curl (no arguments) with help in .curlrc: the usage page, then the try-help line; exit 2 (2026-09-27).
+        CommandLineParseResult result = Parse([], "help\n");
+
+        CollectionAssert.AreEqual(new string?[] { null }, result.ConfigFileHelpSubjects.ToArray());
+        CollectionAssert.AreEqual(new[] { TryHelp }, result.Refusal!.StandardErrorLines.ToArray());
+    }
+
+    [TestMethod]
     public void Parse_EmptyCommandLineWithNoDefaultConfigFile_IsRefusedWithTryHelpAlone()
     {
         CommandLineParseResult result = Parse([], new RecordingDataFileReader());
@@ -245,6 +255,55 @@ public sealed class CommandLineDefaultConfigFileTests
     {
         Assert.ThrowsExactly<ArgumentNullException>(
             () => CommandLineParser.Parse([Url], _ => true, new UnexpectedPasswordPrompt(), new RecordingDataFileReader(), null!));
+    }
+
+    [TestMethod]
+    [DataRow(new[] { "-v", Url })]
+    [DataRow(new[] { "-v", "--bogus", Url })]
+    [DataRow(new[] { "-v" })]
+    public void Parse_VerboseReadWithDefaultConfigFile_NotesTheFile(string[] arguments)
+    {
+        // BL-352: curl -v --bogus and curl -v (no URL) print the note, as an accepted -v does.
+        CommandLineParseResult result = Parse(arguments, "silent\n");
+
+        Assert.AreEqual(Curlrc, result.NotedDefaultConfigFile);
+    }
+
+    [TestMethod]
+    [DataRow(new[] { Url })]
+    [DataRow(new[] { "--bogus", "-v", Url })]
+    public void Parse_NoVerboseReadWithDefaultConfigFile_NotesNoFile(string[] arguments)
+    {
+        // BL-352: curl --bogus -v prints no note; the -v was never read.
+        CommandLineParseResult result = Parse(arguments, "silent\n");
+
+        Assert.IsNull(result.NotedDefaultConfigFile);
+    }
+
+    [TestMethod]
+    public void Parse_EmptyCommandLineWithVerboseDefaultConfigFile_NotesNoFile()
+    {
+        // BL-352: curl (no arguments) with a .curlrc of verbose printed the try-help line alone.
+        CommandLineParseResult result = Parse([], "verbose\n");
+
+        Assert.IsNull(result.NotedDefaultConfigFile);
+        Assert.IsFalse(result.Refusal!.FoundAtTransferSetup);
+    }
+
+    [TestMethod]
+    public void Parse_VerboseWithNoUrl_IsRefusedAtTransferSetup()
+    {
+        CommandLineParseResult result = Parse(["-v"], "silent\n");
+
+        Assert.IsTrue(result.Refusal!.FoundAtTransferSetup);
+    }
+
+    [TestMethod]
+    public void Parse_UnknownOption_IsNotRefusedAtTransferSetup()
+    {
+        CommandLineParseResult result = Parse(["--bogus"], "silent\n");
+
+        Assert.IsFalse(result.Refusal!.FoundAtTransferSetup);
     }
 
     private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, string? curlrc)

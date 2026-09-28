@@ -58,6 +58,14 @@
     Run the integration tests too. Off by default, matching the fast test command in
     CLAUDE.md.
 
+.PARAMETER ReportPath
+    Also write the Markdown report to this file.
+
+.PARAMETER JsonPath
+    Also write the measurements as JSON - totals, one row per library, every failing
+    member and every coverage exclusion - for the published coverage report that
+    .github/coverage/make-coverage-report.cs renders.
+
 .EXAMPLE
     .\Measure-CodeQuality.ps1
 
@@ -75,7 +83,8 @@ param(
     [int] $ComplexityThreshold = 10,
     [double] $CrapThreshold = 30,
     [int] $MaxMissingLinesShown = 12,
-    [string] $ReportPath
+    [string] $ReportPath,
+    [string] $JsonPath
 )
 
 Set-StrictMode -Version Latest
@@ -292,6 +301,9 @@ $report.Add('')
 $report.Add('| Library | Line % | Branch % | Members | Failing | Worst CRAP |')
 $report.Add('| --- | ---: | ---: | ---: | ---: | ---: |')
 
+$jsonLibraries = New-Object System.Collections.Generic.List[object]
+$jsonFailing = New-Object System.Collections.Generic.List[object]
+
 foreach ($assembly in $assemblies) {
     $members = @($selected | Where-Object { $_.Assembly -eq $assembly })
     $failing = @($members | Where-Object { $_.Failures.Count -gt 0 })
@@ -310,6 +322,12 @@ foreach ($assembly in $assemblies) {
 
     $report.Add(('| {0} | {1} | {2} | {3} | {4} | {5} |' -f
             $assembly, $linePercent, $branchPercent, $members.Count, $failing.Count, $worstCrap))
+    $jsonLibraries.Add([ordered]@{
+            name = $assembly; linePercent = $linePercent; branchPercent = $branchPercent
+            linesCovered = [int]$linesCovered; linesTotal = [int]$linesTotal
+            branchesCovered = [int]$branchCovered; branchesTotal = [int]$branchTotal
+            members = $members.Count; failingMembers = $failing.Count; worstCrap = $worstCrap
+        })
 }
 
 $report.Add('')
@@ -350,6 +368,13 @@ foreach ($assembly in $assemblies) {
                 $shortClass, $displayMember, $member.SourceFile, $member.FirstLine,
                 $member.LinePercent, $member.BranchPercent, $member.Complexity, $member.Crap,
                 ($member.Failures -join ' '), $missingText))
+        $jsonFailing.Add([ordered]@{
+                library = $assembly; member = "$shortClass.$displayMember"
+                file = "$($member.SourceFile)"; line = [int]$member.FirstLine
+                linePercent = $member.LinePercent; branchPercent = $member.BranchPercent
+                complexity = [int]$member.Complexity; crap = $member.Crap
+                fails = @($member.Failures); uncoveredLines = $missingText
+            })
     }
     $report.Add('')
 }
@@ -385,6 +410,37 @@ Write-Output $text
 if ($ReportPath) {
     $text | Out-File -FilePath $ReportPath -Encoding utf8
     Write-Host "Report written to $ReportPath" -ForegroundColor Cyan
+}
+
+# The same numbers as data, for the published coverage report (.github/coverage).
+if ($JsonPath) {
+    $allLines = ($selected | Measure-Object -Property LinesTotal -Sum).Sum
+    $allLinesCovered = ($selected | Measure-Object -Property LinesCovered -Sum).Sum
+    $allBranches = ($selected | Measure-Object -Property BranchTotal -Sum).Sum
+    $allBranchesCovered = ($selected | Measure-Object -Property BranchCovered -Sum).Sum
+    $exclusions = @($excludeHits | ForEach-Object {
+            $path = $_.Path
+            if ($path.StartsWith($repositoryRoot, [StringComparison]::OrdinalIgnoreCase)) { $path = $path.Substring($repositoryRoot.Length).TrimStart('\', '/') }
+            [ordered]@{ file = $path; line = [int]$_.LineNumber; text = $_.Line.Trim() }
+        })
+    $data = [ordered]@{
+        measuredAt = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+        thresholds = [ordered]@{ linePercent = $LineThreshold; branchPercent = $BranchThreshold; complexity = $ComplexityThreshold; crap = $CrapThreshold }
+        totals = [ordered]@{
+            linePercent = $(if ($allLines) { [math]::Round(100 * $allLinesCovered / $allLines, 2) } else { 100 })
+            branchPercent = $(if ($allBranches) { [math]::Round(100 * $allBranchesCovered / $allBranches, 2) } else { 100 })
+            linesCovered = [int]$allLinesCovered; linesTotal = [int]$allLines
+            branchesCovered = [int]$allBranchesCovered; branchesTotal = [int]$allBranches
+            libraries = $assemblies.Count
+            librariesAtGate = @($jsonLibraries | Where-Object { $_.failingMembers -eq 0 }).Count
+            failingMembers = $totalViolations
+        }
+        libraries = $jsonLibraries.ToArray()
+        failing = $jsonFailing.ToArray()
+        exclusions = $exclusions
+    }
+    $data | ConvertTo-Json -Depth 6 | Out-File -FilePath $JsonPath -Encoding utf8
+    Write-Host "Data written to $JsonPath" -ForegroundColor Cyan
 }
 
 if ($totalViolations -gt 0) { exit 1 }

@@ -15,9 +15,9 @@ public sealed class FileProtocolHandlerMaxFileSizeTests
 {
     private const int ChunkSize = 16384;
 
-    private static CurlUrl FileUrl => CurlUrl.Parse("file:///C:/dir/f.txt");
+    private static CurlUrl FileUrl => CurlUrl.Parse("file:///dir/f.txt");
 
-    private static string OsPath => "C:/dir/f.txt".Replace('/', Path.DirectorySeparatorChar);
+    private static string OsPath => "/dir/f.txt".Replace('/', Path.DirectorySeparatorChar);
 
     private static byte[] Content => Encoding.ASCII.GetBytes("HelloWorld");
 

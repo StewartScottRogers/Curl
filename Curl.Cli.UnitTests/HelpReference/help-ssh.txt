@@ -1,0 +1,9 @@
+ssh: SSH protocol
+     --compressed-ssh          Enable SSH compression
+     --hostpubmd5 <md5>        Acceptable MD5 hash of host public key
+     --hostpubsha256 <sha256>  Acceptable SHA256 hash of host public key
+ -k, --insecure                Allow insecure server connections
+     --key <key>               Private key filename
+     --knownhosts <file>       Specify knownhosts path
+     --pass <phrase>           Passphrase for the private key
+     --pubkey <key>            SSH Public key filename

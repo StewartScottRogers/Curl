@@ -4,7 +4,8 @@
 
 .DESCRIPTION
     Downloads the source archive of curl at -Tag from GitHub, then replaces every test* file
-    in this folder with the test* files of tests/data at that tag, and COPYING with curl's
+    in this folder with the test* files of tests/data at that tag as test*.rawhttp, and
+    COPYING with curl's
     COPYING at that tag. Files are written byte for byte; the .gitattributes beside them marks
     them -text so git keeps their line endings. ADR-0013, decision 3: the data is vendored and
     pinned, and tests never download anything - only this script does.
@@ -44,9 +45,9 @@ try {
     $upstreamTests = @(Get-ChildItem -LiteralPath $upstreamData -File -Filter 'test*')
     if ($upstreamTests.Count -eq 0) { throw "No test* files found in tests/data at $Tag." }
 
-    Get-ChildItem -LiteralPath $destination -File -Filter 'test*' | Remove-Item -Force
+    Get-ChildItem -LiteralPath $destination -File -Filter 'test*.rawhttp' | Remove-Item -Force
     foreach ($test in $upstreamTests) {
-        Copy-Item -LiteralPath $test.FullName -Destination (Join-Path $destination $test.Name)
+        Copy-Item -LiteralPath $test.FullName -Destination (Join-Path $destination ($test.Name + '.rawhttp'))
     }
     Copy-Item -LiteralPath (Join-Path $workFolder "$sourceRoot/COPYING") -Destination (Join-Path $destination 'COPYING') -Force
 

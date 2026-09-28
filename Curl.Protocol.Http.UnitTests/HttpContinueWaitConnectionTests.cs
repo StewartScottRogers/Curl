@@ -13,6 +13,8 @@ public sealed class HttpContinueWaitConnectionTests
 {
     private const string Final = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n";
 
+    private const string ExpectationFailedReply = "HTTP/1.1 417 Expectation Failed\r\nContent-Length: 0\r\n\r\n";
+
     private static readonly int[] ChunkSizes = [1, 65536];
 
     [TestMethod]
@@ -121,6 +123,85 @@ public sealed class HttpContinueWaitConnectionTests
         Assert.AreEqual(inner.RemoteEndPoint, connection.RemoteEndPoint);
         Assert.AreEqual("ab", Encoding.Latin1.GetString(inner.Written));
         Assert.IsFalse(inner.IsDisposed);
+    }
+
+    [TestMethod]
+    public async Task SendUnlessStoppedAsync_417AlreadyArrived_SendsNothing()
+    {
+        const string failed = ExpectationFailedReply;
+        GatedConnection inner = new(Encoding.Latin1.GetBytes(failed), 65536, 1);
+        HttpContinueWaitConnection connection = await PastTheWaitAsync(inner);
+
+        Assert.IsTrue(await connection.SendUnlessStoppedAsync("a"u8.ToArray(), CancellationToken.None));
+        Assert.AreEqual(failed, await ReadAllAsync(connection));
+
+        Assert.IsTrue(connection.StopsSending);
+        Assert.IsFalse(await connection.SendUnlessStoppedAsync("b"u8.ToArray(), CancellationToken.None));
+        Assert.AreEqual("a", Encoding.Latin1.GetString(inner.Written));
+    }
+
+    [TestMethod]
+    [DataRow(ExpectationFailedReply, DisplayName = "417")]
+    [DataRow("HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\n\r\n", DisplayName = "500")]
+    [DataRow("HTTP/1.1 301 Moved Permanently\r\nLocation: /v\r\nContent-Length: 0\r\n\r\n", DisplayName = "301")]
+    [DataRow("HTTP/1.1 300 Multiple Choices\r\nContent-Length: 0\r\n\r\n", DisplayName = "300, the lowest that stops")]
+    public async Task SendUnlessStoppedAsync_300OrAboveArrivesDuringTheWrite_CancelsIt(string failed)
+    {
+        foreach (int chunkSize in ChunkSizes)
+        {
+            GatedConnection inner = new(Encoding.Latin1.GetBytes(failed), chunkSize, 1) { StallsWritesOnceReleased = true };
+            HttpContinueWaitConnection connection = await PastTheWaitAsync(inner);
+
+            Assert.IsTrue(await connection.SendUnlessStoppedAsync("a"u8.ToArray(), CancellationToken.None), $"Chunk size {chunkSize}");
+            Assert.IsFalse(await connection.SendUnlessStoppedAsync("b"u8.ToArray(), CancellationToken.None), $"Chunk size {chunkSize}");
+            Assert.AreEqual("a", Encoding.Latin1.GetString(inner.Written), $"Chunk size {chunkSize}");
+            Assert.AreEqual(failed, await ReadAllAsync(connection), $"Chunk size {chunkSize}");
+        }
+    }
+
+    [TestMethod]
+    [DataRow("HTTP/1.1 100 Continue\r\n\r\n", DisplayName = "100 Continue after the wait")]
+    [DataRow("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n", DisplayName = "200")]
+    [DataRow("HTTP/1.1 299 Odd\r\nContent-Length: 0\r\n\r\n", DisplayName = "299, the highest that does not stop")]
+    public async Task SendUnlessStoppedAsync_Below300_LetsTheWriteFinish(string response)
+    {
+        GatedConnection inner = new(Encoding.Latin1.GetBytes(response), 65536, 1);
+        HttpContinueWaitConnection connection = await PastTheWaitAsync(inner);
+
+        Assert.IsTrue(await connection.SendUnlessStoppedAsync("a"u8.ToArray(), CancellationToken.None));
+        Assert.AreEqual(response, await ReadAllAsync(connection));
+        Assert.IsTrue(await connection.SendUnlessStoppedAsync("b"u8.ToArray(), CancellationToken.None));
+
+        Assert.IsFalse(connection.StopsSending);
+        Assert.AreEqual("ab", Encoding.Latin1.GetString(inner.Written));
+    }
+
+    [TestMethod]
+    public async Task SendUnlessStoppedAsync_Cancelled_Throws()
+    {
+        GatedConnection inner = new(Encoding.Latin1.GetBytes(Final), 65536, 1) { StallsWritesOnceReleased = true };
+        HttpContinueWaitConnection connection = await PastTheWaitAsync(inner);
+        await inner.WriteAsync("a"u8.ToArray(), CancellationToken.None);
+        using CancellationTokenSource cancellation = new();
+
+        Task<bool> send = connection.SendUnlessStoppedAsync("b"u8.ToArray(), cancellation.Token).AsTask();
+        await cancellation.CancelAsync();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => send);
+    }
+
+    /// <summary>
+    /// Wraps <paramref name="inner" /> and lets its wait for <c>100 Continue</c> run out.
+    /// </summary>
+    private static async Task<HttpContinueWaitConnection> PastTheWaitAsync(GatedConnection inner)
+    {
+        FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
+        HttpContinueWaitConnection connection = new(inner);
+        Task<bool> wait = connection.WaitForContinueAsync(time, CancellationToken.None).AsTask();
+        await time.FirstTimerCreated;
+        time.Advance(HttpContinueWaitConnection.ContinueWait);
+        Assert.IsTrue(await wait);
+        return connection;
     }
 
     private static ScriptedConnection Connection(string response, int chunkSize) =>

@@ -1,6 +1,8 @@
 using System.Collections.Frozen;
 using System.ComponentModel;
+using System.Net;
 using System.Net.Security;
+using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
 
 namespace Curl.Networking;
@@ -22,13 +24,35 @@ internal static class TlsFailureMessages
     private const string SchannelCaCertificateFileAnchorsNothing =
         "schannel: the certificate or certificate chain is based on an untrusted root";
 
-    private const string SchannelNameMismatch = "schannel: CertFindExtension() returned no extension.";
+    // With --cacert curl's Schannel build builds the chain itself and names the first of
+    // these trust errors it finds, in this order (BL-150, measured; BL-368).
+    private const string SchannelChainNotTimeValid =
+        "schannel: this certificate or one of the certificates in the certificate chain is not time valid";
+
+    private const string SchannelChainIncomplete = "schannel: the certificate chain is incomplete";
+
+    private const string SchannelRevocationStatusUnknown = "schannel: the revocation status is unknown";
+
+    // The Schannel build with --cacert checks the name itself (BL-150, measured): an IP
+    // literal against a certificate with no subjectAltName extension, an IP literal against
+    // one with it (no message of its own, so libcurl's text for exit 60), and a host name.
+    private const string SchannelIpAddressWithoutAlternativeNames = "schannel: CertFindExtension() returned no extension.";
+
+    private const string SchannelIpAddressNotAmongAlternativeNames = "SSL peer certificate or SSH remote key was not OK";
+
+    // Without --cacert, Schannel checks the name and says so with its own status.
+    private const string SchannelWrongPrincipal =
+        "schannel: SNI or certificate check failed: SEC_E_WRONG_PRINCIPAL (0x80090322) - The target principal name is incorrect.";
 
     // What curl's Schannel build reports when the connection closes during the handshake,
     // where there is no security status to name.
     private const string SchannelHandshakeNotReceived = "schannel: failed to receive handshake, SSL/TLS connection failed";
 
     private const string OpenSslErrorStringPrefix = "error:";
+
+    // What the OpenSSL build reports when the server closes mid-handshake (BL-150, measured);
+    // .NET sees the end of the stream before OpenSSL does, so no exception carries it.
+    private const string OpenSslUnexpectedEof = "error:0A000126:SSL routines::unexpected eof while reading";
 
     // The SEC_E_* names curl's Schannel build prints for a security status; any other is
     // "Unknown error", as curl's own table falls back to.
@@ -54,52 +78,133 @@ internal static class TlsFailureMessages
         [unchecked((int)0x80090331)] = "SEC_E_ALGORITHM_MISMATCH",
     }.ToFrozenDictionary();
 
+    // A socket error during the handshake is curl's "Recv failure: " and the error as each
+    // build names it: its own Winsock table in the Schannel build, strerror in the OpenSSL
+    // build (BL-369, measured; ADR-0088). Any other socket error's own message stands in.
+    private static readonly FrozenDictionary<SocketError, string> SchannelSocketErrorTexts = new Dictionary<SocketError, string>
+    {
+        [SocketError.ConnectionReset] = "Connection was reset",
+        [SocketError.ConnectionAborted] = "Connection was aborted",
+    }.ToFrozenDictionary();
+
+    private static readonly FrozenDictionary<SocketError, string> OpenSslSocketErrorTexts = new Dictionary<SocketError, string>
+    {
+        [SocketError.ConnectionReset] = "Connection reset by peer",
+    }.ToFrozenDictionary();
+
     /// <summary>
     /// The Schannel build's message for exit 60: the server certificate or its host name
     /// did not verify.
     /// </summary>
     /// <param name="errors">What the verification found wrong.</param>
+    /// <param name="chain">The chain built for the server certificate, if one was presented.</param>
+    /// <param name="targetHost">The host the certificate was checked against, IPv6 without brackets.</param>
     /// <param name="hasCaCertificateFile">
     /// <see langword="true" /> when <c>--cacert</c> replaced the system store.
     /// </param>
     /// <returns>The message curl prints.</returns>
-    public static string SchannelPeerFailedVerification(SslPolicyErrors errors, bool hasCaCertificateFile)
+    /// <remarks>
+    /// A chain failure is reported before a name mismatch. With <c>--cacert</c> it names the
+    /// first of a certificate out of its validity period, an incomplete chain, an untrusted
+    /// root and an unknown revocation status; without it, every chain failure that reaches
+    /// exit 60 is an untrusted root (see <see cref="IsSchannelCertificateExpired" /> for the
+    /// one that does not). Without <c>--cacert</c> a name mismatch is Schannel's
+    /// <c>SEC_E_WRONG_PRINCIPAL</c>; with it, curl's own check names the host, or for an IP
+    /// literal whether the certificate has a subjectAltName extension.
+    /// </remarks>
+    public static string SchannelPeerFailedVerification(
+        SslPolicyErrors errors,
+        X509Chain? chain,
+        string targetHost,
+        bool hasCaCertificateFile)
     {
-        if (errors == SslPolicyErrors.RemoteCertificateNameMismatch)
+        if (errors != SslPolicyErrors.RemoteCertificateNameMismatch)
         {
-            return SchannelNameMismatch;
+            return hasCaCertificateFile ? SchannelCaCertificateFileChainError(chain) : SchannelUntrustedRoot;
         }
 
-        return hasCaCertificateFile ? SchannelCaCertificateFileAnchorsNothing : SchannelUntrustedRoot;
+        if (!hasCaCertificateFile)
+        {
+            return SchannelWrongPrincipal;
+        }
+
+        if (ToIpAddressFamily(targetHost) is null)
+        {
+            return $"schannel: CertGetNameString() failed to match connection hostname ({targetHost}) against server certificate names";
+        }
+
+        return FindAlternativeNames(chain!.ChainElements[0].Certificate) is null
+            ? SchannelIpAddressWithoutAlternativeNames
+            : SchannelIpAddressNotAmongAlternativeNames;
     }
 
     /// <summary>
-    /// The OpenSSL build's message for exit 60: the chain did not verify, reported as
-    /// OpenSSL's verify result, or it did and the host name did not match.
+    /// The Schannel build's message for exit 35 when the system store's check finds the
+    /// server certificate out of its validity period, measured against
+    /// <c>https://expired.badssl.com/</c>: Schannel fails the handshake itself with
+    /// <c>SEC_E_CERT_EXPIRED</c>, which it also returns for a certificate not yet valid.
+    /// </summary>
+    public const string SchannelCertificateExpired =
+        "schannel: next InitializeSecurityContext failed: SEC_E_CERT_EXPIRED (0x80090328) - The received certificate has expired.";
+
+    /// <summary>
+    /// Whether the Schannel build, checking against the system store, fails the handshake
+    /// with <see cref="SchannelCertificateExpired" /> (exit 35) rather than exit 60: the
+    /// chain is trusted and the host name matches, but a certificate in it is out of its
+    /// validity period.
     /// </summary>
     /// <param name="errors">What the verification found wrong.</param>
     /// <param name="chain">The chain built for the server certificate, if one was presented.</param>
-    /// <param name="targetHost">The host the certificate was checked against.</param>
+    /// <returns><see langword="true" /> when being out of date is the only thing wrong.</returns>
+    public static bool IsSchannelCertificateExpired(SslPolicyErrors errors, X509Chain? chain) =>
+        errors == SslPolicyErrors.RemoteCertificateChainErrors && ChainStatus(chain) == X509ChainStatusFlags.NotTimeValid;
+
+    /// <summary>
+    /// The OpenSSL build's message for exit 60: the host name did not match, or it did and
+    /// the chain did not verify, reported as OpenSSL's verify result.
+    /// </summary>
+    /// <param name="errors">What the verification found wrong.</param>
+    /// <param name="chain">The chain built for the server certificate, if one was presented.</param>
+    /// <param name="targetHost">The host the certificate was checked against, IPv6 without brackets.</param>
     /// <returns>The message curl prints.</returns>
+    /// <remarks>
+    /// curl checks the name first, so a name mismatch is reported even when the chain also
+    /// failed (BL-150, measured). A certificate with DNS or IP subjectAltName entries is
+    /// matched against those alone, and the message names the kind of target; one without
+    /// is matched against its common name.
+    /// </remarks>
     public static string OpenSslPeerFailedVerification(SslPolicyErrors errors, X509Chain? chain, string targetHost)
     {
-        if (errors == SslPolicyErrors.RemoteCertificateNameMismatch)
+        if (!errors.HasFlag(SslPolicyErrors.RemoteCertificateNameMismatch))
         {
-            var subjectName = chain!.ChainElements[0].Certificate.GetNameInfo(X509NameType.SimpleName, forIssuer: false);
-            return $"SSL: certificate subject name '{subjectName}' does not match target hostname '{targetHost}'";
+            return $"SSL certificate OpenSSL verify result: {OpenSslVerifyError(chain)}";
         }
 
-        return $"SSL certificate OpenSSL verify result: {OpenSslVerifyError(chain)}";
+        var certificate = chain!.ChainElements[0].Certificate;
+        var shownHost = ToIpAddressFamily(targetHost) == AddressFamily.InterNetworkV6 ? $"[{targetHost}]" : targetHost;
+        if (HasDnsOrIpAlternativeNames(certificate))
+        {
+            return $"SSL: no alternative certificate subject name matches target {DescribeTarget(targetHost)} '{shownHost}'";
+        }
+
+        var subjectName = certificate.GetNameInfo(X509NameType.SimpleName, forIssuer: false);
+        return $"SSL: certificate subject name '{subjectName}' does not match target hostname '{shownHost}'";
     }
 
     /// <summary>
     /// The Schannel build's message for exit 35: the handshake failed for a reason other
-    /// than verification, named by the security status Schannel returned.
+    /// than verification, named by the security status Schannel returned, or by the socket
+    /// error when the connection failed under it.
     /// </summary>
     /// <param name="exception">What the handshake threw.</param>
     /// <returns>The message curl prints.</returns>
     public static string SchannelSslConnectError(Exception exception)
     {
+        if (RecvFailure(exception, SchannelSocketErrorTexts) is { } recvFailure)
+        {
+            return recvFailure;
+        }
+
         var securityStatus = FindInnerException<Win32Exception>(exception);
         if (securityStatus is null)
         {
@@ -117,11 +222,19 @@ internal static class TlsFailureMessages
     /// </summary>
     /// <param name="exception">What the handshake threw.</param>
     /// <returns>
-    /// The message curl prints; when no OpenSSL error string is in the exception, the
-    /// innermost exception's message stands in for it.
+    /// The message curl prints. A socket error, such as the server resetting the connection,
+    /// is curl's <c>Recv failure</c> line. Otherwise, when no OpenSSL error string is in the
+    /// exception, a bare <see cref="IOException" /> innermost, which is how
+    /// <see cref="SslStream" /> reports the server closing mid-handshake, is OpenSSL's
+    /// unexpected-EOF error string; any other innermost exception's message stands in for one.
     /// </returns>
     public static string OpenSslSslConnectError(Exception exception)
     {
+        if (RecvFailure(exception, OpenSslSocketErrorTexts) is { } recvFailure)
+        {
+            return recvFailure;
+        }
+
         var innermost = exception;
         for (var current = exception; current is not null; current = current.InnerException)
         {
@@ -133,7 +246,9 @@ internal static class TlsFailureMessages
             innermost = current;
         }
 
-        return $"TLS connect error: {innermost.Message}";
+        return innermost.GetType() == typeof(IOException)
+            ? $"TLS connect error: {OpenSslUnexpectedEof}"
+            : $"TLS connect error: {innermost.Message}";
     }
 
     /// <summary>
@@ -162,6 +277,28 @@ internal static class TlsFailureMessages
     /// <returns>The message curl prints.</returns>
     public static string SchannelClientCertificateNotFound(string clientCertificateFile) =>
         $"schannel: Failed to get certificate location or file for {clientCertificateFile}";
+
+    /// <summary>
+    /// The Schannel build's message for exit 58 when the store a <c>--cert</c> store path
+    /// names does not open, measured 2026-09-27 for <c>CurrentUser\NOSUCHSTORE\…</c>.
+    /// </summary>
+    /// <param name="storeLocationFlag">The location's <c>CERT_SYSTEM_STORE_*</c> flag, printed in lowercase hex.</param>
+    /// <param name="storeName">The store name as written.</param>
+    /// <returns>The message curl prints.</returns>
+    public static string SchannelCertificateStoreNotOpened(int storeLocationFlag, string storeName) =>
+        $"schannel: Failed to open cert store {storeLocationFlag:x} {storeName}, last error is 0x00000002";
+
+    /// <summary>
+    /// The Schannel build's message for exit 58 when no certificate in the store has the
+    /// <c>--cert</c> store path's thumbprint, measured 2026-09-27.
+    /// </summary>
+    public const string SchannelClientCertificateNotInStore = "schannel: client cert not found in cert store";
+
+    /// <summary>
+    /// curl's own text for exit 58, printed when the failure has no message of its own, as
+    /// for a <c>--cert</c> store path whose thumbprint is not hex (measured 2026-09-27).
+    /// </summary>
+    public const string SslCertProblem = "Problem with the local SSL certificate";
 
     /// <summary>
     /// The Schannel build's message for exit 58 when the <c>--cert</c> file is empty.
@@ -344,9 +481,32 @@ internal static class TlsFailureMessages
             return "unable to get local issuer certificate (20)";
         }
 
-        var status = chain.ChainStatus.Aggregate(X509ChainStatusFlags.NoError, (all, next) => all | next.Status);
-        return status == X509ChainStatusFlags.NotTimeValid ? OpenSslValidityError(chain) : OpenSslTrustError(chain);
+        return ChainStatus(chain) == X509ChainStatusFlags.NotTimeValid ? OpenSslValidityError(chain) : OpenSslTrustError(chain);
     }
+
+    // curl's Schannel build checks the chain's trust errors in this order. An untrusted root
+    // is also what anything else, or no chain at all, is reported as.
+    private static string SchannelCaCertificateFileChainError(X509Chain? chain)
+    {
+        var status = ChainStatus(chain);
+        if (status.HasFlag(X509ChainStatusFlags.NotTimeValid))
+        {
+            return SchannelChainNotTimeValid;
+        }
+
+        if (status.HasFlag(X509ChainStatusFlags.PartialChain))
+        {
+            return SchannelChainIncomplete;
+        }
+
+        var untrustedOrUnknown = status & (X509ChainStatusFlags.UntrustedRoot | X509ChainStatusFlags.RevocationStatusUnknown);
+        return untrustedOrUnknown == X509ChainStatusFlags.RevocationStatusUnknown
+            ? SchannelRevocationStatusUnknown
+            : SchannelCaCertificateFileAnchorsNothing;
+    }
+
+    private static X509ChainStatusFlags ChainStatus(X509Chain? chain) =>
+        chain?.ChainStatus.Aggregate(X509ChainStatusFlags.NoError, (all, next) => all | next.Status) ?? X509ChainStatusFlags.NoError;
 
     private static string OpenSslTrustError(X509Chain chain)
     {
@@ -368,6 +528,36 @@ internal static class TlsFailureMessages
         return outOfDate.NotBefore > chain.ChainPolicy.VerificationTime
             ? "certificate is not yet valid (9)"
             : "certificate has expired (10)";
+    }
+
+    private static AddressFamily? ToIpAddressFamily(string host) =>
+        IPAddress.TryParse(host, out var address) ? address.AddressFamily : null;
+
+    private static string DescribeTarget(string host) => ToIpAddressFamily(host) switch
+    {
+        null => "hostname",
+        AddressFamily.InterNetworkV6 => "ipv6 address",
+        _ => "ipv4 address",
+    };
+
+    private static X509SubjectAlternativeNameExtension? FindAlternativeNames(X509Certificate2 certificate) =>
+        certificate.Extensions.OfType<X509SubjectAlternativeNameExtension>().FirstOrDefault();
+
+    // curl's OpenSSL build falls back to the common name only when the subjectAltName
+    // extension holds no DNS name and no IP address.
+    private static bool HasDnsOrIpAlternativeNames(X509Certificate2 certificate)
+    {
+        var alternativeNames = FindAlternativeNames(certificate);
+        return alternativeNames is not null
+            && (alternativeNames.EnumerateDnsNames().Any() || alternativeNames.EnumerateIPAddresses().Any());
+    }
+
+    private static string? RecvFailure(Exception exception, FrozenDictionary<SocketError, string> socketErrorTexts)
+    {
+        var socketError = FindInnerException<SocketException>(exception);
+        return socketError is null
+            ? null
+            : $"Recv failure: {socketErrorTexts.GetValueOrDefault(socketError.SocketErrorCode, socketError.Message)}";
     }
 
     private static T? FindInnerException<T>(Exception exception)

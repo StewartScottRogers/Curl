@@ -14,7 +14,9 @@ namespace Curl.Console;
 /// the CONNECT tunnel opened by a real <see cref="TcpConnector" /> over a
 /// <see cref="ScriptedTcpDialer" />. Every expected byte was measured on 2026-09-27 with
 /// curl 8.21.0 (mingw, Schannel) against <c>Record-CurlExchange.ps1</c> or a loopback proxy
-/// answering CONNECT with <c>200 Connection established</c> (BL-238 Notes).
+/// answering CONNECT with <c>200 Connection established</c> (BL-238 Notes). The SOCKS5 bytes
+/// were measured the same way against a loopback SOCKS5 proxy answering <c>05 00</c>, and the
+/// HTTPS-proxy CONNECT bytes inside the proxy's TLS by BL-266 (BL-328 Notes).
 /// </summary>
 [TestClass]
 public sealed class CurlCompositionProxyTests
@@ -33,6 +35,8 @@ public sealed class CurlCompositionProxyTests
 
     private static readonly ConnectTarget Proxy = new("127.0.0.1", 18238, false);
 
+    private static readonly ConnectTarget ForwardProxy = Proxy with { PoolScheme = "http", IsForwardProxy = true };
+
     [TestMethod]
     public async Task RunAsync_HttpUrlWithProxyOption_ForwardsTheRequestInAbsoluteFormToTheProxy()
     {
@@ -42,7 +46,7 @@ public sealed class CurlCompositionProxyTests
 
         Assert.AreEqual(0, run.ExitCode);
         Assert.AreEqual(ForwardedGet, Latin1(server.Written));
-        Assert.AreEqual(Proxy, server.Targets.Single());
+        Assert.AreEqual(ForwardProxy, server.Targets.Single());
         Assert.AreEqual("hello", run.StandardOutput);
     }
 
@@ -80,7 +84,7 @@ public sealed class CurlCompositionProxyTests
 
         Assert.AreEqual(0, run.ExitCode);
         Assert.AreEqual(ForwardedGet, Latin1(server.Written));
-        Assert.AreEqual(Proxy, server.Targets.Single());
+        Assert.AreEqual(ForwardProxy, server.Targets.Single());
     }
 
     [TestMethod]
@@ -94,7 +98,41 @@ public sealed class CurlCompositionProxyTests
         Assert.AreEqual(
             "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18238\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
             Latin1(server.Written));
-        Assert.AreEqual(Proxy, server.Targets.Single());
+        Assert.AreEqual(Proxy with { PoolScheme = "http" }, server.Targets.Single());
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RedirectToANoProxyHost_SendsTheSecondRequestDirectly()
+    {
+        // Measured (BL-329 Notes): curl 8.21.0 sends "GET http://a.test/" to the proxy, then
+        // "GET / HTTP/1.1" with "Host: b.test:18329" straight to b.test.
+        ScriptedConnector server = new([Latin1(RedirectTo("http://b.test:18329/")), Latin1(Hello)]);
+
+        Run run = await RunAsync(server, "-sS", "-L", "-x", "127.0.0.1:18238", "--noproxy", "b.test", "http://a.test/");
+
+        Assert.AreEqual(0, run.ExitCode);
+        Assert.AreEqual(
+            "GET http://a.test/ HTTP/1.1\r\nHost: a.test\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\n\r\n"
+            + "GET / HTTP/1.1\r\nHost: b.test:18329\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
+            Latin1(server.Written));
+        Assert.AreEqual(ForwardProxy, server.Targets[0]);
+        Assert.AreEqual(("b.test", 18329, false, (ProxyEndpoint?)null), RouteOf(server.Targets[1]));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RedirectFromHttpToHttpsWithOnlyHttpProxySet_ConnectsToTheHttpsHostDirectly()
+    {
+        // Measured (BL-329 Notes): with only http_proxy set, curl 8.21.0 forwards the http
+        // request to the proxy, then opens TLS straight to b.test with no CONNECT.
+        ScriptedConnector server = new([Latin1(RedirectTo("https://b.test:18329/")), Latin1(Hello)]);
+        Dictionary<string, string> environment = new() { ["http_proxy"] = "http://127.0.0.1:18238" };
+
+        Run run = await RunAsync(server, environment, "-sS", "-L", "http://a.test/");
+
+        Assert.AreEqual(0, run.ExitCode);
+        Assert.AreEqual(ForwardProxy, server.Targets[0]);
+        Assert.AreEqual(("b.test", 18329, true, (ProxyEndpoint?)null), RouteOf(server.Targets[1]));
+        StringAssert.EndsWith(Latin1(server.Written), "GET / HTTP/1.1\r\nHost: b.test:18329\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n");
     }
 
     [TestMethod]
@@ -172,23 +210,53 @@ public sealed class CurlCompositionProxyTests
     }
 
     [TestMethod]
-    [DataRow(new[] { "--socks5", "127.0.0.1:18238", "http://example.com/a" }, "127.0.0.1:18238", "Socks5", DisplayName = "--socks5")]
-    [DataRow(new[] { "-x", "https://127.0.0.1:18238", "https://example.com/a" }, "127.0.0.1:18238", "Https", DisplayName = "https proxy, https URL")]
-    [DataRow(new[] { "-p", "-x", "https://127.0.0.1:18238", "http://example.com/a" }, "127.0.0.1:18238", "Https", DisplayName = "https proxy, -p")]
-    [DataRow(new[] { "-L", "-x", "https://127.0.0.1:18238", "http://example.com/a" }, "127.0.0.1:18238", "Https", DisplayName = "https proxy, -L")]
-    [DataRow(new[] { "--socks5", "127.0.0.1:1", "dict://example.com/d:x" }, "127.0.0.1:1", "Socks5", DisplayName = "--socks5, dict URL")]
-    [DataRow(new[] { "-x", "https://127.0.0.1:18238", "gopher://example.com/" }, "127.0.0.1:18238", "Https", DisplayName = "https proxy, gopher URL")]
-    public async Task RunAsync_TunnelTheConnectorCannotOpenYet_ExitsFourWithoutConnecting(string[] arguments, string proxy, string kind)
+    [DataRow("--socks5", new byte[] { 5, 1, 0, 1, 127, 0, 0, 1, 0, 80 }, DisplayName = "--socks5")]
+    [DataRow("--socks5-hostname", new byte[] { 5, 1, 0, 3, 11, (byte)'e', (byte)'x', (byte)'a', (byte)'m', (byte)'p', (byte)'l', (byte)'e', (byte)'.', (byte)'c', (byte)'o', (byte)'m', 0, 80 }, DisplayName = "--socks5-hostname")]
+    public async Task RunAsync_Socks5Option_SendsCurlsGreetingAndConnectRequestThenTheRequestThroughTheTunnel(string option, byte[] connectRequest)
     {
-        ScriptedConnector server = new([Latin1(Hello)]);
+        ScriptedConnector server = new([[5, 0], [5, 0, 0, 1, 127, 0, 0, 1, 0, 80], Latin1(Hello)]);
 
-        Run run = await RunAsync(server, ["-sS", .. arguments]);
+        Run run = await RunThroughTcpConnectorAsync(server, "-sS", option, "127.0.0.1:18238", "http://example.com/a");
 
-        Assert.AreEqual(4, run.ExitCode);
+        Assert.AreEqual(0, run.ExitCode);
+        CollectionAssert.AreEqual(
+            (byte[])[5, 2, 0, 1, .. connectRequest, .. Latin1(TunnelledGet)],
+            server.Written);
+        Assert.AreEqual(Proxy, server.Targets.Single());
+        Assert.AreEqual("hello", run.StandardOutput);
+    }
+
+    [TestMethod]
+    [DataRow(new[] { "-x", "https://127.0.0.1:18238", "https://example.com/a" }, 443, DisplayName = "https URL")]
+    [DataRow(new[] { "-p", "-x", "https://127.0.0.1:18238", "http://example.com/a" }, 80, DisplayName = "-p, http URL")]
+    public async Task RunAsync_HttpsProxyTunnel_SendsConnectOverTlsThenTheRequestThroughTheTunnel(string[] arguments, int port)
+    {
+        ScriptedConnector server = new([Latin1(ConnectionEstablished), Latin1(Hello)]);
+
+        Run run = await RunThroughTcpConnectorAsync(server, ["-sS", .. arguments]);
+
+        Assert.AreEqual(0, run.ExitCode);
         Assert.AreEqual(
-            $"curl: (4) Unsupported proxy '{proxy}', Curl cannot tunnel through a {kind} proxy yet{Environment.NewLine}",
-            run.StandardError);
-        Assert.AreEqual(0, server.Targets.Count);
+            $"CONNECT example.com:{port} HTTP/1.1\r\nHost: example.com:{port}\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n\r\n"
+            + TunnelledGet,
+            Latin1(server.Written));
+        Assert.AreEqual(Proxy, server.Targets.Single());
+        Assert.AreEqual("hello", run.StandardOutput);
+    }
+
+    [TestMethod]
+    [DataRow(new[] { "--socks5", "127.0.0.1:1", "dict://example.com/d:x" }, ProxyKind.Socks5, DisplayName = "--socks5, dict URL")]
+    [DataRow(new[] { "-x", "https://127.0.0.1:1", "gopher://example.com/" }, ProxyKind.Https, DisplayName = "https proxy, gopher URL")]
+    [DataRow(new[] { "--socks4a", "127.0.0.1:1", "https://example.com/a" }, ProxyKind.Socks4a, DisplayName = "--socks4a, https URL")]
+    [DataRow(new[] { "-L", "--socks4", "127.0.0.1:1", "http://example.com/a" }, ProxyKind.Socks4, DisplayName = "--socks4, -L")]
+    public async Task RunAsync_SocksOrHttpsProxyForATunnelledUrl_ConnectTargetCarriesTheProxy(string[] arguments, ProxyKind kind)
+    {
+        RecordingConnector connector = new(CurlExitCode.CouldntConnect, "refused");
+
+        await RunAsync(connector, new Dictionary<string, string>(), ["-sS", .. arguments]);
+
+        ProxyEndpoint proxy = connector.Targets.Single().Proxy!;
+        Assert.AreEqual((kind, "127.0.0.1", 1), (proxy.Kind, proxy.Host, proxy.Port));
     }
 
     [TestMethod]
@@ -200,22 +268,19 @@ public sealed class CurlCompositionProxyTests
 
         Assert.AreEqual(0, run.ExitCode);
         Assert.AreEqual(ForwardedGet, Latin1(server.Written));
-        Assert.AreEqual(new ConnectTarget("127.0.0.1", 18238, true), server.Targets.Single());
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 18238, true) { PoolScheme = "http", IsForwardProxy = true }, server.Targets.Single());
     }
 
     [TestMethod]
-    public async Task RunAsync_SocksProxyEnvironmentVariableForAnotherScheme_ExitsFourWithoutConnecting()
+    public async Task RunAsync_SocksProxyEnvironmentVariableForAnotherScheme_ConnectTargetCarriesTheProxy()
     {
-        ScriptedConnector server = new([Latin1("hello")]);
+        RecordingConnector connector = new(CurlExitCode.CouldntConnect, "refused");
         Dictionary<string, string> environment = new() { ["all_proxy"] = "socks5://127.0.0.1:1" };
 
-        Run run = await RunAsync(server, environment, "-sS", "telnet://127.0.0.1:18238");
+        await RunAsync(connector, environment, ["-sS", "telnet://127.0.0.1:18238"]);
 
-        Assert.AreEqual(4, run.ExitCode);
-        Assert.AreEqual(
-            $"curl: (4) Unsupported proxy '127.0.0.1:1', Curl cannot tunnel through a Socks5 proxy yet{Environment.NewLine}",
-            run.StandardError);
-        Assert.AreEqual(0, server.Targets.Count);
+        ProxyEndpoint proxy = connector.Targets.Single().Proxy!;
+        Assert.AreEqual((ProxyKind.Socks5, "127.0.0.1", 1), (proxy.Kind, proxy.Host, proxy.Port));
     }
 
     [TestMethod]
@@ -229,6 +294,21 @@ public sealed class CurlCompositionProxyTests
         Assert.AreEqual(0, run.ExitCode);
         Assert.StartsWith(
             "CONNECT example.com:80 HTTP/1.1\r\nHost: example.com:80\r\nUser-Agent: agent/1.0\r\nProxy-Connection: Keep-Alive\r\n\r\n",
+            Latin1(server.Written));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_ProxyTunnelWithProxyHeaderAndHeader_ConnectRequestCarriesOnlyTheProxyHeader()
+    {
+        // curl -s -x http://127.0.0.1:18336 -p --proxy-header "X-P: 1" -H "X-A: 1" http://example.com/ (BL-347 Notes)
+        ScriptedConnector server = new([Latin1(ConnectionEstablished), Latin1(Hello)]);
+        string[] arguments = ["-sS", "-p", "--proxy-header", "X-P: 1", "-H", "X-A: 1", "-x", "127.0.0.1:18238", "http://example.com/a"];
+
+        Run run = await RunThroughTcpConnectorAsync(server, TunnelOptionsFor(arguments), arguments);
+
+        Assert.AreEqual(0, run.ExitCode);
+        Assert.StartsWith(
+            "CONNECT example.com:80 HTTP/1.1\r\nHost: example.com:80\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\nX-P: 1\r\n\r\nGET /a HTTP/1.1\r\n",
             Latin1(server.Written));
     }
 
@@ -297,7 +377,39 @@ public sealed class CurlCompositionProxyTests
 
         await RunAsync(connector, new Dictionary<string, string>(), ["-sS", "-x", "http://proxy:3128", "http://example.com/a"]);
 
-        Assert.AreEqual(new ConnectTarget("proxy", 3128, false), connector.Targets.Single());
+        Assert.AreEqual(new ConnectTarget("proxy", 3128, false) { PoolScheme = "http", IsForwardProxy = true }, connector.Targets.Single());
+    }
+
+    [TestMethod]
+    public async Task RunAsync_HttpProxyWithoutProxyTunnelForAnFtpUrl_ForwardsAnHttpGetToTheProxy()
+    {
+        ScriptedConnector server = new([Latin1(Hello)]);
+
+        Run run = await RunAsync(server, "-sS", "-x", "http://127.0.0.1:18238", "ftp://example.com/f.txt");
+
+        Assert.AreEqual(0, run.ExitCode);
+        Assert.AreEqual(
+            "GET ftp://example.com/f.txt HTTP/1.1\r\nHost: example.com:21\r\n"
+            + "User-Agent: curl/8.21.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\n\r\n",
+            Latin1(server.Written));
+        Assert.AreEqual(ForwardProxy, server.Targets.Single());
+        Assert.AreEqual("hello", run.StandardOutput);
+    }
+
+    [TestMethod]
+    [DataRow(new[] { "-sS", "-p", "-x", "http://127.0.0.1:18238", "ftp://example.com/f.txt" }, DisplayName = "-p")]
+    [DataRow(new[] { "-sS", "ftp://example.com/f.txt" }, DisplayName = "no proxy")]
+    public async Task RunAsync_FtpUrlNotForwardedThroughAnHttpProxy_ConnectsTheFtpHandlerToTheServer(string[] arguments)
+    {
+        RecordingConnector connector = new(CurlExitCode.CouldntConnect, "refused");
+
+        Run run = await RunAsync(connector, new Dictionary<string, string>(), arguments);
+
+        Assert.AreEqual((int)CurlExitCode.CouldntConnect, run.ExitCode);
+        ConnectTarget target = connector.Targets.Single();
+        Assert.AreEqual("example.com", target.Host);
+        Assert.AreEqual(21, target.Port);
+        Assert.IsFalse(target.IsForwardProxy);
     }
 
     private static Task<Run> RunAsync(ScriptedConnector server, params string[] arguments) =>
@@ -345,6 +457,12 @@ public sealed class CurlCompositionProxyTests
 
         return new Run(exitCode, Latin1(standardOutput.ToArray()), Latin1(standardError.ToArray()));
     }
+
+    private static string RedirectTo(string location) =>
+        $"HTTP/1.1 302 Found\r\nLocation: {location}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+
+    private static (string Host, int Port, bool UseTls, ProxyEndpoint? Proxy) RouteOf(ConnectTarget target) =>
+        (target.Host, target.Port, target.UseTls, target.Proxy);
 
     private static string Latin1(byte[] bytes) => Encoding.Latin1.GetString(bytes);
 

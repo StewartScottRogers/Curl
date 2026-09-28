@@ -18,12 +18,16 @@ public sealed class CommandLineOptions
     private readonly List<UrlOutput> urlOutputs = [];
     private readonly List<string> uploadFiles = [];
     private readonly List<string> telnetOptions = [];
+    private readonly List<string> quoteCommands = [];
     private readonly List<string> resolveEntries = [];
     private readonly List<string> connectToEntries = [];
     private readonly List<string> headers = [];
+    private readonly List<string> proxyHeaders = [];
     private readonly List<CommandLineCookie> cookies = [];
     private readonly List<string> warningLines = [];
+    private readonly List<string?> configFileHelpSubjects = [];
     private readonly List<FormPartSpecification> formParts = [];
+    private readonly Dictionary<string, byte[]> variables = new(StringComparer.Ordinal);
     private readonly Stack<FormPartSpecification> openMultiparts = new();
     private string? userAwaitingPassword;
     private string? proxyUserAwaitingPassword;
@@ -56,6 +60,69 @@ public sealed class CommandLineOptions
     /// line in a <c>-K</c> file does not set it: curl ignores it there.
     /// </summary>
     public bool VersionRequested { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>-h</c> / <c>--help</c> was given on the command line. Parsing stops
+    /// there, as curl 8.21.0's does, so every option after it is unread; the console prints
+    /// <see cref="CurlHelpText"/>'s lines for <see cref="HelpSubject"/> and exits 0 instead of transferring.
+    /// A <c>help</c> line in a <c>-K</c> file does not set it: curl prints that page and carries on, so it
+    /// goes to <see cref="ConfigFileHelpSubjects"/> instead.
+    /// </summary>
+    public bool HelpRequested { get; private set; }
+
+    /// <summary>
+    /// The subject <c>--help</c> was given: its attached value, or else the argument after it, whatever
+    /// it looks like; <see langword="null"/> when there was none or it was empty, which asks for the
+    /// usage page. Set only with <see cref="HelpRequested"/>.
+    /// </summary>
+    public string? HelpSubject { get; private set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>-M</c> / <c>--manual</c> was given on the command line and no
+    /// <c>--no-manual</c> came after it. Parsing stops there, as curl 8.21.0's does; the console prints
+    /// <see cref="CurlManual"/>'s lines and exits 0 instead of transferring. A <c>manual</c> line in a
+    /// <c>-K</c> file does not set it: curl ignores it there.
+    /// </summary>
+    public bool ManualRequested { get; internal set; }
+
+    /// <summary>
+    /// Whether an option has asked for information instead of a transfer (<see cref="VersionRequested"/>,
+    /// <see cref="HelpRequested"/> or <see cref="ManualRequested"/>), which ends parsing where it stands.
+    /// </summary>
+    internal bool InformationRequested => VersionRequested || HelpRequested || ManualRequested;
+
+    /// <summary>Records <c>--help</c> and its subject, an empty one read as none.</summary>
+    /// <param name="subject">The subject as given, empty when there was none.</param>
+    internal void RequestHelp(string subject)
+    {
+        HelpRequested = true;
+        HelpSubject = subject.Length == 0 ? null : subject;
+    }
+
+    /// <summary>
+    /// The subjects of the <c>help</c> / <c>-h</c> lines read from <c>-K</c> files, in the order read;
+    /// a <see langword="null"/> entry asks for the usage page. curl 8.21.0 prints each page on standard
+    /// output as it reads the line and carries on parsing, so the console prints these pages before
+    /// anything else (measured 2026-09-27, BL-375).
+    /// </summary>
+    internal IReadOnlyList<string?> ConfigFileHelpSubjects => configFileHelpSubjects;
+
+    /// <summary>
+    /// Moves a help request made by a <c>-K</c> file line to <see cref="ConfigFileHelpSubjects"/>, and
+    /// forgets any request for information, as curl does for one made in a <c>-K</c> file.
+    /// </summary>
+    internal void MoveConfigFileInformationRequests()
+    {
+        if (HelpRequested)
+        {
+            configFileHelpSubjects.Add(HelpSubject);
+        }
+
+        VersionRequested = false;
+        HelpRequested = false;
+        HelpSubject = null;
+        ManualRequested = false;
+    }
 
     /// <summary><see langword="true"/> when <c>-s</c> / <c>--silent</c> was given and no <c>--no-silent</c> came after it.</summary>
     public bool Silent { get; internal set; }
@@ -311,6 +378,31 @@ public sealed class CommandLineOptions
     /// <summary><see langword="true"/> when <c>--tftp-no-options</c> was given and no <c>--no-tftp-no-options</c> came after it.</summary>
     public bool TftpNoOptions { get; internal set; }
 
+    /// <summary><see langword="true"/> when <c>--disable-epsv</c> was given and no <c>--no-disable-epsv</c> came after it.</summary>
+    public bool FtpDisableEpsv { get; internal set; }
+
+    /// <summary>
+    /// <see langword="false"/> when <c>--no-ftp-skip-pasv-ip</c> was given and no <c>--ftp-skip-pasv-ip</c> came
+    /// after it; <see langword="true"/> otherwise, as curl 8.21.0 skips the <c>PASV</c> reply's address by default.
+    /// </summary>
+    public bool FtpSkipPasvIp { get; internal set; } = true;
+
+    /// <summary>
+    /// The last <c>--ftp-method</c> value, read without regard to case; <see cref="FtpFileMethod.MultiCwd"/> when
+    /// not given or when the last value was none of <c>multicwd</c>, <c>nocwd</c> and <c>singlecwd</c>.
+    /// </summary>
+    public FtpFileMethod FtpFileMethod { get; internal set; }
+
+    /// <summary><see langword="true"/> when <c>--ftp-create-dirs</c> was given and no <c>--no-ftp-create-dirs</c> came after it.</summary>
+    public bool FtpCreateDirectories { get; internal set; }
+
+    /// <summary><see langword="true"/> when <c>-l</c> / <c>--list-only</c> was given and no <c>--no-list-only</c> came after it.</summary>
+    public bool ListOnly { get; internal set; }
+
+    /// <summary>
+    /// Every <c>-Q</c> / <c>--quote</c> value, verbatim (prefix included, possibly empty) and in command-line order.
+    /// </summary>
+    public IReadOnlyList<string> QuoteCommands => quoteCommands;
     /// <summary>
     /// The <c>--create-file-mode</c> value, read as octal and at most <c>0777</c>;
     /// <see langword="null"/> when not given, where curl's default of <c>0644</c> applies.
@@ -320,6 +412,12 @@ public sealed class CommandLineOptions
 
     /// <summary><see langword="true"/> when <c>-k</c> / <c>--insecure</c> was given and no <c>--no-insecure</c> came after it: skip server certificate verification.</summary>
     public bool Insecure { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--ssl-no-revoke</c> was given and no <c>--no-ssl-no-revoke</c> came after it:
+    /// the Schannel build skips the certificate revocation check. curl accepts it in every build; the OpenSSL build ignores it.
+    /// </summary>
+    public bool SkipRevocationCheck { get; internal set; }
 
     /// <summary>
     /// The <c>--cacert</c> file, verbatim; <see langword="null"/> when not given. The parser has
@@ -332,6 +430,21 @@ public sealed class CommandLineOptions
     public string? CaCertificateDirectory { get; internal set; }
 
     /// <summary>
+    /// <see langword="true"/> when <c>--proxy-insecure</c> was given and no <c>--no-proxy-insecure</c> came
+    /// after it: skip verification of an HTTPS proxy's certificate. <c>-k</c> never reaches the proxy.
+    /// </summary>
+    public bool ProxyInsecure { get; internal set; }
+
+    /// <summary>
+    /// The <c>--proxy-cacert</c> file, verbatim, checked as <c>--cacert</c> is; <see langword="null"/> when
+    /// not given. It verifies an HTTPS proxy only, and <c>--cacert</c> never does. The last value wins.
+    /// </summary>
+    public string? ProxyCaCertificateFile { get; internal set; }
+
+    /// <summary>The <c>--proxy-capath</c> directory, verbatim and unchecked; <see langword="null"/> when not given. The last value wins.</summary>
+    public string? ProxyCaCertificateDirectory { get; internal set; }
+
+    /// <summary>
     /// The <c>-E</c> / <c>--cert</c> value, verbatim, with <c>certificate[:password]</c> not yet split;
     /// <see langword="null"/> when not given. The last value wins.
     /// </summary>
@@ -339,6 +452,24 @@ public sealed class CommandLineOptions
 
     /// <summary>The <c>--key</c> private key file, verbatim and unchecked; <see langword="null"/> when not given. The last value wins.</summary>
     public string? PrivateKey { get; internal set; }
+
+    /// <summary>
+    /// The <c>--cert-type</c> value (for example <c>PEM</c>, <c>DER</c> or <c>P12</c>), verbatim; the TLS layer
+    /// compares it case-insensitively. <see langword="null"/> when not given. The last value wins.
+    /// </summary>
+    public string? ClientCertificateType { get; internal set; }
+
+    /// <summary>
+    /// The <c>--key-type</c> value (for example <c>PEM</c> or <c>DER</c>), verbatim; the TLS layer compares it
+    /// case-insensitively. <see langword="null"/> when not given. The last value wins.
+    /// </summary>
+    public string? PrivateKeyType { get; internal set; }
+
+    /// <summary>
+    /// The <c>--pass</c> passphrase for the private key, verbatim; <see langword="null"/> when not given.
+    /// The last value wins.
+    /// </summary>
+    public string? Passphrase { get; internal set; }
 
     /// <summary>
     /// The lowest TLS version to accept: <see cref="SslProtocols.Tls12"/> for <c>--tlsv1.2</c> (1.2 or later),
@@ -484,6 +615,12 @@ public sealed class CommandLineOptions
     public IReadOnlyList<string> Headers => headers;
 
     /// <summary>
+    /// The <c>--proxy-header</c> values in command-line order, each verbatim, empty included,
+    /// with an <c>@file</c> value replaced by the file's non-empty lines in file order.
+    /// </summary>
+    public IReadOnlyList<string> ProxyHeaders => proxyHeaders;
+
+    /// <summary>
     /// The multipart form <c>-F</c> / <c>--form</c> and <c>--form-string</c> values describe, one
     /// top-level part per value in command-line order, parts given between <c>name=(</c> and <c>=)</c>
     /// inside the part that opened them; empty when neither option was given. A multipart part still
@@ -626,6 +763,14 @@ public sealed class CommandLineOptions
     /// <see langword="null"/> when not given. An empty value is refused as blank.
     /// </summary>
     public string? RequestTarget { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--ipfs-gateway</c>, verbatim, for <c>Curl.Core</c>'s <c>IpfsGatewayRewriter</c>;
+    /// <see langword="null"/> when not given. An empty value is refused as blank; any other value is
+    /// accepted, because curl 8.21.0 checks the gateway only when it rewrites an <c>ipfs://</c> or
+    /// <c>ipns://</c> URL, not while it reads the options.
+    /// </summary>
+    public string? IpfsGateway { get; internal set; }
 
     /// <summary>
     /// The HTTP version the last <c>-0</c> / <c>--http1.0</c> or <c>--http1.1</c> asked for;
@@ -784,6 +929,28 @@ public sealed class CommandLineOptions
     /// </summary>
     /// <param name="lines">The lines, without line terminators.</param>
     internal void AddErrorLines(IReadOnlyList<string> lines) => warningLines.AddRange(lines);
+
+    /// <summary>
+    /// Sets the <c>--variable</c> <paramref name="name"/> to <paramref name="content"/>, replacing any earlier
+    /// content, and adds curl 8.21.0's <c>Note: Overwriting variable '&lt;name&gt;'</c> line when it had some
+    /// and <c>-v</c>, <c>--trace</c> or <c>--trace-ascii</c> is in effect, <c>-s</c> or not (measured 2026-09-27).
+    /// </summary>
+    /// <param name="name">The variable's name: letters, digits and underscores, case-sensitive.</param>
+    /// <param name="content">The variable's bytes.</param>
+    internal void SetVariable(string name, byte[] content)
+    {
+        if (variables.ContainsKey(name) && Trace != TraceKind.None)
+        {
+            AddErrorLines(WrappedMessage.Lines("Note: ", $"Overwriting variable '{name}'"));
+        }
+
+        variables[name] = content;
+    }
+
+    /// <summary>Looks up the bytes of the <c>--variable</c> <paramref name="name"/>.</summary>
+    /// <param name="name">The variable's name, case-sensitive.</param>
+    /// <returns>The variable's bytes; <see langword="null"/> when no variable has that name.</returns>
+    internal byte[]? FindVariable(string name) => variables.GetValueOrDefault(name);
 
     /// <summary>Appends <paramref name="url"/> to <see cref="Urls"/>, unchanged and unvalidated.</summary>
     /// <param name="url">A positional argument or a <c>--url</c> value.</param>
@@ -991,6 +1158,10 @@ public sealed class CommandLineOptions
     /// <param name="telnetOption">A <c>-t</c> / <c>--telnet-option</c> value, possibly empty.</param>
     internal void AddTelnetOption(string telnetOption) => telnetOptions.Add(telnetOption);
 
+    /// <summary>Appends <paramref name="quoteCommand"/> to <see cref="QuoteCommands"/>, unchanged and unvalidated.</summary>
+    /// <param name="quoteCommand">A <c>-Q</c> / <c>--quote</c> value, possibly empty.</param>
+    internal void AddQuoteCommand(string quoteCommand) => quoteCommands.Add(quoteCommand);
+
     /// <summary>Appends <paramref name="entry"/> to <see cref="ResolveEntries"/>, unchanged and unvalidated.</summary>
     /// <param name="entry">A <c>--resolve</c> value, possibly empty.</param>
     internal void AddResolveEntry(string entry) => resolveEntries.Add(entry);
@@ -1006,6 +1177,10 @@ public sealed class CommandLineOptions
     /// <summary>Appends <paramref name="header"/> to <see cref="Headers"/>, unchanged and unvalidated.</summary>
     /// <param name="header">A <c>-H</c> / <c>--header</c> value, or one line of its <c>@file</c>.</param>
     internal void AddHeader(string header) => headers.Add(header);
+
+    /// <summary>Appends <paramref name="header"/> to <see cref="ProxyHeaders"/>, unchanged and unvalidated.</summary>
+    /// <param name="header">A <c>--proxy-header</c> value, or one line of its <c>@file</c>.</param>
+    internal void AddProxyHeader(string header) => proxyHeaders.Add(header);
 
     /// <summary>
     /// Appends <paramref name="part"/> to the innermost multipart part still open, or to

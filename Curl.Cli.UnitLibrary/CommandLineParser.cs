@@ -28,14 +28,18 @@ namespace Curl.Cli;
 /// A <c>-K</c> / <c>--config</c> file is read through the same reader and its lines applied in
 /// place of the option (see <see cref="ConfigFileApplier"/>). Only the overload taking a
 /// <see cref="DefaultConfigFileSearch"/> reads the default config file (<c>.curlrc</c>) first; the others
-/// never do, so what they return does not depend on the machine they run on.
+/// never do, so what they return does not depend on the machine they run on, except that a
+/// <c>--variable %name</c> reads this process's environment (ADR-0064). An option given as
+/// <c>--expand-&lt;name&gt;</c> has its value expanded by <see cref="VariableExpansion"/> first.
 /// <c>-V</c> / <c>--version</c> on the command line ends parsing where it stands, even inside a bundle,
-/// with <see cref="CommandLineParseResult.VersionRequested(CommandLineOptions)"/>: the arguments after it
+/// with <see cref="CommandLineParseResult.InformationRequested(CommandLineOptions)"/>: the arguments after it
 /// are neither read nor refused, no password is asked for and no URL is needed, as in curl 8.21.0
-/// (<c>curl -V --bogus</c> prints the version; <c>curl --bogus -V</c> is refused).
+/// (<c>curl -V --bogus</c> prints the version; <c>curl --bogus -V</c> is refused). <c>-M</c> / <c>--manual</c>
+/// and <c>-h</c> / <c>--help</c> end it the same way, <c>--help</c> first reading its subject (see
+/// <see cref="CommandLineOption.Subject"/>), with <see cref="CommandLineParseResult.InformationRequested(CommandLineOptions)"/>.
 /// </summary>
 /// <remarks>
-/// It does not implement <c>--variable</c> or <c>--next</c>, and it
+/// It does not implement <c>--next</c>, and it
 /// neither validates URLs nor opens files itself. Checked against the local curl 8.21.0 on
 /// 2026-09-26; options per <see href="https://curl.se/docs/manpage.html"/>.
 /// </remarks>
@@ -44,6 +48,8 @@ public static class CommandLineParser
     private const string EndOfOptions = "--";
 
     private const string NegationPrefix = "no-";
+
+    private const string ExpansionPrefix = "expand-";
 
     /// <summary>Parses <paramref name="arguments"/>, the command line without the program name.</summary>
     /// <param name="arguments">The arguments; a <see langword="null"/> element reads as an empty argument.</param>
@@ -131,13 +137,13 @@ public static class CommandLineParser
         }
 
         return arguments.Count == 0 && options.Urls.Count == 0
-            ? CommandLineParseResult.Refused(CommandLineRefusal.EmptyCommandLine(), options.WarningLines)
+            ? CommandLineParseResult.RefusedEmpty(options)
             : ParseArguments(options, arguments, pathExists, passwordPrompt, dataFileReader);
     }
 
     /// <summary>
     /// Reads <paramref name="arguments"/> into <paramref name="options"/>, which may already hold the
-    /// default config file's settings, stopping at the first refusal or at <c>-V</c>.
+    /// default config file's settings, stopping at the first refusal or at <c>-V</c>, <c>-M</c> or <c>-h</c>.
     /// </summary>
     private static CommandLineParseResult ParseArguments(CommandLineOptions options, IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader)
     {
@@ -149,12 +155,12 @@ public static class CommandLineParser
                 : ParseArgument(options, argument, reader);
             if (refusal is not null)
             {
-                return CommandLineParseResult.Refused(refusal, options.WarningLines);
+                return CommandLineParseResult.Refused(refusal, options);
             }
 
-            if (options.VersionRequested)
+            if (options.InformationRequested)
             {
-                return CommandLineParseResult.VersionRequested(options);
+                return CommandLineParseResult.InformationRequested(options);
             }
         }
 
@@ -179,7 +185,7 @@ public static class CommandLineParser
     {
         if (options.Urls.Count == 0)
         {
-            return CommandLineParseResult.Refused(CommandLineRefusal.NoUrlSpecified(), options.WarningLines);
+            return CommandLineParseResult.Refused(CommandLineRefusal.NoUrlSpecified(), options);
         }
 
         return options.HttpMethodSelected == SelectedHttpMethod.MultipartFormPost && options.PostData is not null
@@ -194,8 +200,10 @@ public static class CommandLineParser
     private static CommandLineParseResult RefuseFormAndDataBoth(CommandLineOptions options)
     {
         SelectedHttpMethod dataMethod = options.DataInQuery ? SelectedHttpMethod.Get : SelectedHttpMethod.Post;
-        options.AddWarningLinesUnlessSilent(CommandLineWarning.OnlyOneRequestMethod(dataMethod, SelectedHttpMethod.MultipartFormPost));
-        return CommandLineParseResult.Refused(CommandLineRefusal.FormAndDataBoth(), options.WarningLines);
+        IReadOnlyList<string> warningLines = options.Silent
+            ? []
+            : CommandLineWarning.OnlyOneRequestMethod(dataMethod, SelectedHttpMethod.MultipartFormPost);
+        return CommandLineParseResult.Refused(CommandLineRefusal.FormAndDataBoth(warningLines), options);
     }
 
     private static CommandLineRefusal? ParseArgument(CommandLineOptions options, string argument, ArgumentReader reader)
@@ -234,22 +242,32 @@ public static class CommandLineParser
     {
         string nameAndValue = argument[EndOfOptions.Length..];
         int equals = nameAndValue.IndexOf('=', StringComparison.Ordinal);
-        bool hasAttachedValue = equals >= 0;
-        string longName = hasAttachedValue ? nameAndValue[..equals] : nameAndValue;
+        string longName = equals >= 0 ? nameAndValue[..equals] : nameAndValue;
+        string? attachedValue = equals >= 0 ? nameAndValue[(equals + 1)..] : null;
         options.FirstOptionOfArgument = true;
-        if (!CommandLineOptionTable.TryFindLong(longName, out CommandLineOption? option))
+        return CommandLineOptionTable.TryFindLong(longName, out CommandLineOption? option)
+            ? ApplyLong(options, option, argument, attachedValue, reader)
+            : ParseUnlistedLong(options, argument, longName, attachedValue, reader);
+    }
+
+    /// <summary>
+    /// Applies a long option found in the table: a subject row reads its subject, a flag ignores any
+    /// attached value (<c>--silent=x</c>), and a value row takes the attached value or else the next argument.
+    /// </summary>
+    private static CommandLineRefusal? ApplyLong(CommandLineOptions options, CommandLineOption option, string argument, string? attachedValue, ArgumentReader reader)
+    {
+        if (option.TakesSubject)
         {
-            return ParseNegatedLong(options, argument, longName, reader);
+            return ApplySubject(options, option, argument, attachedValue, reader);
         }
 
         if (!option.TakesValue)
         {
-            // curl accepts and ignores a value attached to a flag (--silent=x).
             return option.Apply(options, string.Empty, argument, reader.PathExists, reader.DataFileReader);
         }
 
-        return hasAttachedValue
-            ? option.Apply(options, nameAndValue[(equals + 1)..], argument, reader.PathExists, reader.DataFileReader)
+        return attachedValue is not null
+            ? option.Apply(options, attachedValue, argument, reader.PathExists, reader.DataFileReader)
             : ApplyNextArgument(options, option, argument, reader);
     }
 
@@ -275,6 +293,60 @@ public static class CommandLineParser
         return option.Negate(options, string.Empty, argument, reader.PathExists, reader.DataFileReader);
     }
 
+    /// <summary>Reads a long name that is not in the table: as <c>--expand-&lt;name&gt;</c>, or else as <c>--no-&lt;name&gt;</c>.</summary>
+    private static CommandLineRefusal? ParseUnlistedLong(CommandLineOptions options, string argument, string longName, string? attachedValue, ArgumentReader reader) =>
+        longName.StartsWith(ExpansionPrefix, StringComparison.Ordinal)
+            ? ParseExpandedLong(options, argument, longName[ExpansionPrefix.Length..], attachedValue, reader)
+            : ParseNegatedLong(options, argument, longName, reader);
+
+    /// <summary>
+    /// Reads <c>--expand-&lt;name&gt;</c> as curl 8.21.0's <c>getparameter</c> does: the option
+    /// <c>&lt;name&gt;</c>, its value first expanded by <see cref="VariableExpansion"/>. The value is the
+    /// attached one or the next argument; when there is one, an option that takes no value is refused
+    /// with <see cref="CommandLineRefusal.VariableExpansionFailure"/> (<c>--expand-silent x</c> is refused,
+    /// <c>--expand-silent</c> as the last argument turns <c>-s</c> on). <c>--no-expand-</c> and
+    /// <c>--expand-no-</c> spellings are unknown options, as <c>no-</c> is looked for first and only once.
+    /// </summary>
+    private static CommandLineRefusal? ParseExpandedLong(CommandLineOptions options, string argument, string longName, string? attachedValue, ArgumentReader reader)
+    {
+        if (!CommandLineOptionTable.TryFindLong(longName, out CommandLineOption? option))
+        {
+            return CommandLineRefusal.UnknownOption(argument);
+        }
+
+        string? template = attachedValue ?? reader.PeekNext();
+        if (template is null)
+        {
+            return option.TakesValue
+                ? CommandLineRefusal.RequiresParameter(argument)
+                : option.Apply(options, string.Empty, argument, reader.PathExists, reader.DataFileReader);
+        }
+
+        return option.TakesValue
+            ? ApplyExpandedValue(options, option, argument, template, attachedValue is null, reader)
+            : CommandLineRefusal.VariableExpansionFailure(argument, null, options.ErrorsHidden);
+    }
+
+    /// <summary>
+    /// Expands <paramref name="template"/> and applies the result, first taking the next argument when
+    /// <paramref name="valueIsNextArgument"/> and the expansion was not refused.
+    /// </summary>
+    private static CommandLineRefusal? ApplyExpandedValue(CommandLineOptions options, CommandLineOption option, string argument, string template, bool valueIsNextArgument, ArgumentReader reader)
+    {
+        CommandLineRefusal? refusal = VariableExpansion.Expand(options, template, argument, out string value);
+        if (refusal is not null)
+        {
+            return refusal;
+        }
+
+        if (valueIsNextArgument)
+        {
+            reader.TryTakeNext(out _);
+        }
+
+        return option.Apply(options, value, argument, reader.PathExists, reader.DataFileReader);
+    }
+
     private static CommandLineRefusal? ParseShortBundle(CommandLineOptions options, string argument, ArgumentReader reader)
     {
         if (argument.Length == 1)
@@ -284,19 +356,7 @@ public static class CommandLineParser
 
         for (int letter = 1; letter < argument.Length; letter++)
         {
-            if (!CommandLineOptionTable.TryFindShort(argument[letter], out CommandLineOption? option))
-            {
-                return CommandLineRefusal.UnknownOption(argument);
-            }
-
-            options.FirstOptionOfArgument = letter == 1;
-
-            if (option.TakesValue)
-            {
-                return ApplyRestOfBundle(options, option, argument, argument[(letter + 1)..], reader);
-            }
-
-            if (ApplyFlagLetterEndsBundle(options, option, argument, reader, out CommandLineRefusal? refusal))
+            if (ApplyBundleLetterEndsBundle(options, argument, letter, reader, out CommandLineRefusal? refusal))
             {
                 return refusal;
             }
@@ -306,13 +366,64 @@ public static class CommandLineParser
     }
 
     /// <summary>
+    /// Applies the option letter at <paramref name="letter"/> in a short-option bundle. Returns
+    /// <see langword="true"/> when the bundle ends there: an unknown letter, a letter that takes the
+    /// rest of the bundle or the next argument, or a flag that ends it; <paramref name="refusal"/> is
+    /// then its outcome.
+    /// </summary>
+    private static bool ApplyBundleLetterEndsBundle(CommandLineOptions options, string argument, int letter, ArgumentReader reader, out CommandLineRefusal? refusal)
+    {
+        if (!CommandLineOptionTable.TryFindShort(argument[letter], out CommandLineOption? option))
+        {
+            refusal = CommandLineRefusal.UnknownOption(argument);
+            return true;
+        }
+
+        options.FirstOptionOfArgument = letter == 1;
+
+        if (option.TakesSubject)
+        {
+            refusal = ApplySubjectLetter(options, option, argument, letter, reader);
+            return true;
+        }
+
+        if (option.TakesValue)
+        {
+            refusal = ApplyRestOfBundle(options, option, argument, argument[(letter + 1)..], reader);
+            return true;
+        }
+
+        return ApplyFlagLetterEndsBundle(options, option, argument, reader, out refusal);
+    }
+
+    /// <summary>
     /// Applies a flag letter of a bundle and says whether the bundle ends there: on a refusal, or
-    /// after <c>-V</c>, which ends the bundle as it ends the command line (<c>curl -Vo</c> prints the version).
+    /// after <c>-V</c> or <c>-M</c>, which end the bundle as they end the command line (<c>curl -Vo</c> prints the version).
     /// </summary>
     private static bool ApplyFlagLetterEndsBundle(CommandLineOptions options, CommandLineOption option, string argument, ArgumentReader reader, out CommandLineRefusal? refusal)
     {
         refusal = option.Apply(options, string.Empty, argument, reader.PathExists, reader.DataFileReader);
-        return refusal is not null || options.VersionRequested;
+        return refusal is not null || options.InformationRequested;
+    }
+
+    /// <summary>
+    /// Applies a <see cref="CommandLineOption.Subject"/> letter (<c>-h</c>) of a bundle: as the last letter
+    /// it reads the next argument as its subject; before other letters it ends the bundle having applied
+    /// nothing, as curl 8.21.0 reads <c>-hv</c>.
+    /// </summary>
+    private static CommandLineRefusal? ApplySubjectLetter(CommandLineOptions options, CommandLineOption option, string argument, int letter, ArgumentReader reader) =>
+        letter == argument.Length - 1
+            ? ApplySubject(options, option, argument, null, reader)
+            : null;
+
+    /// <summary>
+    /// Applies a <see cref="CommandLineOption.Subject"/> row with its attached value, or else the next
+    /// argument, taken, or else an empty subject.
+    /// </summary>
+    private static CommandLineRefusal? ApplySubject(CommandLineOptions options, CommandLineOption option, string argument, string? attachedValue, ArgumentReader reader)
+    {
+        string subject = attachedValue ?? (reader.TryTakeNext(out string next) ? next : string.Empty);
+        return option.Apply(options, subject, argument, reader.PathExists, reader.DataFileReader);
     }
 
     /// <summary>
@@ -347,8 +458,9 @@ public static class CommandLineParser
         ArgumentReader reader = new(parameter is null ? [] : [parameter], pathExists, dataFileReader);
         CommandLineRefusal? refusal = ParseConfigFileOption(options, option, reader);
 
-        // curl 8.21.0 ignores version in a -K file: a file of "version" alone reports no URL.
-        options.VersionRequested = false;
+        // curl 8.21.0 ignores version and manual in a -K file: a file of either alone reports no URL.
+        // It prints the page for help there and carries on, so the console prints that page first.
+        options.MoveConfigFileInformationRequests();
         return refusal is null && !string.IsNullOrEmpty(parameter) && reader.TryTakeNext(out _)
             ? CommandLineRefusal.UnusedConfigFileParameter(option)
             : refusal;
@@ -383,6 +495,9 @@ public static class CommandLineParser
         public IDataFileReader DataFileReader => dataFileReader;
 
         public bool OptionsEnded { get; set; }
+
+        /// <summary>The next argument, not taken; <see langword="null"/> when none is left.</summary>
+        public string? PeekNext() => next == arguments.Count ? null : arguments[next] ?? string.Empty;
 
         public bool TryTakeNext(out string argument)
         {

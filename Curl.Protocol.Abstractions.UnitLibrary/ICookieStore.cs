@@ -37,5 +37,9 @@ public interface ICookieStore
     /// <param name="now">
     /// The receive time that relative expiry (<c>Max-Age</c>) counts from.
     /// </param>
-    void StoreFromResponse(CurlUrl url, IReadOnlyList<string> setCookieHeaders, DateTimeOffset now);
+    /// <param name="events">
+    /// Where the store reports, as curl's <c>-v</c> lines, each cookie it adds, replaces or
+    /// drops; <see cref="NoTransferEvents.Instance" /> when nobody is listening.
+    /// </param>
+    void StoreFromResponse(CurlUrl url, IReadOnlyList<string> setCookieHeaders, DateTimeOffset now, ITransferEvents events);
 }

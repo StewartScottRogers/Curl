@@ -5,7 +5,8 @@ namespace Curl.Cli;
 
 /// <summary>
 /// Pins how the parser records the TLS options: <c>-k</c>/<c>--insecure</c>, <c>--cacert</c>,
-/// <c>--capath</c>, <c>-E</c>/<c>--cert</c>, <c>--key</c>, <c>--tlsv1.2</c>/<c>--tlsv1.3</c> (the
+/// <c>--capath</c>, <c>-E</c>/<c>--cert</c>, <c>--key</c>, <c>--cert-type</c>, <c>--key-type</c>,
+/// <c>--pass</c>, <c>--tlsv1.2</c>/<c>--tlsv1.3</c> (the
 /// last one given wins), <c>--ciphers</c> and <c>--tls13-ciphers</c>, and the refusals curl
 /// 8.21.0 prints for them, measured against the local curl 8.21.0 on 2026-09-26. The
 /// <c>--cacert</c> existence check runs against a fake, never the disk, except in the two
@@ -27,6 +28,7 @@ public sealed class CommandLineTlsOptionTests
 
         Assert.IsTrue(result.IsAccepted);
         Assert.IsFalse(result.Options.Insecure);
+        Assert.IsFalse(result.Options.SkipRevocationCheck);
         Assert.IsNull(result.Options.CaCertificateFile);
         Assert.IsNull(result.Options.CaCertificateDirectory);
         Assert.IsNull(result.Options.ClientCertificate);
@@ -45,6 +47,24 @@ public sealed class CommandLineTlsOptionTests
 
         Assert.IsTrue(result.IsAccepted);
         Assert.IsTrue(result.Options.Insecure);
+    }
+
+    [TestMethod]
+    public void Parse_SslNoRevoke_SetsSkipRevocationCheck()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--ssl-no-revoke", Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsTrue(result.Options.SkipRevocationCheck);
+    }
+
+    [TestMethod]
+    public void Parse_SslNoRevokeThenNoSslNoRevoke_ChecksRevocation()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--ssl-no-revoke", "--no-ssl-no-revoke", Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsFalse(result.Options.SkipRevocationCheck);
     }
 
     [TestMethod]
@@ -172,6 +192,72 @@ public sealed class CommandLineTlsOptionTests
     }
 
     [TestMethod]
+    public void Parse_CertType_RecordsClientCertificateTypeVerbatim()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--cert-type", "p12", Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual("p12", result.Options.ClientCertificateType);
+    }
+
+    [TestMethod]
+    public void Parse_CertTypeTwice_TheLastWins()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--cert-type", "DER", "--cert-type", "PEM", Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual("PEM", result.Options.ClientCertificateType);
+    }
+
+    [TestMethod]
+    public void Parse_KeyType_RecordsPrivateKeyTypeVerbatim()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--key-type", "der", Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual("der", result.Options.PrivateKeyType);
+    }
+
+    [TestMethod]
+    public void Parse_KeyTypeTwice_TheLastWins()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--key-type", "DER", "--key-type", "PEM", Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual("PEM", result.Options.PrivateKeyType);
+    }
+
+    [TestMethod]
+    public void Parse_Pass_RecordsPassphraseVerbatim()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--pass", "s3cret:with colon", Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual("s3cret:with colon", result.Options.Passphrase);
+    }
+
+    [TestMethod]
+    public void Parse_PassTwice_TheLastWins()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--pass", "first", "--pass", "second", Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual("second", result.Options.Passphrase);
+    }
+
+    [TestMethod]
+    [DataRow("--cert-type")]
+    [DataRow("--key-type")]
+    [DataRow("--pass")]
+    public void Parse_TypeOrPassGivenFlagLikeValue_AcceptsWithoutWarning(string spelledOption)
+    {
+        CommandLineParseResult result = CommandLineParser.Parse([spelledOption, "-x", Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsEmpty(result.WarningLines);
+    }
+
+    [TestMethod]
     public void Parse_Tlsv12_SetsMinimumTlsVersionTo12()
     {
         CommandLineParseResult result = CommandLineParser.Parse(["--tlsv1.2", Url], NoPathExists);
@@ -232,6 +318,9 @@ public sealed class CommandLineTlsOptionTests
     [DataRow("--key")]
     [DataRow("--ciphers")]
     [DataRow("--tls13-ciphers")]
+    [DataRow("--cert-type")]
+    [DataRow("--key-type")]
+    [DataRow("--pass")]
     public void Parse_EmptyTextValue_RefusesAsBlank(string spelledOption)
     {
         CommandLineParseResult result = CommandLineParser.Parse([spelledOption, "", Url], EveryPathExists);
@@ -285,6 +374,91 @@ public sealed class CommandLineTlsOptionTests
             result,
             "curl: The file '-x' provided to --cacert does not exist",
             "curl: option --cacert: is badly used here");
+        CollectionAssert.AreEqual(
+            new[] { "Warning: The filename argument '-x' looks like a flag." },
+            result.WarningLines.ToArray());
+    }
+
+    [TestMethod]
+    public void Parse_NoProxyTlsOptions_LeavesThemNotGiven()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["-k", "--cacert", "ca.pem", "--capath", "certs", Url], EveryPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsFalse(result.Options.ProxyInsecure);
+        Assert.IsNull(result.Options.ProxyCaCertificateFile);
+        Assert.IsNull(result.Options.ProxyCaCertificateDirectory);
+    }
+
+    [TestMethod]
+    public void Parse_ProxyInsecure_SetsProxyInsecureOnly()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--proxy-insecure", Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsTrue(result.Options.ProxyInsecure);
+        Assert.IsFalse(result.Options.Insecure);
+    }
+
+    [TestMethod]
+    public void Parse_ProxyInsecureThenNoProxyInsecure_VerifiesTheProxy()
+    {
+        // curl -s -S --proxy-insecure --no-proxy-insecure -x https://localhost:18462 https://example.com/
+        // against a self-signed proxy -> exit 60, as without either (curl 8.21.0, 2026-09-27).
+        CommandLineParseResult result = CommandLineParser.Parse(["--proxy-insecure", "--no-proxy-insecure", Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsFalse(result.Options.ProxyInsecure);
+    }
+
+    [TestMethod]
+    public void Parse_ProxyCacertThatExists_RecordsProxyCaCertificateFileOnly()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--proxy-cacert", "proxy.pem", Url], EveryPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual("proxy.pem", result.Options.ProxyCaCertificateFile);
+        Assert.IsNull(result.Options.CaCertificateFile);
+    }
+
+    [TestMethod]
+    [DataRow("nosuch.pem")]
+    [DataRow("")]
+    public void Parse_ProxyCacertThatDoesNotExist_RefusesNamingProxyCacert(string file)
+    {
+        // curl --proxy-cacert nosuch.pem -x http://127.0.0.1:1 http://127.0.0.1:1/ (and '') -> exit 2 (curl 8.21.0, 2026-09-27).
+        CommandLineParseResult result = CommandLineParser.Parse(["--proxy-cacert", file, Url], NoPathExists);
+
+        AssertRefused(
+            result,
+            $"curl: The file '{file}' provided to --proxy-cacert does not exist",
+            "curl: option --proxy-cacert: is badly used here");
+    }
+
+    [TestMethod]
+    public void Parse_ProxyCapath_RecordsProxyCaCertificateDirectoryOnly()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--proxy-capath", "certs", Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual("certs", result.Options.ProxyCaCertificateDirectory);
+        Assert.IsNull(result.Options.CaCertificateDirectory);
+    }
+
+    [TestMethod]
+    public void Parse_EmptyProxyCapath_RefusesAsBlank()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--proxy-capath", "", Url], NoPathExists);
+
+        AssertRefused(result, "curl: option --proxy-capath: blank argument where content is expected");
+    }
+
+    [TestMethod]
+    public void Parse_ProxyCapathGivenFlagLikeValue_AcceptsWithFileNameWarning()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--proxy-capath", "-x", Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(
             new[] { "Warning: The filename argument '-x' looks like a flag." },
             result.WarningLines.ToArray());

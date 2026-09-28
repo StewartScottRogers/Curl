@@ -45,7 +45,10 @@ internal static class FileOpenFailure
     /// <returns>
     /// <see cref="FileAccessStatus.IsDirectory" /> for a directory;
     /// <see cref="FileAccessStatus.NotFound" /> for a missing file or parent directory;
-    /// <see cref="FileAccessStatus.AccessDenied" /> for a refusal; and
+    /// <see cref="FileAccessStatus.AccessDenied" /> for a refusal;
+    /// <see cref="FileAccessStatus.AlreadyExists" /> for the <see cref="IOException" /> a
+    /// <see cref="FileMode.CreateNew" /> open raises over an existing file
+    /// (<see cref="IsFileExists(Exception)" />); and
     /// <see cref="FileAccessStatus.IoError" /> for everything else, an invalid or
     /// over-long path included.
     /// </returns>
@@ -60,8 +63,30 @@ internal static class FileOpenFailure
         {
             FileNotFoundException or DirectoryNotFoundException => FileAccessStatus.NotFound,
             UnauthorizedAccessException => FileAccessStatus.AccessDenied,
+            _ when IsFileExists(exception) => FileAccessStatus.AlreadyExists,
             _ => FileAccessStatus.IoError,
         };
+    }
+
+    /// <summary>
+    /// Tells whether <paramref name="exception" /> is the <see cref="IOException" /> .NET
+    /// raises when a <see cref="FileMode.CreateNew" /> open finds a file already there.
+    /// </summary>
+    /// <param name="exception">The exception the open threw.</param>
+    /// <returns>
+    /// <see langword="true" /> when its <see cref="Exception.HResult" /> is Windows'
+    /// <c>ERROR_FILE_EXISTS</c> (<c>0x80070050</c>) or <c>ERROR_ALREADY_EXISTS</c>
+    /// (<c>0x800700B7</c>), or <c>EEXIST</c> (17 on Linux and macOS), the raw
+    /// <c>errno</c> .NET carries as the <see cref="Exception.HResult" /> off Windows.
+    /// </returns>
+    internal static bool IsFileExists(Exception exception)
+    {
+        const int ErrorFileExists = unchecked((int)0x80070050);
+        const int ErrorAlreadyExists = unchecked((int)0x800700B7);
+        const int PosixErrorExists = 17;
+
+        return exception is IOException
+            && exception.HResult is ErrorFileExists or ErrorAlreadyExists or PosixErrorExists;
     }
 
     /// <summary>

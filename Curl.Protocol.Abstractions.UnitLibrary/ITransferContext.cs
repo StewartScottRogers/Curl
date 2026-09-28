@@ -35,6 +35,18 @@ public interface ITransferContext
     long? ResumeFrom { get; }
 
     /// <summary>
+    /// Gets whether <c>-C -</c> asked a <c>-T</c> upload to resume from an offset the caller
+    /// cannot know: how much of the file the server already holds.
+    /// </summary>
+    /// <remarks>
+    /// curl 8.21.0 turns an upload's <c>-C -</c> into offset -1, whatever <c>-o</c> names, and
+    /// over HTTP sends the whole source with <c>Content-Range: bytes 0-(L-1)/L</c> for its
+    /// length L (measured, BL-351 Notes). When this is <see langword="true" />, a handler that
+    /// honours it ignores <see cref="ResumeFrom" />.
+    /// </remarks>
+    bool ResumeUploadFromUnknownOffset { get; }
+
+    /// <summary>
     /// Gets the byte range requested with <c>-r</c>/<c>--range</c>, or
     /// <see langword="null" /> when the whole resource was asked for.
     /// </summary>
@@ -58,7 +70,12 @@ public interface ITransferContext
     /// then fails with exit 63 (<see cref="CurlExitCode.FilesizeExceeded" />); the limit
     /// counts body bytes only, so headers written to <see cref="HeaderOutput" /> do not use
     /// it up, and an upload ignores it. <c>Curl.Console</c> fills it from <c>--max-filesize</c>.
-    /// Only the <c>file://</c> handler enforces it; no other handler reads it yet.
+    /// The <c>file://</c> and <c>http</c>/<c>https</c> handlers enforce it; no other
+    /// handler reads it yet. Over HTTP a response whose Content-Length is over the limit
+    /// fails before any body is written, with exit 63 and <c>Maximum file size exceeded</c>;
+    /// a body with no Content-Length, or one that grows past it, is cut at the limit and
+    /// fails with exit 63 and <c>Exceeded the maximum allowed file size (N) with N bytes</c>
+    /// (ADR-0044).
     /// </remarks>
     long? MaxFileSize { get; }
 
@@ -146,6 +163,63 @@ public interface ITransferContext
     bool TftpNoOptions { get; }
 
     /// <summary>
+    /// Gets a value indicating whether <c>--disable-epsv</c> was given, which stops an FTP
+    /// transfer trying <c>EPSV</c> before <c>PASV</c>; <see langword="false" /> when not given.
+    /// </summary>
+    /// <remarks>
+    /// <c>ftp://</c> is to read it (ADR-0006).
+    /// </remarks>
+    bool FtpDisableEpsv { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether an FTP transfer ignores the address in the server's
+    /// <c>PASV</c> reply and connects its data channel to the control channel's address;
+    /// <see langword="true" /> unless <c>--no-ftp-skip-pasv-ip</c> was given, as in curl 8.21.0.
+    /// </summary>
+    /// <remarks>
+    /// <c>ftp://</c> is to read it (ADR-0006).
+    /// </remarks>
+    bool FtpSkipPasvIp { get; }
+
+    /// <summary>
+    /// Gets how an FTP transfer reaches the file in the URL's path, per <c>--ftp-method</c>;
+    /// <see cref="FtpFileMethod.MultiCwd" /> when not given.
+    /// </summary>
+    /// <remarks>
+    /// <c>ftp://</c> is to read it (ADR-0006).
+    /// </remarks>
+    FtpFileMethod FtpFileMethod { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether <c>--ftp-create-dirs</c> was given, which creates the
+    /// missing directories of an FTP upload's path; <see langword="false" /> when not given.
+    /// </summary>
+    /// <remarks>
+    /// <c>ftp://</c> is to read it (ADR-0006).
+    /// </remarks>
+    bool FtpCreateDirectories { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether <c>-l</c>/<c>--list-only</c> was given, which lists a
+    /// directory by name only (<c>NLST</c> rather than <c>LIST</c>); <see langword="false" />
+    /// when not given.
+    /// </summary>
+    /// <remarks>
+    /// <c>ftp://</c> is to read it (ADR-0006).
+    /// </remarks>
+    bool ListOnly { get; }
+
+    /// <summary>
+    /// Gets every <c>-Q</c>/<c>--quote</c> value, verbatim and in command-line order; empty
+    /// when none was given.
+    /// </summary>
+    /// <remarks>
+    /// A value keeps its <c>-</c> (after the transfer), <c>+</c> (before the transfer) or
+    /// <c>*</c> (failure ignored) prefix: <c>ftp://</c> is to interpret them (ADR-0006).
+    /// </remarks>
+    IReadOnlyList<string> QuoteCommands { get; }
+
+    /// <summary>
     /// Gets a value indicating whether <c>--crlf</c> was given, which converts each line
     /// feed in an upload to a carriage return plus line feed; <see langword="false" /> when
     /// not given.
@@ -214,8 +288,7 @@ public interface ITransferContext
     /// <remarks>
     /// <c>-m</c> limits the whole operation, so a handler honouring <see cref="MaxTime" />
     /// should count it from here, and print the operation's elapsed time from here, as curl
-    /// counts from its <c>t_startop</c>. The HTTP handler does; the TFTP handler still
-    /// counts <c>-m</c> from its own call. <c>Curl.Core</c>'s redirect
+    /// counts from its <c>t_startop</c>. The HTTP and TFTP handlers do. <c>Curl.Core</c>'s redirect
     /// follower sets it on every hop after the first, so a <c>-L</c> chain shares one
     /// <c>-m</c> (ADR-0040).
     /// </remarks>

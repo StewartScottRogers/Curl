@@ -19,17 +19,55 @@ internal static class ClientCertificateLoader
     private static readonly string[] DerPrivateKeyLabels = ["PRIVATE KEY", "RSA PRIVATE KEY", "EC PRIVATE KEY"];
 
     /// <summary>
-    /// Loads a PKCS#12 file as curl's Schannel build does. <c>--key</c> and <c>--key-type</c>
-    /// are not read: the key is the one in the file.
+    /// Loads the certificate as curl's Schannel build does: from a Windows certificate store
+    /// when the path is a store path (<see cref="ClientCertificateStorePath" />), otherwise
+    /// from a PKCS#12 file. <c>--key</c> and <c>--key-type</c> are not read: the key is the
+    /// one in the store or the file. A store path ignores <c>--cert-type</c> and the passphrase.
     /// </summary>
-    /// <param name="path">The certificate file, as split from the <c>--cert</c> value.</param>
+    /// <param name="path">The store path or certificate file, as split from the <c>--cert</c> value.</param>
     /// <param name="passphrase">The <c>--pass</c> or <c>--cert</c> passphrase, or <see langword="null" />.</param>
     /// <param name="certificateType">
     /// The <c>--cert-type</c> value, or <see langword="null" />; any type but <c>P12</c> is
     /// refused once the file is found.
     /// </param>
+    /// <param name="certificateStore">Opens the store a store path names.</param>
     /// <returns>The certificate with its key, or the exit 58 failure.</returns>
     public static (X509Certificate2? Certificate, ConnectResult? Failure) LoadAsSchannelBuild(
+        string path,
+        string? passphrase,
+        string? certificateType,
+        IClientCertificateStore certificateStore)
+    {
+        var storePath = ClientCertificateStorePath.Parse(path);
+        return storePath is null
+            ? LoadPkcs12AsSchannelBuild(path, passphrase, certificateType)
+            : LoadFromStoreAsSchannelBuild(storePath, certificateStore);
+    }
+
+    // The store is opened before the thumbprint is decoded; a thumbprint that is not hex
+    // fails with no message of its own, so curl prints its text for exit 58.
+    private static (X509Certificate2? Certificate, ConnectResult? Failure) LoadFromStoreAsSchannelBuild(
+        ClientCertificateStorePath storePath,
+        IClientCertificateStore certificateStore)
+    {
+        var certificates = certificateStore.OpenCertificates(storePath.Location, storePath.StoreName);
+        if (certificates is null)
+        {
+            return Failed(TlsFailureMessages.SchannelCertificateStoreNotOpened((int)storePath.Location, storePath.StoreName));
+        }
+
+        if (!storePath.Thumbprint.All(char.IsAsciiHexDigit))
+        {
+            return Failed(TlsFailureMessages.SslCertProblem);
+        }
+
+        var found = certificates.Find(X509FindType.FindByThumbprint, storePath.Thumbprint, validOnly: false);
+        return found.Count == 0
+            ? Failed(TlsFailureMessages.SchannelClientCertificateNotInStore)
+            : (found[0], null);
+    }
+
+    private static (X509Certificate2? Certificate, ConnectResult? Failure) LoadPkcs12AsSchannelBuild(
         string path,
         string? passphrase,
         string? certificateType)

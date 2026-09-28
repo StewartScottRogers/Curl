@@ -6,4 +6,8 @@
     <ProjectReference Include="..\Curl.Protocol.Abstractions.UnitLibrary\Curl.Protocol.Abstractions.UnitLibrary.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="CurlManual.txt" LogicalName="Curl.Cli.CurlManual.txt" />
+  </ItemGroup>
+
 </Project>

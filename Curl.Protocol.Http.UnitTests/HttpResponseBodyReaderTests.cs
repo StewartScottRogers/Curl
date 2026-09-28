@@ -44,7 +44,7 @@ public sealed class HttpResponseBodyReaderTests
             HttpResponseHead head = await new HttpResponseHeadReader(connection).ReadAsync(CancellationToken.None);
             int readsForHead = connection.ReadCount;
 
-            await new HttpResponseBodyReader(connection).CopyAsync(head, false, new FailingWriteStream(), false, CancellationToken.None);
+            await new HttpResponseBodyReader(connection).CopyAsync(head, false, new FailingWriteStream(), false, false, CancellationToken.None);
 
             Assert.AreEqual(readsForHead + (5 - head.BodyPrefix.Length + chunkSize - 1) / chunkSize, connection.ReadCount, $"Chunk size {chunkSize}");
         }
@@ -67,7 +67,7 @@ public sealed class HttpResponseBodyReaderTests
             FailingWriteStream output = new();
             HttpResponseBodyReader reader = new(connection);
 
-            await reader.CopyAsync(head, noBody, output, false, CancellationToken.None);
+            await reader.CopyAsync(head, noBody, output, false, false, CancellationToken.None);
 
             Assert.AreEqual(readsForHead, connection.ReadCount, $"Chunk size {chunkSize}");
             Assert.IsEmpty(output.WriteSizes, $"Chunk size {chunkSize}");
@@ -102,7 +102,7 @@ public sealed class HttpResponseBodyReaderTests
             HttpResponseBodyReader reader = new(connection);
 
             HttpTransferException thrown = await Assert.ThrowsExactlyAsync<HttpTransferException>(
-                async () => await reader.CopyAsync(head, false, output, false, CancellationToken.None));
+                async () => await reader.CopyAsync(head, false, output, false, false, CancellationToken.None));
 
             Assert.AreEqual(CurlExitCode.PartialFile, thrown.ExitCode);
             Assert.AreEqual($"end of response with {missing} bytes missing", thrown.Message);
@@ -137,7 +137,7 @@ public sealed class HttpResponseBodyReaderTests
         HttpResponseBodyReader reader = new(connection);
 
         HttpTransferException thrown = await Assert.ThrowsExactlyAsync<HttpTransferException>(
-            async () => await reader.CopyAsync(Head("Content-Length: 20000"), false, output, false, CancellationToken.None));
+            async () => await reader.CopyAsync(Head("Content-Length: 20000"), false, output, false, false, CancellationToken.None));
 
         Assert.AreEqual(CurlExitCode.WriteError, thrown.ExitCode);
         Assert.AreEqual("Failure writing output to destination, passed 16384 returned 0", thrown.Message);
@@ -152,7 +152,7 @@ public sealed class HttpResponseBodyReaderTests
         HttpResponseBodyReader reader = new(connection);
 
         HttpTransferException thrown = await Assert.ThrowsExactlyAsync<HttpTransferException>(
-            async () => await reader.CopyAsync(Head(string.Empty), false, output, false, CancellationToken.None));
+            async () => await reader.CopyAsync(Head(string.Empty), false, output, false, false, CancellationToken.None));
 
         Assert.AreEqual(CurlExitCode.WriteError, thrown.ExitCode);
         Assert.AreEqual("Failure writing output to destination, passed 3616 returned 100", thrown.Message);
@@ -170,7 +170,7 @@ public sealed class HttpResponseBodyReaderTests
             FailingWriteStream output = new(1, new IOException("Disk full."));
 
             HttpTransferException thrown = await Assert.ThrowsExactlyAsync<HttpTransferException>(
-                async () => await new HttpResponseBodyReader(connection).CopyAsync(head, false, output, false, CancellationToken.None));
+                async () => await new HttpResponseBodyReader(connection).CopyAsync(head, false, output, false, false, CancellationToken.None));
 
             Assert.AreEqual(CurlExitCode.WriteError, thrown.ExitCode);
             Assert.AreEqual($"Failure writing output to destination, passed {output.WriteSizes[0]} returned 0", thrown.Message);
@@ -291,7 +291,7 @@ public sealed class HttpResponseBodyReaderTests
         ScriptedConnection connection = new(body, 65536);
         FailingWriteStream output = new();
 
-        await new HttpResponseBodyReader(connection).CopyAsync(Head(string.Empty), false, output, false, CancellationToken.None);
+        await new HttpResponseBodyReader(connection).CopyAsync(Head(string.Empty), false, output, false, false, CancellationToken.None);
 
         CollectionAssert.AreEqual(body, output.ToArray());
         CollectionAssert.AreEqual(new[] { 16384, 16384, 7232 }, output.WriteSizes);
@@ -306,7 +306,7 @@ public sealed class HttpResponseBodyReaderTests
             FailingWriteStream output = new();
 
             HttpTransferException thrown = await Assert.ThrowsExactlyAsync<HttpTransferException>(
-                async () => await new HttpResponseBodyReader(connection).CopyAsync(head, false, output, false, CancellationToken.None));
+                async () => await new HttpResponseBodyReader(connection).CopyAsync(head, false, output, false, false, CancellationToken.None));
 
             Assert.AreEqual(CurlExitCode.RecvError, thrown.ExitCode);
             Assert.AreEqual(message, thrown.Message);
@@ -325,7 +325,7 @@ public sealed class HttpResponseBodyReaderTests
         ScriptedConnection connection = Connection(response, chunkSize);
         HttpResponseHead head = await new HttpResponseHeadReader(connection).ReadAsync(CancellationToken.None);
         HttpResponseBodyReader reader = new(connection);
-        await reader.CopyAsync(head, noBody, output, decodeContent, CancellationToken.None);
+        await reader.CopyAsync(head, noBody, output, decodeContent, false, CancellationToken.None);
         return (reader, connection, output);
     }
 

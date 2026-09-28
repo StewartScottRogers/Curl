@@ -1,0 +1,38 @@
+auth: Authentication methods
+     --anyauth                      Pick any authentication method
+     --aws-sigv4 <provider1[:prvdr2[:reg[:srv]]]>  AWS V4 signature auth
+     --basic                        HTTP Basic Authentication
+     --delegation <LEVEL>           GSS-API delegation permission
+     --digest                       HTTP Digest Authentication
+     --ftp-account <data>           Account data string
+     --location-trusted          As --location, but send secrets to other hosts
+     --login-options <options>      Server login options
+     --negotiate                    Use HTTP Negotiate (SPNEGO) authentication
+ -n, --netrc                        Must read .netrc for username and password
+     --netrc-file <filename>        Specify FILE for netrc
+     --netrc-optional               Use either .netrc or URL
+     --ntlm                         HTTP NTLM authentication
+     --oauth2-bearer <token>        OAuth 2 Bearer Token
+     --pass <phrase>                Passphrase for the private key
+     --proxy-anyauth                Pick any proxy authentication method
+     --proxy-basic                  Use Basic authentication on the proxy
+     --proxy-negotiate              HTTP Negotiate (SPNEGO) auth with the proxy
+     --proxy-ntlm                   NTLM authentication with the proxy
+     --proxy-pass <phrase>          Passphrase for private key for HTTPS proxy
+     --proxy-tlsauthtype <type>     TLS authentication type for HTTPS proxy
+     --proxy-tlspassword <string>   TLS password for HTTPS proxy
+     --proxy-tlsuser <name>         TLS username for HTTPS proxy
+     --proxy-tlsv1                  TLSv1 for HTTPS proxy
+ -U, --proxy-user <user:password>   Proxy user and password
+     --pubkey <key>                 SSH Public key filename
+     --sasl-authzid <identity>      Identity for SASL PLAIN authentication
+     --sasl-ir                      Initial response in SASL authentication
+     --service-name <name>          SPNEGO service name
+     --socks5-basic                 Username/password auth for SOCKS5 proxies
+     --socks5-gssapi                Enable GSS-API auth for SOCKS5 proxies
+     --socks5-gssapi-nec            Compatibility with NEC SOCKS5 server
+     --socks5-gssapi-service <name>  SOCKS5 proxy service name for GSS-API
+     --tlsauthtype <type>           TLS authentication type
+     --tlspassword <string>         TLS password
+     --tlsuser <name>               TLS username
+ -u, --user <user:password>         Server user and password

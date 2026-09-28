@@ -8,10 +8,10 @@ namespace Curl.Console;
 /// redirected to a file.
 /// </summary>
 /// <remarks>
-/// Only the meter's opening is modelled: the two header lines and the first status line,
-/// whose counters are all zero. That is every byte curl writes for a <c>file://</c>
-/// transfer. For a network transfer curl rewrites the status line in place with the sizes,
-/// speeds and times it measures as the transfer runs, which is not modelled here.
+/// These are the fixed lines: the two header lines, and the first status line, whose
+/// counters are all zero, which is every byte curl writes for a <c>file://</c> transfer.
+/// The status lines curl draws after it from a transfer's byte counts come from
+/// <see cref="TransferProgressRecorder" />.
 /// </remarks>
 internal static class ProgressMeterLines
 {
@@ -40,15 +40,23 @@ internal static class ProgressMeterLines
         "** Resuming transfer from byte position " + resumeFrom.ToString(CultureInfo.InvariantCulture);
 
     /// <summary>
-    /// The meter's opening lines, in the order curl writes them, each without a terminator.
+    /// The offset curl 8.21.0 resumes a <c>-T</c> upload from under <c>-C -</c>: -1, the
+    /// server's to know, which its resuming line names (measured 2026-09-27, BL-351 Notes).
+    /// </summary>
+    internal const long UnknownUploadOffset = -1;
+
+    /// <summary>
+    /// The lines curl writes before the meter's first status line, in the order it writes
+    /// them, each without a terminator.
     /// </summary>
     /// <param name="resumeFrom">
-    /// The resolved <c>-C</c> offset, or <see langword="null" /> without <c>-C</c>. Past zero,
+    /// The resolved <c>-C</c> offset, <see cref="UnknownUploadOffset" /> for a <c>-T</c> upload
+    /// under <c>-C -</c>, or <see langword="null" /> without <c>-C</c>. Past zero, or unknown,
     /// <see cref="ResumingLine" /> comes first.
     /// </param>
     /// <returns>The lines.</returns>
-    internal static IReadOnlyList<string> Opening(long? resumeFrom) =>
-        resumeFrom is > 0 and long position
-            ? [ResumingLine(position), FirstHeaderLine, SecondHeaderLine, ZeroStatusLine]
-            : [FirstHeaderLine, SecondHeaderLine, ZeroStatusLine];
+    internal static IReadOnlyList<string> HeaderLines(long? resumeFrom) =>
+        resumeFrom is (> 0 or UnknownUploadOffset) and long position
+            ? [ResumingLine(position), FirstHeaderLine, SecondHeaderLine]
+            : [FirstHeaderLine, SecondHeaderLine];
 }

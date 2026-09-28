@@ -68,6 +68,13 @@ namespace Curl.Networking;
 /// the OpenSSL build and a protected PKCS#12 file in either. <see langword="null" /> uses the
 /// passphrase in <paramref name="ClientCertificate" />, if any.
 /// </param>
+/// <param name="SkipRevocationCheck">
+/// <see langword="true" /> for curl's <c>--ssl-no-revoke</c>: the Schannel build does not
+/// check whether a certificate in a <paramref name="CaCertificateFile" /> chain is revoked.
+/// Without it the Schannel build checks, and a chain whose revocation status is unknown,
+/// such as one from a private CA with no revocation endpoint, fails with exit 60, as
+/// ADR-0086 decides. The OpenSSL build never checks, so ignores it.
+/// </param>
 public sealed record TlsClientOptions(
     bool Insecure = false,
     TlsMinimumVersion MinimumVersion = TlsMinimumVersion.SystemDefault,
@@ -79,4 +86,5 @@ public sealed record TlsClientOptions(
     string? Tls13Ciphers = null,
     string? CertificateType = null,
     string? PrivateKeyType = null,
-    string? Passphrase = null);
+    string? Passphrase = null,
+    bool SkipRevocationCheck = false);

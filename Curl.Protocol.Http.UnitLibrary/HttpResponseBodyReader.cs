@@ -56,6 +56,12 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     internal bool PassesTransferCoding { get; set; }
 
     /// <summary>
+    /// Gets or sets a value indicating whether the Transfer-Encoding is read as
+    /// <c>--tr-encoding</c> asks (<see cref="HttpResponseBodyFraming" />).
+    /// </summary>
+    internal bool DecodesTransferCoding { get; set; }
+
+    /// <summary>
     /// Gets or sets a value indicating whether the Content-Length is ignored and a body that is
     /// not chunked read until the peer closes, as <c>--ignore-content-length</c> asks.
     /// </summary>
@@ -67,6 +73,13 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     /// <see langword="null" />. It is the <c>out of</c> size of curl's exit 28 message.
     /// </summary>
     internal long? ExpectedLength { get; private set; }
+
+    /// <summary>
+    /// Gets or sets where the body bytes the output has accepted are reported, with
+    /// <see cref="ExpectedLength" /> as the expected total: once when reading starts and after
+    /// each write.
+    /// </summary>
+    internal HttpTransferProgress Progress { get; set; } = HttpTransferProgress.Silent;
 
     /// <summary>
     /// Determines whether a response carries a body: not for <c>-I</c>, and not for a
@@ -81,6 +94,32 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     /// <returns><see langword="true" /> when the body should be read.</returns>
     internal static bool HasBody(HttpResponseHead head, bool noBody) =>
         !noBody && head.StatusLine.StatusCode is not (204 or 304);
+
+    /// <summary>
+    /// Refuses a response whose Content-Encoding headers list more than
+    /// <see cref="HttpContentDecoder.MaximumCodings" /> codings, as curl 8.21.0 does for
+    /// <c>--compressed</c> while it reads the headers (measured, BL-364 Notes): whatever the
+    /// body, for <c>-I</c>, before <c>-f</c> and before a redirect is followed; but not for a
+    /// 204 or 304. A header before the one past the limit is read first, so an invalid
+    /// Content-Length or a refused Transfer-Encoding there is reported instead.
+    /// </summary>
+    /// <param name="head">The response's head.</param>
+    /// <param name="decodeContent"><see langword="true" /> for <c>--compressed</c> without <c>--raw</c>.</param>
+    /// <exception cref="HttpTransferException">
+    /// The codings are past the limit (exit 61), or a header before them is refused as
+    /// <see cref="HttpResponseBodyFraming.Of" /> says (exit 8 or 61).
+    /// </exception>
+    internal void ThrowIfTooManyContentCodings(HttpResponseHead head, bool decodeContent)
+    {
+        int? index = decodeContent && HasBody(head, noBody: false) ? HttpContentDecoder.IndexPastCodingLimit(head.Headers) : null;
+        if (index is null)
+        {
+            return;
+        }
+
+        HttpResponseBodyFraming.Of([.. head.Headers.Take(index.Value)], PassesTransferCoding, IgnoresContentLength, DecodesTransferCoding);
+        throw new HttpTransferException(CurlExitCode.BadContentEncoding, HttpTransferMessages.TooManyContentCodings);
+    }
 
     /// <summary>
     /// Reads the body and writes it to <paramref name="output" />, or reads nothing when the
@@ -98,6 +137,11 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     /// while <see cref="BytesWritten" /> still counts the encoded bytes, as curl's
     /// <c>%{size_download}</c> does.
     /// </param>
+    /// <param name="decodeTransfer">
+    /// <see langword="true" /> for <c>--tr-encoding</c> when the body is not discarded: the
+    /// Transfer-Encoding codings other than <c>chunked</c> are decoded, before any
+    /// Content-Encoding, and <see cref="BytesWritten" /> still counts the encoded bytes.
+    /// </param>
     /// <param name="cancellationToken">Cancels every read and write.</param>
     /// <returns>A task that completes when the whole body is written.</returns>
     /// <exception cref="HttpTransferException">
@@ -113,6 +157,7 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
         bool noBody,
         Stream output,
         bool decodeContent,
+        bool decodeTransfer,
         CancellationToken cancellationToken)
     {
         if (!HasBody(head, noBody))
@@ -120,9 +165,12 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
             return;
         }
 
-        HttpResponseBodyFraming framing = HttpResponseBodyFraming.Of(head.Headers, PassesTransferCoding, IgnoresContentLength);
-        contentDecoder = decodeContent ? HttpContentDecoder.For(head.Headers) : null;
+        HttpResponseBodyFraming framing = HttpResponseBodyFraming.Of(head.Headers, PassesTransferCoding, IgnoresContentLength, DecodesTransferCoding);
+        IEnumerable<string> contentCodings = decodeContent ? HttpContentDecoder.ContentCodings(head.Headers) : [];
+        IEnumerable<string> transferCodings = decodeTransfer ? framing.TransferCodings : [];
+        contentDecoder = HttpContentDecoder.ForCodings(contentCodings.Concat(transferCodings));
         ExpectedLength = framing.ContentLength;
+        Progress.ReportDownloaded(BytesWritten, ExpectedLength);
         try
         {
             await CopyFramedAsync(head.BodyPrefix, framing.IsChunked, framing.ContentLength, output, cancellationToken).ConfigureAwait(false);
@@ -183,7 +231,7 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
             {
                 ReadOnlyMemory<byte> data = decoder.DecodeNext(bytes, out int consumed);
                 bytes = bytes[consumed..];
-                await WriteAsync(output, data, cancellationToken).ConfigureAwait(false);
+                await WriteChunkDataAsync(output, data, cancellationToken).ConfigureAwait(false);
             }
 
             if (decoder.IsComplete)
@@ -198,6 +246,23 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
             }
 
             bytes = buffer.AsMemory(0, read);
+        }
+    }
+
+    /// <summary>
+    /// Writes one piece of chunk data. Bytes after the end of a decoded coding's stream fail
+    /// with exit 23 and the chunked message, as curl 8.21.0 reports them inside chunks
+    /// (measured, BL-365 Notes); every other failure keeps its own message.
+    /// </summary>
+    private async ValueTask WriteChunkDataAsync(Stream output, ReadOnlyMemory<byte> data, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await WriteAsync(output, data, cancellationToken).ConfigureAwait(false);
+        }
+        catch (HttpTransferException exception) when (exception.Message == HttpTransferMessages.ReceivedDataWriteFailed)
+        {
+            throw new HttpTransferException(exception.ExitCode, HttpTransferMessages.ChunkedStreamReadFailed);
         }
     }
 
@@ -276,6 +341,7 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
         }
 
         BytesWritten += bytes.Length;
+        Progress.ReportDownloaded(BytesWritten, ExpectedLength);
         return bytes.Length;
     }
 }

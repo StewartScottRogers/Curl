@@ -21,7 +21,11 @@ set -euo pipefail
 out="${1:?usage: render.sh <output directory>}"
 mkdir -p "$out"
 here="$(cd "$(dirname "$0")" && pwd)"
-py="$(command -v python3 || command -v python)"
+# The log, captions, playlist and stats generators are C# file-based apps (make-*.cs, base
+# class library only). `dotnet run --file` compiles each on first use and caches the build;
+# the SDK is the one global.json names. Run from the repository root: they read git there.
+export DOTNET_NOLOGO=1 DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1
+cs() { dotnet run --file "$here/$1.cs" -- "${@:2}"; }
 work="$out/.work"
 rm -rf "$work"
 mkdir -p "$work/hls/av1/4320p" "$work/hls/av1/2160p" "$work/hls/av1/1080p" \
@@ -36,8 +40,8 @@ scale=4
 # Target length of the animation, however long or short the project's history is.
 seconds=75
 
-"$py" "$here/make-log.py" > "$work/gource.log"
-"$py" "$here/make-captions.py" > "$work/captions.txt"
+cs make-log > "$work/gource.log"
+cs make-captions > "$work/captions.txt"
 first=$(head -n 1 "$work/gource.log" | cut -d'|' -f1)
 last=$(tail -n 1 "$work/gource.log" | cut -d'|' -f1)
 days=$(awk -v s=$(( last - first + 1 )) 'BEGIN { printf "%.2f", s / 86400 }')
@@ -105,7 +109,7 @@ echo "rendering ${width}x${height} at ${fps} fps: $days day(s) at ${spd}s/day, $
       -map "[still]" -update 1 -q:v 2 "$work/still-8k.jpg"
 
 for ladder in av1 h264; do
-    "$py" "$here/make-master-playlist.py" "$d/$ladder" > "$d/$ladder/master.m3u8"
+    cs make-master-playlist "$d/$ladder" > "$d/$ladder/master.m3u8"
 done
 
 # A fragmented MP4 is its init segment followed by its media segments; remux the 4K H.264
@@ -125,7 +129,7 @@ for spec in "1280 12 0.5" "1024 12 0.5" "800 12 0.5" "640 10 0.5" "640 10 0.33" 
     if [ "$(wc -c < "$work/gource.gif")" -le "$limit" ]; then break; fi
 done
 
-"$py" "$here/make-stats.py" "$work/gource.log" "$width" "$height" "$fps" > "$work/stats.json"
+cs make-stats "$work/gource.log" "$width" "$height" "$fps" > "$work/stats.json"
 
 # Move everything into place only now that every piece exists.
 rm -rf "$out/hls"

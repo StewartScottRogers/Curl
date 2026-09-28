@@ -1,0 +1,7 @@
+pop3: POP3 protocol
+ -l, --list-only                List only mode
+     --login-options <options>  Server login options
+     --oauth2-bearer <token>    OAuth 2 Bearer Token
+ -X, --request <method>         Specify request method to use
+     --ssl                      Try enabling TLS
+     --ssl-reqd                 Require SSL/TLS

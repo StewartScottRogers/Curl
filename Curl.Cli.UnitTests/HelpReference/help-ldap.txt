@@ -1,0 +1,6 @@
+ldap: LDAP protocol
+     --login-options <options>  Server login options
+     --oauth2-bearer <token>    OAuth 2 Bearer Token
+     --ssl                      Try enabling TLS
+     --ssl-reqd                 Require SSL/TLS
+ -B, --use-ascii                Use ASCII/text transfer

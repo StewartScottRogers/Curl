@@ -104,6 +104,18 @@ public sealed class TelnetProtocolHandlerTests
         Assert.AreEqual("Failed to connect to example.test port 23", result.ErrorMessage);
         Assert.AreEqual(0L, result.BytesTransferred);
         Assert.AreEqual(0L, output.Length);
+        Assert.IsFalse(result.IsConnectionRefused);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ConnectRefused_ReturnsExit7MarkedConnectionRefused()
+    {
+        var connector = new RecordingConnector(ConnectResult.Refused("Failed to connect to example.test port 23"));
+
+        TransferResult result = await new TelnetProtocolHandler(connector).ExecuteAsync(Context(TelnetUrl, new MemoryStream()));
+
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.IsTrue(result.IsConnectionRefused);
     }
 
     [TestMethod]

@@ -1,0 +1,7 @@
+scp: SCP protocol
+     --compressed-ssh           Enable SSH compression
+     --create-file-mode <mode>  File mode for created files
+     --hostpubmd5 <md5>         Acceptable MD5 hash of host public key
+     --hostpubsha256 <sha256>   Acceptable SHA256 hash of host public key
+ -k, --insecure                 Allow insecure server connections
+     --pubkey <key>             SSH Public key filename

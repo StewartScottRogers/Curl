@@ -109,11 +109,18 @@ public sealed record FileUrlPath
     /// </item>
     /// </list>
     /// <para>
-    /// This method then takes three steps. <strong>Drive letters:</strong> a path of the
-    /// form <c>/X:…</c> or <c>/X|…</c>, where <c>X</c> is a single ASCII letter, loses its
-    /// leading slash, so <c>file:///c:/Windows/win.ini</c> becomes an absolute Windows
-    /// path and <c>file:///C:%2FWindows/win.ini</c> opens <c>C:\Windows\win.ini</c>, as
-    /// curl 8.21.0 does; the <c>|</c> spelling is kept, because curl does not translate it.
+    /// This method then takes three steps. <strong>Drive letters:</strong> on Windows, a
+    /// path of the form <c>/X:…</c> or <c>/X|…</c>, where <c>X</c> is a single ASCII
+    /// letter, loses its leading slash, so <c>file:///c:/Windows/win.ini</c> becomes an
+    /// absolute Windows path and <c>file:///C:%2FWindows/win.ini</c> opens
+    /// <c>C:\Windows\win.ini</c>, as curl 8.21.0 does. The <c>|</c> is kept in both
+    /// <c>UrlPath</c> and <c>OsPath</c>, never rewritten to <c>:</c>: measured against the
+    /// curl 8.21.0 Schannel build, <c>file:///c|/Windows/win.ini</c> exits 37 with
+    /// <c>Could not open file c|/Windows/win.ini</c> even though that file exists, because
+    /// the <c>X|</c> to <c>X:</c> rewrite in <c>lib/file.c</c> only fires on a path that
+    /// still starts with <c>/</c>, and the slash is gone by then. On every other platform the slash stays, so
+    /// the same URL opens the absolute path <c>/C:/Windows/win.ini</c>, because curl
+    /// 8.21.0 strips it only inside <c>#ifdef DOS_FILESYSTEM</c> in <c>lib/file.c</c>.
     /// <strong>Quote:</strong> <c>UrlPath</c> is that text with each unescaped non-ASCII
     /// character encoded as its UTF-8 bytes and the hexadecimal digits of each well-formed
     /// escape uppercased, a malformed one left as written. <strong>Decode:</strong>
@@ -126,7 +133,32 @@ public sealed record FileUrlPath
     /// <exception cref="ArgumentNullException">
     /// <paramref name="url" /> is <see langword="null" />.
     /// </exception>
-    public static bool TryParse(CurlUrl url, [MaybeNullWhen(false)] out FileUrlPath path)
+    public static bool TryParse(CurlUrl url, [MaybeNullWhen(false)] out FileUrlPath path) =>
+        TryParse(url, OperatingSystem.IsWindows(), out path);
+
+    /// <summary>
+    /// Extracts the URL path and the operating-system path from a <c>file://</c> URL with
+    /// the drive-letter rule of the chosen platform.
+    /// </summary>
+    /// <param name="url">The URL to read. Its scheme must be <c>file</c>.</param>
+    /// <param name="driveLetters">
+    /// <see langword="true" /> for the Windows rule, which drops the slash in front of a
+    /// <c>/X:…</c> or <c>/X|…</c> drive; <see langword="false" /> for every other
+    /// platform, which keeps it.
+    /// </param>
+    /// <param name="path">
+    /// On success, the parsed pair; otherwise undefined and not to be read.
+    /// </param>
+    /// <returns>
+    /// <see langword="true" /> when <paramref name="url" /> is a <c>file://</c> URL.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="url" /> is <see langword="null" />.
+    /// </exception>
+    internal static bool TryParse(
+        CurlUrl url,
+        bool driveLetters,
+        [MaybeNullWhen(false)] out FileUrlPath path)
     {
         ArgumentNullException.ThrowIfNull(url);
 
@@ -138,7 +170,9 @@ public sealed record FileUrlPath
         }
 
         // CurlUrl reads a scheme only before ":/", so the path is never empty here.
-        string urlPath = StripDriveLetterSlash(url.AbsolutePath);
+        string urlPath = driveLetters
+            ? StripDriveLetterSlash(url.AbsolutePath)
+            : url.AbsolutePath;
 
         path = new FileUrlPath(
             UppercaseEscapes(EncodeNonAscii(urlPath)),

@@ -68,7 +68,7 @@ public sealed class CurlCommandRunnerStandardOutputFailureTests
     {
         FileProtocolHandler file = new(new InMemoryFileSystem { ReadContent = new byte[bodyLength] });
 
-        return RunAsync(["-sS", "file:///C:/body.bin"], file);
+        return RunAsync(["-sS", "file:///body.bin"], file);
     }
 
     private Task<int> RunTelnetAsync(int lineLength, int lineCount)

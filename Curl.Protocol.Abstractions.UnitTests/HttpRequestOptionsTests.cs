@@ -24,6 +24,7 @@ public sealed class HttpRequestOptionsTests
         Assert.AreEqual(HttpFailMode.None, options.Fail);
         Assert.AreEqual(HttpVersionPreference.Http11, options.Version);
         Assert.IsFalse(options.Compressed);
+        Assert.IsFalse(options.TransferEncoding);
         Assert.IsFalse(options.Raw);
         Assert.IsFalse(options.IgnoreContentLength);
         Assert.IsNull(options.RequestTarget);
@@ -53,6 +54,7 @@ public sealed class HttpRequestOptionsTests
             Fail = HttpFailMode.FailWithBody,
             Version = HttpVersionPreference.Http10,
             Compressed = true,
+            TransferEncoding = true,
             Raw = true,
             IgnoreContentLength = true,
             RequestTarget = "*",
@@ -72,6 +74,7 @@ public sealed class HttpRequestOptionsTests
         Assert.AreEqual(HttpFailMode.FailWithBody, options.Fail);
         Assert.AreEqual(HttpVersionPreference.Http10, options.Version);
         Assert.IsTrue(options.Compressed);
+        Assert.IsTrue(options.TransferEncoding);
         Assert.IsTrue(options.Raw);
         Assert.IsTrue(options.IgnoreContentLength);
         Assert.AreEqual("*", options.RequestTarget);

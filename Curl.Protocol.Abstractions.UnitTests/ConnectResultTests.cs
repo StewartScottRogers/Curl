@@ -176,6 +176,66 @@ public sealed class ConnectResultTests
         Assert.AreEqual(0L, result.ConnectionNumber);
     }
 
+    [TestMethod]
+    public void Failed_Always_IsNotConnectionRefused()
+    {
+        Assert.IsFalse(ConnectResult.Failed(CurlExitCode.CouldntConnect, "failed").IsConnectionRefused);
+        Assert.IsFalse(ConnectResult.Connected(new UnusedConnection()).IsConnectionRefused);
+    }
+
+    [TestMethod]
+    public void Refused_Always_IsCouldntConnectMarkedRefusedWithNoConnection()
+    {
+        var result = ConnectResult.Refused("Failed to connect to 127.0.0.1:1 after 0 ms: Could not connect to server");
+
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.AreEqual("Failed to connect to 127.0.0.1:1 after 0 ms: Could not connect to server", result.ErrorMessage);
+        Assert.IsTrue(result.IsConnectionRefused);
+        Assert.IsNull(result.Connection);
+    }
+
+    [TestMethod]
+    public void Failed_WithoutTimings_CarriesNoTimings()
+    {
+        Assert.IsNull(ConnectResult.Failed(CurlExitCode.CouldntConnect, "failed").Timings);
+        Assert.IsNull(ConnectResult.Refused("refused").Timings);
+    }
+
+    [TestMethod]
+    public void Failed_WithTimings_CarriesThemWithNoConnection()
+    {
+        var timings = new ConnectTimings(10, 20, null, null);
+
+        var result = ConnectResult.Failed(CurlExitCode.CouldntConnect, "failed", timings);
+
+        Assert.AreSame(timings, result.Timings);
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.IsNull(result.Connection);
+        Assert.IsFalse(result.IsConnectionRefused);
+    }
+
+    [TestMethod]
+    public void Failed_WithTimingsAndOk_ThrowsArgumentOutOfRangeException()
+    {
+        var exception = Assert.ThrowsExactly<ArgumentOutOfRangeException>(
+            () => ConnectResult.Failed(CurlExitCode.Ok, "unused", new ConnectTimings(10, 20, null, null)));
+
+        Assert.AreEqual("exitCode", exception.ParamName);
+    }
+
+    [TestMethod]
+    public void Refused_WithTimings_CarriesThemMarkedRefused()
+    {
+        var timings = new ConnectTimings(10, 20, null, null);
+
+        var result = ConnectResult.Refused("refused", timings);
+
+        Assert.AreSame(timings, result.Timings);
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.IsTrue(result.IsConnectionRefused);
+        Assert.IsNull(result.Connection);
+    }
+
     private sealed class UnusedConnection : IConnection
     {
         public bool IsSecure => false;

@@ -9,7 +9,7 @@ namespace Curl.Console;
 /// <summary>
 /// The cookies of one run, as curl 8.21.0's tool sets them up from <c>-b</c>, <c>-c</c> and
 /// <c>-j</c>: one <see cref="CookieStore" /> shared by every URL, the <c>-b</c> files loaded into
-/// it before the first transfer, and the <c>-c</c> jar written from it after each HTTP transfer.
+/// it before the first <c>http</c> or <c>https</c> transfer, and the <c>-c</c> jar written from it after each HTTP transfer.
 /// </summary>
 /// <remarks>
 /// Measured on curl 8.21.0 (mingw, Schannel) against a loopback recorder on 2026-09-26 (BL-237
@@ -17,12 +17,17 @@ namespace Curl.Console;
 /// cookie engine - storing the <c>Set-Cookie</c> headers received and sending them to later
 /// requests - is on only when a <c>-b</c> file is named (one that does not exist included) or
 /// <c>-c</c> is given; with nothing but <c>-b name=value</c> strings, received cookies are
-/// never stored.
+/// never stored. The <c>-b name=value</c> strings are left out altogether when an <c>-H</c> value
+/// names <c>Cookie</c> (<c>-H "Cookie:"</c> included), while the stored cookies are still sent
+/// (BL-182 Notes, BL-291).
 /// </remarks>
 internal sealed class CookieEngine
 {
     /// <summary>The <c>-c</c> value that writes the jar to standard output.</summary>
     private const string StandardOutputJar = "-";
+
+    /// <summary>The <c>-b</c> file name that reads the cookies from standard input.</summary>
+    private const string StandardInputCookieFile = "-";
 
     private readonly CookieStore store = new();
 
@@ -32,20 +37,11 @@ internal sealed class CookieEngine
 
     private readonly bool discardSessionCookies;
 
+    private bool cookieFilesLoaded;
+
     private CookieEngine(CommandLineOptions options)
     {
-        foreach (CommandLineCookie cookie in options.Cookies)
-        {
-            if (cookie.IsCookieString)
-            {
-                store.AddCookieString(cookie.Value);
-            }
-            else
-            {
-                cookieFiles.Add(cookie.Value);
-            }
-        }
-
+        AddCookies(options.Cookies, sendCookieStrings: !options.Headers.Any(NamesCookie));
         cookieJar = options.CookieJar;
         discardSessionCookies = options.JunkSessionCookies;
         HandlerStore = cookieFiles.Count > 0 || cookieJar is not null ? store : new CookieStringSender(store);
@@ -66,16 +62,33 @@ internal sealed class CookieEngine
         options.Cookies.Count > 0 || options.CookieJar is not null ? new CookieEngine(options) : null;
 
     /// <summary>
-    /// Loads every <c>-b</c> file, in command-line order, dropping session cookies under <c>-j</c>;
-    /// a file that cannot be opened loads nothing and is not an error, as in curl.
+    /// Loads every <c>-b</c> file, in command-line order, dropping session cookies under <c>-j</c>,
+    /// the first time it is called; later calls load nothing. A file that cannot be opened loads
+    /// nothing and is not an error, as in curl. <c>-b -</c> reads standard input to its end, so a
+    /// second <c>-b -</c> finds it empty (measured on curl 8.21.0 on 2026-09-27, BL-316 Notes).
     /// </summary>
     /// <param name="fileSystem">Opens the files.</param>
+    /// <param name="standardInput">What <c>-b -</c> reads; it is left open.</param>
     /// <param name="now">The time that decides which loaded cookies have expired.</param>
     /// <returns>A task that completes when every file is loaded.</returns>
-    internal async Task LoadCookieFilesAsync(IFileSystem fileSystem, DateTimeOffset now)
+    internal async Task LoadCookieFilesAsync(IFileSystem fileSystem, Stream standardInput, DateTimeOffset now)
     {
+        if (cookieFilesLoaded)
+        {
+            return;
+        }
+
+        cookieFilesLoaded = true;
         foreach (string cookieFile in cookieFiles)
         {
+            if (cookieFile == StandardInputCookieFile)
+            {
+                using StreamReader reader = new(standardInput, Encoding.Latin1, detectEncodingFromByteOrderMarks: false, leaveOpen: true);
+                using StringReader text = new(await reader.ReadToEndAsync().ConfigureAwait(false));
+                store.LoadCookieFile(text, discardSessionCookies, now);
+                continue;
+            }
+
             await store.LoadCookieFileAsync(fileSystem, cookieFile, discardSessionCookies, now, CancellationToken.None)
                 .ConfigureAwait(false);
         }
@@ -111,6 +124,37 @@ internal sealed class CookieEngine
     }
 
     /// <summary>
+    /// Keeps each <c>-b</c> file to load and puts each <c>-b name=value</c> string in the store,
+    /// unless <paramref name="sendCookieStrings" /> is <see langword="false" />.
+    /// </summary>
+    /// <param name="cookies">The <c>-b</c> values, in command-line order.</param>
+    /// <param name="sendCookieStrings">Whether the <c>name=value</c> strings are sent.</param>
+    private void AddCookies(IEnumerable<CommandLineCookie> cookies, bool sendCookieStrings)
+    {
+        foreach (CommandLineCookie cookie in cookies)
+        {
+            if (!cookie.IsCookieString)
+            {
+                cookieFiles.Add(cookie.Value);
+            }
+            else if (sendCookieStrings)
+            {
+                store.AddCookieString(cookie.Value);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Tells whether an <c>-H</c> value names <c>Cookie</c> as curl's <c>Curl_checkheaders</c>
+    /// matches it: the name, in any case, followed by <c>:</c> or <c>;</c>.
+    /// </summary>
+    /// <param name="header">The <c>-H</c> value.</param>
+    /// <returns><see langword="true" /> when it names <c>Cookie</c>.</returns>
+    private static bool NamesCookie(string header) =>
+        header.StartsWith("Cookie:", StringComparison.OrdinalIgnoreCase)
+        || header.StartsWith("Cookie;", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
     /// Sends the <c>-b name=value</c> strings and stores nothing, as curl does while its cookie
     /// engine is off.
     /// </summary>
@@ -119,7 +163,7 @@ internal sealed class CookieEngine
     {
         public string? GetCookieHeader(CurlUrl url, bool secure, DateTimeOffset now) => store.GetCookieHeader(url, secure, now);
 
-        public void StoreFromResponse(CurlUrl url, IReadOnlyList<string> setCookieHeaders, DateTimeOffset now)
+        public void StoreFromResponse(CurlUrl url, IReadOnlyList<string> setCookieHeaders, DateTimeOffset now, ITransferEvents events)
         {
         }
     }

@@ -9,12 +9,14 @@ namespace Curl.Cli;
 /// </summary>
 public sealed class CommandLineParseResult
 {
-    private CommandLineParseResult(CommandLineOptions? options, CommandLineRefusal? refusal, IReadOnlyList<string> warningLines, IReadOnlyList<string> warningLinesAfterTransfers)
+    private CommandLineParseResult(CommandLineOptions? options, CommandLineRefusal? refusal, IReadOnlyList<string> warningLines, IReadOnlyList<string> warningLinesAfterTransfers, string? notedDefaultConfigFile, IReadOnlyList<string?> configFileHelpSubjects)
     {
         Options = options;
         Refusal = refusal;
         WarningLines = warningLines;
         WarningLinesAfterTransfers = warningLinesAfterTransfers;
+        NotedDefaultConfigFile = notedDefaultConfigFile;
+        ConfigFileHelpSubjects = configFileHelpSubjects;
     }
 
     /// <summary>
@@ -55,6 +57,29 @@ public sealed class CommandLineParseResult
     public IReadOnlyList<string> WarningLinesAfterTransfers { get; }
 
     /// <summary>
+    /// The default config file (<c>.curlrc</c>) curl 8.21.0 announces with
+    /// <c>Note: Read config file from '&lt;path&gt;'</c>: <see cref="CommandLineOptions.DefaultConfigFile"/>
+    /// when one was read and <c>-v</c> or a <c>--trace</c> option had been read by the time parsing
+    /// ended, accepted or refused; <see langword="null"/> otherwise, and always for
+    /// <see cref="CommandLineRefusal.EmptyCommandLine"/>, which curl refuses before it reads the
+    /// command line. <c>--bogus -v</c> names none, because the <c>-v</c> was never read. The console
+    /// layer writes the note after the refusal's lines, or before them when
+    /// <see cref="CommandLineRefusal.FoundAtTransferSetup"/> is set (measured 2026-09-27, BL-352).
+    /// </summary>
+    public string? NotedDefaultConfigFile { get; }
+
+    /// <summary>
+    /// The subjects of the <c>help</c> / <c>-h</c> lines read from <c>-K</c> files and the default config
+    /// file, in the order read, accepted or refused; a <see langword="null"/> entry asks for the usage
+    /// page; empty when there were none. curl 8.21.0 prints each page on standard output as it reads the
+    /// line and carries on, so the console layer prints these pages with <see cref="CurlHelpText"/>
+    /// before anything else: <c>curl -K cfg</c> with <c>help</c> in <c>cfg</c> prints the usage page and
+    /// then <c>curl: (2) no URL specified</c>, and <c>curl -K cfg -V</c> prints the page and then the
+    /// version (measured 2026-09-27, BL-375).
+    /// </summary>
+    public IReadOnlyList<string?> ConfigFileHelpSubjects { get; }
+
+    /// <summary>
     /// Creates the result for an accepted command line, with the warning lines its options
     /// collected and the ones curl prints after the transfers.
     /// </summary>
@@ -66,22 +91,42 @@ public sealed class CommandLineParseResult
             options.HasMoreOutputOptionsThanUrls && !options.Silent
                 ? [CommandLineWarning.MoreOutputOptionsThanUrls]
                 : [];
-        return new(options, null, options.WarningLines, warningLinesAfterTransfers);
+        return new(options, null, options.WarningLines, warningLinesAfterTransfers, NotedDefaultConfigFileOf(options), options.ConfigFileHelpSubjects);
     }
 
     /// <summary>
-    /// Creates the result for a command line whose parsing <c>-V</c> / <c>--version</c> ended: accepted,
-    /// with the warning lines met before it and none after the transfers, because there are none.
+    /// Creates the result for a command line whose parsing <c>-V</c> / <c>--version</c>, <c>-M</c> /
+    /// <c>--manual</c> or <c>-h</c> / <c>--help</c> ended: accepted, with the warning lines met before it
+    /// and none after the transfers, because there are none.
     /// </summary>
-    /// <param name="options">The options read up to and including <c>-V</c>.</param>
-    /// <returns>A result whose <see cref="IsAccepted"/> is <see langword="true"/> and whose options ask for the version.</returns>
-    internal static CommandLineParseResult VersionRequested(CommandLineOptions options) =>
-        new(options, null, options.WarningLines, []);
+    /// <param name="options">The options read up to and including the option that asked.</param>
+    /// <returns>
+    /// A result whose <see cref="IsAccepted"/> is <see langword="true"/> and whose options ask for the
+    /// version, the manual or help.
+    /// </returns>
+    internal static CommandLineParseResult InformationRequested(CommandLineOptions options) =>
+        new(options, null, options.WarningLines, [], NotedDefaultConfigFileOf(options), options.ConfigFileHelpSubjects);
 
-    /// <summary>Creates the result for a refused command line.</summary>
+    /// <summary>Creates the result for a command line refused once reading it had begun.</summary>
     /// <param name="refusal">The first refusal met.</param>
-    /// <param name="warningLines">The warning lines met before the refusal.</param>
+    /// <param name="options">The options read before the refusal, whose warning lines it keeps.</param>
     /// <returns>A result whose <see cref="IsAccepted"/> is <see langword="false"/>.</returns>
-    internal static CommandLineParseResult Refused(CommandLineRefusal refusal, IReadOnlyList<string> warningLines) =>
-        new(null, refusal, warningLines, []);
+    internal static CommandLineParseResult Refused(CommandLineRefusal refusal, CommandLineOptions options) =>
+        new(null, refusal, options.WarningLines, [], NotedDefaultConfigFileOf(options), options.ConfigFileHelpSubjects);
+
+    /// <summary>
+    /// Creates the result for <see cref="CommandLineRefusal.EmptyCommandLine"/>, which names no
+    /// default config file: curl refuses it before reading the command line, so it prints no note.
+    /// </summary>
+    /// <param name="options">The options the default config file filled in, whose warning lines and help subjects it keeps.</param>
+    /// <returns>A result whose <see cref="IsAccepted"/> is <see langword="false"/>.</returns>
+    internal static CommandLineParseResult RefusedEmpty(CommandLineOptions options) =>
+        new(null, CommandLineRefusal.EmptyCommandLine(), options.WarningLines, [], null, options.ConfigFileHelpSubjects);
+
+    /// <summary>
+    /// <see cref="CommandLineOptions.DefaultConfigFile"/> when <c>-v</c> or a <c>--trace</c> option is
+    /// on; otherwise <see langword="null"/>.
+    /// </summary>
+    private static string? NotedDefaultConfigFileOf(CommandLineOptions options) =>
+        options.Trace == TraceKind.None ? null : options.DefaultConfigFile;
 }

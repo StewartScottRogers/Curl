@@ -8,16 +8,16 @@ namespace Curl.Protocol.Http;
 /// <summary>
 /// Formats the head of an HTTP/1.1 or HTTP/1.0 request - the request line, the headers and the empty
 /// line after them - byte for byte as curl 8.21.0 sends it for <c>-X</c>, <c>-H</c>,
-/// <c>-A</c>, <c>-e</c>, <c>-I</c>, <c>--compressed</c>, an <c>Authorization</c> value, a
+/// <c>-A</c>, <c>-e</c>, <c>-I</c>, <c>--compressed</c>, <c>--tr-encoding</c>, an <c>Authorization</c> value, a
 /// <c>Cookie</c> value, a request body, a forward proxy, <c>--proxy-header</c>, <c>-r</c>, <c>-C</c> and <c>-z</c>. Every
-/// rule was measured (BL-172, BL-175, BL-177, BL-178, BL-180, BL-181, BL-182, BL-183, BL-296 and BL-332 Notes).
+/// rule was measured (BL-172, BL-175, BL-177, BL-178, BL-180, BL-181, BL-182, BL-183, BL-296, BL-306, BL-315 and BL-332 Notes).
 /// </summary>
 /// <remarks>
 /// The request line ends in <c>HTTP/1.0</c> for <c>-0</c> and in <c>HTTP/1.1</c> otherwise;
 /// the headers are the same for both. curl's own headers come first, in the order <c>Host</c>, <c>Proxy-Authorization</c>,
 /// <c>Authorization</c>, <c>Range</c>, <c>Content-Range</c> (for a <c>-T</c> upload resumed with
-/// <c>-C</c>, <see cref="HttpUploadResume" />), <c>User-Agent</c>, <c>Accept</c>, <c>Accept-Encoding</c> (for
-/// <c>--compressed</c>), <c>Referer</c>, <c>Proxy-Connection: Keep-Alive</c> (through a forward
+/// <c>-C</c>, or <c>-r</c> on a <c>-d</c> body or a <c>-T</c> upload, <see cref="HttpRequestFraming.ContentRange" />), <c>User-Agent</c>, <c>Accept</c>, <c>TE: gzip</c> (for
+/// <c>--tr-encoding</c>), <c>Accept-Encoding</c> (for <c>--compressed</c>), <c>Referer</c>, <c>Proxy-Connection: Keep-Alive</c> (through a forward
 /// proxy), each left out when an <c>-H</c> value names it, then the cookie store's
 /// <c>Cookie</c>, then <c>If-Modified-Since</c> or <c>If-Unmodified-Since</c> for <c>-z</c>, also
 /// left out when an <c>-H</c> value names it; <c>Cookie</c> and <c>Proxy-Authorization</c> are sent even when an <c>-H</c>
@@ -27,7 +27,8 @@ namespace Curl.Protocol.Http;
 /// same rules; of curl's own headers they override only <c>Proxy-Connection</c> (BL-296 Notes). A custom <c>Host</c> is the exception: it takes the <c>Host</c> slot. A request with a body ends with <c>Content-Length</c> (or
 /// <c>Transfer-Encoding: chunked</c> when the length is unknown), <c>Content-Type</c> and
 /// <c>Expect: 100-continue</c> as <see cref="HttpRequestFraming" /> decides, each again left
-/// out when an <c>-H</c> value names it. Text is sent one byte per character (Latin-1), as curl
+/// out when an <c>-H</c> value names it. The <c>Connection</c> lines come last of all
+/// (<see cref="AppendConnection" />), with <c>TE</c> added for <c>--tr-encoding</c>. Text is sent one byte per character (Latin-1), as curl
 /// sends a command-line argument on Windows; a character above U+00FF takes Latin-1's
 /// best fit, such as <c>A</c> for U+0100, or else <c>?</c>.
 /// </remarks>
@@ -45,6 +46,8 @@ internal static class HttpRequestHeadFormatter
     internal const string AcceptEncoding = "deflate, gzip, br";
 
     private const string HostName = "Host";
+
+    private const string ConnectionName = "Connection";
 
     /// <summary>
     /// Formats the request head for <paramref name="url" />.
@@ -121,6 +124,7 @@ internal static class HttpRequestHeadFormatter
         AppendCustomHeaders(head, customHeaders, hostLine is not null);
         AppendCustomHeaders(head, proxyHeaders, hostLine is not null);
         AppendBodyHeaders(head, customHeaders, framing);
+        AppendConnection(head, customHeaders, SendsTe(options, customHeaders));
         head.Append("\r\n");
         return Encoding.Latin1.GetBytes(head.ToString());
     }
@@ -163,13 +167,15 @@ internal static class HttpRequestHeadFormatter
         options.Version == HttpVersionPreference.Http10 ? " HTTP/1.0" : " HTTP/1.1";
 
     /// <summary>
-    /// Appends <c>User-Agent</c>, <c>Accept</c>, <c>Accept-Encoding</c> (for
-    /// <c>--compressed</c>) and <c>Referer</c>, each unless an <c>-H</c> value names it.
+    /// Appends <c>User-Agent</c>, <c>Accept</c>, <c>TE: gzip</c> (for <c>--tr-encoding</c>),
+    /// <c>Accept-Encoding</c> (for <c>--compressed</c>) and <c>Referer</c>, each unless an
+    /// <c>-H</c> value names it.
     /// </summary>
     private static void AppendClientHeaders(StringBuilder head, HttpCustomHeader[] customHeaders, HttpRequestOptions options)
     {
         AppendUnlessOverridden(head, customHeaders, "User-Agent", options.UserAgent ?? DefaultUserAgent);
         AppendUnlessOverridden(head, customHeaders, "Accept", "*/*");
+        AppendUnlessOverridden(head, customHeaders, "TE", options.TransferEncoding ? "gzip" : null);
         AppendUnlessOverridden(head, customHeaders, "Accept-Encoding", options.Compressed ? AcceptEncoding : null);
         AppendUnlessOverridden(head, customHeaders, "Referer", options.Referer);
     }
@@ -237,13 +243,16 @@ internal static class HttpRequestHeadFormatter
 
     /// <summary>
     /// Appends each <c>-H</c> or <c>--proxy-header</c> value that sends a line, in order,
-    /// leaving out every <c>Host:</c> line when a <c>Host</c> line was already written.
+    /// leaving out every <c>Host:</c> line when a <c>Host</c> line was already written, and
+    /// every value naming <c>Connection</c>, which <see cref="AppendConnection" /> places.
     /// </summary>
     private static void AppendCustomHeaders(StringBuilder head, HttpCustomHeader[] customHeaders, bool hostLineWritten)
     {
         foreach (HttpCustomHeader header in customHeaders)
         {
-            if (header.SentLine is { } line && !(hostLineWritten && line.StartsWith("Host:", StringComparison.OrdinalIgnoreCase)))
+            if (header.SentLine is { } line
+                && !header.Names(ConnectionName)
+                && !(hostLineWritten && line.StartsWith("Host:", StringComparison.OrdinalIgnoreCase)))
             {
                 head.Append(line).Append("\r\n");
             }
@@ -268,5 +277,34 @@ internal static class HttpRequestHeadFormatter
         AppendUnlessOverridden(head, customHeaders, "Transfer-Encoding", framing.KnownLength is null ? "chunked" : null);
         AppendUnlessOverridden(head, customHeaders, "Content-Type", framing.IsUpload ? null : body.ContentType);
         AppendUnlessOverridden(head, customHeaders, "Expect", framing.AddsExpect ? "100-continue" : null);
+    }
+
+    /// <summary>
+    /// Tells whether <c>TE: gzip</c> is sent: for <c>--tr-encoding</c>, unless an <c>-H</c>
+    /// value names <c>TE</c>.
+    /// </summary>
+    private static bool SendsTe(HttpRequestOptions options, HttpCustomHeader[] customHeaders) =>
+        options.TransferEncoding && !customHeaders.Any(header => header.Names("TE"));
+
+    /// <summary>
+    /// Appends the <c>Connection</c> lines last, after <c>Expect</c>, as curl 8.21.0 does
+    /// (measured, BL-315 Notes): the first <c>-H</c> value naming <c>Connection</c> that has a
+    /// value, without the white space around it and with <c>, TE</c> added when
+    /// <paramref name="sendsTe" />, or <c>Connection: TE</c> alone when there is no such value;
+    /// then every later one verbatim. A <c>Connection</c> value with nothing after its colon
+    /// or semicolon, and a <c>--proxy-header</c> naming <c>Connection</c>, is not sent at all.
+    /// </summary>
+    /// <param name="head">The head being written.</param>
+    /// <param name="customHeaders">The <c>-H</c> values.</param>
+    /// <param name="sendsTe"><see langword="true" /> when <c>TE: gzip</c> was sent.</param>
+    private static void AppendConnection(StringBuilder head, HttpCustomHeader[] customHeaders, bool sendsTe)
+    {
+        HttpCustomHeader[] connections = [.. customHeaders.Where(header => header.Names(ConnectionName) && header.Value is not null)];
+        string[] options = [.. connections.Take(1).Select(header => header.Value!), .. sendsTe ? ["TE"] : Array.Empty<string>()];
+        AppendAlways(head, ConnectionName, string.Join(", ", options));
+        foreach (HttpCustomHeader header in connections.Skip(1))
+        {
+            head.Append(header.Entry).Append("\r\n");
+        }
     }
 }

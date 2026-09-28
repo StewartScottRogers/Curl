@@ -107,6 +107,27 @@ public sealed class TftpDownloadRetransmissionTests
         Assert.AreEqual("Operation timed out after 5000 milliseconds with 0 bytes received", result.ErrorMessage);
     }
 
+    /// <summary>
+    /// A <c>-L -m 2</c> chain whose first hop took 1.5 s and ends on a silent
+    /// <c>tftp://</c> hop: curl 8.21.0 printed <c>Operation timed out after 2011
+    /// milliseconds with 0 bytes received</c> (BL-350 Notes), counting from the first
+    /// request.
+    /// </summary>
+    /// <returns>A task that completes when the test has run.</returns>
+    [TestMethod]
+    public async Task ExecuteAsync_SilentServerMaxTime2OperationStarted1500MillisecondsEarlier_OperationTimedOutAfter500MillisecondsReporting2000()
+    {
+        var channel = Channel();
+
+        var result = await Run(
+            channel,
+            Context(maxTime: TimeSpan.FromSeconds(2), operationStarted: -TimeSpan.FromMilliseconds(1500).Ticks));
+
+        Assert.AreEqual(TimeSpan.FromMilliseconds(500), clock.Now);
+        Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
+        Assert.AreEqual("Operation timed out after 2000 milliseconds with 0 bytes received", result.ErrorMessage);
+    }
+
     [TestMethod]
     public async Task ExecuteAsync_SilentAfterFirstBlockMaxTime20_ResendsAckOnScheduleFromTimeLeftThenOperationTimedOutAt20()
     {
@@ -384,13 +405,15 @@ public sealed class TftpDownloadRetransmissionTests
         TimeSpan? connectTimeout = null,
         TimeSpan? maxTime = null,
         Stream? output = null,
-        CancellationToken cancellationToken = default) =>
+        CancellationToken cancellationToken = default,
+        long? operationStarted = null) =>
         new()
         {
             Url = CurlUrl.Parse("tftp://h/file.txt"),
             Output = output ?? new MemoryStream(),
             ConnectTimeout = connectTimeout,
             MaxTime = maxTime,
+            OperationStarted = operationStarted,
             TimeProvider = clock,
             CancellationToken = cancellationToken,
         };

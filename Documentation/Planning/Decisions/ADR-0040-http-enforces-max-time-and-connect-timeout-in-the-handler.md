@@ -49,8 +49,8 @@ Costs and caveats:
 
 - `-m` spans a `-L` chain only because `RedirectFollower` passes the chain's start on
   (see the amendment below); a caller that calls the handler several times for one
-  operation must do the same. The TFTP handler does not read `OperationStarted` yet, so a
-  redirect to `tftp://` restarts `-m` for that hop.
+  operation must do the same. The HTTP and TFTP handlers both read
+  `OperationStarted`.
 - DNS resolution happens inside the connector, so a slow lookup reports curl's connect
   message rather than `Resolving timed out after N milliseconds`.
 - A connector that throws `OperationCanceledException` on its own would be reported as a
@@ -74,6 +74,12 @@ request (`t_startsingle`).
 - `HttpTransferDeadline` runs `-m` for what is left of it since `OperationStarted`, none
   left meaning cancelled at once, and prints the operation message's N from there. The
   connect timeout and the connect message still count from the handler call.
+- `TftpTimeLimits` does the same for `tftp://` (BL-350): `-m` passes at `MaxTime` after
+  `OperationStarted`, and the timeout message's N counts from there. The connect timeout
+  and the re-send schedule still count from the handler call. Measured with
+  `curl -sS -L -m 2 --proto-redir =tftp` and a first hop that answers 302 to a silent
+  `tftp://` port after 1.5 seconds: exit 28,
+  `Operation timed out after 2011 milliseconds with 0 bytes received` (BL-350 Notes).
 
 Rejected: passing each hop `MaxTime` minus the elapsed time. It limits the chain but prints
 the hop's elapsed time as N, not curl's.

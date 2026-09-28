@@ -11,7 +11,7 @@ namespace Curl.Cookies;
 /// </summary>
 /// <remarks>
 /// The Public Suffix List is not consulted here: a <c>Domain</c> that is a public suffix is refused
-/// by the cookie store (BL-223), not by this parser.
+/// by <see cref="CookieStore"/>, not by this parser.
 /// </remarks>
 public static class SetCookieParser
 {
@@ -59,7 +59,7 @@ public static class SetCookieParser
     /// <item><c>Max-Age</c> is read as leading digits after an optional quote, and always wins over
     /// <c>Expires</c>; no digits, or <c>0</c>, means already expired, and too many means the cap.</item>
     /// <item><c>Expires</c> counts only when no <c>Max-Age</c> or earlier date was read and it is
-    /// shorter than 80 characters; a text <see cref="CookieDateParser"/> refuses is ignored, and a date
+    /// shorter than 80 characters; a text <see cref="CurlDateParser"/> refuses is ignored, and a date
     /// at or before the epoch means already expired.</item>
     /// <item>Any other attribute is ignored.</item>
     /// </list>
@@ -295,7 +295,7 @@ public static class SetCookieParser
 
         private void SetExpiryFromExpires(string attributeValue)
         {
-            if (expiresUnixSeconds != 0 || attributeValue.Length >= ShortestIgnoredExpires || !CookieDateParser.TryParse(attributeValue, out long seconds))
+            if (expiresUnixSeconds != 0 || attributeValue.Length >= ShortestIgnoredExpires || !CurlDateParser.TryParse(attributeValue, out long seconds))
             {
                 return;
             }

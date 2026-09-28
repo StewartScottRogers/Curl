@@ -29,4 +29,10 @@ public enum FileAccessStatus
 
     /// <summary>The open failed for any other reason the operating system reported.</summary>
     IoError,
+
+    /// <summary>
+    /// A <see cref="FileWriteMode.CreateNew" /> open found a file already at the path, and
+    /// left it as it was.
+    /// </summary>
+    AlreadyExists,
 }

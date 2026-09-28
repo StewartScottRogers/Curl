@@ -7,8 +7,8 @@ namespace Curl.Protocol.Abstractions;
 /// an open connection, or the curl exit code and message that say why there is none.
 /// </summary>
 /// <remarks>
-/// A result is built only through the two <c>Connected</c> overloads and
-/// <see cref="Failed(CurlExitCode, string)" />, so a success always carries a connection
+/// A result is built only through the two <c>Connected</c> overloads and the two
+/// <c>Failed</c> and two <c>Refused</c> overloads, so a success always carries a connection
 /// and a failure always carries an exit code other than <see cref="CurlExitCode.Ok" />.
 /// </remarks>
 public sealed class ConnectResult
@@ -42,7 +42,8 @@ public sealed class ConnectResult
 
     /// <summary>
     /// Gets the points in time the connector recorded while it connected, or
-    /// <see langword="null" /> when it recorded none or the connect failed.
+    /// <see langword="null" /> when it recorded none. A failed connect carries them only
+    /// when built with timings, as <c>TcpConnector</c> builds a failed dial (ADR-0091).
     /// </summary>
     public ConnectTimings? Timings { get; private init; }
 
@@ -81,6 +82,14 @@ public sealed class ConnectResult
     /// the connector does not number connections or the connect failed.
     /// </summary>
     public long ConnectionNumber { get; private init; }
+
+    /// <summary>
+    /// Gets a value indicating whether the connect failed because the peer refused the last
+    /// address tried (<c>ECONNREFUSED</c>, curl's <c>CURLINFO_OS_ERRNO</c>), the only
+    /// exit 7 <c>--retry-connrefused</c> retries; <see langword="false" /> for a success
+    /// and for every other failure. Set only by <see cref="Refused(string)" />.
+    /// </summary>
+    public bool IsConnectionRefused { get; private init; }
 
     /// <summary>
     /// Creates the result of a successful connect that recorded no timings, endpoint or
@@ -158,7 +167,28 @@ public sealed class ConnectResult
     /// <paramref name="exitCode" /> is <see cref="CurlExitCode.Ok" />, which is not a
     /// failure; use <see cref="Connected(IConnection)" /> instead.
     /// </exception>
-    public static ConnectResult Failed(CurlExitCode exitCode, string errorMessage)
+    public static ConnectResult Failed(CurlExitCode exitCode, string errorMessage) =>
+        Failed(exitCode, errorMessage, null);
+
+    /// <summary>
+    /// Creates the result of a failed resolve, connect or TLS handshake, with the points in
+    /// time the connector recorded before it failed.
+    /// </summary>
+    /// <param name="exitCode">
+    /// The curl exit code, such as <see cref="CurlExitCode.CouldntResolveHost" /> (6) or
+    /// <see cref="CurlExitCode.CouldntConnect" /> (7).
+    /// </param>
+    /// <param name="errorMessage">The message curl prints for the failure.</param>
+    /// <param name="timings">
+    /// The points in time recorded before the failure, with <see cref="ConnectTimings.Connected" />
+    /// <see langword="null" />; or <see langword="null" /> when none were recorded.
+    /// </param>
+    /// <returns>A result with no <see cref="Connection" />.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="exitCode" /> is <see cref="CurlExitCode.Ok" />, which is not a
+    /// failure; use <see cref="Connected(IConnection)" /> instead.
+    /// </exception>
+    public static ConnectResult Failed(CurlExitCode exitCode, string errorMessage, ConnectTimings? timings)
     {
         if (exitCode == CurlExitCode.Ok)
         {
@@ -168,6 +198,36 @@ public sealed class ConnectResult
                 "A failed connect cannot report CurlExitCode.Ok; use ConnectResult.Connected instead.");
         }
 
-        return new ConnectResult(null, exitCode, errorMessage);
+        return new ConnectResult(null, exitCode, errorMessage) { Timings = timings };
     }
+
+    /// <summary>
+    /// Creates the result of a TCP connect whose last attempt the peer refused
+    /// (<c>ECONNREFUSED</c>): exit 7 with <see cref="IsConnectionRefused" /> set, the one
+    /// exit 7 curl's <c>--retry-connrefused</c> retries.
+    /// </summary>
+    /// <param name="errorMessage">The message curl prints for the failure.</param>
+    /// <returns>
+    /// A result with no <see cref="Connection" /> whose <see cref="ExitCode" /> is
+    /// <see cref="CurlExitCode.CouldntConnect" />.
+    /// </returns>
+    public static ConnectResult Refused(string errorMessage) =>
+        Refused(errorMessage, null);
+
+    /// <summary>
+    /// Creates the result of a TCP connect whose last attempt the peer refused, as
+    /// <see cref="Refused(string)" />, with the points in time the connector recorded before
+    /// the dial failed.
+    /// </summary>
+    /// <param name="errorMessage">The message curl prints for the failure.</param>
+    /// <param name="timings">
+    /// The points in time recorded before the failure, with <see cref="ConnectTimings.Connected" />
+    /// <see langword="null" />; or <see langword="null" /> when none were recorded.
+    /// </param>
+    /// <returns>
+    /// A result with no <see cref="Connection" /> whose <see cref="ExitCode" /> is
+    /// <see cref="CurlExitCode.CouldntConnect" />.
+    /// </returns>
+    public static ConnectResult Refused(string errorMessage, ConnectTimings? timings) =>
+        new(null, CurlExitCode.CouldntConnect, errorMessage) { IsConnectionRefused = true, Timings = timings };
 }

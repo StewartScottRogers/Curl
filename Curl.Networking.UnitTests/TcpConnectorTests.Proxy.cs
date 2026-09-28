@@ -37,6 +37,22 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_WhenAProxyOf300BytesDoesNotResolve_FailsWithCouldntResolveProxyCutTo255Characters()
+    {
+        // curl -x http://<300 a's>:3128 http://example.com/ -> curl: (5) Could not resolve proxy: <first 230 a's>
+        // (measured 2026-09-27 against curl 8.21.0, Schannel, BL-377).
+        var proxyHost = new string('a', 300);
+        var connector = new TcpConnector(new SystemDnsResolver(), new FakeTcpDialer(), new FakeTlsProvider(), new ManualTimeProvider());
+
+        var result = await connector.ConnectAsync(
+            PlainTarget with { Proxy = new ProxyEndpoint(ProxyKind.Http, proxyHost, 3128, null) },
+            CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.CouldntResolveProxy, result.ExitCode);
+        Assert.AreEqual("Could not resolve proxy: " + new string('a', 230), result.ErrorMessage);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_WhenTheProxyRefuses_FailsWithCouldntConnectNamingTargetAndProxy()
     {
         // curl -p -x localhost:1 http://example.com:8080/ ->
@@ -60,6 +76,7 @@ public sealed partial class TcpConnectorTests
         Assert.AreEqual(
             "Failed to connect to example.com:8080 over proxy localhost after 2268 ms: Could not connect to server",
             result.ErrorMessage);
+        Assert.IsTrue(result.IsConnectionRefused);
         CollectionAssert.AreEqual(new[] { new IPEndPoint(ProxyAddress, 1) }, dialer.DialedEndPoints);
     }
 
@@ -136,6 +153,7 @@ public sealed partial class TcpConnectorTests
         Assert.AreEqual(
             "Failed to connect to ::1:8080 over proxy localhost after 0 ms: Could not connect to server",
             result.ErrorMessage);
+        Assert.IsTrue(result.IsConnectionRefused);
     }
 
     [TestMethod]
@@ -207,23 +225,6 @@ public sealed partial class TcpConnectorTests
             CancellationToken.None);
 
         Assert.AreSame(failure, result);
-    }
-
-    [TestMethod]
-    [DataRow(ProxyKind.Https)]
-    [DataRow(ProxyKind.Socks4)]
-    [DataRow(ProxyKind.Socks4a)]
-    [DataRow(ProxyKind.Socks5)]
-    [DataRow(ProxyKind.Socks5Hostname)]
-    public async Task ConnectAsync_ThroughAProxyKindNotYetTunnelled_ThrowsNotSupportedExceptionAndNeverResolves(ProxyKind kind)
-    {
-        var resolver = new FakeDnsResolver(ProxyAddress);
-        var connector = new TcpConnector(resolver, new FakeTcpDialer(), new FakeTlsProvider(), new ManualTimeProvider());
-
-        await Assert.ThrowsExactlyAsync<NotSupportedException>(
-            async () => await connector.ConnectAsync(PlainTarget with { Proxy = HttpProxy with { Kind = kind } }, CancellationToken.None));
-
-        Assert.IsEmpty(resolver.ResolvedHosts);
     }
 
     private static TcpConnector CreateProxyConnector(ScriptedConnection proxyConnection, FakeTlsProvider tlsProvider) =>

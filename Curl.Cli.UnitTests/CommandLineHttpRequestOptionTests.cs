@@ -3,7 +3,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Cli;
 
 /// <summary>
-/// Pins <c>-X</c>/<c>--request</c>, <c>-H</c>/<c>--header</c>, <c>-A</c>/<c>--user-agent</c> and
+/// Pins <c>-X</c>/<c>--request</c>, <c>-H</c>/<c>--header</c>, <c>--proxy-header</c>, <c>-A</c>/<c>--user-agent</c> and
 /// <c>-e</c>/<c>--referer</c>. Measured with the local curl 8.21.0 (mingw, Schannel) on 2026-09-26 in
 /// Git Bash, against <c>http://127.0.0.1:1/</c> for standard error and exit codes and against a
 /// loopback listener on port 18787 for the request bytes:
@@ -24,6 +24,10 @@ namespace Curl.Cli;
 /// <c>-e ';auto'</c> is accepted; <c>-A -x</c>, <c>-e -x</c> and <c>-X -x</c> take <c>-x</c> as the value without a warning.</item>
 /// <item><c>--no-request</c>, <c>--no-header</c>, <c>--no-header=x</c>, <c>--no-user-agent</c> and
 /// <c>--no-referer</c> exit 2 with <c>curl: option &lt;as typed&gt;: the given option cannot be reversed with a --no- prefix</c>.</item>
+/// <item>(2026-09-27) <c>--proxy-header</c> reads its value and <c>@file</c> exactly as <c>-H</c> does, into its own list:
+/// <c>--proxy-header bogus</c> and <c>--proxy-header ''</c> warn <c>Warning: The provided proxy header 'bogus' does not look like a header?</c>;
+/// <c>--proxy-header @nosuch</c> exits 26 naming <c>--proxy-header</c>; <c>-x http://127.0.0.1:18346 --proxy-header @ph.txt
+/// --proxy-header "X-Q: 2"</c> sends the file's lines then <c>X-Q: 2</c> to the proxy; <c>--no-proxy-header</c> is not reversible.</item>
 /// </list>
 /// </summary>
 [TestClass]
@@ -61,6 +65,7 @@ public sealed class CommandLineHttpRequestOptionTests
         Assert.IsNull(result.Options.UserAgent);
         Assert.IsNull(result.Options.Referer);
         Assert.IsEmpty(result.Options.Headers);
+        Assert.IsEmpty(result.Options.ProxyHeaders);
     }
 
     [TestMethod]
@@ -312,6 +317,89 @@ public sealed class CommandLineHttpRequestOptionTests
     {
         ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(
             () => CommandLineWarning.HeaderDoesNotLookLikeAHeader(null!));
+
+        Assert.AreEqual("header", exception.ParamName);
+    }
+
+    [TestMethod]
+    public void Parse_SeveralProxyHeaders_KeepsThemVerbatimInOrderApartFromTheHeaders()
+    {
+        CommandLineParseResult result = Parse(["--proxy-header", "X-P: 1", "-H", "X: 0", "--proxy-header=X-Q: 2", Url]);
+
+        Assert.IsTrue(result.IsAccepted);
+        CollectionAssert.AreEqual(new[] { "X-P: 1", "X-Q: 2" }, result.Options.ProxyHeaders.ToArray());
+        CollectionAssert.AreEqual(new[] { "X: 0" }, result.Options.Headers.ToArray());
+        Assert.IsEmpty(result.WarningLines);
+    }
+
+    [TestMethod]
+    [DataRow("bogus")]
+    [DataRow("")]
+    public void Parse_ProxyHeaderWithoutColonOrSemicolon_WarnsAsAProxyHeaderAndKeepsIt(string header)
+    {
+        CommandLineParseResult result = Parse(["--proxy-header", header, Url]);
+
+        Assert.IsTrue(result.IsAccepted);
+        CollectionAssert.AreEqual(new[] { header }, result.Options.ProxyHeaders.ToArray());
+        CollectionAssert.AreEqual(
+            new[] { $"Warning: The provided proxy header '{header}' does not look like a header?" },
+            result.WarningLines.ToArray());
+    }
+
+    [TestMethod]
+    public void Parse_SilentBeforeProxyHeaderWithoutColon_DropsTheWarning()
+    {
+        CommandLineParseResult result = Parse(["-s", "--proxy-header", "bogus", Url]);
+
+        Assert.IsEmpty(result.WarningLines);
+    }
+
+    [TestMethod]
+    public void Parse_ProxyHeaderAtFile_AddsEachNonEmptyLineVerbatimThroughTheReader()
+    {
+        RecordingDataFileReader reader = new() { Files = { ["ph.txt"] = "A: 1\r\nB: 2\n\n  C: 3\nnocolon\n"u8.ToArray() } };
+
+        CommandLineParseResult result = Parse(["--proxy-header", "@ph.txt", "--proxy-header", "X-Q: 2", Url], reader);
+
+        Assert.IsTrue(result.IsAccepted);
+        CollectionAssert.AreEqual(
+            new[] { "A: 1", "B: 2", "  C: 3", "nocolon", "X-Q: 2" },
+            result.Options.ProxyHeaders.ToArray());
+        Assert.IsEmpty(result.Options.Headers);
+        CollectionAssert.AreEqual(new[] { "ph.txt" }, reader.Reads);
+        Assert.IsEmpty(result.WarningLines);
+    }
+
+    [TestMethod]
+    public void Parse_ProxyHeaderAtDash_ReadsStandardInput()
+    {
+        RecordingDataFileReader reader = new() { StandardInput = "X-P: from-stdin\n"u8.ToArray() };
+
+        CommandLineParseResult result = Parse(["--proxy-header", "@-", Url], reader);
+
+        Assert.IsTrue(result.IsAccepted);
+        CollectionAssert.AreEqual(new[] { "X-P: from-stdin" }, result.Options.ProxyHeaders.ToArray());
+    }
+
+    [TestMethod]
+    public void Parse_ProxyHeaderAtMissingFile_IsRefusedWithReadErrorInCurlsThreeLines()
+    {
+        CommandLineParseResult result = Parse(["--proxy-header", "@nosuch", Url]);
+
+        AssertRefused(result, CurlExitCode.ReadError, "curl: Failed to open nosuch", "curl: option --proxy-header: error encountered when reading a file");
+    }
+
+    [TestMethod]
+    public void Parse_NoProxyHeader_IsRefusedAsNotReversible()
+    {
+        AssertCannotBeReversed("--no-proxy-header");
+    }
+
+    [TestMethod]
+    public void ProxyHeaderDoesNotLookLikeAHeader_NullHeader_Throws()
+    {
+        ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(
+            () => CommandLineWarning.ProxyHeaderDoesNotLookLikeAHeader(null!));
 
         Assert.AreEqual("header", exception.ParamName);
     }

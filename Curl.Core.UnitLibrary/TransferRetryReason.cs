@@ -13,8 +13,26 @@ public enum TransferRetryReason
     Timeout,
 
     /// <summary>
+    /// The peer refused the connect (exit 7) and <c>--retry-connrefused</c> was given:
+    /// <c>: connection refused</c>.
+    /// </summary>
+    ConnectionRefused,
+
+    /// <summary>
     /// An HTTP or HTTPS server answered 408, 429, 500, 502, 503, 504, 522 or 524:
     /// <c>: HTTP error</c>.
     /// </summary>
     HttpError,
+
+    /// <summary>
+    /// An FTP or FTPS transfer failed after the server's last reply was a 4xx:
+    /// <c>: FTP error</c>.
+    /// </summary>
+    FtpError,
+
+    /// <summary>
+    /// The transfer failed for a reason curl does not retry by itself, and
+    /// <c>--retry-all-errors</c> was given: <c>(retrying all errors)</c>.
+    /// </summary>
+    AllErrors,
 }

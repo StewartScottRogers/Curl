@@ -2,7 +2,7 @@ namespace Curl.Console;
 
 /// <summary>
 /// Pins the text-mode stream: write-only, each line feed written as CR LF, every other byte
-/// unchanged, and flushes passed through.
+/// unchanged, flushes passed through, and the inner stream disposed only when owned.
 /// </summary>
 [TestClass]
 public sealed class LineFeedToCrLfStreamTests
@@ -64,5 +64,23 @@ public sealed class LineFeedToCrLfStreamTests
         await stream.FlushAsync();
 
         Assert.AreEqual(2, inner.Length);
+    }
+
+    [TestMethod]
+    public void Dispose_NotOwningTheInnerStream_LeavesItOpen()
+    {
+        using MemoryStream inner = new();
+        new LineFeedToCrLfStream(inner).Dispose();
+
+        Assert.IsTrue(inner.CanWrite);
+    }
+
+    [TestMethod]
+    public void Dispose_OwningTheInnerStream_DisposesIt()
+    {
+        MemoryStream inner = new();
+        new LineFeedToCrLfStream(inner, ownsInner: true).Dispose();
+
+        Assert.IsFalse(inner.CanWrite);
     }
 }

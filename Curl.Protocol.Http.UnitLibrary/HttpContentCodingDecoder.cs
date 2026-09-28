@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.IO.Compression;
 using Curl.Protocol.Abstractions;
 
@@ -23,6 +24,14 @@ namespace Curl.Protocol.Http;
 /// A body that ends before its coding's stream does is not an error: what was decoded is
 /// written and the rest is dropped, as curl does.
 /// </para>
+/// <para>
+/// A body with bytes after the end of its gzip member, zlib stream or Brotli stream, a second
+/// gzip member included, has the stream decoded and then fails with exit 23
+/// <see cref="HttpTransferMessages.ReceivedDataWriteFailed" />, as curl does; bytes after a
+/// raw deflate stream are dropped (measured, BL-281 Notes). Brotli is decoded with
+/// <see cref="BrotliDecoder" />, which says how many bytes its stream used; the end of a gzip
+/// member or a zlib stream is found from its <see cref="HttpContentChecksumTrailer" />.
+/// </para>
 /// </remarks>
 /// <param name="coding">The coding to decode.</param>
 internal sealed class HttpContentCodingDecoder(HttpContentCoding coding) : IDisposable
@@ -46,6 +55,14 @@ internal sealed class HttpContentCodingDecoder(HttpContentCoding coding) : IDisp
 
     private Stream? decompressor;
 
+    private BrotliDecoder brotli;
+
+    private HttpContentChecksumTrailer? trailer;
+
+    private byte[] carried = [];
+
+    private bool ended;
+
     /// <summary>
     /// Decodes the next piece of the encoded body.
     /// </summary>
@@ -54,45 +71,125 @@ internal sealed class HttpContentCodingDecoder(HttpContentCoding coding) : IDisp
     /// The decoded bytes, in pieces of at most <see cref="OutputSize" />; each piece is valid
     /// only until the next is asked for.
     /// </returns>
-    /// <exception cref="HttpTransferException">The encoded bytes are corrupt (exit 61).</exception>
+    /// <exception cref="HttpTransferException">
+    /// The encoded bytes are corrupt (exit 61), or go on after the end of the stream (exit 23).
+    /// </exception>
     internal IEnumerable<ReadOnlyMemory<byte>> Decode(ReadOnlyMemory<byte> encoded)
     {
+        if (ended)
+        {
+            throw BytesAfterTheEnd();
+        }
+
+        return coding == HttpContentCoding.Brotli ? DecodeBrotli(encoded) : DecodeDeflate(encoded);
+    }
+
+    /// <summary>
+    /// Releases the decompression stream, if one was chosen, and the Brotli decoder.
+    /// </summary>
+    public void Dispose()
+    {
+        decompressor?.Dispose();
+        brotli.Dispose();
+    }
+
+    private IEnumerable<ReadOnlyMemory<byte>> DecodeBrotli(ReadOnlyMemory<byte> encoded)
+    {
+        OperationStatus status;
+        do
+        {
+            status = brotli.Decompress(encoded.Span, output, out int consumed, out int written);
+            encoded = encoded[consumed..];
+            if (written > 0)
+            {
+                yield return output.AsMemory(0, written);
+            }
+        }
+        while (status == OperationStatus.DestinationTooSmall);
+
+        if (status == OperationStatus.InvalidData)
+        {
+            throw Corrupt(HttpTransferMessages.BadContentEncoding);
+        }
+
+        ended = status == OperationStatus.Done;
+        if (!encoded.IsEmpty)
+        {
+            throw BytesAfterTheEnd();
+        }
+    }
+
+    /// <summary>
+    /// Decodes a gzip, zlib or raw deflate stream, whichever the first bytes call for.
+    /// </summary>
+    private IEnumerable<ReadOnlyMemory<byte>> DecodeDeflate(ReadOnlyMemory<byte> encoded)
+    {
+        encoded = ChooseOnceEnoughArrived(encoded);
         if (decompressor is null)
         {
-            start = [.. start, .. encoded.Span];
-            decompressor = Choose(start);
-            if (decompressor is null)
-            {
-                yield break;
-            }
-
-            encoded = start;
-            start = [];
+            yield break;
         }
 
         input.Pending = encoded;
         int read;
         while ((read = ReadDecoded(decompressor)) > 0)
         {
+            trailer?.Append(output.AsSpan(0, read));
             yield return output.AsMemory(0, read);
+
+            // GZipStream goes on to decode a second gzip member; stop before it does.
+            if (decompressor is GZipStream)
+            {
+                FindEnd(encoded.Span);
+            }
+        }
+
+        if (trailer is not null)
+        {
+            FindEndOnceFinished(encoded.Span);
+            Carry(encoded.Span);
         }
     }
 
     /// <summary>
-    /// Releases the decompression stream, if one was chosen.
+    /// Holds the first bytes until there are enough to choose the decompression stream, and
+    /// returns the bytes to decode: none while they are held, then every byte held.
     /// </summary>
-    public void Dispose() => decompressor?.Dispose();
+    private ReadOnlyMemory<byte> ChooseOnceEnoughArrived(ReadOnlyMemory<byte> encoded)
+    {
+        if (decompressor is not null)
+        {
+            return encoded;
+        }
+
+        start = [.. start, .. encoded.Span];
+        decompressor = Choose(start);
+        if (decompressor is null)
+        {
+            return ReadOnlyMemory<byte>.Empty;
+        }
+
+        byte[] held = start;
+        start = [];
+        return held;
+    }
+
+    /// <summary>
+    /// Keeps the last encoded bytes, as many as the trailer can have begun in before the next
+    /// encoded bytes.
+    /// </summary>
+    private void Carry(ReadOnlySpan<byte> encoded)
+    {
+        carried = [.. carried, .. encoded];
+        carried = carried[Math.Max(0, carried.Length - trailer!.CarriedLength)..];
+    }
 
     /// <summary>
     /// Chooses the decompression stream the first bytes call for, or none while there are
     /// too few of them to tell.
     /// </summary>
-    private Stream? Choose(ReadOnlySpan<byte> first) => coding switch
-    {
-        HttpContentCoding.Brotli => new BrotliStream(input, CompressionMode.Decompress),
-        HttpContentCoding.Gzip => ChooseForGzip(first),
-        _ => ChooseForDeflate(first),
-    };
+    private Stream? Choose(ReadOnlySpan<byte> first) =>
+        coding == HttpContentCoding.Gzip ? ChooseForGzip(first) : ChooseForDeflate(first);
 
     private Stream? ChooseForGzip(ReadOnlySpan<byte> first)
     {
@@ -119,20 +216,75 @@ internal sealed class HttpContentCodingDecoder(HttpContentCoding coding) : IDisp
         return IsZLibHeader(first) ? ZLib(first[0]) : new DeflateStream(input, CompressionMode.Decompress);
     }
 
-    private GZipStream Gzip(byte method) =>
-        method == DeflateMethod
-            ? new GZipStream(input, CompressionMode.Decompress)
-            : throw Corrupt(HttpTransferMessages.UnknownCompressionMethod);
+    private GZipStream Gzip(byte method)
+    {
+        if (method != DeflateMethod)
+        {
+            throw Corrupt(HttpTransferMessages.UnknownCompressionMethod);
+        }
 
-    private ZLibStream ZLib(byte methodAndInfo) =>
-        (methodAndInfo & 0x0F) == DeflateMethod
-            ? new ZLibStream(input, CompressionMode.Decompress)
-            : throw Corrupt(HttpTransferMessages.UnknownCompressionMethod);
+        trailer = new HttpContentChecksumTrailer(isGzip: true);
+        return new GZipStream(input, CompressionMode.Decompress);
+    }
+
+    private ZLibStream ZLib(byte methodAndInfo)
+    {
+        if ((methodAndInfo & 0x0F) != DeflateMethod)
+        {
+            throw Corrupt(HttpTransferMessages.UnknownCompressionMethod);
+        }
+
+        trailer = new HttpContentChecksumTrailer(isGzip: false);
+        return new ZLibStream(input, CompressionMode.Decompress);
+    }
 
     /// <summary>
     /// Applies zlib's header check: the first two bytes, read big-endian, are a multiple of 31.
     /// </summary>
     private static bool IsZLibHeader(ReadOnlySpan<byte> first) => ((first[0] << 8) | first[1]) % 31 == 0;
+
+    /// <summary>
+    /// Looks for the end of the stream once every byte of <paramref name="encoded" /> has been
+    /// read: always for a gzip member, whose 8-byte trailer is not found by chance, and for a
+    /// zlib stream, whose trailer is 4 bytes, only once the stream says it has finished.
+    /// </summary>
+    private void FindEndOnceFinished(ReadOnlySpan<byte> encoded)
+    {
+        if (decompressor is GZipStream || HasFinished(decompressor!))
+        {
+            FindEnd(encoded);
+        }
+    }
+
+    /// <summary>
+    /// Tells whether <paramref name="stream" /> has reached the end of its stream: one that
+    /// has not reads its source again when read, and one that has does not.
+    /// </summary>
+    private bool HasFinished(Stream stream)
+    {
+        int reads = input.ReadCount;
+        _ = ReadDecoded(stream);
+        return input.ReadCount == reads;
+    }
+
+    /// <summary>
+    /// Records the end of the stream when its trailer ends within <paramref name="encoded" />,
+    /// and fails when bytes follow it.
+    /// </summary>
+    private void FindEnd(ReadOnlySpan<byte> encoded)
+    {
+        int end = ended ? -1 : trailer!.EndIn(carried, encoded);
+        if (end < 0)
+        {
+            return;
+        }
+
+        ended = true;
+        if (end < encoded.Length)
+        {
+            throw BytesAfterTheEnd();
+        }
+    }
 
     private int ReadDecoded(Stream stream)
     {
@@ -144,11 +296,10 @@ internal sealed class HttpContentCodingDecoder(HttpContentCoding coding) : IDisp
         {
             throw Corrupt(HttpTransferMessages.BadContentEncoding);
         }
-        catch (InvalidOperationException)
-        {
-            throw Corrupt(HttpTransferMessages.BadContentEncoding);
-        }
     }
 
     private static HttpTransferException Corrupt(string message) => new(CurlExitCode.BadContentEncoding, message);
+
+    private static HttpTransferException BytesAfterTheEnd() =>
+        new(CurlExitCode.WriteError, HttpTransferMessages.ReceivedDataWriteFailed);
 }

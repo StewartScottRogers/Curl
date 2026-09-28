@@ -17,11 +17,11 @@ public sealed class TransferContextFactoryTests
         using MemoryStream standardInput = new();
         using MemoryStream output = new();
         using MemoryStream headerOutput = new();
-        CurlUrl url = CurlUrl.Parse("file:///C:/x.txt");
+        CurlUrl url = CurlUrl.Parse("file:///x.txt");
         ByteRange range = ByteRange.Bounded(2, 5);
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse("file:///C:/x.txt"), url, output, range, 7, headerOutput);
+            .Create(Parse("file:///x.txt"), url, output, range, 7, headerOutput);
 
         Assert.AreSame(url, context.Url);
         Assert.AreSame(output, context.Output);
@@ -31,13 +31,63 @@ public sealed class TransferContextFactoryTests
     }
 
     [TestMethod]
+    public void Create_Progress_IsTheSinkGiven()
+    {
+        using MemoryStream standardInput = new();
+        using MemoryStream output = new();
+        TransferProgressRecorder progress = new(new ManualTimeProvider());
+
+        TransferContext context = new TransferContextFactory(standardInput)
+            .Create(Parse("file:///x.txt"), CurlUrl.Parse("file:///x.txt"), output, null, null, null, progress: progress);
+
+        Assert.AreSame(progress, context.Progress);
+    }
+
+    [TestMethod]
+    public void Create_ClockGiven_IsTheContextsTimeProvider()
+    {
+        using MemoryStream standardInput = new();
+        using MemoryStream output = new();
+        ManualTimeProvider clock = new();
+
+        TransferContext context = new TransferContextFactory(standardInput, clock)
+            .Create(Parse("file:///x.txt"), CurlUrl.Parse("file:///x.txt"), output, null, null, null);
+
+        Assert.AreSame(clock, context.TimeProvider);
+    }
+
+    [TestMethod]
+    public void Create_NoClock_IsTheSystemClock()
+    {
+        using MemoryStream standardInput = new();
+        using MemoryStream output = new();
+
+        TransferContext context = new TransferContextFactory(standardInput)
+            .Create(Parse("file:///x.txt"), CurlUrl.Parse("file:///x.txt"), output, null, null, null);
+
+        Assert.AreSame(TimeProvider.System, context.TimeProvider);
+    }
+
+    [TestMethod]
+    public void Create_NoProgress_IsNoTransferProgress()
+    {
+        using MemoryStream standardInput = new();
+        using MemoryStream output = new();
+
+        TransferContext context = new TransferContextFactory(standardInput)
+            .Create(Parse("file:///x.txt"), CurlUrl.Parse("file:///x.txt"), output, null, null, null);
+
+        Assert.AreSame(NoTransferProgress.Instance, context.Progress);
+    }
+
+    [TestMethod]
     public void Create_NoOptions_LeavesEveryOptionAtItsDefault()
     {
         using MemoryStream standardInput = new();
         using MemoryStream output = new();
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse("file:///C:/x.txt"), CurlUrl.Parse("file:///C:/x.txt"), output, null, null, null);
+            .Create(Parse("file:///x.txt"), CurlUrl.Parse("file:///x.txt"), output, null, null, null);
 
         Assert.IsNull(context.HeaderOutput);
         Assert.IsNull(context.Range);
@@ -49,6 +99,12 @@ public sealed class TransferContextFactoryTests
         Assert.IsEmpty(context.TelnetOptions);
         Assert.IsNull(context.TftpBlockSize);
         Assert.IsFalse(context.TftpNoOptions);
+        Assert.IsFalse(context.FtpDisableEpsv);
+        Assert.IsTrue(context.FtpSkipPasvIp);
+        Assert.AreEqual(FtpFileMethod.MultiCwd, context.FtpFileMethod);
+        Assert.IsFalse(context.FtpCreateDirectories);
+        Assert.IsFalse(context.ListOnly);
+        Assert.IsEmpty(context.QuoteCommands);
         Assert.AreEqual(TransferContext.DefaultCreateFileMode, context.CreateFileMode);
         Assert.IsNull(context.ConnectTimeout);
         Assert.IsNull(context.MaxTime);
@@ -68,6 +124,13 @@ public sealed class TransferContextFactoryTests
             "-t", "TTYPE=vt100",
             "--tftp-blksize", "1024",
             "--tftp-no-options",
+            "--disable-epsv",
+            "--no-ftp-skip-pasv-ip",
+            "--ftp-method", "singlecwd",
+            "--ftp-create-dirs",
+            "-l",
+            "-Q", "NOOP",
+            "-Q", "-DELE x",
             "--create-file-mode", "0600",
             "--connect-timeout", "3",
             "--path-as-is",
@@ -85,6 +148,12 @@ public sealed class TransferContextFactoryTests
         CollectionAssert.AreEqual(new[] { "TTYPE=vt100" }, context.TelnetOptions.ToArray());
         Assert.AreEqual(1024, context.TftpBlockSize);
         Assert.IsTrue(context.TftpNoOptions);
+        Assert.IsTrue(context.FtpDisableEpsv);
+        Assert.IsFalse(context.FtpSkipPasvIp);
+        Assert.AreEqual(FtpFileMethod.SingleCwd, context.FtpFileMethod);
+        Assert.IsTrue(context.FtpCreateDirectories);
+        Assert.IsTrue(context.ListOnly);
+        CollectionAssert.AreEqual(new[] { "NOOP", "-DELE x" }, context.QuoteCommands.ToArray());
         Assert.AreEqual(UnixFileMode.UserRead | UnixFileMode.UserWrite, context.CreateFileMode);
         Assert.AreEqual(TimeSpan.FromSeconds(3), context.ConnectTimeout);
         Assert.AreEqual(TimeSpan.FromSeconds(9), context.MaxTime);
@@ -99,18 +168,36 @@ public sealed class TransferContextFactoryTests
         using MemoryStream standardInput = new();
         using MemoryStream output = new();
         CommandLineOptions options = Parse(
-            "-X", "PATCH", "-H", "X: 1", "-A", "a/1", "-e", "http://r/", "-d", "a=b", "http://example.com/");
+            "-X", "PATCH", "-H", "X: 1", "--proxy-header", "X-P: 1", "--proxy-header", "X-Q: 2", "-A", "a/1", "-e", "http://r/", "-d", "a=b", "http://example.com/");
 
         TransferContext context = new TransferContextFactory(standardInput)
             .Create(options, CurlUrl.Parse("http://example.com/"), output, null, null, null);
 
         Assert.AreEqual("PATCH", context.Http!.CustomMethod);
         CollectionAssert.AreEqual(new[] { "X: 1" }, context.Http.Headers.ToArray());
+        CollectionAssert.AreEqual(new[] { "X-P: 1", "X-Q: 2" }, context.Http.ProxyHeaders.ToArray());
         Assert.AreEqual("a/1", context.Http.UserAgent);
         Assert.AreEqual("http://r/", context.Http.Referer);
         BytesBody body = (BytesBody)context.Http.Body!;
         Assert.AreEqual("a=b", System.Text.Encoding.ASCII.GetString(body.Content.Span));
         Assert.AreEqual(HttpRequestOptionsMapping.FormUrlEncoded, body.ContentType);
+    }
+
+    [TestMethod]
+    [DataRow("-", true, true)]
+    [DataRow("0", true, false)]
+    [DataRow("-", false, false)]
+    public void Create_ContinueAt_ResumesAnUploadFromAnUnknownOffsetOnlyForDashWithAnUpload(string continueAt, bool withUpload, bool expected)
+    {
+        using MemoryStream standardInput = new();
+        using MemoryStream output = new();
+        using MemoryStream upload = new();
+        CommandLineOptions options = Parse("-C", continueAt, "-T", "f.txt", "http://example.com/up");
+
+        TransferContext context = new TransferContextFactory(standardInput)
+            .Create(options, CurlUrl.Parse("http://example.com/up"), output, null, null, null, upload: withUpload ? upload : null);
+
+        Assert.AreEqual(expected, context.ResumeUploadFromUnknownOffset);
     }
 
     [TestMethod]

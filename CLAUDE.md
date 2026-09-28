@@ -42,11 +42,16 @@ Committing and pushing to a feature branch is automatic and needs no confirmatio
 `dotnet build` is clean and the fast tests are green, commit by logical unit and push;
 report it afterwards rather than asking first.
 
-One standing exception: the `gource` branch holds only the latest Gource render and is
+One standing exception: the `gource` branch holds only the latest showcase render (the Gource video and the coverage report) and is
 force-pushed on every render by `.github/workflows/gource.yml` (owned by the
-`gource-publisher` agent). That force push, to that branch only, needs no confirmation.
+`showcase-publisher` agent). That force push, to that branch only, needs no confirmation.
 
-Ask first for: a force push or any rewrite of already-pushed history, a merge to `master`,
+A second standing exception (Stewart, 2026-09-27): at the end of every dark factory
+shift, `RunDarkFactory.ps1` merges its branch into `master` through a pull request, but
+only when the `CI` workflow passed on Windows, Linux and macOS for the exact commit being
+merged. That merge needs no confirmation; a red or unfinished CI run means no merge.
+
+Ask first for: a force push or any rewrite of already-pushed history, any other merge to `master`,
 a tag or a release, creating a repository or changing its visibility, and deleting a
 branch. Irreversible GitHub actions are run directly and not through the subagent, which
 by design refuses authorization relayed to it in a prompt.
@@ -82,11 +87,22 @@ reset time, waits (the wait does not count against `-Hours`), warns a minute bef
 new session and reruns the cut-off task. See the script's header for the details.
 
 When Claude starts a shift it always passes `-NewTab`, e.g.
-`RunDarkFactory.cmd -NewTab -Lanes 4`. Inside herdr (`HERDR_ENV=1`) that opens the shift
+`RunDarkFactory.cmd -NewTab -Lanes 3 -Continuous`; `-Continuous` makes a shift that
+ends with work still ready start the next one itself. A shift ends before the tokens run
+out: once 85% of the 5-hour or weekly usage window is used (`-StopAtUsage`), lanes claim
+nothing new, finish what they hold and push; the next shift waits for a fresh 5-hour
+window, and a used-up weekly window raises the alarm. Inside herdr (`HERDR_ENV=1`) that opens the shift
 and each of its lanes as herdr tabs in the current workspace; outside herdr, as console
 windows. Never start one with `Start-Process` or a bare background command: Stewart
-watches shifts in herdr. Stop a shift by closing its tabs (or killing its process tree),
-then return any task left in `Doing` to `Backlog` with the board script.
+watches shifts in herdr. Stop a shift by closing its tabs (or killing its process tree).
+Leave its tasks in `Doing` and its lane worktrees as they are: the next shift adopts each
+stopped lane and resumes its task from the work in place. While a shift runs, its
+coordinator restarts any lane whose process dies, and lanes wait out the usage limit and
+carry on when tokens return - nobody needs to restart them.
+
+Every session, lanes included, whispers milestones to Stewart through the PostToolUse hook
+`.claude/hooks/whisper-milestone.ps1`: a task moved to Done, a commit made, a branch
+deleted - quietly, in Windows' Zira voice, one phrase at a time.
 ## Repository layout
 Flat and linear. Every project is a directory immediately under the repository root.
 There is no `src/` and no `tests/`; do not create them.
@@ -127,6 +143,11 @@ Each project folder may contain its own `CLAUDE.md` with project-specific rules;
   of the code as it is now, and intent is written as intent. A misaligned name or document
   is a defect, because it is how an agent reading this repository comes to believe
   something false. The `align-and-document` agent owns this.
+- **No Python, committed or throwaway.** Scripts, one-liners, file edits and loopback
+  test servers are PowerShell (or a C# file-based app, `dotnet run tool.cs`). Measure real
+  curl with `Record-CurlExchange.ps1` - it runs the loopback server, records the request
+  bytes, stdout, stderr and exit code - and extend it when it falls short, rather than
+  writing a server of your own. Edit files with the Edit tool, not generated scripts.
 - **Base class library only.** Write against `System.*`. Sockets, TLS, HTTP, DNS,
   compression, JSON and argument handling are all in the BCL already, and
   `Curl.Console` publishes native AOT, where every dependency is a trim risk. The
@@ -136,6 +157,15 @@ Each project folder may contain its own `CLAUDE.md` with project-specific rules;
   added — hand-roll the small piece needed, or stop and ask. Test projects use
   MSTest, the framework in the .NET SDK; no third-party test, mocking or assertion
   library is permitted.
+- **Tests pass on Windows, Linux and macOS.** CI runs the fast tests on all three, and
+  a red Linux or macOS job blocks the dark factory's merge to `master`, but lanes only
+  test on Windows - so write every test to be platform-neutral. No drive-letter URL
+  (`file:///C:/...`) or other Windows-only path, error text, certificate or key outside
+  a test marked `[OSCondition(OperatingSystems.Windows)]`; off Windows curl rejects a
+  drive letter in a `file://` URL, so such a test fails there with exit 3. Use a
+  drive-less URL such as `file:///dir/x` unless the drive letter is what the test is
+  about. Where curl's answer differs by platform, pin each platform's answer in its own
+  test (`[OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]` for the other).
 - Nullable reference types enabled, warnings treated as errors.
 - File-scoped namespaces; namespace matches folder path.
 - Central package management through `Directory.Packages.props`; never put a `Version` attribute on a `PackageReference` in a project file.

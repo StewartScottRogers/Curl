@@ -13,7 +13,9 @@ namespace Curl.Console;
 [TestClass]
 public sealed class CurlCommandRunnerProgressMeterTests
 {
-    private const string SourceUrl = "file:///C:/source.txt";
+    private const string SourceUrl = "file:///source.txt";
+
+    private const string UploadUrl = "http://h/up/";
 
     private static readonly string NewLine = Environment.NewLine;
 
@@ -62,6 +64,41 @@ public sealed class CurlCommandRunnerProgressMeterTests
     }
 
     [TestMethod]
+    public async Task RunAsync_ContinueAtDashWithUpload_WritesResumingFromMinusOneBeforeTheMeter()
+    {
+        outputFiles.ExistingContent["f.txt"] = Encoding.ASCII.GetBytes("abc");
+
+        int exitCode = await RunAsync(["-C", "-", "-T", "f.txt", UploadUrl], handler: RecordingProtocolHandler.WritingPath("http"));
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual("** Resuming transfer from byte position -1" + NewLine + Meter, StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_ContinueAtDashWithUploadAndExistingOutputFile_StillWritesResumingFromMinusOne()
+    {
+        outputFiles.ExistingContent["f.txt"] = Encoding.ASCII.GetBytes("abc");
+        outputFiles.ExistingContent["o3"] = Encoding.ASCII.GetBytes("xyz");
+
+        int exitCode = await RunAsync(
+            ["-C", "-", "-T", "f.txt", "-o", "o3", UploadUrl],
+            handler: RecordingProtocolHandler.WritingPath("http"));
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual("** Resuming transfer from byte position -1" + NewLine + Meter, StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_ContinueAt0WithUpload_WritesTheMeterWithoutTheResumingLine()
+    {
+        outputFiles.ExistingContent["f.txt"] = Encoding.ASCII.GetBytes("abc");
+
+        await RunAsync(["-C", "0", "-T", "f.txt", UploadUrl], handler: RecordingProtocolHandler.WritingPath("http"));
+
+        Assert.AreEqual(Meter, StandardErrorText);
+    }
+
+    [TestMethod]
     public async Task RunAsync_ContinueAt0_WritesTheMeterWithoutTheResumingLine()
     {
         await RunAsync(["-C", "0", "-o", "o1", SourceUrl]);
@@ -92,11 +129,13 @@ public sealed class CurlCommandRunnerProgressMeterTests
     }
 
     [TestMethod]
-    public async Task RunAsync_ProgressBar_WritesNoMeter()
+    public async Task RunAsync_ProgressBar_WritesNoMeterLines()
     {
-        await RunAsync(["-#", "-o", "o1", SourceUrl]);
+        outputFiles.ExistingContent["o2"] = Encoding.ASCII.GetBytes("01234");
 
-        Assert.AreEqual(string.Empty, StandardErrorText);
+        await RunAsync(["-#", "-C", "5", "-o", "o2", SourceUrl]);
+
+        StringAssert.DoesNotMatch(StandardErrorText, new System.Text.RegularExpressions.Regex("% Total|Dload|Resuming"));
     }
 
     [TestMethod]
@@ -137,12 +176,12 @@ public sealed class CurlCommandRunnerProgressMeterTests
     public async Task RunAsync_FailedTransfer_WritesOnlyItsErrorLine()
     {
         RecordingProtocolHandler missingSource =
-            RecordingProtocolHandler.Failing("file", CurlExitCode.FileCouldntReadFile, "Could not open file C:/source.txt");
+            RecordingProtocolHandler.Failing("file", CurlExitCode.FileCouldntReadFile, "Could not open file /source.txt");
 
         int exitCode = await RunAsync(["-o", "o1", SourceUrl], handler: missingSource);
 
         Assert.AreEqual(37, exitCode);
-        Assert.AreEqual("curl: (37) Could not open file C:/source.txt" + NewLine, StandardErrorText);
+        Assert.AreEqual("curl: (37) Could not open file /source.txt" + NewLine, StandardErrorText);
     }
 
     [TestMethod]

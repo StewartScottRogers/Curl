@@ -43,10 +43,29 @@
       -LimitWarnSeconds    before the reset: the new session is about to start
       on resuming          the new session has started, and which task it resumed
 
+    Lanes survive being stopped. Each lane records its process and the task it holds in
+    logs\lanes-<stamp>\; the coordinator restarts a lane whose process has died (five tries
+    each) and the lane resumes its task from the work in its worktree, first integrating
+    any finished commits it had not pushed. A new shift adopts a stopped shift's lanes the
+    same way instead of refusing to start over their tasks in Doing. A run that dies on
+    the API without naming the limit waits until a one-word probe is answered, then runs
+    again (three times at most).
+
     If the limit is lifted early, the shift carries on at once: every -LimitProbeMinutes
     the coordinator (or lone runner) asks Claude for one word, and an answer wakes every
     waiting runner. After resetting the limit by hand, `RunDarkFactory.cmd -Wake` does
     the same without waiting for the next probe.
+
+    Better still, a shift ends before the tokens run out. Every run logs how much of the
+    5-hour and the weekly usage window is used; once either reaches -StopAtUsage (85%)
+    no lane claims another task, the tasks already running finish, integrate and push,
+    and the shift ends clean. The next shift (-Continuous) starts at once and waits for
+    the 5-hour window to reset before starting its lanes; a used-up weekly window raises
+    the alarm instead, since it can be days from resetting.
+
+    At the end of every shift the coordinator merges the branch into master through a
+    pull request, by Stewart's standing permission - only when the CI workflow passed on
+    Windows, Linux and macOS for the exact commit being merged.
 
     The reset time comes from the run's rate_limit_event. Time spent waiting is added
     to the shift, so -Hours is always working time. With lanes, every lane waits on its
@@ -109,6 +128,13 @@ param(
     [ValidateRange(0, 600)][int]$LimitProbeMinutes = 10,
     # Wake a shift that is waiting for tokens (after resetting the limit), and exit.
     [switch]$Wake,
+    # With lanes: when a shift ends and the board still has ready work, start the next one.
+    [switch]$Continuous,
+    # Stop claiming new tasks once this share of the 5-hour or the weekly usage window is
+    # used, so the tasks already running finish, integrate and push before the tokens run
+    # out. The next shift waits for a fresh 5-hour window; a used-up weekly window raises
+    # the alarm instead. 1 means never stop early.
+    [ValidateRange(0.1, 1)][double]$StopAtUsage = 0.85,
     # How many tasks run at once, each in its own worktree and window. 1 is the classic
     # single-runner shift in this checkout.
     [ValidateRange(1, 8)][int]$Lanes = 1,
@@ -120,13 +146,16 @@ param(
     [int]$Lane = 0,
     [string]$Branch = '',
     [string]$LogRoot = '',
-    [string]$ShiftStamp = ''
+    [string]$ShiftStamp = '',
+    # The lane's worktree. Lanes run the coordinator's copy of this script, so a lane adopted
+    # with its worktree left as it was still runs the current code.
+    [string]$LaneDir = ''
 )
 
 # Continue, not Stop: native stderr from git or dotnet must never kill an unattended shift.
 $ErrorActionPreference = 'Continue'
 
-$Root = $PSScriptRoot
+$Root = if ($LaneDir) { $LaneDir.Trim('"') } else { $PSScriptRoot }
 # The board script and every Claude run use this checkout, never one inherited from a
 # Claude Code session that happened to start the shift.
 $env:CLAUDE_PROJECT_DIR = $Root
@@ -177,7 +206,9 @@ function Start-Detached {
     # new tab in the same herdr workspace when inside herdr, else a new console window.
     # Returns @{ Process = <Process> } or @{ Tab = '<tab id>' }.
     param([string]$Label, [string]$Dir, [string[]]$ScriptArgs)
-    $script = Join-Path $Dir 'RunDarkFactory.ps1'
+    # Always this copy of the script; a lane is told its worktree with -LaneDir.
+    $script = $PSCommandPath
+    if ((Resolve-Path $Dir).Path -ne (Resolve-Path $PSScriptRoot).Path) { $ScriptArgs = @($ScriptArgs) + @('-LaneDir', "`"$Dir`"") }
     $herdr = Get-HerdrBin
     if ($herdr) {
         $create = @('tab', 'create', '--cwd', $Dir, '--label', $Label, '--no-focus')
@@ -455,6 +486,40 @@ function Format-SpokenSpan {
 function ConvertTo-Unix { param([datetime]$When) return ([DateTimeOffset]$When).ToUnixTimeSeconds() }
 function ConvertFrom-Unix { param([long]$Seconds) return [DateTimeOffset]::FromUnixTimeSeconds($Seconds).LocalDateTime }
 
+function Get-UsageReading {
+    # The newest usage reading a run logged: the share of the 5-hour and the weekly window
+    # used, and when each resets. A window whose reset has passed reads 0. -ThisShift looks
+    # only at this shift's runs, so a lane never stops on a reading from before a reset
+    # that was lifted early. $null when no run has logged a reading.
+    param([switch]$ThisShift)
+    $filter = if ($ThisShift) { "*-$Stamp*.jsonl" } else { '*.jsonl' }
+    $files = Get-ChildItem $LogDir -Filter $filter -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 10
+    foreach ($f in $files) {
+        $line = Select-String -LiteralPath $f.FullName -Pattern '"five_hour":\{"utilization":' | Select-Object -Last 1
+        if (-not $line) { continue }
+        $text = $line.Line
+        if ($text -notmatch '"five_hour":\{"utilization":([0-9.]+),"resetsAt":(\d+)') { continue }
+        $reading = [pscustomobject]@{ FiveHour = [double]$Matches[1]; FiveHourResets = ConvertFrom-Unix ([long]$Matches[2]); Week = 0.0; WeekResets = [datetime]::MinValue }
+        if ($text -match '"seven_day":\{"utilization":([0-9.]+),"resetsAt":(\d+)') {
+            $reading.Week = [double]$Matches[1]; $reading.WeekResets = ConvertFrom-Unix ([long]$Matches[2])
+        }
+        if ($reading.FiveHourResets -le (Get-Date)) { $reading.FiveHour = 0.0 }
+        if ($reading.WeekResets -le (Get-Date)) { $reading.Week = 0.0 }
+        return $reading
+    }
+    return $null
+}
+
+function Get-UsageStop {
+    # Why no new task should be claimed now - the weekly or the 5-hour window is at least
+    # -StopAtUsage used - or '' when there is room or this shift has no reading yet.
+    $u = Get-UsageReading -ThisShift
+    if (-not $u) { return '' }
+    if ($u.Week -ge $StopAtUsage) { return "weekly tokens $([math]::Round($u.Week * 100))% used, reset $($u.WeekResets.ToString('ddd HH:mm'))" }
+    if ($u.FiveHour -ge $StopAtUsage) { return "session tokens $([math]::Round($u.FiveHour * 100))% used, reset $($u.FiveHourResets.ToString('HH:mm'))" }
+    return ''
+}
+
 function Get-OutOfTokensUntil {
     # When the last run was refused for the account's usage limit, the local time the
     # limit resets; otherwise $null. The run's rate_limit_event gives it exactly; the
@@ -610,6 +675,21 @@ function Wait-ForNewSession {
     return ((Get-Date) - $began)
 }
 
+function Wait-ForFreshSession {
+    # A shift starts on a fresh session: while the 5-hour window is at least -StopAtUsage
+    # used, announce its reset and wait for it. Returns '', or - when it is the weekly
+    # window that is used up, days from resetting - why Stewart must be called instead.
+    $u = Get-UsageReading
+    if (-not $u) { return '' }
+    if ($u.Week -ge $StopAtUsage) {
+        return "WEEKLY TOKENS $([math]::Round($u.Week * 100))% USED  they reset $($u.WeekResets.ToString('dddd d MMM HH:mm')); start the factory again then, or with fewer lanes"
+    }
+    if ($u.FiveHour -lt $StopAtUsage) { return '' }
+    Write-Trace '-' 'tokens' "session tokens $([math]::Round($u.FiveHour * 100))% used; this shift starts on the new session at $($u.FiveHourResets.ToString('HH:mm'))" 'Yellow'
+    [void](Wait-ForNewSession -Id '-' -Until $u.FiveHourResets)
+    return ''
+}
+
 if ($Wake) {
     # Tells every runner of the newest shift that is waiting for tokens to carry on now.
     $file = Get-ChildItem $LogDir -Filter 'limit-*.txt' -ErrorAction SilentlyContinue | Sort-Object LastWriteTime | Select-Object -Last 1
@@ -702,6 +782,41 @@ function Invoke-Requeue {
 
 function Get-Dirty { return @(git -C $Root status --porcelain) | Where-Object { $_ } }
 
+function Invoke-MergeToMaster {
+    # Stewart's standing permission (2026-09-27): at the end of a shift, merge the branch
+    # into master through a pull request - only when the CI workflow passed, on every
+    # platform, for the exact commit being merged. Returns a line for the trace.
+    param([string]$Branch)
+    if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { return 'not merged: gh is not installed' }
+    git -C $Root fetch -q origin master $Branch 2>&1 | Out-Null
+    if ([int](git -C $Root rev-list --count "origin/master..origin/$Branch") -eq 0) { return "nothing on $Branch to merge" }
+    $head = (git -C $Root rev-parse "origin/$Branch").Trim()
+    $short = $head.Substring(0, 7)
+    # CI on the last push takes a few minutes; wait for the run on this exact commit.
+    $deadline = (Get-Date).AddMinutes(30)
+    $run = $null
+    while ($true) {
+        $run = @(gh run list --workflow CI --branch $Branch --commit $head --limit 1 --json status,conclusion 2>$null | ConvertFrom-Json)
+        if ($run.Count -and $run[0].status -eq 'completed') { break }
+        if ((Get-Date) -ge $deadline) { return "not merged: CI did not finish on $short within 30 min" }
+        Start-Sleep -Seconds 30
+    }
+    if ($run[0].conclusion -ne 'success') { return "not merged: CI $($run[0].conclusion) on $short" }
+    $open = @(gh pr list --head $Branch --base master --state open --json number --limit 1 2>$null | ConvertFrom-Json)
+    if ($open.Count) { $number = $open[0].number }
+    else {
+        $bodyFile = Join-Path $LogDir "pr-body-$Stamp.md"
+        $robot = [char]::ConvertFromUtf32(0x1F916)
+        [IO.File]::WriteAllText($bodyFile, "Dark factory shift $Stamp. CI passed on Windows, Linux and macOS for $short.`n`n$robot Generated with [Claude Code](https://claude.com/claude-code)`n", (New-Object Text.UTF8Encoding($false)))
+        $url = gh pr create --base master --head $Branch --title "Dark factory shift $Stamp" --body-file $bodyFile 2>$null
+        if ("$url" -notmatch '/pull/(\d+)') { return 'not merged: could not open the pull request' }
+        $number = $Matches[1]
+    }
+    gh pr merge $number --merge 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) { return "not merged: gh pr merge refused pull request #$number" }
+    return "merged $short into master (pull request #$number)"
+}
+
 function Save-StrayChanges {
     param([string]$Id)
     if (-not (Get-Dirty)) { return }
@@ -718,6 +833,8 @@ wait for input; nobody will reply.
 Run /task-run {ID}.
 
 Rules for this unattended run, in addition to CLAUDE.md:
+0. No Python, not even a one-liner: PowerShell for scripts and checks, the Edit tool
+   for edits, and Record-CurlExchange.ps1 to measure real curl (extend it if needed).
 1. Where a choice has a sensible default, take it and record the choice and why under
    the task's Notes.
 2. Design and behaviour decisions are yours: Stewart has delegated them (CLAUDE.md,
@@ -746,8 +863,8 @@ FACTORY: BLOCKED {ID} <the blocker>
 
 # Put in front of either prompt when a task runs again after the usage limit.
 $ResumeNote = @'
-RESUMING. The previous run of {ID} was cut off when the account ran out of tokens, before
-the task was finished. Whatever that run had done is still here: read git status, git log
+RESUMING. The previous run of {ID} was cut off before the task was finished - the account
+ran out of tokens, the API failed, or the lane was stopped and restarted. Whatever that run had done is still here: read git status, git log
 and the task file before changing anything, and carry on from that work rather than
 starting over.
 
@@ -765,6 +882,8 @@ Run /task-run {ID}. The shift has already claimed {ID}: it is in Tasks/Doing. Sk
 claim step, do not move it to Doing again, and do not take any other task.
 
 Rules for this unattended run, in addition to CLAUDE.md:
+0. No Python, not even a one-liner: PowerShell for scripts and checks, the Edit tool
+   for edits, and Record-CurlExchange.ps1 to measure real curl (extend it if needed).
 1. Where a choice has a sensible default, take it and record the choice and why under
    the task's Notes.
 2. Design and behaviour decisions are yours: Stewart has delegated them (CLAUDE.md,
@@ -829,7 +948,9 @@ $Forbidden = @(
     'git push origin master', 'git push origin HEAD:master', 'git merge',
     'git tag', 'git branch -D', 'git branch -d', 'git reset --hard',
     'dotnet add package', 'dotnet remove package',
-    'gh pr merge', 'gh release', 'gh repo'
+    'gh pr merge', 'gh release', 'gh repo',
+    # No Python (CLAUDE.md): PowerShell, the Edit tool and Record-CurlExchange.ps1 instead.
+    'python', 'python3', 'py'
 )
 # A lane's run also never touches the remote or the branch: the shift owns both.
 $LaneForbidden = $Forbidden + @('git push', 'git pull', 'git fetch', 'git rebase', 'git checkout', 'git switch', 'git worktree', 'git stash')
@@ -1084,6 +1205,15 @@ function Invoke-Integrate {
                 Invoke-Git @('commit', '-q', '-m', "chore(tasks): renumber task IDs another lane took first`n`n$($dedupe -join "`n")") | Out-Null
                 foreach ($line in $dedupe) { Write-Trace $Id 'renum' $line 'DarkYellow' }
             }
+            # Keep Done short enough for Stewart to read at a glance. Only the lane holding
+            # this lock archives, on top of every other lane's work, so two lanes never
+            # move the same finished tasks into different folders.
+            $archived = (Invoke-Board @('archive', '-WhenDoneIsLong')) | Where-Object { $_ -match '^Archived ' }
+            if ($archived) {
+                Invoke-Git @('add', '-A', '--', 'Tasks/Done') | Out-Null
+                Invoke-Git @('commit', '-q', '-m', "chore(tasks): archive Done once it grew past the short list`n`n$archived") | Out-Null
+                Write-Trace $Id 'archive' $archived
+            }
             if ($State -eq 'Done') {
                 $red = Test-Green
                 if ($red) { return "$red after rebasing onto the other lanes' work" }
@@ -1124,6 +1254,84 @@ function Write-LaneSummary {
     Set-Content -Path (Join-Path $dir "lane-$Lane.txt") -Value $Lines -Encoding UTF8
 }
 
+# Lane state, in logs\lanes-<stamp>\: lane-<n>.pid (the lane's process, so the coordinator
+# can tell a dead lane from a busy one) and lane-<n>.task (the task it holds in Doing, so a
+# restarted lane - or the next shift - resumes it instead of losing it).
+function Get-LaneStatePath {
+    param([int]$N, [string]$Kind, [string]$ForStamp = $Stamp)
+    return (Join-Path (Join-Path $LogDir "lanes-$ForStamp") "lane-$N.$Kind")
+}
+
+function Set-LaneState {
+    param([string]$Kind, [string]$Value)
+    $path = Get-LaneStatePath $Lane $Kind
+    New-Item -ItemType Directory -Force -Path (Split-Path $path) | Out-Null
+    if ($Value) { Set-Content -Path $path -Value $Value -Encoding ASCII } else { Remove-Item $path -ErrorAction SilentlyContinue }
+}
+
+function Get-LaneState {
+    param([int]$N, [string]$Kind, [string]$ForStamp = $Stamp)
+    $path = Get-LaneStatePath $N $Kind $ForStamp
+    if (Test-Path $path) { return "$(Get-Content $path -TotalCount 1)".Trim() }
+    return ''
+}
+
+function Test-LaneAlive {
+    # True while lane <n>'s process runs. No pid file yet means it is still starting.
+    param([int]$N, [string]$ForStamp = $Stamp)
+    $lanePid = Get-LaneState $N 'pid' $ForStamp
+    if (-not $lanePid) { return $true }
+    $p = Get-Process -Id ([int]$lanePid) -ErrorAction SilentlyContinue
+    return [bool]($p -and $p.ProcessName -match 'powershell')
+}
+
+function Test-TokensAvailable {
+    # Asks Claude for one word. $true when it answers, $false when the usage limit (or any
+    # API failure) refuses it. Used where a run failed without saying why.
+    try {
+        $psi = New-Object System.Diagnostics.ProcessStartInfo
+        $psi.FileName = $env:ComSpec
+        $psi.Arguments = "/d /c claude -p --model $Model --output-format stream-json --verbose --max-turns 1 2>nul"
+        $psi.WorkingDirectory = $Root
+        $psi.UseShellExecute = $false
+        $psi.RedirectStandardInput = $true
+        $psi.RedirectStandardOutput = $true
+        $p = [System.Diagnostics.Process]::Start($psi)
+        $p.StandardInput.Write('Reply with the single word OK.')
+        $p.StandardInput.Close()
+        $read = $p.StandardOutput.ReadToEndAsync()
+        if (-not $p.WaitForExit(120000)) { & taskkill /T /F /PID $p.Id 2>&1 | Out-Null; return $false }
+        $out = $read.Result
+    } catch { return $false }
+    return ($out -match '"type":"result"' -and $out -notmatch '"status":"rejected"' -and $out -notmatch '"is_error":true')
+}
+
+function Test-ApiFailure {
+    # A run that died on the API rather than on the work: no result at all, or an error
+    # result the API gave (the usage limit in a form Get-OutOfTokensUntil did not know, an
+    # overload, an outage).
+    param($Run)
+    if ($Run.TimedOut) { return $false }
+    $r = $script:RunResult
+    if ($null -eq $r) { return ($Run.ExitCode -ne 0) }
+    return ([bool]($r.PSObject.Properties['is_error'] -and $r.is_error) -and
+        ([bool]$r.PSObject.Properties['api_error_status'] -or "$($r.terminal_reason)" -eq 'api_error'))
+}
+
+function Wait-ForTokensByProbe {
+    # Holds this runner until a one-word probe is answered, checking every 5 minutes, and
+    # returns how long it waited.
+    param([string]$Id)
+    $began = Get-Date
+    Write-Trace $Id 'tokens' 'run failed on the API; waiting until Claude answers again' 'Yellow'
+    while (-not (Test-TokensAvailable)) {
+        if ($Lane) { try { $Host.UI.RawUI.WindowTitle = "Dark factory - lane $Lane waiting for the API" } catch { } }
+        Start-Sleep -Seconds 300
+    }
+    Write-Trace $Id 'resume' 'Claude answers again; running the task again' 'Green'
+    return ((Get-Date) - $began)
+}
+
 # ---------------------------------------------------------------------------- shift
 
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
@@ -1140,28 +1348,62 @@ if ($Lanes -gt 1 -and -not $Lane) {
     if ((git -C $Root rev-parse HEAD).Trim() -ne (git -C $Root rev-parse "origin/$branch").Trim()) {
         Write-Trace '-' 'refuse' "$branch differs from origin/$branch; push or pull first" 'Red'; exit 1
     }
-    $stuck = @(Get-ChildItem (Join-Path $Root 'Tasks\Doing') -Filter 'BL-*.md' -ErrorAction SilentlyContinue)
-    if ($stuck.Count) { Write-Trace '-' 'refuse' "task already in Doing: $($stuck[0].Name)" 'Red'; exit 1 }
+    # Tasks in Doing are only allowed when a previous shift's lane holds each of them and that
+    # lane is dead - a shift stopped mid-task, or killed while waiting for tokens. Those lanes
+    # are adopted: their worktrees are left as they are and they resume the task.
+    $stuck = @(Get-ChildItem (Join-Path $Root 'Tasks\Doing') -Filter 'BL-*.md' -ErrorAction SilentlyContinue | ForEach-Object { $_.Name.Substring(0, 6) })
+    $adopt = @{}
+    if ($stuck.Count) {
+        $previous = Get-ChildItem $LogDir -Directory -Filter 'lanes-*' -ErrorAction SilentlyContinue | Sort-Object Name | Select-Object -Last 1
+        if ($previous) {
+            $prevStamp = $previous.Name.Substring(6)
+            foreach ($n in 1..8) {
+                $held = Get-LaneState $n 'task' $prevStamp
+                if (-not $held -or $stuck -notcontains $held) { continue }
+                if ((Get-LaneState $n 'pid' $prevStamp) -and (Test-LaneAlive $n $prevStamp)) { Write-Trace '-' 'refuse' "lane $n of shift $prevStamp is still running $held" 'Red'; exit 1 }
+                $adopt[$n] = $held
+            }
+        }
+        $orphans = @($stuck | Where-Object { $adopt.Values -notcontains $_ })
+        if ($orphans.Count) { Write-Trace '-' 'refuse' "task already in Doing and held by no lane: $($orphans -join ', ')" 'Red'; exit 1 }
+        if (@($adopt.Keys | Where-Object { $_ -gt $Lanes }).Count) { $Lanes = ($adopt.Keys | Measure-Object -Maximum).Maximum }
+    }
+
+    # The previous shift stopped claiming work near the end of its session; this one starts
+    # on a fresh session, and the wait does not count against -Hours.
+    $weekly = Wait-ForFreshSession
+    if ($weekly) { Write-Trace '-' 'shift' $weekly 'Red'; Invoke-Alarm -Reasons @($weekly); exit 2 }
+    $shiftEnd = (Get-Date).AddHours($Hours)
 
     Write-Trace '-' 'shift' "start  $Lanes lanes  branch=$branch model=$Model until $($shiftEnd.ToString('HH:mm'))" 'Cyan'
     New-Item -ItemType Directory -Force -Path $LanesDir | Out-Null
+    New-Item -ItemType Directory -Force -Path (Join-Path $LogDir "lanes-$Stamp") | Out-Null
+    $laneArgsFor = {
+        param([int]$N)
+        @('-Lane', $N, '-Branch', $branch, '-Hours', $Hours, '-MaxTasks', $MaxTasks,
+          '-TaskMinutes', $TaskMinutes, '-Model', $Model, '-LogRoot', "`"$LogDir`"", '-ShiftStamp', $Stamp)
+    }
     $procs = @()
     foreach ($n in 1..$Lanes) {
         $dir = Join-Path $LanesDir "lane-$n"
-        if (-not (Test-Path (Join-Path $dir '.git'))) {
-            git -C $Root worktree add -q --detach $dir "origin/$branch" 2>&1 | Out-Null
+        if ($adopt.ContainsKey($n)) {
+            Set-Content -Path (Get-LaneStatePath $n 'task') -Value $adopt[$n] -Encoding ASCII
+            Write-Trace '-' 'lane' "lane $n adopts $($adopt[$n]) from the previous shift, work in place"
+        } else {
+            if (-not (Test-Path (Join-Path $dir '.git'))) {
+                git -C $Root worktree add -q --detach $dir "origin/$branch" 2>&1 | Out-Null
+            }
+            git -C $dir stash push -q --include-untracked -m "darkfactory lane-$n before $Stamp" 2>&1 | Out-Null
+            git -C $dir checkout -q -B "factory/lane-$n" "origin/$branch" 2>&1 | Out-Null
+            git -C $dir reset -q --hard "origin/$branch" 2>&1 | Out-Null
         }
-        git -C $dir stash push -q --include-untracked -m "darkfactory lane-$n before $Stamp" 2>&1 | Out-Null
-        git -C $dir checkout -q -B "factory/lane-$n" "origin/$branch" 2>&1 | Out-Null
-        git -C $dir reset -q --hard "origin/$branch" 2>&1 | Out-Null
-        $laneArgs = @('-Lane', $n, '-Branch', $branch, '-Hours', $Hours, '-MaxTasks', $MaxTasks,
-            '-TaskMinutes', $TaskMinutes, '-Model', $Model, '-LogRoot', "`"$LogDir`"", '-ShiftStamp', $Stamp)
-        $started = Start-Detached -Label "Dark factory lane $n" -Dir $dir -ScriptArgs $laneArgs
+        $started = Start-Detached -Label "Dark factory lane $n" -Dir $dir -ScriptArgs (& $laneArgsFor $n)
         $procs += $started
         $where = if ($started.Tab) { "herdr tab $($started.Tab)" } else { "pid $($started.Process.Id)" }
         Write-Trace '-' 'lane' "lane $n started in $dir ($where)"
         Start-Sleep -Seconds 15
     }
+    $restarts = @{}
     # A lane is finished once it has written its summary. A herdr tab has no process to
     # watch, so the summaries are the signal; a lane that dies without one is given up on
     # after the shift's length plus one task's time limit.
@@ -1177,6 +1419,19 @@ if ($Lanes -gt 1 -and -not $Lane) {
         $tick = Get-Date
         $finished = @(Get-ChildItem $summaries -Filter 'lane-*.txt' -ErrorAction SilentlyContinue).Count
         if ($finished -ge $Lanes) { break }
+        # A lane whose process is gone without a summary died - killed, crashed, or closed.
+        # Start it again in the same worktree; it resumes the task it held. Five tries each.
+        foreach ($n in 1..$Lanes) {
+            if (Test-Path (Join-Path $summaries "lane-$n.txt")) { continue }
+            if (Test-LaneAlive $n) { continue }
+            if ($restarts[$n] -ge 5) { continue }
+            $restarts[$n] = 1 + [int]$restarts[$n]
+            Remove-Item (Get-LaneStatePath $n 'pid') -ErrorAction SilentlyContinue
+            $held = Get-LaneState $n 'task'
+            $again = Start-Detached -Label "Dark factory lane $n" -Dir (Join-Path $LanesDir "lane-$n") -ScriptArgs (& $laneArgsFor $n)
+            $procs += $again
+            Write-Trace '-' 'lane' "lane $n had died; restarted ($($restarts[$n]) of 5)$(if ($held) { ", resuming $held" })" 'Yellow'
+        }
         $running = @($procs | Where-Object { $_.Tab -or -not $_.Process.HasExited }).Count
         if ($running -eq 0) { break }
         Start-Sleep -Seconds 5
@@ -1191,7 +1446,19 @@ if ($Lanes -gt 1 -and -not $Lane) {
         }
     }
     Write-Trace '-' 'shift' "end  $Lanes lanes" 'Cyan'
+    Write-Trace '-' 'merge' (Invoke-MergeToMaster -Branch $branch) 'Cyan'
     $reasons = @($stalls) + @(Get-WaitingOnStewart)
+    # -Continuous: while the board still has ready work, the next shift starts itself, so
+    # the factory keeps going without anyone - Stewart or a Claude session - to restart it.
+    $stillReady = (Invoke-Board @('next')) -join "`n"
+    if ($Continuous -and $stillReady -match '(?m)^BL-\d{3}\s') {
+        foreach ($r in $reasons) { Write-Trace '-' 'note' (Get-Short $r 100) 'Yellow' }
+        $forward = @('-Lanes', $Lanes, '-Hours', $Hours, '-MaxTasks', $MaxTasks, '-TaskMinutes', $TaskMinutes, '-Model', $Model, '-Continuous')
+        if ($QuietAlarm) { $forward += '-QuietAlarm' }
+        $next = Start-Detached -Label "Dark factory - $(Split-Path $Root -Leaf)" -Dir $Root -ScriptArgs $forward
+        Write-Trace '-' 'shift' "work is still ready; next shift started ($(if ($next.Tab) { "herdr tab $($next.Tab)" } else { "pid $($next.Process.Id)" }))" 'Cyan'
+        exit 0
+    }
     if ($reasons.Count -gt 0) { Invoke-Alarm -Reasons $reasons; exit 2 }
     try { $Host.UI.RawUI.WindowTitle = 'Dark factory - shift complete' } catch { }
     exit 0
@@ -1218,6 +1485,29 @@ $done = 0; $blocked = 0; $requeued = 0; $stalls = @(); $failStreak = 0; $attempt
 $stopWhy = ''
 # The task to run again once the usage limit resets; it is still claimed.
 $resumeId = ''
+# How many times in a row the current task's run died on the API.
+$apiRetries = 0
+
+if ($Lane) {
+    Set-LaneState 'pid' "$PID"
+    # A restarted or adopted lane finishes the task it held, from the work in its worktree.
+    $held = Get-LaneState $Lane 'task'
+    if ($held -and (Get-TaskState $held) -eq 'Doing') {
+        $resumeId = $held
+        Write-Trace $held 'resume' 'this lane held the task when it stopped; carrying on from its work' 'Green'
+    } elseif ($held) {
+        # It stopped after the run but before its work reached the shared branch: integrate
+        # those commits now, before a claim resets the worktree and loses them.
+        $ahead = [int](git -C $Root rev-list --count "origin/$branch..HEAD" 2>$null)
+        $heldState = Get-TaskState $held
+        if ($ahead -gt 0 -and $heldState -in 'Done', 'Blocked', 'Backlog') {
+            $problem = Invoke-Integrate -Id $held -State $heldState
+            if ($problem) { Invoke-Park -Id $held -Why $problem; Write-Trace $held 'PARKED' "$problem; back to Backlog" 'Yellow' }
+            else { Write-Trace $held 'push' "integrated the stopped lane's work into $branch" }
+        }
+        Set-LaneState 'task' ''
+    }
+}
 
 while ($true) {
   try {
@@ -1227,6 +1517,8 @@ while ($true) {
         if ((Get-Date) -gt $shiftEnd) { $stopWhy = 'time up'; break }
         if ($MaxTasks -gt 0 -and ($done + $blocked + $stalls.Count) -ge $MaxTasks) { $stopWhy = 'max tasks'; break }
         if ($failStreak -ge 2) { $stopWhy = 'runs failing'; break }
+        $low = Get-UsageStop
+        if ($low) { $stopWhy = "tokens low: $low"; break }
     }
 
     if ($resuming) {
@@ -1250,6 +1542,7 @@ while ($true) {
         if ($attempted.ContainsKey($id)) { $stopWhy = "$id offered twice"; $stalls += "$id offered again after a run"; break }
     }
     $attempted[$id] = $true
+    if ($Lane) { Set-LaneState 'task' $id }
 
     if (-not $resuming) { Write-Trace $id 'claim' (Get-Short (Get-TaskTitle $id)) 'Cyan' }
     $run = Invoke-TaskRun $id -Resume:$resuming
@@ -1266,6 +1559,16 @@ while ($true) {
         $resumeId = $id
         continue
     }
+    # A run that died on the API without naming the usage limit gets the same treatment,
+    # three times in a row at most: wait until Claude answers, then run it again.
+    if ($state -eq 'Doing' -and (Test-ApiFailure $run) -and $apiRetries -lt 3) {
+        $apiRetries++
+        $waited = Wait-ForTokensByProbe -Id $id
+        $shiftEnd = $shiftEnd.Add($waited)
+        $resumeId = $id
+        continue
+    }
+    $apiRetries = 0
 
     if ($state -eq 'Doing') {
         $why = if ($run.TimedOut) { "timed out after $TaskMinutes min" } else { "run ended in Doing, exit $($run.ExitCode)" }
@@ -1288,6 +1591,8 @@ while ($true) {
             Write-Trace $id 'push' "integrated into $branch"
         }
     }
+
+    if ($Lane) { Set-LaneState 'task' '' }
 
     if ($state -eq 'Done') {
         $done++; $failStreak = 0

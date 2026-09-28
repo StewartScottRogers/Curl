@@ -20,19 +20,29 @@ internal static class CurlUrlParser
     /// <summary>The length of <c>localhost</c> and of <c>127.0.0.1</c>, the hosts a <c>file</c> URL accepts.</summary>
     private const int LocalHostLength = 9;
 
-    /// <summary>Parses <paramref name="text" />, or returns <see langword="null" /> when curl rejects it.</summary>
-    public static CurlUrl? Parse(string text, bool pathAsIs, bool driveLetters)
+    /// <summary>
+    /// Parses <paramref name="text" />, or returns <see langword="null" /> when curl rejects
+    /// it, with <paramref name="rejection" /> saying why.
+    /// </summary>
+    public static CurlUrl? Parse(string text, bool pathAsIs, bool driveLetters, out CurlUrlRejection rejection)
     {
         if (Encoding.UTF8.GetByteCount(text) > MaximumLength || text.Any(IsControlOrSpace))
         {
+            rejection = CurlUrlRejection.MalformedInput;
+
             return null;
         }
 
         string? scheme = CurlUrlScheme.Read(text, driveLetters);
+        if (scheme != FileScheme)
+        {
+            return ParseWithAuthority(text, scheme, pathAsIs, out rejection);
+        }
 
-        return scheme == FileScheme
-            ? ParseFile(text, pathAsIs, driveLetters)
-            : ParseWithAuthority(text, scheme, pathAsIs);
+        CurlUrl? url = ParseFile(text, pathAsIs, driveLetters);
+        rejection = url is null ? CurlUrlRejection.BadFileUrl : CurlUrlRejection.None;
+
+        return url;
     }
 
     private static bool IsControlOrSpace(char character) => character <= ' ' || character == '\x7f';
@@ -41,22 +51,29 @@ internal static class CurlUrlParser
     /// Parses a URL whose scheme is not <c>file</c>, or that has no scheme: one to three
     /// slashes, then an authority that must name a host.
     /// </summary>
-    private static CurlUrl? ParseWithAuthority(string text, string? scheme, bool pathAsIs)
+    private static CurlUrl? ParseWithAuthority(string text, string? scheme, bool pathAsIs, out CurlUrlRejection rejection)
     {
         string? rest = scheme is null ? text : SkipSchemeAndSlashes(text, scheme);
         if (rest is null)
         {
+            rejection = CurlUrlRejection.BadSlashes;
+
             return null;
         }
 
         int hostEnd = AuthorityLength(rest);
-        CurlUrlAuthority? authority = hostEnd == 0 ? null : CurlUrlAuthority.Parse(rest[..hostEnd], scheme);
-        if (authority is null)
+        if (hostEnd == 0)
         {
+            rejection = CurlUrlRejection.NoHost;
+
             return null;
         }
 
-        return Build(text, scheme ?? CurlUrlScheme.Guess(authority.Host), authority, rest[hostEnd..], pathAsIs);
+        CurlUrlAuthority? authority = CurlUrlAuthority.Parse(rest[..hostEnd], scheme, out rejection);
+
+        return authority is null
+            ? null
+            : Build(text, scheme ?? CurlUrlScheme.Guess(authority.Host), authority, rest[hostEnd..], pathAsIs);
     }
 
     /// <summary>
@@ -67,8 +84,12 @@ internal static class CurlUrlParser
     {
         string rest = ConvertBackslashesAfterDoubleSlash(text[(scheme.Length + 1)..]);
         int slashes = rest.AsSpan().IndexOfAnyExcept('/');
+        if (slashes < 0)
+        {
+            slashes = rest.Length;
+        }
 
-        return slashes is < 0 or > MaximumSlashes ? null : rest[slashes..];
+        return slashes > MaximumSlashes ? null : rest[slashes..];
     }
 
     /// <summary>The length of the authority: up to the first <c>/</c>, <c>?</c> or <c>#</c>.</summary>

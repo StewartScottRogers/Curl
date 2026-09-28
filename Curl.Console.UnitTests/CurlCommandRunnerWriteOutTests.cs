@@ -153,6 +153,30 @@ public sealed class CurlCommandRunnerWriteOutTests
     }
 
     [TestMethod]
+    public async Task RunAsync_TwoUrls_PrintTheRefererTheirFilesAndCountConnectionsAndTransfers()
+    {
+        // curl -e http://ref.example/x, two URLs to a server that closes each connection:
+        // conn_id and xfer_id 0 then 1; -o names the file (BL-284's Notes).
+        const string Template = "[%{referer}][%{filename_effective}][%{conn_id}][%{xfer_id}]\\n";
+
+        await RunOkAndFailingAsync(
+            runsOnWindows: false, "-s", "-e", "http://ref.example/x", "-o", "out.bin", "-o", "b.bin", "-w", Template, "ok://h/x", "fail://h/y");
+
+        Assert.AreEqual("[http://ref.example/x][out.bin][0][0]\n[http://ref.example/x][b.bin][1][1]\n", StandardOutputText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RejectedUrlThenStandardOutput_HasNoConnectionAndNoFileName()
+    {
+        // A URL curl rejected printed conn_id -1; standard output printed no filename_effective (BL-284's Notes).
+        const string Template = "[%{referer}][%{filename_effective}][%{conn_id}][%{xfer_id}]\\n";
+
+        await RunOkAndFailingAsync(runsOnWindows: false, "-s", "-w", Template, "xyz://a/b", "ok://h/x");
+
+        Assert.AreEqual("[][][-1][0]\n/x[][][0][1]\n", StandardOutputText);
+    }
+
+    [TestMethod]
     public async Task RunAsync_GetQuery_IsInTheEffectiveUrl()
     {
         await RunOkAndFailingAsync(runsOnWindows: false, "-s", "-G", "-d", "a=b", "-o", "a", "-w", "%{url_effective}", "ok://h/x");

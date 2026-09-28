@@ -1,19 +1,11 @@
 namespace Curl.Console;
 
 /// <summary>
-/// Checks and creates the paths an output file lands at: whether a <c>-J</c> name is already
-/// taken, and the directories <c>--create-dirs</c> makes. The seam that keeps both off the disk
-/// in tests.
+/// Creates the directories <c>--create-dirs</c> makes for an output file. The seam that keeps
+/// them off the disk in tests.
 /// </summary>
 internal interface IOutputPaths
 {
-    /// <summary>
-    /// Tells whether a file, not a directory, exists at <paramref name="path" />.
-    /// </summary>
-    /// <param name="path">The path, as the runner will open it.</param>
-    /// <returns><see langword="true" /> when a file exists there.</returns>
-    bool FileExists(string path);
-
     /// <summary>
     /// Makes sure <paramref name="path" /> exists, creating it as a directory when nothing is
     /// there, as curl's <c>mkdir</c> taking <c>EEXIST</c> as success does.

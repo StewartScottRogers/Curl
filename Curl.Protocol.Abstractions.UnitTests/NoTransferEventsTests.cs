@@ -84,4 +84,30 @@ public sealed class NoTransferEventsTests
         Assert.IsNull(Handshake.ServerCertificate);
         Assert.IsTrue(Handshake.CertificateVerified);
     }
+
+    [TestMethod]
+    public void TlsHandshakeEvent_OpenSslFactsLeftOut_AreNullAndEmpty()
+    {
+        Assert.IsNull(Handshake.NegotiatedGroupName);
+        Assert.IsNull(Handshake.PeerSignatureTypeName);
+        Assert.IsNull(Handshake.CertificateVerifyResult);
+        Assert.IsEmpty(Handshake.PeerCertificateChain);
+    }
+
+    [TestMethod]
+    public void TlsHandshakeEvent_OpenSslFactsGiven_RoundTrip()
+    {
+        TlsHandshakeEvent handshake = Handshake with
+        {
+            NegotiatedGroupName = "X25519MLKEM768",
+            PeerSignatureTypeName = "RSASSA-PSS",
+            CertificateVerifyResult = 18,
+            PeerCertificateChain = [],
+        };
+
+        Assert.AreEqual("X25519MLKEM768", handshake.NegotiatedGroupName);
+        Assert.AreEqual("RSASSA-PSS", handshake.PeerSignatureTypeName);
+        Assert.AreEqual(18L, handshake.CertificateVerifyResult);
+        Assert.IsEmpty(handshake.PeerCertificateChain);
+    }
 }

@@ -89,19 +89,89 @@ public sealed class CurlCommandRunnerTests
         }
     }
 
-    // curl 8.21.0 rejects both with exit 3 and "URL rejected: Bad file:// URL" (measured
-    // 2026-09-27); Curl prints its generic exit 3 line for them (ADR-0010).
+    // curl 8.21.0 rejects each with exit 3 and "URL rejected: Bad file:// URL" (measured
+    // 2026-09-27).
     [TestMethod]
     [DataRow("file://user:pass@localhost/x")]
     [DataRow("file://ab:/x")]
-    public async Task RunAsync_FileUrlCurlRejects_Returns3WithoutOpeningAnything(string url)
+    [DataRow("file://example.com/x")]
+    public async Task RunAsync_FileUrlCurlRejects_PrintsBadFileUrlAndReturns3WithoutOpeningAnything(string url)
     {
         InMemoryFileSystem files = new();
 
         int exitCode = await RunAsync(["-sS", url], new FileProtocolHandler(files));
 
         Assert.AreEqual(3, exitCode);
+        Assert.AreEqual("curl: (3) URL rejected: Bad file:// URL" + NewLine, StandardErrorText);
         Assert.IsEmpty(files.ReadPaths);
+    }
+
+    // Each line is curl 8.21.0's for the same URL, measured with /mingw64/bin/curl -gsS on
+    // 2026-09-27 (BL-324).
+    [TestMethod]
+    [DataRow("http:////h/", "Unsupported number of slashes following scheme")]
+    [DataRow("http://u@/", "No host part in the URL")]
+    [DataRow("http://h:99999/", "Port number was not a decimal number between 0 and 65535")]
+    [DataRow("http://[::g]/", "Bad IPv6 address")]
+    [DataRow("http://a!b/", "Bad hostname")]
+    [DataRow("http://h/a b", "Malformed input to a URL function")]
+    public async Task RunAsync_UrlCurlRejects_PrintsCurlsReasonAndReturns3(string url, string reason)
+    {
+        RecordingProtocolHandler http = RecordingProtocolHandler.WritingPath("http");
+
+        int exitCode = await RunAsync(["-gsS", url], http);
+
+        Assert.AreEqual(3, exitCode);
+        Assert.AreEqual("curl: (3) URL rejected: " + reason + NewLine, StandardErrorText);
+        Assert.IsEmpty(http.Contexts);
+    }
+
+    // curl 8.21.0 (Schannel) exits 3 with this line for a 65536-byte host, and tries to
+    // resolve a 65535-byte one; the length is the percent-decoded host's (measured
+    // 2026-09-27, BL-327; upstream test399).
+    [TestMethod]
+    [DataRow(65536, "")]
+    [DataRow(65534, "%61a")]
+    public async Task RunAsync_HostLongerThan65535Bytes_PrintsTooLongHostnameAndReturns3WithoutConnecting(
+        int letters,
+        string suffix)
+    {
+        RecordingProtocolHandler http = RecordingProtocolHandler.WritingPath("http");
+
+        int exitCode = await RunAsync(["-sS", $"http://{new string('a', letters)}{suffix}/399"], http);
+
+        Assert.AreEqual(3, exitCode);
+        Assert.AreEqual("curl: (3) Too long hostname (maximum is 65535)" + NewLine, StandardErrorText);
+        Assert.IsEmpty(http.Contexts);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_Host65535BytesLong_ReachesTheHandler()
+    {
+        RecordingProtocolHandler http = RecordingProtocolHandler.WritingPath("http");
+
+        int exitCode = await RunAsync(["-sS", $"http://{new string('a', 65534)}%61/399"], http);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.HasCount(1, http.Contexts);
+    }
+
+    // curl 8.21.0 (Schannel) prints these lines and exits 3 before any transfer (measured
+    // 2026-09-27, BL-327; upstream test2092).
+    [TestMethod]
+    public async Task RunAsync_GlobRangeEndingAtLongMaxValue_PrintsRangeOverflowAndReturns3WithoutConnecting()
+    {
+        const string Url = "127.0.0.1:8990/[0-1][9223372036854775806-9223372036854775807]/2092";
+        RecordingProtocolHandler http = RecordingProtocolHandler.WritingPath("http");
+
+        int exitCode = await RunAsync([Url], http);
+
+        Assert.AreEqual(3, exitCode);
+        Assert.AreEqual(
+            "curl: (3) range end/step overflow in position 62:" + NewLine + Url + NewLine
+            + new string(' ', 61) + "^" + NewLine,
+            StandardErrorText);
+        Assert.IsEmpty(http.Contexts);
     }
 
     [TestMethod]
@@ -127,13 +197,13 @@ public sealed class CurlCommandRunnerTests
     public async Task RunAsync_TwoFailures_PrintsBothLinesInOrderAndReturnsLast()
     {
         RecordingProtocolHandler file = RecordingProtocolHandler.Failing(
-            "file", CurlExitCode.FileCouldntReadFile, "Could not open file C:/nonexist/a");
+            "file", CurlExitCode.FileCouldntReadFile, "Could not open file /nonexist/a");
 
-        int exitCode = await RunAsync(["file:///C:/nonexist/a", "foo://x/"], file);
+        int exitCode = await RunAsync(["file:///nonexist/a", "foo://x/"], file);
 
         Assert.AreEqual(1, exitCode);
         Assert.AreEqual(
-            "curl: (37) Could not open file C:/nonexist/a" + NewLine
+            "curl: (37) Could not open file /nonexist/a" + NewLine
             + "curl: (1) Protocol \"foo\" not supported" + NewLine,
             StandardErrorText);
     }
@@ -177,7 +247,7 @@ public sealed class CurlCommandRunnerTests
             standardInput,
             runsOnWindows: false);
 
-        int exitCode = await runner.RunAsync(["-sS", "-o", "C:/nonexist/dir/x", "file:///C:/Windows/win.ini"]);
+        int exitCode = await runner.RunAsync(["-sS", "-o", "C:/nonexist/dir/x", "file:///Windows/win.ini"]);
 
         Assert.AreEqual(23, exitCode);
         Assert.AreEqual("curl: (23) client returned ERROR on write of 92 bytes" + NewLine, StandardErrorText);
@@ -211,7 +281,7 @@ public sealed class CurlCommandRunnerTests
             runsOnWindows: false,
             terminalColumns: 79);
 
-        int exitCode = await runner.RunAsync(["-o", "C:/Windows/System32/bl087.txt", "file:///C:/Windows/win.ini"]);
+        int exitCode = await runner.RunAsync(["-o", "C:/Windows/System32/bl087.txt", "file:///Windows/win.ini"]);
 
         Assert.AreEqual(23, exitCode);
         Assert.AreEqual(
@@ -308,9 +378,9 @@ public sealed class CurlCommandRunnerTests
     public async Task RunAsync_FailedTransferToOutputFile_DoesNotCreateTheFile()
     {
         RecordingProtocolHandler file = RecordingProtocolHandler.Failing(
-            "file", CurlExitCode.FileCouldntReadFile, "Could not open file C:/nonexist/a");
+            "file", CurlExitCode.FileCouldntReadFile, "Could not open file /nonexist/a");
 
-        int exitCode = await RunAsync(["-o", "a.txt", "file:///C:/nonexist/a"], file);
+        int exitCode = await RunAsync(["-o", "a.txt", "file:///nonexist/a"], file);
 
         Assert.AreEqual(37, exitCode);
         Assert.IsFalse(fileSystem.Written.ContainsKey("a.txt"));
@@ -588,13 +658,13 @@ public sealed class CurlCommandRunnerTests
     public async Task RunAsync_MoreOutputOptionsThanUrlsAndTheTransferFails_PrintsTheWarningAfterTheErrorLine()
     {
         RecordingProtocolHandler file = RecordingProtocolHandler.Failing(
-            "file", CurlExitCode.FileCouldntReadFile, "Could not open file Z:/nx");
+            "file", CurlExitCode.FileCouldntReadFile, "Could not open file /nx");
 
-        int exitCode = await RunAsync(["-o", "f", "-o", "g", "file:///Z:/nx"], file);
+        int exitCode = await RunAsync(["-o", "f", "-o", "g", "file:///nx"], file);
 
         Assert.AreEqual(37, exitCode);
         Assert.AreEqual(
-            "curl: (37) Could not open file Z:/nx" + NewLine
+            "curl: (37) Could not open file /nx" + NewLine
             + "Warning: Got more output options than URLs" + NewLine,
             StandardErrorText);
     }
@@ -650,6 +720,6 @@ public sealed class CurlCommandRunnerTests
             standardInput,
             runsOnWindows: false);
 
-        return runner.RunAsync([.. options, "file:///C:/Windows/win.ini"]);
+        return runner.RunAsync([.. options, "file:///Windows/win.ini"]);
     }
 }

@@ -1,0 +1,14 @@
+verbose: Tracing, logging etc
+     --no-progress-meter      Do not show the progress meter
+ -#, --progress-bar           Display transfer progress as a bar
+ -i, --show-headers           Show response headers in output
+ -s, --silent                 Silent mode
+     --stderr <file>          Where to redirect stderr
+     --styled-output          Enable styled output for HTTP headers
+     --trace <file>           Write a debug trace to FILE
+     --trace-ascii <file>     Like --trace, but without hex output
+     --trace-config <string>  Details to log in trace/verbose output
+     --trace-ids              Transfer + connection ids in verbose output
+     --trace-time             Add time stamps to trace/verbose output
+ -v, --verbose                Make the operation more talkative
+ -w, --write-out <format>     Output FORMAT after completion

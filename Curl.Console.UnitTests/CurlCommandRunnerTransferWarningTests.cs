@@ -14,16 +14,17 @@ namespace Curl.Console;
 [TestClass]
 public sealed class CurlCommandRunnerTransferWarningTests
 {
-    // The Schannel build's two --capath lines (ADR-0009), the first with its trailing space.
+    // The Schannel build's two --capath lines at the default 79 columns (ADR-0009), the first
+    // with its trailing space.
     private const string CaPathWarnings =
         "Warning: ignoring setting the CA path for the proxy, not supported by libcurl \r\n"
         + "Warning: with Schannel\r\n";
 
-    private static readonly string[] CaPathWarningLines =
-    [
-        "Warning: ignoring setting the CA path for the proxy, not supported by libcurl ",
-        "Warning: with Schannel",
-    ];
+    // The one warning the Schannel provider reports, unwrapped; the runner wraps it.
+    private const string CaPathWarningLine =
+        "Warning: ignoring setting the CA path for the proxy, not supported by libcurl with Schannel";
+
+    private static readonly string[] CaPathWarningLines = [CaPathWarningLine];
 
     private readonly MemoryStream standardOutput = new();
     private readonly MemoryStream standardError = new();
@@ -47,6 +48,29 @@ public sealed class CurlCommandRunnerTransferWarningTests
     }
 
     [TestMethod]
+    public async Task RunAsync_CaPathWarningAt79Columns_PrintsTheTwoMeasuredLines()
+    {
+        int exitCode = await RunAsync(
+            ["--capath", ".", "file:///Windows/win.ini"], 79, RecordingProtocolHandler.WritingPath("file"));
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(
+            "Warning: ignoring setting the CA path for the proxy, not supported by libcurl " + Environment.NewLine
+            + "Warning: with Schannel" + Environment.NewLine,
+            StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_CaPathWarningAt200Columns_PrintsOneLine()
+    {
+        int exitCode = await RunAsync(
+            ["--capath", ".", "file:///Windows/win.ini"], 200, RecordingProtocolHandler.WritingPath("file"));
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(CaPathWarningLine + Environment.NewLine, StandardErrorText);
+    }
+
+    [TestMethod]
     public async Task RunAsync_CaPathWarnings_ArePrintedBeforeTheHandlerRuns()
     {
         RecordingProtocolHandler file = new("file", _ =>
@@ -56,7 +80,7 @@ public sealed class CurlCommandRunnerTransferWarningTests
             return ValueTask.FromResult(TransferResult.Success(0));
         });
 
-        int exitCode = await RunAsync(["--capath", ".", "file:///C:/Windows/win.ini"], file);
+        int exitCode = await RunAsync(["--capath", ".", "file:///Windows/win.ini"], file);
 
         Assert.AreEqual(0, exitCode);
         Assert.HasCount(1, file.Contexts);
@@ -70,7 +94,7 @@ public sealed class CurlCommandRunnerTransferWarningTests
 
         Assert.AreEqual(3, exitCode);
         Assert.AreEqual(
-            ExpectedWarnings + "curl: (3) " + CurlCommandRunner.MalformedUrlMessage + Environment.NewLine,
+            ExpectedWarnings + "curl: (3) URL rejected: Malformed input to a URL function" + Environment.NewLine,
             StandardErrorText);
     }
 
@@ -92,7 +116,7 @@ public sealed class CurlCommandRunnerTransferWarningTests
         fileSystem.UnwritablePaths.Add("hd.txt");
 
         int exitCode = await RunAsync(
-            ["--capath", ".", "-D", "hd.txt", "file:///C:/Windows/win.ini"],
+            ["--capath", ".", "-D", "hd.txt", "file:///Windows/win.ini"],
             RecordingProtocolHandler.WritingPath("file"));
 
         Assert.AreEqual(23, exitCode);
@@ -108,13 +132,16 @@ public sealed class CurlCommandRunnerTransferWarningTests
     public async Task RunAsync_SilentAnywhereWithCaPathWarnings_PrintsNoWarning(string silent)
     {
         int exitCode = await RunAsync(
-            ["--capath", ".", "file:///C:/Windows/win.ini", silent], RecordingProtocolHandler.WritingPath("file"));
+            ["--capath", ".", "file:///Windows/win.ini", silent], RecordingProtocolHandler.WritingPath("file"));
 
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(string.Empty, StandardErrorText);
     }
 
     private Task<int> RunAsync(IReadOnlyList<string> arguments, params IProtocolHandler[] handlers) =>
+        RunAsync(arguments, TerminalColumns.Default, handlers);
+
+    private Task<int> RunAsync(IReadOnlyList<string> arguments, int terminalColumns, params IProtocolHandler[] handlers) =>
         new CurlCommandRunner(
                 _ => new TransferDispatch(new ProtocolDispatcher(handlers), CaPathWarningLines),
                 fileSystem,
@@ -122,6 +149,7 @@ public sealed class CurlCommandRunnerTransferWarningTests
                 standardOutput,
                 standardError,
                 new MemoryStream(),
-                runsOnWindows: false)
+                runsOnWindows: false,
+                terminalColumns)
             .RunAsync(arguments);
 }

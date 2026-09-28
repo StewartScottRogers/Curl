@@ -1,6 +1,6 @@
 # ADR-0041 — Multipart `;encoder=` parts are encoded whole while the body is built
 
-- **Status:** Accepted
+- **Status:** Accepted; its file-part decision superseded by ADR-0076
 - **Date:** 2026-09-26
 
 Decided by Claude under Stewart's delegation (task BL-274, 2026-09-26).

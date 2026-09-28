@@ -27,6 +27,9 @@ public sealed class TransferContext : ITransferContext
     public long? ResumeFrom { get; init; }
 
     /// <inheritdoc />
+    public bool ResumeUploadFromUnknownOffset { get; init; }
+
+    /// <inheritdoc />
     public ByteRange? Range { get; init; }
 
     /// <inheritdoc />
@@ -55,6 +58,24 @@ public sealed class TransferContext : ITransferContext
 
     /// <inheritdoc />
     public bool TftpNoOptions { get; init; }
+
+    /// <inheritdoc />
+    public bool FtpDisableEpsv { get; init; }
+
+    /// <inheritdoc />
+    public bool FtpSkipPasvIp { get; init; } = true;
+
+    /// <inheritdoc />
+    public FtpFileMethod FtpFileMethod { get; init; }
+
+    /// <inheritdoc />
+    public bool FtpCreateDirectories { get; init; }
+
+    /// <inheritdoc />
+    public bool ListOnly { get; init; }
+
+    /// <inheritdoc />
+    public IReadOnlyList<string> QuoteCommands { get; init; } = [];
 
     /// <inheritdoc />
     public bool ConvertLineEndings { get; init; }

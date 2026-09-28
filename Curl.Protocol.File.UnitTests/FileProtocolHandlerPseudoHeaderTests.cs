@@ -23,9 +23,9 @@ public sealed class FileProtocolHandlerPseudoHeaderTests
         new("Last-Modified", "Wed, 24 Jun 2026 12:34:56 GMT"),
     ];
 
-    private static CurlUrl FileUrl => CurlUrl.Parse("file:///C:/bl285tmp/a.txt");
+    private static CurlUrl FileUrl => CurlUrl.Parse("file:///bl285tmp/a.txt");
 
-    private static string OsPath => "C:/bl285tmp/a.txt".Replace('/', Path.DirectorySeparatorChar);
+    private static string OsPath => "/bl285tmp/a.txt".Replace('/', Path.DirectorySeparatorChar);
 
     private static byte[] Content => Encoding.ASCII.GetBytes("hello world\n");
 

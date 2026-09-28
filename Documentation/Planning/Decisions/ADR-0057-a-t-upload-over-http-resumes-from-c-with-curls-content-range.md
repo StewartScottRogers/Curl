@@ -37,7 +37,7 @@ holds the 10 bytes `abcdefghij`; the exact bytes are in the BL-332 Notes.
    it is the platform rule (root `CLAUDE.md`, "Decisions"), even though curl's library would
    read and discard the offset where a pipe truly refuses to seek.
 4. `-C -` with `-T` is not handled here. The handler receives `ResumeFrom` `null` for it and
-   cannot tell it from no `-C`; the contract change it needs is BL-351.
+   cannot tell it from no `-C`; the contract change it needs is BL-351, decided in ADR-0087.
 
 ## Consequences
 

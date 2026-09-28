@@ -1,0 +1,2 @@
+# Measured curl output, pinned byte for byte: CR LF line ends must survive checkout.
+trace-*.txt -text

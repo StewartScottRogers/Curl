@@ -76,6 +76,12 @@ public sealed record HttpRequestOptions
     public bool Compressed { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether <c>--tr-encoding</c> was given: send <c>TE: gzip</c>
+    /// and decode a compressed Transfer-Encoding.
+    /// </summary>
+    public bool TransferEncoding { get; init; }
+
+    /// <summary>
     /// Gets a value indicating whether <c>--raw</c> was given: pass content and transfer
     /// encodings through undecoded.
     /// </summary>

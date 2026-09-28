@@ -48,6 +48,17 @@ public sealed record ConnectTarget(string Host, int Port, bool UseTls)
     public ProxyEndpoint? Proxy { get; init; }
 
     /// <summary>
+    /// Gets whether <see cref="Host" /> and <see cref="Port" /> name a forward proxy, one
+    /// that is sent each request in absolute form rather than tunnelled through;
+    /// <see langword="false" />, the default, when they name the origin (ADR-0050).
+    /// </summary>
+    /// <remarks>
+    /// A connection pool keys on it, so a forward proxy connection never serves a direct
+    /// request to the proxy's host, and reports a reused one as <c>with proxy</c>.
+    /// </remarks>
+    public bool IsForwardProxy { get; init; }
+
+    /// <summary>
     /// Gets where the connector reports connection and TLS events, in the order they
     /// happen; <see cref="NoTransferEvents.Instance" />, the default, when nobody is
     /// listening.

@@ -48,7 +48,7 @@ public sealed class CurlCommandRunnerWarningLineTests
             return TransferResult.Success(1);
         });
 
-        int exitCode = await RunAsync(["-o", "-x", "file:///C:/Windows/win.ini"], file);
+        int exitCode = await RunAsync(["-o", "-x", "file:///Windows/win.ini"], file);
 
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(FlagLikeFileNameWarning + NewLine, StandardErrorText);
@@ -60,13 +60,13 @@ public sealed class CurlCommandRunnerWarningLineTests
     public async Task RunAsync_FlagLikeOutputAndAFailedTransfer_PrintsTheWarningBeforeTheErrorLine()
     {
         RecordingProtocolHandler file = RecordingProtocolHandler.Failing(
-            "file", CurlExitCode.FileCouldntReadFile, "Could not open file Z:/nx");
+            "file", CurlExitCode.FileCouldntReadFile, "Could not open file /nx");
 
-        int exitCode = await RunAsync(["-o", "-x", "file:///Z:/nx"], file);
+        int exitCode = await RunAsync(["-o", "-x", "file:///nx"], file);
 
         Assert.AreEqual(37, exitCode);
         Assert.AreEqual(
-            FlagLikeFileNameWarning + NewLine + "curl: (37) Could not open file Z:/nx" + NewLine,
+            FlagLikeFileNameWarning + NewLine + "curl: (37) Could not open file /nx" + NewLine,
             StandardErrorText);
     }
 
@@ -76,7 +76,7 @@ public sealed class CurlCommandRunnerWarningLineTests
     public async Task RunAsync_SilentBeforeFlagLikeOutput_PrintsNoWarning(string silent)
     {
         int exitCode = await RunAsync(
-            [silent, "-o", "-x", "file:///C:/Windows/win.ini"], RecordingProtocolHandler.WritingPath("file"));
+            [silent, "-o", "-x", "file:///Windows/win.ini"], RecordingProtocolHandler.WritingPath("file"));
 
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(string.Empty, StandardErrorText);
@@ -98,7 +98,7 @@ public sealed class CurlCommandRunnerWarningLineTests
     public async Task RunAsync_SilentAfterFlagLikeOutput_StillPrintsTheWarning()
     {
         int exitCode = await RunAsync(
-            ["-o", "-x", "-s", "file:///C:/Windows/win.ini"], RecordingProtocolHandler.WritingPath("file"));
+            ["-o", "-x", "-s", "file:///Windows/win.ini"], RecordingProtocolHandler.WritingPath("file"));
 
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(FlagLikeFileNameWarning + NewLine, StandardErrorText);

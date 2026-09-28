@@ -63,6 +63,13 @@ namespace Curl.Protocol.Http;
 /// its Content-Encoding says (<see cref="HttpContentDecoder" />, BL-177 Notes).
 /// </para>
 /// <para>
+/// <see cref="HttpRequestOptions.TransferEncoding" /> (<c>--tr-encoding</c>) sends
+/// <c>TE: gzip</c> and <c>TE</c> in the <c>Connection</c> header, and decodes the body as its
+/// Transfer-Encoding says, <c>--raw</c> or not, before any Content-Encoding; a body with a
+/// Transfer-Encoding that is not chunked runs to close. A discarded body is framed the same way
+/// but not decoded (<see cref="HttpTransferEncoding.Requested" />, BL-315 Notes).
+/// </para>
+/// <para>
 /// <see cref="HttpVersionPreference.Http10" /> (<c>-0</c>) ends the request line in
 /// <c>HTTP/1.0</c>, adds no <c>Expect: 100-continue</c>, and fails a body of unknown length
 /// with exit 25 once connected, sending nothing. <see cref="HttpRequestOptions.Raw" /> writes a
@@ -88,6 +95,11 @@ namespace Curl.Protocol.Http;
 /// same connection without curl's own <c>Expect</c> line and without the wait: the 417's head
 /// and trailers are written, its body is read and discarded, and the resend's response is the
 /// result; an <c>-H</c> <c>Expect</c> line is sent again. Measured on curl 8.21.0 (BL-260 Notes).
+/// A 417 that arrives once the wait ran out, while the body is being sent, stops the sending
+/// at the piece under way, and is answered the same way but on a new connection, with the body
+/// sent from its start; a stream that cannot seek goes on from the first byte not sent. Under
+/// <c>-f</c>, or when the 417 closes the connection, sending stops just the same and the 417
+/// is the result. Measured on curl 8.21.0 (BL-319 Notes).
 /// </para>
 /// <para>
 /// With a cookie store, every request, an authentication retry included, asks it afresh for
@@ -130,7 +142,9 @@ namespace Curl.Protocol.Http;
 /// </para>
 /// <para>
 /// <see cref="ITransferContext.ResumeFrom" /> above zero resumes a <c>-T</c> upload from that
-/// offset with a <c>Content-Range</c> (<see cref="HttpUploadResume" />, BL-332 Notes); for a
+/// offset with a <c>Content-Range</c> (<see cref="HttpUploadResume" />, BL-332 Notes), and
+/// <see cref="ITransferContext.ResumeUploadFromUnknownOffset" /> sends the whole upload with
+/// <c>Content-Range: bytes 0-(L-1)/L</c> (BL-351 Notes); for a
 /// request without a body it sends <c>Range: bytes=N-</c>, and else
 /// <see cref="ITransferContext.Range" /> sends its range, for a request without a body
 /// (<see cref="HttpRangeHeader" />); <see cref="ITransferContext.TimeCondition" /> sends
@@ -141,6 +155,23 @@ namespace Curl.Protocol.Http;
 /// that grows past the limit ends the transfer with exit 63 after as many bytes as it allows.
 /// A successful result carries the <c>Last-Modified</c> time (<see cref="HttpLastModified" />).
 /// Measured on curl 8.21.0 (BL-178 Notes, ADR-0044).
+/// </para>
+/// <para>
+/// <see cref="ITransferContext.Progress" /> is told the transfer started once the first
+/// connection is established, so a connect failure is never reported as started; the response
+/// body bytes the output accepts, with the Content-Length as the expected total, or none when
+/// the body has none; and the request body bytes sent, with the body's length when known. A body
+/// read and discarded (a 3xx under <c>-L</c>, or a response a retry answers) is not reported,
+/// and a body sent again by a retry is not reported below the count already reported
+/// (<see cref="HttpTransferProgress" />, ADR-0045, ADR-0065).
+/// </para>
+/// <para>
+/// Every report carries <see cref="TransferTimings" /> on <see cref="ITransferContext.TimeProvider" />:
+/// the start of this method, the connector's timings, the moment before the first request byte,
+/// the moment the request was sent, the first response byte
+/// (<see cref="HttpFirstByteTimingConnection" />) and the report's end. A failed connect reports
+/// one timestamp, taken as it failed, for all but the start and the connect, as curl 8.21.0
+/// does (measured, ADR-0075).
 /// </para>
 /// </remarks>
 public sealed class HttpProtocolHandler(
@@ -175,8 +206,9 @@ public sealed class HttpProtocolHandler(
     {
         ArgumentNullException.ThrowIfNull(context);
 
+        long started = context.TimeProvider.GetTimestamp();
         HttpRequestOptions options = context.Http ?? new HttpRequestOptions();
-        HttpRequestFraming framing = HttpRequestFraming.Of(options, [.. options.Headers.Select(HttpCustomHeader.Parse)], context.NoBody, context.Upload, context.ResumeFrom);
+        HttpRequestFraming framing = HttpRequestFraming.Of(options, [.. options.Headers.Select(HttpCustomHeader.Parse)], context.NoBody, context.Upload, context.ResumeFrom, context.Range, context.ResumeUploadFromUnknownOffset);
         HttpAuthRequest authRequest = new(
             framing.Method,
             context.Url,
@@ -189,7 +221,9 @@ public sealed class HttpProtocolHandler(
         using HttpTransferDeadline deadline = new(context);
         HttpRequestPlan plan = new(context, options, framing, authRequest, Authenticator.CreateAuthorization(authRequest, []))
         {
+            Started = started,
             Deadline = deadline,
+            Progress = new HttpTransferProgress(context.Progress),
             ForwardProxy = forwardProxy,
             ProxyAuthorization = forwardProxy is null ? null : ProxyAuthorizationFor(authRequest, forwardProxy),
         };
@@ -204,14 +238,20 @@ public sealed class HttpProtocolHandler(
         new(url.IdnHost, url.Port, url.Scheme == "https");
 
     /// <summary>
-    /// Builds the connect target for <paramref name="plan" />: the forward proxy itself, with
-    /// TLS for an HTTPS proxy; or else the URL's host, tunnelled through the transfer's proxy
-    /// when it has one.
+    /// Builds the connect target for <paramref name="plan" />: the forward proxy itself, marked
+    /// <see cref="ConnectTarget.IsForwardProxy" />, with TLS for an HTTPS proxy; or else the URL's host, tunnelled through the transfer's proxy
+    /// when it has one. Either is pooled under <c>https</c> for an <c>https</c> URL and
+    /// <c>http</c> otherwise, so a forward proxy connection serves every origin behind it, and
+    /// carries the transfer's events for the connector to report through (ADR-0050).
     /// </summary>
-    private static ConnectTarget TargetOf(HttpRequestPlan plan) =>
-        plan.ForwardProxy is { } proxy
-            ? new ConnectTarget(proxy.Host, proxy.Port, proxy.Kind == ProxyKind.Https)
-            : TargetOf(plan.Context.Url) with { Proxy = plan.Options.ForwardProxy };
+    private static ConnectTarget TargetOf(HttpRequestPlan plan)
+    {
+        ConnectTarget urlTarget = TargetOf(plan.Context.Url);
+        ConnectTarget target = plan.ForwardProxy is { } proxy
+            ? new ConnectTarget(proxy.Host, proxy.Port, proxy.Kind == ProxyKind.Https) { IsForwardProxy = true }
+            : urlTarget with { Proxy = plan.Options.ForwardProxy };
+        return target with { PoolScheme = urlTarget.UseTls ? "https" : "http", Events = plan.Context.Events };
+    }
 
     /// <summary>
     /// Gives the proxy the request is forwarded through in absolute form: an HTTP-kind proxy,
@@ -235,10 +275,16 @@ public sealed class HttpProtocolHandler(
             []);
 
     /// <summary>
-    /// Opens a connection and sends <paramref name="plan" /> on it, then each retry a response
-    /// asks for - an authentication retry, or a resend without <c>Expect</c> - on the same
-    /// connection while it stays open, or on a new one when it closes.
+    /// Opens a connection, or takes a pooled one, and sends <paramref name="plan" /> on it, then
+    /// each retry a response asks for - an authentication retry, or a resend without
+    /// <c>Expect</c> - on the same connection while it stays open, or on a new one when it
+    /// closes. A pooled connection that dies before its response begins is closed and the
+    /// request sent again once on a fresh one, as curl 8.21.0 does (BL-336 Notes).
     /// </summary>
+    /// <remarks>
+    /// The connection is marked reusable when the last response on it persists, and the
+    /// end-of-transfer <c>-v</c> line is reported once it is disposed (ADR-0050).
+    /// </remarks>
     /// <param name="plan">The request to send.</param>
     /// <param name="earlier">
     /// The report of the exchange whose response asked for this retry, or
@@ -246,27 +292,127 @@ public sealed class HttpProtocolHandler(
     /// </param>
     private async ValueTask<TransferResult> ConnectAndExchangeAsync(HttpRequestPlan plan, TransferReport? earlier)
     {
-        ConnectResult connect = await plan.Deadline.ConnectAsync(connector, TargetOf(plan)).ConfigureAwait(false);
+        ConnectTarget target = TargetOf(plan);
+        ConnectResult connect = await plan.Deadline.ConnectAsync(connector, target).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
         {
-            TransferResult failure = TransferResult.Failure(connect.ExitCode, connect.ErrorMessage!);
-            return plan.Options.ForwardProxy is null ? failure : failure with { Report = new TransferReport { UsedProxy = true } };
+            return TransferResult.Failure(connect.ExitCode, connect.ErrorMessage!) with
+            {
+                Report = FailedConnectReport(plan, connect),
+                IsConnectionRefused = connect.IsConnectionRefused,
+            };
         }
+
+        plan.Progress.ReportTransferStarted();
 
         HttpAttemptOutcome outcome;
         await using (connection.ConfigureAwait(false))
         {
-            outcome = await ExchangeAsync(plan, connect, connection, earlier, newConnection: true).ConfigureAwait(false);
-            while (outcome.Retry is { } retry && outcome.KeepsAlive)
-            {
-                outcome = await ExchangeAsync(retry, connect, connection, outcome.Result.Report, newConnection: false).ConfigureAwait(false);
-            }
+            outcome = await ExchangeOnConnectionAsync(plan, connect, connection, earlier).ConfigureAwait(false);
         }
 
+        ReportConnectionEnd(plan.Context, target, connect, outcome);
         return outcome.Retry is { } reconnect
             ? await ConnectAndExchangeAsync(reconnect, outcome.Result.Report).ConfigureAwait(false)
             : outcome.Result;
     }
+
+    /// <summary>
+    /// Reports a connect that failed: whether it went to a forward proxy, and the transfer's
+    /// timings with <c>%{time_pretransfer}</c>, <c>%{time_posttransfer}</c> and
+    /// <c>%{time_starttransfer}</c> taken when it failed, as curl 8.21.0 takes them after a
+    /// refused connect or a failed resolve (measured, ADR-0075), and whatever connect timings
+    /// the connector recorded before it failed, so a refused dial still reports
+    /// <c>%{time_namelookup}</c> (measured, ADR-0091).
+    /// </summary>
+    private static TransferReport FailedConnectReport(HttpRequestPlan plan, ConnectResult connect)
+    {
+        long failed = plan.Context.TimeProvider.GetTimestamp();
+        return new TransferReport
+        {
+            UsedProxy = plan.Options.ForwardProxy is not null,
+            Timings = new TransferTimings(plan.Started, connect.Timings, failed, failed, failed, failed),
+        };
+    }
+
+    /// <summary>
+    /// Sends <paramref name="plan" /> on <paramref name="connection" />, then each retry that
+    /// may go on the same connection; then marks the connection reusable when the last
+    /// response persists, or reports that a pooled connection that died is being given up.
+    /// </summary>
+    private async ValueTask<HttpAttemptOutcome> ExchangeOnConnectionAsync(
+        HttpRequestPlan plan,
+        ConnectResult connect,
+        IConnection connection,
+        TransferReport? earlier)
+    {
+        if (HttpTimeConditionLimit.Refuses(plan.Context.TimeCondition, OperatingSystem.IsWindows()))
+        {
+            connection.MarkReusable();
+            return TimeValueRefused(plan, connect);
+        }
+
+        HttpAttemptOutcome outcome = await ExchangeAsync(plan, connect, connection, earlier, newConnection: !connect.IsReused).ConfigureAwait(false);
+        while (outcome.Retry is { } retry && outcome.KeepsAlive)
+        {
+            outcome = await ExchangeAsync(retry, connect, connection, outcome.Result.Report, newConnection: false).ConfigureAwait(false);
+        }
+
+        if (outcome.KeepsAlive)
+        {
+            connection.MarkReusable();
+        }
+        else if (outcome.DiedBeforeResponse)
+        {
+            plan.Context.Events.ReportInfo(HttpConnectionInfoLines.ConnectionDiedRetrying);
+        }
+
+        return outcome;
+    }
+
+    /// <summary>
+    /// Fails a request whose <c>-z</c> time curl 8.21.0 on Windows cannot write into its header
+    /// (<see cref="HttpTimeConditionLimit" />): exit 43 before any byte is sent, the connection
+    /// left intact, as measured (BL-381 Notes).
+    /// </summary>
+    private static HttpAttemptOutcome TimeValueRefused(HttpRequestPlan plan, ConnectResult connect)
+    {
+        TransferReport report = new()
+        {
+            UsedProxy = plan.Options.ForwardProxy is not null,
+            LocalEndPoint = connect.LocalEndPoint,
+            Timings = new TransferTimings(plan.Started, connect.Timings, null, null, null, plan.Context.TimeProvider.GetTimestamp()),
+        };
+        TransferResult refused = TransferResult.Failure(CurlExitCode.BadFunctionArgument, HttpTimeConditionLimit.InvalidTimeValue) with { Report = report };
+        return new HttpAttemptOutcome(refused, null, KeepsAlive: true);
+    }
+
+    /// <summary>
+    /// Reports what became of the connection once it is disposed, as curl 8.21.0's <c>-v</c>
+    /// does (ADR-0050): left intact when marked reusable, closed when the transfer failed, and
+    /// shut down otherwise - its response did not persist, or it died before its response, in
+    /// which case the line that the request goes out again follows.
+    /// </summary>
+    private static void ReportConnectionEnd(ITransferContext context, ConnectTarget target, ConnectResult connect, HttpAttemptOutcome outcome)
+    {
+        context.Events.ReportInfo(ConnectionEndLine(target, connect.ConnectionNumber, outcome));
+        if (outcome.DiedBeforeResponse)
+        {
+            context.Events.ReportInfo(HttpConnectionInfoLines.IssueAnotherRequest(context.Url));
+        }
+    }
+
+    /// <summary>
+    /// Gives curl 8.21.0's <c>-v</c> line for what became of connection <paramref name="number" />
+    /// (ADR-0050): left intact, closing, or shutting down.
+    /// </summary>
+    private static string ConnectionEndLine(ConnectTarget target, long number, HttpAttemptOutcome outcome) =>
+        outcome switch
+        {
+            { KeepsAlive: true } => HttpConnectionInfoLines.LeftIntact(number, target.Host, target.Port),
+            { DiedBeforeResponse: false, Result.ExitCode: not CurlExitCode.Ok } => HttpConnectionInfoLines.Closing(number),
+            _ => HttpConnectionInfoLines.ShuttingDown(number),
+        };
 
     /// <summary>
     /// Sends the request on <paramref name="connection" /> and reads the response into the
@@ -296,34 +442,44 @@ public sealed class HttpProtocolHandler(
             HttpRangeHeader.ValueFor(context, framing.Body is not null),
             context.TimeCondition,
             framing);
+        HttpFirstByteTimingConnection timedConnection = new(connection, context.TimeProvider);
+        IConnection responseConnection = framing.AwaitsContinue ? new HttpContinueWaitConnection(timedConnection) : timedConnection;
         HttpRequestBodyWriter upload = new(connection)
         {
             SharedHeadLength = framing.AwaitsContinue ? 0 : request.Length,
+            HeldHead = request,
             IsUpload = framing.IsUpload,
+            Progress = plan.Progress,
+            EarlyResponseWatch = responseConnection as HttpContinueWaitConnection,
         };
         HttpExchange exchange = new(connect, connection, framing.Method, request.Length, upload, earlier, newConnection)
         {
             UsedProxy = options.ForwardProxy is not null,
+            Started = plan.Started,
+            TimeProvider = context.TimeProvider,
+            ResponseConnection = timedConnection,
         };
-        IConnection responseConnection = framing.AwaitsContinue ? new HttpContinueWaitConnection(connection) : connection;
         HttpResponseBodyReader body = new(responseConnection)
         {
             PassesTransferCoding = options.Raw,
             IgnoresContentLength = options.IgnoreContentLength,
+            DecodesTransferCoding = options.TransferEncoding,
         };
+        HttpResponseHeadReader headReader = new(responseConnection);
         HttpRequestPlan? retry = null;
         HttpBodyDelivery delivery = HttpBodyDelivery.Deliver;
         try
         {
             ThrowIfRefused(framing);
-            await HttpConnectionSend.WriteAsync(connection, request, cancellationToken).ConfigureAwait(false);
-            await HttpConnectionSend.FlushAsync(connection, cancellationToken).ConfigureAwait(false);
+            exchange.RequestReady = context.TimeProvider.GetTimestamp();
             bool bodyLeftUnsent = await SendBodyAsync(context.TimeProvider, framing, responseConnection, upload, cancellationToken).ConfigureAwait(false);
-            exchange.Head = await new HttpResponseHeadReader(responseConnection).ReadAsync(cancellationToken).ConfigureAwait(false);
+            exchange.RequestSent = context.TimeProvider.GetTimestamp();
+            exchange.Head = await headReader.ReadAsync(cancellationToken).ConfigureAwait(false);
             exchange.RedirectUrl = HttpRedirectLocation.Find(context.Url, exchange.Head);
             StoreCookies(context, exchange.Head);
             await WriteHeadersAsync(context.HeaderOutput, exchange.Head.HeadBytes, cancellationToken).ConfigureAwait(false);
-            retry = RetryOf(plan, exchange.Head, bodyLeftUnsent);
+            body.ThrowIfTooManyContentCodings(exchange.Head, DecodesContent(options));
+            retry = RetryOf(plan, exchange.Head, bodyLeftUnsent, upload);
             HttpFailMode fail = retry is null ? options.Fail : HttpFailMode.None;
             ThrowIfFailing(fail, HttpFailMode.Fail, exchange.Head);
             bool discardsBody = retry is not null || (options.FollowRedirects && exchange.RedirectUrl is not null);
@@ -336,7 +492,7 @@ public sealed class HttpProtocolHandler(
             TransferResult failed = TransferResult.Failure(failure.ExitCode, failure.Message, body.BytesWritten)
                 with
             { Report = exchange.Report(body.BytesWritten) };
-            return new HttpAttemptOutcome(failed, null, KeepsAlive: false);
+            return FailedOutcome(plan, failed, DiedBeforeResponse(plan, connect, headReader, failure));
         }
         catch (OperationCanceledException) when (plan.Deadline.EndedByLimit)
         {
@@ -348,9 +504,51 @@ public sealed class HttpProtocolHandler(
         }
 
         TransferResult result = Succeeded(delivery, exchange.Head!, exchange.Report(body.BytesWritten));
-        bool keepsAlive = HttpConnectionPersistence.KeepsAlive(exchange.Head, context.NoBody, options.Raw, options.IgnoreContentLength);
-        return new HttpAttemptOutcome(result, retry, keepsAlive);
+        return new HttpAttemptOutcome(result, retry, KeepsAlive(plan, exchange.Head, upload, headReader, delivery));
     }
+
+    /// <summary>
+    /// Builds the outcome of an exchange that failed: sent again once on a fresh connection when
+    /// its pooled connection <paramref name="diedBeforeResponse" />, and final otherwise.
+    /// </summary>
+    private static HttpAttemptOutcome FailedOutcome(HttpRequestPlan plan, TransferResult failed, bool diedBeforeResponse) =>
+        diedBeforeResponse
+            ? new HttpAttemptOutcome(failed, plan.OnFreshConnection(), KeepsAlive: false) { DiedBeforeResponse = true }
+            : new HttpAttemptOutcome(failed, null, KeepsAlive: false);
+
+    /// <summary>
+    /// Decides whether the connection can carry another request: not after a body a status of
+    /// 300 or above cut short, which curl 8.21.0 shuts the connection on (measured, BL-319 and
+    /// BL-395 Notes), nor after a 101, nor when the body was left unread; and else as
+    /// <see cref="HttpConnectionPersistence" /> says (ADR-0050).
+    /// </summary>
+    private static bool KeepsAlive(HttpRequestPlan plan, HttpResponseHead head, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpBodyDelivery delivery) =>
+        !upload.CutShort
+            && delivery == HttpBodyDelivery.Deliver
+            && !headReader.SwitchedProtocols
+            && HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, plan.Options.Raw, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding);
+
+    /// <summary>
+    /// Decides whether a failed exchange was on a pooled connection that died while idle, so
+    /// the request is sent again once on a fresh one, as curl 8.21.0 does (BL-336 Notes): the
+    /// connection was reused, it failed sending or receiving before any byte of the response
+    /// arrived, the request has not already been sent again for this reason, and its body, if
+    /// any, is bytes that can be sent again.
+    /// </summary>
+    private static bool DiedBeforeResponse(HttpRequestPlan plan, ConnectResult connect, HttpResponseHeadReader headReader, HttpTransferException failure) =>
+        !headReader.HasReceived
+            && failure.ExitCode is CurlExitCode.GotNothing or CurlExitCode.SendError or CurlExitCode.RecvError
+            && CanSendAgainOnFreshConnection(plan, connect);
+
+    /// <summary>
+    /// Decides whether <paramref name="plan" /> may be sent again on a fresh connection: it went
+    /// out on a pooled one, it has not already been sent again, and its body, if any, is bytes
+    /// that can be sent again.
+    /// </summary>
+    private static bool CanSendAgainOnFreshConnection(HttpRequestPlan plan, ConnectResult connect) =>
+        connect.IsReused
+            && !plan.SentOnFreshConnection
+            && plan.Framing.Body is not StreamBody;
 
     /// <summary>
     /// Fails a request before any byte of it is sent, as curl 8.21.0 does once connected: a
@@ -409,7 +607,8 @@ public sealed class HttpProtocolHandler(
         ITransferContext context = plan.Context;
         Stream bodyOutput = discardsBody ? Stream.Null : context.Output;
         body.MaximumBodySize = discardsBody ? null : HttpDownloadConditions.LimitOf(context.MaxFileSize);
-        await body.CopyAsync(head, context.NoBody, bodyOutput, DecodesContent(plan.Options, discardsBody), cancellationToken)
+        body.Progress = discardsBody ? HttpTransferProgress.Silent : plan.Progress;
+        await body.CopyAsync(head, context.NoBody, bodyOutput, DecodesContent(plan.Options, discardsBody), plan.Options.TransferEncoding && !discardsBody, cancellationToken)
             .ConfigureAwait(false);
         await WriteHeadersAsync(context.HeaderOutput, body.TrailerBytes, cancellationToken).ConfigureAwait(false);
     }
@@ -436,14 +635,15 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Hands the <c>Set-Cookie</c> values of <paramref name="head" />, in received order, to
-    /// the cookie store, when cookies are on and the head has any.
+    /// the cookie store, with the transfer's events for its <c>-v</c> lines, when cookies are
+    /// on and the head has any.
     /// </summary>
     private void StoreCookies(ITransferContext context, HttpResponseHead head)
     {
         string[] setCookies = ValuesOf(head, "Set-Cookie");
         if (CookieStore is { } store && setCookies.Length > 0)
         {
-            store.StoreFromResponse(context.Url, setCookies, context.TimeProvider.GetUtcNow());
+            store.StoreFromResponse(context.Url, setCookies, context.TimeProvider.GetUtcNow(), context.Events);
         }
     }
 
@@ -451,30 +651,32 @@ public sealed class HttpProtocolHandler(
     /// Decides whether a response is answered with one more request, and which: the same
     /// request with the <c>Authorization</c> value <see cref="RetryAuthorization" /> gives, or
     /// else, for a 417 <see cref="RetriesWithoutExpect" /> accepts, the same request without
-    /// <c>Expect</c>; <see langword="null" /> when the response is the result.
+    /// <c>Expect</c> and with the body <paramref name="upload" /> rewinds; <see langword="null" />
+    /// when the response is the result.
     /// </summary>
-    private HttpRequestPlan? RetryOf(HttpRequestPlan plan, HttpResponseHead head, bool bodyLeftUnsent)
+    private HttpRequestPlan? RetryOf(HttpRequestPlan plan, HttpResponseHead head, bool bodyLeftUnsent, HttpRequestBodyWriter upload)
     {
         if (RetryAuthorization(plan, head) is { } authorization)
         {
             return plan.WithAuthorization(authorization);
         }
 
-        return RetriesWithoutExpect(plan, head, bodyLeftUnsent) ? plan.WithoutExpect() : null;
+        return RetriesWithoutExpect(plan, head, bodyLeftUnsent || upload.CutShort) ? plan.WithoutExpect(upload.Rewound(plan.Framing.Body!)) : null;
     }
 
     /// <summary>
     /// Decides whether <paramref name="head" /> is answered by resending the request without
-    /// <c>Expect</c>, as curl 8.21.0 does (measured, BL-260 Notes): a 417 that arrived while
-    /// the body waited for <c>100 Continue</c> and so was left unsent, on a connection the 417
-    /// leaves open, and not under <c>-f</c>, which fails on the 417 itself. The resent request
-    /// waits for nothing, so it is never resent again.
+    /// <c>Expect</c>, as curl 8.21.0 does (measured, BL-260 and BL-319 Notes): a 417 that
+    /// arrived before the whole body was sent - while it waited for <c>100 Continue</c>, or
+    /// while it was being sent once the wait ran out - on a connection the 417 leaves open, and
+    /// not under <c>-f</c>, which fails on the 417 itself. The resent request waits for
+    /// nothing, so it is never resent again.
     /// </summary>
-    private static bool RetriesWithoutExpect(HttpRequestPlan plan, HttpResponseHead head, bool bodyLeftUnsent) =>
-        bodyLeftUnsent
+    private static bool RetriesWithoutExpect(HttpRequestPlan plan, HttpResponseHead head, bool bodyStopped) =>
+        bodyStopped
             && head.StatusLine.StatusCode == 417
             && plan.Options.Fail != HttpFailMode.Fail
-            && HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, plan.Options.Raw, plan.Options.IgnoreContentLength);
+            && HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, plan.Options.Raw, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding);
 
     /// <summary>
     /// Decides whether a response is answered with one more request, and with what
@@ -517,12 +719,22 @@ public sealed class HttpProtocolHandler(
     /// retry follows.
     /// </summary>
     private static bool DecodesContent(HttpRequestOptions options, bool discardsBody) =>
-        options.Compressed && !options.Raw && !discardsBody;
+        DecodesContent(options) && !discardsBody;
 
     /// <summary>
-    /// Sends the request body, if there is one: at once, or once
-    /// <paramref name="responseConnection" /> has waited for <c>100 Continue</c> and not been
-    /// answered with a final status instead.
+    /// Decides whether Content-Encoding is decoded at all: for <c>--compressed</c> without
+    /// <c>--raw</c>, which is also when curl 8.21.0 holds the response to
+    /// <see cref="HttpContentDecoder.MaximumCodings" /> (measured, BL-364 Notes).
+    /// </summary>
+    private static bool DecodesContent(HttpRequestOptions options) =>
+        options.Compressed && !options.Raw;
+
+    /// <summary>
+    /// Sends the request head and body, if there is one: the head alone when there is no body
+    /// or the request waits for <c>100 Continue</c>, and else with the body's first read, so a
+    /// body whose first read fails sends nothing (measured, BL-184 Notes); the body at once, or
+    /// once <paramref name="responseConnection" /> has waited for <c>100 Continue</c> and not
+    /// been answered with a final status instead.
     /// </summary>
     /// <returns>
     /// <see langword="true" /> when a final status arrived during the wait and the body was left
@@ -537,13 +749,17 @@ public sealed class HttpProtocolHandler(
     {
         if (framing.Body is not { } requestBody)
         {
+            await upload.WriteHeldHeadAsync(cancellationToken).ConfigureAwait(false);
             return false;
         }
 
-        if (responseConnection is HttpContinueWaitConnection waiting
-            && !await waiting.WaitForContinueAsync(timeProvider, cancellationToken).ConfigureAwait(false))
+        if (responseConnection is HttpContinueWaitConnection waiting)
         {
-            return true;
+            await upload.WriteHeldHeadAsync(cancellationToken).ConfigureAwait(false);
+            if (!await waiting.WaitForContinueAsync(timeProvider, cancellationToken).ConfigureAwait(false))
+            {
+                return true;
+            }
         }
 
         await upload.WriteAsync(requestBody, framing.IsChunked, cancellationToken).ConfigureAwait(false);
@@ -640,9 +856,38 @@ public sealed class HttpProtocolHandler(
         internal string? RedirectUrl { get; set; }
 
         /// <summary>
-        /// Builds the report: what the connect and request told, and what the final head told
-        /// once it was read. The request size counts the body bytes sent as well as the head,
-        /// as curl 8.21.0's <c>%{size_request}</c> does (BL-175 Notes).
+        /// Gets the moment the transfer began, the report's <see cref="TransferTimings.Started" />.
+        /// </summary>
+        internal required long Started { get; init; }
+
+        /// <summary>
+        /// Gets the clock every timestamp of the exchange is taken on.
+        /// </summary>
+        internal required TimeProvider TimeProvider { get; init; }
+
+        /// <summary>
+        /// Gets the connection the response is read through, which records when its first
+        /// byte arrived.
+        /// </summary>
+        internal required HttpFirstByteTimingConnection ResponseConnection { get; init; }
+
+        /// <summary>
+        /// Gets or sets the moment the first request byte was about to be sent,
+        /// <see langword="null" /> until then.
+        /// </summary>
+        internal long? RequestReady { get; set; }
+
+        /// <summary>
+        /// Gets or sets the moment the last request byte was sent, <see langword="null" />
+        /// until then.
+        /// </summary>
+        internal long? RequestSent { get; set; }
+
+        /// <summary>
+        /// Builds the report: what the connect and request told, their timings with the
+        /// transfer's end taken now, and what the final head told once it was read. The request
+        /// size counts the body bytes sent as well as the head, as curl 8.21.0's
+        /// <c>%{size_request}</c> does (BL-175 Notes).
         /// </summary>
         /// <param name="downloadSize">The body bytes the output accepted.</param>
         /// <returns>The report.</returns>
@@ -661,6 +906,13 @@ public sealed class HttpProtocolHandler(
                 LocalEndPoint = connect.LocalEndPoint,
                 PeerCertificates = connect.PeerCertificates,
                 RemoteEndPoint = connection.RemoteEndPoint as IPEndPoint,
+                Timings = new TransferTimings(
+                    Started,
+                    connect.Timings,
+                    RequestReady,
+                    RequestSent,
+                    ResponseConnection.FirstByteReceived,
+                    TimeProvider.GetTimestamp()),
             };
             return Head is null ? report : WithHead(report, Head) with { RedirectUrl = RedirectUrl };
         }
@@ -721,6 +973,17 @@ public sealed class HttpProtocolHandler(
         public required HttpTransferDeadline Deadline { get; init; }
 
         /// <summary>
+        /// Gets the moment the transfer began, shared by every request it sends: the origin
+        /// of every <c>%{time_*}</c> (<see cref="TransferTimings.Started" />).
+        /// </summary>
+        public required long Started { get; init; }
+
+        /// <summary>
+        /// Gets where the transfer's progress is reported, shared by every request it sends.
+        /// </summary>
+        public required HttpTransferProgress Progress { get; init; }
+
+        /// <summary>
         /// Gets the proxy the request is forwarded through in absolute form, or
         /// <see langword="null" /> when it goes to the origin, directly or through a tunnel.
         /// </summary>
@@ -733,6 +996,12 @@ public sealed class HttpProtocolHandler(
         public string? ProxyAuthorization { get; init; }
 
         /// <summary>
+        /// Gets a value indicating whether the request is being sent again on a fresh connection
+        /// because a pooled one died before its response, which happens at most once.
+        /// </summary>
+        public bool SentOnFreshConnection { get; init; }
+
+        /// <summary>
         /// Makes the same request sent with <paramref name="authorization" /> instead.
         /// </summary>
         /// <param name="authorization">The <c>Authorization</c> value the retry is sent with.</param>
@@ -741,17 +1010,31 @@ public sealed class HttpProtocolHandler(
 
         /// <summary>
         /// Makes the same request without curl's own <c>Expect</c> and without the wait for
-        /// <c>100 Continue</c> (<see cref="HttpRequestFraming.WithoutExpect" />).
+        /// <c>100 Continue</c> (<see cref="HttpRequestFraming.WithoutExpect" />), sending
+        /// <paramref name="body" />.
+        /// </summary>
+        /// <param name="body">The body to resend.</param>
+        /// <returns>The resent request's plan.</returns>
+        public HttpRequestPlan WithoutExpect(HttpRequestBody body) => With(Framing.WithoutExpect(body), Authorization);
+
+        /// <summary>
+        /// Makes the same request, marked as sent again on a fresh connection.
         /// </summary>
         /// <returns>The resent request's plan.</returns>
-        public HttpRequestPlan WithoutExpect() => With(Framing.WithoutExpect(), Authorization);
+        public HttpRequestPlan OnFreshConnection() => With(Framing, Authorization, sentOnFreshConnection: true);
 
         private HttpRequestPlan With(HttpRequestFraming framing, string? authorization) =>
+            With(framing, authorization, SentOnFreshConnection);
+
+        private HttpRequestPlan With(HttpRequestFraming framing, string? authorization, bool sentOnFreshConnection) =>
             new(Context, Options, framing, AuthRequest, authorization)
             {
+                Started = Started,
                 Deadline = Deadline,
+                Progress = Progress,
                 ForwardProxy = ForwardProxy,
                 ProxyAuthorization = ProxyAuthorization,
+                SentOnFreshConnection = sentOnFreshConnection,
             };
     }
 
@@ -763,10 +1046,17 @@ public sealed class HttpProtocolHandler(
     /// The request to send next, or <see langword="null" /> when the result is final.
     /// </param>
     /// <param name="KeepsAlive">
-    /// <see langword="true" /> when the retry may be sent on the same connection.
+    /// <see langword="true" /> when the response was read to its end and leaves the connection
+    /// open, so a retry may be sent on it and it is marked reusable.
     /// </param>
     private sealed class HttpAttemptOutcome(TransferResult Result, HttpRequestPlan? Retry, bool KeepsAlive)
     {
+        /// <summary>
+        /// Gets a value indicating whether the exchange ran on a pooled connection that died
+        /// before its response began, so <see cref="Retry" /> resends the request on a fresh one.
+        /// </summary>
+        public bool DiedBeforeResponse { get; init; }
+
         /// <summary>Gets the result, with the report so far.</summary>
         public TransferResult Result { get; } = Result;
 

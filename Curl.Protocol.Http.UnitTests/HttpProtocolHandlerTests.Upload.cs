@@ -113,6 +113,21 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.StartsWith(head, Latin1(connection.Written));
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_UploadFailsItsFirstRead_SendsNoRequestBytes()
+    {
+        // curl -T big.bin http://127.0.0.1:18188/u, every byte of 100000 locked: nothing reached
+        // the server, then "client read function EOF fail, only 0/100000 of needed bytes read".
+        FailingReadStream upload = new([], int.MaxValue, new IOException("Lock violation."), 100000);
+        ScriptedConnection connection = Connection(EmptyOk, 65536);
+
+        TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(UploadContext("http://127.0.0.1:18188/u", upload));
+
+        Assert.AreEqual(CurlExitCode.ReadError, result.ExitCode);
+        Assert.AreEqual("client read function EOF fail, only 0/100000 of needed bytes read", result.ErrorMessage);
+        Assert.IsEmpty(connection.Written);
+    }
+
     private static TransferContext UploadContext(string url, Stream upload, TimeProvider? time = null, HttpRequestOptions? http = null) =>
         new()
         {

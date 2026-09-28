@@ -46,7 +46,7 @@ public sealed class CurlCommandRunnerProxyContextTests
     {
         RecordingProtocolHandler file = RecordingProtocolHandler.WritingPath("file");
 
-        int exitCode = await RunAsync(["-sS", "-x", proxyText, "file:///C:/source.txt"], file);
+        int exitCode = await RunAsync(["-sS", "-x", proxyText, "file:///source.txt"], file);
 
         Assert.AreEqual(0, exitCode);
         ITransferContext context = file.Contexts.Single();

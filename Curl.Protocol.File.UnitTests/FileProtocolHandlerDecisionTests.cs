@@ -23,9 +23,9 @@ public sealed class FileProtocolHandlerDecisionTests
 
     private const string DestinationWriteFailedMessage = "Failed sending data to the peer";
 
-    private static CurlUrl FileUrl => CurlUrl.Parse("file:///C:/dir/f.txt");
+    private static CurlUrl FileUrl => CurlUrl.Parse("file:///dir/f.txt");
 
-    private static string OsPath => "C:/dir/f.txt".Replace('/', Path.DirectorySeparatorChar);
+    private static string OsPath => "/dir/f.txt".Replace('/', Path.DirectorySeparatorChar);
 
     private static byte[] Content => Encoding.ASCII.GetBytes("Hello file");
 

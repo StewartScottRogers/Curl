@@ -69,34 +69,49 @@ public static class CommandLineWarning
     }
 
     /// <summary>
-    /// The two lines curl prints for a <c>-r</c>/<c>--range</c> value that starts with a digit and
-    /// has no dash, which it reads as the range from that position to the end. curl wraps the
-    /// text at 79 columns, so the first line ends in a space.
+    /// The warning for a <c>--proxy-header</c> value holding neither a colon nor a semicolon,
+    /// which curl still sends as given: <c>Warning: The provided proxy header '&lt;value&gt;' does not look like a header?</c>.
+    /// Measured with <c>curl --proxy-header bogus http://127.0.0.1:1/</c> and <c>--proxy-header ''</c>
+    /// (curl 8.21.0, Windows, 2026-09-27); the lines of a <c>--proxy-header @file</c> are never warned about.
+    /// </summary>
+    /// <param name="header">The value exactly as given.</param>
+    /// <returns>The warning line.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="header"/> is <see langword="null"/>.</exception>
+    public static string ProxyHeaderDoesNotLookLikeAHeader(string header)
+    {
+        ArgumentNullException.ThrowIfNull(header);
+
+        return $"Warning: The provided proxy header '{header}' does not look like a header?";
+    }
+
+    /// <summary>
+    /// The warning curl prints for a <c>-r</c>/<c>--range</c> value that starts with a digit and
+    /// has no dash, which it reads as the range from that position to the end, as one unwrapped
+    /// line; the console layer wraps it at the terminal width as curl does.
     /// </summary>
     public static IReadOnlyList<string> RangeHasNoDash { get; } =
     [
-        "Warning: A specified range MUST include at least one dash (-). Appending one ",
-        "Warning: for you",
+        "Warning: A specified range MUST include at least one dash (-). Appending one for you",
     ];
 
     /// <summary>
-    /// The three lines curl prints for a <c>-r</c>/<c>--range</c> value holding anything but
-    /// digits, dashes and commas, which it keeps unchanged. curl wraps the text at 79 columns, so
-    /// the first two lines end in a space.
+    /// The warning curl prints for a <c>-r</c>/<c>--range</c> value holding anything but digits,
+    /// dashes and commas, which it keeps unchanged, as one unwrapped line; the console layer wraps
+    /// it at the terminal width as curl does.
     /// </summary>
     public static IReadOnlyList<string> RangeHasInvalidCharacter { get; } =
     [
-        "Warning: Invalid character is found in given range. A specified range MUST ",
-        "Warning: have only digits in 'start'-'stop'. The server's response to this ",
-        "Warning: request is uncertain.",
+        "Warning: Invalid character is found in given range. A specified range MUST have only digits in 'start'-'stop'. The server's response to this request is uncertain.",
     ];
 
     /// <summary>
     /// The line curl prints when it cannot read the modification time of the file a
-    /// <c>-z</c>/<c>--time-cond</c> value that is not a date names, for any reason but the file not
-    /// existing; <see cref="TimeConditionIsNotADate"/> follows it. Measured with
-    /// <c>curl -z "" -o NUL file:///Z:/.../global.json</c> (curl 8.21.0, Windows, 2026-09-26):
-    /// <c>Warning: Failed to get filetime: CreateFile failed: GetLastError 0x00000003</c>.
+    /// <c>-z</c>/<c>--time-cond</c> value that is not a date names, on Windows for any reason but the
+    /// file not existing and elsewhere for any reason; <see cref="TimeConditionIsNotADate"/> follows it.
+    /// Measured with <c>curl -z "" -o NUL file:///Z:/.../global.json</c> (curl 8.21.0, Windows, 2026-09-26):
+    /// <c>Warning: Failed to get filetime: CreateFile failed: GetLastError 0x00000003</c>; and with
+    /// <c>curl -z "" file:///dev/null</c> (curl 8.18.0, OpenSSL, Ubuntu, 2026-09-27):
+    /// <c>Warning: Failed to get filetime: No such file or directory</c>.
     /// </summary>
     /// <param name="reason">The failure <see cref="IDataFileReader.TryReadModificationTime"/> reported.</param>
     /// <returns>The warning line.</returns>
@@ -215,6 +230,18 @@ public static class CommandLineWarning
     [
         $"Warning: {longName} overrides an earlier trace/verbose option",
     ];
+
+    /// <summary>
+    /// The lines curl prints for a <c>--ftp-method</c> value that is none of <c>multicwd</c>, <c>nocwd</c>
+    /// and <c>singlecwd</c> (in any case), after which it uses <c>multicwd</c>:
+    /// <c>Warning: unrecognized ftp file method '&lt;value&gt;', using default</c>, wrapped at 79 columns as
+    /// curl wraps it. Measured with <c>curl --ftp-method bogus http://127.0.0.1:1/</c>, <c>--ftp-method ''</c>
+    /// and a value long enough to wrap (curl 8.21.0, Windows, 2026-09-27): the warning, then the transfer.
+    /// </summary>
+    /// <param name="value">The value exactly as given.</param>
+    /// <returns>The warning's lines.</returns>
+    internal static IReadOnlyList<string> UnrecognizedFtpFileMethod(string value) =>
+        WrappedMessage.Lines("Warning: ", $"unrecognized ftp file method '{value}', using default");
 
     /// <summary>
     /// The line curl prints when a command line gives more <c>-o</c>/<c>--output</c> values than

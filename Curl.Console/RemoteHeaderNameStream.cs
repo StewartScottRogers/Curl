@@ -14,7 +14,6 @@ namespace Curl.Console;
 /// Where the header lines go on to: the <c>-D</c> output, the output file for <c>-i</c> or
 /// <c>-I</c>, both, or <see langword="null" /> for nowhere.
 /// </param>
-/// <param name="outputPaths">Tells whether the header's name is already taken.</param>
 /// <param name="pathOf">Turns the header's file name into the path to open: sanitized and put under <c>--output-dir</c>.</param>
 /// <remarks>
 /// <para>
@@ -27,14 +26,13 @@ namespace Curl.Console;
 /// the ones before the <c>Content-Disposition</c> line included, lands in the named file.
 /// </para>
 /// <para>
-/// Whether the name is taken is asked before the file is opened, where curl opens it with
-/// <c>O_EXCL</c>; <see cref="IFileSystem" /> has no exclusive open.
+/// A taken name is found by the open itself, <see cref="FileWriteMode.CreateNew" /> as curl's
+/// <c>O_EXCL</c>, never by a check before it, so a file created in between is not overwritten.
 /// </para>
 /// </remarks>
 internal sealed class RemoteHeaderNameStream(
     DeferredOutputFileStream output,
     Stream? headerOutput,
-    IOutputPaths outputPaths,
     Func<string, string> pathOf) : Stream
 {
     /// <summary>The start of a status line.</summary>
@@ -133,9 +131,9 @@ internal sealed class RemoteHeaderNameStream(
     }
 
     /// <summary>
-    /// Opens the output file as <paramref name="path" />, unless the file is already open or
-    /// a file already exists there; a directory there fails in the open, as curl 8.21.0's
-    /// <c>Permission denied</c> for <c>--output-dir od</c> with <c>filename=""</c> does.
+    /// Opens the output file as <paramref name="path" />, unless the file is already open; a
+    /// file already there fails the open with <c>File exists</c>, and a directory there with
+    /// <c>Permission denied</c>, as curl 8.21.0's does for <c>--output-dir od</c> with <c>filename=""</c>.
     /// </summary>
     /// <param name="path">The file to open.</param>
     /// <param name="lineLength">The <c>Content-Disposition</c> line's length, reported by curl's exit 23 message.</param>
@@ -146,12 +144,6 @@ internal sealed class RemoteHeaderNameStream(
         if (output.IsOpen)
         {
             output.FailOpen(null, lineLength);
-            return false;
-        }
-
-        if (outputPaths.FileExists(path))
-        {
-            output.FailOpen(OutputFileOpenWarning.ForExistingFile(path), lineLength);
             return false;
         }
 

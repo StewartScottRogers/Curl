@@ -236,6 +236,36 @@ public sealed class PhysicalFileSystemTests
     }
 
     [TestMethod]
+    public async Task OpenForWriteAsync_CreateNewOverExistingFile_IsAlreadyExistsAndKeepsItsBytes()
+    {
+        using var directory = new TemporaryDirectory();
+        string path = directory.Combine("taken.txt");
+        await System.IO.File.WriteAllTextAsync(path, "kept");
+
+        var result = await new PhysicalFileSystem().OpenForWriteAsync(path, FileWriteMode.CreateNew, DefaultCreateMode, CancellationToken.None);
+
+        AssertFailed(FileAccessStatus.AlreadyExists, result);
+        Assert.AreEqual("kept", await System.IO.File.ReadAllTextAsync(path));
+    }
+
+    [TestMethod]
+    public async Task OpenForWriteAsync_CreateNewWithNoFile_CreatesIt()
+    {
+        using var directory = new TemporaryDirectory();
+        string path = directory.Combine("new.txt");
+
+        var result = await new PhysicalFileSystem().OpenForWriteAsync(path, FileWriteMode.CreateNew, DefaultCreateMode, CancellationToken.None);
+
+        Assert.AreEqual(FileAccessStatus.Ok, result.Status);
+        await using (var content = result.Content!)
+        {
+            await content.WriteAsync(Content);
+        }
+
+        CollectionAssert.AreEqual(Content, await System.IO.File.ReadAllBytesAsync(path));
+    }
+
+    [TestMethod]
     public async Task OpenForWriteAsync_Append_PositionsAfterTheExistingContent()
     {
         using var directory = new TemporaryDirectory();

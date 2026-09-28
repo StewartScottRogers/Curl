@@ -30,7 +30,8 @@ public sealed class NetscapeCookieFileTests
         store.StoreFromResponse(
             CurlUrl.Parse("http://localhost:18221/p/x"),
             ["a=1; Path=/", "h=2; HttpOnly; Path=/p", "d=3; Domain=localhost; Max-Age=3600", "s=4; Secure; HttpOnly", "q=\"x y\""],
-            received);
+            received,
+            NoTransferEvents.Instance);
 
         Assert.AreEqual(
             Header
@@ -450,7 +451,7 @@ public sealed class NetscapeCookieFileTests
         CookieStore store = Load("Set-Cookie: s=1; Secure\nSet-Cookie: t=1; Secure; domain=foo.test\n", discardSessionCookies: false);
         CurlUrl foo = CurlUrl.Parse("http://foo.test:18273/");
 
-        store.StoreFromResponse(foo, ["s=2", "t=2"], Now);
+        store.StoreFromResponse(foo, ["s=2", "t=2"], Now, NoTransferEvents.Instance);
 
         Assert.AreEqual("t=2; s=2", store.GetCookieHeader(foo, secure: false, Now));
         Assert.AreEqual(
@@ -471,7 +472,7 @@ public sealed class NetscapeCookieFileTests
         CookieStore store = Load("Set-Cookie: s=1; Secure; Path=/\nSet-Cookie: t=1; Secure; domain=foo.test; Path=/\n", discardSessionCookies: false);
         CurlUrl foo = CurlUrl.Parse("http://foo.test:18273/");
 
-        store.StoreFromResponse(foo, ["s=2", "t=2"], Now);
+        store.StoreFromResponse(foo, ["s=2", "t=2"], Now, NoTransferEvents.Instance);
 
         Assert.AreEqual("s=2", store.GetCookieHeader(foo, secure: false, Now));
         Assert.AreEqual(
@@ -490,7 +491,7 @@ public sealed class NetscapeCookieFileTests
     {
         CookieStore store = Load("Set-Cookie: t=1; Secure; domain=foo.test; Path=/\n", discardSessionCookies: false);
 
-        store.StoreFromResponse(CurlUrl.Parse("http://bar.test:18273/"), ["t=2"], Now);
+        store.StoreFromResponse(CurlUrl.Parse("http://bar.test:18273/"), ["t=2"], Now, NoTransferEvents.Instance);
 
         Assert.AreEqual(
             Header

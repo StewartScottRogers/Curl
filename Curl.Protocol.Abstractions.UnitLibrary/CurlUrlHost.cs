@@ -26,15 +26,26 @@ internal static class CurlUrlHost
 
     private static readonly IdnMapping Idn = new();
 
-    /// <summary>Normalises <paramref name="host" />, or returns <see langword="false" /> when curl rejects it.</summary>
-    public static bool TryNormalize(string host, out string normalized, out string idnHost, out string? zoneId)
+    /// <summary>
+    /// Normalises <paramref name="host" />, or returns <see langword="false" /> when curl
+    /// rejects it, with <paramref name="rejection" /> saying why.
+    /// </summary>
+    public static bool TryNormalize(
+        string host,
+        out string normalized,
+        out string idnHost,
+        out string? zoneId,
+        out CurlUrlRejection rejection)
     {
         zoneId = null;
         if (host.StartsWith('['))
         {
-            return TryNormalizeIPv6(host, out normalized, out idnHost, out zoneId);
+            rejection = NormalizeIPv6(host, out normalized, out idnHost, out zoneId);
+
+            return rejection == CurlUrlRejection.None;
         }
 
+        rejection = CurlUrlRejection.BadHostname;
         idnHost = normalized = string.Empty;
         string withoutTrailingDot = host.EndsWith('.') ? host[..^1] : host;
         if (withoutTrailingDot.Length == 0 || withoutTrailingDot.EndsWith('.'))
@@ -42,14 +53,22 @@ internal static class CurlUrlHost
             return false;
         }
 
-        if (CurlUrlIPv4Address.TryNormalize(withoutTrailingDot, out string? address))
+        bool accepted = CurlUrlIPv4Address.TryNormalize(withoutTrailingDot, out string address);
+        if (accepted)
         {
             idnHost = normalized = address;
-
-            return true;
+        }
+        else
+        {
+            accepted = TryNormalizeName(host, out normalized, out idnHost);
         }
 
-        return TryNormalizeName(host, out normalized, out idnHost);
+        if (accepted)
+        {
+            rejection = CurlUrlRejection.None;
+        }
+
+        return accepted;
     }
 
     private static bool TryNormalizeName(string host, out string normalized, out string idnHost)
@@ -124,9 +143,11 @@ internal static class CurlUrlHost
     /// Checks and normalises a bracketed IPv6 address as curl's <c>ipv6_parse</c> does:
     /// only hexadecimal digits, colons and dots, then optionally <c>%</c> (or <c>%25</c>)
     /// and a zone id of 1 to 15 characters, and the address printed back in its shortest
-    /// form.
+    /// form. A zone id longer than 15 characters is a bad host name to curl; every other
+    /// fault is a bad IPv6 address.
     /// </summary>
-    private static bool TryNormalizeIPv6(string host, out string normalized, out string idnHost, out string? zoneId)
+    /// <returns>Why curl rejects the address, or <see cref="CurlUrlRejection.None" />.</returns>
+    private static CurlUrlRejection NormalizeIPv6(string host, out string normalized, out string idnHost, out string? zoneId)
     {
         normalized = idnHost = string.Empty;
         zoneId = null;
@@ -134,10 +155,10 @@ internal static class CurlUrlHost
         int addressLength = inner.AsSpan().IndexOfAnyExcept(IPv6Characters);
         if (addressLength >= 0)
         {
-            zoneId = ReadZoneId(inner[addressLength..]);
-            if (zoneId is null)
+            CurlUrlRejection zoneRejection = ReadZoneId(inner[addressLength..], out zoneId);
+            if (zoneRejection != CurlUrlRejection.None)
             {
-                return false;
+                return zoneRejection;
             }
 
             inner = inner[..addressLength];
@@ -145,33 +166,47 @@ internal static class CurlUrlHost
 
         if (!IPAddress.TryParse(inner, out IPAddress? address) || address.AddressFamily != AddressFamily.InterNetworkV6)
         {
-            return false;
+            return CurlUrlRejection.BadIPv6;
         }
 
         string text = address.ToString();
         normalized = $"[{text}]";
         idnHost = zoneId is null ? text : $"{text}%{zoneId}";
 
-        return true;
+        return CurlUrlRejection.None;
     }
 
     /// <summary>
     /// Reads the zone id from the text after an IPv6 address, which starts with
     /// <c>%</c>; a leading <c>25</c> is the encoded percent sign and is skipped.
     /// </summary>
-    private static string? ReadZoneId(string text)
+    /// <returns>Why curl rejects the zone id, or <see cref="CurlUrlRejection.None" />.</returns>
+    private static CurlUrlRejection ReadZoneId(string text, out string? zoneId)
     {
+        zoneId = null;
         if (!text.StartsWith('%'))
         {
-            return null;
+            return CurlUrlRejection.BadIPv6;
         }
 
-        string zoneId = text[1..];
-        if (zoneId.StartsWith("25", StringComparison.Ordinal))
+        string id = text[1..];
+        if (id.StartsWith("25", StringComparison.Ordinal))
         {
-            zoneId = zoneId[2..];
+            id = id[2..];
         }
 
-        return zoneId.Length is > 0 and <= MaximumZoneIdLength ? zoneId : null;
+        if (id.Length == 0)
+        {
+            return CurlUrlRejection.BadIPv6;
+        }
+
+        if (id.Length > MaximumZoneIdLength)
+        {
+            return CurlUrlRejection.BadHostname;
+        }
+
+        zoneId = id;
+
+        return CurlUrlRejection.None;
     }
 }

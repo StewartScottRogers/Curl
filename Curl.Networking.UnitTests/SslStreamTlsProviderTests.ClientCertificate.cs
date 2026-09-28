@@ -364,7 +364,8 @@ public sealed partial class SslStreamTlsProviderTests
     // the test sees exactly what the provider presented.
     private static async Task<(ConnectResult Result, X509Certificate? Received, bool PlaintextDisposed)> HandshakeWithClientCertificateRequestAsync(
         TlsClientOptions options,
-        bool matchesSchannelBuild)
+        bool matchesSchannelBuild,
+        IClientCertificateStore? certificateStore = null)
     {
         var (client, server) = InMemoryDuplexStream.CreatePair();
         X509Certificate? received = null;
@@ -382,7 +383,9 @@ public sealed partial class SslStreamTlsProviderTests
                 },
             });
         });
-        var provider = new SslStreamTlsProvider(options, matchesSchannelBuild);
+        var provider = certificateStore is null
+            ? new SslStreamTlsProvider(options, matchesSchannelBuild)
+            : new SslStreamTlsProvider(options, matchesSchannelBuild, TimeProvider.System, certificateStore);
 
         var result = await provider.AuthenticateAsClientAsync(
             new StreamConnection(client, ServerEndPoint), CertificateHost, CancellationToken.None);

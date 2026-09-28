@@ -16,6 +16,13 @@ namespace Curl.Core;
 public static class TransferRetryWarning
 {
     /// <summary>
+    /// The line curl prints instead, and then stops retrying, when a <c>Retry-After</c> wait
+    /// would end past <c>--retry-max-time</c>; measured with curl 8.21.0 on 2026-09-27 (BL-317).
+    /// </summary>
+    public const string RetryAfterExceedsMaxTime =
+        "Warning: The Retry-After: time would make this command line exceed the maximum allowed time for retries.";
+
+    /// <summary>
     /// Builds the warning line, without a line terminator.
     /// </summary>
     /// <param name="reason">Why the transfer is retried.</param>
@@ -25,7 +32,7 @@ public static class TransferRetryWarning
     public static string For(TransferRetryReason reason, TimeSpan wait, long retriesLeft)
     {
         long milliseconds = (long)wait.TotalMilliseconds;
-        string problem = reason == TransferRetryReason.Timeout ? ": timeout" : ": HTTP error";
+        string problem = Problem(reason);
         string fraction = milliseconds % 1000 == 0
             ? string.Empty
             : string.Create(CultureInfo.InvariantCulture, $".{milliseconds % 1000:D3}");
@@ -35,4 +42,15 @@ public static class TransferRetryWarning
             CultureInfo.InvariantCulture,
             $"Warning: Problem {problem}. Retrying in {milliseconds / 1000}{fraction} {seconds}. {retriesLeft} {retries} left.");
     }
+
+    /// <summary>The words curl prints after <c>Problem</c> for <paramref name="reason" />.</summary>
+    private static string Problem(TransferRetryReason reason) =>
+        reason switch
+        {
+            TransferRetryReason.Timeout => ": timeout",
+            TransferRetryReason.ConnectionRefused => ": connection refused",
+            TransferRetryReason.HttpError => ": HTTP error",
+            TransferRetryReason.FtpError => ": FTP error",
+            _ => "(retrying all errors)",
+        };
 }

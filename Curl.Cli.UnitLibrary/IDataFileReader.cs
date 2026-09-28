@@ -27,9 +27,10 @@ public interface IDataFileReader
     /// <param name="path">The <c>-z</c> value after any <c>-</c>, <c>+</c> or <c>=</c> prefix, possibly empty.</param>
     /// <param name="modificationTime">The file's modification time, to the whole second, when it was read; otherwise <see langword="default"/>.</param>
     /// <param name="failureReason">
-    /// When the lookup failed other than because the file does not exist, the reason curl prints after
-    /// <c>Warning: Failed to get filetime: </c>, such as <c>CreateFile failed: GetLastError 0x00000005</c>;
-    /// otherwise <see langword="null"/>.
+    /// When the lookup failed and curl says why, the reason it prints after
+    /// <c>Warning: Failed to get filetime: </c>, such as <c>CreateFile failed: GetLastError 0x00000005</c>
+    /// on Windows or <c>Not a directory</c> elsewhere; otherwise <see langword="null"/>, which curl's
+    /// Windows build gives for a file that does not exist.
     /// </param>
     /// <returns><see langword="true"/> when the modification time was read.</returns>
     bool TryReadModificationTime(string path, out DateTimeOffset modificationTime, out string? failureReason);

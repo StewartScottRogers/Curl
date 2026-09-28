@@ -6,7 +6,8 @@ namespace Curl.Console;
 /// <summary>
 /// The <see cref="IWriteOutFileOpener" /> <see cref="CurlCommandRunner" /> uses when it is given
 /// none: it opens no file, so a <c>%output{file}</c> in a <c>-w</c> template leaves the output
-/// where it was, as curl does for a file it cannot open. Opening the files on disk is BL-280.
+/// where it was, as curl does for a file it cannot open. The executable opens them on disk with
+/// <see cref="DiskWriteOutFileOpener" />.
 /// </summary>
 internal sealed class RefusingWriteOutFileOpener : IWriteOutFileOpener
 {

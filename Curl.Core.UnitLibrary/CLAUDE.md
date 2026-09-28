@@ -30,12 +30,14 @@ successful 3xx hop's `TransferReport.RedirectUrl` under a `RedirectPolicy`
 rewriting POST to GET and dropping credentials to another host, port or scheme as curl
 8.21.0 does, and returns the last hop's result with one merged report (redirect count,
 effective URL, summed header/request/connection counts, timings from the first hop with
-`RedirectDuration`). Without `-L` it returns the dispatcher's result unchanged. It is not
-yet wired into `Curl.Console`.
+`RedirectDuration`). Without `-L` it returns the dispatcher's result unchanged. Given a
+`HopProxySelector`, it chooses each hop's proxy again from that hop's own URL, as curl
+8.21.0 does (BL-329); without one, every hop keeps the first URL's proxy.
 
 `TransferRetrier` runs a transfer again under `--retry` (`RetryPolicy`: `--retry`,
 `--retry-delay`) after curl 8.21.0's transient failures: exit 28, 6, 5 or 12
-(`: timeout`), or an http(s) status 408, 429, 500, 502, 503, 504, 522 or 524 on a
+(`: timeout`), under `--retry-connrefused` an exit 7 whose `TransferResult.IsConnectionRefused`
+is set (`: connection refused`; any other exit 7 only under `--retry-all-errors`), or an http(s) status 408, 429, 500, 502, 503, 504, 522 or 524 on a
 success or a `-f` exit 22 (`: HTTP error`). It waits a `Retry-After`
 (`RetryAfterHeader`, capped at six hours) when one asks for a wait, else the fixed
 delay, else curl's backoff (1 s doubling to 10 min, advanced only when used), with
@@ -64,9 +66,12 @@ environment is always HTTP) and `socks://` is SOCKS4 (BL-269). It is not yet wir
 libcurl's `Curl_mime_prepare_headers` chooses them, files opened through `IFileSystem` while
 building so `Content-Length` is known, then streamed; an unopenable file is exit 26 before
 anything is sent. The text encoding and the boundary source are injected. A part's
-`Encoder` (`;encoder=`) goes through `MultipartPartEncoder`: `binary`/`8bit` files still
-stream, `base64`, `quoted-printable` and `7bit` are encoded whole in memory, and an unknown
-name is exit 43 (ADR-0041). An `@-` or `<-` part reads the standard-input `Stream` the
+`Encoder` (`;encoder=`) goes through `MultipartPartEncoder`: every file part streams, and
+`base64`, `quoted-printable` and `7bit` files are encoded as they are sent by
+`EncodedReadStream`, never held whole; a seekable `7bit` file is read through once while
+building so a byte above 127 still fails before sending, and an unseekable one fails the
+read that reaches such a byte with a `RequestBodyReadFailedException`, which the sender turns
+into exit 26. An unknown name is exit 43 (ADR-0041, ADR-0076, ADR-0093). An `@-` or `<-` part reads the standard-input `Stream` the
 builder is given whole, never closing it, so the body keeps its `Content-Length`; without
 one it opens the path `-` as before (BL-275). It is not yet wired into `Curl.Console`.
 

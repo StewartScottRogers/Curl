@@ -130,6 +130,22 @@ public sealed class ConnectTargetTests
     }
 
     [TestMethod]
+    public void IsForwardProxy_WhenNotSet_IsFalse()
+    {
+        var target = new ConnectTarget("example.com", 80, false);
+
+        Assert.IsFalse(target.IsForwardProxy);
+    }
+
+    [TestMethod]
+    public void IsForwardProxy_WhenSetWithInitializer_RoundTrips()
+    {
+        var target = new ConnectTarget("proxy.example", 3128, false) { IsForwardProxy = true };
+
+        Assert.IsTrue(target.IsForwardProxy);
+    }
+
+    [TestMethod]
     public void Events_WhenNotSet_IsNoTransferEvents()
     {
         var target = new ConnectTarget("example.com", 443, true);

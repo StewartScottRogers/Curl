@@ -90,6 +90,41 @@ public sealed class HttpRequestBodyWriterTests
     }
 
     [TestMethod]
+    public async Task WriteAsync_ChunkedMultipartBodyReadIsRefusedMidBody_FailsWithExit26AndTheMeasuredMessage()
+    {
+        // curl -F 'f=@fifo;encoder=7bit', a byte above 127 at 150000 (Linux curl, a FIFO is
+        // chunked): the chunks before it went out, no closing 0 chunk, then exit 26,
+        // "read error getting mime data" (BL-385 Notes).
+        FailingReadStream stream = new("abcde"u8.ToArray(), 2, new RequestBodyReadFailedException("read error getting mime data"));
+        ScriptedConnection connection = new([], 1);
+        HttpRequestBodyWriter writer = new(connection);
+
+        HttpTransferException failure = await Assert.ThrowsExactlyAsync<HttpTransferException>(
+            async () => await writer.WriteAsync(new StreamBody(stream, null, "multipart/form-data; boundary=b"), true, CancellationToken.None));
+
+        Assert.AreEqual(CurlExitCode.ReadError, failure.ExitCode);
+        Assert.AreEqual("read error getting mime data", failure.Message);
+        Assert.AreEqual(5L, writer.BytesWritten);
+        Assert.AreEqual("2\r\nab\r\n2\r\ncd\r\n1\r\ne\r\n", Encoding.Latin1.GetString(connection.Written));
+    }
+
+    [TestMethod]
+    public async Task WriteAsync_MultipartBodyOfKnownLengthReadIsRefused_FailsWithExit26AndTheMeasuredMessage()
+    {
+        // curl -F 'f=@f.bin;encoder=7bit', a byte above 127 at 150000 of 200000: exit 26,
+        // "read error getting mime data", not the short-read message (BL-385 Notes).
+        FailingReadStream stream = new(new byte[207], 65536, new RequestBodyReadFailedException("read error getting mime data"));
+        HttpRequestBodyWriter writer = new(new ScriptedConnection([], 1));
+
+        HttpTransferException failure = await Assert.ThrowsExactlyAsync<HttpTransferException>(
+            async () => await writer.WriteAsync(new StreamBody(stream, 100207, "multipart/form-data; boundary=b"), false, CancellationToken.None));
+
+        Assert.AreEqual(CurlExitCode.ReadError, failure.ExitCode);
+        Assert.AreEqual("read error getting mime data", failure.Message);
+        Assert.AreEqual(207L, writer.BytesWritten);
+    }
+
+    [TestMethod]
     [DataRow(0, 100000, DisplayName = "every byte locked: 0/100000")]
     [DataRow(65432, 100000, DisplayName = "locked from 70000: 65432/100000")]
     [DataRow(130968, 200000, DisplayName = "locked from 140000: 130968/200000")]
@@ -104,6 +139,20 @@ public sealed class HttpRequestBodyWriterTests
 
         Assert.AreEqual(CurlExitCode.ReadError, failure.ExitCode);
         Assert.AreEqual($"client read function EOF fail, only {readable}/{length} of needed bytes read", failure.Message);
+    }
+
+    [TestMethod]
+    public async Task WriteAsync_HeldHead_SendsItOnceBeforeTheFirstBodyBytes()
+    {
+        FailingReadStream stream = new("hello"u8.ToArray(), 2, new IOException("Not reached."), 5);
+        ScriptedConnection connection = new([], 1);
+        HttpRequestBodyWriter writer = new(connection) { HeldHead = "HEAD\r\n\r\n"u8.ToArray() };
+
+        await writer.WriteAsync(new StreamBody(stream, 5, "a/b"), false, CancellationToken.None);
+        await writer.WriteHeldHeadAsync(CancellationToken.None);
+
+        Assert.AreEqual("HEAD\r\n\r\nhello", Encoding.Latin1.GetString(connection.Written));
+        Assert.IsTrue(writer.HeldHead.IsEmpty);
     }
 
     [TestMethod]

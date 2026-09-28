@@ -31,33 +31,56 @@ public sealed partial class SslStreamTlsProviderTests
         await IgnoreFailureAsync(serverTask);
     }
 
+    // Integration: on Windows the server's certificate context writes the intermediate into
+    // the current user's CA store, so the test depends on that store and changes it. Each run
+    // names its authorities afresh, so a copy left by a crashed run or another checkout
+    // running at the same time can never be taken for this run's issuer while the chain builds.
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task AuthenticateAsClientAsync_WhenTheServerSendsAnIntermediate_ReportsItAfterTheServersCertificate()
     {
+        var runName = Guid.NewGuid().ToString("N");
         using var rootKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-        using var root = CreateAuthority("CN=BL303 Test Root", rootKey, null, null);
+        using var root = CreateAuthority($"CN=BL303 Test Root {runName}", rootKey, null, null);
         using var intermediateKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-        using var intermediate = CreateAuthority("CN=BL303 Intermediate", intermediateKey, root, rootKey);
+        using var intermediate = CreateAuthority($"CN=BL303 Intermediate {runName}", intermediateKey, root, rootKey);
         using var leaf = CreateServerCertificate(intermediate, intermediateKey);
-        var (client, server) = InMemoryDuplexStream.CreatePair();
-        var context = SslStreamCertificateContext.Create(leaf, [intermediate], offline: true);
-        var serverTask = Task.Run(async () =>
+        try
         {
-            await using var sslStream = new SslStream(server);
-            await sslStream.AuthenticateAsServerAsync(new SslServerAuthenticationOptions { ServerCertificateContext = context });
-            _ = await sslStream.ReadAtLeastAsync(new byte[1], 1, throwOnEndOfStream: false);
-        });
-        var provider = new SslStreamTlsProvider(new TlsClientOptions(Insecure: true));
+            var (client, server) = InMemoryDuplexStream.CreatePair();
+            var context = SslStreamCertificateContext.Create(leaf, [intermediate], offline: true);
+            var serverTask = Task.Run(async () =>
+            {
+                await using var sslStream = new SslStream(server);
+                await sslStream.AuthenticateAsServerAsync(new SslServerAuthenticationOptions { ServerCertificateContext = context });
+                _ = await sslStream.ReadAtLeastAsync(new byte[1], 1, throwOnEndOfStream: false);
+            });
+            var provider = new SslStreamTlsProvider(new TlsClientOptions(Insecure: true));
 
-        var result = await provider.AuthenticateAsClientAsync(
-            new StreamConnection(client, ServerEndPoint), CertificateHost, CancellationToken.None);
+            var result = await provider.AuthenticateAsClientAsync(
+                new StreamConnection(client, ServerEndPoint), CertificateHost, CancellationToken.None);
 
-        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
-        Assert.HasCount(2, result.PeerCertificates);
-        CollectionAssert.AreEqual(leaf.RawData, result.PeerCertificates[0].ToArray());
-        CollectionAssert.AreEqual(intermediate.RawData, result.PeerCertificates[1].ToArray());
-        await result.Connection!.DisposeAsync();
-        await IgnoreFailureAsync(serverTask);
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+            Assert.HasCount(2, result.PeerCertificates);
+            CollectionAssert.AreEqual(leaf.RawData, result.PeerCertificates[0].ToArray());
+            CollectionAssert.AreEqual(intermediate.RawData, result.PeerCertificates[1].ToArray());
+            await result.Connection!.DisposeAsync();
+            await IgnoreFailureAsync(serverTask);
+        }
+        finally
+        {
+            RemoveFromCurrentUserCaStore(intermediate);
+        }
+    }
+
+    // On Windows, SslStreamCertificateContext.Create saves the intermediate into the current
+    // user's CA store, where the server's handshake finds it. Left there, every run adds
+    // another same-named authority until building a chain fails, so the test removes it.
+    private static void RemoveFromCurrentUserCaStore(X509Certificate2 intermediate)
+    {
+        using var store = new X509Store(StoreName.CertificateAuthority, StoreLocation.CurrentUser);
+        store.Open(OpenFlags.ReadWrite);
+        store.Remove(intermediate);
     }
 
     [TestMethod]

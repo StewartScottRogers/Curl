@@ -108,9 +108,13 @@ lines end in CRLF, on Linux and macOS in LF, as each build writes them.
 ### 2. `--capath`
 
 - **Windows:** ignored. The transfer proceeds without the directory. Unless `-s` is
-  given, stderr gets exactly two lines:
+  given, stderr gets one warning,
+  `Warning: ignoring setting the CA path for the proxy, not supported by libcurl with Schannel`,
+  wrapped at the terminal width as curl wraps every `Warning: ` message. At the default
+  79 columns (a pipe) that is two lines,
   `Warning: ignoring setting the CA path for the proxy, not supported by libcurl `
-  (note the trailing space) and `Warning: with Schannel`. With `-s`, nothing.
+  (note the trailing space) and `Warning: with Schannel`; at `COLUMNS=200` it is one line
+  (measured with curl 8.21.0, mingw, Schannel, 2026-09-27, BL-272). With `-s`, nothing.
 - **Linux and macOS:** honoured. Every certificate in the directory is added to the
   trust anchors used to verify the peer. An empty or missing directory adds nothing,
   prints nothing, and verification then fails or succeeds on the remaining anchors.

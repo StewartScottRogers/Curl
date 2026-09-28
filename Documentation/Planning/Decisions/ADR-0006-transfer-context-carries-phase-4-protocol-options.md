@@ -96,3 +96,38 @@ Costs and caveats:
   so they would be duplicated across interfaces that then drift.
 - **Keep one hand-written `ITransferContext` fake per test project.** Rejected: every
   member addition breaks every such project, outside the adding task's `touches`.
+
+## Addendum (2026-09-27, BL-435): the FTP control options
+
+Decided by Claude under Stewart's delegation.
+
+Six FTP settings join the context on the same terms, parsed by `CommandLineOptionTable`
+rows onto `CommandLineOptions` and copied by `Curl.Console`'s `TransferContextFactory`.
+`ftp://` (BL-436) is to read them; nothing reads them yet.
+
+| Option | Context member | Not given |
+| --- | --- | --- |
+| `--disable-epsv` / `--no-disable-epsv` | `bool FtpDisableEpsv` | `false` |
+| `--ftp-skip-pasv-ip` / `--no-ftp-skip-pasv-ip` | `bool FtpSkipPasvIp` | `true`, curl 8.21.0's default (ADR-0093 relies on it) |
+| `--ftp-method <multicwd\|nocwd\|singlecwd>` | `FtpFileMethod FtpFileMethod` | `FtpFileMethod.MultiCwd` |
+| `--ftp-create-dirs` / `--no-ftp-create-dirs` | `bool FtpCreateDirectories` | `false` |
+| `-l`, `--list-only` / `--no-list-only` | `bool ListOnly` | `false` |
+| `-Q`, `--quote <command>` (repeatable) | `IReadOnlyList<string> QuoteCommands` | empty |
+
+Measured with the local curl 8.21.0 (Windows, Schannel) on 2026-09-27 before pinning:
+
+- `--ftp-method` reads its three values without regard to ASCII case. Any other value,
+  empty included, is not refused: curl prints
+  `Warning: unrecognized ftp file method '<value>', using default` (wrapped at 79
+  columns, dropped under `-s`) and uses `multicwd`, even after an earlier valid
+  `--ftp-method`. So the task's "refusal for a bad value" is a warning, and the parser
+  records `MultiCwd`.
+- `--ftp-method`, `-Q` and `--quote` as the last argument exit 2 with
+  `curl: option <as typed>: requires parameter`; `-Q ''` is accepted.
+- The four flags accept `--no-`; `--no-ftp-method` and `--no-quote` exit 2 as not reversible.
+
+`-Q` values are carried verbatim and in order, `-`/`+`/`*` prefixes included; the
+FTP handler interprets them, because which list a command joins (before or after the
+transfer) and whether its failure is ignored is FTP conversation, not parsing.
+`FtpFileMethod` is an enum in `Curl.Protocol.Abstractions` rather than curl's string
+so the handler switches over a closed set.

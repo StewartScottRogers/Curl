@@ -1,0 +1,11 @@
+sftp: SFTP protocol
+ -a, --append                   Append to target file when uploading
+     --create-file-mode <mode>  File mode for created files
+     --ftp-create-dirs          Create the remote dirs if not present
+     --hostpubmd5 <md5>         Acceptable MD5 hash of host public key
+     --hostpubsha256 <sha256>   Acceptable SHA256 hash of host public key
+ -k, --insecure                 Allow insecure server connections
+ -l, --list-only                List only mode
+     --pubkey <key>             SSH Public key filename
+ -Q, --quote <command>          Send command(s) to server before transfer
+ -r, --range <range>            Retrieve only the bytes within RANGE

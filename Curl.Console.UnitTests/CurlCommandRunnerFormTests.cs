@@ -41,6 +41,20 @@ public sealed class CurlCommandRunnerFormTests
         + "print(1)\n\r\n"
         + "--" + Boundary + "--\r\n";
 
+    private const string RedirectBoundary = "------------------------ugfPuRE0XGGB3ODF3hLOBy";
+
+    private const string MeasuredRedirectBody =
+        "--" + RedirectBoundary + "\r\n"
+        + "Content-Disposition: form-data; name=\"a\"\r\n"
+        + "\r\n"
+        + "b\r\n"
+        + "--" + RedirectBoundary + "\r\n"
+        + "Content-Disposition: form-data; name=\"f\"; filename=\"file.txt\"\r\n"
+        + "Content-Type: text/plain\r\n"
+        + "\r\n"
+        + "hello\r\n"
+        + "--" + RedirectBoundary + "--\r\n";
+
     private readonly InMemoryFileSystem files = new();
 
     private readonly MemoryStream standardOutput = new();
@@ -105,6 +119,174 @@ public sealed class CurlCommandRunnerFormTests
 
         Assert.IsFalse(tracking.Opened.Single().CanRead);
     }
+
+    /// <summary>
+    /// Measured on 2026-09-27 with curl 8.21.0 (mingw, Schannel) as
+    /// <c>curl -L --max-redirs 1 -F a=b -F f=@&lt;dir&gt;\file.txt http://127.0.0.1:18298/first</c>,
+    /// <c>file.txt</c> holding <c>hello</c>, answered 307 or 308 with <c>Location: /next</c>
+    /// (BL-298 Notes): both POSTs carry the same body, boundary and all.
+    /// </summary>
+    [TestMethod]
+    [DataRow(307)]
+    [DataRow(308)]
+    public async Task RunAsync_FormFollowed307Or308_SendsTheMeasuredMultipartBodyOnBothRequests(int status)
+    {
+        files.ExistingContent["file.txt"] = Encoding.ASCII.GetBytes("hello");
+        ScriptedConnector redirectingServer = new(
+        [
+            Encoding.Latin1.GetBytes($"HTTP/1.1 {status} Moved\r\nLocation: /next\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"),
+            Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 5\r\nConnection: close\r\n\r\nhello"),
+        ]);
+
+        int exitCode = await new CurlCommandRunner(
+                _ => new TransferDispatch(new ProtocolDispatcher(
+                    CurlComposition.CreateProtocolHandlers(redirectingServer, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused")))),
+                files,
+                files,
+                standardOutput,
+                standardError,
+                new MemoryStream(),
+                runsOnWindows: false,
+                formBodyBuilder: new MultipartFormBodyBuilder(files, Encoding.UTF8, () => RedirectBoundary))
+            .RunAsync(["-sS", "-L", "-F", "a=b", "-F", "f=@file.txt", "http://127.0.0.1:18298/first"]);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(
+            MeasuredRedirectRequest("/first") + MeasuredRedirectRequest("/next"),
+            Encoding.Latin1.GetString(redirectingServer.Written));
+        Assert.AreEqual("hello", Encoding.Latin1.GetString(standardOutput.ToArray()));
+    }
+
+    /// <summary>
+    /// The part curl 8.21.0 sent on 2026-09-26 for <c>-F "t=hi;encoder=base64"</c>
+    /// (<c>MultipartFormBodyBuilderEncoderTests</c>, 187 bytes), under this class's boundary.
+    /// </summary>
+    [TestMethod]
+    public async Task RunAsync_FormBase64Encoder_SendsTheBase64EncodedPart()
+    {
+        int exitCode = await RunAsync("-sS", "-F", "t=hi;encoder=base64", Url);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(
+            "POST / HTTP/1.1\r\n"
+            + "Host: 127.0.0.1:18233\r\n"
+            + "User-Agent: curl/8.21.0\r\n"
+            + "Accept: */*\r\n"
+            + "Content-Length: 187\r\n"
+            + "Content-Type: multipart/form-data; boundary=" + Boundary + "\r\n"
+            + "\r\n"
+            + "--" + Boundary + "\r\n"
+            + "Content-Disposition: form-data; name=\"t\"\r\n"
+            + "Content-Transfer-Encoding: base64\r\n"
+            + "\r\n"
+            + "aGk=\r\n"
+            + "--" + Boundary + "--\r\n",
+            Encoding.Latin1.GetString(server.Written));
+    }
+
+    /// <summary>Measured on 2026-09-27 with curl 8.21.0 (mingw, Schannel): <c>curl -sS -F "t=hi;encoder=bogus" http://127.0.0.1:1/</c>.</summary>
+    [TestMethod]
+    public async Task RunAsync_FormUnknownEncoder_Exits43WithoutConnecting()
+    {
+        int exitCode = await RunAsync("-sS", "-F", "t=hi;encoder=bogus", Url);
+
+        Assert.AreEqual(43, exitCode);
+        Assert.AreEqual(
+            $"curl: (43) A libcurl function was given a bad argument{Environment.NewLine}",
+            Encoding.UTF8.GetString(standardError.ToArray()));
+        Assert.IsEmpty(server.Targets);
+    }
+
+    /// <summary>
+    /// The body BL-275 pinned from curl 8.21.0 for <c>printf 'hello\nworld' | curl -F a=@- URL</c>
+    /// (<c>MultipartFormBodyBuilderStandardInputTests</c>, 173 bytes), built by the runner's own
+    /// builder, with its random 46-character boundary, from the standard input the runner is given.
+    /// </summary>
+    [TestMethod]
+    public async Task RunAsync_FormUploadFromStandardInput_SendsStandardInputAsAPartNamedDash()
+    {
+        int exitCode = await RunWithStandardInputAsync(server, "-sS", "-F", "a=@-", Url);
+
+        Assert.AreEqual(0, exitCode);
+        string written = Encoding.Latin1.GetString(server.Written);
+        string boundary = SentBoundary(written);
+        Assert.AreEqual(46, boundary.Length);
+        Assert.AreEqual(
+            "POST / HTTP/1.1\r\n"
+            + "Host: 127.0.0.1:18233\r\n"
+            + "User-Agent: curl/8.21.0\r\n"
+            + "Accept: */*\r\n"
+            + "Content-Length: 173\r\n"
+            + "Content-Type: multipart/form-data; boundary=" + boundary + "\r\n"
+            + "\r\n"
+            + "--" + boundary + "\r\n"
+            + "Content-Disposition: form-data; name=\"a\"; filename=\"-\"\r\n"
+            + "\r\n"
+            + "hello\nworld\r\n"
+            + "--" + boundary + "--\r\n",
+            written);
+    }
+
+    /// <summary>
+    /// curl 8.21.0 sends piped standard input to the first URL of <c>-F "a=&lt;-" URL1 URL2</c>
+    /// and an empty part to the second, which it declares with the first body's length and fails
+    /// with exit 26 (BL-311 Context). ADR-0062 matches the first URL and sends the second a
+    /// consistent body with the empty part.
+    /// </summary>
+    [TestMethod]
+    public async Task RunAsync_FormContentFromStandardInputOnTwoUrls_SendsTheInputOnceThenAnEmptyPart()
+    {
+        ScriptedConnector twoResponses = new(
+        [
+            Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"),
+            Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"),
+        ]);
+
+        int exitCode = await RunWithStandardInputAsync(twoResponses, "-sS", "-F", "a=<-", Url, Url);
+
+        Assert.AreEqual(0, exitCode);
+        string written = Encoding.Latin1.GetString(twoResponses.Written);
+        int secondRequest = written.IndexOf("POST", 1, StringComparison.Ordinal);
+        Assert.AreEqual(
+            "Content-Length: 159\r\n" + FormBody(SentBoundary(written), "hello\nworld"),
+            written[written.IndexOf("Content-Length", StringComparison.Ordinal)..secondRequest]);
+        string second = written[secondRequest..];
+        Assert.AreEqual(
+            "Content-Length: 148\r\n" + FormBody(SentBoundary(second), string.Empty),
+            second[second.IndexOf("Content-Length", StringComparison.Ordinal)..]);
+    }
+
+    private static string FormBody(string boundary, string content) =>
+        "Content-Type: multipart/form-data; boundary=" + boundary + "\r\n"
+        + "\r\n"
+        + "--" + boundary + "\r\nContent-Disposition: form-data; name=\"a\"\r\n\r\n"
+        + content
+        + "\r\n--" + boundary + "--\r\n";
+
+    private static string SentBoundary(string written) =>
+        written.Split("boundary=")[1].Split("\r\n")[0];
+
+    private Task<int> RunWithStandardInputAsync(ScriptedConnector connector, params string[] arguments) =>
+        new CurlCommandRunner(
+                _ => new TransferDispatch(new ProtocolDispatcher(
+                    CurlComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused")))),
+                files,
+                files,
+                standardOutput,
+                standardError,
+                new MemoryStream(Encoding.ASCII.GetBytes("hello\nworld")),
+                runsOnWindows: false)
+            .RunAsync(arguments);
+
+    private static string MeasuredRedirectRequest(string path) =>
+        $"POST {path} HTTP/1.1\r\n"
+        + "Host: 127.0.0.1:18298\r\n"
+        + "User-Agent: curl/8.21.0\r\n"
+        + "Accept: */*\r\n"
+        + "Content-Length: 297\r\n"
+        + "Content-Type: multipart/form-data; boundary=" + RedirectBoundary + "\r\n"
+        + "\r\n"
+        + MeasuredRedirectBody;
 
     private Task<int> RunAsync(params string[] arguments) =>
         new CurlCommandRunner(

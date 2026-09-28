@@ -228,7 +228,7 @@ public sealed class WriteOutTemplateRendererTests
     public async Task RenderAsync_FailingWrite_StillClosesTheOpenedFile()
     {
         RecordingFileOpener files = new();
-        WriteOutTemplateRenderer renderer = new(files, writesLineFeedAsCrLf: true, TimeProvider.System);
+        WriteOutTemplateRenderer renderer = new(files, writesLineFeedAsCrLf: true, WriteOutTimeDialect.WindowsCRuntime, TimeProvider.System);
         using MemoryStream standardOutput = new();
         using FailingStream standardError = new();
 
@@ -242,7 +242,7 @@ public sealed class WriteOutTemplateRendererTests
     [TestMethod]
     public async Task RenderAsync_StreamsThatCompleteLater_RenderTheSameBytes()
     {
-        WriteOutTemplateRenderer renderer = new(new YieldingFileOpener(), writesLineFeedAsCrLf: true, TimeProvider.System);
+        WriteOutTemplateRenderer renderer = new(new YieldingFileOpener(), writesLineFeedAsCrLf: true, WriteOutTimeDialect.WindowsCRuntime, TimeProvider.System);
         using YieldingStream standardOutput = new();
         using YieldingStream standardError = new();
 
@@ -344,6 +344,17 @@ public sealed class WriteOutTemplateRendererTests
     }
 
     [TestMethod]
+    public async Task RenderAsync_TimeInTheGlibcDialect_RendersWhatLinuxCurlPrints()
+    {
+        // Linux curl 8.21.0 prints glibc's %F and %T, which the Windows C runtime rejects.
+        Harness harness = new(writesLineFeedAsCrLf: false, WriteOutTimeDialect.Glibc);
+
+        await harness.RenderAsync("[%time{%F %T.%f}]");
+
+        Assert.AreEqual("[2026-09-27 03:30:08.545957]", harness.StandardOutputText);
+    }
+
+    [TestMethod]
     public async Task RenderAsync_UnclosedTime_IsWrittenAsItStands()
     {
         // curl -w "[%time{%Y]" wrote "[%time{%Y]".
@@ -357,19 +368,31 @@ public sealed class WriteOutTemplateRendererTests
     [TestMethod]
     public void Constructor_NullTimeProvider_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => new WriteOutTemplateRenderer(new RecordingFileOpener(), writesLineFeedAsCrLf: true, null!));
+        Assert.ThrowsExactly<ArgumentNullException>(() => new WriteOutTemplateRenderer(new RecordingFileOpener(), writesLineFeedAsCrLf: true, WriteOutTimeDialect.WindowsCRuntime, null!));
+    }
+
+    [TestMethod]
+    public async Task Constructor_WithoutTimeDialect_RendersTheWindowsDialect()
+    {
+        // The Windows C runtime rejects %F, so the whole %time{%F} prints nothing.
+        WriteOutTemplateRenderer renderer = new(new RecordingFileOpener(), writesLineFeedAsCrLf: false, TimeProvider.System);
+        using MemoryStream standardOutput = new();
+
+        await renderer.RenderAsync("[%time{%F}]", new DictionaryVariableSource(), standardOutput, Stream.Null);
+
+        Assert.AreEqual("[]", Encoding.UTF8.GetString(standardOutput.ToArray()));
     }
 
     [TestMethod]
     public void Constructor_NullFileOpener_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => new WriteOutTemplateRenderer(null!, writesLineFeedAsCrLf: true, TimeProvider.System));
+        Assert.ThrowsExactly<ArgumentNullException>(() => new WriteOutTemplateRenderer(null!, writesLineFeedAsCrLf: true, WriteOutTimeDialect.WindowsCRuntime, TimeProvider.System));
     }
 
     [TestMethod]
     public async Task RenderAsync_NullArgument_Throws()
     {
-        WriteOutTemplateRenderer renderer = new(new RecordingFileOpener(), writesLineFeedAsCrLf: true, TimeProvider.System);
+        WriteOutTemplateRenderer renderer = new(new RecordingFileOpener(), writesLineFeedAsCrLf: true, WriteOutTimeDialect.WindowsCRuntime, TimeProvider.System);
         DictionaryVariableSource variables = new();
         using MemoryStream stream = new();
 
@@ -379,8 +402,10 @@ public sealed class WriteOutTemplateRendererTests
         await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => renderer.RenderAsync("x", variables, stream, null!));
     }
 
-    private sealed class Harness(bool writesLineFeedAsCrLf)
+    private sealed class Harness(bool writesLineFeedAsCrLf, WriteOutTimeDialect timeDialect = WriteOutTimeDialect.WindowsCRuntime)
     {
+        public WriteOutTimeDialect TimeDialect { get; } = timeDialect;
+
         public DictionaryVariableSource Variables { get; } = new();
 
         public RecordingFileOpener Files { get; } = new();
@@ -397,7 +422,7 @@ public sealed class WriteOutTemplateRendererTests
 
         public Task RenderAsync(string template)
         {
-            WriteOutTemplateRenderer renderer = new(Files, writesLineFeedAsCrLf, Clock);
+            WriteOutTemplateRenderer renderer = new(Files, writesLineFeedAsCrLf, TimeDialect, Clock);
             return renderer.RenderAsync(template, Variables, StandardOutput, StandardError);
         }
     }

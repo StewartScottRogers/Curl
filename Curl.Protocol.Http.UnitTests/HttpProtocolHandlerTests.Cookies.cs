@@ -84,11 +84,32 @@ public sealed partial class HttpProtocolHandlerTests
                 .ExecuteAsync(CookieContext(CookieUrl, options));
 
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
-            (CurlUrl uri, IReadOnlyList<string> setCookies, DateTimeOffset now) = store.Responses.Single();
+            (CurlUrl uri, IReadOnlyList<string> setCookies, DateTimeOffset now, ITransferEvents events) = store.Responses.Single();
             Assert.AreEqual(CurlUrl.Parse(CookieUrl), uri, $"Chunk size {chunkSize}");
             CollectionAssert.AreEqual(new[] { "b=2; Path=/", "a=1" }, setCookies.ToArray(), $"Chunk size {chunkSize}");
             Assert.AreEqual(CookieTime, now, $"Chunk size {chunkSize}");
+            Assert.AreSame(NoTransferEvents.Instance, events, $"Chunk size {chunkSize}");
         }
+    }
+
+    /// <summary>
+    /// The store is handed the transfer's events, so it can report each cookie it adds or
+    /// drops as curl's <c>-v</c> lines (BL-367).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_ResponseSetsCookies_HandsTheStoreTheTransferEvents()
+    {
+        const string head = "HTTP/1.1 200 OK\r\nSet-Cookie: n2=v; Path=/\r\nContent-Length: 0\r\n\r\n";
+        ScriptedCookieStore store = new();
+        RecordingTransferEvents events = new();
+        TransferContext context = new() { Url = CurlUrl.Parse(CookieUrl), Output = new MemoryStream(), TimeProvider = new FakeTimeProvider(CookieTime), Events = events };
+
+        TransferResult result = await CookieHandler(QueueConnector.For(Connection(head, 65536)), store).ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        (_, IReadOnlyList<string> setCookies, _, ITransferEvents handed) = store.Responses.Single();
+        CollectionAssert.AreEqual(new[] { "n2=v; Path=/" }, setCookies.ToArray());
+        Assert.AreSame(events, handed);
     }
 
     [TestMethod]

@@ -20,6 +20,7 @@ public sealed class TransferContextTests
 
         Assert.IsNull(context.Upload);
         Assert.IsNull(context.ResumeFrom);
+        Assert.IsFalse(context.ResumeUploadFromUnknownOffset);
         Assert.IsNull(context.Range);
         Assert.IsNull(context.MaxFileSize);
         Assert.IsFalse(context.NoBody);
@@ -30,6 +31,12 @@ public sealed class TransferContextTests
         Assert.IsEmpty(context.TelnetOptions);
         Assert.IsNull(context.TftpBlockSize);
         Assert.IsFalse(context.TftpNoOptions);
+        Assert.IsFalse(context.FtpDisableEpsv);
+        Assert.IsTrue(context.FtpSkipPasvIp);
+        Assert.AreEqual(FtpFileMethod.MultiCwd, context.FtpFileMethod);
+        Assert.IsFalse(context.FtpCreateDirectories);
+        Assert.IsFalse(context.ListOnly);
+        Assert.IsEmpty(context.QuoteCommands);
         Assert.IsFalse(context.ConvertLineEndings);
         Assert.IsFalse(context.PathAsIs);
         Assert.AreEqual((UnixFileMode)0b110_100_100, context.CreateFileMode);
@@ -58,6 +65,7 @@ public sealed class TransferContextTests
         ReadOnlyMemory<byte> postData = new byte[] { 0x78 };
         var credentials = new NetworkCredential("bob", "secret");
         string[] telnetOptions = ["TTYPE=vt100", "XDISPLOC=host:0"];
+        string[] quoteCommands = ["+NOOP", "-DELE x"];
         var timeProvider = new StubTimeProvider();
         var proxy = new ProxyEndpoint(ProxyKind.Http, "proxy.example", 3128, null);
         var http = new HttpRequestOptions { CustomMethod = "PATCH" };
@@ -70,6 +78,7 @@ public sealed class TransferContextTests
             Output = output,
             Upload = upload,
             ResumeFrom = 42,
+            ResumeUploadFromUnknownOffset = true,
             Range = range,
             MaxFileSize = 1024,
             NoBody = true,
@@ -80,6 +89,12 @@ public sealed class TransferContextTests
             TelnetOptions = telnetOptions,
             TftpBlockSize = 70000,
             TftpNoOptions = true,
+            FtpDisableEpsv = true,
+            FtpSkipPasvIp = false,
+            FtpFileMethod = FtpFileMethod.SingleCwd,
+            FtpCreateDirectories = true,
+            ListOnly = true,
+            QuoteCommands = quoteCommands,
             ConvertLineEndings = true,
             PathAsIs = true,
             CreateFileMode = UnixFileMode.UserRead,
@@ -98,6 +113,7 @@ public sealed class TransferContextTests
         Assert.AreSame(output, context.Output);
         Assert.AreSame(upload, context.Upload);
         Assert.AreEqual(42L, context.ResumeFrom);
+        Assert.IsTrue(context.ResumeUploadFromUnknownOffset);
         Assert.AreEqual(range, context.Range);
         Assert.AreEqual(1024L, context.MaxFileSize);
         Assert.IsTrue(context.NoBody);
@@ -109,6 +125,12 @@ public sealed class TransferContextTests
         Assert.AreSame(telnetOptions, context.TelnetOptions);
         Assert.AreEqual(70000, context.TftpBlockSize);
         Assert.IsTrue(context.TftpNoOptions);
+        Assert.IsTrue(context.FtpDisableEpsv);
+        Assert.IsFalse(context.FtpSkipPasvIp);
+        Assert.AreEqual(FtpFileMethod.SingleCwd, context.FtpFileMethod);
+        Assert.IsTrue(context.FtpCreateDirectories);
+        Assert.IsTrue(context.ListOnly);
+        Assert.AreSame(quoteCommands, context.QuoteCommands);
         Assert.IsTrue(context.ConvertLineEndings);
         Assert.IsTrue(context.PathAsIs);
         Assert.AreEqual(UnixFileMode.UserRead, context.CreateFileMode);

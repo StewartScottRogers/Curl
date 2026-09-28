@@ -206,7 +206,8 @@ public sealed class TransferWriteOutVariablesTests
     [DataRow("url.bogus")]
     [DataRow("urle.bogus")]
     [DataRow("url.")]
-    [DataRow("referer")]
+    [DataRow("filename")]
+    [DataRow("connid")]
     [DataRow("num_cert")]
     [DataRow("HTTP_CODE")]
     [DataRow(" http_code")]
@@ -529,6 +530,35 @@ public sealed class TransferWriteOutVariablesTests
 
         Assert.AreEqual("3", Get(variables, "num_certs"));
         Assert.AreEqual(LoopbackChain.CertsText, Get(variables, "certs"));
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_CommandLineInputsNotGiven_PrintAsCurlPrintsThem()
+    {
+        // curl -s -w "[%{referer}][%{filename_effective}]" to standard output without -e printed [][];
+        // a URL curl rejected with exit 3 printed conn_id -1 (BL-284's Notes).
+        TransferWriteOutVariables variables = new(TransferResult.Success(0), LoopbackUrl, 0, LoopbackUrl, "http", Clock);
+
+        Assert.AreEqual(
+            "[][][-1][0]",
+            $"[{Get(variables, "referer")}][{Get(variables, "filename_effective")}][{Get(variables, "conn_id")}][{Get(variables, "xfer_id")}]");
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_CommandLineInputsGiven_PrintAsGiven()
+    {
+        // curl -e http://ref.example/x -o out.bin, second of two URLs: referer, out.bin, conn_id 1, xfer_id 1 (BL-284's Notes).
+        TransferWriteOutVariables variables = new(TransferResult.Success(0), LoopbackUrl, 1, LoopbackUrl, "http", Clock)
+        {
+            Referer = "http://ref.example/x",
+            OutputFileName = "out.bin",
+            ConnectionId = 1,
+            TransferId = 1,
+        };
+
+        Assert.AreEqual(
+            "[http://ref.example/x][out.bin][1][1]",
+            $"[{Get(variables, "referer")}][{Get(variables, "filename_effective")}][{Get(variables, "conn_id")}][{Get(variables, "xfer_id")}]");
     }
 
     [TestMethod]

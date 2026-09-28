@@ -1,0 +1,9 @@
+timeout: Timeouts and delays
+     --connect-timeout <seconds>       Maximum time allowed to connect
+     --expect100-timeout <seconds>     How long to wait for 100-continue
+     --happy-eyeballs-timeout-ms <ms>  Time for IPv6 before IPv4
+     --keepalive-time <seconds>        Interval time for keepalive probes
+ -m, --max-time <seconds>              Maximum time allowed for transfer
+     --retry-delay <seconds>           Wait time between retries
+     --retry-max-time <seconds>        Retry only within this period
+ -y, --speed-time <seconds>         Trigger 'speed-limit' abort after this time

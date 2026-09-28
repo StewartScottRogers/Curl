@@ -12,6 +12,9 @@ namespace Curl.Protocol.Http;
 [TestClass]
 public sealed class HttpContentCodingDecoderTests
 {
+    /// <summary><c>world</c> as gzip, as sent to curl after <c>hello</c> as a second member.</summary>
+    private const string GzipWorld = "1F8B08000000000004002BCF2FCA4901004311773A05000000";
+
     private static readonly int[] ChunkSizes = [1, 7, 65536];
 
     /// <summary>
@@ -55,6 +58,80 @@ public sealed class HttpContentCodingDecoderTests
         }
     }
 
+    /// <summary>
+    /// Measured (BL-281 Notes): with <c>41 42</c> after the end of a gzip, zlib or Brotli
+    /// stream, or a second complete gzip member after the first, curl writes <c>hello</c>
+    /// and exits 23 with <c>Failed writing received data to disk/application</c>.
+    /// </summary>
+    [TestMethod]
+    [DataRow("gzip", HttpContentDecoderTests.Gzip + "4142", DisplayName = "gzip, then 41 42")]
+    [DataRow("gzip", HttpContentDecoderTests.Gzip + "1F", DisplayName = "gzip, then 1F")]
+    [DataRow("gzip", HttpContentDecoderTests.Gzip + GzipWorld, DisplayName = "gzip, then a second gzip member")]
+    [DataRow("gzip", HttpContentDecoderTests.ZLib + "4142", DisplayName = "gzip label on a zlib stream, then 41 42")]
+    [DataRow("deflate", HttpContentDecoderTests.ZLib + "4142", DisplayName = "zlib, then 41 42")]
+    [DataRow("br", HttpContentDecoderTests.Brotli + "4142", DisplayName = "br, then 41 42")]
+    public void Decode_BytesAfterTheEndOfTheStream_DecodesTheStreamThenThrowsExit23(string coding, string encoded)
+    {
+        foreach (int chunkSize in ChunkSizes)
+        {
+            List<byte> decoded = [];
+
+            HttpTransferException thrown = Assert.ThrowsExactly<HttpTransferException>(
+                () => DecodeInto(decoded, coding, HttpContentDecoderTests.Bytes(encoded), chunkSize));
+
+            Assert.AreEqual("hello", Encoding.ASCII.GetString([.. decoded]), $"Chunk size {chunkSize}");
+            Assert.AreEqual(CurlExitCode.WriteError, thrown.ExitCode, $"Chunk size {chunkSize}");
+            Assert.AreEqual("Failed writing received data to disk/application", thrown.Message, $"Chunk size {chunkSize}");
+        }
+    }
+
+    /// <summary>
+    /// Measured (BL-281 Notes): raw deflate with <c>41 42</c> after its end writes
+    /// <c>hello</c> and exits 0; curl drops what follows a raw deflate stream.
+    /// </summary>
+    [TestMethod]
+    public void Decode_BytesAfterTheEndOfARawDeflateStream_AreDropped()
+    {
+        foreach (int chunkSize in ChunkSizes)
+        {
+            byte[] decoded = Decode("deflate", HttpContentDecoderTests.Bytes(HttpContentDecoderTests.RawDeflate + "4142"), chunkSize);
+
+            Assert.AreEqual("hello", Encoding.ASCII.GetString(decoded), $"Chunk size {chunkSize}");
+        }
+    }
+
+    [TestMethod]
+    [DataRow("gzip")]
+    [DataRow("deflate")]
+    [DataRow("br")]
+    public void Decode_LargeBodyThenOneByte_ThrowsExit23AfterTheWholeBody(string coding)
+    {
+        byte[] body = [.. Enumerable.Range(0, 100000).Select(index => (byte)(index * index % 251))];
+        foreach (int chunkSize in ChunkSizes)
+        {
+            List<byte> decoded = [];
+
+            HttpTransferException thrown = Assert.ThrowsExactly<HttpTransferException>(
+                () => DecodeInto(decoded, coding, [.. Encode(coding, body), 0x41], chunkSize));
+
+            CollectionAssert.AreEqual(body, decoded, $"Chunk size {chunkSize}");
+            Assert.AreEqual(CurlExitCode.WriteError, thrown.ExitCode, $"Chunk size {chunkSize}");
+        }
+    }
+
+    [TestMethod]
+    [DataRow("gzip")]
+    [DataRow("deflate")]
+    [DataRow("br")]
+    public void Decode_LargeBodyThatEndsWithItsStream_DecodesWithoutFailing(string coding)
+    {
+        byte[] body = [.. Enumerable.Range(0, 100000).Select(index => (byte)(index * index % 251))];
+        foreach (int chunkSize in ChunkSizes)
+        {
+            CollectionAssert.AreEqual(body, Decode(coding, Encode(coding, body), chunkSize), $"Chunk size {chunkSize}");
+        }
+    }
+
     [TestMethod]
     [DataRow("gzip", "1F", DisplayName = "gzip: one byte")]
     [DataRow("gzip", "1F8B", DisplayName = "gzip: two bytes of gzip header")]
@@ -83,8 +160,14 @@ public sealed class HttpContentCodingDecoderTests
 
     private static byte[] Decode(string coding, byte[] encoded, int chunkSize)
     {
-        HttpContentCodingDecoder decoder = new(CodingOf(coding));
         List<byte> decoded = [];
+        DecodeInto(decoded, coding, encoded, chunkSize);
+        return [.. decoded];
+    }
+
+    private static void DecodeInto(List<byte> decoded, string coding, byte[] encoded, int chunkSize)
+    {
+        using HttpContentCodingDecoder decoder = new(CodingOf(coding));
         for (int offset = 0; offset < encoded.Length; offset += chunkSize)
         {
             foreach (ReadOnlyMemory<byte> piece in decoder.Decode(encoded.AsMemory(offset, Math.Min(chunkSize, encoded.Length - offset))))
@@ -92,8 +175,6 @@ public sealed class HttpContentCodingDecoderTests
                 decoded.AddRange(piece.ToArray());
             }
         }
-
-        return [.. decoded];
     }
 
     private static HttpContentCoding CodingOf(string coding) => coding switch

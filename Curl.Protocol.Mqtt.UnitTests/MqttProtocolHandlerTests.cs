@@ -132,6 +132,18 @@ public sealed class MqttProtocolHandlerTests
         TransferResult result = await RunAsync(connector, "mqtt://h/t", new RecordingStream());
 
         Assert.AreEqual(new TransferResult(CurlExitCode.CouldntConnect, 0, "Could not connect to server"), result);
+        Assert.IsFalse(result.IsConnectionRefused);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ConnectRefused_ReturnsExit7MarkedConnectionRefused()
+    {
+        FakeConnector connector = new(ConnectResult.Refused("Could not connect to server"));
+
+        TransferResult result = await RunAsync(connector, "mqtt://h/t", new RecordingStream());
+
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.IsTrue(result.IsConnectionRefused);
     }
 
     /// <summary>

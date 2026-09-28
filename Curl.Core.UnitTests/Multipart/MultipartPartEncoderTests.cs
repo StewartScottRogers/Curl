@@ -49,11 +49,30 @@ public sealed class MultipartPartEncoderTests
         MultipartPartEncoder quotedPrintable = MultipartPartEncoder.Find("Quoted-Printable")!;
         MultipartPartEncoder base64 = MultipartPartEncoder.Find("base64")!;
 
-        Assert.IsFalse(quotedPrintable.KnowsEncodedLength(1));
-        Assert.IsTrue(quotedPrintable.KnowsEncodedLength(0));
-        Assert.IsTrue(base64.KnowsEncodedLength(1));
-        Assert.IsFalse(base64.KnowsEncodedLength(null));
+        Assert.IsNull(quotedPrintable.EncodedLength(1));
+        Assert.AreEqual(0, quotedPrintable.EncodedLength(0));
+        Assert.AreEqual(4, base64.EncodedLength(1));
+        Assert.IsNull(base64.EncodedLength(null));
+        Assert.AreEqual(7, MultipartPartEncoder.Find("7bit")!.EncodedLength(7));
         Assert.IsNull(MultipartPartEncoder.Find("base-64"));
+    }
+
+    [TestMethod]
+    [DataRow(0)]
+    [DataRow(1)]
+    [DataRow(56)]
+    [DataRow(57)]
+    [DataRow(58)]
+    [DataRow(114)]
+    [DataRow(115)]
+    [DataRow(1000)]
+    public void Base64EncodedLengthIsTheLengthOfItsSeventySixColumnLines(int dataLength)
+    {
+        byte[] data = new byte[dataLength];
+        byte[] encoded = MultipartPartEncoder.Find("base64")!.Encode(data)!;
+
+        Assert.AreEqual(Convert.ToBase64String(data, Base64FormattingOptions.InsertLineBreaks), Encoding.ASCII.GetString(encoded));
+        Assert.AreEqual(encoded.Length, Base64DataEncoding.EncodedLength(dataLength));
     }
 
     private static string QuotedPrintable(string data) =>

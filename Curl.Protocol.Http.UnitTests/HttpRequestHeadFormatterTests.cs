@@ -10,7 +10,7 @@ namespace Curl.Protocol.Http;
 /// measured bytes, and the command that produced it is in the BL-172 Notes.
 /// </summary>
 [TestClass]
-public sealed class HttpRequestHeadFormatterTests
+public sealed partial class HttpRequestHeadFormatterTests
 {
     private const string Url = "http://127.0.0.1:18091/";
 

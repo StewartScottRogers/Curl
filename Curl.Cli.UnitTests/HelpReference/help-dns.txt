@@ -1,0 +1,12 @@
+dns: Names and resolving
+     --connect-to <HOST1:PORT1:HOST2:PORT2>  Connect to host2 instead of host1
+     --dns-interface <interface>         Interface to use for DNS requests
+     --dns-ipv4-addr <address>           IPv4 address to use for DNS requests
+     --dns-ipv6-addr <address>           IPv6 address to use for DNS requests
+     --dns-servers <addresses>           DNS server addrs to use
+     --doh-cert-status                Verify DoH server cert status OCSP-staple
+     --doh-insecure                      Allow insecure DoH server connections
+     --doh-url <URL>                     Resolve hostnames over DoH
+ -4, --ipv4                              Resolve names to IPv4 addresses
+ -6, --ipv6                              Resolve names to IPv6 addresses
+     --resolve <[+]host:port:addr[,addr]...>  Resolve host+port to address

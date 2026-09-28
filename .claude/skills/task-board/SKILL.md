@@ -90,7 +90,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .claude/skills/task-board/ta
 | `new` | `-Title` (required), `-Priority`, `-Assignee`, `-Pipeline`, `-DependsOn BL-001,BL-002`, `-Requirement` | Creates the task in `Backlog` from `TASK-TEMPLATE.md` and prints its path. Fill in the body with an edit afterwards. |
 | `move` | `-Id`, `-To`, `-Reason` | Validates the transition, appends the `Log` line, and moves the file. `-Reason` is required for every destination except `Doing`. |
 | `dedupe` | `-Since <git ref>` | Renumbers tasks that share an ID: files present at the ref keep it, the rest get the next free IDs, and the old ID is rewritten in Markdown changed since the ref. Parallel lanes number tasks from their own copy of the board, so each lane runs this after rebasing, before it pushes. |
-| `archive` | `-OlderThanDays` (default 7; 0 for all) | Moves finished tasks into a new `Done/<yyyy-MM-dd_HHmm>/` folder. |
+| `archive` | `-OlderThanDays` (default 7; 0 for all), or `-WhenDoneIsLong` | Moves finished tasks into a new `Done/<yyyy-MM-dd_HHmm>/` folder. `-WhenDoneIsLong` moves all of them, but only once `Done` holds more than 20, so Stewart can always read `Done` at a glance. Each dark factory lane runs it while integrating; an interactive session runs it after moving a task to `Done`. |
 
 The script refuses:
 

@@ -45,7 +45,8 @@ public sealed class UdpDatagramConnector : IDatagramConnector
 
     /// <inheritdoc />
     /// <remarks>
-    /// The messages are curl 8.21.0's: <c>Could not resolve host: &lt;host&gt;</c> for
+    /// The messages are curl 8.21.0's, cut to 255 characters as curl cuts them (ADR-0072):
+    /// <c>Could not resolve host: &lt;host&gt;</c> for
     /// exit 6, and <c>Failed to connect to &lt;host&gt;:&lt;port&gt; after &lt;n&gt; ms:
     /// Could not connect to server</c> for exit 7 when no resolved address can have a
     /// socket opened for it, where <c>n</c> is measured by the injected
@@ -60,7 +61,7 @@ public sealed class UdpDatagramConnector : IDatagramConnector
         {
             return DatagramOpenResult.Failed(
                 CurlExitCode.CouldntResolveHost,
-                $"Could not resolve host: {host}");
+                CurlErrorBuffer.Truncate($"Could not resolve host: {host}"));
         }
 
         var openStarted = _timeProvider.GetTimestamp();

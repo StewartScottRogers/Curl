@@ -24,8 +24,12 @@ namespace Curl.Core.Multipart;
 /// </para>
 /// <para>
 /// A part's <see cref="MultipartFormPart.Encoder" /> encodes its body as <see cref="MultipartPartEncoder" />
-/// describes. A file part whose encoder changes or checks its bytes is read whole while
-/// building; one sent <c>binary</c> or <c>8bit</c> is streamed like any other. See ADR-0041.
+/// describes. A file part is streamed whatever its encoder, encoded as it is sent, never held
+/// in memory whole. A <c>7bit</c> file that can seek is also read through once while building,
+/// so a byte above 127 or a failed read fails the body before a connection is made. One that
+/// cannot seek (a pipe) is not read while building: a byte above 127 fails the read that reaches
+/// it with a <see cref="RequestBodyReadFailedException" />, which fails the send with exit 26, as
+/// curl meets it. See ADR-0041, ADR-0076 and ADR-0093.
 /// </para>
 /// <para>
 /// A file part whose path is <see cref="MultipartFormPart.StandardInputPath" /> reads standard
@@ -193,7 +197,11 @@ public sealed class MultipartFormBodyBuilder(
             .ConfigureAwait(false);
     }
 
-    /// <summary>Streams <paramref name="content" /> when its encoder sends it as it is, otherwise encodes it whole.</summary>
+    /// <summary>
+    /// Streams <paramref name="content" />, encoded as it is sent when its encoder encodes; a
+    /// <c>7bit</c> file that can seek back is checked first, and one that cannot is refused
+    /// only when the send reaches the refused byte.
+    /// </summary>
     private static ValueTask<TransferResult?> AddFileDataAsync(
         MultipartBodySegments segments,
         Stream content,
@@ -207,30 +215,44 @@ public sealed class MultipartFormBodyBuilder(
             return ValueTask.FromResult<TransferResult?>(null);
         }
 
-        return AddEncodedFileAsync(segments, content, length.HasValue, encoder, cancellationToken);
+        if (encoder.CanRefuseData && content.CanSeek)
+        {
+            return AddCheckedFileAsync(segments, content, length, encoder, cancellationToken);
+        }
+
+        segments.AddStream(encoder.EncodeWhileReading(content, length), encoder.EncodedLength(length));
+        return ValueTask.FromResult<TransferResult?>(null);
     }
 
-    /// <summary>Reads <paramref name="content" /> whole, closes it, and adds its encoded bytes.</summary>
-    private static async ValueTask<TransferResult?> AddEncodedFileAsync(
+    /// <summary>
+    /// Reads <paramref name="content" /> through its encoder once, keeping nothing, then adds it
+    /// to be encoded again as it is sent; refused data waits to fail the body, and a failed read
+    /// fails it now.
+    /// </summary>
+    private static async ValueTask<TransferResult?> AddCheckedFileAsync(
         MultipartBodySegments segments,
         Stream content,
-        bool dataLengthIsKnown,
+        long? length,
         MultipartPartEncoder encoder,
         CancellationToken cancellationToken)
     {
-        await using (content.ConfigureAwait(false))
+        // The segments own the stream from here, so a body that fails closes it with the rest.
+        EncodedReadStream encoded = encoder.EncodeWhileReading(content, length);
+        segments.AddStream(encoded, encoder.EncodedLength(length));
+        try
         {
-            try
-            {
-                using MemoryStream copy = new();
-                await content.CopyToAsync(copy, cancellationToken).ConfigureAwait(false);
-                AddEncodedData(segments, copy.ToArray(), dataLengthIsKnown, encoder);
-                return null;
-            }
-            catch (IOException)
-            {
-                return TransferResult.Failure(CurlExitCode.ReadError, ReadFailedMessage);
-            }
+            await encoded.CopyToAsync(Stream.Null, cancellationToken).ConfigureAwait(false);
+            encoded.Position = 0;
+            return null;
+        }
+        catch (RequestBodyReadFailedException)
+        {
+            segments.AddRefusedData();
+            return null;
+        }
+        catch (IOException)
+        {
+            return TransferResult.Failure(CurlExitCode.ReadError, ReadFailedMessage);
         }
     }
 
@@ -267,7 +289,7 @@ public sealed class MultipartFormBodyBuilder(
             return;
         }
 
-        AddEncodedData(segments, textEncoding.GetBytes(part.Content), dataLengthIsKnown: true, encoder);
+        AddEncodedData(segments, textEncoding.GetBytes(part.Content), encoder);
     }
 
     /// <summary>Adds <paramref name="data" />, whose length is known, encoded when there is an encoder.</summary>
@@ -279,10 +301,10 @@ public sealed class MultipartFormBodyBuilder(
             return;
         }
 
-        AddEncodedData(segments, data, dataLengthIsKnown: true, encoder);
+        AddEncodedData(segments, data, encoder);
     }
 
-    private static void AddEncodedData(MultipartBodySegments segments, byte[] data, bool dataLengthIsKnown, MultipartPartEncoder encoder)
+    private static void AddEncodedData(MultipartBodySegments segments, byte[] data, MultipartPartEncoder encoder)
     {
         byte[]? encoded = encoder.Encode(data);
         if (encoded is null)
@@ -291,7 +313,7 @@ public sealed class MultipartFormBodyBuilder(
             return;
         }
 
-        long? length = encoder.KnowsEncodedLength(dataLengthIsKnown ? data.Length : null) ? encoded.Length : null;
+        long? length = encoder.EncodedLength(data.Length);
         segments.AddStream(new MemoryStream(encoded, writable: false), length);
     }
 }

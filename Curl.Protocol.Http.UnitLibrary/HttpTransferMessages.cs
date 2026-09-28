@@ -124,6 +124,18 @@ internal static class HttpTransferMessages
     internal const string BadContentEncoding = "Unrecognized or bad HTTP Content or Transfer-Encoding";
 
     /// <summary>
+    /// The exit 23 message for a <c>--compressed</c> body with bytes after the end of its
+    /// gzip, zlib or Brotli stream (measured, BL-281 Notes).
+    /// </summary>
+    internal const string ReceivedDataWriteFailed = "Failed writing received data to disk/application";
+
+    /// <summary>
+    /// The exit 23 message for a decoded chunked body with bytes after the end of its gzip,
+    /// zlib or Brotli stream (measured, BL-365 Notes).
+    /// </summary>
+    internal const string ChunkedStreamReadFailed = "Failed reading the chunked-encoded stream";
+
+    /// <summary>
     /// The exit 33 message for a <c>-C</c> resume the response does not honour.
     /// </summary>
     internal const string ResumeNotSupported = "HTTP server does not seem to support byte ranges. Cannot resume.";
@@ -207,6 +219,24 @@ internal static class HttpTransferMessages
     /// <returns>The message, such as <c>Unsolicited Transfer-Encoding (gzip) found</c>.</returns>
     internal static string UnsolicitedTransferCoding(string coding) =>
         $"Unsolicited Transfer-Encoding ({coding}) found";
+
+    /// <summary>
+    /// The exit 61 message, under <c>--tr-encoding</c>, for a Transfer-Encoding that lists a
+    /// coding after <c>chunked</c>, in the same header or a later one (measured, BL-315 Notes).
+    /// </summary>
+    internal const string ChunkedNotLast = "Reject response due to 'chunked' not being the last Transfer-Encoding";
+
+    /// <summary>
+    /// The exit 61 message, under <c>--tr-encoding</c>, for a Transfer-Encoding that lists more
+    /// than five codings across its headers (measured, BL-315 Notes).
+    /// </summary>
+    internal const string TooManyTransferCodings = "Reject response exceeding limit of 5 transfer encodings";
+
+    /// <summary>
+    /// The exit 61 message, under <c>--compressed</c>, for a response whose Content-Encoding
+    /// headers list more than five codings (measured, BL-364 Notes).
+    /// </summary>
+    internal const string TooManyContentCodings = "Reject response exceeding limit of 5 content encodings";
 
     /// <summary>
     /// Formats the exit 56 message for heads whose combined size passed

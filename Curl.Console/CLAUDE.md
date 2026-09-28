@@ -12,6 +12,12 @@ calls - no container, no reflection, no assembly scanning, so native AOT sees ev
 type. `Curl.Core.UnitLibrary` dispatches through the `IProtocolHandler` instances it is
 given and must never reference a protocol library directly.
 
+`CurlComposition.CreateTransports` wraps the run's `TcpConnector` in one `PoolingConnector`,
+which every TCP handler connects through, so a later URL to the same pool key reuses an
+earlier URL's connection; `TransferDispatch` holds it as the run's `ConnectionPool`, and the
+runner disposes the dispatch, closing the pool without writing anything, once the transfers
+end, whatever their outcome (ADR-0050, BL-334).
+
 `Program.Main` only opens the standard streams, builds the composition and hands the
 arguments to `CurlCommandRunner`, which parses them, runs each URL and prints curl's
 `curl: (N) <message>` lines. The parse reads the default config file first, where
@@ -26,9 +32,27 @@ parser's warning lines are written to standard error before anything else.
 Every `Warning: ` line is wrapped by `WarningLineWrapper` as curl's `warnf` wraps it, at the
 width `TerminalColumns` resolves (`COLUMNS` from 21 to 9999, else the standard-error
 console, else 79).
-On Windows each `-o` name is first rewritten by `WindowsOutputFileNameSanitizer`
-(`"*<>?|` and control characters become `_`, as curl 8.21.0 does), and that name is the
-one opened, sized for `-C -` and named in every message.
+On Windows each `-o` name is first rewritten by `Curl.Core`'s `WindowsOutputFileNameSanitizer`
+(`"*<>?|` and control characters become `_`, as curl 8.21.0 does; not under `-g`, see below),
+and that name is the one opened, sized for `-C -` and named in every message.
+
+Before its transfers, each command-line URL is expanded as a glob by `Curl.Core`'s `UrlGlob`
+(`{a,b}`, `[1-3]`, ...; under `-g` the URL is taken as written), and every URL it expands to is
+one transfer, a `UrlTransfer`: all of them share the command-line URL's output entry, `-T` file
+and `%{urlnum}`, while `%{xfer_id}` counts transfers across the run. Each `#N` in the `-o` name
+takes glob N's value and, on Windows and not under `-g`, the result is sanitized
+(`UrlGlobMatch.ResolveOutputFileName`); a `-D` file is truncated by the first transfer and
+appended to by every later one, even of the same glob. A URL that is not a well-formed glob
+prints curl's `curl: (3) bad range in position N:` lines (not under `-s`) and ends the run with
+exit 3. An `ipfs://` or `ipns://` URL is then rewritten by `IpfsGatewayRewriter` from
+`--ipfs-gateway`, `IPFS_GATEWAY` or the gateway file (read through the runner's data-file
+reader; the environment comes from the runner's `readEnvironmentVariable`, the process's in
+production and none in tests unless given), and `%{url}` prints the gateway URL; one that
+cannot be rewritten prints `curl: <message>` and the try-help line even under `-s`, has
+`%{xfer_id}` and `%{conn_id}` `-1`, and ends the run with exit 37 or 3. A URL still without a
+scheme gets the one `UrlSchemeGuesser` guesses (`http`, or `ftp` for `ftp.` and so on), which
+`%{url_effective}` shows while `%{url}` keeps the URL as typed. Measured on curl 8.21.0
+(BL-240 Notes).
 
 Each URL's output comes from `CommandLineOptions.UrlOutputs`: an `-o` name, or for `-O` /
 `--remote-name-all` the name `RemoteFileName` takes from the URL path (last non-empty
@@ -50,7 +74,7 @@ no range ends the transfer with exit 33 before it is dispatched), the `-C` offse
 `--max-filesize` limit. `-C -` resumes from the size of the URL's `-o` file, and a transfer
 that resumes past byte zero opens that file for appending before it starts, as curl does.
 Every context also carries `Http`, which `HttpRequestOptionsMapping` fills from `-X`,
-`-H`, `-A`, `-e`, the `-d` family and `--json`: `--json` appends `Content-Type: application/json` and
+`--request-target` (sent verbatim as the request-line target), `-H`, `-A`, `-e`, the `-d` family and `--json`: `--json` appends `Content-Type: application/json` and
 `Accept: application/json` after the `-H` headers unless a `-H` header already starts with
 that name (case-insensitive), and a body is a `BytesBody` sent as
 `application/x-www-form-urlencoded` unless `-G` moved it into the query. The runner appends
@@ -59,15 +83,20 @@ the `-G` / `--url-query` query with `QueryUrl` before the URL is parsed. `http` 
 `RankedHttpAuthenticator` (Basic and Bearer, and Digest with a random client nonce, all in the
 platform's credential encoding), which answers the scheme `-u`, `--basic`, `--digest`,
 `--anyauth` and `--oauth2-bearer` allow (`HttpRequestOptions.AuthSchemes` and `BearerToken`).
+`-0` / `--http1.0` and `--http1.1` set `HttpRequestOptions.Version` (the last one wins, HTTP/1.1
+when neither is given), and `--compressed`, `--tr-encoding`, `--raw` and `--ignore-content-length`
+are copied as they are (BL-236); `CurlCommandRunnerTransferEncodingTests` pins each one's request
+bytes and output as BL-177, BL-180 and BL-315 measured them.
 With `-b` or `-c` the handler also gets the run's `CookieEngine`: one `CookieStore` shared by
 every URL, the `-b` files loaded before the first transfer (session cookies dropped under
-`-j`, a missing file ignored), the `-b name=value` strings sent after the stored cookies, and
+`-j`, a missing file ignored), the `-b name=value` strings sent after the stored cookies (left out when an `-H` value names
+`Cookie`, BL-291), and
 the `-c` jar written after every `http`/`https` transfer, after its `-w` output, whatever its
 outcome, and after no other scheme's (`-c -` prints it to standard output each time, in the
 mode standard output is in). With nothing but `-b` strings, received cookies are not stored,
 as curl's cookie engine stays off. Measured on curl 8.21.0 (BL-237 Notes).
 `-D -` sends the handler's header lines to standard output; any other `-D` name is opened
-(unsanitized, truncated for the first URL and appended for the rest) before the transfer,
+(unsanitized, truncated for the first transfer and appended for the rest) before the transfer,
 and one that cannot be opened prints `curl: Failed to open <file>` and stops the run with
 exit 23. `-i` and `-I` send the header lines to the body output too (standard output or the
 `-o` file); with `-D` as well, `HeaderLineTeeStream` writes each line to the `-D` output and
@@ -99,6 +128,10 @@ cannot use ends the transfer with the selector's exit 5 or 7, and a SOCKS proxy,
 proxy for `https` or under `-p` or `-L`, ends an `http`/`https` transfer with exit 4 until the connector opens those tunnels
 (ADR-0053, BL-328). Other schemes do not read the proxy yet (BL-330), and redirect hops keep
 the first URL's proxy (BL-329). Measured on curl 8.21.0 (BL-238 Notes).
+An `ftp` URL is claimed by `RoutingFtpProtocolHandler`, which hands it to the HTTP handler
+when its proxy is `Http` or `Http10` and `-p` is not given, so it is forwarded to the proxy as
+`GET ftp://host/path` with `Host: host:21` (ADR-0056, rule 3; BL-344); any other `ftp` transfer
+goes to `FtpProtocolHandler` over the pooling connector (ADR-0093, BL-434).
 
 Every transfer goes through `Curl.Core`'s `RedirectFollower`. `-L` becomes
 `HttpRequestOptions.FollowRedirects`, and `RedirectPolicyMapping` turns `--max-redirs`,
@@ -112,20 +145,51 @@ Under `-R`/`--remote-time` a successful transfer to an `-o` file whose result ca
 (`PhysicalFileSystem` in production), even when no body was written, as curl does. A
 failed stamp is ignored for now; curl's warning lines for it are BL-139.
 
-After each successful transfer, and after one `-f` failed with exit 22, standard error gets the opening of curl's progress meter
-(`ProgressMeterLines`): `** Resuming transfer from byte position N` when it resumed past
-byte zero, the two header lines, and the all-zero status line - every byte curl 8.21.0
-writes for a `file://` transfer. It is not written under `-s`, `--no-progress-meter` or
-`-#`, nor for a body on standard output when that is a terminal. Live counters, the bar
-form and the meter after any other failed transfer are not modelled yet (BL-130 to BL-132).
+Under `-v`, `--trace` or `--trace-ascii` every transfer's context carries the run's
+`ITransferEvents`, which `TransferEventOutput` opens once the first command-line URL has parsed
+as a glob and closes after the last transfer (ADR-0046): `-v` is `Curl.Output`'s
+`VerboseTransferEventWriter` on standard error, with no `[N bytes data]` lines when standard
+output is a terminal; a trace is its `TraceTransferEventWriter`, stamped under `--trace-time`, into
+the named file (opened once per run, truncated), standard output for `-`, standard error for `%`,
+and standard error, with no warning, for a file that cannot be opened. On Windows each is text
+mode, CR LF. Measured on curl 8.21.0 (BL-242 Notes). The lines are only as complete as what the
+handler and connector report; `--stderr` is not wired yet (BL-242 Notes name the follow-ups).
+
+After each successful transfer, after one `-f` failed with exit 22, and after one that failed
+once its handler reported it past connect or open (BL-130), standard error gets curl's progress
+meter: `** Resuming transfer from byte position N` when it resumed past byte zero (N is `-1`
+for a `-T` upload under `-C -`, whatever the `-o` file holds, BL-416), the two
+header lines (`ProgressMeterLines`), the status lines, and one newline. The status lines come
+from `TransferProgressRecorder`, the transfer's `ITransferProgress` sink, which draws them on the
+runner's `TimeProvider` as curl 8.21.0's `progress_calc` and `progress_meter` do, with the fields
+`ProgressMeterFields` formats (`max6out`, `time2str`): the all-zero line when the transfer
+starts, a line for a byte report a second or more after the last speed sample, and, when the
+handler reported any bytes, three done lines after a success or one more update after a failure.
+A handler that reports no bytes, as `file://`'s does not, leaves only the zero line - every byte
+curl writes for a `file://` transfer. The meter is written after the transfer, so its bytes are
+curl's but a terminal does not see it move (BL-131 Notes). It is not written under `-s`,
+`--no-progress-meter` or `-#`, nor for a body on standard output when that is a terminal.
+
+Under `-#` (and not `-s`, `--no-progress-meter` or a body on a terminal) the recorder passes
+every report on to a `ProgressBarRecorder` instead, which draws curl 8.21.0's bar as
+`tool_progress_cb` does: `\r`, `#` padded to the width less seven, and ` %5.1f%`, drawn when
+the position moves, at most every 100 ms below 100%, with `fly`'s `-=O=-` animation while
+the size is unknown. The width is `terminalColumns`, clamped to 20..400; the `-C` offset
+counts towards the position and the total. A successful transfer whose handler reported no
+bytes gets one last call with its byte count, which is how a `file://` transfer ends on a
+full bar. The bar is written after the transfer. Its newline, written when the handler
+reported the transfer started, comes after the failure lines and before the `-w` output, as
+in curl. No `** Resuming` line is written under `-#` (ADR-0082, BL-132 Notes).
 
 With `-w`, each transfer's template is rendered by `Curl.Output`'s `WriteOutTemplateRenderer`
 after its failure lines, after a failure as after a success (a `-D` or resumed `-o` file that
 cannot be opened included), with `TransferWriteOutVariables` as its values. On Windows the
 line feeds it writes to standard error, and to standard output while curl's standard output
 would still be in text mode, go through `LineFeedToCrLfStream` as CR LF (ADR-0040).
-`%output{file}` targets go through the runner's `IWriteOutFileOpener`; the default,
-`RefusingWriteOutFileOpener`, opens none until BL-280.
+`%output{file}` targets go through the runner's `IWriteOutFileOpener`: `CurlComposition`
+passes `DiskWriteOutFileOpener`, which opens each file shared for writing (truncated, or
+appended for `%output{>>file}`), in text mode on Windows, and refuses one it cannot open;
+a runner given none uses `RefusingWriteOutFileOpener`, which opens none.
 
 A URL with no `-o` writes through `StandardOutputFailureDeferringStream`, which
 models curl's 4096-byte stdio buffer: a failed standard output is reported as

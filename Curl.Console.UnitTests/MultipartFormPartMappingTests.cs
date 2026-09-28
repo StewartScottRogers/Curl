@@ -35,6 +35,15 @@ public sealed class MultipartFormPartMappingTests
         AssertPart(multipart.Parts[1], "y", MultipartFormPartKind.FileUpload, "t.txt", null, null, []);
     }
 
+    [TestMethod]
+    public void FromCommandLine_PartWithEncoder_CopiesTheEncoder()
+    {
+        IReadOnlyList<MultipartFormPart> parts = Map("-F", "t=hi;encoder=base64", "-F", "u=hi");
+
+        Assert.AreEqual("base64", parts[0].Encoder);
+        Assert.IsNull(parts[1].Encoder);
+    }
+
     private static IReadOnlyList<MultipartFormPart> Map(params string[] arguments)
     {
         CommandLineParseResult parsed = CommandLineParser.Parse([.. arguments, "http://example.com/"], _ => true);

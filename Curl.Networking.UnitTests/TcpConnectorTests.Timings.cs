@@ -73,6 +73,67 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_WhenTheDialIsRefused_CarriesStartAndLookupWithNoConnect()
+    {
+        // curl 8.21.0, http://127.0.0.1:1/: exit 7, ns=0.000048|c=0.000000 (measured 2026-09-27, BL-382).
+        var dialer = new FakeTcpDialer
+        {
+            DialOutcome = _ => throw new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.ConnectionRefused),
+        };
+        var connector = new TcpConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider(), new SteppingTimeProvider(100));
+
+        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 1, UseTls: false), CancellationToken.None);
+
+        Assert.IsTrue(result.IsConnectionRefused);
+        Assert.AreEqual(new ConnectTimings(100, 110, null, null), result.Timings);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WhenTheDialFailsForAnotherReason_CarriesStartAndLookupWithNoConnect()
+    {
+        var dialer = new FakeTcpDialer
+        {
+            DialOutcome = _ => throw new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.AddressNotAvailable),
+        };
+        var connector = new TcpConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider(), new SteppingTimeProvider(100));
+
+        var result = await connector.ConnectAsync(new ConnectTarget("0.0.0.0", 1, UseTls: false), CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.IsFalse(result.IsConnectionRefused);
+        Assert.AreEqual(new ConnectTimings(100, 110, null, null), result.Timings);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WhenTheProxyDialIsRefused_CarriesStartAndLookupWithNoConnect()
+    {
+        var dialer = new FakeTcpDialer
+        {
+            DialOutcome = _ => throw new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.ConnectionRefused),
+        };
+        var connector = new TcpConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider(), new SteppingTimeProvider(100));
+
+        var result = await connector.ConnectAsync(
+            new ConnectTarget("example.com", 80, UseTls: false) { Proxy = new ProxyEndpoint(ProxyKind.Http, "localhost", 1, null) },
+            CancellationToken.None);
+
+        Assert.IsTrue(result.IsConnectionRefused);
+        Assert.AreEqual(new ConnectTimings(100, 110, null, null), result.Timings);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WhenTheHostDoesNotResolve_CarriesNoTimings()
+    {
+        // curl 8.21.0, http://nonexistent.invalid/: exit 6, ns=0.000000 (measured 2026-09-27, BL-382).
+        var connector = new TcpConnector(new FakeDnsResolver(), new FakeTcpDialer(), new FakeTlsProvider(), new SteppingTimeProvider(100));
+
+        var result = await connector.ConnectAsync(new ConnectTarget("nonexistent.invalid", 80, UseTls: false), CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
+        Assert.IsNull(result.Timings);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_WithoutUseTls_ReportsNoPeerCertificates()
     {
         var dialer = new FakeTcpDialer { DialOutcome = _ => new FakeConnection() };

@@ -31,23 +31,23 @@ namespace Curl.Cli;
 /// <para>
 /// <c>--no-</c> negation, measured with the local curl 8.21.0 on 2026-09-26
 /// (<c>curl &lt;arguments&gt; http://127.0.0.1:1/</c>, reading standard error and the exit code):
-/// <c>--no-silent</c>, <c>--no-show-error</c>, <c>--no-insecure</c>, <c>--no-tftp-no-options</c>, <c>--no-remote-time</c>,
+/// <c>--no-silent</c>, <c>--no-show-error</c>, <c>--no-insecure</c>, <c>--no-proxy-insecure</c>, <c>--no-tftp-no-options</c>, <c>--no-remote-time</c>,
 /// <c>--no-progress-meter</c>, <c>--no-progress-bar</c>, <c>--no-get</c>, <c>--no-location</c>, <c>--no-location-trusted</c>,
 /// <c>--no-post301</c>, <c>--no-post302</c>, <c>--no-post303</c>, <c>--no-show-headers</c>, <c>--no-include</c>, <c>--no-head</c>,
 /// <c>--no-fail</c>, <c>--no-fail-with-body</c>, <c>--no-fail-early</c>, <c>--no-compressed</c>, <c>--no-raw</c>, <c>--no-tr-encoding</c>,
 /// <c>--no-ignore-content-length</c>, <c>--no-path-as-is</c>, <c>--no-http0.9</c>, <c>--no-basic</c>, <c>--no-digest</c>, <c>--no-ntlm</c>, <c>--no-negotiate</c>, <c>--no-proxytunnel</c>, <c>--no-remote-name</c>,
-/// <c>--no-remote-name-all</c>, <c>--no-remote-header-name</c>, <c>--no-create-dirs</c>, <c>--no-junk-session-cookies</c>, <c>--no-globoff</c>, <c>--no-version</c>, <c>--no-verbose</c>, <c>--no-trace-time</c>, <c>--no-retry-all-errors</c> and <c>--no-retry-connrefused</c> are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
+/// <c>--no-remote-name-all</c>, <c>--no-remote-header-name</c>, <c>--no-create-dirs</c>, <c>--no-junk-session-cookies</c>, <c>--no-globoff</c>, <c>--no-version</c>, <c>--no-verbose</c>, <c>--no-trace-time</c>, <c>--no-retry-all-errors</c>, <c>--no-retry-connrefused</c>, <c>--no-disable-epsv</c>, <c>--no-ftp-skip-pasv-ip</c>, <c>--no-ftp-create-dirs</c> and <c>--no-list-only</c> (measured 2026-09-27) are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
 /// silent and <c>--no-silent -s</c> is. <c>--no-silent=x</c> is accepted, its value ignored.
 /// <c>--no-tlsv1.2</c>, <c>--no-tlsv1.3</c>, <c>--no-url</c>, <c>--no-output</c> (even as the last
 /// argument), <c>--no-output=x</c>, <c>--no-data</c>, <c>--no-dump-header</c>, <c>--no-range</c>, <c>--no-time-cond</c>,
-/// <c>--no-request</c>, <c>--no-cookie</c>, <c>--no-cookie-jar</c>, <c>--no-header</c> (and <c>--no-header=x</c>), <c>--no-user-agent</c>, <c>--no-referer</c>,
+/// <c>--no-request</c>, <c>--no-cookie</c>, <c>--no-cookie-jar</c>, <c>--no-header</c> (and <c>--no-header=x</c>), <c>--no-proxy-header</c>, <c>--no-user-agent</c>, <c>--no-referer</c>,
 /// <c>--no-data-ascii</c>, <c>--no-data-binary</c>, <c>--no-data-raw</c>, <c>--no-data-urlencode</c>, <c>--no-json</c>,
 /// <c>--no-form</c>, <c>--no-form-string</c>,
 /// <c>--no-url-query</c>, <c>--no-max-redirs</c>, <c>--no-config</c>, <c>--no-http1.0</c>, <c>--no-http1.1</c>, <c>--no-http2</c>,
-/// <c>--no-http2-prior-knowledge</c>, <c>--no-http3</c>, <c>--no-http3-only</c>, <c>--no-request-target</c>, <c>--no-anyauth</c>,
+/// <c>--no-http2-prior-knowledge</c>, <c>--no-http3</c>, <c>--no-http3-only</c>, <c>--no-request-target</c>, <c>--no-ipfs-gateway</c>, <c>--no-anyauth</c>,
 /// <c>--no-oauth2-bearer</c>, <c>--no-proxy</c>, <c>--no-proxy-user</c>, <c>--no-noproxy</c>, <c>--no-socks4</c>, <c>--no-socks4a</c>,
 /// <c>--no-socks5</c>, <c>--no-socks5-hostname</c>, <c>--no-write-out</c>, <c>--no-output-dir</c>, <c>--no-trace</c>, <c>--no-trace-ascii</c>, <c>--no-stderr</c>, <c>--no-retry</c>, <c>--no-retry-delay</c>, <c>--no-retry-max-time</c>, <c>--no-limit-rate</c>,
-/// <c>--no-speed-limit</c> and <c>--no-speed-time</c> (each also with <c>=x</c>) exit 2 with
+/// <c>--no-speed-limit</c>, <c>--no-speed-time</c>, <c>--no-ftp-method</c> and <c>--no-quote</c> (each also with <c>=x</c>) exit 2 with
 /// <c>curl: option &lt;as typed&gt;: the given option cannot be reversed with a --no- prefix</c> and
 /// the try-help line. <c>--no-bogus</c>, <c>--no-</c>, <c>--no-no-silent</c> and <c>--no-Silent</c>
 /// exit 2 as unknown. A short letter is never negated.
@@ -107,12 +107,25 @@ public static class CommandLineOptionTable
         CommandLineOption.Value("resolve", null, AcceptingEmpty((options, entry) => options.AddResolveEntry(entry))),
         CommandLineOption.Value("connect-to", null, AcceptingEmpty((options, entry) => options.AddConnectToEntry(entry))),
         CommandLineOption.NegatableFlag("tftp-no-options", null, (options, on) => options.TftpNoOptions = on),
+        CommandLineOption.NegatableFlag("disable-epsv", null, (options, on) => options.FtpDisableEpsv = on),
+        CommandLineOption.NegatableFlag("ftp-skip-pasv-ip", null, (options, on) => options.FtpSkipPasvIp = on),
+        CommandLineOption.Value("ftp-method", null, AcceptingEmpty(SetFtpFileMethod)),
+        CommandLineOption.NegatableFlag("ftp-create-dirs", null, (options, on) => options.FtpCreateDirectories = on),
+        CommandLineOption.NegatableFlag("list-only", 'l', (options, on) => options.ListOnly = on),
+        CommandLineOption.Value("quote", 'Q', AcceptingEmpty((options, command) => options.AddQuoteCommand(command))),
         CommandLineOption.Value("create-file-mode", null, SetCreateFileMode),
         CommandLineOption.NegatableFlag("insecure", 'k', (options, on) => options.Insecure = on),
-        CommandLineOption.Value("cacert", null, SetCaCertificateFile),
+        CommandLineOption.NegatableFlag("ssl-no-revoke", null, (options, on) => options.SkipRevocationCheck = on),
+        CommandLineOption.Value("cacert", null, SettingCaCertificateFile("--cacert", (options, file) => options.CaCertificateFile = file)),
         CommandLineOption.FileName("capath", null, (options, directory) => options.CaCertificateDirectory = directory),
+        CommandLineOption.NegatableFlag("proxy-insecure", null, (options, on) => options.ProxyInsecure = on),
+        CommandLineOption.Value("proxy-cacert", null, SettingCaCertificateFile("--proxy-cacert", (options, file) => options.ProxyCaCertificateFile = file)),
+        CommandLineOption.FileName("proxy-capath", null, (options, directory) => options.ProxyCaCertificateDirectory = directory),
         CommandLineOption.FileName("cert", 'E', (options, certificate) => options.ClientCertificate = certificate),
         CommandLineOption.FileName("key", null, (options, key) => options.PrivateKey = key),
+        CommandLineOption.Text("cert-type", null, (options, type) => options.ClientCertificateType = type),
+        CommandLineOption.Text("key-type", null, (options, type) => options.PrivateKeyType = type),
+        CommandLineOption.Text("pass", null, (options, passphrase) => options.Passphrase = passphrase),
         CommandLineOption.Flag("tlsv1.2", null, options => options.MinimumTlsVersion = SslProtocols.Tls12),
         CommandLineOption.Flag("tlsv1.3", null, options => options.MinimumTlsVersion = SslProtocols.Tls13),
         CommandLineOption.Text("ciphers", null, (options, ciphers) => options.Ciphers = ciphers),
@@ -134,6 +147,7 @@ public static class CommandLineOptionTable
         CommandLineOption.Value("time-cond", 'z', SetTimeCondition),
         CommandLineOption.Text("request", 'X', (options, method) => options.RequestMethod = method),
         CommandLineOption.Value("header", 'H', AddHeaders),
+        CommandLineOption.Value("proxy-header", null, AddProxyHeaders),
         CommandLineOption.Value("user-agent", 'A', AcceptingEmpty((options, userAgent) => options.UserAgent = userAgent)),
         CommandLineOption.Value("referer", 'e', AcceptingEmpty(SetReferer)),
         CommandLineOption.Value("cookie", 'b', AcceptingEmpty((options, cookie) => options.AddCookie(cookie))),
@@ -152,8 +166,11 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("fail-with-body", null, SetFailWithBody),
         CommandLineOption.NegatableFlag("fail-early", null, (options, on) => options.FailEarly = on),
         CommandLineOption.Value("config", 'K', ApplyConfigFile),
+        CommandLineOption.Value("variable", null, VariableDefinition.Apply),
         CommandLineOption.NegatableFlag("disable", 'q', IgnoreDisable),
         CommandLineOption.NegatableFlag("version", 'V', (options, on) => options.VersionRequested = on),
+        CommandLineOption.Subject("help", 'h', (options, subject) => options.RequestHelp(subject)),
+        CommandLineOption.NegatableFlag("manual", 'M', (options, on) => options.ManualRequested = on),
         CommandLineOption.NegatableFlag("compressed", null, (options, on) => options.Compressed = on),
         CommandLineOption.NegatableFlag("raw", null, (options, on) => options.Raw = on),
         CommandLineOption.NegatableFlag("tr-encoding", null, (options, on) => options.TransferEncoding = on),
@@ -161,6 +178,7 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("path-as-is", null, (options, on) => options.PathAsIs = on),
         CommandLineOption.NegatableFlag("http0.9", null, (options, on) => options.AllowHttp09Reply = on),
         CommandLineOption.Text("request-target", null, (options, target) => options.RequestTarget = target),
+        CommandLineOption.Text("ipfs-gateway", null, (options, gateway) => options.IpfsGateway = gateway),
         CommandLineOption.Flag("http1.0", '0', options => options.SelectHttpVersion(HttpVersionPreference.Http10)),
         CommandLineOption.Flag("http1.1", null, options => options.SelectHttpVersion(HttpVersionPreference.Http11)),
         CommandLineOption.UnsupportedFlag("http2"),
@@ -241,6 +259,34 @@ public static class CommandLineOptionTable
             set(options, value);
             return null;
         };
+
+    /// <summary>
+    /// Sets <see cref="CommandLineOptions.FtpFileMethod"/> from a <c>--ftp-method</c> value as curl 8.21.0
+    /// does: <c>multicwd</c>, <c>nocwd</c> or <c>singlecwd</c> in any case, and any other value, empty
+    /// included, warned about and read as <c>multicwd</c> rather than refused. Case is folded for ASCII
+    /// letters only, as curl's <c>curl_strequal</c> folds it.
+    /// </summary>
+    private static void SetFtpFileMethod(CommandLineOptions options, string value)
+    {
+        if (Ascii.EqualsIgnoreCase(value, "nocwd"))
+        {
+            options.FtpFileMethod = FtpFileMethod.NoCwd;
+            return;
+        }
+
+        if (Ascii.EqualsIgnoreCase(value, "singlecwd"))
+        {
+            options.FtpFileMethod = FtpFileMethod.SingleCwd;
+            return;
+        }
+
+        if (!Ascii.EqualsIgnoreCase(value, "multicwd"))
+        {
+            options.AddWarningLinesUnlessSilent(CommandLineWarning.UnrecognizedFtpFileMethod(value));
+        }
+
+        options.FtpFileMethod = FtpFileMethod.MultiCwd;
+    }
 
     /// <summary>
     /// Sets the <c>-e</c> / <c>--referer</c> value as curl 8.21.0 does: a value ending in <c>;auto</c>
@@ -407,16 +453,38 @@ public static class CommandLineOptionTable
     /// returns and line feeds, so empty lines are skipped, and warning about none, as curl 8.21.0 does.
     /// A file that cannot be read is refused with <see cref="CommandLineRefusal.DataFileUnreadable"/>.
     /// </summary>
-    private static CommandLineRefusal? AddHeaders(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    private static CommandLineRefusal? AddHeaders(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader) =>
+        AddHeaderValue(options, value, spelledOption, dataFileReader, CommandLineWarning.HeaderDoesNotLookLikeAHeader, options.AddHeader);
+
+    /// <summary>
+    /// Adds a <c>--proxy-header</c> value to the proxy headers exactly as <see cref="AddHeaders"/> adds
+    /// a <c>-H</c> value, warning with <see cref="CommandLineWarning.ProxyHeaderDoesNotLookLikeAHeader(string)"/>
+    /// instead, as curl 8.21.0 does.
+    /// </summary>
+    private static CommandLineRefusal? AddProxyHeaders(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader) =>
+        AddHeaderValue(options, value, spelledOption, dataFileReader, CommandLineWarning.ProxyHeaderDoesNotLookLikeAHeader, options.AddProxyHeader);
+
+    /// <summary>
+    /// Adds one <c>-H</c> or <c>--proxy-header</c> value through <paramref name="addHeader"/>: verbatim,
+    /// after the <paramref name="notAHeaderWarning"/> line when it holds neither a colon nor a semicolon,
+    /// or, for <c>@file</c>, each non-empty line of the file, unwarned.
+    /// </summary>
+    private static CommandLineRefusal? AddHeaderValue(
+        CommandLineOptions options,
+        string value,
+        string spelledOption,
+        IDataFileReader dataFileReader,
+        Func<string, string> notAHeaderWarning,
+        Action<string> addHeader)
     {
         if (!value.StartsWith('@'))
         {
             if (!value.AsSpan().ContainsAny(':', ';'))
             {
-                options.AddWarningLinesUnlessSilent([CommandLineWarning.HeaderDoesNotLookLikeAHeader(value)]);
+                options.AddWarningLinesUnlessSilent([notAHeaderWarning(value)]);
             }
 
-            options.AddHeader(value);
+            addHeader(value);
             return null;
         }
 
@@ -425,7 +493,7 @@ public static class CommandLineOptionTable
         {
             foreach (string line in Encoding.UTF8.GetString(contents).Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
             {
-                options.AddHeader(line);
+                addHeader(line);
             }
         }
 
@@ -510,22 +578,27 @@ public static class CommandLineOptionTable
     }
 
     /// <summary>
-    /// Records a <c>--cacert</c> value when a file or directory exists at it, and otherwise refuses
-    /// it with curl 8.21.0's three lines. An empty value is checked like any other, so it is refused
-    /// as a missing file, not as blank. A directory passes here; curl fails it later, at handshake.
-    /// A value that looks like a flag gets curl's filename warning first, whether or not it exists.
+    /// Records a <c>--cacert</c> or <c>--proxy-cacert</c> value through <paramref name="set"/> when a
+    /// file or directory exists at it, and otherwise refuses it with curl 8.21.0's three lines, which
+    /// name <paramref name="longOption"/> (measured for both). An empty value is checked like any
+    /// other, so it is refused as a missing file, not as blank. A directory passes here; curl fails it
+    /// later, at handshake. A value that looks like a flag gets curl's filename warning first, whether
+    /// or not it exists.
     /// </summary>
-    private static CommandLineRefusal? SetCaCertificateFile(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
-    {
-        CommandLineOption.WarnWhenFileNameLooksLikeFlag(options, value);
-        if (!pathExists(value))
+    /// <param name="longOption">The option as curl names it in the refusal, <c>--cacert</c> or <c>--proxy-cacert</c>.</param>
+    /// <param name="set">Records the accepted file.</param>
+    private static CommandLineOptionApplier SettingCaCertificateFile(string longOption, Action<CommandLineOptions, string> set) =>
+        (options, value, spelledOption, pathExists, _) =>
         {
-            return CommandLineRefusal.FileDoesNotExist(spelledOption, "--cacert", value);
-        }
+            CommandLineOption.WarnWhenFileNameLooksLikeFlag(options, value);
+            if (!pathExists(value))
+            {
+                return CommandLineRefusal.FileDoesNotExist(spelledOption, longOption, value);
+            }
 
-        options.CaCertificateFile = value;
-        return null;
-    }
+            set(options, value);
+            return null;
+        };
 
     /// <summary>
     /// Records a <c>-r</c>/<c>--range</c> value the way curl 8.21.0 keeps it. It is refused when
@@ -714,8 +787,8 @@ public static class CommandLineOptionTable
     /// and that file's modification time, read through <paramref name="dataFileReader"/>, is the date.
     /// A value that is neither, empty included, is never refused: it clears any earlier condition and
     /// adds <see cref="CommandLineWarning.TimeConditionIsNotADate"/>, after
-    /// <see cref="CommandLineWarning.FailedToGetFileTime"/> when the lookup failed other than as file
-    /// not found, unless <c>-s</c> / <c>--silent</c> has been read.
+    /// <see cref="CommandLineWarning.FailedToGetFileTime"/> when the lookup reported a failure reason
+    /// (on Windows, any failure but file not found), unless <c>-s</c> / <c>--silent</c> has been read.
     /// </summary>
     private static CommandLineRefusal? SetTimeCondition(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
     {
@@ -754,9 +827,23 @@ public static class CommandLineOptionTable
     private static bool TryReadTimeConditionDate(string date, IDataFileReader dataFileReader, out DateTimeOffset instant, out string? failureReason)
     {
         failureReason = null;
-        return CurlDateParser.TryParse(date, out instant)
-            || dataFileReader.TryReadModificationTime(date, out instant, out failureReason);
+        if (CurlDateParser.TryParse(date, out long unixSeconds))
+        {
+            instant = TimeConditionInstant(unixSeconds);
+            return true;
+        }
+
+        return dataFileReader.TryReadModificationTime(date, out instant, out failureReason);
     }
+
+    /// <summary>
+    /// The instant a <c>-z</c> date's Unix seconds name. One after the last whole second a
+    /// <see cref="DateTimeOffset"/> holds, which curl computes in a 64-bit <c>time_t</c>, reads as that
+    /// second, 9999-12-31 23:59:59 UTC (ADR-0073); <see cref="CurlDateParser"/> refuses every year
+    /// before 1583, so none falls before year 1.
+    /// </summary>
+    private static DateTimeOffset TimeConditionInstant(long unixSeconds) =>
+        DateTimeOffset.FromUnixTimeSeconds(Math.Min(unixSeconds, DateTimeOffset.MaxValue.ToUnixTimeSeconds()));
 
     /// <summary>
     /// Turns <c>--location-trusted</c> on or off: it follows redirects and sends credentials to every

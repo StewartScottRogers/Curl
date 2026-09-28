@@ -14,7 +14,7 @@ namespace Curl.Console;
 [TestClass]
 public sealed class CurlCommandRunnerTransferOptionTests
 {
-    private const string SourceUrl = "file:///C:/source.txt";
+    private const string SourceUrl = "file:///source.txt";
 
     private static readonly string NewLine = Environment.NewLine;
 
@@ -63,7 +63,13 @@ public sealed class CurlCommandRunnerTransferOptionTests
         int exitCode = await RunAsync(["-r", "abc", SourceUrl], file);
 
         Assert.AreEqual(33, exitCode);
-        Assert.AreEqual(Lines(CommandLineWarning.RangeHasInvalidCharacter) + NotDeliveredLine, StandardErrorText);
+        Assert.AreEqual(
+            Lines(
+                "Warning: Invalid character is found in given range. A specified range MUST ",
+                "Warning: have only digits in 'start'-'stop'. The server's response to this ",
+                "Warning: request is uncertain.")
+            + NotDeliveredLine,
+            StandardErrorText);
         Assert.IsEmpty(file.Contexts);
     }
 
@@ -91,7 +97,9 @@ public sealed class CurlCommandRunnerTransferOptionTests
         int exitCode = await RunAsync(["-r", "5abc", SourceUrl], file);
 
         Assert.AreEqual(0, exitCode);
-        string warning = Lines(CommandLineWarning.RangeHasNoDash);
+        string warning = Lines(
+            "Warning: A specified range MUST include at least one dash (-). Appending one ",
+            "Warning: for you");
         Assert.AreEqual(warning, StandardErrorText);
         Assert.AreEqual(Encoding.UTF8.GetByteCount(warning), standardErrorLengthAtDispatch);
         Assert.AreEqual(ByteRange.FromOffset(5), file.Contexts.Single().Range);
@@ -104,9 +112,51 @@ public sealed class CurlCommandRunnerTransferOptionTests
 
         Assert.AreEqual((int)CurlExitCode.FailedInit, exitCode);
         Assert.AreEqual(
-            Lines(CommandLineWarning.RangeHasInvalidCharacter)
+            Lines(
+                "Warning: Invalid character is found in given range. A specified range MUST ",
+                "Warning: have only digits in 'start'-'stop'. The server's response to this ",
+                "Warning: request is uncertain.")
             + "curl: option --bogus: is unknown" + NewLine
             + CommandLineRefusal.TryHelpLine + NewLine,
+            StandardErrorText);
+    }
+
+    // Measured with COLUMNS=200 and COLUMNS=40 curl -r abc --bogus x and curl -r 5 --bogus x
+    // (curl 8.21.0, Windows, 2026-09-27).
+    [TestMethod]
+    public async Task RunAsync_RangeWarningsAt200Columns_AreEachOneLine()
+    {
+        int exitCode = await RunAsync(["-r", "abc", "-r", "5", "--bogus", SourceUrl], fileHandler, terminalColumns: 200);
+
+        Assert.AreEqual((int)CurlExitCode.FailedInit, exitCode);
+        Assert.AreEqual(
+            Lines(
+                "Warning: Invalid character is found in given range. A specified range MUST have only digits in 'start'-'stop'. The server's response to this request is uncertain.",
+                "Warning: A specified range MUST include at least one dash (-). Appending one for you",
+                "curl: option --bogus: is unknown",
+                CommandLineRefusal.TryHelpLine),
+            StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RangeWarningsAt40Columns_AreWrappedAsCurlWrapsThem()
+    {
+        int exitCode = await RunAsync(["-r", "abc", "-r", "5", "--bogus", SourceUrl], fileHandler, terminalColumns: 40);
+
+        Assert.AreEqual((int)CurlExitCode.FailedInit, exitCode);
+        Assert.AreEqual(
+            Lines(
+                "Warning: Invalid character is found in ",
+                "Warning: given range. A specified range ",
+                "Warning: MUST have only digits in ",
+                "Warning: 'start'-'stop'. The server's ",
+                "Warning: response to this request is ",
+                "Warning: uncertain.",
+                "Warning: A specified range MUST include ",
+                "Warning: at least one dash (-). ",
+                "Warning: Appending one for you",
+                "curl: option --bogus: is unknown",
+                CommandLineRefusal.TryHelpLine),
             StandardErrorText);
     }
 
@@ -296,11 +346,11 @@ public sealed class CurlCommandRunnerTransferOptionTests
             StandardErrorText);
     }
 
-    private static string Lines(IReadOnlyList<string> lines) => string.Concat(lines.Select(line => line + NewLine));
+    private static string Lines(params string[] lines) => string.Concat(lines.Select(line => line + NewLine));
 
     private string WrittenText(string path) => Encoding.ASCII.GetString(outputFiles.Written[path].ToArray());
 
-    private Task<int> RunAsync(IReadOnlyList<string> arguments, IProtocolHandler handler) =>
-        new CurlCommandRunner(_ => new TransferDispatch(new ProtocolDispatcher([handler])), outputFiles, outputFiles, standardOutput, standardError, new MemoryStream(), runsOnWindows: false)
+    private Task<int> RunAsync(IReadOnlyList<string> arguments, IProtocolHandler handler, int terminalColumns = TerminalColumns.Default) =>
+        new CurlCommandRunner(_ => new TransferDispatch(new ProtocolDispatcher([handler])), outputFiles, outputFiles, standardOutput, standardError, new MemoryStream(), runsOnWindows: false, terminalColumns)
             .RunAsync(arguments);
 }

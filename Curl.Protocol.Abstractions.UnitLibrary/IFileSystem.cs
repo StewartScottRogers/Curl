@@ -57,7 +57,12 @@ public interface IFileSystem
     /// An operating-system path, already percent-decoded. URL knowledge stays in the
     /// protocol handler; this interface never sees a <see cref="CurlUrl" />.
     /// </param>
-    /// <param name="mode">Whether existing content is discarded or appended to.</param>
+    /// <param name="mode">
+    /// Whether existing content is discarded or appended to, or, for
+    /// <see cref="FileWriteMode.CreateNew" />, whether an existing file refuses the open with
+    /// <see cref="FileAccessStatus.AlreadyExists" /> - never truncated - in the same call
+    /// that would otherwise create it.
+    /// </param>
     /// <param name="createMode">
     /// The permission bits a file created by this open is to receive on a POSIX system:
     /// the <c>--create-file-mode</c> value, else curl's default of <c>0644</c>
@@ -70,7 +75,7 @@ public interface IFileSystem
     /// <returns>
     /// The outcome. When it succeeded, <see cref="FileOpenResult.Content" /> is
     /// positioned where the first write lands: the start of the file for
-    /// <see cref="FileWriteMode.Truncate" />, the end of the existing content for
+    /// <see cref="FileWriteMode.Truncate" /> and <see cref="FileWriteMode.CreateNew" />, the end of the existing content for
     /// <see cref="FileWriteMode.Append" />.
     /// </returns>
     ValueTask<FileOpenResult> OpenForWriteAsync(

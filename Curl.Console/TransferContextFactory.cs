@@ -12,7 +12,12 @@ namespace Curl.Console;
 /// <see cref="ITransferContext.Upload" />, because curl's telnet "sends what it reads on
 /// stdin" (ADR-0006). Every other scheme's upload is <see langword="null" />.
 /// </param>
-internal sealed class TransferContextFactory(Stream standardInput)
+/// <param name="timeProvider">
+/// Every context's <see cref="TransferContext.TimeProvider" />, the runner's clock, which
+/// <see cref="Curl.Core.TransferRetrier" /> waits on; <see langword="null" /> for
+/// <see cref="TimeProvider.System" />.
+/// </param>
+internal sealed class TransferContextFactory(Stream standardInput, TimeProvider? timeProvider = null)
 {
     /// <summary>The one scheme whose transfer uploads standard input.</summary>
     private const string TelnetScheme = "telnet";
@@ -41,8 +46,18 @@ internal sealed class TransferContextFactory(Stream standardInput)
     /// <see cref="RemoteHeaderNameStream" /> must read each header line before it goes anywhere;
     /// <see langword="null" /> to use that output as it is.
     /// </param>
+    /// <param name="progress">
+    /// Where the handler reports how far the transfer got, or <see langword="null" /> for
+    /// <see cref="NoTransferProgress.Instance" />.
+    /// </param>
+    /// <param name="events">
+    /// Where the handler and its connector report transfer events for <c>-v</c> and <c>--trace</c>, or
+    /// <see langword="null" /> for <see cref="NoTransferEvents.Instance" />.
+    /// </param>
     /// <returns>
-    /// The context. Its <see cref="TransferContext.NoBody" /> is <c>-I</c>, and its
+    /// The context. Its <see cref="TransferContext.NoBody" /> is <c>-I</c>, its
+    /// <see cref="TransferContext.ResumeUploadFromUnknownOffset" /> is <c>-C -</c> with a
+    /// <c>-T</c> <paramref name="upload" />, and its
     /// <see cref="TransferContext.HeaderOutput" /> is <see cref="HeaderOutputOf" />'s, wrapped by
     /// <paramref name="watchHeaderOutput" /> when given.
     /// </returns>
@@ -56,7 +71,9 @@ internal sealed class TransferContextFactory(Stream standardInput)
         HttpRequestBody? formBody = null,
         Stream? upload = null,
         ProxyEndpoint? proxy = null,
-        Func<Stream?, Stream>? watchHeaderOutput = null) =>
+        Func<Stream?, Stream>? watchHeaderOutput = null,
+        ITransferProgress? progress = null,
+        ITransferEvents? events = null) =>
         new()
         {
             Url = url,
@@ -67,6 +84,7 @@ internal sealed class TransferContextFactory(Stream standardInput)
             NoBody = options.NoBody,
             Range = range,
             ResumeFrom = resumeFrom,
+            ResumeUploadFromUnknownOffset = ResumesUploadFromUnknownOffset(options, upload),
             MaxFileSize = options.MaxFileSize,
             Upload = upload ?? (string.Equals(url.Scheme, TelnetScheme, StringComparison.Ordinal) ? standardInput : null),
             PostData = options.PostData,
@@ -74,6 +92,12 @@ internal sealed class TransferContextFactory(Stream standardInput)
             TelnetOptions = options.TelnetOptions,
             TftpBlockSize = options.TftpBlockSize,
             TftpNoOptions = options.TftpNoOptions,
+            FtpDisableEpsv = options.FtpDisableEpsv,
+            FtpSkipPasvIp = options.FtpSkipPasvIp,
+            FtpFileMethod = options.FtpFileMethod,
+            FtpCreateDirectories = options.FtpCreateDirectories,
+            ListOnly = options.ListOnly,
+            QuoteCommands = options.QuoteCommands,
             CreateFileMode = options.CreateFileMode ?? TransferContext.DefaultCreateFileMode,
             PathAsIs = options.PathAsIs,
             ConnectTimeout = options.ConnectTimeout,
@@ -81,7 +105,27 @@ internal sealed class TransferContextFactory(Stream standardInput)
             TimeCondition = options.TimeCondition,
             Proxy = proxy,
             Http = HttpRequestOptionsMapping.FromCommandLine(options, formBody, proxy),
+            Progress = progress ?? NoTransferProgress.Instance,
+            Events = EventsOrNone(events),
+            TimeProvider = timeProvider ?? TimeProvider.System,
         };
+
+    /// <summary>
+    /// Tells whether <c>-C -</c> resumes the <c>-T</c> <paramref name="upload" /> from an offset
+    /// only the server knows, as curl 8.21.0's offset -1 does.
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <param name="upload">The <c>-T</c> source given to <see cref="Create" />, or <see langword="null" />.</param>
+    /// <returns><see langword="true" /> for <c>-C -</c> with a <c>-T</c> source.</returns>
+    private static bool ResumesUploadFromUnknownOffset(CommandLineOptions options, Stream? upload) =>
+        options.ResumeFromOutputSize && upload is not null;
+
+    /// <summary>
+    /// Gets <paramref name="events" />, or <see cref="NoTransferEvents.Instance" /> when it is <see langword="null" />.
+    /// </summary>
+    /// <param name="events">The sink given to <see cref="Create" />.</param>
+    /// <returns>The sink the context carries.</returns>
+    private static ITransferEvents EventsOrNone(ITransferEvents? events) => events ?? NoTransferEvents.Instance;
 
     /// <summary>
     /// Chooses where a transfer's header lines go. <c>-i</c> and <c>-I</c> send them to the

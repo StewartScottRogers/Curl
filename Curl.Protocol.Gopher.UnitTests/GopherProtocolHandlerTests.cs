@@ -276,6 +276,18 @@ public sealed class GopherProtocolHandlerTests
 
         Assert.AreEqual(new TransferResult(CurlExitCode.CouldntConnect, 0, "Failed to connect to h port 70"), result);
         Assert.AreEqual(0, output.Length);
+        Assert.IsFalse(result.IsConnectionRefused);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ConnectRefused_ReturnsExit7MarkedConnectionRefused()
+    {
+        FakeConnector connector = new(ConnectResult.Refused("Failed to connect to h port 70"));
+
+        TransferResult result = await new GopherProtocolHandler(connector).ExecuteAsync(Context("gopher://h/", new MemoryStream()));
+
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.IsTrue(result.IsConnectionRefused);
     }
 
     [TestMethod]

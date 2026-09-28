@@ -1,0 +1,30 @@
+curl: The command line tool itself
+ -K, --config <file>                  Read config from a file
+ -q, --disable                        Disable .curlrc
+     --disallow-username-in-url       Disallow username in URL
+     --fail-early                     Fail on first transfer error
+ -g, --globoff                        Disable URL globbing with {} and []
+ -h, --help <subject>                 Get help for commands
+     --ipfs-gateway <URL>             Gateway for IPFS
+     --libcurl <file>               Generate libcurl code for this command line
+ -M, --manual                         Display the full manual
+ -:, --next                           Make next URL use separate options
+ -Z, --parallel                       Perform transfers in parallel
+     --parallel-immediate             Do not wait for multiplexing
+     --parallel-max <num>            Maximum concurrency for parallel transfers
+     --parallel-max-host <num>        Maximum connections to a single host
+     --path-as-is                     Do not squash .. sequences in URL path
+     --proto <protocols>              Enable/disable PROTOCOLS
+     --proto-default <protocol>       Use PROTOCOL for any URL missing a scheme
+     --proto-redir <protocols>        Enable/disable PROTOCOLS on redirect
+     --retry <num>                    Retry request if transient problems occur
+     --retry-all-errors               Retry all errors (with --retry)
+     --retry-connrefused             Retry on connection refused (with --retry)
+     --retry-delay <seconds>          Wait time between retries
+     --retry-max-time <seconds>       Retry only within this period
+ -S, --show-error                     Show error even when -s is used
+     --skip-existing                 Skip download if local file already exists
+     --upload-flags <flags>           IMAP upload behavior
+     --url <url/file>                 URL(s) to work with
+     --variable <[%]name=text/@file>  Set variable
+ -V, --version                        Show version number and quit

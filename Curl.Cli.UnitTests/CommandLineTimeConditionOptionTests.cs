@@ -70,6 +70,26 @@ public sealed class CommandLineTimeConditionOptionTests
     }
 
     /// <summary>
+    /// curl 8.21.0, <c>curl -z "1 Jan 099999999" file:///...</c>: no warning, and a 2026 file is
+    /// not new enough, so the date is read as the last second of year 9999 (ADR-0073). So is
+    /// <c>31 Dec 9999 23:00 -1400</c>, after 9999 once its zone is applied.
+    /// </summary>
+    /// <param name="value">The value after <c>-z</c>.</param>
+    [TestMethod]
+    [DataRow("1 Jan 099999999")]
+    [DataRow("31 Dec 9999 23:00 -1400")]
+    public void Parse_TimeCondDateAfterYear9999_IsIfModifiedSinceTheLastSecondOfYear9999WithNoWarning(string value)
+    {
+        CommandLineParseResult result = Parse(["-z", value, Url], new RecordingDataFileReader());
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual(
+            new TimeCondition(new DateTimeOffset(9999, 12, 31, 23, 59, 59, TimeSpan.Zero), TimeConditionKind.IfModifiedSince),
+            result.Options.TimeCondition);
+        Assert.IsEmpty(result.WarningLines);
+    }
+
+    /// <summary>
     /// curl 8.21.0, <c>curl -z notadate -o NUL file:///Z:/repos/Curl.lanes/lane-3/global.json</c>:
     /// these two lines on standard error, then the transfer, exit 0. <c>-z -notadate</c> prints the same.
     /// </summary>
@@ -90,6 +110,40 @@ public sealed class CommandLineTimeConditionOptionTests
                 "Warning: Disabling time condition. See curl_getdate(3) for valid date syntax.",
             },
             result.WarningLines.ToArray());
+    }
+
+    /// <summary>
+    /// curl 8.21.0, <c>curl -z "1 Jan 1500" -o NUL file:///Z:/repos/Curl.lanes/lane-3/global.json</c>
+    /// on 2026-09-27: the two illegal-date lines, then the transfer, exit 0; <c>-z "1 Jan 1583"</c>
+    /// prints nothing. curl refuses a year before 1583, year 0 (<c>00000101</c>) included.
+    /// </summary>
+    /// <param name="value">The value after <c>-z</c>.</param>
+    [TestMethod]
+    [DataRow("1 Jan 1500")]
+    [DataRow("00000101")]
+    public void Parse_TimeCondYearBefore1583_WarnsWithCurlsLinesAndHasNoTimeCondition(string value)
+    {
+        CommandLineParseResult result = Parse(["-z", value, Url], new RecordingDataFileReader());
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsNull(result.Options.TimeCondition);
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "Warning: Illegal date format for -z, --time-cond (and not a filename). ",
+                "Warning: Disabling time condition. See curl_getdate(3) for valid date syntax.",
+            },
+            result.WarningLines.ToArray());
+    }
+
+    [TestMethod]
+    public void Parse_TimeCondYear1583_IsIfModifiedSinceThatDate()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["-z", "1 Jan 1583", Url]);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual(new DateTimeOffset(1583, 1, 1, 0, 0, 0, TimeSpan.Zero), result.Options.TimeCondition?.Value);
+        Assert.IsEmpty(result.WarningLines);
     }
 
     /// <summary>
@@ -151,6 +205,62 @@ public sealed class CommandLineTimeConditionOptionTests
                 "Warning: Disabling time condition. See curl_getdate(3) for valid date syntax.",
             },
             result.WarningLines.ToArray());
+    }
+
+    /// <summary>
+    /// curl 8.18.0 (OpenSSL build, Ubuntu), 2026-09-27, whose <c>getfiletime</c> is unchanged in 8.21.0:
+    /// <c>curl -z nodir/x file:///dev/null</c> and <c>curl -z "" ...</c> print <c>No such file or
+    /// directory</c>, <c>curl -z file/x ...</c> <c>Not a directory</c> and <c>curl -z noaccess/x ...</c>
+    /// <c>Permission denied</c> before the two illegal-date lines, then transfer, exit 0.
+    /// </summary>
+    /// <param name="value">The value after <c>-z</c>.</param>
+    /// <param name="failureKind">What the injected <c>stat</c> stand-in throws.</param>
+    /// <param name="expectedFirstLine">The filetime line curl prints.</param>
+    [TestMethod]
+    [DataRow("nodir/x", "DirectoryNotFound", "Warning: Failed to get filetime: No such file or directory")]
+    [DataRow("", "EmptyPath", "Warning: Failed to get filetime: No such file or directory")]
+    [DataRow("file/x", "NotADirectory", "Warning: Failed to get filetime: Not a directory")]
+    [DataRow("noaccess/x", "AccessDenied", "Warning: Failed to get filetime: Permission denied")]
+    public void Parse_TimeCondFileLookupFailsOffWindows_WarnsWithCurlsStatLineFirst(string value, string failureKind, string expectedFirstLine)
+    {
+        Exception failure = failureKind switch
+        {
+            "DirectoryNotFound" => new DirectoryNotFoundException(),
+            "EmptyPath" => new ArgumentException(),
+            "NotADirectory" => new IOException("Not a directory"),
+            _ => new UnauthorizedAccessException(),
+        };
+        DiskDataFileReader reader = new(_ => [], () => Stream.Null, _ => throw failure, reportsWindowsErrors: false);
+
+        CommandLineParseResult result = Parse(["-z", value, Url], reader);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsNull(result.Options.TimeCondition);
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                expectedFirstLine,
+                "Warning: Illegal date format for -z, --time-cond (and not a filename). ",
+                "Warning: Disabling time condition. See curl_getdate(3) for valid date syntax.",
+            },
+            result.WarningLines.ToArray());
+    }
+
+    /// <summary>
+    /// curl 8.18.0 (OpenSSL build, Ubuntu), 2026-09-27: <c>curl -z &lt;a file mode 000&gt; ...</c> prints
+    /// nothing and uses the file's time, because <c>stat</c> needs no read access.
+    /// </summary>
+    [TestMethod]
+    public void Parse_TimeCondUnreadableFileOffWindows_UsesItsModificationTimeSilently()
+    {
+        DateTime modified = new(2026, 9, 27, 14, 19, 38, DateTimeKind.Utc);
+        DiskDataFileReader reader = new(_ => throw new UnauthorizedAccessException(), () => Stream.Null, _ => modified, reportsWindowsErrors: false);
+
+        CommandLineParseResult result = Parse(["-z", "unreadable", Url], reader);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual(new TimeCondition(new DateTimeOffset(modified), TimeConditionKind.IfModifiedSince), result.Options.TimeCondition);
+        Assert.IsEmpty(result.WarningLines);
     }
 
     /// <summary>curl 8.21.0: <c>curl -s -z "" ...</c> prints nothing on standard error.</summary>

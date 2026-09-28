@@ -6,9 +6,6 @@ namespace Curl.Console;
 internal sealed class PhysicalOutputPaths : IOutputPaths
 {
     /// <inheritdoc />
-    public bool FileExists(string path) => File.Exists(path);
-
-    /// <inheritdoc />
     public bool TryCreateDirectory(string path)
     {
         if (File.Exists(path) || Directory.Exists(path))

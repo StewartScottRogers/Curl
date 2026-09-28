@@ -24,6 +24,12 @@ internal sealed class HttpLineReader(IConnection connection)
     private int end;
 
     /// <summary>
+    /// Gets a value indicating whether any byte has arrived from the peer, which tells a
+    /// connection that died before its response began from one that failed partway.
+    /// </summary>
+    internal bool HasReceived { get; private set; }
+
+    /// <summary>
     /// Reads the next line, through its line feed.
     /// </summary>
     /// <param name="isStatusLine">
@@ -97,6 +103,7 @@ internal sealed class HttpLineReader(IConnection connection)
         }
 
         end += read;
+        HasReceived |= read > 0;
         return read > 0;
     }
 

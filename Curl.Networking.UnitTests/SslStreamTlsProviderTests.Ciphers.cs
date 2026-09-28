@@ -104,6 +104,33 @@ public sealed partial class SslStreamTlsProviderTests
     }
 
     [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithValidCiphersInTheOpenSslBuild_SetsThePolicyBuiltFromTheSelectedSuites()
+    {
+        var options = new TlsClientOptions(
+            Insecure: true, Ciphers: "BOGUS:ECDHE-RSA-AES128-GCM-SHA256", Tls13Ciphers: "TLS_AES_128_GCM_SHA256");
+        var factory = new RecordingCipherSuitesPolicyFactory();
+        SslClientAuthenticationOptions? handshakeOptions = null;
+        var provider = new SslStreamTlsProvider(options, OpenSslBuild)
+        {
+            CipherSuitesPolicyFactory = factory,
+            AuthenticateSslStreamAsClientAsync = (_, authenticationOptions, _) =>
+            {
+                handshakeOptions = authenticationOptions;
+                throw new AuthenticationException("The test stops before the handshake.");
+            },
+        };
+        var (client, _) = InMemoryDuplexStream.CreatePair();
+
+        var result = await provider.AuthenticateAsClientAsync(
+            new StreamConnection(client, ServerEndPoint), CertificateHost, CancellationToken.None);
+
+        var (expectedSuites, _) = OpenSslCipherSuites.Select(options.Ciphers, options.Tls13Ciphers);
+        CollectionAssert.AreEqual(expectedSuites!.ToArray(), factory.Suites);
+        Assert.AreSame<object>(factory.Policy, handshakeOptions!.CipherSuitesPolicy);
+        Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
+    }
+
+    [TestMethod]
     [DataRow("ECDHE-RSA-AES128-GCM-SHA256", TlsCipherSuite.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256)]
     [DataRow("TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384", TlsCipherSuite.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384)]
     [DataRow("BOGUS:ECDHE-RSA-AES256-SHA", TlsCipherSuite.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA)]

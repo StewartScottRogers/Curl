@@ -1,0 +1,14 @@
+smtp: SMTP protocol
+     --crlf                       Convert LF to CRLF in upload
+ -F, --form <name=content>        Specify multipart MIME data
+     --form-string <name=string>  Specify multipart MIME data
+ -H, --header <header/@file>      Pass custom header(s) to server
+     --login-options <options>    Server login options
+     --mail-auth <address>        Originator address of the original email
+     --mail-from <address>        Mail from this address
+     --mail-rcpt <address>        Mail to this address
+     --mail-rcpt-allowfails       Allow RCPT TO command to fail
+     --oauth2-bearer <token>      OAuth 2 Bearer Token
+ -X, --request <method>           Specify request method to use
+     --ssl                        Try enabling TLS
+     --ssl-reqd                   Require SSL/TLS

@@ -17,7 +17,12 @@ namespace Curl.Protocol.Http;
 /// is read in the same pieces curl reads it in (measured, BL-184 Notes). A stream of known
 /// length is read up to that length and no further; if a read fails or the stream ends
 /// first, the transfer ends with exit 26. A stream of unknown length ends at its end or at
-/// its first failed read, as curl's body reader treats both.
+/// its first failed read, as curl's body reader treats both. A read that throws
+/// <see cref="RequestBodyReadFailedException" /> is the exception: it fails the transfer with
+/// exit 26 and the exception's message, and a chunked body gets no closing chunk. Under
+/// <see cref="EarlyResponseWatch" /> every piece, a <see cref="BytesBody" /> cut into the same
+/// buffer-sized pieces, is raced against a status of 300 or above, and sending stops at the first piece that
+/// status beats (<see cref="CutShort" />, measured, BL-319 and BL-395 Notes).
 /// </remarks>
 /// <param name="connection">The connection the request head was written to.</param>
 internal sealed class HttpRequestBodyWriter(IConnection connection)
@@ -52,11 +57,51 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     internal int SharedHeadLength { get; init; }
 
     /// <summary>
+    /// Gets the request head this writer sends, written and flushed by
+    /// <see cref="WriteHeldHeadAsync" /> or just before the first body bytes, so a body whose
+    /// first read fails sends no request bytes at all, as curl 8.21.0 holds the head in its
+    /// upload buffer with the first read (measured, BL-184 Notes). Empty when the head was
+    /// sent elsewhere.
+    /// </summary>
+    internal ReadOnlyMemory<byte> HeldHead
+    {
+        get => heldHead;
+        init => heldHead = value;
+    }
+
+    private ReadOnlyMemory<byte> heldHead;
+
+    /// <summary>
     /// Gets a value indicating whether the body is a <c>-T</c> upload, whose short read curl
     /// reports as <c>client read function EOF fail</c> rather than
     /// <c>client mime read EOF fail</c> (measured, BL-184 Notes).
     /// </summary>
     internal bool IsUpload { get; init; }
+
+    /// <summary>
+    /// Gets where the body bytes sent so far are reported, with the body's length when it is
+    /// known: once before the first byte and after each piece sent.
+    /// </summary>
+    internal HttpTransferProgress Progress { get; init; } = HttpTransferProgress.Silent;
+
+    private long? expectedLength;
+
+    private long? startPosition;
+
+    private ReadOnlyMemory<byte> unsent;
+
+    /// <summary>
+    /// Gets the connection that waited for <c>100 Continue</c> and so watches for a
+    /// status of 300 or above while the body is sent, or <see langword="null" /> when the
+    /// request waited for nothing and the body is sent whole.
+    /// </summary>
+    internal HttpContinueWaitConnection? EarlyResponseWatch { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether sending stopped before the end of the body because a
+    /// status of 300 or above arrived first.
+    /// </summary>
+    internal bool CutShort { get; private set; }
 
     /// <summary>
     /// Writes <paramref name="body" /> and flushes the connection.
@@ -67,20 +112,24 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     /// <returns>A task that completes when the body has been written.</returns>
     /// <exception cref="HttpTransferException">
     /// A stream of known length failed a read or ended before its length was read (exit 26),
-    /// or the connection failed a write (exit 55).
+    /// a read threw <see cref="RequestBodyReadFailedException" /> (exit 26), or the connection
+    /// failed a write (exit 55).
     /// </exception>
     internal async ValueTask WriteAsync(HttpRequestBody body, bool isChunked, CancellationToken cancellationToken)
     {
+        expectedLength = body is BytesBody known ? known.Content.Length : ((StreamBody)body).Length;
+        Progress.ReportUploaded(BytesWritten, expectedLength);
         if (body is BytesBody bytes)
         {
-            await WritePieceAsync(bytes.Content, isChunked, cancellationToken).ConfigureAwait(false);
+            await WriteBytesAsync(bytes.Content, isChunked, cancellationToken).ConfigureAwait(false);
         }
         else
         {
             await WriteStreamAsync((StreamBody)body, isChunked, cancellationToken).ConfigureAwait(false);
         }
 
-        if (isChunked)
+        await WriteHeldHeadAsync(cancellationToken).ConfigureAwait(false);
+        if (isChunked && !CutShort)
         {
             await HttpConnectionSend.WriteAsync(connection, LastChunk, cancellationToken).ConfigureAwait(false);
         }
@@ -88,10 +137,74 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
         await HttpConnectionSend.FlushAsync(connection, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Writes and flushes <see cref="HeldHead" /> if it has not been sent yet; does nothing
+    /// after that.
+    /// </summary>
+    /// <param name="cancellationToken">Cancels the write and the flush.</param>
+    /// <returns>A task that completes when the head has been sent.</returns>
+    /// <exception cref="HttpTransferException">The connection failed the write (exit 55).</exception>
+    internal async ValueTask WriteHeldHeadAsync(CancellationToken cancellationToken)
+    {
+        if (heldHead.IsEmpty)
+        {
+            return;
+        }
+
+        ReadOnlyMemory<byte> head = heldHead;
+        heldHead = ReadOnlyMemory<byte>.Empty;
+        await HttpConnectionSend.WriteAsync(connection, head, cancellationToken).ConfigureAwait(false);
+        await HttpConnectionSend.FlushAsync(connection, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Gives the body a resend of this request sends: the same bytes, or the same stream
+    /// rewound to where this writer began reading it; a stream that cannot seek goes on from
+    /// where it is, after the bytes of a piece a <c>417</c> cut short, as curl 8.21.0 goes on
+    /// reading stdin rather than failing (measured, BL-319 Notes).
+    /// </summary>
+    /// <param name="body">The body this writer was given.</param>
+    /// <returns>The body to resend.</returns>
+    internal HttpRequestBody Rewound(HttpRequestBody body)
+    {
+        if (body is not StreamBody stream)
+        {
+            return body;
+        }
+
+        if (startPosition is { } start)
+        {
+            stream.Content.Position = start;
+            return body;
+        }
+
+        return stream with { Content = new HttpPrefixedStream(unsent, stream.Content) };
+    }
+
+    /// <summary>
+    /// Writes a body of bytes: whole, or under <see cref="EarlyResponseWatch" /> in the pieces
+    /// curl's upload buffer holds, until they are all sent or one is cut short.
+    /// </summary>
+    private async ValueTask WriteBytesAsync(ReadOnlyMemory<byte> content, bool isChunked, CancellationToken cancellationToken)
+    {
+        if (EarlyResponseWatch is null)
+        {
+            await WritePieceAsync(content, isChunked, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        while (BytesWritten < content.Length && !CutShort)
+        {
+            int length = (int)Math.Min(NextReadRoom(isChunked), content.Length - BytesWritten);
+            await WritePieceAsync(content.Slice((int)BytesWritten, length), isChunked, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
     private async ValueTask WriteStreamAsync(StreamBody body, bool isChunked, CancellationToken cancellationToken)
     {
+        startPosition = body.Content.CanSeek ? body.Content.Position : null;
         byte[] buffer = new byte[UploadBufferSize];
-        while (true)
+        while (!CutShort)
         {
             int room = NextReadRoom(isChunked);
             long remaining = body.Length is { } length ? length - BytesWritten : room;
@@ -127,13 +240,20 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
 
     /// <summary>
     /// Reads from the body stream, taking a failed read as the end of the stream, as curl
-    /// does.
+    /// does, except a <see cref="RequestBodyReadFailedException" />, which fails the transfer
+    /// with exit 26 and its message, as curl fails a multipart part its encoder refuses
+    /// (measured, BL-385 Notes).
     /// </summary>
+    /// <exception cref="HttpTransferException">The read threw a <see cref="RequestBodyReadFailedException" />.</exception>
     private static async ValueTask<int> ReadAsync(Stream stream, Memory<byte> buffer, CancellationToken cancellationToken)
     {
         try
         {
             return await stream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+        }
+        catch (RequestBodyReadFailedException failed)
+        {
+            throw new HttpTransferException(CurlExitCode.ReadError, failed.Message);
         }
         catch (IOException)
         {
@@ -159,10 +279,31 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
             return;
         }
 
+        if (EarlyResponseWatch is not { } watch)
+        {
+            await WriteHeldHeadAsync(cancellationToken).ConfigureAwait(false);
+            await WriteFramedAsync(piece, isChunked, cancellationToken).ConfigureAwait(false);
+        }
+        else if (!await watch.SendUnlessStoppedAsync(Framed(piece, isChunked), cancellationToken).ConfigureAwait(false))
+        {
+            CutShort = true;
+            unsent = piece.ToArray();
+            return;
+        }
+
+        BytesWritten += piece.Length;
+        Progress.ReportUploaded(BytesWritten, expectedLength);
+    }
+
+    /// <summary>
+    /// Writes a piece, for a chunked body with its chunk's size line and closing CRLF as
+    /// writes of their own.
+    /// </summary>
+    private async ValueTask WriteFramedAsync(ReadOnlyMemory<byte> piece, bool isChunked, CancellationToken cancellationToken)
+    {
         if (isChunked)
         {
-            byte[] size = Encoding.ASCII.GetBytes(string.Create(CultureInfo.InvariantCulture, $"{piece.Length:x}\r\n"));
-            await HttpConnectionSend.WriteAsync(connection, size, cancellationToken).ConfigureAwait(false);
+            await HttpConnectionSend.WriteAsync(connection, ChunkSizeLine(piece.Length), cancellationToken).ConfigureAwait(false);
         }
 
         await HttpConnectionSend.WriteAsync(connection, piece, cancellationToken).ConfigureAwait(false);
@@ -170,7 +311,15 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
         {
             await HttpConnectionSend.WriteAsync(connection, "\r\n"u8.ToArray(), cancellationToken).ConfigureAwait(false);
         }
-
-        BytesWritten += piece.Length;
     }
+
+    /// <summary>
+    /// Gives a piece as one write: itself, or for a chunked body the whole chunk, size line
+    /// and closing CRLF included.
+    /// </summary>
+    private static ReadOnlyMemory<byte> Framed(ReadOnlyMemory<byte> piece, bool isChunked) =>
+        isChunked ? (byte[])[.. ChunkSizeLine(piece.Length), .. piece.Span, .. "\r\n"u8] : piece;
+
+    private static byte[] ChunkSizeLine(int length) =>
+        Encoding.ASCII.GetBytes(string.Create(CultureInfo.InvariantCulture, $"{length:x}\r\n"));
 }
