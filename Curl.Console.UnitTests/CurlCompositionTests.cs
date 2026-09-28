@@ -45,7 +45,7 @@ public sealed class CurlCompositionTests
             new LoopbackDnsResolver());
 
         Dictionary<string, Type> served = handlers
-            .SelectMany(handler => handler.SupportedSchemes.Select(scheme => (scheme, type: handler.GetType())))
+            .SelectMany(handler => handler.SupportedSchemes.Select(scheme => (scheme, type: Unwrapped(handler).GetType())))
             .ToDictionary(pair => pair.scheme, pair => pair.type);
         Dictionary<string, Type> expected = new()
         {
@@ -384,7 +384,7 @@ public sealed class CurlCompositionTests
 
         IProtocolHandler[] handlers = [.. CapturedDependency<Dictionary<string, IProtocolHandler>>(dispatch.Dispatcher).Values.Distinct()];
         IConnector[] connectors = [.. handlers.SelectMany(ConnectorsOf)];
-        string[] connectingHandlers = [.. handlers.Where(handler => ConnectorsOf(handler).Any()).Select(handler => handler.GetType().Name).Order()];
+        string[] connectingHandlers = [.. handlers.Where(handler => ConnectorsOf(handler).Any()).Select(handler => Unwrapped(handler).GetType().Name).Order()];
         CollectionAssert.AreEqual(
             new[] { "DictProtocolHandler", "GopherProtocolHandler", "HttpProtocolHandler", "MqttProtocolHandler", "RoutingFtpProtocolHandler", "TelnetProtocolHandler", "TftpProtocolHandler" },
             connectingHandlers);
@@ -412,12 +412,12 @@ public sealed class CurlCompositionTests
 
         Dictionary<string, IProtocolHandler> handlers = CapturedDependency<Dictionary<string, IProtocolHandler>>(dispatch.Dispatcher);
         Assert.AreSame(handlers["ftp"], handlers["ftps"]);
-        FtpProtocolHandler ftp = (FtpProtocolHandler)CapturedDependency<IProtocolHandler>(handlers["ftps"], "ftpHandler");
+        FtpProtocolHandler ftp = (FtpProtocolHandler)CapturedDependency<IProtocolHandler>(Unwrapped(handlers["ftps"]), "ftpHandler");
         Assert.IsInstanceOfType<TcpConnectionListener>(CapturedDependency<IConnectionListener>(ftp));
         Assert.AreSame(transports.TlsProvider, CapturedDependency<ITlsProvider>(ftp));
         Assert.AreSame(transports.DnsResolver, CapturedDependency<IDnsResolver>(ftp));
         Assert.IsInstanceOfType<SystemNetworkInterfaceLookup>(CapturedDependency<INetworkInterfaceLookup>(ftp));
-        Assert.AreSame(transports.PoolingConnector, CapturedDependency<IConnector>(ftp));
+        Assert.AreSame(transports.PoolingConnector, Unrecorded(CapturedDependency<IConnector>(ftp)));
     }
 
     [TestMethod]
@@ -553,6 +553,20 @@ public sealed class CurlCompositionTests
     }
 
     /// <summary>
+    /// The handler <paramref name="handler" /> reports the end points of, as every registered
+    /// handler is wrapped in an <see cref="EndPointReportingProtocolHandler" /> (ADR-0119).
+    /// </summary>
+    private static IProtocolHandler Unwrapped(IProtocolHandler handler) =>
+        ((EndPointReportingProtocolHandler)handler).Handler;
+
+    /// <summary>
+    /// The connector <paramref name="connector" /> records the connections of, as every handler
+    /// connects through an <see cref="EndPointRecordingConnector" /> (ADR-0119).
+    /// </summary>
+    private static IConnector Unrecorded(IConnector connector) =>
+        CapturedDependency<IConnector>((EndPointRecordingConnector)connector);
+
+    /// <summary>
     /// Reads every connector <paramref name="handler" /> holds in a private field, and those of
     /// any handler it forwards to, so a test can check which connector each handler was given.
     /// </summary>
@@ -563,7 +577,7 @@ public sealed class CurlCompositionTests
             switch (field.GetValue(handler))
             {
                 case IConnector connector:
-                    yield return connector;
+                    yield return Unrecorded(connector);
                     break;
                 case IProtocolHandler forwardedTo:
                     foreach (IConnector connector in ConnectorsOf(forwardedTo))

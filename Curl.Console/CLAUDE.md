@@ -21,6 +21,13 @@ end, whatever their outcome (ADR-0050, BL-334). It also holds the `TcpConnector`
 the `-b` files load, so `-v` prints the `--resolve` entries' `Added ... to DNS cache` lines for
 each URL; a `--retry` attempt and a followed redirect reload nothing, as in curl 8.21.0 (BL-486).
 
+`CurlComposition.CreateProtocolHandlers` gives every handler an `EndPointRecordingConnector` and
+an `EndPointRecordingDatagramConnector` sharing one `ConnectionEndPointRecorder`, and wraps
+each handler in an `EndPointReportingProtocolHandler`, which puts the end points of the
+transfer's first connection (FTP's control connection) on its report when the handler reported
+neither, so `%{local_ip}`, `%{local_port}`, `%{remote_ip}` and `%{remote_port}` work for every
+scheme without handler code; HTTP keeps its own (ADR-0119, BL-515).
+
 `Program.Main` only opens the standard streams, builds the composition and hands the
 arguments to `CurlCommandRunner`, which parses them, runs each URL and prints curl's
 `curl: (N) <message>` lines, each transfer's message cut to curl's 255-byte error buffer by
