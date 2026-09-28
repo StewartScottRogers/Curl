@@ -60,3 +60,4 @@ completed:
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
 - 2026-09-27: Doing -> Backlog. Needs Curl.Core.UnitLibrary/UnitTests (RedirectFollower must send the auto referer), which BL-385 in Doing touches; waits until they no longer overlap
+- 2026-09-27: Backlog -> Doing.
