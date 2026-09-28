@@ -46,3 +46,4 @@ The live task board is served at https://stewartscottrogers.github.io/Curl/board
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
