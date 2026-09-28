@@ -9,7 +9,20 @@ only for what `SslStream` cannot offer (`--curves`, `--sigalgs`, `--tls-earlydat
 where the operating system disables them, `--ssl-allow-beast`). Everything else stays on
 `SslStreamTlsProvider` in `Curl.Networking.UnitLibrary`.
 
-Namespace `Curl.Tls`. The project is empty until its first type lands (BL-699 onwards).
+Namespace `Curl.Tls`. What is here so far (BL-698): the handshake message codecs.
+
+- `HandshakeMessageReader` frames handshake bytes into `HandshakeMessage`s (type and
+  body); an unknown type is `unexpected_message`.
+- One record per message with `Encode()` (header included) and `Decode(body)`:
+  `ClientHello`, `ServerHello` (`IsHelloRetryRequest`), `EncryptedExtensions`,
+  `CertificateRequest`, `CertificateMessage`, `CertificateVerify`, `Finished`,
+  `NewSessionTicket`.
+- One static codec per extension (`KeyShareExtension`, `SupportedVersionsExtension`,
+  `PreSharedKeyExtension` and the rest), with a method pair per message shape.
+- Decoders return `TlsDecodeResult<T>`: the value or a `TlsAlertDescription`, never an
+  exception. They read through the internal `TlsReader`, whose first failure sticks, so
+  a decoder reads in a straight line and checks once in `Finish`; a repeated extension
+  in one block is `illegal_parameter`, any length past its end is `decode_error`.
 
 ## Rules
 
