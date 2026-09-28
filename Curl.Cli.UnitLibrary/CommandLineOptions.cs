@@ -486,6 +486,20 @@ public sealed class CommandLineOptions
     public IReadOnlyList<string> ConnectToEntries => connectToEntries;
 
     /// <summary>
+    /// The path of the Unix domain socket to connect through, from whichever of <c>--unix-socket</c> and
+    /// <c>--abstract-unix-socket</c> came last; <see langword="null"/> when neither was given. curl 8.21.0
+    /// refuses an empty path as blank and accepts any other without looking at it, on Windows too (measured
+    /// 2026-09-28, BL-506 Notes).
+    /// </summary>
+    public string? UnixSocketPath { get; private set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <see cref="UnixSocketPath"/> came from <c>--abstract-unix-socket</c>, so
+    /// it names a socket in the abstract namespace rather than a file.
+    /// </summary>
+    public bool UnixSocketIsAbstract { get; private set; }
+
+    /// <summary>
     /// The <c>--tftp-blksize</c> value as given, unclamped, except that a value past
     /// <see cref="int.MaxValue"/> (accepted where a C <c>long</c> is 64 bits) is recorded as
     /// <see cref="int.MaxValue"/>; <see langword="null"/> when not given. The TFTP handler clamps
@@ -1595,6 +1609,15 @@ public sealed class CommandLineOptions
     /// <summary>Appends <paramref name="entry"/> to <see cref="ConnectToEntries"/>, unchanged and unvalidated.</summary>
     /// <param name="entry">A <c>--connect-to</c> value, possibly empty.</param>
     internal void AddConnectToEntry(string entry) => connectToEntries.Add(entry);
+
+    /// <summary>Sets <see cref="UnixSocketPath"/> and <see cref="UnixSocketIsAbstract"/>, replacing any earlier socket.</summary>
+    /// <param name="path">A non-empty <c>--unix-socket</c> or <c>--abstract-unix-socket</c> value.</param>
+    /// <param name="isAbstract">Whether it came from <c>--abstract-unix-socket</c>.</param>
+    internal void SetUnixSocket(string path, bool isAbstract)
+    {
+        UnixSocketPath = path;
+        UnixSocketIsAbstract = isAbstract;
+    }
 
     /// <summary>Appends <paramref name="cookie"/> to <see cref="Cookies"/>, unchanged and unvalidated.</summary>
     /// <param name="cookie">A <c>-b</c> / <c>--cookie</c> value, possibly empty.</param>

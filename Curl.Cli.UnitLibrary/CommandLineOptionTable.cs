@@ -127,6 +127,8 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("sasl-ir", null, (options, on) => options.SaslInitialResponse = on),
         CommandLineOption.Value("resolve", null, AcceptingEmpty((options, entry) => options.AddResolveEntry(entry))),
         CommandLineOption.Value("connect-to", null, AcceptingEmpty((options, entry) => options.AddConnectToEntry(entry))),
+        CommandLineOption.FileName("unix-socket", null, (options, path) => options.SetUnixSocket(path, isAbstract: false)),
+        CommandLineOption.FileName("abstract-unix-socket", null, (options, path) => options.SetUnixSocket(path, isAbstract: true)),
         CommandLineOption.NegatableFlag("tftp-no-options", null, (options, on) => options.TftpNoOptions = on),
         CommandLineOption.NegatableFlag("disable-epsv", null, (options, on) => options.FtpDisableEpsv = on),
         CommandLineOption.NegatableFlag("epsv", null, (options, on) => options.FtpDisableEpsv = !on),
