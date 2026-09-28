@@ -47,6 +47,26 @@ public sealed class HttpConnectionPersistenceTests
     }
 
     [TestMethod]
+    [DataRow("HTTP/1.0 200 OK\r\nConnection: keep-alive\r\n\r\n", false, false, true, DisplayName = "1.0 keep-alive with no length")]
+    [DataRow("HTTP/1.0 200 OK\r\nConnection: keep-alive\r\nContent-Length: 4\r\n\r\n", false, true, true, DisplayName = "1.0 keep-alive with --ignore-content-length")]
+    [DataRow("HTTP/1.0 200 OK\r\nConnection: keep-alive\r\nContent-Length: 4\r\n\r\n", false, false, false, DisplayName = "1.0 keep-alive with a length")]
+    [DataRow("HTTP/1.0 200 OK\r\nConnection: keep-alive\r\n\r\n", true, false, false, DisplayName = "1.0 keep-alive to HEAD has no body")]
+    [DataRow("HTTP/1.0 200 OK\r\n\r\n", false, false, false, DisplayName = "1.0 without keep-alive")]
+    [DataRow("HTTP/1.0 200 OK\r\nConnection: keep-alive, close\r\n\r\n", false, false, false, DisplayName = "1.0 keep-alive and close")]
+    [DataRow("HTTP/1.1 200 OK\r\nConnection: keep-alive\r\n\r\n", false, false, false, DisplayName = "1.1 keep-alive with no length")]
+    public async Task KeepsHttp10AliveUntilServerCloses_Head_IsTrueForAnHttp10KeepAliveBodyThatRunsToTheClose(
+        string response,
+        bool noBody,
+        bool ignoresContentLength,
+        bool expected)
+    {
+        ScriptedConnection connection = new(Encoding.Latin1.GetBytes(response), 65536);
+        HttpResponseHead head = await new HttpResponseHeadReader(connection).ReadAsync(CancellationToken.None);
+
+        Assert.AreEqual(expected, HttpConnectionPersistence.KeepsHttp10AliveUntilServerCloses(head, noBody, false, ignoresContentLength, false));
+    }
+
+    [TestMethod]
     [DataRow("HTTP/1.1 200 OK\r\nContent-Length: 4\r\nTransfer-Encoding: gzip\r\n\r\n", false, DisplayName = "gzip without chunked runs to the close")]
     [DataRow("HTTP/1.1 200 OK\r\nTransfer-Encoding: gzip, chunked\r\n\r\n", true, DisplayName = "gzip, chunked stays open")]
     [DataRow("HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\n", true, DisplayName = "No Transfer-Encoding stays open")]

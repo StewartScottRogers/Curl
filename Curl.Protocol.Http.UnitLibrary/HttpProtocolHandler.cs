@@ -419,7 +419,7 @@ public sealed class HttpProtocolHandler(
     private static string ConnectionEndLine(ConnectTarget target, long number, HttpAttemptOutcome outcome) =>
         outcome switch
         {
-            { KeepsAlive: true } => HttpConnectionInfoLines.LeftIntact(number, target.Host, target.Port),
+            { ReportsLeftIntact: true } => HttpConnectionInfoLines.LeftIntact(number, target.Host, target.Port),
             { DiedBeforeResponse: false, Result.ExitCode: not CurlExitCode.Ok } => HttpConnectionInfoLines.Closing(number),
             _ => HttpConnectionInfoLines.ShuttingDown(number),
         };
@@ -530,7 +530,10 @@ public sealed class HttpProtocolHandler(
         }
 
         TransferResult result = Succeeded(delivery, exchange.Head!, exchange.Report(body.BytesWritten));
-        return new HttpAttemptOutcome(result, retry, KeepsAlive(plan, exchange.Head, upload, headReader, delivery));
+        return new HttpAttemptOutcome(result, retry, KeepsAlive(plan, exchange.Head, upload, headReader, delivery))
+        {
+            LeftIntactAfterServerClosed = LeftIntactAfterServerClosed(plan, exchange.Head, upload, headReader, delivery),
+        };
     }
 
     /// <summary>
@@ -650,10 +653,26 @@ public sealed class HttpProtocolHandler(
     /// <see cref="HttpConnectionPersistence" /> says (ADR-0050).
     /// </summary>
     private static bool KeepsAlive(HttpRequestPlan plan, HttpResponseHead head, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpBodyDelivery delivery) =>
+        DeliveredWhole(upload, headReader, delivery)
+            && HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, plan.Options.Raw, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding);
+
+    /// <summary>
+    /// Decides whether the connection is reported left intact although the server closed it
+    /// to end the body, as curl 8.21.0 does for an HTTP/1.0 keep-alive response with no length
+    /// (measured, BL-471 Notes; ADR-0109). It is not marked reusable: it is closed.
+    /// </summary>
+    private static bool LeftIntactAfterServerClosed(HttpRequestPlan plan, HttpResponseHead head, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpBodyDelivery delivery) =>
+        DeliveredWhole(upload, headReader, delivery)
+            && HttpConnectionPersistence.KeepsHttp10AliveUntilServerCloses(head, plan.Context.NoBody, plan.Options.Raw, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding);
+
+    /// <summary>
+    /// Decides whether the exchange ran whole: its request body was not cut short, its
+    /// response body was delivered, and the response did not switch protocols.
+    /// </summary>
+    private static bool DeliveredWhole(HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpBodyDelivery delivery) =>
         !upload.CutShort
             && delivery == HttpBodyDelivery.Deliver
-            && !headReader.SwitchedProtocols
-            && HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, plan.Options.Raw, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding);
+            && !headReader.SwitchedProtocols;
 
     /// <summary>
     /// Decides whether a failed exchange was on a pooled connection that died while idle, so
@@ -1276,6 +1295,18 @@ public sealed class HttpProtocolHandler(
         /// before its response began, so <see cref="Retry" /> resends the request on a fresh one.
         /// </summary>
         public bool DiedBeforeResponse { get; init; }
+
+        /// <summary>
+        /// Gets a value indicating whether the connection is reported left intact although the
+        /// server closed it to end the body (ADR-0109); it is not marked reusable.
+        /// </summary>
+        public bool LeftIntactAfterServerClosed { get; init; }
+
+        /// <summary>
+        /// Gets a value indicating whether the connection is reported left intact: it
+        /// <see cref="KeepsAlive" />, or it is <see cref="LeftIntactAfterServerClosed" />.
+        /// </summary>
+        public bool ReportsLeftIntact => KeepsAlive || LeftIntactAfterServerClosed;
 
         /// <summary>Gets the result, with the report so far.</summary>
         public TransferResult Result { get; } = Result;

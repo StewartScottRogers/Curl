@@ -69,6 +69,26 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_Http10KeepAliveBodyRunsToTheClose_LeavesTheConnectionUnmarkedButReportsItLeftIntact()
+    {
+        foreach (int chunkSize in ChunkSizes)
+        {
+            ScriptedConnection connection = Connection("HTTP/1.0 200 OK\r\nConnection: keep-alive\r\n\r\nhi", chunkSize);
+            RecordingTransferEvents events = new();
+
+            TransferResult result = await Handler(new QueueConnector(ConnectResult.Connected(connection, null, connectionNumber: 0)))
+                .ExecuteAsync(ReuseContext(events));
+
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Assert.IsFalse(connection.IsMarkedReusable, $"Chunk size {chunkSize}");
+            CollectionAssert.AreEqual(
+                InfoLines(AssumeClose + "|" + Http10KeepAlive, "Connection #0 to host 127.0.0.1:18977 left intact"),
+                events.Info,
+                $"Chunk size {chunkSize}");
+        }
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ContentLengthOverMaxFileSize_LeavesTheConnectionUnmarkedAndClosesIt()
     {
         ScriptedConnection connection = Connection(KeepAliveResponse, 65536);

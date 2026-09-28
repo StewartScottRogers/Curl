@@ -47,6 +47,32 @@ internal static class HttpConnectionPersistence
     }
 
     /// <summary>
+    /// Decides whether curl 8.21.0 leaves the connection that carried <paramref name="head" />
+    /// intact although its body ran until the server closed: an HTTP/1.0 response kept alive by
+    /// a <c>Connection: keep-alive</c> header, not named <c>close</c>, whose body has no
+    /// Content-Length it stops at and no chunked coding (measured, BL-471 Notes). curl reports
+    /// <c>Connection #N to host H:P left intact</c> for it; the connection itself is closed, so
+    /// it is not reusable (ADR-0109).
+    /// </summary>
+    /// <param name="head">The response head.</param>
+    /// <param name="noBody"><see langword="true" /> for a request made with HEAD (<c>-I</c>).</param>
+    /// <param name="passesTransferCoding"><see langword="true" /> for <c>--raw</c>.</param>
+    /// <param name="ignoresContentLength"><see langword="true" /> for <c>--ignore-content-length</c>.</param>
+    /// <param name="decodesTransferCoding"><see langword="true" /> for <c>--tr-encoding</c>.</param>
+    /// <returns><see langword="true" /> when curl reports the closed connection as left intact.</returns>
+    internal static bool KeepsHttp10AliveUntilServerCloses(
+        HttpResponseHead head,
+        bool noBody,
+        bool passesTransferCoding,
+        bool ignoresContentLength,
+        bool decodesTransferCoding) =>
+        head.StatusLine.Version < new Version(1, 1)
+            && NamesConnectionOption(head, "keep-alive")
+            && !NamesConnectionOption(head, "close")
+            && HttpResponseBodyReader.HasBody(head, noBody)
+            && HttpResponseBodyFraming.Of(head.Headers, passesTransferCoding, ignoresContentLength, decodesTransferCoding).RunsToClose;
+
+    /// <summary>
     /// Decides whether one header line is what makes curl 8.21.0 keep an HTTP/1.0 connection
     /// alive and print <see cref="HttpConnectionInfoLines.Http10KeepAlive" />: a
     /// <c>Connection</c> header naming <c>keep-alive</c> and not <c>close</c> (measured, BL-467
