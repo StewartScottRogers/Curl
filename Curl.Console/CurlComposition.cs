@@ -1,3 +1,4 @@
+using System.Net.Sockets;
 using System.Text;
 using Curl.Authentication;
 using Curl.Cli;
@@ -231,7 +232,22 @@ internal static class CurlComposition
             ResolveOverrides.Parse(options.ResolveEntries),
             new ConnectToMappings(options.ConnectToEntries),
             proxyTlsProvider,
-            ConnectTimeoutOf(options));
+            ConnectTimeoutOf(options),
+            AddressFamilyOf(options));
+
+    /// <summary>
+    /// The address family both connectors dial: <see cref="AddressFamily.InterNetwork" /> under
+    /// <c>-4</c>, <see cref="AddressFamily.InterNetworkV6" /> under <c>-6</c>, and
+    /// <see cref="AddressFamily.Unspecified" /> (either) when neither was given (BL-500).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns>The family.</returns>
+    internal static AddressFamily AddressFamilyOf(CommandLineOptions options) => options.IpAddressFamily switch
+    {
+        IpAddressFamilyChoice.IPv4Only => AddressFamily.InterNetwork,
+        IpAddressFamilyChoice.IPv6Only => AddressFamily.InterNetworkV6,
+        _ => AddressFamily.Unspecified,
+    };
 
     /// <summary>
     /// The connect timeout <see cref="CreateTcpConnector" /> gives the connector: the
@@ -266,7 +282,8 @@ internal static class CurlComposition
             dnsResolver,
             timeProvider,
             ResolveOverrides.Parse(options.ResolveEntries),
-            new ConnectToMappings(options.ConnectToEntries));
+            new ConnectToMappings(options.ConnectToEntries),
+            AddressFamilyOf(options));
 
     /// <summary>
     /// Maps the command line to what the CONNECT request through an HTTP proxy carries: the

@@ -42,6 +42,11 @@ namespace Curl.Networking;
 /// handshakes together (ADR-0117); <see langword="null" />, zero or less for curl's default of
 /// 300 seconds.
 /// </param>
+/// <param name="addressFamily">
+/// The family <c>-4</c> (<see cref="AddressFamily.InterNetwork" />) or <c>-6</c>
+/// (<see cref="AddressFamily.InterNetworkV6" />) chose, or <see cref="AddressFamily.Unspecified" />
+/// for either: only addresses of that family are dialled for a host or proxy name (BL-500).
+/// </param>
 public sealed class TcpConnector(
     IDnsResolver dnsResolver,
     ITcpDialer tcpDialer,
@@ -51,7 +56,8 @@ public sealed class TcpConnector(
     ResolveOverrides? resolveOverrides = null,
     ConnectToMappings? connectToMappings = null,
     ITlsProvider? proxyTlsProvider = null,
-    TimeSpan? connectTimeout = null) : IConnector
+    TimeSpan? connectTimeout = null,
+    AddressFamily addressFamily = AddressFamily.Unspecified) : IConnector
 {
     private const string AnyHost = "*";
 
@@ -182,6 +188,12 @@ public sealed class TcpConnector(
     /// reports none of the three (measured, BL-482). Before anything else, a connect that no
     /// transfer has preceded with <see cref="LoadResolveEntries" /> loads the <c>--resolve</c>
     /// entries itself, with their <c>Added</c> lines, before a bad entry fails it.
+    /// </para>
+    /// <para>
+    /// Under <c>-4</c> or <c>-6</c> (the constructor's address family) a host or proxy name is
+    /// dialled at that family's addresses only, and one with none fails as not resolved: exit 6
+    /// <c>Could not resolve host: &lt;host&gt;</c>, or exit 5 for a proxy. An IP address literal
+    /// is dialled as written, as curl 8.21.0 dials it (measured, BL-500).
     /// </para>
     /// </remarks>
     public async ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
@@ -329,26 +341,52 @@ public sealed class TcpConnector(
     /// cache</c>. A host that did not resolve is not kept, so it is looked up again. Every
     /// answer is then reported as curl's resolved lines (<see cref="ReportResolved" />).
     /// </summary>
+    /// <remarks>
+    /// Under <c>-4</c> or <c>-6</c> only the chosen family's addresses are returned for a name
+    /// (<see cref="AddressFamilyFilter" />). A looked-up answer is kept and reported with that
+    /// family's only, as curl asks the system resolver for the one family; <c>localhost</c> is
+    /// kept and reported whole, as curl answers it itself with both. A cached entry is reported
+    /// whole, and one left with no address of the family is reported as <c>Negative DNS
+    /// entry</c> instead, and so fails the resolve (measured on curl 8.21.0, BL-500).
+    /// </remarks>
     private async ValueTask<IReadOnlyList<IPAddress>> ResolveAsync(string host, int port, ITransferEvents events, CancellationToken cancellationToken)
     {
         var cacheKey = DnsCacheKey(host, port);
         if ((_dnsCache.GetValueOrDefault(cacheKey) ?? _dnsCache.GetValueOrDefault(DnsCacheKey(AnyHost, port))) is { } cached)
         {
-            events.ReportInfo($"Hostname {host} was found in DNS cache");
-            ReportResolved(cached, events);
-            return cached.Addresses;
+            return AnswerFromCache(host, cached, events);
         }
 
         var addresses = await dnsResolver.ResolveAsync(host, cancellationToken).ConfigureAwait(false);
-        if (addresses.Count > 0)
+        var answered = IsLocalhost(host) ? addresses : AddressFamilyFilter.Dialable(host, addresses, addressFamily);
+        if (answered.Count > 0)
         {
-            var resolved = new DnsCacheEntry(host, port, addresses);
+            var resolved = new DnsCacheEntry(host, port, answered);
             _dnsCache[cacheKey] = resolved;
             ReportResolved(resolved, events);
         }
 
-        return addresses;
+        return AddressFamilyFilter.Dialable(host, answered, addressFamily);
     }
+
+    private IReadOnlyList<IPAddress> AnswerFromCache(string host, DnsCacheEntry cached, ITransferEvents events)
+    {
+        var dialable = AddressFamilyFilter.Dialable(host, cached.Addresses, addressFamily);
+        if (dialable.Count == 0)
+        {
+            events.ReportInfo("Negative DNS entry");
+            return dialable;
+        }
+
+        events.ReportInfo($"Hostname {host} was found in DNS cache");
+        ReportResolved(cached, events);
+        return dialable;
+    }
+
+    // curl 8.21.0 answers localhost and every name under .localhost itself, with ::1 and 127.0.0.1.
+    private static bool IsLocalhost(string host) =>
+        string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)
+        || host.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Reports curl 8.21.0's <c>Host &lt;name&gt;:&lt;port&gt; was resolved.</c>,

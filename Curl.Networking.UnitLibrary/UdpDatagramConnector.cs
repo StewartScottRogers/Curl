@@ -19,6 +19,7 @@ public sealed class UdpDatagramConnector : IDatagramConnector
     private readonly Func<IPEndPoint, IDatagramChannel> _openChannel;
     private readonly ResolveOverrides _resolveOverrides;
     private readonly ConnectToMappings _connectToMappings;
+    private readonly AddressFamily _addressFamily;
 
     /// <summary>
     /// Initializes a connector that opens <see cref="UdpDatagramChannel" /> sockets.
@@ -31,12 +32,17 @@ public sealed class UdpDatagramConnector : IDatagramConnector
     /// <param name="connectToMappings">
     /// The <c>--connect-to</c> mappings; <see langword="null" /> for <see cref="ConnectToMappings.None" />.
     /// </param>
+    /// <param name="addressFamily">
+    /// The family <c>-4</c> or <c>-6</c> chose, or <see cref="AddressFamily.Unspecified" /> for
+    /// either: a host name is opened at that family's addresses only (BL-500).
+    /// </param>
     public UdpDatagramConnector(
         IDnsResolver dnsResolver,
         TimeProvider timeProvider,
         ResolveOverrides? resolveOverrides = null,
-        ConnectToMappings? connectToMappings = null)
-        : this(dnsResolver, timeProvider, serverEndPoint => new UdpDatagramChannel(serverEndPoint), resolveOverrides, connectToMappings)
+        ConnectToMappings? connectToMappings = null,
+        AddressFamily addressFamily = AddressFamily.Unspecified)
+        : this(dnsResolver, timeProvider, serverEndPoint => new UdpDatagramChannel(serverEndPoint), resolveOverrides, connectToMappings, addressFamily)
     {
     }
 
@@ -53,18 +59,23 @@ public sealed class UdpDatagramConnector : IDatagramConnector
     /// <param name="connectToMappings">
     /// The <c>--connect-to</c> mappings; <see langword="null" /> for <see cref="ConnectToMappings.None" />.
     /// </param>
+    /// <param name="addressFamily">
+    /// The family <c>-4</c> or <c>-6</c> chose, or <see cref="AddressFamily.Unspecified" /> for either.
+    /// </param>
     internal UdpDatagramConnector(
         IDnsResolver dnsResolver,
         TimeProvider timeProvider,
         Func<IPEndPoint, IDatagramChannel> openChannel,
         ResolveOverrides? resolveOverrides = null,
-        ConnectToMappings? connectToMappings = null)
+        ConnectToMappings? connectToMappings = null,
+        AddressFamily addressFamily = AddressFamily.Unspecified)
     {
         _dnsResolver = dnsResolver;
         _timeProvider = timeProvider;
         _openChannel = openChannel;
         _resolveOverrides = resolveOverrides ?? ResolveOverrides.None;
         _connectToMappings = connectToMappings ?? ConnectToMappings.None;
+        _addressFamily = addressFamily;
     }
 
     /// <inheritdoc />
@@ -112,8 +123,11 @@ public sealed class UdpDatagramConnector : IDatagramConnector
     }
 
     private async ValueTask<IReadOnlyList<IPAddress>> ResolveAsync(ConnectDestination destination, CancellationToken cancellationToken) =>
-        _resolveOverrides.Find(destination.Host, destination.Port)
-            ?? await _dnsResolver.ResolveAsync(destination.Host, cancellationToken).ConfigureAwait(false);
+        AddressFamilyFilter.Dialable(
+            destination.Host,
+            _resolveOverrides.Find(destination.Host, destination.Port)
+                ?? await _dnsResolver.ResolveAsync(destination.Host, cancellationToken).ConfigureAwait(false),
+            _addressFamily);
 
     private DatagramOpenResult OpenFailure(string host, int port, ConnectDestination destination, long openStarted)
     {
