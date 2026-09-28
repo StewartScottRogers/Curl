@@ -32,3 +32,4 @@ The hand-built client runs a full TLS 1.3 client handshake as a message-level st
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
