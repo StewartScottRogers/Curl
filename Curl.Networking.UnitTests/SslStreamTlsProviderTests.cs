@@ -249,7 +249,7 @@ public sealed partial class SslStreamTlsProviderTests
         await AssertTls13IsAvailableAsync();
 
         var result = await HandshakeAsync(
-            new TlsClientOptions(Insecure: true, MinimumVersion: TlsMinimumVersion.Tls13),
+            new TlsClientOptions(Insecure: true, MinimumVersion: TlsVersion.Tls13),
             CertificateHost,
             SslProtocols.Tls12);
 
@@ -269,7 +269,7 @@ public sealed partial class SslStreamTlsProviderTests
         await AssertTls13IsAvailableAsync();
 
         var result = await HandshakeAsync(
-            new TlsClientOptions(Insecure: true, MinimumVersion: TlsMinimumVersion.Tls13),
+            new TlsClientOptions(Insecure: true, MinimumVersion: TlsVersion.Tls13),
             CertificateHost,
             SslProtocols.Tls12,
             SchannelBuild);
@@ -291,7 +291,7 @@ public sealed partial class SslStreamTlsProviderTests
         await AssertTls13IsAvailableAsync();
 
         var result = await HandshakeAsync(
-            new TlsClientOptions(Insecure: true, MinimumVersion: TlsMinimumVersion.Tls13),
+            new TlsClientOptions(Insecure: true, MinimumVersion: TlsVersion.Tls13),
             CertificateHost,
             SslProtocols.Tls12,
             OpenSslBuild);
@@ -304,7 +304,7 @@ public sealed partial class SslStreamTlsProviderTests
     public async Task AuthenticateAsClientAsync_WithTls12MinimumAgainstATls12OnlyServer_Succeeds()
     {
         var result = await HandshakeAsync(
-            new TlsClientOptions(Insecure: true, MinimumVersion: TlsMinimumVersion.Tls12),
+            new TlsClientOptions(Insecure: true, MinimumVersion: TlsVersion.Tls12),
             CertificateHost,
             SslProtocols.Tls12);
 

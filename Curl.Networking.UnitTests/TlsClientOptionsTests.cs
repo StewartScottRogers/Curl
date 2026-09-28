@@ -12,7 +12,7 @@ public sealed class TlsClientOptionsTests
         var options = new TlsClientOptions();
 
         Assert.IsFalse(options.Insecure);
-        Assert.AreEqual(TlsMinimumVersion.SystemDefault, options.MinimumVersion);
+        Assert.AreEqual(TlsVersion.SystemDefault, options.MinimumVersion);
         Assert.IsNull(options.CaCertificateFile);
         Assert.IsNull(options.CaCertificateDirectory);
         Assert.IsNull(options.ClientCertificate);
@@ -29,7 +29,7 @@ public sealed class TlsClientOptionsTests
         var changed = original with
         {
             Insecure = true,
-            MinimumVersion = TlsMinimumVersion.Tls13,
+            MinimumVersion = TlsVersion.Tls13,
             CaCertificateFile = "ca.pem",
             CaCertificateDirectory = "certs",
             ClientCertificate = "client.p12:secret",
@@ -39,7 +39,7 @@ public sealed class TlsClientOptionsTests
         };
 
         Assert.IsTrue(changed.Insecure);
-        Assert.AreEqual(TlsMinimumVersion.Tls13, changed.MinimumVersion);
+        Assert.AreEqual(TlsVersion.Tls13, changed.MinimumVersion);
         Assert.AreEqual("ca.pem", changed.CaCertificateFile);
         Assert.AreEqual("certs", changed.CaCertificateDirectory);
         Assert.AreEqual("client.p12:secret", changed.ClientCertificate);

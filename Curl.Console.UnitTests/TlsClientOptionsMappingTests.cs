@@ -102,29 +102,82 @@ public sealed class TlsClientOptionsMappingTests
     [TestMethod]
     public void FromCommandLine_Tlsv12_SetsMinimumVersionTls12()
     {
-        Assert.AreEqual(new TlsClientOptions(MinimumVersion: TlsMinimumVersion.Tls12), Map("--tlsv1.2", Url));
+        Assert.AreEqual(new TlsClientOptions(MinimumVersion: TlsVersion.Tls12), Map("--tlsv1.2", Url));
     }
 
     [TestMethod]
     public void FromCommandLine_Tlsv13_SetsMinimumVersionTls13()
     {
-        Assert.AreEqual(new TlsClientOptions(MinimumVersion: TlsMinimumVersion.Tls13), Map("--tlsv1.3", Url));
+        Assert.AreEqual(new TlsClientOptions(MinimumVersion: TlsVersion.Tls13), Map("--tlsv1.3", Url));
     }
 
     [TestMethod]
     public void FromCommandLine_Tlsv13ThenTlsv12_LastOneWinsAsTls12()
     {
         Assert.AreEqual(
-            new TlsClientOptions(MinimumVersion: TlsMinimumVersion.Tls12),
+            new TlsClientOptions(MinimumVersion: TlsVersion.Tls12),
             Map("--tlsv1.3", "--tlsv1.2", Url));
     }
 
     [TestMethod]
-    public void ToTlsMinimumVersion_OtherNonNullVersion_MapsToSystemDefault()
+    [DataRow("-1", TlsVersion.Tls10)]
+    [DataRow("--tlsv1", TlsVersion.Tls10)]
+    [DataRow("--tlsv1.0", TlsVersion.Tls10)]
+    [DataRow("--tlsv1.1", TlsVersion.Tls11)]
+    [DataRow("--tlsv1.2", TlsVersion.Tls12)]
+    [DataRow("--tlsv1.3", TlsVersion.Tls13)]
+    public void FromCommandLine_MinimumVersionOption_SetsMinimumVersionOnly(string option, TlsVersion expected)
+    {
+        Assert.AreEqual(new TlsClientOptions(MinimumVersion: expected), Map(option, Url));
+    }
+
+    [TestMethod]
+    [DataRow("1.0", TlsVersion.Tls10)]
+    [DataRow("1.1", TlsVersion.Tls11)]
+    [DataRow("1.2", TlsVersion.Tls12)]
+    [DataRow("1.3", TlsVersion.Tls13)]
+    [DataRow("default", TlsVersion.SystemDefault)]
+    public void FromCommandLine_TlsMax_SetsMaximumVersionOnly(string version, TlsVersion expected)
+    {
+        Assert.AreEqual(new TlsClientOptions(MaximumVersion: expected), Map("--tls-max", version, Url));
+    }
+
+    [TestMethod]
+    public void FromCommandLine_MinimumAndTlsMax_SetsBothEnds()
     {
         Assert.AreEqual(
-            TlsMinimumVersion.SystemDefault,
-            TlsClientOptionsMapping.ToTlsMinimumVersion(SslProtocols.None));
+            new TlsClientOptions(MinimumVersion: TlsVersion.Tls10, MaximumVersion: TlsVersion.Tls11),
+            Map("--tlsv1.0", "--tls-max", "1.1", Url));
+    }
+
+    [TestMethod]
+    public void FromCommandLine_ProxyTlsv1_LeavesTheTargetsVersionsAlone()
+    {
+        Assert.AreEqual(new TlsClientOptions(), Map("--proxy-tlsv1", Url));
+    }
+
+    [TestMethod]
+    public void ProxyFromCommandLine_ProxyTlsv1_SetsTheProxysMinimumVersionTls10()
+    {
+        Assert.AreEqual(new TlsClientOptions(MinimumVersion: TlsVersion.Tls10), MapProxy("--proxy-tlsv1", Url));
+    }
+
+    [TestMethod]
+    public void ProxyFromCommandLine_TargetMinimumAndTlsMax_NeverReachTheProxy()
+    {
+        // curl 8.21.0 (Schannel) -x https://<a TLS 1.2-only proxy> --proxy-insecure with --tlsv1.3, with
+        // --tls-max 1.1 and with --proxy-tlsv1 --tls-max 1.1 each completes the proxy handshake (BL-502).
+        Assert.AreEqual(
+            new TlsClientOptions(MinimumVersion: TlsVersion.Tls10),
+            MapProxy("--proxy-tlsv1", "--tlsv1.0", "--tls-max", "1.1", Url));
+    }
+
+    [TestMethod]
+    public void ToTlsVersion_OtherNonNullVersion_MapsToSystemDefault()
+    {
+        Assert.AreEqual(
+            TlsVersion.SystemDefault,
+            TlsClientOptionsMapping.ToTlsVersion(SslProtocols.None));
     }
 
     /// <summary>
