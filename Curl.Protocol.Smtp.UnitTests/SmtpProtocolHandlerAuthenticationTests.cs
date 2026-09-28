@@ -27,9 +27,9 @@ public sealed class SmtpProtocolHandlerAuthenticationTests
 
     private const string Accepted = "235 Authentication successful\r\n";
 
-    private const string Bye = "221 Bye\r\n";
+    private const string HelpReplyAndBye = SmtpRun.HelpReply + "221 Bye\r\n";
 
-    private const string Quit = "QUIT\r\n";
+    private const string HelpAndQuit = "HELP\r\nQUIT\r\n";
 
     /// <summary>PLAIN's message for <c>u</c>/<c>p</c>: NUL, user, NUL, password.</summary>
     private static readonly byte[] PlainMessage = "\0u\0p"u8.ToArray();
@@ -39,10 +39,10 @@ public sealed class SmtpProtocolHandlerAuthenticationTests
     {
         var sasl = new FakeSaslAuthenticator("PLAIN", PlainMessage);
 
-        SmtpRun run = await RunAsync(Greeting + EhloReply + "334 \r\n" + Accepted + Bye, sasl);
+        SmtpRun run = await RunAsync(Greeting + EhloReply + "334 \r\n" + Accepted + HelpReplyAndBye, sasl);
 
-        Assert.AreEqual(Ehlo + "AUTH PLAIN\r\nAHUAcA==\r\n" + Quit, run.Sent);
-        Assert.AreEqual(TransferResult.Success(0), run.Result);
+        Assert.AreEqual(Ehlo + "AUTH PLAIN\r\nAHUAcA==\r\n" + HelpAndQuit, run.Sent);
+        Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
         Assert.IsEmpty(sasl.Challenges);
     }
 
@@ -52,7 +52,7 @@ public sealed class SmtpProtocolHandlerAuthenticationTests
         var sasl = new FakeSaslAuthenticator("PLAIN", PlainMessage);
         var context = Context(new MailRequestOptions { SaslAuthorizationIdentity = "z", ServiceName = "svc" });
 
-        await RunAsync(context, Greeting + EhloReply + "334 \r\n" + Accepted + Bye, sasl);
+        await RunAsync(context, Greeting + EhloReply + "334 \r\n" + Accepted + HelpReplyAndBye, sasl);
 
         (SaslRequest request, string[] offered) = sasl.Choices.Single();
         CollectionAssert.AreEqual(new[] { "PLAIN", "LOGIN" }, offered);
@@ -71,9 +71,9 @@ public sealed class SmtpProtocolHandlerAuthenticationTests
         var sasl = new FakeSaslAuthenticator("PLAIN", PlainMessage);
         var context = new TransferContext { Url = CurlUrl.Parse(Url), Output = Stream.Null, Credentials = new NetworkCredential("u", "p") };
 
-        SmtpRun run = await RunAsync(context, Greeting + EhloReply + "334 \r\n" + Accepted + Bye, sasl);
+        SmtpRun run = await RunAsync(context, Greeting + EhloReply + "334 \r\n" + Accepted + HelpReplyAndBye, sasl);
 
-        Assert.AreEqual(Ehlo + "AUTH PLAIN\r\nAHUAcA==\r\n" + Quit, run.Sent);
+        Assert.AreEqual(Ehlo + "AUTH PLAIN\r\nAHUAcA==\r\n" + HelpAndQuit, run.Sent);
         Assert.AreEqual("smtp", sasl.Choices.Single().Request.ServiceName);
     }
 
@@ -82,10 +82,10 @@ public sealed class SmtpProtocolHandlerAuthenticationTests
     {
         var sasl = new FakeSaslAuthenticator("PLAIN", PlainMessage);
 
-        SmtpRun run = await RunAsync(Context(SaslIr), Greeting + EhloReply + Accepted + Bye, sasl);
+        SmtpRun run = await RunAsync(Context(SaslIr), Greeting + EhloReply + Accepted + HelpReplyAndBye, sasl);
 
-        Assert.AreEqual(Ehlo + "AUTH PLAIN AHUAcA==\r\n" + Quit, run.Sent);
-        Assert.AreEqual(TransferResult.Success(0), run.Result);
+        Assert.AreEqual(Ehlo + "AUTH PLAIN AHUAcA==\r\n" + HelpAndQuit, run.Sent);
+        Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
     }
 
     [TestMethod]
@@ -94,10 +94,10 @@ public sealed class SmtpProtocolHandlerAuthenticationTests
         var sasl = new FakeSaslAuthenticator("LOGIN", "u"u8.ToArray(), "p"u8.ToArray());
 
         SmtpRun run = await RunAsync(
-            Greeting + EhloReply + "334 VXNlcm5hbWU6\r\n334 UGFzc3dvcmQ6\r\n" + Accepted + Bye, sasl);
+            Greeting + EhloReply + "334 VXNlcm5hbWU6\r\n334 UGFzc3dvcmQ6\r\n" + Accepted + HelpReplyAndBye, sasl);
 
-        Assert.AreEqual(Ehlo + "AUTH LOGIN\r\ndQ==\r\ncA==\r\n" + Quit, run.Sent);
-        Assert.AreEqual(TransferResult.Success(0), run.Result);
+        Assert.AreEqual(Ehlo + "AUTH LOGIN\r\ndQ==\r\ncA==\r\n" + HelpAndQuit, run.Sent);
+        Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
         Assert.AreEqual("Password:", Encoding.ASCII.GetString(sasl.Challenges.Single()));
     }
 
@@ -106,10 +106,10 @@ public sealed class SmtpProtocolHandlerAuthenticationTests
     {
         var sasl = new FakeSaslAuthenticator("LOGIN", "u"u8.ToArray(), "p"u8.ToArray());
 
-        SmtpRun run = await RunAsync(Context(SaslIr), Greeting + EhloReply + "334 UGFzc3dvcmQ6\r\n" + Accepted + Bye, sasl);
+        SmtpRun run = await RunAsync(Context(SaslIr), Greeting + EhloReply + "334 UGFzc3dvcmQ6\r\n" + Accepted + HelpReplyAndBye, sasl);
 
-        Assert.AreEqual(Ehlo + "AUTH LOGIN dQ==\r\ncA==\r\n" + Quit, run.Sent);
-        Assert.AreEqual(TransferResult.Success(0), run.Result);
+        Assert.AreEqual(Ehlo + "AUTH LOGIN dQ==\r\ncA==\r\n" + HelpAndQuit, run.Sent);
+        Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
     }
 
     [TestMethod]
@@ -119,9 +119,9 @@ public sealed class SmtpProtocolHandlerAuthenticationTests
         var sasl = new FakeSaslAuthenticator("CRAM-MD5", null, "u 05eea7f7bd83786044680b700b4965a4"u8.ToArray());
 
         SmtpRun run = await RunAsync(
-            Context(SaslIr), Greeting + EhloReply + "334 PDE4OTYuNjk3MTcwOTUyQGxvY2FsaG9zdD4=\r\n" + Accepted + Bye, sasl);
+            Context(SaslIr), Greeting + EhloReply + "334 PDE4OTYuNjk3MTcwOTUyQGxvY2FsaG9zdD4=\r\n" + Accepted + HelpReplyAndBye, sasl);
 
-        Assert.AreEqual(Ehlo + "AUTH CRAM-MD5\r\ndSAwNWVlYTdmN2JkODM3ODYwNDQ2ODBiNzAwYjQ5NjVhNA==\r\n" + Quit, run.Sent);
+        Assert.AreEqual(Ehlo + "AUTH CRAM-MD5\r\ndSAwNWVlYTdmN2JkODM3ODYwNDQ2ODBiNzAwYjQ5NjVhNA==\r\n" + HelpAndQuit, run.Sent);
         Assert.AreEqual("<1896.697170952@localhost>", Encoding.ASCII.GetString(sasl.Challenges.Single()));
     }
 
@@ -131,9 +131,9 @@ public sealed class SmtpProtocolHandlerAuthenticationTests
         // curl -u : --sasl-ir --login-options AUTH=LOGIN
         var sasl = new FakeSaslAuthenticator("LOGIN", [], Array.Empty<byte>());
 
-        SmtpRun run = await RunAsync(Context(SaslIr), Greeting + EhloReply + "334 UGFzc3dvcmQ6\r\n" + Accepted + Bye, sasl);
+        SmtpRun run = await RunAsync(Context(SaslIr), Greeting + EhloReply + "334 UGFzc3dvcmQ6\r\n" + Accepted + HelpReplyAndBye, sasl);
 
-        Assert.AreEqual(Ehlo + "AUTH LOGIN =\r\n=\r\n" + Quit, run.Sent);
+        Assert.AreEqual(Ehlo + "AUTH LOGIN =\r\n=\r\n" + HelpAndQuit, run.Sent);
     }
 
     [TestMethod]
@@ -148,7 +148,7 @@ public sealed class SmtpProtocolHandlerAuthenticationTests
         var sasl = new FakeSaslAuthenticator("PLAIN", PlainMessage);
 
         SmtpRun run = await RunAsync(
-            Context(new MailRequestOptions { SaslInitialResponse = saslIr }), Greeting + EhloReply + reply + "\r\n" + Bye, sasl);
+            Context(new MailRequestOptions { SaslInitialResponse = saslIr }), Greeting + EhloReply + reply + "\r\n" + HelpReplyAndBye, sasl);
 
         Assert.AreEqual(Ehlo + auth, run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), run.Result);
@@ -160,7 +160,7 @@ public sealed class SmtpProtocolHandlerAuthenticationTests
         var sasl = new FakeSaslAuthenticator("OAUTHBEARER", "n,a=u,"u8.ToArray(), [0x01]);
         var context = Context(new MailRequestOptions { SaslInitialResponse = true, BearerToken = "tok" });
 
-        SmtpRun run = await RunAsync(context, Greeting + EhloReply + "334 eyJzdGF0dXMiOiJpbnZhbGlkIn0=\r\n535 no\r\n" + Bye, sasl);
+        SmtpRun run = await RunAsync(context, Greeting + EhloReply + "334 eyJzdGF0dXMiOiJpbnZhbGlkIn0=\r\n535 no\r\n" + HelpReplyAndBye, sasl);
 
         Assert.AreEqual(Ehlo + "AUTH OAUTHBEARER bixhPXUs\r\nAQ==\r\n", run.Sent);
         Assert.AreEqual(CurlExitCode.LoginDenied, run.Result.ExitCode);
@@ -179,9 +179,9 @@ public sealed class SmtpProtocolHandlerAuthenticationTests
             Mail = new MailRequestOptions { SaslInitialResponse = true, BearerToken = "tok" },
         };
 
-        SmtpRun run = await RunAsync(context, Greeting + EhloReply + Accepted + Bye, sasl);
+        SmtpRun run = await RunAsync(context, Greeting + EhloReply + Accepted + HelpReplyAndBye, sasl);
 
-        Assert.AreEqual(Ehlo + "AUTH OAUTHBEARER bixhPSw=\r\n" + Quit, run.Sent);
+        Assert.AreEqual(Ehlo + "AUTH OAUTHBEARER bixhPSw=\r\n" + HelpAndQuit, run.Sent);
         Assert.AreEqual("tok", sasl.Choices.Single().Request.BearerToken);
         Assert.IsNull(sasl.Choices.Single().Request.Credential);
     }
@@ -198,9 +198,9 @@ public sealed class SmtpProtocolHandlerAuthenticationTests
             Mail = new MailRequestOptions { SaslInitialResponse = true, LoginOptions = "AUTH=external" },
         };
 
-        SmtpRun run = await RunAsync(context, Greeting + "250-localhost\r\n250-AUTH EXTERNAL\r\n250 OK\r\n" + Accepted + Bye, sasl);
+        SmtpRun run = await RunAsync(context, Greeting + "250-localhost\r\n250-AUTH EXTERNAL\r\n250 OK\r\n" + Accepted + HelpReplyAndBye, sasl);
 
-        Assert.AreEqual(Ehlo + "AUTH EXTERNAL =\r\n" + Quit, run.Sent);
+        Assert.AreEqual(Ehlo + "AUTH EXTERNAL =\r\n" + HelpAndQuit, run.Sent);
         Assert.AreEqual("external", sasl.Choices.Single().Request.RequiredMechanism);
     }
 
@@ -217,10 +217,10 @@ public sealed class SmtpProtocolHandlerAuthenticationTests
             Mail = new MailRequestOptions { LoginOptions = loginOptions },
         };
 
-        SmtpRun run = await RunAsync(context, Greeting + EhloReply + Bye, sasl);
+        SmtpRun run = await RunAsync(context, Greeting + EhloReply + HelpReplyAndBye, sasl);
 
-        Assert.AreEqual(Ehlo + Quit, run.Sent);
-        Assert.AreEqual(TransferResult.Success(0), run.Result);
+        Assert.AreEqual(Ehlo + HelpAndQuit, run.Sent);
+        Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
         Assert.IsEmpty(sasl.Choices);
     }
 
@@ -232,10 +232,10 @@ public sealed class SmtpProtocolHandlerAuthenticationTests
     {
         var sasl = new FakeSaslAuthenticator("PLAIN", PlainMessage);
 
-        SmtpRun run = await RunAsync(Greeting + ehloReply + Bye, sasl);
+        SmtpRun run = await RunAsync(Greeting + ehloReply + HelpReplyAndBye, sasl);
 
-        Assert.AreEqual(Ehlo + Quit, run.Sent);
-        Assert.AreEqual(TransferResult.Success(0), run.Result);
+        Assert.AreEqual(Ehlo + HelpAndQuit, run.Sent);
+        Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
         Assert.IsEmpty(sasl.Choices);
     }
 
@@ -252,12 +252,12 @@ public sealed class SmtpProtocolHandlerAuthenticationTests
         };
         var plaintext = new ScriptedConnection(Encoding.Latin1.GetBytes(
             Greeting + "250-localhost\r\n250-AUTH LOGIN\r\n250 STARTTLS\r\n220 Ready to start TLS\r\n"));
-        var secured = new ScriptedConnection(Encoding.Latin1.GetBytes(EhloReply + "334 \r\n" + Accepted + Bye));
+        var secured = new ScriptedConnection(Encoding.Latin1.GetBytes(EhloReply + "334 \r\n" + Accepted + HelpReplyAndBye));
 
         SmtpRun run = await SmtpRun.ExecuteAsync(context, plaintext, sasl, ConnectResult.Connected(secured));
 
         Assert.AreEqual(Ehlo + "STARTTLS\r\n", run.Sent);
-        Assert.AreEqual(Ehlo + "AUTH PLAIN\r\nAHUAcA==\r\n" + Quit, Encoding.Latin1.GetString(secured.Sent));
+        Assert.AreEqual(Ehlo + "AUTH PLAIN\r\nAHUAcA==\r\n" + HelpAndQuit, Encoding.Latin1.GetString(secured.Sent));
         CollectionAssert.AreEqual(new[] { "PLAIN", "LOGIN" }, sasl.Choices.Single().Offered);
     }
 
@@ -266,9 +266,9 @@ public sealed class SmtpProtocolHandlerAuthenticationTests
     {
         var sasl = new FakeSaslAuthenticator("PLAIN", PlainMessage);
 
-        SmtpRun run = await RunAsync(Greeting + "502 no\r\n250 localhost\r\n" + Bye, sasl);
+        SmtpRun run = await RunAsync(Greeting + "502 no\r\n250 localhost\r\n" + HelpReplyAndBye, sasl);
 
-        Assert.AreEqual(Ehlo + "HELO x\r\n" + Quit, run.Sent);
+        Assert.AreEqual(Ehlo + "HELO x\r\n" + HelpAndQuit, run.Sent);
         Assert.IsEmpty(sasl.Choices);
     }
 
@@ -281,7 +281,7 @@ public sealed class SmtpProtocolHandlerAuthenticationTests
     {
         var sasl = new FakeSaslAuthenticator("PLAIN", PlainMessage);
 
-        await RunAsync(Greeting + ehloReply + "334 \r\n" + Accepted + Bye, sasl);
+        await RunAsync(Greeting + ehloReply + "334 \r\n" + Accepted + HelpReplyAndBye, sasl);
 
         CollectionAssert.AreEqual(expected, sasl.Choices.Single().Offered);
     }
@@ -293,7 +293,7 @@ public sealed class SmtpProtocolHandlerAuthenticationTests
     {
         var sasl = new FakeSaslAuthenticator(null, null);
 
-        SmtpRun run = await RunAsync(Greeting + ehloReply + Bye, sasl);
+        SmtpRun run = await RunAsync(Greeting + ehloReply + HelpReplyAndBye, sasl);
 
         Assert.AreEqual(Ehlo, run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), run.Result);
@@ -308,10 +308,10 @@ public sealed class SmtpProtocolHandlerAuthenticationTests
         byte[] message = Enumerable.Repeat((byte)'u', messageLength).ToArray();
         var sasl = new FakeSaslAuthenticator("PLAIN", message);
 
-        SmtpRun run = await RunAsync(Context(SaslIr), Greeting + EhloReply + challenge + Accepted + Bye, sasl);
+        SmtpRun run = await RunAsync(Context(SaslIr), Greeting + EhloReply + challenge + Accepted + HelpReplyAndBye, sasl);
 
         StringAssert.StartsWith(run.Sent, Ehlo + expectedStart + Convert.ToBase64String(message)[..4], StringComparison.Ordinal);
-        Assert.AreEqual(TransferResult.Success(0), run.Result);
+        Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
     }
 
     [TestMethod]
@@ -321,9 +321,9 @@ public sealed class SmtpProtocolHandlerAuthenticationTests
     {
         var sasl = new FakeSaslAuthenticator("LOGIN", "u"u8.ToArray(), "p"u8.ToArray());
 
-        SmtpRun run = await RunAsync(Context(SaslIr), Greeting + EhloReply + challenge + Accepted + Bye, sasl);
+        SmtpRun run = await RunAsync(Context(SaslIr), Greeting + EhloReply + challenge + Accepted + HelpReplyAndBye, sasl);
 
-        Assert.AreEqual(Ehlo + "AUTH LOGIN dQ==\r\ncA==\r\n" + Quit, run.Sent);
+        Assert.AreEqual(Ehlo + "AUTH LOGIN dQ==\r\ncA==\r\n" + HelpAndQuit, run.Sent);
         Assert.IsEmpty(sasl.Challenges.Single());
     }
 
@@ -347,7 +347,7 @@ public sealed class SmtpProtocolHandlerAuthenticationTests
             upload: new MemoryStream("hi\r\n"u8.ToArray()));
 
         SmtpRun run = await RunAsync(
-            context, Greeting + EhloReply + Accepted + "250 OK\r\n250 OK\r\n354 go\r\n250 OK\r\n" + Bye, sasl);
+            context, Greeting + EhloReply + Accepted + "250 OK\r\n250 OK\r\n354 go\r\n250 OK\r\n" + HelpReplyAndBye, sasl);
 
         StringAssert.StartsWith(run.Sent, Ehlo + "AUTH PLAIN AHUAcA==\r\nMAIL FROM:<a@b>\r\n", StringComparison.Ordinal);
         Assert.IsTrue(run.Result.IsSuccess);
@@ -364,7 +364,7 @@ public sealed class SmtpProtocolHandlerAuthenticationTests
         string url = urlOptions is null ? Url : "smtp://u:p;" + urlOptions + "@127.0.0.1:18025/x";
         var context = Context(new MailRequestOptions { LoginOptions = loginOptions }, url);
 
-        await RunAsync(context, Greeting + EhloReply + "334 \r\n" + Accepted + Bye, sasl);
+        await RunAsync(context, Greeting + EhloReply + "334 \r\n" + Accepted + HelpReplyAndBye, sasl);
 
         Assert.AreEqual(expected, sasl.Choices.Single().Request.RequiredMechanism);
     }

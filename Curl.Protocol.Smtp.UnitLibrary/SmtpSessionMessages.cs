@@ -31,7 +31,9 @@ internal static class SmtpSessionMessages
 
     /// <summary>
     /// <c>MAIL</c> or <c>RCPT</c> was answered with something other than 2xx, or <c>DATA</c>
-    /// with something other than 354 (exit 55, BL-542), such as <c>RCPT failed: 550</c>.
+    /// with something other than 354 (exit 55, BL-542), such as <c>RCPT failed: 550</c>; or,
+    /// as <c>Command failed: 550</c>, a <c>VRFY</c>, <c>HELP</c> or <c>-X</c> command was
+    /// refused (exit 8, BL-543).
     /// </summary>
     internal static string CommandFailed(string command, int code) =>
         string.Create(CultureInfo.InvariantCulture, $"{command} failed: {code}");

@@ -30,7 +30,9 @@ namespace Curl.Protocol.Smtp;
 /// authenticates through <see cref="SmtpSaslAuthentication" /> before anything else
 /// (BL-541); one greeted with <c>HELO</c> never does.</item>
 /// <item>With <c>-T</c> and at least one <c>--mail-rcpt</c>, the open session sends the
-/// message through <see cref="SmtpMailTransaction" /> (BL-542).</item>
+/// message through <see cref="SmtpMailTransaction" /> (BL-542). Otherwise it sends
+/// <c>VRFY</c>, <c>EXPN</c>, <c>HELP</c> or the <c>-X</c> command through
+/// <see cref="SmtpCommandTransfer" /> (BL-543).</item>
 /// </list>
 /// </remarks>
 internal sealed class SmtpSession(
@@ -45,6 +47,8 @@ internal sealed class SmtpSession(
 
     private const string StartTlsKeyword = "STARTTLS";
 
+    private const string SmtpUtf8Keyword = "SMTPUTF8";
+
     private bool secure = implicitTls;
 
     private IConnection? securedConnection;
@@ -53,8 +57,8 @@ internal sealed class SmtpSession(
     private SmtpReply? capabilities;
 
     /// <summary>
-    /// Opens the session, authenticates, sends the message when there is one, and closes it
-    /// with <c>QUIT</c>.
+    /// Opens the session, authenticates, sends the message when there is one or the commands
+    /// when there is not, and closes it with <c>QUIT</c>.
     /// </summary>
     /// <returns>A success, or the failure that stopped the session or its message.</returns>
     public async ValueTask<TransferResult> RunAsync()
@@ -75,13 +79,7 @@ internal sealed class SmtpSession(
             return TransferResult.Failure(CurlExitCode.TooLarge, SmtpSessionMessages.ReplyLineTooLarge);
         }
 
-        if (context.Upload is { } upload && context.Mail is { Recipients.Count: > 0 } mail)
-        {
-            return await new SmtpMailTransaction(channel, context).SendAsync(upload, mail).ConfigureAwait(false);
-        }
-
-        await channel.QuitAsync().ConfigureAwait(false);
-        return TransferResult.Success(0);
+        return await SendMailOrCommandsAsync().ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -93,9 +91,37 @@ internal sealed class SmtpSession(
         }
     }
 
+    /// <summary>
+    /// Whether a line of the <c>EHLO</c> reply starts, after its code, with <c>SMTPUTF8</c> in
+    /// capitals, as curl matches it.
+    /// </summary>
+    private static bool AdvertisesSmtpUtf8(SmtpReply ehlo) =>
+        ehlo.Lines.Any(line => line.Length >= 4 + SmtpUtf8Keyword.Length
+            && line.AsSpan(4, SmtpUtf8Keyword.Length).SequenceEqual(SmtpUtf8Keyword));
+
     private static bool AdvertisesStartTls(SmtpReply ehlo) =>
         ehlo.Lines.Any(line => line.Length >= 4 + StartTlsKeyword.Length
             && line.AsSpan(4, StartTlsKeyword.Length).Equals(StartTlsKeyword, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Sends the message when there is an upload and a recipient, and the commands
+    /// otherwise, as curl chooses between them.
+    /// </summary>
+    private ValueTask<TransferResult> SendMailOrCommandsAsync()
+    {
+        if (context.Upload is { } upload && context.Mail is { Recipients.Count: > 0 } mail)
+        {
+            return new SmtpMailTransaction(channel, context).SendAsync(upload, mail);
+        }
+
+        return SendCommandsAsync();
+    }
+
+    private ValueTask<TransferResult> SendCommandsAsync()
+    {
+        bool smtpUtf8Advertised = capabilities is { } ehlo && AdvertisesSmtpUtf8(ehlo);
+        return new SmtpCommandTransfer(channel, context, smtpUtf8Advertised).SendAsync(context.Mail ?? new MailRequestOptions());
+    }
 
     private async ValueTask<TransferResult?> AuthenticateAsync() =>
         saslAuthenticator is not null && capabilities is { } ehlo

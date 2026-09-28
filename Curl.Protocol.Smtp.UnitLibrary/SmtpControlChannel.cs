@@ -52,7 +52,7 @@ internal sealed class SmtpControlChannel(IConnection connection, CancellationTok
 
     /// <summary>
     /// Sends <paramref name="command" /> followed by CRLF. A connection that fails with an
-    /// <see cref="IOException" /> is left for the next <see cref="ReadReplyAsync" /> to find
+    /// <see cref="IOException" /> is left for the next <see cref="ReadReplyAsync()" /> to find
     /// closed.
     /// </summary>
     /// <param name="command">The command line without its line end, such as <c>EHLO x</c>.</param>
@@ -62,7 +62,7 @@ internal sealed class SmtpControlChannel(IConnection connection, CancellationTok
     /// <summary>
     /// Sends <paramref name="bytes" /> as they are, such as a piece of the message after
     /// <c>DATA</c>. A connection that fails with an <see cref="IOException" /> is left for the
-    /// next <see cref="ReadReplyAsync" /> to find closed.
+    /// next <see cref="ReadReplyAsync()" /> to find closed.
     /// </summary>
     /// <param name="bytes">The bytes to send.</param>
     /// <returns>A task that completes once the bytes are sent or the send has failed.</returns>
@@ -88,7 +88,24 @@ internal sealed class SmtpControlChannel(IConnection connection, CancellationTok
     /// <exception cref="InvalidDataException">
     /// A line reached 65536 bytes, its CR and LF included, as curl refuses with exit 100.
     /// </exception>
-    public async ValueTask<SmtpReply?> ReadReplyAsync()
+    public ValueTask<SmtpReply?> ReadReplyAsync() => ReadReplyAsync(static _ => ValueTask.CompletedTask);
+
+    /// <summary>
+    /// Reads the next complete reply, handing each continuation line to
+    /// <paramref name="continuationRead" /> as soon as it arrives, as curl writes the
+    /// continuation lines of a command's reply before it has seen the final one (BL-543).
+    /// </summary>
+    /// <param name="continuationRead">
+    /// Receives each continuation line exactly as it arrived, with its line end.
+    /// </param>
+    /// <returns>
+    /// The reply, or <see langword="null" /> when the server closed the connection or a
+    /// read failed with an <see cref="IOException" /> before the reply was complete.
+    /// </returns>
+    /// <exception cref="InvalidDataException">
+    /// A line reached 65536 bytes, its CR and LF included, as curl refuses with exit 100.
+    /// </exception>
+    public async ValueTask<SmtpReply?> ReadReplyAsync(Func<string, ValueTask> continuationRead)
     {
         var lines = new List<string>();
         while (await ReadLineAsync().ConfigureAwait(false) is { } line)
@@ -98,16 +115,17 @@ internal sealed class SmtpControlChannel(IConnection connection, CancellationTok
                 continue;
             }
 
-            bool isFinal = line.Length == 4 || line[3] == ' ';
-            if (isFinal || line[3] == '-')
+            if (line.Length == 4 || line[3] == ' ')
             {
                 lines.Add(line.TrimEnd('\r'));
+                LastReplyCode = int.Parse(line.AsSpan(0, 3), provider: null);
+                return new SmtpReply(LastReplyCode, lines) { FinalLine = line + "\n" };
             }
 
-            if (isFinal)
+            if (line[3] == '-')
             {
-                LastReplyCode = int.Parse(line.AsSpan(0, 3), provider: null);
-                return new SmtpReply(LastReplyCode, lines);
+                lines.Add(line.TrimEnd('\r'));
+                await continuationRead(line + "\n").ConfigureAwait(false);
             }
         }
 

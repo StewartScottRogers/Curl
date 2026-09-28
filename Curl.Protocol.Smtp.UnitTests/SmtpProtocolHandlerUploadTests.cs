@@ -200,32 +200,34 @@ public sealed class SmtpProtocolHandlerUploadTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_UploadWithoutRecipient_SendsNoMail()
+    public async Task ExecuteAsync_UploadWithoutRecipient_SendsHelpInsteadOfMail()
     {
-        SmtpRun run = await RunAsync(Greeting + EhloReply + Bye, Body("one\r\n"), new MailRequestOptions { From = "a@b" });
+        // Measured (BL-543): -T mail.txt smtp://127.0.0.1:18125/ with no --mail-rcpt sends HELP.
+        SmtpRun run = await RunAsync(Greeting + EhloReply + SmtpRun.HelpReply + Bye, Body("one\r\n"), new MailRequestOptions { From = "a@b" });
 
-        Assert.AreEqual("EHLO dom\r\n" + Quit, run.Sent);
-        Assert.AreEqual(TransferResult.Success(0), run.Result);
+        Assert.AreEqual("EHLO dom\r\nHELP\r\n" + Quit, run.Sent);
+        Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_UploadWithoutMailOptions_SendsNoMail()
+    public async Task ExecuteAsync_UploadWithoutMailOptions_SendsHelpInsteadOfMail()
     {
         var context = new TransferContext { Url = CurlUrl.Parse(Url), Output = Stream.Null, Upload = Body("one\r\n") };
 
-        SmtpRun run = await SmtpRun.ExecuteAsync(context, new ScriptedConnection(Encoding.Latin1.GetBytes(Greeting + EhloReply + Bye)));
+        SmtpRun run = await SmtpRun.ExecuteAsync(
+            context, new ScriptedConnection(Encoding.Latin1.GetBytes(Greeting + EhloReply + SmtpRun.HelpReply + Bye)));
 
-        Assert.AreEqual("EHLO dom\r\n" + Quit, run.Sent);
-        Assert.AreEqual(TransferResult.Success(0), run.Result);
+        Assert.AreEqual("EHLO dom\r\nHELP\r\n" + Quit, run.Sent);
+        Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_RecipientWithoutUpload_SendsNoMail()
+    public async Task ExecuteAsync_RecipientWithoutUpload_SendsVrfyInsteadOfMail()
     {
-        SmtpRun run = await RunAsync(Greeting + EhloReply + Bye, null);
+        SmtpRun run = await RunAsync(Greeting + EhloReply + Ok + Bye, null);
 
-        Assert.AreEqual("EHLO dom\r\n" + Quit, run.Sent);
-        Assert.AreEqual(TransferResult.Success(0), run.Result);
+        Assert.AreEqual("EHLO dom\r\nVRFY c@d\r\n" + Quit, run.Sent);
+        Assert.AreEqual(CurlExitCode.Ok, run.Result.ExitCode);
     }
 
     private static MemoryStream Body(string text) => new(Encoding.Latin1.GetBytes(text));

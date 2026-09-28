@@ -21,9 +21,9 @@ namespace Curl.Protocol.Smtp;
 /// With <c>-T</c> and at least one <c>--mail-rcpt</c> the open session sends the message
 /// (<see cref="SmtpMailTransaction" />, BL-542), after authenticating with <c>AUTH</c> when
 /// the handler was given an <see cref="ISaslAuthenticator" /> (<see cref="SmtpSaslAuthentication" />,
-/// BL-541). The commands sent without an upload or without a recipient (BL-543) are not
-/// implemented yet: then the handler closes the session with <c>QUIT</c> and reports
-/// success. Cancellation leaves as an exception.
+/// BL-541). Without an upload or without a recipient it sends <c>VRFY</c>, <c>EXPN</c>,
+/// <c>HELP</c> or the <c>-X</c> command and writes the replies to the output
+/// (<see cref="SmtpCommandTransfer" />, BL-543). Cancellation leaves as an exception.
 /// </para>
 /// </remarks>
 public sealed class SmtpProtocolHandler : IProtocolHandler

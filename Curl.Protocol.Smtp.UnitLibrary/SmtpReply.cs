@@ -16,4 +16,10 @@ internal sealed record SmtpReply(int Code, IReadOnlyList<string> Lines)
     /// Gets a value indicating whether <see cref="Code" /> is a 2xx completion.
     /// </summary>
     public bool IsCompletion => Code / 100 == 2;
+
+    /// <summary>
+    /// Gets the final reply line exactly as it arrived, with its line end (CRLF, or LF
+    /// alone), which is what curl writes to the output for a command's reply (BL-543).
+    /// </summary>
+    public string FinalLine { get; init; } = string.Empty;
 }
