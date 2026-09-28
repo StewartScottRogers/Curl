@@ -1,5 +1,5 @@
 ---
-id: BL-467
+id: BL-470
 title: Apply -Y and -y defaults in command-line order so -Y 0 -y 2 watches 1 byte per second
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-467 — Apply -Y and -y defaults in command-line order so -Y 0 -y 2 watches 1 byte per second
+# BL-470 — Apply -Y and -y defaults in command-line order so -Y 0 -y 2 watches 1 byte per second
 
 ## Goal
 
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-- Filed by BL-400 (ADR-0105, Consequences). curl's tool sets a zero `low_speed_limit` to 1 when `-y` is parsed and a zero `low_speed_time` to 30 when `-Y` is parsed, so the defaults depend on the order the options came in. `CommandLineOptions` keeps only the last value of each, and `LowSpeedWatchdog.StartFromCommandLine` applies the defaults to `null` only, so `-Y 0 -y 2` watches nothing.
+- Filed by BL-400 (ADR-0106, Consequences). curl's tool sets a zero `low_speed_limit` to 1 when `-y` is parsed and a zero `low_speed_time` to 30 when `-Y` is parsed, so the defaults depend on the order the options came in. `CommandLineOptions` keeps only the last value of each, and `LowSpeedWatchdog.StartFromCommandLine` applies the defaults to `null` only, so `-Y 0 -y 2` watches nothing.
 - Measured by BL-400 on curl 8.21.0 (Windows): `-sS -Y 0 -y 2` against a stalled server prints `curl: (28) Operation too slow. Less than 1 bytes/sec transferred the last 2 seconds` and exits 28. Measure `-y 2 -Y 0` and `-Y 100 -y 0` with `Record-CurlExchange.ps1` (`-ResponseDelayMilliseconds`) before pinning them.
 
 ## Acceptance criteria

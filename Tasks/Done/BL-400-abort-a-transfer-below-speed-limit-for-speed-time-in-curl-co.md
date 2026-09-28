@@ -35,9 +35,9 @@ A transfer whose speed stays below `-Y`/`--speed-limit` bytes per second for `-y
   - `-sS -y 2`: `... Less than 1 bytes/sec transferred the last 2 seconds`
   - `-sS -Y 0 -y 2`: `... Less than 1 bytes/sec transferred the last 2 seconds`
 - The second criterion's "sets no limit" contradicts the measurement (and BL-196's `--libcurl` reading); "as measured" governs, so `-y` alone watches for 1 byte per second.
-- Design (ADR-0105): `Curl.Core`'s `LowSpeedWatchdog` samples once a second on the runner's clock, measures the faster of output bytes and reported upload bytes over the last six samples as `Curl_speedcheck` does, and cancels its token after a slow spell lasting the speed time. `TransferContextFactory` wraps the output and progress sink and passes the token as the context's `CancellationToken`; `CurlCommandRunner.FollowWatchingSpeedAsync` turns the resulting `OperationCanceledException` into exit 28. Works for every handler that honours the context's token, with no protocol change.
-- `touches` gained `Documentation/Planning/Decisions` for ADR-0105 and its index row; no task in Doing (BL-449, BL-452) names it.
-- Order-dependent zero edge (`-Y 0 -y 2`) filed as BL-467.
+- Design (ADR-0106): `Curl.Core`'s `LowSpeedWatchdog` samples once a second on the runner's clock, measures the faster of output bytes and reported upload bytes over the last six samples as `Curl_speedcheck` does, and cancels its token after a slow spell lasting the speed time. `TransferContextFactory` wraps the output and progress sink and passes the token as the context's `CancellationToken`; `CurlCommandRunner.FollowWatchingSpeedAsync` turns the resulting `OperationCanceledException` into exit 28. Works for every handler that honours the context's token, with no protocol change.
+- `touches` gained `Documentation/Planning/Decisions` for ADR-0106 and its index row (renumbered from 0105 at rebase, which BL-453 took first); no task in Doing (BL-449, BL-452) names it.
+- Order-dependent zero edge (`-Y 0 -y 2`) filed as BL-470.
 - `Measure-CodeQuality.ps1`: Curl.Core.UnitLibrary 100/100, 0 failing. Curl.Console's only two failing members are pre-existing and already filed: `DiskWriteOutFileOpener.TryOpen` (BL-432) and `DumpHeaderOutputStream.WriteAsync` (BL-455, BL-462); every member this task added or changed is at 100%.
 - Tests: `LowSpeedWatchdogTests` (19, Core), `CurlCommandRunnerSpeedLimitTests` (8, Console).
 
