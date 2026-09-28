@@ -32,3 +32,4 @@ A `tftp://` transfer resolves through `--resolve` entries and follows `--connect
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
