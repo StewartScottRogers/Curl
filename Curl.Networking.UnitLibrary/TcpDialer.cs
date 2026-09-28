@@ -36,6 +36,8 @@ public sealed class TcpDialer : ITcpDialer
 
         var localEndPoint = (IPEndPoint)socket.LocalEndPoint!;
 
-        return new DialedTcpConnection(new StreamConnection(new NetworkStream(socket, ownsSocket: true), endPoint), localEndPoint);
+        return new DialedTcpConnection(
+            new StreamConnection(new NetworkStream(socket, ownsSocket: true), endPoint, localEndPoint),
+            localEndPoint);
     }
 }

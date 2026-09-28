@@ -8,7 +8,8 @@ production implementations of the transport contracts in
 nothing else.
 
 This is the one project allowed to construct a `Socket`, and only inside a transport
-type: `TcpDialer` (behind `ITcpDialer`) is the only type that constructs a TCP
+type: `TcpDialer` (behind `ITcpDialer`) and `TcpConnectionListener` with its
+`TcpPendingConnection` (behind `IConnectionListener`) are the only types that construct a TCP
 `Socket` or a `NetworkStream`, and `UdpDatagramChannel` (opened by
 `UdpDatagramConnector`, behind `IDatagramConnector`) the only one that constructs a
 UDP `Socket`. `SslStreamTlsProvider` (behind `ITlsProvider`, configured by
@@ -95,6 +96,21 @@ is exit 6 (exit 5 for a proxy) as in curl 8.21.0, which accepts hosts up to 6553
 `Could not resolve host:` and `Could not resolve proxy:` message goes through `CurlErrorBuffer`,
 which cuts it to 255 characters as curl's 256-byte error buffer does (ADR-0072).
 
+`TcpConnectionListener` is FTP active mode's listener (ADR-0102, BL-456): it binds the
+`ListenTarget` address on each port of its range in turn and listens on the first it can bind.
+Every failure is exit 30 with curl 8.21.0's `lib/ftp.c` message: a port in use or not permitted
+moves on to the next, and a range with no free port is `bind() failed, ran out of ports`
+(measured); any other bind error is `bind(port=<port>) failed: <reason>`, and a socket that
+cannot be opened or put to listening is `socket failure: <reason>`, reached in tests through the
+internal `OpenSocket` and `StartListening` seams. curl's retry on the control connection's
+address after a non-local `-P` address is not here: the target holds one address.
+`TcpPendingConnection.AcceptAsync` returns the accepted socket as a `StreamConnection`; a failed
+accept is exit 10, `Error accept()ing server connect: <reason>`, as curl's `lib/cf-socket.c`
+words it. Every `<reason>` is `ConnectFailureReason`'s. Every TCP connection reports
+`IConnection.LocalEndPoint`: `StreamConnection` carries the socket's, and `SslStreamConnection`
+and `PooledConnection` forward the one underneath, so FTP's `-P -` can announce the control
+connection's own address.
+
 `PoolingConnector` wraps another `IConnector` and keeps connections for reuse per ADR-0050.
 Every connection it returns is a `PooledConnection`; one marked with `MarkReusable` goes back
 to the pool on dispose, anything else closes. `ConnectionPoolKey` (with
@@ -117,9 +133,12 @@ through an internal seam, so its tests need no socket. `UdpDatagramChannelTests`
 cancels and disposes local UDP sockets without sending anything.
 `SslStreamTlsProviderTests` runs real handshakes against a server-side `SslStream` over
 the in-memory `Fakes/InMemoryDuplexStream` pair, with a self-signed certificate made in
-the test, so TLS is tested without a socket. The tests that send
-bytes are the loopback tests in `TcpDialerTests` and `UdpDatagramChannelTests`, tagged
-`[TestCategory("Integration")]`. Per ADR-0083 the three members only those tests can reach,
-`TcpDialer.DialAsync`, `UdpDatagramChannel.SendAsync` and `UdpDatagramChannel.ReceiveAsync`,
+the test, so TLS is tested without a socket. `TcpConnectionListenerTests` and
+`TcpPendingConnectionTests` bind local TCP sockets without connecting to them. The tests that
+connect or send bytes are the loopback tests in `TcpDialerTests`, `UdpDatagramChannelTests`,
+`TcpConnectorTests.LocalEndPoint` and the accepting test in `TcpConnectionListenerTests`, tagged
+`[TestCategory("Integration")]`. Per ADR-0083 the four members only those tests can reach,
+`TcpDialer.DialAsync`, `TcpPendingConnection.AcceptStreamConnectionAsync` (behind the internal
+`AcceptConnectionAsync` seam), `UdpDatagramChannel.SendAsync` and `UdpDatagramChannel.ReceiveAsync`,
 carry `[ExcludeFromCodeCoverage]`, so the fast-run coverage gate holds without the network.
 Keep them thin: logic added there is not measured.

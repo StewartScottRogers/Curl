@@ -149,14 +149,16 @@ public sealed partial class SslStreamTlsProviderTests
         var (client, server) = InMemoryDuplexStream.CreatePair();
         var serverTask = RunEchoServerAsync(server, SslProtocols.None);
         var provider = new SslStreamTlsProvider(new TlsClientOptions(Insecure: true));
+        var localEndPoint = new IPEndPoint(IPAddress.Loopback, 50000);
 
         var result = await provider.AuthenticateAsClientAsync(
-            new StreamConnection(client, ServerEndPoint), CertificateHost, CancellationToken.None);
+            new StreamConnection(client, ServerEndPoint, localEndPoint), CertificateHost, CancellationToken.None);
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         await using var connection = result.Connection!;
         Assert.IsTrue(connection.IsSecure);
         Assert.AreSame(ServerEndPoint, connection.RemoteEndPoint);
+        Assert.AreSame(localEndPoint, connection.LocalEndPoint);
 
         await connection.WriteAsync(Encoding.ASCII.GetBytes("ping"), CancellationToken.None);
         await connection.FlushAsync(CancellationToken.None);

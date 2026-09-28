@@ -40,6 +40,9 @@ public sealed class PooledConnection : IConnection
     public EndPoint? RemoteEndPoint => _underlying.Connection.RemoteEndPoint;
 
     /// <inheritdoc />
+    public EndPoint? LocalEndPoint => _underlying.Connection.LocalEndPoint;
+
+    /// <inheritdoc />
     public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken) =>
         _underlying.Connection.ReadAsync(buffer, cancellationToken);
 
