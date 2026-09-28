@@ -62,4 +62,9 @@ internal sealed class HttpTransferProgress(ITransferProgress sink)
             sink.ReportUploaded(bytesSoFar, expectedTotal);
         }
     }
+
+    /// <summary>
+    /// Reports that the final exchange's data is complete, before the connection-end <c>-v</c> line.
+    /// </summary>
+    internal void ReportTransferDone() => sink.ReportTransferDone();
 }

@@ -107,7 +107,7 @@ public sealed class LowSpeedWatchdogTests
     }
 
     [TestMethod]
-    public void WatchProgress_PassesStartedAndDownloadedReportsThrough()
+    public void WatchProgress_PassesStartedDownloadedAndDoneReportsThrough()
     {
         using LowSpeedWatchdog watchdog = new(1, TimeSpan.FromSeconds(1), clock);
         RecordingProgress recorded = new();
@@ -117,6 +117,8 @@ public sealed class LowSpeedWatchdogTests
         Assert.AreEqual("started", recorded.Last);
         progress.ReportDownloaded(3, null);
         Assert.AreEqual("downloaded 3 of ", recorded.Last);
+        progress.ReportTransferDone();
+        Assert.AreEqual("done", recorded.Last);
     }
 
     [TestMethod]
@@ -212,5 +214,7 @@ public sealed class LowSpeedWatchdogTests
         public void ReportDownloaded(long bytesSoFar, long? expectedTotal) => Last = $"downloaded {bytesSoFar} of {expectedTotal}";
 
         public void ReportUploaded(long bytesSoFar, long? expectedTotal) => Last = $"uploaded {bytesSoFar} of {expectedTotal}";
+
+        public void ReportTransferDone() => Last = "done";
     }
 }

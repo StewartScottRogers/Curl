@@ -290,7 +290,8 @@ public sealed class HttpProtocolHandler(
     /// </summary>
     /// <remarks>
     /// The connection is marked reusable when the last response on it persists, and the
-    /// end-of-transfer <c>-v</c> line is reported once it is disposed (ADR-0050). A connect
+    /// end-of-transfer <c>-v</c> line is reported once it is disposed (ADR-0050), after the
+    /// final exchange reports the transfer done (ADR-0111). A connect
     /// that fails reports <c>closing connection #N</c> after the connector's own lines, as
     /// curl 8.21.0 does for a failed resolve, a refused dial and a connect timeout (ADR-0105).
     /// </remarks>
@@ -319,6 +320,11 @@ public sealed class HttpProtocolHandler(
         await using (connection.ConfigureAwait(false))
         {
             outcome = await ExchangeOnConnectionAsync(plan, connect, connection, earlier).ConfigureAwait(false);
+        }
+
+        if (outcome.Retry is null)
+        {
+            plan.Progress.ReportTransferDone();
         }
 
         ReportConnectionEnd(plan.Context, target, connect, outcome);

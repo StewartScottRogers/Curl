@@ -2,7 +2,8 @@ namespace Curl.Protocol.Abstractions;
 
 /// <summary>
 /// An <see cref="ITransferProgress" /> that is not <see cref="NoTransferProgress.Instance" />,
-/// for tests that pin a sink is passed through as given. Its members are never called.
+/// for tests that pin a sink is passed through as given. Its own members are never called;
+/// it keeps <see cref="ITransferProgress.ReportTransferDone" />'s default body, which one test calls.
 /// </summary>
 internal sealed class StubTransferProgress : ITransferProgress
 {

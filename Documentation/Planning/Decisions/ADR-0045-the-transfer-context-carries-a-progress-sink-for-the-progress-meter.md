@@ -1,6 +1,6 @@
 # ADR-0045 — The transfer context carries a progress sink for the progress meter
 
-- **Status:** Accepted
+- **Status:** Accepted; amended by ADR-0111 (`ReportTransferDone`)
 - **Date:** 2026-09-26
 - **Decided by Claude under Stewart's delegation** (root `CLAUDE.md`, "Decisions").
 

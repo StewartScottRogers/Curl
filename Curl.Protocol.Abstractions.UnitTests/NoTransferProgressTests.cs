@@ -16,5 +16,14 @@ public sealed class NoTransferProgressTests
         progress.ReportDownloaded(10, null);
         progress.ReportUploaded(10, 200000);
         progress.ReportUploaded(10, null);
+        progress.ReportTransferDone();
+    }
+
+    [TestMethod]
+    public void ReportTransferDone_OnASinkThatDoesNotImplementIt_DoesNothing()
+    {
+        ITransferProgress progress = new StubTransferProgress();
+
+        progress.ReportTransferDone();
     }
 }

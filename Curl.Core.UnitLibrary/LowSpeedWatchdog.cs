@@ -256,6 +256,8 @@ public sealed class LowSpeedWatchdog : IDisposable
 
         public void ReportDownloaded(long bytesSoFar, long? expectedTotal) => inner.ReportDownloaded(bytesSoFar, expectedTotal);
 
+        public void ReportTransferDone() => inner.ReportTransferDone();
+
         public void ReportUploaded(long bytesSoFar, long? expectedTotal)
         {
             Interlocked.Exchange(ref watchdog.bytesUploaded, bytesSoFar);
