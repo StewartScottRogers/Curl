@@ -8,7 +8,7 @@ depends-on: []
 touches: [.claude/skills/task-board]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-28
 ---
 # BL-764 — Add a capacity command to the task board that counts how many tasks can run at once
 
@@ -38,8 +38,8 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `capacity` is in the `$Command` `ValidateSet`, in the script's header comment Commands list, and in `SKILL.md`'s command table, with the one-line meaning above.
-- [ ] A throwaway fixture board built under `$env:TEMP` gives the expected output when run with `$env:CLAUDE_PROJECT_DIR` set to it. The fixture has:
+- [x] `capacity` is in the `$Command` `ValidateSet`, in the script's header comment Commands list, and in `SKILL.md`'s command table, with the one-line meaning above.
+- [x] A throwaway fixture board built under `$env:TEMP` gives the expected output when run with `$env:CLAUDE_PROJECT_DIR` set to it. The fixture has:
   - Doing: `BL-001` touching `A`.
   - Backlog, all `assignee: Claude` and `priority: High` (so `next` order is by ID), plus `BL-007` assigned to `Stewart`:
     - `BL-002` touches `A/x.cs`, which overlaps Doing;
@@ -49,10 +49,10 @@ completed:
     - `BL-006` has `depends-on: [BL-007]`, so it is not ready, and `BL-007` is Stewart's, so it is not ready either.
 
   `capacity` then prints exactly `Capacity 3: 1 in Doing, 2 more can start (BL-003, BL-005).`
-- [ ] The same fixture with Doing emptied and `BL-002`'s touches removed (so it reads `*`) prints `Capacity 1: 0 in Doing, 1 more can start (BL-002).`
-- [ ] `next` and `status` print the same as before the change on the real board. Compare their output before and after the edit; the live shift may move tasks between the two runs, so compare on the fixture if the board changed.
-- [ ] `[System.Management.Automation.Language.Parser]::ParseFile` reports no errors for `task-board.ps1`, and `Select-String -Path .claude\skills\task-board\task-board.ps1 -Pattern '[^\x00-\x7F]'` finds nothing.
-- [ ] `git diff --stat` shows only files under `.claude/skills/task-board` changed outside `Tasks/`.
+- [x] The same fixture with Doing emptied and `BL-002`'s touches removed (so it reads `*`) prints `Capacity 1: 0 in Doing, 1 more can start (BL-002).`
+- [x] `next` and `status` print the same as before the change on the real board. Compare their output before and after the edit; the live shift may move tasks between the two runs, so compare on the fixture if the board changed.
+- [x] `[System.Management.Automation.Language.Parser]::ParseFile` reports no errors for `task-board.ps1`, and `Select-String -Path .claude\skills\task-board\task-board.ps1 -Pattern '[^\x00-\x7F]'` finds nothing.
+- [x] `git diff --stat` shows only files under `.claude/skills/task-board` changed outside `Tasks/`.
 
 ## Notes
 
@@ -60,3 +60,4 @@ completed:
 
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Doing.
+- 2026-09-28: Doing -> Done. task-board.ps1 capacity prints how many tasks can run at once: Doing plus ready tasks startable beside them without touches overlap.
