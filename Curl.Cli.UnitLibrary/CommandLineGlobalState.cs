@@ -51,6 +51,14 @@ internal sealed class CommandLineGlobalState
 
     public bool FailEarly { get; set; }
 
+    public bool Parallel { get; set; }
+
+    public bool ParallelImmediate { get; set; }
+
+    public int ParallelMax { get; set; } = CommandLineOptions.DefaultParallelMax;
+
+    public int ParallelMaxHost { get; set; }
+
     public string? DefaultConfigFile { get; set; }
 
     public int OpenConfigFileCount { get; set; }

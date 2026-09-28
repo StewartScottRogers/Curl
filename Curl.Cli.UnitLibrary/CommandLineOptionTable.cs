@@ -36,7 +36,7 @@ namespace Curl.Cli;
 /// <c>--no-post301</c>, <c>--no-post302</c>, <c>--no-post303</c>, <c>--no-show-headers</c>, <c>--no-include</c>, <c>--no-head</c>,
 /// <c>--no-fail</c>, <c>--no-fail-with-body</c>, <c>--no-fail-early</c>, <c>--no-compressed</c>, <c>--no-raw</c>, <c>--no-tr-encoding</c>,
 /// <c>--no-ignore-content-length</c>, <c>--no-path-as-is</c>, <c>--no-http0.9</c>, <c>--no-basic</c>, <c>--no-digest</c>, <c>--no-ntlm</c>, <c>--no-negotiate</c>, <c>--no-proxytunnel</c>, <c>--no-remote-name</c>,
-/// <c>--no-remote-name-all</c>, <c>--no-remote-header-name</c>, <c>--no-create-dirs</c>, <c>--no-clobber</c> (measured 2026-09-28), <c>--no-skip-existing</c> and <c>--no-remove-on-error</c> (measured 2026-09-28), <c>--no-junk-session-cookies</c>, <c>--no-globoff</c>, <c>--no-version</c>, <c>--no-verbose</c>, <c>--no-trace-time</c>, <c>--no-retry-all-errors</c>, <c>--no-retry-connrefused</c>, <c>--no-disable-epsv</c>, <c>--no-epsv</c>, <c>--no-ftp-skip-pasv-ip</c>, <c>--no-ftp-create-dirs</c>, <c>--no-disable-eprt</c>, <c>--no-eprt</c>, <c>--no-ssl</c>, <c>--no-ftp-ssl</c>, <c>--no-ssl-reqd</c>, <c>--no-ftp-ssl-reqd</c>, <c>--no-ftp-ssl-control</c> and <c>--no-list-only</c> (measured 2026-09-27) and <c>--no-buffer</c> (measured 2026-09-28; <c>-N</c> is <c>--no-buffer</c>) are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
+/// <c>--no-remote-name-all</c>, <c>--no-remote-header-name</c>, <c>--no-create-dirs</c>, <c>--no-clobber</c> (measured 2026-09-28), <c>--no-skip-existing</c> and <c>--no-remove-on-error</c> (measured 2026-09-28), <c>--no-junk-session-cookies</c>, <c>--no-globoff</c>, <c>--no-version</c>, <c>--no-verbose</c>, <c>--no-trace-time</c>, <c>--no-retry-all-errors</c>, <c>--no-retry-connrefused</c>, <c>--no-disable-epsv</c>, <c>--no-epsv</c>, <c>--no-ftp-skip-pasv-ip</c>, <c>--no-ftp-create-dirs</c>, <c>--no-disable-eprt</c>, <c>--no-eprt</c>, <c>--no-ssl</c>, <c>--no-ftp-ssl</c>, <c>--no-ssl-reqd</c>, <c>--no-ftp-ssl-reqd</c>, <c>--no-ftp-ssl-control</c> and <c>--no-list-only</c> (measured 2026-09-27) <c>--no-buffer</c> (measured 2026-09-28; <c>-N</c> is <c>--no-buffer</c>), <c>--no-parallel</c> and <c>--no-parallel-immediate</c> (measured 2026-09-28) are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
 /// silent and <c>--no-silent -s</c> is. <c>--no-silent=x</c> is accepted, its value ignored.
 /// <c>--no-out-null</c> is accepted and, as in curl 8.21.0, discards its URL's body just as <c>--out-null</c> does
 /// (measured 2026-09-28, BL-495 Notes).
@@ -49,7 +49,7 @@ namespace Curl.Cli;
 /// <c>--no-http2-prior-knowledge</c>, <c>--no-http3</c>, <c>--no-http3-only</c>, <c>--no-request-target</c>, <c>--no-ipfs-gateway</c>, <c>--no-anyauth</c>,
 /// <c>--no-oauth2-bearer</c>, <c>--no-proxy</c>, <c>--no-proxy-user</c>, <c>--no-noproxy</c>, <c>--no-socks4</c>, <c>--no-socks4a</c>,
 /// <c>--no-socks5</c>, <c>--no-socks5-hostname</c>, <c>--no-write-out</c>, <c>--no-output-dir</c>, <c>--no-trace</c>, <c>--no-trace-ascii</c>, <c>--no-stderr</c>, <c>--no-retry</c>, <c>--no-retry-delay</c>, <c>--no-retry-max-time</c>, <c>--no-limit-rate</c>,
-/// <c>--no-speed-limit</c>, <c>--no-speed-time</c>, <c>--no-ftp-method</c>, <c>--no-ftp-port</c>, <c>--no-ftp-pasv</c> and <c>--no-quote</c> (each also with <c>=x</c>) exit 2 with
+/// <c>--no-speed-limit</c>, <c>--no-speed-time</c>, <c>--no-ftp-method</c>, <c>--no-ftp-port</c>, <c>--no-ftp-pasv</c>, <c>--no-quote</c>, <c>--no-parallel-max</c> and <c>--no-parallel-max-host</c> (each also with <c>=x</c>) exit 2 with
 /// <c>curl: option &lt;as typed&gt;: the given option cannot be reversed with a --no- prefix</c> and
 /// the try-help line. <c>--no-bogus</c>, <c>--no-</c>, <c>--no-no-silent</c> and <c>--no-Silent</c>
 /// exit 2 as unknown. A short letter is never negated.
@@ -209,6 +209,10 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("fail", 'f', SetFail),
         CommandLineOption.NegatableFlag("fail-with-body", null, SetFailWithBody),
         CommandLineOption.NegatableFlag("fail-early", null, (options, on) => options.FailEarly = on),
+        CommandLineOption.NegatableFlag("parallel", 'Z', (options, on) => options.Parallel = on),
+        CommandLineOption.NegatableFlag("parallel-immediate", null, (options, on) => options.ParallelImmediate = on),
+        CommandLineOption.Value("parallel-max", null, SetParallelMax),
+        CommandLineOption.Value("parallel-max-host", null, SetParallelMaxHost),
         CommandLineOption.Value("config", 'K', ApplyConfigFile),
         CommandLineOption.NextGroup("next", ':'),
         CommandLineOption.Value("variable", null, VariableDefinition.Apply),
@@ -279,7 +283,7 @@ public static class CommandLineOptionTable
     /// <remarks>
     /// curl 8.21.0's manual marks <c>--fail-early</c>, <c>-#</c>, <c>--progress-meter</c>, <c>-S</c>,
     /// <c>--stderr</c>, <c>--styled-output</c>, <c>--trace</c>, <c>--trace-ascii</c>,
-    /// <c>--trace-time</c> and <c>-v</c> "global"; <c>-s</c>, <c>--variable</c>, <c>-V</c>, <c>-h</c>
+    /// <c>--trace-time</c>, <c>-v</c>, <c>-Z</c>, <c>--parallel-immediate</c>, <c>--parallel-max</c> and <c>--parallel-max-host</c> "global"; <c>-s</c>, <c>--variable</c>, <c>-V</c>, <c>-h</c>
     /// and <c>-M</c> are global in its tool (<c>struct GlobalConfig</c>) without the mark. Measured
     /// 2026-09-28 (BL-508 Notes): <c>-v</c> given only after <c>--next</c> shows the first group's
     /// transfer too, while <c>-w</c>, <c>-o</c> and <c>-H</c> given before it do not reach the second group.
@@ -297,6 +301,10 @@ public static class CommandLineOptionTable
         "stderr",
         "styled-output",
         "fail-early",
+        "parallel",
+        "parallel-immediate",
+        "parallel-max",
+        "parallel-max-host",
         "variable",
         "version",
         "help",
@@ -925,6 +933,43 @@ public static class CommandLineOptionTable
 
         return refusal;
     }
+
+    /// <summary>
+    /// Reads <c>--parallel-max</c> as a number of zero or more, as curl 8.21.0 does (measured
+    /// 2026-09-28, BL-517 Notes: <c>-1</c> is refused as not positive, <c>0</c> and <c>301</c> are
+    /// accepted). As in curl's tool, zero means <see cref="CommandLineOptions.DefaultParallelMax"/> and a
+    /// value past <see cref="CommandLineOptions.LargestParallelLimit"/> means that limit.
+    /// </summary>
+    private static CommandLineRefusal? SetParallelMax(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        CommandLineRefusal? refusal = CommandLineNumber.ParseNonNegative(spelledOption, value, CommandLineNumber.PlatformLongMaximum, out long limit);
+        if (refusal is null)
+        {
+            options.ParallelMax = limit == 0 ? CommandLineOptions.DefaultParallelMax : ParallelLimitAtMostLargest(limit);
+        }
+
+        return refusal;
+    }
+
+    /// <summary>
+    /// Reads <c>--parallel-max-host</c> as a number of zero or more, as curl 8.21.0 does (measured
+    /// 2026-09-28, BL-517 Notes: <c>-1</c> is refused as not positive, <c>0</c> and <c>99999</c> are
+    /// accepted). Zero means no limit, and a value past <see cref="CommandLineOptions.LargestParallelLimit"/>
+    /// means that limit.
+    /// </summary>
+    private static CommandLineRefusal? SetParallelMaxHost(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        CommandLineRefusal? refusal = CommandLineNumber.ParseNonNegative(spelledOption, value, CommandLineNumber.PlatformLongMaximum, out long limit);
+        if (refusal is null)
+        {
+            options.ParallelMaxHost = ParallelLimitAtMostLargest(limit);
+        }
+
+        return refusal;
+    }
+
+    private static int ParallelLimitAtMostLargest(long limit) =>
+        (int)Math.Min(limit, CommandLineOptions.LargestParallelLimit);
 
     private static CommandLineRefusal? SetRetryCount(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
     {

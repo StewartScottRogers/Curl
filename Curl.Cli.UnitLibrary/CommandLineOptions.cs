@@ -947,6 +947,44 @@ public sealed class CommandLineOptions
     public bool FailEarly { get => globals.FailEarly; internal set => globals.FailEarly = value; }
 
     /// <summary>
+    /// The <c>--parallel-max</c> curl 8.21.0 uses when none is given, or when the one given is zero.
+    /// </summary>
+    public const int DefaultParallelMax = 50;
+
+    /// <summary>
+    /// The largest <c>--parallel-max</c> and <c>--parallel-max-host</c> curl 8.21.0 supports; a larger
+    /// value is taken as this one.
+    /// </summary>
+    public const int LargestParallelLimit = 65535;
+
+    /// <summary>
+    /// <see langword="true"/> when <c>-Z</c> / <c>--parallel</c> was given and no <c>--no-parallel</c> came
+    /// after it: run the transfers concurrently instead of one after another.
+    /// </summary>
+    public bool Parallel { get => globals.Parallel; internal set => globals.Parallel = value; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--parallel-immediate</c> was given and no
+    /// <c>--no-parallel-immediate</c> came after it: in a parallel run, open new connections at once
+    /// rather than wait to multiplex on an existing one.
+    /// </summary>
+    public bool ParallelImmediate { get => globals.ParallelImmediate; internal set => globals.ParallelImmediate = value; }
+
+    /// <summary>
+    /// The most transfers a parallel run has in progress at once, from <c>--parallel-max</c>:
+    /// <see cref="DefaultParallelMax"/> when it is not given or given as zero, and at most
+    /// <see cref="LargestParallelLimit"/>.
+    /// </summary>
+    public int ParallelMax { get => globals.ParallelMax; internal set => globals.ParallelMax = value; }
+
+    /// <summary>
+    /// The most connections a parallel run has open to one protocol, host and port at once, from
+    /// <c>--parallel-max-host</c>: zero, meaning no limit, when it is not given or given as zero, and at
+    /// most <see cref="LargestParallelLimit"/>.
+    /// </summary>
+    public int ParallelMaxHost { get => globals.ParallelMaxHost; internal set => globals.ParallelMaxHost = value; }
+
+    /// <summary>
     /// <see langword="true"/> when <c>--compressed</c> was given and no <c>--no-compressed</c> came after
     /// it: ask for a compressed response and decompress it.
     /// </summary>
