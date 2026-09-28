@@ -25,15 +25,22 @@ public sealed record SmtpRun(
         params ConnectResult[] handshakes) =>
         ExecuteAsync(new TransferContext { Url = CurlUrl.Parse(url), Output = Stream.Null, SslLevel = sslLevel }, connection, handshakes);
 
+    public static Task<SmtpRun> ExecuteAsync(
+        TransferContext context,
+        ScriptedConnection connection,
+        params ConnectResult[] handshakes) =>
+        ExecuteAsync(context, connection, saslAuthenticator: null, handshakes);
+
     public static async Task<SmtpRun> ExecuteAsync(
         TransferContext context,
         ScriptedConnection connection,
+        ISaslAuthenticator? saslAuthenticator,
         params ConnectResult[] handshakes)
     {
         var connector = new QueuedConnector(ConnectResult.Connected(connection));
         var tls = new QueuedTlsProvider(handshakes);
 
-        TransferResult result = await new SmtpProtocolHandler(connector, tls, () => LocalHostName).ExecuteAsync(context);
+        TransferResult result = await new SmtpProtocolHandler(connector, tls, saslAuthenticator, () => LocalHostName).ExecuteAsync(context);
 
         return new SmtpRun(result, connection, connector, tls);
     }

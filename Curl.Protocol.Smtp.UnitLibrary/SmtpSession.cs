@@ -26,6 +26,9 @@ namespace Curl.Protocol.Smtp;
 /// bytes is exit 100.</item>
 /// <item>No failure above sends <c>QUIT</c>. Once the session is open, <c>QUIT</c>'s reply is
 /// read and whatever it says is ignored, as curl ignores it.</item>
+/// <item>Given an <see cref="ISaslAuthenticator" />, a session opened with <c>EHLO</c>
+/// authenticates through <see cref="SmtpSaslAuthentication" /> before anything else
+/// (BL-541); one greeted with <c>HELO</c> never does.</item>
 /// <item>With <c>-T</c> and at least one <c>--mail-rcpt</c>, the open session sends the
 /// message through <see cref="SmtpMailTransaction" /> (BL-542).</item>
 /// </list>
@@ -33,6 +36,7 @@ namespace Curl.Protocol.Smtp;
 internal sealed class SmtpSession(
     SmtpControlChannel channel,
     ITlsProvider tlsProvider,
+    ISaslAuthenticator? saslAuthenticator,
     ITransferContext context,
     string domain,
     bool implicitTls) : IAsyncDisposable
@@ -45,15 +49,19 @@ internal sealed class SmtpSession(
 
     private IConnection? securedConnection;
 
+    /// <summary>The reply to the last accepted <c>EHLO</c>; <see langword="null" /> once greeted with <c>HELO</c>.</summary>
+    private SmtpReply? capabilities;
+
     /// <summary>
-    /// Opens the session, sends the message when there is one, and closes it with <c>QUIT</c>.
+    /// Opens the session, authenticates, sends the message when there is one, and closes it
+    /// with <c>QUIT</c>.
     /// </summary>
     /// <returns>A success, or the failure that stopped the session or its message.</returns>
     public async ValueTask<TransferResult> RunAsync()
     {
         try
         {
-            if (await OpenAsync().ConfigureAwait(false) is { } failure)
+            if ((await OpenAsync().ConfigureAwait(false) ?? await AuthenticateAsync().ConfigureAwait(false)) is { } failure)
             {
                 return failure;
             }
@@ -89,6 +97,11 @@ internal sealed class SmtpSession(
         ehlo.Lines.Any(line => line.Length >= 4 + StartTlsKeyword.Length
             && line.AsSpan(4, StartTlsKeyword.Length).Equals(StartTlsKeyword, StringComparison.OrdinalIgnoreCase));
 
+    private async ValueTask<TransferResult?> AuthenticateAsync() =>
+        saslAuthenticator is not null && capabilities is { } ehlo
+            ? await new SmtpSaslAuthentication(channel, saslAuthenticator, context).AuthenticateAsync(ehlo).ConfigureAwait(false)
+            : null;
+
     private async ValueTask<TransferResult?> OpenAsync()
     {
         SmtpReply greeting = await ReadReplyAsync().ConfigureAwait(false);
@@ -100,6 +113,7 @@ internal sealed class SmtpSession(
     private async ValueTask<TransferResult?> GreetAsync()
     {
         SmtpReply ehlo = await ExchangeAsync("EHLO " + domain).ConfigureAwait(false);
+        capabilities = ehlo.IsCompletion ? ehlo : null;
         if (ehlo.IsCompletion)
         {
             return await SecureAsync(ehlo).ConfigureAwait(false);

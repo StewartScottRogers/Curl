@@ -20,6 +20,12 @@ internal static class SmtpSessionMessages
     /// <summary><c>--ssl-reqd</c> and the <c>EHLO</c> reply did not advertise <c>STARTTLS</c> (exit 64).</summary>
     internal const string StartTlsNotSupported = "STARTTLS not supported.";
 
+    /// <summary>
+    /// <c>AUTH</c> was offered but no mechanism could be used, or the server refused the
+    /// exchange (exit 67, BL-541).
+    /// </summary>
+    internal const string LoginDenied = "Login denied";
+
     /// <summary>The reply to the end of the message was not 250 (exit 8, BL-542).</summary>
     internal const string WeirdServerReply = "Weird server reply";
 

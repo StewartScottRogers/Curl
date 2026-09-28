@@ -372,7 +372,8 @@ public sealed class SmtpProtocolHandlerSessionTests
 
         Assert.ThrowsExactly<ArgumentNullException>(() => new SmtpProtocolHandler(null!, tls));
         Assert.ThrowsExactly<ArgumentNullException>(() => new SmtpProtocolHandler(connector, null!));
-        Assert.ThrowsExactly<ArgumentNullException>(() => new SmtpProtocolHandler(connector, tls, null!));
+        Assert.ThrowsExactly<ArgumentNullException>(() => new SmtpProtocolHandler(connector, tls, (ISaslAuthenticator)null!));
+        Assert.ThrowsExactly<ArgumentNullException>(() => new SmtpProtocolHandler(connector, tls, saslAuthenticator: null, null!));
     }
 
     [TestMethod]
