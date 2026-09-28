@@ -1,5 +1,5 @@
 ---
-id: BL-781
+id: BL-782
 title: Send SYST after a PWD reply naming a relative directory
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-781 — Send SYST after a PWD reply naming a relative directory
+# BL-782 — Send SYST after a PWD reply naming a relative directory
 
 ## Goal
 

@@ -43,7 +43,7 @@ Measured 2026-09-28 against curl 8.21.0 (mingw, Schannel):
 | `257 /home/u is cwd` (no quotes) | empty | `null` | empty | 0 |
 | `257 ""` | empty | `null` | empty | 0 |
 | `257 rubbish "/r" x` | `/r` | `"/r"` | empty | 0 |
-| `257 "home" is cwd` | `home` | `"home"` | empty | 0 (curl also sends `SYST` - filed as BL-781) |
+| `257 "home" is cwd` | `home` | `"home"` | empty | 0 (curl also sends `SYST` - filed as BL-782) |
 | `550 no` | empty | `null` | empty | 0 |
 | `257 "/x` (quote never closed) | empty | `null` | `curl: (8) Weird server reply` | 8, no `QUIT` |
 | `257 "/x is cwd` | empty | `null` | `curl: (8) Weird server reply` | 8, no `QUIT` |
@@ -54,7 +54,7 @@ name meaning none, an unended name exit 8 `Weird server reply` with no `QUIT`;
 `FtpSession` puts it on every report after `PWD`; `%{ftp_entry_path}` (Output) prints it.
 No design choice beyond matching curl, so no ADR. Output text and JSON rendering are the
 existing `WriteOutValue.FromText` path; HTTP/file/failed-transfer tests still pin it empty.
-Follow-up filed: BL-781 (`SYST` after a relative directory).
+Follow-up filed: BL-782 (`SYST` after a relative directory).
 
 ## Log
 
