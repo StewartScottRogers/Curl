@@ -82,6 +82,9 @@ internal static class FtpTransferMessages
     /// <summary>The exit 14 message for a <c>227</c> reply with no port curl can read.</summary>
     internal const string Weird227Reply = "Could not interpret the 227-response";
 
+    /// <summary>The exit 8 message for a <c>257</c> reply whose quoted directory never ends.</summary>
+    internal const string WeirdServerReply = "Weird server reply";
+
     /// <summary>The exit 17 message for a <c>TYPE</c> the server refused.</summary>
     internal const string CouldNotSetType = "Could not set desired mode";
 
