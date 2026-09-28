@@ -33,3 +33,4 @@ Under `-v --trace-time` (and `-vv`), `Curl.Console` builds `VerboseTransferEvent
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
