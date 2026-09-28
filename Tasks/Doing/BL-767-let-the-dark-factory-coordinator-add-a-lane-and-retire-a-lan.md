@@ -73,3 +73,4 @@ The coordinator can start one more lane during a shift, and can ask one lane to 
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
