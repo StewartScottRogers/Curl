@@ -550,15 +550,31 @@ internal sealed class FtpSession(FtpSessionConnections connections, FtpControlCh
     /// Binds a port on the <c>-P</c> address and announces it: <c>EPRT</c> first, unless
     /// <c>--disable-eprt</c> on IPv4, then on IPv4 a fresh port with <c>PORT</c> when
     /// <c>EPRT</c> was skipped or refused. IPv6 has no <c>PORT</c>, so a refused <c>EPRT</c>
-    /// there is exit 30 after <c>QUIT</c>.
+    /// there is exit 30 after <c>QUIT</c>. A <c>-P</c> value that names a network interface
+    /// is that interface's address, and exit 30 after <c>QUIT</c> when it has none of the
+    /// control connection's family and IPv6 scope, as curl 8.21.0's <c>Curl_if2ip</c> answers
+    /// <c>IF2IP_AF_NOT_SUPPORTED</c> (ADR-0110).
     /// </summary>
     private async ValueTask<TransferResult?> AnnounceActivePortAsync(FtpPortArgument argument)
     {
-        if (await ActiveAddressOfAsync(argument).ConfigureAwait(false) is not { } address)
+        if (!argument.UsesControlAddress && connections.InterfaceLookup.FindAddresses(argument.Address) is { } interfaceAddresses)
         {
-            return await RefuseActiveAddressAsync(argument).ConfigureAwait(false);
+            return InterfaceAddressOf(interfaceAddresses) is { } interfaceAddress
+                ? await AnnounceActivePortAsync(interfaceAddress, argument).ConfigureAwait(false)
+                : await QuitAndFailAsync(CurlExitCode.FtpPortFailed, FtpTransferMessages.FailedToDoPort).ConfigureAwait(false);
         }
 
+        return await ActiveAddressOfAsync(argument).ConfigureAwait(false) is { } address
+            ? await AnnounceActivePortAsync(address, argument).ConfigureAwait(false)
+            : await RefuseActiveAddressAsync(argument).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Binds a port on <paramref name="address" /> and announces it, as
+    /// <see cref="AnnounceActivePortAsync(FtpPortArgument)" /> describes.
+    /// </summary>
+    private async ValueTask<TransferResult?> AnnounceActivePortAsync(IPAddress address, FtpPortArgument argument)
+    {
         bool ipv6 = address.AddressFamily == AddressFamily.InterNetworkV6;
         if (context.FtpUseEprt || ipv6)
         {
@@ -618,6 +634,32 @@ internal sealed class FtpSession(FtpSessionConnections connections, FtpControlCh
             .ConfigureAwait(false);
         return resolved.Count == 0 ? null : Unmapped(resolved[0]);
     }
+
+    /// <summary>
+    /// The first of a <c>-P</c> interface's addresses with the control connection's own
+    /// address family and, for IPv6, scope, without its scope ID, as curl 8.21.0's
+    /// <c>Curl_if2ip</c> picks one and formats it with <c>inet_ntop</c> (ADR-0110);
+    /// <see langword="null" /> when it has none or the control connection's address is unknown.
+    /// </summary>
+    private IPAddress? InterfaceAddressOf(IReadOnlyList<IPAddress> interfaceAddresses)
+    {
+        if (ControlAddress is not { } control)
+        {
+            return null;
+        }
+
+        IPAddress? found = interfaceAddresses.FirstOrDefault(candidate =>
+            FamilyAndScopeOf(candidate) == FamilyAndScopeOf(control));
+        return found is null ? null : new IPAddress(found.GetAddressBytes());
+    }
+
+    /// <summary>
+    /// <paramref name="address" />'s family and the scope curl's <c>Curl_ipv6_scope</c> gives
+    /// it: unique local, link-local, site-local, node-local for <c>::1</c>, or none of them
+    /// for global, which is every IPv4 address.
+    /// </summary>
+    private static (AddressFamily Family, bool UniqueLocal, bool LinkLocal, bool SiteLocal, bool NodeLocal) FamilyAndScopeOf(IPAddress address) =>
+        (address.AddressFamily, address.IsIPv6UniqueLocal, address.IsIPv6LinkLocal, address.IsIPv6SiteLocal, address.Equals(IPAddress.IPv6Loopback));
 
     private static IPAddress? Unmapped(IPAddress? address) =>
         address is { IsIPv4MappedToIPv6: true } ? address.MapToIPv4() : address;
