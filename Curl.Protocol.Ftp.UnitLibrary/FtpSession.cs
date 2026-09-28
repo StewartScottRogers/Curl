@@ -554,7 +554,7 @@ internal sealed class FtpSession(FtpSessionConnections connections, FtpControlCh
     /// </summary>
     private async ValueTask<TransferResult?> AnnounceActivePortAsync(FtpPortArgument argument)
     {
-        if (ActiveAddressOf(argument) is not { } address)
+        if (await ActiveAddressOfAsync(argument).ConfigureAwait(false) is not { } address)
         {
             return await RefuseActiveAddressAsync(argument).ConfigureAwait(false);
         }
@@ -595,28 +595,51 @@ internal sealed class FtpSession(FtpSessionConnections connections, FtpControlCh
     private IPAddress? ControlAddress => Unmapped((controlLocalEndPoint as IPEndPoint)?.Address);
 
     /// <summary>
-    /// The address <paramref name="argument" /> names: the control connection's own for
-    /// <c>-</c>, an IPv4-mapped one as plain IPv4, or the literal; <see langword="null" />
-    /// when the control connection's address is unknown or the address is a name.
+    /// The address <paramref name="argument" /> names, an IPv4-mapped one as plain IPv4: the
+    /// control connection's own for <c>-</c>, the literal, or a name's first resolved address,
+    /// as curl 8.21.0 announced <c>::1</c> for <c>-P localhost</c> (ADR-0108);
+    /// <see langword="null" /> when the control connection's address is unknown or the name
+    /// does not resolve.
     /// </summary>
-    private IPAddress? ActiveAddressOf(FtpPortArgument argument) =>
-        argument.UsesControlAddress
-            ? ControlAddress
-            : Unmapped(IPAddress.TryParse(argument.Address, out IPAddress? literal) ? literal : null);
+    private async ValueTask<IPAddress?> ActiveAddressOfAsync(FtpPortArgument argument)
+    {
+        if (argument.UsesControlAddress)
+        {
+            return ControlAddress;
+        }
+
+        if (IPAddress.TryParse(argument.Address, out IPAddress? literal))
+        {
+            return Unmapped(literal);
+        }
+
+        IReadOnlyList<IPAddress> resolved = await connections.DnsResolver
+            .ResolveAsync(argument.Address, context.CancellationToken)
+            .ConfigureAwait(false);
+        return resolved.Count == 0 ? null : Unmapped(resolved[0]);
+    }
 
     private static IPAddress? Unmapped(IPAddress? address) =>
         address is { IsIPv4MappedToIPv6: true } ? address.MapToIPv4() : address;
 
     /// <summary>
     /// Ends a transfer whose <c>-P</c> address could not be used: exit 30 after <c>QUIT</c>
-    /// when the control connection's own address is unknown, and for a host or interface
-    /// name, which is not resolved (ADR-0102's BL-437 addendum), exit 6 with no <c>QUIT</c>,
-    /// as curl 8.21.0 ends for a name that does not resolve.
+    /// when the control connection's own address is unknown, and for a name that does not
+    /// resolve exit 6 with no <c>QUIT</c>, after curl 8.21.0's two <c>-v</c> lines
+    /// (ADR-0108).
     /// </summary>
-    private async ValueTask<TransferResult> RefuseActiveAddressAsync(FtpPortArgument argument) =>
-        argument.UsesControlAddress
-            ? await QuitAndFailAsync(CurlExitCode.FtpPortFailed, FtpTransferMessages.FailedToDoPort).ConfigureAwait(false)
-            : TransferResult.Failure(CurlExitCode.CouldntResolveHost, FtpTransferMessages.CouldNotResolveHost(argument.Address));
+    private async ValueTask<TransferResult> RefuseActiveAddressAsync(FtpPortArgument argument)
+    {
+        if (argument.UsesControlAddress)
+        {
+            return await QuitAndFailAsync(CurlExitCode.FtpPortFailed, FtpTransferMessages.FailedToDoPort).ConfigureAwait(false);
+        }
+
+        string couldNotResolve = FtpTransferMessages.CouldNotResolveHost(argument.Address);
+        context.Events.ReportInfo(couldNotResolve);
+        context.Events.ReportInfo(FtpTransferMessages.PortAddressNotResolved(argument.Address));
+        return TransferResult.Failure(CurlExitCode.CouldntResolveHost, couldNotResolve);
+    }
 
     /// <summary>
     /// Binds the active-mode listening port; a bind failure is the listener's exit code and

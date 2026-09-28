@@ -9,7 +9,7 @@ namespace Curl.Protocol.Ftp;
 /// <param name="Address">
 /// The address part: <c>-</c> or empty for the control connection's own address, an IPv4
 /// literal, or an IPv6 literal (written in brackets when a port follows); anything else is
-/// a host or interface name, which is not resolved (ADR-0102's BL-437 addendum).
+/// a host or interface name, which the handler resolves as a host name (ADR-0108).
 /// </param>
 /// <param name="LowPort">The lowest port to listen on; 0 with <paramref name="HighPort" /> 0 for any.</param>
 /// <param name="HighPort">The highest port to listen on, never below <paramref name="LowPort" />.</param>

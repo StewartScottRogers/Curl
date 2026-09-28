@@ -39,7 +39,8 @@ namespace Curl.Protocol.Ftp;
 /// the control connection TLS from the start, and <see cref="ITransferContext.SslLevel" />
 /// and <see cref="ITransferContext.FtpSslControlOnly" /> upgrade an <c>ftp</c> one with
 /// <c>AUTH</c> as <c>--ssl</c>, <c>--ssl-reqd</c> and <c>--ftp-ssl-control</c> do (BL-437,
-/// ADR-0102). The other FTP-only options are not implemented yet.
+/// ADR-0102); a host name given to <c>-P</c> is resolved through the injected
+/// <see cref="IDnsResolver" /> (BL-466, ADR-0108). The other FTP-only options are not implemented yet.
 /// Cancellation leaves as an exception.
 /// </para>
 /// </remarks>
@@ -69,6 +70,8 @@ public sealed class FtpProtocolHandler : IProtocolHandler
 
     private readonly ITlsProvider tlsProvider;
 
+    private readonly IDnsResolver dnsResolver;
+
     private readonly string[] schemes;
 
     /// <summary>
@@ -83,7 +86,7 @@ public sealed class FtpProtocolHandler : IProtocolHandler
     /// </param>
     /// <exception cref="ArgumentNullException"><paramref name="connector" /> is <see langword="null" />.</exception>
     public FtpProtocolHandler(IConnector connector)
-        : this(connector, UnavailableConnectionListener.Instance, UnavailableTlsProvider.Instance, PlaintextSchemes)
+        : this(connector, UnavailableConnectionListener.Instance, UnavailableTlsProvider.Instance, UnavailableDnsResolver.Instance, PlaintextSchemes)
     {
     }
 
@@ -102,15 +105,42 @@ public sealed class FtpProtocolHandler : IProtocolHandler
     /// </param>
     /// <exception cref="ArgumentNullException">Any argument is <see langword="null" />.</exception>
     public FtpProtocolHandler(IConnector connector, IConnectionListener listener, ITlsProvider tlsProvider)
-        : this(connector, listener, tlsProvider, Schemes)
+        : this(connector, listener, tlsProvider, UnavailableDnsResolver.Instance)
     {
     }
 
-    private FtpProtocolHandler(IConnector connector, IConnectionListener listener, ITlsProvider tlsProvider, string[] schemes)
+    /// <summary>
+    /// Initializes a handler that serves <c>ftp</c> and <c>ftps</c>, in passive or active
+    /// mode, over plaintext or TLS, and resolves a host name given to <c>-P</c> to the address
+    /// it listens on and announces (ADR-0108).
+    /// </summary>
+    /// <param name="connector">
+    /// Supplies the control connection, made with TLS for <c>ftps</c> (port 990 unless the URL
+    /// names one), and the passive data connection.
+    /// </param>
+    /// <param name="listener">Binds the port the server connects back to under <c>-P</c>.</param>
+    /// <param name="tlsProvider">
+    /// Upgrades the control connection after an accepted <c>AUTH</c>, and each data connection
+    /// after an accepted <c>PROT P</c>.
+    /// </param>
+    /// <param name="dnsResolver">Resolves a <c>-P</c> host name; its first address is the one used.</param>
+    /// <exception cref="ArgumentNullException">Any argument is <see langword="null" />.</exception>
+    public FtpProtocolHandler(IConnector connector, IConnectionListener listener, ITlsProvider tlsProvider, IDnsResolver dnsResolver)
+        : this(connector, listener, tlsProvider, dnsResolver, Schemes)
+    {
+    }
+
+    private FtpProtocolHandler(
+        IConnector connector,
+        IConnectionListener listener,
+        ITlsProvider tlsProvider,
+        IDnsResolver dnsResolver,
+        string[] schemes)
     {
         this.connector = connector ?? throw new ArgumentNullException(nameof(connector));
         this.listener = listener ?? throw new ArgumentNullException(nameof(listener));
         this.tlsProvider = tlsProvider ?? throw new ArgumentNullException(nameof(tlsProvider));
+        this.dnsResolver = dnsResolver ?? throw new ArgumentNullException(nameof(dnsResolver));
         this.schemes = schemes;
     }
 
@@ -153,7 +183,7 @@ public sealed class FtpProtocolHandler : IProtocolHandler
 
     private async ValueTask<TransferResult> TransferAsync(IConnection control, ITransferContext context, bool implicitTls)
     {
-        var connections = new FtpSessionConnections(connector, listener, tlsProvider);
+        var connections = new FtpSessionConnections(connector, listener, tlsProvider, dnsResolver);
         var session = new FtpSession(connections, new FtpControlChannel(control, context.CancellationToken), context, implicitTls);
         await using (session.ConfigureAwait(false))
         {

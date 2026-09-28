@@ -210,15 +210,90 @@ public sealed class FtpProtocolHandlerActiveModeTests
     [TestMethod]
     [DataRow("nosuch.invalid")]
     [DataRow("[::1")]
-    public async Task ExecuteAsync_PortNamesAHost_EndsWithExit6WithoutQuit(string value)
+    public async Task ExecuteAsync_PortNamesAHostWithNoResolver_EndsWithExit6WithoutQuit(string value)
     {
-        // curl -P nosuch.invalid ftp://127.0.0.1:18437/a.txt: exit 6 with no QUIT. Names are
-        // not resolved, so every name ends this way (ADR-0102's BL-437 addendum).
+        // A handler built without a resolver resolves no name, so every name ends as curl
+        // ends for one that does not resolve (ADR-0108).
         ActiveRun run = await RunAsync("/a.txt", value, LoggedIn, _ => { }, []);
 
         Assert.AreEqual(LogInSent, run.Sent);
         Assert.AreEqual(0, run.Listener.Targets.Count);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.CouldntResolveHost, "Could not resolve host: " + value), run.Result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_PortLocalhost_ListensOnAndAnnouncesTheFirstResolvedAddress()
+    {
+        // curl -v -P localhost ftp://127.0.0.1:47466/f.txt (measured 2026-09-27, BL-466): the
+        // name resolves to ::1 first, and curl sends EPRT |2|::1|58064| on an IPv4 control
+        // connection.
+        var resolver = new NamedDnsResolver(new Dictionary<string, IPAddress[]>
+        {
+            ["localhost"] = [IPAddress.IPv6Loopback, IPAddress.Loopback],
+        });
+        ActiveRun run = await RunAsync("/a.txt", "localhost", LoggedIn + EprtOk + Retrieved, resolver, Pending(58064, "::1"));
+
+        Assert.AreEqual(LogInSent + "EPRT |2|::1|58064|\r\n" + RetrieveSent, run.Sent);
+        CollectionAssert.AreEqual(new[] { "localhost" }, resolver.Hosts);
+        Assert.AreEqual(new ListenTarget(IPAddress.IPv6Loopback, 0, 0), run.Listener.Targets.Single());
+        Assert.AreEqual("hello", run.OutputText);
+        Assert.AreEqual(TransferResult.Success(5), run.Result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_PortNameResolvesToIpv4Mapped_AnnouncesItAsIpv4WithThePortRange()
+    {
+        // A name that resolves to ::ffff:192.0.2.7 is announced as 192.0.2.7, as a mapped
+        // literal is; the port range still applies.
+        var resolver = new NamedDnsResolver(new Dictionary<string, IPAddress[]>
+        {
+            ["host.example"] = [IPAddress.Parse("::ffff:192.0.2.7")],
+        });
+        ActiveRun run = await RunAsync("/a.txt", "host.example:40000-40010", LoggedIn + EprtOk + Retrieved, resolver, Pending(40000, "192.0.2.7"));
+
+        Assert.AreEqual(LogInSent + "EPRT |1|192.0.2.7|40000|\r\n" + RetrieveSent, run.Sent);
+        Assert.AreEqual(new ListenTarget(IPAddress.Parse("192.0.2.7"), 40000, 40010), run.Listener.Targets.Single());
+        Assert.AreEqual(TransferResult.Success(5), run.Result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_PortLiteral_IsNotResolved()
+    {
+        // curl -P 127.0.0.1 ftp://127.0.0.1:18437/a.txt: a literal is used as it is.
+        var resolver = new NamedDnsResolver(new Dictionary<string, IPAddress[]>());
+        ActiveRun run = await RunAsync("/a.txt", "127.0.0.1", LoggedIn + EprtOk + Retrieved, resolver, Pending(56703));
+
+        Assert.AreEqual(LogInSent + "EPRT |1|127.0.0.1|56703|\r\n" + RetrieveSent, run.Sent);
+        Assert.IsEmpty(resolver.Hosts);
+        Assert.AreEqual(TransferResult.Success(5), run.Result);
+    }
+
+    [TestMethod]
+    [DataRow("nosuch.invalid")]
+    [DataRow("Loopback Pseudo-Interface 1")]
+    public async Task ExecuteAsync_PortNameDoesNotResolve_ReportsCurlsTwoLinesAndEndsWithExit6WithoutQuit(string value)
+    {
+        // curl -v -P nosuch.invalid ftp://127.0.0.1:47466/f.txt (measured 2026-09-27, BL-466):
+        // two -v lines, exit 6 and no QUIT. The Schannel build does not look interface names
+        // up, so "Loopback Pseudo-Interface 1" ended the same way (ADR-0108).
+        var events = new RecordingTransferEvents();
+        var resolver = new NamedDnsResolver(new Dictionary<string, IPAddress[]>());
+        ActiveRun run = await RunAsync("/a.txt", value, LoggedIn, context => context.Events = events, new QueuedListener(), resolver: resolver);
+
+        Assert.AreEqual(LogInSent, run.Sent);
+        CollectionAssert.AreEqual(new[] { value }, resolver.Hosts);
+        Assert.AreEqual(0, run.Listener.Targets.Count);
+        CollectionAssert.AreEqual(
+            new[] { "Could not resolve host: " + value, "failed to resolve the address provided to PORT: " + value },
+            events.Info);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.CouldntResolveHost, "Could not resolve host: " + value), run.Result);
+    }
+
+    [TestMethod]
+    public void Constructor_NullDnsResolver_Throws()
+    {
+        Assert.ThrowsExactly<ArgumentNullException>(
+            () => new FtpProtocolHandler(new QueuedConnector(), new QueuedListener(), new QueuedTlsProvider(), null!));
     }
 
     [TestMethod]
@@ -412,6 +487,14 @@ public sealed class FtpProtocolHandlerActiveModeTests
         string path,
         string ftpPort,
         string replies,
+        IDnsResolver resolver,
+        params ScriptedPendingConnection[] pending) =>
+        RunAsync(path, ftpPort, replies, _ => { }, new QueuedListener([.. pending.Select(ListenResult.Listening)]), resolver: resolver);
+
+    private static Task<ActiveRun> RunAsync(
+        string path,
+        string ftpPort,
+        string replies,
         Action<MutableContext> adjust,
         params ScriptedPendingConnection[] pending) =>
         RunAsync(path, ftpPort, replies, adjust, new QueuedListener([.. pending.Select(ListenResult.Listening)]));
@@ -431,7 +514,8 @@ public sealed class FtpProtocolHandlerActiveModeTests
         Action<MutableContext> adjust,
         QueuedListener listener,
         IPEndPoint? controlLocal = null,
-        bool useDefaultControlLocal = true)
+        bool useDefaultControlLocal = true,
+        IDnsResolver? resolver = null)
     {
         var control = new ScriptedConnection(Encoding.Latin1.GetBytes(replies))
         {
@@ -445,7 +529,9 @@ public sealed class FtpProtocolHandlerActiveModeTests
                 mutable.FtpPort = ftpPort;
                 adjust(mutable);
             });
-        var handler = new FtpProtocolHandler(connector, listener, new QueuedTlsProvider());
+        var handler = resolver is null
+            ? new FtpProtocolHandler(connector, listener, new QueuedTlsProvider())
+            : new FtpProtocolHandler(connector, listener, new QueuedTlsProvider(), resolver);
 
         TransferResult result = await handler.ExecuteAsync(context);
 

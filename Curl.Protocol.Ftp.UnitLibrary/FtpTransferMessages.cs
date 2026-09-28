@@ -135,10 +135,16 @@ internal static class FtpTransferMessages
     internal static string AccessDenied(int code) => Format($"Access denied: {code}");
 
     /// <summary>
-    /// The exit 6 message for a <c>-P</c> address that is a host or interface name, which is
-    /// not resolved (BL-437): curl's words for a name that does not resolve.
+    /// The exit 6 message, and the first of two <c>-v</c> lines, for a <c>-P</c> name that
+    /// does not resolve (ADR-0108).
     /// </summary>
     internal static string CouldNotResolveHost(string name) => "Could not resolve host: " + name;
+
+    /// <summary>
+    /// The second <c>-v</c> line curl 8.21.0 prints for a <c>-P</c> name that does not
+    /// resolve (ADR-0108).
+    /// </summary>
+    internal static string PortAddressNotResolved(string name) => "failed to resolve the address provided to PORT: " + name;
 
     /// <summary>The exit 13 message when neither <c>EPSV</c> nor <c>PASV</c> was accepted.</summary>
     /// <param name="code">The code of the reply to <c>PASV</c>.</param>
