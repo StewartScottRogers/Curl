@@ -70,8 +70,9 @@ internal sealed class CookieEngine
     /// <param name="fileSystem">Opens the files.</param>
     /// <param name="standardInput">What <c>-b -</c> reads; it is left open.</param>
     /// <param name="now">The time that decides which loaded cookies have expired.</param>
+    /// <param name="events">Where the <c>-v</c> line for each refused <c>Set-Cookie:</c> line is reported.</param>
     /// <returns>A task that completes when every file is loaded.</returns>
-    internal async Task LoadCookieFilesAsync(IFileSystem fileSystem, Stream standardInput, DateTimeOffset now)
+    internal async Task LoadCookieFilesAsync(IFileSystem fileSystem, Stream standardInput, DateTimeOffset now, ITransferEvents events)
     {
         if (cookieFilesLoaded)
         {
@@ -85,11 +86,11 @@ internal sealed class CookieEngine
             {
                 using StreamReader reader = new(standardInput, Encoding.Latin1, detectEncodingFromByteOrderMarks: false, leaveOpen: true);
                 using StringReader text = new(await reader.ReadToEndAsync().ConfigureAwait(false));
-                store.LoadCookieFile(text, discardSessionCookies, now);
+                store.LoadCookieFile(text, discardSessionCookies, now, events);
                 continue;
             }
 
-            await store.LoadCookieFileAsync(fileSystem, cookieFile, discardSessionCookies, now, CancellationToken.None)
+            await store.LoadCookieFileAsync(fileSystem, cookieFile, discardSessionCookies, now, events, CancellationToken.None)
                 .ConfigureAwait(false);
         }
     }

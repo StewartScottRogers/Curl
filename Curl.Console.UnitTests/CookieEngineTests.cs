@@ -49,7 +49,7 @@ public sealed class CookieEngineTests
         CookieEngine cookies = CookieEngine.FromCommandLine(
             Parse("-b", "jar.txt", "-b", "a=b", "-H", "Cookie: c=d", Url))!;
 
-        await cookies.LoadCookieFilesAsync(fileSystem, Stream.Null, Now);
+        await cookies.LoadCookieFilesAsync(fileSystem, Stream.Null, Now, NoTransferEvents.Instance);
 
         Assert.AreEqual("sess=s1", cookies.HandlerStore.GetCookieHeader(CurlUrl.Parse(Url), false, Now));
     }

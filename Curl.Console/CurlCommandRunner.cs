@@ -1266,7 +1266,7 @@ internal sealed class CurlCommandRunner(
     {
         if (dispatch.Cookies is { } cookies && IsHttpUrl(QueryUrl.Append(transferUrl, options)))
         {
-            await cookies.LoadCookieFilesAsync(fileSystem, standardInput, timeProvider.GetUtcNow()).ConfigureAwait(false);
+            await cookies.LoadCookieFilesAsync(fileSystem, standardInput, timeProvider.GetUtcNow(), transferEventOutput.Events).ConfigureAwait(false);
         }
     }
 
