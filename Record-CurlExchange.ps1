@@ -133,6 +133,40 @@
     same backslash escapes as Response.
     Default empty.
 
+.PARAMETER Smtp
+    Serve one SMTP session instead of HTTP responses (BL-529): send a greeting, then read
+    curl's command lines one at a time and answer each from a table of replies, as -Ftp
+    does. request.bin then holds every line curl sent, the message body after DATA
+    included, and transcript.txt holds both directions, each line prefixed "> " (curl)
+    or "< " (server). Response, Connections, ResponseDelayMilliseconds and Reset are
+    ignored. With -Tls it serves implicit TLS from the first byte, as smtps:// expects.
+
+    The default replies (RFC 5321) are: greeting 220 localhost ESMTP; EHLO a multiline
+    250 advertising AUTH PLAIN LOGIN CRAM-MD5, STARTTLS (left out once the session is
+    TLS), SIZE 1000000, 8BITMIME and SMTPUTF8; HELO 250; AUTH 235, after the 334
+    continuations the mechanism needs (PLAIN without an initial response one, LOGIN one
+    per credential it still lacks, CRAM-MD5 one challenge), each continuation line curl
+    sends recorded like a command; MAIL 250; RCPT 250; DATA 354, then every line up to
+    and including the lone "." that ends the body, then 250; VRFY 250; EXPN 250; HELP
+    214; NOOP 250; RSET 250; QUIT 221 (and the session ends); and 502 for any other
+    command. STARTTLS is answered 220 and the session is then served over TLS with the
+    same throwaway certificate as -Tls (curl needs -k), with a "= TLS handshake completed
+    on the control connection" line in transcript.txt.
+
+.PARAMETER SmtpReply
+    Overrides for the SMTP reply table, each 'VERB=reply' with the same backslash escapes
+    as Response, e.g. 'RCPT=550 no such user'. The reply is sent as given with CRLF
+    appended; a multiline reply is written with \r\n between its lines. VERB is a command
+    name in capitals, GREETING for the greeting, or DATADONE for the reply sent after the
+    message body. An overridden AUTH sends only the reply, with no continuations. An
+    overridden DATA whose reply starts 354 still reads the body, and an overridden
+    STARTTLS whose reply starts 220 still switches to TLS. The reply CLOSE and the use of
+    several overrides for one VERB work as in FtpReply.
+
+.PARAMETER SmtpIdleMilliseconds
+    How long, in -Smtp mode, the server waits for curl's next line before it hangs up.
+    Default 5000.
+
 .PARAMETER Tls
     Answer each connection over TLS 1.2 instead of plain TCP, so the recorder can stand
     in for an HTTPS server or an HTTPS proxy (BL-398, BL-442). The certificate served
@@ -143,7 +177,8 @@
     added to a certificate store, and its key container is deleted when the run ends.
     A connection whose handshake fails is recorded as empty. -Reset resets the connection
     before any handshake. With -Ftp it serves implicit FTPS: the control connection is TLS
-    from its first byte, as ftps:// expects (BL-437).
+    from its first byte, as ftps:// expects (BL-437); with -Smtp, implicit SMTPS, as
+    smtps:// expects (BL-529).
 
 .PARAMETER FtpIdleMilliseconds
     How long, in -Ftp mode, the server waits for curl's next command before it hangs up.
@@ -166,9 +201,9 @@
     server cannot speak (BL-528). Only stdout.bin, stderr.txt and exitcode.txt are
     written; there is no request.bin, since the script sees none of the traffic. Port,
     Response, Connections, ResponseDelayMilliseconds, Reset, HoldOpenMilliseconds,
-    RespondAfterBodyBytes, FtpReply, FtpData, FtpIdleMilliseconds and ListenAddress are
-    ignored, and Port need not be given. Combining it with a server mode, -Ftp or -Tls,
-    is refused. StandardInput and Curl work as in every other mode.
+    RespondAfterBodyBytes, FtpReply, FtpData, FtpIdleMilliseconds, SmtpReply,
+    SmtpIdleMilliseconds and ListenAddress are ignored, and Port need not be given.
+    Combining it with a server mode, -Ftp, -Smtp or -Tls, is refused. StandardInput and Curl work as in every other mode.
 
 .EXAMPLE
     .\Record-CurlExchange.ps1 -Port 18081 -Response 'HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello' -CurlArgs 'http://127.0.0.1:18081/a?b' -OutDirectory fixtures\default-get
@@ -182,6 +217,12 @@
 
     Runs curl against an sshd the caller already started on port 2222 and records only
     what curl printed and its exit code.
+
+.EXAMPLE
+    .\Record-CurlExchange.ps1 -Port 18025 -Smtp -SmtpReply 'RCPT=550 no such user' -CurlArgs '-sS','--mail-from','a@b','--mail-rcpt','c@d','-T','mail.txt','smtp://127.0.0.1:18025/' -OutDirectory fixtures\smtp-rcpt-refused
+
+    Serves one SMTP session that refuses the recipient; transcript.txt shows EHLO,
+    MAIL FROM, RCPT TO and the 550, and request.bin the lines curl sent.
 #>
 [CmdletBinding()]
 param(
@@ -199,6 +240,9 @@ param(
     [string[]] $FtpReply = @(),
     [string] $FtpData = '',
     [ValidateRange(1, 600000)] [int] $FtpIdleMilliseconds = 5000,
+    [switch] $Smtp,
+    [string[]] $SmtpReply = @(),
+    [ValidateRange(1, 600000)] [int] $SmtpIdleMilliseconds = 5000,
     [switch] $Tls,
     [string] $Curl,
     [System.Net.IPAddress] $ListenAddress = [System.Net.IPAddress]::Loopback,
@@ -211,7 +255,8 @@ $ErrorActionPreference = 'Stop'
 # powershell -File binds '-sS','http://...' as the one string "-sS,http://..."; only then
 # is the invocation line empty, so only then is that string split back into its elements.
 if ([string]::IsNullOrEmpty($MyInvocation.Line) -and $CurlArgs.Count -eq 1) { $CurlArgs = $CurlArgs[0].Split(',') }
-if ($NoServer -and ($Ftp -or $Tls)) { throw '-NoServer runs no server, so it cannot be combined with -Ftp or -Tls.' }
+if ($NoServer -and ($Ftp -or $Smtp -or $Tls)) { throw '-NoServer runs no server, so it cannot be combined with -Ftp, -Smtp or -Tls.' }
+if ($Ftp -and $Smtp) { throw '-Ftp and -Smtp each serve a whole session; give one of them.' }
 if (-not $NoServer -and $Port -eq 0) { throw '-Port is required unless -NoServer is given: the URL in CurlArgs must name the port the server listens on.' }
 
 function Get-ReferenceCurlPath {
@@ -392,15 +437,42 @@ $serveConnections = {
     return , $requests.ToArray()
 }
 
+# Helpers both line-at-a-time sessions (-Ftp and -Smtp) dot-source into their runspace.
+# They pass as text, since a script block invoked in another runspace would run back in
+# this one, which is busy waiting for curl. They read $TlsCertificate and $Overrides
+# from the session that dot-sources them.
+$sessionHelpers = {
+    # Serves TLS 1.2 over $Stream with the throwaway certificate, as the server side.
+    function Wrap-Tls {
+        param($Stream)
+        $secure = New-Object System.Net.Security.SslStream($Stream, $false)
+        $secure.AuthenticateAsServer($TlsCertificate, $false, [System.Security.Authentication.SslProtocols]::Tls12, $false)
+        return $secure
+    }
+
+    # Several overrides for one verb are used in turn; the last one repeats.
+    function Get-Override {
+        param([string] $Verb)
+        $replies = $Overrides[$Verb]
+        if ($replies.Count -gt 1) {
+            $reply = $replies[0]
+            $replies.RemoveAt(0)
+            return $reply
+        }
+        return $replies[0]
+    }
+}
+
 # The -Ftp server: one control connection, answered a line at a time, with a passive
 # data listener for RETR, LIST, STOR and APPE. It returns the control bytes curl sent, as
 # one array, writes the two-way transcript into $Transcript, and the bytes uploaded on
 # STOR and APPE data connections into $UploadedData.
 $serveFtpSession = {
-    param($Listener, [hashtable] $Overrides, [byte[]] $DataBytes, [System.Text.StringBuilder] $Transcript, [System.IO.MemoryStream] $UploadedData, $TlsCertificate, [bool] $ImplicitTls, [int] $ControlIdleMilliseconds, [System.Net.IPAddress] $ListenAddress)
+    param($Listener, [hashtable] $Overrides, [byte[]] $DataBytes, [System.Text.StringBuilder] $Transcript, [System.IO.MemoryStream] $UploadedData, $TlsCertificate, [bool] $ImplicitTls, [int] $ControlIdleMilliseconds, [System.Net.IPAddress] $ListenAddress, [string] $SessionHelpers)
 
     Set-StrictMode -Version Latest
     $ErrorActionPreference = 'Stop'
+    . ([scriptblock]::Create($SessionHelpers))
     $latin1 = [System.Text.Encoding]::GetEncoding(28591)
     $received = New-Object System.IO.MemoryStream
     $dataListener = New-Object System.Net.Sockets.TcpListener($ListenAddress, 0)
@@ -412,14 +484,6 @@ $serveFtpSession = {
     $activeEndPoint = $null
     # Set by PROT P, and by implicit TLS until a PROT C: data connections are TLS (BL-437).
     $protectData = $ImplicitTls
-
-    # Serves TLS 1.2 over $Stream with the throwaway certificate, as the server side.
-    function Wrap-Tls {
-        param($Stream)
-        $secure = New-Object System.Net.Security.SslStream($Stream, $false)
-        $secure.AuthenticateAsServer($TlsCertificate, $false, [System.Security.Authentication.SslProtocols]::Tls12, $false)
-        return $secure
-    }
 
     # Opens the data connection: dials curl's EPRT/PORT address in active mode, otherwise
     # accepts on the passive listener; either way wrapped in TLS once PROT P was accepted.
@@ -448,18 +512,6 @@ $serveFtpSession = {
         $numbers = $Argument.Split(',')
         $activePort = [int] $numbers[4] * 256 + [int] $numbers[5]
         return New-Object System.Net.IPEndPoint([System.Net.IPAddress]::Parse(($numbers[0..3] -join '.')), $activePort)
-    }
-
-    # Several overrides for one verb are used in turn; the last one repeats.
-    function Get-Override {
-        param([string] $Verb)
-        $replies = $Overrides[$Verb]
-        if ($replies.Count -gt 1) {
-            $reply = $replies[0]
-            $replies.RemoveAt(0)
-            return $reply
-        }
-        return $replies[0]
     }
 
     function Send-Reply {
@@ -593,6 +645,159 @@ $serveFtpSession = {
     return , @(, $received.ToArray())
 }
 
+# The -Smtp server: one connection, answered a line at a time, reading the message body
+# after DATA up to its lone "." line. It returns every byte curl sent, as one array, and
+# writes the two-way transcript into $Transcript (BL-529).
+$serveSmtpSession = {
+    param($Listener, [hashtable] $Overrides, [System.Text.StringBuilder] $Transcript, $TlsCertificate, [bool] $ImplicitTls, [int] $IdleMilliseconds, [string] $SessionHelpers)
+
+    Set-StrictMode -Version Latest
+    $ErrorActionPreference = 'Stop'
+    . ([scriptblock]::Create($SessionHelpers))
+    $latin1 = [System.Text.Encoding]::GetEncoding(28591)
+    $received = New-Object System.IO.MemoryStream
+
+    function Send-Reply {
+        param($Stream, [string] $Reply)
+        $bytes = $latin1.GetBytes($Reply + "`r`n")
+        $Stream.Write($bytes, 0, $bytes.Length)
+        $Stream.Flush()
+        foreach ($line in ($Reply -split "`r`n")) { [void] $Transcript.Append("< $line`r`n") }
+    }
+
+    # One line from curl, recorded, without its line ending; $null once curl hangs up or
+    # stays silent for IdleMilliseconds.
+    function Read-Line {
+        param($Stream)
+        $line = New-Object System.IO.MemoryStream
+        while ($true) {
+            try {
+                $next = $Stream.ReadByte()
+            } catch [System.IO.IOException] {
+                return $null
+            }
+            if ($next -lt 0) { return $null }
+            $received.WriteByte([byte] $next)
+            $line.WriteByte([byte] $next)
+            if ($next -eq 10) { break }
+        }
+        $text = $latin1.GetString($line.ToArray()).TrimEnd("`r", "`n")
+        [void] $Transcript.Append("> $text`r`n")
+        return $text
+    }
+
+    function Get-EhloReply {
+        param([bool] $Secure)
+        $capabilities = @('250-localhost', '250-AUTH PLAIN LOGIN CRAM-MD5')
+        # RFC 3207: STARTTLS is not offered again once the session is TLS.
+        if (-not $Secure) { $capabilities += '250-STARTTLS' }
+        $capabilities += @('250-SIZE 1000000', '250-8BITMIME', '250 SMTPUTF8')
+        return $capabilities -join "`r`n"
+    }
+
+    # The 334 continuations each mechanism needs before 235; $false once curl hangs up.
+    function Complete-Authentication {
+        param($Stream, [string] $Argument)
+        $mechanism = ($Argument -split ' ', 2)[0].ToUpperInvariant()
+        $hasInitialResponse = $Argument.Contains(' ')
+        $challenges = switch ($mechanism) {
+            'PLAIN' { if ($hasInitialResponse) { @() } else { @('334 ') } }
+            'LOGIN' { if ($hasInitialResponse) { @('334 UGFzc3dvcmQ6') } else { @('334 VXNlcm5hbWU6', '334 UGFzc3dvcmQ6') } }
+            'CRAM-MD5' { @('334 ' + [Convert]::ToBase64String($latin1.GetBytes('<1896.697170952@localhost>'))) }
+            default { @() }
+        }
+        foreach ($challenge in $challenges) {
+            Send-Reply -Stream $Stream -Reply $challenge
+            if ($null -eq (Read-Line -Stream $Stream)) { return $false }
+        }
+        Send-Reply -Stream $Stream -Reply '235 Authentication successful'
+        return $true
+    }
+
+    # The body after DATA's 354, up to and including the lone "." line, then the reply.
+    function Receive-MessageBody {
+        param($Stream)
+        while ($true) {
+            $bodyLine = Read-Line -Stream $Stream
+            if ($null -eq $bodyLine) { return $false }
+            if ($bodyLine -ceq '.') { break }
+        }
+        $done = if ($Overrides.ContainsKey('DATADONE')) { Get-Override -Verb 'DATADONE' } else { '250 OK message accepted' }
+        Send-Reply -Stream $Stream -Reply $done
+        return $true
+    }
+
+    function Start-Tls {
+        param($Stream)
+        $secure = Wrap-Tls -Stream $Stream
+        $secure.ReadTimeout = $IdleMilliseconds
+        [void] $Transcript.Append("= TLS handshake completed on the control connection`r`n")
+        return $secure
+    }
+
+    try {
+        $client = $Listener.AcceptTcpClient()
+    } catch {
+        return , @(, $received.ToArray())
+    }
+    try {
+        $stream = $client.GetStream()
+        $secure = $ImplicitTls
+        if ($ImplicitTls) { $stream = Wrap-Tls -Stream $stream }
+        $stream.ReadTimeout = $IdleMilliseconds
+        $greeting = if ($Overrides.ContainsKey('GREETING')) { Get-Override -Verb 'GREETING' } else { '220 localhost ESMTP' }
+        Send-Reply -Stream $stream -Reply $greeting
+        while ($true) {
+            $command = Read-Line -Stream $stream
+            if ($null -eq $command) { break }  # SmtpIdleMilliseconds without a byte, or curl hung up.
+            $verb = ($command -split ' ', 2)[0].ToUpperInvariant()
+            $argument = if ($command.Contains(' ')) { ($command -split ' ', 2)[1] } else { '' }
+            if ($Overrides.ContainsKey($verb)) {
+                $override = Get-Override -Verb $verb
+                if ($override -ceq 'CLOSE') { break }  # Hang up instead of replying.
+                Send-Reply -Stream $stream -Reply $override
+                if ($verb -eq 'QUIT') { break }
+                if ($verb -eq 'DATA' -and $override.StartsWith('354') -and -not (Receive-MessageBody -Stream $stream)) { break }
+                if ($verb -eq 'STARTTLS' -and $override.StartsWith('220')) {
+                    $stream = Start-Tls -Stream $stream
+                    $secure = $true
+                }
+                continue
+            }
+            $continue = $true
+            switch ($verb) {
+                'EHLO' { Send-Reply -Stream $stream -Reply (Get-EhloReply -Secure $secure) }
+                'HELO' { Send-Reply -Stream $stream -Reply '250 localhost' }
+                'STARTTLS' {
+                    Send-Reply -Stream $stream -Reply '220 Ready to start TLS'
+                    $stream = Start-Tls -Stream $stream
+                    $secure = $true
+                }
+                'AUTH' { $continue = Complete-Authentication -Stream $stream -Argument $argument }
+                'MAIL' { Send-Reply -Stream $stream -Reply '250 OK' }
+                'RCPT' { Send-Reply -Stream $stream -Reply '250 OK' }
+                'DATA' {
+                    Send-Reply -Stream $stream -Reply '354 End data with <CR><LF>.<CR><LF>'
+                    $continue = Receive-MessageBody -Stream $stream
+                }
+                'VRFY' { Send-Reply -Stream $stream -Reply '250 Recorder <recorder@localhost>' }
+                'EXPN' { Send-Reply -Stream $stream -Reply '250 Recorder <recorder@localhost>' }
+                'HELP' { Send-Reply -Stream $stream -Reply '214 EHLO HELO STARTTLS AUTH MAIL RCPT DATA VRFY EXPN HELP NOOP RSET QUIT' }
+                'NOOP' { Send-Reply -Stream $stream -Reply '250 OK' }
+                'RSET' { Send-Reply -Stream $stream -Reply '250 OK' }
+                'QUIT' { Send-Reply -Stream $stream -Reply '221 Bye'; $continue = $false }
+                default { Send-Reply -Stream $stream -Reply '502 Command not implemented' }
+            }
+            if (-not $continue) { break }
+        }
+    } catch [System.IO.IOException] {
+        # curl closed the connection mid-reply; what arrived is still recorded.
+    } finally {
+        $client.Close()
+    }
+    return , @(, $received.ToArray())
+}
+
 function New-ThrowawayTlsCertificate {
     # Schannel will not serve the ephemeral key CreateSelfSigned returns, so the
     # certificate is reloaded from its PFX export. Loaded without PersistKeySet, its key
@@ -619,20 +824,27 @@ function New-ThrowawayTlsCertificate {
 if ([string]::IsNullOrEmpty($Curl)) { $Curl = Get-ReferenceCurlPath }
 $responseBytes = New-Object System.Collections.Generic.List[byte[]]
 foreach ($text in $Response) { $responseBytes.Add((ConvertFrom-EscapedResponse -Text $text)) }
-$ftpOverrides = @{}
-foreach ($entry in $FtpReply) {
-    $separator = $entry.IndexOf('=')
-    if ($separator -lt 1) { throw "FtpReply '$entry' is not VERB=reply." }
-    $overrideVerb = $entry.Substring(0, $separator).ToUpperInvariant()
-    if (-not $ftpOverrides.ContainsKey($overrideVerb)) { $ftpOverrides[$overrideVerb] = New-Object System.Collections.Generic.List[string] }
-    $ftpOverrides[$overrideVerb].Add([System.Text.Encoding]::GetEncoding(28591).GetString((ConvertFrom-EscapedResponse -Text $entry.Substring($separator + 1))))
+function ConvertTo-ReplyOverrides {
+    # 'VERB=reply' entries as a table of verb to the list of its replies, in order.
+    param([string[]] $Entries, [string] $ParameterName)
+    $overrides = @{}
+    foreach ($entry in $Entries) {
+        $separator = $entry.IndexOf('=')
+        if ($separator -lt 1) { throw "$ParameterName '$entry' is not VERB=reply." }
+        $overrideVerb = $entry.Substring(0, $separator).ToUpperInvariant()
+        if (-not $overrides.ContainsKey($overrideVerb)) { $overrides[$overrideVerb] = New-Object System.Collections.Generic.List[string] }
+        $overrides[$overrideVerb].Add([System.Text.Encoding]::GetEncoding(28591).GetString((ConvertFrom-EscapedResponse -Text $entry.Substring($separator + 1))))
+    }
+    return $overrides
 }
+$ftpOverrides = ConvertTo-ReplyOverrides -Entries $FtpReply -ParameterName 'FtpReply'
+$smtpOverrides = ConvertTo-ReplyOverrides -Entries $SmtpReply -ParameterName 'SmtpReply'
 $transcript = New-Object System.Text.StringBuilder
 $uploadedData = New-Object System.IO.MemoryStream
 $OutDirectory = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine((Get-Location).ProviderPath, $OutDirectory))
 New-Item -ItemType Directory -Path $OutDirectory -Force | Out-Null
 
-$tlsCertificate = if ($Tls -or $Ftp) { New-ThrowawayTlsCertificate } else { $null }
+$tlsCertificate = if ($Tls -or $Ftp -or $Smtp) { New-ThrowawayTlsCertificate } else { $null }
 # -NoServer binds nothing: the caller's own server answers curl.
 $listener = $null
 $server = $null
@@ -645,7 +857,9 @@ try {
     if ($NoServer) {
         $serverRun = $null
     } elseif ($Ftp) {
-        [void] $server.AddScript($serveFtpSession).AddArgument($listener).AddArgument($ftpOverrides).AddArgument([byte[]] (ConvertFrom-EscapedResponse -Text $FtpData)).AddArgument($transcript).AddArgument($uploadedData).AddArgument($tlsCertificate).AddArgument([bool] $Tls).AddArgument($FtpIdleMilliseconds).AddArgument($ListenAddress)
+        [void] $server.AddScript($serveFtpSession).AddArgument($listener).AddArgument($ftpOverrides).AddArgument([byte[]] (ConvertFrom-EscapedResponse -Text $FtpData)).AddArgument($transcript).AddArgument($uploadedData).AddArgument($tlsCertificate).AddArgument([bool] $Tls).AddArgument($FtpIdleMilliseconds).AddArgument($ListenAddress).AddArgument($sessionHelpers.ToString())
+    } elseif ($Smtp) {
+        [void] $server.AddScript($serveSmtpSession).AddArgument($listener).AddArgument($smtpOverrides).AddArgument($transcript).AddArgument($tlsCertificate).AddArgument([bool] $Tls).AddArgument($SmtpIdleMilliseconds).AddArgument($sessionHelpers.ToString())
     } else {
         [void] $server.AddScript($serveConnections).AddArgument($listener).AddArgument($responseBytes).AddArgument($Connections).AddArgument($ResponseDelayMilliseconds).AddArgument([bool] $Reset).AddArgument($RespondAfterBodyBytes).AddArgument($tlsCertificate).AddArgument($HoldOpenMilliseconds)
     }
@@ -716,6 +930,9 @@ if (-not $NoServer) { [System.IO.File]::WriteAllBytes((Join-Path $OutDirectory '
 if ($Ftp) {
     [System.IO.File]::WriteAllText((Join-Path $OutDirectory 'transcript.txt'), $transcript.ToString(), [System.Text.Encoding]::GetEncoding(28591))
     [System.IO.File]::WriteAllBytes((Join-Path $OutDirectory 'upload.bin'), $uploadedData.ToArray())
+}
+if ($Smtp) {
+    [System.IO.File]::WriteAllText((Join-Path $OutDirectory 'transcript.txt'), $transcript.ToString(), [System.Text.Encoding]::GetEncoding(28591))
 }
 
 Write-Host "curl exited $exitCode after $($curlClock.ElapsedMilliseconds) ms; fixtures written to $OutDirectory"
