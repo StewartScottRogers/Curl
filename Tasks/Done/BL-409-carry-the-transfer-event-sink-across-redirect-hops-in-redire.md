@@ -1,0 +1,39 @@
+---
+id: BL-409
+title: Carry the transfer event sink across redirect hops in RedirectFollower
+priority: Low
+assignee: Claude
+pipeline: direct
+depends-on: []
+touches: [Curl.Core.UnitLibrary, Curl.Core.UnitTests]
+requirement: none
+created: 2026-09-27
+completed: 2026-09-27
+---
+# BL-409 — Carry the transfer event sink across redirect hops in RedirectFollower
+
+## Goal
+
+`RedirectFollower.NextHop` copies `Events` from the first context, so `-L -v` shows every hop.
+
+## Context
+
+- ADR-0046, "Who does what next": `Events` must be carried across redirect hops beside the `Progress` copy, because the default hides a missing copy from the compiler.
+- Found in BL-242: `Curl.Core.UnitLibrary/RedirectFollower.cs` `NextHop` sets `Progress = first.Progress` but not `Events`, so every hop after the first reports to `NoTransferEvents.Instance`.
+
+## Acceptance criteria
+
+- [x] A `RedirectFollowerTests` test shows the second hop's context carries the first context's `Events` instance.
+- [x] `dotnet build -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes and no new test needs `TestCategory=Integration`; `Measure-CodeQuality.ps1` reports 100% line and branch coverage and no failing member for `Curl.Core`.
+
+## Notes
+
+- Filed from BL-242 (2026-09-27), which wired `-v` and `--trace` in `Curl.Console`.
+- 2026-09-27: `NextHop` now sets `Events = first.Events` beside `Progress`. Test `FollowAsync_NextHop_ReportsToTheFirstHopsEventSink` uses a hand-rolled `IgnoringTransferEvents` so the instance differs from `NoTransferEvents.Instance`. Also moved a stray `MillisecondTimeProvider` summary back onto its class in `RedirectFollowerTests.cs`.
+- 2026-09-27: `Measure-CodeQuality.ps1`: `Curl.Core.UnitLibrary` 100% line and branch, 0 failing. The run reports two failures outside this task's touches: `DiskWriteOutFileOpener.TryOpen` in `Curl.Console` (tracked by BL-432) and `SslStreamTlsProvider.VerifyPeer` complexity 12 in `Curl.Networking.UnitLibrary` (from the Networking work in progress on another lane).
+
+## Log
+
+- 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Done. RedirectFollower carries Events to every hop, so -L -v reports each hop
