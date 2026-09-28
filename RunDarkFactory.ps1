@@ -100,6 +100,21 @@
     before its next claim. Restarts cover the active lanes, and the end-of-shift report
     covers every lane started, retired ones included.
 
+    AUTO LANES (-Lanes Auto)
+
+    The shift sizes itself (ADR-0130) and never needs to know the Claude plan. Before any
+    lane starts it reads the machine cap from <repo>.lanes\machine-lanes.json, running the
+    machine probe first when that file is missing, incomplete or from other hardware, and
+    starts at the lane count <repo>.lanes\auto-lanes.json saved (2 the first time), capped
+    by the ceilings. Every 15 minutes, except while waiting for tokens, it samples usage,
+    meters the burn rate per busy lane, paces to the 5-hour window and (unless
+    -NoWeeklyPace) the weekly one, caps that by the board's capacity, the machine cap and
+    -MaxLanes, and adds or retires at most one lane, tracing why: "lanes 3 -> 4 (5-hour
+    pace allows 4.9)". It holds while the tokens are low or the shift's time is up. The
+    capacity is read in a detached worktree, <repo>.lanes\auto-board, so this checkout is
+    only pulled at shift end. auto-lanes.json is saved on each change and at shift end, and
+    -Continuous hands on -Lanes Auto. -AutoLanesReport prints one step's reading and exits.
+
     LIVE BOARD
 
     Every runner keeps a heartbeat file, <repo>.logs\lanes-<stamp>\lane-<n>.heartbeat.json
@@ -129,6 +144,8 @@
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestAlarm
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestAlarm -AlarmScale 0.1
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestOutOfTokens
+    powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -Lanes Auto -Continuous
+    powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -AutoLanesReport
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestAutoLanes
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -ProbeMachine
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestMachineProbe
@@ -183,8 +200,18 @@ param(
     # runs it closer to empty (Stewart, 2026-09-28); a used-up weekly window raises the alarm.
     [ValidateRange(0.1, 1)][double]$StopAtWeeklyUsage = 0.97,
     # How many tasks run at once, each in its own worktree and window. 1 is the classic
-    # single-runner shift in this checkout.
-    [ValidateRange(1, 16)][int]$Lanes = 1,
+    # single-runner shift in this checkout. Auto sizes the shift itself (ADR-0130): every
+    # 15 minutes it adds or retires at most one lane, paced to the usage windows and capped
+    # by the board, the machine and -MaxLanes.
+    [ValidatePattern('^(?i:auto|[1-9]|1[0-6])$')][string]$Lanes = '1',
+    # -Lanes Auto's lane maximum.
+    [ValidateRange(1, 16)][int]$MaxLanes = 16,
+    # -Lanes Auto paces to the 5-hour window only: burn fast and stop at -StopAtWeeklyUsage
+    # instead of spreading the weekly budget evenly until its reset.
+    [switch]$NoWeeklyPace,
+    # Print what -Lanes Auto would do now - machine cap, board capacity, burn rates, pace
+    # targets, start count and the step's log line - without starting a lane, and exit.
+    [switch]$AutoLanesReport,
     # Start the shift somewhere of its own and return at once: a new herdr tab when this
     # is running inside herdr, otherwise a new console window. How Claude starts a shift.
     [switch]$NewTab,
@@ -201,6 +228,11 @@ param(
 
 # Continue, not Stop: native stderr from git or dotnet must never kill an unattended shift.
 $ErrorActionPreference = 'Continue'
+
+# -Lanes is Auto or a number; $LaneCount is the number, which Auto sets at shift start and
+# changes step by step.
+$AutoLanes = $Lanes -eq 'auto'
+$LaneCount = if ($AutoLanes) { 1 } else { [int]$Lanes }
 
 $Root = if ($LaneDir) { $LaneDir.Trim('"') } else { $PSScriptRoot }
 # The board script and every Claude run use this checkout, never one inherited from a
@@ -244,7 +276,7 @@ function Get-Short {
 # Each runner's lane-<n>.heartbeat.json (ADR-0129 items 8 and 9), for the coordinator to
 # publish. The coordinator of a multi-lane shift runs no task and writes none, and nor
 # does the out-of-tokens rehearsal.
-$WritesHeartbeat = ($Lane -or $Lanes -le 1) -and -not $TestOutOfTokens
+$WritesHeartbeat = ($Lane -or (-not $AutoLanes -and $LaneCount -le 1)) -and -not $TestOutOfTokens
 $script:Beat = @{ Task = $null; Title = $null; Phase = 'starting'; Step = ''; TaskStartedAt = $null; WrittenAt = [datetime]::MinValue; FailureTraced = $false }
 
 function Get-UtcStamp {
@@ -963,11 +995,13 @@ function Invoke-ProbeBuilds {
     }
 }
 
-if ($ProbeMachine) {
+$MachineFile = Join-Path $LanesDir 'machine-lanes.json'
+
+function Invoke-MachineProbe {
     # Warm up once, then step k = 1, 2, ... concurrent builds until a step fails, 16, or
-    # -ProbeMaxLanes, and write the cap to <LanesDir>\machine-lanes.json.
+    # -ProbeMaxLanes, write the cap to <LanesDir>\machine-lanes.json and return it.
     $probeDir = Join-Path $LanesDir 'probe'
-    $machineFile = Join-Path $LanesDir 'machine-lanes.json'
+    $machineFile = $MachineFile
     New-Item -ItemType Directory -Force -Path $probeDir | Out-Null
     Write-Trace 'probe' 'warm-up' "one build of $Root, not measured"
     $warmUp = Invoke-ProbeBuilds -ProbeDir $probeDir -Count 1 -Incremental
@@ -1002,8 +1036,10 @@ if ($ProbeMachine) {
     Move-Item -Force -Path $temp -Destination $machineFile
     Remove-Item -Recurse -Force -Path $probeDir -ErrorAction SilentlyContinue
     Write-Trace 'probe' 'done' "machine sustains $($result.Cap)$(if (-not $result.Complete) { ' (incomplete)' }); $machineFile" 'Cyan'
-    exit 0
+    return $result
 }
+
+if ($ProbeMachine) { Invoke-MachineProbe | Out-Null; exit 0 }
 
 function Get-OutOfTokensUntil {
     # When the last run was refused for the account's usage limit, the local time the
@@ -1079,7 +1115,7 @@ function Update-LimitNotice {
         $n.Resumed = $true; $n.Warned = $true
         Show-LimitNotice 'NEW SESSION STARTED' "Started using the new session at $(Get-Date -Format 'HH:mm'); resuming $($resumed[0])." `
             "Stewart, the new session has started. The dark factory is working again." 'Green'
-        try { $Host.UI.RawUI.WindowTitle = if ($Lanes -gt 1) { "Dark factory - $Lanes lanes" } else { 'Dark factory - running' } } catch { }
+        try { $Host.UI.RawUI.WindowTitle = if ($AutoLanes -or $LaneCount -gt 1) { "Dark factory - $LaneCount lanes" } else { 'Dark factory - running' } } catch { }
         return
     }
     if ($n.Resumed) { return }
@@ -1866,6 +1902,174 @@ if ($TestHeartbeat) {
     exit 0
 }
 
+# ---- auto lanes: the shift's reads and writes (ADR-0130 items 1, 5, 7 and 8)
+
+$AutoLanesFile = Join-Path $LanesDir 'auto-lanes.json'
+# A detached worktree the coordinator reads the board's capacity from, so its own checkout
+# is pulled only at shift end: lanes run its copy of this script.
+$AutoBoardDir = Join-Path $LanesDir 'auto-board'
+# The samples of the last 3 hours, the rates last metered, the saved auto-lanes.json, the
+# machine cap, and whether a capacity failure has been traced yet.
+$script:Auto = @{ Samples = @(); FiveHourRate = $null; WeeklyRate = $null; Saved = $null; MachineCap = 16; CapacityTraced = $false }
+
+function Read-JsonFile {
+    # The file's JSON, or $null when it is missing or does not parse.
+    param([string]$Path)
+    if (-not (Test-Path $Path)) { return $null }
+    try { return (Get-Content -Raw -Path $Path | ConvertFrom-Json) } catch { return $null }
+}
+
+function Get-MachineProbeNeed {
+    # Why the machine cap must be measured again - no probe yet, an incomplete one, or other
+    # hardware - or '' while machine-lanes.json still describes this PC.
+    param($Record)
+    if (-not $Record) { return 'no probe yet' }
+    if (-not $Record.complete) { return 'the last probe was incomplete' }
+    if ([int]$Record.logicalProcessors -ne [Environment]::ProcessorCount) { return 'the processor count changed' }
+    $memoryGB = [double](Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB
+    if ([math]::Abs([double]$Record.memoryGB - $memoryGB) -gt 1) { return 'the memory size changed' }
+    return ''
+}
+
+function Get-MachineCap {
+    # This PC's lane cap and the line saying where it came from. -Probe measures it when
+    # machine-lanes.json is missing, incomplete or from other hardware; without -Probe the
+    # cap is then unknown and does not limit the lanes.
+    param([switch]$Probe)
+    $record = Read-JsonFile $MachineFile
+    $need = Get-MachineProbeNeed $record
+    if ($need -and -not $Probe) { return [pscustomobject]@{ Cap = 16; Text = "machine cap unknown ($need)" } }
+    if ($need) {
+        Write-Trace '-' 'probe' "measuring the machine cap first: $need" 'Cyan'
+        Invoke-MachineProbe | Out-Null
+        $record = Read-JsonFile $MachineFile
+        if (-not $record) { return [pscustomobject]@{ Cap = 16; Text = 'machine cap unknown (the probe wrote no file)' } }
+    }
+    $cap = [math]::Max(1, [int]$record.cap)
+    return [pscustomobject]@{ Cap = $cap; Text = "machine cap $cap lanes (probed $(([datetime]$record.probedAt).ToString('yyyy-MM-dd')))" }
+}
+
+function Get-BoardCapacity {
+    # How many tasks the board at -Ref could run at once, from the capacity command of the
+    # task board in the $AutoBoardDir worktree checked out at -Ref. Created returns whether
+    # this call made the worktree; Capacity is $null, with Why, when it could not be read.
+    param([string]$Ref)
+    $created = $false
+    $saved = $env:CLAUDE_PROJECT_DIR
+    try {
+        if (-not (Test-Path (Join-Path $AutoBoardDir '.git'))) {
+            New-Item -ItemType Directory -Force -Path $LanesDir | Out-Null
+            git -C $Root worktree add -q --detach $AutoBoardDir $Ref 2>&1 | Out-Null
+            if ($LASTEXITCODE) { return [pscustomobject]@{ Capacity = $null; Created = $false; Why = "cannot add the worktree $AutoBoardDir" } }
+            $created = $true
+        }
+        git -C $AutoBoardDir checkout -q --detach $Ref 2>&1 | Out-Null
+        if ($LASTEXITCODE) { return [pscustomobject]@{ Capacity = $null; Created = $created; Why = "cannot check out $Ref in $AutoBoardDir" } }
+        $env:CLAUDE_PROJECT_DIR = $AutoBoardDir
+        $out = (& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $AutoBoardDir '.claude\skills\task-board\task-board.ps1') capacity 2>&1) -join "`n"
+        if ($out -match '(?m)^Capacity (\d+):') { return [pscustomobject]@{ Capacity = [int]$Matches[1]; Created = $created; Why = '' } }
+        return [pscustomobject]@{ Capacity = $null; Created = $created; Why = "the board printed no capacity: $(Get-Short $out 60)" }
+    } catch {
+        return [pscustomobject]@{ Capacity = $null; Created = $created; Why = $_.Exception.Message }
+    } finally { $env:CLAUDE_PROJECT_DIR = $saved }
+}
+
+function Remove-AutoBoard {
+    # Deletes the $AutoBoardDir worktree.
+    git -C $Root worktree remove --force $AutoBoardDir 2>&1 | Out-Null
+    git -C $Root worktree prune 2>&1 | Out-Null
+}
+
+function Get-AutoStartCount {
+    # Where an Auto shift starts: the lane count auto-lanes.json saved, or 2 on the first
+    # Auto shift, capped by the ceilings and at least 1. Why says which.
+    param($Saved, [int]$Capacity, [int]$MachineCap)
+    $count = 2
+    $why = 'first auto shift'
+    if ($Saved -and $Saved.lanes) { $count = [int]$Saved.lanes; $why = "last shift saved $count" }
+    $ceiling = [math]::Min($Capacity, [math]::Min($MachineCap, $MaxLanes))
+    if ($count -gt $ceiling) { $count = [math]::Max(1, $ceiling); $why += ", capped at $count" }
+    return [pscustomobject]@{ Count = $count; Why = $why }
+}
+
+function Get-AutoLaneStep {
+    # One Auto step's computation from -Samples, newest last: both burn rates (the saved
+    # ones while the samples give none), the pace target and the next lane count.
+    param([object[]]$Samples, [int]$Current, [int]$Capacity, [int]$MachineCap, $Saved)
+    $fiveHourRate = Get-BurnRate -Samples $Samples -Window FiveHour
+    if ($null -eq $fiveHourRate -and $Saved -and $null -ne $Saved.fiveHourRatePerLane) { $fiveHourRate = [double]$Saved.fiveHourRatePerLane }
+    $weeklyRate = Get-BurnRate -Samples $Samples -Window Week
+    if ($null -eq $weeklyRate -and $Saved -and $null -ne $Saved.weeklyRatePerLane) { $weeklyRate = [double]$Saved.weeklyRatePerLane }
+    $pace = $null
+    if (@($Samples).Count) {
+        $pace = Get-PaceTarget -Sample @($Samples)[-1] -FiveHourRate $fiveHourRate -WeeklyRate $weeklyRate -WeeklyPace (-not $NoWeeklyPace) `
+            -StopAtUsage $StopAtUsage -StopAtWeeklyUsage $StopAtWeeklyUsage
+    }
+    $next = Get-NextLaneCount -Current $Current -Pace $pace -Capacity $Capacity -MachineCap $MachineCap -MaxLanes $MaxLanes
+    return [pscustomobject]@{ FiveHourRate = $fiveHourRate; WeeklyRate = $weeklyRate; Pace = $pace; Next = $next }
+}
+
+function Save-AutoLanes {
+    # Writes auto-lanes.json: -Count lanes and the rates last metered, for the next shift's
+    # cold start. A temporary file and a rename, so a reader never sees half of one.
+    param([int]$Count)
+    $record = [ordered]@{
+        schema = 1; lanes = $Count; savedAt = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+        fiveHourRatePerLane = $(if ($null -ne $script:Auto.FiveHourRate) { [math]::Round([double]$script:Auto.FiveHourRate, 3) } else { $null })
+        weeklyRatePerLane = $(if ($null -ne $script:Auto.WeeklyRate) { [math]::Round([double]$script:Auto.WeeklyRate, 3) } else { $null })
+    }
+    try {
+        New-Item -ItemType Directory -Force -Path $LanesDir | Out-Null
+        $temp = "$AutoLanesFile.tmp"
+        [IO.File]::WriteAllText($temp, ($record | ConvertTo-Json), (New-Object Text.UTF8Encoding $false))
+        Move-Item -Force -Path $temp -Destination $AutoLanesFile
+    } catch { Write-Trace '-' 'lanes' "cannot save $($AutoLanesFile): $($_.Exception.Message)" 'Yellow' }
+}
+
+function Format-Rate {
+    # A rate or target with one decimal, invariant culture; 'none yet' for $null, 'unbounded' for infinity.
+    param($Value)
+    if ($null -eq $Value) { return 'none yet' }
+    if ([double]::IsPositiveInfinity([double]$Value)) { return 'unbounded' }
+    return ([double]$Value).ToString('0.0', [Globalization.CultureInfo]::InvariantCulture)
+}
+
+if ($AutoLanesReport) {
+    # The shift-start reads and one step's computation from the newest readings in $LogDir,
+    # printed; never the probe, a lane, a claim or a push. The board is read at origin/-Branch
+    # when -Branch is given, otherwise at this checkout's commit.
+    $machine = Get-MachineCap
+    Write-Host $machine.Text
+    $ref = (git -C $Root rev-parse HEAD).Trim()
+    if ($Branch) {
+        git -C $Root fetch -q origin $Branch 2>&1 | Out-Null
+        $ref = "origin/$Branch"
+    }
+    $board = Get-BoardCapacity -Ref $ref
+    if ($board.Created) { Remove-AutoBoard }
+    $saved = Read-JsonFile $AutoLanesFile
+    $capacity = $board.Capacity
+    if ($null -eq $capacity) { Write-Host "capacity unknown ($($board.Why)); counted as $MaxLanes"; $capacity = $MaxLanes }
+    else { Write-Host "capacity $capacity (board at $ref)" }
+    $start = Get-AutoStartCount -Saved $saved -Capacity $capacity -MachineCap $machine.Cap
+    $reading = Get-UsageReading
+    $samples = @()
+    if ($reading) { $samples = @(New-UsageSample -At (Get-Date) -Reading $reading -ActiveLanes 0) }
+    $step = Get-AutoLaneStep -Samples $samples -Current $start.Count -Capacity $capacity -MachineCap $machine.Cap -Saved $saved
+    $savedNote = if ($saved) { " (saved $($saved.savedAt))" } else { '' }
+    Write-Host "5-hour rate $(Format-Rate $step.FiveHourRate)$(if ($null -ne $step.FiveHourRate) { ' points/hour/lane' })$savedNote"
+    Write-Host "weekly rate $(Format-Rate $step.WeeklyRate)$(if ($null -ne $step.WeeklyRate) { ' points/hour/lane' })$savedNote"
+    if ($reading) {
+        Write-Host ("usage 5-hour {0}% (reset {1}), weekly {2}% (reset {3})" -f [math]::Round($reading.FiveHour * 100),
+            $reading.FiveHourResets.ToString('HH:mm'), [math]::Round($reading.Week * 100), $reading.WeekResets.ToString('ddd HH:mm'))
+    } else { Write-Host "usage unknown (no reading in $LogDir)" }
+    if ($step.Pace) { Write-Host "5-hour target $(Format-Rate $step.Pace.FiveHour) lanes, weekly target $(Format-Rate $step.Pace.Weekly) lanes$(if ($NoWeeklyPace) { ' (not pacing weekly)' })" }
+    else { Write-Host '5-hour target none yet, weekly target none yet' }
+    Write-Host "start count $($start.Count) ($($start.Why))"
+    Write-Host $step.Next.Reason
+    exit 0
+}
+
 # ---------------------------------------------------------------------------- shift
 
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
@@ -1887,8 +2091,9 @@ $shiftEnd = (Get-Date).AddHours($Hours)
 
 # ------------------------------------------------ coordinator: start lanes, wait, alarm
 
-if ($Lanes -gt 1 -and -not $Lane) {
-    try { $Host.UI.RawUI.WindowTitle = "Dark factory - $Lanes lanes" } catch { }
+# Auto always coordinates lanes, even at one lane.
+if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
+    try { $Host.UI.RawUI.WindowTitle = "Dark factory - $(if ($AutoLanes) { 'auto' } else { $LaneCount }) lanes" } catch { }
     $branch = (git -C $Root rev-parse --abbrev-ref HEAD).Trim()
     if ($branch -in 'master', 'main') { Write-Trace '-' 'refuse' "on $branch; switch to a feature branch" 'Red'; exit 1 }
     if (Get-Dirty) { Write-Trace '-' 'refuse' 'working tree not clean; commit or stash first' 'Red'; exit 1 }
@@ -1914,7 +2119,36 @@ if ($Lanes -gt 1 -and -not $Lane) {
         }
         $orphans = @($stuck | Where-Object { $adopt.Values -notcontains $_ })
         if ($orphans.Count) { Write-Trace '-' 'refuse' "task already in Doing and held by no lane: $($orphans -join ', ')" 'Red'; exit 1 }
-        if (@($adopt.Keys | Where-Object { $_ -gt $Lanes }).Count) { $Lanes = ($adopt.Keys | Measure-Object -Maximum).Maximum }
+        if (@($adopt.Keys | Where-Object { $_ -gt $LaneCount }).Count) { $LaneCount = [int]($adopt.Keys | Measure-Object -Maximum).Maximum }
+    }
+
+    function Get-ShiftCapacity {
+        # The board's capacity on origin/<branch>, read in the auto-board worktree; the
+        # coordinator's own checkout is not pulled. -Fallback when it cannot be read, traced once.
+        param([int]$Fallback)
+        git -C $Root fetch -q origin $branch 2>&1 | Out-Null
+        $board = Get-BoardCapacity -Ref "origin/$branch"
+        if ($null -ne $board.Capacity) { return $board.Capacity }
+        if (-not $script:Auto.CapacityTraced) {
+            $script:Auto.CapacityTraced = $true
+            Write-Trace '-' 'lanes' "cannot read the board's capacity ($($board.Why)); using $Fallback" 'Yellow'
+        }
+        return $Fallback
+    }
+
+    if ($AutoLanes) {
+        # Sized before any lane starts: the machine cap, probed now while nothing builds if
+        # machine-lanes.json no longer describes this PC, then the start count from the last
+        # Auto shift, capped by the ceilings. Adopted lanes raise it, as with a fixed count.
+        $machine = Get-MachineCap -Probe
+        $script:Auto.MachineCap = $machine.Cap
+        Write-Trace '-' 'lanes' $machine.Text 'Cyan'
+        $script:Auto.Saved = Read-JsonFile $AutoLanesFile
+        $start = Get-AutoStartCount -Saved $script:Auto.Saved -Capacity (Get-ShiftCapacity -Fallback $MaxLanes) -MachineCap $machine.Cap
+        $why = $start.Why
+        if ($LaneCount -gt $start.Count) { $why = "lane $LaneCount adopted from the previous shift" }
+        $LaneCount = [math]::Max($LaneCount, $start.Count)
+        Write-Trace '-' 'lanes' "lanes auto: starting at $LaneCount ($why)" 'Cyan'
     }
 
     # The previous shift stopped claiming work near the end of its session; this one starts
@@ -1924,7 +2158,7 @@ if ($Lanes -gt 1 -and -not $Lane) {
     $shiftEnd = (Get-Date).AddHours($Hours)
 
     Set-OwnTabLabel ''
-    Write-Trace '-' 'shift' "start  $Lanes lanes  branch=$branch model=$Model until $($shiftEnd.ToString('HH:mm'))" 'Cyan'
+    Write-Trace '-' 'shift' "start  $LaneCount lanes$(if ($AutoLanes) { ' (auto)' })  branch=$branch model=$Model until $($shiftEnd.ToString('HH:mm'))" 'Cyan'
     New-Item -ItemType Directory -Force -Path $LanesDir | Out-Null
     New-Item -ItemType Directory -Force -Path (Join-Path $LogDir "lanes-$Stamp") | Out-Null
     $laneArgsFor = {
@@ -2021,7 +2255,36 @@ if ($Lanes -gt 1 -and -not $Lane) {
         return [bool]($Report.Summary -and -not $Report.Stalls.Count -and $Report.Summary -notmatch 'blocked=[1-9]')
     }
 
-    foreach ($n in 1..$Lanes) {
+    function Invoke-AutoLaneStep {
+        # One -Lanes Auto step (ADR-0130 items 2 to 5): sample the usage, meter the rates,
+        # and add or retire at most one lane. Holds without asking while the tokens are low
+        # or the shift's time is up.
+        $retiring = @($activeLanes | Where-Object { Test-Path (Get-LaneStatePath $_ 'retire') })
+        $current = @($activeLanes | Where-Object { $retiring -notcontains $_ }).Count
+        $low = Get-UsageStop
+        $hold = if ($low) { "tokens low: $low" } elseif ((Get-Date) -gt $shiftEnd) { 'shift time up' } else { '' }
+        if ($hold) { Write-Trace '-' 'lanes' "lanes $current held ($hold)" 'DarkGray'; return }
+        $now = Get-Date
+        $reading = Get-UsageReading -ThisShift
+        if ($reading) {
+            $busy = @($activeLanes | Where-Object { (Test-LaneAlive $_) -and (Get-LaneState $_ 'task') }).Count
+            $script:Auto.Samples = @(@($script:Auto.Samples) + @(New-UsageSample -At $now -Reading $reading -ActiveLanes $busy) |
+                Where-Object { $_.At -ge $now.AddHours(-3) })
+        }
+        $capacity = Get-ShiftCapacity -Fallback $current
+        $step = Get-AutoLaneStep -Samples $script:Auto.Samples -Current $current -Capacity $capacity -MachineCap $script:Auto.MachineCap -Saved $script:Auto.Saved
+        $script:Auto.FiveHourRate = $step.FiveHourRate
+        $script:Auto.WeeklyRate = $step.WeeklyRate
+        if (-not $step.Next.Changed) { Write-Trace '-' 'lanes' $step.Next.Reason 'DarkGray'; return }
+        Write-Trace '-' 'lanes' $step.Next.Reason 'Cyan'
+        $moved = if ($step.Next.Lanes -gt $current) { Add-Lane } else { Request-LaneRetire }
+        if ($null -eq $moved) { Write-Trace '-' 'lanes' "no lane to $(if ($step.Next.Lanes -gt $current) { 'add' } else { 'retire' })" 'Yellow'; return }
+        $script:LaneCount = $step.Next.Lanes
+        try { $Host.UI.RawUI.WindowTitle = "Dark factory - $($script:LaneCount) lanes (auto)" } catch { }
+        Save-AutoLanes $script:LaneCount
+    }
+
+    foreach ($n in 1..$LaneCount) {
         $where = Start-Lane -N $n
         $activeLanes.Add($n)
         Write-Trace '-' 'lane' "lane $n started in $(Join-Path $LanesDir "lane-$n") ($where)"
@@ -2033,6 +2296,7 @@ if ($Lanes -gt 1 -and -not $Lane) {
     # after the shift's length plus one task's time limit.
     $giveUp = $shiftEnd.AddMinutes($TaskMinutes + 30)
     $tick = Get-Date
+    $nextAutoStep = (Get-Date).AddMinutes(15)
     while ((Get-Date) -lt $giveUp) {
         # The coordinator announces the usage limit for every lane, and lanes waiting for a
         # new session add that wait to their shift, so the coordinator waits longer too.
@@ -2068,6 +2332,11 @@ if ($Lanes -gt 1 -and -not $Lane) {
             Start-Lane -N $n -Label "restart $($restarts[$n])$(if ($held) { " $held" })" -KeepWorktree | Out-Null
             Write-Trace '-' 'lane' "lane $n had died; restarted ($($restarts[$n]) of 5)$(if ($held) { ", resuming $held" })" 'Yellow'
         }
+        # -Lanes Auto steps every 15 minutes, but never while the shift waits for tokens.
+        if ($AutoLanes -and (Get-Date) -ge $nextAutoStep -and -not (Test-WaitingForSession)) {
+            Invoke-AutoLaneStep
+            $nextAutoStep = (Get-Date).AddMinutes(15)
+        }
         $running = @($procs | Where-Object { $_.Tab -or -not $_.Process.HasExited }).Count
         if ($running -eq 0) { break }
         Start-Sleep -Seconds 5
@@ -2092,7 +2361,8 @@ if ($Lanes -gt 1 -and -not $Lane) {
     foreach ($n in @($startedLanes)) {
         if (-not (Test-Path (Join-Path $summaries "lane-$n.txt"))) { Set-HerdrTabLabel $laneTabs[$n] (Get-LaneTabLabel $n 'no report, read') }
     }
-    Write-Trace '-' 'shift' "end  $Lanes lanes" 'Cyan'
+    Write-Trace '-' 'shift' "end  $LaneCount lanes$(if ($AutoLanes) { ' (auto)' })" 'Cyan'
+    if ($AutoLanes) { Save-AutoLanes $LaneCount }
     Write-Trace '-' 'merge' (Invoke-MergeToMaster -Branch $branch) 'Cyan'
     $reasons = @($stalls) + @($retiredLines) + @(Get-WaitingOnStewart)
     # -Continuous: while the board still has ready work, the next shift starts itself, so
@@ -2100,7 +2370,11 @@ if ($Lanes -gt 1 -and -not $Lane) {
     $stillReady = (Invoke-Board @('next')) -join "`n"
     if ($Continuous -and $stillReady -match '(?m)^BL-\d{3}\s') {
         foreach ($r in $reasons) { Write-Trace '-' 'note' (Get-Short $r 100) 'Yellow' }
-        $forward = @('-Lanes', $Lanes, '-Hours', $Hours, '-MaxTasks', $MaxTasks, '-TaskMinutes', $TaskMinutes, '-Model', $Model, '-Continuous')
+        # An Auto shift hands on Auto, not the count it ended at; the next one starts from
+        # the count auto-lanes.json saved.
+        $forward = @('-Lanes', $(if ($AutoLanes) { 'Auto' } else { $LaneCount }), '-Hours', $Hours, '-MaxTasks', $MaxTasks, '-TaskMinutes', $TaskMinutes, '-Model', $Model, '-Continuous')
+        if ($AutoLanes) { $forward += @('-MaxLanes', $MaxLanes) }
+        if ($NoWeeklyPace) { $forward += '-NoWeeklyPace' }
         if ($QuietAlarm) { $forward += '-QuietAlarm' }
         $next = Start-Detached -Label "DF shift starting" -Dir $Root -ScriptArgs $forward
         Write-Trace '-' 'shift' "work is still ready; next shift started ($(if ($next.Tab) { "herdr tab $($next.Tab)" } else { "pid $($next.Process.Id)" }))" 'Cyan'
