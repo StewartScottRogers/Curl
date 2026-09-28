@@ -29,6 +29,8 @@ completed: 2026-09-27
 
 ## Notes
 
+- Extracted the Schannel build's failure answer from `VerifyPeer` into the private `SchannelPeerVerificationFailure`; `VerifyPeer` now picks the build with one conditional. Behaviour unchanged, tests untouched. Measured 2026-09-27: 287 members, 0 failing, worst CRAP 10, 100% line and branch.
+
 ## Log
 
 - 2026-09-27: Created.
