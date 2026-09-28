@@ -124,7 +124,7 @@ internal sealed class HttpResponseHeadBuilder
 
         string header = pendingHeader.ToString();
         int colon = header.IndexOf(':', StringComparison.Ordinal);
-        headers.Add(new HttpResponseHeader(header[..colon], header[(colon + 1)..].Trim(' ', '\t')));
+        headers.Add(new HttpResponseHeader(header[..colon], header[(colon + 1)..].Trim(' ', '\t')) { LineStart = headText.Length });
         Append(header, pendingTerminator);
         hasPendingHeader = false;
     }

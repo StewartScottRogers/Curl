@@ -478,10 +478,12 @@ public sealed class HttpProtocolHandler(
             ReportRequestSent(context.Events, framing, upload, bodyLeftUnsent);
             exchange.RequestSent = context.TimeProvider.GetTimestamp();
             exchange.Head = await headReader.ReadAsync(cancellationToken).ConfigureAwait(false);
+            HttpHeadRefusal? refusal = body.FindHeadRefusal(exchange.Head, context.NoBody, DecodesContent(options));
+            exchange.Head = HeadCurlRead(exchange.Head, refusal);
             exchange.RedirectUrl = HttpRedirectLocation.Find(context.Url, exchange.Head);
             StoreCookies(context, exchange.Head);
             await WriteHeadersAsync(context.HeaderOutput, exchange.Head.HeadBytes, cancellationToken).ConfigureAwait(false);
-            body.ThrowIfTooManyContentCodings(exchange.Head, DecodesContent(options));
+            ThrowIfHeaderRefused(refusal);
             retry = RetryOf(plan, exchange.Head, bodyLeftUnsent, upload);
             HttpFailMode fail = retry is null ? options.Fail : HttpFailMode.None;
             ThrowIfFailing(fail, HttpFailMode.Fail, exchange.Head);
@@ -604,6 +606,27 @@ public sealed class HttpProtocolHandler(
         if (framing.RefusesUnknownLength)
         {
             throw new HttpTransferException(CurlExitCode.UploadFailed, HttpTransferMessages.ChunkedUploadNeedsHttp11);
+        }
+    }
+
+    /// <summary>
+    /// Gives the part of <paramref name="head" /> curl 8.21.0 reads, writes and reports: all of
+    /// it, or the part before the header it refused (<see cref="HttpResponseHead.Before" />).
+    /// </summary>
+    private static HttpResponseHead HeadCurlRead(HttpResponseHead head, HttpHeadRefusal? refusal) =>
+        refusal is null ? head : head.Before(refusal.HeaderIndex);
+
+    /// <summary>
+    /// Fails the transfer with the failure of the header curl refused while reading the head
+    /// (<see cref="HttpResponseBodyReader.FindHeadRefusal" />), once the head before it is
+    /// written.
+    /// </summary>
+    /// <exception cref="HttpTransferException"><paramref name="refusal" /> is not <see langword="null" />.</exception>
+    private static void ThrowIfHeaderRefused(HttpHeadRefusal? refusal)
+    {
+        if (refusal is not null)
+        {
+            throw refusal.Failure;
         }
     }
 

@@ -16,4 +16,10 @@ internal sealed class HttpResponseHeader(string name, string value)
     /// Gets the text after the first colon, without leading or trailing blanks.
     /// </summary>
     internal string Value { get; } = value;
+
+    /// <summary>
+    /// Gets the offset in <see cref="HttpResponseHead.HeadBytes" /> where this header's line
+    /// starts: how much of the head curl has written for <c>-D</c> before it reads this header.
+    /// </summary>
+    internal int LineStart { get; init; }
 }

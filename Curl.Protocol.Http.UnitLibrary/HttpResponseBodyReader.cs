@@ -105,29 +105,90 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
         !noBody && head.StatusLine.StatusCode is not (204 or 304);
 
     /// <summary>
-    /// Refuses a response whose Content-Encoding headers list more than
-    /// <see cref="HttpContentDecoder.MaximumCodings" /> codings, as curl 8.21.0 does for
-    /// <c>--compressed</c> while it reads the headers (measured, BL-364 Notes): whatever the
-    /// body, for <c>-I</c>, before <c>-f</c> and before a redirect is followed; but not for a
-    /// 204 or 304. A header before the one past the limit is read first, so an invalid
-    /// Content-Length or a refused Transfer-Encoding there is reported instead.
+    /// Finds the first header curl 8.21.0 refuses while it reads the head, in the order the
+    /// headers arrived (measured, BL-364 and BL-412 Notes): an invalid Content-Length (exit 8),
+    /// unless <c>--ignore-content-length</c>; a Transfer-Encoding
+    /// <see cref="HttpResponseBodyFraming.Of" /> refuses (exit 61), but not for <c>-I</c>; and,
+    /// for <c>--compressed</c>, the Content-Encoding header that takes the codings past
+    /// <see cref="HttpContentDecoder.MaximumCodings" /> (exit 61). Nothing is refused in a 204
+    /// or 304. Curl refuses the header before <c>-f</c> and before a redirect is followed, and
+    /// writes header output only up to it.
     /// </summary>
     /// <param name="head">The response's head.</param>
+    /// <param name="noBody"><see langword="true" /> for <c>-I</c>.</param>
     /// <param name="decodeContent"><see langword="true" /> for <c>--compressed</c> without <c>--raw</c>.</param>
-    /// <exception cref="HttpTransferException">
-    /// The codings are past the limit (exit 61), or a header before them is refused as
-    /// <see cref="HttpResponseBodyFraming.Of" /> says (exit 8 or 61).
-    /// </exception>
-    internal void ThrowIfTooManyContentCodings(HttpResponseHead head, bool decodeContent)
+    /// <returns>The refused header and its failure, or <see langword="null" /> when none is refused.</returns>
+    internal HttpHeadRefusal? FindHeadRefusal(HttpResponseHead head, bool noBody, bool decodeContent)
     {
-        int? index = decodeContent && HasBody(head, noBody: false) ? HttpContentDecoder.IndexPastCodingLimit(head.Headers) : null;
-        if (index is null)
+        if (!HasBody(head, noBody: false))
         {
-            return;
+            return null;
         }
 
-        HttpResponseBodyFraming.Of([.. head.Headers.Take(index.Value)], PassesTransferCoding, IgnoresContentLength, DecodesTransferCoding);
-        throw new HttpTransferException(CurlExitCode.BadContentEncoding, HttpTransferMessages.TooManyContentCodings);
+        int? codingIndex = decodeContent ? HttpContentDecoder.IndexPastCodingLimit(head.Headers) : null;
+        int checkedCount = codingIndex ?? head.Headers.Count;
+        if (FramingFailure(head.Headers, checkedCount, noBody) is not null)
+        {
+            return FirstFramingRefusal(head.Headers, checkedCount, noBody);
+        }
+
+        return codingIndex is { } index
+            ? new HttpHeadRefusal(index, new HttpTransferException(CurlExitCode.BadContentEncoding, HttpTransferMessages.TooManyContentCodings))
+            : null;
+    }
+
+    /// <summary>
+    /// Finds the header whose framing refusal the first <paramref name="refusedCount" />
+    /// headers carry. Each check reads headers in order and fails at the first it refuses, so
+    /// once a run of headers is refused every longer one is too, and a binary search finds the
+    /// shortest refused run without checking every one of a long head's runs.
+    /// </summary>
+    private HttpHeadRefusal FirstFramingRefusal(IReadOnlyList<HttpResponseHeader> headers, int refusedCount, bool noBody)
+    {
+        int low = 1;
+        int high = refusedCount;
+        while (low < high)
+        {
+            int middle = low + ((high - low) / 2);
+            if (FramingFailure(headers, middle, noBody) is null)
+            {
+                low = middle + 1;
+            }
+            else
+            {
+                high = middle;
+            }
+        }
+
+        return new HttpHeadRefusal(low - 1, FramingFailure(headers, low, noBody)!);
+    }
+
+    /// <summary>
+    /// Checks the framing headers among the first <paramref name="count" /> headers: the
+    /// Content-Length alone for <c>-I</c>, which reads no body and so refuses no
+    /// Transfer-Encoding (measured, BL-412 Notes).
+    /// </summary>
+    /// <returns>The failure, or <see langword="null" /> when those headers are accepted.</returns>
+    private HttpTransferException? FramingFailure(IReadOnlyList<HttpResponseHeader> headers, int count, bool noBody)
+    {
+        IReadOnlyList<HttpResponseHeader> checkedHeaders = [.. headers.Take(count)];
+        try
+        {
+            if (noBody)
+            {
+                _ = IgnoresContentLength ? null : HttpContentLength.Find(checkedHeaders);
+            }
+            else
+            {
+                HttpResponseBodyFraming.Of(checkedHeaders, PassesTransferCoding, IgnoresContentLength, DecodesTransferCoding);
+            }
+
+            return null;
+        }
+        catch (HttpTransferException failure)
+        {
+            return failure;
+        }
     }
 
     /// <summary>
