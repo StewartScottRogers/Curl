@@ -31,7 +31,7 @@ public sealed class CurlCommandRunnerConnectTimeoutTests
         int exitCode = await RunAsync("--connect-timeout", "1", "dict://127.0.0.1/d:x");
 
         Assert.AreEqual((int)CurlExitCode.OperationTimedOut, exitCode);
-        Assert.AreEqual("curl: (28) Connection timed out after 1000 milliseconds\r\n", StandardErrorText);
+        Assert.AreEqual("curl: (28) Connection timed out after 1000 milliseconds" + Environment.NewLine, StandardErrorText);
     }
 
     [TestMethod]
@@ -41,7 +41,7 @@ public sealed class CurlCommandRunnerConnectTimeoutTests
         int exitCode = await RunAsync("--connect-timeout", "5", "-m", "1", "dict://127.0.0.1/d:x");
 
         Assert.AreEqual((int)CurlExitCode.OperationTimedOut, exitCode);
-        StringAssert.EndsWith(StandardErrorText, "curl: (28) Connection timed out after 1000 milliseconds\r\n");
+        StringAssert.EndsWith(StandardErrorText, "curl: (28) Connection timed out after 1000 milliseconds" + Environment.NewLine);
     }
 
     [TestMethod]
