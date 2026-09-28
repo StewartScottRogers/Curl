@@ -42,8 +42,15 @@ Namespace `Curl.Cryptography`. It holds:
 - `BcryptPbkdf` (public): OpenBSD's `bcrypt_pbkdf`, the KDF of encrypted
   `openssh-key-v1` keys - `DeriveKey`, plus the internal bcrypt `ComputeHash`. Not
   constant-time.
+- `AesCtr` (public, `IDisposable`): NIST SP 800-38A counter mode on the BCL's AES-ECB,
+  128-bit big-endian counter that wraps to zero (SSH `aes*-ctr`, RFC 4344).
+  `ApplyKeyStream` keeps the counter and keystream position between calls, plus the
+  internal `Increment`.
+- `AesCbcCts` (public, `IDisposable`): CBC with ciphertext stealing as RFC 3962 defines
+  it for Kerberos, on the BCL's AES-CBC - `Encrypt` and `Decrypt` of a message of at
+  least one block; a longer one always has its last two blocks swapped (CBC-CS3).
 
-The remaining primitives land under their own tasks (BL-675 to BL-677, BL-737
+The remaining primitives land under their own tasks (BL-675 to BL-677, BL-738
 to BL-745).
 
 ## Rules
