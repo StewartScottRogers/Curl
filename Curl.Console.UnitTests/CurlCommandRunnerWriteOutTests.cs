@@ -184,6 +184,15 @@ public sealed class CurlCommandRunnerWriteOutTests
         Assert.AreEqual("ok://h/x?a=b", StandardOutputText);
     }
 
+    /// <summary>Measured (BL-444 Notes): <c>HTTP://LocalHost:1/a/../b</c> prints <c>http://LocalHost:1/b</c>.</summary>
+    [TestMethod]
+    public async Task RunAsync_UpperCaseSchemeAndDotSegments_EffectiveUrlIsNormalised()
+    {
+        await RunOkAndFailingAsync(runsOnWindows: false, "-s", "-o", "a", "-w", "%{url_effective}", "OK://H/a/../b");
+
+        Assert.AreEqual("ok://H/b", StandardOutputText);
+    }
+
     [TestMethod]
     public async Task RunAsync_UnknownVariableOnWindows_WarnsWithCrLf()
     {

@@ -57,8 +57,10 @@ gateway or not: `curl: Failed to extract a filename from the URL to use for stor
 `-1`, exit 1, and the run ends (BL-372 Notes). A URL still without a
 scheme gets the one `UrlSchemeGuesser` guesses (`http`, or `ftp` for `ftp.` and so on), which
 `%{url_effective}` shows while `%{url}` keeps the URL as typed. Measured on curl 8.21.0
-(BL-240 Notes). `%{url_effective}` also gives a URL with an empty path the root path `/`
-(`UrlRootPath`, before any query or fragment), as curl 8.21.0 does (BL-371 Notes).
+(BL-240 Notes). `%{url_effective}` prints the URL `UrlEffective` rebuilds: the scheme in
+lower case, the authority as typed, and the path as curl sends it - `/` when empty, dot
+segments removed unless `--path-as-is` - before the query and fragment; a URL curl rejects
+prints as typed, as curl 8.21.0 does (BL-371 and BL-444 Notes).
 
 Each URL's output comes from `CommandLineOptions.UrlOutputs`: an `-o` name, or for `-O` /
 `--remote-name-all` the name `RemoteFileName` takes from the URL path (last non-empty

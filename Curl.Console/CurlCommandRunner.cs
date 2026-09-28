@@ -1216,7 +1216,7 @@ internal sealed class CurlCommandRunner(
         TransferResult result,
         long connectionId)
     {
-        string requestUrl = UrlRootPath.AddToEmptyPath(QueryUrl.Append(transferUrl, options));
+        string requestUrl = UrlEffective.Normalize(QueryUrl.Append(transferUrl, options), options.PathAsIs);
         return new(result, givenUrl, transfer.UrlIndex, requestUrl, WriteOutScheme(requestUrl, result), timeProvider)
         {
             Referer = result.Report?.Referer ?? options.Referer,
