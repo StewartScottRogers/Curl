@@ -361,6 +361,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
             TimeProvider = first.TimeProvider,
             CancellationToken = first.CancellationToken,
             Progress = first.Progress,
+            Events = first.Events,
         };
 
     /// <summary>

@@ -783,6 +783,25 @@ public sealed class RedirectFollowerTests
     }
 
     [TestMethod]
+    public async Task FollowAsync_NextHop_ReportsToTheFirstHopsEventSink()
+    {
+        ScriptedHandler handler = new(Redirect(302, Next), Ok(200, 0));
+        IgnoringTransferEvents events = new();
+        TransferContext first = new()
+        {
+            Url = CurlUrl.Parse(First),
+            Output = Stream.Null,
+            Http = Location(),
+            Events = events,
+        };
+
+        await Follow(handler, first);
+
+        Assert.HasCount(2, handler.Contexts);
+        Assert.AreSame(events, handler.Contexts[1].Events);
+    }
+
+    [TestMethod]
     public async Task FollowAsync_NoHopProxySelector_EveryHopKeepsTheFirstUrlsProxy()
     {
         ProxyEndpoint socks = new(ProxyKind.Socks5, "127.0.0.1", 1080, null);
@@ -1007,9 +1026,6 @@ public sealed class RedirectFollowerTests
     }
 
     /// <summary>
-    /// A time source whose timestamps count milliseconds.
-    /// </summary>
-    /// <summary>
     /// An <see cref="ITransferProgress" /> that counts the reports it receives, standing in
     /// for <c>Curl.Console</c>'s progress meter so a test can tell its instance apart from
     /// <see cref="NoTransferProgress.Instance" />.
@@ -1025,6 +1041,53 @@ public sealed class RedirectFollowerTests
         public void ReportUploaded(long bytesSoFar, long? expectedTotal) => ReportCount++;
     }
 
+    /// <summary>
+    /// An <see cref="ITransferEvents" /> that ignores every event, standing in for
+    /// <c>Curl.Console</c>'s verbose sink so a test can tell its instance apart from
+    /// <see cref="NoTransferEvents.Instance" />.
+    /// </summary>
+    private sealed class IgnoringTransferEvents : ITransferEvents
+    {
+        public void ReportInfo(string text)
+        {
+        }
+
+        public void ReportConnectionOpened(ConnectionOpenedEvent opened)
+        {
+        }
+
+        public void ReportConnectionReused(ConnectionReusedEvent reused)
+        {
+        }
+
+        public void ReportTlsHandshake(TlsHandshakeEvent handshake)
+        {
+        }
+
+        public void ReportTlsData(ReadOnlySpan<byte> bytes, bool sent)
+        {
+        }
+
+        public void ReportRequestHeader(ReadOnlySpan<byte> bytes)
+        {
+        }
+
+        public void ReportResponseHeader(ReadOnlySpan<byte> bytes)
+        {
+        }
+
+        public void ReportDataSent(ReadOnlySpan<byte> bytes)
+        {
+        }
+
+        public void ReportDataReceived(ReadOnlySpan<byte> bytes)
+        {
+        }
+    }
+
+    /// <summary>
+    /// A time source whose timestamps count milliseconds.
+    /// </summary>
     private sealed class MillisecondTimeProvider : TimeProvider
     {
         public override long TimestampFrequency => 1000;
