@@ -33,3 +33,4 @@ Without `-s`, `-v` lines and the progress meter appear on standard error in the 
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
