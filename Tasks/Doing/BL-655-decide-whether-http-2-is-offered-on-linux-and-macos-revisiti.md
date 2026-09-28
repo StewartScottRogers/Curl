@@ -34,3 +34,4 @@ A new ADR supersedes ADR-0017's HTTP/2 half (its refusal of `--http2` and `--htt
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
