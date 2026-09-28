@@ -340,6 +340,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
             Output = first.Output,
             Upload = bodyDropped ? null : first.Upload,
             ResumeFrom = first.ResumeFrom,
+            ResumeUploadFromUnknownOffset = !bodyDropped && first.ResumeUploadFromUnknownOffset,
             Range = first.Range,
             MaxFileSize = first.MaxFileSize,
             NoBody = first.NoBody,

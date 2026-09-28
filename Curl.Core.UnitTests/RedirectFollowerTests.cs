@@ -317,6 +317,28 @@ public sealed class RedirectFollowerTests
     }
 
     [TestMethod]
+    [DataRow(307, true)]
+    [DataRow(308, true)]
+    [DataRow(303, false)]
+    public async Task FollowAsync_ResumedUploadFromUnknownOffset_NextHopResumesOnlyWhenUploadKept(int status, bool expected)
+    {
+        // curl -L -C - -T up.txt: a 307 or 308 PUTs again with Content-Range; a 303 GETs with no upload.
+        ScriptedHandler handler = new(Redirect(status, Next), Ok(200, 0));
+        TransferContext first = new()
+        {
+            Url = CurlUrl.Parse(First),
+            Output = Stream.Null,
+            Http = Location(),
+            Upload = new MemoryStream([1, 2, 3]),
+            ResumeUploadFromUnknownOffset = true,
+        };
+
+        await Follow(handler, first);
+
+        Assert.AreEqual(expected, handler.Contexts[1].ResumeUploadFromUnknownOffset);
+    }
+
+    [TestMethod]
     public async Task FollowAsync_UploadAnswered303_DropsUpload()
     {
         // curl -L --max-redirs 1 -T up.txt, 303: PUT /a with "abc", then GET /next with no body.
