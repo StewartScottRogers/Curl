@@ -34,3 +34,4 @@ Under `-v`, a `-b` file that cannot be opened prints curl 8.21.0's `* WARNING: f
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
