@@ -36,3 +36,4 @@ On Linux and macOS, `FtpProtocolHandler` takes a `-P` value that names a network
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
