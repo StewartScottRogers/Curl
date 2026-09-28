@@ -207,7 +207,7 @@ public sealed class CommandLineOptions
 
     /// <summary>
     /// Where each URL's body goes, one <see cref="UrlOutput"/> per URL or output option, in the order
-    /// curl 8.21.0 pairs them: the Nth URL with the Nth <c>-o</c>, <c>-O</c> or kept
+    /// curl 8.21.0 pairs them: the Nth URL with the Nth <c>-o</c>, <c>-O</c>, <c>--out-null</c> or kept
     /// <c>--no-remote-name</c>. Entries past the last URL have no <see cref="UrlOutput.Url"/>.
     /// </summary>
     public IReadOnlyList<UrlOutput> UrlOutputs => urlOutputs;
@@ -1166,6 +1166,18 @@ public sealed class CommandLineOptions
     {
         UrlOutput output = urlOutputs.Find(output => !output.HasOutputOption) ?? AddUrlOutput();
         output.FileName = outputFile;
+        output.HasOutputOption = true;
+    }
+
+    /// <summary>
+    /// Pairs <c>--out-null</c> with the next URL in <see cref="UrlOutputs"/>, which then discards its
+    /// body instead of saving it under the remote name <see cref="RemoteNameAll"/> would give it.
+    /// </summary>
+    internal void PairDiscardedBody()
+    {
+        UrlOutput output = urlOutputs.Find(output => !output.HasOutputOption) ?? AddUrlOutput();
+        output.DiscardsBody = true;
+        output.UsesRemoteName = false;
         output.HasOutputOption = true;
     }
 

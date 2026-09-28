@@ -476,9 +476,10 @@ internal sealed class CurlCommandRunner(
     private long nextTransferId;
 
     /// <summary>
-    /// Whether a transfer of this run has sent, or was set up to send, its body to standard output.
+    /// Whether a transfer of this run has switched standard output to binary mode, as one set up to
+    /// send its body to standard output, or to discard it under <c>--out-null</c>, does.
     /// </summary>
-    private bool bodyWrittenToStandardOutput;
+    private bool standardOutputSwitchedToBinary;
 
     /// <summary>
     /// Whether the current transfer has written the progress meter's header lines, which curl
@@ -922,9 +923,9 @@ internal sealed class CurlCommandRunner(
 
         await RemoveOutputFileOfFailedTransferAsync(options, result).ConfigureAwait(false);
         bool endsTheRun = EndsTheRun(options, result);
-        bodyWrittenToStandardOutput |= SendsBodyToStandardOutput(transfer, result);
+        standardOutputSwitchedToBinary |= SwitchesStandardOutputToBinary(transfer, result);
         bool standardOutputIsBinary = IsStandardOutputBinaryForWriteOut(
-            options, transfer.UrlIndex, bodyWrittenToStandardOutput, endsTheRun);
+            options, transfer.UrlIndex, standardOutputSwitchedToBinary, endsTheRun);
         await WriteOutAsync(options, transfer, givenUrl, transferUrl, result, standardOutputIsBinary).ConfigureAwait(false);
         await WriteCookieJarAsync(dispatch, options, transferUrl, standardOutputIsBinary).ConfigureAwait(false);
 
@@ -1171,16 +1172,17 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
-    /// Tells whether <paramref name="transfer" /> was set up to send its body to standard output,
-    /// which is when curl switches standard output to binary mode: it has no <c>-o</c> or remote
-    /// name, and its <c>-D</c> file, if any, could be opened. An IPFS URL that could not be
-    /// rewritten counts: curl 8.21.0 wrote its <c>-w</c> line feed as LF without <c>-o</c> and as
-    /// CR LF with one (measured 2026-09-27, BL-240 Notes).
+    /// Tells whether <paramref name="transfer" /> switches standard output to binary mode, as curl
+    /// does for a transfer with no <c>-o</c> or remote name whose <c>-D</c> file, if any, could be
+    /// opened: one sending its body to standard output, or discarding it under <c>--out-null</c>
+    /// (<c>--out-null u -w "%{http_code}\n"</c> wrote LF, measured 2026-09-28, BL-495 Notes). An
+    /// IPFS URL that could not be rewritten counts: curl 8.21.0 wrote its <c>-w</c> line feed as LF
+    /// without <c>-o</c> and as CR LF with one (measured 2026-09-27, BL-240 Notes).
     /// </summary>
     /// <param name="transfer">The transfer.</param>
     /// <param name="result">The transfer's result.</param>
-    /// <returns><see langword="true" /> when the body went, or was to go, to standard output.</returns>
-    private static bool SendsBodyToStandardOutput(UrlTransfer transfer, TransferResult result) =>
+    /// <returns><see langword="true" /> when standard output is now in binary mode.</returns>
+    private static bool SwitchesStandardOutputToBinary(UrlTransfer transfer, TransferResult result) =>
         !transfer.WritesToFile && !ReferenceEquals(result, CannotOpenHeaderFileFailure);
 
     /// <summary>
@@ -1203,13 +1205,14 @@ internal sealed class CurlCommandRunner(
         UrlOutputOf(options, index) is { FileName: not null and not UrlTransfer.StandardOutputFileName } or { UsesRemoteName: true };
 
     /// <summary>
-    /// Tells whether any URL after the one at <paramref name="index" /> sends its body to
-    /// standard output.
+    /// Tells whether any URL after the one at <paramref name="index" /> switches standard output
+    /// to binary mode: one that saves no file, sending its body to standard output or discarding
+    /// it under <c>--out-null</c>.
     /// </summary>
     /// <param name="options">The accepted command line.</param>
     /// <param name="index">The URL's position on the command line.</param>
-    /// <returns><see langword="true" /> when a later URL writes to standard output.</returns>
-    private static bool LaterUrlWritesToStandardOutput(CommandLineOptions options, int index)
+    /// <returns><see langword="true" /> when a later URL saves no file.</returns>
+    private static bool LaterUrlSwitchesStandardOutputToBinary(CommandLineOptions options, int index)
     {
         for (int later = index + 1; later < options.Urls.Count; later++)
         {
@@ -1228,11 +1231,11 @@ internal sealed class CurlCommandRunner(
     /// </summary>
     /// <param name="options">The accepted command line.</param>
     /// <param name="index">The URL's position on the command line.</param>
-    /// <param name="bodyWrittenToStandardOutput">Whether this or an earlier transfer sent its body to standard output.</param>
+    /// <param name="standardOutputSwitchedToBinary">Whether this or an earlier transfer switched standard output to binary mode.</param>
     /// <param name="endsTheRun">Whether this transfer is the run's last.</param>
     /// <returns>
     /// Always <see langword="true" /> off Windows. On Windows, <see langword="true" /> when this or
-    /// an earlier transfer sent its body to standard output, or when the run goes on and a later
+    /// an earlier transfer switched standard output to binary mode, or when the run goes on and a later
     /// URL has no <c>-o</c> or remote name: curl 8.21.0 holds the <c>-w</c> text in its stdio buffer, and the
     /// later transfer switches standard output to binary before the buffer is written out.
     /// Measured on 2026-09-26: <c>-o NUL -o NUL -w "%{exitcode}\n" f f g</c>, with <c>g</c> to
@@ -1243,11 +1246,11 @@ internal sealed class CurlCommandRunner(
     private bool IsStandardOutputBinaryForWriteOut(
         CommandLineOptions options,
         int index,
-        bool bodyWrittenToStandardOutput,
+        bool standardOutputSwitchedToBinary,
         bool endsTheRun) =>
         !runsOnWindows
-        || bodyWrittenToStandardOutput
-        || (!endsTheRun && LaterUrlWritesToStandardOutput(options, index));
+        || standardOutputSwitchedToBinary
+        || (!endsTheRun && LaterUrlSwitchesStandardOutputToBinary(options, index));
 
     /// <summary>
     /// Renders the <c>-w</c> template, when one was given, for the finished
@@ -1813,8 +1816,9 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// Performs one checked transfer, sending <paramref name="formBody" /> when given, to the file
-    /// <see cref="ResolveOutputFileAsync" /> names when it names one and to standard output
-    /// otherwise, and writes the progress meter after it. The transfer goes through the proxy
+    /// <see cref="ResolveOutputFileAsync" /> names when it names one, nowhere under <c>--out-null</c>
+    /// (<see cref="Stream.Null" />, with the progress meter drawn as for a file) and to standard
+    /// output otherwise, and writes the progress meter after it. The transfer goes through the proxy
     /// <see cref="TransferProxySelection" /> chooses; when it refuses one, the transfer ends with
     /// its failure and nothing is sent.
     /// </summary>
@@ -1859,26 +1863,26 @@ internal sealed class CurlCommandRunner(
 
         if (outputFile is null)
         {
-            StartTransferProgress(options, options.ResumeFrom, toStandardOutput: true);
-            TransferResult standardOutputResult = await TransferToStandardOutputAsync(
-                    follower,
-                    options,
-                    () => transferContextFactory.Create(
-                        options,
-                        url,
-                        RateLimited(options, FlushedEachWriteUnderNoBuffer(options, deferringStandardOutput)),
-                        range,
-                        options.ResumeFrom,
-                        headerOutput,
-                        formBody,
-                        upload,
-                        proxy,
-                        progress: transferProgress,
-                        events: transferEventOutput.Events,
-                        lowSpeedWatchdog: StartLowSpeedWatchdog(options)))
-                .ConfigureAwait(false);
+            bool toStandardOutput = !transfer.DiscardsBody;
+            StartTransferProgress(options, options.ResumeFrom, toStandardOutput);
+            Func<TransferContext> createAttemptContext = () => transferContextFactory.Create(
+                options,
+                url,
+                RateLimited(options, toStandardOutput ? FlushedEachWriteUnderNoBuffer(options, deferringStandardOutput) : Stream.Null),
+                range,
+                options.ResumeFrom,
+                headerOutput,
+                formBody,
+                upload,
+                proxy,
+                progress: transferProgress,
+                events: transferEventOutput.Events,
+                lowSpeedWatchdog: StartLowSpeedWatchdog(options));
+            TransferResult result = toStandardOutput
+                ? await TransferToStandardOutputAsync(follower, options, createAttemptContext).ConfigureAwait(false)
+                : await FollowRetryingAsync(follower, options, createAttemptContext, options.ResumeFrom, null).ConfigureAwait(false);
 
-            return await WriteProgressAsync(options, standardOutputResult, options.ResumeFrom, toStandardOutput: true)
+            return await WriteProgressAsync(options, result, options.ResumeFrom, toStandardOutput)
                 .ConfigureAwait(false);
         }
 

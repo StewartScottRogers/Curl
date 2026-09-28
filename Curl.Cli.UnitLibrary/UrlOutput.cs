@@ -2,7 +2,7 @@ namespace Curl.Cli;
 
 /// <summary>
 /// Where one URL's response body goes, paired the way curl 8.21.0 pairs URLs with <c>-o</c> /
-/// <c>--output</c>, <c>-O</c> / <c>--remote-name</c> and <c>--remote-name-all</c>: the Nth URL takes
+/// <c>--output</c>, <c>-O</c> / <c>--remote-name</c>, <c>--out-null</c> and <c>--remote-name-all</c>: the Nth URL takes
 /// the Nth output option, whatever order they were given in. A pairing is made by whichever of the two
 /// comes first, and one made while <c>--remote-name-all</c> is on starts out using the remote name.
 /// <see cref="FileName"/>, when set, wins over <see cref="UsesRemoteName"/>; with neither, the body
@@ -32,7 +32,16 @@ public sealed class UrlOutput
     public bool UsesRemoteName { get; internal set; }
 
     /// <summary>
-    /// <see langword="true"/> when an <c>-o</c>, <c>-O</c> or <c>--no-remote-name</c> has been paired
+    /// <see langword="true"/> when <c>--out-null</c> (or <c>--no-out-null</c>, which curl 8.21.0 treats
+    /// the same) was paired with the URL: its body, and any <c>-i</c> header lines, are thrown away,
+    /// no file is created and nothing reaches standard output. <see cref="FileName"/> is then
+    /// <see langword="null"/> and <see cref="UsesRemoteName"/> <see langword="false"/>, even under
+    /// <c>--remote-name-all</c> (measured 2026-09-28, BL-495 Notes).
+    /// </summary>
+    public bool DiscardsBody { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when an <c>-o</c>, <c>-O</c>, <c>--out-null</c> or <c>--no-remote-name</c> has been paired
     /// with this entry, so the next such option pairs with the entry after it.
     /// </summary>
     internal bool HasOutputOption { get; set; }

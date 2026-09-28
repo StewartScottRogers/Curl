@@ -38,6 +38,8 @@ namespace Curl.Cli;
 /// <c>--no-ignore-content-length</c>, <c>--no-path-as-is</c>, <c>--no-http0.9</c>, <c>--no-basic</c>, <c>--no-digest</c>, <c>--no-ntlm</c>, <c>--no-negotiate</c>, <c>--no-proxytunnel</c>, <c>--no-remote-name</c>,
 /// <c>--no-remote-name-all</c>, <c>--no-remote-header-name</c>, <c>--no-create-dirs</c>, <c>--no-clobber</c> (measured 2026-09-28), <c>--no-skip-existing</c> and <c>--no-remove-on-error</c> (measured 2026-09-28), <c>--no-junk-session-cookies</c>, <c>--no-globoff</c>, <c>--no-version</c>, <c>--no-verbose</c>, <c>--no-trace-time</c>, <c>--no-retry-all-errors</c>, <c>--no-retry-connrefused</c>, <c>--no-disable-epsv</c>, <c>--no-epsv</c>, <c>--no-ftp-skip-pasv-ip</c>, <c>--no-ftp-create-dirs</c>, <c>--no-disable-eprt</c>, <c>--no-eprt</c>, <c>--no-ssl</c>, <c>--no-ftp-ssl</c>, <c>--no-ssl-reqd</c>, <c>--no-ftp-ssl-reqd</c>, <c>--no-ftp-ssl-control</c> and <c>--no-list-only</c> (measured 2026-09-27) and <c>--no-buffer</c> (measured 2026-09-28; <c>-N</c> is <c>--no-buffer</c>) are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
 /// silent and <c>--no-silent -s</c> is. <c>--no-silent=x</c> is accepted, its value ignored.
+/// <c>--no-out-null</c> is accepted and, as in curl 8.21.0, discards its URL's body just as <c>--out-null</c> does
+/// (measured 2026-09-28, BL-495 Notes).
 /// <c>--no-tlsv1</c>, <c>--no-tlsv1.0</c>, <c>--no-tlsv1.1</c>, <c>--no-tlsv1.2</c>, <c>--no-tlsv1.3</c>, <c>--no-tls-max</c>, <c>--no-proxy-tlsv1</c>, <c>--no-url</c>, <c>--no-output</c> (even as the last
 /// argument), <c>--no-output=x</c>, <c>--no-data</c>, <c>--no-dump-header</c>, <c>--no-range</c>, <c>--no-time-cond</c>,
 /// <c>--no-request</c>, <c>--no-cookie</c>, <c>--no-cookie-jar</c>, <c>--no-header</c> (and <c>--no-header=x</c>), <c>--no-proxy-header</c>, <c>--no-user-agent</c>, <c>--no-referer</c>,
@@ -75,6 +77,7 @@ public static class CommandLineOptionTable
         CommandLineOption.FileName("output", 'o', (options, file) => options.AddOutputFile(file)),
         CommandLineOption.Value("upload-file", 'T', AddUploadFile),
         CommandLineOption.NegatableFlag("remote-name", 'O', (options, on) => options.PairRemoteName(on)),
+        CommandLineOption.NegatableFlag("out-null", null, (options, _) => options.PairDiscardedBody()),
         CommandLineOption.NegatableFlag("remote-name-all", null, (options, on) => options.RemoteNameAll = on),
         CommandLineOption.NegatableFlag("remote-header-name", 'J', (options, on) => options.RemoteHeaderName = on),
         CommandLineOption.Text("output-dir", null, (options, directory) => options.OutputDirectory = directory),
