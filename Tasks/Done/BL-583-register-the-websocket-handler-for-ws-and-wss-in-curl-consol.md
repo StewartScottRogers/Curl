@@ -47,7 +47,7 @@ completed: 2026-09-28
     `Connection: Upgrade`; stdout `hello` `03 e8` `101 11 102 239`; exit 0. Pinned for `ws` and `wss`.
   - `-I` → `HEAD /` request (193 bytes), no head on stdout, frames not read, `101 0 102 193`,
     exit 52 `Empty reply from server`. The head routing is done here; the `HEAD` method and the
-    52 are the handler's, filed as BL-787.
+    52 are the handler's, filed as BL-788.
 - Tests: `CurlCompositionWsTests` (8), plus `ws`/`wss` rows in `CurlCompositionTests`. The random
   key is checked as base64 of 16 bytes and hidden; the `-T` frame is unmasked with its own mask.
   Console 1281 passed; Cli 2493 passed. `Measure-CodeQuality.ps1 -Library Curl.Console`: 100% line,

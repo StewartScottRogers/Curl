@@ -1,5 +1,5 @@
 ---
-id: BL-787
+id: BL-788
 title: Send HEAD and end with exit 52 for -I on a WebSocket URL
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-787 — Send HEAD and end with exit 52 for -I on a WebSocket URL
+# BL-788 — Send HEAD and end with exit 52 for -I on a WebSocket URL
 
 ## Goal
 
