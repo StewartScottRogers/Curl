@@ -45,7 +45,8 @@
     powershell -File hands a comma-separated list to the script as one string, so under
     -File a single CurlArgs string is split at its commas back into the list (BL-528).
     To pass an argument that itself holds a comma, run the script from PowerShell
-    (& or .\) instead.
+    (& or .\) instead. An empty element reaches curl as an empty argument (""), as
+    when measuring how an option treats a blank value.
 
 .PARAMETER OutDirectory
     Where the four fixture files are written. Created if missing; existing fixture
@@ -338,7 +339,7 @@
 param(
     [ValidateRange(0, 65535)] [int] $Port = 0,
     [string[]] $Response = @('HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n'),
-    [Parameter(Mandatory = $true)] [string[]] $CurlArgs,
+    [Parameter(Mandatory = $true)] [AllowEmptyString()] [string[]] $CurlArgs,
     [Parameter(Mandatory = $true)] [string] $OutDirectory,
     [ValidateRange(1, 1000)] [int] $Connections = 1,
     [ValidateRange(0, 600000)] [int] $ResponseDelayMilliseconds = 0,
