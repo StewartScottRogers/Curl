@@ -49,6 +49,20 @@ Namespace `Curl.Cryptography`. It holds:
 - `AesCbcCts` (public, `IDisposable`): CBC with ciphertext stealing as RFC 3962 defines
   it for Kerberos, on the BCL's AES-CBC - `Encrypt` and `Decrypt` of a message of at
   least one block; a longer one always has its last two blocks swapped (CBC-CS3).
+- `MontgomeryModulus` (internal): arithmetic modulo a public odd modulus on 32-bit limbs
+  - CIOS Montgomery multiplication with a masked final subtraction, and a fixed 4-bit
+  window exponentiation whose table look-up reads all 16 entries.
+- `FiniteFieldDiffieHellmanGroup` (public): p and g - `Group1`, `Group2` (RFC 2409),
+  `Group14`, `Group16`, `Group18` (RFC 3526), `Ffdhe2048` to `Ffdhe8192` (RFC 7919), and
+  `TryCreate` for an SSH group-exchange group, `false` for an even p, p below 2^8, or g
+  outside 1 < g < p - 1. A parameter set, not a primitive, so it is a second public type
+  beside the one ADR-0118 names.
+- `FiniteFieldDiffieHellman` (public, `IDisposable`): one key pair - `Generate` (a 512-bit
+  exponent, top bit set, or one byte less than p for a shorter p), the constructor taking
+  x for known answers, `ComputePublicValue`, and `TryComputeSharedSecret`, `false` with the
+  secret zeroed for a peer y outside 1 < y < p - 1. Values are exactly p's length,
+  big-endian, leading zeros kept (RFC 7919 section 5.1); SSH's `mpint` and TLS 1.2's
+  stripped premaster secret are the caller's to apply. Constant-time in x.
 
 The remaining primitives land under their own tasks (BL-675 to BL-677, BL-738
 to BL-745).
