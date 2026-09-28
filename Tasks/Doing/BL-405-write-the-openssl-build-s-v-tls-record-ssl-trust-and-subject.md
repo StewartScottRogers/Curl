@@ -45,3 +45,4 @@ build of curl 8.21.0 prints around a handshake that BL-356 left out: the TLS rec
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
