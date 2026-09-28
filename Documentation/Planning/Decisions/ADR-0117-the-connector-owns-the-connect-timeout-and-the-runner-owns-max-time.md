@@ -165,3 +165,25 @@ an attempt the two agree to the millisecond; for a later connect (a redirect hop
 connection) the connector allows the whole `-m` again, and the runner's watchdog of Decision 2
 is what ends it on time. `TcpConnector.DefaultConnectTimeout` is curl's 300 seconds, public so the
 composition does not repeat it.
+
+## Amendment (BL-511, 2026-09-28): telnet keeps curl's own `Time-out`, and the watchdog never fires early
+
+Decided by Claude under Stewart's delegation.
+
+Measured on curl 8.21.0 (Schannel) with `Record-CurlExchange.ps1 -HoldOpenMilliseconds 6000`
+against a server that sent `hello\r\n` and stalled, `-m 3`: `dict://` and `gopher://` end with
+exit 28 and `Operation timed out after 3005 milliseconds with 7 bytes received`, `mqtt://`
+(CONNACK, SUBACK, one 5-byte PUBLISH) with `... with 5 out of 5 bytes received`, as Decisions 2
+and 3 expect, but `telnet://` ends with exit 28 and `Time-out`: curl's telnet loop checks `-m`
+itself (`telnet.c`) before the multi loop does.
+
+1. **Telnet is a handler with its own limit, under Decision 4.** `TelnetProtocolHandler` catches a
+   cancelled read when `-m` has passed on the context's clock since
+   `ITransferContext.OperationStarted` (or its own start), and ends with exit 28, `Time-out` and
+   the bytes written. A cancellation before `-m` has passed escapes for the runner, as before.
+2. **The watchdog only cancels once `-m` has passed on its clock.** A timer that fires early (a
+   real timer can, by up to the timer resolution) is set again for the time left, so a handler that
+   checks the clock after the cancellation, as HTTP, TFTP and telnet do, always finds its limit
+   passed, and the runner's message never prints an N below `-m`.
+3. **MQTT reports each PUBLISH body's length as the expected size**, as curl's
+   `Curl_pgrsSetDownloadSize` does, so its message says `with M out of T bytes received`.
