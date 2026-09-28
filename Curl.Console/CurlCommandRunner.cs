@@ -449,9 +449,16 @@ internal sealed class CurlCommandRunner(
 
         await WriteDefaultConfigFileNoteAsync(parsed.NotedDefaultConfigFile).ConfigureAwait(false);
 
-        if (parsed.Options.VersionRequested)
+        if (InformationLines(parsed.Options) is { } informationLines)
         {
-            await WriteVersionLinesAsync().ConfigureAwait(false);
+            await WriteStandardOutputLinesAsync(informationLines).ConfigureAwait(false);
+
+            return (int)CurlExitCode.Ok;
+        }
+
+        if (CurlHelpText.IsOptionSubject(parsed.Options.HelpSubject))
+        {
+            await WriteOptionManualSectionAsync(parsed.Options.HelpSubject!).ConfigureAwait(false);
 
             return (int)CurlExitCode.Ok;
         }
@@ -2217,14 +2224,55 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
-    /// Writes <see cref="CurlVersionText" />'s lines for the running system to standard output as
-    /// UTF-8, each followed by <see cref="Environment.NewLine" />, for <c>-V</c> / <c>--version</c>.
+    /// The lines an option asking for information instead of a transfer prints on standard output:
+    /// <see cref="CurlVersionText" />'s for the running system for <c>-V</c> / <c>--version</c>,
+    /// <see cref="CurlManual" />'s for <c>-M</c> / <c>--manual</c>, and <see cref="CurlHelpText" />'s at
+    /// <c>terminalColumns</c> for <c>-h</c> / <c>--help</c> with no subject, a category, <c>all</c> or
+    /// <c>category</c>. Parsing ends at the first of these options, so at most one is set.
     /// </summary>
+    /// <param name="options">The parsed options.</param>
+    /// <returns>
+    /// The lines, without terminators; <see langword="null" /> when no such option was given, or
+    /// <c>--help</c> names an option, whose manual section <see cref="WriteOptionManualSectionAsync" /> writes.
+    /// </returns>
+    private IReadOnlyList<string>? InformationLines(CommandLineOptions options) => options switch
+    {
+        { VersionRequested: true } => CurlVersionText.Lines(runsOnWindows, OperatingSystem.IsMacOS()),
+        { ManualRequested: true } => CurlManual.Lines(),
+        { HelpRequested: true, HelpSubject: var subject } when !CurlHelpText.IsOptionSubject(subject) =>
+            CurlHelpText.Lines(subject, terminalColumns),
+        _ => null,
+    };
+
+    /// <summary>
+    /// Writes what <c>--help &lt;option&gt;</c> prints, as curl 8.21.0 does: the option's
+    /// <see cref="CurlOptionManualSection" /> on standard output, or, for a subject naming no option,
+    /// <see cref="CurlOptionManualSection.IncorrectOptionNameMessage" /> on standard error.
+    /// </summary>
+    /// <param name="subject">The subject, starting with <c>-</c>.</param>
+    /// <returns>A task that completes when the output is flushed.</returns>
+    private async Task WriteOptionManualSectionAsync(string subject)
+    {
+        if (CurlOptionManualSection.TryGetLines(subject, out IReadOnlyList<string> lines))
+        {
+            await WriteStandardOutputLinesAsync(lines).ConfigureAwait(false);
+        }
+        else
+        {
+            await WriteErrorLineAsync(CurlOptionManualSection.IncorrectOptionNameMessage).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Writes <paramref name="lines" /> to standard output as UTF-8, each followed by
+    /// <see cref="Environment.NewLine" />, in one write.
+    /// </summary>
+    /// <param name="lines">The lines, without terminators.</param>
     /// <returns>A task that completes when the lines are flushed.</returns>
-    private async Task WriteVersionLinesAsync()
+    private async Task WriteStandardOutputLinesAsync(IReadOnlyList<string> lines)
     {
         StringBuilder text = new();
-        foreach (string line in CurlVersionText.Lines(runsOnWindows, OperatingSystem.IsMacOS()))
+        foreach (string line in lines)
         {
             text.Append(line).Append(Environment.NewLine);
         }
