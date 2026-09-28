@@ -139,6 +139,20 @@ disposes when the group ends, so connections are not yet reused across groups (B
 `-v`/trace output stays open for the whole run, `--fail-early` stops every group, and the exit
 code is the last transfer's. Measured on curl 8.21.0 (BL-509 Notes).
 
+Under `-Z` (ADR-0127, BL-519) the same loops start each transfer, in command-line order across the
+groups, once fewer than `--parallel-max` are running (`ParallelTransferQueue`), without waiting for
+it; each group's dispatch stays open until the run ends. Each transfer keeps its own
+`RunningTransferState` (an `AsyncLocal`, set as it starts), and every write to standard output and
+standard error goes through one `WriteGate` (`WriteGateStream`), so a body chunk is never split and a
+finished transfer's error line and `-w` text are written together, in completion order. `ParallelRun`
+holds the exit code - the first failure's in completion order, not the last's - and, under
+`--fail-early`, cancels the running transfers through the context's token: each ends with
+`curl: (42) Transfer aborted due to critical error in another transfer`, each queued one is not
+started and ends with the first failure's code and `CurlEasyErrorText`'s text, and both are reported
+in command-line order after the run's other transfers. A result that ends a serial run without
+`--fail-early` (a bad glob, a `-T` or `-D` file that cannot be opened) stops further starts and lets
+the running transfers finish. Without `-Z` nothing changes.
+
 The Nth `-T` / `--upload-file` value uploads to the Nth URL (ADR-0051). Its URL is resolved
 by `UploadTransferUrl` before anything else of that transfer: one it cannot parse is exit 3
 with no warning lines. The `-T` file is opened through the runner's `IFileSystem` after the
