@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using System.Runtime.ExceptionServices;
@@ -50,6 +51,7 @@ public sealed class TcpConnector(
     private readonly HttpProxyTunnelOptions _proxyTunnelOptions = proxyTunnelOptions ?? HttpProxyTunnelOptions.Default;
     private readonly ResolveOverrides _resolveOverrides = resolveOverrides ?? ResolveOverrides.None;
     private readonly ConnectToMappings _connectToMappings = connectToMappings ?? ConnectToMappings.None;
+    private readonly ConcurrentDictionary<string, IReadOnlyList<IPAddress>> _resolvedAddresses = new(StringComparer.OrdinalIgnoreCase);
     private long _nextConnectionNumber;
 
     /// <inheritdoc />
@@ -145,7 +147,10 @@ public sealed class TcpConnector(
     /// any tunnel and TLS handshake, naming the host dialled and numbering the connections this
     /// connector opened from <c>0</c> (<see cref="ConnectResult.ConnectionNumber" />). A connect
     /// that fails after its options parse takes the next number too, as curl 8.21.0 numbers the
-    /// connection it tried (ADR-0109).
+    /// connection it tried (ADR-0109). A host and port answered by a <c>--resolve</c> entry, or
+    /// resolved before by this connector (to the host, the proxy or a SOCKS target), are
+    /// answered from that cache and reported first as <c>Hostname &lt;host&gt; was found in DNS
+    /// cache</c>, as curl 8.21.0 reports them (measured, BL-481).
     /// </para>
     /// </remarks>
     public async ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
@@ -176,7 +181,7 @@ public sealed class TcpConnector(
         long started,
         CancellationToken cancellationToken)
     {
-        var addresses = await ResolveAsync(destination.Host, destination.Port, cancellationToken).ConfigureAwait(false);
+        var addresses = await ResolveAsync(destination.Host, destination.Port, target.Events, cancellationToken).ConfigureAwait(false);
         if (addresses.Count == 0)
         {
             return ConnectResult.Failed(
@@ -201,8 +206,30 @@ public sealed class TcpConnector(
         return await SecureWhenAskedAsync(dialed, target, timings, 0, cancellationToken).ConfigureAwait(false);
     }
 
-    private async ValueTask<IReadOnlyList<IPAddress>> ResolveAsync(string host, int port, CancellationToken cancellationToken) =>
-        _resolveOverrides.Find(host, port) ?? await dnsResolver.ResolveAsync(host, cancellationToken).ConfigureAwait(false);
+    /// <summary>
+    /// Resolves <paramref name="host" /> for <paramref name="port" /> as curl 8.21.0's DNS cache
+    /// does (BL-481): a <c>--resolve</c> entry, or a host and port this connector already
+    /// resolved, answers without <see cref="IDnsResolver" /> and is reported on
+    /// <paramref name="events" /> as <c>Hostname &lt;host&gt; was found in DNS cache</c>. A
+    /// host that did not resolve is not kept, so it is looked up again.
+    /// </summary>
+    private async ValueTask<IReadOnlyList<IPAddress>> ResolveAsync(string host, int port, ITransferEvents events, CancellationToken cancellationToken)
+    {
+        var cacheKey = $"{host}:{port}";
+        if ((_resolveOverrides.Find(host, port) ?? _resolvedAddresses.GetValueOrDefault(cacheKey)) is { } cached)
+        {
+            events.ReportInfo($"Hostname {host} was found in DNS cache");
+            return cached;
+        }
+
+        var addresses = await dnsResolver.ResolveAsync(host, cancellationToken).ConfigureAwait(false);
+        if (addresses.Count > 0)
+        {
+            _resolvedAddresses[cacheKey] = addresses;
+        }
+
+        return addresses;
+    }
 
     private async ValueTask<ConnectResult> ConnectThroughProxyAsync(
         ConnectTarget target,
@@ -211,7 +238,7 @@ public sealed class TcpConnector(
         long started,
         CancellationToken cancellationToken)
     {
-        var addresses = await ResolveAsync(proxy.Host, proxy.Port, cancellationToken).ConfigureAwait(false);
+        var addresses = await ResolveAsync(proxy.Host, proxy.Port, target.Events, cancellationToken).ConfigureAwait(false);
         if (addresses.Count == 0)
         {
             return ConnectResult.Failed(
@@ -272,7 +299,7 @@ public sealed class TcpConnector(
         CancellationToken cancellationToken)
     {
         var connection = dialed.Connection;
-        var (failure, exception) = await RunSocksHandshakeAsync(connection, destination, proxy, cancellationToken).ConfigureAwait(false);
+        var (failure, exception) = await RunSocksHandshakeAsync(connection, destination, proxy, target.Events, cancellationToken).ConfigureAwait(false);
         if (exception is not null || failure is not null)
         {
             // The proxy connection is disposed whether the handshake failed or could not be sent or read.
@@ -331,11 +358,18 @@ public sealed class TcpConnector(
         IConnection connection,
         ConnectDestination destination,
         ProxyEndpoint proxy,
+        ITransferEvents events,
         CancellationToken cancellationToken)
     {
         try
         {
-            return (await SocksProxyTunnel.OpenAsync(connection, proxy, destination.Host, destination.Port, ResolveAsync, cancellationToken).ConfigureAwait(false), null);
+            return (await SocksProxyTunnel.OpenAsync(
+                connection,
+                proxy,
+                destination.Host,
+                destination.Port,
+                (host, port, token) => ResolveAsync(host, port, events, token),
+                cancellationToken).ConfigureAwait(false), null);
         }
         catch (Exception exception)
         {

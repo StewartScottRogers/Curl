@@ -73,6 +73,9 @@ each dial, `connect to ... failed: <reason>` after each failed one (the reason f
 TLS handshake are done, numbering its connections from `0` in `ConnectResult.ConnectionNumber`.
 Per ADR-0109 a connect that fails after its options parse takes the next number too, through
 `NumberedConnectFailure`, as curl 8.21.0 numbers the connection it tried.
+Per ADR-0113 it keeps curl's DNS cache for its life (one command line): a host and port it
+resolved before, or one a `--resolve` entry answers, is answered without `IDnsResolver` and
+reported as `Hostname H was found in DNS cache` before `Trying`.
 
 `TcpConnector` tunnels through `ConnectTarget.Proxy` when it is an HTTP proxy
 (`ProxyKind.Http`, `Http10`) per ADR-0023: `HttpProxyTunnel` writes curl 8.21.0's CONNECT
