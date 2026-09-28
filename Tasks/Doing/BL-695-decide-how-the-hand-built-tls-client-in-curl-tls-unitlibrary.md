@@ -35,3 +35,4 @@ An ADR fixes how `Curl.Tls.UnitLibrary`, a hand-built TLS client, is structured 
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
