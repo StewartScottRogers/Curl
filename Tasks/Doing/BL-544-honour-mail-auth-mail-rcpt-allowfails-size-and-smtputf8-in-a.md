@@ -32,3 +32,4 @@ The SMTP upload adds `AUTH=<addr>` to `MAIL FROM` for `--mail-auth`, carries on 
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
