@@ -400,6 +400,13 @@ internal sealed class CurlCommandRunner(
     private TransferProgressRecorder transferProgress = new(TimeProvider.System);
 
     /// <summary>
+    /// The <c>-Y</c>/<c>-y</c> watchdog <see cref="StartLowSpeedWatchdog" /> started for the attempt
+    /// whose context was created last, until <see cref="FollowWatchingSpeedAsync" /> takes it;
+    /// <see langword="null" /> when the speed is not watched.
+    /// </summary>
+    private LowSpeedWatchdog? attemptLowSpeedWatchdog;
+
+    /// <summary>
     /// The current transfer's <c>-#</c> bar, which <see cref="transferProgress" /> passes every
     /// report on to; <see langword="null" /> when the bar is not shown. Cleared before each transfer.
     /// </summary>
@@ -1614,7 +1621,8 @@ internal sealed class CurlCommandRunner(
                         upload,
                         proxy,
                         progress: transferProgress,
-                        events: transferEventOutput.Events))
+                        events: transferEventOutput.Events,
+                        lowSpeedWatchdog: StartLowSpeedWatchdog(options)))
                 .ConfigureAwait(false);
 
             return await WriteProgressAsync(options, standardOutputResult, options.ResumeFrom, toStandardOutput: true)
@@ -2107,7 +2115,8 @@ internal sealed class CurlCommandRunner(
                         proxy,
                         watchHeaderOutput,
                         transferProgress,
-                        transferEventOutput.Events),
+                        transferEventOutput.Events,
+                        StartLowSpeedWatchdog(options)),
                     resumeFrom,
                     output)
                 .ConfigureAwait(false);
@@ -2200,7 +2209,7 @@ internal sealed class CurlCommandRunner(
             await retryLinesWritten.ConfigureAwait(false);
             TransferContext context = firstContext ?? createAttemptContext();
             firstContext = null;
-            return await follower.FollowAsync(context, redirectPolicy).ConfigureAwait(false);
+            return await FollowWatchingSpeedAsync(follower, context, redirectPolicy).ConfigureAwait(false);
         });
 
         TransferResult result = await retrier
@@ -2213,6 +2222,40 @@ internal sealed class CurlCommandRunner(
         await retryLinesWritten.ConfigureAwait(false);
 
         return result;
+    }
+
+    /// <summary>
+    /// Starts the <c>-Y</c>/<c>-y</c> watchdog for the attempt whose context is being created, on
+    /// the runner's clock, and keeps it for <see cref="FollowWatchingSpeedAsync" />: <c>-Y</c>
+    /// alone watches for 30 seconds and <c>-y</c> alone for 1 byte per second, as curl 8.21.0
+    /// does (measured 2026-09-27, BL-400 Notes).
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <returns>The started watchdog, or <see langword="null" /> when the speed is not watched.</returns>
+    private LowSpeedWatchdog? StartLowSpeedWatchdog(CommandLineOptions options) =>
+        attemptLowSpeedWatchdog = LowSpeedWatchdog.StartFromCommandLine(options.SpeedLimit, options.SpeedTimeSeconds, timeProvider);
+
+    /// <summary>
+    /// Performs one attempt through <paramref name="follower" /> under the watchdog its context
+    /// was created with, stopping the watchdog when the attempt ends. An attempt the watchdog
+    /// cancelled ends with its exit 28 failure, which <c>--retry</c> counts as transient.
+    /// </summary>
+    /// <param name="follower">Performs the attempt, following redirects under <c>-L</c>.</param>
+    /// <param name="context">The attempt's context.</param>
+    /// <param name="redirectPolicy">The <c>-L</c> policy.</param>
+    /// <returns>The attempt's result, or the watchdog's failure.</returns>
+    private async Task<TransferResult> FollowWatchingSpeedAsync(RedirectFollower follower, TransferContext context, RedirectPolicy redirectPolicy)
+    {
+        using LowSpeedWatchdog? watchdog = attemptLowSpeedWatchdog;
+        attemptLowSpeedWatchdog = null;
+        try
+        {
+            return await follower.FollowAsync(context, redirectPolicy).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (watchdog is { IsTooSlow: true })
+        {
+            return watchdog.Failure;
+        }
     }
 
     /// <summary>
