@@ -36,3 +36,4 @@ In the Schannel build with `--cacert`, a server certificate whose subjectAltName
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
