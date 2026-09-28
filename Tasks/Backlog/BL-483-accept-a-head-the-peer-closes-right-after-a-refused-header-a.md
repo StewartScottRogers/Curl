@@ -1,5 +1,5 @@
 ---
-id: BL-482
+id: BL-483
 title: Accept a head the peer closes right after a refused header, as curl 8.21.0 does
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-482 — Accept a head the peer closes right after a refused header, as curl 8.21.0 does
+# BL-483 — Accept a head the peer closes right after a refused header, as curl 8.21.0 does
 
 ## Goal
 
