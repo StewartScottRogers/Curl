@@ -74,6 +74,76 @@ public sealed class TransferProgressRecorderTests
     }
 
     [TestMethod]
+    public void ReportTransferDone_MeterWrittenLiveAfterTransferStarted_HoldsTheEventOutput()
+    {
+        using MemoryStream standardError = new();
+        using HoldableStream eventOutput = new(standardError);
+        TransferProgressRecorder recorder = new(clock, writeLive: _ => { }, eventOutput: eventOutput);
+        recorder.ReportTransferStarted();
+
+        recorder.ReportTransferDone();
+        eventOutput.Write([1], 0, 1);
+
+        Assert.AreEqual(0, standardError.Length);
+    }
+
+    [TestMethod]
+    public void ReportTransferDone_BeforeTransferStarted_LeavesTheEventOutputUnheld()
+    {
+        using MemoryStream standardError = new();
+        using HoldableStream eventOutput = new(standardError);
+        TransferProgressRecorder recorder = new(clock, writeLive: _ => { }, eventOutput: eventOutput);
+
+        recorder.ReportTransferDone();
+        eventOutput.Write([1], 0, 1);
+
+        Assert.AreEqual(1, standardError.Length);
+    }
+
+    [TestMethod]
+    public void ReportTransferDone_MeterNotWrittenLive_LeavesTheEventOutputUnheld()
+    {
+        using MemoryStream standardError = new();
+        using HoldableStream eventOutput = new(standardError);
+        TransferProgressRecorder recorder = new(clock, eventOutput: eventOutput);
+        recorder.ReportTransferStarted();
+
+        recorder.ReportTransferDone();
+        eventOutput.Write([1], 0, 1);
+
+        Assert.AreEqual(1, standardError.Length);
+    }
+
+    [TestMethod]
+    public void ReportTransferDone_NoEventOutput_DrawsNothing()
+    {
+        List<string> written = [];
+        TransferProgressRecorder recorder = new(clock, writeLive: written.Add);
+        recorder.ReportTransferStarted();
+
+        recorder.ReportTransferDone();
+
+        CollectionAssert.AreEqual(new[] { Zero }, written);
+    }
+
+    [TestMethod]
+    public void ReportTransferStarted_NextHopAfterDone_ReleasesTheHeldEventOutputBeforeTheHopsDraws()
+    {
+        using MemoryStream standardError = new();
+        using HoldableStream eventOutput = new(standardError);
+        TransferProgressRecorder recorder = new(clock, writeLive: text => standardError.Write(System.Text.Encoding.UTF8.GetBytes(text)), eventOutput: eventOutput);
+        recorder.ReportTransferStarted();
+        recorder.ReportTransferDone();
+        eventOutput.Write("* left intact\n"u8.ToArray(), 0, 14);
+
+        recorder.ReportTransferStarted();
+
+        StringAssert.StartsWith(
+            System.Text.Encoding.UTF8.GetString(standardError.ToArray()),
+            Zero + "* left intact\n" + Zero);
+    }
+
+    [TestMethod]
     public void TakeUnwrittenStatusLines_AfterLiveWrites_IsOnlyTheLinesDrawnSince()
     {
         List<string> written = [];

@@ -494,6 +494,14 @@ internal sealed class CurlCommandRunner(
     private TransferEventOutput transferEventOutput = TransferEventOutput.None;
 
     /// <summary>
+    /// The standard error <see cref="transferEventOutput" /> writes through, which
+    /// <see cref="transferProgress" /> holds once the handler reports the transfer done and
+    /// <see cref="WriteProgressAsync" /> releases after the meter's end (task BL-411);
+    /// <see langword="null" /> until it is opened.
+    /// </summary>
+    private HoldableStream? eventStandardError;
+
+    /// <summary>
     /// Runs <paramref name="arguments" /> to completion.
     /// </summary>
     /// <param name="arguments">The command-line arguments, without the program name.</param>
@@ -743,8 +751,9 @@ internal sealed class CurlCommandRunner(
 
             if (index == 0)
             {
+                eventStandardError = new HoldableStream(standardError);
                 transferEventOutput = await TransferEventOutput
-                    .OpenAsync(options, fileSystem, deferringStandardOutput, standardError, runsOnWindows, standardOutputIsTerminal, timeProvider)
+                    .OpenAsync(options, fileSystem, deferringStandardOutput, eventStandardError, runsOnWindows, standardOutputIsTerminal, timeProvider)
                     .ConfigureAwait(false);
             }
 
@@ -1953,7 +1962,8 @@ internal sealed class CurlCommandRunner(
         transferProgress = new TransferProgressRecorder(
             timeProvider,
             progressBar,
-            ShowsProgressMeter(options, toStandardOutput) ? statusText => WriteProgressMeterLive(resumeFrom, statusText) : null);
+            ShowsProgressMeter(options, toStandardOutput) ? statusText => WriteProgressMeterLive(resumeFrom, statusText) : null,
+            eventStandardError);
     }
 
     /// <summary>
@@ -2017,6 +2027,8 @@ internal sealed class CurlCommandRunner(
             await WriteErrorLinesAsync([.. TakeProgressMeterHeaderLines(resumeFrom), transferProgress.TakeUnwrittenStatusLines()])
                 .ConfigureAwait(false);
         }
+
+        eventStandardError?.Release();
 
         return result;
     }

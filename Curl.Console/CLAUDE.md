@@ -206,7 +206,10 @@ curl writes for a `file://` transfer. From the handler's first "transfer started
 recorder hands each drawn line to the runner, which writes it (after the header lines the first
 time) to standard error synchronously, so a terminal sees it move; the end draws, the newline,
 and the whole meter of a transfer never reported started are written after the transfer, so the
-bytes are BL-131's (ADR-0099, BL-383). It is not written under `-s`,
+bytes are BL-131's (ADR-0099, BL-383). The `-v` and trace output goes through a `HoldableStream`
+over standard error, which the recorder holds when the handler reports the transfer done (while
+the meter is written live) and the runner releases after the meter's end, so the connection-end
+`-v` line follows the meter as in curl 8.21.0 (ADR-0116, BL-411). It is not written under `-s`,
 `--no-progress-meter` or `-#`, nor for a body on standard output when that is a terminal.
 
 Under `-#` (and not `-s`, `--no-progress-meter` or a body on a terminal) the recorder passes
