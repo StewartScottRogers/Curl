@@ -37,3 +37,4 @@ A push to the `board` branch starts no workflow, and the Gource workflow does no
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
