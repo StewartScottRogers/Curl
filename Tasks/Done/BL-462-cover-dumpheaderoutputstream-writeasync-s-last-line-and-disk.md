@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-27
-completed:
+completed: 2026-09-27
 ---
 # BL-462 — Cover DumpHeaderOutputStream.WriteAsync's last line and DiskWriteOutFileOpener.TryOpen in the fast run
 
@@ -24,12 +24,15 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `Measure-CodeQuality.ps1 -Library Curl.Console` reports `0` failing members for `Curl.Console`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests pass.
+- [x] `Measure-CodeQuality.ps1 -Library Curl.Console` reports `0` failing members for `Curl.Console`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests pass.
 
 ## Notes
+
+- 2026-09-27: Both gaps were already closed by earlier commits before this run started, so no code change was needed. `151b5245` moved the `-D` failure report in `DumpHeaderOutputStream.WriteAsync` after the catch (`ExceptionDispatchInfo`). `2ba8f67d` (BL-432) took the `DiskWriteOutFileOpenerTests` disk tests out of `Integration`, so `TryOpen` is covered by a fast test and needs no exclusion. Measured: `Measure-CodeQuality.ps1 -Library Curl.Console` gives 100% line, 100% branch, 372 members, 0 failing, worst CRAP 10. `dotnet build -warnaserror` is clean and the fast tests pass (Curl.Console.UnitTests 985 passed, 3 skipped).
 
 ## Log
 
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Done. Measure-CodeQuality reports 0 failing Curl.Console members; both gaps were already closed by 151b5245 and 2ba8f67d
