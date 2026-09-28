@@ -158,6 +158,10 @@ public sealed record SaslRequest(
 
 ### 2. The mechanism preference order
 
+> Amended by ADR-0123 (BL-536): PLAIN ranks before LOGIN, an authorization identity does
+> not skip LOGIN, and a bearer token excludes PLAIN and LOGIN. Items 8 and 9 below are
+> superseded.
+
 Measured above, so this is the order `ChooseMechanism` implements, first usable wins:
 
 1. `EXTERNAL` - only when the login options say `AUTH=EXTERNAL`.
