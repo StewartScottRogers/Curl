@@ -4,7 +4,7 @@ title: Authenticate to a SOCKS5 proxy with --socks5-basic and --socks5-gssapi
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-612, BL-527]
+depends-on: [BL-612, BL-527, BL-691]
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-28
@@ -14,11 +14,11 @@ completed:
 
 ## Goal
 
-The SOCKS5 greeting offers the methods `--socks5-basic` and `--socks5-gssapi` select (as curl 8.21.0 offers them, including its default), username/password authentication (RFC 1929) works with the proxy credentials, and GSS-API authentication (RFC 1961, with `--socks5-gssapi-service` and `--socks5-gssapi-nec`) works through the Negotiate seam of BL-525 and BL-527, where the platform allows.
+The SOCKS5 greeting offers the methods `--socks5-basic` and `--socks5-gssapi` select (as curl 8.21.0 offers them, including its default), username/password authentication (RFC 1929) works with the proxy credentials, and GSS-API authentication (RFC 1961, with `--socks5-gssapi-service` and `--socks5-gssapi-nec`) works through the Kerberos GSS-API mechanism (BL-691) behind the seam of BL-525 and BL-527, including RFC 1961's per-message protection negotiation, on every platform.
 
 ## Context
 
-- Conformance audit 2026-09-28, row 16 (Major). Options: BL-612; Negotiate seam: BL-525, BL-527.
+- Conformance audit 2026-09-28, row 16 (Major). Options: BL-612; seam: BL-525, BL-527; GSS Wrap/Unwrap for the protection-level exchange: BL-691. Standing rule (root `CLAUDE.md`, "Decisions", 2026-09-28): SOCKS5 GSS-API works on every platform, no refusal.
 - Code: `Curl.Networking.UnitLibrary/Socks5Handshake.cs` (ADR-0084 follows the Schannel build).
 
 ## Acceptance criteria

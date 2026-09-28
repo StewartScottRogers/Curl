@@ -4,7 +4,7 @@ title: Parse --doh-url, --doh-insecure and --doh-cert-status and resolve through
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-641]
+depends-on: [BL-641, BL-610]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-28
@@ -14,7 +14,7 @@ completed:
 
 ## Goal
 
-`--doh-url <url>` makes every transfer resolve through `DohDnsResolver` (BL-641), `--doh-insecure` skips the DoH server's certificate check, `--doh-cert-status` behaves as the platform's curl 8.21.0 build does (measured; see BL-610 for `--cert-status`), and `-v` writes curl's DoH lines.
+`--doh-url <url>` makes every transfer resolve through `DohDnsResolver` (BL-641), `--doh-insecure` skips the DoH server's certificate check, `--doh-cert-status` checks the DoH server's stapled OCSP response exactly as `--cert-status` does for the transfer (BL-610; on every platform, standing rule, root `CLAUDE.md`, "Decisions", 2026-09-28), and `-v` writes curl's DoH lines.
 
 ## Context
 

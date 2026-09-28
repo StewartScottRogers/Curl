@@ -1,6 +1,6 @@
 ---
 id: BL-651
-title: Parse --xattr and store the URL and content type as extended attributes where the platform allows
+title: Parse --xattr and store the URL and content type as extended attributes on every OS curl can
 priority: Low
 assignee: Claude
 pipeline: feature
@@ -10,16 +10,16 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-651 — Parse --xattr and store the URL and content type as extended attributes where the platform allows
+# BL-651 — Parse --xattr and store the URL and content type as extended attributes on every OS curl can
 
 ## Goal
 
-`--xattr` parses, and after a successful `-o`/`-O` transfer Curl stores the attributes the platform's curl 8.21.0 build stores (`user.xdg.origin.url`, `user.mime_type` and any others it writes) where that build does, and does exactly what the build does where it does not (the Windows build may ignore the option or write an alternate data stream: measure it).
+`--xattr` parses, and after a successful `-o`/`-O` transfer Curl stores the attributes curl 8.21.0 stores (`user.xdg.origin.url`, `user.mime_type` and any others it writes) on every operating system for which any curl build writes them (read `src/tool_xattr.c` at tag `curl-8_21_0` for the list), whatever the platform's usual build does; only on an operating system no curl build supports does Curl do what curl does there.
 
 ## Context
 
-- Conformance audit 2026-09-28, row 30 (Major; filed Low as rarely used).
-- The BCL has no extended-attribute API; on Linux and macOS `setxattr` is a libc call, which would need `LibraryImport` (source-generated P/Invoke, AOT-safe, no package). Record the choice, and what is done per platform, in an ADR marked "Decided by Claude under Stewart's delegation".
+- Conformance audit 2026-09-28, row 30 (Major; filed Low as rarely used). Standing rule (root `CLAUDE.md`, "Decisions", 2026-09-28): what any official curl build supports, Curl supports on every platform it can exist on; the BCL lacking an API is not a reason to leave it out.
+- The BCL has no extended-attribute API; on Linux and macOS `setxattr` (and FreeBSD `extattr_set_file` if relevant) is a libc call through `LibraryImport` (source-generated P/Invoke, part of the BCL, AOT-safe, no package); if curl writes attributes on Windows (for example as NTFS alternate data streams), the BCL's file APIs can write those. Record the route per OS in an ADR marked "Decided by Claude under Stewart's delegation" (HOW, not WHETHER).
 - Output-file handling: `Curl.Console/OutputFileTarget.cs`; the `-R` file-time setter (`IFileTimeSetter`) is the model for a post-transfer file seam.
 
 ## Acceptance criteria

@@ -4,7 +4,7 @@ title: Send an HTTP/2 request and read its response on a stream
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-656, BL-657]
+depends-on: [BL-656, BL-657, BL-668]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-09-28
@@ -18,7 +18,7 @@ When a connection speaks HTTP/2, the HTTP handler sends the request as HEADERS (
 
 ## Context
 
-- Conformance audit 2026-09-28, row 32. If BL-655's ADR decides not to offer HTTP/2, move this task to `Deferred` with that reason. Builds on BL-656 (HPACK) and BL-657 (frames).
+- Conformance audit 2026-09-28, row 32. Standing rule (root `CLAUDE.md`, "Decisions", 2026-09-28): HTTP/2 is offered on every platform. Builds on BL-656 (HPACK) and BL-657 (frames) in `Curl.Http2.UnitLibrary`: add that `ProjectReference` to `Curl.Protocol.Http.UnitLibrary` (allowed by BL-668) and amend `Curl.Protocol.Http.UnitLibrary/CLAUDE.md` to name it. Keep the request/response plumbing version-neutral so the HTTP/3 path (BL-731) reuses it.
 - The handler's HTTP/1.1 path (`Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs` and its request writer and head reader) is the model; the version choice itself (ALPN, prior knowledge) is BL-659.
 
 ## Acceptance criteria

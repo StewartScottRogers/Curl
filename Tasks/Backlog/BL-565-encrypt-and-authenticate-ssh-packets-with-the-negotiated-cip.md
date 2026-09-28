@@ -14,12 +14,12 @@ completed:
 
 ## Goal
 
-After `NEWKEYS`, packets are encrypted and authenticated with the ciphers and MACs BL-560's ADR offers (`aes128-ctr`/`aes192-ctr`/`aes256-ctr`, `aes128-gcm@openssh.com`/`aes256-gcm@openssh.com`, `hmac-sha2-256`/`hmac-sha2-512` and their `-etm@openssh.com` forms, and whatever else the ADR lists), and a packet whose MAC or tag fails ends the session as curl 8.21.0 ends it.
+After `NEWKEYS`, packets are encrypted and authenticated with the ciphers and MACs BL-560's ADR offers (`aes128-ctr`/`aes192-ctr`/`aes256-ctr`, `aes128-gcm@openssh.com`/`aes256-gcm@openssh.com`, `hmac-sha2-256`/`hmac-sha2-512` and their `-etm@openssh.com` forms; `chacha20-poly1305@openssh.com` is BL-679 and the CBC, 3DES, Blowfish, CAST-128, arcfour, SHA-1, MD5 and RIPEMD-160 algorithms are BL-680), and a packet whose MAC or tag fails ends the session as curl 8.21.0 ends it.
 
 ## Context
 
 - Conformance audit 2026-09-28, row 35. Builds on BL-564's keys.
-- **BCL only.** `Aes` (CTR mode built on `EncryptEcb`), `AesGcm`, `HMACSHA256`, `HMACSHA512`, `CryptographicOperations.FixedTimeEquals` for MAC comparison. If something needed cannot be built on the BCL, move the task to `Blocked` for Stewart naming what is missing; never add a package.
+- **BCL only.** `Aes` (CTR mode built on `EncryptEcb`), `AesGcm`, `HMACSHA256`, `HMACSHA512`, `CryptographicOperations.FixedTimeEquals` for MAC comparison. If `AesGcm` is unsupported on a CI platform, use the fallback BL-669's ADR names (standing rule, root `CLAUDE.md`, "Decisions", 2026-09-28: hand-built in `Curl.Cryptography.UnitLibrary`, never a package, never a task blocked for a missing primitive). Structure the packet layer so BL-679 and BL-680 add ciphers and MACs without reshaping it.
 - Test vectors: NIST SP 800-38A (CTR) and SP 800-38D (GCM) vectors for the primitives; round trips against the in-memory peer for the packet layer.
 
 ## Acceptance criteria

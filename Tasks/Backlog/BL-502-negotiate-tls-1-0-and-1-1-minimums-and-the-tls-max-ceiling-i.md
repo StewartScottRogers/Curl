@@ -21,6 +21,7 @@ The TLS provider offers exactly the protocol versions between the minimum (`-1`,
 - Conformance audit 2026-09-28, row 5 (Blocker). Parsing is BL-501.
 - Code: `Curl.Networking.UnitLibrary/SslStreamTlsProvider.cs`, `TlsClientOptions.cs`, `TlsMinimumVersion.cs`, `TlsFailureMessages.cs`; mapping in `Curl.Console/TlsClientOptionsMapping.cs`. The HTTPS proxy's options are separate (ADR-0095).
 - ADR-0009: match the platform's build (Schannel on Windows, OpenSSL elsewhere). Windows 11 disables TLS 1.0/1.1 in the OS; Schannel's answer to `--tls-max 1.1` against a TLS 1.2-only server must be measured, as must a min above the max (`--tlsv1.3 --tls-max 1.2`).
+- This task covers what `SslStream` can negotiate. Where the operating system's TLS stack refuses TLS 1.0/1.1 but an official curl build connects (curl.se's LibreSSL Windows build), BL-714 closes the gap through the hand-built TLS client (standing rule, root `CLAUDE.md`, "Decisions", 2026-09-28); pin today's `SslStream` answer here and name BL-714 in the XML docs.
 
 ## Acceptance criteria
 

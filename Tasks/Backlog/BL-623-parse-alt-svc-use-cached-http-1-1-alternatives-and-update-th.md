@@ -14,7 +14,7 @@ completed:
 
 ## Goal
 
-`--alt-svc <file>` loads the cache, connects to a cached `h1` alternative for an HTTPS origin as curl 8.21.0 does (never to `h2`/`h3` ones while Curl speaks HTTP/1.1 only, ADR-0017), updates the cache from `Alt-Svc` response headers, and saves the file when the run ends; `--alt-svc ""` enables the feature without a file.
+`--alt-svc <file>` loads the cache, connects to a cached `h1` alternative for an HTTPS origin as curl 8.21.0 does (`h2` and `h3` alternatives are used by BL-733 once HTTP/2 and HTTP/3 run; until then this task skips them as curl skips an alternative whose HTTP version is not allowed), updates the cache from `Alt-Svc` response headers, and saves the file when the run ends; `--alt-svc ""` enables the feature without a file.
 
 ## Context
 

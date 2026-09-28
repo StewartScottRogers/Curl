@@ -19,7 +19,7 @@ With `--compressed-ssh`, the `KEXINIT` offers the compression methods curl 8.21.
 ## Context
 
 - Conformance audit 2026-09-28, row 31. Builds on BL-565's packet layer; the option arrives on the context (BL-561, BL-562).
-- **BCL only.** `System.IO.Compression.ZLibStream` or `DeflateStream` with sync flushes per packet (SSH needs `Z_PARTIAL_FLUSH`-compatible output; check that the BCL's flush produces what OpenSSH accepts). If it cannot be done on the BCL, move the task to `Blocked` for Stewart naming what is missing; never add a package.
+- **BCL only.** `System.IO.Compression.ZLibStream` or `DeflateStream` with sync flushes per packet (SSH needs `Z_PARTIAL_FLUSH`-compatible output; check that the BCL's flush produces what OpenSSH accepts). If the BCL's flush output is not what OpenSSH accepts, hand-build the deflate stream the SSH packet layer needs in its own `Curl.Compression.UnitLibrary` with its `.UnitTests` (standing rule, root `CLAUDE.md`, "Decisions", 2026-09-28): file that as a task (a new-project task and an implementation task) and add it to this task's `depends-on`; never a package, never a task left blocked.
 - Measure the offered list: `sshd -ddd` log of the reference curl's `KEXINIT` with and without `--compressed-ssh` through `Record-CurlExchange.ps1 -NoServer`.
 
 ## Acceptance criteria

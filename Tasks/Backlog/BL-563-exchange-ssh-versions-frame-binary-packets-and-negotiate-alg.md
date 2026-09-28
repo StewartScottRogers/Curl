@@ -20,7 +20,7 @@ The SSH transport in `Curl.Protocol.Ssh.UnitLibrary` sends its identification st
 
 - Conformance audit 2026-09-28, row 35 (Blocker, L+; SSH split: this framing, BL-564 key exchange, BL-565 cipher and MAC, BL-566 host key, BL-567/BL-568 user auth, BL-569 to BL-573 SFTP, BL-574/BL-577 SCP, BL-575 compression, BL-576 registration, BL-578 `-v`).
 - Design: BL-560's ADR (identification string, algorithm lists, class structure). Contract: BL-561. Timeouts: BL-498's ADR.
-- **BCL only.** Crypto comes from `System.Security.Cryptography`; this task needs only `RandomNumberGenerator` (padding and cookie), injected so tests are deterministic. If anything needed cannot be built on the BCL, move the task to `Blocked` for Stewart naming what is missing; never add a package.
+- **BCL only.** Crypto comes from `System.Security.Cryptography`; this task needs only `RandomNumberGenerator` (padding and cookie), injected so tests are deterministic. What the BCL lacks is hand-built in `Curl.Cryptography.UnitLibrary` (BL-669's ADR; standing rule, root `CLAUDE.md`, "Decisions", 2026-09-28): never a package, never a task blocked for a missing primitive. The `KEXINIT` lists offer only algorithms implemented so far, in BL-560's ADR order; BL-564, BL-565 and BL-678 to BL-680 each add theirs until the lists are the ADR's full lists.
 - Measure with the reference curl against a local OpenSSH server through `Record-CurlExchange.ps1 -NoServer`: a server whose `KexAlgorithms` (then `Ciphers`, then `MACs`, then `HostKeyAlgorithms`) share nothing with Curl's lists, and a TCP server that sends a non-SSH banner (the HTTP mode of the script serves that); stderr and exit code.
 
 ## Acceptance criteria

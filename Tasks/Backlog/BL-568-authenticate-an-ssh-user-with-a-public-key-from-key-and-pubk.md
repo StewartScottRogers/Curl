@@ -19,7 +19,7 @@ The handler authenticates with `publickey` (RFC 4252 section 7, rsa-sha2-256/512
 ## Context
 
 - Conformance audit 2026-09-28, rows 31 and 35. Builds on BL-567's user-auth flow. Key formats: BL-560's ADR.
-- **BCL only.** `RSA.ImportFromPem`/`ImportFromEncryptedPem`, `ECDsa.ImportFromPem`, PKCS#8 and PKCS#1 via the BCL; the unencrypted `openssh-key-v1` format parsed by hand. Encrypted `openssh-key-v1` keys need bcrypt-pbkdf and Ed25519 keys need Ed25519 signing, neither in the BCL: do what BL-560's ADR decided. If a key format the ADR requires cannot be built on the BCL, move the task to `Blocked` for Stewart naming what is missing; never add a package.
+- **BCL only.** `RSA.ImportFromPem`/`ImportFromEncryptedPem`, `ECDsa.ImportFromPem`, PKCS#8 and PKCS#1 via the BCL; the unencrypted `openssh-key-v1` format parsed by hand. `DSA` keys (`ssh-dss`) are read and used here too. Encrypted `openssh-key-v1` keys (bcrypt-pbkdf) and Ed25519 keys are BL-681, built on `Curl.Cryptography.UnitLibrary`; structure the key reader so BL-681 adds them without reshaping it. Standing rule (root `CLAUDE.md`, "Decisions", 2026-09-28): every key format curl reads is read; what the BCL lacks is hand-built, never a package, never a task blocked for a missing primitive.
 - Measure with the reference curl against a local OpenSSH server through `Record-CurlExchange.ps1 -NoServer`: an RSA key in PEM and in `openssh-key-v1`, an ECDSA key, an encrypted key with and without `--pass`, a key the server does not authorise, and a missing `--key` file.
 
 ## Acceptance criteria

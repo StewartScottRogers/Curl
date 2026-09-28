@@ -19,7 +19,7 @@ The server's host key is accepted or refused as curl 8.21.0 does: matched agains
 ## Context
 
 - Conformance audit 2026-09-28, rows 31 and 35. Builds on BL-564 (the host key and its verified signature).
-- **BCL only.** `MD5`, `SHA256`, `HMACSHA1` (hashed known_hosts entries). If something needed cannot be built on the BCL, move the task to `Blocked` for Stewart naming what is missing; never add a package.
+- **BCL only.** `MD5`, `SHA256`, `HMACSHA1` (hashed known_hosts entries). Known-hosts entries of every key type BL-560's ADR offers are matched, `ssh-ed25519` included (its signature check is BL-678), and `@cert-authority` covers `ssh-ed25519-cert-v01@openssh.com` host certificates as curl's libssh2 build treats them. What the BCL lacks is hand-built in `Curl.Cryptography.UnitLibrary` (standing rule, root `CLAUDE.md`, "Decisions", 2026-09-28): never a package, never a task blocked for a missing primitive.
 - The known-hosts reader takes text, not a path (tests need no disk); the file is opened through the seam BL-560's ADR names.
 - Measure with the reference curl against a local OpenSSH server through `Record-CurlExchange.ps1 -NoServer`: host absent from known_hosts, present with a matching key, present with a different key, a hashed entry, `--hostpubmd5` right and wrong, `--hostpubsha256` right and wrong, and each wrong case with `-k`.
 

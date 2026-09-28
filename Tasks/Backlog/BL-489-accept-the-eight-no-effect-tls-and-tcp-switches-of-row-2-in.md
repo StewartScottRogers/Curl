@@ -20,7 +20,7 @@ The eight switches `--[no-]tcp-nodelay`, `--[no-]alpn`, `--[no-]sessionid`, `--[
 
 - Conformance audit 2026-09-28, row 2 (Blocker): curl 8.21.0 exits 0 for each; only the exit code under `-s` was measured, so the standard-error text (without `-s`, and under `-v`) is not yet known.
 - Each is a row in `Curl.Cli.UnitLibrary/CurlOptionAliasTable.cs` with its `--no-` rule (`alpn`, `keepalive`, `sessionid` are `Documented`, `tcp-nodelay` and `styled-output` `Accepted`); none has a row in `CommandLineOptionTable.cs`.
-- This task parses and stores them. Acting on them in the connector is BL-490; `--styled-output` (bold header names on a terminal) is stored only, because redirected output is never styled and the tests never run on a terminal.
+- This task parses and stores them; every one of them then acts (standing rule, root `CLAUDE.md`, "Decisions", 2026-09-28: nothing stays parse-only). Acting on them: BL-490 (`--no-alpn`, `--no-keepalive`, `--no-tcp-nodelay`, `--ssl-revoke-best-effort`, `--ca-native`), BL-713 (`--no-sessionid`, `--ssl-allow-beast`), BL-736 (`--styled-output` styles header output on a terminal).
 - Defaults to store: TCP_NODELAY on, ALPN on, session ID cache on, keepalive on, styled output on (curl's documented defaults in `Curl.Cli.UnitLibrary/CurlManual.txt`).
 
 ## Acceptance criteria

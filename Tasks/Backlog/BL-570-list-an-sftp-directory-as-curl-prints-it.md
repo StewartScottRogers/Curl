@@ -19,7 +19,7 @@ completed:
 ## Context
 
 - Conformance audit 2026-09-28, row 35. Builds on BL-569.
-- **BCL only.** If something needed cannot be built on the BCL, move the task to `Blocked` for Stewart naming what is missing; never add a package.
+- **BCL first.** Anything the BCL lacks is hand-built in its own library (standing rule, root `CLAUDE.md`, "Decisions", 2026-09-28): never a package, never a task blocked for a missing primitive.
 - Measure with the reference curl against a local OpenSSH server through `Record-CurlExchange.ps1 -NoServer`: a directory with files, a subdirectory and a symbolic link, with and without `-l`, an empty directory, and a missing directory.
 
 ## Acceptance criteria

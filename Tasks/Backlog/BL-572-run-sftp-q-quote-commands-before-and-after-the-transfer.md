@@ -19,7 +19,7 @@ completed:
 ## Context
 
 - Conformance audit 2026-09-28, row 35. `-Q` is already parsed and carried as `ITransferContext.QuoteCommands` (the FTP handler uses it). The SFTP command list is in `CurlManual.txt` (`--quote`).
-- **BCL only.** If something needed cannot be built on the BCL, move the task to `Blocked` for Stewart naming what is missing; never add a package.
+- **BCL first.** Anything the BCL lacks is hand-built in its own library (standing rule, root `CLAUDE.md`, "Decisions", 2026-09-28): never a package, never a task blocked for a missing primitive.
 - Measure with the reference curl against a local OpenSSH server through `Record-CurlExchange.ps1 -NoServer`: each command once, a quoted argument with a space, `pwd` (what it prints), an unknown command, a failing `rm` with and without `*`, and a `-` post-transfer command.
 
 ## Acceptance criteria

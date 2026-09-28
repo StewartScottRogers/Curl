@@ -14,14 +14,14 @@ completed:
 
 ## Goal
 
-An ADR states what Curl prints and exits for each class of curl 8.21.0 long option: parsed, deprecated with no function (BL-488), accepted with no effect (BL-489), refused by design on the reference build (ADR-0017's HTTP/2 and HTTP/3 options), real but not yet implemented, and not a curl option at all.
+An ADR states what Curl prints and exits for each class of curl 8.21.0 long option: parsed, deprecated with no function (BL-488), real but not yet implemented (a temporary class: every such option has a task on the board that implements it), and not a curl option at all. There is no "refused by design" class: ADR-0017's HTTP/2 and HTTP/3 refusals are superseded (BL-655, BL-718) and those options are "not yet implemented" until BL-659 and BL-732 land.
 
 ## Context
 
 - Conformance audit 2026-09-28, row 33 (Major; frames the handling of rows 1 and 2): of 280 long options, 138 are parsed, 4 are refused by design, and 138 are unknown to the parser. Today a real-but-unparsed option and a typo both print `curl: option --X: is unknown` and exit 2, and nothing records that this is deliberate.
 - The line is built in `Curl.Cli.UnitLibrary/CommandLineRefusal.cs` (`UnknownOption`) and chosen in `CommandLineParser.cs` (`ParseNegatedLong`, `ParseUnlistedLong`, `ParseShortBundle`). `CurlOptionAliasTable.cs` already lists every real name, so the parser can tell the two apart.
 - Depends on BL-488, BL-489 and BL-491 to BL-495 so the ADR is written against the classes as they exist once those land, and names them as the examples.
-- Standing rules (root `CLAUDE.md`, "Decisions"): match the platform's curl, simplest thing that stays a drop-in replacement. A script that passes a real option must not silently get different behaviour; weigh a distinct message against keeping curl's exact `is unknown` text, and say what `--help <option>` and `-K` config lines do for such an option.
+- Standing rules (root `CLAUDE.md`, "Decisions"): match the platform's curl, simplest thing that stays a drop-in replacement, and (Stewart, 2026-09-28) do what a complete reimplementation of curl needs: no option is left out, so the ADR describes an interim state, never a permanent refusal; if any official curl build supports an option, Curl supports it on every platform. A script that passes a real option must not silently get different behaviour; weigh a distinct message against keeping curl's exact `is unknown` text, and say what `--help <option>` and `-K` config lines do for such an option.
 
 ## Acceptance criteria
 

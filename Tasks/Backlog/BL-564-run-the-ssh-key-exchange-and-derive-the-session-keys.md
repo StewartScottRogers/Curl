@@ -14,12 +14,12 @@ completed:
 
 ## Goal
 
-The transport runs each key exchange BL-560's ADR offers (ECDH on NIST curves per RFC 5656 and finite-field DH group14-sha256/group16-sha512 per RFC 8268, plus any hand-written one the ADR allows), computes the exchange hash and session identifier, verifies the server's signature over it with the host-key algorithm chosen, derives the six keys (RFC 4253 section 7.2), and switches keys on `NEWKEYS`.
+The transport runs every BCL-backed key exchange BL-560's ADR offers (ECDH on NIST curves per RFC 5656; finite-field `diffie-hellman-group1-sha1`, `group14-sha1`, `group14-sha256`, `group16-sha512`, `group18-sha512` per RFC 4253 and RFC 8268; `diffie-hellman-group-exchange-sha1`/`sha256` per RFC 4419; `curve25519-sha256` is BL-678), verifying `rsa-sha2-256`, `rsa-sha2-512`, `ssh-rsa`, `ssh-dss` and `ecdsa-sha2-nistp*` host-key signatures (`ssh-ed25519` is BL-678), computes the exchange hash and session identifier, verifies the server's signature over it with the host-key algorithm chosen, derives the six keys (RFC 4253 section 7.2), and switches keys on `NEWKEYS`.
 
 ## Context
 
 - Conformance audit 2026-09-28, row 35. Builds on BL-563.
-- **BCL only.** `ECDiffieHellman`, `System.Numerics.BigInteger`, `SHA256`/`SHA384`/`SHA512`, `RSA` and `ECDsa` for signature checks. Whether the server's host key is *trusted* is BL-566; this task checks the signature only. If something needed cannot be built on the BCL, move the task to `Blocked` for Stewart naming what is missing; never add a package.
+- **BCL only.** `ECDiffieHellman`, `System.Numerics.BigInteger`, `SHA1`/`SHA256`/`SHA384`/`SHA512`, `RSA`, `DSA` and `ECDsa` for signature checks. Whether the server's host key is *trusted* is BL-566; this task checks the signature only. What the BCL lacks (on any CI platform, per BL-669's ADR) is hand-built in `Curl.Cryptography.UnitLibrary` (standing rule, root `CLAUDE.md`, "Decisions", 2026-09-28): never a package, never a task blocked for a missing primitive.
 - Test vectors: fixed client ephemeral keys (injected), a test peer with fixed host keys; cross-check one exchange hash against a value computed independently in the test from the RFC's definition.
 - Measure: a server whose signature is bad cannot be staged with OpenSSH; pin curl's exit code for a failed key exchange from BL-563's measurements (a server that closes during KEX) and record it in Notes.
 

@@ -19,7 +19,7 @@ completed:
 ## Context
 
 - Conformance audit 2026-09-28, row 35. Builds on BL-567 (authenticated transport). Channel windowing and `SSH_MSG_CHANNEL_WINDOW_ADJUST` belong here.
-- **BCL only.** No new primitive needed. If something needed cannot be built on the BCL, move the task to `Blocked` for Stewart naming what is missing; never add a package.
+- **BCL only.** No new primitive needed. Anything the BCL lacks is hand-built in its own library (standing rule, root `CLAUDE.md`, "Decisions", 2026-09-28): never a package, never a task blocked for a missing primitive.
 - SFTP v3: draft-ietf-secsh-filexfer-02.
 - Measure with the reference curl against a local OpenSSH server through `Record-CurlExchange.ps1 -NoServer`: a file, an empty file, a missing file, a file without read permission, `sftp://h/~/file`, a path with `%20`, and `-w '%{size_download}'`.
 

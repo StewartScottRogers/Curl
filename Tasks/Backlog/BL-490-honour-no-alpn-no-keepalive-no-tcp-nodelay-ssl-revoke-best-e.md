@@ -21,7 +21,7 @@ The switches BL-489 parses change what the TCP and TLS layers do, as they do in 
 - Conformance audit 2026-09-28, row 2 (Blocker; "+Networking for Schannel meaning").
 - Where they land: `Curl.Networking.UnitLibrary/TcpDialer.cs` and `ITcpDialer.cs` (socket options, behind the `ITcpDialer` seam), `SslStreamTlsProvider.cs` and `TlsClientOptions.cs` (ALPN, revocation, trust store); the mapping from `CommandLineOptions` is `Curl.Console/TlsClientOptionsMapping.cs` and `CurlTransports.cs`.
 - Revocation: ADR-0086 (`the-schannel-build-checks-revocation-for-a-cacert-chain`) is the current rule; `--ssl-revoke-best-effort` relaxes it for `X509ChainStatusFlags.RevocationStatusUnknown` and `OfflineRevocation` on the Schannel build. What the OpenSSL build does with it must be measured.
-- `--no-sessionid`, `--ssl-allow-beast` and `--styled-output` have no BCL control and stay parse-only; state that in the XML doc of the properties BL-489 added.
+- Not in this task, but not parse-only either (standing rule, root `CLAUDE.md`, "Decisions", 2026-09-28): `--no-sessionid` and `--ssl-allow-beast` have no `SslStream` control and are honoured through the hand-built TLS client by BL-713; `--styled-output` is BL-736. Name those tasks in the XML doc of the properties BL-489 added until they land.
 - ADR-0009: TLS behaviour matches the platform's usual curl build (Schannel on Windows, OpenSSL elsewhere). ADR-0083: thin socket adapters are measured by the integration run, so unit tests go through `ITcpDialer`.
 
 ## Acceptance criteria

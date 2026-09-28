@@ -14,7 +14,7 @@ completed:
 
 ## Goal
 
-`--proxy-ntlm` and `--proxy-negotiate` (and `--proxy-anyauth` when they rank first) complete their handshakes against a `407` on the same proxy connection, for `CONNECT` tunnels and forward proxy requests, using the NTLM and Negotiate implementations from BL-526 and BL-527, as curl 8.21.0 does.
+`--proxy-ntlm` and `--proxy-negotiate` (and `--proxy-anyauth` when they rank first) complete their handshakes against a `407` on the same proxy connection, for `CONNECT` tunnels and forward proxy requests, using the NTLM and Negotiate implementations from BL-526 and BL-527, as curl 8.21.0 does, on every platform (standing rule, root `CLAUDE.md`, "Decisions", 2026-09-28).
 
 ## Context
 
