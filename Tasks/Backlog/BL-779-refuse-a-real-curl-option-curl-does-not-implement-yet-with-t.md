@@ -1,5 +1,5 @@
 ---
-id: BL-778
+id: BL-779
 title: Refuse a real curl option Curl does not implement yet with 'the installed libcurl version does not support this' (ADR-0137)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-778 — Refuse a real curl option Curl does not implement yet with 'the installed libcurl version does not support this' (ADR-0137)
+# BL-779 — Refuse a real curl option Curl does not implement yet with 'the installed libcurl version does not support this' (ADR-0137)
 
 ## Goal
 

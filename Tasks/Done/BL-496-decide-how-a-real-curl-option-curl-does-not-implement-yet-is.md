@@ -35,10 +35,10 @@ An ADR states what Curl prints and exits for each class of curl 8.21.0 long opti
 - Decided in ADR-0137 (0137 was the next unused number; the highest on this branch was 0136). A real-but-unimplemented option is refused with curl's own `the installed libcurl version does not support this`, exit 2 - the line a curl built without a feature prints, already used for ADR-0017's `UnsupportedFlag` rows - rather than `is unknown` (misleads: says typo) or new text no curl prints.
 - Measured 2026-09-28 against the Windows system curl 8.21.0 (Schannel): `--http3`, a `-K` line `http3`, a `-K` line `bogus-opt`, `--no-http3` and `--expand-http3 x`, all exit 2; texts in the ADR's Context.
 - The ADR's example letters were computed from the two tables: 93 alias-table names had no option-table row on 2026-09-28, with letters `-4`, `-6`, `-n`, `-B`.
-- The parser change is filed as BL-778 (`Curl.Cli.UnitLibrary`, `Curl.Cli.UnitTests`), outside this docs task's `touches`.
+- The parser change is filed as BL-779 (`Curl.Cli.UnitLibrary`, `Curl.Cli.UnitTests`), outside this docs task's `touches`.
 
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Doing.
-- 2026-09-28: Doing -> Done. ADR-0137 decides the four option classes: a real curl option not yet implemented is refused with 'the installed libcurl version does not support this', exit 2, apart from a typo's 'is unknown'; parser change filed as BL-778
+- 2026-09-28: Doing -> Done. ADR-0137 decides the four option classes: a real curl option not yet implemented is refused with 'the installed libcurl version does not support this', exit 2, apart from a typo's 'is unknown'; parser change filed as BL-779
