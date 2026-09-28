@@ -52,3 +52,4 @@ Fix in the test file only: mark the three existing tests `[OSCondition(Operating
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
