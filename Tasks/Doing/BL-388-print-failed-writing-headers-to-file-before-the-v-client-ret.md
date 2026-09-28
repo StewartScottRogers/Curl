@@ -31,3 +31,4 @@ BL-111 measured curl 8.21.0 on Windows: with `-v`, `curl: Failed writing headers
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
