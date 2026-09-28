@@ -20,9 +20,20 @@ internal static class Pop3MessageId
     /// the path names no message; or <see langword="null" /> when a decoded byte is below
     /// 0x20, which curl refuses with exit 3 (0x7F is kept).
     /// </returns>
-    public static string? Read(CurlUrl url)
+    public static string? Read(CurlUrl url) => Decode(url.AbsolutePath[1..]);
+
+    /// <summary>
+    /// Percent-decodes <paramref name="text" /> as curl's <c>Curl_urldecode</c> with
+    /// <c>REJECT_CTRL</c> does, for the message id and for a <c>-X</c> command alike.
+    /// </summary>
+    /// <param name="text">The text to decode.</param>
+    /// <returns>
+    /// The decoded text, each byte as one Latin-1 character, or <see langword="null" /> when a
+    /// decoded byte is below 0x20.
+    /// </returns>
+    public static string? Decode(string text)
     {
-        byte[] encoded = Encoding.UTF8.GetBytes(url.AbsolutePath[1..]);
+        byte[] encoded = Encoding.UTF8.GetBytes(text);
         var decoded = new List<byte>(encoded.Length);
         for (int index = 0; index < encoded.Length; index++)
         {

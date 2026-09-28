@@ -6,8 +6,8 @@ namespace Curl.Protocol.Pop3;
 /// Serves the <c>pop3</c> and <c>pop3s</c> schemes: connects, reads the greeting, asks for
 /// the capabilities with <c>CAPA</c>, upgrades with <c>STLS</c> as <c>--ssl</c> and
 /// <c>--ssl-reqd</c> ask, logs in with SASL <c>AUTH</c>, <c>APOP</c> or <c>USER</c>/<c>PASS</c>,
-/// lists the maildrop with <c>LIST</c> or retrieves the URL's message with <c>RETR</c>, and
-/// closes with <c>QUIT</c>, as curl 8.21.0 does (BL-547, BL-548, BL-549).
+/// lists the maildrop with <c>LIST</c>, retrieves the URL's message with <c>RETR</c> or sends
+/// <c>-X</c>'s command, and closes with <c>QUIT</c>, as curl 8.21.0 does (BL-547 to BL-550).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -18,8 +18,8 @@ namespace Curl.Protocol.Pop3;
 /// each failure are described on <see cref="Pop3Session" />.
 /// </para>
 /// <para>
-/// Custom commands, <c>-l</c> and <c>-I</c> (BL-550) are not implemented yet. Cancellation
-/// leaves as an exception.
+/// <c>-X</c>, <c>-l</c> and <c>-I</c> behave as <see cref="Pop3Command" /> describes; like
+/// curl's, <c>-I</c> changes nothing. Cancellation leaves as an exception.
 /// </para>
 /// </remarks>
 public sealed class Pop3ProtocolHandler : IProtocolHandler

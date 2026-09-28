@@ -5,9 +5,9 @@ namespace Curl.Protocol.Pop3;
 
 /// <summary>
 /// One POP3 conversation on an open connection: the greeting, <c>CAPA</c>, the <c>STLS</c>
-/// upgrade <c>--ssl</c> and <c>--ssl-reqd</c> ask for, the login, <c>LIST</c> or <c>RETR</c>,
-/// and <c>QUIT</c>, each step and each failure's exit code measured on curl 8.21.0 with
-/// <c>Record-CurlExchange.ps1 -Pop3</c> (BL-547, BL-548, BL-549).
+/// upgrade <c>--ssl</c> and <c>--ssl-reqd</c> ask for, the login, <c>LIST</c>, <c>RETR</c> or
+/// <c>-X</c>'s command, and <c>QUIT</c>, each step and each failure's exit code measured on curl 8.21.0 with
+/// <c>Record-CurlExchange.ps1 -Pop3</c> (BL-547, BL-548, BL-549, BL-550).
 /// </summary>
 /// <remarks>
 /// <list type="bullet">
@@ -16,9 +16,11 @@ namespace Curl.Protocol.Pop3;
 /// <item>After <c>CAPA</c> and any upgrade, the session logs in as <see cref="Pop3Login" />
 /// describes; a login failure sends no <c>QUIT</c>.</item>
 /// <item>A URL naming no message sends <c>LIST</c>, one naming <c>&lt;id&gt;</c> sends
-/// <c>RETR &lt;id&gt;</c> (<see cref="Pop3MessageId" />); an id with a control character is
-/// exit 3 after <c>CAPA</c>, and <c>QUIT</c> is still sent. An answer other than <c>+OK</c> is
-/// exit 8, <c>Weird server reply</c>, and <c>QUIT</c> is still sent. The body is written as
+/// <c>RETR &lt;id&gt;</c> (<see cref="Pop3MessageId" />), and <c>-X</c> and <c>-l</c> change
+/// the command and whether its answer has a body as <see cref="Pop3Command" /> describes; an
+/// id or <c>-X</c> command with a control character is exit 3 after the login, and
+/// <c>QUIT</c> is still sent. An answer other than <c>+OK</c> is exit 8,
+/// <c>Weird server reply</c>, and <c>QUIT</c> is still sent. A body is written as
 /// <see cref="Pop3BodyDecoder" /> decodes it; the server closing before its terminator is a
 /// success with no <c>QUIT</c>.</item>
 /// <item>A greeting that does not start <c>+OK</c> is exit 8,
@@ -199,24 +201,24 @@ internal sealed class Pop3Session(
     }
 
     /// <summary>
-    /// Sends <c>LIST</c> when the URL names no message, else <c>RETR &lt;id&gt;</c>, and writes
-    /// the answer's body to <see cref="ITransferContext.Output" />.
+    /// Sends the command <see cref="Pop3Command" /> chooses and, when its answer has a body,
+    /// writes the body to <see cref="ITransferContext.Output" />.
     /// </summary>
     private async ValueTask<TransferResult> TransferAsync()
     {
-        if (Pop3MessageId.Read(context.Url) is not { } messageId)
+        if (Pop3Command.Choose(context) is not { } command)
         {
             return TransferResult.Failure(CurlExitCode.UrlMalformat, Pop3SessionMessages.UrlMalformed);
         }
 
-        await channel.SendAsync(messageId.Length == 0 ? "LIST" : "RETR " + messageId).ConfigureAwait(false);
+        await channel.SendAsync(command.Line).ConfigureAwait(false);
         Pop3Response response = await channel.ReadResponseAsync().ConfigureAwait(false);
         if (!response.IsOk)
         {
             return TransferResult.Failure(CurlExitCode.WeirdServerReply, Pop3SessionMessages.WeirdServerReply);
         }
 
-        return TransferResult.Success(await ReceiveBodyAsync().ConfigureAwait(false));
+        return TransferResult.Success(command.WritesBody ? await ReceiveBodyAsync().ConfigureAwait(false) : 0);
     }
 
     /// <summary>
