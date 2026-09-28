@@ -23,6 +23,7 @@ completed:
 - `ftps` through an HTTP proxy: check how curl 8.21.0 treats it before routing it (ADR-0056, rule 3) and record the answer under Notes.
 - `-V` lists protocols per ADR-0021; add `ftps` only as the platform's curl lists it.
 - BL-466 (ADR-0108) added `FtpProtocolHandler(IConnector, IConnectionListener, ITlsProvider, IDnsResolver)`: build the handler with that constructor and the composition's `IDnsResolver` (the one `TcpConnector` gets), so a `-P` host name resolves.
+- BL-474 (ADR-0110) added a five-argument constructor that also takes an `INetworkInterfaceLookup`: pass `new SystemNetworkInterfaceLookup()` (Curl.Networking) so `-P lo` announces the interface address off Windows; it finds nothing on Windows.
 
 ## Acceptance criteria
 
