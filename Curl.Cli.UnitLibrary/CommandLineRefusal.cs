@@ -403,6 +403,49 @@ public sealed class CommandLineRefusal
             "is badly used here");
 
     /// <summary>
+    /// Refuses a minimum TLS version option (<c>--tlsv1.1</c>, <c>--tlsv1.2</c>, <c>--tlsv1.3</c>) read after a
+    /// <c>--tls-max</c> below it: <c>curl: Minimum TLS version set higher than max</c> (hidden when
+    /// <paramref name="errorsHidden"/>), <c>curl: option &lt;spelled&gt;: is badly used here</c> and the
+    /// try-help line.
+    /// </summary>
+    /// <remarks>
+    /// Measured with the local curl 8.21.0 (Schannel) on 2026-09-28 (BL-502 Notes): <c>--tls-max 1.2 --tlsv1.3</c>,
+    /// <c>--tls-max 1.1 --tlsv1.2</c> and <c>--tls-max 1.0 --tlsv1.1</c> exit 2 with these lines; <c>-s</c> drops the
+    /// first and <c>-sS</c> keeps it.
+    /// </remarks>
+    /// <param name="spelledOption">The whole argument as typed.</param>
+    /// <param name="errorsHidden"><see langword="true"/> when <c>-s</c> without <c>-S</c> is in effect.</param>
+    /// <returns>The refusal.</returns>
+    internal static CommandLineRefusal MinimumTlsVersionAboveMaximum(string spelledOption, bool errorsHidden) =>
+        new(
+            CurlExitCode.FailedInit,
+            ErrorMessageLines(errorsHidden, "Minimum TLS version set higher than max"),
+            spelledOption,
+            "is badly used here");
+
+    /// <summary>
+    /// Refuses a <c>--tls-max</c> read after a minimum TLS version above it, or given as <c>default</c> after
+    /// any minimum: <c>curl: --tls-max set lower than minimum accepted version</c> (hidden when
+    /// <paramref name="errorsHidden"/>), <c>curl: option &lt;spelled&gt;: is badly used here</c> and the
+    /// try-help line.
+    /// </summary>
+    /// <remarks>
+    /// Measured with the local curl 8.21.0 (Schannel) on 2026-09-28 and curl 8.18.0 (OpenSSL) the same day
+    /// (BL-502 Notes): <c>--tlsv1.3 --tls-max 1.2</c>, <c>--tlsv1.1 --tls-max 1.0</c>, and <c>--tls-max default</c>
+    /// after any of <c>-1</c>, <c>--tlsv1.0</c> or <c>--tlsv1.2</c>, exit 2 with these lines; <c>-s</c> drops the
+    /// first and <c>-sS</c> keeps it.
+    /// </remarks>
+    /// <param name="spelledOption">The whole argument as typed.</param>
+    /// <param name="errorsHidden"><see langword="true"/> when <c>-s</c> without <c>-S</c> is in effect.</param>
+    /// <returns>The refusal.</returns>
+    internal static CommandLineRefusal MaximumTlsVersionBelowMinimum(string spelledOption, bool errorsHidden) =>
+        new(
+            CurlExitCode.FailedInit,
+            ErrorMessageLines(errorsHidden, "--tls-max set lower than minimum accepted version"),
+            spelledOption,
+            "is badly used here");
+
+    /// <summary>
     /// Refuses a line of a <c>-K</c> file whose parameter its option did not use (a flag given a
     /// parameter, as in <c>silent foo</c>), with the reason <c>had unsupported trailing garbage</c>.
     /// Only its reason and exit code are ever shown, through <see cref="ConfigFileOptionRefused"/>.

@@ -697,7 +697,9 @@ public sealed class CommandLineOptions
     /// The highest TLS version to offer, from <c>--tls-max</c>: <see cref="ObsoleteTlsProtocols.Tls10"/> for
     /// <c>1.0</c>, <see cref="ObsoleteTlsProtocols.Tls11"/> for <c>1.1</c>, <see cref="SslProtocols.Tls12"/> for
     /// <c>1.2</c>, <see cref="SslProtocols.Tls13"/> for <c>1.3</c>; <see langword="null"/> when not given or given
-    /// as <c>default</c>. curl applies it to the origin and to an HTTPS proxy alike. The last value wins.
+    /// as <c>default</c>. curl 8.21.0 applies it to the origin only, never to an HTTPS proxy (measured, BL-502).
+    /// The last value wins. A ceiling below <see cref="MinimumTlsVersion"/>, in either order, is refused at parse
+    /// time, as curl refuses it.
     /// </summary>
     public SslProtocols? MaximumTlsVersion { get; internal set; }
 

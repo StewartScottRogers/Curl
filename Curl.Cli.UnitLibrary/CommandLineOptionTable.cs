@@ -167,11 +167,11 @@ public static class CommandLineOptionTable
         CommandLineOption.Value("hostpubmd5", null, SetHostPublicKeyMd5),
         CommandLineOption.Text("hostpubsha256", null, (options, hash) => options.SshHostPublicKeySha256 = hash),
         CommandLineOption.NegatableFlag("compressed-ssh", null, (options, on) => options.SshCompression = on),
-        CommandLineOption.Flag("tlsv1", '1', options => options.MinimumTlsVersion = ObsoleteTlsProtocols.Tls10),
-        CommandLineOption.Flag("tlsv1.0", null, options => options.MinimumTlsVersion = ObsoleteTlsProtocols.Tls10),
-        CommandLineOption.Flag("tlsv1.1", null, options => options.MinimumTlsVersion = ObsoleteTlsProtocols.Tls11),
-        CommandLineOption.Flag("tlsv1.2", null, options => options.MinimumTlsVersion = SslProtocols.Tls12),
-        CommandLineOption.Flag("tlsv1.3", null, options => options.MinimumTlsVersion = SslProtocols.Tls13),
+        CommandLineOption.FlagThatCanRefuse("tlsv1", '1', (options, spelledOption) => SetMinimumTlsVersion(options, ObsoleteTlsProtocols.Tls10, spelledOption)),
+        CommandLineOption.FlagThatCanRefuse("tlsv1.0", null, (options, spelledOption) => SetMinimumTlsVersion(options, ObsoleteTlsProtocols.Tls10, spelledOption)),
+        CommandLineOption.FlagThatCanRefuse("tlsv1.1", null, (options, spelledOption) => SetMinimumTlsVersion(options, ObsoleteTlsProtocols.Tls11, spelledOption)),
+        CommandLineOption.FlagThatCanRefuse("tlsv1.2", null, (options, spelledOption) => SetMinimumTlsVersion(options, SslProtocols.Tls12, spelledOption)),
+        CommandLineOption.FlagThatCanRefuse("tlsv1.3", null, (options, spelledOption) => SetMinimumTlsVersion(options, SslProtocols.Tls13, spelledOption)),
         CommandLineOption.Value("tls-max", null, SetMaximumTlsVersion),
         CommandLineOption.Flag("proxy-tlsv1", null, options => options.ProxyMinimumTlsVersion = ObsoleteTlsProtocols.Tls10),
         CommandLineOption.Value("proto", null, (options, value, spelledOption, _, _) => SetAllowedProtocols(options, value, spelledOption, allowed => options.AllowedProtocols = allowed)),
@@ -777,7 +777,9 @@ public static class CommandLineOptionTable
     /// Records the <c>--tls-max</c> ceiling, or refuses with <see cref="CommandLineRefusal.BadlyUsedHere"/> for
     /// any value but <c>default</c>, <c>1.0</c>, <c>1.1</c>, <c>1.2</c> and <c>1.3</c>, matched exactly and
     /// case-sensitively as curl 8.21.0 does (<c>1.4</c>, <c>abc</c>, <c>DEFAULT</c>, <c>1</c>, <c>1.2 </c> and an
-    /// empty value are refused; measured 2026-09-28).
+    /// empty value are refused; measured 2026-09-28). A ceiling below the minimum already read is refused with
+    /// <see cref="CommandLineRefusal.MaximumTlsVersionBelowMinimum"/>, and so is <c>default</c> after any minimum,
+    /// as curl 8.21.0 counts <c>default</c> as lower than every version there (BL-502 Notes).
     /// </summary>
     private static CommandLineRefusal? SetMaximumTlsVersion(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
     {
@@ -786,7 +788,28 @@ public static class CommandLineOptionTable
             return CommandLineRefusal.BadlyUsedHere(spelledOption);
         }
 
+        if (options.MinimumTlsVersion is { } minimum && (maximum ?? SslProtocols.None) < minimum)
+        {
+            return CommandLineRefusal.MaximumTlsVersionBelowMinimum(spelledOption, options.ErrorsHidden);
+        }
+
         options.MaximumTlsVersion = maximum;
+        return null;
+    }
+
+    /// <summary>
+    /// Records a minimum TLS version from <c>-1</c>/<c>--tlsv1</c>, <c>--tlsv1.0</c> … <c>--tlsv1.3</c>, or refuses
+    /// with <see cref="CommandLineRefusal.MinimumTlsVersionAboveMaximum"/> when a <c>--tls-max</c> already read is
+    /// below it, as curl 8.21.0 does (BL-502 Notes).
+    /// </summary>
+    private static CommandLineRefusal? SetMinimumTlsVersion(CommandLineOptions options, SslProtocols minimum, string spelledOption)
+    {
+        if (options.MaximumTlsVersion is { } maximum && minimum > maximum)
+        {
+            return CommandLineRefusal.MinimumTlsVersionAboveMaximum(spelledOption, options.ErrorsHidden);
+        }
+
+        options.MinimumTlsVersion = minimum;
         return null;
     }
 
