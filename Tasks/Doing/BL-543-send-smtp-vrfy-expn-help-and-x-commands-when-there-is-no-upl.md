@@ -32,3 +32,4 @@ Without `-T`, the SMTP handler does what curl 8.21.0 does: `VRFY` for each `--ma
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
