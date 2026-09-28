@@ -1,5 +1,5 @@
 ---
-id: BL-476
+id: BL-477
 title: Report a pooled connection the server closed as dead before reusing it
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-476 — Report a pooled connection the server closed as dead before reusing it
+# BL-477 — Report a pooled connection the server closed as dead before reusing it
 
 ## Goal
 
