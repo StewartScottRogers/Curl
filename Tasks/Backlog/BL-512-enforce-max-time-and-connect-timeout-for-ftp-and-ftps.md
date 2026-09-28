@@ -4,7 +4,7 @@ title: Enforce --max-time and --connect-timeout for ftp and ftps
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: [BL-498, BL-510]
+depends-on: [BL-498, BL-510, BL-511]
 touches: [Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-28
