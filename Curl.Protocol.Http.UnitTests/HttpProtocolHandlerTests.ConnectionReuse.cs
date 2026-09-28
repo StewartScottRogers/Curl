@@ -19,13 +19,19 @@ public sealed partial class HttpProtocolHandlerTests
 
     private const string RequestSent = "Request completely sent off";
 
+    private const string AssumeClose = "HTTP 1.0, assume close after body";
+
+    private const string Http10KeepAlive = "HTTP/1.0 connection set to keep alive";
+
+    private const string NoEndOfMessage = "no chunk, no close, no size. Assume close to signal end";
+
     private const string IssueAnother = "Issue another request to this URL: 'http://127.0.0.1:18977/b'";
 
     [TestMethod]
-    [DataRow("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok", DisplayName = "Content-Length")]
-    [DataRow("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n2\r\nok\r\n0\r\n\r\n", DisplayName = "Chunked")]
-    [DataRow("HTTP/1.0 200 OK\r\nConnection: keep-alive\r\nContent-Length: 2\r\n\r\nok", DisplayName = "HTTP/1.0 with keep-alive")]
-    public async Task ExecuteAsync_ResponsePersists_MarksTheConnectionReusableAndLeavesItIntact(string response)
+    [DataRow("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok", "", DisplayName = "Content-Length")]
+    [DataRow("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n2\r\nok\r\n0\r\n\r\n", "", DisplayName = "Chunked")]
+    [DataRow("HTTP/1.0 200 OK\r\nConnection: keep-alive\r\nContent-Length: 2\r\n\r\nok", AssumeClose + "|" + Http10KeepAlive, DisplayName = "HTTP/1.0 with keep-alive")]
+    public async Task ExecuteAsync_ResponsePersists_MarksTheConnectionReusableAndLeavesItIntact(string response, string headInfoLines)
     {
         foreach (int chunkSize in ChunkSizes)
         {
@@ -37,16 +43,16 @@ public sealed partial class HttpProtocolHandlerTests
 
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.IsTrue(connection.IsMarkedReusable, $"Chunk size {chunkSize}");
-            CollectionAssert.AreEqual(InfoLines(response, "Connection #0 to host 127.0.0.1:18977 left intact"), events.Info, $"Chunk size {chunkSize}");
+            CollectionAssert.AreEqual(InfoLines(headInfoLines, "Connection #0 to host 127.0.0.1:18977 left intact"), events.Info, $"Chunk size {chunkSize}");
         }
     }
 
     [TestMethod]
-    [DataRow("HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 2\r\n\r\nok", DisplayName = "Connection: close")]
-    [DataRow("HTTP/1.0 200 OK\r\nContent-Length: 2\r\n\r\nok", DisplayName = "HTTP/1.0 without keep-alive")]
-    [DataRow("HTTP/1.1 200 OK\r\n\r\nok", DisplayName = "Body read to close")]
-    [DataRow("HTTP/1.1 101 Switching Protocols\r\nUpgrade: h2c\r\n\r\nHTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok", DisplayName = "101")]
-    public async Task ExecuteAsync_ResponseDoesNotPersist_LeavesTheConnectionUnmarkedAndShutsItDown(string response)
+    [DataRow("HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 2\r\n\r\nok", "", DisplayName = "Connection: close")]
+    [DataRow("HTTP/1.0 200 OK\r\nContent-Length: 2\r\n\r\nok", AssumeClose, DisplayName = "HTTP/1.0 without keep-alive")]
+    [DataRow("HTTP/1.1 200 OK\r\n\r\nok", NoEndOfMessage, DisplayName = "Body read to close")]
+    [DataRow("HTTP/1.1 101 Switching Protocols\r\nUpgrade: h2c\r\n\r\nHTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok", "", DisplayName = "101")]
+    public async Task ExecuteAsync_ResponseDoesNotPersist_LeavesTheConnectionUnmarkedAndShutsItDown(string response, string headInfoLines)
     {
         foreach (int chunkSize in ChunkSizes)
         {
@@ -58,7 +64,7 @@ public sealed partial class HttpProtocolHandlerTests
 
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.IsFalse(connection.IsMarkedReusable, $"Chunk size {chunkSize}");
-            CollectionAssert.AreEqual(InfoLines(response, "shutting down connection #4"), events.Info, $"Chunk size {chunkSize}");
+            CollectionAssert.AreEqual(InfoLines(headInfoLines, "shutting down connection #4"), events.Info, $"Chunk size {chunkSize}");
         }
     }
 
@@ -264,10 +270,12 @@ public sealed partial class HttpProtocolHandlerTests
         CollectionAssert.AreEqual(new[] { "closing connection #0" }, events.Info);
     }
 
-    private static string[] InfoLines(string response, string connectionEnd) =>
-        response.StartsWith("HTTP/1.0", StringComparison.Ordinal)
-            ? [UsingHttp1, RequestSent, "HTTP 1.0, assume close after body", connectionEnd]
-            : [UsingHttp1, RequestSent, connectionEnd];
+    /// <summary>
+    /// The info lines of one exchange on a fresh connection: the head's own lines, given as
+    /// one string separated by <c>|</c>, between the request's and the connection's end.
+    /// </summary>
+    private static string[] InfoLines(string headInfoLines, string connectionEnd) =>
+        [UsingHttp1, RequestSent, .. headInfoLines.Split('|', StringSplitOptions.RemoveEmptyEntries), connectionEnd];
 
     private static TransferContext ReuseContext(ITransferEvents events, Stream? output = null, long? maxFileSize = null, HttpRequestOptions? http = null) =>
         new() { Url = CurlUrl.Parse(ReuseUrl), Output = output ?? new MemoryStream(), Events = events, MaxFileSize = maxFileSize, Http = http };

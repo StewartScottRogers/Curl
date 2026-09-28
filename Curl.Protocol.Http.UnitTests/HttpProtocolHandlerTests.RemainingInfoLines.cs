@@ -174,7 +174,7 @@ public sealed partial class HttpProtocolHandlerTests
 
     [TestMethod]
     [DataRow("HTTP/1.0 200 OK\r\nContent-Length: 2\r\n\r\nok", "< Content-Length: 2\r\n", DisplayName = "Without keep-alive")]
-    [DataRow("HTTP/1.0 200 OK\r\nConnection: keep-alive\r\nContent-Length: 2\r\n\r\nok", "< Connection: keep-alive\r\n", DisplayName = "With keep-alive")]
+    [DataRow("HTTP/1.0 200 OK\r\nConnection: keep-alive\r\nContent-Length: 2\r\n\r\nok", "* HTTP/1.0 connection set to keep alive", DisplayName = "With keep-alive")]
     public async Task ExecuteAsync_Http10Response_ReportsAssumeCloseBeforeTheStatusLine(string response, string firstHeader)
     {
         // curl -s -v against an HTTP/1.0 200: "HTTP 1.0, assume close after body" right after

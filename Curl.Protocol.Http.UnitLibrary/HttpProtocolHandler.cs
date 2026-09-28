@@ -495,6 +495,7 @@ public sealed class HttpProtocolHandler(
             StoreCookies(context, exchange.Head);
             await WriteHeadersAsync(context.HeaderOutput, exchange.Head.HeadBytes, cancellationToken).ConfigureAwait(false);
             ThrowIfHeaderRefused(refusal);
+            ReportNoEndOfMessageIndicator(plan, exchange.Head, headReader);
             retry = RetryOf(plan, exchange.Head, bodyLeftUnsent, upload);
             HttpFailMode fail = retry is null ? options.Fail : HttpFailMode.None;
             ThrowIfFailing(fail, HttpFailMode.Fail, exchange.Head);
@@ -556,6 +557,21 @@ public sealed class HttpProtocolHandler(
         else if (!bodyLeftUnsent && !upload.CutShort)
         {
             events.ReportInfo(HttpConnectionInfoLines.UploadSent(upload.BytesSent));
+        }
+    }
+
+    /// <summary>
+    /// Reports <c>no chunk, no close, no size. Assume close to signal end</c> for a head whose
+    /// body can only end when the server closes, as curl 8.21.0 does once the head is accepted:
+    /// before the <c>-f</c> failure and the head's empty line; nothing for a head the peer
+    /// closed before its empty line (measured, BL-467 Notes).
+    /// </summary>
+    private static void ReportNoEndOfMessageIndicator(HttpRequestPlan plan, HttpResponseHead head, HttpResponseHeadReader headReader)
+    {
+        if (headReader.EndedAtEmptyLine
+            && HttpConnectionPersistence.LacksEndOfMessageIndicator(head, plan.Context.NoBody, plan.Options.IgnoreContentLength))
+        {
+            plan.Context.Events.ReportInfo(HttpConnectionInfoLines.NoEndOfMessageIndicator);
         }
     }
 

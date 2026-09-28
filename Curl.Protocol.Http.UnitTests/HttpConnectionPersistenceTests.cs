@@ -57,4 +57,44 @@ public sealed class HttpConnectionPersistenceTests
 
         Assert.AreEqual(expected, HttpConnectionPersistence.KeepsAlive(head, false, decodesTransferCoding: true));
     }
+
+    [TestMethod]
+    [DataRow("Connection: keep-alive", true, DisplayName = "keep-alive")]
+    [DataRow("connection:Keep-Alive", true, DisplayName = "Any case, no blank")]
+    [DataRow("Connection: Foo, Keep-Alive", true, DisplayName = "Among other options")]
+    [DataRow("Connection: keep-alive, close", false, DisplayName = "close wins")]
+    [DataRow("Connection: close", false, DisplayName = "close")]
+    [DataRow("Keep-Alive: timeout=5", false, DisplayName = "Another header")]
+    [DataRow("X-Connection: keep-alive", false, DisplayName = "A header ending in Connection")]
+    [DataRow("no colon", false, DisplayName = "No colon")]
+    public void KeepsHttp10Alive_HeaderLine_IsTrueForAConnectionHeaderNamingKeepAliveAndNotClose(string headerLine, bool expected)
+    {
+        bool keepsAlive = HttpConnectionPersistence.KeepsHttp10Alive(headerLine);
+
+        Assert.AreEqual(expected, keepsAlive);
+    }
+
+    [TestMethod]
+    [DataRow("HTTP/1.1 200 OK\r\nX: y\r\n\r\n", false, false, true, DisplayName = "1.1 without a length")]
+    [DataRow("HTTP/1.1 200 OK\r\nConnection: keep-alive\r\n\r\n", false, false, true, DisplayName = "1.1 keep-alive without a length")]
+    [DataRow("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n", false, true, true, DisplayName = "--ignore-content-length")]
+    [DataRow("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n", false, false, false, DisplayName = "A Content-Length")]
+    [DataRow("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n", false, true, false, DisplayName = "Transfer-Encoding")]
+    [DataRow("HTTP/1.1 200 OK\r\nConnection: close, keep-alive\r\n\r\n", false, false, false, DisplayName = "Connection: close")]
+    [DataRow("HTTP/1.0 200 OK\r\nConnection: keep-alive\r\n\r\n", false, false, false, DisplayName = "HTTP/1.0")]
+    [DataRow("HTTP/1.1 204 No Content\r\n\r\n", false, false, false, DisplayName = "204")]
+    [DataRow("HTTP/1.1 200 OK\r\nX: y\r\n\r\n", true, false, false, DisplayName = "HEAD")]
+    public async Task LacksEndOfMessageIndicator_Head_IsTrueWhenOnlyTheServerClosingCanEndTheBody(
+        string response,
+        bool noBody,
+        bool ignoresContentLength,
+        bool expected)
+    {
+        ScriptedConnection connection = new(Encoding.Latin1.GetBytes(response), 65536);
+        HttpResponseHead head = await new HttpResponseHeadReader(connection).ReadAsync(CancellationToken.None);
+
+        bool lacksIndicator = HttpConnectionPersistence.LacksEndOfMessageIndicator(head, noBody, ignoresContentLength);
+
+        Assert.AreEqual(expected, lacksIndicator);
+    }
 }

@@ -34,6 +34,12 @@ internal sealed class HttpResponseHeadReader(IConnection connection)
     internal bool SwitchedProtocols { get; private set; }
 
     /// <summary>
+    /// Gets a value indicating whether the final head read ended at its empty line rather than
+    /// where the peer closed; curl 8.21.0 decides how the body ends only at that empty line.
+    /// </summary>
+    internal bool EndedAtEmptyLine { get; private set; }
+
+    /// <summary>
     /// Gets where each head line is reported once it is accepted: one
     /// <see cref="ITransferEvents.ReportResponseHeader" /> per line as received, its line end
     /// included - every status line, 1xx heads' included, every header line and each head's
@@ -74,9 +80,10 @@ internal sealed class HttpResponseHeadReader(IConnection connection)
         while (true)
         {
             HttpStatusLine statusLine = await ReadStatusLineAsync(cancellationToken).ConfigureAwait(false);
-            bool closed = await ReadHeaderLinesAsync(statusLine.IsInformational, cancellationToken).ConfigureAwait(false);
+            bool closed = await ReadHeaderLinesAsync(statusLine, cancellationToken).ConfigureAwait(false);
             if (!statusLine.IsInformational)
             {
+                EndedAtEmptyLine = !closed;
                 return builder.Build(statusLine, closed ? [] : lines.TakeRemaining());
             }
 
@@ -108,14 +115,18 @@ internal sealed class HttpResponseHeadReader(IConnection connection)
 
     /// <summary>
     /// Reads header lines through the head's empty line, or until the peer closes; the
-    /// empty line of a head that is not <paramref name="informational" /> is held for
-    /// <see cref="ReportHeldEmptyLine" /> rather than reported.
+    /// empty line of a head that is not informational is held for
+    /// <see cref="ReportHeldEmptyLine" /> rather than reported. In an HTTP/1.0 head, a header
+    /// line that <see cref="HttpConnectionPersistence.KeepsHttp10Alive" /> is preceded by
+    /// <see cref="HttpConnectionInfoLines.Http10KeepAlive" />.
     /// </summary>
-    /// <param name="informational">Whether the head is a 1xx head.</param>
+    /// <param name="statusLine">The head's status line.</param>
     /// <param name="cancellationToken">Cancels every read.</param>
     /// <returns><see langword="true" /> when the peer closed before the empty line.</returns>
-    private async ValueTask<bool> ReadHeaderLinesAsync(bool informational, CancellationToken cancellationToken)
+    private async ValueTask<bool> ReadHeaderLinesAsync(HttpStatusLine statusLine, CancellationToken cancellationToken)
     {
+        bool informational = statusLine.IsInformational;
+        bool http10 = statusLine.Version == new Version(1, 0);
         while (await lines.ReadLineAsync(false, cancellationToken).ConfigureAwait(false) is { } bytes)
         {
             HttpLine line = HttpLine.Split(bytes);
@@ -132,6 +143,11 @@ internal sealed class HttpResponseHeadReader(IConnection connection)
             }
 
             builder.AddLine(line);
+            if (http10 && HttpConnectionPersistence.KeepsHttp10Alive(line.Content))
+            {
+                Events.ReportInfo(HttpConnectionInfoLines.Http10KeepAlive);
+            }
+
             Events.ReportResponseHeader(bytes);
         }
 

@@ -40,6 +40,19 @@ internal static class HttpConnectionInfoLines
     internal const string AssumeCloseAfterBody = "HTTP 1.0, assume close after body";
 
     /// <summary>
+    /// The line written before each header line of an HTTP/1.0 head that
+    /// <see cref="HttpConnectionPersistence.KeepsHttp10Alive" /> (measured, BL-467 Notes).
+    /// </summary>
+    internal const string Http10KeepAlive = "HTTP/1.0 connection set to keep alive";
+
+    /// <summary>
+    /// The line written before the empty line of an HTTP/1.1 head whose body can only end when
+    /// the server closes (<see cref="HttpConnectionPersistence.LacksEndOfMessageIndicator" />,
+    /// measured, BL-467 Notes).
+    /// </summary>
+    internal const string NoEndOfMessageIndicator = "no chunk, no close, no size. Assume close to signal end";
+
+    /// <summary>
     /// The line written before the empty line of a head whose body is read and discarded on a
     /// connection that stays open, as for a redirect <c>-L</c> follows (measured, BL-449 Notes).
     /// </summary>
