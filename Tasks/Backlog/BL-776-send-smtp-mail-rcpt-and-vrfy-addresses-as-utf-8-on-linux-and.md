@@ -1,5 +1,5 @@
 ---
-id: BL-775
+id: BL-776
 title: Send SMTP MAIL, RCPT and VRFY addresses as UTF-8 on Linux and macOS and convert RCPT hosts to IDNA A-labels
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-775 — Send SMTP MAIL, RCPT and VRFY addresses as UTF-8 on Linux and macOS and convert RCPT hosts to IDNA A-labels
+# BL-776 — Send SMTP MAIL, RCPT and VRFY addresses as UTF-8 on Linux and macOS and convert RCPT hosts to IDNA A-labels
 
 ## Goal
 

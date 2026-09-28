@@ -63,7 +63,7 @@ VRFY / `-X` per recipient or HELP / `-X` alone; continuation lines are written a
 (`SmtpReply.FinalLine`, as received) only when 2xx or 553-for-a-recipient; refusal is exit 8
 `Command failed: <code>` and still sends QUIT; `BytesTransferred` = bytes written, `Report.ResponseCode`
 = last command reply. IDNA via the BCL `IdnMapping`. Commands stay Latin-1 like RCPT; UTF-8 on
-Linux/macOS and RCPT's A-label conversion filed as BL-775.
+Linux/macOS and RCPT's A-label conversion filed as BL-776.
 
 Existing session, auth and EHLO-domain tests now expect the `HELP` a session without a message
 sends (constants `HelpAndQuit`, `HelpReplyAndBye`, `SmtpRun.HelpAnswered`); the three upload tests
