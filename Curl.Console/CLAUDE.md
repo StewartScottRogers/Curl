@@ -254,3 +254,7 @@ to a pipe whose reader has gone as a success. A console is still opened the .NET
 redirected standard output becomes an unbuffered `FileStream` over the process's own
 handle (`GetStdHandle` on Windows, descriptor 1 elsewhere), and a closed one a
 `ClosedStandardOutputStream` whose writes throw.
+
+Under `-N` / `--no-buffer` the runner wraps a transfer's body output, standard output or an
+`-o` file, in a `FlushEachWriteStream`, which flushes after every write as curl 8.21.0 does;
+the bytes are unchanged (BL-491).

@@ -1819,7 +1819,7 @@ internal sealed class CurlCommandRunner(
                     () => transferContextFactory.Create(
                         options,
                         url,
-                        RateLimited(options, deferringStandardOutput),
+                        RateLimited(options, FlushedEachWriteUnderNoBuffer(options, deferringStandardOutput)),
                         range,
                         options.ResumeFrom,
                         headerOutput,
@@ -2315,7 +2315,7 @@ internal sealed class CurlCommandRunner(
                     () => transferContextFactory.Create(
                         options,
                         url,
-                        RateLimited(options, output),
+                        RateLimited(options, FlushedEachWriteUnderNoBuffer(options, output)),
                         range,
                         resumeFrom,
                         headerOutput,
@@ -2522,6 +2522,16 @@ internal sealed class CurlCommandRunner(
         options.LimitRate is > 0 and long bytesPerSecond
             ? new RateLimitedStream(output, bytesPerSecond, timeProvider)
             : output;
+
+    /// <summary>
+    /// Flushes <paramref name="output" /> after every write with a <see cref="FlushEachWriteStream" />
+    /// under <c>-N</c> / <c>--no-buffer</c>, as curl 8.21.0 flushes each write then.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="output">The attempt's body output.</param>
+    /// <returns>The flushing stream, or <paramref name="output" /> when buffering is on.</returns>
+    private static Stream FlushedEachWriteUnderNoBuffer(CommandLineOptions options, Stream output) =>
+        options.NoBuffer ? new FlushEachWriteStream(output) : output;
 
     /// <summary>
     /// Writes each of <paramref name="lines" /> to standard error, in order.
