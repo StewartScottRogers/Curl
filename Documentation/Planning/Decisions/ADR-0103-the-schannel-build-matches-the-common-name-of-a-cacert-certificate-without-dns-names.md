@@ -40,3 +40,22 @@ platform: it accepts the certificate on Windows and can report
 - The OpenSSL build still follows .NET for a CN-only name. On Windows .NET accepts the
   certificate where curl's OpenSSL build would refuse it (it falls back to the CN only
   without DNS or IP subjectAltNames); that build runs on Windows only in tests.
+
+## Amendment — BL-460: the OpenSSL build refuses the CN of a certificate with IP subjectAltNames
+
+Decided by Claude under Stewart's delegation, in BL-460.
+
+- **The OpenSSL build no longer follows .NET for this certificate.** curl's
+  `ossl_verifyhost` falls back to the CN only when the subjectAltName holds no DNS and no
+  IP entry, so for a host-name target a certificate whose subjectAltName holds IP
+  addresses and no DNS name matches nothing. `SslStreamTlsProvider` adds a name mismatch
+  when `OpenSslCommonNameRefusal.RefusesHostName` says so, and the existing message
+  follows: exit 60, `SSL: no alternative certificate subject name matches target hostname
+  '<host>'`.
+- **Why not measure .NET on Linux and macOS first:** the added mismatch gives curl's answer
+  whatever .NET's check said, so the result no longer depends on the platform; the
+  handshake test runs on all three in CI.
+- **An IP-literal target, or a certificate with a DNS subjectAltName, is left to .NET's
+  check, as before; with a DNS subjectAltName .NET matches only those names, as curl does.
+
+The last Decision bullet and the last Consequences bullet above are superseded by this.

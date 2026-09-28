@@ -11,8 +11,8 @@ namespace Curl.Networking;
 /// Pins the name check for a certificate whose subjectAltName holds only an IP address
 /// and whose common name is the host (BL-415): with <c>--cacert</c> curl 8.21.0's Schannel
 /// build matches the common name, as BL-150 measured, while curl's OpenSSL build, which
-/// falls back to the common name only without DNS or IP subjectAltNames, reports the name
-/// mismatch .NET found.
+/// falls back to the common name only without DNS or IP subjectAltNames, refuses it on
+/// every platform, whether or not .NET found the name mismatch (BL-460).
 /// </summary>
 public sealed partial class SslStreamTlsProviderTests
 {
@@ -86,6 +86,50 @@ public sealed partial class SslStreamTlsProviderTests
         Assert.AreEqual(
             "SSL: no alternative certificate subject name matches target hostname 'localhost'",
             failure?.Message);
+    }
+
+    // .NET on Windows accepts this certificate by its common name; curl's OpenSSL build
+    // does not, on any platform (BL-460).
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithCaCertificateFileAndACommonNameOnlyDnsNameInTheOpenSslBuild_ReportsNoAlternativeNameMatches()
+    {
+        using var certificate = CreateIpAddressOnlyCertificate();
+        var caFile = WriteCaFile("ip-only.pem", certificate.ExportCertificatePem());
+
+        var result = await HandshakeWithServerCertificateAsync(
+            new SslStreamTlsProvider(new TlsClientOptions(CaCertificateFile: caFile), OpenSslBuild), certificate);
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
+        Assert.AreEqual(
+            "SSL: no alternative certificate subject name matches target hostname 'localhost'",
+            result.Result.ErrorMessage);
+        Assert.IsTrue(result.PlaintextDisposed);
+    }
+
+    [TestMethod]
+    public void VerifyPeer_WithNoErrorsForACommonNameOnlyDnsNameInTheOpenSslBuild_ReportsNoAlternativeNameMatches()
+    {
+        var provider = new SslStreamTlsProvider(new TlsClientOptions(CaCertificateFile: "ip-only.pem"), OpenSslBuild);
+        using var certificate = CreateIpAddressOnlyCertificate();
+        using var chain = BuildSelfTrustedChain(certificate);
+
+        var failure = provider.VerifyPeer(SslPolicyErrors.None, chain, CertificateHost, []);
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+        Assert.AreEqual(
+            "SSL: no alternative certificate subject name matches target hostname 'localhost'",
+            failure?.Message);
+    }
+
+    [TestMethod]
+    public void VerifyPeer_WithNoErrorsAndAnUnbuiltChainInTheOpenSslBuild_AcceptsTheCertificate()
+    {
+        var provider = new SslStreamTlsProvider(new TlsClientOptions(), OpenSslBuild);
+        using var chain = new X509Chain();
+
+        var failure = provider.VerifyPeer(SslPolicyErrors.None, chain, CertificateHost, []);
+
+        Assert.IsNull(failure);
     }
 
     private static X509Chain BuildSelfTrustedChain(X509Certificate2 certificate)

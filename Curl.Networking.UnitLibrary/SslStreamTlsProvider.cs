@@ -319,7 +319,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider
             RemoteCertificateValidationCallback = (_, certificate, chain, errors) =>
             {
                 peerCertificates = ListPeerCertificates(certificate, chain);
-                var anchoredErrors = WithoutNameMismatchSchannelAccepts(
+                var anchoredErrors = WithTheNameCheckCurlRuns(
                     WithoutChainErrorsWhenAnchored(errors, chain, anchorsBesideSystemStore), chain, targetHost);
                 peerVerification = ObservePeerVerification(anchoredErrors, chain, peerCertificates);
                 verificationFailure = VerifyPeer(anchoredErrors, chain, targetHost, []);
@@ -383,7 +383,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider
             return null;
         }
 
-        errors = WithoutNameMismatchSchannelAccepts(
+        errors = WithTheNameCheckCurlRuns(
             WithoutChainErrorsWhenAnchored(errors, chain, anchorsBesideSystemStore), chain, targetHost);
         if (errors == SslPolicyErrors.None)
         {
@@ -447,12 +447,25 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider
             ? errors & ~SslPolicyErrors.RemoteCertificateChainErrors
             : errors;
 
+    // Where curl's name check and .NET's disagree, the build curl's answer stands.
+    private SslPolicyErrors WithTheNameCheckCurlRuns(SslPolicyErrors errors, X509Chain? chain, string targetHost) =>
+        _matchesSchannelBuild
+            ? WithoutNameMismatchSchannelAccepts(errors, chain, targetHost)
+            : WithNameMismatchOpenSslFinds(errors, chain, targetHost);
+
+    // curl's OpenSSL build never matches a host name by the common name of a certificate
+    // whose subjectAltName holds only IP addresses, which .NET on Windows does (BL-460).
+    private static SslPolicyErrors WithNameMismatchOpenSslFinds(SslPolicyErrors errors, X509Chain? chain, string targetHost) =>
+        chain is { ChainElements.Count: > 0 }
+        && OpenSslCommonNameRefusal.RefusesHostName(chain.ChainElements[0].Certificate, targetHost)
+            ? errors | SslPolicyErrors.RemoteCertificateNameMismatch
+            : errors;
+
     // With --cacert curl's Schannel build checks the name itself and, for a certificate
     // with no DNS subjectAltName, matches the common name, which .NET's check does not
     // (BL-415). Without --cacert Schannel's own check stands.
     private SslPolicyErrors WithoutNameMismatchSchannelAccepts(SslPolicyErrors errors, X509Chain? chain, string targetHost) =>
-        _matchesSchannelBuild
-        && _options.CaCertificateFile is not null
+        _options.CaCertificateFile is not null
         && errors.HasFlag(SslPolicyErrors.RemoteCertificateNameMismatch)
         && SchannelCommonNameCheck.CommonNameMatches(chain!.ChainElements[0].Certificate, targetHost)
             ? errors & ~SslPolicyErrors.RemoteCertificateNameMismatch
