@@ -12,7 +12,7 @@ namespace Curl.Protocol.Http;
 /// starts with a blank continues the header before it. A peer that closes before a final
 /// head's status line is whole, or inside a 1xx head, is an empty reply (exit 52); one that
 /// closes among the final response's headers ends the head there, which curl 8.21.0 treats
-/// as a complete response.
+/// as a complete response, never acting on the header it ends on (<see cref="HeadActedOn" />).
 /// </remarks>
 internal sealed class HttpResponseHeadReader
 {
@@ -101,6 +101,8 @@ internal sealed class HttpResponseHeadReader
 
     private int wholeHeadersAsked;
 
+    private bool endedAtRefusedHeader;
+
     private byte[]? heldEmptyLine;
 
     /// <summary>
@@ -151,7 +153,7 @@ internal sealed class HttpResponseHeadReader
             {
                 EndedAtEmptyLine = !closed;
                 HttpResponseHead head = builder.Build(statusLine, closed ? [] : lines.TakeRemaining());
-                Refusal = FindRefusal(head);
+                Refusal = FindRefusal(closed && !endedAtRefusedHeader ? HeadBeforeLastHeader(head) : head);
                 ReleaseHeadBeforeRefusal();
                 return head;
             }
@@ -162,6 +164,26 @@ internal sealed class HttpResponseHeadReader
             }
         }
     }
+
+    /// <summary>
+    /// Gives the part of the final head <see cref="ReadAsync" /> read that curl 8.21.0 acts on -
+    /// frames the body by, decides the connection's reuse by, follows a redirect by: all of it,
+    /// unless the peer closed among its headers with none refused, when the last header is left
+    /// out. It is still reported, written and counted, but curl acts on a header only once a byte
+    /// of the next line shows it whole, so never on the one the head ends on at close (measured,
+    /// BL-483 Notes).
+    /// </summary>
+    /// <param name="head">The head <see cref="ReadAsync" /> returned, cut before any <see cref="Refusal" />.</param>
+    /// <returns>The head curl acts on.</returns>
+    internal HttpResponseHead HeadActedOn(HttpResponseHead head) =>
+        EndedAtEmptyLine || Refusal is not null ? head : HeadBeforeLastHeader(head);
+
+    /// <summary>
+    /// Gives a head the peer closed among its headers without its last header, the one curl
+    /// 8.21.0 never acts on (<see cref="HeadActedOn" />).
+    /// </summary>
+    private static HttpResponseHead HeadBeforeLastHeader(HttpResponseHead head) =>
+        head.Headers.Count == 0 ? head : head.Before(head.Headers.Count - 1);
 
     /// <summary>
     /// Handles a head that failed before it ended: asks <see cref="FindRefusal" /> of the whole
@@ -214,7 +236,8 @@ internal sealed class HttpResponseHeadReader
             headers.Add(builder.PendingHeader);
         }
 
-        return FindRefusal(new HttpResponseHead(headStatusLine!, headers, ReadOnlyMemory<byte>.Empty, ReadOnlyMemory<byte>.Empty)) is not null;
+        endedAtRefusedHeader = FindRefusal(new HttpResponseHead(headStatusLine!, headers, ReadOnlyMemory<byte>.Empty, ReadOnlyMemory<byte>.Empty)) is not null;
+        return endedAtRefusedHeader;
     }
 
     /// <summary>

@@ -493,6 +493,7 @@ public sealed class HttpProtocolHandler(
             FindRefusal = head => body.FindHeadRefusal(head, context.NoBody, DecodesContent(options)),
         };
         HttpRequestPlan? retry = null;
+        HttpResponseHead? actedOn = null;
         HttpBodyDelivery delivery = HttpBodyDelivery.Deliver;
         ReportProtocolChosen(context.Events, newConnection);
         try
@@ -505,19 +506,20 @@ public sealed class HttpProtocolHandler(
             exchange.Head = await headReader.ReadAsync(cancellationToken).ConfigureAwait(false);
             HttpHeadRefusal? refusal = headReader.Refusal;
             exchange.Head = HeadCurlRead(exchange.Head, refusal);
-            exchange.RedirectUrl = HttpRedirectLocation.Find(context.Url, exchange.Head);
+            actedOn = headReader.HeadActedOn(exchange.Head);
+            exchange.RedirectUrl = HttpRedirectLocation.Find(context.Url, actedOn);
             await WriteHeadersAsync(context.HeaderOutput, exchange.Head.HeadBytes, cancellationToken).ConfigureAwait(false);
             ThrowIfHeaderRefused(refusal);
-            ReportNoEndOfMessageIndicator(plan, exchange.Head, headReader);
-            retry = RetryOf(plan, exchange.Head, bodyLeftUnsent, upload);
+            ReportNoEndOfMessageIndicator(plan, actedOn, headReader);
+            retry = RetryOf(plan, actedOn, bodyLeftUnsent, upload);
             HttpFailMode fail = retry is null ? options.Fail : HttpFailMode.None;
-            ThrowIfFailing(fail, HttpFailMode.Fail, exchange.Head);
+            ThrowIfFailing(fail, HttpFailMode.Fail, actedOn);
             bool discardsBody = retry is not null || (options.FollowRedirects && exchange.RedirectUrl is not null);
-            ReportIgnoredBody(plan, exchange.Head, discardsBody);
+            ReportIgnoredBody(plan, actedOn, discardsBody);
             headReader.ReportHeldLines();
-            delivery = DeliveryOf(plan, exchange.Head, discardsBody);
-            await ReadBodyAsync(plan, exchange.Head, body, delivery, discardsBody, cancellationToken).ConfigureAwait(false);
-            ThrowIfFailing(fail, HttpFailMode.FailWithBody, exchange.Head);
+            delivery = DeliveryOf(plan, actedOn, discardsBody);
+            await ReadBodyAsync(plan, actedOn, body, delivery, discardsBody, cancellationToken).ConfigureAwait(false);
+            ThrowIfFailing(fail, HttpFailMode.FailWithBody, actedOn);
         }
         catch (HttpTransferException failure)
         {
@@ -538,10 +540,10 @@ public sealed class HttpProtocolHandler(
             return new HttpAttemptOutcome(timedOut, null, KeepsAlive: false);
         }
 
-        TransferResult result = Succeeded(delivery, exchange.Head!, exchange.Report(body.BytesWritten));
-        return new HttpAttemptOutcome(result, retry, KeepsAlive(plan, exchange.Head, upload, headReader, delivery))
+        TransferResult result = Succeeded(delivery, actedOn!, exchange.Report(body.BytesWritten));
+        return new HttpAttemptOutcome(result, retry, KeepsAlive(plan, actedOn, upload, headReader, delivery))
         {
-            LeftIntactAfterServerClosed = LeftIntactAfterServerClosed(plan, exchange.Head, upload, headReader, delivery),
+            LeftIntactAfterServerClosed = LeftIntactAfterServerClosed(plan, actedOn, upload, headReader, delivery),
         };
     }
 
@@ -659,11 +661,14 @@ public sealed class HttpProtocolHandler(
     /// Decides whether the connection can carry another request: not after a body a status of
     /// 300 or above cut short, which curl 8.21.0 shuts the connection on (measured, BL-319 and
     /// BL-395 Notes), nor after a 101, nor when the body was left unread; and else as
-    /// <see cref="HttpConnectionPersistence" /> says (ADR-0050).
+    /// <see cref="HttpConnectionPersistence" /> says (ADR-0050), for a head the peer closed among
+    /// its headers as for one with no body, since curl 8.21.0 decides that a body runs until the
+    /// server closes only at the head's empty line and leaves such a connection intact
+    /// (measured, BL-483 Notes).
     /// </summary>
     private static bool KeepsAlive(HttpRequestPlan plan, HttpResponseHead head, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpBodyDelivery delivery) =>
         DeliveredWhole(upload, headReader, delivery)
-            && HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, plan.Options.Raw, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding);
+            && HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody || !headReader.EndedAtEmptyLine, plan.Options.Raw, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding);
 
     /// <summary>
     /// Decides whether the connection is reported left intact although the server closed it

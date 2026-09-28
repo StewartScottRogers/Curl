@@ -244,6 +244,78 @@ public sealed partial class HttpProtocolHandlerTests
         }
     }
 
+    /// <summary>
+    /// Measured with <c>-s -v</c>, <c>-sS -D -</c> and <c>-s -w %{num_headers}</c> against a
+    /// server that sent this and closed (BL-483 Notes): curl 8.21.0 acts on a header only once a
+    /// byte of the next line shows it whole, so it never acts on the header the head ends on at
+    /// close, refused or not. It exits 0, reports and writes every head line, counts that
+    /// header, and leaves the connection intact.
+    /// </summary>
+    [TestMethod]
+    [DataRow("Content-Length: x\r\n", DisplayName = "Invalid Content-Length")]
+    [DataRow("Transfer-Encoding: bogus\r\n", DisplayName = "Unsolicited Transfer-Encoding")]
+    [DataRow("Content-Length: 5\r\n", DisplayName = "Content-Length the body falls short of")]
+    [DataRow("X-After: 1\r\n", DisplayName = "No framing header")]
+    public async Task ExecuteAsync_PeerClosesRightAfterAHeader_NeverActsOnIt(string lastHeader)
+    {
+        string response = "HTTP/1.1 200 OK\r\nX-Before: 1\r\n" + lastHeader;
+        foreach (int chunkSize in ChunkSizes)
+        {
+            RecordingTransferEvents events = new();
+            MemoryStream output = new();
+            MemoryStream headers = new();
+            TransferContext context = new() { Url = CurlUrl.Parse(ReuseUrl), Output = output, HeaderOutput = headers, Events = events };
+
+            TransferResult result = await Handler(new QueueConnector(ConnectResult.Connected(Connection(response, chunkSize), null, connectionNumber: 0)))
+                .ExecuteAsync(context);
+
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}: {result.ErrorMessage}");
+            CollectionAssert.AreEqual(new[] { "< HTTP/1.1 200 OK\r\n", "< X-Before: 1\r\n", "< " + lastHeader }, HeadEvents(events), $"Chunk size {chunkSize}");
+            CollectionAssert.AreEqual(InfoLines(string.Empty, "Connection #0 to host 127.0.0.1:18977 left intact"), events.Info, $"Chunk size {chunkSize}");
+            Assert.AreEqual(response, Latin1(headers.ToArray()), $"Chunk size {chunkSize}");
+            Assert.HasCount(2, result.Report!.ResponseHeaders, $"Chunk size {chunkSize}");
+            Assert.AreEqual(0L, output.Length, $"Chunk size {chunkSize}");
+        }
+    }
+
+    /// <summary>
+    /// Measured with <c>-s -v</c> against a server that sent only the status line and closed
+    /// (BL-483 Notes): exit 0, the connection left intact.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_PeerClosesRightAfterTheStatusLine_LeavesTheConnectionIntact()
+    {
+        foreach (int chunkSize in ChunkSizes)
+        {
+            RecordingTransferEvents events = new();
+
+            TransferResult result = await Handler(new QueueConnector(ConnectResult.Connected(Connection("HTTP/1.1 200 OK\r\n", chunkSize), null, connectionNumber: 0)))
+                .ExecuteAsync(ReuseContext(events));
+
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}: {result.ErrorMessage}");
+            CollectionAssert.AreEqual(InfoLines(string.Empty, "Connection #0 to host 127.0.0.1:18977 left intact"), events.Info, $"Chunk size {chunkSize}");
+        }
+    }
+
+    /// <summary>
+    /// Measured with <c>-s -L -w "[%{redirect_url}][%{num_redirects}]"</c> against a server that
+    /// sent this and closed (BL-483 Notes): <c>[][0]</c>, exit 0 - curl never acts on the
+    /// Location the head ends on at close, so it neither follows nor reports it.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_PeerClosesRightAfterALocation_NeitherFollowsNorReportsIt()
+    {
+        foreach (int chunkSize in ChunkSizes)
+        {
+            TransferResult result = await Handler(QueueConnector.For(Connection("HTTP/1.1 302 Found\r\nX-Before: 1\r\nLocation: /b\r\n", chunkSize)))
+                .ExecuteAsync(FollowContext("http://example.com/", new MemoryStream()));
+
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}: {result.ErrorMessage}");
+            Assert.IsNull(result.Report!.RedirectUrl, $"Chunk size {chunkSize}");
+            Assert.AreEqual(0, result.Report.RedirectCount, $"Chunk size {chunkSize}");
+        }
+    }
+
     [TestMethod]
     public async Task ExecuteAsync_HeadFailsWithNoHeaderRefused_FailsWithTheHeadsError()
     {
