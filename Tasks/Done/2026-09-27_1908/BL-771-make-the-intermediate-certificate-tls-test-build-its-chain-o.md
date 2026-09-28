@@ -1,5 +1,5 @@
 ---
-id: BL-354
+id: BL-771
 title: Make the intermediate-certificate TLS test build its chain on Windows
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed: 2026-09-27
 ---
-# BL-354 — Make the intermediate-certificate TLS test build its chain on Windows
+# BL-771 — Make the intermediate-certificate TLS test build its chain on Windows
 
 ## Goal
 
@@ -39,3 +39,4 @@ completed: 2026-09-27
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
 - 2026-09-27: Doing -> Done. Intermediate-certificate TLS test passes on Windows; fix already landed in 2b8e665/16ed1b3, verified here
+- 2026-09-28: Renumbered from BL-354 to BL-771; the ID was shared with Tasks/Done/2026-09-27_1215/BL-354-make-the-intermediate-certificate-tls-provider-test-pass-whe.md, which keeps it.
