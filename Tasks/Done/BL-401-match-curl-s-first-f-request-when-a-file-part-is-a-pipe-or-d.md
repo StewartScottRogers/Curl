@@ -64,7 +64,7 @@ completed: 2026-09-27
   platform-neutral.
 - Touches: added `Documentation/Planning/Decisions` for ADR-0097 and its index line; no task in Doing
   names it.
-- Filed BL-444: `/dev/null` on Linux and macOS opens seekable (length 0) so we declare a length where libcurl
+- Filed BL-445: `/dev/null` on Linux and macOS opens seekable (length 0) so we declare a length where libcurl
   sends a character device chunked; depends on BL-402's measurement.
 - `Measure-CodeQuality.ps1 -Library Curl.Core.UnitLibrary`: 100% line, 100% branch, 0 failing, worst CRAP 10.
   Pipeline stages run in-session (no subagents) for this one-class change.

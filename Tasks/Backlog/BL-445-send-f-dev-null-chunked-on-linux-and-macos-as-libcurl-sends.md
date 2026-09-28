@@ -1,5 +1,5 @@
 ---
-id: BL-444
+id: BL-445
 title: Send -F @/dev/null chunked on Linux and macOS as libcurl sends a character device
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-444 — Send -F @/dev/null chunked on Linux and macOS as libcurl sends a character device
+# BL-445 — Send -F @/dev/null chunked on Linux and macOS as libcurl sends a character device
 
 ## Goal
 
