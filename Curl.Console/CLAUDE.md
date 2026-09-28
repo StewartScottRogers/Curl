@@ -172,8 +172,11 @@ runner's `TimeProvider` as curl 8.21.0's `progress_calc` and `progress_meter` do
 starts, a line for a byte report a second or more after the last speed sample, and, when the
 handler reported any bytes, three done lines after a success or one more update after a failure.
 A handler that reports no bytes, as `file://`'s does not, leaves only the zero line - every byte
-curl writes for a `file://` transfer. The meter is written after the transfer, so its bytes are
-curl's but a terminal does not see it move (BL-131 Notes). It is not written under `-s`,
+curl writes for a `file://` transfer. From the handler's first "transfer started" report the
+recorder hands each drawn line to the runner, which writes it (after the header lines the first
+time) to standard error synchronously, so a terminal sees it move; the end draws, the newline,
+and the whole meter of a transfer never reported started are written after the transfer, so the
+bytes are BL-131's (ADR-0099, BL-383). It is not written under `-s`,
 `--no-progress-meter` or `-#`, nor for a body on standard output when that is a terminal.
 
 Under `-#` (and not `-s`, `--no-progress-meter` or a body on a terminal) the recorder passes

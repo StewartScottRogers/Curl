@@ -47,6 +47,49 @@ public sealed class TransferProgressRecorderTests
     }
 
     [TestMethod]
+    public void WriteLive_ByteReportsBeforeTransferStarted_WritesNothing()
+    {
+        List<string> written = [];
+        TransferProgressRecorder recorder = new(clock, writeLive: written.Add);
+
+        clock.Advance(1000);
+        recorder.ReportDownloaded(10, 10);
+        recorder.ReportUploaded(5, null);
+
+        Assert.IsEmpty(written);
+    }
+
+    [TestMethod]
+    public void WriteLive_TransferStarted_WritesTheLinesDrawnSoFarOnce()
+    {
+        List<string> written = [];
+        TransferProgressRecorder recorder = new(clock, writeLive: written.Add);
+
+        recorder.ReportTransferStarted();
+        clock.Advance(40);
+        recorder.ReportDownloaded(10, 10);
+        recorder.ReportUploaded(0, null);
+
+        CollectionAssert.AreEqual(new[] { Zero }, written);
+    }
+
+    [TestMethod]
+    public void TakeUnwrittenStatusLines_AfterLiveWrites_IsOnlyTheLinesDrawnSince()
+    {
+        List<string> written = [];
+        TransferProgressRecorder recorder = new(clock, writeLive: written.Add);
+        recorder.ReportTransferStarted();
+        clock.Advance(40);
+        recorder.ReportDownloaded(10, 10);
+
+        recorder.Finish(succeeded: true);
+
+        Assert.AreEqual(TenOfTenIn40Milliseconds + TenOfTenIn40Milliseconds + TenOfTenIn40Milliseconds, recorder.TakeUnwrittenStatusLines());
+        Assert.AreEqual(string.Empty, recorder.TakeUnwrittenStatusLines());
+        Assert.AreEqual(Zero + TenOfTenIn40Milliseconds + TenOfTenIn40Milliseconds + TenOfTenIn40Milliseconds, recorder.StatusLines);
+    }
+
+    [TestMethod]
     public void StatusLines_NothingReported_IsTheZeroStatusLine()
     {
         Assert.AreEqual(Zero, new TransferProgressRecorder(clock).StatusLines);

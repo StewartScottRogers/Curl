@@ -154,8 +154,10 @@ namespace Curl.Console;
 /// meter (<see cref="ProgressMeterLines.HeaderLines" />, then the status lines
 /// <see cref="TransferProgressRecorder" /> drew from the handler's byte reports), preceded by curl's
 /// <c>** Resuming transfer from byte position N</c> line when it resumed past byte zero.
-/// The meter is on standard error and the body is not, so writing it after the transfer
-/// leaves the bytes of each stream as curl's. Under <c>-#</c> the bar
+/// From the handler's first report that the transfer started, the meter is written as it is
+/// drawn, so a terminal sees the status line rewritten in place; what is drawn after the
+/// transfer, and all of it for a transfer never reported started, is written when it ends
+/// (ADR-0099). Under <c>-#</c> the bar
 /// <see cref="ProgressBarRecorder" /> drew is written in the meter's place, with no resuming line,
 /// and its newline follows the transfer's failure lines (ADR-0082).
 /// </para>
@@ -1714,7 +1716,9 @@ internal sealed class CurlCommandRunner(
     /// <summary>
     /// Makes the current transfer's progress sink, on the runner's clock, with a
     /// <see cref="ProgressBarRecorder" /> for <see cref="progressBar" /> when
-    /// <see cref="ShowsProgressBar" /> says the bar is shown.
+    /// <see cref="ShowsProgressBar" /> says the bar is shown, and
+    /// <see cref="WriteProgressMeterLive" /> as its live writer when
+    /// <see cref="ShowsProgressMeter" /> says the meter is.
     /// </summary>
     /// <param name="options">The accepted command line.</param>
     /// <param name="resumeFrom">The resolved <c>-C</c> offset, or <see langword="null" />.</param>
@@ -1724,7 +1728,29 @@ internal sealed class CurlCommandRunner(
         progressBar = ShowsProgressBar(options, toStandardOutput)
             ? new ProgressBarRecorder(timeProvider, resumeFrom ?? 0, terminalColumns)
             : null;
-        transferProgress = new TransferProgressRecorder(timeProvider, progressBar);
+        transferProgress = new TransferProgressRecorder(
+            timeProvider,
+            progressBar,
+            ShowsProgressMeter(options, toStandardOutput) ? statusText => WriteProgressMeterLive(resumeFrom, statusText) : null);
+    }
+
+    /// <summary>
+    /// Writes status-line text the handler's reports drew to standard error while the transfer
+    /// runs, after the meter's header lines when they are not yet written, and flushes it. The
+    /// write is synchronous because <see cref="ITransferProgress" /> reports are.
+    /// </summary>
+    /// <param name="resumeFrom">The resolved <c>-C</c> offset, or <see langword="null" />.</param>
+    /// <param name="statusText">The status lines, each starting with a carriage return.</param>
+    private void WriteProgressMeterLive(long? resumeFrom, string statusText)
+    {
+        StringBuilder text = new();
+        foreach (string headerLine in TakeProgressMeterHeaderLines(resumeFrom))
+        {
+            text.Append(headerLine).Append(Environment.NewLine);
+        }
+
+        standardError.Write(Encoding.UTF8.GetBytes(text.Append(statusText).ToString()));
+        standardError.Flush();
     }
 
     /// <summary>
@@ -1735,8 +1761,8 @@ internal sealed class CurlCommandRunner(
     /// <see cref="ShowsProgressMeter" /> says it is shown: its header lines, then the status
     /// lines <see cref="transferProgress" /> drew, each starting with a carriage return, then
     /// one newline, as curl 8.21.0 does (task BL-131); under <c>-L</c>, one such line per hop
-    /// (task BL-277). Either is written after the
-    /// transfer, so its bytes are curl's but a terminal does not see it move.
+    /// (task BL-277). The header lines and status lines <see cref="WriteProgressMeterLive" />
+    /// already wrote while the transfer ran are not written again (task BL-383).
     /// </summary>
     /// <param name="options">The accepted command line.</param>
     /// <param name="result">
@@ -1766,7 +1792,7 @@ internal sealed class CurlCommandRunner(
             && ShowsProgressMeter(options, toStandardOutput))
         {
             FinishTransferProgress(result);
-            await WriteErrorLinesAsync([.. TakeProgressMeterHeaderLines(resumeFrom), transferProgress.StatusLines])
+            await WriteErrorLinesAsync([.. TakeProgressMeterHeaderLines(resumeFrom), transferProgress.TakeUnwrittenStatusLines()])
                 .ConfigureAwait(false);
         }
 
