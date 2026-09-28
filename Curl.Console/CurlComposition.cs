@@ -18,6 +18,7 @@ using Curl.Protocol.Pop3;
 using Curl.Protocol.Smtp;
 using Curl.Protocol.Telnet;
 using Curl.Protocol.Tftp;
+using Curl.Protocol.Ws;
 
 namespace Curl.Console;
 
@@ -35,7 +36,11 @@ internal static class CurlComposition
     /// <see cref="CreateSaslAuthenticator" />'s authenticator and upgrading with
     /// <paramref name="tlsProvider" /> after <c>STARTTLS</c> or <c>STLS</c>), and <c>http</c> and <c>https</c> over <paramref name="connector" />,
     /// the last two answering authentication with <see cref="CreateHttpAuthenticator" />'s
-    /// authenticator and keeping cookies in <paramref name="cookieStore" />; and <c>tftp</c> over
+    /// authenticator and keeping cookies in <paramref name="cookieStore" />; <c>ws</c> and <c>wss</c>
+    /// over <paramref name="connector" />, sending a pre-emptive <c>Authorization</c> from
+    /// <see cref="CreateHttpAuthenticator" />'s authenticator and drawing each
+    /// <c>Sec-WebSocket-Key</c> and frame mask from <see cref="SystemWebSocketRandomSource" />
+    /// (ADR-0128); and <c>tftp</c> over
     /// <paramref name="datagramConnector" />, sending its MASQUE request through an HTTP or HTTPS
     /// proxy over <paramref name="connector" /> with the proxy credential in the platform's
     /// encoding (ADR-0056, rule 4); and <c>ftp</c> and <c>ftps</c>, which
@@ -48,7 +53,7 @@ internal static class CurlComposition
     /// <see cref="EndPointReportingProtocolHandler" />, so every scheme's report carries the end
     /// points of the first connection its transfer opened (ADR-0119).
     /// </summary>
-    /// <param name="connector">Connects the TCP protocols, with TLS for <c>gophers</c>, <c>imaps</c>, <c>mqtts</c>, <c>pop3s</c>, <c>smtps</c> and <c>ftps</c>.</param>
+    /// <param name="connector">Connects the TCP protocols, with TLS for <c>gophers</c>, <c>imaps</c>, <c>mqtts</c>, <c>pop3s</c>, <c>smtps</c>, <c>wss</c> and <c>ftps</c>.</param>
     /// <param name="datagramConnector">Opens the UDP channels TFTP uses.</param>
     /// <param name="tlsProvider">
     /// Upgrades an FTP connection after an accepted <c>AUTH</c> or <c>PROT P</c>, an IMAP connection after an accepted <c>STARTTLS</c>, a POP3 connection
@@ -83,6 +88,7 @@ internal static class CurlComposition
             new ImapProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator()),
             new Pop3ProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator()),
             new SmtpProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator()),
+            new WsProtocolHandler(recordingConnector, CreateHttpAuthenticator(), new SystemWebSocketRandomSource()),
             http,
             new RoutingFtpProtocolHandler(http, CreateFtpProtocolHandler(recordingConnector, tlsProvider, dnsResolver)),
         ];

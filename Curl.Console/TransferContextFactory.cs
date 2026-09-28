@@ -108,8 +108,8 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             Url = url,
             Output = WatchedOutput(output, lowSpeedWatchdog),
             HeaderOutput = watchHeaderOutput is null
-                ? HeaderOutputOf(options, output, headerOutput)
-                : watchHeaderOutput(HeaderOutputOf(options, output, headerOutput)),
+                ? HeaderOutputOf(options, url, output, headerOutput)
+                : watchHeaderOutput(HeaderOutputOf(options, url, output, headerOutput)),
             NoBody = options.NoBody,
             Range = range,
             RangeText = options.Range,
@@ -233,23 +233,31 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
 
     /// <summary>
     /// Chooses where a transfer's header lines go. <c>-i</c> and <c>-I</c> send them to the
-    /// body output as well as to any <c>-D</c> output, as curl 8.21.0 does.
+    /// body output as well as to any <c>-D</c> output, as curl 8.21.0 does, except on a
+    /// <c>ws</c> or <c>wss</c> transfer, where curl writes the upgrade reply head only to
+    /// <c>-D</c> (ADR-0128 row 5; <c>-I</c> measured the same, BL-583).
     /// </summary>
     /// <param name="options">The parsed command line.</param>
+    /// <param name="url">The URL to transfer.</param>
     /// <param name="output">Where the transfer's body goes.</param>
     /// <param name="dumpHeaderOutput">Where the <c>-D</c> header lines go, or <see langword="null" /> without <c>-D</c>.</param>
     /// <returns>
-    /// <paramref name="dumpHeaderOutput" /> without <c>-i</c> or <c>-I</c>; with either,
-    /// <paramref name="output" /> when there is no <c>-D</c>, otherwise a
+    /// <paramref name="dumpHeaderOutput" /> without <c>-i</c> or <c>-I</c>, or for a WebSocket URL;
+    /// otherwise <paramref name="output" /> when there is no <c>-D</c>, or a
     /// <see cref="HeaderLineTeeStream" /> writing each line to both.
     /// </returns>
-    private static Stream? HeaderOutputOf(CommandLineOptions options, Stream output, Stream? dumpHeaderOutput)
+    private static Stream? HeaderOutputOf(CommandLineOptions options, CurlUrl url, Stream output, Stream? dumpHeaderOutput)
     {
-        if (!options.ShowHeaders && !options.NoBody)
+        if ((!options.ShowHeaders && !options.NoBody) || IsWebSocket(url))
         {
             return dumpHeaderOutput;
         }
 
         return dumpHeaderOutput is null ? output : new HeaderLineTeeStream(dumpHeaderOutput, output);
     }
+
+    /// <summary>Whether <paramref name="url" /> is a <c>ws</c> or <c>wss</c> URL.</summary>
+    /// <param name="url">The URL to transfer.</param>
+    /// <returns><see langword="true" /> for either WebSocket scheme.</returns>
+    private static bool IsWebSocket(CurlUrl url) => url.Scheme is "ws" or "wss";
 }

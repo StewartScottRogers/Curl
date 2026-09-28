@@ -19,9 +19,9 @@ public static class CurlVersionText
     /// <summary>
     /// The third line: the schemes the registered handlers serve, in curl's alphabetical order —
     /// <c>file</c>, <c>dict</c>, <c>ftp</c>/<c>ftps</c>, <c>gopher</c>/<c>gophers</c>, <c>telnet</c>, <c>tftp</c>,
-    /// <c>imap</c>/<c>imaps</c>, <c>mqtt</c>/<c>mqtts</c>, <c>pop3</c>/<c>pop3s</c>, <c>smtp</c>/<c>smtps</c> and <c>http</c>/<c>https</c>.
+    /// <c>imap</c>/<c>imaps</c>, <c>mqtt</c>/<c>mqtts</c>, <c>pop3</c>/<c>pop3s</c>, <c>smtp</c>/<c>smtps</c>, <c>ws</c>/<c>wss</c> and <c>http</c>/<c>https</c>.
     /// </summary>
-    public const string ProtocolsLine = "Protocols: dict file ftp ftps gopher gophers http https imap imaps mqtt mqtts pop3 pop3s smtp smtps telnet tftp";
+    public const string ProtocolsLine = "Protocols: dict file ftp ftps gopher gophers http https imap imaps mqtt mqtts pop3 pop3s smtp smtps telnet tftp ws wss";
 
     /// <summary>
     /// The fourth line: the curl features the code gives evidence for, in curl's order (alphabetical,

@@ -17,6 +17,7 @@ using Curl.Protocol.Pop3;
 using Curl.Protocol.Smtp;
 using Curl.Protocol.Telnet;
 using Curl.Protocol.Tftp;
+using Curl.Protocol.Ws;
 
 namespace Curl.Console;
 
@@ -66,6 +67,8 @@ public sealed class CurlCompositionTests
             ["pop3s"] = typeof(Pop3ProtocolHandler),
             ["smtp"] = typeof(SmtpProtocolHandler),
             ["smtps"] = typeof(SmtpProtocolHandler),
+            ["ws"] = typeof(WsProtocolHandler),
+            ["wss"] = typeof(WsProtocolHandler),
             ["http"] = typeof(HttpProtocolHandler),
             ["https"] = typeof(HttpProtocolHandler),
             ["ftp"] = typeof(RoutingFtpProtocolHandler),
@@ -84,6 +87,8 @@ public sealed class CurlCompositionTests
     [DataRow("pop3://h/", 110, false, null)]
     [DataRow("smtps://h/", 465, true, null)]
     [DataRow("smtp://h/", 25, false, null)]
+    [DataRow("ws://h/", 80, false, null)]
+    [DataRow("wss://h/", 443, true, null)]
     [DataRow("gopher://h/", 70, false, null)]
     [DataRow("mqtt://h/", 1883, false, null)]
     [DataRow("dict://h/d:x", 2628, false, null)]
@@ -401,7 +406,7 @@ public sealed class CurlCompositionTests
         IConnector[] connectors = [.. handlers.SelectMany(ConnectorsOf)];
         string[] connectingHandlers = [.. handlers.Where(handler => ConnectorsOf(handler).Any()).Select(handler => Unwrapped(handler).GetType().Name).Order()];
         CollectionAssert.AreEqual(
-            new[] { "DictProtocolHandler", "GopherProtocolHandler", "HttpProtocolHandler", "ImapProtocolHandler", "MqttProtocolHandler", "Pop3ProtocolHandler", "RoutingFtpProtocolHandler", "SmtpProtocolHandler", "TelnetProtocolHandler", "TftpProtocolHandler" },
+            new[] { "DictProtocolHandler", "GopherProtocolHandler", "HttpProtocolHandler", "ImapProtocolHandler", "MqttProtocolHandler", "Pop3ProtocolHandler", "RoutingFtpProtocolHandler", "SmtpProtocolHandler", "TelnetProtocolHandler", "TftpProtocolHandler", "WsProtocolHandler" },
             connectingHandlers);
         Assert.IsTrue(connectors.All(connector => ReferenceEquals(connector, transports.PoolingConnector)));
         Assert.AreSame(transports.PoolingConnector, dispatch.ConnectionPool);
