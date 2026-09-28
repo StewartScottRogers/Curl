@@ -52,7 +52,7 @@ namespace Curl.Core;
 /// Under <see cref="HttpRequestOptions.AutoReferer" /> (<c>-e "...;auto"</c>) every hop after the
 /// first is sent the previous hop's URL, without user information or fragment, as its
 /// <c>Referer</c>, and the merged report's <see cref="TransferReport.Referer" /> is the one the
-/// last request was sent with (measured, BL-361 Notes; ADR-0100).
+/// last request was sent with (measured, BL-361 Notes; ADR-0101).
 /// </para>
 /// <para>
 /// Every hop after the first carries the chain's start as

@@ -35,7 +35,7 @@ effective URL, summed header/request/connection counts, timings from the first h
 8.21.0 does (BL-329); without one, every hop keeps the first URL's proxy. Under
 `HttpRequestOptions.AutoReferer` (`-e "...;auto"`) each hop is sent the previous URL, without
 user information or fragment, as its `Referer`, and the merged report's `Referer` is the last
-one sent, which `%{referer}` prints (ADR-0100, BL-361).
+one sent, which `%{referer}` prints (ADR-0101, BL-361).
 
 `TransferRetrier` runs a transfer again under `--retry` (`RetryPolicy`: `--retry`,
 `--retry-delay`) after curl 8.21.0's transient failures: exit 28, 6, 5 or 12
