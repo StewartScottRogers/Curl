@@ -36,3 +36,4 @@ A parser warning or refusal raised by an option after `--stderr <file>` goes to 
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
