@@ -8,7 +8,7 @@ depends-on: [BL-319]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Core.UnitLibrary, Curl.Core.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-27
-completed:
+completed: 2026-09-27
 ---
 # BL-396 — Resend a custom Expect request after a 417 mid-upload the way curl loops to its redirect limit
 
@@ -25,8 +25,8 @@ A request with an `-H "Expect: 100-continue"` line that draws a 417 while its bo
 ## Acceptance criteria
 
 - [x] The loop is measured on curl 8.21.0, with and without `--max-redirs 3`, and the bytes are in Notes.
-- [ ] A handler test replays it through the fakes and matches the measured connection count, exit code, message and `-D` bytes.
-- [ ] `Measure-CodeQuality.ps1 -Library Curl.Protocol.Http*` reports no failing member.
+- [x] A handler test replays it through the fakes and matches the measured connection count, exit code, message and `-D` bytes.
+- [x] `Measure-CodeQuality.ps1 -Library Curl.Protocol.Http*` reports no failing member.
 
 ## Notes
 
@@ -76,9 +76,42 @@ offers it again once BL-348 is Done. Unmeasured and worth a check next run: whet
 the wait (BL-260, same connection) also counts as a redirect - curl uses the same retry path, so
 it most likely does.
 
+### A 417 during the wait counts too (measured 2026-09-27, lane 1)
+
+`Record-CurlExchange.ps1 -RespondAfterBodyBytes 0` (the 417 sent as soon as the head arrives,
+during the wait) with `--data-binary @big.bin --max-redirs 0`: exit 47
+`Maximum (0) redirects followed`, no resend, stdout `417 176 0 54 1 0`. So the BL-260 resend
+counts as a redirect as well, and `--max-redirs 0` refuses it.
+
+### What was built (2026-09-27, lane 1)
+
+- `HttpRequestOptions.MaxRedirects` (default 50, -1 no limit) and `RedirectsFollowed` (the
+  chain's count before this request), with tests; `Curl.Console` maps `--max-redirs` into
+  `MaxRedirects`.
+- `HttpProtocolHandler`: the request plan carries `RedirectsFollowed`; each 417 resend adds one
+  and reports this transfer's resends as `TransferReport.RedirectCount`. `RetryOf` calls
+  `ThrowIfRedirectLimitReached` before a resend: exit 47 `Maximum (N) redirects followed`, after
+  the 417 head is written. `HttpRequestFraming.WithoutExpect(body, keepsCustomWait)` keeps an
+  `-H` `Expect: 100-continue` wait for a resend after a 417 while sending, not after one during
+  the wait (BL-260 measured no wait there).
+- `RedirectFollower`: adds each hop's `RedirectCount` to the chain's and sends every later hop
+  the count as `RedirectsFollowed`, so `-L` hops and resends share one limit.
+- Tests: `HttpProtocolHandlerTests.ExpectationFailedLoop.cs` replays the measured loop (51 and 4
+  connections, `--max-redirs 0`, with and without `-L`), the own-`Expect` and during-the-wait
+  counts, and the shared limit; `FakeTimeProvider.TimerCreatedAsync(dueTime, count)` lets a test
+  run out each of the 51 waits in turn.
+
+### Choices (sensible defaults, no ADR: each pinned behaviour was measured)
+
+- `-f` still fails a 417 with exit 22 before any redirect-limit check, as it never resends
+  (BL-260/BL-319 measured). `-f` with `--max-redirs 0` was not measured; the existing order was kept.
+- An authentication retry after a 401 is not counted as a redirect: nothing measured says curl
+  counts it, and this task does not change it.
+
 ## Log
 
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
 - 2026-09-27: Doing -> Backlog. Needs Curl.Protocol.Abstractions.UnitLibrary, Curl.Core.UnitLibrary and Curl.Console to carry --max-redirs to the handler; BL-348 (Doing) touches all three
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Done. A -H Expect upload drawing a 417 mid-upload resends, waiting again, until --max-redirs ends it with exit 47; every 417 resend counts as a redirect shared with -L hops
