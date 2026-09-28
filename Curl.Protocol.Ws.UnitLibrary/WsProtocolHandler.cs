@@ -120,11 +120,16 @@ public sealed class WsProtocolHandler(
         return TransferResult.Success(0) with { Report = report };
     }
 
-    private static async ValueTask SendAsync(IConnection connection, byte[] request, CancellationToken cancellationToken)
+    /// <summary>Sends <paramref name="bytes" /> and flushes, turning a failure into curl's exit 55.</summary>
+    /// <param name="connection">The connection to send on.</param>
+    /// <param name="bytes">The request or frame to send.</param>
+    /// <param name="cancellationToken">Cancels the send.</param>
+    /// <returns>A task that completes once the bytes are flushed.</returns>
+    internal static async ValueTask SendAsync(IConnection connection, byte[] bytes, CancellationToken cancellationToken)
     {
         try
         {
-            await connection.WriteAsync(request, cancellationToken).ConfigureAwait(false);
+            await connection.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
             await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (IOException exception)
