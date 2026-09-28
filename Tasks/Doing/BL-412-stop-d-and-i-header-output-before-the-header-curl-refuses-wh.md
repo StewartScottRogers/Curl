@@ -32,3 +32,4 @@ When a response header is refused while curl reads the head (more than five Cont
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
