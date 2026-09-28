@@ -88,3 +88,4 @@ It starts from the last shift's lane count and never needs to know the Claude pl
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
