@@ -335,11 +335,17 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider
             return null;
         }
 
-        if (!_matchesSchannelBuild)
-        {
-            return (CurlExitCode.PeerFailedVerification, TlsFailureMessages.OpenSslPeerFailedVerification(errors, chain, targetHost));
-        }
+        return _matchesSchannelBuild
+            ? SchannelPeerVerificationFailure(errors, chain, targetHost)
+            : (CurlExitCode.PeerFailedVerification, TlsFailureMessages.OpenSslPeerFailedVerification(errors, chain, targetHost));
+    }
 
+    // The Schannel build's answer for a certificate SslStream found fault with.
+    private (CurlExitCode ExitCode, string Message) SchannelPeerVerificationFailure(
+        SslPolicyErrors errors,
+        X509Chain? chain,
+        string targetHost)
+    {
         var hasCaCertificateFile = _options.CaCertificateFile is not null;
         return !hasCaCertificateFile && TlsFailureMessages.IsSchannelCertificateExpired(errors, chain)
             ? (CurlExitCode.SslConnectError, TlsFailureMessages.SchannelCertificateExpired)

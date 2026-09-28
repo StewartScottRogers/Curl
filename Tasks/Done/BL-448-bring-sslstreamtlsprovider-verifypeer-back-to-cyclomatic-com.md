@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-09-27
-completed:
+completed: 2026-09-27
 ---
 # BL-448 — Bring SslStreamTlsProvider.VerifyPeer back to cyclomatic complexity 10 or less
 
@@ -24,8 +24,8 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `Measure-CodeQuality.ps1` reports 100% line and branch coverage and 0 failing members for `Curl.Networking.UnitLibrary`.
-- [ ] `dotnet build -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] `Measure-CodeQuality.ps1` reports 100% line and branch coverage and 0 failing members for `Curl.Networking.UnitLibrary`.
+- [x] `dotnet build -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -33,3 +33,4 @@ completed:
 
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Done. SslStreamTlsProvider.VerifyPeer is under the complexity limit; Curl.Networking.UnitLibrary has 0 failing members
