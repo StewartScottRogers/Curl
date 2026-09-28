@@ -8,7 +8,7 @@ depends-on: [BL-757, BL-756]
 touches: [.github/workflows/gource.yml, README.md, .claude/agents/showcase-publisher.md]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-28
 ---
 # BL-758 — Publish the live task board page on GitHub Pages and link it from the README
 
@@ -30,20 +30,32 @@ The live task board is served at https://stewartscottrogers.github.io/Curl/board
 
 ## Acceptance criteria
 
-- [ ] `gource.yml` has a new job, e.g. `board-page`, that runs on every trigger and is not gated on `decide`.
+- [x] `gource.yml` has a new job, e.g. `board-page`, that runs on every trigger and is not gated on `decide`.
   - When `.github/board/site/index.html` exists in the workspace and differs from the `gource` branch's `board/index.html`, it commits the file onto `gource` as `board/index.html` without force, using the same sparse clone and three-try loop as the coverage job. It then requests a Pages build.
   - When the file is identical or missing, the job does nothing and succeeds.
-- [ ] The `render` job copies `.github/board/site/index.html` to `board/index.html` when the workspace has it, and otherwise downloads `board/index.html` from the current `gource` branch as it does `coverage/`. `board` is included in its `git add` only when the file exists.
-- [ ] The README text that the render job writes onto the branch mentions the board page, and the workflow's header comment describes the new job and `board/`.
-- [ ] `README.md` has a link next to the coverage badge, reading "Live task board" or similar, to `https://stewartscottrogers.github.io/Curl/board/`. It has one sentence saying the board shows the tasks by state and the dark factory's lanes, and refreshes itself.
-- [ ] `.claude/agents/showcase-publisher.md` lists `board/index.html` among the `gource` branch's contents and says where its source lives.
-- [ ] Nothing in the workflow force-pushes anything other than `gource`.
+- [x] The `render` job copies `.github/board/site/index.html` to `board/index.html` when the workspace has it, and otherwise downloads `board/index.html` from the current `gource` branch as it does `coverage/`. `board` is included in its `git add` only when the file exists.
+- [x] The README text that the render job writes onto the branch mentions the board page, and the workflow's header comment describes the new job and `board/`.
+- [x] `README.md` has a link next to the coverage badge, reading "Live task board" or similar, to `https://stewartscottrogers.github.io/Curl/board/`. It has one sentence saying the board shows the tasks by state and the dark factory's lanes, and refreshes itself.
+- [x] `.claude/agents/showcase-publisher.md` lists `board/index.html` among the `gource` branch's contents and says where its source lives.
+- [x] Nothing in the workflow force-pushes anything other than `gource`.
 
 ## Notes
 
 - A lane cannot see the workflow run: runs do not push, and lanes are denied `git push`/`fetch`. Whoever next looks at Actions after this lands should confirm that the `board-page` job succeeded and that `https://stewartscottrogers.github.io/Curl/board/` answers 200. If it does not, file a task.
+- Concurrency (decided in-task): the workflow-level `concurrency: gource` group would have
+  queued every run, `board-page` included, behind a running 8K render, which the goal rules
+  out. The group moved to job level: `decide`, `coverage` and `render` share `gource-render`
+  (so a run still decides only after the previous render finished, and renders never
+  overlap), and `board-page` has `gource-board`. Because a newer pending job in a group
+  replaces an older pending one, `render` now also skips when `coverage` was cancelled.
+- A render's force push can race a `board-page` commit made seconds earlier; the next run's
+  `board-page` sees the difference and republishes, so the page heals itself.
+- `board-page` checks out only `.github/board/site` (sparse) and compares with `cmp -s`
+  against the sparse, blob-less clone of `gource`; the Pages build is requested only when it
+  pushed.
 
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Doing.
+- 2026-09-28: Doing -> Done. gource.yml publishes the live task board to Pages at /Curl/board/ via a board-page job that never waits for a render; README links it
