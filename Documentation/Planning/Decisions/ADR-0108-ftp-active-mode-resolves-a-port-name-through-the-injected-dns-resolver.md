@@ -49,7 +49,8 @@ Measured with `Record-CurlExchange.ps1 -Ftp` on 2026-09-27 (curl 8.21.0, Schanne
   connection's address.
 - **Interface names are host names.** This matches the Windows (Schannel) build as
   measured. The Linux and macOS OpenSSL builds look an interface name up with `getifaddrs`
-  first; that is not done here and is left to BL-474.
+  first; that is not done here. (BL-474, ADR-0110: an injected `INetworkInterfaceLookup`
+  now does it before the resolver, and finds nothing on Windows.)
 - Wiring the resolver into `Curl.Console` is part of BL-458, which wires the listener and
   TLS provider into the same constructor call.
 
