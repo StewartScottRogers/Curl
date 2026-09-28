@@ -88,7 +88,7 @@ The same headers served in a response (`-Response "HTTP/1.1 200 OK\r\nSet-Cookie
 - Pinned in `CookieStoreTests.CookieFileRefusals.cs`, `SetCookieParserTests` and
   `CurlCommandRunnerCookieTests.RunAsync_VerboseCookieFileWithRefusedSetCookieLines_PrintsCurlsRefusalLines`.
 - Also measured: a `-b` file that cannot be opened prints `* WARNING: failed to open cookie file "<path>"` under `-v`,
-  which Curl does not print yet. Filed as BL-483.
+  which Curl does not print yet. Filed as BL-487.
 
 ## Log
 

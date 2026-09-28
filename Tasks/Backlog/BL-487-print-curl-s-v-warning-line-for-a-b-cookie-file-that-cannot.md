@@ -1,5 +1,5 @@
 ---
-id: BL-483
+id: BL-487
 title: Print curl's -v WARNING line for a -b cookie file that cannot be opened
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-483 — Print curl's -v WARNING line for a -b cookie file that cannot be opened
+# BL-487 — Print curl's -v WARNING line for a -b cookie file that cannot be opened
 
 ## Goal
 
