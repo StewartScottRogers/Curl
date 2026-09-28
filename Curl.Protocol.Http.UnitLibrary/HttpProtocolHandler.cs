@@ -482,6 +482,7 @@ public sealed class HttpProtocolHandler(
         {
             Events = context.Events,
             HeaderReceived = header => cookiesStored = StoreCookie(context, header, cookiesStored),
+            FindRefusal = head => body.FindHeadRefusal(head, context.NoBody, DecodesContent(options)),
         };
         HttpRequestPlan? retry = null;
         HttpBodyDelivery delivery = HttpBodyDelivery.Deliver;
@@ -494,7 +495,7 @@ public sealed class HttpProtocolHandler(
             ReportRequestSent(context.Events, framing, upload, bodyLeftUnsent);
             exchange.RequestSent = context.TimeProvider.GetTimestamp();
             exchange.Head = await headReader.ReadAsync(cancellationToken).ConfigureAwait(false);
-            HttpHeadRefusal? refusal = body.FindHeadRefusal(exchange.Head, context.NoBody, DecodesContent(options));
+            HttpHeadRefusal? refusal = headReader.Refusal;
             exchange.Head = HeadCurlRead(exchange.Head, refusal);
             exchange.RedirectUrl = HttpRedirectLocation.Find(context.Url, exchange.Head);
             await WriteHeadersAsync(context.HeaderOutput, exchange.Head.HeadBytes, cancellationToken).ConfigureAwait(false);

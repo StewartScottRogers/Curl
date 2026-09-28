@@ -160,6 +160,40 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     /// <summary>
+    /// Measured with <c>-s -v -c -</c> (BL-475 Notes): curl 8.21.0 stops reading the head at a
+    /// header it refuses, so it reports and stores the cookies before it, and reports neither
+    /// the refused header, nor a <c>Set-Cookie</c> header or any other line after it, nor the
+    /// head's empty line.
+    /// </summary>
+    [TestMethod]
+    [DataRow("Content-Length: x\r\n", false, CurlExitCode.WeirdServerReply, DisplayName = "Invalid Content-Length")]
+    [DataRow("Transfer-Encoding: bogus\r\n", false, CurlExitCode.BadContentEncoding, DisplayName = "Unsolicited Transfer-Encoding")]
+    [DataRow("Content-Encoding: gzip,gzip,gzip,gzip,gzip,gzip\r\n", true, CurlExitCode.BadContentEncoding, DisplayName = "Six content codings, with --compressed")]
+    public async Task ExecuteAsync_HeaderRefused_ReportsAndStoresNothingFromItOn(string refusedHeader, bool compressed, CurlExitCode exitCode)
+    {
+        string head = "HTTP/1.1 200 OK\r\nSet-Cookie: b=2\r\nX-Before: 1\r\n" + refusedHeader + "Set-Cookie: a=1\r\nX-After: 1\r\n\r\n";
+        string[] expected =
+        [
+            "< HTTP/1.1 200 OK\r\n",
+            "* Added b=2",
+            "< Set-Cookie: b=2\r\n",
+            "< X-Before: 1\r\n",
+        ];
+        foreach (int chunkSize in ChunkSizes)
+        {
+            ScriptedCookieStore store = new() { ReportedLine = header => "Added " + header };
+            RecordingTransferEvents events = new();
+
+            TransferResult result = await CookieHandler(QueueConnector.For(Connection(head, chunkSize)), store)
+                .ExecuteAsync(CookieContext(CookieUrl, new HttpRequestOptions { Compressed = compressed }, events));
+
+            Assert.AreEqual(exitCode, result.ExitCode, $"Chunk size {chunkSize}");
+            CollectionAssert.AreEqual(expected, HeadEvents(events), $"Chunk size {chunkSize}");
+            CollectionAssert.AreEqual(new[] { "b=2" }, store.Responses.Select(call => call.SetCookieHeader).ToArray(), $"Chunk size {chunkSize}");
+        }
+    }
+
+    /// <summary>
     /// Measured (BL-468 Notes): curl 8.21.0 stores a cookie a 1xx head sets, reporting it before
     /// its header line, and counts it toward the request's cookies.
     /// </summary>

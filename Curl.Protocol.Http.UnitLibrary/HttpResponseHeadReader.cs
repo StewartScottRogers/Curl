@@ -46,7 +46,8 @@ internal sealed class HttpResponseHeadReader(IConnection connection)
     /// (ADR-0046). A status line is reported as received. A header line is held until the
     /// next line shows its header is whole, then reported after <see cref="HeaderReceived" />
     /// is told of the header, since curl 8.21.0 prints the <c>-v</c> lines a header causes
-    /// before the header (measured, BL-468 Notes). The final head's empty line is held until
+    /// before the header (measured, BL-468 Notes); a final head's whole headers are held
+    /// further, until the head ends (<see cref="FindRefusal" />). The final head's empty line is held until
     /// <see cref="ReportHeldLines" />, since curl 8.21.0 prints the lines it decides at the
     /// end of the head before it (measured, BL-449 Notes). An HTTP/1.0 status line is
     /// preceded by <see cref="HttpConnectionInfoLines.AssumeCloseAfterBody" />.
@@ -60,19 +61,42 @@ internal sealed class HttpResponseHeadReader(IConnection connection)
     /// </summary>
     internal Action<HttpResponseHeader> HeaderReceived { get; init; } = static _ => { };
 
+    /// <summary>
+    /// Gets what finds the header of a final head that curl 8.21.0 refuses while it reads the
+    /// head (<see cref="HttpResponseBodyReader.FindHeadRefusal" />), or <see langword="null" />
+    /// when it refuses none. The final head's whole headers are held until the head ends so it
+    /// can be asked once of the whole head; then those before the refused header are released
+    /// and neither it nor any line after it is told to <see cref="HeaderReceived" /> or reported
+    /// to <see cref="Events" />, the head's empty line included, since curl 8.21.0 stops reading
+    /// the head at the refused header (measured, BL-475 Notes).
+    /// </summary>
+    internal Func<HttpResponseHead, HttpHeadRefusal?> FindRefusal { get; init; } = static _ => null;
+
+    /// <summary>
+    /// Gets the refused header of the final head <see cref="ReadAsync" /> read, as
+    /// <see cref="FindRefusal" /> found it, or <see langword="null" /> when none was refused.
+    /// </summary>
+    internal HttpHeadRefusal? Refusal { get; private set; }
+
     private readonly List<byte[]> heldHeaderLines = [];
 
+    private readonly List<HeldHeader> heldHeaders = [];
+
     private bool heldHeaderKeepsHttp10Alive;
+
+    private bool holdsWholeHeaders;
 
     private byte[]? heldEmptyLine;
 
     /// <summary>
-    /// Reports the lines <see cref="ReadAsync" /> still holds, once: those of a header a
-    /// failure cut off before it was whole, then the final head's empty line. Does nothing when
-    /// none is held.
+    /// Reports the lines <see cref="ReadAsync" /> still holds, once: the whole headers of a
+    /// final head a failure cut off, each after <see cref="HeaderReceived" /> is told of it, then
+    /// those of a header a failure cut off before it was whole, then the final head's empty
+    /// line. Does nothing when none is held.
     /// </summary>
     internal void ReportHeldLines()
     {
+        ReleaseHeldHeaders();
         ReportHeldHeaderLines();
         if (heldEmptyLine is { } bytes)
         {
@@ -100,7 +124,10 @@ internal sealed class HttpResponseHeadReader(IConnection connection)
             if (!statusLine.IsInformational)
             {
                 EndedAtEmptyLine = !closed;
-                return builder.Build(statusLine, closed ? [] : lines.TakeRemaining());
+                HttpResponseHead head = builder.Build(statusLine, closed ? [] : lines.TakeRemaining());
+                Refusal = FindRefusal(head);
+                ReleaseHeadBeforeRefusal();
+                return head;
             }
 
             if (closed)
@@ -143,6 +170,7 @@ internal sealed class HttpResponseHeadReader(IConnection connection)
     {
         bool informational = statusLine.IsInformational;
         bool http10 = statusLine.Version == new Version(1, 0);
+        holdsWholeHeaders = !informational;
         while (await lines.ReadLineAsync(false, cancellationToken).ConfigureAwait(false) is { } bytes)
         {
             HttpLine line = HttpLine.Split(bytes);
@@ -175,36 +203,93 @@ internal sealed class HttpResponseHeadReader(IConnection connection)
     }
 
     /// <summary>
-    /// Tells <see cref="HeaderReceived" /> of the header the builder has just completed and
-    /// reports its held lines; does nothing when no header line is held.
+    /// Releases the header the builder has just completed: in a 1xx head, tells
+    /// <see cref="HeaderReceived" /> of it and reports its held lines; in the final head, holds
+    /// it whole until the head ends (<see cref="FindRefusal" />). Does nothing when no header
+    /// line is held.
     /// </summary>
     private void ReleaseHeldHeader()
     {
-        if (heldHeaderLines.Count > 0)
+        if (heldHeaderLines.Count == 0)
         {
-            HeaderReceived(builder.LastHeader);
-            ReportHeldHeaderLines();
+            return;
+        }
+
+        if (holdsWholeHeaders)
+        {
+            heldHeaders.Add(new HeldHeader(builder.LastHeader, [.. heldHeaderLines], heldHeaderKeepsHttp10Alive));
+            heldHeaderLines.Clear();
+            heldHeaderKeepsHttp10Alive = false;
+            return;
+        }
+
+        HeaderReceived(builder.LastHeader);
+        ReportHeldHeaderLines();
+    }
+
+    /// <summary>
+    /// Releases the final head's whole headers before its refused header, or all of them when
+    /// none is refused; a refused head drops the rest and its empty line unreported.
+    /// </summary>
+    private void ReleaseHeadBeforeRefusal()
+    {
+        if (Refusal is { } refusal)
+        {
+            heldHeaders.RemoveRange(refusal.HeaderIndex, heldHeaders.Count - refusal.HeaderIndex);
+            heldEmptyLine = null;
+        }
+
+        ReleaseHeldHeaders();
+    }
+
+    /// <summary>
+    /// Tells <see cref="HeaderReceived" /> of each held whole header and reports its lines, in
+    /// the order they arrived, and holds none after.
+    /// </summary>
+    private void ReleaseHeldHeaders()
+    {
+        foreach (HeldHeader held in heldHeaders)
+        {
+            HeaderReceived(held.Header);
+            ReportHeaderLines(held.Lines, held.KeepsHttp10Alive);
+        }
+
+        heldHeaders.Clear();
+    }
+
+    /// <summary>
+    /// Reports the held lines of the header not yet released, and holds none after.
+    /// </summary>
+    private void ReportHeldHeaderLines()
+    {
+        ReportHeaderLines(heldHeaderLines, heldHeaderKeepsHttp10Alive);
+        heldHeaderKeepsHttp10Alive = false;
+        heldHeaderLines.Clear();
+    }
+
+    /// <summary>
+    /// Reports one header's lines, preceded by
+    /// <see cref="HttpConnectionInfoLines.Http10KeepAlive" /> when the header keeps an HTTP/1.0
+    /// connection alive.
+    /// </summary>
+    private void ReportHeaderLines(IReadOnlyList<byte[]> headerLines, bool keepsHttp10Alive)
+    {
+        if (keepsHttp10Alive)
+        {
+            Events.ReportInfo(HttpConnectionInfoLines.Http10KeepAlive);
+        }
+
+        foreach (byte[] held in headerLines)
+        {
+            Events.ReportResponseHeader(held);
         }
     }
 
     /// <summary>
-    /// Reports the held header lines, preceded by
-    /// <see cref="HttpConnectionInfoLines.Http10KeepAlive" /> when the header keeps an HTTP/1.0
-    /// connection alive, and holds none after.
+    /// A whole header of the final head, held until the head ends.
     /// </summary>
-    private void ReportHeldHeaderLines()
-    {
-        if (heldHeaderKeepsHttp10Alive)
-        {
-            heldHeaderKeepsHttp10Alive = false;
-            Events.ReportInfo(HttpConnectionInfoLines.Http10KeepAlive);
-        }
-
-        foreach (byte[] held in heldHeaderLines)
-        {
-            Events.ReportResponseHeader(held);
-        }
-
-        heldHeaderLines.Clear();
-    }
+    /// <param name="Header">The header, its continuation lines folded in.</param>
+    /// <param name="Lines">Its lines as received, line ends included.</param>
+    /// <param name="KeepsHttp10Alive">Whether it keeps an HTTP/1.0 connection alive.</param>
+    private sealed record HeldHeader(HttpResponseHeader Header, byte[][] Lines, bool KeepsHttp10Alive);
 }
