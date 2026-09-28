@@ -35,3 +35,4 @@ The four endpoint variables print the connection's addresses for every networked
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
