@@ -5,7 +5,9 @@ namespace Curl.Protocol.Imap;
 /// <summary>
 /// Serves the <c>imap</c> and <c>imaps</c> schemes: connects, reads the greeting, asks for
 /// the server's <c>CAPABILITY</c>, upgrades with <c>STARTTLS</c> as <c>--ssl</c> and
-/// <c>--ssl-reqd</c> ask, and closes with <c>LOGOUT</c>, as curl 8.21.0 does (BL-553).
+/// <c>--ssl-reqd</c> ask, fetches the message a URL such as <c>imap://host/INBOX;UID=1</c>
+/// names with <c>SELECT</c> and <c>FETCH</c>, and closes with <c>LOGOUT</c>, as curl 8.21.0
+/// does (BL-553, BL-555).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -17,10 +19,9 @@ namespace Curl.Protocol.Imap;
 /// each failure are described on <see cref="ImapSession" />.
 /// </para>
 /// <para>
-/// Authentication (BL-554), fetching (BL-555), listing, searching and custom commands
-/// (BL-556) and the upload (BL-557) are not implemented yet: once the session is open the
-/// handler closes it with <c>LOGOUT</c> and reports success. Cancellation leaves as an
-/// exception.
+/// Authentication (BL-554), listing, searching and custom commands (BL-556) and the upload
+/// (BL-557) are not implemented yet: a URL asking for one of those closes the open session
+/// with <c>LOGOUT</c> and reports success. Cancellation leaves as an exception.
 /// </para>
 /// </remarks>
 /// <param name="connector">

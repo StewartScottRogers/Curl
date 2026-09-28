@@ -1,8 +1,10 @@
+using System.Globalization;
+
 namespace Curl.Protocol.Imap;
 
 /// <summary>
-/// The messages curl 8.21.0 prints when an IMAP session fails to open, each measured with
-/// <c>Record-CurlExchange.ps1 -Imap</c> (BL-553).
+/// The messages curl 8.21.0 prints when an IMAP session fails to open or to fetch, each measured with
+/// <c>Record-CurlExchange.ps1 -Imap</c> (BL-553, BL-555).
 /// </summary>
 internal static class ImapSessionMessages
 {
@@ -32,4 +34,37 @@ internal static class ImapSessionMessages
 
     /// <summary><c>--ssl-reqd</c> and <c>STARTTLS</c> was answered other than <c>OK</c> (exit 64).</summary>
     internal const string StartTlsDenied = "STARTTLS denied";
+
+    /// <summary>The URL's path is malformed as an IMAP URL (exit 3); curl prints its error text.</summary>
+    internal const string MalformedUrl = "URL using bad/illegal format or missing URL";
+
+    /// <summary><c>SELECT</c> was answered other than <c>OK</c> (exit 67).</summary>
+    internal const string SelectFailed = "Select failed";
+
+    /// <summary>
+    /// The URL's <c>UIDVALIDITY</c> is not the one <c>SELECT</c> reported (exit 78).
+    /// </summary>
+    internal const string UidValidityChanged = "Mailbox UIDVALIDITY has changed";
+
+    /// <summary>
+    /// <c>FETCH</c> completed with no untagged <c>FETCH</c> response, whatever its status
+    /// (exit 78); curl prints its error text.
+    /// </summary>
+    internal const string RemoteFileNotFound = "Remote file not found";
+
+    /// <summary>The untagged <c>FETCH</c> response announced no literal <c>{n}</c> (exit 8).</summary>
+    internal const string FetchResponseUnparsed = "Failed to parse FETCH response.";
+
+    /// <summary>The server closed the connection <paramref name="missing" /> bytes short of the literal (exit 18).</summary>
+    /// <param name="missing">The literal's bytes that never arrived.</param>
+    /// <returns>The message, such as <c>end of response with 90 bytes missing</c>.</returns>
+    internal static string LiteralCutShort(long missing) =>
+        string.Create(CultureInfo.InvariantCulture, $"end of response with {missing} bytes missing");
+
+    /// <summary>The output stopped accepting the message's bytes (exit 23).</summary>
+    /// <param name="passed">The bytes offered to the output: one read's worth.</param>
+    /// <param name="returned">The bytes of those the output accepted before it failed.</param>
+    /// <returns>The message to report.</returns>
+    internal static string OutputWriteFailed(int passed, int returned) =>
+        string.Create(CultureInfo.InvariantCulture, $"Failure writing output to destination, passed {passed} returned {returned}");
 }

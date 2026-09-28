@@ -1,12 +1,14 @@
+using System.Globalization;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Imap;
 
 /// <summary>
 /// One IMAP conversation on an open connection: the greeting, <c>CAPABILITY</c>, the
-/// <c>STARTTLS</c> upgrade <c>--ssl</c> and <c>--ssl-reqd</c> ask for, and <c>LOGOUT</c>,
-/// each step and each failure's exit code measured on curl 8.21.0 with
-/// <c>Record-CurlExchange.ps1 -Imap</c> and read in its <c>lib/imap.c</c> (BL-553).
+/// <c>STARTTLS</c> upgrade <c>--ssl</c> and <c>--ssl-reqd</c> ask for, the <c>SELECT</c> and
+/// <c>FETCH</c> of the message the URL names, and <c>LOGOUT</c>, each step and each
+/// failure's exit code measured on curl 8.21.0 with <c>Record-CurlExchange.ps1 -Imap</c> and
+/// read in its <c>lib/imap.c</c> (BL-553, BL-555).
 /// </summary>
 /// <remarks>
 /// <list type="bullet">
@@ -27,6 +29,17 @@ namespace Curl.Protocol.Imap;
 /// response is complete is exit 56; a response line of 65536 bytes is exit 100.</item>
 /// <item>No failure above sends <c>LOGOUT</c>. Once the session is open, <c>LOGOUT</c>'s
 /// response is read and whatever it says, or the server hanging up, is ignored.</item>
+/// <item>Once the session is open, the URL's path is read as <see cref="ImapUrlPath" />
+/// describes; a malformed one is exit 3. A mailbox with a <c>UID</c> or <c>MAILINDEX</c>
+/// sends <c>SELECT</c> (the name as <see cref="ImapQuoting" /> writes it), then
+/// <c>UID FETCH uid BODY[section]&lt;partial&gt;</c> or <c>FETCH index ...</c>. <c>SELECT</c>
+/// answered other than <c>OK</c> is exit 67 <c>Select failed</c>; a numeric URL
+/// <c>UIDVALIDITY</c> other than the one <c>SELECT</c> reported is exit 78 <c>Mailbox
+/// UIDVALIDITY has changed</c>; <c>FETCH</c> completing before an untagged <c>FETCH</c> is
+/// exit 78, and an untagged <c>FETCH</c> with no <c>{n}</c> exit 8. The literal's n bytes are
+/// written to the output as they arrive; its completion other than <c>OK</c> is then exit
+/// 8. Each of these sends <c>LOGOUT</c> first. The server closing inside the literal (exit
+/// 18) or the output failing (exit 23) ends the transfer with no <c>LOGOUT</c>.</item>
 /// </list>
 /// </remarks>
 internal sealed class ImapSession(
@@ -50,17 +63,15 @@ internal sealed class ImapSession(
     private IConnection? securedConnection;
 
     /// <summary>
-    /// Opens the session and closes it again with <c>LOGOUT</c>.
+    /// Opens the session, fetches the message the URL names when it names one, and closes the
+    /// session again with <c>LOGOUT</c>.
     /// </summary>
-    /// <returns>A success, or the failure that stopped the session opening.</returns>
+    /// <returns>A success, or the failure that stopped the session.</returns>
     public async ValueTask<TransferResult> RunAsync()
     {
         try
         {
-            if (await OpenAsync().ConfigureAwait(false) is { } failure)
-            {
-                return failure;
-            }
+            return await OpenAsync().ConfigureAwait(false) ?? await PerformAsync().ConfigureAwait(false);
         }
         catch (ImapResponseMissingException)
         {
@@ -74,9 +85,6 @@ internal sealed class ImapSession(
         {
             return TransferResult.Failure(CurlExitCode.WeirdServerReply, weird.Message);
         }
-
-        await LogoutAsync().ConfigureAwait(false);
-        return TransferResult.Success(0);
     }
 
     /// <inheritdoc />
@@ -91,19 +99,93 @@ internal sealed class ImapSession(
     /// <summary>Keeps no untagged response: the greeting, <c>STARTTLS</c> and <c>LOGOUT</c> want none.</summary>
     private static readonly Func<string, bool> NoUntagged = static _ => false;
 
+    /// <summary>Keeps every untagged response, as curl does while <c>SELECT</c> waits.</summary>
+    private static readonly Func<string, bool> AnyUntagged = static _ => true;
+
+    private static readonly Func<string, bool> IsCapabilityResponse = static line => IsUntaggedResponse(line, CapabilityCommand);
+
+    private static readonly Func<string, bool> IsFetchResponse = static line => IsUntaggedResponse(line, "FETCH");
+
     /// <summary>
-    /// Whether <paramref name="line" /> is an untagged <c>CAPABILITY</c> response as curl's
-    /// <c>imap_matchresp</c> judges one: <c>* </c>, an optional number and a space, then the
-    /// name in any case followed by a space or by exactly one character before the LF.
+    /// Whether <paramref name="line" /> is an untagged <paramref name="name" /> response as
+    /// curl's <c>imap_matchresp</c> judges one: <c>* </c>, an optional number and a space,
+    /// then the name in any case followed by a space or by exactly one character before the LF.
     /// </summary>
-    private static bool IsCapabilityResponse(string line)
+    private static bool IsUntaggedResponse(string line, string name)
     {
-        int name = ResponseNameStartOf(line);
-        int after = name + CapabilityCommand.Length;
-        return name > 0
+        int start = ResponseNameStartOf(line);
+        int after = start + name.Length;
+        return start > 0
             && after < line.Length
-            && line.AsSpan(name, CapabilityCommand.Length).Equals(CapabilityCommand, StringComparison.OrdinalIgnoreCase)
+            && line.AsSpan(start, name.Length).Equals(name, StringComparison.OrdinalIgnoreCase)
             && (line[after] == ' ' || after + 1 == line.Length);
+    }
+
+    /// <summary>
+    /// The mailbox's UIDVALIDITY as the last untagged <c>OK [UIDVALIDITY n]</c> (in any case)
+    /// of a <c>SELECT</c> response that carries a number reports it, or
+    /// <see langword="null" /> when none does.
+    /// </summary>
+    private static uint? UidValidityOf(IReadOnlyList<string> selectUntagged)
+    {
+        const string Prefix = "* OK [UIDVALIDITY ";
+        uint? validity = null;
+        foreach (string line in selectUntagged)
+        {
+            if (line.StartsWith(Prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                validity = LeadingNumberOf(line.AsSpan(Prefix.Length)) ?? validity;
+            }
+        }
+
+        return validity;
+    }
+
+    /// <summary>
+    /// The number the digits starting <paramref name="text" /> spell, as curl's
+    /// <c>curlx_str_number</c> reads one: <see langword="null" /> when there are none or it
+    /// is more than <see cref="uint.MaxValue" />; whatever follows them is ignored.
+    /// </summary>
+    private static uint? LeadingNumberOf(ReadOnlySpan<char> text)
+    {
+        int digits = text.IndexOfAnyExceptInRange('0', '9');
+        return uint.TryParse(digits < 0 ? text : text[..digits], NumberStyles.None, CultureInfo.InvariantCulture, out uint number)
+            ? number
+            : null;
+    }
+
+    /// <summary>
+    /// The size of the literal an untagged <c>FETCH</c> response announces, read as curl
+    /// does: digits right after the line's first <c>{</c>, then <c>}</c>; <see langword="null" />
+    /// when the line has no such literal.
+    /// </summary>
+    private static long? LiteralSizeOf(string fetchLine)
+    {
+        int open = fetchLine.IndexOf('{', StringComparison.Ordinal);
+        if (open < 0)
+        {
+            return null;
+        }
+
+        ReadOnlySpan<char> afterBrace = fetchLine.AsSpan(open + 1);
+        int digits = afterBrace.IndexOfAnyExceptInRange('0', '9');
+        return digits >= 0
+            && afterBrace[digits] == '}'
+            && long.TryParse(afterBrace[..digits], NumberStyles.None, CultureInfo.InvariantCulture, out long size)
+                ? size
+                : null;
+    }
+
+    /// <summary>
+    /// The <c>FETCH</c> curl sends for <paramref name="path" />: <c>UID FETCH</c> for a
+    /// <c>UID</c>, else <c>FETCH</c> for a <c>MAILINDEX</c>, then <c>BODY[section]</c> and
+    /// <c>&lt;partial&gt;</c> when the URL gives one.
+    /// </summary>
+    private static string FetchCommandOf(ImapUrlPath path)
+    {
+        string command = path.Uid is { } uid ? "UID FETCH " + uid : "FETCH " + path.MailIndex;
+        command += " BODY[" + path.Section + "]";
+        return path.Partial is { } partial ? command + "<" + partial + ">" : command;
     }
 
     /// <summary>
@@ -213,6 +295,140 @@ internal sealed class ImapSession(
         channel.SwitchTo(connection);
         secure = true;
         return await CapabilityAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Once the session is open: reads the URL's path, fetches the message it names when it
+    /// names a mailbox and a <c>UID</c> or <c>MAILINDEX</c>, and closes with <c>LOGOUT</c>. A
+    /// malformed path is exit 3 after <c>LOGOUT</c>. Any other URL (a listing, a search, a
+    /// custom command or an upload) is not implemented yet and closes with a success.
+    /// </summary>
+    private async ValueTask<TransferResult> PerformAsync()
+    {
+        if (ImapUrlPath.Parse(context.Url.AbsolutePath) is not { } path)
+        {
+            return await LogoutAndFailAsync(CurlExitCode.UrlMalformat, ImapSessionMessages.MalformedUrl).ConfigureAwait(false);
+        }
+
+        if (NamesAMessageToFetch(path))
+        {
+            return await SelectAsync(path.Mailbox!, path).ConfigureAwait(false);
+        }
+
+        await LogoutAsync().ConfigureAwait(false);
+        return TransferResult.Success(0);
+    }
+
+    /// <summary>
+    /// Whether curl fetches for <paramref name="path" />: it names a mailbox and a
+    /// <c>UID</c> or <c>MAILINDEX</c>, with no custom command and no upload.
+    /// </summary>
+    private bool NamesAMessageToFetch(ImapUrlPath path) =>
+        path.Mailbox is not null
+        && (path.Uid ?? path.MailIndex) is not null
+        && context.Upload is null
+        && context.Mail?.CustomCommand is null;
+
+    /// <summary>
+    /// Sends <c>SELECT</c> for <paramref name="mailbox" />: other than <c>OK</c> is exit 67,
+    /// a UIDVALIDITY other than the URL's is exit 78, each after <c>LOGOUT</c>; otherwise the
+    /// message is fetched.
+    /// </summary>
+    private async ValueTask<TransferResult> SelectAsync(string mailbox, ImapUrlPath path)
+    {
+        ImapResponse selected = await ExchangeAsync("SELECT " + ImapQuoting.AtomOrQuoted(mailbox), AnyUntagged).ConfigureAwait(false);
+        if (selected.Status != ImapResponseStatus.Ok)
+        {
+            return await LogoutAndFailAsync(CurlExitCode.LoginDenied, ImapSessionMessages.SelectFailed).ConfigureAwait(false);
+        }
+
+        if (UidValidityOf(selected.Untagged) is { } actual
+            && path.UidValidity is { } requested
+            && LeadingNumberOf(requested) is { } expected
+            && actual != expected)
+        {
+            return await LogoutAndFailAsync(CurlExitCode.RemoteFileNotFound, ImapSessionMessages.UidValidityChanged).ConfigureAwait(false);
+        }
+
+        return await FetchAsync(path).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sends the <c>FETCH</c> and waits for its untagged <c>FETCH</c> response: a completion
+    /// first is exit 78 and a response with no literal exit 8, each after <c>LOGOUT</c>;
+    /// otherwise the literal is written to the output.
+    /// </summary>
+    private async ValueTask<TransferResult> FetchAsync(ImapUrlPath path)
+    {
+        await channel.SendCommandAsync(FetchCommandOf(path)).ConfigureAwait(false);
+        if (await channel.ReadUntaggedAsync(IsFetchResponse).ConfigureAwait(false) is not { } fetchLine)
+        {
+            return await LogoutAndFailAsync(CurlExitCode.RemoteFileNotFound, ImapSessionMessages.RemoteFileNotFound).ConfigureAwait(false);
+        }
+
+        return LiteralSizeOf(fetchLine) is { } size
+            ? await DownloadAsync(size).ConfigureAwait(false)
+            : await LogoutAndFailAsync(CurlExitCode.WeirdServerReply, ImapSessionMessages.FetchResponseUnparsed).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Writes the literal's <paramref name="size" /> bytes to the output, then reads the rest
+    /// of the <c>FETCH</c> response: its completion other than <c>OK</c> is exit 8 after
+    /// <c>LOGOUT</c>. The server closing inside the literal is exit 18 and the output failing
+    /// exit 23, both without <c>LOGOUT</c>, as curl drops a connection a transfer failed on.
+    /// </summary>
+    private async ValueTask<TransferResult> DownloadAsync(long size)
+    {
+        context.Progress.ReportTransferStarted();
+        long written = 0;
+        while (written < size)
+        {
+            ReadOnlyMemory<byte> piece = await channel.ReadLiteralPieceAsync(size - written).ConfigureAwait(false);
+            if (piece.IsEmpty)
+            {
+                return TransferResult.Failure(CurlExitCode.PartialFile, ImapSessionMessages.LiteralCutShort(size - written), written);
+            }
+
+            if (await WriteOutputAsync(piece, written).ConfigureAwait(false) is { } failure)
+            {
+                return failure;
+            }
+
+            written += piece.Length;
+            context.Progress.ReportDownloaded(written, size);
+        }
+
+        ImapResponse completion = await channel.ReadResponseAsync(NoUntagged).ConfigureAwait(false)
+            ?? throw new ImapResponseMissingException();
+        if (completion.Status != ImapResponseStatus.Ok)
+        {
+            return await LogoutAndFailAsync(CurlExitCode.WeirdServerReply, ImapSessionMessages.WeirdServerReply, size).ConfigureAwait(false);
+        }
+
+        await LogoutAsync().ConfigureAwait(false);
+        return TransferResult.Success(size);
+    }
+
+    /// <summary>Writes <paramref name="piece" /> to the output; exit 23 when the output fails.</summary>
+    private async ValueTask<TransferResult?> WriteOutputAsync(ReadOnlyMemory<byte> piece, long written)
+    {
+        try
+        {
+            await context.Output.WriteAsync(piece, context.CancellationToken).ConfigureAwait(false);
+            return null;
+        }
+        catch (IOException exception)
+        {
+            int accepted = exception is OutputWriteFailedException failed ? failed.BytesAccepted : 0;
+            return TransferResult.Failure(
+                CurlExitCode.WriteError, ImapSessionMessages.OutputWriteFailed(piece.Length, accepted), written);
+        }
+    }
+
+    private async ValueTask<TransferResult> LogoutAndFailAsync(CurlExitCode exitCode, string message, long bytesTransferred = 0)
+    {
+        await LogoutAsync().ConfigureAwait(false);
+        return TransferResult.Failure(exitCode, message, bytesTransferred);
     }
 
     private async ValueTask LogoutAsync()

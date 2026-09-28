@@ -138,6 +138,67 @@ internal sealed class ImapControlChannel(IConnection connection, CancellationTok
         return null;
     }
 
+    /// <summary>
+    /// Reads until the first untagged line <paramref name="isWanted" /> accepts, or the line
+    /// completing the response tagged <see cref="Tag" />, whichever comes first. A literal
+    /// the untagged line announces is left unread for <see cref="ReadLiteralPieceAsync(long)" />,
+    /// as curl leaves a <c>FETCH</c> body.
+    /// </summary>
+    /// <param name="isWanted">Whether an untagged line, starting <c>* </c>, is the one waited for.</param>
+    /// <returns>
+    /// The untagged line without its LF, or <see langword="null" /> when the response
+    /// completed first, however it completed.
+    /// </returns>
+    /// <exception cref="ImapResponseMissingException">The server closed the connection first.</exception>
+    /// <exception cref="InvalidDataException">A line reached 65536 bytes (exit 100).</exception>
+    /// <exception cref="ImapWeirdResponseException">
+    /// A line held a NUL byte, or was a continuation (exit 8).
+    /// </exception>
+    public async ValueTask<string?> ReadUntaggedAsync(Func<string, bool> isWanted)
+    {
+        while (await ReadLineAsync(0).ConfigureAwait(false) is { } line)
+        {
+            if (line.StartsWith(Tag + " ", StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            if (line.StartsWith("* ", StringComparison.Ordinal) && isWanted(line))
+            {
+                return line;
+            }
+
+            if (IsContinuation(line))
+            {
+                throw new ImapWeirdResponseException(ImapSessionMessages.UnexpectedContinuation);
+            }
+        }
+
+        throw new ImapResponseMissingException();
+    }
+
+    /// <summary>
+    /// Reads the next bytes the server sent, at most <paramref name="maxCount" />, without
+    /// looking for line ends: the next piece of a literal being streamed.
+    /// </summary>
+    /// <param name="maxCount">The most bytes wanted; more than zero.</param>
+    /// <returns>
+    /// The bytes, valid until the next read on the channel; empty when the server closed the
+    /// connection or a read failed with an <see cref="IOException" />.
+    /// </returns>
+    public async ValueTask<ReadOnlyMemory<byte>> ReadLiteralPieceAsync(long maxCount)
+    {
+        if (bufferStart == bufferEnd && !await TryFillAsync().ConfigureAwait(false))
+        {
+            return ReadOnlyMemory<byte>.Empty;
+        }
+
+        int take = (int)Math.Min(maxCount, bufferEnd - bufferStart);
+        var bytes = new ReadOnlyMemory<byte>(buffer, bufferStart, take);
+        bufferStart += take;
+        return bytes;
+    }
+
     private static ImapResponseStatus StatusOf(ReadOnlySpan<char> afterTag) =>
         afterTag.StartsWith("OK", StringComparison.Ordinal) ? ImapResponseStatus.Ok
         : afterTag.StartsWith("PREAUTH", StringComparison.Ordinal) ? ImapResponseStatus.Preauth
