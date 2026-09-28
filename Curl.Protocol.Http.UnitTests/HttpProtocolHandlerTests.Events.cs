@@ -89,8 +89,9 @@ public sealed partial class HttpProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_ChunkedUploadAfterTheContinueWait_ReportsEachChunkWithItsFramingAndTheBytesOnTheWire()
     {
-        // printf abcde | curl -s --trace-ascii - -T - http://127.0.0.1:18475/u: Send data 10
-        // bytes (5 CRLF abcde CRLF), Send data 5 bytes (0 CRLF CRLF), "upload completely sent off: 15 bytes".
+        // printf abcde | curl -s --trace-ascii - -T - http://127.0.0.1:18475/u: "Done waiting
+        // for 100-continue", Send data 10 bytes (5 CRLF abcde CRLF), Send data 5 bytes (0 CRLF
+        // CRLF), "upload completely sent off: 15 bytes" (BL-407 and BL-449 Notes).
         const string head = "PUT /u HTTP/1.1\r\nHost: 127.0.0.1:18475\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
             + "Transfer-Encoding: chunked\r\nExpect: 100-continue\r\n\r\n";
         FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
@@ -112,8 +113,8 @@ public sealed partial class HttpProtocolHandlerTests
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(
-            new[] { "> " + head, "} 5\r\nabcde\r\n", "} 0\r\n\r\n", "* upload completely sent off: 15 bytes" },
-            events.Events.Skip(1).Take(4).ToArray());
+            new[] { "> " + head, "* Done waiting for 100-continue", "} 5\r\nabcde\r\n", "} 0\r\n\r\n", "* upload completely sent off: 15 bytes" },
+            events.Events.Skip(1).Take(5).ToArray());
     }
 
     [TestMethod]

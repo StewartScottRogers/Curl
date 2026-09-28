@@ -6,7 +6,7 @@ namespace Curl.Protocol.Http;
 /// <summary>
 /// The <c>-v</c> lines the handler reports through <see cref="ITransferEvents.ReportInfo" />
 /// about the connection and the request sent on it, as curl 8.21.0 prints them (ADR-0050,
-/// BL-336 and BL-407 Notes).
+/// BL-336, BL-407 and BL-449 Notes).
 /// </summary>
 internal static class HttpConnectionInfoLines
 {
@@ -26,6 +26,30 @@ internal static class HttpConnectionInfoLines
     /// The line written once a request without a body has been sent.
     /// </summary>
     internal const string RequestSent = "Request completely sent off";
+
+    /// <summary>
+    /// The line written before the body of a request that waited for <c>100 Continue</c>
+    /// when the wait ran out with nothing received (measured, BL-449 Notes).
+    /// </summary>
+    internal const string DoneWaitingForContinue = "Done waiting for 100-continue";
+
+    /// <summary>
+    /// The line written before every HTTP/1.0 status line, whether or not a
+    /// <c>Connection: keep-alive</c> header follows (measured, BL-449 Notes).
+    /// </summary>
+    internal const string AssumeCloseAfterBody = "HTTP 1.0, assume close after body";
+
+    /// <summary>
+    /// The line written before the empty line of a head whose body is read and discarded on a
+    /// connection that stays open, as for a redirect <c>-L</c> follows (measured, BL-449 Notes).
+    /// </summary>
+    internal const string IgnoringBody = "Ignoring the response-body";
+
+    /// <summary>
+    /// The line written after <see cref="IgnoringBody" /> when that body's length is known from
+    /// its Content-Length (measured, BL-449 Notes).
+    /// </summary>
+    internal const string SettingSizeWhileIgnoring = "setting size while ignoring";
 
     /// <summary>
     /// Formats the line written once a request's whole body has been sent.

@@ -482,7 +482,7 @@ public sealed class HttpProtocolHandler(
         {
             ThrowIfRefused(framing);
             exchange.RequestReady = context.TimeProvider.GetTimestamp();
-            bool bodyLeftUnsent = await SendBodyAsync(context.TimeProvider, framing, responseConnection, upload, cancellationToken).ConfigureAwait(false);
+            bool bodyLeftUnsent = await SendBodyAsync(context, framing, responseConnection, upload, cancellationToken).ConfigureAwait(false);
             ReportRequestSent(context.Events, framing, upload, bodyLeftUnsent);
             exchange.RequestSent = context.TimeProvider.GetTimestamp();
             exchange.Head = await headReader.ReadAsync(cancellationToken).ConfigureAwait(false);
@@ -496,12 +496,16 @@ public sealed class HttpProtocolHandler(
             HttpFailMode fail = retry is null ? options.Fail : HttpFailMode.None;
             ThrowIfFailing(fail, HttpFailMode.Fail, exchange.Head);
             bool discardsBody = retry is not null || (options.FollowRedirects && exchange.RedirectUrl is not null);
+            ReportIgnoredBody(plan, exchange.Head, discardsBody);
+            headReader.ReportHeldEmptyLine();
             delivery = DeliveryOf(plan, exchange.Head, discardsBody);
             await ReadBodyAsync(plan, exchange.Head, body, delivery, discardsBody, cancellationToken).ConfigureAwait(false);
             ThrowIfFailing(fail, HttpFailMode.FailWithBody, exchange.Head);
         }
         catch (HttpTransferException failure)
         {
+            headReader.ReportHeldEmptyLine();
+            ReportReceiveFailure(context.Events, failure);
             TransferResult failed = TransferResult.Failure(failure.ExitCode, failure.Message, body.BytesWritten)
                 with
             { Report = exchange.Report(body.BytesWritten) };
@@ -509,6 +513,7 @@ public sealed class HttpProtocolHandler(
         }
         catch (OperationCanceledException) when (plan.Deadline.EndedByLimit)
         {
+            headReader.ReportHeldEmptyLine();
             string message = HttpTransferMessages.OperationTimedOut(plan.Deadline.OperationElapsedMilliseconds, body.BytesWritten, body.ExpectedLength);
             TransferResult timedOut = TransferResult.Failure(CurlExitCode.OperationTimedOut, message, body.BytesWritten)
                 with
@@ -548,6 +553,61 @@ public sealed class HttpProtocolHandler(
         else if (!bodyLeftUnsent && !upload.CutShort)
         {
             events.ReportInfo(HttpConnectionInfoLines.UploadSent(upload.BytesSent));
+        }
+    }
+
+    /// <summary>
+    /// Reports that a body is read only to be discarded, as curl 8.21.0 does before the
+    /// head's empty line (measured, BL-449 Notes): <c>Ignoring the response-body</c> when the
+    /// body is discarded - a redirect <c>-L</c> follows, or a response answered with a retry -
+    /// on a connection that stays open, and then <c>setting size while ignoring</c> when its
+    /// length is known from a Content-Length. Nothing when the connection closes after it:
+    /// curl reads no such body at all.
+    /// </summary>
+    private static void ReportIgnoredBody(HttpRequestPlan plan, HttpResponseHead head, bool discardsBody)
+    {
+        HttpRequestOptions options = plan.Options;
+        if (!discardsBody
+            || !HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, options.Raw, options.IgnoreContentLength, options.TransferEncoding))
+        {
+            return;
+        }
+
+        ITransferEvents events = plan.Context.Events;
+        events.ReportInfo(HttpConnectionInfoLines.IgnoringBody);
+        if (IgnoredBodyLength(plan, head) is not null)
+        {
+            events.ReportInfo(HttpConnectionInfoLines.SettingSizeWhileIgnoring);
+        }
+    }
+
+    /// <summary>
+    /// Gives the Content-Length of a body read only to be discarded, or <see langword="null" />
+    /// when it has none it stops at: framed as <see cref="HttpResponseBodyFraming" /> says when
+    /// the response has a body, and for a response to HEAD, which has none, its Content-Length
+    /// unless it is chunked or <c>--ignore-content-length</c> is given (measured, BL-449 Notes).
+    /// </summary>
+    private static long? IgnoredBodyLength(HttpRequestPlan plan, HttpResponseHead head)
+    {
+        HttpRequestOptions options = plan.Options;
+        if (HttpResponseBodyReader.HasBody(head, plan.Context.NoBody))
+        {
+            return HttpResponseBodyFraming.Of(head.Headers, options.Raw, options.IgnoreContentLength, options.TransferEncoding).ContentLength;
+        }
+
+        return options.IgnoreContentLength || HttpTransferEncoding.ListsChunked(head.Headers) ? null : HttpContentLength.Find(head.Headers);
+    }
+
+    /// <summary>
+    /// Reports a read the peer reset as the <c>-v</c> line curl 8.21.0 prints for it,
+    /// <c>Recv failure: Connection was reset</c>, before the connection's end is reported
+    /// (measured, BL-449 Notes). Any other failure is left to the transfer's result.
+    /// </summary>
+    private static void ReportReceiveFailure(ITransferEvents events, HttpTransferException failure)
+    {
+        if (failure.Message == HttpTransferMessages.ConnectionReset)
+        {
+            events.ReportInfo(failure.Message);
         }
     }
 
@@ -844,7 +904,7 @@ public sealed class HttpProtocolHandler(
     /// unsent; <see langword="false" /> when the body was sent or there is none.
     /// </returns>
     private static async ValueTask<bool> SendBodyAsync(
-        TimeProvider timeProvider,
+        ITransferContext context,
         HttpRequestFraming framing,
         IConnection responseConnection,
         HttpRequestBodyWriter upload,
@@ -859,14 +919,29 @@ public sealed class HttpProtocolHandler(
         if (responseConnection is HttpContinueWaitConnection waiting)
         {
             await upload.WriteHeldHeadAsync(cancellationToken).ConfigureAwait(false);
-            if (!await waiting.WaitForContinueAsync(timeProvider, cancellationToken).ConfigureAwait(false))
+            if (!await waiting.WaitForContinueAsync(context.TimeProvider, cancellationToken).ConfigureAwait(false))
             {
                 return true;
             }
+
+            ReportContinueWaitRanOut(context.Events, waiting);
         }
 
         await upload.WriteAsync(requestBody, framing.IsChunked, cancellationToken).ConfigureAwait(false);
         return false;
+    }
+
+    /// <summary>
+    /// Reports <c>Done waiting for 100-continue</c> before the body when the wait for
+    /// <c>100 Continue</c> ran out with nothing received, as curl 8.21.0 does (measured,
+    /// BL-449 Notes); nothing when a <c>100 Continue</c> ended it.
+    /// </summary>
+    private static void ReportContinueWaitRanOut(ITransferEvents events, HttpContinueWaitConnection waiting)
+    {
+        if (waiting.WaitRanOut)
+        {
+            events.ReportInfo(HttpConnectionInfoLines.DoneWaitingForContinue);
+        }
     }
 
     /// <summary>

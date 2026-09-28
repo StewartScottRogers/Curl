@@ -59,8 +59,16 @@ internal sealed class HttpContinueWaitConnection(IConnection connection) : IConn
         Task first = await Task.WhenAny(statusLineRead, wait).ConfigureAwait(false);
         await waitEnded.CancelAsync().ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
-        return first == wait || (statusLineRead.IsCompletedSuccessfully && statusLineRead.Result);
+        WaitRanOut = first == wait;
+        return WaitRanOut || (statusLineRead.IsCompletedSuccessfully && statusLineRead.Result);
     }
+
+    /// <summary>
+    /// Gets a value indicating whether <see cref="WaitForContinueAsync" /> ran out of time
+    /// before any status line arrived, after which curl 8.21.0 reports
+    /// <see cref="HttpConnectionInfoLines.DoneWaitingForContinue" /> (measured, BL-449 Notes).
+    /// </summary>
+    internal bool WaitRanOut { get; private set; }
 
     /// <summary>
     /// Gets a value indicating whether the first status line received, after the wait ran out,

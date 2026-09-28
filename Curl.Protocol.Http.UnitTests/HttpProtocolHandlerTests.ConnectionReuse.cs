@@ -37,7 +37,7 @@ public sealed partial class HttpProtocolHandlerTests
 
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.IsTrue(connection.IsMarkedReusable, $"Chunk size {chunkSize}");
-            CollectionAssert.AreEqual(new[] { UsingHttp1, RequestSent, "Connection #0 to host 127.0.0.1:18977 left intact" }, events.Info, $"Chunk size {chunkSize}");
+            CollectionAssert.AreEqual(InfoLines(response, "Connection #0 to host 127.0.0.1:18977 left intact"), events.Info, $"Chunk size {chunkSize}");
         }
     }
 
@@ -58,7 +58,7 @@ public sealed partial class HttpProtocolHandlerTests
 
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.IsFalse(connection.IsMarkedReusable, $"Chunk size {chunkSize}");
-            CollectionAssert.AreEqual(new[] { UsingHttp1, RequestSent, "shutting down connection #4" }, events.Info, $"Chunk size {chunkSize}");
+            CollectionAssert.AreEqual(InfoLines(response, "shutting down connection #4"), events.Info, $"Chunk size {chunkSize}");
         }
     }
 
@@ -234,6 +234,16 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.AreEqual(CurlExitCode.GotNothing, result.ExitCode);
         Assert.AreEqual(1, connector.Targets.Count);
     }
+
+    /// <summary>
+    /// The info lines of one request on a new connection: <c>using HTTP/1.x</c>, <c>Request
+    /// completely sent off</c>, <c>HTTP 1.0, assume close after body</c> before an HTTP/1.0
+    /// status line (measured, BL-449 Notes), and the connection's end.
+    /// </summary>
+    private static string[] InfoLines(string response, string connectionEnd) =>
+        response.StartsWith("HTTP/1.0", StringComparison.Ordinal)
+            ? [UsingHttp1, RequestSent, "HTTP 1.0, assume close after body", connectionEnd]
+            : [UsingHttp1, RequestSent, connectionEnd];
 
     private static TransferContext ReuseContext(ITransferEvents events, Stream? output = null, long? maxFileSize = null, HttpRequestOptions? http = null) =>
         new() { Url = CurlUrl.Parse(ReuseUrl), Output = output ?? new MemoryStream(), Events = events, MaxFileSize = maxFileSize, Http = http };
