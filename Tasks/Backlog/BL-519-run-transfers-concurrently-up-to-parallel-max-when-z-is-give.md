@@ -4,7 +4,7 @@ title: Run transfers concurrently up to --parallel-max when -Z is given
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: [BL-509, BL-517, BL-518]
+depends-on: [BL-509, BL-517, BL-518, BL-755]
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-28
