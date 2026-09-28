@@ -118,6 +118,7 @@ choices do not need one.
 | [0101](ADR-0101-the-redirect-follower-sends-the-auto-referer-and-reports-the-last-one-sent.md) | Under `-e "...;auto" -L` the redirect follower sends each hop the previous URL, without user information or fragment, as its `Referer`, and `TransferReport.Referer` carries the last one sent, which `%{referer}` prints before the `-e` text (amends ADR-0015) | Accepted | 2026-09-27 |
 | [0102](ADR-0102-ftp-active-mode-and-tls-need-a-listening-seam-and-four-transfer-options.md) | FTP active mode (`-P`) and TLS (`ftps://`, `--ssl`, `--ssl-reqd`) need an `IConnectionListener` seam, `IConnection.LocalEndPoint` and four transfer options, delivered by abstractions, networking, CLI and console tasks around BL-437 | Accepted | 2026-09-27 |
 | [0103](ADR-0103-the-schannel-build-matches-the-common-name-of-a-cacert-certificate-without-dns-names.md) | With `--cacert` the Schannel build accepts a certificate whose subjectAltName holds no DNS name when its CN matches the host as `Curl_cert_hostcheck` matches it (one left-most `*` label, never for an IP literal); without `--cacert`, and in the OpenSSL build, .NET's name check stands | Accepted | 2026-09-27 |
+| [0104](ADR-0104-a-device-under-dev-is-sent-chunked-off-windows.md) | Off Windows a seekable `-F` file under `/dev/` (not `/dev/shm/`, `/dev/fd/` or `/dev/std*`) declares no length, so the body goes chunked as libcurl sends a device; on Windows a seekable file's length stands | Accepted | 2026-09-27 |
 
 ## Template
 

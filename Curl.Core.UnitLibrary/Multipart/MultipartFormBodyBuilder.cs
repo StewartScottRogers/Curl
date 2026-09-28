@@ -15,7 +15,9 @@ namespace Curl.Core.Multipart;
 /// The files are then streamed, not read into memory. A file whose stream cannot seek (a
 /// pipe or a device) declares the length curl's <c>stat</c> gives it, as
 /// <see cref="UnseekableFileLength" /> describes: on Windows a fixed length the sender cuts the
-/// body off at, whatever the pipe delivers; elsewhere none, so the body is sent chunked.
+/// body off at, whatever the pipe delivers; elsewhere none, so the body is sent chunked. A file
+/// that can seek declares its length, except a device such as <c>/dev/null</c> off Windows, which
+/// declares none, as <see cref="SeekableFileLength" /> describes.
 /// </para>
 /// <para>
 /// The layout is libcurl 8.21.0's <c>lib/mime.c</c>: each part is preceded by
@@ -61,15 +63,25 @@ namespace Curl.Core.Multipart;
 /// none, which sends the body chunked; <see langword="null" /> takes the platform curl's rule,
 /// <see cref="UnseekableFileLength.ForPlatform" />.
 /// </param>
+/// <param name="seekableFileLength">
+/// The length a file that can seek declares, from its path and opened length, or
+/// <see langword="null" /> for none, which sends the body chunked, as curl sends a device such as
+/// <c>/dev/null</c> on Linux and macOS; <see langword="null" /> takes the platform curl's rule,
+/// <see cref="SeekableFileLength.ForPlatform" />.
+/// </param>
 public sealed class MultipartFormBodyBuilder(
     IFileSystem fileSystem,
     Encoding textEncoding,
     Func<string> createBoundary,
     Stream? standardInput = null,
-    Func<string, long?>? unseekableFileLength = null)
+    Func<string, long?>? unseekableFileLength = null,
+    Func<string, long, long?>? seekableFileLength = null)
 {
     private readonly Func<string, long?> unseekableFileLength =
         unseekableFileLength ?? UnseekableFileLength.ForPlatform(OperatingSystem.IsWindows());
+
+    private readonly Func<string, long, long?> seekableFileLength =
+        seekableFileLength ?? SeekableFileLength.ForPlatform(OperatingSystem.IsWindows());
 
     /// <summary>The message curl 8.21.0 gives, with exit 26, for a form file it cannot open.</summary>
     public const string OpenFailedMessage = "Failed to open/read local data from file/application";
@@ -204,7 +216,7 @@ public sealed class MultipartFormBodyBuilder(
 
         Stream content = opened.Content!;
         segments.AddText(MultipartPartHeaders.Format(part, disposition, null, encoder?.Name, out _));
-        long? length = content.CanSeek ? opened.Length : unseekableFileLength(part.Content);
+        long? length = content.CanSeek ? seekableFileLength(part.Content, opened.Length) : unseekableFileLength(part.Content);
         return await AddFileDataAsync(segments, content, length, encoder, cancellationToken)
             .ConfigureAwait(false);
     }

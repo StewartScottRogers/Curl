@@ -78,7 +78,10 @@ building so a byte above 127 still fails before sending, and an unseekable one f
 read that reaches such a byte with a `RequestBodyReadFailedException`, which the sender turns
 into exit 26. An unknown name is exit 43 (ADR-0041, ADR-0076, ADR-0093). An `@-` or `<-` part reads the standard-input `Stream` the
 builder is given whole, never closing it, so the body keeps its `Content-Length`; without
-one it opens the path `-` as before (BL-275). It is not yet wired into `Curl.Console`.
+one it opens the path `-` as before (BL-275). A file that cannot seek declares the length
+`UnseekableFileLength` gives it (ADR-0097); one that can declares its length, except a device
+under `/dev/` off Windows, which `SeekableFileLength` sends chunked as libcurl does
+(ADR-0104). It is not yet wired into `Curl.Console`.
 
 `Globbing\UrlGlob` is curl 8.21.0's URL globbing (ADR-0032): `TryParse` reads `{a,b}` sets
 and `[1-10]`, `[01-10]`, `[a-z:2]` ranges as `tool_urlglob.c` does, failing with exit 3 and

@@ -1,4 +1,5 @@
 using System.Text;
+using Curl.Core.FileSystem;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Core.Multipart;
@@ -369,6 +370,50 @@ public sealed class MultipartFormBodyBuilderTests
             $"--{B}\r\nContent-Disposition: form-data; name=\"f\"; filename=\"NUL\"\r\nContent-Type: application/octet-stream\r\n\r\n"
             + $"\r\n--{B}--\r\n";
         await AssertBodyAsync(result, expected, 204, B);
+    }
+
+    [TestMethod]
+    public async Task TheNullDeviceDeclaresNoLengthOffWindowsAsCurlSendsItChunked()
+    {
+        // Measured (BL-445 Notes): the OpenSSL build sent -F f=@/dev/null with
+        // Transfer-Encoding: chunked, one 0xcd-byte chunk holding this body.
+        const string B = "------------------------vqgGmrr7xDndwoOS2J8VDy";
+        FormFileSystem files = new FormFileSystem().WithFile("/dev/null", string.Empty);
+        MultipartFormBodyBuilder builder = new(
+            files,
+            Encoding.UTF8,
+            () => B,
+            standardInput: null,
+            UnseekableFileLength.Unknown,
+            SeekableFileLength.AsPosixStatReportsIt);
+
+        MultipartFormBuildResult result = await builder.BuildAsync(
+            [File("f", MultipartFormPartKind.FileUpload, "/dev/null")],
+            TestContext.CancellationToken);
+
+        Assert.IsTrue(result.IsBuilt);
+        Assert.IsNull(result.Body.Length);
+        string expected =
+            $"--{B}\r\nContent-Disposition: form-data; name=\"f\"; filename=\"null\"\r\nContent-Type: application/octet-stream\r\n\r\n"
+            + $"\r\n--{B}--\r\n";
+        byte[] bytes = await ReadAllAsync(result.Body.Content);
+        Assert.AreEqual(expected, Encoding.Latin1.GetString(bytes));
+        Assert.HasCount(0xcd, bytes);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task TheRealNullDeviceIsSentChunkedByDefaultOffWindows()
+    {
+        MultipartFormBodyBuilder builder = new(new PhysicalFileSystem(), Encoding.UTF8, () => "b");
+
+        MultipartFormBuildResult result = await builder.BuildAsync(
+            [File("f", MultipartFormPartKind.FileUpload, "/dev/null")],
+            TestContext.CancellationToken);
+
+        Assert.IsTrue(result.IsBuilt);
+        Assert.IsNull(result.Body.Length);
+        await result.Body.Content.DisposeAsync();
     }
 
     [TestMethod]
