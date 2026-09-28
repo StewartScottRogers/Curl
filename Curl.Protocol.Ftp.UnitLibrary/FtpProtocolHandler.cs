@@ -29,8 +29,13 @@ namespace Curl.Protocol.Ftp;
 /// <see cref="ITransferContext.ResumeFrom" /> and <see cref="ITransferContext.NoBody" />
 /// are honoured as curl 8.21.0 honours <c>-r</c>, <c>-C</c> and <c>-I</c> (BL-438), and
 /// <see cref="ITransferContext.Upload" /> is sent with <c>STOR</c>, or <c>APPE</c> when
-/// <c>-C</c> resumes it (BL-439). <c>ftps</c>, active mode and every FTP-only option are
-/// not implemented yet.
+/// <c>-C</c> resumes it (BL-439). <see cref="ITransferContext.FtpDisableEpsv" />,
+/// <see cref="ITransferContext.FtpSkipPasvIp" />, <see cref="ITransferContext.FtpFileMethod" />,
+/// <see cref="ITransferContext.FtpCreateDirectories" />, <see cref="ITransferContext.ListOnly" />
+/// and <see cref="ITransferContext.QuoteCommands" /> are honoured as curl 8.21.0 honours
+/// <c>--disable-epsv</c>, <c>--no-ftp-skip-pasv-ip</c>, <c>--ftp-method</c>,
+/// <c>--ftp-create-dirs</c>, <c>-l</c> and <c>-Q</c> (BL-436). <c>ftps</c>, active mode
+/// and the other FTP-only options are not implemented yet.
 /// Cancellation leaves as an exception.
 /// </para>
 /// </remarks>

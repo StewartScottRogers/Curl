@@ -1,48 +1,84 @@
 using System.Text;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Ftp;
 
 /// <summary>
-/// An <c>ftp://</c> URL's path split as curl 8.21.0 walks it by default: one <c>CWD</c>
-/// per directory, then the file name.
+/// An <c>ftp://</c> URL's path split as curl 8.21.0 walks it under <c>--ftp-method</c>:
+/// the <c>CWD</c> arguments, the name the file commands carry, and the argument a listing
+/// carries.
 /// </summary>
 /// <param name="Directories">
-/// Each directory to change into, in order, percent-decoded; empty segments, as in
-/// <c>a//b</c>, are skipped.
+/// Each <c>CWD</c> argument, in order, percent-decoded: one per directory for
+/// <c>multicwd</c> (empty segments, as in <c>a//b</c>, skipped), the whole directory part
+/// for <c>singlecwd</c>, none for <c>nocwd</c>.
 /// </param>
 /// <param name="FileName">
-/// The last segment, percent-decoded; empty when the path ends in <c>/</c>, which asks for
-/// a directory listing.
+/// The name <c>SIZE</c>, <c>RETR</c>, <c>STOR</c> and the rest carry, percent-decoded: the
+/// last segment, or for <c>nocwd</c> the whole path without its leading <c>/</c>. Empty
+/// when the path ends in <c>/</c>, which asks for a directory listing.
+/// </param>
+/// <param name="ListArgument">
+/// The argument <c>LIST</c> or <c>NLST</c> carries: for <c>nocwd</c> the directory part,
+/// <see langword="null" /> otherwise and when the path has no directory part.
 /// </param>
 /// <remarks>
+/// <para>
 /// Decoded bytes are held one per <see cref="char" /> (Latin-1), so they reach the server
 /// exactly as decoded: <c>caf%C3%A9</c> is sent as the bytes <c>63 61 66 C3 A9</c>.
+/// </para>
+/// <para>
+/// <c>singlecwd</c> and <c>nocwd</c> decode the whole path and then split it at its last
+/// <c>/</c>, as curl does; a directory part that is empty because the path starts with
+/// <c>//</c> is <c>/</c> (BL-436).
+/// </para>
 /// </remarks>
-internal sealed record FtpUrlPath(IReadOnlyList<string> Directories, string FileName)
+internal sealed record FtpUrlPath(IReadOnlyList<string> Directories, string FileName, string? ListArgument = null)
 {
     /// <summary>
-    /// Splits and decodes <paramref name="absolutePath" />.
+    /// Splits and decodes <paramref name="absolutePath" /> for <paramref name="method" />.
     /// </summary>
     /// <param name="absolutePath">The URL's path, still percent-encoded, starting with <c>/</c>.</param>
+    /// <param name="method">How <c>--ftp-method</c> reaches the file.</param>
     /// <returns>
-    /// The split path, or <see langword="null" /> when a segment decodes to a byte below
+    /// The split path, or <see langword="null" /> when the path decodes to a byte below
     /// 0x20, which curl refuses with exit 3 and <c>path contains control characters</c>.
     /// </returns>
-    public static FtpUrlPath? Parse(string absolutePath)
+    public static FtpUrlPath? Parse(string absolutePath, FtpFileMethod method)
     {
         string[] segments = absolutePath.Split('/');
-        var decoded = new string[segments.Length];
-        for (int index = 0; index < segments.Length; index++)
+        string[] decoded = [.. segments.Select(PercentDecode)];
+        if (decoded.Any(segment => segment.Any(character => character < ' ')))
         {
-            decoded[index] = PercentDecode(segments[index]);
-            if (decoded[index].Any(character => character < ' '))
-            {
-                return null;
-            }
+            return null;
         }
 
-        string[] directories = [.. decoded[..^1].Where(segment => segment.Length > 0)];
-        return new FtpUrlPath(directories, decoded[^1]);
+        return method switch
+        {
+            FtpFileMethod.NoCwd => SplitForNoCwd(string.Join('/', decoded[1..])),
+            FtpFileMethod.SingleCwd => SplitForSingleCwd(string.Join('/', decoded[1..])),
+            _ => new FtpUrlPath([.. decoded[..^1].Where(segment => segment.Length > 0)], decoded[^1]),
+        };
+    }
+
+    private static FtpUrlPath SplitForSingleCwd(string path)
+    {
+        int slash = path.LastIndexOf('/');
+        if (slash < 0)
+        {
+            return new FtpUrlPath([], path);
+        }
+
+        string directory = slash == 0 ? "/" : path[..slash];
+        return new FtpUrlPath([directory], path[(slash + 1)..]);
+    }
+
+    private static FtpUrlPath SplitForNoCwd(string path)
+    {
+        int slash = path.LastIndexOf('/');
+        string fileName = path[(slash + 1)..];
+        string? listArgument = slash < 0 ? null : path[..Math.Max(slash, 1)];
+        return new FtpUrlPath([], fileName.Length == 0 ? string.Empty : path, listArgument);
     }
 
     private static string PercentDecode(string segment)

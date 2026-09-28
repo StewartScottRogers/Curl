@@ -104,7 +104,23 @@ internal static class FtpTransferMessages
     /// <returns>The message to report.</returns>
     internal static string BadPassiveReply(int code) => Format($"Bad PASV/EPSV response: {code}");
 
-    /// <summary>The exit 19 or 78 message for a refused <c>RETR</c> or <c>LIST</c>.</summary>
+    /// <summary>
+    /// The exit 21 message for a <c>-Q</c> command sent before the transfer, with no prefix
+    /// or with <c>+</c>, answered with 400 or more (BL-436).
+    /// </summary>
+    /// <param name="code">The refusing reply's code.</param>
+    /// <returns>The message to report.</returns>
+    internal static string QuoteCommandFailed(int code) => Format($"QUOT command failed with {code}");
+
+    /// <summary>
+    /// The exit 21 message for a <c>-Q -</c> command, sent after the transfer, answered with
+    /// 400 or more (BL-436).
+    /// </summary>
+    /// <param name="command">The command as sent, its prefixes removed.</param>
+    /// <returns>The message to report.</returns>
+    internal static string QuoteNotAccepted(string command) => "QUOT string not accepted: " + command;
+
+    /// <summary>The exit 19 or 78 message for a refused <c>RETR</c>, <c>LIST</c> or <c>NLST</c>.</summary>
     /// <param name="code">The refusing reply's code.</param>
     /// <returns>The message to report.</returns>
     internal static string RetrieveRefused(int code) => Format($"RETR response: {code}");
