@@ -124,6 +124,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             TimeCondition = options.TimeCondition,
             Proxy = proxy,
             Http = HttpRequestOptionsMapping.FromCommandLine(options, formBody, proxy, commandLineTextEncoding),
+            Mail = MailRequestOptionsMapping.FromCommandLine(options, url.Scheme),
             Progress = WatchedProgress(progress ?? NoTransferProgress.Instance, lowSpeedWatchdog),
             Events = EventsOrNone(events),
             TimeProvider = timeProvider ?? TimeProvider.System,

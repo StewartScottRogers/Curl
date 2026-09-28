@@ -112,6 +112,15 @@ internal static class CurlComposition
     }
 
     /// <summary>
+    /// Creates the SASL authenticator the SMTP, POP3 and IMAP handlers share (ADR-0121): a
+    /// <see cref="SaslAuthenticator" /> encoding credentials in the platform's encoding
+    /// (<see cref="CredentialEncoding.ForPlatform" />), as the HTTP authenticator does.
+    /// </summary>
+    /// <returns>The authenticator.</returns>
+    internal static ISaslAuthenticator CreateSaslAuthenticator() =>
+        new SaslAuthenticator(CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()));
+
+    /// <summary>
     /// Creates the network transports for one run: a <see cref="TcpConnector" /> over a
     /// <see cref="SystemDnsResolver" />, a <see cref="TcpDialer" /> that sets <c>TCP_NODELAY</c> and
     /// <c>SO_KEEPALIVE</c> unless <c>--no-tcp-nodelay</c> or <c>--no-keepalive</c> says not to, and an
