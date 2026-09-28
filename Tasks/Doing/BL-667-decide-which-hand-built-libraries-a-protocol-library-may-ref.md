@@ -33,3 +33,4 @@ An ADR states which non-protocol libraries holding hand-built pieces the BCL lac
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
