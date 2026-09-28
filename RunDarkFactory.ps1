@@ -235,25 +235,65 @@ function Start-Detached {
     return @{ Process = (Start-Process -FilePath 'powershell.exe' -ArgumentList $argList -WorkingDirectory $Dir -PassThru) }
 }
 
+# Tab captions are all Stewart sees of a shift, so each says whose it is and whether it can
+# go: "DF 09:07 L1 · BL-670 Create Curl.Cryptography", "DF 09:07 L2 · BLOCKED, read",
+# "DF 09:07 shift · done, close". DF and the shift's start time come first, so a shift's
+# tabs group together; a finished tab ends in "close" or "read"; anything else is working.
+$Dot = [char]0x00B7
+$ShiftTime = if ($Stamp -match '^\d{8}-(\d\d)(\d\d)') { "$($Matches[1]):$($Matches[2])" } else { (Get-Date).ToString('HH:mm') }
+$OwnTabPrefix = if ($Lane) { "DF $ShiftTime L$Lane" } else { "DF $ShiftTime shift" }
+
+function Get-LaneTabLabel {
+    # The caption the coordinator gives lane $N's tab: its prefix, then $Text if any.
+    param([int]$N, [string]$Text)
+    $label = "DF $ShiftTime L$N"
+    if ($Text) { $label += " $Dot $Text" }
+    return $label
+}
+
+function Set-HerdrTabLabel {
+    # Renames a tab the factory opened; captions past 48 characters are cut with "~".
+    param([string]$Tab, [string]$Label)
+    $herdr = Get-HerdrBin
+    if (-not $herdr -or -not $Tab) { return }
+    if ($Label.Length -gt 48) { $Label = $Label.Substring(0, 47) + '~' }
+    & $herdr tab rename $Tab $Label 2>&1 | Out-Null
+}
+
+function Test-FactoryTab {
+    # True when $Tab is one the factory opened ("DF ..." or the older "Dark factory ..."),
+    # so a shift Stewart started by hand in his own tab never renames or closes it.
+    param([string]$Tab)
+    $herdr = Get-HerdrBin
+    if (-not $herdr -or -not $Tab) { return $false }
+    $label = "$(((& $herdr tab get $Tab) -join "`n" | ConvertFrom-Json).result.tab.label)"
+    return ($label -like 'DF *' -or $label -like 'Dark factory*')
+}
+
+function Set-OwnTabLabel {
+    # Captions this process's own tab: "DF 09:07 L1 · $Text", or just the prefix.
+    param([string]$Text)
+    if (-not (Test-FactoryTab $env:HERDR_TAB_ID)) { return }
+    Set-HerdrTabLabel $env:HERDR_TAB_ID $(if ($Text) { "$OwnTabPrefix $Dot $Text" } else { $OwnTabPrefix })
+}
+
 function Close-HerdrTab {
     # Closes a herdr tab the factory opened, once nothing in it is worth reading: a tab
     # left behind only says "idle" and looks like a lane that is still working. Its
-    # trace and summary are in <repo>.logs\ either way. Closing this process's own tab ends it.
-    param([string]$Tab, [string]$Why)
+    # trace and summary are in <repo>.logs\ either way. Closing this process's own tab
+    # ends it. A tab herdr will not close is captioned "done, close" instead.
+    param([string]$Tab, [string]$Why, [string]$DoneLabel)
     $herdr = Get-HerdrBin
     if (-not $herdr -or -not $Tab) { return }
     Write-Trace '-' 'herdr' "closing tab $Tab ($Why)"
     & $herdr tab close $Tab 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0 -and $DoneLabel) { Set-HerdrTabLabel $Tab "$DoneLabel $Dot done, close" }
 }
 
 function Close-OwnHerdrTab {
-    # Closes the tab this shift runs in, but only one Start-Detached opened (its label
-    # starts "Dark factory"): a shift Stewart started by hand in his own tab keeps it.
+    # Closes the tab this shift runs in, but only one the factory opened.
     param([string]$Why)
-    $herdr = Get-HerdrBin
-    if (-not $herdr -or -not $env:HERDR_TAB_ID) { return }
-    $label = "$(((& $herdr tab get $env:HERDR_TAB_ID) -join "`n" | ConvertFrom-Json).result.tab.label)"
-    if ($label -like 'Dark factory*') { Close-HerdrTab $env:HERDR_TAB_ID $Why }
+    if (Test-FactoryTab $env:HERDR_TAB_ID) { Close-HerdrTab $env:HERDR_TAB_ID $Why $OwnTabPrefix }
 }
 
 if ($NewTab) {
@@ -264,7 +304,7 @@ if ($NewTab) {
         if ($p.Value -is [System.Management.Automation.SwitchParameter]) { if ($p.Value) { $forward += "-$($p.Key)" } }
         else { $forward += @("-$($p.Key)", "`"$($p.Value)`"") }
     }
-    $where = Start-Detached -Label "Dark factory - $(Split-Path $Root -Leaf)" -Dir $Root -ScriptArgs $forward
+    $where = Start-Detached -Label "DF shift starting" -Dir $Root -ScriptArgs $forward
     if ($where.Tab) { Write-Host "Dark factory started in herdr tab $($where.Tab)." }
     else { Write-Host "Dark factory started in a new console window (pid $($where.Process.Id))." }
     exit 0
@@ -637,9 +677,13 @@ function Update-LimitNotice {
 function Test-WakeRequested {
     # True once "wake <unix>" for this reset is in the limit file: tokens came back early,
     # because Stewart reset the limit or the probe found the account answering again.
+    # Only a wake written after the last time a runner hit this limit counts: a runner
+    # that hits it again after a wake finds the tokens were not back after all, and must
+    # wait, not spin through wait after wait on the stale wake.
     param([long]$Unix)
     if (-not (Test-Path $LimitFile)) { return $false }
-    return [bool](@(Get-Content $LimitFile -ErrorAction SilentlyContinue) -contains "wake $Unix")
+    $marks = @(Get-Content $LimitFile -ErrorAction SilentlyContinue)
+    return ([array]::LastIndexOf($marks, "wake $Unix") -gt [array]::LastIndexOf($marks, "reset $Unix"))
 }
 
 $script:NextProbe = [datetime]::MinValue
@@ -677,15 +721,22 @@ function Wait-ForNewSession {
     # Holds this runner until just after the usage limit resets, and returns how long it
     # waited so the shift can add it back. A lone runner announces as it waits; a lane
     # leaves the announcing to the coordinator.
-    param([string]$Id, [datetime]$Until)
+    # -UsageOnly: the tokens are not out, the shift is choosing to start on a fresh session
+    # (-StopAtUsage). Then nothing is marked in the limit file and no probe or wake can
+    # end the wait: a probe is always answered while tokens remain, so it would start the
+    # shift at once, its lanes would stop on the same reading, and -Continuous would start
+    # empty shift after empty shift until the reset.
+    param([string]$Id, [datetime]$Until, [switch]$UsageOnly)
     $began = Get-Date
     $unix = ConvertTo-Unix $Until
-    Add-LimitMark "reset $unix"
-    Write-Trace $Id 'tokens' "out of tokens; waiting for the new session at $($Until.ToString('HH:mm'))" 'Yellow'
+    if (-not $UsageOnly) { Add-LimitMark "reset $unix" }
+    Write-Trace $Id 'tokens' "$(if ($UsageOnly) { 'saving tokens' } else { 'out of tokens' }); waiting for the new session at $($Until.ToString('HH:mm'))" 'Yellow'
+    Set-OwnTabLabel "tokens back $($Until.ToString('HH:mm'))"
     # A little past the reset, so the first request lands in the new session.
     $resume = $Until.AddSeconds(20)
     $nextTrace = (Get-Date).AddMinutes(30)
     while ((Get-Date) -lt $resume) {
+        if ($UsageOnly) { Start-Sleep -Seconds 5; continue }
         if (Test-WakeRequested $unix) { Write-Trace $Id 'wake' 'tokens are back before the reset' 'Green'; break }
         if ($Lane) { try { $Host.UI.RawUI.WindowTitle = "Dark factory - lane $Lane out of tokens until $($Until.ToString('HH:mm'))" } catch { } }
         else { Update-LimitNotice; Invoke-LimitProbe }
@@ -695,8 +746,10 @@ function Wait-ForNewSession {
         }
         Start-Sleep -Seconds 1
     }
+    if ($UsageOnly) { Write-Trace $Id 'resume' 'new session; starting the shift' 'Green'; Set-OwnTabLabel ''; return ((Get-Date) - $began) }
     Add-LimitMark "resumed $unix $Id"
     Write-Trace $Id 'resume' 'new session; running the task again' 'Green'
+    Set-OwnTabLabel $(if ($Id -match '^BL-') { "$Id $(Get-TaskTitle $Id)" } else { '' })
     if ($Lane) { try { $Host.UI.RawUI.WindowTitle = "Dark factory - lane $Lane" } catch { } }
     else { Update-LimitNotice }
     return ((Get-Date) - $began)
@@ -713,7 +766,7 @@ function Wait-ForFreshSession {
     }
     if ($u.FiveHour -lt $StopAtUsage) { return '' }
     Write-Trace '-' 'tokens' "session tokens $([math]::Round($u.FiveHour * 100))% used; this shift starts on the new session at $($u.FiveHourResets.ToString('HH:mm'))" 'Yellow'
-    [void](Wait-ForNewSession -Id '-' -Until $u.FiveHourResets)
+    [void](Wait-ForNewSession -Id '-' -Until $u.FiveHourResets -UsageOnly)
     return ''
 }
 
@@ -1414,9 +1467,10 @@ if ($Lanes -gt 1 -and -not $Lane) {
     # The previous shift stopped claiming work near the end of its session; this one starts
     # on a fresh session, and the wait does not count against -Hours.
     $weekly = Wait-ForFreshSession
-    if ($weekly) { Write-Trace '-' 'shift' $weekly 'Red'; Invoke-Alarm -Reasons @($weekly); exit 2 }
+    if ($weekly) { Write-Trace '-' 'shift' $weekly 'Red'; Set-OwnTabLabel 'ALARM, read'; Invoke-Alarm -Reasons @($weekly); exit 2 }
     $shiftEnd = (Get-Date).AddHours($Hours)
 
+    Set-OwnTabLabel ''
     Write-Trace '-' 'shift' "start  $Lanes lanes  branch=$branch model=$Model until $($shiftEnd.ToString('HH:mm'))" 'Cyan'
     New-Item -ItemType Directory -Force -Path $LanesDir | Out-Null
     New-Item -ItemType Directory -Force -Path (Join-Path $LogDir "lanes-$Stamp") | Out-Null
@@ -1440,7 +1494,7 @@ if ($Lanes -gt 1 -and -not $Lane) {
             git -C $dir checkout -q -B "factory/lane-$n" "origin/$branch" 2>&1 | Out-Null
             git -C $dir reset -q --hard "origin/$branch" 2>&1 | Out-Null
         }
-        $started = Start-Detached -Label "Dark factory lane $n" -Dir $dir -ScriptArgs (& $laneArgsFor $n)
+        $started = Start-Detached -Label (Get-LaneTabLabel $n 'starting') -Dir $dir -ScriptArgs (& $laneArgsFor $n)
         $procs += $started
         $laneTabs[$n] = $started.Tab
         $where = if ($started.Tab) { "herdr tab $($started.Tab)" } else { "pid $($started.Process.Id)" }
@@ -1473,7 +1527,7 @@ if ($Lanes -gt 1 -and -not $Lane) {
             Remove-Item (Get-LaneStatePath $n 'pid') -ErrorAction SilentlyContinue
             $held = Get-LaneState $n 'task'
             Close-HerdrTab $laneTabs[$n] "lane $n died; its restart gets a new tab"
-            $again = Start-Detached -Label "Dark factory lane $n" -Dir (Join-Path $LanesDir "lane-$n") -ScriptArgs (& $laneArgsFor $n)
+            $again = Start-Detached -Label (Get-LaneTabLabel $n "restart $($restarts[$n])$(if ($held) { " $held" })") -Dir (Join-Path $LanesDir "lane-$n") -ScriptArgs (& $laneArgsFor $n)
             $procs += $again
             $laneTabs[$n] = $again.Tab
             Write-Trace '-' 'lane' "lane $n had died; restarted ($($restarts[$n]) of 5)$(if ($held) { ", resuming $held" })" 'Yellow'
@@ -1498,8 +1552,13 @@ if ($Lanes -gt 1 -and -not $Lane) {
         # summary (it has no file here and is never closed).
         $n = [int]($file.BaseName -replace '^lane-', '')
         if ($laneSummary -and -not $laneStalls.Count -and $laneSummary -notmatch 'blocked=[1-9]') {
-            Close-HerdrTab $laneTabs[$n] "lane $n ended cleanly"
+            Close-HerdrTab $laneTabs[$n] "lane $n ended cleanly" (Get-LaneTabLabel $n)
         }
+        elseif ($laneSummary -match 'blocked=[1-9]') { Set-HerdrTabLabel $laneTabs[$n] (Get-LaneTabLabel $n 'BLOCKED, read') }
+        else { Set-HerdrTabLabel $laneTabs[$n] (Get-LaneTabLabel $n 'STALLED, read') }
+    }
+    foreach ($n in 1..$Lanes) {
+        if (-not (Test-Path (Join-Path $summaries "lane-$n.txt"))) { Set-HerdrTabLabel $laneTabs[$n] (Get-LaneTabLabel $n 'no report, read') }
     }
     Write-Trace '-' 'shift' "end  $Lanes lanes" 'Cyan'
     Write-Trace '-' 'merge' (Invoke-MergeToMaster -Branch $branch) 'Cyan'
@@ -1511,13 +1570,13 @@ if ($Lanes -gt 1 -and -not $Lane) {
         foreach ($r in $reasons) { Write-Trace '-' 'note' (Get-Short $r 100) 'Yellow' }
         $forward = @('-Lanes', $Lanes, '-Hours', $Hours, '-MaxTasks', $MaxTasks, '-TaskMinutes', $TaskMinutes, '-Model', $Model, '-Continuous')
         if ($QuietAlarm) { $forward += '-QuietAlarm' }
-        $next = Start-Detached -Label "Dark factory - $(Split-Path $Root -Leaf)" -Dir $Root -ScriptArgs $forward
+        $next = Start-Detached -Label "DF shift starting" -Dir $Root -ScriptArgs $forward
         Write-Trace '-' 'shift' "work is still ready; next shift started ($(if ($next.Tab) { "herdr tab $($next.Tab)" } else { "pid $($next.Process.Id)" }))" 'Cyan'
         # The next shift has its own tab; this one has only notes, and they are in the log.
         if ($next.Tab) { Close-OwnHerdrTab 'shift handed over to the next one' }
         exit 0
     }
-    if ($reasons.Count -gt 0) { Invoke-Alarm -Reasons $reasons; exit 2 }
+    if ($reasons.Count -gt 0) { Set-OwnTabLabel 'ALARM, read'; Invoke-Alarm -Reasons $reasons; exit 2 }
     try { $Host.UI.RawUI.WindowTitle = 'Dark factory - shift complete' } catch { }
     Close-OwnHerdrTab 'shift complete with nothing waiting on Stewart'
     exit 0
@@ -1604,6 +1663,7 @@ while ($true) {
     if ($Lane) { Set-LaneState 'task' $id }
 
     if (-not $resuming) { Write-Trace $id 'claim' (Get-Short (Get-TaskTitle $id)) 'Cyan' }
+    if ($Lane) { Set-OwnTabLabel "$id $(Get-TaskTitle $id)" }
     $run = Invoke-TaskRun $id -Resume:$resuming
     $state = Get-TaskState $id
 
