@@ -346,6 +346,35 @@ public sealed class CurlCommandRunnerTransferOptionTests
             StandardErrorText);
     }
 
+    // Measured with COLUMNS=200 and COLUMNS=40 curl -z notadate -o NUL file:///Z:/.../global.json
+    // (curl 8.21.0, Windows, 2026-09-27).
+    [TestMethod]
+    public async Task RunAsync_TimeCondNotADateAt200Columns_WarnsOnOneLine()
+    {
+        int exitCode = await RunAsync(["-z", "notadate", SourceUrl], fileHandler, terminalColumns: 200);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(
+            Lines("Warning: Illegal date format for -z, --time-cond (and not a filename). Disabling time condition. See curl_getdate(3) for valid date syntax."),
+            StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_TimeCondNotADateAt40Columns_WrapsTheWarningAsCurlWrapsIt()
+    {
+        int exitCode = await RunAsync(["-z", "notadate", SourceUrl], fileHandler, terminalColumns: 40);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(
+            Lines(
+                "Warning: Illegal date format for -z, ",
+                "Warning: --time-cond (and not a ",
+                "Warning: filename). Disabling time ",
+                "Warning: condition. See curl_getdate(3) ",
+                "Warning: for valid date syntax."),
+            StandardErrorText);
+    }
+
     private static string Lines(params string[] lines) => string.Concat(lines.Select(line => line + NewLine));
 
     private string WrittenText(string path) => Encoding.ASCII.GetString(outputFiles.Written[path].ToArray());

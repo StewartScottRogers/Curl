@@ -21,14 +21,12 @@ public sealed class CommandLineRedirectAndFailOptionTests
 
     private static readonly string[] HeadAfterGetWarning =
     [
-        "Warning: You can only select one HTTP request method! You asked for both HEAD ",
-        "Warning: (-I, --head) and GET (-G, --get).",
+        "Warning: You can only select one HTTP request method! You asked for both HEAD (-I, --head) and GET (-G, --get).",
     ];
 
     private static readonly string[] GetAfterHeadWarning =
     [
-        "Warning: You can only select one HTTP request method! You asked for both GET ",
-        "Warning: (-G, --get) and HEAD (-I, --head).",
+        "Warning: You can only select one HTTP request method! You asked for both GET (-G, --get) and HEAD (-I, --head).",
     ];
 
     // ---- defaults -----------------------------------------------------------------

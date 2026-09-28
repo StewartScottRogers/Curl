@@ -106,8 +106,7 @@ public sealed class CommandLineTimeConditionOptionTests
         CollectionAssert.AreEqual(
             new[]
             {
-                "Warning: Illegal date format for -z, --time-cond (and not a filename). ",
-                "Warning: Disabling time condition. See curl_getdate(3) for valid date syntax.",
+                "Warning: Illegal date format for -z, --time-cond (and not a filename). Disabling time condition. See curl_getdate(3) for valid date syntax.",
             },
             result.WarningLines.ToArray());
     }
@@ -130,8 +129,7 @@ public sealed class CommandLineTimeConditionOptionTests
         CollectionAssert.AreEqual(
             new[]
             {
-                "Warning: Illegal date format for -z, --time-cond (and not a filename). ",
-                "Warning: Disabling time condition. See curl_getdate(3) for valid date syntax.",
+                "Warning: Illegal date format for -z, --time-cond (and not a filename). Disabling time condition. See curl_getdate(3) for valid date syntax.",
             },
             result.WarningLines.ToArray());
     }
@@ -201,8 +199,7 @@ public sealed class CommandLineTimeConditionOptionTests
             new[]
             {
                 "Warning: Failed to get filetime: CreateFile failed: GetLastError 0x00000003",
-                "Warning: Illegal date format for -z, --time-cond (and not a filename). ",
-                "Warning: Disabling time condition. See curl_getdate(3) for valid date syntax.",
+                "Warning: Illegal date format for -z, --time-cond (and not a filename). Disabling time condition. See curl_getdate(3) for valid date syntax.",
             },
             result.WarningLines.ToArray());
     }
@@ -240,8 +237,7 @@ public sealed class CommandLineTimeConditionOptionTests
             new[]
             {
                 expectedFirstLine,
-                "Warning: Illegal date format for -z, --time-cond (and not a filename). ",
-                "Warning: Disabling time condition. See curl_getdate(3) for valid date syntax.",
+                "Warning: Illegal date format for -z, --time-cond (and not a filename). Disabling time condition. See curl_getdate(3) for valid date syntax.",
             },
             result.WarningLines.ToArray());
     }
@@ -291,7 +287,7 @@ public sealed class CommandLineTimeConditionOptionTests
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(TimeConditionKind.IfUnmodifiedSince, result.Options.TimeCondition?.Kind);
-        Assert.HasCount(2, result.WarningLines);
+        Assert.HasCount(1, result.WarningLines);
     }
 
     /// <summary>curl 8.21.0: <c>curl -s -z notadate ...</c> prints nothing on standard error.</summary>

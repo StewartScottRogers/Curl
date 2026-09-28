@@ -31,25 +31,34 @@ public sealed class CommandLineWarningTests
     }
 
     [TestMethod]
-    public void PostRequestedWithHead_IsCurlsExactTwoLines()
+    public void TimeConditionIsNotADate_IsCurlsExactUnwrappedLine()
     {
         CollectionAssert.AreEqual(
             new[]
             {
-                "Warning: You can only select one HTTP request method! You asked for both POST ",
-                "Warning: (-d, --data) and HEAD (-I, --head).",
+                "Warning: Illegal date format for -z, --time-cond (and not a filename). Disabling time condition. See curl_getdate(3) for valid date syntax.",
+            },
+            CommandLineWarning.TimeConditionIsNotADate.ToArray());
+    }
+
+    [TestMethod]
+    public void PostRequestedWithHead_IsCurlsExactUnwrappedLine()
+    {
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "Warning: You can only select one HTTP request method! You asked for both POST (-d, --data) and HEAD (-I, --head).",
             },
             CommandLineWarning.PostRequestedWithHead.ToArray());
     }
 
     [TestMethod]
-    public void PostRequestedWithGet_IsCurlsExactTwoLines()
+    public void PostRequestedWithGet_IsCurlsExactUnwrappedLine()
     {
         CollectionAssert.AreEqual(
             new[]
             {
-                "Warning: You can only select one HTTP request method! You asked for both POST ",
-                "Warning: (-d, --data) and GET (-G, --get).",
+                "Warning: You can only select one HTTP request method! You asked for both POST (-d, --data) and GET (-G, --get).",
             },
             CommandLineWarning.PostRequestedWithGet.ToArray());
     }
