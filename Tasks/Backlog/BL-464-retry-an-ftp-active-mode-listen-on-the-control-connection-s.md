@@ -1,5 +1,5 @@
 ---
-id: BL-463
+id: BL-464
 title: Retry an FTP active-mode listen on the control connection's address when the -P address is not local
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-463 — Retry an FTP active-mode listen on the control connection's address when the -P address is not local
+# BL-464 — Retry an FTP active-mode listen on the control connection's address when the -P address is not local
 
 ## Goal
 

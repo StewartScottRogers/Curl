@@ -58,7 +58,7 @@ Filed by BL-437 under ADR-0102. BL-458 depends on this task.
   `EADDRNOTAVAIL` on every platform; the socket and listen cases go through internal seams).
 - Not done here: curl's once-only retry on the control connection's address after `EADDRNOTAVAIL`
   on a non-local `-P` address. `ListenTarget` holds one address, so it is the FTP handler's or the
-  contract's; filed as BL-463.
+  contract's; filed as BL-464.
 - Review (code-reviewer) found, and this task fixed: a socket-constructor `SocketException`
   escaping `ListenAsync`, an accepted socket leaked when it failed before being wrapped, and
   every bind error being treated as a taken port.
