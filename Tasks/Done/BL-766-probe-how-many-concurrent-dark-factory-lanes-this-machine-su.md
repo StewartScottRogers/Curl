@@ -8,7 +8,7 @@ depends-on: [BL-763]
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-28
 ---
 # BL-766 — Probe how many concurrent dark factory lanes this machine sustains and record the cap
 
@@ -44,21 +44,28 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestMachineProbe` exits 0 with a `PASS` line and no `FAIL` for each case (seconds for k = 1, 2, ...; free memory 50% unless stated; all builds succeeded unless stated):
+- [x] `powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestMachineProbe` exits 0 with a `PASS` line and no `FAIL` for each case (seconds for k = 1, 2, ...; free memory 50% unless stated; all builds succeeded unless stated):
   - **knee-by-time.** 60, 62, 70, 90, 118, 125. Result: cap 5, complete.
   - **knee-by-memory.** 60, 61, 63, 64 with free memory 40, 25, 12, 8. Result: cap 3, complete.
   - **failed-build.** 60, 61, then a failed build at k = 3. Result: cap 2, complete.
   - **all-pass-to-16.** Sixteen steps of 60. Result: cap 16, complete.
   - **cut-short.** 60, 61 with `-MaxLanes 2`. Result: cap 2, not complete.
   - **first-step-fails.** k = 1 has a failed build. Result: cap 1, complete.
-- [ ] `powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -ProbeMachine -ProbeMaxLanes 2` exits 0 and writes `machine-lanes.json` as specified. The file parses with `ConvertFrom-Json`, has `schema` 1, two `steps`, `complete` `false` (unless step 2 failed), and `logicalProcessors` equal to `[Environment]::ProcessorCount`. The `probe` folder is gone afterwards, and `git status --porcelain` is unchanged by the run.
-- [ ] `-ProbeMachine` and `-ProbeMaxLanes` are documented in `param` like their neighbours. The header's `.EXAMPLE` block shows `-ProbeMachine` and `-TestMachineProbe`, and the header says in one paragraph what the probe measures and where it writes.
-- [ ] `[System.Management.Automation.Language.Parser]::ParseFile` reports no errors for `RunDarkFactory.ps1`.
-- [ ] `git diff --stat` shows only `RunDarkFactory.ps1` changed outside `Tasks/`.
+- [x] `powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -ProbeMachine -ProbeMaxLanes 2` exits 0 and writes `machine-lanes.json` as specified. The file parses with `ConvertFrom-Json`, has `schema` 1, two `steps`, `complete` `false` (unless step 2 failed), and `logicalProcessors` equal to `[Environment]::ProcessorCount`. The `probe` folder is gone afterwards, and `git status --porcelain` is unchanged by the run.
+- [x] `-ProbeMachine` and `-ProbeMaxLanes` are documented in `param` like their neighbours. The header's `.EXAMPLE` block shows `-ProbeMachine` and `-TestMachineProbe`, and the header says in one paragraph what the probe measures and where it writes.
+- [x] `[System.Management.Automation.Language.Parser]::ParseFile` reports no errors for `RunDarkFactory.ps1`.
+- [x] `git diff --stat` shows only `RunDarkFactory.ps1` changed outside `Tasks/`.
 
 ## Notes
+
+- The rule is split in two pure functions: `Test-MachineProbeStep` (one step against the one-build time) is shared by the live probe's stop test and `Get-MachineLaneCap`, so the probe and the rehearsal cannot disagree.
+- `Complete` is true when a step failed or 16 steps passed; otherwise the steps ran out at `-MaxLanes` and the file is incomplete.
+- Each build's stdout and stderr are redirected to `probe\<i>.out`/`.err` so parallel builds do not interleave on the console; they go with the probe folder. `$process.Handle` is read at start so Windows PowerShell reports `ExitCode`.
+- Windows PowerShell's `ConvertTo-Json` escapes `<` and `>` as `<`/`>`; they are unescaped so `rule` reads as the ADR shows it.
+- Smoke run from lane-3 (beside two busy lanes, so not a real measurement): warm-up 18 s, step 1 7.5 s, step 2 12.5 s (1.67x), free memory 64%; `complete: false`, cap 2. A full solution build here is about 9 s, so a full probe to 16 takes a few minutes. The `lane-3.lanes` folder was deleted afterwards.
 
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Doing.
+- 2026-09-28: Doing -> Done. RunDarkFactory.ps1 -ProbeMachine measures the concurrent-build cap into machine-lanes.json; -TestMachineProbe proves the rule
