@@ -10,8 +10,8 @@ namespace Curl.Protocol.Pop3;
 /// exit code and message of every failure. Every case was recorded from real curl (the
 /// Schannel build) on 2026-09-28 with <c>Record-CurlExchange.ps1 -Pop3</c>, curl running
 /// <c>-sS pop3://127.0.0.1:18110/</c> (BL-547 Notes). Without credentials curl sends no
-/// authentication; the <c>LIST</c> it sends between <c>CAPA</c> and <c>QUIT</c> is BL-549's,
-/// so these tests pin the commands before it and the <c>QUIT</c> after it.
+/// authentication, so <c>LIST</c> follows <c>CAPA</c>; <see cref="Pop3ProtocolHandlerTransferTests" />
+/// pins what it writes.
 /// </summary>
 [TestClass]
 public sealed class Pop3ProtocolHandlerSessionTests
@@ -27,6 +27,14 @@ public sealed class Pop3ProtocolHandlerSessionTests
     /// <summary>The recorder's <c>CAPA</c> answer once the connection is TLS: no <c>STLS</c>.</summary>
     private const string SecureCapaReply =
         "+OK Capability list follows\r\nUSER\r\nSASL PLAIN LOGIN\r\nTOP\r\nUIDL\r\n.\r\n";
+
+    /// <summary>The recorder's <c>LIST</c> answer for its default maildrop of two 52-byte messages.</summary>
+    private const string ListReply = "+OK 2 messages (104 octets)\r\n1 52\r\n2 52\r\n.\r\n";
+
+    /// <summary>The bytes curl wrote for <see cref="ListReply" />: <c>1 52</c> and <c>2 52</c>, each with CRLF.</summary>
+    private const long ListedBytes = 12;
+
+    private const string List = "LIST\r\n";
 
     private const string Bye = "+OK Bye\r\n";
 
@@ -47,10 +55,10 @@ public sealed class Pop3ProtocolHandlerSessionTests
     [TestMethod]
     public async Task ExecuteAsync_DefaultSession_SendsCapaThenQuit()
     {
-        Pop3Run run = await RunAsync(Url, Greeting + CapaReply + Bye);
+        Pop3Run run = await RunAsync(Url, Greeting + CapaReply + ListReply + Bye);
 
-        Assert.AreEqual(Capa + Quit, run.Sent);
-        Assert.AreEqual(TransferResult.Success(0), run.Result);
+        Assert.AreEqual(Capa + List + Quit, run.Sent);
+        Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
         Assert.AreEqual(new ConnectTarget("127.0.0.1", 18110, false), run.Connector.Targets.Single());
         Assert.IsEmpty(run.Tls.Handshakes);
         Assert.IsTrue(run.Connection.IsDisposed);
@@ -59,7 +67,7 @@ public sealed class Pop3ProtocolHandlerSessionTests
     [TestMethod]
     public async Task ExecuteAsync_UrlWithoutPort_ConnectsToPort110()
     {
-        Pop3Run run = await RunAsync("pop3://127.0.0.1/", Greeting + CapaReply + Bye);
+        Pop3Run run = await RunAsync("pop3://127.0.0.1/", Greeting + CapaReply + ListReply + Bye);
 
         Assert.AreEqual(new ConnectTarget("127.0.0.1", 110, false), run.Connector.Targets.Single());
     }
@@ -69,14 +77,14 @@ public sealed class Pop3ProtocolHandlerSessionTests
     {
         var proxy = new ProxyEndpoint(ProxyKind.Socks5, "proxy", 1080, null);
         var events = new RecordingTransferEvents();
-        var connector = new QueuedConnector(ConnectResult.Connected(Script(Greeting + CapaReply + Bye)));
+        var connector = new QueuedConnector(ConnectResult.Connected(Script(Greeting + CapaReply + ListReply + Bye)));
         var context = new TransferContext { Url = CurlUrl.Parse(Url), Output = Stream.Null, Proxy = proxy, Events = events };
 
         TransferResult result = await new Pop3ProtocolHandler(connector, new QueuedTlsProvider()).ExecuteAsync(context);
 
         Assert.AreSame(proxy, connector.Targets.Single().Proxy);
         Assert.AreSame(events, connector.Targets.Single().Events);
-        Assert.AreEqual(TransferResult.Success(0), result);
+        Assert.AreEqual(TransferResult.Success(ListedBytes), result);
     }
 
     [TestMethod]
@@ -85,21 +93,21 @@ public sealed class Pop3ProtocolHandlerSessionTests
     public async Task ExecuteAsync_Pop3sUrl_ConnectsWithTlsToPort995AndNeverSendsStls(TransportSecurityLevel sslLevel)
     {
         // Recorder -Tls: CAPA (no STLS offered), LIST, QUIT, exit 0; here without the port.
-        Pop3Run run = await RunAsync("pop3s://127.0.0.1/", Greeting + SecureCapaReply + Bye, sslLevel);
+        Pop3Run run = await RunAsync("pop3s://127.0.0.1/", Greeting + SecureCapaReply + ListReply + Bye, sslLevel);
 
-        Assert.AreEqual(Capa + Quit, run.Sent);
+        Assert.AreEqual(Capa + List + Quit, run.Sent);
         Assert.AreEqual(new ConnectTarget("127.0.0.1", 995, true), run.Connector.Targets.Single());
         Assert.IsEmpty(run.Tls.Handshakes);
-        Assert.AreEqual(TransferResult.Success(0), run.Result);
+        Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_Pop3sUrlWhoseCapaOffersStls_StillNeverSendsIt()
     {
-        Pop3Run run = await RunAsync("pop3s://127.0.0.1/", Greeting + CapaReply + Bye, Required);
+        Pop3Run run = await RunAsync("pop3s://127.0.0.1/", Greeting + CapaReply + ListReply + Bye, Required);
 
-        Assert.AreEqual(Capa + Quit, run.Sent);
-        Assert.AreEqual(TransferResult.Success(0), run.Result);
+        Assert.AreEqual(Capa + List + Quit, run.Sent);
+        Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
     }
 
     [TestMethod]
@@ -125,10 +133,10 @@ public sealed class Pop3ProtocolHandlerSessionTests
     [DataRow("+OK hi\n", DisplayName = "LF only")]
     public async Task ExecuteAsync_GreetingAfterSkippedLinesOrLoose_IsAccepted(string greeting)
     {
-        Pop3Run run = await RunAsync(Url, greeting + CapaReply + Bye);
+        Pop3Run run = await RunAsync(Url, greeting + CapaReply + ListReply + Bye);
 
-        Assert.AreEqual(Capa + Quit, run.Sent);
-        Assert.AreEqual(TransferResult.Success(0), run.Result);
+        Assert.AreEqual(Capa + List + Quit, run.Sent);
+        Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
     }
 
     [TestMethod]
@@ -171,7 +179,7 @@ public sealed class Pop3ProtocolHandlerSessionTests
     {
         // The default session's bytes in three-byte reads, so every line and CRLF is split.
         byte[] replies = Encoding.Latin1.GetBytes(Greeting + CapaReply + StlsAccepted);
-        var secured = Script(SecureCapaReply + Bye);
+        var secured = Script(SecureCapaReply + ListReply + Bye);
 
         Pop3Run run = await Pop3Run.ExecuteAsync(
             Url,
@@ -180,8 +188,8 @@ public sealed class Pop3ProtocolHandlerSessionTests
             ConnectResult.Connected(secured));
 
         Assert.AreEqual(Capa + Stls, run.Sent);
-        Assert.AreEqual(Capa + Quit, Encoding.Latin1.GetString(secured.Sent));
-        Assert.AreEqual(TransferResult.Success(0), run.Result);
+        Assert.AreEqual(Capa + List + Quit, Encoding.Latin1.GetString(secured.Sent));
+        Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
     }
 
     [TestMethod]
@@ -190,10 +198,10 @@ public sealed class Pop3ProtocolHandlerSessionTests
     public async Task ExecuteAsync_CapaRefused_CarriesOnWithoutStls(TransportSecurityLevel sslLevel)
     {
         // Measured: CAPA, -ERR, then LIST and QUIT, exit 0.
-        Pop3Run run = await RunAsync(Url, Greeting + "-ERR no\r\n" + Bye, sslLevel);
+        Pop3Run run = await RunAsync(Url, Greeting + "-ERR no\r\n" + ListReply + Bye, sslLevel);
 
-        Assert.AreEqual(Capa + Quit, run.Sent);
-        Assert.AreEqual(TransferResult.Success(0), run.Result);
+        Assert.AreEqual(Capa + List + Quit, run.Sent);
+        Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
     }
 
     [TestMethod]
@@ -213,21 +221,21 @@ public sealed class Pop3ProtocolHandlerSessionTests
     [TestMethod]
     public async Task ExecuteAsync_StlsNotListedUnderSsl_CarriesOnInPlaintext()
     {
-        Pop3Run run = await RunAsync(Url, Greeting + "+OK\r\nUSER\r\n.\r\n" + Bye, Try);
+        Pop3Run run = await RunAsync(Url, Greeting + "+OK\r\nUSER\r\n.\r\n" + ListReply + Bye, Try);
 
-        Assert.AreEqual(Capa + Quit, run.Sent);
-        Assert.AreEqual(TransferResult.Success(0), run.Result);
+        Assert.AreEqual(Capa + List + Quit, run.Sent);
+        Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_StlsRefusedUnderSsl_CarriesOnInPlaintext()
     {
         // --ssl, STLS=-ERR not now: CAPA, STLS, then LIST and QUIT, exit 0.
-        Pop3Run run = await RunAsync(Url, Greeting + CapaReply + "-ERR not now\r\n" + Bye, Try);
+        Pop3Run run = await RunAsync(Url, Greeting + CapaReply + "-ERR not now\r\n" + ListReply + Bye, Try);
 
-        Assert.AreEqual(Capa + Stls + Quit, run.Sent);
+        Assert.AreEqual(Capa + Stls + List + Quit, run.Sent);
         Assert.IsEmpty(run.Tls.Handshakes);
-        Assert.AreEqual(TransferResult.Success(0), run.Result);
+        Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
     }
 
     [TestMethod]
@@ -246,7 +254,7 @@ public sealed class Pop3ProtocolHandlerSessionTests
     public async Task ExecuteAsync_StlsAcceptedUnderSslReqd_UpgradesAndAsksForCapabilitiesAgain()
     {
         // curl --ssl-reqd -k: CAPA, STLS, +OK, the handshake, CAPA again over TLS, LIST, QUIT.
-        var secured = Script(SecureCapaReply + Bye);
+        var secured = Script(SecureCapaReply + ListReply + Bye);
         Pop3Run run = await Pop3Run.ExecuteAsync(
             Url,
             Script(Greeting + CapaReply + StlsAccepted),
@@ -254,11 +262,11 @@ public sealed class Pop3ProtocolHandlerSessionTests
             ConnectResult.Connected(secured));
 
         Assert.AreEqual(Capa + Stls, run.Sent);
-        Assert.AreEqual(Capa + Quit, Encoding.Latin1.GetString(secured.Sent));
+        Assert.AreEqual(Capa + List + Quit, Encoding.Latin1.GetString(secured.Sent));
         Assert.AreSame(run.Connection, run.Tls.Handshakes.Single().Plaintext);
         Assert.AreEqual("127.0.0.1", run.Tls.Handshakes.Single().TargetHost);
         Assert.IsTrue(secured.IsDisposed);
-        Assert.AreEqual(TransferResult.Success(0), run.Result);
+        Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
     }
 
     [TestMethod]
@@ -271,7 +279,7 @@ public sealed class Pop3ProtocolHandlerSessionTests
     public async Task ExecuteAsync_StlsListedLoosely_IsStillSent(string capaReply)
     {
         // Each measured but the last: curl sent STLS.
-        var secured = Script(SecureCapaReply + Bye);
+        var secured = Script(SecureCapaReply + ListReply + Bye);
         Pop3Run run = await Pop3Run.ExecuteAsync(
             Url,
             Script(Greeting + capaReply + StlsAccepted),
@@ -279,21 +287,21 @@ public sealed class Pop3ProtocolHandlerSessionTests
             ConnectResult.Connected(secured));
 
         Assert.AreEqual(Capa + Stls, run.Sent);
-        Assert.AreEqual(TransferResult.Success(0), run.Result);
+        Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_StlsAcceptedUnderSsl_Upgrades()
     {
-        var secured = Script(SecureCapaReply + Bye);
+        var secured = Script(SecureCapaReply + ListReply + Bye);
         Pop3Run run = await Pop3Run.ExecuteAsync(
             Url,
             Script(Greeting + CapaReply + StlsAccepted),
             Try,
             ConnectResult.Connected(secured));
 
-        Assert.AreEqual(Capa + Quit, Encoding.Latin1.GetString(secured.Sent));
-        Assert.AreEqual(TransferResult.Success(0), run.Result);
+        Assert.AreEqual(Capa + List + Quit, Encoding.Latin1.GetString(secured.Sent));
+        Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
     }
 
     [TestMethod]
@@ -327,10 +335,10 @@ public sealed class Pop3ProtocolHandlerSessionTests
     public async Task ExecuteAsync_ResponseLineOf65535Bytes_IsRead()
     {
         // GREETING=+OK and 65529 x: 65533 characters and CRLF, exit 0.
-        Pop3Run run = await RunAsync(Url, "+OK " + new string('x', 65529) + "\r\n" + CapaReply + Bye);
+        Pop3Run run = await RunAsync(Url, "+OK " + new string('x', 65529) + "\r\n" + CapaReply + ListReply + Bye);
 
-        Assert.AreEqual(Capa + Quit, run.Sent);
-        Assert.AreEqual(TransferResult.Success(0), run.Result);
+        Assert.AreEqual(Capa + List + Quit, run.Sent);
+        Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
     }
 
     [TestMethod]
@@ -339,18 +347,18 @@ public sealed class Pop3ProtocolHandlerSessionTests
     [DataRow("+OK " + "x", DisplayName = "an unfinished line")]
     public async Task ExecuteAsync_QuitAnsweredAnyway_StillSucceeds(string quitReply)
     {
-        Pop3Run run = await RunAsync(Url, Greeting + CapaReply + quitReply);
+        Pop3Run run = await RunAsync(Url, Greeting + CapaReply + ListReply + quitReply);
 
-        Assert.AreEqual(Capa + Quit, run.Sent);
-        Assert.AreEqual(TransferResult.Success(0), run.Result);
+        Assert.AreEqual(Capa + List + Quit, run.Sent);
+        Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_QuitAnsweredWithAnOverlongLine_StillSucceeds()
     {
-        Pop3Run run = await RunAsync(Url, Greeting + CapaReply + "+OK " + new string('x', 70000) + "\r\n");
+        Pop3Run run = await RunAsync(Url, Greeting + CapaReply + ListReply + "+OK " + new string('x', 70000) + "\r\n");
 
-        Assert.AreEqual(TransferResult.Success(0), run.Result);
+        Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
     }
 
     [TestMethod]
@@ -389,7 +397,17 @@ public sealed class Pop3ProtocolHandlerSessionTests
         await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await handler.ExecuteAsync(null!));
     }
 
-    private static ScriptedConnection Script(string replies) => new(Encoding.Latin1.GetBytes(replies));
+    /// <summary>
+    /// A server sending <paramref name="replies" />, with a read ending after
+    /// <see cref="ListReply" />: the terminator ends a listing only when it ends a read, and
+    /// the recorder sends the <c>QUIT</c> reply only once <c>QUIT</c> arrives.
+    /// </summary>
+    private static ScriptedConnection Script(string replies)
+    {
+        int listEnd = replies.IndexOf(ListReply, StringComparison.Ordinal) + ListReply.Length;
+        string[] reads = listEnd < ListReply.Length ? [replies] : [replies[..listEnd], replies[listEnd..]];
+        return new([.. reads.Where(read => read.Length > 0).Select(Encoding.Latin1.GetBytes)]);
+    }
 
     private static Task<Pop3Run> RunAsync(string url, string replies, TransportSecurityLevel sslLevel = TransportSecurityLevel.None) =>
         Pop3Run.ExecuteAsync(url, Script(replies), sslLevel);

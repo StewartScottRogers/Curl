@@ -1,8 +1,8 @@
 namespace Curl.Protocol.Pop3;
 
 /// <summary>
-/// The messages curl 8.21.0 prints when a POP3 session fails to open, each measured with
-/// <c>Record-CurlExchange.ps1 -Pop3</c> (BL-547).
+/// The messages curl 8.21.0 prints when a POP3 session fails, each measured with
+/// <c>Record-CurlExchange.ps1 -Pop3</c> (BL-547, BL-549).
 /// </summary>
 internal static class Pop3SessionMessages
 {
@@ -20,4 +20,10 @@ internal static class Pop3SessionMessages
 
     /// <summary><c>--ssl-reqd</c> and <c>STLS</c> was answered with something other than <c>+OK</c> (exit 64).</summary>
     internal const string StartTlsDenied = "STARTTLS denied";
+
+    /// <summary><c>LIST</c> or <c>RETR</c> was answered with something other than <c>+OK</c> (exit 8, BL-549).</summary>
+    internal const string WeirdServerReply = "Weird server reply";
+
+    /// <summary>The URL's message id decodes to a byte below 0x20 (exit 3, BL-549).</summary>
+    internal const string UrlMalformed = "URL using bad/illegal format or missing URL";
 }

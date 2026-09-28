@@ -10,7 +10,9 @@ public sealed record Pop3Run(
     TransferResult Result,
     ScriptedConnection Connection,
     QueuedConnector Connector,
-    QueuedTlsProvider Tls)
+    QueuedTlsProvider Tls,
+    byte[] Output,
+    RecordingProgress Progress)
 {
     /// <summary>Gets every byte written to the plaintext connection, as Latin-1 text.</summary>
     public string Sent => Encoding.Latin1.GetString(Connection.Sent);
@@ -21,12 +23,14 @@ public sealed record Pop3Run(
         TransportSecurityLevel sslLevel = TransportSecurityLevel.None,
         params ConnectResult[] handshakes)
     {
-        var context = new TransferContext { Url = CurlUrl.Parse(url), Output = Stream.Null, SslLevel = sslLevel };
+        using var output = new MemoryStream();
+        var progress = new RecordingProgress();
+        var context = new TransferContext { Url = CurlUrl.Parse(url), Output = output, SslLevel = sslLevel, Progress = progress };
         var connector = new QueuedConnector(ConnectResult.Connected(connection));
         var tls = new QueuedTlsProvider(handshakes);
 
         TransferResult result = await new Pop3ProtocolHandler(connector, tls).ExecuteAsync(context);
 
-        return new Pop3Run(result, connection, connector, tls);
+        return new Pop3Run(result, connection, connector, tls, output.ToArray(), progress);
     }
 }

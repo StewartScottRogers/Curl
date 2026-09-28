@@ -114,6 +114,27 @@ internal sealed class Pop3ControlChannel(IConnection connection, CancellationTok
     }
 
     /// <summary>
+    /// Reads the next chunk of a multi-line body: the bytes left over after the status line
+    /// when there are any, as curl hands on the rest of the read that carried it, else what
+    /// the next read returns.
+    /// </summary>
+    /// <returns>
+    /// The chunk, valid until the next read on this channel; empty once the server has closed
+    /// the connection or a read has failed.
+    /// </returns>
+    public async ValueTask<ReadOnlyMemory<byte>> ReadChunkAsync()
+    {
+        if (bufferStart == bufferEnd && !await TryFillAsync().ConfigureAwait(false))
+        {
+            return ReadOnlyMemory<byte>.Empty;
+        }
+
+        ReadOnlyMemory<byte> chunk = buffer.AsMemory(bufferStart, bufferEnd - bufferStart);
+        bufferStart = bufferEnd;
+        return chunk;
+    }
+
+    /// <summary>
     /// Reads one line up to its LF, without the LF or a CR before it.
     /// </summary>
     private async ValueTask<string> ReadLineAsync()

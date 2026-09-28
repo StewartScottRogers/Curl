@@ -1,15 +1,22 @@
+using System.Buffers;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Pop3;
 
 /// <summary>
 /// One POP3 conversation on an open connection: the greeting, <c>CAPA</c>, the <c>STLS</c>
-/// upgrade <c>--ssl</c> and <c>--ssl-reqd</c> ask for, and <c>QUIT</c>, each step and each
-/// failure's exit code measured on curl 8.21.0 with <c>Record-CurlExchange.ps1 -Pop3</c>
-/// (BL-547).
+/// upgrade <c>--ssl</c> and <c>--ssl-reqd</c> ask for, <c>LIST</c> or <c>RETR</c>, and
+/// <c>QUIT</c>, each step and each failure's exit code measured on curl 8.21.0 with
+/// <c>Record-CurlExchange.ps1 -Pop3</c> (BL-547, BL-549).
 /// </summary>
 /// <remarks>
 /// <list type="bullet">
+/// <item>A URL naming no message sends <c>LIST</c>, one naming <c>&lt;id&gt;</c> sends
+/// <c>RETR &lt;id&gt;</c> (<see cref="Pop3MessageId" />); an id with a control character is
+/// exit 3 after <c>CAPA</c>, and <c>QUIT</c> is still sent. An answer other than <c>+OK</c> is
+/// exit 8, <c>Weird server reply</c>, and <c>QUIT</c> is still sent. The body is written as
+/// <see cref="Pop3BodyDecoder" /> decodes it; the server closing before its terminator is a
+/// success with no <c>QUIT</c>.</item>
 /// <item>A greeting that does not start <c>+OK</c> is exit 8,
 /// <c>Got unexpected pop3-server response</c>. The greeting's APOP timestamp is kept in
 /// <see cref="ApopTimestamp" />.</item>
@@ -39,6 +46,12 @@ internal sealed class Pop3Session(
     private IConnection? securedConnection;
 
     /// <summary>
+    /// Whether the server closed the connection before the body's terminator, after which
+    /// curl sends no <c>QUIT</c>.
+    /// </summary>
+    private bool bodyCutOff;
+
+    /// <summary>
     /// Gets the APOP timestamp the greeting carried, or <see langword="null" /> when it
     /// carried none (<see cref="Pop3ApopTimestamp" />).
     /// </summary>
@@ -51,17 +64,22 @@ internal sealed class Pop3Session(
     public Pop3Capabilities? Capabilities { get; private set; }
 
     /// <summary>
-    /// Opens the session and closes it again with <c>QUIT</c>.
+    /// Opens the session, lists or retrieves, and closes the session again with <c>QUIT</c>.
     /// </summary>
-    /// <returns>A success, or the failure that stopped the session opening.</returns>
+    /// <returns>
+    /// A success carrying the body bytes written, or the failure that stopped the session.
+    /// </returns>
     public async ValueTask<TransferResult> RunAsync()
     {
+        TransferResult result;
         try
         {
             if (await OpenAsync().ConfigureAwait(false) is { } failure)
             {
                 return failure;
             }
+
+            result = await TransferAsync().ConfigureAwait(false);
         }
         catch (Pop3ReplyMissingException)
         {
@@ -72,8 +90,12 @@ internal sealed class Pop3Session(
             return TransferResult.Failure(CurlExitCode.TooLarge, Pop3SessionMessages.ResponseLineTooLarge);
         }
 
-        await QuitAsync().ConfigureAwait(false);
-        return TransferResult.Success(0);
+        if (!bodyCutOff)
+        {
+            await QuitAsync().ConfigureAwait(false);
+        }
+
+        return result;
     }
 
     /// <inheritdoc />
@@ -157,6 +179,59 @@ internal sealed class Pop3Session(
         channel.SwitchTo(connection);
         secure = true;
         return await ReadCapabilitiesAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sends <c>LIST</c> when the URL names no message, else <c>RETR &lt;id&gt;</c>, and writes
+    /// the answer's body to <see cref="ITransferContext.Output" />.
+    /// </summary>
+    private async ValueTask<TransferResult> TransferAsync()
+    {
+        if (Pop3MessageId.Read(context.Url) is not { } messageId)
+        {
+            return TransferResult.Failure(CurlExitCode.UrlMalformat, Pop3SessionMessages.UrlMalformed);
+        }
+
+        await channel.SendAsync(messageId.Length == 0 ? "LIST" : "RETR " + messageId).ConfigureAwait(false);
+        Pop3Response response = await channel.ReadResponseAsync().ConfigureAwait(false);
+        if (!response.IsOk)
+        {
+            return TransferResult.Failure(CurlExitCode.WeirdServerReply, Pop3SessionMessages.WeirdServerReply);
+        }
+
+        return TransferResult.Success(await ReceiveBodyAsync().ConfigureAwait(false));
+    }
+
+    /// <summary>
+    /// Writes the body chunk by chunk through a <see cref="Pop3BodyDecoder" /> until a chunk
+    /// ends with the terminator, or the server closes the connection, which curl also counts
+    /// as success, writing what it had and sending no <c>QUIT</c>.
+    /// </summary>
+    /// <returns>How many body bytes were written.</returns>
+    private async ValueTask<long> ReceiveBodyAsync()
+    {
+        context.Progress.ReportTransferStarted();
+        var decoder = new Pop3BodyDecoder();
+        var decoded = new ArrayBufferWriter<byte>();
+        long written = 0;
+        bool ended = false;
+        while (!ended)
+        {
+            ReadOnlyMemory<byte> chunk = await channel.ReadChunkAsync().ConfigureAwait(false);
+            if (chunk.IsEmpty)
+            {
+                bodyCutOff = true;
+                return written;
+            }
+
+            ended = decoder.Decode(chunk.Span, decoded);
+            await context.Output.WriteAsync(decoded.WrittenMemory, context.CancellationToken).ConfigureAwait(false);
+            written += decoded.WrittenCount;
+            decoded.ResetWrittenCount();
+            context.Progress.ReportDownloaded(written, null);
+        }
+
+        return written;
     }
 
     private async ValueTask QuitAsync()
