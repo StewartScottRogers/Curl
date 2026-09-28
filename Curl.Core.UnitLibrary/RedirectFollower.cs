@@ -29,9 +29,11 @@ namespace Curl.Core;
 /// <see cref="StreamBody" /> - is sent again from its start when its stream seeks, as curl
 /// 8.21.0 sends the same multipart body, boundary and all, after a 307 or 308 (BL-298 Notes).
 /// A kept <see cref="StreamBody" /> whose stream cannot seek - a file part read from a pipe or
-/// device - ends the chain at the next hop with exit 26, <c>read error getting mime data</c>,
-/// counting the redirect and leaving <c>%{redirect_url}</c> empty, as curl 8.21.0 does
-/// (measured, BL-359 Notes).
+/// device - ends the chain at the next hop, counting the redirect and leaving
+/// <c>%{redirect_url}</c> empty: on Windows with exit 26, <c>read error getting mime data</c>,
+/// as the Schannel build does (measured, BL-359 Notes), elsewhere with exit 65,
+/// <c>Cannot rewind mime/post data</c>, as the OpenSSL build does (measured, BL-402 Notes;
+/// ADR-0098).
 /// </para>
 /// <para>
 /// A hop whose host, port or scheme differs from the first URL's gets no
@@ -57,8 +59,18 @@ namespace Curl.Core;
 /// Chooses the proxy for each hop after the first, or <see langword="null" /> to keep the first
 /// URL's proxy for every hop.
 /// </param>
-public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySelector? selectHopProxy = null)
+/// <param name="runsOnWindows">
+/// Whether an unseekable body's rewind fails as the Windows build fails it (exit 26) rather
+/// than as the Linux and macOS build does (exit 65); <see langword="null" /> for
+/// <see cref="OperatingSystem.IsWindows" />.
+/// </param>
+public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySelector? selectHopProxy = null, bool? runsOnWindows = null)
 {
+    /// <summary>The Linux and macOS build's message for a multipart body it cannot rewind for the next hop.</summary>
+    public const string CannotRewindMessage = "Cannot rewind mime/post data";
+
+    private readonly bool rewindFailsAsReadError = runsOnWindows ?? OperatingSystem.IsWindows();
+
     private static readonly HashSet<string> SchemesCurlParses = new(
         [
             "dict", "file", "ftp", "ftps", "gopher", "gophers", "http", "https", "imap",
@@ -131,7 +143,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
     /// <summary>
     /// The failure that ends the chain instead of following <paramref name="target" />: a
     /// <see cref="Refusal" />, the hop proxy selector's failure, or - when
-    /// <paramref name="bodyCannotBeResent" /> - curl's exit 26 for a multipart body it cannot
+    /// <paramref name="bodyCannotBeResent" /> - curl's failure for a multipart body it cannot
     /// rewind, which counts the redirect as followed; <see langword="null" />, with
     /// <paramref name="next" /> and <paramref name="hopProxy" /> set, when the hop goes ahead.
     /// </summary>
@@ -163,14 +175,17 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
     }
 
     /// <summary>
-    /// curl 8.21.0's failure for a hop whose multipart body cannot be rewound: the redirect
-    /// counts as followed, <c>%{redirect_url}</c> is empty, and the exit is 26 (BL-359 Notes).
+    /// curl's failure for a hop whose multipart body cannot be rewound: the redirect counts as
+    /// followed, <c>%{redirect_url}</c> is empty, and the exit is 26 on Windows (BL-359 Notes)
+    /// and 65 elsewhere (BL-402 Notes).
     /// </summary>
-    private static TransferResult BodyRewindFailure(string target, RedirectChain chain, TransferResult result)
+    private TransferResult BodyRewindFailure(string target, RedirectChain chain, TransferResult result)
     {
         chain.Followed(target);
         chain.Refused(keepsRedirectUrl: false);
-        return TransferResult.Failure(CurlExitCode.ReadError, "read error getting mime data", result.BytesTransferred);
+        return rewindFailsAsReadError
+            ? TransferResult.Failure(CurlExitCode.ReadError, "read error getting mime data", result.BytesTransferred)
+            : TransferResult.Failure(CurlExitCode.SendFailRewind, CannotRewindMessage, result.BytesTransferred);
     }
 
     /// <summary>

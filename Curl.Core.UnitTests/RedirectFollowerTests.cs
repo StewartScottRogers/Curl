@@ -226,23 +226,45 @@ public sealed class RedirectFollowerTests
     [TestMethod]
     [DataRow(307)]
     [DataRow(308)]
-    public async Task FollowAsync_NonSeekableStreamBodyAnswered307Or308_FailsTheNextHopWithReadError(int status)
+    public async Task FollowAsync_NonSeekableStreamBodyAnswered307Or308OnWindows_FailsTheNextHopWithReadError(int status)
     {
         // curl -sS -L --max-redirs 1 -w "[%{http_code}|%{num_redirects}|%{url_effective}|%{redirect_url}]"
         // -F f=@\\.\pipe\name, 307: exit 26, "curl: (26) read error getting mime data",
         // stdout [307|1|http://127.0.0.1:18380/next|] (BL-359 Notes).
-        ScriptedHandler handler = new(Redirect(status, Next), Ok(200, 0));
-        StreamBody body = new(new NonSeekableStream([1, 2, 3]), null, "multipart/form-data; boundary=b");
+        TransferResult result = await FollowNonSeekableBody(status, runsOnWindows: true);
 
-        TransferResult result = await Follow(handler, Context(Location() with { Body = body }));
+        AssertRewindFailure(result, status, CurlExitCode.ReadError, "read error getting mime data");
+    }
 
-        Assert.HasCount(1, handler.Contexts);
+    [TestMethod]
+    [DataRow(307)]
+    [DataRow(308)]
+    public async Task FollowAsync_NonSeekableStreamBodyAnswered307Or308OffWindows_FailsTheNextHopWithCannotRewind(int status)
+    {
+        // Linux, OpenSSL build: curl -L -sS -F "f=@<fifo>" -w "[%{http_code}|%{num_redirects}|%{url_effective}|%{redirect_url}]",
+        // 307: exit 65, "curl: (65) Cannot rewind mime/post data",
+        // stdout [307|1|http://172.26.96.1:18402/second|] (BL-402 Notes).
+        TransferResult result = await FollowNonSeekableBody(status, runsOnWindows: false);
+
+        AssertRewindFailure(result, status, CurlExitCode.SendFailRewind, "Cannot rewind mime/post data");
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task FollowAsync_NonSeekableStreamBodyWithDefaultPlatformOnWindows_FailsWithReadError()
+    {
+        TransferResult result = await FollowNonSeekableBody(307, runsOnWindows: null);
+
         Assert.AreEqual(CurlExitCode.ReadError, result.ExitCode);
-        Assert.AreEqual("read error getting mime data", result.ErrorMessage);
-        Assert.AreEqual(status, result.Report!.ResponseCode);
-        Assert.AreEqual(1, result.Report.RedirectCount);
-        Assert.AreEqual(Next, result.Report.EffectiveUrl);
-        Assert.IsNull(result.Report.RedirectUrl);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task FollowAsync_NonSeekableStreamBodyWithDefaultPlatformOffWindows_FailsWithCannotRewind()
+    {
+        TransferResult result = await FollowNonSeekableBody(307, runsOnWindows: null);
+
+        Assert.AreEqual(CurlExitCode.SendFailRewind, result.ExitCode);
     }
 
     [TestMethod]
@@ -853,6 +875,28 @@ public sealed class RedirectFollowerTests
         new RedirectFollower(new ProtocolDispatcher([handler]))
             .FollowAsync(context, policy ?? new RedirectPolicy())
             .AsTask();
+
+    private static async Task<TransferResult> FollowNonSeekableBody(int status, bool? runsOnWindows)
+    {
+        ScriptedHandler handler = new(Redirect(status, Next), Ok(200, 0));
+        StreamBody body = new(new NonSeekableStream([1, 2, 3]), null, "multipart/form-data; boundary=b");
+
+        TransferResult result = await new RedirectFollower(new ProtocolDispatcher([handler]), runsOnWindows: runsOnWindows)
+            .FollowAsync(Context(Location() with { Body = body }), new RedirectPolicy());
+
+        Assert.HasCount(1, handler.Contexts);
+        return result;
+    }
+
+    private static void AssertRewindFailure(TransferResult result, int status, CurlExitCode exitCode, string message)
+    {
+        Assert.AreEqual(exitCode, result.ExitCode);
+        Assert.AreEqual(message, result.ErrorMessage);
+        Assert.AreEqual(status, result.Report!.ResponseCode);
+        Assert.AreEqual(1, result.Report.RedirectCount);
+        Assert.AreEqual(Next, result.Report.EffectiveUrl);
+        Assert.IsNull(result.Report.RedirectUrl);
+    }
 
     private static Task<TransferResult> FollowWith(HopProxySelector selector, IProtocolHandler handler, ITransferContext context) =>
         new RedirectFollower(new ProtocolDispatcher([handler]), selector)
