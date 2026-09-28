@@ -35,3 +35,4 @@ When the peer closes the connection right after the line of a header curl 8.21.0
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
