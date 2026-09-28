@@ -31,6 +31,8 @@ internal sealed class HttpTransferDeadline : IDisposable
 
     private readonly TimeSpan connectTimeout;
 
+    private readonly TimeSpan? maxTime;
+
     private readonly CancellationTokenSource? maxTimeElapsed;
 
     private readonly CancellationTokenSource transfer;
@@ -47,7 +49,8 @@ internal sealed class HttpTransferDeadline : IDisposable
         operationStartedAt = context.OperationStarted ?? startedAt;
         transferCancellation = context.CancellationToken;
         connectTimeout = context.ConnectTimeout is { } given && given > TimeSpan.Zero ? given : DefaultConnectTimeout;
-        maxTimeElapsed = MaxTimeElapsed(context.MaxTime);
+        maxTime = context.MaxTime is { } limit && limit > TimeSpan.Zero ? limit : null;
+        maxTimeElapsed = MaxTimeElapsed(maxTime);
         transfer = maxTimeElapsed is null
             ? CancellationTokenSource.CreateLinkedTokenSource(transferCancellation)
             : CancellationTokenSource.CreateLinkedTokenSource(transferCancellation, maxTimeElapsed.Token);
@@ -62,9 +65,14 @@ internal sealed class HttpTransferDeadline : IDisposable
     /// <summary>
     /// Gets a value indicating whether a cancelled read, write or connect was ended by a time
     /// limit: true unless the transfer itself was cancelled, the only other thing that cancels
-    /// <see cref="Token" />.
+    /// <see cref="Token" />, and true even then once <c>-m</c> has passed on the clock, so the
+    /// runner's <c>-m</c> watchdog, which cancels the transfer at the same instant, cannot take
+    /// the handler's measured message from it (ADR-0117, Decision 4).
     /// </summary>
-    internal bool EndedByLimit => !transferCancellation.IsCancellationRequested;
+    internal bool EndedByLimit => !transferCancellation.IsCancellationRequested || MaxTimePassed;
+
+    /// <summary>Gets a value indicating whether <c>-m</c> is set and has passed on the clock.</summary>
+    private bool MaxTimePassed => maxTime is { } limit && timeProvider.GetElapsedTime(operationStartedAt) >= limit;
 
     /// <summary>
     /// Gets how many whole milliseconds have passed since the deadline was created, as the
@@ -102,9 +110,9 @@ internal sealed class HttpTransferDeadline : IDisposable
         }
     }
 
-    private CancellationTokenSource? MaxTimeElapsed(TimeSpan? maxTime)
+    private CancellationTokenSource? MaxTimeElapsed(TimeSpan? positiveMaxTime)
     {
-        if (maxTime is not { } limit || limit <= TimeSpan.Zero)
+        if (positiveMaxTime is not { } limit)
         {
             return null;
         }

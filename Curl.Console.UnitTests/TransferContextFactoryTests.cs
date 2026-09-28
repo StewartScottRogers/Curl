@@ -356,6 +356,55 @@ public sealed class TransferContextFactoryTests
         Assert.IsFalse(watchdog.Token.IsCancellationRequested);
     }
 
+    [TestMethod]
+    public void Create_MaxTimeWatchdogAlone_IsTheWatchdogsTokenAndStart()
+    {
+        using MemoryStream standardInput = new();
+        using MemoryStream output = new();
+        SteppingTimeProvider clock = new();
+        clock.Advance(TimeSpan.FromSeconds(4));
+        using MaxTimeWatchdog watchdog = new(TimeSpan.FromHours(1), clock);
+
+        TransferContext context = new TransferContextFactory(standardInput, clock)
+            .Create(Parse("dict://h/d:x"), CurlUrl.Parse("dict://h/d:x"), output, null, null, null, maxTimeWatchdog: watchdog);
+
+        Assert.AreEqual(watchdog.Token, context.CancellationToken);
+        Assert.AreEqual(TimeSpan.FromSeconds(4).Ticks, context.OperationStarted);
+    }
+
+    [TestMethod]
+    public void Create_NoMaxTimeWatchdog_LeavesOperationStartedUnset()
+    {
+        using MemoryStream standardInput = new();
+        using MemoryStream output = new();
+
+        TransferContext context = new TransferContextFactory(standardInput)
+            .Create(Parse("dict://h/d:x"), CurlUrl.Parse("dict://h/d:x"), output, null, null, null);
+
+        Assert.IsNull(context.OperationStarted);
+    }
+
+    [TestMethod]
+    public void Create_BothWatchdogsAndAbortToken_IsCancelledByTheMaxTimeWatchdogAndReportsToBoth()
+    {
+        using MemoryStream standardInput = new();
+        using MemoryStream output = new();
+        SteppingTimeProvider clock = new();
+        using LowSpeedWatchdog lowSpeed = new(1, TimeSpan.FromHours(1), clock);
+        using MaxTimeWatchdog maxTime = new(TimeSpan.FromSeconds(1), clock);
+        using CancellationTokenSource abort = new();
+
+        TransferContext context = new TransferContextFactory(standardInput, clock)
+            .Create(Parse("dict://h/d:x"), CurlUrl.Parse("dict://h/d:x"), output, null, null, null, lowSpeedWatchdog: lowSpeed, abortToken: abort.Token, maxTimeWatchdog: maxTime);
+        context.Progress.ReportTransferStarted();
+        context.Progress.ReportDownloaded(7, null);
+        clock.Advance(TimeSpan.FromSeconds(1));
+
+        Assert.IsTrue(context.CancellationToken.IsCancellationRequested);
+        Assert.IsFalse(abort.Token.IsCancellationRequested);
+        Assert.AreEqual("Operation timed out after 1000 milliseconds with 7 bytes received", maxTime.Failure.ErrorMessage);
+    }
+
     private static CommandLineOptions Parse(params string[] arguments)
     {
         CommandLineParseResult parsed = CommandLineParser.Parse(arguments, _ => true);

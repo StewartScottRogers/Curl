@@ -87,7 +87,7 @@ internal sealed class TftpTimeLimits(ITransferContext context, long startTimesta
         {
             return await channel.ReceiveAsync(buffer, linked.Token).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (!context.CancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (!context.CancellationToken.IsCancellationRequested || Elapsed() >= maxTime)
         {
             return null;
         }

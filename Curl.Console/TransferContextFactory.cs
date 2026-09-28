@@ -29,6 +29,9 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// <summary>The one scheme whose transfer uploads standard input.</summary>
     private const string TelnetScheme = "telnet";
 
+    /// <summary>Every context's clock: the one given, or <see cref="TimeProvider.System" />.</summary>
+    private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
+
     /// <summary>
     /// Creates the context for one transfer, carrying every option a handler reads.
     /// </summary>
@@ -71,6 +74,12 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// The token <c>--fail-early</c> aborts the transfer through under <c>-Z</c> (ADR-0127), which also
     /// cancels <see cref="TransferContext.CancellationToken" />; <see cref="CancellationToken.None" /> otherwise.
     /// </param>
+    /// <param name="maxTimeWatchdog">
+    /// The attempt's <c>-m</c> watchdog (ADR-0117), whose start becomes
+    /// <see cref="TransferContext.OperationStarted" />, which watches the reports made to
+    /// <paramref name="progress" />, and whose token also cancels
+    /// <see cref="TransferContext.CancellationToken" />; <see langword="null" /> without a positive <c>-m</c>.
+    /// </param>
     /// <returns>
     /// The context. Its <see cref="TransferContext.NoBody" /> is <c>-I</c>, its
     /// <see cref="TransferContext.ResumeUploadFromUnknownOffset" /> is <c>-C -</c> with a
@@ -92,7 +101,8 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
         ITransferProgress? progress = null,
         ITransferEvents? events = null,
         LowSpeedWatchdog? lowSpeedWatchdog = null,
-        CancellationToken abortToken = default) =>
+        CancellationToken abortToken = default,
+        MaxTimeWatchdog? maxTimeWatchdog = null) =>
         new()
         {
             Url = url,
@@ -106,7 +116,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             ResumeFrom = resumeFrom,
             ResumeUploadFromUnknownOffset = ResumesUploadFromUnknownOffset(options, upload),
             MaxFileSize = options.MaxFileSize,
-            Upload = upload ?? (string.Equals(url.Scheme, TelnetScheme, StringComparison.Ordinal) ? standardInput : null),
+            Upload = UploadOf(url, upload),
             PostData = options.PostData,
             Credentials = options.Credentials,
             TelnetOptions = options.TelnetOptions,
@@ -126,14 +136,15 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             PathAsIs = options.PathAsIs,
             ConnectTimeout = options.ConnectTimeout,
             MaxTime = options.MaxTime,
+            OperationStarted = OperationStartedOf(maxTimeWatchdog),
             TimeCondition = options.TimeCondition,
             Proxy = proxy,
             Http = HttpRequestOptionsMapping.FromCommandLine(options, formBody, proxy, commandLineTextEncoding),
             Mail = MailRequestOptionsMapping.FromCommandLine(options, url.Scheme),
-            Progress = WatchedProgress(progress ?? NoTransferProgress.Instance, lowSpeedWatchdog),
+            Progress = WatchedProgress(progress, lowSpeedWatchdog, maxTimeWatchdog),
             Events = EventsOrNone(events),
-            TimeProvider = timeProvider ?? TimeProvider.System,
-            CancellationToken = TokenOf(lowSpeedWatchdog, abortToken),
+            TimeProvider = clock,
+            CancellationToken = TokenOf(abortToken, lowSpeedWatchdog, maxTimeWatchdog),
         };
 
     /// <summary>
@@ -147,32 +158,60 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
         lowSpeedWatchdog is null ? output : lowSpeedWatchdog.WatchOutput(output);
 
     /// <summary>
-    /// Gets <paramref name="progress" /> watched by <paramref name="lowSpeedWatchdog" />, or as it
-    /// is when there is no watchdog.
+    /// Gets <paramref name="progress" />, or <see cref="NoTransferProgress.Instance" /> when it is
+    /// <see langword="null" />, watched by each watchdog given, the <c>-m</c> one outermost.
     /// </summary>
-    /// <param name="progress">The attempt's progress sink.</param>
-    /// <param name="lowSpeedWatchdog">The attempt's watchdog, or <see langword="null" />.</param>
+    /// <param name="progress">The attempt's progress sink, or <see langword="null" /> for none.</param>
+    /// <param name="lowSpeedWatchdog">The attempt's <c>-Y</c>/<c>-y</c> watchdog, or <see langword="null" />.</param>
+    /// <param name="maxTimeWatchdog">The attempt's <c>-m</c> watchdog, or <see langword="null" />.</param>
     /// <returns>The sink the context carries.</returns>
-    private static ITransferProgress WatchedProgress(ITransferProgress progress, LowSpeedWatchdog? lowSpeedWatchdog) =>
-        lowSpeedWatchdog is null ? progress : lowSpeedWatchdog.WatchProgress(progress);
+    private static ITransferProgress WatchedProgress(
+        ITransferProgress? progress,
+        LowSpeedWatchdog? lowSpeedWatchdog,
+        MaxTimeWatchdog? maxTimeWatchdog)
+    {
+        ITransferProgress given = progress ?? NoTransferProgress.Instance;
+        ITransferProgress speedWatched = lowSpeedWatchdog is null ? given : lowSpeedWatchdog.WatchProgress(given);
+        return maxTimeWatchdog is null ? speedWatched : maxTimeWatchdog.WatchProgress(speedWatched);
+    }
 
     /// <summary>
-    /// Gets the token that cancels the attempt: <paramref name="lowSpeedWatchdog" />'s,
-    /// <paramref name="abortToken" /> without a watchdog, and one cancelled by either when both can be.
+    /// Gets what the transfer uploads: the <c>-T</c> <paramref name="upload" /> when given, standard
+    /// input for a <c>telnet</c> URL without one, and nothing for any other.
     /// </summary>
-    /// <param name="lowSpeedWatchdog">The attempt's watchdog, or <see langword="null" />.</param>
-    /// <param name="abortToken">The token <c>--fail-early</c> aborts the transfer through under <c>-Z</c>.</param>
-    /// <returns>The token the context carries.</returns>
-    private static CancellationToken TokenOf(LowSpeedWatchdog? lowSpeedWatchdog, CancellationToken abortToken)
-    {
-        if (lowSpeedWatchdog is null)
-        {
-            return abortToken;
-        }
+    /// <param name="url">The URL to transfer.</param>
+    /// <param name="upload">The <c>-T</c> source, or <see langword="null" /> without <c>-T</c>.</param>
+    /// <returns>The context's <see cref="TransferContext.Upload" />.</returns>
+    private Stream? UploadOf(CurlUrl url, Stream? upload) =>
+        upload ?? (string.Equals(url.Scheme, TelnetScheme, StringComparison.Ordinal) ? standardInput : null);
 
-        return abortToken.CanBeCanceled
-            ? CancellationTokenSource.CreateLinkedTokenSource(lowSpeedWatchdog.Token, abortToken).Token
-            : lowSpeedWatchdog.Token;
+    /// <summary>
+    /// Gets the <c>-m</c> watchdog's start, which every limit of the attempt counts from, or
+    /// <see langword="null" /> without one, when the handler takes its own start.
+    /// </summary>
+    /// <param name="maxTimeWatchdog">The attempt's <c>-m</c> watchdog, or <see langword="null" />.</param>
+    /// <returns>The context's <see cref="TransferContext.OperationStarted" />.</returns>
+    private static long? OperationStartedOf(MaxTimeWatchdog? maxTimeWatchdog) => maxTimeWatchdog?.OperationStarted;
+
+    /// <summary>
+    /// Gets the token that cancels the attempt: <see cref="CancellationToken.None" /> when neither
+    /// <paramref name="abortToken" /> can be cancelled nor a watchdog is given, the one token that
+    /// can cancel when there is only one, and one cancelled by any of them otherwise.
+    /// </summary>
+    /// <param name="abortToken">The token <c>--fail-early</c> aborts the transfer through under <c>-Z</c>.</param>
+    /// <param name="lowSpeedWatchdog">The attempt's <c>-Y</c>/<c>-y</c> watchdog, or <see langword="null" />.</param>
+    /// <param name="maxTimeWatchdog">The attempt's <c>-m</c> watchdog, or <see langword="null" />.</param>
+    /// <returns>The token the context carries.</returns>
+    private static CancellationToken TokenOf(CancellationToken abortToken, LowSpeedWatchdog? lowSpeedWatchdog, MaxTimeWatchdog? maxTimeWatchdog)
+    {
+        CancellationToken[] cancellable = [.. new[] { abortToken, lowSpeedWatchdog?.Token ?? default, maxTimeWatchdog?.Token ?? default }
+            .Where(token => token.CanBeCanceled)];
+        return cancellable.Length switch
+        {
+            0 => CancellationToken.None,
+            1 => cancellable[0],
+            _ => CancellationTokenSource.CreateLinkedTokenSource(cancellable).Token,
+        };
     }
 
     /// <summary>

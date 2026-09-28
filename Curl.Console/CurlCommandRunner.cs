@@ -2243,7 +2243,8 @@ internal sealed class CurlCommandRunner(
                 progress: Running.Progress,
                 events: transferEventOutput.Events,
                 lowSpeedWatchdog: StartLowSpeedWatchdog(options),
-                abortToken: Running.AbortToken);
+                abortToken: Running.AbortToken,
+                maxTimeWatchdog: StartMaxTimeWatchdog(options));
             TransferResult result = toStandardOutput
                 ? await TransferToStandardOutputAsync(follower, options, createAttemptContext).ConfigureAwait(false)
                 : await FollowRetryingAsync(follower, options, createAttemptContext, options.ResumeFrom, null).ConfigureAwait(false);
@@ -2792,7 +2793,8 @@ internal sealed class CurlCommandRunner(
                         Running.Progress,
                         transferEventOutput.Events,
                         StartLowSpeedWatchdog(options),
-                        Running.AbortToken),
+                        Running.AbortToken,
+                        StartMaxTimeWatchdog(options)),
                     resumeFrom,
                     output)
                 .ConfigureAwait(false);
@@ -2912,19 +2914,32 @@ internal sealed class CurlCommandRunner(
         Running.AttemptLowSpeedWatchdog = LowSpeedWatchdog.StartFromCommandLine(options.SpeedLimit, options.SpeedTimeSeconds, timeProvider);
 
     /// <summary>
-    /// Performs one attempt through <paramref name="follower" /> under the watchdog its context
-    /// was created with, stopping the watchdog when the attempt ends. An attempt the watchdog
-    /// cancelled ends with its exit 28 failure, which <c>--retry</c> counts as transient.
+    /// Starts the <c>-m</c> watchdog for the attempt whose context is being created, on the
+    /// runner's clock, and keeps it for <see cref="FollowWatchingSpeedAsync" /> (ADR-0117): each
+    /// <c>--retry</c> attempt gets a fresh <c>-m</c>, as in curl 8.21.0.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <returns>The started watchdog, or <see langword="null" /> without a positive <c>-m</c>.</returns>
+    private MaxTimeWatchdog? StartMaxTimeWatchdog(CommandLineOptions options) =>
+        Running.AttemptMaxTimeWatchdog = MaxTimeWatchdog.StartFromCommandLine(options.MaxTime, timeProvider);
+
+    /// <summary>
+    /// Performs one attempt through <paramref name="follower" /> under the <c>-Y</c>/<c>-y</c> and
+    /// <c>-m</c> watchdogs its context was created with, stopping both when the attempt ends. An
+    /// attempt either watchdog cancelled ends with that watchdog's exit 28 failure, which
+    /// <c>--retry</c> counts as transient.
     /// </summary>
     /// <param name="follower">Performs the attempt, following redirects under <c>-L</c>.</param>
     /// <param name="context">The attempt's context.</param>
     /// <param name="redirectPolicy">The <c>-L</c> policy.</param>
-    /// <returns>The attempt's result, or the watchdog's failure.</returns>
+    /// <returns>The attempt's result, or a watchdog's failure.</returns>
     private async Task<TransferResult> FollowWatchingSpeedAsync(RedirectFollower follower, TransferContext context, RedirectPolicy redirectPolicy)
     {
         RunningTransferState state = Running;
         using LowSpeedWatchdog? watchdog = state.AttemptLowSpeedWatchdog;
+        using MaxTimeWatchdog? maxTimeWatchdog = state.AttemptMaxTimeWatchdog;
         state.AttemptLowSpeedWatchdog = null;
+        state.AttemptMaxTimeWatchdog = null;
         try
         {
             return await follower.FollowAsync(context, redirectPolicy).ConfigureAwait(false);
@@ -2932,6 +2947,10 @@ internal sealed class CurlCommandRunner(
         catch (OperationCanceledException) when (watchdog is { IsTooSlow: true })
         {
             return watchdog.Failure;
+        }
+        catch (OperationCanceledException) when (maxTimeWatchdog is { HasTimedOut: true })
+        {
+            return maxTimeWatchdog.Failure;
         }
     }
 
