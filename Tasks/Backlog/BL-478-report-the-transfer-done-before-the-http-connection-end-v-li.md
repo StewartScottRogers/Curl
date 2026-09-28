@@ -1,5 +1,5 @@
 ---
-id: BL-477
+id: BL-478
 title: Report the transfer done before the HTTP connection-end -v line
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-477 — Report the transfer done before the HTTP connection-end -v line
+# BL-478 — Report the transfer done before the HTTP connection-end -v line
 
 ## Goal
 
