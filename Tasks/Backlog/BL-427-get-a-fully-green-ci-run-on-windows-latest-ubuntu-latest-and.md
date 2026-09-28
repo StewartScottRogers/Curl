@@ -4,7 +4,7 @@ title: Get a fully green CI run on windows-latest, ubuntu-latest and macos-lates
 priority: High
 assignee: Claude
 pipeline: direct
-depends-on: [BL-418, BL-419, BL-420, BL-421, BL-422, BL-423, BL-424, BL-425, BL-426]
+depends-on: [BL-418, BL-419, BL-420, BL-421, BL-422, BL-423, BL-424, BL-425, BL-426, BL-472, BL-473]
 touches: []
 requirement: none
 created: 2026-09-27
@@ -52,7 +52,17 @@ naming them. When every job is green, record the run ID in `## Log` and finish.
 
 ## Notes
 
+- 2026-09-27: CI run 36376508151 (head 46db192, contains BL-418 to BL-426) passed on
+  windows-latest and failed 4 fast tests on ubuntu-latest and macos-latest, two root causes:
+  the three `RunAsync_TimeCondNotADate*` tests in `Curl.Console.UnitTests` pin only the Windows
+  build's `-z` warnings (off Windows curl adds `Failed to get filetime: No such file or
+  directory` first) -> BL-472; `ReportTlsData_WritesNothing` in `Curl.Output.UnitTests` takes
+  the platform-default TLS backend, which is OpenSSL off Windows -> BL-473. Filed rather than
+  fixed here so this task stays a check, as its Context asks; moved to Backlog (not Blocked)
+  because only other work stands in the way.
+
 ## Log
 
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Backlog. Waiting on BL-472 and BL-473 (last Linux/macOS CI failures in run 36376508151)
