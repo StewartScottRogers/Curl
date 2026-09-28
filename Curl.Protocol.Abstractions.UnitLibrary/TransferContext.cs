@@ -78,6 +78,18 @@ public sealed class TransferContext : ITransferContext
     public bool ListOnly { get; init; }
 
     /// <inheritdoc />
+    public string? FtpPort { get; init; }
+
+    /// <inheritdoc />
+    public bool FtpUseEprt { get; init; } = true;
+
+    /// <inheritdoc />
+    public TransportSecurityLevel SslLevel { get; init; }
+
+    /// <inheritdoc />
+    public bool FtpSslControlOnly { get; init; }
+
+    /// <inheritdoc />
     public IReadOnlyList<string> QuoteCommands { get; init; } = [];
 
     /// <inheritdoc />

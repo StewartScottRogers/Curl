@@ -12,6 +12,57 @@ public sealed class TransferContextTests
     private static readonly CurlUrl AnyUrl = CurlUrl.Parse("tftp://example.com/file");
 
     [TestMethod]
+    public void FtpPort_WhenNotSet_IsNullForPassiveMode()
+    {
+        var context = new TransferContext { Url = AnyUrl, Output = Stream.Null };
+
+        Assert.IsNull(context.FtpPort);
+    }
+
+    [TestMethod]
+    public void FtpUseEprt_WhenNotSet_IsTrue()
+    {
+        var context = new TransferContext { Url = AnyUrl, Output = Stream.Null };
+
+        Assert.IsTrue(context.FtpUseEprt);
+    }
+
+    [TestMethod]
+    public void SslLevel_WhenNotSet_IsNone()
+    {
+        var context = new TransferContext { Url = AnyUrl, Output = Stream.Null };
+
+        Assert.AreEqual(TransportSecurityLevel.None, context.SslLevel);
+    }
+
+    [TestMethod]
+    public void FtpSslControlOnly_WhenNotSet_IsFalse()
+    {
+        var context = new TransferContext { Url = AnyUrl, Output = Stream.Null };
+
+        Assert.IsFalse(context.FtpSslControlOnly);
+    }
+
+    [TestMethod]
+    public void FtpActiveModeAndTlsOptions_WhenSet_ReadBackUnchanged()
+    {
+        var context = new TransferContext
+        {
+            Url = AnyUrl,
+            Output = Stream.Null,
+            FtpPort = "-",
+            FtpUseEprt = false,
+            SslLevel = TransportSecurityLevel.Required,
+            FtpSslControlOnly = true,
+        };
+
+        Assert.AreEqual("-", context.FtpPort);
+        Assert.IsFalse(context.FtpUseEprt);
+        Assert.AreEqual(TransportSecurityLevel.Required, context.SslLevel);
+        Assert.IsTrue(context.FtpSslControlOnly);
+    }
+
+    [TestMethod]
     public void TransferContext_OnlyRequiredMembersSet_ReportsNotGivenForEveryOption()
     {
         using var output = new MemoryStream();

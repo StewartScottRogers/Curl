@@ -226,6 +226,45 @@ public interface ITransferContext
     bool ListOnly { get; }
 
     /// <summary>
+    /// Gets the <c>-P</c>/<c>--ftp-port</c> value verbatim, which makes an FTP transfer use
+    /// active mode; <see langword="null" /> for passive mode, when not given.
+    /// </summary>
+    /// <remarks>
+    /// <c>ftp://</c> is to read it (ADR-0102).
+    /// </remarks>
+    string? FtpPort { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether an active-mode FTP transfer tries <c>EPRT</c> before
+    /// <c>PORT</c>; <see langword="true" /> unless <c>--disable-eprt</c> was given.
+    /// </summary>
+    /// <remarks>
+    /// <c>ftp://</c> is to read it (ADR-0102).
+    /// </remarks>
+    bool FtpUseEprt { get; }
+
+    /// <summary>
+    /// Gets whether a plaintext scheme upgrades to TLS, per <c>--ssl</c>/<c>--ftp-ssl</c>
+    /// (<see cref="TransportSecurityLevel.Try" />) and <c>--ssl-reqd</c>/<c>--ftp-ssl-reqd</c>
+    /// (<see cref="TransportSecurityLevel.Required" />); <see cref="TransportSecurityLevel.None" />
+    /// when neither was given.
+    /// </summary>
+    /// <remarks>
+    /// <c>ftp://</c> is to read it (ADR-0102).
+    /// </remarks>
+    TransportSecurityLevel SslLevel { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether <c>--ftp-ssl-control</c> was given, which secures an
+    /// FTP transfer's control connection only and leaves its data connections in plaintext;
+    /// <see langword="false" /> when not given.
+    /// </summary>
+    /// <remarks>
+    /// <c>ftp://</c> is to read it (ADR-0102).
+    /// </remarks>
+    bool FtpSslControlOnly { get; }
+
+    /// <summary>
     /// Gets every <c>-Q</c>/<c>--quote</c> value, verbatim and in command-line order; empty
     /// when none was given.
     /// </summary>
