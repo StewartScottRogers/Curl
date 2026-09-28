@@ -79,6 +79,11 @@ namespace Curl.Console;
 /// <c>time_*</c> variables are measured with, and the clock <c>%time{format}</c> reads;
 /// <see cref="TimeProvider.System" /> when not given.
 /// </param>
+/// <param name="writeOutTimeDialect">
+/// The C runtime whose <c>strftime</c> a <c>-w</c> <c>%time{format}</c> follows; the composition
+/// passes the platform's (<see cref="CurlComposition.WriteOutTimeDialectFor" />), and
+/// <see cref="WriteOutTimeDialect.WindowsCRuntime" /> is used when not given.
+/// </param>
 /// <param name="outputPaths">
 /// Creates the <c>--create-dirs</c> directories; a <see cref="PhysicalOutputPaths" /> when
 /// not given.
@@ -215,6 +220,7 @@ internal sealed class CurlCommandRunner(
     MultipartFormBodyBuilder? formBodyBuilder = null,
     IWriteOutFileOpener? writeOutFileOpener = null,
     TimeProvider? timeProvider = null,
+    WriteOutTimeDialect writeOutTimeDialect = WriteOutTimeDialect.WindowsCRuntime,
     IOutputPaths? outputPaths = null,
     IDataFileReader? configFileReader = null,
     DefaultConfigFileSearch? defaultConfigFileSearch = null,
@@ -284,6 +290,7 @@ internal sealed class CurlCommandRunner(
     private readonly WriteOutTemplateRenderer writeOutRenderer = new(
         writeOutFileOpener ?? new RefusingWriteOutFileOpener(),
         writesLineFeedAsCrLf: false,
+        writeOutTimeDialect,
         timeProvider ?? TimeProvider.System);
 
     /// <summary>

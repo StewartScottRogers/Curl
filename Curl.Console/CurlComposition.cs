@@ -4,6 +4,7 @@ using Curl.Cli;
 using Curl.Core;
 using Curl.Core.FileSystem;
 using Curl.Networking;
+using Curl.Output;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Dict;
 using Curl.Protocol.File;
@@ -225,6 +226,7 @@ internal static class CurlComposition
             writesProgressMeter: true,
             standardOutputIsTerminal,
             writeOutFileOpener: new DiskWriteOutFileOpener(writesLineFeedAsCrLf: OperatingSystem.IsWindows()),
+            writeOutTimeDialect: WriteOutTimeDialectFor(OperatingSystem.IsWindows()),
             outputPaths: new PhysicalOutputPaths(),
             defaultConfigFileSearch: DefaultConfigFileSearch.ForProcess,
             readEnvironmentVariable: name => Environment.GetEnvironmentVariable(name));
@@ -259,7 +261,18 @@ internal static class CurlComposition
             standardError,
             standardInput,
             OperatingSystem.IsWindows(),
+            writeOutTimeDialect: WriteOutTimeDialectFor(OperatingSystem.IsWindows()),
             outputPaths: new PhysicalOutputPaths());
+
+    /// <summary>
+    /// The C runtime whose <c>strftime</c> a <c>-w</c> <c>%time{format}</c> follows on the
+    /// platform: the Windows one, as the Windows curl 8.21.0 (mingw, Schannel) prints it, or
+    /// glibc, as the Linux curl 8.21.0 does and the macOS build is matched to (ADR-0078).
+    /// </summary>
+    /// <param name="runsOnWindows">Whether the process runs on Windows.</param>
+    /// <returns><see cref="WriteOutTimeDialect.WindowsCRuntime" /> on Windows, otherwise <see cref="WriteOutTimeDialect.Glibc" />.</returns>
+    internal static WriteOutTimeDialect WriteOutTimeDialectFor(bool runsOnWindows) =>
+        runsOnWindows ? WriteOutTimeDialect.WindowsCRuntime : WriteOutTimeDialect.Glibc;
 
     /// <summary>
     /// Creates the dispatcher over the production handler set, connecting the TCP protocols

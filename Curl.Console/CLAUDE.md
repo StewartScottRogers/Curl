@@ -193,7 +193,9 @@ in curl. No `** Resuming` line is written under `-#` (ADR-0082, BL-132 Notes).
 
 With `-w`, each transfer's template is rendered by `Curl.Output`'s `WriteOutTemplateRenderer`
 after its failure lines, after a failure as after a success (a `-D` or resumed `-o` file that
-cannot be opened included), with `TransferWriteOutVariables` as its values. On Windows the
+cannot be opened included), with `TransferWriteOutVariables` as its values. Its `%time{format}`
+follows the `WriteOutTimeDialect` the runner is given: `CurlComposition.WriteOutTimeDialectFor`
+passes `WindowsCRuntime` on Windows and `Glibc` elsewhere (ADR-0078, BL-387). On Windows the
 line feeds it writes to standard error, and to standard output while curl's standard output
 would still be in text mode, go through `LineFeedToCrLfStream` as CR LF (ADR-0081).
 `%output{file}` targets go through the runner's `IWriteOutFileOpener`: `CurlComposition`

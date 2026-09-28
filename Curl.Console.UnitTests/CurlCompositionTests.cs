@@ -4,6 +4,7 @@ using System.Text;
 using Curl.Cli;
 using Curl.Core;
 using Curl.Networking;
+using Curl.Output;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Dict;
 using Curl.Protocol.File;
@@ -24,6 +25,14 @@ namespace Curl.Console;
 public sealed class CurlCompositionTests
 {
     private const string ConnectFailure = "Failed to connect to h:2628 after 0 ms: Could not connect to server";
+
+    [TestMethod]
+    [DataRow(true, WriteOutTimeDialect.WindowsCRuntime)]
+    [DataRow(false, WriteOutTimeDialect.Glibc)]
+    public void WriteOutTimeDialectFor_Platform_IsThatPlatformsCRuntime(bool runsOnWindows, WriteOutTimeDialect expected)
+    {
+        Assert.AreEqual(expected, CurlComposition.WriteOutTimeDialectFor(runsOnWindows));
+    }
 
     [TestMethod]
     public void CreateProtocolHandlers_ServesEachSchemeThroughItsHandlerOnce()

@@ -284,6 +284,29 @@ public sealed class CurlCommandRunnerWriteOutTests
         Assert.AreEqual("|http://127.0.0.1:18361/a?q=1", string.Join('|', SentReferers(server)));
     }
 
+    [TestMethod]
+    [DataRow(WriteOutTimeDialect.Glibc, "[2026-09-27]")]
+    [DataRow(WriteOutTimeDialect.WindowsCRuntime, "[]")]
+    public async Task RunAsync_TimeTemplateWithIsoDate_PrintsItInTheDialectTheRunnerWasGiven(WriteOutTimeDialect dialect, string expected)
+    {
+        // glibc's strftime knows %F; the Windows C runtime rejects it, so the whole %time{%F} prints nothing (ADR-0078).
+        CurlCommandRunner runner = new(
+            _ => new TransferDispatch(new ProtocolDispatcher([RecordingProtocolHandler.WritingPath("ok")])),
+            outputFiles,
+            outputFiles,
+            standardOutput,
+            standardError,
+            new MemoryStream(),
+            runsOnWindows: false,
+            timeProvider: new FixedUtcClock(new DateTimeOffset(2026, 9, 27, 12, 0, 0, TimeSpan.Zero)),
+            writeOutTimeDialect: dialect);
+
+        int exitCode = await runner.RunAsync(["-s", "-o", "out.txt", "-w", "[%time{%F}]", "ok://h/x"]);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(expected, StandardOutputText);
+    }
+
     private static IEnumerable<string> RedirectResponses(int count) =>
         Enumerable.Range(0, count).Select(index => $"HTTP/1.1 302 Found\r\nLocation: /{(char)('b' + index)}\r\nContent-Length: 0\r\n\r\n");
 
@@ -341,6 +364,14 @@ public sealed class CurlCommandRunnerWriteOutTests
                 writeOutFileOpener: opener,
                 timeProvider: TimeProvider.System)
             .RunAsync(arguments);
+
+    /// <summary>A clock stopped at one instant, in a UTC local time zone.</summary>
+    private sealed class FixedUtcClock(DateTimeOffset now) : TimeProvider
+    {
+        public override TimeZoneInfo LocalTimeZone => TimeZoneInfo.Utc;
+
+        public override DateTimeOffset GetUtcNow() => now;
+    }
 
     /// <summary>Opens every <c>%output{…}</c> file as one memory stream, kept for reading.</summary>
     private sealed class MemoryOpener : IWriteOutFileOpener

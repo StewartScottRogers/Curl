@@ -25,7 +25,7 @@ public sealed class DiskWriteOutFileOpenerTests
     {
         string file = Path.Combine(root, "o3.txt");
         File.WriteAllText(file, "old contents");
-        WriteOutTemplateRenderer renderer = new(new DiskWriteOutFileOpener(writesLineFeedAsCrLf: true), false, TimeProvider.System);
+        WriteOutTemplateRenderer renderer = new(new DiskWriteOutFileOpener(writesLineFeedAsCrLf: true), false, WriteOutTimeDialect.WindowsCRuntime, TimeProvider.System);
 
         await renderer.RenderAsync(
             $"%output{{{file}}}F\nG%output{{>>{file}}}H\n",
