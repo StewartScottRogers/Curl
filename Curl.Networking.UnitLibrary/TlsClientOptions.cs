@@ -75,6 +75,19 @@ namespace Curl.Networking;
 /// such as one from a private CA with no revocation endpoint, fails with exit 60, as
 /// ADR-0086 decides. The OpenSSL build never checks, so ignores it.
 /// </param>
+/// <param name="RevocationCheckBestEffort">
+/// <see langword="true" /> for curl's <c>--ssl-revoke-best-effort</c>: the Schannel build
+/// still checks revocation, but accepts a chain whose only faults are an unknown or offline
+/// revocation status (<see cref="System.Security.Cryptography.X509Certificates.X509ChainStatusFlags.RevocationStatusUnknown" />,
+/// <see cref="System.Security.Cryptography.X509Certificates.X509ChainStatusFlags.OfflineRevocation" />),
+/// as curl 8.21.0 does (measured, BL-490). The OpenSSL build never checks, so ignores it.
+/// </param>
+/// <param name="UseAlpn">
+/// <see langword="true" />, curl's default, to offer in the handshake's ALPN extension the
+/// application protocols the connection asks for; <see langword="false" /> for curl's
+/// <c>--no-alpn</c>, which sends no ALPN extension, so curl's <c>-v</c> prints no
+/// <c>ALPN:</c> line (measured, BL-490).
+/// </param>
 public sealed record TlsClientOptions(
     bool Insecure = false,
     TlsMinimumVersion MinimumVersion = TlsMinimumVersion.SystemDefault,
@@ -87,4 +100,6 @@ public sealed record TlsClientOptions(
     string? CertificateType = null,
     string? PrivateKeyType = null,
     string? Passphrase = null,
-    bool SkipRevocationCheck = false);
+    bool SkipRevocationCheck = false,
+    bool RevocationCheckBestEffort = false,
+    bool UseAlpn = true);

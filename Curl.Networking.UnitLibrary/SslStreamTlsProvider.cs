@@ -218,7 +218,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider
     /// whether its chain verified, <see cref="TlsHandshakeEvent.CertificateVerifyResult" /> as
     /// <see cref="OpenSslVerifyResult" /> maps it, and
     /// <see cref="TlsHandshakeEvent.PeerCertificateChain" />: the verified chain when the chain
-    /// verified, else what the server sent. No ALPN is offered, and
+    /// verified, else what the server sent. This overload offers no ALPN, and
     /// <see cref="SslStream" /> exposes neither the key-exchange group nor the peer's signature
     /// type, so those stay <see langword="null" /> (ADR-0085).
     /// </remarks>
@@ -267,17 +267,48 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider
     /// </param>
     /// <param name="cancellationToken">Cancels the handshake.</param>
     /// <returns>The same result the three-argument overload describes.</returns>
+    public ValueTask<ConnectResult> AuthenticateAsClientAsync(
+        IConnection plaintext,
+        string targetHost,
+        ITransferEvents events,
+        bool isProxy,
+        CancellationToken cancellationToken) =>
+        AuthenticateAsClientAsync(plaintext, targetHost, events, isProxy, [], cancellationToken);
+
+    /// <summary>
+    /// Performs the client handshake as
+    /// <see cref="AuthenticateAsClientAsync(IConnection, string, ITransferEvents, bool, CancellationToken)" />
+    /// does, offering <paramref name="applicationProtocols" /> through ALPN unless
+    /// <see cref="TlsClientOptions.UseAlpn" /> is off (<c>--no-alpn</c>), in which case the
+    /// handshake carries no ALPN extension (BL-490).
+    /// </summary>
+    /// <remarks>
+    /// The <see cref="TlsHandshakeEvent" /> names what was offered and what the server
+    /// selected, <see langword="null" /> when it selected nothing, so <c>-v</c> prints curl's
+    /// <c>ALPN:</c> lines, and none when nothing was offered.
+    /// </remarks>
+    /// <param name="plaintext">The connection to upgrade; ownership transfers to the provider.</param>
+    /// <param name="targetHost">The host name to validate the server certificate against.</param>
+    /// <param name="events">Where the trust and the completed handshake are reported.</param>
+    /// <param name="isProxy">
+    /// <see langword="true" /> when the handshake is with an HTTPS proxy rather than the origin.
+    /// </param>
+    /// <param name="applicationProtocols">The protocols to offer through ALPN, in preference order.</param>
+    /// <param name="cancellationToken">Cancels the handshake.</param>
+    /// <returns>The same result the three-argument overload describes.</returns>
     public async ValueTask<ConnectResult> AuthenticateAsClientAsync(
         IConnection plaintext,
         string targetHost,
         ITransferEvents events,
         bool isProxy,
+        IReadOnlyList<string> applicationProtocols,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(events);
         ArgumentNullException.ThrowIfNull(plaintext);
         ArgumentException.ThrowIfNullOrWhiteSpace(targetHost);
 
+        var offeredApplicationProtocols = OfferedApplicationProtocols(applicationProtocols);
         var (cipherSuitesPolicy, cipherFailure) = CreateCipherSuitesPolicy();
         if (cipherFailure is not null)
         {
@@ -316,11 +347,12 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider
             CertificateChainPolicy = chainPolicy,
             LocalCertificateSelectionCallback = ToCertificateSelection(clientCertificate),
             CipherSuitesPolicy = cipherSuitesPolicy,
+            ApplicationProtocols = ToSslApplicationProtocols(offeredApplicationProtocols),
             RemoteCertificateValidationCallback = (_, certificate, chain, errors) =>
             {
                 peerCertificates = ListPeerCertificates(certificate, chain);
                 var anchoredErrors = WithTheNameCheckCurlRuns(
-                    WithoutChainErrorsWhenAnchored(errors, chain, anchorsBesideSystemStore), chain, targetHost);
+                    WithoutChainErrorsCurlTolerates(errors, chain, anchorsBesideSystemStore), chain, targetHost);
                 peerVerification = ObservePeerVerification(anchoredErrors, chain, peerCertificates);
                 verificationFailure = VerifyPeer(anchoredErrors, chain, targetHost, []);
                 return verificationFailure is null;
@@ -333,7 +365,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider
         {
             var handshakeStarted = _timeProvider.GetTimestamp();
             await AuthenticateSslStreamAsClientAsync(sslStream, authenticationOptions, cancellationToken).ConfigureAwait(false);
-            events.ReportTlsHandshake(DescribeHandshake(sslStream, peerVerification) with
+            events.ReportTlsHandshake(DescribeHandshake(sslStream, peerVerification, offeredApplicationProtocols) with
             {
                 IsProxy = isProxy,
                 VerifiedHostName = VerifiedHostName(targetHost, _options.Insecure),
@@ -384,7 +416,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider
         }
 
         errors = WithTheNameCheckCurlRuns(
-            WithoutChainErrorsWhenAnchored(errors, chain, anchorsBesideSystemStore), chain, targetHost);
+            WithoutChainErrorsCurlTolerates(errors, chain, anchorsBesideSystemStore), chain, targetHost);
         if (errors == SslPolicyErrors.None)
         {
             return null;
@@ -438,14 +470,37 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider
     }
 
     // The chain's errors do not count when it leads to a --capath root trusted beside the
-    // system store.
-    private static SslPolicyErrors WithoutChainErrorsWhenAnchored(
+    // system store, or when --ssl-revoke-best-effort tolerates every one of them.
+    private SslPolicyErrors WithoutChainErrorsCurlTolerates(
         SslPolicyErrors errors,
         X509Chain? chain,
         X509Certificate2Collection anchorsBesideSystemStore) =>
-        ChainLeadsToAnyOf(chain, anchorsBesideSystemStore)
+        ChainLeadsToAnyOf(chain, anchorsBesideSystemStore) || RevocationBestEffortTolerates(chain)
             ? errors & ~SslPolicyErrors.RemoteCertificateChainErrors
             : errors;
+
+    // curl's Schannel build, under --ssl-revoke-best-effort, masks CERT_TRUST_REVOCATION_STATUS_UNKNOWN
+    // and CERT_TRUST_IS_OFFLINE_REVOCATION out of the chain's trust errors (measured, BL-490).
+    private bool RevocationBestEffortTolerates(X509Chain? chain) =>
+        _matchesSchannelBuild
+        && _options.RevocationCheckBestEffort
+        && chain is not null
+        && HasOnlyUnavailableRevocationStatus(chain.ChainStatus);
+
+    /// <summary>
+    /// Returns whether a chain's faults are all ones <c>--ssl-revoke-best-effort</c> tolerates:
+    /// its revocation status is unknown or could not be fetched, and nothing else is wrong.
+    /// </summary>
+    /// <param name="chainStatus">The chain's <see cref="X509Chain.ChainStatus" />.</param>
+    /// <returns>
+    /// <see langword="true" /> when there is at least one fault and every fault is
+    /// <see cref="X509ChainStatusFlags.RevocationStatusUnknown" /> or
+    /// <see cref="X509ChainStatusFlags.OfflineRevocation" />.
+    /// </returns>
+    internal static bool HasOnlyUnavailableRevocationStatus(X509ChainStatus[] chainStatus) =>
+        chainStatus.Length > 0
+        && chainStatus.All(status =>
+            (status.Status & ~(X509ChainStatusFlags.RevocationStatusUnknown | X509ChainStatusFlags.OfflineRevocation)) == 0);
 
     // Where curl's name check and .NET's disagree, the build curl's answer stands.
     private SslPolicyErrors WithTheNameCheckCurlRuns(SslPolicyErrors errors, X509Chain? chain, string targetHost) =>
@@ -499,17 +554,51 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider
         return [.. elements];
     }
 
-    private static TlsHandshakeEvent DescribeHandshake(SslStream sslStream, PeerVerification peerVerification) => new()
+    private static TlsHandshakeEvent DescribeHandshake(
+        SslStream sslStream,
+        PeerVerification peerVerification,
+        IReadOnlyList<string> offeredApplicationProtocols) => new()
+        {
+            ProtocolVersion = sslStream.SslProtocol,
+            CipherSuite = sslStream.NegotiatedCipherSuite,
+            NegotiatedApplicationProtocol = NegotiatedApplicationProtocol(sslStream.NegotiatedApplicationProtocol),
+            OfferedApplicationProtocols = offeredApplicationProtocols,
+            ServerCertificate = sslStream.RemoteCertificate as X509Certificate2,
+            CertificateVerified = peerVerification.Verified,
+            CertificateVerifyResult = peerVerification.VerifyResult,
+            PeerCertificateChain = [.. peerVerification.Chain.Select(der => X509CertificateLoader.LoadCertificate(der.Span))],
+        };
+
+    /// <summary>
+    /// Names the protocol the server selected through ALPN, as curl's <c>ALPN: server accepted</c>
+    /// line names it.
+    /// </summary>
+    /// <param name="negotiated">What <see cref="SslStream.NegotiatedApplicationProtocol" /> returned.</param>
+    /// <returns>The protocol's name, or <see langword="null" /> when the server selected none.</returns>
+    internal static string? NegotiatedApplicationProtocol(SslApplicationProtocol negotiated) =>
+        negotiated.Protocol.IsEmpty ? null : negotiated.ToString();
+
+    /// <summary>
+    /// Turns the protocols to offer through ALPN into the list
+    /// <see cref="SslClientAuthenticationOptions.ApplicationProtocols" /> takes.
+    /// </summary>
+    /// <param name="applicationProtocols">The protocols, in preference order.</param>
+    /// <returns>
+    /// <see langword="null" />, which sends no ALPN extension, when there are none; otherwise
+    /// the protocols in the same order.
+    /// </returns>
+    internal static List<SslApplicationProtocol>? ToSslApplicationProtocols(IReadOnlyList<string> applicationProtocols) =>
+        applicationProtocols.Count == 0
+            ? null
+            : [.. applicationProtocols.Select(protocol => new SslApplicationProtocol(protocol))];
+
+    // What the handshake offers through ALPN: the connection's protocols, or none under --no-alpn.
+    private IReadOnlyList<string> OfferedApplicationProtocols(IReadOnlyList<string> applicationProtocols)
     {
-        ProtocolVersion = sslStream.SslProtocol,
-        CipherSuite = sslStream.NegotiatedCipherSuite,
-        NegotiatedApplicationProtocol = null,
-        OfferedApplicationProtocols = [],
-        ServerCertificate = sslStream.RemoteCertificate as X509Certificate2,
-        CertificateVerified = peerVerification.Verified,
-        CertificateVerifyResult = peerVerification.VerifyResult,
-        PeerCertificateChain = [.. peerVerification.Chain.Select(der => X509CertificateLoader.LoadCertificate(der.Span))],
-    };
+        ArgumentNullException.ThrowIfNull(applicationProtocols);
+
+        return _options.UseAlpn ? applicationProtocols : [];
+    }
 
     private TlsTrustEvent DescribeTrust() => new()
     {

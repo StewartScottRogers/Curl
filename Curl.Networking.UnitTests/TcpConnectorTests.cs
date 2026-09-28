@@ -181,6 +181,36 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_ToAnHttpsTargetTheHttpHandlerPools_OffersHttp11ThroughAlpn()
+    {
+        // curl -v -k https://127.0.0.1:P/ says ALPN: curl offers http/1.1 (8.21.0 Schannel, measured, BL-490).
+        var tlsProvider = new FakeTlsProvider();
+        var connector = CreateConnector(
+            new FakeDnsResolver(Loopback),
+            new FakeTcpDialer { DialOutcome = _ => new FakeConnection() },
+            tlsProvider);
+
+        await connector.ConnectAsync(new ConnectTarget("example.com", 443, UseTls: true) { PoolScheme = "https" }, CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { "http/1.1" }, Assert.ContainsSingle(tlsProvider.ReceivedApplicationProtocols).ToArray());
+    }
+
+    [TestMethod]
+    [DataRow("https", false, "http/1.1")]
+    [DataRow("HTTPS", false, "http/1.1")]
+    [DataRow("https", true, null)]
+    [DataRow("http", false, null)]
+    [DataRow(null, false, null)]
+    public void ApplicationProtocolsFor_OffersHttp11OnlyForHttpOverTlsToTheOrigin(string? poolScheme, bool isForwardProxy, string? expected)
+    {
+        var target = new ConnectTarget("example.com", 443, UseTls: true) { PoolScheme = poolScheme, IsForwardProxy = isForwardProxy };
+
+        CollectionAssert.AreEqual(
+            expected is null ? Array.Empty<string>() : new[] { expected },
+            TcpConnector.ApplicationProtocolsFor(target).ToArray());
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_ToAnHttpsForwardProxy_ReportsItsHandshakeAsTheProxys()
     {
         // curl -sv --proxy-insecure -x https://proxy http://example.test/ says Proxy certificate:
