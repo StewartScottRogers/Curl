@@ -31,3 +31,4 @@ BL-131 draws the status lines as the handler reports bytes (`Curl.Console/Transf
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
