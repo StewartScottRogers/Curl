@@ -35,3 +35,4 @@ The SSH transport in `Curl.Protocol.Ssh.UnitLibrary` sends its identification st
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
