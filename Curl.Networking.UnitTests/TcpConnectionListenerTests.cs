@@ -111,11 +111,13 @@ public sealed class TcpConnectionListenerTests
     }
 
     [TestMethod]
-    public async Task ListenAsync_OnAnAddressThatIsNotLocal_FailsWithFtpPortFailedAndTheBindReason()
+    public async Task ListenAsync_OnAnAddressThatIsNotLocal_FailsWithTheNonLocalBindLineForTheHandlerToRetry()
     {
-        // curl 8.21.0's lib/ftp.c, ftp_port_bind_socket: an error other than EADDRINUSE or
-        // EACCES is failf(data, "bind(port=%hu) failed: %s", ...) -> CURLE_FTP_PORT_FAILED.
-        // 192.0.2.1 is TEST-NET-1 (RFC 5737), never a local address.
+        // curl 8.21.0 -v -P 192.0.2.1 ftp://127.0.0.1:47464/f.txt (Schannel, measured
+        // 2026-09-27 with Record-CurlExchange.ps1 -Ftp, BL-464) prints
+        // "* bind(port=0) on non-local address failed: Address not available" and binds again
+        // on the control connection's address; the listener reports that line and the FTP
+        // handler retries (ADR-0107). 192.0.2.1 is TEST-NET-1 (RFC 5737), never local.
         var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         var expected = Assert.ThrowsExactly<SocketException>(() => socket.Bind(new IPEndPoint(IPAddress.Parse("192.0.2.1"), 0)));
         socket.Dispose();
@@ -123,10 +125,45 @@ public sealed class TcpConnectionListenerTests
         var listened = await new TcpConnectionListener().ListenAsync(
             new ListenTarget(IPAddress.Parse("192.0.2.1"), 0, 5), CancellationToken.None);
 
+        Assert.AreEqual(SocketError.AddressNotAvailable, expected.SocketErrorCode);
         Assert.AreEqual(CurlExitCode.FtpPortFailed, listened.ExitCode);
         Assert.AreEqual(
-            "bind(port=0) failed: " + ConnectFailureReason.Describe(expected, OperatingSystem.IsWindows()),
+            "bind(port=0) on non-local address failed: " + ConnectFailureReason.Describe(expected, OperatingSystem.IsWindows()),
             listened.ErrorMessage);
+        Assert.IsNull(listened.PendingConnection);
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task ListenAsync_OnAnAddressThatIsNotLocal_OnWindows_GivesCurlsWinsockWording()
+    {
+        var listened = await new TcpConnectionListener().ListenAsync(
+            new ListenTarget(IPAddress.Parse("192.0.2.1"), 0, 0), CancellationToken.None);
+
+        Assert.AreEqual("bind(port=0) on non-local address failed: Address not available", listened.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ListenAsync_WhenTheBindFailsForAnotherReason_FailsWithFtpPortFailedAndTheBindReason()
+    {
+        // curl 8.21.0's lib/ftp.c, ftp_port_bind_socket: an error other than EADDRNOTAVAIL,
+        // EADDRINUSE or EACCES is failf(data, "bind(port=%hu) failed: %s", ...) -> exit 30.
+        // Binding a socket that is already bound fails with EINVAL.
+        var listener = new TcpConnectionListener
+        {
+            OpenSocket = family =>
+            {
+                var bound = new Socket(family, SocketType.Stream, ProtocolType.Tcp);
+                bound.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+                return bound;
+            },
+        };
+
+        var listened = await listener.ListenAsync(new ListenTarget(IPAddress.Loopback, 0, 0), CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.FtpPortFailed, listened.ExitCode);
+        StringAssert.StartsWith(listened.ErrorMessage, "bind(port=0) failed: ");
+        Assert.IsNull(listened.PendingConnection);
     }
 
     [TestMethod]
@@ -180,11 +217,18 @@ public sealed class TcpConnectionListenerTests
     }
 
     [TestMethod]
-    [DataRow(SocketError.AddressAlreadyInUse, true)]
-    [DataRow(SocketError.AccessDenied, true)]
-    [DataRow(SocketError.AddressNotAvailable, false)]
-    public void MovesOnToTheNextPort_MovesOnOnlyForAPortInUseOrNotPermitted(SocketError error, bool expected)
+    [DataRow(SocketError.AddressAlreadyInUse, null)]
+    [DataRow(SocketError.AccessDenied, null)]
+    [DataRow(SocketError.AddressNotAvailable, "bind(port=40000) on non-local address failed: ")]
+    [DataRow(SocketError.InvalidArgument, "bind(port=40000) failed: ")]
+    public void BindFailureMessage_MovesOnForAPortInUseOrNotPermittedAndTellsANonLocalAddressApart(SocketError error, string? expectedBeforeReason)
     {
-        Assert.AreEqual(expected, TcpConnectionListener.MovesOnToTheNextPort(error));
+        var exception = new SocketException((int)error);
+
+        var message = TcpConnectionListener.BindFailureMessage(exception, 40000);
+
+        Assert.AreEqual(
+            expectedBeforeReason is null ? null : expectedBeforeReason + ConnectFailureReason.Describe(exception, OperatingSystem.IsWindows()),
+            message);
     }
 }

@@ -13,7 +13,9 @@ namespace Curl.Networking;
 /// <remarks>
 /// Every failure is curl 8.21.0's exit 30 with the message its <c>lib/ftp.c</c> prints: a port
 /// that is in use or not permitted moves on to the next one, and when the range runs out it is
-/// <c>bind() failed, ran out of ports</c> (measured with a held port, BL-456); any other bind
+/// <c>bind() failed, ran out of ports</c> (measured with a held port, BL-456); an address that
+/// is not local is <c>bind(port=&lt;port&gt;) on non-local address failed: &lt;reason&gt;</c>,
+/// which the FTP handler retries on the control connection's address (BL-464); any other bind
 /// error is <c>bind(port=&lt;port&gt;) failed: &lt;reason&gt;</c>, and a socket that cannot be
 /// opened or put to listening is <c>socket failure: &lt;reason&gt;</c>. The reason is worded by
 /// <see cref="ConnectFailureReason" />, as curl's <c>curlx_strerror</c> words it.
@@ -43,13 +45,22 @@ public sealed class TcpConnectionListener : IConnectionListener
     }
 
     /// <summary>
-    /// Gets a value indicating whether curl moves on to the next port after a bind fails with
-    /// <paramref name="error" />: only when the port is in use or not permitted.
+    /// Gives curl's message for a bind that failed with <paramref name="exception" />: none when
+    /// the next port is tried; for an address that is not local (<c>EADDRNOTAVAIL</c>) the line
+    /// curl 8.21.0 prints with <c>-v</c> before it binds on the control connection's address,
+    /// <c>bind(port=N) on non-local address failed: reason</c>, which the FTP handler tells
+    /// apart and retries on (ADR-0107); otherwise <c>bind(port=N) failed: reason</c>.
     /// </summary>
-    /// <param name="error">The bind's error.</param>
-    /// <returns><see langword="true" /> for <c>EADDRINUSE</c> and <c>EACCES</c>.</returns>
-    internal static bool MovesOnToTheNextPort(SocketError error) =>
-        error == SocketError.AddressAlreadyInUse || error == SocketError.AccessDenied;
+    /// <param name="exception">The failed bind.</param>
+    /// <param name="port">The port it tried.</param>
+    /// <returns>The message, or <see langword="null" /> to move on to the next port.</returns>
+    internal static string? BindFailureMessage(SocketException exception, int port) =>
+        exception.SocketErrorCode switch
+        {
+            SocketError.AddressAlreadyInUse or SocketError.AccessDenied => null,
+            SocketError.AddressNotAvailable => $"bind(port={port}) on non-local address failed: {Reason(exception)}",
+            _ => $"bind(port={port}) failed: {Reason(exception)}",
+        };
 
     private static string Reason(SocketException exception) =>
         ConnectFailureReason.Describe(exception, OperatingSystem.IsWindows());
@@ -100,9 +111,7 @@ public sealed class TcpConnectionListener : IConnectionListener
         catch (SocketException exception)
         {
             socket.Dispose();
-            return (null, MovesOnToTheNextPort(exception.SocketErrorCode)
-                ? null
-                : $"bind(port={endPoint.Port}) failed: {Reason(exception)}");
+            return (null, BindFailureMessage(exception, endPoint.Port));
         }
 
         try

@@ -107,10 +107,12 @@ which cuts it to 255 characters as curl's 256-byte error buffer does (ADR-0072).
 `ListenTarget` address on each port of its range in turn and listens on the first it can bind.
 Every failure is exit 30 with curl 8.21.0's `lib/ftp.c` message: a port in use or not permitted
 moves on to the next, and a range with no free port is `bind() failed, ran out of ports`
-(measured); any other bind error is `bind(port=<port>) failed: <reason>`, and a socket that
-cannot be opened or put to listening is `socket failure: <reason>`, reached in tests through the
-internal `OpenSocket` and `StartListening` seams. curl's retry on the control connection's
-address after a non-local `-P` address is not here: the target holds one address.
+(measured); an address that is not local (`EADDRNOTAVAIL`) is
+`bind(port=<port>) on non-local address failed: <reason>`, the `-v` line curl prints before it
+binds again on the control connection's address, which the FTP handler tells apart and retries
+on (ADR-0107, BL-464); any other bind error is `bind(port=<port>) failed: <reason>`, and a socket
+that cannot be opened or put to listening is `socket failure: <reason>`, reached in tests through
+the internal `OpenSocket` and `StartListening` seams.
 `TcpPendingConnection.AcceptAsync` returns the accepted socket as a `StreamConnection`; a failed
 accept is exit 10, `Error accept()ing server connect: <reason>`, as curl's `lib/cf-socket.c`
 words it. Every `<reason>` is `ConnectFailureReason`'s. Every TCP connection reports
