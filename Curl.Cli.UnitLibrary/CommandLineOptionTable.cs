@@ -104,6 +104,9 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("negotiate", null, (options, on) => options.WantAuthScheme(HttpAuthSchemes.Negotiate, on)),
         CommandLineOption.Flag("anyauth", null, options => options.WantEveryAuthScheme()),
         CommandLineOption.Text("oauth2-bearer", null, (options, token) => options.SetBearerToken(token)),
+        CommandLineOption.NegatableFlag("netrc", 'n', (options, on) => options.NetrcRequested = on),
+        CommandLineOption.NegatableFlag("netrc-optional", null, (options, on) => options.NetrcOptionalRequested = on),
+        CommandLineOption.Value("netrc-file", null, SettingExistingFile("--netrc-file", (options, file) => options.NetrcFile = file)),
         CommandLineOption.Value("proxy", 'x', AcceptingEmpty((options, proxy) => options.SetProxy(proxy, ProxyKind.Http))),
         CommandLineOption.Text("socks4", null, (options, proxy) => options.SetProxy(proxy, ProxyKind.Socks4)),
         CommandLineOption.Text("socks4a", null, (options, proxy) => options.SetProxy(proxy, ProxyKind.Socks4a)),
@@ -721,9 +724,9 @@ public static class CommandLineOptionTable
     }
 
     /// <summary>
-    /// Records a <c>--cacert</c>, <c>--proxy-cacert</c> or <c>--knownhosts</c> value through
+    /// Records a <c>--cacert</c>, <c>--proxy-cacert</c>, <c>--knownhosts</c> or <c>--netrc-file</c> value through
     /// <paramref name="set"/> when a file or directory exists at it, and otherwise refuses it with curl
-    /// 8.21.0's lines, which name <paramref name="longOption"/> (measured for all three); <c>-s</c> without
+    /// 8.21.0's lines, which name <paramref name="longOption"/> (measured for all four); <c>-s</c> without
     /// <c>-S</c>, read first, hides the first of them. An empty value is checked like any other, so it is
     /// refused as a missing file, not as blank. A directory passes here; curl fails it later. A value that
     /// looks like a flag gets curl's filename warning first, whether or not it exists.

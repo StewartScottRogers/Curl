@@ -31,7 +31,7 @@ public sealed class CommandLineNextGroupTests
         "remote-header-name", "output-dir", "create-dirs", "clobber", "skip-existing", "remove-on-error",
         "write-out", "data", "data-ascii", "data-binary", "data-raw", "data-urlencode", "json", "form",
         "form-string", "get", "url-query", "dump-header", "user", "basic", "digest", "ntlm", "negotiate",
-        "anyauth", "oauth2-bearer", "proxy", "socks4", "socks4a", "socks5", "socks5-hostname", "proxy-user",
+        "anyauth", "oauth2-bearer", "netrc", "netrc-optional", "netrc-file","proxy", "socks4", "socks4a", "socks5", "socks5-hostname", "proxy-user",
         "noproxy", "proxytunnel", "telnet-option", "tftp-blksize", "mail-from", "mail-rcpt", "mail-auth",
         "mail-rcpt-allowfails", "upload-flags", "login-options", "sasl-authzid", "sasl-ir", "resolve", "connect-to", "tftp-no-options",
         "disable-epsv", "epsv", "ftp-skip-pasv-ip", "ftp-method", "ftp-create-dirs", "ftp-port", "ftp-pasv",

@@ -371,6 +371,37 @@ public sealed class CommandLineOptions
     public NetworkCredential? Credentials { get; private set; }
 
     /// <summary>
+    /// <see langword="true"/> when <c>-n</c> / <c>--netrc</c> was given and no <c>--no-netrc</c> came after it.
+    /// Giving it more than once has no extra effect.
+    /// </summary>
+    public bool NetrcRequested { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--netrc-optional</c> was given and no <c>--no-netrc-optional</c> came
+    /// after it. It makes the netrc file optional even beside <c>-n</c> or <c>--netrc-file</c>, which curl
+    /// 8.21.0 accepts in either order although its manual calls them mutually exclusive (measured
+    /// 2026-09-28, BL-504 Notes).
+    /// </summary>
+    public bool NetrcOptionalRequested { get; internal set; }
+
+    /// <summary>
+    /// The <c>--netrc-file</c> value, which curl 8.21.0 requires to exist (a directory passes) when the option
+    /// is read; <see langword="null"/> when not given. The last value wins, and <c>--no-netrc</c> does not
+    /// clear it.
+    /// </summary>
+    public string? NetrcFile { get; internal set; }
+
+    /// <summary>
+    /// Whether the transfer reads a netrc file, as curl 8.21.0 decides it: <see cref="NetrcUse.Optional"/>
+    /// when <see cref="NetrcOptionalRequested"/>, otherwise <see cref="NetrcUse.Required"/> when
+    /// <see cref="NetrcRequested"/> or a <see cref="NetrcFile"/> is named, otherwise <see cref="NetrcUse.Ignored"/>.
+    /// </summary>
+    public NetrcUse NetrcUse =>
+        NetrcOptionalRequested ? NetrcUse.Optional
+        : NetrcRequested || NetrcFile is not null ? NetrcUse.Required
+        : NetrcUse.Ignored;
+
+    /// <summary>
     /// The <c>-U</c> / <c>--proxy-user</c> value split at its first colon into user name and
     /// password, for the proxy; <see langword="null"/> when not given. A user with no password is
     /// asked for as <see cref="Credentials"/> is, with curl 8.21.0's proxy prompt. An empty value is
