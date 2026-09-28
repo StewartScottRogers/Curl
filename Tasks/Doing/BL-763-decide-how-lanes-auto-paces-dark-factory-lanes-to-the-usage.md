@@ -103,3 +103,4 @@ An ADR records how `RunDarkFactory.ps1 -Lanes Auto` chooses how many lanes to ru
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
