@@ -8,7 +8,7 @@ depends-on: [BL-768]
 touches: [RunDarkFactory.ps1, CLAUDE.md]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-28
 ---
 # BL-769 — Document -Lanes Auto as the way to start a dark factory shift
 
@@ -46,15 +46,20 @@ The script header, `CLAUDE.md` and Stewart's memory all say to start shifts with
 
 ## Acceptance criteria
 
-- [ ] `RunDarkFactory.ps1`'s header has an `AUTO LANES (-Lanes Auto)` section naming each item listed in Context. Its first lane `.EXAMPLE` line is the `-Lanes Auto -Continuous` one. `git diff RunDarkFactory.ps1` changes only lines inside the header comment block.
-- [ ] `CLAUDE.md` "Dark factory" contains `RunDarkFactory.cmd -NewTab -Lanes Auto -Continuous` and a sentence describing Auto as above. `Select-String -Path CLAUDE.md -Pattern '-Lanes 3'` finds nothing.
-- [ ] `run-dark-factory-in-herdr.md`, its `MEMORY.md` line and `dark-factory-sizes-lanes-to-plan.md` read as described in Context. No file under that memory folder still recommends `-Lanes 3`.
-- [ ] `[System.Management.Automation.Language.Parser]::ParseFile` reports no errors for `RunDarkFactory.ps1`, and `-TestAutoLanes` still exits 0.
-- [ ] `git diff --stat` shows only `RunDarkFactory.ps1` and `CLAUDE.md` changed outside `Tasks/`.
+- [x] `RunDarkFactory.ps1`'s header has an `AUTO LANES (-Lanes Auto)` section naming each item listed in Context. Its first lane `.EXAMPLE` line is the `-Lanes Auto -Continuous` one. `git diff RunDarkFactory.ps1` changes only lines inside the header comment block.
+- [x] `CLAUDE.md` "Dark factory" contains `RunDarkFactory.cmd -NewTab -Lanes Auto -Continuous` and a sentence describing Auto as above. `Select-String -Path CLAUDE.md -Pattern '-Lanes 3'` finds nothing.
+- [x] `run-dark-factory-in-herdr.md`, its `MEMORY.md` line and `dark-factory-sizes-lanes-to-plan.md` read as described in Context. No file under that memory folder still recommends `-Lanes 3`.
+- [x] `[System.Management.Automation.Language.Parser]::ParseFile` reports no errors for `RunDarkFactory.ps1`, and `-TestAutoLanes` still exits 0.
+- [x] `git diff --stat` shows only `RunDarkFactory.ps1` and `CLAUDE.md` changed outside `Tasks/`.
 
 ## Notes
+
+- BL-768 had already written an `AUTO LANES (-Lanes Auto)` section and put the Auto example in `.EXAMPLE` (after `-TestOutOfTokens`). This run rewrote the section into a start / step / ceilings / change layout so it names every Context item (plan-relative utilization, `-ProbeMachine`, one lane per step, a retiring lane finishing first), reflowed its over-long line, and moved the `-Lanes Auto -Continuous` example to be the first lane example. Code and ADR-0130 agree; nothing differed.
+- Delivered directly rather than through `align-and-document`: the change is comment-only in one script header and one CLAUDE.md paragraph, and needed reading the pace code to state it truly. No `.cs` or project file changed, so the `verify` skill does not apply; the checks were `ParseFile` (0 errors) and `-TestAutoLanes` (exit 0).
+- Memory: `shifts-end-before-tokens-run-out.md` still mentions "3 lanes" as a past measurement, not a recommendation, so it stays.
 
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Doing.
+- 2026-09-28: Doing -> Done. RunDarkFactory.ps1's header and CLAUDE.md describe -Lanes Auto and start shifts with it; memory updated
