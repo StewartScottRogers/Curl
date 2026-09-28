@@ -47,3 +47,4 @@ the decisions BL-405 made, and its Decision section no longer says those lines a
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
