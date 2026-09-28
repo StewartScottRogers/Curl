@@ -78,6 +78,9 @@ connection. A refused or cut-short handshake is exit 97 with curl's message; GSS
 but not implemented, so a proxy that picks it fails with the message the reference build's SSPI
 printed. ADR-0084 records these choices (first address, literals, UTF-8, disposal). Through an HTTPS proxy (`Https`, BL-266) TLS runs to the proxy host first, then the same CONNECT
 over it, then TLS to the target inside that; each handshake failure is the TLS provider's result.
+The handshake to the proxy runs through the proxy's `ITlsProvider` (the `--proxy-*` TLS options,
+ADR-0095), and so does the handshake to an HTTPS forward proxy (`ConnectTarget.IsForwardProxy`
+with `UseTls`), which curl 8.21.0 verifies with `--proxy-insecure` and never `-k` (measured, BL-441).
 
 `TcpConnector` applies `--resolve` through `ResolveOverrides` and `--connect-to` through
 `ConnectToMappings`, both built from the verbatim option values and parsed as curl 8.21.0

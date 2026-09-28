@@ -81,6 +81,40 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    [DataRow(true, "proxy")]
+    [DataRow(false, "target")]
+    public async Task ConnectAsync_WithTls_HandshakesAForwardProxyThroughTheProxyTlsProviderAndATargetThroughTheOther(
+        bool isForwardProxy,
+        string expectedProvider)
+    {
+        // curl -sS -k -x https://127.0.0.1:18441 http://example.com/ against a self-signed proxy -> exit 60,
+        // and with --proxy-insecure in place of -k -> exit 0 (BL-441): a forward proxy is verified
+        // with the proxy's TLS options, never the target's.
+        var proxyTls = new FakeConnection { IsSecure = true };
+        var targetTls = new FakeConnection { IsSecure = true };
+        var proxyTlsProvider = new SequencedTlsProvider(ConnectResult.Connected(proxyTls));
+        var tlsProvider = new SequencedTlsProvider(ConnectResult.Connected(targetTls));
+        var connector = new TcpConnector(
+            new FakeDnsResolver(ProxyAddress),
+            new FakeTcpDialer { DialOutcome = _ => new ScriptedConnection([]) },
+            tlsProvider,
+            new ManualTimeProvider(),
+            proxyTlsProvider: proxyTlsProvider);
+
+        var result = await connector.ConnectAsync(
+            new ConnectTarget("localhost", 18441, UseTls: true) { IsForwardProxy = isForwardProxy },
+            CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        var (usedProvider, unusedProvider, secured) = expectedProvider == "proxy"
+            ? (proxyTlsProvider, tlsProvider, proxyTls)
+            : (tlsProvider, proxyTlsProvider, targetTls);
+        Assert.AreSame(secured, result.Connection);
+        CollectionAssert.AreEqual(new[] { "localhost" }, usedProvider.ReceivedTargetHosts);
+        Assert.IsEmpty(unusedProvider.ReceivedTargetHosts);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_ThroughAnHttpsProxyToAnHttpTarget_ReturnsTheTunnelWithoutASecondHandshake()
     {
         // curl -s -S -o /dev/null --proxy-insecure -p -x https://localhost:18411 http://example.com/

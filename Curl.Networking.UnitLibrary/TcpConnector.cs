@@ -31,7 +31,8 @@ namespace Curl.Networking;
 /// but not the host TLS verifies; <see langword="null" /> for <see cref="ConnectToMappings.None" />.
 /// </param>
 /// <param name="proxyTlsProvider">
-/// Runs the handshake to an HTTPS proxy (<see cref="ProxyKind.Https" />), as curl verifies the
+/// Runs the handshake to an HTTPS proxy, tunnelling (<see cref="ProxyKind.Https" />) or a forward
+/// proxy (<see cref="ConnectTarget.IsForwardProxy" /> with <see cref="ConnectTarget.UseTls" />), as curl verifies the
 /// proxy with the <c>--proxy-*</c> TLS options and the target with <c>-k</c> and <c>--cacert</c>;
 /// <see langword="null" /> for <paramref name="tlsProvider" />.
 /// </param>
@@ -403,13 +404,19 @@ public sealed class TcpConnector(
 
     // A provider that can report its handshake reports it on the target's events (BL-404).
     // The proxy's handshake is not reported: -v would word it as the server's (ADR-0085).
+    // A forward proxy is the target itself, so its handshake runs through the proxy's
+    // provider, as curl 8.21.0 verifies it with --proxy-insecure and not -k (measured, BL-441),
+    // and is reported as a target's is.
     private ValueTask<ConnectResult> AuthenticateTargetAsync(
         IConnection plaintext,
         ConnectTarget target,
-        CancellationToken cancellationToken) =>
-        tlsProvider is IHandshakeReportingTlsProvider reportingProvider
+        CancellationToken cancellationToken)
+    {
+        var provider = target.IsForwardProxy ? _proxyTlsProvider : tlsProvider;
+        return provider is IHandshakeReportingTlsProvider reportingProvider
             ? reportingProvider.AuthenticateAsClientAsync(plaintext, target.Host, target.Events, cancellationToken)
-            : tlsProvider.AuthenticateAsClientAsync(plaintext, target.Host, cancellationToken);
+            : provider.AuthenticateAsClientAsync(plaintext, target.Host, cancellationToken);
+    }
 
     /// <summary>
     /// Dials each address in turn and returns the first connection, or <see langword="null" />
