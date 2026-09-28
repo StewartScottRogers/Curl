@@ -254,6 +254,13 @@ public sealed class CommandLineOptions
     public bool SkipExisting { get; internal set; }
 
     /// <summary>
+    /// <see langword="true"/> when the last of <c>--remove-on-error</c> and <c>--no-remove-on-error</c> was
+    /// <c>--remove-on-error</c>: a transfer that fails removes the <c>-o</c> or <c>-O</c> file it opened, as
+    /// curl 8.21.0 does (BL-494). It cannot be combined with <c>-C</c>/<c>--continue-at</c>.
+    /// </summary>
+    public bool RemoveOnError { get; internal set; }
+
+    /// <summary>
     /// The <c>-w</c> / <c>--write-out</c> template, unexpanded; <see langword="null"/> when not given or
     /// when the last <c>-w @file</c> named an empty file. The last value wins. An <c>@file</c> or
     /// <c>@-</c> value is the file's (or standard input's) text with every carriage return, line feed and

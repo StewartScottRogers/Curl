@@ -202,13 +202,44 @@ public sealed class CommandLineRefusal
     /// </param>
     /// <returns>A refusal of three lines, or two when <paramref name="errorsHidden"/>.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="spelledOption"/> is <see langword="null"/>.</exception>
-    public static CommandLineRefusal ContinueAtExclusiveWithRange(string spelledOption, bool errorsHidden)
+    public static CommandLineRefusal ContinueAtExclusiveWithRange(string spelledOption, bool errorsHidden) =>
+        ContinueAtExclusiveWith("--range", spelledOption, errorsHidden);
+
+    /// <summary>
+    /// Refuses <c>-C</c>/<c>--continue-at</c> and <c>--remove-on-error</c> on one command line,
+    /// naming whichever came second: <c>curl: --continue-at is mutually exclusive with --remove-on-error</c>,
+    /// <c>curl: option &lt;spelled&gt;: is badly used here</c> and the try-help line.
+    /// </summary>
+    /// <remarks>
+    /// Measured with the local curl 8.21.0 on 2026-09-28 (BL-494 Notes): <c>-C -</c> and <c>-C 0</c>
+    /// count as much as <c>-C 5</c>, a <c>--no-remove-on-error</c> after <c>--remove-on-error</c>
+    /// clears it, and the first line is hidden by <c>-s</c> without <c>-S</c> as
+    /// <see cref="ContinueAtExclusiveWithRange"/>'s is.
+    /// </remarks>
+    /// <param name="spelledOption">The whole argument as typed, for whichever option came second.</param>
+    /// <param name="errorsHidden">
+    /// <see langword="true"/> when <c>-s</c> without <c>-S</c> was read before the refused option.
+    /// </param>
+    /// <returns>A refusal of three lines, or two when <paramref name="errorsHidden"/>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="spelledOption"/> is <see langword="null"/>.</exception>
+    public static CommandLineRefusal ContinueAtExclusiveWithRemoveOnError(string spelledOption, bool errorsHidden) =>
+        ContinueAtExclusiveWith("--remove-on-error", spelledOption, errorsHidden);
+
+    /// <summary>
+    /// Refuses <c>-C</c>/<c>--continue-at</c> beside <paramref name="otherOption"/>, as
+    /// <see cref="ContinueAtExclusiveWithRange"/> describes.
+    /// </summary>
+    /// <param name="otherOption">The long option <c>-C</c> cannot be combined with, dashes included.</param>
+    /// <param name="spelledOption">The whole argument as typed, for whichever option came second.</param>
+    /// <param name="errorsHidden"><see langword="true"/> when <c>-s</c> without <c>-S</c> was read before the refused option.</param>
+    /// <returns>A refusal of three lines, or two when <paramref name="errorsHidden"/>.</returns>
+    private static CommandLineRefusal ContinueAtExclusiveWith(string otherOption, string spelledOption, bool errorsHidden)
     {
         ArgumentNullException.ThrowIfNull(spelledOption);
 
         return new CommandLineRefusal(
             CurlExitCode.FailedInit,
-            errorsHidden ? [] : ["curl: --continue-at is mutually exclusive with --range"],
+            errorsHidden ? [] : ["curl: --continue-at is mutually exclusive with " + otherOption],
             spelledOption,
             "is badly used here");
     }
