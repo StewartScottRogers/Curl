@@ -9,8 +9,9 @@
     question in its Reason, and the shift moves on to the next ready task.
 
     The terminal shows a terse, timestamped trace. The same trace goes to
-    logs\DarkFactory-<stamp>.log, and each run's raw stream to logs\<ID>-<stamp>.jsonl
-    (logs\ is gitignored).
+    ..\<repo>.logs\DarkFactory-<stamp>.log (beside the checkout, like the lanes, so it is
+    never in the working tree), and each run's raw stream to <repo>.logs\<ID>-<stamp>.jsonl.
+    A shift moves any logs\ left inside the checkout by an older version out there.
 
     When the shift ends with anything waiting on Stewart - a Blocked task, a Backlog task
     assigned to him, a run that stalled - it fills the screen with a flashing ASCII banner
@@ -44,7 +45,7 @@
       on resuming          the new session has started, and which task it resumed
 
     Lanes survive being stopped. Each lane records its process and the task it holds in
-    logs\lanes-<stamp>\; the coordinator restarts a lane whose process has died (five tries
+    <repo>.logs\lanes-<stamp>\; the coordinator restarts a lane whose process has died (five tries
     each) and the lane resumes its task from the work in its worktree, first integrating
     any finished commits it had not pushed. A new shift adopts a stopped shift's lanes the
     same way instead of refusing to start over their tasks in Doing. A run that dies on
@@ -90,7 +91,7 @@
     Claims and integrations hold ..\<repo>.lanes\integrate.lock, so they happen one at
     a time; runs overlap freely. This window coordinates: it starts the lanes, waits
     for them, pulls the result and raises the alarm once for all of them. Each lane
-    traces to logs\DarkFactory-<stamp>-L<n>.log in this checkout.
+    traces to <repo>.logs\DarkFactory-<stamp>-L<n>.log beside this checkout.
 
 .EXAMPLE
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1
@@ -160,7 +161,9 @@ $Root = if ($LaneDir) { $LaneDir.Trim('"') } else { $PSScriptRoot }
 # Claude Code session that happened to start the shift.
 $env:CLAUDE_PROJECT_DIR = $Root
 $Board = Join-Path $Root '.claude\skills\task-board\task-board.ps1'
-$LogDir = if ($LogRoot) { $LogRoot } else { Join-Path $Root 'logs' }
+# Logs live beside the checkout, like the lanes: Z:\repos\Curl -> Z:\repos\Curl.logs.
+# Lanes are always handed the shift's -LogRoot.
+$LogDir = if ($LogRoot) { $LogRoot } else { "$Root.logs" }
 $Stamp = if ($ShiftStamp) { $ShiftStamp } else { Get-Date -Format 'yyyyMMdd-HHmmss' }
 $LaneTag = if ($Lane) { "-L$Lane" } else { '' }
 $TraceFile = Join-Path $LogDir "DarkFactory-$Stamp$LaneTag.log"
@@ -233,7 +236,7 @@ function Start-Detached {
 function Close-HerdrTab {
     # Closes a herdr tab the factory opened, once nothing in it is worth reading: a tab
     # left behind only says "idle" and looks like a lane that is still working. Its
-    # trace and summary are in logs\ either way. Closing this process's own tab ends it.
+    # trace and summary are in <repo>.logs\ either way. Closing this process's own tab ends it.
     param([string]$Tab, [string]$Why)
     $herdr = Get-HerdrBin
     if (-not $herdr -or -not $Tab) { return }
@@ -301,7 +304,7 @@ function Show-Banner {
     $lines += ''
     $lines += ($Reasons | Select-Object -First 8 | ForEach-Object { '  ' + (Get-Short $_ 74) })
     $lines += ''
-    $lines += '  Press any key to silence.  Trace: logs\' + (Split-Path $TraceFile -Leaf)
+    $lines += '  Press any key to silence.  Trace: ' + $TraceFile
     $lines += ''
     foreach ($l in $lines) { Write-Host ('  ' + $l).PadRight($width) -ForegroundColor $fg -BackgroundColor $bg }
 }
@@ -1276,7 +1279,7 @@ function Write-LaneSummary {
     Set-Content -Path (Join-Path $dir "lane-$Lane.txt") -Value $Lines -Encoding UTF8
 }
 
-# Lane state, in logs\lanes-<stamp>\: lane-<n>.pid (the lane's process, so the coordinator
+# Lane state, in <repo>.logs\lanes-<stamp>\: lane-<n>.pid (the lane's process, so the coordinator
 # can tell a dead lane from a busy one) and lane-<n>.task (the task it holds in Doing, so a
 # restarted lane - or the next shift - resumes it instead of losing it).
 function Get-LaneStatePath {
@@ -1357,6 +1360,20 @@ function Wait-ForTokensByProbe {
 # ---------------------------------------------------------------------------- shift
 
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
+# Logs used to be written to logs\ inside the checkout. Move them beside it, where the
+# next shift looks for the lanes it adopts - but never while a lane still writes there.
+$oldLogDir = Join-Path $Root 'logs'
+if (-not $Lane -and -not $LogRoot -and (Test-Path $oldLogDir)) {
+    # Only the newest shift can still be running; a lane is a powershell process.
+    $newest = Get-ChildItem $oldLogDir -Directory -Filter 'lanes-*' -ErrorAction SilentlyContinue | Sort-Object Name | Select-Object -Last 1
+    $pids = if ($newest) { @(Get-ChildItem $newest.FullName -Filter 'lane-*.pid') } else { @() }
+    $writing = @($pids | Where-Object { $p = "$(Get-Content $_.FullName -TotalCount 1)".Trim(); $p -match '^\d+$' -and (Get-Process -Id ([int]$p) -ErrorAction SilentlyContinue | Where-Object ProcessName -eq 'powershell') })
+    if (-not $writing.Count) {
+        Get-ChildItem $oldLogDir -Force | Move-Item -Destination $LogDir -Force -ErrorAction SilentlyContinue
+        if (-not (Get-ChildItem $oldLogDir -Force -ErrorAction SilentlyContinue)) { Remove-Item $oldLogDir -Force -ErrorAction SilentlyContinue }
+        Write-Trace '-' 'logs' "moved logs\ to $LogDir"
+    }
+}
 $shiftEnd = (Get-Date).AddHours($Hours)
 
 # ------------------------------------------------ coordinator: start lanes, wait, alarm
@@ -1612,7 +1629,7 @@ while ($true) {
     if ($state -eq 'Doing') {
         $why = if ($run.TimedOut) { "timed out after $TaskMinutes min" } else { "run ended in Doing, exit $($run.ExitCode)" }
         Save-StrayChanges $id
-        Invoke-Board @('move', '-Id', $id, '-To', 'Blocked', '-Reason', "Stewart: dark factory $why; see logs\$id-$Stamp$LaneTag.jsonl") | Out-Null
+        Invoke-Board @('move', '-Id', $id, '-To', 'Blocked', '-Reason', "Stewart: dark factory $why; see $(Join-Path $LogDir "$id-$Stamp$LaneTag.jsonl")") | Out-Null
         git -C $Root add -A Tasks 2>&1 | Out-Null
         git -C $Root commit -q -m "chore(tasks): block $id - dark factory $why" 2>&1 | Out-Null
         if (-not $Lane) { git -C $Root push -q 2>&1 | Out-Null }
@@ -1659,7 +1676,7 @@ while ($true) {
 }
 
 Write-Trace '-' 'shift' "end ($stopWhy)  done=$done blocked=$blocked requeued=$requeued stalled=$($stalls.Count)" 'Cyan'
-if ($stopWhy -eq 'runs failing') { $stalls = @('FACTORY STALLED - two runs in a row failed; check logs\') + $stalls }
+if ($stopWhy -eq 'runs failing') { $stalls = @('FACTORY STALLED - two runs in a row failed; check ' + $LogDir) + $stalls }
 
 if ($Lane) {
     # The coordinator raises one alarm for every lane; a lane only reports.
