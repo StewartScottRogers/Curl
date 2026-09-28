@@ -31,7 +31,7 @@ A redirect hop that keeps the `-T` upload carries `ITransferContext.ResumeUpload
 
 - `NextHop` sets `ResumeUploadFromUnknownOffset = !bodyDropped && first.ResumeUploadFromUnknownOffset`, so the flag goes only where the upload goes (a 303 that turns the PUT into a GET drops both). No curl measurement was needed: the change only keeps the first hop's already-pinned `-C - -T` behaviour on a hop that keeps the upload.
 - Pinned by `RedirectFollowerTests.FollowAsync_ResumedUploadFromUnknownOffset_NextHopResumesOnlyWhenUploadKept` (307 and 308 keep it, 303 drops it).
-- `Measure-CodeQuality.ps1`: Curl.Core.UnitLibrary 100% line, 100% branch, 0 failing. Two failing members elsewhere are outside this task: `DiskWriteOutFileOpener.TryOpen` (already BL-432) and `SslStreamTlsProvider.VerifyPeer` at complexity 12 (filed as BL-447).
+- `Measure-CodeQuality.ps1`: Curl.Core.UnitLibrary 100% line, 100% branch, 0 failing. Two failing members elsewhere are outside this task: `DiskWriteOutFileOpener.TryOpen` (already BL-432) and `SslStreamTlsProvider.VerifyPeer` at complexity 12 (filed as BL-448).
 
 ## Log
 

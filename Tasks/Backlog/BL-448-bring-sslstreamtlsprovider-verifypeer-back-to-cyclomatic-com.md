@@ -1,5 +1,5 @@
 ---
-id: BL-447
+id: BL-448
 title: Bring SslStreamTlsProvider.VerifyPeer back to cyclomatic complexity 10 or less
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-447 — Bring SslStreamTlsProvider.VerifyPeer back to cyclomatic complexity 10 or less
+# BL-448 — Bring SslStreamTlsProvider.VerifyPeer back to cyclomatic complexity 10 or less
 
 ## Goal
 
