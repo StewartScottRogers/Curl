@@ -247,6 +247,21 @@ public static class CommandLineWarning
     ];
 
     /// <summary>
+    /// The line curl prints for an option it still accepts but that no longer does anything
+    /// (<c>--sslv2</c>, <c>--metalink</c>, <c>--krb4</c> and the rest of its no-function options):
+    /// <c>Warning: --&lt;name&gt; is deprecated and has no function anymore</c>, naming the long option
+    /// whatever spelling was typed. Measured with each of the nine, <c>-2</c>, <c>-3</c> and
+    /// <c>--no-metalink</c> against a loopback 200 (curl 8.21.0, Windows, 2026-09-28): the warning, then
+    /// the transfer, exit 0; nothing when <c>-s</c> came first.
+    /// </summary>
+    /// <param name="longName">The option's long name without its <c>--</c>.</param>
+    /// <returns>The warning's lines.</returns>
+    internal static IReadOnlyList<string> DeprecatedWithNoFunction(string longName) =>
+    [
+        $"Warning: --{longName} is deprecated and has no function anymore",
+    ];
+
+    /// <summary>
     /// The lines curl prints for a <c>--ftp-method</c> value that is none of <c>multicwd</c>, <c>nocwd</c>
     /// and <c>singlecwd</c> (in any case), after which it uses <c>multicwd</c>:
     /// <c>Warning: unrecognized ftp file method '&lt;value&gt;', using default</c>, wrapped at 79 columns as

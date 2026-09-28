@@ -51,6 +51,9 @@ namespace Curl.Cli;
 /// <c>curl: option &lt;as typed&gt;: the given option cannot be reversed with a --no- prefix</c> and
 /// the try-help line. <c>--no-bogus</c>, <c>--no-</c>, <c>--no-no-silent</c> and <c>--no-Silent</c>
 /// exit 2 as unknown. A short letter is never negated.
+/// <c>--no-metalink</c>, <c>--no-npn</c>, <c>--no-ntlm-wb</c> and <c>--no-false-start</c> print the same
+/// no-function warning as their positive spelling, while <c>--no-sslv2</c> and <c>--no-egd-file</c> are
+/// refused as not reversible (measured 2026-09-28; see <see cref="CommandLineOption.NoFunctionFlag"/>).
 /// </para>
 /// </remarks>
 public static class CommandLineOptionTable
@@ -126,6 +129,14 @@ public static class CommandLineOptionTable
         CommandLineOption.Value("create-file-mode", null, SetCreateFileMode),
         CommandLineOption.NegatableFlag("insecure", 'k', (options, on) => options.Insecure = on),
         CommandLineOption.NegatableFlag("ssl-no-revoke", null, (options, on) => options.SkipRevocationCheck = on),
+        CommandLineOption.NegatableFlag("ssl-revoke-best-effort", null, (options, on) => options.RevocationCheckBestEffort = on),
+        CommandLineOption.NegatableFlag("ssl-allow-beast", null, (options, on) => options.AllowBeast = on),
+        CommandLineOption.NegatableFlag("ca-native", null, (options, on) => options.UseNativeCaStore = on),
+        CommandLineOption.NegatableFlag("alpn", null, (options, on) => options.UseAlpn = on),
+        CommandLineOption.NegatableFlag("sessionid", null, (options, on) => options.ReuseSessionIds = on),
+        CommandLineOption.NegatableFlag("tcp-nodelay", null, (options, on) => options.TcpNoDelay = on),
+        CommandLineOption.NegatableFlag("keepalive", null, (options, on) => options.TcpKeepAlive = on),
+        CommandLineOption.NegatableFlag("styled-output", null, (options, on) => options.StyledOutput = on),
         CommandLineOption.Value("cacert", null, SettingCaCertificateFile("--cacert", (options, file) => options.CaCertificateFile = file)),
         CommandLineOption.FileName("capath", null, (options, directory) => options.CaCertificateDirectory = directory),
         CommandLineOption.NegatableFlag("proxy-insecure", null, (options, on) => options.ProxyInsecure = on),
@@ -195,6 +206,15 @@ public static class CommandLineOptionTable
         CommandLineOption.UnsupportedFlag("http2-prior-knowledge"),
         CommandLineOption.UnsupportedFlag("http3"),
         CommandLineOption.UnsupportedFlag("http3-only"),
+        CommandLineOption.NoFunctionFlag("sslv2", '2', negatable: false),
+        CommandLineOption.NoFunctionFlag("sslv3", '3', negatable: false),
+        CommandLineOption.NoFunctionFlag("metalink", null, negatable: true),
+        CommandLineOption.NoFunctionFlag("npn", null, negatable: true),
+        CommandLineOption.NoFunctionFlag("ntlm-wb", null, negatable: true),
+        CommandLineOption.NoFunctionFlag("false-start", null, negatable: true),
+        CommandLineOption.NoFunctionValue("egd-file"),
+        CommandLineOption.NoFunctionValue("random-file"),
+        CommandLineOption.NoFunctionValue("krb4"),
     ];
 
     /// <summary>The largest <c>--create-file-mode</c> curl 8.21.0 accepts: octal <c>0777</c>.</summary>

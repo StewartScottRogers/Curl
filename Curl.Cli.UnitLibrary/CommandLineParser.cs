@@ -398,12 +398,13 @@ public static class CommandLineParser
 
     /// <summary>
     /// Applies a flag letter of a bundle and says whether the bundle ends there: on a refusal, or
-    /// after <c>-V</c> or <c>-M</c>, which end the bundle as they end the command line (<c>curl -Vo</c> prints the version).
+    /// after <c>-V</c> or <c>-M</c>, which end the bundle as they end the command line (<c>curl -Vo</c> prints the version),
+    /// or after a <see cref="CommandLineOption.EndsBundle"/> letter (<c>curl -2s</c> is <c>-2</c> alone).
     /// </summary>
     private static bool ApplyFlagLetterEndsBundle(CommandLineOptions options, CommandLineOption option, string argument, ArgumentReader reader, out CommandLineRefusal? refusal)
     {
         refusal = option.Apply(options, string.Empty, argument, reader.PathExists, reader.DataFileReader);
-        return refusal is not null || options.InformationRequested;
+        return refusal is not null || options.InformationRequested || option.EndsBundle;
     }
 
     /// <summary>

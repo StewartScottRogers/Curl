@@ -468,6 +468,58 @@ public sealed class CommandLineOptions
     public bool SkipRevocationCheck { get; internal set; }
 
     /// <summary>
+    /// <see langword="true"/> when <c>--ssl-revoke-best-effort</c> was given and no <c>--no-ssl-revoke-best-effort</c>
+    /// came after it: the Schannel build ignores a revocation check that fails for a missing or offline
+    /// distribution point. curl accepts it in every build; the OpenSSL build ignores it.
+    /// </summary>
+    public bool RevocationCheckBestEffort { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--ssl-allow-beast</c> was given and no <c>--no-ssl-allow-beast</c> came after it:
+    /// leave the TLS 1.0 BEAST workaround (record splitting) off, for servers that cannot handle it.
+    /// </summary>
+    public bool AllowBeast { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--ca-native</c> was given and no <c>--no-ca-native</c> came after it:
+    /// verify the server against the operating system's certificate store. curl accepts it in every build;
+    /// the Schannel build always uses that store.
+    /// </summary>
+    public bool UseNativeCaStore { get; internal set; }
+
+    /// <summary>
+    /// <see langword="false"/> when the last of <c>--alpn</c> and <c>--no-alpn</c> was <c>--no-alpn</c>: offer no
+    /// protocols through ALPN in the TLS handshake. <see langword="true"/> otherwise, as curl offers ALPN by default.
+    /// </summary>
+    public bool UseAlpn { get; internal set; } = true;
+
+    /// <summary>
+    /// <see langword="false"/> when the last of <c>--sessionid</c> and <c>--no-sessionid</c> was <c>--no-sessionid</c>:
+    /// never resume a cached TLS session. <see langword="true"/> otherwise, as curl caches session IDs by default.
+    /// </summary>
+    public bool ReuseSessionIds { get; internal set; } = true;
+
+    /// <summary>
+    /// <see langword="false"/> when the last of <c>--tcp-nodelay</c> and <c>--no-tcp-nodelay</c> was
+    /// <c>--no-tcp-nodelay</c>: leave Nagle's algorithm on. <see langword="true"/> otherwise, as curl sets
+    /// <c>TCP_NODELAY</c> by default.
+    /// </summary>
+    public bool TcpNoDelay { get; internal set; } = true;
+
+    /// <summary>
+    /// <see langword="false"/> when the last of <c>--keepalive</c> and <c>--no-keepalive</c> was <c>--no-keepalive</c>:
+    /// send no TCP keepalive probes. <see langword="true"/> otherwise, as curl turns keepalive on by default.
+    /// </summary>
+    public bool TcpKeepAlive { get; internal set; } = true;
+
+    /// <summary>
+    /// <see langword="false"/> when the last of <c>--styled-output</c> and <c>--no-styled-output</c> was
+    /// <c>--no-styled-output</c>: never style header output. <see langword="true"/> otherwise, as curl styles
+    /// headers written to a terminal by default.
+    /// </summary>
+    public bool StyledOutput { get; internal set; } = true;
+
+    /// <summary>
     /// The <c>--cacert</c> file, verbatim; <see langword="null"/> when not given. The parser has
     /// already refused a value at which nothing exists, and records a directory here unchanged.
     /// The last value wins.
