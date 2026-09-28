@@ -1116,6 +1116,13 @@ public sealed class CommandLineOptions
     public HttpVersionPreference? HttpVersion { get; private set; }
 
     /// <summary>
+    /// The IP address family the last <c>-4</c> / <c>--ipv4</c> or <c>-6</c> / <c>--ipv6</c> chose;
+    /// <see cref="IpAddressFamilyChoice.Either"/> when neither was given. A later one overrides an
+    /// earlier one without a warning, as curl 8.21.0 does.
+    /// </summary>
+    public IpAddressFamilyChoice IpAddressFamily { get; internal set; }
+
+    /// <summary>
     /// <see langword="true"/> when <c>--http0.9</c> was given and no <c>--no-http0.9</c> came after it:
     /// accept an HTTP/0.9 reply, one with no status line, instead of refusing it.
     /// </summary>

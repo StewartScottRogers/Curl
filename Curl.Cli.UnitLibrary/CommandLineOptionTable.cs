@@ -46,7 +46,7 @@ namespace Curl.Cli;
 /// <c>--no-data-ascii</c>, <c>--no-data-binary</c>, <c>--no-data-raw</c>, <c>--no-data-urlencode</c>, <c>--no-json</c>,
 /// <c>--no-form</c>, <c>--no-form-string</c>,
 /// <c>--no-url-query</c>, <c>--no-max-redirs</c>, <c>--no-config</c>, <c>--no-http1.0</c>, <c>--no-http1.1</c>, <c>--no-http2</c>,
-/// <c>--no-http2-prior-knowledge</c>, <c>--no-http3</c>, <c>--no-http3-only</c>, <c>--no-request-target</c>, <c>--no-ipfs-gateway</c>, <c>--no-anyauth</c>,
+/// <c>--no-http2-prior-knowledge</c>, <c>--no-http3</c>, <c>--no-http3-only</c>, <c>--no-ipv4</c>, <c>--no-ipv6</c>, <c>--no-request-target</c>, <c>--no-ipfs-gateway</c>, <c>--no-anyauth</c>,
 /// <c>--no-oauth2-bearer</c>, <c>--no-proxy</c>, <c>--no-proxy-user</c>, <c>--no-noproxy</c>, <c>--no-socks4</c>, <c>--no-socks4a</c>,
 /// <c>--no-socks5</c>, <c>--no-socks5-hostname</c>, <c>--no-write-out</c>, <c>--no-output-dir</c>, <c>--no-trace</c>, <c>--no-trace-ascii</c>, <c>--no-stderr</c>, <c>--no-retry</c>, <c>--no-retry-delay</c>, <c>--no-retry-max-time</c>, <c>--no-limit-rate</c>,
 /// <c>--no-speed-limit</c>, <c>--no-speed-time</c>, <c>--no-ftp-method</c>, <c>--no-ftp-port</c>, <c>--no-ftp-pasv</c>, <c>--no-quote</c>, <c>--no-parallel-max</c> and <c>--no-parallel-max-host</c> (each also with <c>=x</c>) exit 2 with
@@ -235,6 +235,8 @@ public static class CommandLineOptionTable
         CommandLineOption.Text("ipfs-gateway", null, (options, gateway) => options.IpfsGateway = gateway),
         CommandLineOption.Flag("http1.0", '0', options => options.SelectHttpVersion(HttpVersionPreference.Http10)),
         CommandLineOption.Flag("http1.1", null, options => options.SelectHttpVersion(HttpVersionPreference.Http11)),
+        CommandLineOption.Flag("ipv4", '4', options => options.IpAddressFamily = IpAddressFamilyChoice.IPv4Only),
+        CommandLineOption.Flag("ipv6", '6', options => options.IpAddressFamily = IpAddressFamilyChoice.IPv6Only),
         CommandLineOption.UnsupportedFlag("http2"),
         CommandLineOption.UnsupportedFlag("http2-prior-knowledge"),
         CommandLineOption.UnsupportedFlag("http3"),

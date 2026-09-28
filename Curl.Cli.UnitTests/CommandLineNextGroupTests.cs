@@ -48,7 +48,7 @@ public sealed class CommandLineNextGroupTests
         "max-redirs", "post301", "post302", "post303", "show-headers", "include", "head", "fail",
         "fail-with-body", "compressed", "raw", "tr-encoding", "ignore-content-length", "path-as-is", "http0.9",
         "request-target", "ipfs-gateway", "http1.0", "http1.1", "http2", "http2-prior-knowledge", "http3",
-        "http3-only", "sslv2", "sslv3", "metalink", "npn", "ntlm-wb", "false-start", "egd-file", "random-file",
+        "http3-only", "ipv4", "ipv6", "sslv2", "sslv3", "metalink", "npn", "ntlm-wb", "false-start", "egd-file", "random-file",
         "krb4",
     ];
 
