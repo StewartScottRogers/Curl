@@ -38,7 +38,7 @@ namespace Curl.Cli;
 /// <c>--no-ignore-content-length</c>, <c>--no-path-as-is</c>, <c>--no-http0.9</c>, <c>--no-basic</c>, <c>--no-digest</c>, <c>--no-ntlm</c>, <c>--no-negotiate</c>, <c>--no-proxytunnel</c>, <c>--no-remote-name</c>,
 /// <c>--no-remote-name-all</c>, <c>--no-remote-header-name</c>, <c>--no-create-dirs</c>, <c>--no-junk-session-cookies</c>, <c>--no-globoff</c>, <c>--no-version</c>, <c>--no-verbose</c>, <c>--no-trace-time</c>, <c>--no-retry-all-errors</c>, <c>--no-retry-connrefused</c>, <c>--no-disable-epsv</c>, <c>--no-epsv</c>, <c>--no-ftp-skip-pasv-ip</c>, <c>--no-ftp-create-dirs</c>, <c>--no-disable-eprt</c>, <c>--no-eprt</c>, <c>--no-ssl</c>, <c>--no-ftp-ssl</c>, <c>--no-ssl-reqd</c>, <c>--no-ftp-ssl-reqd</c>, <c>--no-ftp-ssl-control</c> and <c>--no-list-only</c> (measured 2026-09-27) are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
 /// silent and <c>--no-silent -s</c> is. <c>--no-silent=x</c> is accepted, its value ignored.
-/// <c>--no-tlsv1.2</c>, <c>--no-tlsv1.3</c>, <c>--no-url</c>, <c>--no-output</c> (even as the last
+/// <c>--no-tlsv1</c>, <c>--no-tlsv1.0</c>, <c>--no-tlsv1.1</c>, <c>--no-tlsv1.2</c>, <c>--no-tlsv1.3</c>, <c>--no-tls-max</c>, <c>--no-proxy-tlsv1</c>, <c>--no-url</c>, <c>--no-output</c> (even as the last
 /// argument), <c>--no-output=x</c>, <c>--no-data</c>, <c>--no-dump-header</c>, <c>--no-range</c>, <c>--no-time-cond</c>,
 /// <c>--no-request</c>, <c>--no-cookie</c>, <c>--no-cookie-jar</c>, <c>--no-header</c> (and <c>--no-header=x</c>), <c>--no-proxy-header</c>, <c>--no-user-agent</c>, <c>--no-referer</c>,
 /// <c>--no-data-ascii</c>, <c>--no-data-binary</c>, <c>--no-data-raw</c>, <c>--no-data-urlencode</c>, <c>--no-json</c>,
@@ -147,8 +147,13 @@ public static class CommandLineOptionTable
         CommandLineOption.Text("cert-type", null, (options, type) => options.ClientCertificateType = type),
         CommandLineOption.Text("key-type", null, (options, type) => options.PrivateKeyType = type),
         CommandLineOption.Text("pass", null, (options, passphrase) => options.Passphrase = passphrase),
+        CommandLineOption.Flag("tlsv1", '1', options => options.MinimumTlsVersion = ObsoleteTlsProtocols.Tls10),
+        CommandLineOption.Flag("tlsv1.0", null, options => options.MinimumTlsVersion = ObsoleteTlsProtocols.Tls10),
+        CommandLineOption.Flag("tlsv1.1", null, options => options.MinimumTlsVersion = ObsoleteTlsProtocols.Tls11),
         CommandLineOption.Flag("tlsv1.2", null, options => options.MinimumTlsVersion = SslProtocols.Tls12),
         CommandLineOption.Flag("tlsv1.3", null, options => options.MinimumTlsVersion = SslProtocols.Tls13),
+        CommandLineOption.Value("tls-max", null, SetMaximumTlsVersion),
+        CommandLineOption.Flag("proxy-tlsv1", null, options => options.ProxyMinimumTlsVersion = ObsoleteTlsProtocols.Tls10),
         CommandLineOption.Text("ciphers", null, (options, ciphers) => options.Ciphers = ciphers),
         CommandLineOption.Text("tls13-ciphers", null, (options, ciphers) => options.Tls13Ciphers = ciphers),
         CommandLineOption.Value("range", 'r', SetRange),
@@ -639,6 +644,33 @@ public static class CommandLineOptionTable
     /// value holding anything but digits, dashes and commas is kept verbatim with a warning.
     /// Parsing the text into a range is <c>ByteRangeParser</c>'s job, at transfer time.
     /// </summary>
+    /// <summary>
+    /// Records the <c>--tls-max</c> ceiling, or refuses with <see cref="CommandLineRefusal.BadlyUsedHere"/> for
+    /// any value but <c>default</c>, <c>1.0</c>, <c>1.1</c>, <c>1.2</c> and <c>1.3</c>, matched exactly and
+    /// case-sensitively as curl 8.21.0 does (<c>1.4</c>, <c>abc</c>, <c>DEFAULT</c>, <c>1</c>, <c>1.2 </c> and an
+    /// empty value are refused; measured 2026-09-28).
+    /// </summary>
+    private static CommandLineRefusal? SetMaximumTlsVersion(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        if (!MaximumTlsVersionsByName.TryGetValue(value, out SslProtocols? maximum))
+        {
+            return CommandLineRefusal.BadlyUsedHere(spelledOption);
+        }
+
+        options.MaximumTlsVersion = maximum;
+        return null;
+    }
+
+    private static readonly FrozenDictionary<string, SslProtocols?> MaximumTlsVersionsByName =
+        new Dictionary<string, SslProtocols?>(StringComparer.Ordinal)
+        {
+            ["default"] = null,
+            ["1.0"] = ObsoleteTlsProtocols.Tls10,
+            ["1.1"] = ObsoleteTlsProtocols.Tls11,
+            ["1.2"] = SslProtocols.Tls12,
+            ["1.3"] = SslProtocols.Tls13,
+        }.ToFrozenDictionary(StringComparer.Ordinal);
+
     private static CommandLineRefusal? SetRange(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
     {
         if (options.ResumeFrom is not null || options.ResumeFromOutputSize)

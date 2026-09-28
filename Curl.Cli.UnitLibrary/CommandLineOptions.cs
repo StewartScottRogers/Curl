@@ -572,11 +572,26 @@ public sealed class CommandLineOptions
     public string? Passphrase { get; internal set; }
 
     /// <summary>
-    /// The lowest TLS version to accept: <see cref="SslProtocols.Tls12"/> for <c>--tlsv1.2</c> (1.2 or later),
-    /// <see cref="SslProtocols.Tls13"/> for <c>--tlsv1.3</c> (1.3 or later); <see langword="null"/> when neither
-    /// was given. When both are given the last one wins, as in curl 8.21.0.
+    /// The lowest TLS version to accept: <see cref="ObsoleteTlsProtocols.Tls10"/> for <c>-1</c>/<c>--tlsv1</c>
+    /// and <c>--tlsv1.0</c> (1.0 or later), <see cref="ObsoleteTlsProtocols.Tls11"/> for <c>--tlsv1.1</c>,
+    /// <see cref="SslProtocols.Tls12"/> for <c>--tlsv1.2</c>, <see cref="SslProtocols.Tls13"/> for
+    /// <c>--tlsv1.3</c>; <see langword="null"/> when none was given. The last one given wins, as in curl 8.21.0.
     /// </summary>
     public SslProtocols? MinimumTlsVersion { get; internal set; }
+
+    /// <summary>
+    /// The highest TLS version to offer, from <c>--tls-max</c>: <see cref="ObsoleteTlsProtocols.Tls10"/> for
+    /// <c>1.0</c>, <see cref="ObsoleteTlsProtocols.Tls11"/> for <c>1.1</c>, <see cref="SslProtocols.Tls12"/> for
+    /// <c>1.2</c>, <see cref="SslProtocols.Tls13"/> for <c>1.3</c>; <see langword="null"/> when not given or given
+    /// as <c>default</c>. curl applies it to the origin and to an HTTPS proxy alike. The last value wins.
+    /// </summary>
+    public SslProtocols? MaximumTlsVersion { get; internal set; }
+
+    /// <summary>
+    /// The lowest TLS version to accept from an HTTPS proxy: <see cref="ObsoleteTlsProtocols.Tls10"/> (1.0 or
+    /// later) for <c>--proxy-tlsv1</c>; <see langword="null"/> when not given.
+    /// </summary>
+    public SslProtocols? ProxyMinimumTlsVersion { get; internal set; }
 
     /// <summary>The <c>--ciphers</c> list, verbatim; <see langword="null"/> when not given. The last value wins.</summary>
     public string? Ciphers { get; internal set; }
