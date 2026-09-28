@@ -8,7 +8,7 @@ depends-on: [BL-765]
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-28
 ---
 # BL-767 — Let the dark factory coordinator add a lane and retire a lane mid-shift
 
@@ -53,24 +53,31 @@ The coordinator can start one more lane during a shift, and can ask one lane to 
 
 ## Acceptance criteria
 
-- [ ] `powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestAutoLanes` exits 0. Its output includes `PASS` lines for these cases, and every BL-765 case still passes:
+- [x] `powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestAutoLanes` exits 0. Its output includes `PASS` lines for these cases, and every BL-765 case still passes:
   - `Get-LaneToAdd` over active `1,2,4` gives `3`, and over `1..16` gives `$null`.
   - `Get-LaneToRetire` over active `1,2,3` with retiring `3` gives `2`, and with retiring `1,2,3` gives `$null`.
   - `Test-LanesFinished` over active `1,3` with finished `1,2` gives false, and with finished `1,3` gives true.
-- [ ] `[System.Management.Automation.Language.Parser]::ParseFile` reports no errors for `RunDarkFactory.ps1`.
-- [ ] Reading the diff shows each of these:
+- [x] `[System.Management.Automation.Language.Parser]::ParseFile` reports no errors for `RunDarkFactory.ps1`.
+- [x] Reading the diff shows each of these:
   - the three launch sites all call `Start-Lane`;
   - the wait loop's exit and the restarts use the active set;
   - the lane checks `retire` only inside the not-resuming stop checks;
   - `Add-Lane` renames a retired lane's summary before restarting it;
   - `-Lanes` is `ValidateRange(1, 16)`, and adoption scans `1..16`.
-- [ ] `powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -Lanes 17 -TestAlarm -QuietAlarm` fails parameter validation. `-Lanes 16 -TestAlarm -QuietAlarm` shows the banner and exits.
-- [ ] The script's header "PARALLEL LANES" section says the maximum is 16, and that a lane asked to retire finishes and integrates its task first.
-- [ ] `git diff --stat` shows only `RunDarkFactory.ps1` changed outside `Tasks/`.
+- [x] `powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -Lanes 17 -TestAlarm -QuietAlarm` fails parameter validation. `-Lanes 16 -TestAlarm -QuietAlarm` shows the banner and exits.
+- [x] The script's header "PARALLEL LANES" section says the maximum is 16, and that a lane asked to retire finishes and integrates its task first.
+- [x] `git diff --stat` shows only `RunDarkFactory.ps1` changed outside `Tasks/`.
 
 ## Notes
+
+- `Start-Lane` takes `-KeepWorktree` for the dead-lane restart, which must resume the held task from the work in place rather than reset the worktree; the initial start and `Add-Lane` prepare a clean `factory/lane-<n>`. An adopted lane's entry is removed from `$adopt` once started, so re-adding that lane number later gets a clean worktree.
+- A lane checks `retire` after the time, max-tasks and failing-runs checks and before the usage check, all inside `if (-not $resuming)`, so a held or token-waiting task always finishes first.
+- `Read-LaneSummary` and `Test-LaneSummaryClean` are shared by the retirement close and the shift-end loop, so both judge "clean" the same way; a tab closed at retirement is recorded in `$closedTabs` and not touched again at shift end.
+- Nothing calls `Add-Lane` or `Request-LaneRetire` yet (BL-768 will), so a fixed-lane shift behaves as before: the active set is `1..$Lanes` and nothing leaves it.
+- Verified: `-TestAutoLanes` 19 PASS, exit 0; ParseFile 0 errors; `-Lanes 17` fails validation, `-Lanes 16 -TestAlarm -QuietAlarm` shows the banner and exits 0; no new non-ASCII characters; `dotnet build` clean, fast tests 23 test projects passed, 0 failed.
 
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Doing.
+- 2026-09-28: Doing -> Done. The coordinator can add a lane (up to 16) and retire one after its current task; restarts, adoption and the shift report follow the active lane set
