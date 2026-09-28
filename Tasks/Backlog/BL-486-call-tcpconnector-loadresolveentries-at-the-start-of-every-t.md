@@ -1,5 +1,5 @@
 ---
-id: BL-483
+id: BL-486
 title: Call TcpConnector.LoadResolveEntries at the start of every transfer in Curl.Console
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-483 — Call TcpConnector.LoadResolveEntries at the start of every transfer in Curl.Console
+# BL-486 — Call TcpConnector.LoadResolveEntries at the start of every transfer in Curl.Console
 
 ## Goal
 

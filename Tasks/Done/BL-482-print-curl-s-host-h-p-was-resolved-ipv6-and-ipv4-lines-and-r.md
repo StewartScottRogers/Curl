@@ -35,7 +35,7 @@ With `-v`, a connect to a host name prints curl 8.21.0's `Host H:P was resolved.
 - Filed from BL-481 (2026-09-27).
 - Measured 2026-09-27 (curl 8.21.0 mingw Schannel, `Record-CurlExchange.ps1`): `Added` is printed at the start of every transfer (URL), not for a followed `-L` redirect; from the second transfer each is preceded by `RESOLVE H:P - old addresses discarded`; `+` entries add ` (non-permanent)`, `*` entries add `RESOLVE *:P using wildcard`; removals print nothing; the address list is echoed verbatim; `Host H:P was resolved.` names the host as cached (the entry's text, `*`, or the name looked up); a bad entry comes after the `Added` lines of those before it. Full table in ADR-0114.
 - Decision (ADR-0114): `ResolveOverrides.Entries` (new `ResolveEntry`) feeds `TcpConnector.LoadResolveEntries(events)`, meant for the console at each transfer's start; until it is called, `ConnectAsync` loads the entries once itself, so the first transfer already matches curl. Tried telling transfers apart by their `ITransferEvents` first, but the console shares one events object across the run.
-- Console wiring filed as BL-483 (`Curl.Console` is held by BL-458 in another lane).
+- Console wiring filed as BL-486 (`Curl.Console` is held by BL-458 in another lane).
 - Added `Documentation/Planning/Decisions` to `touches` for ADR-0114 and its index row; no task in Doing names it.
 - Known gap: the `IPAddress.TryParse` test for "name is an IP address" also accepts shorthand like `1`; URL parsing normalises those before they get here.
 
@@ -43,4 +43,4 @@ With `-v`, a connect to a host name prints curl 8.21.0's `Host H:P was resolved.
 
 - 2026-09-27: Created.
 - 2026-09-27: Backlog -> Doing.
-- 2026-09-27: Doing -> Done. -v prints curl's Host H:P was resolved., IPv6: and IPv4: lines after every lookup, and --resolve's Added H:P:A to DNS cache lines on the first transfer (every transfer once BL-483 wires the console)
+- 2026-09-27: Doing -> Done. -v prints curl's Host H:P was resolved., IPv6: and IPv4: lines after every lookup, and --resolve's Added H:P:A to DNS cache lines on the first transfer (every transfer once BL-486 wires the console)

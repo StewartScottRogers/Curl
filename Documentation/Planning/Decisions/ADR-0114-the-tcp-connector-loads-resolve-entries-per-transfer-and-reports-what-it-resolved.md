@@ -47,7 +47,7 @@ each response `HTTP/1.1 200 OK`, `Connection: close`:
 
 ## Consequences
 
-- Until the console calls `LoadResolveEntries` at each transfer's start (BL-483), only the
+- Until the console calls `LoadResolveEntries` at each transfer's start (BL-486), only the
   first transfer prints the `Added` lines, and no transfer prints `discarded`.
 - Called from the console, it reports for a transfer whose connection is reused from the
   pool too, as curl does.
