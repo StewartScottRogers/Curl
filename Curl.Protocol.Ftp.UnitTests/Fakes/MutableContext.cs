@@ -45,6 +45,8 @@ public sealed class MutableContext
 
     public Stream? HeaderOutput { get; set; }
 
+    public ITransferEvents Events { get; set; } = NoTransferEvents.Instance;
+
     /// <summary>Gets the output the built context writes to, so a test can send headers there too.</summary>
     public Stream Output { get; private init; } = Stream.Null;
 
@@ -74,6 +76,7 @@ public sealed class MutableContext
             FtpSslControlOnly = mutable.FtpSslControlOnly,
             TimeProvider = mutable.TimeProvider,
             CancellationToken = mutable.CancellationToken,
+            Events = mutable.Events,
         };
     }
 }

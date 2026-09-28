@@ -119,6 +119,12 @@ internal sealed class FtpSession(FtpSessionConnections connections, FtpControlCh
     /// <summary>The port an active-mode data connection is accepted on, once bound.</summary>
     private IPendingConnection? pendingConnection;
 
+    /// <summary>
+    /// The address <c>EPRT</c> and <c>PORT</c> announce: the <c>-P</c> address, even when the
+    /// port was bound on the control connection's address instead (BL-464).
+    /// </summary>
+    private IPAddress? announcedAddress;
+
     private IConnection? dataConnection;
 
     private FtpDownloadWindow window;
@@ -579,21 +585,27 @@ internal sealed class FtpSession(FtpSessionConnections connections, FtpControlCh
             ? null
             : await QuitAndFailAsync(CurlExitCode.FtpPortFailed, FtpTransferMessages.FailedToDoPort).ConfigureAwait(false);
 
-    /// <summary>The address and port the active-mode listener is bound to.</summary>
-    private IPEndPoint ListeningEndPoint => (IPEndPoint)pendingConnection!.LocalEndPoint;
+    /// <summary>The announced address and the port the active-mode listener is bound to.</summary>
+    private IPEndPoint ListeningEndPoint => new(announcedAddress!, ((IPEndPoint)pendingConnection!.LocalEndPoint).Port);
+
+    /// <summary>
+    /// The control connection's own address, an IPv4-mapped one as plain IPv4;
+    /// <see langword="null" /> when it is unknown.
+    /// </summary>
+    private IPAddress? ControlAddress => Unmapped((controlLocalEndPoint as IPEndPoint)?.Address);
 
     /// <summary>
     /// The address <paramref name="argument" /> names: the control connection's own for
     /// <c>-</c>, an IPv4-mapped one as plain IPv4, or the literal; <see langword="null" />
     /// when the control connection's address is unknown or the address is a name.
     /// </summary>
-    private IPAddress? ActiveAddressOf(FtpPortArgument argument)
-    {
-        IPAddress? address = argument.UsesControlAddress
-            ? (controlLocalEndPoint as IPEndPoint)?.Address
-            : IPAddress.TryParse(argument.Address, out IPAddress? literal) ? literal : null;
-        return address is { IsIPv4MappedToIPv6: true } ? address.MapToIPv4() : address;
-    }
+    private IPAddress? ActiveAddressOf(FtpPortArgument argument) =>
+        argument.UsesControlAddress
+            ? ControlAddress
+            : Unmapped(IPAddress.TryParse(argument.Address, out IPAddress? literal) ? literal : null);
+
+    private static IPAddress? Unmapped(IPAddress? address) =>
+        address is { IsIPv4MappedToIPv6: true } ? address.MapToIPv4() : address;
 
     /// <summary>
     /// Ends a transfer whose <c>-P</c> address could not be used: exit 30 after <c>QUIT</c>
@@ -609,16 +621,31 @@ internal sealed class FtpSession(FtpSessionConnections connections, FtpControlCh
     /// <summary>
     /// Binds the active-mode listening port; a bind failure is the listener's exit code and
     /// message after <c>QUIT</c>, as curl 8.21.0 ends <c>bind() failed, ran out of ports</c>.
+    /// A <c>-P</c> address that is not local is reported with <c>-v</c> and bound once more on
+    /// the control connection's address, as curl 8.21.0's <c>ftp_port_bind_socket</c> does;
+    /// the <c>-P</c> address is still the one announced (BL-464, ADR-0107).
     /// </summary>
     private async ValueTask<TransferResult?> ListenAsync(IPAddress address, FtpPortArgument argument)
     {
-        var target = new ListenTarget(address, argument.LowPort, argument.HighPort);
-        ListenResult listening = await connections.Listener.ListenAsync(target, context.CancellationToken).ConfigureAwait(false);
+        announcedAddress = address;
+        ListenResult listening = await BindAsync(address, argument).ConfigureAwait(false);
+        if (IsNonLocalBindFailure(listening) && !argument.UsesControlAddress && ControlAddress is { } controlAddress)
+        {
+            context.Events.ReportInfo(listening.ErrorMessage!);
+            listening = await BindAsync(controlAddress, argument).ConfigureAwait(false);
+        }
+
         pendingConnection = listening.PendingConnection;
         return pendingConnection is null
-            ? await QuitAndFailAsync(listening.ExitCode, listening.ErrorMessage!).ConfigureAwait(false)
+            ? await QuitAndFailAsync(listening.ExitCode, FtpTransferMessages.BindFailed(listening.ErrorMessage!)).ConfigureAwait(false)
             : null;
     }
+
+    private static bool IsNonLocalBindFailure(ListenResult listening) =>
+        listening.ErrorMessage?.Contains(FtpTransferMessages.NonLocalBindFailed, StringComparison.Ordinal) == true;
+
+    private ValueTask<ListenResult> BindAsync(IPAddress address, FtpPortArgument argument) =>
+        connections.Listener.ListenAsync(new ListenTarget(address, argument.LowPort, argument.HighPort), context.CancellationToken);
 
     private async ValueTask ReleasePendingConnectionAsync()
     {

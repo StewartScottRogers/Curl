@@ -4,7 +4,9 @@ Phase 2.
 
 FTP with a separate control and data channel. `FtpProtocolHandler` serves `ftp` and
 `ftps` downloads and directory listings in passive mode (`EPSV`, then `PASV`), as ADR-0093
-records, or in active mode under `-P` (`EPRT`, then `PORT`, and `--disable-eprt`), honouring
+records, or in active mode under `-P` (`EPRT`, then `PORT`, and `--disable-eprt`; a `-P`
+address that is not local is bound once more on the control connection's address and still
+announced, with curl's `-v` line, ADR-0107), honouring
 `-r`, `-C` and `-I` (ADR-0093's BL-438 addendum), and uploads `-T` with `STOR`, or `APPE`
 for `-C` (ADR-0093's BL-439 addendum), and honours `--disable-epsv`,
 `--no-ftp-skip-pasv-ip`, `--ftp-method`, `--ftp-create-dirs`, `-l` and `-Q`

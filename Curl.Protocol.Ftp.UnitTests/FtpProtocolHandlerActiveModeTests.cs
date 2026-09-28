@@ -48,6 +48,14 @@ public sealed class FtpProtocolHandlerActiveModeTests
     /// <summary>The control connection's own address, as curl reported it: <c>from 127.0.0.1 port 55129</c>.</summary>
     private static readonly IPEndPoint ControlLocal = new(IPAddress.Loopback, 55129);
 
+    /// <summary>
+    /// curl 8.21.0's <c>-v</c> line for a bind on <c>-P 192.0.2.1</c>, as the Schannel build
+    /// printed it (BL-464); the listener words it so, and the handler passes it on.
+    /// </summary>
+    private const string NotLocalLine = "bind(port=0) on non-local address failed: Address not available";
+
+    private static readonly ListenResult NotLocal = ListenResult.Failed(CurlExitCode.FtpPortFailed, NotLocalLine);
+
     [TestMethod]
     public async Task ExecuteAsync_PortDash_SendsEprtWithTheControlAddressThenAcceptsTheData()
     {
@@ -222,6 +230,78 @@ public sealed class FtpProtocolHandlerActiveModeTests
 
         Assert.AreEqual(LogInSent + "QUIT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.FtpPortFailed, "bind() failed, ran out of ports"), run.Result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_PortAddressNotLocal_ListensAgainOnTheControlAddressAndAnnouncesThePortAddress()
+    {
+        // curl -v -P 192.0.2.1 ftp://127.0.0.1:47464/f.txt (measured 2026-09-27, BL-464): the
+        // bind on 192.0.2.1 fails, curl prints the non-local line with -v, binds again on the
+        // control connection's address and still announces 192.0.2.1 in EPRT.
+        var events = new RecordingTransferEvents();
+        var listener = new QueuedListener(NotLocal, ListenResult.Listening(Pending(61200)));
+        ActiveRun run = await RunAsync("/a.txt", "192.0.2.1", LoggedIn + EprtOk + Retrieved, context => context.Events = events, listener);
+
+        Assert.AreEqual(LogInSent + "EPRT |1|192.0.2.1|61200|\r\n" + RetrieveSent, run.Sent);
+        CollectionAssert.AreEqual(
+            new[] { new ListenTarget(IPAddress.Parse("192.0.2.1"), 0, 0), new ListenTarget(IPAddress.Loopback, 0, 0) },
+            listener.Targets);
+        CollectionAssert.AreEqual(new[] { NotLocalLine }, events.Info);
+        Assert.AreEqual(TransferResult.Success(5), run.Result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_PortAddressNotLocalAndEprtRefused_RetriesTheBindAgainForPort()
+    {
+        // curl -v -P 192.0.2.1 ftp://127.0.0.1:47464/f.txt, EPRT and PORT answered 500 no
+        // (measured 2026-09-27, BL-464): each bind retries once, so the line is printed twice.
+        var events = new RecordingTransferEvents();
+        var listener = new QueuedListener(NotLocal, ListenResult.Listening(Pending(61200)), NotLocal, ListenResult.Listening(Pending(61201)));
+        ActiveRun run = await RunAsync("/a.txt", "192.0.2.1", LoggedIn + Refused + Refused + Bye, context => context.Events = events, listener);
+
+        Assert.AreEqual(LogInSent + "EPRT |1|192.0.2.1|61200|\r\nPORT 192,0,2,1,239,17\r\nQUIT\r\n", run.Sent);
+        CollectionAssert.AreEqual(new[] { NotLocalLine, NotLocalLine }, events.Info);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.FtpPortFailed, "Failed to do PORT"), run.Result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_RetryOnTheControlAddressFailsToo_QuitsWithExit30AndBindFailedWithoutAThirdAttempt()
+    {
+        // curl 8.21.0's ftp_port_bind_socket retries once; a second failure is
+        // failf(data, "bind(port=%hu) failed: %s") -> exit 30.
+        var events = new RecordingTransferEvents();
+        var listener = new QueuedListener(NotLocal, NotLocal);
+        ActiveRun run = await RunAsync("/a.txt", "192.0.2.1", LoggedIn + Bye, context => context.Events = events, listener);
+
+        Assert.AreEqual(LogInSent + "QUIT\r\n", run.Sent);
+        Assert.HasCount(2, listener.Targets);
+        CollectionAssert.AreEqual(new[] { NotLocalLine }, events.Info);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.FtpPortFailed, "bind(port=0) failed: Address not available"), run.Result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_PortDashAndAddressNotAvailable_DoesNotRetry()
+    {
+        // -P - already binds the control connection's address: curl's non_local is false, so
+        // EADDRNOTAVAIL is failf(data, "bind(port=%hu) failed: %s") at once.
+        var events = new RecordingTransferEvents();
+        var listener = new QueuedListener(NotLocal);
+        ActiveRun run = await RunAsync("/a.txt", "-", LoggedIn + Bye, context => context.Events = events, listener);
+
+        Assert.HasCount(1, listener.Targets);
+        Assert.IsEmpty(events.Info);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.FtpPortFailed, "bind(port=0) failed: Address not available"), run.Result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_PortAddressNotLocalAndControlAddressUnknown_DoesNotRetry()
+    {
+        // With no control connection address there is nothing to bind again on.
+        var listener = new QueuedListener(NotLocal);
+        ActiveRun run = await RunAsync("/a.txt", "192.0.2.1", LoggedIn + Bye, _ => { }, listener, controlLocal: null, useDefaultControlLocal: false);
+
+        Assert.HasCount(1, listener.Targets);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.FtpPortFailed, "bind(port=0) failed: Address not available"), run.Result);
     }
 
     [TestMethod]

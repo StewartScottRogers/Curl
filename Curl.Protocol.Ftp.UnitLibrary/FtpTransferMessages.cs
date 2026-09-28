@@ -42,6 +42,23 @@ internal static class FtpTransferMessages
     internal const string FailedToDoPort = "Failed to do PORT";
 
     /// <summary>
+    /// What sets curl 8.21.0's <c>-v</c> line for a bind on a <c>-P</c> address that is not
+    /// local, <c>bind(port=N) on non-local address failed: reason</c>, apart from its exit 30
+    /// message, <c>bind(port=N) failed: reason</c>: the listener words a bind that failed
+    /// with <c>EADDRNOTAVAIL</c> the first way (ADR-0107).
+    /// </summary>
+    internal const string NonLocalBindFailed = " on non-local address failed: ";
+
+    /// <summary>
+    /// Gives the exit 30 message for a failed listen: a non-local bind's line reworded as
+    /// curl 8.21.0's <c>bind(port=N) failed: reason</c>, any other message as it is (BL-464).
+    /// </summary>
+    /// <param name="listenMessage">The listener's message.</param>
+    /// <returns>The message curl prints.</returns>
+    internal static string BindFailed(string listenMessage) =>
+        listenMessage.Replace(NonLocalBindFailed, " failed: ", StringComparison.Ordinal);
+
+    /// <summary>
     /// The exit 12 message for an active-mode data connection the server did not open
     /// within curl's 60-second accept timeout (BL-437).
     /// </summary>
