@@ -35,3 +35,4 @@ When a final response head carries a header curl 8.21.0 refuses (an invalid Cont
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
