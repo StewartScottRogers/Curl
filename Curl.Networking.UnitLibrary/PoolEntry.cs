@@ -26,4 +26,11 @@ internal sealed record PoolEntry(
     /// connection last went idle.
     /// </summary>
     public long IdleSince { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether a read on the connection found the end of the
+    /// server's stream: the server has closed it, so curl 8.21.0 reports it dead instead of
+    /// reusing it (ADR-0112).
+    /// </summary>
+    public bool HasReadPeerClose { get; set; }
 }

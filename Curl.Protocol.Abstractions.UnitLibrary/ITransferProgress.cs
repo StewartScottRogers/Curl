@@ -34,4 +34,15 @@ public interface ITransferProgress
     /// <param name="bytesSoFar">The running total of body bytes sent, never a delta and never decreasing.</param>
     /// <param name="expectedTotal">The size of the upload, or <see langword="null" /> when it is not known.</param>
     void ReportUploaded(long bytesSoFar, long? expectedTotal);
+
+    /// <summary>
+    /// Reports that the transfer's data is complete and the handler is about to report what
+    /// became of its connection, so the consumer can finish drawing before the connection-end
+    /// <c>-v</c> line (ADR-0045, ADR-0111). Called at most once per handler run, for
+    /// the final exchange only, whether that exchange succeeded or failed; the default body
+    /// does nothing, so a handler that never calls it and a sink that ignores it need no change.
+    /// </summary>
+    void ReportTransferDone()
+    {
+    }
 }

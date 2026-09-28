@@ -5,8 +5,9 @@ namespace Curl.Console;
 
 /// <summary>
 /// Drives <see cref="DiskWriteOutFileOpener" /> against the real disk, in a fresh temporary
-/// directory removed afterwards. The tests that open real files are
-/// <c>[TestCategory("Integration")]</c> (BL-280); the fast run covers only the exception filter.
+/// directory removed afterwards. None is <c>[TestCategory("Integration")]</c>: they need no
+/// network, and the fast run must reach every line of <see cref="DiskWriteOutFileOpener" /> for its
+/// coverage gate (BL-432), as <c>PhysicalOutputPathsTests</c> does for <c>PhysicalOutputPaths</c>.
 /// </summary>
 [TestClass]
 public sealed class DiskWriteOutFileOpenerTests
@@ -20,12 +21,11 @@ public sealed class DiskWriteOutFileOpenerTests
     public void DeleteRoot() => Directory.Delete(root, recursive: true);
 
     [TestMethod]
-    [TestCategory("Integration")]
     public async Task RenderAsync_TruncateThenAppendToTheSameFileInTextMode_MatchesCurl()
     {
         string file = Path.Combine(root, "o3.txt");
         File.WriteAllText(file, "old contents");
-        WriteOutTemplateRenderer renderer = new(new DiskWriteOutFileOpener(writesLineFeedAsCrLf: true), false, TimeProvider.System);
+        WriteOutTemplateRenderer renderer = new(new DiskWriteOutFileOpener(writesLineFeedAsCrLf: true), false, WriteOutTimeDialect.WindowsCRuntime, TimeProvider.System);
 
         await renderer.RenderAsync(
             $"%output{{{file}}}F\nG%output{{>>{file}}}H\n",
@@ -37,7 +37,6 @@ public sealed class DiskWriteOutFileOpenerTests
     }
 
     [TestMethod]
-    [TestCategory("Integration")]
     public void TryOpen_WithoutTextMode_WritesLineFeedsAsTheyAre()
     {
         string file = Path.Combine(root, "raw.txt");
@@ -53,7 +52,6 @@ public sealed class DiskWriteOutFileOpenerTests
     }
 
     [TestMethod]
-    [TestCategory("Integration")]
     public void TryOpen_Append_KeepsWhatTheFileHeld()
     {
         string file = Path.Combine(root, "kept.txt");
@@ -70,15 +68,12 @@ public sealed class DiskWriteOutFileOpenerTests
     }
 
     [TestMethod]
-    [TestCategory("Integration")]
     public void TryOpen_EmptyName_IsFalse() => AssertRefused(string.Empty);
 
     [TestMethod]
-    [TestCategory("Integration")]
     public void TryOpen_MissingDirectory_IsFalse() => AssertRefused(Path.Combine(root, "missing", "o.txt"));
 
     [TestMethod]
-    [TestCategory("Integration")]
     public void TryOpen_Directory_IsFalse() => AssertRefused(root);
 
     [TestMethod]

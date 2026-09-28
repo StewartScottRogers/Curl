@@ -16,7 +16,7 @@ namespace Curl.Protocol.Http;
 /// <c>--tr-encoding</c> the Transfer-Encoding codings other than <c>chunked</c> are decoded the
 /// same way, before the Content-Encoding ones, with the same messages (measured, BL-315 Notes).
 /// More than <see cref="MaximumCodings" /> Content-Encoding codings are refused while the
-/// headers are read (<see cref="HttpResponseBodyReader.ThrowIfTooManyContentCodings" />).
+/// headers are read (<see cref="HttpResponseBodyReader.FindHeadRefusal" />).
 /// </remarks>
 internal sealed class HttpContentDecoder : IDisposable
 {

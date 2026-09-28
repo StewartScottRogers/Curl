@@ -1,4 +1,5 @@
 using System.Text;
+using Curl.Core.FileSystem;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Core.Multipart;
@@ -329,6 +330,93 @@ public sealed class MultipartFormBodyBuilderTests
     }
 
     [TestMethod]
+    [DataRow("abcde", "1PQGfpXEKWOBJUw2cVmmCb", "bl401m-18412-5", "abcde\r\n--{B}")]
+    [DataRow("", "hPRLUVz4YTDnuhseH9gMXT", "bl401m-18413-0", "\r\n--{B}--\r\n")]
+    public async Task APipeFileDeclaresTheLengthWindowsStatGivesItAndItsFirstBytesMatchCurl(
+        string delivered,
+        string boundaryLetters,
+        string fileName,
+        string measuredEnd)
+    {
+        // Measured (BL-401 Notes): -F f=@\\.\pipe\<name> against a one-instance pipe delivering
+        // `delivered` sent Content-Length: 216, the length of a 1-byte file, and a body cut off
+        // at it; with nothing delivered the body was one byte short of it.
+        string b = "------------------------" + boundaryLetters;
+        FormFileSystem files = new FormFileSystem().WithUnseekableFile("pipe", delivered);
+        MultipartFormPart part = new("f", MultipartFormPartKind.FileUpload, "pipe", null, fileName, NoHeaders, NoParts);
+        MultipartFormBuildResult result = await BuildAsync(files, [b], _ => 1, part);
+
+        Assert.AreEqual(216, result.Body!.Length);
+        string measured =
+            $"--{b}\r\nContent-Disposition: form-data; name=\"f\"; filename=\"{fileName}\"\r\nContent-Type: application/octet-stream\r\n\r\n"
+            + measuredEnd.Replace("{B}", b, StringComparison.Ordinal);
+        string sent = Encoding.Latin1.GetString(await ReadAllAsync(result.Body.Content));
+        Assert.AreEqual(measured, sent[..(int)Math.Min(sent.Length, result.Body.Length!.Value)]);
+    }
+
+    [TestMethod]
+    public async Task TheNullDeviceDeclaresNoBytesOnWindowsAsCurlSendsIt()
+    {
+        // Measured (BL-401 Notes): -F f=@NUL sent Content-Length: 204 and the whole body.
+        const string B = "------------------------XM7E1XhXQENTASVd3j0BuN";
+        FormFileSystem files = new FormFileSystem().WithUnseekableFile("NUL", string.Empty);
+        MultipartFormBuildResult result = await BuildAsync(
+            files,
+            [B],
+            UnseekableFileLength.AsWindowsStatReportsIt,
+            File("f", MultipartFormPartKind.FileUpload, "NUL"));
+
+        string expected =
+            $"--{B}\r\nContent-Disposition: form-data; name=\"f\"; filename=\"NUL\"\r\nContent-Type: application/octet-stream\r\n\r\n"
+            + $"\r\n--{B}--\r\n";
+        await AssertBodyAsync(result, expected, 204, B);
+    }
+
+    [TestMethod]
+    public async Task TheNullDeviceDeclaresNoLengthOffWindowsAsCurlSendsItChunked()
+    {
+        // Measured (BL-445 Notes): the OpenSSL build sent -F f=@/dev/null with
+        // Transfer-Encoding: chunked, one 0xcd-byte chunk holding this body.
+        const string B = "------------------------vqgGmrr7xDndwoOS2J8VDy";
+        FormFileSystem files = new FormFileSystem().WithFile("/dev/null", string.Empty);
+        MultipartFormBodyBuilder builder = new(
+            files,
+            Encoding.UTF8,
+            () => B,
+            standardInput: null,
+            UnseekableFileLength.Unknown,
+            SeekableFileLength.AsPosixStatReportsIt);
+
+        MultipartFormBuildResult result = await builder.BuildAsync(
+            [File("f", MultipartFormPartKind.FileUpload, "/dev/null")],
+            TestContext.CancellationToken);
+
+        Assert.IsTrue(result.IsBuilt);
+        Assert.IsNull(result.Body.Length);
+        string expected =
+            $"--{B}\r\nContent-Disposition: form-data; name=\"f\"; filename=\"null\"\r\nContent-Type: application/octet-stream\r\n\r\n"
+            + $"\r\n--{B}--\r\n";
+        byte[] bytes = await ReadAllAsync(result.Body.Content);
+        Assert.AreEqual(expected, Encoding.Latin1.GetString(bytes));
+        Assert.HasCount(0xcd, bytes);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task TheRealNullDeviceIsSentChunkedByDefaultOffWindows()
+    {
+        MultipartFormBodyBuilder builder = new(new PhysicalFileSystem(), Encoding.UTF8, () => "b");
+
+        MultipartFormBuildResult result = await builder.BuildAsync(
+            [File("f", MultipartFormPartKind.FileUpload, "/dev/null")],
+            TestContext.CancellationToken);
+
+        Assert.IsTrue(result.IsBuilt);
+        Assert.IsNull(result.Body.Length);
+        await result.Body.Content.DisposeAsync();
+    }
+
+    [TestMethod]
     [DataRow(FileAccessStatus.NotFound)]
     [DataRow(FileAccessStatus.AccessDenied)]
     [DataRow(FileAccessStatus.IoError)]
@@ -419,10 +507,23 @@ public sealed class MultipartFormBodyBuilderTests
     private Task<MultipartFormBuildResult> BuildAsync(string[] boundaries, params MultipartFormPart[] parts) =>
         BuildAsync(MeasuredFiles(), boundaries, parts);
 
-    private async Task<MultipartFormBuildResult> BuildAsync(FormFileSystem files, string[] boundaries, params MultipartFormPart[] parts)
+    /// <summary>Builds with no length for a file that cannot seek, as curl on Linux and macOS declares none.</summary>
+    private Task<MultipartFormBuildResult> BuildAsync(FormFileSystem files, string[] boundaries, params MultipartFormPart[] parts) =>
+        BuildAsync(files, boundaries, UnseekableFileLength.Unknown, parts);
+
+    private async Task<MultipartFormBuildResult> BuildAsync(
+        FormFileSystem files,
+        string[] boundaries,
+        Func<string, long?> unseekableFileLength,
+        params MultipartFormPart[] parts)
     {
         Queue<string> queue = new(boundaries);
-        MultipartFormBodyBuilder builder = new(files, Encoding.UTF8, () => queue.Count > 1 ? queue.Dequeue() : queue.Peek());
+        MultipartFormBodyBuilder builder = new(
+            files,
+            Encoding.UTF8,
+            () => queue.Count > 1 ? queue.Dequeue() : queue.Peek(),
+            standardInput: null,
+            unseekableFileLength);
         return await builder.BuildAsync(parts, TestContext.CancellationToken);
     }
 

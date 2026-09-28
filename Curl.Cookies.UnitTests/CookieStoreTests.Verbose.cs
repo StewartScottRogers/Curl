@@ -98,20 +98,72 @@ public sealed partial class CookieStoreTests
 
     /// <summary>
     /// Measured: of 52 cookies curl printed 50 <c>Added</c> lines and nothing for the rest. A header the parser
-    /// refuses is out of this store's reach (BL-367's Notes list the lines curl prints for those).
+    /// refuses is reported (BL-443) but not counted.
     /// </summary>
     [TestMethod]
-    public void StoreFromResponse_PastTheLimitOrRefusedByTheParser_ReportsNothingForThem()
+    public void StoreFromResponse_PastTheLimit_ReportsNothingForThem()
     {
         RecordingTransferEvents events = new();
 
         new CookieStore().StoreFromResponse(CoUk, ["noequals", .. Enumerable.Range(1, 52).Select(number => $"k{number}=v; Path=/")], Now, events);
 
-        Assert.HasCount(CookieStore.MostCookiesStoredPerResponse, events.Info);
+        Assert.HasCount(CookieStore.MostCookiesStoredPerResponse + 1, events.Info);
+        Assert.AreEqual("invalid cookie, dropped", events.Info[0]);
         Assert.AreEqual("Added cookie k50=\"v\" for domain www.example.co.uk, path /, expire 0", events.Info[^1]);
+    }
+
+    /// <summary>
+    /// Measured (BL-468 Notes): after <c>Set-Cookie: a=1; Max-Age=0</c>, curl reports <c>a=2</c> in the same
+    /// response as added, not replaced: the expired cookie is gone before the next header is stored.
+    /// </summary>
+    [TestMethod]
+    public void StoreFromResponse_ExpiredArrivalThenNamesake_ReportsTheNamesakeAdded()
+    {
+        RecordingTransferEvents events = new();
+
+        new CookieStore().StoreFromResponse(Loopback, ["a=1; Max-Age=0", "a=2"], Now, events);
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "Added cookie a=\"1\" for domain 127.0.0.1, path /, expire 1",
+                "Added cookie a=\"2\" for domain 127.0.0.1, path /, expire 0",
+            },
+            events.Info);
+    }
+
+    /// <summary>
+    /// One header at a time: the count comes back one higher for a cookie stored, unchanged for a header
+    /// refused, and a header that arrives once the count has reached the limit is neither stored nor reported.
+    /// </summary>
+    [TestMethod]
+    public void StoreFromResponse_OneHeader_CountsTowardTheLimit()
+    {
+        CookieStore store = new();
+        RecordingTransferEvents events = new();
+
+        int afterStored = store.StoreFromResponse(Loopback, "a=1", 7, Now, events);
+        int afterRefused = store.StoreFromResponse(Loopback, "noequals", afterStored, Now, events);
+        int pastTheLimit = store.StoreFromResponse(Loopback, "b=1", CookieStore.MostCookiesStoredPerResponse, Now, events);
+
+        Assert.AreEqual(8, afterStored);
+        Assert.AreEqual(8, afterRefused);
+        Assert.AreEqual(CookieStore.MostCookiesStoredPerResponse, pastTheLimit);
+        Assert.HasCount(2, events.Info);
+        Assert.AreEqual("a", store.Cookies.Single().Name);
     }
 
     [TestMethod]
     public void StoreFromResponse_NullEvents_Throws() =>
         Assert.ThrowsExactly<ArgumentNullException>(() => new CookieStore().StoreFromResponse(Www, [], Now, null!));
+
+    [TestMethod]
+    public void StoreFromResponse_OneHeaderNullArgument_Throws()
+    {
+        CookieStore store = new();
+
+        Assert.ThrowsExactly<ArgumentNullException>(() => store.StoreFromResponse(null!, "a=1", 0, Now, NoTransferEvents.Instance));
+        Assert.ThrowsExactly<ArgumentNullException>(() => store.StoreFromResponse(Www, (string)null!, 0, Now, NoTransferEvents.Instance));
+        Assert.ThrowsExactly<ArgumentNullException>(() => store.StoreFromResponse(Www, "a=1", 0, Now, null!));
+    }
 }

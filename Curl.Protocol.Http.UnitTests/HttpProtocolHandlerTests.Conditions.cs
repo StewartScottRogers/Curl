@@ -23,12 +23,16 @@ public sealed partial class HttpProtocolHandlerTests
     [DataRow(18781, "0-99", DisplayName = "-r 0-99")]
     [DataRow(18782, "100-", DisplayName = "-r 100-")]
     [DataRow(18783, "-500", DisplayName = "-r -500")]
+    [DataRow(18837, "0-9,20-29", DisplayName = "-r 0-9,20-29")]
+    [DataRow(18838, "1-2abc", DisplayName = "-r 1-2abc")]
+    [DataRow(18839, "abc", DisplayName = "-r abc")]
+    [DataRow(18840, "-0", DisplayName = "-r -0")]
     public async Task ExecuteAsync_Range_SendsItAfterHostAndWritesTheBody(int port, string range)
     {
         foreach (int chunkSize in ChunkSizes)
         {
             MemoryStream output = new();
-            TransferContext context = new() { Url = ConditionUrl(port), Output = output, Range = ParseRange(range) };
+            TransferContext context = new() { Url = ConditionUrl(port), Output = output, RangeText = range };
 
             TransferResult result = await Handler(QueueConnector.For(Connection(Partial + "hello", chunkSize, RangeRequest(port, range))))
                 .ExecuteAsync(context);
@@ -42,7 +46,7 @@ public sealed partial class HttpProtocolHandlerTests
     public async Task ExecuteAsync_RangeAnswered200_WritesTheWholeBody()
     {
         MemoryStream output = new();
-        TransferContext context = new TransferContext { Url = ConditionUrl(18784), Output = output, Range = ByteRange.Bounded(0, 99) };
+        TransferContext context = new TransferContext { Url = ConditionUrl(18784), Output = output, RangeText = "0-99" };
 
         TransferResult result = await Handler(QueueConnector.For(Connection(WholeHead + "hello", 65536, RangeRequest(18784, "0-99"))))
             .ExecuteAsync(context);
@@ -59,7 +63,7 @@ public sealed partial class HttpProtocolHandlerTests
         {
             Url = ConditionUrl(18832),
             Output = new MemoryStream(),
-            Range = ByteRange.Bounded(0, 9),
+            RangeText = "0-9",
             Http = new HttpRequestOptions { Headers = ["Range: bytes=1-2"] },
         };
 
@@ -78,7 +82,7 @@ public sealed partial class HttpProtocolHandlerTests
         {
             Url = ConditionUrl(18831),
             Output = new MemoryStream(),
-            Range = ByteRange.Bounded(0, 9),
+            RangeText = "0-9",
             TimeCondition = new TimeCondition(ConditionTime, TimeConditionKind.IfModifiedSince),
             Http = new HttpRequestOptions { Headers = ["X-A: 1"], Referer = "ref", Compressed = true },
         };
@@ -100,8 +104,30 @@ public sealed partial class HttpProtocolHandlerTests
         {
             Url = ConditionUrl(18834),
             Output = new MemoryStream(),
-            Range = ByteRange.Bounded(0, 9),
+            RangeText = "0-9",
             TimeCondition = new TimeCondition(ConditionTime, TimeConditionKind.IfModifiedSince),
+            Http = new HttpRequestOptions { Body = new BytesBody("x"u8.ToArray(), "application/x-www-form-urlencoded") },
+        };
+
+        TransferResult result = await Handler(QueueConnector.For(Connection(Partial + "hello", 65536, expected))).ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+    }
+
+    [TestMethod]
+    [DataRow(18841, "0-9,20-29", DisplayName = "-d x -r 0-9,20-29")]
+    [DataRow(18842, "1-2abc", DisplayName = "-d x -r 1-2abc")]
+    [DataRow(18843, "abc", DisplayName = "-d x -r abc")]
+    [DataRow(18844, "-0", DisplayName = "-d x -r -0")]
+    public async Task ExecuteAsync_RangeTextWithARequestBody_SendsItAsTypedInContentRange(int port, string range)
+    {
+        string expected = $"POST /f HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nContent-Range: bytes {range}/1\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+            + "Content-Length: 1\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\nx";
+        TransferContext context = new TransferContext
+        {
+            Url = ConditionUrl(port),
+            Output = new MemoryStream(),
+            RangeText = range,
             Http = new HttpRequestOptions { Body = new BytesBody("x"u8.ToArray(), "application/x-www-form-urlencoded") },
         };
 
@@ -119,7 +145,7 @@ public sealed partial class HttpProtocolHandlerTests
         {
             Url = ConditionUrl(18835),
             Output = new MemoryStream(),
-            Range = ByteRange.FromOffset(100),
+            RangeText = "100-",
             Http = new HttpRequestOptions { CustomMethod = "PUT", Body = new BytesBody("hello"u8.ToArray(), "application/x-www-form-urlencoded") },
         };
 
@@ -137,7 +163,7 @@ public sealed partial class HttpProtocolHandlerTests
         {
             Url = ConditionUrl(18836),
             Output = new MemoryStream(),
-            Range = ByteRange.Bounded(0, 9),
+            RangeText = "0-9",
             Http = new HttpRequestOptions { Headers = ["Content-Range: foo"], Body = new BytesBody("x"u8.ToArray(), "application/x-www-form-urlencoded") },
         };
 
@@ -481,13 +507,6 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual("1234567890", Latin1(output.ToArray()));
     }
-
-    private static ByteRange ParseRange(string range) =>
-        range.StartsWith('-')
-            ? ByteRange.Suffix(long.Parse(range[1..], System.Globalization.CultureInfo.InvariantCulture))
-            : range.EndsWith('-')
-                ? ByteRange.FromOffset(long.Parse(range[..^1], System.Globalization.CultureInfo.InvariantCulture))
-                : ByteRange.Bounded(0, 99);
 
     private static string RangeRequest(int port, string range) =>
         $"GET /f HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nRange: bytes={range}\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";

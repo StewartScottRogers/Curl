@@ -27,6 +27,20 @@ internal sealed class HttpResponseHeadBuilder
     private string pendingTerminator = string.Empty;
 
     /// <summary>
+    /// Gets the header added last to the current head, its continuation lines folded in; valid
+    /// once <see cref="AddLine" />, <see cref="EndHead" /> or <see cref="EndHeadAtClose" /> has
+    /// completed a header of it.
+    /// </summary>
+    internal HttpResponseHeader LastHeader => headers[^1];
+
+    /// <summary>
+    /// Gets the header the current head's last header line started, its continuation lines so
+    /// far folded in, as it would be added were it whole now; valid once <see cref="AddLine" />
+    /// has started a header that no later line has completed.
+    /// </summary>
+    internal HttpResponseHeader PendingHeader => ToHeader(pendingHeader.ToString());
+
+    /// <summary>
     /// Starts the next response's head with its status line, dropping the previous head's
     /// headers but keeping its bytes.
     /// </summary>
@@ -123,10 +137,15 @@ internal sealed class HttpResponseHeadBuilder
         }
 
         string header = pendingHeader.ToString();
-        int colon = header.IndexOf(':', StringComparison.Ordinal);
-        headers.Add(new HttpResponseHeader(header[..colon], header[(colon + 1)..].Trim(' ', '\t')));
+        headers.Add(ToHeader(header));
         Append(header, pendingTerminator);
         hasPendingHeader = false;
+    }
+
+    private HttpResponseHeader ToHeader(string header)
+    {
+        int colon = header.IndexOf(':', StringComparison.Ordinal);
+        return new HttpResponseHeader(header[..colon], header[(colon + 1)..].Trim(' ', '\t')) { LineStart = headText.Length };
     }
 
     private void Append(string content, string terminator)

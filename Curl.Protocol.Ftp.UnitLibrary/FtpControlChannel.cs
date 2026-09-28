@@ -21,6 +21,19 @@ internal sealed class FtpControlChannel(IConnection connection, CancellationToke
     private const int ReadBufferSize = 4096;
 
     /// <summary>
+    /// Gets the connection commands are sent on and replies read from: the one the channel
+    /// was built with until <see cref="SwitchTo(IConnection)" />.
+    /// </summary>
+    public IConnection Connection => connection;
+
+    /// <summary>
+    /// Carries on over <paramref name="secured" />, the control connection after
+    /// <c>AUTH</c> upgraded it to TLS.
+    /// </summary>
+    /// <param name="secured">The upgraded connection; the caller owns it.</param>
+    public void SwitchTo(IConnection secured) => connection = secured;
+
+    /// <summary>
     /// The most bytes a reply line may hold before its LF, so that the line with its LF is
     /// at most 65535 bytes: measured on curl 8.21.0, one byte more fails with exit 100.
     /// </summary>

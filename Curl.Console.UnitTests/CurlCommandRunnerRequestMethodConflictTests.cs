@@ -55,6 +55,31 @@ public sealed class CurlCommandRunnerRequestMethodConflictTests
         AssertRefused(exitCode, PostAndGetLines);
     }
 
+    // Measured with COLUMNS=200 and COLUMNS=40 curl -I -d x http://127.0.0.1:1/
+    // (curl 8.21.0, Windows, 2026-09-27).
+    [TestMethod]
+    public async Task RunAsync_HeadWithPostBodyAt200Columns_PrintsTheWarningOnOneLine()
+    {
+        int exitCode = await RunAsync(["-I", "-d", "x", Url], terminalColumns: 200);
+
+        AssertRefused(
+            exitCode,
+            "Warning: You can only select one HTTP request method! You asked for both POST (-d, --data) and HEAD (-I, --head)." + Environment.NewLine);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_HeadWithPostBodyAt40Columns_WrapsTheWarningAsCurlWrapsIt()
+    {
+        int exitCode = await RunAsync(["-I", "-d", "x", Url], terminalColumns: 40);
+
+        AssertRefused(
+            exitCode,
+            "Warning: You can only select one HTTP " + Environment.NewLine
+            + "Warning: request method! You asked for " + Environment.NewLine
+            + "Warning: both POST (-d, --data) and " + Environment.NewLine
+            + "Warning: HEAD (-I, --head)." + Environment.NewLine);
+    }
+
     [TestMethod]
     [DataRow(new[] { "-s", "-I", "-d", "x" })]
     [DataRow(new[] { "-I", "-d", "x", "-s" })]
@@ -99,7 +124,7 @@ public sealed class CurlCommandRunnerRequestMethodConflictTests
         Assert.IsEmpty(http.Contexts);
     }
 
-    private Task<int> RunAsync(IReadOnlyList<string> arguments) =>
+    private Task<int> RunAsync(IReadOnlyList<string> arguments, int terminalColumns = TerminalColumns.Default) =>
         new CurlCommandRunner(
                 _ =>
                 {
@@ -111,6 +136,7 @@ public sealed class CurlCommandRunnerRequestMethodConflictTests
                 standardOutput,
                 standardError,
                 new MemoryStream(),
-                runsOnWindows: false)
+                runsOnWindows: false,
+                terminalColumns)
             .RunAsync(arguments);
 }

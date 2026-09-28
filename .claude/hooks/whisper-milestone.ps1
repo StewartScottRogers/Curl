@@ -8,7 +8,8 @@
     JSON from standard input, recognises three milestones from the command and its output,
     and speaks one short phrase very quietly in Windows' Zira voice:
 
-      task-board.ps1 move ... -To Done        "Task done. B L 199, expand variable."
+      task-board.ps1 move ... -To Done        "Task done. B L 199, expand variable references in config files."
+                                              (the task's whole file name, never shortened)
       git commit (that made a commit)         "Committed. Parse the proxy text."
       git branch -d/-D, git push --delete     "Branch factory BL 147 wip, deleted."
 
@@ -39,7 +40,8 @@ try {
     # A task moved to Done: the board script prints "BL-199  Doing -> Done  Tasks\Done\BL-199-<slug>.md".
     if ($command -match 'task-board\.ps1' -and $command -match '\bmove\b' -and $command -match '-To\s+Done') {
         foreach ($m in [regex]::Matches($output, '(BL-\d+)\s+\w+\s+->\s+Done\s+\S*?\1-([a-z0-9-]+)\.md')) {
-            $phrases += "Task done. $($m.Groups[1].Value), $(Get-Words ($m.Groups[2].Value -replace '-', ' ') 4)."
+            # The whole file name, never a shortened one: Stewart asked to hear all of it.
+            $phrases += "Task done. $($m.Groups[1].Value), $($m.Groups[2].Value -replace '-', ' ')."
         }
     }
 

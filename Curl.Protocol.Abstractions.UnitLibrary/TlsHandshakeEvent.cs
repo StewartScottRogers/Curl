@@ -74,4 +74,18 @@ public sealed record TlsHandshakeEvent
     /// the platform does not report it (ADR-0085).
     /// </summary>
     public IReadOnlyList<X509Certificate2> PeerCertificateChain { get; init; } = [];
+
+    /// <summary>
+    /// Gets a value indicating whether the handshake was with an HTTPS proxy rather than the
+    /// origin, which makes curl's OpenSSL build say <c>Proxy certificate:</c> instead of
+    /// <c>Server certificate:</c> (ADR-0085).
+    /// </summary>
+    public bool IsProxy { get; init; }
+
+    /// <summary>
+    /// Gets the host name, as the user gave it, that the server's certificate was checked
+    /// against, or <see langword="null" /> when the host name was not checked (<c>-k</c>).
+    /// An IP address is given without brackets (ADR-0085).
+    /// </summary>
+    public string? VerifiedHostName { get; init; }
 }

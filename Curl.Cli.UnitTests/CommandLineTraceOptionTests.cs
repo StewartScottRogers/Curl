@@ -286,6 +286,40 @@ public sealed class CommandLineTraceOptionTests
         Assert.AreEqual(string.Empty, result.Options.StandardErrorFile);
     }
 
+    [TestMethod]
+    public void Parse_NoStderr_HasNoStandardErrorRedirects()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse([Url]);
+
+        Assert.IsEmpty(result.StandardErrorRedirects);
+    }
+
+    [TestMethod]
+    public void Parse_StderrAmongWarnings_RecordsEachAtTheWarningLinesMetBeforeIt()
+    {
+        CommandLineParseResult result = Parse("-H nocolon --stderr a -H x --stderr b -s --stderr c");
+
+        Assert.IsTrue(result.IsAccepted);
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                new StandardErrorRedirect("a", 1, false),
+                new StandardErrorRedirect("b", 2, false),
+                new StandardErrorRedirect("c", 2, true),
+            },
+            result.StandardErrorRedirects.ToArray());
+        Assert.AreSame(result.Options.StandardErrorRedirects, result.StandardErrorRedirects);
+    }
+
+    [TestMethod]
+    public void Parse_RefusalAfterStderr_KeepsTheRedirect()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--stderr", "se", "--bogus", Url]);
+
+        Assert.IsFalse(result.IsAccepted);
+        CollectionAssert.AreEqual(new[] { new StandardErrorRedirect("se", 0, false) }, result.StandardErrorRedirects.ToArray());
+    }
+
     private static CommandLineParseResult Parse(string arguments) =>
         CommandLineParser.Parse([.. arguments.Split(' '), Url]);
 

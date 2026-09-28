@@ -2,7 +2,7 @@
 
 Phase 1.
 
-Transfer engine: URL parsing, scheme dispatch, redirects, resume, retries, rate limiting, IPFS gateway rewriting.
+Transfer engine: URL parsing, scheme dispatch, redirects, resume, retries, rate limiting, low-speed aborts (`LowSpeedWatchdog`, ADR-0106), IPFS gateway rewriting.
 
 Never construct a `Socket`, `SslStream` or `HttpClient` here. Take `IConnection`
 so the tests in the matching `.UnitTests` project can drive this code from a
@@ -22,7 +22,9 @@ into `Curl.Console`.
 
 `ByteRangeParser` is the one place `-r`/`--range` text becomes the `ByteRange` a handler
 receives on `ITransferContext.Range`, read as libcurl 8.21.0's `Curl_range` reads it; text
-that names no range is `NotDeliveredFailure`, exit 33. Handlers never parse range text.
+that names no range is `NotDeliveredFailure`, exit 33, except on an `http`/`https` URL, whose
+handler sends `ITransferContext.RangeText` verbatim as curl does (ADR-0044, BL-386). Handlers
+never parse range text.
 
 `RedirectFollower` wraps `ProtocolDispatcher` for `-L`/`--location`: it follows a
 successful 3xx hop's `TransferReport.RedirectUrl` under a `RedirectPolicy`
@@ -32,7 +34,10 @@ rewriting POST to GET and dropping credentials to another host, port or scheme a
 effective URL, summed header/request/connection counts, timings from the first hop with
 `RedirectDuration`). Without `-L` it returns the dispatcher's result unchanged. Given a
 `HopProxySelector`, it chooses each hop's proxy again from that hop's own URL, as curl
-8.21.0 does (BL-329); without one, every hop keeps the first URL's proxy.
+8.21.0 does (BL-329); without one, every hop keeps the first URL's proxy. Under
+`HttpRequestOptions.AutoReferer` (`-e "...;auto"`) each hop is sent the previous URL, without
+user information or fragment, as its `Referer`, and the merged report's `Referer` is the last
+one sent, which `%{referer}` prints (ADR-0101, BL-361).
 
 `TransferRetrier` runs a transfer again under `--retry` (`RetryPolicy`: `--retry`,
 `--retry-delay`) after curl 8.21.0's transient failures: exit 28, 6, 5 or 12
@@ -73,7 +78,10 @@ building so a byte above 127 still fails before sending, and an unseekable one f
 read that reaches such a byte with a `RequestBodyReadFailedException`, which the sender turns
 into exit 26. An unknown name is exit 43 (ADR-0041, ADR-0076, ADR-0093). An `@-` or `<-` part reads the standard-input `Stream` the
 builder is given whole, never closing it, so the body keeps its `Content-Length`; without
-one it opens the path `-` as before (BL-275). It is not yet wired into `Curl.Console`.
+one it opens the path `-` as before (BL-275). A file that cannot seek declares the length
+`UnseekableFileLength` gives it (ADR-0097); one that can declares its length, except a device
+under `/dev/` off Windows, which `SeekableFileLength` sends chunked as libcurl does
+(ADR-0104). It is not yet wired into `Curl.Console`.
 
 `Globbing\UrlGlob` is curl 8.21.0's URL globbing (ADR-0032): `TryParse` reads `{a,b}` sets
 and `[1-10]`, `[01-10]`, `[a-z:2]` ranges as `tool_urlglob.c` does, failing with exit 3 and

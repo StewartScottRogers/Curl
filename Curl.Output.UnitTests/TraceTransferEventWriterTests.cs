@@ -183,12 +183,20 @@ public sealed class TraceTransferEventWriterTests
     }
 
     [TestMethod]
-    public void ReportTlsData_WritesNothing()
+    public void TlsDataMessagesAndTrust_Schannel_WriteNothing()
     {
-        TraceTransferEventWriter writer = new(output, TraceDumpFormat.HexAndText, writesTimestamps: false, TimeProvider.System);
+        TraceTransferEventWriter writer = new(output, TraceDumpFormat.HexAndText, writesTimestamps: false, TimeProvider.System, TlsBackend.Schannel);
 
         writer.ReportTlsData([1, 2, 3], sent: true);
         writer.ReportTlsData([1, 2, 3], sent: false);
+        writer.ReportTlsMessage(new TlsMessageEvent
+        {
+            ProtocolVersion = 0x0304,
+            ContentType = TlsContentType.Handshake,
+            Sent = true,
+            Bytes = new byte[] { 1, 0, 0, 0 },
+        });
+        writer.ReportTlsTrust(new TlsTrustEvent { VerifiesPeer = false });
 
         Assert.AreEqual(string.Empty, Written());
     }

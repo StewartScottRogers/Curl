@@ -19,7 +19,13 @@ public sealed class ScriptedCookieStore(params string?[] cookieHeaders) : ICooki
     /// <summary>
     /// Gets every <see cref="StoreFromResponse" /> call made, in order.
     /// </summary>
-    public List<(CurlUrl Url, IReadOnlyList<string> SetCookieHeaders, DateTimeOffset Now, ITransferEvents Events)> Responses { get; } = [];
+    public List<(CurlUrl Url, string SetCookieHeader, int StoredFromResponse, DateTimeOffset Now, ITransferEvents Events)> Responses { get; } = [];
+
+    /// <summary>
+    /// Gets or sets the <c>-v</c> line each <see cref="StoreFromResponse" /> call reports, made
+    /// from the header it was given; <see langword="null" /> reports nothing.
+    /// </summary>
+    public Func<string, string>? ReportedLine { get; set; }
 
     /// <inheritdoc />
     public string? GetCookieHeader(CurlUrl url, bool secure, DateTimeOffset now)
@@ -29,6 +35,14 @@ public sealed class ScriptedCookieStore(params string?[] cookieHeaders) : ICooki
     }
 
     /// <inheritdoc />
-    public void StoreFromResponse(CurlUrl url, IReadOnlyList<string> setCookieHeaders, DateTimeOffset now, ITransferEvents events) =>
-        Responses.Add((url, setCookieHeaders, now, events));
+    public int StoreFromResponse(CurlUrl url, string setCookieHeader, int storedFromResponse, DateTimeOffset now, ITransferEvents events)
+    {
+        Responses.Add((url, setCookieHeader, storedFromResponse, now, events));
+        if (ReportedLine is { } line)
+        {
+            events.ReportInfo(line(setCookieHeader));
+        }
+
+        return storedFromResponse + 1;
+    }
 }

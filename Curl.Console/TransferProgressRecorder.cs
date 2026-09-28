@@ -27,6 +27,12 @@ namespace Curl.Console;
 /// draws and ended with a newline, and the new hop's counters start again from zero at a new
 /// zero line, as curl 8.21.0 draws them (measured 2026-09-27, BL-277 Notes).
 /// </para>
+/// <para>
+/// Given a live writer, the recorder hands it the lines drawn so far once the handler first
+/// reports the transfer started, and after that every line as a report draws it, so a
+/// terminal sees the meter move (task BL-383, ADR-0099). Before that report the lines are
+/// only kept: a transfer that fails before it starts shows no meter (task BL-130).
+/// </para>
 /// </remarks>
 internal sealed class TransferProgressRecorder : ITransferProgress
 {
@@ -61,6 +67,12 @@ internal sealed class TransferProgressRecorder : ITransferProgress
 
     private readonly StringBuilder statusLines = new();
 
+    private readonly Action<string>? writeLive;
+
+    private readonly HoldableStream? eventOutput;
+
+    private int writtenLength;
+
     private long start;
 
     private int sampleCount;
@@ -89,10 +101,26 @@ internal sealed class TransferProgressRecorder : ITransferProgress
     /// </summary>
     /// <param name="timeProvider">The clock every draw reads.</param>
     /// <param name="progressBar">The <c>-#</c> bar every report is passed on to, or <see langword="null" /> without one.</param>
-    internal TransferProgressRecorder(TimeProvider timeProvider, ProgressBarRecorder? progressBar = null)
+    /// <param name="writeLive">
+    /// Writes status-line text to standard error while the transfer runs, from the first
+    /// <see cref="ReportTransferStarted" /> on; <see langword="null" /> when the meter is not shown.
+    /// </param>
+    /// <param name="eventOutput">
+    /// The stream the run's <c>-v</c> and trace lines go through, held from the handler's
+    /// <see cref="ReportTransferDone" /> while the meter is written live, so the runner can write
+    /// the meter's end before the lines the handler reports after it; <see langword="null" />
+    /// when the run shows none.
+    /// </param>
+    internal TransferProgressRecorder(
+        TimeProvider timeProvider,
+        ProgressBarRecorder? progressBar = null,
+        Action<string>? writeLive = null,
+        HoldableStream? eventOutput = null)
     {
         this.timeProvider = timeProvider;
         this.progressBar = progressBar;
+        this.writeLive = writeLive;
+        this.eventOutput = eventOutput;
         StartHop();
     }
 
@@ -109,17 +137,23 @@ internal sealed class TransferProgressRecorder : ITransferProgress
     internal string StatusLines => statusLines.ToString();
 
     /// <inheritdoc />
-    /// <remarks>A repeat is the next redirect hop starting, which starts a new status line.</remarks>
+    /// <remarks>
+    /// The first report hands the live writer every line drawn so far; a repeat is the next
+    /// redirect hop starting, which starts a new status line after the <c>-v</c> lines held
+    /// since the hop before it reported done.
+    /// </remarks>
     public void ReportTransferStarted()
     {
         if (HasTransferStarted)
         {
+            eventOutput?.Release();
             FinishRedirectHop();
             statusLines.Append(Environment.NewLine);
             StartHop();
         }
 
         HasTransferStarted = true;
+        WriteLive();
         progressBar?.ReportTransferStarted();
     }
 
@@ -130,6 +164,7 @@ internal sealed class TransferProgressRecorder : ITransferProgress
         downloadTotal = expectedTotal;
         bytesReported = true;
         Draw(done: false);
+        WriteLive();
         progressBar?.ReportDownloaded(bytesSoFar, expectedTotal);
     }
 
@@ -140,7 +175,50 @@ internal sealed class TransferProgressRecorder : ITransferProgress
         uploadTotal = expectedTotal;
         bytesReported = true;
         Draw(done: false);
+        WriteLive();
         progressBar?.ReportUploaded(bytesSoFar, expectedTotal);
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// While the meter is written live, holds the <c>-v</c> and trace lines from here on, so the
+    /// connection-end line the handler reports next comes after the meter's done status lines and
+    /// their newline, which the runner writes once the handler returns with its result and then
+    /// releases the lines: curl 8.21.0 draws them in <c>Curl_pgrsDone</c>, before
+    /// <c>multi_done</c> reports the connection (task BL-411, ADR-0116).
+    /// </remarks>
+    public void ReportTransferDone()
+    {
+        if (writeLive is not null && HasTransferStarted)
+        {
+            eventOutput?.Hold();
+        }
+    }
+
+    /// <summary>
+    /// Takes the status lines drawn and not yet handed to the live writer: every line when
+    /// there is none or the transfer never reported starting, else those drawn since the
+    /// last report, such as the ones <see cref="Finish" /> draws.
+    /// </summary>
+    /// <returns>The lines, each starting with a carriage return, as <see cref="StatusLines" /> gives them.</returns>
+    internal string TakeUnwrittenStatusLines()
+    {
+        string unwritten = statusLines.ToString(writtenLength, statusLines.Length - writtenLength);
+        writtenLength = statusLines.Length;
+
+        return unwritten;
+    }
+
+    /// <summary>
+    /// Hands the live writer, when there is one and the transfer has reported starting, the
+    /// lines drawn since it was last handed any.
+    /// </summary>
+    private void WriteLive()
+    {
+        if (writeLive is not null && HasTransferStarted && statusLines.Length > writtenLength)
+        {
+            writeLive(TakeUnwrittenStatusLines());
+        }
     }
 
     /// <summary>

@@ -5,10 +5,13 @@ namespace Curl.Protocol.Ftp.Fakes;
 
 /// <summary>
 /// One transfer run against a scripted control and data connection, and what it left
-/// behind.
+/// behind. <see cref="Result" /> is the handler's result with its
+/// <see cref="TransferResult.Report" /> set aside in <see cref="Report" />, so a test pins
+/// the outcome and the report separately.
 /// </summary>
 public sealed record FtpRun(
     TransferResult Result,
+    TransferReport? Report,
     ScriptedConnection Control,
     ScriptedConnection Data,
     QueuedConnector Connector,
@@ -46,6 +49,6 @@ public sealed record FtpRun(
 
         TransferResult result = await new FtpProtocolHandler(connector).ExecuteAsync(context);
 
-        return new FtpRun(result, control, data, connector, context.Output);
+        return new FtpRun(result with { Report = null }, result.Report, control, data, connector, context.Output);
     }
 }

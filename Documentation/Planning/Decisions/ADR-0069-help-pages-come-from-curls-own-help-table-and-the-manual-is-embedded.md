@@ -53,4 +53,6 @@ descriptions or categories.
 
 - A new curl version means refreshing `CurlHelpTable.cs`, `CurlManual.txt` and the
   `Curl.Cli.UnitTests/HelpReference` files from the new build, not editing text by hand.
-- Until BL-376 lands, `curl -h` through `Curl.Console` is accepted with no URL and prints nothing.
+- Since BL-376, `CurlCommandRunner` writes `-h`, `--help <subject>` (an option's manual section
+  included) and `-M` to standard output with the platform newline, at the width
+  `TerminalColumns.Resolve()` gives, and exits 0.

@@ -48,7 +48,7 @@ internal sealed class TransferEventOutput(ITransferEvents events, Stream? ownedT
     /// <param name="standardOutputIsTerminal">
     /// Whether standard output is a terminal, where curl's <c>-v</c> shows no <c>[N bytes data]</c> lines.
     /// </param>
-    /// <param name="timeProvider">The clock a <c>--trace-time</c> stamp reads.</param>
+    /// <param name="timeProvider">The clock a <c>--trace-time</c> stamp on a <c>-v</c> line or a dump reads.</param>
     /// <returns>The output; <see cref="None" /> when no trace option is in effect.</returns>
     internal static async Task<TransferEventOutput> OpenAsync(
         CommandLineOptions options,
@@ -67,7 +67,12 @@ internal sealed class TransferEventOutput(ITransferEvents events, Stream? ownedT
         if (options.Trace == TraceKind.Verbose)
         {
             return new TransferEventOutput(
-                new VerboseTransferEventWriter(TextMode(standardError, runsOnWindows), !standardOutputIsTerminal),
+                new VerboseTransferEventWriter(
+                    TextMode(standardError, runsOnWindows),
+                    !standardOutputIsTerminal,
+                    options.TraceTime,
+                    timeProvider,
+                    PlatformTlsBackend.ForProcess),
                 null);
         }
 

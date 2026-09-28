@@ -36,7 +36,7 @@ namespace Curl.Cli;
 /// <c>--no-post301</c>, <c>--no-post302</c>, <c>--no-post303</c>, <c>--no-show-headers</c>, <c>--no-include</c>, <c>--no-head</c>,
 /// <c>--no-fail</c>, <c>--no-fail-with-body</c>, <c>--no-fail-early</c>, <c>--no-compressed</c>, <c>--no-raw</c>, <c>--no-tr-encoding</c>,
 /// <c>--no-ignore-content-length</c>, <c>--no-path-as-is</c>, <c>--no-http0.9</c>, <c>--no-basic</c>, <c>--no-digest</c>, <c>--no-ntlm</c>, <c>--no-negotiate</c>, <c>--no-proxytunnel</c>, <c>--no-remote-name</c>,
-/// <c>--no-remote-name-all</c>, <c>--no-remote-header-name</c>, <c>--no-create-dirs</c>, <c>--no-junk-session-cookies</c>, <c>--no-globoff</c>, <c>--no-version</c>, <c>--no-verbose</c>, <c>--no-trace-time</c>, <c>--no-retry-all-errors</c>, <c>--no-retry-connrefused</c>, <c>--no-disable-epsv</c>, <c>--no-ftp-skip-pasv-ip</c>, <c>--no-ftp-create-dirs</c> and <c>--no-list-only</c> (measured 2026-09-27) are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
+/// <c>--no-remote-name-all</c>, <c>--no-remote-header-name</c>, <c>--no-create-dirs</c>, <c>--no-junk-session-cookies</c>, <c>--no-globoff</c>, <c>--no-version</c>, <c>--no-verbose</c>, <c>--no-trace-time</c>, <c>--no-retry-all-errors</c>, <c>--no-retry-connrefused</c>, <c>--no-disable-epsv</c>, <c>--no-epsv</c>, <c>--no-ftp-skip-pasv-ip</c>, <c>--no-ftp-create-dirs</c>, <c>--no-disable-eprt</c>, <c>--no-eprt</c>, <c>--no-ssl</c>, <c>--no-ftp-ssl</c>, <c>--no-ssl-reqd</c>, <c>--no-ftp-ssl-reqd</c>, <c>--no-ftp-ssl-control</c> and <c>--no-list-only</c> (measured 2026-09-27) are accepted and turn their flag off; the last spelling wins, so <c>-s --no-silent</c> is not
 /// silent and <c>--no-silent -s</c> is. <c>--no-silent=x</c> is accepted, its value ignored.
 /// <c>--no-tlsv1.2</c>, <c>--no-tlsv1.3</c>, <c>--no-url</c>, <c>--no-output</c> (even as the last
 /// argument), <c>--no-output=x</c>, <c>--no-data</c>, <c>--no-dump-header</c>, <c>--no-range</c>, <c>--no-time-cond</c>,
@@ -47,7 +47,7 @@ namespace Curl.Cli;
 /// <c>--no-http2-prior-knowledge</c>, <c>--no-http3</c>, <c>--no-http3-only</c>, <c>--no-request-target</c>, <c>--no-ipfs-gateway</c>, <c>--no-anyauth</c>,
 /// <c>--no-oauth2-bearer</c>, <c>--no-proxy</c>, <c>--no-proxy-user</c>, <c>--no-noproxy</c>, <c>--no-socks4</c>, <c>--no-socks4a</c>,
 /// <c>--no-socks5</c>, <c>--no-socks5-hostname</c>, <c>--no-write-out</c>, <c>--no-output-dir</c>, <c>--no-trace</c>, <c>--no-trace-ascii</c>, <c>--no-stderr</c>, <c>--no-retry</c>, <c>--no-retry-delay</c>, <c>--no-retry-max-time</c>, <c>--no-limit-rate</c>,
-/// <c>--no-speed-limit</c>, <c>--no-speed-time</c>, <c>--no-ftp-method</c> and <c>--no-quote</c> (each also with <c>=x</c>) exit 2 with
+/// <c>--no-speed-limit</c>, <c>--no-speed-time</c>, <c>--no-ftp-method</c>, <c>--no-ftp-port</c>, <c>--no-ftp-pasv</c> and <c>--no-quote</c> (each also with <c>=x</c>) exit 2 with
 /// <c>curl: option &lt;as typed&gt;: the given option cannot be reversed with a --no- prefix</c> and
 /// the try-help line. <c>--no-bogus</c>, <c>--no-</c>, <c>--no-no-silent</c> and <c>--no-Silent</c>
 /// exit 2 as unknown. A short letter is never negated.
@@ -108,9 +108,19 @@ public static class CommandLineOptionTable
         CommandLineOption.Value("connect-to", null, AcceptingEmpty((options, entry) => options.AddConnectToEntry(entry))),
         CommandLineOption.NegatableFlag("tftp-no-options", null, (options, on) => options.TftpNoOptions = on),
         CommandLineOption.NegatableFlag("disable-epsv", null, (options, on) => options.FtpDisableEpsv = on),
+        CommandLineOption.NegatableFlag("epsv", null, (options, on) => options.FtpDisableEpsv = !on),
         CommandLineOption.NegatableFlag("ftp-skip-pasv-ip", null, (options, on) => options.FtpSkipPasvIp = on),
         CommandLineOption.Value("ftp-method", null, AcceptingEmpty(SetFtpFileMethod)),
         CommandLineOption.NegatableFlag("ftp-create-dirs", null, (options, on) => options.FtpCreateDirectories = on),
+        CommandLineOption.Text("ftp-port", 'P', (options, address) => options.FtpPort = address),
+        CommandLineOption.Flag("ftp-pasv", null, options => options.FtpPort = null),
+        CommandLineOption.NegatableFlag("disable-eprt", null, (options, on) => options.FtpUseEprt = !on),
+        CommandLineOption.NegatableFlag("eprt", null, (options, on) => options.FtpUseEprt = on),
+        CommandLineOption.NegatableFlag("ssl", null, (options, on) => options.SetSslTry(on, "--ssl")),
+        CommandLineOption.NegatableFlag("ftp-ssl", null, (options, on) => options.SetSslTry(on, "--ftp-ssl")),
+        CommandLineOption.NegatableFlag("ssl-reqd", null, (options, on) => options.SslRequired = on),
+        CommandLineOption.NegatableFlag("ftp-ssl-reqd", null, (options, on) => options.SslRequired = on),
+        CommandLineOption.NegatableFlag("ftp-ssl-control", null, (options, on) => options.FtpSslControlOnly = on),
         CommandLineOption.NegatableFlag("list-only", 'l', (options, on) => options.ListOnly = on),
         CommandLineOption.Value("quote", 'Q', AcceptingEmpty((options, command) => options.AddQuoteCommand(command))),
         CommandLineOption.Value("create-file-mode", null, SetCreateFileMode),
@@ -233,7 +243,7 @@ public static class CommandLineOptionTable
     private static CommandLineRefusal? SetStandardErrorFile(CommandLineOptions options, string file, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
     {
         CommandLineOption.WarnWhenFileNameLooksLikeFlag(options, file);
-        options.StandardErrorFile = file;
+        options.RedirectStandardError(file);
         return null;
     }
 
@@ -762,6 +772,10 @@ public static class CommandLineOptionTable
         if (refusal is null)
         {
             options.SpeedLimit = bytesPerSecond;
+            if (options.SpeedTimeSeconds == 0)
+            {
+                options.SpeedTimeSeconds = 30;
+            }
         }
 
         return refusal;
@@ -773,6 +787,10 @@ public static class CommandLineOptionTable
         if (refusal is null)
         {
             options.SpeedTimeSeconds = seconds;
+            if (options.SpeedLimit == 0)
+            {
+                options.SpeedLimit = 1;
+            }
         }
 
         return refusal;

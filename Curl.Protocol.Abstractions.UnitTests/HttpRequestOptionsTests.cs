@@ -21,6 +21,8 @@ public sealed class HttpRequestOptionsTests
         Assert.IsNull(options.Referer);
         Assert.IsNull(options.Body);
         Assert.IsFalse(options.FollowRedirects);
+        Assert.AreEqual(50, options.MaxRedirects);
+        Assert.AreEqual(0, options.RedirectsFollowed);
         Assert.AreEqual(HttpFailMode.None, options.Fail);
         Assert.AreEqual(HttpVersionPreference.Http11, options.Version);
         Assert.IsFalse(options.Compressed);
@@ -51,6 +53,8 @@ public sealed class HttpRequestOptionsTests
             Referer = "https://example.com/from",
             Body = body,
             FollowRedirects = true,
+            MaxRedirects = -1,
+            RedirectsFollowed = 7,
             Fail = HttpFailMode.FailWithBody,
             Version = HttpVersionPreference.Http10,
             Compressed = true,
@@ -71,6 +75,8 @@ public sealed class HttpRequestOptionsTests
         Assert.AreEqual("https://example.com/from", options.Referer);
         Assert.AreSame(body, options.Body);
         Assert.IsTrue(options.FollowRedirects);
+        Assert.AreEqual(-1, options.MaxRedirects);
+        Assert.AreEqual(7, options.RedirectsFollowed);
         Assert.AreEqual(HttpFailMode.FailWithBody, options.Fail);
         Assert.AreEqual(HttpVersionPreference.Http10, options.Version);
         Assert.IsTrue(options.Compressed);

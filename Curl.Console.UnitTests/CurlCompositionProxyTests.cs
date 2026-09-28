@@ -1,5 +1,6 @@
 using System.Text;
 
+using Curl.Authentication;
 using Curl.Cli;
 using Curl.Core;
 using Curl.Networking;
@@ -313,6 +314,16 @@ public sealed class CurlCompositionProxyTests
     }
 
     [TestMethod]
+    public void CreateProxyTunnelOptions_EncodesCommandLineTextInThePlatformEncoding()
+    {
+        HttpProxyTunnelOptions options = TunnelOptionsFor(["-p", "-x", "127.0.0.1:18238", "http://example.com/a"]);
+
+        Assert.AreEqual(
+            CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()).CodePage,
+            options.CommandLineTextEncoding.CodePage);
+    }
+
+    [TestMethod]
     public async Task RunAsync_ProxyTunnelWithEmptyUserAgentOption_ConnectRequestHasNoUserAgent()
     {
         ScriptedConnector server = new([Latin1(ConnectionEstablished), Latin1(Hello)]);
@@ -394,6 +405,34 @@ public sealed class CurlCompositionProxyTests
             Latin1(server.Written));
         Assert.AreEqual(ForwardProxy, server.Targets.Single());
         Assert.AreEqual("hello", run.StandardOutput);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_TftpUrlThroughAnHttpProxy_SendsTheMasqueRequestToTheProxyAndExitsSeven()
+    {
+        // Measured by BL-330: curl -sS -x http://127.0.0.1:18331 tftp://example.com/f
+        ScriptedConnector server = new([Latin1("HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: connect-udp\r\nCapsule-Protocol: ?1\r\n\r\n")]);
+
+        Run run = await RunAsync(server, "-sS", "-x", "http://127.0.0.1:18331", "tftp://example.com/f");
+
+        Assert.AreEqual(7, run.ExitCode);
+        Assert.AreEqual(
+            "GET http://127.0.0.1:18331/.well-known/masque/udp/example.com/69/ HTTP/1.1\r\n"
+            + "Host: 127.0.0.1:18331\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n"
+            + "Connection: Upgrade\r\nUpgrade: connect-udp\r\nCapsule-Protocol: ?1\r\n\r\n",
+            Latin1(server.Written));
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 18331, false) { IsForwardProxy = true }, server.Targets.Single());
+        Assert.AreEqual($"curl: (7) bind() failed; Invalid arguments{Environment.NewLine}", run.StandardError);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_TftpUrlThroughAnHttpProxyWithProxyUser_SendsProxyAuthorizationInTheMasqueRequest()
+    {
+        ScriptedConnector server = new([Latin1("HTTP/1.1 101 Switching Protocols\r\n\r\n")]);
+
+        await RunAsync(server, "-sS", "-x", "http://127.0.0.1:18331", "-U", "u:p", "tftp://example.com/f");
+
+        StringAssert.Contains(Latin1(server.Written), "Proxy-Authorization: Basic dTpw\r\n");
     }
 
     [TestMethod]

@@ -56,6 +56,36 @@ public sealed class CurlCommandRunnerTransferOptionTests
     }
 
     [TestMethod]
+    [DataRow("http", "abc")]
+    [DataRow("https", "-0")]
+    [DataRow("http", "3-1")]
+    public async Task RunAsync_HttpRangeThatNamesNoRange_DispatchesTheTextAsTyped(string scheme, string rangeText)
+    {
+        RecordingProtocolHandler http = RecordingProtocolHandler.WritingPath(scheme);
+
+        int exitCode = await RunAsync(["-s", "-r", rangeText, scheme + "://127.0.0.1/f"], http);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(string.Empty, StandardErrorText);
+        ITransferContext context = http.Contexts.Single();
+        Assert.AreEqual(rangeText, context.RangeText);
+        Assert.IsNull(context.Range);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RangeList_DispatchesTheTextAsTypedAndTheFirstRangeParsed()
+    {
+        RecordingProtocolHandler http = RecordingProtocolHandler.WritingPath("http");
+
+        int exitCode = await RunAsync(["-r", "0-9,20-29", "http://127.0.0.1/f"], http);
+
+        Assert.AreEqual(0, exitCode);
+        ITransferContext context = http.Contexts.Single();
+        Assert.AreEqual("0-9,20-29", context.RangeText);
+        Assert.AreEqual(ByteRange.Bounded(0, 9), context.Range);
+    }
+
+    [TestMethod]
     public async Task RunAsync_RangeWithInvalidCharacter_PrintsTheWarningThenExit33()
     {
         RecordingProtocolHandler file = RecordingProtocolHandler.WritingPath("file");
@@ -334,7 +364,8 @@ public sealed class CurlCommandRunnerTransferOptionTests
     /// </summary>
     /// <returns>A task that completes when the test has run.</returns>
     [TestMethod]
-    public async Task RunAsync_TimeCondNotADate_WarnsAndTransfersUnconditionally()
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task RunAsync_TimeCondNotADateOnWindows_WarnsAndTransfersUnconditionally()
     {
         int exitCode = await RunAsync(["-z", "notadate", SourceUrl], fileHandler);
 
@@ -343,6 +374,89 @@ public sealed class CurlCommandRunnerTransferOptionTests
         Assert.AreEqual(
             "Warning: Illegal date format for -z, --time-cond (and not a filename). " + NewLine
             + "Warning: Disabling time condition. See curl_getdate(3) for valid date syntax." + NewLine,
+            StandardErrorText);
+    }
+
+    // Measured with COLUMNS=200 and COLUMNS=40 curl -z notadate -o NUL file:///Z:/.../global.json
+    // (curl 8.21.0, Windows, 2026-09-27).
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task RunAsync_TimeCondNotADateAt200ColumnsOnWindows_WarnsOnOneLine()
+    {
+        int exitCode = await RunAsync(["-z", "notadate", SourceUrl], fileHandler, terminalColumns: 200);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(
+            Lines("Warning: Illegal date format for -z, --time-cond (and not a filename). Disabling time condition. See curl_getdate(3) for valid date syntax."),
+            StandardErrorText);
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task RunAsync_TimeCondNotADateAt40ColumnsOnWindows_WrapsTheWarningAsCurlWrapsIt()
+    {
+        int exitCode = await RunAsync(["-z", "notadate", SourceUrl], fileHandler, terminalColumns: 40);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(
+            Lines(
+                "Warning: Illegal date format for -z, ",
+                "Warning: --time-cond (and not a ",
+                "Warning: filename). Disabling time ",
+                "Warning: condition. See curl_getdate(3) ",
+                "Warning: for valid date syntax."),
+            StandardErrorText);
+    }
+
+    // Off Windows, curl first tries the -z value as a file name: getfiletime in src/tool_filetime.c
+    // warns "Failed to get filetime: " + strerror(errno) when stat fails, before src/tool_getparam.c
+    // warns the value is not a date either. Texts from CI run 36376508151 (ubuntu-latest, macos-latest).
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task RunAsync_TimeCondNotADateOffWindows_WarnsNoFileTimeThenNotADateAndTransfersUnconditionally()
+    {
+        int exitCode = await RunAsync(["-z", "notadate", SourceUrl], fileHandler);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual("0123456789", StandardOutputText);
+        Assert.AreEqual(
+            Lines(
+                "Warning: Failed to get filetime: No such file or directory",
+                "Warning: Illegal date format for -z, --time-cond (and not a filename). ",
+                "Warning: Disabling time condition. See curl_getdate(3) for valid date syntax."),
+            StandardErrorText);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task RunAsync_TimeCondNotADateAt200ColumnsOffWindows_WarnsNoFileTimeThenNotADateOnOneLine()
+    {
+        int exitCode = await RunAsync(["-z", "notadate", SourceUrl], fileHandler, terminalColumns: 200);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(
+            Lines(
+                "Warning: Failed to get filetime: No such file or directory",
+                "Warning: Illegal date format for -z, --time-cond (and not a filename). Disabling time condition. See curl_getdate(3) for valid date syntax."),
+            StandardErrorText);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task RunAsync_TimeCondNotADateAt40ColumnsOffWindows_WrapsBothWarningsAsCurlWrapsThem()
+    {
+        int exitCode = await RunAsync(["-z", "notadate", SourceUrl], fileHandler, terminalColumns: 40);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(
+            Lines(
+                "Warning: Failed to get filetime: No ",
+                "Warning: such file or directory",
+                "Warning: Illegal date format for -z, ",
+                "Warning: --time-cond (and not a ",
+                "Warning: filename). Disabling time ",
+                "Warning: condition. See curl_getdate(3) ",
+                "Warning: for valid date syntax."),
             StandardErrorText);
     }
 

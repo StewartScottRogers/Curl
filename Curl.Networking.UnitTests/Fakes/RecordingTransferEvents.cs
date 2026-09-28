@@ -3,8 +3,8 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Networking.Fakes;
 
 /// <summary>
-/// An <see cref="ITransferEvents" /> that records the information lines and reuse events it
-/// is given and ignores the rest.
+/// An <see cref="ITransferEvents" /> that records the information lines, open and reuse events,
+/// TLS trust and TLS handshakes it is given and ignores the rest.
 /// </summary>
 public sealed class RecordingTransferEvents : ITransferEvents
 {
@@ -14,21 +14,36 @@ public sealed class RecordingTransferEvents : ITransferEvents
     /// <summary>Gets every <see cref="ReportConnectionReused" /> event, in order.</summary>
     public List<ConnectionReusedEvent> Reused { get; } = [];
 
+    /// <summary>Gets every <see cref="ReportTlsHandshake" /> event, in order.</summary>
+    public List<TlsHandshakeEvent> Handshakes { get; } = [];
+
     /// <inheritdoc />
     public void ReportInfo(string text) => Info.Add(text);
 
+    /// <summary>Gets every <see cref="ReportConnectionOpened" /> event, in order.</summary>
+    public List<ConnectionOpenedEvent> Opened { get; } = [];
+
     /// <inheritdoc />
-    public void ReportConnectionOpened(ConnectionOpenedEvent opened)
-    {
-    }
+    public void ReportConnectionOpened(ConnectionOpenedEvent opened) => Opened.Add(opened);
 
     /// <inheritdoc />
     public void ReportConnectionReused(ConnectionReusedEvent reused) => Reused.Add(reused);
 
+    /// <summary>
+    /// Gets every <see cref="ReportTlsTrust" /> and <see cref="ReportTlsHandshake" /> event, in
+    /// the order reported.
+    /// </summary>
+    public List<object> TlsEvents { get; } = [];
+
     /// <inheritdoc />
     public void ReportTlsHandshake(TlsHandshakeEvent handshake)
     {
+        Handshakes.Add(handshake);
+        TlsEvents.Add(handshake);
     }
+
+    /// <inheritdoc />
+    public void ReportTlsTrust(TlsTrustEvent trust) => TlsEvents.Add(trust);
 
     /// <inheritdoc />
     public void ReportTlsData(ReadOnlySpan<byte> bytes, bool sent)

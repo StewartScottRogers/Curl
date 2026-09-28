@@ -1,4 +1,5 @@
 using System.Text;
+using Curl.Networking;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ftp;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
@@ -88,11 +89,27 @@ public sealed class RoutingFtpProtocolHandlerTests
     }
 
     [TestMethod]
-    public void SupportedSchemes_IsFtpOnly()
+    public async Task ExecuteAsync_FtpsThroughHttpProxyWithoutProxyTunnel_IsPerformedByTheFtpHandler()
     {
-        RoutingFtpProtocolHandler handler = new(RecordingProtocolHandler.WritingPath("http"), RecordingProtocolHandler.WritingPath("ftp"));
+        // curl 8.21.0 tunnels ftps://h/f through -x http://p with CONNECT h:990 (BL-458).
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse("ftps://example.com/f.txt"),
+            Output = new MemoryStream(),
+            Http = new HttpRequestOptions { ForwardProxy = ProxyOf(ProxyKind.Http) },
+        };
 
-        CollectionAssert.AreEqual(new[] { "ftp" }, handler.SupportedSchemes.ToArray());
+        AssertPerformedByTheFtpHandler(context, await ExecuteWithRecordingHandlersAsync(context));
+    }
+
+    [TestMethod]
+    public void SupportedSchemes_IsTheFtpHandlersSchemes()
+    {
+        RoutingFtpProtocolHandler handler = new(
+            RecordingProtocolHandler.WritingPath("http"),
+            new FtpProtocolHandler(new ScriptedConnector([]), new TcpConnectionListener(), new PassThroughTlsProvider()));
+
+        CollectionAssert.AreEqual(new[] { "ftp", "ftps" }, handler.SupportedSchemes.ToArray());
     }
 
     private static async Task<(RecordingProtocolHandler Http, RecordingProtocolHandler Ftp, TransferResult Result)> ExecuteWithRecordingHandlersAsync(TransferContext context)

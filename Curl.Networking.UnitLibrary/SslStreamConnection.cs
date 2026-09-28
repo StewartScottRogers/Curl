@@ -25,6 +25,9 @@ internal sealed class SslStreamConnection(SslStream sslStream, IConnection plain
     /// <summary>Gets the plaintext connection's remote endpoint.</summary>
     public EndPoint? RemoteEndPoint => plaintext.RemoteEndPoint;
 
+    /// <summary>Gets the plaintext connection's local endpoint.</summary>
+    public EndPoint? LocalEndPoint => plaintext.LocalEndPoint;
+
     /// <inheritdoc />
     public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken) =>
         sslStream.ReadAsync(buffer, cancellationToken);

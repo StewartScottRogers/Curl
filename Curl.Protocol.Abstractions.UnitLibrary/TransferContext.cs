@@ -33,6 +33,9 @@ public sealed class TransferContext : ITransferContext
     public ByteRange? Range { get; init; }
 
     /// <inheritdoc />
+    public string? RangeText { get; init; }
+
+    /// <inheritdoc />
     public long? MaxFileSize { get; init; }
 
     /// <inheritdoc />
@@ -73,6 +76,18 @@ public sealed class TransferContext : ITransferContext
 
     /// <inheritdoc />
     public bool ListOnly { get; init; }
+
+    /// <inheritdoc />
+    public string? FtpPort { get; init; }
+
+    /// <inheritdoc />
+    public bool FtpUseEprt { get; init; } = true;
+
+    /// <inheritdoc />
+    public TransportSecurityLevel SslLevel { get; init; }
+
+    /// <inheritdoc />
+    public bool FtpSslControlOnly { get; init; }
 
     /// <inheritdoc />
     public IReadOnlyList<string> QuoteCommands { get; init; } = [];

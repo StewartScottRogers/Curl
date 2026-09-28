@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace Curl.Protocol.Abstractions;
 
 /// <summary>
@@ -34,6 +36,15 @@ public sealed record HttpRequestOptions
     public IReadOnlyList<string> ProxyHeaders { get; init; } = [];
 
     /// <summary>
+    /// Gets the encoding that turns command-line text in the request head - the
+    /// <see cref="Headers" />, <see cref="ProxyHeaders" />, <see cref="UserAgent" /> and
+    /// <see cref="Referer" /> values - into bytes, as the platform's curl receives its
+    /// arguments (ADR-0067): the system ANSI code page with best fit on Windows, UTF-8
+    /// elsewhere. <see cref="Encoding.Latin1" />, one byte per character, when not set.
+    /// </summary>
+    public Encoding CommandLineTextEncoding { get; init; } = Encoding.Latin1;
+
+    /// <summary>
     /// Gets the value from <c>-A</c>/<c>--user-agent</c>: <see langword="null" /> sends
     /// curl's own <c>User-Agent</c>, and the empty string sends none.
     /// </summary>
@@ -46,6 +57,13 @@ public sealed record HttpRequestOptions
     public string? Referer { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether a followed redirect sends the URL it came from as its
+    /// <c>Referer</c>, without user information or fragment, as <c>-e "...;auto"</c> asks
+    /// curl 8.21.0 to (BL-361 Notes).
+    /// </summary>
+    public bool AutoReferer { get; init; }
+
+    /// <summary>
     /// Gets the request body from the <c>-d</c> and <c>-F</c> families, already encoded,
     /// or <see langword="null" /> to send none.
     /// </summary>
@@ -56,6 +74,21 @@ public sealed record HttpRequestOptions
     /// handler drains a 3xx body instead of writing it.
     /// </summary>
     public bool FollowRedirects { get; init; }
+
+    /// <summary>
+    /// Gets the <c>--max-redirs</c> limit: 50 when not given, as in curl 8.21.0, and <c>-1</c>
+    /// for no limit. curl counts each resend after a <c>417 Expectation Failed</c> as a
+    /// followed redirect, with or without <c>-L</c>, so the handler ends a resend that would
+    /// pass it with exit 47 (measured, BL-396 Notes).
+    /// </summary>
+    public int MaxRedirects { get; init; } = 50;
+
+    /// <summary>
+    /// Gets how many redirects the transfer followed before this request: 0 for the first,
+    /// and the count so far for a hop <c>-L</c> follows, whose resends count against the same
+    /// <see cref="MaxRedirects" /> (BL-396 Notes).
+    /// </summary>
+    public int RedirectsFollowed { get; init; }
 
     /// <summary>
     /// Gets how a status of 400 or above ends the transfer; <see cref="HttpFailMode.None" />

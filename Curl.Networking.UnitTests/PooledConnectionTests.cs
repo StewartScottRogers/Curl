@@ -29,6 +29,7 @@ public sealed class PooledConnectionTests
         Assert.AreEqual(0, read);
         Assert.IsFalse(connection.IsSecure);
         Assert.IsNull(connection.RemoteEndPoint);
+        Assert.IsNull(connection.LocalEndPoint);
         Assert.AreEqual(0L, connection.ConnectionNumber);
     }
 }

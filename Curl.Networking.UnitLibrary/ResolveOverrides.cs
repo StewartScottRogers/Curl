@@ -29,10 +29,22 @@ public sealed class ResolveOverrides
 
     private readonly Dictionary<string, IReadOnlyList<IPAddress>> _addressesByHostAndPort;
 
-    private ResolveOverrides(Dictionary<string, IReadOnlyList<IPAddress>> addressesByHostAndPort, string? parseError)
+    private ResolveOverrides(IReadOnlyList<ResolveEntry> entries, string? parseError)
     {
-        _addressesByHostAndPort = addressesByHostAndPort;
+        Entries = entries;
         ParseError = parseError;
+        _addressesByHostAndPort = new Dictionary<string, IReadOnlyList<IPAddress>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var entry in entries)
+        {
+            if (entry.IsRemoval)
+            {
+                _addressesByHostAndPort.Remove(Key(entry.Host, entry.Port));
+            }
+            else
+            {
+                _addressesByHostAndPort[Key(entry.Host, entry.Port)] = entry.Addresses;
+            }
+        }
     }
 
     /// <summary>
@@ -47,6 +59,12 @@ public sealed class ResolveOverrides
     public string? ParseError { get; }
 
     /// <summary>
+    /// Gets the entries that parsed, in the order given and up to the first that did not;
+    /// the ignored ones (an empty entry, an empty host, a malformed removal) are left out.
+    /// </summary>
+    public IReadOnlyList<ResolveEntry> Entries { get; }
+
+    /// <summary>
     /// Parses the <c>--resolve</c> values in the order they were given.
     /// </summary>
     /// <param name="entries">The values, verbatim.</param>
@@ -58,16 +76,16 @@ public sealed class ResolveOverrides
     {
         ArgumentNullException.ThrowIfNull(entries);
 
-        var addressesByHostAndPort = new Dictionary<string, IReadOnlyList<IPAddress>>(StringComparer.OrdinalIgnoreCase);
+        var parsedEntries = new List<ResolveEntry>();
         foreach (var entry in entries)
         {
-            if (!TryApply(entry, addressesByHostAndPort))
+            if (!TryParse(entry, parsedEntries))
             {
-                return new ResolveOverrides(addressesByHostAndPort, $"Could not parse CURLOPT_RESOLVE entry '{entry}'");
+                return new ResolveOverrides(parsedEntries, $"Could not parse CURLOPT_RESOLVE entry '{entry}'");
             }
         }
 
-        return new ResolveOverrides(addressesByHostAndPort, null);
+        return new ResolveOverrides(parsedEntries, null);
     }
 
     /// <summary>
@@ -85,24 +103,24 @@ public sealed class ResolveOverrides
             ?? _addressesByHostAndPort.GetValueOrDefault(Key(AnyHost, port));
     }
 
-    private static bool TryApply(string entry, Dictionary<string, IReadOnlyList<IPAddress>> addressesByHostAndPort) =>
+    private static bool TryParse(string entry, List<ResolveEntry> parsedEntries) =>
         entry.StartsWith('-')
-            ? ApplyRemoval(entry[1..], addressesByHostAndPort)
+            ? ParseRemoval(entry[1..], parsedEntries)
             // "+" marks an entry curl may time out of its DNS cache; one transfer never outlives it.
-            : TryApplyAddition(entry.StartsWith('+') ? entry[1..] : entry, addressesByHostAndPort);
+            : TryParseAddition(entry.StartsWith('+') ? entry[1..] : entry, isPermanent: !entry.StartsWith('+'), parsedEntries);
 
-    private static bool ApplyRemoval(string hostAndPort, Dictionary<string, IReadOnlyList<IPAddress>> addressesByHostAndPort)
+    private static bool ParseRemoval(string hostAndPort, List<ResolveEntry> parsedEntries)
     {
         // A removal that does not parse is ignored (measured: "-a" and "-a:x").
         if (TrySplitHostAndPort(hostAndPort, out var host, out var port, out _))
         {
-            addressesByHostAndPort.Remove(Key(host, port));
+            parsedEntries.Add(new ResolveEntry(host, port, string.Empty, [], IsRemoval: true, IsPermanent: true));
         }
 
         return true;
     }
 
-    private static bool TryApplyAddition(string entry, Dictionary<string, IReadOnlyList<IPAddress>> addressesByHostAndPort)
+    private static bool TryParseAddition(string entry, bool isPermanent, List<ResolveEntry> parsedEntries)
     {
         if (IsIgnoredAddition(entry))
         {
@@ -118,7 +136,7 @@ public sealed class ResolveOverrides
         // An empty host is ignored (measured: ":80:127.0.0.1").
         if (host.Length > 0)
         {
-            addressesByHostAndPort[Key(host, port)] = addresses;
+            parsedEntries.Add(new ResolveEntry(host, port, addressList, addresses, IsRemoval: false, isPermanent));
         }
 
         return true;
@@ -127,6 +145,7 @@ public sealed class ResolveOverrides
     // An empty entry, and a bracketed host with no "]:", are ignored (measured: "+" and "[::1:80:127.0.0.1").
     private static bool IsIgnoredAddition(string entry) =>
         entry.Length == 0 || (entry.StartsWith('[') && !entry.Contains("]:", StringComparison.Ordinal));
+
 
     private static bool TrySplitHostAndPort(string text, out string host, out int port, out string rest)
     {

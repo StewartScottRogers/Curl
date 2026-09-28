@@ -73,6 +73,49 @@ public sealed class RedirectFollowerTests
     }
 
     [TestMethod]
+    public async Task FollowAsync_AutoReferer_SendsEachHopThePreviousUrlWithoutUserOrFragmentAndReportsTheLast()
+    {
+        // curl -e ";auto" -L sends the previous URL, query kept, user and fragment dropped (BL-361 Notes).
+        ScriptedHandler handler = new(
+            Redirect(302, "https://h.example/b"),
+            Redirect(302, Next),
+            Ok(200, 0));
+
+        TransferResult result = await Follow(
+            handler, Context(Location() with { AutoReferer = true, Referer = "http://r/" }, url: "http://u:p@127.0.0.1:18203/a?q=1#f"));
+
+        CollectionAssert.AreEqual(
+            new[] { "http://r/", "http://127.0.0.1:18203/a?q=1", "https://h.example/b" },
+            handler.Contexts.Select(context => context.Http!.Referer).ToArray());
+        Assert.AreEqual("https://h.example/b", result.Report!.Referer);
+    }
+
+    [TestMethod]
+    public async Task FollowAsync_WithoutAutoReferer_SendsEveryHopTheGivenRefererAndReportsIt()
+    {
+        ScriptedHandler handler = new(Redirect(302, Next), Ok(200, 0));
+
+        TransferResult result = await Follow(handler, Context(Location() with { Referer = "http://r/" }));
+
+        CollectionAssert.AreEqual(
+            new[] { "http://r/", "http://r/" },
+            handler.Contexts.Select(context => context.Http!.Referer).ToArray());
+        Assert.AreEqual("http://r/", result.Report!.Referer);
+    }
+
+    [TestMethod]
+    public async Task FollowAsync_RefusedRedirect_ReportsTheRefererOfTheLastRequestSent()
+    {
+        ScriptedHandler handler = new(Redirect(302, Next), Redirect(302, "http://127.0.0.1:18203/c"));
+
+        TransferResult result = await Follow(
+            handler, Context(Location() with { AutoReferer = true }), new RedirectPolicy { MaxRedirects = 1 });
+
+        Assert.AreEqual(CurlExitCode.TooManyRedirects, result.ExitCode);
+        Assert.AreEqual(First, result.Report!.Referer);
+    }
+
+    [TestMethod]
     public async Task FollowAsync_NoRedirect_ReportsZeroRedirectsAndNoEffectiveUrl()
     {
         ScriptedHandler handler = new(Ok(200, 3));
@@ -111,6 +154,34 @@ public sealed class RedirectFollowerTests
         Assert.AreEqual(CurlExitCode.TooManyRedirects, result.ExitCode);
         Assert.AreEqual("Maximum (50) redirects followed", result.ErrorMessage);
         Assert.HasCount(51, handler.Contexts);
+    }
+
+    [TestMethod]
+    public async Task FollowAsync_HopResends_CountTowardTheChainsRedirects()
+    {
+        // curl counts each 417 resend as a followed redirect, sharing -L's count (BL-396 Notes).
+        TransferResult resent = Redirect(302, Next) with { Report = Redirect(302, Next).Report! with { RedirectCount = 2 } };
+        ScriptedHandler handler = new(resent, Ok(200, 0));
+
+        TransferResult result = await Follow(handler, Context(Location()));
+
+        Assert.AreEqual(0, handler.Contexts[0].Http!.RedirectsFollowed);
+        Assert.AreEqual(3, handler.Contexts[1].Http!.RedirectsFollowed);
+        Assert.AreEqual(3, result.Report!.RedirectCount);
+    }
+
+    [TestMethod]
+    public async Task FollowAsync_HopResendsReachTheLimit_Exits47BeforeTheNextHop()
+    {
+        TransferResult resent = Redirect(302, Next) with { Report = Redirect(302, Next).Report! with { RedirectCount = 3 } };
+        ScriptedHandler handler = new(resent);
+
+        TransferResult result = await Follow(handler, Context(Location()), new RedirectPolicy { MaxRedirects = 3 });
+
+        Assert.AreEqual(CurlExitCode.TooManyRedirects, result.ExitCode);
+        Assert.AreEqual("Maximum (3) redirects followed", result.ErrorMessage);
+        Assert.HasCount(1, handler.Contexts);
+        Assert.AreEqual(3, result.Report!.RedirectCount);
     }
 
     [TestMethod]
@@ -226,23 +297,45 @@ public sealed class RedirectFollowerTests
     [TestMethod]
     [DataRow(307)]
     [DataRow(308)]
-    public async Task FollowAsync_NonSeekableStreamBodyAnswered307Or308_FailsTheNextHopWithReadError(int status)
+    public async Task FollowAsync_NonSeekableStreamBodyAnswered307Or308OnWindows_FailsTheNextHopWithReadError(int status)
     {
         // curl -sS -L --max-redirs 1 -w "[%{http_code}|%{num_redirects}|%{url_effective}|%{redirect_url}]"
         // -F f=@\\.\pipe\name, 307: exit 26, "curl: (26) read error getting mime data",
         // stdout [307|1|http://127.0.0.1:18380/next|] (BL-359 Notes).
-        ScriptedHandler handler = new(Redirect(status, Next), Ok(200, 0));
-        StreamBody body = new(new NonSeekableStream([1, 2, 3]), null, "multipart/form-data; boundary=b");
+        TransferResult result = await FollowNonSeekableBody(status, runsOnWindows: true);
 
-        TransferResult result = await Follow(handler, Context(Location() with { Body = body }));
+        AssertRewindFailure(result, status, CurlExitCode.ReadError, "read error getting mime data");
+    }
 
-        Assert.HasCount(1, handler.Contexts);
+    [TestMethod]
+    [DataRow(307)]
+    [DataRow(308)]
+    public async Task FollowAsync_NonSeekableStreamBodyAnswered307Or308OffWindows_FailsTheNextHopWithCannotRewind(int status)
+    {
+        // Linux, OpenSSL build: curl -L -sS -F "f=@<fifo>" -w "[%{http_code}|%{num_redirects}|%{url_effective}|%{redirect_url}]",
+        // 307: exit 65, "curl: (65) Cannot rewind mime/post data",
+        // stdout [307|1|http://172.26.96.1:18402/second|] (BL-402 Notes).
+        TransferResult result = await FollowNonSeekableBody(status, runsOnWindows: false);
+
+        AssertRewindFailure(result, status, CurlExitCode.SendFailRewind, "Cannot rewind mime/post data");
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task FollowAsync_NonSeekableStreamBodyWithDefaultPlatformOnWindows_FailsWithReadError()
+    {
+        TransferResult result = await FollowNonSeekableBody(307, runsOnWindows: null);
+
         Assert.AreEqual(CurlExitCode.ReadError, result.ExitCode);
-        Assert.AreEqual("read error getting mime data", result.ErrorMessage);
-        Assert.AreEqual(status, result.Report!.ResponseCode);
-        Assert.AreEqual(1, result.Report.RedirectCount);
-        Assert.AreEqual(Next, result.Report.EffectiveUrl);
-        Assert.IsNull(result.Report.RedirectUrl);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task FollowAsync_NonSeekableStreamBodyWithDefaultPlatformOffWindows_FailsWithCannotRewind()
+    {
+        TransferResult result = await FollowNonSeekableBody(307, runsOnWindows: null);
+
+        Assert.AreEqual(CurlExitCode.SendFailRewind, result.ExitCode);
     }
 
     [TestMethod]
@@ -292,6 +385,28 @@ public sealed class RedirectFollowerTests
         await Follow(handler, Context(Location() with { Body = PostBody }));
 
         Assert.IsNull(handler.Contexts[2].Http!.Body);
+    }
+
+    [TestMethod]
+    [DataRow(307, true)]
+    [DataRow(308, true)]
+    [DataRow(303, false)]
+    public async Task FollowAsync_ResumedUploadFromUnknownOffset_NextHopResumesOnlyWhenUploadKept(int status, bool expected)
+    {
+        // curl -L -C - -T up.txt: a 307 or 308 PUTs again with Content-Range; a 303 GETs with no upload.
+        ScriptedHandler handler = new(Redirect(status, Next), Ok(200, 0));
+        TransferContext first = new()
+        {
+            Url = CurlUrl.Parse(First),
+            Output = Stream.Null,
+            Http = Location(),
+            Upload = new MemoryStream([1, 2, 3]),
+            ResumeUploadFromUnknownOffset = true,
+        };
+
+        await Follow(handler, first);
+
+        Assert.AreEqual(expected, handler.Contexts[1].ResumeUploadFromUnknownOffset);
     }
 
     [TestMethod]
@@ -703,6 +818,7 @@ public sealed class RedirectFollowerTests
             Output = output,
             ResumeFrom = 4,
             Range = ByteRange.Bounded(1, 2),
+            RangeText = "1-2,5-6",
             MaxFileSize = 99,
             NoBody = true,
             TimeCondition = new TimeCondition(DateTimeOffset.UnixEpoch, TimeConditionKind.IfModifiedSince),
@@ -725,6 +841,7 @@ public sealed class RedirectFollowerTests
         Assert.AreSame(output, second.Output);
         Assert.AreEqual(first.ResumeFrom, second.ResumeFrom);
         Assert.AreEqual(first.Range, second.Range);
+        Assert.AreEqual(first.RangeText, second.RangeText);
         Assert.AreEqual(first.MaxFileSize, second.MaxFileSize);
         Assert.IsTrue(second.NoBody);
         Assert.AreEqual(first.TimeCondition, second.TimeCondition);
@@ -736,7 +853,7 @@ public sealed class RedirectFollowerTests
         Assert.AreEqual(first.CreateFileMode, second.CreateFileMode);
         Assert.AreEqual(first.ConnectTimeout, second.ConnectTimeout);
         Assert.AreEqual(first.MaxTime, second.MaxTime);
-        Assert.AreEqual(first.Http, second.Http);
+        Assert.AreEqual(first.Http with { RedirectsFollowed = 1 }, second.Http);
         Assert.AreSame(first.TimeProvider, second.TimeProvider);
         Assert.AreEqual(first.CancellationToken, second.CancellationToken);
     }
@@ -758,6 +875,25 @@ public sealed class RedirectFollowerTests
 
         Assert.HasCount(2, handler.Contexts);
         Assert.AreSame(progress, handler.Contexts[1].Progress);
+    }
+
+    [TestMethod]
+    public async Task FollowAsync_NextHop_ReportsToTheFirstHopsEventSink()
+    {
+        ScriptedHandler handler = new(Redirect(302, Next), Ok(200, 0));
+        IgnoringTransferEvents events = new();
+        TransferContext first = new()
+        {
+            Url = CurlUrl.Parse(First),
+            Output = Stream.Null,
+            Http = Location(),
+            Events = events,
+        };
+
+        await Follow(handler, first);
+
+        Assert.HasCount(2, handler.Contexts);
+        Assert.AreSame(events, handler.Contexts[1].Events);
     }
 
     [TestMethod]
@@ -853,6 +989,28 @@ public sealed class RedirectFollowerTests
         new RedirectFollower(new ProtocolDispatcher([handler]))
             .FollowAsync(context, policy ?? new RedirectPolicy())
             .AsTask();
+
+    private static async Task<TransferResult> FollowNonSeekableBody(int status, bool? runsOnWindows)
+    {
+        ScriptedHandler handler = new(Redirect(status, Next), Ok(200, 0));
+        StreamBody body = new(new NonSeekableStream([1, 2, 3]), null, "multipart/form-data; boundary=b");
+
+        TransferResult result = await new RedirectFollower(new ProtocolDispatcher([handler]), runsOnWindows: runsOnWindows)
+            .FollowAsync(Context(Location() with { Body = body }), new RedirectPolicy());
+
+        Assert.HasCount(1, handler.Contexts);
+        return result;
+    }
+
+    private static void AssertRewindFailure(TransferResult result, int status, CurlExitCode exitCode, string message)
+    {
+        Assert.AreEqual(exitCode, result.ExitCode);
+        Assert.AreEqual(message, result.ErrorMessage);
+        Assert.AreEqual(status, result.Report!.ResponseCode);
+        Assert.AreEqual(1, result.Report.RedirectCount);
+        Assert.AreEqual(Next, result.Report.EffectiveUrl);
+        Assert.IsNull(result.Report.RedirectUrl);
+    }
 
     private static Task<TransferResult> FollowWith(HopProxySelector selector, IProtocolHandler handler, ITransferContext context) =>
         new RedirectFollower(new ProtocolDispatcher([handler]), selector)
@@ -963,9 +1121,6 @@ public sealed class RedirectFollowerTests
     }
 
     /// <summary>
-    /// A time source whose timestamps count milliseconds.
-    /// </summary>
-    /// <summary>
     /// An <see cref="ITransferProgress" /> that counts the reports it receives, standing in
     /// for <c>Curl.Console</c>'s progress meter so a test can tell its instance apart from
     /// <see cref="NoTransferProgress.Instance" />.
@@ -981,6 +1136,53 @@ public sealed class RedirectFollowerTests
         public void ReportUploaded(long bytesSoFar, long? expectedTotal) => ReportCount++;
     }
 
+    /// <summary>
+    /// An <see cref="ITransferEvents" /> that ignores every event, standing in for
+    /// <c>Curl.Console</c>'s verbose sink so a test can tell its instance apart from
+    /// <see cref="NoTransferEvents.Instance" />.
+    /// </summary>
+    private sealed class IgnoringTransferEvents : ITransferEvents
+    {
+        public void ReportInfo(string text)
+        {
+        }
+
+        public void ReportConnectionOpened(ConnectionOpenedEvent opened)
+        {
+        }
+
+        public void ReportConnectionReused(ConnectionReusedEvent reused)
+        {
+        }
+
+        public void ReportTlsHandshake(TlsHandshakeEvent handshake)
+        {
+        }
+
+        public void ReportTlsData(ReadOnlySpan<byte> bytes, bool sent)
+        {
+        }
+
+        public void ReportRequestHeader(ReadOnlySpan<byte> bytes)
+        {
+        }
+
+        public void ReportResponseHeader(ReadOnlySpan<byte> bytes)
+        {
+        }
+
+        public void ReportDataSent(ReadOnlySpan<byte> bytes)
+        {
+        }
+
+        public void ReportDataReceived(ReadOnlySpan<byte> bytes)
+        {
+        }
+    }
+
+    /// <summary>
+    /// A time source whose timestamps count milliseconds.
+    /// </summary>
     private sealed class MillisecondTimeProvider : TimeProvider
     {
         public override long TimestampFrequency => 1000;

@@ -123,8 +123,144 @@ public sealed class UdpDatagramConnectorTests
         Assert.AreEqual(new IPEndPoint(IPAddress.Loopback, 69), channel.ServerEndPoint);
     }
 
-    private static UdpDatagramConnector CreateConnector(IDnsResolver resolver, Func<IPEndPoint, IDatagramChannel> openChannel) =>
-        new(resolver, new ManualTimeProvider(), openChannel);
+    [TestMethod]
+    public async Task OpenAsync_WithResolveEntry_OpensAtTheOverriddenAddressWithoutAskingTheResolver()
+    {
+        // curl -v --resolve tftp.test:6969:127.0.0.1 tftp://tftp.test:6969/x: "Trying 127.0.0.1:6969..." (curl 8.21.0, 2026-09-27).
+        var resolver = new FakeDnsResolver(IPAddress.Parse("192.0.2.1"));
+        var opened = new List<IPEndPoint>();
+        var connector = CreateConnector(resolver, OpenFake(opened), ResolveOverrides.Parse(["tftp.test:6969:127.0.0.1"]));
+
+        var result = await connector.OpenAsync("tftp.test", 6969, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(new[] { new IPEndPoint(IPAddress.Loopback, 6969) }, opened);
+        Assert.IsEmpty(resolver.ResolvedHosts);
+    }
+
+    [TestMethod]
+    public async Task OpenAsync_WithConnectToMapping_ResolvesTheMappedHostAndOpensAtTheMappedPort()
+    {
+        // curl -v --connect-to tftp.test:6969:other: --resolve other:6969:127.0.0.1 tftp://tftp.test:6969/x:
+        // "Trying 127.0.0.1:6969..." (curl 8.21.0, 2026-09-27).
+        var resolver = new FakeDnsResolver(IPAddress.Parse("192.0.2.5"));
+        var opened = new List<IPEndPoint>();
+        var connector = CreateConnector(
+            resolver,
+            OpenFake(opened),
+            connectToMappings: new ConnectToMappings(["tftp.test:6969:mapped.test:7000"]));
+
+        var result = await connector.OpenAsync("tftp.test", 6969, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(new[] { "mapped.test" }, resolver.ResolvedHosts);
+        CollectionAssert.AreEqual(new[] { new IPEndPoint(IPAddress.Parse("192.0.2.5"), 7000) }, opened);
+    }
+
+    [TestMethod]
+    public async Task OpenAsync_WithConnectToAndResolveForTheMappedHost_OpensAtTheMappedHostsOverriddenAddress()
+    {
+        // curl -v --connect-to tftp.test:6969:127.0.0.1:6970 --resolve tftp.test:6969:127.0.0.2 tftp://tftp.test:6969/x:
+        // "Trying 127.0.0.1:6970..." - the entry for the URL's host no longer applies (curl 8.21.0, 2026-09-27).
+        var opened = new List<IPEndPoint>();
+        var connector = CreateConnector(
+            new FakeDnsResolver(),
+            OpenFake(opened),
+            ResolveOverrides.Parse(["tftp.test:6969:192.0.2.1", "mapped.test:6970:192.0.2.9"]),
+            new ConnectToMappings(["tftp.test:6969:mapped.test:6970"]));
+
+        var result = await connector.OpenAsync("tftp.test", 6969, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(new[] { new IPEndPoint(IPAddress.Parse("192.0.2.9"), 6970) }, opened);
+    }
+
+    [TestMethod]
+    public async Task OpenAsync_WhenTheMappedHostDoesNotResolve_FailsWithCouldntResolveHostNamingTheMappedHost()
+    {
+        // curl --connect-to tftp.test:6969:nonexistent.invalid:70 tftp://tftp.test:6969/x:
+        // "curl: (6) Could not resolve host: nonexistent.invalid" (curl 8.21.0, 2026-09-27).
+        var connector = CreateConnector(
+            new FakeDnsResolver(),
+            OpenFake([]),
+            connectToMappings: new ConnectToMappings(["tftp.test:6969:nonexistent.invalid:70"]));
+
+        var result = await connector.OpenAsync("tftp.test", 6969, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
+        Assert.AreEqual("Could not resolve host: nonexistent.invalid", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task OpenAsync_WhenNoMappedAddressCanBeOpened_FailsWithCouldntConnectNamingTheMappedDestination()
+    {
+        var connector = new UdpDatagramConnector(
+            new FakeDnsResolver(IPAddress.Loopback),
+            new ManualTimeProvider(),
+            _ => throw new SocketException((int)SocketError.AddressFamilyNotSupported),
+            connectToMappings: new ConnectToMappings(["tftp.test:6969:mapped.test:7000"]));
+
+        var result = await connector.OpenAsync("tftp.test", 6969, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.AreEqual(
+            "Failed to connect to tftp.test:6969 via mapped.test:7000 after 0 ms: Could not connect to server",
+            result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task OpenAsync_WithUnparsableResolveEntry_FailsWithExit49AndResolvesNothing()
+    {
+        // curl --resolve bad tftp://tftp.test:6969/x: "curl: (49) Could not parse CURLOPT_RESOLVE entry 'bad'" (curl 8.21.0, 2026-09-27).
+        var resolver = new FakeDnsResolver(IPAddress.Loopback);
+        var opened = new List<IPEndPoint>();
+        var connector = CreateConnector(resolver, OpenFake(opened), ResolveOverrides.Parse(["bad"]));
+
+        var result = await connector.OpenAsync("tftp.test", 6969, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.SetoptOptionSyntax, result.ExitCode);
+        Assert.AreEqual("Could not parse CURLOPT_RESOLVE entry 'bad'", result.ErrorMessage);
+        Assert.IsEmpty(resolver.ResolvedHosts);
+        Assert.IsEmpty(opened);
+    }
+
+    [TestMethod]
+    public async Task OpenAsync_WithUnparsableConnectToDestination_FailsWithExit49AndResolvesNothing()
+    {
+        // curl --connect-to tftp.test:6969:[::1:9 tftp://tftp.test:6969/x:
+        // "curl: (49) Invalid IPv6 address format in '[::1:9'" (curl 8.21.0, 2026-09-27).
+        var resolver = new FakeDnsResolver(IPAddress.Loopback);
+        var connector = CreateConnector(resolver, OpenFake([]), connectToMappings: new ConnectToMappings(["tftp.test:6969:[::1:9"]));
+
+        var result = await connector.OpenAsync("tftp.test", 6969, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.SetoptOptionSyntax, result.ExitCode);
+        Assert.AreEqual("Invalid IPv6 address format in '[::1:9'", result.ErrorMessage);
+        Assert.IsEmpty(resolver.ResolvedHosts);
+    }
+
+    [TestMethod]
+    public async Task OpenAsync_ThroughThePublicConstructorWithOverrides_OpensAUdpChannelAtTheMappedOverriddenEndPoint()
+    {
+        var connector = new UdpDatagramConnector(
+            new FakeDnsResolver(),
+            TimeProvider.System,
+            ResolveOverrides.Parse(["mapped.test:7000:127.0.0.1"]),
+            new ConnectToMappings(["tftp.test:69:mapped.test:7000"]));
+
+        var result = await connector.OpenAsync("tftp.test", 69, CancellationToken.None);
+
+        Assert.IsNotNull(result.Channel);
+        await using var channel = result.Channel;
+        Assert.AreEqual(new IPEndPoint(IPAddress.Loopback, 7000), channel.ServerEndPoint);
+    }
+
+    private static UdpDatagramConnector CreateConnector(
+        IDnsResolver resolver,
+        Func<IPEndPoint, IDatagramChannel> openChannel,
+        ResolveOverrides? resolveOverrides = null,
+        ConnectToMappings? connectToMappings = null) =>
+        new(resolver, new ManualTimeProvider(), openChannel, resolveOverrides, connectToMappings);
 
     private static Func<IPEndPoint, IDatagramChannel> OpenFake(List<IPEndPoint> opened) =>
         endPoint =>

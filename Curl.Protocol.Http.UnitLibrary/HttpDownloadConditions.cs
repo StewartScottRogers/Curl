@@ -86,7 +86,7 @@ internal static class HttpDownloadConditions
     /// one and no range was asked for.
     /// </summary>
     private static HttpBodyDelivery DecideTimeCondition(ITransferContext context, HttpResponseHead head) =>
-        context.TimeCondition is { } condition && context.Range is null && !IsMet(condition, HttpLastModified.Find(head))
+        context.TimeCondition is { } condition && context.RangeText is null && !IsMet(condition, HttpLastModified.Find(head))
             ? HttpBodyDelivery.TimeConditionUnmet
             : HttpBodyDelivery.Deliver;
 

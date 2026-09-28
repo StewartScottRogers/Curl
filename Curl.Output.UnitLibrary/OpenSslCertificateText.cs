@@ -51,15 +51,16 @@ internal static class OpenSslCertificateText
         [Ed448] = "ED448",
     };
 
-    /// <summary>Returns the <c>Server certificate:</c> block.</summary>
-    /// <param name="certificate">The server's certificate.</param>
+    /// <summary>Returns the <c>Server certificate:</c> or <c>Proxy certificate:</c> block.</summary>
+    /// <param name="certificate">The server's or the HTTPS proxy's certificate.</param>
+    /// <param name="isProxy">Whether the certificate is an HTTPS proxy's.</param>
     /// <returns>The five lines, without the <c>* </c> prefix.</returns>
     /// <remarks>A name OpenSSL cannot print is <c>[NONE]</c>, as curl prints the subject.</remarks>
-    internal static IReadOnlyList<string> ServerCertificate(X509Certificate2 certificate)
+    internal static IReadOnlyList<string> PeerCertificate(X509Certificate2 certificate, bool isProxy)
     {
         return
         [
-            "Server certificate:",
+            (isProxy ? "Proxy" : "Server") + " certificate:",
             "  subject: " + (OpenSslDistinguishedNameText.Format(certificate.SubjectName) ?? "[NONE]"),
             "  start date: " + FormatTime(certificate.NotBefore),
             "  expire date: " + FormatTime(certificate.NotAfter),

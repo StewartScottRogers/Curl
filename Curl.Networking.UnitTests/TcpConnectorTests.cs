@@ -165,6 +165,65 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_WithUseTls_PassesTheTargetsEventsToAHandshakeReportingProvider()
+    {
+        var events = new RecordingTransferEvents();
+        var tlsProvider = new FakeTlsProvider();
+        var connector = CreateConnector(
+            new FakeDnsResolver(Loopback),
+            new FakeTcpDialer { DialOutcome = _ => new FakeConnection() },
+            tlsProvider);
+
+        await connector.ConnectAsync(new ConnectTarget("example.com", 443, UseTls: true) { Events = events }, CancellationToken.None);
+
+        Assert.AreSame(events, tlsProvider.ReceivedEvents);
+        CollectionAssert.AreEqual(new[] { false }, tlsProvider.ReceivedIsProxy);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_ToAnHttpsForwardProxy_ReportsItsHandshakeAsTheProxys()
+    {
+        // curl -sv --proxy-insecure -x https://proxy http://example.test/ says Proxy certificate:
+        // for the forward proxy's handshake (curl 8.21.0 OpenSSL, measured, BL-405).
+        var events = new RecordingTransferEvents();
+        var tlsProvider = new FakeTlsProvider();
+        var connector = CreateConnector(
+            new FakeDnsResolver(Loopback),
+            new FakeTcpDialer { DialOutcome = _ => new FakeConnection() },
+            tlsProvider);
+
+        await connector.ConnectAsync(
+            new ConnectTarget("proxy.example", 443, UseTls: true) { Events = events, IsForwardProxy = true },
+            CancellationToken.None);
+
+        Assert.AreSame(events, tlsProvider.ReceivedEvents);
+        CollectionAssert.AreEqual(new[] { true }, tlsProvider.ReceivedIsProxy);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_ThroughAnHttpsProxy_ReportsTheProxysHandshakeOnTheTargetsEventsAsTheProxys()
+    {
+        var events = new RecordingTransferEvents();
+        var tlsProvider = new FakeTlsProvider { FailureToReturn = ConnectResult.Failed(CurlExitCode.SslConnectError, "x") };
+        var connector = CreateConnector(
+            new FakeDnsResolver(Loopback),
+            new FakeTcpDialer { DialOutcome = _ => new FakeConnection() },
+            tlsProvider);
+
+        await connector.ConnectAsync(
+            new ConnectTarget("example.com", 443, UseTls: true)
+            {
+                Events = events,
+                Proxy = new ProxyEndpoint(ProxyKind.Https, "proxy.example", 443, null),
+            },
+            CancellationToken.None);
+
+        Assert.AreSame(events, tlsProvider.ReceivedEvents);
+        CollectionAssert.AreEqual(new[] { true }, tlsProvider.ReceivedIsProxy);
+        Assert.AreEqual("proxy.example", tlsProvider.ReceivedTargetHost);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_WithUseTls_WhenHandshakeFails_ReturnsTheProvidersFailureUnchanged()
     {
         var failure = ConnectResult.Failed(CurlExitCode.SslConnectError, "x");

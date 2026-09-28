@@ -124,16 +124,15 @@ public static class CommandLineWarning
     }
 
     /// <summary>
-    /// The two lines curl prints for a <c>-z</c>/<c>--time-cond</c> value that is neither a date nor a
-    /// file whose modification time can be read, after
-    /// which it carries on with no time condition. curl wraps the text at 79 columns, so the first
-    /// line ends in a space. Measured with <c>curl -z notadate -o NUL file:///Z:/.../global.json</c>
-    /// (curl 8.21.0, Windows, 2026-09-26): these two lines, then the transfer, exit 0.
+    /// The warning curl prints for a <c>-z</c>/<c>--time-cond</c> value that is neither a date nor a
+    /// file whose modification time can be read, after which it carries on with no time condition,
+    /// as one unwrapped line; the console layer wraps it at the terminal width as curl does. Measured
+    /// with <c>curl -z notadate -o NUL file:///Z:/.../global.json</c> at <c>COLUMNS=200</c>, 79 and 40
+    /// (curl 8.21.0, Windows, 2026-09-26 and 2026-09-27): the warning, then the transfer, exit 0.
     /// </summary>
     public static IReadOnlyList<string> TimeConditionIsNotADate { get; } =
     [
-        "Warning: Illegal date format for -z, --time-cond (and not a filename). ",
-        "Warning: Disabling time condition. See curl_getdate(3) for valid date syntax.",
+        "Warning: Illegal date format for -z, --time-cond (and not a filename). Disabling time condition. See curl_getdate(3) for valid date syntax.",
     ];
 
     /// <summary>
@@ -156,39 +155,41 @@ public static class CommandLineWarning
     ];
 
     /// <summary>
-    /// The lines curl prints when an option asks for an HTTP request method after another option has
+    /// The warning curl prints when an option asks for an HTTP request method after another option has
     /// selected a different one: <c>Warning: You can only select one HTTP request method! You asked for
-    /// both &lt;requested&gt; and &lt;selected&gt;.</c>, wrapped at 79 columns as curl wraps it, each method
-    /// named as curl 8.21.0 names it: <c>GET (-G, --get)</c>, <c>HEAD (-I, --head)</c>,
-    /// <c>multipart formpost (-F, --form)</c> or <c>POST (-d, --data)</c>. Measured with
-    /// <c>curl --no-head -I</c>, <c>curl -I --no-head</c>, <c>curl -F a=b -I</c>, <c>curl -I -F a=b</c>,
-    /// <c>curl --no-head -F a=b</c>, <c>curl -F a=b --no-head</c>, <c>curl -F a=b -d x</c> and
-    /// <c>curl -F a=b -d x -G</c> against <c>http://127.0.0.1:1/</c> (curl 8.21.0, Windows, 2026-09-26).
+    /// both &lt;requested&gt; and &lt;selected&gt;.</c>, as one unwrapped line that the console layer wraps
+    /// at the terminal width as curl does, each method named as curl 8.21.0 names it:
+    /// <c>GET (-G, --get)</c>, <c>HEAD (-I, --head)</c>, <c>multipart formpost (-F, --form)</c> or
+    /// <c>POST (-d, --data)</c>. Measured with <c>curl --no-head -I</c>, <c>curl -I --no-head</c>,
+    /// <c>curl -F a=b -I</c>, <c>curl -I -F a=b</c>, <c>curl --no-head -F a=b</c>, <c>curl -F a=b --no-head</c>,
+    /// <c>curl -F a=b -d x</c> and <c>curl -F a=b -d x -G</c> against <c>http://127.0.0.1:1/</c> (curl 8.21.0,
+    /// Windows, 2026-09-26), and <c>curl -F a=b -I --bogus x</c> at <c>COLUMNS=200</c> and 40 (2026-09-27).
     /// </summary>
     /// <param name="requested">The method the later option asks for.</param>
     /// <param name="selected">The method already selected.</param>
-    /// <returns>The warning's lines.</returns>
+    /// <returns>The warning line, as the only element.</returns>
     internal static IReadOnlyList<string> OnlyOneRequestMethod(SelectedHttpMethod requested, SelectedHttpMethod selected) =>
-        WrappedMessage.Lines(
-            "Warning: ",
-            $"You can only select one HTTP request method! You asked for both {RequestMethodNames[(int)requested]} and {RequestMethodNames[(int)selected]}.");
+    [
+        $"Warning: You can only select one HTTP request method! You asked for both {RequestMethodNames[(int)requested]} and {RequestMethodNames[(int)selected]}.",
+    ];
 
     /// <summary>
-    /// The two lines curl prints, at transfer setup rather than while reading the command line, when
+    /// The warning curl prints, at transfer setup rather than while reading the command line, when
     /// <c>-I</c> / <c>--head</c> selected <c>HEAD</c> and a <c>-d</c> / <c>--data*</c> or <c>--json</c> body
-    /// is to be posted (no <c>-G</c>), after which it ends with exit 2. curl wraps the text at 79
-    /// columns, so the first line ends in a space. Measured with <c>curl -I -d x http://127.0.0.1:1/</c>
-    /// (curl 8.21.0, Windows, 2026-09-27); <c>-d x -I</c> and <c>-I --json x</c> print the same.
+    /// is to be posted (no <c>-G</c>), after which it ends with exit 2, as one unwrapped line; the console
+    /// layer wraps it at the terminal width. Measured with <c>curl -I -d x http://127.0.0.1:1/</c>
+    /// (curl 8.21.0, Windows, 2026-09-27) at <c>COLUMNS=200</c>, 79 and 40; <c>-d x -I</c> and
+    /// <c>-I --json x</c> print the same.
     /// </summary>
     public static IReadOnlyList<string> PostRequestedWithHead { get; } =
         OnlyOneRequestMethod(SelectedHttpMethod.Post, SelectedHttpMethod.Head);
 
     /// <summary>
-    /// The two lines curl prints, at transfer setup rather than while reading the command line, when
+    /// The warning curl prints, at transfer setup rather than while reading the command line, when
     /// <c>--no-head</c> selected <c>GET</c> and a <c>-d</c> / <c>--data*</c> or <c>--json</c> body is to be
-    /// posted (no <c>-G</c>), after which it ends with exit 2. curl wraps the text at 79 columns, so the
-    /// first line ends in a space. Measured with <c>curl --no-head -d x http://127.0.0.1:1/</c>
-    /// (curl 8.21.0, Windows, 2026-09-27); <c>-d x --no-head</c> prints the same.
+    /// posted (no <c>-G</c>), after which it ends with exit 2, as one unwrapped line; the console layer
+    /// wraps it at the terminal width. Measured with <c>curl --no-head -d x http://127.0.0.1:1/</c>
+    /// (curl 8.21.0, Windows, 2026-09-27) at <c>COLUMNS=200</c>, 79 and 40; <c>-d x --no-head</c> prints the same.
     /// </summary>
     public static IReadOnlyList<string> PostRequestedWithGet { get; } =
         OnlyOneRequestMethod(SelectedHttpMethod.Post, SelectedHttpMethod.Get);
@@ -229,6 +230,20 @@ public static class CommandLineWarning
     internal static IReadOnlyList<string> TraceOverridesEarlierTrace(string longName) =>
     [
         $"Warning: {longName} overrides an earlier trace/verbose option",
+    ];
+
+    /// <summary>
+    /// The line curl prints for <c>--ssl</c> or <c>--ftp-ssl</c>, which go on in plaintext when the
+    /// server refuses TLS: <c>Warning: &lt;option&gt; is an insecure option, consider --ssl-reqd instead</c>.
+    /// Measured with <c>curl --ssl</c>, <c>--ftp-ssl</c> and <c>--ssl=x</c> against <c>ftp://127.0.0.1:1/</c>
+    /// (curl 8.21.0, Windows, 2026-09-27): the long name only, whatever value is attached; once per
+    /// occurrence; none for <c>--no-ssl</c>.
+    /// </summary>
+    /// <param name="longName">The option's long name with its <c>--</c>: <c>--ssl</c> or <c>--ftp-ssl</c>.</param>
+    /// <returns>The warning's lines.</returns>
+    internal static IReadOnlyList<string> InsecureSsl(string longName) =>
+    [
+        $"Warning: {longName} is an insecure option, consider --ssl-reqd instead",
     ];
 
     /// <summary>

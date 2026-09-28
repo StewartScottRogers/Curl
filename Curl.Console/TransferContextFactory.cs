@@ -1,4 +1,7 @@
+using System.Text;
+
 using Curl.Cli;
+using Curl.Core;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Console;
@@ -17,7 +20,11 @@ namespace Curl.Console;
 /// <see cref="Curl.Core.TransferRetrier" /> waits on; <see langword="null" /> for
 /// <see cref="TimeProvider.System" />.
 /// </param>
-internal sealed class TransferContextFactory(Stream standardInput, TimeProvider? timeProvider = null)
+/// <param name="commandLineTextEncoding">
+/// Every context's <see cref="Curl.Protocol.Abstractions.HttpRequestOptions.CommandLineTextEncoding" />,
+/// the platform curl's argument encoding (ADR-0067); <see langword="null" /> for Latin-1.
+/// </param>
+internal sealed class TransferContextFactory(Stream standardInput, TimeProvider? timeProvider = null, Encoding? commandLineTextEncoding = null)
 {
     /// <summary>The one scheme whose transfer uploads standard input.</summary>
     private const string TelnetScheme = "telnet";
@@ -54,6 +61,12 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// Where the handler and its connector report transfer events for <c>-v</c> and <c>--trace</c>, or
     /// <see langword="null" /> for <see cref="NoTransferEvents.Instance" />.
     /// </param>
+    /// <param name="lowSpeedWatchdog">
+    /// The attempt's <c>-Y</c>/<c>-y</c> watchdog, which counts the bytes written to
+    /// <paramref name="output" /> and reported uploaded to <paramref name="progress" />, and whose
+    /// token becomes <see cref="TransferContext.CancellationToken" />; <see langword="null" /> when
+    /// the speed is not watched.
+    /// </param>
     /// <returns>
     /// The context. Its <see cref="TransferContext.NoBody" /> is <c>-I</c>, its
     /// <see cref="TransferContext.ResumeUploadFromUnknownOffset" /> is <c>-C -</c> with a
@@ -73,16 +86,18 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
         ProxyEndpoint? proxy = null,
         Func<Stream?, Stream>? watchHeaderOutput = null,
         ITransferProgress? progress = null,
-        ITransferEvents? events = null) =>
+        ITransferEvents? events = null,
+        LowSpeedWatchdog? lowSpeedWatchdog = null) =>
         new()
         {
             Url = url,
-            Output = output,
+            Output = WatchedOutput(output, lowSpeedWatchdog),
             HeaderOutput = watchHeaderOutput is null
                 ? HeaderOutputOf(options, output, headerOutput)
                 : watchHeaderOutput(HeaderOutputOf(options, output, headerOutput)),
             NoBody = options.NoBody,
             Range = range,
+            RangeText = options.Range,
             ResumeFrom = resumeFrom,
             ResumeUploadFromUnknownOffset = ResumesUploadFromUnknownOffset(options, upload),
             MaxFileSize = options.MaxFileSize,
@@ -96,6 +111,10 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             FtpSkipPasvIp = options.FtpSkipPasvIp,
             FtpFileMethod = options.FtpFileMethod,
             FtpCreateDirectories = options.FtpCreateDirectories,
+            FtpPort = options.FtpPort,
+            FtpUseEprt = options.FtpUseEprt,
+            SslLevel = options.SslLevel,
+            FtpSslControlOnly = options.FtpSslControlOnly,
             ListOnly = options.ListOnly,
             QuoteCommands = options.QuoteCommands,
             CreateFileMode = options.CreateFileMode ?? TransferContext.DefaultCreateFileMode,
@@ -104,11 +123,41 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             MaxTime = options.MaxTime,
             TimeCondition = options.TimeCondition,
             Proxy = proxy,
-            Http = HttpRequestOptionsMapping.FromCommandLine(options, formBody, proxy),
-            Progress = progress ?? NoTransferProgress.Instance,
+            Http = HttpRequestOptionsMapping.FromCommandLine(options, formBody, proxy, commandLineTextEncoding),
+            Progress = WatchedProgress(progress ?? NoTransferProgress.Instance, lowSpeedWatchdog),
             Events = EventsOrNone(events),
             TimeProvider = timeProvider ?? TimeProvider.System,
+            CancellationToken = TokenOf(lowSpeedWatchdog),
         };
+
+    /// <summary>
+    /// Gets <paramref name="output" /> counted by <paramref name="lowSpeedWatchdog" />, or as it is
+    /// when there is no watchdog.
+    /// </summary>
+    /// <param name="output">The attempt's body output.</param>
+    /// <param name="lowSpeedWatchdog">The attempt's watchdog, or <see langword="null" />.</param>
+    /// <returns>The output the context carries.</returns>
+    private static Stream WatchedOutput(Stream output, LowSpeedWatchdog? lowSpeedWatchdog) =>
+        lowSpeedWatchdog is null ? output : lowSpeedWatchdog.WatchOutput(output);
+
+    /// <summary>
+    /// Gets <paramref name="progress" /> watched by <paramref name="lowSpeedWatchdog" />, or as it
+    /// is when there is no watchdog.
+    /// </summary>
+    /// <param name="progress">The attempt's progress sink.</param>
+    /// <param name="lowSpeedWatchdog">The attempt's watchdog, or <see langword="null" />.</param>
+    /// <returns>The sink the context carries.</returns>
+    private static ITransferProgress WatchedProgress(ITransferProgress progress, LowSpeedWatchdog? lowSpeedWatchdog) =>
+        lowSpeedWatchdog is null ? progress : lowSpeedWatchdog.WatchProgress(progress);
+
+    /// <summary>
+    /// Gets the token that cancels the attempt: <paramref name="lowSpeedWatchdog" />'s, or
+    /// <see cref="CancellationToken.None" /> when there is no watchdog.
+    /// </summary>
+    /// <param name="lowSpeedWatchdog">The attempt's watchdog, or <see langword="null" />.</param>
+    /// <returns>The token the context carries.</returns>
+    private static CancellationToken TokenOf(LowSpeedWatchdog? lowSpeedWatchdog) =>
+        lowSpeedWatchdog is null ? CancellationToken.None : lowSpeedWatchdog.Token;
 
     /// <summary>
     /// Tells whether <c>-C -</c> resumes the <c>-T</c> <paramref name="upload" /> from an offset

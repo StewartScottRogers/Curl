@@ -18,13 +18,23 @@ public sealed class StreamConnectionTests
     }
 
     [TestMethod]
-    public async Task Properties_ReportPlaintextAndTheGivenEndPoint()
+    public async Task Properties_ReportPlaintextAndTheGivenEndPoints()
     {
         var endPoint = new IPEndPoint(IPAddress.Loopback, 80);
-        await using var connection = new StreamConnection(new MemoryStream(), endPoint);
+        var localEndPoint = new IPEndPoint(IPAddress.Loopback, 50000);
+        await using var connection = new StreamConnection(new MemoryStream(), endPoint, localEndPoint);
 
         Assert.IsFalse(connection.IsSecure);
         Assert.AreSame(endPoint, connection.RemoteEndPoint);
+        Assert.AreSame(localEndPoint, connection.LocalEndPoint);
+    }
+
+    [TestMethod]
+    public async Task LocalEndPoint_WhenNotGiven_IsNull()
+    {
+        await using var connection = new StreamConnection(new MemoryStream(), null);
+
+        Assert.IsNull(connection.LocalEndPoint);
     }
 
     [TestMethod]

@@ -16,11 +16,15 @@ given and must never reference a protocol library directly.
 which every TCP handler connects through, so a later URL to the same pool key reuses an
 earlier URL's connection; `TransferDispatch` holds it as the run's `ConnectionPool`, and the
 runner disposes the dispatch, closing the pool without writing anything, once the transfers
-end, whatever their outcome (ADR-0050, BL-334).
+end, whatever their outcome (ADR-0050, BL-334). It also holds the `TcpConnector`'s
+`LoadResolveEntries`, which the runner calls at the start of every URL's transfer, just before
+the `-b` files load, so `-v` prints the `--resolve` entries' `Added ... to DNS cache` lines for
+each URL; a `--retry` attempt and a followed redirect reload nothing, as in curl 8.21.0 (BL-486).
 
 `Program.Main` only opens the standard streams, builds the composition and hands the
 arguments to `CurlCommandRunner`, which parses them, runs each URL and prints curl's
-`curl: (N) <message>` lines. The parse reads the default config file first, where
+`curl: (N) <message>` lines, each transfer's message cut to curl's 255-byte error buffer by
+`CurlErrorBuffer` (a bad glob's lines are not cut; ADR-0072, BL-380). The parse reads the default config file first, where
 `DefaultConfigFileSearch.ForProcess` finds it (the composition passes it; a runner given none
 reads no `.curlrc`, which keeps tests off the real home directory), unless the first argument
 starts with `-q` or is `--disable`; `-K` files apply where they stand. Both are read through
@@ -49,10 +53,17 @@ exit 3. An `ipfs://` or `ipns://` URL is then rewritten by `IpfsGatewayRewriter`
 reader; the environment comes from the runner's `readEnvironmentVariable`, the process's in
 production and none in tests unless given), and `%{url}` prints the gateway URL; one that
 cannot be rewritten prints `curl: <message>` and the try-help line even under `-s`, has
-`%{xfer_id}` and `%{conn_id}` `-1`, and ends the run with exit 37 or 3. A URL still without a
+`%{xfer_id}` and `%{conn_id}` `-1`, and ends the run with exit 37 or 3. Before that, `-O` or
+`--remote-name-all` on an IPFS URL with no `-o` name is refused as curl 8.21.0 refuses it,
+gateway or not: `curl: Failed to extract a filename from the URL to use for storage` and
+`curl: (1) Unsupported protocol` (neither under `-s` alone), `%{xfer_id}` and `%{conn_id}`
+`-1`, exit 1, and the run ends (BL-372 Notes). A URL still without a
 scheme gets the one `UrlSchemeGuesser` guesses (`http`, or `ftp` for `ftp.` and so on), which
 `%{url_effective}` shows while `%{url}` keeps the URL as typed. Measured on curl 8.21.0
-(BL-240 Notes).
+(BL-240 Notes). `%{url_effective}` prints the URL `UrlEffective` rebuilds: the scheme in
+lower case, the authority as typed, and the path as curl sends it - `/` when empty, dot
+segments removed unless `--path-as-is` - before the query and fragment; a URL curl rejects
+prints as typed, as curl 8.21.0 does (BL-371 and BL-444 Notes).
 
 Each URL's output comes from `CommandLineOptions.UrlOutputs`: an `-o` name, or for `-O` /
 `--remote-name-all` the name `RemoteFileName` takes from the URL path (last non-empty
@@ -69,8 +80,9 @@ name already taken is refused with `File exists` and exit 23. Measured on curl 8
 (BL-239 Notes).
 
 `TransferContextFactory` builds each transfer's context from the parsed options; the
-context carries the parsed `-r` range (`ByteRangeParser`; text that names
-no range ends the transfer with exit 33 before it is dispatched), the `-C` offset and the
+context carries the `-r` text as given (`RangeText`, which the HTTP handler sends verbatim)
+and its parsed range (`ByteRangeParser`; text that names no range ends the transfer with exit
+33 before it is dispatched, except on an `http`/`https` URL, BL-386), the `-C` offset and the
 `--max-filesize` limit. `-C -` resumes from the size of the URL's `-o` file, and a transfer
 that resumes past byte zero opens that file for appending before it starts, as curl does.
 Every context also carries `Http`, which `HttpRequestOptionsMapping` fills from `-X`,
@@ -116,7 +128,9 @@ by `UploadTransferUrl` before anything else of that transfer: one it cannot pars
 with no warning lines. The `-T` file is opened through the runner's `IFileSystem` after the
 before-transfer warning lines and becomes the context's `Upload`; one that cannot be opened
 prints `curl: cannot open '<file>'` and the try-help line even under `-s`, is exit 26, and
-stops the run. `-T -` and `-T .` upload standard input. `%{url_effective}` prints the
+stops the run, a `-T` glob match as much as a lone file. When the run's previous transfer
+failed, it reports that transfer's code instead, with the text `CurlEasyErrorText` gives it
+(`curl: (7) Could not connect to server`), as curl 8.21.0 does (BL-440 Notes). `-T -` and `-T .` upload standard input. `%{url_effective}` prints the
 resolved URL.
 
 Each transfer's proxy is chosen by `TransferProxySelection`, after the URL, range and `-F`
@@ -128,10 +142,15 @@ cannot use ends the transfer with the selector's exit 5 or 7, and a SOCKS proxy,
 proxy for `https` or under `-p` or `-L`, ends an `http`/`https` transfer with exit 4 until the connector opens those tunnels
 (ADR-0053, BL-328). Other schemes do not read the proxy yet (BL-330), and redirect hops keep
 the first URL's proxy (BL-329). Measured on curl 8.21.0 (BL-238 Notes).
-An `ftp` URL is claimed by `RoutingFtpProtocolHandler`, which hands it to the HTTP handler
-when its proxy is `Http` or `Http10` and `-p` is not given, so it is forwarded to the proxy as
-`GET ftp://host/path` with `Host: host:21` (ADR-0056, rule 3; BL-344); any other `ftp` transfer
-goes to `FtpProtocolHandler` over the pooling connector (ADR-0093, BL-434).
+An `ftp` or `ftps` URL is claimed by `RoutingFtpProtocolHandler`, which hands an `ftp` one to
+the HTTP handler when its proxy is `Http` or `Http10` and `-p` is not given, so it is forwarded
+to the proxy as `GET ftp://host/path` with `Host: host:21` (ADR-0056, rule 3; BL-344); any
+other transfer, `ftps` through an HTTP proxy included (curl 8.21.0 tunnels it with
+`CONNECT host:990`, BL-458), goes to `FtpProtocolHandler` over the pooling connector
+(ADR-0093, BL-434). `CurlComposition.CreateFtpProtocolHandler` builds it with a
+`TcpConnectionListener` for `-P`, the run's TLS provider and DNS resolver, and a
+`SystemNetworkInterfaceLookup` (ADR-0102, ADR-0108, ADR-0110), and `TransferContextFactory`
+copies `-P`, `--disable-eprt`, `--ssl`/`--ssl-reqd` and `--ftp-ssl-control` into the context.
 
 Every transfer goes through `Curl.Core`'s `RedirectFollower`. `-L` becomes
 `HttpRequestOptions.FollowRedirects`, and `RedirectPolicyMapping` turns `--max-redirs`,
@@ -139,6 +158,13 @@ Every transfer goes through `Curl.Core`'s `RedirectFollower`. `-L` becomes
 hop writes to the same body and header outputs, so `-L -i` prints every response's head and
 only the last body, and one redirect past `--max-redirs` exits 47 with
 `curl: (47) Maximum (N) redirects followed`, as measured on curl 8.21.0 (BL-234).
+
+Under `-Y`/`--speed-limit` or `-y`/`--speed-time` each attempt gets a `Curl.Core`
+`LowSpeedWatchdog` on the runner's clock: `TransferContextFactory` wraps the output and the
+progress sink so it counts the bytes moved, and gives the context its token. An attempt it
+cancels after `-y` seconds below `-Y` (30 seconds, or 1 byte per second, when only one is
+given) ends with `curl: (28) Operation too slow. Less than N bytes/sec transferred the last T
+seconds`, as measured on curl 8.21.0 (ADR-0106, BL-400).
 
 Under `-R`/`--remote-time` a successful transfer to an `-o` file whose result carries
 `SourceLastWriteTimeUtc` stamps the closed file with it through `IFileTimeSetter`
@@ -153,7 +179,17 @@ output is a terminal; a trace is its `TraceTransferEventWriter`, stamped under `
 the named file (opened once per run, truncated), standard output for `-`, standard error for `%`,
 and standard error, with no warning, for a file that cannot be opened. On Windows each is text
 mode, CR LF. Measured on curl 8.21.0 (BL-242 Notes). The lines are only as complete as what the
-handler and connector report; `--stderr` is not wired yet (BL-242 Notes name the follow-ups).
+handler and connector report (BL-242 Notes name the follow-ups).
+
+`--stderr <file>` replaces the runner's standard error where it stands among the parser's
+warning lines, as curl opens the file while parsing: each `StandardErrorRedirect` in
+`CommandLineParseResult.StandardErrorRedirects` says how many warning lines came before it, so
+those go where standard error went until then and the rest, a refusal's lines, the config-file
+note and every later line (`-v`, warnings, `curl: (N)`, the progress meter, `-w %{stderr}`) go to
+the file, opened truncated even when nothing is written, or to standard output for
+`--stderr -`. A later `--stderr` closes the earlier file and takes over. A file that cannot be
+opened prints `Warning: Warning: Failed to open <file>` where standard error goes at that point,
+unless `-s` came before the option, and standard error stays put (BL-410, BL-476 Notes).
 
 After each successful transfer, after one `-f` failed with exit 22, and after one that failed
 once its handler reported it past connect or open (BL-130), standard error gets curl's progress
@@ -166,8 +202,14 @@ runner's `TimeProvider` as curl 8.21.0's `progress_calc` and `progress_meter` do
 starts, a line for a byte report a second or more after the last speed sample, and, when the
 handler reported any bytes, three done lines after a success or one more update after a failure.
 A handler that reports no bytes, as `file://`'s does not, leaves only the zero line - every byte
-curl writes for a `file://` transfer. The meter is written after the transfer, so its bytes are
-curl's but a terminal does not see it move (BL-131 Notes). It is not written under `-s`,
+curl writes for a `file://` transfer. From the handler's first "transfer started" report the
+recorder hands each drawn line to the runner, which writes it (after the header lines the first
+time) to standard error synchronously, so a terminal sees it move; the end draws, the newline,
+and the whole meter of a transfer never reported started are written after the transfer, so the
+bytes are BL-131's (ADR-0099, BL-383). The `-v` and trace output goes through a `HoldableStream`
+over standard error, which the recorder holds when the handler reports the transfer done (while
+the meter is written live) and the runner releases after the meter's end, so the connection-end
+`-v` line follows the meter as in curl 8.21.0 (ADR-0116, BL-411). It is not written under `-s`,
 `--no-progress-meter` or `-#`, nor for a body on standard output when that is a terminal.
 
 Under `-#` (and not `-s`, `--no-progress-meter` or a body on a terminal) the recorder passes
@@ -183,9 +225,11 @@ in curl. No `** Resuming` line is written under `-#` (ADR-0082, BL-132 Notes).
 
 With `-w`, each transfer's template is rendered by `Curl.Output`'s `WriteOutTemplateRenderer`
 after its failure lines, after a failure as after a success (a `-D` or resumed `-o` file that
-cannot be opened included), with `TransferWriteOutVariables` as its values. On Windows the
+cannot be opened included), with `TransferWriteOutVariables` as its values. Its `%time{format}`
+follows the `WriteOutTimeDialect` the runner is given: `CurlComposition.WriteOutTimeDialectFor`
+passes `WindowsCRuntime` on Windows and `Glibc` elsewhere (ADR-0078, BL-387). On Windows the
 line feeds it writes to standard error, and to standard output while curl's standard output
-would still be in text mode, go through `LineFeedToCrLfStream` as CR LF (ADR-0040).
+would still be in text mode, go through `LineFeedToCrLfStream` as CR LF (ADR-0081).
 `%output{file}` targets go through the runner's `IWriteOutFileOpener`: `CurlComposition`
 passes `DiskWriteOutFileOpener`, which opens each file shared for writing (truncated, or
 appended for `%output{>>file}`), in text mode on Windows, and refuses one it cannot open;

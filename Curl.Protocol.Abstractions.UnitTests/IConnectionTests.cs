@@ -1,0 +1,49 @@
+using System.Net;
+
+namespace Curl.Protocol.Abstractions;
+
+/// <summary>
+/// Pins the default members of <see cref="IConnection" />, which let an implementation
+/// leave them out.
+/// </summary>
+[TestClass]
+public sealed class IConnectionTests
+{
+    [TestMethod]
+    public void LocalEndPoint_WhenNotOverridden_ReturnsNull()
+    {
+        IConnection connection = new MinimalConnection();
+
+        var localEndPoint = connection.LocalEndPoint;
+
+        Assert.IsNull(localEndPoint);
+    }
+
+    [TestMethod]
+    public void MarkReusable_WhenNotOverridden_DoesNothing()
+    {
+        IConnection connection = new MinimalConnection();
+
+        connection.MarkReusable();
+
+        Assert.IsFalse(connection.IsSecure);
+    }
+
+    private sealed class MinimalConnection : IConnection
+    {
+        public bool IsSecure => false;
+
+        public EndPoint? RemoteEndPoint => null;
+
+        public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public ValueTask FlushAsync(CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+}

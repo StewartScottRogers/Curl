@@ -29,4 +29,9 @@ public sealed class NoTransferProgress : ITransferProgress
     public void ReportUploaded(long bytesSoFar, long? expectedTotal)
     {
     }
+
+    /// <inheritdoc />
+    public void ReportTransferDone()
+    {
+    }
 }

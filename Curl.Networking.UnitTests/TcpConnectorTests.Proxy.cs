@@ -224,7 +224,8 @@ public sealed partial class TcpConnectorTests
             new ConnectTarget("example.com", 443, UseTls: true) { Proxy = HttpProxy },
             CancellationToken.None);
 
-        Assert.AreSame(failure, result);
+        Assert.AreEqual(failure.ExitCode, result.ExitCode);
+        Assert.AreEqual(failure.ErrorMessage, result.ErrorMessage);
     }
 
     private static TcpConnector CreateProxyConnector(ScriptedConnection proxyConnection, FakeTlsProvider tlsProvider) =>

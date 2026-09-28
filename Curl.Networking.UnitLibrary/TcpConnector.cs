@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using System.Runtime.ExceptionServices;
@@ -31,7 +32,8 @@ namespace Curl.Networking;
 /// but not the host TLS verifies; <see langword="null" /> for <see cref="ConnectToMappings.None" />.
 /// </param>
 /// <param name="proxyTlsProvider">
-/// Runs the handshake to an HTTPS proxy (<see cref="ProxyKind.Https" />), as curl verifies the
+/// Runs the handshake to an HTTPS proxy, tunnelling (<see cref="ProxyKind.Https" />) or a forward
+/// proxy (<see cref="ConnectTarget.IsForwardProxy" /> with <see cref="ConnectTarget.UseTls" />), as curl verifies the
 /// proxy with the <c>--proxy-*</c> TLS options and the target with <c>-k</c> and <c>--cacert</c>;
 /// <see langword="null" /> for <paramref name="tlsProvider" />.
 /// </param>
@@ -45,10 +47,15 @@ public sealed class TcpConnector(
     ConnectToMappings? connectToMappings = null,
     ITlsProvider? proxyTlsProvider = null) : IConnector
 {
+    private const string AnyHost = "*";
+
     private readonly ITlsProvider _proxyTlsProvider = proxyTlsProvider ?? tlsProvider;
     private readonly HttpProxyTunnelOptions _proxyTunnelOptions = proxyTunnelOptions ?? HttpProxyTunnelOptions.Default;
     private readonly ResolveOverrides _resolveOverrides = resolveOverrides ?? ResolveOverrides.None;
     private readonly ConnectToMappings _connectToMappings = connectToMappings ?? ConnectToMappings.None;
+    private readonly ConcurrentDictionary<string, DnsCacheEntry> _dnsCache = new(StringComparer.OrdinalIgnoreCase);
+    private int _resolveEntriesLoaded;
+    private long _nextConnectionNumber;
 
     /// <inheritdoc />
     /// <remarks>
@@ -133,22 +140,51 @@ public sealed class TcpConnector(
     /// connect (measured, ADR-0091). A failed resolve, a bad <c>--resolve</c> or <c>--connect-to</c>
     /// entry and a failed tunnel carry none; a failed handshake is the provider's result as it is.
     /// </para>
+    /// <para>
+    /// On <see cref="ConnectTarget.Events" /> it reports curl 8.21.0's <c>-v</c> lines for the
+    /// connect (ADR-0100): <c>  Trying &lt;address&gt;:&lt;port&gt;...</c> before each dial,
+    /// <c>connect to &lt;address&gt; port &lt;port&gt; from 0.0.0.0 port 0 failed:
+    /// &lt;reason&gt;</c> after each dial that fails (<see cref="ConnectFailureReason" />), and
+    /// the exit 7 message when none reached. A success is reported through
+    /// <see cref="ITransferEvents.ReportConnectionOpened" /> once the connection is ready, after
+    /// any tunnel and TLS handshake, naming the host dialled and numbering the connections this
+    /// connector opened from <c>0</c> (<see cref="ConnectResult.ConnectionNumber" />). A connect
+    /// that fails after its options parse takes the next number too, as curl 8.21.0 numbers the
+    /// connection it tried (ADR-0109). A host and port answered by a <c>--resolve</c> entry, or
+    /// resolved before by this connector (to the host, the proxy or a SOCKS target), are
+    /// answered from that cache and reported first as <c>Hostname &lt;host&gt; was found in DNS
+    /// cache</c>, as curl 8.21.0 reports them (measured, BL-481). Every answer, cached or
+    /// looked up, is then reported as <c>Host &lt;name&gt;:&lt;port&gt; was resolved.</c>,
+    /// <c>IPv6: &lt;addresses&gt;</c> and <c>IPv4: &lt;addresses&gt;</c>, naming the host as it
+    /// was cached (a <c>--resolve</c> entry's as written, <c>*</c> for a wildcard) and each
+    /// family's addresses joined by <c>, </c> or <c>(none)</c>; a name that is an IP address
+    /// reports none of the three (measured, BL-482). Before anything else, a connect that no
+    /// transfer has preceded with <see cref="LoadResolveEntries" /> loads the <c>--resolve</c>
+    /// entries itself, with their <c>Added</c> lines, before a bad entry fails it.
+    /// </para>
     /// </remarks>
     public async ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(target);
 
         var started = timeProvider.GetTimestamp();
+        LoadResolveEntriesUnlessLoaded(target.Events);
         var destination = _connectToMappings.Map(target.Host, target.Port);
         if ((_resolveOverrides.ParseError ?? destination.ParseError) is { } parseError)
         {
             return ConnectResult.Failed(CurlExitCode.SetoptOptionSyntax, parseError);
         }
 
-        return target.Proxy is { } proxy
+        var result = target.Proxy is { } proxy
             ? await ConnectThroughProxyAsync(target, destination, proxy, started, cancellationToken).ConfigureAwait(false)
             : await ConnectDirectlyAsync(target, destination, started, cancellationToken).ConfigureAwait(false);
+
+        return result.Connection is null
+            ? NumberedConnectFailure.Of(result, TakeConnectionNumber())
+            : result;
     }
+
+    private long TakeConnectionNumber() => Interlocked.Increment(ref _nextConnectionNumber) - 1;
 
     private async ValueTask<ConnectResult> ConnectDirectlyAsync(
         ConnectTarget target,
@@ -156,7 +192,7 @@ public sealed class TcpConnector(
         long started,
         CancellationToken cancellationToken)
     {
-        var addresses = await ResolveAsync(destination.Host, destination.Port, cancellationToken).ConfigureAwait(false);
+        var addresses = await ResolveAsync(destination.Host, destination.Port, target.Events, cancellationToken).ConfigureAwait(false);
         if (addresses.Count == 0)
         {
             return ConnectResult.Failed(
@@ -165,12 +201,13 @@ public sealed class TcpConnector(
         }
 
         var nameResolved = timeProvider.GetTimestamp();
-        var (dialed, lastDialError) = await DialFirstReachableAsync(addresses, destination.Port, cancellationToken).ConfigureAwait(false);
+        var (dialed, lastDialError) = await DialFirstReachableAsync(addresses, destination.Port, destination.Host, target.Events, cancellationToken).ConfigureAwait(false);
         if (dialed is null)
         {
             var elapsedMilliseconds = (long)timeProvider.GetElapsedTime(nameResolved).TotalMilliseconds;
             var via = destination.IsMapped ? $" via {destination.Host}:{destination.Port}" : string.Empty;
             return DialFailure(
+                target.Events,
                 lastDialError,
                 new ConnectTimings(started, nameResolved, null, null),
                 $"Failed to connect to {target.Host}:{target.Port}{via} after {elapsedMilliseconds} ms: Could not connect to server");
@@ -180,8 +217,112 @@ public sealed class TcpConnector(
         return await SecureWhenAskedAsync(dialed, target, timings, 0, cancellationToken).ConfigureAwait(false);
     }
 
-    private async ValueTask<IReadOnlyList<IPAddress>> ResolveAsync(string host, int port, CancellationToken cancellationToken) =>
-        _resolveOverrides.Find(host, port) ?? await dnsResolver.ResolveAsync(host, cancellationToken).ConfigureAwait(false);
+    /// <summary>
+    /// Loads the <c>--resolve</c> entries into the DNS cache, as curl 8.21.0 loads them at the
+    /// start of every transfer but not for a redirect it follows (measured, BL-482). Each
+    /// addition is reported on <paramref name="events" /> as <c>Added
+    /// &lt;host&gt;:&lt;port&gt;:&lt;addresses&gt; to DNS cache</c> (with <c> (non-permanent)</c>
+    /// for a <c>+</c> entry, and <c>RESOLVE *:&lt;port&gt; using wildcard</c> after a <c>*</c>
+    /// one), after <c>RESOLVE &lt;host&gt;:&lt;port&gt; - old addresses discarded</c> when the
+    /// key was cached; a removal drops the key without a line. When no transfer has called
+    /// this, <see cref="ConnectAsync" /> calls it on its target's events first.
+    /// </summary>
+    /// <param name="events">The transfer's events.</param>
+    public void LoadResolveEntries(ITransferEvents events)
+    {
+        ArgumentNullException.ThrowIfNull(events);
+
+        Interlocked.Exchange(ref _resolveEntriesLoaded, 1);
+        foreach (var entry in _resolveOverrides.Entries)
+        {
+            LoadResolveEntry(entry, events);
+        }
+    }
+
+    private void LoadResolveEntriesUnlessLoaded(ITransferEvents events)
+    {
+        if (Interlocked.CompareExchange(ref _resolveEntriesLoaded, 1, 0) == 0)
+        {
+            LoadResolveEntries(events);
+        }
+    }
+
+    private void LoadResolveEntry(ResolveEntry entry, ITransferEvents events)
+    {
+        var cacheKey = DnsCacheKey(entry.Host, entry.Port);
+        if (entry.IsRemoval)
+        {
+            _dnsCache.TryRemove(cacheKey, out _);
+            return;
+        }
+
+        if (_dnsCache.ContainsKey(cacheKey))
+        {
+            events.ReportInfo($"RESOLVE {entry.Host}:{entry.Port} - old addresses discarded");
+        }
+
+        _dnsCache[cacheKey] = new DnsCacheEntry(entry.Host, entry.Port, entry.Addresses);
+        events.ReportInfo($"Added {entry.Host}:{entry.Port}:{entry.AddressText} to DNS cache{(entry.IsPermanent ? string.Empty : " (non-permanent)")}");
+        if (entry.Host == AnyHost)
+        {
+            events.ReportInfo($"RESOLVE {AnyHost}:{entry.Port} using wildcard");
+        }
+    }
+
+    /// <summary>
+    /// Resolves <paramref name="host" /> for <paramref name="port" /> as curl 8.21.0's DNS cache
+    /// does (BL-481): a <c>--resolve</c> entry for the host or for <c>*</c>, or a host and port
+    /// this connector already resolved, answers without <see cref="IDnsResolver" /> and is
+    /// reported on <paramref name="events" /> as <c>Hostname &lt;host&gt; was found in DNS
+    /// cache</c>. A host that did not resolve is not kept, so it is looked up again. Every
+    /// answer is then reported as curl's resolved lines (<see cref="ReportResolved" />).
+    /// </summary>
+    private async ValueTask<IReadOnlyList<IPAddress>> ResolveAsync(string host, int port, ITransferEvents events, CancellationToken cancellationToken)
+    {
+        var cacheKey = DnsCacheKey(host, port);
+        if ((_dnsCache.GetValueOrDefault(cacheKey) ?? _dnsCache.GetValueOrDefault(DnsCacheKey(AnyHost, port))) is { } cached)
+        {
+            events.ReportInfo($"Hostname {host} was found in DNS cache");
+            ReportResolved(cached, events);
+            return cached.Addresses;
+        }
+
+        var addresses = await dnsResolver.ResolveAsync(host, cancellationToken).ConfigureAwait(false);
+        if (addresses.Count > 0)
+        {
+            var resolved = new DnsCacheEntry(host, port, addresses);
+            _dnsCache[cacheKey] = resolved;
+            ReportResolved(resolved, events);
+        }
+
+        return addresses;
+    }
+
+    /// <summary>
+    /// Reports curl 8.21.0's <c>Host &lt;name&gt;:&lt;port&gt; was resolved.</c>,
+    /// <c>IPv6: &lt;addresses&gt;</c> and <c>IPv4: &lt;addresses&gt;</c> lines for a cache
+    /// entry, naming the entry's host as it was cached (a <c>--resolve</c> entry's as written,
+    /// <c>*</c> for a wildcard) and each family's addresses in order, joined by <c>, </c>, or
+    /// <c>(none)</c>. An entry named by an IP address reports none of them (measured, BL-482).
+    /// </summary>
+    private static void ReportResolved(DnsCacheEntry entry, ITransferEvents events)
+    {
+        if (IPAddress.TryParse(entry.Name, out _))
+        {
+            return;
+        }
+
+        events.ReportInfo($"Host {entry.Name}:{entry.Port} was resolved.");
+        events.ReportInfo($"IPv6: {JoinAddresses(entry.Addresses, AddressFamily.InterNetworkV6)}");
+        events.ReportInfo($"IPv4: {JoinAddresses(entry.Addresses, AddressFamily.InterNetwork)}");
+    }
+
+    private static string JoinAddresses(IReadOnlyList<IPAddress> addresses, AddressFamily family) =>
+        addresses.Where(address => address.AddressFamily == family).Select(address => address.ToString()).ToArray() is { Length: > 0 } inFamily
+            ? string.Join(", ", inFamily)
+            : "(none)";
+
+    private static string DnsCacheKey(string host, int port) => $"{host}:{port}";
 
     private async ValueTask<ConnectResult> ConnectThroughProxyAsync(
         ConnectTarget target,
@@ -190,7 +331,7 @@ public sealed class TcpConnector(
         long started,
         CancellationToken cancellationToken)
     {
-        var addresses = await ResolveAsync(proxy.Host, proxy.Port, cancellationToken).ConfigureAwait(false);
+        var addresses = await ResolveAsync(proxy.Host, proxy.Port, target.Events, cancellationToken).ConfigureAwait(false);
         if (addresses.Count == 0)
         {
             return ConnectResult.Failed(
@@ -199,11 +340,12 @@ public sealed class TcpConnector(
         }
 
         var nameResolved = timeProvider.GetTimestamp();
-        var (dialed, lastDialError) = await DialFirstReachableAsync(addresses, proxy.Port, cancellationToken).ConfigureAwait(false);
+        var (dialed, lastDialError) = await DialFirstReachableAsync(addresses, proxy.Port, proxy.Host, target.Events, cancellationToken).ConfigureAwait(false);
         if (dialed is null)
         {
             var elapsedMilliseconds = (long)timeProvider.GetElapsedTime(nameResolved).TotalMilliseconds;
             return DialFailure(
+                target.Events,
                 lastDialError,
                 new ConnectTimings(started, nameResolved, null, null),
                 $"Failed to connect to {target.Host}:{target.Port} over proxy {proxy.Host} after {elapsedMilliseconds} ms: Could not connect to server");
@@ -218,7 +360,7 @@ public sealed class TcpConnector(
     }
 
     private async ValueTask<ConnectResult> OpenTunnelOverTlsAsync(
-        DialedTcpConnection dialed,
+        DialedSocket dialed,
         ConnectTarget target,
         ConnectDestination destination,
         ProxyEndpoint proxy,
@@ -230,19 +372,19 @@ public sealed class TcpConnector(
         // handshake to it with the same exit code and message as one to a target (measured).
         // It verifies with the --proxy-* TLS options, not -k or --cacert, so the proxy's own
         // provider runs this handshake (ADR-0061).
-        var securedProxy = await _proxyTlsProvider.AuthenticateAsClientAsync(dialed.Connection, proxy.Host, cancellationToken).ConfigureAwait(false);
+        var securedProxy = await AuthenticateAsync(_proxyTlsProvider, dialed.Connection, proxy.Host, target.Events, isProxy: true, cancellationToken).ConfigureAwait(false);
         if (securedProxy.Connection is not { } proxyConnection)
         {
             return securedProxy;
         }
 
         // CONNECT and the target's TLS run over the proxy's TLS; the socket's local end point stays.
-        var securedDialed = new DialedTcpConnection(proxyConnection, dialed.LocalEndPoint);
+        var securedDialed = dialed with { Connection = proxyConnection };
         return await OpenTunnelAsync(securedDialed, target, destination, proxy, started, nameResolved, cancellationToken).ConfigureAwait(false);
     }
 
     private async ValueTask<ConnectResult> OpenSocksTunnelAsync(
-        DialedTcpConnection dialed,
+        DialedSocket dialed,
         ConnectTarget target,
         ConnectDestination destination,
         ProxyEndpoint proxy,
@@ -250,7 +392,7 @@ public sealed class TcpConnector(
         CancellationToken cancellationToken)
     {
         var connection = dialed.Connection;
-        var (failure, exception) = await RunSocksHandshakeAsync(connection, destination, proxy, cancellationToken).ConfigureAwait(false);
+        var (failure, exception) = await RunSocksHandshakeAsync(connection, destination, proxy, target.Events, cancellationToken).ConfigureAwait(false);
         if (exception is not null || failure is not null)
         {
             // The proxy connection is disposed whether the handshake failed or could not be sent or read.
@@ -264,7 +406,7 @@ public sealed class TcpConnector(
     }
 
     private async ValueTask<ConnectResult> OpenTunnelAsync(
-        DialedTcpConnection dialed,
+        DialedSocket dialed,
         ConnectTarget target,
         ConnectDestination destination,
         ProxyEndpoint proxy,
@@ -309,11 +451,18 @@ public sealed class TcpConnector(
         IConnection connection,
         ConnectDestination destination,
         ProxyEndpoint proxy,
+        ITransferEvents events,
         CancellationToken cancellationToken)
     {
         try
         {
-            return (await SocksProxyTunnel.OpenAsync(connection, proxy, destination.Host, destination.Port, ResolveAsync, cancellationToken).ConfigureAwait(false), null);
+            return (await SocksProxyTunnel.OpenAsync(
+                connection,
+                proxy,
+                destination.Host,
+                destination.Port,
+                (host, port, token) => ResolveAsync(host, port, events, token),
+                cancellationToken).ConfigureAwait(false), null);
         }
         catch (Exception exception)
         {
@@ -327,7 +476,7 @@ public sealed class TcpConnector(
             : ConnectResult.Failed(CurlExitCode.CouldntConnect, $"CONNECT tunnel failed, response {reply.StatusCode}");
 
     private async ValueTask<ConnectResult> SecureWhenAskedAsync(
-        DialedTcpConnection dialed,
+        DialedSocket dialed,
         ConnectTarget target,
         ConnectTimings timings,
         int proxyConnectResponseCode,
@@ -335,10 +484,10 @@ public sealed class TcpConnector(
     {
         if (!target.UseTls)
         {
-            return ConnectResult.Connected(dialed.Connection, timings, dialed.LocalEndPoint, proxyConnectResponseCode);
+            return Opened(dialed, target.Events, dialed.Connection, timings, proxyConnectResponseCode, peerCertificates: null);
         }
 
-        var secured = await tlsProvider.AuthenticateAsClientAsync(dialed.Connection, target.Host, cancellationToken).ConfigureAwait(false);
+        var secured = await AuthenticateTargetAsync(dialed.Connection, target, cancellationToken).ConfigureAwait(false);
         if (secured.Connection is not { } securedConnection)
         {
             return secured;
@@ -347,35 +496,105 @@ public sealed class TcpConnector(
         // A provider that measured its handshake is trusted for the moment it completed; for
         // one that did not, the moment it returned is that moment.
         var handshakeCompleted = secured.Timings?.TlsHandshakeCompleted ?? timeProvider.GetTimestamp();
-        return ConnectResult.Connected(
+        return Opened(
+            dialed,
+            target.Events,
             securedConnection,
             timings with { TlsHandshakeCompleted = handshakeCompleted },
-            dialed.LocalEndPoint,
             proxyConnectResponseCode,
             secured.PeerCertificates);
     }
 
     /// <summary>
+    /// Numbers a connection that is ready for the transfer, reports it opened as curl 8.21.0's
+    /// <c>Established connection</c> line, after any tunnel and TLS handshake (BL-228), and
+    /// returns it.
+    /// </summary>
+    private ConnectResult Opened(
+        DialedSocket dialed,
+        ITransferEvents events,
+        IConnection connection,
+        ConnectTimings timings,
+        int proxyConnectResponseCode,
+        IReadOnlyList<ReadOnlyMemory<byte>>? peerCertificates)
+    {
+        var connectionNumber = TakeConnectionNumber();
+        events.ReportConnectionOpened(new ConnectionOpenedEvent
+        {
+            HostName = dialed.HostName,
+            RemoteEndPoint = dialed.RemoteEndPoint,
+            LocalEndPoint = dialed.LocalEndPoint,
+            ConnectionNumber = connectionNumber,
+        });
+
+        return ConnectResult.Connected(
+            connection,
+            timings,
+            dialed.LocalEndPoint,
+            proxyConnectResponseCode,
+            peerCertificates,
+            isReused: false,
+            connectionNumber);
+    }
+
+    // A forward proxy is the target itself, so its handshake runs through the proxy's
+    // provider, as curl 8.21.0 verifies it with --proxy-insecure and not -k (measured, BL-441),
+    // and is reported as a proxy's, as curl's OpenSSL build says Proxy certificate: for it
+    // (measured, BL-405).
+    private ValueTask<ConnectResult> AuthenticateTargetAsync(
+        IConnection plaintext,
+        ConnectTarget target,
+        CancellationToken cancellationToken) =>
+        AuthenticateAsync(
+            target.IsForwardProxy ? _proxyTlsProvider : tlsProvider,
+            plaintext,
+            target.Host,
+            target.Events,
+            target.IsForwardProxy,
+            cancellationToken);
+
+    // A provider that can report its handshake reports its trust and handshake on the
+    // target's events, marked as the proxy's when it is with an HTTPS proxy (BL-404, BL-452).
+    private static ValueTask<ConnectResult> AuthenticateAsync(
+        ITlsProvider provider,
+        IConnection plaintext,
+        string host,
+        ITransferEvents events,
+        bool isProxy,
+        CancellationToken cancellationToken) =>
+        provider is IHandshakeReportingTlsProvider reportingProvider
+            ? reportingProvider.AuthenticateAsClientAsync(plaintext, host, events, isProxy, cancellationToken)
+            : provider.AuthenticateAsClientAsync(plaintext, host, cancellationToken);
+
+    /// <summary>
     /// Dials each address in turn and returns the first connection, or <see langword="null" />
     /// with the <see cref="SocketError" /> of the last attempt, which curl keeps as
-    /// <c>CURLINFO_OS_ERRNO</c>.
+    /// <c>CURLINFO_OS_ERRNO</c>. Each attempt is reported on <paramref name="events" /> as
+    /// curl 8.21.0's <c>-v</c> reports it: <c>Trying</c> before it, and the
+    /// <c>connect to ... failed</c> line when it fails (measured, BL-408).
     /// </summary>
-    private async ValueTask<(DialedTcpConnection? Dialed, SocketError LastError)> DialFirstReachableAsync(
+    private async ValueTask<(DialedSocket? Dialed, SocketError LastError)> DialFirstReachableAsync(
         IReadOnlyList<IPAddress> addresses,
         int port,
+        string hostName,
+        ITransferEvents events,
         CancellationToken cancellationToken)
     {
         var lastError = SocketError.Success;
         foreach (var address in addresses)
         {
+            var remoteEndPoint = new IPEndPoint(address, port);
+            events.ReportInfo($"  Trying {remoteEndPoint}...");
             try
             {
-                return (await tcpDialer.DialAsync(new IPEndPoint(address, port), cancellationToken).ConfigureAwait(false), SocketError.Success);
+                var dialed = await tcpDialer.DialAsync(remoteEndPoint, cancellationToken).ConfigureAwait(false);
+                return (new DialedSocket(dialed.Connection, dialed.LocalEndPoint, hostName, remoteEndPoint), SocketError.Success);
             }
             catch (SocketException exception)
             {
                 // curl moves on to the next address; only when every one fails is it exit 7.
                 lastError = exception.SocketErrorCode;
+                events.ReportInfo(ConnectFailedLine(remoteEndPoint, exception));
             }
         }
 
@@ -383,13 +602,41 @@ public sealed class TcpConnector(
     }
 
     /// <summary>
-    /// The exit 7 for a dial that reached no address: marked refused when the last attempt
-    /// was refused, as <c>--retry-connrefused</c> reads curl's <c>CURLINFO_OS_ERRNO</c>. It
-    /// carries the start and lookup timestamps, as curl 8.21.0 still reports
+    /// curl 8.21.0's line for one failed dial, such as <c>connect to 127.0.0.1 port 1 from
+    /// 0.0.0.0 port 56585 failed: Connection refused</c>. A failed dial reports no local end
+    /// point, so it names the unspecified address of the family and port <c>0</c> (ADR-0100).
+    /// </summary>
+    private static string ConnectFailedLine(IPEndPoint remoteEndPoint, SocketException exception)
+    {
+        var unspecified = remoteEndPoint.AddressFamily == AddressFamily.InterNetworkV6 ? IPAddress.IPv6Any : IPAddress.Any;
+        var reason = ConnectFailureReason.Describe(exception, OperatingSystem.IsWindows());
+        return $"connect to {remoteEndPoint.Address} port {remoteEndPoint.Port} from {unspecified} port 0 failed: {reason}";
+    }
+
+    /// <summary>
+    /// The exit 7 for a dial that reached no address, its message also reported on
+    /// <paramref name="events" /> as curl's <c>-v</c> repeats it: marked refused when the last
+    /// attempt was refused, as <c>--retry-connrefused</c> reads curl's <c>CURLINFO_OS_ERRNO</c>.
+    /// It carries the start and lookup timestamps, as curl 8.21.0 still reports
     /// <c>%{time_namelookup}</c> after a refused connect (measured, ADR-0091).
     /// </summary>
-    private static ConnectResult DialFailure(SocketError lastError, ConnectTimings timings, string errorMessage) =>
-        lastError == SocketError.ConnectionRefused
+    private static ConnectResult DialFailure(ITransferEvents events, SocketError lastError, ConnectTimings timings, string errorMessage)
+    {
+        events.ReportInfo(errorMessage);
+        return lastError == SocketError.ConnectionRefused
             ? ConnectResult.Refused(errorMessage, timings)
             : ConnectResult.Failed(CurlExitCode.CouldntConnect, errorMessage, timings);
+    }
+
+    /// <summary>
+    /// A dialled TCP connection with the name and address it was dialled for: the connection
+    /// the transfer talks over, which becomes the proxy's TLS stream through an HTTPS proxy.
+    /// </summary>
+    private sealed record DialedSocket(IConnection Connection, IPEndPoint LocalEndPoint, string HostName, IPEndPoint RemoteEndPoint);
+
+    /// <summary>
+    /// One key of curl's DNS cache: the host as it was cached (the name looked up, or a
+    /// <c>--resolve</c> entry's host as written), the port and the addresses.
+    /// </summary>
+    private sealed record DnsCacheEntry(string Name, int Port, IReadOnlyList<IPAddress> Addresses);
 }

@@ -13,7 +13,7 @@ namespace Curl.Output;
 public sealed class OpenSslCertificateTextTests
 {
     [TestMethod]
-    public void ServerCertificate_LoopbackLeaf_PrintsNamesAndDatesAsOpenSsl()
+    public void PeerCertificate_LoopbackLeaf_PrintsNamesAndDatesAsOpenSsl()
     {
         using var leaf = X509CertificateLoader.LoadCertificate(LoopbackChain.Certificates[0].Span);
 
@@ -26,21 +26,21 @@ public sealed class OpenSslCertificateTextTests
                 "  expire date: Nov  1 05:24:52 2027 GMT",
                 "  issuer: C=GB; O=BL303; OU=Intermediates; CN=BL303 Intermediate; emailAddress=ca@example.test",
             },
-            OpenSslCertificateText.ServerCertificate(leaf).ToArray());
+            OpenSslCertificateText.PeerCertificate(leaf, isProxy: false).ToArray());
     }
 
     // Linux (OpenSSL) and macOS (Security framework) refuse to load a certificate whose name
     // holds an odd-length BMPString, so the [NONE] fallback is only reachable on Windows.
     [TestMethod]
     [OSCondition(OperatingSystems.Windows)]
-    public void ServerCertificate_NamesOpenSslCannotPrint_PrintNone()
+    public void PeerCertificate_NamesOpenSslCannotPrint_PrintNone()
     {
         using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         X500DistinguishedName brokenName = new([0x30, 0x0C, 0x31, 0x0A, 0x30, 0x08, 0x06, 0x03, 0x55, 0x04, 0x03, 0x1E, 0x01, 0x41]);
         using var certificate = new CertificateRequest(brokenName, key, HashAlgorithmName.SHA256)
             .CreateSelfSigned(new DateTimeOffset(2026, 9, 27, 0, 0, 0, TimeSpan.Zero), new DateTimeOffset(2026, 9, 28, 0, 0, 0, TimeSpan.Zero));
 
-        var lines = OpenSslCertificateText.ServerCertificate(certificate);
+        var lines = OpenSslCertificateText.PeerCertificate(certificate, isProxy: false);
 
         Assert.AreEqual("  subject: [NONE]", lines[1]);
         Assert.AreEqual("  issuer: [NONE]", lines[4]);

@@ -372,18 +372,6 @@ public sealed class WriteOutTemplateRendererTests
     }
 
     [TestMethod]
-    public async Task Constructor_WithoutTimeDialect_RendersTheWindowsDialect()
-    {
-        // The Windows C runtime rejects %F, so the whole %time{%F} prints nothing.
-        WriteOutTemplateRenderer renderer = new(new RecordingFileOpener(), writesLineFeedAsCrLf: false, TimeProvider.System);
-        using MemoryStream standardOutput = new();
-
-        await renderer.RenderAsync("[%time{%F}]", new DictionaryVariableSource(), standardOutput, Stream.Null);
-
-        Assert.AreEqual("[]", Encoding.UTF8.GetString(standardOutput.ToArray()));
-    }
-
-    [TestMethod]
     public void Constructor_NullFileOpener_Throws()
     {
         Assert.ThrowsExactly<ArgumentNullException>(() => new WriteOutTemplateRenderer(null!, writesLineFeedAsCrLf: true, WriteOutTimeDialect.WindowsCRuntime, TimeProvider.System));

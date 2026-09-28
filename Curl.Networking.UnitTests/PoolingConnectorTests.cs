@@ -40,15 +40,35 @@ public sealed class PoolingConnectorTests
     }
 
     [TestMethod]
-    public async Task ConnectAsync_WhenTheInnerConnectorFails_ReturnsItsResultAsItIs()
+    public async Task ConnectAsync_WhenTheInnerConnectorFails_ReturnsItsFailureWithThePoolsNumber()
     {
         await using var pool = CreatePool();
-        var failure = ConnectResult.Failed(CurlExitCode.CouldntConnect, "Failed to connect");
-        _inner.Failure = failure;
+        var timings = new ConnectTimings(1, 2, null, null);
+        _inner.Failure = ConnectResult.Failed(CurlExitCode.CouldntResolveHost, "Could not resolve host: x", timings, connectionNumber: 9);
+
+        var first = await pool.ConnectAsync(Target(), CancellationToken.None);
+        var second = await pool.ConnectAsync(Target(), CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.CouldntResolveHost, first.ExitCode);
+        Assert.AreEqual("Could not resolve host: x", first.ErrorMessage);
+        Assert.AreSame(timings, first.Timings);
+        Assert.IsFalse(first.IsConnectionRefused);
+        Assert.IsNull(first.Connection);
+        Assert.AreEqual(0L, first.ConnectionNumber);
+        Assert.AreEqual(1L, second.ConnectionNumber);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WhenTheInnerConnectorIsRefused_KeepsItRefused()
+    {
+        await using var pool = CreatePool();
+        _inner.Failure = ConnectResult.Refused("Failed to connect");
 
         var result = await pool.ConnectAsync(Target(), CancellationToken.None);
 
-        Assert.AreSame(failure, result);
+        Assert.IsTrue(result.IsConnectionRefused);
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.AreEqual(0L, result.ConnectionNumber);
     }
 
     [TestMethod]
@@ -300,6 +320,62 @@ public sealed class PoolingConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_AfterAReadFoundTheServersClose_ReportsTheConnectionDeadAndOpensANewOne()
+    {
+        // curl 8.21.0 -s -v http://127.0.0.1:P/a http://127.0.0.1:P/b, each answered
+        // HTTP/1.0 200 with Connection: keep-alive and no length, then closed (BL-477 Notes).
+        await using var pool = CreatePool();
+        var events = new RecordingTransferEvents();
+        await ReturnToPoolAsync(pool, Target(), readsToTheClose: true);
+
+        var fresh = await pool.ConnectAsync(Target() with { Events = events }, CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { "Connection 0 seems to be dead", "shutting down connection #0" }, events.Info);
+        Assert.IsEmpty(events.Reused);
+        Assert.IsTrue(_inner.Opened[0].IsDisposed);
+        Assert.IsFalse(fresh.IsReused);
+        Assert.AreEqual(1L, fresh.ConnectionNumber);
+        Assert.HasCount(2, _inner.Targets);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WhenADeadConnectionIsPooledBeforeALiveOne_ShutsTheDeadOneAndReusesTheLiveOne()
+    {
+        await using var pool = CreatePool();
+        var events = new RecordingTransferEvents();
+        var dead = await pool.ConnectAsync(Target(), CancellationToken.None);
+        var live = await pool.ConnectAsync(Target(), CancellationToken.None);
+        await dead.Connection!.ReadAsync(new byte[1], CancellationToken.None);
+        dead.Connection.MarkReusable();
+        await dead.Connection.DisposeAsync();
+        live.Connection!.MarkReusable();
+        await live.Connection.DisposeAsync();
+
+        var reused = await pool.ConnectAsync(Target() with { Events = events }, CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { "Connection 0 seems to be dead", "shutting down connection #0" }, events.Info);
+        Assert.IsTrue(reused.IsReused);
+        Assert.AreEqual(1L, reused.ConnectionNumber);
+        Assert.HasCount(2, _inner.Targets);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_AfterAnEmptyReadReturnedZero_ReusesTheConnection()
+    {
+        await using var pool = CreatePool();
+        var events = new RecordingTransferEvents();
+        var first = await pool.ConnectAsync(Target(), CancellationToken.None);
+        await first.Connection!.ReadAsync(Memory<byte>.Empty, CancellationToken.None);
+        first.Connection.MarkReusable();
+        await first.Connection.DisposeAsync();
+
+        var reused = await pool.ConnectAsync(Target() with { Events = events }, CancellationToken.None);
+
+        Assert.IsTrue(reused.IsReused);
+        Assert.IsEmpty(events.Info);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_AfterExactly118SecondsIdle_ReusesTheConnection()
     {
         await using var pool = CreatePool();
@@ -382,9 +458,14 @@ public sealed class PoolingConnectorTests
             _ => pooled with { Proxy = pooled.Proxy! with { Credential = null } },
         };
 
-    private static async Task ReturnToPoolAsync(PoolingConnector pool, ConnectTarget target)
+    private static async Task ReturnToPoolAsync(PoolingConnector pool, ConnectTarget target, bool readsToTheClose = false)
     {
         var result = await pool.ConnectAsync(target, CancellationToken.None);
+        if (readsToTheClose)
+        {
+            await result.Connection!.ReadAsync(new byte[1], CancellationToken.None);
+        }
+
         result.Connection!.MarkReusable();
         await result.Connection.DisposeAsync();
     }

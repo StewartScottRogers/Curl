@@ -79,7 +79,8 @@ public sealed class ConnectResult
     /// <summary>
     /// Gets curl's number for the connection, the <c>N</c> of <c>#N</c> in <c>-v</c>,
     /// counted from <c>0</c> in the order connections are opened (ADR-0050); <c>0</c> when
-    /// the connector does not number connections or the connect failed.
+    /// the connector does not number connections. A failed connect carries the number curl
+    /// gave the connection it tried, as curl 8.21.0 numbers failed connections too (ADR-0109).
     /// </summary>
     public long ConnectionNumber { get; private init; }
 
@@ -183,12 +184,20 @@ public sealed class ConnectResult
     /// The points in time recorded before the failure, with <see cref="ConnectTimings.Connected" />
     /// <see langword="null" />; or <see langword="null" /> when none were recorded.
     /// </param>
+    /// <param name="connectionNumber">
+    /// curl's number for the connection the connect tried, counted from <c>0</c>; <c>0</c>
+    /// when not numbered.
+    /// </param>
     /// <returns>A result with no <see cref="Connection" />.</returns>
     /// <exception cref="ArgumentOutOfRangeException">
     /// <paramref name="exitCode" /> is <see cref="CurlExitCode.Ok" />, which is not a
     /// failure; use <see cref="Connected(IConnection)" /> instead.
     /// </exception>
-    public static ConnectResult Failed(CurlExitCode exitCode, string errorMessage, ConnectTimings? timings)
+    public static ConnectResult Failed(
+        CurlExitCode exitCode,
+        string errorMessage,
+        ConnectTimings? timings,
+        long connectionNumber = 0)
     {
         if (exitCode == CurlExitCode.Ok)
         {
@@ -198,7 +207,7 @@ public sealed class ConnectResult
                 "A failed connect cannot report CurlExitCode.Ok; use ConnectResult.Connected instead.");
         }
 
-        return new ConnectResult(null, exitCode, errorMessage) { Timings = timings };
+        return new ConnectResult(null, exitCode, errorMessage) { Timings = timings, ConnectionNumber = connectionNumber };
     }
 
     /// <summary>
@@ -224,10 +233,19 @@ public sealed class ConnectResult
     /// The points in time recorded before the failure, with <see cref="ConnectTimings.Connected" />
     /// <see langword="null" />; or <see langword="null" /> when none were recorded.
     /// </param>
+    /// <param name="connectionNumber">
+    /// curl's number for the connection the connect tried, counted from <c>0</c>; <c>0</c>
+    /// when not numbered.
+    /// </param>
     /// <returns>
     /// A result with no <see cref="Connection" /> whose <see cref="ExitCode" /> is
     /// <see cref="CurlExitCode.CouldntConnect" />.
     /// </returns>
-    public static ConnectResult Refused(string errorMessage, ConnectTimings? timings) =>
-        new(null, CurlExitCode.CouldntConnect, errorMessage) { IsConnectionRefused = true, Timings = timings };
+    public static ConnectResult Refused(string errorMessage, ConnectTimings? timings, long connectionNumber = 0) =>
+        new(null, CurlExitCode.CouldntConnect, errorMessage)
+        {
+            IsConnectionRefused = true,
+            Timings = timings,
+            ConnectionNumber = connectionNumber,
+        };
 }

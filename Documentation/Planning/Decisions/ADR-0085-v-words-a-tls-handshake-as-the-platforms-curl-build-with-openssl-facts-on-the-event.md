@@ -59,11 +59,12 @@ reproduces itself.
   gets no `Certificate level` line. A name OpenSSL could not print is `[NONE]` for the
   issuer as well as the subject (curl fails the transfer on an unprintable issuer, which
   only a malformed certificate causes).
-- The handshake event carries no host name, so the `subjectAltName: ... matches` lines of
-  `ossl_verifyhost`, the `SSL Trust` lines written at connect time, and the TLS record
-  lines (`* TLSv1.3 (OUT), TLS handshake, ...`) that the OpenSSL build writes from
-  `ReportTlsData` are left to follow-up tasks. `Proxy certificate:` is not yet
-  distinguished from `Server certificate:`.
+- The host-name lines of `ossl_verifyhost`, the `SSL Trust` lines, the TLS record lines
+  (`* TLSv1.3 (OUT), TLS handshake, ...`) and `Proxy certificate:` were outside this
+  decision. `Curl.Output` now writes all of them for `-v` (amendment BL-405), and
+  `--trace` writes the record and trust lines too (BL-450). `Curl.Networking` reports the
+  trust event, the checked host name and proxy handshakes (amendment BL-452); what it
+  still does not report is the TLS records themselves, which `SslStream` does not expose.
 
 ## Consequences
 
@@ -84,3 +85,97 @@ reproduces itself.
   it; the certificate itself is already on the event.
 - **Deriving the verify code from `CertificateVerified` alone.** Lost: curl prints the
   exact code (`12`, hex, for a self-signed certificate), which only the TLS layer knows.
+
+## Amendment (BL-404, 2026-09-27): `SslStreamTlsProvider` reports the event
+
+Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions").
+
+- **Who reports it.** `SslStreamTlsProvider` reports a `TlsHandshakeEvent` after every
+  successful handshake through a four-argument `AuthenticateAsClientAsync` overload that
+  takes the `ITransferEvents`; the `ITlsProvider` overload reports to `NoTransferEvents`.
+  `TcpConnector` passes `ConnectTarget.Events` to any provider implementing the internal
+  `IHandshakeReportingTlsProvider`, so `ITlsProvider` in Abstractions is unchanged. This
+  amendment left the HTTPS proxy's handshake unreported, because `-v` could not yet word
+  it as `Proxy certificate:`; amendment BL-452 reports it.
+- **What it fills.** Version, cipher suite, the server's certificate, whether it verified,
+  `CertificateVerifyResult` and `PeerCertificateChain`: the chain .NET built when the chain
+  verified (errors cleared by a `--capath` root count as verified), else what the server
+  sent. No ALPN is offered, so none is reported. `SslStream` exposes neither the
+  key-exchange group nor the peer signature type; both stay `null` and print as
+  OpenSSL's fallbacks.
+- **The `X509_V_` mapping** (`OpenSslVerifyResult`), from what the validation callback saw:
+
+  | `SslStream` saw | Code |
+  | --- | --- |
+  | No certificate sent | `null` |
+  | No chain error (a host-name mismatch alone included: curl checks the name itself after OpenSSL verified) | `0` `X509_V_OK` |
+  | `NotTimeValid`, a certificate's start date still ahead | `9` `X509_V_ERR_CERT_NOT_YET_VALID` |
+  | `NotTimeValid` otherwise | `10` `X509_V_ERR_CERT_HAS_EXPIRED` |
+  | `UntrustedRoot`, chain of one | `18` `X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT` |
+  | `UntrustedRoot`, longer chain | `19` `X509_V_ERR_SELF_SIGNED_CERT_IN_CHAIN` |
+  | `PartialChain` | `20` `X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY` |
+  | Any other status | `null` |
+
+  A date error wins over a trust error because OpenSSL's `verify_chain` checks dates in
+  `internal_verify`, after `build_chain` reports the trust error, and
+  `SSL_get_verify_result` keeps the last error. This was read from OpenSSL's source, not
+  measured: this Windows checkout runs the Schannel build, which prints none of it.
+
+## Amendment (BL-405, 2026-09-27): TLS message, trust and host-name lines
+
+Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"). Measured
+against curl 8.21.0's OpenSSL build (`curlimages/curl:8.21.0`); the measurements are in
+BL-405's Notes.
+
+- **New facts ride new, optional contract members, so no other project changes.**
+  `ITransferEvents` gained two default interface members: `ReportTlsMessage(TlsMessageEvent)`
+  (OpenSSL's message callback: version number, `TlsContentType`, direction, bytes; by
+  default it forwards the bytes to `ReportTlsData`) and `ReportTlsTrust(TlsTrustEvent)`
+  (`VerifiesPeer`, `HasCaCertificateBlob`, `CaCertificateFile`, `CaCertificateDirectory`;
+  a no-op by default). `TlsHandshakeEvent` gained `IsProxy` and `VerifiedHostName` (the
+  host as typed, `null` when the host is not checked). Changing `ReportTlsData`'s
+  signature was rejected: it would break every implementation and fake of
+  `ITransferEvents` in other projects.
+- **The Schannel wording writes nothing for the new events**, as curl's Schannel build
+  has no message callback and no `SSL Trust` lines. The OpenSSL wording writes the TLS
+  record lines (`OpenSslMessageText`) and the `SSL Trust` lines (`OpenSslTrustText`), and
+  writes TLS bytes as `{`/`}` data lines under the same `traced_data` rule as body bytes.
+  `IsProxy` makes the certificate block say `Proxy certificate:` instead of
+  `Server certificate:`.
+- **Host-name checking is ported, not reported.** `OpenSslHostNameText` re-runs
+  `ossl_verifyhost` on the certificate the event carries (the SAN entries of the host's
+  kind, else the last single-valued CN; RFC 6125 wildcards as `hostcheck.c`), because the
+  line names the matching SAN entry, which `SslStream` never exposes. A failed check
+  writes only curl's info line (or none) and stops before the verify result; the error
+  text is the transfer's.
+- **Defaults taken.** A CN in a multi-valued RDN is skipped (OpenSSL would find it; rare).
+  `CURL_CA_FALLBACK`, native CA stores and the "error setting certificate file" variants
+  are not worded, as the measured Linux build prints none of them. IPv4 host detection
+  counts dots, where curl uses `inet_pton`.
+
+## Amendment (BL-452, 2026-09-27): `Curl.Networking` reports trust, host name and proxy handshakes
+
+Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions").
+
+- **The proxy flag rides the internal interface.** `IHandshakeReportingTlsProvider`'s
+  method gained `bool isProxy`; `SslStreamTlsProvider` keeps its public four-argument
+  overload (`isProxy: false`) and adds a five-argument one. `TcpConnector` reports the
+  HTTPS tunnelling proxy's handshake and a forward proxy's with `isProxy: true`, as curl's
+  OpenSSL build says `Proxy certificate:` for both. Both land on the target's `Events`.
+- **Trust is reported after the cipher and client-certificate checks, before the
+  `--cacert` file is read**, so exit 59 and exit 58 report no trust (curl fails those in
+  `ossl_connect_step1`, before the store is populated) while a bad `--cacert` still shows
+  the `SSL Trust Anchors:` lines it was loading. The provider reports it on every
+  platform; `Curl.Output` writes nothing for it under Schannel.
+- **The default bundle is named `/cacert.pem`**, the reference build's, held as
+  `SslStreamTlsProvider.OpenSslDefaultCaCertificateFile`. It is named, never read:
+  verification without `--cacert` still uses the system store. Distribution builds print
+  their own path; matching the measured reference build is the standing rule. With only
+  `--capath` the default file is still named, as curl keeps its built-in bundle unless
+  `--cacert` replaces it.
+- **`VerifiedHostName`** is the host as passed to the handshake, an IPv6 literal without
+  brackets, and `null` under `-k` (or `--proxy-insecure` for the proxy's handshake).
+- **No ALPN is offered**, so no `ALPN: curl offers` line is written and its ordering
+  needs no decision yet; whoever adds ALPN places the offer line.
+- **No `TlsMessageEvent` is reported**: `SslStream` exposes no TLS records, so the record
+  lines stay unwritten in a real transfer.

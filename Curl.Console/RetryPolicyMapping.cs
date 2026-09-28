@@ -6,7 +6,7 @@ namespace Curl.Console;
 /// <summary>
 /// Maps the retry options of a parsed command line onto the <see cref="RetryPolicy" />
 /// <see cref="TransferRetrier" /> applies: <c>--retry</c>, <c>--retry-delay</c>,
-/// <c>--retry-max-time</c> and <c>--retry-all-errors</c>.
+/// <c>--retry-max-time</c>, <c>--retry-all-errors</c> and <c>--retry-connrefused</c>.
 /// </summary>
 internal static class RetryPolicyMapping
 {
@@ -18,7 +18,8 @@ internal static class RetryPolicyMapping
     /// The policy: <see cref="CommandLineOptions.RetryCount" />, capped at
     /// <see cref="int.MaxValue" /> (a run cannot retry more often than that in practice);
     /// <see cref="CommandLineOptions.RetryDelay" /> and <see cref="CommandLineOptions.RetryMaxTime" />,
-    /// or zero, curl's default, when not given; and <see cref="CommandLineOptions.RetryAllErrors" />.
+    /// or zero, curl's default, when not given; <see cref="CommandLineOptions.RetryAllErrors" />; and
+    /// <see cref="CommandLineOptions.RetryConnectionRefused" />.
     /// </returns>
     internal static RetryPolicy FromCommandLine(CommandLineOptions options) =>
         new()
@@ -27,5 +28,6 @@ internal static class RetryPolicyMapping
             Delay = options.RetryDelay ?? TimeSpan.Zero,
             MaxTime = options.RetryMaxTime ?? TimeSpan.Zero,
             RetryAllErrors = options.RetryAllErrors,
+            RetryConnectionRefused = options.RetryConnectionRefused,
         };
 }

@@ -9,7 +9,7 @@ namespace Curl.Cli;
 /// </summary>
 public sealed class CommandLineParseResult
 {
-    private CommandLineParseResult(CommandLineOptions? options, CommandLineRefusal? refusal, IReadOnlyList<string> warningLines, IReadOnlyList<string> warningLinesAfterTransfers, string? notedDefaultConfigFile, IReadOnlyList<string?> configFileHelpSubjects)
+    private CommandLineParseResult(CommandLineOptions? options, CommandLineRefusal? refusal, IReadOnlyList<string> warningLines, IReadOnlyList<string> warningLinesAfterTransfers, string? notedDefaultConfigFile, IReadOnlyList<string?> configFileHelpSubjects, IReadOnlyList<StandardErrorRedirect> standardErrorRedirects)
     {
         Options = options;
         Refusal = refusal;
@@ -17,6 +17,7 @@ public sealed class CommandLineParseResult
         WarningLinesAfterTransfers = warningLinesAfterTransfers;
         NotedDefaultConfigFile = notedDefaultConfigFile;
         ConfigFileHelpSubjects = configFileHelpSubjects;
+        StandardErrorRedirects = standardErrorRedirects;
     }
 
     /// <summary>
@@ -80,6 +81,16 @@ public sealed class CommandLineParseResult
     public IReadOnlyList<string?> ConfigFileHelpSubjects { get; }
 
     /// <summary>
+    /// Every <c>--stderr</c> read before parsing ended, accepted or refused, in the order read; empty
+    /// when there was none. curl 8.21.0 opens each file as it reads the option, so the console layer
+    /// writes <see cref="WarningLines"/> up to each one's <see cref="StandardErrorRedirect.WarningLinesBefore"/>
+    /// where standard error went until then, opens its file, and writes the rest, the refusal's lines
+    /// included, where the last one sends them: <c>--stderr se -d @nosuch</c> puts the refusal in
+    /// <c>se</c>, <c>-d @nosuch --stderr se</c> never reads the <c>--stderr</c> (measured 2026-09-27, BL-476).
+    /// </summary>
+    public IReadOnlyList<StandardErrorRedirect> StandardErrorRedirects { get; }
+
+    /// <summary>
     /// Creates the result for an accepted command line, with the warning lines its options
     /// collected and the ones curl prints after the transfers.
     /// </summary>
@@ -91,7 +102,7 @@ public sealed class CommandLineParseResult
             options.HasMoreOutputOptionsThanUrls && !options.Silent
                 ? [CommandLineWarning.MoreOutputOptionsThanUrls]
                 : [];
-        return new(options, null, options.WarningLines, warningLinesAfterTransfers, NotedDefaultConfigFileOf(options), options.ConfigFileHelpSubjects);
+        return new(options, null, options.WarningLines, warningLinesAfterTransfers, NotedDefaultConfigFileOf(options), options.ConfigFileHelpSubjects, options.StandardErrorRedirects);
     }
 
     /// <summary>
@@ -105,14 +116,14 @@ public sealed class CommandLineParseResult
     /// version, the manual or help.
     /// </returns>
     internal static CommandLineParseResult InformationRequested(CommandLineOptions options) =>
-        new(options, null, options.WarningLines, [], NotedDefaultConfigFileOf(options), options.ConfigFileHelpSubjects);
+        new(options, null, options.WarningLines, [], NotedDefaultConfigFileOf(options), options.ConfigFileHelpSubjects, options.StandardErrorRedirects);
 
     /// <summary>Creates the result for a command line refused once reading it had begun.</summary>
     /// <param name="refusal">The first refusal met.</param>
     /// <param name="options">The options read before the refusal, whose warning lines it keeps.</param>
     /// <returns>A result whose <see cref="IsAccepted"/> is <see langword="false"/>.</returns>
     internal static CommandLineParseResult Refused(CommandLineRefusal refusal, CommandLineOptions options) =>
-        new(null, refusal, options.WarningLines, [], NotedDefaultConfigFileOf(options), options.ConfigFileHelpSubjects);
+        new(null, refusal, options.WarningLines, [], NotedDefaultConfigFileOf(options), options.ConfigFileHelpSubjects, options.StandardErrorRedirects);
 
     /// <summary>
     /// Creates the result for <see cref="CommandLineRefusal.EmptyCommandLine"/>, which names no
@@ -121,7 +132,7 @@ public sealed class CommandLineParseResult
     /// <param name="options">The options the default config file filled in, whose warning lines and help subjects it keeps.</param>
     /// <returns>A result whose <see cref="IsAccepted"/> is <see langword="false"/>.</returns>
     internal static CommandLineParseResult RefusedEmpty(CommandLineOptions options) =>
-        new(null, CommandLineRefusal.EmptyCommandLine(), options.WarningLines, [], null, options.ConfigFileHelpSubjects);
+        new(null, CommandLineRefusal.EmptyCommandLine(), options.WarningLines, [], null, options.ConfigFileHelpSubjects, options.StandardErrorRedirects);
 
     /// <summary>
     /// <see cref="CommandLineOptions.DefaultConfigFile"/> when <c>-v</c> or a <c>--trace</c> option is

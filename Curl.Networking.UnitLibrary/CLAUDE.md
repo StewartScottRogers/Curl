@@ -8,7 +8,8 @@ production implementations of the transport contracts in
 nothing else.
 
 This is the one project allowed to construct a `Socket`, and only inside a transport
-type: `TcpDialer` (behind `ITcpDialer`) is the only type that constructs a TCP
+type: `TcpDialer` (behind `ITcpDialer`) and `TcpConnectionListener` with its
+`TcpPendingConnection` (behind `IConnectionListener`) are the only types that construct a TCP
 `Socket` or a `NetworkStream`, and `UdpDatagramChannel` (opened by
 `UdpDatagramConnector`, behind `IDatagramConnector`) the only one that constructs a
 UDP `Socket`. `SslStreamTlsProvider` (behind `ITlsProvider`, configured by
@@ -18,7 +19,9 @@ adapter and returns an `SslStreamConnection`. With `--cacert` (`TlsClientOptions
 it trusts only the certificates in that PEM file; there the Schannel build also checks
 revocation below the root unless `TlsClientOptions.SkipRevocationCheck` (`--ssl-no-revoke`)
 is set, and names the first of a certificate out of date, an incomplete chain, an untrusted
-root and an unknown revocation status (ADR-0086, BL-368). Against the system store a
+root and an unknown revocation status (ADR-0086, BL-368). There too the Schannel build accepts
+a certificate with no DNS subjectAltName whose CN matches the host, as `SchannelCommonNameCheck`
+matches it the way curl's `Curl_cert_hostcheck` does (ADR-0103, BL-415). Against the system store a
 certificate that is only out of date is exit 35 with `SEC_E_CERT_EXPIRED`. Per ADR-0009 it behaves like the curl
 build the platform usually runs, the Schannel build on Windows and the OpenSSL build
 elsewhere; its internal constructor names the build so tests pin both on any platform.
@@ -53,7 +56,30 @@ the `DialedTcpConnection` that `ITcpDialer` returns, and `TlsHandshakeCompleted`
 timings `SslStreamTlsProvider` reports on its own `TimeProvider`. Per ADR-0054 the provider
 also reports `ConnectResult.PeerCertificates`, the DER of every certificate the server sent
 (its own first, then the validation callback's `ChainPolicy.ExtraStore` in the order sent),
-and `TcpConnector` passes them on.
+and `TcpConnector` passes them on. Per ADR-0085's BL-404 amendment a successful handshake is
+also reported as a `TlsHandshakeEvent` through the provider's four-argument overload
+(`IHandshakeReportingTlsProvider`), to which `TcpConnector` passes the target's `Events`; the
+event's `CertificateVerifyResult` is OpenSSL's `X509_V_` code as `OpenSslVerifyResult` maps it.
+Per BL-452 the provider reports a `TlsTrustEvent` before each handshake, once the cipher suites
+and client certificate are ready (`-k`, the `--cacert` file or else the reference build's
+default bundle name `/cacert.pem`, which is named but never read, and `--capath`), sets the
+event's `VerifiedHostName` (the host without IPv6 brackets, `null` with `-k`) and `IsProxy`;
+`TcpConnector` reports the HTTPS proxy's handshake, and a forward proxy's, with `IsProxy` set
+through `IHandshakeReportingTlsProvider`'s `isProxy` argument. `SslStream` exposes no TLS
+records, so no `TlsMessageEvent` is reported, and no ALPN is offered.
+Per ADR-0100 it also reports curl's `-v` connect lines on the target's `Events`: `Trying` before
+each dial, `connect to ... failed: <reason>` after each failed one (the reason from
+`ConnectFailureReason`), the exit 7 message, and `ReportConnectionOpened` once any tunnel and
+TLS handshake are done, numbering its connections from `0` in `ConnectResult.ConnectionNumber`.
+Per ADR-0109 a connect that fails after its options parse takes the next number too, through
+`NumberedConnectFailure`, as curl 8.21.0 numbers the connection it tried.
+Per ADR-0113 it keeps curl's DNS cache for its life (one command line): a host and port it
+resolved before, or one a `--resolve` entry answers, is answered without `IDnsResolver` and
+reported as `Hostname H was found in DNS cache` before `Trying`. Per ADR-0114 every answer is
+then reported as `Host H:P was resolved.`, `IPv6: ...` and `IPv4: ...`, naming the host as
+cached (none for an IP address), and `LoadResolveEntries` loads the `--resolve` entries
+(`ResolveOverrides.Entries`, as `ResolveEntry`) into the cache with curl's `Added H:P:A to DNS
+cache` lines at a transfer's start; until a transfer calls it, the first connect loads them.
 
 `TcpConnector` tunnels through `ConnectTarget.Proxy` when it is an HTTP proxy
 (`ProxyKind.Http`, `Http10`) per ADR-0023: `HttpProxyTunnel` writes curl 8.21.0's CONNECT
@@ -69,6 +95,9 @@ connection. A refused or cut-short handshake is exit 97 with curl's message; GSS
 but not implemented, so a proxy that picks it fails with the message the reference build's SSPI
 printed. ADR-0084 records these choices (first address, literals, UTF-8, disposal). Through an HTTPS proxy (`Https`, BL-266) TLS runs to the proxy host first, then the same CONNECT
 over it, then TLS to the target inside that; each handshake failure is the TLS provider's result.
+The handshake to the proxy runs through the proxy's `ITlsProvider` (the `--proxy-*` TLS options,
+ADR-0095), and so does the handshake to an HTTPS forward proxy (`ConnectTarget.IsForwardProxy`
+with `UseTls`), which curl 8.21.0 verifies with `--proxy-insecure` and never `-k` (measured, BL-441).
 
 `TcpConnector` applies `--resolve` through `ResolveOverrides` and `--connect-to` through
 `ConnectToMappings`, both built from the verbatim option values and parsed as curl 8.21.0
@@ -83,6 +112,23 @@ is exit 6 (exit 5 for a proxy) as in curl 8.21.0, which accepts hosts up to 6553
 `Could not resolve host:` and `Could not resolve proxy:` message goes through `CurlErrorBuffer`,
 which cuts it to 255 characters as curl's 256-byte error buffer does (ADR-0072).
 
+`TcpConnectionListener` is FTP active mode's listener (ADR-0102, BL-456): it binds the
+`ListenTarget` address on each port of its range in turn and listens on the first it can bind.
+Every failure is exit 30 with curl 8.21.0's `lib/ftp.c` message: a port in use or not permitted
+moves on to the next, and a range with no free port is `bind() failed, ran out of ports`
+(measured); an address that is not local (`EADDRNOTAVAIL`) is
+`bind(port=<port>) on non-local address failed: <reason>`, the `-v` line curl prints before it
+binds again on the control connection's address, which the FTP handler tells apart and retries
+on (ADR-0107, BL-464); any other bind error is `bind(port=<port>) failed: <reason>`, and a socket
+that cannot be opened or put to listening is `socket failure: <reason>`, reached in tests through
+the internal `OpenSocket` and `StartListening` seams.
+`TcpPendingConnection.AcceptAsync` returns the accepted socket as a `StreamConnection`; a failed
+accept is exit 10, `Error accept()ing server connect: <reason>`, as curl's `lib/cf-socket.c`
+words it. Every `<reason>` is `ConnectFailureReason`'s. Every TCP connection reports
+`IConnection.LocalEndPoint`: `StreamConnection` carries the socket's, and `SslStreamConnection`
+and `PooledConnection` forward the one underneath, so FTP's `-P -` can announce the control
+connection's own address.
+
 `PoolingConnector` wraps another `IConnector` and keeps connections for reuse per ADR-0050.
 Every connection it returns is a `PooledConnection`; one marked with `MarkReusable` goes back
 to the pool on dispose, anything else closes. `ConnectionPoolKey` (with
@@ -91,7 +137,8 @@ to the pool on dispose, anything else closes. `ConnectionPoolKey` (with
 The pool holds at most five idle connections in total, closing the oldest with curl's
 `Connection pool is full` and `shutting down connection #N` lines on the returning target's
 `Events`, and drops one idle longer than 118 seconds on its `TimeProvider`. It numbers
-connections from `0` (`ConnectResult.ConnectionNumber`) and returns a reused one with
+connections from `0` (`ConnectResult.ConnectionNumber`), the inner connector's failures
+included (ADR-0109), and returns a reused one with
 `IsReused`, its original local end point and certificates, and no timings. A reused
 connection is reported `with proxy` (`ConnectionReusedEvent.IsProxy`) when the target is a
 forward proxy (`ConnectTarget.IsForwardProxy`) or tunnels through one, naming the proxy's host
@@ -105,9 +152,12 @@ through an internal seam, so its tests need no socket. `UdpDatagramChannelTests`
 cancels and disposes local UDP sockets without sending anything.
 `SslStreamTlsProviderTests` runs real handshakes against a server-side `SslStream` over
 the in-memory `Fakes/InMemoryDuplexStream` pair, with a self-signed certificate made in
-the test, so TLS is tested without a socket. The tests that send
-bytes are the loopback tests in `TcpDialerTests` and `UdpDatagramChannelTests`, tagged
-`[TestCategory("Integration")]`. Per ADR-0083 the three members only those tests can reach,
-`TcpDialer.DialAsync`, `UdpDatagramChannel.SendAsync` and `UdpDatagramChannel.ReceiveAsync`,
+the test, so TLS is tested without a socket. `TcpConnectionListenerTests` and
+`TcpPendingConnectionTests` bind local TCP sockets without connecting to them. The tests that
+connect or send bytes are the loopback tests in `TcpDialerTests`, `UdpDatagramChannelTests`,
+`TcpConnectorTests.LocalEndPoint` (plain and over TLS) and the accepting test in `TcpConnectionListenerTests`, tagged
+`[TestCategory("Integration")]`. Per ADR-0083 the four members only those tests can reach,
+`TcpDialer.DialAsync`, `TcpPendingConnection.AcceptStreamConnectionAsync` (behind the internal
+`AcceptConnectionAsync` seam), `UdpDatagramChannel.SendAsync` and `UdpDatagramChannel.ReceiveAsync`,
 carry `[ExcludeFromCodeCoverage]`, so the fast-run coverage gate holds without the network.
 Keep them thin: logic added there is not measured.

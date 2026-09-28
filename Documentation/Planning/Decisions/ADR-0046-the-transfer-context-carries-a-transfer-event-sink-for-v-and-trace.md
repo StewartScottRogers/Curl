@@ -101,8 +101,8 @@ consumer from the injected `TimeProvider` when the event arrives (ADR-0045's rul
 | `ReportTlsData(ReadOnlySpan<byte> bytes, bool sent)` | `CURLINFO_SSL_DATA_IN/OUT` | Raw TLS record bytes. Reserved: `SslStream` does not expose them, so no BCL provider reports them, and neither does curl's Schannel build in `--trace`. | nothing (as curl) |
 | `ReportRequestHeader(ReadOnlySpan<byte> bytes)` | `CURLINFO_HEADER_OUT` | The request head bytes exactly as written, CRLFs included, one call per write of a head (measured: one 84-byte block for the whole head). | `> ` per line |
 | `ReportResponseHeader(ReadOnlySpan<byte> bytes)` | `CURLINFO_HEADER_IN` | One received header line, its CRLF included, one call per line, the status line and the final blank line each one call (measured). | `< ` per line |
-| `ReportDataSent(ReadOnlySpan<byte> bytes)` | `CURLINFO_DATA_OUT` | Body bytes as written to the connection, one call per write. | `} [N bytes data]` |
-| `ReportDataReceived(ReadOnlySpan<byte> bytes)` | `CURLINFO_DATA_IN` | Body bytes as delivered, one call per read. | `{ [N bytes data]` |
+| `ReportDataSent(ReadOnlySpan<byte> bytes)` | `CURLINFO_DATA_OUT` | Body bytes as written to the connection, one call per write; a chunked body's chunk framing included, one call per chunk and one for the closing chunk (measured, BL-407). | `} [N bytes data]` |
+| `ReportDataReceived(ReadOnlySpan<byte> bytes)` | `CURLINFO_DATA_IN` | Body bytes as received, before any transfer or content decoding - a chunked body's framing and trailers included - one call per read; none for a body curl ignores, such as a redirect's that `-L` follows past (measured, BL-407). | `{ [N bytes data]` |
 
 The structured events (`ConnectionOpened`, `ConnectionReused`, `TlsHandshake`) carry facts,
 not text: `Curl.Output`'s verbose formatter (BL-228) owns curl's wording for them, per

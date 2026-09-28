@@ -390,20 +390,21 @@ public sealed class CommandLineFormOptionTests
     }
 
     [TestMethod]
-    [DataRow("-I", "-F", "Warning: multipart formpost (-F, --form) and HEAD (-I, --head).", "-F")]
-    [DataRow("--no-head", "-F", "Warning: multipart formpost (-F, --form) and GET (-G, --get).", "-F")]
-    [DataRow("-F", "-I", "Warning: (-I, --head) and multipart formpost (-F, --form).", "-I")]
-    [DataRow("-F", "--no-head", "Warning: (-G, --get) and multipart formpost (-F, --form).", "--no-head")]
-    public void Parse_FormAndAnotherMethod_RefusesTheSecond(string first, string second, string secondWarningLine, string refused)
+    [DataRow("-I", "-F", "multipart formpost (-F, --form) and HEAD (-I, --head).", "-F")]
+    [DataRow("--no-head", "-F", "multipart formpost (-F, --form) and GET (-G, --get).", "-F")]
+    [DataRow("-F", "-I", "HEAD (-I, --head) and multipart formpost (-F, --form).", "-I")]
+    [DataRow("-F", "--no-head", "GET (-G, --get) and multipart formpost (-F, --form).", "--no-head")]
+    public void Parse_FormAndAnotherMethod_RefusesTheSecond(string first, string second, string methods, string refused)
     {
         string[] arguments = first == "-F" ? [first, "a=b", second, Url] : [first, second, "a=b", Url];
 
         CommandLineParseResult result = Parse(arguments);
 
-        string firstWarningLine = first == "-F"
-            ? $"Warning: You can only select one HTTP request method! You asked for both {(second == "-I" ? "HEAD" : "GET")} "
-            : "Warning: You can only select one HTTP request method! You asked for both ";
-        AssertRefused(result, [firstWarningLine, secondWarningLine], $"curl: option {refused}: is badly used here", TryHelp);
+        AssertRefused(
+            result,
+            [$"Warning: You can only select one HTTP request method! You asked for both {methods}"],
+            $"curl: option {refused}: is badly used here",
+            TryHelp);
     }
 
     [TestMethod]
@@ -430,8 +431,7 @@ public sealed class CommandLineFormOptionTests
         AssertRefusedAtTransferSetup(
             result,
             [
-                "Warning: You can only select one HTTP request method! You asked for both POST ",
-                "Warning: (-d, --data) and multipart formpost (-F, --form).",
+                "Warning: You can only select one HTTP request method! You asked for both POST (-d, --data) and multipart formpost (-F, --form).",
             ]);
     }
 
@@ -443,8 +443,7 @@ public sealed class CommandLineFormOptionTests
         AssertRefusedAtTransferSetup(
             result,
             [
-                "Warning: You can only select one HTTP request method! You asked for both GET ",
-                "Warning: (-G, --get) and multipart formpost (-F, --form).",
+                "Warning: You can only select one HTTP request method! You asked for both GET (-G, --get) and multipart formpost (-F, --form).",
             ]);
     }
 

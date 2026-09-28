@@ -87,6 +87,13 @@ public sealed record TransferReport
     public int RedirectCount { get; init; }
 
     /// <summary>
+    /// Gets the <c>Referer</c> the last request was sent with, set by the redirect follower,
+    /// the source of <c>%{referer}</c>; <see langword="null" /> from a handler, meaning
+    /// <see cref="HttpRequestOptions.Referer" />.
+    /// </summary>
+    public string? Referer { get; init; }
+
+    /// <summary>
     /// Gets the bytes of every response header block received, status lines and blank
     /// lines included, the source of <c>%{size_header}</c>.
     /// </summary>

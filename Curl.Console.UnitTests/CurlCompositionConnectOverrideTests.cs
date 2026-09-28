@@ -1,3 +1,5 @@
+using System.Net;
+
 using Curl.Cli;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
@@ -5,8 +7,8 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Console;
 
 /// <summary>
-/// Pins that the TCP connector the composition builds applies <c>--resolve</c> and
-/// <c>--connect-to</c>: each connect is dialed through a <see cref="ScriptedTcpDialer" />,
+/// Pins that the TCP and UDP connectors the composition builds apply <c>--resolve</c> and
+/// <c>--connect-to</c>: each TCP connect is dialed through a <see cref="ScriptedTcpDialer" />,
 /// whose <see cref="ScriptedConnector" /> records the address and port actually dialed.
 /// </summary>
 [TestClass]
@@ -94,6 +96,51 @@ public sealed class CurlCompositionConnectOverrideTests
         Assert.AreEqual(CurlExitCode.SetoptOptionSyntax, result.ExitCode);
         Assert.AreEqual("No valid port number in 'mapped.test:x'", result.ErrorMessage);
         Assert.IsEmpty(server.Targets);
+    }
+
+    [TestMethod]
+    public async Task CreateTransports_WithConnectToAndResolve_UdpConnectorOpensAtTheMappedHostsOverriddenAddress()
+    {
+        // curl -v --connect-to tftp.test:6969:other: --resolve other:6969:127.0.0.1 tftp://tftp.test:6969/x:
+        // "Trying 127.0.0.1:6969..." (curl 8.21.0, 2026-09-27).
+        DatagramOpenResult result = await OpenTftpAsync(
+            "--connect-to", "tftp.test:69:mapped.test:7000", "--resolve", "mapped.test:7000:127.0.0.1");
+
+        Assert.IsNotNull(result.Channel);
+        await using IDatagramChannel channel = result.Channel;
+        Assert.AreEqual(new IPEndPoint(IPAddress.Loopback, 7000), channel.ServerEndPoint);
+    }
+
+    [TestMethod]
+    public async Task CreateTransports_WithUnparsableResolve_UdpConnectorFailsWithExit49()
+    {
+        DatagramOpenResult result = await OpenTftpAsync("--resolve", "bad");
+
+        Assert.AreEqual(CurlExitCode.SetoptOptionSyntax, result.ExitCode);
+        Assert.AreEqual("Could not parse CURLOPT_RESOLVE entry 'bad'", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task CreateTransports_WithUnparsableConnectToPort_UdpConnectorFailsWithExit49()
+    {
+        DatagramOpenResult result = await OpenTftpAsync("--connect-to", "tftp.test:69:mapped.test:x");
+
+        Assert.AreEqual(CurlExitCode.SetoptOptionSyntax, result.ExitCode);
+        Assert.AreEqual("No valid port number in 'mapped.test:x'", result.ErrorMessage);
+    }
+
+    /// <summary>
+    /// Parses <paramref name="arguments" /> and a <c>tftp://tftp.test/</c> URL, builds the
+    /// run's transports from them, and opens the UDP connector to <c>tftp.test</c> on port 69.
+    /// </summary>
+    private static async Task<DatagramOpenResult> OpenTftpAsync(params string[] arguments)
+    {
+        CommandLineParseResult parsed = CommandLineParser.Parse([.. arguments, "tftp://tftp.test/"], _ => true);
+        Assert.IsTrue(parsed.IsAccepted);
+
+        CurlTransports transports = CurlComposition.CreateTransports(parsed.Options);
+
+        return await transports.UdpDatagramConnector.OpenAsync("tftp.test", 69, CancellationToken.None);
     }
 
     /// <summary>

@@ -19,7 +19,12 @@ A TLS handshake is worded for `-v` and the trace dumps as the `TlsBackend` the w
 given (ADR-0085): Schannel's two ALPN lines, or the OpenSSL build's lines from
 `OpenSslHandshakeText`, `OpenSslCertificateText`, `OpenSslDistinguishedNameText` (a port
 of OpenSSL's `X509_NAME_print_ex` with curl's flags) and `OpenSslSecurityBits` (a port of
-`ossl_ifc_ffc_compute_security_bits`). Keep them ports: change them only against OpenSSL's
+`ossl_ifc_ffc_compute_security_bits`). The OpenSSL build's other TLS lines for `-v` and
+the trace dumps (where each TLS message is also dumped as `=> Send SSL data` or
+`<= Recv SSL data`) come
+from `OpenSslMessageText` (`ossl_trace`: `TLSv1.3 (OUT), TLS handshake, Client hello (1):`),
+`OpenSslTrustText` (the `SSL Trust` lines) and `OpenSslHostNameText` (`ossl_verifyhost` and
+`hostcheck.c`: the `subjectAltName` and `common name` lines). Keep them ports: change them only against OpenSSL's
 or curl's source, or a measurement of the OpenSSL build of curl.
 
 Never construct a `Socket`, `SslStream` or `HttpClient` here. Take `IConnection`

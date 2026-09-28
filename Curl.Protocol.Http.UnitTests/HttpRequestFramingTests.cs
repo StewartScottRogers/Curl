@@ -219,13 +219,14 @@ public sealed class HttpRequestFramingTests
     }
 
     [TestMethod]
-    [DataRow(0L, 9L, 1, "bytes 0-9/1", DisplayName = "-d x -r 0-9")]
-    [DataRow(0L, 9L, 5, "bytes 0-9/5", DisplayName = "-d hello -r 0-9")]
-    public void Of_RangeOnADataBody_SendsTheRangeOverTheBodyLength(long first, long last, int length, string expected)
+    [DataRow("0-9", 1, "bytes 0-9/1", DisplayName = "-d x -r 0-9")]
+    [DataRow("0-9", 5, "bytes 0-9/5", DisplayName = "-d hello -r 0-9")]
+    [DataRow("0-9,20-29", 1, "bytes 0-9,20-29/1", DisplayName = "-d x -r 0-9,20-29")]
+    public void Of_RangeOnADataBody_SendsTheRangeOverTheBodyLength(string rangeText, int length, string expected)
     {
         HttpRequestOptions options = new() { Body = new BytesBody(new byte[length], "a/b") };
 
-        HttpRequestFraming framing = HttpRequestFraming.Of(options, [], range: ByteRange.Bounded(first, last));
+        HttpRequestFraming framing = HttpRequestFraming.Of(options, [], rangeText: rangeText);
 
         Assert.AreEqual(expected, framing.ContentRange);
         Assert.AreEqual(expected, framing.WithoutExpect(framing.Body).ContentRange);
@@ -240,17 +241,17 @@ public sealed class HttpRequestFramingTests
     {
         HttpRequestOptions options = new() { Body = new StreamBody(Stream.Null, 149, "multipart/form-data; boundary=b") };
 
-        Assert.IsNull(HttpRequestFraming.Of(options, [], range: ByteRange.Bounded(0, 9)).ContentRange);
+        Assert.IsNull(HttpRequestFraming.Of(options, [], rangeText: "0-9").ContentRange);
     }
 
     [TestMethod]
     public void Of_RangeWithoutABody_SendsNoContentRange() =>
-        Assert.IsNull(HttpRequestFraming.Of(new HttpRequestOptions(), [], range: ByteRange.Bounded(0, 9)).ContentRange);
+        Assert.IsNull(HttpRequestFraming.Of(new HttpRequestOptions(), [], rangeText: "0-9").ContentRange);
 
     [TestMethod]
     public void Of_RangeOnAnUpload_SendsTheRangeOverTheUploadLength()
     {
-        HttpRequestFraming framing = HttpRequestFraming.Of(new HttpRequestOptions(), [], upload: new MemoryStream(new byte[87]), range: ByteRange.Bounded(0, 9));
+        HttpRequestFraming framing = HttpRequestFraming.Of(new HttpRequestOptions(), [], upload: new MemoryStream(new byte[87]), rangeText: "0-9");
 
         Assert.AreEqual("bytes 0-9/87", framing.ContentRange);
     }
@@ -260,7 +261,7 @@ public sealed class HttpRequestFramingTests
     {
         using FailingReadStream upload = new([], 1, new IOException());
 
-        HttpRequestFraming framing = HttpRequestFraming.Of(new HttpRequestOptions(), [], upload: upload, range: ByteRange.Bounded(0, 9));
+        HttpRequestFraming framing = HttpRequestFraming.Of(new HttpRequestOptions(), [], upload: upload, rangeText: "0-9");
 
         Assert.AreEqual("bytes 0-9/-1", framing.ContentRange);
     }
@@ -268,9 +269,39 @@ public sealed class HttpRequestFramingTests
     [TestMethod]
     public void Of_ResumedUploadWithARange_SendsTheResumeContentRange()
     {
-        HttpRequestFraming framing = HttpRequestFraming.Of(new HttpRequestOptions(), [], upload: new MemoryStream(new byte[10]), resumeFrom: 4, range: ByteRange.Bounded(0, 1));
+        HttpRequestFraming framing = HttpRequestFraming.Of(new HttpRequestOptions(), [], upload: new MemoryStream(new byte[10]), resumeFrom: 4, rangeText: "0-1");
 
         Assert.AreEqual("bytes 4-9/10", framing.ContentRange);
+    }
+
+    [TestMethod]
+    [DataRow(false, false, DisplayName = "-H Expect, 417 during the wait")]
+    [DataRow(true, true, DisplayName = "-H Expect, 417 while sending")]
+    public void WithoutExpect_CustomExpect_KeepsTheWaitOnlyWhenAsked(bool keepsCustomWait, bool expected)
+    {
+        // A resend after a 417 while sending waits again for an -H Expect (BL-396 Notes);
+        // one after a 417 during the wait does not (BL-260 Notes).
+        HttpRequestFraming framing = Of(new HttpRequestOptions { Headers = ["Expect: 100-continue"], Body = new BytesBody("hi"u8.ToArray(), "a/b") });
+
+        HttpRequestFraming resent = framing.WithoutExpect(framing.Body, keepsCustomWait);
+
+        Assert.IsFalse(resent.AddsExpect);
+        Assert.AreEqual(expected, resent.AwaitsContinue);
+    }
+
+    [TestMethod]
+    [DataRow(true, DisplayName = "curl's own Expect")]
+    [DataRow(false, DisplayName = "small body, no wait to keep")]
+    public void WithoutExpect_KeepingTheCustomWait_NeverWaitsWithoutAnHExpect(bool ownExpect)
+    {
+        // curl's own Expect is dropped with its wait; a small body never waited.
+        byte[] content = ownExpect ? new byte[HttpRequestFraming.ExpectContinueThreshold + 1] : "hi"u8.ToArray();
+        HttpRequestFraming framing = Of(new HttpRequestOptions { Body = new BytesBody(content, "a/b") });
+
+        HttpRequestFraming resent = framing.WithoutExpect(framing.Body, keepsCustomWait: true);
+
+        Assert.AreEqual(ownExpect, framing.AwaitsContinue);
+        Assert.IsFalse(resent.AwaitsContinue);
     }
 
     private static HttpRequestFraming Of(HttpRequestOptions options) =>

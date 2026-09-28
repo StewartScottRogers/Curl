@@ -86,6 +86,43 @@ public sealed class CurlCommandRunnerTransferEventTests
     }
 
     [TestMethod]
+    public async Task RunAsync_VerboseWithTraceTime_StampsEachLineStartFromTheRunnersClock()
+    {
+        // The stamp is HH:MM:SS.uuuuuu and a space in front of each line an event starts, as
+        // curl 8.21.0 wrote it for -s -v --trace-time (measured 2026-09-27, BL-358).
+        int exitCode = await RunAsync(
+            ["-s", "-v", "--trace-time", "http://127.0.0.1:18441/f.txt", "-o", "o"],
+            MeasuredExchange(18441, 55116, clock));
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(
+            "11:54:11.571000 *   Trying 127.0.0.1:18441..." + InfoEnd
+            + "11:54:11.572000 * Established connection to 127.0.0.1 (127.0.0.1 port 18441) from 127.0.0.1 port 55116 " + InfoEnd
+            + "11:54:11.572000 * using HTTP/1.x" + InfoEnd
+            + "11:54:11.572000 > GET /f.txt HTTP/1.1" + HeaderEnd
+            + "11:54:11.572000 > Host: 127.0.0.1:18441" + HeaderEnd
+            + "11:54:11.572000 > User-Agent: curl/8.21.0" + HeaderEnd
+            + "11:54:11.572000 > Accept: */*" + HeaderEnd
+            + "11:54:11.572000 > " + HeaderEnd
+            + "11:54:11.572000 * Request completely sent off" + InfoEnd
+            + "11:54:11.574000 < HTTP/1.1 200 OK" + HeaderEnd
+            + "11:54:11.574000 < Content-Type: text/plain" + HeaderEnd
+            + "11:54:11.574000 < Content-Length: 6" + HeaderEnd
+            + "11:54:11.574000 < " + HeaderEnd
+            + "11:54:11.574000 { [6 bytes data]" + InfoEnd
+            + "11:54:11.574000 * Connection #0 to host 127.0.0.1:18441 left intact" + InfoEnd,
+            StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_DoubleVerbose_StampsTheVerboseLines()
+    {
+        await RunAsync(["-s", "-vv", "http://127.0.0.1:18441/f.txt", "-o", "o"], MeasuredExchange(18441, 55116, clock));
+
+        StringAssert.StartsWith(StandardErrorText, "11:54:11.571000 *   Trying 127.0.0.1:18441..." + InfoEnd);
+    }
+
+    [TestMethod]
     public async Task RunAsync_TraceFile_WritesTheMeasuredDumpToTheFile()
     {
         int exitCode = await RunAsync(["-s", "--trace", "t.txt", "http://127.0.0.1:18422/f.txt", "-o", "o"], MeasuredExchange(18422, 51405));

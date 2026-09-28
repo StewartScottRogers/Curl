@@ -220,7 +220,8 @@ These `-w` variables come from elsewhere and are not report members:
 
 - `%{exitcode}` and `%{errormsg}`: `TransferResult.ExitCode` and
   `TransferResult.ErrorMessage`, as today.
-- `%{url}`, `%{urlnum}`, `%{scheme}`, `%{url.*}`, `%{referer}`, `%{filename_effective}`,
+- `%{url}`, `%{urlnum}`, `%{scheme}`, `%{url.*}`, `%{referer}` (a report member since
+  ADR-0101, for `-e "...;auto" -L`), `%{filename_effective}`,
   `%{stdout}`, `%{stderr}`, `%{onerror}`: the command line and the context, known
   before the transfer.
 - `%{certs}`, `%{num_certs}`, `%{ssl_verify_result}`, `%{proxy_ssl_verify_result}`,

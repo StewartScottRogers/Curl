@@ -84,12 +84,206 @@ public sealed partial class HttpProtocolHandlerTests
                 .ExecuteAsync(CookieContext(CookieUrl, options));
 
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
-            (CurlUrl uri, IReadOnlyList<string> setCookies, DateTimeOffset now, ITransferEvents events) = store.Responses.Single();
-            Assert.AreEqual(CurlUrl.Parse(CookieUrl), uri, $"Chunk size {chunkSize}");
-            CollectionAssert.AreEqual(new[] { "b=2; Path=/", "a=1" }, setCookies.ToArray(), $"Chunk size {chunkSize}");
-            Assert.AreEqual(CookieTime, now, $"Chunk size {chunkSize}");
-            Assert.AreSame(NoTransferEvents.Instance, events, $"Chunk size {chunkSize}");
+            CollectionAssert.AreEqual(new[] { "b=2; Path=/", "a=1" }, store.Responses.Select(call => call.SetCookieHeader).ToArray(), $"Chunk size {chunkSize}");
+            CollectionAssert.AreEqual(new[] { 0, 1 }, store.Responses.Select(call => call.StoredFromResponse).ToArray(), $"Chunk size {chunkSize}");
+            foreach ((CurlUrl uri, _, _, DateTimeOffset now, ITransferEvents events) in store.Responses)
+            {
+                Assert.AreEqual(CurlUrl.Parse(CookieUrl), uri, $"Chunk size {chunkSize}");
+                Assert.AreEqual(CookieTime, now, $"Chunk size {chunkSize}");
+                Assert.AreSame(NoTransferEvents.Instance, events, $"Chunk size {chunkSize}");
+            }
         }
+    }
+
+    /// <summary>
+    /// Measured (BL-468 Notes): curl 8.21.0 prints each cookie's <c>-v</c> line immediately
+    /// before the <c>Set-Cookie</c> header line it came from, not after the head.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_ResponseSetsCookies_ReportsEachCookieLineBeforeItsHeaderLine()
+    {
+        const string head = "HTTP/1.1 200 OK\r\nSet-Cookie: a=1\r\nX-Mid: y\r\nSet-Cookie: b=2; Path=/\r\nSet-Cookie: a=3\r\nContent-Length: 2\r\n\r\nok";
+        string[] expected =
+        [
+            "< HTTP/1.1 200 OK\r\n",
+            "* Added a=1",
+            "< Set-Cookie: a=1\r\n",
+            "< X-Mid: y\r\n",
+            "* Added b=2; Path=/",
+            "< Set-Cookie: b=2; Path=/\r\n",
+            "* Added a=3",
+            "< Set-Cookie: a=3\r\n",
+            "< Content-Length: 2\r\n",
+            "< \r\n",
+        ];
+        foreach (int chunkSize in ChunkSizes)
+        {
+            ScriptedCookieStore store = new() { ReportedLine = header => "Added " + header };
+            RecordingTransferEvents events = new();
+
+            TransferResult result = await CookieHandler(QueueConnector.For(Connection(head, chunkSize)), store)
+                .ExecuteAsync(CookieContext(CookieUrl, events: events));
+
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            CollectionAssert.AreEqual(expected, HeadEvents(events), $"Chunk size {chunkSize}");
+            CollectionAssert.AreEqual(new[] { 0, 1, 2 }, store.Responses.Select(call => call.StoredFromResponse).ToArray(), $"Chunk size {chunkSize}");
+        }
+    }
+
+    /// <summary>
+    /// Measured (BL-468 Notes): curl 8.21.0 unfolds a folded <c>Set-Cookie</c> header before
+    /// storing its cookie, and prints the cookie line before the header.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_SetCookieIsFolded_StoresTheWholeValueAndReportsItsLineFirst()
+    {
+        const string head = "HTTP/1.1 200 OK\r\nSet-Cookie: a=1;\r\n Path=/x\r\nContent-Length: 0\r\n\r\n";
+        string[] expected =
+        [
+            "< HTTP/1.1 200 OK\r\n",
+            "* Added a=1; Path=/x",
+            "< Set-Cookie: a=1;\r\n",
+            "<  Path=/x\r\n",
+            "< Content-Length: 0\r\n",
+            "< \r\n",
+        ];
+        foreach (int chunkSize in ChunkSizes)
+        {
+            ScriptedCookieStore store = new() { ReportedLine = header => "Added " + header };
+            RecordingTransferEvents events = new();
+
+            await CookieHandler(QueueConnector.For(Connection(head, chunkSize)), store)
+                .ExecuteAsync(CookieContext(CookieUrl, events: events));
+
+            CollectionAssert.AreEqual(expected, HeadEvents(events), $"Chunk size {chunkSize}");
+        }
+    }
+
+    /// <summary>
+    /// Measured with <c>-v -c -</c> against a server that sent this and closed (BL-484 Notes):
+    /// curl 8.21.0 acts on a header only once a byte of the next line shows it whole, so it
+    /// stores no cookie from the <c>Set-Cookie</c> header the head ends on at close and prints
+    /// no cookie line for it, yet still prints the header line, writes it for <c>-D</c>, exits 0
+    /// and leaves the connection intact. The <c>Set-Cookie</c> header before it is stored.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_PeerClosesRightAfterASetCookie_StoresNoCookieFromIt()
+    {
+        const string response = "HTTP/1.1 200 OK\r\nSet-Cookie: b=2\r\nX-Before: 1\r\nSet-Cookie: a=1\r\n";
+        string[] expected =
+        [
+            "< HTTP/1.1 200 OK\r\n",
+            "* Added b=2",
+            "< Set-Cookie: b=2\r\n",
+            "< X-Before: 1\r\n",
+            "< Set-Cookie: a=1\r\n",
+        ];
+        foreach (int chunkSize in ChunkSizes)
+        {
+            ScriptedCookieStore store = new() { ReportedLine = header => "Added " + header };
+            RecordingTransferEvents events = new();
+            MemoryStream headers = new();
+            TransferContext context = new()
+            {
+                Url = CurlUrl.Parse(CookieUrl),
+                Output = new MemoryStream(),
+                HeaderOutput = headers,
+                TimeProvider = new FakeTimeProvider(CookieTime),
+                Events = events,
+            };
+
+            TransferResult result = await CookieHandler(QueueConnector.For(Connection(response, chunkSize)), store)
+                .ExecuteAsync(context);
+
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}: {result.ErrorMessage}");
+            CollectionAssert.AreEqual(expected, HeadEvents(events), $"Chunk size {chunkSize}");
+            CollectionAssert.AreEqual(new[] { "b=2" }, store.Responses.Select(call => call.SetCookieHeader).ToArray(), $"Chunk size {chunkSize}");
+            Assert.AreEqual(response, Latin1(headers.ToArray()), $"Chunk size {chunkSize}");
+            Assert.AreEqual("Connection #0 to host 127.0.0.1:18082 left intact", events.Info[^1], $"Chunk size {chunkSize}");
+        }
+    }
+
+    /// <summary>
+    /// Measured with <c>-s -v -c -</c> (BL-475 Notes): curl 8.21.0 stops reading the head at a
+    /// header it refuses, so it reports and stores the cookies before it, and reports neither
+    /// the refused header, nor a <c>Set-Cookie</c> header or any other line after it, nor the
+    /// head's empty line.
+    /// </summary>
+    [TestMethod]
+    [DataRow("Content-Length: x\r\n", false, CurlExitCode.WeirdServerReply, DisplayName = "Invalid Content-Length")]
+    [DataRow("Transfer-Encoding: bogus\r\n", false, CurlExitCode.BadContentEncoding, DisplayName = "Unsolicited Transfer-Encoding")]
+    [DataRow("Content-Encoding: gzip,gzip,gzip,gzip,gzip,gzip\r\n", true, CurlExitCode.BadContentEncoding, DisplayName = "Six content codings, with --compressed")]
+    public async Task ExecuteAsync_HeaderRefused_ReportsAndStoresNothingFromItOn(string refusedHeader, bool compressed, CurlExitCode exitCode)
+    {
+        string head = "HTTP/1.1 200 OK\r\nSet-Cookie: b=2\r\nX-Before: 1\r\n" + refusedHeader + "Set-Cookie: a=1\r\nX-After: 1\r\n\r\n";
+        string[] expected =
+        [
+            "< HTTP/1.1 200 OK\r\n",
+            "* Added b=2",
+            "< Set-Cookie: b=2\r\n",
+            "< X-Before: 1\r\n",
+        ];
+        foreach (int chunkSize in ChunkSizes)
+        {
+            ScriptedCookieStore store = new() { ReportedLine = header => "Added " + header };
+            RecordingTransferEvents events = new();
+
+            TransferResult result = await CookieHandler(QueueConnector.For(Connection(head, chunkSize)), store)
+                .ExecuteAsync(CookieContext(CookieUrl, new HttpRequestOptions { Compressed = compressed }, events));
+
+            Assert.AreEqual(exitCode, result.ExitCode, $"Chunk size {chunkSize}");
+            CollectionAssert.AreEqual(expected, HeadEvents(events), $"Chunk size {chunkSize}");
+            CollectionAssert.AreEqual(new[] { "b=2" }, store.Responses.Select(call => call.SetCookieHeader).ToArray(), $"Chunk size {chunkSize}");
+        }
+    }
+
+    /// <summary>
+    /// Measured (BL-468 Notes): curl 8.21.0 stores a cookie a 1xx head sets, reporting it before
+    /// its header line, and counts it toward the request's cookies.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_InformationalHeadSetsACookie_StoresItBeforeItsHeaderLine()
+    {
+        const string head = "HTTP/1.1 100 Continue\r\nSet-Cookie: z=9\r\n\r\nHTTP/1.1 200 OK\r\nSet-Cookie: y=8\r\nContent-Length: 0\r\n\r\n";
+        string[] expected =
+        [
+            "< HTTP/1.1 100 Continue\r\n",
+            "* Added z=9",
+            "< Set-Cookie: z=9\r\n",
+            "< \r\n",
+            "< HTTP/1.1 200 OK\r\n",
+            "* Added y=8",
+            "< Set-Cookie: y=8\r\n",
+            "< Content-Length: 0\r\n",
+            "< \r\n",
+        ];
+        ScriptedCookieStore store = new() { ReportedLine = header => "Added " + header };
+        RecordingTransferEvents events = new();
+
+        await CookieHandler(QueueConnector.For(Connection(head, 65536)), store)
+            .ExecuteAsync(CookieContext(CookieUrl, events: events));
+
+        CollectionAssert.AreEqual(expected, HeadEvents(events));
+        CollectionAssert.AreEqual(new[] { 0, 1 }, store.Responses.Select(call => call.StoredFromResponse).ToArray());
+    }
+
+    /// <summary>
+    /// A head that fails before a header is whole still reports that header's lines, but hands
+    /// no cookie to the store.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_HeadFailsAfterASetCookieLine_ReportsTheLineAndStoresNothing()
+    {
+        const string head = "HTTP/1.1 200 OK\r\nSet-Cookie: a=1\r\nno colon\r\n\r\n";
+        ScriptedCookieStore store = new() { ReportedLine = header => "Added " + header };
+        RecordingTransferEvents events = new();
+
+        TransferResult result = await CookieHandler(QueueConnector.For(Connection(head, 65536)), store)
+            .ExecuteAsync(CookieContext(CookieUrl, events: events));
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
+        CollectionAssert.AreEqual(new[] { "< HTTP/1.1 200 OK\r\n", "< Set-Cookie: a=1\r\n" }, HeadEvents(events));
+        Assert.IsEmpty(store.Responses);
     }
 
     /// <summary>
@@ -107,8 +301,8 @@ public sealed partial class HttpProtocolHandlerTests
         TransferResult result = await CookieHandler(QueueConnector.For(Connection(head, 65536)), store).ExecuteAsync(context);
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        (_, IReadOnlyList<string> setCookies, _, ITransferEvents handed) = store.Responses.Single();
-        CollectionAssert.AreEqual(new[] { "n2=v; Path=/" }, setCookies.ToArray());
+        (_, string setCookie, _, _, ITransferEvents handed) = store.Responses.Single();
+        Assert.AreEqual("n2=v; Path=/", setCookie);
         Assert.AreSame(events, handed);
     }
 
@@ -145,7 +339,7 @@ public sealed partial class HttpProtocolHandlerTests
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(first + retry, connection.Written, $"Chunk size {chunkSize}");
             Assert.HasCount(2, store.Requests, $"Chunk size {chunkSize}");
-            CollectionAssert.AreEqual(new[] { "s=1", "t=2" }, store.Responses.Single().SetCookieHeaders.ToArray(), $"Chunk size {chunkSize}");
+            CollectionAssert.AreEqual(new[] { "s=1", "t=2" }, store.Responses.Select(call => call.SetCookieHeader).ToArray(), $"Chunk size {chunkSize}");
         }
     }
 
@@ -162,12 +356,23 @@ public sealed partial class HttpProtocolHandlerTests
     private static HttpProtocolHandler CookieHandler(QueueConnector connector, ICookieStore store) =>
         new(connector, new SilentAuthenticator(), store);
 
-    private static TransferContext CookieContext(string url, HttpRequestOptions? options = null) =>
+    private static TransferContext CookieContext(string url, HttpRequestOptions? options = null, ITransferEvents? events = null) =>
         new()
         {
             Url = CurlUrl.Parse(url),
             Output = new MemoryStream(),
             Http = options,
             TimeProvider = new FakeTimeProvider(CookieTime),
+            Events = events ?? NoTransferEvents.Instance,
         };
+
+    /// <summary>
+    /// The response head lines and the <c>-v</c> lines among them: every event from the first
+    /// response header on, up to the first body byte.
+    /// </summary>
+    private static string[] HeadEvents(RecordingTransferEvents events) =>
+        [.. events.Events
+            .SkipWhile(line => !line.StartsWith("< ", StringComparison.Ordinal))
+            .TakeWhile(line => !line.StartsWith("{ ", StringComparison.Ordinal))
+            .Where(line => line.StartsWith("< ", StringComparison.Ordinal) || line.StartsWith("* Added", StringComparison.Ordinal))];
 }

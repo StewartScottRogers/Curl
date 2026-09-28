@@ -1,3 +1,5 @@
+using System.Text;
+
 using Curl.Cli;
 using Curl.Protocol.Abstractions;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
@@ -43,40 +45,50 @@ internal static class HttpRequestOptionsMapping
     /// The proxy chosen for this transfer (<see cref="TransferProxySelection" />), or
     /// <see langword="null" /> to connect directly.
     /// </param>
+    /// <param name="commandLineTextEncoding">
+    /// The platform curl's argument encoding the <c>-H</c>, <c>--proxy-header</c>, <c>-A</c> and
+    /// <c>-e</c> text is sent in (ADR-0067), or <see langword="null" /> for Latin-1.
+    /// </param>
     /// <returns>
     /// The options: <see cref="CommandLineOptions.RequestMethod" />,
     /// <see cref="CommandLineOptions.RequestTarget" />,
-    /// <see cref="CommandLineOptions.UserAgent" /> and <see cref="CommandLineOptions.Referer" />
-    /// verbatim; the <c>-H</c> headers followed by the ones <c>--json</c> adds; and
+    /// <see cref="CommandLineOptions.UserAgent" />, <see cref="CommandLineOptions.Referer" /> and
+    /// <see cref="CommandLineOptions.AutoReferer" /> verbatim; the <c>-H</c> headers followed by the ones <c>--json</c> adds; and
     /// <see cref="CommandLineOptions.ProxyHeaders" /> verbatim; and
     /// <paramref name="formBody" /> when given, otherwise
     /// <see cref="CommandLineOptions.PostData" /> as a <see cref="BytesBody" />, unless
     /// <see cref="CommandLineOptions.DataInQuery" /> moved it into the query; and
     /// <see cref="CommandLineOptions.FailMode" /> as <see cref="HttpRequestOptions.Fail" />; and
     /// <see cref="CommandLineOptions.FollowRedirects" /> as <see cref="HttpRequestOptions.FollowRedirects" />; and
+    /// <see cref="CommandLineOptions.MaxRedirects" /> as <see cref="HttpRequestOptions.MaxRedirects" />; and
     /// <see cref="CommandLineOptions.AuthSchemes" /> and <see cref="CommandLineOptions.BearerToken" /> verbatim; and
     /// <see cref="CommandLineOptions.HttpVersion" /> as <see cref="HttpRequestOptions.Version" />, HTTP/1.1 when
     /// neither <c>-0</c> nor <c>--http1.1</c> was given; and <see cref="CommandLineOptions.Compressed" />,
     /// <see cref="CommandLineOptions.TransferEncoding" />, <see cref="CommandLineOptions.Raw" /> and
     /// <see cref="CommandLineOptions.IgnoreContentLength" /> verbatim; and
     /// <paramref name="proxy" /> as <see cref="HttpRequestOptions.ForwardProxy" /> with
-    /// <see cref="CommandLineOptions.ProxyTunnel" /> as <see cref="HttpRequestOptions.ProxyTunnel" />.
+    /// <see cref="CommandLineOptions.ProxyTunnel" /> as <see cref="HttpRequestOptions.ProxyTunnel" />; and
+    /// <paramref name="commandLineTextEncoding" /> as <see cref="HttpRequestOptions.CommandLineTextEncoding" />.
     /// </returns>
     internal static HttpRequestOptions FromCommandLine(
         CommandLineOptions options,
         HttpRequestBody? formBody = null,
-        ProxyEndpoint? proxy = null) =>
+        ProxyEndpoint? proxy = null,
+        Encoding? commandLineTextEncoding = null) =>
         new()
         {
             CustomMethod = options.RequestMethod,
             RequestTarget = options.RequestTarget,
             Headers = HeadersOf(options),
             ProxyHeaders = options.ProxyHeaders,
+            CommandLineTextEncoding = commandLineTextEncoding ?? Encoding.Latin1,
             UserAgent = options.UserAgent,
             Referer = options.Referer,
+            AutoReferer = options.AutoReferer,
             Body = formBody ?? PostDataBodyOf(options),
             Fail = options.FailMode,
             FollowRedirects = options.FollowRedirects,
+            MaxRedirects = options.MaxRedirects,
             AuthSchemes = options.AuthSchemes,
             BearerToken = options.BearerToken,
             Version = options.HttpVersion ?? HttpVersionPreference.Http11,

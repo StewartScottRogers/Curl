@@ -4,9 +4,11 @@ using System.Text;
 using Curl.Cli;
 using Curl.Core;
 using Curl.Networking;
+using Curl.Output;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Dict;
 using Curl.Protocol.File;
+using Curl.Protocol.Ftp;
 using Curl.Protocol.Gopher;
 using Curl.Protocol.Http;
 using Curl.Protocol.Mqtt;
@@ -26,11 +28,21 @@ public sealed class CurlCompositionTests
     private const string ConnectFailure = "Failed to connect to h:2628 after 0 ms: Could not connect to server";
 
     [TestMethod]
+    [DataRow(true, WriteOutTimeDialect.WindowsCRuntime)]
+    [DataRow(false, WriteOutTimeDialect.Glibc)]
+    public void WriteOutTimeDialectFor_Platform_IsThatPlatformsCRuntime(bool runsOnWindows, WriteOutTimeDialect expected)
+    {
+        Assert.AreEqual(expected, CurlComposition.WriteOutTimeDialectFor(runsOnWindows));
+    }
+
+    [TestMethod]
     public void CreateProtocolHandlers_ServesEachSchemeThroughItsHandlerOnce()
     {
         IReadOnlyList<IProtocolHandler> handlers = CurlComposition.CreateProtocolHandlers(
             new RecordingConnector(CurlExitCode.CouldntConnect, ConnectFailure),
-            new RecordingDatagramConnector(CurlExitCode.CouldntConnect, ConnectFailure));
+            new RecordingDatagramConnector(CurlExitCode.CouldntConnect, ConnectFailure),
+            new PassThroughTlsProvider(),
+            new LoopbackDnsResolver());
 
         Dictionary<string, Type> served = handlers
             .SelectMany(handler => handler.SupportedSchemes.Select(scheme => (scheme, type: handler.GetType())))
@@ -48,6 +60,7 @@ public sealed class CurlCompositionTests
             ["http"] = typeof(HttpProtocolHandler),
             ["https"] = typeof(HttpProtocolHandler),
             ["ftp"] = typeof(RoutingFtpProtocolHandler),
+            ["ftps"] = typeof(RoutingFtpProtocolHandler),
         };
         CollectionAssert.AreEquivalent(expected.ToList(), served.ToList());
         _ = new ProtocolDispatcher(handlers);
@@ -373,7 +386,7 @@ public sealed class CurlCompositionTests
         IConnector[] connectors = [.. handlers.SelectMany(ConnectorsOf)];
         string[] connectingHandlers = [.. handlers.Where(handler => ConnectorsOf(handler).Any()).Select(handler => handler.GetType().Name).Order()];
         CollectionAssert.AreEqual(
-            new[] { "DictProtocolHandler", "GopherProtocolHandler", "HttpProtocolHandler", "MqttProtocolHandler", "RoutingFtpProtocolHandler", "TelnetProtocolHandler" },
+            new[] { "DictProtocolHandler", "GopherProtocolHandler", "HttpProtocolHandler", "MqttProtocolHandler", "RoutingFtpProtocolHandler", "TelnetProtocolHandler", "TftpProtocolHandler" },
             connectingHandlers);
         Assert.IsTrue(connectors.All(connector => ReferenceEquals(connector, transports.PoolingConnector)));
         Assert.AreSame(transports.PoolingConnector, dispatch.ConnectionPool);
@@ -388,6 +401,36 @@ public sealed class CurlCompositionTests
 
         IProtocolHandler http = CapturedDependency<Dictionary<string, IProtocolHandler>>(dispatcher)["http"];
         Assert.AreSame(transports.PoolingConnector, ConnectorsOf(http).Single());
+    }
+
+    [TestMethod]
+    public void CreateTransferDispatch_ProductionTransports_FtpHandlerGetsTheListenerTlsProviderAndResolver()
+    {
+        CurlTransports transports = CurlComposition.CreateTransports(NoOptions());
+
+        TransferDispatch dispatch = CurlComposition.CreateTransferDispatch(transports);
+
+        Dictionary<string, IProtocolHandler> handlers = CapturedDependency<Dictionary<string, IProtocolHandler>>(dispatch.Dispatcher);
+        Assert.AreSame(handlers["ftp"], handlers["ftps"]);
+        FtpProtocolHandler ftp = (FtpProtocolHandler)CapturedDependency<IProtocolHandler>(handlers["ftps"], "ftpHandler");
+        Assert.IsInstanceOfType<TcpConnectionListener>(CapturedDependency<IConnectionListener>(ftp));
+        Assert.AreSame(transports.TlsProvider, CapturedDependency<ITlsProvider>(ftp));
+        Assert.AreSame(transports.DnsResolver, CapturedDependency<IDnsResolver>(ftp));
+        Assert.IsInstanceOfType<SystemNetworkInterfaceLookup>(CapturedDependency<INetworkInterfaceLookup>(ftp));
+        Assert.AreSame(transports.PoolingConnector, CapturedDependency<IConnector>(ftp));
+    }
+
+    [TestMethod]
+    public async Task CreateRunner_FtpsUrlWithFakeConnectors_ReachesConnectorAtPort990WithTls()
+    {
+        RecordingConnector connector = new(CurlExitCode.CouldntConnect, ConnectFailure);
+
+        await RunWithFakeConnectorsAsync("ftps://h/f", connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, ConnectFailure));
+
+        ConnectTarget target = connector.Targets.Single();
+        Assert.AreEqual("h", target.Host);
+        Assert.AreEqual(990, target.Port);
+        Assert.IsTrue(target.UseTls);
     }
 
     [TestMethod]

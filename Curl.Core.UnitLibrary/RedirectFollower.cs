@@ -29,9 +29,11 @@ namespace Curl.Core;
 /// <see cref="StreamBody" /> - is sent again from its start when its stream seeks, as curl
 /// 8.21.0 sends the same multipart body, boundary and all, after a 307 or 308 (BL-298 Notes).
 /// A kept <see cref="StreamBody" /> whose stream cannot seek - a file part read from a pipe or
-/// device - ends the chain at the next hop with exit 26, <c>read error getting mime data</c>,
-/// counting the redirect and leaving <c>%{redirect_url}</c> empty, as curl 8.21.0 does
-/// (measured, BL-359 Notes).
+/// device - ends the chain at the next hop, counting the redirect and leaving
+/// <c>%{redirect_url}</c> empty: on Windows with exit 26, <c>read error getting mime data</c>,
+/// as the Schannel build does (measured, BL-359 Notes), elsewhere with exit 65,
+/// <c>Cannot rewind mime/post data</c>, as the OpenSSL build does (measured, BL-402 Notes;
+/// ADR-0098).
 /// </para>
 /// <para>
 /// A hop whose host, port or scheme differs from the first URL's gets no
@@ -47,6 +49,18 @@ namespace Curl.Core;
 /// chain with that failure. Without a selector, every hop keeps the first URL's proxy.
 /// </para>
 /// <para>
+/// Under <see cref="HttpRequestOptions.AutoReferer" /> (<c>-e "...;auto"</c>) every hop after the
+/// first is sent the previous hop's URL, without user information or fragment, as its
+/// <c>Referer</c>, and the merged report's <see cref="TransferReport.Referer" /> is the one the
+/// last request was sent with (measured, BL-361 Notes; ADR-0101).
+/// </para>
+/// <para>
+/// Each hop's own <see cref="TransferReport.RedirectCount" /> - the HTTP handler's resends after
+/// a 417 - is added to the chain's count, and every hop after the first is sent that count as
+/// <see cref="HttpRequestOptions.RedirectsFollowed" />, so the resends and the followed hops share
+/// one <c>--max-redirs</c> limit, as curl 8.21.0's do (measured, BL-396 Notes).
+/// </para>
+/// <para>
 /// Every hop after the first carries the chain's start as
 /// <see cref="ITransferContext.OperationStarted" />, so <c>-m</c> limits the whole chain, as
 /// curl's does, rather than each hop (measured, BL-299 Notes).
@@ -57,8 +71,18 @@ namespace Curl.Core;
 /// Chooses the proxy for each hop after the first, or <see langword="null" /> to keep the first
 /// URL's proxy for every hop.
 /// </param>
-public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySelector? selectHopProxy = null)
+/// <param name="runsOnWindows">
+/// Whether an unseekable body's rewind fails as the Windows build fails it (exit 26) rather
+/// than as the Linux and macOS build does (exit 65); <see langword="null" /> for
+/// <see cref="OperatingSystem.IsWindows" />.
+/// </param>
+public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySelector? selectHopProxy = null, bool? runsOnWindows = null)
 {
+    /// <summary>The Linux and macOS build's message for a multipart body it cannot rewind for the next hop.</summary>
+    public const string CannotRewindMessage = "Cannot rewind mime/post data";
+
+    private readonly bool rewindFailsAsReadError = runsOnWindows ?? OperatingSystem.IsWindows();
+
     private static readonly HashSet<string> SchemesCurlParses = new(
         [
             "dict", "file", "ftp", "ftps", "gopher", "gophers", "http", "https", "imap",
@@ -107,7 +131,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
         while (true)
         {
             TransferResult result = await dispatcher.DispatchAsync(hop);
-            chain.Add(result.Report);
+            chain.Add(result.Report, hop.Http!.Referer);
             if (RedirectTarget(result) is not { } target)
             {
                 return chain.Merge(result);
@@ -122,16 +146,16 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
 
             Rewind(context.Upload, uploadStart, bodyDropped);
             Rewind(bodyContent, bodyStart, bodyDropped);
-            // No stop means the target parsed, so next is set.
-            hop = NextHop(context, next!, http, hopProxy, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted);
             chain.Followed(target);
+            // No stop means the target parsed, so next is set.
+            hop = NextHop(context, hop.Url, next!, http with { RedirectsFollowed = chain.RedirectCount }, hopProxy, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted);
         }
     }
 
     /// <summary>
     /// The failure that ends the chain instead of following <paramref name="target" />: a
     /// <see cref="Refusal" />, the hop proxy selector's failure, or - when
-    /// <paramref name="bodyCannotBeResent" /> - curl's exit 26 for a multipart body it cannot
+    /// <paramref name="bodyCannotBeResent" /> - curl's failure for a multipart body it cannot
     /// rewind, which counts the redirect as followed; <see langword="null" />, with
     /// <paramref name="next" /> and <paramref name="hopProxy" /> set, when the hop goes ahead.
     /// </summary>
@@ -163,14 +187,17 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
     }
 
     /// <summary>
-    /// curl 8.21.0's failure for a hop whose multipart body cannot be rewound: the redirect
-    /// counts as followed, <c>%{redirect_url}</c> is empty, and the exit is 26 (BL-359 Notes).
+    /// curl's failure for a hop whose multipart body cannot be rewound: the redirect counts as
+    /// followed, <c>%{redirect_url}</c> is empty, and the exit is 26 on Windows (BL-359 Notes)
+    /// and 65 elsewhere (BL-402 Notes).
     /// </summary>
-    private static TransferResult BodyRewindFailure(string target, RedirectChain chain, TransferResult result)
+    private TransferResult BodyRewindFailure(string target, RedirectChain chain, TransferResult result)
     {
         chain.Followed(target);
         chain.Refused(keepsRedirectUrl: false);
-        return TransferResult.Failure(CurlExitCode.ReadError, "read error getting mime data", result.BytesTransferred);
+        return rewindFailsAsReadError
+            ? TransferResult.Failure(CurlExitCode.ReadError, "read error getting mime data", result.BytesTransferred)
+            : TransferResult.Failure(CurlExitCode.SendFailRewind, CannotRewindMessage, result.BytesTransferred);
     }
 
     /// <summary>
@@ -295,9 +322,14 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
         && string.Equals(first.Host, next.Host, StringComparison.OrdinalIgnoreCase)
         && first.Port == next.Port;
 
-    private static HttpRequestOptions HopHttp(HttpRequestOptions http, ProxyEndpoint? forwardProxy, bool bodyDropped, bool sendCredentials)
+    private static HttpRequestOptions HopHttp(CurlUrl previousUrl, HttpRequestOptions http, ProxyEndpoint? forwardProxy, bool bodyDropped, bool sendCredentials)
     {
-        HttpRequestOptions hopHttp = http with { Body = bodyDropped ? null : http.Body, ForwardProxy = forwardProxy };
+        HttpRequestOptions hopHttp = http with
+        {
+            Body = bodyDropped ? null : http.Body,
+            ForwardProxy = forwardProxy,
+            Referer = http.AutoReferer ? AutoReferer(previousUrl) : http.Referer,
+        };
         return sendCredentials
             ? hopHttp
             : hopHttp with
@@ -307,12 +339,27 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
             };
     }
 
+    /// <summary>
+    /// The <c>Referer</c> <c>-e "...;auto"</c> sends on a followed hop: the URL the redirect came
+    /// from without user information or fragment, its query kept, as curl 8.21.0 sends
+    /// <c>http://127.0.0.1:18361/a?q=1</c> after <c>http://u:p@127.0.0.1:18361/a?q=1#f</c>
+    /// (measured, BL-361 Notes).
+    /// </summary>
+    private static string AutoReferer(CurlUrl url) =>
+        url.Query is null
+            ? $"{url.Scheme}://{HostAndPort(url)}{url.AbsolutePath}"
+            : $"{url.Scheme}://{HostAndPort(url)}{url.AbsolutePath}?{url.Query}";
+
+    private static string HostAndPort(CurlUrl url) =>
+        url.IsDefaultPort ? url.Host : string.Create(CultureInfo.InvariantCulture, $"{url.Host}:{url.Port}");
+
     private static bool IsCredentialHeader(string header) =>
         header.StartsWith("Authorization:", StringComparison.OrdinalIgnoreCase)
         || header.StartsWith("Cookie:", StringComparison.OrdinalIgnoreCase);
 
     private static TransferContext NextHop(
         ITransferContext first,
+        CurlUrl previousUrl,
         CurlUrl url,
         HttpRequestOptions http,
         HopProxy hopProxy,
@@ -325,7 +372,9 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
             Output = first.Output,
             Upload = bodyDropped ? null : first.Upload,
             ResumeFrom = first.ResumeFrom,
+            ResumeUploadFromUnknownOffset = !bodyDropped && first.ResumeUploadFromUnknownOffset,
             Range = first.Range,
+            RangeText = first.RangeText,
             MaxFileSize = first.MaxFileSize,
             NoBody = first.NoBody,
             TimeCondition = first.TimeCondition,
@@ -342,10 +391,11 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
             MaxTime = first.MaxTime,
             OperationStarted = operationStarted,
             Proxy = hopProxy.Proxy,
-            Http = HopHttp(http, hopProxy.ForwardProxy, bodyDropped, sendCredentials),
+            Http = HopHttp(previousUrl, http, hopProxy.ForwardProxy, bodyDropped, sendCredentials),
             TimeProvider = first.TimeProvider,
             CancellationToken = first.CancellationToken,
             Progress = first.Progress,
+            Events = first.Events,
         };
 
     /// <summary>
@@ -360,6 +410,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
     private sealed class RedirectChain(TimeProvider timeProvider)
     {
         private TransferReport? lastReport;
+        private string? lastReferer;
         private long? firstStarted;
         private string? effectiveUrl;
         private long headerSize;
@@ -369,9 +420,10 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
 
         public int RedirectCount { get; private set; }
 
-        public void Add(TransferReport? report)
+        public void Add(TransferReport? report, string? referer)
         {
             lastReport = report;
+            lastReferer = referer;
             if (report is null)
             {
                 return;
@@ -381,6 +433,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
             headerSize += report.HeaderSize;
             requestSize += report.RequestSize;
             connectionCount += report.ConnectionCount;
+            RedirectCount += report.RedirectCount;
         }
 
         public void Followed(string url)
@@ -405,6 +458,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
                     EffectiveUrl = effectiveUrl,
                     RedirectUrl = redirectUrlCleared ? null : report.RedirectUrl,
                     RedirectCount = RedirectCount,
+                    Referer = lastReferer,
                     HeaderSize = headerSize,
                     RequestSize = requestSize,
                     ConnectionCount = connectionCount,

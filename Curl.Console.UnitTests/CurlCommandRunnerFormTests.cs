@@ -107,7 +107,7 @@ public sealed class CurlCommandRunnerFormTests
 
         await new CurlCommandRunner(
                 _ => new TransferDispatch(new ProtocolDispatcher(
-                    CurlComposition.CreateProtocolHandlers(server, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused")))),
+                    CurlComposition.CreateProtocolHandlers(server, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver()))),
                 files,
                 files,
                 standardOutput,
@@ -140,7 +140,7 @@ public sealed class CurlCommandRunnerFormTests
 
         int exitCode = await new CurlCommandRunner(
                 _ => new TransferDispatch(new ProtocolDispatcher(
-                    CurlComposition.CreateProtocolHandlers(redirectingServer, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused")))),
+                    CurlComposition.CreateProtocolHandlers(redirectingServer, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver()))),
                 files,
                 files,
                 standardOutput,
@@ -269,7 +269,7 @@ public sealed class CurlCommandRunnerFormTests
     private Task<int> RunWithStandardInputAsync(ScriptedConnector connector, params string[] arguments) =>
         new CurlCommandRunner(
                 _ => new TransferDispatch(new ProtocolDispatcher(
-                    CurlComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused")))),
+                    CurlComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver()))),
                 files,
                 files,
                 standardOutput,
@@ -291,7 +291,7 @@ public sealed class CurlCommandRunnerFormTests
     private Task<int> RunAsync(params string[] arguments) =>
         new CurlCommandRunner(
                 _ => new TransferDispatch(new ProtocolDispatcher(
-                    CurlComposition.CreateProtocolHandlers(server, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused")))),
+                    CurlComposition.CreateProtocolHandlers(server, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver()))),
                 files,
                 files,
                 standardOutput,

@@ -185,6 +185,55 @@ public sealed partial class HttpRequestHeadFormatterTests
         CollectionAssert.AreEqual(expected, head);
     }
 
+    /// <summary>
+    /// Measured with curl 8.21.0 (mingw) on a Windows-1252 system (ADR-0067, BL-172): <c>é</c>
+    /// is <c>E9</c>, U+0100 takes the best fit <c>A</c>, <c>€</c> is Windows-1252's <c>80</c>
+    /// and <c>中</c>, with no best fit, is <c>?</c>.
+    /// </summary>
+    [TestMethod]
+    public void Format_NonAsciiHeaderInWindows1252_SendsTheMeasuredBytes()
+    {
+        byte[] expected =
+        [
+            .. Encoding.ASCII.GetBytes("GET / HTTP/1.1\r\n" + DefaultHeaders + "X-A: "), 0xE9,
+            .. "\r\nX-B: "u8, 0x41, .. "\r\nX-C: "u8, 0x80, .. "\r\nX-D: "u8, 0x3F, .. "\r\n\r\n"u8,
+        ];
+        HttpRequestOptions options = new()
+        {
+            Headers = ["X-A: é", "X-B: Ā", "X-C: €", "X-D: 中"],
+            CommandLineTextEncoding = CodePagesEncodingProvider.Instance.GetEncoding(1252)!,
+        };
+
+        byte[] head = HttpRequestHeadFormatter.Format(CurlUrl.Parse(Url), options);
+
+        CollectionAssert.AreEqual(expected, head);
+    }
+
+    /// <summary>
+    /// curl on Linux and macOS sends the UTF-8 bytes its shell passed (ADR-0067), for
+    /// <c>-H</c>, <c>--proxy-header</c>, <c>-A</c> and <c>-e</c> alike; the request target
+    /// stays as the URL has it.
+    /// </summary>
+    [TestMethod]
+    public void Format_NonAsciiCommandLineTextInUtf8_SendsUtf8Bytes()
+    {
+        HttpRequestOptions options = new()
+        {
+            Headers = ["X-A: é"],
+            ProxyHeaders = ["X-P: é"],
+            UserAgent = "é",
+            Referer = "€",
+            CommandLineTextEncoding = Encoding.UTF8,
+        };
+
+        byte[] head = HttpRequestHeadFormatter.Format(CurlUrl.Parse("http://example.com/"), options, forwardProxy: true);
+
+        Assert.AreEqual(
+            "GET http://example.com/ HTTP/1.1\r\nHost: example.com\r\nUser-Agent: Ã©\r\nAccept: */*\r\n"
+            + "Referer: â\u0082¬\r\nProxy-Connection: Keep-Alive\r\nX-A: Ã©\r\nX-P: Ã©\r\n\r\n",
+            Encoding.Latin1.GetString(head));
+    }
+
     [TestMethod]
     public void Format_DefaultOptions_MatchesNullOptions()
     {

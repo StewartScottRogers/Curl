@@ -3,13 +3,13 @@ using System.Globalization;
 namespace Curl.Protocol.Ftp;
 
 /// <summary>
-/// Reads the data port out of a <c>229</c> reply to <c>EPSV</c> or a <c>227</c> reply to
-/// <c>PASV</c>.
+/// Reads the data port out of a <c>229</c> reply to <c>EPSV</c>, and the address and port
+/// out of a <c>227</c> reply to <c>PASV</c>.
 /// </summary>
 /// <remarks>
-/// Only the port is taken. The address a <c>227</c> reply names is ignored and the data
-/// connection goes to the control connection's host, as curl 8.21.0 does by default
-/// (<c>--ftp-skip-pasv-ip</c> is on unless turned off).
+/// The address a <c>227</c> reply names is used only under <c>--no-ftp-skip-pasv-ip</c>;
+/// by default the data connection goes to the control connection's host, as curl 8.21.0
+/// does (<c>--ftp-skip-pasv-ip</c> is on unless turned off).
 /// </remarks>
 internal static class FtpPassiveReply
 {
@@ -40,18 +40,23 @@ internal static class FtpPassiveReply
     }
 
     /// <summary>
-    /// Reads the port from a <c>PASV</c> reply such as
-    /// <c>227 Entering Passive Mode (127,0,0,1,156,64)</c>: the fifth number times 256
-    /// plus the sixth.
+    /// Reads the address and port from a <c>PASV</c> reply such as
+    /// <c>227 Entering Passive Mode (127,0,0,1,156,64)</c>: the first four numbers as a
+    /// dotted address, and the fifth number times 256 plus the sixth as the port.
     /// </summary>
     /// <param name="lastLine">The reply's last line.</param>
+    /// <param name="address">
+    /// The dotted address, such as <c>127.0.0.1</c>, when this returns <see langword="true" />;
+    /// only <c>--no-ftp-skip-pasv-ip</c> connects to it.
+    /// </param>
     /// <param name="port">The port, from 1 to 65535, when this returns <see langword="true" />.</param>
     /// <returns>
     /// <see langword="true" /> when the line holds six comma-separated numbers of at most
     /// three digits, each at most 255, naming a port other than 0.
     /// </returns>
-    public static bool TryParsePasvPort(string lastLine, out int port)
+    public static bool TryParsePasv(string lastLine, out string address, out int port)
     {
+        address = string.Empty;
         port = 0;
         Span<int> numbers = stackalloc int[PasvNumberCount];
         for (int start = 0; start < lastLine.Length; start++)
@@ -59,6 +64,7 @@ internal static class FtpPassiveReply
             bool startsNumber = start == 0 || !char.IsAsciiDigit(lastLine[start - 1]);
             if (startsNumber && TryReadPasvNumbers(lastLine.AsSpan(start), numbers))
             {
+                address = string.Create(CultureInfo.InvariantCulture, $"{numbers[0]}.{numbers[1]}.{numbers[2]}.{numbers[3]}");
                 port = (numbers[4] * 256) + numbers[5];
                 return numbers.IndexOfAnyExceptInRange(0, 255) < 0 && port >= 1;
             }

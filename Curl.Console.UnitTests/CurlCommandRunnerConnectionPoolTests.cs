@@ -74,7 +74,7 @@ public sealed class CurlCommandRunnerConnectionPoolTests
     private Task<int> RunAsync(RecordingConnectionPool pool, IConnector connector, string url) =>
         new CurlCommandRunner(
                 _ => new TransferDispatch(
-                    new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"))),
+                    new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())),
                     [],
                     connectionPool: pool),
                 fileSystem,

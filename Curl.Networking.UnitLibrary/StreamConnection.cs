@@ -7,11 +7,15 @@ namespace Curl.Networking;
 /// <summary>
 /// A plaintext <see cref="IConnection" /> over a <see cref="Stream" />. In production the
 /// stream is the <see cref="System.Net.Sockets.NetworkStream" /> <see cref="TcpDialer" />
-/// opens; the connection owns the stream and disposes it.
+/// opens or <see cref="TcpPendingConnection" /> accepts; the connection owns the stream and
+/// disposes it.
 /// </summary>
 /// <param name="stream">The stream to read from and write to.</param>
 /// <param name="remoteEndPoint">The peer's address, or <see langword="null" /> when there is none.</param>
-public sealed class StreamConnection(Stream stream, EndPoint? remoteEndPoint) : IConnection
+/// <param name="localEndPoint">
+/// The local address of the socket under the stream, or <see langword="null" /> when there is none.
+/// </param>
+public sealed class StreamConnection(Stream stream, EndPoint? remoteEndPoint, EndPoint? localEndPoint = null) : IConnection
 {
     private readonly Stream _stream = stream ?? throw new ArgumentNullException(nameof(stream));
 
@@ -23,6 +27,9 @@ public sealed class StreamConnection(Stream stream, EndPoint? remoteEndPoint) : 
 
     /// <inheritdoc />
     public EndPoint? RemoteEndPoint { get; } = remoteEndPoint;
+
+    /// <inheritdoc />
+    public EndPoint? LocalEndPoint { get; } = localEndPoint;
 
     /// <inheritdoc />
     public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken) =>

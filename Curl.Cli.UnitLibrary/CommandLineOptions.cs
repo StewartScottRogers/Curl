@@ -25,6 +25,7 @@ public sealed class CommandLineOptions
     private readonly List<string> proxyHeaders = [];
     private readonly List<CommandLineCookie> cookies = [];
     private readonly List<string> warningLines = [];
+    private readonly List<StandardErrorRedirect> standardErrorRedirects = [];
     private readonly List<string?> configFileHelpSubjects = [];
     private readonly List<FormPartSpecification> formParts = [];
     private readonly Dictionary<string, byte[]> variables = new(StringComparer.Ordinal);
@@ -180,7 +181,13 @@ public sealed class CommandLineOptions
     /// kept, not refused: curl 8.21.0 fails to open it, warns and carries on writing to standard error,
     /// which the console layer does when it opens the file.
     /// </summary>
-    public string? StandardErrorFile { get; internal set; }
+    public string? StandardErrorFile { get; private set; }
+
+    /// <summary>
+    /// Every <c>--stderr</c> read, in command-line order, each with the point where curl opens its
+    /// file; empty when none was given. The last one's file is <see cref="StandardErrorFile"/>.
+    /// </summary>
+    public IReadOnlyList<StandardErrorRedirect> StandardErrorRedirects => standardErrorRedirects;
 
     /// <summary>
     /// The <c>-o</c> / <c>--output</c> file name of each entry of <see cref="UrlOutputs"/>, in the same
@@ -378,7 +385,10 @@ public sealed class CommandLineOptions
     /// <summary><see langword="true"/> when <c>--tftp-no-options</c> was given and no <c>--no-tftp-no-options</c> came after it.</summary>
     public bool TftpNoOptions { get; internal set; }
 
-    /// <summary><see langword="true"/> when <c>--disable-epsv</c> was given and no <c>--no-disable-epsv</c> came after it.</summary>
+    /// <summary>
+    /// <see langword="true"/> when the last of <c>--disable-epsv</c>, <c>--epsv</c> and their <c>--no-</c>
+    /// spellings turned <c>EPSV</c> off (<c>--disable-epsv</c> or <c>--no-epsv</c>); <see langword="false"/> otherwise.
+    /// </summary>
     public bool FtpDisableEpsv { get; internal set; }
 
     /// <summary>
@@ -395,6 +405,44 @@ public sealed class CommandLineOptions
 
     /// <summary><see langword="true"/> when <c>--ftp-create-dirs</c> was given and no <c>--no-ftp-create-dirs</c> came after it.</summary>
     public bool FtpCreateDirectories { get; internal set; }
+
+    /// <summary>
+    /// The last <c>-P</c> / <c>--ftp-port</c> address, verbatim, for FTP active mode; <see langword="null"/>
+    /// when not given or when a later <c>--ftp-pasv</c> cleared it, for passive mode (ADR-0102).
+    /// </summary>
+    public string? FtpPort { get; internal set; }
+
+    /// <summary>
+    /// <see langword="false"/> when the last of <c>--disable-eprt</c>, <c>--eprt</c> and their <c>--no-</c>
+    /// spellings turned <c>EPRT</c> off (<c>--disable-eprt</c> or <c>--no-eprt</c>); <see langword="true"/>
+    /// otherwise, as curl 8.21.0 sends <c>EPRT</c> before <c>PORT</c> by default.
+    /// </summary>
+    public bool FtpUseEprt { get; internal set; } = true;
+
+    /// <summary>
+    /// Whether a plaintext scheme upgrades to TLS: <see cref="TransportSecurityLevel.Required"/> when
+    /// <c>--ssl-reqd</c>/<c>--ftp-ssl-reqd</c> or <c>--ftp-ssl-control</c> is in effect,
+    /// <see cref="TransportSecurityLevel.Try"/> when only <c>--ssl</c>/<c>--ftp-ssl</c> is, and
+    /// <see cref="TransportSecurityLevel.None"/> otherwise. curl 8.21.0 keeps the three flags apart, so
+    /// <c>--no-ssl</c> does not undo <c>--ssl-reqd</c> (ADR-0102).
+    /// </summary>
+    public TransportSecurityLevel SslLevel =>
+        SslRequired || FtpSslControlOnly ? TransportSecurityLevel.Required
+        : SslTry ? TransportSecurityLevel.Try
+        : TransportSecurityLevel.None;
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--ftp-ssl-control</c> was given and no <c>--no-ftp-ssl-control</c> came
+    /// after it: TLS is required for the control connection only, and the data connections stay clear.
+    /// It outranks <c>--ssl-reqd</c> whichever comes first, as curl sets it last.
+    /// </summary>
+    public bool FtpSslControlOnly { get; internal set; }
+
+    /// <summary><see langword="true"/> when <c>--ssl</c> or <c>--ftp-ssl</c> was given and no <c>--no-ssl</c> or <c>--no-ftp-ssl</c> came after it.</summary>
+    internal bool SslTry { get; private set; }
+
+    /// <summary><see langword="true"/> when <c>--ssl-reqd</c> or <c>--ftp-ssl-reqd</c> was given and no <c>--no-</c> spelling of either came after it.</summary>
+    internal bool SslRequired { get; set; }
 
     /// <summary><see langword="true"/> when <c>-l</c> / <c>--list-only</c> was given and no <c>--no-list-only</c> came after it.</summary>
     public bool ListOnly { get; internal set; }
@@ -577,7 +625,8 @@ public sealed class CommandLineOptions
     /// The <c>-Y</c> / <c>--speed-limit</c> in bytes per second below which a transfer is too slow;
     /// <see langword="null"/> when not given. Curl 8.21.0 aborts a transfer that stays slower than
     /// this for <see cref="SpeedTimeSeconds"/>, or for 30 seconds when that is not given (measured
-    /// through <c>--libcurl</c>). The last value wins.
+    /// through <c>--libcurl</c>). The last value wins, except that a <c>-y</c> given after a
+    /// zero <c>-Y</c> makes it 1, as curl 8.21.0's tool does when it parses <c>-y</c> (ADR-0115).
     /// </summary>
     public long? SpeedLimit { get; internal set; }
 
@@ -585,7 +634,8 @@ public sealed class CommandLineOptions
     /// The <c>-y</c> / <c>--speed-time</c> in whole seconds a transfer may stay slower than
     /// <see cref="SpeedLimit"/>; <see langword="null"/> when not given. When it is given and
     /// <see cref="SpeedLimit"/> is not, curl 8.21.0 uses a limit of 1 byte per second (measured
-    /// through <c>--libcurl</c>). The last value wins.
+    /// through <c>--libcurl</c>). The last value wins, except that a <c>-Y</c> given after a
+    /// zero <c>-y</c> makes it 30, as curl 8.21.0's tool does when it parses <c>-Y</c> (ADR-0115).
     /// </summary>
     public long? SpeedTimeSeconds { get; internal set; }
 
@@ -868,6 +918,21 @@ public sealed class CommandLineOptions
         RaiseVerbosity();
     }
 
+    /// <summary>
+    /// Turns <c>--ssl</c> / <c>--ftp-ssl</c> on or off. Turning it on warns, unless silent, as curl 8.21.0
+    /// warns that trying TLS and going on in plaintext is insecure.
+    /// </summary>
+    /// <param name="on"><see langword="true"/> for the option, <see langword="false"/> for its <c>--no-</c> spelling.</param>
+    /// <param name="longName">The option's long name with its <c>--</c>, named in the warning.</param>
+    internal void SetSslTry(bool on, string longName)
+    {
+        SslTry = on;
+        if (on)
+        {
+            AddWarningLinesUnlessSilent(CommandLineWarning.InsecureSsl(longName));
+        }
+    }
+
     /// <summary>Takes <see cref="Verbosity"/> one step up, to at most 4, as one more <c>v</c> does.</summary>
     private void RaiseVerbosity()
     {
@@ -929,6 +994,18 @@ public sealed class CommandLineOptions
     /// </summary>
     /// <param name="lines">The lines, without line terminators.</param>
     internal void AddErrorLines(IReadOnlyList<string> lines) => warningLines.AddRange(lines);
+
+    /// <summary>
+    /// Makes <paramref name="file"/> the <see cref="StandardErrorFile"/> and appends a
+    /// <see cref="StandardErrorRedirect"/> for it to <see cref="StandardErrorRedirects"/>, at the
+    /// warning lines met so far and with the <c>-s</c> in effect now.
+    /// </summary>
+    /// <param name="file">The file the <c>--stderr</c> names.</param>
+    internal void RedirectStandardError(string file)
+    {
+        StandardErrorFile = file;
+        standardErrorRedirects.Add(new(file, warningLines.Count, Silent));
+    }
 
     /// <summary>
     /// Sets the <c>--variable</c> <paramref name="name"/> to <paramref name="content"/>, replacing any earlier

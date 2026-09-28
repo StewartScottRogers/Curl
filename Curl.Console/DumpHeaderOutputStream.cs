@@ -1,22 +1,28 @@
+using System.Runtime.ExceptionServices;
+using System.Text;
+
 namespace Curl.Console;
 
 /// <summary>
 /// The stream a transfer's <c>-D</c> header lines are written through: every write is passed
 /// to <paramref name="destination" /> and flushed at once, as curl 8.21.0's header callback
-/// flushes after each header, and a failed write or flush is recorded in
-/// <see cref="HasWriteFailed" /> before its <see cref="IOException" /> is rethrown to the handler.
+/// flushes after each header, and a failed write or flush prints
+/// <c>curl: Failed writing headers to &lt;file&gt;</c> to <paramref name="failureReportOutput" />
+/// before its <see cref="IOException" /> is rethrown to the handler.
 /// </summary>
 /// <param name="destination">The <c>-D</c> destination: standard output or the named file.</param>
+/// <param name="headerFile">The <c>-D</c> value as given, which the failure line names.</param>
+/// <param name="failureReportOutput">
+/// Standard error, or <see langword="null" /> when errors are not shown (<c>-s</c> without <c>-S</c>).
+/// </param>
 /// <remarks>
-/// curl prints <c>curl: Failed writing headers to &lt;file&gt;</c> when that flush fails
-/// (measured 2026-09-26, BL-111 Notes); the runner prints it from <see cref="HasWriteFailed" />.
-/// The stream does not own <paramref name="destination" /> and never disposes it.
+/// curl prints the line inside its header callback, at the moment the flush fails, so under
+/// <c>-v</c> it comes before the handler's <c>* client returned ERROR on write of N bytes</c>
+/// line (measured 2026-09-26, BL-111 Notes; BL-388). The stream owns neither
+/// <paramref name="destination" /> nor <paramref name="failureReportOutput" /> and never disposes them.
 /// </remarks>
-internal sealed class DumpHeaderOutputStream(Stream destination) : Stream
+internal sealed class DumpHeaderOutputStream(Stream destination, string headerFile, Stream? failureReportOutput) : Stream
 {
-    /// <summary>Gets a value indicating whether a header write or flush has failed.</summary>
-    internal bool HasWriteFailed { get; private set; }
-
     /// <inheritdoc />
     public override bool CanRead => false;
 
@@ -35,6 +41,9 @@ internal sealed class DumpHeaderOutputStream(Stream destination) : Stream
         get => throw new NotSupportedException();
         set => throw new NotSupportedException();
     }
+
+    /// <summary>Gets curl's failure line, terminated, as UTF-8.</summary>
+    private byte[] FailureLine => Encoding.UTF8.GetBytes($"curl: Failed writing headers to {headerFile}{Environment.NewLine}");
 
     /// <inheritdoc />
     public override void Flush()
@@ -61,7 +70,12 @@ internal sealed class DumpHeaderOutputStream(Stream destination) : Stream
         }
         catch (IOException)
         {
-            HasWriteFailed = true;
+            if (failureReportOutput is not null)
+            {
+                failureReportOutput.Write(FailureLine);
+                failureReportOutput.Flush();
+            }
+
             throw;
         }
     }
@@ -70,15 +84,27 @@ internal sealed class DumpHeaderOutputStream(Stream destination) : Stream
     /// <exception cref="IOException">The destination failed the write or its flush.</exception>
     public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
     {
+        // The report is awaited after the catch, not inside it: an await inside a catch that
+        // rethrows makes the compiler add a rethrow branch no exception can take.
+        ExceptionDispatchInfo failure;
         try
         {
             await destination.WriteAsync(buffer, cancellationToken).ConfigureAwait(false);
             await destination.FlushAsync(cancellationToken).ConfigureAwait(false);
+
+            return;
         }
-        catch (IOException)
+        catch (IOException exception)
         {
-            HasWriteFailed = true;
-            throw;
+            failure = ExceptionDispatchInfo.Capture(exception);
         }
+
+        if (failureReportOutput is not null)
+        {
+            await failureReportOutput.WriteAsync(FailureLine, cancellationToken).ConfigureAwait(false);
+            await failureReportOutput.FlushAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        failure.Throw();
     }
 }

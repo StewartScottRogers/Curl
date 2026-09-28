@@ -35,4 +35,14 @@ internal sealed class HttpResponseHead(
     /// body, and empty when the peer closed inside the head.
     /// </summary>
     internal ReadOnlyMemory<byte> BodyPrefix { get; } = bodyPrefix;
+
+    /// <summary>
+    /// Cuts the head short before one of its headers: the head as curl 8.21.0 has read and
+    /// written it when it refuses that header (measured, BL-412 Notes), with the headers and
+    /// head lines before it, no line ending the head, and no body.
+    /// </summary>
+    /// <param name="headerIndex">The index in <see cref="Headers" /> of the refused header.</param>
+    /// <returns>The head before that header.</returns>
+    internal HttpResponseHead Before(int headerIndex) =>
+        new(StatusLine, [.. Headers.Take(headerIndex)], HeadBytes[..Headers[headerIndex].LineStart], ReadOnlyMemory<byte>.Empty);
 }

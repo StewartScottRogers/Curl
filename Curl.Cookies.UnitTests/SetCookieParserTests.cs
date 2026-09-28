@@ -277,6 +277,69 @@ public sealed class SetCookieParserTests
         Assert.ThrowsExactly<ArgumentNullException>(() => SetCookieParser.Parse(null!, uri, DateTimeOffset.UnixEpoch));
         Assert.ThrowsExactly<ArgumentNullException>(() => SetCookieParser.Parse("a=1", null!, DateTimeOffset.UnixEpoch));
         Assert.ThrowsExactly<ArgumentNullException>(() => SetCookieParser.ParseFromCookieFile(null!, DateTimeOffset.UnixEpoch));
+        Assert.ThrowsExactly<ArgumentNullException>(() => SetCookieParser.Parse(null!, uri, DateTimeOffset.UnixEpoch, out _));
+        Assert.ThrowsExactly<ArgumentNullException>(() => SetCookieParser.Parse("a=1", null!, DateTimeOffset.UnixEpoch, out _));
+    }
+
+    /// <summary>
+    /// Measured 2026-09-27 (BL-443): <c>curl -v -b file -c - http://127.0.0.1:&lt;port&gt;/</c> with a file of
+    /// <c>Set-Cookie: f=v; Pa&lt;TAB&gt;th=/; X=&lt;0x01&gt;</c> and <c>Set-Cookie: g=v; X=&lt;0x01&gt;</c> sent
+    /// <c>Cookie: f=v</c>: a control character after a part that a tab ended is never checked.
+    /// </summary>
+    [TestMethod]
+    public void ParseFromCookieFile_ControlCharacterAfterATabEndedPart_IsNeverChecked()
+    {
+        DateTimeOffset now = DateTimeOffset.FromUnixTimeSeconds(Now);
+
+        Cookie? read = SetCookieParser.ParseFromCookieFile("f=v; Pa\tth=/; X=\u0001", now);
+        Cookie? refused = SetCookieParser.ParseFromCookieFile("g=v; X=\u0001", now);
+
+        Assert.AreEqual("f", read?.Name);
+        Assert.IsNull(refused);
+    }
+
+    /// <summary>
+    /// Measured 2026-09-27 (BL-461): served to <c>curl -s -v -c - http://127.0.0.1:&lt;port&gt;/</c>, a part with no
+    /// name at all ends the reading unless a <c>;</c> follows it, so the <c>Path</c> or the control character after
+    /// <c>=x</c> is never read, while after an empty part it is.
+    /// </summary>
+    [TestMethod]
+    [DataRow("a=b;=x; Path=/q", "127.0.0.1|FALSE|/|FALSE|0|a|b", DisplayName = "=x ends the reading")]
+    [DataRow("a=b;=x; Y=\u0001", "127.0.0.1|FALSE|/|FALSE|0|a|b", DisplayName = "=x hides a control character")]
+    [DataRow("a=b;;Path=/q", "127.0.0.1|FALSE|/q|FALSE|0|a|b", DisplayName = "an empty part does not")]
+    [DataRow("a=b; =x; Path=/q", "127.0.0.1|FALSE|/q|FALSE|0|a|b", DisplayName = "nor a blank name")]
+    [DataRow(";a=b", null, DisplayName = "a nameless first part is refused")]
+    [DataRow("=x;a=b", null, DisplayName = "=x first is refused")]
+    public void Parse_NamelessPart_EndsTheReadingAsCurlDid(string header, string? expectedJarLine) =>
+        AssertParsesAsCurlDid("http://127.0.0.1/", header, expectedJarLine);
+
+    [TestMethod]
+    [DataRow(";a=b")]
+    [DataRow("=x;a=b")]
+    [DataRow("\t=v")]
+    public void Parse_NamelessFirstPart_ReportsInvalidCookie(string header)
+    {
+        SetCookieParser.Parse(header, CurlUrl.Parse("http://127.0.0.1/"), DateTimeOffset.FromUnixTimeSeconds(Now), out string? refusal);
+
+        Assert.AreEqual("invalid cookie, dropped", refusal);
+    }
+
+    /// <summary>
+    /// Measured 2026-09-27 (BL-461) as a <c>-b</c> file line: a first part with no name is skipped, so the next part is
+    /// the cookie, and <c>=x</c> ends the reading there.
+    /// </summary>
+    [TestMethod]
+    [DataRow(";a=b", "a", "")]
+    [DataRow(";a=b; Secure", "a", "")]
+    [DataRow(";a=b;=x;Path=/q", "a", "")]
+    [DataRow("a=b;;Path=/q", "a", "/q")]
+    public void ParseFromCookieFile_NamelessFirstPart_ReadsTheNextPartAsTheCookie(string header, string expectedName, string expectedPath)
+    {
+        Cookie? cookie = SetCookieParser.ParseFromCookieFile(header, DateTimeOffset.FromUnixTimeSeconds(Now), out string? refusal);
+
+        Assert.AreEqual(expectedName, cookie?.Name);
+        Assert.AreEqual(expectedPath, cookie?.Path);
+        Assert.IsNull(refusal);
     }
 
     private static void AssertParsesAsCurlDid(string url, string header, string? expectedJarLine)

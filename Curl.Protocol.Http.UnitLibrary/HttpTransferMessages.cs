@@ -188,6 +188,15 @@ internal static class HttpTransferMessages
         string.Create(CultureInfo.InvariantCulture, $"The requested URL returned error: {statusCode}");
 
     /// <summary>
+    /// Formats the exit 47 message for a <c>417</c> resend that would pass the
+    /// <c>--max-redirs</c> limit (measured, BL-396 Notes).
+    /// </summary>
+    /// <param name="maxRedirects">The limit.</param>
+    /// <returns>The message, such as <c>Maximum (50) redirects followed</c>.</returns>
+    internal static string MaximumRedirectsFollowed(int maxRedirects) =>
+        string.Create(CultureInfo.InvariantCulture, $"Maximum ({maxRedirects}) redirects followed");
+
+    /// <summary>
     /// Formats the exit 56 message for a chunk size line that does not start with a
     /// hexadecimal digit.
     /// </summary>
@@ -323,6 +332,15 @@ internal static class HttpTransferMessages
     /// <returns>The message, such as <c>end of response with 7 bytes missing</c>.</returns>
     internal static string BodyBytesMissing(long missing) =>
         string.Create(CultureInfo.InvariantCulture, $"end of response with {missing} bytes missing");
+
+    /// <summary>
+    /// Formats the exit 18 message, also its <c>-v</c> line, for a peer that closed among the
+    /// final head's headers after a Content-Length curl 8.21.0 acted on (measured, BL-485 Notes).
+    /// </summary>
+    /// <param name="remaining">How many body bytes the Content-Length still promised.</param>
+    /// <returns>The message, such as <c>transfer closed with 5 bytes remaining to read</c>.</returns>
+    internal static string TransferClosedWithBytesRemaining(long remaining) =>
+        string.Create(CultureInfo.InvariantCulture, $"transfer closed with {remaining} bytes remaining to read");
 
     /// <summary>
     /// Formats the exit 23 message for an output that stopped accepting body bytes.

@@ -51,20 +51,6 @@ public sealed class WriteOutTemplateRenderer(
     private readonly TimeProvider timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
 
     /// <summary>
-    /// Creates a renderer whose <c>%time{format}</c> follows the Windows C runtime
-    /// (<see cref="WriteOutTimeDialect.WindowsCRuntime"/>) on every platform. <c>Curl.Console</c>
-    /// still calls this one; BL-387 makes it pass the platform's dialect instead.
-    /// </summary>
-    /// <param name="fileOpener">Opens the <c>%output{file}</c> targets.</param>
-    /// <param name="writesLineFeedAsCrLf"><see langword="true"/> to write each line feed as CR LF, as the Windows curl does.</param>
-    /// <param name="timeProvider">Supplies the time <c>%time{format}</c> renders.</param>
-    /// <exception cref="ArgumentNullException"><paramref name="fileOpener"/> or <paramref name="timeProvider"/> is <see langword="null"/>.</exception>
-    public WriteOutTemplateRenderer(IWriteOutFileOpener fileOpener, bool writesLineFeedAsCrLf, TimeProvider timeProvider)
-        : this(fileOpener, writesLineFeedAsCrLf, WriteOutTimeDialect.WindowsCRuntime, timeProvider)
-    {
-    }
-
-    /// <summary>
     /// The warning line, without its line terminator, curl writes to standard error for a
     /// <c>%{name}</c> it does not know: <c>curl: unknown --write-out variable: '&lt;name&gt;'</c>.
     /// </summary>

@@ -4,6 +4,7 @@ using Curl.Cli;
 using Curl.Core;
 using Curl.Core.FileSystem;
 using Curl.Networking;
+using Curl.Output;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Dict;
 using Curl.Protocol.File;
@@ -29,14 +30,18 @@ internal static class CurlComposition
     /// and <c>mqtts</c>, and <c>http</c> and <c>https</c> over <paramref name="connector" />,
     /// the last two answering authentication with <see cref="CreateHttpAuthenticator" />'s
     /// authenticator and keeping cookies in <paramref name="cookieStore" />; and <c>tftp</c> over
-    /// <paramref name="datagramConnector" />; and <c>ftp</c>, which
-    /// <see cref="RoutingFtpProtocolHandler" /> hands to the HTTP handler when it is forwarded
-    /// through an HTTP proxy without <c>-p</c> (ADR-0056, rule 3) and otherwise to an
-    /// <see cref="FtpProtocolHandler" /> over <paramref name="connector" /> (ADR-0093). Each
-    /// scheme is claimed by exactly one handler.
+    /// <paramref name="datagramConnector" />, sending its MASQUE request through an HTTP or HTTPS
+    /// proxy over <paramref name="connector" /> with the proxy credential in the platform's
+    /// encoding (ADR-0056, rule 4); and <c>ftp</c> and <c>ftps</c>, which
+    /// <see cref="RoutingFtpProtocolHandler" /> hands to the HTTP handler when an <c>ftp</c>
+    /// transfer is forwarded through an HTTP proxy without <c>-p</c> (ADR-0056, rule 3) and
+    /// otherwise to <see cref="CreateFtpProtocolHandler" />'s handler (ADR-0093, ADR-0102).
+    /// Each scheme is claimed by exactly one handler.
     /// </summary>
-    /// <param name="connector">Connects the TCP protocols, with TLS for <c>gophers</c> and <c>mqtts</c>.</param>
+    /// <param name="connector">Connects the TCP protocols, with TLS for <c>gophers</c>, <c>mqtts</c> and <c>ftps</c>.</param>
     /// <param name="datagramConnector">Opens the UDP channels TFTP uses.</param>
+    /// <param name="tlsProvider">Upgrades an FTP connection after an accepted <c>AUTH</c> or <c>PROT P</c>.</param>
+    /// <param name="dnsResolver">Resolves a host name given to <c>-P</c>.</param>
     /// <param name="cookieStore">
     /// The cookies the HTTP handler sends and stores, or <see langword="null" /> to keep none.
     /// </param>
@@ -44,6 +49,8 @@ internal static class CurlComposition
     internal static IReadOnlyList<IProtocolHandler> CreateProtocolHandlers(
         IConnector connector,
         IDatagramConnector datagramConnector,
+        ITlsProvider tlsProvider,
+        IDnsResolver dnsResolver,
         ICookieStore? cookieStore = null)
     {
         HttpProtocolHandler http = new(connector, CreateHttpAuthenticator(), cookieStore);
@@ -54,12 +61,27 @@ internal static class CurlComposition
             new DictProtocolHandler(connector),
             new GopherProtocolHandler(connector),
             new TelnetProtocolHandler(connector),
-            new TftpProtocolHandler(datagramConnector),
+            new TftpProtocolHandler(datagramConnector, connector, CredentialEncoding.ForPlatform(OperatingSystem.IsWindows())),
             new MqttProtocolHandler(connector),
             http,
-            new RoutingFtpProtocolHandler(http, new FtpProtocolHandler(connector)),
+            new RoutingFtpProtocolHandler(http, CreateFtpProtocolHandler(connector, tlsProvider, dnsResolver)),
         ];
     }
+
+    /// <summary>
+    /// Creates the FTP handler for <c>ftp</c> and <c>ftps</c> (ADR-0102): passive data
+    /// connections through <paramref name="connector" />, active ones (<c>-P</c>) on a
+    /// <see cref="TcpConnectionListener" />, a <c>-P</c> interface name looked up with
+    /// <see cref="SystemNetworkInterfaceLookup" /> (ADR-0110) and a <c>-P</c> host name
+    /// resolved with <paramref name="dnsResolver" /> (ADR-0108), and TLS from
+    /// <paramref name="tlsProvider" />.
+    /// </summary>
+    /// <param name="connector">Supplies the control connection and the passive data connection.</param>
+    /// <param name="tlsProvider">Upgrades a connection after an accepted <c>AUTH</c> or <c>PROT P</c>.</param>
+    /// <param name="dnsResolver">Resolves a host name given to <c>-P</c>.</param>
+    /// <returns>The handler.</returns>
+    internal static FtpProtocolHandler CreateFtpProtocolHandler(IConnector connector, ITlsProvider tlsProvider, IDnsResolver dnsResolver) =>
+        new(connector, new TcpConnectionListener(), tlsProvider, dnsResolver, new SystemNetworkInterfaceLookup());
 
     /// <summary>
     /// Creates the HTTP authenticator: a <see cref="RankedHttpAuthenticator" /> that answers the
@@ -92,7 +114,8 @@ internal static class CurlComposition
     /// TLS options, so <c>-k</c> and <c>--cacert</c> never reach the proxy. The CONNECT request that tunnels through an HTTP proxy carries the
     /// <see cref="HttpProxyTunnelOptions" /> <see cref="CreateProxyTunnelOptions" /> maps from
     /// <paramref name="options" />, and the TCP connector applies the <c>--resolve</c> and
-    /// <c>--connect-to</c> values (<see cref="CreateTcpConnector" />). One
+    /// <c>--connect-to</c> values (<see cref="CreateTcpConnector" />), as the UDP connector does
+    /// (<see cref="CreateUdpDatagramConnector" />). One
     /// <see cref="PoolingConnector" /> over the TCP connector, on the same clock, is the run's
     /// connection pool (ADR-0050).
     /// </summary>
@@ -132,7 +155,7 @@ internal static class CurlComposition
             proxyTlsProvider,
             proxyTunnelOptions,
             tcpConnector,
-            new UdpDatagramConnector(dnsResolver, timeProvider),
+            CreateUdpDatagramConnector(options, dnsResolver, timeProvider),
             new PoolingConnector(tcpConnector, timeProvider));
     }
 
@@ -172,11 +195,33 @@ internal static class CurlComposition
             proxyTlsProvider);
 
     /// <summary>
+    /// Creates the run's <see cref="UdpDatagramConnector" />, which TFTP opens its channel
+    /// through, with the same <c>--resolve</c> entries and <c>--connect-to</c> mappings
+    /// <see cref="CreateTcpConnector" /> applies: curl 8.21.0 applies both to a
+    /// <c>tftp://</c> transfer and fails it with exit 49 for an entry that does not parse
+    /// (measured).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <param name="dnsResolver">Resolves a host no <c>--resolve</c> entry answers for.</param>
+    /// <param name="timeProvider">The clock the connector times on.</param>
+    /// <returns>The connector.</returns>
+    internal static UdpDatagramConnector CreateUdpDatagramConnector(
+        CommandLineOptions options,
+        IDnsResolver dnsResolver,
+        TimeProvider timeProvider) =>
+        new(
+            dnsResolver,
+            timeProvider,
+            ResolveOverrides.Parse(options.ResolveEntries),
+            new ConnectToMappings(options.ConnectToEntries));
+
+    /// <summary>
     /// Maps the command line to what the CONNECT request through an HTTP proxy carries: the
     /// <c>-A</c> value as its <c>User-Agent</c>, no <c>User-Agent</c> header for <c>-A ""</c>,
     /// <c>curl/8.21.0</c> without <c>-A</c>; the proxy credential encoded as the server
     /// credential is (<see cref="CredentialEncoding.ForPlatform" />, ADR-0022); and the
-    /// <c>--proxy-header</c> values verbatim, never the <c>-H</c> ones (ADR-0077).
+    /// <c>--proxy-header</c> values verbatim, never the <c>-H</c> ones (ADR-0077); the
+    /// <c>-A</c> and <c>--proxy-header</c> text encoded in that same platform encoding (ADR-0067).
     /// </summary>
     /// <param name="options">The parsed command line.</param>
     /// <returns>The tunnel's options.</returns>
@@ -191,6 +236,7 @@ internal static class CurlComposition
             CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()))
         {
             ProxyHeaders = options.ProxyHeaders,
+            CommandLineTextEncoding = CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()),
         };
 
     /// <summary>
@@ -225,6 +271,7 @@ internal static class CurlComposition
             writesProgressMeter: true,
             standardOutputIsTerminal,
             writeOutFileOpener: new DiskWriteOutFileOpener(writesLineFeedAsCrLf: OperatingSystem.IsWindows()),
+            writeOutTimeDialect: WriteOutTimeDialectFor(OperatingSystem.IsWindows()),
             outputPaths: new PhysicalOutputPaths(),
             defaultConfigFileSearch: DefaultConfigFileSearch.ForProcess,
             readEnvironmentVariable: name => Environment.GetEnvironmentVariable(name));
@@ -252,14 +299,25 @@ internal static class CurlComposition
         IDatagramConnector datagramConnector,
         ProxySelector? proxySelector = null) =>
         new(
-            options => CreateTransferDispatch(connector, datagramConnector, CookieEngine.FromCommandLine(options), proxySelector),
+            options => CreateTransferDispatch(connector, datagramConnector, new SslStreamTlsProvider(TlsClientOptionsMapping.FromCommandLine(options), TimeProvider.System), CookieEngine.FromCommandLine(options), proxySelector),
             new PhysicalFileSystem(),
             new PhysicalFileSystem(),
             standardOutput,
             standardError,
             standardInput,
             OperatingSystem.IsWindows(),
+            writeOutTimeDialect: WriteOutTimeDialectFor(OperatingSystem.IsWindows()),
             outputPaths: new PhysicalOutputPaths());
+
+    /// <summary>
+    /// The C runtime whose <c>strftime</c> a <c>-w</c> <c>%time{format}</c> follows on the
+    /// platform: the Windows one, as the Windows curl 8.21.0 (mingw, Schannel) prints it, or
+    /// glibc, as the Linux curl 8.21.0 does and the macOS build is matched to (ADR-0078).
+    /// </summary>
+    /// <param name="runsOnWindows">Whether the process runs on Windows.</param>
+    /// <returns><see cref="WriteOutTimeDialect.WindowsCRuntime" /> on Windows, otherwise <see cref="WriteOutTimeDialect.Glibc" />.</returns>
+    internal static WriteOutTimeDialect WriteOutTimeDialectFor(bool runsOnWindows) =>
+        runsOnWindows ? WriteOutTimeDialect.WindowsCRuntime : WriteOutTimeDialect.Glibc;
 
     /// <summary>
     /// Creates the dispatcher over the production handler set, connecting the TCP protocols
@@ -269,7 +327,7 @@ internal static class CurlComposition
     /// <param name="transports">The run's connectors.</param>
     /// <returns>The dispatcher.</returns>
     internal static ProtocolDispatcher CreateDispatcher(CurlTransports transports) =>
-        new(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector));
+        new(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver));
 
     /// <summary>
     /// Creates what one run transfers through: the production handler set, every TCP handler
@@ -280,19 +338,22 @@ internal static class CurlComposition
     /// about the proxy's CA path, once per URL for <c>--capath</c>, <c>--proxy-capath</c> or both
     /// (measured, proxy or not), and the proxy's CA path is <c>--proxy-capath</c> or else
     /// <c>--capath</c>; <paramref name="cookies" /> for the runner to load and save; a
-    /// <see cref="ProxySelector" /> reading the process's proxy environment variables; and the
-    /// pooling connector as the connection pool the runner disposes when the run ends (ADR-0050).
+    /// <see cref="ProxySelector" /> reading the process's proxy environment variables; the
+    /// pooling connector as the connection pool the runner disposes when the run ends (ADR-0050);
+    /// and the TCP connector's <see cref="TcpConnector.LoadResolveEntries" />, which the runner
+    /// calls at the start of every transfer (BL-486).
     /// </summary>
     /// <param name="transports">The run's connectors.</param>
     /// <param name="cookies">The run's cookies, or <see langword="null" /> without <c>-b</c> or <c>-c</c>.</param>
-    /// <returns>The dispatcher, the warning lines, the cookies, the proxy selector and the connection pool.</returns>
+    /// <returns>The dispatcher, the warning lines, the cookies, the proxy selector, the connection pool and the <c>--resolve</c> loader.</returns>
     internal static TransferDispatch CreateTransferDispatch(CurlTransports transports, CookieEngine? cookies = null) =>
         new(
-            new ProtocolDispatcher(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, cookies?.HandlerStore)),
+            new ProtocolDispatcher(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver, cookies?.HandlerStore)),
             transports.ProxyTlsProvider.Warnings,
             cookies,
             new ProxySelector(Environment.GetEnvironmentVariable),
-            transports.PoolingConnector);
+            transports.PoolingConnector,
+            transports.TcpConnector.LoadResolveEntries);
 
     /// <summary>
     /// Creates what one run transfers through over the given connectors instead of the real
@@ -301,16 +362,18 @@ internal static class CurlComposition
     /// </summary>
     /// <param name="connector">Connects the TCP protocols.</param>
     /// <param name="datagramConnector">Opens the UDP channels TFTP uses.</param>
+    /// <param name="tlsProvider">Upgrades an FTP connection after an accepted <c>AUTH</c> or <c>PROT P</c>.</param>
     /// <param name="cookies">The run's cookies, or <see langword="null" /> without <c>-b</c> or <c>-c</c>.</param>
     /// <param name="proxySelector">Chooses each transfer's proxy, or <see langword="null" /> for one that reads no environment variables.</param>
     /// <returns>The dispatcher, no warning lines, the cookies and the proxy selector.</returns>
     private static TransferDispatch CreateTransferDispatch(
         IConnector connector,
         IDatagramConnector datagramConnector,
+        ITlsProvider tlsProvider,
         CookieEngine? cookies,
         ProxySelector? proxySelector) =>
         new(
-            new ProtocolDispatcher(CreateProtocolHandlers(connector, datagramConnector, cookies?.HandlerStore)),
+            new ProtocolDispatcher(CreateProtocolHandlers(connector, datagramConnector, tlsProvider, new SystemDnsResolver(), cookies?.HandlerStore)),
             [],
             cookies,
             proxySelector);

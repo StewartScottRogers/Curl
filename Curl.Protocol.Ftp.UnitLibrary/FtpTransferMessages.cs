@@ -35,6 +35,41 @@ internal static class FtpTransferMessages
     /// <summary>The exit 3 message for a <c>-T</c> upload to a URL ending in <c>/</c> (BL-439).</summary>
     internal const string UploadWithoutFileName = "Uploading to a URL without a filename";
 
+    /// <summary>
+    /// The exit 30 message for an active-mode port the server refused, with <c>EPRT</c> and
+    /// then <c>PORT</c> (BL-437).
+    /// </summary>
+    internal const string FailedToDoPort = "Failed to do PORT";
+
+    /// <summary>
+    /// What sets curl 8.21.0's <c>-v</c> line for a bind on a <c>-P</c> address that is not
+    /// local, <c>bind(port=N) on non-local address failed: reason</c>, apart from its exit 30
+    /// message, <c>bind(port=N) failed: reason</c>: the listener words a bind that failed
+    /// with <c>EADDRNOTAVAIL</c> the first way (ADR-0107).
+    /// </summary>
+    internal const string NonLocalBindFailed = " on non-local address failed: ";
+
+    /// <summary>
+    /// Gives the exit 30 message for a failed listen: a non-local bind's line reworded as
+    /// curl 8.21.0's <c>bind(port=N) failed: reason</c>, any other message as it is (BL-464).
+    /// </summary>
+    /// <param name="listenMessage">The listener's message.</param>
+    /// <returns>The message curl prints.</returns>
+    internal static string BindFailed(string listenMessage) =>
+        listenMessage.Replace(NonLocalBindFailed, " failed: ", StringComparison.Ordinal);
+
+    /// <summary>
+    /// The exit 12 message for an active-mode data connection the server did not open
+    /// within curl's 60-second accept timeout (BL-437).
+    /// </summary>
+    internal const string AcceptTimeout = "Accept timeout occurred while waiting server connect";
+
+    /// <summary>
+    /// The exit 64 message for an <c>AUTH</c> refused under <c>--ssl-reqd</c> or
+    /// <c>--ftp-ssl-control</c>, or a <c>PROT P</c> refused under <c>--ssl-reqd</c> (BL-437).
+    /// </summary>
+    internal const string RequestedSslLevelFailed = "Requested SSL level failed";
+
     /// <summary>The exit 67 message for a <c>332</c> reply to <c>PASS</c>.</summary>
     internal const string AccountRequested = "ACCT requested but none available";
 
@@ -99,12 +134,40 @@ internal static class FtpTransferMessages
     /// <returns>The message to report.</returns>
     internal static string AccessDenied(int code) => Format($"Access denied: {code}");
 
+    /// <summary>
+    /// The exit 6 message, and the first of two <c>-v</c> lines, for a <c>-P</c> name that
+    /// does not resolve (ADR-0108).
+    /// </summary>
+    internal static string CouldNotResolveHost(string name) => "Could not resolve host: " + name;
+
+    /// <summary>
+    /// The second <c>-v</c> line curl 8.21.0 prints for a <c>-P</c> name that does not
+    /// resolve (ADR-0108).
+    /// </summary>
+    internal static string PortAddressNotResolved(string name) => "failed to resolve the address provided to PORT: " + name;
+
     /// <summary>The exit 13 message when neither <c>EPSV</c> nor <c>PASV</c> was accepted.</summary>
     /// <param name="code">The code of the reply to <c>PASV</c>.</param>
     /// <returns>The message to report.</returns>
     internal static string BadPassiveReply(int code) => Format($"Bad PASV/EPSV response: {code}");
 
-    /// <summary>The exit 19 or 78 message for a refused <c>RETR</c> or <c>LIST</c>.</summary>
+    /// <summary>
+    /// The exit 21 message for a <c>-Q</c> command sent before the transfer, with no prefix
+    /// or with <c>+</c>, answered with 400 or more (BL-436).
+    /// </summary>
+    /// <param name="code">The refusing reply's code.</param>
+    /// <returns>The message to report.</returns>
+    internal static string QuoteCommandFailed(int code) => Format($"QUOT command failed with {code}");
+
+    /// <summary>
+    /// The exit 21 message for a <c>-Q -</c> command, sent after the transfer, answered with
+    /// 400 or more (BL-436).
+    /// </summary>
+    /// <param name="command">The command as sent, its prefixes removed.</param>
+    /// <returns>The message to report.</returns>
+    internal static string QuoteNotAccepted(string command) => "QUOT string not accepted: " + command;
+
+    /// <summary>The exit 19 or 78 message for a refused <c>RETR</c>, <c>LIST</c> or <c>NLST</c>.</summary>
     /// <param name="code">The refusing reply's code.</param>
     /// <returns>The message to report.</returns>
     internal static string RetrieveRefused(int code) => Format($"RETR response: {code}");

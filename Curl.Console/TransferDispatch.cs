@@ -1,4 +1,5 @@
 using Curl.Core;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Console;
 
@@ -27,12 +28,18 @@ namespace Curl.Console;
 /// The run's connection pool, which <see cref="DisposeAsync" /> closes once the run ends
 /// (ADR-0050), or <see langword="null" /> when the dispatcher's handlers keep none.
 /// </param>
+/// <param name="loadResolveEntries">
+/// Loads the <c>--resolve</c> entries into the run's DNS cache, reporting each on the events it
+/// is given, as <see cref="LoadResolveEntries" /> does at the start of every transfer; or
+/// <see langword="null" /> when the dispatcher's handlers keep no DNS cache.
+/// </param>
 internal sealed class TransferDispatch(
     ProtocolDispatcher dispatcher,
     IReadOnlyList<string> warningLinesBeforeEachTransfer,
     CookieEngine? cookies = null,
     ProxySelector? proxySelector = null,
-    IAsyncDisposable? connectionPool = null) : IAsyncDisposable
+    IAsyncDisposable? connectionPool = null,
+    Action<ITransferEvents>? loadResolveEntries = null) : IAsyncDisposable
 {
     /// <summary>
     /// Creates the dispatch with no warning lines.
@@ -70,6 +77,16 @@ internal sealed class TransferDispatch(
     /// keep none.
     /// </summary>
     internal IAsyncDisposable? ConnectionPool { get; } = connectionPool;
+
+    /// <summary>
+    /// Loads the <c>--resolve</c> entries into the run's DNS cache at the start of a transfer,
+    /// with their <c>Added ... to DNS cache</c> lines on <paramref name="events" />, as curl
+    /// 8.21.0 loads them for every URL but not for a <c>--retry</c> attempt or a followed
+    /// redirect (measured, BL-482 and BL-486 Notes); does nothing when the dispatch keeps no DNS
+    /// cache.
+    /// </summary>
+    /// <param name="events">The transfer's events.</param>
+    internal void LoadResolveEntries(ITransferEvents events) => loadResolveEntries?.Invoke(events);
 
     /// <summary>
     /// Closes the run's <see cref="ConnectionPool" />, writing nothing, as curl closes its

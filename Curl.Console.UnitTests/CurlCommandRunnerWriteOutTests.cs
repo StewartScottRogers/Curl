@@ -184,6 +184,15 @@ public sealed class CurlCommandRunnerWriteOutTests
         Assert.AreEqual("ok://h/x?a=b", StandardOutputText);
     }
 
+    /// <summary>Measured (BL-444 Notes): <c>HTTP://LocalHost:1/a/../b</c> prints <c>http://LocalHost:1/b</c>.</summary>
+    [TestMethod]
+    public async Task RunAsync_UpperCaseSchemeAndDotSegments_EffectiveUrlIsNormalised()
+    {
+        await RunOkAndFailingAsync(runsOnWindows: false, "-s", "-o", "a", "-w", "%{url_effective}", "OK://H/a/../b");
+
+        Assert.AreEqual("ok://H/b", StandardOutputText);
+    }
+
     [TestMethod]
     public async Task RunAsync_UnknownVariableOnWindows_WarnsWithCrLf()
     {
@@ -249,6 +258,82 @@ public sealed class CurlCommandRunnerWriteOutTests
         Assert.AreEqual("B23\n", StandardErrorText);
     }
 
+    [TestMethod]
+    [DataRow(";auto", "-L", 1, "http://127.0.0.1:18361/a", "|http://127.0.0.1:18361/a")]
+    [DataRow(";auto", "-L", 2, "http://127.0.0.1:18361/b", "|http://127.0.0.1:18361/a|http://127.0.0.1:18361/b")]
+    [DataRow("http://r/;auto", "-L", 1, "http://127.0.0.1:18361/a", "http://r/|http://127.0.0.1:18361/a")]
+    [DataRow("http://r/;auto", "-L", 2, "http://127.0.0.1:18361/b", "http://r/|http://127.0.0.1:18361/a|http://127.0.0.1:18361/b")]
+    [DataRow("http://r/;auto", "-s", 1, "http://r/", "http://r/")]
+    [DataRow(";auto", "-s", 1, "", "")]
+    public async Task RunAsync_AutoReferer_PrintsTheRefererTheLastRequestWasSentWith(
+        string referer, string location, int redirects, string expectedReferer, string expectedSentReferers)
+    {
+        // curl -s -e <referer> [-L] -w "%{referer}", /a -> /b -> /c (measured, BL-361 Notes).
+        string[] responses = [.. RedirectResponses(redirects), "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"];
+
+        (int exitCode, ScriptedConnector server) = await RunHttpWithServerAsync(
+            responses, "-s", "-e", referer, location, "-w", "%{referer}", "http://127.0.0.1:18361/a");
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(expectedReferer, StandardOutputText);
+        Assert.AreEqual(expectedSentReferers, string.Join('|', SentReferers(server)));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_AutoRefererFromAUrlWithUserAndFragment_PrintsItWithoutThemButWithTheQuery()
+    {
+        // curl -s -e ";auto" -L -w "%{referer}" http://u:p@127.0.0.1:18361/a?q=1#f (measured, BL-361 Notes).
+        string[] responses = [.. RedirectResponses(1), "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"];
+
+        (int exitCode, ScriptedConnector server) = await RunHttpWithServerAsync(
+            responses, "-s", "-e", ";auto", "-L", "-w", "%{referer}", "http://u:p@127.0.0.1:18361/a?q=1#f");
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual("http://127.0.0.1:18361/a?q=1", StandardOutputText);
+        Assert.AreEqual("|http://127.0.0.1:18361/a?q=1", string.Join('|', SentReferers(server)));
+    }
+
+    [TestMethod]
+    [DataRow(WriteOutTimeDialect.Glibc, "[2026-09-27]")]
+    [DataRow(WriteOutTimeDialect.WindowsCRuntime, "[]")]
+    public async Task RunAsync_TimeTemplateWithIsoDate_PrintsItInTheDialectTheRunnerWasGiven(WriteOutTimeDialect dialect, string expected)
+    {
+        // glibc's strftime knows %F; the Windows C runtime rejects it, so the whole %time{%F} prints nothing (ADR-0078).
+        CurlCommandRunner runner = new(
+            _ => new TransferDispatch(new ProtocolDispatcher([RecordingProtocolHandler.WritingPath("ok")])),
+            outputFiles,
+            outputFiles,
+            standardOutput,
+            standardError,
+            new MemoryStream(),
+            runsOnWindows: false,
+            timeProvider: new FixedUtcClock(new DateTimeOffset(2026, 9, 27, 12, 0, 0, TimeSpan.Zero)),
+            writeOutTimeDialect: dialect);
+
+        int exitCode = await runner.RunAsync(["-s", "-o", "out.txt", "-w", "[%time{%F}]", "ok://h/x"]);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(expected, StandardOutputText);
+    }
+
+    private static IEnumerable<string> RedirectResponses(int count) =>
+        Enumerable.Range(0, count).Select(index => $"HTTP/1.1 302 Found\r\nLocation: /{(char)('b' + index)}\r\nContent-Length: 0\r\n\r\n");
+
+    /// <summary>Each request's <c>Referer</c> value, empty for a request that sent none.</summary>
+    private static IEnumerable<string> SentReferers(ScriptedConnector server) =>
+        Encoding.Latin1.GetString(server.Written)
+            .Split("\r\n\r\n", StringSplitOptions.RemoveEmptyEntries)
+            .Select(head => head.Split("\r\n").FirstOrDefault(line => line.StartsWith("Referer: ", StringComparison.Ordinal))?["Referer: ".Length..] ?? string.Empty);
+
+    private async Task<(int ExitCode, ScriptedConnector Server)> RunHttpWithServerAsync(string[] responses, params string[] arguments)
+    {
+        ScriptedConnector server = new(responses.Select(Encoding.Latin1.GetBytes));
+        HttpProtocolHandler http = new(server, new BasicAndBearerAuthenticator(CredentialEncoding.ForPlatform(isWindows: false)));
+
+        int exitCode = await RunAsync(new ProtocolDispatcher([http]), runsOnWindows: false, null, arguments);
+        return (exitCode, server);
+    }
+
     private Task<int> RunHttpAsync(string[] responses, bool runsOnWindows, params string[] arguments)
     {
         ScriptedConnector server = new(responses.Select(Encoding.Latin1.GetBytes));
@@ -288,6 +373,14 @@ public sealed class CurlCommandRunnerWriteOutTests
                 writeOutFileOpener: opener,
                 timeProvider: TimeProvider.System)
             .RunAsync(arguments);
+
+    /// <summary>A clock stopped at one instant, in a UTC local time zone.</summary>
+    private sealed class FixedUtcClock(DateTimeOffset now) : TimeProvider
+    {
+        public override TimeZoneInfo LocalTimeZone => TimeZoneInfo.Utc;
+
+        public override DateTimeOffset GetUtcNow() => now;
+    }
 
     /// <summary>Opens every <c>%output{…}</c> file as one memory stream, kept for reading.</summary>
     private sealed class MemoryOpener : IWriteOutFileOpener

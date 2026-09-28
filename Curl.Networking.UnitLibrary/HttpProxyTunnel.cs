@@ -31,13 +31,13 @@ internal static class HttpProxyTunnel
     {
         var authority = FormatAuthority(host, port);
         var version = proxy.Kind == ProxyKind.Http10 ? "HTTP/1.0" : "HTTP/1.1";
-        HttpProxyTunnelHeader[] proxyHeaders = [.. options.ProxyHeaders.Select(HttpProxyTunnelHeader.Parse)];
+        HttpProxyTunnelHeader[] proxyHeaders = [.. options.ProxyHeaders.Select(value => HttpProxyTunnelHeader.Parse(RequestText(value, options)))];
         var request = new StringBuilder()
             .Append(CultureInfo.InvariantCulture, $"CONNECT {authority} {version}\r\n");
 
         AppendUnlessNamed(request, proxyHeaders, "Host", authority);
         AppendUnlessNamed(request, proxyHeaders, "Proxy-Authorization", FormatBasicCredential(proxy, options));
-        AppendUnlessNamed(request, proxyHeaders, "User-Agent", options.UserAgent);
+        AppendUnlessNamed(request, proxyHeaders, "User-Agent", options.UserAgent is { } userAgent ? RequestText(userAgent, options) : null);
         AppendUnlessNamed(request, proxyHeaders, "Proxy-Connection", "Keep-Alive");
         foreach (var sentLine in proxyHeaders.Select(header => header.SentLine).OfType<string>())
         {
@@ -56,6 +56,11 @@ internal static class HttpProxyTunnel
             request.Append(CultureInfo.InvariantCulture, $"{name}: {value}\r\n");
         }
     }
+
+    // Command-line text as its bytes in the options' CommandLineTextEncoding, one character per
+    // byte, so the request's closing Latin-1 step puts those bytes on the wire (ADR-0067).
+    private static string RequestText(string text, HttpProxyTunnelOptions options) =>
+        Encoding.Latin1.GetString(options.CommandLineTextEncoding.GetBytes(text));
 
     // "Basic " and the proxy credential base64-encoded, or null when the proxy has none.
     private static string? FormatBasicCredential(ProxyEndpoint proxy, HttpProxyTunnelOptions options) =>

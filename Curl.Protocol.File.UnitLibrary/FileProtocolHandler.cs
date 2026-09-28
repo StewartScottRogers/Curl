@@ -709,7 +709,11 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
 
     /// <summary>
     /// Writes curl's synthesised header block, when the caller asked for headers at all,
-    /// one line per write as curl does.
+    /// one line per write as curl does. A failed write reports its message to
+    /// <see cref="ITransferContext.Events" /> as an information line too, as libcurl's
+    /// <c>failf</c> does: curl 8.21.0 under <c>-v</c> prints
+    /// <c>* client returned ERROR on write of 20 bytes</c> before <c>curl: (23)</c>
+    /// (measured 2026-09-26, BL-111 Notes).
     /// </summary>
     /// <param name="context">The transfer being performed.</param>
     /// <param name="opened">The metadata that came with the open.</param>
@@ -733,9 +737,10 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
 
             if (await TryWriteAsync(headerOutput, bytes, context.CancellationToken).ConfigureAwait(false) is not null)
             {
-                return TransferResult.Failure(
-                    CurlExitCode.WriteError,
-                    FileTransferMessages.HeaderWriteFailed(bytes.Length));
+                string message = FileTransferMessages.HeaderWriteFailed(bytes.Length);
+                context.Events.ReportInfo(message);
+
+                return TransferResult.Failure(CurlExitCode.WriteError, message);
             }
         }
 

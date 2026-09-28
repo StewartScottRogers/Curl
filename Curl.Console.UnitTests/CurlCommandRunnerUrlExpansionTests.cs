@@ -40,6 +40,26 @@ public sealed class CurlCommandRunnerUrlExpansionTests
     }
 
     [TestMethod]
+    [DataRow("localhost:1")]
+    [DataRow("http://localhost:1")]
+    public async Task RunAsync_UrlWithoutPath_PrintsTheEffectiveUrlWithTheRootPath(string url)
+    {
+        int exitCode = await RunAsync(["-w", "|%{url}|%{url_effective}", url]);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual("/|" + url + "|http://localhost:1/", StandardOutputText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_UrlWithoutPathButWithAQuery_PrintsTheRootPathBeforeTheQuery()
+    {
+        int exitCode = await RunAsync(["-w", "|%{url_effective}", "localhost:1?q"]);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual("/|http://localhost:1/?q", StandardOutputText);
+    }
+
+    [TestMethod]
     public async Task RunAsync_UrlWithoutSchemeWhoseHostStartsWithFtp_IsTransferredAsFtp()
     {
         RecordingProtocolHandler ftp = RecordingProtocolHandler.WritingPath("ftp");
@@ -279,6 +299,91 @@ public sealed class CurlCommandRunnerUrlExpansionTests
         Assert.AreEqual(3, exitCode);
         Assert.AreEqual("curl: malformed target URL" + NewLine + TryHelpLine, StandardErrorText);
         Assert.AreEqual("[ipfs://bafyabc||URL using bad/illegal format or missing URL|3]\n", StandardOutputText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_IpfsWithMalformedGatewayOption_PrintsCurlsLinesEvenSilentAndReturns43()
+    {
+        int exitCode = await RunAsync(
+            ["-s", "-w", "[%{errormsg}] [%{exitcode}]\\n", "--ipfs-gateway", ":::", "ipfs://cid/x"]);
+
+        Assert.AreEqual(43, exitCode);
+        Assert.AreEqual("curl: --ipfs-gateway was given a malformed URL" + NewLine + TryHelpLine, StandardErrorText);
+        Assert.AreEqual("[A libcurl function was given a bad argument] [43]\n", StandardOutputText);
+    }
+
+    [TestMethod]
+    [DataRow("-O", "ipfs://bafyabc/n.txt")]
+    [DataRow("-O", "ipfs://bafyabc")]
+    [DataRow("-O", "ipns://k51/n.txt")]
+    [DataRow("--remote-name-all", "ipfs://bafyabc/n.txt")]
+    public async Task RunAsync_RemoteNameOnIpfsUrl_PrintsCurlsLinesAndReturns1BeforeAnyGatewayIsLookedUp(
+        string remoteNameOption,
+        string url)
+    {
+        environment[IpfsGatewayRewriter.HomeVariableName] = "/home/u";
+
+        int exitCode = await RunAsync(
+            [remoteNameOption, url, "-w", "[%{filename_effective}|%{exitcode}|%{errormsg}|%{url}|%{url_effective}|%{xfer_id}|%{conn_id}|%{http_code}]\\n"]);
+
+        Assert.AreEqual(1, exitCode);
+        Assert.AreEqual(
+            "curl: Failed to extract a filename from the URL to use for storage" + NewLine
+            + "curl: (1) Unsupported protocol" + NewLine,
+            StandardErrorText);
+        Assert.AreEqual("[|1|Unsupported protocol|" + url + "||-1|-1|000]\n", StandardOutputText);
+        Assert.IsEmpty(dataFiles.PathsRead);
+        Assert.IsEmpty(http.Contexts);
+        Assert.IsEmpty(fileSystem.Written);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RemoteNameOnIpfsUrlWithAGateway_IsRefusedTheSameWay()
+    {
+        int exitCode = await RunAsync(
+            ["--ipfs-gateway", "http://127.0.0.1:9/", "-O", "ipfs://bafyabc/n.txt", "-w", "[%{url}|%{url_effective}|%{exitcode}]\\n"]);
+
+        Assert.AreEqual(1, exitCode);
+        Assert.AreEqual(
+            "curl: Failed to extract a filename from the URL to use for storage" + NewLine
+            + "curl: (1) Unsupported protocol" + NewLine,
+            StandardErrorText);
+        Assert.AreEqual("[ipfs://bafyabc/n.txt||1]\n", StandardOutputText);
+        Assert.IsEmpty(http.Contexts);
+    }
+
+    [TestMethod]
+    [DataRow("-s", "")]
+    [DataRow("-sS", "curl: Failed to extract a filename from the URL to use for storage\ncurl: (1) Unsupported protocol\n")]
+    public async Task RunAsync_RemoteNameOnIpfsUrlUnderSilent_PrintsTheLinesOnlyWithShowError(
+        string silentOption,
+        string expectedStandardError)
+    {
+        int exitCode = await RunAsync([silentOption, "-O", "ipfs://bafyabc/n.txt", "-w", "[%{exitcode}]"]);
+
+        Assert.AreEqual(1, exitCode);
+        Assert.AreEqual(expectedStandardError.Replace("\n", NewLine, StringComparison.Ordinal), StandardErrorText);
+        Assert.AreEqual("[1]", StandardOutputText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RemoteNameOnIpfsUrlBetweenTwoUrls_StopsTheRunAfterTheOneBeforeIt()
+    {
+        int exitCode = await RunAsync(
+            ["-s", "-o", "y", "http://h/a", "-O", "ipfs://bafyabc/n.txt", "-o", "z", "http://h/b", "-w", "[%{filename_effective}|%{exitcode}|%{urlnum}|%{xfer_id}]\\n"]);
+
+        Assert.AreEqual(1, exitCode);
+        Assert.AreEqual("http://h/a", Assert.ContainsSingle(http.Contexts).Url.OriginalString);
+        Assert.AreEqual("[y|0|0|0]\n[|1|1|-1]\n", StandardOutputText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_OutputFileOnIpfsUrl_IsNotRefusedAsARemoteName()
+    {
+        int exitCode = await RunAsync(["--ipfs-gateway", "http://gw:1", "-o", "x.out", "ipfs://bafyabc/n.txt"]);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual("http://gw:1/ipfs/bafyabc/n.txt", Assert.ContainsSingle(http.Contexts).Url.OriginalString);
     }
 
     private string WrittenText(string path) => Encoding.ASCII.GetString(fileSystem.Written[path].ToArray());

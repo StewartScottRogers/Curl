@@ -46,8 +46,32 @@ public interface ITransferEvents
     /// </param>
     /// <remarks>
     /// Reserved: <c>SslStream</c> does not expose TLS records, so nothing reports them yet.
+    /// <see cref="ReportTlsMessage" /> reports them with what kind of message they are.
     /// </remarks>
     void ReportTlsData(ReadOnlySpan<byte> bytes, bool sent);
+
+    /// <summary>
+    /// Reports one TLS protocol message with what kind it is, as OpenSSL's message callback
+    /// does (ADR-0085).
+    /// </summary>
+    /// <param name="message">The message.</param>
+    /// <remarks>
+    /// By default only its bytes are reported, through <see cref="ReportTlsData" />; a sink
+    /// that words the message itself overrides this.
+    /// </remarks>
+    void ReportTlsMessage(TlsMessageEvent message)
+    {
+        ReportTlsData(message.Bytes.Span, message.Sent);
+    }
+
+    /// <summary>
+    /// Reports the trust a TLS connection is set up with, before its handshake (ADR-0085).
+    /// </summary>
+    /// <param name="trust">The trust.</param>
+    /// <remarks>Does nothing by default.</remarks>
+    void ReportTlsTrust(TlsTrustEvent trust)
+    {
+    }
 
     /// <summary>
     /// Reports request head bytes exactly as written (<c>CURLINFO_HEADER_OUT</c>), CRLFs

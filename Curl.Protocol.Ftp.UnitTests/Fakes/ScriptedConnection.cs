@@ -43,6 +43,12 @@ public sealed class ScriptedConnection(params byte[][] reads) : IConnection
     /// <inheritdoc />
     public EndPoint? RemoteEndPoint => null;
 
+    /// <summary>
+    /// Gets the local endpoint the connection reports, which <c>-P -</c> listens on;
+    /// <see langword="null" />, the default, for none.
+    /// </summary>
+    public EndPoint? LocalEndPoint { get; init; }
+
     /// <summary>Gets a value indicating whether the connection has been disposed.</summary>
     public bool IsDisposed { get; private set; }
 

@@ -100,6 +100,12 @@ namespace Curl.Protocol.Http;
 /// sent from its start; a stream that cannot seek goes on from the first byte not sent. Under
 /// <c>-f</c>, or when the 417 closes the connection, sending stops just the same and the 417
 /// is the result. Measured on curl 8.21.0 (BL-319 Notes).
+/// That resend keeps an <c>-H</c> <c>Expect: 100-continue</c> line's wait, so it can draw
+/// another 417 and another resend. Every resend counts as a followed redirect in
+/// <see cref="TransferReport.RedirectCount" />, with or without <c>-L</c>, and one that would
+/// pass <see cref="HttpRequestOptions.MaxRedirects" /> is not sent: the 417's head is written
+/// and the transfer ends with exit 47, <c>Maximum (N) redirects followed</c>. Measured on curl
+/// 8.21.0 (BL-396 Notes).
 /// </para>
 /// <para>
 /// With a cookie store, every request, an authentication retry included, asks it afresh for
@@ -146,7 +152,7 @@ namespace Curl.Protocol.Http;
 /// <see cref="ITransferContext.ResumeUploadFromUnknownOffset" /> sends the whole upload with
 /// <c>Content-Range: bytes 0-(L-1)/L</c> (BL-351 Notes); for a
 /// request without a body it sends <c>Range: bytes=N-</c>, and else
-/// <see cref="ITransferContext.Range" /> sends its range, for a request without a body
+/// <see cref="ITransferContext.RangeText" /> sends the <c>-r</c> text as typed, for a request without a body
 /// (<see cref="HttpRangeHeader" />); <see cref="ITransferContext.TimeCondition" /> sends
 /// <c>If-Modified-Since</c> or <c>If-Unmodified-Since</c>. Once the final head is written,
 /// <see cref="HttpDownloadConditions" /> ends the transfer with exit 63 for a Content-Length over
@@ -208,7 +214,7 @@ public sealed class HttpProtocolHandler(
 
         long started = context.TimeProvider.GetTimestamp();
         HttpRequestOptions options = context.Http ?? new HttpRequestOptions();
-        HttpRequestFraming framing = HttpRequestFraming.Of(options, [.. options.Headers.Select(HttpCustomHeader.Parse)], context.NoBody, context.Upload, context.ResumeFrom, context.Range, context.ResumeUploadFromUnknownOffset);
+        HttpRequestFraming framing = HttpRequestFraming.Of(options, HttpRequestHeadFormatter.CustomHeadersOf(options.Headers, options), context.NoBody, context.Upload, context.ResumeFrom, context.RangeText, context.ResumeUploadFromUnknownOffset);
         HttpAuthRequest authRequest = new(
             framing.Method,
             context.Url,
@@ -226,6 +232,7 @@ public sealed class HttpProtocolHandler(
             Progress = new HttpTransferProgress(context.Progress),
             ForwardProxy = forwardProxy,
             ProxyAuthorization = forwardProxy is null ? null : ProxyAuthorizationFor(authRequest, forwardProxy),
+            RedirectsFollowed = options.RedirectsFollowed,
         };
         return await ConnectAndExchangeAsync(plan, earlier: null).ConfigureAwait(false);
     }
@@ -283,7 +290,10 @@ public sealed class HttpProtocolHandler(
     /// </summary>
     /// <remarks>
     /// The connection is marked reusable when the last response on it persists, and the
-    /// end-of-transfer <c>-v</c> line is reported once it is disposed (ADR-0050).
+    /// end-of-transfer <c>-v</c> line is reported once it is disposed (ADR-0050), after the
+    /// final exchange reports the transfer done (ADR-0111). A connect
+    /// that fails reports <c>closing connection #N</c> after the connector's own lines, as
+    /// curl 8.21.0 does for a failed resolve, a refused dial and a connect timeout (ADR-0105).
     /// </remarks>
     /// <param name="plan">The request to send.</param>
     /// <param name="earlier">
@@ -296,6 +306,7 @@ public sealed class HttpProtocolHandler(
         ConnectResult connect = await plan.Deadline.ConnectAsync(connector, target).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
         {
+            plan.Context.Events.ReportInfo(HttpConnectionInfoLines.Closing(connect.ConnectionNumber));
             return TransferResult.Failure(connect.ExitCode, connect.ErrorMessage!) with
             {
                 Report = FailedConnectReport(plan, connect),
@@ -309,6 +320,11 @@ public sealed class HttpProtocolHandler(
         await using (connection.ConfigureAwait(false))
         {
             outcome = await ExchangeOnConnectionAsync(plan, connect, connection, earlier).ConfigureAwait(false);
+        }
+
+        if (outcome.Retry is null)
+        {
+            plan.Progress.ReportTransferDone();
         }
 
         ReportConnectionEnd(plan.Context, target, connect, outcome);
@@ -338,7 +354,9 @@ public sealed class HttpProtocolHandler(
     /// <summary>
     /// Sends <paramref name="plan" /> on <paramref name="connection" />, then each retry that
     /// may go on the same connection; then marks the connection reusable when the last
-    /// response persists, or reports that a pooled connection that died is being given up.
+    /// response is reported left intact - it persists, or it is an HTTP/1.0 keep-alive body the
+    /// server closed, which the pool then finds dead as curl does (ADR-0112) - or reports that a
+    /// pooled connection that died is being given up.
     /// </summary>
     private async ValueTask<HttpAttemptOutcome> ExchangeOnConnectionAsync(
         HttpRequestPlan plan,
@@ -358,7 +376,7 @@ public sealed class HttpProtocolHandler(
             outcome = await ExchangeAsync(retry, connect, connection, outcome.Result.Report, newConnection: false).ConfigureAwait(false);
         }
 
-        if (outcome.KeepsAlive)
+        if (outcome.ReportsLeftIntact)
         {
             connection.MarkReusable();
         }
@@ -409,7 +427,7 @@ public sealed class HttpProtocolHandler(
     private static string ConnectionEndLine(ConnectTarget target, long number, HttpAttemptOutcome outcome) =>
         outcome switch
         {
-            { KeepsAlive: true } => HttpConnectionInfoLines.LeftIntact(number, target.Host, target.Port),
+            { ReportsLeftIntact: true } => HttpConnectionInfoLines.LeftIntact(number, target.Host, target.Port),
             { DiedBeforeResponse: false, Result.ExitCode: not CurlExitCode.Ok } => HttpConnectionInfoLines.Closing(number),
             _ => HttpConnectionInfoLines.ShuttingDown(number),
         };
@@ -450,6 +468,7 @@ public sealed class HttpProtocolHandler(
             HeldHead = request,
             IsUpload = framing.IsUpload,
             Progress = plan.Progress,
+            Events = context.Events,
             EarlyResponseWatch = responseConnection as HttpContinueWaitConnection,
         };
         HttpExchange exchange = new(connect, connection, framing.Method, request.Length, upload, earlier, newConnection)
@@ -458,6 +477,7 @@ public sealed class HttpProtocolHandler(
             Started = plan.Started,
             TimeProvider = context.TimeProvider,
             ResponseConnection = timedConnection,
+            RedirectCount = plan.RedirectsFollowed - options.RedirectsFollowed,
         };
         HttpResponseBodyReader body = new(responseConnection)
         {
@@ -465,30 +485,48 @@ public sealed class HttpProtocolHandler(
             IgnoresContentLength = options.IgnoreContentLength,
             DecodesTransferCoding = options.TransferEncoding,
         };
-        HttpResponseHeadReader headReader = new(responseConnection);
+        int cookiesStored = 0;
+        HttpResponseHeadReader headReader = new(responseConnection)
+        {
+            Events = context.Events,
+            HeaderReceived = header => cookiesStored = StoreCookie(context, header, cookiesStored),
+            FindRefusal = head => body.FindHeadRefusal(head, context.NoBody, DecodesContent(options)),
+        };
         HttpRequestPlan? retry = null;
+        HttpResponseHead? actedOn = null;
         HttpBodyDelivery delivery = HttpBodyDelivery.Deliver;
+        ReportProtocolChosen(context.Events, newConnection);
         try
         {
             ThrowIfRefused(framing);
             exchange.RequestReady = context.TimeProvider.GetTimestamp();
-            bool bodyLeftUnsent = await SendBodyAsync(context.TimeProvider, framing, responseConnection, upload, cancellationToken).ConfigureAwait(false);
+            bool bodyLeftUnsent = await SendBodyAsync(context, framing, responseConnection, upload, cancellationToken).ConfigureAwait(false);
+            ReportRequestSent(context.Events, framing, upload, bodyLeftUnsent);
             exchange.RequestSent = context.TimeProvider.GetTimestamp();
             exchange.Head = await headReader.ReadAsync(cancellationToken).ConfigureAwait(false);
-            exchange.RedirectUrl = HttpRedirectLocation.Find(context.Url, exchange.Head);
-            StoreCookies(context, exchange.Head);
+            HttpHeadRefusal? refusal = headReader.Refusal;
+            exchange.Head = HeadCurlRead(exchange.Head, refusal);
+            actedOn = headReader.HeadActedOn(exchange.Head);
+            exchange.RedirectUrl = HttpRedirectLocation.Find(context.Url, actedOn);
             await WriteHeadersAsync(context.HeaderOutput, exchange.Head.HeadBytes, cancellationToken).ConfigureAwait(false);
-            body.ThrowIfTooManyContentCodings(exchange.Head, DecodesContent(options));
-            retry = RetryOf(plan, exchange.Head, bodyLeftUnsent, upload);
+            ThrowIfHeaderRefused(refusal);
+            ThrowIfClosedBeforeContentLength(plan, actedOn, headReader);
+            headReader.ReportHeaderHeldAtClose();
+            ReportNoEndOfMessageIndicator(plan, actedOn, headReader);
+            retry = RetryOf(plan, actedOn, bodyLeftUnsent, upload);
             HttpFailMode fail = retry is null ? options.Fail : HttpFailMode.None;
-            ThrowIfFailing(fail, HttpFailMode.Fail, exchange.Head);
+            ThrowIfFailing(fail, HttpFailMode.Fail, actedOn);
             bool discardsBody = retry is not null || (options.FollowRedirects && exchange.RedirectUrl is not null);
-            delivery = DeliveryOf(plan, exchange.Head, discardsBody);
-            await ReadBodyAsync(plan, exchange.Head, body, delivery, discardsBody, cancellationToken).ConfigureAwait(false);
-            ThrowIfFailing(fail, HttpFailMode.FailWithBody, exchange.Head);
+            ReportIgnoredBody(plan, actedOn, discardsBody);
+            headReader.ReportHeldLines();
+            delivery = DeliveryOf(plan, actedOn, discardsBody);
+            await ReadBodyAsync(plan, actedOn, body, delivery, discardsBody, cancellationToken).ConfigureAwait(false);
+            ThrowIfFailing(fail, HttpFailMode.FailWithBody, actedOn);
         }
         catch (HttpTransferException failure)
         {
+            headReader.ReportHeldLines();
+            ReportReceiveFailure(context.Events, failure);
             TransferResult failed = TransferResult.Failure(failure.ExitCode, failure.Message, body.BytesWritten)
                 with
             { Report = exchange.Report(body.BytesWritten) };
@@ -496,6 +534,7 @@ public sealed class HttpProtocolHandler(
         }
         catch (OperationCanceledException) when (plan.Deadline.EndedByLimit)
         {
+            headReader.ReportHeldLines();
             string message = HttpTransferMessages.OperationTimedOut(plan.Deadline.OperationElapsedMilliseconds, body.BytesWritten, body.ExpectedLength);
             TransferResult timedOut = TransferResult.Failure(CurlExitCode.OperationTimedOut, message, body.BytesWritten)
                 with
@@ -503,8 +542,112 @@ public sealed class HttpProtocolHandler(
             return new HttpAttemptOutcome(timedOut, null, KeepsAlive: false);
         }
 
-        TransferResult result = Succeeded(delivery, exchange.Head!, exchange.Report(body.BytesWritten));
-        return new HttpAttemptOutcome(result, retry, KeepsAlive(plan, exchange.Head, upload, headReader, delivery));
+        TransferResult result = Succeeded(delivery, actedOn!, exchange.Report(body.BytesWritten));
+        return new HttpAttemptOutcome(result, retry, KeepsAlive(plan, actedOn, upload, headReader, delivery))
+        {
+            LeftIntactAfterServerClosed = LeftIntactAfterServerClosed(plan, actedOn, upload, headReader, delivery),
+        };
+    }
+
+    /// <summary>
+    /// Reports <c>using HTTP/1.x</c> before the first request on a connection this transfer
+    /// opened; curl 8.21.0 prints nothing of the kind for a connection it reuses (measured,
+    /// BL-407 Notes).
+    /// </summary>
+    private static void ReportProtocolChosen(ITransferEvents events, bool newConnection)
+    {
+        if (newConnection)
+        {
+            events.ReportInfo(HttpConnectionInfoLines.UsingHttp1);
+        }
+    }
+
+    /// <summary>
+    /// Reports that the request went out, as curl 8.21.0 does (measured, BL-407 Notes):
+    /// <c>Request completely sent off</c> for a request without a body, and
+    /// <c>upload completely sent off: N bytes</c> once a whole body has been sent; nothing for
+    /// a body a final status stopped.
+    /// </summary>
+    private static void ReportRequestSent(ITransferEvents events, HttpRequestFraming framing, HttpRequestBodyWriter upload, bool bodyLeftUnsent)
+    {
+        if (framing.Body is null)
+        {
+            events.ReportInfo(HttpConnectionInfoLines.RequestSent);
+        }
+        else if (!bodyLeftUnsent && !upload.CutShort)
+        {
+            events.ReportInfo(HttpConnectionInfoLines.UploadSent(upload.BytesSent));
+        }
+    }
+
+    /// <summary>
+    /// Reports <c>no chunk, no close, no size. Assume close to signal end</c> for a head whose
+    /// body can only end when the server closes, as curl 8.21.0 does once the head is accepted:
+    /// before the <c>-f</c> failure and the head's empty line; nothing for a head the peer
+    /// closed before its empty line (measured, BL-467 Notes).
+    /// </summary>
+    private static void ReportNoEndOfMessageIndicator(HttpRequestPlan plan, HttpResponseHead head, HttpResponseHeadReader headReader)
+    {
+        if (headReader.EndedAtEmptyLine
+            && HttpConnectionPersistence.LacksEndOfMessageIndicator(head, plan.Context.NoBody, plan.Options.IgnoreContentLength))
+        {
+            plan.Context.Events.ReportInfo(HttpConnectionInfoLines.NoEndOfMessageIndicator);
+        }
+    }
+
+    /// <summary>
+    /// Reports that a body is read only to be discarded, as curl 8.21.0 does before the
+    /// head's empty line (measured, BL-449 Notes): <c>Ignoring the response-body</c> when the
+    /// body is discarded - a redirect <c>-L</c> follows, or a response answered with a retry -
+    /// on a connection that stays open, and then <c>setting size while ignoring</c> when its
+    /// length is known from a Content-Length. Nothing when the connection closes after it:
+    /// curl reads no such body at all.
+    /// </summary>
+    private static void ReportIgnoredBody(HttpRequestPlan plan, HttpResponseHead head, bool discardsBody)
+    {
+        HttpRequestOptions options = plan.Options;
+        if (!discardsBody
+            || !HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, options.Raw, options.IgnoreContentLength, options.TransferEncoding))
+        {
+            return;
+        }
+
+        ITransferEvents events = plan.Context.Events;
+        events.ReportInfo(HttpConnectionInfoLines.IgnoringBody);
+        if (IgnoredBodyLength(plan, head) is not null)
+        {
+            events.ReportInfo(HttpConnectionInfoLines.SettingSizeWhileIgnoring);
+        }
+    }
+
+    /// <summary>
+    /// Gives the Content-Length of a body read only to be discarded, or <see langword="null" />
+    /// when it has none it stops at: framed as <see cref="HttpResponseBodyFraming" /> says when
+    /// the response has a body, and for a response to HEAD, which has none, its Content-Length
+    /// unless it is chunked or <c>--ignore-content-length</c> is given (measured, BL-449 Notes).
+    /// </summary>
+    private static long? IgnoredBodyLength(HttpRequestPlan plan, HttpResponseHead head)
+    {
+        HttpRequestOptions options = plan.Options;
+        if (HttpResponseBodyReader.HasBody(head, plan.Context.NoBody))
+        {
+            return HttpResponseBodyFraming.Of(head.Headers, options.Raw, options.IgnoreContentLength, options.TransferEncoding).ContentLength;
+        }
+
+        return options.IgnoreContentLength || HttpTransferEncoding.ListsChunked(head.Headers) ? null : HttpContentLength.Find(head.Headers);
+    }
+
+    /// <summary>
+    /// Reports a read the peer reset as the <c>-v</c> line curl 8.21.0 prints for it,
+    /// <c>Recv failure: Connection was reset</c>, before the connection's end is reported
+    /// (measured, BL-449 Notes). Any other failure is left to the transfer's result.
+    /// </summary>
+    private static void ReportReceiveFailure(ITransferEvents events, HttpTransferException failure)
+    {
+        if (failure.Message == HttpTransferMessages.ConnectionReset)
+        {
+            events.ReportInfo(failure.Message);
+        }
     }
 
     /// <summary>
@@ -520,13 +663,33 @@ public sealed class HttpProtocolHandler(
     /// Decides whether the connection can carry another request: not after a body a status of
     /// 300 or above cut short, which curl 8.21.0 shuts the connection on (measured, BL-319 and
     /// BL-395 Notes), nor after a 101, nor when the body was left unread; and else as
-    /// <see cref="HttpConnectionPersistence" /> says (ADR-0050).
+    /// <see cref="HttpConnectionPersistence" /> says (ADR-0050), for a head the peer closed among
+    /// its headers as for one with no body, since curl 8.21.0 decides that a body runs until the
+    /// server closes only at the head's empty line and leaves such a connection intact
+    /// (measured, BL-483 Notes).
     /// </summary>
     private static bool KeepsAlive(HttpRequestPlan plan, HttpResponseHead head, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpBodyDelivery delivery) =>
+        DeliveredWhole(upload, headReader, delivery)
+            && HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody || !headReader.EndedAtEmptyLine, plan.Options.Raw, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding);
+
+    /// <summary>
+    /// Decides whether the connection is reported left intact although the server closed it
+    /// to end the body, as curl 8.21.0 does for an HTTP/1.0 keep-alive response with no length
+    /// (measured, BL-471 Notes; ADR-0109). It is marked reusable, as curl pools it, and the pool
+    /// reports it dead before any reuse (ADR-0112).
+    /// </summary>
+    private static bool LeftIntactAfterServerClosed(HttpRequestPlan plan, HttpResponseHead head, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpBodyDelivery delivery) =>
+        DeliveredWhole(upload, headReader, delivery)
+            && HttpConnectionPersistence.KeepsHttp10AliveUntilServerCloses(head, plan.Context.NoBody, plan.Options.Raw, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding);
+
+    /// <summary>
+    /// Decides whether the exchange ran whole: its request body was not cut short, its
+    /// response body was delivered, and the response did not switch protocols.
+    /// </summary>
+    private static bool DeliveredWhole(HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpBodyDelivery delivery) =>
         !upload.CutShort
             && delivery == HttpBodyDelivery.Deliver
-            && !headReader.SwitchedProtocols
-            && HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, plan.Options.Raw, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding);
+            && !headReader.SwitchedProtocols;
 
     /// <summary>
     /// Decides whether a failed exchange was on a pooled connection that died while idle, so
@@ -574,6 +737,50 @@ public sealed class HttpProtocolHandler(
     }
 
     /// <summary>
+    /// Gives the part of <paramref name="head" /> curl 8.21.0 reads, writes and reports: all of
+    /// it, or the part before the header it refused (<see cref="HttpResponseHead.Before" />).
+    /// </summary>
+    private static HttpResponseHead HeadCurlRead(HttpResponseHead head, HttpHeadRefusal? refusal) =>
+        refusal is null ? head : head.Before(refusal.HeaderIndex);
+
+    /// <summary>
+    /// Fails the transfer with the failure of the header curl refused while reading the head
+    /// (<see cref="HttpResponseBodyReader.FindHeadRefusal" />), once the head before it is
+    /// written.
+    /// </summary>
+    /// <exception cref="HttpTransferException"><paramref name="refusal" /> is not <see langword="null" />.</exception>
+    private static void ThrowIfHeaderRefused(HttpHeadRefusal? refusal)
+    {
+        if (refusal is not null)
+        {
+            throw refusal.Failure;
+        }
+    }
+
+    /// <summary>
+    /// Fails a head the peer closed among its headers when the part curl 8.21.0 acted on frames
+    /// a body by a Content-Length above zero: exit 18, <c>transfer closed with N bytes remaining
+    /// to read</c>, its <c>-v</c> line reported before the head's last header line and ahead of
+    /// any <c>-f</c> failure (measured, BL-485 Notes). A body a response has none of -
+    /// <c>-I</c>, 204, 304 - and <c>--ignore-content-length</c> fail nothing.
+    /// </summary>
+    private static void ThrowIfClosedBeforeContentLength(HttpRequestPlan plan, HttpResponseHead head, HttpResponseHeadReader headReader)
+    {
+        if (headReader.EndedAtEmptyLine || !HttpResponseBodyReader.HasBody(head, plan.Context.NoBody))
+        {
+            return;
+        }
+
+        HttpRequestOptions options = plan.Options;
+        if (HttpResponseBodyFraming.Of(head.Headers, options.Raw, options.IgnoreContentLength, options.TransferEncoding).ContentLength is > 0 and { } remaining)
+        {
+            string message = HttpTransferMessages.TransferClosedWithBytesRemaining(remaining);
+            plan.Context.Events.ReportInfo(message);
+            throw new HttpTransferException(CurlExitCode.PartialFile, message);
+        }
+    }
+
+    /// <summary>
     /// Applies <c>--max-filesize</c> to the head's Content-Length, then decides what becomes of
     /// a body that is not being discarded (<see cref="HttpDownloadConditions" />).
     /// </summary>
@@ -587,9 +794,9 @@ public sealed class HttpProtocolHandler(
     }
 
     /// <summary>
-    /// Reads the body into the transfer's output, or into nothing when it is discarded, held to
-    /// the <c>--max-filesize</c> limit unless discarded, then writes a chunked body's trailers;
-    /// or reads nothing when <paramref name="delivery" /> says there is no body to deliver.
+    /// Reads the body into the transfer's output, or into nothing when it is discarded, as
+    /// <see cref="SetBodyLimitAndSinks" /> sets it up, then writes a chunked body's trailers; or reads
+    /// nothing when <paramref name="delivery" /> says there is no body to deliver.
     /// </summary>
     private static async ValueTask ReadBodyAsync(
         HttpRequestPlan plan,
@@ -606,11 +813,22 @@ public sealed class HttpProtocolHandler(
 
         ITransferContext context = plan.Context;
         Stream bodyOutput = discardsBody ? Stream.Null : context.Output;
-        body.MaximumBodySize = discardsBody ? null : HttpDownloadConditions.LimitOf(context.MaxFileSize);
-        body.Progress = discardsBody ? HttpTransferProgress.Silent : plan.Progress;
+        SetBodyLimitAndSinks(plan, body, discardsBody);
         await body.CopyAsync(head, context.NoBody, bodyOutput, DecodesContent(plan.Options, discardsBody), plan.Options.TransferEncoding && !discardsBody, cancellationToken)
             .ConfigureAwait(false);
         await WriteHeadersAsync(context.HeaderOutput, body.TrailerBytes, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sets where a body's bytes are held and reported: to the <c>--max-filesize</c> limit, the
+    /// progress meter and the transfer's events, or, for a discarded body, to none of them -
+    /// curl 8.21.0 reports no data for a body it ignores (measured, BL-407 Notes).
+    /// </summary>
+    private static void SetBodyLimitAndSinks(HttpRequestPlan plan, HttpResponseBodyReader body, bool discardsBody)
+    {
+        body.MaximumBodySize = discardsBody ? null : HttpDownloadConditions.LimitOf(plan.Context.MaxFileSize);
+        body.Progress = discardsBody ? HttpTransferProgress.Silent : plan.Progress;
+        body.Events = discardsBody ? NoTransferEvents.Instance : plan.Context.Events;
     }
 
     /// <summary>
@@ -634,26 +852,31 @@ public sealed class HttpProtocolHandler(
         CookieStore?.GetCookieHeader(context.Url, TargetOf(context.Url).UseTls, context.TimeProvider.GetUtcNow());
 
     /// <summary>
-    /// Hands the <c>Set-Cookie</c> values of <paramref name="head" />, in received order, to
-    /// the cookie store, with the transfer's events for its <c>-v</c> lines, when cookies are
-    /// on and the head has any.
+    /// Hands <paramref name="header" />, when it is a <c>Set-Cookie</c> header and cookies are
+    /// on, to the cookie store with the transfer's events for its <c>-v</c> lines, as it arrives
+    /// in any head of the response, 1xx heads' included (measured, BL-468 Notes).
     /// </summary>
-    private void StoreCookies(ITransferContext context, HttpResponseHead head)
-    {
-        string[] setCookies = ValuesOf(head, "Set-Cookie");
-        if (CookieStore is { } store && setCookies.Length > 0)
-        {
-            store.StoreFromResponse(context.Url, setCookies, context.TimeProvider.GetUtcNow(), context.Events);
-        }
-    }
+    /// <param name="context">The transfer.</param>
+    /// <param name="header">A whole header of the response.</param>
+    /// <param name="storedFromResponse">How many cookies the store has stored from this request's responses.</param>
+    /// <returns>The count the store gives back, or <paramref name="storedFromResponse" /> when the store is not asked.</returns>
+    private int StoreCookie(ITransferContext context, HttpResponseHeader header, int storedFromResponse) =>
+        CookieStore is { } store && string.Equals(header.Name, "Set-Cookie", StringComparison.OrdinalIgnoreCase)
+            ? store.StoreFromResponse(context.Url, header.Value, storedFromResponse, context.TimeProvider.GetUtcNow(), context.Events)
+            : storedFromResponse;
 
     /// <summary>
     /// Decides whether a response is answered with one more request, and which: the same
     /// request with the <c>Authorization</c> value <see cref="RetryAuthorization" /> gives, or
     /// else, for a 417 <see cref="RetriesWithoutExpect" /> accepts, the same request without
     /// <c>Expect</c> and with the body <paramref name="upload" /> rewinds; <see langword="null" />
-    /// when the response is the result.
+    /// when the response is the result. A resend after a 417 that arrived while the body was
+    /// being sent keeps an <c>-H</c> <c>Expect: 100-continue</c> wait, so it can draw another
+    /// (measured, BL-396 Notes).
     /// </summary>
+    /// <exception cref="HttpTransferException">
+    /// The resend would pass <see cref="HttpRequestOptions.MaxRedirects" /> (exit 47).
+    /// </exception>
     private HttpRequestPlan? RetryOf(HttpRequestPlan plan, HttpResponseHead head, bool bodyLeftUnsent, HttpRequestBodyWriter upload)
     {
         if (RetryAuthorization(plan, head) is { } authorization)
@@ -661,7 +884,30 @@ public sealed class HttpProtocolHandler(
             return plan.WithAuthorization(authorization);
         }
 
-        return RetriesWithoutExpect(plan, head, bodyLeftUnsent || upload.CutShort) ? plan.WithoutExpect(upload.Rewound(plan.Framing.Body!)) : null;
+        if (!RetriesWithoutExpect(plan, head, bodyLeftUnsent || upload.CutShort))
+        {
+            return null;
+        }
+
+        ThrowIfRedirectLimitReached(plan);
+        return plan.WithoutExpect(upload.Rewound(plan.Framing.Body!), keepsCustomWait: !bodyLeftUnsent);
+    }
+
+    /// <summary>
+    /// Ends the transfer with exit 47 when one more resend would pass
+    /// <see cref="HttpRequestOptions.MaxRedirects" />: curl 8.21.0 counts each resend after a
+    /// 417 as a followed redirect, with or without <c>-L</c>, sharing the count with the hops
+    /// <c>-L</c> followed before this request, and <c>--max-redirs 0</c> refuses even the first
+    /// (measured, BL-396 Notes). The 417's head is written first.
+    /// </summary>
+    /// <exception cref="HttpTransferException">The limit is reached (exit 47).</exception>
+    private static void ThrowIfRedirectLimitReached(HttpRequestPlan plan)
+    {
+        int limit = plan.Options.MaxRedirects;
+        if (limit >= 0 && plan.RedirectsFollowed >= limit)
+        {
+            throw new HttpTransferException(CurlExitCode.TooManyRedirects, HttpTransferMessages.MaximumRedirectsFollowed(limit));
+        }
     }
 
     /// <summary>
@@ -669,8 +915,7 @@ public sealed class HttpProtocolHandler(
     /// <c>Expect</c>, as curl 8.21.0 does (measured, BL-260 and BL-319 Notes): a 417 that
     /// arrived before the whole body was sent - while it waited for <c>100 Continue</c>, or
     /// while it was being sent once the wait ran out - on a connection the 417 leaves open, and
-    /// not under <c>-f</c>, which fails on the 417 itself. The resent request waits for
-    /// nothing, so it is never resent again.
+    /// not under <c>-f</c>, which fails on the 417 itself.
     /// </summary>
     private static bool RetriesWithoutExpect(HttpRequestPlan plan, HttpResponseHead head, bool bodyStopped) =>
         bodyStopped
@@ -741,7 +986,7 @@ public sealed class HttpProtocolHandler(
     /// unsent; <see langword="false" /> when the body was sent or there is none.
     /// </returns>
     private static async ValueTask<bool> SendBodyAsync(
-        TimeProvider timeProvider,
+        ITransferContext context,
         HttpRequestFraming framing,
         IConnection responseConnection,
         HttpRequestBodyWriter upload,
@@ -756,14 +1001,29 @@ public sealed class HttpProtocolHandler(
         if (responseConnection is HttpContinueWaitConnection waiting)
         {
             await upload.WriteHeldHeadAsync(cancellationToken).ConfigureAwait(false);
-            if (!await waiting.WaitForContinueAsync(timeProvider, cancellationToken).ConfigureAwait(false))
+            if (!await waiting.WaitForContinueAsync(context.TimeProvider, cancellationToken).ConfigureAwait(false))
             {
                 return true;
             }
+
+            ReportContinueWaitRanOut(context.Events, waiting);
         }
 
         await upload.WriteAsync(requestBody, framing.IsChunked, cancellationToken).ConfigureAwait(false);
         return false;
+    }
+
+    /// <summary>
+    /// Reports <c>Done waiting for 100-continue</c> before the body when the wait for
+    /// <c>100 Continue</c> ran out with nothing received, as curl 8.21.0 does (measured,
+    /// BL-449 Notes); nothing when a <c>100 Continue</c> ended it.
+    /// </summary>
+    private static void ReportContinueWaitRanOut(ITransferEvents events, HttpContinueWaitConnection waiting)
+    {
+        if (waiting.WaitRanOut)
+        {
+            events.ReportInfo(HttpConnectionInfoLines.DoneWaitingForContinue);
+        }
     }
 
     /// <summary>
@@ -872,6 +1132,12 @@ public sealed class HttpProtocolHandler(
         internal required HttpFirstByteTimingConnection ResponseConnection { get; init; }
 
         /// <summary>
+        /// Gets how many resends after a 417 this transfer made before this exchange, the
+        /// report's <see cref="TransferReport.RedirectCount" /> (BL-396 Notes).
+        /// </summary>
+        internal int RedirectCount { get; init; }
+
+        /// <summary>
         /// Gets or sets the moment the first request byte was about to be sent,
         /// <see langword="null" /> until then.
         /// </summary>
@@ -901,6 +1167,7 @@ public sealed class HttpProtocolHandler(
                 DownloadSize = downloadSize,
                 HeaderSize = earlier?.HeaderSize ?? 0,
                 ConnectionCount = (earlier?.ConnectionCount ?? 0) + (newConnection ? 1 : 0),
+                RedirectCount = RedirectCount,
                 ProxyConnectResponseCode = connect.ProxyConnectResponseCode,
                 UsedProxy = UsedProxy,
                 LocalEndPoint = connect.LocalEndPoint,
@@ -1002,6 +1269,13 @@ public sealed class HttpProtocolHandler(
         public bool SentOnFreshConnection { get; init; }
 
         /// <summary>
+        /// Gets how many redirects the transfer has followed before this request: the chain's
+        /// count (<see cref="HttpRequestOptions.RedirectsFollowed" />) and one for each resend
+        /// after a 417, as curl 8.21.0 counts them (BL-396 Notes).
+        /// </summary>
+        public int RedirectsFollowed { get; init; }
+
+        /// <summary>
         /// Makes the same request sent with <paramref name="authorization" /> instead.
         /// </summary>
         /// <param name="authorization">The <c>Authorization</c> value the retry is sent with.</param>
@@ -1014,19 +1288,23 @@ public sealed class HttpProtocolHandler(
         /// <paramref name="body" />.
         /// </summary>
         /// <param name="body">The body to resend.</param>
-        /// <returns>The resent request's plan.</returns>
-        public HttpRequestPlan WithoutExpect(HttpRequestBody body) => With(Framing.WithoutExpect(body), Authorization);
+        /// <param name="keepsCustomWait">
+        /// <see langword="true" /> to keep an <c>-H</c> <c>Expect: 100-continue</c> wait.
+        /// </param>
+        /// <returns>The resent request's plan, one more redirect followed.</returns>
+        public HttpRequestPlan WithoutExpect(HttpRequestBody body, bool keepsCustomWait) =>
+            With(Framing.WithoutExpect(body, keepsCustomWait), Authorization, SentOnFreshConnection, RedirectsFollowed + 1);
 
         /// <summary>
         /// Makes the same request, marked as sent again on a fresh connection.
         /// </summary>
         /// <returns>The resent request's plan.</returns>
-        public HttpRequestPlan OnFreshConnection() => With(Framing, Authorization, sentOnFreshConnection: true);
+        public HttpRequestPlan OnFreshConnection() => With(Framing, Authorization, sentOnFreshConnection: true, RedirectsFollowed);
 
         private HttpRequestPlan With(HttpRequestFraming framing, string? authorization) =>
-            With(framing, authorization, SentOnFreshConnection);
+            With(framing, authorization, SentOnFreshConnection, RedirectsFollowed);
 
-        private HttpRequestPlan With(HttpRequestFraming framing, string? authorization, bool sentOnFreshConnection) =>
+        private HttpRequestPlan With(HttpRequestFraming framing, string? authorization, bool sentOnFreshConnection, int redirectsFollowed) =>
             new(Context, Options, framing, AuthRequest, authorization)
             {
                 Started = Started,
@@ -1035,6 +1313,7 @@ public sealed class HttpProtocolHandler(
                 ForwardProxy = ForwardProxy,
                 ProxyAuthorization = ProxyAuthorization,
                 SentOnFreshConnection = sentOnFreshConnection,
+                RedirectsFollowed = redirectsFollowed,
             };
     }
 
@@ -1056,6 +1335,19 @@ public sealed class HttpProtocolHandler(
         /// before its response began, so <see cref="Retry" /> resends the request on a fresh one.
         /// </summary>
         public bool DiedBeforeResponse { get; init; }
+
+        /// <summary>
+        /// Gets a value indicating whether the connection is reported left intact although the
+        /// server closed it to end the body (ADR-0109); it is marked reusable all the same, and
+        /// the pool finds it dead (ADR-0112).
+        /// </summary>
+        public bool LeftIntactAfterServerClosed { get; init; }
+
+        /// <summary>
+        /// Gets a value indicating whether the connection is reported left intact: it
+        /// <see cref="KeepsAlive" />, or it is <see cref="LeftIntactAfterServerClosed" />.
+        /// </summary>
+        public bool ReportsLeftIntact => KeepsAlive || LeftIntactAfterServerClosed;
 
         /// <summary>Gets the result, with the report so far.</summary>
         public TransferResult Result { get; } = Result;

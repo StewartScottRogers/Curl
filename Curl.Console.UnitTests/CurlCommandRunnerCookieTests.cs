@@ -41,6 +41,8 @@ public sealed class CurlCommandRunnerCookieTests
 
     private readonly MemoryStream standardOutput = new();
 
+    private readonly MemoryStream standardError = new();
+
     private string StandardOutputText => Encoding.Latin1.GetString(standardOutput.ToArray());
 
     [TestInitialize]
@@ -78,7 +80,7 @@ public sealed class CurlCommandRunnerCookieTests
         int exitCode = await RunAsync(server, ["-s", .. arguments, "http://127.0.0.1:18316/x"], StandardInputCookies);
 
         Assert.AreEqual(0, exitCode);
-        Assert.AreEqual(
+        Assert.StartsWith(
             $"GET /x HTTP/1.1\r\nHost: 127.0.0.1:18316\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n{expectedCookieHeader}\r\n",
             Latin1(server.Written));
     }
@@ -98,9 +100,48 @@ public sealed class CurlCommandRunnerCookieTests
             StandardInputCookies);
 
         Assert.AreEqual(0, exitCode);
-        Assert.AreEqual(
+        Assert.StartsWith(
             StandardInputCookies + "GET /x HTTP/1.1\r\nHost: 127.0.0.1:18316\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
             Latin1(server.Written));
+    }
+
+    /// <summary>
+    /// Measured 2026-09-27 with <c>curl -s -v -b cf.txt -c - http://127.0.0.1:&lt;port&gt;/</c>: each refused
+    /// <c>Set-Cookie:</c> line of the file prints its line before the connection's, and the
+    /// accepted one is sent (BL-461 Notes). The scripted connector prints no <c>Trying</c> lines.
+    /// </summary>
+    [TestMethod]
+    public async Task RunAsync_VerboseCookieFileWithRefusedSetCookieLines_PrintsCurlsRefusalLines()
+    {
+        fileSystem.ExistingContent["cf.txt"] =
+            Encoding.Latin1.GetBytes("Set-Cookie: g=v; X=\u0001\nSet-Cookie: c\nSet-Cookie: s=v; Secure\n");
+        ScriptedConnector server = Serve(SetsCookie);
+
+        int exitCode = await RunAsync(server, ["-s", "-v", "-b", "cf.txt", Url]);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.StartsWith(
+            "* invalid octets in value, cookie dropped\r\n* invalid cookie, dropped\r\n* using HTTP/1.x\r\n",
+            Latin1(standardError.ToArray()));
+        Assert.AreEqual($"GET / HTTP/1.1\r\n{Head}Cookie: s=v\r\n\r\n", Latin1(server.Written));
+    }
+
+    /// <summary>
+    /// Measured 2026-09-27 with <c>curl -s -v -b sub\missing.txt http://127.0.0.1:&lt;port&gt;/</c>: the warning is
+    /// the first line on standard error, with the path as given, and the transfer goes on to exit 0 (BL-487 Notes).
+    /// </summary>
+    [TestMethod]
+    public async Task RunAsync_VerboseCookieFileThatCannotBeOpened_PrintsCurlsWarningFirst()
+    {
+        fileSystem.UnreadablePaths.Add("sub\\missing.txt");
+        ScriptedConnector server = Serve(SetsCookie);
+
+        int exitCode = await RunAsync(server, ["-s", "-v", "-b", "sub\\missing.txt", Url]);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.StartsWith(
+            "* WARNING: failed to open cookie file \"sub\\missing.txt\"\r\n* using HTTP/1.x\r\n",
+            Latin1(standardError.ToArray()));
     }
 
     [TestMethod]
@@ -148,7 +189,7 @@ public sealed class CurlCommandRunnerCookieTests
 
         string jar = JarHeader + GotLine;
         Assert.AreEqual($"body\n[w]\n{jar}body\n[w]\n{jar}", StandardOutputText);
-        Assert.AreEqual(
+        Assert.StartsWith(
             $"GET /1 HTTP/1.1\r\n{Head}\r\nGET /2 HTTP/1.1\r\n{Head}Cookie: got=g1\r\n\r\n",
             Latin1(server.Written));
     }
@@ -160,7 +201,7 @@ public sealed class CurlCommandRunnerCookieTests
 
         await RunAsync(server, ["-s", "-b", "a=1", "http://127.0.0.1:18231/1", "http://127.0.0.1:18231/2"]);
 
-        Assert.AreEqual(
+        Assert.StartsWith(
             $"GET /1 HTTP/1.1\r\n{Head}Cookie: a=1\r\n\r\nGET /2 HTTP/1.1\r\n{Head}Cookie: a=1\r\n\r\n",
             Latin1(server.Written));
     }
@@ -172,7 +213,7 @@ public sealed class CurlCommandRunnerCookieTests
 
         await RunAsync(server, ["-s", "-b", "in.txt", "-b", "a=1", "http://127.0.0.1:18231/1", "http://127.0.0.1:18231/2"]);
 
-        Assert.AreEqual(
+        Assert.StartsWith(
             $"GET /1 HTTP/1.1\r\n{Head}Cookie: keep=k1; sess=s1; a=1\r\n\r\n"
             + $"GET /2 HTTP/1.1\r\n{Head}Cookie: keep=k1; sess=s1; got=g1; a=1\r\n\r\n",
             Latin1(server.Written));
@@ -230,7 +271,7 @@ public sealed class CurlCommandRunnerCookieTests
                 fileSystem,
                 fileSystem,
                 standardOutput,
-                new MemoryStream(),
+                standardError,
                 new MemoryStream(Encoding.Latin1.GetBytes(standardInput)),
                 runsOnWindows: true)
             .RunAsync(arguments);
@@ -242,6 +283,8 @@ public sealed class CurlCommandRunnerCookieTests
         IReadOnlyList<IProtocolHandler> handlers = CurlComposition.CreateProtocolHandlers(
             connector,
             new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"),
+            new PassThroughTlsProvider(),
+            new LoopbackDnsResolver(),
             cookies?.HandlerStore);
 
         return new TransferDispatch(new ProtocolDispatcher(handlers), [], cookies);

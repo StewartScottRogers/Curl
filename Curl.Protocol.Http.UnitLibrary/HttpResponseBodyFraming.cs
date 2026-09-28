@@ -14,8 +14,8 @@ namespace Curl.Protocol.Http;
 /// Content-Length. <c>--ignore-content-length</c> never reads the Content-Length, so a body
 /// that is not chunked runs to close, however short or long it is. Under
 /// <c>--tr-encoding</c> any Transfer-Encoding header makes the Content-Length untrusted: the
-/// body is chunked or runs to close, and a Content-Length header is checked only when it comes
-/// before the first Transfer-Encoding header; <c>--raw</c> then passes only <c>chunked</c>
+/// body is chunked or runs to close, though every Content-Length header is still checked, one
+/// after the Transfer-Encoding header included (measured, BL-454 Notes); <c>--raw</c> then passes only <c>chunked</c>
 /// through (<see cref="HttpTransferEncoding.Requested" />).
 /// </remarks>
 /// <param name="isChunked">Whether the body is decoded as chunked transfer coding.</param>
@@ -97,8 +97,7 @@ internal readonly struct HttpResponseBodyFraming(bool isChunked, long? contentLe
         bool ignoresContentLength)
     {
         HttpTransferCodings codings = HttpTransferEncoding.Requested(headers, passesTransferCoding);
-        IReadOnlyList<HttpResponseHeader> checkedHeaders = codings.FirstHeaderIndex is { } first ? [.. headers.Take(first)] : headers;
-        long? contentLength = ignoresContentLength ? null : HttpContentLength.Find(checkedHeaders);
+        long? contentLength = ignoresContentLength ? null : HttpContentLength.Find(headers);
         return new HttpResponseBodyFraming(codings.IsChunked, codings.FirstHeaderIndex is null ? contentLength : null, codings.Codings);
     }
 }

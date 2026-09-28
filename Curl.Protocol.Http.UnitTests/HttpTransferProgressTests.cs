@@ -18,6 +18,17 @@ public sealed class HttpTransferProgressTests
     }
 
     [TestMethod]
+    public void ReportTransferDone_PassesItOn()
+    {
+        RecordingTransferProgress sink = new();
+        HttpTransferProgress progress = new(sink);
+
+        progress.ReportTransferDone();
+
+        CollectionAssert.AreEqual(new[] { "done" }, sink.Reports.ToArray());
+    }
+
+    [TestMethod]
     public void ReportDownloaded_BelowACountAlreadyReported_IsDropped()
     {
         RecordingTransferProgress sink = new();

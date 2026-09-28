@@ -50,8 +50,10 @@ and messages are pinned in `FtpProtocolHandlerTests`.
 ## Consequences
 
 `curl ftp://host/path/file` downloads as curl does, with curl's exit codes. `ftps`,
-active mode, `--disable-epsv`, `--ftp-method`, `-l` and `-Q` are not implemented. `-r`, `-C`
-and `-I` are honoured since BL-438, and `-T` uploads since BL-439 (see the addenda below). Since BL-434 `Curl.Console` registers the handler:
+active mode and the other FTP-only options are not implemented. `-r`, `-C` and `-I` are
+honoured since BL-438, `-T` uploads since BL-439, and `--disable-epsv`,
+`--no-ftp-skip-pasv-ip`, `--ftp-method`, `--ftp-create-dirs`, `-l` and `-Q` since BL-436
+(see the addenda below). Since BL-434 `Curl.Console` registers the handler:
 `RoutingFtpProtocolHandler` hands an `ftp://` transfer forwarded through an HTTP proxy to the
 HTTP handler (ADR-0056, rule 3) and every other to `FtpProtocolHandler`.
 
@@ -175,3 +177,73 @@ callback); a failed write to the data connection is exit 55 `Failure when sendin
 the peer`, with no `QUIT`, as a failed receive ends a download; `-I` with `-T` uploads, as
 the upload is checked first. `--crlf` (`ConvertLineEndings`) and `-a`/`--append` are not
 honoured on FTP uploads yet.
+
+## Addendum (BL-436, 2026-09-27): FTP control options
+
+Decided by Claude under Stewart's delegation. Measured with curl 8.21.0 on 2026-09-27 with
+`Record-CurlExchange.ps1 -Ftp`, serving the three bytes `abc` and uploading `hello`. The
+recorder now serves `NLST` like `LIST`, answers several `-FtpReply` overrides for one verb
+in turn (the last repeating), and puts the data port into a reply through `{DATAPORT}`,
+`{DATAPORT_HI}` and `{DATAPORT_LO}`, so a `227` can name another address. The login
+(`USER`, `PASS`, `PWD`) is as before and left out below.
+
+| Case | Commands after `PWD` | Exit |
+| --- | --- | --- |
+| `--disable-epsv` | `CWD d`, `PASV`, `TYPE I`, `SIZE`, `RETR`, `QUIT` | 0 |
+| `--disable-epsv`, `PASV` `500` | `PASV`, `QUIT` | 13 `Bad PASV/EPSV response: 500` |
+| `--disable-epsv --no-ftp-skip-pasv-ip`, `227` naming `127.0.0.2` | `PASV`; data connect to `127.0.0.2` fails | 7, no `QUIT` |
+| `--no-ftp-skip-pasv-ip`, `EPSV` accepted | as without: data to the control host | 0 |
+| `--ftp-method singlecwd .../a/b/f.txt` | `CWD a/b`, then as usual | 0 |
+| `singlecwd`, `//abs/f.txt`, `//f.txt`, `/a//b%20c/f.txt` | `CWD /abs`, `CWD /`, `CWD a//b c` | 0 |
+| `singlecwd`, `CWD` `550` | `CWD a/b`, `QUIT` | 9 |
+| `--ftp-method nocwd .../a/b/f.txt` | no `CWD`; `SIZE a/b/f.txt`, `RETR a/b/f.txt` (and `MDTM`, `STOR` the same) | 0 |
+| `nocwd`, `.../a/b/`, `.../`, `...//` | `LIST a/b`, `LIST`, `LIST /` | 0 |
+| `--ftp-create-dirs`, `CWD a` `550`, `MKD` `257` | `CWD a`, `MKD a`, `CWD a`, `CWD b`, ... | 0 |
+| `--ftp-create-dirs`, `MKD` `550`, `CWD` again `550` | `CWD a`, `MKD a`, `CWD a`, `QUIT` | 9 `Server denied you to change to the given directory` |
+| `--ftp-create-dirs`, `MKD a` refused, `CWD a` then accepted, `CWD b` refused | `... CWD b`, `MKD b`, `CWD b`, ... | each directory gets its own `MKD` |
+| `--ftp-create-dirs` on a download, and with `singlecwd` | the same (`MKD a/b` for `singlecwd`) | 0 |
+| `--ftp-create-dirs`, `MKD` `421` | `CWD a`, `MKD a` | 28, no `QUIT` |
+| `-l .../d/` and `-l .../d/f.txt` | `CWD d`, `EPSV`, `TYPE A`, `NLST`, `QUIT`: the file name is dropped | 0 |
+| `-l`, `NLST` `550` / `450` | `NLST`, `QUIT` | 19 `RETR response: 550` / 0, empty |
+| `-l --ftp-method nocwd .../a/b/f.txt` | `NLST a/b` | 0 |
+| `-l -T`, `-l -I` | as without `-l` | 0 |
+| `-Q NOOP -Q "+SITE A" -Q "-DELE f.txt" -Q "*BOGUS"` | `NOOP`, `BOGUS` (502, ignored), `CWD d`, `EPSV`, `TYPE I`, `SITE A`, `SIZE`, `RETR`, `DELE f.txt`, `QUIT` | 0 |
+| `-Q "BOGUS x"` or `-Q "+BOGUS x"` answered `502` | up to `BOGUS x`, no `QUIT` | 21 `QUOT command failed with 502` |
+| `-Q "-BOGUS x"` answered `502` | the whole download, `BOGUS x`, `QUIT` | 21 `QUOT string not accepted: BOGUS x`, file written |
+| `-Q "-*BOGUS x"`, `-Q "*"` (sends an empty line), `-Q "*-X"` (sends `-X` after login) | failures ignored | 0 |
+| `-Q "RNFR a"` answered `350` | accepted: curl fails a quote only at 400 or more | 0 |
+| `-Q NOOP` answered `421` | `NOOP` | 28 `Timeout was reached`, no `QUIT` |
+| `-I` with `NOOP`, `+NOOP`, `-NOOP` | `NOOP`, `CWD d`, `MDTM`, `TYPE I`, `SIZE`, `REST 0`, `NOOP`, `NOOP`, `QUIT`; on a directory `NOOP`, `CWD d`, `NOOP`, `NOOP`, `QUIT` | 0 |
+| `-T` with the three | `NOOP`, `CWD d`, `EPSV`, `TYPE I`, `NOOP`, `STOR`, `NOOP`, `QUIT`; `+` goes before `SIZE` under `-C -` | 0 |
+| a listing with the three | `+` after `TYPE A`, `-` after the `226`, and after a `450` | 0 |
+| `-C 1 -Q +NOOP` | `TYPE I`, `NOOP`, `SIZE`, `REST 1`, `RETR` | 0 |
+| `-Q -NOOP` with `RETR` `550` | no `NOOP` | 78 |
+| `-C 3 -Q -NOOP` (nothing left), `-C 5 -T -Q -NOOP` (upload whole) | `NOOP` before `QUIT` | 0 |
+| `-r 0-0 -Q -NOOP` | `RETR`, `ABOR`, `NOOP`, `QUIT`: curl read the pending `226` for `ABOR` and `ABOR`'s `502` for `NOOP` | 21 `QUOT string not accepted: NOOP` |
+| `-Q NOOP .../d%01/f.txt` | nothing after `PWD` | 3: the path is checked before any quote |
+
+So `--disable-epsv` skips `EPSV`; `--no-ftp-skip-pasv-ip` connects the data connection to
+the address a `227` names (the connector's own failure message is reported when it
+cannot); `singlecwd` and `nocwd` decode the whole path and split it at its last `/`
+(`FtpUrlPath`); `--ftp-create-dirs` answers every refused `CWD` with `MKD`, whatever `MKD`
+replies, and one more `CWD` whose refusal is exit 9, for downloads as well as uploads;
+`-l` lists with `NLST` whatever the URL names, except for `-T` and `-I`; and `-Q` values
+are sorted by their first character (`FtpQuoteCommands`): none after `PWD`, `+` after
+`TYPE` (after `REST 0` under `-I`), `-` after a successful transfer, a `*` after that
+marking the failure as ignored. A refused quote before the transfer is exit 21 with no
+`QUIT`; after it, exit 21 with `QUIT`.
+
+Not measured, and decided by the nearest measured rule: curl's exit 7 message for a
+refused `227` address reads `Failed to connect to 127.0.0.1:<control port> via
+127.0.0.2:<data port> after <n> ms: Could not connect to server`; the handler reports
+the connector's message, as it does for every data connect failure.
+
+`multicwd`, the default, measured with curl 8.21.0 on 2026-09-27 (BL-446) and pinned in
+`FtpProtocolHandlerPathOptionTests`: curl decodes the whole path, sends `CWD /` when it
+then starts with `/`, and one `CWD` per non-empty segment after that.
+
+| Path | `CWD` commands after `PWD` |
+| --- | --- |
+| `//abs/f.txt`, `///abs/f.txt`, `/%2Fabs/f.txt`, `//abs/` | `CWD /`, `CWD abs` |
+| `//f.txt` | `CWD /` |
+| `/a//b/f.txt`, `/a%2Fb/f.txt`, `/a/%2Fb/f.txt` | `CWD a`, `CWD b` |

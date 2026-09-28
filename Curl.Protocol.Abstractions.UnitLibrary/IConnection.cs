@@ -27,6 +27,17 @@ public interface IConnection : IAsyncDisposable
     EndPoint? RemoteEndPoint { get; }
 
     /// <summary>
+    /// Gets the local endpoint of the connection, or <see langword="null" />, the default,
+    /// when the implementation has no meaningful address.
+    /// </summary>
+    /// <remarks>
+    /// FTP's <c>-P -</c> announces this address for its active-mode data connection. Only
+    /// the TCP connection overrides it, so no other implementation or test fake has to
+    /// (ADR-0102).
+    /// </remarks>
+    EndPoint? LocalEndPoint => null;
+
+    /// <summary>
     /// Reads up to <paramref name="buffer" /> bytes from the peer.
     /// </summary>
     /// <param name="buffer">The destination for the bytes read.</param>
