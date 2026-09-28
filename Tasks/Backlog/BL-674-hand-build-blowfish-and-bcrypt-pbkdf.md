@@ -33,3 +33,4 @@ completed:
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Doing.
 - 2026-09-28: Doing -> Blocked. Stewart: dark factory run ended in Doing, exit 0; see Z:\repos\Curl.logs\BL-674-20260928-120958-L1.jsonl
+- 2026-09-28: Blocked -> Backlog. Not a blocker: the headless run ended while waiting on a long build and coverage run. Back in the queue for the dark factory.
