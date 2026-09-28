@@ -95,12 +95,14 @@ an ADR that decides a feature stays out.
 of the shift. `-Lanes N` runs N tasks at once, each in its own git worktree beside the
 checkout (`<repo>.lanes\lane-<n>`); the board never gives two lanes tasks whose
 `touches` overlap, and each lane rebases, rebuilds, tests and pushes its own work, one
-lane at a time. Running out of tokens is not a stall: the shift announces it with the
+lane at a time. `-Lanes Auto` sizes the shift itself, adding or retiring one lane at a
+time to the measured burn rate, the board's parallel capacity and the machine's cap, so
+it suits whichever Claude plan is in use. Running out of tokens is not a stall: the shift announces it with the
 reset time, waits (the wait does not count against `-Hours`), warns a minute before the
 new session and reruns the cut-off task. See the script's header for the details.
 
 When Claude starts a shift it always passes `-NewTab`, e.g.
-`RunDarkFactory.cmd -NewTab -Lanes 3 -Continuous`; `-Continuous` makes a shift that
+`RunDarkFactory.cmd -NewTab -Lanes Auto -Continuous`; `-Continuous` makes a shift that
 ends with work still ready start the next one itself. A shift ends before the tokens run
 out: once 85% of the 5-hour window (`-StopAtUsage`) or 97% of the weekly window
 (`-StopAtWeeklyUsage`) is used, lanes claim

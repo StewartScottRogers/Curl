@@ -102,19 +102,28 @@
 
     AUTO LANES (-Lanes Auto)
 
-    The shift sizes itself (ADR-0130) and never needs to know the Claude plan. Before any
-    lane starts it reads the machine cap from <repo>.lanes\machine-lanes.json, running the
-    machine probe first when that file is missing, incomplete or from other hardware, and
-    starts at the lane count <repo>.lanes\auto-lanes.json saved, raised to -MinStartLanes
-    (default 3) when that is more, and capped by the ceilings. -MinStartLanes is only where
-    the shift starts, not a floor: Auto still retires below it when pace demands. Every 15 minutes, except while waiting for tokens, it samples usage,
-    meters the burn rate per busy lane, paces to the 5-hour window and (unless
-    -NoWeeklyPace) the weekly one, caps that by the board's capacity, the machine cap and
-    -MaxLanes, and adds or retires at most one lane, tracing why: "lanes 3 -> 4 (5-hour
-    pace allows 4.9)". It holds while the tokens are low or the shift's time is up. The
-    capacity is read in a detached worktree, <repo>.lanes\auto-board, so this checkout is
-    only pulled at shift end. auto-lanes.json is saved on each change and at shift end, and
-    -Continuous hands on -Lanes Auto. -AutoLanesReport prints one step's reading and exits.
+    The shift sizes itself (ADR-0130). It never needs to know the Claude plan: the usage
+    windows are read as the share of the plan used, so the burn rate it meters - points per
+    hour per busy lane - already scales with whatever plan Stewart is on.
+
+      start     The machine cap comes from <repo>.lanes\machine-lanes.json; the machine
+                probe (-ProbeMachine, below) runs first when that file is missing,
+                incomplete or from other hardware. The cold start is the lane count
+                <repo>.lanes\auto-lanes.json saved, raised to -MinStartLanes (default 3),
+                capped by the ceilings. -MinStartLanes is a start, not a floor.
+      step      Every 15 minutes, except while waiting for tokens, it samples usage and
+                paces to the 5-hour window and (unless -NoWeeklyPace) the weekly one: the
+                lanes that would spend each window up to -StopAtUsage or -StopAtWeeklyUsage
+                just as it resets. The lower target binds.
+      ceilings  task-board.ps1 capacity (read in a detached worktree, <repo>.lanes\auto-board,
+                so this checkout is only pulled at shift end), the machine cap and -MaxLanes.
+      change    At most one lane per step, added or retired; a retiring lane finishes and
+                integrates its task first. Each step traces "lanes a -> b (reason)", e.g.
+                "lanes 3 -> 4 (5-hour pace allows 4.9)". It holds while the tokens are low
+                or the shift's time is up.
+
+    auto-lanes.json is saved on each change and at shift end, and -Continuous hands on
+    -Lanes Auto. -AutoLanesReport prints one step's reading without starting a lane, and exits.
 
     LIVE BOARD
 
@@ -150,11 +159,11 @@
 .EXAMPLE
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -Hours 4 -MaxTasks 3
+    powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -Lanes Auto -Continuous
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -Lanes 4
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestAlarm
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestAlarm -AlarmScale 0.1
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestOutOfTokens
-    powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -Lanes Auto -Continuous
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -AutoLanesReport
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestAutoLanes
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -ProbeMachine
