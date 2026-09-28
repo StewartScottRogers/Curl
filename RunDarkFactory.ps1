@@ -802,9 +802,10 @@ function Invoke-MergeToMaster {
         Start-Sleep -Seconds 30
     }
     if ($run[0].conclusion -ne 'success') { return "not merged: CI $($run[0].conclusion) on $short" }
-    $open = @(gh pr list --head $Branch --base master --state open --json number --limit 1 2>$null | ConvertFrom-Json)
-    if ($open.Count) { $number = $open[0].number }
-    else {
+    # --jq, not ConvertFrom-Json: Windows PowerShell turns "[]" into one empty element, so
+    # a missing pull request looked like one with no number and the merge was a silent no-op.
+    $number = "$(gh pr list --head $Branch --base master --state open --json number --limit 1 --jq '.[0].number // empty' 2>$null)".Trim()
+    if (-not $number) {
         $bodyFile = Join-Path $LogDir "pr-body-$Stamp.md"
         $robot = [char]::ConvertFromUtf32(0x1F916)
         [IO.File]::WriteAllText($bodyFile, "Dark factory shift $Stamp. CI passed on Windows, Linux and macOS for $short.`n`n$robot Generated with [Claude Code](https://claude.com/claude-code)`n", (New-Object Text.UTF8Encoding($false)))
