@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation/Planning/Decisions]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-28
 ---
 # BL-763 — Decide how -Lanes Auto paces dark factory lanes to the usage windows, the board and the machine
 
@@ -90,17 +90,21 @@ An ADR records how `RunDarkFactory.ps1 -Lanes Auto` chooses how many lanes to ru
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Planning/Decisions/ADR-<next free number>-<slug>.md` exists, with the number checked as unused at the time of writing (lanes add ADRs concurrently). Its Status is Accepted, and it is marked "Decided by Claude under Stewart's delegation", noting that Stewart approved the overall design on 2026-09-28.
-- [ ] Its Context holds the 2026-09-28 measurements above: the reading resolution, the events per run, and the machine.
-- [ ] Its Decision states items 1 to 10, with the formulas written exactly as above and the `machine-lanes.json` and `auto-lanes.json` fields listed.
-- [ ] It lists the rejected alternatives above.
-- [ ] Its Consequences name BL-764, BL-765, BL-766, BL-767, BL-768, BL-769 and BL-770.
-- [ ] `Documentation/Planning/Decisions/README.md` indexes the new ADR.
-- [ ] `git diff --stat` shows only `Documentation/Planning/Decisions` changed outside `Tasks/`.
+- [x] `Documentation/Planning/Decisions/ADR-<next free number>-<slug>.md` exists, with the number checked as unused at the time of writing (lanes add ADRs concurrently). Its Status is Accepted, and it is marked "Decided by Claude under Stewart's delegation", noting that Stewart approved the overall design on 2026-09-28.
+- [x] Its Context holds the 2026-09-28 measurements above: the reading resolution, the events per run, and the machine.
+- [x] Its Decision states items 1 to 10, with the formulas written exactly as above and the `machine-lanes.json` and `auto-lanes.json` fields listed.
+- [x] It lists the rejected alternatives above.
+- [x] Its Consequences name BL-764, BL-765, BL-766, BL-767, BL-768, BL-769 and BL-770.
+- [x] `Documentation/Planning/Decisions/README.md` indexes the new ADR.
+- [x] `git diff --stat` shows only `Documentation/Planning/Decisions` changed outside `Tasks/`.
 
 ## Notes
+
+- ADR-0130 written directly in the session rather than through `align-and-document`: it is a single new document transcribing an already-approved design, with no code or names to align. ADR-0130 was the next free number (highest in the tree, on `origin/master` and in git history was 0129).
+- Field tables for `machine-lanes.json` and `auto-lanes.json` follow the shapes BL-766 and BL-768 already specify, so the ADR and those tasks agree. A failed probe build also fails its step, as BL-766's failed-build case expects; the ADR says so. The "different RAM size" test uses BL-768's 1 GB tolerance.
 
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Doing.
+- 2026-09-28: Doing -> Done. ADR-0130 records how -Lanes Auto paces lanes to the usage windows, board capacity and the probed machine cap, for BL-764 to BL-770 to build against
