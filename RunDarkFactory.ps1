@@ -58,9 +58,9 @@
     the same without waiting for the next probe.
 
     Better still, a shift ends before the tokens run out. Every run logs how much of the
-    5-hour and the weekly usage window is used; once either reaches -StopAtUsage (85%)
-    no lane claims another task, the tasks already running finish, integrate and push,
-    and the shift ends clean. The next shift (-Continuous) starts at once and waits for
+    5-hour and the weekly usage window is used; once the 5-hour window reaches
+    -StopAtUsage (85%) or the weekly one -StopAtWeeklyUsage (97%) no lane claims another
+    task, the tasks already running finish, integrate and push, and the shift ends clean. The next shift (-Continuous) starts at once and waits for
     the 5-hour window to reset before starting its lanes; a used-up weekly window raises
     the alarm instead, since it can be days from resetting.
 
@@ -131,11 +131,13 @@ param(
     [switch]$Wake,
     # With lanes: when a shift ends and the board still has ready work, start the next one.
     [switch]$Continuous,
-    # Stop claiming new tasks once this share of the 5-hour or the weekly usage window is
-    # used, so the tasks already running finish, integrate and push before the tokens run
-    # out. The next shift waits for a fresh 5-hour window; a used-up weekly window raises
-    # the alarm instead. 1 means never stop early.
+    # Stop claiming new tasks once this share of the 5-hour usage window is used, so the
+    # tasks already running finish, integrate and push before the tokens run out. The next
+    # shift waits for a fresh 5-hour window. 1 means never stop early.
     [ValidateRange(0.1, 1)][double]$StopAtUsage = 0.85,
+    # The same for the weekly usage window, which is days from resetting, so the shift
+    # runs it closer to empty (Stewart, 2026-09-28); a used-up weekly window raises the alarm.
+    [ValidateRange(0.1, 1)][double]$StopAtWeeklyUsage = 0.97,
     # How many tasks run at once, each in its own worktree and window. 1 is the classic
     # single-runner shift in this checkout.
     [ValidateRange(1, 8)][int]$Lanes = 1,
@@ -535,11 +537,12 @@ function Get-UsageReading {
 }
 
 function Get-UsageStop {
-    # Why no new task should be claimed now - the weekly or the 5-hour window is at least
-    # -StopAtUsage used - or '' when there is room or this shift has no reading yet.
+    # Why no new task should be claimed now - the weekly window is at least
+    # -StopAtWeeklyUsage used or the 5-hour one -StopAtUsage - or '' when there is room or
+    # this shift has no reading yet.
     $u = Get-UsageReading -ThisShift
     if (-not $u) { return '' }
-    if ($u.Week -ge $StopAtUsage) { return "weekly tokens $([math]::Round($u.Week * 100))% used, reset $($u.WeekResets.ToString('ddd HH:mm'))" }
+    if ($u.Week -ge $StopAtWeeklyUsage) { return "weekly tokens $([math]::Round($u.Week * 100))% used, reset $($u.WeekResets.ToString('ddd HH:mm'))" }
     if ($u.FiveHour -ge $StopAtUsage) { return "session tokens $([math]::Round($u.FiveHour * 100))% used, reset $($u.FiveHourResets.ToString('HH:mm'))" }
     return ''
 }
@@ -701,11 +704,11 @@ function Wait-ForNewSession {
 
 function Wait-ForFreshSession {
     # A shift starts on a fresh session: while the 5-hour window is at least -StopAtUsage
-    # used, announce its reset and wait for it. Returns '', or - when it is the weekly
-    # window that is used up, days from resetting - why Stewart must be called instead.
+    # used, announce its reset and wait for it. Returns '', or - when the weekly window is
+    # -StopAtWeeklyUsage used, days from resetting - why Stewart must be called instead.
     $u = Get-UsageReading
     if (-not $u) { return '' }
-    if ($u.Week -ge $StopAtUsage) {
+    if ($u.Week -ge $StopAtWeeklyUsage) {
         return "WEEKLY TOKENS $([math]::Round($u.Week * 100))% USED  they reset $($u.WeekResets.ToString('dddd d MMM HH:mm')); start the factory again then, or with fewer lanes"
     }
     if ($u.FiveHour -lt $StopAtUsage) { return '' }
