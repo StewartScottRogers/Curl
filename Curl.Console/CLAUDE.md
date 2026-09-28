@@ -152,7 +152,7 @@ Under `-Y`/`--speed-limit` or `-y`/`--speed-time` each attempt gets a `Curl.Core
 progress sink so it counts the bytes moved, and gives the context its token. An attempt it
 cancels after `-y` seconds below `-Y` (30 seconds, or 1 byte per second, when only one is
 given) ends with `curl: (28) Operation too slow. Less than N bytes/sec transferred the last T
-seconds`, as measured on curl 8.21.0 (ADR-0105, BL-400).
+seconds`, as measured on curl 8.21.0 (ADR-0106, BL-400).
 
 Under `-R`/`--remote-time` a successful transfer to an `-o` file whose result carries
 `SourceLastWriteTimeUtc` stamps the closed file with it through `IFileTimeSetter`
