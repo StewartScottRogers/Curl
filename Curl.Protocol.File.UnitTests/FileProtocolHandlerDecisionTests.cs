@@ -119,6 +119,26 @@ public sealed class FileProtocolHandlerDecisionTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_HeaderOutputFails_ReportsTheWriteErrorAsAnInformationLine()
+    {
+        var fileSystem = new FakeFileSystem();
+        fileSystem.AddFile(OsPath, Content);
+        var events = new RecordingTransferEvents();
+        var context = new TransferContext
+        {
+            Url = FileUrl,
+            Output = new ChunkRecordingStream(),
+            HeaderOutput = FaultingStream.FailingOnWrite(1),
+            Events = events,
+        };
+        var handler = new FileProtocolHandler(fileSystem);
+
+        await handler.ExecuteAsync(context);
+
+        CollectionAssert.AreEqual(new[] { HeaderWriteFailedForFirstLine }, events.Info);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_UploadSucceeds_DisposesTheDestination()
     {
         var fileSystem = new FakeFileSystem();
