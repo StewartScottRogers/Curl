@@ -56,3 +56,4 @@ During a shift, every runner keeps a heartbeat file up to date: each lane, and t
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
