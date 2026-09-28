@@ -8,7 +8,7 @@ depends-on: [BL-498, BL-515]
 touches: [Documentation/Planning/Decisions]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-28
 ---
 # BL-579 — Decide how the WebSocket handler upgrades an HTTP request without referencing Curl.Protocol.Http
 
@@ -25,14 +25,20 @@ An ADR fixes how `Curl.Protocol.Ws.UnitLibrary` sends curl 8.21.0's upgrade requ
 
 ## Acceptance criteria
 
-- [ ] The measurements above are recorded in the ADR's Context.
-- [ ] `Documentation/Planning/Decisions/ADR-<next free number>-<slug>.md` exists (number checked unused), Status Accepted, marked "Decided by Claude under Stewart's delegation", with alternatives weighed, stating where the upgrade request and reply code live, which options apply, the tool's post-upgrade behaviour, the randomness seam, and any Abstractions change (so a task can be filed for it before BL-580 if needed).
-- [ ] Consequences list BL-580 to BL-584.
-- [ ] `Documentation/Planning/Decisions/README.md` indexes the new ADR.
+- [x] The measurements above are recorded in the ADR's Context.
+- [x] `Documentation/Planning/Decisions/ADR-<next free number>-<slug>.md` exists (number checked unused), Status Accepted, marked "Decided by Claude under Stewart's delegation", with alternatives weighed, stating where the upgrade request and reply code live, which options apply, the tool's post-upgrade behaviour, the randomness seam, and any Abstractions change (so a task can be filed for it before BL-580 if needed).
+- [x] Consequences list BL-580 to BL-584.
+- [x] `Documentation/Planning/Decisions/README.md` indexes the new ADR.
 
 ## Notes
+
+- Measured curl 8.21.0 with `Record-CurlExchange.ps1` (24 cases, recorded in ADR-0128's Context); the recorder needed no extension.
+- Decision: ADR-0128. `Curl.Protocol.Ws.UnitLibrary` owns its own upgrade request formatter and `101` head reader; no Abstractions change, so no task is needed before BL-580.
+- Findings that change the follow-up tasks: curl checks neither `Sec-WebSocket-Accept` nor `Upgrade` (BL-580 must not either, despite its goal text), writes close-frame payloads to stdout, never answers or stops at a close frame (the transfer ends when the server closes the connection), ignores `-i`, `-b`, `-d` and `--compressed`, and sends `-T` as one masked binary frame.
+- Delivered in the session rather than through `align-and-document`: the measurements were made here and the ADR is their write-up. No `.cs` or project file changed.
 
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Doing.
+- 2026-09-28: Doing -> Done. ADR-0128 fixes the WebSocket upgrade, options, post-upgrade behaviour and randomness seam from 24 measured curl exchanges
