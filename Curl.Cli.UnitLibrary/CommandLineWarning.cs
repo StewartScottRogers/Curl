@@ -274,6 +274,17 @@ public static class CommandLineWarning
         WrappedMessage.Lines("Warning: ", $"unrecognized ftp file method '{value}', using default");
 
     /// <summary>
+    /// The line curl prints for a <c>--proto</c> or <c>--proto-redir</c> item naming a scheme it does not know:
+    /// <c>Warning: unrecognized protocol '&lt;name&gt;'</c>, the name without its <c>+</c>, <c>-</c> or <c>=</c>
+    /// and cut to its first 31 characters by the caller. Measured with <c>curl --proto http,bogus</c> and
+    /// <c>--proto-redir http,bogus</c> (curl 8.21.0, Windows, 2026-09-28): the warning, then the transfer.
+    /// </summary>
+    /// <param name="name">The name as curl repeats it.</param>
+    /// <returns>The warning line.</returns>
+    internal static string UnrecognizedProtocol(string name) =>
+        $"Warning: unrecognized protocol '{name}'";
+
+    /// <summary>
     /// The line curl prints when a command line gives more <c>-o</c>/<c>--output</c> values than
     /// URLs: <c>Warning: Got more output options than URLs</c>. curl 8.21.0 prints it once, however
     /// many values are left over, after the last transfer has ended, not while reading the command

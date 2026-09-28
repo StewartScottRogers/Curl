@@ -154,6 +154,9 @@ public static class CommandLineOptionTable
         CommandLineOption.Flag("tlsv1.3", null, options => options.MinimumTlsVersion = SslProtocols.Tls13),
         CommandLineOption.Value("tls-max", null, SetMaximumTlsVersion),
         CommandLineOption.Flag("proxy-tlsv1", null, options => options.ProxyMinimumTlsVersion = ObsoleteTlsProtocols.Tls10),
+        CommandLineOption.Value("proto", null, (options, value, spelledOption, _, _) => SetAllowedProtocols(options, value, spelledOption, allowed => options.AllowedProtocols = allowed)),
+        CommandLineOption.Value("proto-redir", null, (options, value, spelledOption, _, _) => SetAllowedProtocols(options, value, spelledOption, allowed => options.AllowedRedirectProtocols = allowed)),
+        CommandLineOption.Value("proto-default", null, SetDefaultProtocol),
         CommandLineOption.Text("ciphers", null, (options, ciphers) => options.Ciphers = ciphers),
         CommandLineOption.Text("tls13-ciphers", null, (options, ciphers) => options.Tls13Ciphers = ciphers),
         CommandLineOption.Value("range", 'r', SetRange),
@@ -658,6 +661,47 @@ public static class CommandLineOptionTable
         }
 
         options.MaximumTlsVersion = maximum;
+        return null;
+    }
+
+    /// <summary>
+    /// Records a <c>--proto</c> or <c>--proto-redir</c> value read by <see cref="CommandLineProtocolSet"/>,
+    /// warning (unless silent) about each name curl does not know, or refuses with
+    /// <see cref="CommandLineRefusal.BadlyUsedHere"/>, after those warnings, a value that allows no scheme.
+    /// </summary>
+    private static CommandLineRefusal? SetAllowedProtocols(CommandLineOptions options, string value, string spelledOption, Action<IReadOnlySet<string>> set)
+    {
+        List<string> warningLines = [];
+        IReadOnlySet<string>? allowed = CommandLineProtocolSet.Read(value, warningLines);
+        options.AddWarningLinesUnlessSilent(warningLines);
+        if (allowed is null)
+        {
+            return CommandLineRefusal.BadlyUsedHere(spelledOption);
+        }
+
+        set(allowed);
+        return null;
+    }
+
+    /// <summary>
+    /// Records the <c>--proto-default</c> scheme, lowercase, or refuses an empty value with
+    /// <see cref="CommandLineRefusal.BlankArgument"/> and a scheme curl does not know (<c>all</c> included) with
+    /// <see cref="CommandLineRefusal.UnsupportedProtocol"/>, as curl 8.21.0 does (measured 2026-09-28).
+    /// </summary>
+    private static CommandLineRefusal? SetDefaultProtocol(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        if (value.Length == 0)
+        {
+            return CommandLineRefusal.BlankArgument(spelledOption);
+        }
+
+        string? scheme = CommandLineProtocolSet.KnownScheme(value);
+        if (scheme is null)
+        {
+            return CommandLineRefusal.UnsupportedProtocol(spelledOption);
+        }
+
+        options.DefaultProtocol = scheme;
         return null;
     }
 

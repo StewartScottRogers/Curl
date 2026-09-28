@@ -593,6 +593,25 @@ public sealed class CommandLineOptions
     /// </summary>
     public SslProtocols? ProxyMinimumTlsVersion { get; internal set; }
 
+    /// <summary>
+    /// The schemes <c>--proto</c> allows, lowercase, read by <see cref="CommandLineProtocolSet"/>;
+    /// <see langword="null"/> when not given, which allows every scheme. Each <c>--proto</c> starts again from
+    /// every scheme curl knows, so the last one given decides (curl 8.21.0, measured 2026-09-28).
+    /// </summary>
+    public IReadOnlySet<string>? AllowedProtocols { get; internal set; }
+
+    /// <summary>
+    /// The schemes <c>--proto-redir</c> allows a followed redirect to use, lowercase, read as
+    /// <see cref="AllowedProtocols"/> is; <see langword="null"/> when not given, which leaves curl's default.
+    /// </summary>
+    public IReadOnlySet<string>? AllowedRedirectProtocols { get; internal set; }
+
+    /// <summary>
+    /// The scheme <c>--proto-default</c> names for a URL given without one, lowercase; <see langword="null"/>
+    /// when not given. The last value wins.
+    /// </summary>
+    public string? DefaultProtocol { get; internal set; }
+
     /// <summary>The <c>--ciphers</c> list, verbatim; <see langword="null"/> when not given. The last value wins.</summary>
     public string? Ciphers { get; internal set; }
 

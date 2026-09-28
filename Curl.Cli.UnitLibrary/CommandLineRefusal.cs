@@ -12,7 +12,8 @@ namespace Curl.Cli;
 /// exit code, which is <see cref="CurlExitCode.FailedInit"/>
 /// (curl's <c>CURLE_FAILED_INIT</c>, exit 2; see <see href="https://curl.se/libcurl/c/libcurl-errors.html"/>)
 /// for every refusal but a file that cannot be read (<see cref="DataFileUnreadable"/>,
-/// <see cref="ConfigFileUnreadable"/>), which is <see cref="CurlExitCode.ReadError"/> (26).
+/// <see cref="ConfigFileUnreadable"/>), which is <see cref="CurlExitCode.ReadError"/> (26), and an unknown
+/// <c>--proto-default</c> scheme (<see cref="UnsupportedProtocol"/>), which is <see cref="CurlExitCode.UnsupportedProtocol"/> (1).
 /// It writes nothing itself; the console layer writes the lines and chooses the newline.
 /// </summary>
 /// <remarks>
@@ -62,7 +63,8 @@ public sealed class CommandLineRefusal
 
     /// <summary>
     /// The exit code curl returns for the refused command line: <see cref="CurlExitCode.FailedInit"/>,
-    /// or <see cref="CurlExitCode.ReadError"/> when a file could not be read.
+    /// <see cref="CurlExitCode.ReadError"/> when a file could not be read, or <see cref="CurlExitCode.UnsupportedProtocol"/>
+    /// for <see cref="UnsupportedProtocol"/>.
     /// </summary>
     public CurlExitCode ExitCode { get; }
 
@@ -167,6 +169,21 @@ public sealed class CommandLineRefusal
     /// <exception cref="ArgumentNullException"><paramref name="spelledOption"/> is <see langword="null"/>.</exception>
     public static CommandLineRefusal BadlyUsedHere(string spelledOption) =>
         Create(spelledOption, "is badly used here");
+
+    /// <summary>
+    /// Refuses a <c>--proto-default</c> scheme curl does not know, with exit code
+    /// <see cref="CurlExitCode.UnsupportedProtocol"/> (1), whether or not <c>-s</c> came first
+    /// (measured with <c>curl --proto-default bogus</c>, curl 8.21.0, Windows, 2026-09-28).
+    /// </summary>
+    /// <param name="spelledOption">The whole argument as typed, such as <c>--proto-default</c>.</param>
+    /// <returns>A refusal reading <c>a specified protocol is unsupported by libcurl</c>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="spelledOption"/> is <see langword="null"/>.</exception>
+    public static CommandLineRefusal UnsupportedProtocol(string spelledOption)
+    {
+        ArgumentNullException.ThrowIfNull(spelledOption);
+
+        return new CommandLineRefusal(CurlExitCode.UnsupportedProtocol, [], spelledOption, "a specified protocol is unsupported by libcurl");
+    }
 
     /// <summary>
     /// Refuses <c>-C</c>/<c>--continue-at</c> and <c>-r</c>/<c>--range</c> on one command line,
