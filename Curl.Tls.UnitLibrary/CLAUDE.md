@@ -9,7 +9,8 @@ only for what `SslStream` cannot offer (`--curves`, `--sigalgs`, `--tls-earlydat
 where the operating system disables them, `--ssl-allow-beast`). Everything else stays on
 `SslStreamTlsProvider` in `Curl.Networking.UnitLibrary`.
 
-Namespace `Curl.Tls`. What is here so far (BL-698): the handshake message codecs.
+Namespace `Curl.Tls`. What is here so far: the handshake message codecs (BL-698) and the
+TLS 1.3 key schedule (BL-697).
 
 - `HandshakeMessageReader` frames handshake bytes into `HandshakeMessage`s (type and
   body); an unknown type is `unexpected_message`.
@@ -23,6 +24,16 @@ Namespace `Curl.Tls`. What is here so far (BL-698): the handshake message codecs
   exception. They read through the internal `TlsReader`, whose first failure sticks, so
   a decoder reads in a straight line and checks once in `Finish`; a repeated extension
   in one block is `illegal_parameter`, any length past its end is `decode_error`.
+- `HkdfLabel` (public, for QUIC): `Encode` builds RFC 8446's `HkdfLabel` info block with
+  the `tls13 ` prefix, `Expand` is HKDF-Expand-Label over the BCL's `HKDF`.
+- `Tls13KeySchedule` (`Sha256`, `Sha384`): pure functions for RFC 8446 section 7 - the
+  early, handshake and master secrets, every Derive-Secret by its RFC name, traffic keys
+  and IVs (`Tls13TrafficKeys`), Finished keys and verify data, PSK binders, the
+  resumption PSK, and the KeyUpdate secret. Secrets are passed in and returned; the
+  handshake holds them.
+- `TranscriptHash` accumulates handshake messages (header included) and reads the hash
+  without ending it; `ReplaceWithMessageHash` swaps the first ClientHello for the
+  `message_hash` message after a HelloRetryRequest.
 
 ## Rules
 
