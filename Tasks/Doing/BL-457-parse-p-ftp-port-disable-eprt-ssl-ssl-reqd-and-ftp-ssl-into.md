@@ -36,3 +36,4 @@ Filed by BL-437 under ADR-0102. BL-458 depends on this task.
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
