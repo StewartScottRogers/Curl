@@ -46,7 +46,7 @@ namespace Curl.Cli;
 /// <c>--no-data-ascii</c>, <c>--no-data-binary</c>, <c>--no-data-raw</c>, <c>--no-data-urlencode</c>, <c>--no-json</c>,
 /// <c>--no-form</c>, <c>--no-form-string</c>,
 /// <c>--no-url-query</c>, <c>--no-max-redirs</c>, <c>--no-config</c>, <c>--no-http1.0</c>, <c>--no-http1.1</c>, <c>--no-http2</c>,
-/// <c>--no-http2-prior-knowledge</c>, <c>--no-http3</c>, <c>--no-http3-only</c>, <c>--no-request-target</c>, <c>--no-ipfs-gateway</c>, <c>--no-anyauth</c>,
+/// <c>--no-http2-prior-knowledge</c>, <c>--no-http3</c>, <c>--no-http3-only</c>, <c>--no-ipv4</c>, <c>--no-ipv6</c>, <c>--no-request-target</c>, <c>--no-ipfs-gateway</c>, <c>--no-anyauth</c>,
 /// <c>--no-oauth2-bearer</c>, <c>--no-proxy</c>, <c>--no-proxy-user</c>, <c>--no-noproxy</c>, <c>--no-socks4</c>, <c>--no-socks4a</c>,
 /// <c>--no-socks5</c>, <c>--no-socks5-hostname</c>, <c>--no-write-out</c>, <c>--no-output-dir</c>, <c>--no-trace</c>, <c>--no-trace-ascii</c>, <c>--no-stderr</c>, <c>--no-retry</c>, <c>--no-retry-delay</c>, <c>--no-retry-max-time</c>, <c>--no-limit-rate</c>,
 /// <c>--no-speed-limit</c>, <c>--no-speed-time</c>, <c>--no-ftp-method</c>, <c>--no-ftp-port</c>, <c>--no-ftp-pasv</c>, <c>--no-quote</c>, <c>--no-parallel-max</c> and <c>--no-parallel-max-host</c> (each also with <c>=x</c>) exit 2 with
@@ -104,6 +104,9 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("negotiate", null, (options, on) => options.WantAuthScheme(HttpAuthSchemes.Negotiate, on)),
         CommandLineOption.Flag("anyauth", null, options => options.WantEveryAuthScheme()),
         CommandLineOption.Text("oauth2-bearer", null, (options, token) => options.SetBearerToken(token)),
+        CommandLineOption.NegatableFlag("netrc", 'n', (options, on) => options.NetrcRequested = on),
+        CommandLineOption.NegatableFlag("netrc-optional", null, (options, on) => options.NetrcOptionalRequested = on),
+        CommandLineOption.Value("netrc-file", null, SettingExistingFile("--netrc-file", (options, file) => options.NetrcFile = file)),
         CommandLineOption.Value("proxy", 'x', AcceptingEmpty((options, proxy) => options.SetProxy(proxy, ProxyKind.Http))),
         CommandLineOption.Text("socks4", null, (options, proxy) => options.SetProxy(proxy, ProxyKind.Socks4)),
         CommandLineOption.Text("socks4a", null, (options, proxy) => options.SetProxy(proxy, ProxyKind.Socks4a)),
@@ -124,6 +127,8 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("sasl-ir", null, (options, on) => options.SaslInitialResponse = on),
         CommandLineOption.Value("resolve", null, AcceptingEmpty((options, entry) => options.AddResolveEntry(entry))),
         CommandLineOption.Value("connect-to", null, AcceptingEmpty((options, entry) => options.AddConnectToEntry(entry))),
+        CommandLineOption.FileName("unix-socket", null, (options, path) => options.SetUnixSocket(path, isAbstract: false)),
+        CommandLineOption.FileName("abstract-unix-socket", null, (options, path) => options.SetUnixSocket(path, isAbstract: true)),
         CommandLineOption.NegatableFlag("tftp-no-options", null, (options, on) => options.TftpNoOptions = on),
         CommandLineOption.NegatableFlag("disable-epsv", null, (options, on) => options.FtpDisableEpsv = on),
         CommandLineOption.NegatableFlag("epsv", null, (options, on) => options.FtpDisableEpsv = !on),
@@ -167,11 +172,11 @@ public static class CommandLineOptionTable
         CommandLineOption.Value("hostpubmd5", null, SetHostPublicKeyMd5),
         CommandLineOption.Text("hostpubsha256", null, (options, hash) => options.SshHostPublicKeySha256 = hash),
         CommandLineOption.NegatableFlag("compressed-ssh", null, (options, on) => options.SshCompression = on),
-        CommandLineOption.Flag("tlsv1", '1', options => options.MinimumTlsVersion = ObsoleteTlsProtocols.Tls10),
-        CommandLineOption.Flag("tlsv1.0", null, options => options.MinimumTlsVersion = ObsoleteTlsProtocols.Tls10),
-        CommandLineOption.Flag("tlsv1.1", null, options => options.MinimumTlsVersion = ObsoleteTlsProtocols.Tls11),
-        CommandLineOption.Flag("tlsv1.2", null, options => options.MinimumTlsVersion = SslProtocols.Tls12),
-        CommandLineOption.Flag("tlsv1.3", null, options => options.MinimumTlsVersion = SslProtocols.Tls13),
+        CommandLineOption.FlagThatCanRefuse("tlsv1", '1', (options, spelledOption) => SetMinimumTlsVersion(options, ObsoleteTlsProtocols.Tls10, spelledOption)),
+        CommandLineOption.FlagThatCanRefuse("tlsv1.0", null, (options, spelledOption) => SetMinimumTlsVersion(options, ObsoleteTlsProtocols.Tls10, spelledOption)),
+        CommandLineOption.FlagThatCanRefuse("tlsv1.1", null, (options, spelledOption) => SetMinimumTlsVersion(options, ObsoleteTlsProtocols.Tls11, spelledOption)),
+        CommandLineOption.FlagThatCanRefuse("tlsv1.2", null, (options, spelledOption) => SetMinimumTlsVersion(options, SslProtocols.Tls12, spelledOption)),
+        CommandLineOption.FlagThatCanRefuse("tlsv1.3", null, (options, spelledOption) => SetMinimumTlsVersion(options, SslProtocols.Tls13, spelledOption)),
         CommandLineOption.Value("tls-max", null, SetMaximumTlsVersion),
         CommandLineOption.Flag("proxy-tlsv1", null, options => options.ProxyMinimumTlsVersion = ObsoleteTlsProtocols.Tls10),
         CommandLineOption.Value("proto", null, (options, value, spelledOption, _, _) => SetAllowedProtocols(options, value, spelledOption, allowed => options.AllowedProtocols = allowed)),
@@ -235,6 +240,8 @@ public static class CommandLineOptionTable
         CommandLineOption.Text("ipfs-gateway", null, (options, gateway) => options.IpfsGateway = gateway),
         CommandLineOption.Flag("http1.0", '0', options => options.SelectHttpVersion(HttpVersionPreference.Http10)),
         CommandLineOption.Flag("http1.1", null, options => options.SelectHttpVersion(HttpVersionPreference.Http11)),
+        CommandLineOption.Flag("ipv4", '4', options => options.IpAddressFamily = IpAddressFamilyChoice.IPv4Only),
+        CommandLineOption.Flag("ipv6", '6', options => options.IpAddressFamily = IpAddressFamilyChoice.IPv6Only),
         CommandLineOption.UnsupportedFlag("http2"),
         CommandLineOption.UnsupportedFlag("http2-prior-knowledge"),
         CommandLineOption.UnsupportedFlag("http3"),
@@ -719,9 +726,9 @@ public static class CommandLineOptionTable
     }
 
     /// <summary>
-    /// Records a <c>--cacert</c>, <c>--proxy-cacert</c> or <c>--knownhosts</c> value through
+    /// Records a <c>--cacert</c>, <c>--proxy-cacert</c>, <c>--knownhosts</c> or <c>--netrc-file</c> value through
     /// <paramref name="set"/> when a file or directory exists at it, and otherwise refuses it with curl
-    /// 8.21.0's lines, which name <paramref name="longOption"/> (measured for all three); <c>-s</c> without
+    /// 8.21.0's lines, which name <paramref name="longOption"/> (measured for all four); <c>-s</c> without
     /// <c>-S</c>, read first, hides the first of them. An empty value is checked like any other, so it is
     /// refused as a missing file, not as blank. A directory passes here; curl fails it later. A value that
     /// looks like a flag gets curl's filename warning first, whether or not it exists.
@@ -775,7 +782,9 @@ public static class CommandLineOptionTable
     /// Records the <c>--tls-max</c> ceiling, or refuses with <see cref="CommandLineRefusal.BadlyUsedHere"/> for
     /// any value but <c>default</c>, <c>1.0</c>, <c>1.1</c>, <c>1.2</c> and <c>1.3</c>, matched exactly and
     /// case-sensitively as curl 8.21.0 does (<c>1.4</c>, <c>abc</c>, <c>DEFAULT</c>, <c>1</c>, <c>1.2 </c> and an
-    /// empty value are refused; measured 2026-09-28).
+    /// empty value are refused; measured 2026-09-28). A ceiling below the minimum already read is refused with
+    /// <see cref="CommandLineRefusal.MaximumTlsVersionBelowMinimum"/>, and so is <c>default</c> after any minimum,
+    /// as curl 8.21.0 counts <c>default</c> as lower than every version there (BL-502 Notes).
     /// </summary>
     private static CommandLineRefusal? SetMaximumTlsVersion(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
     {
@@ -784,7 +793,28 @@ public static class CommandLineOptionTable
             return CommandLineRefusal.BadlyUsedHere(spelledOption);
         }
 
+        if (options.MinimumTlsVersion is { } minimum && (maximum ?? SslProtocols.None) < minimum)
+        {
+            return CommandLineRefusal.MaximumTlsVersionBelowMinimum(spelledOption, options.ErrorsHidden);
+        }
+
         options.MaximumTlsVersion = maximum;
+        return null;
+    }
+
+    /// <summary>
+    /// Records a minimum TLS version from <c>-1</c>/<c>--tlsv1</c>, <c>--tlsv1.0</c> … <c>--tlsv1.3</c>, or refuses
+    /// with <see cref="CommandLineRefusal.MinimumTlsVersionAboveMaximum"/> when a <c>--tls-max</c> already read is
+    /// below it, as curl 8.21.0 does (BL-502 Notes).
+    /// </summary>
+    private static CommandLineRefusal? SetMinimumTlsVersion(CommandLineOptions options, SslProtocols minimum, string spelledOption)
+    {
+        if (options.MaximumTlsVersion is { } maximum && minimum > maximum)
+        {
+            return CommandLineRefusal.MinimumTlsVersionAboveMaximum(spelledOption, options.ErrorsHidden);
+        }
+
+        options.MinimumTlsVersion = minimum;
         return null;
     }
 

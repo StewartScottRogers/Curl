@@ -339,8 +339,43 @@ public sealed class DictProtocolHandlerTests
         Assert.IsTrue(connection.IsDisposed);
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_Connected_ReportsTheTransferStartedAndTheRunningByteTotal()
+    {
+        // The runner's -m watchdog reads these to print "with 7 bytes received" (ADR-0117, BL-511).
+        var connection = new ScriptedConnection("hel"u8.ToArray(), "lo\r\n"u8.ToArray());
+        RecordingProgress progress = new();
+        var context = new TransferContext { Url = CurlUrl.Parse("dict://h/d:x"), Output = new MemoryStream(), Progress = progress };
+
+        await new DictProtocolHandler(new RecordingConnector(ConnectResult.Connected(connection))).ExecuteAsync(context);
+
+        CollectionAssert.AreEqual(new[] { "started", "downloaded 3", "downloaded 7" }, progress.Reports);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ConnectFailed_ReportsNothing()
+    {
+        RecordingProgress progress = new();
+        var context = new TransferContext { Url = CurlUrl.Parse("dict://h/d:x"), Output = new MemoryStream(), Progress = progress };
+
+        await new DictProtocolHandler(new RecordingConnector(ConnectResult.Failed(CurlExitCode.CouldntConnect, "refused"))).ExecuteAsync(context);
+
+        Assert.IsEmpty(progress.Reports);
+    }
+
     private static TransferContext Context(string url, Stream output) =>
         new() { Url = CurlUrl.Parse(url), Output = output };
+
+    private sealed class RecordingProgress : ITransferProgress
+    {
+        public List<string> Reports { get; } = [];
+
+        public void ReportTransferStarted() => Reports.Add("started");
+
+        public void ReportDownloaded(long bytesSoFar, long? expectedTotal) => Reports.Add($"downloaded {bytesSoFar}{expectedTotal}");
+
+        public void ReportUploaded(long bytesSoFar, long? expectedTotal) => Reports.Add($"uploaded {bytesSoFar}");
+    }
 
     private static async Task<string> SentForAsync(string path) =>
         Encoding.Latin1.GetString(await SentBytesForAsync(path));

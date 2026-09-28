@@ -74,6 +74,7 @@ public sealed class GopherProtocolHandler : IProtocolHandler
             return new TransferResult(connected.ExitCode, 0, connected.ErrorMessage) { IsConnectionRefused = connected.IsConnectionRefused };
         }
 
+        context.Progress.ReportTransferStarted();
         await using (connection.ConfigureAwait(false))
         {
             if (GopherSelector.FromUrl(context.Url) is not { } selector)
@@ -86,7 +87,7 @@ public sealed class GopherProtocolHandler : IProtocolHandler
                 return TransferResult.Failure(CurlExitCode.SendError, GopherTransferMessages.SendFailed);
             }
 
-            return await CopyReplyAsync(connection, context.Output, context.CancellationToken).ConfigureAwait(false);
+            return await CopyReplyAsync(connection, context.Output, context.Progress, context.CancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -120,6 +121,7 @@ public sealed class GopherProtocolHandler : IProtocolHandler
     private static async ValueTask<TransferResult> CopyReplyAsync(
         IConnection connection,
         Stream output,
+        ITransferProgress progress,
         CancellationToken cancellationToken)
     {
         byte[] buffer = new byte[ReadBufferSize];
@@ -154,6 +156,7 @@ public sealed class GopherProtocolHandler : IProtocolHandler
             }
 
             bytesWritten += read;
+            progress.ReportDownloaded(bytesWritten, null);
         }
     }
 

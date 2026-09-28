@@ -105,8 +105,9 @@
     The shift sizes itself (ADR-0130) and never needs to know the Claude plan. Before any
     lane starts it reads the machine cap from <repo>.lanes\machine-lanes.json, running the
     machine probe first when that file is missing, incomplete or from other hardware, and
-    starts at the lane count <repo>.lanes\auto-lanes.json saved (2 the first time), capped
-    by the ceilings. Every 15 minutes, except while waiting for tokens, it samples usage,
+    starts at the lane count <repo>.lanes\auto-lanes.json saved, raised to -MinStartLanes
+    (default 3) when that is more, and capped by the ceilings. -MinStartLanes is only where
+    the shift starts, not a floor: Auto still retires below it when pace demands. Every 15 minutes, except while waiting for tokens, it samples usage,
     meters the burn rate per busy lane, paces to the 5-hour window and (unless
     -NoWeeklyPace) the weekly one, caps that by the board's capacity, the machine cap and
     -MaxLanes, and adds or retires at most one lane, tracing why: "lanes 3 -> 4 (5-hour
@@ -123,7 +124,16 @@
     finished), the last tool step and when the task started. It is rewritten on every phase
     change, on each new tool step and at least every 60 seconds during a run or a wait,
     through a temporary file and a rename, so a reader never sees half of one. Lanes never
-    push it; the coordinator publishes the lanes' files. -TestHeartbeat rehearses it.
+    push it. Every -HeartbeatMinutes (default 3; 0 turns publishing off) the coordinator
+    merges the shift's heartbeat files into one status.json, sorted by lane, and
+    force-pushes it to the board branch as a single parentless commit built with plumbing
+    (hash-object, mktree, commit-tree), so its checkout's working tree and index never
+    change. It publishes once more at shift end with "state": "ended" and every lane
+    finished. A single-runner shift publishes its own lane 0 the same way, from where it
+    writes its heartbeat. The board branch is the only one this script force-pushes
+    (Stewart, 2026-09-28); a failed push is traced once and never stops the shift. The
+    live board page reads it. -TestHeartbeat rehearses the files, the merge and the
+    commit, without pushing.
 
     MACHINE PROBE (-ProbeMachine)
 
@@ -182,8 +192,13 @@ param(
     [ValidateRange(1, 16)][int]$ProbeMaxLanes = 16,
     # Check the -ProbeMachine pass and cap rule on recorded steps, and exit.
     [switch]$TestMachineProbe,
-    # Walk lane 1's heartbeat file through its phases in a temporary log root, print each, and exit.
+    # Walk lane 1's heartbeat file through its phases in a temporary log root, print each,
+    # then merge three made-up lanes into status.json, print it and the board commit built
+    # from it (never pushed), and exit.
     [switch]$TestHeartbeat,
+    # How often, in minutes, the lanes' heartbeats are published as status.json on the
+    # force-pushed board branch, plus once at shift end. 0 = never publish.
+    [ValidateRange(0, 60)][int]$HeartbeatMinutes = 3,
     # How long before the usage limit resets to say the new session is about to start.
     [ValidateRange(0, 3600)][int]$LimitWarnSeconds = 60,
     # While waiting for tokens, how often to check whether the limit was lifted early. 0 = never.
@@ -206,6 +221,9 @@ param(
     [ValidatePattern('^(?i:auto|[1-9]|1[0-6])$')][string]$Lanes = '1',
     # -Lanes Auto's lane maximum.
     [ValidateRange(1, 16)][int]$MaxLanes = 16,
+    # The fewest lanes a -Lanes Auto shift starts with (Stewart, 2026-09-28). A start, not a
+    # floor: the ceilings still cap it, and Auto still retires below it when pace demands.
+    [ValidateRange(1, 16)][int]$MinStartLanes = 3,
     # -Lanes Auto paces to the 5-hour window only: burn fast and stop at -StopAtWeeklyUsage
     # instead of spreading the weekly budget evenly until its reset.
     [switch]$NoWeeklyPace,
@@ -330,6 +348,9 @@ function Write-Heartbeat {
             Write-Trace '-' 'beat' "heartbeat not written: $(Get-Short $_.Exception.Message 80)" 'DarkYellow'
         }
     }
+    # The single runner publishes its own lane 0, throttled to -HeartbeatMinutes; its last
+    # publish, with "state": "ended", is made at shift end.
+    if (-not $Lane -and $script:Beat.Phase -ne 'finished') { Publish-BoardStatusIfDue -Branch $branch }
 }
 
 function Write-HeartbeatIfDue {
@@ -346,6 +367,91 @@ function Set-HeartbeatStep {
     if ($step -eq $script:Beat.Step) { return }
     $script:Beat.Step = $step
     Write-Heartbeat
+}
+
+# ---------------------------------------------------------------------------- board branch
+
+# The board branch's status.json (ADR-0129 items 7 to 9): the shift's heartbeat files merged
+# into one file and force-pushed as a single parentless commit. It has one writer - the
+# coordinator of a lane shift, or the single runner for its own lane 0. Lanes never push.
+$script:BoardStatus = @{ Lanes = @{}; PublishedAt = [datetime]::MinValue; PushFailing = $false }
+
+function Get-BoardStatusJson {
+    # Merges every lane-<n>.heartbeat.json of this shift into status.json schema 1, lanes
+    # sorted by number. A lane whose file cannot be read keeps its last good object.
+    # -State ended marks every lane finished.
+    param([string]$Branch, [string]$State = 'running')
+    $dir = Join-Path $LogDir "lanes-$Stamp"
+    foreach ($file in @(Get-ChildItem $dir -Filter 'lane-*.heartbeat.json' -ErrorAction SilentlyContinue)) {
+        try {
+            $laneObject = [System.IO.File]::ReadAllText($file.FullName) | ConvertFrom-Json -ErrorAction Stop
+            if ($null -eq $laneObject.lane) { continue }
+            $script:BoardStatus.Lanes[[int]$laneObject.lane] = $laneObject
+        } catch { }
+    }
+    $laneObjects = @($script:BoardStatus.Lanes.Keys | Sort-Object | ForEach-Object { $script:BoardStatus.Lanes[$_] })
+    if ($State -eq 'ended') { foreach ($laneObject in $laneObjects) { $laneObject.phase = 'finished' } }
+    return [pscustomobject][ordered]@{
+        schema = 1
+        shift = $Stamp
+        branch = $Branch
+        state = $State
+        publishedAt = Get-UtcStamp
+        lanes = $laneObjects
+    } | ConvertTo-Json -Depth 4
+}
+
+function New-BoardCommit {
+    # Builds the board branch's commit with plumbing - a blob, a tree holding only
+    # status.json, and a commit with no parent - so the checkout's working tree and index
+    # never change. Returns the commit id; throws when git fails.
+    param([string]$Json)
+    # Nothing is piped to git: Windows PowerShell pipes to a native command in its output
+    # encoding, which can prepend a byte order mark and mangle a title's non-ASCII
+    # characters. The blob is hashed from a UTF-8 file and mktree reads its line through a
+    # cmd redirect.
+    $utf8 = New-Object System.Text.UTF8Encoding $false
+    $file = Join-Path ([IO.Path]::GetTempPath()) "DarkFactoryStatus-$Stamp-$PID.json"
+    $treeFile = "$file.tree"
+    try {
+        [System.IO.File]::WriteAllText($file, $Json, $utf8)
+        $blob = "$(git -C $Root hash-object -w -- $file 2>$null)".Trim()
+        if ($LASTEXITCODE -ne 0 -or $blob -notmatch '^[0-9a-f]{40,64}$') { throw 'git hash-object failed' }
+        [System.IO.File]::WriteAllText($treeFile, "100644 blob $blob`tstatus.json`n", $utf8)
+        $mktree = 'git -C "{0}" mktree < "{1}"' -f $Root, $treeFile
+        $tree = "$(cmd /s /c $mktree 2>$null)".Trim()
+        if ($LASTEXITCODE -ne 0 -or $tree -notmatch '^[0-9a-f]{40,64}$') { throw 'git mktree failed' }
+    } finally { Remove-Item $file, $treeFile -ErrorAction SilentlyContinue }
+    $commit = "$(git -C $Root commit-tree $tree -m "chore(board): lane status $(Get-UtcStamp)" 2>$null)".Trim()
+    if ($LASTEXITCODE -ne 0 -or $commit -notmatch '^[0-9a-f]{40,64}$') { throw 'git commit-tree failed' }
+    return $commit
+}
+
+function Publish-BoardStatus {
+    # Publishes status.json now: builds the commit and force-pushes it to the board branch,
+    # the only branch this script force-pushes. A failure is traced once per failure streak
+    # and never stops the shift or raises the alarm. -HeartbeatMinutes 0 publishes nothing.
+    param([string]$Branch, [string]$State = 'running')
+    if ($HeartbeatMinutes -le 0) { return }
+    $script:BoardStatus.PublishedAt = Get-Date
+    try {
+        $commit = New-BoardCommit (Get-BoardStatusJson -Branch $Branch -State $State)
+        git -C $Root push -q --force origin "${commit}:refs/heads/board" 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "git push exited $LASTEXITCODE" }
+        if ($script:BoardStatus.PushFailing) { Write-Trace '-' 'board' 'status.json published to board again' }
+        $script:BoardStatus.PushFailing = $false
+    } catch {
+        if (-not $script:BoardStatus.PushFailing) {
+            Write-Trace '-' 'board' "status.json not published: $(Get-Short $_.Exception.Message 80)" 'DarkYellow'
+        }
+        $script:BoardStatus.PushFailing = $true
+    }
+}
+
+function Publish-BoardStatusIfDue {
+    # Publishes once -HeartbeatMinutes have passed since the last publish.
+    param([string]$Branch)
+    if (((Get-Date) - $script:BoardStatus.PublishedAt).TotalMinutes -ge $HeartbeatMinutes) { Publish-BoardStatus -Branch $Branch }
 }
 
 # ---------------------------------------------------------------------------- herdr
@@ -820,6 +926,19 @@ function Get-NextLaneCount {
     return [pscustomobject]@{ Lanes = $lanes; Changed = ($lanes -ne $Current); Desired = $desired; Reason = "$step ($limit)" }
 }
 
+function Get-AutoStartCount {
+    # Where an Auto shift starts: the lane count auto-lanes.json saved (none on the first
+    # Auto shift), raised to -MinStart, capped by the ceilings and at least 1. Why says which.
+    param($Saved, [int]$Capacity, [int]$MachineCap, [int]$MinStart = $MinStartLanes, [int]$Max = $MaxLanes)
+    $count = $MinStart
+    $why = 'first auto shift'
+    if ($Saved -and $Saved.lanes) { $count = [int]$Saved.lanes; $why = "last shift saved $count" }
+    if ($count -lt $MinStart) { $count = $MinStart; $why += ", raised to $count by -MinStartLanes" }
+    $ceiling = [math]::Min($Capacity, [math]::Min($MachineCap, $Max))
+    if ($count -gt $ceiling) { $count = [math]::Max(1, $ceiling); $why += ", capped at $count" }
+    return [pscustomobject]@{ Count = $count; Why = $why }
+}
+
 # Which lane scaling touches (ADR-0130 item 6), pure so -TestAutoLanes proves them.
 function Get-LaneToAdd {
     # The lowest lane number from 1 to -Max that is not active, or $null when all are.
@@ -894,7 +1013,12 @@ if ($TestAutoLanes) {
         ,@('lane-to-retire 1,2,3 retiring 3', '2', "$(Get-LaneToRetire -Active 1, 2, 3 -Retiring 3)")
         ,@('lane-to-retire 1,2,3 retiring 1,2,3', 'null', "$(if ($null -eq (Get-LaneToRetire -Active 1, 2, 3 -Retiring 1, 2, 3)) { 'null' } else { 'a lane' })")
         ,@('lanes-finished 1,3 of 1,2', 'False', "$(Test-LanesFinished -Active 1, 3 -Finished 1, 2)")
-        ,@('lanes-finished 1,3 of 1,3', 'True', "$(Test-LanesFinished -Active 1, 3 -Finished 1, 3)"))
+        ,@('lanes-finished 1,3 of 1,3', 'True', "$(Test-LanesFinished -Active 1, 3 -Finished 1, 3)")
+        ,@('start saved 2', '3 (last shift saved 2, raised to 3 by -MinStartLanes)', "$((Get-AutoStartCount ([pscustomobject]@{ lanes = 2 }) 16 16 3 16) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
+        ,@('start saved 5', '5 (last shift saved 5)', "$((Get-AutoStartCount ([pscustomobject]@{ lanes = 5 }) 16 16 3 16) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
+        ,@('start first shift', '3 (first auto shift)', "$((Get-AutoStartCount $null 16 16 3 16) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
+        ,@('start min 4 ceiling 2', '2 (first auto shift, capped at 2)', "$((Get-AutoStartCount $null 2 16 4 16) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
+        ,@('start min 1 saved 1', '1 (last shift saved 1)', "$((Get-AutoStartCount ([pscustomobject]@{ lanes = 1 }) 16 16 1 16) | ForEach-Object { "$($_.Count) ($($_.Why))" })"))
     $failed = 0
     foreach ($case in $cases) {
         if ($case[1] -ceq $case[2]) { Write-Host "PASS $($case[0]): $($case[2])" -ForegroundColor Green }
@@ -1898,6 +2022,21 @@ if ($TestHeartbeat) {
         Set-HeartbeatTask ''
         Write-Heartbeat 'finished'
         Get-Content -Raw $heartbeatFile
+        # Three made-up lanes, written out of order, merged into status.json and built into
+        # the board branch's commit. Never pushed: lanes are denied git push, and the first
+        # real push is the next shift's.
+        foreach ($fake in @(
+            @{ Lane = 3; Task = $null; Title = $null; Phase = 'wait'; Step = 'nothing can start yet' },
+            @{ Lane = 1; Task = 'BL-001'; Title = 'Rehearse lane one'; Phase = 'run'; Step = 'build' },
+            @{ Lane = 2; Task = 'BL-002'; Title = 'Rehearse lane two'; Phase = 'integrate'; Step = '' })) {
+            $Lane = $fake.Lane
+            $script:Beat.Task = $null
+            Set-HeartbeatTask $fake.Task -Title $fake.Title
+            Write-Heartbeat $fake.Phase $fake.Step
+        }
+        $json = Get-BoardStatusJson -Branch 'work/dark-factory'
+        $json
+        New-BoardCommit $json
     } finally { Remove-Item $LogDir -Recurse -Force -ErrorAction SilentlyContinue }
     exit 0
 }
@@ -1978,18 +2117,6 @@ function Remove-AutoBoard {
     # Deletes the $AutoBoardDir worktree.
     git -C $Root worktree remove --force $AutoBoardDir 2>&1 | Out-Null
     git -C $Root worktree prune 2>&1 | Out-Null
-}
-
-function Get-AutoStartCount {
-    # Where an Auto shift starts: the lane count auto-lanes.json saved, or 2 on the first
-    # Auto shift, capped by the ceilings and at least 1. Why says which.
-    param($Saved, [int]$Capacity, [int]$MachineCap)
-    $count = 2
-    $why = 'first auto shift'
-    if ($Saved -and $Saved.lanes) { $count = [int]$Saved.lanes; $why = "last shift saved $count" }
-    $ceiling = [math]::Min($Capacity, [math]::Min($MachineCap, $MaxLanes))
-    if ($count -gt $ceiling) { $count = [math]::Max(1, $ceiling); $why += ", capped at $count" }
-    return [pscustomobject]@{ Count = $count; Why = $why }
 }
 
 function Get-AutoLaneStep {
@@ -2337,6 +2464,8 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
             Invoke-AutoLaneStep
             $nextAutoStep = (Get-Date).AddMinutes(15)
         }
+        # The coordinator is the board branch's one writer for a lane shift.
+        Publish-BoardStatusIfDue -Branch $branch
         $running = @($procs | Where-Object { $_.Tab -or -not $_.Process.HasExited }).Count
         if ($running -eq 0) { break }
         Start-Sleep -Seconds 5
@@ -2361,6 +2490,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     foreach ($n in @($startedLanes)) {
         if (-not (Test-Path (Join-Path $summaries "lane-$n.txt"))) { Set-HerdrTabLabel $laneTabs[$n] (Get-LaneTabLabel $n 'no report, read') }
     }
+    Publish-BoardStatus -Branch $branch -State 'ended'
     Write-Trace '-' 'shift' "end  $LaneCount lanes$(if ($AutoLanes) { ' (auto)' })" 'Cyan'
     if ($AutoLanes) { Save-AutoLanes $LaneCount }
     Write-Trace '-' 'merge' (Invoke-MergeToMaster -Branch $branch) 'Cyan'
@@ -2372,8 +2502,8 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         foreach ($r in $reasons) { Write-Trace '-' 'note' (Get-Short $r 100) 'Yellow' }
         # An Auto shift hands on Auto, not the count it ended at; the next one starts from
         # the count auto-lanes.json saved.
-        $forward = @('-Lanes', $(if ($AutoLanes) { 'Auto' } else { $LaneCount }), '-Hours', $Hours, '-MaxTasks', $MaxTasks, '-TaskMinutes', $TaskMinutes, '-Model', $Model, '-Continuous')
-        if ($AutoLanes) { $forward += @('-MaxLanes', $MaxLanes) }
+        $forward = @('-Lanes', $(if ($AutoLanes) { 'Auto' } else { $LaneCount }), '-Hours', $Hours, '-MaxTasks', $MaxTasks, '-TaskMinutes', $TaskMinutes, '-Model', $Model, '-HeartbeatMinutes', $HeartbeatMinutes, '-Continuous')
+        if ($AutoLanes) { $forward += @('-MaxLanes', $MaxLanes, '-MinStartLanes', $MinStartLanes) }
         if ($NoWeeklyPace) { $forward += '-NoWeeklyPace' }
         if ($QuietAlarm) { $forward += '-QuietAlarm' }
         $next = Start-Detached -Label "DF shift starting" -Dir $Root -ScriptArgs $forward
@@ -2558,6 +2688,7 @@ Write-Trace '-' 'shift' "end ($stopWhy)  done=$done blocked=$blocked requeued=$r
 if ($stopWhy -eq 'runs failing') { $stalls = @('FACTORY STALLED - two runs in a row failed; check ' + $LogDir) + $stalls }
 Set-HeartbeatTask ''
 Write-Heartbeat 'finished' (Get-Short $stopWhy 80)
+if (-not $Lane) { Publish-BoardStatus -Branch $branch -State 'ended' }
 
 if ($Lane) {
     # The coordinator raises one alarm for every lane; a lane only reports.

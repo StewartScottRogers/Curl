@@ -196,6 +196,15 @@ cancels after `-y` seconds below `-Y` (30 seconds, or 1 byte per second, when on
 given) ends with `curl: (28) Operation too slow. Less than N bytes/sec transferred the last T
 seconds`, as measured on curl 8.21.0 (ADR-0106, BL-400).
 
+Under a positive `-m`/`--max-time` each attempt also gets a `Curl.Core` `MaxTimeWatchdog` on the
+runner's clock (ADR-0117 and its BL-511 amendment): its start becomes the context's
+`OperationStarted`, `TransferContextFactory` wraps the progress sink so it learns whether the
+handler reported the transfer started and how many body bytes it received, and its token also
+cancels the context's. An attempt it cancels ends with exit 28 and `Operation timed out after N
+milliseconds with M bytes received` (`with M out of T` when the size is known), or `Connection
+timed out after N milliseconds` before the handler reported the transfer started; each `--retry`
+attempt gets a fresh `-m`. HTTP, TFTP and telnet (`Time-out`) keep their own measured messages.
+
 Under `-R`/`--remote-time` a successful transfer to an `-o` file whose result carries
 `SourceLastWriteTimeUtc` stamps the closed file with it through `IFileTimeSetter`
 (`PhysicalFileSystem` in production), even when no body was written, as curl does. A

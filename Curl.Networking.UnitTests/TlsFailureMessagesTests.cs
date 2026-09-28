@@ -31,6 +31,57 @@ public sealed class TlsFailureMessagesTests
     }
 
     [TestMethod]
+    public void SchannelSslConnectError_UnsupportedFunctionWhenOfferingOnlyVersionsBelowTls12_IsTheMeasuredHandshakeNotReceivedLine()
+    {
+        // curl 8.21.0 (Schannel) --tlsv1.1 --tls-max 1.1 against a TLS 1.2 server, 2026-09-28 (BL-502).
+        var exception = new AuthenticationException(
+            "Authentication failed, see inner exception.",
+            new Win32Exception(unchecked((int)0x80090302), "The function requested is not supported"));
+
+        var message = TlsFailureMessages.SchannelSslConnectError(exception, offersOnlyVersionsBelowTls12: true);
+
+        Assert.AreEqual("schannel: failed to receive handshake, SSL/TLS connection failed", message);
+    }
+
+    [TestMethod]
+    public void SchannelSslConnectError_ServerRefusalWhenOfferingOnlyVersionsBelowTls12_IsTheMeasuredHandshakeNotReceivedLine()
+    {
+        // curl 8.21.0 (Schannel) --tls-max 1.1 against a TLS 1.2 server, 2026-09-28 (BL-502).
+        var exception = new AuthenticationException(
+            "Authentication failed because the remote party sent a TLS alert: 'ProtocolVersion'.",
+            new Win32Exception(unchecked((int)0x80090326), "The message received was unexpected or badly formatted."));
+
+        var message = TlsFailureMessages.SchannelSslConnectError(exception, offersOnlyVersionsBelowTls12: true);
+
+        Assert.AreEqual("schannel: failed to receive handshake, SSL/TLS connection failed", message);
+    }
+
+    [TestMethod]
+    public void SchannelSslConnectError_SocketErrorWhenOfferingOnlyVersionsBelowTls12_IsTheRecvFailure()
+    {
+        var message = TlsFailureMessages.SchannelSslConnectError(
+            ResetDuringHandshake(SocketError.ConnectionReset), offersOnlyVersionsBelowTls12: true);
+
+        Assert.AreEqual("Recv failure: Connection was reset", message);
+    }
+
+    [TestMethod]
+    public void OpenSslSslConnectError_NoProtocolsAvailable_IsTheMeasuredLine()
+    {
+        // curl 8.18.0 (OpenSSL 3.5.5, Ubuntu) --tls-max 1.1 and --tlsv1.0 --tls-max 1.0, 2026-09-28 (BL-502);
+        // SslStream on the same OpenSSL throws this chain for a TLS 1.0/1.1-only client.
+        var exception = new AuthenticationException(
+            "Authentication failed, see inner exception.",
+            new InvalidOperationException(
+                "SSL Handshake failed with OpenSSL error - SSL_ERROR_SSL.",
+                new CryptographicException("error:0A0000BF:SSL routines::no protocols available")));
+
+        var message = TlsFailureMessages.OpenSslSslConnectError(exception);
+
+        Assert.AreEqual("TLS connect error: error:0A0000BF:SSL routines::no protocols available", message);
+    }
+
+    [TestMethod]
     public void SchannelSslConnectError_WithASecurityStatusCurlDoesNotName_SaysUnknownError()
     {
         var exception = new AuthenticationException(

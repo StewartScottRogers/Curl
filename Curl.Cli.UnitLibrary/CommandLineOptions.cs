@@ -371,6 +371,37 @@ public sealed class CommandLineOptions
     public NetworkCredential? Credentials { get; private set; }
 
     /// <summary>
+    /// <see langword="true"/> when <c>-n</c> / <c>--netrc</c> was given and no <c>--no-netrc</c> came after it.
+    /// Giving it more than once has no extra effect.
+    /// </summary>
+    public bool NetrcRequested { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--netrc-optional</c> was given and no <c>--no-netrc-optional</c> came
+    /// after it. It makes the netrc file optional even beside <c>-n</c> or <c>--netrc-file</c>, which curl
+    /// 8.21.0 accepts in either order although its manual calls them mutually exclusive (measured
+    /// 2026-09-28, BL-504 Notes).
+    /// </summary>
+    public bool NetrcOptionalRequested { get; internal set; }
+
+    /// <summary>
+    /// The <c>--netrc-file</c> value, which curl 8.21.0 requires to exist (a directory passes) when the option
+    /// is read; <see langword="null"/> when not given. The last value wins, and <c>--no-netrc</c> does not
+    /// clear it.
+    /// </summary>
+    public string? NetrcFile { get; internal set; }
+
+    /// <summary>
+    /// Whether the transfer reads a netrc file, as curl 8.21.0 decides it: <see cref="NetrcUse.Optional"/>
+    /// when <see cref="NetrcOptionalRequested"/>, otherwise <see cref="NetrcUse.Required"/> when
+    /// <see cref="NetrcRequested"/> or a <see cref="NetrcFile"/> is named, otherwise <see cref="NetrcUse.Ignored"/>.
+    /// </summary>
+    public NetrcUse NetrcUse =>
+        NetrcOptionalRequested ? NetrcUse.Optional
+        : NetrcRequested || NetrcFile is not null ? NetrcUse.Required
+        : NetrcUse.Ignored;
+
+    /// <summary>
     /// The <c>-U</c> / <c>--proxy-user</c> value split at its first colon into user name and
     /// password, for the proxy; <see langword="null"/> when not given. A user with no password is
     /// asked for as <see cref="Credentials"/> is, with curl 8.21.0's proxy prompt. An empty value is
@@ -453,6 +484,20 @@ public sealed class CommandLineOptions
     /// the parser never refuses one.
     /// </summary>
     public IReadOnlyList<string> ConnectToEntries => connectToEntries;
+
+    /// <summary>
+    /// The path of the Unix domain socket to connect through, from whichever of <c>--unix-socket</c> and
+    /// <c>--abstract-unix-socket</c> came last; <see langword="null"/> when neither was given. curl 8.21.0
+    /// refuses an empty path as blank and accepts any other without looking at it, on Windows too (measured
+    /// 2026-09-28, BL-506 Notes).
+    /// </summary>
+    public string? UnixSocketPath { get; private set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <see cref="UnixSocketPath"/> came from <c>--abstract-unix-socket</c>, so
+    /// it names a socket in the abstract namespace rather than a file.
+    /// </summary>
+    public bool UnixSocketIsAbstract { get; private set; }
 
     /// <summary>
     /// The <c>--tftp-blksize</c> value as given, unclamped, except that a value past
@@ -697,7 +742,9 @@ public sealed class CommandLineOptions
     /// The highest TLS version to offer, from <c>--tls-max</c>: <see cref="ObsoleteTlsProtocols.Tls10"/> for
     /// <c>1.0</c>, <see cref="ObsoleteTlsProtocols.Tls11"/> for <c>1.1</c>, <see cref="SslProtocols.Tls12"/> for
     /// <c>1.2</c>, <see cref="SslProtocols.Tls13"/> for <c>1.3</c>; <see langword="null"/> when not given or given
-    /// as <c>default</c>. curl applies it to the origin and to an HTTPS proxy alike. The last value wins.
+    /// as <c>default</c>. curl 8.21.0 applies it to the origin only, never to an HTTPS proxy (measured, BL-502).
+    /// The last value wins. A ceiling below <see cref="MinimumTlsVersion"/>, in either order, is refused at parse
+    /// time, as curl refuses it.
     /// </summary>
     public SslProtocols? MaximumTlsVersion { get; internal set; }
 
@@ -1114,6 +1161,13 @@ public sealed class CommandLineOptions
     /// <see langword="null"/> when neither was given, which means curl's default, HTTP/1.1.
     /// </summary>
     public HttpVersionPreference? HttpVersion { get; private set; }
+
+    /// <summary>
+    /// The IP address family the last <c>-4</c> / <c>--ipv4</c> or <c>-6</c> / <c>--ipv6</c> chose;
+    /// <see cref="IpAddressFamilyChoice.Either"/> when neither was given. A later one overrides an
+    /// earlier one without a warning, as curl 8.21.0 does.
+    /// </summary>
+    public IpAddressFamilyChoice IpAddressFamily { get; internal set; }
 
     /// <summary>
     /// <see langword="true"/> when <c>--http0.9</c> was given and no <c>--no-http0.9</c> came after it:
@@ -1555,6 +1609,15 @@ public sealed class CommandLineOptions
     /// <summary>Appends <paramref name="entry"/> to <see cref="ConnectToEntries"/>, unchanged and unvalidated.</summary>
     /// <param name="entry">A <c>--connect-to</c> value, possibly empty.</param>
     internal void AddConnectToEntry(string entry) => connectToEntries.Add(entry);
+
+    /// <summary>Sets <see cref="UnixSocketPath"/> and <see cref="UnixSocketIsAbstract"/>, replacing any earlier socket.</summary>
+    /// <param name="path">A non-empty <c>--unix-socket</c> or <c>--abstract-unix-socket</c> value.</param>
+    /// <param name="isAbstract">Whether it came from <c>--abstract-unix-socket</c>.</param>
+    internal void SetUnixSocket(string path, bool isAbstract)
+    {
+        UnixSocketPath = path;
+        UnixSocketIsAbstract = isAbstract;
+    }
 
     /// <summary>Appends <paramref name="cookie"/> to <see cref="Cookies"/>, unchanged and unvalidated.</summary>
     /// <param name="cookie">A <c>-b</c> / <c>--cookie</c> value, possibly empty.</param>

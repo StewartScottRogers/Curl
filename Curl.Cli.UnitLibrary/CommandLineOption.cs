@@ -86,6 +86,28 @@ public sealed class CommandLineOption
     }
 
     /// <summary>
+    /// Creates a row for an option that takes no value, whose <c>--no-</c> spelling curl refuses, and
+    /// that can itself be refused given what was read before it, as curl 8.21.0 refuses <c>--tlsv1.3</c>
+    /// after <c>--tls-max 1.2</c>.
+    /// </summary>
+    /// <param name="longName">The long name without its leading <c>--</c>.</param>
+    /// <param name="shortName">The short letter, or <see langword="null"/> when there is none.</param>
+    /// <param name="setOrRefuse">
+    /// Sets the flag on the options being filled in and returns <see langword="null"/>, or returns the
+    /// refusal; it is given the argument as typed, for naming it in a refusal.
+    /// </param>
+    /// <returns>The row.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="longName"/> or <paramref name="setOrRefuse"/> is <see langword="null"/>.</exception>
+    public static CommandLineOption FlagThatCanRefuse(string longName, char? shortName, Func<CommandLineOptions, string, CommandLineRefusal?> setOrRefuse)
+    {
+        ArgumentNullException.ThrowIfNull(longName);
+        ArgumentNullException.ThrowIfNull(setOrRefuse);
+
+        return new CommandLineOption(longName, shortName, takesValue: false, (options, _, spelledOption, _, _) =>
+            setOrRefuse(options, spelledOption));
+    }
+
+    /// <summary>
     /// Creates the row for <c>-:</c> / <c>--next</c>, which ends one option group and starts the next:
     /// it takes no value (<c>--next=x</c> ignores the <c>x</c>), starts the next group through
     /// <see cref="CommandLineOptions.StartNextGroup"/>, and as a letter of a bundle ends the bundle, so

@@ -127,6 +127,54 @@ public sealed class CommandLineOptionTests
         Assert.IsFalse(setTo);
     }
 
+    // ---- FlagThatCanRefuse ----------------------------------------------------------
+
+    [TestMethod]
+    public void FlagThatCanRefuse_WithShortName_KeepsNamesAndTakesNoValueAndCannotBeNegated()
+    {
+        CommandLineOption option = CommandLineOption.FlagThatCanRefuse("tlsv1", '1', (_, _) => null);
+
+        Assert.AreEqual("tlsv1", option.LongName);
+        Assert.AreEqual('1', option.ShortName);
+        Assert.IsFalse(option.TakesValue);
+        Assert.IsNull(option.Negate);
+    }
+
+    [TestMethod]
+    public void FlagThatCanRefuse_NullLongName_ThrowsArgumentNull()
+    {
+        ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(
+            () => CommandLineOption.FlagThatCanRefuse(null!, '1', (_, _) => null));
+
+        Assert.AreEqual("longName", exception.ParamName);
+    }
+
+    [TestMethod]
+    public void FlagThatCanRefuse_NullSetOrRefuse_ThrowsArgumentNull()
+    {
+        ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(
+            () => CommandLineOption.FlagThatCanRefuse("tlsv1", '1', null!));
+
+        Assert.AreEqual("setOrRefuse", exception.ParamName);
+    }
+
+    [TestMethod]
+    public void FlagThatCanRefuseApply_Called_PassesSpellingAndReturnsItsRefusal()
+    {
+        CommandLineRefusal badlyUsed = CommandLineRefusal.BadlyUsedHere("--tlsv1.3");
+        string? spelled = null;
+        CommandLineOption option = CommandLineOption.FlagThatCanRefuse("tlsv1.3", null, (_, spelling) =>
+        {
+            spelled = spelling;
+            return badlyUsed;
+        });
+
+        CommandLineRefusal? refusal = option.Apply(new CommandLineOptions(), string.Empty, "--tlsv1.3", _ => false, new RecordingDataFileReader());
+
+        Assert.AreSame(badlyUsed, refusal);
+        Assert.AreEqual("--tlsv1.3", spelled);
+    }
+
     // ---- NegatableFlagThatCanRefuse -------------------------------------------------
 
     [TestMethod]

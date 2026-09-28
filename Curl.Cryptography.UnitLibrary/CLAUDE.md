@@ -31,8 +31,19 @@ Namespace `Curl.Cryptography`. It holds:
   internal `Initialize`, `Absorb` and `Finish` steps the AEAD drives.
 - `AeadChaCha20Poly1305` (public, `IDisposable`): AEAD_CHACHA20_POLY1305 - `Encrypt` and
   `TryDecrypt`, which returns `false` with the plaintext zeroed on a wrong tag.
+- `BlowfishPiDigits` (internal): Blowfish's initial P-array and S-boxes, the hexadecimal
+  digits of pi.
+- `BlowfishState` (internal): the P-array and S-boxes, the 16 rounds, and OpenBSD's two
+  key expansions (`ExpandKey(key)`, the standard schedule, and `ExpandKey(data, key)`,
+  bcrypt's salted one); `BcryptPbkdf` reuses it.
+- `Blowfish` (public, `IDisposable`): the block cipher, keys of 1 to 56 bytes -
+  `EncryptBlock`, `DecryptBlock`, and the CBC mode of SSH's `blowfish-cbc`, `EncryptCbc`
+  and `DecryptCbc`. Not constant-time.
+- `BcryptPbkdf` (public): OpenBSD's `bcrypt_pbkdf`, the KDF of encrypted
+  `openssh-key-v1` keys - `DeriveKey`, plus the internal bcrypt `ComputeHash`. Not
+  constant-time.
 
-The remaining primitives land under their own tasks (BL-674 to BL-677, BL-737
+The remaining primitives land under their own tasks (BL-675 to BL-677, BL-737
 to BL-745).
 
 ## Rules

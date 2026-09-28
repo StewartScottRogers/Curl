@@ -18,6 +18,11 @@ of at most 10 and a CRAP score of at most 30. The [full report](https://stewarts
 shows each library against those gates and every member outside one, measured on Windows
 and regenerated on the same schedule as the video above.*
 
+### [▦ Live task board](https://stewartscottrogers.github.io/Curl/board/)
+
+*The [live task board](https://stewartscottrogers.github.io/Curl/board/) shows every task
+by state and one card per dark factory lane, and refreshes itself every few minutes.*
+
 ## What this is
 
 Curl is a port of the open-source [curl](https://curl.se) command-line tool to C# on

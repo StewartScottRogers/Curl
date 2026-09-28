@@ -151,9 +151,9 @@ know.
    | `fiveHourRatePerLane` | Last five-hour rate, percentage points per hour per lane, or `null`. |
    | `weeklyRatePerLane` | Last weekly rate, percentage points per hour per lane, or `null`. |
 
-   - An Auto shift starts at `lanes`, capped by the ceilings, and meters from the saved
-     rates until it has its own.
-   - The first-ever start (no file) is 2 lanes.
+   - An Auto shift starts at `lanes`, raised to `-MinStartLanes` (default 3) when that is
+     more, capped by the ceilings, and meters from the saved rates until it has its own.
+   - The first-ever start (no file) is `-MinStartLanes` lanes. See the amendment below.
    - When adopted lanes number more than the start count, the shift starts at the highest
      adopted lane number, as today.
 
@@ -205,3 +205,15 @@ know.
 - **Guessing the machine cap from the processor count.** Builds are memory and disk
   bound too, so only a measurement is trustworthy.
 - **Worktrees for the probe.** `--artifacts-path` isolates the outputs without git.
+
+## Amendment 2026-09-28: a starting count of at least three lanes (BL-780)
+
+Stewart asked for at least three lanes, and chose a starting count over a hard floor. An
+Auto shift now starts at the larger of the saved `lanes` and `-MinStartLanes` (default 3),
+still capped by the board's capacity, the machine cap and `-MaxLanes`. The start trace
+says when the rule applied, e.g. `last shift saved 2, raised to 3 by -MinStartLanes`.
+
+It is not a floor. After the start, Auto steps as before (item 5) and retires below
+`-MinStartLanes` when the pace demands it, because a fixed three lanes is what ran the
+tokens out on Max 5X. A fixed `-Lanes N` ignores `-MinStartLanes`, and `-Continuous`
+hands it on to the next shift. `-TestAutoLanes` covers the rule.

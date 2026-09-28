@@ -56,6 +56,12 @@ internal sealed class RunningTransferState(
     internal LowSpeedWatchdog? AttemptLowSpeedWatchdog { get; set; }
 
     /// <summary>
+    /// Gets or sets the <c>-m</c> watchdog started for the attempt whose context was created last,
+    /// until the attempt takes it; <see langword="null" /> without a positive <c>-m</c>.
+    /// </summary>
+    internal MaxTimeWatchdog? AttemptMaxTimeWatchdog { get; set; }
+
+    /// <summary>
     /// Gets or sets the transfer's <c>-#</c> bar, which <see cref="Progress" /> passes every report on
     /// to; <see langword="null" /> when the bar is not shown.
     /// </summary>

@@ -393,6 +393,20 @@ public sealed class TransferWriteOutVariablesTests
     }
 
     [TestMethod]
+    [DataRow("/", "/", "\"/\"", DisplayName = "257 \"/\"")]
+    [DataRow("/home/u", "/home/u", "\"/home/u\"", DisplayName = "257 \"/home/u\"")]
+    [DataRow("/a \"b\"", "/a \"b\"", "\"/a \\\"b\\\"\"", DisplayName = "257 \"/a \"\"b\"\"\"")]
+    [DataRow(null, "", "null", DisplayName = "257 with no quoted directory")]
+    public void TryGetVariableText_FtpTransfer_PrintsTheEntryPathAsCurl(string? entryPath, string expectedText, string expectedJson)
+    {
+        // Record-CurlExchange.ps1 -Ftp -FtpReply 'PWD=...' -CurlArgs -sS,-o,NUL,-w,%{ftp_entry_path} (and %{json}); see BL-514's Notes.
+        TransferWriteOutVariables variables = WithReport(new TransferReport { ResponseCode = 226, FtpEntryPath = entryPath });
+
+        Assert.AreEqual(expectedText, Get(variables, "ftp_entry_path"));
+        Assert.Contains("\"ftp_entry_path\":" + expectedJson + ",", Get(variables, "json"));
+    }
+
+    [TestMethod]
     public void TryGetVariableText_FailedTransfer_PrintsTheFixedVariablesAsCurl()
     {
         // curl -s -o out.bin -w "..." https://self-signed.badssl.com/ exited 60 with ssl_verify_result 0 under Schannel.

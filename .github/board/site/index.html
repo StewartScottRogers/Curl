@@ -13,8 +13,10 @@
                        made per refresh) is clamped up to it
     ?tree=url          fetch this URL instead of the recursive tree call, e.g.
                        ?tree=../fixtures/tree.json against .github/gource/serve.cs
-    ?now=ISO-8601      pin the clock the page reads (the refresh stamp, and staleness
-                       once lane cards arrive)
+    ?status=url        fetch this URL instead of the board branch's status.json, e.g.
+                       ?status=../fixtures/status.json
+    ?now=ISO-8601      pin the clock the page reads (the refresh stamp, run times,
+                       heartbeat ages and staleness)
 
   Adding a data source: append one { name, url, fetch, render } object to `sources`
   below. `fetch(source)` returns the parsed data (use fetchJson, which records the
@@ -39,6 +41,18 @@
   #messages p.warning { border: 1px solid var(--warn); }
   #messages p.error { border: 1px solid var(--bad); }
   #lanes:empty { display: none; }
+  #lanes { margin-top: 12px; }
+  #lanes > p { margin: 6px 0; }
+  #lanes .banner { padding: 6px 10px; border-radius: 4px; border: 1px solid var(--warn); }
+  .lane-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+  .lane { border: 1px solid var(--line); border-radius: 6px; padding: 8px; background: var(--card); }
+  .lane.stale { border-color: var(--bad); }
+  .lane h2 { font-size: 15px; margin: 0 0 4px; display: flex; justify-content: space-between; }
+  .lane .stale-mark { color: var(--bad); font-weight: 600; }
+  .lane .task { margin-bottom: 4px; }
+  .lane .task a, .lane .task .id { font-weight: 600; margin-right: 6px; color: inherit; }
+  .lane dl { display: grid; grid-template-columns: auto 1fr; gap: 0 8px; margin: 0; }
+  .lane dd { margin: 0; overflow-wrap: anywhere; }
   #board { display: grid; grid-template-columns: repeat(5, minmax(180px, 1fr)); gap: 12px; margin-top: 12px; }
   .column { border: 1px solid var(--line); border-radius: 6px; padding: 8px; min-width: 0; }
   .column h2 { font-size: 15px; margin: 0 0 8px; display: flex; justify-content: space-between; }
@@ -72,6 +86,10 @@ const states = ['Backlog', 'Doing', 'Blocked', 'Deferred', 'Done'];
 const archiveFolder = /^\d{4}-\d{2}-\d{2}_\d{4}$/;
 const taskFile = /^(BL-\d+)(?:-(.*))?\.md$/;
 const secondsPerCall = 60;
+const staleMs = 10 * 60 * 1000;
+
+// The tree most recently read, so lane cards can link their task to its file.
+let latestTree = null;
 
 function now() { return pinnedNow || new Date(); }
 
@@ -86,7 +104,14 @@ const sources = [
     url: resolveOverride('tree',
       `https://api.github.com/repos/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`),
     fetch: source => fetchJson(source.url),
-    render: tree => renderBoard(tree),
+    render: tree => { latestTree = tree; renderBoard(tree); },
+  },
+  {
+    name: 'dark factory status',
+    url: resolveOverride('status',
+      `https://api.github.com/repos/${repo}/contents/status.json?ref=board`),
+    fetch: source => fetchJson(source.url, { Accept: 'application/vnd.github.raw+json' }, [404]),
+    render: status => renderLanes(status),
   },
 ];
 
@@ -99,8 +124,9 @@ let rateLimit = { remaining: null, resetAt: null, exhausted: false };
 
 class RateLimitError extends Error {}
 
-async function fetchJson(url) {
-  const response = await fetch(url, { cache: 'no-store' });
+// Returns null instead of throwing for a status listed in nullStatuses.
+async function fetchJson(url, headers = {}, nullStatuses = []) {
+  const response = await fetch(url, { cache: 'no-store', headers });
   const remaining = response.headers.get('X-RateLimit-Remaining');
   const reset = response.headers.get('X-RateLimit-Reset');
   if (remaining !== null) rateLimit.remaining = parseInt(remaining, 10);
@@ -109,6 +135,7 @@ async function fetchJson(url) {
     rateLimit.exhausted = true;
     throw new RateLimitError(`${url} answered ${response.status}`);
   }
+  if (nullStatuses.includes(response.status)) return null;
   if (!response.ok) throw new Error(`${url} answered ${response.status} ${response.statusText}`);
   return response.json();
 }
@@ -191,6 +218,93 @@ function renderBoard(tree) {
 
 function showMessage(kind, text) {
   document.getElementById('messages').append(element('p', kind, text));
+}
+
+function utcTime(date) {
+  return date.toISOString().slice(11, 16) + ' UTC';
+}
+
+function duration(ms) {
+  const seconds = Math.max(0, Math.floor(ms / 1000));
+  if (seconds < 60) return `${seconds} s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} min`;
+  return `${Math.floor(minutes / 60)} h ${minutes % 60} min`;
+}
+
+function taskPath(id) {
+  const entry = ((latestTree && latestTree.tree) || []).find(entry =>
+    entry.type === 'blob' && entry.path.startsWith('Tasks/') && entry.path.split('/').pop().startsWith(`${id}-`));
+  return entry ? entry.path : null;
+}
+
+function laneTaskElement(lane) {
+  const line = element('div', 'task');
+  if (!lane.task) {
+    line.append(element('span', 'muted', 'Holds no task'));
+    return line;
+  }
+  const path = taskPath(lane.task);
+  let id;
+  if (path) {
+    id = element('a', null, lane.task);
+    id.href = `https://github.com/${repo}/blob/${branch}/${path.split('/').map(encodeURIComponent).join('/')}`;
+    id.title = path;
+  } else {
+    id = element('span', 'id', lane.task);
+  }
+  line.append(id, element('span', 'title', lane.title || ''));
+  return line;
+}
+
+// One card per lane: task, phase, step, run time and heartbeat age (ADR-0129 items 8 and 9).
+// `stale` is decided by renderLanes, which knows whether the shift is still running.
+function laneCardElement(lane, stale) {
+  const heartbeat = new Date(lane.heartbeatAt);
+  const card = element('article', stale ? 'lane stale' : 'lane');
+  card.dataset.lane = String(lane.lane);
+  const heading = element('h2');
+  heading.append(element('span', 'name', lane.lane === 0 ? 'Runner' : `Lane ${lane.lane}`));
+  if (stale) heading.append(element('span', 'stale-mark', 'stale'));
+  card.append(heading, laneTaskElement(lane));
+  const facts = element('dl');
+  const fact = (term, value) => facts.append(element('dt', 'muted', term), element('dd', null, value));
+  fact('Phase', lane.phase || '');
+  fact('Step', lane.step || '');
+  if (lane.task && lane.taskStartedAt) fact('Running', duration(now() - new Date(lane.taskStartedAt)));
+  fact('Heartbeat', `${duration(now() - heartbeat)} ago`);
+  card.append(facts);
+  return card;
+}
+
+function renderLanes(status) {
+  const section = document.getElementById('lanes');
+  section.replaceChildren();
+  if (status === null) {
+    section.append(element('p', 'muted', 'No dark factory status published yet'));
+    return;
+  }
+  if (status.schema !== 1) {
+    section.append(element('p', 'banner',
+      `The dark factory status uses schema ${status.schema}, which this page cannot read; reload it to get the current page.`));
+    return;
+  }
+  const publishedAt = new Date(status.publishedAt);
+  let notLive = false;
+  if (status.state === 'ended') {
+    section.append(element('p', 'banner', `The shift ended at ${utcTime(publishedAt)}.`));
+  } else if (now() - publishedAt > staleMs) {
+    notLive = true;
+    section.append(element('p', 'banner',
+      `The status has not been updated since ${utcTime(publishedAt)}; the shift may have stopped.`));
+  }
+  const cards = element('div', 'lane-cards');
+  const lanes = [...(status.lanes || [])].sort((a, b) => a.lane - b.lane);
+  for (const lane of lanes) {
+    const heartbeatOld = now() - new Date(lane.heartbeatAt) > staleMs;
+    cards.append(laneCardElement(lane, status.state !== 'ended' && (notLive || heartbeatOld)));
+  }
+  section.append(cards);
 }
 
 function clockTime(date, withSeconds) {

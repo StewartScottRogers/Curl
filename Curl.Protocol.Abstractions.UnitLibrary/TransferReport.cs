@@ -152,4 +152,12 @@ public sealed record TransferReport
     /// TLS.
     /// </summary>
     public IReadOnlyList<ReadOnlyMemory<byte>> PeerCertificates { get; init; } = [];
+
+    /// <summary>
+    /// Gets the directory the FTP server's <c>257</c> reply to <c>PWD</c> named at login,
+    /// its doubled quotes undoubled, the source of <c>%{ftp_entry_path}</c>;
+    /// <see langword="null" /> for a transfer that is not FTP, or when the reply named no
+    /// directory (BL-514).
+    /// </summary>
+    public string? FtpEntryPath { get; init; }
 }

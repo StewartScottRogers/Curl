@@ -52,6 +52,54 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_TransferCancelledAtTheSameInstantMaxTimePasses_KeepsItsOwnMeasuredMessage()
+    {
+        // The runner's -m watchdog cancels the transfer's token at the instant -m passes; its
+        // timer, created first, fires first (ADR-0117, Decision 4).
+        FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
+        using CancellationTokenSource runnerWatchdog = new(TimeSpan.FromSeconds(1), time);
+        StalledConnection connection = new(Encoding.Latin1.GetBytes(ContentLengthHead + "hello"), 65536);
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse("http://127.0.0.1:18174/"),
+            Output = new MemoryStream(),
+            TimeProvider = time,
+            MaxTime = TimeSpan.FromSeconds(1),
+            CancellationToken = runnerWatchdog.Token,
+        };
+
+        Task<TransferResult> transfer = Handler(QueueConnector.For(connection)).ExecuteAsync(context).AsTask();
+        await connection.Stalled;
+        time.Advance(TimeSpan.FromSeconds(1));
+        TransferResult result = await transfer;
+
+        Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
+        Assert.AreEqual("Operation timed out after 1000 milliseconds with 5 out of 100 bytes received", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TransferCancelledBeforeMaxTimePasses_LetsTheCancellationOut()
+    {
+        FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
+        using CancellationTokenSource transferCancellation = new();
+        StalledConnection connection = new(Encoding.Latin1.GetBytes(ContentLengthHead + "hello"), 65536);
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse("http://127.0.0.1:18174/"),
+            Output = new MemoryStream(),
+            TimeProvider = time,
+            MaxTime = TimeSpan.FromSeconds(1),
+            CancellationToken = transferCancellation.Token,
+        };
+
+        Task<TransferResult> transfer = Handler(QueueConnector.For(connection)).ExecuteAsync(context).AsTask();
+        await connection.Stalled;
+        await transferCancellation.CancelAsync();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => transfer);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ServerStallsPastMaxTime_ReportsTheHeadAndTheBodyWritten()
     {
         FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);

@@ -31,9 +31,9 @@ public sealed class CommandLineNextGroupTests
         "remote-header-name", "output-dir", "create-dirs", "clobber", "skip-existing", "remove-on-error",
         "write-out", "data", "data-ascii", "data-binary", "data-raw", "data-urlencode", "json", "form",
         "form-string", "get", "url-query", "dump-header", "user", "basic", "digest", "ntlm", "negotiate",
-        "anyauth", "oauth2-bearer", "proxy", "socks4", "socks4a", "socks5", "socks5-hostname", "proxy-user",
+        "anyauth", "oauth2-bearer", "netrc", "netrc-optional", "netrc-file","proxy", "socks4", "socks4a", "socks5", "socks5-hostname", "proxy-user",
         "noproxy", "proxytunnel", "telnet-option", "tftp-blksize", "mail-from", "mail-rcpt", "mail-auth",
-        "mail-rcpt-allowfails", "upload-flags", "login-options", "sasl-authzid", "sasl-ir", "resolve", "connect-to", "tftp-no-options",
+        "mail-rcpt-allowfails", "upload-flags", "login-options", "sasl-authzid", "sasl-ir", "resolve", "connect-to", "unix-socket", "abstract-unix-socket", "tftp-no-options",
         "disable-epsv", "epsv", "ftp-skip-pasv-ip", "ftp-method", "ftp-create-dirs", "ftp-port", "ftp-pasv",
         "disable-eprt", "eprt", "ssl", "ftp-ssl", "ssl-reqd", "ftp-ssl-reqd", "ftp-ssl-control", "list-only",
         "quote", "create-file-mode", "insecure", "ssl-no-revoke", "ssl-revoke-best-effort", "ssl-allow-beast",
@@ -48,7 +48,7 @@ public sealed class CommandLineNextGroupTests
         "max-redirs", "post301", "post302", "post303", "show-headers", "include", "head", "fail",
         "fail-with-body", "compressed", "raw", "tr-encoding", "ignore-content-length", "path-as-is", "http0.9",
         "request-target", "ipfs-gateway", "http1.0", "http1.1", "http2", "http2-prior-knowledge", "http3",
-        "http3-only", "sslv2", "sslv3", "metalink", "npn", "ntlm-wb", "false-start", "egd-file", "random-file",
+        "http3-only", "ipv4", "ipv6", "sslv2", "sslv3", "metalink", "npn", "ntlm-wb", "false-start", "egd-file", "random-file",
         "krb4",
     ];
 

@@ -9,8 +9,9 @@ namespace Curl.Networking;
 /// and host name are not verified.
 /// </param>
 /// <param name="MinimumVersion">
-/// The lowest TLS version offered; <see cref="TlsMinimumVersion.SystemDefault" /> leaves
-/// the choice to the operating system.
+/// The lowest TLS version offered; <see cref="TlsVersion.SystemDefault" /> leaves the
+/// choice to the operating system unless <paramref name="MaximumVersion" /> is below
+/// TLS 1.3, when the range starts at TLS 1.0 (<see cref="TlsVersionRange" />).
 /// </param>
 /// <param name="CaCertificateFile">
 /// curl's <c>--cacert</c>: the path of a PEM file whose certificates are the only roots
@@ -88,9 +89,15 @@ namespace Curl.Networking;
 /// <c>--no-alpn</c>, which sends no ALPN extension, so curl's <c>-v</c> prints no
 /// <c>ALPN:</c> line (measured, BL-490).
 /// </param>
+/// <param name="MaximumVersion">
+/// curl's <c>--tls-max</c>: the highest TLS version offered; <see cref="TlsVersion.SystemDefault" />
+/// sets no ceiling. It must not be below <paramref name="MinimumVersion" />, a pair the
+/// command-line parser refuses as curl does; <see cref="SslStreamTlsProvider" /> throws
+/// <see cref="ArgumentException" /> for one (BL-502).
+/// </param>
 public sealed record TlsClientOptions(
     bool Insecure = false,
-    TlsMinimumVersion MinimumVersion = TlsMinimumVersion.SystemDefault,
+    TlsVersion MinimumVersion = TlsVersion.SystemDefault,
     string? CaCertificateFile = null,
     string? CaCertificateDirectory = null,
     string? ClientCertificate = null,
@@ -102,4 +109,5 @@ public sealed record TlsClientOptions(
     string? Passphrase = null,
     bool SkipRevocationCheck = false,
     bool RevocationCheckBestEffort = false,
-    bool UseAlpn = true);
+    bool UseAlpn = true,
+    TlsVersion MaximumVersion = TlsVersion.SystemDefault);

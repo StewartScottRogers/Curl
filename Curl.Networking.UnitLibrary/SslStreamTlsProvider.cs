@@ -50,6 +50,8 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider
 
     private readonly bool _matchesSchannelBuild;
 
+    private readonly SslProtocols _offeredProtocols;
+
     private readonly TimeProvider _timeProvider;
 
     private readonly IClientCertificateStore _certificateStore;
@@ -117,6 +119,9 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider
     /// </param>
     /// <param name="timeProvider">Takes the timestamps in a successful handshake's timings.</param>
     /// <param name="certificateStore">Opens the store a Schannel <c>--cert</c> store path names.</param>
+    /// <exception cref="ArgumentException">
+    /// <see cref="TlsClientOptions.MinimumVersion" /> is above <see cref="TlsClientOptions.MaximumVersion" />.
+    /// </exception>
     internal SslStreamTlsProvider(
         TlsClientOptions options,
         bool matchesSchannelBuild,
@@ -124,6 +129,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider
         IClientCertificateStore certificateStore)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
+        _offeredProtocols = TlsVersionRange.ToSslProtocols(options.MinimumVersion, options.MaximumVersion);
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         _certificateStore = certificateStore ?? throw new ArgumentNullException(nameof(certificateStore));
         _matchesSchannelBuild = matchesSchannelBuild;
@@ -170,7 +176,14 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider
     /// revocation, unless <see cref="TlsClientOptions.SkipRevocationCheck" /> is set, and an
     /// unknown revocation status is exit 60 (ADR-0086). Any other failure,
     /// such as no TLS version both sides allow or the server closing mid-handshake, is
-    /// exit 35 (<see cref="CurlExitCode.SslConnectError" />). A
+    /// exit 35 (<see cref="CurlExitCode.SslConnectError" />). The handshake offers the
+    /// versions from <see cref="TlsClientOptions.MinimumVersion" /> up to
+    /// <see cref="TlsClientOptions.MaximumVersion" /> (<see cref="TlsVersionRange" />). Where
+    /// the operating system will not offer a range below TLS 1.2 at all, the Schannel build
+    /// reports what curl's Schannel build reports when the server refuses it,
+    /// <c>failed to receive handshake</c> (measured, BL-502); connecting to a server that
+    /// speaks only TLS 1.0 or 1.1 where the operating system refuses them is BL-714's
+    /// hand-built TLS client. A
     /// <see cref="TlsClientOptions.CaCertificateFile" /> that cannot be read is exit 77
     /// (<see cref="CurlExitCode.SslCacertBadfile" />). In the OpenSSL build so is one that
     /// holds no certificate or a certificate block that does not parse; in the Schannel
@@ -343,7 +356,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider
         var authenticationOptions = new SslClientAuthenticationOptions
         {
             TargetHost = targetHost,
-            EnabledSslProtocols = ToSslProtocols(_options.MinimumVersion),
+            EnabledSslProtocols = _offeredProtocols,
             CertificateChainPolicy = chainPolicy,
             LocalCertificateSelectionCallback = ToCertificateSelection(clientCertificate),
             CipherSuitesPolicy = cipherSuitesPolicy,
@@ -677,8 +690,10 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider
         clientCertificate is null ? null : (_, _, _, _, _) => clientCertificate;
 
     private string SslConnectError(Exception failure) => _matchesSchannelBuild
-        ? TlsFailureMessages.SchannelSslConnectError(failure)
+        ? TlsFailureMessages.SchannelSslConnectError(failure, OffersOnlyVersionsBelowTls12)
         : TlsFailureMessages.OpenSslSslConnectError(failure);
+
+    private bool OffersOnlyVersionsBelowTls12 => _options.MaximumVersion is TlsVersion.Tls10 or TlsVersion.Tls11;
 
     private string CaCertificateFileUnusable(string caCertificateFile) => _matchesSchannelBuild
         ? TlsFailureMessages.SchannelCaCertificateFileUnusable(caCertificateFile)
@@ -841,13 +856,6 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider
 
         await plaintext.DisposeAsync().ConfigureAwait(false);
     }
-
-    private static SslProtocols ToSslProtocols(TlsMinimumVersion minimumVersion) => minimumVersion switch
-    {
-        TlsMinimumVersion.Tls12 => SslProtocols.Tls12 | SslProtocols.Tls13,
-        TlsMinimumVersion.Tls13 => SslProtocols.Tls13,
-        _ => SslProtocols.None,
-    };
 
     // What the validation callback learned about the server's certificate: whether it
     // verified, OpenSSL's code for it, and the DER of the chain the event reports.

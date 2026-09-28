@@ -413,6 +413,30 @@ public sealed class GopherProtocolHandlerTests
         CollectionAssert.AreEqual(Encoding.ASCII.GetBytes(expectedBytes), connection.Written);
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_Connected_ReportsTheTransferStartedAndTheRunningByteTotal()
+    {
+        // The runner's -m watchdog reads these to print "with 7 bytes received" (ADR-0117, BL-511).
+        ScriptedConnection connection = new("hel"u8.ToArray(), "lo\r\n"u8.ToArray());
+        RecordingProgress progress = new();
+        var context = new TransferContext { Url = CurlUrl.Parse("gopher://h/1"), Output = new MemoryStream(), Progress = progress };
+
+        await new GopherProtocolHandler(FakeConnector.For(connection)).ExecuteAsync(context);
+
+        CollectionAssert.AreEqual(new[] { "started", "downloaded 3", "downloaded 7" }, progress.Reports);
+    }
+
     private static TransferContext Context(string url, Stream? output = null) =>
         new() { Url = CurlUrl.Parse(url), Output = output ?? new MemoryStream() };
+
+    private sealed class RecordingProgress : ITransferProgress
+    {
+        public List<string> Reports { get; } = [];
+
+        public void ReportTransferStarted() => Reports.Add("started");
+
+        public void ReportDownloaded(long bytesSoFar, long? expectedTotal) => Reports.Add($"downloaded {bytesSoFar}{expectedTotal}");
+
+        public void ReportUploaded(long bytesSoFar, long? expectedTotal) => Reports.Add($"uploaded {bytesSoFar}");
+    }
 }

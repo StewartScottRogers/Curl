@@ -108,6 +108,35 @@ public sealed class TftpDownloadRetransmissionTests
     }
 
     /// <summary>
+    /// The runner's <c>-m</c> watchdog cancels the transfer's token at the instant <c>-m</c>
+    /// passes; its timer, created first, fires first, and the handler still ends with its own
+    /// message (ADR-0117, Decision 4).
+    /// </summary>
+    /// <returns>A task that completes when the test has run.</returns>
+    [TestMethod]
+    public async Task ExecuteAsync_SilentServerCancelledAtTheInstantMaxTimePasses_EndsWithItsOwnOperationTimedOut()
+    {
+        var channel = Channel();
+        using var runnerWatchdog = new CancellationTokenSource(TimeSpan.FromSeconds(5), clock);
+
+        var result = await Run(channel, Context(maxTime: TimeSpan.FromSeconds(5), cancellationToken: runnerWatchdog.Token));
+
+        Assert.AreEqual(TimeSpan.FromSeconds(5), clock.Now);
+        Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
+        Assert.AreEqual("Operation timed out after 5000 milliseconds with 0 bytes received", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_SilentServerCancelledBeforeMaxTimePasses_LetsTheCancellationOut()
+    {
+        var channel = Channel();
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(4500), clock);
+
+        await Assert.ThrowsExactlyAsync<OperationCanceledException>(
+            async () => await Run(channel, Context(maxTime: TimeSpan.FromSeconds(5), cancellationToken: cancellation.Token)));
+    }
+
+    /// <summary>
     /// A <c>-L -m 2</c> chain whose first hop took 1.5 s and ends on a silent
     /// <c>tftp://</c> hop: curl 8.21.0 printed <c>Operation timed out after 2011
     /// milliseconds with 0 bytes received</c> (BL-350 Notes), counting from the first

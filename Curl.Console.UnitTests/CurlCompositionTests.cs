@@ -322,7 +322,7 @@ public sealed class CurlCompositionTests
 
         CurlTransports transports = CurlComposition.CreateTransports(options);
 
-        TlsClientOptions expected = new(Insecure: true, MinimumVersion: TlsMinimumVersion.Tls13, CaCertificateFile: "x.pem");
+        TlsClientOptions expected = new(Insecure: true, MinimumVersion: TlsVersion.Tls13, CaCertificateFile: "x.pem");
         Assert.AreEqual(expected, transports.TlsClientOptions);
         Assert.AreSame(transports.TlsClientOptions, CapturedDependency<TlsClientOptions>(transports.TlsProvider));
     }

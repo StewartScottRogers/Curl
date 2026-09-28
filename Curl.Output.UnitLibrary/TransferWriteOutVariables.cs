@@ -66,11 +66,13 @@ namespace Curl.Output;
 /// </para>
 /// <para>
 /// <c>time_queue</c> is the handler's start, the moment the transfer left the queue, so
-/// one microsecond with timings and <c>0.000000</c> without. The last five print the
+/// one microsecond with timings and <c>0.000000</c> without. The next four print the
 /// fixed text curl 8.21.0 (Schannel) prints for every transfer this tool can run: a
 /// verify result of <c>0</c>, which Schannel reports even for a failed verification;
-/// <c>0</c> early-data bytes, which Schannel never sends; <c>0</c> retries and an empty
-/// FTP entry path, because no <c>--retry</c> and no FTP handler exist yet. See ADR-0043.
+/// <c>0</c> early-data bytes, which Schannel never sends; and <c>0</c> retries, because
+/// no <c>--retry</c> exists yet. See ADR-0043. <c>ftp_entry_path</c> is
+/// <see cref="TransferReport.FtpEntryPath"/>: nothing, and <c>null</c> in <c>json</c>,
+/// for a transfer that is not FTP or whose <c>PWD</c> reply named no directory (BL-514).
 /// </para>
 /// <para>
 /// A <c>time_*</c> value is the seconds from <see cref="TransferTimings.Started"/> to its
@@ -169,7 +171,7 @@ public sealed class TransferWriteOutVariables(
         ["proxy_ssl_verify_result"] = _ => WriteOutValue.FromNumber(0),
         ["tls_earlydata"] = _ => WriteOutValue.FromNumber(0),
         ["num_retries"] = _ => WriteOutValue.FromNumber(0),
-        ["ftp_entry_path"] = _ => WriteOutValue.FromText(null),
+        ["ftp_entry_path"] = variables => WriteOutValue.FromText(variables.report.FtpEntryPath),
         ["num_certs"] = variables => WriteOutValue.FromNumber(variables.report.PeerCertificates.Count),
         ["proxy_used"] = variables => WriteOutValue.FromNumber(variables.report.UsedProxy ? 1 : 0),
         ["certs"] = variables => WriteOutValue.FromText(string.Concat(variables.report.PeerCertificates.Select(PeerCertificateText.Format))),

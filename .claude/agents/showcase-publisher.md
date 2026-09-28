@@ -13,7 +13,7 @@ that keeps all of it current without anyone's involvement.
 
 | Piece | Role |
 | --- | --- |
-| `.github/workflows/gource.yml` | Three jobs: `decide` whether to render; `coverage` on a Windows runner (measures, renders the report, commits `coverage/` onto the `gource` branch); `render` on an Ubuntu runner (the video, then a force-pushed single-commit `gource` branch carrying `coverage/` over). Each asks GitHub Pages to rebuild. |
+| `.github/workflows/gource.yml` | Four jobs: `decide` whether to render; `coverage` on a Windows runner (measures, renders the report, commits `coverage/` onto the `gource` branch); `render` on an Ubuntu runner (the video, then a force-pushed single-commit `gource` branch carrying `coverage/` and `board/` over); `board-page` on every run, not gated on `decide`, which commits `.github/board/site/index.html` onto the `gource` branch as `board/index.html` without force when it changed. The first three share the concurrency group `gource-render`; `board-page` has its own, so it never waits behind a render. Each asks GitHub Pages to rebuild. |
 | `Measure-CodeQuality.ps1` (repository root) | Measures coverage, complexity and CRAP with the tooling the solution already has; `-JsonPath` writes the data the report is rendered from. Shared with the `coverage-auditor` agent - change its measuring only with that in mind. |
 | `.github/coverage/make-coverage-report.cs` | Renders `coverage/index.html` (per-library table against the gates, every member outside a gate, coverage exclusions) and `coverage/badge.svg` from that JSON. Base class library only; `.github/coverage/Directory.Build.*` isolate it like the Gource apps. Preview: run it on a local `Measure-CodeQuality.ps1 -JsonPath` output and open the page. |
 | `.github/gource/make-log.cs` | Builds a Gource custom log from every branch except `gource`. A co-authored commit is drawn once per author; every Claude model is the one user "Claude". |
@@ -24,8 +24,9 @@ that keeps all of it current without anyone's involvement.
 | `.github/gource/serve.cs` | Local preview only: serves a render directory at http://localhost:8000/. |
 | `.github/gource/Directory.Build.props` (and `.targets`, `Directory.Packages.props`) | Isolate the `make-*.cs` apps from the repository root's build settings, whose gates are for the product's projects. |
 | `.github/gource/site/index.html` | The viewer page: splash with counted-up stats, full-screen playback through hls.js, quality selector, keyboard shortcuts, idle-hiding controls. |
-| `gource` branch | One commit: the viewer, `hls/`, the downloads, `stats.json`, `coverage/`, `fingerprint.txt`, `rendered-at.txt`, `.nojekyll`. Force-pushed on each render so the repository never accumulates old videos. GitHub Pages serves it. |
-| `README.md` | Shows `gource.gif` and `coverage/badge.svg` by fixed URLs on the `gource` branch, linked to the viewer and the report. It never needs editing when either changes. |
+| `.github/board/site/index.html` | The live task board page (ADR-0129), published as `board/index.html` and served at https://stewartscottrogers.github.io/Curl/board/. Its source is owned by the task board work, not by this agent; the workflow only publishes it. |
+| `gource` branch | One commit: the viewer, `hls/`, the downloads, `stats.json`, `coverage/`, `board/index.html` (the live task board, from `.github/board/site/index.html`), `fingerprint.txt`, `rendered-at.txt`, `.nojekyll`. Force-pushed on each render so the repository never accumulates old videos. GitHub Pages serves it. |
+| `README.md` | Shows `gource.gif` and `coverage/badge.svg` by fixed URLs on the `gource` branch, linked to the viewer and the report, and links the live task board. It never needs editing when any of them changes. |
 
 The four `make-*.cs` generators are C# file-based apps (.NET 10, top-level statements, base
 class library only, no `#:package`); `render.sh` runs each with `dotnet run --file` from the

@@ -43,6 +43,11 @@ namespace Curl.Protocol.Ftp;
 /// <c>TYPE I</c>, <c>SIZE</c> and <c>RETR</c>, and copies the listing.
 /// </para>
 /// <para>
+/// The directory the <c>257</c> reply to <c>PWD</c> quotes is reported as
+/// <see cref="TransferReport.FtpEntryPath" />; a quoted name that never ends is exit 8
+/// with no <c>QUIT</c>, as curl 8.21.0 does (<see cref="FtpEntryPath" />, BL-514).
+/// </para>
+/// <para>
 /// A file download honours <c>-r</c> and <c>-C</c> through <see cref="FtpDownloadWindow" />:
 /// a non-zero offset sends <c>REST</c> before <c>RETR</c> (exit 31, with no <c>QUIT</c>,
 /// when it is refused; exit 36 when it lies past the <c>SIZE</c> count), and a range with
@@ -142,6 +147,13 @@ internal sealed class FtpSession(FtpSessionConnections connections, FtpControlCh
     private int lastReplyCode;
 
     /// <summary>
+    /// The directory the <c>257</c> reply to <c>PWD</c> named, reported as
+    /// <see cref="TransferReport.FtpEntryPath" />; <see langword="null" /> before <c>PWD</c>
+    /// or when the reply named none.
+    /// </summary>
+    private string? entryPath;
+
+    /// <summary>
     /// Holds the whole conversation. The data connection it opens stays open until the
     /// session is disposed.
     /// </summary>
@@ -164,7 +176,7 @@ internal sealed class FtpSession(FtpSessionConnections connections, FtpControlCh
             result = lost.Result;
         }
 
-        return result with { Report = new TransferReport { ResponseCode = lastReplyCode } };
+        return result with { Report = new TransferReport { ResponseCode = lastReplyCode, FtpEntryPath = entryPath } };
     }
 
     /// <summary>
@@ -297,7 +309,11 @@ internal sealed class FtpSession(FtpSessionConnections connections, FtpControlCh
 
     private async ValueTask<TransferResult> TransferPathAsync()
     {
-        await ExchangeAsync("PWD").ConfigureAwait(false);
+        if (!FtpEntryPath.TryRead(await ExchangeAsync("PWD").ConfigureAwait(false), out entryPath))
+        {
+            return TransferResult.Failure(CurlExitCode.WeirdServerReply, FtpTransferMessages.WeirdServerReply);
+        }
+
         if (FtpUrlPath.Parse(context.Url.AbsolutePath, context.FtpFileMethod) is not { } path)
         {
             return TransferResult.Failure(CurlExitCode.UrlMalformat, FtpTransferMessages.PathHasControlCharacters);

@@ -63,6 +63,7 @@ public sealed class DictProtocolHandler(IConnector connector) : IProtocolHandler
             return new TransferResult(connect.ExitCode, 0, connect.ErrorMessage) { IsConnectionRefused = connect.IsConnectionRefused };
         }
 
+        context.Progress.ReportTransferStarted();
         await using (connection.ConfigureAwait(false))
         {
             if (!DictRequest.TryEncode(url.AbsolutePath, out byte[] request))
@@ -85,6 +86,7 @@ public sealed class DictProtocolHandler(IConnector connector) : IProtocolHandler
         {
             await context.Output.WriteAsync(buffer.AsMemory(0, read), context.CancellationToken).ConfigureAwait(false);
             bytesWritten += read;
+            context.Progress.ReportDownloaded(bytesWritten, null);
         }
 
         return TransferResult.Success(bytesWritten);

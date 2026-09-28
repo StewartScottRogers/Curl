@@ -162,7 +162,70 @@ public sealed class SaslAuthenticatorTests
     }
 
     [TestMethod]
-    [DataRow("CRAM-MD5")]
+    [DataRow("user", "pencil", "dXNlciBlZTg3NzliY2M1MzFhNzhmNGRiMzc4YzQ3N2E1N2IwZA==", DisplayName = "-u user:pencil: user ee8779bc...")]
+    [DataRow("user", "", "dXNlciAzYjFkZDYxZDNmODM4ZDAzZWVlYWJmZGRlOTFlYzVlOQ==", DisplayName = "-u user: : user 3b1dd61d...")]
+    public void Begin_CramMd5_AnswersTheChallengeAsCurl(string user, string password, string expected)
+    {
+        // Measured: AUTH CRAM-MD5 (also under --sasl-ir), 334 PDE4OTYuNjk3MTcwOTUyQGxvY2FsaG9zdD4=, the answer, 235.
+        ISaslExchange exchange = Authenticator.Begin("cram-md5", Request(new NetworkCredential(user, password)));
+
+        Assert.AreEqual("CRAM-MD5", exchange.Mechanism);
+        Assert.IsNull(exchange.InitialResponse);
+        Assert.AreEqual(expected, Base64(exchange.Respond(Encoding.ASCII.GetBytes("<1896.697170952@localhost>"))));
+        Assert.IsNull(exchange.Respond([]));
+    }
+
+    [TestMethod]
+    public void Begin_CramMd5WithoutCredential_SendsAnEmptyUserAndPassword()
+    {
+        ISaslExchange exchange = Authenticator.Begin("CRAM-MD5", Request(null));
+
+        StringAssert.StartsWith(Windows1252.GetString(exchange.Respond("c"u8)!), " ");
+    }
+
+    [TestMethod]
+    [DataRow(true, "127.0.0.1", "81eed5b913007ab96776b8224946a866",
+        "username=\"user\",realm=\"\",nonce=\"OA6MG9tEQGm2hh\",digest-uri=\"smtp/127.0.0.1\",cnonce=\"81eed5b913007ab96776b8224946a866\",nc=00000001,response=1ae34deb057c4c638fc093d4913d8f29,qop=auth,charset=utf-8",
+        DisplayName = "Schannel (SSPI)")]
+    [DataRow(false, "172.26.96.1", "dab6bbea0a329577a0c691f97f35a087",
+        "username=\"user\",realm=\"localhost\",nonce=\"OA6MG9tEQGm2hh\",cnonce=\"dab6bbea0a329577a0c691f97f35a087\",nc=\"00000001\",digest-uri=\"smtp/172.26.96.1\",response=8c416297044dbc635e16a5432c6cc0a1,qop=auth",
+        DisplayName = "OpenSSL")]
+    public void Begin_DigestMd5_AnswersTheChallengeThenRspauthAsCurl(bool answerAsSspi, string host, string clientNonce, string expected)
+    {
+        // Measured: AUTH DIGEST-MD5, 334 <challenge>, the answer, 334 <rspauth>, an empty line, 235.
+        var authenticator = new SaslAuthenticator(Windows1252, () => clientNonce, answerAsSspi);
+        SaslRequest request = Request(new NetworkCredential("user", "pencil"), authorizationIdentity: "z") with { Host = host };
+        ISaslExchange exchange = authenticator.Begin("DIGEST-MD5", request);
+
+        Assert.AreEqual("DIGEST-MD5", exchange.Mechanism);
+        Assert.IsNull(exchange.InitialResponse);
+        byte[] challenge = Encoding.ASCII.GetBytes("realm=\"localhost\",nonce=\"OA6MG9tEQGm2hh\",qop=\"auth\",algorithm=md5-sess,charset=utf-8");
+        Assert.AreEqual(expected, Windows1252.GetString(exchange.Respond(challenge)!));
+        CollectionAssert.AreEqual(Array.Empty<byte>(), exchange.Respond("rspauth=ea40f60335c427b5527b84dbabcdfffd"u8));
+        Assert.IsNull(exchange.Respond([]));
+    }
+
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public void Begin_DigestMd5WithoutCredential_SendsAnEmptyUser(bool answerAsSspi)
+    {
+        ISaslExchange exchange = new SaslAuthenticator(Windows1252, () => "c", answerAsSspi).Begin("DIGEST-MD5", Request(null));
+
+        StringAssert.StartsWith(
+            Windows1252.GetString(exchange.Respond("nonce=\"n\",qop=\"auth\",algorithm=md5-sess"u8)!), "username=\"\",");
+    }
+
+    [TestMethod]
+    public void Begin_DigestMd5ChallengeCurlCancels_AnswersNull()
+    {
+        ISaslExchange exchange = Authenticator.Begin("DIGEST-MD5", Request(new NetworkCredential("u", "p")));
+
+        Assert.IsNull(exchange.Respond("realm=\"r\""u8));
+    }
+
+    [TestMethod]
+    [DataRow("NTLM")]
     [DataRow("SCRAM-SHA-256")]
     public void Begin_MechanismNotBuilt_Throws(string mechanism)
     {
@@ -173,8 +236,11 @@ public sealed class SaslAuthenticatorTests
     }
 
     [TestMethod]
-    [DataRow(new[] { "EXTERNAL", "GSSAPI", "DIGEST-MD5", "CRAM-MD5", "NTLM", "OAUTHBEARER", "XOAUTH2", "LOGIN", "PLAIN", "SCRAM-SHA-256" }, "PLAIN",
-        DisplayName = "All ten: curl sends DIGEST-MD5, then CRAM-MD5, then NTLM; until BL-537 and BL-538, PLAIN")]
+    [DataRow(new[] { "EXTERNAL", "GSSAPI", "DIGEST-MD5", "CRAM-MD5", "NTLM", "OAUTHBEARER", "XOAUTH2", "LOGIN", "PLAIN", "SCRAM-SHA-256" }, "DIGEST-MD5",
+        DisplayName = "All ten: DIGEST-MD5")]
+    [DataRow(new[] { "DIGEST-MD5", "CRAM-MD5", "PLAIN" }, "DIGEST-MD5", DisplayName = "DIGEST-MD5 CRAM-MD5 PLAIN: DIGEST-MD5")]
+    [DataRow(new[] { "CRAM-MD5", "PLAIN" }, "CRAM-MD5", DisplayName = "CRAM-MD5 PLAIN: CRAM-MD5")]
+    [DataRow(new[] { "NTLM", "OAUTHBEARER", "XOAUTH2", "LOGIN", "PLAIN" }, "PLAIN", DisplayName = "Without the MD5 mechanisms: PLAIN until NTLM is built (BL-538)")]
     [DataRow(new[] { "EXTERNAL", "GSSAPI", "OAUTHBEARER", "XOAUTH2", "LOGIN", "SCRAM-SHA-256" }, "LOGIN", DisplayName = "Without PLAIN: LOGIN")]
     [DataRow(new[] { "EXTERNAL", "GSSAPI", "OAUTHBEARER", "XOAUTH2", "SCRAM-SHA-256" }, null, DisplayName = "No usable mechanism: none (exit 67)")]
     [DataRow(new[] { "LOGIN", "PLAIN" }, "PLAIN", DisplayName = "LOGIN PLAIN: PLAIN")]
@@ -197,6 +263,7 @@ public sealed class SaslAuthenticatorTests
     [DataRow(new[] { "EXTERNAL", "GSSAPI", "DIGEST-MD5", "CRAM-MD5", "NTLM", "OAUTHBEARER", "XOAUTH2", "LOGIN", "PLAIN" }, "OAUTHBEARER", DisplayName = "Everything: OAUTHBEARER")]
     [DataRow(new[] { "XOAUTH2", "LOGIN", "PLAIN" }, "XOAUTH2", DisplayName = "Without OAUTHBEARER: XOAUTH2")]
     [DataRow(new[] { "PLAIN", "LOGIN" }, null, DisplayName = "PLAIN LOGIN with a token: none (exit 67)")]
+    [DataRow(new[] { "DIGEST-MD5", "CRAM-MD5", "PLAIN" }, null, DisplayName = "DIGEST-MD5 CRAM-MD5 PLAIN with a token: none (exit 67)")]
     public void ChooseMechanism_BearerToken_PicksAsCurl(string[] offered, string? expected)
     {
         Assert.AreEqual(expected, Authenticator.ChooseMechanism(Request(new NetworkCredential("u", "p"), bearerToken: "tok"), offered));
@@ -245,6 +312,20 @@ public sealed class SaslAuthenticatorTests
         SaslRequest request = Request(new NetworkCredential("u", "p"), requiredMechanism: required);
 
         Assert.AreEqual(expected, Authenticator.ChooseMechanism(request, ["LOGIN", "PLAIN"]));
+    }
+
+    [TestMethod]
+    public void ChooseMechanism_LoginOptionsCramMd5_SkipsDigestMd5()
+    {
+        SaslRequest request = Request(new NetworkCredential("user", "pencil"), requiredMechanism: "CRAM-MD5");
+
+        Assert.AreEqual("CRAM-MD5", Authenticator.ChooseMechanism(request, ["DIGEST-MD5", "CRAM-MD5", "PLAIN"]));
+    }
+
+    [TestMethod]
+    public void ChooseMechanism_TokenWithoutUser_SkipsTheMd5Mechanisms()
+    {
+        Assert.IsNull(Authenticator.ChooseMechanism(Request(null, bearerToken: "tok"), ["DIGEST-MD5", "CRAM-MD5", "PLAIN"]));
     }
 
     // Plays a handler's side of one exchange: the initial response on the command line or in

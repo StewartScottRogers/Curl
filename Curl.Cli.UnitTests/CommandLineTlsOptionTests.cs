@@ -398,6 +398,67 @@ public sealed class CommandLineTlsOptionTests
     }
 
     [TestMethod]
+    [DataRow("--tlsv1.3", "1.2")]
+    [DataRow("--tlsv1.2", "1.1")]
+    [DataRow("--tlsv1.1", "1.0")]
+    [DataRow("--tlsv1.3", "default")]
+    [DataRow("--tlsv1.2", "default")]
+    [DataRow("--tlsv1.0", "default")]
+    [DataRow("-1", "default")]
+    [DataRow("--tlsv1", "default")]
+    public void Parse_TlsMaxBelowTheMinimumReadBefore_RefusesTheTlsMax(string minimumOption, string maximum)
+    {
+        // Measured with curl 8.21.0 (Schannel) and 8.18.0 (OpenSSL) on 2026-09-28 (BL-502 Notes).
+        CommandLineParseResult result = CommandLineParser.Parse([minimumOption, "--tls-max", maximum, Url], NoPathExists);
+
+        AssertRefused(
+            result,
+            "curl: --tls-max set lower than minimum accepted version",
+            "curl: option --tls-max: is badly used here");
+    }
+
+    [TestMethod]
+    [DataRow("1.2", "--tlsv1.3")]
+    [DataRow("1.1", "--tlsv1.2")]
+    [DataRow("1.0", "--tlsv1.1")]
+    public void Parse_MinimumAboveTheTlsMaxReadBefore_RefusesTheMinimum(string maximum, string minimumOption)
+    {
+        // Measured with curl 8.21.0 (Schannel) on 2026-09-28 (BL-502 Notes).
+        CommandLineParseResult result = CommandLineParser.Parse(["--tls-max", maximum, minimumOption, Url], NoPathExists);
+
+        AssertRefused(
+            result,
+            "curl: Minimum TLS version set higher than max",
+            $"curl: option {minimumOption}: is badly used here");
+    }
+
+    [TestMethod]
+    [DataRow("-s", "--tlsv1.3", "--tls-max", "1.2", "curl: option --tls-max: is badly used here")]
+    [DataRow("-s", "--tls-max", "1.2", "--tlsv1.3", "curl: option --tlsv1.3: is badly used here")]
+    public void Parse_TlsVersionRangeRefusedWhileSilent_HidesTheFirstLine(string silent, string first, string second, string third, string expectedLine)
+    {
+        CommandLineParseResult result = CommandLineParser.Parse([silent, first, second, third, Url], NoPathExists);
+
+        AssertRefused(result, expectedLine);
+    }
+
+    [TestMethod]
+    [DataRow("--tlsv1.3", "--tls-max", "1.3")]
+    [DataRow("--tls-max", "1.3", "--tlsv1.3")]
+    [DataRow("--tlsv1.2", "--tls-max", "1.2")]
+    [DataRow("-1", "--tls-max", "1.0")]
+    [DataRow("--tls-max", "1.0", "--tlsv1")]
+    [DataRow("--tls-max", "default", "--tlsv1.3")]
+    [DataRow("--proxy-tlsv1", "--tls-max", "default")]
+    public void Parse_TlsVersionRangeThatIsNotEmpty_IsAccepted(string first, string second, string third)
+    {
+        // Measured with curl 8.21.0 (Schannel) on 2026-09-28 (BL-502 Notes): each reaches the connect.
+        CommandLineParseResult result = CommandLineParser.Parse([first, second, third, Url], NoPathExists);
+
+        Assert.IsTrue(result.IsAccepted);
+    }
+
+    [TestMethod]
     public void Parse_TlsMaxWithNoValue_RefusesAsRequiringAParameter()
     {
         CommandLineParseResult result = CommandLineParser.Parse(["--tls-max"], NoPathExists);

@@ -198,7 +198,26 @@ internal static class TlsFailureMessages
     /// </summary>
     /// <param name="exception">What the handshake threw.</param>
     /// <returns>The message curl prints.</returns>
-    public static string SchannelSslConnectError(Exception exception)
+    public static string SchannelSslConnectError(Exception exception) =>
+        SchannelSslConnectError(exception, offersOnlyVersionsBelowTls12: false);
+
+    /// <summary>
+    /// The Schannel build's message for exit 35, as <see cref="SchannelSslConnectError(Exception)" />
+    /// gives it, except that when the handshake offered only TLS 1.0 or TLS 1.1, a security
+    /// status is not named: the message is <c>failed to receive handshake</c>, as curl's
+    /// Schannel build reported every such range measured against a TLS 1.2 server
+    /// (<c>--tls-max 1.1</c>, <c>--tls-max 1.0</c>, <c>--tlsv1.0 --tls-max 1.1</c>,
+    /// <c>--tlsv1.1 --tls-max 1.1</c>, <c>--tlsv1.0 --tls-max 1.0</c>; curl 8.21.0, 2026-09-28,
+    /// BL-502), where <see cref="System.Net.Security.SslStream" /> returns
+    /// <c>SEC_E_UNSUPPORTED_FUNCTION</c> for a range Windows 11 will not offer and
+    /// <c>SEC_E_ILLEGAL_MESSAGE</c> for the server's refusal of one it will.
+    /// </summary>
+    /// <param name="exception">What the handshake threw.</param>
+    /// <param name="offersOnlyVersionsBelowTls12">
+    /// <see langword="true" /> when the ceiling was TLS 1.0 or TLS 1.1.
+    /// </param>
+    /// <returns>The message curl prints.</returns>
+    public static string SchannelSslConnectError(Exception exception, bool offersOnlyVersionsBelowTls12)
     {
         if (RecvFailure(exception, SchannelSocketErrorTexts) is { } recvFailure)
         {
@@ -206,7 +225,7 @@ internal static class TlsFailureMessages
         }
 
         var securityStatus = FindInnerException<Win32Exception>(exception);
-        if (securityStatus is null)
+        if (securityStatus is null || offersOnlyVersionsBelowTls12)
         {
             return SchannelHandshakeNotReceived;
         }

@@ -46,6 +46,11 @@ only from tests) reports exit 59 instead of throwing. The provider builds the po
 `[UnsupportedOSPlatformGuard]` property satisfies CA1416) and runs the handshake through its
 `AuthenticateSslStreamAsClientAsync` step; both are internal `init` seams, so the tests follow
 the policy into `SslClientAuthenticationOptions` on Windows too (BL-268).
+Per ADR-0138 (BL-502) the handshake offers every TLS version from `TlsClientOptions.MinimumVersion`
+to `MaximumVersion` (`TlsVersion`; `--tlsv1.x`, `--tls-max`), as `TlsVersionRange` computes it,
+the one place here that names the obsolete TLS 1.0 and 1.1 members; a minimum above the ceiling
+throws, since the parser refuses it. With a ceiling of TLS 1.0 or 1.1 the Schannel build reports
+any security status as `failed to receive handshake`, as curl's did in every measured case.
 The messages for its exit 35, exit 43, exit 58, exit 59, exit 60 and exit 77 live in
 `TlsFailureMessages` and nowhere else; the `More details here` block after an exit 60 is
 the console's to print. No type here constructs an `HttpClient`.

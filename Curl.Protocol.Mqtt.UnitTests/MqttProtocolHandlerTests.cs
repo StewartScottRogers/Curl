@@ -981,8 +981,32 @@ public sealed class MqttProtocolHandlerTests
 
     private static byte[] Concat(params byte[][] parts) => [.. parts.SelectMany(part => part)];
 
+    [TestMethod]
+    public async Task ExecuteAsync_Subscribed_ReportsTheTransferStartedAndEachPublishWithItsSizeExpected()
+    {
+        // curl 8.21.0 -m 3 against a stalled subscription: "with 5 out of 5 bytes received" (BL-511 Notes).
+        ScriptedConnection connection = new(Connack, Suback, Publish("t", "hi"), Publish("t", "HELLO"), Disconnect);
+        RecordingProgress progress = new();
+        var context = new TransferContext { Url = CurlUrl.Parse("mqtt://h/t"), Output = new RecordingStream(), Progress = progress };
+
+        await new MqttProtocolHandler(FakeConnector.For(connection)).ExecuteAsync(context);
+
+        CollectionAssert.AreEqual(new[] { "started", "downloaded 5 of 5", "downloaded 13 of 8" }, progress.Reports);
+    }
+
     private static TransferContext Context(string url, Stream output) =>
         new() { Url = CurlUrl.Parse(url), Output = output };
+
+    private sealed class RecordingProgress : ITransferProgress
+    {
+        public List<string> Reports { get; } = [];
+
+        public void ReportTransferStarted() => Reports.Add("started");
+
+        public void ReportDownloaded(long bytesSoFar, long? expectedTotal) => Reports.Add($"downloaded {bytesSoFar} of {expectedTotal}");
+
+        public void ReportUploaded(long bytesSoFar, long? expectedTotal) => Reports.Add($"uploaded {bytesSoFar}");
+    }
 
     private Task<TransferResult> PublishAsync(
         ScriptedConnection connection,

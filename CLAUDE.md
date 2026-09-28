@@ -46,6 +46,11 @@ One standing exception: the `gource` branch holds only the latest showcase rende
 force-pushed on every render by `.github/workflows/gource.yml` (owned by the
 `showcase-publisher` agent). That force push, to that branch only, needs no confirmation.
 
+Another standing exception (Stewart, 2026-09-28): the `board` branch holds only the dark
+factory's latest `status.json` and is force-pushed every few minutes by
+`RunDarkFactory.ps1`'s coordinator (ADR-0129). That force push, to that branch only,
+needs no confirmation.
+
 A second standing exception (Stewart, 2026-09-27): at the end of every dark factory
 shift, `RunDarkFactory.ps1` merges its branch into `master` through a pull request, but
 only when the `CI` workflow passed on Windows, Linux and macOS for the exact commit being
@@ -107,7 +112,9 @@ watches shifts in herdr. Stop a shift by closing its tabs (or killing its proces
 Leave its tasks in `Doing` and its lane worktrees as they are: the next shift adopts each
 stopped lane and resumes its task from the work in place. While a shift runs, its
 coordinator restarts any lane whose process dies, and lanes wait out the usage limit and
-carry on when tokens return - nobody needs to restart them.
+carry on when tokens return - nobody needs to restart them. The lanes' heartbeats are
+published as `status.json` on the `board` branch every `-HeartbeatMinutes` (default 3)
+for the live board page.
 
 Every session, lanes included, whispers milestones to Stewart through the PostToolUse hook
 `.claude/hooks/whisper-milestone.ps1`: a task moved to Done, a commit made, a branch

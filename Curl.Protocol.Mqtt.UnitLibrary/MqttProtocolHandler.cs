@@ -115,9 +115,10 @@ public sealed class MqttProtocolHandler : IProtocolHandler
             return new TransferResult(connected.ExitCode, 0, connected.ErrorMessage) { IsConnectionRefused = connected.IsConnectionRefused };
         }
 
+        context.Progress.ReportTransferStarted();
         await using (connection.ConfigureAwait(false))
         {
-            MqttSession session = new(connection, context.Output, context.CancellationToken);
+            MqttSession session = new(connection, context.Output, context.Progress, context.CancellationToken);
             try
             {
                 await session

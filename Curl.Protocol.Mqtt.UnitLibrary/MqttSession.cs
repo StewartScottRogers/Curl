@@ -11,6 +11,11 @@ namespace Curl.Protocol.Mqtt;
 /// </summary>
 /// <param name="connection">The connection to talk over; the caller owns and disposes it.</param>
 /// <param name="output">The stream each received PUBLISH is written to.</param>
+/// <param name="progress">
+/// Where every write to <paramref name="output" /> is reported, as the running total with the
+/// PUBLISH body's length as the expected size, as curl's <c>Curl_pgrsSetDownloadSize</c> sets it
+/// (so <c>-m</c> reports <c>with 5 out of 5 bytes received</c>, BL-511 Notes).
+/// </param>
 /// <param name="cancellationToken">Cancels every read and write.</param>
 /// <remarks>
 /// <para>
@@ -34,7 +39,7 @@ namespace Curl.Protocol.Mqtt;
 /// code and message; <see cref="BytesWritten" /> still says how much reached the output.
 /// </para>
 /// </remarks>
-internal sealed class MqttSession(IConnection connection, Stream output, CancellationToken cancellationToken)
+internal sealed class MqttSession(IConnection connection, Stream output, ITransferProgress progress, CancellationToken cancellationToken)
 {
     /// <summary>
     /// The most bytes one write to the output carries: the size of the buffer curl 8.21.0's
@@ -43,6 +48,9 @@ internal sealed class MqttSession(IConnection connection, Stream output, Cancell
     private const int OutputWriteSize = 4096;
 
     private readonly MqttPacketReader reader = new(connection, cancellationToken);
+
+    /// <summary>The body length of the PUBLISH being written, reported as the expected download size.</summary>
+    private long publishLength;
 
     /// <summary>
     /// Gets the number of bytes written to the output so far.
@@ -201,6 +209,7 @@ internal sealed class MqttSession(IConnection connection, Stream output, Cancell
     /// </summary>
     private async ValueTask WritePublishAsync(MqttFixedHeader header)
     {
+        publishLength = header.RemainingLength;
         using MemoryStream body = new();
         while (body.Length < header.RemainingLength)
         {
@@ -257,6 +266,7 @@ internal sealed class MqttSession(IConnection connection, Stream output, Cancell
         }
 
         BytesWritten += slice.Length;
+        progress.ReportDownloaded(BytesWritten, publishLength);
     }
 
     private async ValueTask SendAsync(byte[] packet)
