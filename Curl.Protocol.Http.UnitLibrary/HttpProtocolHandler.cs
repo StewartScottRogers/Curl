@@ -450,6 +450,7 @@ public sealed class HttpProtocolHandler(
             HeldHead = request,
             IsUpload = framing.IsUpload,
             Progress = plan.Progress,
+            Events = context.Events,
             EarlyResponseWatch = responseConnection as HttpContinueWaitConnection,
         };
         HttpExchange exchange = new(connect, connection, framing.Method, request.Length, upload, earlier, newConnection)
@@ -465,14 +466,16 @@ public sealed class HttpProtocolHandler(
             IgnoresContentLength = options.IgnoreContentLength,
             DecodesTransferCoding = options.TransferEncoding,
         };
-        HttpResponseHeadReader headReader = new(responseConnection);
+        HttpResponseHeadReader headReader = new(responseConnection) { Events = context.Events };
         HttpRequestPlan? retry = null;
         HttpBodyDelivery delivery = HttpBodyDelivery.Deliver;
+        ReportProtocolChosen(context.Events, newConnection);
         try
         {
             ThrowIfRefused(framing);
             exchange.RequestReady = context.TimeProvider.GetTimestamp();
             bool bodyLeftUnsent = await SendBodyAsync(context.TimeProvider, framing, responseConnection, upload, cancellationToken).ConfigureAwait(false);
+            ReportRequestSent(context.Events, framing, upload, bodyLeftUnsent);
             exchange.RequestSent = context.TimeProvider.GetTimestamp();
             exchange.Head = await headReader.ReadAsync(cancellationToken).ConfigureAwait(false);
             exchange.RedirectUrl = HttpRedirectLocation.Find(context.Url, exchange.Head);
@@ -505,6 +508,37 @@ public sealed class HttpProtocolHandler(
 
         TransferResult result = Succeeded(delivery, exchange.Head!, exchange.Report(body.BytesWritten));
         return new HttpAttemptOutcome(result, retry, KeepsAlive(plan, exchange.Head, upload, headReader, delivery));
+    }
+
+    /// <summary>
+    /// Reports <c>using HTTP/1.x</c> before the first request on a connection this transfer
+    /// opened; curl 8.21.0 prints nothing of the kind for a connection it reuses (measured,
+    /// BL-407 Notes).
+    /// </summary>
+    private static void ReportProtocolChosen(ITransferEvents events, bool newConnection)
+    {
+        if (newConnection)
+        {
+            events.ReportInfo(HttpConnectionInfoLines.UsingHttp1);
+        }
+    }
+
+    /// <summary>
+    /// Reports that the request went out, as curl 8.21.0 does (measured, BL-407 Notes):
+    /// <c>Request completely sent off</c> for a request without a body, and
+    /// <c>upload completely sent off: N bytes</c> once a whole body has been sent; nothing for
+    /// a body a final status stopped.
+    /// </summary>
+    private static void ReportRequestSent(ITransferEvents events, HttpRequestFraming framing, HttpRequestBodyWriter upload, bool bodyLeftUnsent)
+    {
+        if (framing.Body is null)
+        {
+            events.ReportInfo(HttpConnectionInfoLines.RequestSent);
+        }
+        else if (!bodyLeftUnsent && !upload.CutShort)
+        {
+            events.ReportInfo(HttpConnectionInfoLines.UploadSent(upload.BytesSent));
+        }
     }
 
     /// <summary>
@@ -587,9 +621,9 @@ public sealed class HttpProtocolHandler(
     }
 
     /// <summary>
-    /// Reads the body into the transfer's output, or into nothing when it is discarded, held to
-    /// the <c>--max-filesize</c> limit unless discarded, then writes a chunked body's trailers;
-    /// or reads nothing when <paramref name="delivery" /> says there is no body to deliver.
+    /// Reads the body into the transfer's output, or into nothing when it is discarded, as
+    /// <see cref="SetBodyLimitAndSinks" /> sets it up, then writes a chunked body's trailers; or reads
+    /// nothing when <paramref name="delivery" /> says there is no body to deliver.
     /// </summary>
     private static async ValueTask ReadBodyAsync(
         HttpRequestPlan plan,
@@ -606,11 +640,22 @@ public sealed class HttpProtocolHandler(
 
         ITransferContext context = plan.Context;
         Stream bodyOutput = discardsBody ? Stream.Null : context.Output;
-        body.MaximumBodySize = discardsBody ? null : HttpDownloadConditions.LimitOf(context.MaxFileSize);
-        body.Progress = discardsBody ? HttpTransferProgress.Silent : plan.Progress;
+        SetBodyLimitAndSinks(plan, body, discardsBody);
         await body.CopyAsync(head, context.NoBody, bodyOutput, DecodesContent(plan.Options, discardsBody), plan.Options.TransferEncoding && !discardsBody, cancellationToken)
             .ConfigureAwait(false);
         await WriteHeadersAsync(context.HeaderOutput, body.TrailerBytes, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sets where a body's bytes are held and reported: to the <c>--max-filesize</c> limit, the
+    /// progress meter and the transfer's events, or, for a discarded body, to none of them -
+    /// curl 8.21.0 reports no data for a body it ignores (measured, BL-407 Notes).
+    /// </summary>
+    private static void SetBodyLimitAndSinks(HttpRequestPlan plan, HttpResponseBodyReader body, bool discardsBody)
+    {
+        body.MaximumBodySize = discardsBody ? null : HttpDownloadConditions.LimitOf(plan.Context.MaxFileSize);
+        body.Progress = discardsBody ? HttpTransferProgress.Silent : plan.Progress;
+        body.Events = discardsBody ? NoTransferEvents.Instance : plan.Context.Events;
     }
 
     /// <summary>

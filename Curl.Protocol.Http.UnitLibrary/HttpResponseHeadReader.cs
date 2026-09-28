@@ -34,6 +34,14 @@ internal sealed class HttpResponseHeadReader(IConnection connection)
     internal bool SwitchedProtocols { get; private set; }
 
     /// <summary>
+    /// Gets where each head line is reported once it is accepted: one
+    /// <see cref="ITransferEvents.ReportResponseHeader" /> per line as received, its line end
+    /// included - every status line, 1xx heads' included, every header line and each head's
+    /// empty line (ADR-0046).
+    /// </summary>
+    internal ITransferEvents Events { get; init; } = NoTransferEvents.Instance;
+
+    /// <summary>
     /// Reads the response head.
     /// </summary>
     /// <param name="cancellationToken">Cancels every read.</param>
@@ -71,6 +79,7 @@ internal sealed class HttpResponseHeadReader(IConnection connection)
         HttpStatusLine statusLine = HttpStatusLine.Parse(line.Content);
         SwitchedProtocols |= statusLine.StatusCode == 101;
         builder.StartHead(line);
+        Events.ReportResponseHeader(bytes);
         return statusLine;
     }
 
@@ -87,10 +96,12 @@ internal sealed class HttpResponseHeadReader(IConnection connection)
             if (line.IsEmpty)
             {
                 builder.EndHead(line);
+                Events.ReportResponseHeader(bytes);
                 return false;
             }
 
             builder.AddLine(line);
+            Events.ReportResponseHeader(bytes);
         }
 
         builder.EndHeadAtClose();

@@ -50,6 +50,21 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     internal long BytesWritten { get; private set; }
 
     /// <summary>
+    /// Gets how many body bytes have gone onto the connection, chunk framing and the closing
+    /// chunk included: the count curl 8.21.0 prints as <c>upload completely sent off: N bytes</c>
+    /// (measured, BL-407 Notes).
+    /// </summary>
+    internal long BytesSent { get; private set; }
+
+    /// <summary>
+    /// Gets where the head and body bytes are reported as they are sent (ADR-0046): the head as
+    /// one <see cref="ITransferEvents.ReportRequestHeader" />, and each piece of the body, and
+    /// the closing chunk, as one <see cref="ITransferEvents.ReportDataSent" /> with its chunk
+    /// framing, as curl 8.21.0's <c>--trace</c> shows them (measured, BL-407 Notes).
+    /// </summary>
+    internal ITransferEvents Events { get; init; } = NoTransferEvents.Instance;
+
+    /// <summary>
     /// Gets the length of the request head that shares the upload buffer with the first read:
     /// the whole head when the body follows it at once, 0 when the head went out alone to wait
     /// for <c>100 Continue</c>. A head that fills the buffer leaves the first read a whole one.
@@ -132,6 +147,7 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
         if (isChunked && !CutShort)
         {
             await HttpConnectionSend.WriteAsync(connection, LastChunk, cancellationToken).ConfigureAwait(false);
+            ReportSent(LastChunk);
         }
 
         await HttpConnectionSend.FlushAsync(connection, cancellationToken).ConfigureAwait(false);
@@ -154,6 +170,7 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
         ReadOnlyMemory<byte> head = heldHead;
         heldHead = ReadOnlyMemory<byte>.Empty;
         await HttpConnectionSend.WriteAsync(connection, head, cancellationToken).ConfigureAwait(false);
+        Events.ReportRequestHeader(head.Span);
         await HttpConnectionSend.FlushAsync(connection, cancellationToken).ConfigureAwait(false);
     }
 
@@ -279,18 +296,20 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
             return;
         }
 
+        ReadOnlyMemory<byte> framed = Framed(piece, isChunked);
         if (EarlyResponseWatch is not { } watch)
         {
             await WriteHeldHeadAsync(cancellationToken).ConfigureAwait(false);
             await WriteFramedAsync(piece, isChunked, cancellationToken).ConfigureAwait(false);
         }
-        else if (!await watch.SendUnlessStoppedAsync(Framed(piece, isChunked), cancellationToken).ConfigureAwait(false))
+        else if (!await watch.SendUnlessStoppedAsync(framed, cancellationToken).ConfigureAwait(false))
         {
             CutShort = true;
             unsent = piece.ToArray();
             return;
         }
 
+        ReportSent(framed.Span);
         BytesWritten += piece.Length;
         Progress.ReportUploaded(BytesWritten, expectedLength);
     }
@@ -311,6 +330,15 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
         {
             await HttpConnectionSend.WriteAsync(connection, "\r\n"u8.ToArray(), cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// Counts <paramref name="bytes" /> as sent and reports them as one data event.
+    /// </summary>
+    private void ReportSent(ReadOnlySpan<byte> bytes)
+    {
+        BytesSent += bytes.Length;
+        Events.ReportDataSent(bytes);
     }
 
     /// <summary>

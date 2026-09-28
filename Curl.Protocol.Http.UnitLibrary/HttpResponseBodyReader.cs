@@ -82,6 +82,15 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     internal HttpTransferProgress Progress { get; set; } = HttpTransferProgress.Silent;
 
     /// <summary>
+    /// Gets or sets where the body bytes are reported as they are received, before any decoding
+    /// (ADR-0046): the bytes read along with the head as one
+    /// <see cref="ITransferEvents.ReportDataReceived" />, then one per read, a chunked body's
+    /// framing and trailers included, as curl 8.21.0's <c>--trace</c> shows them (measured,
+    /// BL-407 Notes).
+    /// </summary>
+    internal ITransferEvents Events { get; set; } = NoTransferEvents.Instance;
+
+    /// <summary>
     /// Determines whether a response carries a body: not for <c>-I</c>, and not for a
     /// 204 or 304 status, whatever its Content-Length says.
     /// </summary>
@@ -200,6 +209,7 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
 
         long remaining = contentLength ?? long.MaxValue;
         ReadOnlyMemory<byte> prefix = bodyPrefix[..(int)Math.Min(bodyPrefix.Length, remaining)];
+        ReportReceived(prefix);
         remaining -= await WriteAsync(output, prefix, cancellationToken).ConfigureAwait(false);
 
         byte[] buffer = new byte[ReadSize];
@@ -213,6 +223,7 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
                 return;
             }
 
+            ReportReceived(buffer.AsMemory(0, read));
             remaining -= await WriteAsync(output, buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
         }
     }
@@ -224,6 +235,7 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     private async ValueTask CopyChunkedAsync(ReadOnlyMemory<byte> bytes, Stream output, CancellationToken cancellationToken)
     {
         decoder = new HttpChunkedDecoder();
+        ReportReceived(bytes);
         byte[] buffer = new byte[ReadSize];
         while (true)
         {
@@ -246,6 +258,18 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
             }
 
             bytes = buffer.AsMemory(0, read);
+            ReportReceived(bytes);
+        }
+    }
+
+    /// <summary>
+    /// Reports received body bytes as one data event, or nothing when there are none.
+    /// </summary>
+    private void ReportReceived(ReadOnlyMemory<byte> bytes)
+    {
+        if (!bytes.IsEmpty)
+        {
+            Events.ReportDataReceived(bytes.Span);
         }
     }
 

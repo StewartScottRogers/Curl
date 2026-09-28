@@ -15,6 +15,10 @@ public sealed partial class HttpProtocolHandlerTests
 
     private const string DiedRetrying = "Connection died, retrying a fresh connect (retry count: 1)";
 
+    private const string UsingHttp1 = "using HTTP/1.x";
+
+    private const string RequestSent = "Request completely sent off";
+
     private const string IssueAnother = "Issue another request to this URL: 'http://127.0.0.1:18977/b'";
 
     [TestMethod]
@@ -33,7 +37,7 @@ public sealed partial class HttpProtocolHandlerTests
 
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.IsTrue(connection.IsMarkedReusable, $"Chunk size {chunkSize}");
-            CollectionAssert.AreEqual(new[] { "Connection #0 to host 127.0.0.1:18977 left intact" }, events.Info, $"Chunk size {chunkSize}");
+            CollectionAssert.AreEqual(new[] { UsingHttp1, RequestSent, "Connection #0 to host 127.0.0.1:18977 left intact" }, events.Info, $"Chunk size {chunkSize}");
         }
     }
 
@@ -54,7 +58,7 @@ public sealed partial class HttpProtocolHandlerTests
 
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.IsFalse(connection.IsMarkedReusable, $"Chunk size {chunkSize}");
-            CollectionAssert.AreEqual(new[] { "shutting down connection #4" }, events.Info, $"Chunk size {chunkSize}");
+            CollectionAssert.AreEqual(new[] { UsingHttp1, RequestSent, "shutting down connection #4" }, events.Info, $"Chunk size {chunkSize}");
         }
     }
 
@@ -69,7 +73,7 @@ public sealed partial class HttpProtocolHandlerTests
 
         Assert.AreEqual(CurlExitCode.FilesizeExceeded, result.ExitCode);
         Assert.IsFalse(connection.IsMarkedReusable);
-        CollectionAssert.AreEqual(new[] { "closing connection #2" }, events.Info);
+        CollectionAssert.AreEqual(new[] { UsingHttp1, RequestSent, "closing connection #2" }, events.Info);
     }
 
     [TestMethod]
@@ -83,7 +87,7 @@ public sealed partial class HttpProtocolHandlerTests
 
         Assert.AreEqual(CurlExitCode.PartialFile, result.ExitCode);
         Assert.IsFalse(connection.IsMarkedReusable);
-        CollectionAssert.AreEqual(new[] { "closing connection #3" }, events.Info);
+        CollectionAssert.AreEqual(new[] { UsingHttp1, RequestSent, "closing connection #3" }, events.Info);
     }
 
     [TestMethod]
@@ -127,7 +131,7 @@ public sealed partial class HttpProtocolHandlerTests
             Assert.IsTrue(dead.IsDisposed, $"Chunk size {chunkSize}");
             Assert.IsFalse(dead.IsMarkedReusable, $"Chunk size {chunkSize}");
             CollectionAssert.AreEqual(
-                new[] { DiedRetrying, "shutting down connection #0", IssueAnother, "shutting down connection #1" },
+                new[] { RequestSent, DiedRetrying, "shutting down connection #0", IssueAnother, UsingHttp1, RequestSent, "shutting down connection #1" },
                 events.Info,
                 $"Chunk size {chunkSize}");
         }
@@ -147,7 +151,7 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(2, connector.Targets.Count);
         CollectionAssert.AreEqual(
-            new[] { DiedRetrying, "shutting down connection #0", IssueAnother, "Connection #1 to host 127.0.0.1:18977 left intact" },
+            new[] { RequestSent, DiedRetrying, "shutting down connection #0", IssueAnother, UsingHttp1, RequestSent, "Connection #1 to host 127.0.0.1:18977 left intact" },
             events.Info);
     }
 
@@ -178,7 +182,7 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.AreEqual(CurlExitCode.GotNothing, result.ExitCode);
         Assert.AreEqual(2, connector.Targets.Count);
         CollectionAssert.AreEqual(
-            new[] { DiedRetrying, "shutting down connection #0", IssueAnother, "closing connection #1" },
+            new[] { RequestSent, DiedRetrying, "shutting down connection #0", IssueAnother, RequestSent, "closing connection #1" },
             events.Info);
     }
 
@@ -191,7 +195,7 @@ public sealed partial class HttpProtocolHandlerTests
         TransferResult result = await Handler(connector).ExecuteAsync(ReuseContext(events));
 
         Assert.AreEqual(CurlExitCode.GotNothing, result.ExitCode);
-        CollectionAssert.AreEqual(new[] { "closing connection #0" }, events.Info);
+        CollectionAssert.AreEqual(new[] { UsingHttp1, RequestSent, "closing connection #0" }, events.Info);
     }
 
     [TestMethod]

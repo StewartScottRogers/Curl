@@ -5,7 +5,8 @@ namespace Curl.Protocol.Http;
 
 /// <summary>
 /// The <c>-v</c> lines the handler reports through <see cref="ITransferEvents.ReportInfo" />
-/// about what became of a connection, as curl 8.21.0 prints them (ADR-0050, BL-336 Notes).
+/// about the connection and the request sent on it, as curl 8.21.0 prints them (ADR-0050,
+/// BL-336 and BL-407 Notes).
 /// </summary>
 internal static class HttpConnectionInfoLines
 {
@@ -14,6 +15,25 @@ internal static class HttpConnectionInfoLines
     /// written before it is closed and the request is sent again on a fresh connection.
     /// </summary>
     internal const string ConnectionDiedRetrying = "Connection died, retrying a fresh connect (retry count: 1)";
+
+    /// <summary>
+    /// The line written before the first request on a connection this transfer opened, not on
+    /// one it reuses (measured, BL-407 Notes).
+    /// </summary>
+    internal const string UsingHttp1 = "using HTTP/1.x";
+
+    /// <summary>
+    /// The line written once a request without a body has been sent.
+    /// </summary>
+    internal const string RequestSent = "Request completely sent off";
+
+    /// <summary>
+    /// Formats the line written once a request's whole body has been sent.
+    /// </summary>
+    /// <param name="bytesSent">The body bytes sent, chunk framing included.</param>
+    /// <returns>The line, such as <c>upload completely sent off: 2 bytes</c>.</returns>
+    internal static string UploadSent(long bytesSent) =>
+        string.Create(CultureInfo.InvariantCulture, $"upload completely sent off: {bytesSent} bytes");
 
     /// <summary>
     /// Formats the line for a connection left open for another transfer.
