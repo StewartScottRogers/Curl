@@ -247,6 +247,13 @@ public sealed class CommandLineOptions
     public bool? Clobber { get; internal set; }
 
     /// <summary>
+    /// <see langword="true"/> when the last of <c>--skip-existing</c> and <c>--no-skip-existing</c> was
+    /// <c>--skip-existing</c>: a transfer whose <c>-o</c> or <c>-O</c> file already exists is not
+    /// performed, as curl 8.21.0 skips it (BL-493).
+    /// </summary>
+    public bool SkipExisting { get; internal set; }
+
+    /// <summary>
     /// The <c>-w</c> / <c>--write-out</c> template, unexpanded; <see langword="null"/> when not given or
     /// when the last <c>-w @file</c> named an empty file. The last value wins. An <c>@file</c> or
     /// <c>@-</c> value is the file's (or standard input's) text with every carriage return, line feed and
