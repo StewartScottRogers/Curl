@@ -63,8 +63,18 @@ Namespace `Curl.Cryptography`. It holds:
   secret zeroed for a peer y outside 1 < y < p - 1. Values are exactly p's length,
   big-endian, leading zeros kept (RFC 7919 section 5.1); SSH's `mpint` and TLS 1.2's
   stripped premaster secret are the caller's to apply. Constant-time in x.
+- `ILittleEndianCompressionFunction` (internal) and `LittleEndianMerkleDamgard<T>`
+  (internal): the MD4-style construction MD4 and RIPEMD-160 share - 64-byte blocks of
+  little-endian words, `0x80` padding and a little-endian bit length; each hash supplies
+  its initial state and compression function through the interface's static members.
+- `Md4` (public, `IDisposable`): RFC 1320 - static `HashData`, and incremental
+  `AppendData` and `GetHashAndReset`. Constant-time.
+- `Ripemd160` (public, `IDisposable`): RIPEMD-160 - the same three members. Constant-time.
+- `HmacRipemd160` (public, `IDisposable`): RFC 2286 - static `HashData` and `Verify`
+  (fixed-time comparison), and a keyed instance's `AppendData` and `GetHashAndReset`,
+  which keeps the key for the next message. Constant-time in the key.
 
-The remaining primitives land under their own tasks (BL-675 to BL-677, BL-738
+The remaining primitives land under their own tasks (BL-676, BL-677, BL-738
 to BL-745).
 
 ## Rules
