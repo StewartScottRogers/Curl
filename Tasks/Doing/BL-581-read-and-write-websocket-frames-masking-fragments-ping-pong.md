@@ -33,3 +33,4 @@ The WebSocket handler reads RFC 6455 frames (7-, 16- and 64-bit lengths, continu
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
