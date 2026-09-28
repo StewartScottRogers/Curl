@@ -1,3 +1,6 @@
+using System.Collections.Frozen;
+using System.Diagnostics.CodeAnalysis;
+
 namespace Curl.Cli;
 
 /// <summary>
@@ -10,13 +13,13 @@ namespace Curl.Cli;
 /// looks names up in it (ADR-0069). The rows are sorted by name in ordinal order, as curl's binary search
 /// needs.
 /// </summary>
-internal static class CurlOptionAliasTable
+public static class CurlOptionAliasTable
 {
     /// <summary>The letter curl stores for a name that has no single-letter form.</summary>
-    internal const char NoLetter = ' ';
+    public const char NoLetter = ' ';
 
     /// <summary>The rows, in curl's order.</summary>
-    internal static readonly IReadOnlyList<CurlOptionAlias> Aliases =
+    public static IReadOnlyList<CurlOptionAlias> Aliases { get; } =
     [
         new("abstract-unix-socket", ' ', CurlOptionNoPrefix.NotAccepted),
         new("alpn", ' ', CurlOptionNoPrefix.Documented),
@@ -299,10 +302,28 @@ internal static class CurlOptionAliasTable
         new("write-out", 'w', CurlOptionNoPrefix.NotAccepted),
         new("xattr", ' ', CurlOptionNoPrefix.Accepted),
     ];
+
+    private static readonly FrozenDictionary<string, CurlOptionAlias> AliasesByName =
+        Aliases.ToFrozenDictionary(alias => alias.Name, StringComparer.Ordinal);
+
+    private static readonly FrozenSet<char> Letters =
+        Aliases.Where(alias => alias.Letter != NoLetter).Select(alias => alias.Letter).ToFrozenSet();
+
+    /// <summary>Finds the row named <paramref name="name"/>, case-sensitively.</summary>
+    /// <param name="name">The long name without its leading <c>--</c>.</param>
+    /// <param name="alias">The row found; <see langword="null"/> when there is none.</param>
+    /// <returns><see langword="true"/> when curl 8.21.0 knows the name.</returns>
+    public static bool TryFindName(string name, [NotNullWhen(true)] out CurlOptionAlias? alias) =>
+        AliasesByName.TryGetValue(name, out alias);
+
+    /// <summary>Reports whether <paramref name="letter"/> is one of curl 8.21.0's short option letters.</summary>
+    /// <param name="letter">The letter after <c>-</c>, or one letter of a bundle.</param>
+    /// <returns><see langword="true"/> when some row has that letter.</returns>
+    public static bool IsLetter(char letter) => Letters.Contains(letter);
 }
 
 /// <summary>Whether a long option takes a <c>--no-</c> prefix, and whether the manual names it that way.</summary>
-internal enum CurlOptionNoPrefix
+public enum CurlOptionNoPrefix
 {
     /// <summary>Not a boolean: <c>--no-&lt;name&gt;</c> is not an option (curl's <c>ARG_NONE</c>, <c>ARG_STRG</c> and the like).</summary>
     NotAccepted,
@@ -318,4 +339,4 @@ internal enum CurlOptionNoPrefix
 /// <param name="Name">The name without its leading <c>--</c>.</param>
 /// <param name="Letter">The single letter that also names it, or <see cref="CurlOptionAliasTable.NoLetter"/>.</param>
 /// <param name="NoPrefix">Whether it takes a <c>--no-</c> prefix, and whether the manual names it that way.</param>
-internal sealed record CurlOptionAlias(string Name, char Letter, CurlOptionNoPrefix NoPrefix);
+public sealed record CurlOptionAlias(string Name, char Letter, CurlOptionNoPrefix NoPrefix);

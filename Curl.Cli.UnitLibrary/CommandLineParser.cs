@@ -307,15 +307,21 @@ public static class CommandLineParser
     /// <summary>
     /// Reads a long name that is not in the table as <c>--no-&lt;name&gt;</c>: it turns off a
     /// negatable flag (any attached value ignored) unless the row refuses that, is refused as not reversible for any other row,
-    /// and is unknown when there is no <c>no-</c> or no row after it. Checked before a value is
+    /// and, when there is no <c>no-</c> or no row after it, is refused by <see cref="RefuseUnlistedName"/>
+    /// or <see cref="RefuseUnlistedNegation"/>. Checked before a value is
     /// taken, so <c>--no-output</c> as the last argument is refused as not reversible.
     /// </summary>
     private static CommandLineRefusal? ParseNegatedLong(CommandLineOptions options, string argument, string longName, ArgumentReader reader)
     {
-        if (!longName.StartsWith(NegationPrefix, StringComparison.Ordinal)
-            || !CommandLineOptionTable.TryFindLong(longName[NegationPrefix.Length..], out CommandLineOption? option))
+        if (!longName.StartsWith(NegationPrefix, StringComparison.Ordinal))
         {
-            return CommandLineRefusal.UnknownOption(argument);
+            return RefuseUnlistedName(argument, longName);
+        }
+
+        string negatedName = longName[NegationPrefix.Length..];
+        if (!CommandLineOptionTable.TryFindLong(negatedName, out CommandLineOption? option))
+        {
+            return RefuseUnlistedNegation(argument, negatedName);
         }
 
         if (option.Negate is null)
@@ -325,6 +331,43 @@ public static class CommandLineParser
 
         return option.Negate(options, string.Empty, argument, reader.PathExists, reader.DataFileReader);
     }
+
+    /// <summary>
+    /// Refuses a long name <see cref="CommandLineOptionTable"/> has no row for, as ADR-0137 decides: a name
+    /// curl 8.21.0 knows (<see cref="CurlOptionAliasTable"/>) is not implemented yet and gets
+    /// <see cref="CommandLineRefusal.InstalledLibcurlDoesNotSupport"/>; any other name is <see cref="CommandLineRefusal.UnknownOption"/>.
+    /// </summary>
+    private static CommandLineRefusal RefuseUnlistedName(string argument, string name) =>
+        CurlOptionAliasTable.TryFindName(name, out _)
+            ? CommandLineRefusal.InstalledLibcurlDoesNotSupport(argument)
+            : CommandLineRefusal.UnknownOption(argument);
+
+    /// <summary>
+    /// Refuses <c>--no-&lt;name&gt;</c> where <see cref="CommandLineOptionTable"/> has no row for
+    /// <paramref name="negatedName"/>, as ADR-0137 decides: not reversible when curl 8.21.0 knows the name
+    /// but gives it no <c>--no-</c> prefix, not implemented yet when it gives it one, and unknown otherwise.
+    /// </summary>
+    private static CommandLineRefusal RefuseUnlistedNegation(string argument, string negatedName)
+    {
+        if (!CurlOptionAliasTable.TryFindName(negatedName, out CurlOptionAlias? alias))
+        {
+            return CommandLineRefusal.UnknownOption(argument);
+        }
+
+        return alias.NoPrefix == CurlOptionNoPrefix.NotAccepted
+            ? CommandLineRefusal.CannotBeReversed(argument)
+            : CommandLineRefusal.InstalledLibcurlDoesNotSupport(argument);
+    }
+
+    /// <summary>
+    /// Refuses the short letter at <paramref name="letter"/> that <see cref="CommandLineOptionTable"/> has no
+    /// row for, spelled as the whole argument: not implemented yet when it is one of curl 8.21.0's letters
+    /// (ADR-0137), unknown otherwise.
+    /// </summary>
+    private static CommandLineRefusal RefuseUnlistedLetter(string argument, int letter) =>
+        CurlOptionAliasTable.IsLetter(argument[letter])
+            ? CommandLineRefusal.InstalledLibcurlDoesNotSupport(argument)
+            : CommandLineRefusal.UnknownOption(argument);
 
     /// <summary>Reads a long name that is not in the table: as <c>--expand-&lt;name&gt;</c>, or else as <c>--no-&lt;name&gt;</c>.</summary>
     private static CommandLineRefusal? ParseUnlistedLong(CommandLineOptions options, string argument, string longName, string? attachedValue, ArgumentReader reader) =>
@@ -344,7 +387,7 @@ public static class CommandLineParser
     {
         if (!CommandLineOptionTable.TryFindLong(longName, out CommandLineOption? option))
         {
-            return CommandLineRefusal.UnknownOption(argument);
+            return RefuseUnlistedName(argument, longName);
         }
 
         string? template = attachedValue ?? reader.PeekNext();
@@ -408,7 +451,7 @@ public static class CommandLineParser
     {
         if (!CommandLineOptionTable.TryFindShort(argument[letter], out CommandLineOption? option))
         {
-            refusal = CommandLineRefusal.UnknownOption(argument);
+            refusal = RefuseUnlistedLetter(argument, letter);
             return true;
         }
 
