@@ -114,6 +114,14 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("proxytunnel", 'p', (options, on) => options.ProxyTunnel = on),
         CommandLineOption.Value("telnet-option", 't', AcceptingEmpty((options, telnetOption) => options.AddTelnetOption(telnetOption))),
         CommandLineOption.Value("tftp-blksize", null, SetTftpBlockSize),
+        CommandLineOption.Text("mail-from", null, (options, address) => options.MailFrom = address),
+        CommandLineOption.Value("mail-rcpt", null, AcceptingEmpty((options, recipient) => options.AddMailRecipient(recipient))),
+        CommandLineOption.Text("mail-auth", null, (options, address) => options.MailAuth = address),
+        CommandLineOption.NegatableFlag("mail-rcpt-allowfails", null, (options, on) => options.MailRecipientAllowFails = on),
+        CommandLineOption.Value("upload-flags", null, SetUploadFlags),
+        CommandLineOption.Value("login-options", null, AcceptingEmpty((options, loginOptions) => options.LoginOptions = loginOptions)),
+        CommandLineOption.Text("sasl-authzid", null, (options, identity) => options.SaslAuthorizationIdentity = identity),
+        CommandLineOption.NegatableFlag("sasl-ir", null, (options, on) => options.SaslInitialResponse = on),
         CommandLineOption.Value("resolve", null, AcceptingEmpty((options, entry) => options.AddResolveEntry(entry))),
         CommandLineOption.Value("connect-to", null, AcceptingEmpty((options, entry) => options.AddConnectToEntry(entry))),
         CommandLineOption.NegatableFlag("tftp-no-options", null, (options, on) => options.TftpNoOptions = on),
@@ -236,6 +244,16 @@ public static class CommandLineOptionTable
     /// <summary>The largest <c>--create-file-mode</c> curl 8.21.0 accepts: octal <c>0777</c>.</summary>
     private const int MaximumCreateFileMode = 0b111_111_111;
 
+    /// <summary>The names <c>--upload-flags</c> accepts, matched case-sensitively as curl 8.21.0 matches them.</summary>
+    private static readonly FrozenDictionary<string, ImapUploadFlags> UploadFlagsByName = new Dictionary<string, ImapUploadFlags>(StringComparer.Ordinal)
+    {
+        ["answered"] = ImapUploadFlags.Answered,
+        ["deleted"] = ImapUploadFlags.Deleted,
+        ["draft"] = ImapUploadFlags.Draft,
+        ["flagged"] = ImapUploadFlags.Flagged,
+        ["seen"] = ImapUploadFlags.Seen,
+    }.ToFrozenDictionary(StringComparer.Ordinal);
+
     /// <summary>The characters curl 8.21.0 expects in a range, and warns about any other.</summary>
     private static readonly SearchValues<char> RangeCharacters = SearchValues.Create("0123456789-,");
 
@@ -341,6 +359,31 @@ public static class CommandLineOptionTable
             set(options, value);
             return null;
         };
+
+    /// <summary>
+    /// Applies an <c>--upload-flags</c> value to <see cref="CommandLineOptions.UploadFlags"/> as curl
+    /// 8.21.0's <c>parse_upload_flags</c> does: a comma list of <c>answered</c>, <c>deleted</c>,
+    /// <c>draft</c>, <c>flagged</c> and <c>seen</c>, matched case-sensitively, each setting its flag or,
+    /// after one leading <c>-</c>, clearing it. Any other item, an empty one included (so an empty value
+    /// or a stray comma), refuses the option as unknown (measured 2026-09-28, BL-535 Notes).
+    /// </summary>
+    private static CommandLineRefusal? SetUploadFlags(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        ImapUploadFlags flags = options.UploadFlags;
+        foreach (string item in value.Split(','))
+        {
+            bool clear = item.StartsWith('-');
+            if (!UploadFlagsByName.TryGetValue(clear ? item[1..] : item, out ImapUploadFlags named))
+            {
+                return CommandLineRefusal.UnknownOption(spelledOption);
+            }
+
+            flags = clear ? flags & ~named : flags | named;
+        }
+
+        options.UploadFlags = flags;
+        return null;
+    }
 
     /// <summary>
     /// Sets <see cref="CommandLineOptions.FtpFileMethod"/> from a <c>--ftp-method</c> value as curl 8.21.0

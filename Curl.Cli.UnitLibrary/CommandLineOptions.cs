@@ -18,6 +18,7 @@ public sealed class CommandLineOptions
     private readonly List<UrlOutput> urlOutputs = [];
     private readonly List<string> uploadFiles = [];
     private readonly List<string> telnetOptions = [];
+    private readonly List<string> mailRecipients = [];
     private readonly List<string> quoteCommands = [];
     private readonly List<string> resolveEntries = [];
     private readonly List<string> connectToEntries = [];
@@ -990,6 +991,55 @@ public sealed class CommandLineOptions
     public string? IpfsGateway { get; internal set; }
 
     /// <summary>
+    /// The last <c>--mail-from</c>, the SMTP reverse path, verbatim; <see langword="null"/> when not
+    /// given. An empty value is refused as blank.
+    /// </summary>
+    public string? MailFrom { get; internal set; }
+
+    /// <summary>
+    /// Every <c>--mail-rcpt</c> value, verbatim and in command-line order; empty when none was given.
+    /// An empty value is accepted and kept, as curl 8.21.0 accepts it.
+    /// </summary>
+    public IReadOnlyList<string> MailRecipients => mailRecipients;
+
+    /// <summary>
+    /// The last <c>--mail-auth</c>, the address for SMTP's <c>AUTH=</c> parameter, verbatim;
+    /// <see langword="null"/> when not given. An empty value is refused as blank.
+    /// </summary>
+    public string? MailAuth { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--mail-rcpt-allowfails</c> was given and no
+    /// <c>--no-mail-rcpt-allowfails</c> came after it.
+    /// </summary>
+    public bool MailRecipientAllowFails { get; internal set; }
+
+    /// <summary>
+    /// The IMAP flags an <c>APPEND</c> sets: <see cref="ImapUploadFlags.Seen"/> until an
+    /// <c>--upload-flags</c> changes it. Each <c>--upload-flags</c> sets the flags it names and clears
+    /// those it names with a leading <c>-</c>, left to right, on top of the flags before it.
+    /// </summary>
+    public ImapUploadFlags UploadFlags { get; internal set; } = ImapUploadFlags.Seen;
+
+    /// <summary>
+    /// The last <c>--login-options</c>, verbatim; <see langword="null"/> when not given. An empty value
+    /// is accepted and kept, as curl 8.21.0 accepts it.
+    /// </summary>
+    public string? LoginOptions { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--sasl-authzid</c>, the SASL authorization identity; <see langword="null"/> when
+    /// not given. An empty value is refused as blank.
+    /// </summary>
+    public string? SaslAuthorizationIdentity { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--sasl-ir</c> was given and no <c>--no-sasl-ir</c> came after
+    /// it: send the SASL initial response with the authentication command.
+    /// </summary>
+    public bool SaslInitialResponse { get; internal set; }
+
+    /// <summary>
     /// The HTTP version the last <c>-0</c> / <c>--http1.0</c> or <c>--http1.1</c> asked for;
     /// <see langword="null"/> when neither was given, which means curl's default, HTTP/1.1.
     /// </summary>
@@ -1419,6 +1469,10 @@ public sealed class CommandLineOptions
     /// <summary>Appends <paramref name="telnetOption"/> to <see cref="TelnetOptions"/>, unchanged and unvalidated.</summary>
     /// <param name="telnetOption">A <c>-t</c> / <c>--telnet-option</c> value, possibly empty.</param>
     internal void AddTelnetOption(string telnetOption) => telnetOptions.Add(telnetOption);
+
+    /// <summary>Appends <paramref name="recipient"/> to <see cref="MailRecipients"/>, unchanged and unvalidated.</summary>
+    /// <param name="recipient">A <c>--mail-rcpt</c> value, possibly empty.</param>
+    internal void AddMailRecipient(string recipient) => mailRecipients.Add(recipient);
 
     /// <summary>Appends <paramref name="quoteCommand"/> to <see cref="QuoteCommands"/>, unchanged and unvalidated.</summary>
     /// <param name="quoteCommand">A <c>-Q</c> / <c>--quote</c> value, possibly empty.</param>
