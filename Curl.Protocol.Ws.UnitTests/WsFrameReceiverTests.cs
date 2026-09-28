@@ -20,11 +20,16 @@ public sealed class WsFrameReceiverTests
         var connection = new ScriptedConnection(Hex("81 02 6f 6b"), Hex("88 02 03 e8"));
         var output = new List<byte>();
 
-        long received = await new WsFrameReceiver(connection, MeasuredMask).ReceiveAsync(Hex("81 05 68 65 6c 6c 6f"), Collect(output), CancellationToken.None);
+        var progress = new RecordingProgress();
+        var receiver = new WsFrameReceiver(connection, MeasuredMask, progress);
+
+        await receiver.ReceiveAsync(Hex("81 05 68 65 6c 6c 6f"), Collect(output), CancellationToken.None);
 
         CollectionAssert.AreEqual(Hex("68 65 6c 6c 6f 6f 6b 03 e8"), output.ToArray());
-        Assert.AreEqual(15L, received);
+        Assert.AreEqual(15L, receiver.BytesReceived);
+        Assert.AreEqual(0L, receiver.BytesSent);
         Assert.IsEmpty(connection.Sent);
+        CollectionAssert.AreEqual(new[] { "down 7/?", "down 11/?", "down 15/?" }, progress.Reports.ToArray());
     }
 
     [TestMethod]
@@ -33,7 +38,7 @@ public sealed class WsFrameReceiverTests
         var connection = new ScriptedConnection(Hex("89 02 68 69 81 05 68 65 6c 6c 6f 88 02 03 e8"));
         var output = new List<byte>();
 
-        await new WsFrameReceiver(connection, MeasuredMask).ReceiveAsync(ReadOnlyMemory<byte>.Empty, Collect(output), CancellationToken.None);
+        await new WsFrameReceiver(connection, MeasuredMask, NoTransferProgress.Instance).ReceiveAsync(ReadOnlyMemory<byte>.Empty, Collect(output), CancellationToken.None);
 
         CollectionAssert.AreEqual(Hex("8a 82 44 22 90 af 2c 4b"), connection.Sent);
         CollectionAssert.AreEqual(Hex("68 65 6c 6c 6f 03 e8"), output.ToArray());
@@ -44,7 +49,7 @@ public sealed class WsFrameReceiverTests
     {
         var connection = new ScriptedConnection(Hex("89 01 61 89 01 62"));
 
-        await new WsFrameReceiver(connection, new ScriptedRandomSource(0x64, 0x20, 0xc9, 0x42)).ReceiveAsync(ReadOnlyMemory<byte>.Empty, Collect([]), CancellationToken.None);
+        await new WsFrameReceiver(connection, new ScriptedRandomSource(0x64, 0x20, 0xc9, 0x42), NoTransferProgress.Instance).ReceiveAsync(ReadOnlyMemory<byte>.Empty, Collect([]), CancellationToken.None);
 
         CollectionAssert.AreEqual(Hex("8a 81 64 20 c9 42 06"), connection.Sent);
     }
@@ -54,7 +59,7 @@ public sealed class WsFrameReceiverTests
     {
         var connection = new ScriptedConnection(Hex("89 01 61"), Hex("89 01 62"));
 
-        await new WsFrameReceiver(connection, new FixedRandomSource()).ReceiveAsync(ReadOnlyMemory<byte>.Empty, Collect([]), CancellationToken.None);
+        await new WsFrameReceiver(connection, new FixedRandomSource(), NoTransferProgress.Instance).ReceiveAsync(ReadOnlyMemory<byte>.Empty, Collect([]), CancellationToken.None);
 
         CollectionAssert.AreEqual(Hex("8a 81 00 01 02 03 61 8a 81 00 01 02 03 62"), connection.Sent);
     }
@@ -64,10 +69,13 @@ public sealed class WsFrameReceiverTests
     {
         var connection = new ScriptedConnection();
 
-        long received = await new WsFrameReceiver(connection, new FixedRandomSource()).ReceiveAsync(Hex("89 00"), Collect([]), CancellationToken.None);
+        var receiver = new WsFrameReceiver(connection, new FixedRandomSource(), NoTransferProgress.Instance);
+
+        await receiver.ReceiveAsync(Hex("89 00"), Collect([]), CancellationToken.None);
 
         CollectionAssert.AreEqual(Hex("8a 80 00 01 02 03"), connection.Sent);
-        Assert.AreEqual(2L, received);
+        Assert.AreEqual(2L, receiver.BytesReceived);
+        Assert.AreEqual(6L, receiver.BytesSent);
     }
 
     [TestMethod]
@@ -75,9 +83,11 @@ public sealed class WsFrameReceiverTests
     {
         var output = new List<byte>();
 
-        long received = await new WsFrameReceiver(new ScriptedConnection(), MeasuredMask).ReceiveAsync(ReadOnlyMemory<byte>.Empty, Collect(output), CancellationToken.None);
+        var receiver = new WsFrameReceiver(new ScriptedConnection(), MeasuredMask, NoTransferProgress.Instance);
 
-        Assert.AreEqual(0L, received);
+        await receiver.ReceiveAsync(ReadOnlyMemory<byte>.Empty, Collect(output), CancellationToken.None);
+
+        Assert.AreEqual(0L, receiver.BytesReceived);
         Assert.IsEmpty(output);
     }
 
@@ -88,7 +98,7 @@ public sealed class WsFrameReceiverTests
         var output = new List<byte>();
 
         WsTransferException failure = await Assert.ThrowsExactlyAsync<WsTransferException>(
-            async () => await new WsFrameReceiver(connection, MeasuredMask).ReceiveAsync(ReadOnlyMemory<byte>.Empty, Collect(output), CancellationToken.None));
+            async () => await new WsFrameReceiver(connection, MeasuredMask, NoTransferProgress.Instance).ReceiveAsync(ReadOnlyMemory<byte>.Empty, Collect(output), CancellationToken.None));
 
         Assert.AreEqual(CurlExitCode.RecvError, failure.ExitCode);
         Assert.AreEqual("[WS] fragmented message interrupted by new TEXT msg", failure.Message);
@@ -102,7 +112,7 @@ public sealed class WsFrameReceiverTests
         var output = new List<byte>();
 
         WsTransferException failure = await Assert.ThrowsExactlyAsync<WsTransferException>(
-            async () => await new WsFrameReceiver(new ScriptedConnection(), MeasuredMask).ReceiveAsync(Hex("81 85 01 02 03 04"), Collect(output), CancellationToken.None));
+            async () => await new WsFrameReceiver(new ScriptedConnection(), MeasuredMask, NoTransferProgress.Instance).ReceiveAsync(Hex("81 85 01 02 03 04"), Collect(output), CancellationToken.None));
 
         Assert.AreEqual("[WS] masked input frame", failure.Message);
         Assert.IsEmpty(output);
@@ -114,7 +124,7 @@ public sealed class WsFrameReceiverTests
         var connection = new FailingConnection(readFailure: new IOException("broken"));
 
         WsTransferException failure = await Assert.ThrowsExactlyAsync<WsTransferException>(
-            async () => await new WsFrameReceiver(connection, MeasuredMask).ReceiveAsync(ReadOnlyMemory<byte>.Empty, Collect([]), CancellationToken.None));
+            async () => await new WsFrameReceiver(connection, MeasuredMask, NoTransferProgress.Instance).ReceiveAsync(ReadOnlyMemory<byte>.Empty, Collect([]), CancellationToken.None));
 
         Assert.AreEqual(CurlExitCode.RecvError, failure.ExitCode);
         Assert.AreEqual(WsIoFailures.ReceiveFailedMessage, failure.Message);
@@ -126,7 +136,7 @@ public sealed class WsFrameReceiverTests
         var connection = new FailingConnection(writeFailure: new IOException("broken"));
 
         WsTransferException failure = await Assert.ThrowsExactlyAsync<WsTransferException>(
-            async () => await new WsFrameReceiver(connection, MeasuredMask).ReceiveAsync(Hex("89 00"), Collect([]), CancellationToken.None));
+            async () => await new WsFrameReceiver(connection, MeasuredMask, NoTransferProgress.Instance).ReceiveAsync(Hex("89 00"), Collect([]), CancellationToken.None));
 
         Assert.AreEqual(CurlExitCode.SendError, failure.ExitCode);
         Assert.AreEqual(WsIoFailures.SendFailedMessage, failure.Message);

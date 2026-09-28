@@ -7,7 +7,9 @@ namespace Curl.Protocol.Ws;
 
 /// <summary>
 /// Serves the <c>ws</c> and <c>wss</c> schemes: connects, sends curl's HTTP/1.1 upgrade request
-/// and reads the reply head, accepting the upgrade on a <c>101</c> (ADR-0128).
+/// and reads the reply head, accepting the upgrade on a <c>101</c> (ADR-0128); after it, sends
+/// any <c>-T</c> upload as one frame and writes every frame's payload to the output until the
+/// server closes the connection (ADR-0131).
 /// </summary>
 /// <param name="connector">
 /// Supplies the connection to the URL's host and port, over TLS for <c>wss</c> and tunnelled
@@ -79,6 +81,7 @@ public sealed class WsProtocolHandler(
             return new TransferResult(connect.ExitCode, 0, connect.ErrorMessage) { IsConnectionRefused = connect.IsConnectionRefused };
         }
 
+        context.Progress.ReportTransferStarted();
         await using (connection.ConfigureAwait(false))
         {
             try
@@ -110,14 +113,100 @@ public sealed class WsProtocolHandler(
         await SendAsync(connection, request, context.CancellationToken).ConfigureAwait(false);
         WsUpgradeResponse response = await WsUpgradeResponseReader.ReadAsync(connection, context.CancellationToken).ConfigureAwait(false);
         await WriteHeadAsync(context.HeaderOutput, response.Head, context.CancellationToken).ConfigureAwait(false);
-        TransferReport report = new() { ResponseCode = response.StatusCode, HttpVersion = HttpVersion.Version11, Method = method };
+        TransferReport report = new()
+        {
+            ResponseCode = response.StatusCode,
+            HttpVersion = HttpVersion.Version11,
+            Method = method,
+            HeaderSize = response.Head.Length,
+            RequestSize = request.Length,
+        };
         if (response.StatusCode != SwitchingProtocols)
         {
             string message = string.Create(CultureInfo.InvariantCulture, $"Refused WebSocket upgrade: {response.StatusCode}");
             return TransferResult.Failure(CurlExitCode.HttpReturnedError, message) with { Report = report };
         }
 
-        return TransferResult.Success(0) with { Report = report };
+        return await ExchangeFramesAsync(connection, context, response.Remaining, report).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sends the <c>-T</c> upload as one binary frame, then writes the payload of every frame
+    /// received to the output until the server closes the connection (ADR-0128, ADR-0131).
+    /// </summary>
+    /// <remarks>
+    /// Measured against curl 8.21.0 (BL-582): the transfer ends with exit 0 when the server
+    /// closes the connection after at least one frame byte, close frame or not, and with 52
+    /// <c>Empty reply from server</c> when none arrived. <c>%{size_download}</c> counts frame
+    /// bytes, heads included; <c>%{size_upload}</c> the upload frame; <c>%{size_request}</c>
+    /// the upgrade request, the upload frame and every pong. A failure keeps the report, so
+    /// <c>%{http_code}</c> is still <c>101</c>. <c>-m</c> cancels the reads, and the
+    /// cancellation escapes for the runner's exit 28 (ADR-0117).
+    /// </remarks>
+    private async Task<TransferResult> ExchangeFramesAsync(
+        IConnection connection,
+        ITransferContext context,
+        byte[] alreadyReceived,
+        TransferReport report)
+    {
+        var receiver = new WsFrameReceiver(connection, randomSource, context.Progress);
+        long uploaded = 0;
+        TransferResult result;
+        try
+        {
+            uploaded = await SendUploadAsync(connection, context).ConfigureAwait(false);
+            await receiver.ReceiveAsync(
+                alreadyReceived,
+                (payload, token) => WriteAsync(context.Output, payload, token),
+                context.CancellationToken).ConfigureAwait(false);
+            result = receiver.BytesReceived == 0
+                ? TransferResult.Failure(CurlExitCode.GotNothing, WsUpgradeResponseReader.EmptyReply)
+                : TransferResult.Success(receiver.BytesReceived);
+        }
+        catch (WsTransferException failure)
+        {
+            result = TransferResult.Failure(failure.ExitCode, failure.Message, receiver.BytesReceived);
+        }
+
+        context.Progress.ReportTransferDone();
+        return result with
+        {
+            Report = report with
+            {
+                RequestSize = report.RequestSize + uploaded + receiver.BytesSent,
+                DownloadSize = receiver.BytesReceived,
+                UploadSize = uploaded,
+            },
+        };
+    }
+
+    /// <summary>
+    /// Sends the whole of <see cref="ITransferContext.Upload" /> as one masked binary frame, as
+    /// curl 8.21.0 sends <c>-T</c> on a WebSocket; a failed read ends the upload, as curl takes
+    /// a file read that fails.
+    /// </summary>
+    /// <returns>The frame's length, or 0 when there is no upload.</returns>
+    private async ValueTask<long> SendUploadAsync(IConnection connection, ITransferContext context)
+    {
+        if (context.Upload is not { } upload)
+        {
+            return 0;
+        }
+
+        using var payload = new MemoryStream();
+        try
+        {
+            await upload.CopyToAsync(payload, context.CancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException)
+        {
+            // The bytes read before the failure are the upload.
+        }
+
+        byte[] frame = WsFrameEncoder.Encode(WsOpcode.Binary, payload.GetBuffer().AsSpan(0, (int)payload.Length), randomSource);
+        await SendAsync(connection, frame, context.CancellationToken).ConfigureAwait(false);
+        context.Progress.ReportUploaded(frame.Length, frame.Length);
+        return frame.Length;
     }
 
     /// <summary>Sends <paramref name="bytes" /> and flushes, turning a failure into curl's exit 55.</summary>
@@ -140,18 +229,22 @@ public sealed class WsProtocolHandler(
 
     private static async ValueTask WriteHeadAsync(Stream? headerOutput, byte[] head, CancellationToken cancellationToken)
     {
-        if (headerOutput is null)
+        if (headerOutput is not null)
         {
-            return;
+            await WriteAsync(headerOutput, head, cancellationToken).ConfigureAwait(false);
         }
+    }
 
+    /// <summary>Writes <paramref name="bytes" /> to <paramref name="destination" />, turning a failure into curl's exit 23.</summary>
+    private static async ValueTask WriteAsync(Stream destination, ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken)
+    {
         try
         {
-            await headerOutput.WriteAsync(head, cancellationToken).ConfigureAwait(false);
+            await destination.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
         }
         catch (IOException exception)
         {
-            throw WsIoFailures.HeaderWriteFailed(head.Length, exception);
+            throw WsIoFailures.WriteFailed(bytes.Length, exception);
         }
     }
 

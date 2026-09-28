@@ -20,7 +20,11 @@ internal static class WsUpgradeResponseReader
     /// <summary>The most bytes a reply head may take before the transfer fails with 100.</summary>
     internal const int MaximumHeadLength = 102400;
 
-    private const string EmptyReply = "Empty reply from server";
+    /// <summary>
+    /// The exit 52 message for a connection that closed before a head arrived, or, after a
+    /// <c>101</c>, before any frame byte did.
+    /// </summary>
+    internal const string EmptyReply = "Empty reply from server";
 
     private const string HeadTooLarge = "A value or data field grew larger than allowed";
 

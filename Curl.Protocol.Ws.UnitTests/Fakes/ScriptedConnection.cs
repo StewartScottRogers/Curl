@@ -7,8 +7,8 @@ namespace Curl.Protocol.Ws.Fakes;
 /// An <see cref="IConnection" /> that plays a WebSocket server from a script: each element of
 /// <paramref name="reads" /> is returned by one read, in order (split over several when the
 /// reader's buffer is shorter), and once the script is
-/// exhausted every read returns zero, which is the server closing. Every byte written is
-/// recorded in <see cref="Sent" />.
+/// exhausted every read returns zero, which is the server closing. A read on a cancelled token
+/// throws. Every byte written is recorded in <see cref="Sent" />.
 /// </summary>
 /// <param name="reads">What the server sends, one non-empty read at a time.</param>
 public sealed class ScriptedConnection(params byte[][] reads) : IConnection
@@ -34,6 +34,7 @@ public sealed class ScriptedConnection(params byte[][] reads) : IConnection
     /// <inheritdoc />
     public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (nextRead == reads.Length)
         {
             return ValueTask.FromResult(0);
