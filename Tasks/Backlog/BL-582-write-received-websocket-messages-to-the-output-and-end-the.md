@@ -34,6 +34,11 @@ The payload of each received data frame reaches the transfer's output exactly as
   not 0. `WsProtocolHandler` currently returns success right after the `101`; the frame loop
   built here replaces that, and `WsUpgradeResponse.Remaining` holds bytes that arrived with
   the head.
+- From BL-581: `WsFrameReceiver.ReceiveAsync(Remaining, writePayload, token)` is the frame
+  loop, ready to call after the `101`. It decodes every frame (ADR-0131), writes nothing itself
+  but hands each payload run to `writePayload`, answers pings, throws `WsTransferException`
+  (56/55) on a violation or failed read or pong, and returns the frame bytes received (0 means
+  exit 52). `WsFrameEncoder.Encode(WsOpcode.Binary, upload, randomSource)` makes the `-T` frame.
 
 ## Log
 
