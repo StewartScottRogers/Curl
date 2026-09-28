@@ -34,3 +34,4 @@ HTTP `Range` and `Content-Range` carry the `-r` text as typed, as curl 8.21.0 do
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
