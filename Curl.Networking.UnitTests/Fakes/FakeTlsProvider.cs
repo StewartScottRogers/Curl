@@ -6,10 +6,11 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Networking.Fakes;
 
 /// <summary>
-/// An <see cref="ITlsProvider" /> that records what it was given and returns either a
-/// fixed secure connection or, when <see cref="FailureToReturn" /> is set, that failure.
+/// An <see cref="IHandshakeReportingTlsProvider" /> that records what it was given and returns
+/// either a fixed secure connection or, when <see cref="FailureToReturn" /> is set, that
+/// failure. It reports no handshake itself.
 /// </summary>
-public sealed class FakeTlsProvider : ITlsProvider
+public sealed class FakeTlsProvider : IHandshakeReportingTlsProvider
 {
     /// <summary>Gets the connection every handshake returns.</summary>
     public FakeConnection SecuredConnection { get; } = new() { IsSecure = true };
@@ -37,6 +38,22 @@ public sealed class FakeTlsProvider : ITlsProvider
 
     /// <summary>Gets the number of handshakes requested.</summary>
     public int HandshakeCount { get; private set; }
+
+    /// <summary>
+    /// Gets the events last passed to the reporting overload, if it was called.
+    /// </summary>
+    public ITransferEvents? ReceivedEvents { get; private set; }
+
+    /// <inheritdoc />
+    public ValueTask<ConnectResult> AuthenticateAsClientAsync(
+        IConnection plaintext,
+        string targetHost,
+        ITransferEvents events,
+        CancellationToken cancellationToken)
+    {
+        ReceivedEvents = events;
+        return AuthenticateAsClientAsync(plaintext, targetHost, cancellationToken);
+    }
 
     /// <inheritdoc />
     public ValueTask<ConnectResult> AuthenticateAsClientAsync(

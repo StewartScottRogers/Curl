@@ -338,7 +338,7 @@ public sealed class TcpConnector(
             return ConnectResult.Connected(dialed.Connection, timings, dialed.LocalEndPoint, proxyConnectResponseCode);
         }
 
-        var secured = await tlsProvider.AuthenticateAsClientAsync(dialed.Connection, target.Host, cancellationToken).ConfigureAwait(false);
+        var secured = await AuthenticateTargetAsync(dialed.Connection, target, cancellationToken).ConfigureAwait(false);
         if (secured.Connection is not { } securedConnection)
         {
             return secured;
@@ -354,6 +354,16 @@ public sealed class TcpConnector(
             proxyConnectResponseCode,
             secured.PeerCertificates);
     }
+
+    // A provider that can report its handshake reports it on the target's events (BL-404).
+    // The proxy's handshake is not reported: -v would word it as the server's (ADR-0085).
+    private ValueTask<ConnectResult> AuthenticateTargetAsync(
+        IConnection plaintext,
+        ConnectTarget target,
+        CancellationToken cancellationToken) =>
+        tlsProvider is IHandshakeReportingTlsProvider reportingProvider
+            ? reportingProvider.AuthenticateAsClientAsync(plaintext, target.Host, target.Events, cancellationToken)
+            : tlsProvider.AuthenticateAsClientAsync(plaintext, target.Host, cancellationToken);
 
     /// <summary>
     /// Dials each address in turn and returns the first connection, or <see langword="null" />

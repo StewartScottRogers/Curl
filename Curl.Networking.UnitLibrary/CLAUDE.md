@@ -53,7 +53,10 @@ the `DialedTcpConnection` that `ITcpDialer` returns, and `TlsHandshakeCompleted`
 timings `SslStreamTlsProvider` reports on its own `TimeProvider`. Per ADR-0054 the provider
 also reports `ConnectResult.PeerCertificates`, the DER of every certificate the server sent
 (its own first, then the validation callback's `ChainPolicy.ExtraStore` in the order sent),
-and `TcpConnector` passes them on.
+and `TcpConnector` passes them on. Per ADR-0085's BL-404 amendment a successful handshake is
+also reported as a `TlsHandshakeEvent` through the provider's four-argument overload
+(`IHandshakeReportingTlsProvider`), to which `TcpConnector` passes the target's `Events`; the
+event's `CertificateVerifyResult` is OpenSSL's `X509_V_` code as `OpenSslVerifyResult` maps it.
 
 `TcpConnector` tunnels through `ConnectTarget.Proxy` when it is an HTTP proxy
 (`ProxyKind.Http`, `Http10`) per ADR-0023: `HttpProxyTunnel` writes curl 8.21.0's CONNECT

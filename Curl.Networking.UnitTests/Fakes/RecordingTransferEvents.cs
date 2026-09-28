@@ -3,8 +3,8 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Networking.Fakes;
 
 /// <summary>
-/// An <see cref="ITransferEvents" /> that records the information lines and reuse events it
-/// is given and ignores the rest.
+/// An <see cref="ITransferEvents" /> that records the information lines, reuse events and TLS
+/// handshakes it is given and ignores the rest.
 /// </summary>
 public sealed class RecordingTransferEvents : ITransferEvents
 {
@@ -13,6 +13,9 @@ public sealed class RecordingTransferEvents : ITransferEvents
 
     /// <summary>Gets every <see cref="ReportConnectionReused" /> event, in order.</summary>
     public List<ConnectionReusedEvent> Reused { get; } = [];
+
+    /// <summary>Gets every <see cref="ReportTlsHandshake" /> event, in order.</summary>
+    public List<TlsHandshakeEvent> Handshakes { get; } = [];
 
     /// <inheritdoc />
     public void ReportInfo(string text) => Info.Add(text);
@@ -26,9 +29,7 @@ public sealed class RecordingTransferEvents : ITransferEvents
     public void ReportConnectionReused(ConnectionReusedEvent reused) => Reused.Add(reused);
 
     /// <inheritdoc />
-    public void ReportTlsHandshake(TlsHandshakeEvent handshake)
-    {
-    }
+    public void ReportTlsHandshake(TlsHandshakeEvent handshake) => Handshakes.Add(handshake);
 
     /// <inheritdoc />
     public void ReportTlsData(ReadOnlySpan<byte> bytes, bool sent)
