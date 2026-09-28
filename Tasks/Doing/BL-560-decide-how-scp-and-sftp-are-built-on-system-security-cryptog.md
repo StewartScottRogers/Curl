@@ -39,3 +39,4 @@ An ADR fixes how `Curl.Protocol.Ssh.UnitLibrary` implements SSH-2 for `scp://` a
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
