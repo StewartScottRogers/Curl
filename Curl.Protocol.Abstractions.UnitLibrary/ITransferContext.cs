@@ -373,6 +373,17 @@ public interface ITransferContext
     HttpRequestOptions? Http { get; }
 
     /// <summary>
+    /// Gets the mail-only options, or <see langword="null" /> for every scheme but
+    /// <c>smtp</c>, <c>smtps</c>, <c>pop3</c>, <c>pop3s</c>, <c>imap</c> and <c>imaps</c>.
+    /// </summary>
+    /// <remarks>
+    /// A mail handler treats <see langword="null" /> exactly as
+    /// <c>new MailRequestOptions()</c>, every member at its default; every other handler
+    /// ignores it (ADR-0121).
+    /// </remarks>
+    MailRequestOptions? Mail { get; }
+
+    /// <summary>
     /// Gets the time source. Injected so that timeout and retry behaviour is testable
     /// without a real delay.
     /// </summary>
