@@ -15,13 +15,17 @@ internal interface IHandshakeReportingTlsProvider : ITlsProvider
     /// Performs the client handshake as
     /// <see cref="ITlsProvider.AuthenticateAsClientAsync(IConnection, string, CancellationToken)" />
     /// does, reporting the trust it is set up with to <paramref name="events" /> and, when it
-    /// succeeds, what it negotiated.
+    /// succeeds, what it negotiated, offering <paramref name="applicationProtocols" /> through ALPN.
     /// </summary>
     /// <param name="plaintext">The connection to upgrade; ownership transfers to the provider.</param>
     /// <param name="targetHost">The host name to validate the server certificate against.</param>
     /// <param name="events">Where the trust and the completed handshake are reported.</param>
     /// <param name="isProxy">
     /// <see langword="true" /> when the handshake is with an HTTPS proxy rather than the origin.
+    /// </param>
+    /// <param name="applicationProtocols">
+    /// The protocols the connection can speak, in preference order, for the handshake to offer
+    /// through ALPN unless the provider was told not to (<c>--no-alpn</c>); empty offers none.
     /// </param>
     /// <param name="cancellationToken">Cancels the handshake.</param>
     /// <returns>The same result the three-argument overload returns.</returns>
@@ -30,5 +34,6 @@ internal interface IHandshakeReportingTlsProvider : ITlsProvider
         string targetHost,
         ITransferEvents events,
         bool isProxy,
+        IReadOnlyList<string> applicationProtocols,
         CancellationToken cancellationToken);
 }

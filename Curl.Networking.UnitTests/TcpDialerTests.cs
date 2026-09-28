@@ -20,6 +20,57 @@ public sealed class TcpDialerTests
     }
 
     [TestMethod]
+    public void Constructor_WithNullSocketOptions_ThrowsArgumentNullException()
+    {
+        var exception = Assert.ThrowsExactly<ArgumentNullException>(() => new TcpDialer(null!));
+
+        Assert.AreEqual("socketOptions", exception.ParamName);
+    }
+
+    [TestMethod]
+    public void Constructor_WithoutSocketOptions_UsesCurlsDefaults()
+    {
+        Assert.AreEqual(new TcpSocketOptions(NoDelay: true, KeepAlive: true), new TcpDialer().SocketOptions);
+    }
+
+    [TestMethod]
+    public void ApplySocketOptions_ByDefault_SetsNoDelayAndKeepAliveEverySixtySeconds()
+    {
+        using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+        new TcpDialer().ApplySocketOptions(socket);
+
+        Assert.IsTrue(socket.NoDelay);
+        Assert.AreNotEqual(0, (int)socket.GetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive)!);
+        Assert.AreEqual(60, (int)socket.GetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveTime)!);
+        Assert.AreEqual(60, (int)socket.GetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveInterval)!);
+    }
+
+    [TestMethod]
+    public void ApplySocketOptions_WithNoTcpNoDelayAndNoKeepAlive_LeavesNagleOnAndKeepAliveOff()
+    {
+        using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+        new TcpDialer(new TcpSocketOptions(NoDelay: false, KeepAlive: false)).ApplySocketOptions(socket);
+
+        Assert.IsFalse(socket.NoDelay);
+        Assert.AreEqual(0, (int)socket.GetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive)!);
+    }
+
+    [TestMethod]
+    [DataRow(true, false)]
+    [DataRow(false, true)]
+    public void ApplySocketOptions_WithOneSwitchOff_SetsTheOtherAlone(bool noDelay, bool keepAlive)
+    {
+        using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+        new TcpDialer(new TcpSocketOptions(noDelay, keepAlive)).ApplySocketOptions(socket);
+
+        Assert.AreEqual(noDelay, socket.NoDelay);
+        Assert.AreEqual(keepAlive, (int)socket.GetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive)! != 0);
+    }
+
+    [TestMethod]
     [TestCategory("Integration")]
     public async Task DialAsync_OverLoopback_CarriesBytesBothWaysThenFailsOnceTheListenerStops()
     {

@@ -49,16 +49,23 @@ public sealed class FakeTlsProvider : IHandshakeReportingTlsProvider
     /// </summary>
     public List<bool> ReceivedIsProxy { get; } = [];
 
+    /// <summary>
+    /// Gets the <c>applicationProtocols</c> value of every call to the reporting overload, in order.
+    /// </summary>
+    public List<IReadOnlyList<string>> ReceivedApplicationProtocols { get; } = [];
+
     /// <inheritdoc />
     public ValueTask<ConnectResult> AuthenticateAsClientAsync(
         IConnection plaintext,
         string targetHost,
         ITransferEvents events,
         bool isProxy,
+        IReadOnlyList<string> applicationProtocols,
         CancellationToken cancellationToken)
     {
         ReceivedEvents = events;
         ReceivedIsProxy.Add(isProxy);
+        ReceivedApplicationProtocols.Add(applicationProtocols);
         return AuthenticateAsClientAsync(plaintext, targetHost, cancellationToken);
     }
 

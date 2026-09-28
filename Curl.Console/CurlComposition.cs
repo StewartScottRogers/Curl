@@ -112,7 +112,8 @@ internal static class CurlComposition
 
     /// <summary>
     /// Creates the network transports for one run: a <see cref="TcpConnector" /> over a
-    /// <see cref="SystemDnsResolver" />, a <see cref="TcpDialer" /> and an
+    /// <see cref="SystemDnsResolver" />, a <see cref="TcpDialer" /> that sets <c>TCP_NODELAY</c> and
+    /// <c>SO_KEEPALIVE</c> unless <c>--no-tcp-nodelay</c> or <c>--no-keepalive</c> says not to, and an
     /// <see cref="SslStreamTlsProvider" />, and a <see cref="UdpDatagramConnector" />. Both
     /// connectors and the TLS provider share the one resolver and <see cref="TimeProvider.System" />. TLS uses
     /// the <see cref="TlsClientOptions" /> mapped from <paramref name="options" /> by
@@ -146,7 +147,7 @@ internal static class CurlComposition
     internal static CurlTransports CreateTransports(CommandLineOptions options, TimeProvider timeProvider)
     {
         SystemDnsResolver dnsResolver = new();
-        TcpDialer tcpDialer = new();
+        TcpDialer tcpDialer = new(new TcpSocketOptions(options.TcpNoDelay, options.TcpKeepAlive));
         TlsClientOptions tlsClientOptions = TlsClientOptionsMapping.FromCommandLine(options);
         SslStreamTlsProvider tlsProvider = new(tlsClientOptions, timeProvider);
         TlsClientOptions proxyTlsClientOptions = TlsClientOptionsMapping.ProxyFromCommandLine(options);

@@ -507,6 +507,7 @@ public sealed class CommandLineOptions
     /// <summary>
     /// <see langword="true"/> when <c>--ssl-allow-beast</c> was given and no <c>--no-ssl-allow-beast</c> came after it:
     /// leave the TLS 1.0 BEAST workaround (record splitting) off, for servers that cannot handle it.
+    /// Parsed only: <c>SslStream</c> has no control for it, so the hand-built TLS client of BL-713 honours it.
     /// </summary>
     public bool AllowBeast { get; internal set; }
 
@@ -526,6 +527,7 @@ public sealed class CommandLineOptions
     /// <summary>
     /// <see langword="false"/> when the last of <c>--sessionid</c> and <c>--no-sessionid</c> was <c>--no-sessionid</c>:
     /// never resume a cached TLS session. <see langword="true"/> otherwise, as curl caches session IDs by default.
+    /// Parsed only: <c>SslStream</c> has no control for it, so the hand-built TLS client of BL-713 honours it.
     /// </summary>
     public bool ReuseSessionIds { get; internal set; } = true;
 
@@ -545,7 +547,7 @@ public sealed class CommandLineOptions
     /// <summary>
     /// <see langword="false"/> when the last of <c>--styled-output</c> and <c>--no-styled-output</c> was
     /// <c>--no-styled-output</c>: never style header output. <see langword="true"/> otherwise, as curl styles
-    /// headers written to a terminal by default.
+    /// headers written to a terminal by default. Parsed only until BL-736 styles header output.
     /// </summary>
     public bool StyledOutput { get; internal set; } = true;
 

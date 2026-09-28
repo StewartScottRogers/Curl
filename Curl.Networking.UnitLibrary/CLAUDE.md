@@ -66,7 +66,12 @@ default bundle name `/cacert.pem`, which is named but never read, and `--capath`
 event's `VerifiedHostName` (the host without IPv6 brackets, `null` with `-k`) and `IsProxy`;
 `TcpConnector` reports the HTTPS proxy's handshake, and a forward proxy's, with `IsProxy` set
 through `IHandshakeReportingTlsProvider`'s `isProxy` argument. `SslStream` exposes no TLS
-records, so no `TlsMessageEvent` is reported, and no ALPN is offered.
+records, so no `TlsMessageEvent` is reported. Per ADR-0124 the origin handshake of an `https://`
+transfer offers `http/1.1` through ALPN (`TcpConnector.ApplicationProtocolsFor`), none under `--no-alpn`
+(`TlsClientOptions.UseAlpn`); the Schannel build under `--ssl-revoke-best-effort`
+(`TlsClientOptions.RevocationCheckBestEffort`) accepts a `--cacert` chain whose only faults are an
+unknown or offline revocation status; and `TcpDialer` sets `TCP_NODELAY` and `SO_KEEPALIVE` from
+`TcpSocketOptions` (`--no-tcp-nodelay`, `--no-keepalive`) in `ApplySocketOptions`, which unit tests measure.
 Per ADR-0100 it also reports curl's `-v` connect lines on the target's `Events`: `Trying` before
 each dial, `connect to ... failed: <reason>` after each failed one (the reason from
 `ConnectFailureReason`), the exit 7 message, and `ReportConnectionOpened` once any tunnel and

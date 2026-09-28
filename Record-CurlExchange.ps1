@@ -277,6 +277,13 @@
     smtps:// expects (BL-529); with -Imap, implicit IMAPS, as imaps:// expects (BL-531);
     with -Pop3, implicit POP3S, as pop3s:// expects (BL-530).
 
+.PARAMETER TlsRootCertificateFile
+    With -Tls, serve a certificate issued by a throwaway private root CA in place of the
+    self-signed one, and write that root's PEM to this path so curl can be given
+    --cacert <path> (BL-490). Neither certificate names a revocation endpoint, so the
+    Schannel build's revocation check of the leaf ends "status unknown", as ADR-0086
+    describes. The root's key is never written; the file is left for the caller to delete.
+
 .PARAMETER FtpIdleMilliseconds
     How long, in -Ftp mode, the server waits for curl's next command before it hangs up.
     Default 5000. Raise it to measure a wait longer than five seconds, such as curl's
@@ -363,6 +370,7 @@ param(
     [string] $Pop3Message = 'From: sender@example.com\r\nTo: recipient@example.com\r\nSubject: Recorded\r\n\r\nHello from the recorder.\r\n.A line that starts with a dot.\r\n',
     [ValidateRange(1, 600000)] [int] $Pop3IdleMilliseconds = 5000,
     [switch] $Tls,
+    [string] $TlsRootCertificateFile,
     [string] $Curl,
     [System.Net.IPAddress] $ListenAddress = [System.Net.IPAddress]::Loopback,
     [switch] $NoServer
@@ -1300,10 +1308,42 @@ $servePop3Session = {
     return , @(, $received.ToArray())
 }
 
+function New-IssuedByThrowawayRoot {
+    # Signs Request with a throwaway root CA named by no store and writes the root's PEM
+    # to RootCertificateFile. Neither certificate names a CRL or OCSP endpoint.
+    param($Request, $Key, [string] $RootCertificateFile, [System.DateTimeOffset] $NotBefore, [System.DateTimeOffset] $NotAfter)
+    $rootKey = New-Object System.Security.Cryptography.RSACng(2048)
+    try {
+        $rootRequest = New-Object System.Security.Cryptography.X509Certificates.CertificateRequest('CN=Record-CurlExchange throwaway root', $rootKey, [System.Security.Cryptography.HashAlgorithmName]::SHA256, [System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
+        $rootRequest.CertificateExtensions.Add((New-Object System.Security.Cryptography.X509Certificates.X509BasicConstraintsExtension($true, $false, 0, $true)))
+        $rootRequest.CertificateExtensions.Add((New-Object System.Security.Cryptography.X509Certificates.X509KeyUsageExtension([System.Security.Cryptography.X509Certificates.X509KeyUsageFlags]::KeyCertSign, $true)))
+        $root = $rootRequest.CreateSelfSigned($NotBefore.AddMinutes(-5), $NotAfter.AddDays(1))
+        try {
+            $pem = "-----BEGIN CERTIFICATE-----`n" + [System.Convert]::ToBase64String($root.RawData, [System.Base64FormattingOptions]::InsertLineBreaks) + "`n-----END CERTIFICATE-----`n"
+            [System.IO.File]::WriteAllText($RootCertificateFile, $pem.Replace("`r`n", "`n"))
+            $serial = New-Object byte[] 16
+            [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($serial)
+            $serial[0] = $serial[0] -band 0x7F
+            $issued = $Request.Create($root, $NotBefore, $NotAfter, $serial)
+            try {
+                return [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::CopyWithPrivateKey($issued, $Key)
+            } finally {
+                $issued.Reset()
+            }
+        } finally {
+            $root.Reset()
+        }
+    } finally {
+        $rootKey.Dispose()
+    }
+}
+
 function New-ThrowawayTlsCertificate {
     # Schannel will not serve the ephemeral key CreateSelfSigned returns, so the
     # certificate is reloaded from its PFX export. Loaded without PersistKeySet, its key
-    # container is deleted when the certificate is reset; no store is touched.
+    # container is deleted when the certificate is reset; no store is touched. With a
+    # RootCertificateFile the leaf is issued by a throwaway root whose PEM is written there.
+    param([string] $RootCertificateFile)
     $rsa = New-Object System.Security.Cryptography.RSACng(2048)
     try {
         $request = New-Object System.Security.Cryptography.X509Certificates.CertificateRequest('CN=127.0.0.1', $rsa, [System.Security.Cryptography.HashAlgorithmName]::SHA256, [System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
@@ -1311,7 +1351,11 @@ function New-ThrowawayTlsCertificate {
         $alternativeNames.AddIpAddress([System.Net.IPAddress]::Loopback)
         $request.CertificateExtensions.Add($alternativeNames.Build())
         $now = [System.DateTimeOffset]::UtcNow
-        $selfSigned = $request.CreateSelfSigned($now.AddMinutes(-5), $now.AddDays(1))
+        $selfSigned = if ([string]::IsNullOrEmpty($RootCertificateFile)) {
+            $request.CreateSelfSigned($now.AddMinutes(-5), $now.AddDays(1))
+        } else {
+            New-IssuedByThrowawayRoot -Request $request -Key $rsa -RootCertificateFile $RootCertificateFile -NotBefore $now.AddMinutes(-5) -NotAfter $now.AddDays(1)
+        }
         try {
             $pfx = $selfSigned.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Pfx)
         } finally {
@@ -1348,7 +1392,7 @@ $uploadedData = New-Object System.IO.MemoryStream
 $OutDirectory = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine((Get-Location).ProviderPath, $OutDirectory))
 New-Item -ItemType Directory -Path $OutDirectory -Force | Out-Null
 
-$tlsCertificate = if ($Tls -or $Ftp -or $Smtp -or $Imap -or $Pop3) { New-ThrowawayTlsCertificate } else { $null }
+$tlsCertificate = if ($Tls -or $Ftp -or $Smtp -or $Imap -or $Pop3) { New-ThrowawayTlsCertificate -RootCertificateFile $TlsRootCertificateFile } else { $null }
 # -NoServer binds nothing: the caller's own server answers curl.
 $listener = $null
 $server = $null

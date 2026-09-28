@@ -162,6 +162,37 @@ public sealed class TlsClientOptionsMappingTests
         Assert.AreEqual(new TlsClientOptions(CaCertificateDirectory: "certs"), MapProxy("--capath", "certs", Url));
     }
 
+    [TestMethod]
+    public void FromCommandLine_SslRevokeBestEffort_SetsRevocationCheckBestEffortOnly()
+    {
+        Assert.AreEqual(new TlsClientOptions(RevocationCheckBestEffort: true), Map("--ssl-revoke-best-effort", Url));
+    }
+
+    [TestMethod]
+    public void FromCommandLine_NoAlpn_TurnsAlpnOff()
+    {
+        Assert.AreEqual(new TlsClientOptions(UseAlpn: false), Map("--no-alpn", Url));
+    }
+
+    [TestMethod]
+    public void FromCommandLine_NoAlpnThenAlpn_LeavesAlpnOn()
+    {
+        Assert.AreEqual(new TlsClientOptions(UseAlpn: true), Map("--no-alpn", "--alpn", Url));
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void FromCommandLine_CaNative_ChangesNothingOnEitherBuild(bool withCaCertificateFile)
+    {
+        string[] trustArguments = withCaCertificateFile ? ["--cacert", "root.pem"] : [];
+        // Measured (BL-490): curl 8.21.0 Schannel and curl 8.18.0 OpenSSL on Ubuntu give the
+        // same answer with and without --ca-native, with and without --cacert (ADR-0124).
+        Assert.AreEqual(
+            Map([.. trustArguments, Url]),
+            Map([.. trustArguments, "--ca-native", Url]));
+    }
+
     private static TlsClientOptions Map(params string[] arguments) =>
         TlsClientOptionsMapping.FromCommandLine(Parse(arguments));
 

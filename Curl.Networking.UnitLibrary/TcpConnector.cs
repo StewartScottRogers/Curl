@@ -372,7 +372,7 @@ public sealed class TcpConnector(
         // handshake to it with the same exit code and message as one to a target (measured).
         // It verifies with the --proxy-* TLS options, not -k or --cacert, so the proxy's own
         // provider runs this handshake (ADR-0061).
-        var securedProxy = await AuthenticateAsync(_proxyTlsProvider, dialed.Connection, proxy.Host, target.Events, isProxy: true, cancellationToken).ConfigureAwait(false);
+        var securedProxy = await AuthenticateAsync(_proxyTlsProvider, dialed.Connection, proxy.Host, target.Events, isProxy: true, applicationProtocols: [], cancellationToken).ConfigureAwait(false);
         if (securedProxy.Connection is not { } proxyConnection)
         {
             return securedProxy;
@@ -551,19 +551,37 @@ public sealed class TcpConnector(
             target.Host,
             target.Events,
             target.IsForwardProxy,
+            ApplicationProtocolsFor(target),
             cancellationToken);
 
+    /// <summary>
+    /// Returns the protocols the handshake with <paramref name="target" /> offers through ALPN:
+    /// <c>http/1.1</c> for HTTP over TLS to the origin, the one target the HTTP handler pools
+    /// as <c>https</c>, as curl 8.21.0's Schannel build offers it (measured, BL-490); nothing
+    /// for a forward proxy or any other protocol, which curl offers no ALPN.
+    /// </summary>
+    /// <param name="target">The target whose handshake is about to run.</param>
+    /// <returns>The protocols, in preference order; empty to offer none.</returns>
+    internal static IReadOnlyList<string> ApplicationProtocolsFor(ConnectTarget target) =>
+        !target.IsForwardProxy && string.Equals(target.PoolScheme, "https", StringComparison.OrdinalIgnoreCase)
+            ? HttpOverTlsApplicationProtocols
+            : [];
+
+    private static readonly string[] HttpOverTlsApplicationProtocols = ["http/1.1"];
+
     // A provider that can report its handshake reports its trust and handshake on the
-    // target's events, marked as the proxy's when it is with an HTTPS proxy (BL-404, BL-452).
+    // target's events, marked as the proxy's when it is with an HTTPS proxy (BL-404, BL-452),
+    // and offers the target's application protocols through ALPN (BL-490).
     private static ValueTask<ConnectResult> AuthenticateAsync(
         ITlsProvider provider,
         IConnection plaintext,
         string host,
         ITransferEvents events,
         bool isProxy,
+        IReadOnlyList<string> applicationProtocols,
         CancellationToken cancellationToken) =>
         provider is IHandshakeReportingTlsProvider reportingProvider
-            ? reportingProvider.AuthenticateAsClientAsync(plaintext, host, events, isProxy, cancellationToken)
+            ? reportingProvider.AuthenticateAsClientAsync(plaintext, host, events, isProxy, applicationProtocols, cancellationToken)
             : provider.AuthenticateAsClientAsync(plaintext, host, cancellationToken);
 
     /// <summary>
