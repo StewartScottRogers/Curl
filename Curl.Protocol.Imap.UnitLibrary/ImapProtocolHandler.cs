@@ -20,9 +20,9 @@ namespace Curl.Protocol.Imap;
 /// </para>
 /// <para>
 /// A URL naming no message sends <c>LIST</c>, one with a search query <c>SEARCH</c>, and
-/// <c>-X</c> its own command, each writing the untagged responses curl writes (BL-556). The
-/// upload (BL-557) is not implemented yet: it closes the open session with <c>LOGOUT</c> and
-/// reports success. Cancellation leaves as an exception.
+/// <c>-X</c> its own command, each writing the untagged responses curl writes (BL-556). A
+/// <c>-T</c> upload is appended to the URL's mailbox with <c>APPEND</c> and the
+/// <c>--upload-flags</c> flags (BL-557). Cancellation leaves as an exception.
 /// </para>
 /// </remarks>
 public sealed class ImapProtocolHandler : IProtocolHandler

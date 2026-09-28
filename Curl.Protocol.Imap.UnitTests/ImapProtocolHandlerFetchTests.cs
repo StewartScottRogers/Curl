@@ -316,16 +316,6 @@ public sealed class ImapProtocolHandlerFetchTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_Upload_IsNotAFetch()
-    {
-        var context = Context(Host + "INBOX;UID=1", upload: new MemoryStream([1]));
-
-        FetchRun run = await RunAsync(context, new ScriptedConnection(Latin1(Opening + "A002 OK bye\r\n")));
-
-        Assert.AreEqual("A001 CAPABILITY\r\nA002 LOGOUT\r\n", run.Sent);
-    }
-
-    [TestMethod]
     public async Task ExecuteAsync_MailOptionsWithoutCustomCommand_Fetches()
     {
         var context = Context(Host + "INBOX;UID=1", mail: new MailRequestOptions());
@@ -338,13 +328,12 @@ public sealed class ImapProtocolHandlerFetchTests
     private static byte[] Latin1(string text) => Encoding.Latin1.GetBytes(text);
 
     private static TransferContext Context(
-        string url, Stream? output = null, MailRequestOptions? mail = null, Stream? upload = null) =>
+        string url, Stream? output = null, MailRequestOptions? mail = null) =>
         new()
         {
             Url = CurlUrl.Parse(url),
             Output = output ?? new MemoryStream(),
             Mail = mail,
-            Upload = upload,
             Progress = new RecordingTransferProgress(),
         };
 

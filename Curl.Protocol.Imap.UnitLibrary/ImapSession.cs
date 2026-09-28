@@ -9,7 +9,7 @@ namespace Curl.Protocol.Imap;
 /// <c>STARTTLS</c> upgrade <c>--ssl</c> and <c>--ssl-reqd</c> ask for, the <c>SELECT</c> and
 /// <c>FETCH</c> of the message the URL names, and <c>LOGOUT</c>, each step and each
 /// failure's exit code measured on curl 8.21.0 with <c>Record-CurlExchange.ps1 -Imap</c> and
-/// read in its <c>lib/imap.c</c> (BL-553, BL-555, BL-556).
+/// read in its <c>lib/imap.c</c> (BL-553, BL-555, BL-556, BL-557).
 /// </summary>
 /// <remarks>
 /// <list type="bullet">
@@ -52,6 +52,9 @@ namespace Curl.Protocol.Imap;
 /// <c>LIST "mailbox" *</c>. The untagged responses <see cref="ImapListedResponses" /> names
 /// are written to the output as they arrive; completion other than <c>OK</c> is exit 21 after
 /// <c>LOGOUT</c> (BL-556).</item>
+/// <item>A <c>-T</c> upload, whatever the path's parameters or <c>-X</c> say, is appended to
+/// the mailbox as <see cref="ImapAppend" /> describes, then <c>LOGOUT</c> is sent whatever
+/// became of it (BL-557).</item>
 /// </list>
 /// </remarks>
 internal sealed class ImapSession(
@@ -362,7 +365,7 @@ internal sealed class ImapSession(
     /// <summary>
     /// Once the session is open, does what curl does for the URL and <c>-X</c>: a path or
     /// command that is malformed or decodes to a control byte is exit 3 after <c>LOGOUT</c>;
-    /// an upload is not implemented yet (BL-557) and closes with a success; a mailbox with a
+    /// an upload is appended to the URL's mailbox (BL-557); a mailbox with a
     /// command, a <c>UID</c>, a <c>MAILINDEX</c> or a search query is selected first;
     /// anything else sends the command, or <c>LIST</c>, straight away.
     /// </summary>
@@ -374,9 +377,20 @@ internal sealed class ImapSession(
             return await LogoutAndFailAsync(CurlExitCode.UrlMalformat, ImapSessionMessages.MalformedUrl).ConfigureAwait(false);
         }
 
-        return context.Upload is not null
-            ? await LogoutAndSucceedAsync(0).ConfigureAwait(false)
+        return context.Upload is { } upload
+            ? await AppendAsync(path, upload).ConfigureAwait(false)
             : await PerformForAsync(path, customCommand).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Uploads <paramref name="upload" /> to the mailbox of <paramref name="path" /> as
+    /// <see cref="ImapAppend" /> describes, then sends <c>LOGOUT</c> whatever became of it.
+    /// </summary>
+    private async ValueTask<TransferResult> AppendAsync(ImapUrlPath path, Stream upload)
+    {
+        TransferResult result = await new ImapAppend(channel, context).AppendAsync(path.Mailbox, upload).ConfigureAwait(false);
+        await LogoutAsync().ConfigureAwait(false);
+        return result;
     }
 
     /// <summary>

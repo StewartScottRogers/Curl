@@ -4,7 +4,7 @@ namespace Curl.Protocol.Imap;
 
 /// <summary>
 /// The messages curl 8.21.0 prints when an IMAP session fails to open or to fetch, each measured with
-/// <c>Record-CurlExchange.ps1 -Imap</c> (BL-553, BL-555).
+/// <c>Record-CurlExchange.ps1 -Imap</c> (BL-553, BL-555, BL-557).
 /// </summary>
 internal static class ImapSessionMessages
 {
@@ -63,6 +63,18 @@ internal static class ImapSessionMessages
     /// (exit 21); curl prints its error text.
     /// </summary>
     internal const string QuoteCommandFailed = "Quote command returned error";
+
+    /// <summary>An upload's URL names no mailbox to <c>APPEND</c> to (exit 3).</summary>
+    internal const string AppendWithoutMailbox = "Cannot APPEND without a mailbox.";
+
+    /// <summary>An upload's size is not known before it is sent, as with <c>-T -</c> (exit 25).</summary>
+    internal const string AppendWithUnknownSize = "Cannot APPEND with unknown input file size";
+
+    /// <summary>
+    /// <c>APPEND</c> was answered other than with a <c>+</c> continuation, or completed other
+    /// than <c>OK</c> (exit 25); curl prints its error text.
+    /// </summary>
+    internal const string UploadFailed = "Upload failed (at start/before it took off)";
 
     /// <summary>The untagged <c>FETCH</c> response announced no literal <c>{n}</c> (exit 8).</summary>
     internal const string FetchResponseUnparsed = "Failed to parse FETCH response.";

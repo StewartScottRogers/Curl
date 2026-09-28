@@ -18,7 +18,7 @@ namespace Curl.Protocol.Imap;
 /// kept; a line starting with the tag and a space completes the response; a line starting
 /// <c>* </c> is kept when the caller is interested in it and skipped otherwise; a
 /// continuation (<c>+ </c>, or <c>+</c> and one character) is refused unless
-/// <c>AUTHENTICATE</c> is waiting for one; and any other line
+/// <c>AUTHENTICATE</c> or <c>APPEND</c> is waiting for one; and any other line
 /// is skipped.
 /// </para>
 /// <para>
@@ -97,12 +97,21 @@ internal sealed class ImapControlChannel(IConnection connection, CancellationTok
     /// </summary>
     /// <param name="text">The line without its line end.</param>
     /// <returns>A task that completes once the line is sent or the send has failed.</returns>
-    public async ValueTask SendLineAsync(string text)
+    public ValueTask SendLineAsync(string text) => SendBytesAsync(Encoding.Latin1.GetBytes(text + "\r\n"));
+
+    /// <summary>
+    /// Sends <paramref name="bytes" /> as they are, with no tag and no line end: a piece of
+    /// the literal an <c>APPEND</c> uploads. A connection that fails with an
+    /// <see cref="IOException" /> is left for the next <see cref="ReadResponseAsync" /> to
+    /// find closed.
+    /// </summary>
+    /// <param name="bytes">The bytes to send.</param>
+    /// <returns>A task that completes once the bytes are sent or the send has failed.</returns>
+    public async ValueTask SendBytesAsync(ReadOnlyMemory<byte> bytes)
     {
-        byte[] line = Encoding.Latin1.GetBytes(text + "\r\n");
         try
         {
-            await connection.WriteAsync(line, cancellationToken).ConfigureAwait(false);
+            await connection.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
             await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (IOException)
@@ -117,7 +126,8 @@ internal sealed class ImapControlChannel(IConnection connection, CancellationTok
     /// Whether an untagged line, starting <c>* </c>, belongs to the command waiting and is kept.
     /// </param>
     /// <param name="acceptsContinuation">
-    /// Whether a continuation ends the read, as one does while <c>AUTHENTICATE</c> waits:
+    /// Whether a continuation ends the read, as one does while <c>AUTHENTICATE</c> or
+    /// <c>APPEND</c> waits:
     /// it is returned as an <see cref="ImapResponseStatus.Continuation" /> response whose one
     /// untagged entry is the continuation line.
     /// </param>

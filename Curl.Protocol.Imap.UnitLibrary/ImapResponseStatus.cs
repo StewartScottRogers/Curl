@@ -16,8 +16,8 @@ internal enum ImapResponseStatus
     NotOk,
 
     /// <summary>
-    /// Not a completion: a <c>+</c> continuation, read only while <c>AUTHENTICATE</c> waits
-    /// for one (<see cref="ImapControlChannel.ReadResponseAsync" />).
+    /// Not a completion: a <c>+</c> continuation, read only while <c>AUTHENTICATE</c> or
+    /// <c>APPEND</c> waits for one (<see cref="ImapControlChannel.ReadResponseAsync" />).
     /// </summary>
     Continuation,
 
