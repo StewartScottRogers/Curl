@@ -1,5 +1,5 @@
 ---
-id: BL-756
+id: BL-772
 title: Record BL-519's -Z implementation choices in ADR-0127
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-756 — Record BL-519's -Z implementation choices in ADR-0127
+# BL-772 — Record BL-519's -Z implementation choices in ADR-0127
 
 ## Goal
 

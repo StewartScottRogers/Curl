@@ -1,5 +1,5 @@
 ---
-id: BL-757
+id: BL-773
 title: Keep -v lines and standard-output write failures per transfer under -Z
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-757 — Keep -v lines and standard-output write failures per transfer under -Z
+# BL-773 — Keep -v lines and standard-output write failures per transfer under -Z
 
 ## Goal
 

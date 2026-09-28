@@ -51,7 +51,7 @@ With `-Z`, `CurlCommandRunner` starts up to `--parallel-max` transfers at once a
   test doubles, and unit tests for the gate, stream, queue, run and the context token. Ran the
   parallel tests 20 times in a row: all green.
 
-### Decisions (Decided by Claude under Stewart's delegation; ADR-0127 amendment filed as BL-756)
+### Decisions (Decided by Claude under Stewart's delegation; ADR-0127 amendment filed as BL-772)
 
 `Documentation/Planning/Decisions` is held by BL-579 in Doing, so these are recorded here, not in the ADR.
 
@@ -75,7 +75,7 @@ With `-Z`, `CurlCommandRunner` starts up to `--parallel-max` transfers at once a
 
 ### Left for follow-ups
 
-- BL-757: `-v` lines are held run-wide by one `HoldableStream` while any transfer's meter is pending,
+- BL-773: `-v` lines are held run-wide by one `HoldableStream` while any transfer's meter is pending,
   and the standard-output write-failure flag is run-wide; both should be per transfer under `-Z`.
 - BL-520 (`--parallel-max-host`, `--parallel-immediate`) and BL-521 (combined meter) already exist.
 
