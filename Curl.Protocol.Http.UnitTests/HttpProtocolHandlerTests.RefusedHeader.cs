@@ -279,6 +279,87 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     /// <summary>
+    /// Measured with <c>-s -v</c>, <c>-s -v -f</c> and <c>-sS -D -</c> against a server that sent
+    /// this and closed (BL-485 Notes): curl 8.21.0 acted on the Content-Length before the last
+    /// header, so it fails with exit 18, prints the failure before the last header's line -
+    /// ahead of any <c>-f</c> failure - writes every head line, and closes the connection.
+    /// </summary>
+    [TestMethod]
+    [DataRow("HTTP/1.1 200 OK\r\n", DisplayName = "200")]
+    [DataRow("HTTP/1.1 404 Not Found\r\n", DisplayName = "404 with -f")]
+    public async Task ExecuteAsync_PeerClosesAmongHeadersAfterAContentLength_FailsWithTransferClosed(string statusLine)
+    {
+        string response = statusLine + "Content-Length: 5\r\nX-Before: 1\r\n";
+        foreach (int chunkSize in ChunkSizes)
+        {
+            RecordingTransferEvents events = new();
+            MemoryStream headers = new();
+            TransferContext context = new()
+            {
+                Url = CurlUrl.Parse(ReuseUrl),
+                Output = new MemoryStream(),
+                HeaderOutput = headers,
+                Events = events,
+                Http = new HttpRequestOptions { Fail = HttpFailMode.Fail },
+            };
+
+            TransferResult result = await Handler(new QueueConnector(ConnectResult.Connected(Connection(response, chunkSize), null, connectionNumber: 0)))
+                .ExecuteAsync(context);
+
+            Assert.AreEqual(CurlExitCode.PartialFile, result.ExitCode, $"Chunk size {chunkSize}");
+            Assert.AreEqual("transfer closed with 5 bytes remaining to read", result.ErrorMessage, $"Chunk size {chunkSize}");
+            CollectionAssert.AreEqual(
+                new[]
+                {
+                    "* using HTTP/1.x",
+                    "* Request completely sent off",
+                    "< " + statusLine,
+                    "< Content-Length: 5\r\n",
+                    "* transfer closed with 5 bytes remaining to read",
+                    "< X-Before: 1\r\n",
+                    "* closing connection #0",
+                },
+                events.Events.Where(line => line[0] is '*' or '<').ToArray(),
+                $"Chunk size {chunkSize}");
+            Assert.AreEqual(response, Latin1(headers.ToArray()), $"Chunk size {chunkSize}");
+        }
+    }
+
+    /// <summary>
+    /// Measured with <c>-s -v</c>, <c>-s -v -I</c> and <c>-s -v --ignore-content-length</c>
+    /// against a server that sent this and closed (BL-485 Notes): exit 0, the connection left
+    /// intact - a Content-Length of zero, or one curl does not frame a body by, leaves nothing
+    /// to read.
+    /// </summary>
+    [TestMethod]
+    [DataRow("Content-Length: 0\r\n", false, false, DisplayName = "Content-Length: 0")]
+    [DataRow("Content-Length: 5\r\n", true, false, DisplayName = "-I")]
+    [DataRow("Content-Length: 5\r\n", false, true, DisplayName = "--ignore-content-length")]
+    public async Task ExecuteAsync_PeerClosesAmongHeadersAfterAContentLengthItReadsNothingBy_Succeeds(string contentLength, bool noBody, bool ignoreContentLength)
+    {
+        string response = "HTTP/1.1 200 OK\r\n" + contentLength + "X-Before: 1\r\n";
+        foreach (int chunkSize in ChunkSizes)
+        {
+            RecordingTransferEvents events = new();
+            TransferContext context = new()
+            {
+                Url = CurlUrl.Parse(ReuseUrl),
+                Output = new MemoryStream(),
+                Events = events,
+                NoBody = noBody,
+                Http = new HttpRequestOptions { IgnoreContentLength = ignoreContentLength },
+            };
+
+            TransferResult result = await Handler(new QueueConnector(ConnectResult.Connected(Connection(response, chunkSize), null, connectionNumber: 0)))
+                .ExecuteAsync(context);
+
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}: {result.ErrorMessage}");
+            Assert.AreEqual("< X-Before: 1\r\n", HeadEvents(events)[^1], $"Chunk size {chunkSize}");
+            Assert.AreEqual("Connection #0 to host 127.0.0.1:18977 left intact", events.Info[^1], $"Chunk size {chunkSize}");
+        }
+    }
+
+    /// <summary>
     /// Measured with <c>-s -v</c> against a server that sent only the status line and closed
     /// (BL-483 Notes): exit 0, the connection left intact.
     /// </summary>

@@ -510,6 +510,8 @@ public sealed class HttpProtocolHandler(
             exchange.RedirectUrl = HttpRedirectLocation.Find(context.Url, actedOn);
             await WriteHeadersAsync(context.HeaderOutput, exchange.Head.HeadBytes, cancellationToken).ConfigureAwait(false);
             ThrowIfHeaderRefused(refusal);
+            ThrowIfClosedBeforeContentLength(plan, actedOn, headReader);
+            headReader.ReportHeaderHeldAtClose();
             ReportNoEndOfMessageIndicator(plan, actedOn, headReader);
             retry = RetryOf(plan, actedOn, bodyLeftUnsent, upload);
             HttpFailMode fail = retry is null ? options.Fail : HttpFailMode.None;
@@ -752,6 +754,29 @@ public sealed class HttpProtocolHandler(
         if (refusal is not null)
         {
             throw refusal.Failure;
+        }
+    }
+
+    /// <summary>
+    /// Fails a head the peer closed among its headers when the part curl 8.21.0 acted on frames
+    /// a body by a Content-Length above zero: exit 18, <c>transfer closed with N bytes remaining
+    /// to read</c>, its <c>-v</c> line reported before the head's last header line and ahead of
+    /// any <c>-f</c> failure (measured, BL-485 Notes). A body a response has none of -
+    /// <c>-I</c>, 204, 304 - and <c>--ignore-content-length</c> fail nothing.
+    /// </summary>
+    private static void ThrowIfClosedBeforeContentLength(HttpRequestPlan plan, HttpResponseHead head, HttpResponseHeadReader headReader)
+    {
+        if (headReader.EndedAtEmptyLine || !HttpResponseBodyReader.HasBody(head, plan.Context.NoBody))
+        {
+            return;
+        }
+
+        HttpRequestOptions options = plan.Options;
+        if (HttpResponseBodyFraming.Of(head.Headers, options.Raw, options.IgnoreContentLength, options.TransferEncoding).ContentLength is > 0 and { } remaining)
+        {
+            string message = HttpTransferMessages.TransferClosedWithBytesRemaining(remaining);
+            plan.Context.Events.ReportInfo(message);
+            throw new HttpTransferException(CurlExitCode.PartialFile, message);
         }
     }
 

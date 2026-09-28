@@ -334,6 +334,15 @@ internal static class HttpTransferMessages
         string.Create(CultureInfo.InvariantCulture, $"end of response with {missing} bytes missing");
 
     /// <summary>
+    /// Formats the exit 18 message, also its <c>-v</c> line, for a peer that closed among the
+    /// final head's headers after a Content-Length curl 8.21.0 acted on (measured, BL-485 Notes).
+    /// </summary>
+    /// <param name="remaining">How many body bytes the Content-Length still promised.</param>
+    /// <returns>The message, such as <c>transfer closed with 5 bytes remaining to read</c>.</returns>
+    internal static string TransferClosedWithBytesRemaining(long remaining) =>
+        string.Create(CultureInfo.InvariantCulture, $"transfer closed with {remaining} bytes remaining to read");
+
+    /// <summary>
     /// Formats the exit 23 message for an output that stopped accepting body bytes.
     /// </summary>
     /// <param name="passed">The size of the write offered to the output.</param>

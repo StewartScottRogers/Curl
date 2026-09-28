@@ -124,6 +124,19 @@ internal sealed class HttpResponseHeadReader
     }
 
     /// <summary>
+    /// Reports the last header of a final head the peer closed among its headers, which
+    /// <see cref="ReadAsync" /> holds (<see cref="ReleaseHeadBeforeRefusal" />); does nothing for
+    /// a head that ended at its empty line, whose held lines wait for <see cref="ReportHeldLines" />.
+    /// </summary>
+    internal void ReportHeaderHeldAtClose()
+    {
+        if (!EndedAtEmptyLine)
+        {
+            ReportHeldLines();
+        }
+    }
+
+    /// <summary>
     /// Reads the response head.
     /// </summary>
     /// <param name="cancellationToken">Cancels every read.</param>
@@ -342,9 +355,11 @@ internal sealed class HttpResponseHeadReader
     /// <summary>
     /// Releases the final head's whole headers before its refused header, or all of them when
     /// none is refused; a refused head drops the rest and its empty line unreported. A head the
-    /// peer closed among its headers with none refused releases its last header unacted on:
-    /// reported, but never told to <see cref="HeaderReceived" />, so its cookie is never stored
-    /// (<see cref="HeadActedOn" />; measured, BL-484 Notes).
+    /// peer closed among its headers with none refused releases all but its last header, which
+    /// it holds unacted on for <see cref="ReportHeldLines" />: reported then, but never told to
+    /// <see cref="HeaderReceived" />, so its cookie is never stored (<see cref="HeadActedOn" />;
+    /// measured, BL-484 Notes), and reported after the <c>-v</c> line of a failure the head
+    /// before it causes (measured, BL-485 Notes).
     /// </summary>
     private void ReleaseHeadBeforeRefusal()
     {
@@ -355,7 +370,11 @@ internal sealed class HttpResponseHeadReader
         }
         else if (!EndedAtEmptyLine && heldHeaders.Count > 0)
         {
-            heldHeaders[^1] = heldHeaders[^1] with { IsActedOn = false };
+            HeldHeader last = heldHeaders[^1] with { IsActedOn = false };
+            heldHeaders.RemoveAt(heldHeaders.Count - 1);
+            ReleaseHeldHeaders();
+            heldHeaders.Add(last);
+            return;
         }
 
         ReleaseHeldHeaders();
