@@ -52,7 +52,8 @@ cannot be rewritten prints `curl: <message>` and the try-help line even under `-
 `%{xfer_id}` and `%{conn_id}` `-1`, and ends the run with exit 37 or 3. A URL still without a
 scheme gets the one `UrlSchemeGuesser` guesses (`http`, or `ftp` for `ftp.` and so on), which
 `%{url_effective}` shows while `%{url}` keeps the URL as typed. Measured on curl 8.21.0
-(BL-240 Notes).
+(BL-240 Notes). `%{url_effective}` also gives a URL with an empty path the root path `/`
+(`UrlRootPath`, before any query or fragment), as curl 8.21.0 does (BL-371 Notes).
 
 Each URL's output comes from `CommandLineOptions.UrlOutputs`: an `-o` name, or for `-O` /
 `--remote-name-all` the name `RemoteFileName` takes from the URL path (last non-empty

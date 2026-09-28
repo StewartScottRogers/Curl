@@ -40,6 +40,26 @@ public sealed class CurlCommandRunnerUrlExpansionTests
     }
 
     [TestMethod]
+    [DataRow("localhost:1")]
+    [DataRow("http://localhost:1")]
+    public async Task RunAsync_UrlWithoutPath_PrintsTheEffectiveUrlWithTheRootPath(string url)
+    {
+        int exitCode = await RunAsync(["-w", "|%{url}|%{url_effective}", url]);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual("/|" + url + "|http://localhost:1/", StandardOutputText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_UrlWithoutPathButWithAQuery_PrintsTheRootPathBeforeTheQuery()
+    {
+        int exitCode = await RunAsync(["-w", "|%{url_effective}", "localhost:1?q"]);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual("/|http://localhost:1/?q", StandardOutputText);
+    }
+
+    [TestMethod]
     public async Task RunAsync_UrlWithoutSchemeWhoseHostStartsWithFtp_IsTransferredAsFtp()
     {
         RecordingProtocolHandler ftp = RecordingProtocolHandler.WritingPath("ftp");

@@ -991,7 +991,7 @@ internal sealed class CurlCommandRunner(
             return;
         }
 
-        string requestUrl = QueryUrl.Append(transferUrl, options);
+        string requestUrl = UrlRootPath.AddToEmptyPath(QueryUrl.Append(transferUrl, options));
         TransferWriteOutVariables variables = new(
             result, givenUrl, transfer.UrlIndex, requestUrl, WriteOutScheme(requestUrl, result), timeProvider)
         {
