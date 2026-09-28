@@ -160,6 +160,50 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     /// <summary>
+    /// Measured with <c>-v -c -</c> against a server that sent this and closed (BL-484 Notes):
+    /// curl 8.21.0 acts on a header only once a byte of the next line shows it whole, so it
+    /// stores no cookie from the <c>Set-Cookie</c> header the head ends on at close and prints
+    /// no cookie line for it, yet still prints the header line, writes it for <c>-D</c>, exits 0
+    /// and leaves the connection intact. The <c>Set-Cookie</c> header before it is stored.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_PeerClosesRightAfterASetCookie_StoresNoCookieFromIt()
+    {
+        const string response = "HTTP/1.1 200 OK\r\nSet-Cookie: b=2\r\nX-Before: 1\r\nSet-Cookie: a=1\r\n";
+        string[] expected =
+        [
+            "< HTTP/1.1 200 OK\r\n",
+            "* Added b=2",
+            "< Set-Cookie: b=2\r\n",
+            "< X-Before: 1\r\n",
+            "< Set-Cookie: a=1\r\n",
+        ];
+        foreach (int chunkSize in ChunkSizes)
+        {
+            ScriptedCookieStore store = new() { ReportedLine = header => "Added " + header };
+            RecordingTransferEvents events = new();
+            MemoryStream headers = new();
+            TransferContext context = new()
+            {
+                Url = CurlUrl.Parse(CookieUrl),
+                Output = new MemoryStream(),
+                HeaderOutput = headers,
+                TimeProvider = new FakeTimeProvider(CookieTime),
+                Events = events,
+            };
+
+            TransferResult result = await CookieHandler(QueueConnector.For(Connection(response, chunkSize)), store)
+                .ExecuteAsync(context);
+
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}: {result.ErrorMessage}");
+            CollectionAssert.AreEqual(expected, HeadEvents(events), $"Chunk size {chunkSize}");
+            CollectionAssert.AreEqual(new[] { "b=2" }, store.Responses.Select(call => call.SetCookieHeader).ToArray(), $"Chunk size {chunkSize}");
+            Assert.AreEqual(response, Latin1(headers.ToArray()), $"Chunk size {chunkSize}");
+            Assert.AreEqual("Connection #0 to host 127.0.0.1:18082 left intact", events.Info[^1], $"Chunk size {chunkSize}");
+        }
+    }
+
+    /// <summary>
     /// Measured with <c>-s -v -c -</c> (BL-475 Notes): curl 8.21.0 stops reading the head at a
     /// header it refuses, so it reports and stores the cookies before it, and reports neither
     /// the refused header, nor a <c>Set-Cookie</c> header or any other line after it, nor the

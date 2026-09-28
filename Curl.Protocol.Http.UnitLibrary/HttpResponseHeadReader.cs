@@ -65,7 +65,8 @@ internal sealed class HttpResponseHeadReader
     /// <summary>
     /// Gets what is told of each header of every head, 1xx heads' included, once it is whole -
     /// its continuation lines folded in - just before its lines are reported to
-    /// <see cref="Events" />; a header whose head fails before it is whole is never told.
+    /// <see cref="Events" />; a header whose head fails before it is whole is never told, nor
+    /// the last header of a final head the peer closed among its headers (<see cref="HeadActedOn" />).
     /// </summary>
     internal Action<HttpResponseHeader> HeaderReceived { get; init; } = static _ => { };
 
@@ -340,7 +341,10 @@ internal sealed class HttpResponseHeadReader
 
     /// <summary>
     /// Releases the final head's whole headers before its refused header, or all of them when
-    /// none is refused; a refused head drops the rest and its empty line unreported.
+    /// none is refused; a refused head drops the rest and its empty line unreported. A head the
+    /// peer closed among its headers with none refused releases its last header unacted on:
+    /// reported, but never told to <see cref="HeaderReceived" />, so its cookie is never stored
+    /// (<see cref="HeadActedOn" />; measured, BL-484 Notes).
     /// </summary>
     private void ReleaseHeadBeforeRefusal()
     {
@@ -349,19 +353,27 @@ internal sealed class HttpResponseHeadReader
             heldHeaders.RemoveRange(refusal.HeaderIndex, heldHeaders.Count - refusal.HeaderIndex);
             heldEmptyLine = null;
         }
+        else if (!EndedAtEmptyLine && heldHeaders.Count > 0)
+        {
+            heldHeaders[^1] = heldHeaders[^1] with { IsActedOn = false };
+        }
 
         ReleaseHeldHeaders();
     }
 
     /// <summary>
-    /// Tells <see cref="HeaderReceived" /> of each held whole header and reports its lines, in
-    /// the order they arrived, and holds none after.
+    /// Tells <see cref="HeaderReceived" /> of each held whole header curl acts on and reports
+    /// its lines, in the order they arrived, and holds none after.
     /// </summary>
     private void ReleaseHeldHeaders()
     {
         foreach (HeldHeader held in heldHeaders)
         {
-            HeaderReceived(held.Header);
+            if (held.IsActedOn)
+            {
+                HeaderReceived(held.Header);
+            }
+
             ReportHeaderLines(held.Lines, held.KeepsHttp10Alive);
         }
 
@@ -402,5 +414,13 @@ internal sealed class HttpResponseHeadReader
     /// <param name="Header">The header, its continuation lines folded in.</param>
     /// <param name="Lines">Its lines as received, line ends included.</param>
     /// <param name="KeepsHttp10Alive">Whether it keeps an HTTP/1.0 connection alive.</param>
-    private sealed record HeldHeader(HttpResponseHeader Header, byte[][] Lines, bool KeepsHttp10Alive);
+    private sealed record HeldHeader(HttpResponseHeader Header, byte[][] Lines, bool KeepsHttp10Alive)
+    {
+        /// <summary>
+        /// Gets a value indicating whether curl 8.21.0 acts on the header, so
+        /// <see cref="HeaderReceived" /> is told of it: all but the last header of a head the
+        /// peer closed among its headers.
+        /// </summary>
+        internal bool IsActedOn { get; init; } = true;
+    }
 }
