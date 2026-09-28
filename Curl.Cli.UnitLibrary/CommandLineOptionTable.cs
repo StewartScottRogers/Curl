@@ -152,16 +152,21 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("tcp-nodelay", null, (options, on) => options.TcpNoDelay = on),
         CommandLineOption.NegatableFlag("keepalive", null, (options, on) => options.TcpKeepAlive = on),
         CommandLineOption.NegatableFlag("styled-output", null, (options, on) => options.StyledOutput = on),
-        CommandLineOption.Value("cacert", null, SettingCaCertificateFile("--cacert", (options, file) => options.CaCertificateFile = file)),
+        CommandLineOption.Value("cacert", null, SettingExistingFile("--cacert", (options, file) => options.CaCertificateFile = file)),
         CommandLineOption.FileName("capath", null, (options, directory) => options.CaCertificateDirectory = directory),
         CommandLineOption.NegatableFlag("proxy-insecure", null, (options, on) => options.ProxyInsecure = on),
-        CommandLineOption.Value("proxy-cacert", null, SettingCaCertificateFile("--proxy-cacert", (options, file) => options.ProxyCaCertificateFile = file)),
+        CommandLineOption.Value("proxy-cacert", null, SettingExistingFile("--proxy-cacert", (options, file) => options.ProxyCaCertificateFile = file)),
         CommandLineOption.FileName("proxy-capath", null, (options, directory) => options.ProxyCaCertificateDirectory = directory),
         CommandLineOption.FileName("cert", 'E', (options, certificate) => options.ClientCertificate = certificate),
         CommandLineOption.FileName("key", null, (options, key) => options.PrivateKey = key),
         CommandLineOption.Text("cert-type", null, (options, type) => options.ClientCertificateType = type),
         CommandLineOption.Text("key-type", null, (options, type) => options.PrivateKeyType = type),
         CommandLineOption.Text("pass", null, (options, passphrase) => options.Passphrase = passphrase),
+        CommandLineOption.Text("pubkey", null, (options, file) => options.SshPublicKeyFile = file),
+        CommandLineOption.Value("knownhosts", null, SettingExistingFile("--knownhosts", (options, file) => options.SshKnownHostsFile = file)),
+        CommandLineOption.Value("hostpubmd5", null, SetHostPublicKeyMd5),
+        CommandLineOption.Text("hostpubsha256", null, (options, hash) => options.SshHostPublicKeySha256 = hash),
+        CommandLineOption.NegatableFlag("compressed-ssh", null, (options, on) => options.SshCompression = on),
         CommandLineOption.Flag("tlsv1", '1', options => options.MinimumTlsVersion = ObsoleteTlsProtocols.Tls10),
         CommandLineOption.Flag("tlsv1.0", null, options => options.MinimumTlsVersion = ObsoleteTlsProtocols.Tls10),
         CommandLineOption.Flag("tlsv1.1", null, options => options.MinimumTlsVersion = ObsoleteTlsProtocols.Tls11),
@@ -247,6 +252,9 @@ public static class CommandLineOptionTable
 
     /// <summary>The largest <c>--create-file-mode</c> curl 8.21.0 accepts: octal <c>0777</c>.</summary>
     private const int MaximumCreateFileMode = 0b111_111_111;
+
+    /// <summary>The length curl 8.21.0 requires of a <c>--hostpubmd5</c> value: 32, the hex digits of an MD5 hash.</summary>
+    private const int HostPublicKeyMd5Length = 32;
 
     /// <summary>The names <c>--upload-flags</c> accepts, matched case-sensitively as curl 8.21.0 matches them.</summary>
     private static readonly FrozenDictionary<string, ImapUploadFlags> UploadFlagsByName = new Dictionary<string, ImapUploadFlags>(StringComparer.Ordinal)
@@ -711,27 +719,48 @@ public static class CommandLineOptionTable
     }
 
     /// <summary>
-    /// Records a <c>--cacert</c> or <c>--proxy-cacert</c> value through <paramref name="set"/> when a
-    /// file or directory exists at it, and otherwise refuses it with curl 8.21.0's three lines, which
-    /// name <paramref name="longOption"/> (measured for both). An empty value is checked like any
-    /// other, so it is refused as a missing file, not as blank. A directory passes here; curl fails it
-    /// later, at handshake. A value that looks like a flag gets curl's filename warning first, whether
-    /// or not it exists.
+    /// Records a <c>--cacert</c>, <c>--proxy-cacert</c> or <c>--knownhosts</c> value through
+    /// <paramref name="set"/> when a file or directory exists at it, and otherwise refuses it with curl
+    /// 8.21.0's lines, which name <paramref name="longOption"/> (measured for all three); <c>-s</c> without
+    /// <c>-S</c>, read first, hides the first of them. An empty value is checked like any other, so it is
+    /// refused as a missing file, not as blank. A directory passes here; curl fails it later. A value that
+    /// looks like a flag gets curl's filename warning first, whether or not it exists.
     /// </summary>
-    /// <param name="longOption">The option as curl names it in the refusal, <c>--cacert</c> or <c>--proxy-cacert</c>.</param>
+    /// <param name="longOption">The option as curl names it in the refusal, such as <c>--cacert</c>.</param>
     /// <param name="set">Records the accepted file.</param>
-    private static CommandLineOptionApplier SettingCaCertificateFile(string longOption, Action<CommandLineOptions, string> set) =>
+    private static CommandLineOptionApplier SettingExistingFile(string longOption, Action<CommandLineOptions, string> set) =>
         (options, value, spelledOption, pathExists, _) =>
         {
             CommandLineOption.WarnWhenFileNameLooksLikeFlag(options, value);
             if (!pathExists(value))
             {
-                return CommandLineRefusal.FileDoesNotExist(spelledOption, longOption, value);
+                return CommandLineRefusal.FileDoesNotExist(spelledOption, longOption, value, options.ErrorsHidden);
             }
 
             set(options, value);
             return null;
         };
+
+    /// <summary>
+    /// Records a <c>--hostpubmd5</c> value, refusing an empty one as blank and any value that is not exactly
+    /// 32 characters long with <see cref="CommandLineRefusal.BadlyUsedHere"/>, as curl 8.21.0 does; it does
+    /// not check that the characters are hex digits (measured 2026-09-28, BL-562 Notes).
+    /// </summary>
+    private static CommandLineRefusal? SetHostPublicKeyMd5(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        if (value.Length == 0)
+        {
+            return CommandLineRefusal.BlankArgument(spelledOption);
+        }
+
+        if (value.Length != HostPublicKeyMd5Length)
+        {
+            return CommandLineRefusal.BadlyUsedHere(spelledOption);
+        }
+
+        options.SshHostPublicKeyMd5 = value;
+        return null;
+    }
 
     /// <summary>
     /// Records a <c>-r</c>/<c>--range</c> value the way curl 8.21.0 keeps it. It is refused when

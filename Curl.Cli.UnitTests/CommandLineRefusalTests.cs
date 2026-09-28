@@ -103,7 +103,7 @@ public sealed class CommandLineRefusalTests
     [TestMethod]
     public void FileDoesNotExist_Spelled_NamesFileAndOptionInThreeLines()
     {
-        CommandLineRefusal refusal = CommandLineRefusal.FileDoesNotExist("--cacert=", "--cacert", "nonexist.pem");
+        CommandLineRefusal refusal = CommandLineRefusal.FileDoesNotExist("--cacert=", "--cacert", "nonexist.pem", errorsHidden: false);
 
         Assert.AreEqual(CurlExitCode.FailedInit, refusal.ExitCode);
         CollectionAssert.AreEqual(
@@ -117,13 +117,24 @@ public sealed class CommandLineRefusalTests
     }
 
     [TestMethod]
+    public void FileDoesNotExist_ErrorsHidden_LeavesOutTheFileLine()
+    {
+        CommandLineRefusal refusal = CommandLineRefusal.FileDoesNotExist("--knownhosts", "--knownhosts", "nope", errorsHidden: true);
+
+        Assert.AreEqual(CurlExitCode.FailedInit, refusal.ExitCode);
+        CollectionAssert.AreEqual(
+            new[] { "curl: option --knownhosts: is badly used here", CommandLineRefusal.TryHelpLine },
+            refusal.StandardErrorLines.ToArray());
+    }
+
+    [TestMethod]
     [DataRow(null, "--cacert", "f", "spelledOption")]
     [DataRow("--cacert", null, "f", "longOption")]
     [DataRow("--cacert", "--cacert", null, "file")]
     public void FileDoesNotExist_NullArgument_ThrowsArgumentNull(string? spelledOption, string? longOption, string? file, string expectedParamName)
     {
         ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(
-            () => CommandLineRefusal.FileDoesNotExist(spelledOption!, longOption!, file!));
+            () => CommandLineRefusal.FileDoesNotExist(spelledOption!, longOption!, file!, errorsHidden: false));
 
         Assert.AreEqual(expectedParamName, exception.ParamName);
     }

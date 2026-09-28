@@ -654,6 +654,38 @@ public sealed class CommandLineOptions
     public string? Passphrase { get; internal set; }
 
     /// <summary>
+    /// The <c>--pubkey</c> SSH public key file, verbatim and unchecked; <see langword="null"/> when not given.
+    /// The last value wins. The SSH private key and its passphrase are <see cref="PrivateKey"/>,
+    /// <see cref="PrivateKeyType"/> and <see cref="Passphrase"/>, which <c>--key</c>, <c>--key-type</c> and
+    /// <c>--pass</c> set for TLS and SSH alike.
+    /// </summary>
+    public string? SshPublicKeyFile { get; internal set; }
+
+    /// <summary>
+    /// The <c>--knownhosts</c> file, which curl 8.21.0 requires to exist (a directory passes) when the option is
+    /// read; <see langword="null"/> when not given. The last value wins.
+    /// </summary>
+    public string? SshKnownHostsFile { get; internal set; }
+
+    /// <summary>
+    /// The <c>--hostpubmd5</c> value, verbatim: exactly 32 characters, which curl 8.21.0 checks when the option is
+    /// read without checking that they are hex digits; <see langword="null"/> when not given. The last value wins.
+    /// </summary>
+    public string? SshHostPublicKeyMd5 { get; internal set; }
+
+    /// <summary>
+    /// The <c>--hostpubsha256</c> value, verbatim and unchecked (curl 8.21.0 accepts <c>!!!</c> when the option is
+    /// read); <see langword="null"/> when not given. The last value wins.
+    /// </summary>
+    public string? SshHostPublicKeySha256 { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--compressed-ssh</c> asks for SSH compression; <c>--no-compressed-ssh</c>
+    /// clears it. <see langword="false"/> by default.
+    /// </summary>
+    public bool SshCompression { get; internal set; }
+
+    /// <summary>
     /// The lowest TLS version to accept: <see cref="ObsoleteTlsProtocols.Tls10"/> for <c>-1</c>/<c>--tlsv1</c>
     /// and <c>--tlsv1.0</c> (1.0 or later), <see cref="ObsoleteTlsProtocols.Tls11"/> for <c>--tlsv1.1</c>,
     /// <see cref="SslProtocols.Tls12"/> for <c>--tlsv1.2</c>, <see cref="SslProtocols.Tls13"/> for
