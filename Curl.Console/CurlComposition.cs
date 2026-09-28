@@ -212,7 +212,22 @@ internal static class CurlComposition
             proxyTunnelOptions,
             ResolveOverrides.Parse(options.ResolveEntries),
             new ConnectToMappings(options.ConnectToEntries),
-            proxyTlsProvider);
+            proxyTlsProvider,
+            ConnectTimeoutOf(options));
+
+    /// <summary>
+    /// The connect timeout <see cref="CreateTcpConnector" /> gives the connector: the
+    /// <c>--connect-timeout</c> value (curl's 300 seconds when none or 0 was given), or a positive
+    /// <c>-m</c> when it runs out sooner, as curl 8.21.0 ends a connect with its connect message
+    /// at whichever runs out first (measured, BL-510).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns>The limit on each connect.</returns>
+    internal static TimeSpan ConnectTimeoutOf(CommandLineOptions options)
+    {
+        TimeSpan connectTimeout = options.ConnectTimeout is { } given && given > TimeSpan.Zero ? given : TcpConnector.DefaultConnectTimeout;
+        return options.MaxTime is { } maxTime && maxTime > TimeSpan.Zero && maxTime < connectTimeout ? maxTime : connectTimeout;
+    }
 
     /// <summary>
     /// Creates the run's <see cref="UdpDatagramConnector" />, which TFTP opens its channel

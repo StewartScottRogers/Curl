@@ -85,6 +85,13 @@ then reported as `Host H:P was resolved.`, `IPv6: ...` and `IPv4: ...`, naming t
 cached (none for an IP address), and `LoadResolveEntries` loads the `--resolve` entries
 (`ResolveOverrides.Entries`, as `ResolveEntry`) into the cache with curl's `Added H:P:A to DNS
 cache` lines at a transfer's start; until a transfer calls it, the first connect loads them.
+Per ADR-0117 (BL-510) each `ConnectAsync` runs its resolve, dials, tunnel and TLS handshakes under
+one limit, the constructor's `connectTimeout` (`CurlComposition.ConnectTimeoutOf`: `--connect-timeout`,
+or a smaller `-m`), else `DefaultConnectTimeout` (300 s), on its `TimeProvider`; when it passes the
+connect fails with exit 28 and `Connection timed out after N milliseconds`, N from the connect's
+start, also reported as a `-v` line. A cancellation arriving once the limit has passed is that
+failure; an earlier one escapes. Tests stall through `Fakes/StallingTcpDialer`,
+`StallingTlsProvider` and `StallingConnection` and fire the limit with `ManualTimeProvider.Advance`.
 
 `TcpConnector` tunnels through `ConnectTarget.Proxy` when it is an HTTP proxy
 (`ProxyKind.Http`, `Http10`) per ADR-0023: `HttpProxyTunnel` writes curl 8.21.0's CONNECT
