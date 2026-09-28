@@ -32,3 +32,4 @@ A connection to an HTTPS proxy that is not a tunnel (`ConnectTarget { IsForwardP
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
