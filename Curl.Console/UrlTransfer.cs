@@ -54,6 +54,7 @@ internal sealed class UrlTransfer
             ? match.ResolveOutputFileName(fileName, sanitizesForWindows)
             : null;
         UsesRemoteName = output?.UsesRemoteName ?? false;
+        DiscardsBody = output?.DiscardsBody ?? false;
     }
 
     /// <summary>Gets the position of the command-line URL, printed by <c>%{urlnum}</c>.</summary>
@@ -79,6 +80,11 @@ internal sealed class UrlTransfer
 
     /// <summary>Gets whether the body is saved under the remote name, when there is no <c>-o</c> name.</summary>
     internal bool UsesRemoteName { get; }
+
+    /// <summary>
+    /// Gets whether <c>--out-null</c> throws the body away: no file, nothing on standard output.
+    /// </summary>
+    internal bool DiscardsBody { get; }
 
     /// <summary>Gets whether the body goes to a file: an <c>-o</c> name or the remote name.</summary>
     internal bool WritesToFile => OutputFileName is not null || UsesRemoteName;

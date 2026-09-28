@@ -283,3 +283,10 @@ Under `--remove-on-error` a transfer that fails deletes the output file it opene
 <file>`, wrapped as a note is; a file that cannot be deleted (`NUL` included) gets `Warning:
 Failed removing: <file>` unless `-s`. `--remove-on-error` beside `-C` is refused while parsing,
 as in curl 8.21.0 (BL-494 Notes).
+
+A URL paired with `--out-null` (or `--no-out-null`, which curl 8.21.0 treats the same) sends its
+body, and any `-i` header lines, to `Stream.Null`: no file is created, even under
+`--remote-name-all`, nothing reaches standard output, and `%{filename_effective}` is empty. `-D`
+still gets the head, the progress meter is drawn as for a file (even when standard output is a
+terminal), and the transfer switches standard output to binary as one to standard output does,
+so its `-w` line feeds stay LF on Windows (BL-495 Notes).
