@@ -35,3 +35,4 @@ An ADR fixes how `CurlCommandRunner` runs transfers concurrently under `-Z`: the
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
