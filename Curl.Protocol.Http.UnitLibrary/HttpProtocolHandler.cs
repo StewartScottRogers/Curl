@@ -208,7 +208,7 @@ public sealed class HttpProtocolHandler(
 
         long started = context.TimeProvider.GetTimestamp();
         HttpRequestOptions options = context.Http ?? new HttpRequestOptions();
-        HttpRequestFraming framing = HttpRequestFraming.Of(options, [.. options.Headers.Select(HttpCustomHeader.Parse)], context.NoBody, context.Upload, context.ResumeFrom, context.Range, context.ResumeUploadFromUnknownOffset);
+        HttpRequestFraming framing = HttpRequestFraming.Of(options, HttpRequestHeadFormatter.CustomHeadersOf(options.Headers, options), context.NoBody, context.Upload, context.ResumeFrom, context.Range, context.ResumeUploadFromUnknownOffset);
         HttpAuthRequest authRequest = new(
             framing.Method,
             context.Url,

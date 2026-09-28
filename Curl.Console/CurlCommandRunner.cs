@@ -257,8 +257,8 @@ internal sealed class CurlCommandRunner(
     /// <summary>The <c>-D</c> value that sends the header lines to standard output.</summary>
     private const string StandardOutputHeaderFile = "-";
 
-    /// <summary>Builds each transfer's context on the runner's clock; gives a <c>telnet</c> transfer standard input.</summary>
-    private readonly TransferContextFactory transferContextFactory = new(standardInput, timeProvider);
+    /// <summary>Builds each transfer's context on the runner's clock; gives a <c>telnet</c> transfer standard input and sends command-line header text in the platform's encoding (ADR-0067).</summary>
+    private readonly TransferContextFactory transferContextFactory = new(standardInput, timeProvider, CredentialEncoding.ForPlatform(runsOnWindows));
 
     /// <summary>Builds each transfer's <c>-F</c> body; reads <c>@-</c> and <c>&lt;-</c> parts from standard input.</summary>
     private readonly MultipartFormBodyBuilder formBodyBuilder = formBodyBuilder

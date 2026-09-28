@@ -1,3 +1,5 @@
+using System.Text;
+
 using Curl.Cli;
 using Curl.Protocol.Abstractions;
 
@@ -17,7 +19,11 @@ namespace Curl.Console;
 /// <see cref="Curl.Core.TransferRetrier" /> waits on; <see langword="null" /> for
 /// <see cref="TimeProvider.System" />.
 /// </param>
-internal sealed class TransferContextFactory(Stream standardInput, TimeProvider? timeProvider = null)
+/// <param name="commandLineTextEncoding">
+/// Every context's <see cref="Curl.Protocol.Abstractions.HttpRequestOptions.CommandLineTextEncoding" />,
+/// the platform curl's argument encoding (ADR-0067); <see langword="null" /> for Latin-1.
+/// </param>
+internal sealed class TransferContextFactory(Stream standardInput, TimeProvider? timeProvider = null, Encoding? commandLineTextEncoding = null)
 {
     /// <summary>The one scheme whose transfer uploads standard input.</summary>
     private const string TelnetScheme = "telnet";
@@ -104,7 +110,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             MaxTime = options.MaxTime,
             TimeCondition = options.TimeCondition,
             Proxy = proxy,
-            Http = HttpRequestOptionsMapping.FromCommandLine(options, formBody, proxy),
+            Http = HttpRequestOptionsMapping.FromCommandLine(options, formBody, proxy, commandLineTextEncoding),
             Progress = progress ?? NoTransferProgress.Instance,
             Events = EventsOrNone(events),
             TimeProvider = timeProvider ?? TimeProvider.System,

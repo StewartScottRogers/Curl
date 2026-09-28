@@ -1,3 +1,5 @@
+using System.Text;
+
 using Curl.Cli;
 using Curl.Protocol.Abstractions;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
@@ -43,6 +45,10 @@ internal static class HttpRequestOptionsMapping
     /// The proxy chosen for this transfer (<see cref="TransferProxySelection" />), or
     /// <see langword="null" /> to connect directly.
     /// </param>
+    /// <param name="commandLineTextEncoding">
+    /// The platform curl's argument encoding the <c>-H</c>, <c>--proxy-header</c>, <c>-A</c> and
+    /// <c>-e</c> text is sent in (ADR-0067), or <see langword="null" /> for Latin-1.
+    /// </param>
     /// <returns>
     /// The options: <see cref="CommandLineOptions.RequestMethod" />,
     /// <see cref="CommandLineOptions.RequestTarget" />,
@@ -60,18 +66,21 @@ internal static class HttpRequestOptionsMapping
     /// <see cref="CommandLineOptions.TransferEncoding" />, <see cref="CommandLineOptions.Raw" /> and
     /// <see cref="CommandLineOptions.IgnoreContentLength" /> verbatim; and
     /// <paramref name="proxy" /> as <see cref="HttpRequestOptions.ForwardProxy" /> with
-    /// <see cref="CommandLineOptions.ProxyTunnel" /> as <see cref="HttpRequestOptions.ProxyTunnel" />.
+    /// <see cref="CommandLineOptions.ProxyTunnel" /> as <see cref="HttpRequestOptions.ProxyTunnel" />; and
+    /// <paramref name="commandLineTextEncoding" /> as <see cref="HttpRequestOptions.CommandLineTextEncoding" />.
     /// </returns>
     internal static HttpRequestOptions FromCommandLine(
         CommandLineOptions options,
         HttpRequestBody? formBody = null,
-        ProxyEndpoint? proxy = null) =>
+        ProxyEndpoint? proxy = null,
+        Encoding? commandLineTextEncoding = null) =>
         new()
         {
             CustomMethod = options.RequestMethod,
             RequestTarget = options.RequestTarget,
             Headers = HeadersOf(options),
             ProxyHeaders = options.ProxyHeaders,
+            CommandLineTextEncoding = commandLineTextEncoding ?? Encoding.Latin1,
             UserAgent = options.UserAgent,
             Referer = options.Referer,
             Body = formBody ?? PostDataBodyOf(options),

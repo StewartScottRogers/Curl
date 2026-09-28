@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text;
 using Curl.Protocol.Abstractions;
@@ -28,9 +29,10 @@ namespace Curl.Protocol.Http;
 /// <c>Transfer-Encoding: chunked</c> when the length is unknown), <c>Content-Type</c> and
 /// <c>Expect: 100-continue</c> as <see cref="HttpRequestFraming" /> decides, each again left
 /// out when an <c>-H</c> value names it. The <c>Connection</c> lines come last of all
-/// (<see cref="AppendConnection" />), with <c>TE</c> added for <c>--tr-encoding</c>. Text is sent one byte per character (Latin-1), as curl
-/// sends a command-line argument on Windows; a character above U+00FF takes Latin-1's
-/// best fit, such as <c>A</c> for U+0100, or else <c>?</c>.
+/// (<see cref="AppendConnection" />), with <c>TE</c> added for <c>--tr-encoding</c>. The <c>-H</c>, <c>--proxy-header</c>, <c>-A</c> and
+/// <c>-e</c> text is sent as its bytes in <see cref="HttpRequestOptions.CommandLineTextEncoding" />,
+/// the platform curl's argument encoding (ADR-0067); with none set that is Latin-1, where a
+/// character above U+00FF takes Latin-1's best fit, such as <c>A</c> for U+0100, or else <c>?</c>.
 /// </remarks>
 internal static class HttpRequestHeadFormatter
 {
@@ -102,8 +104,8 @@ internal static class HttpRequestHeadFormatter
         HttpRequestFraming? framing = null)
     {
         options ??= new HttpRequestOptions();
-        HttpCustomHeader[] customHeaders = [.. options.Headers.Select(HttpCustomHeader.Parse)];
-        HttpCustomHeader[] proxyHeaders = forwardProxy ? [.. options.ProxyHeaders.Select(HttpCustomHeader.Parse)] : [];
+        HttpCustomHeader[] customHeaders = CustomHeadersOf(options.Headers, options);
+        HttpCustomHeader[] proxyHeaders = forwardProxy ? CustomHeadersOf(options.ProxyHeaders, options) : [];
         framing = FramingOf(framing, options, customHeaders, noBody);
         StringBuilder head = new();
         AppendRequestLine(head, framing.Method, url, forwardProxy, options);
@@ -128,6 +130,26 @@ internal static class HttpRequestHeadFormatter
         head.Append("\r\n");
         return Encoding.Latin1.GetBytes(head.ToString());
     }
+
+    /// <summary>
+    /// Reads the <c>-H</c> or <c>--proxy-header</c> <paramref name="entries" /> after turning
+    /// each into its bytes in <see cref="HttpRequestOptions.CommandLineTextEncoding" />
+    /// (<see cref="HeadText" />), as curl reads the bytes of its <c>argv</c> (ADR-0067).
+    /// </summary>
+    /// <param name="entries">The values, verbatim.</param>
+    /// <param name="options">The options that name the encoding.</param>
+    /// <returns>The headers, one character per byte.</returns>
+    internal static HttpCustomHeader[] CustomHeadersOf(IReadOnlyList<string> entries, HttpRequestOptions options) =>
+        [.. entries.Select(entry => HttpCustomHeader.Parse(HeadText(entry, options)))];
+
+    /// <summary>
+    /// Gives command-line <paramref name="text" /> as its bytes in
+    /// <see cref="HttpRequestOptions.CommandLineTextEncoding" />, one character per byte, so the
+    /// head's closing <see cref="Encoding.Latin1" /> step puts those bytes on the wire unchanged.
+    /// </summary>
+    [return: NotNullIfNotNull(nameof(text))]
+    private static string? HeadText(string? text, HttpRequestOptions options) =>
+        text is null ? null : Encoding.Latin1.GetString(options.CommandLineTextEncoding.GetBytes(text));
 
     /// <summary>
     /// Gives <paramref name="framing" />, or the framing <see cref="HttpRequestFraming.Of" />
@@ -173,11 +195,11 @@ internal static class HttpRequestHeadFormatter
     /// </summary>
     private static void AppendClientHeaders(StringBuilder head, HttpCustomHeader[] customHeaders, HttpRequestOptions options)
     {
-        AppendUnlessOverridden(head, customHeaders, "User-Agent", options.UserAgent ?? DefaultUserAgent);
+        AppendUnlessOverridden(head, customHeaders, "User-Agent", HeadText(options.UserAgent, options) ?? DefaultUserAgent);
         AppendUnlessOverridden(head, customHeaders, "Accept", "*/*");
         AppendUnlessOverridden(head, customHeaders, "TE", options.TransferEncoding ? "gzip" : null);
         AppendUnlessOverridden(head, customHeaders, "Accept-Encoding", options.Compressed ? AcceptEncoding : null);
-        AppendUnlessOverridden(head, customHeaders, "Referer", options.Referer);
+        AppendUnlessOverridden(head, customHeaders, "Referer", HeadText(options.Referer, options));
     }
 
     /// <summary>

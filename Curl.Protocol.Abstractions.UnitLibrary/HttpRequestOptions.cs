@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace Curl.Protocol.Abstractions;
 
 /// <summary>
@@ -32,6 +34,15 @@ public sealed record HttpRequestOptions
     /// does.
     /// </summary>
     public IReadOnlyList<string> ProxyHeaders { get; init; } = [];
+
+    /// <summary>
+    /// Gets the encoding that turns command-line text in the request head - the
+    /// <see cref="Headers" />, <see cref="ProxyHeaders" />, <see cref="UserAgent" /> and
+    /// <see cref="Referer" /> values - into bytes, as the platform's curl receives its
+    /// arguments (ADR-0067): the system ANSI code page with best fit on Windows, UTF-8
+    /// elsewhere. <see cref="Encoding.Latin1" />, one byte per character, when not set.
+    /// </summary>
+    public Encoding CommandLineTextEncoding { get; init; } = Encoding.Latin1;
 
     /// <summary>
     /// Gets the value from <c>-A</c>/<c>--user-agent</c>: <see langword="null" /> sends
