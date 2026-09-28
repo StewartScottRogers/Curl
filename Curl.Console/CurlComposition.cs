@@ -95,7 +95,8 @@ internal static class CurlComposition
     /// TLS options, so <c>-k</c> and <c>--cacert</c> never reach the proxy. The CONNECT request that tunnels through an HTTP proxy carries the
     /// <see cref="HttpProxyTunnelOptions" /> <see cref="CreateProxyTunnelOptions" /> maps from
     /// <paramref name="options" />, and the TCP connector applies the <c>--resolve</c> and
-    /// <c>--connect-to</c> values (<see cref="CreateTcpConnector" />). One
+    /// <c>--connect-to</c> values (<see cref="CreateTcpConnector" />), as the UDP connector does
+    /// (<see cref="CreateUdpDatagramConnector" />). One
     /// <see cref="PoolingConnector" /> over the TCP connector, on the same clock, is the run's
     /// connection pool (ADR-0050).
     /// </summary>
@@ -135,7 +136,7 @@ internal static class CurlComposition
             proxyTlsProvider,
             proxyTunnelOptions,
             tcpConnector,
-            new UdpDatagramConnector(dnsResolver, timeProvider),
+            CreateUdpDatagramConnector(options, dnsResolver, timeProvider),
             new PoolingConnector(tcpConnector, timeProvider));
     }
 
@@ -173,6 +174,27 @@ internal static class CurlComposition
             ResolveOverrides.Parse(options.ResolveEntries),
             new ConnectToMappings(options.ConnectToEntries),
             proxyTlsProvider);
+
+    /// <summary>
+    /// Creates the run's <see cref="UdpDatagramConnector" />, which TFTP opens its channel
+    /// through, with the same <c>--resolve</c> entries and <c>--connect-to</c> mappings
+    /// <see cref="CreateTcpConnector" /> applies: curl 8.21.0 applies both to a
+    /// <c>tftp://</c> transfer and fails it with exit 49 for an entry that does not parse
+    /// (measured).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <param name="dnsResolver">Resolves a host no <c>--resolve</c> entry answers for.</param>
+    /// <param name="timeProvider">The clock the connector times on.</param>
+    /// <returns>The connector.</returns>
+    internal static UdpDatagramConnector CreateUdpDatagramConnector(
+        CommandLineOptions options,
+        IDnsResolver dnsResolver,
+        TimeProvider timeProvider) =>
+        new(
+            dnsResolver,
+            timeProvider,
+            ResolveOverrides.Parse(options.ResolveEntries),
+            new ConnectToMappings(options.ConnectToEntries));
 
     /// <summary>
     /// Maps the command line to what the CONNECT request through an HTTP proxy carries: the
