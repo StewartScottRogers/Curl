@@ -618,7 +618,8 @@ public sealed class CommandLineOptions
     /// The <c>-Y</c> / <c>--speed-limit</c> in bytes per second below which a transfer is too slow;
     /// <see langword="null"/> when not given. Curl 8.21.0 aborts a transfer that stays slower than
     /// this for <see cref="SpeedTimeSeconds"/>, or for 30 seconds when that is not given (measured
-    /// through <c>--libcurl</c>). The last value wins.
+    /// through <c>--libcurl</c>). The last value wins, except that a <c>-y</c> given after a
+    /// zero <c>-Y</c> makes it 1, as curl 8.21.0's tool does when it parses <c>-y</c> (ADR-0115).
     /// </summary>
     public long? SpeedLimit { get; internal set; }
 
@@ -626,7 +627,8 @@ public sealed class CommandLineOptions
     /// The <c>-y</c> / <c>--speed-time</c> in whole seconds a transfer may stay slower than
     /// <see cref="SpeedLimit"/>; <see langword="null"/> when not given. When it is given and
     /// <see cref="SpeedLimit"/> is not, curl 8.21.0 uses a limit of 1 byte per second (measured
-    /// through <c>--libcurl</c>). The last value wins.
+    /// through <c>--libcurl</c>). The last value wins, except that a <c>-Y</c> given after a
+    /// zero <c>-y</c> makes it 30, as curl 8.21.0's tool does when it parses <c>-Y</c> (ADR-0115).
     /// </summary>
     public long? SpeedTimeSeconds { get; internal set; }
 

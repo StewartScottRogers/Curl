@@ -87,6 +87,35 @@ public sealed class CurlCommandRunnerSpeedLimitTests
     }
 
     [TestMethod]
+    public async Task RunAsync_SpeedTimeAfterZeroSpeedLimit_WatchesForOneBytePerSecond()
+    {
+        Task<int> run = RunAsync(Stalling(), "-sS", "-Y", "0", "-y", "2", Url);
+        await stalled.Task;
+
+        clock.Advance(TimeSpan.FromSeconds(2));
+        Assert.IsFalse(run.IsCompleted);
+        clock.Advance(TimeSpan.FromSeconds(1));
+
+        Assert.AreEqual(28, await run);
+        Assert.AreEqual(
+            "curl: (28) Operation too slow. Less than 1 bytes/sec transferred the last 2 seconds" + NewLine,
+            StandardErrorText);
+    }
+
+    [TestMethod]
+    [DataRow("-y", "2", "-Y", "0")]
+    [DataRow("-Y", "100", "-y", "0")]
+    public async Task RunAsync_ZeroLastSpeedOption_WatchesNothing(string firstOption, string firstValue, string lastOption, string lastValue)
+    {
+        RecordingProtocolHandler writing = RecordingProtocolHandler.WritingPath("http");
+
+        int exitCode = await RunAsync(writing, "-sS", firstOption, firstValue, lastOption, lastValue, Url);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(CancellationToken.None, writing.Contexts[0].CancellationToken);
+    }
+
+    [TestMethod]
     public async Task RunAsync_FastTransferUnderSpeedLimit_Succeeds()
     {
         RecordingProtocolHandler writing = RecordingProtocolHandler.WritingPath("http");

@@ -772,6 +772,10 @@ public static class CommandLineOptionTable
         if (refusal is null)
         {
             options.SpeedLimit = bytesPerSecond;
+            if (options.SpeedTimeSeconds == 0)
+            {
+                options.SpeedTimeSeconds = 30;
+            }
         }
 
         return refusal;
@@ -783,6 +787,10 @@ public static class CommandLineOptionTable
         if (refusal is null)
         {
             options.SpeedTimeSeconds = seconds;
+            if (options.SpeedLimit == 0)
+            {
+                options.SpeedLimit = 1;
+            }
         }
 
         return refusal;

@@ -185,6 +185,21 @@ public sealed class CommandLineRetryAndSpeedOptionTests
     }
 
     [TestMethod]
+    [DataRow(new[] { "-Y", "0", "-y", "2" }, 1L, 2L)]
+    [DataRow(new[] { "-y", "2", "-Y", "0" }, 0L, 2L)]
+    [DataRow(new[] { "-Y", "100", "-y", "0" }, 100L, 0L)]
+    [DataRow(new[] { "-y", "0", "-Y", "5" }, 5L, 30L)]
+    [DataRow(new[] { "-Y", "0", "-y", "0" }, 1L, 0L)]
+    [DataRow(new[] { "-y", "3", "-Y", "7", "-y", "4" }, 7L, 4L)]
+    public void Parse_SpeedOptionsAfterAZeroOther_ApplyCurlsDefaultsInCommandLineOrder(string[] speedArguments, long expectedLimit, long expectedSeconds)
+    {
+        CommandLineOptions options = Accepted([.. speedArguments, Url]);
+
+        Assert.AreEqual(expectedLimit, options.SpeedLimit);
+        Assert.AreEqual(expectedSeconds, options.SpeedTimeSeconds);
+    }
+
+    [TestMethod]
     public void Parse_SpeedLettersAttachedAndBundled_Accepted()
     {
         CommandLineOptions attached = Accepted("-Y1", "-y2", Url);
