@@ -65,6 +65,36 @@ public sealed class CurlCommandRunnerTests
         Assert.IsEmpty(dict.Contexts);
     }
 
+    // curl 8.21.0 cuts a transfer's message to its 255-byte error buffer (ADR-0072):
+    // `curl -sS file:///nodir/<300 a's>` exits 37 and prints "curl: (37) Could not open file
+    // /nodir/" and the first 228 a's, 268 bytes with CR LF (measured 2026-09-27, BL-380).
+    [TestMethod]
+    public async Task RunAsync_FailureMessageOver255Bytes_PrintsItCutTo255Bytes()
+    {
+        string name = new('a', 300);
+        RecordingProtocolHandler file = RecordingProtocolHandler.Failing(
+            "file", CurlExitCode.FileCouldntReadFile, "Could not open file /nodir/" + name);
+
+        int exitCode = await RunAsync(["-sS", "file:///nodir/" + name], file);
+
+        Assert.AreEqual(37, exitCode);
+        Assert.AreEqual("curl: (37) Could not open file /nodir/" + name[..228] + NewLine, StandardErrorText);
+    }
+
+    // A bad glob's lines are formatted by curl's tool, not libcurl's error buffer, so they are
+    // not cut: `curl -sS http://x/<300 a's>[1-` prints "curl: (3) bad range in position 313:"
+    // and the whole URL (measured 2026-09-27, BL-380).
+    [TestMethod]
+    public async Task RunAsync_BadGlobOver255Bytes_PrintsTheWholeUrl()
+    {
+        string url = "http://x/" + new string('a', 300) + "[1-";
+
+        int exitCode = await RunAsync(["-sS", url]);
+
+        Assert.AreEqual(3, exitCode);
+        Assert.Contains(NewLine + url + NewLine, StandardErrorText);
+    }
+
     // System.Uri refused file://C:, so it ended with exit 3 before any handler ran. curl
     // 8.21.0 on Windows prints "curl: (37) Could not open file C:" (measured 2026-09-27);
     // outside Windows it rejects a drive letter with exit 3, and CurlUrl does the same.

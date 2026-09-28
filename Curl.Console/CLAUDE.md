@@ -20,7 +20,8 @@ end, whatever their outcome (ADR-0050, BL-334).
 
 `Program.Main` only opens the standard streams, builds the composition and hands the
 arguments to `CurlCommandRunner`, which parses them, runs each URL and prints curl's
-`curl: (N) <message>` lines. The parse reads the default config file first, where
+`curl: (N) <message>` lines, each transfer's message cut to curl's 255-byte error buffer by
+`CurlErrorBuffer` (a bad glob's lines are not cut; ADR-0072, BL-380). The parse reads the default config file first, where
 `DefaultConfigFileSearch.ForProcess` finds it (the composition passes it; a runner given none
 reads no `.curlrc`, which keeps tests off the real home directory), unless the first argument
 starts with `-q` or is `--disable`; `-K` files apply where they stand. Both are read through

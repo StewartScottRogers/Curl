@@ -698,7 +698,7 @@ internal sealed class CurlCommandRunner(
     {
         if (ShowsErrors(options))
         {
-            await WriteErrorLinesAsync(FormatErrorLine(failure).Split('\n')).ConfigureAwait(false);
+            await WriteErrorLinesAsync(FormatErrorLine(failure, failure.ErrorMessage).Split('\n')).ConfigureAwait(false);
         }
     }
 
@@ -927,7 +927,7 @@ internal sealed class CurlCommandRunner(
     /// <returns>A task that completes when the lines are flushed.</returns>
     private async Task WriteFailureLinesAsync(TransferResult result)
     {
-        await WriteErrorLineAsync(FormatErrorLine(result)).ConfigureAwait(false);
+        await WriteErrorLineAsync(FormatTransferErrorLine(result)).ConfigureAwait(false);
         if (result.ExitCode == CurlExitCode.PeerFailedVerification)
         {
             await WriteCertificateHelpBlockAsync().ConfigureAwait(false);
@@ -1235,14 +1235,25 @@ internal sealed class CurlCommandRunner(
     private static bool ShowsErrors(CommandLineOptions options) => !options.Silent || options.ShowError;
 
     /// <summary>
-    /// Formats the line printed for a failed transfer that carries a message.
+    /// Formats the line printed for a failed transfer that carries a message, with the message
+    /// cut to curl's error buffer (<see cref="CurlErrorBuffer" />). A bad glob's lines are not
+    /// cut: curl's tool formats them itself (measured 2026-09-27, BL-380 Notes).
     /// </summary>
     /// <param name="result">The failed transfer's result.</param>
+    /// <returns>The line <see cref="FormatErrorLine" /> gives for the cut message.</returns>
+    private static string FormatTransferErrorLine(TransferResult result) =>
+        FormatErrorLine(result, CurlErrorBuffer.Truncate(result.ErrorMessage));
+
+    /// <summary>
+    /// Formats the line printed for a failure that carries a message.
+    /// </summary>
+    /// <param name="result">The failure's result.</param>
+    /// <param name="message">The message to print.</param>
     /// <returns>
     /// <see cref="FailedWritingBodyLine" /> when standard output could not be written;
     /// otherwise <c>curl: (N) &lt;message&gt;</c>.
     /// </returns>
-    private static string FormatErrorLine(TransferResult result)
+    private static string FormatErrorLine(TransferResult result, string? message)
     {
         if (ReferenceEquals(result, StandardOutputWriteFailure))
         {
@@ -1251,7 +1262,7 @@ internal sealed class CurlCommandRunner(
 
         string code = ((int)result.ExitCode).ToString(CultureInfo.InvariantCulture);
 
-        return $"curl: ({code}) {result.ErrorMessage}";
+        return $"curl: ({code}) {message}";
     }
 
     /// <summary>
