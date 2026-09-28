@@ -34,3 +34,4 @@ The TCP connector reports curl's `  Trying <ip>:<port>...` info line, `ReportCon
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
