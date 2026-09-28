@@ -37,3 +37,4 @@ Every `curl: (<code>) <message>` line Curl.Console prints cuts `<message>` to 25
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
