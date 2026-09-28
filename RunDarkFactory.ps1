@@ -93,6 +93,18 @@
     for them, pulls the result and raises the alarm once for all of them. Each lane
     traces to <repo>.logs\DarkFactory-<stamp>-L<n>.log beside this checkout.
 
+    MACHINE PROBE (-ProbeMachine)
+
+    Measures how many lanes this PC sustains, since parallel builds are a shift's CPU
+    and memory peak. After one untimed warm-up build it runs k = 1, 2, ... concurrent
+    `dotnet build --no-incremental` of this checkout, each into its own artifacts folder
+    under <repo>.lanes\probe, and records each step's wall time and lowest free memory.
+    A step passes when its wall time is at most 2.0 times one build's, free memory stays
+    at least 10% of RAM and every build succeeds; the cap is the largest passing k (at
+    least 1), found at the first failing step, 16, or -ProbeMaxLanes. The result goes to
+    <repo>.lanes\machine-lanes.json (marked incomplete when -ProbeMaxLanes cut it short)
+    and the probe folder is deleted. Run it only when no shift is building.
+
 .EXAMPLE
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -Hours 4 -MaxTasks 3
@@ -101,6 +113,8 @@
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestAlarm -AlarmScale 0.1
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestOutOfTokens
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestAutoLanes
+    powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -ProbeMachine
+    powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestMachineProbe
 #>
 [CmdletBinding()]
 param(
@@ -126,6 +140,13 @@ param(
     [switch]$TestOutOfTokens,
     # Check the -Lanes Auto burn-rate, pace and lane-step logic on recorded readings, and exit.
     [switch]$TestAutoLanes,
+    # Measure how many concurrent solution builds this PC sustains, write the cap to
+    # <repo>.lanes\machine-lanes.json, and exit. Never while a shift is running.
+    [switch]$ProbeMachine,
+    # The most concurrent builds -ProbeMachine tries; below 16 its file may come out incomplete.
+    [ValidateRange(1, 16)][int]$ProbeMaxLanes = 16,
+    # Check the -ProbeMachine pass and cap rule on recorded steps, and exit.
+    [switch]$TestMachineProbe,
     # How long before the usage limit resets to say the new session is about to start.
     [ValidateRange(0, 3600)][int]$LimitWarnSeconds = 60,
     # While waiting for tokens, how often to check whether the limit was lifted early. 0 = never.
@@ -723,6 +744,140 @@ if ($TestAutoLanes) {
         else { Write-Host "FAIL $($case[0]): expected $($case[1]), got $($case[2])" -ForegroundColor Red; $failed++ }
     }
     exit $(if ($failed) { 1 } else { 0 })
+}
+
+# ---- machine probe
+# How many concurrent solution builds this PC sustains (ADR-0130 item 7). The pass and cap
+# rule is pure, so -TestMachineProbe proves it on recorded steps; -ProbeMachine measures.
+
+$MachineProbeRule = 'wall <= 2.0x one build and free memory >= 10%'
+
+function Test-MachineProbeStep {
+    # Whether one probe step passes: wall time at most 2.0 times the one-build time, the
+    # lowest free memory at least 10% of RAM, and every build succeeded.
+    param($Step, [double]$OneBuildSeconds)
+    return ([bool]$Step.Succeeded -and [double]$Step.Seconds -le 2.0 * $OneBuildSeconds -and
+        [double]$Step.MinFreeMemoryPercent -ge 10)
+}
+
+function Get-MachineLaneCap {
+    # The largest passing lane count before the first failing step, at least 1. Complete is
+    # false when the steps ran out (at -MaxLanes) before any failed and before 16.
+    param([object[]]$Steps, [ValidateRange(1, 16)][int]$MaxLanes = 16)
+    $steps = @($Steps | Where-Object { $_ } | Select-Object -First $MaxLanes)
+    $cap = 0
+    $failed = $false
+    foreach ($step in $steps) {
+        if (-not (Test-MachineProbeStep -Step $step -OneBuildSeconds $steps[0].Seconds)) { $failed = $true; break }
+        $cap = [int]$step.Lanes
+    }
+    return [pscustomobject]@{ Cap = [math]::Max(1, $cap); Complete = ($failed -or $cap -ge 16) }
+}
+
+if ($TestMachineProbe) {
+    function New-TestProbeSteps {
+        # Recorded steps for k = 1, 2, ...: wall seconds, free memory percent (50 unless
+        # given) and whether every build succeeded (unless k is in -FailedAt).
+        param([double[]]$Seconds, [double[]]$FreePercent = @(), [int[]]$FailedAt = @())
+        $k = 0
+        return @($Seconds | ForEach-Object {
+            $k++
+            $free = if ($FreePercent.Count -ge $k) { $FreePercent[$k - 1] } else { 50 }
+            [pscustomobject]@{ Lanes = $k; Seconds = $_; MinFreeMemoryPercent = $free; Succeeded = ($FailedAt -notcontains $k) }
+        })
+    }
+    function Get-TestCapText {
+        param([object[]]$Steps, [int]$MaxLanes = 16)
+        $result = Get-MachineLaneCap -Steps $Steps -MaxLanes $MaxLanes
+        return "cap $($result.Cap), $(if ($result.Complete) { 'complete' } else { 'not complete' })"
+    }
+    $cases = @(
+        ,@('knee-by-time', 'cap 5, complete', (Get-TestCapText (New-TestProbeSteps 60, 62, 70, 90, 118, 125)))
+        ,@('knee-by-memory', 'cap 3, complete', (Get-TestCapText (New-TestProbeSteps 60, 61, 63, 64 -FreePercent 40, 25, 12, 8)))
+        ,@('failed-build', 'cap 2, complete', (Get-TestCapText (New-TestProbeSteps 60, 61, 62 -FailedAt 3)))
+        ,@('all-pass-to-16', 'cap 16, complete', (Get-TestCapText (New-TestProbeSteps (@(60) * 16))))
+        ,@('cut-short', 'cap 2, not complete', (Get-TestCapText (New-TestProbeSteps 60, 61) 2))
+        ,@('first-step-fails', 'cap 1, complete', (Get-TestCapText (New-TestProbeSteps 60 -FailedAt 1))))
+    $failed = 0
+    foreach ($case in $cases) {
+        if ($case[1] -ceq $case[2]) { Write-Host "PASS $($case[0]): $($case[2])" -ForegroundColor Green }
+        else { Write-Host "FAIL $($case[0]): expected $($case[1]), got $($case[2])" -ForegroundColor Red; $failed++ }
+    }
+    exit $(if ($failed) { 1 } else { 0 })
+}
+
+function Invoke-ProbeBuilds {
+    # Runs -Count concurrent builds of the checkout, each with its own artifacts folder
+    # under -ProbeDir, sampling free memory every 2 s. Returns the step's measurements.
+    param([string]$ProbeDir, [int]$Count, [switch]$Incremental)
+    $os = Get-CimInstance Win32_OperatingSystem
+    $totalKB = [double]$os.TotalVisibleMemorySize
+    $minFreeKB = [double]$os.FreePhysicalMemory
+    $clock = [Diagnostics.Stopwatch]::StartNew()
+    $builds = foreach ($i in 1..$Count) {
+        $artifacts = Join-Path $ProbeDir "$i"
+        New-Item -ItemType Directory -Force -Path $artifacts | Out-Null
+        $buildArgs = @('build', "`"$Root`"", '-nologo', '-v', 'q', '--artifacts-path', "`"$artifacts`"")
+        if (-not $Incremental) { $buildArgs += '--no-incremental' }
+        $process = Start-Process dotnet -ArgumentList $buildArgs -PassThru -NoNewWindow `
+            -RedirectStandardOutput (Join-Path $ProbeDir "$i.out") -RedirectStandardError (Join-Path $ProbeDir "$i.err")
+        # Windows PowerShell only reports ExitCode for a process whose handle was taken early.
+        [void]$process.Handle
+        $process
+    }
+    while (@($builds | Where-Object { -not $_.HasExited }).Count) {
+        Start-Sleep -Seconds 2
+        $minFreeKB = [math]::Min($minFreeKB, [double](Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory)
+    }
+    $clock.Stop()
+    $builds | ForEach-Object { $_.WaitForExit() }
+    return [pscustomobject]@{
+        Lanes = $Count; Seconds = [math]::Round($clock.Elapsed.TotalSeconds, 1)
+        MinFreeMemoryPercent = [math]::Round(100 * $minFreeKB / $totalKB, 1)
+        Succeeded = (@($builds | Where-Object { $_.ExitCode -ne 0 }).Count -eq 0)
+    }
+}
+
+if ($ProbeMachine) {
+    # Warm up once, then step k = 1, 2, ... concurrent builds until a step fails, 16, or
+    # -ProbeMaxLanes, and write the cap to <LanesDir>\machine-lanes.json.
+    $probeDir = Join-Path $LanesDir 'probe'
+    $machineFile = Join-Path $LanesDir 'machine-lanes.json'
+    New-Item -ItemType Directory -Force -Path $probeDir | Out-Null
+    Write-Trace 'probe' 'warm-up' "one build of $Root, not measured"
+    $warmUp = Invoke-ProbeBuilds -ProbeDir $probeDir -Count 1 -Incremental
+    if (-not $warmUp.Succeeded) { Write-Trace 'probe' 'warn' 'the warm-up build failed' 'Yellow' }
+    $steps = @()
+    foreach ($k in 1..$ProbeMaxLanes) {
+        $step = Invoke-ProbeBuilds -ProbeDir $probeDir -Count $k
+        $steps += $step
+        $passed = Test-MachineProbeStep -Step $step -OneBuildSeconds $steps[0].Seconds
+        $culture = [Globalization.CultureInfo]::InvariantCulture
+        Write-Trace 'probe' $(if ($passed) { 'pass' } else { 'fail' }) ("{0} builds {1}s, {2}x, free memory {3}%{4}" -f $k,
+            $step.Seconds.ToString('0.0', $culture), ($step.Seconds / $steps[0].Seconds).ToString('0.00', $culture),
+            $step.MinFreeMemoryPercent.ToString('0.0', $culture), $(if ($step.Succeeded) { '' } else { ', a build failed' })) `
+            $(if ($passed) { 'Green' } else { 'Yellow' })
+        if (-not $passed) { break }
+    }
+    $result = Get-MachineLaneCap -Steps $steps -MaxLanes $ProbeMaxLanes
+    $memoryBytes = [double](Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory
+    $record = [ordered]@{
+        schema = 1; probedAt = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+        logicalProcessors = [Environment]::ProcessorCount; memoryGB = [math]::Round($memoryBytes / 1GB, 1)
+        complete = $result.Complete; cap = $result.Cap; rule = $MachineProbeRule
+        steps = @($steps | ForEach-Object {
+            [ordered]@{ lanes = $_.Lanes; seconds = $_.Seconds; slowdown = [math]::Round($_.Seconds / $steps[0].Seconds, 2)
+                minFreeMemoryPercent = $_.MinFreeMemoryPercent; succeeded = $_.Succeeded }
+        })
+    }
+    $temp = "$machineFile.tmp"
+    # Windows PowerShell escapes < and > in JSON; the rule reads better as written.
+    $json = ($record | ConvertTo-Json -Depth 4) -replace '\\u003c', '<' -replace '\\u003e', '>'
+    [IO.File]::WriteAllText($temp, $json, (New-Object Text.UTF8Encoding $false))
+    Move-Item -Force -Path $temp -Destination $machineFile
+    Remove-Item -Recurse -Force -Path $probeDir -ErrorAction SilentlyContinue
+    Write-Trace 'probe' 'done' "machine sustains $($result.Cap)$(if (-not $result.Complete) { ' (incomplete)' }); $machineFile" 'Cyan'
+    exit 0
 }
 
 function Get-OutOfTokensUntil {
