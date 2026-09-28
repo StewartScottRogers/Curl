@@ -266,3 +266,11 @@ free the transfer ends with exit 23 and `client returned ERROR on write of N byt
 warning names the file asked for (`File exists`), and `%{filename_effective}` names `.99`, as
 curl 8.21.0 does. `--clobber` overwrites even a `-J` name. A resumed (`-C`) file appends
 either way (BL-492 Notes).
+
+Under `--skip-existing` a transfer whose `-o` or `-O` file (after `--output-dir` and
+`--create-dirs`) is already there, as a file or a directory (`IOutputPaths.Exists`), is not
+performed: no connection, no file opened, no progress meter, exit 0, and `-w` still runs with
+`%{http_code}` `000` and `%{filename_effective}` naming the file. Under `-v` or a `--trace`
+option, even with `-s`, standard error gets `Note: skips transfer, "<file>" exists locally`,
+wrapped as a note is. The check comes before the proxy is chosen, so a bad `-x` does not fail a
+skipped transfer; later URLs still run, as in curl 8.21.0 (BL-493 Notes).

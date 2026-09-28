@@ -50,6 +50,21 @@ public sealed class PhysicalOutputPathsTests
     }
 
     [TestMethod]
+    public void Exists_FileThere_IsTrue()
+    {
+        string file = Path.Combine(root, "f");
+        File.WriteAllText(file, "x");
+
+        Assert.IsTrue(outputPaths.Exists(file));
+    }
+
+    [TestMethod]
+    public void Exists_DirectoryThere_IsTrue() => Assert.IsTrue(outputPaths.Exists(root));
+
+    [TestMethod]
+    public void Exists_NothingThere_IsFalse() => Assert.IsFalse(outputPaths.Exists(Path.Combine(root, "missing")));
+
+    [TestMethod]
     public void IsCreateFailure_TheExceptionsCreateDirectoryRaises_AreTrue()
     {
         Assert.IsTrue(PhysicalOutputPaths.IsCreateFailure(new IOException()));

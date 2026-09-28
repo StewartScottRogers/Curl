@@ -8,7 +8,7 @@ internal sealed class PhysicalOutputPaths : IOutputPaths
     /// <inheritdoc />
     public bool TryCreateDirectory(string path)
     {
-        if (File.Exists(path) || Directory.Exists(path))
+        if (Exists(path))
         {
             return true;
         }
@@ -24,6 +24,9 @@ internal sealed class PhysicalOutputPaths : IOutputPaths
             return false;
         }
     }
+
+    /// <inheritdoc />
+    public bool Exists(string path) => File.Exists(path) || Directory.Exists(path);
 
     /// <summary>
     /// Tells whether <paramref name="exception" /> is one <see cref="Directory.CreateDirectory(string)" />

@@ -85,8 +85,8 @@ namespace Curl.Console;
 /// <see cref="WriteOutTimeDialect.WindowsCRuntime" /> is used when not given.
 /// </param>
 /// <param name="outputPaths">
-/// Creates the <c>--create-dirs</c> directories; a <see cref="PhysicalOutputPaths" /> when
-/// not given.
+/// Creates the <c>--create-dirs</c> directories and checks for a <c>--skip-existing</c> file; a
+/// <see cref="PhysicalOutputPaths" /> when not given.
 /// </param>
 /// <param name="configFileReader">
 /// Reads the default config file (<c>.curlrc</c>), each <c>-K</c> / <c>--config</c> file, and every
@@ -1790,7 +1790,9 @@ internal sealed class CurlCommandRunner(
     /// <param name="upload">The <c>-T</c> source, or <see langword="null" /> without <c>-T</c>.</param>
     /// <returns>
     /// The transfer's result; <see cref="CannotCreateDirectoryFailure" />, with nothing
-    /// transferred, when a <c>--create-dirs</c> directory cannot be created.
+    /// transferred, when a <c>--create-dirs</c> directory cannot be created; a success with
+    /// nothing transferred when <c>--skip-existing</c> finds the output file already there
+    /// (<see cref="SkipExistingOutputFileAsync" />). Both are decided before the proxy is chosen.
     /// </returns>
     private async Task<TransferResult> TransferWithBodyAsync(
         RedirectFollower follower,
@@ -1804,12 +1806,18 @@ internal sealed class CurlCommandRunner(
         Stream? upload)
     {
         uploadResumesFromUnknownOffset = options.ResumeFromOutputSize && upload is not null;
+        string? outputFile = await ResolveOutputFileAsync(options, transfer, url).ConfigureAwait(false);
+        if (outputFile is not null
+            && await CreateOutputDirectoriesOrSkipAsync(options, outputFile).ConfigureAwait(false) is { } unstarted)
+        {
+            return unstarted;
+        }
+
         if (!TransferProxySelection.TrySelect(proxySelector, options, url, out ProxyEndpoint? proxy, out TransferResult? proxyFailure))
         {
             return proxyFailure;
         }
 
-        string? outputFile = await ResolveOutputFileAsync(options, transfer, url).ConfigureAwait(false);
         if (outputFile is null)
         {
             StartTransferProgress(options, options.ResumeFrom, toStandardOutput: true);
@@ -1835,12 +1843,6 @@ internal sealed class CurlCommandRunner(
                 .ConfigureAwait(false);
         }
 
-        if (options.CreateDirectories
-            && OutputFileDirectories.CreateLeadingDirectories(OutputPaths, outputFile, runsOnWindows) is { } directory)
-        {
-            return await ReportCannotCreateDirectoryAsync(options, directory).ConfigureAwait(false);
-        }
-
         long? resumeFrom = await ResolveResumeFromAsync(options, outputFile).ConfigureAwait(false);
         StartTransferProgress(options, resumeFrom, toStandardOutput: false);
         OutputFileTarget target = new(outputFile, TakesContentDispositionName(options, transfer));
@@ -1853,10 +1855,58 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
-    /// Gets what checks <c>-J</c> names and creates <c>--create-dirs</c> directories: the one the
-    /// runner was given, else <see cref="DiskOutputPaths" />.
+    /// Gets what creates <c>--create-dirs</c> directories and checks for a <c>--skip-existing</c>
+    /// file: the one the runner was given, else <see cref="DiskOutputPaths" />.
     /// </summary>
     private IOutputPaths OutputPaths => outputPaths ?? DiskOutputPaths;
+
+    /// <summary>
+    /// Makes the <c>--create-dirs</c> directories for <paramref name="outputFile" />, then, under
+    /// <c>--skip-existing</c>, skips the transfer when the file is already there, in curl
+    /// 8.21.0's order.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="outputFile">The transfer's output file.</param>
+    /// <returns>
+    /// <see cref="CannotCreateDirectoryFailure" /> when a directory cannot be created, the
+    /// skipped transfer's success when the file exists, or <see langword="null" /> when the
+    /// transfer goes ahead.
+    /// </returns>
+    private async Task<TransferResult?> CreateOutputDirectoriesOrSkipAsync(CommandLineOptions options, string outputFile)
+    {
+        if (options.CreateDirectories
+            && OutputFileDirectories.CreateLeadingDirectories(OutputPaths, outputFile, runsOnWindows) is { } directory)
+        {
+            return await ReportCannotCreateDirectoryAsync(options, directory).ConfigureAwait(false);
+        }
+
+        return options.SkipExisting && OutputPaths.Exists(outputFile)
+            ? await SkipExistingOutputFileAsync(options, outputFile).ConfigureAwait(false)
+            : null;
+    }
+
+    /// <summary>
+    /// Skips a transfer under <c>--skip-existing</c> because its output file is already there, as
+    /// curl 8.21.0 does: nothing is connected, opened or written, no progress meter is drawn, and
+    /// the transfer succeeds with <c>%{filename_effective}</c> naming the file. Under <c>-v</c> or a
+    /// <c>--trace</c> option, <c>-s</c> or not, standard error gets
+    /// <c>Note: skips transfer, "&lt;file&gt;" exists locally</c>, wrapped as a note is
+    /// (measured 2026-09-28, BL-493 Notes).
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="outputFile">The output file that exists.</param>
+    /// <returns>A successful result with no bytes moved.</returns>
+    private async Task<TransferResult> SkipExistingOutputFileAsync(CommandLineOptions options, string outputFile)
+    {
+        transferOutputFileName = outputFile;
+        if (options.Trace != TraceKind.None)
+        {
+            await WriteErrorPiecesAsync(WarningLineWrapper.WrapNoteText($"skips transfer, \"{outputFile}\" exists locally", terminalColumns))
+                .ConfigureAwait(false);
+        }
+
+        return TransferResult.Success(0);
+    }
 
     /// <summary>
     /// Works out the file a transfer saves its body to: the <c>-o</c> name, or the remote name

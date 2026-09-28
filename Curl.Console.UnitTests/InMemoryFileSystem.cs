@@ -16,7 +16,8 @@ namespace Curl.Console;
 /// <see cref="ExistingContent" />, which only feeds reads); a path added to it by
 /// <see cref="BeforeCreateNew" /> just before the open counts too. As <see cref="IOutputPaths" />,
 /// every directory is created, into
-/// <see cref="CreatedDirectories" />, except those in <see cref="UncreatableDirectories" />.
+/// <see cref="CreatedDirectories" />, except those in <see cref="UncreatableDirectories" />, and a
+/// path exists when it is in <see cref="ExistingPaths" />.
 /// </summary>
 internal sealed class InMemoryFileSystem : IFileSystem, IFileTimeSetter, IOutputPaths
 {
@@ -120,4 +121,6 @@ internal sealed class InMemoryFileSystem : IFileSystem, IFileTimeSetter, IOutput
 
         return true;
     }
+
+    public bool Exists(string path) => ExistingPaths.Contains(path);
 }
