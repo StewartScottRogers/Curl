@@ -39,6 +39,13 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider
         static (sslStream, authenticationOptions, cancellationToken) =>
             sslStream.AuthenticateAsClientAsync(authenticationOptions, cancellationToken);
 
+    /// <summary>
+    /// The CA bundle curl's OpenSSL build names in its <c>SSL Trust Anchors:</c> lines when
+    /// <c>--cacert</c> is not given: <c>/cacert.pem</c>, as the reference build,
+    /// <c>curlimages/curl:8.21.0</c>, prints it (measured, BL-405). It is reported, never read.
+    /// </summary>
+    internal const string OpenSslDefaultCaCertificateFile = "/cacert.pem";
+
     private readonly TlsClientOptions _options;
 
     private readonly bool _matchesSchannelBuild;
@@ -220,10 +227,51 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider
     /// <param name="events">Where the completed handshake is reported.</param>
     /// <param name="cancellationToken">Cancels the handshake.</param>
     /// <returns>The same result the three-argument overload describes.</returns>
+    public ValueTask<ConnectResult> AuthenticateAsClientAsync(
+        IConnection plaintext,
+        string targetHost,
+        ITransferEvents events,
+        CancellationToken cancellationToken) =>
+        AuthenticateAsClientAsync(plaintext, targetHost, events, isProxy: false, cancellationToken);
+
+    /// <summary>
+    /// Performs the client handshake as
+    /// <see cref="AuthenticateAsClientAsync(IConnection, string, CancellationToken)" /> does,
+    /// reporting to <paramref name="events" /> a <see cref="TlsTrustEvent" /> before the
+    /// handshake and, when it succeeds, a <see cref="TlsHandshakeEvent" /> (BL-404, BL-452).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The trust is reported once the cipher suites and any client certificate are ready and
+    /// before a <see cref="TlsClientOptions.CaCertificateFile" /> is read, as curl's OpenSSL
+    /// build writes its <c>SSL Trust</c> lines before it loads the file:
+    /// <see cref="TlsTrustEvent.VerifiesPeer" /> unless <see cref="TlsClientOptions.Insecure" />,
+    /// the <c>--cacert</c> file or else <see cref="OpenSslDefaultCaCertificateFile" />, and the
+    /// <c>--capath</c> directory. The default file is only named: verification without
+    /// <c>--cacert</c> still uses the system store.
+    /// </para>
+    /// <para>
+    /// The handshake event is as the four-argument overload describes, with
+    /// <see cref="TlsHandshakeEvent.IsProxy" /> from <paramref name="isProxy" /> and
+    /// <see cref="TlsHandshakeEvent.VerifiedHostName" /> the target host without IPv6
+    /// brackets, or <see langword="null" /> under <see cref="TlsClientOptions.Insecure" />.
+    /// <see cref="SslStream" /> exposes no TLS records, so no <see cref="TlsMessageEvent" /> is
+    /// reported (ADR-0085).
+    /// </para>
+    /// </remarks>
+    /// <param name="plaintext">The connection to upgrade; ownership transfers to the provider.</param>
+    /// <param name="targetHost">The host name to validate the server certificate against.</param>
+    /// <param name="events">Where the trust and the completed handshake are reported.</param>
+    /// <param name="isProxy">
+    /// <see langword="true" /> when the handshake is with an HTTPS proxy rather than the origin.
+    /// </param>
+    /// <param name="cancellationToken">Cancels the handshake.</param>
+    /// <returns>The same result the three-argument overload describes.</returns>
     public async ValueTask<ConnectResult> AuthenticateAsClientAsync(
         IConnection plaintext,
         string targetHost,
         ITransferEvents events,
+        bool isProxy,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(events);
@@ -244,6 +292,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider
             return clientCertificateFailure;
         }
 
+        events.ReportTlsTrust(DescribeTrust());
         X509ChainPolicy? chainPolicy;
         X509Certificate2Collection anchorsBesideSystemStore;
         try
@@ -284,7 +333,11 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider
         {
             var handshakeStarted = _timeProvider.GetTimestamp();
             await AuthenticateSslStreamAsClientAsync(sslStream, authenticationOptions, cancellationToken).ConfigureAwait(false);
-            events.ReportTlsHandshake(DescribeHandshake(sslStream, peerVerification));
+            events.ReportTlsHandshake(DescribeHandshake(sslStream, peerVerification) with
+            {
+                IsProxy = isProxy,
+                VerifiedHostName = VerifiedHostName(targetHost, _options.Insecure),
+            });
             return ConnectResult.Connected(
                 new SslStreamConnection(sslStream, plaintext, clientCertificate),
                 new ConnectTimings(handshakeStarted, null, handshakeStarted, _timeProvider.GetTimestamp()),
@@ -444,6 +497,27 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider
         CertificateVerifyResult = peerVerification.VerifyResult,
         PeerCertificateChain = [.. peerVerification.Chain.Select(der => X509CertificateLoader.LoadCertificate(der.Span))],
     };
+
+    private TlsTrustEvent DescribeTrust() => new()
+    {
+        VerifiesPeer = !_options.Insecure,
+        CaCertificateFile = _options.CaCertificateFile ?? OpenSslDefaultCaCertificateFile,
+        CaCertificateDirectory = _options.CaCertificateDirectory,
+    };
+
+    /// <summary>
+    /// Returns the host name a handshake checks the certificate against, as
+    /// <see cref="TlsHandshakeEvent.VerifiedHostName" /> carries it: the target host, an IPv6
+    /// literal without its brackets, or <see langword="null" /> under <c>-k</c>, which checks
+    /// no host name.
+    /// </summary>
+    /// <param name="targetHost">The host the handshake was asked to verify.</param>
+    /// <param name="insecure">Whether <c>-k</c> (or <c>--proxy-insecure</c>) is set.</param>
+    /// <returns>The host name, or <see langword="null" />.</returns>
+    internal static string? VerifiedHostName(string targetHost, bool insecure) =>
+        insecure ? null
+        : targetHost.StartsWith('[') && targetHost.EndsWith(']') ? targetHost[1..^1]
+        : targetHost;
 
     // ADR-0011: the Schannel build refuses --ciphers and ignores --tls13-ciphers; the
     // OpenSSL build offers what they name. CipherSuitesPolicy cannot be constructed on

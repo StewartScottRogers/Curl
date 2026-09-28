@@ -244,7 +244,7 @@ public sealed class TcpConnector(
         // handshake to it with the same exit code and message as one to a target (measured).
         // It verifies with the --proxy-* TLS options, not -k or --cacert, so the proxy's own
         // provider runs this handshake (ADR-0061).
-        var securedProxy = await _proxyTlsProvider.AuthenticateAsClientAsync(dialed.Connection, proxy.Host, cancellationToken).ConfigureAwait(false);
+        var securedProxy = await AuthenticateAsync(_proxyTlsProvider, dialed.Connection, proxy.Host, target.Events, isProxy: true, cancellationToken).ConfigureAwait(false);
         if (securedProxy.Connection is not { } proxyConnection)
         {
             return securedProxy;
@@ -402,21 +402,34 @@ public sealed class TcpConnector(
             connectionNumber);
     }
 
-    // A provider that can report its handshake reports it on the target's events (BL-404).
-    // The proxy's handshake is not reported: -v would word it as the server's (ADR-0085).
     // A forward proxy is the target itself, so its handshake runs through the proxy's
     // provider, as curl 8.21.0 verifies it with --proxy-insecure and not -k (measured, BL-441),
-    // and is reported as a target's is.
+    // and is reported as a proxy's, as curl's OpenSSL build says Proxy certificate: for it
+    // (measured, BL-405).
     private ValueTask<ConnectResult> AuthenticateTargetAsync(
         IConnection plaintext,
         ConnectTarget target,
-        CancellationToken cancellationToken)
-    {
-        var provider = target.IsForwardProxy ? _proxyTlsProvider : tlsProvider;
-        return provider is IHandshakeReportingTlsProvider reportingProvider
-            ? reportingProvider.AuthenticateAsClientAsync(plaintext, target.Host, target.Events, cancellationToken)
-            : provider.AuthenticateAsClientAsync(plaintext, target.Host, cancellationToken);
-    }
+        CancellationToken cancellationToken) =>
+        AuthenticateAsync(
+            target.IsForwardProxy ? _proxyTlsProvider : tlsProvider,
+            plaintext,
+            target.Host,
+            target.Events,
+            target.IsForwardProxy,
+            cancellationToken);
+
+    // A provider that can report its handshake reports its trust and handshake on the
+    // target's events, marked as the proxy's when it is with an HTTPS proxy (BL-404, BL-452).
+    private static ValueTask<ConnectResult> AuthenticateAsync(
+        ITlsProvider provider,
+        IConnection plaintext,
+        string host,
+        ITransferEvents events,
+        bool isProxy,
+        CancellationToken cancellationToken) =>
+        provider is IHandshakeReportingTlsProvider reportingProvider
+            ? reportingProvider.AuthenticateAsClientAsync(plaintext, host, events, isProxy, cancellationToken)
+            : provider.AuthenticateAsClientAsync(plaintext, host, cancellationToken);
 
     /// <summary>
     /// Dials each address in turn and returns the first connection, or <see langword="null" />

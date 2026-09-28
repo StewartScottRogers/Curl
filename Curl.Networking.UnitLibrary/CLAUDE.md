@@ -60,6 +60,13 @@ and `TcpConnector` passes them on. Per ADR-0085's BL-404 amendment a successful 
 also reported as a `TlsHandshakeEvent` through the provider's four-argument overload
 (`IHandshakeReportingTlsProvider`), to which `TcpConnector` passes the target's `Events`; the
 event's `CertificateVerifyResult` is OpenSSL's `X509_V_` code as `OpenSslVerifyResult` maps it.
+Per BL-452 the provider reports a `TlsTrustEvent` before each handshake, once the cipher suites
+and client certificate are ready (`-k`, the `--cacert` file or else the reference build's
+default bundle name `/cacert.pem`, which is named but never read, and `--capath`), sets the
+event's `VerifiedHostName` (the host without IPv6 brackets, `null` with `-k`) and `IsProxy`;
+`TcpConnector` reports the HTTPS proxy's handshake, and a forward proxy's, with `IsProxy` set
+through `IHandshakeReportingTlsProvider`'s `isProxy` argument. `SslStream` exposes no TLS
+records, so no `TlsMessageEvent` is reported, and no ALPN is offered.
 Per ADR-0100 it also reports curl's `-v` connect lines on the target's `Events`: `Trying` before
 each dial, `connect to ... failed: <reason>` after each failed one (the reason from
 `ConnectFailureReason`), the exit 7 message, and `ReportConnectionOpened` once any tunnel and
