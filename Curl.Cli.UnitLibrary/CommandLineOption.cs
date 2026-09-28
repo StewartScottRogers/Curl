@@ -7,7 +7,7 @@ namespace Curl.Cli;
 /// </summary>
 public sealed class CommandLineOption
 {
-    private CommandLineOption(string longName, char? shortName, bool takesValue, CommandLineOptionApplier apply, CommandLineOptionApplier? negate = null, bool takesSubject = false)
+    private CommandLineOption(string longName, char? shortName, bool takesValue, CommandLineOptionApplier apply, CommandLineOptionApplier? negate = null, bool takesSubject = false, bool endsBundle = false)
     {
         LongName = longName;
         ShortName = shortName;
@@ -15,7 +15,14 @@ public sealed class CommandLineOption
         Apply = apply;
         Negate = negate;
         TakesSubject = takesSubject;
+        EndsBundle = endsBundle;
     }
+
+    /// <summary>
+    /// <see langword="true"/> for a row built with <see cref="NoFunctionFlag"/>: as a letter of a
+    /// short-option bundle it ends the bundle, and the letters after it are read as nothing at all.
+    /// </summary>
+    public bool EndsBundle { get; }
 
     /// <summary>The long name without its leading <c>--</c>, matched exactly and case-sensitively.</summary>
     public string LongName { get; }
@@ -87,6 +94,53 @@ public sealed class CommandLineOption
         return new CommandLineOption(longName, shortName: null, takesValue: false, (_, _, spelledOption, _, _) =>
             CommandLineRefusal.InstalledLibcurlDoesNotSupport(spelledOption));
     }
+
+    /// <summary>
+    /// Creates a row for a flag curl 8.21.0 still accepts but that no longer does anything
+    /// (<c>--sslv2</c>, <c>--metalink</c>): every spelling of it, its <c>--no-</c> one too when
+    /// <paramref name="negatable"/>, changes no setting and adds
+    /// <see cref="CommandLineWarning.DeprecatedWithNoFunction(string)"/> unless <c>-s</c> / <c>--silent</c>
+    /// has been read already. As a letter of a bundle it ends the bundle: curl 8.21.0 reads <c>-2s</c>
+    /// and <c>-23</c> as <c>-2</c> alone (measured 2026-09-28: <c>-2s</c> still shows the progress meter,
+    /// <c>-23</c> warns about <c>--sslv2</c> only).
+    /// </summary>
+    /// <param name="longName">The long name without its leading <c>--</c>.</param>
+    /// <param name="shortName">The short letter, or <see langword="null"/> when there is none.</param>
+    /// <param name="negatable">Whether curl accepts the <c>--no-</c> spelling rather than refusing it as not reversible.</param>
+    /// <returns>The row.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="longName"/> is <see langword="null"/>.</exception>
+    public static CommandLineOption NoFunctionFlag(string longName, char? shortName, bool negatable)
+    {
+        ArgumentNullException.ThrowIfNull(longName);
+
+        CommandLineOptionApplier warn = WarnDeprecatedWithNoFunction(longName);
+        return new CommandLineOption(longName, shortName, takesValue: false, warn, negatable ? warn : null, endsBundle: true);
+    }
+
+    /// <summary>
+    /// Creates a row for an option that takes a value and that curl 8.21.0 still accepts but that no
+    /// longer does anything (<c>--egd-file</c>, <c>--random-file</c>, <c>--krb4</c>): the value, empty
+    /// included, is taken and ignored, and <see cref="CommandLineWarning.DeprecatedWithNoFunction(string)"/>
+    /// is added unless <c>-s</c> / <c>--silent</c> has been read already. Its <c>--no-</c> spelling is
+    /// refused as not reversible, and a missing value as for any value option.
+    /// </summary>
+    /// <param name="longName">The long name without its leading <c>--</c>.</param>
+    /// <returns>The row.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="longName"/> is <see langword="null"/>.</exception>
+    public static CommandLineOption NoFunctionValue(string longName)
+    {
+        ArgumentNullException.ThrowIfNull(longName);
+
+        return new CommandLineOption(longName, shortName: null, takesValue: true, WarnDeprecatedWithNoFunction(longName));
+    }
+
+    /// <summary>An applier that ignores its value and adds curl's no-function warning for <paramref name="longName"/>.</summary>
+    private static CommandLineOptionApplier WarnDeprecatedWithNoFunction(string longName) =>
+        (options, _, _, _, _) =>
+        {
+            options.AddWarningLinesUnlessSilent(CommandLineWarning.DeprecatedWithNoFunction(longName));
+            return null;
+        };
 
     /// <summary>
     /// Creates a row for an option that takes no value and that <c>--no-&lt;long name&gt;</c> turns

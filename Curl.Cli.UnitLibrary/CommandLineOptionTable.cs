@@ -51,6 +51,9 @@ namespace Curl.Cli;
 /// <c>curl: option &lt;as typed&gt;: the given option cannot be reversed with a --no- prefix</c> and
 /// the try-help line. <c>--no-bogus</c>, <c>--no-</c>, <c>--no-no-silent</c> and <c>--no-Silent</c>
 /// exit 2 as unknown. A short letter is never negated.
+/// <c>--no-metalink</c>, <c>--no-npn</c>, <c>--no-ntlm-wb</c> and <c>--no-false-start</c> print the same
+/// no-function warning as their positive spelling, while <c>--no-sslv2</c> and <c>--no-egd-file</c> are
+/// refused as not reversible (measured 2026-09-28; see <see cref="CommandLineOption.NoFunctionFlag"/>).
 /// </para>
 /// </remarks>
 public static class CommandLineOptionTable
@@ -203,6 +206,15 @@ public static class CommandLineOptionTable
         CommandLineOption.UnsupportedFlag("http2-prior-knowledge"),
         CommandLineOption.UnsupportedFlag("http3"),
         CommandLineOption.UnsupportedFlag("http3-only"),
+        CommandLineOption.NoFunctionFlag("sslv2", '2', negatable: false),
+        CommandLineOption.NoFunctionFlag("sslv3", '3', negatable: false),
+        CommandLineOption.NoFunctionFlag("metalink", null, negatable: true),
+        CommandLineOption.NoFunctionFlag("npn", null, negatable: true),
+        CommandLineOption.NoFunctionFlag("ntlm-wb", null, negatable: true),
+        CommandLineOption.NoFunctionFlag("false-start", null, negatable: true),
+        CommandLineOption.NoFunctionValue("egd-file"),
+        CommandLineOption.NoFunctionValue("random-file"),
+        CommandLineOption.NoFunctionValue("krb4"),
     ];
 
     /// <summary>The largest <c>--create-file-mode</c> curl 8.21.0 accepts: octal <c>0777</c>.</summary>
