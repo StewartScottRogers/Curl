@@ -49,7 +49,11 @@ exit 3. An `ipfs://` or `ipns://` URL is then rewritten by `IpfsGatewayRewriter`
 reader; the environment comes from the runner's `readEnvironmentVariable`, the process's in
 production and none in tests unless given), and `%{url}` prints the gateway URL; one that
 cannot be rewritten prints `curl: <message>` and the try-help line even under `-s`, has
-`%{xfer_id}` and `%{conn_id}` `-1`, and ends the run with exit 37 or 3. A URL still without a
+`%{xfer_id}` and `%{conn_id}` `-1`, and ends the run with exit 37 or 3. Before that, `-O` or
+`--remote-name-all` on an IPFS URL with no `-o` name is refused as curl 8.21.0 refuses it,
+gateway or not: `curl: Failed to extract a filename from the URL to use for storage` and
+`curl: (1) Unsupported protocol` (neither under `-s` alone), `%{xfer_id}` and `%{conn_id}`
+`-1`, exit 1, and the run ends (BL-372 Notes). A URL still without a
 scheme gets the one `UrlSchemeGuesser` guesses (`http`, or `ftp` for `ftp.` and so on), which
 `%{url_effective}` shows while `%{url}` keeps the URL as typed. Measured on curl 8.21.0
 (BL-240 Notes). `%{url_effective}` also gives a URL with an empty path the root path `/`

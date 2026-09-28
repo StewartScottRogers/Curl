@@ -335,6 +335,23 @@ internal sealed class CurlCommandRunner(
         TransferResult.Failure(IpfsGatewayFailure.GatewayDetectionFailed.ExitCode, "Could not read a file:// file");
 
     /// <summary>
+    /// The line curl 8.21.0 prints, after <c>curl: </c>, when <c>-O</c> or <c>--remote-name-all</c>
+    /// asks for the remote name of an <c>ipfs://</c> or <c>ipns://</c> URL (measured 2026-09-27,
+    /// BL-372 Notes).
+    /// </summary>
+    private const string IpfsRemoteNameMessage = "Failed to extract a filename from the URL to use for storage";
+
+    /// <summary>
+    /// The result of <c>-O</c> or <c>--remote-name-all</c> on an <c>ipfs://</c> or <c>ipns://</c>
+    /// URL: exit 1, <c>Unsupported protocol</c>, before any gateway is looked up, with no transfer
+    /// number and no connection, as curl 8.21.0 does whether or not a gateway is given (measured
+    /// 2026-09-27, BL-372 Notes). It is compared by reference, so that
+    /// <see cref="TransferAllAsync" /> stops before the remaining URLs, as curl does.
+    /// </summary>
+    private static readonly TransferResult IpfsRemoteNameFailure =
+        TransferResult.Failure(CurlExitCode.UnsupportedProtocol, "Unsupported protocol");
+
+    /// <summary>
     /// The result of an <c>ipfs://</c> or <c>ipns://</c> URL whose gateway, or rewritten URL, curl
     /// rejects: exit 3, whose <c>%{errormsg}</c> curl 8.21.0 prints as its generic text for the
     /// code (measured 2026-09-27, BL-240 Notes). It is compared by reference, so that
@@ -737,6 +754,11 @@ internal sealed class CurlCommandRunner(
         CommandLineOptions options,
         UrlTransfer transfer)
     {
+        if (TakesRemoteNameFromIpfsUrl(transfer))
+        {
+            return (await RefuseIpfsRemoteNameAsync(options).ConfigureAwait(false), transfer.Url, string.Empty);
+        }
+
         if (!TryRewriteIpfsUrl(options, transfer.Url, out string givenUrl, out IpfsGatewayFailure? ipfsFailure))
         {
             return (await ReportIpfsGatewayFailureAsync(options, transfer, ipfsFailure).ConfigureAwait(false), givenUrl, string.Empty);
@@ -753,6 +775,34 @@ internal sealed class CurlCommandRunner(
         TransferResult result = await TransferWithHeaderOutputAsync(dispatch, options, transfer, transferUrl, uploadFile)
             .ConfigureAwait(false);
         return (result, givenUrl, transferUrl);
+    }
+
+    /// <summary>
+    /// Tells whether <paramref name="transfer" /> saves its body under the remote name of an
+    /// <c>ipfs://</c> or <c>ipns://</c> URL, which curl 8.21.0 takes from the URL before the IPFS
+    /// rewrite and cannot (measured 2026-09-27, BL-372 Notes).
+    /// </summary>
+    /// <param name="transfer">The transfer.</param>
+    /// <returns><see langword="true" /> for <c>-O</c> or <c>--remote-name-all</c> on an IPFS URL with no <c>-o</c> name.</returns>
+    private static bool TakesRemoteNameFromIpfsUrl(UrlTransfer transfer) =>
+        transfer is { UsesRemoteName: true, OutputFileName: null }
+        && CurlUrl.TryParse(transfer.Url, pathAsIs: false, out CurlUrl? parsed)
+        && IpfsGatewayRewriter.IsIpfsUrl(parsed);
+
+    /// <summary>
+    /// Prints curl's <see cref="IpfsRemoteNameMessage" /> line unless <c>-s</c> was given without
+    /// <c>-S</c>; the <c>curl: (1)</c> line follows as any failure's does.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <returns><see cref="IpfsRemoteNameFailure" />.</returns>
+    private async Task<TransferResult> RefuseIpfsRemoteNameAsync(CommandLineOptions options)
+    {
+        if (ShowsErrors(options))
+        {
+            await WriteErrorLineAsync("curl: " + IpfsRemoteNameMessage).ConfigureAwait(false);
+        }
+
+        return IpfsRemoteNameFailure;
     }
 
     /// <summary>
@@ -836,6 +886,16 @@ internal sealed class CurlCommandRunner(
     /// <returns><see langword="true" /> for <see cref="IpfsGatewayDetectionFailure" /> and <see cref="IpfsMalformedTargetUrlFailure" />.</returns>
     private static bool IsIpfsGatewayFailure(TransferResult result) =>
         ReferenceEquals(result, IpfsGatewayDetectionFailure) || ReferenceEquals(result, IpfsMalformedTargetUrlFailure);
+
+    /// <summary>
+    /// Tells whether <paramref name="result" /> ended an IPFS URL before curl numbered its
+    /// transfer, so that <c>%{xfer_id}</c> prints <c>-1</c>: a gateway failure, or a remote name
+    /// asked of the URL.
+    /// </summary>
+    /// <param name="result">The transfer's result.</param>
+    /// <returns><see langword="true" /> when the transfer has no number.</returns>
+    private static bool HasNoTransferNumber(TransferResult result) =>
+        IsIpfsGatewayFailure(result) || ReferenceEquals(result, IpfsRemoteNameFailure);
 
     /// <summary>
     /// The <c>-T</c> file uploaded to the URL at <paramref name="index" />: the Nth <c>-T</c> value
@@ -998,7 +1058,7 @@ internal sealed class CurlCommandRunner(
             Referer = options.Referer,
             OutputFileName = transferOutputFileName,
             ConnectionId = connectionId,
-            TransferId = IsIpfsGatewayFailure(result) ? NoTransferId : transfer.TransferId,
+            TransferId = HasNoTransferNumber(result) ? NoTransferId : transfer.TransferId,
         };
 
         Stream liveStandardOutput = deferringStandardOutput.HasWriteFailed ? Stream.Null : deferringStandardOutput;
@@ -1112,7 +1172,8 @@ internal sealed class CurlCommandRunner(
     /// Tells whether a transfer's result stops the URLs after it: a resumed transfer whose
     /// <c>-o</c> file cannot be opened, a transfer whose <c>-D</c> or <c>-T</c> file cannot be
     /// opened or whose <c>--create-dirs</c> directory cannot be created, an IPFS URL that cannot
-    /// be rewritten, and, under <c>--fail-early</c>, any failed transfer, as curl 8.21.0 does.
+    /// be rewritten or asked for its remote name, and, under <c>--fail-early</c>, any failed
+    /// transfer, as curl 8.21.0 does.
     /// </summary>
     /// <param name="options">The accepted command line.</param>
     /// <param name="result">The transfer's result.</param>
@@ -1124,7 +1185,7 @@ internal sealed class CurlCommandRunner(
     /// The results, compared by reference, after which no further URL is transferred whatever
     /// the options: a resumed <c>-o</c> file, a <c>-T</c> or <c>-D</c> file that cannot be opened,
     /// a <c>--create-dirs</c> directory that cannot be created, and an IPFS URL that cannot be
-    /// rewritten.
+    /// rewritten or asked for its remote name.
     /// </summary>
     private static readonly HashSet<TransferResult> RunEndingFailures = new(ReferenceEqualityComparer.Instance)
     {
@@ -1134,6 +1195,7 @@ internal sealed class CurlCommandRunner(
         CannotCreateDirectoryFailure,
         IpfsGatewayDetectionFailure,
         IpfsMalformedTargetUrlFailure,
+        IpfsRemoteNameFailure,
     };
 
     /// <summary>
