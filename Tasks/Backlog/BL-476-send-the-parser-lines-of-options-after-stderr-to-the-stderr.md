@@ -1,5 +1,5 @@
 ---
-id: BL-474
+id: BL-476
 title: Send the parser lines of options after --stderr to the --stderr file
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-27
 completed:
 ---
-# BL-474 — Send the parser lines of options after --stderr to the --stderr file
+# BL-476 — Send the parser lines of options after --stderr to the --stderr file
 
 ## Goal
 
