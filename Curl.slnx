@@ -59,6 +59,8 @@
   <Project Path="Curl.Cookies.UnitTests/Curl.Cookies.UnitTests.csproj" />
   <Project Path="Curl.Core.UnitLibrary/Curl.Core.UnitLibrary.csproj" />
   <Project Path="Curl.Core.UnitTests/Curl.Core.UnitTests.csproj" />
+  <Project Path="Curl.Cryptography.UnitLibrary/Curl.Cryptography.UnitLibrary.csproj" />
+  <Project Path="Curl.Cryptography.UnitTests/Curl.Cryptography.UnitTests.csproj" />
   <Project Path="Curl.Networking.UnitLibrary/Curl.Networking.UnitLibrary.csproj" />
   <Project Path="Curl.Networking.UnitTests/Curl.Networking.UnitTests.csproj" />
   <Project Path="Curl.Output.UnitLibrary/Curl.Output.UnitLibrary.csproj" />
