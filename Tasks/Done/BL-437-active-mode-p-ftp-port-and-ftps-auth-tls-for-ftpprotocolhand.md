@@ -8,7 +8,7 @@ depends-on: [BL-431, BL-459]
 touches: [Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests, Record-CurlExchange.ps1, Documentation/Planning/Decisions]
 requirement: none
 created: 2026-09-27
-completed:
+completed: 2026-09-27
 ---
 # BL-437 — Active mode (-P/--ftp-port) and ftps:// / AUTH TLS for FtpProtocolHandler
 
@@ -27,10 +27,10 @@ completed:
 ## Acceptance criteria
 
 - [x] An ADR under `Documentation/Planning/Decisions/`, marked "Decided by Claude under Stewart's delegation", records the scope of active mode and FTP TLS and the contract additions they need; the prerequisite tasks it names are filed and listed in this task's `depends-on`.
-- [ ] Named tests in `Curl.Protocol.Ftp.UnitTests` pin curl 8.21.0's command bytes for `-P -` (`EPRT`, then `PORT` when `EPRT` is refused) and the exit code and message when the server never connects back, as recorded with `Record-CurlExchange.ps1 -Ftp`.
-- [ ] Named tests pin the `ftps://` implicit-TLS conversation and the `AUTH TLS` command and the protection commands after it that curl 8.21.0 sends (as measured) for `ftp://` with `--ssl-reqd`, and the exit code when `AUTH TLS` is refused under `--ssl-reqd`, using a fake `ITlsProvider` so no test touches the network.
-- [ ] `dotnet build Curl.Protocol.Ftp.UnitLibrary -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes; no new test needs `TestCategory=Integration`.
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1` reports 100% line and branch coverage, complexity at most 10 and CRAP at most 30 for every member of `Curl.Protocol.Ftp.UnitLibrary`.
+- [x] Named tests in `Curl.Protocol.Ftp.UnitTests` pin curl 8.21.0's command bytes for `-P -` (`EPRT`, then `PORT` when `EPRT` is refused) and the exit code and message when the server never connects back, as recorded with `Record-CurlExchange.ps1 -Ftp`.
+- [x] Named tests pin the `ftps://` implicit-TLS conversation and the `AUTH TLS` command and the protection commands after it that curl 8.21.0 sends (as measured) for `ftp://` with `--ssl-reqd`, and the exit code when `AUTH TLS` is refused under `--ssl-reqd`, using a fake `ITlsProvider` so no test touches the network.
+- [x] `dotnet build Curl.Protocol.Ftp.UnitLibrary -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` passes; no new test needs `TestCategory=Integration`.
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1` reports 100% line and branch coverage, complexity at most 10 and CRAP at most 30 for every member of `Curl.Protocol.Ftp.UnitLibrary`.
 
 ## Notes
 
@@ -47,6 +47,22 @@ completed:
 - `touches` gained `Documentation/Planning/Decisions` (the ADR and its index row; no task
   in Doing names it) and `Record-CurlExchange.ps1` (the recorder extension for active mode
   and TLS, as Context says).
+- 2026-09-27 (lane 3): delivered. Measured curl 8.21.0 (Schannel) with the extended
+  `Record-CurlExchange.ps1 -Ftp` (dials back to `EPRT`/`PORT`, answers `AUTH` and `PROT P`
+  with TLS, `-Tls` with `-Ftp` for implicit FTPS, `-FtpIdleMilliseconds` for the 60-second
+  accept wait). What was measured and every divergence is in ADR-0102's BL-437 addendum.
+  New tests: `FtpProtocolHandlerActiveModeTests` (31) and `FtpProtocolHandlerTlsTests`
+  (23); FTP tests 214 -> 268; `Measure-CodeQuality.ps1 -Library Curl.Protocol.Ftp.UnitLibrary`
+  reports 100% line, 100% branch, worst CRAP 10, 0 failing members.
+- Defaults taken: the one-argument constructor stays for `Curl.Console` until BL-458 and
+  serves `ftp` only (`-P` there is exit 30, an accepted `AUTH` exit 64); a `-P` host or
+  interface name ends with exit 6 and no `QUIT` (curl's ending for a name that does not
+  resolve; resolving is BL-463); IPv6 with `EPRT` refused ends with exit 30 after `QUIT`
+  where curl hangs; a failed data TLS handshake ends without `QUIT` (unmeasured, same as a
+  failed passive connect); curl's watch on the control connection during the accept wait
+  is not reproduced.
+- Filed BL-462 (TLS connections from `TcpConnector` must report `LocalEndPoint`, or
+  `-P -` over `ftps://` ends with exit 30) and BL-463 (`-P` host and interface names).
 
 ## Log
 
@@ -54,3 +70,4 @@ completed:
 - 2026-09-27: Backlog -> Doing.
 - 2026-09-27: Doing -> Backlog. Waits on BL-459 (IConnectionListener and the FTP active-mode/TLS transfer options in Curl.Protocol.Abstractions), per ADR-0102
 - 2026-09-27: Backlog -> Doing.
+- 2026-09-27: Doing -> Done. FtpProtocolHandler does active mode (-P: EPRT, PORT, --disable-eprt) and TLS (ftps://, AUTH SSL/TLS, PBSZ/PROT) as curl 8.21.0 was measured to
