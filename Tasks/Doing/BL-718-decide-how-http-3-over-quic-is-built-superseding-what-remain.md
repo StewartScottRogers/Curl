@@ -35,3 +35,4 @@ An ADR fixes how Curl speaks HTTP/3 over a hand-built QUIC on every platform: th
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
