@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation/Planning/Decisions]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-28
 ---
 # BL-655 — Decide how HTTP/2 is built and offered on every platform, superseding ADR-0017 for HTTP/2
 
@@ -25,13 +25,18 @@ A new ADR supersedes ADR-0017's HTTP/2 half (its refusal of `--http2` and `--htt
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Planning/Decisions/ADR-<next free number>-<slug>.md` exists (number checked unused), Status Accepted, marked "Decided by Claude under Stewart's delegation", with the measurements, stating per platform what `https://` negotiates by default and what `--http2`, `--http2-prior-knowledge` and `--http1.1` do (all accepted everywhere), and which build's text each platform matches; ADR-0017 is marked superseded for HTTP/2.
-- [ ] Consequences list BL-656 to BL-660, BL-715, BL-716 and BL-717.
-- [ ] `Documentation/Planning/Decisions/README.md` indexes the new ADR and updates ADR-0017's status column.
+- [x] `Documentation/Planning/Decisions/ADR-<next free number>-<slug>.md` exists (number checked unused), Status Accepted, marked "Decided by Claude under Stewart's delegation", with the measurements, stating per platform what `https://` negotiates by default and what `--http2`, `--http2-prior-knowledge` and `--http1.1` do (all accepted everywhere), and which build's text each platform matches; ADR-0017 is marked superseded for HTTP/2.
+- [x] Consequences list BL-656 to BL-660, BL-715, BL-716 and BL-717.
+- [x] `Documentation/Planning/Decisions/README.md` indexes the new ADR and updates ADR-0017's status column.
 
 ## Notes
+
+- ADR-0141 written (next free number, checked against every branch). Measured 2026-09-28 with System32 curl 8.21.0 (Schannel), Git's mingw64 curl 8.21.0 (Schannel), curl.se's Windows build 8.18.0 installed by WinGet (LibreSSL, nghttp2) and Ubuntu WSL curl 8.18.0 (OpenSSL, nghttp2), against www.google.com.
+- Decision: `--http2`, `--http2-prior-knowledge`, `--http1.1` and `--http1.0` are accepted everywhere with nghttp2 curl's behaviour; a plain `https://` offers `h2,http/1.1` on Linux and macOS and `http/1.1` alone on Windows (the Schannel reference wins where it does the same thing, so scripts that never ask for HTTP/2 see no change); `-V` lists `HTTP2` everywhere once BL-659 lands; ADR-0017's refusal holds until then.
+- Docs only: no `.cs` or project file touched (the Documentation project includes `**\*.md`), so `verify` had nothing to check. Written directly rather than through align-and-document, since the work was one ADR and two index edits.
 
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Doing.
+- 2026-09-28: Doing -> Done. ADR-0141 decides hand-built HTTP/2 on every platform with per-platform default ALPN, superseding ADR-0017 for HTTP/2
