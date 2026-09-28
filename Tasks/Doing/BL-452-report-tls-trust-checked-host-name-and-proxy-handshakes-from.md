@@ -53,3 +53,4 @@ With the OpenSSL wording, `curl -v https://...` prints the `SSL Trust` lines, th
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
