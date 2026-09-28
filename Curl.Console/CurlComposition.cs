@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Authentication;
 using Curl.Cli;
+using Curl.Cookies;
 using Curl.Core;
 using Curl.Core.FileSystem;
 using Curl.Networking;
@@ -270,7 +271,7 @@ internal static class CurlComposition
         Stream standardInput,
         bool standardOutputIsTerminal) =>
         new(
-            options => CreateTransferDispatch(CreateTransports(options), CookieEngine.FromCommandLine(options)),
+            SharingRunCookies((options, cookies) => CreateTransferDispatch(CreateTransports(options), cookies)),
             new PhysicalFileSystem(),
             new PhysicalFileSystem(),
             standardOutput,
@@ -309,7 +310,7 @@ internal static class CurlComposition
         IDatagramConnector datagramConnector,
         ProxySelector? proxySelector = null) =>
         new(
-            options => CreateTransferDispatch(connector, datagramConnector, new SslStreamTlsProvider(TlsClientOptionsMapping.FromCommandLine(options), TimeProvider.System), CookieEngine.FromCommandLine(options), proxySelector),
+            SharingRunCookies((options, cookies) => CreateTransferDispatch(connector, datagramConnector, new SslStreamTlsProvider(TlsClientOptionsMapping.FromCommandLine(options), TimeProvider.System), cookies, proxySelector)),
             new PhysicalFileSystem(),
             new PhysicalFileSystem(),
             standardOutput,
@@ -328,6 +329,20 @@ internal static class CurlComposition
     /// <returns><see cref="WriteOutTimeDialect.WindowsCRuntime" /> on Windows, otherwise <see cref="WriteOutTimeDialect.Glibc" />.</returns>
     internal static WriteOutTimeDialect WriteOutTimeDialectFor(bool runsOnWindows) =>
         runsOnWindows ? WriteOutTimeDialect.WindowsCRuntime : WriteOutTimeDialect.Glibc;
+
+    /// <summary>
+    /// Wraps a dispatch factory so every <c>-:</c> / <c>--next</c> option group of one run gets its own
+    /// <see cref="CookieEngine" /> over the one <see cref="CookieStore" /> the run shares, as curl 8.21.0
+    /// shares its cookie list between groups (measured 2026-09-28, BL-509 Notes).
+    /// </summary>
+    /// <param name="createTransferDispatch">Builds a group's dispatch from its options and its cookies.</param>
+    /// <returns>The factory the runner calls once per option group.</returns>
+    internal static Func<CommandLineOptions, TransferDispatch> SharingRunCookies(
+        Func<CommandLineOptions, CookieEngine?, TransferDispatch> createTransferDispatch)
+    {
+        CookieStore runCookies = new();
+        return options => createTransferDispatch(options, CookieEngine.FromCommandLine(options, runCookies));
+    }
 
     /// <summary>
     /// Creates the dispatcher over the production handler set, connecting the TCP protocols

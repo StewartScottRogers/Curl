@@ -29,7 +29,9 @@ internal sealed class CookieEngine
     /// <summary>The <c>-b</c> file name that reads the cookies from standard input.</summary>
     private const string StandardInputCookieFile = "-";
 
-    private readonly CookieStore store = new();
+    private readonly CookieStore store;
+
+    private readonly List<string> cookieStrings = [];
 
     private readonly List<string> cookieFiles = [];
 
@@ -39,27 +41,46 @@ internal sealed class CookieEngine
 
     private bool cookieFilesLoaded;
 
-    private CookieEngine(CommandLineOptions options)
+    private CookieEngine(CommandLineOptions options, CookieStore store)
     {
+        this.store = store;
         AddCookies(options.Cookies, sendCookieStrings: !options.Headers.Any(NamesCookie));
         cookieJar = options.CookieJar;
         discardSessionCookies = options.JunkSessionCookies;
-        HandlerStore = cookieFiles.Count > 0 || cookieJar is not null ? store : new CookieStringSender(store);
+        HandlerStore = cookieFiles.Count > 0 || cookieJar is not null
+            ? new GroupCookies(store, cookieStrings)
+            : new CookieStringSender(cookieStrings);
     }
 
     /// <summary>
-    /// Gets the store the HTTP handler reads and writes: the run's <see cref="CookieStore" /> when
-    /// the cookie engine is on, or else one that sends the <c>-b</c> strings and stores nothing.
+    /// Gets the store the HTTP handler reads and writes: the run's <see cref="CookieStore" />, with
+    /// this option group's <c>-b</c> strings, when the group's cookie engine is on, or else one that
+    /// sends the group's <c>-b</c> strings and stores nothing.
     /// </summary>
     internal ICookieStore HandlerStore { get; }
 
     /// <summary>
-    /// Creates the run's cookies from the parsed command line.
+    /// Creates the cookies of a run of one option group from the parsed command line, with a store
+    /// of their own.
     /// </summary>
     /// <param name="options">The parsed command line.</param>
     /// <returns>The run's cookies, or <see langword="null" /> when neither <c>-b</c> nor <c>-c</c> was given.</returns>
     internal static CookieEngine? FromCommandLine(CommandLineOptions options) =>
-        options.Cookies.Count > 0 || options.CookieJar is not null ? new CookieEngine(options) : null;
+        FromCommandLine(options, new CookieStore());
+
+    /// <summary>
+    /// Creates one <c>-:</c> / <c>--next</c> option group's cookies over the run's
+    /// <paramref name="runCookies" />, which every group shares, as curl 8.21.0 shares its cookie
+    /// list between groups while each group's <c>-b</c>, <c>-c</c> and <c>-j</c> are its own:
+    /// <c>-c j1 A --next -c j2 B</c> sent A's cookie to B and wrote both to <c>j2</c>, while
+    /// <c>-c j A --next B</c> sent B none and <c>A --next -c j B</c> kept only B's (measured
+    /// 2026-09-28, BL-509 Notes).
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <param name="runCookies">The cookies stored and loaded by the run so far.</param>
+    /// <returns>The group's cookies, or <see langword="null" /> when the group gives neither <c>-b</c> nor <c>-c</c>.</returns>
+    internal static CookieEngine? FromCommandLine(CommandLineOptions options, CookieStore runCookies) =>
+        options.Cookies.Count > 0 || options.CookieJar is not null ? new CookieEngine(options, runCookies) : null;
 
     /// <summary>
     /// Loads every <c>-b</c> file, in command-line order, dropping session cookies under <c>-j</c>,
@@ -140,7 +161,7 @@ internal sealed class CookieEngine
             }
             else if (sendCookieStrings)
             {
-                store.AddCookieString(cookie.Value);
+                cookieStrings.Add(cookie.Value);
             }
         }
     }
@@ -156,13 +177,29 @@ internal sealed class CookieEngine
         || header.StartsWith("Cookie;", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Sends the <c>-b name=value</c> strings and stores nothing, as curl does while its cookie
-    /// engine is off.
+    /// Sends the run's stored cookies and then one option group's <c>-b name=value</c> strings, and
+    /// stores what the responses set in the run's store, as curl does while the group's cookie
+    /// engine is on.
     /// </summary>
-    /// <param name="store">The store that holds the strings.</param>
-    private sealed class CookieStringSender(CookieStore store) : ICookieStore
+    /// <param name="store">The run's store.</param>
+    /// <param name="cookieStrings">The group's <c>-b name=value</c> strings.</param>
+    private sealed class GroupCookies(CookieStore store, IReadOnlyList<string> cookieStrings) : ICookieStore
     {
-        public string? GetCookieHeader(CurlUrl url, bool secure, DateTimeOffset now) => store.GetCookieHeader(url, secure, now);
+        public string? GetCookieHeader(CurlUrl url, bool secure, DateTimeOffset now) => store.GetCookieHeader(url, secure, now, cookieStrings);
+
+        public int StoreFromResponse(CurlUrl url, string setCookieHeader, int storedFromResponse, DateTimeOffset now, ITransferEvents events) =>
+            store.StoreFromResponse(url, setCookieHeader, storedFromResponse, now, events);
+    }
+
+    /// <summary>
+    /// Sends one option group's <c>-b name=value</c> strings and stores nothing, as curl does while
+    /// the group's cookie engine is off.
+    /// </summary>
+    /// <param name="cookieStrings">The group's <c>-b name=value</c> strings.</param>
+    private sealed class CookieStringSender(IReadOnlyList<string> cookieStrings) : ICookieStore
+    {
+        public string? GetCookieHeader(CurlUrl url, bool secure, DateTimeOffset now) =>
+            cookieStrings.Count == 0 ? null : string.Join("; ", cookieStrings);
 
         public int StoreFromResponse(CurlUrl url, string setCookieHeader, int storedFromResponse, DateTimeOffset now, ITransferEvents events) =>
             storedFromResponse;

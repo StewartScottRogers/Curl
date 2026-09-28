@@ -19,9 +19,10 @@ namespace Curl.Console;
 /// <c>curl: (N) &lt;message&gt;</c> line for each failure.
 /// </summary>
 /// <param name="createTransferDispatch">
-/// Builds, from the accepted command line, the dispatcher that performs each transfer with
-/// the handler for its scheme and the warning lines printed before each transfer; called
-/// once per run, and not at all for a refused command line. It takes the options because
+/// Builds, from one option group of the accepted command line, the dispatcher that performs each
+/// transfer with the handler for its scheme and the warning lines printed before each transfer;
+/// called once per <c>-:</c> / <c>--next</c> option group that runs, and not at all for a refused
+/// command line. It takes the options because
 /// the network handlers' TLS settings, and the warnings for the ones the build ignores,
 /// come from them.
 /// </param>
@@ -476,6 +477,22 @@ internal sealed class CurlCommandRunner(
     private long nextTransferId;
 
     /// <summary>
+    /// The <c>%{xfer_id}</c> of the running <c>-:</c> / <c>--next</c> option group's first transfer,
+    /// which truncates the group's <c>-D</c> file: curl 8.21.0 opens each group's <c>-D</c> file anew, so
+    /// <c>-D h A --next -D h B</c> left only B's head in <c>h</c> (measured 2026-09-28, BL-509 Notes).
+    /// </summary>
+    private long firstTransferIdOfGroup;
+
+    /// <summary>
+    /// The <c>%{urlnum}</c> of the running option group's first command-line URL: the command-line
+    /// URLs of the groups before it, counted.
+    /// </summary>
+    private int firstUrlNumberOfGroup;
+
+    /// <summary>The option groups that run after the running one, in order; empty for the last.</summary>
+    private IReadOnlyList<CommandLineOptions> laterGroups = [];
+
+    /// <summary>
     /// Whether a transfer of this run has switched standard output to binary mode, as one set up to
     /// send its body to standard output, or to discard it under <c>--out-null</c>, does.
     /// </summary>
@@ -546,14 +563,14 @@ internal sealed class CurlCommandRunner(
 
         await WriteDefaultConfigFileNoteAsync(parsed.NotedDefaultConfigFile).ConfigureAwait(false);
 
-        int exitCode = await RunAcceptedAsync(parsed.Options, parsed.WarningLinesAfterTransfers).ConfigureAwait(false);
+        int exitCode = await RunAcceptedAsync(parsed.Options, parsed.Groups, parsed.WarningLinesAfterTransfers).ConfigureAwait(false);
         if (parsed.RefusalAfterGroups is not { } refusalAfterGroups)
         {
             return exitCode;
         }
 
         // curl 8.21.0 refuses a later -:/--next group only once the groups before it have run
-        // (test686: "htdhdhdtp://localhost --next" exits 2). Running groups after the first is BL-509.
+        // (test686: "htdhdhdtp://localhost --next" exits 2).
         await WriteErrorLinesAsync(refusalAfterGroups.StandardErrorLines).ConfigureAwait(false);
         return (int)refusalAfterGroups.ExitCode;
     }
@@ -641,10 +658,14 @@ internal sealed class CurlCommandRunner(
     /// Runs an accepted command line, for <see cref="RunAsync" />, once standard error is where
     /// <c>--stderr</c> sends it.
     /// </summary>
-    /// <param name="options">The accepted command line.</param>
+    /// <param name="options">The accepted command line's first option group.</param>
+    /// <param name="groups">The option groups to run, <paramref name="options" /> first.</param>
     /// <param name="warningLinesAfterTransfers">The parser's warning lines printed after the transfers.</param>
     /// <returns>The process exit code.</returns>
-    private async Task<int> RunAcceptedAsync(CommandLineOptions options, IReadOnlyList<string> warningLinesAfterTransfers)
+    private async Task<int> RunAcceptedAsync(
+        CommandLineOptions options,
+        IReadOnlyList<CommandLineOptions> groups,
+        IReadOnlyList<string> warningLinesAfterTransfers)
     {
         if (InformationLines(options) is { } informationLines)
         {
@@ -660,20 +681,97 @@ internal sealed class CurlCommandRunner(
             return (int)CurlExitCode.Ok;
         }
 
-        if (RequestMethodConflictLines(options) is { } conflictLines)
+        if (await TransferAllGroupsAsync(groups).ConfigureAwait(false) is not { } exitCode)
         {
-            if (!options.Silent)
-            {
-                await WriteErrorLinesAsync(conflictLines).ConfigureAwait(false);
-            }
-
             return (int)CurlExitCode.FailedInit;
         }
 
-        CurlExitCode exitCode = await TransferAllAsync(options).ConfigureAwait(false);
         await WriteErrorLinesAsync(warningLinesAfterTransfers).ConfigureAwait(false);
 
         return (int)exitCode;
+    }
+
+    /// <summary>
+    /// Runs the <c>-:</c> / <c>--next</c> option groups in order, for <see cref="RunAcceptedAsync" />,
+    /// each command-line URL with its own group's options, then closes the run's
+    /// <see cref="transferEventOutput" />. <c>%{xfer_id}</c>, <c>%{conn_id}</c> and <c>%{urlnum}</c> count
+    /// on across the groups, and the exit code is the last transfer's, as curl 8.21.0 does: a failed
+    /// first group followed by a good one exits 0, a good one followed by a failed one exits with the
+    /// failure's code (measured 2026-09-28, BL-509 Notes).
+    /// </summary>
+    /// <param name="groups">The option groups to run.</param>
+    /// <returns>
+    /// The last transfer's exit code, or <see cref="CurlExitCode.Ok" /> when there was none; or
+    /// <see langword="null" /> when a group's request methods conflict
+    /// (<see cref="RequestMethodConflictLines" />), whose lines are written and whose group and those
+    /// after it are not run, as curl 8.21.0 refuses it once the groups before it have run.
+    /// </returns>
+    /// <remarks>
+    /// No group runs after one that ends the run (<see cref="EndsTheRun" />, <c>--fail-early</c>
+    /// included) or one with an output option left over, whose run curl 8.21.0 ends there
+    /// (<c>-o nul -o nul2 A --next B</c> requested only A, BL-508 Notes).
+    /// </remarks>
+    private async Task<CurlExitCode?> TransferAllGroupsAsync(IReadOnlyList<CommandLineOptions> groups)
+    {
+        try
+        {
+            IReadOnlyList<CommandLineOptions> groupsThatRun = GroupsThatRun(groups);
+            CurlExitCode exitCode = CurlExitCode.Ok;
+            for (int group = 0; group < groupsThatRun.Count; group++)
+            {
+                if (!await AcceptsRequestMethodsAsync(groupsThatRun[group]).ConfigureAwait(false))
+                {
+                    return null;
+                }
+
+                laterGroups = [.. groupsThatRun.Skip(group + 1)];
+                (exitCode, bool runEnded) = await TransferAllAsync(groupsThatRun[group], exitCode).ConfigureAwait(false);
+                if (runEnded)
+                {
+                    break;
+                }
+            }
+
+            return exitCode;
+        }
+        finally
+        {
+            await transferEventOutput.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Tells whether an option group's request methods agree, writing
+    /// <see cref="RequestMethodConflictLines" />' lines, unless <c>-s</c>, when they do not.
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <returns><see langword="true" /> when the group can run.</returns>
+    private async Task<bool> AcceptsRequestMethodsAsync(CommandLineOptions options)
+    {
+        if (RequestMethodConflictLines(options) is not { } conflictLines)
+        {
+            return true;
+        }
+
+        if (!options.Silent)
+        {
+            await WriteErrorLinesAsync(conflictLines).ConfigureAwait(false);
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// The option groups that run: every one up to and including the first with an <c>-o</c>,
+    /// <c>-O</c> or kept <c>--no-remote-name</c> left over with no URL to pair with. An output entry is
+    /// only ever left without a URL by an output option, as a URL takes the first entry without one.
+    /// </summary>
+    /// <param name="groups">The option groups.</param>
+    /// <returns>The groups that run, in order.</returns>
+    private static IReadOnlyList<CommandLineOptions> GroupsThatRun(IReadOnlyList<CommandLineOptions> groups)
+    {
+        int firstWithOutputLeftOver = groups.ToList().FindIndex(group => group.UrlOutputs.Any(output => output.Url is null));
+        return firstWithOutputLeftOver < 0 ? groups : [.. groups.Take(firstWithOutputLeftOver + 1)];
     }
 
     /// <summary>
@@ -720,52 +818,57 @@ internal sealed class CurlCommandRunner(
             defaultConfigFileSearch ?? NoDefaultConfigFile);
 
     /// <summary>
-    /// Transfers every URL in order, each command-line URL once for every URL its glob expands to,
-    /// and reports each failure, then disposes the run's <see cref="TransferDispatch" />, closing
-    /// its connection pool, whatever the outcome.
+    /// Transfers every URL of one option group in order, each command-line URL once for every URL
+    /// its glob expands to, and reports each failure, then disposes the group's
+    /// <see cref="TransferDispatch" />, closing its connection pool, whatever the outcome.
     /// </summary>
-    /// <param name="options">The accepted command line.</param>
+    /// <param name="options">The option group.</param>
+    /// <param name="exitCode">The exit code so far, returned when nothing is transferred.</param>
     /// <returns>
-    /// The last transfer's exit code, or <see cref="CurlExitCode.Ok" /> when there was none.
-    /// A transfer <see cref="EndsTheRun" /> names is the last: the URLs after it are not
-    /// transferred. A URL that is not a well-formed glob also ends the run, with exit 3.
+    /// The last transfer's exit code, and whether the run ended: a transfer <see cref="EndsTheRun" />
+    /// names is the last, and the URLs after it are not transferred. A URL that is not a well-formed
+    /// glob also ends the run, with exit 3.
     /// </returns>
-    private async Task<CurlExitCode> TransferAllAsync(CommandLineOptions options)
+    private async Task<(CurlExitCode ExitCode, bool RunEnded)> TransferAllAsync(CommandLineOptions options, CurlExitCode exitCode)
     {
+        firstTransferIdOfGroup = nextTransferId;
         TransferDispatch dispatch = createTransferDispatch(options);
         try
         {
-            return await TransferEachUrlAsync(dispatch, options).ConfigureAwait(false);
+            return await TransferEachUrlAsync(dispatch, options, exitCode).ConfigureAwait(false);
         }
         finally
         {
             await dispatch.DisposeAsync().ConfigureAwait(false);
-            await transferEventOutput.DisposeAsync().ConfigureAwait(false);
+            firstUrlNumberOfGroup += options.Urls.Count;
         }
     }
 
     /// <summary>
-    /// Transfers every URL in order, for <see cref="TransferAllAsync" />, opening the run's
-    /// <see cref="transferEventOutput" /> once the first URL has parsed as a glob: curl 8.21.0
-    /// opens its trace file at the first event, and a URL that is not a well-formed glob makes
+    /// Transfers every URL of one option group in order, for <see cref="TransferAllAsync" />, opening
+    /// the run's <see cref="transferEventOutput" /> once the run's first URL has parsed as a glob: curl
+    /// 8.21.0 opens its trace file at the first event, and a URL that is not a well-formed glob makes
     /// none (measured 2026-09-27, BL-242 Notes).
     /// </summary>
-    /// <param name="dispatch">What the run transfers through.</param>
-    /// <param name="options">The accepted command line.</param>
-    /// <returns>The exit code <see cref="TransferAllAsync" /> returns.</returns>
-    private async Task<CurlExitCode> TransferEachUrlAsync(TransferDispatch dispatch, CommandLineOptions options)
+    /// <param name="dispatch">What the group transfers through.</param>
+    /// <param name="options">The option group.</param>
+    /// <param name="exitCode">The exit code so far, returned when nothing is transferred.</param>
+    /// <returns>The exit code and run end <see cref="TransferAllAsync" /> returns.</returns>
+    private async Task<(CurlExitCode ExitCode, bool RunEnded)> TransferEachUrlAsync(
+        TransferDispatch dispatch,
+        CommandLineOptions options,
+        CurlExitCode exitCode)
     {
-        CurlExitCode exitCode = CurlExitCode.Ok;
         for (int index = 0; index < options.Urls.Count; index++)
         {
             if (!TryParseUploadFiles(options, index, out IReadOnlyList<string?>? uploadFiles, out TransferResult? globFailure)
                 || !TryParseGlob(options, index, out UrlGlob? glob, out globFailure))
             {
                 await WriteGlobFailureLinesAsync(options, globFailure).ConfigureAwait(false);
-                return globFailure.ExitCode;
+                return (globFailure.ExitCode, true);
             }
 
-            if (index == 0)
+            if (eventStandardError is null)
             {
                 eventStandardError = new HoldableStream(standardError);
                 transferEventOutput = await TransferEventOutput
@@ -777,11 +880,11 @@ internal sealed class CurlCommandRunner(
                 .ConfigureAwait(false);
             if (runEnded)
             {
-                return exitCode;
+                return (exitCode, true);
             }
         }
 
-        return exitCode;
+        return (exitCode, false);
     }
 
     /// <summary>
@@ -809,7 +912,7 @@ internal sealed class CurlCommandRunner(
         {
             foreach (UrlGlobMatch match in glob.Expand())
             {
-                UrlTransfer transfer = new(options, index, nextTransferId++, match, uploadFile, runsOnWindows);
+                UrlTransfer transfer = new(options, index, firstUrlNumberOfGroup + index, nextTransferId++, match, uploadFile, runsOnWindows);
                 TransferResult result = await TransferAndReportAsync(dispatch, options, transfer).ConfigureAwait(false);
                 exitCode = result.ExitCode;
                 if (EndsTheRun(options, result))
@@ -1218,12 +1321,26 @@ internal sealed class CurlCommandRunner(
     /// to binary mode: one that saves no file, sending its body to standard output or discarding
     /// it under <c>--out-null</c>.
     /// </summary>
-    /// <param name="options">The accepted command line.</param>
-    /// <param name="index">The URL's position on the command line.</param>
-    /// <returns><see langword="true" /> when a later URL saves no file.</returns>
-    private static bool LaterUrlSwitchesStandardOutputToBinary(CommandLineOptions options, int index)
+    /// <param name="options">The running option group.</param>
+    /// <param name="index">The URL's position in its option group.</param>
+    /// <returns>
+    /// <see langword="true" /> when a later URL of the group, or any URL of a later group, saves no
+    /// file: curl 8.21.0 wrote <c>-o NUL -w "%{exitcode}\n" A --next B</c>'s line feed as LF, and as
+    /// CR LF with <c>-o NUL</c> in the second group too (measured 2026-09-28, BL-509 Notes).
+    /// </returns>
+    private bool LaterUrlSwitchesStandardOutputToBinary(CommandLineOptions options, int index) =>
+        UrlFromSwitchesStandardOutputToBinary(options, index + 1)
+        || laterGroups.Any(group => UrlFromSwitchesStandardOutputToBinary(group, 0));
+
+    /// <summary>
+    /// Tells whether any URL of <paramref name="options" /> from <paramref name="first" /> on saves no file.
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <param name="first">The position of the first URL looked at.</param>
+    /// <returns><see langword="true" /> when one of those URLs saves no file.</returns>
+    private static bool UrlFromSwitchesStandardOutputToBinary(CommandLineOptions options, int first)
     {
-        for (int later = index + 1; later < options.Urls.Count; later++)
+        for (int later = first; later < options.Urls.Count; later++)
         {
             if (!WritesToFile(options, later))
             {
@@ -1331,7 +1448,7 @@ internal sealed class CurlCommandRunner(
         long connectionId)
     {
         string requestUrl = UrlEffective.Normalize(QueryUrl.Append(transferUrl, options), options.PathAsIs);
-        return new(result, givenUrl, transfer.UrlIndex, requestUrl, WriteOutScheme(requestUrl, result), timeProvider)
+        return new(result, givenUrl, transfer.UrlNumber, requestUrl, WriteOutScheme(requestUrl, result), timeProvider)
         {
             Referer = result.Report?.Referer ?? options.Referer,
             OutputFileName = transferOutputFileName,
@@ -1624,7 +1741,7 @@ internal sealed class CurlCommandRunner(
         FileOpenResult opened = await fileSystem
             .OpenForWriteAsync(
                 headerFile,
-                transfer.TransferId == 0 ? FileWriteMode.Truncate : FileWriteMode.Append,
+                transfer.TransferId == firstTransferIdOfGroup ? FileWriteMode.Truncate : FileWriteMode.Append,
                 DeferredOutputFileStream.CreateMode,
                 CancellationToken.None)
             .ConfigureAwait(false);

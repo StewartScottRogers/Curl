@@ -27,7 +27,12 @@ internal sealed class UrlTransfer
 
     /// <summary>Creates the transfer of one URL <paramref name="match" /> names.</summary>
     /// <param name="options">The accepted command line.</param>
-    /// <param name="urlIndex">The position of the command-line URL the glob came from.</param>
+    /// <param name="urlIndex">The position of the command-line URL the glob came from, in its option group.</param>
+    /// <param name="urlNumber">
+    /// The run-wide zero-based number of that command-line URL, counted on across <c>-:</c> /
+    /// <c>--next</c> option groups: <c>A B --next C</c> printed urlnum <c>0 1 2</c> (measured
+    /// 2026-09-28, BL-509 Notes).
+    /// </param>
     /// <param name="transferId">The run-wide zero-based number of this transfer.</param>
     /// <param name="match">The URL the glob expanded to, with its glob values.</param>
     /// <param name="uploadFile">
@@ -40,6 +45,7 @@ internal sealed class UrlTransfer
     internal UrlTransfer(
         CommandLineOptions options,
         int urlIndex,
+        int urlNumber,
         long transferId,
         UrlGlobMatch match,
         string? uploadFile,
@@ -47,6 +53,7 @@ internal sealed class UrlTransfer
     {
         UrlOutput? output = urlIndex < options.UrlOutputs.Count ? options.UrlOutputs[urlIndex] : null;
         UrlIndex = urlIndex;
+        UrlNumber = urlNumber;
         TransferId = transferId;
         Url = match.Url;
         UploadFile = uploadFile;
@@ -57,8 +64,11 @@ internal sealed class UrlTransfer
         DiscardsBody = output?.DiscardsBody ?? false;
     }
 
-    /// <summary>Gets the position of the command-line URL, printed by <c>%{urlnum}</c>.</summary>
+    /// <summary>Gets the position of the command-line URL in its option group, which pairs it with its output entry.</summary>
     internal int UrlIndex { get; }
+
+    /// <summary>Gets the run-wide number of the command-line URL, printed by <c>%{urlnum}</c>.</summary>
+    internal int UrlNumber { get; }
 
     /// <summary>Gets the run-wide zero-based number of the transfer, printed by <c>%{xfer_id}</c>.</summary>
     internal long TransferId { get; }
