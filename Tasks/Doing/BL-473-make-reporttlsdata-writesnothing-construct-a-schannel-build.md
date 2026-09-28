@@ -36,3 +36,4 @@ Fix in the test only: pass the Schannel backend explicitly and rename the test s
 ## Log
 
 - 2026-09-27: Created.
+- 2026-09-27: Backlog -> Doing.
