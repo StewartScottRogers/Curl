@@ -40,15 +40,35 @@ public sealed class PoolingConnectorTests
     }
 
     [TestMethod]
-    public async Task ConnectAsync_WhenTheInnerConnectorFails_ReturnsItsResultAsItIs()
+    public async Task ConnectAsync_WhenTheInnerConnectorFails_ReturnsItsFailureWithThePoolsNumber()
     {
         await using var pool = CreatePool();
-        var failure = ConnectResult.Failed(CurlExitCode.CouldntConnect, "Failed to connect");
-        _inner.Failure = failure;
+        var timings = new ConnectTimings(1, 2, null, null);
+        _inner.Failure = ConnectResult.Failed(CurlExitCode.CouldntResolveHost, "Could not resolve host: x", timings, connectionNumber: 9);
+
+        var first = await pool.ConnectAsync(Target(), CancellationToken.None);
+        var second = await pool.ConnectAsync(Target(), CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.CouldntResolveHost, first.ExitCode);
+        Assert.AreEqual("Could not resolve host: x", first.ErrorMessage);
+        Assert.AreSame(timings, first.Timings);
+        Assert.IsFalse(first.IsConnectionRefused);
+        Assert.IsNull(first.Connection);
+        Assert.AreEqual(0L, first.ConnectionNumber);
+        Assert.AreEqual(1L, second.ConnectionNumber);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WhenTheInnerConnectorIsRefused_KeepsItRefused()
+    {
+        await using var pool = CreatePool();
+        _inner.Failure = ConnectResult.Refused("Failed to connect");
 
         var result = await pool.ConnectAsync(Target(), CancellationToken.None);
 
-        Assert.AreSame(failure, result);
+        Assert.IsTrue(result.IsConnectionRefused);
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.AreEqual(0L, result.ConnectionNumber);
     }
 
     [TestMethod]

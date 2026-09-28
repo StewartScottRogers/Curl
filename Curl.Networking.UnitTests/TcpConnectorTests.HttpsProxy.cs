@@ -162,7 +162,8 @@ public sealed partial class TcpConnectorTests
             new ConnectTarget("example.com", 443, UseTls: true) { Proxy = HttpsProxy },
             CancellationToken.None);
 
-        Assert.AreSame(failure, result);
+        Assert.AreEqual(failure.ExitCode, result.ExitCode);
+        Assert.AreEqual(failure.ErrorMessage, result.ErrorMessage);
         Assert.AreEqual(exitCode, result.ExitCode);
         Assert.AreEqual(message, result.ErrorMessage);
         CollectionAssert.AreEqual(new[] { "localhost" }, tlsProvider.ReceivedTargetHosts);
@@ -207,7 +208,8 @@ public sealed partial class TcpConnectorTests
             new ConnectTarget("example.com", 443, UseTls: true) { Proxy = HttpsProxy },
             CancellationToken.None);
 
-        Assert.AreSame(failure, result);
+        Assert.AreEqual(failure.ExitCode, result.ExitCode);
+        Assert.AreEqual(failure.ErrorMessage, result.ErrorMessage);
         Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
         CollectionAssert.AreEqual(new[] { "localhost", "example.com" }, tlsProvider.ReceivedTargetHosts);
         Assert.AreSame(proxyTls, tlsProvider.ReceivedPlaintexts[1]);

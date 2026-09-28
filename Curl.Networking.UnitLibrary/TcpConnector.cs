@@ -143,7 +143,9 @@ public sealed class TcpConnector(
     /// the exit 7 message when none reached. A success is reported through
     /// <see cref="ITransferEvents.ReportConnectionOpened" /> once the connection is ready, after
     /// any tunnel and TLS handshake, naming the host dialled and numbering the connections this
-    /// connector opened from <c>0</c> (<see cref="ConnectResult.ConnectionNumber" />).
+    /// connector opened from <c>0</c> (<see cref="ConnectResult.ConnectionNumber" />). A connect
+    /// that fails after its options parse takes the next number too, as curl 8.21.0 numbers the
+    /// connection it tried (ADR-0109).
     /// </para>
     /// </remarks>
     public async ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
@@ -157,10 +159,16 @@ public sealed class TcpConnector(
             return ConnectResult.Failed(CurlExitCode.SetoptOptionSyntax, parseError);
         }
 
-        return target.Proxy is { } proxy
+        var result = target.Proxy is { } proxy
             ? await ConnectThroughProxyAsync(target, destination, proxy, started, cancellationToken).ConfigureAwait(false)
             : await ConnectDirectlyAsync(target, destination, started, cancellationToken).ConfigureAwait(false);
+
+        return result.Connection is null
+            ? NumberedConnectFailure.Of(result, TakeConnectionNumber())
+            : result;
     }
+
+    private long TakeConnectionNumber() => Interlocked.Increment(ref _nextConnectionNumber) - 1;
 
     private async ValueTask<ConnectResult> ConnectDirectlyAsync(
         ConnectTarget target,
@@ -383,7 +391,7 @@ public sealed class TcpConnector(
         int proxyConnectResponseCode,
         IReadOnlyList<ReadOnlyMemory<byte>>? peerCertificates)
     {
-        var connectionNumber = Interlocked.Increment(ref _nextConnectionNumber) - 1;
+        var connectionNumber = TakeConnectionNumber();
         events.ReportConnectionOpened(new ConnectionOpenedEvent
         {
             HostName = dialed.HostName,

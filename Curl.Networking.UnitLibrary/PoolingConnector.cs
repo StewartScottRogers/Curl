@@ -18,7 +18,8 @@ namespace Curl.Networking;
 /// The pool holds at most <see cref="MaximumIdleConnections" /> idle connections across all
 /// keys, closing the oldest when one more is returned, and drops a connection idle for longer
 /// than <see cref="MaximumIdleTime" />, measured on the injected <see cref="TimeProvider" />.
-/// Connections are numbered from <c>0</c> in the order the inner connector opens them.
+/// Connections are numbered from <c>0</c> in the order the inner connector opens them, or
+/// fails to (ADR-0109).
 /// </para>
 /// </remarks>
 /// <param name="innerConnector">Opens a connection when the pool has none for the key.</param>
@@ -50,8 +51,9 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
     /// <see cref="ConnectResult.IsReused" /> set, its original
     /// <see cref="ConnectResult.ConnectionNumber" />, <see cref="ConnectResult.LocalEndPoint" />
     /// and <see cref="ConnectResult.PeerCertificates" />, and no
-    /// <see cref="ConnectResult.Timings" />. Otherwise it asks the inner connector, returns a
-    /// failure as it is, and numbers a success. A target without
+    /// <see cref="ConnectResult.Timings" />. Otherwise it asks the inner connector and gives
+    /// its result the next number, a failure's included, as curl 8.21.0 numbers a failed
+    /// connection too (ADR-0109). A target without
     /// <see cref="ConnectTarget.PoolScheme" /> is never served from the pool. A reuse is
     /// reported <c>with proxy</c> for a forward-proxy target and for a tunnelled one, which
     /// names the proxy's host, as curl 8.21.0 prints it (BL-360).
@@ -169,15 +171,16 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
     {
         var connect = await innerConnector.ConnectAsync(target, cancellationToken);
 
+        var connectionNumber = Interlocked.Increment(ref _nextConnectionNumber) - 1;
         if (connect.Connection is null)
         {
-            return connect;
+            return NumberedConnectFailure.Of(connect, connectionNumber);
         }
 
         var entry = new PoolEntry(
             key,
             connect.Connection,
-            Interlocked.Increment(ref _nextConnectionNumber) - 1,
+            connectionNumber,
             connect.LocalEndPoint,
             connect.PeerCertificates);
 

@@ -89,6 +89,73 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_WhenTheDialIsRefusedAfterOneConnection_NumbersTheRefusedConnectOne()
+    {
+        var dials = 0;
+        var dialer = new FakeTcpDialer
+        {
+            DialOutcome = _ => dials++ == 0
+                ? new FakeConnection()
+                : throw new SocketException((int)SocketError.ConnectionRefused),
+        };
+        var connector = CreateConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider());
+        var target = new ConnectTarget("127.0.0.1", 1, UseTls: false);
+
+        var first = await connector.ConnectAsync(target, CancellationToken.None);
+        var refused = await connector.ConnectAsync(target, CancellationToken.None);
+
+        Assert.AreEqual(0L, first.ConnectionNumber);
+        Assert.AreEqual(1L, refused.ConnectionNumber);
+        Assert.IsTrue(refused.IsConnectionRefused);
+        Assert.IsNotNull(refused.Timings);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WhenARefusedConnectFollowsAnUnresolvedHost_NumbersThemZeroAndOne()
+    {
+        // curl -sv http://nohost.invalid/ http://127.0.0.1:1/ -> * closing connection #0 after
+        // Could not resolve host, * closing connection #1 after the refused connect (measured
+        // 2026-09-27, curl 8.21.0, ADR-0109).
+        var connector = new TcpConnector(new LoopbackOnlyDnsResolver(), new FakeTcpDialer(), new FakeTlsProvider(), new ManualTimeProvider());
+
+        var unresolved = await connector.ConnectAsync(new ConnectTarget("nohost.invalid", 80, UseTls: false), CancellationToken.None);
+        var refused = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 1, UseTls: false), CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.CouldntResolveHost, unresolved.ExitCode);
+        Assert.AreEqual("Could not resolve host: nohost.invalid", unresolved.ErrorMessage);
+        Assert.AreEqual(0L, unresolved.ConnectionNumber);
+        Assert.AreEqual(CurlExitCode.CouldntConnect, refused.ExitCode);
+        Assert.AreEqual(1L, refused.ConnectionNumber);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WhenAResolveEntryDoesNotParse_TakesNoConnectionNumber()
+    {
+        // curl fails the option before it creates a connection, so there is nothing to number.
+        var connector = new TcpConnector(
+            new FakeDnsResolver(Loopback),
+            new FakeTcpDialer { DialOutcome = _ => new FakeConnection() },
+            new FakeTlsProvider(),
+            new ManualTimeProvider(),
+            resolveOverrides: ResolveOverrides.Parse(["garbage"]));
+        var target = new ConnectTarget("a", 80, UseTls: false);
+
+        var first = await connector.ConnectAsync(target, CancellationToken.None);
+        var second = await connector.ConnectAsync(target, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.SetoptOptionSyntax, first.ExitCode);
+        Assert.AreEqual(0L, first.ConnectionNumber);
+        Assert.AreEqual(0L, second.ConnectionNumber);
+    }
+
+    /// <summary>Resolves <c>127.0.0.1</c> to the loopback address and every other host to nothing.</summary>
+    private sealed class LoopbackOnlyDnsResolver : IDnsResolver
+    {
+        public ValueTask<IReadOnlyList<IPAddress>> ResolveAsync(string host, CancellationToken cancellationToken) =>
+            ValueTask.FromResult<IReadOnlyList<IPAddress>>(host == "127.0.0.1" ? [Loopback] : []);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_WhenAnIPv6DialIsRefused_BracketsTheAddressInTryingAndNamesTheIPv6UnspecifiedAddress()
     {
         var events = new RecordingTransferEvents();

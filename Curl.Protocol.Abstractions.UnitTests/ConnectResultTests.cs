@@ -236,6 +236,30 @@ public sealed class ConnectResultTests
         Assert.IsNull(result.Connection);
     }
 
+    [TestMethod]
+    public void Failed_WithAConnectionNumber_CarriesIt()
+    {
+        var result = ConnectResult.Failed(CurlExitCode.CouldntResolveHost, "Could not resolve host: x", null, connectionNumber: 3);
+
+        Assert.AreEqual(3L, result.ConnectionNumber);
+        Assert.IsNull(result.Connection);
+    }
+
+    [TestMethod]
+    public void Refused_WithAConnectionNumber_CarriesItMarkedRefused()
+    {
+        var result = ConnectResult.Refused("refused", null, connectionNumber: 1);
+
+        Assert.AreEqual(1L, result.ConnectionNumber);
+        Assert.IsTrue(result.IsConnectionRefused);
+    }
+
+    [TestMethod]
+    public void Refused_WithoutAConnectionNumber_NumbersItZero()
+    {
+        Assert.AreEqual(0L, ConnectResult.Refused("refused", new ConnectTimings(10, 20, null, null)).ConnectionNumber);
+    }
+
     private sealed class UnusedConnection : IConnection
     {
         public bool IsSecure => false;

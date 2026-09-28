@@ -71,6 +71,8 @@ Per ADR-0100 it also reports curl's `-v` connect lines on the target's `Events`:
 each dial, `connect to ... failed: <reason>` after each failed one (the reason from
 `ConnectFailureReason`), the exit 7 message, and `ReportConnectionOpened` once any tunnel and
 TLS handshake are done, numbering its connections from `0` in `ConnectResult.ConnectionNumber`.
+Per ADR-0109 a connect that fails after its options parse takes the next number too, through
+`NumberedConnectFailure`, as curl 8.21.0 numbers the connection it tried.
 
 `TcpConnector` tunnels through `ConnectTarget.Proxy` when it is an HTTP proxy
 (`ProxyKind.Http`, `Http10`) per ADR-0023: `HttpProxyTunnel` writes curl 8.21.0's CONNECT
@@ -128,7 +130,8 @@ to the pool on dispose, anything else closes. `ConnectionPoolKey` (with
 The pool holds at most five idle connections in total, closing the oldest with curl's
 `Connection pool is full` and `shutting down connection #N` lines on the returning target's
 `Events`, and drops one idle longer than 118 seconds on its `TimeProvider`. It numbers
-connections from `0` (`ConnectResult.ConnectionNumber`) and returns a reused one with
+connections from `0` (`ConnectResult.ConnectionNumber`), the inner connector's failures
+included (ADR-0109), and returns a reused one with
 `IsReused`, its original local end point and certificates, and no timings. A reused
 connection is reported `with proxy` (`ConnectionReusedEvent.IsProxy`) when the target is a
 forward proxy (`ConnectTarget.IsForwardProxy`) or tunnels through one, naming the proxy's host
