@@ -21,10 +21,13 @@ internal sealed class ScriptedConnector(IEnumerable<byte[]> reads) : IConnector
     /// <summary>Gets every byte written to any connection, in order.</summary>
     public byte[] Written => written.ToArray();
 
+    /// <summary>Gets the protocol each connection's TLS handshake agreed with ALPN; <see langword="null" />, the default, for none.</summary>
+    public string? ApplicationProtocol { get; init; }
+
     public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
     {
         Targets.Add(target);
-        return ValueTask.FromResult(ConnectResult.Connected(new ScriptedConnection(pendingReads, written)));
+        return ValueTask.FromResult(ConnectResult.Connected(new ScriptedConnection(pendingReads, written), null, applicationProtocol: ApplicationProtocol));
     }
 
     private sealed class ScriptedConnection(Queue<byte[]> pendingReads, MemoryStream written) : IConnection

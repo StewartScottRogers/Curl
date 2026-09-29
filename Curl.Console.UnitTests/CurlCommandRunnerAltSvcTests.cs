@@ -63,12 +63,12 @@ public sealed class CurlCommandRunnerAltSvcTests
     }
 
     [TestMethod]
-    public async Task RunAsync_OnlyAnH2Alternative_ConnectsToTheOriginAndWritesTheEntryBack()
+    public async Task RunAsync_Http11AndOnlyAnH2Alternative_ConnectsToTheOriginAndWritesTheEntryBack()
     {
         CacheFileHolds(H2AlternativeEntry);
         ScriptedConnector server = Serve();
 
-        int exitCode = await RunAsync(server, ["-v", "--alt-svc", CacheFile, Origin]);
+        int exitCode = await RunAsync(server, ["-v", "--http1.1", "--alt-svc", CacheFile, Origin]);
 
         Assert.AreEqual(0, exitCode);
         Assert.IsNull(server.Targets.Single().AltSvcRoute);
@@ -77,17 +77,30 @@ public sealed class CurlCommandRunnerAltSvcTests
     }
 
     [TestMethod]
-    public async Task RunAsync_H2EntryThenH1Entry_UsesTheH1OneAndWritesBothBack()
+    public async Task RunAsync_Http11AndAnH2EntryThenH1Entry_UsesTheH1OneAndWritesBothBack()
     {
         string h2Entry = $"h1 localhost 18499 h2 localhost 18444 {Future} 0 0";
         CacheFileHolds(h2Entry, H1AlternativeEntry);
         ScriptedConnector server = Serve();
 
-        int exitCode = await RunAsync(server, ["-s", "-i", "--alt-svc", CacheFile, AlternativeOrigin]);
+        int exitCode = await RunAsync(server, ["-s", "-i", "--http1.1", "--alt-svc", CacheFile, AlternativeOrigin]);
 
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(RouteTo18443, server.Targets.Single().AltSvcRoute);
         Assert.AreEqual(CacheFileText(h2Entry, H1AlternativeEntry), SavedCacheFile());
+    }
+
+    [TestMethod]
+    public async Task RunAsync_H2EntryThenH1Entry_UsesTheFirstWithoutAVersionOption()
+    {
+        string h2Entry = $"h1 localhost 18499 h2 localhost 18444 {Future} 0 0";
+        CacheFileHolds(h2Entry, H1AlternativeEntry);
+        ScriptedConnector server = Serve();
+
+        int exitCode = await RunAsync(server, ["-s", "--alt-svc", CacheFile, AlternativeOrigin]);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(new AltSvcRoute("h1", new AltSvcAlternative("h2", "localhost", 18444)), server.Targets.Single().AltSvcRoute);
     }
 
     [TestMethod]

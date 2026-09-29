@@ -91,10 +91,12 @@ just after the `-b` files, a missing one as empty, and written back after the `-
 missing and silently left alone if it cannot be written; no other scheme reads or writes it, and
 `--alt-svc ""` does neither. `TransferContextFactory` puts it on `HttpRequestOptions.AltSvcStore`, so
 the HTTP handler learns each `Alt-Svc` header of an `https` response and prints `* Added alt-svc`,
-and sets `AltSvcRoute` to the first unexpired `h1` alternative for an `https` origin, unless a
-`--connect-to` mapping matches it or the entry names the origin itself; the TCP connector dials it
-and the handler sends `Alt-Used`. `h2` and `h3` alternatives are skipped until BL-733, and a redirect
-to another origin drops the route (`RedirectFollower`). Measured on curl 8.21.0 (ADR-0214, BL-623 Notes).
+and `AltSvcTransferCache.ApplyTo` sets `AltSvcRoute` and `Version` for an `https` origin, unless a
+`--connect-to` mapping matches it: the version option decides which `h1`, `h2` and `h3` entries apply,
+as curl.se's build looks them up; an entry for another host or port is dialled (with `Alt-Used`), an
+`h3` one over HTTP/3 alone, an `h1` or `h2` one over TCP with ALPN choosing; an `h3` entry naming the
+origin itself makes a transfer without a version option race HTTP/3 against TCP. `RedirectFollower`
+calls `ApplyTo` again for each hop. Measured (ADR-0214, BL-623 Notes; ADR-0226, BL-733 Notes).
 
 The run holds one HSTS cache, `Curl.Core`'s `HstsTransferPolicy`, shared by every transfer of every
 group with or without `--hsts`. Under `--hsts <file>` each transfer reads the file (`HstsCacheFile`)

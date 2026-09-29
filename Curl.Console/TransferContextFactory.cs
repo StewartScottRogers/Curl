@@ -4,6 +4,7 @@ using System.Text;
 using Curl.Cli;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
+using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 
 namespace Curl.Console;
 
@@ -91,7 +92,8 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// </param>
     /// <param name="altSvc">
     /// The transfer's <c>--alt-svc</c> cache, which the HTTP handler stores <c>Alt-Svc</c> headers in and whose
-    /// <see cref="AltSvcTransferCache.RouteFor" /> gives the alternative it connects to; <see langword="null" /> for none.
+    /// <see cref="AltSvcTransferCache.ApplyTo" /> gives the alternative it connects to and the HTTP version it uses;
+    /// <see langword="null" /> for none.
     /// </param>
     /// <returns>
     /// The context. Its <see cref="TransferContext.NoBody" /> is <c>-I</c>, its
@@ -155,11 +157,10 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             OperationStarted = OperationStartedOf(maxTimeWatchdog),
             TimeCondition = options.TimeCondition,
             Proxy = proxy,
-            Http = HttpRequestOptionsMapping.FromCommandLine(options, formBody, proxy, commandLineTextEncoding, ifNoneMatchHeaders) with
-            {
-                AltSvcStore = altSvc,
-                AltSvcRoute = altSvc?.RouteFor(url, options.ConnectToEntries),
-            },
+            Http = HttpOptionsWithAltSvc(
+                url,
+                HttpRequestOptionsMapping.FromCommandLine(options, formBody, proxy, commandLineTextEncoding, ifNoneMatchHeaders),
+                altSvc),
             Mail = MailRequestOptionsMapping.FromCommandLine(options, url.Scheme),
             Progress = WatchedProgress(progress, lowSpeedWatchdog, maxTimeWatchdog),
             Events = EventsOrNone(events),
@@ -176,6 +177,18 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// <returns>The output the context carries.</returns>
     private static Stream WatchedOutput(Stream output, LowSpeedWatchdog? lowSpeedWatchdog) =>
         lowSpeedWatchdog is null ? output : lowSpeedWatchdog.WatchOutput(output);
+
+    /// <summary>
+    /// Gets <paramref name="http" /> storing <c>Alt-Svc</c> headers in <paramref name="altSvc" /> and with the
+    /// route and HTTP version its <see cref="AltSvcTransferCache.ApplyTo" /> gives for <paramref name="url" />;
+    /// as it is without a cache.
+    /// </summary>
+    /// <param name="url">The transfer's URL.</param>
+    /// <param name="http">The HTTP options the command line maps to.</param>
+    /// <param name="altSvc">The transfer's <c>--alt-svc</c> cache, or <see langword="null" />.</param>
+    /// <returns>The HTTP options the context carries.</returns>
+    private static HttpRequestOptions HttpOptionsWithAltSvc(CurlUrl url, HttpRequestOptions http, AltSvcTransferCache? altSvc) =>
+        altSvc is null ? http : altSvc.ApplyTo(url, http with { AltSvcStore = altSvc });
 
     /// <summary>
     /// Gets <paramref name="progress" />, or <see cref="NoTransferProgress.Instance" /> when it is

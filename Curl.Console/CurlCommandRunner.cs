@@ -2164,7 +2164,9 @@ internal sealed class CurlCommandRunner(
     {
         if (options.AltSvcFile is { } file && IsHttpUrl(QueryUrl.Append(transferUrl, options)))
         {
-            Running.AltSvc = await AltSvcTransferCache.OpenAsync(file, fileSystem, timeProvider).ConfigureAwait(false);
+            Running.AltSvc = await AltSvcTransferCache
+                .OpenAsync(file, options.HttpVersion, options.ConnectToEntries, fileSystem, timeProvider)
+                .ConfigureAwait(false);
         }
     }
 
@@ -2609,7 +2611,8 @@ internal sealed class CurlCommandRunner(
             dispatch.Dispatcher,
             (CurlUrl hopUrl, out ProxyEndpoint? hopProxy, [NotNullWhen(false)] out TransferResult? hopFailure) =>
                 TransferProxySelection.TrySelect(dispatch.ProxySelector, options, hopUrl, out hopProxy, out hopFailure),
-            hsts: Hsts);
+            hsts: Hsts,
+            selectHopAltSvc: (hopUrl, hopHttp) => Running.AltSvc is { } altSvc ? altSvc.ApplyTo(hopUrl, hopHttp) : hopHttp);
 
         if (!CurlUrl.TryParse(
             QueryUrl.Append(url, options),
