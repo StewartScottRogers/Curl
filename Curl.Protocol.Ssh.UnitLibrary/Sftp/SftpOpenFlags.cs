@@ -9,7 +9,7 @@ internal static class SftpOpenFlags
     /// <summary><c>SSH_FXF_READ</c>: open for reading, as every download does.</summary>
     internal const uint Read = 0x01;
 
-    /// <summary><c>SSH_FXF_WRITE</c>: open for writing, alone for a <c>-C</c> upload (measured, ADR-0243).</summary>
+    /// <summary><c>SSH_FXF_WRITE</c>: open for writing, alone for a <c>-C</c> upload (measured, ADR-0244).</summary>
     internal const uint Write = 0x02;
 
     /// <summary><c>SSH_FXF_APPEND</c>: every write goes to the end of the file, as <c>-a</c> asks.</summary>

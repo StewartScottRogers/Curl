@@ -9,7 +9,7 @@ namespace Curl.Protocol.Ssh.Sftp;
 /// byte - open flags and attributes, <c>MKDIR</c>s, write offsets and sizes - and the
 /// outcome of each case measured 2026-09-29 with curl 8.21.0 (libssh2 1.11.1, Schannel
 /// build) against OpenSSH 10.2, once with its own <c>sftp-server</c> logging every request
-/// and once with a scripted SFTP subsystem (BL-571, ADR-0243).
+/// and once with a scripted SFTP subsystem (BL-571, ADR-0244).
 /// </summary>
 [TestClass]
 public sealed class SftpFileUploadTests

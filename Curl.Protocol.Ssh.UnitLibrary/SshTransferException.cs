@@ -81,7 +81,7 @@ internal sealed class SshTransferException(CurlExitCode exitCode, string message
     /// <c>SSH_FXP_OPEN</c> with a failed status: the status's exit code and <c>Upload
     /// failed: &lt;description&gt; (&lt;status&gt;/-31)</c>, libssh2's
     /// <c>LIBSSH2_ERROR_SFTP_PROTOCOL</c>, measured 2026-09-29 for codes 1, 2, 3, 4 and 11
-    /// (BL-571, ADR-0243).
+    /// (BL-571, ADR-0244).
     /// </summary>
     /// <param name="status">The <c>SSH_FX_*</c> code.</param>
     /// <returns>The exception.</returns>
@@ -92,7 +92,7 @@ internal sealed class SshTransferException(CurlExitCode exitCode, string message
     /// Creates the failure curl 8.21.0 reports when an upload's second <c>SSH_FXP_OPEN</c>,
     /// after <c>--ftp-create-dirs</c> made the directories, fails too: the status's exit
     /// code and <c>Creating the dir/file failed: &lt;description&gt;</c>, measured 2026-09-29
-    /// (BL-571, ADR-0243).
+    /// (BL-571, ADR-0244).
     /// </summary>
     /// <param name="status">The <c>SSH_FX_*</c> code.</param>
     /// <returns>The exception.</returns>

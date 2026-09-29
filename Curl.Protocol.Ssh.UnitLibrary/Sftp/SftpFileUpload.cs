@@ -4,7 +4,7 @@ using Curl.Protocol.Ssh.Transport;
 namespace Curl.Protocol.Ssh.Sftp;
 
 /// <summary>
-/// Uploads one file over SFTP as curl 8.21.0 does through libssh2 1.11.1 (ADR-0243):
+/// Uploads one file over SFTP as curl 8.21.0 does through libssh2 1.11.1 (ADR-0244):
 /// starts the SFTP session, sends <c>REALPATH .</c> for the home directory, asks the
 /// remote size with <c>STAT</c> under <c>-C -</c>, opens the URL's path for writing -
 /// creating, truncating, appending or resuming as asked - and, when that open fails and
@@ -164,7 +164,7 @@ internal sealed class SftpFileUpload(SshTransport transport)
         }
 
         // A source that fails to read ends the upload as its end does, as the FTP upload
-        // takes it (ADR-0243).
+        // takes it (ADR-0244).
         private async ValueTask<int> ReadSourceAsync(byte[] buffer, CancellationToken cancellationToken)
         {
             try

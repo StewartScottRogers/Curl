@@ -206,7 +206,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
             : await TransferOverSftpAsync(context, transport).ConfigureAwait(false);
     }
 
-    // An upload is sent (ADR-0243); otherwise a path ending with a slash is listed and any
+    // An upload is sent (ADR-0244); otherwise a path ending with a slash is listed and any
     // other is downloaded (ADR-0241).
     private static async ValueTask<TransferResult> TransferOverSftpAsync(ITransferContext context, SshTransport transport)
     {
