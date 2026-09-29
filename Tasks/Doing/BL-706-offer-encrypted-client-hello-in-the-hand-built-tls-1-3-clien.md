@@ -32,3 +32,4 @@ The hand-built TLS 1.3 client offers Encrypted Client Hello from an ECHConfigLis
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
