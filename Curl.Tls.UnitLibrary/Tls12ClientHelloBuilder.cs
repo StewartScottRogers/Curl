@@ -22,7 +22,7 @@ internal static class Tls12ClientHelloBuilder
         extensions.Add(SupportedGroupsExtension.Encode(settings.SupportedGroups));
         AddSessionAndStatusExtensions(settings, extensions);
         AddNegotiatedExtensions(settings, extensions);
-        return new ClientHello((ushort)settings.MaximumVersion, random, sessionId, settings.CipherSuites, [0], extensions);
+        return new ClientHello((ushort)settings.MaximumVersion, random, sessionId, settings.OfferedCipherSuites, [0], extensions);
     }
 
     private static void AddSessionAndStatusExtensions(Tls12ClientSettings settings, List<TlsExtension> extensions)

@@ -8,7 +8,7 @@ depends-on: [BL-703, BL-796]
 touches: [Curl.Tls.UnitLibrary, Curl.Tls.UnitTests]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-29
 ---
 # BL-801 — Offer the AES-CCM, AES-CCM8 and RC4 suites in the TLS 1.2 client handshake
 
@@ -29,16 +29,33 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `Tls12CipherSuite` has the 12 CCM/CCM8 and 6 RC4 suites above, each with its key exchange, authentication, bulk cipher, MAC, PRF hash and minimum version; a `Tls12CipherSuiteTests` test pins each code point's properties.
-- [ ] `Tls12ClientHandshakeTests` complete an in-memory handshake against `Tls12TestServer` on one CCM suite (e.g. `0xc0ac`), one CCM8 suite (e.g. `0xc0a0`) and one RC4 suite (e.g. `0xc011`), and in each case an application-data record protected with the derived keys is decrypted by the other side.
-- [ ] A CCM or CCM8 suite is not offered when the maximum version is below TLS 1.2, and a server that selects one at TLS 1.1 or 1.0 is refused with the alert ADR-0154 names for an illegal suite selection (a named test in `Tls12ClientHandshakeFailureTests`).
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Tls.UnitLibrary` reports 100% line and branch coverage and no failing member.
+- [x] `Tls12CipherSuite` has the 12 CCM/CCM8 and 6 RC4 suites above, each with its key exchange, authentication, bulk cipher, MAC, PRF hash and minimum version; a `Tls12CipherSuiteTests` test pins each code point's properties.
+- [x] `Tls12ClientHandshakeTests` complete an in-memory handshake against `Tls12TestServer` on one CCM suite (e.g. `0xc0ac`), one CCM8 suite (e.g. `0xc0a0`) and one RC4 suite (e.g. `0xc011`), and in each case an application-data record protected with the derived keys is decrypted by the other side.
+- [x] A CCM or CCM8 suite is not offered when the maximum version is below TLS 1.2, and a server that selects one at TLS 1.1 or 1.0 is refused with the alert ADR-0154 names for an illegal suite selection (a named test in `Tls12ClientHandshakeFailureTests`).
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Tls.UnitLibrary` reports 100% line and branch coverage and no failing member.
 
 ## Notes
 
 - Whether the RC4 and CCM suites appear in the default ClientHello is a profile question for whichever task builds the per-platform hello; this task makes them available in `Tls12CipherSuite`, not a change to the default offer unless ADR-0140's profiles already list them.
+- 2026-09-29: Delivered directly rather than through the full `/feature` stages: the
+  record layer (BL-796) already carried every cipher, so the change is 18 table rows and
+  one offer filter. The default `CipherSuites` offer is unchanged.
+- Decision (follows OpenSSL, which leaves out of the ClientHello every suite the highest
+  offered version cannot run): `Tls12ClientSettings.OfferedCipherSuites` drops the suites
+  that need TLS 1.2 (every AEAD, CCM included, and the SHA-256/384 MAC suites) when
+  `MaximumVersion` is below TLS 1.2, and `Validate` refuses settings that leave no suite
+  to offer. A server that picks a CCM suite at TLS 1.1 or 1.0 is refused with
+  `illegal_parameter`, the alert ADR-0154 names, through the existing `RequiresTls12` check.
+- Tests: `Tls12CipherSuiteTests.EachCcmSuiteIsPinnedAndNeedsTlsOneTwoWithASha256Prf`,
+  `EachRc4SuiteIsPinnedAndRunsFromTlsOneZero`;
+  `Tls12ClientHandshakeTests.CcmCcm8AndRc4SuitesCompleteAndTheirKeysProtectRecords`
+  (CCM, CCM8, RC4 at TLS 1.2, 1.1 and 1.0), `AClientCappedBelowTlsOneTwoLeavesOutTheSuitesThatNeedIt`;
+  `Tls12ClientHandshakeFailureTests.AServerChoosingACcmSuiteBelowTlsOneTwoIsIllegal`.
+- The first `Measure-CodeQuality.ps1` run reported a transient failing test outside
+  Curl.Tls; the rerun passed with Curl.Tls.UnitLibrary at 100% line and branch, 0 failing members.
 
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Done. The TLS 1.2 client offers and completes handshakes on the AES-CCM, AES-CCM8 and RC4 suites, and leaves TLS 1.2-only suites out below TLS 1.2

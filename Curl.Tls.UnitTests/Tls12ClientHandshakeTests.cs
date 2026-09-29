@@ -70,6 +70,40 @@ public sealed class Tls12ClientHandshakeTests
     }
 
     [TestMethod]
+    [DataRow(TlsProtocolVersion.Tls12, (ushort)0xc0ac, "ecdsa", DisplayName = "TLS_ECDHE_ECDSA_WITH_AES_128_CCM")]
+    [DataRow(TlsProtocolVersion.Tls12, (ushort)0xc0af, "ecdsa", DisplayName = "TLS_ECDHE_ECDSA_WITH_AES_256_CCM_8")]
+    [DataRow(TlsProtocolVersion.Tls12, (ushort)0xc0a0, "rsa", DisplayName = "TLS_RSA_WITH_AES_128_CCM_8")]
+    [DataRow(TlsProtocolVersion.Tls12, (ushort)0xc09f, "rsa", DisplayName = "TLS_DHE_RSA_WITH_AES_256_CCM")]
+    [DataRow(TlsProtocolVersion.Tls12, (ushort)0xc011, "rsa", DisplayName = "TLS_ECDHE_RSA_WITH_RC4_128_SHA")]
+    [DataRow(TlsProtocolVersion.Tls11, (ushort)0x0004, "rsa", DisplayName = "TLS_RSA_WITH_RC4_128_MD5 in TLS 1.1")]
+    [DataRow(TlsProtocolVersion.Tls10, (ushort)0xc016, "none", DisplayName = "TLS_ECDH_anon_WITH_RC4_128_SHA in TLS 1.0")]
+    public void CcmCcm8AndRc4SuitesCompleteAndTheirKeysProtectRecords(TlsProtocolVersion version, int cipherSuite, string credential)
+    {
+        Tls12TestServer server = new(Credential(credential)) { Version = version, CipherSuite = (ushort)cipherSuite };
+        Tls12ClientHandshake client = Client(EverySuite with { MinimumVersion = TlsProtocolVersion.Tls10 });
+
+        Tls12HandshakeOutput output = Run(client, server);
+
+        AssertCompletesWithServerKeys(client, server, output);
+        Assert.AreEqual(cipherSuite, client.CipherSuite!.Code);
+        Assert.AreEqual(version, client.Version);
+        using Tls12RecordWriteState write = Tls12RecordWriteState.Create(client.RecordProtection!, client.KeyBlock!.ClientWrite, SystemTlsRandomSource.Instance);
+        using Tls12RecordReadState read = Tls12RecordReadState.Create(client.RecordProtection!, server.KeyBlock.ClientWrite);
+        byte[] record = write.Protect(TlsContentType.ApplicationData, "GET / HTTP/1.1"u8);
+        CollectionAssert.AreEqual("GET / HTTP/1.1"u8.ToArray(), read.Unprotect(TlsContentType.ApplicationData, record.AsSpan(5)).Value);
+    }
+
+    [TestMethod]
+    public void AClientCappedBelowTlsOneTwoLeavesOutTheSuitesThatNeedIt()
+    {
+        Tls12ClientHandshake client = Client(EverySuite with { MinimumVersion = TlsProtocolVersion.Tls10, MaximumVersion = TlsProtocolVersion.Tls11, CipherSuites = [0xc0ac, 0xc0a0, 0xc02b, 0xc011, Tls12CipherSuite.EmptyRenegotiationInfoScsv] });
+
+        ClientHello decoded = ClientHello.Decode(Body(client.Start().MessagesToSend[0])).Value;
+
+        CollectionAssert.AreEqual(new ushort[] { 0xc011, Tls12CipherSuite.EmptyRenegotiationInfoScsv }, decoded.CipherSuites.ToArray());
+    }
+
+    [TestMethod]
     [DataRow(TlsProtocolVersion.Tls12, (ushort)0x00a2)]
     [DataRow(TlsProtocolVersion.Tls11, (ushort)0x0032)]
     [DataRow(TlsProtocolVersion.Tls10, (ushort)0x0032)]

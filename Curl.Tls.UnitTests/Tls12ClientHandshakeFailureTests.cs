@@ -35,6 +35,7 @@ public sealed class Tls12ClientHandshakeFailureTests
         Assert.ThrowsExactly<ArgumentException>(() => Client(DefaultSettings with { CipherSuites = [] }));
         Assert.ThrowsExactly<ArgumentException>(() => Client(DefaultSettings with { CipherSuites = [Tls12CipherSuite.EmptyRenegotiationInfoScsv] }));
         Assert.ThrowsExactly<ArgumentException>(() => Client(DefaultSettings with { CipherSuites = [0xc02b, 0x1301] }));
+        Assert.ThrowsExactly<ArgumentException>(() => Client(DefaultSettings with { MinimumVersion = TlsProtocolVersion.Tls10, MaximumVersion = TlsProtocolVersion.Tls11, CipherSuites = [0xc0ac, 0xc0a0] }));
         Assert.ThrowsExactly<ArgumentException>(() => Client(DefaultSettings with { SupportedGroups = [TlsNamedGroup.Ffdhe2048] }));
         Assert.ThrowsExactly<ArgumentException>(() => Client(DefaultSettings with { SignatureAlgorithms = [0xfefe] }));
         Assert.ThrowsExactly<ArgumentException>(() => Client(DefaultSettings with { SessionToResume = session with { Version = TlsProtocolVersion.Tls11 } }));
@@ -146,6 +147,20 @@ public sealed class Tls12ClientHandshakeFailureTests
         Tls12HandshakeOutput output = Run(client, new Tls12TestServer(Ecdsa()), flight => RewriteServerHello(
             flight,
             hello => hello with { CipherSuite = (ushort)cipherSuite, LegacyVersion = (ushort)version, LegacyCompressionMethod = compression }));
+
+        AssertFails(TlsAlertDescription.IllegalParameter, output);
+    }
+
+    [TestMethod]
+    [DataRow((ushort)0xc0ac, TlsProtocolVersion.Tls11)]
+    [DataRow((ushort)0xc0a0, TlsProtocolVersion.Tls10)]
+    public void AServerChoosingACcmSuiteBelowTlsOneTwoIsIllegal(int cipherSuite, TlsProtocolVersion version)
+    {
+        Tls12ClientHandshake client = Client(EverySuite with { MinimumVersion = TlsProtocolVersion.Tls10 });
+
+        Tls12HandshakeOutput output = Run(client, new Tls12TestServer(Ecdsa()), flight => RewriteServerHello(
+            flight,
+            hello => hello with { CipherSuite = (ushort)cipherSuite, LegacyVersion = (ushort)version }));
 
         AssertFails(TlsAlertDescription.IllegalParameter, output);
     }

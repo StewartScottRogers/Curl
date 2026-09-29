@@ -10,7 +10,8 @@ namespace Curl.Tls;
 /// supports"): its key exchange, how it authenticates the server, its bulk cipher and
 /// record MAC, and whether its TLS 1.2 PRF is SHA-384. The table holds every ECDHE, DHE
 /// (RSA and DSS), RSA and anonymous suite with one of these bulk ciphers: AES-CBC, AES-GCM,
-/// ChaCha20-Poly1305, Camellia-CBC, ARIA-GCM, 3DES and NULL.
+/// AES-CCM and AES-CCM8 (RFC 6655, RFC 7251), ChaCha20-Poly1305, Camellia-CBC, ARIA-GCM,
+/// 3DES, RC4 and NULL.
 /// </summary>
 /// <param name="Code">The suite's code point.</param>
 /// <param name="KeyExchange">How the pre-master secret is agreed.</param>
@@ -43,6 +44,11 @@ public sealed record Tls12CipherSuite(
         new(0xc05c, Kx.Ecdhe, Auth.Ecdsa, Aria128Gcm, None, false),
         new(0xc05d, Kx.Ecdhe, Auth.Ecdsa, Aria256Gcm, None, true),
         new(0xc008, Kx.Ecdhe, Auth.Ecdsa, TripleDesEdeCbc, HmacSha1, false),
+        new(0xc0ac, Kx.Ecdhe, Auth.Ecdsa, Aes128Ccm, None, false),
+        new(0xc0ad, Kx.Ecdhe, Auth.Ecdsa, Aes256Ccm, None, false),
+        new(0xc0ae, Kx.Ecdhe, Auth.Ecdsa, Aes128Ccm8, None, false),
+        new(0xc0af, Kx.Ecdhe, Auth.Ecdsa, Aes256Ccm8, None, false),
+        new(0xc007, Kx.Ecdhe, Auth.Ecdsa, Rc4128, HmacSha1, false),
         new(0xc006, Kx.Ecdhe, Auth.Ecdsa, Null, HmacSha1, false),
         new(0xc02f, Kx.Ecdhe, Auth.Rsa, Aes128Gcm, None, false),
         new(0xc030, Kx.Ecdhe, Auth.Rsa, Aes256Gcm, None, true),
@@ -56,6 +62,7 @@ public sealed record Tls12CipherSuite(
         new(0xc060, Kx.Ecdhe, Auth.Rsa, Aria128Gcm, None, false),
         new(0xc061, Kx.Ecdhe, Auth.Rsa, Aria256Gcm, None, true),
         new(0xc012, Kx.Ecdhe, Auth.Rsa, TripleDesEdeCbc, HmacSha1, false),
+        new(0xc011, Kx.Ecdhe, Auth.Rsa, Rc4128, HmacSha1, false),
         new(0xc010, Kx.Ecdhe, Auth.Rsa, Null, HmacSha1, false),
         new(0x009e, Kx.Dhe, Auth.Rsa, Aes128Gcm, None, false),
         new(0x009f, Kx.Dhe, Auth.Rsa, Aes256Gcm, None, true),
@@ -71,6 +78,10 @@ public sealed record Tls12CipherSuite(
         new(0xc052, Kx.Dhe, Auth.Rsa, Aria128Gcm, None, false),
         new(0xc053, Kx.Dhe, Auth.Rsa, Aria256Gcm, None, true),
         new(0x0016, Kx.Dhe, Auth.Rsa, TripleDesEdeCbc, HmacSha1, false),
+        new(0xc09e, Kx.Dhe, Auth.Rsa, Aes128Ccm, None, false),
+        new(0xc09f, Kx.Dhe, Auth.Rsa, Aes256Ccm, None, false),
+        new(0xc0a2, Kx.Dhe, Auth.Rsa, Aes128Ccm8, None, false),
+        new(0xc0a3, Kx.Dhe, Auth.Rsa, Aes256Ccm8, None, false),
         new(0x00a2, Kx.Dhe, Auth.Dss, Aes128Gcm, None, false),
         new(0x00a3, Kx.Dhe, Auth.Dss, Aes256Gcm, None, true),
         new(0x0040, Kx.Dhe, Auth.Dss, Aes128Cbc, HmacSha256, false),
@@ -100,6 +111,12 @@ public sealed record Tls12CipherSuite(
         new(0x003b, Kx.Rsa, Auth.Rsa, Null, HmacSha256, false),
         new(0x0002, Kx.Rsa, Auth.Rsa, Null, HmacSha1, false),
         new(0x0001, Kx.Rsa, Auth.Rsa, Null, HmacMd5, false),
+        new(0xc09c, Kx.Rsa, Auth.Rsa, Aes128Ccm, None, false),
+        new(0xc09d, Kx.Rsa, Auth.Rsa, Aes256Ccm, None, false),
+        new(0xc0a0, Kx.Rsa, Auth.Rsa, Aes128Ccm8, None, false),
+        new(0xc0a1, Kx.Rsa, Auth.Rsa, Aes256Ccm8, None, false),
+        new(0x0005, Kx.Rsa, Auth.Rsa, Rc4128, HmacSha1, false),
+        new(0x0004, Kx.Rsa, Auth.Rsa, Rc4128, HmacMd5, false),
         new(0x00a6, Kx.Dhe, Auth.Anonymous, Aes128Gcm, None, false),
         new(0x00a7, Kx.Dhe, Auth.Anonymous, Aes256Gcm, None, true),
         new(0x006c, Kx.Dhe, Auth.Anonymous, Aes128Cbc, HmacSha256, false),
@@ -113,9 +130,11 @@ public sealed record Tls12CipherSuite(
         new(0xc05a, Kx.Dhe, Auth.Anonymous, Aria128Gcm, None, false),
         new(0xc05b, Kx.Dhe, Auth.Anonymous, Aria256Gcm, None, true),
         new(0x001b, Kx.Dhe, Auth.Anonymous, TripleDesEdeCbc, HmacSha1, false),
+        new(0x0018, Kx.Dhe, Auth.Anonymous, Rc4128, HmacMd5, false),
         new(0xc018, Kx.Ecdhe, Auth.Anonymous, Aes128Cbc, HmacSha1, false),
         new(0xc019, Kx.Ecdhe, Auth.Anonymous, Aes256Cbc, HmacSha1, false),
         new(0xc017, Kx.Ecdhe, Auth.Anonymous, TripleDesEdeCbc, HmacSha1, false),
+        new(0xc016, Kx.Ecdhe, Auth.Anonymous, Rc4128, HmacSha1, false),
         new(0xc015, Kx.Ecdhe, Auth.Anonymous, Null, HmacSha1, false),
     }.ToDictionary(suite => suite.Code);
 

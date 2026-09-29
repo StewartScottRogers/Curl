@@ -91,6 +91,14 @@ public sealed record Tls12ClientSettings
     /// </summary>
     public bool InsertEmptyFragment { get; init; } = true;
 
+    /// <summary>
+    /// Gets the suites the ClientHello carries: <see cref="CipherSuites" /> without those that
+    /// need TLS 1.2 when <see cref="MaximumVersion" /> is below it, as OpenSSL leaves out a
+    /// suite the highest offered version cannot run.
+    /// </summary>
+    internal IReadOnlyList<ushort> OfferedCipherSuites =>
+        MaximumVersion == TlsProtocolVersion.Tls12 ? CipherSuites : [.. CipherSuites.Where(code => Tls12CipherSuite.Find(code)?.RequiresTls12 != true)];
+
     /// <summary>Throws when the settings cannot drive a handshake.</summary>
     /// <exception cref="ArgumentException">
     /// The version range is empty, a suite is unknown, a group is not an ECDHE group, a
@@ -99,7 +107,7 @@ public sealed record Tls12ClientSettings
     internal void Validate()
     {
         Require(HasVersionRange(), "The versions must be TLS 1.0, 1.1 or 1.2, the minimum not above the maximum.", nameof(MinimumVersion));
-        Require(HasSuites(), "Offer at least one cipher suite, and only TLS 1.2 and below suites.", nameof(CipherSuites));
+        Require(HasSuites(), "Offer at least one cipher suite the maximum version can run, and only TLS 1.2 and below suites.", nameof(CipherSuites));
         Require(SupportedGroups.All(IsEcdheGroup), "Every supported group must be X25519 or a NIST curve.", nameof(SupportedGroups));
         Require(SignatureAlgorithms.All(TlsSignatureScheme.IsTls12Scheme), "Every signature algorithm must be one TLS 1.2 can check.", nameof(SignatureAlgorithms));
         Require(SessionToResume is null || CanResume(SessionToResume), "The session to resume must have an offered version and suite.", nameof(SessionToResume));
@@ -111,7 +119,7 @@ public sealed record Tls12ClientSettings
 
     private bool HasVersionRange() => Enum.IsDefined(MinimumVersion) && Enum.IsDefined(MaximumVersion) && MinimumVersion <= MaximumVersion;
 
-    private bool HasSuites() => CipherSuites.Any(code => Tls12CipherSuite.Find(code) is not null) && CipherSuites.All(IsOfferable);
+    private bool HasSuites() => OfferedCipherSuites.Any(code => Tls12CipherSuite.Find(code) is not null) && CipherSuites.All(IsOfferable);
 
     private static void Require(bool condition, string message, string parameterName)
     {
