@@ -33,3 +33,4 @@ When the GSSAPI or NTLM security context cannot make a token, `curl smtp://`, `i
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-29: Backlog -> Doing.
