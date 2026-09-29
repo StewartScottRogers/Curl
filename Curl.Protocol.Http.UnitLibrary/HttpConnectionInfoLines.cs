@@ -29,6 +29,12 @@ internal static class HttpConnectionInfoLines
     internal const string UsingHttp2 = "using HTTP/2";
 
     /// <summary>
+    /// The line written in place of <see cref="UsingHttp1" /> when the connection is QUIC and
+    /// speaks HTTP/3 (measured, ADR-0144).
+    /// </summary>
+    internal const string UsingHttp3 = "using HTTP/3";
+
+    /// <summary>
     /// The line written once a request without a body has been sent.
     /// </summary>
     internal const string RequestSent = "Request completely sent off";

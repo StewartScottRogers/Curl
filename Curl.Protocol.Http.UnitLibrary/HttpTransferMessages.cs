@@ -100,6 +100,41 @@ internal static class HttpTransferMessages
         string.Create(CultureInfo.InvariantCulture, $"nghttp2 shuts down connection with error {(uint)errorCode}: {Http2ErrorName(errorCode)}");
 
     /// <summary>
+    /// The exit 3 message for <c>--http3-only</c> with a URL that is not <c>https://</c>
+    /// (measured, ADR-0144).
+    /// </summary>
+    internal const string Http3NeedsHttps = "HTTP/3 requested for non-HTTPS URL";
+
+    /// <summary>
+    /// Formats the message for an HTTP/3 request stream the server reset, exit 95 before any
+    /// body byte arrived and exit 18 after: <c>HTTP/3 stream 0 reset by server</c>
+    /// (<c>curl_ngtcp2.c</c>, ADR-0144 section 7).
+    /// </summary>
+    /// <param name="streamId">The QUIC stream ID.</param>
+    /// <returns>The message.</returns>
+    internal static string Http3StreamReset(long streamId) =>
+        string.Create(CultureInfo.InvariantCulture, $"HTTP/3 stream {streamId} reset by server");
+
+    /// <summary>
+    /// Formats the exit 95 message for an HTTP/3 request stream that ended before the final
+    /// response head (<c>curl_ngtcp2.c</c>, ADR-0144 section 7).
+    /// </summary>
+    /// <param name="streamId">The QUIC stream ID.</param>
+    /// <returns>The message.</returns>
+    internal static string Http3StreamClosedBeforeHead(long streamId) =>
+        string.Create(CultureInfo.InvariantCulture, $"HTTP/3 stream {streamId} was closed cleanly, but before getting all response header fields, treated as error");
+
+    /// <summary>
+    /// Formats the exit 56 message for HTTP/3 or QPACK bytes the server sent that break RFC 9114
+    /// or RFC 9204, as curl reports nghttp3's refusal: <c>nghttp3_conn_read_stream returned
+    /// error: ERR_H3_FRAME_UNEXPECTED</c> (<c>curl_ngtcp2.c</c>, ADR-0172).
+    /// </summary>
+    /// <param name="errorName">nghttp3's name for the error, such as <c>ERR_H3_FRAME_ERROR</c>.</param>
+    /// <returns>The message.</returns>
+    internal static string Http3ReadStreamFailed(string errorName) =>
+        $"nghttp3_conn_read_stream returned error: {errorName}";
+
+    /// <summary>
     /// Gives an HTTP/2 error code's name as nghttp2's <c>nghttp2_http2_strerror</c> gives it,
     /// <c>unknown</c> for a code RFC 9113 does not list.
     /// </summary>

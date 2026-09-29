@@ -38,4 +38,25 @@ public sealed class QueueConnector(params ConnectResult[] results) : IConnector
 
         return ValueTask.FromResult(result);
     }
+
+    /// <summary>
+    /// Gets the results the QUIC connects return, first to last; a QUIC connect with none left
+    /// fails as the default <see cref="IConnector.ConnectMultiplexedAsync" /> does.
+    /// </summary>
+    public Queue<MultiplexedConnectResult> MultiplexedResults { get; } = new();
+
+    /// <summary>
+    /// Gets every target a QUIC connect was asked for, in order.
+    /// </summary>
+    public List<ConnectTarget> MultiplexedTargets { get; } = [];
+
+    /// <inheritdoc />
+    public ValueTask<MultiplexedConnectResult> ConnectMultiplexedAsync(ConnectTarget target, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        MultiplexedTargets.Add(target);
+        return ValueTask.FromResult(MultiplexedResults.TryDequeue(out MultiplexedConnectResult? result)
+            ? result
+            : MultiplexedConnectResult.Failed(CurlExitCode.CouldntConnect, "QUIC is not available on this connector"));
+    }
 }

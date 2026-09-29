@@ -73,11 +73,11 @@ public sealed class HttpRequestFramingTests
     }
 
     [TestMethod]
-    public void ForHttp2_UploadOfUnknownLength_IsNeitherChunkedNorWaitingForContinue()
+    public void ForHttp2OrHttp3_UploadOfUnknownLength_IsNeitherChunkedNorWaitingForContinue()
     {
         HttpRequestFraming framing = HttpRequestFraming.Of(new HttpRequestOptions(), [], upload: new UnseekableStream([]));
 
-        HttpRequestFraming http2 = framing.ForHttp2();
+        HttpRequestFraming http2 = framing.ForHttp2OrHttp3();
 
         Assert.IsTrue(framing.IsChunked);
         Assert.IsTrue(framing.AddsExpect);

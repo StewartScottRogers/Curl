@@ -13,7 +13,7 @@ public sealed class Http2StreamConnectionTests
     public async Task Members_TakeTheConnectionsSecurityAndEndPointAndDisposingLeavesItOpen()
     {
         ScriptedConnection connection = new([], 1);
-        Http2StreamConnection stream = new Http2Session(connection).CreateStream("http", 0);
+        Http2StreamConnection stream = (Http2StreamConnection)new Http2Session(connection).CreateStream("http", 0);
 
         await stream.DisposeAsync();
 

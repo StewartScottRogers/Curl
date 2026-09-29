@@ -5,8 +5,9 @@ using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 namespace Curl.Protocol.Http;
 
 /// <summary>
-/// Serves the <c>http</c> and <c>https</c> schemes over HTTP/1.1, HTTP/1.0 for <c>-0</c>, or HTTP/2 on a
-/// connection that speaks it (<see cref="Http2StreamConnection" />, ADR-0159): connects through the
+/// Serves the <c>http</c> and <c>https</c> schemes over HTTP/1.1, HTTP/1.0 for <c>-0</c>, HTTP/2 on a
+/// connection that speaks it (<see cref="Http2StreamConnection" />, ADR-0159), or HTTP/3 over QUIC
+/// for <c>--http3</c> and <c>--http3-only</c> (<see cref="Http3StreamConnection" />, ADR-0172): connects through the
 /// injected <see cref="IConnector" />, sends the request head, writes the response head to
 /// <see cref="ITransferContext.HeaderOutput" /> and the body to
 /// <see cref="ITransferContext.Output" />, and reports what it learned in a
@@ -304,7 +305,12 @@ public sealed class HttpProtocolHandler(
     private async ValueTask<TransferResult> ConnectAndExchangeAsync(HttpRequestPlan plan, TransferReport? earlier)
     {
         ConnectTarget target = TargetOf(plan);
-        ConnectResult connect = await plan.Deadline.ConnectAsync(connector, target).ConfigureAwait(false);
+        if (plan.Options.Version == HttpVersionPreference.Http3Only && plan.Context.Url.Scheme != "https")
+        {
+            return Http3NeedsHttps(plan);
+        }
+
+        ConnectResult connect = await ConnectAsync(plan, target).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
         {
             plan.Context.Events.ReportInfo(HttpConnectionInfoLines.Closing(connect.ConnectionNumber));
@@ -335,6 +341,63 @@ public sealed class HttpProtocolHandler(
     }
 
     /// <summary>
+    /// Fails <c>--http3-only</c> with a URL that is not <c>https://</c> before connecting: exit 3,
+    /// <c>HTTP/3 requested for non-HTTPS URL</c>, reported with <c>closing connection #-1</c>, as
+    /// curl.se's ngtcp2 build does (measured, ADR-0144).
+    /// </summary>
+    private static TransferResult Http3NeedsHttps(HttpRequestPlan plan)
+    {
+        plan.Context.Events.ReportInfo(HttpTransferMessages.Http3NeedsHttps);
+        plan.Context.Events.ReportInfo(HttpConnectionInfoLines.Closing(-1));
+        return TransferResult.Failure(CurlExitCode.UrlMalformat, HttpTransferMessages.Http3NeedsHttps) with
+        {
+            Report = FailedConnectReport(plan, ConnectResult.Failed(CurlExitCode.UrlMalformat, HttpTransferMessages.Http3NeedsHttps)),
+        };
+    }
+
+    /// <summary>
+    /// Opens the transfer's connection (ADR-0144 section 4, ADR-0172): over QUIC for
+    /// <c>--http3-only</c>, whose failure is the transfer's; over QUIC and then, when that fails,
+    /// over TCP for <c>--http3</c>, failing with the QUIC attempt's exit code and message when
+    /// both fail; and over TCP for every other version, for an <c>http://</c> URL and through a
+    /// proxy. A QUIC connection is handed on as an <see cref="Http3Session" />.
+    /// </summary>
+    private async ValueTask<ConnectResult> ConnectAsync(HttpRequestPlan plan, ConnectTarget target)
+    {
+        if (!TriesQuic(plan, target))
+        {
+            return await plan.Deadline.ConnectAsync(connector, target).ConfigureAwait(false);
+        }
+
+        MultiplexedConnectResult quic = await plan.Deadline.ConnectMultiplexedAsync(connector, target).ConfigureAwait(false);
+        if (quic.Connection is { } quicConnection)
+        {
+            return ConnectResult.Connected(
+                new Http3Session(quicConnection),
+                quic.Timings,
+                quicConnection.LocalEndPoint as IPEndPoint,
+                applicationProtocol: quicConnection.ApplicationProtocol);
+        }
+
+        if (plan.Options.Version == HttpVersionPreference.Http3Only)
+        {
+            return ConnectResult.Failed(quic.ExitCode, quic.ErrorMessage!);
+        }
+
+        ConnectResult tcp = await plan.Deadline.ConnectAsync(connector, target).ConfigureAwait(false);
+        return tcp.Connection is null ? ConnectResult.Failed(quic.ExitCode, quic.ErrorMessage!, tcp.Timings, tcp.ConnectionNumber) : tcp;
+    }
+
+    /// <summary>
+    /// Decides whether the transfer tries QUIC: <c>--http3</c> or <c>--http3-only</c> with an
+    /// <c>https://</c> URL and no proxy.
+    /// </summary>
+    private static bool TriesQuic(HttpRequestPlan plan, ConnectTarget target) =>
+        plan.Options.Version is HttpVersionPreference.Http3 or HttpVersionPreference.Http3Only
+            && target.UseTls
+            && plan.Options.ForwardProxy is null;
+
+    /// <summary>
     /// Reports a connect that failed: whether it went to a forward proxy, and the transfer's
     /// timings with <c>%{time_pretransfer}</c>, <c>%{time_posttransfer}</c> and
     /// <c>%{time_starttransfer}</c> taken when it failed, as curl 8.21.0 takes them after a
@@ -357,9 +420,9 @@ public sealed class HttpProtocolHandler(
     /// may go on the same connection; then marks the connection reusable when the last
     /// response is reported left intact - it persists, or it is an HTTP/1.0 keep-alive body the
     /// server closed, which the pool then finds dead as curl does (ADR-0112) - or reports that a
-    /// pooled connection that died is being given up. A connection that speaks HTTP/2
-    /// (<see cref="SpeaksHttp2" />) carries each request on a stream of its own and is never
-    /// marked reusable, since the pool would hand it on without its HTTP/2 session (BL-658 Notes).
+    /// pooled connection that died is being given up. A connection that speaks HTTP/2 or HTTP/3
+    /// (<see cref="StreamSessionOf" />) carries each request on a stream of its own and is never
+    /// marked reusable, since the pool would hand it on without its session (BL-658 Notes).
     /// </summary>
     private async ValueTask<HttpAttemptOutcome> ExchangeOnConnectionAsync(
         HttpRequestPlan plan,
@@ -373,9 +436,9 @@ public sealed class HttpProtocolHandler(
             return TimeValueRefused(plan, connect);
         }
 
-        Http2Session? http2 = SpeaksHttp2(plan, connect) ? new Http2Session(connection) : null;
-        HttpAttemptOutcome outcome = await ExchangeWithRetriesAsync(plan, connect, connection, earlier, http2).ConfigureAwait(false);
-        if (outcome.ReportsLeftIntact && http2 is null)
+        IHttpStreamSession? streams = StreamSessionOf(plan, connect, connection);
+        HttpAttemptOutcome outcome = await ExchangeWithRetriesAsync(plan, connect, connection, earlier, streams).ConfigureAwait(false);
+        if (outcome.ReportsLeftIntact && streams is null)
         {
             connection.MarkReusable();
         }
@@ -388,7 +451,7 @@ public sealed class HttpProtocolHandler(
     }
 
     /// <summary>
-    /// Sends <paramref name="plan" />, framed for HTTP/2 when <paramref name="http2" /> is set,
+    /// Sends <paramref name="plan" />, framed for HTTP/2 or HTTP/3 when <paramref name="streams" /> is set,
     /// then each retry the response asks for while the connection stays open.
     /// </summary>
     private async ValueTask<HttpAttemptOutcome> ExchangeWithRetriesAsync(
@@ -396,13 +459,13 @@ public sealed class HttpProtocolHandler(
         ConnectResult connect,
         IConnection connection,
         TransferReport? earlier,
-        Http2Session? http2)
+        IHttpStreamSession? streams)
     {
-        HttpRequestPlan first = http2 is null ? plan : plan.ForHttp2();
-        HttpAttemptOutcome outcome = await ExchangeAsync(first, connect, connection, earlier, newConnection: !connect.IsReused, http2).ConfigureAwait(false);
+        HttpRequestPlan first = streams is null ? plan : plan.ForHttp2OrHttp3();
+        HttpAttemptOutcome outcome = await ExchangeAsync(first, connect, connection, earlier, newConnection: !connect.IsReused, streams).ConfigureAwait(false);
         while (outcome.Retry is { } retry && outcome.KeepsAlive)
         {
-            outcome = await ExchangeAsync(retry, connect, connection, outcome.Result.Report, newConnection: false, http2).ConfigureAwait(false);
+            outcome = await ExchangeAsync(retry, connect, connection, outcome.Result.Report, newConnection: false, streams).ConfigureAwait(false);
         }
 
         return outcome;
@@ -415,6 +478,14 @@ public sealed class HttpProtocolHandler(
     /// </summary>
     private static bool SpeaksHttp2(HttpRequestPlan plan, ConnectResult connect) =>
         plan.Options.Version == HttpVersionPreference.Http2PriorKnowledge || connect.ApplicationProtocol == "h2";
+
+    /// <summary>
+    /// Gives the session that carries each request on a stream of its own over the connection:
+    /// the HTTP/3 session a QUIC connect made, a new HTTP/2 session for a connection that speaks
+    /// HTTP/2 (<see cref="SpeaksHttp2" />), or <see langword="null" /> for HTTP/1.x.
+    /// </summary>
+    private static IHttpStreamSession? StreamSessionOf(HttpRequestPlan plan, ConnectResult connect, IConnection connection) =>
+        (IHttpStreamSession?)(connection as Http3Session) ?? (SpeaksHttp2(plan, connect) ? new Http2Session(connection) : null);
 
     /// <summary>
     /// Fails a request whose <c>-z</c> time curl 8.21.0 on Windows cannot write into its header
@@ -465,8 +536,8 @@ public sealed class HttpProtocolHandler(
     /// transfer's outputs; or, when the response is one this handler retries (a 401 it
     /// answers, or a 417 to a request whose body waited for <c>100 Continue</c>), writes its
     /// head and trailers, reads and discards its body, and returns the retry's plan. Over
-    /// HTTP/2 the exchange runs on a new stream of <paramref name="http2" />
-    /// (<see cref="Http2StreamConnection" />), which the same code reads and writes.
+    /// HTTP/2 or HTTP/3 the exchange runs on a new stream of <paramref name="streams" />
+    /// (<see cref="IHttpStreamConnection" />), which the same code reads and writes.
     /// </summary>
     private async ValueTask<HttpAttemptOutcome> ExchangeAsync(
         HttpRequestPlan plan,
@@ -474,15 +545,15 @@ public sealed class HttpProtocolHandler(
         IConnection transport,
         TransferReport? earlier,
         bool newConnection,
-        Http2Session? http2)
+        IHttpStreamSession? streams)
     {
         ITransferContext context = plan.Context;
         HttpRequestOptions options = plan.Options;
         HttpRequestFraming framing = plan.Framing;
         CancellationToken cancellationToken = plan.Deadline.Token;
-        Http2StreamConnection? http2Stream = CreateHttp2Stream(plan, http2);
-        IConnection connection = ExchangeConnectionOf(http2Stream, transport);
-        byte[] request = FormatRequestHead(plan, http2Stream is not null);
+        IHttpStreamConnection? requestStream = CreateRequestStream(plan, streams);
+        IConnection connection = ExchangeConnectionOf(requestStream, transport);
+        byte[] request = FormatRequestHead(plan, streams);
         HttpFirstByteTimingConnection timedConnection = new(connection, context.TimeProvider);
         IConnection responseConnection = framing.AwaitsContinue ? new HttpContinueWaitConnection(timedConnection) : timedConnection;
         HttpRequestBodyWriter upload = new(connection)
@@ -514,12 +585,12 @@ public sealed class HttpProtocolHandler(
             Events = context.Events,
             HeaderReceived = header => cookiesStored = StoreCookie(context, header, cookiesStored),
             FindRefusal = head => body.FindHeadRefusal(head, context.NoBody, DecodesContent(options)),
-            IsHttp2 = http2Stream is not null,
+            IsHttp2OrHttp3 = requestStream is not null,
         };
         HttpRequestPlan? retry = null;
         HttpResponseHead? actedOn = null;
         HttpBodyDelivery delivery = HttpBodyDelivery.Deliver;
-        ReportProtocolChosen(context.Events, newConnection, http2Stream is not null);
+        ReportProtocolChosen(context.Events, newConnection, streams);
         try
         {
             ThrowIfRefused(framing);
@@ -544,7 +615,7 @@ public sealed class HttpProtocolHandler(
             ReportIgnoredBody(plan, actedOn, discardsBody);
             headReader.ReportHeldLines();
             delivery = DeliveryOf(plan, actedOn, discardsBody);
-            await ReadBodyAsync(plan, actedOn, body, http2Stream, delivery, discardsBody, cancellationToken).ConfigureAwait(false);
+            await ReadBodyAsync(plan, actedOn, body, requestStream, delivery, discardsBody, cancellationToken).ConfigureAwait(false);
             ThrowIfFailing(fail, HttpFailMode.FailWithBody, actedOn);
         }
         catch (HttpTransferException failure)
@@ -567,32 +638,32 @@ public sealed class HttpProtocolHandler(
         }
 
         TransferResult result = Succeeded(delivery, actedOn!, exchange.Report(body));
-        return new HttpAttemptOutcome(result, retry, KeepsAlive(plan, actedOn, upload, headReader, delivery, http2))
+        return new HttpAttemptOutcome(result, retry, KeepsAlive(plan, actedOn, upload, headReader, delivery, streams))
         {
             LeftIntactAfterServerClosed = LeftIntactAfterServerClosed(plan, actedOn, upload, headReader, delivery),
         };
     }
 
     /// <summary>
-    /// Creates the HTTP/2 stream the exchange runs on, with the request body's length (0 for
+    /// Creates the HTTP/2 or HTTP/3 stream the exchange runs on, with the request body's length (0 for
     /// none), or gives <see langword="null" /> when the connection speaks HTTP/1.x.
     /// </summary>
-    private static Http2StreamConnection? CreateHttp2Stream(HttpRequestPlan plan, Http2Session? http2) =>
-        http2?.CreateStream(plan.Context.Url.Scheme, plan.Framing.Body is null ? 0 : plan.Framing.KnownLength);
+    private static IHttpStreamConnection? CreateRequestStream(HttpRequestPlan plan, IHttpStreamSession? streams) =>
+        streams?.CreateStream(plan.Context.Url.Scheme, plan.Framing.Body is null ? 0 : plan.Framing.KnownLength);
 
     /// <summary>
-    /// Gives the connection the exchange reads and writes: the HTTP/2 stream when there is one,
+    /// Gives the connection the exchange reads and writes: the HTTP/2 or HTTP/3 stream when there is one,
     /// and else the transport itself.
     /// </summary>
-    private static IConnection ExchangeConnectionOf(Http2StreamConnection? http2Stream, IConnection transport) =>
-        (IConnection?)http2Stream ?? transport;
+    private static IConnection ExchangeConnectionOf(IHttpStreamConnection? requestStream, IConnection transport) =>
+        (IConnection?)requestStream ?? transport;
 
     /// <summary>
-    /// Formats the request head: the HTTP/1.1 head, or over HTTP/2 the same head naming
-    /// <c>HTTP/2</c> in its request line, which is what is reported sent and what the stream
+    /// Formats the request head: the HTTP/1.1 head, or over HTTP/2 or HTTP/3 the same head naming
+    /// <c>HTTP/2</c> or <c>HTTP/3</c> in its request line, which is what is reported sent and what the stream
     /// turns into its HEADERS (<see cref="Http2RequestHeaders" />).
     /// </summary>
-    private byte[] FormatRequestHead(HttpRequestPlan plan, bool isHttp2)
+    private byte[] FormatRequestHead(HttpRequestPlan plan, IHttpStreamSession? streams)
     {
         ITransferContext context = plan.Context;
         byte[] head = HttpRequestHeadFormatter.Format(
@@ -606,19 +677,19 @@ public sealed class HttpProtocolHandler(
             HttpRangeHeader.ValueFor(context, plan.Framing.Body is not null),
             context.TimeCondition,
             plan.Framing);
-        return isHttp2 ? Http2RequestHeaders.WithHttp2RequestLine(head) : head;
+        return streams is null ? head : Http2RequestHeaders.WithRequestLineVersion(head, streams.VersionName);
     }
 
     /// <summary>
-    /// Reports <c>using HTTP/1.x</c>, or <c>using HTTP/2</c>, before the first request on a
+    /// Reports <c>using HTTP/1.x</c>, <c>using HTTP/2</c> or <c>using HTTP/3</c>, before the first request on a
     /// connection this transfer opened; curl 8.21.0 prints nothing of the kind for a connection
     /// it reuses (measured, BL-407 Notes).
     /// </summary>
-    private static void ReportProtocolChosen(ITransferEvents events, bool newConnection, bool isHttp2)
+    private static void ReportProtocolChosen(ITransferEvents events, bool newConnection, IHttpStreamSession? streams)
     {
         if (newConnection)
         {
-            events.ReportInfo(isHttp2 ? HttpConnectionInfoLines.UsingHttp2 : HttpConnectionInfoLines.UsingHttp1);
+            events.ReportInfo(streams?.UsingLine ?? HttpConnectionInfoLines.UsingHttp1);
         }
     }
 
@@ -729,13 +800,13 @@ public sealed class HttpProtocolHandler(
     /// (measured, BL-483 Notes).
     /// </summary>
     /// <remarks>
-    /// Over HTTP/2 the stream, not the connection, ends with the response, so the connection
+    /// Over HTTP/2 and HTTP/3 the stream, not the connection, ends with the response, so the connection
     /// carries another request once the exchange ran whole unless the peer sent GOAWAY or
-    /// closed it (<see cref="Http2Session.AcceptsNewStreams" />).
+    /// closed it (<see cref="IHttpStreamSession.AcceptsNewStreams" />).
     /// </remarks>
-    private static bool KeepsAlive(HttpRequestPlan plan, HttpResponseHead head, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpBodyDelivery delivery, Http2Session? http2) =>
+    private static bool KeepsAlive(HttpRequestPlan plan, HttpResponseHead head, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpBodyDelivery delivery, IHttpStreamSession? streams) =>
         DeliveredWhole(upload, headReader, delivery)
-            && (http2?.AcceptsNewStreams
+            && (streams?.AcceptsNewStreams
                 ?? HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody || !headReader.EndedAtEmptyLine, plan.Options.Raw, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding));
 
     /// <summary>
@@ -862,14 +933,14 @@ public sealed class HttpProtocolHandler(
     /// <summary>
     /// Reads the body into the transfer's output, or into nothing when it is discarded, as
     /// <see cref="SetBodyLimitAndSinks" /> sets it up, then writes a chunked body's trailers; or reads
-    /// nothing when <paramref name="delivery" /> says there is no body to deliver. Over HTTP/2
-    /// the trailers are the stream's trailing header block, read once the stream has ended.
+    /// nothing when <paramref name="delivery" /> says there is no body to deliver. Over HTTP/2 and HTTP/3
+    /// the trailers are the stream's trailing field section, read once the stream has ended.
     /// </summary>
     private static async ValueTask ReadBodyAsync(
         HttpRequestPlan plan,
         HttpResponseHead head,
         HttpResponseBodyReader body,
-        Http2StreamConnection? http2Stream,
+        IHttpStreamConnection? requestStream,
         HttpBodyDelivery delivery,
         bool discardsBody,
         CancellationToken cancellationToken)
@@ -884,23 +955,23 @@ public sealed class HttpProtocolHandler(
         SetBodyLimitAndSinks(plan, body, discardsBody);
         await body.CopyAsync(head, context.NoBody, bodyOutput, DecodesContent(plan.Options, discardsBody), plan.Options.TransferEncoding && !discardsBody, cancellationToken)
             .ConfigureAwait(false);
-        ReadOnlyMemory<byte> trailers = await TrailersOfAsync(body, http2Stream, cancellationToken).ConfigureAwait(false);
+        ReadOnlyMemory<byte> trailers = await TrailersOfAsync(body, requestStream, cancellationToken).ConfigureAwait(false);
         await WriteHeadersAsync(context.HeaderOutput, trailers, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
-    /// Gives the trailers of a body just read: a chunked body's, or an HTTP/2 stream's once it
-    /// has been read to its end (<see cref="Http2StreamConnection.ReadToEndAsync" />).
+    /// Gives the trailers of a body just read: a chunked body's, or an HTTP/2 or HTTP/3 stream's once it
+    /// has been read to its end (<see cref="IHttpStreamConnection.ReadToEndAsync" />).
     /// </summary>
-    private static async ValueTask<ReadOnlyMemory<byte>> TrailersOfAsync(HttpResponseBodyReader body, Http2StreamConnection? http2Stream, CancellationToken cancellationToken)
+    private static async ValueTask<ReadOnlyMemory<byte>> TrailersOfAsync(HttpResponseBodyReader body, IHttpStreamConnection? requestStream, CancellationToken cancellationToken)
     {
-        if (http2Stream is null)
+        if (requestStream is null)
         {
             return body.TrailerBytes;
         }
 
-        await http2Stream.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
-        return http2Stream.TrailerBytes;
+        await requestStream.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
+        return requestStream.TrailerBytes;
     }
 
     /// <summary>
@@ -1384,10 +1455,10 @@ public sealed class HttpProtocolHandler(
             With(Framing.WithoutExpect(body, keepsCustomWait), Authorization, SentOnFreshConnection, RedirectsFollowed + 1);
 
         /// <summary>
-        /// Makes the same request framed for an HTTP/2 stream (<see cref="HttpRequestFraming.ForHttp2" />).
+        /// Makes the same request framed for an HTTP/2 or HTTP/3 stream (<see cref="HttpRequestFraming.ForHttp2OrHttp3" />).
         /// </summary>
-        /// <returns>The HTTP/2 request's plan.</returns>
-        public HttpRequestPlan ForHttp2() => With(Framing.ForHttp2(), Authorization);
+        /// <returns>The HTTP/2 or HTTP/3 request's plan.</returns>
+        public HttpRequestPlan ForHttp2OrHttp3() => With(Framing.ForHttp2OrHttp3(), Authorization);
 
         /// <summary>
         /// Makes the same request, marked as sent again on a fresh connection.

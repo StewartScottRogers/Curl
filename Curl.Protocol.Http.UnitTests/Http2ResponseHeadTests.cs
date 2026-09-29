@@ -32,7 +32,7 @@ public sealed class Http2ResponseHeadTests
     [TestMethod]
     public void Format_Block_WritesTheStatusLineWithATrailingBlankAndSkipsPseudoHeaders()
     {
-        byte[] head = Http2ResponseHead.Format(200, [new(":status", "200"), new("content-type", "text/plain"), new("x-a", "b")]);
+        byte[] head = Http2ResponseHead.Format("HTTP/2", 200, [new(":status", "200"), new("content-type", "text/plain"), new("x-a", "b")]);
 
         Assert.AreEqual("HTTP/2 200 \r\ncontent-type: text/plain\r\nx-a: b\r\n\r\n", Encoding.Latin1.GetString(head));
     }

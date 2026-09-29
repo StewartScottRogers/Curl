@@ -284,7 +284,7 @@ internal static class HttpRequestHeadFormatter
     /// <summary>
     /// Gives the <c>Content-Length</c> value: the body's length, or <see langword="null" /> when
     /// the body is sent chunked or its length is unknown (an HTTP/2 body,
-    /// <see cref="HttpRequestFraming.ForHttp2" />).
+    /// <see cref="HttpRequestFraming.ForHttp2OrHttp3" />).
     /// </summary>
     private static string? ContentLengthOf(HttpRequestFraming framing) =>
         framing.IsChunked ? null : framing.KnownLength?.ToString(CultureInfo.InvariantCulture);

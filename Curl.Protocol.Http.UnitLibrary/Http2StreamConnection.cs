@@ -25,7 +25,7 @@ namespace Curl.Protocol.Http;
 /// <param name="session">The connection's HTTP/2 session.</param>
 /// <param name="scheme">The URL's scheme, sent as <c>:scheme</c>.</param>
 /// <param name="bodyLength">The request body's length, 0 when there is none, or <see langword="null" /> when unknown.</param>
-internal sealed class Http2StreamConnection(Http2Session session, string scheme, long? bodyLength) : IConnection
+internal sealed class Http2StreamConnection(Http2Session session, string scheme, long? bodyLength) : IHttpStreamConnection
 {
     private readonly Queue<ReadOnlyMemory<byte>> received = new();
 
@@ -53,7 +53,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     /// Gets the response's trailers as <see cref="Http2ResponseHead.FormatTrailers" /> gives
     /// them, empty until the trailing header block has been read.
     /// </summary>
-    internal ReadOnlyMemory<byte> TrailerBytes => trailers.ToArray();
+    public ReadOnlyMemory<byte> TrailerBytes => trailers.ToArray();
 
     /// <inheritdoc />
     /// <exception cref="HttpTransferException">The stream failed (exit 16, 18, 56 or 92).</exception>
@@ -103,7 +103,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     /// </summary>
     /// <param name="cancellationToken">Cancels the write.</param>
     /// <returns>A task that completes when the frame is written.</returns>
-    internal async ValueTask EndRequestAsync(CancellationToken cancellationToken)
+    public async ValueTask EndRequestAsync(CancellationToken cancellationToken)
     {
         if (isRequestEnded || isResponseEnded)
         {
@@ -121,7 +121,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     /// <param name="cancellationToken">Cancels the reads.</param>
     /// <returns>A task that completes when the stream has ended.</returns>
     /// <exception cref="HttpTransferException">The stream failed (exit 16, 18, 56 or 92).</exception>
-    internal async ValueTask ReadToEndAsync(CancellationToken cancellationToken)
+    public async ValueTask ReadToEndAsync(CancellationToken cancellationToken)
     {
         while (!isResponseEnded)
         {
@@ -240,7 +240,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
         else
         {
             int statusCode = Http2ResponseHead.StatusOf(fields) ?? throw await ResetMalformedAsync(cancellationToken).ConfigureAwait(false);
-            received.Enqueue(Http2ResponseHead.Format(statusCode, fields));
+            received.Enqueue(Http2ResponseHead.Format(session.VersionName, statusCode, fields));
             isFinalHeadReceived = statusCode >= 200;
         }
 

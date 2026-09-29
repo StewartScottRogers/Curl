@@ -9,7 +9,9 @@ namespace Curl.Protocol.Http;
 /// <c>:method</c>, <c>:scheme</c>, <c>:authority</c> from <c>Host</c> and <c>:path</c> from the
 /// request target, then every other header in order with its name lower-cased, leaving out the
 /// connection-specific ones HTTP/2 forbids (RFC 9113 section 8.2.2). Measured with curl.se's
-/// nghttp2 build, whose HTTP/2 layer is libcurl's own (ADR-0141; BL-658 Notes).
+/// nghttp2 build, whose HTTP/2 layer is libcurl's own (ADR-0141; BL-658 Notes). An HTTP/3
+/// request sends the same list, since curl's HTTP/3 layer builds it with the same function
+/// (<c>curl_ngtcp2.c</c>; the order measured in ADR-0144).
 /// </summary>
 internal static class Http2RequestHeaders
 {
@@ -17,8 +19,6 @@ internal static class Http2RequestHeaders
         ["host", "connection", "keep-alive", "proxy-connection", "transfer-encoding", "upgrade"];
 
     private static readonly byte[] Http11LineEnd = " HTTP/1.1\r\n"u8.ToArray();
-
-    private static readonly byte[] Http2LineEnd = " HTTP/2\r\n"u8.ToArray();
 
     /// <summary>
     /// Gives the header list for <paramref name="head" />. A <c>TE</c> header is sent only as
@@ -46,14 +46,16 @@ internal static class Http2RequestHeaders
 
     /// <summary>
     /// Gives <paramref name="head" /> with its request line's <c>HTTP/1.1</c> made
-    /// <c>HTTP/2</c>, the head curl 8.21.0 reports sending over HTTP/2 (<c>&gt; GET / HTTP/2</c>).
+    /// <paramref name="versionName" />, the head curl reports sending over HTTP/2
+    /// (<c>&gt; GET / HTTP/2</c>, curl 8.21.0) and HTTP/3 (<c>&gt; GET / HTTP/3</c>, ADR-0144).
     /// </summary>
     /// <param name="head">The HTTP/1.1 request head.</param>
-    /// <returns>The same head naming HTTP/2.</returns>
-    internal static byte[] WithHttp2RequestLine(byte[] head)
+    /// <param name="versionName">The version to name: <c>HTTP/2</c> or <c>HTTP/3</c>.</param>
+    /// <returns>The same head naming <paramref name="versionName" />.</returns>
+    internal static byte[] WithRequestLineVersion(byte[] head, string versionName)
     {
         int lineEnd = head.AsSpan().IndexOf(Http11LineEnd);
-        return [.. head.AsSpan(0, lineEnd), .. Http2LineEnd, .. head.AsSpan(lineEnd + Http11LineEnd.Length)];
+        return [.. head.AsSpan(0, lineEnd), .. Encoding.Latin1.GetBytes($" {versionName}\r\n"), .. head.AsSpan(lineEnd + Http11LineEnd.Length)];
     }
 
     private static (string Name, string Value) Split(string line)

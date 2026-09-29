@@ -20,7 +20,9 @@ HTTP/3 framing is here too (BL-730, ADR-0165): `Http3Frame` and its seven subcla
 sorts the server's streams by type, `Http3ControlStreamReader` reads its control stream
 and `Http3PeerQpackStreams` feeds its QPACK streams to `QpackDecoder` and `QpackEncoder`.
 Every RFC 9114 violation is an `Http3Exception` carrying its `Http3ErrorCode`. Request
-streams (sending a request, reading a response) land with BL-731.
+streams (sending a request, reading a response) are the HTTP handler's:
+`Curl.Protocol.Http.UnitLibrary`'s `Http3StreamConnection` builds them from these frames and
+QPACK (BL-731, ADR-0172).
 
 ## Rules
 

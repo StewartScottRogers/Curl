@@ -103,17 +103,38 @@ internal sealed class HttpTransferDeadline : IDisposable
     /// <param name="target">What to connect to.</param>
     /// <returns>The connector's result, or the exit 28 failure.</returns>
     /// <exception cref="OperationCanceledException">The transfer was cancelled.</exception>
-    internal async ValueTask<ConnectResult> ConnectAsync(IConnector connector, ConnectTarget target)
+    internal ValueTask<ConnectResult> ConnectAsync(IConnector connector, ConnectTarget target) =>
+        WithinConnectTimeoutAsync(
+            token => connector.ConnectAsync(target, token),
+            message => ConnectResult.Failed(CurlExitCode.OperationTimedOut, message));
+
+    /// <summary>
+    /// Connects over QUIC through <paramref name="connector" />
+    /// (<see cref="IConnector.ConnectMultiplexedAsync" />), under the same limits as
+    /// <see cref="ConnectAsync" /> and with the same exit 28 failure (ADR-0144 section 7).
+    /// </summary>
+    /// <param name="connector">The connector to open the connection with.</param>
+    /// <param name="target">What to connect to.</param>
+    /// <returns>The connector's result, or the exit 28 failure.</returns>
+    /// <exception cref="OperationCanceledException">The transfer was cancelled.</exception>
+    internal ValueTask<MultiplexedConnectResult> ConnectMultiplexedAsync(IConnector connector, ConnectTarget target) =>
+        WithinConnectTimeoutAsync(
+            token => connector.ConnectMultiplexedAsync(target, token),
+            message => MultiplexedConnectResult.Failed(CurlExitCode.OperationTimedOut, message));
+
+    private async ValueTask<TResult> WithinConnectTimeoutAsync<TResult>(
+        Func<CancellationToken, ValueTask<TResult>> connectAsync,
+        Func<string, TResult> timedOut)
     {
         using CancellationTokenSource connectElapsed = new(connectTimeout, timeProvider);
         using CancellationTokenSource connect = CancellationTokenSource.CreateLinkedTokenSource(Token, connectElapsed.Token);
         try
         {
-            return await connector.ConnectAsync(target, connect.Token).ConfigureAwait(false);
+            return await connectAsync(connect.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (EndedByLimit)
         {
-            return ConnectResult.Failed(CurlExitCode.OperationTimedOut, HttpTransferMessages.ConnectionTimedOut(ElapsedMilliseconds));
+            return timedOut(HttpTransferMessages.ConnectionTimedOut(ElapsedMilliseconds));
         }
     }
 

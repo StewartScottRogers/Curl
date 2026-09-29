@@ -26,12 +26,22 @@ public sealed class HttpStatusLineTests
     }
 
     [TestMethod]
-    public void ParseHttp2_StatusLineTheHttp2StreamWrites_IsVersion2WithTheCodeAndNoReason()
+    public void ParseHttp2OrHttp3_StatusLineTheHttp2StreamWrites_IsVersion2WithTheCodeAndNoReason()
     {
-        HttpStatusLine statusLine = HttpStatusLine.ParseHttp2("HTTP/2 404 ");
+        HttpStatusLine statusLine = HttpStatusLine.ParseHttp2OrHttp3("HTTP/2 404 ");
 
         Assert.AreEqual(HttpVersion.Version20, statusLine.Version);
         Assert.AreEqual(404, statusLine.StatusCode);
+        Assert.AreEqual(string.Empty, statusLine.ReasonPhrase);
+    }
+
+    [TestMethod]
+    public void ParseHttp2OrHttp3_StatusLineTheHttp3StreamWrites_IsVersion3WithTheCodeAndNoReason()
+    {
+        HttpStatusLine statusLine = HttpStatusLine.ParseHttp2OrHttp3("HTTP/3 204 ");
+
+        Assert.AreEqual(HttpVersion.Version30, statusLine.Version);
+        Assert.AreEqual(204, statusLine.StatusCode);
         Assert.AreEqual(string.Empty, statusLine.ReasonPhrase);
     }
 

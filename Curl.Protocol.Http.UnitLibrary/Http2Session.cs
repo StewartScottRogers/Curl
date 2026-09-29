@@ -10,7 +10,7 @@ namespace Curl.Protocol.Http;
 /// without waiting for the server's SETTINGS (measured, BL-658 Notes).
 /// </summary>
 /// <param name="connection">The connection; the handler keeps ownership.</param>
-internal sealed class Http2Session(IConnection connection)
+internal sealed class Http2Session(IConnection connection) : IHttpStreamSession
 {
     private readonly HpackEncoder encoder = new();
 
@@ -27,11 +27,17 @@ internal sealed class Http2Session(IConnection connection)
     /// <summary>Gets the decoder every response header block on the connection passes through.</summary>
     internal HpackDecoder Decoder { get; } = new();
 
+    /// <inheritdoc />
+    public string VersionName => "HTTP/2";
+
+    /// <inheritdoc />
+    public string UsingLine => HttpConnectionInfoLines.UsingHttp2;
+
     /// <summary>
     /// Gets a value indicating whether the connection can carry another request: the peer has
     /// sent no GOAWAY and has not closed it.
     /// </summary>
-    internal bool AcceptsNewStreams => Frames.PeerGoAway is null && !Frames.IsClosedByPeer;
+    public bool AcceptsNewStreams => Frames.PeerGoAway is null && !Frames.IsClosedByPeer;
 
     /// <summary>
     /// Creates the stream a request is sent and its response read on; nothing is sent until
@@ -43,7 +49,7 @@ internal sealed class Http2Session(IConnection connection)
     /// unknown.
     /// </param>
     /// <returns>The stream.</returns>
-    internal Http2StreamConnection CreateStream(string scheme, long? bodyLength) => new(this, scheme, bodyLength);
+    public IHttpStreamConnection CreateStream(string scheme, long? bodyLength) => new Http2StreamConnection(this, scheme, bodyLength);
 
     /// <summary>
     /// Sends the client preface if it has not gone yet, then opens a stream and sends

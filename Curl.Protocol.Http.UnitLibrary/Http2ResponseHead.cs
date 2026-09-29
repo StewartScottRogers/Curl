@@ -30,13 +30,15 @@ internal static class Http2ResponseHead
 
     /// <summary>
     /// Gives the head bytes for a header block with <paramref name="statusCode" />: the status
-    /// line, a line for each header that is not a pseudo-header, and the empty line.
+    /// line, a line for each header that is not a pseudo-header, and the empty line. curl's
+    /// HTTP/3 layer writes an HTTP/3 field section the same way, <c>HTTP/3 200 \r\n</c> (ADR-0144).
     /// </summary>
+    /// <param name="versionName">The version the status line names: <c>HTTP/2</c> or <c>HTTP/3</c>.</param>
     /// <param name="statusCode">The block's <c>:status</c>.</param>
     /// <param name="fields">The decoded header block.</param>
     /// <returns>The head, as Latin-1 bytes.</returns>
-    internal static byte[] Format(int statusCode, IReadOnlyList<HeaderField> fields) =>
-        Encoding.Latin1.GetBytes(string.Create(CultureInfo.InvariantCulture, $"HTTP/2 {statusCode:000} \r\n{HeaderLines(fields)}\r\n"));
+    internal static byte[] Format(string versionName, int statusCode, IReadOnlyList<HeaderField> fields) =>
+        Encoding.Latin1.GetBytes(string.Create(CultureInfo.InvariantCulture, $"{versionName} {statusCode:000} \r\n{HeaderLines(fields)}\r\n"));
 
     /// <summary>
     /// Gives the trailer bytes for a trailing header block: a line for each header that is not

@@ -71,13 +71,17 @@ internal sealed class HttpStatusLine(Version version, int statusCode, string rea
     }
 
     /// <summary>
-    /// Parses the status line <see cref="Http2ResponseHead.Format" /> writes for an HTTP/2
-    /// response, <c>HTTP/2 200 </c>: version 2.0, the status code, and no reason phrase.
+    /// Parses the status line <see cref="Http2ResponseHead.Format" /> writes for an HTTP/2 or
+    /// HTTP/3 response, <c>HTTP/2 200 </c> or <c>HTTP/3 200 </c>: version 2.0 or 3.0, the
+    /// status code, and no reason phrase.
     /// </summary>
     /// <param name="line">The line, without its terminator.</param>
     /// <returns>The status line.</returns>
-    internal static HttpStatusLine ParseHttp2(string line) =>
-        new(HttpVersion.Version20, int.Parse(line.AsSpan(7, 3), System.Globalization.CultureInfo.InvariantCulture), string.Empty);
+    internal static HttpStatusLine ParseHttp2OrHttp3(string line) =>
+        new(
+            line[5] == '3' ? HttpVersion.Version30 : HttpVersion.Version20,
+            int.Parse(line.AsSpan(7, 3), System.Globalization.CultureInfo.InvariantCulture),
+            string.Empty);
 
     /// <summary>
     /// Tells whether bytes received so far could still begin a status line: they must match

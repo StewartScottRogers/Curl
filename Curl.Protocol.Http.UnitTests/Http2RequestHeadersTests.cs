@@ -49,11 +49,11 @@ public sealed class Http2RequestHeadersTests
     }
 
     [TestMethod]
-    public void WithHttp2RequestLine_Head_NamesHttp2InTheRequestLineOnly()
+    public void WithRequestLineVersion_Http2_NamesHttp2InTheRequestLineOnly()
     {
         byte[] head = Encoding.Latin1.GetBytes("GET / HTTP/1.1\r\nX-Note: HTTP/1.1\r\n\r\n");
 
-        byte[] http2 = Http2RequestHeaders.WithHttp2RequestLine(head);
+        byte[] http2 = Http2RequestHeaders.WithRequestLineVersion(head, "HTTP/2");
 
         Assert.AreEqual("GET / HTTP/2\r\nX-Note: HTTP/1.1\r\n\r\n", Encoding.Latin1.GetString(http2));
     }
