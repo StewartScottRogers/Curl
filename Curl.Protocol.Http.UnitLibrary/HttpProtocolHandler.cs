@@ -1081,28 +1081,40 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Decides whether a response is answered with one more request, and with what
-    /// <c>Authorization</c> value: only a 401, only when the request that drew it sent none
-    /// (a credential sent up front and refused ends the transfer, as in curl 8.21.0), only
-    /// when its body can be sent again, and only when the authenticator answers the
-    /// response's <c>WWW-Authenticate</c> challenges.
+    /// <c>Authorization</c> value: only a 401, only when its body can be sent again, and only
+    /// when the authenticator answers the response's <c>WWW-Authenticate</c> challenges -
+    /// through <see cref="IHttpAuthenticator.ContinueAuthorizationAsync" /> when the request
+    /// that drew it already sent one, which only a handshake of more than one leg (NTLM)
+    /// answers, so a credential sent up front and refused ends the transfer, as in curl 8.21.0
+    /// (ADR-0180).
     /// </summary>
+    /// <exception cref="HttpTransferException">The authenticator fails the transfer (<see cref="HttpAuthenticationFailedException" />).</exception>
     private async ValueTask<string?> RetryAuthorizationAsync(HttpRequestPlan plan, HttpResponseHead head, CancellationToken cancellationToken)
     {
-        if (!MayRetry(plan, head))
+        string[] challenges = MayRetry(plan, head) ? ValuesOf(head, "WWW-Authenticate") : [];
+        if (challenges.Length == 0)
         {
             return null;
         }
 
-        string[] challenges = ValuesOf(head, "WWW-Authenticate");
-        return challenges.Length == 0 ? null : await Authenticator.CreateAuthorizationAsync(plan.AuthRequest, challenges, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return plan.Authorization is { } sent
+                ? await Authenticator.ContinueAuthorizationAsync(plan.AuthRequest, sent, !plan.AuthorizationAnswersChallenge, challenges, cancellationToken).ConfigureAwait(false)
+                : await Authenticator.CreateAuthorizationAsync(plan.AuthRequest, challenges, cancellationToken).ConfigureAwait(false);
+        }
+        catch (HttpAuthenticationFailedException failure)
+        {
+            throw new HttpTransferException(failure.ExitCode, failure.Message);
+        }
     }
 
     /// <summary>
     /// Decides whether <paramref name="head" /> may be answered with a retry at all: a 401 to
-    /// a request that sent no <c>Authorization</c> and whose body is not a stream.
+    /// a request whose body is not a stream.
     /// </summary>
     private static bool MayRetry(HttpRequestPlan plan, HttpResponseHead head) =>
-        plan.Authorization is null && head.StatusLine.StatusCode == 401 && plan.Framing.Body is not StreamBody;
+        head.StatusLine.StatusCode == 401 && plan.Framing.Body is not StreamBody;
 
     /// <summary>
     /// Gets the values of every <paramref name="name" /> header of <paramref name="head" />,
@@ -1436,11 +1448,20 @@ public sealed class HttpProtocolHandler(
         public int RedirectsFollowed { get; init; }
 
         /// <summary>
-        /// Makes the same request sent with <paramref name="authorization" /> instead.
+        /// Gets a value indicating whether <see cref="Authorization" /> answers a challenge, as
+        /// every value a retry sends does; <see langword="false" /> for the transfer's first
+        /// request, whose value was made before any challenge.
+        /// </summary>
+        public bool AuthorizationAnswersChallenge { get; init; }
+
+        /// <summary>
+        /// Makes the same request sent with <paramref name="authorization" /> instead, in answer
+        /// to a challenge.
         /// </summary>
         /// <param name="authorization">The <c>Authorization</c> value the retry is sent with.</param>
         /// <returns>The retry's plan.</returns>
-        public HttpRequestPlan WithAuthorization(string authorization) => With(Framing, authorization);
+        public HttpRequestPlan WithAuthorization(string authorization) =>
+            With(Framing, authorization, SentOnFreshConnection, RedirectsFollowed, authorizationAnswersChallenge: true);
 
         /// <summary>
         /// Makes the same request without curl's own <c>Expect</c> and without the wait for
@@ -1453,7 +1474,7 @@ public sealed class HttpProtocolHandler(
         /// </param>
         /// <returns>The resent request's plan, one more redirect followed.</returns>
         public HttpRequestPlan WithoutExpect(HttpRequestBody body, bool keepsCustomWait) =>
-            With(Framing.WithoutExpect(body, keepsCustomWait), Authorization, SentOnFreshConnection, RedirectsFollowed + 1);
+            With(Framing.WithoutExpect(body, keepsCustomWait), Authorization, SentOnFreshConnection, RedirectsFollowed + 1, AuthorizationAnswersChallenge);
 
         /// <summary>
         /// Makes the same request framed for an HTTP/2 or HTTP/3 stream (<see cref="HttpRequestFraming.ForHttp2OrHttp3" />).
@@ -1465,12 +1486,12 @@ public sealed class HttpProtocolHandler(
         /// Makes the same request, marked as sent again on a fresh connection.
         /// </summary>
         /// <returns>The resent request's plan.</returns>
-        public HttpRequestPlan OnFreshConnection() => With(Framing, Authorization, sentOnFreshConnection: true, RedirectsFollowed);
+        public HttpRequestPlan OnFreshConnection() => With(Framing, Authorization, sentOnFreshConnection: true, RedirectsFollowed, AuthorizationAnswersChallenge);
 
         private HttpRequestPlan With(HttpRequestFraming framing, string? authorization) =>
-            With(framing, authorization, SentOnFreshConnection, RedirectsFollowed);
+            With(framing, authorization, SentOnFreshConnection, RedirectsFollowed, AuthorizationAnswersChallenge);
 
-        private HttpRequestPlan With(HttpRequestFraming framing, string? authorization, bool sentOnFreshConnection, int redirectsFollowed) =>
+        private HttpRequestPlan With(HttpRequestFraming framing, string? authorization, bool sentOnFreshConnection, int redirectsFollowed, bool authorizationAnswersChallenge) =>
             new(Context, Options, framing, AuthRequest, authorization)
             {
                 Started = Started,
@@ -1480,6 +1501,7 @@ public sealed class HttpProtocolHandler(
                 ProxyAuthorization = ProxyAuthorization,
                 SentOnFreshConnection = sentOnFreshConnection,
                 RedirectsFollowed = redirectsFollowed,
+                AuthorizationAnswersChallenge = authorizationAnswersChallenge,
             };
     }
 
