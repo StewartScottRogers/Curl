@@ -21,6 +21,15 @@ internal static class MultipartFormPartMapping
     internal static IReadOnlyList<MultipartFormPart> FromCommandLine(IReadOnlyList<FormPartSpecification> parts) =>
         [.. parts.Select(FromSpecification)];
 
+    /// <summary>
+    /// The escaping the builder gives names and file names: <see cref="MultipartNameEscaping.Backslash" />
+    /// under <c>--form-escape</c>, otherwise curl's default <see cref="MultipartNameEscaping.Percent" /> (BL-625).
+    /// </summary>
+    /// <param name="options">The option group whose form is being built.</param>
+    /// <returns>The escaping <see cref="CommandLineOptions.FormEscape" /> asks for.</returns>
+    internal static MultipartNameEscaping NameEscapingOf(CommandLineOptions options) =>
+        options.FormEscape ? MultipartNameEscaping.Backslash : MultipartNameEscaping.Percent;
+
     private static MultipartFormPart FromSpecification(FormPartSpecification part) =>
         new(
             part.Name,

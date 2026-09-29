@@ -2631,7 +2631,10 @@ internal sealed class CurlCommandRunner(
         }
 
         MultipartFormBuildResult form = await formBodyBuilder
-            .BuildAsync(MultipartFormPartMapping.FromCommandLine(options.FormParts), CancellationToken.None)
+            .BuildAsync(
+                MultipartFormPartMapping.FromCommandLine(options.FormParts),
+                MultipartFormPartMapping.NameEscapingOf(options),
+                CancellationToken.None)
             .ConfigureAwait(false);
         if (!form.IsBuilt)
         {
