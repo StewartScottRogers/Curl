@@ -94,6 +94,15 @@ namespace Curl.Protocol.Ftp;
 /// transfer with no <c>QUIT</c>, after it with <c>QUIT</c>.
 /// </para>
 /// <para>
+/// ASCII mode and appending (BL-633): <c>-B</c> or a <c>;type=a</c> URL suffix
+/// (<see cref="FtpTypeCode" />) sends <c>TYPE A</c> instead of <c>TYPE I</c>, for a
+/// download, an upload and <c>-I</c> alike; an ASCII download sends no <c>SIZE</c> or
+/// <c>REST</c>. <c>;type=d</c> lists with <c>NLST</c> as <c>-l</c> does. The data bytes
+/// pass unchanged either way. <c>-a</c> uploads with <c>APPE</c> instead of <c>STOR</c>, and
+/// <c>--crlf</c> converts each line feed of an upload not already after a carriage return
+/// into a carriage-return line-feed pair.
+/// </para>
+/// <para>
 /// <c>-v</c> and <c>--trace</c> (BL-931) see curl 8.21.0's info lines about the data
 /// connection, worded in <see cref="FtpTransferMessages" />: how the data stream is connected,
 /// where a passive one is dialled, the range and size of a download, an accepted active one,
@@ -137,6 +146,9 @@ internal sealed class FtpSession(
     private readonly FtpQuoteCommands quotes = FtpQuoteCommands.Parse(context.QuoteCommands);
 
     private readonly FtpTlsRequirement tlsRequirement = FtpTlsRequirements.Of(context);
+
+    /// <summary>The URL path without its <c>;type=</c> suffix, and whether it asks for ASCII or a name-only listing.</summary>
+    private readonly FtpTypeCode typeCode = FtpTypeCode.Of(context);
 
     /// <summary>The control connection's own address, which <c>-P -</c> listens on.</summary>
     private readonly EndPoint? controlLocalEndPoint = control.Connection.LocalEndPoint;
@@ -429,7 +441,7 @@ internal sealed class FtpSession(
 
     private async ValueTask<TransferResult> TransferPathAsync()
     {
-        if (FtpUrlPath.Parse(context.Url.AbsolutePath, context.FtpFileMethod) is not { } path)
+        if (FtpUrlPath.Parse(typeCode.Path, context.FtpFileMethod) is not { } path)
         {
             return TransferResult.Failure(CurlExitCode.UrlMalformat, FtpTransferMessages.PathHasControlCharacters);
         }
@@ -453,19 +465,38 @@ internal sealed class FtpSession(
 
     /// <summary>
     /// Downloads the file, or the listing when the path names a directory or <c>-l</c> asks
-    /// for one. The window <c>-r</c> or <c>-C</c> asks for applies to a file only.
+    /// for one. The window <c>-r</c> or <c>-C</c> asks for applies to a file only. An ASCII
+    /// download sends no <c>SIZE</c>, so no <c>REST</c> either: as curl 8.21.0 was measured
+    /// to (BL-633), it reads from the start, <c>-C</c> ignored, and keeps only the byte
+    /// limit of a <c>-r</c> range.
     /// </summary>
     private async ValueTask<TransferResult> DownloadAsync(FtpUrlPath path)
     {
-        bool listing = path.FileName.Length == 0 || context.ListOnly;
-        window = listing ? default : FtpDownloadWindow.Of(context);
+        bool listing = path.FileName.Length == 0 || typeCode.ListOnly;
+        bool ascii = listing || typeCode.UseAscii;
+        window = DownloadWindowOf(listing);
         return await OpenDataConnectionAsync().ConfigureAwait(false)
-            ?? await SetTypeAsync(listing).ConfigureAwait(false)
+            ?? await SetTypeAsync(ascii).ConfigureAwait(false)
             ?? await SendQuotesAsync(quotes.BeforeTransfer).ConfigureAwait(false)
-            ?? await ReadSizeAsync(path.FileName, listing).ConfigureAwait(false)
+            ?? await ReadSizeAsync(path.FileName, ascii).ConfigureAwait(false)
             ?? await RefuseOversizedFileAsync().ConfigureAwait(false)
             ?? await PositionAsync().ConfigureAwait(false)
             ?? await RetrieveAsync(listing ? ListCommand(path) : "RETR " + path.FileName, listing).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The window a download reads: none for a listing, and for an ASCII file the
+    /// <c>-r</c> byte limit alone, from the start.
+    /// </summary>
+    private FtpDownloadWindow DownloadWindowOf(bool listing)
+    {
+        if (listing)
+        {
+            return default;
+        }
+
+        FtpDownloadWindow asked = FtpDownloadWindow.Of(context);
+        return typeCode.UseAscii ? asked with { Offset = 0 } : asked;
     }
 
     /// <summary>
@@ -474,7 +505,7 @@ internal sealed class FtpSession(
     /// </summary>
     private string ListCommand(FtpUrlPath path)
     {
-        string verb = context.ListOnly ? "NLST" : "LIST";
+        string verb = typeCode.ListOnly ? "NLST" : "LIST";
         return path.ListArgument is { } argument ? verb + " " + argument : verb;
     }
 
@@ -494,14 +525,15 @@ internal sealed class FtpSession(
             ?? await ChangeDirectoriesAsync(path.Directories).ConfigureAwait(false)
             ?? await CheckModificationTimeAsync(path.FileName).ConfigureAwait(false)
             ?? await OpenDataConnectionAsync().ConfigureAwait(false)
-            ?? await SetTypeAsync(false).ConfigureAwait(false)
+            ?? await SetTypeAsync(typeCode.UseAscii).ConfigureAwait(false)
             ?? await SendQuotesAsync(quotes.BeforeTransfer).ConfigureAwait(false)
             ?? await StoreAsync(path.FileName, upload).ConfigureAwait(false);
     }
 
     /// <summary>
-    /// Sends <c>STOR</c> from offset 0, or skips the <c>-C</c> offset and sends <c>APPE</c>;
-    /// an offset that covers the whole upload sends nothing more than <c>QUIT</c> and succeeds.
+    /// Sends <c>STOR</c> from offset 0 (<c>APPE</c> under <c>-a</c>), or skips the <c>-C</c>
+    /// offset and sends <c>APPE</c>; an offset that covers the whole upload sends nothing
+    /// more than <c>QUIT</c> and succeeds.
     /// </summary>
     private async ValueTask<TransferResult> StoreAsync(string fileName, Stream upload)
     {
@@ -510,7 +542,7 @@ internal sealed class FtpSession(
             : context.ResumeFrom ?? 0;
         if (offset <= 0)
         {
-            return await SendUploadAsync("STOR " + fileName, upload).ConfigureAwait(false);
+            return await SendUploadAsync((context.Append ? "APPE " : "STOR ") + fileName, upload).ConfigureAwait(false);
         }
 
         return FtpUploadOffset.TrySkip(upload, offset)
@@ -550,19 +582,25 @@ internal sealed class FtpSession(
     /// <summary>
     /// Copies the upload to the data connection and closes it, which tells the server the
     /// file has ended. A failed read ends the upload as the end of the source does, as curl
-    /// takes it; a failed write is exit 55.
+    /// takes it; a failed write is exit 55. Under <c>--crlf</c> each chunk is converted
+    /// first, and the converted bytes are the ones sent and counted, as curl 8.21.0 was
+    /// measured to (BL-633).
     /// </summary>
     private async ValueTask<TransferResult?> CopyUploadAsync(Stream upload)
     {
         IConnection data = dataConnection!;
         long? expected = upload.CanSeek ? Math.Max(0, upload.Length - upload.Position) : null;
         byte[] buffer = new byte[ReadBufferSize];
+        Func<ReadOnlyMemory<byte>, ReadOnlyMemory<byte>> convertChunk = context.ConvertLineEndings
+            ? new CrlfUploadConverter(ReadBufferSize).Convert
+            : static chunk => chunk;
         int read;
         while ((read = await ReadUploadAsync(upload, buffer).ConfigureAwait(false)) > 0)
         {
+            ReadOnlyMemory<byte> chunk = convertChunk(buffer.AsMemory(0, read));
             try
             {
-                await data.WriteAsync(buffer.AsMemory(0, read), context.CancellationToken).ConfigureAwait(false);
+                await data.WriteAsync(chunk, context.CancellationToken).ConfigureAwait(false);
                 await data.FlushAsync(context.CancellationToken).ConfigureAwait(false);
             }
             catch (IOException)
@@ -570,8 +608,8 @@ internal sealed class FtpSession(
                 return TransferResult.Failure(CurlExitCode.SendError, FtpTransferMessages.SendFailed, bytesTransferred);
             }
 
-            context.Events.ReportDataSent(buffer.AsSpan(0, read));
-            bytesTransferred += read;
+            context.Events.ReportDataSent(chunk.Span);
+            bytesTransferred += chunk.Length;
             context.Progress.ReportUploaded(bytesTransferred, expected);
         }
 
@@ -671,7 +709,7 @@ internal sealed class FtpSession(
                 ?? await QuitAndSucceedAsync().ConfigureAwait(false);
         }
 
-        return await SetTypeAsync(false).ConfigureAwait(false)
+        return await SetTypeAsync(typeCode.UseAscii).ConfigureAwait(false)
             ?? await ReadSizeAsync(fileName, false).ConfigureAwait(false)
             ?? await WriteHeaderAsync(fileSize is { } size ? FtpHeadHeaderLines.ContentLength(size) : null).ConfigureAwait(false)
             ?? await ReportRestAsync().ConfigureAwait(false);
@@ -1085,9 +1123,10 @@ internal sealed class FtpSession(
             : null;
     }
 
-    private async ValueTask<TransferResult?> SetTypeAsync(bool listing)
+    /// <summary>Sends <c>TYPE A</c> for a listing or an ASCII transfer, <c>TYPE I</c> otherwise.</summary>
+    private async ValueTask<TransferResult?> SetTypeAsync(bool ascii)
     {
-        FtpReply type = await ExchangeAsync(listing ? "TYPE A" : "TYPE I").ConfigureAwait(false);
+        FtpReply type = await ExchangeAsync(ascii ? "TYPE A" : "TYPE I").ConfigureAwait(false);
         return type.IsCompletion
             ? null
             : await QuitAndFailAsync(CurlExitCode.FtpCouldntSetType, FtpTransferMessages.CouldNotSetType).ConfigureAwait(false);

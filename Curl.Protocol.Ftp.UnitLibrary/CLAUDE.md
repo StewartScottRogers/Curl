@@ -12,7 +12,9 @@ announced, with curl's `-v` line, ADR-0107; a host name is resolved through the 
 `-r`, `-C` and `-I` (ADR-0093's BL-438 addendum), `--max-filesize` through `SIZE`, or
 part-way when the size is unknown (BL-638), `-z` and `-R` through `MDTM`
 (`FtpTimeCondition`, `FtpModificationTime`, ADR-0093's BL-637 addendum), and uploads `-T` with `STOR`, or `APPE`
-for `-C` (ADR-0093's BL-439 addendum), and honours `--disable-epsv`,
+for `-C` or `-a` (ADR-0093's BL-439 addendum; `-a`, BL-633), converting LF to CRLF under `--crlf`,
+sends `TYPE A` under `-B` or a `;type=a` URL suffix (`FtpTypeCode`; an ASCII download sends no
+`SIZE` or `REST`, BL-633), and honours `--disable-epsv`,
 `--no-ftp-skip-pasv-ip`, `--ftp-method`, `--ftp-create-dirs`, `-l` and `-Q`
 (ADR-0093's BL-436 addendum). TLS: `ftps://` is TLS from the first byte, and `--ssl`,
 `--ssl-reqd` and `--ftp-ssl-control` upgrade `ftp://` with `AUTH`, then `PBSZ` and `PROT`
