@@ -19,7 +19,8 @@ namespace Curl.Authentication;
 /// them (ADR-0176, ADR-0181). As libcurl does, <c>--negotiate</c> alone tries it on the first
 /// request, and after a challenge answers only when <c>-u</c> was given, even as <c>-u :</c>;
 /// NTLM answers only when <c>-u</c> was given, and <c>--ntlm</c> alone sends its Type 1 message
-/// on the first request. Only NTLM goes on after a request that sent a credential.
+/// on the first request. Only NTLM, and Negotiate when the 401 carries the acceptor's token
+/// (ADR-0227), go on after a request that sent a credential.
 /// </remarks>
 public sealed class RankedHttpAuthenticator(BasicAndBearerAuthenticator basicAndBearer, DigestAuthenticator digest, NegotiateHttpAuthenticator negotiate, NtlmHttpAuthenticator ntlm) : IHttpAuthenticator
 {
@@ -58,10 +59,30 @@ public sealed class RankedHttpAuthenticator(BasicAndBearerAuthenticator basicAnd
         ArgumentNullException.ThrowIfNull(sentAuthorization);
         ArgumentNullException.ThrowIfNull(challenges);
 
-        return challenges.Count != 0 && AnswersWithNtlm(request, challenges)
+        if (challenges.Count == 0)
+        {
+            return null;
+        }
+
+        if (ContinuesNegotiate(request, sentAuthorization))
+        {
+            return await negotiate.ContinueAuthorizationAsync(sentAuthorization, challenges, cancellationToken).ConfigureAwait(false);
+        }
+
+        return AnswersWithNtlm(request, challenges)
             ? await ntlm.CreateAuthorizationAsync(request, sentAuthorization, sentBeforeAnyChallenge, challenges, cancellationToken).ConfigureAwait(false)
             : null;
     }
+
+    /// <summary>
+    /// Decides whether the continuation is Negotiate's: for the origin only, when the request
+    /// sent a Negotiate value, which only <see cref="NegotiateHttpAuthenticator" /> makes, and
+    /// <c>-u</c> was given, as libcurl answers no 401 without a user (ADR-0227).
+    /// </summary>
+    private static bool ContinuesNegotiate(HttpAuthRequest request, string sentAuthorization) =>
+        !request.IsProxy
+            && request.Credential is not null
+            && sentAuthorization.StartsWith(NegotiateHttpAuthenticator.SchemePrefix, StringComparison.Ordinal);
 
     private static HttpAuthSchemes PickOf(HttpAuthRequest request, IReadOnlyList<string> challenges) =>
         HttpAuthSchemeRanking.PickFirst(request.AllowedSchemes & HttpChallengeSchemes.Offered(challenges));

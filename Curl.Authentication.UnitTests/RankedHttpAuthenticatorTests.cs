@@ -230,6 +230,37 @@ public sealed class RankedHttpAuthenticatorTests
     }
 
     [TestMethod]
+    public async Task ContinueAuthorizationAsync_NegotiateTokenInThe401_SendsTheContextsNextToken()
+    {
+        ScriptedSecurityContext context = new(
+            new SecurityContextStep(SecurityContextStatus.ContinueNeeded, [0x01]),
+            new SecurityContextStep(SecurityContextStatus.Completed, [0x02]));
+        RankedHttpAuthenticator authenticator = WithContexts(new ScriptedSecurityContextFactory(context));
+        HttpAuthRequest request = Request(HttpAuthSchemes.Negotiate);
+        string? sent = await authenticator.CreateAuthorizationAsync(request, [], CancellationToken.None);
+
+        string? value = await authenticator.ContinueAuthorizationAsync(request, sent!, sentBeforeAnyChallenge: true, ["Negotiate BA=="], CancellationToken.None);
+
+        Assert.AreEqual("Negotiate Ag==", value);
+    }
+
+    [TestMethod]
+    [DataRow(false, true, DisplayName = "A proxy's")]
+    [DataRow(true, false, DisplayName = "No -u")]
+    public async Task ContinueAuthorizationAsync_NotANegotiateLeg_SendsNothing(bool withoutCredential, bool isProxy)
+    {
+        ScriptedSecurityContext context = new(new SecurityContextStep(SecurityContextStatus.ContinueNeeded, [0x01]));
+        RankedHttpAuthenticator authenticator = WithContexts(new ScriptedSecurityContextFactory(context));
+        HttpAuthRequest request = Request(HttpAuthSchemes.Negotiate) with { Credential = withoutCredential ? null : new NetworkCredential("u", "p") };
+        string? sent = await authenticator.CreateAuthorizationAsync(request, [], CancellationToken.None);
+
+        string? value = await authenticator.ContinueAuthorizationAsync(request with { IsProxy = isProxy }, sent!, sentBeforeAnyChallenge: true, ["Negotiate BA=="], CancellationToken.None);
+
+        Assert.IsNull(value);
+        Assert.HasCount(1, context.IncomingTokens);
+    }
+
+    [TestMethod]
     public async Task ContinueAuthorizationAsync_NullArguments_Throw()
     {
         HttpAuthRequest request = Request(HttpAuthSchemes.Ntlm);

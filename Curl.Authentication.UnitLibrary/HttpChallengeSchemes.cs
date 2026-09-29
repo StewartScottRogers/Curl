@@ -19,12 +19,14 @@ internal static class HttpChallengeSchemes
 
     private const string NtlmSchemeName = "NTLM";
 
+    private const string NegotiateSchemeName = "Negotiate";
+
     private static readonly (string Name, HttpAuthSchemes Scheme)[] KnownSchemes =
     [
         ("Basic", HttpAuthSchemes.Basic),
         ("Digest", HttpAuthSchemes.Digest),
         (NtlmSchemeName, HttpAuthSchemes.Ntlm),
-        ("Negotiate", HttpAuthSchemes.Negotiate),
+        (NegotiateSchemeName, HttpAuthSchemes.Negotiate),
         ("Bearer", HttpAuthSchemes.Bearer),
     ];
 
@@ -56,16 +58,31 @@ internal static class HttpChallengeSchemes
     /// The base64 text of the Type 2 message; empty for a bare <c>NTLM</c>, which asks for
     /// Type 1; <see langword="null" /> when no challenge is NTLM.
     /// </returns>
-    internal static string? NtlmTokenOf(IReadOnlyList<string> challenges)
+    internal static string? NtlmTokenOf(IReadOnlyList<string> challenges) =>
+        TokenOf(challenges, HttpAuthSchemes.Ntlm, NtlmSchemeName);
+
+    /// <summary>
+    /// Gets the token of the first Negotiate challenge, as curl's <c>Curl_input_negotiate</c>
+    /// reads it: the text after <c>Negotiate</c> and the blanks that follow it.
+    /// </summary>
+    /// <param name="challenges">The header values, verbatim.</param>
+    /// <returns>
+    /// The base64 text of the acceptor's token; empty for a bare <c>Negotiate</c>;
+    /// <see langword="null" /> when no challenge is Negotiate.
+    /// </returns>
+    internal static string? NegotiateTokenOf(IReadOnlyList<string> challenges) =>
+        TokenOf(challenges, HttpAuthSchemes.Negotiate, NegotiateSchemeName);
+
+    private static string? TokenOf(IReadOnlyList<string> challenges, HttpAuthSchemes scheme, string schemeName)
     {
         foreach (string challenge in challenges)
         {
             foreach (string element in challenge.Split(','))
             {
                 string trimmed = element.TrimStart(' ', '\t');
-                if (SchemeAtStartOf(trimmed) == HttpAuthSchemes.Ntlm)
+                if (SchemeAtStartOf(trimmed) == scheme)
                 {
-                    return trimmed[NtlmSchemeName.Length..].Trim(CurlSpaces.ToCharArray());
+                    return trimmed[schemeName.Length..].Trim(CurlSpaces.ToCharArray());
                 }
             }
         }

@@ -6,12 +6,13 @@ namespace Curl.Protocol.Abstractions;
 /// </summary>
 /// <remarks>
 /// Implemented in <c>Curl.Authentication.UnitLibrary</c> and handed to the HTTP handler by
-/// <c>Curl.Console</c>, so the handler never references the implementation. No call
-/// keeps state between calls. <see cref="CreateAuthorization" /> does no I/O;
-/// <see cref="CreateAuthorizationAsync" />, which the HTTP handler calls, may, as Negotiate
-/// asks a KDC (ADR-0176). A handshake of more than one leg (NTLM) goes on through
+/// <c>Curl.Console</c>, so the handler never references the implementation.
+/// <see cref="CreateAuthorization" /> does no I/O; <see cref="CreateAuthorizationAsync" />,
+/// which the HTTP and WebSocket handlers call, may, as Negotiate asks a KDC (ADR-0176). A
+/// handshake of more than one leg (NTLM, Negotiate) goes on through
 /// <see cref="ContinueAuthorizationAsync" />, which is told what the last request sent
-/// (ADR-0181).
+/// (ADR-0181). The only state kept between calls is a Negotiate context awaiting its next
+/// leg, found again by the value its token made (ADR-0227).
 /// </remarks>
 public interface IHttpAuthenticator
 {
@@ -49,8 +50,9 @@ public interface IHttpAuthenticator
     /// <summary>
     /// Creates the authorization header value that answers a challenge to a request that
     /// already sent one, as NTLM answers its Type 2 challenge to the Type 1 message it sent
-    /// (ADR-0181). By default it answers nothing, so a credential sent and refused ends the
-    /// transfer on the response, as curl 8.21.0 does for Basic, Digest and Negotiate.
+    /// (ADR-0181), or a Negotiate context its acceptor's token (ADR-0227). By default it
+    /// answers nothing, so a credential sent and refused ends the transfer on the response, as
+    /// curl 8.21.0 does for Basic, Digest and a Negotiate context with nothing more to say.
     /// </summary>
     /// <param name="request">The request being authorised, and what it may be authorised with.</param>
     /// <param name="sentAuthorization">The header value the request that drew the challenges sent.</param>

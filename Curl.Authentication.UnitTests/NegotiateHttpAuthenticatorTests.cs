@@ -13,25 +13,127 @@ namespace Curl.Authentication;
 public sealed class NegotiateHttpAuthenticatorTests
 {
     [TestMethod]
-    public async Task CreateAuthorizationAsync_ContextMakesAToken_SendsItBase64EncodedAndDisposesTheContext()
+    public async Task CreateAuthorizationAsync_ContextMakesAToken_SendsItBase64EncodedAndKeepsTheContextForTheNextLeg()
     {
         ScriptedSecurityContext context = new(new SecurityContextStep(SecurityContextStatus.ContinueNeeded, [0x60, 0x82, 0x01]));
 
         string? value = await new NegotiateHttpAuthenticator(new ScriptedSecurityContextFactory(context)).CreateAuthorizationAsync(Request(":"), CancellationToken.None);
 
         Assert.AreEqual("Negotiate YIIB", value);
-        Assert.IsTrue(context.IsDisposed);
+        Assert.IsFalse(context.IsDisposed);
         Assert.IsEmpty(context.IncomingTokens.Single());
     }
 
     [TestMethod]
-    public async Task CreateAuthorizationAsync_ContextCompletesAtOnce_SendsItsToken()
+    public async Task CreateAuthorizationAsync_ContextCompletesAtOnce_SendsItsTokenAndDisposesTheContext()
     {
         ScriptedSecurityContext context = new(new SecurityContextStep(SecurityContextStatus.Completed, [0x01]));
 
         string? value = await new NegotiateHttpAuthenticator(new ScriptedSecurityContextFactory(context)).CreateAuthorizationAsync(Request(":"), CancellationToken.None);
 
         Assert.AreEqual("Negotiate AQ==", value);
+        Assert.IsTrue(context.IsDisposed);
+    }
+
+    [TestMethod]
+    public async Task CreateAuthorizationAsync_StepThrows_DisposesTheContextAndRethrows()
+    {
+        ScriptedSecurityContext context = new();
+
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(
+            () => new NegotiateHttpAuthenticator(new ScriptedSecurityContextFactory(context)).CreateAuthorizationAsync(Request(":"), CancellationToken.None).AsTask());
+
+        Assert.IsTrue(context.IsDisposed);
+    }
+
+    [TestMethod]
+    public async Task CreateAuthorizationAsync_SameTokenTwice_DisposesTheContextItReplaces()
+    {
+        ScriptedSecurityContext first = new(new SecurityContextStep(SecurityContextStatus.ContinueNeeded, [0x01]));
+        ScriptedSecurityContext second = new(
+            new SecurityContextStep(SecurityContextStatus.ContinueNeeded, [0x01]),
+            new SecurityContextStep(SecurityContextStatus.Completed, [0x02]));
+        NegotiateHttpAuthenticator authenticator = new(new ScriptedSecurityContextFactory(first, second));
+
+        await authenticator.CreateAuthorizationAsync(Request(":"), CancellationToken.None);
+        await authenticator.CreateAuthorizationAsync(Request(":"), CancellationToken.None);
+        string? value = await authenticator.ContinueAuthorizationAsync("Negotiate AQ==", ["Negotiate BA=="], CancellationToken.None);
+
+        Assert.IsTrue(first.IsDisposed);
+        Assert.AreEqual("Negotiate Ag==", value);
+        Assert.IsTrue(second.IsDisposed);
+    }
+
+    [TestMethod]
+    public async Task ContinueAuthorizationAsync_AcceptorsToken_StepsTheSameContextThroughEveryLeg()
+    {
+        ScriptedSecurityContext context = new(
+            new SecurityContextStep(SecurityContextStatus.ContinueNeeded, [0x01]),
+            new SecurityContextStep(SecurityContextStatus.ContinueNeeded, [0x02]),
+            new SecurityContextStep(SecurityContextStatus.Completed, [0x03]));
+        ScriptedSecurityContextFactory factory = new(context);
+        NegotiateHttpAuthenticator authenticator = new(factory);
+
+        string? first = await authenticator.CreateAuthorizationAsync(Request(":"), CancellationToken.None);
+        string? second = await authenticator.ContinueAuthorizationAsync(first!, ["Basic realm=\"r\", negotiate  BA==  "], CancellationToken.None);
+        string? third = await authenticator.ContinueAuthorizationAsync(second!, ["Negotiate BQ=="], CancellationToken.None);
+
+        Assert.AreEqual("Negotiate AQ==", first);
+        Assert.AreEqual("Negotiate Ag==", second);
+        Assert.AreEqual("Negotiate Aw==", third);
+        Assert.HasCount(1, factory.Requests);
+        CollectionAssert.AreEqual(new byte[] { 0x04 }, context.IncomingTokens[1]);
+        CollectionAssert.AreEqual(new byte[] { 0x05 }, context.IncomingTokens[2]);
+        Assert.IsTrue(context.IsDisposed);
+    }
+
+    [TestMethod]
+    [DataRow("Negotiate", DisplayName = "Bare Negotiate: curl's LOGIN_DENIED")]
+    [DataRow("Negotiate @@@", DisplayName = "Token that is not base64")]
+    [DataRow("Basic realm=\"r\"", DisplayName = "No Negotiate challenge")]
+    public async Task ContinueAuthorizationAsync_NoTokenToStepWith_EndsOnThe401AndDisposesTheContext(string challenge)
+    {
+        ScriptedSecurityContext context = new(new SecurityContextStep(SecurityContextStatus.ContinueNeeded, [0x01]));
+        NegotiateHttpAuthenticator authenticator = new(new ScriptedSecurityContextFactory(context));
+        string? sent = await authenticator.CreateAuthorizationAsync(Request(":"), CancellationToken.None);
+
+        string? value = await authenticator.ContinueAuthorizationAsync(sent!, [challenge], CancellationToken.None);
+
+        Assert.IsNull(value);
+        Assert.IsTrue(context.IsDisposed);
+        Assert.HasCount(1, context.IncomingTokens);
+    }
+
+    [TestMethod]
+    public async Task ContinueAuthorizationAsync_ContextRefusesTheToken_SendsNothingAndDisposesIt()
+    {
+        ScriptedSecurityContext context = new(
+            new SecurityContextStep(SecurityContextStatus.ContinueNeeded, [0x01]),
+            new SecurityContextStep(SecurityContextStatus.Refused, []));
+        NegotiateHttpAuthenticator authenticator = new(new ScriptedSecurityContextFactory(context));
+        string? sent = await authenticator.CreateAuthorizationAsync(Request(":"), CancellationToken.None);
+
+        string? value = await authenticator.ContinueAuthorizationAsync(sent!, ["Negotiate BA=="], CancellationToken.None);
+
+        Assert.IsNull(value);
+        Assert.IsTrue(context.IsDisposed);
+    }
+
+    [TestMethod]
+    [DataRow("Negotiate AQ==", DisplayName = "A value no context awaiting a leg made")]
+    [DataRow("Basic dTpw", DisplayName = "Not a Negotiate value")]
+    public async Task ContinueAuthorizationAsync_NoContextAwaitsTheValueSent_SendsNothing(string sent)
+    {
+        string? value = await Default.ContinueAuthorizationAsync(sent, ["Negotiate BA=="], CancellationToken.None);
+
+        Assert.IsNull(value);
+    }
+
+    [TestMethod]
+    public async Task ContinueAuthorizationAsync_NullArguments_Throw()
+    {
+        await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => Default.ContinueAuthorizationAsync(null!, [], CancellationToken.None).AsTask());
+        await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => Default.ContinueAuthorizationAsync("Negotiate AQ==", null!, CancellationToken.None).AsTask());
     }
 
     [TestMethod]
