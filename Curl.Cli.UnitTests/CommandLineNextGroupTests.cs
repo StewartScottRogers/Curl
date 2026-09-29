@@ -49,7 +49,7 @@ public sealed class CommandLineNextGroupTests
         "tlspassword", "tlsauthtype", "range", "continue-at", "max-filesize", "connect-timeout", "max-time",
         "retry", "retry-delay", "retry-max-time", "retry-all-errors", "retry-connrefused", "limit-rate",
         "speed-limit", "speed-time", "remote-time", "time-cond", "request", "header", "proxy-header",
-        "user-agent", "referer", "cookie", "cookie-jar", "junk-session-cookies", "location", "location-trusted",
+        "user-agent", "referer", "cookie", "cookie-jar", "junk-session-cookies", "follow", "location", "location-trusted",
         "max-redirs", "post301", "post302", "post303", "show-headers", "include", "head", "fail",
         "fail-with-body", "compressed", "raw", "tr-encoding", "ignore-content-length", "path-as-is", "http0.9",
         "request-target", "ipfs-gateway", "http1.0", "http1.1", "http2", "http2-prior-knowledge", "http3",

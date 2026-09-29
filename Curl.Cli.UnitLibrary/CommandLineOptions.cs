@@ -1399,10 +1399,19 @@ public sealed class CommandLineOptions
     public bool JunkSessionCookies { get; internal set; }
 
     /// <summary>
-    /// <see langword="true"/> when <c>-L</c> / <c>--location</c> or <c>--location-trusted</c> was
-    /// given and no <c>--no-location</c> or <c>--no-location-trusted</c> came after it: follow redirects.
+    /// <see langword="true"/> when <c>-L</c> / <c>--location</c>, <c>--location-trusted</c> or
+    /// <c>--follow</c> was given and no <c>--no-location</c>, <c>--no-location-trusted</c> or
+    /// <c>--no-follow</c> came after it: follow redirects.
     /// </summary>
     public bool FollowRedirects { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--follow</c> was the last of <c>-L</c>, <c>--location-trusted</c>,
+    /// <c>--follow</c> and their <c>--no-</c> spellings given: redirects are followed with the method
+    /// changed as the HTTP specification says, a <c>-X</c> method dropped whenever a redirect switches
+    /// the request to GET, rather than kept as <c>-L</c> keeps it (curl 8.21.0, measured, BL-627 Notes).
+    /// </summary>
+    public bool FollowRedirectsPerSpec { get; internal set; }
 
     /// <summary>
     /// <see langword="true"/> when <c>--location-trusted</c> was given and no <c>--no-location-trusted</c>

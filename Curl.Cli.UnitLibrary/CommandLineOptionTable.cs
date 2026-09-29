@@ -273,7 +273,8 @@ public static class CommandLineOptionTable
         CommandLineOption.Value("cookie", 'b', AcceptingEmpty((options, cookie) => options.AddCookie(cookie))),
         CommandLineOption.Text("cookie-jar", 'c', (options, file) => options.CookieJar = file),
         CommandLineOption.NegatableFlag("junk-session-cookies", 'j', (options, on) => options.JunkSessionCookies = on),
-        CommandLineOption.NegatableFlag("location", 'L', (options, on) => options.FollowRedirects = on),
+        CommandLineOption.NegatableFlag("follow", null, SetFollow),
+        CommandLineOption.NegatableFlag("location", 'L', SetLocation),
         CommandLineOption.NegatableFlag("location-trusted", null, SetLocationTrusted),
         CommandLineOption.Value("max-redirs", null, SetMaxRedirects),
         CommandLineOption.NegatableFlag("post301", null, (options, on) => options.KeepPostAfter301 = on),
@@ -1464,11 +1465,34 @@ public static class CommandLineOptionTable
     /// <summary>
     /// Turns <c>--location-trusted</c> on or off: it follows redirects and sends credentials to every
     /// host they lead to, and its <c>--no-</c> spelling turns off both, as curl 8.21.0's tool does.
+    /// Like <c>-L</c>, either spelling ends an earlier <c>--follow</c>'s per-specification method changes.
     /// </summary>
     private static void SetLocationTrusted(CommandLineOptions options, bool on)
     {
         options.SendCredentialsToRedirectHosts = on;
+        SetLocation(options, on);
+    }
+
+    /// <summary>
+    /// Turns <c>-L</c> / <c>--location</c> on or off. curl 8.21.0 keeps one follow switch for
+    /// <c>-L</c> and <c>--follow</c>, the last given winning, so either spelling also ends an
+    /// earlier <c>--follow</c>'s per-specification method changes (measured, BL-627 Notes).
+    /// </summary>
+    private static void SetLocation(CommandLineOptions options, bool on)
+    {
         options.FollowRedirects = on;
+        options.FollowRedirectsPerSpec = false;
+    }
+
+    /// <summary>
+    /// Turns <c>--follow</c> on or off: it follows redirects as <c>-L</c> does, and also drops a
+    /// <c>-X</c> method whenever a redirect switches the request to GET; <c>--no-follow</c> stops
+    /// following altogether, as <c>--no-location</c> does (curl 8.21.0, measured, BL-627 Notes).
+    /// </summary>
+    private static void SetFollow(CommandLineOptions options, bool on)
+    {
+        options.FollowRedirects = on;
+        options.FollowRedirectsPerSpec = on;
     }
 
     private static CommandLineRefusal? SetMaxRedirects(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)

@@ -87,6 +87,79 @@ public sealed class CommandLineRedirectAndFailOptionTests
         Assert.IsFalse(options.SendCredentialsToRedirectHosts);
     }
 
+    // ---- --follow (curl 8.21.0, measured, BL-627 Notes) ------------------------------
+
+    [TestMethod]
+    public void Parse_NoneOfTheOptions_DoesNotFollowPerSpec()
+    {
+        Assert.IsFalse(Accept(Url).FollowRedirectsPerSpec);
+    }
+
+    [TestMethod]
+    public void Parse_Follow_FollowsRedirectsPerSpec()
+    {
+        CommandLineOptions options = Accept("--follow", Url);
+
+        Assert.IsTrue(options.FollowRedirects);
+        Assert.IsTrue(options.FollowRedirectsPerSpec);
+        Assert.IsFalse(options.SendCredentialsToRedirectHosts);
+    }
+
+    [TestMethod]
+    [DataRow("-L")]
+    [DataRow("--location")]
+    public void Parse_Location_DoesNotFollowPerSpec(string spelling)
+    {
+        Assert.IsFalse(Accept(spelling, Url).FollowRedirectsPerSpec);
+    }
+
+    [TestMethod]
+    [DataRow("--follow", "-L")]
+    [DataRow("--follow", "--location-trusted")]
+    [DataRow("--follow", "--no-follow", "-L")]
+    [DataRow("--follow", "--no-location", "-L")]
+    [DataRow("--follow", "--no-location", "--location-trusted")]
+    public void Parse_LocationAfterFollow_FollowsAsLocation(params string[] arguments)
+    {
+        CommandLineOptions options = Accept([.. arguments, Url]);
+
+        Assert.IsTrue(options.FollowRedirects);
+        Assert.IsFalse(options.FollowRedirectsPerSpec);
+    }
+
+    [TestMethod]
+    [DataRow("-L", "--follow")]
+    [DataRow("--location-trusted", "--follow")]
+    [DataRow("--no-location", "--follow")]
+    public void Parse_FollowAfterLocation_FollowsPerSpec(params string[] arguments)
+    {
+        CommandLineOptions options = Accept([.. arguments, Url]);
+
+        Assert.IsTrue(options.FollowRedirects);
+        Assert.IsTrue(options.FollowRedirectsPerSpec);
+    }
+
+    [TestMethod]
+    [DataRow("--follow", "--no-follow")]
+    [DataRow("-L", "--no-follow")]
+    [DataRow("--follow", "--no-location")]
+    [DataRow("--follow", "--no-location-trusted")]
+    public void Parse_NoFollowOrNoLocationLast_DoesNotFollow(params string[] arguments)
+    {
+        CommandLineOptions options = Accept([.. arguments, Url]);
+
+        Assert.IsFalse(options.FollowRedirects);
+        Assert.IsFalse(options.FollowRedirectsPerSpec);
+    }
+
+    [TestMethod]
+    public void Parse_LocationTrustedAfterFollow_KeepsSendingCredentialsOn()
+    {
+        CommandLineOptions options = Accept("--follow", "--location-trusted", Url);
+
+        Assert.IsTrue(options.SendCredentialsToRedirectHosts);
+    }
+
     // ---- --max-redirs -------------------------------------------------------------
 
     [TestMethod]
