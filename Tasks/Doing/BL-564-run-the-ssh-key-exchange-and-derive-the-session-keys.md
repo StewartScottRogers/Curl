@@ -56,3 +56,4 @@ The transport runs every BCL-backed key exchange BL-560's ADR offers (ECDH on NI
 - 2026-09-29: Doing -> Backlog. Lane 6 could not integrate: fast tests failed after rebasing onto the other lanes' work. The work is on branch factory/BL-564-lane-6-20260929-023709; start with git cherry-pick --no-commit factory/BL-564-lane-6-20260929-023709 and fix it.
 - 2026-09-29: Backlog -> Doing.
 - 2026-09-29: Doing -> Backlog. Overlaps Documentation/Planning/Decisions with BL-883 in Doing; code is green on factory/BL-564-lane-6-20260929-023709 - cherry-pick 9e19c6f4 5d5ae996 per Notes
+- 2026-09-29: Backlog -> Doing.
