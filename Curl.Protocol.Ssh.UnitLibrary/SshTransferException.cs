@@ -77,6 +77,29 @@ internal sealed class SshTransferException(CurlExitCode exitCode, string message
         new(Sftp.SftpStatusCode.ExitCodeFor(status), $"Could not open remote file for reading: {Sftp.SftpStatusCode.DescriptionOf(status)}");
 
     /// <summary>
+    /// Creates the failure curl 8.21.0 reports when the server answers an upload's
+    /// <c>SSH_FXP_OPEN</c> with a failed status: the status's exit code and <c>Upload
+    /// failed: &lt;description&gt; (&lt;status&gt;/-31)</c>, libssh2's
+    /// <c>LIBSSH2_ERROR_SFTP_PROTOCOL</c>, measured 2026-09-29 for codes 1, 2, 3, 4 and 11
+    /// (BL-571, ADR-0243).
+    /// </summary>
+    /// <param name="status">The <c>SSH_FX_*</c> code.</param>
+    /// <returns>The exception.</returns>
+    internal static SshTransferException SftpUploadFailed(uint status) =>
+        new(Sftp.SftpStatusCode.ExitCodeFor(status), $"Upload failed: {Sftp.SftpStatusCode.DescriptionOf(status)} ({status}/-31)");
+
+    /// <summary>
+    /// Creates the failure curl 8.21.0 reports when an upload's second <c>SSH_FXP_OPEN</c>,
+    /// after <c>--ftp-create-dirs</c> made the directories, fails too: the status's exit
+    /// code and <c>Creating the dir/file failed: &lt;description&gt;</c>, measured 2026-09-29
+    /// (BL-571, ADR-0243).
+    /// </summary>
+    /// <param name="status">The <c>SSH_FX_*</c> code.</param>
+    /// <returns>The exception.</returns>
+    internal static SshTransferException SftpCreateFailed(uint status) =>
+        new(Sftp.SftpStatusCode.ExitCodeFor(status), $"Creating the dir/file failed: {Sftp.SftpStatusCode.DescriptionOf(status)}");
+
+    /// <summary>
     /// Creates the failure curl 8.21.0 reports when the server answers
     /// <c>SSH_FXP_OPENDIR</c> with a failed status: the status's exit code and <c>Could not
     /// open directory for reading: &lt;description&gt;</c>, measured 2026-09-29 for codes 1,

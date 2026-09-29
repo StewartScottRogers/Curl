@@ -15,7 +15,9 @@ namespace Curl.Protocol.Ssh;
 /// Serves the <c>scp</c> and <c>sftp</c> schemes as curl 8.21.0 does through libssh2 1.11.1
 /// (ADR-0122): narrows the host-key list from the known-hosts file, connects,
 /// runs the transport's handshake, requests <c>ssh-userauth</c>, checks the server's host
-/// key, authenticates the user, downloads the URL's file with <see cref="SftpFileDownload" />
+/// key, authenticates the user, uploads <see cref="ITransferContext.Upload" /> over
+/// <c>sftp</c> with <see cref="SftpFileUpload" /> when there is one, and otherwise downloads
+/// the URL's file with <see cref="SftpFileDownload" />
 /// or <see cref="ScpFileDownload" /> - or, for an <c>sftp</c> path ending with a slash, lists
 /// the directory with <see cref="SftpDirectoryListing" /> - into
 /// <see cref="ITransferContext.Output" />, and ends the session with
@@ -204,10 +206,16 @@ public sealed class SshProtocolHandler : IProtocolHandler
             : await TransferOverSftpAsync(context, transport).ConfigureAwait(false);
     }
 
-    // A path ending with a slash is listed; any other is downloaded (ADR-0241).
+    // An upload is sent (ADR-0243); otherwise a path ending with a slash is listed and any
+    // other is downloaded (ADR-0241).
     private static async ValueTask<TransferResult> TransferOverSftpAsync(ITransferContext context, SshTransport transport)
     {
         string urlPath = context.Url.AbsolutePath;
+        if (context.Upload is { } upload)
+        {
+            return await new SftpFileUpload(transport).UploadAsync(urlPath, SftpUploadOptions.From(context), upload, context.Progress, context.CancellationToken).ConfigureAwait(false);
+        }
+
         return SftpRemotePath.NamesDirectory(urlPath)
             ? await new SftpDirectoryListing(transport).ListAsync(urlPath, context.ListOnly, context.NoBody, context.Output, context.Progress, context.CancellationToken).ConfigureAwait(false)
             : await new SftpFileDownload(transport).DownloadAsync(urlPath, context.CreateFileMode, context.Output, context.Progress, context.CancellationToken).ConfigureAwait(false);

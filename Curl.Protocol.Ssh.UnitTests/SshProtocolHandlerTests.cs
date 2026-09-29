@@ -308,6 +308,57 @@ public sealed class SshProtocolHandlerTests
     }
 
     [TestMethod]
+    [DataRow(false, DisplayName = "no -C")]
+    [DataRow(true, DisplayName = "a negative -C counts as 0")]
+    public async Task ExecuteAsync_SftpUpload_StoresTheFileAndReportsItsSizeAsCurlDoes(bool negativeResume)
+    {
+        InMemorySshServer server = Server();
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse($"sftp://{Host}/data/up.txt"),
+            Output = new MemoryStream(),
+            Credentials = new NetworkCredential(User, Password),
+            Upload = new MemoryStream(Hello),
+            ResumeFrom = negativeResume ? -1 : null,
+        };
+
+        TransferResult result = await Handler(server).ExecuteAsync(context);
+        await server.WhenSessionsEndAsync();
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(Hello.Length, result.Report!.UploadSize);
+        CollectionAssert.AreEqual(Hello, server.Files["/data/up.txt"]);
+        AssertEvents(
+            server,
+            "service ssh-userauth", $"auth none {User} refused", $"auth password {User} ok", "channel open session", "subsystem sftp",
+            "sftp 16 .", "sftp 3 /data/up.txt", "sftp 6 /data/up.txt", "sftp 4 /data/up.txt", "channel eof", "channel close", "disconnect 11 Shutdown");
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_SftpUploadResumedAndAppended_ReadsEachOptionFromTheContext()
+    {
+        InMemorySshServer server = Server();
+        server.Files["/data/up.txt"] = [.. "prefix-"u8];
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse($"sftp://{Host}/data/up.txt"),
+            Output = new MemoryStream(),
+            Credentials = new NetworkCredential(User, Password),
+            Upload = new MemoryStream(Hello),
+            ResumeUploadFromUnknownOffset = true,
+            Append = true,
+            FtpCreateDirectories = true,
+        };
+
+        TransferResult result = await Handler(server).ExecuteAsync(context);
+        await server.WhenSessionsEndAsync();
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.Contains("sftp 17 /data/up.txt", server.Events, "-C - asks the remote size");
+        CollectionAssert.AreEqual(Hello, server.Files["/data/up.txt"], "the in-memory server writes at the offset sent, 0 under -a");
+    }
+
+    [TestMethod]
     [DataRow(0, "connector")]
     [DataRow(1, "fileSystem")]
     [DataRow(2, "preferences")]

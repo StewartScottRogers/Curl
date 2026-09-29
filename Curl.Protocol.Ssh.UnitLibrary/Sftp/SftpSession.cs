@@ -37,10 +37,8 @@ internal sealed class SftpSession
     /// <summary>libssh2's description when a <c>SSH_FXP_VERSION</c> extension's data is cut short.</summary>
     internal const string ExtensionDataTooShort = "Data too short when extracting extdata";
 
-    // SSH_FXF_READ, the attribute flags, and the file-type bits libssh2 sends with an open
+    // The attribute flags, and the file-type bits libssh2 sends with an open or a mkdir
     // and reads from a directory's entries.
-    private const uint OpenForReading = 0x00000001;
-
     private const uint AttributeSize = 0x00000001;
 
     private const uint AttributeUserAndGroup = 0x00000002;
@@ -53,7 +51,12 @@ internal sealed class SftpSession
 
     private const uint FileTypeMask = 0xF000;
 
+    private const uint DirectoryType = 0x4000;
+
     private const uint RegularFileType = 0x8000;
+
+    // curl's CURLOPT_NEW_DIRECTORY_PERMS default, which the curl tool never changes.
+    private const uint NewDirectoryPermissions = 0x1ED;
 
     private const uint SymbolicLinkType = 0xA000;
 
@@ -127,17 +130,90 @@ internal sealed class SftpSession
     /// <exception cref="InvalidDataException">The answer is malformed or of another type.</exception>
     internal async ValueTask<byte[]> OpenForReadingAsync(byte[] path, UnixFileMode createFileMode, CancellationToken cancellationToken)
     {
+        (byte[]? handle, uint status) = await OpenAsync(path, SftpOpenFlags.Read, createFileMode, cancellationToken).ConfigureAwait(false);
+        return handle ?? throw SshTransferException.SftpOpenFailed(status);
+    }
+
+    /// <summary>
+    /// Sends <c>SSH_FXP_OPEN</c> with <paramref name="flags" /> and the permissions
+    /// attribute libssh2 adds: a regular file with <paramref name="createFileMode" />. A
+    /// status of <c>SSH_FX_OK</c> is not an answer: as measured, curl goes on waiting.
+    /// </summary>
+    /// <param name="path">The path to open.</param>
+    /// <param name="flags">The <see cref="SftpOpenFlags" /> bits.</param>
+    /// <param name="createFileMode">The permission bits, curl's <c>--create-file-mode</c>, 0644 unless given.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    /// <returns>The file's handle, or <see langword="null" /> and the failed status the server answered with.</returns>
+    /// <exception cref="InvalidDataException">The answer is malformed or of another type.</exception>
+    internal async ValueTask<(byte[]? Handle, uint Status)> OpenAsync(byte[] path, uint flags, UnixFileMode createFileMode, CancellationToken cancellationToken)
+    {
         uint id = await SendRequestAsync(
             SftpPacketType.Open,
             fields =>
             {
                 fields.WriteString(path);
-                fields.WriteUInt32(OpenForReading);
+                fields.WriteUInt32(flags);
                 fields.WriteUInt32(AttributePermissions);
                 fields.WriteUInt32(RegularFileType | (uint)createFileMode);
             },
             cancellationToken).ConfigureAwait(false);
-        return await ReadHandleAsync(id, SshTransferException.SftpOpenFailed, cancellationToken).ConfigureAwait(false);
+        return await ReadHandleOrStatusAsync(id, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sends <c>SSH_FXP_MKDIR</c> for <paramref name="path" /> with the permissions
+    /// attribute libssh2 adds: a directory with mode 0755, curl's default, as measured.
+    /// </summary>
+    /// <param name="path">The directory to create.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    /// <returns>The status the server answered with.</returns>
+    /// <exception cref="InvalidDataException">The answer is malformed or of another type.</exception>
+    internal async ValueTask<uint> MakeDirectoryAsync(byte[] path, CancellationToken cancellationToken)
+    {
+        uint id = await SendRequestAsync(
+            SftpPacketType.MakeDirectory,
+            fields =>
+            {
+                fields.WriteString(path);
+                fields.WriteUInt32(AttributePermissions);
+                fields.WriteUInt32(DirectoryType | NewDirectoryPermissions);
+            },
+            cancellationToken).ConfigureAwait(false);
+        return await ReadStatusAsync(id, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sends <c>SSH_FXP_WRITE</c> of <paramref name="data" /> at <paramref name="offset" />,
+    /// without waiting for the answer.
+    /// </summary>
+    /// <param name="handle">The open file's handle.</param>
+    /// <param name="offset">Where the bytes go in the file.</param>
+    /// <param name="data">The bytes.</param>
+    /// <param name="cancellationToken">Cancels the send.</param>
+    /// <returns>The request's number, for <see cref="ReadStatusAsync" />.</returns>
+    internal ValueTask<uint> SendWriteAsync(byte[] handle, long offset, ReadOnlyMemory<byte> data, CancellationToken cancellationToken) =>
+        SendRequestAsync(
+            SftpPacketType.Write,
+            fields =>
+            {
+                fields.WriteString(handle);
+                fields.WriteUInt32((uint)(offset >> 32));
+                fields.WriteUInt32((uint)offset);
+                fields.WriteString(data.Span);
+            },
+            cancellationToken);
+
+    /// <summary>
+    /// Reads the status that answers the request numbered <paramref name="id" />.
+    /// </summary>
+    /// <param name="id">The request's number.</param>
+    /// <param name="cancellationToken">Cancels the read.</param>
+    /// <returns>The <c>SSH_FX_*</c> code.</returns>
+    /// <exception cref="InvalidDataException">The answer is malformed or of another type.</exception>
+    internal async ValueTask<uint> ReadStatusAsync(uint id, CancellationToken cancellationToken)
+    {
+        (byte type, SshWireReader answer) = await ReadAnswerAsync(id, cancellationToken).ConfigureAwait(false);
+        return ReadStatus(type, answer);
     }
 
     /// <summary>
@@ -405,18 +481,25 @@ internal sealed class SftpSession
     // The handle answering the open numbered id; an SSH_FX_OK status is waited past.
     private async ValueTask<byte[]> ReadHandleAsync(uint id, Func<uint, SshTransferException> failure, CancellationToken cancellationToken)
     {
+        (byte[]? handle, uint status) = await ReadHandleOrStatusAsync(id, cancellationToken).ConfigureAwait(false);
+        return handle ?? throw failure(status);
+    }
+
+    // The handle answering the open numbered id, or the failed status; SSH_FX_OK is waited past.
+    private async ValueTask<(byte[]? Handle, uint Status)> ReadHandleOrStatusAsync(uint id, CancellationToken cancellationToken)
+    {
         while (true)
         {
             (byte type, SshWireReader answer) = await ReadAnswerAsync(id, cancellationToken).ConfigureAwait(false);
             if (type == SftpPacketType.Handle)
             {
-                return answer.ReadString().ToArray();
+                return (answer.ReadString().ToArray(), SftpStatusCode.Ok);
             }
 
             uint status = ReadStatus(type, answer);
             if (status != SftpStatusCode.Ok)
             {
-                throw failure(status);
+                return (null, status);
             }
         }
     }

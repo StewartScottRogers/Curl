@@ -21,11 +21,17 @@ internal static class SftpPacketType
     /// <summary><c>SSH_FXP_READ</c>: asks for up to a length of bytes at an offset of an open file.</summary>
     internal const byte Read = 5;
 
+    /// <summary><c>SSH_FXP_WRITE</c>: writes bytes at an offset of an open file, answered by a status.</summary>
+    internal const byte Write = 6;
+
     /// <summary><c>SSH_FXP_OPENDIR</c>: opens a directory for listing, answered by a handle or a status.</summary>
     internal const byte OpenDirectory = 11;
 
     /// <summary><c>SSH_FXP_READDIR</c>: asks for the next names of an open directory, answered by names or a status.</summary>
     internal const byte ReadDirectory = 12;
+
+    /// <summary><c>SSH_FXP_MKDIR</c>: creates a directory with attributes, answered by a status.</summary>
+    internal const byte MakeDirectory = 14;
 
     /// <summary><c>SSH_FXP_REALPATH</c>: asks the server to make a path absolute; curl sends <c>.</c> for the home directory.</summary>
     internal const byte RealPath = 16;

@@ -289,10 +289,11 @@ internal sealed class InMemorySshServerSession(InMemorySshServer server, InMemor
         uint id = request.ReadUInt32();
         string argument = Encoding.UTF8.GetString(request.ReadString().Span);
         server.Record($"sftp {type} {argument}");
-        byte[]? file = server.Files.TryGetValue(argument, out byte[]? found) ? found : null;
+        byte[]? file = FileFor(type, argument, request);
         byte[] answer = type switch
         {
             SftpPacketType.RealPath => Join([SftpPacketType.Name], UInt32(id), UInt32(1), Name(server.HomeDirectory), Name(server.HomeDirectory), UInt32(0)),
+            SftpPacketType.Write => StoreWrite(id, argument, request),
             SftpPacketType.Open or SftpPacketType.Stat when file is null => Status(id, 2),
             SftpPacketType.Open => Join([SftpPacketType.Handle], UInt32(id), Name(argument)),
             SftpPacketType.Stat => Join([SftpPacketType.Attributes], UInt32(id), UInt32(1), UInt32(0), UInt32((uint)file!.Length)),
@@ -302,6 +303,30 @@ internal sealed class InMemorySshServerSession(InMemorySshServer server, InMemor
             _ => Status(id, 0),
         };
         await SendSftpAsync(answer).ConfigureAwait(false);
+    }
+
+    // The file a request names; an open with SSH_FXF_CREAT creates a missing one, empty.
+    private byte[]? FileFor(byte type, string path, SshWireReader request)
+    {
+        if (server.Files.TryGetValue(path, out byte[]? found))
+        {
+            return found;
+        }
+
+        return type == SftpPacketType.Open && (request.ReadUInt32() & SftpOpenFlags.Create) != 0 ? server.Files[path] = [] : null;
+    }
+
+    // Writes the bytes at their offset of the file whose handle is its path, growing it.
+    private byte[] StoreWrite(uint id, string path, SshWireReader request)
+    {
+        long offset = (long)System.Buffers.Binary.BinaryPrimitives.ReadUInt64BigEndian(request.ReadBytes(8).Span);
+        ReadOnlySpan<byte> data = request.ReadString().Span;
+        byte[] file = server.Files[path];
+        byte[] written = new byte[Math.Max(file.Length, offset + data.Length)];
+        file.CopyTo(written, 0);
+        data.CopyTo(written.AsSpan((int)offset));
+        server.Files[path] = written;
+        return Status(id, 0);
     }
 
     private static byte[] ReadAnswer(uint id, byte[] file, ReadOnlyMemory<byte> offsetBytes, uint length)

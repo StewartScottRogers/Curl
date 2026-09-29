@@ -15,7 +15,8 @@ appears.
 `SshProtocolHandler`, at the root, is the library's `IProtocolHandler`: it narrows the
 host-key list from the known-hosts file, connects through the injected `IConnector`,
 runs the handshake, requests `ssh-userauth`, checks the host key, authenticates, runs
-`SftpFileDownload` or `ScpFileDownload` - or `SftpDirectoryListing` for an `sftp` path
+`SftpFileUpload` for an `sftp` transfer with an upload, and otherwise `SftpFileDownload`
+or `ScpFileDownload` - or `SftpDirectoryListing` for an `sftp` path
 ending with a slash - into the output, and ends the session with
 `DISCONNECT` 11 `Shutdown`; every `SshTransferException` becomes a failed
 `TransferResult`. The console passes the platform's preset and ADR-0022's credential
@@ -47,7 +48,10 @@ channel, and `SftpFileDownload`, which downloads one file with `SftpReadAhead`'s
 flight and maps each `SSH_FX_*` status to curl's exit code through `SftpStatusCode`
 (ADR-0220), and `SftpDirectoryListing`, which lists a directory with `OPENDIR` and
 `READDIR` as curl prints it - each `SftpDirectoryEntry`'s long name, a symbolic link
-followed with `READLINK`, or the names alone with `-l` (ADR-0241). A new algorithm registers in
+followed with `READLINK`, or the names alone with `-l` (ADR-0241), and `SftpFileUpload`,
+which uploads with the `SftpOpenFlags` `SftpUploadOptions` call for (`-C`, `-C -`, `-a`,
+`--create-file-mode`), makes missing directories with `MKDIR` under `--ftp-create-dirs`,
+and sends 64 KiB blocks as `WRITE`s of 30000 bytes (ADR-0243). A new algorithm registers in
 `SshKeyExchangeMethods`, `SshSignatureVerifiers` or `SshPacketProtections`, and
 `SshAlgorithmCatalogue.Implemented` offers it from then on. Failure messages and
 their libssh2 codes are ADR-0122's, ADR-0206's and ADR-0212's, measured from the

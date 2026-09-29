@@ -14,7 +14,9 @@ namespace Curl.Protocol.Ssh.Fakes;
 /// (both in the Windows and the OpenSSL presets), <c>aes128-ctr</c> and <c>hmac-sha2-256</c>;
 /// <c>password</c> and <c>publickey</c> authentication; one <c>session</c> channel running
 /// either the <c>sftp</c> subsystem or <c>scp -pf</c>, serving <see cref="Files" /> and, over
-/// SFTP, listing the files directly under a directory path that ends with a slash.
+/// SFTP, listing the files directly under a directory path that ends with a slash and
+/// storing an upload's writes in <see cref="Files" />, an open with <c>SSH_FXF_CREAT</c>
+/// creating a missing file.
 /// </summary>
 /// <remarks>
 /// Public so that another test project, such as <c>Curl.Console.UnitTests</c>, can reference

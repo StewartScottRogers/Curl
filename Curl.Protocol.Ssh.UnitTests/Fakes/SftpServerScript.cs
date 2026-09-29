@@ -155,6 +155,18 @@ internal sealed class SftpServerScript
     internal static byte[] OpenRequest(string path, uint id = 1) =>
         Join([SftpPacketType.Open], UInt32(id), String(Encoding.UTF8.GetBytes(path)), UInt32(1), UInt32(4), UInt32(0x81A4));
 
+    /// <summary>The client's <c>SSH_FXP_OPEN</c> with <paramref name="flags" />, and <paramref name="permissions" /> as a regular file.</summary>
+    internal static byte[] OpenRequest(string path, uint flags, uint id, uint permissions = 0x1A4) =>
+        Join([SftpPacketType.Open], UInt32(id), String(Encoding.UTF8.GetBytes(path)), UInt32(flags), UInt32(4), UInt32(0x8000 | permissions));
+
+    /// <summary>The client's <c>SSH_FXP_WRITE</c> of <paramref name="data" /> to handle <c>H1</c>.</summary>
+    internal static byte[] WriteRequest(uint id, ulong offset, byte[] data) =>
+        Join([SftpPacketType.Write], UInt32(id), Name("H1"), UInt32((uint)(offset >> 32)), UInt32((uint)offset), String(data));
+
+    /// <summary>The client's <c>SSH_FXP_MKDIR</c>, with 0755 as a directory.</summary>
+    internal static byte[] MakeDirectoryRequest(string path, uint id) =>
+        Join([SftpPacketType.MakeDirectory], UInt32(id), String(Encoding.UTF8.GetBytes(path)), UInt32(4), UInt32(0x41ED));
+
     /// <summary>The client's <c>SSH_FXP_STAT</c>.</summary>
     internal static byte[] StatRequest(string path, uint id = 2) =>
         Join([SftpPacketType.Stat], UInt32(id), String(Encoding.UTF8.GetBytes(path)));
