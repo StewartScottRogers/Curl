@@ -1,5 +1,5 @@
 ---
-id: BL-901
+id: BL-903
 title: Fail FTP over IPv6 with exit 8 when EPSV is refused instead of falling back to PASV
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-901 — Fail FTP over IPv6 with exit 8 when EPSV is refused instead of falling back to PASV
+# BL-903 — Fail FTP over IPv6 with exit 8 when EPSV is refused instead of falling back to PASV
 
 ## Goal
 

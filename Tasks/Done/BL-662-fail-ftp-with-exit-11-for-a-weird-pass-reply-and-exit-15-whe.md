@@ -52,11 +52,11 @@ Measured 2026-09-29, curl 8.21.0 (x86_64-w64-mingw32, Schannel), `Record-CurlExc
 
 curl 8.21.0's binary holds `ACCT rejected by server: %03d` but no longer `cannot resolve new host`: the data host goes through the ordinary connect, so no case produces exit 15.
 
-Decision (ADR-0215, decided by Claude under Stewart's delegation): no production change. Every measured `PASS` reply was already answered as curl does; exit 11 comes only from a refused `ACCT`, which needs `--ftp-account` in `ITransferContext` (Abstractions) and is BL-635's work, so BL-635 gained an acceptance criterion pinning it. Exit 15 is not produced, matching curl 8.21.0; data-connection failures keep the connector's exit (6, 7, 28). `FtpProtocolHandlerPassReplyTests` pins all of it.
+Decision (ADR-0216, decided by Claude under Stewart's delegation): no production change. Every measured `PASS` reply was already answered as curl does; exit 11 comes only from a refused `ACCT`, which needs `--ftp-account` in `ITransferContext` (Abstractions) and is BL-635's work, so BL-635 gained an acceptance criterion pinning it. Exit 15 is not produced, matching curl 8.21.0; data-connection failures keep the connector's exit (6, 7, 28). `FtpProtocolHandlerPassReplyTests` pins all of it.
 
-`touches` gained `Documentation/Planning/Decisions` (for ADR-0215) and `Tasks/Backlog/BL-635-…` was edited; no task in Doing names either.
+`touches` gained `Documentation/Planning/Decisions` (for ADR-0216) and `Tasks/Backlog/BL-635-…` was edited; no task in Doing names either.
 
-Follow-ups filed: BL-901 (IPv6 control with `EPSV` refused is exit 8, not a `PASV` fallback), BL-902 (a failed data connect names the control host `via` the data address).
+Follow-ups filed: BL-903 (IPv6 control with `EPSV` refused is exit 8, not a `PASV` fallback), BL-904 (a failed data connect names the control host `via` the data address).
 
 Gates: `dotnet build Curl.slnx -warnaserror` clean; fast tests green (Curl.Protocol.Ftp.UnitTests 380 passed); `Measure-CodeQuality.ps1 -Library Curl.Protocol.Ftp.UnitLibrary` 100% line, 100% branch, 0 failing members.
 
@@ -64,4 +64,4 @@ Gates: `dotnet build Curl.slnx -warnaserror` clean; fast tests green (Curl.Proto
 
 - 2026-09-28: Created.
 - 2026-09-29: Backlog -> Doing.
-- 2026-09-29: Doing -> Done. FTP PASS replies, ACCT exit 11 and PASV data-host failures pinned against curl 8.21.0; exit 15 is never produced, as in curl (ADR-0215)
+- 2026-09-29: Doing -> Done. FTP PASS replies, ACCT exit 11 and PASV data-host failures pinned against curl 8.21.0; exit 15 is never produced, as in curl (ADR-0216)

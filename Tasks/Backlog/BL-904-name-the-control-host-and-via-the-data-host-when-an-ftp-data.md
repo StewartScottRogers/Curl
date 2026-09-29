@@ -1,5 +1,5 @@
 ---
-id: BL-902
+id: BL-904
 title: Name the control host and via the data host when an FTP data connection fails to connect
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-902 — Name the control host and via the data host when an FTP data connection fails to connect
+# BL-904 — Name the control host and via the data host when an FTP data connection fails to connect
 
 ## Goal
 
