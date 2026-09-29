@@ -447,6 +447,17 @@ public interface ITransferContext
     ITransferEvents Events { get; }
 
     /// <summary>
+    /// Gets where the handler and its connector write Curl's own diagnostic log for
+    /// <c>--log-level</c>. Never <see langword="null" />.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="NoDiagnosticLog.Instance" /> at <c>--log-level none</c>, and by default,
+    /// so an implementation that does not override it writes nothing. A handler that
+    /// connects passes it on as <see cref="ConnectTarget.DiagnosticLog" /> (ADR-0222).
+    /// </remarks>
+    IDiagnosticLog DiagnosticLog => NoDiagnosticLog.Instance;
+
+    /// <summary>
     /// Gets where the handler reports how far the transfer has got, for the progress meter.
     /// Never <see langword="null" />.
     /// </summary>

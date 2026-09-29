@@ -138,6 +138,9 @@ public sealed class TransferContext : ITransferContext
     public ITransferEvents Events { get; init; } = NoTransferEvents.Instance;
 
     /// <inheritdoc />
+    public IDiagnosticLog DiagnosticLog { get; init; } = NoDiagnosticLog.Instance;
+
+    /// <inheritdoc />
     public ITransferProgress Progress { get; init; } = NoTransferProgress.Instance;
 
     /// <inheritdoc />

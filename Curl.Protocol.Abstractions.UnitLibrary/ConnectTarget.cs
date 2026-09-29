@@ -70,6 +70,17 @@ public sealed record ConnectTarget(string Host, int Port, bool UseTls)
     public ITransferEvents Events { get; init; } = NoTransferEvents.Instance;
 
     /// <summary>
+    /// Gets where the connector writes Curl's own diagnostic log for <c>--log-level</c>;
+    /// <see cref="NoDiagnosticLog.Instance" />, the default, when the level is
+    /// <c>none</c>.
+    /// </summary>
+    /// <remarks>
+    /// A handler sets it from <see cref="ITransferContext.DiagnosticLog" />, so no
+    /// connector learns about the transfer context (ADR-0222).
+    /// </remarks>
+    public IDiagnosticLog DiagnosticLog { get; init; } = NoDiagnosticLog.Instance;
+
+    /// <summary>
     /// Gets the scheme that keys this target in a connection pool, such as <c>http</c> or
     /// <c>https</c>, or <see langword="null" />, the default, when the connection is never
     /// pooled and never served from a pool (ADR-0050).
