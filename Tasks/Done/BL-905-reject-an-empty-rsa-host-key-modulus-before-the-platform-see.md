@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Ssh.UnitLibrary, Curl.Protocol.Ssh.UnitTests]
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-29
 ---
 # BL-905 — Reject an empty RSA host-key modulus before the platform sees it, so Linux and macOS fail key exchange with -8
 
@@ -28,9 +28,9 @@ Fix: in `Verify`, reject an empty modulus before calling `RSA.Create`, throwing 
 
 ## Acceptance criteria
 
-- [ ] `RsaSshSignatureVerifier.Verify` throws `CryptographicException` for an `ssh-rsa` host key with an empty modulus, without calling `RSA.Create`.
-- [ ] `ExchangeKeysAsync_RsaHostKeyThePlatformRefuses_FailsWithMinus8` passes on Windows, and the `CI` workflow passes on ubuntu-latest and macos-latest for the commit that lands this.
-- [ ] `Curl.Protocol.Ssh.UnitLibrary` keeps 100% line and branch coverage.
+- [x] `RsaSshSignatureVerifier.Verify` throws `CryptographicException` for an `ssh-rsa` host key with an empty modulus, without calling `RSA.Create`.
+- [x] `ExchangeKeysAsync_RsaHostKeyThePlatformRefuses_FailsWithMinus8` passes on Windows, and the `CI` workflow passes on ubuntu-latest and macos-latest for the commit that lands this.
+- [x] `Curl.Protocol.Ssh.UnitLibrary` keeps 100% line and branch coverage.
 
 ## Notes
 
@@ -39,3 +39,5 @@ Blocks the merge of `work/dark-factory` into `master` Stewart asked for on 2026-
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Done. Empty ssh-rsa modulus now fails key exchange with -8 on every platform; CI run 36588755038 green on Windows, Linux and macOS.
