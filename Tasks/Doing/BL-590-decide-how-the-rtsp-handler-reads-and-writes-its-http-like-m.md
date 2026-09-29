@@ -35,3 +35,4 @@ An ADR fixes how `Curl.Protocol.Rtsp.UnitLibrary` writes RTSP/1.0 requests and r
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
