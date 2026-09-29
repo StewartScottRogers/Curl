@@ -30,7 +30,9 @@ namespace Curl.Protocol.Ws;
 /// nothing written to the output; <c>Sec-WebSocket-Accept</c>, <c>Upgrade</c> and
 /// <c>Connection</c> in a <c>101</c> are not checked, because curl does not check them. The
 /// reply head, <c>101</c> or not, is written to <see cref="ITransferContext.HeaderOutput" />
-/// (<c>-D</c>). A connect failure is returned as the connector reported it.
+/// (<c>-D</c>). A connect failure is returned as the connector reported it. The upgrade, each
+/// frame and the transfer's end are written to <see cref="ITransferContext.DiagnosticLog" />
+/// under the <c>ws</c> component (<see cref="WsTransferLog" />).
 /// </remarks>
 public sealed class WsProtocolHandler(
     IConnector connector,
@@ -72,11 +74,21 @@ public sealed class WsProtocolHandler(
     {
         ArgumentNullException.ThrowIfNull(context);
 
+        long startTimestamp = context.TimeProvider.GetTimestamp();
+        TransferResult result = await ConnectAndUpgradeAsync(context).ConfigureAwait(false);
+        new WsTransferLog(context.DiagnosticLog).Ended(result, context.TimeProvider.GetElapsedTime(startTimestamp));
+        return result;
+    }
+
+    // Connects, upgrades and exchanges frames; ExecuteAsync logs how it ended.
+    private async ValueTask<TransferResult> ConnectAndUpgradeAsync(ITransferContext context)
+    {
         CurlUrl url = context.Url;
         var target = new ConnectTarget(url.IdnHost, url.Port, url.Scheme == "wss")
         {
             Proxy = context.Proxy,
             Events = context.Events,
+            DiagnosticLog = context.DiagnosticLog,
         };
         ConnectResult connect = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
@@ -146,6 +158,8 @@ public sealed class WsProtocolHandler(
         context.Events.ReportRequestHeader(request);
         await SendAsync(connection, request, context.CancellationToken).ConfigureAwait(false);
         context.Events.ReportInfo(WsInfoLines.RequestSent);
+        var log = new WsTransferLog(context.DiagnosticLog);
+        log.UpgradeRequested(method, WsUpgradeRequestFormatter.RequestTarget(context.Url));
         WsUpgradeResponse response = await WsUpgradeResponseReader.ReadAsync(connection, context.CancellationToken).ConfigureAwait(false);
         await WriteHeadAsync(context.HeaderOutput, response.Head, context.CancellationToken).ConfigureAwait(false);
         TransferReport report = new()
@@ -165,6 +179,7 @@ public sealed class WsProtocolHandler(
         }
 
         ReportHead(context.Events, response.Head, refusal: null);
+        log.UpgradeAccepted();
         context.Events.ReportInfo(WsInfoLines.SwitchingToWebSocket);
         context.Events.ReportInfo(WsInfoLines.SwitchedToWebSocket);
         TransferResult result = context.NoBody
@@ -245,7 +260,7 @@ public sealed class WsProtocolHandler(
         byte[] alreadyReceived,
         TransferReport report)
     {
-        var receiver = new WsFrameReceiver(connection, randomSource, context.Progress, context.Events);
+        var receiver = new WsFrameReceiver(connection, randomSource, context.Progress, context.Events, context.DiagnosticLog);
         Func<ReadOnlyMemory<byte>, CancellationToken, ValueTask> writePayload =
             (payload, token) => WriteAsync(context.Output, payload, token);
         long uploaded = 0;
@@ -307,6 +322,7 @@ public sealed class WsProtocolHandler(
         byte[] frame = WsFrameEncoder.Encode(WsOpcode.Binary, payload.GetBuffer().AsSpan(0, (int)payload.Length), randomSource);
         context.Events.ReportDataSent(frame);
         await SendAsync(connection, frame, context.CancellationToken).ConfigureAwait(false);
+        new WsTransferLog(context.DiagnosticLog).Frame("sent", WsOpcode.Binary, isFinal: true, payload.Length);
         context.Events.ReportInfo(WsInfoLines.UploadSent(frame.Length));
         context.Progress.ReportUploaded(frame.Length, frame.Length);
         return frame.Length;
