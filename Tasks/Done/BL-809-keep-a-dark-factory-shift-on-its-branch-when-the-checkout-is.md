@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-28
 ---
 # BL-809 — Keep a dark factory shift on its branch when the checkout is switched under it
 
@@ -44,3 +44,4 @@ would have stopped the factory without an alarm.
 
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Doing.
+- 2026-09-28: Doing -> Done. Restore-ShiftBranch before the shift-end pull and at the start of a -Continuous shift via -ShiftBranch; -TestShiftBranch 3/3, other self-checks, build and fast tests green.
