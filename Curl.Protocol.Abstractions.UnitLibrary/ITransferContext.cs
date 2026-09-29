@@ -230,6 +230,36 @@ public interface ITransferContext
     bool FtpCreateDirectories { get; }
 
     /// <summary>
+    /// Gets the <c>--ftp-account</c> value verbatim, the account an FTP login sends with
+    /// <c>ACCT</c> when the server answers its password with <c>332</c>;
+    /// <see langword="null" /> when not given.
+    /// </summary>
+    /// <remarks>
+    /// <c>ftp://</c> is to read it.
+    /// </remarks>
+    string? FtpAccount { get; }
+
+    /// <summary>
+    /// Gets the <c>--ftp-alternative-to-user</c> value verbatim, the command an FTP login
+    /// sends in place of <c>USER</c> when the server refuses <c>USER</c>;
+    /// <see langword="null" /> when not given.
+    /// </summary>
+    /// <remarks>
+    /// <c>ftp://</c> is to read it.
+    /// </remarks>
+    string? FtpAlternativeToUser { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether <c>--ftp-pret</c> was given, which makes a passive-mode
+    /// FTP transfer send <c>PRET</c> before <c>EPSV</c> or <c>PASV</c>;
+    /// <see langword="false" /> when not given.
+    /// </summary>
+    /// <remarks>
+    /// <c>ftp://</c> is to read it.
+    /// </remarks>
+    bool FtpSendPret { get; }
+
+    /// <summary>
     /// Gets a value indicating whether <c>-l</c>/<c>--list-only</c> was given, which lists a
     /// directory by name only (<c>NLST</c> rather than <c>LIST</c>); <see langword="false" />
     /// when not given.

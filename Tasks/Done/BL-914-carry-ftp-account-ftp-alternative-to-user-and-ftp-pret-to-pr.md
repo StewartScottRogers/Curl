@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests]
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-29
 ---
 # BL-914 — Carry --ftp-account, --ftp-alternative-to-user and --ftp-pret to protocols as ITransferContext members
 
@@ -23,13 +23,16 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `ITransferContext.FtpAccount`, `ITransferContext.FtpAlternativeToUser` and `ITransferContext.FtpSendPret` exist with XML doc comments; `TransferContext` implements all three, defaulting to `null`, `null` and `false`.
-- [ ] `Curl.Protocol.Abstractions.UnitTests/TransferContextTests.cs` covers the defaults and an `init` of each.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1 -Library Curl.Protocol.Abstractions.UnitLibrary` reports 100% line and branch coverage and no failing member.
+- [x] `ITransferContext.FtpAccount`, `ITransferContext.FtpAlternativeToUser` and `ITransferContext.FtpSendPret` exist with XML doc comments; `TransferContext` implements all three, defaulting to `null`, `null` and `false`.
+- [x] `Curl.Protocol.Abstractions.UnitTests/TransferContextTests.cs` covers the defaults and an `init` of each.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1 -Library Curl.Protocol.Abstractions.UnitLibrary` reports 100% line and branch coverage and no failing member.
 
 ## Notes
+
+- Delivered directly rather than through the full `/feature` stages: a three-member contract addition with no behaviour to plan. The members sit after `FtpCreateDirectories` beside the other FTP options. The test-only `ForwardingTransferContext` (Curl.Protocol.Abstractions.UnitTests) forwards the three as well. Build clean, fast tests green, Measure-CodeQuality: 100% line and branch, 0 failing members.
 
 ## Log
 
 - 2026-09-29: Created.
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Done. ITransferContext carries FtpAccount, FtpAlternativeToUser and FtpSendPret; TransferContext defaults them to null, null, false

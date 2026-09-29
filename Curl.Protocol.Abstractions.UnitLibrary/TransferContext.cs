@@ -78,6 +78,15 @@ public sealed class TransferContext : ITransferContext
     public bool FtpCreateDirectories { get; init; }
 
     /// <inheritdoc />
+    public string? FtpAccount { get; init; }
+
+    /// <inheritdoc />
+    public string? FtpAlternativeToUser { get; init; }
+
+    /// <inheritdoc />
+    public bool FtpSendPret { get; init; }
+
+    /// <inheritdoc />
     public bool ListOnly { get; init; }
 
     /// <inheritdoc />

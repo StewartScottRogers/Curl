@@ -28,6 +28,9 @@ internal sealed class ForwardingTransferContext(ITransferContext inner) : ITrans
     public bool FtpSkipPasvIp => inner.FtpSkipPasvIp;
     public FtpFileMethod FtpFileMethod => inner.FtpFileMethod;
     public bool FtpCreateDirectories => inner.FtpCreateDirectories;
+    public string? FtpAccount => inner.FtpAccount;
+    public string? FtpAlternativeToUser => inner.FtpAlternativeToUser;
+    public bool FtpSendPret => inner.FtpSendPret;
     public bool ListOnly => inner.ListOnly;
     public bool UseAscii => inner.UseAscii;
     public bool Append => inner.Append;
