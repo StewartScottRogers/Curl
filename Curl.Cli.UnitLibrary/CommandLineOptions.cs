@@ -1307,6 +1307,15 @@ public sealed class CommandLineOptions
     public TimeSpan? MaxTime { get; internal set; }
 
     /// <summary>
+    /// The <c>--expect100-timeout</c> wait for <c>100 Continue</c> before a request body is sent
+    /// anyway, to the millisecond, read as <c>--connect-timeout</c> is (see
+    /// <see cref="CommandLineNumber.ParseSeconds"/>); <see langword="null"/> when not given.
+    /// Zero is recorded as given and means curl's default one second, as it does to curl
+    /// 8.21.0 (measured, BL-624). The last value wins.
+    /// </summary>
+    public TimeSpan? Expect100Timeout { get; internal set; }
+
+    /// <summary>
     /// The <c>--retry</c> count: how many times a transient failure is retried, from 0 to the
     /// platform's C <c>LONG_MAX</c> (<see cref="CommandLineNumber.PlatformLongMaximum"/>). Zero,
     /// the default, retries nothing. The last value wins.

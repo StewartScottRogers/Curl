@@ -260,6 +260,7 @@ public static class CommandLineOptionTable
         CommandLineOption.Value("max-filesize", null, SetMaxFileSize),
         CommandLineOption.Value("connect-timeout", null, SetConnectTimeout),
         CommandLineOption.Value("max-time", 'm', SetMaxTime),
+        CommandLineOption.Value("expect100-timeout", null, SetExpect100Timeout),
         CommandLineOption.Value("retry", null, SetRetryCount),
         CommandLineOption.Value("retry-delay", null, SetRetryDelay),
         CommandLineOption.Value("retry-max-time", null, SetRetryMaxTime),
@@ -1304,6 +1305,17 @@ public static class CommandLineOptionTable
         if (refusal is null)
         {
             options.ConnectTimeout = duration;
+        }
+
+        return refusal;
+    }
+
+    private static CommandLineRefusal? SetExpect100Timeout(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        CommandLineRefusal? refusal = CommandLineNumber.ParseSeconds(spelledOption, value, CommandLineNumber.PlatformLongMaximum, out TimeSpan duration);
+        if (refusal is null)
+        {
+            options.Expect100Timeout = duration;
         }
 
         return refusal;
