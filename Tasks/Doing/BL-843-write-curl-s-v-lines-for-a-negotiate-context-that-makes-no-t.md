@@ -32,3 +32,4 @@ Under `-v`, `--negotiate` writes the lines curl 8.21.0 writes: the platform's co
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
