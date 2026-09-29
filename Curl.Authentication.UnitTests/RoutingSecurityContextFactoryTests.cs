@@ -70,6 +70,17 @@ public sealed class RoutingSecurityContextFactoryTests
     }
 
     [TestMethod]
+    public async Task Create_NtlmOffWindows_SendsCurlsOwnType1AsCurl8180Measured()
+    {
+        using ISecurityContext context = ProductionRouter(isWindows: false).Create(new SecurityContextRequest(SecurityMechanism.Ntlm, "HTTP", "127.0.0.1") { UserName = "u", Password = "p" });
+
+        SecurityContextStep step = await context.NextTokenAsync(ReadOnlyMemory<byte>.Empty, CancellationToken.None);
+
+        Assert.AreEqual(SecurityContextStatus.ContinueNeeded, step.Status);
+        Assert.AreEqual(HandBuiltNtlmSecurityContextTests.CurlType1, Convert.ToBase64String(step.Token));
+    }
+
+    [TestMethod]
     [DataRow(SecurityMechanism.Ntlm)]
     [DataRow(SecurityMechanism.Kerberos)]
     public void Create_Windows_UsesSspiWithTheRequestAsGiven(SecurityMechanism mechanism)
@@ -176,7 +187,8 @@ public sealed class RoutingSecurityContextFactoryTests
                 () => throw new Kerberos.KerberosFileException(Kerberos.KerberosFileError.NotFound),
                 _ => throw new AssertFailedException("No KDC client is needed.")),
             TimeProvider.System,
-            new Kerberos.SystemKerberosRandomSource()));
+            new Kerberos.SystemKerberosRandomSource(),
+            new Ntlm.SystemNtlmRandomSource()));
 
     [TestMethod]
     public void Create_NullRequest_Throws()

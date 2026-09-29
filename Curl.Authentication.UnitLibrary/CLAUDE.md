@@ -19,8 +19,17 @@ the same factory with the default credentials, falling back (`FallbackSecurityCo
 `HandBuiltSecurityContextFactory` when it answers `Unsupported`. The hand-built route is SPNEGO
 (`SpnegoInitialToken`, `SpnegoNegotiationResponse`) over `Curl.Kerberos.UnitLibrary`'s
 `KerberosGssContext`, with the service ticket from `KerberosServiceTicketSource` (the default
-credential cache, else a TGS exchange). Hand-built NTLM is not composed yet (BL-526); the
-hand-built route answers it `NoMechanism`. This library references `Curl.Kerberos.UnitLibrary`.
+credential cache, else a TGS exchange). This library references `Curl.Kerberos.UnitLibrary`
+and `Curl.Ntlm.UnitLibrary`.
+
+NTLM (BL-526, ADR-0142, ADR-0180): `RankedHttpAuthenticator` hands an NTLM pick, and `--ntlm`
+before any challenge, to `NtlmHttpAuthenticator`, both on the first call and through
+`ContinueAuthorizationAsync` for a 401 to a request that already sent a credential. It sends
+Type 1, then Type 3 for the server's Type 2 from a fresh context stepped through Type 1 (no
+context is kept between legs), and nothing after Type 3. The router gives SSPI on Windows and
+`HandBuiltNtlmSecurityContext` (curl's own NTLM, over `Curl.Ntlm`'s `NtlmChallengeAnswerer`)
+elsewhere; a Type 2 the context cannot answer throws `HttpAuthenticationFailedException`
+(exit 94) where the SSPI build is matched, and sends nothing elsewhere.
 Tests fake the seam with `ScriptedSecurityContext` and run the hand-built route against
 `Curl.Kerberos.UnitTests`' `FakeKdc` and `FakeGssAcceptor`, linked into the test project.
 

@@ -3,10 +3,11 @@ using System.Text;
 using Curl.Authentication;
 using Curl.Cli;
 using Curl.Cookies;
-using Curl.Kerberos;
 using Curl.Core;
 using Curl.Core.FileSystem;
+using Curl.Kerberos;
 using Curl.Networking;
+using Curl.Ntlm;
 using Curl.Output;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Dict;
@@ -67,7 +68,7 @@ internal static class CurlComposition
     /// The cookies the HTTP handler sends and stores, or <see langword="null" /> to keep none.
     /// </param>
     /// <param name="securityContexts">
-    /// Makes the HTTP handler's Negotiate contexts, or <see langword="null" /> for
+    /// Makes the HTTP handler's Negotiate and NTLM contexts, or <see langword="null" /> for
     /// <see cref="CreateSecurityContextFactory" />'s router over <paramref name="connector" /> and
     /// <paramref name="datagramConnector" />.
     /// </param>
@@ -122,15 +123,16 @@ internal static class CurlComposition
 
     /// <summary>
     /// Creates the HTTP authenticator: a <see cref="RankedHttpAuthenticator" /> that answers the
-    /// scheme curl 8.21.0 picks among those <c>--basic</c>, <c>--digest</c> and <c>--anyauth</c>
+    /// scheme curl 8.21.0 picks among those <c>--basic</c>, <c>--digest</c>, <c>--ntlm</c>, <c>--negotiate</c> and <c>--anyauth</c>
     /// allow, with a <see cref="BasicAndBearerAuthenticator" /> for Basic, Bearer
     /// (<c>--oauth2-bearer</c>) and the first request, and a <see cref="DigestAuthenticator" />
     /// drawing each client nonce from <see cref="DigestClientNonce.CreateRandom" />, both encoding
     /// credentials in the platform's encoding (<see cref="CredentialEncoding.ForPlatform" />),
-    /// and a <see cref="NegotiateHttpAuthenticator" /> over <paramref name="securityContexts" />
-    /// for <c>--negotiate</c> (ADR-0176).
+    /// and a <see cref="NegotiateHttpAuthenticator" /> and an <see cref="NtlmHttpAuthenticator" /> over <paramref name="securityContexts" />
+    /// for <c>--negotiate</c> and <c>--ntlm</c> (ADR-0176, ADR-0180), a refused NTLM Type 2 message failing the transfer
+    /// on Windows, as curl's SSPI build fails it.
     /// </summary>
-    /// <param name="securityContexts">Makes Negotiate's contexts: <see cref="CreateSecurityContextFactory" />'s in production.</param>
+    /// <param name="securityContexts">Makes Negotiate's and NTLM's contexts: <see cref="CreateSecurityContextFactory" />'s in production.</param>
     /// <returns>The authenticator.</returns>
     internal static RankedHttpAuthenticator CreateHttpAuthenticator(ISecurityContextFactory securityContexts)
     {
@@ -139,7 +141,8 @@ internal static class CurlComposition
         return new RankedHttpAuthenticator(
             new BasicAndBearerAuthenticator(credentialEncoding),
             new DigestAuthenticator(credentialEncoding, DigestClientNonce.CreateRandom),
-            new NegotiateHttpAuthenticator(securityContexts));
+            new NegotiateHttpAuthenticator(securityContexts),
+            new NtlmHttpAuthenticator(securityContexts, refusedChallengeFailsTransfer: OperatingSystem.IsWindows()));
     }
 
     /// <summary>
@@ -167,7 +170,7 @@ internal static class CurlComposition
         return new RoutingSecurityContextFactory(
             OperatingSystem.IsWindows(),
             new SystemSecurityContextFactory(),
-            new HandBuiltSecurityContextFactory(sources.CreateTicketSource(), TimeProvider.System, new SystemKerberosRandomSource()));
+            new HandBuiltSecurityContextFactory(sources.CreateTicketSource(), TimeProvider.System, new SystemKerberosRandomSource(), new SystemNtlmRandomSource()));
     }
 
     /// <summary>
@@ -459,7 +462,7 @@ internal static class CurlComposition
     /// environment variables.
     /// </param>
     /// <param name="securityContexts">
-    /// Makes the HTTP handler's Negotiate contexts, or <see langword="null" /> for the production router.
+    /// Makes the HTTP handler's Negotiate and NTLM contexts, or <see langword="null" /> for the production router.
     /// </param>
     /// <returns>The runner.</returns>
     internal static CurlCommandRunner CreateRunner(

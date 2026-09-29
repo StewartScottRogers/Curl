@@ -60,6 +60,42 @@ public sealed class SystemSecurityContextFactoryTests
         Assert.IsFalse(context.IsCompleted);
     }
 
+    /// <summary>
+    /// curl 8.21.0 (Schannel, SSPI) answered MS-NLMP 4.2.4.3's CHALLENGE with a Type 3 whose
+    /// header starts <c>NTLMSSP\0</c>, type 3, a 24-byte LM response, and carries flags
+    /// 0xA2888205 and user <c>u</c> (BL-526 Notes); its workstation is the machine's name
+    /// and its NTLMv2 response holds a fresh nonce, time and MIC, so only these are pinned.
+    /// </summary>
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task NextTokenAsync_WindowsNtlmMeasuredChallenge_GivesSspisType3()
+    {
+        using ISecurityContext context = new SystemSecurityContextFactory().Create(Ntlm());
+        await context.NextTokenAsync(ReadOnlyMemory<byte>.Empty, CancellationToken.None);
+
+        SecurityContextStep step = await context.NextTokenAsync(Convert.FromBase64String(HandBuiltNtlmSecurityContextTests.MeasuredChallenge), CancellationToken.None);
+
+        Assert.AreEqual(SecurityContextStatus.Completed, step.Status);
+        Assert.AreEqual("4E544C4D53535000030000001800", Convert.ToHexString(step.Token, 0, 14));
+        Assert.AreEqual(0xA2888205u, BitConverter.ToUInt32(step.Token, 60));
+        int userLength = BitConverter.ToUInt16(step.Token, 36);
+        int userOffset = BitConverter.ToInt32(step.Token, 40);
+        Assert.AreEqual("u", System.Text.Encoding.Unicode.GetString(step.Token, userOffset, userLength));
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task NextTokenAsync_WindowsNtlmChallengeSspiCannotRead_AnswersMalformedToken()
+    {
+        using ISecurityContext context = new SystemSecurityContextFactory().Create(Ntlm());
+        await context.NextTokenAsync(ReadOnlyMemory<byte>.Empty, CancellationToken.None);
+
+        SecurityContextStep step = await context.NextTokenAsync(Convert.FromBase64String("TlRMTVNTUAACAAAA"), CancellationToken.None);
+
+        Assert.AreEqual(SecurityContextStatus.MalformedToken, step.Status);
+        Assert.IsEmpty(step.Token);
+    }
+
     [TestMethod]
     [OSCondition(OperatingSystems.Windows)]
     public async Task NextTokenAsync_WindowsKerberosExplicitCredentialOffDomain_AnswersNoCredentials()

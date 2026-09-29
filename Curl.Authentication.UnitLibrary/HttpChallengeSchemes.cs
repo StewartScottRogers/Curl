@@ -17,11 +17,13 @@ internal static class HttpChallengeSchemes
     // curl's ISSPACE: space, tab, line feed, vertical tab, form feed, carriage return.
     private const string CurlSpaces = " \t\n\v\f\r";
 
+    private const string NtlmSchemeName = "NTLM";
+
     private static readonly (string Name, HttpAuthSchemes Scheme)[] KnownSchemes =
     [
         ("Basic", HttpAuthSchemes.Basic),
         ("Digest", HttpAuthSchemes.Digest),
-        ("NTLM", HttpAuthSchemes.Ntlm),
+        (NtlmSchemeName, HttpAuthSchemes.Ntlm),
         ("Negotiate", HttpAuthSchemes.Negotiate),
         ("Bearer", HttpAuthSchemes.Bearer),
     ];
@@ -43,6 +45,32 @@ internal static class HttpChallengeSchemes
         }
 
         return offered;
+    }
+
+    /// <summary>
+    /// Gets the token of the first NTLM challenge, as curl's <c>Curl_input_ntlm</c> reads it:
+    /// the text after <c>NTLM</c> and the blanks that follow it.
+    /// </summary>
+    /// <param name="challenges">The header values, verbatim.</param>
+    /// <returns>
+    /// The base64 text of the Type 2 message; empty for a bare <c>NTLM</c>, which asks for
+    /// Type 1; <see langword="null" /> when no challenge is NTLM.
+    /// </returns>
+    internal static string? NtlmTokenOf(IReadOnlyList<string> challenges)
+    {
+        foreach (string challenge in challenges)
+        {
+            foreach (string element in challenge.Split(','))
+            {
+                string trimmed = element.TrimStart(' ', '\t');
+                if (SchemeAtStartOf(trimmed) == HttpAuthSchemes.Ntlm)
+                {
+                    return trimmed[NtlmSchemeName.Length..].Trim(CurlSpaces.ToCharArray());
+                }
+            }
+        }
+
+        return null;
     }
 
     private static HttpAuthSchemes SchemeAtStartOf(string element)

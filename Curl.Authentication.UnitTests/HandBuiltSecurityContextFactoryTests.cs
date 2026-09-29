@@ -5,7 +5,8 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Authentication;
 
 /// <summary>
-/// Runs ADR-0142's hand-built Negotiate route (SPNEGO over the hand-built Kerberos) against
+/// Runs ADR-0142's hand-built routes: NTLM, curl's own, whose exchange
+/// <see cref="HandBuiltNtlmSecurityContextTests" /> pins; and Negotiate (SPNEGO over the hand-built Kerberos) against
 /// <c>Curl.Kerberos.UnitTests</c>' in-memory KDC, reached through the KDC transport seam, and
 /// its in-memory GSS-API acceptor: a TGS exchange from the cache's ticket-granting ticket, the
 /// NegTokenInit MIT sends, the AP-REP read back, and each way it fails.
@@ -64,7 +65,7 @@ public sealed class HandBuiltSecurityContextFactoryTests
         FakeKdc kdc = new();
         KerberosConfiguration configuration = Configuration("[domain_realm]\n .example.test = EXAMPLE.TEST\n");
         KerberosServiceTicketSource tickets = new(() => configuration, () => Cache(TicketGrantingTicket()), _ => Client(configuration, kdc));
-        using ISecurityContext context = new HandBuiltSecurityContextFactory(tickets, new FixedTimeProvider(FakeKdc.Now), new FixedKerberosRandomSource(RandomBytes))
+        using ISecurityContext context = new HandBuiltSecurityContextFactory(tickets, new FixedTimeProvider(FakeKdc.Now), new FixedKerberosRandomSource(RandomBytes), new FixedNtlmRandomSource(RandomBytes))
             .Create(new SecurityContextRequest(SecurityMechanism.Negotiate, "HTTP", "Server.Example.Test"));
 
         SecurityContextStep step = await context.NextTokenAsync(ReadOnlyMemory<byte>.Empty, CancellationToken.None);
@@ -74,15 +75,15 @@ public sealed class HandBuiltSecurityContextFactoryTests
     }
 
     [TestMethod]
-    public async Task Ntlm_AnswersNoMechanismUntilHandBuiltNtlmIsComposed()
+    public async Task Ntlm_MakesCurlsOwnNtlmType1()
     {
         using ISecurityContext context = Factory(new FakeKdc()).Create(Request(SecurityMechanism.Ntlm));
 
         SecurityContextStep step = await context.NextTokenAsync(ReadOnlyMemory<byte>.Empty, CancellationToken.None);
 
-        Assert.AreEqual(new SecurityContextStep(SecurityContextStatus.NoMechanism, []).Status, step.Status);
-        Assert.IsEmpty(step.Token);
-        Assert.IsFalse(context.IsCompleted);
+        Assert.AreEqual(SecurityContextStatus.ContinueNeeded, step.Status);
+        Assert.AreEqual("TlRMTVNTUAABAAAABoIIAAAAAAAAAAAAAAAAAAAAAAA=", Convert.ToBase64String(step.Token));
+        Assert.IsInstanceOfType<HandBuiltNtlmSecurityContext>(context);
     }
 
     [TestMethod]
@@ -193,7 +194,7 @@ public sealed class HandBuiltSecurityContextFactoryTests
     private static HandBuiltSecurityContextFactory Factory(FakeKdc kdc) => Factory(Tickets(kdc, Cache(TicketGrantingTicket())));
 
     private static HandBuiltSecurityContextFactory Factory(KerberosServiceTicketSource tickets) =>
-        new(tickets, new FixedTimeProvider(FakeKdc.Now), new FixedKerberosRandomSource(RandomBytes));
+        new(tickets, new FixedTimeProvider(FakeKdc.Now), new FixedKerberosRandomSource(RandomBytes), new FixedNtlmRandomSource(RandomBytes));
 
     private static KerberosServiceTicketSource Tickets(FakeKdc kdc, CredentialCache cache)
     {
