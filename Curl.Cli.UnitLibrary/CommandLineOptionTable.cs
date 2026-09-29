@@ -144,6 +144,8 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("sasl-ir", null, (options, on) => options.SaslInitialResponse = on),
         CommandLineOption.Value("resolve", null, AcceptingEmpty((options, entry) => options.AddResolveEntry(entry))),
         CommandLineOption.Value("connect-to", null, AcceptingEmpty((options, entry) => options.AddConnectToEntry(entry))),
+        CommandLineOption.Text("interface", null, (options, name) => options.Interface = InterfaceBinding.Parse(name)),
+        CommandLineOption.Value("local-port", null, SetLocalPorts),
         CommandLineOption.Text("dns-servers", null, (options, servers) => options.DnsServers = servers),
         CommandLineOption.Text("dns-interface", null, (options, name) => options.DnsInterface = name),
         CommandLineOption.Text("dns-ipv4-addr", null, (options, address) => options.DnsIPv4Address = address),
@@ -915,6 +917,21 @@ public static class CommandLineOptionTable
         }
 
         return refusal;
+    }
+
+    /// <summary>
+    /// Records a <c>--local-port</c> range, or refuses the value as badly used, an empty one included,
+    /// as curl 8.21.0 does (measured 2026-09-28, BL-599 Notes).
+    /// </summary>
+    private static CommandLineRefusal? SetLocalPorts(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        if (!LocalPortRange.TryParse(value, out LocalPortRange range))
+        {
+            return CommandLineRefusal.BadlyUsedHere(spelledOption);
+        }
+
+        options.LocalPorts = range;
+        return null;
     }
 
     private static CommandLineRefusal? SetCreateFileMode(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)

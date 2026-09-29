@@ -626,6 +626,19 @@ public sealed class CommandLineOptions
     public IReadOnlyList<string> ConnectToEntries => connectToEntries;
 
     /// <summary>
+    /// The last <c>--interface</c>, split by its <c>if!</c>, <c>host!</c> or <c>ifhost!</c> prefix;
+    /// <see langword="null"/> when not given. An empty value is refused as blank; any other is accepted, a
+    /// value libcurl would refuse included (<see cref="InterfaceBinding.IsMalformed"/>).
+    /// </summary>
+    public InterfaceBinding? Interface { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--local-port</c> range; <see langword="null"/> when not given. A value that is not
+    /// <c>num</c> or <c>num-num</c> within 0 to 65535, low to high, is refused as badly used.
+    /// </summary>
+    public LocalPortRange? LocalPorts { get; internal set; }
+
+    /// <summary>
     /// The last <c>--dns-servers</c> value (<c>host[:port]</c> entries separated by commas), verbatim and
     /// unvalidated; <see langword="null"/> when not given. An empty value is refused as blank. A c-ares
     /// build of curl checks the list only when it resolves a host name, failing that transfer with exit
