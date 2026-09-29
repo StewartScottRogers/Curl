@@ -112,7 +112,16 @@ public sealed class SaslAuthenticatorTests
     }
 
     [TestMethod]
-    public async Task Begin_OAuthBearer_LeavesThePortOutUntilTheRequestCarriesIt()
+    public async Task Begin_OAuthBearerOnPort18125_MatchesCurl()
+    {
+        ISaslExchange exchange = Authenticator.Begin("OAUTHBEARER", Request(new NetworkCredential("u", ""), bearerToken: "tok") with { Port = 18125 });
+
+        Assert.AreEqual("OAUTHBEARER", exchange.Mechanism);
+        Assert.AreEqual("bixhPXUsAWhvc3Q9MTI3LjAuMC4xAXBvcnQ9MTgxMjUBYXV0aD1CZWFyZXIgdG9rAQE=", Base64((await InitialResponseAsync(exchange))));
+    }
+
+    [TestMethod]
+    public async Task Begin_OAuthBearerOnPortZero_LeavesThePortOut()
     {
         ISaslExchange exchange = Authenticator.Begin("OAUTHBEARER", Request(new NetworkCredential("u", ""), bearerToken: "tok"));
 

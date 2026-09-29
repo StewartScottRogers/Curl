@@ -14,7 +14,7 @@ public sealed class SaslRequestTests
     {
         var credential = new NetworkCredential("u", "p");
 
-        var request = new SaslRequest(credential, "zid", "token", "PLAIN", "smtp", "mail.example");
+        var request = new SaslRequest(credential, "zid", "token", "PLAIN", "smtp", "mail.example", 587);
 
         Assert.AreSame(credential, request.Credential);
         Assert.AreEqual("zid", request.AuthorizationIdentity);
@@ -22,6 +22,23 @@ public sealed class SaslRequestTests
         Assert.AreEqual("PLAIN", request.RequiredMechanism);
         Assert.AreEqual("smtp", request.ServiceName);
         Assert.AreEqual("mail.example", request.Host);
+        Assert.AreEqual(587, request.Port);
+    }
+
+    [TestMethod]
+    public void Constructor_WithoutPort_HoldsZero()
+    {
+        var request = new SaslRequest(null, null, null, null, "imap", "mail.example");
+
+        Assert.AreEqual(0, request.Port);
+    }
+
+    [TestMethod]
+    public void Equals_ForTheSameRequestToAnotherPort_ReturnsFalse()
+    {
+        var submission = new SaslRequest(null, null, null, null, "smtp", "mail.example", 587);
+
+        Assert.AreNotEqual(submission, submission with { Port = 25 });
     }
 
     [TestMethod]

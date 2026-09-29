@@ -100,7 +100,7 @@ public sealed class SaslAuthenticator(
             [SaslMechanismRanking.XOAuth2] = request =>
                 [$"user={UserOf(request)}{FieldSeparator}auth=Bearer {TokenOf(request)}{FieldSeparator}{FieldSeparator}"],
             [SaslMechanismRanking.OAuthBearer] = request =>
-                [OAuthBearerMessage(UserOf(request), request.Host, port: null, TokenOf(request)), FieldSeparator.ToString()],
+                [OAuthBearerMessage(UserOf(request), request.Host, request.Port, TokenOf(request)), FieldSeparator.ToString()],
         };
 
     /// <inheritdoc />
@@ -143,16 +143,15 @@ public sealed class SaslAuthenticator(
     /// <param name="user">The user name, sent as the GS2 authorization identity <c>a=</c>.</param>
     /// <param name="host">The server's host name.</param>
     /// <param name="port">
-    /// The server's port, which curl always sends; <see langword="null" /> leaves the
-    /// <c>port=</c> field out, as curl does for port 0, until <see cref="SaslRequest" />
-    /// carries the port.
+    /// The server's port, <see cref="SaslRequest.Port" />, sent as <c>port=</c>; <c>0</c> leaves
+    /// the field out, as curl does for port 0.
     /// </param>
     /// <param name="token">The bearer token.</param>
     /// <returns>The message, before encoding.</returns>
-    internal static string OAuthBearerMessage(string user, string host, int? port, string token)
+    internal static string OAuthBearerMessage(string user, string host, int port, string token)
     {
-        string portField = port is { } value
-            ? "port=" + value.ToString(CultureInfo.InvariantCulture) + FieldSeparator
+        string portField = port != 0
+            ? "port=" + port.ToString(CultureInfo.InvariantCulture) + FieldSeparator
             : string.Empty;
         return $"n,a={user},{FieldSeparator}host={host}{FieldSeparator}{portField}auth=Bearer {token}{FieldSeparator}{FieldSeparator}";
     }

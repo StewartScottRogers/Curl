@@ -26,11 +26,17 @@ namespace Curl.Protocol.Abstractions;
 /// The SASL service name: <c>smtp</c>, <c>pop</c> or <c>imap</c>, or
 /// <see cref="MailRequestOptions.ServiceName" /> when <c>--service-name</c> overrides it.
 /// </param>
-/// <param name="Host">The URL's host, for GSSAPI and DIGEST-MD5.</param>
+/// <param name="Host">The URL's host, for GSSAPI, DIGEST-MD5 and OAUTHBEARER.</param>
+/// <param name="Port">
+/// The connection's port: the URL's, or the scheme's default when the URL names none.
+/// OAUTHBEARER sends it as <c>port=</c> (ADR-0123); <c>0</c> leaves that field out, as curl
+/// does for port 0.
+/// </param>
 public sealed record SaslRequest(
     NetworkCredential? Credential,
     string? AuthorizationIdentity,
     string? BearerToken,
     string? RequiredMechanism,
     string ServiceName,
-    string Host);
+    string Host,
+    int Port = 0);
