@@ -33,3 +33,4 @@ Through `--unix-socket <path>`, `-v` ends an HTTP transfer with curl 8.21.0's `C
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
