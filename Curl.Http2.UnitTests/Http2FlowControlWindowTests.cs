@@ -26,6 +26,10 @@ public sealed class Http2FlowControlWindowTests
     }
 
     [TestMethod]
+    public void TryConsume_NegativeCount_Throws() =>
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new Http2FlowControlWindow(10).TryConsume(-1));
+
+    [TestMethod]
     public void TryAdjust_ToTheMaximum_GrowsTheWindow()
     {
         var window = new Http2FlowControlWindow(1);

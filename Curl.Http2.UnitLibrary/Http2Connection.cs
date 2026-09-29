@@ -28,8 +28,11 @@ public sealed class Http2Connection
     /// </summary>
     public const int ClientConnectionWindowIncrement = 1048510465;
 
-    /// <summary>The largest header block accepted across HEADERS and CONTINUATION frames, against CONTINUATION floods.</summary>
-    public const int MaximumHeaderBlockSize = 1 << 20;
+    /// <summary>
+    /// The most CONTINUATION frames one header block may take, against CONTINUATION floods:
+    /// nghttp2's default (NGHTTP2_DEFAULT_MAX_CONTINUATIONS), which curl's library uses.
+    /// </summary>
+    public const int MaximumContinuationFrames = 8;
 
     private static readonly byte[] ClientPrefaceBytes = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"u8.ToArray();
 
@@ -39,6 +42,8 @@ public sealed class Http2Connection
     private readonly int streamReceiveWindowSize;
     private long connectionReceiveWindowTarget;
     private PendingHeaderBlock? pendingHeaderBlock;
+    private int highestStartedStreamId;
+    private Http2ProtocolException? connectionError;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="Http2Connection" /> class.
@@ -96,8 +101,8 @@ public sealed class Http2Connection
     /// <summary>Gets the GOAWAY the peer sent, or <see langword="null" /> if none.</summary>
     public Http2GoAwayPayload? PeerGoAway { get; private set; }
 
-    /// <summary>Gets how many streams are open or half closed.</summary>
-    public int OpenStreamCount => streams.Values.Count(openStream => !openStream.IsClosed);
+    /// <summary>Gets how many streams are open or half closed; a closed or reset stream is forgotten.</summary>
+    public int OpenStreamCount => streams.Count;
 
     /// <summary>
     /// Sends the client preface, <see cref="ClientSettings" /> and the connection
@@ -113,9 +118,9 @@ public sealed class Http2Connection
             .. Http2FrameCodec.Serialize(Http2FrameFactory.CreateSettings(ClientSettings)),
             .. Http2FrameCodec.Serialize(Http2FrameFactory.CreateWindowUpdate(0, ClientConnectionWindowIncrement)),
         ];
+        await stream.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
         _ = ConnectionReceiveWindow.TryAdjust(ClientConnectionWindowIncrement);
         connectionReceiveWindowTarget = ConnectionReceiveWindow.Size;
-        await stream.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -124,11 +129,12 @@ public sealed class Http2Connection
     /// </summary>
     /// <returns>The stream identifier.</returns>
     /// <exception cref="InvalidOperationException">
-    /// The peer sent GOAWAY, the identifiers are exhausted, or the peer's
-    /// SETTINGS_MAX_CONCURRENT_STREAMS is reached.
+    /// The connection failed, the peer sent GOAWAY, the identifiers are exhausted, or the
+    /// peer's SETTINGS_MAX_CONCURRENT_STREAMS is reached.
     /// </exception>
     public int OpenStream()
     {
+        ThrowIfFailed();
         if (PeerGoAway is not null)
         {
             throw new InvalidOperationException("The peer sent GOAWAY; no new HTTP/2 stream may be opened.");
@@ -169,10 +175,18 @@ public sealed class Http2Connection
     /// <param name="isEndStream">Whether to end the stream: no body follows.</param>
     /// <param name="cancellationToken">Cancels the write.</param>
     /// <returns>A task that completes when the frames are written.</returns>
-    /// <exception cref="InvalidOperationException">The stream is not open, or this endpoint already ended it.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// The stream is not open, this endpoint already ended it, or a stream with a higher
+    /// identifier has already started, which RFC 9113 section 5.1.1 forbids.
+    /// </exception>
     public async Task WriteHeadersAsync(int streamId, ReadOnlyMemory<byte> headerBlock, bool isEndStream, CancellationToken cancellationToken)
     {
         var sendingStream = GetSendingStream(streamId);
+        if (!sendingStream.IsHeadersSent && streamId < highestStartedStreamId)
+        {
+            throw new InvalidOperationException($"HTTP/2 stream {streamId} cannot start after stream {highestStartedStreamId} has.");
+        }
+
         var maximumFrameSize = PeerSettings.MaxFrameSize;
         var fragment = headerBlock[..Math.Min(maximumFrameSize, headerBlock.Length)];
         var remaining = headerBlock[fragment.Length..];
@@ -185,8 +199,10 @@ public sealed class Http2Connection
             buffer.Write(Http2FrameCodec.Serialize(Http2FrameFactory.CreateContinuation(streamId, fragment, remaining.IsEmpty)));
         }
 
-        sendingStream.IsLocalEnded = isEndStream;
         await stream.WriteAsync(buffer.WrittenMemory, cancellationToken).ConfigureAwait(false);
+        sendingStream.IsHeadersSent = true;
+        highestStartedStreamId = Math.Max(highestStartedStreamId, streamId);
+        EndLocally(streamId, sendingStream, isEndStream);
     }
 
     /// <summary>
@@ -199,10 +215,15 @@ public sealed class Http2Connection
     /// <param name="isEndStream">Whether this is the end of the body.</param>
     /// <param name="cancellationToken">Cancels the write.</param>
     /// <returns>How many bytes were sent; the caller sends the rest once the peer grows the window.</returns>
-    /// <exception cref="InvalidOperationException">The stream is not open, or this endpoint already ended it.</exception>
+    /// <exception cref="InvalidOperationException">The stream is not open, its HEADERS has not been sent, or this endpoint already ended it.</exception>
     public async Task<int> WriteDataAsync(int streamId, ReadOnlyMemory<byte> data, bool isEndStream, CancellationToken cancellationToken)
     {
         var sendingStream = GetSendingStream(streamId);
+        if (!sendingStream.IsHeadersSent)
+        {
+            throw new InvalidOperationException($"HTTP/2 stream {streamId} has no HEADERS yet; DATA cannot come first.");
+        }
+
         var count = Math.Min(data.Length, Math.Min(ConnectionSendWindow.Available, sendingStream.SendWindow.Available));
         var isLastFrameEndStream = isEndStream && count == data.Length;
         if (count == 0 && !isLastFrameEndStream)
@@ -210,21 +231,10 @@ public sealed class Http2Connection
             return 0;
         }
 
-        var buffer = new ArrayBufferWriter<byte>();
-        var offset = 0;
-        do
-        {
-            var size = Math.Min(count - offset, PeerSettings.MaxFrameSize);
-            var chunk = data.Slice(offset, size);
-            offset += size;
-            buffer.Write(Http2FrameCodec.Serialize(Http2FrameFactory.CreateData(streamId, chunk, isLastFrameEndStream && offset == count)));
-        }
-        while (offset < count);
-
+        await stream.WriteAsync(SerializeDataFrames(streamId, data[..count], isLastFrameEndStream), cancellationToken).ConfigureAwait(false);
         _ = ConnectionSendWindow.TryConsume(count);
         _ = sendingStream.SendWindow.TryConsume(count);
-        sendingStream.IsLocalEnded = isLastFrameEndStream;
-        await stream.WriteAsync(buffer.WrittenMemory, cancellationToken).ConfigureAwait(false);
+        EndLocally(streamId, sendingStream, isLastFrameEndStream);
         return count;
     }
 
@@ -242,13 +252,14 @@ public sealed class Http2Connection
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(increment);
         var openStream = GetOpenStream(streamId);
-        if (!openStream.ReceiveWindow.TryAdjust(increment))
+        if (openStream.ReceiveWindow.Size + increment > Http2FlowControlWindow.MaximumSize)
         {
             throw new ArgumentOutOfRangeException(nameof(increment), increment, "The increment would grow the window past 2^31 - 1.");
         }
 
-        openStream.ReceiveWindowTarget = openStream.ReceiveWindow.Size;
         await WriteFrameAsync(Http2FrameFactory.CreateWindowUpdate(streamId, increment), cancellationToken).ConfigureAwait(false);
+        _ = openStream.ReceiveWindow.TryAdjust(increment);
+        openStream.ReceiveWindowTarget = openStream.ReceiveWindow.Size;
     }
 
     /// <summary>
@@ -258,8 +269,14 @@ public sealed class Http2Connection
     /// <param name="errorCode">Why, usually <see cref="Http2ErrorCode.Cancel" />.</param>
     /// <param name="cancellationToken">Cancels the write.</param>
     /// <returns>A task that completes when the frame is written.</returns>
+    /// <exception cref="InvalidOperationException">The stream was never opened: RST_STREAM on an idle stream is a protocol error.</exception>
     public async Task ResetStreamAsync(int streamId, Http2ErrorCode errorCode, CancellationToken cancellationToken)
     {
+        if (IsIdle(streamId))
+        {
+            throw new InvalidOperationException($"HTTP/2 stream {streamId} was never opened.");
+        }
+
         _ = streams.Remove(streamId);
         await WriteFrameAsync(Http2FrameFactory.CreateRstStream(streamId, errorCode), cancellationToken).ConfigureAwait(false);
     }
@@ -295,20 +312,71 @@ public sealed class Http2Connection
     /// <exception cref="Http2StreamResetException">The peer reset a stream this endpoint has open.</exception>
     /// <exception cref="Http2GoAwayException">The peer sent GOAWAY with an error, or one leaving an open stream unprocessed.</exception>
     /// <exception cref="EndOfStreamException">The peer closed the connection part way through a frame or header block.</exception>
+    /// <exception cref="InvalidOperationException">The connection already failed with a protocol error.</exception>
     public async Task<Http2StreamFrame?> ReadStreamFrameAsync(CancellationToken cancellationToken)
     {
-        Http2ProtocolException failure;
+        ThrowIfFailed();
         try
         {
             return await ReadUntilStreamFrameAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (Http2ProtocolException exception)
         {
-            failure = exception;
+            connectionError = exception;
         }
 
-        await SendGoAwayAsync(failure.ErrorCode, cancellationToken).ConfigureAwait(false);
-        throw failure;
+        await SendGoAwayAfterErrorAsync(connectionError.ErrorCode, cancellationToken).ConfigureAwait(false);
+        throw connectionError;
+    }
+
+    private async Task SendGoAwayAfterErrorAsync(Http2ErrorCode errorCode, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await SendGoAwayAsync(errorCode, cancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException)
+        {
+            // The transport is already gone; the protocol error is still what the caller hears.
+        }
+    }
+
+    private ReadOnlyMemory<byte> SerializeDataFrames(int streamId, ReadOnlyMemory<byte> data, bool isEndStream)
+    {
+        var buffer = new ArrayBufferWriter<byte>();
+        var offset = 0;
+        do
+        {
+            var size = Math.Min(data.Length - offset, PeerSettings.MaxFrameSize);
+            var chunk = data.Slice(offset, size);
+            offset += size;
+            buffer.Write(Http2FrameCodec.Serialize(Http2FrameFactory.CreateData(streamId, chunk, isEndStream && offset == data.Length)));
+        }
+        while (offset < data.Length);
+
+        return buffer.WrittenMemory;
+    }
+
+    private void ThrowIfFailed()
+    {
+        if (connectionError is not null)
+        {
+            throw new InvalidOperationException("The HTTP/2 connection failed with a protocol error; a new connection is needed.", connectionError);
+        }
+    }
+
+    private void EndLocally(int streamId, Http2Stream sendingStream, bool isEndStream)
+    {
+        sendingStream.IsLocalEnded = isEndStream;
+        ForgetIfClosed(streamId, sendingStream);
+    }
+
+    private void ForgetIfClosed(int streamId, Http2Stream closingStream)
+    {
+        if (closingStream.IsClosed)
+        {
+            _ = streams.Remove(streamId);
+        }
     }
 
     private static Http2ProtocolException ProtocolError(string detail) => new(Http2ErrorCode.ProtocolError, detail);
@@ -413,13 +481,14 @@ public sealed class Http2Connection
             throw FlowControlError($"DATA of {frame.Payload.Length} bytes overran stream {frame.StreamId}'s receive window of {receivingStream.ReceiveWindow.Size}");
         }
 
-        receivingStream.IsRemoteEnded = frame.HasFlag(Http2FrameFlags.EndStream);
-        if (!receivingStream.IsRemoteEnded)
+        var isEndStream = frame.HasFlag(Http2FrameFlags.EndStream);
+        if (!isEndStream)
         {
             await TopUpReceiveWindowAsync(frame.StreamId, receivingStream.ReceiveWindow, receivingStream.ReceiveWindowTarget, cancellationToken).ConfigureAwait(false);
         }
 
-        return new Http2StreamFrame(Http2FrameType.Data, frame.StreamId, data, receivingStream.IsRemoteEnded);
+        EndRemotely(frame.StreamId, receivingStream, isEndStream);
+        return new Http2StreamFrame(Http2FrameType.Data, frame.StreamId, data, isEndStream);
     }
 
     private async Task TopUpReceiveWindowAsync(int streamId, Http2FlowControlWindow window, long targetSize, CancellationToken cancellationToken)
@@ -456,9 +525,9 @@ public sealed class Http2Connection
             throw ProtocolError($"{frame.Type} on stream {frame.StreamId} interrupted stream {pending.StreamId}'s header block");
         }
 
-        if (pending.Fragments.WrittenCount + frame.Payload.Length > MaximumHeaderBlockSize)
+        if (++pending.ContinuationFrameCount > MaximumContinuationFrames)
         {
-            throw new Http2ProtocolException(Http2ErrorCode.EnhanceYourCalm, $"stream {pending.StreamId}'s header block exceeds {MaximumHeaderBlockSize} bytes");
+            throw new Http2ProtocolException(Http2ErrorCode.EnhanceYourCalm, $"stream {pending.StreamId}'s header block takes more than {MaximumContinuationFrames} CONTINUATION frames");
         }
 
         pending.Fragments.Write(frame.Payload.Span);
@@ -471,17 +540,36 @@ public sealed class Http2Connection
         return CompleteHeaderBlock(pending.StreamId, pending.Stream, pending.Fragments.WrittenMemory, pending.IsEndStream);
     }
 
-    private static Http2StreamFrame CompleteHeaderBlock(int streamId, Http2Stream? receivingStream, ReadOnlyMemory<byte> headerBlock, bool isEndStream)
+    private Http2StreamFrame CompleteHeaderBlock(int streamId, Http2Stream? receivingStream, ReadOnlyMemory<byte> headerBlock, bool isEndStream)
     {
-        receivingStream?.IsRemoteEnded = isEndStream;
+        if (receivingStream is not null)
+        {
+            EndRemotely(streamId, receivingStream, isEndStream);
+        }
+
         return new Http2StreamFrame(Http2FrameType.Headers, streamId, headerBlock, isEndStream);
     }
 
+    private void EndRemotely(int streamId, Http2Stream receivingStream, bool isEndStream)
+    {
+        receivingStream.IsRemoteEnded = isEndStream;
+        ForgetIfClosed(streamId, receivingStream);
+    }
+
+    /// <summary>
+    /// A RST_STREAM with NO_ERROR after the whole response arrived is the server declining
+    /// the rest of the request body (RFC 9113 section 8.1): the response stands.
+    /// </summary>
     private void ReceiveRstStream(Http2Frame frame)
     {
         var errorCode = Http2FramePayloadParser.ParseRstStream(frame);
-        if (streams.Remove(frame.StreamId))
+        if (streams.Remove(frame.StreamId, out var resetStream))
         {
+            if (errorCode == Http2ErrorCode.NoError && resetStream.IsRemoteEnded)
+            {
+                return;
+            }
+
             throw new Http2StreamResetException(frame.StreamId, errorCode);
         }
 
@@ -511,6 +599,11 @@ public sealed class Http2Connection
 
     private void ApplyPeerSetting(Http2Setting setting)
     {
+        if (setting is { Identifier: Http2SettingIdentifier.EnablePush, Value: 1 })
+        {
+            throw ProtocolError("a server sent SETTINGS_ENABLE_PUSH of 1");
+        }
+
         var previousInitialWindowSize = PeerSettings.InitialWindowSize;
         PeerSettings.Apply(setting);
         var delta = (long)PeerSettings.InitialWindowSize - previousInitialWindowSize;
@@ -536,7 +629,7 @@ public sealed class Http2Connection
     {
         var goAway = Http2FramePayloadParser.ParseGoAway(frame);
         PeerGoAway = goAway;
-        if (goAway.ErrorCode != Http2ErrorCode.NoError || streams.Any(entry => entry.Key > goAway.LastStreamId && !entry.Value.IsClosed))
+        if (goAway.ErrorCode != Http2ErrorCode.NoError || streams.Keys.Any(streamId => streamId > goAway.LastStreamId))
         {
             throw new Http2GoAwayException(goAway);
         }
@@ -576,9 +669,13 @@ public sealed class Http2Connection
 
     private bool IsIdle(int streamId) => streamId % 2 == 0 || streamId >= nextStreamId;
 
-    private Http2Stream GetOpenStream(int streamId) => streams.TryGetValue(streamId, out var openStream)
-        ? openStream
-        : throw new InvalidOperationException($"HTTP/2 stream {streamId} is not open.");
+    private Http2Stream GetOpenStream(int streamId)
+    {
+        ThrowIfFailed();
+        return streams.TryGetValue(streamId, out var openStream)
+            ? openStream
+            : throw new InvalidOperationException($"HTTP/2 stream {streamId} is not open.");
+    }
 
     private Http2Stream GetSendingStream(int streamId)
     {
@@ -595,5 +692,7 @@ public sealed class Http2Connection
     private sealed record PendingHeaderBlock(int StreamId, Http2Stream? Stream, bool IsEndStream)
     {
         public ArrayBufferWriter<byte> Fragments { get; } = new();
+
+        public int ContinuationFrameCount { get; set; }
     }
 }

@@ -22,6 +22,9 @@ internal sealed class Http2Stream
     /// <summary>Gets or sets the size the receive window is topped back up to.</summary>
     public long ReceiveWindowTarget { get; set; }
 
+    /// <summary>Gets or sets whether this endpoint has sent the stream's HEADERS, which starts it.</summary>
+    public bool IsHeadersSent { get; set; }
+
     /// <summary>Gets or sets whether this endpoint has sent END_STREAM.</summary>
     public bool IsLocalEnded { get; set; }
 

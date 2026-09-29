@@ -30,8 +30,10 @@ public sealed class Http2FlowControlWindow
     /// </summary>
     /// <param name="count">The DATA frame's full payload length, padding included.</param>
     /// <returns><see langword="false" />, leaving the window unchanged, when <paramref name="count" /> exceeds it.</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="count" /> is negative.</exception>
     public bool TryConsume(int count)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(count);
         if (count > Size)
         {
             return false;

@@ -38,9 +38,10 @@ internal static class Http2Test
 
 /// <summary>
 /// A connection's stream in a test: reads come from the peer's scripted bytes, at most
-/// <c>readSize</c> at a time so frames arrive split, and writes are recorded.
+/// <c>readSize</c> at a time so frames arrive split, and writes are recorded, or fail with
+/// <see cref="IOException" /> when <c>failWrites</c> is set, as a dropped transport does.
 /// </summary>
-internal sealed class PeerStream(byte[] fromPeer, int readSize = int.MaxValue) : Stream
+internal sealed class PeerStream(byte[] fromPeer, int readSize = int.MaxValue, bool failWrites = false) : Stream
 {
     private readonly MemoryStream input = new(fromPeer);
 
@@ -71,7 +72,15 @@ internal sealed class PeerStream(byte[] fromPeer, int readSize = int.MaxValue) :
 
     public override void SetLength(long value) => throw new NotSupportedException();
 
-    public override void Write(byte[] buffer, int offset, int count) => Written.Write(buffer, offset, count);
+    public override void Write(byte[] buffer, int offset, int count)
+    {
+        if (failWrites)
+        {
+            throw new IOException("The peer is gone.");
+        }
+
+        Written.Write(buffer, offset, count);
+    }
 
     /// <summary>Reads the frames the connection wrote.</summary>
     public Task<List<Http2Frame>> WrittenFrames() => Http2Test.FramesIn(Written.ToArray());

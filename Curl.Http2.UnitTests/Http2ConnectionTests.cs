@@ -117,7 +117,7 @@ public sealed class Http2ConnectionTests
     public async Task WriteDataAsync_BodyWithinTheWindows_SendsItAndEndsTheStream()
     {
         var (connection, peer) = Connect();
-        var streamId = connection.OpenStream();
+        var streamId = await StartStreamAsync(connection, peer);
 
         var sent = await connection.WriteDataAsync(streamId, "body"u8.ToArray(), isEndStream: true, None);
 
@@ -131,7 +131,7 @@ public sealed class Http2ConnectionTests
     public async Task WriteDataAsync_BodyLargerThanAFrame_SplitsItAtThePeersMaximumFrameSize()
     {
         var (connection, peer) = Connect();
-        var streamId = connection.OpenStream();
+        var streamId = await StartStreamAsync(connection, peer);
 
         var sent = await connection.WriteDataAsync(streamId, new byte[20000], isEndStream: false, None);
 
@@ -147,7 +147,7 @@ public sealed class Http2ConnectionTests
         var (connection, peer) = Connect(
             CreateSettings([new(Http2SettingIdentifier.InitialWindowSize, 10), new(Http2SettingIdentifier.MaxFrameSize, 20000)]),
             CreateWindowUpdate(1, 5));
-        var streamId = connection.OpenStream();
+        var streamId = await StartStreamAsync(connection, peer);
         _ = await ReadUntilEnd(connection);
 
         var sent = await connection.WriteDataAsync(streamId, new byte[20], isEndStream: true, None);
@@ -165,7 +165,7 @@ public sealed class Http2ConnectionTests
             CreateSettings([new(Http2SettingIdentifier.InitialWindowSize, 0)]),
             CreateHeaders(1, new byte[] { 0x88 }, isEndStream: false, isEndHeaders: true),
             CreateWindowUpdate(1, 3));
-        var streamId = connection.OpenStream();
+        var streamId = await StartStreamAsync(connection, peer);
         _ = await connection.ReadStreamFrameAsync(None);
         peer.Written.SetLength(0);
 
@@ -181,7 +181,7 @@ public sealed class Http2ConnectionTests
     public async Task WriteDataAsync_EmptyEndOfBody_SendsAnEmptyDataFrameWithEndStream()
     {
         var (connection, peer) = Connect();
-        var streamId = connection.OpenStream();
+        var streamId = await StartStreamAsync(connection, peer);
 
         var sent = await connection.WriteDataAsync(streamId, ReadOnlyMemory<byte>.Empty, isEndStream: true, None);
 
@@ -434,9 +434,9 @@ public sealed class Http2ConnectionTests
     }
 
     [TestMethod]
-    public async Task ReadStreamFrameAsync_HeaderBlockOverTheLimit_IsEnhanceYourCalm()
+    public async Task ReadStreamFrameAsync_FloodOfEmptyContinuations_IsEnhanceYourCalm()
     {
-        var continuations = Enumerable.Range(0, 64).Select(_ => CreateContinuation(1, new byte[16384], isEndHeaders: false));
+        var continuations = Enumerable.Range(0, Http2Connection.MaximumContinuationFrames + 1).Select(_ => CreateContinuation(1, ReadOnlyMemory<byte>.Empty, isEndHeaders: false));
         var (connection, _) = Connect([CreateHeaders(1, new byte[1], isEndStream: false, isEndHeaders: false), .. continuations]);
         _ = connection.OpenStream();
 
@@ -542,8 +542,8 @@ public sealed class Http2ConnectionTests
     [TestMethod]
     public async Task ReadStreamFrameAsync_InitialWindowSizeChange_AdjustsOpenStreamsSendWindows()
     {
-        var (connection, _) = Connect(CreateSettings([new(Http2SettingIdentifier.InitialWindowSize, 100)]));
-        var streamId = connection.OpenStream();
+        var (connection, peer) = Connect(CreateSettings([new(Http2SettingIdentifier.InitialWindowSize, 100)]));
+        var streamId = await StartStreamAsync(connection, peer);
         _ = await connection.WriteDataAsync(streamId, new byte[65000], isEndStream: false, None);
 
         _ = await connection.ReadStreamFrameAsync(None);
@@ -671,6 +671,129 @@ public sealed class Http2ConnectionTests
         _ = connection.OpenStream();
 
         Assert.AreEqual(Http2ErrorCode.FlowControlError, await ProtocolErrorOf(connection));
+    }
+
+    [TestMethod]
+    public async Task ReadStreamFrameAsync_EightContinuations_AreAccepted()
+    {
+        var continuations = Enumerable.Range(0, Http2Connection.MaximumContinuationFrames).Select(index => CreateContinuation(1, new byte[] { 0x40 }, index == Http2Connection.MaximumContinuationFrames - 1));
+        var (connection, _) = Connect([CreateHeaders(1, new byte[] { 0x88 }, isEndStream: false, isEndHeaders: false), .. continuations]);
+        _ = connection.OpenStream();
+
+        var frame = await connection.ReadStreamFrameAsync(None);
+
+        Assert.AreEqual(9, frame!.Content.Length);
+    }
+
+    [TestMethod]
+    public async Task ReadStreamFrameAsync_RstStreamNoErrorAfterTheResponseEnded_KeepsTheResponse()
+    {
+        var (connection, peer) = Connect(
+            CreateHeaders(1, new byte[] { 0x88 }, isEndStream: true, isEndHeaders: true),
+            CreateRstStream(1, Http2ErrorCode.NoError));
+        _ = await StartStreamAsync(connection, peer);
+
+        var response = await connection.ReadStreamFrameAsync(None);
+
+        Assert.IsTrue(response!.IsEndStream);
+        Assert.IsNull(await connection.ReadStreamFrameAsync(None));
+        Assert.AreEqual(0, connection.OpenStreamCount);
+    }
+
+    [TestMethod]
+    public async Task ReadStreamFrameAsync_RstStreamNoErrorBeforeTheResponseEnded_ThrowsStreamReset()
+    {
+        var (connection, _) = Connect(CreateRstStream(1, Http2ErrorCode.NoError));
+        _ = connection.OpenStream();
+
+        var exception = await Assert.ThrowsExactlyAsync<Http2StreamResetException>(() => connection.ReadStreamFrameAsync(None));
+
+        Assert.AreEqual(Http2ErrorCode.NoError, exception.ErrorCode);
+    }
+
+    [TestMethod]
+    public async Task ReadStreamFrameAsync_ServerEnablingPush_IsAProtocolError()
+    {
+        var (connection, _) = Connect(CreateSettings([new(Http2SettingIdentifier.EnablePush, 1)]));
+
+        Assert.AreEqual(Http2ErrorCode.ProtocolError, await ProtocolErrorOf(connection));
+    }
+
+    [TestMethod]
+    public async Task ReadStreamFrameAsync_AfterAProtocolError_EveryCallThrows()
+    {
+        var (connection, _) = Connect(CreateContinuation(1, new byte[] { 0x40 }, isEndHeaders: true));
+        var streamId = connection.OpenStream();
+        var protocolError = await Assert.ThrowsExactlyAsync<Http2ProtocolException>(() => connection.ReadStreamFrameAsync(None));
+
+        var failure = await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => connection.ReadStreamFrameAsync(None));
+
+        Assert.AreSame(protocolError, failure.InnerException);
+        Assert.ThrowsExactly<InvalidOperationException>(() => connection.OpenStream());
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => connection.WriteHeadersAsync(streamId, new byte[] { 0x82 }, isEndStream: true, None));
+    }
+
+    [TestMethod]
+    public async Task ReadStreamFrameAsync_GoAwayCannotBeWritten_StillThrowsTheProtocolError()
+    {
+        using var peer = new PeerStream(Wire(CreateContinuation(1, new byte[] { 0x40 }, isEndHeaders: true)), failWrites: true);
+        var connection = new Http2Connection(peer);
+
+        var exception = await Assert.ThrowsExactlyAsync<Http2ProtocolException>(() => connection.ReadStreamFrameAsync(None));
+
+        Assert.AreEqual(Http2ErrorCode.ProtocolError, exception.ErrorCode);
+    }
+
+    [TestMethod]
+    public async Task WriteDataAsync_BeforeHeaders_Throws()
+    {
+        var (connection, _) = Connect();
+        var streamId = connection.OpenStream();
+
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => connection.WriteDataAsync(streamId, new byte[1], isEndStream: true, None));
+    }
+
+    [TestMethod]
+    public async Task WriteHeadersAsync_StreamStartedOutOfOrder_Throws()
+    {
+        var (connection, _) = Connect();
+        var first = connection.OpenStream();
+        var second = connection.OpenStream();
+        await connection.WriteHeadersAsync(second, new byte[] { 0x82 }, isEndStream: false, None);
+
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => connection.WriteHeadersAsync(first, new byte[] { 0x82 }, isEndStream: false, None));
+        await connection.WriteHeadersAsync(second, new byte[] { 0x40 }, isEndStream: true, None);
+    }
+
+    [TestMethod]
+    public async Task WriteDataAsync_WriteFails_LeavesTheWindowsAndStreamUnchanged()
+    {
+        using var peer = new PeerStream([], failWrites: true);
+        var connection = new Http2Connection(peer);
+        var streamId = connection.OpenStream();
+        await Assert.ThrowsExactlyAsync<IOException>(() => connection.WriteHeadersAsync(streamId, new byte[] { 0x82 }, isEndStream: false, None));
+
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => connection.WriteDataAsync(streamId, new byte[5], isEndStream: true, None));
+
+        Assert.AreEqual(65535, connection.ConnectionSendWindow.Size);
+        Assert.AreEqual(1, connection.OpenStreamCount);
+    }
+
+    [TestMethod]
+    public async Task ResetStreamAsync_IdleStream_Throws()
+    {
+        var (connection, peer) = Connect();
+
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => connection.ResetStreamAsync(1, Http2ErrorCode.Cancel, None));
+        Assert.AreEqual(0, peer.Written.Length);
+    }
+
+    private static async Task<int> StartStreamAsync(Http2Connection connection, PeerStream peer)
+    {
+        var streamId = connection.OpenStream();
+        await connection.WriteHeadersAsync(streamId, new byte[] { 0x82 }, isEndStream: false, None);
+        peer.Written.SetLength(0);
+        return streamId;
     }
 
     private static (Http2Connection Connection, PeerStream Peer) Connect(params Http2Frame[] fromPeer)
