@@ -4,7 +4,7 @@ using System.Security.Cryptography;
 namespace Curl.Kerberos;
 
 /// <summary>
-/// The initiator's side of the GSS-API Kerberos V5 mechanism (RFC 4121, ADR-0169): the
+/// The initiator's side of the GSS-API Kerberos V5 mechanism (RFC 4121, ADR-0171): the
 /// initial context token (an AP-REQ whose authenticator carries RFC 4121's checksum, a fresh
 /// subkey and a sequence number), the check of the acceptor's AP-REP, and then Wrap and MIC
 /// tokens in RFC 4121 section 4.2's format, or RFC 4757 section 7's for an <c>rc4-hmac</c>

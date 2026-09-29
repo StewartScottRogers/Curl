@@ -1,5 +1,5 @@
 ---
-id: BL-830
+id: BL-832
 title: Pass TLS channel bindings into the hand-built GSS-API Kerberos checksum
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-830 — Pass TLS channel bindings into the hand-built GSS-API Kerberos checksum
+# BL-832 — Pass TLS channel bindings into the hand-built GSS-API Kerberos checksum
 
 ## Goal
 
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-- BL-691 sends all-zero bindings (ADR-0169, Consequences). Whether curl's GSS-API Negotiate over HTTPS passes `tls-server-end-point` bindings (RFC 5929) depends on the curl version; measure curl 8.21.0 with MIT on Linux against a loopback HTTPS server with `Record-CurlExchange.ps1` before pinning anything, and record the answer in an ADR (or amend ADR-0169).
+- BL-691 sends all-zero bindings (ADR-0171, Consequences). Whether curl's GSS-API Negotiate over HTTPS passes `tls-server-end-point` bindings (RFC 5929) depends on the curl version; measure curl 8.21.0 with MIT on Linux against a loopback HTTPS server with `Record-CurlExchange.ps1` before pinning anything, and record the answer in an ADR (or amend ADR-0171).
 - If curl passes none, record that and finish with the zeros kept.
 
 ## Acceptance criteria

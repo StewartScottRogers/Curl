@@ -41,7 +41,7 @@ reads Wrap and MIC tokens, RFC 4121's for AES keys and RFC 4757's for `rc4-hmac`
 (`KerberosGssContextOptions`, `KerberosGssFlags`, `KerberosDelegation`,
 `KerberosGssToken` for RFC 2743's framing, `Rfc4121GssMessageProtection`,
 `Rc4HmacGssMessageProtection`, `KerberosCredentialMessage`); every refusal is a
-`KerberosGssException` with a `KerberosGssError` (BL-691, ADR-0169).
+`KerberosGssException` with a `KerberosGssError` (BL-691, ADR-0171).
 
 ## Rules
 

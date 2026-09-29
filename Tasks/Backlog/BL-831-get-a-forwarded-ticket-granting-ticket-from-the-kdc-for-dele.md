@@ -1,5 +1,5 @@
 ---
-id: BL-829
+id: BL-831
 title: Get a forwarded ticket-granting ticket from the KDC for --delegation
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-829 — Get a forwarded ticket-granting ticket from the KDC for --delegation
+# BL-831 — Get a forwarded ticket-granting ticket from the KDC for --delegation
 
 ## Goal
 
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-- BL-691 built `KerberosGssContext`, which delegates only when the caller supplies a forwarded TGT (ADR-0169); without one it drops the delegation flag, as MIT does for a TGT that is not forwardable.
+- BL-691 built `KerberosGssContext`, which delegates only when the caller supplies a forwarded TGT (ADR-0171); without one it drops the delegation flag, as MIT does for a TGT that is not forwardable.
 - RFC 4120 section 2.6 and 3.3 (`forwarded` option, bit 2 of `KDCOptions`; the TGT must carry `forwardable`). MIT asks for no addresses (`noaddresses`) by default.
 - Consumer: BL-631 (`--delegation` on the hand-built route), composed by BL-527.
 

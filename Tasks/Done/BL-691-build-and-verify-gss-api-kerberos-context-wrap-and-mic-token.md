@@ -39,7 +39,7 @@ completed: 2026-09-28
 - Seam: `Curl.Kerberos.UnitLibrary` may not reference `Curl.Protocol.Abstractions.UnitLibrary`,
   so `KerberosGssContext.NextToken`/`Wrap`/`Unwrap` mirror ADR-0142's `ISecurityContext`
   shape and BL-527's hand-built adapter wraps it one to one.
-- Decisions (ADR-0169): checksum flags are the requested ones plus confidentiality and
+- Decisions (ADR-0171): checksum flags are the requested ones plus confidentiality and
   integrity, as MIT adds them (curl's default gives 0x36, 0x37 with delegation);
   `policy` delegates only on `ok-as-delegate`; delegation needs a caller-supplied
   forwarded TGT, else the flag is dropped as MIT does; KRB-CRED in the session key;
@@ -51,7 +51,7 @@ completed: 2026-09-28
   that independent implementation; no MIT/KDC machine was available to record real tokens.
 - Quality: 444 tests in `Curl.Kerberos.UnitTests`; `Measure-CodeQuality.ps1 -Library
   Curl.Kerberos.UnitLibrary`: 100% line, 100% branch, 0 failing members, worst CRAP 10.
-- Follow-ups filed: BL-829 (forwarded TGT from the KDC), BL-830 (TLS channel bindings).
+- Follow-ups filed: BL-831 (forwarded TGT from the KDC), BL-832 (TLS channel bindings).
 - The ADR and its README row sit in `Documentation/Planning/Decisions`, as every task's ADR does.
 
 ## Log

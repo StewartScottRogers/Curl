@@ -9,7 +9,7 @@ namespace Curl.Kerberos;
 /// </summary>
 /// <remarks>
 /// Every acceptor token must carry exactly the next sequence number: a replayed, reordered
-/// or skipped one is refused with <see cref="KerberosGssError.BadSequenceNumber" /> (ADR-0169).
+/// or skipped one is refused with <see cref="KerberosGssError.BadSequenceNumber" /> (ADR-0171).
 /// </remarks>
 internal abstract class KerberosGssMessageProtection : IDisposable
 {
