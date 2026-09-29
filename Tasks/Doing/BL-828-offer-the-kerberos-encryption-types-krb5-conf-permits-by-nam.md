@@ -32,3 +32,4 @@ Every KDC request offers the encryption types `permitted_enctypes` / `default_tk
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
