@@ -44,6 +44,14 @@ public sealed class TransferContextTests
     }
 
     [TestMethod]
+    public void RemoteTime_WhenSet_ReadsBackTrue()
+    {
+        var context = new TransferContext { Url = AnyUrl, Output = Stream.Null, RemoteTime = true };
+
+        Assert.IsTrue(context.RemoteTime);
+    }
+
+    [TestMethod]
     public void FtpActiveModeAndTlsOptions_WhenSet_ReadBackUnchanged()
     {
         var context = new TransferContext
@@ -77,6 +85,7 @@ public sealed class TransferContextTests
         Assert.IsNull(context.MaxFileSize);
         Assert.IsFalse(context.NoBody);
         Assert.IsNull(context.TimeCondition);
+        Assert.IsFalse(context.RemoteTime);
         Assert.IsNull(context.HeaderOutput);
         Assert.IsNull(context.PostData);
         Assert.IsNull(context.Credentials);
