@@ -28,7 +28,7 @@ The QUIC connection closes as curl's build closes it (CONNECTION_CLOSE with the 
 
 ## Notes
 
-- Decisions in ADR-0175, from `lib/vquic/curl_ngtcp2.c` at `curl-8_18_0` (read for this
+- Decisions in ADR-0177, from `lib/vquic/curl_ngtcp2.c` at `curl-8_18_0` (read for this
   task): after the handshake the server's CONNECTION_CLOSE (TLS alert included), a
   transport error the client detects and a stateless reset are exit 56 `Failure when
   receiving data from the peer` (`ngtcp2_conn_read_pkt` fails, curl returns
@@ -49,11 +49,11 @@ The QUIC connection closes as curl's build closes it (CONNECTION_CLOSE with the 
   (`..._ClosesWithInternalErrorAndExit55After10Seconds`, `..._ClosesWithNoErrorAndExit28`)
   and a TLS alert or transport error closing the handshake by
   `QuicClientHandshakeTests.Receive_ServerCloseDuringTheHandshake_FailsWithTheMappedExit`.
-- Added `Documentation/Planning/Decisions` to `touches` for ADR-0175; no task in Doing
+- Added `Documentation/Planning/Decisions` to `touches` for ADR-0177; no task in Doing
   names it.
 
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Doing.
-- 2026-09-28: Doing -> Done. QUIC connections close, drain, keep alive and idle out as curl's ngtcp2 build does; stateless resets are recognised; post-handshake failures map to exit 56 and 55 (ADR-0175)
+- 2026-09-28: Doing -> Done. QUIC connections close, drain, keep alive and idle out as curl's ngtcp2 build does; stateless resets are recognised; post-handshake failures map to exit 56 and 55 (ADR-0177)
