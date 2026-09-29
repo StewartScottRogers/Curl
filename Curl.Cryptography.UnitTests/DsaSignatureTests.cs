@@ -234,6 +234,16 @@ public sealed class DsaSignatureTests
         Assert.ThrowsExactly<ObjectDisposedException>(() => key.SignHash(new byte[20], HashAlgorithmName.SHA1, new byte[40]));
     }
 
+    [TestMethod]
+    [DataRow("SHA224", "23097D223405D8228642A477BDA255B32AADBCE4BDA0B3F7E36C9DA7", DisplayName = "SHA-224, FIPS 180-2 appendix B")]
+    [DataRow("SHA256", "BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD", DisplayName = "SHA-256, FIPS 180-2 appendix B")]
+    public void HashData_Abc_GivesPublishedDigest(string hashName, string expected) =>
+        Assert.AreEqual(expected, Convert.ToHexString(DsaSignature.HashData("abc"u8, new HashAlgorithmName(hashName))));
+
+    [TestMethod]
+    public void HashData_HashDsaDoesNotUse_Throws() =>
+        Assert.ThrowsExactly<ArgumentException>(() => DsaSignature.HashData("abc"u8, HashAlgorithmName.MD5));
+
     private static void AssertRfc6979Signature(string prime, string subprime, string generator, string privateKey, string publicKey, string hashName, string message, string expected)
     {
         byte[] hash = Hash(hashName, Encoding.ASCII.GetBytes(message));

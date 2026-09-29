@@ -80,6 +80,29 @@ public sealed class DsaSignature : IDisposable
     }
 
     /// <summary>
+    /// Returns the hash of <paramref name="data" /> that <see cref="SignHash" /> and
+    /// <see cref="VerifyHash" /> take, SHA-224 included, which the BCL does not compute.
+    /// </summary>
+    /// <param name="data">The message.</param>
+    /// <param name="hashAlgorithm">SHA1, SHA224 (by its name), SHA256, SHA384 or SHA512.</param>
+    /// <returns>The hash, the algorithm's length.</returns>
+    /// <exception cref="ArgumentException">The hash algorithm is not one of those.</exception>
+    public static byte[] HashData(ReadOnlySpan<byte> data, HashAlgorithmName hashAlgorithm)
+    {
+        byte[] hash = new byte[DeterministicDsaNonce.DigestLength(hashAlgorithm)];
+        if (hashAlgorithm.Name == "SHA224")
+        {
+            FixedBlockMerkleDamgard<Sha224>.Hash([], [], data, data.Length, data.Length, hash);
+        }
+        else
+        {
+            CryptographicOperations.HashData(hashAlgorithm, data, hash);
+        }
+
+        return hash;
+    }
+
+    /// <summary>
     /// Writes the signature r || s over <paramref name="hash" />, with the nonce k derived
     /// from x and the hash by RFC 6979 section 3.2, so the same key and hash always give the
     /// same signature.

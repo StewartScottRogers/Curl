@@ -142,7 +142,8 @@ Namespace `Curl.Cryptography`. It holds:
   and x, `SignHash` signs with RFC 6979's deterministic nonce over SHA1 to SHA512, and the
   static `VerifyHash` returns `false` for bad parameters, y not below p, r or s outside
   [1, q - 1], or a mismatch. Signatures are r || s at q's length (ADR-0201). Constant-time
-  in x and k.
+  in x and k. The static `HashData` hashes a message for either, SHA-224 included, which
+  the BCL lacks (ADR-0208: TLS's `dsa_sha224`).
 - `KeccakPermutation` (internal): Keccak-p[1600, 24] (FIPS 202 section 3.3) on 25
   64-bit lanes.
 - `KeccakSponge` (internal, `IDisposable`): FIPS 202's sponge with byte-aligned pad10*1 -
