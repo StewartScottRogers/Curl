@@ -38,3 +38,4 @@ The SMTP, IMAP and POP3 handlers write the diagnostic log (components `smtp`, `i
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-29: Backlog -> Doing.
