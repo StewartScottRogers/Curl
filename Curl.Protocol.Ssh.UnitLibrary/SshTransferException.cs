@@ -90,7 +90,7 @@ internal sealed class SshTransferException(CurlExitCode exitCode, string message
     /// Creates the failure curl 8.21.0 reports when the server refuses the <c>session</c>
     /// channel an SCP transfer opens: exit 79 and libssh2's text for the reason code,
     /// measured 2026-09-29 as <c>Channel open failure (connect failed)</c> for OpenSSH's
-    /// <c>MaxSessions 0</c> (BL-574, ADR-0221).
+    /// <c>MaxSessions 0</c> (BL-574, ADR-0225).
     /// </summary>
     /// <param name="reasonCode">The <c>SSH_MSG_CHANNEL_OPEN_FAILURE</c> reason code.</param>
     /// <returns>The exception.</returns>
@@ -107,7 +107,7 @@ internal sealed class SshTransferException(CurlExitCode exitCode, string message
     /// <summary>
     /// Creates the failure curl 8.21.0 reports when the server refuses the <c>exec</c>
     /// request that starts <c>scp</c>: exit 79 and libssh2's <c>Unable to complete request
-    /// for channel-process-startup</c> (libssh2 1.11.1's <c>channel.c</c>, ADR-0221).
+    /// for channel-process-startup</c> (libssh2 1.11.1's <c>channel.c</c>, ADR-0225).
     /// </summary>
     /// <returns>The exception.</returns>
     internal static SshTransferException ScpExecRequestDenied() =>
@@ -116,7 +116,7 @@ internal sealed class SshTransferException(CurlExitCode exitCode, string message
     /// <summary>
     /// Creates the failure curl 8.21.0 reports when the connection breaks while it reads
     /// the SCP server's <c>T</c> or <c>C</c> line: exit 79 and <c>Failed reading SCP
-    /// response</c>, measured 2026-09-29 (BL-574, ADR-0221).
+    /// response</c>, measured 2026-09-29 (BL-574, ADR-0225).
     /// </summary>
     /// <returns>The exception.</returns>
     internal static SshTransferException ScpResponseReadFailed() =>
@@ -126,7 +126,7 @@ internal sealed class SshTransferException(CurlExitCode exitCode, string message
     /// Creates the failure curl 8.21.0 reports for an SCP answer libssh2 refuses - a remote
     /// error line, a malformed <c>T</c> or <c>C</c> line, or a channel that ends before
     /// them: exit 78 and libssh2's message, such as <c>Failed to recv file</c>, measured
-    /// 2026-09-29 (BL-574, ADR-0221).
+    /// 2026-09-29 (BL-574, ADR-0225).
     /// </summary>
     /// <param name="message">libssh2's message.</param>
     /// <returns>The exception.</returns>

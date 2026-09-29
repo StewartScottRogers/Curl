@@ -5,7 +5,7 @@ using Curl.Protocol.Ssh.Transport;
 namespace Curl.Protocol.Ssh.Scp;
 
 /// <summary>
-/// Downloads one file over SCP as curl 8.21.0 does through libssh2 1.11.1 (ADR-0221):
+/// Downloads one file over SCP as curl 8.21.0 does through libssh2 1.11.1 (ADR-0225):
 /// opens a <c>session</c> channel, runs <c>scp -pf &lt;path&gt;</c> with <c>exec</c>, reads
 /// the file's header with <see cref="ScpFileHeaderReader" />, copies exactly the size the
 /// header gives to the output, reporting progress, and closes the channel. No

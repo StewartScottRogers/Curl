@@ -12,7 +12,7 @@ namespace Curl.Protocol.Ssh.Scp;
 /// and the acknowledgements byte for byte, the bytes written and the outcome of each case
 /// measured 2026-09-29 with curl 8.21.0 (libssh2 1.11.1, Schannel build) against OpenSSH
 /// 10.2, once running its own <c>scp</c> and once a scripted one that logged what curl
-/// sent (BL-574, ADR-0221).
+/// sent (BL-574, ADR-0225).
 /// </summary>
 [TestClass]
 public sealed class ScpFileDownloadTests

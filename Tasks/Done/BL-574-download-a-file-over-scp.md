@@ -55,12 +55,12 @@ completed: 2026-09-29
   - `/x/it%27s%21''here`: sent as `scp -pf '/x/it'"'"'s'\!"''"'here'`
   - `MaxSessions 0`: `curl: (79) Channel open failure (connect failed)` / 79
 - **Measured against the scripted `scp`**: 31 header and data variants; the full table is in
-  ADR-0221 (for example a short file is exit 18 `end of response with 5 bytes missing`
+  ADR-0225 (for example a short file is exit 18 `end of response with 5 bytes missing`
   with the 5 bytes, size `-5` is exit 18 `transfer closed with -5 bytes remaining to
   read`, size `-1` reads to the end, a killed connection is exit 79 `Failed reading SCP
   response` in the header and `Error in the SSH layer` in the data). The parse rules were
   then read from libssh2 1.11.1's `src/scp.c` and `src/channel.c`, and match every case.
-- **Decisions (ADR-0221, decided under Stewart's delegation):** follow libssh2's byte-level
+- **Decisions (ADR-0225, decided under Stewart's delegation):** follow libssh2's byte-level
   checks and messages exactly; close the channel after the copy with the existing
   `CloseAsync`, but leave it open on a header failure as the SFTP open failure does (the
   handler, BL-576, ends the session); an unmeasured break before the exec answer is exit

@@ -5,7 +5,7 @@ namespace Curl.Protocol.Ssh.Scp;
 
 /// <summary>
 /// Reads the start of an SCP download as libssh2 1.11.1's <c>scp_recv</c> does for curl
-/// 8.21.0 (ADR-0221): sends the first acknowledgement, a zero byte; reads the
+/// 8.21.0 (ADR-0225): sends the first acknowledgement, a zero byte; reads the
 /// <c>T&lt;mtime&gt; 0 &lt;atime&gt; 0</c> line and acknowledges it; reads the
 /// <c>C&lt;mode&gt; &lt;size&gt; &lt;name&gt;</c> line and acknowledges it. Each line is read
 /// a byte at a time, checked byte by byte, and held to libssh2's 256-byte response buffer.
