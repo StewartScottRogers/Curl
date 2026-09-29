@@ -20,10 +20,31 @@ internal sealed class LdapExchange(IConnection connection, LdapBerWriter writer)
     /// <param name="password">The password; empty for the anonymous bind.</param>
     /// <param name="cancellationToken">Cancels the exchange.</param>
     /// <returns>The server's answer.</returns>
-    public async ValueTask<LdapBindReply> BindAsync(int version, string name, string password, CancellationToken cancellationToken)
+    public ValueTask<LdapBindReply> BindAsync(int version, string name, string password, CancellationToken cancellationToken) =>
+        BindWithAsync(messageId => LdapRequests.Bind(writer, messageId, version, name, password), cancellationToken);
+
+    /// <summary>Sends a BindRequest with SASL authentication and reads the server's answer.</summary>
+    /// <param name="mechanism">The SASL mechanism's name.</param>
+    /// <param name="credentials">The mechanism's token.</param>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <returns>The server's answer.</returns>
+    public ValueTask<LdapBindReply> SaslBindAsync(string mechanism, byte[] credentials, CancellationToken cancellationToken) =>
+        BindWithAsync(messageId => LdapRequests.SaslBind(writer, messageId, mechanism, credentials), cancellationToken);
+
+    /// <summary>Sends a BindRequest with a Sicily authentication choice and reads the server's answer.</summary>
+    /// <param name="name">The BindRequest's name.</param>
+    /// <param name="choice">The authentication choice's tag number, 10 or 11.</param>
+    /// <param name="token">The NTLM message.</param>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <returns>The server's answer.</returns>
+    public ValueTask<LdapBindReply> SicilyBindAsync(string name, int choice, byte[] token, CancellationToken cancellationToken) =>
+        BindWithAsync(messageId => LdapRequests.SicilyBind(writer, messageId, name, choice, token), cancellationToken);
+
+    /// <summary>Sends the BindRequest <paramref name="encode" /> writes for the next messageID and reads the server's answer.</summary>
+    private async ValueTask<LdapBindReply> BindWithAsync(Func<int, byte[]> encode, CancellationToken cancellationToken)
     {
         int messageId = nextMessageId++;
-        await SendAsync(LdapRequests.Bind(writer, messageId, version, name, password), cancellationToken).ConfigureAwait(false);
+        await SendAsync(encode(messageId), cancellationToken).ConfigureAwait(false);
         (LdapReadStatus status, byte[] message) = await reader.ReadMessageAsync(cancellationToken).ConfigureAwait(false);
         return status switch
         {

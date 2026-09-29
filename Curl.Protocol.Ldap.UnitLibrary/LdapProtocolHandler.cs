@@ -25,14 +25,19 @@ namespace Curl.Protocol.Ldap;
 /// <see cref="OpenLdapUrlReader" />): the OpenLDAP build refuses a bad URL with exit 3 before it
 /// connects, the Windows build after connecting and before it sends a byte. Once bound, the
 /// search runs as <see cref="LdapSearch" /> describes, writing each entry to
-/// <see cref="ITransferContext.Output" /> as the build writes it. The Windows build's bind
-/// without <c>-u</c> - the rootDSE
-/// read, then WinLDAP's NTLM bind as the logged-on user, which ADR-0166 decides - with
-/// BL-830, so the WinLDAP dialect binds anonymously until then. The handler is not
+/// <see cref="ITransferContext.Output" /> as the build writes it. The handler is not
 /// registered in <c>Curl.Console</c> until BL-589.
 /// </para>
+/// <para>
+/// Without <c>-u</c> the WinLDAP dialect binds as the logged-on user as
+/// <see cref="WinLdapLogonBind" /> describes - the rootDSE reads, then the <c>GSS-SPNEGO</c>
+/// or Sicily NTLM bind - with tokens from <paramref name="logonTokenSource" />. WinLDAP then
+/// signs and seals the rest of the session with the bind's keys; until BL-847 builds that
+/// security layer, the search after a logon bind is sent unsealed.
+/// </para>
 /// </remarks>
-public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialect) : IProtocolHandler
+/// <param name="logonTokenSource">Produces the logged-on user's tokens for the WinLDAP dialect's bind without <c>-u</c>.</param>
+public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialect, ILdapLogonTokenSource logonTokenSource) : IProtocolHandler
 {
     private const int DefaultPort = 389;
 
@@ -49,6 +54,21 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
     private readonly LdapDialect dialect = Enum.IsDefined(dialect)
         ? dialect
         : throw new ArgumentOutOfRangeException(nameof(dialect), dialect, "The LDAP dialect is WinLdap or OpenLdap.");
+
+    private readonly ILdapLogonTokenSource logonTokenSource =
+        logonTokenSource ?? throw new ArgumentNullException(nameof(logonTokenSource));
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="LdapProtocolHandler" /> class whose
+    /// WinLDAP dialect binds without <c>-u</c> with the logged-on user's tokens from
+    /// <see cref="NegotiateLogonTokenSource" />.
+    /// </summary>
+    /// <param name="connector">Supplies the connection to the URL's host and port.</param>
+    /// <param name="dialect">The build to answer as.</param>
+    public LdapProtocolHandler(IConnector connector, LdapDialect dialect)
+        : this(connector, dialect, new NegotiateLogonTokenSource())
+    {
+    }
 
     /// <inheritdoc />
     public IReadOnlyCollection<string> SupportedSchemes => Schemes;
@@ -101,22 +121,28 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
         return new ConnectTarget(url.IdnHost, url.IsDefaultPort ? defaultPort : url.Port, useTls);
     }
 
-    /// <summary>Binds with the transfer's credentials, or anonymously without them, then runs the search.</summary>
+    /// <summary>
+    /// Binds with the transfer's credentials; without them anonymously on OpenLDAP and as the
+    /// logged-on user on WinLDAP; then runs the search.
+    /// </summary>
     private async ValueTask<TransferResult> BindAndSearchAsync(IConnection connection, ITransferContext context, LdapSearchParameters search)
     {
         var exchange = new LdapExchange(connection, new LdapBerWriter(dialect));
-        NetworkCredential credentials = context.Credentials ?? new NetworkCredential(string.Empty, string.Empty);
-        TransferResult? bindFailure = await LdapBind.BindAsync(
-            dialect,
-            exchange,
-            credentials.UserName,
-            credentials.Password,
-            context.CancellationToken).ConfigureAwait(false);
+        TransferResult? bindFailure = dialect == LdapDialect.WinLdap && context.Credentials is null
+            ? await WinLdapLogonBind.BindAsync(exchange, logonTokenSource, context.Url.IdnHost, context.CancellationToken).ConfigureAwait(false)
+            : await BindWithCredentialsAsync(exchange, context).ConfigureAwait(false);
         if (bindFailure is not null)
         {
             return bindFailure;
         }
 
         return await LdapSearch.RunAsync(dialect, exchange, search, context).ConfigureAwait(false);
+    }
+
+    /// <summary>Binds with a simple bind: the transfer's credentials, or the anonymous bind without them.</summary>
+    private ValueTask<TransferResult?> BindWithCredentialsAsync(LdapExchange exchange, ITransferContext context)
+    {
+        NetworkCredential credentials = context.Credentials ?? new NetworkCredential(string.Empty, string.Empty);
+        return LdapBind.BindAsync(dialect, exchange, credentials.UserName, credentials.Password, context.CancellationToken);
     }
 }

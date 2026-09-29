@@ -217,15 +217,6 @@ public sealed partial class LdapProtocolHandlerTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_WinLdapWithoutUser_BindsAnonymouslyUntilTheNtlmBindIsBuilt()
-    {
-        (TransferResult result, byte[] sent) = await RunAsync(LdapDialect.WinLdap, null, BindSuccess1, SearchDone2);
-
-        Assert.AreEqual(TransferResult.Success(0), result);
-        CollectionAssert.AreEqual(Hex.Bytes("30 84 00 00 00 10 02 01 01 60 84 00 00 00 07 02 01 03 04 00 80 00 " + WinLdapSearch2 + " " + WinLdapUnbind3), sent);
-    }
-
-    [TestMethod]
     [DataRow(true)]
     [DataRow(false)]
     public async Task ExecuteAsync_OpenLdapInvalidCredentials_UnbindsAndFailsWith67LoginDenied(bool withUser)

@@ -16,6 +16,12 @@ internal static class WinLdapResultText
     /// <summary>WinLDAP's <c>LDAP_UNAVAILABLE</c>, reported when the server closes before answering the LDAPv2 retry.</summary>
     public const int Unavailable = 52;
 
+    /// <summary>WinLDAP's <c>LDAP_SERVER_DOWN</c>, reported when the server closes while the logon bind's retry reads the rootDSE.</summary>
+    public const int ServerDown = 81;
+
+    /// <summary>WinLDAP's <c>LDAP_LOCAL_ERROR</c>, reported when the logon bind's security package produces no token.</summary>
+    public const int LocalError = 82;
+
     /// <summary>WinLDAP's <c>LDAP_TIMEOUT</c>, reported when the first bind gets no BindResponse.</summary>
     public const int Timeout = 85;
 

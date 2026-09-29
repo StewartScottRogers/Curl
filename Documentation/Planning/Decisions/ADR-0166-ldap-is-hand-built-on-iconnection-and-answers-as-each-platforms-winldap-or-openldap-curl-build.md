@@ -71,10 +71,11 @@ with exit 39, `LDAP remote: Server Down`.
   exit mapping and the extra line after an entry, per the table above.
 - **Bind.** With `-u`, a simple bind with the user as the DN and the password, LDAPv3, on
   both. Without `-u`: the OpenLDAP dialect binds anonymously (empty name and password);
-  the WinLDAP dialect reproduces `ldap_win_bind` - the rootDSE read, then the Sicily NTLM
-  bind as the logged-on user through the BCL's `NegotiateAuthentication` with default
-  credentials - measured and pinned by BL-586. A complete reimplementation leaves neither
-  out.
+  the WinLDAP dialect reproduces `ldap_win_bind` - the rootDSE reads, then the SASL
+  `GSS-SPNEGO` bind or, when the server offers no `GSS-SPNEGO`, the Sicily NTLM bind, as the
+  logged-on user through the BCL's `NegotiateAuthentication` with default credentials behind
+  the `ILdapLogonTokenSource` seam - measured and pinned by BL-830. A complete
+  reimplementation leaves neither out.
 - **The URL** follows RFC 4516, `ldap://host[:port]/<dn>?<attributes>?<scope>?<filter>?<extensions>`,
   percent-decoded per part, scope `base` by default, the filter `(objectClass=*)` by
   default (spelled `ObjectClass` by WinLDAP and `objectclass` by OpenLDAP on the wire, as
@@ -129,8 +130,7 @@ recordings on 2026-09-28 (Windows curl 8.21.0 with WinLDAP; Linux curl 8.18.0 wi
 - Bytes that cannot start an LDAPMessage (not a SEQUENCE, an indefinite or over-long
   length) are treated as a reply that is not a BindResponse; not measured separately.
 - Without `-u` the Windows build reads the rootDSE (`supportedCapabilities`, time limit
-  120) before its NTLM bind. That bind is its own task, BL-830; until it lands the WinLDAP
-  dialect binds anonymously without `-u`, and BL-589 registers the handler only after it.
+  120) before its NTLM bind. That bind is BL-830's; see "Measured by BL-830".
 
 ## Measured by BL-587
 
@@ -214,6 +214,46 @@ recordings on 2026-09-28 (the same two builds as BL-586), each with
   where WinLDAP would look both up by name.
 - A failed write to the output, and a connection that fails with an I/O error rather than
   closing, are not handled by the LDAP handler yet; BL-845 does that.
+
+## Measured by BL-830
+
+Decided by Claude under Stewart's delegation, in BL-830, from 14 `Record-CurlExchange.ps1 -Script`
+recordings on 2026-09-28 of Windows curl 8.21.0 with WinLDAP, `-sS ldap://127.0.0.1:<port>/dc=example`
+(no `-u`), the rootDSE and binds answered with canned replies and a hand-made NTLM challenge.
+curl's `ldap_win_bind` calls `ldap_bind_s(server, NULL, NULL, LDAP_AUTH_NEGOTIATE)`, and its
+LDAPv2 retry makes a second, identical attempt:
+
+- **Discovery.** Each attempt reads the rootDSE's `supportedCapabilities`, then its
+  `supportedSASLMechanisms`: SearchRequests with base `""`, scope base, time limit 120,
+  filter `(objectclass=*)`, one attribute, numbered on from 1 like every other message.
+- **`GSS-SPNEGO`.** When the mechanisms name it, WinLDAP sends an LDAPv3 BindRequest with an
+  empty name and SASL credentials `GSS-SPNEGO` and the token - on a machine outside a domain a
+  raw NTLM negotiate message asking to sign and seal (`b7 b2 08 e2`), with target name
+  `ldap/<host>`. A `saslBindInProgress` (14) answer's serverSaslCreds are the challenge, and the
+  authenticate message goes in the next bind. Once a server has named `GSS-SPNEGO` the retry
+  uses it too, even when its second answer names nothing.
+- **Sicily.** When the mechanisms do not name it, WinLDAP reads `supportedCapabilities` once
+  more and sends `sicilyNegotiate` (`[10]`, name `NTLM`); a `success` answer carries the NTLM
+  challenge in its matchedDN, and `sicilyResponse` (`[11]`, empty name) carries the
+  authenticate message.
+- **Failure.** A bind answered with any other result ends the attempt; when the retry fails
+  too, curl sends an UnbindRequest and fails with exit 38 `LDAP local: bind via ldap_win_bind`
+  and WinLDAP's text for the retry's result (49 twice: `Invalid Credentials`). A server that
+  closes during the first attempt's rootDSE reads, or on any bind, ends with `Timeout` (after
+  WinLDAP's waits of up to 240 seconds, reported at once here, as BL-586 decided); one that
+  closes during the retry's rootDSE reads ends with `Server Down`. Neither sends an Unbind.
+- **After the bind.** WinLDAP signs and seals everything that follows: the SearchRequest went
+  out as a four-byte length, a 16-byte NTLM signature and the sealed message. That security
+  layer is BL-847's; until it lands the search after a logon bind is sent unsealed, and
+  BL-589 registers the handler only after it.
+- Not measured, decided by the same rules: a `success` answer to a `GSS-SPNEGO` bind before
+  the security package has finished (recorded once: WinLDAP started its retry) fails the
+  attempt with `Local Error`, as does a security package that cannot produce a token;
+  `GSS-SPNEGO` is matched without regard to case; a rootDSE SearchResultDone that is not
+  `success` still ends the read, and replies to it that are neither entries nor the
+  SearchResultDone are skipped. The tokens come through `ILdapLogonTokenSource`, which the
+  handler takes as a constructor argument (`NegotiateLogonTokenSource` by default), so tests
+  use a fake package and need no domain.
 
 ## Consequences
 

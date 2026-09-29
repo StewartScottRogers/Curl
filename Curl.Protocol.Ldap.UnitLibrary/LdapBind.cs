@@ -110,10 +110,18 @@ internal static class LdapBind
         return await UnbindAndFailAsync(exchange, failure, cancellationToken).ConfigureAwait(false);
     }
 
-    private static TransferResult WinLdapBindFailed(int resultCode) =>
+    /// <summary>The failure <c>ldap_win_bind</c> reports for <paramref name="resultCode" />: exit 38 and WinLDAP's text for it.</summary>
+    /// <param name="resultCode">The LDAP or WinLDAP result code.</param>
+    /// <returns>The failed transfer's result.</returns>
+    internal static TransferResult WinLdapBindFailed(int resultCode) =>
         TransferResult.Failure(CurlExitCode.LdapCannotBind, WinLdapBindFailedPrefix + WinLdapResultText.Of(resultCode));
 
-    private static async ValueTask<TransferResult?> UnbindAndFailAsync(
+    /// <summary>Sends an UnbindRequest, then returns <paramref name="failure" />.</summary>
+    /// <param name="exchange">The session to leave.</param>
+    /// <param name="failure">The failed transfer's result.</param>
+    /// <param name="cancellationToken">Cancels the send.</param>
+    /// <returns><paramref name="failure" />.</returns>
+    internal static async ValueTask<TransferResult?> UnbindAndFailAsync(
         LdapExchange exchange,
         TransferResult failure,
         CancellationToken cancellationToken)
