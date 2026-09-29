@@ -928,11 +928,7 @@ public sealed class HttpProtocolHandler(
     /// </summary>
     private static void ReportAuthorizationLines(HttpRequestPlan plan)
     {
-        foreach (string line in plan.AuthorizationInfoLines)
-        {
-            plan.Context.Events.ReportInfo(line);
-        }
-
+        ReportInfoLines(plan.Context.Events, plan.AuthorizationInfoLines);
         if (HttpNegotiateInfoLines.PicksNegotiate(plan.AuthRequest, plan.Authorization, plan.AuthorizationAnswersChallenge))
         {
             plan.Context.Events.ReportInfo(HttpNegotiateInfoLines.ServerAuthUsing(plan.AuthRequest.Credential));
@@ -1340,9 +1336,9 @@ public sealed class HttpProtocolHandler(
             return plan.WithProxyAuthorization(proxyAuthorization);
         }
 
-        if (await RetryAuthorizationAsync(plan, head, cancellationToken).ConfigureAwait(false) is { } authorization)
+        if (await RetryWithAuthorizationAsync(plan, head, cancellationToken).ConfigureAwait(false) is { } authorized)
         {
-            return plan.WithAuthorization(authorization);
+            return authorized;
         }
 
         if (!RetriesWithoutExpect(plan, head, bodyLeftUnsent || upload.CutShort))
@@ -1394,13 +1390,57 @@ public sealed class HttpProtocolHandler(
     /// curl 8.21.0 (ADR-0181, ADR-0227).
     /// </summary>
     /// <exception cref="HttpTransferException">The authenticator fails the transfer (<see cref="HttpAuthenticationFailedException" />).</exception>
-    private ValueTask<string?> RetryAuthorizationAsync(HttpRequestPlan plan, HttpResponseHead head, CancellationToken cancellationToken) =>
+    private ValueTask<string?> RetryAuthorizationAsync(HttpRequestPlan plan, HttpAuthRequest request, HttpResponseHead head, CancellationToken cancellationToken) =>
         AnswerChallengesAsync(
-            plan.AuthRequest,
+            request,
             plan.Authorization,
             plan.AuthorizationAnswersChallenge,
             MayRetry(plan, head, 401) ? ValuesOf(head, "WWW-Authenticate") : [],
             cancellationToken);
+
+    /// <summary>
+    /// Makes the request <see cref="RetryAuthorizationAsync" /> answers a 401 with, or gives
+    /// <see langword="null" /> when it answers none. What the authenticator reports while it
+    /// answers goes where curl 8.21.0 writes it (ADR-0232): before the retry when the request
+    /// that drew the 401 was not sent with Negotiate picked, as curl steps that context on the
+    /// way out, and else at once, just before the Negotiate challenge header (ADR-0231), as it
+    /// does when there is no retry.
+    /// </summary>
+    /// <exception cref="HttpTransferException">The authenticator fails the transfer (<see cref="HttpAuthenticationFailedException" />).</exception>
+    private async ValueTask<HttpRequestPlan?> RetryWithAuthorizationAsync(HttpRequestPlan plan, HttpResponseHead head, CancellationToken cancellationToken)
+    {
+        HttpInfoLineRecorder retryLines = new();
+        HttpAuthRequest request = HttpNegotiateInfoLines.PicksNegotiate(plan.AuthRequest, plan.Authorization, plan.AuthorizationAnswersChallenge)
+            ? plan.AuthRequest
+            : plan.AuthRequest with { Events = retryLines };
+        string? authorization;
+        try
+        {
+            authorization = await RetryAuthorizationAsync(plan, request, head, cancellationToken).ConfigureAwait(false);
+        }
+        catch (HttpTransferException)
+        {
+            ReportInfoLines(plan.Context.Events, retryLines.Lines);
+            throw;
+        }
+
+        if (authorization is null)
+        {
+            ReportInfoLines(plan.Context.Events, retryLines.Lines);
+            return null;
+        }
+
+        return plan.WithAuthorization(authorization, retryLines.Lines);
+    }
+
+    /// <summary>Reports each of <paramref name="lines" /> to <paramref name="events" />, in order.</summary>
+    private static void ReportInfoLines(ITransferEvents events, IReadOnlyList<string> lines)
+    {
+        foreach (string line in lines)
+        {
+            events.ReportInfo(line);
+        }
+    }
 
     /// <summary>
     /// Decides whether a response is answered with one more request, and with what
@@ -1418,7 +1458,9 @@ public sealed class HttpProtocolHandler(
     /// Asks the authenticator to answer <paramref name="challenges" /> for
     /// <paramref name="request" />: nothing when there are none; through
     /// <see cref="IHttpAuthenticator.ContinueAuthorizationAsync" /> when the request that drew
-    /// them already sent <paramref name="sent" />; and else afresh.
+    /// them already sent <paramref name="sent" />, even an empty one, an empty answer to which
+    /// sends nothing more, so the request is never sent again without a header twice
+    /// (ADR-0232); and else afresh.
     /// </summary>
     /// <exception cref="HttpTransferException">The authenticator fails the transfer (<see cref="HttpAuthenticationFailedException" />).</exception>
     private async ValueTask<string?> AnswerChallengesAsync(HttpAuthRequest request, string? sent, bool sentAnswersChallenge, string[] challenges, CancellationToken cancellationToken)
@@ -1431,7 +1473,7 @@ public sealed class HttpProtocolHandler(
         try
         {
             return sent is not null
-                ? await Authenticator.ContinueAuthorizationAsync(request, sent, !sentAnswersChallenge, challenges, cancellationToken).ConfigureAwait(false)
+                ? NullIfEmpty(await Authenticator.ContinueAuthorizationAsync(request, sent, !sentAnswersChallenge, challenges, cancellationToken).ConfigureAwait(false))
                 : await Authenticator.CreateAuthorizationAsync(request, challenges, cancellationToken).ConfigureAwait(false);
         }
         catch (HttpAuthenticationFailedException failure)
@@ -1439,6 +1481,10 @@ public sealed class HttpProtocolHandler(
             throw new HttpTransferException(failure.ExitCode, failure.Message);
         }
     }
+
+    /// <summary>Gives <paramref name="value" />, or <see langword="null" /> when it is empty.</summary>
+    private static string? NullIfEmpty(string? value) =>
+        string.IsNullOrEmpty(value) ? null : value;
 
     /// <summary>
     /// Decides whether <paramref name="head" /> may be answered with a retry at all: a
@@ -1806,20 +1852,22 @@ public sealed class HttpProtocolHandler(
 
         /// <summary>
         /// Gets the <c>-v</c> lines the authenticator reported while it made
-        /// <see cref="Authorization" /> before any challenge, written just before the request
-        /// each time it is sent; empty for a value that answers a challenge, whose lines were
-        /// written with the response's head (BL-843).
+        /// <see cref="Authorization" />, written just before the request each time it is sent:
+        /// those of the value made before any challenge (BL-843), or of a value answering a
+        /// challenge to a request not sent with Negotiate picked (ADR-0232); empty for a value
+        /// whose lines were written with the response's head (ADR-0231).
         /// </summary>
         public IReadOnlyList<string> AuthorizationInfoLines { get; init; } = [];
 
         /// <summary>
         /// Makes the same request sent with <paramref name="authorization" /> instead, in answer
-        /// to a challenge.
+        /// to a challenge; an empty value sends no header (ADR-0232).
         /// </summary>
         /// <param name="authorization">The <c>Authorization</c> value the retry is sent with.</param>
+        /// <param name="infoLines">The lines the authenticator reported while it made the value that belong just before the retry.</param>
         /// <returns>The retry's plan.</returns>
-        public HttpRequestPlan WithAuthorization(string authorization) =>
-            With(Framing, authorization, SentOnFreshConnection, RedirectsFollowed, authorizationAnswersChallenge: true);
+        public HttpRequestPlan WithAuthorization(string authorization, IReadOnlyList<string> infoLines) =>
+            With(Framing, authorization, SentOnFreshConnection, RedirectsFollowed, authorizationAnswersChallenge: true, ProxyAuthorization, ProxyAuthorizationAnswersChallenge, infoLines);
 
         /// <summary>
         /// Makes the same request sent with <paramref name="proxyAuthorization" /> instead, in
@@ -1880,7 +1928,8 @@ public sealed class HttpProtocolHandler(
             int redirectsFollowed,
             bool authorizationAnswersChallenge,
             string? proxyAuthorization,
-            bool proxyAuthorizationAnswersChallenge) =>
+            bool proxyAuthorizationAnswersChallenge,
+            IReadOnlyList<string>? authorizationInfoLines = null) =>
             new(Context, Options, framing, AuthRequest, authorization)
             {
                 Started = Started,
@@ -1893,7 +1942,7 @@ public sealed class HttpProtocolHandler(
                 SentOnFreshConnection = sentOnFreshConnection,
                 RedirectsFollowed = redirectsFollowed,
                 AuthorizationAnswersChallenge = authorizationAnswersChallenge,
-                AuthorizationInfoLines = authorizationAnswersChallenge ? [] : AuthorizationInfoLines,
+                AuthorizationInfoLines = authorizationInfoLines ?? AuthorizationInfoLines,
                 StreamRefusedRetries = StreamRefusedRetries,
             };
     }

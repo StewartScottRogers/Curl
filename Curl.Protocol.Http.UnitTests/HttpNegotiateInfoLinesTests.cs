@@ -25,6 +25,7 @@ public sealed class HttpNegotiateInfoLinesTests
     [TestMethod]
     [DataRow("Negotiate YII=", false, HttpAuthSchemes.Any, true, DisplayName = "Negotiate value sent")]
     [DataRow("Basic dTpw", false, HttpAuthSchemes.Negotiate, false, DisplayName = "Another scheme's value")]
+    [DataRow("", true, HttpAuthSchemes.Any, true, DisplayName = "Sent again without a header, --anyauth")]
     [DataRow(null, false, HttpAuthSchemes.Negotiate, true, DisplayName = "First request, --negotiate alone, no token")]
     [DataRow(null, false, HttpAuthSchemes.Any, false, DisplayName = "First request, --anyauth")]
     [DataRow(null, true, HttpAuthSchemes.Negotiate, false, DisplayName = "No value in answer to a challenge")]

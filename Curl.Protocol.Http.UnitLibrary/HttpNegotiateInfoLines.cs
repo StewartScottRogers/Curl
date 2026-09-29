@@ -25,16 +25,17 @@ internal static class HttpNegotiateInfoLines
 
     /// <summary>
     /// Decides whether curl picks Negotiate for a request to the origin: one sending a
-    /// Negotiate value, or the transfer's first request when <c>--negotiate</c> is the one
-    /// scheme allowed, whether or not its context made a token.
+    /// Negotiate value; one sent again without a header on the authenticator's empty answer,
+    /// which only Negotiate picked after a 401 gives (ADR-0232); or the transfer's first request
+    /// when <c>--negotiate</c> is the one scheme allowed, whether or not its context made a token.
     /// </summary>
     /// <param name="request">The request as the authenticator is asked about it.</param>
-    /// <param name="authorization">The <c>Authorization</c> value the request sends, or <see langword="null" />.</param>
+    /// <param name="authorization">The <c>Authorization</c> value the request sends, empty for none after a 401, or <see langword="null" />.</param>
     /// <param name="answersChallenge"><see langword="true" /> when the request answers a 401.</param>
     /// <returns><see langword="true" /> when the request is sent with Negotiate picked.</returns>
     internal static bool PicksNegotiate(HttpAuthRequest request, string? authorization, bool answersChallenge) =>
         authorization is not null
-            ? authorization.StartsWith(SchemePrefix, StringComparison.Ordinal)
+            ? authorization.Length == 0 || authorization.StartsWith(SchemePrefix, StringComparison.Ordinal)
             : !answersChallenge && request.AllowedSchemes == HttpAuthSchemes.Negotiate;
 
     /// <summary>
