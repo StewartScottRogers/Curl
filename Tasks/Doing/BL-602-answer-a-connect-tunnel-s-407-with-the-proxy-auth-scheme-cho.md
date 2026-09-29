@@ -33,3 +33,4 @@ A `CONNECT` answered `407` with `Proxy-Authenticate` is retried with `Proxy-Auth
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
