@@ -35,3 +35,4 @@ The server's host key is accepted or refused as curl 8.21.0 does: matched agains
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
