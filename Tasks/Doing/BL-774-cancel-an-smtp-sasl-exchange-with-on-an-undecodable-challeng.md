@@ -81,3 +81,4 @@ Criterion 4 needs `Documentation/Planning/Decisions` (ADR-0133); BL-610, in Doin
 - 2026-09-28: Created.
 - 2026-09-29: Backlog -> Doing.
 - 2026-09-29: Doing -> Backlog. Needs Documentation/Planning/Decisions (ADR-0133 amendment), which BL-610 in Doing touches; code and tests done and uncommitted, see Notes
+- 2026-09-29: Backlog -> Doing.
