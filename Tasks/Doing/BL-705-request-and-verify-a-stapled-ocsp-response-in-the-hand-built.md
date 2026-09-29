@@ -32,3 +32,4 @@ The hand-built TLS client (1.3 and 1.2) sends `status_request`, receives the sta
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
