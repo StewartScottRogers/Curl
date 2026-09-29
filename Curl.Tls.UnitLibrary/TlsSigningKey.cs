@@ -1,28 +1,34 @@
 namespace Curl.Tls;
 
 /// <summary>
-/// A private key that signs a TLS 1.3 CertificateVerify: the client certificate's key, or
-/// in tests the in-memory server's.
+/// A private key that signs a CertificateVerify (TLS 1.3, or TLS 1.2 and below): the
+/// client certificate's key, or in tests the in-memory server's.
 /// </summary>
 public abstract class TlsSigningKey
 {
-    /// <summary>Returns whether this key can sign with <paramref name="scheme" />.</summary>
+    /// <summary>Returns whether this key can sign a TLS 1.3 CertificateVerify with <paramref name="scheme" />.</summary>
     /// <param name="scheme">The signature scheme code point.</param>
     /// <returns><see langword="true" /> when the scheme fits the key's type, curve and padding.</returns>
-    public bool CanSign(ushort scheme) => TlsSignatureScheme.FindRule(scheme) is { } rule && Fits(rule);
+    public bool CanSign(ushort scheme) => CanSign(TlsSignatureScheme.FindRule(scheme));
 
-    /// <summary>Signs <paramref name="content" /> with <paramref name="scheme" />.</summary>
-    /// <param name="scheme">A scheme <see cref="CanSign" /> accepts.</param>
+    /// <summary>Signs <paramref name="content" /> with the TLS 1.3 scheme <paramref name="scheme" />.</summary>
+    /// <param name="scheme">A scheme <see cref="CanSign(ushort)" /> accepts.</param>
     /// <param name="content">The content to sign.</param>
     /// <returns>The signature.</returns>
     /// <exception cref="ArgumentException">The key cannot sign with the scheme.</exception>
     public byte[] Sign(ushort scheme, byte[] content)
     {
         TlsSignatureRule? rule = TlsSignatureScheme.FindRule(scheme);
-        return rule is not null && Fits(rule)
-            ? Sign(rule, content)
+        return CanSign(rule)
+            ? Sign(rule!, content)
             : throw new ArgumentException($"This key cannot sign with signature scheme 0x{scheme:x4}.", nameof(scheme));
     }
+
+    /// <summary>Returns whether this key can sign by <paramref name="rule" />; a missing rule signs nothing.</summary>
+    internal bool CanSign(TlsSignatureRule? rule) => rule is not null && Fits(rule);
+
+    /// <summary>Signs <paramref name="content" /> by <paramref name="rule" />, which <see cref="CanSign(TlsSignatureRule)" /> accepted.</summary>
+    internal byte[] SignByRule(TlsSignatureRule rule, byte[] content) => Sign(rule, content);
 
     private protected abstract bool Fits(TlsSignatureRule rule);
 

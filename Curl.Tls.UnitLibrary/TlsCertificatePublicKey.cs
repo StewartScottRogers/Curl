@@ -1,4 +1,5 @@
 using System.Formats.Asn1;
+using System.Numerics;
 using System.Security.Cryptography;
 
 namespace Curl.Tls;
@@ -14,6 +15,10 @@ namespace Curl.Tls;
 /// <param name="SubjectPublicKeyInfo">The whole DER <c>SubjectPublicKeyInfo</c>.</param>
 public sealed record TlsCertificatePublicKey(string AlgorithmOid, string? CurveOid, byte[] KeyBits, byte[] SubjectPublicKeyInfo)
 {
+    private const int MinimumLegacyRsaModulusLength = 36 + 11;
+    private const int MaximumRsaModulusLength = 16384 / 8;
+    private const int MaximumRsaExponentBits = 64;
+
     private static readonly Asn1Tag VersionTag = new(TagClass.ContextSpecific, 0, true);
 
     /// <summary>Reads the public key of the DER certificate <paramref name="certificate" />.</summary>
@@ -57,7 +62,7 @@ public sealed record TlsCertificatePublicKey(string AlgorithmOid, string? CurveO
         return new TlsCertificatePublicKey(algorithmOid, curveOid, spki.ReadBitString(out _), subjectPublicKeyInfo);
     }
 
-    /// <summary>Checks a CertificateVerify signature made with this key.</summary>
+    /// <summary>Checks a TLS 1.3 CertificateVerify signature made with this key.</summary>
     /// <param name="scheme">The signature scheme the CertificateVerify names.</param>
     /// <param name="content">The signed content (<see cref="TlsSignatureScheme.BuildCertificateVerifyContent" />).</param>
     /// <param name="signature">The signature.</param>
@@ -68,10 +73,18 @@ public sealed record TlsCertificatePublicKey(string AlgorithmOid, string? CurveO
     /// <see cref="TlsAlertDescription.BadCertificate" /> when the key does not import; or
     /// <see cref="TlsAlertDescription.DecryptError" /> when the signature is wrong.
     /// </returns>
-    public TlsAlertDescription? VerifySignature(ushort scheme, byte[] content, byte[] signature)
+    public TlsAlertDescription? VerifySignature(ushort scheme, byte[] content, byte[] signature) =>
+        VerifySignature(TlsSignatureScheme.FindRule(scheme), content, signature);
+
+    /// <summary>
+    /// Checks a signature by <paramref name="rule" />, with the alerts of
+    /// <see cref="VerifySignature(ushort, byte[], byte[])" />: a missing rule, or one that
+    /// does not fit this key, is <see cref="TlsAlertDescription.IllegalParameter" />. A rule
+    /// with no curve fits an EC key on any curve.
+    /// </summary>
+    internal TlsAlertDescription? VerifySignature(TlsSignatureRule? rule, byte[] content, byte[] signature)
     {
-        TlsSignatureRule? rule = TlsSignatureScheme.FindRule(scheme);
-        if (rule is null || rule.KeyOid != AlgorithmOid || rule.CurveOid != CurveOid)
+        if (rule is null || rule.KeyOid != AlgorithmOid || (rule.CurveOid is not null && rule.CurveOid != CurveOid))
         {
             return TlsAlertDescription.IllegalParameter;
         }
@@ -80,24 +93,83 @@ public sealed record TlsCertificatePublicKey(string AlgorithmOid, string? CurveO
         {
             return Verify(rule, content, signature) ? null : TlsAlertDescription.DecryptError;
         }
-        catch (CryptographicException)
+        catch (Exception exception) when (exception is CryptographicException or AsnContentException)
         {
             return TlsAlertDescription.BadCertificate;
         }
     }
 
+    /// <summary>
+    /// Encrypts a TLS 1.2 and below RSA pre-master secret to this key with PKCS #1 v1.5
+    /// (RFC 5246 section 7.4.7.1).
+    /// </summary>
+    /// <returns>The encrypted pre-master secret, or <see langword="null" /> when this is not an <c>rsaEncryption</c> key or it does not import.</returns>
+    internal byte[]? EncryptPkcs1(byte[] preMasterSecret)
+    {
+        if (AlgorithmOid != TlsSignatureScheme.RsaEncryptionOid)
+        {
+            return null;
+        }
+
+        try
+        {
+            using RSA rsa = RSA.Create();
+            rsa.ImportRSAPublicKey(KeyBits, out _);
+            return rsa.Encrypt(preMasterSecret, RSAEncryptionPadding.Pkcs1);
+        }
+        catch (CryptographicException)
+        {
+            return null;
+        }
+    }
+
     private bool Verify(TlsSignatureRule rule, byte[] content, byte[] signature) => rule.Kind switch
     {
-        TlsSignatureKind.RsaPss => VerifyRsaPss(rule.Hash, content, signature),
         TlsSignatureKind.Ecdsa => VerifyEcdsa(rule.Hash, content, signature),
-        _ => VerifyEd25519(content, signature),
+        TlsSignatureKind.Ed25519 => VerifyEd25519(content, signature),
+        _ => VerifyRsa(rule, content, signature),
     };
 
-    private bool VerifyRsaPss(HashAlgorithmName hash, byte[] content, byte[] signature)
+    private bool VerifyRsa(TlsSignatureRule rule, byte[] content, byte[] signature) => rule.Kind == TlsSignatureKind.RsaMd5Sha1
+        ? VerifyRsaMd5Sha1(content, signature)
+        : VerifyRsa(rule.Hash, rule.Kind == TlsSignatureKind.RsaPss ? RSASignaturePadding.Pss : RSASignaturePadding.Pkcs1, content, signature);
+
+    /// <summary>
+    /// The BCL verifies PKCS #1 v1.5 only with a DigestInfo, so TLS 1.0 and 1.1's bare MD5
+    /// and SHA-1 block is checked with the public operation s^e mod n, which involves no secret.
+    /// </summary>
+    private bool VerifyRsaMd5Sha1(byte[] content, byte[] signature)
+    {
+        AsnReader key = new AsnReader(KeyBits, AsnEncodingRules.DER).ReadSequence();
+        BigInteger modulus = key.ReadInteger();
+        BigInteger exponent = key.ReadInteger();
+        key.ThrowIfNotEmpty();
+        var value = new BigInteger(signature, isUnsigned: true, isBigEndian: true);
+        if (!IsUsableLegacyRsaKey(modulus, exponent) || signature.Length != modulus.GetByteCount(isUnsigned: true) || value >= modulus)
+        {
+            return false;
+        }
+
+        BigInteger recovered = BigInteger.ModPow(value, exponent, modulus);
+        return recovered == new BigInteger(TlsSignatureScheme.BuildMd5Sha1Block(content, signature.Length), isUnsigned: true, isBigEndian: true);
+    }
+
+    /// <summary>
+    /// Whether a server's RSA key can carry the MD5 and SHA-1 block (36 bytes and 11 of
+    /// padding) within OpenSSL's limits on the public operation: a modulus of at most
+    /// 16384 bits and an exponent of at most 64 bits.
+    /// </summary>
+    private static bool IsUsableLegacyRsaKey(BigInteger modulus, BigInteger exponent) =>
+        modulus.Sign > 0
+        && modulus.GetByteCount(isUnsigned: true) is >= MinimumLegacyRsaModulusLength and <= MaximumRsaModulusLength
+        && exponent.Sign > 0
+        && exponent.GetBitLength() <= MaximumRsaExponentBits;
+
+    private bool VerifyRsa(HashAlgorithmName hash, RSASignaturePadding padding, byte[] content, byte[] signature)
     {
         using RSA rsa = RSA.Create();
         rsa.ImportRSAPublicKey(KeyBits, out _);
-        return rsa.VerifyData(content, signature, hash, RSASignaturePadding.Pss);
+        return rsa.VerifyData(content, signature, hash, padding);
     }
 
     private bool VerifyEcdsa(HashAlgorithmName hash, byte[] content, byte[] signature)

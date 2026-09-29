@@ -14,11 +14,21 @@ namespace Curl.Tls;
 /// </summary>
 internal sealed record TestServerCredential(byte[] Certificate, TlsSigningKey SigningKey, ushort Scheme)
 {
+    /// <summary>Gets the RSA private key of an <see cref="Rsa" /> credential, for TLS 1.2 RSA key exchange and TLS 1.0 and 1.1 signatures.</summary>
+    public RSA? RsaKey { get; init; }
+
     public static TestServerCredential Rsa(ushort scheme)
     {
         RSA key = RSA.Create(2048);
-        return new(SelfSigned(new X509CertificateRequest("CN=rsa", key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1)), new RsaTlsSigningKey(key), scheme);
+        return new(SelfSigned(new X509CertificateRequest("CN=rsa", key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1)), new RsaTlsSigningKey(key), scheme)
+        {
+            RsaKey = key,
+        };
     }
+
+    /// <summary>A certificate whose <c>SubjectPublicKeyInfo</c> says <paramref name="algorithmOid" /> over <paramref name="keyBits" />, with no usable private key.</summary>
+    public static TestServerCredential Foreign(string algorithmOid, byte[] keyBits) =>
+        new(WithForeignKey("CN=foreign", new PublicKey(new Oid(algorithmOid), null, new AsnEncodedData(keyBits))), new Ed25519TlsSigningKey(new byte[32]), TlsSignatureScheme.Ed25519);
 
     public static TestServerCredential RsaPss(ushort scheme)
     {

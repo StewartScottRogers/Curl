@@ -10,8 +10,9 @@ where the operating system disables them, `--ssl-allow-beast`). Everything else 
 `SslStreamTlsProvider` in `Curl.Networking.UnitLibrary`.
 
 Namespace `Curl.Tls`. What is here so far: the handshake message codecs (BL-698), the
-TLS 1.3 key schedule (BL-697), the TLS 1.3 client handshake (BL-699, ADR-0146), and the
-TLS 1.2, 1.1 and 1.0 PRF and record protection (BL-702, ADR-0150).
+TLS 1.3 key schedule (BL-697), the TLS 1.3 client handshake (BL-699, ADR-0146), the
+TLS 1.2, 1.1 and 1.0 PRF and record protection (BL-702, ADR-0150), and the TLS 1.2,
+1.1 and 1.0 client handshake (BL-703, ADR-0152).
 
 - `HandshakeMessageReader` frames handshake bytes into `HandshakeMessage`s (type and
   body); an unknown type is `unexpected_message`.
@@ -66,14 +67,42 @@ TLS 1.2, 1.1 and 1.0 PRF and record protection (BL-702, ADR-0150).
   `insertEmptyFragment` is off (`--ssl-allow-beast`). CBC padding is checked with masks
   (`Tls12CbcPadding`); the Lucky Thirteen hash-time residual is BL-795's. AES-CCM and RC4
   records are BL-796's.
-- `ITlsRandomSource` supplies the random, session ID and key shares;
-  `SystemTlsRandomSource` is the production one.
+- `Tls12ClientHandshake`: the I/O-free TLS 1.2, 1.1 and 1.0 client state machine.
+  `Start()` returns the ClientHello; `ReceiveHandshake(bytes)` takes handshake record
+  content and `ReceiveChangeCipherSpec(content)` the server's ChangeCipherSpec; each
+  returns a `Tls12HandshakeOutput` of `Tls12OutgoingMessage`s (handshake messages and
+  the client's ChangeCipherSpec, in order), completion, or a `TlsHandshakeFailure`. It
+  exposes `RecordProtection` and `KeyBlock`: the caller switches its write state after
+  sending the ChangeCipherSpec and its read state after the server's is accepted. Key
+  exchanges: ECDHE (X25519, P-256/384/521), DHE with the server's group (1024 bits at
+  least), RSA and anonymous; `Tls12CipherSuite` holds the 73 suites the record layer can
+  protect (`Tls12KeyExchange`, `Tls12Authentication`, bulk cipher, MAC, PRF). Covers the
+  ServerKeyExchange signature (TLS 1.2 schemes, and TLS 1.0/1.1's MD5+SHA-1 RSA and
+  SHA-1 ECDSA), empty `renegotiation_info` (a server without it is refused), extended
+  master secret, encrypt-then-MAC, ALPN, SNI, `status_request` with the CertificateStatus
+  handed to the verifier with the chain, resumption by session ID and by ticket
+  (`Tls12Session`, `Tls12NewSessionTicket`), and an optional client certificate (an RSA
+  key cannot yet sign TLS 1.0/1.1's CertificateVerify, so it sends an empty Certificate).
+  HelloRequest is ignored. The TLS 1.2 codecs: `Tls12CertificateMessage`,
+  `Tls12CertificateRequest`, `Tls12ServerKeyExchange` (`Tls12EcdheParameters`,
+  `Tls12DheParameters`), `Tls12ClientKeyExchange`, `Tls12CertificateVerify`.
+- `Tls12ClientSettings`: version range, suites (and the renegotiation SCSV), ECDHE
+  groups, TLS 1.2 signature algorithms, ALPN, `status_request`, whether to offer
+  `session_ticket`, `extended_master_secret` and `encrypt_then_mac`, the session to
+  resume, and the client certificate. The ClientHello's extensions follow OpenSSL's order.
+- `ITlsRandomSource` supplies the random, session ID, key shares, DHE exponent and RSA
+  pre-master secret; `SystemTlsRandomSource` is the production one.
 - `IServerCertificateVerifier` gets the chain as a `ServerCertificateChain` (DER
   certificates, SNI name, stapled OCSP response) and answers a `ServerCertificateVerdict`.
-- Signatures: `TlsSignatureScheme` (codes and the CertificateVerify content),
-  `TlsCertificatePublicKey` (a certificate's `SubjectPublicKeyInfo` and the
-  CertificateVerify check), `TlsSigningKey` with `RsaTlsSigningKey`,
-  `EcdsaTlsSigningKey` and `Ed25519TlsSigningKey`.
+- Signatures: `TlsSignatureScheme` (codes, the TLS 1.3 and TLS 1.2 scheme tables - TLS
+  1.2 adds `rsa_pkcs1_*` and `ecdsa_sha1` and binds `ecdsa_*` to no curve - TLS 1.0/1.1's
+  legacy signatures, and the CertificateVerify content), `TlsCertificatePublicKey` (a
+  certificate's `SubjectPublicKeyInfo`, the signature checks, and the RSA pre-master
+  secret encryption), `TlsSigningKey` with `RsaTlsSigningKey`, `EcdsaTlsSigningKey` and
+  `Ed25519TlsSigningKey`.
+- Tests: `Tls13TestServer` and `Tls12TestServer` in `Curl.Tls.UnitTests` are in-memory
+  servers built from these codecs; `Tls12TestServer` resumes from a shared
+  `Tls12TestSessionCache` and signs TLS 1.0/1.1 RSA with `BigInteger` (test code only).
 
 ## Rules
 

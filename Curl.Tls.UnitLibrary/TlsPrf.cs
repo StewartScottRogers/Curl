@@ -117,6 +117,15 @@ public sealed class TlsPrf
         Compute(masterSecret, "server finished", handshakeHash, VerifyDataLength);
 
     /// <summary>
+    /// Hashes the handshake messages as the Finished messages, the extended master secret
+    /// and a TLS 1.0 or 1.1 CertificateVerify take them: MD5 then SHA-1 (36 bytes) for
+    /// <see cref="Md5Sha1" />, otherwise the PRF's own hash (RFC 5246 section 7.4.9).
+    /// </summary>
+    internal byte[] HashHandshake(ReadOnlySpan<byte> messages) => hashAlgorithm is { } hash
+        ? CryptographicOperations.HashData(hash, messages)
+        : [.. CryptographicOperations.HashData(HashAlgorithmName.MD5, messages), .. CryptographicOperations.HashData(HashAlgorithmName.SHA1, messages)];
+
+    /// <summary>
     /// P_hash (RFC 5246 section 5): <c>HMAC(secret, A(i) + seed)</c> for <c>A(1)</c>,
     /// <c>A(2)</c> and on, where <c>A(0)</c> is the seed and <c>A(i)</c> is
     /// <c>HMAC(secret, A(i-1))</c>, until <paramref name="output" /> is full.
