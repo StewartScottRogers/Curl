@@ -47,3 +47,4 @@ completed:
 - 2026-09-28: Created.
 - 2026-09-29: Backlog -> Doing.
 - 2026-09-29: Doing -> Backlog. Waiting on BL-952: no SshProtocolHandler exists in Curl.Protocol.Ssh.UnitLibrary to register
+- 2026-09-29: Backlog -> Doing.
