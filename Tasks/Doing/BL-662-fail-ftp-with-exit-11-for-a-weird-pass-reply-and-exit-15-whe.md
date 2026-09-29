@@ -32,3 +32,4 @@ The FTP handler ends with exit 11 (`CURLE_FTP_WEIRD_PASS_REPLY`) and curl 8.21.0
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
