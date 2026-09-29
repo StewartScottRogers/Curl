@@ -60,6 +60,16 @@ internal sealed class SftpSession
 
     private const uint SymbolicLinkType = 0xA000;
 
+    // statvfs@openssh.com answers eleven 64-bit fields; libssh2 keeps only ST_RDONLY and
+    // ST_NOSUID of f_flag, the tenth.
+    private const int StatFileSystemFieldCount = 11;
+
+    private const int StatFileSystemFlagField = 9;
+
+    private const ulong StatFileSystemFlagsKept = 0x3;
+
+    private static readonly byte[] StatFileSystemExtension = "statvfs@openssh.com"u8.ToArray();
+
     private readonly SshSessionChannel channel;
 
     private uint nextRequestId;
@@ -180,6 +190,114 @@ internal sealed class SftpSession
             },
             cancellationToken).ConfigureAwait(false);
         return await ReadStatusAsync(id, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sends a request that names paths and is answered by a status alone:
+    /// <c>SSH_FXP_REMOVE</c>, <c>SSH_FXP_RMDIR</c>, <c>SSH_FXP_RENAME</c> or
+    /// <c>SSH_FXP_SYMLINK</c>. libssh2 1.11.1 sends a version 3 <c>RENAME</c> with no flags,
+    /// and a <c>SYMLINK</c> with its two paths in the order it is given them.
+    /// </summary>
+    /// <param name="type">The request's <see cref="SftpPacketType" />.</param>
+    /// <param name="paths">The paths, in the order the request carries them.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    /// <returns>The status the server answered with.</returns>
+    /// <exception cref="InvalidDataException">The answer is malformed or of another type.</exception>
+    internal async ValueTask<uint> RequestPathsAsync(byte type, byte[][] paths, CancellationToken cancellationToken)
+    {
+        uint id = await SendRequestAsync(
+            type,
+            fields =>
+            {
+                foreach (byte[] path in paths)
+                {
+                    fields.WriteString(path);
+                }
+            },
+            cancellationToken).ConfigureAwait(false);
+        return await ReadStatusAsync(id, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sends <c>SSH_FXP_STAT</c> for <paramref name="path" /> and reads the whole answer, as
+    /// libssh2's <c>libssh2_sftp_stat_ex</c> does.
+    /// </summary>
+    /// <param name="path">The path.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    /// <returns>
+    /// The attributes and <see cref="SftpStatusCode.Ok" />; or, for a status answer, empty
+    /// attributes and that status, which libssh2 takes as success when it is
+    /// <see cref="SftpStatusCode.Ok" />.
+    /// </returns>
+    /// <exception cref="InvalidDataException">The answer is malformed or of another type.</exception>
+    internal async ValueTask<(SftpAttributes Attributes, uint Status)> StatAsync(byte[] path, CancellationToken cancellationToken)
+    {
+        uint id = await SendRequestAsync(SftpPacketType.Stat, fields => fields.WriteString(path), cancellationToken).ConfigureAwait(false);
+        return await ReadAttributesOrStatusAsync(id, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sends <c>SSH_FXP_SETSTAT</c> for <paramref name="path" /> with
+    /// <paramref name="attributes" /> as libssh2 writes them. An attributes answer counts as
+    /// success, as libssh2 takes it.
+    /// </summary>
+    /// <param name="path">The path.</param>
+    /// <param name="attributes">The attributes to set.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    /// <returns>The status the server answered with; <see cref="SftpStatusCode.Ok" /> for an attributes answer.</returns>
+    /// <exception cref="InvalidDataException">The answer is malformed or of another type.</exception>
+    internal async ValueTask<uint> SetStatAsync(byte[] path, SftpAttributes attributes, CancellationToken cancellationToken)
+    {
+        uint id = await SendRequestAsync(
+            SftpPacketType.SetStat,
+            fields =>
+            {
+                fields.WriteString(path);
+                attributes.WriteTo(fields);
+            },
+            cancellationToken).ConfigureAwait(false);
+        return (await ReadAttributesOrStatusAsync(id, cancellationToken).ConfigureAwait(false)).Status;
+    }
+
+    /// <summary>
+    /// Sends OpenSSH's <c>statvfs@openssh.com</c> extension for <paramref name="path" /> and
+    /// reads its eleven 64-bit fields, keeping only the read-only and no-set-uid bits of
+    /// <c>f_flag</c>, as libssh2's <c>libssh2_sftp_statvfs</c> does.
+    /// </summary>
+    /// <param name="path">A path on the file system.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    /// <returns>
+    /// The fields in OpenSSH's order - <c>f_bsize</c>, <c>f_frsize</c>, <c>f_blocks</c>,
+    /// <c>f_bfree</c>, <c>f_bavail</c>, <c>f_files</c>, <c>f_ffree</c>, <c>f_favail</c>,
+    /// <c>f_fsid</c>, <c>f_flag</c>, <c>f_namemax</c> - and <see cref="SftpStatusCode.Ok" />;
+    /// or <see langword="null" /> and the status the server answered with, which libssh2
+    /// fails on even when it is <see cref="SftpStatusCode.Ok" />.
+    /// </returns>
+    /// <exception cref="InvalidDataException">The answer is cut short or of another type.</exception>
+    internal async ValueTask<(ulong[]? Fields, uint Status)> StatFileSystemAsync(byte[] path, CancellationToken cancellationToken)
+    {
+        uint id = await SendRequestAsync(
+            SftpPacketType.Extended,
+            fields =>
+            {
+                fields.WriteString(StatFileSystemExtension);
+                fields.WriteString(path);
+            },
+            cancellationToken).ConfigureAwait(false);
+        (byte type, SshWireReader answer) = await ReadAnswerAsync(id, cancellationToken).ConfigureAwait(false);
+        if (type != SftpPacketType.ExtendedReply)
+        {
+            return (null, ReadStatus(type, answer));
+        }
+
+        ulong[] values = new ulong[StatFileSystemFieldCount];
+        for (int index = 0; index < values.Length; index++)
+        {
+            values[index] = ((ulong)answer.ReadUInt32() << 32) | answer.ReadUInt32();
+        }
+
+        values[StatFileSystemFlagField] &= StatFileSystemFlagsKept;
+        return (values, SftpStatusCode.Ok);
     }
 
     /// <summary>
@@ -354,14 +472,18 @@ internal sealed class SftpSession
     internal ValueTask ShutdownAsync(CancellationToken cancellationToken) => channel.CloseAsync(cancellationToken);
 
     /// <summary>
-    /// Closes <paramref name="handle" />, when there is one, then the channel, as curl ends
-    /// every SFTP transfer (ADR-0220): a close that fails is only logged by curl, and a
-    /// broken connection has already decided the transfer's outcome, so neither fails.
+    /// Closes <paramref name="handle" />, when there is one, runs
+    /// <paramref name="afterClose" />, then closes the channel, as curl ends every SFTP
+    /// transfer (ADR-0220), running its <c>-Q -</c> commands between the two closes
+    /// (ADR-0247): a close that fails is only logged by curl, and a broken connection has
+    /// already decided the transfer's outcome, so neither fails, and a broken connection
+    /// before <paramref name="afterClose" /> skips it.
     /// </summary>
     /// <param name="handle">The open file's or directory's handle, or <see langword="null" /> when nothing was opened.</param>
+    /// <param name="afterClose">What to do once the handle is closed and before the channel is.</param>
     /// <param name="cancellationToken">Cancels the close.</param>
     /// <returns>A task that completes once the channel is closed or the connection found broken.</returns>
-    internal async ValueTask FinishIgnoringFailureAsync(byte[]? handle, CancellationToken cancellationToken)
+    internal async ValueTask FinishIgnoringFailureAsync(byte[]? handle, Func<ValueTask> afterClose, CancellationToken cancellationToken)
     {
         try
         {
@@ -370,6 +492,7 @@ internal sealed class SftpSession
                 await CloseHandleAsync(handle, cancellationToken).ConfigureAwait(false);
             }
 
+            await afterClose().ConfigureAwait(false);
             await ShutdownAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (Exception exception) when (SshConnectionFailure.Is(exception))
@@ -476,6 +599,15 @@ internal sealed class SftpSession
         {
             return null;
         }
+    }
+
+    // The attributes answering the request numbered id, or empty ones and the status.
+    private async ValueTask<(SftpAttributes Attributes, uint Status)> ReadAttributesOrStatusAsync(uint id, CancellationToken cancellationToken)
+    {
+        (byte type, SshWireReader answer) = await ReadAnswerAsync(id, cancellationToken).ConfigureAwait(false);
+        return type == SftpPacketType.Attributes
+            ? (SftpAttributes.Read(answer), SftpStatusCode.Ok)
+            : (default, ReadStatus(type, answer));
     }
 
     // The handle answering the open numbered id; an SSH_FX_OK status is waited past.

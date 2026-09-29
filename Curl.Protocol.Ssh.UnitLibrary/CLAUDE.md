@@ -51,7 +51,11 @@ flight and maps each `SSH_FX_*` status to curl's exit code through `SftpStatusCo
 followed with `READLINK`, or the names alone with `-l` (ADR-0241), and `SftpFileUpload`,
 which uploads with the `SftpOpenFlags` `SftpUploadOptions` call for (`-C`, `-C -`, `-a`,
 `--create-file-mode`), makes missing directories with `MKDIR` under `--ftp-create-dirs`,
-and sends 64 KiB blocks as `WRITE`s of 30000 bytes (ADR-0244). A new algorithm registers in
+and sends 64 KiB blocks as `WRITE`s of 30000 bytes (ADR-0244). All three run the `-Q`
+commands through `SftpQuoteCommands`: those with no prefix after `REALPATH .`, those with a
+`-` after a successful transfer's `CLOSE`. `SftpQuoteCommand` reads each command as curl's
+`sftp_quote` does, and `SftpAttributes` carries what `STAT` and `SETSTAT` exchange
+(ADR-0247). A new algorithm registers in
 `SshKeyExchangeMethods`, `SshSignatureVerifiers` or `SshPacketProtections`, and
 `SshAlgorithmCatalogue.Implemented` offers it from then on. Failure messages and
 their libssh2 codes are ADR-0122's, ADR-0206's and ADR-0212's, measured from the

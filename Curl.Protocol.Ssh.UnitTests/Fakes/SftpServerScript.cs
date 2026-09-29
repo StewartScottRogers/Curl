@@ -90,6 +90,9 @@ internal sealed class SftpServerScript
     internal SftpServerScript Size(ulong size, uint id = 2) =>
         Sftp(Join([SftpPacketType.Attributes], UInt32(id), UInt32(1), UInt32((uint)(size >> 32)), UInt32((uint)size)));
 
+    /// <summary>Scripts <c>SSH_FXP_ATTRS</c> carrying <paramref name="attributes" /> as they are, for request <paramref name="id" />.</summary>
+    internal SftpServerScript Attributes(uint id, byte[] attributes) => Sftp(Join([SftpPacketType.Attributes], UInt32(id), attributes));
+
     /// <summary>Scripts <c>SSH_FXP_DATA</c> for request <paramref name="id" />.</summary>
     internal SftpServerScript Data(uint id, byte[] data) => Sftp(Join([SftpPacketType.Data], UInt32(id), String(data)));
 

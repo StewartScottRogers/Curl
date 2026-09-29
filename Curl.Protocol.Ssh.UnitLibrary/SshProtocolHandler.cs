@@ -207,18 +207,20 @@ public sealed class SshProtocolHandler : IProtocolHandler
     }
 
     // An upload is sent (ADR-0244); otherwise a path ending with a slash is listed and any
-    // other is downloaded (ADR-0241).
+    // other is downloaded (ADR-0241). Each runs the -Q commands around it (ADR-0247), with
+    // Windows' 32-bit C long deciding how curl reads their numbers and dates.
     private static async ValueTask<TransferResult> TransferOverSftpAsync(ITransferContext context, SshTransport transport)
     {
         string urlPath = context.Url.AbsolutePath;
+        SftpQuoteCommands quotes = SftpQuoteCommands.From(context, OperatingSystem.IsWindows());
         if (context.Upload is { } upload)
         {
-            return await new SftpFileUpload(transport).UploadAsync(urlPath, SftpUploadOptions.From(context), upload, context.Progress, context.CancellationToken).ConfigureAwait(false);
+            return await new SftpFileUpload(transport).UploadAsync(urlPath, SftpUploadOptions.From(context), upload, context.Progress, context.CancellationToken, quotes).ConfigureAwait(false);
         }
 
         return SftpRemotePath.NamesDirectory(urlPath)
-            ? await new SftpDirectoryListing(transport).ListAsync(urlPath, context.ListOnly, context.NoBody, context.Output, context.Progress, context.CancellationToken).ConfigureAwait(false)
-            : await new SftpFileDownload(transport).DownloadAsync(urlPath, context.CreateFileMode, context.Output, context.Progress, context.CancellationToken).ConfigureAwait(false);
+            ? await new SftpDirectoryListing(transport).ListAsync(urlPath, context.ListOnly, context.NoBody, context.Output, context.Progress, context.CancellationToken, quotes).ConfigureAwait(false)
+            : await new SftpFileDownload(transport).DownloadAsync(urlPath, context.CreateFileMode, context.Output, context.Progress, context.CancellationToken, quotes).ConfigureAwait(false);
     }
 
     // What the host-key check and the key files need to know about the session.

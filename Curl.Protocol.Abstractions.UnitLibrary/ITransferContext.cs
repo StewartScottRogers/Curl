@@ -335,7 +335,8 @@ public interface ITransferContext
     /// </summary>
     /// <remarks>
     /// A value keeps its <c>-</c> (after the transfer), <c>+</c> (before the transfer) or
-    /// <c>*</c> (failure ignored) prefix: <c>ftp://</c> is to interpret them (ADR-0006).
+    /// <c>*</c> (failure ignored) prefix: <c>ftp://</c> interprets them (ADR-0006), and so
+    /// does <c>sftp://</c>, which drops a <c>+</c> value as curl does (ADR-0247).
     /// </remarks>
     IReadOnlyList<string> QuoteCommands { get; }
 

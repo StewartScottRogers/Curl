@@ -300,6 +300,51 @@ public sealed class SshProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_SftpQuoteCommands_RunsThemAroundTheDownloadAndDropsThosePrefixedWithPlus()
+    {
+        InMemorySshServer server = Server();
+        server.Files["/data/hello.txt"] = Hello;
+        MemoryStream header = new();
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse($"sftp://{Host}/data/hello.txt"),
+            Output = new MemoryStream(),
+            HeaderOutput = header,
+            Credentials = new NetworkCredential(User, Password),
+            QuoteCommands = ["rm /data/old", "pwd", "+rm /data/never", "-rmdir /data/d"],
+        };
+
+        TransferResult result = await Handler(server).ExecuteAsync(context);
+        await server.WhenSessionsEndAsync();
+
+        Assert.AreEqual(TransferResult.Success(Hello.Length), result);
+        Assert.AreEqual("257 \"/data/hello.txt\" is current directory.\n", Encoding.UTF8.GetString(header.ToArray()));
+        AssertEvents(
+            server,
+            "service ssh-userauth", $"auth none {User} refused", $"auth password {User} ok", "channel open session", "subsystem sftp",
+            "sftp 16 .", "sftp 13 /data/old", "sftp 3 /data/hello.txt", "sftp 17 /data/hello.txt", "sftp 5 /data/hello.txt",
+            "sftp 4 /data/hello.txt", "sftp 15 /data/d", "channel eof", "channel close", "disconnect 11 Shutdown");
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_SftpQuoteCommandFails_ReturnsExit21AndCurlsMessage()
+    {
+        InMemorySshServer server = Server();
+        server.Files["/data/hello.txt"] = Hello;
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse($"sftp://{Host}/data/hello.txt"),
+            Output = new MemoryStream(),
+            Credentials = new NetworkCredential(User, Password),
+            QuoteCommands = ["foo bar"],
+        };
+
+        TransferResult result = await Handler(server).ExecuteAsync(context);
+
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.QuoteError, "Unknown SFTP command"), result);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_NullContext_Throws()
     {
         SshProtocolHandler handler = Handler(Server());

@@ -24,6 +24,7 @@ internal sealed class SftpFileDownload(SshTransport transport)
     /// <param name="output">Where the file's bytes go.</param>
     /// <param name="progress">Told the bytes downloaded so far, and the size when known.</param>
     /// <param name="cancellationToken">Cancels the download.</param>
+    /// <param name="quotes">The <c>-Q</c> commands, run after <c>REALPATH</c> and after the handle's close; none when not given.</param>
     /// <returns>
     /// Success with the bytes downloaded; exit 18, <c>end of response with N bytes
     /// missing</c>, when the file ends before the size <c>STAT</c> gave; exit 79,
@@ -40,20 +41,23 @@ internal sealed class SftpFileDownload(SshTransport transport)
         UnixFileMode createFileMode,
         Stream output,
         ITransferProgress progress,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        SftpQuoteCommands? quotes = null)
     {
+        quotes ??= SftpQuoteCommands.None;
         SftpSession session = await SftpSession.StartAsync(transport, cancellationToken).ConfigureAwait(false);
+        byte[] homeDirectory = await SshConnectionFailure.ReportAsSshLayerErrorAsync(
+            () => session.RealPathAsync(HomeDirectory, cancellationToken)).ConfigureAwait(false);
+        byte[] path = SftpRemotePath.Resolve(SftpRemotePath.Decode(urlPath), homeDirectory);
+        await quotes.RunBeforeTransferAsync(session, homeDirectory, path, cancellationToken).ConfigureAwait(false);
         (byte[] handle, long? size) = await SshConnectionFailure.ReportAsSshLayerErrorAsync(async () =>
         {
-            byte[] homeDirectory = await session.RealPathAsync(HomeDirectory, cancellationToken).ConfigureAwait(false);
-            byte[] path = SftpRemotePath.Resolve(SftpRemotePath.Decode(urlPath), homeDirectory);
             byte[] opened = await session.OpenForReadingAsync(path, createFileMode, cancellationToken).ConfigureAwait(false);
             return (opened, await session.StatSizeAsync(path, cancellationToken).ConfigureAwait(false));
         }).ConfigureAwait(false);
         Copy copy = new(new SftpReadAhead(session, handle, size), size, output, progress);
         TransferResult result = await copy.RunAsync(cancellationToken).ConfigureAwait(false);
-        await session.FinishIgnoringFailureAsync(handle, cancellationToken).ConfigureAwait(false);
-        return result;
+        return await quotes.FinishAsync(session, handle, homeDirectory, result, cancellationToken).ConfigureAwait(false);
     }
 
     // One copy of the file's bytes to the output, counting them as they go.

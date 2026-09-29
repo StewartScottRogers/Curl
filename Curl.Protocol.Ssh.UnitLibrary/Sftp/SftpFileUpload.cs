@@ -41,6 +41,7 @@ internal sealed class SftpFileUpload(SshTransport transport)
     /// <param name="upload">The source; one that can seek is moved past a <c>-C</c> offset, standard input is sent whole.</param>
     /// <param name="progress">Told the bytes the server has acknowledged so far, and the size when known.</param>
     /// <param name="cancellationToken">Cancels the upload.</param>
+    /// <param name="quotes">The <c>-Q</c> commands, run after <c>REALPATH</c> and after the handle's close; none when not given.</param>
     /// <returns>
     /// Success with the bytes uploaded, or exit 79, <c>Error in the SSH layer</c>, when a
     /// write is refused or the connection breaks during the copy, with the bytes
@@ -59,11 +60,17 @@ internal sealed class SftpFileUpload(SshTransport transport)
         SftpUploadOptions options,
         Stream upload,
         ITransferProgress progress,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        SftpQuoteCommands? quotes = null)
     {
+        quotes ??= SftpQuoteCommands.None;
         SftpSession session = await SftpSession.StartAsync(transport, cancellationToken).ConfigureAwait(false);
+        byte[] homeDirectory = await SshConnectionFailure.ReportAsSshLayerErrorAsync(
+            () => session.RealPathAsync(HomeDirectory, cancellationToken)).ConfigureAwait(false);
+        byte[] path = SftpRemotePath.Resolve(SftpRemotePath.Decode(urlPath), homeDirectory);
+        await quotes.RunBeforeTransferAsync(session, homeDirectory, path, cancellationToken).ConfigureAwait(false);
         (byte[] handle, long offset) = await SshConnectionFailure.ReportAsSshLayerErrorAsync(
-            () => OpenAsync(session, urlPath, options, cancellationToken)).ConfigureAwait(false);
+            () => OpenAsync(session, path, options, cancellationToken)).ConfigureAwait(false);
 
         // Measured: -a appends the whole source from offset 0 whatever -C says.
         long writeOffset = options.Append ? 0 : offset;
@@ -71,7 +78,7 @@ internal sealed class SftpFileUpload(SshTransport transport)
         long? expected = upload.CanSeek ? upload.Length - upload.Position : null;
         Copy copy = new(session, handle, upload, progress, expected);
         TransferResult result = await copy.RunAsync(writeOffset, cancellationToken).ConfigureAwait(false);
-        await session.FinishIgnoringFailureAsync(handle, cancellationToken).ConfigureAwait(false);
+        result = await quotes.FinishAsync(session, handle, homeDirectory, result, cancellationToken).ConfigureAwait(false);
         return result with { Report = new TransferReport { UploadSize = result.BytesTransferred } };
     }
 
@@ -92,10 +99,8 @@ internal sealed class SftpFileUpload(SshTransport transport)
             : offset > 0 ? SftpOpenFlags.Write
             : SftpOpenFlags.Write | SftpOpenFlags.Create | SftpOpenFlags.Truncate;
 
-    private static async ValueTask<(byte[] Handle, long Offset)> OpenAsync(SftpSession session, string urlPath, SftpUploadOptions options, CancellationToken cancellationToken)
+    private static async ValueTask<(byte[] Handle, long Offset)> OpenAsync(SftpSession session, byte[] path, SftpUploadOptions options, CancellationToken cancellationToken)
     {
-        byte[] homeDirectory = await session.RealPathAsync(HomeDirectory, cancellationToken).ConfigureAwait(false);
-        byte[] path = SftpRemotePath.Resolve(SftpRemotePath.Decode(urlPath), homeDirectory);
         long offset = options.ResumeFromRemoteSize
             ? await session.StatSizeAsync(path, cancellationToken).ConfigureAwait(false) ?? 0
             : options.ResumeFrom;
