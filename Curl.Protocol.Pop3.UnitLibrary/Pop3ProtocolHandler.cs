@@ -89,17 +89,39 @@ public sealed class Pop3ProtocolHandler : IProtocolHandler
 
         await using (connection.ConfigureAwait(false))
         {
-            return await RunSessionAsync(connection, context, implicitTls).ConfigureAwait(false);
+            var session = new Pop3Session(
+                new Pop3ControlChannel(connection, context.Events, context.CancellationToken), tlsProvider, context, implicitTls, saslAuthenticator);
+            TransferResult result;
+            await using (session.ConfigureAwait(false))
+            {
+                result = await session.RunAsync().ConfigureAwait(false);
+            }
+
+            ReportConnectionEnd(context.Events, result, session.IsOpen, target, connected.ConnectionNumber);
+            return result;
         }
     }
 
-    private async ValueTask<TransferResult> RunSessionAsync(IConnection connection, ITransferContext context, bool implicitTls)
+    /// <summary>
+    /// Writes the lines curl 8.21.0's <c>-v</c> ends a POP3 transfer with (BL-552): a success
+    /// ends with <c>Connection #N to host H:P left intact</c>; a failure with its message, when
+    /// curl reports it (<see cref="Pop3SessionMessages.IsWrittenByVerbose" />), then
+    /// <c>shutting down connection #N</c> once the session was logged in and
+    /// <c>closing connection #N</c> before.
+    /// </summary>
+    private static void ReportConnectionEnd(ITransferEvents events, TransferResult result, bool sessionOpen, ConnectTarget target, long connectionNumber)
     {
-        var session = new Pop3Session(
-            new Pop3ControlChannel(connection, context.CancellationToken), tlsProvider, context, implicitTls, saslAuthenticator);
-        await using (session.ConfigureAwait(false))
+        if (result.ExitCode == CurlExitCode.Ok)
         {
-            return await session.RunAsync().ConfigureAwait(false);
+            events.ReportInfo(Pop3ConnectionInfoLines.LeftIntact(connectionNumber, target.Host, target.Port));
+            return;
         }
+
+        if (Pop3SessionMessages.IsWrittenByVerbose(result.ErrorMessage!))
+        {
+            events.ReportInfo(result.ErrorMessage!);
+        }
+
+        events.ReportInfo(sessionOpen ? Pop3ConnectionInfoLines.ShuttingDown(connectionNumber) : Pop3ConnectionInfoLines.Closing(connectionNumber));
     }
 }
