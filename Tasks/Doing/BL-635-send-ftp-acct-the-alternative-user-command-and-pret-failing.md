@@ -37,3 +37,4 @@ The FTP handler sends `ACCT <account>` when the server answers `332` and `--ftp-
 - 2026-09-28: Created.
 - 2026-09-29: Backlog -> Doing.
 - 2026-09-29: Doing -> Backlog. Waits on BL-914: ITransferContext members for --ftp-account, --ftp-alternative-to-user and --ftp-pret
+- 2026-09-29: Backlog -> Doing.
