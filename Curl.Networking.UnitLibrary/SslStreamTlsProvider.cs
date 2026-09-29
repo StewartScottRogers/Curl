@@ -564,7 +564,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     }
 
     private (X509Certificate2? Certificate, ConnectResult? Failure) LoadClientCertificate() =>
-        ClientCertificateLoader.Load(_options, _matchesSchannelBuild, _certificateStore);
+        ClientCertificateLoader.Load(_options, _matchesSchannelBuild, _certificateStore, _timeProvider.GetUtcNow());
 
     // Selected by callback, not given as ClientCertificateContext: on Windows SslStream opens
     // a handshake that has a certificate context with a credential handle that carries it,

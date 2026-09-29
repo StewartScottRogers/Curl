@@ -31,7 +31,10 @@ namespace Curl.Networking;
 /// <c>--cert</c> that does not load, 59 for <c>--ciphers</c> the build refuses or cannot
 /// apply, 77 for an unusable <c>--cacert</c>, 60 (or the Schannel build's 35 for an expired
 /// certificate) for a certificate that does not verify, and 35 for any other handshake
-/// failure, with the text <see cref="TlsFailureMessages" /> gives each build.
+/// failure, with the text <see cref="TlsFailureMessages" /> gives each build. With
+/// <c>--cert-status</c> it also asks for the server's stapled OCSP response, and one that
+/// does not vouch for the certificate is exit 91 on every platform, with the text
+/// <see cref="CertificateStatusFailureMessages" /> gives (ADR-0191).
 /// </para>
 /// </remarks>
 public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsProviderWithWarnings
@@ -263,7 +266,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             return (null, ConnectResult.Failed(CurlExitCode.SslCipher, cipherFailure));
         }
 
-        var (clientCertificate, clientCertificateFailure) = ClientCertificateLoader.Load(_options, _matchesSchannelBuild, _certificateStore);
+        var (clientCertificate, clientCertificateFailure) = ClientCertificateLoader.Load(_options, _matchesSchannelBuild, _certificateStore, _timeProvider.GetUtcNow());
         if (clientCertificateFailure is not null)
         {
             return (null, clientCertificateFailure);
@@ -274,7 +277,11 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         {
             var (chainPolicy, anchorsBesideSystemStore) = _verification.ReadTrustAnchors();
             return (new PreparedHandshake(
-                ClientSettings.Of(targetHost, offeredApplicationProtocols, suites, ToTlsClientCertificate(clientCertificate)),
+                ClientSettings.Of(targetHost, offeredApplicationProtocols, suites, ToTlsClientCertificate(clientCertificate)) with
+                {
+                    RequestOcspStatus = _options.RequireCertificateStatus,
+                    TimeProvider = _timeProvider,
+                },
                 clientCertificate,
                 new HandBuiltCertificateVerifier(_verification, chainPolicy, anchorsBesideSystemStore, targetHost)), null);
         }
@@ -301,11 +308,14 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         }
     }
 
-    // A certificate the verifier rejected fails as the SslStream provider fails it; any
-    // other handshake failure is exit 35.
+    // A certificate the verifier rejected fails as the SslStream provider fails it, a stapled
+    // OCSP response --cert-status rejected is exit 91 (ADR-0191), and any other handshake
+    // failure is exit 35.
     private ConnectResult FailedHandshake(TlsHandshakeFailure failure) =>
         failure.CertificateRejection is ValueTuple<CurlExitCode, string> rejected
             ? ConnectResult.Failed(rejected.Item1, rejected.Item2)
+            : failure.CertificateStatusRejection is { } statusRejection
+            ? ConnectResult.Failed(CurlExitCode.SslInvalidCertStatus, CertificateStatusFailureMessages.For(statusRejection))
             : ConnectResult.Failed(CurlExitCode.SslConnectError, HandshakeFailureMessage(failure));
 
     private async Task<HandBuiltHandshake> HandshakeAsync(
@@ -372,6 +382,11 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         IReadOnlyList<ushort>? CipherSuites,
         TlsClientCertificate? ClientCertificate)
     {
+        // --cert-status: ask for a stapled OCSP response and judge it on this clock.
+        internal bool RequestOcspStatus { get; init; }
+
+        internal TimeProvider TimeProvider { get; init; } = TimeProvider.System;
+
         internal static ClientSettings Of(
             string targetHost,
             IReadOnlyList<string> applicationProtocols,
@@ -386,6 +401,8 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
                 ServerName = ServerName,
                 ApplicationProtocols = ApplicationProtocols,
                 ClientCertificate = ClientCertificate,
+                RequestOcspStatus = RequestOcspStatus,
+                TimeProvider = TimeProvider,
             };
             return CipherSuites is null ? settings : settings with { CipherSuites = CipherSuites };
         }
@@ -399,6 +416,8 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
                 MaximumVersion = ToTlsProtocolVersion(options.MaximumVersion),
                 ApplicationProtocols = ApplicationProtocols,
                 ClientCertificate = ClientCertificate,
+                RequestOcspStatus = RequestOcspStatus,
+                TimeProvider = TimeProvider,
             };
             return CipherSuites is null ? settings : settings with { CipherSuites = CipherSuites };
         }

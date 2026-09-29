@@ -23,6 +23,16 @@ public sealed class TlsClientRoutingTests
         [new TlsClientOptions(MaximumVersion: TlsVersion.Tls12)],
         [new TlsClientOptions(MaximumVersion: TlsVersion.Tls13)],
         [new TlsClientOptions(MinimumVersion: TlsVersion.Tls10, MaximumVersion: TlsVersion.Tls12)],
+        [new TlsClientOptions(AutoClientCertificate: true)],
+    ];
+
+    // ADR-0191's row: --cert-status, whose stapled response SslStream never exposes.
+    public static IEnumerable<object[]> CertificateStatusOptionSets =>
+    [
+        [new TlsClientOptions(RequireCertificateStatus: true)],
+        [new TlsClientOptions(Insecure: true, RequireCertificateStatus: true)],
+        [new TlsClientOptions(MaximumVersion: TlsVersion.Tls12, RequireCertificateStatus: true)],
+        [new TlsClientOptions(RequireCertificateStatus: true, AutoClientCertificate: true)],
     ];
 
     // ADR-0140's legacy-versions row: the range's maximum (--tls-max) is TLS 1.0 or 1.1.
@@ -44,6 +54,11 @@ public sealed class TlsClientRoutingTests
     [TestMethod]
     [DynamicData(nameof(LegacyVersionOptionSets))]
     public void Choose_WithACeilingOfTls10OrTls11_IsTheHandBuiltClient(TlsClientOptions options) =>
+        Assert.AreEqual(TlsClientRoute.HandBuilt, TlsClientRouting.Choose(options));
+
+    [TestMethod]
+    [DynamicData(nameof(CertificateStatusOptionSets))]
+    public void Choose_WithCertStatus_IsTheHandBuiltClient(TlsClientOptions options) =>
         Assert.AreEqual(TlsClientRoute.HandBuilt, TlsClientRouting.Choose(options));
 
     [TestMethod]

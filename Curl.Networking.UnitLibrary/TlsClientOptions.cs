@@ -144,6 +144,18 @@ namespace Curl.Networking;
 /// curl's <c>--tlsauthtype</c>: <c>SRP</c>, the only type the command line accepts, or
 /// <see langword="null" /> when not given.
 /// </param>
+/// <param name="RequireCertificateStatus">
+/// <see langword="true" /> for curl's <c>--cert-status</c>: the handshake asks for the server's stapled
+/// OCSP response and fails with exit 91 unless it vouches for the certificate. <c>SslStream</c>
+/// exposes no stapled response, so <see cref="TlsClientRouting" /> sends such a connection to
+/// <see cref="HandBuiltTlsProvider" /> on every platform (ADR-0191).
+/// </param>
+/// <param name="AutoClientCertificate">
+/// <see langword="true" /> for curl's <c>--ssl-auto-client-cert</c> (<c>--proxy-ssl-auto-client-cert</c>
+/// for an HTTPS proxy): without <paramref name="ClientCertificate" />, a certificate chosen from the
+/// user's personal store is presented when the server asks for one, on every platform (ADR-0191,
+/// <see cref="AutomaticClientCertificate" />).
+/// </param>
 public sealed record TlsClientOptions(
     bool Insecure = false,
     TlsVersion MinimumVersion = TlsVersion.SystemDefault,
@@ -170,4 +182,6 @@ public sealed record TlsClientOptions(
     string? Engine = null,
     string? TlsUser = null,
     string? TlsPassword = null,
-    string? TlsAuthType = null);
+    string? TlsAuthType = null,
+    bool RequireCertificateStatus = false,
+    bool AutoClientCertificate = false);

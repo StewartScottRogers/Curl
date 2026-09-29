@@ -8,7 +8,7 @@ namespace Curl.Networking;
 /// <remarks>
 /// Each row of ADR-0140's table is one condition here. Only the rows whose options reach
 /// <see cref="TlsClientOptions" /> are present; the option tasks that carry the others
-/// (BL-618, BL-610, BL-713) add a condition each. QUIC is not routed here: it has no
+/// (BL-618, BL-713) add a condition each; <c>--cert-status</c>'s row is ADR-0191's. QUIC is not routed here: it has no
 /// <c>SslStream</c> route at all.
 /// </remarks>
 public static class TlsClientRouting
@@ -23,7 +23,9 @@ public static class TlsClientRouting
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        return CapsVersionsBelowTls12(options) ? TlsClientRoute.HandBuilt : TlsClientRoute.SslStream;
+        return CapsVersionsBelowTls12(options) || options.RequireCertificateStatus
+            ? TlsClientRoute.HandBuilt
+            : TlsClientRoute.SslStream;
     }
 
     // The legacy-versions row: --tls-max 1.0 or 1.1, which the operating system's stack

@@ -24,6 +24,30 @@ internal static class ClientCertificateLoader
     /// certificate store or a PKCS#12 file and ignores <c>--key</c> and <c>--key-type</c>; only
     /// the Windows build of curl keeps a drive letter's colon in the <c>--cert</c> value.
     /// <c>--pass</c>, when given, is the passphrase in place of the one in <c>--cert</c>.
+    /// Without <c>--cert</c>, <c>--ssl-auto-client-cert</c> chooses one from the user's
+    /// personal store through <see cref="AutomaticClientCertificate" /> (ADR-0191).
+    /// </summary>
+    /// <param name="options">The handshake's settings.</param>
+    /// <param name="matchesSchannelBuild">Whether to load as curl's Schannel build does.</param>
+    /// <param name="certificateStore">Opens the store a Schannel store path names, and the personal store.</param>
+    /// <param name="now">The time an automatically chosen certificate must be valid at.</param>
+    /// <returns>
+    /// Without <c>--cert</c>, the automatically chosen certificate or none, and no failure;
+    /// otherwise the certificate with its key, or the build's exit 58 or exit 43 failure.
+    /// </returns>
+    public static (X509Certificate2? Certificate, ConnectResult? Failure) Load(
+        TlsClientOptions options,
+        bool matchesSchannelBuild,
+        IClientCertificateStore certificateStore,
+        DateTimeOffset now) =>
+        options.ClientCertificate is null && options.AutoClientCertificate
+            ? (AutomaticClientCertificate.Choose(certificateStore, now), null)
+            : Load(options, matchesSchannelBuild, certificateStore);
+
+    /// <summary>
+    /// Loads the <see cref="TlsClientOptions.ClientCertificate" /> as the four-argument
+    /// <see cref="Load(TlsClientOptions, bool, IClientCertificateStore, DateTimeOffset)" /> does,
+    /// without <c>--ssl-auto-client-cert</c>'s choice.
     /// </summary>
     /// <param name="options">The handshake's settings.</param>
     /// <param name="matchesSchannelBuild">Whether to load as curl's Schannel build does.</param>

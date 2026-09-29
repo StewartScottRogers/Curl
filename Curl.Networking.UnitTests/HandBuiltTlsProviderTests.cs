@@ -21,7 +21,7 @@ namespace Curl.Networking;
 /// has no TLS 1.3 server.
 /// </summary>
 [TestClass]
-public sealed class HandBuiltTlsProviderTests
+public sealed partial class HandBuiltTlsProviderTests
 {
     private const string CertificateHost = "localhost";
 

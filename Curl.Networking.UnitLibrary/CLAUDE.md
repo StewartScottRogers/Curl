@@ -14,8 +14,15 @@ answers SRV lookups through `DnsServerResolver.ResolveServiceAsync` (BL-527, ADR
 
 Per ADR-0140 and ADR-0162 (BL-708) there are two TLS providers, and `TlsClientRouting.Choose`
 picks one from a `TlsClientOptions` as one pure function: `HandBuiltTlsProvider` when a row of
-ADR-0140's table holds (today only a `MaximumVersion` of TLS 1.0 or 1.1; each option task adds
-its row and a data row in `TlsClientRoutingTests`), `SslStreamTlsProvider` otherwise. Both
+ADR-0140's table holds (today a `MaximumVersion` of TLS 1.0 or 1.1, and `RequireCertificateStatus`
+for `--cert-status` by ADR-0191; each option task adds its row and a data row in
+`TlsClientRoutingTests`), `SslStreamTlsProvider` otherwise. With `--cert-status` the hand-built
+client asks for the stapled OCSP response and a rejected one is exit 91 with
+`CertificateStatusFailureMessages`' text on every platform. Per ADR-0191 `--ssl-auto-client-cert`
+(`TlsClientOptions.AutoClientCertificate`) without `--cert` makes `ClientCertificateLoader.Load`
+present the certificate `AutomaticClientCertificate.Choose` takes from `CurrentUser\MY`, in both
+providers; `HandBuiltTlsProviderTests.CertificateStatus` drives it against `Fakes/Tls13Server`,
+a copy of `Curl.Tls.UnitTests`' in-memory TLS 1.3 server and OCSP response builder. Both
 implement `ITlsProviderWithWarnings`. `HandBuiltTlsProvider` runs `Tls13ClientConnection` for a
 range reaching TLS 1.3 and `Tls12ClientConnection` below it over the internal `ConnectionStream`,
 and returns a `HandBuiltTlsConnection`. Both providers judge the server's certificate with
