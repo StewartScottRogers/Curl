@@ -2,6 +2,7 @@ using System.Collections.Frozen;
 using System.Formats.Asn1;
 using System.Security.Cryptography;
 using System.Text;
+using Curl.Cryptography;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Authentication;
@@ -12,7 +13,7 @@ namespace Curl.Authentication;
 /// followed by the hash of the server certificate's DER, the hash being the one its
 /// signature algorithm uses, or SHA-256 when that is MD5 or SHA-1. A signature algorithm
 /// that names no hash fails the transfer with exit 91, as curl 8.18.0's OpenSSL build was
-/// measured doing (ADR-0234, BL-965).
+/// measured doing (ADR-0234, BL-965); a SHA-3 signature takes its SHA-3 (BL-980).
 /// </summary>
 internal static class TlsServerEndPointChannelBindings
 {
@@ -34,7 +35,9 @@ internal static class TlsServerEndPointChannelBindings
 
     /// <summary>
     /// The hash RFC 5929 section 4.1 takes for each signature algorithm, by OID: SHA-256 for
-    /// MD5 and SHA-1, else the algorithm's own, for RSA PKCS #1, ECDSA and DSA.
+    /// MD5 and SHA-1, else the algorithm's own, for RSA PKCS #1, ECDSA and DSA. The SHA-3 ones
+    /// (RSA PKCS #1 and ECDSA with SHA3-224 to SHA3-512) take the hand-built
+    /// <see cref="Sha3" />, which curl 8.18.0's OpenSSL build was measured accepting (BL-980).
     /// </summary>
     private static readonly FrozenDictionary<string, CertificateHash> HashBySignatureAlgorithm = new Dictionary<string, CertificateHash>
     {
@@ -52,6 +55,14 @@ internal static class TlsServerEndPointChannelBindings
         ["1.2.840.10045.4.3.3"] = SHA384.HashData,
         ["1.2.840.113549.1.1.13"] = SHA512.HashData,
         ["1.2.840.10045.4.3.4"] = SHA512.HashData,
+        ["2.16.840.1.101.3.4.3.9"] = Sha3_224,
+        ["2.16.840.1.101.3.4.3.13"] = Sha3_224,
+        ["2.16.840.1.101.3.4.3.10"] = Sha3_256,
+        ["2.16.840.1.101.3.4.3.14"] = Sha3_256,
+        ["2.16.840.1.101.3.4.3.11"] = Sha3_384,
+        ["2.16.840.1.101.3.4.3.15"] = Sha3_384,
+        ["2.16.840.1.101.3.4.3.12"] = Sha3_512,
+        ["2.16.840.1.101.3.4.3.16"] = Sha3_512,
     }.ToFrozenDictionary(StringComparer.Ordinal);
 
     /// <summary>
@@ -101,5 +112,33 @@ internal static class TlsServerEndPointChannelBindings
         AsnReader fields = new AsnReader(certificate, AsnEncodingRules.DER).ReadSequence();
         fields.ReadEncodedValue();
         return fields.ReadSequence().ReadObjectIdentifier();
+    }
+
+    private static byte[] Sha3_224(ReadOnlySpan<byte> certificate)
+    {
+        byte[] hash = new byte[Sha3.Sha3_224HashSize];
+        Sha3.HashData224(certificate, hash);
+        return hash;
+    }
+
+    private static byte[] Sha3_256(ReadOnlySpan<byte> certificate)
+    {
+        byte[] hash = new byte[Sha3.Sha3_256HashSize];
+        Sha3.HashData256(certificate, hash);
+        return hash;
+    }
+
+    private static byte[] Sha3_384(ReadOnlySpan<byte> certificate)
+    {
+        byte[] hash = new byte[Sha3.Sha3_384HashSize];
+        Sha3.HashData384(certificate, hash);
+        return hash;
+    }
+
+    private static byte[] Sha3_512(ReadOnlySpan<byte> certificate)
+    {
+        byte[] hash = new byte[Sha3.Sha3_512HashSize];
+        Sha3.HashData512(certificate, hash);
+        return hash;
     }
 }

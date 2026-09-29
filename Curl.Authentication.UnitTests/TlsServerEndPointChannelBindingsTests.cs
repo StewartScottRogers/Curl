@@ -2,6 +2,7 @@ using System.Formats.Asn1;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using Curl.Cryptography;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Authentication;
@@ -10,7 +11,8 @@ namespace Curl.Authentication;
 /// Checks the <c>tls-server-end-point</c> application data curl with MIT passes over HTTPS
 /// (RFC 5929 section 4.1, BL-915): the prefix and the certificate's hash in its signature's
 /// algorithm, SHA-256 in place of MD5 and SHA-1, none without a certificate, and exit 91 for a
-/// signature that names no hash, as curl 8.18.0 was measured failing (BL-965).
+/// signature that names no hash, as curl 8.18.0 was measured failing (BL-965), and SHA-3 for a
+/// SHA-3 signature, as it was measured accepting (BL-980).
 /// </summary>
 [TestClass]
 public sealed class TlsServerEndPointChannelBindingsTests
@@ -30,6 +32,20 @@ public sealed class TlsServerEndPointChannelBindingsTests
     /// </summary>
     private const string OpenSslSha224RsaCertificate =
         "MIIDHTCCAgWgAwIBAgIUWiN2MPfP9qPNhLYvYMhVNrW9wj8wDQYJKoZIhvcNAQEOBQAwHjEcMBoGA1UEAwwTc2VydmVyLmV4YW1wbGUudGVzdDAeFw0yNjA5MjkyMjMxMjlaFw0yNjEwMjkyMjMxMjlaMB4xHDAaBgNVBAMME3NlcnZlci5leGFtcGxlLnRlc3QwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDaDR1/N5Tyo77OoiCktLYUXrHECo4LUiaBZATyVcSLtYsdFTYjiXiq6ssbdhH6gXDGzt7A89oMgJSwVuqdK3+qMCVK/uCE5a9l9TBdMmR2UiT/16LwES+2+N4U0PdzbmZmFN3fVKdLjzWrNaMo6Lmf5OozOBx+nFdE/9Hh9s/FsIVZzvWOnoBswo0PX1IjRZ/3jZuSWc30bm7ej9bOpIbmMbZs3c2AK9ThxAgpQkl84GxMtTYsxfePdFujVnpFlj3ea/t582ifbShr+hMG+lYdX+bW3Yf1Q7WXa7HnpRjZKmrmitkiOd/T0t2FuXM7+oDwIJ/sGIybOdgE6crlIZhBAgMBAAGjUzBRMB0GA1UdDgQWBBR9wjhzkGz+GpuxkI6rYbrWaTgTDTAfBgNVHSMEGDAWgBR9wjhzkGz+GpuxkI6rYbrWaTgTDTAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBDgUAA4IBAQCsTp4FnmgM1gOrr7BjGii4hIExFPYWqYpfB45IpgsnIoLtGNUjYbkIZFi36FDpf0Yz+ig4bgFaRg+mGv70XKDo25WDTobBnixZIKSHpDZQl8YgkTsisZHPmPTFNfWxj8Hk4H7ctgOjoEECUd8W12zcCTSoYTnlGdI4T9HrXdJjuHJONOz05fHd/BIFUQ71+FPdVhXs9/mMwa/hwtRDpyA5NJcOGd8oIHarH9/5vohNrh52VNEwjr6rMV/YwIhCBE99s7SjeyXjsLx+rOuQtFwCf1KeEe+KNKaTq07Tfax9jfMPNTVAQ7JDA8yxZSanFeo+ONllqMju7kWO5r4+jK5O";
+
+    /// <summary>
+    /// The RSA-SHA3-256 certificate curl 8.18.0 was measured sending a Negotiate token over
+    /// (BL-980), from <c>openssl req -sha3-256</c>.
+    /// </summary>
+    private const string OpenSslSha3_256RsaCertificate =
+        "MIIDHTCCAgWgAwIBAgIUMg92DXixtcPC9NBkOIinYd7Iy80wDQYJYIZIAWUDBAMOBQAwHjEcMBoGA1UEAwwTc2VydmVyLmV4YW1wbGUudGVzdDAeFw0yNjA5MjkyMzIyNDRaFw0yNjEwMjkyMzIyNDRaMB4xHDAaBgNVBAMME3NlcnZlci5leGFtcGxlLnRlc3QwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCd435yId+bVtIX7t3bQHWYCt1UnrJgPXvguuQO42qVg2zoNP+M9hQH0fDUveXtHcsHBpDXjQEiM8TU6FBFxTZe83/yIrttAsQbMfOzch6bOKQKpljn9I+wb1eCUZkvdYMKWhX2upX89j4e7NLtIWuf/xdTapDIfmC17YM4Ry9m36MtwNkll3JWcw+R3CBTURyI3SiQ9WE2R/KkKhdB+VEI1nu5VmAzOIErsmqDFwsbuR/Y6DtwJz9CHs+XXvOSdACqH0WVxmXeheFNJXYoeAUtJpxttO7naWJ6iWxoi9OdCFx9/cLBQ4KM3SJZEbySCeKgfruAJQbfiPu02lGDn7ZTAgMBAAGjUzBRMB0GA1UdDgQWBBQhEqO6QfNgsWhUaFdchdkLeMo8bDAfBgNVHSMEGDAWgBQhEqO6QfNgsWhUaFdchdkLeMo8bDAPBgNVHRMBAf8EBTADAQH/MA0GCWCGSAFlAwQDDgUAA4IBAQCItppssHa2BW16MUVDJ85jzLscHlhGBuimoZsoZacwHkwuy52z4XjMxw4Ub20oIsoV+QZr6Kzm8mSVDtJ0wiD9ytChIdcla97Si6fz2BvtA5lgJKlNOzjLyEEYHQ0flymQFcBZFGUzmG7lkGnnAc08OKTIDgwEGh1HdyDalpZ/quAoCZVNPzcWxxOGXqqcqStEgk1gOo9kxugaJbXrcJwH4Pjn8siExwx+41tRdEtoO8VeAq4ulfLXAmi6U1elTcawEFGcPCp9bANP7X0x49tqkVh5SMt0b5jNlG898qGqHiYZ5PXXoA5jVYEnFK4/kNFbhMajou5gnpL8QLU83zW0";
+
+    /// <summary>
+    /// The ecdsa_with_SHA3-512 certificate curl 8.18.0 was measured sending a Negotiate token
+    /// over (BL-980), from <c>openssl req -newkey ec -sha3-512</c>.
+    /// </summary>
+    private const string OpenSslSha3_512EcdsaCertificate =
+        "MIIBkzCCATigAwIBAgIUWxeR5usPngqVU0a19su6GkOXnvYwCwYJYIZIAWUDBAMMMB4xHDAaBgNVBAMME3NlcnZlci5leGFtcGxlLnRlc3QwHhcNMjYwOTI5MjMyMjQ0WhcNMjYxMDI5MjMyMjQ0WjAeMRwwGgYDVQQDDBNzZXJ2ZXIuZXhhbXBsZS50ZXN0MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+QWU5ca2Crub0W1HnIYPj0S5NuCuQz1pURpqtwbhtyUo9F+MET6o+9VvJNVk2ITkE8EhlS8R+oGggs0MuX2ZrqNTMFEwHQYDVR0OBBYEFI4QgSATdUr6TL9ZCvE+YrEiWmX4MB8GA1UdIwQYMBaAFI4QgSATdUr6TL9ZCvE+YrEiWmX4MA8GA1UdEwEB/wQFMAMBAf8wCwYJYIZIAWUDBAMMA0gAMEUCIQCbCjQtmx/uqVh5BnLALASO++ZmOmtamOlvAiDYkNJKcgIgXa7GZ3mNZziFH0F1LMmMDyr9KHQlnxZhTejvPP5xmTA=";
 
     private static readonly byte[] Prefix = Encoding.ASCII.GetBytes("tls-server-end-point:");
 
@@ -84,6 +100,33 @@ public sealed class TlsServerEndPointChannelBindingsTests
     }
 
     [TestMethod]
+    [DataRow(OpenSslSha3_256RsaCertificate, "c5829afc46088a28ed3cbc7693af23672708c8dec95a4ebad03e1428cfb44217", DisplayName = "RSA-SHA3-256")]
+    [DataRow(
+        OpenSslSha3_512EcdsaCertificate,
+        "2179cd4b8b0f6f2159fee5709456a18b7c88ebafaab241b5546edc3720c6a4b298503a26a1cbdd223e370851175c1ef3fa34929eb630ebdbf922c0f678ecdae6",
+        DisplayName = "ecdsa_with_SHA3-512")]
+    public void Of_OpenSslSha3Certificate_TakesItsSha3AsOpenSslHashesIt(string certificate, string expectedHash)
+    {
+        CollectionAssert.AreEqual(Expected(Convert.FromHexString(expectedHash)), TlsServerEndPointChannelBindings.Of(Convert.FromBase64String(certificate)));
+    }
+
+    [TestMethod]
+    [DataRow("2.16.840.1.101.3.4.3.9", 224, DisplayName = "id-ecdsa-with-sha3-224")]
+    [DataRow("2.16.840.1.101.3.4.3.10", 256, DisplayName = "id-ecdsa-with-sha3-256")]
+    [DataRow("2.16.840.1.101.3.4.3.11", 384, DisplayName = "id-ecdsa-with-sha3-384")]
+    [DataRow("2.16.840.1.101.3.4.3.12", 512, DisplayName = "id-ecdsa-with-sha3-512")]
+    [DataRow("2.16.840.1.101.3.4.3.13", 224, DisplayName = "id-rsassa-pkcs1-v1_5-with-sha3-224")]
+    [DataRow("2.16.840.1.101.3.4.3.14", 256, DisplayName = "id-rsassa-pkcs1-v1_5-with-sha3-256")]
+    [DataRow("2.16.840.1.101.3.4.3.15", 384, DisplayName = "id-rsassa-pkcs1-v1_5-with-sha3-384")]
+    [DataRow("2.16.840.1.101.3.4.3.16", 512, DisplayName = "id-rsassa-pkcs1-v1_5-with-sha3-512")]
+    public void Of_Sha3Certificate_TakesThatSha3(string signatureAlgorithm, int bits)
+    {
+        byte[] certificate = CertificateNaming(signatureAlgorithm);
+
+        CollectionAssert.AreEqual(Expected(Sha3Of(certificate, bits)), TlsServerEndPointChannelBindings.Of(certificate));
+    }
+
+    [TestMethod]
     public void Of_RsaPssCertificate_FailsWithExit91AsCurlWasMeasured()
     {
         AssertFails(RsaCertificate(HashAlgorithmName.SHA256, RSASignaturePadding.Pss), TlsServerEndPointChannelBindings.NoDigestAlgorithmMessage);
@@ -127,6 +170,20 @@ public sealed class TlsServerEndPointChannelBindingsTests
     }
 
     private static byte[] Expected(byte[] hash) => [.. Prefix, .. hash];
+
+    private static byte[] Sha3Of(byte[] certificate, int bits)
+    {
+        byte[] hash = new byte[bits / 8];
+        switch (bits)
+        {
+            case 224: Sha3.HashData224(certificate, hash); break;
+            case 256: Sha3.HashData256(certificate, hash); break;
+            case 384: Sha3.HashData384(certificate, hash); break;
+            default: Sha3.HashData512(certificate, hash); break;
+        }
+
+        return hash;
+    }
 
     private static void AssertFails(byte[] certificate, string message)
     {
