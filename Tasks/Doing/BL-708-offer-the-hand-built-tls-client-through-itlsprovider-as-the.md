@@ -34,3 +34,4 @@ A second `ITlsProvider` in `Curl.Networking.UnitLibrary` runs the hand-built TLS
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
