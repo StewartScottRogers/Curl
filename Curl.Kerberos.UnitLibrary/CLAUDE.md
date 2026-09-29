@@ -64,7 +64,8 @@ forwarded one by a TGS-REQ with `forwarded`, as MIT's `krb5_fwd_tgt_creds` does,
 refuses one without `forwardable` as `KerberosKdcError.TicketNotForwardable` (BL-831,
 ADR-0210). It is the initiator of the GSS-API Kerberos V5 mechanism:
 `KerberosGssContext` makes the initial context token (an AP-REQ whose authenticator
-carries RFC 4121's checksum with the context flags, the MD5 of the caller's channel
+carries RFC 4121's checksum with the context flags, MIT's `GSS_C_TRANS_FLAG` among them as
+measured (BL-916), the MD5 of the caller's channel
 bindings when given (RFC 2744's structure, as curl with MIT sends `tls-server-end-point`
 over HTTPS; BL-832) and, for `--delegation`, a KRB-CRED of a forwarded ticket-granting
 ticket), checks the acceptor's AP-REP, and then makes and

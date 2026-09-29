@@ -30,8 +30,19 @@ written independently from the RFCs.
   `IntegrityCheckFailed`, `BadSequenceNumber`.
 - **Flags.** The caller's requested flags (curl asks for mutual authentication and
   replay detection, the default), with confidentiality and integrity always added, as
-  MIT adds them unless told not to: `0x36` without delegation, `0x37` with it. MIT's local
-  `GSS_C_TRANS_FLAG` is not an RFC 4121 checksum flag and is not sent.
+  MIT adds them unless told not to, and MIT's `GSS_C_TRANS_FLAG` (0x100), which MIT's
+  `gss_init_sec_context` always sets and writes into the checksum although RFC 4121 does
+  not define it: `0x136` without delegation, `0x137` with it, so the checksum's flags word
+  is `36010000` or `37010000`. Measured, not assumed (BL-916, 2026-09-29): curl 8.18.0
+  with `mit-krb5/1.22.1` ran `--negotiate -u :` over plain HTTP against
+  `Record-CurlExchange.ps1 -Curl wsl.exe`, with a ticket from the user-space MIT KDC below;
+  decrypting the AP-REQ's authenticator with the ccache's session key (key usage 11) gave
+  `36010000`, and with `--delegation always` and a forwardable ticket `37010000`, matching
+  BL-832's two HTTPS recordings. `KerberosGssFlags.Transfer` names the bit and
+  `KerberosGssContext.Flags` includes it, as MIT's returned flags do. SASL `GSSAPI` and
+  SOCKS5 GSS-API reach the same `gss_init_sec_context`, so they send it too.
+  (Decided by Claude under Stewart's delegation; this replaces the first version of this
+  bullet, which left the flag out before any MIT machine was at hand.)
 - **Delegation.** `--delegation none` never delegates; `always` delegates; `policy`
   delegates only when the service ticket has `ok-as-delegate` (MIT's
   `GSS_C_DELEG_POLICY_FLAG`). Delegation also needs a forwarded ticket-granting ticket in
@@ -79,8 +90,8 @@ written independently from the RFCs.
   the served sha256RSA certificate (`D7AD5D5F…568B08`), RFC 5929's binding. Plain HTTP
   passes none, so its `Bnd` stays zero. `KerberosGssContextTests` pin both values. Taking
   the certificate hash from the HTTPS connection is the caller's (BL-915). The same
-  recording showed MIT's checksum flags as `0x136`, `GSS_C_TRANS_FLAG` included, against
-  the "Flags" bullet above; BL-916 re-measures and aligns it.
+  recording showed MIT's checksum flags as `0x136`, `GSS_C_TRANS_FLAG` included; BL-916
+  re-measured it and the "Flags" bullet above now says so.
 
 ## Consequences
 

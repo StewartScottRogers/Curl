@@ -52,8 +52,8 @@ public sealed class KerberosGssContext : IDisposable
 
     /// <summary>
     /// Gets the flags the initial token's checksum carries: those asked for, with
-    /// <see cref="KerberosGssFlags.Confidentiality" /> and <see cref="KerberosGssFlags.Integrity" />
-    /// always added as MIT adds them, and <see cref="KerberosGssFlags.Delegation" /> when a
+    /// <see cref="KerberosGssFlags.Confidentiality" />, <see cref="KerberosGssFlags.Integrity" /> and
+    /// <see cref="KerberosGssFlags.Transfer" /> always added as MIT adds them, and <see cref="KerberosGssFlags.Delegation" /> when a
     /// ticket-granting ticket was forwarded. <see cref="KerberosGssFlags.None" /> until then.
     /// </summary>
     public KerberosGssFlags Flags { get; private set; }
@@ -142,7 +142,7 @@ public sealed class KerberosGssContext : IDisposable
         (authenticatorTime, authenticatorMicroseconds) = KerberosClock.Now(timeProvider);
         bool delegates = Delegates();
         Flags = (options.RequestedFlags & ~KerberosGssFlags.Delegation) | KerberosGssFlags.Confidentiality | KerberosGssFlags.Integrity
-            | (delegates ? KerberosGssFlags.Delegation : KerberosGssFlags.None);
+            | KerberosGssFlags.Transfer | (delegates ? KerberosGssFlags.Delegation : KerberosGssFlags.None);
 
         KerberosAuthenticator authenticator = new()
         {

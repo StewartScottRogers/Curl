@@ -52,9 +52,10 @@ public sealed class KerberosGssContextTests
         CollectionAssert.AreEqual(RandomBytes[..acceptor.SessionKey.Length], authenticator.Subkey.Value.ToArray());
         Assert.AreEqual(0x01020304u, authenticator.SequenceNumber);
         Assert.AreEqual(KerberosGssContext.GssChecksumType, authenticator.Checksum!.ChecksumType);
-        CollectionAssert.AreEqual(Hex.Bytes("10000000 00000000000000000000000000000000 36000000"), authenticator.Checksum.Value);
+        CollectionAssert.AreEqual(Hex.Bytes("10000000 00000000000000000000000000000000 36010000"), authenticator.Checksum.Value);
         Assert.AreEqual(
-            KerberosGssFlags.MutualAuthentication | KerberosGssFlags.ReplayDetection | KerberosGssFlags.Confidentiality | KerberosGssFlags.Integrity,
+            KerberosGssFlags.MutualAuthentication | KerberosGssFlags.ReplayDetection | KerberosGssFlags.Confidentiality | KerberosGssFlags.Integrity
+                | KerberosGssFlags.Transfer,
             context.Flags);
 
         Assert.IsEmpty(context.NextToken(acceptor.Reply()));
@@ -76,7 +77,7 @@ public sealed class KerberosGssContextTests
 
         acceptor.Accept(context.NextToken([]));
 
-        CollectionAssert.AreEqual(Hex.Bytes("10000000 CCA1946F38023F173903A4E68BDCCCEA 36000000"), acceptor.Authenticator!.Checksum!.Value);
+        CollectionAssert.AreEqual(Hex.Bytes("10000000 CCA1946F38023F173903A4E68BDCCCEA 36010000"), acceptor.Authenticator!.Checksum!.Value);
     }
 
     /// <summary>
@@ -119,16 +120,16 @@ public sealed class KerberosGssContextTests
 
         Assert.IsTrue(context.IsCompleted);
         Assert.AreEqual(KerberosApOptions.None, acceptor.Request!.Options);
-        Assert.AreEqual(0x34u, BinaryPrimitives.ReadUInt32LittleEndian(acceptor.Authenticator!.Checksum!.Value.AsSpan(20)));
+        Assert.AreEqual(0x134u, BinaryPrimitives.ReadUInt32LittleEndian(acceptor.Authenticator!.Checksum!.Value.AsSpan(20)));
         CollectionAssert.AreEqual(Message, context.Unwrap(acceptor.Rfc4121Wrap(Message, 0x01020304, encrypt: true)).Message);
     }
 
     [TestMethod]
-    [DataRow(KerberosDelegation.None, KerberosTicketFlags.OkAsDelegate, true, 0x36u)]
-    [DataRow(KerberosDelegation.Policy, KerberosTicketFlags.None, true, 0x36u)]
-    [DataRow(KerberosDelegation.Policy, KerberosTicketFlags.OkAsDelegate, true, 0x37u)]
-    [DataRow(KerberosDelegation.Always, KerberosTicketFlags.None, true, 0x37u)]
-    [DataRow(KerberosDelegation.Always, KerberosTicketFlags.None, false, 0x36u)]
+    [DataRow(KerberosDelegation.None, KerberosTicketFlags.OkAsDelegate, true, 0x136u)]
+    [DataRow(KerberosDelegation.Policy, KerberosTicketFlags.None, true, 0x136u)]
+    [DataRow(KerberosDelegation.Policy, KerberosTicketFlags.OkAsDelegate, true, 0x137u)]
+    [DataRow(KerberosDelegation.Always, KerberosTicketFlags.None, true, 0x137u)]
+    [DataRow(KerberosDelegation.Always, KerberosTicketFlags.None, false, 0x136u)]
     public void NextToken_Delegation_SetsTheChecksumFlagsForEachLevel(KerberosDelegation delegation, KerberosTicketFlags ticketFlags, bool forwardable, uint expectedFlags)
     {
         FakeGssAcceptor acceptor = new(KerberosEncryptionType.Aes256CtsHmacSha196);

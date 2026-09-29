@@ -27,4 +27,10 @@ public enum KerberosGssFlags
 
     /// <summary><c>GSS_C_INTEG_FLAG</c>: per-message tokens carry a keyed checksum.</summary>
     Integrity = 32,
+
+    /// <summary>
+    /// <c>GSS_C_TRANS_FLAG</c>: the context could be exported. Not an RFC 4121 flag, but MIT
+    /// always sets it and sends it in the checksum, so it is always set here too (ADR-0171).
+    /// </summary>
+    Transfer = 256,
 }
