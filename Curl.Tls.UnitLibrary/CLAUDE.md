@@ -10,7 +10,7 @@ where the operating system disables them, `--ssl-allow-beast`). Everything else 
 `SslStreamTlsProvider` in `Curl.Networking.UnitLibrary`.
 
 Namespace `Curl.Tls`. What is here so far: the handshake message codecs (BL-698), the
-TLS 1.3 key schedule (BL-697) and the TLS 1.3 client handshake (BL-699, ADR-0143).
+TLS 1.3 key schedule (BL-697) and the TLS 1.3 client handshake (BL-699, ADR-0146).
 
 - `HandshakeMessageReader` frames handshake bytes into `HandshakeMessage`s (type and
   body); an unknown type is `unexpected_message`.
