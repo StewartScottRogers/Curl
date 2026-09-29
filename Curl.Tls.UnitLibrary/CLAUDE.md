@@ -10,7 +10,8 @@ where the operating system disables them, `--ssl-allow-beast`). Everything else 
 `SslStreamTlsProvider` in `Curl.Networking.UnitLibrary`.
 
 Namespace `Curl.Tls`. What is here so far: the handshake message codecs (BL-698), the
-TLS 1.3 key schedule (BL-697) and the TLS 1.3 client handshake (BL-699, ADR-0146).
+TLS 1.3 key schedule (BL-697), the TLS 1.3 client handshake (BL-699, ADR-0146), and the
+TLS 1.2, 1.1 and 1.0 PRF and record protection (BL-702, ADR-0148).
 
 - `HandshakeMessageReader` frames handshake bytes into `HandshakeMessage`s (type and
   body); an unknown type is `unexpected_message`.
@@ -48,6 +49,23 @@ TLS 1.3 key schedule (BL-697) and the TLS 1.3 client handshake (BL-699, ADR-0146
   extensions (`padding` in the order pads a 256-to-511-byte hello to 512).
 - Key shares: `X25519KeyShare`, `EcdhKeyShare` (NIST curves, points checked by
   `NistCurve`), `FfdheKeyShare` (RFC 7919 groups); `TlsNamedGroup` names them.
+- `TlsPrf` (`Md5Sha1` for TLS 1.0 and 1.1, `Sha256`, `Sha384`): the PRF of RFC 2246 and
+  RFC 5246, the master secret, the extended master secret (RFC 7627), the key block and
+  both Finished `verify_data`s. `Tls12KeyBlock.Partition` divides the key block into each
+  side's `Tls12WriteKeys` by the lengths `Tls12RecordProtectionParameters` (version,
+  `Tls12BulkCipher`, `Tls12MacAlgorithm`, encrypt-then-MAC) implies. ADR-0140 names this
+  pair `Tls12RecordLayer`; it is built as the two connection states below.
+- `Tls12RecordWriteState` fragments content to 2^14, protects each record and writes
+  its header; `Tls12RecordReadState.Unprotect` takes one record's fragment and returns
+  the content or `bad_record_mac` / `record_overflow`. Each holds its own sequence number;
+  `CreatePlaintext` is the initial state. Record layouts: null with or without a MAC, CBC
+  (AES, Camellia, 3DES) MAC-then-encrypt or encrypt-then-MAC (RFC 7366), with TLS 1.0's
+  chained IVs or explicit random IVs from `ITlsRandomSource`, and TLS 1.2 AEAD (AES-GCM,
+  ARIA-GCM with the sequence number as the explicit nonce, ChaCha20-Poly1305 with the
+  XORed nonce). TLS 1.0 CBC writes an empty record before application data unless
+  `insertEmptyFragment` is off (`--ssl-allow-beast`). CBC padding is checked with masks
+  (`Tls12CbcPadding`); the Lucky Thirteen hash-time residual is BL-792's. AES-CCM and RC4
+  records are BL-793's.
 - `ITlsRandomSource` supplies the random, session ID and key shares;
   `SystemTlsRandomSource` is the production one.
 - `IServerCertificateVerifier` gets the chain as a `ServerCertificateChain` (DER
