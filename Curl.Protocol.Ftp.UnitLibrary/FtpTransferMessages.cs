@@ -129,6 +129,24 @@ internal static class FtpTransferMessages
     /// <summary>The exit 78 message for a <c>550</c> reply to <c>SIZE</c>.</summary>
     internal const string FileDoesNotExist = "The file does not exist";
 
+    /// <summary>
+    /// The exit 63 message for a <c>SIZE</c> count larger than <c>--max-filesize</c>, which
+    /// curl 8.21.0 reports before <c>REST</c> or <c>RETR</c> (BL-638).
+    /// </summary>
+    internal const string MaxFileSizeExceeded = "Maximum file size exceeded";
+
+    /// <summary>
+    /// The exit 63 message for a download whose size was not known up front and that
+    /// delivered all <paramref name="maxFileSize" /> bytes <c>--max-filesize</c> allows with
+    /// more still arriving, measured against curl 8.21.0:
+    /// <c>Exceeded the maximum allowed file size (5) with 5 bytes</c> (BL-638).
+    /// </summary>
+    /// <param name="maxFileSize">The limit.</param>
+    /// <param name="delivered">The bytes written before the transfer stopped.</param>
+    /// <returns>The message to report.</returns>
+    internal static string MaxFileSizeExceededWhileReading(long maxFileSize, long delivered) =>
+        Format($"Exceeded the maximum allowed file size ({maxFileSize}) with {delivered} bytes");
+
     /// <summary>The exit 31 message for a <c>REST</c> answered with anything but <c>350</c>.</summary>
     internal const string CouldNotUseRest = "Could not use REST";
 

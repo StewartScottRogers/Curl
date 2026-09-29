@@ -62,6 +62,13 @@ namespace Curl.Protocol.Ftp;
 /// sends nothing more. ADR-0093's BL-438 addendum records the measurements.
 /// </para>
 /// <para>
+/// <c>--max-filesize</c> (BL-638): a <c>SIZE</c> count over the limit, the whole file's
+/// whatever <c>-C</c> or <c>-r</c> asks for, is exit 63 before <c>REST</c> or <c>RETR</c>,
+/// with <c>ABOR</c> for a range and then <c>QUIT</c>. When the size is not known, a file or
+/// listing that delivers the limit with more arriving is exit 63 with no <c>QUIT</c>, the
+/// limit counted from this transfer's first byte.
+/// </para>
+/// <para>
 /// With <see cref="ITransferContext.Upload" /> set the conversation after <c>PWD</c> is
 /// the <c>CWD</c>s, <c>EPSV</c> (or <c>PASV</c>), <c>TYPE I</c>, <c>STOR</c>, the upload
 /// written to the data connection and closed, and <c>QUIT</c>. <c>-C</c> sends
@@ -148,6 +155,9 @@ internal sealed class FtpSession(
     private long? expectedSize;
 
     private long bytesTransferred;
+
+    /// <summary>The <c>--max-filesize</c> limit, or <see langword="null" /> when there is none; 0 is none, as in curl.</summary>
+    private readonly long? maxFileSize = context.MaxFileSize > 0 ? context.MaxFileSize : null;
 
     /// <summary>
     /// The code of the last reply read before <c>QUIT</c>, <c>ABOR</c>'s included; 0 before
@@ -389,6 +399,7 @@ internal sealed class FtpSession(
             ?? await SetTypeAsync(listing).ConfigureAwait(false)
             ?? await SendQuotesAsync(quotes.BeforeTransfer).ConfigureAwait(false)
             ?? await ReadSizeAsync(path.FileName, listing).ConfigureAwait(false)
+            ?? await RefuseOversizedFileAsync().ConfigureAwait(false)
             ?? await PositionAsync().ConfigureAwait(false)
             ?? await RetrieveAsync(listing ? ListCommand(path) : "RETR " + path.FileName, listing).ConfigureAwait(false);
     }
@@ -975,6 +986,16 @@ internal sealed class FtpSession(
             : null;
 
     /// <summary>
+    /// Ends the download with exit 63 when the <c>SIZE</c> count, the whole file's whatever
+    /// <c>-C</c> or <c>-r</c> asks for, is larger than <c>--max-filesize</c>: <c>ABOR</c> for
+    /// a range, then <c>QUIT</c>, and no <c>REST</c> or <c>RETR</c>, as curl 8.21.0 does.
+    /// </summary>
+    private async ValueTask<TransferResult?> RefuseOversizedFileAsync() =>
+        fileSize > maxFileSize
+            ? await EndAndFailAsync(CurlExitCode.FilesizeExceeded, FtpTransferMessages.MaxFileSizeExceeded).ConfigureAwait(false)
+            : null;
+
+    /// <summary>
     /// Applies the window before <c>RETR</c>: works out how many bytes to expect and, for
     /// a non-zero offset, sends <c>REST</c>, failing with exit 31 and no <c>QUIT</c> when
     /// it is answered with anything but <c>350</c>.
@@ -1086,22 +1107,52 @@ internal sealed class FtpSession(
             }
 
             int wanted = CountWithinWindow(read);
-            try
+            int allowed = CountWithinMaxFileSize(wanted);
+            if (await WriteOutputAsync(buffer.AsMemory(0, allowed)).ConfigureAwait(false) is { } writeFailed)
             {
-                await context.Output.WriteAsync(buffer.AsMemory(0, wanted), context.CancellationToken).ConfigureAwait(false);
-            }
-            catch (IOException exception)
-            {
-                int accepted = exception is OutputWriteFailedException failed ? failed.BytesAccepted : 0;
-                return TransferResult.Failure(CurlExitCode.WriteError, FtpTransferMessages.OutputWriteFailed(wanted, accepted), bytesTransferred);
+                return writeFailed;
             }
 
-            bytesTransferred += wanted;
+            bytesTransferred += allowed;
             context.Progress.ReportDownloaded(bytesTransferred, expectedSize);
+            if (allowed < wanted)
+            {
+                return TransferResult.Failure(CurlExitCode.FilesizeExceeded, FtpTransferMessages.MaxFileSizeExceededWhileReading(maxFileSize!.Value, bytesTransferred), bytesTransferred);
+            }
         }
 
         return null;
     }
+
+    /// <summary>
+    /// Writes <paramref name="bytes" /> to the output: nothing at all, not an empty write,
+    /// when there are none; exit 23 when the output refuses them.
+    /// </summary>
+    private async ValueTask<TransferResult?> WriteOutputAsync(ReadOnlyMemory<byte> bytes)
+    {
+        if (bytes.IsEmpty)
+        {
+            return null;
+        }
+
+        try
+        {
+            await context.Output.WriteAsync(bytes, context.CancellationToken).ConfigureAwait(false);
+            return null;
+        }
+        catch (IOException exception)
+        {
+            int accepted = exception is OutputWriteFailedException failed ? failed.BytesAccepted : 0;
+            return TransferResult.Failure(CurlExitCode.WriteError, FtpTransferMessages.OutputWriteFailed(bytes.Length, accepted), bytesTransferred);
+        }
+    }
+
+    /// <summary>
+    /// The bytes of <paramref name="count" /> that still fit under <c>--max-filesize</c>,
+    /// counted from this transfer's first byte: the whole count when there is no limit.
+    /// </summary>
+    private int CountWithinMaxFileSize(int count) =>
+        maxFileSize is { } max ? (int)Math.Min(count, max - bytesTransferred) : count;
 
     /// <summary>
     /// Gets whether the window's byte limit has been written, so curl stops reading the
