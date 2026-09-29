@@ -30,3 +30,4 @@ ADR-0140's decoded OpenSSL 3.5.5 hello says what its captured bytes say about `c
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
