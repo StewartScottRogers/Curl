@@ -1,5 +1,5 @@
 ---
-id: BL-967
+id: BL-968
 title: Log the TLS route's reason, incomplete revocation checks, UDP and Unix socket connects to the diagnostic log
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-967 — Log the TLS route's reason, incomplete revocation checks, UDP and Unix socket connects to the diagnostic log
+# BL-968 — Log the TLS route's reason, incomplete revocation checks, UDP and Unix socket connects to the diagnostic log
 
 ## Goal
 

@@ -56,7 +56,7 @@ completed: 2026-09-29
   catches, logs and rethrows with `throw;` so the stack is kept.
 - The resolve's elapsed time reads the clock only when `info` is on, so tests pinning timestamps
   through `SteppingTimeProvider` see no extra reads.
-- Left for BL-967 (filed): the reason `TlsClientRouting` chose the route, a revocation check that
+- Left for BL-968 (filed): the reason `TlsClientRouting` chose the route, a revocation check that
   could not complete (`warning`), `UdpDatagramConnector`, and Unix socket dials. None is in the
   acceptance criteria.
 - No ADR: ADR-0222 already decides levels, components and the never-logged values; the choices
