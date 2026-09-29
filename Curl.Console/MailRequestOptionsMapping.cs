@@ -41,7 +41,7 @@ internal static class MailRequestOptionsMapping
     /// <c>pop3s</c>, <c>imap</c> and <c>imaps</c>; for those, every mail option verbatim, the
     /// recipients in command-line order, and <see cref="CommandLineOptions.UploadFlags" /> as
     /// the names of its set flags in curl's order. <see cref="MailRequestOptions.ServiceName" />
-    /// stays <see langword="null" />, the scheme's default, until <c>--service-name</c> is parsed.
+    /// is <c>--service-name</c>, <see langword="null" /> for the scheme's default (ADR-0188).
     /// </returns>
     internal static MailRequestOptions? FromCommandLine(CommandLineOptions options, string scheme) =>
         !MailSchemes.Contains(scheme)
@@ -58,6 +58,7 @@ internal static class MailRequestOptionsMapping
                 SaslAuthorizationIdentity = options.SaslAuthorizationIdentity,
                 SaslInitialResponse = options.SaslInitialResponse,
                 BearerToken = options.BearerToken,
+                ServiceName = options.ServiceName,
             };
 
     /// <summary>Gets the names of the flags set in <paramref name="flags" />, in curl's order.</summary>

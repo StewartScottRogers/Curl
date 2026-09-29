@@ -77,6 +77,11 @@ internal static class CurlComposition
     /// The scheme the <c>--proxy-*</c> auth switches pick (<see cref="CommandLineOptions.ProxyAuthSchemes" />),
     /// which the HTTP handler answers a forward proxy with; Basic, curl's default, when not given.
     /// </param>
+    /// <param name="negotiateOptions">
+    /// The <c>--service-name</c>, <c>--proxy-service-name</c> and <c>--delegation</c> the HTTP
+    /// handler's Negotiate answers with (<see cref="NegotiateOptionsMapping.FromCommandLine" />);
+    /// <see cref="NegotiateOptions.Default" /> when not given.
+    /// </param>
     /// <returns>Every registered handler.</returns>
     internal static IReadOnlyList<IProtocolHandler> CreateProtocolHandlers(
         IConnector connector,
@@ -85,12 +90,13 @@ internal static class CurlComposition
         IDnsResolver dnsResolver,
         ICookieStore? cookieStore = null,
         ISecurityContextFactory? securityContexts = null,
-        HttpAuthSchemes proxyAuthSchemes = HttpAuthSchemes.Basic)
+        HttpAuthSchemes proxyAuthSchemes = HttpAuthSchemes.Basic,
+        NegotiateOptions? negotiateOptions = null)
     {
         ConnectionEndPointRecorder recorder = new();
         EndPointRecordingConnector recordingConnector = new(connector, recorder);
         EndPointRecordingDatagramConnector recordingDatagramConnector = new(datagramConnector, recorder);
-        RankedHttpAuthenticator httpAuthenticator = CreateHttpAuthenticator(securityContexts ?? CreateSecurityContextFactory(connector, datagramConnector));
+        RankedHttpAuthenticator httpAuthenticator = CreateHttpAuthenticator(securityContexts ?? CreateSecurityContextFactory(connector, datagramConnector), negotiateOptions);
         HttpProtocolHandler http = new(recordingConnector, httpAuthenticator, cookieStore, proxyAuthSchemes);
 
         IProtocolHandler[] handlers =
@@ -136,18 +142,20 @@ internal static class CurlComposition
     /// credentials in the platform's encoding (<see cref="CredentialEncoding.ForPlatform" />),
     /// and a <see cref="NegotiateHttpAuthenticator" /> and an <see cref="NtlmHttpAuthenticator" /> over <paramref name="securityContexts" />
     /// for <c>--negotiate</c> and <c>--ntlm</c> (ADR-0176, ADR-0181), a refused NTLM Type 2 message failing the transfer
-    /// on Windows, as curl's SSPI build fails it.
+    /// on Windows, as curl's SSPI build fails it, Negotiate naming the service and delegating as
+    /// <paramref name="negotiateOptions" /> says (ADR-0188).
     /// </summary>
     /// <param name="securityContexts">Makes Negotiate's and NTLM's contexts: <see cref="CreateSecurityContextFactory" />'s in production.</param>
+    /// <param name="negotiateOptions">The service names and delegation level; <see cref="NegotiateOptions.Default" /> when <see langword="null" />.</param>
     /// <returns>The authenticator.</returns>
-    internal static RankedHttpAuthenticator CreateHttpAuthenticator(ISecurityContextFactory securityContexts)
+    internal static RankedHttpAuthenticator CreateHttpAuthenticator(ISecurityContextFactory securityContexts, NegotiateOptions? negotiateOptions = null)
     {
         Encoding credentialEncoding = CredentialEncoding.ForPlatform(OperatingSystem.IsWindows());
 
         return new RankedHttpAuthenticator(
             new BasicAndBearerAuthenticator(credentialEncoding),
             new DigestAuthenticator(credentialEncoding, DigestClientNonce.CreateRandom),
-            new NegotiateHttpAuthenticator(securityContexts),
+            new NegotiateHttpAuthenticator(securityContexts, negotiateOptions),
             new NtlmHttpAuthenticator(securityContexts, refusedChallengeFailsTransfer: OperatingSystem.IsWindows()));
     }
 
@@ -411,8 +419,9 @@ internal static class CurlComposition
     /// (<see cref="CommandLineOptions.ProxyAuthSchemes" />), answered by the same
     /// <see cref="CreateHttpAuthenticator" /> the origin uses: Basic up front, Digest and
     /// <c>--proxy-anyauth</c> after a <c>407</c> (ADR-0186). Its Negotiate and NTLM contexts come
-    /// from a <see cref="SystemSecurityContextFactory" />, though the authenticator answers neither
-    /// for a proxy yet (BL-604).
+    /// from a <see cref="SystemSecurityContextFactory" />, with the <c>--proxy-service-name</c> and
+    /// <c>--delegation</c> of <see cref="NegotiateOptionsMapping.FromCommandLine" />, though the
+    /// authenticator answers neither for a proxy yet (BL-604).
     /// </summary>
     /// <param name="options">The parsed command line.</param>
     /// <returns>The tunnel's options.</returns>
@@ -429,7 +438,7 @@ internal static class CurlComposition
             ProxyHeaders = options.ProxyHeaders,
             CommandLineTextEncoding = CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()),
             ProxyAuthSchemes = options.ProxyAuthSchemes,
-            ProxyAuthenticator = CreateHttpAuthenticator(new SystemSecurityContextFactory()),
+            ProxyAuthenticator = CreateHttpAuthenticator(new SystemSecurityContextFactory(), NegotiateOptionsMapping.FromCommandLine(options)),
         };
 
     /// <summary>
@@ -453,7 +462,7 @@ internal static class CurlComposition
         Stream standardInput,
         bool standardOutputIsTerminal) =>
         new(
-            SharingRunCookies((options, cookies) => CreateTransferDispatch(CreateTransports(options), cookies)),
+            SharingRunCookies((options, cookies) => CreateTransferDispatch(CreateTransports(options), cookies, NegotiateOptionsMapping.FromCommandLine(options))),
             new PhysicalFileSystem(),
             new PhysicalFileSystem(),
             standardOutput,
@@ -496,7 +505,7 @@ internal static class CurlComposition
         ProxySelector? proxySelector = null,
         ISecurityContextFactory? securityContexts = null) =>
         new(
-            SharingRunCookies((options, cookies) => CreateTransferDispatch(connector, datagramConnector, CreateTlsProvider(TlsClientOptionsMapping.FromCommandLine(options), TimeProvider.System), cookies, proxySelector, securityContexts, options.ProxyAuthSchemes)),
+            SharingRunCookies((options, cookies) => CreateTransferDispatch(connector, datagramConnector, CreateTlsProvider(TlsClientOptionsMapping.FromCommandLine(options), TimeProvider.System), cookies, proxySelector, securityContexts, options)),
             new PhysicalFileSystem(),
             new PhysicalFileSystem(),
             standardOutput,
@@ -556,10 +565,11 @@ internal static class CurlComposition
     /// </summary>
     /// <param name="transports">The run's connectors.</param>
     /// <param name="cookies">The run's cookies, or <see langword="null" /> without <c>-b</c> or <c>-c</c>.</param>
+    /// <param name="negotiateOptions">The service names and delegation the HTTP handler's Negotiate answers with; <see cref="NegotiateOptions.Default" /> when <see langword="null" />.</param>
     /// <returns>The dispatcher, the warning lines, the cookies, the proxy selector, the connection pool and the <c>--resolve</c> loader.</returns>
-    internal static TransferDispatch CreateTransferDispatch(CurlTransports transports, CookieEngine? cookies = null) =>
+    internal static TransferDispatch CreateTransferDispatch(CurlTransports transports, CookieEngine? cookies = null, NegotiateOptions? negotiateOptions = null) =>
         new(
-            new ProtocolDispatcher(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver, cookies?.HandlerStore, proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes)),
+            new ProtocolDispatcher(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver, cookies?.HandlerStore, proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes, negotiateOptions: negotiateOptions)),
             transports.ProxyTlsProvider.Warnings,
             cookies,
             new ProxySelector(Environment.GetEnvironmentVariable),
@@ -577,7 +587,11 @@ internal static class CurlComposition
     /// <param name="cookies">The run's cookies, or <see langword="null" /> without <c>-b</c> or <c>-c</c>.</param>
     /// <param name="proxySelector">Chooses each transfer's proxy, or <see langword="null" /> for one that reads no environment variables.</param>
     /// <param name="securityContexts">Makes the HTTP handler's Negotiate contexts, or <see langword="null" /> for the production router.</param>
-    /// <param name="proxyAuthSchemes">The scheme the <c>--proxy-*</c> auth switches pick, which the HTTP handler answers a forward proxy with.</param>
+    /// <param name="options">
+    /// The option group: its <c>--proxy-*</c> auth switches pick the scheme the HTTP handler answers a
+    /// forward proxy with, and its <c>--service-name</c>, <c>--proxy-service-name</c> and
+    /// <c>--delegation</c> shape its Negotiate answers.
+    /// </param>
     /// <returns>The dispatcher, no warning lines, the cookies and the proxy selector.</returns>
     private static TransferDispatch CreateTransferDispatch(
         IConnector connector,
@@ -586,9 +600,9 @@ internal static class CurlComposition
         CookieEngine? cookies,
         ProxySelector? proxySelector,
         ISecurityContextFactory? securityContexts,
-        HttpAuthSchemes proxyAuthSchemes) =>
+        CommandLineOptions options) =>
         new(
-            new ProtocolDispatcher(CreateProtocolHandlers(connector, datagramConnector, tlsProvider, new SystemDnsResolver(), cookies?.HandlerStore, securityContexts, proxyAuthSchemes)),
+            new ProtocolDispatcher(CreateProtocolHandlers(connector, datagramConnector, tlsProvider, new SystemDnsResolver(), cookies?.HandlerStore, securityContexts, options.ProxyAuthSchemes, NegotiateOptionsMapping.FromCommandLine(options))),
             [],
             cookies,
             proxySelector);

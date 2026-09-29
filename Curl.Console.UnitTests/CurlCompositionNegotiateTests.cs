@@ -1,4 +1,6 @@
 using System.Text;
+using Curl.Authentication;
+using Curl.Cli;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Console;
@@ -33,6 +35,33 @@ public sealed class CurlCompositionNegotiateTests
         Assert.AreEqual(Request.Replace("User-Agent", "Authorization: Negotiate YAEA\r\nUser-Agent", StringComparison.Ordinal), Latin1(server.Written));
         Assert.AreEqual("hello", standardOutput);
         Assert.AreEqual(new SecurityContextRequest(SecurityMechanism.Negotiate, "HTTP", "127.0.0.1"), tokens.Requests.Single());
+    }
+
+    [TestMethod]
+    public async Task RunAsync_ServiceNameAndDelegation_ReachTheAuthenticatorsContextRequest()
+    {
+        TokenSource tokens = new(new SecurityContextStep(SecurityContextStatus.ContinueNeeded, [0x60, 0x01, 0x00]));
+        ScriptedConnector server = new([Encoding.Latin1.GetBytes(Ok)]);
+
+        (int exitCode, _) = await RunAsync(server, tokens, "--negotiate", "-u", ":", "--service-name", "svc", "--proxy-service-name", "proxysvc", "--delegation", "always", Url);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(new SecurityContextRequest(SecurityMechanism.Negotiate, "svc", "127.0.0.1") { Delegation = SecurityDelegation.Always }, tokens.Requests.Single());
+    }
+
+    [TestMethod]
+    [DataRow(new string[0], null, null, SecurityDelegation.None, DisplayName = "none given")]
+    [DataRow(new[] { "--service-name", "svc" }, "svc", null, SecurityDelegation.None, DisplayName = "--service-name")]
+    [DataRow(new[] { "--proxy-service-name", "proxysvc" }, null, "proxysvc", SecurityDelegation.None, DisplayName = "--proxy-service-name")]
+    [DataRow(new[] { "--delegation", "policy" }, null, null, SecurityDelegation.Policy, DisplayName = "--delegation policy")]
+    [DataRow(new[] { "--delegation", "always" }, null, null, SecurityDelegation.Always, DisplayName = "--delegation always")]
+    [DataRow(new[] { "--delegation", "none" }, null, null, SecurityDelegation.None, DisplayName = "--delegation none")]
+    public void NegotiateOptionsMapping_EachOption_ReachesTheNegotiateOptions(string[] arguments, string? serviceName, string? proxyServiceName, SecurityDelegation delegation)
+    {
+        CommandLineParseResult parsed = CommandLineParser.Parse([.. arguments, Url], _ => true);
+        Assert.IsNotNull(parsed.Options);
+
+        Assert.AreEqual(new NegotiateOptions(serviceName, proxyServiceName, delegation), NegotiateOptionsMapping.FromCommandLine(parsed.Options));
     }
 
     [TestMethod]

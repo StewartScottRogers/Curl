@@ -45,6 +45,12 @@ public sealed class TransferContextFactoryMailTests
     }
 
     [TestMethod]
+    public void Create_ServiceName_CarriesItForSasl()
+    {
+        Assert.AreEqual("svc", MailOf("smtp://example.com/", "--service-name", "svc").ServiceName);
+    }
+
+    [TestMethod]
     public void Create_MailSchemeWithoutMailOptions_CarriesTheDefaults()
     {
         MailRequestOptions mail = MailOf("imap://example.com/");
