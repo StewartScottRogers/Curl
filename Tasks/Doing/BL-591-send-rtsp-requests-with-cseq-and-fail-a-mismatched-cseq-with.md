@@ -33,3 +33,4 @@ An `RtspProtocolHandler` sends the requests BL-590's ADR says the curl tool send
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
