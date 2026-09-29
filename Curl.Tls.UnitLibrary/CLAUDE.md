@@ -53,7 +53,7 @@ TLS 1.2, 1.1 and 1.0 PRF and record protection (BL-702, ADR-0150), the TLS 1.2,
   `NistCurve`), `FfdheKeyShare` (RFC 7919 groups); `TlsNamedGroup` names them.
 - TLS 1.3 over a byte stream (ADR-0157): `Tls13RecordProtection` is one direction under
   one traffic secret (RFC 8446 section 5.2 nonces, no padding sent, peer padding removed,
-  the GCM and ChaCha20-Poly1305 suites; CCM is BL-810's). The internal
+  the GCM and ChaCha20-Poly1305 suites; CCM is BL-811's). The internal
   `Tls13RecordLayer` reads whole records off the caller's `Stream` and holds a protection
   per level. `Tls13ClientConnection.ConnectAsync` runs `Tls13ClientHandshake` over it
   (middlebox compatibility `change_cipher_spec` included) and returns a

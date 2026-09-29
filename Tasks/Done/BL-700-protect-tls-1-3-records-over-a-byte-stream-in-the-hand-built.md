@@ -29,7 +29,7 @@ The hand-built client runs TLS 1.3 over a byte stream: the record layer (RFC 844
 ## Notes
 
 - Missing `close_notify` (ADR-0157; BL-695's ADR is ADR-0140, which names `close_notify` but not the rule): `Tls13ClientStream` returns 0 as `SslStream` does and exposes `CloseNotifyReceived`; curl's exit 56 for a transfer left unfinished is the caller's mapping, noted on BL-708.
-- "Each suite" is the three the record layer can protect today (0x1301-0x1303). The CCM suites wait for BL-738's hand-built AES-CCM; filed BL-810 for their TLS 1.3 records. Until then `ConnectAsync` refuses them before sending anything.
+- "Each suite" is the three the record layer can protect today (0x1301-0x1303). The CCM suites wait for BL-738's hand-built AES-CCM; filed BL-811 for their TLS 1.3 records. Until then `ConnectAsync` refuses them before sending anything.
 - `ITls12Aead` and its implementations are renamed `ITlsAead` / `*TlsAead`, since TLS 1.3 records share them.
 - Measured 2026-09-28: `Measure-CodeQuality.ps1 -Library Curl.Tls.UnitLibrary` 100% line, 100% branch, 605 members, 0 failing, worst CRAP 10. Solution build clean, fast tests green.
 

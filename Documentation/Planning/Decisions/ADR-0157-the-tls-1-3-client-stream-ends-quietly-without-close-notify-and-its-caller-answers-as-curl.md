@@ -58,7 +58,7 @@ curl's builds have made them:
    and leaves reads open; disposing does not send it.
 4. **Suites.** `Tls13RecordProtection` protects the AES-GCM and ChaCha20-Poly1305 suites.
    A connection offering a CCM suite is refused with `ArgumentException` before anything
-   is sent, until BL-810 adds AES-CCM and AES-CCM8 on BL-738's hand-built AEAD. The AEADs
+   is sent, until BL-811 adds AES-CCM and AES-CCM8 on BL-738's hand-built AEAD. The AEADs
    are renamed from `ITls12Aead` and its `*Tls12Aead` implementations to `ITlsAead` and
    `*TlsAead`, since TLS 1.2 and 1.3 share them.
 

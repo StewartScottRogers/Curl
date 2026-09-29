@@ -1,5 +1,5 @@
 ---
-id: BL-810
+id: BL-811
 title: Protect TLS 1.3 records with AES-CCM and AES-CCM8 in the hand-built TLS client
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-810 — Protect TLS 1.3 records with AES-CCM and AES-CCM8 in the hand-built TLS client
+# BL-811 — Protect TLS 1.3 records with AES-CCM and AES-CCM8 in the hand-built TLS client
 
 ## Goal
 
