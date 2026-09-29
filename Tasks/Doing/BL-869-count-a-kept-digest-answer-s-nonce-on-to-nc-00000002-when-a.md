@@ -32,3 +32,4 @@ When a transfer through a forward proxy answers both a `407` and a `401` with Di
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-29: Backlog -> Doing.
