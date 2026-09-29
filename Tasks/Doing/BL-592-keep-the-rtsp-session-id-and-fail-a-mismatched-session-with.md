@@ -32,3 +32,4 @@ The RTSP handler records the `Session` header from a reply, sends it on later re
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
