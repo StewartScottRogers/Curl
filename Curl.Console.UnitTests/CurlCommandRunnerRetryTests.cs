@@ -25,6 +25,10 @@ public sealed class CurlCommandRunnerRetryTests
 
     private const string BusyForLong = "HTTP/1.1 503 Service Unavailable\r\nRetry-After: 100\r\nContent-Length: 4\r\n\r\nbusy";
 
+    private const string EmptyBusy = "HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\n\r\n";
+
+    private const string OkOk = "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok";
+
     private static readonly string NewLine = Environment.NewLine;
 
     private static readonly string RetryWarningLine =
@@ -110,6 +114,44 @@ public sealed class CurlCommandRunnerRetryTests
             StandardErrorText);
         Assert.AreEqual("busy", StandardOutputText);
         Assert.AreEqual(0, clock.Waits.Count);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_NumRetriesAfterTwoRetriesThatSucceed_PrintsTwo()
+    {
+        // curl -s --retry 2 --retry-delay 1 -w '%{num_retries}' against 503, 503, 200 (BL-513 Notes).
+        int exitCode = await RunAsync([EmptyBusy, EmptyBusy, OkOk], "-s", "--retry", "2", "--retry-delay", "1", "-w", "%{num_retries}", Url);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual("ok2", StandardOutputText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_NumRetriesAfterRetriesRunOut_PrintsTwo()
+    {
+        // curl -s --retry 2 --retry-delay 1 -w '%{num_retries}' against three 503s (BL-513 Notes).
+        int exitCode = await RunAsync([EmptyBusy, EmptyBusy, EmptyBusy], "-s", "--retry", "2", "--retry-delay", "1", "-w", "%{num_retries}", Url);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual("2", StandardOutputText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_JsonAfterTwoRetries_PrintsNumRetriesTwo()
+    {
+        int exitCode = await RunAsync([EmptyBusy, EmptyBusy, OkOk], "-s", "--retry", "2", "--retry-delay", "1", "-w", "%{json}", Url);
+
+        Assert.AreEqual(0, exitCode);
+        StringAssert.Contains(StandardOutputText, "\"num_redirects\":0,\"num_retries\":2,");
+    }
+
+    [TestMethod]
+    public async Task RunAsync_NumRetriesWithoutRetry_PrintsZero()
+    {
+        int exitCode = await RunAsync([EmptyBusy], "-s", "-w", "%{num_retries}", Url);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual("0", StandardOutputText);
     }
 
     [TestMethod]

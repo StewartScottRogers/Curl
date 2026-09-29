@@ -72,11 +72,11 @@ namespace Curl.Output;
 /// </para>
 /// <para>
 /// <c>time_queue</c> is the handler's start, the moment the transfer left the queue, so
-/// one microsecond with timings and <c>0.000000</c> without. The next four print the
+/// one microsecond with timings and <c>0.000000</c> without. The next three print the
 /// fixed text curl 8.21.0 (Schannel) prints for every transfer this tool can run: a
-/// verify result of <c>0</c>, which Schannel reports even for a failed verification;
-/// <c>0</c> early-data bytes, which Schannel never sends; and <c>0</c> retries, because
-/// no <c>--retry</c> exists yet. See ADR-0043. <c>ftp_entry_path</c> is
+/// verify result of <c>0</c>, which Schannel reports even for a failed verification; and
+/// <c>0</c> early-data bytes, which Schannel never sends. See ADR-0043. <c>num_retries</c>
+/// is <see cref="RetryCount"/>, set by the caller (BL-513). <c>ftp_entry_path</c> is
 /// <see cref="TransferReport.FtpEntryPath"/>: nothing, and <c>null</c> in <c>json</c>,
 /// for a transfer that is not FTP or whose <c>PWD</c> reply named no directory (BL-514).
 /// </para>
@@ -176,7 +176,7 @@ public sealed class TransferWriteOutVariables(
         ["ssl_verify_result"] = _ => WriteOutValue.FromNumber(0),
         ["proxy_ssl_verify_result"] = _ => WriteOutValue.FromNumber(0),
         ["tls_earlydata"] = _ => WriteOutValue.FromNumber(0),
-        ["num_retries"] = _ => WriteOutValue.FromNumber(0),
+        ["num_retries"] = variables => WriteOutValue.FromNumber(variables.RetryCount),
         ["ftp_entry_path"] = variables => WriteOutValue.FromText(variables.report.FtpEntryPath),
         ["num_certs"] = variables => WriteOutValue.FromNumber(variables.report.PeerCertificates.Count),
         ["proxy_used"] = variables => WriteOutValue.FromNumber(variables.report.UsedProxy ? 1 : 0),
@@ -222,6 +222,15 @@ public sealed class TransferWriteOutVariables(
     /// Gets the process-wide zero-based number of the transfer, printed by <c>%{xfer_id}</c>.
     /// </summary>
     public long TransferId { get; init; }
+
+    /// <summary>
+    /// Gets how many times <c>--retry</c> ran the transfer again before this, its last attempt,
+    /// printed by <c>%{num_retries}</c>; <c>0</c>, the default, when it ran once. The caller
+    /// counts the retries <c>Curl.Core</c>'s <c>TransferRetrier</c> announces. curl 8.21.0
+    /// printed <c>2</c> for <c>--retry 2</c> against 503, 503, 200 and against three 503s
+    /// (measured 2026-09-28, BL-513).
+    /// </summary>
+    public int RetryCount { get; init; }
 
     /// <summary>
     /// Gets the library version <c>%{json}</c> prints last, as <c>curl_version</c>; by

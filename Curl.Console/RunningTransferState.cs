@@ -74,6 +74,12 @@ internal sealed class RunningTransferState(
     internal bool ProgressMeterHeaderWritten { get; set; }
 
     /// <summary>
+    /// Gets or sets how many times <c>--retry</c> has run the transfer again, printed by
+    /// <c>%{num_retries}</c> (task BL-513).
+    /// </summary>
+    internal int RetryCount { get; set; }
+
+    /// <summary>
     /// Gets or sets a value indicating whether the transfer is a <c>-T</c> upload under <c>-C -</c>,
     /// whose meter curl 8.21.0 heads with <c>** Resuming transfer from byte position -1</c> whatever
     /// the <c>-o</c> file holds (task BL-416).

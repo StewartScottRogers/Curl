@@ -1713,6 +1713,7 @@ internal sealed class CurlCommandRunner(
             OutputFileName = Running.OutputFileName,
             ConnectionId = connectionId,
             TransferId = HasNoTransferNumber(result) ? NoTransferId : transfer.TransferId,
+            RetryCount = Running.RetryCount,
         };
     }
 
@@ -2945,7 +2946,11 @@ internal sealed class CurlCommandRunner(
             .RunAsync(
                 firstContext,
                 RetryPolicyMapping.FromCommandLine(options),
-                (attempt, warning) => retryLinesWritten = WriteRetryLinesAsync(options, attempt, warning, resumeFrom, outputFile),
+                (attempt, warning) =>
+                {
+                    Running.RetryCount++;
+                    retryLinesWritten = WriteRetryLinesAsync(options, attempt, warning, resumeFrom, outputFile);
+                },
                 (_, warning) => retryLinesWritten = WriteWarningUnlessSilentAsync(options, warning))
             .ConfigureAwait(false);
         await retryLinesWritten.ConfigureAwait(false);
