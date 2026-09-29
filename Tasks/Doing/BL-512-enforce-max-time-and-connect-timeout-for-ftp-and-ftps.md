@@ -33,3 +33,4 @@ An FTP or FTPS transfer that outlasts `-m`, or whose control or data connection 
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
