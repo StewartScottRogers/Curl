@@ -19,7 +19,7 @@ implemented names; `KeyExchange` holds one `ISshKeyExchange` per method family a
 `SshKeyDerivation`; `HostKeys` holds one `ISshSignatureVerifier` per host-key type.
 A new algorithm registers in `SshKeyExchangeMethods` or `SshSignatureVerifiers`, and
 `SshAlgorithmCatalogue.Implemented` offers it from then on. Failure messages and
-their libssh2 codes are ADR-0122's and ADR-0205's, measured from the reference builds.
+their libssh2 codes are ADR-0122's and ADR-0206's, measured from the reference builds.
 
 Never construct a `Socket`, `SslStream` or `HttpClient` here. Take `IConnection`
 so the tests in the matching `.UnitTests` project can drive this code from a
