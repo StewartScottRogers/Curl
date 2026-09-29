@@ -61,6 +61,14 @@ public sealed record AltSvcEntry(
         && SourcePort == sourcePort
         && string.Equals(WithoutTrailingDot(SourceHost), WithoutTrailingDot(sourceHost), StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Whether this entry's destination is the host and port given, compared as libcurl's
+    /// <c>hostcompare</c> does: host case-insensitive, ignoring one trailing dot on either.
+    /// </summary>
+    internal bool IsDestination(string host, int port) =>
+        DestinationPort == port
+        && string.Equals(WithoutTrailingDot(DestinationHost), WithoutTrailingDot(host), StringComparison.OrdinalIgnoreCase);
+
     private static bool IsBracketed(string host) => host.Length > 2 && host[0] == '[';
 
     private static string WithoutTrailingDot(string host) => host.EndsWith('.') ? host[..^1] : host;

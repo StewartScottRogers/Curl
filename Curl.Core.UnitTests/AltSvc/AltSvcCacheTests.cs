@@ -292,6 +292,55 @@ public sealed class AltSvcCacheTests
     }
 
     [TestMethod]
+    public void FindForOrigin_EntriesUnderTwoVersions_GivesTheFirstVersionsEntry()
+    {
+        AltSvcCache cache = CacheAt(2026, 9, 29, 5, 21, 46);
+        cache.ApplyHeader("h2=\":1\"", AltSvcAlpn.H1, "example.com", 443);
+        cache.ApplyHeader("h3=\":2\"", AltSvcAlpn.H2, "example.com", 443);
+
+        AltSvcMatch? match = cache.FindForOrigin([AltSvcAlpn.H3, AltSvcAlpn.H2, AltSvcAlpn.H1], "example.com", 443, AnyAlpn);
+
+        Assert.AreEqual(AltSvcAlpn.H2, match?.SourceAlpn);
+        Assert.AreEqual(2, match?.Entry.DestinationPort);
+        Assert.IsFalse(match?.IsSameDestination);
+    }
+
+    [TestMethod]
+    public void FindForOrigin_OnlyADisallowedVersionsEntry_FallsThroughToTheNextVersion()
+    {
+        AltSvcCache cache = CacheAt(2026, 9, 29, 5, 21, 46);
+        cache.ApplyHeader("h3=\":2\"", AltSvcAlpn.H2, "example.com", 443);
+        cache.ApplyHeader("h2=\":1\"", AltSvcAlpn.H1, "example.com", 443);
+
+        AltSvcMatch? match = cache.FindForOrigin([AltSvcAlpn.H2, AltSvcAlpn.H1], "example.com", 443, new HashSet<AltSvcAlpn> { AltSvcAlpn.H1, AltSvcAlpn.H2 });
+
+        Assert.AreEqual(new AltSvcMatch(AltSvcAlpn.H1, cache.Entries[1], false), match);
+    }
+
+    [TestMethod]
+    [DataRow("h3=\":443\"", "Example.COM.", true)]
+    [DataRow("h3=\"example.com.:443\"", "example.com", true)]
+    [DataRow("h3=\":8443\"", "example.com", false)]
+    [DataRow("h3=\"other.example:443\"", "example.com", false)]
+    public void FindForOrigin_DestinationTheOrigin_IsTheSameDestination(string header, string origin, bool same)
+    {
+        AltSvcCache cache = CacheAt(2026, 9, 29, 5, 21, 46);
+        cache.ApplyHeader(header, AltSvcAlpn.H1, "example.com", 443);
+
+        Assert.AreEqual(same, cache.FindForOrigin([AltSvcAlpn.H1], origin, 443, AnyAlpn)?.IsSameDestination);
+    }
+
+    [TestMethod]
+    public void FindForOrigin_NoVersionsOrNoEntry_GivesNull()
+    {
+        AltSvcCache cache = CacheAt(2026, 9, 29, 5, 21, 46);
+        cache.ApplyHeader("h3=\":2\"", AltSvcAlpn.H1, "example.com", 443);
+
+        Assert.IsNull(cache.FindForOrigin([], "example.com", 443, AnyAlpn));
+        Assert.IsNull(cache.FindForOrigin([AltSvcAlpn.H2], "example.com", 443, AnyAlpn));
+    }
+
+    [TestMethod]
     public void Methods_NullArguments_Throw()
     {
         AltSvcCache cache = CacheAt(2026, 9, 29, 5, 21, 46);
@@ -301,6 +350,7 @@ public sealed class AltSvcCacheTests
         Assert.ThrowsExactly<ArgumentNullException>(() => cache.ApplyHeader(null!, AltSvcAlpn.H1, "a", 443));
         Assert.ThrowsExactly<ArgumentNullException>(() => cache.Find(AltSvcAlpn.H1, null!, 443, AnyAlpn));
         Assert.ThrowsExactly<ArgumentNullException>(() => cache.Find(AltSvcAlpn.H1, "a", 443, null!));
+        Assert.ThrowsExactly<ArgumentNullException>(() => cache.FindForOrigin(null!, "a", 443, AnyAlpn));
         Assert.ThrowsExactly<ArgumentNullException>(() => cache.FormatFile(null!));
     }
 

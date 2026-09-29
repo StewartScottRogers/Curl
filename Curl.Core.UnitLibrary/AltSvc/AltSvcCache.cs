@@ -143,6 +143,38 @@ public sealed class AltSvcCache(TimeProvider timeProvider)
     }
 
     /// <summary>
+    /// Finds the alternative for an origin as libcurl 8.21.0's <c>url_set_conn_peer</c> does:
+    /// <see cref="Find" /> under each of <paramref name="sourceAlpns" /> in turn, the first hit
+    /// winning, and whether that entry's destination is the origin itself.
+    /// </summary>
+    /// <param name="sourceAlpns">
+    /// The origin's HTTP versions to look the entry up under, in curl's order: <c>h3</c>, then
+    /// <c>h2</c>, then <c>h1</c>, each only when the transfer wants it.
+    /// </param>
+    /// <param name="sourceHost">The origin's host, an IPv6 address without brackets.</param>
+    /// <param name="sourcePort">The origin's port.</param>
+    /// <param name="allowedDestinationAlpns">The versions the transfer may switch to.</param>
+    /// <returns>The match, or <see langword="null" /> when no entry applies.</returns>
+    public AltSvcMatch? FindForOrigin(
+        IReadOnlyList<AltSvcAlpn> sourceAlpns,
+        string sourceHost,
+        int sourcePort,
+        IReadOnlySet<AltSvcAlpn> allowedDestinationAlpns)
+    {
+        ArgumentNullException.ThrowIfNull(sourceAlpns);
+
+        foreach (AltSvcAlpn sourceAlpn in sourceAlpns)
+        {
+            if (Find(sourceAlpn, sourceHost, sourcePort, allowedDestinationAlpns) is { } entry)
+            {
+                return new AltSvcMatch(sourceAlpn, entry, entry.IsDestination(sourceHost, sourcePort));
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// Writes the file as libcurl 8.21.0's <c>Curl_altsvc_save</c> does: the two header
     /// comments, then one line per entry, an IPv6 host in brackets, the expiry in UTC and the
     /// priority always 0.

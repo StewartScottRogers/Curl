@@ -641,6 +641,29 @@ public sealed class RedirectFollowerTests
     }
 
     [TestMethod]
+    public async Task FollowAsync_AltSvcSelector_GivesEveryHopAfterTheFirstItsOptions()
+    {
+        // curl looks the alternative up again for each connection (BL-733); the selector does the lookup.
+        AltSvcRoute route = new("h1", new AltSvcAlternative("h3", "127.0.0.1", 18443));
+        ScriptedHandler handler = new(Redirect(302, "http://localhost:18203/next"), Ok(200, 0));
+        List<CurlUrl> looked = [];
+        RedirectFollower follower = new(
+            new ProtocolDispatcher([handler]),
+            selectHopAltSvc: (url, http) =>
+            {
+                looked.Add(url);
+                return http with { AltSvcRoute = null, Version = HttpVersionPreference.Http11 };
+            });
+
+        await follower.FollowAsync(Context(Location() with { AltSvcRoute = route, Version = HttpVersionPreference.Http3Only }), new RedirectPolicy());
+
+        Assert.AreSame(route, handler.Contexts[0].Http!.AltSvcRoute);
+        Assert.IsNull(handler.Contexts[1].Http!.AltSvcRoute);
+        Assert.AreEqual(HttpVersionPreference.Http11, handler.Contexts[1].Http!.Version);
+        Assert.AreEqual("localhost", looked.Single().Host);
+    }
+
+    [TestMethod]
     [DataRow("http://127.0.0.1:18203/next", false)]
     [DataRow("HTTP://127.0.0.1:80/", false)]
     [DataRow("http://localhost:18203/next", true)]

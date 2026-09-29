@@ -35,7 +35,9 @@ credentials go to it (ADR-0193, BL-814) - and returns the last hop's result with
 effective URL, summed header/request/connection counts, timings from the first hop with
 `RedirectDuration`). Without `-L` it returns the dispatcher's result unchanged. Given a
 `HopProxySelector`, it chooses each hop's proxy again from that hop's own URL, as curl
-8.21.0 does (BL-329); without one, every hop keeps the first URL's proxy. Under
+8.21.0 does (BL-329); without one, every hop keeps the first URL's proxy. Given a
+`HopAltSvcSelector`, it looks each hop's `--alt-svc` route and HTTP version up again from the
+hop's URL (ADR-0226); without one, only a hop to the first URL's origin keeps its route. Under
 `HttpRequestOptions.AutoReferer` (`-e "...;auto"`) each hop is sent the previous URL, without
 user information or fragment, as its `Referer`, and the merged report's `Referer` is the last
 one sent, which `%{referer}` prints (ADR-0101, BL-361).
@@ -109,10 +111,12 @@ constructed with. No gateway is `IpfsGatewayFailure.GatewayDetectionFailed` (exi
 skipped), `ApplyHeader` learns from one `Alt-Svc` value as `AltSvcHeaderParser` reads it
 (`clear`; `ma` and `persist` per alternative, 24 hours by default; the first known
 alternative replaces the origin's entries), `Find` gives the first unexpired entry for an
-origin and allowed versions, removing the expired ones it passes, and `FormatFile` writes
+origin and allowed versions, removing the expired ones it passes, `FindForOrigin` runs `Find`
+under several origin versions in curl's order and says whether the entry names the origin
+itself (`AltSvcMatch`, ADR-0226), and `FormatFile` writes
 curl's file byte for byte with the line ending the caller passes (`Environment.NewLine`:
 curl's Windows build writes CR LF). Time comes from the injected `TimeProvider`; it touches
-no file. It is not yet wired into `Curl.Console` (BL-623).
+no file. `Curl.Console`'s `AltSvcTransferCache` wraps it for each transfer (BL-623, BL-733).
 
 `Hsts\HstsCache` is the `--hsts` cache (ADR-0179, BL-620): `ReadFile` takes curl 8.21.0's HSTS
 file text (`[.]host "date"` lines read by `HstsFileLineParser`, dates by `CurlDateParser` or

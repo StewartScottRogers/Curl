@@ -96,11 +96,18 @@ namespace Curl.Core;
 /// curl 8.21.0 does after <c>Issue another request to this URL</c> (BL-621 Notes);
 /// <see langword="null" /> for none.
 /// </param>
+/// <param name="selectHopAltSvc">
+/// Looks up each hop's <c>--alt-svc</c> alternative and HTTP version from the hop's own URL, as
+/// curl 8.21.0 looks it up for each connection; <see langword="null" /> to keep the first hop's
+/// <see cref="HttpRequestOptions.AltSvcRoute" /> for a hop to the first URL's origin and drop it
+/// for any other.
+/// </param>
 public sealed class RedirectFollower(
     ProtocolDispatcher dispatcher,
     HopProxySelector? selectHopProxy = null,
     bool? runsOnWindows = null,
-    HstsTransferPolicy? hsts = null)
+    HstsTransferPolicy? hsts = null,
+    HopAltSvcSelector? selectHopAltSvc = null)
 {
     /// <summary>The Linux and macOS build's message for a multipart body it cannot rewind for the next hop.</summary>
     public const string CannotRewindMessage = "Cannot rewind mime/post data";
@@ -189,7 +196,7 @@ public sealed class RedirectFollower(
             Rewind(bodyContent, bodyStart, bodyDropped);
             chain.Followed(target);
             // No stop means the target parsed, so next is set.
-            hop = NextHop(context, hop.Url, next!, HopMethod(http, methodDropped) with { RedirectsFollowed = chain.RedirectCount }, hopProxy, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted);
+            hop = NextHop(context, hop.Url, next!, HopMethod(http, methodDropped) with { RedirectsFollowed = chain.RedirectCount }, hopProxy, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted, selectHopAltSvc);
         }
     }
 
@@ -433,6 +440,16 @@ public sealed class RedirectFollower(
         && string.Equals(first.Host, next.Host, StringComparison.OrdinalIgnoreCase)
         && first.Port == next.Port;
 
+    /// <summary>
+    /// The hop's HTTP options with its <c>--alt-svc</c> route: the selector's lookup for
+    /// <paramref name="url" />, or, without one, the first hop's route for a hop to the first
+    /// URL's origin and none for any other.
+    /// </summary>
+    private static HttpRequestOptions HopAltSvc(CurlUrl first, CurlUrl url, HttpRequestOptions http, HopAltSvcSelector? selectHopAltSvc) =>
+        selectHopAltSvc is null
+            ? http with { AltSvcRoute = IsSameOrigin(first, url) ? http.AltSvcRoute : null }
+            : selectHopAltSvc(url, http);
+
     private static HttpRequestOptions HopHttp(CurlUrl previousUrl, HttpRequestOptions http, ProxyEndpoint? forwardProxy, bool bodyDropped, bool sendCredentials)
     {
         HttpRequestOptions hopHttp = http with
@@ -476,7 +493,8 @@ public sealed class RedirectFollower(
         HopProxy hopProxy,
         bool bodyDropped,
         bool sendCredentials,
-        long operationStarted) =>
+        long operationStarted,
+        HopAltSvcSelector? selectHopAltSvc) =>
         new()
         {
             Url = url,
@@ -502,7 +520,7 @@ public sealed class RedirectFollower(
             MaxTime = first.MaxTime,
             OperationStarted = operationStarted,
             Proxy = hopProxy.Proxy,
-            Http = HopHttp(previousUrl, http, hopProxy.ForwardProxy, bodyDropped, sendCredentials) with { AltSvcRoute = IsSameOrigin(first.Url, url) ? http.AltSvcRoute : null },
+            Http = HopAltSvc(first.Url, url, HopHttp(previousUrl, http, hopProxy.ForwardProxy, bodyDropped, sendCredentials), selectHopAltSvc),
             TimeProvider = first.TimeProvider,
             CancellationToken = first.CancellationToken,
             Progress = first.Progress,
