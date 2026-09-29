@@ -1,0 +1,185 @@
+(µ/ıHmê¼“using System.Buffers.Binary;
+Numerics;
+
+namespace Curl.Zstandard;
+
+/// <summary>
+/// The XXH64 non-cryptographic hash (xxHash specification, <c>doc/xxhash_spec.md</c>),
+/// which RFC 8878 uses with seed 0 for a frame's <c>Content_Checksum</c>: the checksum is
+/// the low 32 bits of the XXH64 of the frame's decoded content.
+/// </summary>
+/// <remarks>
+/// Public so its own published test vectors pin it (ADR-0185), not because another
+/// library needs it. <see cref="XxHash64Accumulator" /> is the same hash over input that
+/// arrives in pieces.</remarks>
+public static class XxHash64
+{
+    The length in bytes of one stripe: four 8-byte lanes.</summary>
+    internal const int StripeLength = 32;
+internal const ulong Prime1 = 0x9E3779B185EBCA87;
+ulong Prime2 = 0xC2B2AE3D27D4EB4F3 = 0x165667B19E3779F9;4 = 0x85EBCA77C2B2AE63;5 = 0x2F165667C5Returns<paramref name="data" /> underseed" />.</    public staticHash(ReadOnlySpan<byte> data,seed = 0)
+    {
+ var lanes = new XxHash64Lanes(seed);
+   var rest = datawhile (rest.Length >=)lanes.ConsumeStripe(rest[..]);
+rest = rest[..];
+  }
+return Finish(data. ? lanes.Converge() : seed + Prime5, (ulong), rest}Adds the total length toa, folds in the fewer than32 bytes oftail" />, and avalanches the result., ulong totaltail)
+    {    var hash = accumulator + totalLength;tail.8hash ^= Round(0, BinaryPrimitives.ReadUInt64LittleEndian(tail));
+     hash = (BitOperations.RotateLeft(hash, 27) * Prime1) + Prime4tail = tail[8if4)
+ 32Lit3) * 2) + 3;
+ 4..];foreach (var value in tail)
+5;
+ 11) *    return Avalanche(hashMixes one into one.Roundlane) => + (lan2), 3privatehashhash >> 33hash *=2;
+ 29;
+3;
+ 32;
+hash;
+}
+namespace Curl.Zstandard;
+/// XXH64 arrives in pieces:Append" /> any number of times, thenGetCurrentHash" /> gives whatXxHash64.for all ofinput at onceDecoder" /> feeds it each piece ofcontent as it writes it.ealedA
+{readonlybyte[] pendingStripe = new byte[XxHash64.];
+Lanes lanesint pendingLengthStarts an empty hashthis. Reset(Forgets allppended so far, keeping the seed.</void Reset()lanes = new = 0;sdata" /> to the input hashed so far.(data)+= (ulong)data.!data.IsEmpty{
+   var count = Math.Min( -, datadata[..count].CopyTo(pendingStripe.AsSpan( += count;
+data = data[countif (==    sumeStripe(}
+  everythingince construction orReset(var a = >=..,.AsSpan(0}
+}XXH64's four stripeds: each 32-byte stripe feedto each,
+/// andConverge" /> merges them once at leaststructLanesfirst;secondthirfourththe four fromseedfirst1thir- XxH1s one 32-bytevoid first,64Lit[8..]thir16..]));
+ 24Mergeinto the one the tail is folded intohash =1) +7+12) +18);
+= Mergehash, first);
+  thirdreturnfourthMergeA) =>
+  ((hash ^0, a)) *)4;Reads a Zstandard backward bitstream (RFC 8878 se4.1): the Huffman s andFSE-codedre written forwards and read from their last byte back, starting
+/// below the highest set bit of tha, which is padding. Reading past thezero bits and leavesBitsRemaining" /> negative, which is how anFSE stream signals its endref struct BBitReader
+{eam;
+eam)= stream;
+  = ((stream. - 1) * 8)Log2(stream[^1])The bits still unread;more bits wer than the stream holdsint{ get;set;Whether morebool IsOverflowed =>< 0;readingeam" />; <see langword="false" /> when it is empty oritsis 0, so it has no padding bitRFC 8878 makes corruption.bool TryCreate(, out reader{ader = defaulif (stream ||  == 0)turn false;new(truethe nextcount" /> bits (at most 32), the first-read bit highestuint ReadBits(int count)-var start =if (s>turnitLoad.LowBits(ittleEndian64 >> 3) >> (start & 7), count)turn - ? 0 :0) << -start,Loads the little-endian bytes ts extract their bits fromclass/// Returns the eight bytes ofource" /> fromindexas alittle-endian integer, with every byte past the endread as 0.64ource, int indexif (sourceindex >= sizeof(ulong)){
+    return BinaryPrimitives.ReadUInt64(source[index..]);for (var position = - 1; position >= index--)
+ {
+   = (value << 8) | source[];
+ }
+
+valuelowvaluint LowBits(,  => (uint)(value & ((1UL << count) - 1));Why.Decompress" /> last returned
+Status.InvalidData" />: one member per libzstd errorde the decoder can raise, named after it, so a caller can map each to the text curl
+/// prints for itenum ENo error:t failNone,Tswith neither the magic nor a skippable-frame magic (libzstd <c>prefix_unknown</c>)PrefixU,The frame header sets its reserved bit (libzstd <c>frameParameter_unsupportedFrameParameterUnsupported's window is larg <c>2^maxWindowLog</c>f_windowTooLargeW names a <c>Dictionary_ID</c> other than 0, and no dictionary is loadeddwrongWrong's <c>Content_Checksum</c> doematch its decodedchecksum_wrongCbreaksin its blocks: a reserved type, a block larg<c>Block_Maximum_Size</c>, content whose size differs declaredc>Frame_Contenta literalsthat runs past itsor regeneratesmoreBlock_MaximumHuffman tree or stream that, ortreeless literalo earlier treecorruption_detectedDAsplits few6into four<c>literals_headerWLHcompressed block holds sequences, which this decoder yet (BL-860 addsthem, and removes this member). libzstd has no such error.SNotYetSupported,;Aing push decoder for), shaped after the baselibrary'sIO.Compression.BrotliDecoder" /> (ADR-0185)call tocit can of its source andstinationits state between calls, so input and output may a byteat a time/// <remarksIss of raw, RLE ands, checks each frame's
+///skips. A'd in full (-with or without its own tree,n one or fours); a that is withError." /> until BL-860is gathered whole and itto a block buffer before any of themis given; no  buffer is allocated yet, as nothing refers back to earlier outputuntil s dowhoseSize</c> is 0 is an emptys'sr, the one curl drives, treats it (ADR-0192)ealedThe default largest, 2^27:<c>ZSTD_WINDOWLOG_LIMIT_DEFAULTmit curl decodes under.DefaultM = 27;The smallest <c>maxWindowLog</c> accepted:'s minimum1 KiB.MinimumMaxW10;
+aximu31;
+uintFrameMagic = 0xFD2FB528S184D2A50;
+Mask = 0xFFFFFFF0int MagicLength = 4int BlockHeader3;
+= 43.1.1.2.3: no regenerates128 KiBSizeLimit = 128 * 102RawBlockTypeleBlo1;
+C2;
+ulong SizeA <c>Number_of_Sf 0 in its 2-byte formTwoByteZeroS=> [128, 0]Holds a fixed-size fieldits bytes arrive: at most a 13aftercriptorbyte[13] = new()int fieldNeeded =Stage stage = Stage.MagicDFrameHeader fframeCWrittenbool lastBlockThe bytes still to skip in a s,give from a raw or RLE blocklong ryte rleValue; allocated at the first?Blockss' literals; created atr? lCreates a decoderefusess whose exceeds <c>2^Log" /></c> bytes/// <exception cref="ArgumentOutOfRangeException"> is outside <see cref="" /> to(int m = DefaultMArgumentOutOfRangeE.ThrowIfLessThan(, Min)GreateraximuSize = 1UL << menum StageMagic,    SFrameSize,
+FieldsBlockValueFailedWhy the lasthappened; <None" /> until thenError LastError { get;/// every frame in" /> intodestination" />call.struis whos intothe data is invalid, endid-s to holdsint bytesWritten, vartus = Done;bytes(!source.IsEmpty && status =)
+  r.Dec(source,[..], out vardvar written)[     += written= as much of asthe two alloweach frame (callthenext frame)NeedMoreDataall of///was DTooSmallfilled withd byte,with" /> saying why, for anyforbids, after whichcall fails the same way. var bu?do    Step(ref buffers)}
+  is null = buffers..Advances by one stage;null" /> means carry on with ) => switchStage. =>    Stage. => Skip,
+   => CopyRawBlock,
+  leBloRepeatRleValueGive_ => GatherField}Gather<c>age reads: a header, or avar target === ! : field;
+= Math.Min(fieldNeeded -,.S.Take(.CopyTo(target.AsSpan(    if (<0,) : ReadField(field? ReadvalueMagic => ReadMagic(32LitSize(value[0]Block[0] | 1] << 8)2] << 16)V_uint magicif (magic ==Expect( 1);
+(&MagicMask) ==    ?, 4)
+: Fail((uint size = sizege =null;
+Skip(int)== 0 ? EndFrame() :(byte dif .HasReservedBit(dFail(    f =,.(fieldsf = .Read(s    if (.DictionaryId != 0Wrong);
+  }
+
+if .Size >Sc.    lr?.StartFrameBlock, BlockRead(int b = ( & 1) !var b(b >> 1) & 3;var error = CheckBlock(,Size)if (e!None)Fail(error);;
+  Type => Expect(, 0),    RleBlocValue, 1),
+_ == 0 => EndBlock(}trand 128> (int)Math.Mins wrong withos is" />," />.A raw or RLE's size i, so it must also fit size.Type, if ( >|| >. != Type && ExceedsContentSize(
+      :Nonemorewould passbool ExceedsSize(int count) =>+>..GetValueOr.MaxValue); ??= new byte[];
+    literalsD();
+ 3):must hold noDecodeblock)r!.Decode(block,varSerror =[== Zs &&.)
+      e!= Zs;
+  .2.1: a, in its 1-byte form (0)/// or (128, 0), ends the; any byte is c,finds it. Any other waits for BL-860.if (sectionvar zeroSequences =[0] == 0 ?..1] :if (!.With() == None :Giveoded of a, as far as.</)!Give(.Slice( - (int)remaining,AddContent= 0 ? EndBlockCopyRawBlockMath.Min(buffers.Scountif ( ?byte valuerleValue =.Fill(void-= content.;
+  if (!!=.Has ,) : EndFrameRead) =>
+ == (uint) ? MagicMoves next" />, which gatherslength" /> bytes beforeread. next, int lnext; = l error = errWleft of one" /> call's  and dhow much of each is used;Destiint int nextTak
+   taken = Source[..count];[count..dtakenClaimforGivgiven = D[..count];
+DestigivenReads bits, lowest bitas an FSE table dion
+/// is w4.1.1)end gives zero bits and sets
+IsOverrun" />F)
+{int The wholebits read so far occupyint B> (+ 7)ourcerun =>  * 8its (32) without ing theuint Peek =>
+> 3) >& 7), itsvoid Skipvar value = valueA1): the <c>Frame_Header_</c>
+/// bytelds it says follow it - <c>Window, <c>_ID</candrecord structF Size, uint Id, ulong? Cbool HasChecksum)
+int SingleSegmentBit = 0x20;
+R08;
+4;
+ISizes => [0, 1, 2, 4]2, 4, 8];
+wd" /> sets the bit rmust be 0 => ( &) != 0how many header bytes folint     WindowDSize() +[ & 3] +  Readvar w = W(d ReadwindowRead[(w +)c) :Of(fields[0] &)SingleSegmentBit) !0 : 1;flag = >> 6;= 0 &&1 :s[flagulong?) => fieldswitch0 => null,
+ 2 => 16Litfield) + 256UL,
+ _ => .2: <c>Exponent</c>top fiv, <c>MantissareeOf(bytBas(10 + Base + ((/ 8) *& 7index =- 1;0; index--)(<< 8) |[indexAn FSEing table (4.1): for each state, the symbol ithnext state Theweight use one, ands threeFseTable
+{.1: <c>Accuracy_Logs its 4-bitplus 5Log = 5snumberOfBitint[] baselines;
+(int a,, int[] baselines)a = = numberOfBits;
+ = baselinesThe table ha</c> statesint adbuilds its tablewhen th, uses anabovemax" /> or a symbol aboveSymbolrunssourceReadvar bbits.4) +counts> maxLog ? null :NormalizedCounts(ref bits, a, maxSymbol)bytesRead = bits.Bytes || bits.?: Build(counBthe table for a distributionn" /> (âˆ’1 fora "less1" probability) have magnitudes summing to" /></c Builshort> s1 <<rbyte[size]nextStates = new int[var highThreshold = size = 0;<;++)[] == -1{
+  s[--] = (byte)symbol; }
+  }
+
+   SpreadSymbols,s, nextStates, )var tate = 0; state < size; statevar next =s[state]]++;   ( - Bitnext)   <) - s,state" /> decodes.byte Symbol(int state) =>rst statebitInitialState(ref bits)state that followsN, ref +/// reads each symbol'stheiadd up;y do not add up exactly byshort[]unts = new short[ + 1];
+   varwhile (remaining >=
+   u    counts[] = (short)count; -= Math.AbsReadZeroRepeat(ref:: nullone count, just enough any count up to the probability, plus one forwidth = + 1) + 1;
+lower(1 << (- 1)) -twidth) - (widthif () <    bits.SkipBits> low ? value -:After a zero: how many more have, in 2-bit pieces3ZeroRepeavar total = 0uint repeat;repeat = bits.ReadBits(2);
+  += (int)}
+  (= 3);total;Spreadsover as manys as its count, stepping over thetoppreadShighTstep = (size+3) + 3var mask = sizeoccurrence = 0; occurrence < n; occurrence{
+       [{
+   = (+ step) & mask;
+}
+  >= = Math.Max(,for(4.2): readtree
+/// dion, indexed byMaxNits of a streamTable.1: nos lon 11axCode = 11;.2: FSE-cuse anof at most 6Weight = 6A is Code = A255are coded; the 256t'simplids = 25A <c>headerByte</c> of 128 or more codes <c>headerByte - 127</c>directly, four bitDirectH= 128N    M = mThe longest in bits: the table has <c>2^</c> entriestree dion ()" />it runs pas or itsform a complete tree of t most long.0h[0];
+1 + (<?: (header -+ 2) / 2);
+)
+  1..=ReadFse() : Read,- Dir+From/// Deonestream4.2.2) intofalsen the oend exactly where the last symbol dodeStreamif (!.TryCreate(bits))false;m <;
+   (<< length) & mask) |bits.BitsR== - packed two to a byhigh nibble.Readvar wbyte[count(byte)((index >> 1] >> 4 :& 0x0F/// Wcoded with FSE.2): athen oneb read by twoleavedit overflowble =.Read(,tableLif (table is|| ![var current =.bits)< - 1)    w[count++](current);
+Nits.IsOverflowed)other);
+   = (other, 1.3),lastnoset,the codes would be, notree, or thstare not paired.Table?.Sum(weight => (1 << weight) >> 1if (total = =totaleftover) - total;
+ > || !IsPow2(leftover))allW[.. weights,) + 1)]HasPairedLongestCodes(all) ? Build,) :at least two 1, codes'sc>HUF_readStarequires (it refuses atree as <c>c_detectTheirways even here: th tree sum to a power of 2of at least 2, and ever adds an even amountPairedLCodes(s) =>. => = 1) >= 2;
+</// Gives eacable its code prefixel takelowest entries, and withwer symbol comes first.rankStart + 1];
+   i    rankStarts[weight] +) >> 1rt = 0 = 1;<=;([], start) = (+ ranks > 0)
+     span-s.AsSpan(, span).Fill(( + 1 - += span;
+ }
+
+,s,. in a
+///3.1), keeping the lastfof latesL's <c>MIN_LITERALS_FOR_4_STREAMS</c>: fours regenerate6inimumFourStreamSize = 6;Fourwith a jumpree 2-bytezJumpTpreviousTableintwhosemostLimitpLimit) => l]Theuccessful <see cref="Decode" />d0,Forgettable, as a new frame startstart=> previousTblock" />, which impty, allowing atmaxLize" /sets" />t;s whyError .TryRead(block)CCheckHeader(, maxerror;. + header.ContentLRlock.Slice((None
+:at is wrongytesblockif ( > maxSize ||  - .StreamCount == 4 && <Wrong: Zstbool, .Type)    casType.Raw:
+true;le:
+[0])d}var tre0;
+  =Compressed ?out) :Tableif (tTt[treeLength1 ? table.Trys : DecodeFours(table, .6:gfirst' sizetakt; each ofs <c>(_Size + 3) / 4</cbythe remainders(if ( < JumpTablevar segment= ;
+   < 3; =16Lit * 2)..])!TryDecodeNextStream(table, refs[..][..];
+}
+
+ table. moveream(refs{if ( || ![..], segment)) = streams['how many
+they rthe header name="Type">The <c>Literals_Block_Type</c>.</param">The's own, 1 to 5 bytesSize">Thetheto": <c> for raw literals, 1 for RLE, and(andincluded) for-coded ones./paramCount: 1 or 4readonly recouct LsType The size fields' width,s for each <c>Size_Format</c>SizeWidths => [10, 10, 14, 18] is shorterRead( = default;var type = (Type)([0] & 3 = >> 2) & 3;
+ = type < . ? Unc(sizeFormat) :3,+<var fields =64(], 0);( : Huffman(Raw and RLE: <c>Size_Format</c> 0 and 2 take 1 byte, 12 and 3int) => (1 : / 2 + 2type,headeields)var r == 1 ? >> 3 :4Raw ?dSize :,=[ >> 4, width(4 + width)1 : 4_Block_Type</c>enum Type
+are stored aareRaw,
+One bypeatedtimes    Rle, withfirst' tree    Treeless,
+}
+µ¨Ô3tX<:—„0e1c4tµÍ£` 88,NÇ¤eÔ€º(Ñ¬  (”ÆCy”å81…220"2 3®TCÂ8Ù%"y™îE=C7•ĞŞøšÇ(7Àä n´HÌâÕ$qäDÄ”…·İ@Tn
+-ú#Ğ“)v¿Aƒµ8,"¿6Gò•…Ó¡"l°åÊÃ^¾x‘ Eá„ú 0zÚSF4ùÑá¤<ÖÆø6i»àë»]€ÌÕhæqÎ!É‚”€]ßi°¾vÜÖlR:©|¸MŠ„ÿ²±Rîk¥€;Ğ>û4L}¼ÓÂ³£8ç–ƒ,Böç¸»GšXİu–$am”T’ô×íã_äà§l	l,$ouåº‘3ñ—Œ—Ã¶Üáê>k®ä<æšŒ¢–œLÁöÑÌe©&­NJ§š\ƒú­ND,ëÁè¼/ãHàrÆÛŠg}»ÑvÎú%)Kş*s®áFÜt¢	ºeûÙèEš|‘ğòNše˜ Ë„Ÿ§¡¯0lË¬2Òöd­ı
+S>l¹!¥´}šÉ> Ø±‰–-Luø†;RF­Má	ˆ	Q³‡ÊjjY¦§ÅóL)Ãiõq0<Å9¬˜š™ÄØŞe'¦“õ×?ù”ƒÚ}ËgikFÕ€wäË}È¿Šß¢¨Y½nD O’uÓÁ@öi¤,."èÔ$liEf"DÚ˜±VV8óGêÔ¯ß`E/­>ò+Ÿ’—¾£X‰ä@™tì#‘õàq½±^¢’Á÷NNWºÈ‚«Ê+‹Z¤¤£¤<ÚGÁÿ/tÄá¬–ˆg”æV¼éáÅtù$’Í‹…Oõavşñ(§K4#fb’ĞÉbùù]zâ¤å•—–_ü]X–ĞçÄ6G[Ÿ´B {C×ß1U]Ì,¥9å¹‰52³Ì Å¬iÚò¬óxUÿ“2Š)ªVµ2Ğİh½5ÔsvKÊ¹B›g¸&€¯¨–ÖeÅàBiµ}(hyDDÈMP&â|>‚İ:[ëƒVPy’µ3½~3šÑo¹ı9°Ì¶·;¦×áD‘
+úFOJ¶;‚`²õC~ùĞ0œ[¹ƒ„–çÁÂ~±9Î4I‹«.B'®¨Wg¿ğ#©Q_çl €òêûå¾*[¸;`¢ğÍ?H¼r§ï1ªç[jmù„‡Ë)=Éa¹œ¹)Wˆédùzfh‹’×&½Ü¼¿è1³
+¼vJ×W&ñ/ôÊ°xãpüˆì„¬P|âµÿ.g#‹¥QÉCˆmusûcÁ{•ØËñğ»vÊ”Ë¦ÂÔ>àşt¥¼¶S2¦$œó¯š2ÒpeJ@ÃL,ÀQ»'c§®t¯Í”–,	 <> òòYª´³\¼|öy%"m¨QŸYIar.Ë PT¥‘"Ôd—Q’üş 6\?Ğ>ªã\ª°2@äè£ŠÃ‚­¨—y¢˜—ìçŸÒs­ÓbÀtÆbøõ8@‘%ªÈlÄrÅ`†ia5>n8½Ş`B‹oÂ¶!©/¤Õ>vÇœ×(¿ƒ	öÃwàqŒ M\ÌEvŸ-q|«ˆà€9Ü¢mXÿRÒ{øjÍR[ĞHbã-òæ´¦ùRA
+Œ¯‰aşPp©ÈU$­6°ØåReÖ/\&ÁUá-;gM'iQ•¹ú8§™Ğ(&ÏF¢ZÅÊÚ:è©WwG<Î´ANÛ±üXˆC6†µğí2‡h­eiD?¯¼kmâÄ}õúFN!ŞX!>ÈšóÓI¯…¯MeT¼DÏÖg÷°uÕ/Ó´[H³%4”ú²*´¯?lnÕ¨ÈZıD®ôòË[æB;[¹%§‡Qƒ¾ºDoZÓq>zfwŠ =Pƒ½b–ò×„OÛd¾ªtÇc<«ŞN};w^ÿs¾ CM2¡5DèO¨9mÆ@n ah˜“+µ9œLíbu¦´!ôÙ z!Şİ¦h?.fœ0õf²>Šág­"¨‰A!´!Ñ½ÊBç%“Ş¬óÍ…ëhc§½B`
+‹Z†h‹ÕóI„^ƒRMxq>‹[i>íşaŒ)â«ÕáŒ(´nšk"9¹ÚiÚoŞÎa]€5 €_j:vfĞ)´µã2¯lÍù®9Ë”ş[‡š÷£ğÊP?…–®²,/-~æ|#Û¼Í/ü4mâ ÀÌ’1_'ÍÂ`ù†áÆÊİóv€[Ûå§>QË¥¯BëìÊô²üˆ,ŞŒo-÷Ç&Æ{Ü2³/wÚÃt†œšúc`ÉtÖh2?÷ou=}G>é
+Rhö9!ùLÇV;­	£”ºZcÛYÎªè……¹Y\]‡®bLÓˆ³¿ã.™('\ßä¡U­ƒ41{bHÖN(Ş&½×RÆ/mf¶ÛN÷¸JtVQ&‹F-N>ø`IJ(Ïà\­q}©&çÒé”ßÇ„y?ğ]YJL3Fáƒ&İàr¢ŒŒj h*hU=JoeCÔY!|ı(Ğõ §m¢]óG!I¿Ì,›A¾õŒ³¹×B-I¥³¬’Æ\Mó¢”Ââ_4jÒxWkT2ç¹çê$¨˜ -Fş—%öÁ±kR¹o­xZ1¸un5µ–>ÇqµÒùMqóæÆßápUü	¯ŞJ™(bàªj†§±Fau‹*eD£ÇÕŠ´ãğ+¢¨IŒôkJ\hÂÜ6 Àõ68òñu'À9lû
+Af¯æ¹¥EßDİ8Vqb=ÆÿhşùgU…^º—É÷Lßyk7Û²Ø´{—Cf¯'ht–5¤Âì†ùÒš•ùcóBˆl@ˆƒ¼zY€0ÿ,
+ÚÎ¬—fC÷ÿ€KÔdWBªVmˆ±ó¡ÏÇ½
+­0µ»æ‚Ú¡ı…VkÉõ8X'<ß1DâB‡¢ís& '·/ŒÏ8¥Œ/&ùÏ¨’¹Xû‚#Yi._¥Ä:5.l~k°íè¤!=^!á­±êêäEáDW¯«qX\6y$"+1­tŸ(^†°İáJëÙÿ¯n[â*±²oÖlPİD½ğyx­ÀBÆ«$øœx‚:?ß6€Õd/·AédÆµ†æV
+·ëj:´‡®!N¥Æ¬[¼$40pù-† ¦E«ÕéR'µª×Sû)ãH[{ƒkgJ&ÿìdµ±[É$â#ÓãÜ#˜bÂ³>$ı³9²ß<Ò¶‡ÅÚ“Ç€>	0–!æŠÊ ãJğK{üˆ»Íïl~XlohNétœÕ<,XX?Zu£/ƒ
+¦ó„N¥¹>‹Û°S"b†	
+nû@—½–IeŒ‚š 4—)ĞD™°z€Òü'ÛÆ9@Ó·Æ‹ (NíéÔ÷¦ZÁ)L[i¾çç'‘xµºˆ	[©ˆg§àŠ”Ò˜;Õèğ6wWï¦ i2.gígtîj¡˜¶Üñò{˜ŒcUuo›G‚ˆñ~!L±*H€yTXZeoÍãiÛ‰
+l`X6Å‚îYŸ­(ÖÅ.>–Šz‹ f”óÆp¯ø©05Pu/FBi ;ïf²K0˜Ò½‹YÚW¯Í•ê×ÚÌuÕÀ0,±íËdøåŞEÚe•‰]În_,4ºµ_ÀæÑ}‘¬$@ÛV¥ìšëXçPpûÖPK>'ì‚ySÔ9Ë,„íZ˜—0'"c§É­ë ¬‰ÔnXyŠ¼£‰;qÈ*ø„µ¾›¬‘F İ”İ¥¼1­Éµ™Ãº^hÍY{¾ñ¨›Zş;ÄŞèbC‚Œõ$^ÿÔÙNDQxQÏH-r.%P/7Oïõ9—¡yK<í®[‚a“ûªzE³û2“°Ë*ÍQb€lWuã^÷ÔVÕ{ig!“Ì xI(”J†°Ó¥ì3ZzŠ)zêÖ_>î1€ıÁìmnDb)–§˜Ç9¹'´“-ÏÛÕoáe@zÜ>¶„›)¦šN&ŠhªÆN#É:CÅøJ¤ì¸B—ÓŒiÉ³³7Ï1›¸Î\©jíi Š<~cuIÓ»«4ª^–FĞh‰}¬Dê¬GP*ª¹x´S¬’·à¢â·¹‹"ºgüËDÖ”ÎH¨‹ıb§ÑÎ×h¿#…z±0XÏ¹ÊPğ–Ä¯ËÁ|.6ÙõÌù	AÃCôß¹<6	 Øc‡R "p²Ô¿Jÿ‰L	ÿ%0±”VG÷y:,Õ˜¤Ö¡tÆ oºêeğò5Æ, Ä²ú&·éÔC¨1ÚãÎ«Ôş/Ã‰ıßÃ€©ÍWÑ–Xô\:i@r¬:‚è½È²ØfÆòéó´—×ˆ[ŸmÀ˜"DOí> !Œçv~o
+QÇ%ÚJ»ˆCÖbÚ5Là Ø8‘½pÁh“Sš­è‡Ãùáô5Cæƒ>ÑDb{†Å”® šQµDø£‰¤"Œ›iü…Rb€&šSÒ'xaÊ3v©Kö£ÏMßgk«ÃÒÆz!Ñıæê×ş®n¢U±®%k'Cíñ˜Lí\ƒüøå"ĞË¤‰Ô!V¸¤Æ[EÃDO°“
+Ìa\ÏŞµ¤~†÷÷§eÜ§P µ­±|»É|¥v]é_
+\¡ı^;\îãƒÓ8ÜŒPÅvP¬‰B³æ¹§®B£¯hô±Pß¦?+şø½NLk>Ó{~J¦$šÂ‹]“PÆ>¤l¤ù˜;™è®†å Ñî kïÉøcÁ[ÏR]<ˆËğ¥Jìlc!ïË°”qŒşNp½jâ®ì\•÷Õ‹gd‚róü˜œÈª¿´Í¢ƒ·:7Àéö5ñ‹2Bİ˜‡‘Q2ê‚y¥}U<H»™j\AmTxfšE<ÔE€zgßË,›ªéLÂ„•N8ËtkQ(>2«ƒLyì¹24öÊüXCú!ÙQ]ÌyÌWEç6œãŠDô¸gİj"d‡ŠgVÉ&Ê°¯|@Üt	Äƒ‹;YM¨™/E*ºÅVáê;n±ó.Ö˜}æböé#$b¯aÂ
+/À4­–Ö/–¥..è6%0f0ô©š¤au!%5X,¡Èä¹ñpæê—:'Ïõ
+„°ıGa£55["&²nôWr›Ûq½·Ç½’€rÜœÒpøH q:İ¾/sÁ3Åï”¨y5Œ$1çšÌÔZ)à…é¬÷)‡›Ğß7×İxPF(Eâ0öáò
+œª¾–{:hgØ_İuÌ°˜M/G—j……a[³Æ58cÉfÏWt	dİErFµ,ş@¤Y˜EIÂÿ¨Æº*µÜxföì‚ç[U!j‚™Û0»ÒáÄ§¶g3óóĞL(ƒÕK@‹Äîü„¹¡èL!
+S¦M<	 h4Iƒ>[•PÆ­ò‘DIrÂîng3š0–—¶tQ=gƒ¦Ô,¡‹tºÇ¯<Jàn’ô+71(ÚçÿTÊ4Ëö µWvif=Ó"Ùàfµ³ëÜ_ìCC½ÌLE`
+Ğ‹yÀì8Dç‘&Şë˜%l(ŞG\¦ˆE‚¤€—û[€ÅvWQúoŠjÉ¦¬µ˜uİ9ørp'Ù‚óäQ/§\¸ÊG0¾ƒõU8ĞªurF(q7UyTu,çz9¶pB-g
+Ì²Ÿ‚…•BäÍSKIÁr Áp.NEl‚µ¢ïÂ;XD&¿VÛ¿JÅ*cò­¨²Òƒ+Íª<w®ö«9×h²Al,DqüĞĞf ƒ¼ÇÑe¦m£%ÑÙÃÎÄ¦$à¶® :‹ĞÃ³ã¹0&a
+[HR3ÿw·Thí-@É«úöäµBî
+F¬Ã“ğhÅú¡¨a'edüÖ†ê«>´wı0´‹f”n¡µB‚5-§Ø˜jÙÖÅºe<øF!‰Ü™fY2¾äa»qP ŒV]õ9¡Ño±üí
+yTÆ-€]ŞÒTÒ¹ gHÖJâJ:Ø…N#*oı€†+v%)aŸ{š0xÛˆ´•¶âÇ­â}aadcZõ¦ï&ñàÖV—†Ëàhz"[å¾X%<uÓZ‘ëQ`»yb€êlhİpÛY_`8ß3WÑ,0WÀÃ=rÅğí›İÌv{ì–%Ñ»f‘64¹”A¨Ø,ë/×ÎH=Àe©ˆQOØ÷‘ıèç6?mW4J%*s#Cú‹¥Ô‰|’Ö‘jr8eŠf¸)€8¸*¨ÛĞVÿ-L¹À*êû’»xV“«†ó+ëˆì›dÊ›N;Ôí„/	Šºí9íÄÉ½ÑÆ=çü³=?	ZoTQTĞ·Ôˆuulf5(„@ºÊ¯Î¥FÅ”²*V)õªìˆ[s|ï9}}Ä€yF&%Š*lYN¢Ôå')»10vjN3÷%ªSiàŸh:3+fÛ'Î6™…é¬zÅ,5?Ÿ©h?½C™ŒM"‡Øi~kbTİÿ»"÷•„¾
+Ÿ°‚M‡x@ÒpšZº[1™’w^¡;çÛ5¶åöv?»‡ºÀÇå×ì«øœšıátÊ!ª`ĞÆÄèG-¼)HÎy"	ÿÚcËN·z^?PrtãNÔ€´\v‹“˜íõ%‘Oä†¯+~¼á°'’îí;ã*å”‡%ilfœ'tÑXâÉïEoiA/÷|-Z ˆ…¥PY%å7âÑçIxñb»xVºï8ıÛ¬%*Â0¹ÛYˆ¿yîëá{¾7ªü»=4êÀ Ná$ËÜ ğ£
+hÍd%Óí'˜à± ¡àÕhè3ä–N·Å¤;ÕØq=Èµúy­*†f'G"J5Ú.«{:œŒA†ğ{]2)Qrd·¨r¹İvwéª°_ÁÑ‚¹\PÆCZëŞ†vOÄ1)-oµ'Àpgş‚Ö@°NÄİo\&¾…æ?Îçaüã˜}ñ–á¡4,òà•8¶O„¿¯TğëÛel4JX!}³ü5qÏšØÅÙDŠpD&£#ŠGŠØÁäü‚Ë¡¼™…G€Ñü
+Z2¿~@P¤‰IYÈëUÕ3}¤”.çœğU*A´^œßl¯Â÷¸eRTrè°uÔ:†ÅÿQtM±“.œšÜ'-Y8{)ØhoYrlÛ,S¾DŠ©àâJBŠí‰ân€…O¿o‰Ûò‰)±µK~’§
+È,Ûƒ'ºÑZóÔ¤ ^wZ¿0ÎúñPî Bp¡†·¸Ûxïy¤œV¿,BòÍEÅLKŠ(šü`Ê§TÑÙ@xİâ¡(qö‹òİ“9ÚßËÊwı–Š4Øî¸FÓÁÇAU£Gb–ÁnÑãX‡æ,ègDm­NÑõ%Îãl¥`+ø¸;€œÚ­ÓN/›q6î¼İ¬M9F#ø!º³ã`X…pÙA_˜Q~¿}ª‰*©s7ÅsC½Š“v|m­†ñŠ¥hi]ü¥Œ}VY~Ósá‚~¤BŠŒ=ó'VI{":>Y•1cy4_¥¢È®Ù<ı­î1ò½º3Â*XŞ‘äÀJähÿÆîİ³µªÇ:‹*7Á­.:ÿ4	“××Ôy-±Şïôù6fĞû?¿|Ş¼$4£Ú4zkpÇ ¸]ÿ0~«­%=[®vP*šd‹&àFX•¬İÃƒØ6$àaÑ˜tNrkUú÷‰Û6Y|ƒÅ"&ï¹/¼òh8š¯ĞS3m‚-JÉ•«ÀÓJG]Şy²ùäT_¤0) /ÇñH7üæT!ûØœQ§@rÜVc&³Päğñ$Å2».g<vG1l[æ†Ï‘ñYådƒôâ†…ÌeJ:u$úlVê‚xz‹"ĞEùê÷IÔ¡\Lòı¨ô•!§¿,Œºõ$Fe;µúé!é!]:`ûZ‹`ÛB8óô“NóÏ¾óÂìy HiB:ø‹å0~³kês.Ü eü•†*ûW‰Ôş3õ¥Rş'HBn
+—Ú³„Ê—ğZµ¼V/1°	vÿïšû\¸¾„ğ¼Sq[©¹´êXÙv"ë¨f75t3øçlGÊÃ5&)ox3;íçPeİÂ¬‡ª<Ğ —jÕÓÊRV1<²g+q€ÈIeVWå‚q,á¢™Yäš}œ©RVßO-‰~gÏ5ãR`œlm³V š	®ë6ë^tpİw†å‡góòtÍ„¼½çi~H",êxm8Íîƒú~£Î-Š«ljPzóO·/7ûºÓÌƒU¹¦¾évß¢€ş98¨ÈPQ¬„sJ“U@ák)Â¸P·ät}hÎ¯å¤ŠX–1ĞNˆ§ğG|2òš>„8AŞæùŞDº0ˆ•Ù Ö9ñ=´Åİµ»íÿ§5Çe0¾ÏôÉ‰ÜåR•bÚM:¨$}²¶
+ÖˆÑT ¢Úè”ŠkÁ$Èñ„öƒ4òü€„³"æ |L1Ş®à9UµğÃ~¿ñn,øg……‚¯İWçKĞ˜'À°æ2´#W‡Û›âïÎÏûÂ¹ó‹vf	“G7¸D³h°ŠS¦º¤D³	ğ¡½§É+.ã˜âr*ã±¦˜Ü ûm›öw‡¶Á„Ï‡’q¼Tâ°i,“Ğ«¸6ŠbQˆ{MœZb3åD.Ô½‰‡øtÔâA´Ï@@‚¸ÛìÕ)ê,vİ dgSaÜ	KûC¬oÔ¤äV„õÏ4XÙ›"83íYLĞKˆÏ|İ À~YDoÖiÏx/KróÈ×¤o¶PØÔh`oK©ª3ÇÂ¼¤P„œÉwñõÃV"wÀ´eMUÁeALqÀór|DBéa¿H%†Ô>·;/+d”9#‚»™ÑàÌñt@}WH•û¸‘{$b…‰ èt­è+txÔÜ4Ñ¦àUoø9è+‚ÌREgD†ıEæ²ÿ…7önHÖÆ†É¾Îi6áDØ_máÉ¦ÑÒÔœéã‘Õ|Rl`çÃgûˆ’µ ˆsˆ<IêÈu¦û8â{wKÖ!®ôßÒFyHÈ+äDs¶Ú jœ.9ÑÚ·8TI7Å·j»`Z®oQˆ¸Î8 eJÈÄº.‰GéaÆˆA…¾•õZ5!A1‘ÖòË aKø“¢ıìloğƒ‘¿'ƒ7YÚãZrg[ÄîÙgè–."Ç&¤à­n£;Ç´40>ÏA¨F‚äãíEñ²táš
+‰8Àî„À¢÷ç¾ê£bÍÀÛ_.‚Ì¨<Â<…‚m;˜û2&‰Ubáj­nh„Í'¬ğ:ĞXıÚÌåêÆke·ÕÑ8Mœà®Ì²•Tşr"Ì5‡« İŸÙ
+"q-ooå4ÙîZœNj›pĞ»Ñ„;¸÷]æº¢Òh@(2†wÇZ·ûËüÚÔúˆ©¬¡,o±#ñ$~Qã‰?Ç[Şøkëæ„?"çRˆê–ûDOjØŞSf¢'G"ul¾Îö3)	<®_åïˆétÖ‘HîÃşkÙ‚	C)Ôºh·ÒxÜê&æ•äø3«£ÈşCæp=:˜±w DVW¸V	}Ô<SäP€q ©($ó  æë‘)b¹`FÍqÎ@RJˆÚ]åm`ÏtQ¢¸:‡I\‹záØoÙ~Œ+ | !îëEA¦³vˆ‚°˜!±|-ü¦~fÌqšÎØ'—9å,œÉÅ¬Ğ=i~Opéjé‰eÒ–$FGòªÂ	5áĞù²…	©ˆ–S0}éî2#Nƒ¬\d6¦^fhKÈìÙ ]T Mo‹”·"”Ù$6 yçÇ®Û9õÿE™+˜*ò‹½R6RÀN©!@7¼cÍk‚:ŒY%8©è:k‚wƒbİ4æv‘9Îjt	V1³3¢ğdìM…æ}™¢:øJˆ¦"»ÌÇd	uØÊOlCåVÀ°¤|`¼íà¸ËAğf/2"‚ÌÕÕÍ™o)“Ã—­4ŒF.m}/t×0JÛ­ù”ú_ş%–5"ÒÄÈîW”Y0lı^ò×Ëh³ær.¦Bb'ç‘Ô;´¿5À¼–ÓO¢ó¹ò…ÓXÅ˜§ÊMCpDğqnQ)ùÕ¢ñ^ıOOŠÀS—Ø¯Ò×+Ğ‹0÷¶€åŠ°rĞ7F¤?£_'èÌ ZìØ¹j=°ú'ô.ª•ÎÉö²H¼-"¹)T\«÷7{¥c¾›šì €ûõ'[à¨´ìkºEy€i<dÛ±­“tudÂh8ş^Ôòi&(›í'ÅñÍßÂ DÁ®HXÄ—_Ä¿ïœj6ë³7Õ*
+À¨ÚYàád1xˆ¡öş£k9Kù•ÿ¨½tb	ÿ8ŠXÍzÓª>¦öd7­ •)JOvUjMlËõK¯0\²	›zÇ‘¼§U8GlÉ«xÃÈÀæJŒQM‘\ã¥»0Cië¥N]Ä‚(ÈÙuÆÆ;º=| OáD<¥?«jZ°hæŞPÍçŠÙ²KŒNˆA‘'‹^S .dP„¿›0†XOºh3ç%úo=‰ñélZcÌJ#Ş§Õ«·ØÊãÉê>gbT…È4¯~ g•Åş$,u t´ù…ÅàêgÒÑÊ]I¸€Ô¿4_?$†‘g6‘!Æ’.âä™¹nîİ<"·Gq¹®ã´T‹K¦b™;‚ -ˆ…Oš9œìèk 0¼	NSÀ’€.»z¹o&¦·Ö)Ê8Š\Õ:Dãš4!(¼8š]¶“»lÖ&O)r¦–L¡¾N÷§çpŞÑùÕ‚µÍÿ²´m§”Â®qFå"ÔüŒ¥È.tˆ\•DxCQ"S‡DèvÉDDƒçüE6éoQH3©|²ó•6¨ƒÈC¤À%â>Í\%¸A•48fQñ»´‹=LLd´àªlöRF-èø­íK­tó.,Ü¡SQ
+±®4ùH§Â¿¤¾} 9ØJÓë	‘˜öpµLl%létÓG²ûëMïX…É+ıÊb>0_”Êc­¼¹ìæƒÔêÆ0øFŞc–D‰~Î¹„É!e÷	F|I›Ş%Ù–üüyîÓÿP ÷{x9Üvõ2LQ„=ä»dU¯{ôŠË$(D¿`cî–òoqIicæavÃv(¼Vğ=aĞ¿ĞÄ»'hZ^ÈÏİR×xàxR ¢¡Ê>°£ ‘AÉævl÷´©LT‹åo>ˆ{ªX<­±?µ´ªÑrõ„­ÃFTœM~uµnßp=½o7ñfÛwm#'HI¼ÅÈ9‘øÕ<£‹'(æ´ŠÉş†?Vs˜HXq´ ì"ş¬ôä!l¿úÙ½õâÉ lTU†LLåk³wà³6ÙğüXHQ¸6Áå!Iğˆ0¸(É¡sÒÄ7ŒLŸ@ß$ıÓJs(ÒÖb˜” ’•KXåë‘ipYIÔî'H8 ¥Cm§©ÌÀ‘a®äú'!‚UP#ïl«Ù¤2ÈÒe¯bDœ¤ßDÊß¼“úMãòæ‰üLóá€Şq6‰öIŞÃ/'ç£Èg[L¬†PÃa„‡³#ío­edI’çhz{mqGşµA›‚Ú•) Ÿdır•ß– pk?j—‡à±ÓÒœÂ)Ü Æ¥Âà©(ò¹‚S?Èé˜Âä"Ÿğád,Ed~DcNñ¼ŒûKg<†_$×Üv2µÿPÀ(±;]rÉ¢ˆÉ¨pË”š‰‰5œÚÿ«1Gßs´O ïªÆ]|ÃÈÈ¹½÷gîYuvd¬Ôc¼vÉ¦«À`=<1ráûVK |€¾VŒÂ‘e ãFaJş%_î([¯€§^i i¾‰šy¬ ^B/q÷9_DAš‘ı«õ}OVdopªj–1h!l‡&›k/å1 d°PPlE%È™P#Y„•JÄÎå›­\İNèÏj-•C–sB–ò]ƒ‡¢ã˜ÊqŸV^”™Î6İÄ¡ş>+Š¼ß¾ËçhízÔÄœÙ'ÿ‡ãOuÄn“v7XKo”Ğ7*„sıò¢õ¢h&

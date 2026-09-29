@@ -76,6 +76,17 @@ internal sealed class ZstandardFseTable
         return new ZstandardFseTable(accuracyLog, symbols, numberOfBits, baselines);
     }
 
+    /// <summary>
+    /// The table of a sequences section's <c>RLE_Mode</c>: <c>Accuracy_Log</c> 0, one state
+    /// that decodes <paramref name="symbol" /> and reads no bits.
+    /// </summary>
+    public static ZstandardFseTable Rle(byte symbol)
+    {
+        var counts = new short[symbol + 1];
+        counts[symbol] = 1;
+        return Build(counts, 0);
+    }
+
     /// <summary>The symbol <paramref name="state" /> decodes.</summary>
     public byte Symbol(int state) => symbols[state];
 

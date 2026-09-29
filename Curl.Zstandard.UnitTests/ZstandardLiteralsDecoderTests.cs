@@ -111,10 +111,10 @@ public sealed class ZstandardLiteralsDecoderTests
         ["no sequences section", Frame(CompressedBlockWithSequences(true, RawLiterals(Ascii("ok")))), ZstandardDecodeError.CorruptionDetected],
         ["a byte after zero sequences", Frame(CompressedBlockWithSequences(true, RawLiterals(Ascii("ok")), 0x00, 0x00)), ZstandardDecodeError.CorruptionDetected],
         ["a byte after the 2-byte zero sequences", Frame(CompressedBlockWithSequences(true, RawLiterals(Ascii("ok")), 0x80, 0x00, 0x00)), ZstandardDecodeError.CorruptionDetected],
-        ["one sequence", Frame(CompressedBlockWithSequences(true, RawLiterals(Ascii("ok")), 0x01, 0x00)), ZstandardDecodeError.SequencesNotYetSupported],
-        ["256 sequences", Frame(CompressedBlockWithSequences(true, RawLiterals(Ascii("ok")), 0x81, 0x00, 0x00)), ZstandardDecodeError.SequencesNotYetSupported],
-        ["one sequence in the 2-byte form", Frame(CompressedBlockWithSequences(true, RawLiterals(Ascii("ok")), 0x80, 0x01, 0x00)), ZstandardDecodeError.SequencesNotYetSupported],
-        ["a 2-byte Number_of_Sequences cut short", Frame(CompressedBlockWithSequences(true, RawLiterals(Ascii("ok")), 0x80)), ZstandardDecodeError.SequencesNotYetSupported],
+        ["one sequence and no bitstream", Frame(CompressedBlockWithSequences(true, RawLiterals(Ascii("ok")), 0x01, 0x00)), ZstandardDecodeError.CorruptionDetected],
+        ["256 sequences and no bitstream", Frame(CompressedBlockWithSequences(true, RawLiterals(Ascii("ok")), 0x81, 0x00, 0x00)), ZstandardDecodeError.CorruptionDetected],
+        ["one sequence in the 2-byte form and no bitstream", Frame(CompressedBlockWithSequences(true, RawLiterals(Ascii("ok")), 0x80, 0x01, 0x00)), ZstandardDecodeError.CorruptionDetected],
+        ["a 2-byte Number_of_Sequences cut short", Frame(CompressedBlockWithSequences(true, RawLiterals(Ascii("ok")), 0x80)), ZstandardDecodeError.CorruptionDetected],
     ];
 
     private static byte[] ManyLetters => [.. Enumerable.Range(0, 20000).Select(index => Letters[(index * 7) % Letters.Length])];

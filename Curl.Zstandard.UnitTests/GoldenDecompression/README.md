@@ -9,12 +9,15 @@ github.com/facebook/zstd, at commit `01b7154f1172432f8abe9b3bb9909e14a1176b7d`:
 | `GoldenDecompression/empty-block.zst` | `tests/golden-decompression/empty-block.zst` | decode |
 | `GoldenDecompression/rle-first-block.zst` | `tests/golden-decompression/rle-first-block.zst` | decode |
 | `GoldenDecompression/zeroSeq_2B.zst` | `tests/golden-decompression/zeroSeq_2B.zst` | decode |
+| `GoldenDecompressionErrors/off0.bin.zst` | `tests/golden-decompression-errors/off0.bin.zst` | fail |
 | `GoldenDecompressionErrors/truncated_huff_state.zst` | `tests/golden-decompression-errors/truncated_huff_state.zst` | fail |
 | `GoldenDecompressionErrors/zeroSeq_extraneous.zst` | `tests/golden-decompression-errors/zeroSeq_extraneous.zst` | fail |
 
-BL-859 copied the files that exercise frames, raw, RLE and literals-only compressed
-blocks. `tests/golden-decompression-errors/off0.bin.zst` holds sequences and comes with
-BL-860.
+These are every file under both upstream folders at that commit: BL-859 copied the ones
+that exercise frames, raw, RLE and literals-only compressed blocks, and BL-860 added
+`off0.bin.zst`, whose second sequence resolves to offset 0. `off0.bin.zst` is embedded with
+`WithCulture="false"`, or MSBuild would take `.bin` for the Bini culture and build it into a
+satellite assembly.
 
 ## Licence
 

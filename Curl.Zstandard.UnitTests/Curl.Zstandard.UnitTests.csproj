@@ -9,7 +9,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="GoldenDecompression\*.zst;GoldenDecompressionErrors\*.zst" LogicalName="%(Filename)%(Extension)" />
+    <EmbeddedResource Include="GoldenDecompression\*.zst;GoldenDecompressionErrors\*.zst;LibzstdFrames\*.zst" LogicalName="%(Filename)%(Extension)" WithCulture="false" />
   </ItemGroup>
 
   <ItemGroup>

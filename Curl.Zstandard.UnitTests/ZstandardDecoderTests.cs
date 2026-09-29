@@ -63,7 +63,7 @@ public sealed class ZstandardDecoderTests
         ["more content than declared", Concatenate(FrameHeader(0x80, OneKibibyteWindow, 5, 0, 0, 0), RawBlock(true, Ascii("123456"))), ZstandardDecodeError.CorruptionDetected, ZstandardDecoder.DefaultMaxWindowLog],
         ["less content than declared", Concatenate(FrameHeader(0x80, OneKibibyteWindow, 5, 0, 0, 0), RawBlock(true, Ascii("1234"))), ZstandardDecodeError.CorruptionDetected, ZstandardDecoder.DefaultMaxWindowLog],
         ["reserved block type", Concatenate(FrameHeader(0x00, OneKibibyteWindow), BlockHeader(true, ReservedBlockType, 0)), ZstandardDecodeError.CorruptionDetected, ZstandardDecoder.DefaultMaxWindowLog],
-        ["compressed block with a sequence", Concatenate(FrameHeader(0x00, OneKibibyteWindow), BlockHeader(true, CompressedBlockType, 2), [0, 1]), ZstandardDecodeError.SequencesNotYetSupported, ZstandardDecoder.DefaultMaxWindowLog],
+        ["compressed block with a sequence and no Symbol_Compression_Modes", Concatenate(FrameHeader(0x00, OneKibibyteWindow), BlockHeader(true, CompressedBlockType, 2), [0, 1]), ZstandardDecodeError.CorruptionDetected, ZstandardDecoder.DefaultMaxWindowLog],
         ["compressed block larger than the window", Concatenate(FrameHeader(0x00, OneKibibyteWindow), BlockHeader(true, CompressedBlockType, 1025)), ZstandardDecodeError.CorruptionDetected, ZstandardDecoder.DefaultMaxWindowLog],
     ];
 
