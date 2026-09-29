@@ -34,3 +34,4 @@ A new ADR in `Documentation/Planning/Decisions`, marked "Decided by Claude under
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-29: Backlog -> Doing.
