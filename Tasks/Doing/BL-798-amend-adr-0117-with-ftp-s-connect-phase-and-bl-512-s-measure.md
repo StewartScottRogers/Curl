@@ -33,3 +33,4 @@ ADR-0117 carries an amendment, "Decided by Claude under Stewart's delegation", r
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
