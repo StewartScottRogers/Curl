@@ -240,6 +240,27 @@ public interface ITransferContext
     bool ListOnly { get; }
 
     /// <summary>
+    /// Gets a value indicating whether <c>-B</c>/<c>--use-ascii</c> was given, which
+    /// transfers the file as ASCII text (FTP <c>TYPE A</c> rather than <c>TYPE I</c>);
+    /// <see langword="false" /> when not given.
+    /// </summary>
+    /// <remarks>
+    /// <c>ftp://</c> is to read it; an FTP URL's <c>;type=A</c> asks for the same.
+    /// </remarks>
+    bool UseAscii { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether <c>-a</c>/<c>--append</c> was given, which makes an
+    /// upload append to the remote file instead of overwriting it; <see langword="false" />
+    /// when not given.
+    /// </summary>
+    /// <remarks>
+    /// <c>ftp://</c> (<c>APPE</c> rather than <c>STOR</c>) and <c>sftp://</c> are to read
+    /// it; a download ignores it.
+    /// </remarks>
+    bool Append { get; }
+
+    /// <summary>
     /// Gets the <c>-P</c>/<c>--ftp-port</c> value verbatim, which makes an FTP transfer use
     /// active mode; <see langword="null" /> for passive mode, when not given.
     /// </summary>

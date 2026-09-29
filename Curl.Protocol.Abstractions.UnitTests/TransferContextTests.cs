@@ -97,6 +97,8 @@ public sealed class TransferContextTests
         Assert.AreEqual(FtpFileMethod.MultiCwd, context.FtpFileMethod);
         Assert.IsFalse(context.FtpCreateDirectories);
         Assert.IsFalse(context.ListOnly);
+        Assert.IsFalse(context.UseAscii);
+        Assert.IsFalse(context.Append);
         Assert.IsEmpty(context.QuoteCommands);
         Assert.IsFalse(context.ConvertLineEndings);
         Assert.IsFalse(context.PathAsIs);
@@ -160,6 +162,8 @@ public sealed class TransferContextTests
             FtpFileMethod = FtpFileMethod.SingleCwd,
             FtpCreateDirectories = true,
             ListOnly = true,
+            UseAscii = true,
+            Append = true,
             QuoteCommands = quoteCommands,
             ConvertLineEndings = true,
             PathAsIs = true,
@@ -199,6 +203,8 @@ public sealed class TransferContextTests
         Assert.AreEqual(FtpFileMethod.SingleCwd, context.FtpFileMethod);
         Assert.IsTrue(context.FtpCreateDirectories);
         Assert.IsTrue(context.ListOnly);
+        Assert.IsTrue(context.UseAscii);
+        Assert.IsTrue(context.Append);
         Assert.AreSame(quoteCommands, context.QuoteCommands);
         Assert.IsTrue(context.ConvertLineEndings);
         Assert.IsTrue(context.PathAsIs);

@@ -81,6 +81,12 @@ public sealed class TransferContext : ITransferContext
     public bool ListOnly { get; init; }
 
     /// <inheritdoc />
+    public bool UseAscii { get; init; }
+
+    /// <inheritdoc />
+    public bool Append { get; init; }
+
+    /// <inheritdoc />
     public string? FtpPort { get; init; }
 
     /// <inheritdoc />
