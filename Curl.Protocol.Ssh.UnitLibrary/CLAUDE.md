@@ -23,7 +23,10 @@ reader and writer switch to at each `NEWKEYS` (ADR-0212); `Authentication` holds
 `SshUserAuthentication`, which requests the `ssh-userauth` service and authenticates the
 user with `none`, `password` and `keyboard-interactive` in curl's order (ADR-0215);
 `Connection` holds `SshSessionChannel`, one RFC 4254 `session` channel with libssh2's
-window and packet size; `Sftp` holds `SftpSession`, the SFTP version 3 client over that
+window and packet size, which starts a subsystem or an `exec` command; `Scp` holds
+`ScpFileDownload`, which runs `scp -pf` (`ScpCommand`, `ScpRemotePath`), reads its `T`
+and `C` lines with libssh2's checks (`ScpFileHeaderReader`, `ScpHeaderNumber`) and copies
+the file (ADR-0225); `Sftp` holds `SftpSession`, the SFTP version 3 client over that
 channel, and `SftpFileDownload`, which downloads one file with `SftpReadAhead`'s reads in
 flight and maps each `SSH_FX_*` status to curl's exit code through `SftpStatusCode`
 (ADR-0220). A new algorithm registers in
