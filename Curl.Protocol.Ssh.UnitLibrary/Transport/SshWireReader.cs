@@ -12,6 +12,11 @@ internal sealed class SshWireReader(ReadOnlyMemory<byte> payload)
     private int position;
 
     /// <summary>
+    /// Gets how many bytes of the payload are still unread.
+    /// </summary>
+    internal int RemainingLength => payload.Length - position;
+
+    /// <summary>
     /// Reads one <c>byte</c>.
     /// </summary>
     /// <returns>The byte.</returns>

@@ -55,4 +55,34 @@ internal sealed class SshTransferException(CurlExitCode exitCode, string message
     /// <returns>The exception.</returns>
     internal static SshTransferException SshLayerError() =>
         new(CurlExitCode.Ssh, "Error in the SSH layer");
+
+    /// <summary>
+    /// Creates the failure curl 8.21.0 reports when libssh2 cannot start the SFTP session:
+    /// exit 2 and <c>Failure initializing sftp session: &lt;description&gt;</c>, measured
+    /// 2026-09-29 (BL-569, ADR-0220).
+    /// </summary>
+    /// <param name="description">libssh2's description, such as <c>Unable to request SFTP subsystem</c>.</param>
+    /// <returns>The exception.</returns>
+    internal static SshTransferException SftpInitializationFailed(string description) =>
+        new(CurlExitCode.FailedInit, $"Failure initializing sftp session: {description}");
+
+    /// <summary>
+    /// Creates the failure curl 8.21.0 reports when the server answers <c>SSH_FXP_OPEN</c>
+    /// with a failed status: the status's exit code and <c>Could not open remote file for
+    /// reading: &lt;description&gt;</c>, measured for every code (BL-569, ADR-0220).
+    /// </summary>
+    /// <param name="status">The <c>SSH_FX_*</c> code.</param>
+    /// <returns>The exception.</returns>
+    internal static SshTransferException SftpOpenFailed(uint status) =>
+        new(Sftp.SftpStatusCode.ExitCodeFor(status), $"Could not open remote file for reading: {Sftp.SftpStatusCode.DescriptionOf(status)}");
+
+    /// <summary>
+    /// Creates the failure curl 8.21.0 reports when a request with no message of its own,
+    /// such as <c>SSH_FXP_REALPATH</c>, ends in a failed status: the status's exit code
+    /// and that exit code's text, measured for codes 2, 3 and 4 (BL-569, ADR-0220).
+    /// </summary>
+    /// <param name="status">The <c>SSH_FX_*</c> code.</param>
+    /// <returns>The exception.</returns>
+    internal static SshTransferException SftpRequestFailed(uint status) =>
+        new(Sftp.SftpStatusCode.ExitCodeFor(status), Sftp.SftpStatusCode.ExitCodeTextFor(status));
 }
