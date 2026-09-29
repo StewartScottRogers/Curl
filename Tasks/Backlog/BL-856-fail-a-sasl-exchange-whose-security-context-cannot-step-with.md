@@ -1,5 +1,5 @@
 ---
-id: BL-855
+id: BL-856
 title: Fail a SASL exchange whose security context cannot step with exit 94
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-855 — Fail a SASL exchange whose security context cannot step with exit 94
+# BL-856 — Fail a SASL exchange whose security context cannot step with exit 94
 
 ## Goal
 

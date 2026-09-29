@@ -69,7 +69,7 @@ The SASL authenticator answers the NTLM and GSSAPI mechanisms with the token sou
 - Measured failure path (no KDC): a Kerberos step that fails ends curl with exit 94 and nothing
   more sent (without `--sasl-ir`: `AUTH GSSAPI`, `334 `, close; with it: no `AUTH`). Ours answers
   `null`, so `*` and exit 67, because ADR-0183's contract has no way to carry exit 94. Filed as
-  BL-855 (touches Abstractions and the three mail handlers).
+  BL-856 (touches Abstractions and the three mail handlers).
 - Platform pins: `Begin_NtlmOnSspi_SendsSspisType1AndAType3` (Windows, SSPI's first 16 bytes as
   measured; the OS version block varies) and `Begin_NtlmOnCurlsOwnNtlm_SendsCurlsType1AndAType3`
   (elsewhere, curl's own Type 1). GSSAPI runs end-to-end on the hand-built Kerberos against

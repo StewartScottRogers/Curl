@@ -45,7 +45,7 @@ cannot be measured on the loopback recorder.
    (`new SaslAuthenticator(Encoding)`) both stay not offered and `Begin` refuses them.
 5. **A failed step answers `null`**, so the handler cancels with `*` and exit 67 under
    ADR-0183's contract. curl fails with exit 94 and sends nothing more (measured); matching it
-   needs the contract to carry the exit, filed as BL-855.
+   needs the contract to carry the exit, filed as BL-856.
 
 ## Consequences
 
