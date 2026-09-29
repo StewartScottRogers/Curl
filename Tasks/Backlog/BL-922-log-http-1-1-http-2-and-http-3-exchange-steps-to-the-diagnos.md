@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-938]
-touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
+touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-29
 completed:
@@ -35,7 +35,36 @@ completed:
 
 ## Notes
 
+- 2026-09-29 (lane 5): `Curl.Console.UnitTests` added to `touches`. The work makes
+  `CurlCommandRunnerDiagnosticLogTests.RunAsync_LogLevelInfoUnderSilent_WritesTheLinesToStandardError`
+  fail: it pins exactly 3 lines at `--log-level info` over a loopback HTTP GET, and the http
+  component now adds 4 (`GET / sent`, `reply HTTP/1.1 200 OK`, `body framed by Content-Length 5`,
+  `exchange done: ...`), so 7. The fix is to expect 7 (or assert the http lines too). BL-736,
+  in Doing, touches `Curl.Console.UnitTests`, so the task went back to Backlog until it is Done.
+- Design used on the first attempt (build clean, all other fast tests green, 38 new tests):
+  one `internal sealed class HttpExchangeLog(IDiagnosticLog, string component)` in the library,
+  made per exchange with `HttpExchangeLog.For(context.DiagnosticLog, streams)` (component from
+  `IHttpStreamSession.VersionName`: `http2`, `http3`, else `http`). Methods, each testing
+  `IsEnabled` first: `VersionChosen` (verbose `using HTTP/x on a new|reused connection`; warning
+  for `--http3` that fell back to TCP, and `--http2` over TLS left on HTTP/1.x by ALPN),
+  `RequestSent(method, Url.AbsolutePath, head bytes)` (info `GET /path sent`; verbose each
+  request header, values of `Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie`
+  written as `(value not logged)`), `ReplyRead(actedOn head)` (info `reply <status line>`;
+  verbose each reply header), `BodyFramed` called from `HttpResponseBodyReader.CopyAsync` through
+  a new `Log` property (info `body framed chunked|by Content-Length N|until the connection
+  closes`; verbose the decoder chain), `Exchanged` (info status, body bytes, ms since
+  `RequestReady`; reads the clock only when enabled so existing time-stepping tests are
+  unchanged), `Failed` (error `exchange failed with <CurlExitCode> (exit N): <message>
+  [<exception type>: <message>]`, from both catch blocks of `ExchangeAsync`), and
+  `RetryingOnFreshConnection` (warning, in `SettleConnection`'s died-before-response branch).
+  Tests: `HttpExchangeLogTests` and `HttpProtocolHandlerTests.DiagnosticLog.cs` with
+  `Fakes/RecordingDiagnosticLog` (copied from Rtsp) and `Fakes/StubStreamSession`.
+- Frame-level lines (each HTTP/2 or HTTP/3 frame type and stream ID, SETTINGS, GOAWAY,
+  RST_STREAM) need hooks inside `Http2Session`/`Http3Session`; not in the acceptance criteria,
+  so the first attempt left them for a follow-up task.
+
 ## Log
 
 - 2026-09-29: Created.
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Backlog. Needs Curl.Console.UnitTests (its loopback --log-level info test pins 3 lines; the http lines make 7), which BL-736 in Doing touches
