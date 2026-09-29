@@ -22,6 +22,18 @@ public sealed partial class HttpProtocolHandlerTests
 
     private const string MeasuredUserAgent = "curl/8.18.0";
 
+    /// <summary>
+    /// The two WINDOW_UPDATEs curl 8.18.0 sends on stream 1 right after the frame that ends the
+    /// request, growing its window to 10 MiB from the default 65535 (measured, BL-817 Notes).
+    /// </summary>
+    private const string StreamOneWindowUpdates = "000004080000000001009F0001" + "000004080000000001009F0001";
+
+    /// <summary>
+    /// The GOAWAY curl 8.18.0 sends when it closes an HTTP/2 connection: last stream 0,
+    /// NO_ERROR, debug data <c>shutdown</c> and a NUL (measured, BL-817 Notes).
+    /// </summary>
+    private const string ClosingGoAway = "000011070000000000" + "00000000" + "00000000" + "73687574646F776E00";
+
     [TestMethod]
     public async Task ExecuteAsync_Http2Get_SendsCurlsHeadersAndWritesTheHeadAndBody()
     {
@@ -34,7 +46,7 @@ public sealed partial class HttpProtocolHandlerTests
             byte[] response = Http2Response(
                 Http2FrameFactory.CreateHeaders(1, server.Encode([new(":status", "200"), new("content-type", "text/plain"), new("content-length", "5")]), isEndStream: false, isEndHeaders: true),
                 Http2FrameFactory.CreateData(1, "hello"u8.ToArray(), isEndStream: true));
-            ScriptedConnection connection = new(response, chunkSize, Convert.FromHexString(Http2Preface + headers));
+            ScriptedConnection connection = new(response, chunkSize, Convert.FromHexString(Http2Preface + headers + StreamOneWindowUpdates));
             MemoryStream output = new();
             MemoryStream headerOutput = new();
 
@@ -46,7 +58,8 @@ public sealed partial class HttpProtocolHandlerTests
             Assert.AreEqual("hello", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
             Assert.AreEqual(200, result.Report!.ResponseCode);
             Assert.AreEqual(new Version(2, 0), result.Report.HttpVersion);
-            Assert.IsFalse(connection.IsMarkedReusable, "an HTTP/2 connection is never pooled without its session");
+            Assert.IsTrue(connection.IsMarkedReusable, $"Chunk size {chunkSize}: curl leaves an HTTP/2 connection intact");
+            StringAssert.EndsWith(Convert.ToHexString(connection.Written), ClosingGoAway, $"Chunk size {chunkSize}: a connection that holds no session gets the GOAWAY from the handler");
         }
     }
 
@@ -62,7 +75,7 @@ public sealed partial class HttpProtocolHandlerTests
         byte[] response = Http2Response(
             Http2FrameFactory.CreateHeaders(1, server.Encode([new(":status", "200"), new("content-length", "2")]), isEndStream: false, isEndHeaders: true),
             Http2FrameFactory.CreateData(1, "ok"u8.ToArray(), isEndStream: true));
-        ScriptedConnection connection = new(response, 65536, Convert.FromHexString(Http2Preface + headers + data));
+        ScriptedConnection connection = new(response, 65536, Convert.FromHexString(Http2Preface + headers + data + StreamOneWindowUpdates));
         MemoryStream output = new();
 
         TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(Http2Context(
@@ -87,7 +100,7 @@ public sealed partial class HttpProtocolHandlerTests
         byte[] response = Http2Response(
             Http2FrameFactory.CreateHeaders(1, server.Encode([new(":status", "200"), new("content-length", "2")]), isEndStream: false, isEndHeaders: true),
             Http2FrameFactory.CreateData(1, "ok"u8.ToArray(), isEndStream: true));
-        ScriptedConnection connection = new(response, 65536, Convert.FromHexString(Http2Preface + headers));
+        ScriptedConnection connection = new(response, 65536, Convert.FromHexString(Http2Preface + headers + StreamOneWindowUpdates));
 
         TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(Http2Context(
             "http://127.0.0.1:18660/",
@@ -249,7 +262,7 @@ public sealed partial class HttpProtocolHandlerTests
 
         Assert.AreEqual(CurlExitCode.Http2Stream, result.ExitCode);
         Assert.AreEqual("HTTP/2 stream 1 was not closed cleanly: PROTOCOL_ERROR (err 1)", result.ErrorMessage);
-        Assert.AreEqual("00000403000000000100000001", Convert.ToHexString(connection.Written[^13..]), "RST_STREAM PROTOCOL_ERROR");
+        StringAssert.EndsWith(Convert.ToHexString(connection.Written), "00000403000000000100000001" + ClosingGoAway, "RST_STREAM PROTOCOL_ERROR, then the closing GOAWAY");
     }
 
     [TestMethod]
@@ -460,6 +473,59 @@ public sealed partial class HttpProtocolHandlerTests
 
         Assert.AreEqual(CurlExitCode.Http2, result.ExitCode);
         Assert.AreEqual("Error in the HTTP2 framing layer", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TwoHttp2TransfersToOneOrigin_ContinueOneSessionOnThePooledConnection()
+    {
+        // curl --http2-prior-knowledge http://127.0.0.1:18817/a http://127.0.0.1:18817/b (curl 8.18.0,
+        // BL-817 Notes): stream 3 with no second preface, its HEADERS indexing what stream 1's
+        // added to the HPACK table, and its WINDOW_UPDATEs counted from the acknowledged 65536.
+        string firstRequest = "000022010500000001" + "8286" + "418B089D5C0B8170DC0BCF05DF" + "04022F61" + "7A8825B650C3CB85E5C1" + "53032A2F2A";
+        string settingsAcknowledgement = "000000040100000000";
+        string secondRequest = "000009010500000003" + "8286C004022F62BFBE";
+        string streamThreeWindowUpdates = "000004080000000003009F0000" + "000004080000000003009F0000";
+        HpackEncoder server = new();
+        byte[] response = Http2Response(
+            Http2FrameFactory.CreateHeaders(1, server.Encode([new(":status", "200"), new("x-served", "one")]), isEndStream: true, isEndHeaders: true),
+            Http2FrameFactory.CreateHeaders(3, server.Encode([new(":status", "200"), new("x-served", "one")]), isEndStream: true, isEndHeaders: true));
+        ScriptedConnection wire = new(response, 65536, Convert.FromHexString(Http2Preface + firstRequest + StreamOneWindowUpdates));
+        SessionHoldingConnection connection = new(wire);
+        HttpProtocolHandler handler = Handler(new QueueConnector(
+            ConnectResult.Connected(connection, null),
+            ConnectResult.Connected(connection, null, isReused: true)));
+        MemoryStream secondHead = new();
+
+        TransferResult first = await handler.ExecuteAsync(Http2Context("http://127.0.0.1:18817/a", new MemoryStream()));
+        TransferResult second = await handler.ExecuteAsync(Http2Context("http://127.0.0.1:18817/b", new MemoryStream(), secondHead));
+        await connection.CloseAsync();
+
+        Assert.AreEqual(CurlExitCode.Ok, first.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, second.ExitCode);
+        Assert.AreEqual("HTTP/2 200 \r\nx-served: one\r\n\r\n", Latin1(secondHead.ToArray()), "the second head decodes against the first's HPACK table");
+        Assert.AreEqual(2, connection.ReturnedReusableCount);
+        Assert.AreEqual(0, second.Report!.ConnectionCount, "the second transfer reused the connection");
+        CollectionAssert.AreEqual(
+            Convert.FromHexString(Http2Preface + firstRequest + StreamOneWindowUpdates + settingsAcknowledgement + secondRequest + streamThreeWindowUpdates + ClosingGoAway),
+            wire.Written);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_Http2ConnectionWhosePeerSentGoAway_IsClosedNotPooled()
+    {
+        HpackEncoder server = new();
+        byte[] response = Http2Response(
+            Http2FrameFactory.CreateGoAway(1, Http2ErrorCode.NoError, ReadOnlyMemory<byte>.Empty),
+            Http2FrameFactory.CreateHeaders(1, server.Encode([new(":status", "200"), new("content-length", "0")]), isEndStream: true, isEndHeaders: true));
+        ScriptedConnection wire = new(response, 65536);
+        SessionHoldingConnection connection = new(wire);
+
+        TransferResult result = await Handler(QueueConnector.For(connection))
+            .ExecuteAsync(Http2Context("http://example.com/", new MemoryStream()));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(0, connection.ReturnedReusableCount);
+        Assert.IsTrue(wire.IsDisposed);
     }
 
     private static TransferContext Http2Context(string url, Stream output, Stream? headerOutput = null, HttpRequestOptions? options = null, Stream? upload = null) =>

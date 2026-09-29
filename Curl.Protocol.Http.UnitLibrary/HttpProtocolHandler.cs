@@ -530,9 +530,12 @@ public sealed class HttpProtocolHandler(
     /// may go on the same connection; then marks the connection reusable when the last
     /// response is reported left intact - it persists, or it is an HTTP/1.0 keep-alive body the
     /// server closed, which the pool then finds dead as curl does (ADR-0112) - or reports that a
-    /// pooled connection that died is being given up. A connection that speaks HTTP/2 or HTTP/3
-    /// (<see cref="StreamSessionOf" />) carries each request on a stream of its own and is never
-    /// marked reusable, since the pool would hand it on without its session (BL-658 Notes).
+    /// pooled connection that died is being given up. A connection that speaks HTTP/2
+    /// (<see cref="StreamSessionOf" />) carries each request on a stream of its own; its
+    /// <see cref="Http2Session" /> is handed to the connection, which keeps it for the next
+    /// transfer when pooled and sends its closing GOAWAY when it closes, or, on a connection
+    /// that holds no session, the GOAWAY is sent here (BL-817). An HTTP/3 connection is never
+    /// marked reusable.
     /// </summary>
     private async ValueTask<HttpAttemptOutcome> ExchangeOnConnectionAsync(
         HttpRequestPlan plan,
@@ -547,8 +550,32 @@ public sealed class HttpProtocolHandler(
         }
 
         IHttpStreamSession? streams = StreamSessionOf(plan, connect, connection);
+        Http2Session? unheldSession = UnheldHttp2Session(streams, connection);
         HttpAttemptOutcome outcome = await ExchangeWithRetriesAsync(plan, connect, connection, earlier, streams).ConfigureAwait(false);
-        if (outcome.ReportsLeftIntact && streams is null)
+        SettleConnection(plan, connection, streams, outcome);
+        await ShutDownAsync(unheldSession).ConfigureAwait(false);
+        return outcome;
+    }
+
+    /// <summary>
+    /// Hands an HTTP/2 session to its connection to hold (BL-817), and gives it back when the
+    /// connection holds none, so the handler sends its closing GOAWAY itself; gives
+    /// <see langword="null" /> for any other session, or none.
+    /// </summary>
+    private static Http2Session? UnheldHttp2Session(IHttpStreamSession? streams, IConnection connection) =>
+        streams is Http2Session http2 && !connection.TryHoldSession(http2) ? http2 : null;
+
+    /// <summary>Sends the closing GOAWAY of a session no connection holds, if there is one.</summary>
+    private static ValueTask ShutDownAsync(Http2Session? unheldSession) =>
+        unheldSession?.ShutDownAsync(CancellationToken.None) ?? ValueTask.CompletedTask;
+
+    /// <summary>
+    /// Marks the connection reusable when the last response is reported left intact over
+    /// HTTP/1.x or HTTP/2, or reports that a pooled connection that died is being given up.
+    /// </summary>
+    private static void SettleConnection(HttpRequestPlan plan, IConnection connection, IHttpStreamSession? streams, HttpAttemptOutcome outcome)
+    {
+        if (outcome.ReportsLeftIntact && streams is null or Http2Session)
         {
             connection.MarkReusable();
         }
@@ -556,8 +583,6 @@ public sealed class HttpProtocolHandler(
         {
             plan.Context.Events.ReportInfo(HttpConnectionInfoLines.ConnectionDiedRetrying(outcome.RetryCount));
         }
-
-        return outcome;
     }
 
     /// <summary>
@@ -591,11 +616,14 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Gives the session that carries each request on a stream of its own over the connection:
-    /// the HTTP/3 session a QUIC connect made, a new HTTP/2 session for a connection that speaks
-    /// HTTP/2 (<see cref="SpeaksHttp2" />), or <see langword="null" /> for HTTP/1.x.
+    /// the HTTP/3 session a QUIC connect made, the HTTP/2 session an earlier transfer left with
+    /// a pooled connection (BL-817), a new HTTP/2 session for a connection that speaks HTTP/2
+    /// (<see cref="SpeaksHttp2" />), or <see langword="null" /> for HTTP/1.x.
     /// </summary>
     private static IHttpStreamSession? StreamSessionOf(HttpRequestPlan plan, ConnectResult connect, IConnection connection) =>
-        (IHttpStreamSession?)(connection as Http3Session) ?? (SpeaksHttp2(plan, connect) ? new Http2Session(connection) : null);
+        (IHttpStreamSession?)(connection as Http3Session)
+            ?? (connection.Session as Http2Session)
+            ?? (SpeaksHttp2(plan, connect) ? new Http2Session(connection) : null);
 
     /// <summary>
     /// Fails a request whose <c>-z</c> time curl 8.21.0 on Windows cannot write into its header

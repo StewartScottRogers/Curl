@@ -59,19 +59,42 @@ with `--http2-prior-knowledge` (BL-658 Notes):
    valid `:status`, or DATA before the head, is reset with PROTOCOL_ERROR and fails with
    exit 92, as nghttp2 treats a malformed response; an undecodable header block is exit 16
    with COMPRESSION_ERROR.
-5. **A connection that speaks HTTP/2 is never marked reusable** for now: the pool hands on
-   the `IConnection`, not the `Http2Session` holding its HPACK tables and stream numbers.
-   A retry within the transfer (authentication, 417) goes on the next stream of the same
-   connection while the peer has sent no GOAWAY.
+5. **An HTTP/2 connection is pooled with its session** (BL-817, as curl 8.18.0 pools it).
+   Protocol libraries never reference `Curl.Networking`, so the session travels through
+   `Curl.Protocol.Abstractions`: `IConnectionSession` (one member, `ShutDownAsync`) and two
+   default members on `IConnection` - `Session` and `TryHoldSession`. The handler hands its
+   `Http2Session` to the connection; a pooled connection (`PooledConnection`) keeps it on
+   its pool entry, so the next transfer to the origin reads it back from `Session` and
+   continues it - the next odd stream, the same HPACK tables, no second preface. The
+   connection is marked reusable when the exchange left it intact and the peer has sent no
+   GOAWAY and not closed it (`AcceptsNewStreams`); otherwise it is closed. A retry within
+   the transfer (authentication, 417) goes on the next stream of the same connection on the
+   same terms. Whoever closes the connection first calls `ShutDownAsync`, which sends curl's
+   closing GOAWAY: the pool, for a connection not marked reusable and for an idle one it
+   evicts, expires, finds dead or drops at the end of the run; the handler itself, on a
+   connection that holds no session (`TryHoldSession` returns false, as every non-pooled
+   connection does). The GOAWAY is last stream 0, NO_ERROR, debug data `shutdown` and a NUL
+   (`00 00 11 07 00 00 00 00 00 00 00 00 00 00 00 00 00 73 68 75 74 64 6F 77 6E 00`,
+   measured), and is not sent when no preface went out, a GOAWAY already has, or the peer
+   closed the connection; a write that fails is ignored, as the connection is closing.
+   Keeping the session keyed inside the HTTP library was rejected: it would need its own
+   eviction, expiry and end-of-run disposal that the pool already has.
+6. **Each stream's receive window grows to 10 MiB**, as curl 8.18.0 does: two identical
+   WINDOW_UPDATEs on the stream right after the frame that ends the request - HEADERS for a
+   request with no body, its last DATA otherwise - (measured, BL-817 Notes) and, for a body
+   still waiting for window, before the first frame is read. The increment is 10 MiB less the
+   initial window in force: 65535 (10420225) until the server acknowledges the client's
+   SETTINGS, 65536 (10420224) after, as nghttp2 counts it. A stream an h2c upgrade continues
+   sends none (not measured; left as it was).
 
 ## Consequences
 
 - HTTP/2 transfers get every HTTP/1.1 behaviour already built, measured and tested, and
   HTTP/3 can take the same approach with a QUIC stream.
-- Known differences from curl, each filed as follow-up work: curl pools and reuses HTTP/2
-  connections; it grows each stream's receive window to 10 MiB with a WINDOW_UPDATE after
-  HEADERS; it sends GOAWAY (NO_ERROR, `shutdown`) when it closes the connection; and its
-  `-v` output names streams (`[HTTP/2] [1] OPENED stream ...`), which is BL-660.
+- Pooling, the stream window and the closing GOAWAY now match curl on the wire (BL-817,
+  points 5 and 6). Known differences from curl still open: its `-v` output names streams
+  (`[HTTP/2] [1] OPENED stream ...`), which is BL-660, and `-Z` multiplexes concurrent
+  transfers over one connection, which is BL-717.
 
 ## Alternatives considered
 

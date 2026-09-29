@@ -9,9 +9,32 @@ namespace Curl.Protocol.Http;
 /// preface goes out with the first request, as curl 8.21.0 sends it before the first HEADERS
 /// without waiting for the server's SETTINGS (measured, BL-658 Notes).
 /// </summary>
+/// <remarks>
+/// The session outlives its transfer when the connection is pooled (BL-817, ADR-0159 point 5):
+/// the handler hands it to the connection (<see cref="IConnection.TryHoldSession" />) and the
+/// next transfer to the origin continues it - the next odd stream, the same HPACK tables, no
+/// second preface. It keeps reading and writing through the connection it was created on,
+/// whose later leases reach the same socket. Whoever closes the connection first calls
+/// <see cref="ShutDownAsync" />, which sends curl's closing GOAWAY.
+/// </remarks>
 /// <param name="connection">The connection; the handler keeps ownership.</param>
-internal sealed class Http2Session(IConnection connection) : IHttpStreamSession
+internal sealed class Http2Session(IConnection connection) : IHttpStreamSession, IConnectionSession
 {
+    /// <summary>
+    /// The receive window curl grows each stream to right after its HEADERS: 10 MiB
+    /// (nghttp2's <c>H2_STREAM_WINDOW_SIZE_MAX</c> in curl; measured, BL-817 Notes).
+    /// </summary>
+    internal const int StreamReceiveWindowSize = 10 * 1024 * 1024;
+
+    /// <summary>
+    /// How many times curl 8.18.0 sends the stream's WINDOW_UPDATE after HEADERS, each with
+    /// the same increment: twice (measured, BL-817 Notes).
+    /// </summary>
+    private const int StreamWindowUpdateCount = 2;
+
+    /// <summary>The debug data of curl's closing GOAWAY: <c>shutdown</c> and its terminating NUL (measured, BL-817 Notes).</summary>
+    private static readonly byte[] ShutdownDebugData = "shutdown\0"u8.ToArray();
+
     private readonly HpackEncoder encoder = new();
 
     private uint peerHeaderTableSize = HpackEncoder.DefaultMaximumTableSize;
@@ -64,6 +87,32 @@ internal sealed class Http2Session(IConnection connection) : IHttpStreamSession
     public IHttpStreamConnection CreateStream(string scheme, long? bodyLength, bool ignoresBody) => new Http2StreamConnection(this, scheme, bodyLength);
 
     /// <summary>
+    /// Sends GOAWAY with NO_ERROR, last stream 0 and debug data <c>shutdown</c> and a NUL, as
+    /// curl 8.18.0 does when it closes an HTTP/2 connection (measured, BL-817 Notes); nothing
+    /// when no preface went out, when a GOAWAY already has, or when the peer closed the
+    /// connection. A connection that fails the write is closing anyway, so that is not an error.
+    /// </summary>
+    /// <param name="cancellationToken">Cancels the write.</param>
+    /// <returns>A task that completes when the frame is written, or at once when none is due.</returns>
+    public async ValueTask ShutDownAsync(CancellationToken cancellationToken)
+    {
+        if (!isPrefaceSent || Frames.IsGoAwaySent || Frames.IsClosedByPeer)
+        {
+            return;
+        }
+
+        try
+        {
+            await Frames.SendGoAwayAsync(Http2ErrorCode.NoError, ShutdownDebugData, cancellationToken).ConfigureAwait(false);
+            await Connection.FlushAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException)
+        {
+            // The transport is already gone; there is no one left to say goodbye to.
+        }
+    }
+
+    /// <summary>
     /// Sends the client preface if it has not gone yet, then opens a stream and sends
     /// <paramref name="fields" /> on it as one header block.
     /// </summary>
@@ -97,6 +146,25 @@ internal sealed class Http2Session(IConnection connection) : IHttpStreamSession
         await Frames.SendPrefaceAsync(cancellationToken).ConfigureAwait(false);
         isPrefaceSent = true;
         return Frames.OpenStream();
+    }
+
+    /// <summary>
+    /// Sends curl's WINDOW_UPDATEs for a new stream. The increment is what takes the stream's
+    /// window to <see cref="StreamReceiveWindowSize" /> from the initial size in force: the
+    /// default 65535 until the peer acknowledges this client's SETTINGS, 65536 after, as
+    /// nghttp2 counts it - 10420225 on the first stream of a prior-knowledge connection,
+    /// 10420224 on the next (measured, BL-817 Notes).
+    /// </summary>
+    /// <param name="streamId">The stream whose window grows.</param>
+    /// <param name="cancellationToken">Cancels the writes.</param>
+    /// <returns>A task that completes when both frames are written.</returns>
+    internal async ValueTask GrowStreamReceiveWindowAsync(int streamId, CancellationToken cancellationToken)
+    {
+        int initialWindowSize = Frames.IsClientSettingsAcknowledged ? Http2Connection.ClientInitialWindowSize : Http2Settings.DefaultInitialWindowSize;
+        for (int sent = 0; sent < StreamWindowUpdateCount; sent++)
+        {
+            await Frames.IncreaseStreamReceiveWindowAsync(streamId, StreamReceiveWindowSize - initialWindowSize, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     /// <summary>

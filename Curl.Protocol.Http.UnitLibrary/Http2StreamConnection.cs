@@ -39,6 +39,8 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
 
     private bool isRequestEnded;
 
+    private bool isReceiveWindowGrown;
+
     private bool isResponseEnded;
 
     private bool isFinalHeadReceived;
@@ -97,9 +99,9 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     public ValueTask FlushAsync(CancellationToken cancellationToken) => session.Connection.FlushAsync(cancellationToken);
 
     /// <summary>
-    /// Ends the request with an empty DATA frame carrying END_STREAM, unless it has ended
-    /// already - it had no body, or the last body write ended it - or the response has ended,
-    /// after which nothing more is sent.
+    /// Ends the request with an empty DATA frame carrying END_STREAM, then grows the stream's
+    /// receive window, unless it has ended already - it had no body, or the last body write
+    /// ended it - or the response has ended, after which nothing more is sent.
     /// </summary>
     /// <param name="cancellationToken">Cancels the write.</param>
     /// <returns>A task that completes when the frame is written.</returns>
@@ -112,6 +114,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
 
         _ = await session.Frames.WriteDataAsync(streamId, ReadOnlyMemory<byte>.Empty, isEndStream: true, cancellationToken).ConfigureAwait(false);
         isRequestEnded = true;
+        await GrowReceiveWindowOnceAsync(cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -144,6 +147,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     {
         streamId = await session.StartUpgradedStreamAsync(cancellationToken).ConfigureAwait(false);
         isRequestEnded = true;
+        isReceiveWindowGrown = true;
     }
 
     /// <summary>
@@ -163,6 +167,11 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
         {
             throw new HttpTransferException(CurlExitCode.Http2, HttpTransferMessages.Http2FramingError);
         }
+
+        if (isRequestEnded)
+        {
+            await GrowReceiveWindowOnceAsync(cancellationToken).ConfigureAwait(false);
+        }
     }
 
     private async ValueTask SendDataAsync(ReadOnlyMemory<byte> data, CancellationToken cancellationToken)
@@ -179,10 +188,34 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
                 await ReceiveFrameAsync(cancellationToken).ConfigureAwait(false);
             }
         }
+
+        if (isRequestEnded)
+        {
+            await GrowReceiveWindowOnceAsync(cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Sends curl's WINDOW_UPDATEs for this stream (<see cref="Http2Session.GrowStreamReceiveWindowAsync" />)
+    /// the first time it is called: curl 8.18.0 sends them right after the frame that ends the
+    /// request - HEADERS for a request with no body, else its last DATA (measured, BL-817
+    /// Notes) - and this is also called before the first frame is read, for a body still
+    /// waiting for window.
+    /// </summary>
+    private async ValueTask GrowReceiveWindowOnceAsync(CancellationToken cancellationToken)
+    {
+        if (isReceiveWindowGrown)
+        {
+            return;
+        }
+
+        isReceiveWindowGrown = true;
+        await session.GrowStreamReceiveWindowAsync(streamId, cancellationToken).ConfigureAwait(false);
     }
 
     private async ValueTask ReceiveFrameAsync(CancellationToken cancellationToken)
     {
+        await GrowReceiveWindowOnceAsync(cancellationToken).ConfigureAwait(false);
         Http2StreamFrame? frame = await ReadFrameAsync(cancellationToken).ConfigureAwait(false);
         if (frame is null)
         {
