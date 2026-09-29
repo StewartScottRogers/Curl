@@ -21,6 +21,12 @@ component `gopher` from `ITransferContext.DiagnosticLog` - the failure that ends
 as `error` with its `CurlExitCode`, and the selector sent and the transfer's end (bytes
 and milliseconds) as `info`; the connect target carries the log on.
 
+`-v` and `--trace` (BL-934): after connecting, the handler reports each read to
+`ITransferContext.Events` as data received, the server's close as a zero-byte block, and
+never the selector (curl does not trace it); then `shutting down connection #N`, or for a
+failure other than a malformed selector the failure's message (unless it is curl's
+fallback text for a failed send or receive) and `closing connection #N`.
+
 This library may reference `Curl.Protocol.Abstractions.UnitLibrary` and nothing
 else horizontal. Referencing another protocol library is a build break, and
 `Curl.Protocol.Abstractions.UnitTests` fails if one appears.

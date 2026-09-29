@@ -23,6 +23,13 @@ public sealed class ScriptedConnection(params byte[]?[] reads) : IConnection
     public bool FailWrites { get; set; }
 
     /// <summary>
+    /// Gets or sets the exception a <see langword="null" /> chunk's read throws, such as a
+    /// <see cref="MissingCloseNotifyException" />; <see langword="null" /> for a plain
+    /// <see cref="IOException" />.
+    /// </summary>
+    public IOException? ReadFailure { get; set; }
+
+    /// <summary>
     /// Gets a value indicating whether the handler disposed the connection.
     /// </summary>
     public bool IsDisposed { get; private set; }
@@ -49,7 +56,7 @@ public sealed class ScriptedConnection(params byte[]?[] reads) : IConnection
 
         if (chunk is null)
         {
-            throw new IOException("The scripted peer reset the connection.");
+            throw ReadFailure ?? new IOException("The scripted peer reset the connection.");
         }
 
         chunk.CopyTo(buffer);

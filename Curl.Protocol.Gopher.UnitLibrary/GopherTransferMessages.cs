@@ -37,4 +37,21 @@ internal static class GopherTransferMessages
         string.Create(
             CultureInfo.InvariantCulture,
             $"Failure writing output to destination, passed {passed} returned {returned}");
+
+    /// <summary>
+    /// The <c>-v</c> line that ends a finished transfer's connection, or one whose selector
+    /// was malformed.
+    /// </summary>
+    /// <param name="connectionNumber">The connection's number.</param>
+    /// <returns>The line, such as <c>shutting down connection #0</c>.</returns>
+    internal static string ShuttingDownConnection(long connectionNumber) =>
+        string.Create(CultureInfo.InvariantCulture, $"shutting down connection #{connectionNumber}");
+
+    /// <summary>
+    /// The <c>-v</c> line that ends a failed transfer's connection.
+    /// </summary>
+    /// <param name="connectionNumber">The connection's number.</param>
+    /// <returns>The line, such as <c>closing connection #0</c>.</returns>
+    internal static string ClosingConnection(long connectionNumber) =>
+        string.Create(CultureInfo.InvariantCulture, $"closing connection #{connectionNumber}");
 }
