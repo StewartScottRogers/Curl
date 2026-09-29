@@ -34,3 +34,4 @@ An ADR fixes how a DoH resolver in `Curl.Networking.UnitLibrary` sends RFC 8484 
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
