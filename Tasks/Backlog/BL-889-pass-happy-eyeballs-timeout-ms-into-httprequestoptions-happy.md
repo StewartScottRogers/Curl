@@ -1,5 +1,5 @@
 ---
-id: BL-887
+id: BL-889
 title: Pass --happy-eyeballs-timeout-ms into HttpRequestOptions.HappyEyeballsTimeout
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-887 — Pass --happy-eyeballs-timeout-ms into HttpRequestOptions.HappyEyeballsTimeout
+# BL-889 — Pass --happy-eyeballs-timeout-ms into HttpRequestOptions.HappyEyeballsTimeout
 
 ## Goal
 

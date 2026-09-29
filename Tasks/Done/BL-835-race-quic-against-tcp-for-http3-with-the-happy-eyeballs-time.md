@@ -38,7 +38,7 @@ With `--http3` on an `https://` URL and no proxy, `HttpProtocolHandler` starts t
 - Choice: the post-TCP-start logic checks "TCP connected first" and otherwise takes QUIC's result, so "TCP failed then QUIC connected" and "QUIC connected first" share one path. That keeps the outcome independent of which completion `Task.WhenAny` sees when both land at once, and keeps the tests deterministic.
 - Choice: no new ADR. The behaviour is ADR-0144 section 4, already decided; ADR-0172's "only when QUIC fails" is amended in place (added `Documentation/Planning/Decisions/ADR-0172-...md` to `touches`; no task in Doing names it).
 - Test fakes: `Fakes/RacingConnector.cs` (TCS-driven QUIC and TCP connects that record their tokens), plus a `Disposed` task on `ScriptedConnection` and `FakeMultiplexedConnection` so a test can wait for a loser's disposal. `Http3Context` gained a `connectTimeout` parameter so race tests use 60 s and never collide with the happy-eyeballs timer.
-- Follow-up filed: BL-887 fills `HappyEyeballsTimeout` from `--happy-eyeballs-timeout-ms` in `Curl.Console` (depends on BL-644).
+- Follow-up filed: BL-889 fills `HappyEyeballsTimeout` from `--happy-eyeballs-timeout-ms` in `Curl.Console` (depends on BL-644).
 
 ## Log
 
