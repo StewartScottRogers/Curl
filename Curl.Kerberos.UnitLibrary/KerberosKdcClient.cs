@@ -9,12 +9,19 @@ namespace Curl.Kerberos;
 /// from the credential cache when it holds a live one, otherwise by a TGS exchange with the
 /// cache's ticket-granting ticket; or, from a password, a ticket-granting ticket by an AS
 /// exchange with <c>PA-ENC-TIMESTAMP</c> pre-authentication and then the service ticket by
-/// a TGS exchange. Every KRB-ERROR becomes a <see cref="KerberosKdcException" />.
+/// a TGS exchange, following the KDCs' cross-realm referrals (ADR-0200). Every KRB-ERROR
+/// becomes a <see cref="KerberosKdcException" />.
 /// </summary>
 public sealed class KerberosKdcClient
 {
     /// <summary>The <c>KRB_NT_SRV_INST</c> name type of a <c>krbtgt</c> principal.</summary>
     public const int ServiceInstanceNameType = 2;
+
+    /// <summary>
+    /// The most cross-realm referrals one TGS request follows before it fails with
+    /// <see cref="KerberosKdcError.ReferralLimitExceeded" />: MIT's <c>KRB5_REFERRAL_MAXHOPS</c>.
+    /// </summary>
+    public const int MaximumReferralHops = 10;
 
     private const string TicketGrantingServiceName = "krbtgt";
     private const int EncryptedTimestampUsage = 1;
@@ -145,23 +152,89 @@ public sealed class KerberosKdcClient
     }
 
     /// <summary>
-    /// Gets a ticket for <paramref name="server" /> by a TGS exchange (RFC 4120 section 3.3)
+    /// Gets a ticket for <paramref name="server" /> by TGS exchanges (RFC 4120 section 3.3)
     /// with <paramref name="ticketGrantingTicket" />, sent to the KDCs of the realm the
-    /// ticket-granting ticket is for.
+    /// ticket-granting ticket is for, asking with <c>canonicalize</c> and following the KDCs'
+    /// cross-realm referrals (RFC 6806 section 8, ADR-0200): a TGS-REP carrying
+    /// <c>krbtgt/OTHER@REALM</c> in place of the service's ticket is used to ask OTHER's KDCs,
+    /// up to <see cref="MaximumReferralHops" /> times, as MIT's <c>krb5_get_credentials</c> does.
     /// </summary>
     /// <param name="ticketGrantingTicket">A ticket for <c>krbtgt/REALM</c>; it stays the caller's.</param>
-    /// <param name="server">The service.</param>
-    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <param name="server">The service; a referral from the KDC of its realm moves it to the realm referred to.</param>
+    /// <param name="cancellationToken">Cancels the exchanges.</param>
     /// <returns>The service ticket; the caller disposes it.</returns>
     /// <exception cref="KerberosKdcException">No ticket could be got; <see cref="KerberosKdcException.Error" /> says why.</exception>
     public async Task<KerberosCredential> GetTicketFromTicketGrantingServiceAsync(KerberosCredential ticketGrantingTicket, KerberosPrincipal server, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(ticketGrantingTicket);
         ArgumentNullException.ThrowIfNull(server);
+        KerberosCredential granting = ticketGrantingTicket;
+        try
+        {
+            for (int referrals = 0; ; referrals++)
+            {
+                string kdcRealm = granting.Server.Components[^1];
+                KerberosCredential reply = await ExchangeWithTicketGrantingServiceAsync(granting, server, cancellationToken).ConfigureAwait(false);
+                if (SamePrincipal(reply.Server, server))
+                {
+                    return reply;
+                }
+
+                string referredRealm = ReferredRealm(reply, kdcRealm, referrals);
+                ReleaseReferral(granting, ticketGrantingTicket);
+                granting = reply;
+                server = server.Realm == kdcRealm ? new KerberosPrincipal(server.NameType, referredRealm, server.Components) : server;
+            }
+        }
+        finally
+        {
+            ReleaseReferral(granting, ticketGrantingTicket);
+        }
+    }
+
+    /// <summary>
+    /// Gets the realm a TGS-REP from <paramref name="kdcRealm" />'s KDC refers the client to:
+    /// OTHER when it carries <c>krbtgt/OTHER@</c><paramref name="kdcRealm" />. Any other server
+    /// is <see cref="KerberosKdcError.UnexpectedReply" />, and a referral past the
+    /// <see cref="MaximumReferralHops" />th is <see cref="KerberosKdcError.ReferralLimitExceeded" />;
+    /// either way <paramref name="reply" /> is disposed.
+    /// </summary>
+    private static string ReferredRealm(KerberosCredential reply, string kdcRealm, int referralsFollowed)
+    {
+        IReadOnlyList<string> components = reply.Server.Components;
+        bool isReferral = IsReferralFrom(reply.Server, kdcRealm);
+        KerberosKdcError? refusal = !isReferral ? KerberosKdcError.UnexpectedReply
+            : referralsFollowed >= MaximumReferralHops ? KerberosKdcError.ReferralLimitExceeded
+            : null;
+        if (refusal is { } error)
+        {
+            reply.Dispose();
+            throw new KerberosKdcException(error);
+        }
+
+        return components[1];
+    }
+
+    /// <summary>Whether <paramref name="server" /> is <c>krbtgt/OTHER@</c><paramref name="kdcRealm" /> for a realm OTHER other than <paramref name="kdcRealm" />.</summary>
+    private static bool IsReferralFrom(KerberosPrincipal server, string kdcRealm) =>
+        server.Realm == kdcRealm && server.Components is [TicketGrantingServiceName, string referred] && referred != kdcRealm;
+
+    /// <summary>Disposes a cross-realm ticket-granting ticket got by a referral, never the caller's own.</summary>
+    private static void ReleaseReferral(KerberosCredential granting, KerberosCredential callersTicket)
+    {
+        if (!ReferenceEquals(granting, callersTicket))
+        {
+            granting.Dispose();
+        }
+    }
+
+    /// <summary>One TGS exchange: asks the KDCs of <paramref name="ticketGrantingTicket" />'s realm for <paramref name="server" /> with <c>canonicalize</c>.</summary>
+    private async Task<KerberosCredential> ExchangeWithTicketGrantingServiceAsync(KerberosCredential ticketGrantingTicket, KerberosPrincipal server, CancellationToken cancellationToken)
+    {
         KerberosEncryption encryption = EncryptionOf(ticketGrantingTicket.SessionKey.EncryptionType);
         KerberosKdcRequestBody body = new()
         {
-            Options = KerberosKdcOptions.None,
+            Options = KerberosKdcOptions.Canonicalize,
             Realm = server.Realm,
             ServerName = NameOf(server),
             Till = ticketGrantingTicket.EndTime,
@@ -177,7 +250,7 @@ public sealed class KerberosKdcClient
         byte[] reply = await sender.SendAsync(ticketGrantingTicket.Server.Components[^1], request.Encode(), cancellationToken).ConfigureAwait(false);
         KerberosKdcReply kdcReply = ReadReply(reply, KerberosMessageType.TgsReply);
         byte[] plaintext = Decrypt(encryption, ticketGrantingTicket.SessionKey.Value, TgsReplyUsage, kdcReply.EncryptedPart, KerberosKdcError.UnexpectedReply);
-        return CredentialFrom(kdcReply, plaintext, body.Nonce, server);
+        return CredentialFrom(kdcReply, plaintext, body.Nonce, expectedServer: null);
     }
 
     private static CachedCredential? FindLive(CredentialCache cache, KerberosPrincipal server, DateTimeOffset now) =>
@@ -240,8 +313,12 @@ public sealed class KerberosKdcClient
         }
     }
 
-    /// <summary>Reads the decrypted part and checks it answers the request: the same <paramref name="nonce" /> and the <paramref name="expectedServer" /> asked for.</summary>
-    private static KerberosCredential CredentialFrom(KerberosKdcReply reply, byte[] plaintext, uint nonce, KerberosPrincipal expectedServer)
+    /// <summary>
+    /// Reads the decrypted part and checks it answers the request: the same <paramref name="nonce" />
+    /// and, when given, the <paramref name="expectedServer" /> asked for (a TGS-REP may instead
+    /// carry a referral, which the caller judges).
+    /// </summary>
+    private static KerberosCredential CredentialFrom(KerberosKdcReply reply, byte[] plaintext, uint nonce, KerberosPrincipal? expectedServer)
     {
         KerberosEncryptedKdcReplyPart part;
         try
@@ -254,7 +331,7 @@ public sealed class KerberosKdcClient
         }
 
         KerberosPrincipal server = new(part.ServerName.NameType, part.ServerRealm, part.ServerName.Components);
-        if (part.Nonce != nonce || !SamePrincipal(server, expectedServer))
+        if (part.Nonce != nonce || (expectedServer is not null && !SamePrincipal(server, expectedServer)))
         {
             part.Dispose();
             throw UnexpectedReply();

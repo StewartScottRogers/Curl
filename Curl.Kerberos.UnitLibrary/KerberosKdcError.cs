@@ -47,4 +47,7 @@ public enum KerberosKdcError
 
     /// <summary>No password was given and the credential cache holds neither the service ticket nor a ticket-granting ticket.</summary>
     NoCredentials,
+
+    /// <summary>The KDCs referred the TGS request to another realm more than <see cref="KerberosKdcClient.MaximumReferralHops" /> times, as a referral loop does.</summary>
+    ReferralLimitExceeded,
 }

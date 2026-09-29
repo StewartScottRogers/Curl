@@ -9,7 +9,7 @@ namespace Curl.Kerberos;
 /// the one asked for.
 /// </summary>
 [TestClass]
-public sealed class KerberosKdcClientTests
+public sealed partial class KerberosKdcClientTests
 {
     private static readonly KerberosPasswordCredential AlicePassword = new(FakeKdc.Alice, FakeKdc.Password);
 
