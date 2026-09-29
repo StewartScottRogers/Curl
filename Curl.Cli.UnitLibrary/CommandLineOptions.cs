@@ -412,6 +412,14 @@ public sealed class CommandLineOptions
     public string? AltSvcFile { get; internal set; }
 
     /// <summary>
+    /// The <c>--hsts</c> cache file, verbatim and unchecked; <see langword="null"/> when not given. An
+    /// empty value is accepted and names no file, as curl 8.21.0 accepts it, and a value that looks like a
+    /// flag draws no warning (measured 2026-09-29, BL-621 Notes). The transfer reads and writes the file;
+    /// nothing is opened here. The last value wins.
+    /// </summary>
+    public string? HstsFile { get; internal set; }
+
+    /// <summary>
     /// The <c>-u</c> / <c>--user</c> value split at its first colon into user name and password;
     /// <see langword="null"/> when not given. A value with no colon that does not start with <c>;</c>
     /// is a user name whose password <see cref="CommandLineParser"/> asks for through its

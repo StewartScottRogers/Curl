@@ -101,6 +101,7 @@ public static class CommandLineOptionTable
         CommandLineOption.Value("etag-save", null, SetEtagFile((options, file) => options.EtagSaveFile = file)),
         CommandLineOption.Value("etag-compare", null, SetEtagFile((options, file) => options.EtagCompareFile = file)),
         CommandLineOption.Value("alt-svc", null, AcceptingEmpty((options, file) => options.AltSvcFile = file)),
+        CommandLineOption.Value("hsts", null, AcceptingEmpty((options, file) => options.HstsFile = file)),
         CommandLineOption.Value("user", 'u', AcceptingEmpty((options, user) => options.SetCredentials(user))),
         CommandLineOption.NegatableFlag("basic", null, (options, on) => options.WantAuthScheme(HttpAuthSchemes.Basic, on)),
         CommandLineOption.NegatableFlag("digest", null, (options, on) => options.WantAuthScheme(HttpAuthSchemes.Digest, on)),
