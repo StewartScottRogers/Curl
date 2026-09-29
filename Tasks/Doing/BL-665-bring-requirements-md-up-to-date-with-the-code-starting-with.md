@@ -33,3 +33,4 @@ Every requirement row in `Documentation/Product/Requirements.md` says truthfully
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
