@@ -36,7 +36,25 @@ Packet protection (BL-723, RFC 9001 sections 5 and 6):
   Suites: `0x1301`, `0x1302`, `0x1303`; the AES-CCM suites wait for the hand-built AES-CCM.
 - `QuicRetryIntegrity`: the Retry Integrity Tag (section 5.8) and its fixed-time check.
 
-The rest of the transport lands in the tasks ADR-0144 lists.
+The handshake (BL-724, RFC 9000 sections 5 to 8, 17 and 18, RFC 9001 section 4, ADR-0165):
+
+- `QuicClientHandshake`: I/O-free. `Start()` returns the first Initial (curl's ClientHello
+  in one CRYPTO frame, padded to 1200 bytes), `Receive(datagram)` returns what to send,
+  `Abandon` returns the CONNECTION_CLOSE datagrams. It drives `Tls13ClientHandshake` at the
+  Initial, Handshake and 1-RTT levels, follows one Retry, fails on Version Negotiation
+  without version 1, checks the server's transport parameters, discards Initial keys at the
+  first Handshake packet and Handshake keys at HANDSHAKE_DONE, and keeps NEW_TOKEN tokens.
+  `QuicClientSettings` (with `CreateCurlTlsSettings`), `QuicHandshakeFailure` and the
+  internal `QuicHandshakeFailures` hold the settings and the exit mapping.
+- `QuicClientConnector`: runs a handshake over `IDatagramChannel` with the injected
+  `TimeProvider`; 10 s without `--connect-timeout` is exit 55, the timeout exit 28.
+- `QuicTransportParameters` and `QuicVersionInformation`: RFC 9000 section 18 and
+  RFC 9368, encoded in curl's order, only the values that differ from the defaults.
+- `QuicCryptoReassembler`, `QuicPeerConnectionIds`, `QuicLocalConnectionIds`, and the
+  internal `QuicPacketNumberSpace`, `QuicDatagramAssembler` and `QuicPacketAddress`.
+
+No retransmission yet (BL-725), no streams (BL-726). The rest of the transport lands in
+the tasks ADR-0144 lists.
 
 ## Rules
 
@@ -45,7 +63,7 @@ The rest of the transport lands in the tasks ADR-0144 lists.
   QUIC handshake, ADR-0140), `Curl.Cryptography.UnitLibrary` (the primitives the BCL
   lacks on a CI platform) and `Curl.Protocol.Abstractions.UnitLibrary`. No package, and
   no other project reference. BL-723 added the `Curl.Tls` and `Curl.Cryptography`
-  references; `Curl.Protocol.Abstractions` is added by the first task that needs it.
+  references, BL-724 `Curl.Protocol.Abstractions` (for `IDatagramChannel` and `CurlExitCode`).
 - **Never a `Socket`.** Datagrams go in and out through a seam the caller implements;
   the library turns datagrams into datagrams and never opens a socket or any stream.
   This is what keeps its tests off the network.

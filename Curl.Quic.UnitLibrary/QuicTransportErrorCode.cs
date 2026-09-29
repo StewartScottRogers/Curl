@@ -58,6 +58,9 @@ public enum QuicTransportErrorCode : ulong
     /// <summary>No network path can carry the connection.</summary>
     NoViablePath = 0x10,
 
+    /// <summary>Version negotiation failed: the peer's <c>version_information</c> chose another version (RFC 9368 section 10.2).</summary>
+    VersionNegotiationError = 0x11,
+
     /// <summary>The first <c>CRYPTO_ERROR</c> code; a TLS alert <c>n</c> is this plus <c>n</c>.</summary>
     CryptoErrorBase = 0x0100,
 }
