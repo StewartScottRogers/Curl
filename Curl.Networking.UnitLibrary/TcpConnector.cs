@@ -709,6 +709,12 @@ public sealed class TcpConnector(
             return (securedProxy, null);
         }
 
+        // Both builds say what the proxy's ALPN agreed before the CONNECT, with and without
+        // --no-alpn (measured, BL-872).
+        tunnel.Target.Events.ReportInfo(securedProxy.ApplicationProtocol is { } agreed
+            ? $"CONNECT: '{agreed}' negotiated"
+            : "CONNECT: no ALPN negotiated");
+
         // CONNECT and the target's TLS run over the proxy's TLS; the socket's local end point stays.
         var securedDialed = dialed with { Connection = proxyConnection };
         return await OpenTunnelAsync(securedDialed, tunnel, proxyAuthorization, cancellationToken).ConfigureAwait(false);

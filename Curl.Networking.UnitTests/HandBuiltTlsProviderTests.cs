@@ -260,6 +260,7 @@ public sealed partial class HandBuiltTlsProviderTests
         Assert.AreEqual(SslProtocols.Tls12, handshake.ProtocolVersion);
         Assert.AreEqual(TlsCipherSuite.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, handshake.CipherSuite);
         Assert.AreEqual("http/1.1", handshake.NegotiatedApplicationProtocol);
+        Assert.AreEqual("http/1.1", result.ApplicationProtocol);
         CollectionAssert.AreEqual(Http11, handshake.OfferedApplicationProtocols.ToArray());
         CollectionAssert.AreEqual(s_serverCertificate.RawData, handshake.ServerCertificate!.RawData);
         Assert.IsFalse(handshake.CertificateVerified);
@@ -286,6 +287,7 @@ public sealed partial class HandBuiltTlsProviderTests
         var handshake = Assert.ContainsSingle(events.Handshakes);
         Assert.IsEmpty(handshake.OfferedApplicationProtocols);
         Assert.IsNull(handshake.NegotiatedApplicationProtocol);
+        Assert.IsNull(result.ApplicationProtocol);
         await result.Connection!.DisposeAsync();
         await IgnoreFailureAsync(serverTask);
     }

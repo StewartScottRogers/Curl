@@ -43,6 +43,7 @@ public sealed partial class SslStreamTlsProviderTests
         var handshake = Assert.ContainsSingle(events.Handshakes);
         CollectionAssert.AreEqual(Http11, handshake.OfferedApplicationProtocols.ToArray());
         Assert.IsNull(handshake.NegotiatedApplicationProtocol);
+        Assert.IsNull(result.ApplicationProtocol);
         await result.Connection!.DisposeAsync();
     }
 

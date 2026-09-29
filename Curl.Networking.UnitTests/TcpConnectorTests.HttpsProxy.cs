@@ -17,6 +17,9 @@ public sealed partial class TcpConnectorTests
 
     private static readonly ProxyEndpoint HttpsProxy = new(ProxyKind.Https, "localhost", 18405, null);
 
+    private static readonly string[] ProxyResolvedAndTriedLines =
+        ["Host localhost:18405 was resolved.", "IPv6: (none)", "IPv4: 192.0.2.10", "  Trying 192.0.2.10:18405..."];
+
     [TestMethod]
     public async Task ConnectAsync_ThroughAnHttpsProxy_RunsTlsToTheProxyThenConnectThenTlsToTheTarget()
     {
@@ -213,6 +216,51 @@ public sealed partial class TcpConnectorTests
         Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
         CollectionAssert.AreEqual(new[] { "localhost", "example.com" }, tlsProvider.ReceivedTargetHosts);
         Assert.AreSame(proxyTls, tlsProvider.ReceivedPlaintexts[1]);
+    }
+
+    [TestMethod]
+    [DataRow("http/1.1", "CONNECT: 'http/1.1' negotiated")]
+    [DataRow(null, "CONNECT: no ALPN negotiated")]
+    public async Task ConnectAsync_ThroughAnHttpsProxy_ReportsTheProxysAlpnAfterItsHandshakeAndBeforeTheConnect(
+        string? agreedProtocol,
+        string expectedLine)
+    {
+        // curl -v --proxy-insecure -p -x https://127.0.0.1:18872 http://example.test/ says, after the
+        // proxy's handshake and before the CONNECT, CONNECT: 'http/1.1' negotiated when the proxy
+        // agrees on http/1.1 and CONNECT: no ALPN negotiated when it agrees on nothing
+        // (8.21.0 Schannel and 8.18.0 OpenSSL, measured, BL-872).
+        var proxyTls = new ScriptedConnection(Encoding.Latin1.GetBytes(EstablishedReply));
+        var writtenWhenReported = -1;
+        var events = new RecordingTransferEvents
+        {
+            OnInfo = text => writtenWhenReported = text.StartsWith("CONNECT:", StringComparison.Ordinal) ? proxyTls.Written.Count : writtenWhenReported,
+        };
+        var tlsProvider = new SequencedTlsProvider(ConnectResult.Connected(proxyTls, null, applicationProtocol: agreedProtocol));
+        var connector = CreateHttpsProxyConnector(tlsProvider);
+
+        var result = await connector.ConnectAsync(
+            new ConnectTarget("example.test", 80, UseTls: false) { Events = events, Proxy = HttpsProxy },
+            CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(ProxyResolvedAndTriedLines.Append(expectedLine).ToArray(), events.Info);
+        Assert.AreEqual(0, writtenWhenReported);
+        Assert.IsNotEmpty(proxyTls.Written);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WhenTheHandshakeToAnHttpsProxyFails_ReportsNoConnectAlpnLine()
+    {
+        var events = new RecordingTransferEvents();
+        var tlsProvider = new SequencedTlsProvider(ConnectResult.Failed(CurlExitCode.SslConnectError, "x"));
+        var connector = CreateHttpsProxyConnector(tlsProvider);
+
+        var result = await connector.ConnectAsync(
+            new ConnectTarget("example.test", 80, UseTls: false) { Events = events, Proxy = HttpsProxy },
+            CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
+        CollectionAssert.AreEqual(ProxyResolvedAndTriedLines, events.Info);
     }
 
     private static TcpConnector CreateHttpsProxyConnector(SequencedTlsProvider tlsProvider) =>

@@ -400,7 +400,8 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             return ConnectResult.Connected(
                 new SslStreamConnection(sslStream, transport, plaintext, clientCertificate, TlsFailureMessages.MissingCloseNotify(_matchesSchannelBuild)),
                 new ConnectTimings(handshakeStarted, null, handshakeStarted, _timeProvider.GetTimestamp()),
-                peerCertificates: peerCertificates);
+                peerCertificates: peerCertificates,
+                applicationProtocol: NegotiatedApplicationProtocol(sslStream.NegotiatedApplicationProtocol));
         }
         catch (Exception exception)
         {

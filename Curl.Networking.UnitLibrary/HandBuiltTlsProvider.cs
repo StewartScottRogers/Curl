@@ -189,7 +189,8 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         return ConnectResult.Connected(
             new HandBuiltTlsConnection(handshake.Stream!, plaintext, prepared.ClientCertificate, TlsFailureMessages.MissingCloseNotify(_matchesSchannelBuild)),
             new ConnectTimings(handshakeStarted, null, handshakeStarted, _timeProvider.GetTimestamp()),
-            peerCertificates: prepared.Verifier.PeerCertificates);
+            peerCertificates: prepared.Verifier.PeerCertificates,
+            applicationProtocol: handshake.ApplicationProtocol);
     }
 
     /// <summary>
