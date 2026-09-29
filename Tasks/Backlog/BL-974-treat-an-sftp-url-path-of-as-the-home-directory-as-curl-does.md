@@ -1,5 +1,5 @@
 ---
-id: BL-970
+id: BL-974
 title: Treat an sftp:// URL path of /~ as the home directory, as curl does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-970 — Treat an sftp:// URL path of /~ as the home directory, as curl does
+# BL-974 — Treat an sftp:// URL path of /~ as the home directory, as curl does
 
 ## Goal
 

@@ -1,5 +1,5 @@
 ---
-id: BL-969
+id: BL-973
 title: Close the SFTP channel after a failed open or quote command, as curl does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-969 — Close the SFTP channel after a failed open or quote command, as curl does
+# BL-973 — Close the SFTP channel after a failed open or quote command, as curl does
 
 ## Goal
 

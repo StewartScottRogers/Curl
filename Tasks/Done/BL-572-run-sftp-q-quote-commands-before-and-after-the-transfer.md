@@ -88,8 +88,8 @@ completed: 2026-09-29
   in `Doing` names it. The ADR and its index line sit outside `touches`, as every SSH task's
   ADR does; no task in `Doing` names `Documentation`. `--ai-help` is unchanged: no option was
   added or changed. SCP's `-Q` is not in this task.
-- **Follow-ups filed.** BL-969: close the channel after a failed open or quote command, as
-  measured (the existing failures leave it open, per ADR-0220). BL-970: `sftp://host/~`
+- **Follow-ups filed.** BL-973: close the channel after a failed open or quote command, as
+  measured (the existing failures leave it open, per ADR-0220). BL-974: `sftp://host/~`
   resolves to the home directory, as curl lists it.
 - **Results.** `Curl.Protocol.Ssh.UnitTests` passes 979 tests, the new
   `SftpQuoteCommandTests`, `SftpQuoteCommandsTests`, `SftpTransferQuoteTests` and two handler
