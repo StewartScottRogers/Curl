@@ -68,7 +68,7 @@ Loss detection and congestion control (BL-725, RFC 9002, RFC 9438):
   `QuicCubicCongestionController`, the default as in curl's build, and
   `QuicNewRenoCongestionController` (Appendix B); `QuicClientSettings.CongestionControl`
   chooses. `QuicPacer` is RFC 9002 section 7.7's token bucket.
-- HyStart++ and application-limited sending (BL-833, ADR-0196): CUBIC's first slow start
+- HyStart++ and application-limited sending (BL-833, ADR-0198): CUBIC's first slow start
   runs HyStart++ (RFC 9406) with ngtcp2's constants, rounds by send time, one RTT sample
   per acknowledgement, Conservative Slow Start at a quarter growth for five rounds.
   `QuicClientHandshake` marks every packet of a flush that left window unused
