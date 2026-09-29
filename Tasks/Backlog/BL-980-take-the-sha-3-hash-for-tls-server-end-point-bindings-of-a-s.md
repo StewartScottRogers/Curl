@@ -1,5 +1,5 @@
 ---
-id: BL-978
+id: BL-980
 title: Take the SHA-3 hash for tls-server-end-point bindings of a SHA-3-signed server certificate
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-978 — Take the SHA-3 hash for tls-server-end-point bindings of a SHA-3-signed server certificate
+# BL-980 — Take the SHA-3 hash for tls-server-end-point bindings of a SHA-3-signed server certificate
 
 ## Goal
 

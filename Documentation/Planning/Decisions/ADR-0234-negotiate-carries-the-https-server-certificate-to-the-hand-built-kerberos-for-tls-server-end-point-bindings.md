@@ -86,4 +86,4 @@ This is curl's `ossl_get_channel_binding`: OpenSSL pairs PSS, Ed25519 and Ed448 
   the BCL has none; tests pin it to NIST's examples and to OpenSSL's hash of the measured
   certificate.
 - Other signatures OpenSSL pairs with a digest the table lacks (the SHA-3 family) still fall
-  to the unknown-OID failure until BL-978 measures and matches them.
+  to the unknown-OID failure until BL-980 measures and matches them.

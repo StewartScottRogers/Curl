@@ -34,7 +34,7 @@ Hand-built Negotiate over HTTPS does what curl 8.18.0 (OpenSSL, MIT) is measured
 - **Measured** (ADR-0234 amendment): curl 8.18.0 OpenSSL + MIT in WSL, served by `openssl s_server -HTTP` (a 401 Negotiate file) because `Record-CurlExchange.ps1 -Tls` serves through Schannel, which cannot serve Ed25519/Ed448; throwaway script `~/bl965.sh` in WSL, nothing committed. PSS, Ed25519, Ed448: no request sent, `* Could not find digest algorithm UNDEF (NID 0)`, `curl: (91) ...`, exit 91 - with and without a ticket. SHA-224 RSA: token sent, exit 0.
 - **Design.** `TlsServerEndPointChannelBindings.Of` reads the signature OID with `System.Formats.Asn1` (no X509Certificate2, so Ed25519/Ed448 parse on every platform) and throws `HttpAuthenticationFailedException(SslInvalidCertStatus, ...)`, which the HTTP handler already turns into the transfer failure. An OID OpenSSL does not know gives "Unable to find digest NID for certificate signature algorithm" from curl source (s_server refused the patched certificate, so unmeasured). `HandBuiltKerberosSecurityContext` computes bindings before the ticket, as measured. SHA-224 hand-built as `Sha224` (NIST vectors + OpenSSL hash of the measured certificate).
 - Added the ADR-0234 file to `touches` to amend it; no task in Doing names it.
-- Follow-up filed: BL-978 (SHA-3 signature OIDs).
+- Follow-up filed: BL-980 (SHA-3 signature OIDs).
 - Tests: `Sha224Tests`, `TlsServerEndPointChannelBindingsTests` (PSS, Ed25519, Ed448, unknown OID, SHA-224 RSA/ECDSA/DSA), `HandBuiltSecurityContextFactoryTests.ChannelBindings_RsaPssServerCertificateWithoutTicket_FailsWithExit91BeforeLookingForOne`. Curl.Authentication.UnitTests 699 passed; Measure-CodeQuality 100% line, 100% branch, 0 failing.
 
 ## Log
