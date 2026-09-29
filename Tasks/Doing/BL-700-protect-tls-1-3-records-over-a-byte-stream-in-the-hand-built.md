@@ -31,3 +31,4 @@ The hand-built client runs TLS 1.3 over a byte stream: the record layer (RFC 844
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
