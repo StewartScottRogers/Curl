@@ -76,4 +76,24 @@ public interface IConnection : IAsyncDisposable
     void MarkReusable()
     {
     }
+
+    /// <summary>
+    /// Gets the protocol session a transfer that earlier had this connection left with it
+    /// (<see cref="TryHoldSession" />), or <see langword="null" />, the default, when there is
+    /// none.
+    /// </summary>
+    IConnectionSession? Session => null;
+
+    /// <summary>
+    /// Asks the connection to hold <paramref name="session" />: to keep it for the next transfer
+    /// that has the connection, and to call its <see cref="IConnectionSession.ShutDownAsync" />
+    /// before the connection closes (BL-817).
+    /// </summary>
+    /// <param name="session">The protocol's session on this connection.</param>
+    /// <returns>
+    /// <see langword="true" /> when the connection holds it; <see langword="false" />, the
+    /// default, when it holds none, and the caller shuts the session down itself before
+    /// disposing the connection. Only a pooled connection, which outlives a transfer, holds one.
+    /// </returns>
+    bool TryHoldSession(IConnectionSession session) => false;
 }
