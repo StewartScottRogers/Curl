@@ -10,7 +10,10 @@ library's.
 Namespace `Curl.Kerberos`. It reads MIT's credential cache (version 4) and keytab
 (version 2) files and finds the default cache and keytab as MIT does
 (`CredentialCacheReader`, `KeytabReader`, `CredentialCacheStore`, `KeytabStore`;
-BL-688, ADR-0158). The client, its encryption types and the GSS-API mechanism land
+BL-688, ADR-0158). It reads `krb5.conf` as MIT's profile library does, maps a host to
+its realm and locates a realm's KDCs from the file or from DNS SRV records through
+`IKerberosSrvLookup` (`KerberosConfigurationStore`, `KerberosConfigurationReader`,
+`KerberosConfiguration`, `KerberosKdcLocator`; BL-689, ADR-0160). The client, its encryption types and the GSS-API mechanism land
 under their own tasks.
 
 ## Rules
