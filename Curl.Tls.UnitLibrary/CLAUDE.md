@@ -76,8 +76,13 @@ ClientHello (BL-821, ADR-0205), and post-handshake client authentication (BL-880
 - `Tls13ClientSettings`: suites, groups, key share groups, signature algorithms, ALPN,
   legacy session ID on or off, the ClientHello extension order and verbatim extra
   extensions (`padding` in the order pads a 256-to-511-byte hello to 512).
-- Key shares: `X25519KeyShare`, `EcdhKeyShare` (NIST curves, points checked by
-  `NistCurve`), `FfdheKeyShare` (RFC 7919 groups); `TlsNamedGroup` names them.
+- Key shares: `X25519KeyShare`, `X448KeyShare`, `EcdhKeyShare` (NIST curves, points
+  checked by `NistCurve`), `FfdheKeyShare` (RFC 7919 groups) and
+  `X25519MlKem768KeyShare` (BL-879: the ML-KEM-768 encapsulation key then the X25519
+  key out, the 1088-byte ciphertext then the server's X25519 key in, the ML-KEM secret
+  then the X25519 secret as the shared secret); `TlsNamedGroup` names them. A server
+  share of the wrong length is `illegal_parameter`. The server's encapsulation lives in
+  the tests (`X25519MlKem768ServerShare`), since the client never needs it.
 - TLS 1.3 over a byte stream (ADR-0157): `Tls13RecordProtection` is one direction under
   one traffic secret (RFC 8446 section 5.2 nonces, no padding sent, peer padding removed,
   the GCM and ChaCha20-Poly1305 suites; CCM is BL-811's). The internal

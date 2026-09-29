@@ -2,7 +2,8 @@ namespace Curl.Tls;
 
 /// <summary>
 /// The named groups (RFC 8446 section 4.2.7) the TLS 1.3 client can make a key share
-/// for: X25519, the NIST curves and the RFC 7919 finite-field groups.
+/// for: X25519, x448, the NIST curves, the RFC 7919 finite-field groups and the
+/// X25519MLKEM768 hybrid.
 /// </summary>
 public static class TlsNamedGroup
 {
@@ -17,6 +18,9 @@ public static class TlsNamedGroup
 
     /// <summary>x25519 (RFC 7748).</summary>
     public const ushort X25519 = 0x001d;
+
+    /// <summary>x448 (RFC 7748).</summary>
+    public const ushort X448 = 0x001e;
 
     /// <summary>ffdhe2048 (RFC 7919).</summary>
     public const ushort Ffdhe2048 = 0x0100;
@@ -33,9 +37,12 @@ public static class TlsNamedGroup
     /// <summary>ffdhe8192 (RFC 7919).</summary>
     public const ushort Ffdhe8192 = 0x0104;
 
+    /// <summary>X25519MLKEM768, the ML-KEM-768 and X25519 hybrid (draft-ietf-tls-ecdhe-mlkem).</summary>
+    public const ushort X25519MlKem768 = 0x11ec;
+
     /// <summary>Returns whether the client can make a key share for <paramref name="group" />.</summary>
     /// <param name="group">The named group code point.</param>
-    /// <returns><see langword="true" /> for X25519, the three NIST curves and the five finite-field groups.</returns>
+    /// <returns><see langword="true" /> for X25519, x448, the three NIST curves, the five finite-field groups and X25519MLKEM768.</returns>
     public static bool CanShare(ushort group) =>
-        group is X25519 or Secp256r1 or Secp384r1 or Secp521r1 or (>= Ffdhe2048 and <= Ffdhe8192);
+        group is X25519 or X448 or X25519MlKem768 or Secp256r1 or Secp384r1 or Secp521r1 or (>= Ffdhe2048 and <= Ffdhe8192);
 }

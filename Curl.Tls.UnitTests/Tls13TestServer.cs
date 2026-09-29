@@ -15,7 +15,6 @@ internal sealed class Tls13TestServer(TestServerCredential credential)
     private readonly List<byte[]> transcriptMessages = [];
     private Tls13CipherSuite suite = Tls13CipherSuite.Aes128GcmSha256;
     private byte[] masterSecret = [];
-    private bool retried;
 
     public ushort CipherSuite { get; init; } = Tls13CipherSuite.Aes128GcmSha256.Code;
 
@@ -59,6 +58,9 @@ internal sealed class Tls13TestServer(TestServerCredential credential)
     /// <summary>Gets the lifetime, in seconds, of the tickets the server issues.</summary>
     public uint TicketLifetime { get; init; } = 7200;
 
+    /// <summary>Gets a value indicating whether the server answered a ClientHello with a HelloRetryRequest.</summary>
+    public bool SentHelloRetryRequest { get; private set; }
+
     public bool IsResumed { get; private set; }
 
     public bool EarlyDataOffered { get; private set; }
@@ -87,14 +89,14 @@ internal sealed class Tls13TestServer(TestServerCredential credential)
         suite = Tls13CipherSuite.Find(CipherSuite)!;
         transcriptMessages.Add(clientHelloBytes);
         KeyShareEntry? clientShare = offered.FirstOrDefault(entry => entry.Group == Group);
-        if (clientShare is null && !retried && !AnswerUnsharedGroup)
+        if (clientShare is null && !SentHelloRetryRequest && !AnswerUnsharedGroup)
         {
             return RetryRequest(hello);
         }
 
         byte[]? preSharedKey = FindResumption(hello, clientHelloBytes);
-        using Tls13KeyShare serverShare = SystemTlsRandomSource.Instance.CreateKeyShare(Group);
-        List<TlsExtension> extensions = [KeyShareExtension.EncodeServerShare(serverShare.Entry), SupportedVersionsExtension.EncodeSelected(0x0304)];
+        (byte[] serverKeyExchange, byte[] sharedSecret) = ServerShare(clientShare);
+        List<TlsExtension> extensions = [KeyShareExtension.EncodeServerShare(new KeyShareEntry(Group, serverKeyExchange)), SupportedVersionsExtension.EncodeSelected(0x0304)];
         if (preSharedKey is not null)
         {
             extensions.Add(PreSharedKeyExtension.EncodeSelected(0));
@@ -102,8 +104,23 @@ internal sealed class Tls13TestServer(TestServerCredential credential)
 
         byte[] serverHello = new ServerHello(0x0303, RandomNumberGenerator.GetBytes(32), hello.LegacySessionId, CipherSuite, 0, extensions).Encode();
         transcriptMessages.Add(serverHello);
-        byte[] sharedSecret = clientShare is null ? new byte[32] : serverShare.ComputeSharedSecret(clientShare.KeyExchange)!;
         return new TestServerFlight(serverHello, EncryptedFlight(hello, sharedSecret, preSharedKey));
+    }
+
+    /// <summary>
+    /// The server's <c>key_share</c> value and the shared secret: a share of its own that
+    /// agrees with the client's, or for X25519MLKEM768 an encapsulation to the client's
+    /// share; with no client share, a value the client cannot use and an all-zero secret.
+    /// </summary>
+    private (byte[] KeyExchange, byte[] SharedSecret) ServerShare(KeyShareEntry? clientShare)
+    {
+        if (Group == TlsNamedGroup.X25519MlKem768)
+        {
+            return X25519MlKem768ServerShare.Answer(clientShare?.KeyExchange);
+        }
+
+        using Tls13KeyShare serverShare = SystemTlsRandomSource.Instance.CreateKeyShare(Group);
+        return (serverShare.PublicKey, clientShare is null ? new byte[32] : serverShare.ComputeSharedSecret(clientShare.KeyExchange)!);
     }
 
     /// <summary>Checks the client's EndOfEarlyData, sent under the early keys after accepted early data.</summary>
@@ -156,7 +173,7 @@ internal sealed class Tls13TestServer(TestServerCredential credential)
 
     private TestServerFlight RetryRequest(ClientHello hello)
     {
-        retried = true;
+        SentHelloRetryRequest = true;
         List<TlsExtension> extensions = [KeyShareExtension.EncodeSelectedGroup(Group), SupportedVersionsExtension.EncodeSelected(0x0304)];
         if (RetryCookie is not null)
         {

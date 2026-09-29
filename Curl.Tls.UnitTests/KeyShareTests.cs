@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using Curl.Cryptography;
 
 namespace Curl.Tls;
 
@@ -11,6 +12,7 @@ public sealed class KeyShareTests
 {
     [TestMethod]
     [DataRow(TlsNamedGroup.X25519)]
+    [DataRow(TlsNamedGroup.X448)]
     [DataRow(TlsNamedGroup.Secp256r1)]
     [DataRow(TlsNamedGroup.Secp384r1)]
     [DataRow(TlsNamedGroup.Secp521r1)]
@@ -38,6 +40,52 @@ public sealed class KeyShareTests
 
         Assert.IsNull(share.ComputeSharedSecret(new byte[31]));
         Assert.IsNull(share.ComputeSharedSecret(new byte[32]));
+    }
+
+    [TestMethod]
+    public void AnX448ShareRefusesAWrongLengthOrDegeneratePeer()
+    {
+        using X448KeyShare share = new(RandomNumberGenerator.GetBytes(56));
+
+        Assert.AreEqual(56, share.PublicKey.Length);
+        Assert.IsNull(share.ComputeSharedSecret(new byte[55]));
+        Assert.IsNull(share.ComputeSharedSecret(new byte[56]));
+    }
+
+    [TestMethod]
+    public void AnX25519MlKem768ShareAgreesWithTheServersEncapsulation()
+    {
+        using Tls13KeyShare client = SystemTlsRandomSource.Instance.CreateKeyShare(TlsNamedGroup.X25519MlKem768);
+
+        (byte[] serverShare, byte[] serverSecret) = X25519MlKem768ServerShare.Answer(client.PublicKey);
+
+        Assert.AreEqual(TlsNamedGroup.X25519MlKem768, client.Group);
+        Assert.AreEqual(1184 + 32, client.PublicKey.Length);
+        Assert.AreEqual(1088 + 32, X25519MlKem768KeyShare.ServerShareLength);
+        Assert.AreEqual(1088 + 32, serverShare.Length);
+        CollectionAssert.AreEqual(serverSecret, client.ComputeSharedSecret(serverShare));
+    }
+
+    [TestMethod]
+    public void AnX25519MlKem768ShareRefusesAWrongLengthOrADegenerateX25519Key()
+    {
+        using X25519MlKem768KeyShare share = X25519MlKem768KeyShare.Generate();
+        (byte[] serverShare, _) = X25519MlKem768ServerShare.Answer(share.PublicKey);
+        byte[] degenerate = [.. serverShare];
+        degenerate.AsSpan(1088).Clear();
+
+        Assert.IsNull(share.ComputeSharedSecret(serverShare[..^1]));
+        Assert.IsNull(share.ComputeSharedSecret([.. serverShare, 0]));
+        Assert.IsNull(share.ComputeSharedSecret(degenerate));
+    }
+
+    [TestMethod]
+    public void AnX25519MlKem768ShareNeedsAnMlKem768Key()
+    {
+        using MlKem mlKem512 = MlKem.GenerateKey(MlKemParameterSet.MlKem512);
+
+        Assert.ThrowsExactly<ArgumentException>(() => new X25519MlKem768KeyShare(mlKem512, new byte[32]));
+        Assert.ThrowsExactly<ArgumentNullException>(() => new X25519MlKem768KeyShare(null!, new byte[32]));
     }
 
     [TestMethod]
@@ -95,13 +143,21 @@ public sealed class KeyShareTests
     [DataRow(TlsNamedGroup.Secp521r1, true)]
     [DataRow(TlsNamedGroup.Ffdhe2048, true)]
     [DataRow(TlsNamedGroup.Ffdhe8192, true)]
+    [DataRow(TlsNamedGroup.X448, true)]
+    [DataRow(TlsNamedGroup.X25519MlKem768, true)]
     [DataRow(0x0016, false)]
-    [DataRow(0x001e, false)]
     [DataRow(0x00ff, false)]
     [DataRow(0x0105, false)]
-    [DataRow(0x11ec, false)]
+    [DataRow(0x11eb, false)]
     public void CanShareNamesTheGroupsWithAKeyShare(int group, bool expected) =>
         Assert.AreEqual(expected, TlsNamedGroup.CanShare((ushort)group));
+
+    [TestMethod]
+    [DataRow(0x0016)]
+    [DataRow(0x0105)]
+    [DataRow(0x11eb)]
+    public void TheSystemRandomSourceRefusesAGroupItCannotShare(int group) =>
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => SystemTlsRandomSource.Instance.CreateKeyShare((ushort)group));
 
     [TestMethod]
     public void TheSystemRandomSourceFillsBytes()

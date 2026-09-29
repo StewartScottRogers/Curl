@@ -31,6 +31,8 @@ public sealed class Tls13ClientHandshakeTests
 
     [TestMethod]
     [DataRow(TlsNamedGroup.X25519)]
+    [DataRow(TlsNamedGroup.X448)]
+    [DataRow(TlsNamedGroup.X25519MlKem768)]
     [DataRow(TlsNamedGroup.Secp256r1)]
     [DataRow(TlsNamedGroup.Secp384r1)]
     [DataRow(TlsNamedGroup.Secp521r1)]
@@ -51,6 +53,8 @@ public sealed class Tls13ClientHandshakeTests
     [DataRow(TlsNamedGroup.Secp384r1)]
     [DataRow(TlsNamedGroup.Secp521r1)]
     [DataRow(TlsNamedGroup.Ffdhe3072)]
+    [DataRow(TlsNamedGroup.X448)]
+    [DataRow(TlsNamedGroup.X25519MlKem768)]
     public void HandshakeCompletesAfterAHelloRetryRequestForEachGroup(int group)
     {
         Tls13TestServer server = new(TestServerCredential.Ed25519()) { Group = (ushort)group, CipherSuite = 0x1302 };
@@ -60,6 +64,26 @@ public sealed class Tls13ClientHandshakeTests
 
         Assert.IsTrue(output.IsComplete);
         Assert.AreEqual<ushort?>((ushort)group, client.NegotiatedGroup);
+    }
+
+    [TestMethod]
+    [DataRow(TlsNamedGroup.X25519MlKem768, false)]
+    [DataRow(TlsNamedGroup.X25519, false)]
+    [DataRow(TlsNamedGroup.X448, true)]
+    public void HandshakeCompletesWithTheOpenSslProfilesGroupsWhicheverTheServerPicks(int group, bool retried)
+    {
+        Tls13TestServer server = new(TestServerCredential.Ed25519()) { Group = (ushort)group };
+        using Tls13ClientHandshake client = Client(DefaultSettings with
+        {
+            SupportedGroups = ClientHelloProfile.OpenSsl.SupportedGroups,
+            KeyShareGroups = ClientHelloProfile.OpenSsl.KeyShareGroups,
+        });
+
+        Tls13HandshakeOutput output = Run(client, server);
+
+        Assert.IsTrue(output.IsComplete);
+        Assert.AreEqual<ushort?>((ushort)group, client.NegotiatedGroup);
+        Assert.AreEqual(retried, server.SentHelloRetryRequest);
     }
 
     [TestMethod]
