@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Net;
+using Curl.Core.Hsts;
 using Curl.Protocol.Abstractions;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 
@@ -88,7 +89,18 @@ namespace Curl.Core;
 /// than as the Linux and macOS build does (exit 65); <see langword="null" /> for
 /// <see cref="OperatingSystem.IsWindows" />.
 /// </param>
-public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySelector? selectHopProxy = null, bool? runsOnWindows = null)
+/// <param name="hsts">
+/// The run's HSTS cache, which learns from every hop's response and switches every <c>http</c>
+/// redirect target it knows to <c>https</c> before the target's scheme is checked, reporting
+/// <see cref="HstsTransferPolicy.SwitchedMessagePrefix" /> and the URL to the hop's events, as
+/// curl 8.21.0 does after <c>Issue another request to this URL</c> (BL-621 Notes);
+/// <see langword="null" /> for none.
+/// </param>
+public sealed class RedirectFollower(
+    ProtocolDispatcher dispatcher,
+    HopProxySelector? selectHopProxy = null,
+    bool? runsOnWindows = null,
+    HstsTransferPolicy? hsts = null)
 {
     /// <summary>The Linux and macOS build's message for a multipart body it cannot rewind for the next hop.</summary>
     public const string CannotRewindMessage = "Cannot rewind mime/post data";
@@ -125,7 +137,15 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
 
         return context.Http is { FollowRedirects: true } http
             ? FollowChainAsync(context, http, policy)
-            : dispatcher.DispatchAsync(context, policy.AllowedTransferSchemes);
+            : DispatchAsync(context, policy);
+    }
+
+    /// <summary>Performs one hop and teaches the HSTS cache from its response.</summary>
+    private async ValueTask<TransferResult> DispatchAsync(ITransferContext hop, RedirectPolicy policy)
+    {
+        TransferResult result = await dispatcher.DispatchAsync(hop, policy.AllowedTransferSchemes);
+        hsts?.LearnFrom(hop.Url, result.Report);
+        return result;
     }
 
     private async ValueTask<TransferResult> FollowChainAsync(
@@ -142,7 +162,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
         bool bodyDropped = false;
         while (true)
         {
-            TransferResult result = await dispatcher.DispatchAsync(hop, policy.AllowedTransferSchemes);
+            TransferResult result = await DispatchAsync(hop, policy);
             chain.Add(result.Report, hop.Http!.Referer);
             if (RedirectTarget(result) is not { } target)
             {
@@ -151,7 +171,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
 
             bodyDropped |= DropsBody(result.Report!.ResponseCode, hop, policy);
             bool bodyCannotBeResent = CannotBeResent(bodyContent, bodyDropped);
-            if (StopBeforeHop(context, http, target, chain, policy, result, bodyCannotBeResent, out CurlUrl? next, out HopProxy hopProxy) is { } stop)
+            if (StopBeforeHop(context, http, ref target, chain, policy, result, bodyCannotBeResent, out CurlUrl? next, out HopProxy hopProxy) is { } stop)
             {
                 return chain.Merge(stop);
             }
@@ -170,11 +190,12 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
     /// <paramref name="bodyCannotBeResent" /> - curl's failure for a multipart body it cannot
     /// rewind, which counts the redirect as followed; <see langword="null" />, with
     /// <paramref name="next" /> and <paramref name="hopProxy" /> set, when the hop goes ahead.
+    /// A target the HSTS cache switches to <c>https</c> comes back switched in <paramref name="target" />.
     /// </summary>
     private TransferResult? StopBeforeHop(
         ITransferContext first,
         HttpRequestOptions http,
-        string target,
+        ref string target,
         RedirectChain chain,
         RedirectPolicy policy,
         TransferResult result,
@@ -183,7 +204,7 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
         out HopProxy hopProxy)
     {
         hopProxy = default;
-        if (Refusal(target, first.PathAsIs, chain.RedirectCount, policy, out next) is { } refusal)
+        if (Refusal(ref target, first, chain.RedirectCount, policy, out next) is { } refusal)
         {
             chain.Refused(refusal.KeepsRedirectUrl);
             return TransferResult.Failure(refusal.ExitCode, refusal.Message, result.BytesTransferred);
@@ -247,11 +268,13 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
     /// Why <paramref name="target" /> is not followed, or <see langword="null" /> when it is.
     /// Only the limit refusal keeps <see cref="TransferReport.RedirectUrl" />: curl 8.21.0 writes
     /// an empty <c>%{redirect_url}</c> after refusing a target that does not parse or whose
-    /// scheme it refuses (measured, BL-289).
+    /// scheme it refuses (measured, BL-289). A target that parses is switched to <c>https</c>
+    /// (<see cref="SwitchedToHttps" />) before its scheme is checked, as curl switches it before
+    /// looking the scheme up.
     /// </summary>
-    private static (CurlExitCode ExitCode, string Message, bool KeepsRedirectUrl)? Refusal(
-        string target,
-        bool pathAsIs,
+    private (CurlExitCode ExitCode, string Message, bool KeepsRedirectUrl)? Refusal(
+        ref string target,
+        ITransferContext first,
         int followed,
         RedirectPolicy policy,
         out CurlUrl? next)
@@ -262,12 +285,29 @@ public sealed class RedirectFollower(ProtocolDispatcher dispatcher, HopProxySele
             return (CurlExitCode.TooManyRedirects, $"Maximum ({policy.MaxRedirects}) redirects followed", true);
         }
 
-        if (!CurlUrl.TryParse(target, pathAsIs, out next))
+        if (!CurlUrl.TryParse(target, first.PathAsIs, out next))
         {
             return (CurlExitCode.UrlMalformat, $"The redirect target URL could not be parsed: {UnparsableUrlReason(target)}", false);
         }
 
+        next = SwitchedToHttps(ref target, next, first);
         return SchemeRefusal(next.Scheme, policy);
+    }
+
+    /// <summary>
+    /// The redirect target the HSTS cache switches to <c>https</c>, reported to the hop's events
+    /// as curl's <c>-v</c> line, or <paramref name="url" /> unchanged.
+    /// </summary>
+    private CurlUrl SwitchedToHttps(ref string target, CurlUrl url, ITransferContext first)
+    {
+        if (hsts is null || !hsts.TrySwitchToHttps(target, url, out string? httpsUrl))
+        {
+            return url;
+        }
+
+        first.Events.ReportInfo(HstsTransferPolicy.SwitchedMessagePrefix + httpsUrl);
+        target = httpsUrl;
+        return CurlUrl.Parse(httpsUrl, first.PathAsIs);
     }
 
     private static (CurlExitCode ExitCode, string Message, bool KeepsRedirectUrl)? SchemeRefusal(string scheme, RedirectPolicy policy)

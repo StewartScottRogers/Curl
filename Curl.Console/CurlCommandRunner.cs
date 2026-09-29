@@ -7,6 +7,7 @@ using Curl.Cli;
 using Curl.Core;
 using Curl.Core.FileSystem;
 using Curl.Core.Globbing;
+using Curl.Core.Hsts;
 using Curl.Core.Multipart;
 using Curl.Output;
 using Curl.Protocol.Abstractions;
@@ -494,6 +495,18 @@ internal sealed class CurlCommandRunner(
     /// before the first.
     /// </summary>
     private TransferResult? previousTransferResult;
+
+    /// <summary>
+    /// The run's HSTS cache, shared by every transfer of every option group and on with or without
+    /// <c>--hsts</c>, as curl 8.21.0's tool shares one through its share handle: an <c>https</c>
+    /// response's <c>Strict-Transport-Security</c> switches a later <c>http</c> URL or redirect to the
+    /// same host to <c>https</c> (measured 2026-09-29, BL-621 Notes; ADR-0218). Made on first use, on
+    /// the run's clock.
+    /// </summary>
+    private HstsTransferPolicy Hsts => LazyInitializer.EnsureInitialized(ref hsts, () => new HstsTransferPolicy(timeProvider));
+
+    /// <summary>The run's HSTS cache once <see cref="Hsts" /> has made it.</summary>
+    private HstsTransferPolicy? hsts;
 
     /// <summary>
     /// The <c>If-None-Match</c> lines <c>--etag-compare</c> has added to each option group, one per
@@ -1449,7 +1462,7 @@ internal sealed class CurlCommandRunner(
         bool standardOutputIsBinary = IsStandardOutputBinaryForWriteOut(
             options, transfer.UrlIndex, standardOutputSwitchedToBinary, endsTheRun);
         await WriteOutAsync(options, transfer, givenUrl, transferUrl, result, standardOutputIsBinary).ConfigureAwait(false);
-        await WriteCookieJarAndAltSvcFileAsync(dispatch, options, transferUrl, standardOutputIsBinary, state).ConfigureAwait(false);
+        await WriteCookieJarAltSvcAndHstsFilesAsync(dispatch, options, transferUrl, standardOutputIsBinary, state).ConfigureAwait(false);
 
         previousTransferResult = result;
     }
@@ -1533,6 +1546,7 @@ internal sealed class CurlCommandRunner(
         dispatch.LoadResolveEntries(eventsBeforeConnecting);
         await LoadCookieFilesAsync(dispatch, options, transferUrl, eventsBeforeConnecting).ConfigureAwait(false);
         await OpenAltSvcCacheAsync(options, transferUrl).ConfigureAwait(false);
+        transferUrl = await SwitchToHttpsForHstsAsync(options, transferUrl, eventsBeforeConnecting).ConfigureAwait(false);
         TransferResult result = await TransferWithHeaderOutputAsync(dispatch, options, transfer, transferUrl, uploadFile)
             .ConfigureAwait(false);
         return (result, givenUrl, transferUrl);
@@ -2056,16 +2070,17 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
-    /// Writes the <c>-c</c> jar (<see cref="WriteCookieJarAsync" />) and then the transfer's <c>--alt-svc</c>
-    /// file, when it has one (<see cref="RunningTransferState.AltSvc" />).
+    /// Writes the <c>-c</c> jar (<see cref="WriteCookieJarAsync" />), then the transfer's <c>--alt-svc</c>
+    /// file, when it has one (<see cref="RunningTransferState.AltSvc" />), then the group's <c>--hsts</c>
+    /// file, when it has one (<see cref="HstsCacheFile.WriteAsync" />).
     /// </summary>
     /// <param name="dispatch">What the run transfers through, with its cookies.</param>
     /// <param name="options">The transfer's option group.</param>
     /// <param name="transferUrl">The URL transferred.</param>
     /// <param name="standardOutputIsBinary">Whether standard output is in binary mode for <c>-c -</c>.</param>
     /// <param name="state">The transfer's state, with its alt-svc cache.</param>
-    /// <returns>A task that completes when both are written.</returns>
-    private async Task WriteCookieJarAndAltSvcFileAsync(
+    /// <returns>A task that completes when all are written.</returns>
+    private async Task WriteCookieJarAltSvcAndHstsFilesAsync(
         TransferDispatch dispatch,
         CommandLineOptions options,
         string transferUrl,
@@ -2076,6 +2091,11 @@ internal sealed class CurlCommandRunner(
         if (state.AltSvc is { } altSvc)
         {
             await altSvc.WriteAsync(fileSystem).ConfigureAwait(false);
+        }
+
+        if (options.HstsFile is { } hstsFile)
+        {
+            await HstsCacheFile.WriteAsync(hstsFile, Hsts, fileSystem, runsOnWindows).ConfigureAwait(false);
         }
     }
 
@@ -2097,6 +2117,32 @@ internal sealed class CurlCommandRunner(
         {
             await cookies.LoadCookieFilesAsync(fileSystem, standardInput, timeProvider.GetUtcNow(), events).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// Reads the group's <c>--hsts</c> file into the run's HSTS cache, then switches an <c>http</c> URL whose
+    /// host the cache knows to <c>https</c>, printing curl 8.21.0's <c>-v</c> line with the URL
+    /// <c>%{url_effective}</c> then shows, as curl does just before it connects (BL-621 Notes).
+    /// </summary>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="transferUrl">The URL about to be transferred.</param>
+    /// <param name="events">Where the <c>-v</c> line goes.</param>
+    /// <returns>The URL to transfer: switched, or as it was.</returns>
+    private async Task<string> SwitchToHttpsForHstsAsync(CommandLineOptions options, string transferUrl, ITransferEvents events)
+    {
+        if (options.HstsFile is { } file)
+        {
+            await HstsCacheFile.ReadAsync(file, Hsts, fileSystem).ConfigureAwait(false);
+        }
+
+        if (!CurlUrl.TryParse(QueryUrl.Append(transferUrl, options), options.PathAsIs, out CurlUrl? url)
+            || !Hsts.TrySwitchToHttps(transferUrl, url, out string? httpsUrl))
+        {
+            return transferUrl;
+        }
+
+        events.ReportInfo(HstsTransferPolicy.SwitchedMessagePrefix + UrlEffective.Normalize(QueryUrl.Append(httpsUrl, options), options.PathAsIs));
+        return httpsUrl;
     }
 
     /// <summary>
@@ -2555,7 +2601,8 @@ internal sealed class CurlCommandRunner(
         RedirectFollower follower = new(
             dispatch.Dispatcher,
             (CurlUrl hopUrl, out ProxyEndpoint? hopProxy, [NotNullWhen(false)] out TransferResult? hopFailure) =>
-                TransferProxySelection.TrySelect(dispatch.ProxySelector, options, hopUrl, out hopProxy, out hopFailure));
+                TransferProxySelection.TrySelect(dispatch.ProxySelector, options, hopUrl, out hopProxy, out hopFailure),
+            hsts: Hsts);
 
         if (!CurlUrl.TryParse(
             QueryUrl.Append(url, options),

@@ -96,6 +96,15 @@ and sets `AltSvcRoute` to the first unexpired `h1` alternative for an `https` or
 and the handler sends `Alt-Used`. `h2` and `h3` alternatives are skipped until BL-733, and a redirect
 to another origin drops the route (`RedirectFollower`). Measured on curl 8.21.0 (ADR-0214, BL-623 Notes).
 
+The run holds one HSTS cache, `Curl.Core`'s `HstsTransferPolicy`, shared by every transfer of every
+group with or without `--hsts`. Under `--hsts <file>` each transfer reads the file (`HstsCacheFile`)
+just before it connects, a missing one as empty, and writes the cache back after the `--alt-svc`
+file, whatever the outcome; one that cannot be written is left alone, and `--hsts ""` does neither.
+An `http` URL whose host the cache knows is switched to `https` (the scheme only; an explicit port
+stays), `-v` printing `* Switched from HTTP to HTTPS due to HSTS => <url>`; `RedirectFollower` learns
+every hop's `https` `Strict-Transport-Security` and switches a known `http` redirect target the same
+way before `--proto-redir` checks it. Measured on curl 8.21.0 (ADR-0218, BL-621 Notes).
+
 Each URL's output comes from `CommandLineOptions.UrlOutputs`: an `-o` name, or for `-O` /
 `--remote-name-all` the name `RemoteFileName` takes from the URL path (last non-empty
 segment, still percent-encoded; none gives `curl_response` and curl's
