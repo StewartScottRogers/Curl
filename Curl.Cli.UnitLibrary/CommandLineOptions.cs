@@ -1306,6 +1306,14 @@ public sealed class CommandLineOptions
     public TimeSpan? ConnectTimeout { get; internal set; }
 
     /// <summary>
+    /// The last <c>--happy-eyeballs-timeout-ms</c>: how long the connect waits on the first address
+    /// family before it also dials the other, in whole milliseconds (see
+    /// <see cref="CommandLineNumber.ParseMilliseconds"/>); <see langword="null"/> when not given, for
+    /// curl's 200. Zero dials both families at once, as it does to curl.
+    /// </summary>
+    public TimeSpan? HappyEyeballsTimeout { get; internal set; }
+
+    /// <summary>
     /// The <c>-m</c> / <c>--max-time</c> limit on the whole transfer, to the millisecond, at most
     /// about 29,000 years (see <see cref="CommandLineNumber.ParseSeconds"/>); <see langword="null"/>
     /// when not given. Past about 49.7 days it is longer than a .NET timer accepts, so cap it

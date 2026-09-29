@@ -145,6 +145,28 @@ public static class CommandLineNumber
     }
 
     /// <summary>
+    /// Reads <paramref name="value"/> as whole milliseconds, zero or more, as curl 8.21.0 reads
+    /// <c>--happy-eyeballs-timeout-ms</c>: <see cref="ParseNonNegative"/>'s digits and refusals, the
+    /// duration capped at about <see cref="TimeSpan.MaxValue"/>, which only a 64-bit <c>long</c> reaches.
+    /// </summary>
+    /// <param name="spelledOption">The whole argument as typed, for naming it in a refusal.</param>
+    /// <param name="value">The option's value.</param>
+    /// <param name="longMaximum">The platform's C <c>LONG_MAX</c>, the largest number accepted.</param>
+    /// <param name="duration">The duration read; zero when the value is refused.</param>
+    /// <returns>
+    /// <see langword="null"/> when the value was read; otherwise <see cref="ParseNonNegative"/>'s refusal.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="spelledOption"/> or <paramref name="value"/> is <see langword="null"/>.
+    /// </exception>
+    public static CommandLineRefusal? ParseMilliseconds(string spelledOption, string value, long longMaximum, out TimeSpan duration)
+    {
+        CommandLineRefusal? refusal = ParseNonNegative(spelledOption, value, longMaximum, out long milliseconds);
+        duration = TimeSpan.FromMilliseconds(Math.Min(milliseconds, MaximumDurationMilliseconds));
+        return refusal;
+    }
+
+    /// <summary>
     /// Reads <paramref name="value"/> as an unsigned octal number no larger than <paramref name="maximum"/>.
     /// </summary>
     /// <param name="spelledOption">The whole argument as typed, for naming it in a refusal.</param>

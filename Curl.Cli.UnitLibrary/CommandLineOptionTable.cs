@@ -260,6 +260,7 @@ public static class CommandLineOptionTable
         CommandLineOption.Value("continue-at", 'C', SetResumeFrom),
         CommandLineOption.Value("max-filesize", null, SetMaxFileSize),
         CommandLineOption.Value("connect-timeout", null, SetConnectTimeout),
+        CommandLineOption.Value("happy-eyeballs-timeout-ms", null, SetHappyEyeballsTimeout),
         CommandLineOption.Value("max-time", 'm', SetMaxTime),
         CommandLineOption.Value("expect100-timeout", null, SetExpect100Timeout),
         CommandLineOption.Value("retry", null, SetRetryCount),
@@ -1308,6 +1309,21 @@ public static class CommandLineOptionTable
         if (refusal is null)
         {
             options.ConnectTimeout = duration;
+        }
+
+        return refusal;
+    }
+
+    /// <summary>
+    /// Records <c>--happy-eyeballs-timeout-ms</c>: whole milliseconds, zero or more, at most the platform's
+    /// C <c>LONG_MAX</c>, as curl 8.21.0 reads it (measured 2026-09-29, BL-644 Notes).
+    /// </summary>
+    private static CommandLineRefusal? SetHappyEyeballsTimeout(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        CommandLineRefusal? refusal = CommandLineNumber.ParseMilliseconds(spelledOption, value, CommandLineNumber.PlatformLongMaximum, out TimeSpan duration);
+        if (refusal is null)
+        {
+            options.HappyEyeballsTimeout = duration;
         }
 
         return refusal;

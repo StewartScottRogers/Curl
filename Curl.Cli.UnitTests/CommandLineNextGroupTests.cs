@@ -46,7 +46,7 @@ public sealed class CommandLineNextGroupTests
         "hostpubmd5", "hostpubsha256", "compressed-ssh", "tlsv1", "tlsv1.0",
         "tlsv1.1", "tlsv1.2", "tlsv1.3", "tls-max", "proxy-tlsv1", "proto", "proto-redir", "proto-default",
         "ciphers", "tls13-ciphers", "curves", "sigalgs", "tls-earlydata", "ech", "engine", "tlsuser",
-        "tlspassword", "tlsauthtype", "range", "continue-at", "max-filesize", "connect-timeout", "max-time", "expect100-timeout",
+        "tlspassword", "tlsauthtype", "range", "continue-at", "max-filesize", "connect-timeout", "happy-eyeballs-timeout-ms", "max-time", "expect100-timeout",
         "retry", "retry-delay", "retry-max-time", "retry-all-errors", "retry-connrefused", "limit-rate",
         "speed-limit", "speed-time", "remote-time", "time-cond", "request", "header", "proxy-header",
         "user-agent", "referer", "cookie", "cookie-jar", "junk-session-cookies", "follow", "location", "location-trusted",
