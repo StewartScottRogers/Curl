@@ -31,6 +31,10 @@ completed: 2026-09-28
 
 ## Notes
 
+- Scaffolded with the `new-project` steps, then both csproj files trimmed to match `Curl.Kerberos.*` (BL-685): the library carries only `InternalsVisibleTo` for its tests; the test project only `MSTest`, the global `Using` and the library reference. Template `Class1.cs`, `Test1.cs` and `MSTestSettings.cs` removed (no other test project keeps `MSTestSettings.cs`).
+- The test project holds no tests yet, like `Curl.Kerberos.UnitTests`; the fast test run reports "No test matches" for it and passes. BL-683 adds the first ones.
+- `Measure-CodeQuality.ps1` picks the library up by its `*.UnitLibrary` name; nothing to register.
+
 ## Log
 
 - 2026-09-28: Created.
