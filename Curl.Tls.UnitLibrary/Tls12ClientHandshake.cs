@@ -42,6 +42,8 @@ public sealed class Tls12ClientHandshake
 
     private static readonly string[] EcdsaKeyOids = [TlsSignatureScheme.EcPublicKeyOid, TlsSignatureScheme.Ed25519Oid];
 
+    private static readonly string[] DsaKeyOids = [TlsSignatureScheme.DsaOid];
+
     private readonly Tls12ClientSettings settings;
     private readonly ITlsRandomSource random;
     private readonly IServerCertificateVerifier verifier;
@@ -564,10 +566,17 @@ public sealed class Tls12ClientHandshake
             return TlsAlertDescription.BadCertificate;
         }
 
-        string[] keyOids = CipherSuite!.Authentication == Tls12Authentication.Rsa ? RsaKeyOids : EcdsaKeyOids;
         certificateAwaitsVerification = true;
-        return keyOids.Contains(serverKey.AlgorithmOid) ? null : TlsAlertDescription.HandshakeFailure;
+        return KeyOidsFor(CipherSuite!.Authentication).Contains(serverKey.AlgorithmOid) ? null : TlsAlertDescription.HandshakeFailure;
     }
+
+    /// <summary>Returns the certificate key algorithms a suite's authentication accepts.</summary>
+    private static string[] KeyOidsFor(Tls12Authentication authentication) => authentication switch
+    {
+        Tls12Authentication.Rsa => RsaKeyOids,
+        Tls12Authentication.Dss => DsaKeyOids,
+        _ => EcdsaKeyOids,
+    };
 
     private TlsAlertDescription? VerifyServerCertificates()
     {

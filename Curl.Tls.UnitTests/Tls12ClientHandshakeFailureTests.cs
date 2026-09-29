@@ -36,7 +36,7 @@ public sealed class Tls12ClientHandshakeFailureTests
         Assert.ThrowsExactly<ArgumentException>(() => Client(DefaultSettings with { CipherSuites = [Tls12CipherSuite.EmptyRenegotiationInfoScsv] }));
         Assert.ThrowsExactly<ArgumentException>(() => Client(DefaultSettings with { CipherSuites = [0xc02b, 0x1301] }));
         Assert.ThrowsExactly<ArgumentException>(() => Client(DefaultSettings with { SupportedGroups = [TlsNamedGroup.Ffdhe2048] }));
-        Assert.ThrowsExactly<ArgumentException>(() => Client(DefaultSettings with { SignatureAlgorithms = [0x0202] }));
+        Assert.ThrowsExactly<ArgumentException>(() => Client(DefaultSettings with { SignatureAlgorithms = [0xfefe] }));
         Assert.ThrowsExactly<ArgumentException>(() => Client(DefaultSettings with { SessionToResume = session with { Version = TlsProtocolVersion.Tls11 } }));
         Assert.ThrowsExactly<ArgumentException>(() => Client(DefaultSettings with { MaximumVersion = TlsProtocolVersion.Tls11, MinimumVersion = TlsProtocolVersion.Tls10, SessionToResume = session }));
         Assert.ThrowsExactly<ArgumentException>(() => Client(DefaultSettings with { SessionToResume = session with { CipherSuite = 0x0001 } }));
@@ -308,11 +308,19 @@ public sealed class Tls12ClientHandshakeFailureTests
     [TestMethod]
     [DataRow((ushort)0xc02f, "ecdsa")]
     [DataRow((ushort)0xc02b, "rsa")]
+    [DataRow((ushort)0x00a2, "rsa")]
+    [DataRow((ushort)0x009e, "dsa")]
     public void AKeyOfTheWrongTypeForTheSuiteIsAHandshakeFailure(int cipherSuite, string credential)
     {
-        Tls12ClientHandshake client = Client();
+        Tls12ClientHandshake client = Client(DefaultSettings with { CipherSuites = [(ushort)cipherSuite] });
+        TestServerCredential key = credential switch
+        {
+            "rsa" => Rsa(),
+            "dsa" => TestServerCredential.Dsa(TlsSignatureScheme.DsaSha256),
+            _ => Ecdsa(),
+        };
 
-        AssertFails(TlsAlertDescription.HandshakeFailure, Run(client, new Tls12TestServer(credential == "rsa" ? Rsa() : Ecdsa()) { CipherSuite = (ushort)cipherSuite }));
+        AssertFails(TlsAlertDescription.HandshakeFailure, Run(client, new Tls12TestServer(key) { CipherSuite = (ushort)cipherSuite }));
     }
 
     [TestMethod]
@@ -357,6 +365,25 @@ public sealed class Tls12ClientHandshakeFailureTests
         Tls12ClientHandshake client = Client(DefaultSettings with { MinimumVersion = TlsProtocolVersion.Tls10 });
 
         Tls12HandshakeOutput output = Run(client, server, flight => ReplaceServerKeyExchange(flight, version, message => message with { Signature = Corrupt(message.Signature!) }));
+
+        AssertFails(TlsAlertDescription.DecryptError, output);
+    }
+
+    [TestMethod]
+    [DataRow(TlsProtocolVersion.Tls12, (ushort)0x00a2)]
+    [DataRow(TlsProtocolVersion.Tls11, (ushort)0x0032)]
+    [DataRow(TlsProtocolVersion.Tls10, (ushort)0x0032)]
+    public void ADsaServerKeyExchangeSignatureThatDoesNotVerifyIsADecryptError(TlsProtocolVersion version, int cipherSuite)
+    {
+        Tls12TestServer server = new(TestServerCredential.Dsa(TlsSignatureScheme.DsaSha256)) { Version = version, CipherSuite = (ushort)cipherSuite };
+        Tls12ClientHandshake client = Client(DefaultSettings with
+        {
+            MinimumVersion = TlsProtocolVersion.Tls10,
+            CipherSuites = [0x00a2, 0x0032],
+            SignatureAlgorithms = [TlsSignatureScheme.DsaSha256],
+        });
+
+        Tls12HandshakeOutput output = Run(client, server, flight => ReplaceServerKeyExchange(flight, version, message => message with { Signature = Corrupt(message.Signature!) }, Tls12KeyExchange.Dhe));
 
         AssertFails(TlsAlertDescription.DecryptError, output);
     }
@@ -588,10 +615,10 @@ public sealed class Tls12ClientHandshakeFailureTests
     private static List<Tls12OutgoingMessage> RewriteServerHello(List<Tls12OutgoingMessage> flight, Func<ServerHello, ServerHello> rewrite) =>
         Replace(flight, HandshakeType.ServerHello, rewrite(ServerHello.Decode(Body(flight[0])).Value).Encode());
 
-    private static List<Tls12OutgoingMessage> ReplaceServerKeyExchange(List<Tls12OutgoingMessage> flight, TlsProtocolVersion version, Func<Tls12ServerKeyExchange, Tls12ServerKeyExchange> rewrite)
+    private static List<Tls12OutgoingMessage> ReplaceServerKeyExchange(List<Tls12OutgoingMessage> flight, TlsProtocolVersion version, Func<Tls12ServerKeyExchange, Tls12ServerKeyExchange> rewrite, Tls12KeyExchange keyExchange = Tls12KeyExchange.Ecdhe)
     {
         Tls12OutgoingMessage original = flight.First(message => (HandshakeType)message.Bytes[0] == HandshakeType.ServerKeyExchange);
-        Tls12ServerKeyExchange decoded = Tls12ServerKeyExchange.Decode(Body(original), Tls12KeyExchange.Ecdhe, true, version == TlsProtocolVersion.Tls12).Value;
+        Tls12ServerKeyExchange decoded = Tls12ServerKeyExchange.Decode(Body(original), keyExchange, true, version == TlsProtocolVersion.Tls12).Value;
         return Replace(flight, HandshakeType.ServerKeyExchange, rewrite(decoded).Encode());
     }
 }

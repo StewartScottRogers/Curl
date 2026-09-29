@@ -30,6 +30,20 @@ internal sealed record TestServerCredential(byte[] Certificate, TlsSigningKey Si
     public static TestServerCredential Foreign(string algorithmOid, byte[] keyBits) =>
         new(WithForeignKey("CN=foreign", new PublicKey(new Oid(algorithmOid), null, new AsnEncodedData(keyBits))), new Ed25519TlsSigningKey(new byte[32]), TlsSignatureScheme.Ed25519);
 
+    /// <summary>Gets a value indicating whether the server signs with <see cref="TestDsaKey" /> rather than <see cref="SigningKey" />, which is then a placeholder.</summary>
+    public bool SignsWithDsa { get; init; }
+
+    /// <summary>A DSA certificate over <see cref="TestDsaKey" />, whose signatures the server makes itself: the library signs nothing with DSA.</summary>
+    public static TestServerCredential Dsa(ushort scheme)
+    {
+        PublicKey publicKey = new(new Oid(TlsSignatureScheme.DsaOid), new AsnEncodedData(TestDsaKey.EncodeDomainParameters()), new AsnEncodedData(TestDsaKey.EncodePublicKey()));
+        return new(WithForeignKey("CN=dsa", publicKey), new Ed25519TlsSigningKey(new byte[32]), scheme) { SignsWithDsa = true };
+    }
+
+    /// <summary>Signs <paramref name="content" /> by <paramref name="rule" /> with this credential's key.</summary>
+    public byte[] Sign(TlsSignatureRule rule, byte[] content) =>
+        SignsWithDsa ? TestDsaKey.Sign(rule.Hash, content) : SigningKey.SignByRule(rule, content);
+
     public static TestServerCredential RsaPss(ushort scheme)
     {
         RSA key = RSA.Create(2048);

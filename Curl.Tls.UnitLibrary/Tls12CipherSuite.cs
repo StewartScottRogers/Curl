@@ -8,8 +8,8 @@ namespace Curl.Tls;
 /// <summary>
 /// A TLS 1.2, 1.1 and 1.0 cipher suite the client can run (ADR-0140, "What the client
 /// supports"): its key exchange, how it authenticates the server, its bulk cipher and
-/// record MAC, and whether its TLS 1.2 PRF is SHA-384. The table holds every ECDHE, DHE,
-/// RSA and anonymous suite whose bulk cipher the record layer protects: AES-CBC, AES-GCM,
+/// record MAC, and whether its TLS 1.2 PRF is SHA-384. The table holds every ECDHE, DHE
+/// (RSA and DSS), RSA and anonymous suite whose bulk cipher the record layer protects: AES-CBC, AES-GCM,
 /// ChaCha20-Poly1305, Camellia-CBC, ARIA-GCM, 3DES and NULL.
 /// </summary>
 /// <param name="Code">The suite's code point.</param>
@@ -71,6 +71,19 @@ public sealed record Tls12CipherSuite(
         new(0xc052, Kx.Dhe, Auth.Rsa, Aria128Gcm, None, false),
         new(0xc053, Kx.Dhe, Auth.Rsa, Aria256Gcm, None, true),
         new(0x0016, Kx.Dhe, Auth.Rsa, TripleDesEdeCbc, HmacSha1, false),
+        new(0x00a2, Kx.Dhe, Auth.Dss, Aes128Gcm, None, false),
+        new(0x00a3, Kx.Dhe, Auth.Dss, Aes256Gcm, None, true),
+        new(0x0040, Kx.Dhe, Auth.Dss, Aes128Cbc, HmacSha256, false),
+        new(0x006a, Kx.Dhe, Auth.Dss, Aes256Cbc, HmacSha256, false),
+        new(0x0032, Kx.Dhe, Auth.Dss, Aes128Cbc, HmacSha1, false),
+        new(0x0038, Kx.Dhe, Auth.Dss, Aes256Cbc, HmacSha1, false),
+        new(0x00bd, Kx.Dhe, Auth.Dss, Camellia128Cbc, HmacSha256, false),
+        new(0x00c3, Kx.Dhe, Auth.Dss, Camellia256Cbc, HmacSha256, false),
+        new(0x0044, Kx.Dhe, Auth.Dss, Camellia128Cbc, HmacSha1, false),
+        new(0x0087, Kx.Dhe, Auth.Dss, Camellia256Cbc, HmacSha1, false),
+        new(0xc056, Kx.Dhe, Auth.Dss, Aria128Gcm, None, false),
+        new(0xc057, Kx.Dhe, Auth.Dss, Aria256Gcm, None, true),
+        new(0x0013, Kx.Dhe, Auth.Dss, TripleDesEdeCbc, HmacSha1, false),
         new(0x009c, Kx.Rsa, Auth.Rsa, Aes128Gcm, None, false),
         new(0x009d, Kx.Rsa, Auth.Rsa, Aes256Gcm, None, true),
         new(0x003c, Kx.Rsa, Auth.Rsa, Aes128Cbc, HmacSha256, false),

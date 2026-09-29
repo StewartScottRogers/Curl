@@ -266,15 +266,23 @@ internal sealed class Tls12TestServer(TestServerCredential? credential)
         byte[] content = [.. hello.Random, .. serverRandom, .. parameters.Encode()];
         if (Version != TlsProtocolVersion.Tls12)
         {
-            // An Ed25519 key has no TLS 1.0 or 1.1 signature, so it sends one byte the client must refuse.
-            byte[] legacySignature = credential.RsaKey is { } rsa
-                ? SignMd5Sha1(rsa, content)
-                : credential.SigningKey.CanSign(TlsSignatureScheme.LegacyRules[1]) ? credential.SigningKey.SignByRule(TlsSignatureScheme.LegacyRules[1], content) : [0];
-            return new Tls12ServerKeyExchange(parameters, null, legacySignature);
+            return new Tls12ServerKeyExchange(parameters, null, LegacySignature(credential, content));
         }
 
         ushort scheme = SignatureScheme ?? credential.Scheme;
-        return new Tls12ServerKeyExchange(parameters, scheme, credential.SigningKey.SignByRule(TlsSignatureScheme.FindTls12Rule(scheme)!, content));
+        return new Tls12ServerKeyExchange(parameters, scheme, credential.Sign(TlsSignatureScheme.FindTls12Rule(scheme)!, content));
+    }
+
+    // An Ed25519 key has no TLS 1.0 or 1.1 signature, so it sends one byte the client must refuse.
+    private static byte[] LegacySignature(TestServerCredential credential, byte[] content)
+    {
+        if (credential.RsaKey is { } rsa)
+        {
+            return SignMd5Sha1(rsa, content);
+        }
+
+        TlsSignatureRule? rule = credential.SignsWithDsa ? TlsSignatureScheme.FindLegacyRule(TlsSignatureScheme.DsaOid) : TlsSignatureScheme.LegacyRules[1];
+        return credential.SignsWithDsa || credential.SigningKey.CanSign(rule) ? credential.Sign(rule!, content) : [0];
     }
 
     private Tls12EcdheParameters EcdheParameters()

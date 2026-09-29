@@ -6,7 +6,8 @@ namespace Curl.Tls;
 
 /// <summary>
 /// TLS 1.2 and below signatures: the TLS 1.2 schemes (PKCS #1 v1.5, ECDSA on any curve),
-/// TLS 1.0 and 1.1's MD5 and SHA-1 RSA block and SHA-1 ECDSA, what each key can sign,
+/// TLS 1.0 and 1.1's MD5 and SHA-1 RSA block and SHA-1 ECDSA and DSA, DSA's five schemes and its
+/// Dss-Sig-Value, what each key can sign,
 /// the RSA pre-master secret encryption and the handshake hashes.
 /// </summary>
 [TestClass]
@@ -20,7 +21,7 @@ public sealed class Tls12SignatureTests
         Assert.IsTrue(TlsSignatureScheme.IsTls12Scheme(TlsSignatureScheme.RsaPkcs1Sha1));
         Assert.IsTrue(TlsSignatureScheme.IsTls12Scheme(TlsSignatureScheme.EcdsaSha1));
         Assert.IsTrue(TlsSignatureScheme.IsTls12Scheme(TlsSignatureScheme.RsaPssRsaeSha256));
-        Assert.IsFalse(TlsSignatureScheme.IsTls12Scheme(0x0202));
+        Assert.IsFalse(TlsSignatureScheme.IsTls12Scheme(0xfefe));
         Assert.IsFalse(TlsSignatureScheme.IsCertificateVerifyScheme(TlsSignatureScheme.RsaPkcs1Sha512));
     }
 
@@ -150,11 +151,91 @@ public sealed class Tls12SignatureTests
     }
 
     [TestMethod]
-    public void OnlyRsaAndEcdsaKeysHaveALegacySignature()
+    public void OnlyRsaEcdsaAndDsaKeysHaveALegacySignature()
     {
         Assert.IsNull(TlsSignatureScheme.FindLegacyRule(TlsSignatureScheme.Ed25519Oid));
         Assert.AreEqual(TlsSignatureKind.RsaMd5Sha1, TlsSignatureScheme.FindLegacyRule(TlsSignatureScheme.RsaEncryptionOid)!.Kind);
         Assert.AreEqual(HashAlgorithmName.SHA1, TlsSignatureScheme.FindLegacyRule(TlsSignatureScheme.EcPublicKeyOid)!.Hash);
+        Assert.AreEqual(new TlsSignatureRule(TlsSignatureKind.Dsa, TlsSignatureScheme.DsaOid, null, HashAlgorithmName.SHA1), TlsSignatureScheme.FindLegacyRule(TlsSignatureScheme.DsaOid));
+    }
+
+    [TestMethod]
+    [DataRow(TlsSignatureScheme.DsaSha1, "SHA1")]
+    [DataRow(TlsSignatureScheme.DsaSha224, "SHA224")]
+    [DataRow(TlsSignatureScheme.DsaSha256, "SHA256")]
+    [DataRow(TlsSignatureScheme.DsaSha384, "SHA384")]
+    [DataRow(TlsSignatureScheme.DsaSha512, "SHA512")]
+    public void EachDsaSchemeIsATlsOneTwoSchemeForADsaKeyThatVerifiesIt(int scheme, string hash)
+    {
+        TlsSignatureRule rule = TlsSignatureScheme.FindTls12Rule((ushort)scheme)!;
+        TlsCertificatePublicKey key = DsaKey();
+
+        Assert.IsTrue(TlsSignatureScheme.IsTls12Scheme((ushort)scheme));
+        Assert.IsFalse(TlsSignatureScheme.IsCertificateVerifyScheme((ushort)scheme));
+        Assert.AreEqual(new TlsSignatureRule(TlsSignatureKind.Dsa, TlsSignatureScheme.DsaOid, null, new HashAlgorithmName(hash)), rule);
+        Assert.IsNull(key.VerifySignature(rule, Content, TestDsaKey.Sign(rule.Hash, Content)));
+    }
+
+    [TestMethod]
+    [DataRow(TlsSignatureScheme.DsaSha256, "EACE8BDBBE353C432A795D9EC556C6D021F7A03F42C36E9BC87E4AC7932CC809", "7081E175455F9247B812B74583E9E94F9EA79BD640DC962533B0680793A38D53", DisplayName = "dsa_sha256")]
+    [DataRow(0, "3A1B2DBD7489D6ED7E608FD036C83AF396E290DBD602408E8677DAABD6E7445A", "D26FCBA19FA3E3058FFC02CA1596CDBB6E0D20CB37B06054F7E36DED0CDBBCCF", DisplayName = "TLS 1.0 and 1.1, SHA-1")]
+    public void ADsaKeyVerifiesRfc6979sPublishedSignatureAndRejectsAFlippedBit(int scheme, string r, string s)
+    {
+        TlsSignatureRule rule = scheme == 0 ? TlsSignatureScheme.FindLegacyRule(TlsSignatureScheme.DsaOid)! : TlsSignatureScheme.FindTls12Rule((ushort)scheme)!;
+        byte[] signature = TestDsaKey.EncodeIntegers(Convert.FromHexString(r), Convert.FromHexString(s));
+        TlsCertificatePublicKey key = DsaKey();
+
+        Assert.IsNull(key.VerifySignature(rule, "sample"u8.ToArray(), signature));
+        signature[^1] ^= 1;
+        Assert.AreEqual(TlsAlertDescription.DecryptError, key.VerifySignature(rule, "sample"u8.ToArray(), signature));
+    }
+
+    [TestMethod]
+    [DataRow(new byte[] { 1, 2, 3 }, DisplayName = "not DER")]
+    [DataRow(new byte[] { 0x30, 0x06, 0x02, 0x01, 0x01, 0x02, 0x01, 0x01, 0x00 }, DisplayName = "a byte after the SEQUENCE")]
+    [DataRow(new byte[] { 0x30, 0x09, 0x02, 0x01, 0x01, 0x02, 0x01, 0x01, 0x02, 0x01, 0x01 }, DisplayName = "a third INTEGER")]
+    [DataRow(new byte[] { 0x30, 0x06, 0x02, 0x01, 0xff, 0x02, 0x01, 0x01 }, DisplayName = "a negative r")]
+    [DataRow(new byte[] { 0x30, 0x06, 0x02, 0x01, 0x01, 0x02, 0x01, 0xff }, DisplayName = "a negative s")]
+    [DataRow(new byte[] { 0x30, 0x07, 0x02, 0x02, 0x00, 0x01, 0x02, 0x01, 0x01 }, DisplayName = "an INTEGER not minimally encoded")]
+    public void ADssSigValueThatDoesNotDecodeDoesNotVerify(byte[] signature) =>
+        Assert.AreEqual(TlsAlertDescription.DecryptError, DsaKey().VerifySignature(TlsSignatureScheme.FindTls12Rule(TlsSignatureScheme.DsaSha256), Content, signature));
+
+    [TestMethod]
+    public void ADssSigValueWhoseRIsLongerThanQDoesNotVerify()
+    {
+        byte[] signature = TestDsaKey.EncodeIntegers([.. Enumerable.Repeat((byte)0x7f, 33)], [1]);
+
+        Assert.AreEqual(TlsAlertDescription.DecryptError, DsaKey().VerifySignature(TlsSignatureScheme.FindTls12Rule(TlsSignatureScheme.DsaSha256), Content, signature));
+    }
+
+    [TestMethod]
+    [DataRow(0, false, false, DisplayName = "y of 0")]
+    [DataRow(1, true, false, DisplayName = "a fourth domain parameter")]
+    [DataRow(1, false, true, DisplayName = "a byte after y")]
+    public void ADsaKeyThatDoesNotReadIsABadCertificate(int publicKey, bool extraParameter, bool trailingByte)
+    {
+        byte[] domain = TestDsaKey.EncodeDomainParameters();
+        if (extraParameter)
+        {
+            AsnReader parameters = new AsnReader(domain, AsnEncodingRules.DER).ReadSequence();
+            domain = TestDsaKey.EncodeIntegers(ReadUnsigned(parameters), ReadUnsigned(parameters), ReadUnsigned(parameters), [1]);
+        }
+
+        AsnWriter y = new(AsnEncodingRules.DER);
+        y.WriteInteger(publicKey);
+        byte[] keyBits = trailingByte ? [.. y.Encode(), 0] : y.Encode();
+        TlsCertificatePublicKey key = TlsCertificatePublicKey.ReadSubjectPublicKeyInfo(DsaSubjectPublicKeyInfo(domain, keyBits));
+
+        Assert.AreEqual(TlsAlertDescription.BadCertificate, key.VerifySignature(TlsSignatureScheme.FindTls12Rule(TlsSignatureScheme.DsaSha256), Content, TestDsaKey.Sign(HashAlgorithmName.SHA256, Content)));
+    }
+
+    [TestMethod]
+    public void ADsaRuleDoesNotFitAnotherKeyNorAnotherRuleADsaKey()
+    {
+        TlsCertificatePublicKey rsa = TlsCertificatePublicKey.Read(TestServerCredential.Rsa(TlsSignatureScheme.RsaPkcs1Sha256).Certificate)!;
+
+        Assert.AreEqual(TlsAlertDescription.IllegalParameter, rsa.VerifySignature(TlsSignatureScheme.FindTls12Rule(TlsSignatureScheme.DsaSha256), Content, [1]));
+        Assert.AreEqual(TlsAlertDescription.IllegalParameter, DsaKey().VerifySignature(TlsSignatureScheme.FindTls12Rule(TlsSignatureScheme.RsaPkcs1Sha256), Content, [1]));
     }
 
     [TestMethod]
@@ -200,6 +281,27 @@ public sealed class Tls12SignatureTests
     }
 
     private static BigInteger ToInteger(ReadOnlySpan<byte> bigEndian) => new(bigEndian, isUnsigned: true, isBigEndian: true);
+
+    private static TlsCertificatePublicKey DsaKey() => TlsCertificatePublicKey.Read(TestServerCredential.Dsa(TlsSignatureScheme.DsaSha256).Certificate)!;
+
+    private static byte[] ReadUnsigned(AsnReader reader) => reader.ReadInteger().ToByteArray(isUnsigned: true, isBigEndian: true);
+
+    private static byte[] DsaSubjectPublicKeyInfo(byte[] domain, byte[] keyBits)
+    {
+        AsnWriter writer = new(AsnEncodingRules.DER);
+        using (writer.PushSequence())
+        {
+            using (writer.PushSequence())
+            {
+                writer.WriteObjectIdentifier(TlsSignatureScheme.DsaOid);
+                writer.WriteEncodedValue(domain);
+            }
+
+            writer.WriteBitString(keyBits);
+        }
+
+        return writer.Encode();
+    }
 
     /// <summary>An RSA key whose private parameters refuse export, as a non-exportable CNG key does; it counts the attempts.</summary>
     private sealed class NonExportableRsa : RSA

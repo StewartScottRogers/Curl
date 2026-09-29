@@ -11,4 +11,7 @@ public enum Tls12Authentication
 
     /// <summary>None: the <c>_anon_</c> suites send no Certificate and an unsigned ServerKeyExchange.</summary>
     Anonymous,
+
+    /// <summary>A DSA certificate that signs the ServerKeyExchange: the <c>DHE_DSS</c> suites.</summary>
+    Dss,
 }

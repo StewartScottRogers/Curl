@@ -16,6 +16,12 @@ public sealed class Tls12ClientHandshakeTests
 {
     private static readonly Tls12ClientSettings EverySuite = DefaultSettings with { CipherSuites = [.. Tls12CipherSuite.All.Select(suite => suite.Code)] };
 
+    private static readonly Tls12ClientSettings EveryDsaScheme = EverySuite with
+    {
+        MinimumVersion = TlsProtocolVersion.Tls10,
+        SignatureAlgorithms = [TlsSignatureScheme.DsaSha256, TlsSignatureScheme.DsaSha384, TlsSignatureScheme.DsaSha512, TlsSignatureScheme.DsaSha224, TlsSignatureScheme.DsaSha1],
+    };
+
     [TestMethod]
     [DataRow((ushort)0xc02b, "ecdsa")]
     [DataRow((ushort)0xc02f, "rsa")]
@@ -61,6 +67,42 @@ public sealed class Tls12ClientHandshakeTests
         using Tls12RecordReadState read = Tls12RecordReadState.Create(client.RecordProtection!, server.KeyBlock.ClientWrite);
         byte[] record = write.Protect(TlsContentType.ApplicationData, "GET / HTTP/1.1"u8);
         CollectionAssert.AreEqual("GET / HTTP/1.1"u8.ToArray(), read.Unprotect(TlsContentType.ApplicationData, record.AsSpan(5)).Value);
+    }
+
+    [TestMethod]
+    [DataRow(TlsProtocolVersion.Tls12, (ushort)0x00a2)]
+    [DataRow(TlsProtocolVersion.Tls11, (ushort)0x0032)]
+    [DataRow(TlsProtocolVersion.Tls10, (ushort)0x0032)]
+    public void DheDssCompletesAtEachVersionAndItsKeysProtectRecords(TlsProtocolVersion version, int cipherSuite)
+    {
+        RecordingCertificateVerifier verifier = new();
+        Tls12TestServer server = new(TestServerCredential.Dsa(TlsSignatureScheme.DsaSha256)) { Version = version, CipherSuite = (ushort)cipherSuite };
+        Tls12ClientHandshake client = Client(EveryDsaScheme, verifier);
+
+        Tls12HandshakeOutput output = Run(client, server);
+
+        AssertCompletesWithServerKeys(client, server, output);
+        Assert.AreEqual(version, client.Version);
+        Assert.AreEqual(Tls12Authentication.Dss, client.CipherSuite!.Authentication);
+        Assert.HasCount(1, verifier.Presented);
+        using Tls12RecordWriteState write = Tls12RecordWriteState.Create(client.RecordProtection!, client.KeyBlock!.ClientWrite, SystemTlsRandomSource.Instance, insertEmptyFragment: false);
+        using Tls12RecordReadState read = Tls12RecordReadState.Create(client.RecordProtection!, server.KeyBlock.ClientWrite);
+        byte[] record = write.Protect(TlsContentType.ApplicationData, "GET / HTTP/1.1"u8);
+        CollectionAssert.AreEqual("GET / HTTP/1.1"u8.ToArray(), read.Unprotect(TlsContentType.ApplicationData, record.AsSpan(5)).Value);
+    }
+
+    [TestMethod]
+    [DataRow(TlsSignatureScheme.DsaSha1)]
+    [DataRow(TlsSignatureScheme.DsaSha224)]
+    [DataRow(TlsSignatureScheme.DsaSha256)]
+    [DataRow(TlsSignatureScheme.DsaSha384)]
+    [DataRow(TlsSignatureScheme.DsaSha512)]
+    public void DheDssServerKeyExchangeVerifiesWithEachDsaScheme(int scheme)
+    {
+        Tls12TestServer server = new(TestServerCredential.Dsa((ushort)scheme)) { CipherSuite = 0x00a3 };
+        Tls12ClientHandshake client = Client(EveryDsaScheme);
+
+        AssertCompletesWithServerKeys(client, server, Run(client, server));
     }
 
     [TestMethod]

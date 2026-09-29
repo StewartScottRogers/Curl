@@ -20,4 +20,7 @@ internal enum TlsSignatureKind
     /// the 36-byte MD5 and SHA-1 hashes of the content, with no DigestInfo.
     /// </summary>
     RsaMd5Sha1,
+
+    /// <summary>DSA (FIPS 186-4) with the DER <c>Dss-Sig-Value</c> signature of RFC 5246 section 4.7.</summary>
+    Dsa,
 }

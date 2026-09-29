@@ -6,7 +6,7 @@ namespace Curl.Tls;
 /// The signature schemes (RFC 8446 section 4.2.3) the client can check or sign: in a TLS
 /// 1.3 CertificateVerify, RSA-PSS with RSAE and PSS keys, ECDSA on the three NIST curves,
 /// and Ed25519; in a TLS 1.2 ServerKeyExchange or CertificateVerify (RFC 5246 section
-/// 7.4.1.4.1), those and RSA PKCS #1 v1.5 and ECDSA with SHA-1, ECDSA on any curve.
+/// 7.4.1.4.1), those and RSA PKCS #1 v1.5, ECDSA with SHA-1, ECDSA on any curve, and DSA.
 /// </summary>
 public static class TlsSignatureScheme
 {
@@ -15,6 +15,21 @@ public static class TlsSignatureScheme
 
     /// <summary><c>ecdsa_sha1</c> (TLS 1.2 only).</summary>
     public const ushort EcdsaSha1 = 0x0203;
+
+    /// <summary><c>dsa_sha1</c> (TLS 1.2 only).</summary>
+    public const ushort DsaSha1 = 0x0202;
+
+    /// <summary><c>dsa_sha224</c> (TLS 1.2 only).</summary>
+    public const ushort DsaSha224 = 0x0302;
+
+    /// <summary><c>dsa_sha256</c> (TLS 1.2 only).</summary>
+    public const ushort DsaSha256 = 0x0402;
+
+    /// <summary><c>dsa_sha384</c> (TLS 1.2 only).</summary>
+    public const ushort DsaSha384 = 0x0502;
+
+    /// <summary><c>dsa_sha512</c> (TLS 1.2 only).</summary>
+    public const ushort DsaSha512 = 0x0602;
 
     /// <summary><c>rsa_pkcs1_sha256</c>: offered for certificates only, never a TLS 1.3 CertificateVerify.</summary>
     public const ushort RsaPkcs1Sha256 = 0x0401;
@@ -59,6 +74,7 @@ public static class TlsSignatureScheme
     internal const string RsaSsaPssOid = "1.2.840.113549.1.1.10";
     internal const string EcPublicKeyOid = "1.2.840.10045.2.1";
     internal const string Ed25519Oid = "1.3.101.112";
+    internal const string DsaOid = "1.2.840.10040.4.1";
     internal const string Secp256r1Oid = "1.2.840.10045.3.1.7";
     internal const string Secp384r1Oid = "1.3.132.0.34";
     internal const string Secp521r1Oid = "1.3.132.0.35";
@@ -88,11 +104,18 @@ public static class TlsSignatureScheme
         [EcdsaSecp256r1Sha256] = new(TlsSignatureKind.Ecdsa, EcPublicKeyOid, null, HashAlgorithmName.SHA256),
         [EcdsaSecp384r1Sha384] = new(TlsSignatureKind.Ecdsa, EcPublicKeyOid, null, HashAlgorithmName.SHA384),
         [EcdsaSecp521r1Sha512] = new(TlsSignatureKind.Ecdsa, EcPublicKeyOid, null, HashAlgorithmName.SHA512),
+        [DsaSha1] = new(TlsSignatureKind.Dsa, DsaOid, null, HashAlgorithmName.SHA1),
+        [DsaSha224] = new(TlsSignatureKind.Dsa, DsaOid, null, new HashAlgorithmName("SHA224")),
+        [DsaSha256] = new(TlsSignatureKind.Dsa, DsaOid, null, HashAlgorithmName.SHA256),
+        [DsaSha384] = new(TlsSignatureKind.Dsa, DsaOid, null, HashAlgorithmName.SHA384),
+        [DsaSha512] = new(TlsSignatureKind.Dsa, DsaOid, null, HashAlgorithmName.SHA512),
     };
 
     private static readonly TlsSignatureRule LegacyRsaRule = new(TlsSignatureKind.RsaMd5Sha1, RsaEncryptionOid, null, default);
 
     private static readonly TlsSignatureRule LegacyEcdsaRule = new(TlsSignatureKind.Ecdsa, EcPublicKeyOid, null, HashAlgorithmName.SHA1);
+
+    private static readonly TlsSignatureRule LegacyDsaRule = new(TlsSignatureKind.Dsa, DsaOid, null, HashAlgorithmName.SHA1);
 
     /// <summary>Returns whether a TLS 1.3 CertificateVerify may carry <paramref name="scheme" /> and the client can check and sign it.</summary>
     /// <param name="scheme">The signature scheme code point.</param>
@@ -101,7 +124,7 @@ public static class TlsSignatureScheme
 
     /// <summary>Returns whether a TLS 1.2 ServerKeyExchange or CertificateVerify may carry <paramref name="scheme" /> and the client can check and sign it.</summary>
     /// <param name="scheme">The signature scheme code point.</param>
-    /// <returns><see langword="true" /> for the TLS 1.3 schemes, RSA PKCS #1 v1.5 and ECDSA with SHA-1.</returns>
+    /// <returns><see langword="true" /> for the TLS 1.3 schemes, RSA PKCS #1 v1.5, ECDSA with SHA-1 and DSA.</returns>
     public static bool IsTls12Scheme(ushort scheme) => Tls12Rules.ContainsKey(scheme);
 
     /// <summary>Gets the TLS 1.0 and 1.1 signatures, RSA over MD5 and SHA-1 then ECDSA over SHA-1, for a signer to pick the one its key fits.</summary>
@@ -114,12 +137,14 @@ public static class TlsSignatureScheme
     /// <summary>
     /// Returns the one signature TLS 1.0 and 1.1 make with a key of
     /// <paramref name="keyOid" /> (RFC 4346 section 7.4.3, RFC 8422 section 5.10): RSA over
-    /// MD5 and SHA-1, or ECDSA over SHA-1; any other key signs nothing.
+    /// MD5 and SHA-1, or ECDSA or DSA over SHA-1 (RFC 2246 section 7.4.3); any other key
+    /// signs nothing.
     /// </summary>
     internal static TlsSignatureRule? FindLegacyRule(string keyOid) => keyOid switch
     {
         RsaEncryptionOid => LegacyRsaRule,
         EcPublicKeyOid => LegacyEcdsaRule,
+        DsaOid => LegacyDsaRule,
         _ => null,
     };
 

@@ -119,10 +119,11 @@ ClientHello (BL-821, ADR-0205), and post-handshake client authentication (BL-880
   exposes `RecordProtection` and `KeyBlock`: the caller switches its write state after
   sending the ChangeCipherSpec and its read state after the server's is accepted. Key
   exchanges: ECDHE (X25519, P-256/384/521), DHE with the server's group (1024 bits at
-  least), RSA and anonymous; `Tls12CipherSuite` holds the 73 suites the record layer can
-  protect (`Tls12KeyExchange`, `Tls12Authentication`, bulk cipher, MAC, PRF). Covers the
-  ServerKeyExchange signature (TLS 1.2 schemes, and TLS 1.0/1.1's MD5+SHA-1 RSA and
-  SHA-1 ECDSA), empty `renegotiation_info` (a server without it is refused), extended
+  least, authenticated by RSA or DSA), RSA and anonymous; `Tls12CipherSuite` holds the 86
+  suites the record layer can protect (`Tls12KeyExchange`, `Tls12Authentication`, bulk
+  cipher, MAC, PRF). Covers the ServerKeyExchange signature (TLS 1.2 schemes, and TLS
+  1.0/1.1's MD5+SHA-1 RSA and SHA-1 ECDSA and DSA; DSA is checked with
+  `Curl.Cryptography`'s `DsaSignature`, ADR-0211), empty `renegotiation_info` (a server without it is refused), extended
   master secret, encrypt-then-MAC, ALPN, SNI, `status_request` with the CertificateStatus
   handed to the verifier with the chain, resumption by session ID and by ticket
   (`Tls12Session`, `Tls12NewSessionTicket`), and an optional client certificate (an RSA
@@ -170,7 +171,8 @@ ClientHello (BL-821, ADR-0205), and post-handshake client authentication (BL-880
   and fail anything but good with `bad_certificate_status_response` and
   `TlsHandshakeFailure.CertificateStatusRejection`.
 - Signatures: `TlsSignatureScheme` (codes, the TLS 1.3 and TLS 1.2 scheme tables - TLS
-  1.2 adds `rsa_pkcs1_*` and `ecdsa_sha1` and binds `ecdsa_*` to no curve - TLS 1.0/1.1's
+  1.2 adds `rsa_pkcs1_*`, `ecdsa_sha1` and the five `dsa_*` (verify only) and binds
+  `ecdsa_*` to no curve - TLS 1.0/1.1's
   legacy signatures, and the CertificateVerify content), `TlsCertificatePublicKey` (a
   certificate's `SubjectPublicKeyInfo`, the signature checks, and the RSA pre-master
   secret encryption), `TlsSigningKey` with `RsaTlsSigningKey`, `EcdsaTlsSigningKey` and

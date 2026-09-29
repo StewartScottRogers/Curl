@@ -127,6 +127,7 @@ public sealed record TlsCertificatePublicKey(string AlgorithmOid, string? CurveO
     {
         TlsSignatureKind.Ecdsa => VerifyEcdsa(rule.Hash, content, signature),
         TlsSignatureKind.Ed25519 => VerifyEd25519(content, signature),
+        TlsSignatureKind.Dsa => VerifyDsa(rule.Hash, content, signature),
         _ => VerifyRsa(rule, content, signature),
     };
 
@@ -177,6 +178,69 @@ public sealed record TlsCertificatePublicKey(string AlgorithmOid, string? CurveO
         using ECDsa ecdsa = ECDsa.Create();
         ecdsa.ImportSubjectPublicKeyInfo(SubjectPublicKeyInfo, out _);
         return ecdsa.VerifyData(content, signature, hash, DSASignatureFormat.Rfc3279DerSequence);
+    }
+
+    /// <summary>
+    /// Checks a DSA signature with the hand-built DSA of <c>Curl.Cryptography</c>, which
+    /// reads the same on every platform where the BCL's does not (ADR-0118). The domain
+    /// parameters p, q and g are the key's <c>Dss-Parms</c> and y the INTEGER in its bit
+    /// string (RFC 3279 section 2.3.2); a key that does not read so is a bad certificate. The
+    /// signature is the DER <c>Dss-Sig-Value</c> of r and s (RFC 5246 section 4.7), and one
+    /// that does not decode does not verify.
+    /// </summary>
+    private bool VerifyDsa(HashAlgorithmName hash, byte[] content, byte[] signature)
+    {
+        AsnReader algorithm = new AsnReader(SubjectPublicKeyInfo, AsnEncodingRules.DER).ReadSequence().ReadSequence();
+        algorithm.ReadObjectIdentifier();
+        AsnReader domain = algorithm.ReadSequence();
+        byte[] prime = ReadPositiveInteger(domain);
+        byte[] subprime = ReadPositiveInteger(domain);
+        byte[] generator = ReadPositiveInteger(domain);
+        domain.ThrowIfNotEmpty();
+        AsnReader keyBits = new(KeyBits, AsnEncodingRules.DER);
+        byte[] publicKey = ReadPositiveInteger(keyBits);
+        keyBits.ThrowIfNotEmpty();
+        byte[]? rs = DecodeDssSignature(signature, subprime.Length);
+        return rs is not null && Cryptography.DsaSignature.VerifyHash(prime, subprime, generator, publicKey, Cryptography.DsaSignature.HashData(content, hash), rs);
+    }
+
+    private static byte[] ReadPositiveInteger(AsnReader reader)
+    {
+        BigInteger value = reader.ReadInteger();
+        return value.Sign > 0
+            ? value.ToByteArray(isUnsigned: true, isBigEndian: true)
+            : throw new CryptographicException("A DSA key's p, q, g and y are positive.");
+    }
+
+    /// <summary>Returns r || s, each <paramref name="subprimeLength" /> bytes, from a DER <c>Dss-Sig-Value</c>, or <see langword="null" /> when it does not decode or a value is negative or longer than q.</summary>
+    private static byte[]? DecodeDssSignature(byte[] signature, int subprimeLength)
+    {
+        try
+        {
+            AsnReader reader = new(signature, AsnEncodingRules.DER);
+            AsnReader values = reader.ReadSequence();
+            reader.ThrowIfNotEmpty();
+            byte[] rs = new byte[2 * subprimeLength];
+            bool fits = TryWriteFixedLength(values.ReadInteger(), rs.AsSpan(0, subprimeLength))
+                & TryWriteFixedLength(values.ReadInteger(), rs.AsSpan(subprimeLength));
+            values.ThrowIfNotEmpty();
+            return fits ? rs : null;
+        }
+        catch (AsnContentException)
+        {
+            return null;
+        }
+    }
+
+    private static bool TryWriteFixedLength(BigInteger value, Span<byte> destination)
+    {
+        if (value.Sign < 0 || value.GetByteCount(isUnsigned: true) > destination.Length)
+        {
+            return false;
+        }
+
+        _ = value.TryWriteBytes(destination[^value.GetByteCount(isUnsigned: true)..], out _, isUnsigned: true, isBigEndian: true);
+        return true;
     }
 
     private bool VerifyEd25519(byte[] content, byte[] signature)
