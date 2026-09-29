@@ -7,8 +7,17 @@ decoder, and two layers need one - HTTP content decoding (`Content-Encoding: zst
 `Curl.Tls.UnitLibrary`) - so it lives in neither and both may reference it (ADR-0120's
 table, as amended by ADR-0185).
 
-Namespace `Curl.Zstandard`. The project is empty so far (BL-857); the decoder and XXH64
-arrive in the tasks ADR-0185 lists.
+Namespace `Curl.Zstandard`. What it holds so far (BL-858):
+
+- `XxHash64` (one-shot) and `XxHash64Accumulator` (incremental), pinned to xxhsum's
+  sanity table and python-xxhash's published values.
+- `ZstandardDecoder`: the streaming push decoder of ADR-0185 (`Decompress` returning
+  `OperationStatus`, `LastError`, static `TryDecompress`). It decodes frames of raw and
+  RLE blocks, skips skippable frames and checks `Content_Checksum`. A compressed block is
+  `InvalidData` with `ZstandardDecodeError.CompressedBlockNotYetSupported` until BL-859
+  and BL-860, which also allocate the window buffer (raw and RLE blocks need none).
+- `ZstandardFrameHeader` reads the frame header; `ZstandardDecodeError` names each failure
+  after the libzstd error code.
 
 ## Rules
 
