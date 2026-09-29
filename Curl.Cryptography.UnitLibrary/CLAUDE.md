@@ -68,6 +68,12 @@ Namespace `Curl.Cryptography`. It holds:
 - `AesCbcCts` (public, `IDisposable`): CBC with ciphertext stealing as RFC 3962 defines
   it for Kerberos, on the BCL's AES-CBC - `Encrypt` and `Decrypt` of a message of at
   least one block; a longer one always has its last two blocks swapped (CBC-CS3).
+- `AeadAesCcm` (public, `IDisposable`): RFC 3610 / NIST SP 800-38C CCM on the BCL's
+  AES-ECB, for TLS's CCM and CCM_8 suites (the BCL's `AesCcm` is missing on macOS) - a
+  nonce of 7 to 13 bytes, a tag of an even 4 to 16 bytes taken from the `tag` span's
+  length, `Encrypt` and `TryDecrypt`, which returns `false` with the plaintext zeroed on a
+  wrong tag, plus the internal `FormatBlock` that lays out B0 and the counter blocks.
+  Constant-time.
 - `MontgomeryModulus` (internal): arithmetic modulo an odd modulus, public or secret, on
   32-bit limbs - CIOS Montgomery multiplication with a masked final subtraction, a fixed
   4-bit window exponentiation whose table look-up reads all 16 entries, `Reduce` of any
@@ -179,7 +185,7 @@ Namespace `Curl.Cryptography`. It holds:
   `TryEncapsulate` (random m, or m given) returns `false` with its outputs zeroed for an
   encapsulation key failing the modulus check. `Dispose` zeroes the key. Constant-time.
 
-The remaining primitives land under their own tasks (BL-677, BL-738, BL-740 to BL-742, BL-744).
+The remaining primitives land under their own tasks (BL-677, BL-741, BL-742, BL-744).
 
 ## Rules
 
