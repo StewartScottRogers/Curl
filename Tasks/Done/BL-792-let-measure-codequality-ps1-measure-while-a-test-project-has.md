@@ -8,7 +8,7 @@ depends-on: []
 touches: [Measure-CodeQuality.ps1]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-29
 ---
 # BL-792 — Let Measure-CodeQuality.ps1 measure while a test project has no tests yet
 
@@ -23,10 +23,13 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] With an empty `.UnitTests` project in the solution and every other test passing, `Measure-CodeQuality.ps1 -Library Curl.Http2.UnitLibrary` prints its report and exits 0.
-- [ ] A failing test still makes the script throw `dotnet test failed`.
+- [x] With an empty `.UnitTests` project in the solution and every other test passing, `Measure-CodeQuality.ps1 -Library Curl.Http2.UnitLibrary` prints its report and exits 0.
+- [x] A failing test still makes the script throw `dotnet test failed`.
 
 ## Notes
+
+- 2026-09-29 (lane 4): On a non-zero `dotnet test` exit the script now reads the captured output: it measures anyway (with a warning) only when a `No test matches the given testcase filter` line is present and there is no `Failed!` summary (matched anywhere in a line, since interleaved project output can glue it mid-line), no aborted run, no `: error XX123` build error and no `Build FAILED`. Anything else still throws. Verified with a stand-in `dotnet` function replaying canned output plus a real Cobertura report: empty-project output -> report and exit 0; a mid-line `Failed!` -> throws; a build error -> throws.
+- 2026-09-29 (lane 5): Lane 4's integration failed on the fast tests, not on this change: no test exercises `Measure-CodeQuality.ps1`, and lane 4 had already seen flaky tests under five-lane load (`UnseekableFileLengthTests`, conformance `test1677` timeout). Cherry-picked lane 4's commit unchanged onto the current base; `dotnet build` clean and the fast suite green (exit 0, `Curl.Protocol.Smb.UnitTests` printing `No test matches the given testcase filter`).
 
 ## Log
 
@@ -34,3 +37,4 @@ completed:
 - 2026-09-29: Backlog -> Doing.
 - 2026-09-29: Doing -> Backlog. Lane 4 could not integrate: fast tests failed after rebasing onto the other lanes' work. The work is on branch factory/BL-792-lane-4-20260929-023709; start with git cherry-pick --no-commit factory/BL-792-lane-4-20260929-023709 and fix it.
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Done. Measure-CodeQuality.ps1 measures past a zero-test exit and still throws on a real failure
