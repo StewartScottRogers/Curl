@@ -37,3 +37,4 @@ An `https://` transfer with `--http3` or `--http3-only` and a proxy (`-x http://
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
