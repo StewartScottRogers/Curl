@@ -32,3 +32,4 @@ Each `SearchResultEntry` is written exactly as the platform's curl 8.21.0 build 
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
