@@ -48,4 +48,53 @@ public sealed class TlsClientOptionsTests
         Assert.AreEqual("TLS_AES_128_GCM_SHA256", changed.Tls13Ciphers);
         Assert.AreEqual(new TlsClientOptions(), original);
     }
+
+    [TestMethod]
+    public void Constructor_WithNoArguments_LeavesTheTenOptionsOfAdr0151NotGiven()
+    {
+        var options = new TlsClientOptions();
+
+        Assert.IsNull(options.Curves);
+        Assert.IsNull(options.SignatureAlgorithms);
+        Assert.IsFalse(options.AllowEarlyData);
+        Assert.IsNull(options.Ech);
+        Assert.IsNull(options.EchPublicName);
+        Assert.IsNull(options.EchConfigList);
+        Assert.IsNull(options.SslSessionsFile);
+        Assert.IsNull(options.Engine);
+        Assert.IsNull(options.TlsUser);
+        Assert.IsNull(options.TlsPassword);
+        Assert.IsNull(options.TlsAuthType);
+    }
+
+    [TestMethod]
+    public void With_TheTenOptionsOfAdr0151_CopiesTheOptionsWithTheNewValues()
+    {
+        var changed = new TlsClientOptions() with
+        {
+            Curves = "X25519",
+            SignatureAlgorithms = "ECDSA+SHA256",
+            AllowEarlyData = true,
+            Ech = "hard",
+            EchPublicName = "example.com",
+            EchConfigList = "AEX+DQ==",
+            SslSessionsFile = "sess.bin",
+            Engine = "pkcs11",
+            TlsUser = "user",
+            TlsPassword = "secret",
+            TlsAuthType = "SRP",
+        };
+
+        Assert.AreEqual("X25519", changed.Curves);
+        Assert.AreEqual("ECDSA+SHA256", changed.SignatureAlgorithms);
+        Assert.IsTrue(changed.AllowEarlyData);
+        Assert.AreEqual("hard", changed.Ech);
+        Assert.AreEqual("example.com", changed.EchPublicName);
+        Assert.AreEqual("AEX+DQ==", changed.EchConfigList);
+        Assert.AreEqual("sess.bin", changed.SslSessionsFile);
+        Assert.AreEqual("pkcs11", changed.Engine);
+        Assert.AreEqual("user", changed.TlsUser);
+        Assert.AreEqual("secret", changed.TlsPassword);
+        Assert.AreEqual("SRP", changed.TlsAuthType);
+    }
 }

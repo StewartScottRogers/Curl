@@ -2146,7 +2146,8 @@ internal sealed class CurlCommandRunner(
     /// </param>
     /// <param name="headerOutput">Where the <c>-D</c> header lines go, or <see langword="null" /> without <c>-D</c>.</param>
     /// <returns>
-    /// The transfer's result; <see cref="ByteRangeParser.NotDeliveredFailure" />, with nothing
+    /// The transfer's result; <see cref="NoCryptoEngines.LoadFailure" />'s failure, before any upload
+    /// file is opened or the URL parsed, for an <c>--engine</c> off Windows; <see cref="ByteRangeParser.NotDeliveredFailure" />, with nothing
     /// transferred, when the <c>-r</c> text names no range, as curl 8.21.0 reports it; the
     /// <c>-F</c> body's build failure, with nothing transferred, when a form file cannot be opened;
     /// <see cref="CannotOpenUploadFileResult" />, with nothing transferred, when the <c>-T</c> file
@@ -2169,6 +2170,29 @@ internal sealed class CurlCommandRunner(
             await WriteErrorLinesAsync(dispatch.WarningLinesBeforeEachTransfer).ConfigureAwait(false);
         }
 
+        return NoCryptoEngines.LoadFailure(options.Engine, runsOnWindows)
+            ?? await TransferOpeningUploadFileAsync(dispatch, options, url, uploadFile, transfer, headerOutput).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Performs one transfer for <see cref="TransferAsync" /> once its warning lines are written,
+    /// opening the <c>-T</c> file first when it names one other than standard input.
+    /// </summary>
+    /// <param name="dispatch">Performs the transfer with the handler for its scheme.</param>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="url">The URL to transfer.</param>
+    /// <param name="uploadFile">The URL's <c>-T</c> file, or <see langword="null" /> when it uploads nothing.</param>
+    /// <param name="transfer">The transfer, which names its output.</param>
+    /// <param name="headerOutput">Where the <c>-D</c> header lines go, or <see langword="null" /> without <c>-D</c>.</param>
+    /// <returns>The transfer's result, as <see cref="TransferAsync" /> describes it.</returns>
+    private async Task<TransferResult> TransferOpeningUploadFileAsync(
+        TransferDispatch dispatch,
+        CommandLineOptions options,
+        string url,
+        string? uploadFile,
+        UrlTransfer transfer,
+        Stream? headerOutput)
+    {
         if (uploadFile is null || UploadUrl.IsStandardInput(uploadFile))
         {
             Stream? standardInputUpload = uploadFile is null ? null : standardInput;
@@ -3160,7 +3184,8 @@ internal sealed class CurlCommandRunner(
     /// <see cref="CurlVersionText" />'s for the running system for <c>-V</c> / <c>--version</c>,
     /// <see cref="CurlManual" />'s for <c>-M</c> / <c>--manual</c>, and <see cref="CurlHelpText" />'s at
     /// <c>terminalColumns</c> for <c>-h</c> / <c>--help</c> with no subject, a category, <c>all</c> or
-    /// <c>category</c>. Parsing ends at the first of these options, so at most one is set.
+    /// <c>category</c>, and <see cref="TlsBuildInformation" />'s for <c>--engine list</c> and
+    /// <c>--dump-ca-embed</c>. Parsing ends at the first of these options, so at most one is set.
     /// </summary>
     /// <param name="options">The parsed options.</param>
     /// <returns>
@@ -3173,7 +3198,7 @@ internal sealed class CurlCommandRunner(
         { ManualRequested: true } => CurlManual.Lines(),
         { HelpRequested: true, HelpSubject: var subject } when !CurlHelpText.IsOptionSubject(subject) =>
             CurlHelpText.Lines(subject, terminalColumns),
-        _ => null,
+        _ => TlsBuildInformation.Lines(options),
     };
 
     /// <summary>

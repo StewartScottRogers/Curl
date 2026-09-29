@@ -95,6 +95,55 @@ namespace Curl.Networking;
 /// command-line parser refuses as curl does; <see cref="SslStreamTlsProvider" /> throws
 /// <see cref="ArgumentException" /> for one (BL-502).
 /// </param>
+/// <param name="Curves">
+/// curl's <c>--curves</c> value, verbatim: the key-exchange groups to offer. ADR-0151 gives it to
+/// the hand-built client on every platform (BL-709); neither provider applies it yet.
+/// <see langword="null" /> leaves the choice to the platform.
+/// </param>
+/// <param name="SignatureAlgorithms">
+/// curl's <c>--sigalgs</c> value, verbatim: the signature algorithms to offer. ADR-0151 gives it
+/// to the hand-built client on every platform (BL-709); neither provider applies it yet.
+/// <see langword="null" /> leaves the choice to the platform.
+/// </param>
+/// <param name="AllowEarlyData">
+/// <see langword="true" /> for curl's <c>--tls-earlydata</c>: send TLS 1.3 early data on a resumed
+/// session. ADR-0151 gives it to the hand-built client (BL-710); neither provider applies it yet.
+/// </param>
+/// <param name="Ech">
+/// curl's <c>--ech</c> mode, verbatim (<c>false</c>, <c>grease</c>, <c>true</c> or <c>hard</c>);
+/// <see langword="null" /> when not given. ADR-0151 gives every mode but <c>false</c> to the
+/// hand-built client (BL-711); neither provider applies it yet.
+/// </param>
+/// <param name="EchPublicName">
+/// The public name of curl's <c>--ech pn:&lt;name&gt;</c>, without the prefix; <see langword="null" />
+/// when not given. Applied with <paramref name="Ech" /> (BL-711).
+/// </param>
+/// <param name="EchConfigList">
+/// The base64 ECHConfigList of curl's <c>--ech ecl:&lt;list&gt;</c>, without the prefix;
+/// <see langword="null" /> when not given. Applied with <paramref name="Ech" /> (BL-711).
+/// </param>
+/// <param name="SslSessionsFile">
+/// curl's <c>--ssl-sessions</c> file, which session tickets are loaded from and saved to;
+/// <see langword="null" /> when not given. ADR-0151 gives it to the hand-built client (BL-710);
+/// neither provider applies it yet.
+/// </param>
+/// <param name="Engine">
+/// curl's <c>--engine</c> name, verbatim; <see langword="null" /> when not given. No provider loads
+/// a crypto engine: as ADR-0151 decides, the console ignores it on Windows and fails the transfer
+/// before it connects elsewhere, so a handshake never sees one.
+/// </param>
+/// <param name="TlsUser">
+/// curl's <c>--tlsuser</c>: the TLS-SRP user name; <see langword="null" /> when not given. ADR-0151
+/// gives TLS-SRP to the hand-built client (BL-712); neither provider applies it yet.
+/// </param>
+/// <param name="TlsPassword">
+/// curl's <c>--tlspassword</c>: the TLS-SRP password, empty included; <see langword="null" /> when not
+/// given. Applied with <paramref name="TlsUser" /> (BL-712).
+/// </param>
+/// <param name="TlsAuthType">
+/// curl's <c>--tlsauthtype</c>: <c>SRP</c>, the only type the command line accepts, or
+/// <see langword="null" /> when not given.
+/// </param>
 public sealed record TlsClientOptions(
     bool Insecure = false,
     TlsVersion MinimumVersion = TlsVersion.SystemDefault,
@@ -110,4 +159,15 @@ public sealed record TlsClientOptions(
     bool SkipRevocationCheck = false,
     bool RevocationCheckBestEffort = false,
     bool UseAlpn = true,
-    TlsVersion MaximumVersion = TlsVersion.SystemDefault);
+    TlsVersion MaximumVersion = TlsVersion.SystemDefault,
+    string? Curves = null,
+    string? SignatureAlgorithms = null,
+    bool AllowEarlyData = false,
+    string? Ech = null,
+    string? EchPublicName = null,
+    string? EchConfigList = null,
+    string? SslSessionsFile = null,
+    string? Engine = null,
+    string? TlsUser = null,
+    string? TlsPassword = null,
+    string? TlsAuthType = null);

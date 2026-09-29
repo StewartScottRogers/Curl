@@ -47,7 +47,14 @@ internal static class TlsClientOptionsMapping
     /// <see cref="CommandLineOptions.UseAlpn" /> verbatim, and
     /// <see cref="CommandLineOptions.MinimumTlsVersion" /> and
     /// <see cref="CommandLineOptions.MaximumTlsVersion" /> (<c>--tls-max</c>) as the
-    /// <see cref="TlsVersion" /> <see cref="ToTlsVersion" /> maps them to.
+    /// <see cref="TlsVersion" /> <see cref="ToTlsVersion" /> maps them to; and the ten options of
+    /// ADR-0151 verbatim: <see cref="CommandLineOptions.Curves" />,
+    /// <see cref="CommandLineOptions.SignatureAlgorithms" />,
+    /// <see cref="CommandLineOptions.TlsEarlyData" /> (as <see cref="TlsClientOptions.AllowEarlyData" />),
+    /// <see cref="CommandLineOptions.Ech" />, <see cref="CommandLineOptions.EchPublicName" />,
+    /// <see cref="CommandLineOptions.EchConfigList" />, <see cref="CommandLineOptions.SslSessionsFile" />,
+    /// <see cref="CommandLineOptions.Engine" />, <see cref="CommandLineOptions.TlsUser" />,
+    /// <see cref="CommandLineOptions.TlsPassword" /> and <see cref="CommandLineOptions.TlsAuthType" />.
     /// </returns>
     internal static TlsClientOptions FromCommandLine(CommandLineOptions options) =>
         new(
@@ -65,7 +72,18 @@ internal static class TlsClientOptionsMapping
             options.SkipRevocationCheck,
             options.RevocationCheckBestEffort,
             options.UseAlpn,
-            ToTlsVersion(options.MaximumTlsVersion));
+            ToTlsVersion(options.MaximumTlsVersion),
+            options.Curves,
+            options.SignatureAlgorithms,
+            options.TlsEarlyData,
+            options.Ech,
+            options.EchPublicName,
+            options.EchConfigList,
+            options.SslSessionsFile,
+            options.Engine,
+            options.TlsUser,
+            options.TlsPassword,
+            options.TlsAuthType);
 
     /// <summary>
     /// Maps the proxy TLS options of a parsed command line onto the <see cref="TlsClientOptions" />
