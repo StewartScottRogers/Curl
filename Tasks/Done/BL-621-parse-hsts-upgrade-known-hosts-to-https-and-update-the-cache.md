@@ -53,7 +53,7 @@ completed: 2026-09-29
      `* Connection #0 to host localhost:18443 left intact` /
      `* Issue another request to this URL: 'http://localhost:18443/x'` /
      `* Switched from HTTP to HTTPS due to HSTS => https://localhost:18443/x`. The Issue line is
-     filed as BL-901.
+     filed as BL-907.
   Earlier in the run (before the cut-off): `--hsts ""` and `--hsts -abc` are accepted without a
   warning, a failed connect still writes the file, and an unwritable file is silently skipped.
 

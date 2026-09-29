@@ -1,5 +1,5 @@
 ---
-id: BL-901
+id: BL-907
 title: Print curl's Issue another request line before each followed -L redirect
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-901 — Print curl's Issue another request line before each followed -L redirect
+# BL-907 — Print curl's Issue another request line before each followed -L redirect
 
 ## Goal
 

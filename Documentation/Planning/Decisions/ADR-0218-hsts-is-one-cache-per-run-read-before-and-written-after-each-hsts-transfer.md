@@ -34,4 +34,4 @@ BL-621's Notes (curl 8.21.0 mingw Schannel, 2026-09-29).
 ## Consequences
 
 curl prints `* Issue another request to this URL: '<target>'` before the switch line of a followed
-redirect; Curl prints that line only for the 417 resend today, which BL-901 fixes.
+redirect; Curl prints that line only for the 417 resend today, which BL-907 fixes.
