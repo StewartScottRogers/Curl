@@ -20,4 +20,10 @@ public enum KerberosEncryptionType
 
     /// <summary><c>rc4-hmac</c> (RFC 4757).</summary>
     Rc4Hmac = 23,
+
+    /// <summary><c>camellia128-cts-cmac</c> (RFC 6803).</summary>
+    Camellia128CtsCmac = 25,
+
+    /// <summary><c>camellia256-cts-cmac</c> (RFC 6803).</summary>
+    Camellia256CtsCmac = 26,
 }

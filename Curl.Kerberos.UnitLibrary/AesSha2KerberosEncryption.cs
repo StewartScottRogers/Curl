@@ -33,6 +33,14 @@ internal sealed class AesSha2KerberosEncryption : KerberosEncryption
         this.encryptionTypeName = encryptionTypeName;
     }
 
+    /// <summary>Gives <c>aes128-cts-hmac-sha256-128</c> for <see cref="KerberosEncryptionType.Aes128CtsHmacSha256128" />, <c>aes256-cts-hmac-sha384-192</c> otherwise.</summary>
+    /// <param name="encryptionType">One of the two RFC 8009 encryption types.</param>
+    /// <param name="randomSource">Where the confounders come from.</param>
+    public static AesSha2KerberosEncryption ForType(KerberosEncryptionType encryptionType, IKerberosRandomSource randomSource) =>
+        encryptionType == KerberosEncryptionType.Aes128CtsHmacSha256128
+            ? new(encryptionType, 19, 16, HashAlgorithmName.SHA256, 16, "aes128-cts-hmac-sha256-128"u8.ToArray(), randomSource)
+            : new(encryptionType, 20, 32, HashAlgorithmName.SHA384, 24, "aes256-cts-hmac-sha384-192"u8.ToArray(), randomSource);
+
     /// <summary>
     /// RFC 8009 section 3's <c>KDF-HMAC-SHA2(key, label, [context,] k)</c>: the HMAC of
     /// <c>0x00000001 | label | 0x00 | context | k</c>, cut to <paramref name="bits" />.

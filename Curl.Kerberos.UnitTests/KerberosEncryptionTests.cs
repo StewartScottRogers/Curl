@@ -13,6 +13,8 @@ public sealed class KerberosEncryptionTests
     [DataRow(KerberosEncryptionType.Aes128CtsHmacSha256128, 19, 16, 16)]
     [DataRow(KerberosEncryptionType.Aes256CtsHmacSha384192, 20, 32, 24)]
     [DataRow(KerberosEncryptionType.Rc4Hmac, -138, 16, 16)]
+    [DataRow(KerberosEncryptionType.Camellia128CtsCmac, 17, 16, 16)]
+    [DataRow(KerberosEncryptionType.Camellia256CtsCmac, 18, 32, 16)]
     public void Create_KnownType_HasItsChecksumTypeAndSizes(KerberosEncryptionType encryptionType, int checksumType, int keySize, int checksumSize)
     {
         KerberosEncryption encryption = KerberosEncryption.Create(encryptionType, new SystemKerberosRandomSource());

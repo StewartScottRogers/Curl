@@ -55,9 +55,9 @@ public abstract class KerberosEncryption
     {
         KerberosEncryptionType.Aes128CtsHmacSha196 => new AesSha1KerberosEncryption(encryptionType, 15, 16, randomSource),
         KerberosEncryptionType.Aes256CtsHmacSha196 => new AesSha1KerberosEncryption(encryptionType, 16, 32, randomSource),
-        KerberosEncryptionType.Aes128CtsHmacSha256128 => new AesSha2KerberosEncryption(encryptionType, 19, 16, HashAlgorithmName.SHA256, 16, "aes128-cts-hmac-sha256-128"u8.ToArray(), randomSource),
-        KerberosEncryptionType.Aes256CtsHmacSha384192 => new AesSha2KerberosEncryption(encryptionType, 20, 32, HashAlgorithmName.SHA384, 24, "aes256-cts-hmac-sha384-192"u8.ToArray(), randomSource),
+        KerberosEncryptionType.Aes128CtsHmacSha256128 or KerberosEncryptionType.Aes256CtsHmacSha384192 => AesSha2KerberosEncryption.ForType(encryptionType, randomSource),
         KerberosEncryptionType.Rc4Hmac => new Rc4HmacKerberosEncryption(randomSource),
+        KerberosEncryptionType.Camellia128CtsCmac or KerberosEncryptionType.Camellia256CtsCmac => CamelliaCmacKerberosEncryption.ForType(encryptionType, randomSource),
         _ => throw new KerberosCryptographyException(KerberosCryptographyError.UnsupportedEncryptionType),
     };
 

@@ -24,12 +24,14 @@ its realm and locates a realm's KDCs from the file or from DNS SRV records throu
 `IKerberosSrvLookup` (`KerberosConfigurationStore`, `KerberosConfigurationReader`,
 `KerberosConfiguration`, `KerberosKdcLocator`; BL-689, ADR-0160). It encrypts,
 decrypts, checksums and makes keys from passwords with `aes128`/`aes256-cts-hmac-sha1-96`
-(RFC 3962), `aes128-cts-hmac-sha256-128`, `aes256-cts-hmac-sha384-192` (RFC 8009) and
-`rc4-hmac` (RFC 4757): `KerberosEncryption.Create` gives one per `KerberosEncryptionType`,
+(RFC 3962), `aes128-cts-hmac-sha256-128`, `aes256-cts-hmac-sha384-192` (RFC 8009),
+`rc4-hmac` (RFC 4757) and `camellia128-cts-cmac`, `camellia256-cts-cmac` (RFC 6803):
+`KerberosEncryption.Create` gives one per `KerberosEncryptionType`,
 confounders come from `IKerberosRandomSource`, and a failed integrity check throws
 `KerberosCryptographyException` (`KerberosNFold`, `KerberosAesCts`,
 `AesSha1KerberosEncryption`, `AesSha2KerberosEncryption`, `Rc4HmacKerberosEncryption`;
-BL-686, ADR-0161). It encodes in DER and decodes (BER accepted) the Kerberos V5
+BL-686, ADR-0161; `CamelliaCmacKerberosEncryption` over `Curl.Cryptography`'s
+`Camellia` with `KerberosCamelliaCts` and `KerberosCamelliaCmac`, BL-893). It encodes in DER and decodes (BER accepted) the Kerberos V5
 messages with `System.Formats.Asn1`: `KerberosKdcRequest` (AS-REQ, TGS-REQ),
 `KerberosKdcReply` (AS-REP, TGS-REP), `KerberosEncryptedKdcReplyPart`,
 `KerberosApRequest`, `KerberosAuthenticator`, `KerberosApReply`,
@@ -72,7 +74,7 @@ reads Wrap and MIC tokens, RFC 4121's for AES keys and RFC 4757's for `rc4-hmac`
 
 - **Base class library plus `Curl.Cryptography.UnitLibrary` only.** No package, and no
   other project reference. `Curl.Cryptography.UnitLibrary` supplies AES-CBC-CTS, MD4
-  and RC4 (BL-686).
+  and RC4 (BL-686) and the Camellia block cipher (BL-783).
 - **Never a `Socket`.** The KDC is reached through an injected transport, so every
   exchange is testable with recorded bytes and no network.
 - **Files through an injected seam.** The credential cache, the keytab and `krb5.conf`

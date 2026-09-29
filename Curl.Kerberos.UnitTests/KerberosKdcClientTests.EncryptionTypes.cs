@@ -12,8 +12,8 @@ public sealed partial class KerberosKdcClientTests
     {
         KerberosKdcClient client = ClientFor(new FakeKdc(), string.Empty);
 
-        CollectionAssert.AreEqual(new[] { 18, 17, 20, 19 }, client.AsRequestEncryptionTypes.ToArray());
-        CollectionAssert.AreEqual(new[] { 18, 17, 20, 19 }, client.TgsRequestEncryptionTypes.ToArray());
+        CollectionAssert.AreEqual(new[] { 18, 17, 20, 19, 25, 26 }, client.AsRequestEncryptionTypes.ToArray());
+        CollectionAssert.AreEqual(new[] { 18, 17, 20, 19, 25, 26 }, client.TgsRequestEncryptionTypes.ToArray());
     }
 
     [TestMethod]
@@ -25,7 +25,7 @@ public sealed partial class KerberosKdcClientTests
         using KerberosCredential credential = await client.GetInitialTicketAsync(AlicePassword, KerberosKdcClient.TicketGrantingServer(FakeKdc.Realm), CancellationToken.None);
 
         Assert.HasCount(2, kdc.Requests);
-        Assert.IsTrue(kdc.Requests.All(request => request.Body.EncryptionTypes.SequenceEqual([23, 19, 18])));
+        Assert.IsTrue(kdc.Requests.All(request => request.Body.EncryptionTypes.SequenceEqual([23, 19, 18, 26, 25])));
         Assert.AreEqual(18, KerberosEncryptedData.Decode(kdc.Requests[1].PreAuthenticationData.Single().Value).EncryptionType);
     }
 
@@ -38,7 +38,7 @@ public sealed partial class KerberosKdcClientTests
 
         using KerberosCredential credential = await client.GetTicketFromTicketGrantingServiceAsync(ticketGrantingTicket, FakeKdc.Service, CancellationToken.None);
 
-        CollectionAssert.AreEqual(new[] { 17, 20, 19, 23 }, kdc.Requests.Single().Body.EncryptionTypes.ToArray());
+        CollectionAssert.AreEqual(new[] { 17, 20, 19, 25, 26, 23 }, kdc.Requests.Single().Body.EncryptionTypes.ToArray());
     }
 
     [TestMethod]
@@ -47,7 +47,7 @@ public sealed partial class KerberosKdcClientTests
         FakeKdc kdc = new();
 
         KerberosKdcException failure = await Assert.ThrowsExactlyAsync<KerberosKdcException>(
-            () => ClientFor(kdc, " default_tkt_enctypes = camellia\n").GetInitialTicketAsync(AlicePassword, KerberosKdcClient.TicketGrantingServer(FakeKdc.Realm), CancellationToken.None));
+            () => ClientFor(kdc, " default_tkt_enctypes = des3\n").GetInitialTicketAsync(AlicePassword, KerberosKdcClient.TicketGrantingServer(FakeKdc.Realm), CancellationToken.None));
 
         Assert.AreEqual(KerberosKdcError.EncryptionTypeNotSupported, failure.Error);
         Assert.IsEmpty(kdc.Exchanges);

@@ -56,7 +56,7 @@ public sealed partial class KerberosKdcClientTests
         Assert.IsNull(request.Body.ClientName);
         Assert.AreEqual(FakeKdc.Now.AddHours(8).AddMilliseconds(-500), request.Body.Till, "KerberosTime keeps whole seconds.");
         Assert.AreEqual(0x01020304u, request.Body.Nonce);
-        CollectionAssert.AreEqual(new[] { 18, 17, 20, 19 }, request.Body.EncryptionTypes.ToArray());
+        CollectionAssert.AreEqual(new[] { 18, 17, 20, 19, 25, 26 }, request.Body.EncryptionTypes.ToArray());
         Assert.AreEqual(FakeKdc.Now.AddMilliseconds(-500), kdc.LastAuthenticator!.ClientTime);
         Assert.AreEqual(500_000, kdc.LastAuthenticator.ClientMicroseconds);
         Assert.AreEqual(16, kdc.LastAuthenticator.Checksum!.ChecksumType);
