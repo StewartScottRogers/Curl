@@ -64,6 +64,18 @@ public sealed class ImapProtocolHandlerAuthenticationTests
     }
 
     [TestMethod]
+    [DataRow(Url, 18143, DisplayName = "The URL's port")]
+    [DataRow("imap://127.0.0.1/", 143, DisplayName = "The scheme's default")]
+    public async Task ExecuteAsync_SaslRequest_CarriesTheConnectionsPort(string url, int expected)
+    {
+        var sasl = new FakeSaslAuthenticator("PLAIN", PlainMessage);
+
+        await RunAsync(Greeting + Caps("AUTH=PLAIN") + "+ \r\nA002 OK done\r\n" + ListReply("A003") + LogoutReply("A004"), sasl, url: url);
+
+        Assert.AreEqual(expected, sasl.Begun.Single().Port);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_LoginMechanism_AnswersEachChallenge()
     {
         // opt-auth-login: AUTHENTICATE LOGIN, "+ VXNlcm5hbWU6", dQ==, "+ UGFzc3dvcmQ6", cA==, OK.

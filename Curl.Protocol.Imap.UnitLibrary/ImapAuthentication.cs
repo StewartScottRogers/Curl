@@ -93,7 +93,8 @@ internal sealed class ImapAuthentication(ImapControlChannel channel, ISaslAuthen
             mail.BearerToken,
             RequiredMechanism: null,
             mail.ServiceName ?? DefaultServiceName,
-            context.Url.Host);
+            context.Url.Host,
+            context.Url.Port);
     }
 
     /// <summary>

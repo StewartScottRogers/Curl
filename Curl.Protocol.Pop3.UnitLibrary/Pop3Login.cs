@@ -110,7 +110,8 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
             mail.BearerToken,
             options.RequiredMechanism,
             mail.ServiceName ?? DefaultServiceName,
-            context.Url.IdnHost);
+            context.Url.IdnHost,
+            context.Url.Port);
         return saslAuthenticator.ChooseMechanism(request, capabilities.SaslMechanisms) is { } mechanism
             ? saslAuthenticator.Begin(mechanism, request)
             : null;

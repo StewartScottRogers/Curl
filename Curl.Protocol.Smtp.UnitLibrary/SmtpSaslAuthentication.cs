@@ -165,7 +165,8 @@ internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAu
             mail.BearerToken,
             RequiredMechanism(mail.LoginOptions ?? context.Url.Options),
             mail.ServiceName ?? DefaultServiceName,
-            context.Url.Host);
+            context.Url.Host,
+            context.Url.Port);
     }
 
     /// <summary>

@@ -67,7 +67,18 @@ public sealed class Pop3ProtocolHandlerLoginTests
         var mail = new MailRequestOptions { SaslAuthorizationIdentity = "z", BearerToken = "tok" };
         await RunAsync(Greeting + CapaReply + "+ \r\n+OK\r\n" + ListReply + Bye, mail: mail, sasl: sasl);
 
-        Assert.AreEqual(new SaslRequest(UserP, "z", "tok", null, "pop", "127.0.0.1"), sasl.Requests.Single());
+        Assert.AreEqual(new SaslRequest(UserP, "z", "tok", null, "pop", "127.0.0.1", 18110), sasl.Requests.Single());
+    }
+
+    [TestMethod]
+    [DataRow(Url, 18110, DisplayName = "The URL's port")]
+    [DataRow("pop3://127.0.0.1/", 110, DisplayName = "The scheme's default")]
+    public async Task ExecuteAsync_SaslRequest_CarriesTheConnectionsPort(string url, int expected)
+    {
+        var sasl = PlainAndLogin();
+        await RunAsync(Greeting + CapaReply + "+ \r\n+OK\r\n" + ListReply + Bye, sasl: sasl, url: url);
+
+        Assert.AreEqual(expected, sasl.Requests.Single().Port);
     }
 
     [TestMethod]
