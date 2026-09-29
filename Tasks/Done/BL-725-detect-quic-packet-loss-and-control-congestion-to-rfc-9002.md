@@ -38,7 +38,7 @@ The QUIC connection acknowledges packets (ACK frames with ranges and ACK delay),
   - The pacer is a token bucket of 10 datagrams filling at 1.25 x cwnd / smoothed RTT; an RTT under the 1 ms granularity counts as 1 ms. `QuicClientConnector` waits on it before each datagram.
   - A Retry discards the Initial space's recovery state (section 6.3).
 - `QuicTestServer` answered a retransmitted ClientHello a second time with fresh keys; it now answers only when new CRYPTO bytes arrive.
-- Follow-up filed: BL-825 (HyStart++ and application-limited detection in CUBIC, after BL-726).
+- Follow-up filed: BL-833 (HyStart++ and application-limited detection in CUBIC, after BL-726).
 
 - From BL-724 (ADR-0165 decision 7): `QuicDatagramAssembler` coalesces Handshake and 1-RTT packets even when they go to different destination connection IDs (the server retired its handshake ID before HANDSHAKE_DONE), which RFC 9000 section 12.2 forbids. When retransmission reworks sending, start a new datagram when the destination connection ID changes.
 

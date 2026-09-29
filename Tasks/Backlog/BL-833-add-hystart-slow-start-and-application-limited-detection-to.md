@@ -1,5 +1,5 @@
 ---
-id: BL-825
+id: BL-833
 title: Add HyStart++ slow start and application-limited detection to the QUIC CUBIC controller
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-825 — Add HyStart++ slow start and application-limited detection to the QUIC CUBIC controller
+# BL-833 — Add HyStart++ slow start and application-limited detection to the QUIC CUBIC controller
 
 ## Goal
 
