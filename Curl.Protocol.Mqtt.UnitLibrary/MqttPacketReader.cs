@@ -8,8 +8,9 @@ namespace Curl.Protocol.Mqtt;
 /// several.
 /// </summary>
 /// <param name="connection">The connection to read from.</param>
+/// <param name="log">Where each fixed header read is logged (ADR-0222, BL-928).</param>
 /// <param name="cancellationToken">Cancels every read.</param>
-internal sealed class MqttPacketReader(IConnection connection, CancellationToken cancellationToken)
+internal sealed class MqttPacketReader(IConnection connection, MqttDiagnosticLog log, CancellationToken cancellationToken)
 {
     private const int MaximumLengthBytes = 4;
 
@@ -38,6 +39,7 @@ internal sealed class MqttPacketReader(IConnection connection, CancellationToken
         }
 
         MqttFixedHeader header = new((byte)firstByte, await ReadRemainingLengthAsync().ConfigureAwait(false));
+        log.PacketReceived(header);
         RejectMalformedControlPacket(header);
 
         return header;

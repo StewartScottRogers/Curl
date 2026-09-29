@@ -17,6 +17,16 @@ and disposes that connection itself. A transfer proxy (`ITransferContext.Proxy`)
 proxy code. The client identifier's random eight characters
 come from a constructor parameter, so tests fix them.
 
+Curl's own diagnostic log (`--log-level`, ADR-0222, BL-928): `MqttDiagnosticLog` writes
+component `mqtt` from `ITransferContext.DiagnosticLog` - the failure that ends a transfer
+as `error` with its `CurlExitCode`, a packet the session passes over (a body taken as the
+CONNACK whatever its type, an empty packet ignored, a body left unread, a packet not
+handled) as `warning`, the SUBSCRIBE or PUBLISH line, the CONNACK return code, the
+SUBSCRIBE or PUBLISH done and the transfer end with bytes and ms as `info`, and each
+packet's type and remaining length, sent and received, as `verbose`. No packet body is
+logged, so the CONNECT's user name and password never are; the connect target carries the
+log on.
+
 This library may reference `Curl.Protocol.Abstractions.UnitLibrary` and nothing
 else horizontal. Referencing another protocol library is a build break, and
 `Curl.Protocol.Abstractions.UnitTests` fails if one appears.

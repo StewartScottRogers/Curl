@@ -16,6 +16,7 @@ namespace Curl.Protocol.Mqtt;
 /// PUBLISH body's length as the expected size, as curl's <c>Curl_pgrsSetDownloadSize</c> sets it
 /// (so <c>-m</c> reports <c>with 5 out of 5 bytes received</c>, BL-511 Notes).
 /// </param>
+/// <param name="log">Where each packet sent and received and each step is logged (ADR-0222, BL-928).</param>
 /// <param name="cancellationToken">Cancels every read and write.</param>
 /// <remarks>
 /// <para>
@@ -39,7 +40,7 @@ namespace Curl.Protocol.Mqtt;
 /// code and message; <see cref="BytesWritten" /> still says how much reached the output.
 /// </para>
 /// </remarks>
-internal sealed class MqttSession(IConnection connection, Stream output, ITransferProgress progress, CancellationToken cancellationToken)
+internal sealed class MqttSession(IConnection connection, Stream output, ITransferProgress progress, MqttDiagnosticLog log, CancellationToken cancellationToken)
 {
     /// <summary>
     /// The most bytes one write to the output carries: the size of the buffer curl 8.21.0's
@@ -47,7 +48,7 @@ internal sealed class MqttSession(IConnection connection, Stream output, ITransf
     /// </summary>
     private const int OutputWriteSize = 4096;
 
-    private readonly MqttPacketReader reader = new(connection, cancellationToken);
+    private readonly MqttPacketReader reader = new(connection, log, cancellationToken);
 
     /// <summary>The body length of the PUBLISH being written, reported as the expected download size.</summary>
     private long publishLength;
@@ -95,12 +96,19 @@ internal sealed class MqttSession(IConnection connection, Stream output, ITransf
     /// sets it: a DISCONNECT ends the transfer, a PINGRESP awaits a PUBLISH or SUBACK even
     /// before the CONNACK has come, and any other empty packet drops whatever was awaited.
     /// </summary>
-    private static SessionState StateAfterEmptyPacket(MqttFixedHeader header) => header.PacketType switch
+    private SessionState StateAfterEmptyPacket(MqttFixedHeader header)
     {
-        MqttPackets.DisconnectType => SessionState.Done,
-        MqttPackets.PingResponseType => SessionState.AwaitingPublishOrSuback,
-        _ => SessionState.LeavingBodyUnread,
-    };
+        switch (header.PacketType)
+        {
+            case MqttPackets.DisconnectType:
+                return SessionState.Done;
+            case MqttPackets.PingResponseType:
+                return SessionState.AwaitingPublishOrSuback;
+            default:
+                log.EmptyPacketIgnored(header);
+                return SessionState.LeavingBodyUnread;
+        }
+    }
 
     /// <summary>
     /// Handles a packet that has a body according to the state the session is in, and
@@ -114,9 +122,23 @@ internal sealed class MqttSession(IConnection connection, Stream output, ITransf
         {
             SessionState.AwaitingConnack => await AcceptConnackAsync(header, url, postData).ConfigureAwait(false),
             SessionState.AwaitingPublishOrSuback => await ReceivePublishOrSubackAsync(header).ConfigureAwait(false),
-            SessionState.LeavingBodyUnread => SessionState.StateNotHandled,
-            _ => SessionState.Done,
+            SessionState.LeavingBodyUnread => LeaveBodyUnread(header),
+            _ => EndUnhandled(header),
         };
+
+    /// <summary>Passes over a packet's body, as an empty packet before it made curl do.</summary>
+    private SessionState LeaveBodyUnread(MqttFixedHeader header)
+    {
+        log.BodyLeftUnread(header);
+        return SessionState.StateNotHandled;
+    }
+
+    /// <summary>Ends the transfer with exit 0, as curl's <c>State not handled yet</c> does.</summary>
+    private SessionState EndUnhandled(MqttFixedHeader header)
+    {
+        log.StateNotHandled(header);
+        return SessionState.Done;
+    }
 
     /// <summary>
     /// Checks the CONNACK, then either publishes and disconnects, ending the transfer, or
@@ -131,11 +153,15 @@ internal sealed class MqttSession(IConnection connection, Stream output, ITransf
         byte[] topic = MqttTopic.Decode(url);
         if (postData is { } payload)
         {
-            await SendAsync(MqttPackets.BuildPublish(topic, payload)).ConfigureAwait(false);
+            byte[] publish = MqttPackets.BuildPublish(topic, payload);
+            log.Publishing(topic, payload.Length);
+            await SendAsync(publish).ConfigureAwait(false);
             await SendAsync(MqttPackets.BuildDisconnect()).ConfigureAwait(false);
+            log.PublishDone();
             return SessionState.Done;
         }
 
+        log.Subscribing(topic);
         await SendAsync(MqttPackets.BuildSubscribe(topic)).ConfigureAwait(false);
         return SessionState.AwaitingPublishOrSuback;
     }
@@ -170,13 +196,23 @@ internal sealed class MqttSession(IConnection connection, Stream output, ITransf
                 MqttTransferMessages.ConnackLengthUnexpected(header.RemainingLength));
         }
 
+        WarnIfNotConnack(header);
         byte[] body = await reader.ReadBodyAsync(2, CurlExitCode.RecvError, MqttTransferMessages.ReceiveFailed)
             .ConfigureAwait(false);
+        log.ConnackReceived(body[1]);
         if (body[0] != 0 || body[1] != 0)
         {
             throw new MqttTransferException(
                 CurlExitCode.WeirdServerReply,
                 MqttTransferMessages.ConnackRefused(body[0], body[1]));
+        }
+    }
+
+    private void WarnIfNotConnack(MqttFixedHeader header)
+    {
+        if (header.PacketType != MqttPackets.ConnackType)
+        {
+            log.TakenAsConnack(header);
         }
     }
 
@@ -195,6 +231,8 @@ internal sealed class MqttSession(IConnection connection, Stream output, ITransf
         {
             throw new MqttTransferException(CurlExitCode.WeirdServerReply, MqttTransferMessages.WeirdServerReply);
         }
+
+        log.SubscribeDone();
     }
 
     /// <summary>
@@ -271,6 +309,7 @@ internal sealed class MqttSession(IConnection connection, Stream output, ITransf
 
     private async ValueTask SendAsync(byte[] packet)
     {
+        log.PacketSent(packet);
         try
         {
             await connection.WriteAsync(packet, cancellationToken).ConfigureAwait(false);

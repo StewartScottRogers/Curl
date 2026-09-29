@@ -40,6 +40,11 @@ namespace Curl.Protocol.Mqtt;
 /// CONNACK as in curl. A failure of the connection, or an <see cref="IOException" /> from
 /// the output, is returned rather than thrown; cancellation leaves as an exception.
 /// </para>
+/// <para>
+/// Each step is written to <see cref="ITransferContext.DiagnosticLog" />, component
+/// <c>mqtt</c>, which the <see cref="ConnectTarget" /> carries on to the connector
+/// (ADR-0222, BL-928); see <see cref="MqttDiagnosticLog" />.
+/// </para>
 /// </remarks>
 public sealed class MqttProtocolHandler : IProtocolHandler
 {
@@ -107,6 +112,35 @@ public sealed class MqttProtocolHandler : IProtocolHandler
     {
         ArgumentNullException.ThrowIfNull(context);
 
+        long started = context.TimeProvider.GetTimestamp();
+        MqttDiagnosticLog log = new(context.DiagnosticLog);
+        TransferResult result = await TransferAsync(context, log).ConfigureAwait(false);
+        log.TransferEnded(result, context.TimeProvider.GetElapsedTime(started));
+        return result;
+    }
+
+    private static ConnectTarget CreateTarget(ITransferContext context)
+    {
+        CurlUrl url = context.Url;
+        bool useTls = url.Scheme == "mqtts";
+        int defaultPort = useTls ? MqttsDefaultPort : MqttDefaultPort;
+
+        return new ConnectTarget(url.IdnHost, url.IsDefaultPort ? defaultPort : url.Port, useTls)
+        {
+            Proxy = context.Proxy,
+            Events = context.Events,
+            DiagnosticLog = context.DiagnosticLog,
+        };
+    }
+
+    private static string CreateRandomClientIdentifierSuffix() =>
+        RandomNumberGenerator.GetString(ClientIdentifierAlphabet, ClientIdentifierSuffixLength);
+
+    /// <summary>
+    /// Connects, then runs the session over the connection and disposes it.
+    /// </summary>
+    private async ValueTask<TransferResult> TransferAsync(ITransferContext context, MqttDiagnosticLog log)
+    {
         ConnectResult connected = await connector
             .ConnectAsync(CreateTarget(context), context.CancellationToken)
             .ConfigureAwait(false);
@@ -118,7 +152,7 @@ public sealed class MqttProtocolHandler : IProtocolHandler
         context.Progress.ReportTransferStarted();
         await using (connection.ConfigureAwait(false))
         {
-            MqttSession session = new(connection, context.Output, context.Progress, context.CancellationToken);
+            MqttSession session = new(connection, context.Output, context.Progress, log, context.CancellationToken);
             try
             {
                 await session
@@ -136,20 +170,4 @@ public sealed class MqttProtocolHandler : IProtocolHandler
             }
         }
     }
-
-    private static ConnectTarget CreateTarget(ITransferContext context)
-    {
-        CurlUrl url = context.Url;
-        bool useTls = url.Scheme == "mqtts";
-        int defaultPort = useTls ? MqttsDefaultPort : MqttDefaultPort;
-
-        return new ConnectTarget(url.IdnHost, url.IsDefaultPort ? defaultPort : url.Port, useTls)
-        {
-            Proxy = context.Proxy,
-            Events = context.Events,
-        };
-    }
-
-    private static string CreateRandomClientIdentifierSuffix() =>
-        RandomNumberGenerator.GetString(ClientIdentifierAlphabet, ClientIdentifierSuffixLength);
 }
