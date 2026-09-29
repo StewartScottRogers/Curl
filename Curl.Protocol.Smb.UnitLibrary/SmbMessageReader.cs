@@ -11,7 +11,11 @@ namespace Curl.Protocol.Smb;
 /// </summary>
 /// <param name="connection">The connection to read from.</param>
 /// <param name="timeProvider">The clock a closed connection waits on.</param>
-internal sealed class SmbMessageReader(IConnection connection, TimeProvider timeProvider)
+/// <param name="transferLog">
+/// Where each received message's command and status is logged; <see langword="null" />, the
+/// default, for nowhere.
+/// </param>
+internal sealed class SmbMessageReader(IConnection connection, TimeProvider timeProvider, SmbTransferLog? transferLog = null)
 {
     /// <summary>curl's <c>MAX_MESSAGE_SIZE</c>, the most bytes one message may take.</summary>
     public const int MaxMessageSize = 0x9000;
@@ -88,6 +92,8 @@ internal sealed class SmbMessageReader(IConnection connection, TimeProvider time
             }
         }
 
-        return SmbReceivedMessage.Received(buffer.AsSpan(0, got).ToArray());
+        byte[] message = buffer.AsSpan(0, got).ToArray();
+        (transferLog ?? SmbTransferLog.None).Received(message);
+        return SmbReceivedMessage.Received(message);
     }
 }

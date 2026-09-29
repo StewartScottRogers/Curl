@@ -30,6 +30,8 @@ internal sealed class SmbFileTransfer(IConnection connection, SmbMessageReader r
     // SMB_ERR_NOACCESS: ERRDOS class 0x01, ERRnoaccess 0x0005, as the status reads on the wire.
     private const uint DosNoAccess = 0x00050001;
 
+    private readonly SmbTransferLog log = new(context.DiagnosticLog);
+
     /// <summary>Connects to the share, downloads or uploads the file and disconnects.</summary>
     /// <param name="hostName">The host name the transfer connected to, sent in the tree connect.</param>
     /// <param name="path">The share and file the URL names.</param>
@@ -48,9 +50,15 @@ internal sealed class SmbFileTransfer(IConnection connection, SmbMessageReader r
         }
 
         uint status = SmbMessageHeader.ReadStatus(connected);
-        return status != 0
-            ? NotFoundOrDenied(status)
-            : await OpenAsync(SmbMessageHeader.ReadTreeId(connected), path.FilePath).ConfigureAwait(false);
+        if (status != 0)
+        {
+            log.Refused("tree connect", status);
+            return NotFoundOrDenied(status);
+        }
+
+        ushort treeId = SmbMessageHeader.ReadTreeId(connected);
+        log.TreeConnected(path.Share, treeId);
+        return await OpenAsync(treeId, path.FilePath).ConfigureAwait(false);
     }
 
     private static TransferResult MessageTooLarge() =>
@@ -90,9 +98,12 @@ internal sealed class SmbFileTransfer(IConnection connection, SmbMessageReader r
 
         if (!SmbOpenResponse.TryRead(opened, out SmbOpenResponse? file))
         {
-            return await DisconnectAsync(treeId, NotFoundOrDenied(SmbMessageHeader.ReadStatus(opened))).ConfigureAwait(false);
+            uint status = SmbMessageHeader.ReadStatus(opened);
+            log.Refused("open", status);
+            return await DisconnectAsync(treeId, NotFoundOrDenied(status)).ConfigureAwait(false);
         }
 
+        log.Opened(file!.EndOfFile);
         (TransferResult outcome, bool frameRefused) = await MoveFileAsync(treeId, file!).ConfigureAwait(false);
         return frameRefused ? outcome : await CloseAsync(treeId, file!.FileId, outcome).ConfigureAwait(false);
     }
