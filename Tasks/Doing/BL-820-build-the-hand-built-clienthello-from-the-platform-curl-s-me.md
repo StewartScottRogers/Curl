@@ -37,3 +37,4 @@ completed:
 - 2026-09-28: Created.
 - 2026-09-29: Backlog -> Doing.
 - 2026-09-29: Doing -> Backlog. Waits on BL-821, BL-786, BL-879 and BL-880: Curl.Tls cannot yet send a profile's hello honestly
+- 2026-09-29: Backlog -> Doing.
