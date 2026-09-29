@@ -104,6 +104,9 @@ public sealed class TransferContextFactoryTests
         Assert.IsTrue(context.FtpSkipPasvIp);
         Assert.AreEqual(FtpFileMethod.MultiCwd, context.FtpFileMethod);
         Assert.IsFalse(context.FtpCreateDirectories);
+        Assert.IsNull(context.FtpAccount);
+        Assert.IsNull(context.FtpAlternativeToUser);
+        Assert.IsFalse(context.FtpSendPret);
         Assert.IsFalse(context.ListOnly);
         Assert.IsFalse(context.UseAscii);
         Assert.IsFalse(context.Append);
@@ -132,6 +135,9 @@ public sealed class TransferContextFactoryTests
             "--no-ftp-skip-pasv-ip",
             "--ftp-method", "singlecwd",
             "--ftp-create-dirs",
+            "--ftp-account", "billing",
+            "--ftp-alternative-to-user", "SITE AUTH",
+            "--ftp-pret",
             "-l",
             "-B",
             "-a",
@@ -159,6 +165,9 @@ public sealed class TransferContextFactoryTests
         Assert.IsFalse(context.FtpSkipPasvIp);
         Assert.AreEqual(FtpFileMethod.SingleCwd, context.FtpFileMethod);
         Assert.IsTrue(context.FtpCreateDirectories);
+        Assert.AreEqual("billing", context.FtpAccount);
+        Assert.AreEqual("SITE AUTH", context.FtpAlternativeToUser);
+        Assert.IsTrue(context.FtpSendPret);
         Assert.IsTrue(context.ListOnly);
         Assert.IsTrue(context.UseAscii);
         Assert.IsTrue(context.Append);
