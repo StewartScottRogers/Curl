@@ -105,6 +105,8 @@
   <Project Path="Curl.Protocol.Tftp.UnitTests/Curl.Protocol.Tftp.UnitTests.csproj" />
   <Project Path="Curl.Protocol.Ws.UnitLibrary/Curl.Protocol.Ws.UnitLibrary.csproj" />
   <Project Path="Curl.Protocol.Ws.UnitTests/Curl.Protocol.Ws.UnitTests.csproj" />
+  <Project Path="Curl.Quic.UnitLibrary/Curl.Quic.UnitLibrary.csproj" />
+  <Project Path="Curl.Quic.UnitTests/Curl.Quic.UnitTests.csproj" />
   <Project Path="Curl.Tls.UnitLibrary/Curl.Tls.UnitLibrary.csproj" />
   <Project Path="Curl.Tls.UnitTests/Curl.Tls.UnitTests.csproj" />
 
