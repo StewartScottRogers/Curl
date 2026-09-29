@@ -39,6 +39,7 @@ internal sealed class Tls13ClientHelloBuilder(Tls13ClientSettings settings, byte
             }
         }
 
+        extensions.AddRange(LowerVersionExtensions());
         extensions.AddRange(settings.FixedExtensions.Where(fixedExtension => !settings.ExtensionOrder.Contains(fixedExtension.Type)));
         ClientHello hello = Create(extensions);
         return paddingIndex < 0 ? hello : Pad(hello, extensions, paddingIndex);
@@ -67,19 +68,39 @@ internal sealed class Tls13ClientHelloBuilder(Tls13ClientSettings settings, byte
     }
 
     private ClientHello Create(List<TlsExtension> extensions) =>
-        new(LegacyVersion, random, legacySessionId, settings.CipherSuites, [0], [.. extensions]);
+        new(LegacyVersion, random, legacySessionId, [.. settings.CipherSuites, .. settings.LowerVersions?.CipherSuites ?? []], [0], [.. extensions]);
+
+    /// <summary>TLS 1.3, then with <see cref="Tls13ClientSettings.LowerVersions" /> every version from its ceiling down to its minimum.</summary>
+    private ushort[] OfferedVersions()
+    {
+        Tls12ClientSettings? lower = settings.LowerVersions;
+        if (lower is null)
+        {
+            return [Tls13Version];
+        }
+
+        int count = lower.MaximumVersion - lower.MinimumVersion + 1;
+        return [Tls13Version, .. Enumerable.Range(0, count).Select(step => (ushort)((ushort)lower.MaximumVersion - step))];
+    }
+
+    /// <summary>The TLS 1.2-and-below extensions (<c>renegotiation_info</c>, <c>ec_point_formats</c> and the rest) the TLS 1.3 settings build no counterpart of.</summary>
+    private IEnumerable<TlsExtension> LowerVersionExtensions() =>
+        settings.LowerVersions is not { } lower
+            ? []
+            : Tls12ClientHelloBuilder.Build(lower, random, legacySessionId).Extensions.Where(extension =>
+                !settings.ExtensionOrder.Contains(extension.Type) && settings.FixedExtensions.All(fixedExtension => fixedExtension.Type != extension.Type));
 
     private TlsExtension? BuildExtension(TlsExtensionType type, IReadOnlyList<KeyShareEntry> shares, byte[]? cookie) => type switch
     {
         TlsExtensionType.SupportedGroups => SupportedGroupsExtension.Encode(settings.SupportedGroups),
         TlsExtensionType.KeyShare => KeyShareExtension.EncodeClientShares(shares),
-        TlsExtensionType.SupportedVersions => SupportedVersionsExtension.EncodeOffered([Tls13Version]),
+        TlsExtensionType.SupportedVersions => SupportedVersionsExtension.EncodeOffered(OfferedVersions()),
         _ => BuildSignatureOrCookieExtension(type, cookie),
     };
 
     private TlsExtension? BuildSignatureOrCookieExtension(TlsExtensionType type, byte[]? cookie) => type switch
     {
-        TlsExtensionType.SignatureAlgorithms => SignatureAlgorithmsExtension.Encode(settings.SignatureAlgorithms),
+        TlsExtensionType.SignatureAlgorithms => SignatureAlgorithmsExtension.Encode([.. settings.SignatureAlgorithms.Union(settings.LowerVersions?.SignatureAlgorithms ?? [])]),
         TlsExtensionType.Cookie => EchoCookie(cookie),
         TlsExtensionType.CompressCertificate => BuildCompressCertificate(),
         _ => BuildOptionalExtension(type),

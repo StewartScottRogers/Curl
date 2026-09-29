@@ -64,6 +64,7 @@ public sealed class Tls12ClientHandshake
     private Tls12NewSessionTicket? newTicket;
     private object? certificateRejection;
     private OcspStapleOutcome? certificateStatusRejection;
+    private bool tls13Offered;
 
     /// <summary>Creates a handshake that has not started.</summary>
     /// <param name="settings">What to offer and present.</param>
@@ -156,6 +157,28 @@ public sealed class Tls12ClientHandshake
         Send(clientHello.Encode(), output);
         state = State.WaitServerHello;
         return Build(output);
+    }
+
+    /// <summary>
+    /// Starts the handshake from a ClientHello another handshake already sent: the TLS 1.3
+    /// hello <see cref="TlsClientConnection" /> sends offering this handshake's versions and
+    /// suites too, answered by a TLS 1.2-or-below ServerHello. The hello enters the
+    /// transcript as sent, and since it offered TLS 1.3 either RFC 8446 section 4.1.3
+    /// downgrade sentinel in the ServerHello is <c>illegal_parameter</c>.
+    /// </summary>
+    /// <param name="sent">The ClientHello the server answered.</param>
+    /// <exception cref="InvalidOperationException">The handshake has already started.</exception>
+    internal void StartFrom(ClientHello sent)
+    {
+        if (state != State.Start)
+        {
+            throw new InvalidOperationException("The handshake has already started.");
+        }
+
+        clientHello = sent;
+        transcript.AddRange(sent.Encode());
+        tls13Offered = true;
+        state = State.WaitServerHello;
     }
 
     /// <summary>
@@ -362,12 +385,20 @@ public sealed class Tls12ClientHandshake
             return TlsAlertDescription.ProtocolVersion;
         }
 
-        // RFC 8446 section 4.1.3: a TLS 1.2 client refuses a TLS 1.1 or 1.0 ServerHello that carries the downgrade sentinel.
-        bool downgraded = settings.MaximumVersion == TlsProtocolVersion.Tls12
-            && version != TlsProtocolVersion.Tls12
-            && hello.Random.AsSpan(24).SequenceEqual("DOWNGRD\0"u8);
-        return downgraded ? TlsAlertDescription.IllegalParameter : null;
+        return IsDowngrade(hello.Random, version) ? TlsAlertDescription.IllegalParameter : null;
     }
+
+    // RFC 8446 section 4.1.3: a client that offered TLS 1.3 refuses either downgrade
+    // sentinel, and a TLS 1.2 client a TLS 1.1 or 1.0 ServerHello that carries the second.
+    private bool IsDowngrade(byte[] serverRandom, TlsProtocolVersion version) =>
+        tls13Offered
+            ? HasDowngradeSentinel(serverRandom)
+            : settings.MaximumVersion == TlsProtocolVersion.Tls12
+                && version != TlsProtocolVersion.Tls12
+                && serverRandom.AsSpan(24).SequenceEqual("DOWNGRD\0"u8);
+
+    private static bool HasDowngradeSentinel(byte[] serverRandom) =>
+        serverRandom.AsSpan(24, 7).SequenceEqual("DOWNGRD"u8) && serverRandom[31] <= 1;
 
     private TlsAlertDescription? CheckServerChoices(ServerHello hello)
     {

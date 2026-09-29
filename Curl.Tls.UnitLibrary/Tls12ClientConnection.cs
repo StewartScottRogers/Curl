@@ -14,6 +14,7 @@ public sealed class Tls12ClientConnection
     private readonly ITlsRandomSource random;
     private readonly Tls12ClientHandshake handshake;
     private readonly Tls12RecordLayer layer;
+    private bool clientHelloSent;
 
     private Tls12ClientConnection(Tls12ClientSettings settings, ITlsRandomSource random, Tls12ClientHandshake handshake, Stream transport)
     {
@@ -45,14 +46,37 @@ public sealed class Tls12ClientConnection
     {
         ArgumentNullException.ThrowIfNull(transport);
         Tls12ClientConnection connection = new(settings, random, new Tls12ClientHandshake(settings, random, verifier), transport);
-        TlsHandshakeFailure? failure = await connection.HandshakeAsync(cancellationToken).ConfigureAwait(false);
+        return await connection.CompleteAsync(transport, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Runs the handshake over <paramref name="transport" /> from a ClientHello
+    /// <see cref="TlsClientConnection" /> already sent offering TLS 1.3 and these settings'
+    /// versions (<see cref="Tls12ClientHandshake.StartFrom" />), as <see cref="ConnectAsync" /> does otherwise.
+    /// </summary>
+    internal static Task<Tls12ConnectResult> ContinueAsync(
+        Stream transport,
+        Tls12ClientSettings settings,
+        ITlsRandomSource random,
+        IServerCertificateVerifier verifier,
+        ClientHello sent,
+        CancellationToken cancellationToken)
+    {
+        Tls12ClientConnection connection = new(settings, random, new Tls12ClientHandshake(settings, random, verifier), transport) { clientHelloSent = true };
+        connection.handshake.StartFrom(sent);
+        return connection.CompleteAsync(transport, cancellationToken);
+    }
+
+    private async Task<Tls12ConnectResult> CompleteAsync(Stream transport, CancellationToken cancellationToken)
+    {
+        TlsHandshakeFailure? failure = await HandshakeAsync(cancellationToken).ConfigureAwait(false);
         if (failure is not null)
         {
-            connection.layer.Dispose();
+            layer.Dispose();
             return new Tls12ConnectResult(null, failure);
         }
 
-        return new Tls12ConnectResult(new Tls12ClientStream(transport, connection.layer, connection.handshake), null);
+        return new Tls12ConnectResult(new Tls12ClientStream(transport, layer, handshake), null);
     }
 
     private async Task<TlsHandshakeFailure?> HandshakeAsync(CancellationToken cancellationToken)
@@ -74,7 +98,7 @@ public sealed class Tls12ClientConnection
 
     private async Task<TlsHandshakeFailure?> ExchangeAsync(CancellationToken cancellationToken)
     {
-        await SendAsync(handshake.Start(), cancellationToken).ConfigureAwait(false);
+        await SendClientHelloUnlessSentAsync(cancellationToken).ConfigureAwait(false);
         while (!handshake.IsComplete)
         {
             Tls12RecordContent? record = await layer.ReceiveAsync(cancellationToken).ConfigureAwait(false);
@@ -100,6 +124,10 @@ public sealed class Tls12ClientConnection
 
         return null;
     }
+
+    // TlsClientConnection sent the hello already when the server picked TLS 1.2 or below.
+    private Task SendClientHelloUnlessSentAsync(CancellationToken cancellationToken) =>
+        clientHelloSent ? Task.CompletedTask : SendAsync(handshake.Start(), cancellationToken);
 
     private Tls12HandshakeOutput Receive(Tls12RecordContent record)
     {

@@ -63,6 +63,9 @@ internal sealed class Tls12TestServer(TestServerCredential? credential)
     /// <summary>Gets a value indicating whether the ServerHello random ends in the TLS 1.1-and-below downgrade sentinel.</summary>
     public bool SendDowngradeSentinel { get; init; }
 
+    /// <summary>Gets a value indicating whether the ServerHello random ends in the sentinel a TLS 1.3 server sends when it negotiates TLS 1.2.</summary>
+    public bool SendTls12DowngradeSentinel { get; init; }
+
     public Tls12TestSessionCache Sessions { get; init; } = new();
 
     public byte[] MasterSecret { get; private set; } = [];
@@ -88,6 +91,11 @@ internal sealed class Tls12TestServer(TestServerCredential? credential)
         if (SendDowngradeSentinel)
         {
             "DOWNGRD\0"u8.CopyTo(serverRandom.AsSpan(24));
+        }
+
+        if (SendTls12DowngradeSentinel)
+        {
+            "DOWNGRD\u0001"u8.CopyTo(serverRandom.AsSpan(24));
         }
 
         Tls12TestSession? session = FindSession();

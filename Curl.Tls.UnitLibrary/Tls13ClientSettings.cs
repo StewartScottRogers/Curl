@@ -108,6 +108,17 @@ public sealed record Tls13ClientSettings
     /// <summary>Gets the clock a stapled OCSP response's <c>thisUpdate</c> and <c>nextUpdate</c> are judged against.</summary>
     public TimeProvider TimeProvider { get; init; } = TimeProvider.System;
 
+    /// <summary>
+    /// Gets the TLS 1.2-and-below offer the same ClientHello also carries, or
+    /// <see langword="null" /> to offer TLS 1.3 alone (<see cref="TlsClientConnection" />):
+    /// its versions follow TLS 1.3 in <c>supported_versions</c>, its suites follow the TLS 1.3
+    /// ones, its signature schemes follow those of <see cref="SignatureAlgorithms" />, and its
+    /// extensions whose types <see cref="ExtensionOrder" /> and <see cref="FixedExtensions" />
+    /// do not name are sent after the listed ones. The TLS 1.3 handshake still accepts only
+    /// a TLS 1.3 ServerHello.
+    /// </summary>
+    internal Tls12ClientSettings? LowerVersions { get; init; }
+
     /// <summary>Throws when the settings cannot drive a handshake.</summary>
     /// <exception cref="ArgumentException">
     /// A cipher suite is not TLS 1.3, a group cannot be shared, a key share group is not
@@ -117,12 +128,8 @@ public sealed record Tls13ClientSettings
     /// </exception>
     internal void Validate()
     {
-        Require(!RequestOcspStatus || ExtensionOrder.Contains(TlsExtensionType.StatusRequest), "Asking for OCSP status needs status_request in the extension order.", nameof(ExtensionOrder));
-        Require(CertificateCompressionAlgorithms.Count == 0 || ExtensionOrder.Contains(TlsExtensionType.CompressCertificate), "Offering certificate compression needs compress_certificate in the extension order.", nameof(ExtensionOrder));
-        Require(CertificateCompressionAlgorithms.All(CertificateCompressionAlgorithm.CanDecompress), "Offer only certificate compression algorithms the client can decompress.", nameof(CertificateCompressionAlgorithms));
-        Require(CipherSuites.Count > 0 && CipherSuites.All(code => Tls13CipherSuite.Find(code) is not null), "Offer at least one cipher suite, and only TLS 1.3 suites.", nameof(CipherSuites));
-        Require(SupportedGroups.All(TlsNamedGroup.CanShare), "Every supported group must be one the client can make a key share for.", nameof(SupportedGroups));
-        Require(KeyShareGroups.All(SupportedGroups.Contains), "Every key share group must be one of the supported groups.", nameof(KeyShareGroups));
+        ValidateExtensionPlaces();
+        ValidateOffers();
     }
 
     private static void Require(bool condition, string message, string parameterName)
@@ -131,5 +138,19 @@ public sealed record Tls13ClientSettings
         {
             throw new ArgumentException(message, parameterName);
         }
+    }
+
+    private void ValidateExtensionPlaces()
+    {
+        Require(!RequestOcspStatus || ExtensionOrder.Contains(TlsExtensionType.StatusRequest), "Asking for OCSP status needs status_request in the extension order.", nameof(ExtensionOrder));
+        Require(CertificateCompressionAlgorithms.Count == 0 || ExtensionOrder.Contains(TlsExtensionType.CompressCertificate), "Offering certificate compression needs compress_certificate in the extension order.", nameof(ExtensionOrder));
+    }
+
+    private void ValidateOffers()
+    {
+        Require(CertificateCompressionAlgorithms.All(CertificateCompressionAlgorithm.CanDecompress), "Offer only certificate compression algorithms the client can decompress.", nameof(CertificateCompressionAlgorithms));
+        Require(CipherSuites.Count > 0 && CipherSuites.All(code => Tls13CipherSuite.Find(code) is not null), "Offer at least one cipher suite, and only TLS 1.3 suites.", nameof(CipherSuites));
+        Require(SupportedGroups.All(TlsNamedGroup.CanShare), "Every supported group must be one the client can make a key share for.", nameof(SupportedGroups));
+        Require(KeyShareGroups.All(SupportedGroups.Contains), "Every key share group must be one of the supported groups.", nameof(KeyShareGroups));
     }
 }

@@ -46,22 +46,53 @@ public sealed class Tls13ClientConnection
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(transport);
+        return await Create(transport, settings, random, verifier).CompleteAsync(transport, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Creates a connection that has sent nothing yet, for <see cref="TlsClientConnection" />
+    /// to send its ClientHello, read the server's answer, and complete it or hand the hello
+    /// to the TLS 1.2 client.
+    /// </summary>
+    /// <exception cref="ArgumentException">The settings offer a suite whose records cannot be protected yet, or cannot drive a handshake.</exception>
+    internal static Tls13ClientConnection Create(Stream transport, Tls13ClientSettings settings, ITlsRandomSource random, IServerCertificateVerifier verifier)
+    {
         ArgumentNullException.ThrowIfNull(settings);
         if (!settings.CipherSuites.All(Tls13RecordProtection.CanProtect))
         {
             throw new ArgumentException("A TLS 1.3 connection over a byte stream offers only the GCM and ChaCha20-Poly1305 suites until AES-CCM is built.", nameof(settings));
         }
 
-        Tls13ClientConnection connection = new(settings, new Tls13ClientHandshake(settings, random, verifier), transport);
-        TlsHandshakeFailure? failure = await connection.HandshakeAsync(cancellationToken).ConfigureAwait(false);
+        return new(settings, new Tls13ClientHandshake(settings, random, verifier), transport);
+    }
+
+    /// <summary>Gets the ClientHello <see cref="SendClientHelloAsync" /> sent.</summary>
+    internal ClientHello SentClientHello => handshake.SentClientHello!;
+
+    /// <summary>Starts the handshake and sends the ClientHello.</summary>
+    internal Task SendClientHelloAsync(CancellationToken cancellationToken) => ApplyAsync(handshake.Start(), cancellationToken);
+
+    /// <summary>
+    /// Runs the handshake to its end, starting it first unless <see cref="SendClientHelloAsync" />
+    /// already has; on success the stream owns <paramref name="transport" />.
+    /// </summary>
+    internal async Task<Tls13ConnectResult> CompleteAsync(Stream transport, CancellationToken cancellationToken)
+    {
+        TlsHandshakeFailure? failure = await HandshakeAsync(cancellationToken).ConfigureAwait(false);
         if (failure is not null)
         {
-            connection.layer.Dispose();
-            connection.handshake.Dispose();
+            Abandon();
             return new Tls13ConnectResult(null, failure);
         }
 
-        return new Tls13ConnectResult(new Tls13ClientStream(transport, connection.layer, connection.handshake), null);
+        return new Tls13ConnectResult(new Tls13ClientStream(transport, layer, handshake), null);
+    }
+
+    /// <summary>Zeroes the keys and key shares of a connection that will not complete.</summary>
+    internal void Abandon()
+    {
+        layer.Dispose();
+        handshake.Dispose();
     }
 
     private static void CheckCompatibilityChangeCipherSpec(ReadOnlySpan<byte> fragment)
@@ -99,7 +130,7 @@ public sealed class Tls13ClientConnection
 
     private async Task<TlsHandshakeFailure?> ExchangeAsync(CancellationToken cancellationToken)
     {
-        await ApplyAsync(handshake.Start(), cancellationToken).ConfigureAwait(false);
+        await SendClientHelloUnlessSentAsync(cancellationToken).ConfigureAwait(false);
         while (!handshake.IsComplete)
         {
             byte[]? record = await layer.ReceiveAsync(cancellationToken).ConfigureAwait(false);
@@ -123,6 +154,10 @@ public sealed class Tls13ClientConnection
 
         return null;
     }
+
+    // TlsClientConnection sends the hello before it knows which version the server picks.
+    private Task SendClientHelloUnlessSentAsync(CancellationToken cancellationToken) =>
+        clientHelloSent ? Task.CompletedTask : SendClientHelloAsync(cancellationToken);
 
     /// <summary>Takes one record from the server; returns what the handshake asks for, or <see langword="null" /> for an ignored <c>change_cipher_spec</c>.</summary>
     private Tls13HandshakeOutput? Receive(byte[] record)

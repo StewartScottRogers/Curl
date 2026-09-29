@@ -120,6 +120,9 @@ public sealed class Tls13ClientHandshake : IDisposable
     /// <summary>Gets the NewSessionTicket messages received after the handshake, in order.</summary>
     public IReadOnlyList<NewSessionTicket> ReceivedTickets => tickets;
 
+    /// <summary>Gets the last ClientHello <see cref="Start" /> or a HelloRetryRequest sent, or <see langword="null" /> before the start.</summary>
+    internal ClientHello? SentClientHello => clientHello;
+
     private TranscriptHash Transcript => transcript!;
 
     private Tls13KeySchedule Schedule => CipherSuite!.KeySchedule;
