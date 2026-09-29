@@ -280,6 +280,34 @@ public sealed class CurlCompositionTests
         Assert.AreSame(timeProvider, CapturedDependency<TimeProvider>(transports.UdpDatagramConnector));
     }
 
+    // ADR-0140: SslStream for every option set it can honour, the hand-built client for a
+    // --tls-max of TLS 1.0 or 1.1 (the legacy-versions row), origin and proxy alike.
+    [TestMethod]
+    [DataRow(TlsVersion.SystemDefault, typeof(SslStreamTlsProvider))]
+    [DataRow(TlsVersion.Tls12, typeof(SslStreamTlsProvider))]
+    [DataRow(TlsVersion.Tls13, typeof(SslStreamTlsProvider))]
+    [DataRow(TlsVersion.Tls10, typeof(HandBuiltTlsProvider))]
+    [DataRow(TlsVersion.Tls11, typeof(HandBuiltTlsProvider))]
+    public void CreateTlsProvider_ByTheCeiling_IsTheProviderTheRoutingRuleChooses(TlsVersion maximumVersion, Type expected)
+    {
+        var options = new TlsClientOptions(MaximumVersion: maximumVersion);
+
+        var provider = CurlComposition.CreateTlsProvider(options, TimeProvider.System);
+
+        Assert.IsInstanceOfType(provider, expected);
+        Assert.AreSame(options, CapturedDependency<TlsClientOptions>(provider));
+    }
+
+    [TestMethod]
+    public void CreateTransports_WithTlsMax10_UpgradesTheOriginWithTheHandBuiltClientAndTheProxyWithSslStream()
+    {
+        CurlTransports transports = CurlComposition.CreateTransports(Parse("--tls-max", "1.0", "https://example.com/"));
+
+        Assert.IsInstanceOfType<HandBuiltTlsProvider>(transports.TlsProvider);
+        Assert.IsInstanceOfType<SslStreamTlsProvider>(transports.ProxyTlsProvider);
+        Assert.AreSame(transports.TlsProvider, CapturedDependency<ITlsProvider>(transports.TcpConnector, "<tlsProvider>"));
+    }
+
     [TestMethod]
     public void CreateTransports_TcpConnector_ReceivesTcpDialerAndSecureSslStreamTlsProvider()
     {

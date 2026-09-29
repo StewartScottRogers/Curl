@@ -10,9 +10,12 @@ namespace Curl.Console;
 /// <param name="TimeProvider">The clock both connectors share.</param>
 /// <param name="TcpDialer">Opens the plaintext TCP connections <see cref="TcpConnector" /> dials.</param>
 /// <param name="TlsClientOptions">The settings <see cref="TlsProvider" /> applies to every handshake.</param>
-/// <param name="TlsProvider">Upgrades a TCP connection to TLS with <see cref="System.Net.Security.SslStream" />.</param>
+/// <param name="TlsProvider">
+/// Upgrades a TCP connection to TLS with the client <see cref="TlsClientRouting" /> chooses for
+/// <see cref="TlsClientOptions" />: <see cref="SslStreamTlsProvider" /> or <see cref="HandBuiltTlsProvider" />.
+/// </param>
 /// <param name="ProxyTlsClientOptions">The settings <see cref="ProxyTlsProvider" /> applies to the handshake to an HTTPS proxy.</param>
-/// <param name="ProxyTlsProvider">Runs the handshake to an HTTPS proxy with <see cref="System.Net.Security.SslStream" />.</param>
+/// <param name="ProxyTlsProvider">Runs the handshake to an HTTPS proxy with the client <see cref="TlsClientRouting" /> chooses for <see cref="ProxyTlsClientOptions" />.</param>
 /// <param name="ProxyTunnelOptions">
 /// The <c>User-Agent</c> and credential encoding of the CONNECT request <see cref="TcpConnector" />
 /// sends to tunnel through an HTTP proxy.
@@ -29,9 +32,9 @@ internal sealed record CurlTransports(
     TimeProvider TimeProvider,
     TcpDialer TcpDialer,
     TlsClientOptions TlsClientOptions,
-    SslStreamTlsProvider TlsProvider,
+    ITlsProviderWithWarnings TlsProvider,
     TlsClientOptions ProxyTlsClientOptions,
-    SslStreamTlsProvider ProxyTlsProvider,
+    ITlsProviderWithWarnings ProxyTlsProvider,
     HttpProxyTunnelOptions ProxyTunnelOptions,
     TcpConnector TcpConnector,
     UdpDatagramConnector UdpDatagramConnector,
