@@ -14,6 +14,7 @@ public sealed class ProtocolIsolationTests
     private const string Cryptography = "Curl.Cryptography.UnitLibrary";
     private const string Tls = "Curl.Tls.UnitLibrary";
     private const string Http2 = "Curl.Http2.UnitLibrary";
+    private const string Zstandard = "Curl.Zstandard.UnitLibrary";
 
     /// <summary>
     /// ADR-0120's table: each hand-built library a protocol library may reference, with the
@@ -25,7 +26,8 @@ public sealed class ProtocolIsolationTests
             [Cryptography] = [],
             ["Curl.Ntlm.UnitLibrary"] = [Cryptography],
             ["Curl.Kerberos.UnitLibrary"] = [Cryptography, Abstractions],
-            [Tls] = [Cryptography, Abstractions],
+            [Zstandard] = [],
+            [Tls] = [Cryptography, Zstandard, Abstractions],
             [Http2] = [Abstractions],
             ["Curl.Quic.UnitLibrary"] = [Tls, Cryptography, Abstractions],
             ["Curl.Http3.UnitLibrary"] = [Http2, Abstractions],
@@ -86,6 +88,7 @@ public sealed class ProtocolIsolationTests
     [DataRow("Curl.Http2.UnitLibrary")]
     [DataRow("Curl.Quic.UnitLibrary")]
     [DataRow("Curl.Http3.UnitLibrary")]
+    [DataRow("Curl.Zstandard.UnitLibrary")]
     public void ForbiddenProtocolReferences_AllowedLibrary_IsNotForbidden(string referenced)
     {
         Assert.IsEmpty(ForbiddenProtocolReferences([referenced]));
@@ -111,6 +114,7 @@ public sealed class ProtocolIsolationTests
     [DataRow("Curl.Ntlm.UnitLibrary", "Curl.Cryptography.UnitLibrary")]
     [DataRow("Curl.Kerberos.UnitLibrary", Abstractions)]
     [DataRow("Curl.Tls.UnitLibrary", "Curl.Cryptography.UnitLibrary")]
+    [DataRow("Curl.Tls.UnitLibrary", "Curl.Zstandard.UnitLibrary")]
     [DataRow("Curl.Http2.UnitLibrary", Abstractions)]
     [DataRow("Curl.Quic.UnitLibrary", "Curl.Tls.UnitLibrary")]
     [DataRow("Curl.Http3.UnitLibrary", "Curl.Http2.UnitLibrary")]
@@ -129,6 +133,8 @@ public sealed class ProtocolIsolationTests
     [DataRow("Curl.Quic.UnitLibrary", "Curl.Networking.UnitLibrary")]
     [DataRow("Curl.Kerberos.UnitLibrary", "Curl.Core.UnitLibrary")]
     [DataRow("Curl.Tls.UnitLibrary", "Curl.Console")]
+    [DataRow("Curl.Zstandard.UnitLibrary", "Curl.Cryptography.UnitLibrary")]
+    [DataRow("Curl.Zstandard.UnitLibrary", Abstractions)]
     public void ForbiddenHandBuiltReferences_ReferenceOutsideItsRow_IsForbidden(
         string library, string referenced)
     {
