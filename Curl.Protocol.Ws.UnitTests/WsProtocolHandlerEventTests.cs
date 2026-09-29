@@ -55,6 +55,30 @@ public sealed class WsProtocolHandlerEventTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_NoBody_ReportsTheFramesWithTheHeadAsOneReadThenEmptyReply()
+    {
+        // curl -v -I (BL-788): "{ [11 bytes data]", "* Empty reply from server", then shutting down.
+        var events = new RecordingTransferEvents();
+        await Handler(new ScriptedConnection(Bytes(Head101 + HelloAndClose)), 0).ExecuteAsync(
+            new TransferContext { Url = CurlUrl.Parse("ws://127.0.0.1:47932/p"), Output = new MemoryStream(), Events = events, NoBody = true });
+
+        CollectionAssert.AreEqual(
+            (string[])[.. UpgradeLines.Select(line => line.Replace("> GET ", "> HEAD ", StringComparison.Ordinal)), "{ 11", "* Empty reply from server", "* shutting down connection #0"],
+            events.Transcript);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_NoBodyAndNothingWithTheHead_ReportsNoRead()
+    {
+        var events = new RecordingTransferEvents();
+        await Handler(new ScriptedConnection(Bytes(Head101)), 0).ExecuteAsync(
+            new TransferContext { Url = CurlUrl.Parse("ws://127.0.0.1:47932/p"), Output = new MemoryStream(), Events = events, NoBody = true });
+
+        CollectionAssert.DoesNotContain(events.Transcript, "{ 0");
+        Assert.AreEqual("* Empty reply from server", events.Transcript[^2]);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_FramesAfterTheHead_ReportsEachRead()
     {
         RecordingTransferEvents events = await RunAsync(new ScriptedConnection(Bytes(Head101), Bytes("\x81\x05hello"), Bytes("\x88\x02\x03\xe8")), connectionNumber: 2);

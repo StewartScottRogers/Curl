@@ -127,7 +127,7 @@ public sealed class WsProtocolHandler(
     private async Task<TransferResult> UpgradeAsync(IConnection connection, ITransferContext context, long connectionNumber)
     {
         HttpRequestOptions options = context.Http ?? new HttpRequestOptions();
-        string method = options.CustomMethod ?? "GET";
+        string method = options.CustomMethod ?? (context.NoBody ? "HEAD" : "GET");
         string? authorization = authenticator.CreateAuthorization(
             new HttpAuthRequest(
                 method,
@@ -163,7 +163,9 @@ public sealed class WsProtocolHandler(
         ReportHead(context.Events, response.Head, refusal: null);
         context.Events.ReportInfo(WsInfoLines.SwitchingToWebSocket);
         context.Events.ReportInfo(WsInfoLines.SwitchedToWebSocket);
-        TransferResult result = await ExchangeFramesAsync(connection, context, response.Remaining, report).ConfigureAwait(false);
+        TransferResult result = context.NoBody
+            ? EndWithoutFrames(context, response.Remaining, report)
+            : await ExchangeFramesAsync(connection, context, response.Remaining, report).ConfigureAwait(false);
         ReportTransferEnd(context.Events, result, connectionNumber);
         return result;
     }
@@ -196,6 +198,25 @@ public sealed class WsProtocolHandler(
             events.ReportInfo(WsInfoLines.DecodeFrameError(result.ExitCode));
             events.ReportInfo(WsInfoLines.DecodePayloadError(result.ExitCode));
         }
+    }
+
+    /// <summary>
+    /// Ends a <c>-I</c> transfer after the <c>101</c> as curl 8.21.0 does (BL-788): the bytes that
+    /// came with the reply head are reported as one read but not decoded, nothing more is read
+    /// or written, and the transfer fails with 52 <c>Empty reply from server</c> and
+    /// <c>%{size_download}</c> 0.
+    /// </summary>
+    private static TransferResult EndWithoutFrames(ITransferContext context, byte[] alreadyReceived, TransferReport report)
+    {
+        if (alreadyReceived.Length > 0)
+        {
+            context.Events.ReportDataReceived(alreadyReceived);
+        }
+
+        TransferResult result = TransferResult.Failure(CurlExitCode.GotNothing, WsUpgradeResponseReader.EmptyReply);
+        ReportFailure(context.Events, result, isFrameViolation: false);
+        context.Progress.ReportTransferDone();
+        return result with { Report = report };
     }
 
     /// <summary>

@@ -328,6 +328,45 @@ public sealed class WsProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_NoBody_SendsHeadReadsNoFramesAndFailsWithEmptyReply()
+    {
+        // curl -sS -I -w '%{http_code} %{size_download} %{size_header} %{size_request}' against a
+        // 101 with 81 05 "hello" 88 02 03 e8 (BL-583): HEAD, no output, 101 0 <head> <request>, exit 52.
+        var connection = new ScriptedConnection(Bytes(Head101 + "\x81\x05hello"), Bytes("\x88\x02\x03\xe8"));
+        var output = new MemoryStream();
+        var progress = new RecordingProgress();
+
+        TransferResult result = await Handler(connection).ExecuteAsync(
+            new TransferContext { Url = CurlUrl.Parse("ws://127.0.0.1:47901/chat"), Output = output, NoBody = true, Progress = progress });
+
+        Assert.AreEqual(string.Concat("HEAD", Request.AsSpan(3)), Encoding.Latin1.GetString(connection.Sent));
+        Assert.AreEqual(CurlExitCode.GotNothing, result.ExitCode);
+        Assert.AreEqual("Empty reply from server", result.ErrorMessage);
+        Assert.AreEqual(0L, output.Length);
+        Assert.AreEqual(101, result.Report!.ResponseCode);
+        Assert.AreEqual("HEAD", result.Report.Method);
+        Assert.AreEqual(0L, result.Report.DownloadSize);
+        Assert.AreEqual(Head101.Length, result.Report.HeaderSize);
+        Assert.AreEqual(Request.Length + 1, result.Report.RequestSize);
+        Assert.AreEqual("done", progress.Reports[^1]);
+        Assert.AreEqual(4, await connection.ReadAsync(new byte[16], CancellationToken.None));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_NoBodyWithCustomMethod_KeepsTheCustomMethod()
+    {
+        // curl -I -X POST ws://... sends POST and still ends with 52 (BL-788 Notes).
+        var connection = new ScriptedConnection(Bytes(Head101));
+
+        TransferResult result = await Handler(connection).ExecuteAsync(
+            new TransferContext { Url = CurlUrl.Parse("ws://h/"), Output = new MemoryStream(), NoBody = true, Http = new HttpRequestOptions { CustomMethod = "POST" } });
+
+        StringAssert.StartsWith(Encoding.Latin1.GetString(connection.Sent), "POST / HTTP/1.1\r\n");
+        Assert.AreEqual("POST", result.Report!.Method);
+        Assert.AreEqual(CurlExitCode.GotNothing, result.ExitCode);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_101WithAWrongAcceptValue_StillSucceeds()
     {
         string head = "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: wrong\r\n\r\n\x81\x02ok";
