@@ -105,15 +105,31 @@ public sealed class MultipartFormBodyBuilder(
     /// except that a <c>7bit</c> refusal waits for every other part, as curl meets it only while sending.
     /// </returns>
     /// <exception cref="ArgumentNullException"><paramref name="parts" /> is <see langword="null" />.</exception>
+    public ValueTask<MultipartFormBuildResult> BuildAsync(
+        IReadOnlyList<MultipartFormPart> parts,
+        CancellationToken cancellationToken) =>
+        BuildAsync(parts, MultipartNameEscaping.Percent, cancellationToken);
+
+    /// <summary>
+    /// Builds the body for <paramref name="parts" />, escaping every part's name and file name
+    /// as <paramref name="nameEscaping" /> says: <see cref="MultipartNameEscaping.Backslash" /> under
+    /// <c>--form-escape</c>, otherwise curl's default <see cref="MultipartNameEscaping.Percent" />.
+    /// </summary>
+    /// <param name="parts">The form's parts, in the order given on the command line.</param>
+    /// <param name="nameEscaping">How names and file names are escaped in <c>Content-Disposition</c>.</param>
+    /// <param name="cancellationToken">Cancels the file opens.</param>
+    /// <returns>The body or the failure, as <see cref="BuildAsync(IReadOnlyList{MultipartFormPart}, CancellationToken)" /> gives them.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="parts" /> is <see langword="null" />.</exception>
     public async ValueTask<MultipartFormBuildResult> BuildAsync(
         IReadOnlyList<MultipartFormPart> parts,
+        MultipartNameEscaping nameEscaping,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(parts);
 
         using MultipartBodySegments segments = new(textEncoding);
         string boundary = createBoundary();
-        TransferResult? failure = await AddPartsAsync(segments, parts, boundary, FormDataDisposition, cancellationToken)
+        TransferResult? failure = await AddPartsAsync(segments, parts, boundary, FormDataDisposition, nameEscaping, cancellationToken)
             .ConfigureAwait(false);
         if (failure is not null)
         {
@@ -135,13 +151,14 @@ public sealed class MultipartFormBodyBuilder(
         IReadOnlyList<MultipartFormPart> parts,
         string boundary,
         string? disposition,
+        MultipartNameEscaping nameEscaping,
         CancellationToken cancellationToken)
     {
         string lineBefore = string.Empty;
         foreach (MultipartFormPart part in parts)
         {
             segments.AddText($"{lineBefore}--{boundary}\r\n");
-            TransferResult? failure = await AddPartAsync(segments, part, disposition, cancellationToken).ConfigureAwait(false);
+            TransferResult? failure = await AddPartAsync(segments, part, disposition, nameEscaping, cancellationToken).ConfigureAwait(false);
             if (failure is not null)
             {
                 return failure;
@@ -158,14 +175,15 @@ public sealed class MultipartFormBodyBuilder(
         MultipartBodySegments segments,
         MultipartFormPart part,
         string? disposition,
+        MultipartNameEscaping nameEscaping,
         CancellationToken cancellationToken)
     {
         if (part.Kind == MultipartFormPartKind.Multipart)
         {
             string boundary = createBoundary();
-            segments.AddText(MultipartPartHeaders.Format(part, disposition, boundary, null, out string? contentType));
+            segments.AddText(MultipartPartHeaders.Format(part, disposition, boundary, null, nameEscaping, out string? contentType));
             string? partsDisposition = MultipartPartHeaders.IsContentType(contentType, "multipart/form-data") ? FormDataDisposition : null;
-            return await AddPartsAsync(segments, part.Parts, boundary, partsDisposition, cancellationToken).ConfigureAwait(false);
+            return await AddPartsAsync(segments, part.Parts, boundary, partsDisposition, nameEscaping, cancellationToken).ConfigureAwait(false);
         }
 
         if (!TryFindEncoder(part.Encoder, out MultipartPartEncoder? encoder))
@@ -175,11 +193,11 @@ public sealed class MultipartFormBodyBuilder(
 
         if (part.Kind == MultipartFormPartKind.Text)
         {
-            AddTextPart(segments, part, disposition, encoder);
+            AddTextPart(segments, part, disposition, nameEscaping, encoder);
             return null;
         }
 
-        return await AddFilePartAsync(segments, part, disposition, encoder, cancellationToken).ConfigureAwait(false);
+        return await AddFilePartAsync(segments, part, disposition, nameEscaping, encoder, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Finds the encoder <paramref name="name" /> names; no name finds no encoder, which is not a failure.</summary>
@@ -194,16 +212,18 @@ public sealed class MultipartFormBodyBuilder(
         MultipartBodySegments segments,
         MultipartFormPart part,
         string? disposition,
+        MultipartNameEscaping nameEscaping,
         MultipartPartEncoder? encoder,
         CancellationToken cancellationToken) =>
         part.ReadsStandardInput && standardInput is not null
-            ? AddStandardInputPartAsync(segments, part, disposition, encoder, standardInput, cancellationToken)
-            : AddOpenedFilePartAsync(segments, part, disposition, encoder, cancellationToken);
+            ? AddStandardInputPartAsync(segments, part, disposition, nameEscaping, encoder, standardInput, cancellationToken)
+            : AddOpenedFilePartAsync(segments, part, disposition, nameEscaping, encoder, cancellationToken);
 
     private async ValueTask<TransferResult?> AddOpenedFilePartAsync(
         MultipartBodySegments segments,
         MultipartFormPart part,
         string? disposition,
+        MultipartNameEscaping nameEscaping,
         MultipartPartEncoder? encoder,
         CancellationToken cancellationToken)
     {
@@ -215,7 +235,7 @@ public sealed class MultipartFormBodyBuilder(
         }
 
         Stream content = opened.Content!;
-        segments.AddText(MultipartPartHeaders.Format(part, disposition, null, encoder?.Name, out _));
+        segments.AddText(MultipartPartHeaders.Format(part, disposition, null, encoder?.Name, nameEscaping, out _));
         long? length = content.CanSeek ? seekableFileLength(part.Content, opened.Length) : unseekableFileLength(part.Content);
         return await AddFileDataAsync(segments, content, length, encoder, cancellationToken)
             .ConfigureAwait(false);
@@ -285,6 +305,7 @@ public sealed class MultipartFormBodyBuilder(
         MultipartBodySegments segments,
         MultipartFormPart part,
         string? disposition,
+        MultipartNameEscaping nameEscaping,
         MultipartPartEncoder? encoder,
         Stream input,
         CancellationToken cancellationToken)
@@ -299,14 +320,14 @@ public sealed class MultipartFormBodyBuilder(
             return TransferResult.Failure(CurlExitCode.ReadError, ReadFailedMessage);
         }
 
-        segments.AddText(MultipartPartHeaders.Format(part, disposition, null, encoder?.Name, out _));
+        segments.AddText(MultipartPartHeaders.Format(part, disposition, null, encoder?.Name, nameEscaping, out _));
         AddData(segments, copy.ToArray(), encoder);
         return null;
     }
 
-    private void AddTextPart(MultipartBodySegments segments, MultipartFormPart part, string? disposition, MultipartPartEncoder? encoder)
+    private void AddTextPart(MultipartBodySegments segments, MultipartFormPart part, string? disposition, MultipartNameEscaping nameEscaping, MultipartPartEncoder? encoder)
     {
-        segments.AddText(MultipartPartHeaders.Format(part, disposition, null, encoder?.Name, out _));
+        segments.AddText(MultipartPartHeaders.Format(part, disposition, null, encoder?.Name, nameEscaping, out _));
         if (encoder is null)
         {
             segments.AddText(part.Content);

@@ -45,16 +45,23 @@ internal static class MultipartPartHeaders
     /// The name of the encoder the part's body is sent in, or <see langword="null" /> when it is
     /// sent as it is; the part's own <c>Content-Transfer-Encoding</c> header replaces it.
     /// </param>
+    /// <param name="nameEscaping">How the name and file name are escaped inside their quotes.</param>
     /// <param name="contentType">The content type the part was sent with, or <see langword="null" /> when it was sent without one.</param>
     /// <returns>Every header line, each ending CRLF, followed by the CRLF that ends the block.</returns>
-    internal static string Format(MultipartFormPart part, string? disposition, string? boundary, string? transferEncoding, out string? contentType)
+    internal static string Format(
+        MultipartFormPart part,
+        string? disposition,
+        string? boundary,
+        string? transferEncoding,
+        MultipartNameEscaping nameEscaping,
+        out string? contentType)
     {
         string? fileName = FileNameOf(part);
         contentType = ChooseContentType(part, fileName);
         StringBuilder block = new();
         if (FindHeaderValue(part.Headers, ContentDispositionLabel) is null)
         {
-            AppendDisposition(block, part.Name, fileName, disposition);
+            AppendDisposition(block, part.Name, fileName, disposition, nameEscaping);
         }
 
         AppendContentType(block, contentType, boundary);
@@ -137,7 +144,7 @@ internal static class MultipartPartHeaders
         }
     }
 
-    private static void AppendDisposition(StringBuilder block, string? name, string? fileName, string? disposition)
+    private static void AppendDisposition(StringBuilder block, string? name, string? fileName, string? disposition, MultipartNameEscaping nameEscaping)
     {
         // curl falls back to "attachment" for a part with a name, a file name or a
         // non-multipart content type, then drops an "attachment" with neither name, so
@@ -146,16 +153,23 @@ internal static class MultipartPartHeaders
         if (disposition is not null)
         {
             block.Append($"{ContentDispositionLabel}: {disposition}")
-                .Append(Parameter("name", name))
-                .Append(Parameter("filename", fileName))
+                .Append(Parameter("name", name, nameEscaping))
+                .Append(Parameter("filename", fileName, nameEscaping))
                 .Append("\r\n");
         }
     }
 
-    private static string Parameter(string label, string? value) =>
-        value is null ? string.Empty : $"; {label}=\"{Escape(value)}\"";
+    private static string Parameter(string label, string? value, MultipartNameEscaping nameEscaping) =>
+        value is null ? string.Empty : $"; {label}=\"{Escape(value, nameEscaping)}\"";
 
-    private static string Escape(string text) =>
+    private static string Escape(string text, MultipartNameEscaping nameEscaping) =>
+        nameEscaping == MultipartNameEscaping.Backslash ? EscapeWithBackslashes(text) : EscapeWithPercents(text);
+
+    private static string EscapeWithBackslashes(string text) =>
+        text.Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("\"", "\\\"", StringComparison.Ordinal);
+
+    private static string EscapeWithPercents(string text) =>
         text.Replace("\"", "%22", StringComparison.Ordinal)
             .Replace("\r", "%0D", StringComparison.Ordinal)
             .Replace("\n", "%0A", StringComparison.Ordinal);
