@@ -9,7 +9,8 @@ namespace Curl.Cryptography;
 /// (CIOS) with a masked final subtraction, modular addition, subtraction and reduction,
 /// and a fixed-window exponentiation whose table look-up reads every entry.
 /// <see cref="FiniteFieldDiffieHellman" /> runs on it with a public prime, and
-/// <see cref="RsaCrtPrivateKey" /> with the secret primes of an RSA key.
+/// <see cref="RsaCrtPrivateKey" /> with the secret primes of an RSA key, and the brainpool
+/// curves' field and group order (<see cref="BrainpoolDomainParameters" />) with public primes.
 /// </summary>
 /// <remarks>
 /// Constant-time in the operands, the exponent and the modulus's value: every loop bound
@@ -154,6 +155,17 @@ internal sealed class MontgomeryModulus
 
         SubtractModulusIfNotBelow(result, total);
     }
+
+    /// <summary>
+    /// Sets <paramref name="result" /> to <paramref name="value" /> * R modulo the modulus:
+    /// the value moved into Montgomery form, a Montgomery multiplication by R^2.
+    /// <paramref name="result" /> may alias <paramref name="value" />.
+    /// </summary>
+    /// <param name="value">The value in ordinary form, below the modulus.</param>
+    /// <param name="result">Receives the value in Montgomery form.</param>
+    /// <param name="scratch">At least <see cref="LimbCount" /> + 2 limbs of working space.</param>
+    public void ToMontgomeryForm(ReadOnlySpan<uint> value, Span<uint> result, Span<uint> scratch) =>
+        Multiply(result, value, rSquared, scratch);
 
     /// <summary>
     /// Sets <paramref name="result" /> to <paramref name="left" /> * <paramref name="right" />

@@ -155,6 +155,24 @@ Namespace `Curl.Cryptography`. It holds:
   [1, q - 1], or a mismatch. Signatures are r || s at q's length (ADR-0201). Constant-time
   in x and k. The static `HashData` hashes a message for either, SHA-224 included, which
   the BCL lacks (ADR-0211: TLS's `dsa_sha224`).
+- `BrainpoolCurve` (public enum): `BrainpoolP256r1`, `BrainpoolP384r1`, `BrainpoolP512r1`
+  (RFC 5639's r1 curves, TLS 1.3's `brainpoolP*r1tls13`).
+- `BrainpoolDomainParameters` (internal): each curve's p, q, a, b, 3b and G, with p and q
+  as `MontgomeryModulus` and the constants in Montgomery form - `For(curve)`,
+  `InvertField`, `InvertOrder` (Fermat), `TryReadScalar` ([1, q - 1]) and `ReduceHash`.
+- `BrainpoolPoint` (internal, static): projective points in Montgomery form - `Add` by
+  Renes-Costello-Batina's complete formulas, `MultiplyScalar` (fixed 4-bit window, the
+  table read whole), `TryDecode` of an uncompressed point with the on-curve check,
+  `ToAffine` and `EncodeUncompressed` (ADR-0217).
+- `BrainpoolEcdh` (public, static): ECDH on those curves - `GeneratePrivateKey`,
+  `ComputePublicKey` (uncompressed `0x04 || x || y`), `TryComputeSharedSecret` (the
+  x-coordinate; `false`, zeroed, for a peer point of the wrong form, off the curve or at
+  infinity) and the three `Get...Length` methods. Constant-time in the private key.
+- `BrainpoolEcdsa` (public, `IDisposable`): ECDSA on those curves - the constructor takes
+  the curve and d, `SignHash` signs with RFC 6979's nonce over SHA1 to SHA512,
+  `ExportPublicKey`, and the static `VerifyHash`, `false` for a bad point, r or s outside
+  [1, q - 1], a wrong length or a mismatch. Signatures are r || s (ADR-0217).
+  Constant-time in d and k.
 - `KeccakPermutation` (internal): Keccak-p[1600, 24] (FIPS 202 section 3.3) on 25
   64-bit lanes.
 - `KeccakSponge` (internal, `IDisposable`): FIPS 202's sponge with byte-aligned pad10*1 -
