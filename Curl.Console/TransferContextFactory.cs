@@ -85,6 +85,10 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// The credentials <see cref="TransferCredentialLookup" /> chose, which the context carries in place
     /// of <c>-u</c>'s; <see langword="null" /> to carry <c>-u</c>'s.
     /// </param>
+    /// <param name="ifNoneMatchHeaders">
+    /// The <c>If-None-Match</c> lines <c>--etag-compare</c> added to the option group so far, sent after every
+    /// other header; <see langword="null" /> for none.
+    /// </param>
     /// <returns>
     /// The context. Its <see cref="TransferContext.NoBody" /> is <c>-I</c>, its
     /// <see cref="TransferContext.ResumeUploadFromUnknownOffset" /> is <c>-C -</c> with a
@@ -108,7 +112,8 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
         LowSpeedWatchdog? lowSpeedWatchdog = null,
         CancellationToken abortToken = default,
         MaxTimeWatchdog? maxTimeWatchdog = null,
-        NetworkCredential? lookedUpCredentials = null) =>
+        NetworkCredential? lookedUpCredentials = null,
+        IReadOnlyList<string>? ifNoneMatchHeaders = null) =>
         new()
         {
             Url = url,
@@ -145,7 +150,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             OperationStarted = OperationStartedOf(maxTimeWatchdog),
             TimeCondition = options.TimeCondition,
             Proxy = proxy,
-            Http = HttpRequestOptionsMapping.FromCommandLine(options, formBody, proxy, commandLineTextEncoding),
+            Http = HttpRequestOptionsMapping.FromCommandLine(options, formBody, proxy, commandLineTextEncoding, ifNoneMatchHeaders),
             Mail = MailRequestOptionsMapping.FromCommandLine(options, url.Scheme),
             Progress = WatchedProgress(progress, lowSpeedWatchdog, maxTimeWatchdog),
             Events = EventsOrNone(events),

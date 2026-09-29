@@ -49,11 +49,16 @@ internal static class HttpRequestOptionsMapping
     /// The platform curl's argument encoding the <c>-H</c>, <c>--proxy-header</c>, <c>-A</c> and
     /// <c>-e</c> text is sent in (ADR-0067), or <see langword="null" /> for Latin-1.
     /// </param>
+    /// <param name="ifNoneMatchHeaders">
+    /// The <c>If-None-Match</c> lines <c>--etag-compare</c> added to the option group so far, one per
+    /// transfer, as curl 8.21.0 adds them to its header list (BL-619 Notes); <see langword="null" /> for none.
+    /// </param>
     /// <returns>
     /// The options: <see cref="CommandLineOptions.RequestMethod" />,
     /// <see cref="CommandLineOptions.RequestTarget" />,
     /// <see cref="CommandLineOptions.UserAgent" />, <see cref="CommandLineOptions.Referer" /> and
-    /// <see cref="CommandLineOptions.AutoReferer" /> verbatim; the <c>-H</c> headers followed by the ones <c>--json</c> adds; and
+    /// <see cref="CommandLineOptions.AutoReferer" /> verbatim; the <c>-H</c> headers followed by the ones <c>--json</c> adds
+    /// and then <paramref name="ifNoneMatchHeaders" />; and
     /// <see cref="CommandLineOptions.ProxyHeaders" /> verbatim; and
     /// <paramref name="formBody" /> when given, otherwise
     /// <see cref="CommandLineOptions.PostData" /> as a <see cref="BytesBody" />, unless
@@ -74,12 +79,13 @@ internal static class HttpRequestOptionsMapping
         CommandLineOptions options,
         HttpRequestBody? formBody = null,
         ProxyEndpoint? proxy = null,
-        Encoding? commandLineTextEncoding = null) =>
+        Encoding? commandLineTextEncoding = null,
+        IReadOnlyList<string>? ifNoneMatchHeaders = null) =>
         new()
         {
             CustomMethod = options.RequestMethod,
             RequestTarget = options.RequestTarget,
-            Headers = HeadersOf(options),
+            Headers = [.. HeadersOf(options), .. ifNoneMatchHeaders ?? []],
             ProxyHeaders = options.ProxyHeaders,
             CommandLineTextEncoding = commandLineTextEncoding ?? Encoding.Latin1,
             UserAgent = options.UserAgent,

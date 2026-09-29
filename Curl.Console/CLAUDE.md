@@ -76,6 +76,15 @@ lower case, the authority as typed, and the path as curl sends it - `/` when emp
 segments removed unless `--path-as-is` - before the query and fragment; a URL curl rejects
 prints as typed, as curl 8.21.0 does (BL-371 and BL-444 Notes).
 
+Before each transfer connects, `--etag-compare` reads its file through the `IFileSystem` (every CR
+and LF dropped; `""` for a missing or empty file, after `Warning: Failed to open <file>: <reason>`)
+and adds an `If-None-Match` line to its option group, sent after every `-H` and `--json` header;
+the lines pile up, one per transfer of the group, as curl's do. `--etag-save` then creates its
+file for appending (kept as it is) or chooses standard output for `-`; `EtagSaveStream` watches the
+header lines and replaces the file with the value of each `ETag` of a 200-399 response. A save file
+that cannot be created skips the transfer - no report, no `-w` - and a run whose every transfer was
+skipped ends with `curl: no transfer performed` and exit 26 (BL-619 Notes).
+
 Each URL's output comes from `CommandLineOptions.UrlOutputs`: an `-o` name, or for `-O` /
 `--remote-name-all` the name `RemoteFileName` takes from the URL path (last non-empty
 segment, still percent-encoded; none gives `curl_response` and curl's

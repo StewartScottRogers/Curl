@@ -112,4 +112,16 @@ internal sealed class RunningTransferState(
     /// <c>-w</c> output then prints; <see langword="null" /> until its first event (task BL-648).
     /// </summary>
     internal long? ConnectionId { get; set; }
+
+    /// <summary>
+    /// Gets or sets the <c>If-None-Match</c> lines <c>--etag-compare</c> has added to the transfer's option
+    /// group, this transfer's last; <see langword="null" /> without <c>--etag-compare</c> (task BL-619).
+    /// </summary>
+    internal IReadOnlyList<string>? IfNoneMatchHeaders { get; set; }
+
+    /// <summary>
+    /// Gets or sets what saves an <c>ETag</c> line for <c>--etag-save</c>, which the transfer's
+    /// <see cref="EtagSaveStream" /> calls; <see langword="null" /> without <c>--etag-save</c> (task BL-619).
+    /// </summary>
+    internal Func<byte[], CancellationToken, ValueTask>? SaveEtag { get; set; }
 }

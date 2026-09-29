@@ -374,6 +374,21 @@ internal sealed class CurlCommandRunner(
         TransferResult.Failure(CurlExitCode.WriteError, WriteReceivedDataFailedMessage);
 
     /// <summary>
+    /// The result of a transfer skipped because its <c>--etag-save</c> file could not be created. It is
+    /// compared by reference: the transfer is not reported, and a run whose every transfer was skipped
+    /// ends with <see cref="NoTransferPerformedLine" /> and exit 26, as curl 8.21.0 does (measured
+    /// 2026-09-29, BL-619 Notes).
+    /// </summary>
+    private static readonly TransferResult EtagSaveFileSkippedTransfer =
+        TransferResult.Failure(CurlExitCode.ReadError, "no transfer performed");
+
+    /// <summary>What curl 8.21.0 prints when every transfer of the run was skipped, unless <c>-s</c> was given without <c>-S</c>.</summary>
+    private const string NoTransferPerformedLine = "curl: no transfer performed";
+
+    /// <summary>The <c>If-None-Match</c> line <c>--etag-compare</c> sends for a file that is missing or empty.</summary>
+    private const string EmptyIfNoneMatchHeader = "If-None-Match: \"\"";
+
+    /// <summary>
     /// The result of a <c>-T</c> transfer whose URL <see cref="UploadTransferUrl" /> cannot parse:
     /// exit 3 with <see cref="UploadTransferUrl.MalformedUrlMessage" />, before anything else of the
     /// transfer, as curl 8.21.0 does (measured 2026-09-27, BL-030).
@@ -479,6 +494,25 @@ internal sealed class CurlCommandRunner(
     /// before the first.
     /// </summary>
     private TransferResult? previousTransferResult;
+
+    /// <summary>
+    /// The <c>If-None-Match</c> lines <c>--etag-compare</c> has added to each option group, one per
+    /// transfer started, as curl 8.21.0 adds them to the group's header list (BL-619 Notes). Locked
+    /// while read or changed, as <c>-Z</c> transfers start at once.
+    /// </summary>
+    private readonly Dictionary<CommandLineOptions, List<string>> ifNoneMatchHeadersByGroup = [];
+
+    /// <summary>
+    /// Whether any transfer of the run has been reported (<see cref="ReportAsync" />); a run with none
+    /// whose transfers were skipped ends with <see cref="NoTransferPerformedLine" />.
+    /// </summary>
+    private bool anyTransferReported;
+
+    /// <summary>
+    /// The option group of the run's last transfer skipped for its <c>--etag-save</c> file
+    /// (<see cref="EtagSaveFileSkippedTransfer" />); <see langword="null" /> while none was.
+    /// </summary>
+    private CommandLineOptions? lastSkippedTransferGroup;
 
     /// <summary>
     /// The failure <see cref="CannotOpenUploadFileResult" /> made from a failed earlier transfer,
@@ -714,7 +748,9 @@ internal sealed class CurlCommandRunner(
     /// (<see cref="EndParallelRunAsync" />), or <see cref="CurlExitCode.Ok" /> when there was none; or
     /// <see langword="null" /> when a group's request methods conflict
     /// (<see cref="RequestMethodConflictLines" />), whose lines are written and whose group and those
-    /// after it are not run, as curl 8.21.0 refuses it once the groups before it have run.
+    /// after it are not run, as curl 8.21.0 refuses it once the groups before it have run. A run whose
+    /// every transfer was skipped for its <c>--etag-save</c> file ends with
+    /// <see cref="CurlExitCode.ReadError" /> instead (<see cref="ReportNoTransferPerformedAsync" />).
     /// </returns>
     /// <remarks>
     /// No group runs after one that ends the run (<see cref="EndsTheRun" />, <c>--fail-early</c>
@@ -728,13 +764,36 @@ internal sealed class CurlCommandRunner(
         try
         {
             CurlExitCode? exitCode = await TransferGroupsInOrderAsync(groups).ConfigureAwait(false);
+            exitCode = parallelRun is { } run ? await EndParallelRunAsync(run, exitCode).ConfigureAwait(false) : exitCode;
 
-            return parallelRun is { } run ? await EndParallelRunAsync(run, exitCode).ConfigureAwait(false) : exitCode;
+            return await ReportNoTransferPerformedAsync(exitCode).ConfigureAwait(false);
         }
         finally
         {
             await transferEventOutput.DisposeAsync().ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// Ends a run whose every transfer was skipped for its <c>--etag-save</c> file as curl 8.21.0 does:
+    /// <see cref="NoTransferPerformedLine" />, unless <c>-s</c> was given without <c>-S</c> in the last
+    /// skipped transfer's group, and exit 26 (measured 2026-09-29, BL-619 Notes).
+    /// </summary>
+    /// <param name="exitCode">The run's exit code so far.</param>
+    /// <returns><see cref="CurlExitCode.ReadError" /> when no transfer ran and one was skipped; otherwise <paramref name="exitCode" />.</returns>
+    private async Task<CurlExitCode?> ReportNoTransferPerformedAsync(CurlExitCode? exitCode)
+    {
+        if (anyTransferReported || lastSkippedTransferGroup is not { } skippedGroup)
+        {
+            return exitCode;
+        }
+
+        if (ShowsErrors(skippedGroup))
+        {
+            await WriteErrorLineAsync(NoTransferPerformedLine).ConfigureAwait(false);
+        }
+
+        return CurlExitCode.ReadError;
     }
 
     /// <summary>
@@ -1113,7 +1172,9 @@ internal sealed class CurlCommandRunner(
 
         TransferResult result = await TransferAndReportAsync(dispatch, options, transfer).ConfigureAwait(false);
 
-        return (result.ExitCode, EndsTheRun(options, result));
+        return ReferenceEquals(result, EtagSaveFileSkippedTransfer)
+            ? (exitCode, false)
+            : (result.ExitCode, EndsTheRun(options, result));
     }
 
     /// <summary>
@@ -1240,6 +1301,11 @@ internal sealed class CurlCommandRunner(
         RunningTransferState state,
         (TransferResult Result, string GivenUrl, string TransferUrl) ended)
     {
+        if (NotesSkippedTransfer(options, ended.Result))
+        {
+            return Task.CompletedTask;
+        }
+
         if (run.IsAborted)
         {
             run.DeferReport(
@@ -1316,9 +1382,32 @@ internal sealed class CurlCommandRunner(
         runningTransfer.Value = state;
         (TransferResult result, string givenUrl, string transferUrl) = await TransferUrlAsync(dispatch, options, transfer)
             .ConfigureAwait(false);
+        if (NotesSkippedTransfer(options, result))
+        {
+            return result;
+        }
+
         await ReportAsync(dispatch, options, transfer, state, result, givenUrl, transferUrl).ConfigureAwait(false);
 
         return result;
+    }
+
+    /// <summary>
+    /// Tells whether <paramref name="result" /> is a transfer skipped for its <c>--etag-save</c> file, which is
+    /// not reported, and remembers its group for <see cref="ReportNoTransferPerformedAsync" /> when it is.
+    /// </summary>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="result">The transfer's result.</param>
+    /// <returns><see langword="true" /> for <see cref="EtagSaveFileSkippedTransfer" />.</returns>
+    private bool NotesSkippedTransfer(CommandLineOptions options, TransferResult result)
+    {
+        if (!ReferenceEquals(result, EtagSaveFileSkippedTransfer))
+        {
+            return false;
+        }
+
+        lastSkippedTransferGroup = options;
+        return true;
     }
 
     /// <summary>
@@ -1343,6 +1432,7 @@ internal sealed class CurlCommandRunner(
         string transferUrl)
     {
         runningTransfer.Value = state;
+        anyTransferReported = true;
         if (ShowsErrors(options) && result.ErrorMessage is not null && !IsIpfsGatewayFailure(result))
         {
             await WriteFailureLinesAsync(result).ConfigureAwait(false);
@@ -1434,12 +1524,173 @@ internal sealed class CurlCommandRunner(
             return (UploadUrlMalformedFailure, givenUrl, transferUrl);
         }
 
+        if (await PrepareEtagFilesAsync(options).ConfigureAwait(false) is { } etagFailure)
+        {
+            return (etagFailure, givenUrl, transferUrl);
+        }
+
         ITransferEvents eventsBeforeConnecting = SetUpTransferEvents(transfer);
         dispatch.LoadResolveEntries(eventsBeforeConnecting);
         await LoadCookieFilesAsync(dispatch, options, transferUrl, eventsBeforeConnecting).ConfigureAwait(false);
         TransferResult result = await TransferWithHeaderOutputAsync(dispatch, options, transfer, transferUrl, uploadFile)
             .ConfigureAwait(false);
         return (result, givenUrl, transferUrl);
+    }
+
+    /// <summary>
+    /// Sets the transfer up for <c>--etag-compare</c> and <c>--etag-save</c>, in that order, as curl 8.21.0
+    /// does before it connects: the compare file's <c>If-None-Match</c> line joins the group's
+    /// (<see cref="AddIfNoneMatchHeader" />), and the save file is created, or kept as it is, and chosen as
+    /// where the transfer's ETag goes (measured 2026-09-29, BL-619 Notes).
+    /// </summary>
+    /// <param name="options">The transfer's option group.</param>
+    /// <returns>
+    /// <see langword="null" /> when the transfer goes ahead; <see cref="CannotCreateDirectoryFailure" /> when a
+    /// <c>--create-dirs</c> directory of the save file cannot be made, or <see cref="EtagSaveFileSkippedTransfer" />
+    /// when the save file cannot be created.
+    /// </returns>
+    private async Task<TransferResult?> PrepareEtagFilesAsync(CommandLineOptions options)
+    {
+        if (options.EtagCompareFile is { } compareFile)
+        {
+            string header = await ReadIfNoneMatchHeaderAsync(options, compareFile).ConfigureAwait(false);
+            Running.IfNoneMatchHeaders = AddIfNoneMatchHeader(options, header);
+        }
+
+        return options.EtagSaveFile is { } saveFile
+            ? await PrepareEtagSaveFileAsync(options, saveFile).ConfigureAwait(false)
+            : null;
+    }
+
+    /// <summary>
+    /// Reads the <c>--etag-compare</c> file into the <c>If-None-Match</c> line curl 8.21.0 sends: its bytes with
+    /// every carriage return and line feed dropped, so several lines run together, or <c>""</c> when the file is
+    /// empty or cannot be opened, after <c>Warning: Failed to open &lt;file&gt;: &lt;reason&gt;</c> unless <c>-s</c>
+    /// was given (measured 2026-09-29, BL-619 Notes). The bytes are read as the platform's command-line text,
+    /// which is what the header is sent in.
+    /// </summary>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="compareFile">The <c>--etag-compare</c> value.</param>
+    /// <returns>The header line.</returns>
+    private async Task<string> ReadIfNoneMatchHeaderAsync(CommandLineOptions options, string compareFile)
+    {
+        FileOpenResult opened = await fileSystem.OpenForReadAsync(compareFile, CancellationToken.None).ConfigureAwait(false);
+        if (opened.Content is not { } content)
+        {
+            await WriteWarningUnlessSilentAsync(options, $"Warning: Failed to open {compareFile}: {OutputFileOpenWarning.ReasonFor(opened.Status)}")
+                .ConfigureAwait(false);
+            return EmptyIfNoneMatchHeader;
+        }
+
+        using MemoryStream read = new();
+        await using (content.ConfigureAwait(false))
+        {
+            await content.CopyToAsync(read).ConfigureAwait(false);
+        }
+
+        byte[] etag = [.. read.ToArray().Where(value => value is not ((byte)'\r' or (byte)'\n'))];
+        return etag.Length == 0
+            ? EmptyIfNoneMatchHeader
+            : "If-None-Match: " + CredentialEncoding.ForPlatform(runsOnWindows).GetString(etag);
+    }
+
+    /// <summary>
+    /// Adds <paramref name="header" /> to the <c>If-None-Match</c> lines of <paramref name="options" />'s group.
+    /// </summary>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="header">The line this transfer adds.</param>
+    /// <returns>Every line the group has added so far, this one last.</returns>
+    private IReadOnlyList<string> AddIfNoneMatchHeader(CommandLineOptions options, string header)
+    {
+        lock (ifNoneMatchHeadersByGroup)
+        {
+            if (!ifNoneMatchHeadersByGroup.TryGetValue(options, out List<string>? headers))
+            {
+                headers = [];
+                ifNoneMatchHeadersByGroup[options] = headers;
+            }
+
+            headers.Add(header);
+            return [.. headers];
+        }
+    }
+
+    /// <summary>
+    /// Chooses where the transfer's ETag goes: standard output for <c>-</c>; otherwise the file, which is
+    /// created now if it is missing, its <c>--create-dirs</c> directories first, and otherwise kept as it
+    /// is until an ETag arrives, as curl 8.21.0 opens it for appending before it connects. A file that cannot
+    /// be created skips the transfer, after
+    /// <c>Warning: Failed creating file for saving etags: "&lt;file&gt;". Skip this transfer</c> unless
+    /// <c>-s</c> was given (measured 2026-09-29, BL-619 Notes).
+    /// </summary>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="saveFile">The <c>--etag-save</c> value.</param>
+    /// <returns>
+    /// <see langword="null" /> when the transfer goes ahead; otherwise <see cref="CannotCreateDirectoryFailure" />
+    /// or <see cref="EtagSaveFileSkippedTransfer" />.
+    /// </returns>
+    private async Task<TransferResult?> PrepareEtagSaveFileAsync(CommandLineOptions options, string saveFile)
+    {
+        if (saveFile == StandardOutputHeaderFile)
+        {
+            Running.SaveEtag = SaveEtagToStandardOutputAsync;
+            return null;
+        }
+
+        if (options.CreateDirectories
+            && OutputFileDirectories.CreateLeadingDirectories(OutputPaths, saveFile, runsOnWindows) is { } directory)
+        {
+            return await ReportCannotCreateDirectoryAsync(options, directory).ConfigureAwait(false);
+        }
+
+        FileOpenResult opened = await fileSystem
+            .OpenForWriteAsync(saveFile, FileWriteMode.Append, DeferredOutputFileStream.CreateMode, CancellationToken.None)
+            .ConfigureAwait(false);
+        if (opened.Content is not { } created)
+        {
+            await WriteWarningUnlessSilentAsync(options, $"Warning: Failed creating file for saving etags: \"{saveFile}\". Skip this transfer")
+                .ConfigureAwait(false);
+            return EtagSaveFileSkippedTransfer;
+        }
+
+        await created.DisposeAsync().ConfigureAwait(false);
+        Running.SaveEtag = (etagLine, cancellationToken) => SaveEtagToFileAsync(saveFile, etagLine, cancellationToken);
+        return null;
+    }
+
+    /// <summary>Writes an <c>--etag-save -</c> ETag line to standard output, among the header and body bytes.</summary>
+    /// <param name="etagLine">The ETag and its line feed.</param>
+    /// <param name="cancellationToken">Cancels the write.</param>
+    /// <returns>A task that completes when the line is flushed.</returns>
+    private async ValueTask SaveEtagToStandardOutputAsync(byte[] etagLine, CancellationToken cancellationToken)
+    {
+        await GatedStandardOutput.WriteAsync(etagLine, cancellationToken).ConfigureAwait(false);
+        await GatedStandardOutput.FlushAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Replaces what the <c>--etag-save</c> file holds with an ETag line, as curl 8.21.0 truncates the file
+    /// before each one it writes.
+    /// </summary>
+    /// <param name="saveFile">The <c>--etag-save</c> file.</param>
+    /// <param name="etagLine">The ETag and its line feed.</param>
+    /// <param name="cancellationToken">Cancels the write.</param>
+    /// <returns>A task that completes when the file is closed.</returns>
+    /// <exception cref="IOException">The file could not be opened again, which fails the transfer's header write.</exception>
+    private async ValueTask SaveEtagToFileAsync(string saveFile, byte[] etagLine, CancellationToken cancellationToken)
+    {
+        FileOpenResult opened = await fileSystem
+            .OpenForWriteAsync(saveFile, FileWriteMode.Truncate, DeferredOutputFileStream.CreateMode, cancellationToken)
+            .ConfigureAwait(false);
+        if (opened.Content is not { } saved)
+        {
+            throw new IOException($"Could not write the ETag to {saveFile}.");
+        }
+
+        await using (saved.ConfigureAwait(false))
+        {
+            await saved.WriteAsync(etagLine, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     /// <summary>
@@ -2189,8 +2440,9 @@ internal sealed class CurlCommandRunner(
             await WriteErrorLinesAsync(dispatch.WarningLinesBeforeEachTransfer).ConfigureAwait(false);
         }
 
+        Stream? etagWatchedHeaderOutput = Running.SaveEtag is { } saveEtag ? new EtagSaveStream(saveEtag, headerOutput) : headerOutput;
         return NoCryptoEngines.LoadFailure(options.Engine, runsOnWindows)
-            ?? await TransferOpeningUploadFileAsync(dispatch, options, url, uploadFile, transfer, headerOutput).ConfigureAwait(false);
+            ?? await TransferOpeningUploadFileAsync(dispatch, options, url, uploadFile, transfer, etagWatchedHeaderOutput).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -2401,7 +2653,8 @@ internal sealed class CurlCommandRunner(
                 lowSpeedWatchdog: StartLowSpeedWatchdog(options),
                 abortToken: Running.AbortToken,
                 maxTimeWatchdog: StartMaxTimeWatchdog(options),
-                lookedUpCredentials: Running.LookedUpCredentials);
+                lookedUpCredentials: Running.LookedUpCredentials,
+                ifNoneMatchHeaders: Running.IfNoneMatchHeaders);
             TransferResult result = toStandardOutput
                 ? await TransferToStandardOutputAsync(follower, options, createAttemptContext).ConfigureAwait(false)
                 : await FollowRetryingAsync(follower, options, createAttemptContext, options.ResumeFrom, null).ConfigureAwait(false);
@@ -2955,7 +3208,8 @@ internal sealed class CurlCommandRunner(
                         StartLowSpeedWatchdog(options),
                         Running.AbortToken,
                         StartMaxTimeWatchdog(options),
-                        Running.LookedUpCredentials),
+                        Running.LookedUpCredentials,
+                        Running.IfNoneMatchHeaders),
                     resumeFrom,
                     output)
                 .ConfigureAwait(false);
