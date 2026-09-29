@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation/Planning/Decisions, Curl.Kerberos.UnitLibrary, Curl.Kerberos.UnitTests, Curl.Tls.UnitLibrary, Curl.Http3.UnitLibrary, Curl.Quic.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Protocol.Smb.UnitLibrary, Curl.Protocol.Smb.UnitTests]
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-29
 ---
 # BL-887 — Renumber the duplicate ADRs 0158, 0165 and 0200 and update every reference
 
@@ -28,14 +28,24 @@ ADR numbers 0158, 0165 and 0200 each name exactly one record in `Documentation/P
 
 ## Acceptance criteria
 
-- [ ] `Get-ChildItem Documentation/Planning/Decisions -Filter 'ADR-01[56]*.md'` and `-Filter 'ADR-0200*.md'` show 0158, 0165 and 0200 once each.
-- [ ] `Documentation/Planning/Decisions/README.md` has one row per record of the three pairs, in number order in the index.
-- [ ] A search for each renumbered record's old number finds only references to the record that kept it; each renumbered record's references use its new number.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests pass.
+- [x] `Get-ChildItem Documentation/Planning/Decisions -Filter 'ADR-01[56]*.md'` and `-Filter 'ADR-0200*.md'` show 0158, 0165 and 0200 once each.
+- [x] `Documentation/Planning/Decisions/README.md` has one row per record of the three pairs, in number order in the index.
+- [x] A search for each renumbered record's old number finds only references to the record that kept it; each renumbered record's references use its new number.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests pass.
 
 ## Notes
+
+- Renumbered, by counting live references (outside `Tasks/Done/<timestamp>/`):
+  - 0158: the TLS 1.2 byte-stream record (4 references: `Curl.Tls.UnitLibrary/CLAUDE.md` twice, ADR-0162, ADR-0205) became **ADR-0254**; the Kerberos files record (9 references) keeps 0158.
+  - 0165: the HTTP/3 framing record (3: `Curl.Http3.UnitLibrary/CLAUDE.md`, `HttpProtocolHandlerTests.Http3.cs`, ADR-0172) became **ADR-0255**; the QUIC handshake record (9) keeps 0165.
+  - 0200: a tie (5 each). The Kerberos referrals record became **ADR-0256** and SMB keeps 0200, because SMB is also cited from `Documentation/Planning/Roadmap.md`, outside this task's `touches`, so the SMB side stays untouched.
+- Next free numbers were taken after the highest ADR on every lane and branch (0253). 0249 to 0252 were skipped in case a lane in flight holds them.
+- README: the SMB 0200 row moved from below `## Template` into the index; rows 0254, 0255 and 0256 were added after 0253. The 0228 and 0248 rows that also sit below `## Template` belong to other records and were left alone, since they are outside this task's scope.
+- Follow-up: BL-983 renumbers the other unowned duplicates (0222, 0228, 0232, 0246) and moves the 0228 and 0248 rows into the index.
+- Finished-task logs under `Tasks/Done/<timestamp>/` still say the old numbers. They are history and were not edited.
 
 ## Log
 
 - 2026-09-29: Created.
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Done. ADR 0158, 0165 and 0200 each name one record; TLS 1.2 byte stream is ADR-0254, HTTP/3 framing ADR-0255, Kerberos referrals ADR-0256, all referenced and indexed

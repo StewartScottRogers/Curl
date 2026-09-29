@@ -1,4 +1,4 @@
-# ADR-0200 — The hand-built Kerberos follows cross-realm referrals in the TGS exchange
+# ADR-0256 — The hand-built Kerberos follows cross-realm referrals in the TGS exchange
 
 - **Status:** Accepted
 - **Date:** 2026-09-29

@@ -13,7 +13,7 @@ Namespace `Curl.Tls`. What is here so far: the handshake message codecs (BL-698)
 TLS 1.3 key schedule (BL-697), the TLS 1.3 client handshake (BL-699, ADR-0146), the
 TLS 1.2, 1.1 and 1.0 PRF and record protection (BL-702, ADR-0150), the TLS 1.2,
 1.1 and 1.0 client handshake (BL-703, ADR-0154), TLS 1.3 over a byte stream
-(BL-700, ADR-0157), TLS 1.2, 1.1 and 1.0 over a byte stream (BL-815, ADR-0158), and
+(BL-700, ADR-0157), TLS 1.2, 1.1 and 1.0 over a byte stream (BL-815, ADR-0254), and
 the stapled OCSP response check for `--cert-status` (BL-705, ADR-0173), TLS 1.3
 certificate decompression (BL-786, ADR-0199), TLS 1.3 and TLS 1.2 offered in one
 ClientHello (BL-821, ADR-0205), post-handshake client authentication (BL-880),
@@ -155,7 +155,7 @@ TLS-SRP (BL-704, ADR-0229), and Encrypted Client Hello (BL-706, ADR-0233).
   N, g, s and B: a group outside Appendix A is `insufficient_security`, a B of 0 or not
   below N `illegal_parameter`, and a wrong password fails the server's Finished with
   `decrypt_error`.
-- TLS 1.2 and below over a byte stream (ADR-0158): the internal `Tls12RecordLayer` reads
+- TLS 1.2 and below over a byte stream (ADR-0254): the internal `Tls12RecordLayer` reads
   whole records off the caller's `Stream`, removes their protection with the read state in
   force and writes under the write state in force; the ClientHello record carries TLS 1.0,
   later records the negotiated version, and a record read with another is

@@ -11,7 +11,7 @@ Namespace `Curl.Http3`. QPACK is here (BL-729, ADR-0164): `QpackEncoder` and
 `QpackRequiredInsertCount`, failing with `QpackException` and its `QpackErrorCode`. Both
 work on byte spans and queue their stream instructions for the caller to take.
 
-HTTP/3 framing is here too (BL-730, ADR-0165): `Http3Frame` and its seven subclasses
+HTTP/3 framing is here too (BL-730, ADR-0255): `Http3Frame` and its seven subclasses
 (`Http3DataFrame`, `Http3HeadersFrame`, `Http3CancelPushFrame`, `Http3SettingsFrame`,
 `Http3PushPromiseFrame`, `Http3GoawayFrame`, `Http3MaxPushIdFrame`) write themselves with
 `ToBytes`; `Http3FrameReader` reads them off a stream, skipping unknown and grease types:

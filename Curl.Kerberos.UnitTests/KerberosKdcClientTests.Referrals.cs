@@ -2,7 +2,7 @@ namespace Curl.Kerberos;
 
 // <summary>
 // Checks that <see cref="KerberosKdcClient.GetTicketFromTicketGrantingServiceAsync" /> follows
-// the KDCs' cross-realm referrals (RFC 6806 section 8, ADR-0200) through
+// the KDCs' cross-realm referrals (RFC 6806 section 8, ADR-0256) through
 // <see cref="FakeReferralKdcs" />: a TGS-REP carrying <c>krbtgt/OTHER@REALM</c> is used to ask
 // OTHER's KDCs, up to <see cref="KerberosKdcClient.MaximumReferralHops" /> times.
 // </summary>

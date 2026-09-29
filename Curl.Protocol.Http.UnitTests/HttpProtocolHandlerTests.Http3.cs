@@ -15,7 +15,7 @@ namespace Curl.Protocol.Http;
 /// </summary>
 public sealed partial class HttpProtocolHandlerTests
 {
-    /// <summary>The client's control stream: its type, then curl's SETTINGS (ADR-0165).</summary>
+    /// <summary>The client's control stream: its type, then curl's SETTINGS (ADR-0255).</summary>
     private static readonly byte[] CurlControlStream = [0x00, .. new Http3SettingsFrame(Http3LocalUnidirectionalStreams.CurlSettings).ToBytes()];
 
     [TestMethod]

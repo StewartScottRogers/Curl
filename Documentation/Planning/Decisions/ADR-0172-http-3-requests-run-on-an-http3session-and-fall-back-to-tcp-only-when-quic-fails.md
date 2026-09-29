@@ -8,7 +8,7 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in
 ## Context
 
 ADR-0144 decided that HTTP/3 is hand-built and that the HTTP handler
-(`Curl.Protocol.Http.UnitLibrary`) chooses QUIC or TCP per transfer. ADR-0165 (BL-730)
+(`Curl.Protocol.Http.UnitLibrary`) chooses QUIC or TCP per transfer. ADR-0255 (BL-730)
 built the HTTP/3 frames and QPACK in `Curl.Http3.UnitLibrary`. BL-731 puts them to work: the
 handler must send a request on a QUIC stream and read its response through the same output,
 `-i`/`-D`, `-f`, redirect, authentication, cookie and progress paths as HTTP/1.1 and HTTP/2.

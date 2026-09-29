@@ -49,7 +49,7 @@ TCP and frames TCP) and, for an `https://` KDC, the optional `IKerberosKdcProxyT
 with the request wrapped in MS-KKDCP's `KerberosKdcProxyMessage` as MIT does (BL-827;
 without one, `https://` KDCs are skipped); every refusal is a `KerberosKdcException` with a `KerberosKdcError`
 (BL-690, ADR-0168), and follows the KDCs' cross-realm referrals (`krbtgt/OTHER@REALM`) to
-OTHER's KDCs up to `MaximumReferralHops` times (BL-826, ADR-0200); given a
+OTHER's KDCs up to `MaximumReferralHops` times (BL-826, ADR-0256); given a
 `CredentialCacheStore` and a cache name instead, it stores a ticket got by a TGS exchange
 back in a `FILE:` or `DIR:` cache by appending it through the injected
 `IKerberosFileWriter`, as MIT's `cc_file.c` does, ignoring a failed store as MIT does

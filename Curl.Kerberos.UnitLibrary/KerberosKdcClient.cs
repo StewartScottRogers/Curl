@@ -9,7 +9,7 @@ namespace Curl.Kerberos;
 /// from the credential cache when it holds a live one, otherwise by a TGS exchange with the
 /// cache's ticket-granting ticket; or, from a password, a ticket-granting ticket by an AS
 /// exchange with <c>PA-ENC-TIMESTAMP</c> pre-authentication and then the service ticket by
-/// a TGS exchange, following the KDCs' cross-realm referrals (ADR-0200); and, for
+/// a TGS exchange, following the KDCs' cross-realm referrals (ADR-0256); and, for
 /// <c>--delegation</c>, a forwarded ticket-granting ticket from a forwardable one (ADR-0210). Every KRB-ERROR
 /// becomes a <see cref="KerberosKdcException" />.
 /// </summary>
@@ -196,7 +196,7 @@ public sealed class KerberosKdcClient
     /// Gets a ticket for <paramref name="server" /> by TGS exchanges (RFC 4120 section 3.3)
     /// with <paramref name="ticketGrantingTicket" />, sent to the KDCs of the realm the
     /// ticket-granting ticket is for, asking with <c>canonicalize</c> and following the KDCs'
-    /// cross-realm referrals (RFC 6806 section 8, ADR-0200): a TGS-REP carrying
+    /// cross-realm referrals (RFC 6806 section 8, ADR-0256): a TGS-REP carrying
     /// <c>krbtgt/OTHER@REALM</c> in place of the service's ticket is used to ask OTHER's KDCs,
     /// up to <see cref="MaximumReferralHops" /> times, as MIT's <c>krb5_get_credentials</c> does.
     /// </summary>

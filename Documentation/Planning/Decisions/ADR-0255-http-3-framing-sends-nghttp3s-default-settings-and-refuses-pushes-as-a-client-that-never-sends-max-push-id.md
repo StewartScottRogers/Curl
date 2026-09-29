@@ -1,4 +1,4 @@
-# ADR-0165 — HTTP/3 framing sends nghttp3's default SETTINGS and refuses pushes, as a client that never sends MAX_PUSH_ID
+# ADR-0255 — HTTP/3 framing sends nghttp3's default SETTINGS and refuses pushes, as a client that never sends MAX_PUSH_ID
 
 - **Status:** Accepted
 - **Date:** 2026-09-28
