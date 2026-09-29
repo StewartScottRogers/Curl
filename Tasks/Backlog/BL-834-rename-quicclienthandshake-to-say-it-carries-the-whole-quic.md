@@ -18,7 +18,7 @@ The I/O-free QUIC client state machine has a name that says it carries the conne
 
 ## Context
 
-- Since BL-726, `QuicClientHandshake` in `Curl.Quic.UnitLibrary` also carries the connection's `Streams`, `TakeDatagramsToSend` and `CloseWithApplicationError`; ADR-0172 ("Consequences") notes its name no longer says all it does. Root `CLAUDE.md`: "Say what it does, do what it says".
+- Since BL-726, `QuicClientHandshake` in `Curl.Quic.UnitLibrary` also carries the connection's `Streams`, `TakeDatagramsToSend` and `CloseWithApplicationError`; ADR-0174 ("Consequences") notes its name no longer says all it does. Root `CLAUDE.md`: "Say what it does, do what it says".
 - Rename it (for example to `QuicClientConnectionState`, avoiding a clash with `QuicConnection`), with `QuicClientHandshakeTests`, `QuicHandshakeTest` and the references in `QuicClientConnector`, `QuicConnection` and `Curl.Quic.UnitLibrary/CLAUDE.md`. Check first whether any project outside `Curl.Quic.*` references it (BL-728's `Curl.Networking` may by then); if one does, add it to `touches`.
 
 ## Acceptance criteria

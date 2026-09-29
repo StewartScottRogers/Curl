@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-724]
-touches: [Curl.Quic.UnitLibrary, Curl.Quic.UnitTests, Documentation/Planning/Decisions/ADR-0172-quic-streams-keep-fixed-flow-control-windows-and-one-loop-carries-the-connection.md, Documentation/Planning/Decisions/README.md]
+touches: [Curl.Quic.UnitLibrary, Curl.Quic.UnitTests, Documentation/Planning/Decisions/ADR-0174-quic-streams-keep-fixed-flow-control-windows-and-one-loop-carries-the-connection.md, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-09-28
 completed: 2026-09-28
@@ -31,16 +31,16 @@ The QUIC connection opens client-initiated bidirectional and unidirectional stre
   (`Streams`), with `QuicSendCredit` and `QuicReceiveCredit` for each limit; the
   application space's packets carry its frames. `QuicConnection` (with the internal
   `QuicMultiplexedStream`) implements BL-721's `IMultiplexedConnection` with one loop that
-  owns the datagram channel. Decisions in ADR-0172 (fixed windows raised at half, as curl
+  owns the datagram channel. Decisions in ADR-0174 (fixed windows raised at half, as curl
   turns ngtcp2's window auto-tuning off; BLOCKED frames once per limit; STOP_SENDING
   answered by RESET_STREAM; `WriteAsync` completes once queued).
-- `touches` gained ADR-0172 and the Decisions `README.md` index to record the decisions;
+- `touches` gained ADR-0174 and the Decisions `README.md` index to record the decisions;
   no task in Doing names either.
 - Found and fixed on the way: the datagram assembler coalesced two 1-RTT packets into one
   datagram, which a short header packet (no length field) cannot share.
 - A post-handshake violation still fails with the handshake's exit 7; mapping close
   reasons to curl's exits is BL-727's.
-- `QuicClientHandshake` now carries the connection beyond its handshake; ADR-0172 notes
+- `QuicClientHandshake` now carries the connection beyond its handshake; ADR-0174 notes
   the name no longer says all it does (rename filed as a follow-up).
 - Measured: `Measure-CodeQuality.ps1 -Library Curl.Quic.UnitLibrary` 100% line, 100%
   branch, 525 members, 0 failing, worst CRAP 10. `Curl.Quic.UnitTests` 363 passing; the
