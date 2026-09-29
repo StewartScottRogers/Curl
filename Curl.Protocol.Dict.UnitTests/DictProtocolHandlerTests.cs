@@ -78,6 +78,18 @@ public sealed class DictProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ContextWithEvents_PassesThemToTheConnectTargetSoTheConnectLinesAreReported()
+    {
+        var connector = new RecordingConnector(ConnectResult.Connected(new ScriptedConnection()));
+        var events = new IgnoringTransferEvents();
+        var context = new TransferContext { Url = CurlUrl.Parse("dict://example.com/d:x"), Output = new MemoryStream(), Events = events };
+
+        await new DictProtocolHandler(connector).ExecuteAsync(context);
+
+        Assert.AreSame(events, connector.Targets.Single().Events);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ContextWithoutProxy_ConnectsDirectly()
     {
         var connector = new RecordingConnector(ConnectResult.Connected(new ScriptedConnection()));

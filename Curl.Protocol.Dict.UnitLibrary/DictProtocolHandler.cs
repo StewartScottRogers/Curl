@@ -56,6 +56,7 @@ public sealed class DictProtocolHandler(IConnector connector) : IProtocolHandler
         var target = new ConnectTarget(url.IdnHost, url.IsDefaultPort ? DefaultPort : url.Port, false)
         {
             Proxy = context.Proxy,
+            Events = context.Events,
         };
         ConnectResult connect = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
         if (connect.Connection is not { } connection)

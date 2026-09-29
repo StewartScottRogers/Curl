@@ -105,6 +105,19 @@ public sealed class MqttProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ContextWithEvents_PassesThemToTheConnectTargetSoTheConnectLinesAreReported()
+    {
+        FakeConnector connector = FakeConnector.For(new ScriptedConnection());
+        var events = new IgnoringTransferEvents();
+
+        await RunAsync(
+            connector,
+            new TransferContext { Url = CurlUrl.Parse("mqtt://example.com/t"), Output = new RecordingStream(), Events = events });
+
+        Assert.AreSame(events, connector.Targets.Single().Events);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ContextWithoutProxy_ConnectsDirectly()
     {
         FakeConnector connector = FakeConnector.For(new ScriptedConnection());

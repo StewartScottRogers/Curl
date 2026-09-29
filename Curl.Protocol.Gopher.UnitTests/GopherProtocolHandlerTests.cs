@@ -218,6 +218,18 @@ public sealed class GopherProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ContextWithEvents_PassesThemToTheConnectTargetSoTheConnectLinesAreReported()
+    {
+        FakeConnector connector = FakeConnector.For(new ScriptedConnection());
+        var events = new IgnoringTransferEvents();
+        var context = new TransferContext { Url = CurlUrl.Parse("gopher://example.com/"), Output = new MemoryStream(), Events = events };
+
+        await new GopherProtocolHandler(connector).ExecuteAsync(context);
+
+        Assert.AreSame(events, connector.Targets.Single().Events);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ContextWithoutProxy_ConnectsDirectly()
     {
         FakeConnector connector = FakeConnector.For(new ScriptedConnection());

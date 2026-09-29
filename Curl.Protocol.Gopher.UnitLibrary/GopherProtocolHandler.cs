@@ -97,6 +97,7 @@ public sealed class GopherProtocolHandler : IProtocolHandler
         return new(url.IdnHost, url.IsDefaultPort ? DefaultPort : url.Port, url.Scheme == "gophers")
         {
             Proxy = context.Proxy,
+            Events = context.Events,
         };
     }
 
