@@ -26,6 +26,26 @@ public sealed class ConstantTimeTests
     }
 
     [TestMethod]
+    [DataRow(3u, 4u, uint.MaxValue)]
+    [DataRow(4u, 4u, 0u)]
+    [DataRow(5u, 4u, 0u)]
+    [DataRow(0u, 0x7fffffffu, uint.MaxValue)]
+    public void LessThanMask_IsAllOnesOnlyWhenLeftIsSmaller(uint left, uint right, uint expectedMask)
+    {
+        Assert.AreEqual(expectedMask, ConstantTime.LessThanMask(left, right));
+    }
+
+    [TestMethod]
+    [DataRow(4u, 4u, uint.MaxValue)]
+    [DataRow(0u, 0u, uint.MaxValue)]
+    [DataRow(4u, 5u, 0u)]
+    [DataRow(0x80000000u, 0u, 0u)]
+    public void EqualMask_IsAllOnesOnlyWhenEqual(uint left, uint right, uint expectedMask)
+    {
+        Assert.AreEqual(expectedMask, ConstantTime.EqualMask(left, right));
+    }
+
+    [TestMethod]
     public void ConditionalSwap_BitOne_SwapsEveryElement()
     {
         uint[] left = [1u, 2u, 3u];

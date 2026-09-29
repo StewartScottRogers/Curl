@@ -10,8 +10,8 @@ from `System.Security.Cryptography` instead and never rebuilt here.
 
 Namespace `Curl.Cryptography`. It holds:
 
-- `ConstantTime` (internal): the branch-free helpers (mask from bit, select, conditional
-  swap, all-zero check) the primitives share.
+- `ConstantTime` (internal): the branch-free helpers (mask from bit, select, less-than and
+  equal masks, conditional swap, all-zero check) the primitives share.
 - `Field25519` (internal): GF(2^255 - 19) arithmetic on 16 limbs of 16 bits in a
   caller's `Span<long>`; X25519 uses it and Ed25519 reuses it.
 - `Edwards25519` (internal): edwards25519 points in extended coordinates - addition,
@@ -81,6 +81,16 @@ Namespace `Curl.Cryptography`. It holds:
   (internal): the MD4-style construction MD4 and RIPEMD-160 share - 64-byte blocks of
   little-endian words, `0x80` padding and a little-endian bit length; each hash supplies
   its initial state and compression function through the interface's static members.
+- `IBigEndianCompressionFunction` (internal), `Sha1`, `Sha256` and `Sha384` (internal
+  structs) and `FixedBlockMerkleDamgard<T>` (internal): the SHA family's compression
+  functions (FIPS 180-4; `Sha384` is the SHA-512 function from SHA-384's initial value)
+  and the construction that hashes `prefix || header || data[..dataLength]` over the same
+  number of blocks for every secret `dataLength` in a public range, as OpenSSL's
+  `ssl3_cbc_digest_record` does. Pinned to the BCL's digests. Constant-time.
+- `FixedBlockHmac` (public, static): HMAC-SHA1, -SHA256 and -SHA384 on that construction,
+  `Compute(hash, key, header, data, dataLength, minimumDataLength, destination)` - the
+  Lucky Thirteen countermeasure for TLS MAC-then-encrypt CBC records (BL-795). Byte for
+  byte the BCL's HMAC. Constant-time in the key, the bytes and `dataLength`.
 - `Md4` (public, `IDisposable`): RFC 1320 - static `HashData`, and incremental
   `AppendData` and `GetHashAndReset`. Constant-time.
 - `Ripemd160` (public, `IDisposable`): RIPEMD-160 - the same three members. Constant-time.
