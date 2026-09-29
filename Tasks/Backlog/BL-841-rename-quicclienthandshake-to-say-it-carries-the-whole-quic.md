@@ -1,5 +1,5 @@
 ---
-id: BL-834
+id: BL-841
 title: Rename QuicClientHandshake to say it carries the whole QUIC connection
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-834 — Rename QuicClientHandshake to say it carries the whole QUIC connection
+# BL-841 — Rename QuicClientHandshake to say it carries the whole QUIC connection
 
 ## Goal
 
