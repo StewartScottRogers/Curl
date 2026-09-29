@@ -37,3 +37,4 @@ An HTTP/3 request stream the server resets behaves as BL-839's ADR decides: if i
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
