@@ -39,3 +39,4 @@ A second `ITlsProvider` in `Curl.Networking.UnitLibrary` runs the hand-built TLS
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Doing.
 - 2026-09-28: Doing -> Backlog. Waits on BL-815: no TLS 1.2/1.1/1.0 connection over a byte stream exists in Curl.Tls.UnitLibrary yet
+- 2026-09-28: Backlog -> Doing.
