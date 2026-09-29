@@ -31,6 +31,12 @@ public sealed class ScriptedConnection(params byte[][] reads) : IConnection
     /// <summary>Gets every byte written so far, in order.</summary>
     public byte[] Sent => [.. sent];
 
+    /// <summary>Gets a value indicating whether the handler marked the connection for reuse.</summary>
+    public bool IsMarkedReusable { get; private set; }
+
+    /// <inheritdoc />
+    public void MarkReusable() => IsMarkedReusable = true;
+
     /// <inheritdoc />
     public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {

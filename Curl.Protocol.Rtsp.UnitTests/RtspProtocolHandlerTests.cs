@@ -54,7 +54,7 @@ public sealed class RtspProtocolHandlerTests
             new TransferContext { Url = CurlUrl.Parse("rtsp://h/media"), Output = new MemoryStream(), Proxy = proxy, Events = events });
 
         ConnectTarget target = connector.Targets.Single();
-        Assert.AreEqual(new ConnectTarget("h", 554, false) { Proxy = proxy, Events = events }, target);
+        Assert.AreEqual(new ConnectTarget("h", 554, false) { Proxy = proxy, Events = events, PoolScheme = "rtsp" }, target);
     }
 
     [TestMethod]

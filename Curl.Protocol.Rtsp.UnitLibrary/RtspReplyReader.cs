@@ -31,14 +31,20 @@ internal static class RtspReplyReader
 
     private const int BufferSize = 16384;
 
-    /// <summary>Reads the reply head, writing each line to <paramref name="headerOutput" />.</summary>
+    /// <summary>
+    /// Reads the reply head, writing each line to <paramref name="headerOutput" /> and
+    /// reporting it to <paramref name="events" /> for <c>-v</c>, except the blank line that
+    /// ends it, which is returned as <see cref="RtspReplyHead.EndLine" /> for the caller to
+    /// report after any <c>-f</c> refusal, as curl 8.21.0 does (BL-593).
+    /// </summary>
     /// <param name="connection">The connection the request was sent on.</param>
     /// <param name="session">The transfer's session state, which keeps or checks each <c>Session</c> header.</param>
     /// <param name="headerOutput">Where the head is written, or <see langword="null" /> for nowhere.</param>
+    /// <param name="events">Where each head line is reported.</param>
     /// <param name="cancellationToken">Cancels the read.</param>
     /// <returns>What was read of the head.</returns>
     /// <exception cref="RtspTransferException">The reply is refused, or a read or write failed.</exception>
-    internal static async ValueTask<RtspReplyHead> ReadHeadAsync(IConnection connection, RtspSessionState session, Stream? headerOutput, CancellationToken cancellationToken)
+    internal static async ValueTask<RtspReplyHead> ReadHeadAsync(IConnection connection, RtspSessionState session, Stream? headerOutput, ITransferEvents events, CancellationToken cancellationToken)
     {
         RtspReplyHeadParser parser = new(session);
         byte[] buffer = new byte[BufferSize];
@@ -52,18 +58,20 @@ internal static class RtspReplyReader
             {
                 parser.Accept(buffer.AsSpan(processed, lineEnd - processed));
                 await WriteAsync(headerOutput, buffer.AsMemory(processed, lineEnd - processed), cancellationToken).ConfigureAwait(false);
-                processed = lineEnd;
                 if (parser.IsComplete)
                 {
-                    return Head(parser, processed, isComplete: true, buffer[processed..received]);
+                    return Head(parser, lineEnd, buffer[processed..lineEnd], buffer[lineEnd..received]);
                 }
+
+                events.ReportResponseHeader(buffer.AsSpan(processed, lineEnd - processed));
+                processed = lineEnd;
             }
 
             buffer = MakeRoom(buffer, received);
             int read = await ReceiveAsync(connection, buffer.AsMemory(received, Math.Min(buffer.Length, MaximumHeadLength) - received), cancellationToken).ConfigureAwait(false);
             if (read == 0)
             {
-                return await EndEarlyAsync(parser, headerOutput, buffer.AsMemory(processed, received - processed), received, cancellationToken).ConfigureAwait(false);
+                return await EndEarlyAsync(parser, headerOutput, events, buffer.AsMemory(processed, received - processed), received, cancellationToken).ConfigureAwait(false);
             }
 
             received += read;
@@ -79,6 +87,7 @@ internal static class RtspReplyReader
     /// <param name="alreadyReceived">The bytes received after the head.</param>
     /// <param name="contentLength">The reply's <c>Content-Length</c>.</param>
     /// <param name="progress">Where the running count is reported.</param>
+    /// <param name="events">Where each piece of the body is reported as received data, for <c>-v</c> and <c>--trace</c>.</param>
     /// <param name="cancellationToken">Cancels the read.</param>
     /// <returns>How many body bytes were read.</returns>
     /// <exception cref="RtspTransferException">A read failed.</exception>
@@ -87,20 +96,31 @@ internal static class RtspReplyReader
         byte[] alreadyReceived,
         long contentLength,
         ITransferProgress progress,
+        ITransferEvents events,
         CancellationToken cancellationToken)
     {
         long bodyRead = Math.Min(alreadyReceived.Length, contentLength);
+        ReportReceived(events, alreadyReceived.AsSpan(0, (int)bodyRead));
         byte[] buffer = new byte[BufferSize];
         int read = 1;
         while (bodyRead < contentLength && read > 0)
         {
             progress.ReportDownloaded(bodyRead, contentLength);
             read = await ReceiveAsync(connection, buffer.AsMemory(0, (int)Math.Min(buffer.Length, contentLength - bodyRead)), cancellationToken).ConfigureAwait(false);
+            ReportReceived(events, buffer.AsSpan(0, read));
             bodyRead += read;
         }
 
         progress.ReportDownloaded(bodyRead, contentLength);
         return bodyRead;
+    }
+
+    private static void ReportReceived(ITransferEvents events, ReadOnlySpan<byte> bytes)
+    {
+        if (!bytes.IsEmpty)
+        {
+            events.ReportDataReceived(bytes);
+        }
     }
 
     /// <summary>
@@ -141,11 +161,13 @@ internal static class RtspReplyReader
     /// <summary>
     /// Ends a head the server closed before its blank line: 52 when nothing, or nothing that can
     /// begin <c>RTSP/</c>, arrived; otherwise the unread bytes are written as they are and the
-    /// head is returned incomplete.
+    /// head is returned incomplete. The unread bytes are reported as one head line, as curl
+    /// 8.21.0's <c>-v</c> writes them.
     /// </summary>
     private static async ValueTask<RtspReplyHead> EndEarlyAsync(
         RtspReplyHeadParser parser,
         Stream? headerOutput,
+        ITransferEvents events,
         ReadOnlyMemory<byte> unread,
         int received,
         CancellationToken cancellationToken)
@@ -156,11 +178,12 @@ internal static class RtspReplyReader
         }
 
         await WriteAsync(headerOutput, unread, cancellationToken).ConfigureAwait(false);
-        return Head(parser, received, isComplete: false, []);
+        events.ReportResponseHeader(unread.Span);
+        return Head(parser, received, endLine: null, []);
     }
 
-    private static RtspReplyHead Head(RtspReplyHeadParser parser, int length, bool isComplete, byte[] remaining) =>
-        new(parser.StatusCode, parser.SequenceNumber, parser.ContentLength, length, isComplete, remaining);
+    private static RtspReplyHead Head(RtspReplyHeadParser parser, int length, byte[]? endLine, byte[] remaining) =>
+        new(parser.StatusCode, parser.SequenceNumber, parser.ContentLength, length, endLine, remaining);
 
     private static byte[] MakeRoom(byte[] buffer, int received)
     {

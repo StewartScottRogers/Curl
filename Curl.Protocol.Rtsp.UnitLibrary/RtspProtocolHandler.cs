@@ -37,6 +37,12 @@ namespace Curl.Protocol.Rtsp;
 /// <c>The CSeq of this request 1 did not match the response &lt;received&gt;</c>, also when the
 /// server closed before the head ended. A connect failure is returned as the connector
 /// reported it.
+/// For <c>-v</c> and <c>--trace</c> (BL-593) the request is reported as one header event and
+/// <c>Request completely sent off</c>, the reply head one line at a time, the body as received
+/// data, each failure's message, and then what became of the connection. The connection is
+/// pooled under the <c>rtsp</c> scheme and handed back after a success, a <c>CSeq</c> mismatch
+/// or a refused <c>-H Session</c> header without a reply body; a transfer that starts on a
+/// reused connection sends <c>CSeq: 0</c> (ADR-0169 decision 5).
 /// </remarks>
 public sealed class RtspProtocolHandler(IConnector connector, IHttpAuthenticator authenticator) : IProtocolHandler
 {
@@ -45,6 +51,12 @@ public sealed class RtspProtocolHandler(IConnector connector, IHttpAuthenticator
 
     /// <summary>The <c>CSeq</c> of a transfer's first request.</summary>
     internal const long FirstSequenceNumber = 1;
+
+    /// <summary>
+    /// The <c>CSeq</c> of the first request of a transfer that starts on a reused connection,
+    /// as curl 8.21.0 sends it (ADR-0169 row 20).
+    /// </summary>
+    internal const long ReusedFirstSequenceNumber = 0;
 
     /// <summary>The request target of an <c>OPTIONS</c> request.</summary>
     private const string OptionsTarget = "*";
@@ -86,6 +98,7 @@ public sealed class RtspProtocolHandler(IConnector connector, IHttpAuthenticator
         {
             Proxy = context.Proxy,
             Events = context.Events,
+            PoolScheme = Schemes[0],
         };
         ConnectResult connect = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
@@ -96,8 +109,34 @@ public sealed class RtspProtocolHandler(IConnector connector, IHttpAuthenticator
         context.Progress.ReportTransferStarted();
         await using (connection.ConfigureAwait(false))
         {
-            return await ExchangeAsync(connection, context, new RtspSessionState(FirstSequenceNumber)).ConfigureAwait(false);
+            var session = new RtspSessionState(connect.IsReused ? ReusedFirstSequenceNumber : FirstSequenceNumber);
+            TransferResult result = await ExchangeAsync(connection, context, session).ConfigureAwait(false);
+            ReportConnectionEnd(context.Events, target, connect, result);
+            return result;
         }
+    }
+
+    /// <summary>
+    /// Hands the connection back to the pool and reports it left intact when curl 8.21.0 keeps
+    /// it; otherwise reports it shut down or closed, as measured (BL-593).
+    /// </summary>
+    private static void ReportConnectionEnd(ITransferEvents events, ConnectTarget target, ConnectResult connect, TransferResult result)
+    {
+        if (RtspVerboseLines.LeavesIntact(result))
+        {
+            connect.Connection!.MarkReusable();
+            events.ReportInfo(RtspVerboseLines.LeftIntact(connect.ConnectionNumber, target.Host, target.Port));
+            return;
+        }
+
+        events.ReportInfo(RtspVerboseLines.Dropped(result, connect.ConnectionNumber));
+    }
+
+    /// <summary>Reports <paramref name="message" /> as a <c>-v</c> line and returns it as the transfer's failure.</summary>
+    private static TransferResult Fail(ITransferEvents events, CurlExitCode exitCode, string message, long bytesTransferred = 0)
+    {
+        events.ReportInfo(message);
+        return TransferResult.Failure(exitCode, message, bytesTransferred);
     }
 
     /// <summary>
@@ -122,7 +161,7 @@ public sealed class RtspProtocolHandler(IConnector connector, IHttpAuthenticator
         }
         catch (RtspTransferException failure)
         {
-            return TransferResult.Failure(failure.ExitCode, failure.Message);
+            return Fail(context.Events, failure.ExitCode, failure.Message);
         }
     }
 
@@ -147,15 +186,15 @@ public sealed class RtspProtocolHandler(IConnector connector, IHttpAuthenticator
     /// as curl 8.21.0 does after connecting and before sending anything.
     /// </summary>
     /// <returns>The failure, or <see langword="null" /> when no <c>-H</c> header is refused.</returns>
-    private static TransferResult? CustomHeaderFailure(HttpRequestOptions options)
+    private static TransferResult? CustomHeaderFailure(HttpRequestOptions options, ITransferEvents events)
     {
         if (RtspRequestFormatter.NamesCSeq(options))
         {
-            return TransferResult.Failure(CurlExitCode.RtspCseqError, RtspRequestFormatter.CustomCSeqRefused);
+            return Fail(events, CurlExitCode.RtspCseqError, RtspRequestFormatter.CustomCSeqRefused);
         }
 
         return RtspRequestFormatter.NamesSession(options)
-            ? TransferResult.Failure(CurlExitCode.BadFunctionArgument, RtspRequestFormatter.CustomSessionRefused)
+            ? Fail(events, CurlExitCode.BadFunctionArgument, RtspRequestFormatter.CustomSessionRefused)
             : null;
     }
 
@@ -166,7 +205,8 @@ public sealed class RtspProtocolHandler(IConnector connector, IHttpAuthenticator
     private async Task<TransferResult> SendAndReadAsync(IConnection connection, ITransferContext context, RtspSessionState session)
     {
         HttpRequestOptions options = context.Http ?? new HttpRequestOptions();
-        if (CustomHeaderFailure(options) is { } refused)
+        ITransferEvents events = context.Events;
+        if (CustomHeaderFailure(options, events) is { } refused)
         {
             return refused;
         }
@@ -179,8 +219,10 @@ public sealed class RtspProtocolHandler(IConnector connector, IHttpAuthenticator
             session.SessionId,
             options,
             Authorization(context, options));
+        events.ReportRequestHeader(request);
         await SendAsync(connection, request, context.CancellationToken).ConfigureAwait(false);
-        RtspReplyHead head = await RtspReplyReader.ReadHeadAsync(connection, session, context.HeaderOutput, context.CancellationToken).ConfigureAwait(false);
+        events.ReportInfo(RtspVerboseLines.RequestSent);
+        RtspReplyHead head = await RtspReplyReader.ReadHeadAsync(connection, session, context.HeaderOutput, events, context.CancellationToken).ConfigureAwait(false);
         TransferReport report = new()
         {
             ResponseCode = head.StatusCode,
@@ -188,40 +230,46 @@ public sealed class RtspProtocolHandler(IConnector connector, IHttpAuthenticator
             HeaderSize = head.Length,
             RequestSize = request.Length,
         };
-        if (StatusFailure(head, options) is { } statusFailure)
+        if (StatusFailure(head, options, events) is { } statusFailure)
         {
             return statusFailure with { Report = report };
         }
 
-        long bodyRead = await RtspReplyReader.DiscardBodyAsync(connection, head.Remaining, head.ContentLength, context.Progress, context.CancellationToken).ConfigureAwait(false);
+        long bodyRead = await RtspReplyReader.DiscardBodyAsync(connection, head.Remaining, head.ContentLength, context.Progress, events, context.CancellationToken).ConfigureAwait(false);
         context.Progress.ReportTransferDone();
         TransferResult result = head.SequenceNumber == sequenceNumber
             ? TransferResult.Success(bodyRead)
-            : TransferResult.Failure(CurlExitCode.RtspCseqError, SequenceMismatch(sequenceNumber, head.SequenceNumber), bodyRead);
+            : Fail(events, CurlExitCode.RtspCseqError, SequenceMismatch(sequenceNumber, head.SequenceNumber), bodyRead);
         return result with { Report = report with { DownloadSize = bodyRead } };
     }
 
     /// <summary>
     /// Fails a completed head whose status curl refuses: 400 or more under <c>-f</c> with 22,
-    /// below 100 with 1.
+    /// below 100 with 1. Reports the head's blank line to <c>-v</c> as curl 8.21.0 does: after
+    /// the <c>-f</c> message, before the other one.
     /// </summary>
     /// <returns>The failure, or <see langword="null" /> when the status is accepted.</returns>
-    private static TransferResult? StatusFailure(RtspReplyHead head, HttpRequestOptions options)
+    private static TransferResult? StatusFailure(RtspReplyHead head, HttpRequestOptions options, ITransferEvents events)
     {
-        if (!head.IsComplete)
+        if (head.EndLine is not { } endLine)
         {
             return null;
         }
 
-        if (options.Fail != HttpFailMode.None && head.StatusCode >= LowestErrorStatusCode)
-        {
-            return TransferResult.Failure(
+        TransferResult? refused = options.Fail != HttpFailMode.None && head.StatusCode >= LowestErrorStatusCode
+            ? Fail(
+                events,
                 CurlExitCode.HttpReturnedError,
-                string.Create(CultureInfo.InvariantCulture, $"The requested URL returned error: {head.StatusCode}"));
+                string.Create(CultureInfo.InvariantCulture, $"The requested URL returned error: {head.StatusCode}"))
+            : null;
+        events.ReportResponseHeader(endLine);
+        if (refused is not null)
+        {
+            return refused;
         }
 
         return head.StatusCode < LowestStatusCode
-            ? TransferResult.Failure(CurlExitCode.UnsupportedProtocol, UnsupportedResponseCode)
+            ? Fail(events, CurlExitCode.UnsupportedProtocol, UnsupportedResponseCode)
             : null;
     }
 
