@@ -6,7 +6,7 @@ framing (RFC 9114) - frames, the control and QPACK encoder and decoder streams,
 `--http3` and `--http3-only` under ADR-0144
 (`Documentation/Planning/Decisions/ADR-0144-http-3-is-hand-built-over-a-hand-built-quic-and-http3-races-tcp-as-curls-ngtcp2-build-does.md`).
 
-Namespace `Curl.Http3`. QPACK is here (BL-729, ADR-0163): `QpackEncoder` and
+Namespace `Curl.Http3`. QPACK is here (BL-729, ADR-0164): `QpackEncoder` and
 `QpackDecoder` over `QpackStaticTable`, `QpackDynamicTable`, `QpackPrimitives` and
 `QpackRequiredInsertCount`, failing with `QpackException` and its `QpackErrorCode`. Both
 work on byte spans and queue their stream instructions for the caller to take; nothing
