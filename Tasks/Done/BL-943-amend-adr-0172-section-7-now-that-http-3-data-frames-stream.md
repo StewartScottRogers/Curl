@@ -8,7 +8,7 @@ depends-on: [BL-838]
 touches: [Documentation/Planning/Decisions/ADR-0172-http-3-requests-run-on-an-http3session-and-fall-back-to-tcp-only-when-quic-fails.md]
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-29
 ---
 # BL-943 — Amend ADR-0172 section 7 now that HTTP/3 DATA frames stream
 
@@ -24,11 +24,14 @@ ADR-0172 section 7 ("Frame size") says what the code does after BL-838: `DATA` o
 
 ## Acceptance criteria
 
-- [ ] ADR-0172 section 7 states that `DATA` frames of any length stream through a 16 KiB buffer (BL-838) and that only a non-`DATA` frame over 16 MiB fails with exit 56 and `ERR_H3_EXCESSIVE_LOAD`; the sentence calling streaming "its own task" is gone.
+- [x] ADR-0172 section 7 states that `DATA` frames of any length stream through a 16 KiB buffer (BL-838) and that only a non-`DATA` frame over 16 MiB fails with exit 56 and `ERR_H3_EXCESSIVE_LOAD`; the sentence calling streaming "its own task" is gone.
 
 ## Notes
+
+Docs-only edit made directly (one paragraph); facts checked against `Http3StreamConnection.cs` (`MaximumFramePayloadLength`, `DataBufferLength`), `Http3FrameReader.ReadFrameOrDataAsync` and the test `ExecuteAsync_HeadersFrameOverTheFramePayloadLimit_FailsWithExit56AndExcessiveLoad`. No `.cs` or project file changed, so no build or test run was needed.
 
 ## Log
 
 - 2026-09-29: Created.
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Done. ADR-0172 section 7 now says DATA streams through a 16 KiB buffer and only a non-DATA frame over 16 MiB fails with exit 56

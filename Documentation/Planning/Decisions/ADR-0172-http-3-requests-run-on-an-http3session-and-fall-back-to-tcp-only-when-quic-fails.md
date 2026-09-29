@@ -84,9 +84,12 @@ server can be made to fail on demand (ADR-0144); those are read from curl's
      curl fails the ingress with `CURLE_RECV_ERROR` and its first `failf` is nghttp3's.
    - A lost connection (`MultiplexedConnectionFailedException`, on open, write or read):
      the exit code and message the exception carries, which `Curl.Quic` chooses.
-7. **Frame size.** `Curl.Http3` reads each frame's payload whole, so a request stream
-   accepts frames of up to 16 MiB and fails a bigger one with `ERR_H3_EXCESSIVE_LOAD`.
-   Streaming `DATA` of any length, as nghttp3 does, is its own task.
+7. **Frame size** (amended by BL-838). `DATA` frames of any length stream, as nghttp3
+   does: `Http3FrameReader.ReadFrameOrDataAsync` hands a `DATA` payload over piece by
+   piece, and `Http3StreamConnection` reads it through a 16 KiB buffer
+   (`DataBufferLength`). Every other frame on a request stream - `HEADERS` among them -
+   is still read whole, so only a non-`DATA` frame over 16 MiB
+   (`MaximumFramePayloadLength`) fails, with exit 56 and `ERR_H3_EXCESSIVE_LOAD`.
 8. **The server's streams** (BL-836, decided by Claude under Stewart's delegation). The
    session accepts the server's unidirectional streams from its creation to its disposal,
    one background reader per stream: the control stream through
