@@ -103,6 +103,8 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("ntlm", null, (options, on) => options.WantAuthScheme(HttpAuthSchemes.Ntlm, on)),
         CommandLineOption.NegatableFlag("negotiate", null, (options, on) => options.WantAuthScheme(HttpAuthSchemes.Negotiate, on)),
         CommandLineOption.Flag("anyauth", null, options => options.WantEveryAuthScheme()),
+        CommandLineOption.Value("delegation", null, AcceptingEmpty(SetGssApiDelegation)),
+        CommandLineOption.Text("service-name", null, (options, service) => options.ServiceName = service),
         CommandLineOption.Text("oauth2-bearer", null, (options, token) => options.SetBearerToken(token)),
         CommandLineOption.NegatableFlag("netrc", 'n', (options, on) => options.NetrcRequested = on),
         CommandLineOption.NegatableFlag("netrc-optional", null, (options, on) => options.NetrcOptionalRequested = on),
@@ -127,6 +129,7 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("proxy-ntlm", null, (options, on) => options.WantProxyAuthScheme(HttpAuthSchemes.Ntlm, on)),
         CommandLineOption.NegatableFlag("proxy-negotiate", null, (options, on) => options.WantProxyAuthScheme(HttpAuthSchemes.Negotiate, on)),
         CommandLineOption.NegatableFlag("proxy-anyauth", null, (options, on) => options.WantEveryProxyAuthScheme(on)),
+        CommandLineOption.Text("proxy-service-name", null, (options, service) => options.ProxyServiceName = service),
         CommandLineOption.Value("noproxy", null, AcceptingEmpty((options, hosts) => options.NoProxy = hosts)),
         CommandLineOption.NegatableFlag("proxytunnel", 'p', (options, on) => options.ProxyTunnel = on),
         CommandLineOption.Value("telnet-option", 't', AcceptingEmpty((options, telnetOption) => options.AddTelnetOption(telnetOption))),
@@ -289,6 +292,7 @@ public static class CommandLineOptionTable
         CommandLineOption.NoFunctionValue("egd-file"),
         CommandLineOption.NoFunctionValue("random-file"),
         CommandLineOption.NoFunctionValue("krb4"),
+        CommandLineOption.NoFunctionValue("krb"),
     ];
 
     /// <summary>The largest <c>--create-file-mode</c> curl 8.21.0 accepts: octal <c>0777</c>.</summary>
@@ -468,6 +472,34 @@ public static class CommandLineOptionTable
         }
 
         options.FtpFileMethod = FtpFileMethod.MultiCwd;
+    }
+
+    /// <summary>
+    /// Sets <see cref="CommandLineOptions.GssApiDelegation"/> from a <c>--delegation</c> value as curl 8.21.0
+    /// does: <c>none</c>, <c>policy</c> or <c>always</c> in any case, and any other value, empty included,
+    /// warned about and read as <c>none</c> rather than refused (measured on Windows and Linux, BL-630 Notes).
+    /// Case is folded for ASCII letters only, as curl's <c>curl_strequal</c> folds it.
+    /// </summary>
+    private static void SetGssApiDelegation(CommandLineOptions options, string value)
+    {
+        if (Ascii.EqualsIgnoreCase(value, "policy"))
+        {
+            options.GssApiDelegation = GssApiDelegation.Policy;
+            return;
+        }
+
+        if (Ascii.EqualsIgnoreCase(value, "always"))
+        {
+            options.GssApiDelegation = GssApiDelegation.Always;
+            return;
+        }
+
+        if (!Ascii.EqualsIgnoreCase(value, "none"))
+        {
+            options.AddWarningLinesUnlessSilent(CommandLineWarning.UnrecognizedDelegationMethod(value));
+        }
+
+        options.GssApiDelegation = GssApiDelegation.None;
     }
 
     /// <summary>

@@ -531,6 +531,26 @@ public sealed class CommandLineOptions
     public string? Socks5GssapiServiceName { get; internal set; }
 
     /// <summary>
+    /// The last <c>--delegation</c> value, read without regard to case; <see cref="Cli.GssApiDelegation.None"/>
+    /// when not given or when the last value was none of <c>none</c>, <c>policy</c> and <c>always</c>.
+    /// </summary>
+    public GssApiDelegation GssApiDelegation { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--service-name</c> value, verbatim: the service name SPNEGO, Kerberos and the SASL
+    /// mechanisms use in place of the protocol's default; <see langword="null"/> when not given. An empty
+    /// value is refused as blank, as curl 8.21.0 refuses it.
+    /// </summary>
+    public string? ServiceName { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--proxy-service-name</c> value, verbatim: the service name SPNEGO uses with a proxy in
+    /// place of <c>HTTP</c>; <see langword="null"/> when not given. An empty value is refused as blank, as
+    /// curl 8.21.0 refuses it.
+    /// </summary>
+    public string? ProxyServiceName { get; internal set; }
+
+    /// <summary>
     /// <see langword="true"/> when <c>--socks5-gssapi-nec</c> was given and no
     /// <c>--no-socks5-gssapi-nec</c> came after it: leave the GSS-API protection negotiation
     /// unprotected, as the NEC SOCKS5 server expects.

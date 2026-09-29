@@ -52,7 +52,7 @@ public sealed class CommandLineNextGroupTests
         "fail-with-body", "compressed", "raw", "tr-encoding", "ignore-content-length", "path-as-is", "http0.9",
         "request-target", "ipfs-gateway", "http1.0", "http1.1", "http2", "http2-prior-knowledge", "http3",
         "http3-only", "ipv4", "ipv6", "sslv2", "sslv3", "metalink", "npn", "ntlm-wb", "false-start", "egd-file", "random-file",
-        "krb4",
+        "krb4", "krb", "delegation", "service-name", "proxy-service-name",
     ];
 
     [TestMethod]
