@@ -8,7 +8,7 @@ depends-on: [BL-522]
 touches: [Documentation/Planning/Decisions, Curl.Cli.UnitLibrary]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-29
 ---
 # BL-746 — Record the --proto scheme-set decisions in an ADR
 
@@ -27,13 +27,17 @@ An ADR in `Documentation/Planning/Decisions`, marked "Decided by Claude under St
 
 ## Acceptance criteria
 
-- [ ] A new `ADR-####-*.md` in `Documentation/Planning/Decisions`, numbered after the highest existing one, states the three decisions above and why, and is marked "Decided by Claude under Stewart's delegation".
-- [ ] The Decisions `README.md` index (if it lists ADRs) names the new ADR.
-- [ ] `CommandLineProtocolSet`'s XML summary on `KnownSchemes` cites the ADR number.
+- [x] A new `ADR-####-*.md` in `Documentation/Planning/Decisions`, numbered after the highest existing one, states the three decisions above and why, and is marked "Decided by Claude under Stewart's delegation".
+- [x] The Decisions `README.md` index (if it lists ADRs) names the new ADR.
+- [x] `CommandLineProtocolSet`'s XML summary on `KnownSchemes` cites the ADR number.
 
 ## Notes
+
+- Numbered ADR-0189, not 0188: another lane's branch already holds an ADR-0188 (--cert-status, BL-610), so 0188 would collide when the shifts integrate.
+- Verified: `dotnet build Curl.Cli.UnitTests` clean; fast tests 2864 passed, 15 skipped, 0 failed.
 
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Done. ADR-0189 records the --proto scheme-set decisions; indexed and cited from KnownSchemes
