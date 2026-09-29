@@ -37,3 +37,4 @@ Fix the helper, not the expectations: advance time only once the resolver is wai
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-29: Backlog -> Doing.
