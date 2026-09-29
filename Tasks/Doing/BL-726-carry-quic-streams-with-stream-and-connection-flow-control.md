@@ -30,3 +30,4 @@ The QUIC connection opens client-initiated bidirectional and unidirectional stre
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
