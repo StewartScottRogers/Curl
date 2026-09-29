@@ -35,6 +35,12 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
 
     /// <summary>
+    /// Gets or sets every context's <see cref="TransferContext.DiagnosticLog" />: the run's diagnostic log, which the
+    /// runner sets once it has opened it, and <see cref="NoDiagnosticLog.Instance" /> until then (ADR-0222).
+    /// </summary>
+    internal IDiagnosticLog DiagnosticLog { get; set; } = NoDiagnosticLog.Instance;
+
+    /// <summary>
     /// Creates the context for one transfer, carrying every option a handler reads.
     /// </summary>
     /// <param name="options">The parsed command line.</param>
@@ -165,6 +171,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             Progress = WatchedProgress(progress, lowSpeedWatchdog, maxTimeWatchdog),
             Events = EventsOrNone(events),
             TimeProvider = clock,
+            DiagnosticLog = DiagnosticLog,
             CancellationToken = TokenOf(abortToken, lowSpeedWatchdog, maxTimeWatchdog),
         };
 

@@ -88,6 +88,12 @@ internal sealed class RunningTransferState(
     internal int RetryCount { get; set; }
 
     /// <summary>
+    /// Gets or sets the <see cref="TimeProvider.GetTimestamp" /> the transfer started at, which the
+    /// diagnostic log's end line measures its elapsed milliseconds from (ADR-0222).
+    /// </summary>
+    internal long StartTimestamp { get; set; }
+
+    /// <summary>
     /// Gets or sets a value indicating whether the transfer is a <c>-T</c> upload under <c>-C -</c>,
     /// whose meter curl 8.21.0 heads with <c>** Resuming transfer from byte position -1</c> whatever
     /// the <c>-o</c> file holds (task BL-416).

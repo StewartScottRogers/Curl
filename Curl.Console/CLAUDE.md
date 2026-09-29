@@ -400,3 +400,19 @@ body, and any `-i` header lines, to `Stream.Null`: no file is created, even unde
 still gets the head, the progress meter is drawn as for a file (even when standard output is a
 terminal), and the transfer switches standard output to binary as one to standard output does,
 so its `-w` line feeds stay LF on Windows (BL-495 Notes).
+
+Curl's own diagnostic log (ADR-0222, ADR-0228, BL-919) is opened by the runner, not the
+composition, because its level and file come from the command line: after an accepted parse, the
+`--stderr` redirects and the config-file note, `RunDiagnosticLog` builds `NoDiagnosticLog.Instance`
+at `--log-level none` (no file created, no byte changed), otherwise a `Curl.Output`
+`DiagnosticLogWriter` over `StandardErrorLogTarget` (the runner's standard error at each write, so
+it follows `--stderr`) or over the `--log-file`, truncated, UTF-8 without a byte order mark, and
+closed when the run ends. Every line goes through `GatedDiagnosticLog`, which takes the run's
+`WriteGate` before the writer's lock. A `--log-file` that cannot be opened prints
+`Warning: Failed to open the --log-file <path>`, even under `-s`, and the run carries on without a
+log. `TransferContextFactory.DiagnosticLog` puts the log on every transfer's context. The runner
+logs under `cli` the files the parse tried to read (`RecordingDataFileReader`), the parser's
+`Warning: ` lines and the accepted command line, and under `runner` every `Warning: ` line it
+prints, each transfer's start and end (`TransferDiagnosticLines`: never a credential, only
+`credentials given`), a failing exit code with its `CurlExitCode` name, and the `-Z` scheduler
+starting and finishing each transfer.

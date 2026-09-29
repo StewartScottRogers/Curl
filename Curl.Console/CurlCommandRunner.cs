@@ -582,22 +582,124 @@ internal sealed class CurlCommandRunner(
     private HoldableStream? eventStandardError;
 
     /// <summary>
+    /// The run's diagnostic log (ADR-0222), which owns the <c>--log-file</c>; <see langword="null" />
+    /// until an accepted command line opens it.
+    /// </summary>
+    private RunDiagnosticLog? runDiagnosticLog;
+
+    /// <summary>
+    /// Where the runner writes its own <c>cli</c> and <c>runner</c> diagnostic lines: the run's log once
+    /// it is open, <see cref="NoDiagnosticLog.Instance" /> until then.
+    /// </summary>
+    private IDiagnosticLog diagnosticLog = NoDiagnosticLog.Instance;
+
+    /// <summary>
     /// Runs <paramref name="arguments" /> to completion.
     /// </summary>
     /// <param name="arguments">The command-line arguments, without the program name.</param>
     /// <returns>The process exit code.</returns>
     internal async Task<int> RunAsync(IReadOnlyList<string> arguments)
     {
-        CommandLineParseResult parsed = ParseCommandLine(arguments);
+        RecordingDataFileReader parseFileReader = new(DataFileReader);
+        CommandLineParseResult parsed = ParseCommandLine(arguments, parseFileReader);
         try
         {
             await WriteWarningLinesRedirectingStandardErrorAsync(parsed).ConfigureAwait(false);
 
-            return await RunParsedAsync(parsed).ConfigureAwait(false);
+            return await RunParsedAsync(parsed, parseFileReader.FilesTried).ConfigureAwait(false);
         }
         finally
         {
+            await CloseDiagnosticLogAsync().ConfigureAwait(false);
             await CloseStandardErrorFileAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Opens the run's diagnostic log from the accepted command line's <c>--log-level</c> and
+    /// <c>--log-file</c> once standard error is where <c>--stderr</c> sends it, hands it to every
+    /// transfer's context, and logs the command line: a <c>--log-file</c> that cannot be opened writes
+    /// <see cref="RunDiagnosticLog.LogFileOpenFailedPrefix" />'s warning, even under <c>-s</c>, and the run
+    /// carries on without a log (ADR-0222, decision 4).
+    /// </summary>
+    /// <param name="parsed">The accepted parse result.</param>
+    /// <param name="filesTriedWhileParsing">The files the parse tried to read, in order, and whether each was read.</param>
+    /// <returns>A task that completes when the log is open and the command line logged.</returns>
+    private async Task OpenDiagnosticLogAsync(CommandLineParseResult parsed, IReadOnlyList<(string Path, bool WasRead)> filesTriedWhileParsing)
+    {
+        CommandLineOptions options = parsed.Options!;
+        runDiagnosticLog = await RunDiagnosticLog
+            .OpenAsync(options.DiagnosticLogLevel, options.DiagnosticLogFile, fileSystem, () => standardError, timeProvider, Environment.NewLine, writeGate)
+            .ConfigureAwait(false);
+        if (runDiagnosticLog.LogFileOpenFailed)
+        {
+            await WriteErrorLineAsync(RunDiagnosticLog.LogFileOpenFailedPrefix + options.DiagnosticLogFile).ConfigureAwait(false);
+        }
+
+        diagnosticLog = runDiagnosticLog.Log;
+        transferContextFactory.DiagnosticLog = diagnosticLog;
+        LogCommandLine(parsed, filesTriedWhileParsing);
+    }
+
+    /// <summary>
+    /// Logs the accepted command line: <c>info</c> its option groups and URLs, <c>verbose</c> each file
+    /// the parse tried to read (<c>.curlrc</c> candidates, <c>-K</c> and <c>@file</c> values) by path, saying
+    /// whether it was read, and <c>warning</c> each
+    /// of the parser's <c>Warning: </c> lines, already printed.
+    /// </summary>
+    /// <param name="parsed">The accepted parse result.</param>
+    /// <param name="filesTriedWhileParsing">The files the parse tried to read, in order, and whether each was read.</param>
+    private void LogCommandLine(CommandLineParseResult parsed, IReadOnlyList<(string Path, bool WasRead)> filesTriedWhileParsing)
+    {
+        foreach (string warning in parsed.WarningLines.Where(IsWarningLine))
+        {
+            diagnosticLog.Write(DiagnosticLogLevel.Warning, DiagnosticLogComponents.Cli, warning);
+        }
+
+        if (diagnosticLog.IsEnabled(DiagnosticLogLevel.Info))
+        {
+            diagnosticLog.Write(
+                DiagnosticLogLevel.Info,
+                DiagnosticLogComponents.Cli,
+                string.Create(CultureInfo.InvariantCulture, $"command line accepted: {parsed.Groups.Count} option groups, {parsed.Groups.Sum(group => group.Urls.Count)} URLs"));
+        }
+
+        LogFilesTriedWhileParsing(filesTriedWhileParsing);
+    }
+
+    /// <summary>
+    /// Logs, at <c>verbose</c>, each file the parse tried to read, by path, and whether it was read.
+    /// </summary>
+    /// <param name="filesTriedWhileParsing">The files the parse tried to read, in order, and whether each was read.</param>
+    private void LogFilesTriedWhileParsing(IReadOnlyList<(string Path, bool WasRead)> filesTriedWhileParsing)
+    {
+        if (!diagnosticLog.IsEnabled(DiagnosticLogLevel.Verbose))
+        {
+            return;
+        }
+
+        foreach ((string path, bool wasRead) in filesTriedWhileParsing)
+        {
+            diagnosticLog.Write(DiagnosticLogLevel.Verbose, DiagnosticLogComponents.Cli, $"{(wasRead ? "read" : "could not read")} file '{path}' while parsing the command line");
+        }
+    }
+
+    /// <summary>
+    /// Tells whether a standard-error line is one of curl's <c>Warning: </c> lines.
+    /// </summary>
+    /// <param name="line">The line.</param>
+    /// <returns><see langword="true" /> when it starts with <c>Warning: </c>.</returns>
+    private static bool IsWarningLine(string line) => line.StartsWith("Warning: ", StringComparison.Ordinal);
+
+    /// <summary>
+    /// Closes the run's diagnostic log, and with it the <c>--log-file</c>, if one was opened.
+    /// </summary>
+    /// <returns>A task that completes when the log is closed.</returns>
+    private async Task CloseDiagnosticLogAsync()
+    {
+        if (runDiagnosticLog is not null)
+        {
+            await runDiagnosticLog.DisposeAsync().ConfigureAwait(false);
         }
     }
 
@@ -607,8 +709,9 @@ internal sealed class CurlCommandRunner(
     /// refusal's lines, an accepted one the config-file note and then the run.
     /// </summary>
     /// <param name="parsed">The parse result.</param>
+    /// <param name="filesTriedWhileParsing">The files the parse tried to read, in order, and whether each was read, for the diagnostic log.</param>
     /// <returns>The process exit code.</returns>
-    private async Task<int> RunParsedAsync(CommandLineParseResult parsed)
+    private async Task<int> RunParsedAsync(CommandLineParseResult parsed, IReadOnlyList<(string Path, bool WasRead)> filesTriedWhileParsing)
     {
         if (!parsed.IsAccepted)
         {
@@ -618,6 +721,7 @@ internal sealed class CurlCommandRunner(
         }
 
         await WriteDefaultConfigFileNoteAsync(parsed.NotedDefaultConfigFile).ConfigureAwait(false);
+        await OpenDiagnosticLogAsync(parsed, filesTriedWhileParsing).ConfigureAwait(false);
 
         int exitCode = await RunAcceptedAsync(parsed.Options, parsed.Groups, parsed.WarningLinesAfterTransfers).ConfigureAwait(false);
         if (parsed.RefusalAfterGroups is not { } refusalAfterGroups)
@@ -959,13 +1063,14 @@ internal sealed class CurlCommandRunner(
     /// <c>-u</c> password.
     /// </summary>
     /// <param name="arguments">The command-line arguments, without the program name.</param>
+    /// <param name="fileReader">Reads the config files and <c>@file</c> values, recording each path.</param>
     /// <returns>The parse result.</returns>
-    private CommandLineParseResult ParseCommandLine(IReadOnlyList<string> arguments) =>
+    private CommandLineParseResult ParseCommandLine(IReadOnlyList<string> arguments, RecordingDataFileReader fileReader) =>
         CommandLineParser.Parse(
             arguments,
             Path.Exists,
             ConsolePasswordPrompt.ForProcessConsole,
-            DataFileReader,
+            fileReader,
             defaultConfigFileSearch ?? NoDefaultConfigFile);
 
     /// <summary>
@@ -1231,6 +1336,7 @@ internal sealed class CurlCommandRunner(
 
         state.ParallelProgress = run.ProgressMeter?.AddTransfer();
 
+        LogParallelScheduler("started", transfer);
         run.Queue.Add(TransferInParallelAsync(run, dispatch, options, transfer, state));
         return false;
     }
@@ -1264,9 +1370,27 @@ internal sealed class CurlCommandRunner(
             ended = (ParallelRun.AbortedResult, transfer.Url, UrlSchemeGuesser.AddScheme(transfer.Url, options.DefaultProtocol));
         }
 
+        LogParallelScheduler("finished", transfer);
+
         await writeGate.RunExclusiveAsync(() => EndParallelTransferAsync(run, dispatch, options, transfer, state, ended))
             .ConfigureAwait(false);
         state.ParallelProgress?.End();
+    }
+
+    /// <summary>
+    /// Logs, at <c>verbose</c>, the <c>-Z</c> scheduler starting or finishing a transfer.
+    /// </summary>
+    /// <param name="happened">What the scheduler did: <c>started</c> or <c>finished</c>.</param>
+    /// <param name="transfer">The transfer.</param>
+    private void LogParallelScheduler(string happened, UrlTransfer transfer)
+    {
+        if (diagnosticLog.IsEnabled(DiagnosticLogLevel.Verbose))
+        {
+            diagnosticLog.Write(
+                DiagnosticLogLevel.Verbose,
+                DiagnosticLogComponents.Runner,
+                string.Create(CultureInfo.InvariantCulture, $"parallel scheduler {happened} transfer {transfer.TransferId}"));
+        }
     }
 
     /// <summary>
@@ -1453,6 +1577,7 @@ internal sealed class CurlCommandRunner(
     {
         runningTransfer.Value = state;
         anyTransferReported = true;
+        LogTransferEnded(transfer, state, result);
         if (ShowsErrors(options) && result.ErrorMessage is not null && !IsIpfsGatewayFailure(result))
         {
             await WriteFailureLinesAsync(result).ConfigureAwait(false);
@@ -1472,6 +1597,48 @@ internal sealed class CurlCommandRunner(
         await WriteCookieJarAltSvcAndHstsFilesAsync(dispatch, options, transferUrl, standardOutputIsBinary, state).ConfigureAwait(false);
 
         previousTransferResult = result;
+    }
+
+    /// <summary>
+    /// Logs a transfer about to start: <c>info</c> <see cref="TransferDiagnosticLines.Started" />'s
+    /// summary of its options, and marks the start its end line measures from.
+    /// </summary>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="transfer">The transfer.</param>
+    private void LogTransferStarted(CommandLineOptions options, UrlTransfer transfer)
+    {
+        Running.StartTimestamp = timeProvider.GetTimestamp();
+        if (diagnosticLog.IsEnabled(DiagnosticLogLevel.Info))
+        {
+            string url = UrlSchemeGuesser.AddScheme(transfer.Url, options.DefaultProtocol);
+            diagnosticLog.Write(
+                DiagnosticLogLevel.Info,
+                DiagnosticLogComponents.Runner,
+                TransferDiagnosticLines.Started(transfer.TransferId, options, url, WritesToFile(options, transfer.UrlIndex)));
+        }
+    }
+
+    /// <summary>
+    /// Logs a transfer that has ended: <c>error</c> its failing exit code, then <c>info</c> its exit
+    /// code, bytes and elapsed milliseconds.
+    /// </summary>
+    /// <param name="transfer">The transfer.</param>
+    /// <param name="state">The transfer's state.</param>
+    /// <param name="result">The transfer's result.</param>
+    private void LogTransferEnded(UrlTransfer transfer, RunningTransferState state, TransferResult result)
+    {
+        if (!result.IsSuccess && diagnosticLog.IsEnabled(DiagnosticLogLevel.Error))
+        {
+            diagnosticLog.Write(DiagnosticLogLevel.Error, DiagnosticLogComponents.Runner, TransferDiagnosticLines.Failed(transfer.TransferId, result.ExitCode));
+        }
+
+        if (diagnosticLog.IsEnabled(DiagnosticLogLevel.Info))
+        {
+            diagnosticLog.Write(
+                DiagnosticLogLevel.Info,
+                DiagnosticLogComponents.Runner,
+                TransferDiagnosticLines.Ended(transfer.TransferId, result, timeProvider.GetElapsedTime(state.StartTimestamp)));
+        }
     }
 
     /// <summary>
@@ -1527,6 +1694,7 @@ internal sealed class CurlCommandRunner(
         CommandLineOptions options,
         UrlTransfer transfer)
     {
+        LogTransferStarted(options, transfer);
         if (TakesRemoteNameFromIpfsUrl(transfer))
         {
             return (await RefuseIpfsRemoteNameAsync(options).ConfigureAwait(false), transfer.Url, string.Empty);
@@ -3701,8 +3869,15 @@ internal sealed class CurlCommandRunner(
     /// </summary>
     /// <param name="line">The line, without a terminator.</param>
     /// <returns>A task that completes when the line is flushed.</returns>
-    private Task WriteErrorLineAsync(string line) =>
-        WriteErrorPiecesAsync(WarningLineWrapper.WrapLine(line, terminalColumns));
+    private Task WriteErrorLineAsync(string line)
+    {
+        if (IsWarningLine(line))
+        {
+            diagnosticLog.Write(DiagnosticLogLevel.Warning, DiagnosticLogComponents.Runner, line);
+        }
+
+        return WriteErrorPiecesAsync(WarningLineWrapper.WrapLine(line, terminalColumns));
+    }
 
     /// <summary>
     /// Writes <paramref name="text" /> to standard error as UTF-8, with no terminator added.
