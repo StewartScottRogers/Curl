@@ -34,3 +34,4 @@ A URL whose scheme `--proto` excludes is refused before any connection, and a `-
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
