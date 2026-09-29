@@ -102,7 +102,7 @@ Decisions and scope (sensible defaults, no ADR needed - each follows the measure
   in `FtpTransferMessages`, and `FtpControlConnectionName` carries the control connection's number,
   URL host and port for the closing line.
 - `Entry path is` and `Request has same path as previous transfer` are control-connection lines,
-  not data-connection ones: filed as BL-943. The passive connect's `Trying` and `Established`
+  not data-connection ones: filed as BL-945. The passive connect's `Trying` and `Established`
   lines come from `TcpConnector`, which says `Established connection` rather than curl's
   `Established 2nd connection to <URL host>`: filed as BL-944 (outside this task's touches).
 - Failure paths (e.g. `RETR` 550, where curl still prints `Remembering` and `left intact`) and a
@@ -114,7 +114,7 @@ Decisions and scope (sensible defaults, no ADR needed - each follows the measure
   gained an ordered `Transcript` and the data blocks, and `ScriptedConnection.RemoteEndPoint` became
   settable; no other existing test changed.
 - Verified end to end: our `curl --trace-ascii -` of a passive `RETR` against the recorder matches
-  curl 8.21.0 line for line except BL-943's and BL-944's lines.
+  curl 8.21.0 line for line except BL-945's and BL-944's lines.
 
 ## Log
 

@@ -1,5 +1,5 @@
 ---
-id: BL-943
+id: BL-945
 title: Write curl's Entry path and same-path -v lines for FTP
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-943 — Write curl's Entry path and same-path -v lines for FTP
+# BL-945 — Write curl's Entry path and same-path -v lines for FTP
 
 ## Goal
 
