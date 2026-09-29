@@ -153,6 +153,15 @@ in command-line order after the run's other transfers. A result that ends a seri
 `--fail-early` (a bad glob, a `-T` or `-D` file that cannot be opened) stops further starts and lets
 the running transfers finish. Without `-Z` nothing changes.
 
+Under `-Z` no transfer draws its own meter or `-#` bar: `ParallelRun`'s `ParallelProgressMeter` draws
+curl 8.21.0's combined meter to standard error (ADR-0154, BL-521). Its header line and status lines
+come from `Curl.Output`'s `ParallelProgressMeterText`, drawn when a handler reports bytes (each
+transfer's `TransferProgressRecorder` passes them to its `ParallelTransferProgress`), when a transfer
+ends, when the runner has started every transfer it can, and after a second without a draw. A line
+is drawn only if more than 500 ms have passed since the last. The final line and its line ending
+come once the run's reports are written. `-s` and `--no-progress-meter` in the first option group
+hide the meter, and `-#` is ignored, as in curl.
+
 The Nth `-T` / `--upload-file` value uploads to the Nth URL (ADR-0051). Its URL is resolved
 by `UploadTransferUrl` before anything else of that transfer: one it cannot parse is exit 3
 with no warning lines. The `-T` file is opened through the runner's `IFileSystem` after the

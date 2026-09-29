@@ -16,6 +16,26 @@ public sealed class ParallelRunTests
     private static readonly TransferResult Missing = TransferResult.Failure(CurlExitCode.FileCouldntReadFile, "missing");
 
     [TestMethod]
+    public async Task WaitForFreeSlotAsync_NoSlotFreeWithAMeter_DrawsTheMeterBeforeWaiting()
+    {
+        System.Text.StringBuilder written = new();
+        ParallelRun run = new(1, 0, true)
+        {
+            ProgressMeter = new ParallelProgressMeter(new ManualTimerTimeProvider(), new WriteGate(), text => written.Append(text)),
+        };
+        TaskCompletionSource running = new();
+        run.Queue.Add(running.Task);
+
+        Task wait = run.WaitForFreeSlotAsync();
+        string drawnBeforeTheSlotFreed = written.ToString();
+        running.SetResult();
+        await wait;
+
+        StringAssert.StartsWith(drawnBeforeTheSlotFreed, "DL% UL%  Dled  Uled  Xfers  Live");
+        run.ProgressMeter.Dispose();
+    }
+
+    [TestMethod]
     public void ExitCode_NothingFailed_IsOk()
     {
         ParallelRun run = new(2, 0, true);

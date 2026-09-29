@@ -11,7 +11,8 @@ namespace Curl.Console;
 /// as curl 8.21.0's <c>progress_calc</c> and <c>progress_meter</c> draw them (task BL-131).
 /// Under <c>-#</c> it also passes every report on to the transfer's
 /// <see cref="ProgressBarRecorder" /> (task BL-132). Under <c>-L</c> each hop of the chain is
-/// drawn on a status line of its own (task BL-277, ADR-0086).
+/// drawn on a status line of its own (task BL-277, ADR-0086). Under <c>-Z</c> every byte report is also
+/// passed on to the transfer's share of the run's combined meter (task BL-521, ADR-0154).
 /// </summary>
 /// <remarks>
 /// The first draw is made when the recorder is made, with every counter zero, so it is
@@ -71,6 +72,8 @@ internal sealed class TransferProgressRecorder : ITransferProgress
 
     private readonly HoldableStream? eventOutput;
 
+    private readonly ParallelTransferProgress? parallelProgress;
+
     private int writtenLength;
 
     private long start;
@@ -111,16 +114,22 @@ internal sealed class TransferProgressRecorder : ITransferProgress
     /// the meter's end before the lines the handler reports after it; <see langword="null" />
     /// when the run shows none.
     /// </param>
+    /// <param name="parallelProgress">
+    /// The transfer's share of a <c>-Z</c> run's combined meter, which every byte report is passed on to,
+    /// or <see langword="null" /> outside one (task BL-521).
+    /// </param>
     internal TransferProgressRecorder(
         TimeProvider timeProvider,
         ProgressBarRecorder? progressBar = null,
         Action<string>? writeLive = null,
-        HoldableStream? eventOutput = null)
+        HoldableStream? eventOutput = null,
+        ParallelTransferProgress? parallelProgress = null)
     {
         this.timeProvider = timeProvider;
         this.progressBar = progressBar;
         this.writeLive = writeLive;
         this.eventOutput = eventOutput;
+        this.parallelProgress = parallelProgress;
         StartHop();
     }
 
@@ -166,6 +175,7 @@ internal sealed class TransferProgressRecorder : ITransferProgress
         Draw(done: false);
         WriteLive();
         progressBar?.ReportDownloaded(bytesSoFar, expectedTotal);
+        parallelProgress?.ReportDownloaded(bytesSoFar, expectedTotal);
     }
 
     /// <inheritdoc />
@@ -177,6 +187,7 @@ internal sealed class TransferProgressRecorder : ITransferProgress
         Draw(done: false);
         WriteLive();
         progressBar?.ReportUploaded(bytesSoFar, expectedTotal);
+        parallelProgress?.ReportUploaded(bytesSoFar, expectedTotal);
     }
 
     /// <inheritdoc />

@@ -68,6 +68,13 @@ internal sealed class RunningTransferState(
     internal ProgressBarRecorder? ProgressBar { get; set; }
 
     /// <summary>
+    /// Gets or sets the transfer's share of a <c>-Z</c> run's combined progress meter, which its
+    /// <see cref="Progress" /> passes every byte report on to; <see langword="null" /> outside one or
+    /// when the run shows no meter (BL-521).
+    /// </summary>
+    internal ParallelTransferProgress? ParallelProgress { get; set; }
+
+    /// <summary>
     /// Gets or sets a value indicating whether the transfer has written the progress meter's header
     /// lines, which curl 8.21.0 writes once however many times <c>--retry</c> runs the transfer.
     /// </summary>

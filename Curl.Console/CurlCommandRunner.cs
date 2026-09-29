@@ -724,7 +724,7 @@ internal sealed class CurlCommandRunner(
     private async Task<CurlExitCode?> TransferAllGroupsAsync(IReadOnlyList<CommandLineOptions> groups)
     {
         standardError = writeGate.Guard(standardError);
-        parallelRun = groups[0].Parallel ? new ParallelRun(groups[0].ParallelMax, groups[0].ParallelMaxHost, groups[0].ParallelImmediate) : null;
+        parallelRun = groups[0].Parallel ? NewParallelRun(groups[0]) : null;
         try
         {
             CurlExitCode? exitCode = await TransferGroupsInOrderAsync(groups).ConfigureAwait(false);
@@ -735,6 +735,33 @@ internal sealed class CurlCommandRunner(
         {
             await transferEventOutput.DisposeAsync().ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// Makes the state of a <c>-Z</c> run from its first option group, with the combined progress meter
+    /// curl 8.21.0 draws in place of each transfer's own (<see cref="ParallelProgressMeter" />, BL-521)
+    /// unless this runner writes no meter or <c>-s</c> or <c>--no-progress-meter</c> hides it; <c>-#</c>
+    /// changes nothing, as curl ignores it under <c>-Z</c>.
+    /// </summary>
+    /// <param name="options">The first option group.</param>
+    /// <returns>The run.</returns>
+    private ParallelRun NewParallelRun(CommandLineOptions options) =>
+        new(options.ParallelMax, options.ParallelMaxHost, options.ParallelImmediate)
+        {
+            ProgressMeter = writesProgressMeter && !options.Silent && !options.ProgressMeterOff
+                ? new ParallelProgressMeter(timeProvider, writeGate, WriteParallelProgressMeter)
+                : null,
+        };
+
+    /// <summary>
+    /// Writes text of a <c>-Z</c> run's combined progress meter to standard error and flushes it, holding
+    /// the run's <see cref="writeGate" />.
+    /// </summary>
+    /// <param name="text">The text.</param>
+    private void WriteParallelProgressMeter(string text)
+    {
+        standardError.Write(Encoding.UTF8.GetBytes(text));
+        standardError.Flush();
     }
 
     /// <summary>
@@ -1108,7 +1135,7 @@ internal sealed class CurlCommandRunner(
         CommandLineOptions options,
         UrlTransfer transfer)
     {
-        await run.Queue.WaitForFreeSlotAsync().ConfigureAwait(false);
+        await run.WaitForFreeSlotAsync().ConfigureAwait(false);
         if (run.HasEnded)
         {
             return true;
@@ -1120,6 +1147,8 @@ internal sealed class CurlCommandRunner(
             run.DeferReport(transfer.TransferId, () => ReportSkippedAsync(dispatch, options, transfer, state, run.FirstFailure!));
             return false;
         }
+
+        state.ParallelProgress = run.ProgressMeter?.AddTransfer();
 
         run.Queue.Add(TransferInParallelAsync(run, dispatch, options, transfer, state));
         return false;
@@ -1156,6 +1185,7 @@ internal sealed class CurlCommandRunner(
 
         await writeGate.RunExclusiveAsync(() => EndParallelTransferAsync(run, dispatch, options, transfer, state, ended))
             .ConfigureAwait(false);
+        state.ParallelProgress?.End();
     }
 
     /// <summary>
@@ -1177,6 +1207,7 @@ internal sealed class CurlCommandRunner(
     {
         string url = UrlSchemeGuesser.AddGuessedScheme(transfer.Url);
         await run.Hosts.WaitForHostAsync(url, abortToken).ConfigureAwait(false);
+        Running.ParallelProgress?.MarkLive();
         try
         {
             return await TransferUrlAsync(dispatch, options, transfer).ConfigureAwait(false);
@@ -2504,7 +2535,8 @@ internal sealed class CurlCommandRunner(
             timeProvider,
             state.ProgressBar,
             ShowsProgressMeter(options, toStandardOutput) ? statusText => WriteProgressMeterLive(state, resumeFrom, statusText) : null,
-            eventStandardError);
+            eventStandardError,
+            state.ParallelProgress);
     }
 
     /// <summary>
@@ -2638,14 +2670,16 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// Tells whether a transfer shows progress, the meter or the <c>-#</c> bar: only when this
-    /// runner writes it, never under <c>-s</c> or <c>--no-progress-meter</c>, and not for a body
-    /// written to standard output when that is a terminal, as curl 8.21.0 does.
+    /// runner writes it, never under <c>-s</c> or <c>--no-progress-meter</c>, not for a body
+    /// written to standard output when that is a terminal, and never under <c>-Z</c>, whose run draws
+    /// one combined meter instead (<see cref="ParallelProgressMeter" />), as curl 8.21.0 does.
     /// </summary>
     /// <param name="options">The accepted command line.</param>
     /// <param name="toStandardOutput">Whether the transfer writes its body to standard output.</param>
     /// <returns><see langword="true" /> when progress is shown.</returns>
     private bool ShowsProgress(CommandLineOptions options, bool toStandardOutput) =>
         writesProgressMeter
+        && parallelRun is null
         && !options.Silent
         && !options.ProgressMeterOff
         && !(toStandardOutput && standardOutputIsTerminal);
