@@ -54,8 +54,7 @@ public abstract class KerberosEncryption
     public static KerberosEncryption Create(KerberosEncryptionType encryptionType, IKerberosRandomSource randomSource) => encryptionType switch
     {
         KerberosEncryptionType.Des3CbcSha1 => new Des3CbcSha1KerberosEncryption(randomSource),
-        KerberosEncryptionType.Aes128CtsHmacSha196 => new AesSha1KerberosEncryption(encryptionType, 15, 16, randomSource),
-        KerberosEncryptionType.Aes256CtsHmacSha196 => new AesSha1KerberosEncryption(encryptionType, 16, 32, randomSource),
+        KerberosEncryptionType.Aes128CtsHmacSha196 or KerberosEncryptionType.Aes256CtsHmacSha196 => AesSha1KerberosEncryption.ForType(encryptionType, randomSource),
         KerberosEncryptionType.Aes128CtsHmacSha256128 or KerberosEncryptionType.Aes256CtsHmacSha384192 => AesSha2KerberosEncryption.ForType(encryptionType, randomSource),
         KerberosEncryptionType.Rc4Hmac => new Rc4HmacKerberosEncryption(randomSource),
         KerberosEncryptionType.Camellia128CtsCmac or KerberosEncryptionType.Camellia256CtsCmac => CamelliaCmacKerberosEncryption.ForType(encryptionType, randomSource),
