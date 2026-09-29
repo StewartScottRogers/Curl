@@ -115,6 +115,7 @@ public static class CommandLineOptionTable
         CommandLineOption.Value("delegation", null, AcceptingEmpty(SetGssApiDelegation)),
         CommandLineOption.Text("service-name", null, (options, service) => options.ServiceName = service),
         CommandLineOption.Text("oauth2-bearer", null, (options, token) => options.SetBearerToken(token)),
+        CommandLineOption.Value("aws-sigv4", null, AcceptingEmpty((options, parameter) => options.AwsSigV4 = parameter)),
         CommandLineOption.NegatableFlag("netrc", 'n', (options, on) => options.NetrcRequested = on),
         CommandLineOption.NegatableFlag("netrc-optional", null, (options, on) => options.NetrcOptionalRequested = on),
         CommandLineOption.Value("netrc-file", null, SettingExistingFile("--netrc-file", (options, file) => options.NetrcFile = file)),

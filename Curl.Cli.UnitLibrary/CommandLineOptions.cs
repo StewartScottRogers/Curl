@@ -585,6 +585,14 @@ public sealed class CommandLineOptions
     public string? BearerToken { get; private set; }
 
     /// <summary>
+    /// The last <c>--aws-sigv4</c> value, verbatim, the empty string included, which curl 8.21.0
+    /// signs as <c>aws:amz</c> (measured, BL-629 Notes); <see langword="null"/> when not given.
+    /// While it is set, every request to the origin is signed with AWS Signature Version 4 in
+    /// place of <see cref="AuthSchemes"/>.
+    /// </summary>
+    public string? AwsSigV4 { get; internal set; }
+
+    /// <summary>
     /// The last <c>-x</c> / <c>--proxy</c>, <c>--proxy1.0</c>, <c>--socks4</c>, <c>--socks4a</c>, <c>--socks5</c> or
     /// <c>--socks5-hostname</c> value, with the kind of proxy that option names; <see langword="null"/>
     /// when none was given. curl 8.21.0 keeps one proxy: the last of these options wins, value and kind
