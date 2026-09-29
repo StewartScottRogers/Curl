@@ -105,6 +105,9 @@ public sealed class TransferContextFactoryTests
         Assert.AreEqual(FtpFileMethod.MultiCwd, context.FtpFileMethod);
         Assert.IsFalse(context.FtpCreateDirectories);
         Assert.IsFalse(context.ListOnly);
+        Assert.IsFalse(context.UseAscii);
+        Assert.IsFalse(context.Append);
+        Assert.IsFalse(context.ConvertLineEndings);
         Assert.IsEmpty(context.QuoteCommands);
         Assert.AreEqual(TransferContext.DefaultCreateFileMode, context.CreateFileMode);
         Assert.IsNull(context.ConnectTimeout);
@@ -130,6 +133,9 @@ public sealed class TransferContextFactoryTests
             "--ftp-method", "singlecwd",
             "--ftp-create-dirs",
             "-l",
+            "-B",
+            "-a",
+            "--crlf",
             "-Q", "NOOP",
             "-Q", "-DELE x",
             "--create-file-mode", "0600",
@@ -154,6 +160,9 @@ public sealed class TransferContextFactoryTests
         Assert.AreEqual(FtpFileMethod.SingleCwd, context.FtpFileMethod);
         Assert.IsTrue(context.FtpCreateDirectories);
         Assert.IsTrue(context.ListOnly);
+        Assert.IsTrue(context.UseAscii);
+        Assert.IsTrue(context.Append);
+        Assert.IsTrue(context.ConvertLineEndings);
         CollectionAssert.AreEqual(new[] { "NOOP", "-DELE x" }, context.QuoteCommands.ToArray());
         Assert.AreEqual(UnixFileMode.UserRead | UnixFileMode.UserWrite, context.CreateFileMode);
         Assert.AreEqual(TimeSpan.FromSeconds(3), context.ConnectTimeout);

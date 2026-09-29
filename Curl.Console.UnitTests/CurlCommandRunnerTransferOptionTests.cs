@@ -460,6 +460,21 @@ public sealed class CurlCommandRunnerTransferOptionTests
             StandardErrorText);
     }
 
+    [TestMethod]
+    [DataRow(false, "a\nb\r\nc\n")]
+    [DataRow(true, "a\r\nb\r\nc\r\n")]
+    public async Task RunAsync_UploadToFileUrl_ConvertsLineEndingsOnlyUnderCrlf(bool crlf, string expected)
+    {
+        outputFiles.ExistingContent["up.txt"] = Encoding.ASCII.GetBytes("a\nb\r\nc\n");
+        InMemoryFileSystem destination = new();
+        string[] arguments = crlf ? ["-T", "up.txt", "--crlf", "file:///dir/x"] : ["-T", "up.txt", "file:///dir/x"];
+
+        int exitCode = await RunAsync(arguments, new FileProtocolHandler(destination));
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(expected, Encoding.ASCII.GetString(destination.Written.Values.Single().ToArray()));
+    }
+
     private static string Lines(params string[] lines) => string.Concat(lines.Select(line => line + NewLine));
 
     private string WrittenText(string path) => Encoding.ASCII.GetString(outputFiles.Written[path].ToArray());
