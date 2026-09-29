@@ -67,6 +67,8 @@
   <Project Path="Curl.Kerberos.UnitTests/Curl.Kerberos.UnitTests.csproj" />
   <Project Path="Curl.Networking.UnitLibrary/Curl.Networking.UnitLibrary.csproj" />
   <Project Path="Curl.Networking.UnitTests/Curl.Networking.UnitTests.csproj" />
+  <Project Path="Curl.Ntlm.UnitLibrary/Curl.Ntlm.UnitLibrary.csproj" />
+  <Project Path="Curl.Ntlm.UnitTests/Curl.Ntlm.UnitTests.csproj" />
   <Project Path="Curl.Output.UnitLibrary/Curl.Output.UnitLibrary.csproj" />
   <Project Path="Curl.Output.UnitTests/Curl.Output.UnitTests.csproj" />
   <Project Path="Curl.Protocol.Abstractions.UnitLibrary/Curl.Protocol.Abstractions.UnitLibrary.csproj" />
