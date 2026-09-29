@@ -58,7 +58,10 @@ server can be made to fail on demand (ADR-0144); those are read from curl's
    - The server resets the request stream: `HTTP/3 stream <id> reset by server`, exit 95
      `CURLE_HTTP3`, or exit 18 once body bytes have arrived (curl tests
      `data->req.bytecount`). BL-731's criterion said exit 95 for a reset mid-body; the source
-     says 18, and the source wins.
+     says 18, and the source wins. [ADR-0187](ADR-0187-http-3-stream-resets-follow-curl-8-21-0-and-a-refused-stream-is-retried-on-a-new-connection.md)
+     moves this row and the `:status` row below to `curl-8_21_0`: a reset names its error
+     code, one with `H3_REQUEST_REJECTED` is retried on a new connection, and `-I` ignores a
+     reset after the head (BL-834).
    - The stream ends before the final head: `HTTP/3 stream <id> was closed cleanly, but before
      getting all response header fields, treated as error`, exit 95.
    - A head without a valid `:status`: the client aborts the stream with `H3_MESSAGE_ERROR`
