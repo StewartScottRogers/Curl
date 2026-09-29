@@ -87,9 +87,18 @@ Namespace `Curl.Cryptography`. It holds:
 - `HmacRipemd160` (public, `IDisposable`): RFC 2286 - static `HashData` and `Verify`
   (fixed-time comparison), and a keyed instance's `AppendData` and `GetHashAndReset`,
   which keeps the key for the next message. Constant-time in the key.
+- `Rc4` (public, `IDisposable`): the RC4 stream cipher, keys of 1 to 256 bytes -
+  `ApplyKeyStream`, which keeps its place in the keystream between calls, and
+  `DiscardKeyStream`, with `Rfc4345DiscardLength` (1536) for SSH's `arcfour128` and
+  `arcfour256`. Not constant-time.
+- `Cast128SubstitutionBoxes` (internal): RFC 2144 Appendix A's S1 to S4 (`RoundBoxes`)
+  and S5 to S8 (`KeyScheduleBoxes`).
+- `Cast128` (public, `IDisposable`): RFC 2144, keys of 5 to 16 bytes (12 rounds up to 10
+  bytes, 16 above) - `EncryptBlock`, `DecryptBlock`, and the CBC mode of SSH's
+  `cast128-cbc`, `EncryptCbc` and `DecryptCbc`, plus the internal round function
+  `Round`. The key schedule is RFC 2144 section 2.4 as a row table. Not constant-time.
 
-The remaining primitives land under their own tasks (BL-676, BL-677, BL-738
-to BL-745).
+The remaining primitives land under their own tasks (BL-677, BL-738 to BL-745).
 
 ## Rules
 
