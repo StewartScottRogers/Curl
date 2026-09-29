@@ -1,5 +1,5 @@
 ---
-id: BL-846
+id: BL-848
 title: Write curl's -v lines for HTTP authentication, NTLM's handshake lines included
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-846 — Write curl's -v lines for HTTP authentication, NTLM's handshake lines included
+# BL-848 — Write curl's -v lines for HTTP authentication, NTLM's handshake lines included
 
 ## Goal
 

@@ -84,7 +84,7 @@ CHALLENGE, `TlRMTVNTUAACAAAADAAMADgAAAAzgoriASNFZ4mrze8AAAAAAAAAACQAJABEAAAABgBw
 - Choices with a default taken: after Type 3, another Type 2 gets nothing (curl would loop;
   bounded here); a Type 3 past 1024 bytes ends on the 401 rather than curl's
   `CURLE_TOO_LARGE`; the `-v` NTLM lines are not written. The last two are filed as
-  follow-ups BL-847 and BL-846.
+  follow-ups BL-849 and BL-848.
 
 ### Touches added
 

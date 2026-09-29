@@ -1,5 +1,5 @@
 ---
-id: BL-847
+id: BL-849
 title: Fail an NTLM Type 3 past curl's 1024-byte buffer with exit 100 off Windows
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-847 — Fail an NTLM Type 3 past curl's 1024-byte buffer with exit 100 off Windows
+# BL-849 — Fail an NTLM Type 3 past curl's 1024-byte buffer with exit 100 off Windows
 
 ## Goal
 
