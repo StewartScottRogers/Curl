@@ -11,7 +11,8 @@ namespace Curl.Tls;
 /// record MAC, and whether its TLS 1.2 PRF is SHA-384. The table holds every ECDHE, DHE
 /// (RSA and DSS), RSA and anonymous suite with one of these bulk ciphers: AES-CBC, AES-GCM,
 /// AES-CCM and AES-CCM8 (RFC 6655, RFC 7251), ChaCha20-Poly1305, Camellia-CBC, ARIA-GCM,
-/// 3DES, RC4 and NULL.
+/// 3DES, RC4 and NULL; and the nine SRP suites of RFC 5054 section 2.7 (plain, RSA and DSS,
+/// each with AES-256-CBC, AES-128-CBC and 3DES).
 /// </summary>
 /// <param name="Code">The suite's code point.</param>
 /// <param name="KeyExchange">How the pre-master secret is agreed.</param>
@@ -136,6 +137,15 @@ public sealed record Tls12CipherSuite(
         new(0xc017, Kx.Ecdhe, Auth.Anonymous, TripleDesEdeCbc, HmacSha1, false),
         new(0xc016, Kx.Ecdhe, Auth.Anonymous, Rc4128, HmacSha1, false),
         new(0xc015, Kx.Ecdhe, Auth.Anonymous, Null, HmacSha1, false),
+        new(0xc020, Kx.Srp, Auth.Anonymous, Aes256Cbc, HmacSha1, false),
+        new(0xc01d, Kx.Srp, Auth.Anonymous, Aes128Cbc, HmacSha1, false),
+        new(0xc01a, Kx.Srp, Auth.Anonymous, TripleDesEdeCbc, HmacSha1, false),
+        new(0xc021, Kx.Srp, Auth.Rsa, Aes256Cbc, HmacSha1, false),
+        new(0xc01e, Kx.Srp, Auth.Rsa, Aes128Cbc, HmacSha1, false),
+        new(0xc01b, Kx.Srp, Auth.Rsa, TripleDesEdeCbc, HmacSha1, false),
+        new(0xc022, Kx.Srp, Auth.Dss, Aes256Cbc, HmacSha1, false),
+        new(0xc01f, Kx.Srp, Auth.Dss, Aes128Cbc, HmacSha1, false),
+        new(0xc01c, Kx.Srp, Auth.Dss, TripleDesEdeCbc, HmacSha1, false),
     }.ToDictionary(suite => suite.Code);
 
     /// <summary>Gets every suite the client can run.</summary>

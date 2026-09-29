@@ -1,6 +1,7 @@
 using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Text;
 using Curl.Cryptography;
 using State = Curl.Tls.Tls12ClientHandshakeState;
 using Step = Curl.Tls.Tls12ServerFlightStep;
@@ -14,7 +15,7 @@ namespace Curl.Tls;
 /// switching its record write state to <see cref="KeyBlock" />'s client keys after the
 /// ChangeCipherSpec it sends, and its read state to the server keys after
 /// <see cref="ReceiveChangeCipherSpec" /> accepts the server's. Covers ECDHE (X25519, x448,
-/// the NIST curves and the brainpool curves), DHE with server-chosen parameters, RSA and anonymous key exchange
+/// the NIST curves and the brainpool curves), DHE with server-chosen parameters, RSA, anonymous and SRP (RFC 5054) key exchange
 /// over every <see cref="Tls12CipherSuite" />, the ServerKeyExchange signature, secure
 /// renegotiation's empty <c>renegotiation_info</c> (RFC 5746), the extended master secret
 /// (RFC 7627), encrypt-then-MAC (RFC 7366), ALPN, SNI, <c>status_request</c> with the
@@ -406,7 +407,7 @@ public sealed class Tls12ClientHandshake
     {
         Tls12CipherSuite? suite = Tls12CipherSuite.Find(hello.CipherSuite);
         bool valid = suite is not null
-            && settings.CipherSuites.Contains(suite.Code)
+            && clientHello!.CipherSuites.Contains(suite.Code)
             && (!suite.RequiresTls12 || hello.LegacyVersion == (ushort)TlsProtocolVersion.Tls12)
             && hello.LegacyCompressionMethod == 0;
         return valid ? null : TlsAlertDescription.IllegalParameter;
@@ -631,8 +632,36 @@ public sealed class Tls12ClientHandshake
         return alert ?? message.Parameters switch
         {
             Tls12EcdheParameters ecdhe => AgreeEcdhe(ecdhe),
+            Tls12SrpParameters srp => AgreeSrp(srp),
             _ => AgreeDhe((Tls12DheParameters)message.Parameters),
         };
+    }
+
+    private TlsAlertDescription? AgreeSrp(Tls12SrpParameters parameters)
+    {
+        // RFC 5054 section 2.5.3: only Appendix A's groups; OpenSSL refuses any other with insufficient_security.
+        SrpGroup? group = SrpGroup.Find(parameters.Prime, parameters.Generator);
+        if (group is null)
+        {
+            return TlsAlertDescription.InsufficientSecurity;
+        }
+
+        // RFC 5054 section 2.5.4: B % N == 0 is illegal_parameter; OpenSSL also refuses a B of N or more.
+        BigInteger serverPublicValue = SrpClient.ToInteger(parameters.PublicValue);
+        if (serverPublicValue.IsZero || serverPublicValue >= group.PrimeValue)
+        {
+            return TlsAlertDescription.IllegalParameter;
+        }
+
+        TlsSrpCredentials credentials = settings.SrpCredentials!;
+        byte[] privateKey = SrpClient.ComputePrivateKey(parameters.Salt, Encoding.UTF8.GetBytes(credentials.UserName), Encoding.UTF8.GetBytes(credentials.Password));
+        byte[] privateValue = new byte[SrpClient.PrivateValueLength];
+        random.Fill(privateValue);
+        clientExchangeKeys = SrpClient.ComputePublicValue(group, privateValue);
+        preMasterSecret = SrpClient.ComputePremasterSecret(group, privateKey, privateValue, parameters.PublicValue);
+        CryptographicOperations.ZeroMemory(privateKey);
+        CryptographicOperations.ZeroMemory(privateValue);
+        return null;
     }
 
     private TlsAlertDescription? CheckServerKeyExchangeSignature(Tls12ServerKeyExchange message)

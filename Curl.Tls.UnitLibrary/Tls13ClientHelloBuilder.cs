@@ -85,7 +85,7 @@ internal sealed class Tls13ClientHelloBuilder(Tls13ClientSettings settings, byte
     }
 
     private ClientHello Create(List<TlsExtension> extensions) =>
-        new(LegacyVersion, random, legacySessionId, [.. settings.CipherSuites, .. settings.LowerVersions?.CipherSuites ?? []], [0], [.. extensions]);
+        new(LegacyVersion, random, legacySessionId, [.. settings.CipherSuites, .. settings.LowerVersions?.OfferedCipherSuites ?? []], [0], [.. extensions]);
 
     /// <summary>TLS 1.3, then with <see cref="Tls13ClientSettings.LowerVersions" /> every version from its ceiling down to its minimum.</summary>
     private ushort[] OfferedVersions()

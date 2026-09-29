@@ -10,7 +10,7 @@ public sealed class Tls12CipherSuiteTests
     [TestMethod]
     public void TheTableHoldsEveryFamilyAndNothingElse()
     {
-        Assert.HasCount(104, Tls12CipherSuite.All);
+        Assert.HasCount(113, Tls12CipherSuite.All);
         Assert.IsNull(Tls12CipherSuite.Find(0x1301));
         Assert.IsNull(Tls12CipherSuite.Find(Tls12CipherSuite.EmptyRenegotiationInfoScsv));
         Assert.AreEqual(new Tls12CipherSuite(0xc030, Tls12KeyExchange.Ecdhe, Tls12Authentication.Rsa, Tls12BulkCipher.Aes256Gcm, Tls12MacAlgorithm.None, true), Tls12CipherSuite.Find(0xc030));

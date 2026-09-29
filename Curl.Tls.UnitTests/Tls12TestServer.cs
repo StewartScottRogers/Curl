@@ -1,5 +1,6 @@
 using System.Numerics;
 using System.Security.Cryptography;
+using System.Text;
 using Curl.Cryptography;
 
 namespace Curl.Tls;
@@ -25,6 +26,9 @@ internal sealed class Tls12TestServer(TestServerCredential? credential)
     private bool resumed;
     private Tls13KeyShare? ecdheShare;
     private FiniteFieldDiffieHellman? dheKey;
+    private BigInteger srpVerifier;
+    private BigInteger srpPrivateValue;
+    private byte[] srpPublicValue = [];
 
     public TlsProtocolVersion Version { get; init; } = TlsProtocolVersion.Tls12;
 
@@ -67,6 +71,14 @@ internal sealed class Tls12TestServer(TestServerCredential? credential)
     public bool SendTls12DowngradeSentinel { get; init; }
 
     public Tls12TestSessionCache Sessions { get; init; } = new();
+
+    /// <summary>Gets the SRP user the server knows, whose password its verifier is computed from; the client's <c>srp</c> user name must match.</summary>
+    public TlsSrpCredentials SrpUser { get; init; } = new("alice", "password123");
+
+    public SrpGroup SrpGroup { get; init; } = SrpGroup.Bits1024;
+
+    /// <summary>Gets a value indicating whether the server checks the client's Finished; off, it answers with its own whatever the client sent (a wrong SRP password).</summary>
+    public bool CheckClientFinished { get; init; } = true;
 
     public byte[] MasterSecret { get; private set; } = [];
 
@@ -257,7 +269,12 @@ internal sealed class Tls12TestServer(TestServerCredential? credential)
 
     private Tls12ServerKeyExchange ServerKeyExchange()
     {
-        Tls12ServerKeyExchangeParameters parameters = Suite.KeyExchange == Tls12KeyExchange.Ecdhe ? EcdheParameters() : DheParameters();
+        Tls12ServerKeyExchangeParameters parameters = Suite.KeyExchange switch
+        {
+            Tls12KeyExchange.Ecdhe => EcdheParameters(),
+            Tls12KeyExchange.Srp => SrpParameters(),
+            _ => DheParameters(),
+        };
         if (credential is null)
         {
             return new Tls12ServerKeyExchange(parameters, null, null);
@@ -305,12 +322,39 @@ internal sealed class Tls12TestServer(TestServerCredential? credential)
         {
             Tls12KeyExchange.Rsa => credential!.RsaKey!.Decrypt(exchangeKeys, RSAEncryptionPadding.Pkcs1),
             Tls12KeyExchange.Ecdhe => ecdheShare!.ComputeSharedSecret(exchangeKeys)!,
+            Tls12KeyExchange.Srp => SrpSecret(exchangeKeys),
             _ => DheSecret(exchangeKeys),
         };
         return extendedMasterSecret
             ? Prf.ComputeExtendedMasterSecret(preMasterSecret, Prf.HashHandshake(transcript.ToArray()))
             : Prf.ComputeMasterSecret(preMasterSecret, hello.Random, serverRandom);
     }
+
+    /// <summary>The server's SRP-6a side (RFC 5054 section 2.5.3): v = g^x, B = k*v + g^b, for the user the client named.</summary>
+    private Tls12SrpParameters SrpParameters()
+    {
+        CollectionAssert.AreEqual(Encoding.UTF8.GetBytes(SrpUser.UserName), SrpExtension.Decode(OfferedData(TlsExtensionType.Srp)!).Value);
+        byte[] salt = RandomNumberGenerator.GetBytes(16);
+        byte[] x = SrpClient.ComputePrivateKey(salt, Encoding.UTF8.GetBytes(SrpUser.UserName), Encoding.UTF8.GetBytes(SrpUser.Password));
+        BigInteger n = Integer(SrpGroup.Prime);
+        BigInteger g = Integer(SrpGroup.Generator);
+        srpVerifier = Integer(SrpClient.ComputeVerifier(SrpGroup, x));
+        srpPrivateValue = Integer(RandomNumberGenerator.GetBytes(32));
+        BigInteger b = ((Integer(SrpClient.ComputeMultiplier(SrpGroup)) * srpVerifier) + BigInteger.ModPow(g, srpPrivateValue, n)) % n;
+        srpPublicValue = b.ToByteArray(isUnsigned: true, isBigEndian: true);
+        return new Tls12SrpParameters(SrpGroup.Prime.ToArray(), SrpGroup.Generator.ToArray(), salt, srpPublicValue);
+    }
+
+    /// <summary>S = (A * v^u) ^ b % N.</summary>
+    private byte[] SrpSecret(byte[] clientPublicValue)
+    {
+        BigInteger n = Integer(SrpGroup.Prime);
+        BigInteger u = Integer(SrpClient.ComputeScrambler(SrpGroup, clientPublicValue, srpPublicValue));
+        BigInteger basis = Integer(clientPublicValue) * BigInteger.ModPow(srpVerifier, u, n) % n;
+        return BigInteger.ModPow(basis, srpPrivateValue, n).ToByteArray(isUnsigned: true, isBigEndian: true);
+    }
+
+    private static BigInteger Integer(ReadOnlySpan<byte> value) => new(value, isUnsigned: true, isBigEndian: true);
 
     private byte[] DheSecret(byte[] clientPublicValue)
     {
@@ -345,7 +389,11 @@ internal sealed class Tls12TestServer(TestServerCredential? credential)
         CollectionAssert.AreEqual(Tls12OutgoingMessage.ChangeCipherSpec.Bytes, changeCipherSpec.Bytes);
         byte[] expected = Prf.ComputeClientVerifyData(MasterSecret, Prf.HashHandshake(transcript.ToArray()));
         byte[] finished = Take(messages, HandshakeType.Finished);
-        CollectionAssert.AreEqual(expected, Body(finished));
+        if (CheckClientFinished)
+        {
+            CollectionAssert.AreEqual(expected, Body(finished));
+        }
+
         Assert.IsEmpty(messages);
     }
 
