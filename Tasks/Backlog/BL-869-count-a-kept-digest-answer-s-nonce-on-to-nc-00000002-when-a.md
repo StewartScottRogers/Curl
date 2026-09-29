@@ -1,5 +1,5 @@
 ---
-id: BL-867
+id: BL-869
 title: Count a kept Digest answer's nonce on to nc=00000002 when a proxy and an origin challenge in one transfer
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-867 — Count a kept Digest answer's nonce on to nc=00000002 when a proxy and an origin challenge in one transfer
+# BL-869 — Count a kept Digest answer's nonce on to nc=00000002 when a proxy and an origin challenge in one transfer
 
 ## Goal
 
