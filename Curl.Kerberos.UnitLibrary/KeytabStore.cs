@@ -4,11 +4,25 @@ namespace Curl.Kerberos;
 
 /// <summary>
 /// Finds the default keytab as MIT Kerberos does and reads a <c>FILE:</c> or
-/// <c>WRFILE:</c> keytab through the injected file reader (ADR-0158).
+/// <c>WRFILE:</c> keytab through the injected file reader (ADR-0158, BL-816).
 /// </summary>
 /// <param name="files">Reads the keytab file.</param>
 /// <param name="readEnvironmentVariable">Reads an environment variable; <see langword="null" /> when unset.</param>
-public sealed class KeytabStore(IKerberosFileReader files, Func<string, string?> readEnvironmentVariable)
+/// <param name="readUserId">Gives the user's numeric id, for <c>%{uid}</c> in <c>default_keytab_name</c>.</param>
+/// <param name="configuration">
+/// <c>krb5.conf</c>, for <c>[libdefaults] default_keytab_name</c>; <see langword="null" />
+/// reads as an empty file.
+/// </param>
+/// <param name="readUserName">
+/// Gives the user's login name for <c>%{username}</c>; <see langword="null" /> uses
+/// <see cref="Environment.UserName" />, which is <c>getpwuid(geteuid())</c>'s name off Windows.
+/// </param>
+public sealed class KeytabStore(
+    IKerberosFileReader files,
+    Func<string, string?> readEnvironmentVariable,
+    Func<uint> readUserId,
+    KerberosConfiguration? configuration = null,
+    Func<string>? readUserName = null)
 {
     /// <summary>The environment variable that names the keytab.</summary>
     public const string KeytabNameVariable = "KRB5_KTNAME";
@@ -19,14 +33,25 @@ public sealed class KeytabStore(IKerberosFileReader files, Func<string, string?>
     private const string WritableFileType = "WRFILE";
 
     /// <summary>
-    /// Gets the default keytab's name: <c>KRB5_KTNAME</c> when set and not empty, otherwise
-    /// <see cref="BuiltInKeytabName" />.
+    /// Gets the default keytab's name: <c>KRB5_KTNAME</c> when set and not empty, else
+    /// <c>[libdefaults] default_keytab_name</c> with MIT's <c>%{token}</c> parameters
+    /// expanded, else <see cref="BuiltInKeytabName" />.
     /// </summary>
     /// <returns>The default keytab's name.</returns>
+    /// <exception cref="KerberosFileException">
+    /// <c>default_keytab_name</c> holds an unclosed or unknown token
+    /// (<see cref="KerberosFileError.PathTokenInvalid" />).
+    /// </exception>
     public string DefaultKeytabName()
     {
         string? named = readEnvironmentVariable(KeytabNameVariable);
-        return string.IsNullOrEmpty(named) ? BuiltInKeytabName : named;
+        if (!string.IsNullOrEmpty(named))
+        {
+            return named;
+        }
+
+        string? configured = ConfiguredKeytabName();
+        return configured is null ? BuiltInKeytabName : Expansion().Expand(configured);
     }
 
     /// <summary>Reads the default keytab.</summary>
@@ -54,4 +79,10 @@ public sealed class KeytabStore(IKerberosFileReader files, Func<string, string?>
             CryptographicOperations.ZeroMemory(bytes);
         }
     }
+
+    private string? ConfiguredKeytabName() =>
+        configuration?.GetValues("libdefaults", "default_keytab_name") is [string value, ..] ? value : null;
+
+    private KerberosPathExpansion Expansion() =>
+        new(readUserId(), readEnvironmentVariable, readUserName ?? (() => Environment.UserName));
 }

@@ -14,7 +14,12 @@ BL-688, ADR-0158). `CredentialCacheStore` also reads a `DIR:` collection's cache
 one its `primary` file names, or `DIR::/dir/tktN` directly) and a `KCM:` cache from the
 KCM daemon through the injected `IKerberosKcmConnector`, speaking MIT `cc_kcm.c`'s
 protocol (`KerberosKcmClient`, `KcmCredentialCacheReader`; BL-789), and takes the
-default cache name from `krb5.conf`'s `default_ccache_name` when `KRB5CCNAME` is unset. It reads `krb5.conf` as MIT's profile library does, maps a host to
+default cache name from `krb5.conf`'s `default_ccache_name` when `KRB5CCNAME` is unset;
+`KeytabStore` likewise takes `default_keytab_name` when `KRB5_KTNAME` is unset, and both
+expand MIT's Unix `%{token}` parameters (`%{uid}`, `%{euid}`, `%{USERID}`, `%{username}`,
+`%{TEMP}`, `%{LIBDIR}`, `%{BINDIR}`, `%{SBINDIR}`, `%{null}`) in the configured value
+(`KerberosPathExpansion`; BL-816), an unclosed or unknown token failing as
+`KerberosFileError.PathTokenInvalid`. It reads `krb5.conf` as MIT's profile library does, maps a host to
 its realm and locates a realm's KDCs from the file or from DNS SRV records through
 `IKerberosSrvLookup` (`KerberosConfigurationStore`, `KerberosConfigurationReader`,
 `KerberosConfiguration`, `KerberosKdcLocator`; BL-689, ADR-0160). It encrypts,

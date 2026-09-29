@@ -46,4 +46,11 @@ public enum KerberosFileError
     /// shaped as its request's reply must be.
     /// </summary>
     KcmReplyMalformed,
+
+    /// <summary>
+    /// A <c>krb5.conf</c> <c>default_ccache_name</c> or <c>default_keytab_name</c> holds a
+    /// <c>%{</c> with no closing <c>}</c>, or a <c>%{token}</c> MIT's parameter expansion
+    /// does not know (MIT's <c>EINVAL</c>).
+    /// </summary>
+    PathTokenInvalid,
 }

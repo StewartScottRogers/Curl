@@ -178,6 +178,37 @@ public sealed class CredentialCacheStoreTests
         Assert.AreEqual("FILE:/tmp/krb5cc_1000", store.DefaultCacheName());
     }
 
+    [TestMethod]
+    public void DefaultCacheName_UserNameSeam_ExpandsUsername()
+    {
+        CredentialCacheStore store = new(
+            new InMemoryKerberosFiles(),
+            _ => null,
+            () => 1000,
+            configuration: Configuration("[libdefaults]\n default_ccache_name = FILE:/tmp/krb5cc_%{username}\n"),
+            readUserName: () => "alice");
+
+        Assert.AreEqual("FILE:/tmp/krb5cc_alice", store.DefaultCacheName());
+    }
+
+    [TestMethod]
+    public void DefaultCacheName_NoUserNameSeam_ExpandsUsernameFromTheEnvironment()
+    {
+        CredentialCacheStore store = Store(new InMemoryKerberosFiles(), null, "[libdefaults]\n default_ccache_name = FILE:/tmp/krb5cc_%{username}\n");
+
+        Assert.AreEqual("FILE:/tmp/krb5cc_" + Environment.UserName, store.DefaultCacheName());
+    }
+
+    [TestMethod]
+    public void DefaultCacheName_UnclosedToken_FailsAsPathTokenInvalid()
+    {
+        CredentialCacheStore store = Store(new InMemoryKerberosFiles(), null, "[libdefaults]\n default_ccache_name = FILE:/tmp/krb5cc_%{uid\n");
+
+        KerberosFileException failure = Assert.ThrowsExactly<KerberosFileException>(store.DefaultCacheName);
+
+        Assert.AreEqual(KerberosFileError.PathTokenInvalid, failure.Error);
+    }
+
     /// <summary>Parses <paramref name="text" /> as <c>krb5.conf</c>.</summary>
     internal static KerberosConfiguration Configuration(string text)
     {

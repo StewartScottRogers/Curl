@@ -17,12 +17,17 @@ namespace Curl.Kerberos;
 /// <c>krb5.conf</c>, for <c>[libdefaults] default_ccache_name</c> and <c>kcm_socket</c>;
 /// <see langword="null" /> reads as an empty file.
 /// </param>
+/// <param name="readUserName">
+/// Gives the user's login name for <c>%{username}</c>; <see langword="null" /> uses
+/// <see cref="Environment.UserName" />, which is <c>getpwuid(geteuid())</c>'s name off Windows.
+/// </param>
 public sealed class CredentialCacheStore(
     IKerberosFileReader files,
     Func<string, string?> readEnvironmentVariable,
     Func<uint> readUserId,
     IKerberosKcmConnector? kcm = null,
-    KerberosConfiguration? configuration = null)
+    KerberosConfiguration? configuration = null,
+    Func<string>? readUserName = null)
 {
     /// <summary>The environment variable that names the credential cache.</summary>
     public const string CacheNameVariable = "KRB5CCNAME";
@@ -44,10 +49,14 @@ public sealed class CredentialCacheStore(
 
     /// <summary>
     /// Gets the default cache's name: <c>KRB5CCNAME</c> when set and not empty, else
-    /// <c>[libdefaults] default_ccache_name</c> with <c>%{uid}</c> and <c>%{euid}</c>
+    /// <c>[libdefaults] default_ccache_name</c> with MIT's <c>%{token}</c> parameters
     /// expanded, else MIT's built-in <c>FILE:/tmp/krb5cc_&lt;uid&gt;</c>.
     /// </summary>
     /// <returns>The default cache's name, e.g. <c>FILE:/tmp/krb5cc_1000</c>.</returns>
+    /// <exception cref="KerberosFileException">
+    /// <c>default_ccache_name</c> holds an unclosed or unknown token
+    /// (<see cref="KerberosFileError.PathTokenInvalid" />).
+    /// </exception>
     public string DefaultCacheName()
     {
         string? named = readEnvironmentVariable(CacheNameVariable);
@@ -56,11 +65,11 @@ public sealed class CredentialCacheStore(
             return named;
         }
 
-        string userId = readUserId().ToString(CultureInfo.InvariantCulture);
+        uint userId = readUserId();
         string? configured = ConfiguredValue("default_ccache_name");
         return configured is null
-            ? "FILE:/tmp/krb5cc_" + userId
-            : configured.Replace("%{uid}", userId, StringComparison.Ordinal).Replace("%{euid}", userId, StringComparison.Ordinal);
+            ? "FILE:/tmp/krb5cc_" + userId.ToString(CultureInfo.InvariantCulture)
+            : new KerberosPathExpansion(userId, readEnvironmentVariable, readUserName ?? (() => Environment.UserName)).Expand(configured);
     }
 
     /// <summary>Reads the default credential cache.</summary>
