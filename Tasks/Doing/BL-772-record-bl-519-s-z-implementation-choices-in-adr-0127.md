@@ -31,3 +31,4 @@ ADR-0127 gains an "Implementation (BL-519)" section stating the choices BL-519 m
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
