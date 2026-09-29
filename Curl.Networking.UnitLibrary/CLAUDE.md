@@ -31,7 +31,7 @@ Per ADR-0222 (BL-820) its ClientHello is the platform curl's measured profile, `
 for the Schannel build and `ClientHelloProfile.OpenSsl` for the OpenSSL build, turned into the TLS
 settings by `ClientHelloProfileMapping`: the profile's extension order and fixed extensions, its lists
 cut to the signature schemes and groups the client can honour, and the options changing only the lists
-(below a TLS 1.3 ceiling the order stays `Curl.Tls`'s, BL-918). `HandBuiltTlsProviderTests.ClientHello`
+(below a TLS 1.3 ceiling the order stays `Curl.Tls`'s, BL-941). `HandBuiltTlsProviderTests.ClientHello`
 captures the first record and rebuilds it from the profile. Both providers judge the server's certificate with
 `ServerCertificateVerification` (trust anchors, tolerated chain errors, each build's name check,
 exit 60 and 77); the hand-built path reaches it through `HandBuiltCertificateVerifier`, which

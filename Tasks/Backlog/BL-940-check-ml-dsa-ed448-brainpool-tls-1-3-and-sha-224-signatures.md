@@ -1,5 +1,5 @@
 ---
-id: BL-917
+id: BL-940
 title: Check ML-DSA, Ed448, brainpool TLS 1.3 and SHA-224 signatures in the hand-built TLS client
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-917 — Check ML-DSA, Ed448, brainpool TLS 1.3 and SHA-224 signatures in the hand-built TLS client
+# BL-940 — Check ML-DSA, Ed448, brainpool TLS 1.3 and SHA-224 signatures in the hand-built TLS client
 
 ## Goal
 

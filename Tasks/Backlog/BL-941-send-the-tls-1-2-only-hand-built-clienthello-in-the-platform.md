@@ -1,5 +1,5 @@
 ---
-id: BL-918
+id: BL-941
 title: Send the TLS 1.2-only hand-built ClientHello in the platform profile's extension order
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-918 — Send the TLS 1.2-only hand-built ClientHello in the platform profile's extension order
+# BL-941 — Send the TLS 1.2-only hand-built ClientHello in the platform profile's extension order
 
 ## Goal
 
