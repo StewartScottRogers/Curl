@@ -8,7 +8,8 @@ namespace Curl.Quic;
 /// A datagram channel wired to a <see cref="QuicTestServer" /> that a connection's loop and a
 /// test can use at once: every use of the server is under one lock, and datagrams to receive
 /// queue in a <see cref="Channel{T}" />. A test can make the server stop answering, send it
-/// frames to deliver, queue a datagram from another endpoint, or make the next receive fail.
+/// frames to deliver, queue a datagram from another endpoint, make the next receive fail, or
+/// wait, datagram by datagram, until the server has taken what it expects from the client.
 /// The channel owns the server and disposes it.
 /// </summary>
 internal sealed class QuicTestLiveChannel(QuicTestServer server) : IDatagramChannel
@@ -17,7 +18,12 @@ internal sealed class QuicTestLiveChannel(QuicTestServer server) : IDatagramChan
 
     private readonly Channel<(byte[]? Datagram, EndPoint From, Exception? Error)> inbound = Channel.CreateUnbounded<(byte[]?, EndPoint, Exception?)>();
 
+    /// <summary>How long a test waits for the connection's loop to act before it fails rather than hangs; never how long anything is meant to take.</summary>
+    public static readonly TimeSpan HangGuard = TimeSpan.FromMinutes(1);
+
     private readonly Lock gate = new();
+
+    private TaskCompletionSource datagramTaken = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     private bool silent;
 
@@ -73,20 +79,34 @@ internal sealed class QuicTestLiveChannel(QuicTestServer server) : IDatagramChan
         }
     }
 
-    /// <summary>Waits, a millisecond at a time for up to ten seconds, until <paramref name="condition" /> holds.</summary>
-    public static async Task WaitUntilAsync(Func<bool> condition)
+    /// <summary>
+    /// Waits until <paramref name="condition" />, a question about what the server has taken from
+    /// the client, holds: checks it now and again each time the client sends a datagram, so it never
+    /// polls the clock. Fails when the client sends nothing more for <see cref="HangGuard" />.
+    /// </summary>
+    public async Task WaitUntilSentAsync(Func<bool> condition)
     {
-        for (int attempt = 0; attempt < 10000 && !condition(); attempt++)
+        while (true)
         {
-            await Task.Delay(1);
-        }
+            Task nextDatagram;
+            lock (gate)
+            {
+                nextDatagram = datagramTaken.Task;
+            }
 
-        Assert.IsTrue(condition());
+            if (condition())
+            {
+                return;
+            }
+
+            await nextDatagram.WaitAsync(HangGuard);
+        }
     }
 
     public ValueTask SendAsync(ReadOnlyMemory<byte> datagram, EndPoint destination, CancellationToken cancellationToken)
     {
         IReadOnlyList<byte[]> answers = [];
+        TaskCompletionSource taken;
         lock (gate)
         {
             if (!IsDisposed)
@@ -98,6 +118,9 @@ internal sealed class QuicTestLiveChannel(QuicTestServer server) : IDatagramChan
             {
                 answers = [];
             }
+
+            taken = datagramTaken;
+            datagramTaken = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         }
 
         foreach (byte[] answer in answers)
@@ -105,6 +128,7 @@ internal sealed class QuicTestLiveChannel(QuicTestServer server) : IDatagramChan
             inbound.Writer.TryWrite((answer, ServerEndPoint, null));
         }
 
+        taken.SetResult();
         return ValueTask.CompletedTask;
     }
 
