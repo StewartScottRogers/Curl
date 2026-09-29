@@ -14,7 +14,7 @@ completed:
 
 ## Goal
 
-`QuicClientSettings.CreateCurlTlsSettings` offers cipher suites `1302 1303 1301 00ff`, exactly as ADR-0144 section 5 measured curl.se's ngtcp2 build (LibreSSL 4.2.1) sending, and the pinned first Initial in `Curl.Quic.UnitTests` is re-pinned with it.
+`QuicClientSettings.CreateLibreSslTlsSettings` offers cipher suites `1302 1303 1301 00ff`, exactly as ADR-0144 section 5 measured curl.se's ngtcp2 build (LibreSSL 4.2.1) sending, and the pinned first Initial in `Curl.Quic.UnitTests` is re-pinned with it.
 
 ## Context
 

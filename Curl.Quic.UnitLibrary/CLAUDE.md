@@ -45,7 +45,7 @@ The handshake (BL-724, RFC 9000 sections 5 to 8, 17 and 18, RFC 9001 section 4, 
   Initial, Handshake and 1-RTT levels, follows one Retry, fails on Version Negotiation
   without version 1, checks the server's transport parameters, discards Initial keys at the
   first Handshake packet and Handshake keys at HANDSHAKE_DONE, and keeps NEW_TOKEN tokens.
-  `QuicClientSettings` (with `CreateCurlTlsSettings`), `QuicHandshakeFailure` and the
+  `QuicClientSettings` (with `CreateLibreSslTlsSettings` and `CreateOpenSslTlsSettings`), `QuicHandshakeFailure` and the
   internal `QuicHandshakeFailures` hold the settings and the exit mapping.
 - `QuicClientConnector`: runs a handshake over `IDatagramChannel` with the injected
   `TimeProvider`; 10 s without `--connect-timeout` is exit 55, the timeout exit 28.

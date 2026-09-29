@@ -59,6 +59,9 @@ internal sealed class QuicTestServer : IDisposable
     /// <summary>Gets the frames the server sends in 1-RTT once the client's Finished checks out.</summary>
     public Func<QuicTestServer, IEnumerable<QuicFrame>> FramesAfterHandshake { get; init; } = _ => [new QuicHandshakeDoneFrame()];
 
+    /// <summary>Gets a value indicating whether the server asks for a client certificate.</summary>
+    public bool RequestClientCertificate { get; init; }
+
     /// <summary>Gets a value indicating whether a NewSessionTicket follows the handshake in a 1-RTT CRYPTO frame.</summary>
     public bool SendSessionTicket { get; init; }
 
@@ -185,7 +188,11 @@ internal sealed class QuicTestServer : IDisposable
         }
         else if (space == handshake && bytes.Length > 0)
         {
-            tls!.ReceiveClientFinished(bytes);
+            if (!tls!.ReceiveClientFlight(bytes))
+            {
+                return;
+            }
+
             ClientFinishedReceived = true;
             AfterHandshake();
         }
@@ -199,7 +206,7 @@ internal sealed class QuicTestServer : IDisposable
             return;
         }
 
-        tls = new QuicTestTlsServer(CipherSuite);
+        tls = new QuicTestTlsServer(CipherSuite, RequestClientCertificate);
         QuicTransportParameters parameters = new()
         {
             OriginalDestinationConnectionId = OriginalDestinationConnectionId,

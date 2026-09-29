@@ -274,7 +274,12 @@ Per ADR-0180 (BL-728) `TcpConnector` takes an optional `QuicDialer`, and its
 `QuicDialRequest`, to the dialer. `QuicDialer` opens a UDP channel for each address in turn
 through `IUdpChannelOpener` (`UdpChannelOpener` in production, binding `UdpDatagramChannel` to a
 local address and port), runs `Curl.Quic`'s `QuicClientConnector` with curl's ClientHello and a
-`HandBuiltCertificateVerifier`, and returns a `QuicConnection`; failures print curl's `QUIC connect
+`HandBuiltCertificateVerifier`, and returns a `QuicConnection`. Per BL-847 the ClientHello is
+curl.se's LibreSSL build's (`QuicClientSettings.CreateLibreSslTlsSettings`) for the Windows build and
+the OpenSSL profile's TLS 1.3 parts (`CreateOpenSslTlsSettings`) for the OpenSSL build; both builds
+read `--ciphers`/`--tls13-ciphers` through `OpenSslCipherSuites`, cut to the suites QUIC can protect
+(none left is exit 59 with `HandBuiltTlsProvider`'s text), and load `--cert` through
+`ClientCertificateLoader.LoadAsOpenSslBuild`, the Windows build keeping a drive letter's colon; failures print curl's `QUIC connect
 to` and `Failed to connect to <host> port <port>` lines, and a socket error is exit 56 `QUIC:
 recvfrom() ...`. This project therefore references `Curl.Quic.UnitLibrary`, which lets
 `Curl.Networking.UnitTests` see its internals: `Fakes/QuicTestServer` and `QuicTestTlsServer` are

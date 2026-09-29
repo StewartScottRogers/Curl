@@ -45,7 +45,7 @@ public sealed class QuicDialer
     /// Creates the dialer for the curl build this platform usually runs, opening real UDP
     /// sockets bound to <paramref name="localAddress" /> and <paramref name="localPort" />.
     /// </summary>
-    /// <param name="options">The TLS settings that judge the server's certificate (<c>-k</c>, <c>--cacert</c>, <c>--capath</c>).</param>
+    /// <param name="options">The TLS settings: the ones that judge the server's certificate (<c>-k</c>, <c>--cacert</c>, <c>--capath</c>), <c>--cert</c> and the cipher options.</param>
     /// <param name="timeProvider">The clock the handshake, its timeouts and the timings run on.</param>
     /// <param name="localAddress">The local address <c>--interface</c> gives, or <see langword="null" /> for any.</param>
     /// <param name="localPort">The local port <c>--local-port</c> gives, or <c>0</c> for an ephemeral one.</param>
@@ -59,7 +59,7 @@ public sealed class QuicDialer
     /// handshake against an in-memory server.
     /// </summary>
     /// <param name="channelOpener">Opens the channel to each address.</param>
-    /// <param name="options">The TLS settings that judge the server's certificate.</param>
+    /// <param name="options">The TLS settings: the ones that judge the server's certificate, <c>--cert</c> and the cipher options.</param>
     /// <param name="matchesSchannelBuild"><see langword="true" /> for the Schannel build's messages and Winsock wording.</param>
     /// <param name="timeProvider">The clock the handshake, its timeouts and the timings run on.</param>
     /// <param name="random">Where connection IDs, the TLS client random and key shares come from.</param>
@@ -110,7 +110,8 @@ public sealed class QuicDialer
         return lastFailure!;
     }
 
-    // One address: curl's Trying line and trust anchors, the channel, the handshake.
+    // One address: curl's Trying line, the ClientHello's suites and --cert certificate, then
+    // the connect; the certificate is disposed once the handshake no longer needs it.
     private async ValueTask<(MultiplexedConnectResult Result, bool TryNextAddress)> AttemptAsync(
         QuicDialRequest request,
         IPEndPoint endPoint,
@@ -119,7 +120,22 @@ public sealed class QuicDialer
     {
         var events = request.Target.Events;
         events.ReportInfo($"  Trying {endPoint}...");
-        events.ReportTlsTrust(SslStreamTlsProvider.DescribeTrust(_options));
+        var (tls, loadedCertificate, preparationFailure) = PrepareTls(request.Target.Host);
+        using var clientCertificate = loadedCertificate;
+        return tls is null
+            ? (preparationFailure!, false)
+            : await ConnectAsync(request, endPoint, tls, handshakeTimeout, cancellationToken).ConfigureAwait(false);
+    }
+
+    // The trust anchors, the channel and the handshake, once the ClientHello is ready.
+    private async ValueTask<(MultiplexedConnectResult Result, bool TryNextAddress)> ConnectAsync(
+        QuicDialRequest request,
+        IPEndPoint endPoint,
+        Tls13ClientSettings tls,
+        TimeSpan? handshakeTimeout,
+        CancellationToken cancellationToken)
+    {
+        request.Target.Events.ReportTlsTrust(SslStreamTlsProvider.DescribeTrust(_options));
         var (verifier, unusable) = CreateVerifier(request.Target.Host);
         if (verifier is null)
         {
@@ -133,8 +149,7 @@ public sealed class QuicDialer
             return (Failed(request, endPoint, openFailure!), true);
         }
 
-        var settings = new QuicClientSettings { Tls = QuicClientSettings.CreateCurlTlsSettings(HandBuiltTlsProvider.ServerNameFor(request.Target.Host)) };
-        var handshake = new QuicClientHandshake(settings, _random, verifier, _timeProvider);
+        var handshake = new QuicClientHandshake(new QuicClientSettings { Tls = tls }, _random, verifier, _timeProvider);
         var (failure, cancellation) = await RunHandshakeAsync(handshake, channel, handshakeTimeout, cancellationToken).ConfigureAwait(false);
         if (failure is null && cancellation is null)
         {
@@ -145,6 +160,50 @@ public sealed class QuicDialer
         await channel.DisposeAsync().ConfigureAwait(false);
         cancellation?.Throw();
         return (Failed(request, endPoint, failure!), LeavesTimeForTheNextAddress(failure!));
+    }
+
+    // What the ClientHello offers, in the order HandBuiltTlsProvider prepares it: the suites,
+    // then the --cert certificate. Both QUIC builds run on the OpenSSL API (BL-847): curl.se's
+    // LibreSSL build on Windows sends its measured hello, the OpenSSL build elsewhere its own.
+    private (Tls13ClientSettings? Tls, X509Certificate2? ClientCertificate, MultiplexedConnectResult? Failure) PrepareTls(string targetHost)
+    {
+        var (suites, cipherFailure) = SelectCipherSuites();
+        if (cipherFailure is not null)
+        {
+            return (null, null, MultiplexedConnectResult.Failed(CurlExitCode.SslCipher, cipherFailure));
+        }
+
+        var (certificate, certificateFailure) = ClientCertificateLoader.LoadAsOpenSslBuild(_options, recognisesDriveLetters: _matchesSchannelBuild);
+        if (certificateFailure is not null)
+        {
+            return (null, null, MultiplexedConnectResult.Failed(certificateFailure.ExitCode, certificateFailure.ErrorMessage!));
+        }
+
+        var serverName = HandBuiltTlsProvider.ServerNameFor(targetHost);
+        var profile = _matchesSchannelBuild ? QuicClientSettings.CreateLibreSslTlsSettings(serverName) : QuicClientSettings.CreateOpenSslTlsSettings(serverName);
+        var tls = profile with
+        {
+            CipherSuites = suites ?? profile.CipherSuites,
+            ClientCertificate = HandBuiltTlsProvider.ToTlsClientCertificate(certificate),
+        };
+        return (tls, certificate, null);
+    }
+
+    // --ciphers and --tls13-ciphers as the OpenSSL build reads them (ADR-0011), cut to the
+    // TLS 1.3 suites QUIC protects packets with; a list leaving none is exit 59 with
+    // HandBuiltTlsProvider's message.
+    private (IReadOnlyList<ushort>? Suites, string? FailureMessage) SelectCipherSuites()
+    {
+        var (suites, failureMessage) = OpenSslCipherSuites.Select(_options.Ciphers, _options.Tls13Ciphers);
+        if (suites is null)
+        {
+            return (null, failureMessage);
+        }
+
+        ushort[] offered = [.. suites.Select(suite => (ushort)suite).Where(QuicPacketProtection.CanProtect)];
+        return offered.Length == 0
+            ? (null, OpenSslCipherSuites.Unapplied(_options.Ciphers, _options.Tls13Ciphers))
+            : (offered, null);
     }
 
     // The verifier over the --cacert or system anchors and the --crlfile lists, or what

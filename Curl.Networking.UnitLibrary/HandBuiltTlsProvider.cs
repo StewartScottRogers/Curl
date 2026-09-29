@@ -113,7 +113,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     // The platform curl's measured ClientHello (ADR-0140, "Default ClientHello"; BL-820).
     private ClientHelloProfile Profile => _matchesSchannelBuild ? ClientHelloProfile.Schannel : ClientHelloProfile.OpenSsl;
 
-    private bool OffersOnlyVersionsBelowTls12 =>_options.MaximumVersion is TlsVersion.Tls10 or TlsVersion.Tls11;
+    private bool OffersOnlyVersionsBelowTls12 => _options.MaximumVersion is TlsVersion.Tls10 or TlsVersion.Tls11;
 
     /// <inheritdoc />
     public ValueTask<ConnectResult> AuthenticateAsClientAsync(

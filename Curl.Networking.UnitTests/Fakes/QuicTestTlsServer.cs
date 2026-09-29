@@ -8,8 +8,10 @@ namespace Curl.Networking.Fakes;
 /// The TLS 1.3 server half of <see cref="QuicTestServer" />, built from <c>Curl.Tls</c>'s own
 /// codecs, key schedule and signing key with a generated ECDSA P-256 certificate. It
 /// answers a ClientHello with the ServerHello and the encrypted flight (EncryptedExtensions
-/// with ALPN and <c>quic_transport_parameters</c>, Certificate, CertificateVerify, Finished)
-/// and checks the client's Finished against its own transcript.
+/// with ALPN and <c>quic_transport_parameters</c>, a CertificateRequest when
+/// <see cref="RequestClientCertificate" /> is set, Certificate, CertificateVerify, Finished)
+/// and checks the client's Finished against its own transcript, keeping the certificate the
+/// client presented.
 /// </summary>
 internal sealed class QuicTestTlsServer : IDisposable
 {
@@ -17,11 +19,23 @@ internal sealed class QuicTestTlsServer : IDisposable
 
     private readonly List<byte[]> transcript = [];
 
+    private readonly List<byte> clientFlight = [];
+
     private readonly Tls13CipherSuite suite;
 
     private readonly X25519KeyShare share = new(RandomNumberGenerator.GetBytes(32));
 
-    public QuicTestTlsServer(ushort cipherSuite) => suite = Tls13CipherSuite.Find(cipherSuite)!;
+    public QuicTestTlsServer(ushort cipherSuite, bool requestClientCertificate = false)
+    {
+        suite = Tls13CipherSuite.Find(cipherSuite)!;
+        RequestClientCertificate = requestClientCertificate;
+    }
+
+    /// <summary>Gets a value indicating whether the flight asks for a client certificate.</summary>
+    public bool RequestClientCertificate { get; }
+
+    /// <summary>Gets the Certificate message the client answered a CertificateRequest with, or <see langword="null" />.</summary>
+    public CertificateMessage? ClientCertificate { get; private set; }
 
     public Tls13CipherSuite Suite => suite;
 
@@ -54,12 +68,32 @@ internal sealed class QuicTestTlsServer : IDisposable
         return (serverHello, EncryptedFlight(share.ComputeSharedSecret(clientShare.KeyExchange)!, applicationProtocol, transportParameters));
     }
 
-    /// <summary>Checks the client's Finished.</summary>
-    public void ReceiveClientFinished(byte[] message)
+    /// <summary>
+    /// Takes the client's Handshake-level bytes, which may arrive in pieces: keeps its
+    /// Certificate, adds it and the CertificateVerify to the transcript, and checks its Finished.
+    /// </summary>
+    /// <returns><see langword="true" /> once the client's Finished has arrived and checked out.</returns>
+    public bool ReceiveClientFlight(byte[] bytes)
     {
-        HandshakeMessageReadResult finished = HandshakeMessageReader.Read(message);
-        Assert.AreEqual(HandshakeType.Finished, finished.Message!.Type);
-        CollectionAssert.AreEqual(suite.KeySchedule.ComputeFinishedVerifyData(ClientHandshakeSecret, TranscriptHash()), finished.Message.Body);
+        clientFlight.AddRange(bytes);
+        while (HandshakeMessageReader.Read(clientFlight.ToArray()) is { Message: { } message, BytesConsumed: var consumed })
+        {
+            clientFlight.RemoveRange(0, consumed);
+            if (message.Type == HandshakeType.Finished)
+            {
+                CollectionAssert.AreEqual(suite.KeySchedule.ComputeFinishedVerifyData(ClientHandshakeSecret, TranscriptHash()), message.Body);
+                return true;
+            }
+
+            if (message.Type == HandshakeType.Certificate)
+            {
+                ClientCertificate = CertificateMessage.Decode(message.Body).Value;
+            }
+
+            transcript.Add(message.Encode());
+        }
+
+        return false;
     }
 
     public void Dispose() => share.Dispose();
@@ -95,6 +129,11 @@ internal sealed class QuicTestTlsServer : IDisposable
 
         List<byte[]> flight = [];
         Add(flight, new EncryptedExtensions(extensions).Encode());
+        if (RequestClientCertificate)
+        {
+            Add(flight, new CertificateRequest([], [SignatureAlgorithmsExtension.Encode([TlsSignatureScheme.EcdsaSecp256r1Sha256])]).Encode());
+        }
+
         Add(flight, new CertificateMessage([], [new CertificateEntry(Credential.Value.Certificate, [])]).Encode());
         byte[] content = TlsSignatureScheme.BuildCertificateVerifyContent(true, TranscriptHash());
         Add(flight, new CertificateVerify(TlsSignatureScheme.EcdsaSecp256r1Sha256, new EcdsaTlsSigningKey(Credential.Value.Key).Sign(TlsSignatureScheme.EcdsaSecp256r1Sha256, content)).Encode());
