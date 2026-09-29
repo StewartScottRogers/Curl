@@ -34,6 +34,23 @@ public sealed class RankedHttpAuthenticatorTests
     }
 
     [TestMethod]
+    public void RepeatAuthorization_DigestAnswer_CountsItsNonceOn()
+    {
+        string sent = Authenticator.CreateAuthorization(Request(HttpAuthSchemes.Digest), [Digest + ", qop=\"auth\""])!;
+
+        string value = Authenticator.RepeatAuthorization(Request(HttpAuthSchemes.Digest), sent);
+
+        StringAssert.Contains(sent, "cnonce=\"c\", nc=00000001", StringComparison.Ordinal);
+        StringAssert.Contains(value, "cnonce=\"c\", nc=00000002", StringComparison.Ordinal);
+    }
+
+    [TestMethod]
+    public void RepeatAuthorization_BasicAnswer_SendsItAsSent()
+    {
+        Assert.AreEqual("Basic dTpw", Authenticator.RepeatAuthorization(Request(HttpAuthSchemes.Basic), "Basic dTpw"));
+    }
+
+    [TestMethod]
     [DataRow(HttpAuthSchemes.Any, DisplayName = "--anyauth, Basic only")]
     [DataRow(HttpAuthSchemes.Basic | HttpAuthSchemes.Digest, DisplayName = "--basic --digest, Basic only")]
     public void CreateAuthorization_OnlyBasicOfferedAndAllowed_AnswersBasic(HttpAuthSchemes allowed)

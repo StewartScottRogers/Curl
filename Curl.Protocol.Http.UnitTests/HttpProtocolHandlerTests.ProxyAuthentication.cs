@@ -276,16 +276,17 @@ public sealed partial class HttpProtocolHandlerTests
 
     /// <summary>
     /// Measured: <c>--proxy-digest -u a:b --digest</c> against a 407, then a 401, then a 200
-    /// answers each challenge once, the 401's retry keeping the proxy's Digest answer. curl
-    /// counts the kept answer's nonce on to <c>nc=00000002</c> with a new hash; Curl's Digest
-    /// keeps no state between calls (ADR-0014), so it sends the answer again as it was
-    /// (ADR-0187, BL-603 Notes).
+    /// answers each challenge once, the 401's retry keeping the proxy's Digest answer with its
+    /// nonce counted on to <c>nc=00000002</c>, the same cnonce and curl's hash for that count
+    /// (BL-603 Notes, BL-869).
     /// </summary>
     [TestMethod]
     public async Task ExecuteAsync_ProxyDigestThenOriginDigest_AnswersEachChallengeOnce()
     {
         const string proxyDigest = "Proxy-Authorization: Digest username=\"u\", realm=\"r\", nonce=\"abc\", uri=\"/\", "
             + "cnonce=\"063231b54c58aa830f9917b0665bdaf8\", nc=00000001, qop=auth, response=\"8146a82aefc2f845325c0b151b67e80d\"\r\n";
+        const string keptProxyDigest = "Proxy-Authorization: Digest username=\"u\", realm=\"r\", nonce=\"abc\", uri=\"/\", "
+            + "cnonce=\"063231b54c58aa830f9917b0665bdaf8\", nc=00000002, qop=auth, response=\"924da41f0f75d705a8c76efb5ad7d596\"\r\n";
         const string originDigest = "Authorization: Digest username=\"a\", realm=\"s\", nonce=\"xyz\", uri=\"/\", "
             + "cnonce=\"582287d88c3c0940fe2e132942e332bc\", nc=00000001, qop=auth, response=\"1f89777280a8403ca258416cad303d5b\"\r\n";
         TurnTakingConnection first = new(65536, ProxyDigestChallengeHead + "PPP");
@@ -300,21 +301,23 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(ProxyRequestStart + ProxyRequestEnd, first.Written);
         Assert.AreEqual(ProxyRequestStart + proxyDigest + ProxyRequestEnd, second.Written);
-        Assert.AreEqual(ProxyRequestStart + proxyDigest + originDigest + ProxyRequestEnd, third.Written);
+        Assert.AreEqual(ProxyRequestStart + keptProxyDigest + originDigest + ProxyRequestEnd, third.Written);
         Assert.AreEqual("ok", Latin1(output.ToArray()));
         Assert.AreEqual(3, result.Report!.ConnectionCount);
     }
 
     /// <summary>
     /// Measured: <c>--proxy-anyauth -u a:b --digest</c> against a 401, then a 407, then a 200
-    /// answers the 401 first and keeps that answer when it answers the 407 (curl counts it on
-    /// to <c>nc=00000002</c>; see <see cref="ExecuteAsync_ProxyDigestThenOriginDigest_AnswersEachChallengeOnce" />).
+    /// answers the 401 first and keeps that answer when it answers the 407, counted on to
+    /// <c>nc=00000002</c> with the same cnonce (BL-869).
     /// </summary>
     [TestMethod]
     public async Task ExecuteAsync_OriginDigestThenProxyDigest_AnswersEachChallengeOnce()
     {
         const string originDigest = "Authorization: Digest username=\"a\", realm=\"s\", nonce=\"xyz\", uri=\"/\", "
             + "cnonce=\"f7604464c2453c62e1f5077435011686\", nc=00000001, qop=auth, response=\"9355f1a62b7602de98380cd8232120b8\"\r\n";
+        const string keptOriginDigest = "Authorization: Digest username=\"a\", realm=\"s\", nonce=\"xyz\", uri=\"/\", "
+            + "cnonce=\"f7604464c2453c62e1f5077435011686\", nc=00000002, qop=auth, response=\"19b392bfec0f8a5d87a9d959622271e4\"\r\n";
         const string proxyDigest = "Proxy-Authorization: Digest username=\"u\", realm=\"r\", nonce=\"abc\", uri=\"/\", "
             + "cnonce=\"c06ed45dc85f0a3e7b4671f765ef1672\", nc=00000001, qop=auth, response=\"b54dfbe77d0102f798b83b924efa82c5\"\r\n";
         TurnTakingConnection first = new(65536, OriginDigestChallengeHead + "UUU");
@@ -328,7 +331,7 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(ProxyRequestStart + ProxyRequestEnd, first.Written);
         Assert.AreEqual(ProxyRequestStart + originDigest + ProxyRequestEnd, second.Written);
-        Assert.AreEqual(ProxyRequestStart + proxyDigest + originDigest + ProxyRequestEnd, third.Written);
+        Assert.AreEqual(ProxyRequestStart + proxyDigest + keptOriginDigest + ProxyRequestEnd, third.Written);
         Assert.AreEqual("ok", Latin1(output.ToArray()));
     }
 

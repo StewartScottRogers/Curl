@@ -222,6 +222,81 @@ public sealed class DigestAuthenticatorTests
             () => authenticator.CreateAuthorization(Request(null, "/", HttpAuthSchemes.Digest), null!));
     }
 
+    /// <summary>
+    /// Measured (BL-603 Notes, BL-869): curl 8.21.0 sends a kept proxy Digest answer again with
+    /// the same cnonce, <c>nc=00000002</c> and the hash for that count.
+    /// </summary>
+    [TestMethod]
+    public void RepeatAuthorization_MeasuredKeptAnswer_CountsTheNonceOn()
+    {
+        const string sent = "Digest username=\"u\", realm=\"r\", nonce=\"abc\", uri=\"/\", "
+            + "cnonce=\"063231b54c58aa830f9917b0665bdaf8\", nc=00000001, qop=auth, response=\"8146a82aefc2f845325c0b151b67e80d\"";
+        DigestAuthenticator authenticator = new(Encoding.UTF8, () => throw new AssertFailedException("A kept answer keeps its cnonce."));
+
+        string value = authenticator.RepeatAuthorization(Request(new NetworkCredential("u", "p"), "/", HttpAuthSchemes.Digest), sent);
+
+        Assert.AreEqual(
+            "Digest username=\"u\", realm=\"r\", nonce=\"abc\", uri=\"/\", "
+            + "cnonce=\"063231b54c58aa830f9917b0665bdaf8\", nc=00000002, qop=auth, response=\"924da41f0f75d705a8c76efb5ad7d596\"",
+            value);
+    }
+
+    [TestMethod]
+    public void RepeatAuthorization_SessionAnswerSentTwice_CountsOnFromWhatWasSentWithItsOpaqueAndAlgorithm()
+    {
+        DigestAuthenticator authenticator = new(Encoding.UTF8, () => "c");
+        HttpAuthRequest request = Request(new NetworkCredential("u", "p"), "/", HttpAuthSchemes.Digest);
+        string first = authenticator.CreateAuthorization(request, ["Digest realm=\"r\", nonce=\"abc\", qop=\"auth\", opaque=\"o\", algorithm=MD5-sess"])!;
+
+        string second = authenticator.RepeatAuthorization(request, first);
+        string third = authenticator.RepeatAuthorization(request, second);
+
+        Assert.AreEqual(
+            "Digest username=\"u\", realm=\"r\", nonce=\"abc\", uri=\"/\", cnonce=\"c\", nc=00000001, qop=auth, "
+            + "response=\"d951e3f1e0c46b81f949b8775a826ec1\", opaque=\"o\", algorithm=MD5-sess",
+            first);
+        Assert.AreEqual(
+            "Digest username=\"u\", realm=\"r\", nonce=\"abc\", uri=\"/\", cnonce=\"c\", nc=00000002, qop=auth, "
+            + "response=\"fab95e13b86afb93dd4f856f06e18758\", opaque=\"o\", algorithm=MD5-sess",
+            second);
+        StringAssert.Contains(third, "nc=00000003", StringComparison.Ordinal);
+    }
+
+    [TestMethod]
+    [DataRow("Basic dTpw", DisplayName = "Not Digest")]
+    [DataRow("", DisplayName = "Sent without a header")]
+    [DataRow("Digest username=\"u\", realm=\"r\", uri=\"/\", cnonce=\"c\", nc=00000001, qop=auth, response=\"x\"", DisplayName = "No nonce")]
+    [DataRow("Digest username=\"u\", realm=\"r\", nonce=\"abc\", uri=\"/\", response=\"x\"", DisplayName = "No qop")]
+    [DataRow("Digest username=\"u\", realm=\"r\", nonce=\"abc\", uri=\"/\", nc=00000001, qop=auth, response=\"x\"", DisplayName = "No cnonce")]
+    [DataRow("Digest username=\"u\", realm=\"r\", nonce=\"abc\", uri=\"/\", cnonce=\"c\", qop=auth, response=\"x\"", DisplayName = "No nc")]
+    [DataRow("Digest username=\"u\", realm=\"r\", nonce=\"abc\", uri=\"/\", cnonce=\"c\", nc=zz, qop=auth, response=\"x\"", DisplayName = "An nc that is not hexadecimal")]
+    public void RepeatAuthorization_NothingToCount_SendsTheValueAsSent(string sent)
+    {
+        DigestAuthenticator authenticator = new(Encoding.UTF8, () => "c");
+
+        string value = authenticator.RepeatAuthorization(Request(new NetworkCredential("u", "p"), "/", HttpAuthSchemes.Digest), sent);
+
+        Assert.AreEqual(sent, value);
+    }
+
+    [TestMethod]
+    public void RepeatAuthorization_NoCredential_SendsTheValueAsSent()
+    {
+        const string sent = "Digest username=\"u\", realm=\"r\", nonce=\"abc\", uri=\"/\", cnonce=\"c\", nc=00000001, qop=auth, response=\"x\"";
+        DigestAuthenticator authenticator = new(Encoding.UTF8, () => "c");
+
+        Assert.AreEqual(sent, authenticator.RepeatAuthorization(Request(null, "/", HttpAuthSchemes.Digest), sent));
+    }
+
+    [TestMethod]
+    public void RepeatAuthorization_NullArguments_Throw()
+    {
+        DigestAuthenticator authenticator = new(Encoding.UTF8, () => "c");
+
+        Assert.ThrowsExactly<ArgumentNullException>(() => authenticator.RepeatAuthorization(null!, "Basic dTpw"));
+        Assert.ThrowsExactly<ArgumentNullException>(() => authenticator.RepeatAuthorization(Request(null, "/", HttpAuthSchemes.Digest), null!));
+    }
+
     private static string? Answer(string user, string password, string target, string clientNonce, params string[] challenges)
     {
         DigestAuthenticator authenticator = new(Encoding.UTF8, () => clientNonce);

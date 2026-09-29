@@ -95,6 +95,17 @@ public sealed class RankedHttpAuthenticator(BasicAndBearerAuthenticator basicAnd
     }
 
     /// <summary>
+    /// Sends an answer already sent once more: a Digest answer counted on to its next nonce
+    /// count by <see cref="DigestAuthenticator.RepeatAuthorization" />, as curl 8.21.0 does
+    /// (BL-869); every other scheme's value as sent.
+    /// </summary>
+    /// <param name="request">The request being authorised.</param>
+    /// <param name="sentAuthorization">The header value the last request sent.</param>
+    /// <returns>The header value to send again.</returns>
+    public string RepeatAuthorization(HttpAuthRequest request, string sentAuthorization) =>
+        digest.RepeatAuthorization(request, sentAuthorization);
+
+    /// <summary>
     /// Decides whether the continuation is Negotiate's: for the origin only, when the request
     /// sent a Negotiate value, which only <see cref="NegotiateHttpAuthenticator" /> makes, and
     /// <c>-u</c> was given, as libcurl answers no 401 without a user (ADR-0227).

@@ -29,6 +29,17 @@ public sealed class IHttpAuthenticatorTests
         Assert.IsNull(authorization);
     }
 
+    [TestMethod]
+    public void RepeatAuthorization_WhenNotOverridden_SendsTheValueAsSent()
+    {
+        IHttpAuthenticator authenticator = new FixedAuthenticator();
+        HttpAuthRequest request = new("GET", CurlUrl.Parse("http://example.com/"), "/", null, null, HttpAuthSchemes.Basic, IsProxy: false);
+
+        string authorization = authenticator.RepeatAuthorization(request, "Basic dTpw");
+
+        Assert.AreEqual("Basic dTpw", authorization);
+    }
+
     private sealed class FixedAuthenticator : IHttpAuthenticator
     {
         public string? CreateAuthorization(HttpAuthRequest request, IReadOnlyList<string> challenges) =>

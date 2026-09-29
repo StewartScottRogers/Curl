@@ -67,24 +67,41 @@ internal static class DigestChallengeParameters
     /// <returns>The challenge; <see langword="null" /> when curl rejects it.</returns>
     internal static DigestChallenge? Read(string challenge, int index)
     {
-        if (!IsBlankAt(challenge, index))
+        if (ReadPairs(challenge, index) is not { } pairs)
         {
             return null;
         }
 
         DigestChallengeBuilder builder = new();
-        index = SkipBlanks(challenge, index);
-        while (TryReadPair(challenge, ref index, out string key, out string value))
-        {
-            if (!builder.TryApply(key, value))
-            {
-                return null;
-            }
+        return pairs.All(pair => builder.TryApply(pair.Key, pair.Value)) ? builder.Build() : null;
+    }
 
-            index = SkipSeparator(challenge, index);
+    /// <summary>
+    /// Reads the <c>key=value</c> pairs after a scheme name, up to the first text that is not a
+    /// well-formed pair; a Digest answer's are read the same way as a challenge's.
+    /// </summary>
+    /// <param name="text">The header value.</param>
+    /// <param name="index">The index just after the scheme name.</param>
+    /// <returns>
+    /// The pairs, values unescaped, in order; <see langword="null" /> when no blank follows the
+    /// scheme name.
+    /// </returns>
+    internal static IReadOnlyList<KeyValuePair<string, string>>? ReadPairs(string text, int index)
+    {
+        if (!IsBlankAt(text, index))
+        {
+            return null;
         }
 
-        return builder.Build();
+        List<KeyValuePair<string, string>> pairs = [];
+        index = SkipBlanks(text, index);
+        while (TryReadPair(text, ref index, out string key, out string value))
+        {
+            pairs.Add(new(key, value));
+            index = SkipSeparator(text, index);
+        }
+
+        return pairs;
     }
 
     /// <summary>

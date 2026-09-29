@@ -84,4 +84,16 @@ public interface IHttpAuthenticator
     /// <exception cref="HttpAuthenticationFailedException">curl fails the transfer instead of taking the response.</exception>
     ValueTask<string?> ContinueAuthorizationAsync(HttpAuthRequest request, string sentAuthorization, bool sentBeforeAnyChallenge, IReadOnlyList<string> challenges, CancellationToken cancellationToken) =>
         ValueTask.FromResult<string?>(null);
+
+    /// <summary>
+    /// Creates the header value that sends an answer already sent once more, on a request that
+    /// keeps it while it answers the other party's challenge, as a proxy's answer is kept on
+    /// the retry that answers the origin's 401. By default it is the value as sent; Digest
+    /// counts its nonce on (<c>nc=00000002</c>) with the same <c>cnonce</c> and a new hash,
+    /// as curl 8.21.0 does (BL-869).
+    /// </summary>
+    /// <param name="request">The request being authorised, and what it may be authorised with.</param>
+    /// <param name="sentAuthorization">The header value the last request sent; empty when it was sent without one (ADR-0232).</param>
+    /// <returns>The header value to send again.</returns>
+    string RepeatAuthorization(HttpAuthRequest request, string sentAuthorization) => sentAuthorization;
 }

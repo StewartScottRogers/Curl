@@ -1418,7 +1418,7 @@ public sealed class HttpProtocolHandler(
     {
         if (await RetryProxyAuthorizationAsync(plan, head, cancellationToken).ConfigureAwait(false) is { } proxyAuthorization)
         {
-            return plan.WithProxyAuthorization(proxyAuthorization);
+            return plan.WithProxyAuthorization(proxyAuthorization, RepeatAuthorization(plan));
         }
 
         if (await RetryWithAuthorizationAsync(plan, head, cancellationToken).ConfigureAwait(false) is { } authorized)
@@ -1515,8 +1515,26 @@ public sealed class HttpProtocolHandler(
             return null;
         }
 
-        return plan.WithAuthorization(authorization, retryLines.Lines);
+        return plan.WithAuthorization(authorization, retryLines.Lines, RepeatProxyAuthorization(plan));
     }
+
+    /// <summary>
+    /// Makes the <c>Authorization</c> value a retry that answers a 407 keeps: the one
+    /// <paramref name="plan" /> sent, as <see cref="IHttpAuthenticator.RepeatAuthorization" />
+    /// sends it again, so a Digest answer counts its nonce on as in curl 8.21.0 (BL-869);
+    /// <see langword="null" /> when it sent none.
+    /// </summary>
+    private string? RepeatAuthorization(HttpRequestPlan plan) =>
+        plan.Authorization is { } sent ? Authenticator.RepeatAuthorization(plan.AuthRequest, sent) : null;
+
+    /// <summary>
+    /// Makes the <c>Proxy-Authorization</c> value a retry that answers a 401 keeps, as
+    /// <see cref="RepeatAuthorization" /> makes the <c>Authorization</c> value a 407's retry keeps.
+    /// </summary>
+    private string? RepeatProxyAuthorization(HttpRequestPlan plan) =>
+        plan.ProxyAuthRequest is { } request && plan.ProxyAuthorization is { } sent
+            ? Authenticator.RepeatAuthorization(request, sent)
+            : plan.ProxyAuthorization;
 
     /// <summary>Reports each of <paramref name="lines" /> to <paramref name="events" />, in order.</summary>
     private static void ReportInfoLines(ITransferEvents events, IReadOnlyList<string> lines)
@@ -1957,18 +1975,20 @@ public sealed class HttpProtocolHandler(
         /// </summary>
         /// <param name="authorization">The <c>Authorization</c> value the retry is sent with.</param>
         /// <param name="infoLines">The lines the authenticator reported while it made the value that belong just before the retry.</param>
+        /// <param name="keptProxyAuthorization">The <c>Proxy-Authorization</c> value the retry keeps, as sent again (BL-869).</param>
         /// <returns>The retry's plan.</returns>
-        public HttpRequestPlan WithAuthorization(string authorization, IReadOnlyList<string> infoLines) =>
-            With(Framing, authorization, SentOnFreshConnection, RedirectsFollowed, authorizationAnswersChallenge: true, ProxyAuthorization, ProxyAuthorizationAnswersChallenge, infoLines);
+        public HttpRequestPlan WithAuthorization(string authorization, IReadOnlyList<string> infoLines, string? keptProxyAuthorization) =>
+            With(Framing, authorization, SentOnFreshConnection, RedirectsFollowed, authorizationAnswersChallenge: true, keptProxyAuthorization, ProxyAuthorizationAnswersChallenge, infoLines);
 
         /// <summary>
         /// Makes the same request sent with <paramref name="proxyAuthorization" /> instead, in
         /// answer to a 407's challenge, keeping its <c>Authorization</c> value.
         /// </summary>
         /// <param name="proxyAuthorization">The <c>Proxy-Authorization</c> value the retry is sent with.</param>
+        /// <param name="keptAuthorization">The <c>Authorization</c> value the retry keeps, as sent again (BL-869).</param>
         /// <returns>The retry's plan.</returns>
-        public HttpRequestPlan WithProxyAuthorization(string proxyAuthorization) =>
-            With(Framing, Authorization, SentOnFreshConnection, RedirectsFollowed, AuthorizationAnswersChallenge, proxyAuthorization, proxyAuthorizationAnswersChallenge: true);
+        public HttpRequestPlan WithProxyAuthorization(string proxyAuthorization, string? keptAuthorization) =>
+            With(Framing, keptAuthorization, SentOnFreshConnection, RedirectsFollowed, AuthorizationAnswersChallenge, proxyAuthorization, proxyAuthorizationAnswersChallenge: true);
 
         /// <summary>
         /// Makes the same request without curl's own <c>Expect</c> and without the wait for
