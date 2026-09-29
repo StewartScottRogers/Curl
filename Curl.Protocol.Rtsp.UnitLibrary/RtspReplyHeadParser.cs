@@ -17,9 +17,11 @@ namespace Curl.Protocol.Rtsp;
 /// later <c>CSeq</c> replaces an earlier one; a value with no number fails with 85,
 /// <c>Unable to read the CSeq header: [&lt;line&gt;]</c>. A <c>Content-Length</c> that is not a
 /// decimal number fails with 8, <c>Invalid Content-Length: value</c>. The line that fails is
-/// not written.
+/// not written. A <c>Session</c> header, in any case, is handed to <c>session</c>, which keeps
+/// the first ID and fails a different one with 86 as the line is read (BL-592).
 /// </remarks>
-internal sealed class RtspReplyHeadParser
+/// <param name="session">The transfer's session state, which reads each <c>Session</c> header.</param>
+internal sealed class RtspReplyHeadParser(RtspSessionState session)
 {
     /// <summary>The exit 8 message for a status line curl does not accept.</summary>
     internal const string WeirdServerReply = "Weird server reply";
@@ -100,6 +102,10 @@ internal sealed class RtspReplyHeadParser
         else if (line.StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase))
         {
             ContentLength = ParseContentLength(line.AsSpan("Content-Length:".Length));
+        }
+        else if (line.StartsWith("Session:", StringComparison.OrdinalIgnoreCase))
+        {
+            session.AcceptSession(line["Session:".Length..]);
         }
     }
 

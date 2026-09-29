@@ -139,12 +139,14 @@ session ID starts empty. After each reply the handler compares the reply's `CSeq
 missing) with the one sent and fails a mismatch with exit 85 and
 `The CSeq of this request <sent> did not match the response <received>`. A reply's `Session`
 value (up to the first `;`) is kept when none is held, sent as `Session: <id>` after `CSeq` on
-the transfer's later requests, and a later reply naming a different ID fails with exit 86 (RFC 2326 section 12.37) and
-the message libcurl 8.21.0's `rtsp.c` writes for it, which BL-592 copies from the source because
-the tool cannot be made to print it. Because the
-tool makes one request per transfer, neither a later request nor exit 86 is reachable from the
-command line; BL-592 pins both at the handler level with a transfer that makes two requests, and
-records that the tool cannot produce the sequence.
+the transfer's later requests, and a later `Session` header naming a different ID fails with
+exit 86 (RFC 2326 section 12.37). Because the tool makes one request per transfer, a later
+request is not reachable from the command line, and BL-592 pins it at the handler level with a
+transfer that makes two requests. Exit 86 is reachable: BL-592 measured that a single reply
+carrying two `Session` headers with different IDs fails with
+`Got RTSP Session ID Line [<rest of the line>], but wanted ID [<first ID>]`, and that a `-H`
+header naming `Session` fails with 43, `Session ID cannot be set as a custom header.`; the
+measurements are in BL-592's Notes.
 
 **5. Connection reuse across URLs is matched.** When one command line names several `rtsp` URLs
 on the same host and port, the second and later transfers reuse the connection (the generic
@@ -165,9 +167,9 @@ shared by protocol handlers, BL-593 files that as its own task rather than widen
 - BL-591 builds `RtspRequestFormatter`, `RtspReplyReader` and the handler's single `OPTIONS *`
   exchange: the measured request bytes and header order, the head to `HeaderOutput`, the body read
   and discarded, 85 for a wrong or missing `CSeq`, 22 under `-f`, 52 for a non-RTSP reply.
-- BL-592 builds `RtspSessionState` (the `Session` header on later requests and 86 for a mismatch)
-  at the handler level, with the measured fact that the tool never sends a second request in one
-  transfer.
+- BL-592 builds `RtspSessionState` (the `Session` header on later requests and 86 for a mismatch),
+  pinning later requests at the handler level because the tool never sends a second request in
+  one transfer.
 - BL-593 registers the handler for `rtsp` with port 554 in `Curl.Console`, maps the options in the
   table above and no others, lists `rtsp` in `-V`, writes the `-v` lines above, and reuses the
   connection across URLs with `CSeq: 0` on the reused one.

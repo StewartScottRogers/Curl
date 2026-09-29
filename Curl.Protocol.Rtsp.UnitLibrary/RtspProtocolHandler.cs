@@ -8,7 +8,8 @@ namespace Curl.Protocol.Rtsp;
 /// Serves the <c>rtsp</c> scheme as the curl 8.21.0 tool does: connects, sends one
 /// <c>OPTIONS * RTSP/1.0</c> request with <c>CSeq: 1</c>, writes the reply head to the header
 /// output, reads and discards the body, and fails a reply whose <c>CSeq</c> does not match with
-/// exit 85 (ADR-0169).
+/// exit 85 and one whose <c>Session</c> contradicts the transfer's session ID with exit 86
+/// (ADR-0169).
 /// </summary>
 /// <param name="connector">
 /// Supplies the connection to the URL's host and port (554 when the URL names none),
@@ -23,7 +24,12 @@ namespace Curl.Protocol.Rtsp;
 /// Measured against a loopback listener (ADR-0169, BL-591). <c>-X</c>, <c>--request-target</c>,
 /// <c>-d</c>, <c>-b</c> and <c>--compressed</c> change nothing; the reply body never reaches
 /// the output, even with <c>-i</c>. A <c>-H</c> header naming <c>CSeq</c> fails with 85,
-/// <c>CSeq cannot be set as a custom header.</c>, after connecting and before anything is sent.
+/// <c>CSeq cannot be set as a custom header.</c>, after connecting and before anything is sent;
+/// one naming <c>Session</c> fails the same way with 43,
+/// <c>Session ID cannot be set as a custom header.</c> (BL-592). The first <c>Session</c> ID a
+/// reply gives is kept for the transfer and sent on its later requests; a <c>Session</c>
+/// header naming another ID fails with 86 as soon as it is read (<see cref="RtspSessionState" />),
+/// ahead of the <c>-f</c> and <c>CSeq</c> checks.
 /// Once the head has ended: under <c>-f</c> a status of 400 or more fails with 22,
 /// <c>The requested URL returned error: &lt;code&gt;</c>, ahead of any <c>CSeq</c> check; a
 /// status below 100 fails with 1, <c>Unsupported response code in HTTP response</c>. A reply
@@ -90,14 +96,33 @@ public sealed class RtspProtocolHandler(IConnector connector, IHttpAuthenticator
         context.Progress.ReportTransferStarted();
         await using (connection.ConfigureAwait(false))
         {
-            try
-            {
-                return await ExchangeAsync(connection, context).ConfigureAwait(false);
-            }
-            catch (RtspTransferException failure)
-            {
-                return TransferResult.Failure(failure.ExitCode, failure.Message);
-            }
+            return await ExchangeAsync(connection, context, new RtspSessionState(FirstSequenceNumber)).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Makes one <c>OPTIONS</c> request of a transfer on <paramref name="connection" />: sent
+    /// with the transfer's next <c>CSeq</c> and, once a reply has given one, its session ID; the
+    /// reply read and checked in curl's order.
+    /// </summary>
+    /// <remarks>
+    /// The curl tool makes one request per transfer (ADR-0169), so <see cref="ExecuteAsync" />
+    /// calls this once. It takes the session state so a transfer that makes several requests,
+    /// as a libcurl caller can, carries its <c>CSeq</c> and session ID from one to the next.
+    /// </remarks>
+    /// <param name="connection">The transfer's connection.</param>
+    /// <param name="context">The transfer.</param>
+    /// <param name="session">The transfer's <c>CSeq</c> counter and session ID.</param>
+    /// <returns>The request's outcome.</returns>
+    internal async Task<TransferResult> ExchangeAsync(IConnection connection, ITransferContext context, RtspSessionState session)
+    {
+        try
+        {
+            return await SendAndReadAsync(connection, context, session).ConfigureAwait(false);
+        }
+        catch (RtspTransferException failure)
+        {
+            return TransferResult.Failure(failure.ExitCode, failure.Message);
         }
     }
 
@@ -118,26 +143,44 @@ public sealed class RtspProtocolHandler(IConnector connector, IHttpAuthenticator
     }
 
     /// <summary>
-    /// Sends the <c>OPTIONS</c> request and reads its reply, checking the status and the
-    /// <c>CSeq</c> in curl's order.
+    /// Refuses a <c>-H</c> header naming <c>CSeq</c> (85) or <c>Session</c> (43), in that order,
+    /// as curl 8.21.0 does after connecting and before sending anything.
     /// </summary>
-    private async Task<TransferResult> ExchangeAsync(IConnection connection, ITransferContext context)
+    /// <returns>The failure, or <see langword="null" /> when no <c>-H</c> header is refused.</returns>
+    private static TransferResult? CustomHeaderFailure(HttpRequestOptions options)
     {
-        HttpRequestOptions options = context.Http ?? new HttpRequestOptions();
         if (RtspRequestFormatter.NamesCSeq(options))
         {
             return TransferResult.Failure(CurlExitCode.RtspCseqError, RtspRequestFormatter.CustomCSeqRefused);
         }
 
+        return RtspRequestFormatter.NamesSession(options)
+            ? TransferResult.Failure(CurlExitCode.BadFunctionArgument, RtspRequestFormatter.CustomSessionRefused)
+            : null;
+    }
+
+    /// <summary>
+    /// Sends the <c>OPTIONS</c> request and reads its reply, checking the <c>Session</c>, the
+    /// status and the <c>CSeq</c> in curl's order.
+    /// </summary>
+    private async Task<TransferResult> SendAndReadAsync(IConnection connection, ITransferContext context, RtspSessionState session)
+    {
+        HttpRequestOptions options = context.Http ?? new HttpRequestOptions();
+        if (CustomHeaderFailure(options) is { } refused)
+        {
+            return refused;
+        }
+
+        long sequenceNumber = session.TakeSequenceNumber();
         byte[] request = RtspRequestFormatter.Format(
             RtspMethod.Options,
             OptionsTarget,
-            FirstSequenceNumber,
-            sessionId: null,
+            sequenceNumber,
+            session.SessionId,
             options,
             Authorization(context, options));
         await SendAsync(connection, request, context.CancellationToken).ConfigureAwait(false);
-        RtspReplyHead head = await RtspReplyReader.ReadHeadAsync(connection, context.HeaderOutput, context.CancellationToken).ConfigureAwait(false);
+        RtspReplyHead head = await RtspReplyReader.ReadHeadAsync(connection, session, context.HeaderOutput, context.CancellationToken).ConfigureAwait(false);
         TransferReport report = new()
         {
             ResponseCode = head.StatusCode,
@@ -152,9 +195,9 @@ public sealed class RtspProtocolHandler(IConnector connector, IHttpAuthenticator
 
         long bodyRead = await RtspReplyReader.DiscardBodyAsync(connection, head.Remaining, head.ContentLength, context.Progress, context.CancellationToken).ConfigureAwait(false);
         context.Progress.ReportTransferDone();
-        TransferResult result = head.SequenceNumber == FirstSequenceNumber
+        TransferResult result = head.SequenceNumber == sequenceNumber
             ? TransferResult.Success(bodyRead)
-            : TransferResult.Failure(CurlExitCode.RtspCseqError, SequenceMismatch(FirstSequenceNumber, head.SequenceNumber), bodyRead);
+            : TransferResult.Failure(CurlExitCode.RtspCseqError, SequenceMismatch(sequenceNumber, head.SequenceNumber), bodyRead);
         return result with { Report = report with { DownloadSize = bodyRead } };
     }
 

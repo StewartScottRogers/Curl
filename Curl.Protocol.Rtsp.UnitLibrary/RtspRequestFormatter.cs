@@ -15,8 +15,10 @@ namespace Curl.Protocol.Rtsp;
 /// <c>Authorization</c>, and is sent in its own place among the <c>-H</c> headers (measured,
 /// BL-591): <c>-H 'X-A: 1' -H 'User-Agent: mine' -e http://r/ -u u:p</c> sends <c>CSeq</c>,
 /// <c>Referer</c>, <c>Authorization</c>, <c>X-A: 1</c>, <c>User-Agent: mine</c>. A <c>-H</c>
-/// header naming <c>CSeq</c> is refused before the request is written
-/// (<see cref="NamesCSeq" />). No <c>Host</c> or <c>Accept</c> is sent.
+/// header naming <c>CSeq</c> or <c>Session</c> is refused before the request is written
+/// (<see cref="NamesCSeq" />, <see cref="NamesSession" />). A held session ID is sent even
+/// when empty, as libcurl's <c>rtsp.c</c> sends any ID it holds. No <c>Host</c> or
+/// <c>Accept</c> is sent.
 /// </remarks>
 internal static class RtspRequestFormatter
 {
@@ -25,6 +27,9 @@ internal static class RtspRequestFormatter
 
     /// <summary>The exit 85 message for a <c>-H</c> header that names <c>CSeq</c>.</summary>
     internal const string CustomCSeqRefused = "CSeq cannot be set as a custom header.";
+
+    /// <summary>The exit 43 message for a <c>-H</c> header that names <c>Session</c>.</summary>
+    internal const string CustomSessionRefused = "Session ID cannot be set as a custom header.";
 
     /// <summary>
     /// Determines whether a <c>-H</c> header names <c>CSeq</c>, in any case and in any of its
@@ -36,11 +41,22 @@ internal static class RtspRequestFormatter
     internal static bool NamesCSeq(HttpRequestOptions options) =>
         options.Headers.Any(entry => RtspCustomHeader.Parse(entry).Names("CSeq"));
 
+    /// <summary>
+    /// Determines whether a <c>-H</c> header names <c>Session</c>, in any case and in any of
+    /// its forms (<c>Session: 5</c>, <c>Session:</c>, <c>session;</c>), which curl 8.21.0
+    /// refuses after connecting with exit 43 and <see cref="CustomSessionRefused" />, after the
+    /// <c>CSeq</c> check (measured, BL-592).
+    /// </summary>
+    /// <param name="options">The HTTP options carrying the <c>-H</c> headers.</param>
+    /// <returns><see langword="true" /> when a <c>-H</c> header names <c>Session</c>.</returns>
+    internal static bool NamesSession(HttpRequestOptions options) =>
+        options.Headers.Any(entry => RtspCustomHeader.Parse(entry).Names("Session"));
+
     /// <summary>Writes the request head.</summary>
     /// <param name="method">The request method.</param>
     /// <param name="target">The request target: <c>*</c> for <c>OPTIONS</c>.</param>
     /// <param name="sequenceNumber">The <c>CSeq</c> value.</param>
-    /// <param name="sessionId">The <c>Session</c> value, or <see langword="null" /> for none.</param>
+    /// <param name="sessionId">The <c>Session</c> value, sent even when empty, or <see langword="null" /> for none.</param>
     /// <param name="options">The HTTP options that reach the request: <c>-H</c>, <c>-A</c>, <c>-e</c>.</param>
     /// <param name="authorization">The <c>Authorization</c> value, or <see langword="null" /> for none.</param>
     /// <returns>The request head, Latin-1 encoded, ending with the blank line.</returns>
@@ -56,7 +72,11 @@ internal static class RtspRequestFormatter
         StringBuilder head = new();
         head.Append(method.Name).Append(' ').Append(target).Append(" RTSP/1.0\r\n");
         head.Append("CSeq: ").Append(sequenceNumber.ToString(CultureInfo.InvariantCulture)).Append("\r\n");
-        AppendUnlessOverridden(head, customHeaders, "Session", sessionId);
+        if (sessionId is not null)
+        {
+            head.Append("Session: ").Append(sessionId).Append("\r\n");
+        }
+
         AppendUnlessOverridden(head, customHeaders, "Referer", HeadText(options.Referer, options));
         AppendUnlessOverridden(head, customHeaders, "User-Agent", HeadText(options.UserAgent, options) ?? DefaultUserAgent);
         AppendUnlessOverridden(head, customHeaders, "Authorization", authorization);

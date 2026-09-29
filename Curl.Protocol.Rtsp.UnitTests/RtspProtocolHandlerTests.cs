@@ -281,6 +281,119 @@ public sealed class RtspProtocolHandlerTests
     }
 
     [TestMethod]
+    [DataRow("Session: 1234;timeout=60\r\nSession: 1234\r\n")]
+    [DataRow("Session:\r\nSession:  \r\n")]
+    [DataRow("session: \tab c\r\nSESSION: ab\r\n")]
+    [DataRow("Session:\t 7 ;x\r\nSession:7\r\n")]
+    [DataRow("Session: aéb\r\nSession: a\r\n")]
+    public async Task ExecuteAsync_SessionHeadersNamingTheSameId_Succeed(string lines)
+    {
+        TransferResult result = await Handler(Server("RTSP/1.0 200 OK\r\nCSeq: 1\r\n" + lines + "\r\n")).ExecuteAsync(Context());
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_SecondSessionHeaderNamingAnotherId_WritesTheHeadUpToItAndFailsWith86()
+    {
+        var headers = new MemoryStream();
+
+        TransferResult result = await Handler(Server("RTSP/1.0 200 OK\r\nCSeq: 1\r\nSession: 1234;timeout=60\r\nSession: 9999\r\n\r\n")).ExecuteAsync(Context(headerOutput: headers));
+
+        Assert.AreEqual(CurlExitCode.RtspSessionError, result.ExitCode);
+        Assert.AreEqual("Got RTSP Session ID Line [9999\r\n], but wanted ID [1234]", result.ErrorMessage);
+        Assert.AreEqual("RTSP/1.0 200 OK\r\nCSeq: 1\r\nSession: 1234;timeout=60\r\n", Encoding.Latin1.GetString(headers.ToArray()));
+    }
+
+    [TestMethod]
+    [DataRow("RTSP/1.0 200 OK\r\nCSeq: 1\r\nSession: ;x\r\nSession: 5\r\n\r\n", "Got RTSP Session ID Line [5\r\n], but wanted ID []")]
+    [DataRow("RTSP/1.0 200 OK\r\nSession: 1\r\nSession: 2\r\nCSeq: 1\r\n\r\n", "Got RTSP Session ID Line [2\r\n], but wanted ID [1]")]
+    [DataRow("RTSP/1.0 200 OK\r\nCSeq: 1\r\nSession: 12\r\nSession: 123\r\n\r\n", "Got RTSP Session ID Line [123\r\n], but wanted ID [12]")]
+    [DataRow("RTSP/1.0 200 OK\nCSeq: 1\nSession: 1\nSession: 2\n\n", "Got RTSP Session ID Line [2\n], but wanted ID [1]")]
+    [DataRow("RTSP/1.0 200 OK\r\nCSeq: 1\r\nSession: a\u007fb\r\nSession: a\r\n\r\n", "Got RTSP Session ID Line [a\r\n], but wanted ID [a\u007fb]")]
+    public async Task ExecuteAsync_SessionMismatchInOneReply_FailsWith86(string reply, string message)
+    {
+        TransferResult result = await Handler(Server(reply)).ExecuteAsync(Context());
+
+        Assert.AreEqual(CurlExitCode.RtspSessionError, result.ExitCode);
+        Assert.AreEqual(message, result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_SessionMismatchInANotFoundUnderFail_FailsWith86NotWith22()
+    {
+        const string reply = "RTSP/1.0 404 Not Found\r\nCSeq: 1\r\nSession: 1\r\nSession: 2\r\n\r\n";
+
+        TransferResult result = await Handler(Server(reply)).ExecuteAsync(Context(http: new HttpRequestOptions { Fail = HttpFailMode.Fail }));
+
+        Assert.AreEqual(CurlExitCode.RtspSessionError, result.ExitCode);
+    }
+
+    [TestMethod]
+    public async Task ExchangeAsync_LaterRequest_SendsTheNextCSeqAndTheKeptSession()
+    {
+        var server = new ScriptedConnection(
+            Bytes("RTSP/1.0 200 OK\r\nCSeq: 1\r\nSession: 1234;timeout=60\r\n\r\n"),
+            Bytes("RTSP/1.0 200 OK\r\nCSeq: 2\r\nSession: 1234\r\n\r\n"));
+        var session = new RtspSessionState(RtspProtocolHandler.FirstSequenceNumber);
+        RtspProtocolHandler handler = Handler(server);
+
+        TransferResult first = await handler.ExchangeAsync(server, Context(), session);
+        TransferResult second = await handler.ExchangeAsync(server, Context(), session);
+
+        Assert.AreEqual(CurlExitCode.Ok, first.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, second.ExitCode);
+        Assert.AreEqual(
+            Request + "OPTIONS * RTSP/1.0\r\nCSeq: 2\r\nSession: 1234\r\nUser-Agent: curl/8.21.0\r\n\r\n",
+            Encoding.Latin1.GetString(server.Sent));
+    }
+
+    [TestMethod]
+    public async Task ExchangeAsync_LaterReplyNamingAnotherSession_FailsWith86()
+    {
+        var server = new ScriptedConnection(
+            Bytes("RTSP/1.0 200 OK\r\nCSeq: 1\r\nSession: 1234;timeout=60\r\n\r\n"),
+            Bytes("RTSP/1.0 200 OK\r\nCSeq: 2\r\nSession: 9999\r\n\r\n"));
+        var session = new RtspSessionState(RtspProtocolHandler.FirstSequenceNumber);
+        RtspProtocolHandler handler = Handler(server);
+
+        await handler.ExchangeAsync(server, Context(), session);
+        TransferResult second = await handler.ExchangeAsync(server, Context(), session);
+
+        Assert.AreEqual(CurlExitCode.RtspSessionError, second.ExitCode);
+        Assert.AreEqual("Got RTSP Session ID Line [9999\r\n], but wanted ID [1234]", second.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExchangeAsync_LaterReplyWithTheFirstCSeq_FailsWith85NamingTheSecond()
+    {
+        var server = new ScriptedConnection(Bytes(Ok), Bytes(Ok));
+        var session = new RtspSessionState(RtspProtocolHandler.FirstSequenceNumber);
+        RtspProtocolHandler handler = Handler(server);
+
+        await handler.ExchangeAsync(server, Context(), session);
+        TransferResult second = await handler.ExchangeAsync(server, Context(), session);
+
+        Assert.AreEqual(CurlExitCode.RtspCseqError, second.ExitCode);
+        Assert.AreEqual("The CSeq of this request 2 did not match the response 1", second.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExchangeAsync_EmptyKeptSession_IsSentEmpty()
+    {
+        var server = new ScriptedConnection(
+            Bytes("RTSP/1.0 200 OK\r\nCSeq: 1\r\nSession:\r\n\r\n"),
+            Bytes("RTSP/1.0 200 OK\r\nCSeq: 2\r\n\r\n"));
+        var session = new RtspSessionState(RtspProtocolHandler.FirstSequenceNumber);
+        RtspProtocolHandler handler = Handler(server);
+
+        await handler.ExchangeAsync(server, Context(), session);
+        await handler.ExchangeAsync(server, Context(), session);
+
+        StringAssert.EndsWith(Encoding.Latin1.GetString(server.Sent), "CSeq: 2\r\nSession: \r\nUser-Agent: curl/8.21.0\r\n\r\n");
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_NotFound_SucceedsWithoutFail()
     {
         TransferResult result = await Handler(Server("RTSP/1.0 404 Not Found\r\nCSeq: 1\r\n\r\n")).ExecuteAsync(Context());
@@ -489,6 +602,40 @@ public sealed class RtspProtocolHandlerTests
         Assert.AreEqual(CurlExitCode.RtspCseqError, result.ExitCode);
         Assert.AreEqual("CSeq cannot be set as a custom header.", result.ErrorMessage);
         Assert.AreEqual(0, server.Sent.Length);
+    }
+
+    [TestMethod]
+    [DataRow("Session: 5")]
+    [DataRow("Session:")]
+    [DataRow("session;")]
+    public async Task ExecuteAsync_CustomSessionHeader_FailsWith43AfterConnectingSendingNothing(string header)
+    {
+        ScriptedConnection server = Server(Ok);
+
+        TransferResult result = await Handler(server).ExecuteAsync(Context(http: new HttpRequestOptions { Headers = [header] }));
+
+        Assert.AreEqual(CurlExitCode.BadFunctionArgument, result.ExitCode);
+        Assert.AreEqual("Session ID cannot be set as a custom header.", result.ErrorMessage);
+        Assert.AreEqual(0, server.Sent.Length);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_CustomSessionAndCSeqHeaders_FailsWith85()
+    {
+        TransferResult result = await Handler(Server(Ok)).ExecuteAsync(Context(http: new HttpRequestOptions { Headers = ["Session: 5", "CSeq: 3"] }));
+
+        Assert.AreEqual(CurlExitCode.RtspCseqError, result.ExitCode);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_CustomHeaderEndingInSession_IsSent()
+    {
+        ScriptedConnection server = Server("RTSP/1.0 200 OK\r\nCSeq: 1\r\n\r\n");
+
+        TransferResult result = await Handler(server).ExecuteAsync(Context(http: new HttpRequestOptions { Headers = ["X-Session: 1"] }));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.21.0\r\nX-Session: 1\r\n\r\n", Encoding.Latin1.GetString(server.Sent));
     }
 
     [TestMethod]

@@ -33,13 +33,14 @@ internal static class RtspReplyReader
 
     /// <summary>Reads the reply head, writing each line to <paramref name="headerOutput" />.</summary>
     /// <param name="connection">The connection the request was sent on.</param>
+    /// <param name="session">The transfer's session state, which keeps or checks each <c>Session</c> header.</param>
     /// <param name="headerOutput">Where the head is written, or <see langword="null" /> for nowhere.</param>
     /// <param name="cancellationToken">Cancels the read.</param>
     /// <returns>What was read of the head.</returns>
     /// <exception cref="RtspTransferException">The reply is refused, or a read or write failed.</exception>
-    internal static async ValueTask<RtspReplyHead> ReadHeadAsync(IConnection connection, Stream? headerOutput, CancellationToken cancellationToken)
+    internal static async ValueTask<RtspReplyHead> ReadHeadAsync(IConnection connection, RtspSessionState session, Stream? headerOutput, CancellationToken cancellationToken)
     {
-        RtspReplyHeadParser parser = new();
+        RtspReplyHeadParser parser = new(session);
         byte[] buffer = new byte[BufferSize];
         int received = 0;
         int processed = 0;
