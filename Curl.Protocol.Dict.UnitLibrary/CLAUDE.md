@@ -30,6 +30,10 @@ handler holds no proxy code.
   that ends a transfer as `error` with its `CurlExitCode`, and the command line
   sent and the transfer's end (bytes and milliseconds, timed with the context's
   `TimeProvider`) as `info`. The connect target carries the log on.
+- `-v` and `--trace` (BL-934): after connecting, `DictProtocolHandler` reports the
+  whole request to `ITransferContext.Events` as one block of data sent, each read as
+  data received, the server's close as a zero-byte block, and then
+  `shutting down connection #N`, which a refused path reports too.
 
 Every byte these classes send was measured against curl 8.21.0; the captures are
 in BL-041's Notes and pinned by `DictProtocolHandlerTests`. Change behaviour only

@@ -1,3 +1,5 @@
+using System.Globalization;
+
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Dict;
@@ -20,6 +22,10 @@ namespace Curl.Protocol.Dict;
 /// with exit 3 (<see cref="CurlExitCode.UrlMalformat" />), nothing sent and nothing written.
 /// Each transfer writes Curl's own diagnostic log from <see cref="ITransferContext.DiagnosticLog" />
 /// through <see cref="DictDiagnosticLog" />, and the connect target carries that log on (BL-928).
+/// After connecting, <see cref="ITransferContext.Events" /> gets what curl 8.21.0's <c>-v</c>
+/// and <c>--trace</c> show (measured, BL-934): the whole request as one block of data sent,
+/// each read as data received, the server's close as a zero-byte block, and then
+/// <c>shutting down connection #N</c>, which a refused path reports too.
 /// </remarks>
 public sealed class DictProtocolHandler(IConnector connector) : IProtocolHandler
 {
@@ -77,18 +83,28 @@ public sealed class DictProtocolHandler(IConnector connector) : IProtocolHandler
         }
 
         context.Progress.ReportTransferStarted();
+        TransferResult result;
         await using (connection.ConfigureAwait(false))
         {
-            if (!DictRequest.TryEncode(url.AbsolutePath, out byte[] request))
-            {
-                return TransferResult.Failure(CurlExitCode.UrlMalformat, UrlMalformatMessage);
-            }
-
-            await connection.WriteAsync(request, context.CancellationToken).ConfigureAwait(false);
-            await connection.FlushAsync(context.CancellationToken).ConfigureAwait(false);
-            log.CommandSent(request);
-            return await CopyReplyAsync(connection, context).ConfigureAwait(false);
+            result = await ExchangeAsync(connection, context, log).ConfigureAwait(false);
         }
+
+        context.Events.ReportInfo(string.Create(CultureInfo.InvariantCulture, $"shutting down connection #{connect.ConnectionNumber}"));
+        return result;
+    }
+
+    private static async Task<TransferResult> ExchangeAsync(IConnection connection, ITransferContext context, DictDiagnosticLog log)
+    {
+        if (!DictRequest.TryEncode(context.Url.AbsolutePath, out byte[] request))
+        {
+            return TransferResult.Failure(CurlExitCode.UrlMalformat, UrlMalformatMessage);
+        }
+
+        await connection.WriteAsync(request, context.CancellationToken).ConfigureAwait(false);
+        await connection.FlushAsync(context.CancellationToken).ConfigureAwait(false);
+        context.Events.ReportDataSent(request);
+        log.CommandSent(request);
+        return await CopyReplyAsync(connection, context).ConfigureAwait(false);
     }
 
     private static async Task<TransferResult> CopyReplyAsync(IConnection connection, ITransferContext context)
@@ -98,11 +114,13 @@ public sealed class DictProtocolHandler(IConnector connector) : IProtocolHandler
         int read;
         while ((read = await connection.ReadAsync(buffer, context.CancellationToken).ConfigureAwait(false)) > 0)
         {
+            context.Events.ReportDataReceived(buffer.AsSpan(0, read));
             await context.Output.WriteAsync(buffer.AsMemory(0, read), context.CancellationToken).ConfigureAwait(false);
             bytesWritten += read;
             context.Progress.ReportDownloaded(bytesWritten, null);
         }
 
+        context.Events.ReportDataReceived([]);
         return TransferResult.Success(bytesWritten);
     }
 }
