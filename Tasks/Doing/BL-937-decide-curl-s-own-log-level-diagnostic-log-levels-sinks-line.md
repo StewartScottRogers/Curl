@@ -50,3 +50,4 @@ The decisions to record, as decided here (the ADR may sharpen wording, not rever
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-29: Backlog -> Doing.
