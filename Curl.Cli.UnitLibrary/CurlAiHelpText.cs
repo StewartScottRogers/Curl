@@ -7,7 +7,7 @@ namespace Curl.Cli;
 /// most-used options. A category name in any case gives a <c>#</c> heading for the category and a
 /// <c>##</c> section for each of its options; <c>all</c> gives every category that way, then the exit
 /// codes and the <c>--write-out</c> variables. Each option section is built from the rows of
-/// <see cref="CurlHelpTable"/> (plus <c>--ai-help</c> itself), <see cref="CurlOptionAliasTable"/>,
+/// <see cref="CurlHelpTable"/> (plus Curl's own <c>--ai-help</c>, <c>--log-level</c> and <c>--log-file</c>), <see cref="CurlOptionAliasTable"/>,
 /// <see cref="CommandLineOptionTable"/> and the option's section of <see cref="CurlManual"/>, so it agrees
 /// with <c>--help</c> and <c>--manual</c>. The Markdown is not wrapped to any width and every line ends in
 /// <c>\n</c> alone, so it is the same bytes on every platform.
@@ -16,8 +16,16 @@ public static class CurlAiHelpText
 {
     private const string AllSubject = "all";
 
-    private static readonly CurlHelpEntry AiHelpEntry =
-        new("    --ai-help [category]", "Markdown help for AI agents; name a category or all for more", CurlHelpCategories.Curl);
+    /// <summary>
+    /// The rows <c>--ai-help</c> documents that curl's <c>--help</c> does not: Curl's own options, which
+    /// <see cref="CurlHelpTable"/> must not gain so <c>--help</c> stays byte-identical to curl 8.21.0.
+    /// </summary>
+    private static readonly CurlHelpEntry[] CurlOnlyEntries =
+    [
+        new("    --ai-help [category]", "Markdown help for AI agents; name a category or all for more", CurlHelpCategories.Curl),
+        new("    --log-level <level>", "Curl's own diagnostic log, not curl's -v: none (the default), error, warning, info or verbose, to standard error or the --log-file", CurlHelpCategories.Curl),
+        new("    --log-file <file>", "Write Curl's own diagnostic log, not curl's -v, to this file instead of standard error; at info level unless --log-level says otherwise", CurlHelpCategories.Curl),
+    ];
 
     /// <summary>The options the index lists as most used, by long name, in the order it lists them.</summary>
     private static readonly string[] MostUsedLongNames =
@@ -50,11 +58,11 @@ public static class CurlAiHelpText
     ];
 
     /// <summary>
-    /// Every option <c>--ai-help</c> documents: the rows of <see cref="CurlHelpTable"/> and <c>--ai-help</c>'s
+    /// Every option <c>--ai-help</c> documents: the rows of <see cref="CurlHelpTable"/> and Curl's
     /// own, ordered by long name.
     /// </summary>
     internal static IReadOnlyList<CurlHelpEntry> Entries { get; } =
-        [.. CurlHelpTable.Entries.Append(AiHelpEntry).OrderBy(LongName, StringComparer.Ordinal)];
+        [.. CurlHelpTable.Entries.Concat(CurlOnlyEntries).OrderBy(LongName, StringComparer.Ordinal)];
 
     /// <summary>Builds the Markdown <c>--ai-help</c> prints for <paramref name="subject"/>.</summary>
     /// <param name="subject">

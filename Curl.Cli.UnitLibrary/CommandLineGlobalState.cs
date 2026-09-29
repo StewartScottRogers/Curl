@@ -1,3 +1,5 @@
+using Curl.Protocol.Abstractions;
+
 namespace Curl.Cli;
 
 /// <summary>
@@ -58,6 +60,11 @@ internal sealed class CommandLineGlobalState
     public bool TraceIds { get; set; }
 
     public string? StandardErrorFile { get; set; }
+
+    /// <summary>The level the last <c>--log-level</c> named; <see langword="null"/> when none was given.</summary>
+    public DiagnosticLogLevel? DiagnosticLogLevelGiven { get; set; }
+
+    public string? DiagnosticLogFile { get; set; }
 
     public bool StyledOutput { get; set; } = true;
 

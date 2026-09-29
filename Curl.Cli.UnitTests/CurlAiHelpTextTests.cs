@@ -97,6 +97,20 @@ public sealed class CurlAiHelpTextTests
     }
 
     [TestMethod]
+    [DataRow("log-level", "<level>", "Curl's own diagnostic log, not curl's -v: none (the default), error, warning, info or verbose, to standard error or the --log-file.")]
+    [DataRow("log-file", "<file>", "Write Curl's own diagnostic log, not curl's -v, to this file instead of standard error; at info level unless --log-level says otherwise.")]
+    public void TryGetMarkdown_CurlOwnDiagnosticLogOption_IsDocumentedUnderCurlButNotInHelp(string longName, string argument, string description)
+    {
+        string section = OptionSection(Markdown("curl"), longName);
+
+        Assert.StartsWith($"## --{longName}\n\n- Short form: none\n- Argument: `{argument}`\n", section);
+        Assert.Contains($"\n\n{description}\n", section);
+        Assert.Contains(section, AllMarkdown);
+        Assert.DoesNotContain(longName, HelpLongNames("all").ToArray());
+        Assert.DoesNotContain($"--{longName}", string.Join('\n', CurlManual.Lines()));
+    }
+
+    [TestMethod]
     [DataRow("data", "- Turn off with:")]
     [DataRow("data", "- Not supported by this build yet")]
     [DataRow("data", "- Also accepted as:")]

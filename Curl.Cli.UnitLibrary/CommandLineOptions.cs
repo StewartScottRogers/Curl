@@ -301,6 +301,24 @@ public sealed class CommandLineOptions
     public IReadOnlyList<StandardErrorRedirect> StandardErrorRedirects => globals.StandardErrorRedirects;
 
     /// <summary>
+    /// How much of Curl's own diagnostic log the run asks for (ADR-0222): the level the last
+    /// <c>--log-level</c> named; <see cref="Protocol.Abstractions.DiagnosticLogLevel.Info"/> when there was none but a
+    /// <c>--log-file</c> was given; otherwise <see cref="Protocol.Abstractions.DiagnosticLogLevel.None"/>. Global: it
+    /// holds across <c>-:</c> / <c>--next</c>.
+    /// </summary>
+    public DiagnosticLogLevel DiagnosticLogLevel =>
+        globals.DiagnosticLogLevelGiven ?? (DiagnosticLogFile is null ? DiagnosticLogLevel.None : DiagnosticLogLevel.Info);
+
+    /// <summary>
+    /// The file the last <c>--log-file</c> names, to which the diagnostic log goes instead of standard
+    /// error; <see langword="null"/> when none was given. Parsing never opens it; the console does.
+    /// </summary>
+    public string? DiagnosticLogFile { get => globals.DiagnosticLogFile; internal set => globals.DiagnosticLogFile = value; }
+
+    /// <summary>Records the level a <c>--log-level</c> named, the last one winning.</summary>
+    internal void SetDiagnosticLogLevel(DiagnosticLogLevel level) => globals.DiagnosticLogLevelGiven = level;
+
+    /// <summary>
     /// The <c>-o</c> / <c>--output</c> file name of each entry of <see cref="UrlOutputs"/>, in the same
     /// order and up to the last entry that has one, <see langword="null"/> for an entry before it that
     /// has none: the Nth element is the <c>-o</c> file paired with the Nth URL, and a URL past the end

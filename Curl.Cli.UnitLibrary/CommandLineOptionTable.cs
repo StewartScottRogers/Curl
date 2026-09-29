@@ -75,6 +75,8 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("trace-time", null, (options, on) => options.TraceTime = on),
         CommandLineOption.NegatableFlag("trace-ids", null, (options, on) => options.TraceIds = on),
         CommandLineOption.Value("stderr", null, SetStandardErrorFile),
+        CommandLineOption.Value("log-level", null, SetDiagnosticLogLevel),
+        CommandLineOption.FileName("log-file", null, (options, file) => options.DiagnosticLogFile = file),
         CommandLineOption.FileName("output", 'o', (options, file) => options.AddOutputFile(file)),
         CommandLineOption.Value("upload-file", 'T', AddUploadFile),
         CommandLineOption.NegatableFlag("remote-name", 'O', (options, on) => options.PairRemoteName(on)),
@@ -389,6 +391,8 @@ public static class CommandLineOptionTable
         "trace-time",
         "trace-ids",
         "stderr",
+        "log-level",
+        "log-file",
         "styled-output",
         "fail-early",
         "parallel",
@@ -405,6 +409,17 @@ public static class CommandLineOptionTable
         "config",
         "next",
         "disable");
+
+    /// <summary>The <c>--log-level</c> values, matched ignoring case, and the level each names.</summary>
+    private static readonly FrozenDictionary<string, DiagnosticLogLevel> DiagnosticLogLevelsByName =
+        new Dictionary<string, DiagnosticLogLevel>
+        {
+            ["none"] = DiagnosticLogLevel.None,
+            ["error"] = DiagnosticLogLevel.Error,
+            ["warning"] = DiagnosticLogLevel.Warning,
+            ["info"] = DiagnosticLogLevel.Info,
+            ["verbose"] = DiagnosticLogLevel.Verbose,
+        }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// Does nothing: <c>-q</c> / <c>--disable</c> acts only as the first argument, where
@@ -435,6 +450,22 @@ public static class CommandLineOptionTable
     {
         CommandLineOption.WarnWhenFileNameLooksLikeFlag(options, file);
         options.RedirectStandardError(file);
+        return null;
+    }
+
+    /// <summary>
+    /// Sets the <c>--log-level</c> of Curl's own diagnostic log (ADR-0222): <c>none</c>, <c>error</c>,
+    /// <c>warning</c>, <c>info</c> or <c>verbose</c>, in any case. Any other value, an empty one included,
+    /// is refused with <see cref="CommandLineRefusal.BadlyUsedHere"/>.
+    /// </summary>
+    private static CommandLineRefusal? SetDiagnosticLogLevel(CommandLineOptions options, string level, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        if (!DiagnosticLogLevelsByName.TryGetValue(level, out DiagnosticLogLevel parsed))
+        {
+            return CommandLineRefusal.BadlyUsedHere(spelledOption);
+        }
+
+        options.SetDiagnosticLogLevel(parsed);
         return null;
     }
 
