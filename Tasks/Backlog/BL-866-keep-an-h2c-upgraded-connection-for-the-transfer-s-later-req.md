@@ -1,5 +1,5 @@
 ---
-id: BL-858
+id: BL-866
 title: Keep an h2c-upgraded connection for the transfer's later requests and report it left intact
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-858 — Keep an h2c-upgraded connection for the transfer's later requests and report it left intact
+# BL-866 — Keep an h2c-upgraded connection for the transfer's later requests and report it left intact
 
 ## Goal
 

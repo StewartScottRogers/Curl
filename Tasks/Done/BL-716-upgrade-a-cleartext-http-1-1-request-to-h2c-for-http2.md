@@ -101,7 +101,7 @@ Where the headers go (all measured the same way):
 - `--http2` needed a value the handler can see: `HttpVersionPreference.Http2`, appended to the
   enum. `Curl.Protocol.Abstractions.UnitLibrary` and its tests were added to `touches`; no
   task in Doing named them. The Console mapping from `RequestedHttpVersion.Http2` is filed as
-  BL-857, because `Curl.Console` belongs to BL-602 in Doing.
+  BL-865, because `Curl.Console` belongs to BL-602 in Doing.
 - These choices follow the standing rule of matching measured curl, so they are recorded here
   rather than in an ADR. `Documentation/Planning/Decisions` belongs to BL-785 in Doing.
 - The upgrade is asked for on every HTTP/1.x exchange under `Http2` whose connection is not
@@ -113,7 +113,7 @@ Where the headers go (all measured the same way):
   stream 1, and its response is read as any other. That stream is never ended locally, so it
   counts against the peer's concurrency limit for the connection's life. That is harmless
   while the connection is not reused.
-- Follow-up BL-858: after an upgrade the connection is not reused, and `-v` ends with the
+- Follow-up BL-866: after an upgrade the connection is not reused, and `-v` ends with the
   shutting-down line where curl prints `left intact`. Retries and same-origin redirects then
   go out on a new connection.
 
@@ -121,4 +121,4 @@ Where the headers go (all measured the same way):
 
 - 2026-09-28: Created.
 - 2026-09-29: Backlog -> Doing.
-- 2026-09-29: Doing -> Done. --http2 over cleartext sends curl's h2c upgrade request, switches to HTTP/2 stream 1 on 101 and stays on HTTP/1.1 when the server ignores it (handler level; Console mapping is BL-857)
+- 2026-09-29: Doing -> Done. --http2 over cleartext sends curl's h2c upgrade request, switches to HTTP/2 stream 1 on 101 and stays on HTTP/1.1 when the server ignores it (handler level; Console mapping is BL-865)

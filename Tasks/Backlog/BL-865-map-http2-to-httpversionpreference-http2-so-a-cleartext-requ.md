@@ -1,5 +1,5 @@
 ---
-id: BL-857
+id: BL-865
 title: Map --http2 to HttpVersionPreference.Http2 so a cleartext request upgrades to h2c
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-857 — Map --http2 to HttpVersionPreference.Http2 so a cleartext request upgrades to h2c
+# BL-865 — Map --http2 to HttpVersionPreference.Http2 so a cleartext request upgrades to h2c
 
 ## Goal
 
