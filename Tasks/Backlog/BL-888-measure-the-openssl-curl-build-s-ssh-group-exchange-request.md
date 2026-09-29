@@ -18,9 +18,9 @@ completed:
 
 ## Context
 
-- ADR-0205 (BL-564) pinned `GroupExchangeSshKeyExchange.MinimumBits`/`PreferredBits`/`MaximumBits` at (2048, 4096, 4096) on every preset, measured from the Windows reference build (`curl 8.21.0 ... libssh2/1.11.1`, WinCNG). The OpenSSL reference build (`curlimages/curl:8.21.0`) could not be measured that day because the Docker engine was down.
+- ADR-0206 (BL-564) pinned `GroupExchangeSshKeyExchange.MinimumBits`/`PreferredBits`/`MaximumBits` at (2048, 4096, 4096) on every preset, measured from the Windows reference build (`curl 8.21.0 ... libssh2/1.11.1`, WinCNG). The OpenSSL reference build (`curlimages/curl:8.21.0`) could not be measured that day because the Docker engine was down.
 - Measure: run the container's curl with `-s -S -k -u u:p -m 10 sftp://host.docker.internal:<port>/x` against a listener that sends `SSH-2.0-OpenSSH_9.7\r\n` and a `KEXINIT` offering only `diffie-hellman-group-exchange-sha256` (the builder BL-564 used is described in its Notes), and decode the three `uint32`s of the client's `SSH_MSG_KEX_DH_GEX_REQUEST` (message 34) that follows its `KEXINIT`.
-- If they differ, move the sizes onto `SshAlgorithmPreferences` (the Windows preset keeps (2048, 4096, 4096)) and amend ADR-0205 with a new ADR.
+- If they differ, move the sizes onto `SshAlgorithmPreferences` (the Windows preset keeps (2048, 4096, 4096)) and amend ADR-0206 with a new ADR.
 
 ## Acceptance criteria
 

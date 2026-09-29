@@ -51,7 +51,7 @@ The response was built by a throwaway PowerShell script: `SSH-2.0-OpenSSH_9.7\r\
 min 2048, n 4096, max 4096 (payload `22 00000800 00001000 00001000`). The OpenSSL build
 could not be measured (Docker engine down): filed as BL-888.
 
-### Decisions (ADR-0205)
+### Decisions (ADR-0206)
 
 - Every failure after the algorithms are agreed maps to `-8, Unable to exchange
   encryption keys`, exit 2 (`Libssh2ErrorCode.KeyExchangeMethodFailure`).
@@ -76,7 +76,7 @@ could not be measured (Docker engine down): filed as BL-888.
 
 ### Scope
 
-- `touches` gained `Documentation/Planning/Decisions` for ADR-0205 and its index row; no
+- `touches` gained `Documentation/Planning/Decisions` for ADR-0206 and its index row; no
   task in Doing named it.
 - `Curl.Protocol.Ssh.UnitLibrary.csproj` references `Curl.Cryptography.UnitLibrary`
   (ADR-0120 allows it; `ProtocolIsolationTests` passes).
@@ -92,7 +92,7 @@ could not be measured (Docker engine down): filed as BL-888.
 
 - Cherry-picked 9e19c6f4 and 5d5ae996 from `factory/BL-564-lane-6-20260929-023709` onto
   `factory/lane-1`. ADR-0204 had since been taken by the Kerberos KDC-proxy ADR, so the SSH
-  ADR is now ADR-0205 (file, heading, index row and the Ssh `CLAUDE.md` reference); the
+  ADR is now ADR-0206 (ADR-0205 went to BL-821's TLS ClientHello in the rebase) (file, heading, index row and the Ssh `CLAUDE.md` reference); the
   follow-up task is BL-888 (BL-887 was taken too).
 - `dotnet build Curl.slnx -warnaserror` clean; every fast test passes (Ssh 174);
   `Measure-CodeQuality.ps1 -Library Curl.Protocol.Ssh.UnitLibrary`: 100% line and branch,
