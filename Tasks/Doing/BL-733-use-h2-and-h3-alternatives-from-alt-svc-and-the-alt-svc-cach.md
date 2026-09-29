@@ -33,3 +33,4 @@ With `--alt-svc`, a cached or freshly advertised `h3` alternative upgrades the n
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
