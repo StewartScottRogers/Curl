@@ -31,3 +31,4 @@ The I/O-free QUIC client state machine has a name that says it carries the conne
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
