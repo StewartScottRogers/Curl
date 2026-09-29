@@ -28,6 +28,14 @@ internal static class SshKeyBlobReader
     }
 
     /// <summary>
+    /// Reads the key type name a key blob starts with.
+    /// </summary>
+    /// <param name="blob">The key blob.</param>
+    /// <returns>The key type name, such as <c>ssh-rsa</c>.</returns>
+    /// <exception cref="InvalidDataException">The blob is malformed.</exception>
+    internal static string ReadKeyTypeName(ReadOnlyMemory<byte> blob) => new SshWireReader(blob).ReadName();
+
+    /// <summary>
     /// Reads a signature blob's bytes after checking its algorithm name.
     /// </summary>
     /// <param name="signature">The signature blob.</param>

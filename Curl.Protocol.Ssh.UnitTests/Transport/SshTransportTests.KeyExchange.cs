@@ -38,6 +38,7 @@ public sealed partial class SshTransportTests
 
         CollectionAssert.AreEqual(run.Server.ExchangeHash, result.ExchangeHash);
         CollectionAssert.AreEqual(run.Server.ExchangeHash, result.SessionIdentifier, "the first exchange's hash is the session identifier");
+        CollectionAssert.AreEqual(TestHostKey.Ecdsa("nistp256", TestHostKey.FixedNistP256).Blob, result.HostKey, "the host key is kept for SshHostKeyChecker");
         Assert.AreEqual(method, result.Algorithms.KeyExchange);
         foreach (SshKeyPurpose purpose in Enum.GetValues<SshKeyPurpose>())
         {

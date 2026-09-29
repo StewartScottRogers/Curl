@@ -149,7 +149,7 @@ internal sealed class SshTransport
             await SwitchKeysAsync(messages, handshake.Algorithms, keys, cancellationToken).ConfigureAwait(false);
             sessionIdentifier = session;
             serverIdentification = handshake.ServerIdentification;
-            return new SshKeyExchangeResult(handshake.Algorithms, outcome.ExchangeHash, session, keys);
+            return new SshKeyExchangeResult(handshake.Algorithms, outcome.HostKey, outcome.ExchangeHash, session, keys);
         }
         catch (Exception exception) when (exception is InvalidDataException or EndOfStreamException or CryptographicException)
         {
