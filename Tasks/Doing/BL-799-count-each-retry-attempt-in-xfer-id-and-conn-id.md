@@ -33,3 +33,4 @@ After `--retry` runs a transfer again, `%{xfer_id}` and `%{conn_id}` print the n
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
