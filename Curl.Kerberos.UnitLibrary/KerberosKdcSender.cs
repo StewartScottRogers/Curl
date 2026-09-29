@@ -7,13 +7,15 @@ namespace Curl.Kerberos;
 /// each KDC <see cref="KerberosKdcLocator" /> finds, in order, until one answers. A
 /// <see cref="KerberosKdcTransport.UdpOrTcp" /> KDC gets UDP when the request is no longer
 /// than <see cref="KerberosConfiguration.UdpPreferenceLimit" /> and TCP otherwise; a UDP
-/// reply of <c>KRB_ERR_RESPONSE_TOO_BIG</c> is asked again of the same KDC over TCP. HTTPS
-/// (MS-KKDCP) KDCs are skipped (ADR-0168).
+/// reply of <c>KRB_ERR_RESPONSE_TOO_BIG</c> is asked again of the same KDC over TCP. An HTTPS
+/// (MS-KKDCP) KDC is sent a <see cref="KerberosKdcProxyMessage" /> through
+/// <paramref name="proxyTransport" />, or skipped when there is none (ADR-0168, BL-827).
 /// </summary>
 /// <param name="configuration">The parsed <c>krb5.conf</c>.</param>
 /// <param name="locator">Finds the realm's KDCs.</param>
-/// <param name="transport">Moves the bytes.</param>
-internal sealed class KerberosKdcSender(KerberosConfiguration configuration, KerberosKdcLocator locator, IKerberosKdcTransport transport)
+/// <param name="transport">Moves the bytes to UDP and TCP KDCs.</param>
+/// <param name="proxyTransport">Moves the bytes to HTTPS KDC proxies, or <see langword="null" /> to skip them.</param>
+internal sealed class KerberosKdcSender(KerberosConfiguration configuration, KerberosKdcLocator locator, IKerberosKdcTransport transport, IKerberosKdcProxyTransport? proxyTransport = null)
 {
     /// <summary>The longest TCP reply accepted: a KDC reply carrying a large PAC is tens of kilobytes.</summary>
     internal const int MaximumTcpReplyLength = 1 << 20;
@@ -32,7 +34,7 @@ internal sealed class KerberosKdcSender(KerberosConfiguration configuration, Ker
     public async Task<byte[]> SendAsync(string realm, byte[] request, CancellationToken cancellationToken)
     {
         IReadOnlyList<KerberosKdcAddress> located = await locator.LocateAsync(realm, cancellationToken).ConfigureAwait(false);
-        KerberosKdcAddress[] kdcs = [.. located.Where(kdc => kdc.Transport != KerberosKdcTransport.Https)];
+        KerberosKdcAddress[] kdcs = [.. located.Where(kdc => kdc.Transport != KerberosKdcTransport.Https || proxyTransport is not null)];
         if (kdcs.Length == 0)
         {
             throw new KerberosKdcException(KerberosKdcError.NoKdc);
@@ -42,7 +44,7 @@ internal sealed class KerberosKdcSender(KerberosConfiguration configuration, Ker
         {
             try
             {
-                return await SendToAsync(kdc, request, cancellationToken).ConfigureAwait(false);
+                return await SendToAsync(realm, kdc, request, cancellationToken).ConfigureAwait(false);
             }
             catch (IOException)
             {
@@ -66,8 +68,13 @@ internal sealed class KerberosKdcSender(KerberosConfiguration configuration, Ker
         }
     }
 
-    private async Task<byte[]> SendToAsync(KerberosKdcAddress kdc, byte[] request, CancellationToken cancellationToken)
+    private async Task<byte[]> SendToAsync(string realm, KerberosKdcAddress kdc, byte[] request, CancellationToken cancellationToken)
     {
+        if (kdc.Transport == KerberosKdcTransport.Https)
+        {
+            return await ExchangeThroughProxyAsync(realm, kdc, request, cancellationToken).ConfigureAwait(false);
+        }
+
         bool overUdp = kdc.Transport == KerberosKdcTransport.Udp
             || (kdc.Transport == KerberosKdcTransport.UdpOrTcp && request.Length <= configuration.UdpPreferenceLimit);
         if (!overUdp)
@@ -79,6 +86,25 @@ internal sealed class KerberosKdcSender(KerberosConfiguration configuration, Ker
         return IsResponseTooBig(reply)
             ? await ExchangeOverTcpAsync(kdc, request, cancellationToken).ConfigureAwait(false)
             : reply;
+    }
+
+    /// <summary>
+    /// Posts the request to an MS-KKDCP proxy inside a <c>KDC-PROXY-MESSAGE</c> naming
+    /// <paramref name="realm" />, as MIT's <c>sendto_kdc.c</c> does. A reply that is not one is
+    /// an <see cref="IOException" />, so the realm's next KDC is tried, as MIT does.
+    /// </summary>
+    private async Task<byte[]> ExchangeThroughProxyAsync(string realm, KerberosKdcAddress kdc, byte[] request, CancellationToken cancellationToken)
+    {
+        byte[] body = new KerberosKdcProxyMessage(request, realm).Encode();
+        byte[] reply = await proxyTransport!.PostAsync(kdc.Host, kdc.Port, kdc.HttpsPath, body, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return KerberosKdcProxyMessage.Decode(reply).KerberosMessage;
+        }
+        catch (KerberosMessageException exception)
+        {
+            throw new IOException("The KDC proxy's reply is not a KDC-PROXY-MESSAGE.", exception);
+        }
     }
 
     /// <summary>Sends the request over TCP, each message preceded by its length in four big-endian bytes (RFC 4120 section 7.2.2).</summary>

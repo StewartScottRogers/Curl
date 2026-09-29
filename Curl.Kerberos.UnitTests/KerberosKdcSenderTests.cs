@@ -3,13 +3,15 @@ namespace Curl.Kerberos;
 /// <summary>
 /// Checks that <see cref="KerberosKdcSender" /> reaches a realm's KDCs as RFC 4120 section 7.2
 /// says: UDP for a request within <c>udp_preference_limit</c>, TCP with a four-byte length
-/// prefix otherwise or after <c>KRB_ERR_RESPONSE_TOO_BIG</c>, and the next KDC when one does
-/// not answer.
+/// prefix otherwise or after <c>KRB_ERR_RESPONSE_TOO_BIG</c>, a <c>KDC-PROXY-MESSAGE</c> for an
+/// HTTPS (MS-KKDCP) KDC, and the next KDC when one does not answer.
 /// </summary>
 [TestClass]
 public sealed class KerberosKdcSenderTests
 {
     private const string OneKdc = "[realms]\n EXAMPLE.TEST = {\n kdc = kdc.example.test\n }\n";
+
+    private const string HttpsThenTcp = "[realms]\n EXAMPLE.TEST = {\n kdc = https://proxy.example.test/KdcProxy\n kdc = tcp/kdc.example.test\n }\n";
 
     private static readonly byte[] Reply = FakeKdc.Error(6);
 
@@ -97,6 +99,44 @@ public sealed class KerberosKdcSenderTests
     }
 
     [TestMethod]
+    public async Task SendAsync_HttpsEntryWithAProxyTransport_PostsAKdcProxyMessageAndUnwrapsItsReply()
+    {
+        FakeKdc kdc = Answering(Reply);
+        byte[] request = Request();
+
+        byte[] reply = await ProxiedSenderFor(kdc, HttpsThenTcp).SendAsync(FakeKdc.Realm, request, CancellationToken.None);
+
+        CollectionAssert.AreEqual(Reply, reply);
+        CollectionAssert.AreEqual(new[] { "https proxy.example.test:443/KdcProxy" }, kdc.Exchanges);
+        CollectionAssert.AreEqual(new KerberosKdcProxyMessage(request, FakeKdc.Realm).Encode(), kdc.ProxyBodies.Single());
+        Assert.AreEqual(KerberosMessageType.AsRequest, kdc.Requests.Single().MessageType);
+    }
+
+    [TestMethod]
+    public async Task SendAsync_ProxyReplyIsNotAKdcProxyMessage_TriesTheNextKdc()
+    {
+        FakeKdc kdc = Answering(Reply);
+        kdc.ProxyReply = [0x04, 0x01, 0x00];
+
+        byte[] reply = await ProxiedSenderFor(kdc, HttpsThenTcp).SendAsync(FakeKdc.Realm, Request(), CancellationToken.None);
+
+        CollectionAssert.AreEqual(Reply, reply);
+        CollectionAssert.AreEqual(new[] { "https proxy.example.test:443/KdcProxy", "tcp kdc.example.test:88" }, kdc.Exchanges);
+    }
+
+    [TestMethod]
+    public async Task SendAsync_ProxyDoesNotAnswer_TriesTheNextKdc()
+    {
+        FakeKdc kdc = Answering(Reply);
+        kdc.UnreachableHosts.Add("proxy.example.test");
+
+        byte[] reply = await ProxiedSenderFor(kdc, HttpsThenTcp).SendAsync(FakeKdc.Realm, Request(), CancellationToken.None);
+
+        CollectionAssert.AreEqual(Reply, reply);
+        CollectionAssert.AreEqual(new[] { "https proxy.example.test:443/KdcProxy", "tcp kdc.example.test:88" }, kdc.Exchanges);
+    }
+
+    [TestMethod]
     [DataRow("[libdefaults]\n dns_lookup_kdc = false\n")]
     [DataRow("[realms]\n EXAMPLE.TEST = {\n kdc = https://proxy.example.test\n }\n")]
     public async Task SendAsync_NoUdpOrTcpKdc_ThrowsNoKdc(string configuration)
@@ -149,6 +189,12 @@ public sealed class KerberosKdcSenderTests
     }
 
     private static FakeKdc Answering(byte[] reply) => new() { Override = _ => reply };
+
+    private static KerberosKdcSender ProxiedSenderFor(FakeKdc kdc, string configuration)
+    {
+        KerberosConfiguration parsed = Parse(configuration);
+        return new KerberosKdcSender(parsed, new KerberosKdcLocator(parsed, new FakeSrvLookup()), kdc, kdc);
+    }
 
     private static KerberosKdcSender SenderFor(FakeKdc kdc, string configuration)
     {

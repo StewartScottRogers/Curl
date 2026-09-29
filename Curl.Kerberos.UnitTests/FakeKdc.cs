@@ -4,12 +4,13 @@ namespace Curl.Kerberos;
 
 /// <summary>
 /// An in-memory KDC for realm <see cref="Realm" /> that answers AS-REQs and TGS-REQs over
-/// <see cref="IKerberosKdcTransport" /> with fixed keys, built from this library's own
+/// <see cref="IKerberosKdcTransport" />, or through an MS-KKDCP proxy over
+/// <see cref="IKerberosKdcProxyTransport" />, with fixed keys, built from this library's own
 /// messages and encryption types. It knows one client, <see cref="Alice" /> with password
 /// <see cref="Password" />, and one service, <see cref="Service" />. Its properties bend its
 /// answers for the failure tests.
 /// </summary>
-internal sealed class FakeKdc : IKerberosKdcTransport
+internal sealed class FakeKdc : IKerberosKdcTransport, IKerberosKdcProxyTransport
 {
     public const string Realm = "EXAMPLE.TEST";
 
@@ -65,6 +66,12 @@ internal sealed class FakeKdc : IKerberosKdcTransport
     /// <summary>Gets or sets an answer given instead of the KDC's own when it returns bytes.</summary>
     public Func<KerberosKdcRequest, byte[]?> Override { get; set; } = _ => null;
 
+    /// <summary>Gets the <c>KDC-PROXY-MESSAGE</c> bodies posted to the proxy.</summary>
+    public List<byte[]> ProxyBodies { get; } = [];
+
+    /// <summary>Gets or sets a body the proxy answers with instead of the wrapped answer.</summary>
+    public byte[]? ProxyReply { get; set; }
+
     public KerberosAuthenticator? LastAuthenticator { get; private set; }
 
     public KerberosEncryptedTimestamp? LastTimestamp { get; private set; }
@@ -100,6 +107,16 @@ internal sealed class FakeKdc : IKerberosKdcTransport
         FakeKdcStream stream = new(Answer, TcpReplyLengthPrefix);
         Streams.Add(stream);
         return Task.FromResult<Stream>(stream);
+    }
+
+    /// <summary>Plays an MS-KKDCP proxy in front of this KDC: unwraps the request and wraps the answer, or answers <see cref="ProxyReply" />.</summary>
+    public Task<byte[]> PostAsync(string host, int port, string path, ReadOnlyMemory<byte> body, CancellationToken cancellationToken)
+    {
+        Exchanges.Add($"https {host}:{port}/{path}");
+        ThrowWhenUnreachable(host);
+        ProxyBodies.Add(body.ToArray());
+        KerberosKdcProxyMessage request = KerberosKdcProxyMessage.Decode(body);
+        return Task.FromResult(ProxyReply ?? new KerberosKdcProxyMessage(Answer(request.KerberosMessage), null).Encode());
     }
 
     public byte[] Answer(byte[] bytes)

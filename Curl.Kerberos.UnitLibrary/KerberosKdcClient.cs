@@ -42,14 +42,16 @@ public sealed class KerberosKdcClient
     /// <param name="transport">Reaches the KDCs.</param>
     /// <param name="timeProvider">Gives the time for ticket lifetimes, timestamps and authenticators.</param>
     /// <param name="randomSource">Gives nonces and confounders.</param>
+    /// <param name="proxyTransport">Reaches <c>https://</c> KDCs through their MS-KKDCP proxy, or <see langword="null" /> to skip them.</param>
     public KerberosKdcClient(
         KerberosConfiguration configuration,
         IKerberosSrvLookup srvLookup,
         IKerberosKdcTransport transport,
         TimeProvider timeProvider,
-        IKerberosRandomSource randomSource)
+        IKerberosRandomSource randomSource,
+        IKerberosKdcProxyTransport? proxyTransport = null)
     {
-        sender = new KerberosKdcSender(configuration, new KerberosKdcLocator(configuration, srvLookup), transport);
+        sender = new KerberosKdcSender(configuration, new KerberosKdcLocator(configuration, srvLookup), transport, proxyTransport);
         this.timeProvider = timeProvider;
         this.randomSource = randomSource;
     }

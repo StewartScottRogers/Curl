@@ -111,6 +111,22 @@ public sealed partial class KerberosKdcClientTests
     }
 
     [TestMethod]
+    public async Task GetServiceTicketAsync_HttpsKdcAndAProxyTransport_GetsTheTicketsThroughTheKdcProxy()
+    {
+        FakeKdc kdc = new();
+        KerberosConfigurationNode root = new(string.Empty, null);
+        new KerberosConfigurationReader(new InMemoryKerberosFiles()).Parse("[realms]\n EXAMPLE.TEST = {\n kdc = https://proxy.example.test/KdcProxy\n }\n", "test.conf", root);
+        byte[] random = [.. Enumerable.Range(1, 32).Select(value => (byte)value)];
+        KerberosKdcClient client = new(new KerberosConfiguration(root), new FakeSrvLookup(), kdc, new FixedTimeProvider(FakeKdc.Now), new FixedKerberosRandomSource(random), kdc);
+
+        using KerberosCredential credential = await client.GetServiceTicketAsync(FakeKdc.Service, AlicePassword, CancellationToken.None);
+
+        Assert.AreEqual("HTTP/server.example.test@EXAMPLE.TEST", credential.Server.ToString());
+        Assert.HasCount(3, kdc.Exchanges);
+        Assert.IsTrue(kdc.Exchanges.All(exchange => exchange == "https proxy.example.test:443/KdcProxy"));
+    }
+
+    [TestMethod]
     public async Task GetInitialTicketAsync_KdcNeedsNoPreAuthentication_DecryptsTheReplyInTheDefaultSaltsKey()
     {
         FakeKdc kdc = new() { RequirePreAuthentication = false };
