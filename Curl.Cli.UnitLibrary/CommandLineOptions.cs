@@ -31,6 +31,11 @@ public sealed class CommandLineOptions
     private string? userAwaitingPassword;
     private string? proxyUserAwaitingPassword;
     private HttpAuthSchemes wantedAuthSchemes;
+    private HttpAuthSchemes wantedProxyAuthSchemes;
+    private bool proxyAnyAuthWanted;
+
+    /// <summary>The single proxy schemes curl 8.21.0's tool picks from, first match wins, after <c>--proxy-anyauth</c>.</summary>
+    private static readonly HttpAuthSchemes[] ProxyAuthSchemePrecedence = [HttpAuthSchemes.Negotiate, HttpAuthSchemes.Ntlm, HttpAuthSchemes.Digest];
 
     /// <summary>
     /// Creates the first option group of a command line, with nothing set, and so its own
@@ -436,6 +441,45 @@ public sealed class CommandLineOptions
         {
             HttpAuthSchemes allowed = BearerToken is null ? wantedAuthSchemes & ~HttpAuthSchemes.Bearer : wantedAuthSchemes;
             return allowed == HttpAuthSchemes.None ? HttpAuthSchemes.Basic : allowed;
+        }
+    }
+
+    /// <summary>
+    /// The HTTP authentication schemes to allow for the proxy, as curl 8.21.0's tool asks libcurl
+    /// for them. Unlike <see cref="AuthSchemes"/>, the switches do not add up: <c>--proxy-basic</c>,
+    /// <c>--proxy-digest</c>, <c>--proxy-ntlm</c>, <c>--proxy-negotiate</c> and <c>--proxy-anyauth</c>
+    /// each set a switch (their <c>--no-</c> spellings clear it), and the set is one scheme, picked
+    /// in the order <c>--proxy-anyauth</c> (<see cref="HttpAuthSchemes.Any"/>), <c>--proxy-negotiate</c>,
+    /// <c>--proxy-ntlm</c>, <c>--proxy-digest</c>, whatever order they came in. When none of those is
+    /// on the set is <see cref="HttpAuthSchemes.Basic"/>, which is also libcurl's default.
+    /// </summary>
+    /// <remarks>
+    /// Measured with the reference curl 8.21.0 (<c>Record-CurlExchange.ps1</c> as the proxy,
+    /// <c>-U u:p</c>, 2026-09-28): with no switch, <c>--proxy-basic --no-proxy-basic</c> or
+    /// <c>--proxy-digest --no-proxy-digest</c> curl sends <c>Basic dTpw</c> at once;
+    /// <c>--proxy-digest --proxy-ntlm</c> sends an NTLM type-1 message at once;
+    /// <c>--proxy-ntlm --proxy-negotiate</c> sends nothing; against a <c>407</c> offering only Basic,
+    /// <c>--proxy-digest --proxy-basic</c> and <c>--proxy-basic --proxy-digest</c> give up with the
+    /// <c>407</c>, while <c>--proxy-anyauth --proxy-basic</c> answers with <c>Basic dTpw</c>. See BL-601.
+    /// </remarks>
+    public HttpAuthSchemes ProxyAuthSchemes
+    {
+        get
+        {
+            if (proxyAnyAuthWanted)
+            {
+                return HttpAuthSchemes.Any;
+            }
+
+            foreach (HttpAuthSchemes scheme in ProxyAuthSchemePrecedence)
+            {
+                if ((wantedProxyAuthSchemes & scheme) != 0)
+                {
+                    return scheme;
+                }
+            }
+
+            return HttpAuthSchemes.Basic;
         }
     }
 
@@ -1684,6 +1728,19 @@ public sealed class CommandLineOptions
     /// <summary>Replaces every scheme asked for so far with every scheme there is, for <c>--anyauth</c>.</summary>
     internal void WantEveryAuthScheme() =>
         wantedAuthSchemes = HttpAuthSchemes.Any | HttpAuthSchemes.Bearer;
+
+    /// <summary>
+    /// Turns on, or for its <c>--no-</c> spelling off, the switch <c>--proxy-basic</c>,
+    /// <c>--proxy-digest</c>, <c>--proxy-ntlm</c> or <c>--proxy-negotiate</c> names; see <see cref="ProxyAuthSchemes"/>.
+    /// </summary>
+    /// <param name="scheme">The scheme the option names.</param>
+    /// <param name="on"><see langword="false"/> for the <c>--no-</c> spelling.</param>
+    internal void WantProxyAuthScheme(HttpAuthSchemes scheme, bool on) =>
+        wantedProxyAuthSchemes = on ? wantedProxyAuthSchemes | scheme : wantedProxyAuthSchemes & ~scheme;
+
+    /// <summary>Turns <c>--proxy-anyauth</c> on, or for <c>--no-proxy-anyauth</c> off; see <see cref="ProxyAuthSchemes"/>.</summary>
+    /// <param name="on"><see langword="false"/> for the <c>--no-</c> spelling.</param>
+    internal void WantEveryProxyAuthScheme(bool on) => proxyAnyAuthWanted = on;
 
     /// <summary>
     /// Records an <c>--oauth2-bearer</c> token as <see cref="BearerToken"/> and adds

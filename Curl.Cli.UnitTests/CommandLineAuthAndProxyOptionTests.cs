@@ -3,7 +3,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Cli;
 
 /// <summary>
-/// Pins <c>--basic</c>, <c>--digest</c>, <c>--anyauth</c>, <c>--oauth2-bearer</c>, <c>-x</c> / <c>--proxy</c>,
+/// Pins <c>--basic</c>, <c>--digest</c>, <c>--anyauth</c>, the <c>--proxy-</c> auth switches, <c>--oauth2-bearer</c>, <c>-x</c> / <c>--proxy</c>,
 /// <c>-U</c> / <c>--proxy-user</c>, <c>--noproxy</c>, <c>-p</c> / <c>--proxytunnel</c> and the <c>--socks</c>
 /// options as curl 8.21.0 parses them. Measured with the reference curl 8.21.0 on 2026-09-26; the
 /// commands and what they produced are in BL-192's Notes and ADR-0026.
@@ -57,6 +57,42 @@ public sealed class CommandLineAuthAndProxyOptionTests
 
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expected, result.Options.AuthSchemes);
+    }
+
+    [TestMethod]
+    [DataRow(new string[0], HttpAuthSchemes.Basic)]
+    [DataRow(new[] { "--proxy-basic" }, HttpAuthSchemes.Basic)]
+    [DataRow(new[] { "--proxy-digest" }, HttpAuthSchemes.Digest)]
+    [DataRow(new[] { "--proxy-ntlm" }, HttpAuthSchemes.Ntlm)]
+    [DataRow(new[] { "--proxy-negotiate" }, HttpAuthSchemes.Negotiate)]
+    [DataRow(new[] { "--proxy-anyauth" }, HttpAuthSchemes.Any)]
+    [DataRow(new[] { "--proxy-digest", "--proxy-basic" }, HttpAuthSchemes.Digest)]
+    [DataRow(new[] { "--proxy-basic", "--proxy-digest" }, HttpAuthSchemes.Digest)]
+    [DataRow(new[] { "--proxy-digest", "--proxy-ntlm" }, HttpAuthSchemes.Ntlm)]
+    [DataRow(new[] { "--proxy-ntlm", "--proxy-negotiate" }, HttpAuthSchemes.Negotiate)]
+    [DataRow(new[] { "--proxy-anyauth", "--proxy-basic" }, HttpAuthSchemes.Any)]
+    [DataRow(new[] { "--proxy-negotiate", "--proxy-anyauth" }, HttpAuthSchemes.Any)]
+    [DataRow(new[] { "--proxy-basic", "--no-proxy-basic" }, HttpAuthSchemes.Basic)]
+    [DataRow(new[] { "--proxy-digest", "--no-proxy-digest" }, HttpAuthSchemes.Basic)]
+    [DataRow(new[] { "--proxy-ntlm", "--proxy-digest", "--no-proxy-ntlm" }, HttpAuthSchemes.Digest)]
+    [DataRow(new[] { "--proxy-negotiate", "--no-proxy-negotiate" }, HttpAuthSchemes.Basic)]
+    [DataRow(new[] { "--proxy-anyauth", "--no-proxy-anyauth", "--proxy-digest" }, HttpAuthSchemes.Digest)]
+    public void Parse_ProxyAuthSchemeOptions_AllowTheOneSchemeCurlPicks(string[] options, HttpAuthSchemes expected)
+    {
+        CommandLineParseResult result = CommandLineParser.Parse([.. options, Url]);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual(expected, result.Options.ProxyAuthSchemes);
+    }
+
+    [TestMethod]
+    public void Parse_ProxyAndServerAuthSchemeOptions_SetTheirOwnSets()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["--proxy-digest", "--ntlm", Url]);
+
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual(HttpAuthSchemes.Digest, result.Options.ProxyAuthSchemes);
+        Assert.AreEqual(HttpAuthSchemes.Ntlm, result.Options.AuthSchemes);
     }
 
     [TestMethod]

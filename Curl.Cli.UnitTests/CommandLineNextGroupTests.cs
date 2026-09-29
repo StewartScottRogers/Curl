@@ -31,7 +31,7 @@ public sealed class CommandLineNextGroupTests
         "remote-header-name", "output-dir", "create-dirs", "clobber", "skip-existing", "remove-on-error",
         "write-out", "data", "data-ascii", "data-binary", "data-raw", "data-urlencode", "json", "form",
         "form-string", "get", "url-query", "dump-header", "user", "basic", "digest", "ntlm", "negotiate",
-        "anyauth", "oauth2-bearer", "netrc", "netrc-optional", "netrc-file","proxy", "socks4", "socks4a", "socks5", "socks5-hostname", "proxy1.0", "preproxy", "socks5-basic", "socks5-gssapi", "socks5-gssapi-service", "socks5-gssapi-nec", "haproxy-protocol", "haproxy-clientip", "suppress-connect-headers", "proxy-user",
+        "anyauth", "oauth2-bearer", "netrc", "netrc-optional", "netrc-file","proxy", "socks4", "socks4a", "socks5", "socks5-hostname", "proxy1.0", "preproxy", "socks5-basic", "socks5-gssapi", "socks5-gssapi-service", "socks5-gssapi-nec", "haproxy-protocol", "haproxy-clientip", "suppress-connect-headers", "proxy-user", "proxy-basic", "proxy-digest", "proxy-ntlm", "proxy-negotiate", "proxy-anyauth",
         "noproxy", "proxytunnel", "telnet-option", "tftp-blksize", "mail-from", "mail-rcpt", "mail-auth",
         "mail-rcpt-allowfails", "upload-flags", "login-options", "sasl-authzid", "sasl-ir", "resolve", "connect-to", "dns-servers", "dns-interface", "dns-ipv4-addr", "dns-ipv6-addr", "unix-socket", "abstract-unix-socket", "tftp-no-options",
         "disable-epsv", "epsv", "ftp-skip-pasv-ip", "ftp-method", "ftp-create-dirs", "ftp-port", "ftp-pasv",
