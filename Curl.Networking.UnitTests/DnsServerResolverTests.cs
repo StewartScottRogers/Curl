@@ -130,10 +130,10 @@ public sealed class DnsServerResolverTests
     public async Task ResolveWithFailureReasonAsync_ASilentFirstServer_AsksTheSecondAfterTwoSeconds()
     {
         // The order-silent-first measurement: both queries to the first server at once, then to the second 2000 ms later.
-        var time = new ManualTimeProvider();
+        var time = new TimerCountingTimeProvider();
         var opener = Opener(time, (Second, ScriptedDnsServer.Answering(Four, Six)));
 
-        var resolution = await RunOutTimeoutsAsync(Resolver(opener, "192.0.2.1,192.0.2.2:5353", time: time).ResolveWithFailureReasonAsync(Host, CancellationToken.None).AsTask(), time, 2);
+        var resolution = await RunOutTimeoutsAsync(Resolver(opener, "192.0.2.1,192.0.2.2:5353", time: time).ResolveWithFailureReasonAsync(Host, CancellationToken.None).AsTask(), time, opener, 2);
 
         CollectionAssert.AreEqual(new[] { Six, Four }, resolution.Addresses.ToArray());
         CollectionAssert.AreEqual(new[] { First, First, Second, Second }, opener.Sent.Select(sent => sent.Server).ToArray());
@@ -143,10 +143,10 @@ public sealed class DnsServerResolverTests
     [TestMethod]
     public async Task ResolveWithFailureReasonAsync_OneSilentServer_TriesThreeRoundsDoublingTheWaitThenTimesOut()
     {
-        var time = new ManualTimeProvider();
+        var time = new TimerCountingTimeProvider();
         var opener = Opener(time);
 
-        var resolution = await RunOutTimeoutsAsync(Resolver(opener, "192.0.2.1", AddressFamily.InterNetwork, time: time).ResolveWithFailureReasonAsync(Host, CancellationToken.None).AsTask(), time, 1);
+        var resolution = await RunOutTimeoutsAsync(Resolver(opener, "192.0.2.1", AddressFamily.InterNetwork, time: time).ResolveWithFailureReasonAsync(Host, CancellationToken.None).AsTask(), time, opener, 1);
 
         Assert.AreEqual(DnsLookupFailure.Timeout, resolution.Failure);
         CollectionAssert.AreEqual(new long[] { 0, 2000, 6000 }, opener.Sent.Select(sent => sent.SentAt).ToArray());
@@ -157,10 +157,10 @@ public sealed class DnsServerResolverTests
     public async Task ResolveWithFailureReasonAsync_ThreeSilentServers_GoesRoundTheListThreeTimes()
     {
         // The silent3 measurement: 0, 2000 and 4000 ms, then each server again, round after round.
-        var time = new ManualTimeProvider();
+        var time = new TimerCountingTimeProvider();
         var opener = Opener(time);
 
-        var resolution = await RunOutTimeoutsAsync(Resolver(opener, "192.0.2.1, 192.0.2.2:5353 ,192.0.2.3", AddressFamily.InterNetwork, time: time).ResolveWithFailureReasonAsync(Host, CancellationToken.None).AsTask(), time, 1);
+        var resolution = await RunOutTimeoutsAsync(Resolver(opener, "192.0.2.1, 192.0.2.2:5353 ,192.0.2.3", AddressFamily.InterNetwork, time: time).ResolveWithFailureReasonAsync(Host, CancellationToken.None).AsTask(), time, opener, 1);
 
         Assert.AreEqual(DnsLookupFailure.Timeout, resolution.Failure);
         CollectionAssert.AreEqual(
@@ -525,17 +525,19 @@ public sealed class DnsServerResolverTests
 
     /// <summary>
     /// Fires each attempt's timeout on <paramref name="time" /> once the <paramref name="concurrentQueries" />
-    /// queries are all waiting, until <paramref name="lookup" /> ends.
+    /// queries are all waiting, until <paramref name="lookup" /> ends. An attempt arms its timeout
+    /// before it sends, so the clock moves only once <paramref name="opener" /> has recorded a send
+    /// for every timer armed; moving it between the two would stamp the send late.
     /// </summary>
-    private static async Task<T> RunOutTimeoutsAsync<T>(Task<T> lookup, ManualTimeProvider time, int concurrentQueries)
+    private static async Task<T> RunOutTimeoutsAsync<T>(Task<T> lookup, TimerCountingTimeProvider time, ScriptedDnsSocketOpener opener, int concurrentQueries)
     {
         while (true)
         {
             var clock = Stopwatch.StartNew();
-            while (!lookup.IsCompleted && time.PendingTimerCount < concurrentQueries)
+            while (!lookup.IsCompleted && (time.Clock.PendingTimerCount < concurrentQueries || opener.Sent.Count < time.TimersCreated))
             {
                 Assert.IsLessThan(10000L, clock.ElapsedMilliseconds, "The lookup neither finished nor waited.");
-                await Task.Delay(1);
+                await Task.Yield();
             }
 
             if (lookup.IsCompleted)
@@ -543,7 +545,7 @@ public sealed class DnsServerResolverTests
                 return await lookup;
             }
 
-            time.Advance(time.NextDueAt!.Value - time.GetTimestamp());
+            time.Clock.Advance(time.Clock.NextDueAt!.Value - time.GetTimestamp());
         }
     }
 
@@ -566,6 +568,26 @@ public sealed class DnsServerResolverTests
             () => [],
             _ => null,
             fillRandom ?? new QueuedRandom().Fill);
+
+    /// <summary>A <see cref="ManualTimeProvider" /> that also counts every timer created on it, fired or not.</summary>
+    private sealed class TimerCountingTimeProvider : TimeProvider
+    {
+        private int _timersCreated;
+
+        public ManualTimeProvider Clock { get; } = new();
+
+        public int TimersCreated => Volatile.Read(ref _timersCreated);
+
+        public override long TimestampFrequency => Clock.TimestampFrequency;
+
+        public override long GetTimestamp() => Clock.GetTimestamp();
+
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+        {
+            Interlocked.Increment(ref _timersCreated);
+            return Clock.CreateTimer(callback, state, dueTime, period);
+        }
+    }
 
     /// <summary>Fills each request with the next queued bytes, then with a counter once the queue is empty.</summary>
     private sealed class QueuedRandom(params byte[][] fills)
