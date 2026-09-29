@@ -38,6 +38,7 @@ public sealed partial class SshTransportTests
 
         CollectionAssert.AreEqual(run.Server.ExchangeHash, result.ExchangeHash);
         CollectionAssert.AreEqual(run.Server.ExchangeHash, result.SessionIdentifier, "the first exchange's hash is the session identifier");
+        CollectionAssert.AreEqual(run.Server.ExchangeHash, run.Transport.SessionIdentifier, "the transport keeps it for publickey signatures");
         CollectionAssert.AreEqual(TestHostKey.Ecdsa("nistp256", TestHostKey.FixedNistP256).Blob, result.HostKey, "the host key is kept for SshHostKeyChecker");
         Assert.AreEqual(method, result.Algorithms.KeyExchange);
         foreach (SshKeyPurpose purpose in Enum.GetValues<SshKeyPurpose>())
@@ -74,6 +75,14 @@ public sealed partial class SshTransportTests
 
         Assert.AreEqual(hostKeyAlgorithm, result.Algorithms.ServerHostKey);
         CollectionAssert.AreEqual(run.Server.ExchangeHash, result.ExchangeHash);
+    }
+
+    [TestMethod]
+    public void SessionIdentifier_BeforeTheFirstExchange_Throws()
+    {
+        ScriptedExchange run = Script("ecdh-sha2-nistp256", TestHostKey.Ecdsa("nistp256", TestHostKey.FixedNistP256));
+
+        Assert.ThrowsExactly<InvalidOperationException>(() => run.Transport.SessionIdentifier);
     }
 
     [TestMethod]

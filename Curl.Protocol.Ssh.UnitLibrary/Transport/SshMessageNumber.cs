@@ -24,6 +24,9 @@ internal static class SshMessageNumber
     /// <summary><c>SSH_MSG_SERVICE_ACCEPT</c> (RFC 4253 section 10): the server grants the service it names.</summary>
     internal const byte ServiceAccept = 6;
 
+    /// <summary><c>SSH_MSG_EXT_INFO</c> (RFC 8308 section 2.3): the server's extensions, <c>server-sig-algs</c> among them.</summary>
+    internal const byte ExtensionInfo = 7;
+
     /// <summary><c>SSH_MSG_KEXINIT</c>.</summary>
     internal const byte KeyExchangeInit = 20;
 

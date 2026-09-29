@@ -69,6 +69,13 @@ internal sealed class SshTransport
     internal SshPacketWriter PacketWriter { get; }
 
     /// <summary>
+    /// Gets the session identifier: the exchange hash of the first key exchange, which a
+    /// <c>publickey</c> signature covers (RFC 4252 section 7).
+    /// </summary>
+    /// <exception cref="InvalidOperationException">No key exchange has completed yet.</exception>
+    internal byte[] SessionIdentifier => sessionIdentifier ?? throw new InvalidOperationException("The session identifier exists only after the first key exchange.");
+
+    /// <summary>
     /// Exchanges identification strings, sends the client's <c>KEXINIT</c> at once, reads
     /// the server's and agrees the algorithms, as libssh2 1.11.1 does.
     /// </summary>

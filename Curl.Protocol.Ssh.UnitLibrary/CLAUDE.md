@@ -8,7 +8,7 @@ File transfer over SSH.
 
 This library may reference `Curl.Protocol.Abstractions.UnitLibrary` and the
 hand-built libraries ADR-0120 lists; it references `Curl.Cryptography.UnitLibrary`
-for `FiniteFieldDiffieHellman`, `DsaSignature`, `X25519` and `Ed25519`. Referencing another protocol
+for `FiniteFieldDiffieHellman`, `DsaSignature`, `Des`, `X25519` and `Ed25519`. Referencing another protocol
 library is a build break, and `Curl.Protocol.Abstractions.UnitTests` fails if one
 appears.
 
@@ -21,7 +21,12 @@ implemented names; `KeyExchange` holds one `ISshKeyExchange` per method family a
 `PacketProtection` holds one `ISshPacketProtection` per cipher family, which the packet
 reader and writer switch to at each `NEWKEYS` (ADR-0212); `Authentication` holds
 `SshUserAuthentication`, which requests the `ssh-userauth` service and authenticates the
-user with `none`, `password` and `keyboard-interactive` in curl's order (ADR-0215);
+user with `none`, `publickey`, `password` and `keyboard-interactive` in curl's order
+(ADR-0215, ADR-0226); `Keys` holds `SshUserKeySource`, which finds `--key` (or curl's
+default files through an injected `HOME` reader), `--pubkey` and `--pass`,
+`SshPrivateKeyReader`, which reads every PEM, PKCS #8 and `openssh-key-v1` key file
+ADR-0122 lists but Ed25519 and bcrypt (BL-681), and one `SshPrivateKey` per key type
+(`RsaSshPrivateKey`, `EcdsaSshPrivateKey`, `DsaSshPrivateKey`), which signs;
 `Connection` holds `SshSessionChannel`, one RFC 4254 `session` channel with libssh2's
 window and packet size, which starts a subsystem or an `exec` command; `Scp` holds
 `ScpFileDownload`, which runs `scp -pf` (`ScpCommand`, `ScpRemotePath`), reads its `T`
