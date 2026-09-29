@@ -88,8 +88,14 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
     /// Sets <see cref="SocketOptions" /> on <paramref name="socket" />: <see cref="Socket.NoDelay" />
     /// from <see cref="TcpSocketOptions.NoDelay" />, and <c>SO_KEEPALIVE</c> from
     /// <see cref="TcpSocketOptions.KeepAlive" />, with the probe time and interval
-    /// <see cref="TcpSocketOptions.KeepAliveSeconds" /> when it is on.
+    /// <see cref="TcpSocketOptions.KeepAliveSeconds" /> and the probe count
+    /// <see cref="TcpSocketOptions.KeepAliveProbeCount" /> when it is on.
     /// </summary>
+    /// <remarks>
+    /// A timer the platform refuses is left at the platform's value and the connection goes ahead,
+    /// as libcurl only notes such a failure in its verbose output: Linux, for one, refuses an idle
+    /// time past 32767 seconds or more than 127 probes, and Windows more than 255 probes.
+    /// </remarks>
     /// <param name="socket">A TCP socket not yet connected.</param>
     internal void ApplySocketOptions(Socket socket)
     {
@@ -100,7 +106,20 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
             return;
         }
 
-        socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveTime, TcpSocketOptions.KeepAliveSeconds);
-        socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveInterval, TcpSocketOptions.KeepAliveSeconds);
+        TrySetTcpOption(socket, SocketOptionName.TcpKeepAliveTime, SocketOptions.KeepAliveSeconds);
+        TrySetTcpOption(socket, SocketOptionName.TcpKeepAliveInterval, SocketOptions.KeepAliveSeconds);
+        TrySetTcpOption(socket, SocketOptionName.TcpKeepAliveRetryCount, SocketOptions.KeepAliveProbeCount);
+    }
+
+    private static void TrySetTcpOption(Socket socket, SocketOptionName name, int value)
+    {
+        try
+        {
+            socket.SetSocketOption(SocketOptionLevel.Tcp, name, value);
+        }
+        catch (SocketException)
+        {
+            // libcurl logs "Failed to set TCP_KEEP..." and connects anyway.
+        }
     }
 }
