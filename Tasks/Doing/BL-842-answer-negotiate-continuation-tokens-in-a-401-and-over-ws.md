@@ -34,3 +34,4 @@ A Negotiate exchange of more than one leg works as curl 8.21.0's does: a `401` w
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
