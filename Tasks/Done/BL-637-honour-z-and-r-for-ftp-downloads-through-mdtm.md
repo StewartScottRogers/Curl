@@ -30,7 +30,7 @@ An FTP download with `-z <date>` sends `MDTM` and skips the transfer when the co
 
 ## Notes
 
-Touches widened: `Curl.Protocol.Abstractions.UnitLibrary` and `.UnitTests`, because the handler cannot see `-R` without a new `ITransferContext.RemoteTime` (curl sends `MDTM` only when asked, so it cannot be sent always), and ADR-0093 for its addendum. No task in Doing named them. `Curl.Console` also needs one line (`RemoteTime = options.RemoteTime`), but BL-732 holds it, so that wiring is filed as BL-853 rather than widening this task.
+Touches widened: `Curl.Protocol.Abstractions.UnitLibrary` and `.UnitTests`, because the handler cannot see `-R` without a new `ITransferContext.RemoteTime` (curl sends `MDTM` only when asked, so it cannot be sent always), and ADR-0093 for its addendum. No task in Doing named them. `Curl.Console` also needs one line (`RemoteTime = options.RemoteTime`), but BL-732 holds it, so that wiring is filed as BL-854 rather than widening this task.
 
 Measured 2026-09-29, curl 8.21.0 (mingw64, Schannel), `Record-CurlExchange.ps1 -Ftp -FtpData hello` against `ftp://127.0.0.1:52137/dir/f.txt`, `MDTM` answered `213 20260927123456` unless stated. Every run exited 0 unless stated; stderr below is the relevant `-v` lines.
 
