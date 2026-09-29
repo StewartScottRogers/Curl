@@ -46,3 +46,4 @@ completed:
 - 2026-09-28: Created.
 - 2026-09-29: Backlog -> Doing.
 - 2026-09-29: Doing -> Backlog. Lane 3 could not integrate: fast tests failed after rebasing onto the other lanes' work. The work is on branch factory/BL-751-lane-3-20260928-212155; start with git cherry-pick --no-commit factory/BL-751-lane-3-20260928-212155 and fix it.
+- 2026-09-29: Backlog -> Doing.
