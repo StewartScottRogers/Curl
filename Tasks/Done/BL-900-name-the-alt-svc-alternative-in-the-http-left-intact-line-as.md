@@ -38,7 +38,7 @@ does, not the origin.
 ## Notes
 
 - `HttpProtocolHandler.LeftIntactLine` now names, in order: the Unix socket, the alt-svc alternative (`target.AltSvcRoute.Alternative`), else the target host and port. Pinned by `ExecuteAsync_KeptAliveWithAnAltSvcRoute_ReportsTheAlternativeLeftIntact` and `..._KeptAliveWithoutAnAltSvcRoute_ReportsTheOriginLeftIntact`.
-- `--connect-to` measured (curl 8.21.0, `Record-CurlExchange.ps1 -Port 18499 -CurlArgs -v,--connect-to,example.invalid:80:127.0.0.1:18499,http://example.invalid/`): curl ends `* Connection #0 to host 127.0.0.1:18499 left intact`, naming the destination. Ours names the URL's host, and the mapping lives in `Curl.Networking.UnitLibrary`, outside this task's touches, so it is filed as BL-973.
+- `--connect-to` measured (curl 8.21.0, `Record-CurlExchange.ps1 -Port 18499 -CurlArgs -v,--connect-to,example.invalid:80:127.0.0.1:18499,http://example.invalid/`): curl ends `* Connection #0 to host 127.0.0.1:18499 left intact`, naming the destination. Ours names the URL's host, and the mapping lives in `Curl.Networking.UnitLibrary`, outside this task's touches, so it is filed as BL-975.
 - Measure-CodeQuality: `Curl.Protocol.Http.UnitLibrary` 100% line, 100% branch, 0 failing members, worst CRAP 10.
 
 ## Log

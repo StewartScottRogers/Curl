@@ -1,5 +1,5 @@
 ---
-id: BL-973
+id: BL-975
 title: Name the --connect-to destination in the left intact line as curl does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-973 — Name the --connect-to destination in the left intact line as curl does
+# BL-975 — Name the --connect-to destination in the left intact line as curl does
 
 ## Goal
 
