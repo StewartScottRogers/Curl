@@ -67,7 +67,7 @@ Choices (matching curl, so no ADR):
   `SocketException` "An invalid argument was supplied."), and clamps the time silently.
 
 Scope: `Curl.Console` builds the dialer (`CurlComposition.cs`) but is held by BL-603 in `Doing`, so the
-one-line wiring is filed as BL-869 (depends on this task) rather than widening `touches`.
+one-line wiring is filed as BL-870 (depends on this task) rather than widening `touches`.
 
 Tests: `Curl.Cli.UnitTests` 2864 passed (new `CommandLineKeepAliveTimerTests`), `Curl.Networking.UnitTests`
 1368 passed (new `TcpSocketOptionsTests`, four new `TcpDialerTests` cases); both libraries 100% line and

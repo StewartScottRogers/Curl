@@ -1,5 +1,5 @@
 ---
-id: BL-869
+id: BL-870
 title: Dial with --keepalive-time and --keepalive-cnt in Curl.Console's TcpDialer
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-869 — Dial with --keepalive-time and --keepalive-cnt in Curl.Console's TcpDialer
+# BL-870 — Dial with --keepalive-time and --keepalive-cnt in Curl.Console's TcpDialer
 
 ## Goal
 
