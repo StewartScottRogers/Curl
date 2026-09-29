@@ -25,6 +25,11 @@ handler holds no proxy code.
 - `DictRequest` encodes a URL path as the request bytes (`CLIENT`, one `DEFINE`,
   `MATCH` or raw command line, `QUIT`); it is pure, with no I/O. Its
   `ClientLine` constant names `libcurl 8.21.0`, as upstream sends it.
+- `DictDiagnosticLog` writes Curl's own diagnostic log (`--log-level`, ADR-0222,
+  BL-928), component `dict`, from `ITransferContext.DiagnosticLog`: the failure
+  that ends a transfer as `error` with its `CurlExitCode`, and the command line
+  sent and the transfer's end (bytes and milliseconds, timed with the context's
+  `TimeProvider`) as `info`. The connect target carries the log on.
 
 Every byte these classes send was measured against curl 8.21.0; the captures are
 in BL-041's Notes and pinned by `DictProtocolHandlerTests`. Change behaviour only

@@ -18,6 +18,8 @@ namespace Curl.Protocol.Dict;
 /// connection is tunnelled through it, <c>-p</c> or not; the connector opens the tunnel
 /// (ADR-0056). A connect failure is returned as the connector reported it. A path that decodes to a control character is refused after connecting,
 /// with exit 3 (<see cref="CurlExitCode.UrlMalformat" />), nothing sent and nothing written.
+/// Each transfer writes Curl's own diagnostic log from <see cref="ITransferContext.DiagnosticLog" />
+/// through <see cref="DictDiagnosticLog" />, and the connect target carries that log on (BL-928).
 /// </remarks>
 public sealed class DictProtocolHandler(IConnector connector) : IProtocolHandler
 {
@@ -52,11 +54,21 @@ public sealed class DictProtocolHandler(IConnector connector) : IProtocolHandler
     {
         ArgumentNullException.ThrowIfNull(context);
 
+        var log = new DictDiagnosticLog(context.DiagnosticLog);
+        long started = context.TimeProvider.GetTimestamp();
+        TransferResult result = await TransferAsync(context, log).ConfigureAwait(false);
+        log.TransferEnded(result, context.TimeProvider.GetElapsedTime(started));
+        return result;
+    }
+
+    private async Task<TransferResult> TransferAsync(ITransferContext context, DictDiagnosticLog log)
+    {
         CurlUrl url = context.Url;
         var target = new ConnectTarget(url.IdnHost, url.IsDefaultPort ? DefaultPort : url.Port, false)
         {
             Proxy = context.Proxy,
             Events = context.Events,
+            DiagnosticLog = context.DiagnosticLog,
         };
         ConnectResult connect = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
@@ -74,6 +86,7 @@ public sealed class DictProtocolHandler(IConnector connector) : IProtocolHandler
 
             await connection.WriteAsync(request, context.CancellationToken).ConfigureAwait(false);
             await connection.FlushAsync(context.CancellationToken).ConfigureAwait(false);
+            log.CommandSent(request);
             return await CopyReplyAsync(connection, context).ConfigureAwait(false);
         }
     }
