@@ -376,6 +376,31 @@
     which is how curl's transport parameters are read. Works in every mode, -NoServer
     included; Port must then be given.
 
+.PARAMETER DnsPort
+    Also run a DNS responder (BL-694) on ListenAddress, UDP and TCP, on each of these ports,
+    for measuring curl's c-ares resolver with --dns-servers. Each query is answered with
+    the query's ID and question, flags 0x8180 (a response, RD and RA set, NOERROR), and one
+    answer record per DnsAnswerAddress of the asked family (A or AAAA; any other type gets
+    none), TTL 60. After curl exits, dns.txt holds one line per query, in the order
+    received: the milliseconds since the responder started (just before curl), the transport (udp or tcp), the port it
+    arrived on, and the query bytes as lowercase hex (a TCP query without its two-byte
+    length prefix). Works in every mode, -NoServer included.
+
+.PARAMETER DnsSilentPort
+    DnsPort ports that record each UDP query and never answer, so a server that does not
+    reply can be measured beside one that does (BL-694). Give each port in DnsPort too.
+
+.PARAMETER DnsAnswerAddress
+    The addresses the DNS responder answers with. Default 127.0.0.1.
+
+.PARAMETER DnsTruncate
+    Answer every UDP query with the TC (truncated) flag set and no answer records, so the
+    resolver has to ask again over TCP, which is answered in full (BL-694).
+
+.PARAMETER DnsResponseCode
+    The RCODE every DNS answer carries, e.g. 3 (NXDOMAIN) or 2 (SERVFAIL); any value but 0
+    sends no answer records. Default 0 (NOERROR).
+
 .PARAMETER UnixSocket
     Listen on a Unix domain socket at this path instead of TCP, for --unix-socket (BL-507).
     Any file already at the path is deleted first, and the socket file is deleted at the
@@ -460,6 +485,11 @@ param(
     [System.Net.IPAddress] $ListenAddress = [System.Net.IPAddress]::Loopback,
     [switch] $NoServer,
     [switch] $UdpSink,
+    [int[]] $DnsPort = @(),
+    [int[]] $DnsSilentPort = @(),
+    [System.Net.IPAddress[]] $DnsAnswerAddress = @([System.Net.IPAddress]::Loopback),
+    [switch] $DnsTruncate,
+    [ValidateRange(0, 15)] [int] $DnsResponseCode = 0,
     [string] $UnixSocket
 )
 
@@ -474,6 +504,7 @@ if (@($Ftp, $Smtp, $Imap, $Pop3, [bool] $Script | Where-Object { $_ }).Count -gt
 if ($UnixSocket -and ($NoServer -or $Ftp -or $Smtp -or $Imap -or $Pop3 -or $Script -or $Tls -or $UdpSink)) { throw '-UnixSocket serves HTTP only, so it cannot be combined with -NoServer, -Ftp, -Smtp, -Imap, -Pop3, -Script, -Tls or -UdpSink.' }
 if (-not $NoServer -and -not $UnixSocket -and $Port -eq 0) { throw '-Port is required unless -NoServer is given: the URL in CurlArgs must name the port the server listens on.' }
 if ($UdpSink -and $Port -eq 0) { throw '-UdpSink binds UDP on -Port, so -Port is required with it.' }
+if (@($DnsSilentPort | Where-Object { $DnsPort -notcontains $_ }).Count -gt 0) { throw '-DnsSilentPort names a port -DnsPort does not; give each silent port in -DnsPort too.' }
 
 function Get-ReferenceCurlPath {
     $git = Get-Command git.exe -ErrorAction SilentlyContinue
@@ -1731,6 +1762,172 @@ public sealed class RecorderUnixSocketListener
     $listener.Start()
     $server = [System.Management.Automation.PowerShell]::Create()
 }
+$dnsResponder = $null
+if ($DnsPort.Count -gt 0) {
+    # C#, not a PowerShell class, so its threads need no runspace; Windows PowerShell 5.1
+    # compiles it as C# 5.
+    Add-Type -TypeDefinition @'
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+using System.Threading;
+
+public sealed class RecorderDnsResponder
+{
+    private readonly List<Socket> _sockets = new List<Socket>();
+    private readonly List<TcpListener> _listeners = new List<TcpListener>();
+    private readonly StringBuilder _log = new StringBuilder();
+    private readonly Stopwatch _clock = Stopwatch.StartNew();
+    private readonly IPAddress[] _answers;
+    private readonly bool _truncate;
+    private int _responseCode;
+
+    public RecorderDnsResponder(IPAddress address, int[] ports, int[] silentPorts, IPAddress[] answers, bool truncate, int responseCode)
+    {
+        _responseCode = responseCode;
+        _answers = answers;
+        _truncate = truncate;
+        foreach (int port in ports)
+        {
+            var udp = new Socket(address.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
+            udp.Bind(new IPEndPoint(address, port));
+            _sockets.Add(udp);
+            bool silent = Array.IndexOf(silentPorts, port) >= 0;
+            int boundPort = port;
+            new Thread(delegate() { ServeUdp(udp, boundPort, silent); }) { IsBackground = true }.Start();
+            var tcp = new TcpListener(address, port);
+            tcp.Start();
+            _listeners.Add(tcp);
+            new Thread(delegate() { ServeTcp(tcp, boundPort); }) { IsBackground = true }.Start();
+        }
+    }
+
+    public string Log { get { lock (_log) { return _log.ToString(); } } }
+
+    public void Stop()
+    {
+        foreach (Socket socket in _sockets) { socket.Close(); }
+        foreach (TcpListener listener in _listeners) { listener.Stop(); }
+    }
+
+    private void Record(string transport, int port, byte[] query, int length)
+    {
+        lock (_log)
+        {
+            _log.Append(_clock.ElapsedMilliseconds).Append(' ').Append(transport).Append(' ').Append(port).Append(' ');
+            _log.Append(BitConverter.ToString(query, 0, length).Replace("-", string.Empty).ToLowerInvariant()).Append('\n');
+        }
+    }
+
+    private void ServeUdp(Socket udp, int port, bool silent)
+    {
+        var buffer = new byte[65535];
+        try
+        {
+            while (true)
+            {
+                EndPoint sender = new IPEndPoint(udp.AddressFamily == AddressFamily.InterNetworkV6 ? IPAddress.IPv6Any : IPAddress.Any, 0);
+                int length = udp.ReceiveFrom(buffer, ref sender);
+                Record("udp", port, buffer, length);
+                if (!silent)
+                {
+                    byte[] reply = Answer(buffer, length, _truncate);
+                    udp.SendTo(reply, sender);
+                }
+            }
+        }
+        catch (SocketException) { }
+        catch (ObjectDisposedException) { }
+    }
+
+    private void ServeTcp(TcpListener listener, int port)
+    {
+        try
+        {
+            while (true)
+            {
+                TcpClient client = listener.AcceptTcpClient();
+                new Thread(delegate() { ServeTcpClient(client, port); }) { IsBackground = true }.Start();
+            }
+        }
+        catch (SocketException) { }
+        catch (ObjectDisposedException) { }
+        catch (InvalidOperationException) { }
+    }
+
+    private void ServeTcpClient(TcpClient client, int port)
+    {
+        try
+        {
+            using (client)
+            {
+                NetworkStream stream = client.GetStream();
+                while (true)
+                {
+                    byte[] prefix = ReadExactly(stream, 2);
+                    if (prefix == null) { return; }
+                    byte[] query = ReadExactly(stream, (prefix[0] << 8) | prefix[1]);
+                    if (query == null) { return; }
+                    Record("tcp", port, query, query.Length);
+                    byte[] reply = Answer(query, query.Length, false);
+                    stream.Write(new byte[] { (byte)(reply.Length >> 8), (byte)reply.Length }, 0, 2);
+                    stream.Write(reply, 0, reply.Length);
+                }
+            }
+        }
+        catch (System.IO.IOException) { }
+        catch (ObjectDisposedException) { }
+    }
+
+    private static byte[] ReadExactly(NetworkStream stream, int count)
+    {
+        var bytes = new byte[count];
+        int read = 0;
+        while (read < count)
+        {
+            int n = stream.Read(bytes, read, count - read);
+            if (n == 0) { return null; }
+            read += n;
+        }
+        return bytes;
+    }
+
+    /// The query's header and question, then one answer record per address of the asked family.
+    private byte[] Answer(byte[] query, int length, bool truncate)
+    {
+        int end = 12;
+        while (end < length && query[end] != 0) { end += 1 + query[end]; }
+        end += 1 + 4;
+        int type = (query[end - 4] << 8) | query[end - 3];
+        var reply = new List<byte>();
+        for (int i = 0; i < end; i++) { reply.Add(query[i]); }
+        reply[2] = (byte)(truncate ? 0x83 : 0x81);
+        reply[3] = (byte)(0x80 | _responseCode);
+        for (int i = 6; i < 12; i++) { reply[i] = 0; }
+        int answers = 0;
+        if (!truncate && _responseCode == 0)
+        {
+            foreach (IPAddress address in _answers)
+            {
+                bool wanted = (type == 1 && address.AddressFamily == AddressFamily.InterNetwork)
+                    || (type == 28 && address.AddressFamily == AddressFamily.InterNetworkV6);
+                if (!wanted) { continue; }
+                byte[] data = address.GetAddressBytes();
+                reply.AddRange(new byte[] { 0xC0, 0x0C, (byte)(type >> 8), (byte)type, 0, 1, 0, 0, 0, 60, 0, (byte)data.Length });
+                reply.AddRange(data);
+                answers++;
+            }
+        }
+        reply[7] = (byte)answers;
+        return reply.ToArray();
+    }
+}
+'@
+    $dnsResponder = New-Object RecorderDnsResponder($ListenAddress, $DnsPort, $DnsSilentPort, $DnsAnswerAddress, [bool] $DnsTruncate, $DnsResponseCode)
+}
 # The sink never answers; the datagrams wait in its receive buffer until curl exits.
 $udpSinkClient = $null
 if ($UdpSink) {
@@ -1812,6 +2009,7 @@ try {
     }
 } finally {
     if ($null -ne $udpSinkClient) { $udpSinkClient.Close() }
+    if ($null -ne $dnsResponder) { $dnsResponder.Stop() }
     if ($null -ne $listener) { $listener.Stop() }
     if ($UnixSocket -and (Test-Path -LiteralPath $UnixSocket)) { Remove-Item -LiteralPath $UnixSocket -Force }
     if ($null -ne $server) { $server.Dispose() }
@@ -1834,6 +2032,9 @@ if ($Ftp) {
 }
 if ($UdpSink) {
     [System.IO.File]::WriteAllText((Join-Path $OutDirectory 'datagrams.txt'), $udpDatagrams.ToString(), [System.Text.Encoding]::ASCII)
+}
+if ($null -ne $dnsResponder) {
+    [System.IO.File]::WriteAllText((Join-Path $OutDirectory 'dns.txt'), $dnsResponder.Log, [System.Text.Encoding]::ASCII)
 }
 if ($Smtp -or $Imap -or $Pop3 -or $Script) {
     [System.IO.File]::WriteAllText((Join-Path $OutDirectory 'transcript.txt'), $transcript.ToString(), [System.Text.Encoding]::GetEncoding(28591))
