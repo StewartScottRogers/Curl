@@ -20,7 +20,7 @@ does, not the origin.
 
 ## Context
 
-- Found in BL-623 (ADR-0213). Measured case 1 in BL-623's Notes: with the entry
+- Found in BL-623 (ADR-0214). Measured case 1 in BL-623's Notes: with the entry
   `h1 localhost 18499 h1 localhost 18443`, curl prints `* Connection #0 to host localhost:18443 left intact`;
   ours prints `localhost:18499`.
 - `HttpProtocolHandler.LeftIntactLine` (`Curl.Protocol.Http.UnitLibrary`) passes `target.Host` and

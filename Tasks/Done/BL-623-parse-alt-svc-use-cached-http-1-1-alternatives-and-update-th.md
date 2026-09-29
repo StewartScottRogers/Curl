@@ -46,7 +46,7 @@ completed: 2026-09-29
   the first transfer and written at the end, also when it did not exist (the two comment
   lines); `--alt-svc ""` learns and uses without reading or writing a file.
 
-- 2026-09-29 (lane 3, resumed): delivered. Decisions in ADR-0213 (Decided by Claude under
+- 2026-09-29 (lane 3, resumed): delivered. Decisions in ADR-0214 (Decided by Claude under
   Stewart's delegation): each `http`/`https` transfer gets its own `AltSvcTransferCache`
   (`Curl.Console`), read after the `-b` files and written after the `-c` jar, as libcurl gives each
   easy handle one; only `h1` alternatives, never for plain `http`, a `--connect-to` origin (or an
