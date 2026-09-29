@@ -8,7 +8,7 @@ depends-on: [BL-525]
 touches: [Curl.slnx, Curl.Ntlm.UnitLibrary, Curl.Ntlm.UnitTests]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-28
 ---
 # BL-682 — Create Curl.Ntlm.UnitLibrary and Curl.Ntlm.UnitTests
 
@@ -25,9 +25,9 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] Both projects exist, `Curl.slnx` lists them together in alphabetical order with no solution folder, and the test project references the library.
-- [ ] `Curl.Ntlm.UnitLibrary/CLAUDE.md` exists as described.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests pass.
+- [x] Both projects exist, `Curl.slnx` lists them together in alphabetical order with no solution folder, and the test project references the library.
+- [x] `Curl.Ntlm.UnitLibrary/CLAUDE.md` exists as described.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests pass.
 
 ## Notes
 
@@ -35,3 +35,4 @@ completed:
 
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Doing.
+- 2026-09-28: Doing -> Done. Curl.Ntlm.UnitLibrary and Curl.Ntlm.UnitTests exist, sit in Curl.slnx in sorted place, build clean and are measured by the quality gates
