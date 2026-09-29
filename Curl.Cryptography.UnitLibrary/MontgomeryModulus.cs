@@ -79,6 +79,25 @@ internal sealed class MontgomeryModulus
     }
 
     /// <summary>
+    /// Returns the big-endian <paramref name="prime" /> minus 2, its length kept: the exponent
+    /// that inverts modulo a prime by Fermat's little theorem. The borrow runs through every
+    /// byte, so the time depends only on the length.
+    /// </summary>
+    public static byte[] MinusTwo(ReadOnlySpan<byte> prime)
+    {
+        byte[] result = prime.ToArray();
+        int borrow = 2;
+        for (int index = result.Length - 1; index >= 0; index--)
+        {
+            int difference = result[index] - borrow;
+            result[index] = (byte)difference;
+            borrow = (difference >> 8) & 1;
+        }
+
+        return result;
+    }
+
+    /// <summary>
     /// Computes <paramref name="baseValue" />^<paramref name="exponent" /> modulo the modulus
     /// into <paramref name="result" />, all as limbs in ordinary (not Montgomery) form.
     /// </summary>
@@ -223,6 +242,32 @@ internal sealed class MontgomeryModulus
         }
     }
 
+    /// <summary>
+    /// Sets <paramref name="result" /> to <paramref name="left" /> + <paramref name="right" />
+    /// modulo the modulus, both below it, subtracting the modulus by mask. <paramref name="result" />
+    /// may alias either operand.
+    /// </summary>
+    /// <param name="result">Receives the sum.</param>
+    /// <param name="left">The first addend, below the modulus.</param>
+    /// <param name="right">The second addend, below the modulus.</param>
+    /// <param name="scratch">At least <see cref="LimbCount" /> + 2 limbs of working space.</param>
+    public void Add(Span<uint> result, ReadOnlySpan<uint> left, ReadOnlySpan<uint> right, Span<uint> scratch)
+    {
+        int n = LimbCount;
+        Span<uint> total = scratch[..(n + 2)];
+        ulong carry = 0;
+        for (int index = 0; index < n; index++)
+        {
+            ulong sum = left[index] + (ulong)right[index] + carry;
+            total[index] = (uint)sum;
+            carry = sum >> 32;
+        }
+
+        total[n] = (uint)carry;
+        total[n + 1] = 0;
+        SubtractModulusIfNotBelow(result, total);
+    }
+
     /// <summary>Returns whether <paramref name="value" />, <see cref="LimbCount" /> limbs, is below the modulus: whether subtracting the modulus borrows.</summary>
     /// <param name="value">The value to compare.</param>
     /// <returns><see langword="true" /> when the value is below the modulus.</returns>
@@ -283,28 +328,6 @@ internal sealed class MontgomeryModulus
         {
             Add(value, value, value, scratch);
         }
-    }
-
-    /// <summary>
-    /// Sets <paramref name="result" /> to <paramref name="left" /> + <paramref name="right" />
-    /// modulo the modulus, both below it, subtracting the modulus by mask. <paramref name="result" />
-    /// may alias either operand.
-    /// </summary>
-    private void Add(Span<uint> result, ReadOnlySpan<uint> left, ReadOnlySpan<uint> right, Span<uint> scratch)
-    {
-        int n = LimbCount;
-        Span<uint> total = scratch[..(n + 2)];
-        ulong carry = 0;
-        for (int index = 0; index < n; index++)
-        {
-            ulong sum = left[index] + (ulong)right[index] + carry;
-            total[index] = (uint)sum;
-            carry = sum >> 32;
-        }
-
-        total[n] = (uint)carry;
-        total[n + 1] = 0;
-        SubtractModulusIfNotBelow(result, total);
     }
 
     /// <summary>Fills the table with base^0 to base^15 in Montgomery form.</summary>

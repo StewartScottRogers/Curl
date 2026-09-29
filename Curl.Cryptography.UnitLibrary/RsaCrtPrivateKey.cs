@@ -72,8 +72,8 @@ public sealed class RsaCrtPrivateKey : IDisposable
         uint[] inverseLimbs = Limbs(inverse, (inverse.Length + 3) / 4);
         primeP.Reduce(inverseLimbs, qInverse);
         CryptographicOperations.ZeroMemory(MemoryMarshal.AsBytes(inverseLimbs.AsSpan()));
-        inverseExponentP = MinusTwo(p);
-        inverseExponentQ = MinusTwo(qBytes);
+        inverseExponentP = MontgomeryModulus.MinusTwo(p);
+        inverseExponentQ = MontgomeryModulus.MinusTwo(qBytes);
     }
 
     /// <summary>The length in bytes of n, and so of every message representative and result.</summary>
@@ -188,25 +188,6 @@ public sealed class RsaCrtPrivateKey : IDisposable
         uint[] limbs = new uint[limbCount];
         MontgomeryModulus.ToLimbs(bigEndian, limbs);
         return limbs;
-    }
-
-    /// <summary>
-    /// Returns the big-endian <paramref name="prime" /> minus 2, its length kept: the exponent
-    /// that inverts modulo a prime by Fermat's little theorem. The borrow runs through every
-    /// byte, so the time depends only on the length.
-    /// </summary>
-    private static byte[] MinusTwo(ReadOnlySpan<byte> prime)
-    {
-        byte[] result = prime.ToArray();
-        int borrow = 2;
-        for (int index = result.Length - 1; index >= 0; index--)
-        {
-            int difference = result[index] - borrow;
-            result[index] = (byte)difference;
-            borrow = (difference >> 8) & 1;
-        }
-
-        return result;
     }
 
     /// <summary>

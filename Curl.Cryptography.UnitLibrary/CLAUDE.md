@@ -66,7 +66,8 @@ Namespace `Curl.Cryptography`. It holds:
 - `MontgomeryModulus` (internal): arithmetic modulo an odd modulus, public or secret, on
   32-bit limbs - CIOS Montgomery multiplication with a masked final subtraction, a fixed
   4-bit window exponentiation whose table look-up reads all 16 entries, `Reduce` of any
-  length, `Subtract`, `MultiplyModulo`, `IsBelowModulus` and `Clear`. Its set-up doubles
+  length, `Add`, `Subtract`, `MultiplyModulo`, `IsBelowModulus`, `Clear`, and `MinusTwo`, the
+  Fermat inverse exponent p - 2. Its set-up doubles
   1 by masked additions, never dividing by the modulus (ADR-0195).
 - `RsaCrtPrivateKey` (public, `IDisposable`): PKCS #1's RSASP1, m^d mod n on the key's CRT
   values - `ApplyPrivateExponent`, with and without the blinding bytes, blinded by r^e
@@ -130,8 +131,20 @@ Namespace `Curl.Cryptography`. It holds:
   (the random bytes as a parameter; `false` with both keys zeroed when they give a g with
   no inverse mod 3), `Encapsulate` with and without the random bytes, and `Decapsulate`,
   which gives the implicit-rejection secret for a tampered ciphertext. Constant-time.
+- `Sha224` (internal struct): SHA-256's compression from SHA-224's initial value, the
+  digest cut to 28 bytes, for the HMAC-SHA-224 the BCL lacks.
+- `DeterministicDsaNonce` (internal, `IDisposable`): RFC 6979 section 3.2's HMAC_DRBG -
+  `NextCandidate` gives the candidate nonces in order, and `DigestLength` the hash's size.
+- `DsaDomainParameters` (internal): p, q and g - `TryCreate` (OpenSSL's verification
+  limits: q of 160, 224 or 256 bits, odd p longer than q up to 10,000 bits, 1 < g < p),
+  `RaiseGenerator`, `InvertModuloSubprime` (by Fermat) and `ReduceHash`.
+- `DsaSignature` (public, `IDisposable`): FIPS 186-4 DSA - the constructor takes p, q, g
+  and x, `SignHash` signs with RFC 6979's deterministic nonce over SHA1 to SHA512, and the
+  static `VerifyHash` returns `false` for bad parameters, y not below p, r or s outside
+  [1, q - 1], or a mismatch. Signatures are r || s at q's length (ADR-0200). Constant-time
+  in x and k.
 
-The remaining primitives land under their own tasks (BL-677, BL-738 to BL-745).
+The remaining primitives land under their own tasks (BL-677, BL-738, BL-740 to BL-744).
 
 ## Rules
 
