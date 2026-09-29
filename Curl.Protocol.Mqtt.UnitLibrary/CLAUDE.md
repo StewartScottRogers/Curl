@@ -27,6 +27,16 @@ packet's type and remaining length, sent and received, as `verbose`. No packet b
 logged, so the CONNECT's user name and password never are; the connect target carries the
 log on.
 
+`-v` and `--trace` (BL-935): after connecting, `MqttSession` reports to
+`ITransferContext.Events` `Using client id '...'`, each packet sent as a header block,
+each fixed header byte (`MqttPacketReader`) and each CONNACK or SUBACK body as header
+blocks received, `Remaining length: N bytes` and each PUBLISH body slice as data, curl's
+`mqtt_doing: state [N]` lines (one extra `state [0]` straight after the CONNECT), `Got
+DISCONNECT`, `Received ping response.`, `server disconnected` and `State not handled yet`;
+then `MqttProtocolHandler` reports the failure's message unless curl prints it without
+`failf` (`MqttTransferMessages.IsStrerrorText`), and `closing connection #N` after exit 23
+or `shutting down connection #N` after anything else.
+
 This library may reference `Curl.Protocol.Abstractions.UnitLibrary` and nothing
 else horizontal. Referencing another protocol library is a build break, and
 `Curl.Protocol.Abstractions.UnitTests` fails if one appears.

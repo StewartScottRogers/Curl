@@ -150,9 +150,10 @@ public sealed class MqttProtocolHandler : IProtocolHandler
         }
 
         context.Progress.ReportTransferStarted();
+        TransferResult result;
         await using (connection.ConfigureAwait(false))
         {
-            MqttSession session = new(connection, context.Output, context.Progress, log, context.CancellationToken);
+            MqttSession session = new(connection, context.Output, context.Progress, context.Events, log, context.CancellationToken);
             try
             {
                 await session
@@ -162,12 +163,33 @@ public sealed class MqttProtocolHandler : IProtocolHandler
                         context.Credentials,
                         context.PostData)
                     .ConfigureAwait(false);
-                return TransferResult.Success(session.BytesWritten);
+                result = TransferResult.Success(session.BytesWritten);
             }
             catch (MqttTransferException failure)
             {
-                return new TransferResult(failure.ExitCode, session.BytesWritten, failure.Message);
+                result = new TransferResult(failure.ExitCode, session.BytesWritten, failure.Message);
             }
         }
+
+        ReportConnectionEnd(context.Events, result, connected.ConnectionNumber);
+        return result;
+    }
+
+    /// <summary>
+    /// Reports how the transfer ended, as curl 8.21.0's <c>-v</c> does (measured, BL-935):
+    /// the failure's message unless curl prints it without <c>failf</c>, then
+    /// <c>closing connection #N</c> after an output write failure and
+    /// <c>shutting down connection #N</c> after anything else.
+    /// </summary>
+    private static void ReportConnectionEnd(ITransferEvents events, TransferResult result, long connectionNumber)
+    {
+        if (result.ErrorMessage is { } message && !MqttTransferMessages.IsStrerrorText(message))
+        {
+            events.ReportInfo(message);
+        }
+
+        events.ReportInfo(result.ExitCode == CurlExitCode.WriteError
+            ? MqttTransferMessages.ClosingConnection(connectionNumber)
+            : MqttTransferMessages.ShuttingDownConnection(connectionNumber));
     }
 }

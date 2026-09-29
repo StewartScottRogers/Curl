@@ -52,6 +52,60 @@ internal static class MqttTransferMessages
     /// </summary>
     internal const string TooLarge = "A value or data field grew larger than allowed";
 
+    /// <summary>The <c>-v</c> line for a DISCONNECT received.</summary>
+    internal const string GotDisconnect = "Got DISCONNECT";
+
+    /// <summary>The <c>-v</c> line for a PINGRESP received.</summary>
+    internal const string ReceivedPingResponse = "Received ping response.";
+
+    /// <summary>The <c>-v</c> line for a peer that closed inside a PUBLISH body.</summary>
+    internal const string ServerDisconnected = "server disconnected";
+
+    /// <summary>The <c>-v</c> line for a packet curl's state machine has no state for.</summary>
+    internal const string StateNotHandled = "State not handled yet";
+
+    /// <summary>
+    /// Whether <paramref name="message" /> is one of the texts curl prints for an exit code
+    /// <c>lib/mqtt.c</c> returns without calling <c>failf</c>, and so without a <c>-v</c> line.
+    /// </summary>
+    /// <param name="message">A failure's message.</param>
+    /// <returns><see langword="true" /> for a <c>curl_easy_strerror</c> text.</returns>
+    internal static bool IsStrerrorText(string message) =>
+        message is ReceiveFailed or SendFailed or PartialFile or WeirdServerReply or TooLarge;
+
+    /// <summary>The <c>-v</c> line naming the client identifier, written before the CONNECT.</summary>
+    /// <param name="clientIdentifier">The client identifier the CONNECT carries.</param>
+    /// <returns>The line, such as <c>Using client id 'curlPBadK4E3'</c>.</returns>
+    internal static string UsingClientId(string clientIdentifier) => $"Using client id '{clientIdentifier}'";
+
+    /// <summary>
+    /// The <c>-v</c> line curl's <c>mqtt_doing</c> writes each time it runs, naming the state
+    /// it is in by <c>enum mqttstate</c>'s number: 0 awaiting a packet, 2 the CONNACK, 3 the
+    /// SUBACK, 5 a PUBLISH, 6 the rest of one, 7 a state it has none for.
+    /// </summary>
+    /// <param name="state">The state's number.</param>
+    /// <returns>The line, such as <c>mqtt_doing: state [0]</c>.</returns>
+    internal static string DoingState(int state) =>
+        string.Create(CultureInfo.InvariantCulture, $"mqtt_doing: state [{state}]");
+
+    /// <summary>The <c>-v</c> line written before a PUBLISH body is read.</summary>
+    /// <param name="remainingLength">The PUBLISH's remaining length.</param>
+    /// <returns>The line, such as <c>Remaining length: 8 bytes</c>.</returns>
+    internal static string RemainingLength(int remainingLength) =>
+        string.Create(CultureInfo.InvariantCulture, $"Remaining length: {remainingLength} bytes");
+
+    /// <summary>The <c>-v</c> line that ends the connection after anything but exit 23.</summary>
+    /// <param name="connectionNumber">The connection's number.</param>
+    /// <returns>The line, such as <c>shutting down connection #0</c>.</returns>
+    internal static string ShuttingDownConnection(long connectionNumber) =>
+        string.Create(CultureInfo.InvariantCulture, $"shutting down connection #{connectionNumber}");
+
+    /// <summary>The <c>-v</c> line that ends the connection after an output write failure.</summary>
+    /// <param name="connectionNumber">The connection's number.</param>
+    /// <returns>The line, such as <c>closing connection #0</c>.</returns>
+    internal static string ClosingConnection(long connectionNumber) =>
+        string.Create(CultureInfo.InvariantCulture, $"closing connection #{connectionNumber}");
+
     /// <summary>
     /// The exit 23 message for an output that stopped accepting bytes.
     /// </summary>
