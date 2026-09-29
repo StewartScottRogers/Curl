@@ -279,28 +279,36 @@ internal sealed class FtpSession(
     /// <summary>
     /// Sends <c>PWD</c> and reads the entry path; a relative one sends <c>SYST</c> when
     /// <paramref name="askSystemForRelativePath" /> is set, as curl 8.21.0 does while it
-    /// knows no server system yet (BL-782).
+    /// knows no server system yet (BL-782). The <c>-v</c> line for the reply follows it, or
+    /// follows <c>SYST</c> once sent, as curl's does (BL-945).
     /// </summary>
     private async ValueTask<TransferResult?> ReadEntryPathAsync(bool askSystemForRelativePath)
     {
-        if (!FtpEntryPath.TryRead(await ExchangeAsync("PWD").ConfigureAwait(false), out entryPath))
+        FtpReply pwd = await ExchangeAsync("PWD").ConfigureAwait(false);
+        if (!FtpEntryPath.TryRead(pwd, out entryPath))
         {
             return TransferResult.Failure(CurlExitCode.WeirdServerReply, FtpTransferMessages.WeirdServerReply);
         }
 
-        return askSystemForRelativePath && entryPath?.StartsWith('/') == false
-            ? await AskServerSystemAsync().ConfigureAwait(false)
-            : null;
+        string? entryPathLine = FtpTransferMessages.EntryPathReply(pwd.Code, entryPath);
+        if (askSystemForRelativePath && entryPath?.StartsWith('/') == false)
+        {
+            return await AskServerSystemAsync(entryPathLine).ConfigureAwait(false);
+        }
+
+        ReportInfo(entryPathLine);
+        return null;
     }
 
     /// <summary>
-    /// Sends <c>SYST</c>, whose refusal curl carries on past. A <c>215</c> naming
+    /// Sends <c>SYST</c>, whose refusal curl carries on past, reporting
+    /// <paramref name="entryPathLine" /> once it is sent. A <c>215</c> naming
     /// <c>OS/400</c> sends <c>SITE NAMEFMT 1</c>, and a 2xx to that sends <c>PWD</c> again
     /// for the entry path in the new name format, with no second <c>SYST</c>.
     /// </summary>
-    private async ValueTask<TransferResult?> AskServerSystemAsync()
+    private async ValueTask<TransferResult?> AskServerSystemAsync(string? entryPathLine)
     {
-        FtpReply system = await ExchangeAsync("SYST").ConfigureAwait(false);
+        FtpReply system = await ExchangeAsync("SYST", entryPathLine).ConfigureAwait(false);
         return FtpServerSystem.IsOs400(system)
             && (await ExchangeAsync("SITE NAMEFMT 1").ConfigureAwait(false)).IsCompletion
             ? await ReadEntryPathAsync(askSystemForRelativePath: false).ConfigureAwait(false)
@@ -434,6 +442,7 @@ internal sealed class FtpSession(
 
     private async ValueTask<TransferResult> RetrieveFromPathAsync(FtpUrlPath path)
     {
+        ReportWhetherInEntryDirectory(path);
         return await SendQuotesAsync(quotes.AfterLogin).ConfigureAwait(false)
             ?? await ChangeDirectoriesAsync(path.Directories).ConfigureAwait(false)
             ?? await CheckModificationTimeAsync(path.FileName).ConfigureAwait(false)
@@ -480,6 +489,7 @@ internal sealed class FtpSession(
             return TransferResult.Failure(CurlExitCode.UrlMalformat, FtpTransferMessages.UploadWithoutFileName);
         }
 
+        ReportWhetherInEntryDirectory(path);
         return await SendQuotesAsync(quotes.AfterLogin).ConfigureAwait(false)
             ?? await ChangeDirectoriesAsync(path.Directories).ConfigureAwait(false)
             ?? await CheckModificationTimeAsync(path.FileName).ConfigureAwait(false)
@@ -631,6 +641,13 @@ internal sealed class FtpSession(
         TransferResult ended = await QuitAndSucceedAsync().ConfigureAwait(false);
         return ended.IsSuccess ? TransferResult.TimeConditionNotMet() : ended;
     }
+
+    /// <summary>
+    /// Reports curl 8.21.0's <see cref="FtpTransferMessages.SamePathAsPreviousTransfer" /> when
+    /// <paramref name="path" /> needs no <c>CWD</c> to reach from the entry directory (BL-945).
+    /// </summary>
+    private void ReportWhetherInEntryDirectory(FtpUrlPath path) =>
+        ReportInfo(path.IsInEntryDirectory ? FtpTransferMessages.SamePathAsPreviousTransfer : null);
 
     private void ReportInfo(string? line)
     {

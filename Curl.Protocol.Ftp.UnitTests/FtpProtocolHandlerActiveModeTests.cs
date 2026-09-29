@@ -285,7 +285,7 @@ public sealed class FtpProtocolHandlerActiveModeTests
         Assert.AreEqual(0, run.Listener.Targets.Count);
         CollectionAssert.AreEqual(
             new[] { "Could not resolve host: " + value, "failed to resolve the address provided to PORT: " + value },
-            events.Info);
+            events.InfoPastTheEntryPath);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.CouldntResolveHost, "Could not resolve host: " + value), run.Result);
     }
 
@@ -321,7 +321,7 @@ public sealed class FtpProtocolHandlerActiveModeTests
         CollectionAssert.AreEqual(
             new[] { new ListenTarget(IPAddress.Parse("192.0.2.1"), 0, 0), new ListenTarget(IPAddress.Loopback, 0, 0) },
             listener.Targets);
-        CollectionAssert.AreEqual(new[] { NotLocalLine }, events.Info.TakeWhile(line => line != "Connect data stream actively").ToArray());
+        CollectionAssert.AreEqual(new[] { NotLocalLine }, events.InfoPastTheEntryPath.TakeWhile(line => line != "Connect data stream actively").ToArray());
         Assert.AreEqual(TransferResult.Success(5), run.Result);
     }
 
@@ -335,7 +335,7 @@ public sealed class FtpProtocolHandlerActiveModeTests
         ActiveRun run = await RunAsync("/a.txt", "192.0.2.1", LoggedIn + Refused + Refused + Bye, context => context.Events = events, listener);
 
         Assert.AreEqual(LogInSent + "EPRT |1|192.0.2.1|61200|\r\nPORT 192,0,2,1,239,17\r\nQUIT\r\n", run.Sent);
-        CollectionAssert.AreEqual(new[] { NotLocalLine, NotLocalLine }, events.Info);
+        CollectionAssert.AreEqual(new[] { NotLocalLine, NotLocalLine }, events.InfoPastTheEntryPath);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.FtpPortFailed, "Failed to do PORT"), run.Result);
     }
 
@@ -350,7 +350,7 @@ public sealed class FtpProtocolHandlerActiveModeTests
 
         Assert.AreEqual(LogInSent + "QUIT\r\n", run.Sent);
         Assert.HasCount(2, listener.Targets);
-        CollectionAssert.AreEqual(new[] { NotLocalLine }, events.Info);
+        CollectionAssert.AreEqual(new[] { NotLocalLine }, events.InfoPastTheEntryPath);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.FtpPortFailed, "bind(port=0) failed: Address not available"), run.Result);
     }
 
@@ -364,7 +364,7 @@ public sealed class FtpProtocolHandlerActiveModeTests
         ActiveRun run = await RunAsync("/a.txt", "-", LoggedIn + Bye, context => context.Events = events, listener);
 
         Assert.HasCount(1, listener.Targets);
-        Assert.IsEmpty(events.Info);
+        Assert.IsEmpty(events.InfoPastTheEntryPath);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.FtpPortFailed, "bind(port=0) failed: Address not available"), run.Result);
     }
 

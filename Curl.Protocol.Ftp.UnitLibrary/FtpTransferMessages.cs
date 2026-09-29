@@ -314,6 +314,28 @@ internal static class FtpTransferMessages
     /// <returns>The line, such as <c>upload completely sent off: 14 bytes</c>.</returns>
     internal static string UploadSent(long bytesSent) => Format($"upload completely sent off: {bytesSent} bytes");
 
+    /// <summary>The <c>-v</c> line for a <c>257</c> reply to <c>PWD</c> that names no directory (BL-945).</summary>
+    internal const string FailedToFigureOutPath = "Failed to figure out path";
+
+    /// <summary>
+    /// The <c>-v</c> line before the first command after login when the URL path's
+    /// directory is the entry directory, so no <c>CWD</c> is needed (BL-945).
+    /// </summary>
+    internal const string SamePathAsPreviousTransfer = "Request has same path as previous transfer";
+
+    /// <summary>
+    /// The <c>-v</c> line curl 8.21.0 writes for a reply to <c>PWD</c> (BL-945): the
+    /// directory it named, <see cref="FailedToFigureOutPath" /> for a <c>257</c> that names
+    /// none, and none for any other reply.
+    /// </summary>
+    /// <param name="code">The reply's code.</param>
+    /// <param name="entryPath">The directory the reply named, or <see langword="null" />.</param>
+    /// <returns>The line, such as <c>Entry path is '/'</c>, or <see langword="null" /> for none.</returns>
+    internal static string? EntryPathReply(int code, string? entryPath) =>
+        entryPath is not null ? "Entry path is '" + entryPath + "'"
+        : code == 257 ? FailedToFigureOutPath
+        : null;
+
     /// <summary>The <c>-v</c> line before the end-of-transfer reply is read, or <c>ABOR</c> sent (BL-931).</summary>
     /// <param name="directory">The URL path's directories, each followed by <c>/</c>; empty for none.</param>
     /// <returns>The line, such as <c>Remembering we are in directory "dir/"</c>.</returns>

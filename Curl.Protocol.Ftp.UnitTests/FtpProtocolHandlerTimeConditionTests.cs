@@ -69,7 +69,7 @@ public sealed class FtpProtocolHandlerTimeConditionTests
         Assert.IsTrue(run.Result.TimeConditionUnmet);
         Assert.AreEqual(213, run.Report!.ResponseCode);
         Assert.HasCount(1, run.Connector.Targets);
-        CollectionAssert.AreEqual(new[] { "The requested document is not new enough" }, events.Info);
+        CollectionAssert.AreEqual(new[] { "The requested document is not new enough" }, events.InfoPastTheEntryPath);
     }
 
     [TestMethod]
@@ -93,7 +93,7 @@ public sealed class FtpProtocolHandlerTimeConditionTests
 
         Assert.AreEqual(MdtmSent + "QUIT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.TimeConditionNotMet(), run.Result);
-        CollectionAssert.AreEqual(new[] { "The requested document is not old enough" }, events.Info);
+        CollectionAssert.AreEqual(new[] { "The requested document is not old enough" }, events.InfoPastTheEntryPath);
     }
 
     [TestMethod]
@@ -293,7 +293,7 @@ public sealed class FtpProtocolHandlerTimeConditionTests
     /// <c>MDTM</c> and <c>-z</c> write.
     /// </summary>
     private static string[] BeforeDataConnection(RecordingTransferEvents events) =>
-        [.. events.Info.TakeWhile(line => line != "Connect data stream passively")];
+        [.. events.InfoPastTheEntryPath.TakeWhile(line => line != "Connect data stream passively")];
 
     private static TimeCondition IfModifiedSince(DateTimeOffset value) => new(value, TimeConditionKind.IfModifiedSince);
 

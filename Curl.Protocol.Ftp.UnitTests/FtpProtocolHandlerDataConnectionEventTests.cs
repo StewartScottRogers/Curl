@@ -46,7 +46,10 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
         "< 230 Logged in\r\n",
         "> PWD\r\n",
         "< 257 \"/\" is current directory\r\n",
+        "* Entry path is '/'",
     ];
+
+    private const string SamePath = "* Request has same path as previous transfer";
 
     private static readonly string[] EpsvTranscript =
     [
@@ -101,6 +104,7 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
         string[] expected =
         [
             .. LoggedInTranscript,
+            SamePath,
             "> EPRT |1|127.0.0.1|55822|\r\n",
             "< 200 EPRT command successful\r\n",
             "* Connect data stream actively",
@@ -136,7 +140,7 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
 
         CollectionAssert.AreEqual(
             new[] { "Connection accepted from server", "Remembering we are in directory \"\"" },
-            run.Events.Info.Skip(5).Take(2).ToArray());
+            run.Events.Info.Skip(7).Take(2).ToArray());
     }
 
     [TestMethod]
@@ -155,7 +159,7 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
 
         CollectionAssert.AreEqual(
             new[] { "> PORT 127,0,0,1,218,14\r\n", "< 200 PORT command successful\r\n", "* Connect data stream actively" },
-            run.Events.Transcript.Skip(7).Take(3).ToArray());
+            run.Events.Transcript.Skip(9).Take(3).ToArray());
     }
 
     [TestMethod]
@@ -171,6 +175,7 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
         string[] expected =
         [
             .. LoggedInTranscript,
+            SamePath,
             .. EpsvTranscript,
             "> TYPE I\r\n",
             "< 200 Type set\r\n",
@@ -206,7 +211,7 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
             "< " + Complete,
             "* Connection #0 to host 127.0.0.1:47931 left intact",
         ];
-        CollectionAssert.AreEqual(expected, run.Events.Transcript.Skip(15).ToArray());
+        CollectionAssert.AreEqual(expected, run.Events.Transcript.Skip(16).ToArray());
         CollectionAssert.AreEqual(new[] { File, string.Empty }, run.Events.DataReceived);
     }
 
@@ -241,7 +246,7 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
             "* Connecting to 127.0.0.1 port 64816",
             "> TYPE I\r\n",
         ];
-        CollectionAssert.AreEqual(expected, run.Events.Transcript.Skip(7).Take(6).ToArray());
+        CollectionAssert.AreEqual(expected, run.Events.Transcript.Skip(9).Take(6).ToArray());
     }
 
     [TestMethod]
@@ -261,7 +266,7 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
             "* Skip 127.0.0.1 for data connection, reuse 127.0.0.1 instead",
             "* Connecting to 127.0.0.1 port 64816",
         ];
-        CollectionAssert.AreEqual(expected, run.Events.Transcript.Skip(7).Take(8).ToArray());
+        CollectionAssert.AreEqual(expected, run.Events.Transcript.Skip(9).Take(8).ToArray());
     }
 
     [TestMethod]
@@ -279,7 +284,7 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
 
         CollectionAssert.AreEqual(
             new[] { "< " + Pasv, "* Connecting to 127.0.0.1 port 64816", "> TYPE I\r\n" },
-            run.Events.Transcript.Skip(9).Take(3).ToArray());
+            run.Events.Transcript.Skip(11).Take(3).ToArray());
     }
 
     [TestMethod]
@@ -288,8 +293,8 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
         // curl -v --disable-epsv ftp://localhost:47934/file.txt: the control connection went to 127.0.0.1.
         DataRun run = await RunAsync("/file.txt", LoggedIn + Pasv + Retrieved, context => context.FtpDisableEpsv = true, host: "localhost", controlPeer: new IPEndPoint(IPAddress.Loopback, ControlPort));
 
-        Assert.AreEqual("Skip 127.0.0.1 for data connection, reuse localhost instead", run.Events.Info[1]);
-        Assert.AreEqual("Connecting to 127.0.0.1 port 64816", run.Events.Info[2]);
+        Assert.AreEqual("Skip 127.0.0.1 for data connection, reuse localhost instead", run.Events.Info[3]);
+        Assert.AreEqual("Connecting to 127.0.0.1 port 64816", run.Events.Info[4]);
         Assert.AreEqual("Connection #0 to host localhost:47931 left intact", run.Events.Info[^1]);
     }
 
@@ -298,7 +303,7 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
     {
         DataRun run = await RunAsync("/file.txt", LoggedIn + Epsv + Retrieved, _ => { }, host: "localhost");
 
-        Assert.AreEqual("Connecting to localhost port 55801", run.Events.Info[1]);
+        Assert.AreEqual("Connecting to localhost port 55801", run.Events.Info[3]);
     }
 
     [TestMethod]
@@ -310,7 +315,7 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
             _ => { },
             controlPeer: new IPEndPoint(IPAddress.Loopback.MapToIPv6(), ControlPort));
 
-        Assert.AreEqual("Connecting to 127.0.0.1 port 55801", run.Events.Info[1]);
+        Assert.AreEqual("Connecting to 127.0.0.1 port 55801", run.Events.Info[3]);
     }
 
     [TestMethod]
@@ -334,7 +339,7 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
             "* partial download completed, closing connection",
             "* shutting down connection #3",
         ];
-        CollectionAssert.AreEqual(expected, run.Events.Transcript.Skip(17).ToArray());
+        CollectionAssert.AreEqual(expected, run.Events.Transcript.Skip(19).ToArray());
     }
 
     [TestMethod]
@@ -358,7 +363,7 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
             "* Maxdownload = -1",
             "* Getting file with size: 8",
         ];
-        CollectionAssert.AreEqual(expected, run.Events.Transcript.Skip(14).Take(8).ToArray());
+        CollectionAssert.AreEqual(expected, run.Events.Transcript.Skip(16).Take(8).ToArray());
     }
 
     [TestMethod]
@@ -367,7 +372,7 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
         // curl -v ftp://127.0.0.1:47931/file.txt, SIZE answered 500 no
         DataRun run = await RunAsync("/file.txt", LoggedIn + Epsv + "200 Type set\r\n500 no\r\n" + Opened + Complete + Bye, _ => { });
 
-        Assert.AreEqual("Getting file with size: -1", run.Events.Info[3]);
+        Assert.AreEqual("Getting file with size: -1", run.Events.Info[5]);
     }
 
     [TestMethod]

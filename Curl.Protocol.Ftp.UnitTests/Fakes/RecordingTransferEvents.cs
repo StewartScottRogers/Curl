@@ -13,6 +13,17 @@ public sealed class RecordingTransferEvents : ITransferEvents
     public List<string> Info { get; } = [];
 
     /// <summary>
+    /// Gets <see cref="Info" /> without the lines about the entry path - <c>Entry path is</c>,
+    /// <c>Failed to figure out path</c> and <c>Request has same path as previous transfer</c>
+    /// (BL-945) - for tests that pin the lines a later step reports.
+    /// </summary>
+    public string[] InfoPastTheEntryPath =>
+    [
+        .. Info.Where(line => !line.StartsWith("Entry path is '", StringComparison.Ordinal)
+            && line is not "Failed to figure out path" and not "Request has same path as previous transfer"),
+    ];
+
+    /// <summary>
     /// Gets every information line, header and data block reported, in order, as Latin-1
     /// text: an information line prefixed <c>"* "</c>, a header as in <see cref="Headers" />,
     /// data received <c>"&lt;= "</c> and data sent <c>"=&gt; "</c>.
