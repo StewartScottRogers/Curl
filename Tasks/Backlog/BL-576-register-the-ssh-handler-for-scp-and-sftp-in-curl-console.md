@@ -37,6 +37,10 @@ completed:
   is filed as BL-952 (touches the SSH library and its tests, which BL-568 in `Doing` holds)
   and this task now depends on it. BL-952 also exposes the in-memory SSH peer this task's
   `Curl.Console.UnitTests` need. No code was changed by this run.
+- From BL-568 (ADR-0230): `publickey` runs only when `SshUserAuthentication` is given an
+  `SshUserKeySource` built from the transfer's `SshOptions`, the file system,
+  `Environment.GetEnvironmentVariable` and ADR-0022's credential encoding; without one it
+  is skipped.
 
 ## Log
 
