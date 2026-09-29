@@ -30,6 +30,9 @@ internal sealed class Tls13TestServer(TestServerCredential credential)
 
     public bool RequestClientCertificate { get; init; }
 
+    /// <summary>Gets the data of the <c>quic_transport_parameters</c> extension EncryptedExtensions carries, or <see langword="null" /> to send none.</summary>
+    public byte[]? QuicTransportParameters { get; init; }
+
     public IReadOnlyList<ushort> ClientCertificateSchemes { get; init; } =
         [TlsSignatureScheme.Ed25519, TlsSignatureScheme.EcdsaSecp256r1Sha256, TlsSignatureScheme.RsaPssRsaeSha256];
 
@@ -140,6 +143,11 @@ internal sealed class Tls13TestServer(TestServerCredential credential)
         if (ApplicationProtocol is not null && Find(hello.Extensions, TlsExtensionType.ApplicationLayerProtocolNegotiation) is not null)
         {
             extensions.Add(ApplicationLayerProtocolNegotiationExtension.Encode([ApplicationProtocol]));
+        }
+
+        if (QuicTransportParameters is not null)
+        {
+            extensions.Add(QuicTransportParametersExtension.Encode(QuicTransportParameters));
         }
 
         return extensions;

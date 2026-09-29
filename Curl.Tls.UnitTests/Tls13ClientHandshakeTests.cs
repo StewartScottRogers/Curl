@@ -128,6 +128,18 @@ public sealed class Tls13ClientHandshakeTests
 
         Assert.IsTrue(Run(client, server).IsComplete);
         Assert.AreEqual("http/1.1", client.ApplicationProtocol);
+        Assert.IsNull(client.ServerQuicTransportParameters);
+    }
+
+    [TestMethod]
+    public void HandshakeReportsTheServersQuicTransportParameters()
+    {
+        byte[] parameters = [0x04, 0x01, 0x20];
+        Tls13TestServer server = new(TestServerCredential.Ed25519()) { QuicTransportParameters = parameters };
+        using Tls13ClientHandshake client = Client(DefaultSettings with { FixedExtensions = [QuicTransportParametersExtension.Encode([0x05, 0x01, 0x10])] });
+
+        Assert.IsTrue(Run(client, server).IsComplete);
+        CollectionAssert.AreEqual(parameters, client.ServerQuicTransportParameters);
     }
 
     [TestMethod]

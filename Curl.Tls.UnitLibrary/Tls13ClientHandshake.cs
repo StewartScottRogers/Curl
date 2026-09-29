@@ -86,6 +86,13 @@ public sealed class Tls13ClientHandshake : IDisposable
     /// <summary>Gets the ALPN protocol the server chose, or <see langword="null" /> when it chose none.</summary>
     public string? ApplicationProtocol { get; private set; }
 
+    /// <summary>
+    /// Gets the data of the server's <c>quic_transport_parameters</c> extension (RFC 9001
+    /// section 8.2) once its EncryptedExtensions has arrived, or <see langword="null" /> when
+    /// it sent none. QUIC (<c>Curl.Quic</c>) decodes and checks them.
+    /// </summary>
+    public byte[]? ServerQuicTransportParameters { get; private set; }
+
     /// <summary>Gets the server's DER certificates, leaf first, once its Certificate has arrived.</summary>
     public IReadOnlyList<byte[]> ServerCertificates { get; private set; } = [];
 
@@ -444,6 +451,7 @@ public sealed class Tls13ClientHandshake : IDisposable
             return alert;
         }
 
+        ServerQuicTransportParameters = FindExtension(extensions, TlsExtensionType.QuicTransportParameters);
         Transcript.Append(encoded);
         state = State.WaitCertificateOrRequest;
         return null;
