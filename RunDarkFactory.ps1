@@ -17,7 +17,7 @@
     assigned to him, a run that stalled - it fills the screen with a flashing ASCII banner
     and raises an alarm that escalates until a key is pressed:
 
-      0-2 min    chime and "Stewart, the dark factory needs your input" every 30 s
+      0-2 min    chime and "Stewart, the Curl dark factory needs your input" every 30 s
       2-5 min    chime and the waiting tasks read aloud every 15 s
       5-15 min   siren and slower speech every 10 s; volume raised to -AlarmMaxVolume, unmuted
       15 min+    siren and speech every 5 s
@@ -673,7 +673,7 @@ function Show-Banner {
     $width = 78
     try { Clear-Host } catch { }
     $lines = @('') + (Get-BigText 'STEWART!') + @('') + (Get-BigText 'INPUT NEEDED') + @('')
-    $lines += '  The dark factory is waiting on you.  ' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
+    $lines += '  The Curl dark factory is waiting on you.  ' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
     $lines += ''
     $lines += ($Reasons | Select-Object -First 8 | ForEach-Object { '  ' + (Get-Short $_ 74) })
     $lines += ''
@@ -757,14 +757,18 @@ function Get-Spoken {
     return $id + $text
 }
 
+# What the voice calls this factory. The Surl dark factory runs on the same PC with the same
+# voice, so everything said aloud names Curl (Stewart, 2026-09-29, BL-901).
+$SpokenName = 'the Curl dark factory'
+
 function Get-AlarmSpeech {
     param([string[]]$Reasons, [int]$Stage)
-    if ($Stage -eq 0) { return 'Stewart, the dark factory needs your input.' }
+    if ($Stage -eq 0) { return "Stewart, $SpokenName needs your input." }
     $n = $Reasons.Count
     $what = if ($n -eq 1) { 'One item is' } else { "$n items are" }
     $first = ($Reasons | Select-Object -First 2 | ForEach-Object { Get-Spoken $_ }) -join '. Then, '
-    if ($Stage -eq 1) { return "Stewart. $what waiting on you. $first." }
-    return "Stewart! Stewart! The dark factory has stopped. $what waiting on you. $first. Press any key at the terminal."
+    if ($Stage -eq 1) { return "Stewart. $SpokenName. $what waiting on you. $first." }
+    return "Stewart! Stewart! $SpokenName has stopped. $what waiting on you. $first. Press any key at the terminal."
 }
 
 function Invoke-Chime { try { [Console]::Beep(880, 300); [Console]::Beep(660, 300); [Console]::Beep(880, 450) } catch { } }
@@ -1344,13 +1348,13 @@ function Update-LimitNotice {
         $n.Reset = $latest; $n.Warned = $false; $n.Resumed = $false
         $left = $reset - (Get-Date)
         Show-LimitNotice 'OUT OF TOKENS' "Out of tokens at $(Get-Date -Format 'HH:mm'). New session starts at $at, in $(Format-Span $left)." `
-            "Stewart, the dark factory is out of tokens. The new session starts at $($reset.ToString('h:mm tt')), in $(Format-SpokenSpan $left)." 'Yellow'
+            "Stewart, $SpokenName is out of tokens. The new session starts at $($reset.ToString('h:mm tt')), in $(Format-SpokenSpan $left)." 'Yellow'
     }
     $resumed = @($lines | Where-Object { $_ -match "^resumed $latest \S+$" } | ForEach-Object { ($_ -split ' ')[2] })
     if (-not $n.Resumed -and $resumed.Count) {
         $n.Resumed = $true; $n.Warned = $true
         Show-LimitNotice 'NEW SESSION STARTED' "Started using the new session at $(Get-Date -Format 'HH:mm'); resuming $($resumed[0])." `
-            "Stewart, the new session has started. The dark factory is working again." 'Green'
+            "Stewart, the new session has started. $SpokenName is working again." 'Green'
         try { $Host.UI.RawUI.WindowTitle = if ($AutoLanes -or $LaneCount -gt 1) { "Dark factory - $LaneCount lanes" } else { 'Dark factory - running' } } catch { }
         return
     }
@@ -1359,7 +1363,7 @@ function Update-LimitNotice {
     if (-not $n.Warned -and $left.TotalSeconds -le $LimitWarnSeconds) {
         $n.Warned = $true
         Show-LimitNotice 'NEW SESSION SOON' "The new session starts at $at, in $(Format-Span $left)." `
-            "Stewart, the new session will be ready in about $(Format-SpokenSpan $left)." 'Cyan'
+            "Stewart, the new session for $SpokenName will be ready in about $(Format-SpokenSpan $left)." 'Cyan'
     }
     try { $Host.UI.RawUI.WindowTitle = "Dark factory - out of tokens, new session at $at (in $(Format-Span $left))" } catch { }
 }

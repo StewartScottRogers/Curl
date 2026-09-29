@@ -26,10 +26,10 @@ and the out-of-tokens notices said "the dark factory", and the whisper hook's mi
 
 ## Acceptance criteria
 
-- [ ] `Get-AlarmSpeech` and the three spoken out-of-tokens notices say "the Curl dark
+- [x] `Get-AlarmSpeech` and the three spoken out-of-tokens notices say "the Curl dark
       factory", or start with "Curl", through one `$SpokenName` variable.
-- [ ] Every whisper phrase from `.claude/hooks/whisper-milestone.ps1` starts with "Curl.".
-- [ ] Both scripts parse, and the factory's self-checks pass.
+- [x] Every whisper phrase from `.claude/hooks/whisper-milestone.ps1` starts with "Curl.".
+- [x] Both scripts parse, and the factory's self-checks pass.
 
 ## Notes
 
