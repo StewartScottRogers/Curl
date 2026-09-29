@@ -63,9 +63,15 @@ Namespace `Curl.Cryptography`. It holds:
 - `AesCbcCts` (public, `IDisposable`): CBC with ciphertext stealing as RFC 3962 defines
   it for Kerberos, on the BCL's AES-CBC - `Encrypt` and `Decrypt` of a message of at
   least one block; a longer one always has its last two blocks swapped (CBC-CS3).
-- `MontgomeryModulus` (internal): arithmetic modulo a public odd modulus on 32-bit limbs
-  - CIOS Montgomery multiplication with a masked final subtraction, and a fixed 4-bit
-  window exponentiation whose table look-up reads all 16 entries.
+- `MontgomeryModulus` (internal): arithmetic modulo an odd modulus, public or secret, on
+  32-bit limbs - CIOS Montgomery multiplication with a masked final subtraction, a fixed
+  4-bit window exponentiation whose table look-up reads all 16 entries, `Reduce` of any
+  length, `Subtract`, `MultiplyModulo`, `IsBelowModulus` and `Clear`. Its set-up doubles
+  1 by masked additions, never dividing by the modulus (ADR-0193).
+- `RsaCrtPrivateKey` (public, `IDisposable`): PKCS #1's RSASP1, m^d mod n on the key's CRT
+  values - `ApplyPrivateExponent`, with and without the blinding bytes, blinded by r^e
+  and r^-1 (by Fermat), and checked against e before the result is written. TLS 1.0 and
+  1.1's MD5 + SHA-1 RSA signature uses it (ADR-0193). Constant-time.
 - `FiniteFieldDiffieHellmanGroup` (public): p and g - `Group1`, `Group2` (RFC 2409),
   `Group14`, `Group16`, `Group18` (RFC 3526), `Ffdhe2048` to `Ffdhe8192` (RFC 7919), and
   `TryCreate` for an SSH group-exchange group, `false` for an even p, p below 2^8, or g

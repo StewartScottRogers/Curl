@@ -62,6 +62,66 @@ public sealed class MontgomeryModulusTests
         Assert.AreEqual(expected, ToInteger(result));
     }
 
+    [TestMethod]
+    [DataRow("")]
+    [DataRow("05")]
+    [DataRow("07FFFFFFFFFFFFFFFFFFFFFFFFFF")]
+    [DataRow("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF")]
+    public void Reduce_ValueOfAnyLength_EqualsTheBigIntegerRemainder(string value)
+    {
+        var modulus = new MontgomeryModulus(Modulus);
+        byte[] bytes = Convert.FromHexString(value);
+        uint[] limbs = new uint[(bytes.Length + 3) / 4];
+        MontgomeryModulus.ToLimbs(bytes, limbs);
+        uint[] result = new uint[modulus.LimbCount];
+
+        modulus.Reduce(limbs, result);
+
+        Assert.AreEqual(ToInteger(bytes) % ToInteger(Modulus), ToInteger(result));
+    }
+
+    [TestMethod]
+    [DataRow("05", "03")]
+    [DataRow("03", "05")]
+    [DataRow("00", "07FFFFFFFFFFFFFFFFFFFFFFFFFE")]
+    public void Subtract_OperandsBelowTheModulus_EqualsTheDifferenceModuloTheModulus(string left, string right)
+    {
+        var modulus = new MontgomeryModulus(Modulus);
+        BigInteger p = ToInteger(Modulus);
+        uint[] result = new uint[modulus.LimbCount];
+
+        modulus.Subtract(result, Limbs(modulus, left), Limbs(modulus, right));
+
+        BigInteger expected = ((ToInteger(Convert.FromHexString(left)) - ToInteger(Convert.FromHexString(right))) % p + p) % p;
+        Assert.AreEqual(expected, ToInteger(result));
+    }
+
+    [TestMethod]
+    [DataRow("07FFFFFFFFFFFFFFFFFFFFFFFFFE", "07FFFFFFFFFFFFFFFFFFFFFFFFFE")]
+    [DataRow("FFFFFFFFFFFFFFFFFFFFFFFFFFFF", "0123456789")]
+    public void MultiplyModulo_LeftBelowRRightBelowTheModulus_EqualsTheProductModuloTheModulus(string left, string right)
+    {
+        var modulus = new MontgomeryModulus(Modulus);
+        uint[] result = new uint[modulus.LimbCount];
+
+        modulus.MultiplyModulo(result, Limbs(modulus, left), Limbs(modulus, right));
+
+        Assert.AreEqual(ToInteger(Convert.FromHexString(left)) * ToInteger(Convert.FromHexString(right)) % ToInteger(Modulus), ToInteger(result));
+    }
+
+    [TestMethod]
+    [DataRow("07FFFFFFFFFFFFFFFFFFFFFFFFFE", true)]
+    [DataRow("07FFFFFFFFFFFFFFFFFFFFFFFFFF", false)]
+    [DataRow("080000000000000000000000000000", false)]
+    public void IsBelowModulus_Value_IsTrueOnlyBelowTheModulus(string value, bool expected)
+    {
+        var modulus = new MontgomeryModulus(Modulus);
+        uint[] limbs = new uint[modulus.LimbCount];
+        MontgomeryModulus.ToLimbs(Convert.FromHexString(value.PadLeft(28, '0')), limbs);
+
+        Assert.AreEqual(expected, modulus.IsBelowModulus(limbs));
+    }
+
     private static uint[] Limbs(MontgomeryModulus modulus, string hex)
     {
         uint[] limbs = new uint[modulus.LimbCount];

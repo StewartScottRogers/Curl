@@ -1,19 +1,22 @@
-using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 
 namespace Curl.Cryptography;
 
 /// <summary>
-/// Arithmetic modulo a public odd modulus in Montgomery form, on fixed-width 32-bit limbs
+/// Arithmetic modulo an odd modulus in Montgomery form, on fixed-width 32-bit limbs
 /// stored least significant first: multiplication by coarsely integrated operand scanning
-/// (CIOS) with a masked final subtraction, and a fixed-window exponentiation whose table
-/// look-up reads every entry. <see cref="FiniteFieldDiffieHellman" /> runs on it.
+/// (CIOS) with a masked final subtraction, modular addition, subtraction and reduction,
+/// and a fixed-window exponentiation whose table look-up reads every entry.
+/// <see cref="FiniteFieldDiffieHellman" /> runs on it with a public prime, and
+/// <see cref="RsaCrtPrivateKey" /> with the secret primes of an RSA key.
 /// </summary>
 /// <remarks>
-/// Constant-time in the operands and the exponent: every loop bound is the limb count or
-/// the exponent's byte length, both public, and a secret only ever becomes a mask. The
-/// modulus itself is public, so its set-up uses <see cref="BigInteger" />.
+/// Constant-time in the operands, the exponent and the modulus's value: every loop bound
+/// is the limb count or a byte length, both public, and a secret only ever becomes a mask.
+/// The set-up derives R mod m and R^2 mod m by doubling 1 with masked modular additions,
+/// so it never divides by the modulus either. <see cref="Clear" /> zeroes the modulus and
+/// its derived values when the modulus is a secret.
 /// </remarks>
 internal sealed class MontgomeryModulus
 {
@@ -29,16 +32,19 @@ internal sealed class MontgomeryModulus
     private readonly uint negativeInverse;
 
     /// <summary>Prepares the arithmetic modulo the odd big-endian <paramref name="modulusBigEndian" />.</summary>
-    /// <param name="modulusBigEndian">An odd modulus greater than 1, without leading zero bytes.</param>
+    /// <param name="modulusBigEndian">An odd modulus greater than 1; leading zero bytes only widen the limbs.</param>
     public MontgomeryModulus(ReadOnlySpan<byte> modulusBigEndian)
     {
         LimbCount = (modulusBigEndian.Length + 3) / 4;
         modulus = new uint[LimbCount];
         ToLimbs(modulusBigEndian, modulus);
-        var value = new BigInteger(modulusBigEndian, isUnsigned: true, isBigEndian: true);
-        BigInteger r = BigInteger.One << (32 * LimbCount);
-        rSquared = FromBigInteger(r * r % value);
-        one = FromBigInteger(r % value);
+        one = new uint[LimbCount];
+        rSquared = new uint[LimbCount];
+        uint[] scratch = new uint[LimbCount + 2];
+        one[0] = 1;
+        DoubleRepeatedly(one, 32 * LimbCount, scratch);
+        one.CopyTo(rSquared, 0);
+        DoubleRepeatedly(rSquared, 32 * LimbCount, scratch);
         negativeInverse = ComputeNegativeInverse(modulus[0]);
     }
 
@@ -131,6 +137,115 @@ internal sealed class MontgomeryModulus
     }
 
     /// <summary>
+    /// Sets <paramref name="result" /> to <paramref name="left" /> * <paramref name="right" />
+    /// modulo the modulus, in ordinary form: a Montgomery multiplication, then one by R^2.
+    /// <paramref name="result" /> may alias either operand.
+    /// </summary>
+    /// <param name="result">Receives the product.</param>
+    /// <param name="left">The first operand, below R = 2^(32 * <see cref="LimbCount" />).</param>
+    /// <param name="right">The second operand, below the modulus.</param>
+    public void MultiplyModulo(Span<uint> result, ReadOnlySpan<uint> left, ReadOnlySpan<uint> right)
+    {
+        uint[] scratch = new uint[LimbCount + 2];
+        try
+        {
+            Multiply(result, left, right, scratch);
+            Multiply(result, result, rSquared, scratch);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(MemoryMarshal.AsBytes(scratch.AsSpan()));
+        }
+    }
+
+    /// <summary>
+    /// Sets <paramref name="result" /> to <paramref name="value" /> modulo the modulus, for a
+    /// value of any number of limbs: Horner's rule over chunks of <see cref="LimbCount" />
+    /// limbs, each chunk moved into Montgomery form and the running sum multiplied by R.
+    /// </summary>
+    /// <param name="value">The little-endian limbs to reduce.</param>
+    /// <param name="result">Receives the residue, <see cref="LimbCount" /> limbs.</param>
+    public void Reduce(ReadOnlySpan<uint> value, Span<uint> result)
+    {
+        int n = LimbCount;
+        uint[] work = new uint[(4 * n) + 2];
+        Span<uint> sum = work.AsSpan(0, n);
+        Span<uint> chunk = work.AsSpan(n, n);
+        Span<uint> term = work.AsSpan(2 * n, n);
+        Span<uint> scratch = work.AsSpan(3 * n);
+        try
+        {
+            for (int start = (value.Length - 1) / n * n; start >= 0; start -= n)
+            {
+                chunk.Clear();
+                value.Slice(start, Math.Min(n, value.Length - start)).CopyTo(chunk);
+                Multiply(sum, sum, rSquared, scratch);
+                Multiply(term, chunk, rSquared, scratch);
+                Add(sum, sum, term, scratch);
+            }
+
+            term.Clear();
+            term[0] = 1;
+            Multiply(result, sum, term, scratch);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(MemoryMarshal.AsBytes(work.AsSpan()));
+        }
+    }
+
+    /// <summary>
+    /// Sets <paramref name="result" /> to <paramref name="left" /> - <paramref name="right" />
+    /// modulo the modulus, adding the modulus back by mask when the subtraction borrowed.
+    /// <paramref name="result" /> may alias either operand.
+    /// </summary>
+    /// <param name="result">Receives the difference.</param>
+    /// <param name="left">The minuend, below the modulus.</param>
+    /// <param name="right">The subtrahend, below the modulus.</param>
+    public void Subtract(Span<uint> result, ReadOnlySpan<uint> left, ReadOnlySpan<uint> right)
+    {
+        int n = LimbCount;
+        ulong borrow = 0;
+        for (int index = 0; index < n; index++)
+        {
+            ulong difference = (ulong)left[index] - right[index] - borrow;
+            result[index] = (uint)difference;
+            borrow = difference >> 63;
+        }
+
+        uint addBack = 0u - (uint)borrow;
+        ulong carry = 0;
+        for (int index = 0; index < n; index++)
+        {
+            ulong sum = result[index] + (ulong)(modulus[index] & addBack) + carry;
+            result[index] = (uint)sum;
+            carry = sum >> 32;
+        }
+    }
+
+    /// <summary>Returns whether <paramref name="value" />, <see cref="LimbCount" /> limbs, is below the modulus: whether subtracting the modulus borrows.</summary>
+    /// <param name="value">The value to compare.</param>
+    /// <returns><see langword="true" /> when the value is below the modulus.</returns>
+    public bool IsBelowModulus(ReadOnlySpan<uint> value)
+    {
+        ulong borrow = 0;
+        for (int index = 0; index < LimbCount; index++)
+        {
+            borrow = ((ulong)value[index] - modulus[index] - borrow) >> 63;
+        }
+
+        return borrow != 0;
+    }
+
+    /// <summary>Zeroes the modulus and the values derived from it, for a modulus that is a secret.</summary>
+    public void Clear()
+    {
+        CryptographicOperations.ZeroMemory(MemoryMarshal.AsBytes(modulus.AsSpan()));
+        CryptographicOperations.ZeroMemory(MemoryMarshal.AsBytes(rSquared.AsSpan()));
+        CryptographicOperations.ZeroMemory(MemoryMarshal.AsBytes(one.AsSpan()));
+    }
+
+    /// <summary>
     /// Returns -m^-1 modulo 2^32 for the odd lowest limb <paramref name="lowestLimb" />, by
     /// Newton's iteration, which doubles the correct low bits each step (1, 2, 4, ... 32).
     /// </summary>
@@ -161,12 +276,35 @@ internal sealed class MontgomeryModulus
         }
     }
 
-    private uint[] FromBigInteger(BigInteger value)
+    /// <summary>Doubles <paramref name="value" />, below the modulus, <paramref name="times" /> times modulo the modulus.</summary>
+    private void DoubleRepeatedly(Span<uint> value, int times, Span<uint> scratch)
     {
-        uint[] limbs = new uint[LimbCount];
-        byte[] bytes = value.ToByteArray(isUnsigned: true, isBigEndian: true);
-        ToLimbs(bytes, limbs);
-        return limbs;
+        for (int step = 0; step < times; step++)
+        {
+            Add(value, value, value, scratch);
+        }
+    }
+
+    /// <summary>
+    /// Sets <paramref name="result" /> to <paramref name="left" /> + <paramref name="right" />
+    /// modulo the modulus, both below it, subtracting the modulus by mask. <paramref name="result" />
+    /// may alias either operand.
+    /// </summary>
+    private void Add(Span<uint> result, ReadOnlySpan<uint> left, ReadOnlySpan<uint> right, Span<uint> scratch)
+    {
+        int n = LimbCount;
+        Span<uint> total = scratch[..(n + 2)];
+        ulong carry = 0;
+        for (int index = 0; index < n; index++)
+        {
+            ulong sum = left[index] + (ulong)right[index] + carry;
+            total[index] = (uint)sum;
+            carry = sum >> 32;
+        }
+
+        total[n] = (uint)carry;
+        total[n + 1] = 0;
+        SubtractModulusIfNotBelow(result, total);
     }
 
     /// <summary>Fills the table with base^0 to base^15 in Montgomery form.</summary>
