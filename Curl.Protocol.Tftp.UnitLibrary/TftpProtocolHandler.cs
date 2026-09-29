@@ -45,6 +45,12 @@ namespace Curl.Protocol.Tftp;
 /// <c>tftp</c> component (<see cref="TftpTransferLog" />).
 /// </para>
 /// <para>
+/// For <c>-v</c> and <c>--trace</c>, a transfer whose channel opened reports curl 8.21.0's
+/// lines to <see cref="ITransferContext.Events" />: the connect lines, the timeouts, the
+/// options an OACK carried, a retransmission, an ERROR packet's text, each downloaded
+/// block as data received, and the connection's shutdown (<see cref="TftpTransferEvents" />).
+/// </para>
+/// <para>
 /// A download or an upload re-sends its last packet to a silent server on curl's
 /// schedule and ends with exit 7 when the read or write request goes unanswered, exit
 /// 28 when the server falls silent mid-transfer or
@@ -151,12 +157,18 @@ public sealed class TftpProtocolHandler(
             return TransferResult.Failure(opened.ExitCode, opened.ErrorMessage!);
         }
 
+        var events = new TftpTransferEvents(context.Events);
+        events.Connected(context.Url.IdnHost, channel.ServerEndPoint);
+        TransferResult result;
         await using (channel.ConfigureAwait(false))
         {
-            return context.Upload is { } upload
+            result = context.Upload is { } upload
                 ? await new TftpUpload(context, channel, upload, startTimestamp).RunAsync(fileName).ConfigureAwait(false)
                 : await new TftpDownload(context, channel, startTimestamp).RunAsync(fileName).ConfigureAwait(false);
         }
+
+        events.ShuttingDown();
+        return result;
     }
 
     // Sends the MASQUE request to the proxy, when there is a connector to reach it, and

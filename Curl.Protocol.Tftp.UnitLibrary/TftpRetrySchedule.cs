@@ -7,7 +7,8 @@ namespace Curl.Protocol.Tftp;
 /// </summary>
 /// <param name="retryLimit">The value of <see cref="RetryLimit" />.</param>
 /// <param name="retrySeconds">The value of <see cref="RetrySeconds" />.</param>
-internal readonly struct TftpRetrySchedule(int retryLimit, int retrySeconds)
+/// <param name="timeLeftMilliseconds">The value of <see cref="TimeLeftMilliseconds" />.</param>
+internal readonly struct TftpRetrySchedule(int retryLimit, int retrySeconds, long timeLeftMilliseconds = 0)
 {
     /// <summary>The seconds the schedule is derived from when no time limit applies.</summary>
     private const long UnlimitedTimeoutSeconds = 15;
@@ -35,6 +36,12 @@ internal readonly struct TftpRetrySchedule(int retryLimit, int retrySeconds)
     internal TimeSpan ResendInterval => TimeSpan.FromSeconds(RetrySeconds + 1);
 
     /// <summary>
+    /// Gets the whole milliseconds left when the schedule was derived, 0 when no limit
+    /// applies: the <c>Total</c> curl's <c>set timeouts</c> line reports.
+    /// </summary>
+    internal long TimeLeftMilliseconds { get; } = timeLeftMilliseconds;
+
+    /// <summary>
     /// Derives the schedule from the time the transfer has left.
     /// </summary>
     /// <param name="timeLeft">
@@ -52,6 +59,9 @@ internal readonly struct TftpRetrySchedule(int retryLimit, int retrySeconds)
             ? ((long)left.TotalMilliseconds + 500) / 1000
             : UnlimitedTimeoutSeconds;
         var retryLimit = (int)Math.Clamp(timeoutSeconds / 5, 3, 50);
-        return new TftpRetrySchedule(retryLimit, (int)Math.Max(1, timeoutSeconds / retryLimit));
+        return new TftpRetrySchedule(
+            retryLimit,
+            (int)Math.Max(1, timeoutSeconds / retryLimit),
+            (long)(timeLeft?.TotalMilliseconds ?? 0));
     }
 }
