@@ -57,3 +57,4 @@ completed:
 - 2026-09-28: Created.
 - 2026-09-29: Backlog -> Doing.
 - 2026-09-29: Doing -> Backlog. Needs Curl.Networking.UnitLibrary and Curl.Networking.UnitTests (their tests treat TLS_AES_128_CCM_SHA256 as unrunnable), which BL-819 in Doing touches
+- 2026-09-29: Backlog -> Doing.
