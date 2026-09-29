@@ -40,3 +40,4 @@ Out of scope: `-Z` multiplexing of concurrent transfers over one connection (BL-
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
