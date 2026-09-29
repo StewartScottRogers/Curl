@@ -108,9 +108,10 @@ know.
    `dotnet build <root> -nologo -v q --no-incremental --artifacts-path <LanesDir>\probe\<i>`
    builds of the same checkout. No worktrees are needed.
    - Each step records the wall time and the lowest free physical memory seen.
-   - `machineCap` is the largest `k` whose wall time is at most 4.0 times the one-build
-     time and whose free memory stayed at least 20% of RAM (and whose builds all
-     succeeded), and at least 1. (It was 2.0 times and 10% until the BL-807 amendment.)
+   - `machineCap` is the largest `k` whose builds all succeeded and whose free memory
+     stayed at least 20% of RAM, and at least 1. Wall time is recorded but decides
+     nothing (BL-812 amendment). It was 2.0 times the one-build time and 10% free until
+     BL-807, then 4.0 times and 20% until BL-812.
    - The probe stops at the first `k` that fails either test, or at 16, the hard lane
      maximum.
    - A probe cut short by `-ProbeMaxLanes` before any step failed is marked incomplete.
@@ -118,7 +119,7 @@ know.
 
      ```json
      { "schema": 1, "probedAt": "2026-09-28T14:02:11Z", "logicalProcessors": 32, "memoryGB": 125.6,
-       "complete": true, "cap": 7, "rule": "wall <= 4.0x one build and free memory >= 20%",
+       "complete": true, "cap": 7, "rule": "every build succeeds and free memory >= 20%",
        "steps": [ { "lanes": 1, "seconds": 61.2, "slowdown": 1.0, "minFreeMemoryPercent": 71.3, "succeeded": true } ] }
      ```
 
@@ -281,3 +282,19 @@ Two changes make the step steadier:
 
 Ceilings (board capacity, machine cap, `-MaxLanes`) are exact rather than measured, so
 they still retire a lane at once.
+
+## Amendment 2026-09-28: memory alone caps the machine (BL-812)
+
+Stewart said "cap by memory". BL-807's 4x knee still capped this PC at 3.
+
+The 19:18 probe measured one build at 9.0 s, against 13.6 s in the first probe. Four
+builds then took 41.4 s, which is 4.60x, with 63.8% of memory still free. A slowdown
+ratio swings with its one-build baseline. It also measures lanes building at the same
+moment, which rarely happens: a lane builds for minutes of a task that runs most of an
+hour, and lanes integrate one at a time.
+
+A slow build only costs time. Running out of memory stalls every lane. So a step now
+passes when every build succeeds and at least 20% of memory stays free. Wall time and
+slowdown are still recorded, for reading only.
+
+The new rule text makes the next Auto shift probe again.

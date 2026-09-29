@@ -29,12 +29,12 @@ one at a time. Stewart said "cap by memory".
 
 ## Acceptance criteria
 
-- [ ] `$MachineProbeRule` is `every build succeeds and free memory >= 20%`, and
+- [x] `$MachineProbeRule` is `every build succeeds and free memory >= 20%`, and
       `Test-MachineProbeStep` checks exactly that; `seconds` and `slowdown` are still
       recorded per step for reading, but decide nothing.
-- [ ] `-TestMachineProbe` covers a memory knee, a slow step that still passes, a failed
+- [x] `-TestMachineProbe` covers a memory knee, a slow step that still passes, a failed
       build, all 16 passing, a cut-short probe and a failing first step; all pass.
-- [ ] The script header and ADR-0130 item 7 state the new rule, with a dated amendment.
+- [x] The script header and ADR-0130 item 7 state the new rule, with a dated amendment.
 
 ## Notes
 

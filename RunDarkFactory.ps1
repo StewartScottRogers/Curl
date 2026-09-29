@@ -157,8 +157,8 @@
     and memory peak. After one untimed warm-up build it runs k = 1, 2, ... concurrent
     `dotnet build --no-incremental` of this checkout, each into its own artifacts folder
     under <repo>.lanes\probe, and records each step's wall time and lowest free memory.
-    A step passes when its wall time is at most 4.0 times one build's, free memory stays
-    at least 20% of RAM and every build succeeds; the cap is the largest passing k (at
+    A step passes when every build succeeds and free memory stays at least 20% of RAM;
+    wall time is recorded but decides nothing (BL-812). The cap is the largest passing k (at
     least 1), found at the first failing step, 16, or -ProbeMaxLanes. The result goes to
     <repo>.lanes\machine-lanes.json (marked incomplete when -ProbeMaxLanes cut it short)
     and the probe folder is deleted. Run it only when no shift is building.
@@ -1084,15 +1084,16 @@ if ($TestAutoLanes) {
 # rule is pure, so -TestMachineProbe proves it on recorded steps; -ProbeMachine measures.
 
 # Lanes build for minutes of each task and integrate one at a time, so k simultaneous
-# builds is a worst case: the knee is a 4x slowdown, and memory is the hard limit (BL-807).
-$MachineProbeRule = 'wall <= 4.0x one build and free memory >= 20%'
+# builds is a worst case, and how much slower they run swings with the one-build baseline
+# (13.6 s one probe, 9.0 s the next). Only memory running out stalls lanes, so memory alone
+# sets the cap; wall time and slowdown are recorded for reading (BL-812).
+$MachineProbeRule = 'every build succeeds and free memory >= 20%'
 
 function Test-MachineProbeStep {
-    # Whether one probe step passes: wall time at most 4.0 times the one-build time, the
-    # lowest free memory at least 20% of RAM, and every build succeeded.
+    # Whether one probe step passes: every build succeeded and the lowest free memory
+    # stayed at least 20% of RAM. -OneBuildSeconds is kept for the callers; it decides nothing.
     param($Step, [double]$OneBuildSeconds)
-    return ([bool]$Step.Succeeded -and [double]$Step.Seconds -le 4.0 * $OneBuildSeconds -and
-        [double]$Step.MinFreeMemoryPercent -ge 20)
+    return ([bool]$Step.Succeeded -and [double]$Step.MinFreeMemoryPercent -ge 20)
 }
 
 function Get-MachineLaneCap {
@@ -1127,8 +1128,7 @@ if ($TestMachineProbe) {
         return "cap $($result.Cap), $(if ($result.Complete) { 'complete' } else { 'not complete' })"
     }
     $cases = @(
-        ,@('knee-by-time', 'cap 5, complete', (Get-TestCapText (New-TestProbeSteps 60, 100, 150, 200, 240, 245)))
-        ,@('past-old-2x-knee', 'cap 4, complete', (Get-TestCapText (New-TestProbeSteps 13.6, 23.1, 26.1, 36.7, 45 -FreePercent 82.6, 78.8, 74.7, 71.5, 15)))
+        ,@('slow-steps-still-pass', 'cap 5, complete', (Get-TestCapText (New-TestProbeSteps 9.0, 33.2, 32.4, 41.4, 60, 70 -FreePercent 75.3, 61.2, 67.5, 63.8, 30, 19)))
         ,@('knee-by-memory', 'cap 2, complete', (Get-TestCapText (New-TestProbeSteps 60, 61, 63, 64 -FreePercent 40, 25, 19, 8)))
         ,@('failed-build', 'cap 2, complete', (Get-TestCapText (New-TestProbeSteps 60, 61, 62 -FailedAt 3)))
         ,@('all-pass-to-16', 'cap 16, complete', (Get-TestCapText (New-TestProbeSteps (@(60) * 16))))
