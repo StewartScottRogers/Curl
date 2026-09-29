@@ -78,6 +78,36 @@ public sealed class UrlSchemeGuesserTests
         Assert.ThrowsExactly<ArgumentNullException>(() => UrlSchemeGuesser.AddGuessedScheme(null!));
     }
 
+    // --proto-default cases measured with Record-CurlExchange.ps1, curl 8.21.0, Windows, 2026-09-28 (BL-524).
+    [TestMethod]
+    [DataRow("127.0.0.1:18524/", "https", "https://127.0.0.1:18524/")]
+    [DataRow("127.0.0.1:18525/", "ftp", "ftp://127.0.0.1:18525/")]
+    [DataRow("ftp.localhost:1/", "dict", "dict://ftp.localhost:1/")]
+    [DataRow("ftp.localhost:1/", "https", "https://ftp.localhost:1/")]
+    [DataRow("u:p@dict.localhost:1/x", "ftp", "ftp://u:p@dict.localhost:1/x")]
+    public void AddScheme_DefaultScheme_ReplacesTheGuess(string url, string defaultScheme, string expected)
+    {
+        Assert.AreEqual(expected, UrlSchemeGuesser.AddScheme(url, defaultScheme));
+    }
+
+    [TestMethod]
+    public void AddScheme_DefaultSchemeAndUrlNamesAScheme_IsUnchanged()
+    {
+        Assert.AreEqual("http://127.0.0.1:1/", UrlSchemeGuesser.AddScheme("http://127.0.0.1:1/", "ftp"));
+    }
+
+    [TestMethod]
+    public void AddScheme_NoDefaultScheme_Guesses()
+    {
+        Assert.AreEqual("ftp://ftp.localhost:1/", UrlSchemeGuesser.AddScheme("ftp.localhost:1/", null));
+    }
+
+    [TestMethod]
+    public void AddScheme_Null_Throws()
+    {
+        Assert.ThrowsExactly<ArgumentNullException>(() => UrlSchemeGuesser.AddScheme(null!, "https"));
+    }
+
     [TestMethod]
     public void HasScheme_Null_Throws()
     {

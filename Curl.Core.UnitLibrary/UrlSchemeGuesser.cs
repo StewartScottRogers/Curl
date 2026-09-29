@@ -39,7 +39,28 @@ public static class UrlSchemeGuesser
     {
         ArgumentNullException.ThrowIfNull(url);
 
-        return HasScheme(url) ? url : GuessScheme(url) + "://" + url;
+        return AddScheme(url, defaultScheme: null);
+    }
+
+    /// <summary>
+    /// Returns <paramref name="url" /> unchanged when it names a scheme, otherwise
+    /// <paramref name="defaultScheme" /> (the <c>--proto-default</c> scheme) or, when that is
+    /// <see langword="null" />, the guessed scheme, followed by <c>://</c> and <paramref name="url" />.
+    /// </summary>
+    /// <remarks>
+    /// A default scheme replaces the guess outright, as curl 8.21.0 does: with
+    /// <c>--proto-default dict</c>, <c>ftp.localhost:1/</c> becomes <c>dict://ftp.localhost:1/</c>
+    /// (measured on Windows, 2026-09-28).
+    /// </remarks>
+    /// <param name="url">The URL as the command line gave it.</param>
+    /// <param name="defaultScheme">The scheme for a URL without one, lowercase; <see langword="null" /> to guess.</param>
+    /// <returns>The URL with a scheme.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="url" /> is <see langword="null" />.</exception>
+    public static string AddScheme(string url, string? defaultScheme)
+    {
+        ArgumentNullException.ThrowIfNull(url);
+
+        return HasScheme(url) ? url : (defaultScheme ?? GuessScheme(url)) + "://" + url;
     }
 
     /// <summary>Tells whether <paramref name="url" /> starts with a scheme and <c>:/</c>.</summary>
