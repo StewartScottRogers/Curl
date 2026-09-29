@@ -74,7 +74,8 @@ with exit 39, `LDAP remote: Server Down`.
   the WinLDAP dialect reproduces `ldap_win_bind` - the rootDSE reads, then the SASL
   `GSS-SPNEGO` bind or, when the server offers no `GSS-SPNEGO`, the Sicily NTLM bind, as the
   logged-on user through the BCL's `NegotiateAuthentication` with default credentials behind
-  the `ILdapLogonTokenSource` seam - measured and pinned by BL-830. A complete
+  the `ILdapLogonTokenSource` seam - measured and pinned by BL-830 - and then signs and seals
+  the rest of the session with that bind's keys, as BL-853 measured. A complete
   reimplementation leaves neither out.
 - **The URL** follows RFC 4516, `ldap://host[:port]/<dn>?<attributes>?<scope>?<filter>?<extensions>`,
   percent-decoded per part, scope `base` by default, the filter `(objectClass=*)` by
@@ -244,8 +245,7 @@ LDAPv2 retry makes a second, identical attempt:
   closes during the retry's rootDSE reads ends with `Server Down`. Neither sends an Unbind.
 - **After the bind.** WinLDAP signs and seals everything that follows: the SearchRequest went
   out as a four-byte length, a 16-byte NTLM signature and the sealed message. That security
-  layer is BL-853's; until it lands the search after a logon bind is sent unsealed, and
-  BL-589 registers the handler only after it.
+  layer is BL-853's; see "Measured by BL-853".
 - Not measured, decided by the same rules: a `success` answer to a `GSS-SPNEGO` bind before
   the security package has finished (recorded once: WinLDAP started its retry) fails the
   attempt with `Local Error`, as does a security package that cannot produce a token;
@@ -255,6 +255,44 @@ LDAPv2 retry makes a second, identical attempt:
   handler takes as a constructor argument (`NegotiateLogonTokenSource` by default), so tests
   use a fake package and need no domain.
 
+## Measured by BL-853
+
+Decided by Claude under Stewart's delegation, in BL-853, from seven recordings on 2026-09-29 of
+Windows curl 8.21.0 with WinLDAP, `-sS ldap://127.0.0.1:<port>/dc=example?cn?base` (no `-u`).
+The reply to a sealed request has to be sealed with the bind's keys, which a canned script
+cannot compute, so the measuring server was a throwaway C# file-based app (outside the
+repository) that answered the bind with the BCL's `NegotiateAuthentication` in server mode,
+package `NTLM`, and sealed and unsealed with its `Wrap`/`Unwrap`. That was chosen over a
+hand-built NTLM server computing the keys from a known password: the BCL already holds the
+server side, and the logged-on user's loopback NTLM needs no password. Like the recorder, it
+served the connection WinLDAP speaks on (WinLDAP opens a second one beside curl's).
+
+- **The security layer.** After either logon bind (`GSS-SPNEGO` or Sicily) is answered
+  `success`, every message in both directions is one buffer (RFC 4422 3.7): its length in four
+  big-endian octets, then NTLM's `Wrap` output - a 16-byte signature `01 00 00 00 <checksum>
+  <sequence number>` and the sealed LDAPMessage. The SearchRequest went out as `00 00 00 51`
+  (16 + 65 bytes with one attribute) with sequence number 0, the UnbindRequest as
+  `00 00 00 1b` with sequence number 1; each request is its own buffer.
+- **A sealed reply** - the entry and the SearchResultDone each in its own buffer, or both in
+  one - was unsealed and written (`DN: dc=example` / `cn: one`), exit 0.
+- **A reply whose signature does not check** (one checksum byte flipped): WinLDAP reset the
+  connection at once, sent no UnbindRequest, and curl failed with exit 39
+  `curl: (39) LDAP remote: Server Down` after 0.3 seconds.
+- **An unsealed reply**: WinLDAP read its first four bytes, `30 84 00 00`, as the length of an
+  813 MB buffer and waited for it; with the server holding the connection open it had not
+  finished after 15 minutes. When the server closed instead, curl closed at once without an
+  UnbindRequest and failed with `curl: (39) LDAP remote: Server Down` after WinLDAP's
+  240-second wait.
+
+Decided: `LdapSaslSecurityLayer` is an `IConnection` over the connection that the session
+switches to once the logon bind succeeds, keeping that bind's `ILdapLogonAuthentication`
+(which grew `Wrap` and `Unwrap`) until the transfer ends. A buffer that does not unseal, that
+the server closes part way through, or that says it is longer than 16 MiB reads as the
+server closing, so the search fails as a close does: exit 39 `LDAP remote: Server Down`, no
+UnbindRequest, reported at once as BL-586 decided for WinLDAP's waits. The 16 MiB bound is
+not WinLDAP's (it waits for any length); it keeps an unsealed reply from making this code
+allocate what the length says, and is far beyond any reply a search seals.
+
 ## Consequences
 
 - BL-586: the BER reader and writer, the message types, and the bind with both dialects,
@@ -262,6 +300,8 @@ LDAPv2 retry makes a second, identical attempt:
 - BL-587: the URL reader, the RFC 4515 filter encoder and the SearchRequest, failing with
   39 as above and refusing the URLs curl refuses.
 - BL-588: the output writer for entries, referrals and SearchResultDone in both dialects.
+- BL-830 and BL-853: the WinLDAP bind without `-u`, then the SASL security layer that signs
+  and seals the rest of its session.
 - BL-589: registration in `Curl.Console` for `ldap` (389) and `ldaps` (636), the dialect
   chosen from the platform, the `-v` lines, and `ldap ldaps` in `-V`.
 - Tests pin WinLDAP and OpenLDAP bytes on every operating system, because the dialect is

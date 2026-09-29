@@ -145,7 +145,11 @@ internal static class WinLdapLogonBind
             .SelectMany(attribute => attribute.Values)
             .Select(value => Encoding.UTF8.GetString(value));
 
-    /// <summary>Makes one attempt's bind with a fresh authentication, SASL or Sicily.</summary>
+    /// <summary>
+    /// Makes one attempt's bind with a fresh authentication, SASL or Sicily. A bind that
+    /// succeeds starts the session's security layer with the authentication's keys; any other
+    /// disposes it.
+    /// </summary>
     private static async ValueTask<LdapBindReply> BindOnceAsync(
         LdapExchange exchange,
         ILdapLogonTokenSource tokenSource,
@@ -153,10 +157,27 @@ internal static class WinLdapLogonBind
         string targetName,
         CancellationToken cancellationToken)
     {
-        using ILdapLogonAuthentication authentication = tokenSource.Start(offersSpnego ? LdapLogonPackage.Negotiate : LdapLogonPackage.Ntlm, targetName);
-        return offersSpnego
-            ? await SaslBindAsync(exchange, authentication, cancellationToken).ConfigureAwait(false)
-            : await SicilyBindAsync(exchange, authentication, cancellationToken).ConfigureAwait(false);
+        ILdapLogonAuthentication authentication = tokenSource.Start(offersSpnego ? LdapLogonPackage.Negotiate : LdapLogonPackage.Ntlm, targetName);
+        LdapBindReply reply = LocalError;
+        try
+        {
+            reply = offersSpnego
+                ? await SaslBindAsync(exchange, authentication, cancellationToken).ConfigureAwait(false)
+                : await SicilyBindAsync(exchange, authentication, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            if (reply.IsSuccess)
+            {
+                exchange.StartSecurityLayer(authentication);
+            }
+            else
+            {
+                authentication.Dispose();
+            }
+        }
+
+        return reply;
     }
 
     /// <summary>Sends <c>GSS-SPNEGO</c> binds, one for each token, until the server answers anything but <c>saslBindInProgress</c>.</summary>

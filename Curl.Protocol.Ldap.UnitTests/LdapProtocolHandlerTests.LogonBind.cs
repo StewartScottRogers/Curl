@@ -42,10 +42,10 @@ public sealed partial class LdapProtocolHandlerTests
             Done(2),
             SpnegoChallenge(3),
             BindReply(4, 0),
-            Done(5));
+            Sealed(0, Done(5)));
 
         Assert.AreEqual(TransferResult.Success(0), result);
-        CollectionAssert.AreEqual(Hex.Bytes(Join(CapabilitiesSearch(1), MechanismsSearch(2), SpnegoBind(3), SpnegoAuthenticateBind(4), Search(5), Unbind(6))), sent);
+        CollectionAssert.AreEqual(Hex.Bytes(Join(CapabilitiesSearch(1), MechanismsSearch(2), SpnegoBind(3), SpnegoAuthenticateBind(4), Sealed(0, Search(5)), Sealed(1, Unbind(6)))), sent);
         CollectionAssert.AreEqual(new[] { (LdapLogonPackage.Negotiate, "ldap/127.0.0.1") }, tokens.Starts.ToArray());
         CollectionAssert.AreEqual(Array.Empty<byte>(), tokens.Challenges[0]);
         CollectionAssert.AreEqual(Hex.Bytes(NtlmChallenge), tokens.Challenges[1]);
@@ -64,10 +64,10 @@ public sealed partial class LdapProtocolHandlerTests
             Done(3),
             SicilyChallenge(4),
             BindReply(5, 0),
-            Done(6));
+            Sealed(0, Done(6)));
 
         Assert.AreEqual(TransferResult.Success(0), result);
-        CollectionAssert.AreEqual(Hex.Bytes(Join(CapabilitiesSearch(1), MechanismsSearch(2), CapabilitiesSearch(3), SicilyNegotiateBind(4), SicilyResponseBind(5), Search(6), Unbind(7))), sent);
+        CollectionAssert.AreEqual(Hex.Bytes(Join(CapabilitiesSearch(1), MechanismsSearch(2), CapabilitiesSearch(3), SicilyNegotiateBind(4), SicilyResponseBind(5), Sealed(0, Search(6)), Sealed(1, Unbind(7)))), sent);
         CollectionAssert.AreEqual(new[] { (LdapLogonPackage.Ntlm, "ldap/127.0.0.1") }, tokens.Starts.ToArray());
         CollectionAssert.AreEqual(Hex.Bytes(NtlmChallenge), tokens.Challenges[1]);
     }
@@ -85,10 +85,10 @@ public sealed partial class LdapProtocolHandlerTests
             Done(2),
             SpnegoChallenge(3),
             BindReply(4, 0),
-            Done(5));
+            Sealed(0, Done(5)));
 
         Assert.AreEqual(TransferResult.Success(0), result);
-        CollectionAssert.AreEqual(Hex.Bytes(Join(CapabilitiesSearch(1), MechanismsSearch(2), SpnegoBind(3), SpnegoAuthenticateBind(4), Search(5), Unbind(6))), sent);
+        CollectionAssert.AreEqual(Hex.Bytes(Join(CapabilitiesSearch(1), MechanismsSearch(2), SpnegoBind(3), SpnegoAuthenticateBind(4), Sealed(0, Search(5)), Sealed(1, Unbind(6)))), sent);
     }
 
     [TestMethod]
@@ -310,7 +310,7 @@ public sealed partial class LdapProtocolHandlerTests
             Done(2),
             SpnegoChallenge(3),
             "30 10 02 01 04 61 0b 0a 01 00 04 00 04 00 87 02 ab cd",
-            Done(5),
+            completes ? Sealed(0, Done(5)) : Done(5),
             Done(6),
             SpnegoChallenge(7),
             "30 10 02 01 08 61 0b 0a 01 00 04 00 04 00 87 02 ab cd");
@@ -351,6 +351,120 @@ public sealed partial class LdapProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_WinLdapSpnegoBound_SealsTheSearchInABufferOf77BytesAsMeasured()
+    {
+        (_, byte[] sent) = await RunLogonAsync(
+            new FakeLogonTokenSource(2, NtlmNegotiate, NtlmAuthenticate),
+            CapabilitiesEntry(1),
+            Done(1),
+            MechanismsEntry(2),
+            Done(2),
+            SpnegoChallenge(3),
+            BindReply(4, 0),
+            Sealed(0, Done(5)));
+
+        byte[] search = Hex.Bytes(Join(CapabilitiesSearch(1), MechanismsSearch(2), SpnegoBind(3), SpnegoAuthenticateBind(4)));
+        CollectionAssert.AreEqual(Hex.Bytes($"00 00 00 4d {FakeLogonTokenSource.Signature(0)}"), sent[search.Length..(search.Length + 20)]);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_WinLdapSealedBufferHoldingSeveralReplies_ReadsEachOfThem()
+    {
+        (TransferResult result, byte[] sent) = await RunLogonAsync(
+            new FakeLogonTokenSource(2, NtlmNegotiate, NtlmAuthenticate),
+            Done(1),
+            Done(2),
+            Done(3),
+            SicilyChallenge(4),
+            BindReply(5, 0),
+            Sealed(0, Join("30 10 02 01 06 64 0b 04 03 6e 3d 78 30 04 30 02 04 00", Done(6))));
+
+        // The entry's "DN: n=x" and two line ends: eight bytes written.
+        Assert.AreEqual(TransferResult.Success(8), result);
+        CollectionAssert.AreEqual(Hex.Bytes(Sealed(1, Unbind(7))), sent[^Hex.Bytes(Sealed(1, Unbind(7))).Length..]);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_WinLdapEmptySealedBuffer_IsReadPast()
+    {
+        (TransferResult result, _) = await RunLogonAsync(
+            new FakeLogonTokenSource(2, NtlmNegotiate, NtlmAuthenticate),
+            Done(1),
+            MechanismsEntry(2),
+            Done(2),
+            SpnegoChallenge(3),
+            BindReply(4, 0),
+            Sealed(0, string.Empty).TrimEnd(),
+            Sealed(1, Done(5)));
+
+        Assert.AreEqual(TransferResult.Success(0), result);
+    }
+
+    [TestMethod]
+    [DataRow("00 00 00 14 02 00 00 00 5e 5e 5e 5e 5e 5e 5e 5e 00 00 00 00 30 0c 02 01 05 65 07 0a 01 00 04 00 04 00", DisplayName = "Signature that does not check")]
+    [DataRow("30 0c 02 01 05 65 07 0a 01 00 04 00 04 00", DisplayName = "Unsealed reply")]
+    [DataRow("01 00 00 01", DisplayName = "Length of one byte past 16 MiB")]
+    [DataRow("00 00 00", DisplayName = "Closed in the length")]
+    [DataRow("00 00 00 20 01 00 00 00", DisplayName = "Closed in the buffer")]
+    public async Task ExecuteAsync_WinLdapReplyThatDoesNotUnwrap_FailsWith39ServerDownWithoutUnbinding(string reply)
+    {
+        (TransferResult result, byte[] sent) = await RunLogonAsync(
+            new FakeLogonTokenSource(2, NtlmNegotiate, NtlmAuthenticate),
+            CapabilitiesEntry(1),
+            Done(1),
+            MechanismsEntry(2),
+            Done(2),
+            SpnegoChallenge(3),
+            BindReply(4, 0),
+            reply);
+
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.LdapSearchFailed, "LDAP remote: Server Down"), result);
+        CollectionAssert.AreEqual(Hex.Bytes(Join(CapabilitiesSearch(1), MechanismsSearch(2), SpnegoBind(3), SpnegoAuthenticateBind(4), Sealed(0, Search(5)))), sent);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_WinLdapSealedReplySplitAcrossReads_IsReadWhole()
+    {
+        string sealedDone = Sealed(0, Done(5));
+
+        (TransferResult result, _) = await RunLogonAsync(
+            new FakeLogonTokenSource(2, NtlmNegotiate, NtlmAuthenticate),
+            Done(1),
+            MechanismsEntry(2),
+            Done(2),
+            SpnegoChallenge(3),
+            BindReply(4, 0),
+            sealedDone[..5],
+            sealedDone[6..20],
+            sealedDone[21..]);
+
+        Assert.AreEqual(TransferResult.Success(0), result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_WinLdapBound_KeepsTheBindsAuthenticationUntilTheTransferEnds()
+    {
+        var tokens = new FakeLogonTokenSource(2, NtlmNegotiate, NtlmAuthenticate);
+
+        (TransferResult result, _) = await RunLogonAsync(
+            tokens,
+            CapabilitiesEntry(1),
+            Done(1),
+            MechanismsEntry(2),
+            Done(2),
+            BindReply(3, 0x31),
+            Done(4),
+            Done(5),
+            SpnegoChallenge(6),
+            BindReply(7, 0),
+            Sealed(0, Done(8)));
+
+        Assert.AreEqual(TransferResult.Success(0), result);
+        Assert.AreEqual(2, tokens.Starts.Count);
+        Assert.AreEqual(2, tokens.Disposed);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_OpenLdapWithoutUser_NeverStartsTheLogonAuthentication()
     {
         var tokens = new FakeLogonTokenSource(2, NtlmNegotiate, NtlmAuthenticate);
@@ -374,6 +488,17 @@ public sealed partial class LdapProtocolHandlerTests
     }
 
     private static string Join(params string[] messages) => string.Join(' ', messages);
+
+    /// <summary>
+    /// One SASL security layer buffer as WinLDAP frames it (BL-853): the sealed length in four
+    /// big-endian octets, then the fake's signature for <paramref name="sequenceNumber" /> and
+    /// <paramref name="message" />, which the fake seals as itself.
+    /// </summary>
+    private static string Sealed(int sequenceNumber, string message)
+    {
+        int length = 16 + Hex.Bytes(message).Length;
+        return $"00 00 {length >> 8:x2} {length & 0xff:x2} {FakeLogonTokenSource.Signature(sequenceNumber)} {message}";
+    }
 
     private static string CapabilitiesSearch(int id) =>
         $"30 84 00 00 00 44 02 01 {id:x2} 63 84 00 00 00 3b 04 00 0a 01 00 0a 01 00 02 01 00 02 01 78 01 01 00 87 0b 6f 62 6a 65 63 74 63 6c 61 73 73 30 84 00 00 00 17 04 15 73 75 70 70 6f 72 74 65 64 43 61 70 61 62 69 6c 69 74 69 65 73";

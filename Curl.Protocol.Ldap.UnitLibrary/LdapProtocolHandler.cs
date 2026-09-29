@@ -31,9 +31,9 @@ namespace Curl.Protocol.Ldap;
 /// <para>
 /// Without <c>-u</c> the WinLDAP dialect binds as the logged-on user as
 /// <see cref="WinLdapLogonBind" /> describes - the rootDSE reads, then the <c>GSS-SPNEGO</c>
-/// or Sicily NTLM bind - with tokens from <paramref name="logonTokenSource" />. WinLDAP then
-/// signs and seals the rest of the session with the bind's keys; until BL-847 builds that
-/// security layer, the search after a logon bind is sent unsealed.
+/// or Sicily NTLM bind - with tokens from <paramref name="logonTokenSource" />. The rest of
+/// the session, search and UnbindRequest, is then signed and sealed with the bind's keys as
+/// <see cref="LdapSaslSecurityLayer" /> describes, as WinLDAP does.
 /// </para>
 /// </remarks>
 /// <param name="logonTokenSource">Produces the logged-on user's tokens for the WinLDAP dialect's bind without <c>-u</c>.</param>
@@ -128,15 +128,18 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
     private async ValueTask<TransferResult> BindAndSearchAsync(IConnection connection, ITransferContext context, LdapSearchParameters search)
     {
         var exchange = new LdapExchange(connection, new LdapBerWriter(dialect));
-        TransferResult? bindFailure = dialect == LdapDialect.WinLdap && context.Credentials is null
-            ? await WinLdapLogonBind.BindAsync(exchange, logonTokenSource, context.Url.IdnHost, context.CancellationToken).ConfigureAwait(false)
-            : await BindWithCredentialsAsync(exchange, context).ConfigureAwait(false);
-        if (bindFailure is not null)
+        await using (exchange.ConfigureAwait(false))
         {
-            return bindFailure;
-        }
+            TransferResult? bindFailure = dialect == LdapDialect.WinLdap && context.Credentials is null
+                ? await WinLdapLogonBind.BindAsync(exchange, logonTokenSource, context.Url.IdnHost, context.CancellationToken).ConfigureAwait(false)
+                : await BindWithCredentialsAsync(exchange, context).ConfigureAwait(false);
+            if (bindFailure is not null)
+            {
+                return bindFailure;
+            }
 
-        return await LdapSearch.RunAsync(dialect, exchange, search, context).ConfigureAwait(false);
+            return await LdapSearch.RunAsync(dialect, exchange, search, context).ConfigureAwait(false);
+        }
     }
 
     /// <summary>Binds with a simple bind: the transfer's credentials, or the anonymous bind without them.</summary>

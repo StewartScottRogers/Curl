@@ -4,15 +4,36 @@ namespace Curl.Protocol.Ldap;
 
 /// <summary>
 /// One LDAP session on a connection: numbers each request from messageID 1 on, as both
-/// builds do, sends it, and reads the replies a bind and a search wait for.
+/// builds do, sends it, and reads the replies a bind and a search wait for; after WinLDAP's
+/// logon bind, through the SASL security layer (<see cref="StartSecurityLayer" />).
 /// </summary>
-/// <param name="connection">The connection to the LDAP server.</param>
+/// <param name="connection">The connection to the LDAP server, which the session does not dispose.</param>
 /// <param name="writer">Writes the requests with the dialect's length form.</param>
-internal sealed class LdapExchange(IConnection connection, LdapBerWriter writer)
+internal sealed class LdapExchange(IConnection connection, LdapBerWriter writer) : IAsyncDisposable
 {
-    private readonly LdapMessageReader reader = new(connection);
+    private IConnection connection = connection;
+
+    private LdapMessageReader reader = new(connection);
+
+    private LdapSaslSecurityLayer? securityLayer;
 
     private int nextMessageId = 1;
+
+    /// <summary>
+    /// Sends and reads every later message through the SASL security layer, sealed with the
+    /// keys of <paramref name="authentication" />, which the session now owns.
+    /// </summary>
+    /// <param name="authentication">The logon bind's complete authentication.</param>
+    public void StartSecurityLayer(ILdapLogonAuthentication authentication)
+    {
+        securityLayer = new LdapSaslSecurityLayer(connection, authentication);
+        connection = securityLayer;
+        reader = new LdapMessageReader(securityLayer);
+    }
+
+    /// <summary>Disposes the security layer's keys, if the session has one; the connection stays open.</summary>
+    /// <returns>A task that completes when the keys have been disposed.</returns>
+    public ValueTask DisposeAsync() => securityLayer?.DisposeAsync() ?? ValueTask.CompletedTask;
 
     /// <summary>Sends a simple BindRequest and reads the server's answer.</summary>
     /// <param name="version">The protocol version, 3, or 2 for WinLDAP's retry.</param>

@@ -1,3 +1,6 @@
+using System.Buffers;
+using System.Net.Security;
+
 namespace Curl.Protocol.Ldap;
 
 /// <summary>
@@ -33,6 +36,46 @@ public sealed class NegotiateLogonTokenSourceTests
         CollectionAssert.AreEqual("NTLMSSP\0\u0001\0\0\0"u8.ToArray(), token[..12]);
         Assert.AreEqual(0x30, token[12] & 0x30);
         Assert.IsFalse(authentication.IsAuthenticated);
+    }
+
+    [TestMethod]
+    public void WrapAndUnwrap_AfterAnNtlmLogon_SealForTheServerAndUnsealWhatItSeals()
+    {
+        using ILdapLogonAuthentication client = new NegotiateLogonTokenSource().Start(LdapLogonPackage.Ntlm, "ldap/127.0.0.1");
+        using var server = new NegotiateAuthentication(new NegotiateAuthenticationServerOptions { Package = "NTLM", RequiredProtectionLevel = ProtectionLevel.EncryptAndSign });
+        byte[]? challenge = server.GetOutgoingBlob(client.NextToken([]), out _);
+        server.GetOutgoingBlob(client.NextToken(challenge), out _);
+        var reply = new ArrayBufferWriter<byte>();
+        server.Wrap("done"u8, reply, requestEncryption: true, out _);
+        var unsealed = new ArrayBufferWriter<byte>();
+
+        byte[] sealedSearch = client.Wrap("search"u8);
+        NegotiateAuthenticationStatusCode status = server.Unwrap(sealedSearch, unsealed, out bool encrypted);
+        byte[]? unsealedReply = client.Unwrap(reply.WrittenSpan);
+
+        Assert.AreEqual(NegotiateAuthenticationStatusCode.Completed, status);
+        Assert.IsTrue(encrypted);
+        CollectionAssert.AreEqual("search"u8.ToArray(), unsealed.WrittenSpan.ToArray());
+        Assert.HasCount(16 + 6, sealedSearch);
+        CollectionAssert.AreEqual(new byte[] { 1, 0, 0, 0 }, sealedSearch[..4]);
+        CollectionAssert.AreEqual("done"u8.ToArray(), unsealedReply);
+    }
+
+    [TestMethod]
+    public void Unwrap_MessageWhoseSignatureDoesNotCheck_ReturnsNull()
+    {
+        using ILdapLogonAuthentication client = new NegotiateLogonTokenSource().Start(LdapLogonPackage.Ntlm, "ldap/127.0.0.1");
+        using var server = new NegotiateAuthentication(new NegotiateAuthenticationServerOptions { Package = "NTLM", RequiredProtectionLevel = ProtectionLevel.EncryptAndSign });
+        byte[]? challenge = server.GetOutgoingBlob(client.NextToken([]), out _);
+        server.GetOutgoingBlob(client.NextToken(challenge), out _);
+        var reply = new ArrayBufferWriter<byte>();
+        server.Wrap("done"u8, reply, requestEncryption: true, out _);
+        byte[] altered = reply.WrittenSpan.ToArray();
+        altered[6] ^= 0xff;
+
+        byte[]? unsealed = client.Unwrap(altered);
+
+        Assert.IsNull(unsealed);
     }
 
     [TestMethod]
