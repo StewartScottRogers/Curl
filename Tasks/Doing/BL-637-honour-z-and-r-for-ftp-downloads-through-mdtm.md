@@ -33,3 +33,4 @@ An FTP download with `-z <date>` sends `MDTM` and skips the transfer when the co
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
