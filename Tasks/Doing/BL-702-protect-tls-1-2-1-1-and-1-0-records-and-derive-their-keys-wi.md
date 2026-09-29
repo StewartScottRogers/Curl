@@ -32,3 +32,4 @@ The hand-built client has the TLS 1.2, 1.1 and 1.0 record layer and key derivati
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
