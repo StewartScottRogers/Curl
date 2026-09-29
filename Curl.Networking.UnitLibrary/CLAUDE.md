@@ -4,8 +4,13 @@ Phase 1.
 
 Sockets, DNS, TLS via SslStream, proxy and SOCKS handling, connection reuse: the
 production implementations of the transport contracts in
-`Curl.Protocol.Abstractions.UnitLibrary` (ADR-0005). It references that project and
-`Curl.Tls.UnitLibrary`, the hand-built TLS client (ADR-0120, ADR-0140), and nothing else.
+`Curl.Protocol.Abstractions.UnitLibrary` (ADR-0005). It references that project,
+`Curl.Tls.UnitLibrary`, the hand-built TLS client (ADR-0120, ADR-0140), and
+`Curl.Kerberos.UnitLibrary`, whose KDC transport and SRV lookup it implements, and nothing
+else: `KerberosKdcSocketTransport` moves a KDC's UDP datagram through an `IDatagramConnector`
+(one-second reply wait) and its TCP stream through an `IConnector` (the stream owns and
+disposes the connection, `ConnectionStream`'s `ownsConnection`), and `KerberosDnsSrvLookup`
+answers SRV lookups through `DnsServerResolver.ResolveServiceAsync` (BL-527, ADR-0173).
 
 Per ADR-0140 and ADR-0162 (BL-708) there are two TLS providers, and `TlsClientRouting.Choose`
 picks one from a `TlsClientOptions` as one pure function: `HandBuiltTlsProvider` when a row of

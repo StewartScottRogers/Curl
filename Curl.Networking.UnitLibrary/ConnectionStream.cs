@@ -6,11 +6,26 @@ namespace Curl.Networking;
 /// Presents an <see cref="IConnection" /> as the <see cref="Stream" /> an
 /// <see cref="System.Net.Security.SslStream" /> runs over. Only the asynchronous members
 /// carry bytes, because <see cref="IConnection" /> has no synchronous ones. Disposing the
-/// stream leaves the connection open: its owner disposes it.
+/// stream leaves the connection open, its owner disposing it, unless the stream was made
+/// its owner: then <see cref="DisposeAsync" /> disposes it too, as the KDC transport's
+/// caller disposes only the stream it was given.
 /// </summary>
 /// <param name="connection">The plaintext connection to read from and write to.</param>
-internal sealed class ConnectionStream(IConnection connection) : Stream
+/// <param name="ownsConnection">Whether <see cref="DisposeAsync" /> disposes <paramref name="connection" />.</param>
+internal sealed class ConnectionStream(IConnection connection, bool ownsConnection = false) : Stream
 {
+    /// <summary>Disposes the stream, and the connection when the stream owns it.</summary>
+    /// <returns>A task that completes when both are disposed.</returns>
+    public override async ValueTask DisposeAsync()
+    {
+        if (ownsConnection)
+        {
+            await connection.DisposeAsync().ConfigureAwait(false);
+        }
+
+        await base.DisposeAsync().ConfigureAwait(false);
+    }
+
     /// <inheritdoc />
     public override bool CanRead => true;
 
