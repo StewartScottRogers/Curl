@@ -2,6 +2,7 @@ using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ssh.Fakes;
 using Curl.Protocol.Ssh.KeyExchange;
 using Curl.Protocol.Ssh.Negotiation;
+using Curl.Protocol.Ssh.PacketProtection;
 using static Curl.Protocol.Ssh.Fakes.SshTestEncoding;
 
 namespace Curl.Protocol.Ssh.Transport;
@@ -341,7 +342,10 @@ public sealed partial class SshTransportTests
         TestKeyExchangeServer second = TestKeyExchangeServer.Answer("diffie-hellman-group14-sha256", hostKey, keys, ClientKexInit, secondServerKexInit.ToPayload());
         SshServerScript script = new SshServerScript().Line(TestKeyExchangeServer.ServerIdentification).KexInit(firstServerKexInit);
         first.ServerPayloads.ForEach(payload => script.Packet(payload));
-        script.Packet(SshMessageNumber.NewKeys).Packet(SshMessageNumber.Ignore, 0, 0, 0, 0);
+        SshNegotiatedAlgorithms ctr = SshTestAlgorithms.With("aes128-ctr", "hmac-sha2-256");
+        script.Packet(SshMessageNumber.NewKeys)
+            .Protect(SshPacketProtections.ForServerToClient(ctr, first.Keys(first.ExchangeHash)), strict)
+            .Packet(SshMessageNumber.Ignore, 0, 0, 0, 0);
         second.ServerPayloads.ForEach(payload => script.Packet(payload));
         script.Packet(SshMessageNumber.NewKeys);
         ScriptedConnection connection = new(script.Bytes);
@@ -356,11 +360,43 @@ public sealed partial class SshTransportTests
         CollectionAssert.AreEqual(
             second.DeriveKey('C', 32, first.ExchangeHash),
             secondResult.Keys.DeriveKey(SshKeyPurpose.EncryptionKeyClientToServer, 32));
-        List<byte[]> written = WrittenPayloads(connection.Written);
-        CollectionAssert.AreEqual(ClientKexInit, written[3], "the client answers with its own KEXINIT");
+        List<byte[]> written = await SshClientTranscript.PayloadsAsync(connection.Written, strict, SshPacketProtections.ForClientToServer(ctr, first.Keys(first.ExchangeHash)));
+        CollectionAssert.AreEqual(ClientKexInit, written[3], "the client answers with its own KEXINIT, encrypted with the first keys");
         CollectionAssert.AreEqual(second.ClientPayloads[0], written[4]);
         Assert.AreEqual(strict ? 0u : 6u, transport.PacketWriter.SequenceNumber, "strict key exchange restarts at every NEWKEYS");
         Assert.AreEqual(strict ? 0u : 6u, transport.PacketReader.SequenceNumber);
+    }
+
+    [TestMethod]
+    [DataRow("aes128-ctr", "hmac-sha2-256", "Failure establishing ssh session: -4, Unable to exchange encryption keys", DisplayName = "MAC-then-encrypt")]
+    [DataRow("aes256-ctr", "hmac-sha2-512-etm@openssh.com", "Failure establishing ssh session: -4, Unable to exchange encryption keys", DisplayName = "encrypt-then-MAC")]
+    [DataRow("aes256-gcm@openssh.com", null, "Failure establishing ssh session: -12, Unable to exchange encryption keys", DisplayName = "AES-GCM")]
+    public async Task ReExchangeKeysAsync_ServerPacketFailsItsCheck_EndsTheSessionWithLibssh2sCode(string cipher, string? mac, string expectedMessage)
+    {
+        TestHostKey hostKey = TestHostKey.Dsa();
+        SshKexInit serverKexInit = ServerKexInit("ecdh-sha2-nistp256", hostKey.Algorithm, strict: true) with
+        {
+            CipherClientToServer = [cipher],
+            CipherServerToClient = [cipher],
+            MacClientToServer = [mac ?? "hmac-sha2-256"],
+            MacServerToClient = [mac ?? "hmac-sha2-256"],
+        };
+        TestEphemeralKeys keys = new();
+        TestKeyExchangeServer first = TestKeyExchangeServer.Answer("ecdh-sha2-nistp256", hostKey, keys, ClientKexInit, serverKexInit.ToPayload());
+        SshServerScript script = new SshServerScript().Line(TestKeyExchangeServer.ServerIdentification).KexInit(serverKexInit);
+        first.ServerPayloads.ForEach(payload => script.Packet(payload));
+        script.Packet(SshMessageNumber.NewKeys)
+            .Protect(SshPacketProtections.ForServerToClient(SshTestAlgorithms.With(cipher, mac), first.Keys(first.ExchangeHash)), resetSequenceNumber: true)
+            .Packet([SshMessageNumber.Ignore, 0, 0, 0, 0], sealedPacket => sealedPacket[^1] ^= 0x10);
+        SshTransport transport = new(new ScriptedConnection(script.Bytes), SshAlgorithmPreferences.Full, EverythingImplemented, new RepeatingRandomSource(0x33), keys);
+        await transport.ExchangeKeysAsync(await transport.NegotiateAlgorithmsAsync(CancellationToken.None), CancellationToken.None);
+        byte[] secondServerKexInit = ServerKexInit("diffie-hellman-group14-sha256", hostKey.Algorithm, strict: false).ToPayload();
+
+        SshTransferException failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
+            async () => await transport.ReExchangeKeysAsync(secondServerKexInit, CancellationToken.None));
+
+        Assert.AreEqual(CurlExitCode.FailedInit, failure.ExitCode);
+        Assert.AreEqual(expectedMessage, failure.Message);
     }
 
     [TestMethod]

@@ -1,17 +1,23 @@
 using System.Buffers.Binary;
 using System.Text;
 using Curl.Protocol.Ssh.Negotiation;
+using Curl.Protocol.Ssh.PacketProtection;
 using Curl.Protocol.Ssh.Transport;
 
 namespace Curl.Protocol.Ssh.Fakes;
 
 /// <summary>
 /// Builds the bytes an in-memory SSH server sends, framing packets with the library's own
-/// padding rule and 0xEE padding bytes.
+/// padding rule and 0xEE padding bytes, unprotected until <see cref="Protect" /> installs
+/// the server's keys.
 /// </summary>
 internal sealed class SshServerScript
 {
     private readonly MemoryStream output = new();
+
+    private ISshPacketProtection protection = new SshPlainPacketProtection();
+
+    private uint sequenceNumber;
 
     /// <summary>
     /// Gets everything scripted so far.
@@ -46,6 +52,20 @@ internal sealed class SshServerScript
     }
 
     /// <summary>
+    /// Seals every packet scripted from now on with <paramref name="newProtection" />, as a
+    /// server does after its <c>NEWKEYS</c>.
+    /// </summary>
+    /// <param name="newProtection">The server-to-client protection.</param>
+    /// <param name="resetSequenceNumber">Whether the sequence number restarts at 0, as under strict key exchange.</param>
+    /// <returns>This script.</returns>
+    internal SshServerScript Protect(ISshPacketProtection newProtection, bool resetSequenceNumber)
+    {
+        protection = newProtection;
+        sequenceNumber = resetSequenceNumber ? 0 : sequenceNumber;
+        return this;
+    }
+
+    /// <summary>
     /// Appends a line of text followed by CR LF.
     /// </summary>
     /// <param name="line">The line.</param>
@@ -64,21 +84,36 @@ internal sealed class SshServerScript
     }
 
     /// <summary>
-    /// Appends one well-framed packet carrying <paramref name="payload" />.
+    /// Appends one well-framed packet carrying <paramref name="payload" />, sealed by the
+    /// current protection.
     /// </summary>
     /// <param name="payload">The payload.</param>
     /// <returns>This script.</returns>
-    internal SshServerScript Packet(params byte[] payload)
+    internal SshServerScript Packet(params byte[] payload) => Packet(payload, tamper: null);
+
+    /// <summary>
+    /// Appends one well-framed packet carrying <paramref name="payload" />, sealed by the
+    /// current protection, then changed by <paramref name="tamper" /> on the wire.
+    /// </summary>
+    /// <param name="payload">The payload.</param>
+    /// <param name="tamper">Changes the sealed bytes in place, or <see langword="null" />.</param>
+    /// <returns>This script.</returns>
+    internal SshServerScript Packet(byte[] payload, Action<byte[]>? tamper)
     {
-        int paddingLength = SshPacketWriter.PaddingLengthFor(payload.Length);
-        byte[] padding = new byte[paddingLength];
-        padding.AsSpan().Fill(0xEE);
-        return RawPacket((uint)(1 + payload.Length + paddingLength), (byte)paddingLength, [.. payload, .. padding]);
+        int paddingLength = SshPacketWriter.PaddingLengthFor(payload.Length, protection.BlockSize, protection.PadsPacketLengthField);
+        byte[] packet = new byte[5 + payload.Length + paddingLength];
+        BinaryPrimitives.WriteUInt32BigEndian(packet, (uint)(packet.Length - 4));
+        packet[4] = (byte)paddingLength;
+        payload.CopyTo(packet, 5);
+        packet.AsSpan(5 + payload.Length).Fill(0xEE);
+        byte[] sealedPacket = protection.Seal(sequenceNumber++, packet);
+        tamper?.Invoke(sealedPacket);
+        return Raw(sealedPacket);
     }
 
     /// <summary>
     /// Appends a packet whose <c>packet_length</c> and <c>padding_length</c> are given
-    /// verbatim, followed by <paramref name="rest" />.
+    /// verbatim, followed by <paramref name="rest" />, unprotected.
     /// </summary>
     /// <param name="packetLength">The <c>packet_length</c> field.</param>
     /// <param name="paddingLength">The <c>padding_length</c> field.</param>
@@ -89,6 +124,7 @@ internal sealed class SshServerScript
         byte[] header = new byte[5];
         BinaryPrimitives.WriteUInt32BigEndian(header, packetLength);
         header[4] = paddingLength;
+        sequenceNumber++;
         return Raw([.. header, .. rest]);
     }
 

@@ -3,6 +3,7 @@ using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ssh.HostKeys;
 using Curl.Protocol.Ssh.KeyExchange;
 using Curl.Protocol.Ssh.Negotiation;
+using Curl.Protocol.Ssh.PacketProtection;
 
 namespace Curl.Protocol.Ssh.Transport;
 
@@ -107,7 +108,9 @@ internal sealed class SshTransport
     /// Runs the agreed key-exchange method, checks the server's signature over the exchange
     /// hash with the agreed host-key algorithm, and exchanges <c>NEWKEYS</c>. Under strict
     /// key exchange each direction's sequence number restarts at 0 after its
-    /// <c>NEWKEYS</c>. The first exchange's hash becomes the session identifier.
+    /// <c>NEWKEYS</c>. The first exchange's hash becomes the session identifier. Each
+    /// direction takes the new keys into use at its <c>NEWKEYS</c>: the client's packets
+    /// once its own is sent, the server's once the server's arrives.
     /// </summary>
     /// <param name="handshake">What <see cref="NegotiateAlgorithmsAsync" /> agreed.</param>
     /// <param name="cancellationToken">Cancels the exchange.</param>
@@ -116,8 +119,11 @@ internal sealed class SshTransport
     /// Exit 2 with <c>Failure establishing ssh session: -8, Unable to exchange encryption
     /// keys</c>, as measured, when the peer closes, sends an unexpected or malformed
     /// message, a public value outside its group, a host key or signature of another type,
-    /// or a signature that does not verify.
+    /// or a signature that does not verify; with <c>-4</c> (a MAC) or <c>-12</c> (an AES-GCM
+    /// tag) in place of <c>-8</c> when a re-exchange reads a packet that fails its check
+    /// (ADR-0207).
     /// </exception>
+    /// <exception cref="NotSupportedException">The agreed method, host key, cipher or MAC is not implemented.</exception>
     internal async ValueTask<SshKeyExchangeResult> ExchangeKeysAsync(SshNegotiatedHandshake handshake, CancellationToken cancellationToken)
     {
         bool isFirstExchange = sessionIdentifier is null;
@@ -138,18 +144,20 @@ internal sealed class SshTransport
                 throw new InvalidDataException("The SSH server's signature over the exchange hash does not verify.");
             }
 
-            await SwitchKeysAsync(messages, cancellationToken).ConfigureAwait(false);
-            sessionIdentifier ??= outcome.ExchangeHash;
+            byte[] session = sessionIdentifier ?? outcome.ExchangeHash;
+            SshKeyDerivation keys = new(outcome.HashAlgorithm, outcome.SharedSecret, outcome.ExchangeHash, session);
+            await SwitchKeysAsync(messages, handshake.Algorithms, keys, cancellationToken).ConfigureAwait(false);
+            sessionIdentifier = session;
             serverIdentification = handshake.ServerIdentification;
-            return new SshKeyExchangeResult(
-                handshake.Algorithms,
-                outcome.ExchangeHash,
-                sessionIdentifier,
-                new SshKeyDerivation(outcome.HashAlgorithm, outcome.SharedSecret, outcome.ExchangeHash, sessionIdentifier));
+            return new SshKeyExchangeResult(handshake.Algorithms, outcome.ExchangeHash, session, keys);
         }
         catch (Exception exception) when (exception is InvalidDataException or EndOfStreamException or CryptographicException)
         {
             throw KeyExchangeMethodFailed();
+        }
+        catch (SshPacketAuthenticationException exception)
+        {
+            throw SshTransferException.SessionEstablishmentFailed(exception.Libssh2ErrorCode, Libssh2ErrorCode.UnableToExchangeEncryptionKeys);
         }
     }
 
@@ -207,15 +215,19 @@ internal sealed class SshTransport
         return clientPayload;
     }
 
-    private async ValueTask SwitchKeysAsync(SshKeyExchangeMessages messages, CancellationToken cancellationToken)
+    private async ValueTask SwitchKeysAsync(SshKeyExchangeMessages messages, SshNegotiatedAlgorithms algorithms, SshKeyDerivation keys, CancellationToken cancellationToken)
     {
+        ISshPacketProtection clientToServer = SshPacketProtections.ForClientToServer(algorithms, keys);
+        ISshPacketProtection serverToClient = SshPacketProtections.ForServerToClient(algorithms, keys);
         await messages.SendAsync([SshMessageNumber.NewKeys], cancellationToken).ConfigureAwait(false);
+        PacketWriter.ChangeProtection(clientToServer);
         if (isStrictKeyExchange)
         {
             PacketWriter.ResetSequenceNumber();
         }
 
         await messages.ReadAsync(SshMessageNumber.NewKeys, cancellationToken).ConfigureAwait(false);
+        PacketReader.ChangeProtection(serverToClient);
         if (isStrictKeyExchange)
         {
             PacketReader.ResetSequenceNumber();

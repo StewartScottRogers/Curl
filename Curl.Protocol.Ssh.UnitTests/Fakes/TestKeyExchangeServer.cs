@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Curl.Cryptography;
+using Curl.Protocol.Ssh.KeyExchange;
 using static Curl.Protocol.Ssh.Fakes.SshTestEncoding;
 
 namespace Curl.Protocol.Ssh.Fakes;
@@ -126,6 +127,12 @@ internal sealed record TestKeyExchangeServer(
         serverKey.TryComputeSharedSecret(e, k);
         return (e, f, k);
     }
+
+    /// <summary>
+    /// The library's derivation of this exchange's keys, for building the server's packet
+    /// protection; <see cref="DeriveKey" /> checks the derivation itself independently.
+    /// </summary>
+    internal SshKeyDerivation Keys(byte[] sessionIdentifier) => new(Hash, SharedSecret, ExchangeHash, sessionIdentifier);
 
     /// <summary>
     /// Derives one key as RFC 4253 section 7.2 defines it.

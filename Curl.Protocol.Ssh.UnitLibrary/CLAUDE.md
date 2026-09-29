@@ -16,10 +16,13 @@ Folders follow ADR-0122's structure. `Transport` frames packets and runs the
 handshake (`SshTransport`: identification, `KEXINIT`, key exchange, `NEWKEYS`, a
 server's re-exchange); `Negotiation` holds the presets and the catalogue of
 implemented names; `KeyExchange` holds one `ISshKeyExchange` per method family and
-`SshKeyDerivation`; `HostKeys` holds one `ISshSignatureVerifier` per host-key type.
-A new algorithm registers in `SshKeyExchangeMethods` or `SshSignatureVerifiers`, and
+`SshKeyDerivation`; `HostKeys` holds one `ISshSignatureVerifier` per host-key type;
+`PacketProtection` holds one `ISshPacketProtection` per cipher family, which the packet
+reader and writer switch to at each `NEWKEYS` (ADR-0207). A new algorithm registers in
+`SshKeyExchangeMethods`, `SshSignatureVerifiers` or `SshPacketProtections`, and
 `SshAlgorithmCatalogue.Implemented` offers it from then on. Failure messages and
-their libssh2 codes are ADR-0122's and ADR-0206's, measured from the reference builds.
+their libssh2 codes are ADR-0122's, ADR-0206's and ADR-0207's, measured from the
+reference builds.
 
 Never construct a `Socket`, `SslStream` or `HttpClient` here. Take `IConnection`
 so the tests in the matching `.UnitTests` project can drive this code from a

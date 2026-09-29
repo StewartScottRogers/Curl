@@ -1,11 +1,16 @@
 using System.Buffers.Binary;
+using System.Security.Cryptography;
 using Curl.Protocol.Ssh.Fakes;
+using Curl.Protocol.Ssh.KeyExchange;
+using Curl.Protocol.Ssh.PacketProtection;
 
 namespace Curl.Protocol.Ssh.Transport;
 
 [TestClass]
 public sealed class SshPacketReaderTests
 {
+    private static readonly SshKeyDerivation ReaderKeys = new(HashAlgorithmName.SHA256, [7], [.. new byte[32]], [.. new byte[32]]);
+
     [TestMethod]
     public async Task ReadAsync_ReturnsThePayloadOfEachPacketAndCountsSequenceNumbers()
     {
@@ -54,6 +59,39 @@ public sealed class SshPacketReaderTests
     {
         byte[] bytes = new SshServerScript().RawPacket(packetLength, paddingLength, new byte[64]).Bytes;
         SshPacketReader reader = new(new SshConnectionReader(new ScriptedConnection(bytes)));
+
+        await Assert.ThrowsExactlyAsync<InvalidDataException>(async () => await reader.ReadAsync(CancellationToken.None));
+    }
+
+    [TestMethod]
+    [DataRow("aes128-ctr", "hmac-sha2-256", -4, DisplayName = "MAC-then-encrypt")]
+    [DataRow("aes128-ctr", "hmac-sha2-256-etm@openssh.com", -4, DisplayName = "encrypt-then-MAC")]
+    [DataRow("aes128-gcm@openssh.com", null, -12, DisplayName = "AES-GCM")]
+    public async Task ReadAsync_ProtectedPacketAltered_ThrowsWithLibssh2sCode(string cipher, string? mac, int expectedCode)
+    {
+        byte[] bytes = new SshServerScript()
+            .Protect(SshPacketProtections.ForServerToClient(SshTestAlgorithms.With(cipher, mac), ReaderKeys), resetSequenceNumber: true)
+            .Packet([6, 1, 2, 3], sealedPacket => sealedPacket[^1] ^= 1)
+            .Bytes;
+        SshPacketReader reader = new(new SshConnectionReader(new ScriptedConnection(bytes)));
+        reader.ChangeProtection(SshPacketProtections.ForServerToClient(SshTestAlgorithms.With(cipher, mac), ReaderKeys));
+
+        SshPacketAuthenticationException failure = await Assert.ThrowsExactlyAsync<SshPacketAuthenticationException>(
+            async () => await reader.ReadAsync(CancellationToken.None));
+
+        Assert.AreEqual(expectedCode, failure.Libssh2ErrorCode);
+        Assert.AreEqual(0u, reader.SequenceNumber, "a packet that fails its check is not counted");
+    }
+
+    [TestMethod]
+    [DataRow(0u, DisplayName = "zero length")]
+    [DataRow(20u, DisplayName = "not a multiple of 16 without the length field")]
+    [DataRow(28u, DisplayName = "a multiple of 16 only with the length field")]
+    public async Task ReadAsync_EncryptThenMacFraming_RefusesLengthsOffTheBlockSize(uint packetLength)
+    {
+        byte[] bytes = [.. SshTestEncoding.UInt32(packetLength), .. new byte[128]];
+        SshPacketReader reader = new(new SshConnectionReader(new ScriptedConnection(bytes)));
+        reader.ChangeProtection(SshPacketProtections.ForServerToClient(SshTestAlgorithms.With("aes128-gcm@openssh.com", null), ReaderKeys));
 
         await Assert.ThrowsExactlyAsync<InvalidDataException>(async () => await reader.ReadAsync(CancellationToken.None));
     }

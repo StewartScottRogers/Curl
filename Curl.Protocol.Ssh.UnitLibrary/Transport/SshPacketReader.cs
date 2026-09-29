@@ -1,19 +1,24 @@
-using System.Buffers.Binary;
+using Curl.Protocol.Ssh.PacketProtection;
 
 namespace Curl.Protocol.Ssh.Transport;
 
 /// <summary>
-/// Reads unencrypted binary packets (RFC 4253 section 6), checks their framing and counts
-/// each packet's sequence number.
+/// Reads binary packets (RFC 4253 section 6) through the direction's
+/// <see cref="ISshPacketProtection" />, checks their framing and counts each packet's
+/// sequence number. Packets are unprotected until the transport installs the keys of the
+/// first <c>NEWKEYS</c>.
 /// </summary>
 /// <param name="reader">The buffered reader over the connection.</param>
 internal sealed class SshPacketReader(SshConnectionReader reader)
 {
     /// <summary>
-    /// The largest whole packet accepted, <c>packet_length</c> field included: libssh2
-    /// 1.11.1's <c>LIBSSH2_PACKET_MAXPAYLOAD</c>, above RFC 4253's minimum of 35000.
+    /// The largest whole packet accepted, <c>packet_length</c> field included and MAC
+    /// excluded: libssh2 1.11.1's <c>LIBSSH2_PACKET_MAXPAYLOAD</c>, above RFC 4253's
+    /// minimum of 35000.
     /// </summary>
     internal const int MaximumPacketSize = 40000;
+
+    private ISshPacketProtection protection = new SshPlainPacketProtection();
 
     /// <summary>
     /// Gets the sequence number the next packet read carries: 0 for the first, wrapping
@@ -28,23 +33,38 @@ internal sealed class SshPacketReader(SshConnectionReader reader)
     internal void ResetSequenceNumber() => SequenceNumber = 0;
 
     /// <summary>
+    /// Opens every packet from now on with <paramref name="newProtection" />, the
+    /// server-to-client keys taken into use when the server's <c>NEWKEYS</c> arrives, and
+    /// disposes the protection it replaces.
+    /// </summary>
+    /// <param name="newProtection">The new keys' protection.</param>
+    internal void ChangeProtection(ISshPacketProtection newProtection)
+    {
+        protection.Dispose();
+        protection = newProtection;
+    }
+
+    /// <summary>
     /// Reads one packet and returns its payload.
     /// </summary>
     /// <param name="cancellationToken">Cancels the read.</param>
     /// <returns>The payload, starting with its message number.</returns>
     /// <exception cref="EndOfStreamException">The peer closed before the packet was whole.</exception>
     /// <exception cref="InvalidDataException">
-    /// The packet is larger than <see cref="MaximumPacketSize" />, not a multiple of
-    /// <see cref="SshPacketWriter.BlockSize" />, has fewer than
-    /// <see cref="SshPacketWriter.MinimumPadding" /> padding bytes, or has no payload.
+    /// The packet is larger than <see cref="MaximumPacketSize" />, not a multiple of the
+    /// protection's block size, has fewer than <see cref="SshPacketWriter.MinimumPadding" />
+    /// padding bytes, or has no payload.
     /// </exception>
+    /// <exception cref="SshPacketAuthenticationException">The packet's MAC or tag does not match.</exception>
     internal async ValueTask<byte[]> ReadAsync(CancellationToken cancellationToken)
     {
-        byte[] lengthBytes = await reader.ReadExactlyAsync(sizeof(uint), cancellationToken).ConfigureAwait(false);
-        uint packetLength = BinaryPrimitives.ReadUInt32BigEndian(lengthBytes);
+        byte[] lengthBlock = await reader.ReadExactlyAsync(protection.LengthBlockLength, cancellationToken).ConfigureAwait(false);
+        uint packetLength = protection.DecryptPacketLength(SequenceNumber, lengthBlock);
         RejectBadLength(packetLength);
 
-        byte[] packet = await reader.ReadExactlyAsync((int)packetLength, cancellationToken).ConfigureAwait(false);
+        int remainderLength = sizeof(uint) + (int)packetLength - lengthBlock.Length + protection.TagLength;
+        byte[] remainder = await reader.ReadExactlyAsync(remainderLength, cancellationToken).ConfigureAwait(false);
+        byte[] packet = protection.Open(SequenceNumber, lengthBlock, remainder);
         int paddingLength = packet[0];
         int payloadLength = packet.Length - 1 - paddingLength;
         if (paddingLength < SshPacketWriter.MinimumPadding || payloadLength < 1)
@@ -56,11 +76,12 @@ internal sealed class SshPacketReader(SshConnectionReader reader)
         return packet.AsSpan(1, payloadLength).ToArray();
     }
 
-    private static void RejectBadLength(uint packetLength)
+    private void RejectBadLength(uint packetLength)
     {
-        if (packetLength > MaximumPacketSize - sizeof(uint) || (packetLength + sizeof(uint)) % SshPacketWriter.BlockSize != 0)
+        uint alignedLength = protection.PadsPacketLengthField ? packetLength + sizeof(uint) : packetLength;
+        if (packetLength == 0 || packetLength > MaximumPacketSize - sizeof(uint) || alignedLength % protection.BlockSize != 0)
         {
-            throw new InvalidDataException($"The SSH packet length {packetLength} is not a valid unencrypted packet length.");
+            throw new InvalidDataException($"The SSH packet length {packetLength} is not a valid packet length.");
         }
     }
 }

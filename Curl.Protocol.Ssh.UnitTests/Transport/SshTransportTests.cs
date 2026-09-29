@@ -116,11 +116,20 @@ public sealed partial class SshTransportTests
     }
 
     [TestMethod]
-    public async Task NegotiateAlgorithmsAsync_TodaysCatalogue_FailsEveryServerWithMinus5()
+    [DataRow(false, "aes256-gcm@openssh.com", null, DisplayName = "OpenSSL preset")]
+    [DataRow(true, "aes256-ctr", "hmac-sha2-256", DisplayName = "Windows preset")]
+    public async Task NegotiateAlgorithmsAsync_TodaysCatalogue_AgreesACipherAndMacWithAnOpenSshServer(bool windows, string cipher, string? mac)
     {
         byte[] serverBytes = new SshServerScript().Line("SSH-2.0-OpenSSH_9.7").KexInit(SshServerScript.OpenSshKexInit()).Bytes;
+        SshAlgorithmPreferences preferences = windows ? SshAlgorithmPreferences.WindowsReference : SshAlgorithmPreferences.OpenSslReference;
+        SshTransport transport = new(new ScriptedConnection(serverBytes), preferences, SshAlgorithmCatalogue.Implemented, new RepeatingRandomSource(0), new SystemSshEphemeralKeySource());
 
-        await AssertFailsAsync(serverBytes, SshAlgorithmCatalogue.Implemented, KeyExchangeFailed);
+        SshNegotiatedHandshake handshake = await transport.NegotiateAlgorithmsAsync(CancellationToken.None);
+
+        Assert.AreEqual(cipher, handshake.Algorithms.CipherClientToServer);
+        Assert.AreEqual(cipher, handshake.Algorithms.CipherServerToClient);
+        Assert.AreEqual(mac, handshake.Algorithms.MacClientToServer);
+        Assert.AreEqual(mac, handshake.Algorithms.MacServerToClient);
     }
 
     [TestMethod]
