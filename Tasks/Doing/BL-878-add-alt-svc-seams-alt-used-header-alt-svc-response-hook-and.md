@@ -58,3 +58,4 @@ store that answers what it added.
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-29: Backlog -> Doing.
