@@ -310,7 +310,7 @@ public sealed class WsProtocolHandlerTests
             "\r\n",
             Encoding.Latin1.GetString(connection.Sent));
         HttpAuthRequest asked = authenticator.Requests.Single();
-        Assert.AreEqual(new HttpAuthRequest("GET", asked.Url, "/p?q=1", credential, "t", HttpAuthSchemes.Basic, false), asked);
+        Assert.AreEqual(new HttpAuthRequest("GET", asked.Url, "/p?q=1", credential, "t", HttpAuthSchemes.Basic, false), asked with { Events = NoTransferEvents.Instance });
         Assert.AreEqual(0, authenticator.Challenges.Single().Count);
     }
 

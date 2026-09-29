@@ -21,7 +21,9 @@ namespace Curl.Protocol.Ws;
 /// <c>--oauth2-bearer</c> and <c>--negotiate</c>, with no challenges, through
 /// <see cref="IHttpAuthenticator.CreateAuthorizationAsync" /> (ADR-0227). It is asked once:
 /// a <c>401</c> is refused like any other status, and no continuation is asked for, because
-/// curl 8.21.0 sends the upgrade only once (ADR-0228).
+/// curl 8.21.0 sends the upgrade only once (ADR-0228). A 401 offering Negotiate to an upgrade
+/// sent without a value is still stepped, never answered, so its context's failure is written as
+/// curl writes it; that failure, or the upgrade's own, is the failed transfer's message (BL-955).
 /// </param>
 /// <param name="randomSource">Supplies the 16 bytes behind <c>Sec-WebSocket-Key</c>.</param>
 /// <remarks>
@@ -98,40 +100,119 @@ public sealed class WsProtocolHandler(
 
         context.Progress.ReportTransferStarted();
         context.Events.ReportInfo(WsInfoLines.UsingHttp1);
+        var authLines = new WsInfoLineRecorder();
+        TransferResult result;
         await using (connection.ConfigureAwait(false))
         {
             try
             {
-                return await UpgradeAsync(connection, context, connect.ConnectionNumber).ConfigureAwait(false);
+                result = await UpgradeAsync(connection, context, connect.ConnectionNumber, authLines).ConfigureAwait(false);
             }
             catch (WsTransferException failure)
             {
                 context.Events.ReportInfo(failure.Message);
                 context.Events.ReportInfo(WsInfoLines.Closing(connect.ConnectionNumber));
-                return TransferResult.Failure(failure.ExitCode, failure.Message);
+                result = TransferResult.Failure(failure.ExitCode, failure.Message);
             }
         }
+
+        return WithFirstAuthFailure(result, authLines.Lines);
     }
+
+    /// <summary>
+    /// Gives a failed transfer the message of the first line the authenticator reported for the
+    /// upgrade request, a Negotiate context's failure, as curl 8.21.0 does: its <c>failf</c> for
+    /// the context fills the error buffer first, so <c>curl: (22)</c> after a refused upgrade and
+    /// <c>curl: (52)</c> after an empty one both carry it (measured, BL-955 Notes).
+    /// </summary>
+    private static TransferResult WithFirstAuthFailure(TransferResult result, IReadOnlyList<string> authLines) =>
+        result.ExitCode != CurlExitCode.Ok && authLines.Count > 0
+            ? result with { ErrorMessage = authLines[0] }
+            : result;
 
     /// <summary>
     /// Reports each line of the reply head as curl's <c>-v</c> does, with
     /// <paramref name="refusal" />, when given, reported before the blank line that ends it, where
-    /// curl 8.21.0 writes <c>Refused WebSocket upgrade</c> (BL-584).
+    /// curl 8.21.0 writes <c>Refused WebSocket upgrade</c> (BL-584), and
+    /// <paramref name="challengeLines" /> just before the first <c>WWW-Authenticate</c> header
+    /// offering Negotiate, where curl writes a 401's Negotiate failure (BL-955).
     /// </summary>
-    private static void ReportHead(ITransferEvents events, byte[] head, string? refusal)
+    private static void ReportHead(ITransferEvents events, byte[] head, string? refusal, IReadOnlyList<string> challengeLines)
     {
+        bool challengeLinesPending = challengeLines.Count > 0;
         int lineStart = 0;
         while (lineStart < head.Length)
         {
             int lineEnd = Array.IndexOf(head, (byte)'\n', lineStart) + 1;
+            ReadOnlySpan<byte> line = head.AsSpan(lineStart, lineEnd - lineStart);
+            if (challengeLinesPending && WsNegotiateInfoLines.IsNegotiateChallenge(line))
+            {
+                ReportInfoLines(events, challengeLines);
+                challengeLinesPending = false;
+            }
+
             if (lineEnd == head.Length && refusal is not null)
             {
                 events.ReportInfo(refusal);
             }
 
-            events.ReportResponseHeader(head.AsSpan(lineStart, lineEnd - lineStart));
+            events.ReportResponseHeader(line);
             lineStart = lineEnd;
         }
+    }
+
+    /// <summary>Reports each of <paramref name="lines" /> to <paramref name="events" />, in order.</summary>
+    private static void ReportInfoLines(ITransferEvents events, IReadOnlyList<string> lines)
+    {
+        foreach (string line in lines)
+        {
+            events.ReportInfo(line);
+        }
+    }
+
+    /// <summary>
+    /// Asks for the upgrade request's pre-emptive <c>Authorization</c> value and writes what curl
+    /// 8.21.0 writes before the request (BL-955): the Negotiate context's failure, reported into
+    /// <paramref name="authLines" />, then <c>Server auth using Negotiate with user '...'</c>
+    /// when Negotiate is picked.
+    /// </summary>
+    private async ValueTask<string?> CreateAuthorizationAsync(HttpAuthRequest request, WsInfoLineRecorder authLines, ITransferEvents events, CancellationToken cancellationToken)
+    {
+        string? authorization = await authenticator.CreateAuthorizationAsync(request with { Events = authLines }, [], cancellationToken).ConfigureAwait(false);
+        ReportInfoLines(events, authLines.Lines);
+        if (WsNegotiateInfoLines.PicksNegotiate(request, authorization))
+        {
+            events.ReportInfo(WsNegotiateInfoLines.ServerAuthUsing(request.Credential));
+        }
+
+        return authorization;
+    }
+
+    /// <summary>
+    /// Steps a Negotiate context for a 401 offering Negotiate to an upgrade sent without an
+    /// <c>Authorization</c> value, as curl 8.21.0's <c>Curl_input_negotiate</c> does while it
+    /// reads the head, and gives the lines it reports; the value is never sent, as curl sends
+    /// the upgrade only once (ADR-0228). Any other response steps nothing.
+    /// </summary>
+    private async ValueTask<IReadOnlyList<string>> StepNegotiateForChallengeAsync(
+        HttpAuthRequest request,
+        string? sentAuthorization,
+        WsUpgradeResponse response,
+        CancellationToken cancellationToken)
+    {
+        string[] challenges = WsNegotiateInfoLines.ChallengesOf(response.Head);
+        bool stepsNegotiate = response.StatusCode == 401
+            && sentAuthorization is null
+            && (request.AllowedSchemes & HttpAuthSchemes.Negotiate) != 0
+            && challenges.Any(WsNegotiateInfoLines.OffersNegotiate);
+        if (!stepsNegotiate)
+        {
+            return [];
+        }
+
+        var challengeLines = new WsInfoLineRecorder();
+        await authenticator.CreateAuthorizationAsync(request with { Events = challengeLines }, challenges, cancellationToken).ConfigureAwait(false);
+        return challengeLines.Lines;
     }
 
     /// <summary>
@@ -139,21 +220,19 @@ public sealed class WsProtocolHandler(
     /// <c>--trace</c> as curl 8.21.0 does (BL-584): the request as one header event, the head
     /// one line at a time, and on a refusal <c>closing connection #N</c>.
     /// </summary>
-    private async Task<TransferResult> UpgradeAsync(IConnection connection, ITransferContext context, long connectionNumber)
+    private async Task<TransferResult> UpgradeAsync(IConnection connection, ITransferContext context, long connectionNumber, WsInfoLineRecorder authLines)
     {
         HttpRequestOptions options = context.Http ?? new HttpRequestOptions();
         string method = options.CustomMethod ?? (context.NoBody ? "HEAD" : "GET");
-        string? authorization = await authenticator.CreateAuthorizationAsync(
-            new HttpAuthRequest(
-                method,
-                context.Url,
-                WsUpgradeRequestFormatter.RequestTarget(context.Url),
-                context.Credentials,
-                options.BearerToken,
-                options.AuthSchemes,
-                IsProxy: false),
-            [],
-            context.CancellationToken).ConfigureAwait(false);
+        var authRequest = new HttpAuthRequest(
+            method,
+            context.Url,
+            WsUpgradeRequestFormatter.RequestTarget(context.Url),
+            context.Credentials,
+            options.BearerToken,
+            options.AuthSchemes,
+            IsProxy: false);
+        string? authorization = await CreateAuthorizationAsync(authRequest, authLines, context.Events, context.CancellationToken).ConfigureAwait(false);
         byte[] request = WsUpgradeRequestFormatter.Format(context.Url, options, method, NewKey(), authorization);
         context.Events.ReportRequestHeader(request);
         await SendAsync(connection, request, context.CancellationToken).ConfigureAwait(false);
@@ -172,13 +251,10 @@ public sealed class WsProtocolHandler(
         };
         if (response.StatusCode != SwitchingProtocols)
         {
-            string message = string.Create(CultureInfo.InvariantCulture, $"Refused WebSocket upgrade: {response.StatusCode}");
-            ReportHead(context.Events, response.Head, message);
-            context.Events.ReportInfo(WsInfoLines.Closing(connectionNumber));
-            return TransferResult.Failure(CurlExitCode.HttpReturnedError, message) with { Report = report };
+            return (await RefuseAsync(context, authRequest, authorization, response, connectionNumber).ConfigureAwait(false)) with { Report = report };
         }
 
-        ReportHead(context.Events, response.Head, refusal: null);
+        ReportHead(context.Events, response.Head, refusal: null, challengeLines: []);
         log.UpgradeAccepted();
         context.Events.ReportInfo(WsInfoLines.SwitchingToWebSocket);
         context.Events.ReportInfo(WsInfoLines.SwitchedToWebSocket);
@@ -187,6 +263,26 @@ public sealed class WsProtocolHandler(
             : await ExchangeFramesAsync(connection, context, response.Remaining, report).ConfigureAwait(false);
         ReportTransferEnd(context.Events, result, connectionNumber);
         return result;
+    }
+
+    /// <summary>
+    /// Fails a reply that refuses the upgrade with exit 22 as curl 8.21.0 does (BL-584): the
+    /// head with <c>Refused WebSocket upgrade: &lt;code&gt;</c> before its blank line, then
+    /// <c>closing connection #N</c>. A 401 offering Negotiate is stepped first, its failure
+    /// written before the Negotiate header and made the message (BL-955).
+    /// </summary>
+    private async ValueTask<TransferResult> RefuseAsync(
+        ITransferContext context,
+        HttpAuthRequest authRequest,
+        string? authorization,
+        WsUpgradeResponse response,
+        long connectionNumber)
+    {
+        IReadOnlyList<string> challengeLines = await StepNegotiateForChallengeAsync(authRequest, authorization, response, context.CancellationToken).ConfigureAwait(false);
+        string message = string.Create(CultureInfo.InvariantCulture, $"Refused WebSocket upgrade: {response.StatusCode}");
+        ReportHead(context.Events, response.Head, message, challengeLines);
+        context.Events.ReportInfo(WsInfoLines.Closing(connectionNumber));
+        return TransferResult.Failure(CurlExitCode.HttpReturnedError, challengeLines.FirstOrDefault() ?? message);
     }
 
     /// <summary>

@@ -59,7 +59,7 @@ with its trailing space.
   not measured.
 - **`HttpAuthRequest` carries the sink.** It gains `Events`, an init-only
   `ITransferEvents` defaulting to `NoTransferEvents.Instance`, so no authenticator, fake or
-  caller changes. Only the HTTP handler sets it; the WebSocket handler does not yet (BL-955).
+  caller changes. The HTTP handler sets it, and the WebSocket handler since BL-955 (below).
 - **The HTTP handler places the lines.** The first request's value is made before the
   connection opens, into an `HttpInfoLineRecorder`; its lines are written after
   `using HTTP/1.x` and before the request, then `Server auth using Negotiate with user '...'`
@@ -76,6 +76,30 @@ with its trailing space.
   Bearer and NTLM, and `Proxy auth using ...`, follow the same pattern but change `-v` output
   across the HTTP tests and depend on conditions (custom `Authorization`, redirects to
   another host) to measure first; BL-954 does them.
+
+### Amendment: the WebSocket upgrade (BL-955, 2026-09-29)
+
+Decided by Claude under Stewart's delegation. Measured with curl 8.21.0 Schannel and
+`Record-CurlExchange.ps1`: `--negotiate -u : -v ws://...` (and with no `-u`) against the same
+`401 Negotiate` writes `using HTTP/1.x`, the failure, `Server auth using Negotiate with user ''`,
+the upgrade request, `Request completely sent off`, the status line, the failure again just
+before `WWW-Authenticate: Negotiate`, the rest of the head with `Refused WebSocket upgrade: 401`
+before its blank line, and `closing connection #0`. The upgrade is still sent only once
+(ADR-0228). The error message differs from HTTP's refusal: `curl: (22)` carries the context's
+failure, not `Refused WebSocket upgrade: 401`, and a `101` that closes with no frames ends
+`curl: (52)` with it too, since curl's first `failf` fills the error buffer.
+
+- `WsProtocolHandler` asks for the upgrade's value with `Events` set to a `WsInfoLineRecorder`,
+  writes what it recorded after `using HTTP/1.x`, then the `Server auth using Negotiate` line
+  when Negotiate is picked (`WsNegotiateInfoLines.PicksNegotiate`, the HTTP rule for a first
+  request).
+- A `401` offering Negotiate, to an upgrade that sent no `Authorization` and allows Negotiate,
+  is stepped through `CreateAuthorizationAsync` with the head's challenges; the value is
+  discarded, and the lines it reports are written before the first header offering Negotiate.
+  An upgrade that did send a value is not stepped again: no curl on hand has a ticket to show
+  what it writes then.
+- A failed transfer's message is the first line the upgrade's step reported, else the 401
+  step's, else the handler's own.
 
 ## Consequences
 
