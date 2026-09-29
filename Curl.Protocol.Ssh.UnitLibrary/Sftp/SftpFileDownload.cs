@@ -8,7 +8,8 @@ namespace Curl.Protocol.Ssh.Sftp;
 /// starts the SFTP session, sends <c>REALPATH .</c> for the home directory, opens the
 /// URL's path for reading, asks its size with <c>STAT</c>, reads it with reads kept in
 /// flight, writes each answer's bytes to the output as it arrives and reports progress,
-/// and closes the handle. The channel stays open for the handler's teardown.
+/// closes the handle, and closes the channel with <c>EOF</c> and <c>CLOSE</c>, as measured.
+/// A failure before the copy leaves the channel open for the handler's <c>DISCONNECT</c>.
 /// </summary>
 /// <param name="transport">The transport, after the user is authenticated.</param>
 internal sealed class SftpFileDownload(SshTransport transport)
@@ -52,6 +53,7 @@ internal sealed class SftpFileDownload(SshTransport transport)
         Copy copy = new(new SftpReadAhead(session, handle, size), size, output, progress);
         TransferResult result = await copy.RunAsync(cancellationToken).ConfigureAwait(false);
         await CloseIgnoringFailureAsync(session, handle, cancellationToken).ConfigureAwait(false);
+        await ShutdownIgnoringFailureAsync(session, cancellationToken).ConfigureAwait(false);
         return result;
     }
 
@@ -74,6 +76,19 @@ internal sealed class SftpFileDownload(SshTransport transport)
         try
         {
             await session.CloseHandleAsync(handle, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (SshConnectionFailure.Is(exception))
+        {
+        }
+    }
+
+    // Measured (ADR-0220): curl's CHANNEL_EOF, then its CHANNEL_CLOSE after the server's.
+    // A broken connection has already decided the transfer's outcome.
+    private static async ValueTask ShutdownIgnoringFailureAsync(SftpSession session, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await session.ShutdownAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (Exception exception) when (SshConnectionFailure.Is(exception))
         {
