@@ -4,7 +4,7 @@ title: Decompress server certificates to RFC 8879 in the hand-built TLS client
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-699, BL-785]
+depends-on: [BL-699, BL-785, BL-860]
 touches: [Curl.Tls.UnitLibrary, Curl.Tls.UnitTests]
 requirement: none
 created: 2026-09-28
@@ -19,7 +19,7 @@ The hand-built TLS 1.3 client offers `compress_certificate` (27) with the algori
 ## Context
 
 - ADR-0140 (BL-695): the measured OpenSSL 3.5.5 ClientHello carries `compress_certificate` `0400010003`; the hand-built client supports every extension an official build offers.
-- RFC 8879: the uncompressed length is checked against the declared `uncompressed_length` and a limit (2^24); a mismatch or a decompression failure is a `bad_certificate` alert. zlib through the BCL's `ZLibStream`, Brotli through `BrotliDecoder`, Zstandard through the decoder BL-785 places (add that reference here, as ADR-0120 amended by BL-785 allows).
+- RFC 8879: the uncompressed length is checked against the declared `uncompressed_length` and a limit (2^24); a mismatch or a decompression failure is a `bad_certificate` alert. zlib through the BCL's `ZLibStream`, Brotli through `BrotliDecoder`, Zstandard through `Curl.Zstandard.UnitLibrary`'s `ZstandardDecoder.TryDecompress` into a buffer of the declared length (ADR-0185, built by BL-857 to BL-860; add that reference here, as ADR-0120 amended by ADR-0185 allows).
 - Builds on BL-699 (TLS 1.3 handshake) and BL-698 (codecs).
 
 ## Acceptance criteria
