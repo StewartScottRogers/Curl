@@ -8,7 +8,7 @@ depends-on: [BL-768, BL-760, BL-761]
 touches: [RunDarkFactory.ps1, .github/board]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-29
 ---
 # BL-770 — Publish the auto lane count and its reason in status.json and show it on the task board page
 
@@ -41,20 +41,27 @@ During an Auto shift, the `status.json` the coordinator publishes to the `board`
 
 ## Acceptance criteria
 
-- [ ] `powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestHeartbeat` exits 0. The `status.json` it prints parses with `ConvertFrom-Json` and has `autoLanes` with exactly the fields `lanes`, `target`, `binding`, `reason` and `changedAt`, and `schema` still 1.
-- [ ] Reading the diff shows each of these:
+- [x] `powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestHeartbeat` exits 0. The `status.json` it prints parses with `ConvertFrom-Json` and has `autoLanes` with exactly the fields `lanes`, `target`, `binding`, `reason` and `changedAt`, and `schema` still 1.
+- [x] Reading the diff shows each of these:
   - the Auto step updates the script-scope value on every step;
   - the publisher writes it as `autoLanes`;
   - a fixed-lane shift writes `null`.
-- [ ] Dumping `http://localhost:8000/site/index.html?tree=../fixtures/tree.json&status=../fixtures/status.json&now=2026-09-28T13:14:00Z` shows the line `Auto lanes: 4 - lanes 3 -> 4 (weekly pace allows 5.2), 13:05 UTC` in `section#lanes`, before the first lane card.
-- [ ] With a fixture copy whose `autoLanes` is `null`, and with one that lacks the field, the line is absent and the lane cards still draw.
-- [ ] BL-761's lane-card checks still pass against the updated fixture.
-- [ ] `[System.Management.Automation.Language.Parser]::ParseFile` reports no errors for `RunDarkFactory.ps1`, and `-TestAutoLanes` still exits 0.
-- [ ] `git diff --stat` shows only `RunDarkFactory.ps1` and files under `.github/board` changed outside `Tasks/`.
+- [x] Dumping `http://localhost:8000/site/index.html?tree=../fixtures/tree.json&status=../fixtures/status.json&now=2026-09-28T13:14:00Z` shows the line `Auto lanes: 4 - lanes 3 -> 4 (weekly pace allows 5.2), 13:05 UTC` in `section#lanes`, before the first lane card.
+- [x] With a fixture copy whose `autoLanes` is `null`, and with one that lacks the field, the line is absent and the lane cards still draw.
+- [x] BL-761's lane-card checks still pass against the updated fixture.
+- [x] `[System.Management.Automation.Language.Parser]::ParseFile` reports no errors for `RunDarkFactory.ps1`, and `-TestAutoLanes` still exits 0.
+- [x] `git diff --stat` shows only `RunDarkFactory.ps1` and files under `.github/board` changed outside `Tasks/`.
 
 ## Notes
+
+- `Get-NextLaneCount` now returns `Binding` beside `Reason`, named in the same branch that picks the limit text, so the two cannot disagree; `-TestAutoLanes` gained five binding cases.
+- `Set-AutoLanesStatus` keeps `$script:AutoLanesStatus`. The Auto start sets it (target `null`, binding `no burn rate`, the start line as reason). Every step sets lanes, target and binding; only a change that took effect replaces `reason` and `changedAt`. A step held for low tokens or shift time keeps the last target and binding (no new reading was taken). Only the Auto code sets it, so a fixed-lane shift and the single runner publish `"autoLanes": null`.
+- `target` is `Next.Desired` (pace capped by the ceilings) rounded to one decimal, `null` while the step has no pace.
+- The page puts the line after any shift banner and before the lane cards, as `p.auto-lanes`; unstyled beyond the section's `p` margin.
+- Verified headless: fixture shows the line; `null` and missing copies omit it with 3 cards; BL-761's 13:14, 13:40, ended, schema 2 and 404 checks unchanged. `dotnet build` clean, fast tests 31 projects passed.
 
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Done. status.json carries autoLanes (lanes, target, binding, reason, changedAt) and the board page shows it above the lane cards
