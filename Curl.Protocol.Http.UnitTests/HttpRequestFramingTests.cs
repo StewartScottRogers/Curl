@@ -73,6 +73,24 @@ public sealed class HttpRequestFramingTests
     }
 
     [TestMethod]
+    public void ForHttp2_UploadOfUnknownLength_IsNeitherChunkedNorWaitingForContinue()
+    {
+        HttpRequestFraming framing = HttpRequestFraming.Of(new HttpRequestOptions(), [], upload: new UnseekableStream([]));
+
+        HttpRequestFraming http2 = framing.ForHttp2();
+
+        Assert.IsTrue(framing.IsChunked);
+        Assert.IsTrue(framing.AddsExpect);
+        Assert.IsFalse(http2.IsChunked);
+        Assert.IsFalse(http2.AddsExpect);
+        Assert.IsFalse(http2.AwaitsContinue);
+        Assert.AreEqual("PUT", http2.Method);
+        Assert.AreSame(framing.Body, http2.Body);
+        Assert.IsNull(http2.KnownLength);
+        Assert.IsTrue(http2.IsUpload);
+    }
+
+    [TestMethod]
     public void Of_UploadWithCustomMethodAndBody_SendsTheUploadWithTheCustomMethod()
     {
         HttpRequestOptions options = new() { CustomMethod = "POST", Body = new BytesBody("x"u8.ToArray(), "a/b") };

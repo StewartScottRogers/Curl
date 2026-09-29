@@ -85,6 +85,13 @@ internal sealed class HttpResponseHeadReader
     internal Func<HttpResponseHead, HttpHeadRefusal?> FindRefusal { get; init; } = static _ => null;
 
     /// <summary>
+    /// Gets a value indicating whether the heads are an HTTP/2 stream's, as
+    /// <see cref="Http2StreamConnection" /> writes them, whose status lines are parsed with
+    /// <see cref="HttpStatusLine.ParseHttp2" /> rather than as HTTP/1.x.
+    /// </summary>
+    internal bool IsHttp2 { get; init; }
+
+    /// <summary>
     /// Gets the refused header of the final head <see cref="ReadAsync" /> read, as
     /// <see cref="FindRefusal" /> found it, or <see langword="null" /> when none was refused.
     /// </summary>
@@ -268,7 +275,7 @@ internal sealed class HttpResponseHeadReader
     {
         byte[] bytes = await lines.ReadLineAsync(true, cancellationToken).ConfigureAwait(false) ?? throw EmptyReply();
         HttpLine line = HttpLine.Split(bytes);
-        HttpStatusLine statusLine = HttpStatusLine.Parse(line.Content);
+        HttpStatusLine statusLine = IsHttp2 ? HttpStatusLine.ParseHttp2(line.Content) : HttpStatusLine.Parse(line.Content);
         SwitchedProtocols |= statusLine.StatusCode == 101;
         builder.StartHead(line);
         if (line.Content.StartsWith("HTTP/1.0", StringComparison.Ordinal))

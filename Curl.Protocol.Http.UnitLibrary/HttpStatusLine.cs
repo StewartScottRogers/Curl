@@ -4,9 +4,10 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Protocol.Http;
 
 /// <summary>
-/// The status line of one HTTP/1.x response, parsed as curl 8.21.0 parses it.
+/// The status line of one HTTP/1.x response, parsed as curl 8.21.0 parses it, or of an
+/// HTTP/2 response as <see cref="Http2ResponseHead" /> writes it.
 /// </summary>
-/// <param name="version">The protocol version: <see cref="HttpVersion.Version10" /> or <see cref="HttpVersion.Version11" />.</param>
+/// <param name="version">The protocol version: <see cref="HttpVersion.Version10" />, <see cref="HttpVersion.Version11" /> or <see cref="HttpVersion.Version20" />.</param>
 /// <param name="statusCode">The three-digit status code, from 100 to 999.</param>
 /// <param name="reasonPhrase">The text after the status code, without leading blanks; empty when there is none.</param>
 internal sealed class HttpStatusLine(Version version, int statusCode, string reasonPhrase)
@@ -16,7 +17,7 @@ internal sealed class HttpStatusLine(Version version, int statusCode, string rea
     private const int ReasonOffset = CodeOffset + 3;
 
     /// <summary>
-    /// Gets the protocol version: <see cref="HttpVersion.Version10" /> or <see cref="HttpVersion.Version11" />.
+    /// Gets the protocol version: <see cref="HttpVersion.Version10" />, <see cref="HttpVersion.Version11" /> or <see cref="HttpVersion.Version20" />.
     /// </summary>
     internal Version Version { get; } = version;
 
@@ -68,6 +69,15 @@ internal sealed class HttpStatusLine(Version version, int statusCode, string rea
 
         return line.Length > 5 ? ParseMajorVersion(line) : throw Unsupported(HttpTransferMessages.UnsupportedHttpVersion);
     }
+
+    /// <summary>
+    /// Parses the status line <see cref="Http2ResponseHead.Format" /> writes for an HTTP/2
+    /// response, <c>HTTP/2 200 </c>: version 2.0, the status code, and no reason phrase.
+    /// </summary>
+    /// <param name="line">The line, without its terminator.</param>
+    /// <returns>The status line.</returns>
+    internal static HttpStatusLine ParseHttp2(string line) =>
+        new(HttpVersion.Version20, int.Parse(line.AsSpan(7, 3), System.Globalization.CultureInfo.InvariantCulture), string.Empty);
 
     /// <summary>
     /// Tells whether bytes received so far could still begin a status line: they must match

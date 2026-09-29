@@ -23,6 +23,12 @@ internal static class HttpConnectionInfoLines
     internal const string UsingHttp1 = "using HTTP/1.x";
 
     /// <summary>
+    /// The line written in place of <see cref="UsingHttp1" /> when the connection speaks
+    /// HTTP/2 (measured, ADR-0141).
+    /// </summary>
+    internal const string UsingHttp2 = "using HTTP/2";
+
+    /// <summary>
     /// The line written once a request without a body has been sent.
     /// </summary>
     internal const string RequestSent = "Request completely sent off";

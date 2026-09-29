@@ -282,10 +282,18 @@ internal static class HttpRequestHeadFormatter
     }
 
     /// <summary>
-    /// Appends the body's framing headers: <c>Content-Length</c> unless the body is sent
-    /// chunked, <c>Transfer-Encoding: chunked</c> when its length is unknown, its
-    /// <c>Content-Type</c> unless it is a <c>-T</c> upload, and curl's own
-    /// <c>Expect: 100-continue</c>.
+    /// Gives the <c>Content-Length</c> value: the body's length, or <see langword="null" /> when
+    /// the body is sent chunked or its length is unknown (an HTTP/2 body,
+    /// <see cref="HttpRequestFraming.ForHttp2" />).
+    /// </summary>
+    private static string? ContentLengthOf(HttpRequestFraming framing) =>
+        framing.IsChunked ? null : framing.KnownLength?.ToString(CultureInfo.InvariantCulture);
+
+    /// <summary>
+    /// Appends the body's framing headers: <c>Content-Length</c> as
+    /// <see cref="ContentLengthOf" /> gives it, <c>Transfer-Encoding: chunked</c> when its
+    /// length is unknown, its <c>Content-Type</c> unless it is a <c>-T</c> upload, and curl's
+    /// own <c>Expect: 100-continue</c>.
     /// </summary>
     private static void AppendBodyHeaders(StringBuilder head, HttpCustomHeader[] customHeaders, HttpRequestFraming framing)
     {
@@ -294,8 +302,7 @@ internal static class HttpRequestHeadFormatter
             return;
         }
 
-        string? contentLength = framing.IsChunked ? null : framing.KnownLength.GetValueOrDefault().ToString(CultureInfo.InvariantCulture);
-        AppendUnlessOverridden(head, customHeaders, "Content-Length", contentLength);
+        AppendUnlessOverridden(head, customHeaders, "Content-Length", ContentLengthOf(framing));
         AppendUnlessOverridden(head, customHeaders, "Transfer-Encoding", framing.KnownLength is null ? "chunked" : null);
         AppendUnlessOverridden(head, customHeaders, "Content-Type", framing.IsUpload ? null : body.ContentType);
         AppendUnlessOverridden(head, customHeaders, "Expect", framing.AddsExpect ? "100-continue" : null);

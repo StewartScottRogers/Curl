@@ -4,9 +4,9 @@ using System.Net.Sockets;
 namespace Curl.Protocol.Http;
 
 /// <summary>
-/// Every failure message sending an HTTP/1.x request body or reading a response head or
+/// Every failure message sending an HTTP/1.x or HTTP/2 request body or reading a response head or
 /// body reports, as curl 8.21.0 prints it. Each was measured against a loopback server
-/// (BL-169, BL-170, BL-171, BL-174, BL-175, BL-176, BL-178, BL-180) except <see cref="ReceiveFailed" /> and
+/// (BL-169, BL-170, BL-171, BL-174, BL-175, BL-176, BL-178, BL-180, BL-658) except <see cref="ReceiveFailed" /> and
 /// <see cref="SendFailed" />, which are the texts <c>curl_easy_strerror</c> gives exits 56 and
 /// 55.
 /// </summary>
@@ -66,6 +66,52 @@ internal static class HttpTransferMessages
     /// The exit 56 message curl falls back to for any other failed read.
     /// </summary>
     internal const string ReceiveFailed = "Failure when receiving data from the peer";
+
+    /// <summary>
+    /// The exit 16 message for an HTTP/2 connection the peer closed before a response head
+    /// arrived (measured, BL-658 Notes).
+    /// </summary>
+    internal const string Http2FramingError = "Error in the HTTP2 framing layer";
+
+    /// <summary>
+    /// The exit 18 message for an HTTP/2 connection the peer closed part way through a
+    /// response body (measured, BL-658 Notes).
+    /// </summary>
+    internal const string PartialFile = "Transferred a partial file";
+
+    /// <summary>
+    /// Formats the exit 92 message for an HTTP/2 stream the peer reset, or that this client
+    /// reset for a malformed response: <c>HTTP/2 stream 1 was not closed cleanly:
+    /// INTERNAL_ERROR (err 2)</c> (measured, BL-658 Notes).
+    /// </summary>
+    /// <param name="streamId">The stream.</param>
+    /// <param name="errorCode">The RST_STREAM's error code.</param>
+    /// <returns>The message.</returns>
+    internal static string Http2StreamNotClosedCleanly(int streamId, Curl.Http2.Http2ErrorCode errorCode) =>
+        string.Create(CultureInfo.InvariantCulture, $"HTTP/2 stream {streamId} was not closed cleanly: {Http2ErrorName(errorCode)} (err {(uint)errorCode})");
+
+    /// <summary>
+    /// Formats the exit 16 message for an HTTP/2 connection ended by a protocol error:
+    /// <c>nghttp2 shuts down connection with error 1: PROTOCOL_ERROR</c> (measured, BL-658 Notes).
+    /// </summary>
+    /// <param name="errorCode">The error code of the GOAWAY sent.</param>
+    /// <returns>The message.</returns>
+    internal static string Http2ShutsDownConnection(Curl.Http2.Http2ErrorCode errorCode) =>
+        string.Create(CultureInfo.InvariantCulture, $"nghttp2 shuts down connection with error {(uint)errorCode}: {Http2ErrorName(errorCode)}");
+
+    /// <summary>
+    /// Gives an HTTP/2 error code's name as nghttp2's <c>nghttp2_http2_strerror</c> gives it,
+    /// <c>unknown</c> for a code RFC 9113 does not list.
+    /// </summary>
+    private static string Http2ErrorName(Curl.Http2.Http2ErrorCode errorCode) =>
+        (uint)errorCode < Http2ErrorNames.Length ? Http2ErrorNames[(uint)errorCode] : "unknown";
+
+    private static readonly string[] Http2ErrorNames =
+    [
+        "NO_ERROR", "PROTOCOL_ERROR", "INTERNAL_ERROR", "FLOW_CONTROL_ERROR", "SETTINGS_TIMEOUT",
+        "STREAM_CLOSED", "FRAME_SIZE_ERROR", "REFUSED_STREAM", "CANCEL", "COMPRESSION_ERROR",
+        "CONNECT_ERROR", "ENHANCE_YOUR_CALM", "INADEQUATE_SECURITY", "HTTP_1_1_REQUIRED",
+    ];
 
     /// <summary>
     /// The exit 100 message for one head line, or one header with its continuation lines

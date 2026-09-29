@@ -119,7 +119,9 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     internal bool CutShort { get; private set; }
 
     /// <summary>
-    /// Writes <paramref name="body" /> and flushes the connection.
+    /// Writes <paramref name="body" /> and flushes the connection, then, when the connection is
+    /// an HTTP/2 stream, ends the stream unless the last write already did
+    /// (<see cref="HttpConnectionSend.EndHttp2RequestAsync" />).
     /// </summary>
     /// <param name="body">The body.</param>
     /// <param name="isChunked">Whether the body is sent with chunked transfer coding.</param>
@@ -151,6 +153,7 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
         }
 
         await HttpConnectionSend.FlushAsync(connection, cancellationToken).ConfigureAwait(false);
+        await HttpConnectionSend.EndHttp2RequestAsync(connection, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
