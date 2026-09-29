@@ -35,3 +35,4 @@ completed:
 
 - 2026-09-28: Created.
 - 2026-09-28: Now depends on BL-853 (BL-830): WinLDAP seals the session after its logon bind, so the handler waits for that before it is registered.
+- 2026-09-29: Backlog -> Doing.
