@@ -31,3 +31,4 @@ The hand-built client runs a TLS 1.2 (and 1.1/1.0 when the version range allows)
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
