@@ -31,3 +31,4 @@ The five proxy authentication switches parse into a proxy auth-scheme set on `Co
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
