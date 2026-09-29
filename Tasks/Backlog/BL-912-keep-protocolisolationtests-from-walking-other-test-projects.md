@@ -1,5 +1,5 @@
 ---
-id: BL-911
+id: BL-912
 title: Keep ProtocolIsolationTests from walking other test projects' bin folders
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-911 â€” Keep ProtocolIsolationTests from walking other test projects' bin folders
+# BL-912 â€” Keep ProtocolIsolationTests from walking other test projects' bin folders
 
 ## Goal
 
