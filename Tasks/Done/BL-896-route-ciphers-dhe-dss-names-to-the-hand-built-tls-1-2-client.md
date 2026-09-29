@@ -8,7 +8,7 @@ depends-on: [BL-802]
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-29
 ---
 # BL-896 — Route --ciphers DHE-DSS names to the hand-built TLS 1.2 client
 
@@ -25,15 +25,21 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `OpenSslCipherSuites` maps the 13 DHE-DSS names above to their code points, each pinned by a test.
-- [ ] A hand-built TLS 1.2 connection offered a DHE-DSS suite also offers the `dsa_*` signature schemes, pinned by a test on the `Tls12ClientSettings` the provider builds.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` reports 100% line and branch coverage and no failing member.
+- [x] `OpenSslCipherSuites` maps the 13 DHE-DSS names above to their code points, each pinned by a test.
+- [x] A hand-built TLS 1.2 connection offered a DHE-DSS suite also offers the `dsa_*` signature schemes, pinned by a test on the `Tls12ClientSettings` the provider builds.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` reports 100% line and branch coverage and no failing member.
 
 ## Notes
 
 - Filed from BL-802's review (2026-09-29).
+- Measured with `openssl ciphers -V 'ALL:@SECLEVEL=0'` (OpenSSL 3.5.7): the 12 AES, CAMELLIA and ARIA DHE-DSS names match the code points above. That build has no 3DES, so `DHE-DSS-DES-CBC3-SHA` -> 0x0013 comes from OpenSSL's own name table (`ssl/s3_lib.c`), the name OpenSSL 1.1+ gives the suite.
+- Decision (default taken): the DHE-DSS names live in their own table, `Tls12DssNames`, which `Find` reads and `DefaultTls12Suites` does not. `openssl ciphers -V DEFAULT` lists no DSS suite and the measured OpenSSL ClientHello (ADR-0140) offers none, so a run with only `--tls13-ciphers` must not start offering them.
+- The `dsa_*` schemes needed no production change: `ToTls12` already takes `ClientHelloProfileMapping.Tls12SignatureAlgorithms(ClientHelloProfile.OpenSsl)`, which keeps the measured `0302 0402 0502 0602` (OpenSSL 3.5.5 sends no `0202`, so neither does Curl). The Schannel build refuses `--ciphers` outright, so DSS names apply to the OpenSSL build only. Pinned by `AuthenticateAsClientAsync_WithADheDssCipher_OffersItWithTheDsaSignatureSchemes`, for a TLS 1.2 ceiling and for the default TLS 1.3 + 1.2 offer.
+- Tests added: 13 `Find_WithADheDssName_ReturnsItsCodePoint` rows, `DefaultTls12Suites_WhenCiphersIsAbsent_HaveNoDheDssSuite`, `Select_WithADheDssName_OffersItAfterTheDefaultTls13Suites`, and the two ClientHello rows. Curl.Networking.UnitLibrary: 100% line, 100% branch, 0 failing members.
+- No option added or changed, so `--ai-help` is unaffected.
 
 ## Log
 
 - 2026-09-29: Created.
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Done. --ciphers takes the 13 DHE-DSS names, and the hand-built client offers them with the dsa_* signature schemes
