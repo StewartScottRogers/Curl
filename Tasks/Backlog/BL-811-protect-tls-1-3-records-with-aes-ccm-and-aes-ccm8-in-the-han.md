@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-700, BL-738]
-touches: [Curl.Tls.UnitLibrary, Curl.Tls.UnitTests]
+touches: [Curl.Tls.UnitLibrary, Curl.Tls.UnitTests, Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-09-28
 completed:
@@ -32,8 +32,28 @@ completed:
 ## Notes
 
 - Filed by BL-700, which could not cover the CCM suites before BL-738 builds AES-CCM.
+- 2026-09-29 (lane 5): the `Curl.Tls` change is written and green (1066 `Curl.Tls.UnitTests`
+  pass, `dotnet build Curl.slnx -warnaserror` clean): `CanProtect` is `0x1301..0x1305`,
+  `Create` picks `AesCcmTlsAead` for 0x1304/0x1305, the tag length is per suite (8 for
+  CCM8), new tests `CcmRecordsCarryTheSuitesTagAndOpenOnTheOtherSide`,
+  `Ccm8FragmentShorterThanItsEightByteTagIsABadRecordMac`,
+  `Ccm8RecordWithACorruptedTagIsABadRecordMac`, CCM rows in
+  `ApplicationDataCrossesBothWaysWithEachCipherSuite`; the refusal tests now use the unknown
+  suite 0x1306. It was left uncommitted (the shift stashes it).
+- Why it went back to Backlog: `Curl.Networking.UnitTests` use `TLS_AES_128_CCM_SHA256` as
+  "a TLS 1.3 suite the hand-built client cannot run" -
+  `HandBuiltTlsProviderTests.AuthenticateAsClientAsync_WithOnlyTls13CiphersTheClientCannotRunAndNoCeiling_ConnectsOverTls12`
+  (hangs once CCM is runnable) and the `TLS_AES_128_CCM_SHA256` row of
+  `AuthenticateAsClientAsync_WithCiphersTheOpenSslBuildCannotOffer_FailsWithExit59`. With
+  every TLS 1.3 suite runnable no OpenSSL name reaches that case, so those tests (and the
+  `OffersSuiteFor(Tls13RecordProtection.CanProtect)` false branch in
+  `HandBuiltTlsProvider.HandshakeAsync` / `CanOffer`, which may become unreachable) must be
+  reworked in `Curl.Networking.UnitLibrary` / `.UnitTests`. That project is in BL-819's
+  `touches`, so `Curl.Networking.UnitLibrary` and `Curl.Networking.UnitTests` were added
+  here and the task waits for BL-819 to leave Doing.
 
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Backlog. Needs Curl.Networking.UnitLibrary and Curl.Networking.UnitTests (their tests treat TLS_AES_128_CCM_SHA256 as unrunnable), which BL-819 in Doing touches
