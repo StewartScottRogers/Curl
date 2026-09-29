@@ -35,3 +35,4 @@ An ADR states, for each of `--curves`, `--sigalgs`, `--tls-earlydata`, `--ech`, 
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
