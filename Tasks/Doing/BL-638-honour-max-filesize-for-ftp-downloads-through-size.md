@@ -33,3 +33,4 @@ An FTP download larger than `--max-filesize` fails with exit 63 (`CURLE_FILESIZE
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
