@@ -486,7 +486,8 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// Standard output, deferring a write failure as curl's stdio buffer does and recording
-    /// it for the current transfer.
+    /// it for the current transfer: every transfer's without <c>-Z</c>, and a <c>--trace -</c>
+    /// dump's; under <c>-Z</c> each transfer has one of its own (task BL-773).
     /// </summary>
     private readonly StandardOutputFailureDeferringStream deferringStandardOutput = new(standardOutput);
 
@@ -1429,7 +1430,8 @@ internal sealed class CurlCommandRunner(
             return true;
         }
 
-        RunningTransferState state = NewRunningTransferState(run.AbortToken);
+        StandardOutputFailureDeferringStream transferStandardOutput = new(standardOutput);
+        RunningTransferState state = NewRunningTransferState(run.AbortToken, transferStandardOutput, writeGate.Guard(transferStandardOutput));
         if (run.IsAborted)
         {
             run.DeferReport(transfer.TransferId, () => ReportSkippedAsync(dispatch, options, transfer, state, run.FirstFailure!));
@@ -1607,9 +1609,14 @@ internal sealed class CurlCommandRunner(
     /// Makes the state of a transfer starting now, in the running option group.
     /// </summary>
     /// <param name="abortToken">The token <c>--fail-early</c> aborts the transfer through, under <c>-Z</c>.</param>
+    /// <param name="transferStandardOutput">Standard output as the transfer writes it, recording its write failure.</param>
+    /// <param name="gatedTransferStandardOutput"><paramref name="transferStandardOutput" /> through <see cref="writeGate" />.</param>
     /// <returns>The state.</returns>
-    private RunningTransferState NewRunningTransferState(CancellationToken abortToken) =>
-        new(firstTransferIdOfGroup, laterGroups, abortToken);
+    private RunningTransferState NewRunningTransferState(
+        CancellationToken abortToken,
+        StandardOutputFailureDeferringStream transferStandardOutput,
+        Stream gatedTransferStandardOutput) =>
+        new(firstTransferIdOfGroup, laterGroups, abortToken, transferStandardOutput, gatedTransferStandardOutput);
 
     /// <summary>
     /// Performs one transfer, then writes its failure lines, its <c>-w</c> output and the
@@ -1624,7 +1631,7 @@ internal sealed class CurlCommandRunner(
         CommandLineOptions options,
         UrlTransfer transfer)
     {
-        RunningTransferState state = NewRunningTransferState(CancellationToken.None);
+        RunningTransferState state = NewRunningTransferState(CancellationToken.None, deferringStandardOutput, GatedDeferringStandardOutput);
         runningTransfer.Value = state;
         (TransferResult result, string givenUrl, string transferUrl) = await TransferUrlAsync(dispatch, options, transfer)
             .ConfigureAwait(false);
@@ -2287,7 +2294,7 @@ internal sealed class CurlCommandRunner(
         }
 
         TransferWriteOutVariables variables = WriteOutVariables(options, transfer, givenUrl, transferUrl, result, connectionId);
-        Stream liveStandardOutput = deferringStandardOutput.HasWriteFailed ? Stream.Null : deferringStandardOutput;
+        Stream liveStandardOutput = Running.StandardOutput.HasWriteFailed ? Stream.Null : Running.StandardOutput;
         Stream writeOutStandardOutput = standardOutputIsBinary
             ? liveStandardOutput
             : new LineFeedToCrLfStream(liveStandardOutput);
@@ -2341,7 +2348,7 @@ internal sealed class CurlCommandRunner(
             return;
         }
 
-        Stream liveStandardOutput = deferringStandardOutput.HasWriteFailed ? Stream.Null : deferringStandardOutput;
+        Stream liveStandardOutput = Running.StandardOutput.HasWriteFailed ? Stream.Null : Running.StandardOutput;
         Stream jarStandardOutput = standardOutputIsBinary ? liveStandardOutput : new LineFeedToCrLfStream(liveStandardOutput);
         await cookies.WriteCookieJarAsync(fileSystem, jarStandardOutput, timeProvider.GetUtcNow()).ConfigureAwait(false);
     }
@@ -3091,7 +3098,7 @@ internal sealed class CurlCommandRunner(
             Func<TransferContext> createAttemptContext = () => transferContextFactory.Create(
                 options,
                 url,
-                RateLimited(options, toStandardOutput ? FlushedEachWriteUnderNoBuffer(options, GatedDeferringStandardOutput) : Stream.Null),
+                RateLimited(options, toStandardOutput ? FlushedEachWriteUnderNoBuffer(options, Running.GatedStandardOutput) : Stream.Null),
                 range,
                 options.ResumeFrom,
                 headerOutput,
@@ -3760,12 +3767,13 @@ internal sealed class CurlCommandRunner(
         CommandLineOptions options,
         Func<TransferContext> createAttemptContext)
     {
-        deferringStandardOutput.ClearWriteFailure();
+        RunningTransferState state = Running;
+        state.StandardOutput.ClearWriteFailure();
         TransferResult result = await FollowRetryingAsync(follower, options, createAttemptContext, options.ResumeFrom, null)
             .ConfigureAwait(false);
-        await GatedDeferringStandardOutput.FlushAsync().ConfigureAwait(false);
+        await state.GatedStandardOutput.FlushAsync().ConfigureAwait(false);
 
-        return result.IsSuccess && deferringStandardOutput.HasWriteFailed ? StandardOutputWriteFailure : result;
+        return result.IsSuccess && state.StandardOutput.HasWriteFailed ? StandardOutputWriteFailure : result;
     }
 
     /// <summary>

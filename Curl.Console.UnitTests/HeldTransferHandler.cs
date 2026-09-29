@@ -14,7 +14,11 @@ namespace Curl.Console;
 /// <param name="observesCancellation">
 /// Whether a held transfer stops waiting when its context's token is cancelled, as a real handler does.
 /// </param>
-internal sealed class HeldTransferHandler(bool observesCancellation = true) : IProtocolHandler
+/// <param name="reportsDoneWhileHeld">
+/// Whether a transfer reports itself started and done to its progress sink before it waits, and
+/// reports <c>* Ending &lt;path&gt;</c> to its events once released, before its body.
+/// </param>
+internal sealed class HeldTransferHandler(bool observesCancellation = true, bool reportsDoneWhileHeld = false) : IProtocolHandler
 {
     private readonly ConcurrentDictionary<string, HeldTransfer> transfers = new();
 
@@ -41,6 +45,12 @@ internal sealed class HeldTransferHandler(bool observesCancellation = true) : IP
         int now = Interlocked.Increment(ref running);
         InterlockedMax(now);
         started.Enqueue(path);
+        if (reportsDoneWhileHeld)
+        {
+            context.Progress.ReportTransferStarted();
+            context.Progress.ReportTransferDone();
+        }
+
         transfer.Started.TrySetResult();
         try
         {
@@ -48,6 +58,11 @@ internal sealed class HeldTransferHandler(bool observesCancellation = true) : IP
             (string body, TransferResult result) = observesCancellation
                 ? await ending.WaitAsync(context.CancellationToken)
                 : await ending;
+            if (reportsDoneWhileHeld)
+            {
+                context.Events.ReportInfo($"Ending {path}");
+            }
+
             await context.Output.WriteAsync(Encoding.ASCII.GetBytes(body), CancellationToken.None);
             return result;
         }

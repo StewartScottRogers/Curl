@@ -383,15 +383,60 @@ public sealed class CurlCommandRunnerParallelTests
         Assert.AreEqual("/a/b", standardOutput.Text);
     }
 
+    [TestMethod]
+    public async Task RunAsync_VerboseWithProgressMeter_WritesAnotherTransfersLineWhileOneReportedDoneIsHeld()
+    {
+        // BL-773: a transfer reported done is not holding the -v lines of the transfers running beside it.
+        HeldTransferHandler http = new(reportsDoneWhileHeld: true);
+
+        Task<int> run = RunAsync(http, ["-Z", "-v", A, B], standardOutput, writesProgressMeter: true);
+        await Task.WhenAll(http.WhenStartedAsync("/a"), http.WhenStartedAsync("/b"));
+        http.Finish("/b", "b");
+        await standardOutput.WhenEndsWithAsync("b");
+        string errorWhileAIsHeld = standardError.Text;
+        http.Finish("/a", "a");
+
+        Assert.AreEqual(0, await run);
+        Assert.Contains("* Ending /b\r\n", errorWhileAIsHeld);
+        Assert.DoesNotContain("* Ending /a", errorWhileAIsHeld);
+        Assert.Contains("* Ending /a\r\n", standardError.Text);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_StandardOutputFailsForOneTransfersWrite_EndsOnlyThatTransferWithExit23()
+    {
+        // BL-773: A's body write fails; B, running beside it, still writes its body and -w text and succeeds.
+        HeldTransferHandler http = new();
+        TextRefusingStream refusingStandardOutput = new(standardOutput, "bad");
+
+        Task<int> run = RunAsync(http, ["-Z", "-w", "%{urlnum} %{exitcode}\\n", A, B], refusingStandardOutput);
+        await Task.WhenAll(http.WhenStartedAsync("/a"), http.WhenStartedAsync("/b"));
+        http.Finish("/a", "bad");
+        await standardError.WhenEndsWithAsync("curl: Failed writing body" + NewLine);
+        http.Finish("/b", "good");
+
+        Assert.AreEqual(23, await run);
+        Assert.AreEqual("good1 0\n", standardOutput.Text);
+        Assert.AreEqual("curl: Failed writing body" + NewLine, standardError.Text);
+    }
+
     /// <summary>Runs <paramref name="arguments" /> as on Windows through <paramref name="handler" /> alone.</summary>
     private Task<int> RunAsync(IProtocolHandler handler, string[] arguments) =>
+        RunAsync(handler, arguments, standardOutput);
+
+    /// <summary>
+    /// Runs <paramref name="arguments" /> as on Windows through <paramref name="handler" /> alone, writing
+    /// to <paramref name="runStandardOutput" /> and drawing the progress meter when <paramref name="writesProgressMeter" />.
+    /// </summary>
+    private Task<int> RunAsync(IProtocolHandler handler, string[] arguments, Stream runStandardOutput, bool writesProgressMeter = false) =>
         new CurlCommandRunner(
                 _ => new TransferDispatch(new ProtocolDispatcher([handler])),
                 fileSystem,
                 fileSystem,
-                standardOutput,
+                runStandardOutput,
                 standardError,
                 new MemoryStream(),
-                runsOnWindows: true)
+                runsOnWindows: true,
+                writesProgressMeter: writesProgressMeter)
             .RunAsync(arguments);
 }

@@ -202,7 +202,10 @@ holds the exit code - the first failure's in completion order, not the last's - 
 started and ends with the first failure's code and `CurlEasyErrorText`'s text, and both are reported
 in command-line order after the run's other transfers. A result that ends a serial run without
 `--fail-early` (a bad glob, a `-T` or `-D` file that cannot be opened) stops further starts and lets
-the running transfers finish. Without `-Z` nothing changes.
+the running transfers finish. Each transfer also writes standard output through a
+`StandardOutputFailureDeferringStream` of its own (`RunningTransferState.StandardOutput`), so a write
+failure ends only the transfer whose write failed with exit 23, and the others' bodies and `-w` text
+still reach standard output (BL-773). Without `-Z` nothing changes: every transfer shares the run's one.
 
 Under `-Z` no transfer draws its own meter or `-#` bar: `ParallelRun`'s `ParallelProgressMeter` draws
 curl 8.21.0's combined meter to standard error (ADR-0155, BL-521). Its header line and status lines
@@ -211,7 +214,9 @@ transfer's `TransferProgressRecorder` passes them to its `ParallelTransferProgre
 ends, when the runner has started every transfer it can, and after a second without a draw. A line
 is drawn only if more than 500 ms have passed since the last. The final line and its line ending
 come once the run's reports are written. `-s` and `--no-progress-meter` in the first option group
-hide the meter, and `-#` is ignored, as in curl.
+hide the meter, and `-#` is ignored, as in curl. So under `-Z` no transfer ever holds the `-v`
+`HoldableStream` below: a transfer the handler reported done never delays the `-v` lines of the
+transfers running beside it (BL-773).
 
 The Nth `-T` / `--upload-file` value uploads to the Nth URL (ADR-0051). Its URL is resolved
 by `UploadTransferUrl` before anything else of that transfer: one it cannot parse is exit 3

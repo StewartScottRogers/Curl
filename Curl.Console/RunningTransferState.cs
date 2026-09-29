@@ -17,11 +17,28 @@ namespace Curl.Console;
 /// Cancelled when <c>--fail-early</c> aborts the transfer because another failed;
 /// <see cref="CancellationToken.None" /> outside <c>-Z</c>.
 /// </param>
+/// <param name="standardOutput">
+/// Standard output, deferring a write failure as curl's stdio buffer does: the run's one without
+/// <c>-Z</c>, and one of the transfer's own under it, so that one transfer's failure is never
+/// another's (task BL-773).
+/// </param>
+/// <param name="gatedStandardOutput"><paramref name="standardOutput" /> through the run's <see cref="WriteGate" />.</param>
 internal sealed class RunningTransferState(
     long firstTransferIdOfGroup,
     IReadOnlyList<CommandLineOptions> laterGroups,
-    CancellationToken abortToken)
+    CancellationToken abortToken,
+    StandardOutputFailureDeferringStream standardOutput,
+    Stream gatedStandardOutput)
 {
+    /// <summary>
+    /// Gets standard output as the transfer writes it, which records the transfer's write failure:
+    /// the run's without <c>-Z</c>, the transfer's own under it.
+    /// </summary>
+    internal StandardOutputFailureDeferringStream StandardOutput { get; } = standardOutput;
+
+    /// <summary>Gets <see cref="StandardOutput" /> through the run's <see cref="WriteGate" />.</summary>
+    internal Stream GatedStandardOutput { get; } = gatedStandardOutput;
+
     /// <summary>Gets the <c>%{xfer_id}</c> of the transfer's option group's first transfer.</summary>
     internal long FirstTransferIdOfGroup { get; } = firstTransferIdOfGroup;
 
