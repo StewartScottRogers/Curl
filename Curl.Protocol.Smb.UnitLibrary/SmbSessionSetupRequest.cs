@@ -21,9 +21,6 @@ internal static class SmbSessionSetupRequest
 
     private const int ResponseLength = 24;
 
-    // SMB_COM_NO_ANDX_COMMAND.
-    private const byte NoAndXCommand = 0xff;
-
     // SMB_WC_SETUP_ANDX.
     private const byte WordCount = 0x0d;
 
@@ -70,7 +67,7 @@ internal static class SmbSessionSetupRequest
     private static void WriteParameters(Span<byte> parameters, uint sessionKey, int byteCount)
     {
         parameters[0] = WordCount;
-        parameters[1] = NoAndXCommand;
+        parameters[1] = SmbMessageHeader.NoAndXCommand;
         BinaryPrimitives.WriteUInt16LittleEndian(parameters[5..], MaxBufferSize);
         BinaryPrimitives.WriteUInt16LittleEndian(parameters[7..], 1);
         BinaryPrimitives.WriteUInt16LittleEndian(parameters[9..], 1);

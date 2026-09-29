@@ -1,19 +1,23 @@
 using System.Net;
+using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Smb.Fakes;
 
 namespace Curl.Protocol.Smb;
 
 /// <summary>
-/// Pins the <c>smb://</c> session opening against curl, measured on 2026-09-29
-/// (<see cref="SmbRecordedExchange" />): the bytes sent, and the exit code and message of
-/// each outcome - 3 for a path with no share, 67 with no user or a refused session setup,
-/// 7 for a refused negotiate.
+/// Pins the <c>smb://</c> download against curl, measured on 2026-09-29
+/// (<see cref="SmbRecordedExchange" />): the bytes sent, the file written, and the exit code
+/// and message of each outcome - 3 for a path with no share, 67 with no user or a refused
+/// session setup, 7 for a refused negotiate, 78 for a missing share or file, 9 for a share
+/// refused with ERRnoaccess, 56 for a directory.
 /// </summary>
 [TestClass]
 public sealed class SmbProtocolHandlerTests
 {
     private const string Url = "smb://" + SmbRecordedExchange.Host + "/share/x.txt";
+
+    private static readonly NetworkCredential User = new("User", "Password");
 
     [TestMethod]
     public void SupportedSchemes_AreSmbAndSmbs()
@@ -38,29 +42,128 @@ public sealed class SmbProtocolHandlerTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_AcceptedSession_SendsCurlsNegotiateThenSessionSetupAndSucceeds()
+    public async Task ExecuteAsync_File_SendsCurlsSevenRequestsAndWritesTheFile()
     {
-        var connection = new ScriptedConnection(SmbRecordedExchange.NegotiateResponse, SmbRecordedExchange.SessionSetupAccepted);
+        var connection = FileDownload();
+        var output = new MemoryStream();
 
-        TransferResult result = await Handler(connection).ExecuteAsync(Context(Url, new NetworkCredential("User", "Password")));
+        TransferResult result = await Handler(connection).ExecuteAsync(Context(SmbRecordedExchange.DownloadUrl, User, output));
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(11L, result.BytesTransferred);
+        Assert.AreEqual(SmbRecordedExchange.FileContent, Encoding.ASCII.GetString(output.ToArray()));
         CollectionAssert.AreEqual(
-            SmbRecordedExchange.NegotiateRequest.Concat(SmbRecordedExchange.SessionSetupRequest).ToArray(),
+            Concat(
+                SmbRecordedExchange.NegotiateRequest,
+                SmbRecordedExchange.SessionSetupRequest,
+                SmbRecordedExchange.TreeConnectRequest,
+                SmbRecordedExchange.OpenRequest,
+                SmbRecordedExchange.ReadRequest,
+                SmbRecordedExchange.CloseRequest,
+                SmbRecordedExchange.TreeDisconnectRequest),
             connection.Sent);
+        Assert.IsNull(result.SourceLastWriteTimeUtc);
         Assert.IsTrue(connection.IsDisposed);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_FileWithRemoteTime_ReturnsItsLastChangeTime()
+    {
+        var context = new TransferContext
+        {
+            Url = CurlUrl.Parse(SmbRecordedExchange.DownloadUrl),
+            Output = new MemoryStream(),
+            Credentials = User,
+            RemoteTime = true,
+        };
+
+        TransferResult result = await Handler(FileDownload()).ExecuteAsync(context);
+
+        Assert.AreEqual(SmbRecordedExchange.FileLastChangeTimeUtc, result.SourceLastWriteTimeUtc);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_DomainInUserName_SendsItAsTheDomain()
     {
-        var connection = new ScriptedConnection(SmbRecordedExchange.NegotiateResponse, SmbRecordedExchange.SessionSetupAccepted);
+        var connection = FileDownload();
 
-        await Handler(connection).ExecuteAsync(Context(Url, new NetworkCredential(@"DOM\Us", "pw")));
+        await Handler(connection).ExecuteAsync(Context(SmbRecordedExchange.DownloadUrl, new NetworkCredential(@"DOM\Us", "pw")));
 
         CollectionAssert.AreEqual(
             SmbRecordedExchange.DomainSessionSetupRequest,
-            connection.Sent.Skip(SmbRecordedExchange.NegotiateRequest.Length).ToArray());
+            connection.Sent
+                .Skip(SmbRecordedExchange.NegotiateRequest.Length)
+                .Take(SmbRecordedExchange.DomainSessionSetupRequest.Length)
+                .ToArray());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_MissingShare_Exits78AfterTheTreeConnect()
+    {
+        var connection = new ScriptedConnection(
+            SmbRecordedExchange.NegotiateResponse,
+            SmbRecordedExchange.SessionSetupAccepted,
+            SmbRecordedExchange.TreeConnectMissingShare);
+
+        TransferResult result = await Handler(connection).ExecuteAsync(Context(SmbRecordedExchange.DownloadUrl, User));
+
+        Assert.AreEqual(CurlExitCode.RemoteFileNotFound, result.ExitCode);
+        Assert.AreEqual("Remote file not found", result.ErrorMessage);
+        Assert.IsTrue(connection.Sent.AsSpan().EndsWith(SmbRecordedExchange.TreeConnectRequest));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ShareRefusedWithNoAccess_Exits9()
+    {
+        var connection = new ScriptedConnection(
+            SmbRecordedExchange.NegotiateResponse,
+            SmbRecordedExchange.SessionSetupAccepted,
+            SmbRecordedExchange.TreeConnectNoAccess);
+
+        TransferResult result = await Handler(connection).ExecuteAsync(Context(SmbRecordedExchange.DownloadUrl, User));
+
+        Assert.AreEqual(CurlExitCode.RemoteAccessDenied, result.ExitCode);
+        Assert.AreEqual("Access denied to remote resource", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_MissingFile_Exits78AfterDisconnectingWithoutAClose()
+    {
+        var connection = new ScriptedConnection(
+            SmbRecordedExchange.NegotiateResponse,
+            SmbRecordedExchange.SessionSetupAccepted,
+            SmbRecordedExchange.TreeConnectAccepted,
+            SmbRecordedExchange.OpenMissingFile,
+            SmbRecordedExchange.TreeDisconnectAccepted);
+
+        TransferResult result = await Handler(connection).ExecuteAsync(Context(SmbRecordedExchange.DownloadUrl, User));
+
+        Assert.AreEqual(CurlExitCode.RemoteFileNotFound, result.ExitCode);
+        Assert.AreEqual("Remote file not found", result.ErrorMessage);
+        Assert.IsTrue(connection.Sent.AsSpan().EndsWith(
+            Concat(SmbRecordedExchange.OpenRequest, SmbRecordedExchange.TreeDisconnectRequest)));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_Directory_Exits56AfterClosingAndDisconnecting()
+    {
+        var connection = new ScriptedConnection(
+            SmbRecordedExchange.NegotiateResponse,
+            SmbRecordedExchange.SessionSetupAccepted,
+            SmbRecordedExchange.TreeConnectAccepted,
+            SmbRecordedExchange.OpenDirectory,
+            SmbRecordedExchange.ReadRefused,
+            SmbRecordedExchange.CloseAccepted,
+            SmbRecordedExchange.TreeDisconnectAccepted);
+        var output = new MemoryStream();
+
+        TransferResult result = await Handler(connection).ExecuteAsync(Context(SmbRecordedExchange.DownloadUrl, User, output));
+
+        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Assert.AreEqual("Failure when receiving data from the peer", result.ErrorMessage);
+        Assert.AreEqual(0L, output.Length);
+        Assert.IsTrue(connection.Sent.AsSpan().EndsWith(
+            Concat(SmbRecordedExchange.ReadRequest, SmbRecordedExchange.CloseRequest, SmbRecordedExchange.TreeDisconnectRequest)));
     }
 
     [TestMethod]
@@ -152,6 +255,17 @@ public sealed class SmbProtocolHandlerTests
     private static SmbProtocolHandler Handler(ScriptedConnection connection) =>
         new(new RecordingConnector(ConnectResult.Connected(connection)), SmbCurlOperatingSystem.Linux);
 
-    private static TransferContext Context(string url, NetworkCredential? credentials) =>
-        new() { Url = CurlUrl.Parse(url), Output = new MemoryStream(), Credentials = credentials };
+    private static TransferContext Context(string url, NetworkCredential? credentials, Stream? output = null) =>
+        new() { Url = CurlUrl.Parse(url), Output = output ?? new MemoryStream(), Credentials = credentials };
+
+    private static ScriptedConnection FileDownload() => new(
+        SmbRecordedExchange.NegotiateResponse,
+        SmbRecordedExchange.SessionSetupAccepted,
+        SmbRecordedExchange.TreeConnectAccepted,
+        SmbRecordedExchange.OpenAccepted,
+        SmbRecordedExchange.ReadAccepted,
+        SmbRecordedExchange.CloseAccepted,
+        SmbRecordedExchange.TreeDisconnectAccepted);
+
+    private static byte[] Concat(params byte[][] messages) => [.. messages.SelectMany(message => message)];
 }

@@ -21,6 +21,24 @@ internal static class SmbMessageHeader
     /// <summary>SMB_COM_SESSION_SETUP_ANDX.</summary>
     public const byte SessionSetupAndXCommand = 0x73;
 
+    /// <summary>SMB_COM_TREE_CONNECT_ANDX.</summary>
+    public const byte TreeConnectAndXCommand = 0x75;
+
+    /// <summary>SMB_COM_NT_CREATE_ANDX, which opens the file.</summary>
+    public const byte NtCreateAndXCommand = 0xa2;
+
+    /// <summary>SMB_COM_READ_ANDX.</summary>
+    public const byte ReadAndXCommand = 0x2e;
+
+    /// <summary>SMB_COM_CLOSE.</summary>
+    public const byte CloseCommand = 0x04;
+
+    /// <summary>SMB_COM_TREE_DISCONNECT.</summary>
+    public const byte TreeDisconnectCommand = 0x71;
+
+    /// <summary>SMB_COM_NO_ANDX_COMMAND, the AndX command of every request curl sends.</summary>
+    public const byte NoAndXCommand = 0xff;
+
     private const int CommandOffset = 8;
     private const int StatusOffset = 9;
     private const int FlagsOffset = 13;
@@ -65,11 +83,34 @@ internal static class SmbMessageHeader
         BinaryPrimitives.WriteUInt16LittleEndian(header[UserIdOffset..], userId);
     }
 
+    /// <summary>
+    /// Frames a request: the header of a message of <paramref name="command" />, then
+    /// <paramref name="body" />.
+    /// </summary>
+    /// <param name="command">The SMB command code.</param>
+    /// <param name="userId">The UID the session setup response assigned.</param>
+    /// <param name="treeId">The TID the tree connect response assigned, or 0 before it.</param>
+    /// <param name="body">The word count, parameters, byte count and bytes.</param>
+    /// <returns>The bytes to send, NetBIOS header first.</returns>
+    public static byte[] Frame(byte command, ushort userId, ushort treeId, ReadOnlySpan<byte> body)
+    {
+        var message = new byte[Length + body.Length];
+        Write(message, command, userId, treeId, body.Length);
+        body.CopyTo(message.AsSpan(Length));
+        return message;
+    }
+
     /// <summary>Reads the 32-bit NT status of a received message; 0 is success.</summary>
     /// <param name="message">A whole message, NetBIOS header first.</param>
     /// <returns>The status, as the little-endian value on the wire.</returns>
     public static uint ReadStatus(ReadOnlySpan<byte> message) =>
         BinaryPrimitives.ReadUInt32LittleEndian(message[StatusOffset..]);
+
+    /// <summary>Reads the TID of a received message.</summary>
+    /// <param name="message">A whole message, NetBIOS header first.</param>
+    /// <returns>The TID.</returns>
+    public static ushort ReadTreeId(ReadOnlySpan<byte> message) =>
+        BinaryPrimitives.ReadUInt16LittleEndian(message[TreeIdOffset..]);
 
     /// <summary>Reads the UID of a received message.</summary>
     /// <param name="message">A whole message, NetBIOS header first.</param>

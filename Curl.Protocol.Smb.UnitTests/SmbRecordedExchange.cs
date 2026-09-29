@@ -6,7 +6,8 @@ namespace Curl.Protocol.Smb;
 /// <c>curl -u User:Password smb://172.26.96.1:14450/share/x.txt</c>, and the same with
 /// <c>-u DOM\Us:pw</c>. The server's side was hand-assembled from <c>lib/smb.c</c>'s
 /// structures (ADR-0200): session key <c>0x12345678</c>, challenge
-/// <c>0123456789abcdef</c> (MS-NLMP 4.2.1's), UID <c>0x0064</c>.
+/// <c>0123456789abcdef</c> (MS-NLMP 4.2.1's), UID <c>0x0064</c>. The download that
+/// follows (BL-596) was measured the same way, with TID <c>0x0007</c> and FID <c>0x4001</c>.
 /// </summary>
 internal static class SmbRecordedExchange
 {
@@ -55,6 +56,92 @@ internal static class SmbRecordedExchange
     public static byte[] NegotiateRefused => Hex(
         "00 00 00 23 ff 53 4d 42 72 22 00 00 c0 98 01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
         + "00 00 00");
+
+    /// <summary>
+    /// The URL of the download measured on 2026-09-29 (BL-596): the same curl and recorder,
+    /// <c>curl -u User:Password smb://172.26.96.1:14450/share/dir/x.txt</c>.
+    /// </summary>
+    public const string DownloadUrl = "smb://" + Host + "/share/dir/x.txt";
+
+    /// <summary>The file's bytes: <c>hello world</c>.</summary>
+    public const string FileContent = "hello world";
+
+    /// <summary>The file's last change time the open response carries.</summary>
+    public static readonly DateTimeOffset FileLastChangeTimeUtc = new(2026, 1, 2, 3, 4, 5, TimeSpan.Zero);
+
+    /// <summary>curl's SMB_COM_TREE_CONNECT_ANDX to <c>\\172.26.96.1\share</c>, UID 0x64.</summary>
+    public static byte[] TreeConnectRequest => Hex(
+        "00 00 00 45 ff 53 4d 42 75 00 00 00 00 18 41 00 ba 00 00 00 00 00 00 00 00 00 00 00 00 00 1d d7 64 00 00 00 "
+        + "04 ff 00 00 00 00 00 00 00 1a 00 5c 5c 31 37 32 2e 32 36 2e 39 36 2e 31 5c 73 68 61 72 65 00 3f 3f 3f 3f 3f 00");
+
+    /// <summary>The server's tree connect response accepting it, TID 0x0007.</summary>
+    public static byte[] TreeConnectAccepted => Hex(
+        "00 00 00 2c ff 53 4d 42 75 00 00 00 00 98 01 00 00 00 00 00 00 00 00 00 00 00 00 00 07 00 00 00 64 00 00 00 "
+        + "03 ff 00 00 00 01 00 03 00 41 3a 00");
+
+    /// <summary>The server's tree connect response refusing it, STATUS_BAD_NETWORK_NAME; curl exits 78.</summary>
+    public static byte[] TreeConnectMissingShare => Hex(
+        "00 00 00 23 ff 53 4d 42 75 cc 00 00 c0 98 01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 64 00 00 00 00 00 00");
+
+    /// <summary>The server's tree connect response refusing it with the DOS error ERRnoaccess; curl exits 9.</summary>
+    public static byte[] TreeConnectNoAccess => Hex(
+        "00 00 00 23 ff 53 4d 42 75 01 00 05 00 98 01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 64 00 00 00 00 00 00");
+
+    /// <summary>curl's SMB_COM_NT_CREATE_ANDX opening <c>dir\x.txt</c> for reading.</summary>
+    public static byte[] OpenRequest => Hex(
+        "00 00 00 5d ff 53 4d 42 a2 00 00 00 00 18 41 00 ba 00 00 00 00 00 00 00 00 00 00 00 07 00 1d d7 64 00 00 00 "
+        + "18 ff 00 00 00 00 09 00 00 00 00 00 00 00 00 00 00 00 00 80 00 00 00 00 00 00 00 00 00 00 00 00 07 00 00 00 "
+        + "01 00 00 00 00 00 00 00 00 00 00 00 00 0a 00 64 69 72 5c 78 2e 74 78 74 00");
+
+    /// <summary>The server's open response for the 11-byte file, FID 0x4001, changed at <see cref="FileLastChangeTimeUtc" />.</summary>
+    public static byte[] OpenAccepted => Hex(
+        "00 00 00 67 ff 53 4d 42 a2 00 00 00 00 98 01 00 00 00 00 00 00 00 00 00 00 00 00 00 07 00 00 00 64 00 00 00 "
+        + "22 ff 00 00 00 00 01 40 01 00 00 00 80 00 40 74 94 7b dc 01 80 00 40 74 94 7b dc 01 80 00 40 74 94 7b dc 01 "
+        + "80 00 40 74 94 7b dc 01 80 00 00 00 0b 00 00 00 00 00 00 00 0b 00 00 00 00 00 00 00 00 00 00 00 00 00 00");
+
+    /// <summary>The server's open response for a directory, FID 0x4001, size 0.</summary>
+    public static byte[] OpenDirectory => Hex(
+        "00 00 00 67 ff 53 4d 42 a2 00 00 00 00 98 01 00 00 00 00 00 00 00 00 00 00 00 00 00 07 00 00 00 64 00 00 00 "
+        + "22 ff 00 00 00 00 01 40 01 00 00 00 80 00 40 74 94 7b dc 01 80 00 40 74 94 7b dc 01 80 00 40 74 94 7b dc 01 "
+        + "80 00 40 74 94 7b dc 01 10 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 01 00 00");
+
+    /// <summary>The server's open response refusing it, STATUS_OBJECT_NAME_NOT_FOUND; curl exits 78.</summary>
+    public static byte[] OpenMissingFile => Hex(
+        "00 00 00 23 ff 53 4d 42 a2 34 00 00 c0 98 01 00 00 00 00 00 00 00 00 00 00 00 00 00 07 00 00 00 64 00 00 00 00 00 00");
+
+    /// <summary>curl's SMB_COM_READ_ANDX for up to 0x8000 bytes at offset 0 of FID 0x4001.</summary>
+    public static byte[] ReadRequest => Hex(
+        "00 00 00 3b ff 53 4d 42 2e 00 00 00 00 18 41 00 ba 00 00 00 00 00 00 00 00 00 00 00 07 00 1d d7 64 00 00 00 "
+        + "0c ff 00 00 00 01 40 00 00 00 00 00 80 00 80 00 00 00 00 00 00 00 00 00 00 00 00");
+
+    /// <summary>The server's read response carrying <see cref="FileContent" />.</summary>
+    public static byte[] ReadAccepted => Hex(
+        "00 00 00 46 ff 53 4d 42 2e 00 00 00 00 98 01 00 00 00 00 00 00 00 00 00 00 00 00 00 07 00 00 00 64 00 00 00 "
+        + "0c ff 00 00 00 ff ff 00 00 00 00 0b 00 3b 00 00 00 00 00 00 00 00 00 00 00 0b 00 68 65 6c 6c 6f 20 77 6f 72 6c 64");
+
+    /// <summary>The server's read response refusing a read of a directory, STATUS_INVALID_DEVICE_REQUEST; curl exits 56.</summary>
+    public static byte[] ReadRefused => Hex(
+        "00 00 00 23 ff 53 4d 42 2e 10 00 00 c0 98 01 00 00 00 00 00 00 00 00 00 00 00 00 00 07 00 00 00 64 00 00 00 00 00 00");
+
+    /// <summary>curl's SMB_COM_CLOSE of FID 0x4001.</summary>
+    public static byte[] CloseRequest => Hex(
+        "00 00 00 29 ff 53 4d 42 04 00 00 00 00 18 41 00 ba 00 00 00 00 00 00 00 00 00 00 00 07 00 1d d7 64 00 00 00 "
+        + "03 01 40 00 00 00 00 00 00");
+
+    /// <summary>The server's close response.</summary>
+    public static byte[] CloseAccepted => Hex(
+        "00 00 00 23 ff 53 4d 42 04 00 00 00 00 98 01 00 00 00 00 00 00 00 00 00 00 00 00 00 07 00 00 00 64 00 00 00 00 00 00");
+
+    /// <summary>curl's SMB_COM_TREE_DISCONNECT from TID 0x0007.</summary>
+    public static byte[] TreeDisconnectRequest => Hex(
+        "00 00 00 23 ff 53 4d 42 71 00 00 00 00 18 41 00 ba 00 00 00 00 00 00 00 00 00 00 00 07 00 1d d7 64 00 00 00 00 00 00");
+
+    /// <summary>The server's tree disconnect response.</summary>
+    public static byte[] TreeDisconnectAccepted => Hex(
+        "00 00 00 23 ff 53 4d 42 71 00 00 00 00 98 01 00 00 00 00 00 00 00 00 00 00 00 00 00 07 00 00 00 64 00 00 00 00 00 00");
+
+    /// <summary>A frame curl refuses with exit 56: a NetBIOS length of 1.</summary>
+    public static byte[] TooSmallFrame => Hex("00 00 00 01 00");
 
     /// <summary>Decodes space-separated hex pairs.</summary>
     /// <param name="hex">The pairs.</param>

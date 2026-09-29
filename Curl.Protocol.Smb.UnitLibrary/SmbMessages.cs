@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace Curl.Protocol.Smb;
 
 /// <summary>
@@ -18,9 +20,28 @@ internal static class SmbMessages
     /// <summary>Exit 56, a message whose byte count runs past its frame.</summary>
     public const string ReceiveFailed = "Failure when receiving data from the peer";
 
-    /// <summary>Exit 63, a session setup whose bytes would pass 1024.</summary>
-    public const string SetupTooLarge = "Maximum file size exceeded";
+    /// <summary>Exit 56, a read response whose data runs past the bytes received.</summary>
+    public const string InvalidInputPacket = "Invalid input packet";
+
+    /// <summary>Exit 63, a session setup, tree connect or open whose bytes would pass 1024.</summary>
+    public const string MessageTooLarge = "Maximum file size exceeded";
 
     /// <summary>Exit 67, no user given, or a session setup response with an error status.</summary>
     public const string LoginDenied = "Login denied";
+
+    /// <summary>Exit 8, an open response giving the file a negative size.</summary>
+    public const string WeirdServerReply = "Weird server reply";
+
+    /// <summary>Exit 9, a tree connect or open refused with the DOS error <c>ERRnoaccess</c>.</summary>
+    public const string RemoteAccessDenied = "Access denied to remote resource";
+
+    /// <summary>Exit 78, a tree connect or open refused with any other status, or a short open response.</summary>
+    public const string RemoteFileNotFound = "Remote file not found";
+
+    /// <summary>Exit 23, the output refusing the bytes of a read response.</summary>
+    /// <param name="passed">The bytes handed to the output.</param>
+    /// <param name="returned">The bytes of them the output accepted.</param>
+    /// <returns>curl's message.</returns>
+    public static string OutputWriteFailed(int passed, int returned) =>
+        string.Create(CultureInfo.InvariantCulture, $"Failure writing output to destination, passed {passed} returned {returned}");
 }

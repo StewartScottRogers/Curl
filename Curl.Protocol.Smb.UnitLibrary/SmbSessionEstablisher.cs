@@ -44,7 +44,7 @@ internal sealed class SmbSessionEstablisher(IConnection connection, SmbMessageRe
         byte[]? setup = SmbSessionSetupRequest.Encode(password, identity, operatingSystem, response!);
         if (setup is null)
         {
-            return (0, TransferResult.Failure(CurlExitCode.FilesizeExceeded, SmbMessages.SetupTooLarge));
+            return (0, TransferResult.Failure(CurlExitCode.FilesizeExceeded, SmbMessages.MessageTooLarge));
         }
 
         await SendAsync(setup, cancellationToken).ConfigureAwait(false);

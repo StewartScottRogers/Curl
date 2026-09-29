@@ -4,11 +4,10 @@ namespace Curl.Protocol.Smb;
 
 /// <summary>
 /// Serves the <c>smb</c> and <c>smbs</c> schemes on every platform, speaking curl 8.21.0's
-/// SMBv1 (ADR-0200). So far it opens the session: parses the share from the URL's path,
-/// connects, negotiates the <c>NT LM 0.12</c> dialect and sets up a session authenticated
-/// with NTLMv1 responses. Connecting to the share and reading the file follow (BL-596);
-/// until they do, a session the server accepts ends the transfer with exit 0 and nothing
-/// written.
+/// SMBv1 (ADR-0200) to download a file: parses the share and file from the URL's path,
+/// connects, negotiates the <c>NT LM 0.12</c> dialect, sets up a session authenticated
+/// with NTLMv1 responses, then connects to the share, reads the file to the output and
+/// disconnects (<see cref="SmbFileDownloader" />). Uploading with <c>-T</c> is BL-597's.
 /// </summary>
 /// <remarks>
 /// The connector supplies the connection to the URL's host and port, in TLS from the
@@ -16,7 +15,8 @@ namespace Curl.Protocol.Smb;
 /// constructed here. The outcomes, in curl's order: a path with no share is refused before connecting with
 /// exit 3; a connect failure is returned as the connector reported it; a transfer with no
 /// user (<see cref="ITransferContext.Credentials" />) is refused once connected with exit
-/// 67 and nothing sent; then <see cref="SmbSessionEstablisher" />'s outcomes. The port
+/// 67 and nothing sent; then <see cref="SmbSessionEstablisher" />'s outcomes, then
+/// <see cref="SmbFileDownloader" />'s. The port
 /// defaults to 445 for both schemes. A server that closes the connection mid-exchange is
 /// waited on until <see cref="ITransferContext.CancellationToken" /> ends the transfer, as
 /// curl waits for <c>-m</c>.
@@ -71,7 +71,7 @@ public sealed class SmbProtocolHandler : IProtocolHandler
         ArgumentNullException.ThrowIfNull(context);
 
         CurlUrl url = context.Url;
-        if (SmbUrlPath.TryParse(url.AbsolutePath, out _) is { } pathError)
+        if (SmbUrlPath.TryParse(url.AbsolutePath, out SmbUrlPath? path) is { } pathError)
         {
             return TransferResult.Failure(CurlExitCode.UrlMalformat, pathError);
         }
@@ -89,22 +89,25 @@ public sealed class SmbProtocolHandler : IProtocolHandler
 
         await using (connection.ConfigureAwait(false))
         {
-            return await OpenSessionAsync(connection, context).ConfigureAwait(false);
+            return await DownloadAsync(connection, context, path!).ConfigureAwait(false);
         }
     }
 
-    private async ValueTask<TransferResult> OpenSessionAsync(IConnection connection, ITransferContext context)
+    private async ValueTask<TransferResult> DownloadAsync(IConnection connection, ITransferContext context, SmbUrlPath path)
     {
         if (context.Credentials is not { } credentials)
         {
             return TransferResult.Failure(CurlExitCode.LoginDenied, SmbMessages.LoginDenied);
         }
 
-        var establisher = new SmbSessionEstablisher(connection, new SmbMessageReader(connection, context.TimeProvider), operatingSystem);
-        (_, TransferResult? failure) = await establisher.EstablishAsync(
+        var reader = new SmbMessageReader(connection, context.TimeProvider);
+        var establisher = new SmbSessionEstablisher(connection, reader, operatingSystem);
+        (ushort userId, TransferResult? failure) = await establisher.EstablishAsync(
             credentials.Password,
             SmbIdentity.Split(credentials.UserName, context.Url.IdnHost),
             context.CancellationToken).ConfigureAwait(false);
-        return failure ?? TransferResult.Success(0);
+        return failure ?? await new SmbFileDownloader(connection, reader, userId, context)
+            .DownloadAsync(context.Url.IdnHost, path)
+            .ConfigureAwait(false);
     }
 }
