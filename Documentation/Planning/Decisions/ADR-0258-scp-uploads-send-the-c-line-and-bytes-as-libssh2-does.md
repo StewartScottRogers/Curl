@@ -88,4 +88,4 @@ exit 25.
   differs from run to run on either side.
 - What `--create-file-mode 0` does for an SFTP upload is not measured or decided here; since
   curl leaves the option unset for 0, it probably sends 0644 there too, while the SFTP upload
-  still passes the 0 it is given. BL-982 measures it.
+  still passes the 0 it is given. BL-984 measures it.

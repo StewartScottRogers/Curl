@@ -1,5 +1,5 @@
 ---
-id: BL-982
+id: BL-984
 title: Send curl's default mode for --create-file-mode 0 on an SFTP upload, as measured
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-982 — Send curl's default mode for --create-file-mode 0 on an SFTP upload, as measured
+# BL-984 — Send curl's default mode for --create-file-mode 0 on an SFTP upload, as measured
 
 ## Goal
 

@@ -71,7 +71,7 @@ completed: 2026-09-29
   to `ScpFileUpload`. The fakes gained `scp -t` in `InMemorySshServerSession`,
   `ScpServerScript.Receiving` and a shared `UnseekableStream`. The ADR and its index row sit
   outside `touches`, as every SSH task's ADR does; no task in `Doing` names that folder.
-- **Follow-up:** BL-982 measures `--create-file-mode 0` on an SFTP upload, which still
+- **Follow-up:** BL-984 measures `--create-file-mode 0` on an SFTP upload, which still
   passes 0 through.
 
 ## Log
