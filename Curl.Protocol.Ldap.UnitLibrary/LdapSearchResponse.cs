@@ -18,8 +18,9 @@ internal static class LdapSearchResponse
     /// <param name="messageId">The SearchRequest's messageID.</param>
     /// <returns>
     /// What the message is; <see cref="LdapSearchReplyKind.Lost" /> when it is not valid BER,
-    /// has no messageID, or is a SearchResultDone whose resultCode is negative or too large for
-    /// an <see cref="int" />. A SearchResultDone's referral and controls are skipped.
+    /// has no messageID, is a SearchResultEntry without a DN, or is a SearchResultDone whose
+    /// resultCode is negative or too large for an <see cref="int" />. A SearchResultDone's
+    /// referral and controls are skipped.
     /// </returns>
     public static LdapSearchReply Decode(ReadOnlyMemory<byte> message, int messageId)
     {
@@ -40,11 +41,53 @@ internal static class LdapSearchResponse
 
             Asn1Tag operation = ldapMessage.PeekTag();
             return operation == SearchResultDoneTag ? DecodeDone(ldapMessage)
-                : LdapSearchReply.Of(operation == SearchResultEntryTag ? LdapSearchReplyKind.Entry : LdapSearchReplyKind.OtherResponse);
+                : operation == SearchResultEntryTag ? DecodeEntry(ldapMessage)
+                : LdapSearchReply.Of(LdapSearchReplyKind.OtherResponse);
         }
         catch (AsnContentException)
         {
             return LdapSearchReply.Of(LdapSearchReplyKind.Lost);
+        }
+    }
+
+    /// <summary>
+    /// Decodes a SearchResultEntry. A DN that cannot be read makes the whole message unreadable;
+    /// attributes that cannot be read leave the entry with <see cref="LdapSearchEntry.Attributes" />
+    /// <see langword="null" />, for each build to treat as it does (<see cref="LdapSearch" />).
+    /// </summary>
+    private static LdapSearchReply DecodeEntry(AsnReader ldapMessage)
+    {
+        AsnReader entry = ldapMessage.ReadSequence(SearchResultEntryTag);
+        byte[] dn = entry.ReadOctetString();
+        return LdapSearchReply.OfEntry(new LdapSearchEntry(dn, ReadAttributes(entry)));
+    }
+
+    /// <summary>Reads the entry's PartialAttributeList; <see langword="null" /> when it cannot be read.</summary>
+    private static List<LdapEntryAttribute>? ReadAttributes(AsnReader entry)
+    {
+        try
+        {
+            AsnReader list = entry.ReadSequence();
+            var attributes = new List<LdapEntryAttribute>();
+            while (list.HasData)
+            {
+                AsnReader attribute = list.ReadSequence();
+                byte[] name = attribute.ReadOctetString();
+                AsnReader set = attribute.ReadSetOf();
+                var values = new List<byte[]>();
+                while (set.HasData)
+                {
+                    values.Add(set.ReadOctetString());
+                }
+
+                attributes.Add(new LdapEntryAttribute(name, values));
+            }
+
+            return attributes;
+        }
+        catch (AsnContentException)
+        {
+            return null;
         }
     }
 

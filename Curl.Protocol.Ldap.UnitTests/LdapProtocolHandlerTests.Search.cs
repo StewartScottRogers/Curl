@@ -185,7 +185,7 @@ public sealed partial class LdapProtocolHandlerTests
             dialect,
             "x",
             BindSuccess1,
-            "30 0f 02 01 02 64 0a 04 04 64 63 3d 78 30 02 30 00",
+            "30 0d 02 01 02 64 08 04 04 64 63 3d 78 30 00",
             "30 0c 02 01 07 65 07 0a 01 20 04 00 04 00",
             SearchNoSuchObject);
 

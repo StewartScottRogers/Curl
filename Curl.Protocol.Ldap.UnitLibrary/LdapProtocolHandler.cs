@@ -24,8 +24,9 @@ namespace Curl.Protocol.Ldap;
 /// The URL is read as the build reads it (<see cref="WinLdapUrlReader" />,
 /// <see cref="OpenLdapUrlReader" />): the OpenLDAP build refuses a bad URL with exit 3 before it
 /// connects, the Windows build after connecting and before it sends a byte. Once bound, the
-/// search runs as <see cref="LdapSearch" /> describes and succeeds with nothing written: the
-/// output comes with BL-588, and the Windows build's bind without <c>-u</c> - the rootDSE
+/// search runs as <see cref="LdapSearch" /> describes, writing each entry to
+/// <see cref="ITransferContext.Output" /> as the build writes it. The Windows build's bind
+/// without <c>-u</c> - the rootDSE
 /// read, then WinLDAP's NTLM bind as the logged-on user, which ADR-0166 decides - with
 /// BL-830, so the WinLDAP dialect binds anonymously until then. The handler is not
 /// registered in <c>Curl.Console</c> until BL-589.
@@ -116,6 +117,6 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
             return bindFailure;
         }
 
-        return await LdapSearch.RunAsync(dialect, exchange, search, context.CancellationToken).ConfigureAwait(false);
+        return await LdapSearch.RunAsync(dialect, exchange, search, context).ConfigureAwait(false);
     }
 }

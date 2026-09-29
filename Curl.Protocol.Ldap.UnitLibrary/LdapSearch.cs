@@ -3,9 +3,9 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Protocol.Ldap;
 
 /// <summary>
-/// Sends the search an LDAP URL names and reads it to its SearchResultDone, as each reference
-/// build does, and fails as it fails (ADR-0166, measured by BL-587 against curl 8.21.0 with
-/// WinLDAP and curl 8.18.0 with OpenLDAP 2.6.10).
+/// Sends the search an LDAP URL names, writes its entries and reads it to its
+/// SearchResultDone, as each reference build does, and fails as it fails (ADR-0166, measured
+/// by BL-587 and BL-588 against curl 8.21.0 with WinLDAP and curl 8.18.0 with OpenLDAP 2.6.10).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -14,15 +14,24 @@ namespace Curl.Protocol.Ldap;
 /// from WinLDAP, <c>LDAP local: ldap_search_ext Bad search filter</c> from <c>libldap</c>.
 /// </para>
 /// <para>
+/// Each entry is written as <see cref="LdapEntryFormatter" /> formats it, when
+/// <see cref="LdapEntryWriter" /> says: the OpenLDAP build as it arrives, the Windows build
+/// only once the search has succeeded, so a failed search writes nothing there. The OpenLDAP
+/// build fails on an entry whose attributes cannot be read, writing nothing for it: it
+/// abandons the search and fails with exit 56 without an UnbindRequest; WinLDAP writes such
+/// an entry as its DN line.
+/// </para>
+/// <para>
 /// A SearchResultDone of <c>success</c> or <c>sizeLimitExceeded</c> succeeds; any other fails
 /// with exit 39, WinLDAP's <c>LDAP remote: &lt;text&gt;</c> or <c>libldap</c>'s
 /// <c>LDAP remote: search failed &lt;text&gt; &lt;diagnosticMessage&gt;</c>, and either way
-/// the UnbindRequest is sent. Entries are read past (BL-588 writes them), and so are messages
-/// for other messageIDs. WinLDAP reads past any other reply too; the OpenLDAP build takes one
-/// (a SearchResultReference, say) as the end of the transfer, abandons the search, unbinds and
-/// succeeds. A server that closes, or sends bytes that are not an LDAPMessage, fails without
-/// an UnbindRequest: WinLDAP with exit 39 <c>LDAP remote: Server Down</c> (after a 30-second
-/// wait this does not make), <c>libldap</c> with exit 56.
+/// the UnbindRequest is sent. Messages for other messageIDs are read past. WinLDAP reads past
+/// any other reply too, a SearchResultReference included, and writes nothing for it; the
+/// OpenLDAP build takes one as the end of the transfer, abandons the search, unbinds and
+/// succeeds with the entries written so far. A server that closes, or sends bytes that are not
+/// an LDAPMessage, fails without an UnbindRequest: WinLDAP with exit 39
+/// <c>LDAP remote: Server Down</c> (after a 30-second wait this does not make), <c>libldap</c>
+/// with exit 56.
 /// </para>
 /// </remarks>
 internal static class LdapSearch
@@ -41,18 +50,22 @@ internal static class LdapSearch
 
     private const string OpenLdapCannotContactServer = "LDAP local: search ldap_result Can't contact LDAP server";
 
+    /// <summary>curl's text for exit 56, which the OpenLDAP build reports for an entry it cannot read.</summary>
+    private const string ReceiveFailed = "Failure when receiving data from the peer";
+
     /// <summary>Runs <paramref name="search" /> on a bound session and leaves as the build leaves.</summary>
     /// <param name="dialect">The build to answer as.</param>
     /// <param name="exchange">The bound session.</param>
     /// <param name="search">The search the URL names.</param>
-    /// <param name="cancellationToken">Cancels the search.</param>
+    /// <param name="context">The transfer, whose output the entries are written to.</param>
     /// <returns>The transfer's result.</returns>
     public static async ValueTask<TransferResult> RunAsync(
         LdapDialect dialect,
         LdapExchange exchange,
         LdapSearchParameters search,
-        CancellationToken cancellationToken)
+        ITransferContext context)
     {
+        CancellationToken cancellationToken = context.CancellationToken;
         var encoder = new LdapFilterEncoder(dialect, exchange.Writer);
         byte[]? filter = search.Filter is null ? encoder.EncodeDefault() : encoder.Encode(search.Filter);
         int messageId = exchange.TakeMessageId();
@@ -69,33 +82,57 @@ internal static class LdapSearch
             filter,
             search.Attributes.Select(attribute => LdapWireText.Encode(dialect, attribute)));
         await exchange.SendAsync(request, cancellationToken).ConfigureAwait(false);
-        LdapSearchReply reply = await ReadToTheEndAsync(dialect, exchange, messageId, cancellationToken).ConfigureAwait(false);
-        return reply.Kind switch
+        var entries = new LdapEntryWriter(dialect, context);
+        LdapSearchReply reply = await ReadToTheEndAsync(dialect, exchange, messageId, entries, cancellationToken).ConfigureAwait(false);
+        TransferResult result = reply.Kind switch
         {
             LdapSearchReplyKind.Lost => Lost(dialect),
-            LdapSearchReplyKind.OtherResponse => await AbandonAndUnbindAsync(exchange, messageId, cancellationToken).ConfigureAwait(false),
-            _ => await UnbindAndReturnAsync(exchange, Outcome(dialect, reply), cancellationToken).ConfigureAwait(false),
+            LdapSearchReplyKind.Entry => await AbandonAsync(exchange, messageId, TransferResult.Failure(CurlExitCode.RecvError, ReceiveFailed), cancellationToken).ConfigureAwait(false),
+            LdapSearchReplyKind.OtherResponse => await UnbindAndReturnAsync(
+                exchange,
+                await AbandonAsync(exchange, messageId, TransferResult.Success(0), cancellationToken).ConfigureAwait(false),
+                cancellationToken).ConfigureAwait(false),
+            _ => await UnbindAndReturnAsync(exchange, await OutcomeAsync(dialect, reply, entries).ConfigureAwait(false), cancellationToken).ConfigureAwait(false),
         };
+
+        // Entries the OpenLDAP build wrote before a failure count too, as curl's size_download does.
+        return result with { BytesTransferred = entries.BytesWritten };
     }
 
-    /// <summary>Reads replies until the one that ends the search for <paramref name="dialect" />'s build.</summary>
+    /// <summary>
+    /// Reads replies, handing each entry to <paramref name="entries" />, until the one that
+    /// ends the search for <paramref name="dialect" />'s build; an entry is returned only when
+    /// the OpenLDAP build cannot read its attributes.
+    /// </summary>
     private static async ValueTask<LdapSearchReply> ReadToTheEndAsync(
         LdapDialect dialect,
         LdapExchange exchange,
         int messageId,
+        LdapEntryWriter entries,
         CancellationToken cancellationToken)
     {
         while (true)
         {
             LdapSearchReply reply = await exchange.ReadSearchReplyAsync(messageId, cancellationToken).ConfigureAwait(false);
-            bool readPast = reply.Kind is LdapSearchReplyKind.Entry or LdapSearchReplyKind.OtherMessage
-                || (reply.Kind == LdapSearchReplyKind.OtherResponse && dialect == LdapDialect.WinLdap);
-            if (!readPast)
+            if (reply.Entry is { } entry && IsWritten(dialect, entry))
+            {
+                await entries.AddAsync(entry).ConfigureAwait(false);
+            }
+            else if (!IsReadPast(dialect, reply))
             {
                 return reply;
             }
         }
     }
+
+    /// <summary>Gets a value indicating whether <paramref name="dialect" />'s build writes <paramref name="entry" />: WinLDAP any, OpenLDAP one whose attributes it can read.</summary>
+    private static bool IsWritten(LdapDialect dialect, LdapSearchEntry entry) =>
+        entry.Attributes is not null || dialect == LdapDialect.WinLdap;
+
+    /// <summary>Gets a value indicating whether <paramref name="dialect" />'s build reads past <paramref name="reply" /> to the next.</summary>
+    private static bool IsReadPast(LdapDialect dialect, LdapSearchReply reply) =>
+        reply.Kind == LdapSearchReplyKind.OtherMessage
+        || (reply.Kind == LdapSearchReplyKind.OtherResponse && dialect == LdapDialect.WinLdap);
 
     private static TransferResult FilterRefused(LdapDialect dialect) =>
         dialect == LdapDialect.WinLdap
@@ -107,10 +144,11 @@ internal static class LdapSearch
             ? TransferResult.Failure(CurlExitCode.LdapSearchFailed, WinLdapRemotePrefix + WinLdapResultText.Of(WinLdapServerDown))
             : TransferResult.Failure(CurlExitCode.RecvError, OpenLdapCannotContactServer);
 
-    private static TransferResult Outcome(LdapDialect dialect, LdapSearchReply done)
+    private static async ValueTask<TransferResult> OutcomeAsync(LdapDialect dialect, LdapSearchReply done, LdapEntryWriter entries)
     {
         if (done.IsSuccess)
         {
+            await entries.WriteHeldAsync().ConfigureAwait(false);
             return TransferResult.Success(0);
         }
 
@@ -120,10 +158,10 @@ internal static class LdapSearch
         return TransferResult.Failure(CurlExitCode.LdapSearchFailed, message);
     }
 
-    private static async ValueTask<TransferResult> AbandonAndUnbindAsync(LdapExchange exchange, int messageId, CancellationToken cancellationToken)
+    private static async ValueTask<TransferResult> AbandonAsync(LdapExchange exchange, int messageId, TransferResult result, CancellationToken cancellationToken)
     {
         await exchange.AbandonAsync(messageId, cancellationToken).ConfigureAwait(false);
-        return await UnbindAndReturnAsync(exchange, TransferResult.Success(0), cancellationToken).ConfigureAwait(false);
+        return result;
     }
 
     private static async ValueTask<TransferResult> UnbindAndReturnAsync(LdapExchange exchange, TransferResult result, CancellationToken cancellationToken)

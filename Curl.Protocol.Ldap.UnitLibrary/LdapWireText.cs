@@ -35,6 +35,43 @@ internal static class LdapWireText
     /// <returns>One <see cref="char" /> per UTF-8 byte.</returns>
     public static string ToByteString(string text) => Encoding.Latin1.GetString(Encoding.UTF8.GetBytes(text));
 
+    /// <summary>
+    /// Gets the Windows-1252 bytes WinLDAP's ANSI entry points hand curl for UTF-8 text the
+    /// server sent, such as a DN or an attribute name (measured by BL-588).
+    /// </summary>
+    /// <param name="utf8">The text as the server sent it.</param>
+    /// <returns>
+    /// One byte per UTF-16 code unit: its Windows-1252 byte, or <c>?</c> when it has none, so a
+    /// character outside the Basic Multilingual Plane is <c>??</c>; an invalid UTF-8 sequence
+    /// is one <c>?</c> per maximal invalid subpart.
+    /// </returns>
+    public static byte[] ToWindowsAnsi(byte[] utf8) => [.. Encoding.UTF8.GetString(utf8).Select(ToWindows1252)];
+
+    /// <summary>
+    /// Gets a value indicating whether WinLDAP finds an attribute named <paramref name="utf8" />
+    /// again by its ANSI name: whether every character of the name has a Windows-1252 byte.
+    /// curl asks WinLDAP for an attribute's values by the ANSI name it was given, so an
+    /// attribute whose name does not survive the trip back comes out with no values.
+    /// </summary>
+    /// <param name="utf8">The attribute name as the server sent it.</param>
+    /// <returns><see langword="true" /> when the ANSI name reads back as the name.</returns>
+    public static bool SurvivesWindowsAnsi(byte[] utf8)
+    {
+        string name = Encoding.UTF8.GetString(utf8);
+        return string.Concat(ToWindowsAnsi(utf8).Select(octet => FromWindows1252((char)octet))) == name;
+    }
+
     private static char FromWindows1252(char octet) =>
         octet is >= '\u0080' and <= '\u009F' ? Windows1252High[octet - 0x80] : octet;
+
+    private static byte ToWindows1252(char character)
+    {
+        int high = Windows1252High.IndexOf(character, StringComparison.Ordinal);
+        if (high >= 0)
+        {
+            return (byte)(0x80 + high);
+        }
+
+        return character is < '\u0080' or (>= ' ' and <= 'ÿ') ? (byte)character : (byte)'?';
+    }
 }

@@ -25,6 +25,31 @@ public sealed class LdapWireTextTests
     }
 
     [TestMethod]
+    [DataRow("63 6e 3d c3 a9", "63 6e 3d e9")]
+    [DataRow("e2 82 ac c2 81", "80 81")]
+    [DataRow("c4 80", "3f")]
+    [DataRow("c2 80", "3f")]
+    [DataRow("61 f0 9f 98 80 62", "61 3f 3f 62")]
+    [DataRow("61 ff fe 62", "61 3f 3f 62")]
+    [DataRow("61 c2 62 e0 a0 62", "61 3f 62 3f 62")]
+    public void ToWindowsAnsi_GivesWindows1252OrAQuestionMarkPerUtf16Unit(string utf8, string expected)
+    {
+        CollectionAssert.AreEqual(Hex.Bytes(expected), LdapWireText.ToWindowsAnsi(Hex.Bytes(utf8)));
+    }
+
+    [TestMethod]
+    [DataRow("63 6e", true)]
+    [DataRow("3f", true)]
+    [DataRow("c3 a9 e2 82 ac c2 81", true)]
+    [DataRow("c2 80", false)]
+    [DataRow("c4 80", false)]
+    [DataRow("ff", false)]
+    public void SurvivesWindowsAnsi_IsWhetherTheAnsiNameReadsBack(string utf8, bool expected)
+    {
+        Assert.AreEqual(expected, LdapWireText.SurvivesWindowsAnsi(Hex.Bytes(utf8)));
+    }
+
+    [TestMethod]
     public void ToByteString_HoldsOneCharacterPerUtf8Byte()
     {
         Assert.AreEqual("aÃ©", LdapWireText.ToByteString("aé"));

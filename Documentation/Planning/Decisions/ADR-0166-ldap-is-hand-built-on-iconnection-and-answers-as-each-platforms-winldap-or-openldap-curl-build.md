@@ -177,6 +177,44 @@ and from curl 8.21.0's `lib/ldap.c` and `lib/openldap.c`:
 - `Record-CurlExchange.ps1 -Script` no longer throws when curl exits without writing on any
   connection, as the Windows build does for a URL it refuses after connecting.
 
+## Measured by BL-588
+
+Decided by Claude under Stewart's delegation, in BL-588, from 18 `Record-CurlExchange.ps1 -Script`
+recordings on 2026-09-28 (the same two builds as BL-586), each with
+`-sS -u cn=u:p -w [%{size_download}]`, the search answered with canned entries:
+
+- **Both builds.** `DN:` line, then per attribute one `\t<name>:` line per value and a blank
+  line after the attribute. A value goes to base64 after `::` when the name is longer than
+  `;binary` and ends with it in any case (`y;BINARY` yes, `;binary` alone no), or when it is
+  not printable: its first or last byte is a space or a tab, or a byte is neither `0x20`-`0x7E`
+  nor tab, line feed, vertical tab, form feed or carriage return (so `a\nb` and a leading line
+  feed are written as they are; `a\0b`, `a\x7f`, `\xc3\xa9` are base64). An empty value is not
+  base64. Base64 is one unwrapped line. `size_download` is the bytes written.
+- **WinLDAP.** `DN: <dn>`, values `: <value>` or `:: <base64>` even when empty, an attribute
+  with no values only its blank line, an entry with no attributes only its DN line. The DN and
+  attribute names come through WinLDAP's ANSI functions: UTF-8 to Windows-1252, `?` for each
+  UTF-16 unit without a byte (`U+0100` is `?`, an emoji `??`) and for each invalid UTF-8
+  subpart. An attribute whose name does not survive that (`U+0080`) is written with no values,
+  since curl asks for the values by the ANSI name. Entries are written only when the search
+  succeeds (`ldap_search_s` reads the whole result first): a SearchResultDone of `noSuchObject`
+  after an entry writes nothing. A SearchResultReference is skipped. An entry whose attribute
+  list is missing is written as its DN line.
+- **OpenLDAP.** The DN and names as sent; `DN:` and each `:`/`::` followed by a space and the
+  text only when there is text (`DN:` for an empty DN, `\te:` for an empty value); an attribute
+  with no values is `\t<name>:` with no blank line after it; one more blank line after each
+  entry. Entries are written as they arrive, so a failed search still writes the entries before
+  it and counts them in `size_download`. A SearchResultReference ends the transfer after the
+  entries so far (BL-587's AbandonRequest and UnbindRequest). An entry whose attribute list is
+  missing writes nothing, is abandoned with no UnbindRequest, and fails with exit 56 `Failure
+  when receiving data from the peer`.
+- Not measured, decided by the same rules: an attribute that is not a type and a set of values
+  counts as a missing list; an entry whose DN cannot be read is a reply that is not an
+  LDAPMessage (WinLDAP `Server Down`, OpenLDAP exit 56 `Can't contact LDAP server`). Two
+  attributes of one entry whose names differ only in case are written each with its own values,
+  where WinLDAP would look both up by name.
+- A failed write to the output, and a connection that fails with an I/O error rather than
+  closing, are not handled by the LDAP handler yet; BL-842 does that.
+
 ## Consequences
 
 - BL-586: the BER reader and writer, the message types, and the bind with both dialects,
