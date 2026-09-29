@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-731]
-touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Documentation/Planning/Decisions/ADR-0222-http-3-through-a-proxy-is-refused-as-curl-se-s-ngtcp2-build-refuses-it.md, Documentation/Planning/Decisions/README.md]
+touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Documentation/Planning/Decisions/ADR-0223-http-3-through-a-proxy-is-refused-as-curl-se-s-ngtcp2-build-refuses-it.md, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-09-28
 completed: 2026-09-29
@@ -47,8 +47,8 @@ An `https://` transfer with `--http3` or `--http3-only` and a proxy (`-x http://
   - `curl -v -s --http3 -x http://… https://example.test/` → `* HTTP/3 is not supported over an HTTP proxy` before `*   Trying 127.0.0.1:47837...`, then the ordinary CONNECT exchange, `* CONNECT tunnel failed, response 403`, `* closing connection #0`, exit 56.
   - `curl -v -s --http3-only -x socks5://…` and `-x http://…` → `* HTTP/3 is not supported over a … proxy`, `* closing connection #-1`, exit 3.
 - Finding: for `--http3` the exit code is the real failure's but the text is the refusal's, because libcurl keeps a transfer's first `failf` in its error buffer. The handler reproduces that by replacing a failed result's message.
-- Decision (ADR-0222): SOCKS matches both 8.18.0 and 8.21.0. For HTTP/HTTPS proxies 8.21.0 tunnels QUIC through CONNECT-UDP (source, `lib/cf-setup.c` and `lib/http_proxy.c` at `curl-8_21_0`), which is new protocol work; filed as BL-917. Until then the measured 8.18.0 behaviour stands, which never lets `--http3-only` succeed over TCP.
-- `touches` gained ADR-0222 and the ADR index `Documentation/Planning/Decisions/README.md` (rule 2 requires the ADR; no task in Doing names either).
+- Decision (ADR-0223): SOCKS matches both 8.18.0 and 8.21.0. For HTTP/HTTPS proxies 8.21.0 tunnels QUIC through CONNECT-UDP (source, `lib/cf-setup.c` and `lib/http_proxy.c` at `curl-8_21_0`), which is new protocol work; filed as BL-942. Until then the measured 8.18.0 behaviour stands, which never lets `--http3-only` succeed over TCP.
+- `touches` gained ADR-0223 and the ADR index `Documentation/Planning/Decisions/README.md` (rule 2 requires the ADR; no task in Doing names either).
 
 ## Log
 

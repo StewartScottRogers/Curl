@@ -50,7 +50,7 @@ first `failf` of a transfer in its error buffer, and the refusal came first.
    successful one prints nothing more.
 4. **Interim for HTTP proxies.** The SOCKS rows match 8.21.0 too. The HTTP proxy rows are
    the 8.18.0 behaviour: 8.21.0 tunnels QUIC through CONNECT-UDP instead, which is new
-   protocol work (RFC 9298 and RFC 9297) filed as BL-917. Until it lands, the measured
+   protocol work (RFC 9298 and RFC 9297) filed as BL-942. Until it lands, the measured
    8.18.0 behaviour is the closest measured behaviour, and it never lets `--http3-only`
    succeed over TCP.
 
@@ -61,4 +61,4 @@ first `failf` of a transfer in its error buffer, and the refusal came first.
 - A reused pooled connection does not repeat the refusal in curl (no connect filter
   runs), but the handler still reports it; the difference only shows with `-v` across
   several URLs on one command line.
-- BL-917 replaces decision 4 for HTTP proxies.
+- BL-942 replaces decision 4 for HTTP proxies.
