@@ -15,6 +15,10 @@ namespace Curl.Protocol.Ftp;
 /// <see langword="true" /> for <c>ftps://</c>, whose control connection is TLS from its first
 /// byte, so no <c>AUTH</c> is sent.
 /// </param>
+/// <param name="connectPhase">
+/// Holds the greeting, the login and <c>PWD</c> to <c>--connect-timeout</c>, as curl holds its
+/// states before <c>DO</c> (BL-512); the caller owns it.
+/// </param>
 /// <remarks>
 /// <para>
 /// TLS (ADR-0102's BL-437 addendum): under <c>--ssl</c>, <c>--ftp-ssl-control</c> or
@@ -87,7 +91,12 @@ namespace Curl.Protocol.Ftp;
 /// given, CR and LF included, as curl sends them.
 /// </para>
 /// </remarks>
-internal sealed class FtpSession(FtpSessionConnections connections, FtpControlChannel control, ITransferContext context, bool implicitTls)
+internal sealed class FtpSession(
+    FtpSessionConnections connections,
+    FtpControlChannel control,
+    ITransferContext context,
+    bool implicitTls,
+    FtpConnectPhaseLimit connectPhase)
     : IAsyncDisposable
 {
     private const string AnonymousUser = "anonymous";
@@ -167,8 +176,7 @@ internal sealed class FtpSession(FtpSessionConnections connections, FtpControlCh
         TransferResult result;
         try
         {
-            result = await GreetAndLogInAsync().ConfigureAwait(false)
-                ?? await ProtectDataAsync().ConfigureAwait(false)
+            result = await ConnectAsync().ConfigureAwait(false)
                 ?? await TransferPathAsync().ConfigureAwait(false);
         }
         catch (FtpControlConversationFailedException lost)
@@ -194,6 +202,34 @@ internal sealed class FtpSession(FtpSessionConnections connections, FtpControlCh
 
     private static ValueTask DisposeIfOpenAsync(IAsyncDisposable? disposable) =>
         disposable?.DisposeAsync() ?? ValueTask.CompletedTask;
+
+    /// <summary>
+    /// Holds curl's connect phase - the greeting, the login, <c>PBSZ</c>, <c>PROT</c> and
+    /// <c>PWD</c> - under the connect phase's limit: exit 28 once <c>--connect-timeout</c> has
+    /// passed, and the transfer's own token for everything after it.
+    /// </summary>
+    private async ValueTask<TransferResult?> ConnectAsync()
+    {
+        try
+        {
+            return await GreetAndLogInAsync().ConfigureAwait(false)
+                ?? await ProtectDataAsync().ConfigureAwait(false)
+                ?? await ReadEntryPathAsync().ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (connectPhase.HasPassed)
+        {
+            return connectPhase.Failure();
+        }
+        finally
+        {
+            control.CancellationToken = context.CancellationToken;
+        }
+    }
+
+    private async ValueTask<TransferResult?> ReadEntryPathAsync() =>
+        FtpEntryPath.TryRead(await ExchangeAsync("PWD").ConfigureAwait(false), out entryPath)
+            ? null
+            : TransferResult.Failure(CurlExitCode.WeirdServerReply, FtpTransferMessages.WeirdServerReply);
 
     /// <summary>
     /// Reads the greeting and logs in: a <c>230</c> greeting means already logged in, a
@@ -246,7 +282,7 @@ internal sealed class FtpSession(FtpSessionConnections connections, FtpControlCh
     private async ValueTask<TransferResult?> UpgradeControlAsync()
     {
         ConnectResult secured = await connections.TlsProvider
-            .AuthenticateAsClientAsync(control.Connection, context.Url.IdnHost, context.CancellationToken)
+            .AuthenticateAsClientAsync(control.Connection, context.Url.IdnHost, control.CancellationToken)
             .ConfigureAwait(false);
         if (secured.Connection is not { } connection)
         {
@@ -309,11 +345,6 @@ internal sealed class FtpSession(FtpSessionConnections connections, FtpControlCh
 
     private async ValueTask<TransferResult> TransferPathAsync()
     {
-        if (!FtpEntryPath.TryRead(await ExchangeAsync("PWD").ConfigureAwait(false), out entryPath))
-        {
-            return TransferResult.Failure(CurlExitCode.WeirdServerReply, FtpTransferMessages.WeirdServerReply);
-        }
-
         if (FtpUrlPath.Parse(context.Url.AbsolutePath, context.FtpFileMethod) is not { } path)
         {
             return TransferResult.Failure(CurlExitCode.UrlMalformat, FtpTransferMessages.PathHasControlCharacters);
@@ -422,7 +453,6 @@ internal sealed class FtpSession(FtpSessionConnections connections, FtpControlCh
             return notReady;
         }
 
-        context.Progress.ReportTransferStarted();
         return await CopyUploadAsync(upload).ConfigureAwait(false)
             ?? await ReadTransferCompleteAsync().ConfigureAwait(false);
     }
@@ -942,7 +972,6 @@ internal sealed class FtpSession(FtpSessionConnections connections, FtpControlCh
                 return notReady;
             }
 
-            context.Progress.ReportTransferStarted();
             return await CopyDataAsync().ConfigureAwait(false)
                 ?? await (window.MaxDownload is null ? ReadTransferCompleteAsync() : EndRangeAsync()).ConfigureAwait(false);
         }

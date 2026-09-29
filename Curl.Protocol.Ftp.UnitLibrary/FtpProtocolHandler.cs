@@ -195,6 +195,7 @@ public sealed class FtpProtocolHandler : IProtocolHandler
     {
         ArgumentNullException.ThrowIfNull(context);
 
+        long started = context.TimeProvider.GetTimestamp();
         CurlUrl url = context.Url;
         bool implicitTls = url.Scheme == ImplicitTlsScheme;
         int defaultPort = implicitTls ? DefaultSecurePort : DefaultPort;
@@ -212,16 +213,19 @@ public sealed class FtpProtocolHandler : IProtocolHandler
             };
         }
 
+        // Past the TCP connect, so -m's runner ends a stall with curl's Operation message (BL-512).
+        context.Progress.ReportTransferStarted();
         await using (connection.ConfigureAwait(false))
         {
-            return await TransferAsync(connection, context, implicitTls).ConfigureAwait(false);
+            return await TransferAsync(connection, context, implicitTls, started).ConfigureAwait(false);
         }
     }
 
-    private async ValueTask<TransferResult> TransferAsync(IConnection control, ITransferContext context, bool implicitTls)
+    private async ValueTask<TransferResult> TransferAsync(IConnection control, ITransferContext context, bool implicitTls, long started)
     {
         var connections = new FtpSessionConnections(connector, listener, tlsProvider, dnsResolver, interfaceLookup);
-        var session = new FtpSession(connections, new FtpControlChannel(control, context.CancellationToken), context, implicitTls);
+        using var connectPhase = new FtpConnectPhaseLimit(context, started);
+        var session = new FtpSession(connections, new FtpControlChannel(control, connectPhase.Token), context, implicitTls, connectPhase);
         await using (session.ConfigureAwait(false))
         {
             return await session.RunAsync().ConfigureAwait(false);

@@ -20,6 +20,15 @@ internal static class FtpTransferMessages
     /// <summary>The exit 28 message for a <c>421</c> reply before the data transfer.</summary>
     internal const string TimeoutReached = "Timeout was reached";
 
+    /// <summary>
+    /// The exit 28 message for <c>--connect-timeout</c> passing after the TCP connect, while
+    /// the greeting, the login or <c>PWD</c> is still unanswered (BL-512).
+    /// </summary>
+    /// <param name="milliseconds">The time since the request started.</param>
+    /// <returns>The message curl prints.</returns>
+    internal static string OperationTimedOut(long milliseconds) =>
+        string.Create(CultureInfo.InvariantCulture, $"Operation timed out after {milliseconds} milliseconds with 0 bytes received");
+
     /// <summary>The exit 28 message for a <c>421</c> reply that ends the data transfer.</summary>
     internal const string ControlConnectionLooksDead = "control connection looks dead";
 

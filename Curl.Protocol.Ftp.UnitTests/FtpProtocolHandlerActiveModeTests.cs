@@ -394,7 +394,8 @@ public sealed class FtpProtocolHandlerActiveModeTests
             pending);
 
         Assert.AreEqual(LogInSent + "EPRT |1|127.0.0.1|52272|\r\n" + RetrieveSent, run.Sent);
-        CollectionAssert.AreEqual(new[] { TimeSpan.FromSeconds(60) }, clock.Waits);
+        // The wait before it is the connect phase's --connect-timeout (BL-512).
+        Assert.AreEqual(TimeSpan.FromSeconds(60), clock.Waits[^1]);
         Assert.AreEqual(
             TransferResult.Failure(CurlExitCode.FtpAcceptTimeout, "Accept timeout occurred while waiting server connect"),
             run.Result);
