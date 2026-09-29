@@ -39,3 +39,4 @@ completed:
 - 2026-09-28: Now depends on BL-853 (BL-830): WinLDAP seals the session after its logon bind, so the handler waits for that before it is registered.
 - 2026-09-29: Backlog -> Doing.
 - 2026-09-29: Doing -> Backlog. Needs Curl.Cli.UnitLibrary and Curl.Cli.UnitTests (the -V Protocols line, ADR-0021 Decision 6), which BL-645 in Doing touches; restart once BL-645 is done.
+- 2026-09-29: Backlog -> Doing.
