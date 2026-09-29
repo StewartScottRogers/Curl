@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-- ADR-0163 decision 3: `Tls13ClientSettings.Validate` refuses any suite that is not TLS 1.3 (`Tls13CipherSuite.Find`), so `TLS_EMPTY_RENEGOTIATION_INFO_SCSV` (`0x00ff`, RFC 5746 section 3.3) cannot be listed and BL-724 left it out.
+- ADR-0165 decision 3: `Tls13ClientSettings.Validate` refuses any suite that is not TLS 1.3 (`Tls13CipherSuite.Find`), so `TLS_EMPTY_RENEGOTIATION_INFO_SCSV` (`0x00ff`, RFC 5746 section 3.3) cannot be listed and BL-724 left it out.
 - Files: `Curl.Tls.UnitLibrary/Tls13ClientSettings.cs` (let `0x00ff` pass validation, or add a separate signalling-values setting), `Tls13ClientHandshake.cs` (a ServerHello choosing `0x00ff` must still be refused with `illegal_parameter`), `Curl.Quic.UnitLibrary/QuicClientSettings.cs`, `Curl.Quic.UnitTests/QuicClientHandshakeTests.cs` (`Start_FixedRandomness_SendsThePinned1200ByteInitial`, `Start_CurlSettings_SendsCurlsClientHelloInOneCryptoFrameThenPadding`).
 
 ## Acceptance criteria
