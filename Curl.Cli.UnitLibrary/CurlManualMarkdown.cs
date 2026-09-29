@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Text;
 
 namespace Curl.Cli;
@@ -17,6 +18,9 @@ internal static class CurlManualMarkdown
     private const int SectionTextIndent = 4;
     private const string OptionHeadingStart = "    -";
     private const string WriteOutVariablesIntroduction = "The variables available are:";
+
+    /// <summary>The characters <see cref="Escape"/> puts a backslash before.</summary>
+    private static readonly SearchValues<char> MarkdownSpecialCharacters = SearchValues.Create("\\`*<");
 
     private static readonly Lazy<IReadOnlyList<string>> ManualLines = new(CurlManual.Lines);
 
@@ -66,7 +70,7 @@ internal static class CurlManualMarkdown
         StringBuilder escaped = new(text.Length);
         foreach (char character in text)
         {
-            if (character is '\\' or '`' or '*' or '<')
+            if (MarkdownSpecialCharacters.Contains(character))
             {
                 escaped.Append('\\');
             }
