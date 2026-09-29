@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Core.UnitLibrary, Curl.Core.UnitTests, Documentation/Planning/Decisions/ADR-0177-the-hsts-cache-reads-matches-and-writes-curls-file-as-libcurl-8-21-0-does.md, Documentation/Planning/Decisions/README.md]
+touches: [Curl.Core.UnitLibrary, Curl.Core.UnitTests, Documentation/Planning/Decisions/ADR-0179-the-hsts-cache-reads-matches-and-writes-curls-file-as-libcurl-8-21-0-does.md, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-09-28
 completed: 2026-09-28
@@ -33,9 +33,9 @@ An `HstsCache` in `Curl.Core.UnitLibrary` reads curl 8.21.0's HSTS file format (
 - Delivered: `Curl.Core.UnitLibrary\Hsts` - `HstsCache` (`ReadFile`, `ApplyHeader`, `Find`,
   `FormatFile`), `HstsHeaderParser`/`HstsHeader`, `HstsFileLineParser`/`HstsFileLine`,
   `HstsEntry`, internal `HstsExpiryText` and `AsciiText`; 123 tests in `Curl.Core.UnitTests\Hsts`.
-  Decisions in ADR-0177 (decided by Claude under Stewart's delegation). Measured edge cases
+  Decisions in ADR-0179 (decided by Claude under Stewart's delegation). Measured edge cases
   were cross-checked against libcurl 8.21.0's `lib/hsts.c` (tag `curl-8_21_0`).
-- touches widened: ADR-0177 and the Decisions `README.md` index row, because the design
+- touches widened: ADR-0179 and the Decisions `README.md` index row, because the design
   decisions need an ADR; no task in Doing names either file (BL-823 names only ADR-0130).
 - Dates in the file go through the existing `CurlDateParser` (curl's `Curl_getdate_capped`),
   not a strict `yyyyMMdd HH:mm:ss` read as in `AltSvcCache`: curl accepts `20300230`, `23:59:60`
@@ -93,4 +93,4 @@ Every run: `Record-CurlExchange.ps1 -Tls -Port 18443 -Response 'HTTP/1.1 200 OK\
 
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Doing.
-- 2026-09-28: Doing -> Done. HstsCache reads, matches and writes curl 8.21.0's HSTS file byte for byte and applies Strict-Transport-Security as curl does (ADR-0177)
+- 2026-09-28: Doing -> Done. HstsCache reads, matches and writes curl 8.21.0's HSTS file byte for byte and applies Strict-Transport-Security as curl does (ADR-0179)
