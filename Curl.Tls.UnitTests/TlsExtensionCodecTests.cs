@@ -273,6 +273,88 @@ public sealed class TlsExtensionCodecTests
         AssertRejectsTruncationAndTrailingBytes(renegotiated.Data, RenegotiationInfoExtension.Decode);
     }
 
+    [TestMethod]
+    public void EcPointFormatsRoundTrips()
+    {
+        TlsExtension extension = EcPointFormatsExtension.Encode([0, 1, 2]);
+
+        Assert.AreEqual(TlsExtensionType.EcPointFormats, extension.Type);
+        Assert.AreEqual("03000102", Convert.ToHexStringLower(extension.Data));
+        CollectionAssert.AreEqual(new byte[] { 0, 1, 2 }, EcPointFormatsExtension.Decode(extension.Data).Value);
+        AssertRejectsTruncationAndTrailingBytes(extension.Data, EcPointFormatsExtension.Decode);
+    }
+
+    [TestMethod]
+    public void SessionTicketCarriesTheWholeDataAsTheTicket()
+    {
+        byte[] ticket = [9, 8, 7];
+
+        TlsExtension request = SessionTicketExtension.Encode([]);
+        TlsExtension resumption = SessionTicketExtension.Encode(ticket);
+
+        Assert.AreEqual(TlsExtensionType.SessionTicket, request.Type);
+        Assert.IsEmpty(request.Data);
+        Assert.AreNotSame(ticket, resumption.Data);
+        CollectionAssert.AreEqual(ticket, SessionTicketExtension.Decode(resumption.Data).Value);
+        Assert.IsEmpty(SessionTicketExtension.Decode([]).Value);
+    }
+
+    [TestMethod]
+    public void EmptyExtensionsAreEmptyAndAnythingElseIsADecodeError()
+    {
+        (TlsExtension Extension, TlsExtensionType Type, Func<byte[], TlsAlertDescription?> Decode)[] cases =
+        [
+            (ExtendedMasterSecretExtension.Encode(), TlsExtensionType.ExtendedMasterSecret, ExtendedMasterSecretExtension.Decode),
+            (EncryptThenMacExtension.Encode(), TlsExtensionType.EncryptThenMac, EncryptThenMacExtension.Decode),
+            (PostHandshakeAuthExtension.Encode(), TlsExtensionType.PostHandshakeAuth, PostHandshakeAuthExtension.Decode),
+        ];
+
+        foreach ((TlsExtension extension, TlsExtensionType type, Func<byte[], TlsAlertDescription?> decode) in cases)
+        {
+            Assert.AreEqual(type, extension.Type);
+            Assert.IsEmpty(extension.Data);
+            Assert.IsNull(decode(extension.Data));
+            Assert.AreEqual(TlsAlertDescription.DecodeError, decode([0]));
+        }
+    }
+
+    [TestMethod]
+    public void CompressCertificateRoundTrips()
+    {
+        TlsExtension extension = CompressCertificateExtension.Encode([0x0001, 0x0003]);
+
+        Assert.AreEqual(TlsExtensionType.CompressCertificate, extension.Type);
+        Assert.AreEqual("0400010003", Convert.ToHexStringLower(extension.Data));
+        CollectionAssert.AreEqual(new ushort[] { 0x0001, 0x0003 }, CompressCertificateExtension.Decode(extension.Data).Value.ToArray());
+        AssertRejectsTruncationAndTrailingBytes(extension.Data, CompressCertificateExtension.Decode);
+    }
+
+    [TestMethod]
+    public void CertificateAuthoritiesRoundTrips()
+    {
+        TlsExtension extension = CertificateAuthoritiesExtension.Encode([[0x30, 0x00], [0x30, 0x01, 0x05]]);
+
+        IReadOnlyList<byte[]> names = CertificateAuthoritiesExtension.Decode(extension.Data).Value;
+
+        Assert.AreEqual(TlsExtensionType.CertificateAuthorities, extension.Type);
+        Assert.AreEqual("0009000230000003300105", Convert.ToHexStringLower(extension.Data));
+        Assert.HasCount(2, names);
+        CollectionAssert.AreEqual(new byte[] { 0x30, 0x00 }, names[0]);
+        CollectionAssert.AreEqual(new byte[] { 0x30, 0x01, 0x05 }, names[1]);
+        AssertRejectsTruncationAndTrailingBytes(extension.Data, CertificateAuthoritiesExtension.Decode);
+    }
+
+    [TestMethod]
+    public void SrpRoundTripsTheUserName()
+    {
+        TlsExtension extension = SrpExtension.Encode("user"u8.ToArray());
+
+        Assert.AreEqual(TlsExtensionType.Srp, extension.Type);
+        Assert.AreEqual("0475736572", Convert.ToHexStringLower(extension.Data));
+        CollectionAssert.AreEqual("user"u8.ToArray(), SrpExtension.Decode(extension.Data).Value);
+        AssertRejectsTruncationAndTrailingBytes(extension.Data, SrpExtension.Decode);
+    }
+
     private static void AssertRejectsTruncationAndTrailingBytes<T>(byte[] data, Func<byte[], TlsDecodeResult<T>> decode)
     {
         Assert.AreEqual(TlsAlertDescription.DecodeError, decode(data[..^1]).Alert);
