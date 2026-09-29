@@ -19,6 +19,37 @@ internal static class ClientCertificateLoader
     private static readonly string[] DerPrivateKeyLabels = ["PRIVATE KEY", "RSA PRIVATE KEY", "EC PRIVATE KEY"];
 
     /// <summary>
+    /// Loads the <see cref="TlsClientOptions.ClientCertificate" /> the options name, as the
+    /// build's curl does. The Schannel build reads the certificate and its key from a Windows
+    /// certificate store or a PKCS#12 file and ignores <c>--key</c> and <c>--key-type</c>; only
+    /// the Windows build of curl keeps a drive letter's colon in the <c>--cert</c> value.
+    /// <c>--pass</c>, when given, is the passphrase in place of the one in <c>--cert</c>.
+    /// </summary>
+    /// <param name="options">The handshake's settings.</param>
+    /// <param name="matchesSchannelBuild">Whether to load as curl's Schannel build does.</param>
+    /// <param name="certificateStore">Opens the store a Schannel store path names.</param>
+    /// <returns>
+    /// No certificate and no failure without <c>--cert</c>; otherwise the certificate with its
+    /// key, or the build's exit 58 or exit 43 failure.
+    /// </returns>
+    public static (X509Certificate2? Certificate, ConnectResult? Failure) Load(
+        TlsClientOptions options,
+        bool matchesSchannelBuild,
+        IClientCertificateStore certificateStore)
+    {
+        if (options.ClientCertificate is null)
+        {
+            return (null, null);
+        }
+
+        var (path, splitPassphrase) = ClientCertificateArgument.Split(options.ClientCertificate, matchesSchannelBuild);
+        var passphrase = options.Passphrase ?? splitPassphrase;
+        return matchesSchannelBuild
+            ? LoadAsSchannelBuild(path, passphrase, options.CertificateType, certificateStore)
+            : LoadAsOpenSslBuild(path, passphrase, options.PrivateKey, options.CertificateType, options.PrivateKeyType);
+    }
+
+    /// <summary>
     /// Loads the certificate as curl's Schannel build does: from a Windows certificate store
     /// when the path is a store path (<see cref="ClientCertificateStorePath" />), otherwise
     /// from a PKCS#12 file. <c>--key</c> and <c>--key-type</c> are not read: the key is the

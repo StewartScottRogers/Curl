@@ -5,7 +5,22 @@ Phase 1.
 Sockets, DNS, TLS via SslStream, proxy and SOCKS handling, connection reuse: the
 production implementations of the transport contracts in
 `Curl.Protocol.Abstractions.UnitLibrary` (ADR-0005). It references that project and
-nothing else.
+`Curl.Tls.UnitLibrary`, the hand-built TLS client (ADR-0120, ADR-0140), and nothing else.
+
+Per ADR-0140 and ADR-0160 (BL-708) there are two TLS providers, and `TlsClientRouting.Choose`
+picks one from a `TlsClientOptions` as one pure function: `HandBuiltTlsProvider` when a row of
+ADR-0140's table holds (today only a `MaximumVersion` of TLS 1.0 or 1.1; each option task adds
+its row and a data row in `TlsClientRoutingTests`), `SslStreamTlsProvider` otherwise. Both
+implement `ITlsProviderWithWarnings`. `HandBuiltTlsProvider` runs `Tls13ClientConnection` for a
+range reaching TLS 1.3 and `Tls12ClientConnection` below it over the internal `ConnectionStream`,
+and returns a `HandBuiltTlsConnection`. Both providers judge the server's certificate with
+`ServerCertificateVerification` (trust anchors, tolerated chain errors, each build's name check,
+exit 60 and 77); the hand-built path reaches it through `HandBuiltCertificateVerifier`, which
+builds the chain and the `SslPolicyErrors` `SslStream` would. Both load `--cert` through
+`ClientCertificateLoader.Load`. The hand-built path's other exit 35 texts are
+`TlsFailureMessages.SchannelHandBuiltHandshakeFailure` and `OpenSslHandBuiltHandshakeFailure`.
+Its tests run it against a server-side `SslStream` over `Fakes/InMemoryDuplexStream`, TLS 1.3
+excluded on macOS, and compare each failure with `SslStreamTlsProvider`'s.
 
 This is the one project allowed to construct a `Socket`, and only inside a transport
 type: `TcpDialer` (behind `ITcpDialer`) and `TcpConnectionListener` with its

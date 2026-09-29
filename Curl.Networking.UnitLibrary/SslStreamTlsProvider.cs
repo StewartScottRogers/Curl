@@ -23,10 +23,8 @@ namespace Curl.Networking;
 /// <see cref="TlsClientOptions.CaCertificateDirectory" />, which the OpenSSL build honours
 /// and the Schannel build ignores with <see cref="Warnings" />.
 /// </remarks>
-public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider
+public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsProviderWithWarnings
 {
-    private const string PemCertificateBegin = "-----BEGIN CERTIFICATE-----";
-
     // The one warning curl 8.21.0's Schannel build writes for --capath (ADR-0009), unwrapped:
     // the console wraps it at the terminal width, into two lines at curl's default 79 columns.
     private static readonly string[] SchannelCaCertificateDirectoryWarnings =
@@ -55,6 +53,8 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider
     private readonly TimeProvider _timeProvider;
 
     private readonly IClientCertificateStore _certificateStore;
+
+    private readonly ServerCertificateVerification _verification;
 
     /// <summary>
     /// Creates the provider for the curl build this platform usually runs: Schannel on
@@ -133,10 +133,23 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         _certificateStore = certificateStore ?? throw new ArgumentNullException(nameof(certificateStore));
         _matchesSchannelBuild = matchesSchannelBuild;
-        Warnings = matchesSchannelBuild && options.CaCertificateDirectory is not null
+        _verification = new ServerCertificateVerification(options, matchesSchannelBuild, timeProvider);
+        Warnings = WarningsFor(options, matchesSchannelBuild);
+    }
+
+    /// <summary>
+    /// Returns the lines the build writes to standard error for options it ignores, as
+    /// <see cref="Warnings" /> holds them: the Schannel build's one <c>--capath</c> warning,
+    /// unwrapped, when <see cref="TlsClientOptions.CaCertificateDirectory" /> is set, otherwise
+    /// none. <see cref="HandBuiltTlsProvider" /> reports the same.
+    /// </summary>
+    /// <param name="options">The settings the handshakes run with.</param>
+    /// <param name="matchesSchannelBuild">Whether the provider behaves like curl's Schannel build.</param>
+    /// <returns>The warning lines, each without its line ending.</returns>
+    internal static IReadOnlyList<string> WarningsFor(TlsClientOptions options, bool matchesSchannelBuild) =>
+        matchesSchannelBuild && options.CaCertificateDirectory is not null
             ? SchannelCaCertificateDirectoryWarnings
             : [];
-    }
 
     /// <summary>
     /// Gets the lines curl writes to standard error, unless <c>-s</c> is given, for options
@@ -341,13 +354,13 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider
         X509Certificate2Collection anchorsBesideSystemStore;
         try
         {
-            (chainPolicy, anchorsBesideSystemStore) = ReadTrustAnchors();
+            (chainPolicy, anchorsBesideSystemStore) = _verification.ReadTrustAnchors();
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or CryptographicException)
         {
             clientCertificate?.Dispose();
             await plaintext.DisposeAsync().ConfigureAwait(false);
-            return ConnectResult.Failed(CurlExitCode.SslCacertBadfile, CaCertificateFileUnusable(_options.CaCertificateFile!));
+            return ConnectResult.Failed(CurlExitCode.SslCacertBadfile, _verification.CaCertificateFileUnusable());
         }
 
         (CurlExitCode ExitCode, string Message)? verificationFailure = null;
@@ -364,10 +377,8 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider
             RemoteCertificateValidationCallback = (_, certificate, chain, errors) =>
             {
                 peerCertificates = ListPeerCertificates(certificate, chain);
-                var anchoredErrors = WithTheNameCheckCurlRuns(
-                    WithoutChainErrorsCurlTolerates(errors, chain, anchorsBesideSystemStore), chain, targetHost);
-                peerVerification = ObservePeerVerification(anchoredErrors, chain, peerCertificates);
-                verificationFailure = VerifyPeer(anchoredErrors, chain, targetHost, []);
+                (peerVerification, verificationFailure) = _verification.Judge(
+                    errors, chain, targetHost, anchorsBesideSystemStore, peerCertificates);
                 return verificationFailure is null;
             },
         };
@@ -421,37 +432,8 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider
         SslPolicyErrors errors,
         X509Chain? chain,
         string targetHost,
-        X509Certificate2Collection anchorsBesideSystemStore)
-    {
-        if (_options.Insecure)
-        {
-            return null;
-        }
-
-        errors = WithTheNameCheckCurlRuns(
-            WithoutChainErrorsCurlTolerates(errors, chain, anchorsBesideSystemStore), chain, targetHost);
-        if (errors == SslPolicyErrors.None)
-        {
-            return null;
-        }
-
-        return _matchesSchannelBuild
-            ? SchannelPeerVerificationFailure(errors, chain, targetHost)
-            : (CurlExitCode.PeerFailedVerification, TlsFailureMessages.OpenSslPeerFailedVerification(errors, chain, targetHost));
-    }
-
-    // The Schannel build's answer for a certificate SslStream found fault with.
-    private (CurlExitCode ExitCode, string Message) SchannelPeerVerificationFailure(
-        SslPolicyErrors errors,
-        X509Chain? chain,
-        string targetHost)
-    {
-        var hasCaCertificateFile = _options.CaCertificateFile is not null;
-        return !hasCaCertificateFile && TlsFailureMessages.IsSchannelCertificateExpired(errors, chain)
-            ? (CurlExitCode.SslConnectError, TlsFailureMessages.SchannelCertificateExpired)
-            : (CurlExitCode.PeerFailedVerification,
-                TlsFailureMessages.SchannelPeerFailedVerification(errors, chain, targetHost, hasCaCertificateFile));
-    }
+        X509Certificate2Collection anchorsBesideSystemStore) =>
+        _verification.VerifyPeer(errors, chain, targetHost, anchorsBesideSystemStore);
 
     /// <summary>
     /// Lists what the server sent, as curl's Schannel build does: the server's own
@@ -480,91 +462,6 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider
         }
 
         return [.. sent];
-    }
-
-    // The chain's errors do not count when it leads to a --capath root trusted beside the
-    // system store, or when --ssl-revoke-best-effort tolerates every one of them.
-    private SslPolicyErrors WithoutChainErrorsCurlTolerates(
-        SslPolicyErrors errors,
-        X509Chain? chain,
-        X509Certificate2Collection anchorsBesideSystemStore) =>
-        ChainLeadsToAnyOf(chain, anchorsBesideSystemStore) || RevocationBestEffortTolerates(chain)
-            ? errors & ~SslPolicyErrors.RemoteCertificateChainErrors
-            : errors;
-
-    // curl's Schannel build, under --ssl-revoke-best-effort, masks CERT_TRUST_REVOCATION_STATUS_UNKNOWN
-    // and CERT_TRUST_IS_OFFLINE_REVOCATION out of the chain's trust errors (measured, BL-490).
-    private bool RevocationBestEffortTolerates(X509Chain? chain) =>
-        _matchesSchannelBuild
-        && _options.RevocationCheckBestEffort
-        && chain is not null
-        && HasOnlyUnavailableRevocationStatus(chain.ChainStatus);
-
-    /// <summary>
-    /// Returns whether a chain's faults are all ones <c>--ssl-revoke-best-effort</c> tolerates:
-    /// its revocation status is unknown or could not be fetched, and nothing else is wrong.
-    /// </summary>
-    /// <param name="chainStatus">The chain's <see cref="X509Chain.ChainStatus" />.</param>
-    /// <returns>
-    /// <see langword="true" /> when there is at least one fault and every fault is
-    /// <see cref="X509ChainStatusFlags.RevocationStatusUnknown" /> or
-    /// <see cref="X509ChainStatusFlags.OfflineRevocation" />.
-    /// </returns>
-    internal static bool HasOnlyUnavailableRevocationStatus(X509ChainStatus[] chainStatus) =>
-        chainStatus.Length > 0
-        && chainStatus.All(status =>
-            (status.Status & ~(X509ChainStatusFlags.RevocationStatusUnknown | X509ChainStatusFlags.OfflineRevocation)) == 0);
-
-    // Where curl's name check and .NET's disagree, the build curl's answer stands.
-    private SslPolicyErrors WithTheNameCheckCurlRuns(SslPolicyErrors errors, X509Chain? chain, string targetHost) =>
-        _matchesSchannelBuild
-            ? WithoutNameMismatchSchannelAccepts(errors, chain, targetHost)
-            : WithNameMismatchOpenSslFinds(errors, chain, targetHost);
-
-    // curl's OpenSSL build never matches a host name by the common name of a certificate
-    // whose subjectAltName holds only IP addresses, which .NET on Windows does (BL-460).
-    private static SslPolicyErrors WithNameMismatchOpenSslFinds(SslPolicyErrors errors, X509Chain? chain, string targetHost) =>
-        chain is { ChainElements.Count: > 0 }
-        && OpenSslCommonNameRefusal.RefusesHostName(chain.ChainElements[0].Certificate, targetHost)
-            ? errors | SslPolicyErrors.RemoteCertificateNameMismatch
-            : errors;
-
-    // With --cacert curl's Schannel build checks the name itself and, for a certificate
-    // with no DNS subjectAltName, matches the common name, which .NET's check does not
-    // (BL-415). Without --cacert Schannel's own check stands.
-    private SslPolicyErrors WithoutNameMismatchSchannelAccepts(SslPolicyErrors errors, X509Chain? chain, string targetHost) =>
-        _options.CaCertificateFile is not null
-        && errors.HasFlag(SslPolicyErrors.RemoteCertificateNameMismatch)
-        && SchannelCommonNameCheck.CommonNameMatches(chain!.ChainElements[0].Certificate, targetHost)
-            ? errors & ~SslPolicyErrors.RemoteCertificateNameMismatch
-            : errors;
-
-    // Taken in the validation callback, whether or not -k lets the handshake go on, because
-    // SslStream disposes the chain once the callback returns.
-    private PeerVerification ObservePeerVerification(
-        SslPolicyErrors anchoredErrors,
-        X509Chain? chain,
-        ReadOnlyMemory<byte>[] peerCertificates)
-    {
-        var reportedChain = chain is { ChainElements.Count: > 0 }
-            && (anchoredErrors & SslPolicyErrors.RemoteCertificateChainErrors) == 0
-                ? ListChainElements(chain)
-                : peerCertificates;
-        return new PeerVerification(
-            anchoredErrors == SslPolicyErrors.None,
-            OpenSslVerifyResult.Of(anchoredErrors, chain, _timeProvider.GetUtcNow()),
-            reportedChain);
-    }
-
-    private static ReadOnlyMemory<byte>[] ListChainElements(X509Chain chain)
-    {
-        var elements = new List<ReadOnlyMemory<byte>>();
-        foreach (var element in chain.ChainElements)
-        {
-            elements.Add(element.Certificate.RawData);
-        }
-
-        return [.. elements];
     }
 
     private static TlsHandshakeEvent DescribeHandshake(
@@ -613,11 +510,20 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider
         return _options.UseAlpn ? applicationProtocols : [];
     }
 
-    private TlsTrustEvent DescribeTrust() => new()
+    private TlsTrustEvent DescribeTrust() => DescribeTrust(_options);
+
+    /// <summary>
+    /// Describes the trust a handshake with <paramref name="options" /> verifies against, as
+    /// both TLS clients report it before the handshake: <c>-k</c>, the <c>--cacert</c> file or
+    /// else <see cref="OpenSslDefaultCaCertificateFile" />, and the <c>--capath</c> directory.
+    /// </summary>
+    /// <param name="options">The handshake's settings.</param>
+    /// <returns>The event.</returns>
+    internal static TlsTrustEvent DescribeTrust(TlsClientOptions options) => new()
     {
-        VerifiesPeer = !_options.Insecure,
-        CaCertificateFile = _options.CaCertificateFile ?? OpenSslDefaultCaCertificateFile,
-        CaCertificateDirectory = _options.CaCertificateDirectory,
+        VerifiesPeer = !options.Insecure,
+        CaCertificateFile = options.CaCertificateFile ?? OpenSslDefaultCaCertificateFile,
+        CaCertificateDirectory = options.CaCertificateDirectory,
     };
 
     /// <summary>
@@ -657,28 +563,8 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider
             : (policy, null);
     }
 
-    // The Schannel build reads the certificate and its key from a Windows certificate store
-    // or a PKCS#12 file and ignores --key and --key-type; only the Windows build of curl
-    // keeps a drive letter's colon in the --cert value. --pass, when given, is the
-    // passphrase in place of the one in --cert.
-    private (X509Certificate2? Certificate, ConnectResult? Failure) LoadClientCertificate()
-    {
-        if (_options.ClientCertificate is null)
-        {
-            return (null, null);
-        }
-
-        var (path, splitPassphrase) = ClientCertificateArgument.Split(_options.ClientCertificate, _matchesSchannelBuild);
-        var passphrase = _options.Passphrase ?? splitPassphrase;
-        return _matchesSchannelBuild
-            ? ClientCertificateLoader.LoadAsSchannelBuild(path, passphrase, _options.CertificateType, _certificateStore)
-            : ClientCertificateLoader.LoadAsOpenSslBuild(
-                path,
-                passphrase,
-                _options.PrivateKey,
-                _options.CertificateType,
-                _options.PrivateKeyType);
-    }
+    private (X509Certificate2? Certificate, ConnectResult? Failure) LoadClientCertificate() =>
+        ClientCertificateLoader.Load(_options, _matchesSchannelBuild, _certificateStore);
 
     // Selected by callback, not given as ClientCertificateContext: on Windows SslStream opens
     // a handshake that has a certificate context with a credential handle that carries it,
@@ -694,141 +580,6 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider
         : TlsFailureMessages.OpenSslSslConnectError(failure);
 
     private bool OffersOnlyVersionsBelowTls12 => _options.MaximumVersion is TlsVersion.Tls10 or TlsVersion.Tls11;
-
-    private string CaCertificateFileUnusable(string caCertificateFile) => _matchesSchannelBuild
-        ? TlsFailureMessages.SchannelCaCertificateFileUnusable(caCertificateFile)
-        : TlsFailureMessages.OpenSslCaCertificateFileUnusable(caCertificateFile);
-
-    // The chain policy replaces the system store, from --cacert; null verifies against the
-    // system store, with the --capath roots trusted beside it when there is no --cacert.
-    // With --cacert the Schannel build checks revocation below the root unless
-    // SkipRevocationCheck is set, so a private CA with no revocation endpoint fails with
-    // exit 60 as in curl (ADR-0086); the OpenSSL build never checks it.
-    private (X509ChainPolicy? ChainPolicy, X509Certificate2Collection AnchorsBesideSystemStore) ReadTrustAnchors()
-    {
-        if (_options.Insecure)
-        {
-            return (null, []);
-        }
-
-        var directoryAnchors = ReadCaCertificateDirectory();
-        if (_options.CaCertificateFile is null)
-        {
-            return (null, directoryAnchors);
-        }
-
-        var chainPolicy = new X509ChainPolicy
-        {
-            TrustMode = X509ChainTrustMode.CustomRootTrust,
-            RevocationMode = _matchesSchannelBuild && !_options.SkipRevocationCheck
-                ? X509RevocationMode.Online
-                : X509RevocationMode.NoCheck,
-        };
-        chainPolicy.CustomTrustStore.AddRange(ReadCaCertificateFile(_options.CaCertificateFile));
-        chainPolicy.CustomTrustStore.AddRange(directoryAnchors);
-        return (chainPolicy, []);
-    }
-
-    // The OpenSSL build refuses the whole file (exit 77) unless every CERTIFICATE block in
-    // it parses and there is at least one; ImportFromPem skips a block whose body is not
-    // base64, so the blocks imported are counted against the blocks begun. The Schannel
-    // build trusts whatever parses.
-    private X509Certificate2Collection ReadCaCertificateFile(string path)
-    {
-        var pem = File.ReadAllText(path);
-        var certificates = new X509Certificate2Collection();
-        if (_matchesSchannelBuild)
-        {
-            ImportParsableCertificates(certificates, pem);
-            return certificates;
-        }
-
-        certificates.ImportFromPem(pem);
-        if (certificates.Count == 0 || certificates.Count != pem.AsSpan().Count(PemCertificateBegin))
-        {
-            throw new CryptographicException("The file holds no certificate, or one that could not be decoded.");
-        }
-
-        return certificates;
-    }
-
-    private X509Certificate2Collection ReadCaCertificateDirectory()
-    {
-        var certificates = new X509Certificate2Collection();
-        var directory = _options.CaCertificateDirectory;
-        if (_matchesSchannelBuild || directory is null)
-        {
-            return certificates;
-        }
-
-        foreach (var file in ListFilesOrNothing(directory))
-        {
-            ImportParsableCertificates(certificates, ReadTextOrNothing(file));
-        }
-
-        return certificates;
-    }
-
-    // A --capath that is missing, is not a directory or cannot be listed adds nothing,
-    // as in curl's OpenSSL build.
-    private static string[] ListFilesOrNothing(string directory)
-    {
-        try
-        {
-            return Directory.GetFiles(directory);
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            return [];
-        }
-    }
-
-    private static string ReadTextOrNothing(string path)
-    {
-        try
-        {
-            return File.ReadAllText(path);
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            return string.Empty;
-        }
-    }
-
-    // ImportFromPem throws for a block that is base64 but not a certificate; what was
-    // imported before it is kept.
-    private static void ImportParsableCertificates(X509Certificate2Collection certificates, string pem)
-    {
-        try
-        {
-            certificates.ImportFromPem(pem);
-        }
-        catch (CryptographicException)
-        {
-            // The rest of the text is not a usable certificate; it adds nothing.
-        }
-    }
-
-    // The server's own chain, rebuilt against the extra roots alone.
-    private static bool ChainLeadsToAnyOf(X509Chain? chain, X509Certificate2Collection anchors)
-    {
-        if (chain is null || chain.ChainElements.Count == 0 || anchors.Count == 0)
-        {
-            return false;
-        }
-
-        using var anchoredChain = new X509Chain();
-        anchoredChain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
-        anchoredChain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
-        anchoredChain.ChainPolicy.CustomTrustStore.AddRange(anchors);
-        anchoredChain.ChainPolicy.ExtraStore.AddRange(chain.ChainPolicy.ExtraStore);
-        foreach (var element in chain.ChainElements)
-        {
-            anchoredChain.ChainPolicy.ExtraStore.Add(element.Certificate);
-        }
-
-        return anchoredChain.Build(chain.ChainElements[0].Certificate);
-    }
 
     // Cancellation is the one exception ITlsProvider lets escape; its stack trace is kept.
     private static void RethrowIfCancellation(Exception failure)
@@ -855,12 +606,5 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider
         }
 
         await plaintext.DisposeAsync().ConfigureAwait(false);
-    }
-
-    // What the validation callback learned about the server's certificate: whether it
-    // verified, OpenSSL's code for it, and the DER of the chain the event reports.
-    private sealed record PeerVerification(bool Verified, long? VerifyResult, ReadOnlyMemory<byte>[] Chain)
-    {
-        internal static PeerVerification Unobserved { get; } = new(false, null, []);
     }
 }

@@ -5,6 +5,8 @@ using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
 
+using Curl.Tls;
+
 namespace Curl.Networking;
 
 /// <summary>
@@ -91,6 +93,78 @@ internal static class TlsFailureMessages
     {
         [SocketError.ConnectionReset] = "Connection reset by peer",
     }.ToFrozenDictionary();
+
+    // What curl's Schannel build reports when the server sends a fatal alert during the
+    // handshake (measured against a handshake_failure alert, ADR-0140).
+    private const string SchannelFatalAlertReceived =
+        "schannel: next InitializeSecurityContext failed: SEC_E_ILLEGAL_MESSAGE (0x80090326) - This error usually occurs when a fatal SSL/TLS alert is received (e.g. handshake failed). More detail may be available in the Windows System event log.";
+
+    // OpenSSL 3's reason strings for an alert, each its reason code 1000 plus the alert
+    // (ssl/ssl_err.c): handshake_failure (ADR-0140) and protocol_version (BL-502) measured.
+    private static readonly FrozenDictionary<TlsAlertDescription, string> OpenSslAlertReasons = new Dictionary<TlsAlertDescription, string>
+    {
+        [TlsAlertDescription.UnexpectedMessage] = "sslv3 alert unexpected message",
+        [TlsAlertDescription.BadRecordMac] = "sslv3 alert bad record mac",
+        [TlsAlertDescription.RecordOverflow] = "tlsv1 alert record overflow",
+        [TlsAlertDescription.HandshakeFailure] = "ssl/tls alert handshake failure",
+        [TlsAlertDescription.BadCertificate] = "ssl/tls alert bad certificate",
+        [TlsAlertDescription.UnsupportedCertificate] = "sslv3 alert unsupported certificate",
+        [TlsAlertDescription.CertificateRevoked] = "sslv3 alert certificate revoked",
+        [TlsAlertDescription.CertificateExpired] = "sslv3 alert certificate expired",
+        [TlsAlertDescription.CertificateUnknown] = "sslv3 alert certificate unknown",
+        [TlsAlertDescription.IllegalParameter] = "sslv3 alert illegal parameter",
+        [TlsAlertDescription.UnknownCa] = "tlsv1 alert unknown ca",
+        [TlsAlertDescription.AccessDenied] = "tlsv1 alert access denied",
+        [TlsAlertDescription.DecodeError] = "tlsv1 alert decode error",
+        [TlsAlertDescription.DecryptError] = "tlsv1 alert decrypt error",
+        [TlsAlertDescription.ProtocolVersion] = "tlsv1 alert protocol version",
+        [TlsAlertDescription.InsufficientSecurity] = "tlsv1 alert insufficient security",
+        [TlsAlertDescription.InternalError] = "tlsv1 alert internal error",
+        [TlsAlertDescription.InappropriateFallback] = "tlsv1 alert inappropriate fallback",
+        [TlsAlertDescription.UserCanceled] = "tlsv1 alert user cancelled",
+        [TlsAlertDescription.MissingExtension] = "tlsv13 alert missing extension",
+        [TlsAlertDescription.UnsupportedExtension] = "tlsv1 unsupported extension",
+        [TlsAlertDescription.UnrecognizedName] = "tlsv1 unrecognized name",
+        [TlsAlertDescription.BadCertificateStatusResponse] = "tlsv1 bad certificate status response",
+        [TlsAlertDescription.CertificateRequired] = "tlsv13 alert certificate required",
+        [TlsAlertDescription.NoApplicationProtocol] = "tlsv1 alert no application protocol",
+    }.ToFrozenDictionary();
+
+    /// <summary>
+    /// The Schannel build's message for exit 35 when the hand-built client's handshake fails
+    /// for a reason other than verification (ADR-0140, "Failures and text"): the server
+    /// closing, or any range of only TLS 1.0 and 1.1 (as <see cref="SchannelSslConnectError(Exception, bool)" />
+    /// reports it), is <c>failed to receive handshake</c>; an alert either side sent is the
+    /// line Schannel's curl prints for a fatal alert.
+    /// </summary>
+    /// <param name="failure">Why the hand-built handshake failed.</param>
+    /// <param name="offersOnlyVersionsBelowTls12"><see langword="true" /> when the ceiling was TLS 1.0 or TLS 1.1.</param>
+    /// <returns>The message curl prints.</returns>
+    public static string SchannelHandBuiltHandshakeFailure(TlsHandshakeFailure failure, bool offersOnlyVersionsBelowTls12) =>
+        failure.Origin == TlsHandshakeFailureOrigin.TransportClosed || offersOnlyVersionsBelowTls12
+            ? SchannelHandshakeNotReceived
+            : SchannelFatalAlertReceived;
+
+    /// <summary>
+    /// The OpenSSL build's message for exit 35 when the hand-built client's handshake fails
+    /// for a reason other than verification: the server closing is OpenSSL's unexpected-EOF
+    /// error string, and an alert is OpenSSL's error string for it, reason code 1000 plus the
+    /// alert, named as OpenSSL 3 names it, or <c>reason(N)</c> as OpenSSL prints a reason it
+    /// has no string for.
+    /// </summary>
+    /// <param name="failure">Why the hand-built handshake failed.</param>
+    /// <returns>The message curl prints.</returns>
+    public static string OpenSslHandBuiltHandshakeFailure(TlsHandshakeFailure failure)
+    {
+        if (failure.Origin == TlsHandshakeFailureOrigin.TransportClosed)
+        {
+            return $"TLS connect error: {OpenSslUnexpectedEof}";
+        }
+
+        var reason = 1000 + (int)failure.Alert;
+        var text = OpenSslAlertReasons.GetValueOrDefault(failure.Alert, $"reason({reason})");
+        return $"TLS connect error: error:{0x0A000000 | reason:X8}:SSL routines::{text}";
+    }
 
     /// <summary>
     /// The Schannel build's message for exit 60: the server certificate or its host name

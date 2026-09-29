@@ -14,7 +14,7 @@ namespace Curl.Networking;
 /// and the rule it gives for the cases it did not measure.
 /// </summary>
 [TestClass]
-public sealed class TlsFailureMessagesTests
+public sealed partial class TlsFailureMessagesTests
 {
     [TestMethod]
     public void SchannelSslConnectError_WithTheMeasuredSecurityStatus_IsTheMeasuredLine()
