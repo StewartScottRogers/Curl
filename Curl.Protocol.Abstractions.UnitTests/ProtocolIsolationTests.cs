@@ -157,6 +157,15 @@ public sealed class ProtocolIsolationTests
     }
 
     [TestMethod]
+    public void ProtocolLibraries_FindsTheProjectsUnderTheRepositoryRoot()
+    {
+        var names = ProtocolLibraries().Select(ProjectName).ToList();
+
+        CollectionAssert.Contains(names, "Curl.Protocol.Http.UnitLibrary");
+        CollectionAssert.DoesNotContain(names, Abstractions);
+    }
+
+    [TestMethod]
     public void EveryProtocolLibrary_HasAMatchingTestProject()
     {
         var root = RepositoryRoot();
@@ -191,10 +200,17 @@ public sealed class ProtocolIsolationTests
             .Where(referenced => !HandBuiltLibraries[library].Contains(referenced))
             .ToList();
 
+    /// <summary>
+    /// Returns every protocol library project other than Abstractions. Projects sit
+    /// immediately under the repository root, so only that one level is read: walking
+    /// deeper would enter other test projects' <c>bin</c> folders while their tests
+    /// create and delete files there.
+    /// </summary>
     private static IEnumerable<string> ProtocolLibraries() =>
-        Directory.EnumerateFiles(RepositoryRoot(), "Curl.Protocol.*.UnitLibrary.csproj",
-                SearchOption.AllDirectories)
-            .Where(path => ProjectName(path) != Abstractions);
+        Directory.EnumerateDirectories(RepositoryRoot(), "Curl.Protocol.*.UnitLibrary",
+                SearchOption.TopDirectoryOnly)
+            .Select(folder => Path.Combine(folder, Path.GetFileName(folder) + ".csproj"))
+            .Where(path => File.Exists(path) && ProjectName(path) != Abstractions);
 
     private static string ProjectName(string projectPath) =>
         Path.GetFileNameWithoutExtension(projectPath);
