@@ -98,6 +98,11 @@ The messages for its exit 35, exit 43, exit 58, exit 59, exit 60 and exit 77 liv
 `TlsFailureMessages` and nowhere else; the `More details here` block after an exit 60 is
 the console's to print. No type here constructs an `HttpClient`.
 
+`TcpConnector` dials a host's or proxy's addresses through `AddressFamilyRace` (ADR-0254): the
+first address's family in turn, the other family beside it once `happyEyeballsTimeout`
+(`--happy-eyeballs-timeout-ms`, 200 ms by default) has passed on its `TimeProvider` or the first
+family has failed on every address; the first connection wins and the rest are cancelled or closed.
+
 `TcpConnector` fills `ConnectResult.Timings` and `LocalEndPoint` per ADR-0030: it takes
 `Started`, `NameResolved` and `Connected` from its `TimeProvider`, the local end point from
 the `DialedTcpConnection` that `ITcpDialer` returns, and `TlsHandshakeCompleted` from the

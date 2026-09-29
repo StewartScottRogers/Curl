@@ -8,8 +8,8 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Networking;
 
 /// <summary>
-/// The production <see cref="IConnector" /> for TCP: resolves the host, dials each
-/// address in the resolver's order until one connects, and hands the connection to
+/// The production <see cref="IConnector" /> for TCP: resolves the host, dials its addresses
+/// with happy eyeballs (<see cref="AddressFamilyRace" />) until one connects, and hands the connection to
 /// <see cref="ITlsProvider" /> when the target asks for TLS. Given a <see cref="QuicDialer" />,
 /// it also resolves the host for a QUIC connection and hands the addresses to the dialer.
 /// </summary>
@@ -61,6 +61,11 @@ namespace Curl.Networking;
 /// Opens the QUIC connections <see cref="ConnectMultiplexedAsync" /> asks for, over the addresses
 /// this connector resolves (ADR-0180); <see langword="null" /> for a connector with no QUIC.
 /// </param>
+/// <param name="happyEyeballsTimeout">
+/// The <c>--happy-eyeballs-timeout-ms</c> delay: how long the first address family is dialled alone
+/// before the other is dialled beside it (<see cref="AddressFamilyRace" />, ADR-0254);
+/// <see langword="null" /> for curl's default of 200 milliseconds.
+/// </param>
 public sealed class TcpConnector(
     IDnsResolver dnsResolver,
     ITcpDialer tcpDialer,
@@ -74,7 +79,8 @@ public sealed class TcpConnector(
     AddressFamily addressFamily = AddressFamily.Unspecified,
     UnixSocketAddress? unixSocket = null,
     IReadOnlyList<string>? httpOverTlsApplicationProtocols = null,
-    QuicDialer? quicDialer = null) : IConnector
+    QuicDialer? quicDialer = null,
+    TimeSpan? happyEyeballsTimeout = null) : IConnector
 {
     private const string AnyHost = "*";
 
@@ -83,6 +89,22 @@ public sealed class TcpConnector(
     /// <c>--connect-timeout</c>, or 0, was given.
     /// </summary>
     public static TimeSpan DefaultConnectTimeout { get; } = TimeSpan.FromSeconds(300);
+
+    /// <summary>
+    /// Gets curl's <c>CURL_HET_DEFAULT</c>, 200 milliseconds: the happy-eyeballs delay when no
+    /// <c>--happy-eyeballs-timeout-ms</c> was given.
+    /// </summary>
+    public static TimeSpan DefaultHappyEyeballsTimeout { get; } = TimeSpan.FromMilliseconds(200);
+
+    // The longest delay a .NET timer takes, about 49.7 days; a longer happy-eyeballs delay is held to it.
+    private static readonly TimeSpan LongestTimerDelay = TimeSpan.FromMilliseconds(uint.MaxValue - 1);
+
+    /// <summary>
+    /// Gets how long the first address family is dialled alone before the other is dialled beside
+    /// it: the <c>happyEyeballsTimeout</c> given, or <see cref="DefaultHappyEyeballsTimeout" />,
+    /// held to between zero and the longest delay a .NET timer takes.
+    /// </summary>
+    public TimeSpan HappyEyeballsTimeout { get; } = HappyEyeballsTimeoutOrDefault(happyEyeballsTimeout);
 
     // A Unix domain socket's connection has no IP end points; its opened event carries this for both.
     private static readonly IPEndPoint UnspecifiedEndPoint = new(IPAddress.Any, 0);
@@ -406,6 +428,15 @@ public sealed class TcpConnector(
 
     private static TimeSpan ConnectTimeoutOrDefault(TimeSpan? connectTimeout) =>
         connectTimeout is { } given && given > TimeSpan.Zero ? given : DefaultConnectTimeout;
+
+    private static TimeSpan HappyEyeballsTimeoutOrDefault(TimeSpan? happyEyeballsTimeout) =>
+        happyEyeballsTimeout switch
+        {
+            null => DefaultHappyEyeballsTimeout,
+            { } given when given < TimeSpan.Zero => TimeSpan.Zero,
+            { } given when given > LongestTimerDelay => LongestTimerDelay,
+            { } given => given,
+        };
 
     private long TakeConnectionNumber() => Interlocked.Increment(ref _nextConnectionNumber) - 1;
 
@@ -1065,11 +1096,10 @@ public sealed class TcpConnector(
     }
 
     /// <summary>
-    /// Dials each address in turn and returns the first connection, or <see langword="null" />
-    /// with the <see cref="SocketError" /> of the last attempt, which curl keeps as
-    /// <c>CURLINFO_OS_ERRNO</c>. Each attempt is reported on the target's events as
-    /// curl 8.21.0's <c>-v</c> reports it: <c>Trying</c> before it, and the
-    /// <c>connect to ... failed</c> line when it fails (measured, BL-408).
+    /// Races the address families of <paramref name="addresses" /> through an
+    /// <see cref="AddressFamilyRace" /> and returns the first connection, or <see langword="null" />
+    /// with the <see cref="SocketError" /> of the attempt that failed last, which curl keeps as
+    /// <c>CURLINFO_OS_ERRNO</c>.
     /// </summary>
     private async ValueTask<(DialedSocket? Dialed, SocketError LastError)> DialFirstReachableAsync(
         IReadOnlyList<IPAddress> addresses,
@@ -1078,42 +1108,11 @@ public sealed class TcpConnector(
         ConnectTarget target,
         CancellationToken cancellationToken)
     {
-        var events = target.Events;
-        var log = new NetworkDiagnosticLog(target.DiagnosticLog);
-        var lastError = SocketError.Success;
-        foreach (var address in addresses)
-        {
-            var remoteEndPoint = new IPEndPoint(address, port);
-            events.ReportInfo($"  Trying {remoteEndPoint}...");
-            log.Dialling(remoteEndPoint);
-            try
-            {
-                var dialed = await tcpDialer.DialAsync(remoteEndPoint, cancellationToken).ConfigureAwait(false);
-                log.Connected(remoteEndPoint, dialed.LocalEndPoint);
-                return (new DialedSocket(dialed.Connection, dialed.LocalEndPoint, hostName, remoteEndPoint), SocketError.Success);
-            }
-            catch (SocketException exception)
-            {
-                // curl moves on to the next address; only when every one fails is it exit 7.
-                lastError = exception.SocketErrorCode;
-                events.ReportInfo(ConnectFailedLine(remoteEndPoint, exception));
-                log.DialFailed(remoteEndPoint, exception);
-            }
-        }
-
-        return (null, lastError);
-    }
-
-    /// <summary>
-    /// curl 8.21.0's line for one failed dial, such as <c>connect to 127.0.0.1 port 1 from
-    /// 0.0.0.0 port 56585 failed: Connection refused</c>. A failed dial reports no local end
-    /// point, so it names the unspecified address of the family and port <c>0</c> (ADR-0100).
-    /// </summary>
-    private static string ConnectFailedLine(IPEndPoint remoteEndPoint, SocketException exception)
-    {
-        var unspecified = remoteEndPoint.AddressFamily == AddressFamily.InterNetworkV6 ? IPAddress.IPv6Any : IPAddress.Any;
-        var reason = ConnectFailureReason.Describe(exception, OperatingSystem.IsWindows());
-        return $"connect to {remoteEndPoint.Address} port {remoteEndPoint.Port} from {unspecified} port 0 failed: {reason}";
+        var race = new AddressFamilyRace(tcpDialer, timeProvider, HappyEyeballsTimeout, target.Events, new NetworkDiagnosticLog(target.DiagnosticLog));
+        var (dialed, remoteEndPoint, lastError) = await race.DialAsync(addresses, port, cancellationToken).ConfigureAwait(false);
+        return dialed is null
+            ? (null, lastError)
+            : (new DialedSocket(dialed.Connection, dialed.LocalEndPoint, hostName, remoteEndPoint), SocketError.Success);
     }
 
     /// <summary>
