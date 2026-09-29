@@ -34,5 +34,11 @@ internal sealed class FallbackSecurityContext(ISecurityContext primary, Func<ISe
     }
 
     /// <inheritdoc />
+    public byte[]? Wrap(ReadOnlySpan<byte> message, bool encrypt) => current.Wrap(message, encrypt);
+
+    /// <inheritdoc />
+    public byte[]? Unwrap(ReadOnlySpan<byte> wrappedMessage) => current.Unwrap(wrappedMessage);
+
+    /// <inheritdoc />
     public void Dispose() => current.Dispose();
 }

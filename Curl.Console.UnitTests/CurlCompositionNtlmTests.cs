@@ -215,6 +215,10 @@ public sealed class CurlCompositionNtlmTests
                 : new SecurityContextStep(SecurityContextStatus.Completed, [0x03]));
         }
 
+        public byte[]? Wrap(ReadOnlySpan<byte> message, bool encrypt) => throw new NotSupportedException();
+
+        public byte[]? Unwrap(ReadOnlySpan<byte> wrappedMessage) => throw new NotSupportedException();
+
         public void Dispose()
         {
         }

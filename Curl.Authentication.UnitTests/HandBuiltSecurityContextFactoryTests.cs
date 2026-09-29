@@ -174,6 +174,53 @@ public sealed class HandBuiltSecurityContextFactoryTests
     }
 
     [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public async Task WrapAndUnwrap_KerberosCompleted_ProtectMessagesWithTheContextKey(bool encrypt)
+    {
+        byte[] message = [0x01, 0x00, 0x10, 0x00];
+        FakeGssAcceptor acceptor = new(KerberosEncryptionType.Aes256CtsHmacSha196);
+        using ISecurityContext context = Factory(new FakeKdc()).Create(Request(SecurityMechanism.Kerberos));
+        acceptor.Accept((await context.NextTokenAsync(ReadOnlyMemory<byte>.Empty, CancellationToken.None)).Token);
+        await context.NextTokenAsync(acceptor.Reply(), CancellationToken.None);
+
+        (byte[] wrappedMessage, ulong sequence, bool encrypted) = acceptor.Rfc4121Unwrap(context.Wrap(message, encrypt)!);
+        byte[]? unwrapped = context.Unwrap(acceptor.Rfc4121Wrap(message, acceptor.AcceptorSequence!.Value, encrypt));
+
+        CollectionAssert.AreEqual(message, wrappedMessage);
+        Assert.AreEqual(acceptor.InitiatorSequence, sequence);
+        Assert.AreEqual(encrypt, encrypted);
+        CollectionAssert.AreEqual(message, unwrapped);
+    }
+
+    [TestMethod]
+    public async Task Unwrap_AlteredWrapToken_AnswersNull()
+    {
+        FakeGssAcceptor acceptor = new(KerberosEncryptionType.Aes256CtsHmacSha196);
+        using ISecurityContext context = Factory(new FakeKdc()).Create(Request(SecurityMechanism.Negotiate));
+        (_, byte[] kerberosToken) = ReadNegTokenInit((await context.NextTokenAsync(ReadOnlyMemory<byte>.Empty, CancellationToken.None)).Token);
+        acceptor.Accept(kerberosToken);
+        await context.NextTokenAsync(new SpnegoNegotiationResponse(SpnegoNegotiationState.AcceptCompleted, SpnegoMechanism.KerberosV5, acceptor.Reply(), null).Encode(), CancellationToken.None);
+        byte[] wrapped = acceptor.Rfc4121Wrap([0x01, 0x02], acceptor.AcceptorSequence!.Value, encrypt: true);
+        wrapped[^1] ^= 0xFF;
+
+        byte[]? unwrapped = context.Unwrap(wrapped);
+
+        Assert.IsNull(unwrapped);
+    }
+
+    [TestMethod]
+    public async Task WrapAndUnwrap_BeforeTheContextCompletes_Throw()
+    {
+        using ISecurityContext context = Factory(new FakeKdc()).Create(Request(SecurityMechanism.Kerberos));
+        Assert.ThrowsExactly<InvalidOperationException>(() => context.Wrap([0x01], encrypt: true));
+
+        await context.NextTokenAsync(ReadOnlyMemory<byte>.Empty, CancellationToken.None);
+
+        Assert.ThrowsExactly<InvalidOperationException>(() => context.Unwrap([0x01]));
+    }
+
+    [TestMethod]
     public void Dispose_BeforeAnyStep_DoesNotThrow()
     {
         ISecurityContext context = Factory(new FakeKdc()).Create(Request(SecurityMechanism.Negotiate));

@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.ComponentModel;
 using System.Net.Security;
 using Curl.Protocol.Abstractions;
@@ -8,7 +9,8 @@ namespace Curl.Authentication;
 /// An <see cref="ISecurityContext" /> over the BCL's <see cref="NegotiateAuthentication" />:
 /// SSPI on Windows, the system GSS-API library elsewhere (ADR-0142's W and G). The BCL
 /// context is made on the first step, because SSPI acquires the credential while it is
-/// made and can refuse it there; every step is synchronous underneath.
+/// made and can refuse it there; every step is synchronous underneath. Once established it
+/// wraps and unwraps with the BCL's own <c>Wrap</c> and <c>Unwrap</c> (ADR-0183).
 /// </summary>
 /// <param name="options">The package, target and credential.</param>
 internal sealed class SystemSecurityContext(NegotiateAuthenticationClientOptions options) : ISecurityContext
@@ -26,7 +28,27 @@ internal sealed class SystemSecurityContext(NegotiateAuthenticationClientOptions
     }
 
     /// <inheritdoc />
+    public byte[]? Wrap(ReadOnlySpan<byte> message, bool encrypt)
+    {
+        ArrayBufferWriter<byte> output = new();
+        return WrittenOrNull(Established().Wrap(message, output, encrypt, out _), output);
+    }
+
+    /// <inheritdoc />
+    public byte[]? Unwrap(ReadOnlySpan<byte> wrappedMessage)
+    {
+        ArrayBufferWriter<byte> output = new();
+        return WrittenOrNull(Established().Unwrap(wrappedMessage, output, out _), output);
+    }
+
+    /// <inheritdoc />
     public void Dispose() => authentication?.Dispose();
+
+    private static byte[]? WrittenOrNull(NegotiateAuthenticationStatusCode code, ArrayBufferWriter<byte> output) =>
+        code == NegotiateAuthenticationStatusCode.Completed ? output.WrittenSpan.ToArray() : null;
+
+    private NegotiateAuthentication Established() =>
+        IsCompleted ? authentication! : throw new InvalidOperationException("The security context is not established.");
 
     private SecurityContextStep Step(ReadOnlySpan<byte> incomingToken)
     {

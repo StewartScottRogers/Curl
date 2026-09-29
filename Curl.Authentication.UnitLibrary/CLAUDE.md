@@ -30,6 +30,11 @@ context is kept between legs), and nothing after Type 3. The router gives SSPI o
 `HandBuiltNtlmSecurityContext` (curl's own NTLM, over `Curl.Ntlm`'s `NtlmChallengeAnswerer`)
 elsewhere; a Type 2 the context cannot answer throws `HttpAuthenticationFailedException`
 (exit 94) where the SSPI build is matched, and sends nothing elsewhere.
+Message protection (BL-851, ADR-0183): an established context wraps and unwraps
+(`ISecurityContext.Wrap`/`Unwrap`) - the BCL's on the system route, `KerberosGssContext`'s on
+the hand-built Kerberos route; curl's own NTLM throws `NotSupportedException`, and an unfinished
+context `InvalidOperationException`. SSPI's NTLM needs `SecurityContextRequest.MessageProtection`
+to negotiate the keys. SASL exchanges are awaited (`GetInitialResponseAsync`, `RespondAsync`).
 Tests fake the seam with `ScriptedSecurityContext` and run the hand-built route against
 `Curl.Kerberos.UnitTests`' `FakeKdc` and `FakeGssAcceptor`, linked into the test project.
 

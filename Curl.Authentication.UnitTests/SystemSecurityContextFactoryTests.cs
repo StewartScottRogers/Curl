@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Net;
 using System.Net.Security;
 using System.Security.Principal;
@@ -30,6 +31,7 @@ public sealed class SystemSecurityContextFactoryTests
         Assert.AreEqual("HTTP/server.example.test", options.TargetName);
         Assert.AreSame(CredentialCache.DefaultNetworkCredentials, options.Credential);
         Assert.AreEqual(TokenImpersonationLevel.None, options.AllowedImpersonationLevel);
+        Assert.AreEqual(ProtectionLevel.None, options.RequiredProtectionLevel);
     }
 
     [TestMethod]
@@ -138,6 +140,45 @@ public sealed class SystemSecurityContextFactoryTests
         await Assert.ThrowsExactlyAsync<OperationCanceledException>(() => context.NextTokenAsync(ReadOnlyMemory<byte>.Empty, new CancellationToken(canceled: true)).AsTask());
     }
 
+    /// <summary>
+    /// Establishes NTLM with the logged-on user's credential against an in-process SSPI
+    /// acceptor, then wraps and unwraps each way; SSPI's own keys are the only ones that can
+    /// check the other side, so the acceptor is the BCL's server-side
+    /// <see cref="NegotiateAuthentication" />.
+    /// </summary>
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    [DataRow(true)]
+    [DataRow(false)]
+    public async Task WrapAndUnwrap_WindowsNtlmCompleted_AreSspisMessageProtection(bool encrypt)
+    {
+        byte[] message = [0x01, 0x00, 0x10, 0x00];
+        using ISecurityContext context = new SystemSecurityContextFactory().Create(
+            new SecurityContextRequest(SecurityMechanism.Ntlm, "HTTP", "localhost") { MessageProtection = ProtectionLevel.EncryptAndSign });
+        using NegotiateAuthentication acceptor = new(new NegotiateAuthenticationServerOptions { Package = "NTLM" });
+        await EstablishAsync(context, acceptor);
+
+        ArrayBufferWriter<byte> received = new();
+        NegotiateAuthenticationStatusCode unwrapCode = acceptor.Unwrap(context.Wrap(message, encrypt)!, received, out _);
+        ArrayBufferWriter<byte> reply = new();
+        acceptor.Wrap(message, reply, encrypt, out _);
+        byte[]? unwrapped = context.Unwrap(reply.WrittenSpan);
+
+        Assert.AreEqual(NegotiateAuthenticationStatusCode.Completed, unwrapCode);
+        CollectionAssert.AreEqual(message, received.WrittenSpan.ToArray());
+        CollectionAssert.AreEqual(message, unwrapped);
+        Assert.IsNull(context.Unwrap([0x00, 0x01, 0x02]), "A message SSPI cannot check does not unwrap.");
+    }
+
+    [TestMethod]
+    public void WrapAndUnwrap_BeforeTheContextCompletes_Throw()
+    {
+        using ISecurityContext context = new SystemSecurityContextFactory().Create(Ntlm());
+
+        Assert.ThrowsExactly<InvalidOperationException>(() => context.Wrap([0x01], encrypt: true));
+        Assert.ThrowsExactly<InvalidOperationException>(() => context.Unwrap([0x01]));
+    }
+
     [TestMethod]
     public void Create_NullRequest_Throws()
     {
@@ -157,6 +198,21 @@ public sealed class SystemSecurityContextFactoryTests
     public void StatusOf_EachCode_MapsAsAdr0142Routes(NegotiateAuthenticationStatusCode code, SecurityContextStatus expected)
     {
         Assert.AreEqual(expected, NegotiateAuthenticationStatusMapping.StatusOf(code));
+    }
+
+    /// <summary>Steps <paramref name="context" /> against <paramref name="acceptor" /> until both are established.</summary>
+    private static async Task EstablishAsync(ISecurityContext context, NegotiateAuthentication acceptor)
+    {
+        byte[] incoming = [];
+        while (!context.IsCompleted)
+        {
+            SecurityContextStep step = await context.NextTokenAsync(incoming, CancellationToken.None);
+            Assert.IsTrue(step.Status is SecurityContextStatus.ContinueNeeded or SecurityContextStatus.Completed, $"The initiator's step came to {step.Status}.");
+            incoming = acceptor.GetOutgoingBlob(step.Token, out NegotiateAuthenticationStatusCode code) ?? [];
+            Assert.IsTrue(code is NegotiateAuthenticationStatusCode.ContinueNeeded or NegotiateAuthenticationStatusCode.Completed, $"The acceptor's step came to {code}.");
+        }
+
+        Assert.IsTrue(acceptor.IsAuthenticated);
     }
 
     private static SecurityContextRequest Ntlm() => new(SecurityMechanism.Ntlm, "HTTP", "127.0.0.1") { UserName = "u", Password = "p" };

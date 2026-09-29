@@ -30,9 +30,20 @@ internal sealed class HandBuiltNtlmSecurityContext(SecurityContextRequest reques
     }
 
     /// <inheritdoc />
+    /// <exception cref="NotSupportedException">Always: curl's own NTLM keeps no session key, so it gives no message protection.</exception>
+    public byte[]? Wrap(ReadOnlySpan<byte> message, bool encrypt) => throw NoMessageProtection();
+
+    /// <inheritdoc />
+    /// <exception cref="NotSupportedException">Always: curl's own NTLM keeps no session key, so it gives no message protection.</exception>
+    public byte[]? Unwrap(ReadOnlySpan<byte> wrappedMessage) => throw NoMessageProtection();
+
+    /// <inheritdoc />
     public void Dispose()
     {
     }
+
+    private static NotSupportedException NoMessageProtection() =>
+        new("curl's own NTLM gives no message protection; wrapping needs the system NTLM.");
 
     private SecurityContextStep Step(ReadOnlySpan<byte> incomingToken)
     {

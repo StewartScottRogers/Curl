@@ -1,3 +1,5 @@
+using System.Net.Security;
+
 namespace Curl.Protocol.Abstractions;
 
 /// <summary>
@@ -25,4 +27,12 @@ public sealed record SecurityContextRequest(SecurityMechanism Mechanism, string 
 
     /// <summary>Gets whether the acceptor may act on the initiator's behalf: <c>--delegation</c>.</summary>
     public SecurityDelegation Delegation { get; init; }
+
+    /// <summary>
+    /// Gets the message protection the context must negotiate for <see cref="ISecurityContext.Wrap" />
+    /// and <see cref="ISecurityContext.Unwrap" /> (ADR-0183). <see cref="ProtectionLevel.None" />,
+    /// the default and what HTTP asks, leaves the tokens as curl sends them; SSPI's NTLM then
+    /// negotiates no signing key, so its wrapped messages do not verify.
+    /// </summary>
+    public ProtectionLevel MessageProtection { get; init; }
 }

@@ -29,5 +29,11 @@ internal sealed class SspiNegotiateSecurityContext(ISecurityContext sspi) : ISec
     }
 
     /// <inheritdoc />
+    public byte[]? Wrap(ReadOnlySpan<byte> message, bool encrypt) => sspi.Wrap(message, encrypt);
+
+    /// <inheritdoc />
+    public byte[]? Unwrap(ReadOnlySpan<byte> wrappedMessage) => sspi.Unwrap(wrappedMessage);
+
+    /// <inheritdoc />
     public void Dispose() => sspi.Dispose();
 }

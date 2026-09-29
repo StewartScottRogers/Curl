@@ -125,6 +125,17 @@ public sealed class HandBuiltNtlmSecurityContextTests
         await Assert.ThrowsExactlyAsync<OperationCanceledException>(() => context.NextTokenAsync(ReadOnlyMemory<byte>.Empty, new CancellationToken(canceled: true)).AsTask());
     }
 
+    [TestMethod]
+    public async Task WrapAndUnwrap_Completed_RefuseAsCurlsOwnNtlmKeepsNoSessionKey()
+    {
+        using ISecurityContext context = Context(Request("u", "p"));
+        await AnswerAsync(context, Convert.FromBase64String(MeasuredChallenge));
+
+        Assert.IsTrue(context.IsCompleted);
+        Assert.ThrowsExactly<NotSupportedException>(() => context.Wrap([0x01], encrypt: true));
+        Assert.ThrowsExactly<NotSupportedException>(() => context.Unwrap([0x01]));
+    }
+
     private static SecurityContextRequest Request(string user, string password) =>
         new(SecurityMechanism.Ntlm, "HTTP", "127.0.0.1") { UserName = user, Password = password };
 

@@ -34,6 +34,23 @@ internal sealed class HandBuiltKerberosSecurityContext(
             : ReplyStep(gss, incomingToken);
 
     /// <inheritdoc />
+    public byte[]? Wrap(ReadOnlySpan<byte> message, bool encrypt) => Established().Wrap(message, encrypt);
+
+    /// <inheritdoc />
+    public byte[]? Unwrap(ReadOnlySpan<byte> wrappedMessage)
+    {
+        KerberosGssContext context = Established();
+        try
+        {
+            return context.Unwrap(wrappedMessage).Message;
+        }
+        catch (KerberosGssException)
+        {
+            return null;
+        }
+    }
+
+    /// <inheritdoc />
     public void Dispose()
     {
         gss?.Dispose();
@@ -41,6 +58,9 @@ internal sealed class HandBuiltKerberosSecurityContext(
     }
 
     private static SecurityContextStep Failure(SecurityContextStatus status) => new(status, []);
+
+    private KerberosGssContext Established() =>
+        gss is { IsCompleted: true } context ? context : throw new InvalidOperationException("The security context is not established.");
 
     private static SecurityContextStatus StatusOf(KerberosKdcError error) =>
         error is KerberosKdcError.NoCredentials or KerberosKdcError.TicketExpired

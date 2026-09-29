@@ -33,6 +33,7 @@ public sealed class SystemSecurityContextFactory : ISecurityContextFactory
         AllowedImpersonationLevel = request.Delegation == SecurityDelegation.None
             ? TokenImpersonationLevel.None
             : TokenImpersonationLevel.Delegation,
+        RequiredProtectionLevel = request.MessageProtection,
     };
 
     private static string PackageOf(SecurityMechanism mechanism) => mechanism switch

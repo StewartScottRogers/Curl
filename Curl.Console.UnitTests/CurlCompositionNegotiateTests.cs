@@ -132,6 +132,10 @@ public sealed class CurlCompositionNegotiateTests
         public ValueTask<SecurityContextStep> NextTokenAsync(ReadOnlyMemory<byte> incomingToken, CancellationToken cancellationToken) =>
             ValueTask.FromResult(step);
 
+        public byte[]? Wrap(ReadOnlySpan<byte> message, bool encrypt) => throw new NotSupportedException();
+
+        public byte[]? Unwrap(ReadOnlySpan<byte> wrappedMessage) => throw new NotSupportedException();
+
         public void Dispose()
         {
         }

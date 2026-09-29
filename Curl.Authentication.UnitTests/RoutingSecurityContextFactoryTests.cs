@@ -177,6 +177,34 @@ public sealed class RoutingSecurityContextFactoryTests
         Assert.IsEmpty(handBuilt.Requests);
     }
 
+    [TestMethod]
+    public void Create_WindowsNegotiate_WrapsAndUnwrapsThroughSspi()
+    {
+        ScriptedSecurityContext sspi = new() { IsCompleted = true };
+        using ISecurityContext context = new RoutingSecurityContextFactory(isWindows: true, new ScriptedSecurityContextFactory(sspi), new ScriptedSecurityContextFactory()).Create(Explicit);
+
+        byte[]? wrapped = context.Wrap([0x01], encrypt: true);
+        byte[]? unwrapped = context.Unwrap([(byte)'S', 0x02]);
+
+        CollectionAssert.AreEqual(new byte[] { (byte)'E', 0x01 }, wrapped);
+        CollectionAssert.AreEqual(new byte[] { 0x02 }, unwrapped);
+    }
+
+    [TestMethod]
+    public async Task Create_GssApiUnsupportedOffWindows_WrapsAndUnwrapsOnTheHandBuiltRoute()
+    {
+        ScriptedSecurityContext gss = new(new SecurityContextStep(SecurityContextStatus.NoMechanism, []));
+        ScriptedSecurityContext spnego = new(new SecurityContextStep(SecurityContextStatus.Completed, [])) { IsCompleted = true };
+        using ISecurityContext context = new RoutingSecurityContextFactory(isWindows: false, new ScriptedSecurityContextFactory(gss), new ScriptedSecurityContextFactory(spnego)).Create(Explicit);
+        await context.NextTokenAsync(ReadOnlyMemory<byte>.Empty, CancellationToken.None);
+
+        byte[]? wrapped = context.Wrap([0x01], encrypt: false);
+        byte[]? unwrapped = context.Unwrap([]);
+
+        CollectionAssert.AreEqual(new byte[] { (byte)'S', 0x01 }, wrapped);
+        Assert.IsNull(unwrapped);
+    }
+
     /// <summary>The router as composed in production, with a hand-built route that finds no credential cache.</summary>
     private static RoutingSecurityContextFactory ProductionRouter(bool isWindows) => new(
         isWindows,
