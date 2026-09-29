@@ -29,10 +29,10 @@ completed: 2026-09-28
 
 ## Notes
 
-- Touches widened to `Documentation/Planning/Decisions` for ADR-0159 and its index row; no task in Doing names it (BL-658: Http, BL-815: Tls).
-- Plan, tests and implementation done in this session against the task text (feature pipeline, one library): `KerberosConfigurationReader` parses as `prof_parse.c`, `KerberosConfiguration` gives the relations with MIT defaults and `RealmOfHost`, `KerberosConfigurationStore` finds `KRB5_CONFIG` / `/etc/krb5.conf`, `KerberosKdcLocator` reads `kdc` entries then `_kerberos._udp`/`_tcp` SRV through `IKerberosSrvLookup`. Decisions in ADR-0159.
+- Touches widened to `Documentation/Planning/Decisions` for ADR-0160 and its index row; no task in Doing names it (BL-658: Http, BL-815: Tls).
+- Plan, tests and implementation done in this session against the task text (feature pipeline, one library): `KerberosConfigurationReader` parses as `prof_parse.c`, `KerberosConfiguration` gives the relations with MIT defaults and `RealmOfHost`, `KerberosConfigurationStore` finds `KRB5_CONFIG` / `/etc/krb5.conf`, `KerberosKdcLocator` reads `kdc` entries then `_kerberos._udp`/`_tcp` SRV through `IKerberosSrvLookup`. Decisions in ADR-0160.
 - `IKerberosFileReader` gained `ListFileNames` for `includedir`; its only implementer is the test fake.
-- Measured without a local MIT build this run: parse rules follow MIT's `prof_parse.c` and `locate_kdc.c` behaviour as documented; SRV ordering is deterministic (priority asc, weight desc), recorded in ADR-0159.
+- Measured without a local MIT build this run: parse rules follow MIT's `prof_parse.c` and `locate_kdc.c` behaviour as documented; SRV ordering is deterministic (priority asc, weight desc), recorded in ADR-0160.
 - Gates: `dotnet build Curl.slnx -warnaserror` clean, fast tests green (Curl.Kerberos.UnitTests 191 passed), `Measure-CodeQuality.ps1 -Library Curl.Kerberos.UnitLibrary`: 100% line, 100% branch, 0 failing members, worst CRAP 10.
 
 ## Log
