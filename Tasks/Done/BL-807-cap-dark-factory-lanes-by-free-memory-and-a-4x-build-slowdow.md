@@ -8,7 +8,7 @@ depends-on: [BL-806]
 touches: [RunDarkFactory.ps1, Documentation/Planning/Decisions/ADR-0130-lanes-auto-paces-dark-factory-lanes-to-the-usage-windows-the-board-and-the-machine.md]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-28
 ---
 # BL-807 — Cap dark factory lanes by free memory and a 4x build slowdown instead of 2x
 
@@ -44,3 +44,4 @@ Lanes build for a few minutes of each task and integrate one at a time under
 
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Doing.
+- 2026-09-28: Doing -> Done. Probe rule is 4.0x and 20% free memory; a record under another rule is probed again; -TestMachineProbe 7/7, build and fast tests green.

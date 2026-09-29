@@ -42,3 +42,4 @@ while a single step 0.25 lanes low retires a lane. Ceilings (board capacity, mac
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
