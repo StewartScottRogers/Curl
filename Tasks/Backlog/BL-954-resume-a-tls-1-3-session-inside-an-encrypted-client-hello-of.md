@@ -18,7 +18,7 @@ A `Tls13ClientHandshake` with both `EncryptedClientHelloConfigs` (a supported co
 
 ## Context
 
-- ADR-0230 decision 7: BL-706 leaves resumption out of an ECH offer (`Tls13ClientHandshake.Start` skips `OfferSession` when `ech` is set).
+- ADR-0233 decision 7: BL-706 leaves resumption out of an ECH offer (`Tls13ClientHandshake.Start` skips `OfferSession` when `ech` is set).
 - RFC 9849 section 6.1.2: when the inner hello carries `pre_shared_key`, the outer one SHOULD carry a GREASE `pre_shared_key` with random identities and binders of the same lengths, and `early_data` only if the inner one does; section 10.12.3 on why.
 - The binder is computed over the inner hello (and, after a HelloRetryRequest, the inner transcript); a ServerHello's `pre_shared_key` is judged against the hello the server answered: accepted ECH resumes, a rejected ECH never does (the outer PSK is GREASE, so a `pre_shared_key` there is `illegal_parameter`).
 - Start in `Curl.Tls.UnitLibrary/EchClientHello.cs` (`Build`) and `Tls13ClientHandshake.cs` (`OfferSession`, `BindPsk`, `ReadSelectedIdentity`); tests beside `Tls13EncryptedClientHelloTests` with `EchTestFrontEnd`, `Tls13TestServer.Tickets` and `ConfirmEch`.
@@ -27,7 +27,7 @@ A `Tls13ClientHandshake` with both `EncryptedClientHelloConfigs` (a supported co
 
 - [ ] `Curl.Tls.UnitTests` resume through an accepted ECH offer (the front end sees the ticket in the inner hello and a GREASE `pre_shared_key` of the same lengths in the outer one, and `IsResumed` is true), and a rejection with a `pre_shared_key` in the ServerHello is `illegal_parameter`.
 - [ ] Early data offered with an ECH offer goes under the inner hello's early secret, or is not offered, as the ADR this task updates says.
-- [ ] ADR-0230 decision 7 is updated to say what is built.
+- [ ] ADR-0233 decision 7 is updated to say what is built.
 - [ ] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1 -Library Curl.Tls.UnitLibrary` reports 100% line and branch coverage and no failing member.
 
 ## Notes
