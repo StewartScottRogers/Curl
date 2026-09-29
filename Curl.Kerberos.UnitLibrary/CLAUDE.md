@@ -20,7 +20,15 @@ decrypts, checksums and makes keys from passwords with `aes128`/`aes256-cts-hmac
 confounders come from `IKerberosRandomSource`, and a failed integrity check throws
 `KerberosCryptographyException` (`KerberosNFold`, `KerberosAesCts`,
 `AesSha1KerberosEncryption`, `AesSha2KerberosEncryption`, `Rc4HmacKerberosEncryption`;
-BL-686, ADR-0161). The client and the GSS-API mechanism land under their own tasks.
+BL-686, ADR-0161). It encodes in DER and decodes (BER accepted) the Kerberos V5
+messages with `System.Formats.Asn1`: `KerberosKdcRequest` (AS-REQ, TGS-REQ),
+`KerberosKdcReply` (AS-REP, TGS-REP), `KerberosEncryptedKdcReplyPart`,
+`KerberosApRequest`, `KerberosAuthenticator`, `KerberosApReply`,
+`KerberosEncryptedApReplyPart`, `KerberosErrorMessage`, `KerberosTicket` and the
+structures inside them, with `KerberosMessage.PeekType` to tell a reply from a
+KRB-ERROR; a malformed or unexpected message throws `KerberosMessageException`
+(`KerberosAsn1` holds the shared ASN.1 pieces; BL-687, ADR-0163). The client and the
+GSS-API mechanism land under their own tasks.
 
 ## Rules
 
