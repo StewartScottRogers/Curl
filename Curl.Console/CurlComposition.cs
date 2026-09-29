@@ -16,6 +16,7 @@ using Curl.Protocol.Ftp;
 using Curl.Protocol.Gopher;
 using Curl.Protocol.Http;
 using Curl.Protocol.Imap;
+using Curl.Protocol.Ldap;
 using Curl.Protocol.Mqtt;
 using Curl.Protocol.Pop3;
 using Curl.Protocol.Smtp;
@@ -37,7 +38,8 @@ internal static class CurlComposition
     /// disk; <c>dict</c>, <c>gopher</c> and <c>gophers</c>, <c>telnet</c>, <c>mqtt</c>
     /// and <c>mqtts</c>, <c>imap</c> and <c>imaps</c>, <c>pop3</c> and <c>pop3s</c>, <c>smtp</c> and <c>smtps</c> (the mail schemes authenticating with
     /// <see cref="CreateSaslAuthenticator" />'s authenticator and upgrading with
-    /// <paramref name="tlsProvider" /> after <c>STARTTLS</c> or <c>STLS</c>), and <c>http</c> and <c>https</c> over <paramref name="connector" />,
+    /// <paramref name="tlsProvider" /> after <c>STARTTLS</c> or <c>STLS</c>), <c>ldap</c> and <c>ldaps</c>
+    /// answering as WinLDAP's build on Windows and as the OpenLDAP build elsewhere (ADR-0166), and <c>http</c> and <c>https</c> over <paramref name="connector" />,
     /// the last two answering authentication with <see cref="CreateHttpAuthenticator" />'s
     /// authenticator, answering a forward proxy with <paramref name="proxyAuthSchemes" /> (ADR-0187),
     /// and keeping cookies in <paramref name="cookieStore" />; <c>ws</c> and <c>wss</c>
@@ -57,7 +59,7 @@ internal static class CurlComposition
     /// <see cref="EndPointReportingProtocolHandler" />, so every scheme's report carries the end
     /// points of the first connection its transfer opened (ADR-0119).
     /// </summary>
-    /// <param name="connector">Connects the TCP protocols, with TLS for <c>gophers</c>, <c>imaps</c>, <c>mqtts</c>, <c>pop3s</c>, <c>smtps</c>, <c>wss</c> and <c>ftps</c>.</param>
+    /// <param name="connector">Connects the TCP protocols, with TLS for <c>gophers</c>, <c>imaps</c>, <c>mqtts</c>, <c>pop3s</c>, <c>smtps</c>, <c>ldaps</c>, <c>wss</c> and <c>ftps</c>.</param>
     /// <param name="datagramConnector">Opens the UDP channels TFTP uses.</param>
     /// <param name="tlsProvider">
     /// Upgrades an FTP connection after an accepted <c>AUTH</c> or <c>PROT P</c>, an IMAP connection after an accepted <c>STARTTLS</c>, a POP3 connection
@@ -110,6 +112,7 @@ internal static class CurlComposition
             new ImapProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator()),
             new Pop3ProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator()),
             new SmtpProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator()),
+            new LdapProtocolHandler(recordingConnector, OperatingSystem.IsWindows() ? LdapDialect.WinLdap : LdapDialect.OpenLdap),
             new WsProtocolHandler(recordingConnector, httpAuthenticator, new SystemWebSocketRandomSource()),
             http,
             new RoutingFtpProtocolHandler(http, CreateFtpProtocolHandler(recordingConnector, tlsProvider, dnsResolver)),

@@ -21,7 +21,7 @@ public static class CurlVersionText
     /// <c>file</c>, <c>dict</c>, <c>ftp</c>/<c>ftps</c>, <c>gopher</c>/<c>gophers</c>, <c>telnet</c>, <c>tftp</c>,
     /// <c>imap</c>/<c>imaps</c>, <c>mqtt</c>/<c>mqtts</c>, <c>pop3</c>/<c>pop3s</c>, <c>smtp</c>/<c>smtps</c>, <c>ws</c>/<c>wss</c> and <c>http</c>/<c>https</c>.
     /// </summary>
-    public const string ProtocolsLine = "Protocols: dict file ftp ftps gopher gophers http https imap imaps mqtt mqtts pop3 pop3s smtp smtps telnet tftp ws wss";
+    public const string ProtocolsLine = "Protocols: dict file ftp ftps gopher gophers http https imap imaps ldap ldaps mqtt mqtts pop3 pop3s smtp smtps telnet tftp ws wss";
 
     /// <summary>
     /// The fourth line: the curl features the code gives evidence for, in curl's order (alphabetical,
