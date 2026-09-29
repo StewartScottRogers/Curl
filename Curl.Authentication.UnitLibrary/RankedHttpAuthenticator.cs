@@ -17,7 +17,8 @@ namespace Curl.Authentication;
 /// lower-ranked scheme also offered. Negotiate and NTLM need I/O, so only
 /// <see cref="CreateAuthorizationAsync" /> and <see cref="ContinueAuthorizationAsync" /> answer
 /// them (ADR-0176, ADR-0181). As libcurl does, <c>--negotiate</c> alone tries it on the first
-/// request, and after a challenge answers only when <c>-u</c> was given, even as <c>-u :</c>;
+/// request, and after a challenge answers only when <c>-u</c> was given, even as <c>-u :</c>,
+/// though without it the context is still stepped so <c>-v</c> shows its failure;
 /// NTLM answers only when <c>-u</c> was given, and <c>--ntlm</c> alone sends its Type 1 message
 /// on the first request. Only NTLM, and Negotiate when the 401 carries the acceptor's token
 /// (ADR-0227), go on after a request that sent a credential.
@@ -47,6 +48,12 @@ public sealed class RankedHttpAuthenticator(BasicAndBearerAuthenticator basicAnd
             return await negotiate.CreateAuthorizationAsync(request, cancellationToken).ConfigureAwait(false);
         }
 
+        if (StepsNegotiateWithoutAnswering(request, challenges))
+        {
+            await negotiate.StepWithoutAnsweringAsync(request, cancellationToken).ConfigureAwait(false);
+            return null;
+        }
+
         return AnswersWithNtlm(request, challenges)
             ? await ntlm.CreateAuthorizationAsync(request, null, sentBeforeAnyChallenge: false, challenges, cancellationToken).ConfigureAwait(false)
             : CreateAuthorization(request, challenges);
@@ -66,7 +73,7 @@ public sealed class RankedHttpAuthenticator(BasicAndBearerAuthenticator basicAnd
 
         if (ContinuesNegotiate(request, sentAuthorization))
         {
-            return await negotiate.ContinueAuthorizationAsync(sentAuthorization, challenges, cancellationToken).ConfigureAwait(false);
+            return await negotiate.ContinueAuthorizationAsync(request, sentAuthorization, challenges, cancellationToken).ConfigureAwait(false);
         }
 
         return AnswersWithNtlm(request, challenges)
@@ -97,6 +104,19 @@ public sealed class RankedHttpAuthenticator(BasicAndBearerAuthenticator basicAnd
             && (challenges.Count == 0
                 ? request.AllowedSchemes == HttpAuthSchemes.Negotiate
                 : request.Credential is not null && PickOf(request, challenges) == HttpAuthSchemes.Negotiate);
+
+    /// <summary>
+    /// Decides whether a challenge is Negotiate's to step but not to answer: for the origin,
+    /// when <c>--negotiate</c> is the one scheme allowed, the challenges offer it, and no
+    /// <c>-u</c> was given, as libcurl's <c>Curl_input_negotiate</c> still steps a context for
+    /// the 401 - so <c>-v</c> shows its failure - but sends nothing (measured, BL-843 Notes).
+    /// </summary>
+    private static bool StepsNegotiateWithoutAnswering(HttpAuthRequest request, IReadOnlyList<string> challenges) =>
+        !request.IsProxy
+            && challenges.Count != 0
+            && request.Credential is null
+            && request.AllowedSchemes == HttpAuthSchemes.Negotiate
+            && PickOf(request, challenges) == HttpAuthSchemes.Negotiate;
 
     /// <summary>
     /// Decides whether NTLM answers: for the origin only (proxy NTLM is another task's), when a

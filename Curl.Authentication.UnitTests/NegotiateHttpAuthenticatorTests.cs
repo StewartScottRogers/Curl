@@ -57,7 +57,7 @@ public sealed class NegotiateHttpAuthenticatorTests
 
         await authenticator.CreateAuthorizationAsync(Request(":"), CancellationToken.None);
         await authenticator.CreateAuthorizationAsync(Request(":"), CancellationToken.None);
-        string? value = await authenticator.ContinueAuthorizationAsync("Negotiate AQ==", ["Negotiate BA=="], CancellationToken.None);
+        string? value = await authenticator.ContinueAuthorizationAsync(Request(":"), "Negotiate AQ==", ["Negotiate BA=="], CancellationToken.None);
 
         Assert.IsTrue(first.IsDisposed);
         Assert.AreEqual("Negotiate Ag==", value);
@@ -75,8 +75,8 @@ public sealed class NegotiateHttpAuthenticatorTests
         NegotiateHttpAuthenticator authenticator = new(factory);
 
         string? first = await authenticator.CreateAuthorizationAsync(Request(":"), CancellationToken.None);
-        string? second = await authenticator.ContinueAuthorizationAsync(first!, ["Basic realm=\"r\", negotiate  BA==  "], CancellationToken.None);
-        string? third = await authenticator.ContinueAuthorizationAsync(second!, ["Negotiate BQ=="], CancellationToken.None);
+        string? second = await authenticator.ContinueAuthorizationAsync(Request(":"), first!, ["Basic realm=\"r\", negotiate  BA==  "], CancellationToken.None);
+        string? third = await authenticator.ContinueAuthorizationAsync(Request(":"), second!, ["Negotiate BQ=="], CancellationToken.None);
 
         Assert.AreEqual("Negotiate AQ==", first);
         Assert.AreEqual("Negotiate Ag==", second);
@@ -97,7 +97,7 @@ public sealed class NegotiateHttpAuthenticatorTests
         NegotiateHttpAuthenticator authenticator = new(new ScriptedSecurityContextFactory(context));
         string? sent = await authenticator.CreateAuthorizationAsync(Request(":"), CancellationToken.None);
 
-        string? value = await authenticator.ContinueAuthorizationAsync(sent!, [challenge], CancellationToken.None);
+        string? value = await authenticator.ContinueAuthorizationAsync(Request(":"), sent!, [challenge], CancellationToken.None);
 
         Assert.IsNull(value);
         Assert.IsTrue(context.IsDisposed);
@@ -113,7 +113,7 @@ public sealed class NegotiateHttpAuthenticatorTests
         NegotiateHttpAuthenticator authenticator = new(new ScriptedSecurityContextFactory(context));
         string? sent = await authenticator.CreateAuthorizationAsync(Request(":"), CancellationToken.None);
 
-        string? value = await authenticator.ContinueAuthorizationAsync(sent!, ["Negotiate BA=="], CancellationToken.None);
+        string? value = await authenticator.ContinueAuthorizationAsync(Request(":"), sent!, ["Negotiate BA=="], CancellationToken.None);
 
         Assert.IsNull(value);
         Assert.IsTrue(context.IsDisposed);
@@ -124,7 +124,7 @@ public sealed class NegotiateHttpAuthenticatorTests
     [DataRow("Basic dTpw", DisplayName = "Not a Negotiate value")]
     public async Task ContinueAuthorizationAsync_NoContextAwaitsTheValueSent_SendsNothing(string sent)
     {
-        string? value = await Default.ContinueAuthorizationAsync(sent, ["Negotiate BA=="], CancellationToken.None);
+        string? value = await Default.ContinueAuthorizationAsync(Request(":"), sent, ["Negotiate BA=="], CancellationToken.None);
 
         Assert.IsNull(value);
     }
@@ -132,8 +132,8 @@ public sealed class NegotiateHttpAuthenticatorTests
     [TestMethod]
     public async Task ContinueAuthorizationAsync_NullArguments_Throw()
     {
-        await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => Default.ContinueAuthorizationAsync(null!, [], CancellationToken.None).AsTask());
-        await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => Default.ContinueAuthorizationAsync("Negotiate AQ==", null!, CancellationToken.None).AsTask());
+        await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => Default.ContinueAuthorizationAsync(Request(":"), null!, [], CancellationToken.None).AsTask());
+        await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => Default.ContinueAuthorizationAsync(Request(":"), "Negotiate AQ==", null!, CancellationToken.None).AsTask());
     }
 
     [TestMethod]
@@ -263,6 +263,111 @@ public sealed class NegotiateHttpAuthenticatorTests
         await new NegotiateHttpAuthenticator(factory, new NegotiateOptions("svc", null, SecurityDelegation.Always)).CreateAuthorizationAsync(Request(":"), CancellationToken.None);
 
         Assert.AreEqual(new SecurityContextRequest(SecurityMechanism.Negotiate, "svc", "server.example.test") { Delegation = SecurityDelegation.Always }, factory.Requests.Single());
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task CreateAuthorizationAsync_NoTicketOnWindows_ReportsSspisNoCredentialsLine()
+    {
+        RecordingInfoEvents events = new();
+        ScriptedSecurityContext context = new(new SecurityContextStep(SecurityContextStatus.NoCredentials, []));
+
+        await new NegotiateHttpAuthenticator(new ScriptedSecurityContextFactory(context)).CreateAuthorizationAsync(Request(":") with { Events = events }, CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { "InitializeSecurityContext failed: SEC_E_NO_CREDENTIALS (0x8009030e) - No credentials are available in the security package" }, events.Info);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task CreateAuthorizationAsync_NoTicketOffWindows_ReportsGssApisNoCredentialsLine()
+    {
+        RecordingInfoEvents events = new();
+        ScriptedSecurityContext context = new(new SecurityContextStep(SecurityContextStatus.NoCredentials, []));
+
+        await new NegotiateHttpAuthenticator(new ScriptedSecurityContextFactory(context)).CreateAuthorizationAsync(Request(":") with { Events = events }, CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { "gss_init_sec_context() failed: No credentials were supplied, or the credentials were unavailable or inaccessible. SPNEGO cannot find mechanisms to negotiate. " }, events.Info);
+    }
+
+    [TestMethod]
+    [DataRow(true, "InitializeSecurityContext failed: SEC_E_LOGON_DENIED (0x8009030c) - The logon attempt failed", DisplayName = "SSPI wording")]
+    [DataRow(false, "gss_init_sec_context() failed: Unspecified GSS failure.  Minor code may provide more information. ", DisplayName = "GSS-API wording")]
+    public async Task ContinueAuthorizationAsync_ContextRefusesTheToken_ReportsTheFailureInTheWordingAsked(bool wordsAsSspi, string expected)
+    {
+        RecordingInfoEvents events = new();
+        ScriptedSecurityContext context = new(
+            new SecurityContextStep(SecurityContextStatus.ContinueNeeded, [0x01]),
+            new SecurityContextStep(SecurityContextStatus.Refused, []));
+        NegotiateHttpAuthenticator authenticator = new(new ScriptedSecurityContextFactory(context), wordsFailuresAsSspi: wordsAsSspi);
+        string? sent = await authenticator.CreateAuthorizationAsync(Request(":") with { Events = events }, CancellationToken.None);
+
+        await authenticator.ContinueAuthorizationAsync(Request(":") with { Events = events }, sent!, ["Negotiate BA=="], CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { expected }, events.Info);
+    }
+
+    [TestMethod]
+    [DataRow(SecurityContextStatus.ContinueNeeded, DisplayName = "Goes on")]
+    [DataRow(SecurityContextStatus.Completed, DisplayName = "Completes")]
+    public async Task CreateAuthorizationAsync_ContextMakesAToken_ReportsNothing(SecurityContextStatus status)
+    {
+        RecordingInfoEvents events = new();
+        ScriptedSecurityContext context = new(new SecurityContextStep(status, [0x01]));
+
+        await new NegotiateHttpAuthenticator(new ScriptedSecurityContextFactory(context)).CreateAuthorizationAsync(Request(":") with { Events = events }, CancellationToken.None);
+
+        Assert.IsEmpty(events.Info);
+    }
+
+    [TestMethod]
+    public async Task StepWithoutAnsweringAsync_ContextFails_ReportsTheFailureAndDisposesTheContext()
+    {
+        RecordingInfoEvents events = new();
+        ScriptedSecurityContext context = new(new SecurityContextStep(SecurityContextStatus.NoCredentials, []));
+        ScriptedSecurityContextFactory factory = new(context);
+
+        await new NegotiateHttpAuthenticator(factory, wordsFailuresAsSspi: true).StepWithoutAnsweringAsync(Request(null) with { Events = events }, CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { NegotiateFailureLines.For(SecurityContextStatus.NoCredentials, wordsAsSspi: true) }, events.Info);
+        Assert.IsTrue(context.IsDisposed);
+        Assert.AreEqual(new SecurityContextRequest(SecurityMechanism.Negotiate, "HTTP", "server.example.test"), factory.Requests.Single());
+    }
+
+    [TestMethod]
+    public async Task StepWithoutAnsweringAsync_ContextMakesAToken_ReportsNothingAndKeepsNoContext()
+    {
+        RecordingInfoEvents events = new();
+        ScriptedSecurityContext context = new(new SecurityContextStep(SecurityContextStatus.ContinueNeeded, [0x01]));
+        NegotiateHttpAuthenticator authenticator = new(new ScriptedSecurityContextFactory(context));
+
+        await authenticator.StepWithoutAnsweringAsync(Request(null) with { Events = events }, CancellationToken.None);
+
+        Assert.IsEmpty(events.Info);
+        Assert.IsTrue(context.IsDisposed);
+        Assert.IsNull(await authenticator.ContinueAuthorizationAsync(Request(null), "Negotiate AQ==", ["Negotiate BA=="], CancellationToken.None));
+    }
+
+    [TestMethod]
+    public async Task StepWithoutAnsweringAsync_StepThrows_DisposesTheContextAndRethrows()
+    {
+        ScriptedSecurityContext context = new();
+
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(
+            () => new NegotiateHttpAuthenticator(new ScriptedSecurityContextFactory(context)).StepWithoutAnsweringAsync(Request(null), CancellationToken.None).AsTask());
+
+        Assert.IsTrue(context.IsDisposed);
+    }
+
+    [TestMethod]
+    public async Task StepWithoutAnsweringAsync_NullRequest_Throws()
+    {
+        await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => Default.StepWithoutAnsweringAsync(null!, CancellationToken.None).AsTask());
+    }
+
+    [TestMethod]
+    public async Task ContinueAuthorizationAsync_NullRequest_Throws()
+    {
+        await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => Default.ContinueAuthorizationAsync(null!, "Negotiate AQ==", [], CancellationToken.None).AsTask());
     }
 
     private static NegotiateHttpAuthenticator Default { get; } = new(new ScriptedSecurityContextFactory());

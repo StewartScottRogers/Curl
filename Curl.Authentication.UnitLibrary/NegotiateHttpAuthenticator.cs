@@ -12,10 +12,17 @@ namespace Curl.Authentication;
 /// (ADR-0188), from <paramref name="securityContexts" />; and, when a 401 carries the
 /// acceptor's token back, the same context's next token. When no token can be made - no
 /// ticket, no logged-on user's credential, no mechanism - it answers nothing, and the
-/// transfer ends on the 401 with exit 0, as both platform curls do.
+/// transfer ends on the 401 with exit 0, as both platform curls do, and the context's failure
+/// is reported to <see cref="HttpAuthRequest.Events" /> in the platform curl's words
+/// (ADR-0228).
 /// </summary>
 /// <param name="securityContexts">Makes the Negotiate context; ADR-0142's router in production.</param>
 /// <param name="options">The service names and delegation level; <see cref="NegotiateOptions.Default" /> when <see langword="null" />.</param>
+/// <param name="wordsFailuresAsSspi">
+/// <see langword="true" /> to word a context's failure as curl's SSPI build does,
+/// <see langword="false" /> as its GSS-API build does; <see langword="null" /> for this
+/// platform's curl: SSPI on Windows, GSS-API elsewhere.
+/// </param>
 /// <remarks>
 /// An explicit <c>-u user:password</c> is passed on (a <c>DOMAIN\user</c> or
 /// <c>DOMAIN/user</c> name split into its domain and user, as curl's SSPI build splits it),
@@ -24,7 +31,7 @@ namespace Curl.Authentication;
 /// the request that sent it draws a continuation, because a Kerberos context cannot be made
 /// again: its authenticator is fresh every time (ADR-0227).
 /// </remarks>
-public sealed class NegotiateHttpAuthenticator(ISecurityContextFactory securityContexts, NegotiateOptions? options = null)
+public sealed class NegotiateHttpAuthenticator(ISecurityContextFactory securityContexts, NegotiateOptions? options = null, bool? wordsFailuresAsSspi = null)
 {
     /// <summary>The service name of an HTTP acceptor's principal, before <c>--service-name</c> changes it.</summary>
     public const string HttpServiceName = "HTTP";
@@ -33,6 +40,8 @@ public sealed class NegotiateHttpAuthenticator(ISecurityContextFactory securityC
     public const string SchemePrefix = "Negotiate ";
 
     private readonly NegotiateOptions options = options ?? NegotiateOptions.Default;
+
+    private readonly bool wordsFailuresAsSspi = wordsFailuresAsSspi ?? OperatingSystem.IsWindows();
 
     private readonly ConcurrentDictionary<string, ISecurityContext> contextsAwaitingALeg = new(StringComparer.Ordinal);
 
@@ -44,7 +53,23 @@ public sealed class NegotiateHttpAuthenticator(ISecurityContextFactory securityC
     {
         ArgumentNullException.ThrowIfNull(request);
         ISecurityContext context = securityContexts.Create(ContextRequestFor(request));
-        return await StepAsync(context, ReadOnlyMemory<byte>.Empty, cancellationToken).ConfigureAwait(false);
+        return await StepAsync(context, ReadOnlyMemory<byte>.Empty, request.Events, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Steps a new context for <paramref name="request" /> and disposes of it without making a
+    /// header value, as curl's <c>Curl_input_negotiate</c> does for a 401 it will not answer
+    /// because no <c>-u</c> was given: nothing is sent, but a failure is still reported to
+    /// <see cref="HttpAuthRequest.Events" /> (measured, BL-843 Notes).
+    /// </summary>
+    /// <param name="request">The request being authorised.</param>
+    /// <param name="cancellationToken">Cancels a KDC exchange.</param>
+    /// <returns>A task that completes when the context has stepped.</returns>
+    public async ValueTask StepWithoutAnsweringAsync(HttpAuthRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        using ISecurityContext context = securityContexts.Create(ContextRequestFor(request));
+        ReportFailure(await context.NextTokenAsync(ReadOnlyMemory<byte>.Empty, cancellationToken).ConfigureAwait(false), request.Events);
     }
 
     /// <summary>
@@ -54,12 +79,14 @@ public sealed class NegotiateHttpAuthenticator(ISecurityContextFactory securityC
     /// when the challenge carries a token that decodes; anything else ends the transfer on the
     /// 401.
     /// </summary>
+    /// <param name="request">The request being authorised; a failure is reported to its <see cref="HttpAuthRequest.Events" />.</param>
     /// <param name="sentAuthorization">The header value the request that drew the challenges sent.</param>
     /// <param name="challenges">The response's challenges.</param>
     /// <param name="cancellationToken">Cancels the context's step.</param>
     /// <returns>The header value, or <see langword="null" /> to take the response as the result.</returns>
-    public async ValueTask<string?> ContinueAuthorizationAsync(string sentAuthorization, IReadOnlyList<string> challenges, CancellationToken cancellationToken)
+    public async ValueTask<string?> ContinueAuthorizationAsync(HttpAuthRequest request, string sentAuthorization, IReadOnlyList<string> challenges, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(sentAuthorization);
         ArgumentNullException.ThrowIfNull(challenges);
         if (!contextsAwaitingALeg.TryRemove(sentAuthorization, out ISecurityContext? context))
@@ -73,7 +100,7 @@ public sealed class NegotiateHttpAuthenticator(ISecurityContextFactory securityC
             return null;
         }
 
-        return await StepAsync(context, incomingToken, cancellationToken).ConfigureAwait(false);
+        return await StepAsync(context, incomingToken, request.Events, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Gets the security context request <paramref name="request" /> comes to.</summary>
@@ -119,9 +146,9 @@ public sealed class NegotiateHttpAuthenticator(ISecurityContextFactory securityC
     /// <summary>
     /// Steps <paramref name="context" /> with <paramref name="incomingToken" /> and makes the
     /// header value from its token, keeping the context for the next leg when it needs one
-    /// and disposing of it otherwise.
+    /// and disposing of it otherwise; a failure is reported to <paramref name="events" />.
     /// </summary>
-    private async ValueTask<string?> StepAsync(ISecurityContext context, ReadOnlyMemory<byte> incomingToken, CancellationToken cancellationToken)
+    private async ValueTask<string?> StepAsync(ISecurityContext context, ReadOnlyMemory<byte> incomingToken, ITransferEvents events, CancellationToken cancellationToken)
     {
         SecurityContextStep step;
         try
@@ -134,6 +161,7 @@ public sealed class NegotiateHttpAuthenticator(ISecurityContextFactory securityC
             throw;
         }
 
+        ReportFailure(step, events);
         string? header = step.Status is SecurityContextStatus.ContinueNeeded or SecurityContextStatus.Completed && step.Token.Length != 0
             ? SchemePrefix + Convert.ToBase64String(step.Token)
             : null;
@@ -147,6 +175,18 @@ public sealed class NegotiateHttpAuthenticator(ISecurityContextFactory securityC
         }
 
         return header;
+    }
+
+    /// <summary>
+    /// Reports the platform curl's failure line to <paramref name="events" /> when
+    /// <paramref name="step" /> failed; does nothing for a step that went on or completed.
+    /// </summary>
+    private void ReportFailure(SecurityContextStep step, ITransferEvents events)
+    {
+        if (step.Status is not (SecurityContextStatus.ContinueNeeded or SecurityContextStatus.Completed))
+        {
+            events.ReportInfo(NegotiateFailureLines.For(step.Status, wordsFailuresAsSspi));
+        }
     }
 
     private void KeepForTheNextLeg(string header, ISecurityContext context)

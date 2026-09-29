@@ -114,12 +114,41 @@ public sealed class RankedHttpAuthenticatorTests
     }
 
     [TestMethod]
-    public async Task CreateAuthorizationAsync_NegotiatePickedWithoutCredential_SendsNothing()
+    public async Task CreateAuthorizationAsync_NegotiateAloneWithoutCredential_StepsAContextButSendsNothing()
     {
-        ScriptedSecurityContextFactory contexts = new();
+        ScriptedSecurityContext context = new(new SecurityContextStep(SecurityContextStatus.Completed, [0x01]));
+        ScriptedSecurityContextFactory contexts = new(context);
         HttpAuthRequest request = Request(HttpAuthSchemes.Negotiate) with { Credential = null };
 
         string? value = await WithContexts(contexts).CreateAuthorizationAsync(request, ["Negotiate"], CancellationToken.None);
+
+        Assert.IsNull(value);
+        Assert.HasCount(1, contexts.Requests);
+        Assert.IsTrue(context.IsDisposed);
+    }
+
+    [TestMethod]
+    public async Task CreateAuthorizationAsync_NegotiateAloneWithoutCredentialAndNoTicket_ReportsTheFailure()
+    {
+        ScriptedSecurityContextFactory contexts = new(new ScriptedSecurityContext(new SecurityContextStep(SecurityContextStatus.NoCredentials, [])));
+        RecordingInfoEvents events = new();
+        HttpAuthRequest request = Request(HttpAuthSchemes.Negotiate) with { Credential = null, Events = events };
+
+        await WithContexts(contexts).CreateAuthorizationAsync(request, ["Negotiate"], CancellationToken.None);
+
+        Assert.HasCount(1, events.Info);
+    }
+
+    [TestMethod]
+    [DataRow(HttpAuthSchemes.Any, false, "Negotiate", DisplayName = "--anyauth: no pick before the challenge")]
+    [DataRow(HttpAuthSchemes.Negotiate, true, "Negotiate", DisplayName = "proxy")]
+    [DataRow(HttpAuthSchemes.Negotiate, false, "Basic realm=\"r\"", DisplayName = "Negotiate not offered")]
+    public async Task CreateAuthorizationAsync_NegotiateNotTheOnePickWithoutCredential_StepsNoContext(HttpAuthSchemes allowed, bool isProxy, string challenge)
+    {
+        ScriptedSecurityContextFactory contexts = new();
+        HttpAuthRequest request = Request(allowed) with { Credential = null, IsProxy = isProxy };
+
+        string? value = await WithContexts(contexts).CreateAuthorizationAsync(request, [challenge], CancellationToken.None);
 
         Assert.IsNull(value);
         Assert.IsEmpty(contexts.Requests);

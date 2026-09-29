@@ -39,4 +39,13 @@ public sealed record HttpAuthRequest(
     NetworkCredential? Credential,
     string? BearerToken,
     HttpAuthSchemes AllowedSchemes,
-    bool IsProxy);
+    bool IsProxy)
+{
+    /// <summary>
+    /// Gets where the authenticator reports the <c>-v</c> lines answering the request causes,
+    /// such as a Negotiate context's failure (BL-843); <see cref="NoTransferEvents.Instance" />
+    /// when nobody is listening. The HTTP handler decides where in the transfer's output they
+    /// land.
+    /// </summary>
+    public ITransferEvents Events { get; init; } = NoTransferEvents.Instance;
+}
