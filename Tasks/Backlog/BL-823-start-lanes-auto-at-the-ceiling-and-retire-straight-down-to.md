@@ -29,6 +29,8 @@ stop first. Adding lanes stays one per step: the meter needs samples at each cou
 
 - [ ] `-MinStartLanes` defaults to 16, so an Auto shift starts at its ceiling; its help
       says so. `-MinStartLanes 3` still starts at `max(saved, 3)` as before.
+- [ ] `-MaxLanes` defaults to 6 (Stewart, 2026-09-28: "Maybe we should set the max lanes
+      to 6"), so starting at the ceiling means at most 6.
 - [ ] `Get-NextLaneCount` scales down to `max(1, floor(desired + 0.25))` in one step: at
       once for a ceiling, and for a pace target once `-PreviousLow` confirms it. Up stays
       one lane per step.
@@ -45,3 +47,4 @@ stop first. Adding lanes stays one per step: the meter needs samples at each cou
 
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Doing.
+- 2026-09-28: Doing -> Backlog. Handed to the dark factory: a task in Doing that no lane holds stops a shift from starting.
