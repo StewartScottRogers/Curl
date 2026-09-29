@@ -82,6 +82,25 @@ public sealed class KerberosConfiguration(KerberosConfigurationNode root)
         }
     }
 
+    /// <summary>
+    /// Gets the encryption type names of <c>[libdefaults] default_tgs_enctypes</c>, or
+    /// <see cref="PermittedEncryptionTypes" /> when not set, as MIT 1.18 and later default it.
+    /// </summary>
+    public IReadOnlyList<string> DefaultTicketGrantingServiceEncryptionTypes
+    {
+        get
+        {
+            string? written = FirstValue(LibraryDefaults, "default_tgs_enctypes");
+            return written is null ? PermittedEncryptionTypes : SplitEncryptionTypes(written);
+        }
+    }
+
+    /// <summary>
+    /// Gets <c>[libdefaults] allow_weak_crypto</c>: whether weak encryption types may be
+    /// listed; <see langword="false" /> when unset or not one of MIT's boolean words.
+    /// </summary>
+    public bool AllowWeakCrypto => ParseBoolean(FirstValue(LibraryDefaults, "allow_weak_crypto")) ?? false;
+
     /// <summary>Gets every value of the relation <paramref name="path" /> names, in file order.</summary>
     /// <param name="path">The section, any groups, then the relation's tag, e.g. <c>realms</c>, <c>EXAMPLE.COM</c>, <c>kdc</c>.</param>
     /// <returns>The values; empty when the relation is not set.</returns>

@@ -32,6 +32,9 @@ public sealed class KerberosKdcClient
 
     private static readonly TimeSpan TicketLifetime = TimeSpan.FromDays(1);
 
+    /// <summary>The encryption types <see cref="KerberosEncryption.Create" /> has, by number.</summary>
+    private static readonly int[] ImplementedEncryptionTypes = [.. Enum.GetValues<KerberosEncryptionType>().Select(type => (int)type)];
+
     private readonly KerberosKdcSender sender;
     private readonly TimeProvider timeProvider;
     private readonly IKerberosRandomSource randomSource;
@@ -54,20 +57,25 @@ public sealed class KerberosKdcClient
         sender = new KerberosKdcSender(configuration, new KerberosKdcLocator(configuration, srvLookup), transport, proxyTransport);
         this.timeProvider = timeProvider;
         this.randomSource = randomSource;
+        AsRequestEncryptionTypes = Offerable(configuration.DefaultTicketEncryptionTypes, configuration.AllowWeakCrypto);
+        TgsRequestEncryptionTypes = Offerable(configuration.DefaultTicketGrantingServiceEncryptionTypes, configuration.AllowWeakCrypto);
     }
 
     /// <summary>
-    /// Gets the encryption types every request offers, in order of preference: MIT's default
-    /// order of the types this library has (ADR-0168).
+    /// Gets the encryption types every AS-REQ offers, in order of preference:
+    /// <c>default_tkt_enctypes</c> resolved as MIT does (ADR-0209), keeping the types this
+    /// library has. Empty when none is left, and then every AS exchange fails with
+    /// <see cref="KerberosKdcError.EncryptionTypeNotSupported" /> before anything is sent.
     /// </summary>
-    public static IReadOnlyList<int> RequestedEncryptionTypes { get; } =
-    [
-        (int)KerberosEncryptionType.Aes256CtsHmacSha196,
-        (int)KerberosEncryptionType.Aes128CtsHmacSha196,
-        (int)KerberosEncryptionType.Aes256CtsHmacSha384192,
-        (int)KerberosEncryptionType.Aes128CtsHmacSha256128,
-        (int)KerberosEncryptionType.Rc4Hmac,
-    ];
+    public IReadOnlyList<int> AsRequestEncryptionTypes { get; }
+
+    /// <summary>
+    /// Gets the encryption types every TGS-REQ offers, in order of preference:
+    /// <c>default_tgs_enctypes</c> resolved as MIT does (ADR-0209), keeping the types this
+    /// library has. Empty when none is left, and then every TGS exchange fails with
+    /// <see cref="KerberosKdcError.EncryptionTypeNotSupported" /> before anything is sent.
+    /// </summary>
+    public IReadOnlyList<int> TgsRequestEncryptionTypes { get; }
 
     /// <summary>Gives the ticket-granting service of <paramref name="realm" />, <c>krbtgt/REALM@REALM</c>.</summary>
     /// <param name="realm">The realm.</param>
@@ -263,7 +271,7 @@ public sealed class KerberosKdcClient
     /// <summary>One TGS exchange: asks the KDCs of <paramref name="ticketGrantingTicket" />'s realm for <paramref name="server" /> with <c>canonicalize</c>.</summary>
     private async Task<KerberosCredential> ExchangeWithTicketGrantingServiceAsync(KerberosCredential ticketGrantingTicket, KerberosPrincipal server, CancellationToken cancellationToken)
     {
-        KerberosEncryption encryption = EncryptionOf(ticketGrantingTicket.SessionKey.EncryptionType);
+        KerberosEncryption encryption = EncryptionOf(ticketGrantingTicket.SessionKey.EncryptionType, ImplementedEncryptionTypes);
         KerberosKdcRequestBody body = new()
         {
             Options = KerberosKdcOptions.Canonicalize,
@@ -271,7 +279,7 @@ public sealed class KerberosKdcClient
             ServerName = NameOf(server),
             Till = ticketGrantingTicket.EndTime,
             Nonce = NextNonce(),
-            EncryptionTypes = RequestedEncryptionTypes,
+            EncryptionTypes = Offered(TgsRequestEncryptionTypes),
         };
         KerberosKdcRequest request = new()
         {
@@ -403,8 +411,16 @@ public sealed class KerberosKdcClient
         };
     }
 
-    private KerberosEncryption EncryptionOf(int encryptionType) =>
-        RequestedEncryptionTypes.Contains(encryptionType)
+    /// <summary>Keeps the types of <paramref name="names" />, resolved as MIT does, that this library has.</summary>
+    private static int[] Offerable(IReadOnlyList<string> names, bool allowWeakCrypto) =>
+        [.. KerberosEncryptionTypeList.Resolve(names, allowWeakCrypto).Where(ImplementedEncryptionTypes.Contains)];
+
+    /// <summary>Gives <paramref name="types" /> to offer, or fails as MIT does when the configuration leaves none.</summary>
+    private static IReadOnlyList<int> Offered(IReadOnlyList<int> types) =>
+        types.Count > 0 ? types : throw new KerberosKdcException(KerberosKdcError.EncryptionTypeNotSupported);
+
+    private KerberosEncryption EncryptionOf(int encryptionType, IReadOnlyList<int> acceptable) =>
+        acceptable.Contains(encryptionType)
             ? KerberosEncryption.Create((KerberosEncryptionType)encryptionType, randomSource)
             : throw new KerberosKdcException(KerberosKdcError.EncryptionTypeNotSupported);
 
@@ -420,7 +436,7 @@ public sealed class KerberosKdcClient
             ServerName = NameOf(server),
             Till = timeProvider.GetUtcNow() + TicketLifetime,
             Nonce = NextNonce(),
-            EncryptionTypes = RequestedEncryptionTypes,
+            EncryptionTypes = Offered(AsRequestEncryptionTypes),
         },
     };
 
@@ -454,9 +470,9 @@ public sealed class KerberosKdcClient
     private KerberosPreAuthenticationData EncryptedTimestamp(KerberosPasswordCredential password, IReadOnlyList<KerberosEncryptionTypeInfo2Entry> keyInfo)
     {
         int encryptionType = keyInfo.Count == 0
-            ? RequestedEncryptionTypes[0]
-            : keyInfo.Select(entry => entry.EncryptionType).FirstOrDefault(RequestedEncryptionTypes.Contains);
-        KerberosEncryption encryption = EncryptionOf(encryptionType);
+            ? AsRequestEncryptionTypes[0]
+            : keyInfo.Select(entry => entry.EncryptionType).FirstOrDefault(AsRequestEncryptionTypes.Contains);
+        KerberosEncryption encryption = EncryptionOf(encryptionType, AsRequestEncryptionTypes);
         byte[] key = ClientKey(password, encryption, keyInfo);
         try
         {
@@ -476,7 +492,7 @@ public sealed class KerberosKdcClient
     private KerberosCredential ReadAsReply(byte[] reply, uint nonce, KerberosPasswordCredential password, KerberosPrincipal server, IReadOnlyList<KerberosEncryptionTypeInfo2Entry> errorKeyInfo)
     {
         KerberosKdcReply kdcReply = ReadReply(reply, KerberosMessageType.AsReply);
-        KerberosEncryption encryption = EncryptionOf(kdcReply.EncryptedPart.EncryptionType);
+        KerberosEncryption encryption = EncryptionOf(kdcReply.EncryptedPart.EncryptionType, AsRequestEncryptionTypes);
         byte[] key = ClientKey(password, encryption, [.. KeyInfoIn(kdcReply.PreAuthenticationData), .. errorKeyInfo]);
         byte[] plaintext;
         try

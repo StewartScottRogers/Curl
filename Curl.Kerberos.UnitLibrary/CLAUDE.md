@@ -49,7 +49,10 @@ OTHER's KDCs up to `MaximumReferralHops` times (BL-826, ADR-0200); given a
 `CredentialCacheStore` and a cache name instead, it stores a ticket got by a TGS exchange
 back in a `FILE:` or `DIR:` cache by appending it through the injected
 `IKerberosFileWriter`, as MIT's `cc_file.c` does, ignoring a failed store as MIT does
-(`CredentialCacheWriter`, `CredentialCacheStore.Store`; BL-825, ADR-0208). It is the initiator of the GSS-API Kerberos V5 mechanism:
+(`CredentialCacheWriter`, `CredentialCacheStore.Store`; BL-825, ADR-0208). Its AS-REQs offer
+`default_tkt_enctypes` and its TGS-REQs `default_tgs_enctypes`, resolved by
+`KerberosEncryptionTypeList` as MIT's `krb5int_parse_enctype_list` does and kept to the
+types the library has (BL-828, ADR-0209). It is the initiator of the GSS-API Kerberos V5 mechanism:
 `KerberosGssContext` makes the initial context token (an AP-REQ whose authenticator
 carries RFC 4121's checksum with the context flags and, for `--delegation`, a KRB-CRED of
 a forwarded ticket-granting ticket), checks the acceptor's AP-REP, and then makes and

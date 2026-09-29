@@ -31,6 +31,24 @@ public sealed class KerberosConfigurationTests
     }
 
     [TestMethod]
+    public void DefaultTicketGrantingServiceEncryptionTypes_Unset_IsPermittedEncryptionTypes()
+    {
+        KerberosConfiguration configuration = Parse("[libdefaults]\n permitted_enctypes = aes256-cts,rc4\n");
+
+        CollectionAssert.AreEqual(new[] { "aes256-cts", "rc4" }, configuration.DefaultTicketGrantingServiceEncryptionTypes.ToArray());
+        Assert.IsFalse(configuration.AllowWeakCrypto);
+    }
+
+    [TestMethod]
+    public void DefaultTicketGrantingServiceEncryptionTypes_Set_IsItsOwnWords()
+    {
+        KerberosConfiguration configuration = Parse("[libdefaults]\n permitted_enctypes = aes256-cts\n default_tgs_enctypes = DEFAULT -aes128-cts\n allow_weak_crypto = yes\n");
+
+        CollectionAssert.AreEqual(new[] { "DEFAULT", "-aes128-cts" }, configuration.DefaultTicketGrantingServiceEncryptionTypes.ToArray());
+        Assert.IsTrue(configuration.AllowWeakCrypto);
+    }
+
+    [TestMethod]
     [DataRow("dns_lookup_kdc = no\n dns_fallback = yes", false)]
     [DataRow("dns_lookup_kdc = maybe\n dns_fallback = off", false)]
     [DataRow("dns_fallback = NIL", false)]

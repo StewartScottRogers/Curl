@@ -47,6 +47,7 @@ password.
   order of the types BL-686 built. A reply, a key hint or a cached session key in any
   other type is `EncryptionTypeNotSupported`. Honouring `permitted_enctypes` and
   `default_tkt_enctypes` needs MIT's enctype-name parser and is left to its own task.
+  (Amended by ADR-0209: requests now offer the types `krb5.conf` names, resolved as MIT does.)
 - **Every reply is checked.** A KRB-ERROR becomes `KerberosKdcException` with its code and
   text and, for the codes curl's users meet, a named `KerberosKdcError`
   (`ClientPrincipalUnknown`, `ServerPrincipalUnknown`, `PreAuthenticationFailed`,
