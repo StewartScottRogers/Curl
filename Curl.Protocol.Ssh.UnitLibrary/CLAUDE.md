@@ -12,6 +12,16 @@ for `FiniteFieldDiffieHellman`, `DsaSignature`, `Des`, `X25519` and `Ed25519`. R
 library is a build break, and `Curl.Protocol.Abstractions.UnitTests` fails if one
 appears.
 
+`SshProtocolHandler`, at the root, is the library's `IProtocolHandler`: it narrows the
+host-key list from the known-hosts file, connects through the injected `IConnector`,
+runs the handshake, requests `ssh-userauth`, checks the host key, authenticates, runs
+`SftpFileDownload` or `ScpFileDownload` into the output, and ends the session with
+`DISCONNECT` 11 `Shutdown`; every `SshTransferException` becomes a failed
+`TransferResult`. The console passes the platform's preset and ADR-0022's credential
+encoding. `Curl.Protocol.Ssh.UnitTests` drives it end to end against the public
+`Fakes.InMemorySshServer`, an `IConnector` answering each connection with a real
+server-side session over `Fakes.InMemoryDuplexConnection`.
+
 Folders follow ADR-0122's structure. `Transport` frames packets and runs the
 handshake (`SshTransport`: identification, `KEXINIT`, key exchange, `NEWKEYS`, a
 server's re-exchange); `Negotiation` holds the presets and the catalogue of
