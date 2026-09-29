@@ -129,6 +129,22 @@ public sealed partial class HandBuiltTlsProviderTests
         Assert.AreEqual(profile.ExtensionOrder.Contains(TlsExtensionType.EncryptThenMac), hello.Extensions.Any(extension => extension.Type == TlsExtensionType.EncryptThenMac));
     }
 
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public async Task AuthenticateAsClientAsync_WithADheDssCipher_OffersItWithTheDsaSignatureSchemes(bool tls12Ceiling)
+    {
+        var options = new TlsClientOptions(Ciphers: "DHE-DSS-AES128-GCM-SHA256");
+
+        var hello = DecodeClientHello(await CaptureClientHelloAsync(tls12Ceiling ? Tls12Only(options) : options, OpenSslBuild, ProfileHost, Http11));
+
+        Assert.Contains((ushort)0x00a2, hello.CipherSuites.ToArray());
+        var offeredSchemes = SignatureAlgorithmsExtension.Decode(ExtensionData(hello, TlsExtensionType.SignatureAlgorithms)).Value.ToArray();
+        CollectionAssert.IsSubsetOf(
+            new[] { TlsSignatureScheme.DsaSha224, TlsSignatureScheme.DsaSha256, TlsSignatureScheme.DsaSha384, TlsSignatureScheme.DsaSha512 },
+            offeredSchemes);
+    }
+
     private static ClientHelloProfile ProfileOf(bool matchesSchannelBuild) =>
         matchesSchannelBuild ? ClientHelloProfile.Schannel : ClientHelloProfile.OpenSsl;
 
