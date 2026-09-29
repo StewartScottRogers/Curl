@@ -22,6 +22,12 @@ internal sealed class SshPacketReader(SshConnectionReader reader)
     internal uint SequenceNumber { get; private set; }
 
     /// <summary>
+    /// Starts counting again from 0, as strict key exchange requires after each
+    /// <c>NEWKEYS</c> (OpenSSH's <c>PROTOCOL</c>, section 1.10).
+    /// </summary>
+    internal void ResetSequenceNumber() => SequenceNumber = 0;
+
+    /// <summary>
     /// Reads one packet and returns its payload.
     /// </summary>
     /// <param name="cancellationToken">Cancels the read.</param>

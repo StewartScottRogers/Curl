@@ -28,6 +28,12 @@ internal sealed class SshPacketWriter(IConnection connection, ISshRandomSource r
     internal uint SequenceNumber { get; private set; }
 
     /// <summary>
+    /// Starts counting again from 0, as strict key exchange requires after each
+    /// <c>NEWKEYS</c> (OpenSSH's <c>PROTOCOL</c>, section 1.10).
+    /// </summary>
+    internal void ResetSequenceNumber() => SequenceNumber = 0;
+
+    /// <summary>
     /// Works out how many padding bytes a payload gets: the fewest, at least
     /// <see cref="MinimumPadding" />, that make the whole packet a multiple of
     /// <see cref="BlockSize" />, as libssh2 1.11.1 pads (4 to 11 bytes).

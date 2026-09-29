@@ -1,12 +1,16 @@
+using System.Security.Cryptography;
 using Curl.Protocol.Abstractions;
+using Curl.Protocol.Ssh.HostKeys;
+using Curl.Protocol.Ssh.KeyExchange;
 using Curl.Protocol.Ssh.Negotiation;
 
 namespace Curl.Protocol.Ssh.Transport;
 
 /// <summary>
-/// The client side of the SSH transport layer (RFC 4253) up to the choice of algorithms:
-/// the identification exchange, the unencrypted binary packets, and the two
-/// <c>KEXINIT</c> messages.
+/// The client side of the SSH transport layer (RFC 4253) up to the new keys: the
+/// identification exchange, the unencrypted binary packets, the two <c>KEXINIT</c>
+/// messages, the key exchange, the host key's signature and <c>NEWKEYS</c>; and a key
+/// re-exchange the server starts later.
 /// </summary>
 internal sealed class SshTransport
 {
@@ -18,7 +22,15 @@ internal sealed class SshTransport
 
     private readonly ISshRandomSource randomSource;
 
+    private readonly ISshEphemeralKeySource ephemeralKeySource;
+
     private readonly SshConnectionReader connectionReader;
+
+    private byte[]? sessionIdentifier;
+
+    private string? serverIdentification;
+
+    private bool isStrictKeyExchange;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SshTransport" /> class.
@@ -27,28 +39,31 @@ internal sealed class SshTransport
     /// <param name="preferences">The platform preset, after compression and known-hosts narrowing.</param>
     /// <param name="catalogue">The algorithms this build implements.</param>
     /// <param name="randomSource">Where the cookie and padding bytes come from.</param>
+    /// <param name="ephemeralKeySource">Where the key exchange's ephemeral key pairs come from.</param>
     internal SshTransport(
         IConnection connection,
         SshAlgorithmPreferences preferences,
         SshAlgorithmCatalogue catalogue,
-        ISshRandomSource randomSource)
+        ISshRandomSource randomSource,
+        ISshEphemeralKeySource ephemeralKeySource)
     {
         this.connection = connection;
         this.preferences = preferences;
         this.catalogue = catalogue;
         this.randomSource = randomSource;
+        this.ephemeralKeySource = ephemeralKeySource;
         connectionReader = new SshConnectionReader(connection);
         PacketReader = new SshPacketReader(connectionReader);
         PacketWriter = new SshPacketWriter(connection, randomSource);
     }
 
     /// <summary>
-    /// Gets the reader of the server's packets, for the key exchange that follows.
+    /// Gets the reader of the server's packets.
     /// </summary>
     internal SshPacketReader PacketReader { get; }
 
     /// <summary>
-    /// Gets the writer of the client's packets, for the key exchange that follows.
+    /// Gets the writer of the client's packets.
     /// </summary>
     internal SshPacketWriter PacketWriter { get; }
 
@@ -69,31 +84,141 @@ internal sealed class SshTransport
     /// </exception>
     internal async ValueTask<SshNegotiatedHandshake> NegotiateAlgorithmsAsync(CancellationToken cancellationToken)
     {
-        string serverIdentification = await SshIdentificationExchange.ExchangeAsync(connection, connectionReader, cancellationToken).ConfigureAwait(false);
-        SshKexInit clientKexInit = SshKexInit.ForClient(preferences, catalogue, randomSource);
-        byte[] clientPayload = clientKexInit.ToPayload();
-        await PacketWriter.WriteAsync(clientPayload, cancellationToken).ConfigureAwait(false);
+        string serverIdentificationLine = await SshIdentificationExchange.ExchangeAsync(connection, connectionReader, cancellationToken).ConfigureAwait(false);
+        byte[] clientPayload = await SendClientKexInitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             (byte[] serverPayload, int packetsBefore) = await ReadServerKexInitAsync(cancellationToken).ConfigureAwait(false);
-            SshKexInit serverKexInit = SshKexInit.Parse(serverPayload);
-            SshNegotiatedAlgorithms algorithms = SshAlgorithmNegotiator.Negotiate(clientKexInit, serverKexInit)
-                ?? throw SshTransferException.SessionEstablishmentFailed(Libssh2ErrorCode.KeyExchangeFailure, Libssh2ErrorCode.UnableToExchangeEncryptionKeys);
-            if (algorithms.IsStrictKeyExchange && packetsBefore > 0)
+            SshNegotiatedHandshake handshake = Negotiate(serverIdentificationLine, clientPayload, serverPayload);
+            if (handshake.Algorithms.IsStrictKeyExchange && packetsBefore > 0)
             {
                 throw new InvalidDataException("Strict key exchange allows no packet before the server's KEXINIT.");
             }
 
-            return new SshNegotiatedHandshake(
-                SshIdentificationExchange.ClientIdentification,
-                serverIdentification,
-                clientPayload,
-                serverPayload,
-                algorithms);
+            return handshake;
         }
         catch (Exception exception) when (exception is InvalidDataException or EndOfStreamException)
         {
             throw SshTransferException.SessionEstablishmentFailed(Libssh2ErrorCode.SocketNone, Libssh2ErrorCode.UnableToExchangeEncryptionKeys);
+        }
+    }
+
+    /// <summary>
+    /// Runs the agreed key-exchange method, checks the server's signature over the exchange
+    /// hash with the agreed host-key algorithm, and exchanges <c>NEWKEYS</c>. Under strict
+    /// key exchange each direction's sequence number restarts at 0 after its
+    /// <c>NEWKEYS</c>. The first exchange's hash becomes the session identifier.
+    /// </summary>
+    /// <param name="handshake">What <see cref="NegotiateAlgorithmsAsync" /> agreed.</param>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <returns>The exchange hash, the session identifier and the keys' derivation.</returns>
+    /// <exception cref="SshTransferException">
+    /// Exit 2 with <c>Failure establishing ssh session: -8, Unable to exchange encryption
+    /// keys</c>, as measured, when the peer closes, sends an unexpected or malformed
+    /// message, a public value outside its group, a host key or signature of another type,
+    /// or a signature that does not verify.
+    /// </exception>
+    internal async ValueTask<SshKeyExchangeResult> ExchangeKeysAsync(SshNegotiatedHandshake handshake, CancellationToken cancellationToken)
+    {
+        bool isFirstExchange = sessionIdentifier is null;
+        isStrictKeyExchange = isFirstExchange ? handshake.Algorithms.IsStrictKeyExchange : isStrictKeyExchange;
+        SshKeyExchangeMessages messages = new(PacketReader, PacketWriter, isStrictKeyExchange && isFirstExchange);
+        ISshKeyExchange method = SshKeyExchangeMethods.Create(handshake.Algorithms.KeyExchange, ephemeralKeySource);
+        ISshSignatureVerifier verifier = SshSignatureVerifiers.For(handshake.Algorithms.ServerHostKey);
+        try
+        {
+            if (handshake.Algorithms.DiscardServerGuess)
+            {
+                await PacketReader.ReadAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            SshKeyExchangeOutcome outcome = await method.ExchangeAsync(messages, handshake, cancellationToken).ConfigureAwait(false);
+            if (!verifier.Verify(outcome.HostKey, outcome.Signature, outcome.ExchangeHash))
+            {
+                throw new InvalidDataException("The SSH server's signature over the exchange hash does not verify.");
+            }
+
+            await SwitchKeysAsync(messages, cancellationToken).ConfigureAwait(false);
+            sessionIdentifier ??= outcome.ExchangeHash;
+            serverIdentification = handshake.ServerIdentification;
+            return new SshKeyExchangeResult(
+                handshake.Algorithms,
+                outcome.ExchangeHash,
+                sessionIdentifier,
+                new SshKeyDerivation(outcome.HashAlgorithm, outcome.SharedSecret, outcome.ExchangeHash, sessionIdentifier));
+        }
+        catch (Exception exception) when (exception is InvalidDataException or EndOfStreamException or CryptographicException)
+        {
+            throw KeyExchangeMethodFailed();
+        }
+    }
+
+    /// <summary>
+    /// Answers a <c>KEXINIT</c> the server sends after the first exchange (RFC 4253 section
+    /// 9), the server-initiated re-exchange ADR-0122 gives the transport: sends the client's
+    /// own <c>KEXINIT</c>, agrees the algorithms again and runs a new exchange that keeps
+    /// the session identifier.
+    /// </summary>
+    /// <param name="serverKexInitPayload">The server's <c>KEXINIT</c>, as received.</param>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <returns>The new keys.</returns>
+    /// <exception cref="InvalidOperationException">No key exchange has finished yet.</exception>
+    /// <exception cref="SshTransferException">
+    /// Exit 2 with <c>-5</c> when the lists share no algorithm, and <c>-8</c> for a malformed
+    /// <c>KEXINIT</c> or any failure <see cref="ExchangeKeysAsync" /> reports.
+    /// </exception>
+    internal async ValueTask<SshKeyExchangeResult> ReExchangeKeysAsync(byte[] serverKexInitPayload, CancellationToken cancellationToken)
+    {
+        string identification = serverIdentification
+            ?? throw new InvalidOperationException("A key re-exchange needs a finished first key exchange.");
+        byte[] clientPayload = await SendClientKexInitAsync(cancellationToken).ConfigureAwait(false);
+        SshNegotiatedHandshake handshake;
+        try
+        {
+            handshake = Negotiate(identification, clientPayload, serverKexInitPayload);
+        }
+        catch (InvalidDataException)
+        {
+            throw KeyExchangeMethodFailed();
+        }
+
+        return await ExchangeKeysAsync(handshake, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static SshTransferException KeyExchangeMethodFailed() =>
+        SshTransferException.SessionEstablishmentFailed(Libssh2ErrorCode.KeyExchangeMethodFailure, Libssh2ErrorCode.UnableToExchangeEncryptionKeys);
+
+    private static SshNegotiatedHandshake Negotiate(string serverIdentificationLine, byte[] clientPayload, byte[] serverPayload)
+    {
+        SshNegotiatedAlgorithms algorithms = SshAlgorithmNegotiator.Negotiate(SshKexInit.Parse(clientPayload), SshKexInit.Parse(serverPayload))
+            ?? throw SshTransferException.SessionEstablishmentFailed(Libssh2ErrorCode.KeyExchangeFailure, Libssh2ErrorCode.UnableToExchangeEncryptionKeys);
+        return new SshNegotiatedHandshake(
+            SshIdentificationExchange.ClientIdentification,
+            serverIdentificationLine,
+            clientPayload,
+            serverPayload,
+            algorithms);
+    }
+
+    private async ValueTask<byte[]> SendClientKexInitAsync(CancellationToken cancellationToken)
+    {
+        byte[] clientPayload = SshKexInit.ForClient(preferences, catalogue, randomSource).ToPayload();
+        await PacketWriter.WriteAsync(clientPayload, cancellationToken).ConfigureAwait(false);
+        return clientPayload;
+    }
+
+    private async ValueTask SwitchKeysAsync(SshKeyExchangeMessages messages, CancellationToken cancellationToken)
+    {
+        await messages.SendAsync([SshMessageNumber.NewKeys], cancellationToken).ConfigureAwait(false);
+        if (isStrictKeyExchange)
+        {
+            PacketWriter.ResetSequenceNumber();
+        }
+
+        await messages.ReadAsync(SshMessageNumber.NewKeys, cancellationToken).ConfigureAwait(false);
+        if (isStrictKeyExchange)
+        {
+            PacketReader.ResetSequenceNumber();
         }
     }
 

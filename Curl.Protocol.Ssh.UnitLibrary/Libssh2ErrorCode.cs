@@ -20,6 +20,15 @@ internal static class Libssh2ErrorCode
     internal const int KeyExchangeFailure = -5;
 
     /// <summary>
+    /// <c>LIBSSH2_ERROR_KEY_EXCHANGE_FAILURE</c>: the key-exchange method itself failed
+    /// after the algorithms were agreed - the peer closed or sent an unexpected or malformed
+    /// message, a public value outside its group, a host key or signature of the wrong
+    /// type, or a signature that does not verify. Measured 2026-09-29 (BL-564) for each of
+    /// those cases on the Windows reference build.
+    /// </summary>
+    internal const int KeyExchangeMethodFailure = -8;
+
+    /// <summary>
     /// <c>LIBSSH2_ERROR_SOCKET_DISCONNECT</c>: the peer closed before sending a line that
     /// starts <c>SSH-</c>.
     /// </summary>

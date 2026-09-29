@@ -46,12 +46,22 @@ public sealed class SshKexInitTests
     }
 
     [TestMethod]
-    public void ForClient_TodaysCatalogue_OffersOnlyTheSignalsAndNoCompression()
+    public void ForClient_TodaysCatalogue_OffersTheNistAndFiniteFieldExchangesAndRsaEcdsaHostKeys()
     {
         SshKexInit kexInit = SshKexInit.ForClient(SshAlgorithmPreferences.OpenSslReference, SshAlgorithmCatalogue.Implemented, new RepeatingRandomSource(0));
 
-        CollectionAssert.AreEqual(new[] { "ext-info-c", "kex-strict-c-v00@openssh.com" }, kexInit.KeyExchange.ToArray());
-        Assert.AreEqual(0, kexInit.ServerHostKey.Count);
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "ecdh-sha2-nistp256", "ecdh-sha2-nistp384", "ecdh-sha2-nistp521", "diffie-hellman-group-exchange-sha256",
+                "diffie-hellman-group16-sha512", "diffie-hellman-group18-sha512", "diffie-hellman-group14-sha256",
+                "diffie-hellman-group14-sha1", "diffie-hellman-group1-sha1", "diffie-hellman-group-exchange-sha1",
+                "ext-info-c", "kex-strict-c-v00@openssh.com",
+            },
+            kexInit.KeyExchange.ToArray());
+        CollectionAssert.AreEqual(
+            new[] { "ecdsa-sha2-nistp256", "ecdsa-sha2-nistp384", "ecdsa-sha2-nistp521", "rsa-sha2-512", "rsa-sha2-256", "ssh-rsa" },
+            kexInit.ServerHostKey.ToArray());
         Assert.AreEqual(0, kexInit.CipherClientToServer.Count);
         Assert.AreEqual(0, kexInit.MacClientToServer.Count);
         CollectionAssert.AreEqual(new[] { "none" }, kexInit.CompressionClientToServer.ToArray());
