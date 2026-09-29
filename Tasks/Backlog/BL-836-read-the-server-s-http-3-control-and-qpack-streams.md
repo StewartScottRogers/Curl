@@ -1,5 +1,5 @@
 ---
-id: BL-830
+id: BL-836
 title: Read the server's HTTP/3 control and QPACK streams
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-830 — Read the server's HTTP/3 control and QPACK streams
+# BL-836 — Read the server's HTTP/3 control and QPACK streams
 
 ## Goal
 

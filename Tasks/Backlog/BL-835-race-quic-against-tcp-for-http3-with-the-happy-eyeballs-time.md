@@ -1,5 +1,5 @@
 ---
-id: BL-829
+id: BL-835
 title: Race QUIC against TCP for --http3 with the happy-eyeballs timeout
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-829 — Race QUIC against TCP for --http3 with the happy-eyeballs timeout
+# BL-835 — Race QUIC against TCP for --http3 with the happy-eyeballs timeout
 
 ## Goal
 

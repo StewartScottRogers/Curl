@@ -1,5 +1,5 @@
 ---
-id: BL-832
+id: BL-838
 title: Stream large HTTP/3 DATA frames instead of reading each whole
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-832 — Stream large HTTP/3 DATA frames instead of reading each whole
+# BL-838 — Stream large HTTP/3 DATA frames instead of reading each whole
 
 ## Goal
 

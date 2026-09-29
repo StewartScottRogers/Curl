@@ -1,5 +1,5 @@
 ---
-id: BL-833
+id: BL-839
 title: Decide which curl release's HTTP/3 stream-reset handling Curl matches
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-833 — Decide which curl release's HTTP/3 stream-reset handling Curl matches
+# BL-839 — Decide which curl release's HTTP/3 stream-reset handling Curl matches
 
 ## Goal
 

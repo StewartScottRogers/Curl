@@ -1,5 +1,5 @@
 ---
-id: BL-831
+id: BL-837
 title: Measure and match curl's --http3 and --http3-only through a proxy
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-831 — Measure and match curl's --http3 and --http3-only through a proxy
+# BL-837 — Measure and match curl's --http3 and --http3-only through a proxy
 
 ## Goal
 
