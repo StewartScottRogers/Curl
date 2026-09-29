@@ -32,7 +32,7 @@ completed: 2026-09-29
 
 - Delivered in-session (plan, tests, implementation, verify, docs) on `MontgomeryModulus`:
   `DsaSignature` (public), `DsaDomainParameters`, `DeterministicDsaNonce` and `Sha224`
-  (internal). Decisions in ADR-0200 (Decided by Claude under Stewart's delegation):
+  (internal). Decisions in ADR-0201 (Decided by Claude under Stewart's delegation):
   RFC 6979 nonces always; SHA-1 to SHA-512 for signing (SHA-224 hand-built since the BCL
   lacks it on every platform); OpenSSL's verification limits for domain parameters (q of
   160/224/256 bits, odd p longer than q up to 10,000 bits, 1 < g < p); signatures are
@@ -40,7 +40,7 @@ completed: 2026-09-29
 - Signing's only branch is RFC 6979's candidate rejection; every candidate is computed in
   full and the k, r and s checks combined with non-short-circuit `&`, which also let the
   (probability ~2^-160) r = 0 or s = 0 path share the covered rejection branch.
-- `touches` gained `Documentation/Planning/Decisions` for ADR-0200 and its index row; no
+- `touches` gained `Documentation/Planning/Decisions` for ADR-0201 and its index row; no
   task in Doing named it.
 - Vectors: RFC 6979 A.2.1/A.2.2 (all 20 signatures, SHA-1 to SHA-512, plus the k values
   for 1024 bits) and NIST CAVP `186-3dsatestvectors.zip` `SigVer.rsp` groups (1024,160,SHA-1),
