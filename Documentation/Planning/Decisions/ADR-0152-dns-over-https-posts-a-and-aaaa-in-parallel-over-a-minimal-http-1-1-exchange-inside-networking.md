@@ -96,6 +96,28 @@ Two places could own the HTTP exchange:
    answering is enough. The DoH trace lines (`DoH: Too small type A for <host>` and the rest)
    are written only for `--trace-config doh`, not for `-v`, as measured.
 
+## Amendment (BL-641, 2026-09-28)
+
+Decided by Claude under Stewart's delegation. Point 4 guessed that a non-`200` status or a
+missing or wrong `Content-Type` fails the query; measuring it with `Record-CurlExchange.ps1 -Tls`
+(`-sS -v --trace-config doh D --doh-insecure http://example.test:P2/`, every connection answered
+with the 46-byte A answer for `127.0.0.1`) showed curl 8.21.0 looks at neither:
+
+| Response framing the A answer | Result |
+| --- | --- |
+| `500 Internal Server Error`, `application/dns-message`, `Content-Length: 46` | `IPv4: 127.0.0.1`, then exit 7: resolved |
+| `200 OK`, `Content-Type: text/plain`, `Content-Length: 46` | resolved |
+| `200 OK`, no `Content-Type`, `Content-Length: 46` | resolved |
+| `200 OK`, `Transfer-Encoding: chunked` | resolved |
+| `200 OK`, neither `Content-Length` nor chunked (body ends at the close) | `DoH request Failure when receiving data from the peer` per query, exit 6 |
+| `localhost`, `a.localhost`, `127.0.0.2`, `[::1]` as the transfer's host, nothing listening on the DoH port | resolved without asking the DoH server (`::1`, `127.0.0.1` for the first two), exit 7 |
+
+So `DohDnsResolver` decodes the body whatever the status and `Content-Type`; a body framed by
+neither `Content-Length` nor chunked coding, cut short, or over curl's 3000-byte DoH buffer
+(`DYN_DOH_RESPONSE`) is a receive failure; and IP literals and `localhost` never reach the
+server. The `500` with an empty body of the table above still fails, because the empty body
+decodes as `Too small`. The rest of point 4 stands.
+
 ## Consequences
 
 - BL-640 builds the DNS message codec in `Curl.Networking.UnitLibrary` and pins the query
