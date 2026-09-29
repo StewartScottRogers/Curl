@@ -31,3 +31,4 @@ The four options parse into `CommandLineOptions` (`--pinnedpubkey` as a file pat
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
