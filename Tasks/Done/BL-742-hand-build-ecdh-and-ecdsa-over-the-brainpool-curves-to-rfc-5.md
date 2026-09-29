@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: [BL-670]
-touches: [Curl.Cryptography.UnitLibrary, Curl.Cryptography.UnitTests, Documentation/Planning/Decisions/ADR-0215-brainpool-ecdh-and-ecdsa-use-complete-addition-formulas-uncompressed-points-and-p1363-signatures.md, Documentation/Planning/Decisions/README.md]
+touches: [Curl.Cryptography.UnitLibrary, Curl.Cryptography.UnitTests, Documentation/Planning/Decisions/ADR-0217-brainpool-ecdh-and-ecdsa-use-complete-addition-formulas-uncompressed-points-and-p1363-signatures.md, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-09-28
 completed: 2026-09-29
@@ -30,8 +30,8 @@ completed: 2026-09-29
 
 ## Notes
 
-- Built: `BrainpoolCurve` (public enum), `BrainpoolDomainParameters` and `BrainpoolPoint` (internal), `BrainpoolEcdh` (public static) and `BrainpoolEcdsa` (public, `IDisposable`). `MontgomeryModulus` gains `ToMontgomeryForm`. Design recorded in ADR-0215 (Decided by Claude under Stewart's delegation): Renes-Costello-Batina complete addition (brainpool r1 curves have cofactor 1), a fixed 4-bit-window ladder that reads the whole table, Fermat inversion, uncompressed points only, r || s signatures with RFC 6979 nonces through `DeterministicDsaNonce`, and key generation by reducing 8 extra random bytes mod q.
-- Touches widened to the new ADR-0215 file and `Documentation/Planning/Decisions/README.md`, where every ADR is recorded. No task in Doing names either one.
+- Built: `BrainpoolCurve` (public enum), `BrainpoolDomainParameters` and `BrainpoolPoint` (internal), `BrainpoolEcdh` (public static) and `BrainpoolEcdsa` (public, `IDisposable`). `MontgomeryModulus` gains `ToMontgomeryForm`. Design recorded in ADR-0217 (Decided by Claude under Stewart's delegation): Renes-Costello-Batina complete addition (brainpool r1 curves have cofactor 1), a fixed 4-bit-window ladder that reads the whole table, Fermat inversion, uncompressed points only, r || s signatures with RFC 6979 nonces through `DeterministicDsaNonce`, and key generation by reducing 8 extra random bytes mod q.
+- Touches widened to the new ADR-0217 file and `Documentation/Planning/Decisions/README.md`, where every ADR is recorded. No task in Doing names either one.
 - Wycheproof: "every brainpool ECDSA vector" means the three IEEE P1363 files for the RFC 8734 TLS schemes (P256r1/SHA-256: 261, P384r1/SHA-384: 292, P512r1/SHA-512: 337), converted to `KnownAnswers/wycheproof-ecdsa-*-p1363.txt`. All 890 give their expected result. The DER files exercise a DER parser this API does not have. The P224r1, P320r1 and SHA-3 files cover combinations TLS never uses. The P256r1 file runs in the fast tests (about 2 s in Debug). P384r1 and P512r1 take 7 s and 19 s, so they are `Integration` under ADR-0118's one-second rule; I ran them and they pass.
 - Cross-checked on Windows only (`OSCondition`): the shared secret matches CNG's `DeriveRawSecretAgreement` on brainpoolP384r1, and CNG's ECDsa verifies our signatures on all three curves.
 - Measure-CodeQuality: Curl.Cryptography.UnitLibrary at 100% line and 100% branch, 618 members, 0 failing, worst CRAP 10.
