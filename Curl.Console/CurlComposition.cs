@@ -530,12 +530,17 @@ internal static class CurlComposition
     /// Whether standard output is a terminal, where the progress meter of a transfer with no
     /// <c>-o</c> is hidden, as curl hides it.
     /// </param>
+    /// <param name="terminalRendersStyles">
+    /// Whether that terminal renders bold, so <c>-i</c> and <c>-I</c> header lines are styled under
+    /// <c>--styled-output</c> (<see cref="StandardOutputVirtualTerminal.RendersStyles" />, ADR-0246).
+    /// </param>
     /// <returns>The runner, which writes curl's progress meter, opens the <c>-w</c> <c>%output{file}</c> targets on disk (<see cref="DiskWriteOutFileOpener" />), reads the default config file (<c>.curlrc</c>) where <see cref="DefaultConfigFileSearch.ForProcess" /> finds it, and reads the process's environment for the IPFS gateway.</returns>
     internal static CurlCommandRunner CreateRunner(
         Stream standardOutput,
         Stream standardError,
         Stream standardInput,
-        bool standardOutputIsTerminal) =>
+        bool standardOutputIsTerminal,
+        bool terminalRendersStyles = false) =>
         new(
             SharingRunCookies((options, cookies) => CreateTransferDispatch(CreateTransports(options), cookies, NegotiateOptionsMapping.FromCommandLine(options))),
             new PhysicalFileSystem(),
@@ -551,7 +556,8 @@ internal static class CurlComposition
             writeOutTimeDialect: WriteOutTimeDialectFor(OperatingSystem.IsWindows()),
             outputPaths: new PhysicalOutputPaths(),
             defaultConfigFileSearch: DefaultConfigFileSearch.ForProcess,
-            readEnvironmentVariable: name => Environment.GetEnvironmentVariable(name));
+            readEnvironmentVariable: name => Environment.GetEnvironmentVariable(name),
+            terminalRendersStyles: terminalRendersStyles);
 
     /// <summary>
     /// Creates the runner with the production handler set built around the given

@@ -108,6 +108,12 @@ namespace Curl.Console;
 /// passes <see cref="Environment.GetEnvironmentVariable(string)" />; when not given, no variable is
 /// set, which keeps tests off the real environment.
 /// </param>
+/// <param name="terminalRendersStyles">
+/// Whether the terminal on standard output renders bold, curl's <c>tool_term_has_bold</c>: always off
+/// Windows, and on Windows once virtual-terminal processing is on (<see cref="StandardOutputVirtualTerminal" />).
+/// With <paramref name="standardOutputIsTerminal" /> and <c>--styled-output</c>, the <c>-i</c> and <c>-I</c>
+/// header lines written to standard output are styled (<see cref="HeaderStylesFor" />, ADR-0246); off when not given.
+/// </param>
 /// <remarks>
 /// <para>
 /// The command line is parsed after the default config file, so its options apply first and the
@@ -230,7 +236,8 @@ internal sealed class CurlCommandRunner(
     IOutputPaths? outputPaths = null,
     IDataFileReader? configFileReader = null,
     DefaultConfigFileSearch? defaultConfigFileSearch = null,
-    Func<string, string?>? readEnvironmentVariable = null)
+    Func<string, string?>? readEnvironmentVariable = null,
+    bool terminalRendersStyles = false)
 {
     /// <summary>
     /// What curl 8.21.0 prints before its URL parser's reason when it rejects a transfer
@@ -3011,7 +3018,8 @@ internal sealed class CurlCommandRunner(
                 maxTimeWatchdog: StartMaxTimeWatchdog(options),
                 lookedUpCredentials: Running.LookedUpCredentials,
                 ifNoneMatchHeaders: Running.IfNoneMatchHeaders,
-                altSvc: Running.AltSvc);
+                altSvc: Running.AltSvc,
+                bodyHeaderStyles: toStandardOutput ? HeaderStylesFor(options, url) : null);
             TransferResult result = toStandardOutput
                 ? await TransferToStandardOutputAsync(follower, options, createAttemptContext).ConfigureAwait(false)
                 : await FollowRetryingAsync(follower, options, createAttemptContext, options.ResumeFrom, null).ConfigureAwait(false);
@@ -3339,6 +3347,49 @@ internal sealed class CurlCommandRunner(
         && !options.Silent
         && !options.ProgressMeterOff
         && !(toStandardOutput && standardOutputIsTerminal);
+
+    /// <summary>
+    /// Chooses how the <c>-i</c> and <c>-I</c> header lines of a transfer writing to standard
+    /// output are styled, as curl 8.21.0's <c>tool_header_cb</c> chooses: only on a terminal
+    /// that renders bold, under <c>--styled-output</c> (the default), and for an <c>http</c>,
+    /// <c>https</c>, <c>rtsp</c> or <c>file</c> URL (ADR-0246, BL-736).
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="url">The transfer's URL.</param>
+    /// <returns>The styles for this platform, or <see langword="null" /> to write the lines as they come.</returns>
+    private StyledHeaderLines? HeaderStylesFor(CommandLineOptions options, CurlUrl url) =>
+        StylesTerminalOutput(options) && IsStyledHeaderScheme(url.Scheme)
+            ? StyledHeaderLines.ForPlatform(runsOnWindows, StyledHeaderBaseUrl(url), EnvironmentVariables("VTE_VERSION"))
+            : null;
+
+    /// <summary>
+    /// Tells whether standard output is a terminal that renders bold and <c>--styled-output</c> is on.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <returns><see langword="true" /> when header lines written there are styled, scheme permitting.</returns>
+    private bool StylesTerminalOutput(CommandLineOptions options) =>
+        standardOutputIsTerminal && terminalRendersStyles && options.StyledOutput;
+
+    /// <summary>
+    /// Tells whether curl 8.21.0 styles the header lines of a transfer with <paramref name="scheme" />.
+    /// </summary>
+    /// <param name="scheme">The transfer URL's scheme, in lower case.</param>
+    /// <returns><see langword="true" /> for <c>http</c>, <c>https</c>, <c>rtsp</c> and <c>file</c>.</returns>
+    private static bool IsStyledHeaderScheme(string scheme) => scheme is "http" or "https" or "rtsp" or "file";
+
+    /// <summary>
+    /// Writes <paramref name="url" /> absolute, without its fragment, as the URL a relative
+    /// <c>Location</c> resolves against: curl's effective URL, its default port left out.
+    /// </summary>
+    /// <param name="url">The transfer's URL.</param>
+    /// <returns>The URL text.</returns>
+    private static string StyledHeaderBaseUrl(CurlUrl url)
+    {
+        string userInformation = url.User is null ? string.Empty : url.User + (url.Password is null ? string.Empty : ":" + url.Password) + "@";
+        string port = url.IsDefaultPort ? string.Empty : ":" + url.Port.ToString(CultureInfo.InvariantCulture);
+        string query = url.Query is null ? string.Empty : "?" + url.Query;
+        return $"{url.Scheme}://{userInformation}{url.Host}{port}{url.AbsolutePath}{query}";
+    }
 
     /// <summary>
     /// Parses the <c>-r</c> / <c>--range</c> text, when there is any.

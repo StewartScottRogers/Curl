@@ -3,6 +3,7 @@ using System.Text;
 
 using Curl.Cli;
 using Curl.Core;
+using Curl.Output;
 using Curl.Protocol.Abstractions;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 
@@ -101,6 +102,10 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// <see cref="AltSvcTransferCache.ApplyTo" /> gives the alternative it connects to and the HTTP version it uses;
     /// <see langword="null" /> for none.
     /// </param>
+    /// <param name="bodyHeaderStyles">
+    /// How <c>-i</c> and <c>-I</c> style the header lines they write to <paramref name="output" />, a terminal under
+    /// <c>--styled-output</c> (ADR-0246); <see langword="null" /> to write them as they come.
+    /// </param>
     /// <returns>
     /// The context. Its <see cref="TransferContext.NoBody" /> is <c>-I</c>, its
     /// <see cref="TransferContext.ResumeUploadFromUnknownOffset" /> is <c>-C -</c> with a
@@ -126,14 +131,15 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
         MaxTimeWatchdog? maxTimeWatchdog = null,
         NetworkCredential? lookedUpCredentials = null,
         IReadOnlyList<string>? ifNoneMatchHeaders = null,
-        AltSvcTransferCache? altSvc = null) =>
+        AltSvcTransferCache? altSvc = null,
+        StyledHeaderLines? bodyHeaderStyles = null) =>
         new()
         {
             Url = url,
             Output = WatchedOutput(output, lowSpeedWatchdog),
             HeaderOutput = watchHeaderOutput is null
-                ? HeaderOutputOf(options, url, output, headerOutput)
-                : watchHeaderOutput(HeaderOutputOf(options, url, output, headerOutput)),
+                ? HeaderOutputOf(options, url, output, headerOutput, bodyHeaderStyles)
+                : watchHeaderOutput(HeaderOutputOf(options, url, output, headerOutput, bodyHeaderStyles)),
             NoBody = options.NoBody,
             Range = range,
             RangeText = options.Range,
@@ -287,19 +293,25 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// <param name="url">The URL to transfer.</param>
     /// <param name="output">Where the transfer's body goes.</param>
     /// <param name="dumpHeaderOutput">Where the <c>-D</c> header lines go, or <see langword="null" /> without <c>-D</c>.</param>
+    /// <param name="bodyHeaderStyles">
+    /// How the lines written to <paramref name="output" /> are styled, or <see langword="null" /> for not at all;
+    /// the <c>-D</c> lines are never styled, as curl 8.21.0 styles only <c>-i</c>'s (BL-736 Notes).
+    /// </param>
     /// <returns>
     /// <paramref name="dumpHeaderOutput" /> without <c>-i</c> or <c>-I</c>, or for a WebSocket URL;
-    /// otherwise <paramref name="output" /> when there is no <c>-D</c>, or a
+    /// otherwise <paramref name="output" /> (as a <see cref="StyledHeaderStream" /> when
+    /// <paramref name="bodyHeaderStyles" /> is given) when there is no <c>-D</c>, or a
     /// <see cref="HeaderLineTeeStream" /> writing each line to both.
     /// </returns>
-    private static Stream? HeaderOutputOf(CommandLineOptions options, CurlUrl url, Stream output, Stream? dumpHeaderOutput)
+    private static Stream? HeaderOutputOf(CommandLineOptions options, CurlUrl url, Stream output, Stream? dumpHeaderOutput, StyledHeaderLines? bodyHeaderStyles)
     {
         if ((!options.ShowHeaders && !options.NoBody) || IsWebSocket(url))
         {
             return dumpHeaderOutput;
         }
 
-        return dumpHeaderOutput is null ? output : new HeaderLineTeeStream(dumpHeaderOutput, output);
+        Stream headerLinesOutput = bodyHeaderStyles is null ? output : new StyledHeaderStream(output, bodyHeaderStyles);
+        return dumpHeaderOutput is null ? headerLinesOutput : new HeaderLineTeeStream(dumpHeaderOutput, headerLinesOutput);
     }
 
     /// <summary>Whether <paramref name="url" /> is a <c>ws</c> or <c>wss</c> URL.</summary>

@@ -166,7 +166,12 @@ and one that cannot be opened prints `curl: Failed to open <file>` and stops the
 exit 23. `-i` and `-I` send the header lines to the body output too (standard output or the
 `-o` file); with `-D` as well, `HeaderLineTeeStream` writes each line to the `-D` output and
 then the body output before the next, so `-i -D -` prints every header line twice in a row,
-as curl 8.21.0 does. `-I` also sets the context's `NoBody`, and `-f` / `--fail-with-body`
+as curl 8.21.0 does. When standard output is a terminal that renders bold (`terminalRendersStyles`:
+true off Windows, and on Windows once `StandardOutputVirtualTerminal` has turned on
+virtual-terminal processing, the mode put back when the run ends) and `--styled-output` is on,
+the `-i`/`-I` lines of an `http`, `https`, `rtsp` or `file` transfer writing to standard output
+go through `Curl.Output`'s `StyledHeaderStream`; the `-D` copy and an `-o` file never do
+(ADR-0246, BL-736). `-I` also sets the context's `NoBody`, and `-f` / `--fail-with-body`
 become `HttpRequestOptions.Fail`. Under `--fail-early` the first failed transfer stops the
 run with its own exit code.
 

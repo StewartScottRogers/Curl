@@ -17,9 +17,13 @@ internal static class Program
         using Stream standardOutput = StandardOutputOpener.Open();
         using Stream standardError = System.Console.OpenStandardError();
         using Stream standardInput = System.Console.OpenStandardInput();
+        bool standardOutputIsTerminal = !System.Console.IsOutputRedirected;
+        using StandardOutputVirtualTerminal virtualTerminal = StandardOutputVirtualTerminal.ForWindowsConsole();
+        bool terminalRendersStyles = StandardOutputVirtualTerminal.RendersStyles(
+            standardOutputIsTerminal, OperatingSystem.IsWindows(), virtualTerminal.Enable);
 
         return await CurlComposition
-            .CreateRunner(standardOutput, standardError, standardInput, !System.Console.IsOutputRedirected)
+            .CreateRunner(standardOutput, standardError, standardInput, standardOutputIsTerminal, terminalRendersStyles)
             .RunAsync(args)
             .ConfigureAwait(false);
     }
