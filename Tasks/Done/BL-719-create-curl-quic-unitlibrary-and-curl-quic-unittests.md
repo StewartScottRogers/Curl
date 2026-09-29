@@ -8,7 +8,7 @@ depends-on: [BL-718]
 touches: [Curl.slnx, Curl.Quic.UnitLibrary, Curl.Quic.UnitTests]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-28
 ---
 # BL-719 — Create Curl.Quic.UnitLibrary and Curl.Quic.UnitTests
 
@@ -24,13 +24,18 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] Both projects exist, `Curl.slnx` lists them together in alphabetical order with no solution folder, and the test project references the library.
-- [ ] `Curl.Quic.UnitLibrary/CLAUDE.md` exists as described.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests pass.
+- [x] Both projects exist, `Curl.slnx` lists them together in alphabetical order with no solution folder, and the test project references the library.
+- [x] `Curl.Quic.UnitLibrary/CLAUDE.md` exists as described.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests pass.
 
 ## Notes
+
+- Scaffolded to BL-682's pattern (`Curl.Ntlm`): two csproj files with nothing `Directory.Build.props` already sets, `InternalsVisibleTo` for the test project, no placeholder files. `Curl.slnx` lists them after `Curl.Protocol.Ws.*` and before `Curl.Tls.*`.
+- No project references beyond test -> library; BL-723 adds `Curl.Tls` and `Curl.Cryptography` (and `Curl.Protocol.Abstractions`, per ADR-0120) when first needed.
+- The empty test project reports "No test matches the given testcase filter" under the fast filter, as `Curl.Kerberos.UnitTests` does; `dotnet test` exits 0.
 
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Doing.
+- 2026-09-28: Doing -> Done. Curl.Quic.UnitLibrary and Curl.Quic.UnitTests exist in Curl.slnx and build clean
