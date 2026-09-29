@@ -1,5 +1,5 @@
 ---
-id: BL-797
+id: BL-801
 title: Offer the AES-CCM, AES-CCM8 and RC4 suites in the TLS 1.2 client handshake
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-797 — Offer the AES-CCM, AES-CCM8 and RC4 suites in the TLS 1.2 client handshake
+# BL-801 — Offer the AES-CCM, AES-CCM8 and RC4 suites in the TLS 1.2 client handshake
 
 ## Goal
 
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-- BL-703 built `Tls12ClientHandshake` in `Curl.Tls.UnitLibrary`: the I/O-free TLS 1.2/1.1/1.0 client handshake over the suite table `Tls12CipherSuite` (73 suites today), with `Tls12ClientSettings`, `Tls12Session` and the in-memory `Tls12TestServer` in `Curl.Tls.UnitTests`. Its decisions are in ADR-0152 (`Documentation/Planning/Decisions/ADR-0152-the-tls-1-2-client-handshake-refuses-legacy-renegotiation-ignores-hello-request-and-matches-openssls-alerts.md`).
+- BL-703 built `Tls12ClientHandshake` in `Curl.Tls.UnitLibrary`: the I/O-free TLS 1.2/1.1/1.0 client handshake over the suite table `Tls12CipherSuite` (73 suites today), with `Tls12ClientSettings`, `Tls12Session` and the in-memory `Tls12TestServer` in `Curl.Tls.UnitTests`. Its decisions are in ADR-0154 (`Documentation/Planning/Decisions/ADR-0154-the-tls-1-2-client-handshake-refuses-legacy-renegotiation-ignores-hello-request-and-matches-openssls-alerts.md`).
 - BL-796 adds AES-128/256-CCM, AES-128/256-CCM8 and RC4-128 to `Tls12BulkCipher` (the record layer). This task only wires the suites that use them into the handshake's suite table.
 - ADR-0140 ("What the client supports") requires every suite of OpenSSL 3.5.5's `ALL:COMPLEMENTOFALL` list whose key exchange curl can drive, plus LibreSSL's RC4 and 3DES suites.
 - Suites to add:
@@ -31,7 +31,7 @@ completed:
 
 - [ ] `Tls12CipherSuite` has the 12 CCM/CCM8 and 6 RC4 suites above, each with its key exchange, authentication, bulk cipher, MAC, PRF hash and minimum version; a `Tls12CipherSuiteTests` test pins each code point's properties.
 - [ ] `Tls12ClientHandshakeTests` complete an in-memory handshake against `Tls12TestServer` on one CCM suite (e.g. `0xc0ac`), one CCM8 suite (e.g. `0xc0a0`) and one RC4 suite (e.g. `0xc011`), and in each case an application-data record protected with the derived keys is decrypted by the other side.
-- [ ] A CCM or CCM8 suite is not offered when the maximum version is below TLS 1.2, and a server that selects one at TLS 1.1 or 1.0 is refused with the alert ADR-0152 names for an illegal suite selection (a named test in `Tls12ClientHandshakeFailureTests`).
+- [ ] A CCM or CCM8 suite is not offered when the maximum version is below TLS 1.2, and a server that selects one at TLS 1.1 or 1.0 is refused with the alert ADR-0154 names for an illegal suite selection (a named test in `Tls12ClientHandshakeFailureTests`).
 - [ ] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Tls.UnitLibrary` reports 100% line and branch coverage and no failing member.
 
 ## Notes

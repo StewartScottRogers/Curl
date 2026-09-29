@@ -1,5 +1,5 @@
 ---
-id: BL-800
+id: BL-804
 title: Sign a TLS 1.0 and 1.1 CertificateVerify with an RSA client key
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-800 — Sign a TLS 1.0 and 1.1 CertificateVerify with an RSA client key
+# BL-804 — Sign a TLS 1.0 and 1.1 CertificateVerify with an RSA client key
 
 ## Goal
 
@@ -22,7 +22,7 @@ A client with an RSA certificate key answers a TLS 1.0 or 1.1 server's Certifica
 - The BCL's `RSA.SignHash` always wraps the hash in a DigestInfo, so `RsaTlsSigningKey` cannot fit the `TlsSignatureKind.RsaMd5Sha1` rule (see its `rule.Kind != TlsSignatureKind.RsaMd5Sha1` check). Today a TLS 1.0/1.1 server that requests a certificate therefore gets an empty Certificate from an RSA-keyed client. ECDSA client keys already sign with SHA-1 at these versions.
 - Build the missing piece in `Curl.Cryptography.UnitLibrary`: a raw RSA private-key operation `m^d mod n` using the CRT parameters (p, q, dP, dQ, qInv) exported from `RSAParameters`, with base blinding (a random r, `m * r^e`, then unblind by `r^-1`) and constant-time modular exponentiation. `MontgomeryModulus` (BL-739, used by `FiniteFieldDiffieHellman`) is the existing constant-time exponentiation to build on. Check the result by re-applying the public exponent before returning it (fault-attack guard), as OpenSSL does.
 - Then let `RsaTlsSigningKey` sign the `RsaMd5Sha1` rule by building the block with `BuildMd5Sha1Block` and running the raw private operation; every other rule keeps using the BCL `RSA`.
-- Tests use the in-memory `Tls12TestServer` in `Curl.Tls.UnitTests` (credentials in `TestServerCredential`). The handshake is BL-703's `Tls12ClientHandshake`; its decisions are in ADR-0152 (`Documentation/Planning/Decisions/ADR-0152-the-tls-1-2-client-handshake-refuses-legacy-renegotiation-ignores-hello-request-and-matches-openssls-alerts.md`).
+- Tests use the in-memory `Tls12TestServer` in `Curl.Tls.UnitTests` (credentials in `TestServerCredential`). The handshake is BL-703's `Tls12ClientHandshake`; its decisions are in ADR-0154 (`Documentation/Planning/Decisions/ADR-0154-the-tls-1-2-client-handshake-refuses-legacy-renegotiation-ignores-hello-request-and-matches-openssls-alerts.md`).
 
 ## Acceptance criteria
 

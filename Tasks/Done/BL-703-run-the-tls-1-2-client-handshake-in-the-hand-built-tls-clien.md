@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-702, BL-698, BL-671]
-touches: [Curl.Tls.UnitLibrary, Curl.Tls.UnitTests, Documentation/Planning/Decisions/ADR-0152-the-tls-1-2-client-handshake-refuses-legacy-renegotiation-ignores-hello-request-and-matches-openssls-alerts.md, Documentation/Planning/Decisions/README.md]
+touches: [Curl.Tls.UnitLibrary, Curl.Tls.UnitTests, Documentation/Planning/Decisions/ADR-0154-the-tls-1-2-client-handshake-refuses-legacy-renegotiation-ignores-hello-request-and-matches-openssls-alerts.md, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-09-28
 completed: 2026-09-28
@@ -34,7 +34,7 @@ The hand-built client runs a TLS 1.2 (and 1.1/1.0 when the version range allows)
   server's full flight is checked as an ordered list of steps (Certificate,
   CertificateStatus, ServerKeyExchange, CertificateRequest, ServerHelloDone), each
   permitted and required by the suite and the ServerHello (`Tls12ServerFlightStep`).
-- Decisions in ADR-0152 (decided by Claude under Stewart's delegation): refuse a server
+- Decisions in ADR-0154 (decided by Claude under Stewart's delegation): refuse a server
   without `renegotiation_info` with `handshake_failure` as OpenSSL does; ignore
   HelloRequest; refuse DHE under 1024 bits with `handshake_failure`; offer a ticket with
   a random session ID; hand the chain to the verifier after any CertificateStatus; take
@@ -69,9 +69,9 @@ The hand-built client runs a TLS 1.2 (and 1.1/1.0 when the version range allows)
   (the server's `supported_signature_algorithms` already gates TLS 1.2).
 - Conformance stage: no CLI surface changes (the handshake is not wired to an option
   until BL-708), so there is no curl output to compare.
-- Follow-ups filed by task-planner: BL-797 (CCM/CCM8/RC4 suites, after BL-796), BL-798
-  (DHE-DSS suites, after BL-745), BL-799 (x448 and brainpool ECDHE, after BL-740 and
-  BL-742), BL-800 (RSA signing of a TLS 1.0/1.1 CertificateVerify).
+- Follow-ups filed by task-planner: BL-801 (CCM/CCM8/RC4 suites, after BL-796), BL-802
+  (DHE-DSS suites, after BL-745), BL-803 (x448 and brainpool ECDHE, after BL-740 and
+  BL-742), BL-804 (RSA signing of a TLS 1.0/1.1 CertificateVerify).
 
 ## Log
 
