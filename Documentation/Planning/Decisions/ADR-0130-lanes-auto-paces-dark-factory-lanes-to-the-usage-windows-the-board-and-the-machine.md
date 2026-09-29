@@ -105,9 +105,9 @@ know.
    `dotnet build <root> -nologo -v q --no-incremental --artifacts-path <LanesDir>\probe\<i>`
    builds of the same checkout. No worktrees are needed.
    - Each step records the wall time and the lowest free physical memory seen.
-   - `machineCap` is the largest `k` whose wall time is at most 2.0 times the one-build
-     time and whose free memory stayed at least 10% of RAM (and whose builds all
-     succeeded), and at least 1.
+   - `machineCap` is the largest `k` whose wall time is at most 4.0 times the one-build
+     time and whose free memory stayed at least 20% of RAM (and whose builds all
+     succeeded), and at least 1. (It was 2.0 times and 10% until the BL-807 amendment.)
    - The probe stops at the first `k` that fails either test, or at 16, the hard lane
      maximum.
    - A probe cut short by `-ProbeMaxLanes` before any step failed is marked incomplete.
@@ -115,7 +115,7 @@ know.
 
      ```json
      { "schema": 1, "probedAt": "2026-09-28T14:02:11Z", "logicalProcessors": 32, "memoryGB": 125.6,
-       "complete": true, "cap": 7, "rule": "wall <= 2.0x one build and free memory >= 10%",
+       "complete": true, "cap": 7, "rule": "wall <= 4.0x one build and free memory >= 20%",
        "steps": [ { "lanes": 1, "seconds": 61.2, "slowdown": 1.0, "minFreeMemoryPercent": 71.3, "succeeded": true } ] }
      ```
 
@@ -131,8 +131,9 @@ know.
      | `steps[]` | One per `k`: `lanes`, `seconds` (wall time), `slowdown` (`seconds` over the one-build time), `minFreeMemoryPercent`, `succeeded`. |
 
    - The coordinator runs the probe at the start of an Auto shift, before any lane
-     starts, whenever that file is missing, is marked incomplete, or names a different
-     logical processor count or a RAM size more than 1 GB apart.
+     starts, whenever that file is missing, is marked incomplete, names a different
+     logical processor count or a RAM size more than 1 GB apart, or records a `rule`
+     other than the current one.
    - The finding is recorded on the machine, not in the repository, because it describes
      one PC.
 
@@ -244,3 +245,20 @@ The default is now the old `-NoWeeklyPace` behaviour:
 
 `-WeeklyPace` opts back into item 3's weekly target, for a week when Stewart wants tokens
 kept back.
+
+## Amendment 2026-09-28: the machine cap knee moves to 4x and 20% free memory (BL-807)
+
+Decided by Claude under Stewart's delegation. The first probe on this 32-processor,
+125.6 GB PC capped the factory at 3 lanes: four simultaneous builds took 36.7 s against
+13.6 s for one (2.7x), with 71.5% of memory still free. That cap came from a worst case
+that almost never happens:
+
+- A lane builds for a few minutes of each task.
+- Lanes integrate one at a time under `integrate.lock`.
+
+So simultaneous builds rarely line up, and when they do, a slower build costs minutes of
+a task that takes most of an hour. Memory is the real limit, because running out stalls
+everything.
+
+The rule is now 4.0x the one-build time and at least 20% of memory free. A
+`machine-lanes.json` recorded under another rule is probed again at the next Auto shift.

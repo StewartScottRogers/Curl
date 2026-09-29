@@ -28,13 +28,13 @@ Lanes build for a few minutes of each task and integrate one at a time under
 
 ## Acceptance criteria
 
-- [ ] `$MachineProbeRule` is `wall <= 4.0x one build and free memory >= 20%` and
+- [x] `$MachineProbeRule` is `wall <= 4.0x one build and free memory >= 20%` and
       `Test-MachineProbeStep` applies exactly that.
-- [ ] `Get-MachineProbeNeed` returns `the probe rule changed` when the record's `rule`
+- [x] `Get-MachineProbeNeed` returns `the probe rule changed` when the record's `rule`
       differs from `$MachineProbeRule`, so the next Auto shift probes again.
-- [ ] `-TestMachineProbe` cases cover a time knee past 4x, a memory knee under 20%, a
+- [x] `-TestMachineProbe` cases cover a time knee past 4x, a memory knee under 20%, a
       failed build, all 16 passing, a cut-short probe and a failing first step; all pass.
-- [ ] ADR-0130 item 7 records the new rule in a dated amendment.
+- [x] ADR-0130 item 7 records the new rule in a dated amendment.
 
 ## Notes
 
