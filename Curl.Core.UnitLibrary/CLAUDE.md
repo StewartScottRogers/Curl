@@ -112,3 +112,14 @@ origin and allowed versions, removing the expired ones it passes, and `FormatFil
 curl's file byte for byte with the line ending the caller passes (`Environment.NewLine`:
 curl's Windows build writes CR LF). Time comes from the injected `TimeProvider`; it touches
 no file. It is not yet wired into `Curl.Console` (BL-623).
+
+`Hsts\HstsCache` is the `--hsts` cache (ADR-0177, BL-620): `ReadFile` takes curl 8.21.0's HSTS
+file text (`[.]host "date"` lines read by `HstsFileLineParser`, dates by `CurlDateParser` or
+`unlimited`, expired lines skipped, a repeated host merged), `ApplyHeader` learns from one
+`Strict-Transport-Security` value as `HstsHeaderParser` reads it (nothing from an IP address;
+`max-age=0` removes the host's own entry; an entry held is updated in place), `Find` gives the
+host's entry or its longest `includeSubDomains` parent, removing expired entries it passes,
+and `FormatFile` writes curl's file byte for byte with the caller's line ending, or `null`
+when an expiry is past the platform's `gmtime` limit and curl would leave the file as it was.
+Time comes from the injected `TimeProvider`; it touches no file. It is not yet wired into
+`Curl.Console` (BL-621).
