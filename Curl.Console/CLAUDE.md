@@ -255,7 +255,9 @@ copies `-P`, `--disable-eprt`, `--ssl`/`--ssl-reqd` and `--ftp-ssl-control` into
 
 Every transfer goes through `Curl.Core`'s `RedirectFollower`. `-L` becomes
 `HttpRequestOptions.FollowRedirects`, and `RedirectPolicyMapping` turns `--max-redirs`,
-`--post301`/`--post302`/`--post303` and `--location-trusted` into its `RedirectPolicy`. Every
+`--post301`/`--post302`/`--post303` and `--location-trusted` into its `RedirectPolicy`; `--follow`
+follows as `-L` does but drops a `-X` method whenever a redirect switches the request to GET
+(`RedirectPolicy.DropsCustomMethodOnSwitchToGet`, BL-627). Every
 hop writes to the same body and header outputs, so `-L -i` prints every response's head and
 only the last body, and one redirect past `--max-redirs` exits 47 with
 `curl: (47) Maximum (N) redirects followed`, as measured on curl 8.21.0 (BL-234).

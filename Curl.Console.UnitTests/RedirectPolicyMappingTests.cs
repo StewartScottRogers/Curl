@@ -4,7 +4,7 @@ using Curl.Core;
 namespace Curl.Console;
 
 /// <summary>
-/// Pins how <c>--max-redirs</c>, <c>--post301</c>, <c>--post302</c>, <c>--post303</c> and
+/// Pins how <c>--max-redirs</c>, <c>--post301</c>, <c>--post302</c>, <c>--post303</c>, <c>--follow</c> and
 /// <c>--location-trusted</c> become the <see cref="RedirectPolicy" /> the redirect follower
 /// applies.
 /// </summary>
@@ -81,6 +81,16 @@ public sealed class RedirectPolicyMappingTests
     public void FromCommandLine_LocationTrusted_TrustsEveryRedirectHost()
     {
         Assert.IsTrue(Map("--location-trusted", Url).LocationTrusted);
+    }
+
+    [TestMethod]
+    [DataRow(false, "-L")]
+    [DataRow(true, "--follow")]
+    [DataRow(false, "--follow", "-L")]
+    [DataRow(true, "-L", "--follow")]
+    public void FromCommandLine_FollowLast_DropsCustomMethodOnSwitchToGet(bool expected, params string[] arguments)
+    {
+        Assert.AreEqual(expected, Map([.. arguments, Url]).DropsCustomMethodOnSwitchToGet);
     }
 
     [TestMethod]
