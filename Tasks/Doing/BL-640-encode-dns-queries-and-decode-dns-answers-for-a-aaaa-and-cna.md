@@ -31,3 +31,4 @@ A DNS message codec in `Curl.Networking.UnitLibrary` encodes the query curl 8.21
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
