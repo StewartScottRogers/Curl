@@ -93,6 +93,13 @@ public sealed class ConnectResult
     public bool IsConnectionRefused { get; private init; }
 
     /// <summary>
+    /// Gets the application protocol the TLS handshake agreed with ALPN, such as <c>h2</c> or
+    /// <c>http/1.1</c>; <see langword="null" /> when none was agreed, for a connection without
+    /// TLS, and for a failed connect. <c>h2</c> makes the HTTP handler speak HTTP/2 (ADR-0141).
+    /// </summary>
+    public string? ApplicationProtocol { get; private init; }
+
+    /// <summary>
     /// Creates the result of a successful connect that recorded no timings, endpoint or
     /// CONNECT code.
     /// </summary>
@@ -128,6 +135,10 @@ public sealed class ConnectResult
     /// <param name="connectionNumber">
     /// curl's number for the connection, counted from <c>0</c>; <c>0</c> when not numbered.
     /// </param>
+    /// <param name="applicationProtocol">
+    /// The application protocol the TLS handshake agreed with ALPN, or <see langword="null" />
+    /// when none was agreed.
+    /// </param>
     /// <returns>A result whose <see cref="ExitCode" /> is <see cref="CurlExitCode.Ok" />.</returns>
     /// <exception cref="ArgumentNullException">
     /// <paramref name="connection" /> is <see langword="null" />, which would leave a
@@ -140,7 +151,8 @@ public sealed class ConnectResult
         int proxyConnectResponseCode = 0,
         IReadOnlyList<ReadOnlyMemory<byte>>? peerCertificates = null,
         bool isReused = false,
-        long connectionNumber = 0)
+        long connectionNumber = 0,
+        string? applicationProtocol = null)
     {
         ArgumentNullException.ThrowIfNull(connection);
 
@@ -152,6 +164,7 @@ public sealed class ConnectResult
             PeerCertificates = peerCertificates ?? [],
             IsReused = isReused,
             ConnectionNumber = connectionNumber,
+            ApplicationProtocol = applicationProtocol,
         };
     }
 

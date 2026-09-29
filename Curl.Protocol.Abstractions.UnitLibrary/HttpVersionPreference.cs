@@ -5,7 +5,8 @@ namespace Curl.Protocol.Abstractions;
 /// </summary>
 /// <remarks>
 /// <see cref="Http11" /> is first so that the default value is curl's default. The HTTP/3
-/// values are ADR-0144's; values for HTTP/2 are appended when a task implements them.
+/// values are ADR-0144's and the HTTP/2 value ADR-0141's, appended in the order the tasks
+/// implementing them added them.
 /// </remarks>
 public enum HttpVersionPreference
 {
@@ -31,4 +32,11 @@ public enum HttpVersionPreference
     /// falls back to TCP (ADR-0144).
     /// </summary>
     Http3Only,
+
+    /// <summary>
+    /// HTTP/2 with prior knowledge, per <c>--http2-prior-knowledge</c>: the HTTP handler
+    /// speaks HTTP/2 from the first byte, with no upgrade and whatever TLS negotiated
+    /// (ADR-0141).
+    /// </summary>
+    Http2PriorKnowledge,
 }
