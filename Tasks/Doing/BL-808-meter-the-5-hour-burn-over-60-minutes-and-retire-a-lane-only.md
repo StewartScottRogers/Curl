@@ -27,13 +27,13 @@ while a single step 0.25 lanes low retires a lane. Ceilings (board capacity, mac
 
 ## Acceptance criteria
 
-- [ ] `Get-BurnRate -Window FiveHour` uses a 60-minute window and a 30-minute minimum span.
-- [ ] `Get-NextLaneCount` takes `-PreviousLow`; a pace-bound target below the band holds
+- [x] `Get-BurnRate -Window FiveHour` uses a 60-minute window and a 30-minute minimum span.
+- [x] `Get-NextLaneCount` takes `-PreviousLow`; a pace-bound target below the band holds
       with `(…, low once)` in the reason when `-PreviousLow` is false, and retires one lane
       when it is true. It returns `Low` so the coordinator can pass it to the next step.
-- [ ] A ceiling below the current count still retires at once.
-- [ ] `-TestAutoLanes` covers low once, low twice and the ceiling case, and all cases pass.
-- [ ] ADR-0130 has a dated amendment for the window and the two-step rule.
+- [x] A ceiling below the current count still retires at once.
+- [x] `-TestAutoLanes` covers low once, low twice and the ceiling case, and all cases pass.
+- [x] ADR-0130 has a dated amendment for the window and the two-step rule.
 
 ## Notes
 

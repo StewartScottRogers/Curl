@@ -59,7 +59,8 @@ know.
    from the oldest kept sample inside the window, with the same `resetsAt` for that window
    as the newest sample, to the newest sample. A negative rise counts as 0. There is no
    rate when the mean active lanes is below 0.5.
-   - The five-hour rate uses a 30-minute window and needs a span of at least 15 minutes.
+   - The five-hour rate uses a 60-minute window and needs a span of at least 30 minutes
+     (30 and 15 until the BL-808 amendment).
    - The weekly rate uses a 3-hour window and needs a span of at least 60 minutes,
      because the weekly reading moves one point at a time.
 
@@ -84,7 +85,9 @@ know.
    - `machineCap` comes from the probe (item 7).
 
 5. **One step, with hysteresis.** Let `desired = min(pace target, ceiling)`. Scale up by
-   one when `desired >= current + 1`. Scale down by one when `desired < current - 0.25`.
+   one when `desired >= current + 1`. Scale down by one when `desired < current - 0.25`
+   for a ceiling at once, and for a pace target only when the previous step was below the
+   band too (BL-808 amendment).
    Otherwise hold. There is never fewer than 1 lane.
 
    These cases hold too:
@@ -262,3 +265,19 @@ everything.
 
 The rule is now 4.0x the one-build time and at least 20% of memory free. A
 `machine-lanes.json` recorded under another rule is probed again at the next Auto shift.
+
+## Amendment 2026-09-28: a steadier meter and a two-step retire (BL-808)
+
+Decided by Claude under Stewart's delegation. Usage arrives in whole percentage points.
+A 30-minute five-hour span holds about 5 of them, so one point of rounding moves the
+target by about 20%. A single step a quarter lane low then retired a lane, and it did:
+2.9, then 2.6, then retire.
+
+Two changes make the step steadier:
+
+- The five-hour rate now uses a 60-minute window with a 30-minute minimum span.
+- A pace target below the band retires a lane only when the previous step was below it
+  too. The first low step holds and traces `low once`.
+
+Ceilings (board capacity, machine cap, `-MaxLanes`) are exact rather than measured, so
+they still retire a lane at once.

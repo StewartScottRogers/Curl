@@ -120,7 +120,8 @@
       ceilings  task-board.ps1 capacity (read in a detached worktree, <repo>.lanes\auto-board,
                 so this checkout is only pulled at shift end), the machine cap and -MaxLanes.
       change    At most one lane per step, added or retired; a retiring lane finishes and
-                integrates its task first. Each step traces "lanes a -> b (reason)", e.g.
+                integrates its task first. A pace target must be low two steps running
+                before a lane retires ("low once" holds); a ceiling retires at once. Each step traces "lanes a -> b (reason)", e.g.
                 "lanes 3 -> 4 (5-hour pace allows 4.9)". It holds while the tokens are low
                 or the shift's time is up.
 
@@ -887,9 +888,11 @@ function Get-BurnRate {
     # Percentage points per hour per active lane that -Window rose by, over the span from
     # the oldest sample inside the window sharing the newest sample's reset time to the
     # newest sample. $null when the span is too short or the lanes were idle (mean < 0.5).
+    # Usage comes in whole points, so a span must hold enough of them that one point of
+    # rounding does not swing the rate: 30 to 60 minutes for the 5-hour window (BL-808).
     param([object[]]$Samples, [ValidateSet('FiveHour', 'Week')][string]$Window)
-    $windowMinutes = if ($Window -eq 'FiveHour') { 30 } else { 180 }
-    $minimumMinutes = if ($Window -eq 'FiveHour') { 15 } else { 60 }
+    $windowMinutes = if ($Window -eq 'FiveHour') { 60 } else { 180 }
+    $minimumMinutes = if ($Window -eq 'FiveHour') { 30 } else { 60 }
     $resetsName = "$($Window)Resets"
     $sorted = @($Samples | Where-Object { $_ } | Sort-Object At)
     if ($sorted.Count -lt 2) { return $null }
@@ -930,14 +933,22 @@ function Get-PaceTarget {
 function Get-NextLaneCount {
     # One step from -Current lanes toward the pace, capped by the ceilings: up one when
     # the desired count is a whole lane above, down one when it is more than a quarter
-    # lane below, never below 1. Reason is the log line, e.g. "lanes 3 -> 4 (5-hour pace allows 4.9)".
-    param([int]$Current, $Pace, [int]$Capacity, [int]$MachineCap, [int]$MaxLanes)
+    # lane below, never below 1. A measured pace must be low two steps running before a
+    # lane retires (-PreviousLow, BL-808); a ceiling below -Current retires one at once.
+    # Low says whether this step's pace was low. Reason is the log line, e.g.
+    # "lanes 3 -> 4 (5-hour pace allows 4.9)".
+    param([int]$Current, $Pace, [int]$Capacity, [int]$MachineCap, [int]$MaxLanes, [bool]$PreviousLow = $false)
     $ceiling = [math]::Min($Capacity, [math]::Min($MachineCap, $MaxLanes))
     $paceValue = if ($Pace) { [double]$Pace.Target } else { [double]$Current }
     $desired = [math]::Min($paceValue, [double]$ceiling)
     $lanes = $Current
+    $low = $false
+    $lowOnce = $false
     if ($desired -ge $Current + 1) { $lanes = $Current + 1 }
-    elseif ($desired -lt $Current - 0.25) { $lanes = [math]::Max(1, $Current - 1) }
+    elseif ($desired -lt $Current - 0.25) {
+        $low = $paceValue -le $ceiling
+        if (-not $low -or $PreviousLow) { $lanes = [math]::Max(1, $Current - 1) } else { $lowOnce = $true }
+    }
     $culture = [Globalization.CultureInfo]::InvariantCulture
     $limit = if ($paceValue -le $ceiling) {
         if ($Pace) { "$($Pace.Binding) allows $($paceValue.ToString('0.0', $culture))" } else { 'no burn rate yet' }
@@ -945,8 +956,9 @@ function Get-NextLaneCount {
         if ($Capacity -eq 1) { '1 ready task can run at once' } else { "$Capacity ready tasks can run at once" }
     } elseif ($MachineCap -eq $ceiling) { "machine sustains $MachineCap" }
     else { "lane maximum $MaxLanes" }
+    if ($lowOnce) { $limit += ', low once' }
     $step = if ($lanes -eq $Current) { "lanes $Current held" } else { "lanes $Current -> $lanes" }
-    return [pscustomobject]@{ Lanes = $lanes; Changed = ($lanes -ne $Current); Desired = $desired; Reason = "$step ($limit)" }
+    return [pscustomobject]@{ Lanes = $lanes; Changed = ($lanes -ne $Current); Desired = $desired; Low = $low; Reason = "$step ($limit)" }
 }
 
 function Get-AutoStartCount {
@@ -993,10 +1005,10 @@ if ($TestAutoLanes) {
         return New-UsageSample -At ($D + [TimeSpan]$At) -Reading $reading -ActiveLanes $ActiveLanes
     }
     function Get-SampledLaneCount {
-        param([object[]]$Samples, [int]$Current, [bool]$WeeklyPace, [int]$Capacity, [int]$MachineCap, [int]$MaxLanes)
+        param([object[]]$Samples, [int]$Current, [bool]$WeeklyPace, [int]$Capacity, [int]$MachineCap, [int]$MaxLanes, [bool]$PreviousLow = $false)
         $pace = Get-PaceTarget -Sample $Samples[-1] -FiveHourRate (Get-BurnRate -Samples $Samples -Window FiveHour) `
             -WeeklyRate (Get-BurnRate -Samples $Samples -Window Week) -WeeklyPace $WeeklyPace -StopAtUsage 0.85 -StopAtWeeklyUsage 0.97
-        return (Get-NextLaneCount -Current $Current -Pace $pace -Capacity $Capacity -MachineCap $MachineCap -MaxLanes $MaxLanes).Reason
+        return (Get-NextLaneCount -Current $Current -Pace $pace -Capacity $Capacity -MachineCap $MachineCap -MaxLanes $MaxLanes -PreviousLow $PreviousLow).Reason
     }
     function New-TestPace { param([double]$Target) return [pscustomobject]@{ FiveHour = $Target; Weekly = [double]::PositiveInfinity; Target = $Target; Binding = '5-hour pace' } }
 
@@ -1011,7 +1023,9 @@ if ($TestAutoLanes) {
     $resetInWindow = @(
         New-TestSample '15:29' 0.84 ($D.AddHours(15.5)) 0.30 ($D.AddDays(3)) 3
         New-TestSample '15:44' 0.02 ($D.AddHours(20.5)) 0.30 ($D.AddDays(3)) 3
-        New-TestSample '15:59' 0.05 ($D.AddHours(20.5)) 0.30 ($D.AddDays(3)) 3)
+        New-TestSample '15:59' 0.05 ($D.AddHours(20.5)) 0.30 ($D.AddDays(3)) 3
+        New-TestSample '16:14' 0.08 ($D.AddHours(20.5)) 0.30 ($D.AddDays(3)) 3)
+    $fiveHourTooShort = @($resetInWindow | Select-Object -First 3)
     $idle = @(
         New-TestSample '12:00' 0.20 ($D.AddHours(15.5)) 0.10 ($D.AddDays(3)) 0
         New-TestSample '12:30' 0.26 ($D.AddHours(15.5)) 0.11 ($D.AddDays(3)) 0)
@@ -1020,12 +1034,16 @@ if ($TestAutoLanes) {
     $cases = @(
         ,@('five-hour-binds', 'lanes 3 -> 4 (5-hour pace allows 4.9)', (Get-SampledLaneCount $fiveHourBinds 3 $true 6 8 16))
         ,@('five-hour-binds weekly rate', 'null', "$(if ($null -eq (Get-BurnRate $fiveHourBinds Week)) { 'null' } else { 'a rate' })")
-        ,@('weekly-binds', 'lanes 4 -> 3 (weekly pace allows 1.8)', (Get-SampledLaneCount $weeklyBinds 4 $true 6 8 16))
+        ,@('weekly-binds low once', 'lanes 4 held (weekly pace allows 1.8, low once)', (Get-SampledLaneCount $weeklyBinds 4 $true 6 8 16))
+        ,@('weekly-binds low twice', 'lanes 4 -> 3 (weekly pace allows 1.8)', (Get-SampledLaneCount $weeklyBinds 4 $true 6 8 16 $true))
+        ,@('five-hour span under 30 min', 'null', "$(if ($null -eq (Get-BurnRate $fiveHourTooShort FiveHour)) { 'null' } else { 'a rate' })")
         ,@('weekly-pace-off', 'lanes 4 -> 5 (6 ready tasks can run at once)', (Get-SampledLaneCount $weeklyBinds 4 $false 6 8 16))
         ,@('weekly-pace-off by default', 'Infinity', "$((Get-PaceTarget -Sample $weeklyBinds[-1] -FiveHourRate 1.0 -WeeklyRate 5.0 -StopAtUsage 0.85 -StopAtWeeklyUsage 0.97).Weekly)")
-        ,@('five-hour-reset-in-window', 'lanes 3 -> 4 (5-hour pace allows 4.4)', (Get-SampledLaneCount $resetInWindow 3 $true 8 8 16))
+        ,@('five-hour-reset-in-window', 'lanes 3 -> 4 (5-hour pace allows 4.5)', (Get-SampledLaneCount $resetInWindow 3 $true 8 8 16))
         ,@('hold-inside-band 3.8', 'lanes 4 held (5-hour pace allows 3.8)', (Get-NextLaneCount 4 (New-TestPace 3.8) 16 16 16).Reason)
-        ,@('hold-inside-band 3.7', 'lanes 4 -> 3 (5-hour pace allows 3.7)', (Get-NextLaneCount 4 (New-TestPace 3.7) 16 16 16).Reason)
+        ,@('below-band low once', 'lanes 4 held (5-hour pace allows 3.7, low once)', (Get-NextLaneCount 4 (New-TestPace 3.7) 16 16 16).Reason)
+        ,@('below-band low twice', 'lanes 4 -> 3 (5-hour pace allows 3.7)', (Get-NextLaneCount 4 (New-TestPace 3.7) 16 16 16 $true).Reason)
+        ,@('below-band Low flag', 'True', "$((Get-NextLaneCount 4 (New-TestPace 3.7) 16 16 16).Low)")
         ,@('capacity-ceiling 3', 'lanes 5 -> 4 (3 ready tasks can run at once)', (Get-NextLaneCount 5 (New-TestPace 9.0) 3 16 16).Reason)
         ,@('capacity-ceiling 1', 'lanes 2 -> 1 (1 ready task can run at once)', (Get-NextLaneCount 2 $null 1 16 16).Reason)
         ,@('machine-ceiling', 'lanes 7 held (machine sustains 7)', (Get-NextLaneCount 7 $infinite 20 7 16).Reason)
@@ -2082,7 +2100,7 @@ $AutoLanesFile = Join-Path $LanesDir 'auto-lanes.json'
 $AutoBoardDir = Join-Path $LanesDir 'auto-board'
 # The samples of the last 3 hours, the rates last metered, the saved auto-lanes.json, the
 # machine cap, and whether a capacity failure has been traced yet.
-$script:Auto = @{ Samples = @(); FiveHourRate = $null; WeeklyRate = $null; Saved = $null; MachineCap = 16; CapacityTraced = $false }
+$script:Auto = @{ Samples = @(); FiveHourRate = $null; WeeklyRate = $null; Saved = $null; MachineCap = 16; CapacityTraced = $false; LastLow = $false }
 
 function Read-JsonFile {
     # The file's JSON, or $null when it is missing or does not parse.
@@ -2156,7 +2174,7 @@ function Remove-AutoBoard {
 function Get-AutoLaneStep {
     # One Auto step's computation from -Samples, newest last: both burn rates (the saved
     # ones while the samples give none), the pace target and the next lane count.
-    param([object[]]$Samples, [int]$Current, [int]$Capacity, [int]$MachineCap, $Saved)
+    param([object[]]$Samples, [int]$Current, [int]$Capacity, [int]$MachineCap, $Saved, [bool]$PreviousLow = $false)
     $fiveHourRate = Get-BurnRate -Samples $Samples -Window FiveHour
     if ($null -eq $fiveHourRate -and $Saved -and $null -ne $Saved.fiveHourRatePerLane) { $fiveHourRate = [double]$Saved.fiveHourRatePerLane }
     $weeklyRate = Get-BurnRate -Samples $Samples -Window Week
@@ -2166,7 +2184,7 @@ function Get-AutoLaneStep {
         $pace = Get-PaceTarget -Sample @($Samples)[-1] -FiveHourRate $fiveHourRate -WeeklyRate $weeklyRate -WeeklyPace $WeeklyPace.IsPresent `
             -StopAtUsage $StopAtUsage -StopAtWeeklyUsage $StopAtWeeklyUsage
     }
-    $next = Get-NextLaneCount -Current $Current -Pace $pace -Capacity $Capacity -MachineCap $MachineCap -MaxLanes $MaxLanes
+    $next = Get-NextLaneCount -Current $Current -Pace $pace -Capacity $Capacity -MachineCap $MachineCap -MaxLanes $MaxLanes -PreviousLow $PreviousLow
     return [pscustomobject]@{ FiveHourRate = $fiveHourRate; WeeklyRate = $weeklyRate; Pace = $pace; Next = $next }
 }
 
@@ -2433,9 +2451,12 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
                 Where-Object { $_.At -ge $now.AddHours(-3) })
         }
         $capacity = Get-ShiftCapacity -Fallback $current
-        $step = Get-AutoLaneStep -Samples $script:Auto.Samples -Current $current -Capacity $capacity -MachineCap $script:Auto.MachineCap -Saved $script:Auto.Saved
+        $step = Get-AutoLaneStep -Samples $script:Auto.Samples -Current $current -Capacity $capacity -MachineCap $script:Auto.MachineCap `
+            -Saved $script:Auto.Saved -PreviousLow $script:Auto.LastLow
         $script:Auto.FiveHourRate = $step.FiveHourRate
         $script:Auto.WeeklyRate = $step.WeeklyRate
+        # A low step that retired a lane starts the count again; one that held arms the next.
+        $script:Auto.LastLow = [bool]($step.Next.Low -and -not $step.Next.Changed)
         if (-not $step.Next.Changed) { Write-Trace '-' 'lanes' $step.Next.Reason 'DarkGray'; return }
         Write-Trace '-' 'lanes' $step.Next.Reason 'Cyan'
         $moved = if ($step.Next.Lanes -gt $current) { Add-Lane } else { Request-LaneRetire }
