@@ -4,7 +4,7 @@ title: Log HTTP/1.1, HTTP/2 and HTTP/3 exchange steps to the diagnostic log in C
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-916]
+depends-on: [BL-938]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-09-29
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-- The rules are BL-915's ADR: levels (decision 2), components (6), never-logged values (7), and "test `IsEnabled` before building a message" (8). The contract is BL-916's `IDiagnosticLog` and `DiagnosticLogComponents`.
+- The rules are BL-937's ADR: levels (decision 2), components (6), never-logged values (7), and "test `IsEnabled` before building a message" (8). The contract is BL-938's `IDiagnosticLog` and `DiagnosticLogComponents`.
 - This task changes no `-v`, `--trace`, standard output or exit-code behaviour: every existing test in the touched test projects passes unmodified.
 - Tests use a hand-rolled `RecordingDiagnosticLog : IDiagnosticLog` in each touched test project (no mocking library), recording `(level, component, message)` at a configurable level. Tests are platform-neutral.
 - Where: `HttpProtocolHandler.cs` (version selection and fallback, request and reply milestones, authentication rounds, the 100-continue wait, connection reuse), `HttpResponseHeadReader.cs`, `HttpResponseBodyReader.cs` (chunked, content-length or close-delimited, decoders chosen), `HttpRequestBodyWriter.cs`, `Http2Session.cs`/`Http2StreamConnection.cs` and `Http3Session.cs`/`Http3StreamConnection.cs` (stream opened, SETTINGS, GOAWAY or RST_STREAM received). `Curl.Http2` and `Curl.Http3` get no project reference to the abstractions: log around their calls here.

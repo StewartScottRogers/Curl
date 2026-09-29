@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-- Rules: BL-915's ADR (decisions 3, 4, 5, 7, 8). Pieces: BL-916 (contract), BL-917 (`DiagnosticLogWriter`), BL-918 (`CommandLineOptions.DiagnosticLogLevel`/`DiagnosticLogFile`).
+- Rules: BL-937's ADR (decisions 3, 4, 5, 7, 8). Pieces: BL-938 (contract), BL-917 (`DiagnosticLogWriter`), BL-918 (`CommandLineOptions.DiagnosticLogLevel`/`DiagnosticLogFile`).
 - Composition: `Curl.Console/CurlComposition.cs` builds every service with plain constructor calls (no container, no reflection). Construct the log there: `NoDiagnosticLog.Instance` when the level is `None`; otherwise a `DiagnosticLogWriter` over the runner's standard-error writer (which already follows `--stderr`) or over a UTF-8 (no BOM) file writer for `--log-file`, with the injected `TimeProvider` and the runner's standard-error line end. Dispose the file writer at the end of the run. No static field holds the log.
 - A `--log-file` that cannot be opened: write `Warning: Failed to open the --log-file <path>` plus the line end to standard error once, continue with `NoDiagnosticLog.Instance`, exit code unchanged.
 - Where the transfer context is built (`CurlCommandRunner.cs`) set `DiagnosticLog`; where a `ConnectTarget` is built in the console set it too.

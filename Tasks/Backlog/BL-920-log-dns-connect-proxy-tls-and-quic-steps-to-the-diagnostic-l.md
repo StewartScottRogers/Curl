@@ -4,7 +4,7 @@ title: Log DNS, connect, proxy, TLS and QUIC steps to the diagnostic log in Curl
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-916]
+depends-on: [BL-938]
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-09-29
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-- The rules are BL-915's ADR: levels (decision 2), components (6), never-logged values (7), and "test `IsEnabled` before building a message" (8). The contract is BL-916's `IDiagnosticLog` and `DiagnosticLogComponents`.
+- The rules are BL-937's ADR: levels (decision 2), components (6), never-logged values (7), and "test `IsEnabled` before building a message" (8). The contract is BL-938's `IDiagnosticLog` and `DiagnosticLogComponents`.
 - This task changes no `-v`, `--trace`, standard output or exit-code behaviour: every existing test in the touched test projects passes unmodified.
 - Tests use a hand-rolled `RecordingDiagnosticLog : IDiagnosticLog` in each touched test project (no mocking library), recording `(level, component, message)` at a configurable level. Tests are platform-neutral.
 - Where: `TcpConnector.cs` (resolve, dial, tunnel, handshake, connect timeout), `TcpDialer.cs` (each address tried, the happy-eyeballs race), `SystemDnsResolver.cs`, `DnsServerResolver.cs` and `DohDnsResolver.cs` (log their results at the connector, or pass them the target's log), `HttpProxyTunnel.cs`, `SocksProxyTunnel.cs`, `Socks4Handshake.cs`/`Socks5Handshake.cs`, `SslStreamTlsProvider.cs` and `HandBuiltTlsProvider.cs`/`HandBuiltHandshake.cs` (the route `TlsClientRouting` chose, and why), `HandBuiltCertificateVerifier.cs`/`PeerVerification.cs`, `PoolingConnector.cs` (reuse or new connection, and why), `QuicDialer.cs`, `UdpDatagramConnector.cs`. `Curl.Tls` and `Curl.Quic` get no project reference to the abstractions: log their steps here, around the calls.

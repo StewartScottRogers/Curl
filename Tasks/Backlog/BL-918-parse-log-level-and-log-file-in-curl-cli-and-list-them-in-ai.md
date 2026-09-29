@@ -4,7 +4,7 @@ title: Parse --log-level and --log-file in Curl.Cli and list them in --ai-help
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-915, BL-911]
+depends-on: [BL-937, BL-911]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
 requirement: none
 created: 2026-09-29
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-- Rules: BL-915's ADR, decision 1 (and 10 for help output). Types: BL-916's `DiagnosticLogLevel` in `Curl.Protocol.Abstractions` (Curl.Cli already references it).
+- Rules: BL-937's ADR, decision 1 (and 10 for help output). Types: BL-938's `DiagnosticLogLevel` in `Curl.Protocol.Abstractions` (Curl.Cli already references it).
 - Option table: `Curl.Cli.UnitLibrary/CommandLineOptionTable.cs` (the `CommandLineOption.Value(...)`/`FileName(...)` entries near `--stderr`, line ~77). Both options are global: store them on the run-wide `globals` object in `CommandLineOptions.cs` as `StandardErrorFile` is (line ~271), so `-:`/`--next` does not reset them; the last occurrence wins.
 - Values: `none`, `error`, `warning`, `info`, `verbose`, compared with `StringComparison.OrdinalIgnoreCase`. Anything else (empty included) is refused as badly used, the same way other badly used options are (`curl: option --log-level: is badly used here`, then the `curl: try 'curl --help' or 'curl --manual' for more information` line), exit 2 (`CurlExitCode.FailedInit`).
 - `--log-file <path>` with no `--log-level` anywhere on the line makes the effective level `Info`; an explicit `--log-level` (before or after it) wins. Expose the effective level as `CommandLineOptions.DiagnosticLogLevel` (default `DiagnosticLogLevel.None`) and the path as `CommandLineOptions.DiagnosticLogFile` (`string?`, default `null`). Parsing never opens the file; the console does (BL-919).

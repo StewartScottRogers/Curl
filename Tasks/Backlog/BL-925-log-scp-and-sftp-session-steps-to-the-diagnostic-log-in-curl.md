@@ -4,7 +4,7 @@ title: Log SCP and SFTP session steps to the diagnostic log in Curl.Protocol.Ssh
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-916]
+depends-on: [BL-938]
 touches: [Curl.Protocol.Ssh.UnitLibrary, Curl.Protocol.Ssh.UnitTests]
 requirement: none
 created: 2026-09-29
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-- The rules are BL-915's ADR: levels (decision 2), components (6), never-logged values (7), and "test `IsEnabled` before building a message" (8). The contract is BL-916's `IDiagnosticLog` and `DiagnosticLogComponents`.
+- The rules are BL-937's ADR: levels (decision 2), components (6), never-logged values (7), and "test `IsEnabled` before building a message" (8). The contract is BL-938's `IDiagnosticLog` and `DiagnosticLogComponents`.
 - This task changes no `-v`, `--trace`, standard output or exit-code behaviour: every existing test in the touched test projects passes unmodified.
 - Tests use a hand-rolled `RecordingDiagnosticLog : IDiagnosticLog` in each touched test project (no mocking library), recording `(level, component, message)` at a configurable level. Tests are platform-neutral.
 - Where: `Transport/SshIdentificationExchange.cs` (server identification string), `Negotiation/` (algorithms offered and chosen per direction), `KeyExchange/` (method run, elapsed ms), `HostKeys/` (key type, fingerprint, known_hosts result), `PacketProtection/` (cipher and MAC in force, rekey), `Authentication/SshUserAuthentication.cs` (methods the server allows, method tried, result), `Connection/` (channel open, exec or subsystem), `Sftp/` (each SFTP request type and status). Take the log from the transfer context the handler receives; pass it on its `ConnectTarget`.

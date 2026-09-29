@@ -4,7 +4,7 @@ title: Log HTTP and SASL authentication scheme choices to the diagnostic log in 
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-916, BL-919]
+depends-on: [BL-938, BL-919]
 touches: [Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-29
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-- The rules are BL-915's ADR: levels (decision 2), components (6), never-logged values (7), and "test `IsEnabled` before building a message" (8). The contract is BL-916's `IDiagnosticLog` and `DiagnosticLogComponents`.
+- The rules are BL-937's ADR: levels (decision 2), components (6), never-logged values (7), and "test `IsEnabled` before building a message" (8). The contract is BL-938's `IDiagnosticLog` and `DiagnosticLogComponents`.
 - This task changes no `-v`, `--trace`, standard output or exit-code behaviour: every existing test in the touched test projects passes unmodified.
 - Tests use a hand-rolled `RecordingDiagnosticLog : IDiagnosticLog` in each touched test project (no mocking library), recording `(level, component, message)` at a configurable level. Tests are platform-neutral.
 - Where: `HttpAuthSchemeRanking.cs`, `RankedHttpAuthenticator.cs`, `BasicAndBearerAuthenticator.cs`, `DigestAuthenticator.cs`, `NtlmHttpAuthenticator.cs`, `NegotiateHttpAuthenticator.cs`, `SaslMechanismRanking.cs`, `SaslAuthenticator.cs`, `RoutingSecurityContextFactory.cs`/`HandBuiltSecurityContextFactory.cs` (hand-built or system context, and why), `NetrcFile.cs` (which netrc entry matched, by host and login only), `AwsSigV4Signer.cs` (the scope, never the key). `Curl.Ntlm` and `Curl.Kerberos` get no project reference to the abstractions: log around their calls here.

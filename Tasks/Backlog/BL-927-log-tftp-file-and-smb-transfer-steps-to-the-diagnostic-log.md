@@ -4,7 +4,7 @@ title: Log TFTP, file and SMB transfer steps to the diagnostic log
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-916]
+depends-on: [BL-938]
 touches: [Curl.Protocol.Tftp.UnitLibrary, Curl.Protocol.Tftp.UnitTests, Curl.Protocol.File.UnitLibrary, Curl.Protocol.File.UnitTests, Curl.Protocol.Smb.UnitLibrary, Curl.Protocol.Smb.UnitTests]
 requirement: none
 created: 2026-09-29
@@ -18,7 +18,7 @@ The TFTP, file and SMB handlers write the diagnostic log (components `tftp`, `fi
 
 ## Context
 
-- The rules are BL-915's ADR: levels (decision 2), components (6), never-logged values (7), and "test `IsEnabled` before building a message" (8). The contract is BL-916's `IDiagnosticLog` and `DiagnosticLogComponents`.
+- The rules are BL-937's ADR: levels (decision 2), components (6), never-logged values (7), and "test `IsEnabled` before building a message" (8). The contract is BL-938's `IDiagnosticLog` and `DiagnosticLogComponents`.
 - This task changes no `-v`, `--trace`, standard output or exit-code behaviour: every existing test in the touched test projects passes unmodified.
 - Tests use a hand-rolled `RecordingDiagnosticLog : IDiagnosticLog` in each touched test project (no mocking library), recording `(level, component, message)` at a configurable level. Tests are platform-neutral.
 - Where: `Curl.Protocol.Tftp.UnitLibrary`: `TftpProtocolHandler.cs`, `TftpDownload.cs`, `TftpRetrySchedule.cs`, `TftpErrorMapping.cs`, `TftpMasqueRequest.cs`/`TftpMasqueReply.cs`; `Curl.Protocol.File.UnitLibrary`: `FileProtocolHandler.cs`; `Curl.Protocol.Smb.UnitLibrary`: `SmbProtocolHandler.cs`, `SmbSessionEstablisher.cs`, `SmbFileTransfer.cs` (both wrap or build a context: forward `DiagnosticLog` and set it on each `ConnectTarget`).

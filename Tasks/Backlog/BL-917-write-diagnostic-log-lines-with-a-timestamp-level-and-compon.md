@@ -4,7 +4,7 @@ title: Write diagnostic log lines with a timestamp, level and component through 
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-916]
+depends-on: [BL-938]
 touches: [Curl.Output.UnitLibrary, Curl.Output.UnitTests]
 requirement: none
 created: 2026-09-29
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-- The format and rules are BL-915's ADR (decisions 2, 3, 5, 8); the contract is BL-916's `IDiagnosticLog`.
+- The format and rules are BL-937's ADR (decisions 2, 3, 5, 8); the contract is BL-938's `IDiagnosticLog`.
 - Constructor: `DiagnosticLogWriter(TextWriter target, DiagnosticLogLevel level, TimeProvider timeProvider, string lineEnd)`. The console (BL-919) passes the standard-error writer or the `--log-file` writer, and the line end it already uses for curl's own standard-error text.
 - Timestamp: `timeProvider.GetUtcNow()` formatted `yyyy-MM-ddTHH:mm:ss.fffZ` with `CultureInfo.InvariantCulture`. Level text: `error`, `warning`, `info`, `verbose`.
 - `IsEnabled(level)` is `level != None && level <= configured`; `Write` of a disabled level writes nothing. Constructing it with `DiagnosticLogLevel.None` is refused with `ArgumentOutOfRangeException` (none means no writer at all; the console uses `NoDiagnosticLog.Instance`).

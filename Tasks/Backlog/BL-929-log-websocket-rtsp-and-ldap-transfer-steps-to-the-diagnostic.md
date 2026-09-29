@@ -4,7 +4,7 @@ title: Log WebSocket, RTSP and LDAP transfer steps to the diagnostic log
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-916]
+depends-on: [BL-938]
 touches: [Curl.Protocol.Ws.UnitLibrary, Curl.Protocol.Ws.UnitTests, Curl.Protocol.Rtsp.UnitLibrary, Curl.Protocol.Rtsp.UnitTests, Curl.Protocol.Ldap.UnitLibrary, Curl.Protocol.Ldap.UnitTests]
 requirement: none
 created: 2026-09-29
@@ -18,7 +18,7 @@ The WebSocket, RTSP and LDAP handlers write the diagnostic log (components `ws`,
 
 ## Context
 
-- The rules are BL-915's ADR: levels (decision 2), components (6), never-logged values (7), and "test `IsEnabled` before building a message" (8). The contract is BL-916's `IDiagnosticLog` and `DiagnosticLogComponents`.
+- The rules are BL-937's ADR: levels (decision 2), components (6), never-logged values (7), and "test `IsEnabled` before building a message" (8). The contract is BL-938's `IDiagnosticLog` and `DiagnosticLogComponents`.
 - This task changes no `-v`, `--trace`, standard output or exit-code behaviour: every existing test in the touched test projects passes unmodified.
 - Tests use a hand-rolled `RecordingDiagnosticLog : IDiagnosticLog` in each touched test project (no mocking library), recording `(level, component, message)` at a configurable level. Tests are platform-neutral.
 - Where: `Curl.Protocol.Ws.UnitLibrary`: `WsProtocolHandler.cs`, `WsFrameReceiver.cs` (upgrade request and `101` reply, frames); `Curl.Protocol.Rtsp.UnitLibrary`: `RtspProtocolHandler.cs`, `RtspReplyReader.cs`, `RtspSessionState.cs` (request method and CSeq, reply status, session ID); `Curl.Protocol.Ldap.UnitLibrary`: `LdapProtocolHandler.cs`, `LdapEntryWriter.cs` (bind, search scope and filter, entries returned). All three implement or wrap `ITransferContext`: forward `DiagnosticLog`.

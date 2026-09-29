@@ -1,5 +1,5 @@
 ---
-id: BL-915
+id: BL-937
 title: Decide Curl's own --log-level diagnostic log: levels, sinks, line format and the no-extra-bytes guarantee
 priority: Normal
 assignee: Claude
@@ -10,11 +10,11 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-915 — Decide Curl's own --log-level diagnostic log: levels, sinks, line format and the no-extra-bytes guarantee
+# BL-937 — Decide Curl's own --log-level diagnostic log: levels, sinks, line format and the no-extra-bytes guarantee
 
 ## Goal
 
-An ADR marked "Decided by Claude under Stewart's delegation" fixes every rule of Curl's own diagnostic log (`--log-level none|error|warning|info|verbose`, `--log-file <path>`), and `Documentation/Product/Requirements.md` carries a requirement row for it, so BL-916 to BL-929 build against one written design.
+An ADR marked "Decided by Claude under Stewart's delegation" fixes every rule of Curl's own diagnostic log (`--log-level none|error|warning|info|verbose`, `--log-file <path>`), and `Documentation/Product/Requirements.md` carries a requirement row for it, so BL-938 and BL-917 to BL-929 build against one written design.
 
 ## Context
 
@@ -31,13 +31,13 @@ The decisions to record, as decided here (the ADR may sharpen wording, not rever
 5. **Line format:** `[<UTC timestamp>] [<level>] [<component>] <message>` then the line end the runner uses for its own standard-error text, e.g. `[2026-09-29T14:03:07.123Z] [info] [http] reply HTTP/1.1 200 after 12 ms`. The timestamp is `TimeProvider.GetUtcNow()` (injected, never `DateTime.Now`) formatted `yyyy-MM-ddTHH:mm:ss.fffZ` with the invariant culture; the level is lower case; one call writes one whole line, and lines from `-Z` parallel transfers never interleave inside a line.
 6. **Components** are fixed lower-case names, one per area: `cli`, `runner`, `dns`, `connect`, `proxy`, `tls`, `quic`, `http`, `http2`, `http3`, `auth`, `retry`, `redirect`, `hsts`, `altsvc`, `ftp`, `tftp`, `ssh`, `smtp`, `imap`, `pop3`, `dict`, `gopher`, `telnet`, `mqtt`, `file`, `smb`, `ldap`, `rtsp`, `ws`.
 7. **Never logged:** passwords, `-u`/URL user-info passwords, `Authorization`/`Proxy-Authorization` values, cookies' values, private keys, pass phrases, bearer tokens, SASL and NTLM/Negotiate token bytes. A message may say a credential was sent, never what it was.
-8. **Shape:** base class library only, native-AOT safe, no `Microsoft.Extensions.Logging` or any other package. A small hand-rolled `IDiagnosticLog` (`bool IsEnabled(DiagnosticLogLevel)`, `void Write(DiagnosticLogLevel, string component, string message)`), the `DiagnosticLogLevel` enum and `NoDiagnosticLog` live in `Curl.Protocol.Abstractions.UnitLibrary` so every protocol library can take one without referencing another project (BL-916); the writer lives in `Curl.Output.UnitLibrary` (BL-917); `Curl.Console`'s composition root (`CurlComposition.cs`) constructs it and passes it by constructor and on `ITransferContext.DiagnosticLog`/`ConnectTarget.DiagnosticLog`, never through a static (BL-919). Callers test `IsEnabled` before building a message so `none` costs no formatting.
+8. **Shape:** base class library only, native-AOT safe, no `Microsoft.Extensions.Logging` or any other package. A small hand-rolled `IDiagnosticLog` (`bool IsEnabled(DiagnosticLogLevel)`, `void Write(DiagnosticLogLevel, string component, string message)`), the `DiagnosticLogLevel` enum and `NoDiagnosticLog` live in `Curl.Protocol.Abstractions.UnitLibrary` so every protocol library can take one without referencing another project (BL-938); the writer lives in `Curl.Output.UnitLibrary` (BL-917); `Curl.Console`'s composition root (`CurlComposition.cs`) constructs it and passes it by constructor and on `ITransferContext.DiagnosticLog`/`ConnectTarget.DiagnosticLog`, never through a static (BL-919). Callers test `IsEnabled` before building a message so `none` costs no formatting.
 9. **Libraries that do not reference the abstractions** (`Curl.Tls`, `Curl.Http2`, `Curl.Http3`, `Curl.Ntlm`, `Curl.Kerberos`, `Curl.Cryptography`, `Curl.Zstandard`) get no new project reference; their steps are logged at the call site in the library that uses them (`Curl.Networking`, `Curl.Protocol.Http`, `Curl.Authentication`).
 10. **Not in `--help` or `--manual`**, which stay byte-identical to curl 8.21.0; listed in `--ai-help` (BL-911, BL-918).
 
 ## Acceptance criteria
 
-- [ ] A new ADR exists in `Documentation/Planning/Decisions` with the next unused number (check the folder; 0221 was the lowest unused number at filing; duplicate numbers exist, so look for the number itself, not the file count), marked "Decided by Claude under Stewart's delegation", stating decisions 1 to 10 above and naming BL-916 to BL-929 as the tasks that build it.
+- [ ] A new ADR exists in `Documentation/Planning/Decisions` with the next unused number (check the folder; 0221 was the lowest unused number at filing; duplicate numbers exist, so look for the number itself, not the file count), marked "Decided by Claude under Stewart's delegation", stating decisions 1 to 10 above and naming BL-938 and BL-917 to BL-929 as the tasks that build it.
 - [ ] The ADR states the departure from real curl (exit 2 for the unknown option) and why it cannot break a working script, as the `--ai-help` departure is recorded.
 - [ ] The ADR is indexed in `Documentation/Planning/Decisions/README.md` with a one-line summary.
 - [ ] `Documentation/Product/Requirements.md` has a new FR row (next unused FR number) for `--log-level`/`--log-file`, stating the levels, the default `none` with zero extra bytes, the line format and the refusal of a bad level with exit 2, with status `Draft` and the ADR linked.

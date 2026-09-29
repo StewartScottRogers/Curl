@@ -4,7 +4,7 @@ title: Log SMTP, IMAP and POP3 session steps to the diagnostic log
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-916]
+depends-on: [BL-938]
 touches: [Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests, Curl.Protocol.Imap.UnitLibrary, Curl.Protocol.Imap.UnitTests, Curl.Protocol.Pop3.UnitLibrary, Curl.Protocol.Pop3.UnitTests]
 requirement: none
 created: 2026-09-29
@@ -18,7 +18,7 @@ The SMTP, IMAP and POP3 handlers write the diagnostic log (components `smtp`, `i
 
 ## Context
 
-- The rules are BL-915's ADR: levels (decision 2), components (6), never-logged values (7), and "test `IsEnabled` before building a message" (8). The contract is BL-916's `IDiagnosticLog` and `DiagnosticLogComponents`.
+- The rules are BL-937's ADR: levels (decision 2), components (6), never-logged values (7), and "test `IsEnabled` before building a message" (8). The contract is BL-938's `IDiagnosticLog` and `DiagnosticLogComponents`.
 - This task changes no `-v`, `--trace`, standard output or exit-code behaviour: every existing test in the touched test projects passes unmodified.
 - Tests use a hand-rolled `RecordingDiagnosticLog : IDiagnosticLog` in each touched test project (no mocking library), recording `(level, component, message)` at a configurable level. Tests are platform-neutral.
 - Where: `Curl.Protocol.Smtp.UnitLibrary`: `SmtpSession.cs`, `SmtpControlChannel.cs`, `SmtpSaslAuthentication.cs`, `SmtpMailTransaction.cs`, `SmtpCommandTransfer.cs`; `Curl.Protocol.Imap.UnitLibrary`: `ImapSession.cs`, `ImapControlChannel.cs`, `ImapAuthentication.cs`, `ImapAppend.cs`; `Curl.Protocol.Pop3.UnitLibrary`: `Pop3Session.cs`, `Pop3ControlChannel.cs`, `Pop3Login.cs`. Several of these wrap `ITransferContext`: each wrapper forwards `DiagnosticLog` from the context it wraps, and every `ConnectTarget` they build carries it.

@@ -4,7 +4,7 @@ title: Log retries, redirects, watchdog limits, HSTS and alt-svc decisions to th
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-916, BL-919]
+depends-on: [BL-938, BL-919]
 touches: [Curl.Core.UnitLibrary, Curl.Core.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-29
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-- The rules are BL-915's ADR: levels (decision 2), components (6), never-logged values (7), and "test `IsEnabled` before building a message" (8). The contract is BL-916's `IDiagnosticLog` and `DiagnosticLogComponents`.
+- The rules are BL-937's ADR: levels (decision 2), components (6), never-logged values (7), and "test `IsEnabled` before building a message" (8). The contract is BL-938's `IDiagnosticLog` and `DiagnosticLogComponents`.
 - This task changes no `-v`, `--trace`, standard output or exit-code behaviour: every existing test in the touched test projects passes unmodified.
 - Tests use a hand-rolled `RecordingDiagnosticLog : IDiagnosticLog` in each touched test project (no mocking library), recording `(level, component, message)` at a configurable level. Tests are platform-neutral.
 - Where: `TransferRetrier.cs`, `RetryPolicy.cs`, `RetryAfterHeader.cs` (each retry: reason, attempt number, delay), `RedirectFollower.cs` (each hop: status, target URL with any user info removed, method kept or changed; and `ITransferContext.DiagnosticLog` forwarded from the wrapped context), `RedirectPolicy.cs` (why a hop is refused), `MaxTimeWatchdog.cs` and `LowSpeedWatchdog.cs` (limit armed, limit hit), `Hsts/HstsTransferPolicy.cs` and `Hsts/HstsCache.cs` (an http URL upgraded, an entry stored or expired), `AltSvc/AltSvcCache.cs` (an alternative stored or used), `ProxySelector.cs`/`NoProxyMatcher.cs` (which proxy, or why none).

@@ -4,7 +4,7 @@ title: Log FTP and FTPS session steps to the diagnostic log in Curl.Protocol.Ftp
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-916]
+depends-on: [BL-938]
 touches: [Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests]
 requirement: none
 created: 2026-09-29
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-- The rules are BL-915's ADR: levels (decision 2), components (6), never-logged values (7), and "test `IsEnabled` before building a message" (8). The contract is BL-916's `IDiagnosticLog` and `DiagnosticLogComponents`.
+- The rules are BL-937's ADR: levels (decision 2), components (6), never-logged values (7), and "test `IsEnabled` before building a message" (8). The contract is BL-938's `IDiagnosticLog` and `DiagnosticLogComponents`.
 - This task changes no `-v`, `--trace`, standard output or exit-code behaviour: every existing test in the touched test projects passes unmodified.
 - Tests use a hand-rolled `RecordingDiagnosticLog : IDiagnosticLog` in each touched test project (no mocking library), recording `(level, component, message)` at a configurable level. Tests are platform-neutral.
 - Where: `FtpProtocolHandler.cs` (the handler builds its own `TransferContext`/`ConnectTarget` near lines 205 and, in `FtpSession.cs`, 976: set `DiagnosticLog` on each from the incoming context so the control and data connections log through `Curl.Networking`), `FtpSession.cs` (each state step), `FtpControlChannel.cs` (each command sent and reply code received), `FtpSessionConnections.cs` (passive or active, EPSV/PASV/EPRT/PORT chosen and fallbacks), `FtpTlsRequirements.cs` (AUTH TLS, PROT, CCC decisions), `FtpUrlPath.cs` and the `--ftp-method` walk, `FtpQuoteCommands.cs`.

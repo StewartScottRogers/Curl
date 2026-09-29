@@ -4,7 +4,7 @@ title: Log DICT, Gopher, TELNET and MQTT transfer steps to the diagnostic log
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-916]
+depends-on: [BL-938]
 touches: [Curl.Protocol.Dict.UnitLibrary, Curl.Protocol.Dict.UnitTests, Curl.Protocol.Gopher.UnitLibrary, Curl.Protocol.Gopher.UnitTests, Curl.Protocol.Telnet.UnitLibrary, Curl.Protocol.Telnet.UnitTests, Curl.Protocol.Mqtt.UnitLibrary, Curl.Protocol.Mqtt.UnitTests]
 requirement: none
 created: 2026-09-29
@@ -18,7 +18,7 @@ The DICT, Gopher, TELNET and MQTT handlers write the diagnostic log (components 
 
 ## Context
 
-- The rules are BL-915's ADR: levels (decision 2), components (6), never-logged values (7), and "test `IsEnabled` before building a message" (8). The contract is BL-916's `IDiagnosticLog` and `DiagnosticLogComponents`.
+- The rules are BL-937's ADR: levels (decision 2), components (6), never-logged values (7), and "test `IsEnabled` before building a message" (8). The contract is BL-938's `IDiagnosticLog` and `DiagnosticLogComponents`.
 - This task changes no `-v`, `--trace`, standard output or exit-code behaviour: every existing test in the touched test projects passes unmodified.
 - Tests use a hand-rolled `RecordingDiagnosticLog : IDiagnosticLog` in each touched test project (no mocking library), recording `(level, component, message)` at a configurable level. Tests are platform-neutral.
 - Where: `Curl.Protocol.Dict.UnitLibrary/DictProtocolHandler.cs` (builds a `ConnectTarget` near line 59; also wraps `ITransferContext`: forward `DiagnosticLog`) and `DictRequest.cs`; `Curl.Protocol.Gopher.UnitLibrary/GopherProtocolHandler.cs` (target near line 100); `Curl.Protocol.Telnet.UnitLibrary/TelnetProtocolHandler.cs` (target near line 111); `Curl.Protocol.Mqtt.UnitLibrary/MqttProtocolHandler.cs` (target near line 149), `MqttSession.cs`, `MqttPacketReader.cs`.
