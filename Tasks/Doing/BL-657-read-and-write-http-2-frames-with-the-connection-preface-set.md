@@ -31,3 +31,4 @@ An HTTP/2 connection layer in `Curl.Http2.UnitLibrary`, over a byte stream the c
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
