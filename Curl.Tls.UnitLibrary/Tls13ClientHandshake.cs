@@ -940,6 +940,13 @@ public sealed class Tls13ClientHandshake : IDisposable
         output.Install(TlsEncryptionLevel.Application, TlsTrafficDirection.Read, Schedule.DeriveServerApplicationTrafficSecret(masterSecret, serverFinishedHash));
         clientApplicationTrafficSecret = Schedule.DeriveClientApplicationTrafficSecret(masterSecret, serverFinishedHash);
         ExporterMasterSecret = Schedule.DeriveExporterMasterSecret(masterSecret, serverFinishedHash);
+        SendClientFinishedFlight(output);
+        return null;
+    }
+
+    /// <summary>Sends the client's last flight: EndOfEarlyData when accepted early data ends, the requested certificate, and Finished; then the connection is up.</summary>
+    private void SendClientFinishedFlight(Tls13HandshakeOutputBuilder output)
+    {
         if (EarlyDataAccepted && settings.SendEndOfEarlyData)
         {
             // RFC 8446 section 4.5: accepted early data ends, under the early keys, before the client's flight.
@@ -956,7 +963,6 @@ public sealed class Tls13ClientHandshake : IDisposable
         output.Install(TlsEncryptionLevel.Application, TlsTrafficDirection.Write, clientApplicationTrafficSecret);
         ResumptionMasterSecret = Schedule.DeriveResumptionMasterSecret(masterSecret, Transcript.GetCurrentHash());
         state = State.Connected;
-        return null;
     }
 
     private void SendClientCertificate(
@@ -1092,12 +1098,18 @@ public sealed class Tls13ClientHandshake : IDisposable
     /// <summary>Sends the next ClientHello: with an ECH offer the outer hello, whose inner hello the transcript holds until the server rejects it.</summary>
     private void SendClientHello(byte[]? cookie, Tls13HandshakeOutputBuilder output)
     {
-        KeyShareEntry[] entries = [.. shares.Select(share => share.Entry)];
-        ClientHello hello = ech?.Build(entries, cookie) ?? helloBuilder!.Build(entries, cookie, pskOffer, echGrease);
-        clientHello = pskOffer is null ? hello : BindPsk(hello);
+        clientHello = BuildClientHello(cookie);
         UseTranscriptHello(ech?.TranscriptHello ?? clientHello);
         transcript?.Append(clientHelloBytes);
         output.Send(TlsEncryptionLevel.Initial, clientHello.Encode());
+    }
+
+    /// <summary>Builds the ClientHello to send: the ECH outer hello or the plain one, its PSK binders filled in when a session is offered.</summary>
+    private ClientHello BuildClientHello(byte[]? cookie)
+    {
+        KeyShareEntry[] entries = [.. shares.Select(share => share.Entry)];
+        ClientHello hello = ech?.Build(entries, cookie) ?? helloBuilder!.Build(entries, cookie, pskOffer, echGrease);
+        return pskOffer is null ? hello : BindPsk(hello);
     }
 
     private void UseTranscriptHello(ClientHello hello)

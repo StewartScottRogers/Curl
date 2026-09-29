@@ -191,6 +191,11 @@ public sealed record Tls13ClientSettings
     {
         Require(!RequestOcspStatus || ExtensionOrder.Contains(TlsExtensionType.StatusRequest), "Asking for OCSP status needs status_request in the extension order.", nameof(ExtensionOrder));
         Require(CertificateCompressionAlgorithms.Count == 0 || ExtensionOrder.Contains(TlsExtensionType.CompressCertificate), "Offering certificate compression needs compress_certificate in the extension order.", nameof(ExtensionOrder));
+        ValidateOfferExtensionPlaces();
+    }
+
+    private void ValidateOfferExtensionPlaces()
+    {
         Require(ResumptionSession is null || ExtensionOrder.Contains(TlsExtensionType.PskKeyExchangeModes), "Resuming a session needs psk_key_exchange_modes in the extension order.", nameof(ExtensionOrder));
         Require(!OfferEarlyData || ExtensionOrder.Contains(TlsExtensionType.EarlyData), "Offering early data needs early_data in the extension order.", nameof(ExtensionOrder));
         Require(
