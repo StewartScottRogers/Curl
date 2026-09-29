@@ -61,7 +61,7 @@ handshake. HPKE (RFC 9180) is `Curl.Cryptography`'s `Hpke` (BL-677).
 7. **No resumption with an offer.** A hello offering ECH to a config does not offer
    `ResumptionSession`: resuming inside ECH needs the outer hello to carry a GREASE
    `pre_shared_key` and the ServerHello's `pre_shared_key` judged against whichever hello
-   won, which BL-954 builds. GREASE hellos resume as any other.
+   won, which BL-960 builds. GREASE hellos resume as any other.
 
 ## Alternatives considered
 
@@ -84,4 +84,4 @@ handshake. HPKE (RFC 9180) is `Curl.Cryptography`'s `Hpke` (BL-677).
 - BL-711 builds `--ech` on `EncryptedClientHelloConfigs`, `SendEncryptedClientHelloGrease`,
   `EncryptedClientHelloOffered`, `EncryptedClientHelloAccepted`,
   `EncryptedClientHelloRetryConfigs` and the `EchRequired` failure.
-- BL-954 adds resumption inside an ECH offer.
+- BL-960 adds resumption inside an ECH offer.

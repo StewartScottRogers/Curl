@@ -42,7 +42,7 @@ The hand-built TLS 1.3 client offers Encrypted Client Hello from an ECHConfigLis
   P-256 key) in front of `Tls13TestServer` (`ConfirmEch`, `EchRetryConfigs`). The GREASE
   extension is pinned byte for byte from `ReplayTlsRandomSource`; the inner and outer
   hellos themselves are checked field by field (SNI, session ID, versions, padding to 32).
-- Sensible default taken: an ECH offer offers no session to resume; filed as BL-954.
+- Sensible default taken: an ECH offer offers no session to resume; filed as BL-960.
 - `touches` gained `Documentation/Planning/Decisions` for ADR-0233 and its index row; no
   task in Doing names it.
 - Results: 1163 `Curl.Tls.UnitTests` pass (57 new); `Measure-CodeQuality.ps1 -Library

@@ -186,7 +186,7 @@ TLS-SRP (BL-704, ADR-0229), and Encrypted Client Hello (BL-706, ADR-0233).
   verifies the chain for the public name, keeps `EncryptedClientHelloRetryConfigs` and
   fails with `EchRequired` after the server's Finished. `SendEncryptedClientHelloGrease`
   sends GREASE when no config is supported. An ECH offer offers no session to resume
-  (BL-954). `EncryptedClientHelloExtension` is the extension codec.
+  (BL-960). `EncryptedClientHelloExtension` is the extension codec.
 - `ITlsRandomSource` supplies the random, session ID, key shares, DHE exponent, SRP private value, RSA
   pre-master secret and ECH's inner random, HPKE ephemeral key and GREASE bytes;
   `SystemTlsRandomSource` is the production one.

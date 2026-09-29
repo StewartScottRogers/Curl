@@ -1,5 +1,5 @@
 ---
-id: BL-954
+id: BL-960
 title: Resume a TLS 1.3 session inside an Encrypted Client Hello offer
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-954 — Resume a TLS 1.3 session inside an Encrypted Client Hello offer
+# BL-960 — Resume a TLS 1.3 session inside an Encrypted Client Hello offer
 
 ## Goal
 
