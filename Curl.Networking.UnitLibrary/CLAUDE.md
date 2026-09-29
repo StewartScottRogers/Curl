@@ -26,7 +26,13 @@ a copy of `Curl.Tls.UnitTests`' in-memory TLS 1.3 server and OCSP response build
 implement `ITlsProviderWithWarnings`. `HandBuiltTlsProvider` runs `TlsClientConnection` (one
 ClientHello offering TLS 1.3 and TLS 1.2, TLS 1.2 the default minimum, ADR-0205) for a range
 spanning both, `Tls13ClientConnection` for a TLS 1.3 minimum and `Tls12ClientConnection` for a
-ceiling below TLS 1.3, over the internal `ConnectionStream`, and returns a `HandBuiltTlsConnection`. Both providers judge the server's certificate with
+ceiling below TLS 1.3, over the internal `ConnectionStream`, and returns a `HandBuiltTlsConnection`.
+Per ADR-0222 (BL-820) its ClientHello is the platform curl's measured profile, `ClientHelloProfile.Schannel`
+for the Schannel build and `ClientHelloProfile.OpenSsl` for the OpenSSL build, turned into the TLS
+settings by `ClientHelloProfileMapping`: the profile's extension order and fixed extensions, its lists
+cut to the signature schemes and groups the client can honour, and the options changing only the lists
+(below a TLS 1.3 ceiling the order stays `Curl.Tls`'s, BL-918). `HandBuiltTlsProviderTests.ClientHello`
+captures the first record and rebuilds it from the profile. Both providers judge the server's certificate with
 `ServerCertificateVerification` (trust anchors, tolerated chain errors, each build's name check,
 exit 60 and 77); the hand-built path reaches it through `HandBuiltCertificateVerifier`, which
 builds the chain and the `SslPolicyErrors` `SslStream` would. Both load `--cert` through

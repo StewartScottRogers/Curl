@@ -110,7 +110,10 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
 
     private bool OffersBelowTls13 => _options.MinimumVersion is not TlsVersion.Tls13;
 
-    private bool OffersOnlyVersionsBelowTls12 => _options.MaximumVersion is TlsVersion.Tls10 or TlsVersion.Tls11;
+    // The platform curl's measured ClientHello (ADR-0140, "Default ClientHello"; BL-820).
+    private ClientHelloProfile Profile => _matchesSchannelBuild ? ClientHelloProfile.Schannel : ClientHelloProfile.OpenSsl;
+
+    private bool OffersOnlyVersionsBelowTls12 =>_options.MaximumVersion is TlsVersion.Tls10 or TlsVersion.Tls11;
 
     /// <inheritdoc />
     public ValueTask<ConnectResult> AuthenticateAsClientAsync(
@@ -284,7 +287,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         {
             var (chainPolicy, anchorsBesideSystemStore, revocationLists) = _verification.ReadTrustAnchors();
             return (new PreparedHandshake(
-                ClientSettings.Of(targetHost, offeredApplicationProtocols, suites, ToTlsClientCertificate(clientCertificate)) with
+                ClientSettings.Of(targetHost, offeredApplicationProtocols, suites, ToTlsClientCertificate(clientCertificate), Profile) with
                 {
                     RequestOcspStatus = _options.RequireCertificateStatus,
                     TimeProvider = _timeProvider,
@@ -418,57 +421,69 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         X509Certificate2? ClientCertificate,
         HandBuiltCertificateVerifier Verifier);
 
-    // What the ClientHello offers, before the TLS 1.3 or TLS 1.2 client is chosen.
+    // What the ClientHello offers, before the TLS 1.3 or TLS 1.2 client is chosen: the
+    // platform curl's profile (BL-820), its suites replaced by the cipher options' when given.
     private sealed record ClientSettings(
         string? ServerName,
         IReadOnlyList<string> ApplicationProtocols,
         IReadOnlyList<ushort>? CipherSuites,
-        TlsClientCertificate? ClientCertificate)
+        TlsClientCertificate? ClientCertificate,
+        ClientHelloProfile Profile)
     {
         // --cert-status: ask for a stapled OCSP response and judge it on this clock.
         internal bool RequestOcspStatus { get; init; }
 
         internal TimeProvider TimeProvider { get; init; } = TimeProvider.System;
 
+        private IReadOnlyList<ushort> OfferedSuites => CipherSuites ?? Profile.CipherSuites;
+
         internal static ClientSettings Of(
             string targetHost,
             IReadOnlyList<string> applicationProtocols,
             IReadOnlyList<ushort>? cipherSuites,
-            TlsClientCertificate? clientCertificate) =>
-            new(ServerNameFor(targetHost), applicationProtocols, cipherSuites, clientCertificate);
+            TlsClientCertificate? clientCertificate,
+            ClientHelloProfile profile) =>
+            new(ServerNameFor(targetHost), applicationProtocols, cipherSuites, clientCertificate, profile);
 
-        internal Tls13ClientSettings ToTls13()
+        // Both builds send a 32-byte legacy session ID (middlebox compatibility mode).
+        internal Tls13ClientSettings ToTls13() => new()
         {
-            var settings = new Tls13ClientSettings
-            {
-                ServerName = ServerName,
-                ApplicationProtocols = ApplicationProtocols,
-                ClientCertificate = ClientCertificate,
-                RequestOcspStatus = RequestOcspStatus,
-                TimeProvider = TimeProvider,
-            };
-            return CipherSuites is null ? settings : settings with { CipherSuites = [.. CipherSuites.Where(Tls13RecordProtection.CanProtect)] };
-        }
+            ServerName = ServerName,
+            ApplicationProtocols = ApplicationProtocols,
+            ClientCertificate = ClientCertificate,
+            RequestOcspStatus = RequestOcspStatus,
+            TimeProvider = TimeProvider,
+            CipherSuites = [.. OfferedSuites.Where(Tls13RecordProtection.CanProtect)],
+            SupportedGroups = Profile.SupportedGroups,
+            KeyShareGroups = Profile.KeyShareGroups,
+            SignatureAlgorithms = ClientHelloProfileMapping.CheckableSignatureAlgorithms(Profile),
+            CertificateCompressionAlgorithms = Profile.CertificateCompressionAlgorithms,
+            ExtensionOrder = ClientHelloProfileMapping.ExtensionOrder(Profile, RequestOcspStatus),
+            FixedExtensions = ClientHelloProfileMapping.FixedExtensions(Profile),
+            SendLegacySessionId = true,
+        };
 
-        // Whether the suites to offer include one the predicate accepts; the defaults always do.
+        // Whether the suites to offer include one the predicate accepts; the profiles always do.
         internal bool OffersSuiteFor(Func<ushort, bool> canProtect) => CipherSuites?.Any(canProtect) ?? true;
 
         // A range that reaches TLS 1.3 offers TLS 1.2 as its ceiling below it, and with no
         // minimum starts at TLS 1.2, curl's default minimum since 8.10.0 (ADR-0205).
-        internal Tls12ClientSettings ToTls12(TlsClientOptions options)
+        internal Tls12ClientSettings ToTls12(TlsClientOptions options) => new()
         {
-            var settings = new Tls12ClientSettings
-            {
-                ServerName = ServerName,
-                MinimumVersion = Tls12Minimum(options),
-                MaximumVersion = Tls12Maximum(options),
-                ApplicationProtocols = ApplicationProtocols,
-                ClientCertificate = ClientCertificate,
-                RequestOcspStatus = RequestOcspStatus,
-                TimeProvider = TimeProvider,
-            };
-            return CipherSuites is null ? settings : settings with { CipherSuites = [.. CipherSuites.Where(IsTls12Suite)] };
-        }
+            ServerName = ServerName,
+            MinimumVersion = Tls12Minimum(options),
+            MaximumVersion = Tls12Maximum(options),
+            ApplicationProtocols = ApplicationProtocols,
+            ClientCertificate = ClientCertificate,
+            RequestOcspStatus = RequestOcspStatus,
+            TimeProvider = TimeProvider,
+            CipherSuites = [.. OfferedSuites.Where(IsTls12Suite)],
+            SupportedGroups = ClientHelloProfileMapping.Tls12SupportedGroups(Profile),
+            SignatureAlgorithms = ClientHelloProfileMapping.Tls12SignatureAlgorithms(Profile),
+            OfferSessionTicket = ClientHelloProfileMapping.Sends(Profile, TlsExtensionType.SessionTicket),
+            OfferExtendedMasterSecret = ClientHelloProfileMapping.Sends(Profile, TlsExtensionType.ExtendedMasterSecret),
+            OfferEncryptThenMac = ClientHelloProfileMapping.Sends(Profile, TlsExtensionType.EncryptThenMac),
+        };
 
         private static bool ReachesTls13(TlsClientOptions options) => options.MaximumVersion is TlsVersion.SystemDefault or TlsVersion.Tls13;
 
