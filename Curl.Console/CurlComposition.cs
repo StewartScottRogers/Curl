@@ -400,7 +400,13 @@ internal static class CurlComposition
     /// <c>curl/8.21.0</c> without <c>-A</c>; the proxy credential encoded as the server
     /// credential is (<see cref="CredentialEncoding.ForPlatform" />, ADR-0022); and the
     /// <c>--proxy-header</c> values verbatim, never the <c>-H</c> ones (ADR-0077); the
-    /// <c>-A</c> and <c>--proxy-header</c> text encoded in that same platform encoding (ADR-0067).
+    /// <c>-A</c> and <c>--proxy-header</c> text encoded in that same platform encoding (ADR-0067);
+    /// and the proxy authenticated with the scheme the <c>--proxy-*</c> auth switches pick
+    /// (<see cref="CommandLineOptions.ProxyAuthSchemes" />), answered by the same
+    /// <see cref="CreateHttpAuthenticator" /> the origin uses: Basic up front, Digest and
+    /// <c>--proxy-anyauth</c> after a <c>407</c> (ADR-0186). Its Negotiate and NTLM contexts come
+    /// from a <see cref="SystemSecurityContextFactory" />, though the authenticator answers neither
+    /// for a proxy yet (BL-604).
     /// </summary>
     /// <param name="options">The parsed command line.</param>
     /// <returns>The tunnel's options.</returns>
@@ -416,6 +422,8 @@ internal static class CurlComposition
         {
             ProxyHeaders = options.ProxyHeaders,
             CommandLineTextEncoding = CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()),
+            ProxyAuthSchemes = options.ProxyAuthSchemes,
+            ProxyAuthenticator = CreateHttpAuthenticator(new SystemSecurityContextFactory()),
         };
 
     /// <summary>

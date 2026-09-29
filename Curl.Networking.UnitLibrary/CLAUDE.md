@@ -129,7 +129,12 @@ exit 6 (exit 5 for a proxy). A looked-up answer is cached and reported with the 
 (`ProxyKind.Http`, `Http10`) per ADR-0023: `HttpProxyTunnel` writes curl 8.21.0's CONNECT
 request (its `User-Agent`, credential encoding and `--proxy-header` values from `HttpProxyTunnelOptions`, ADR-0077) and reads
 the reply one byte at a time, so the tunnel's bytes stay on the connection; TLS then runs
-over the tunnel for an https target. Through a SOCKS proxy (`Socks4`, `Socks4a`, `Socks5`,
+over the tunnel for an https target. Per ADR-0186 (BL-602) the CONNECT's `Proxy-Authorization`
+comes from `HttpProxyTunnelOptions.ProxyAuthenticator` (`PreemptiveBasicProxyAuthenticator`
+when none is given) for `ProxyAuthSchemes`: asked first with no challenge, and after a `407` to a
+CONNECT that sent none with its `Proxy-Authenticate` values, the answer sent on the same
+connection after the `Content-Length` body unless the reply closes it or is chunked, else on a
+newly dialled one. A `407` to a CONNECT that sent a credential is exit 7. Through a SOCKS proxy (`Socks4`, `Socks4a`, `Socks5`,
 `Socks5Hostname`) `SocksProxyTunnel` runs curl 8.21.0's handshake, measured byte for byte
 (BL-213): `Socks4Handshake` resolves the target locally and sends its first IPv4 address,
 SOCKS4a sends the host as written; `Socks5Handshake` offers no authentication and GSSAPI (and

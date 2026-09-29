@@ -592,47 +592,102 @@ public sealed class TcpConnector(
         }
 
         var nameResolved = timeProvider.GetTimestamp();
-        var (dialed, lastDialError) = await DialFirstReachableAsync(addresses, proxy.Port, proxy.Host, target.Events, cancellationToken).ConfigureAwait(false);
-        if (dialed is null)
+        var proxyAuthorization = await CreateProxyAuthorizationAsync(destination, proxy, [], cancellationToken).ConfigureAwait(false);
+        while (true)
         {
-            var elapsedMilliseconds = (long)timeProvider.GetElapsedTime(nameResolved).TotalMilliseconds;
-            return DialFailure(
-                target.Events,
-                lastDialError,
-                new ConnectTimings(started, nameResolved, null, null),
-                $"Failed to connect to {target.Host}:{target.Port} over proxy {proxy.Host} after {elapsedMilliseconds} ms: Could not connect to server");
-        }
+            // A 407 answered on a connection the proxy closes is sent again on a new one, as
+            // curl 8.21.0 connects again ("Connect me again please", BL-602 Notes).
+            var (result, redialAuthorization) = await DialAndOpenThroughProxyAsync(
+                addresses, target, destination, proxy, started, nameResolved, proxyAuthorization, cancellationToken).ConfigureAwait(false);
+            if (result is not null)
+            {
+                return result;
+            }
 
-        return proxy.Kind switch
-        {
-            ProxyKind.Http or ProxyKind.Http10 => await OpenTunnelAsync(dialed, target, destination, proxy, started, nameResolved, cancellationToken).ConfigureAwait(false),
-            ProxyKind.Https => await OpenTunnelOverTlsAsync(dialed, target, destination, proxy, started, nameResolved, cancellationToken).ConfigureAwait(false),
-            _ => await OpenSocksTunnelAsync(dialed, target, destination, proxy, new ConnectTimings(started, nameResolved, 0, null), cancellationToken).ConfigureAwait(false),
-        };
+            proxyAuthorization = redialAuthorization;
+        }
     }
 
-    private async ValueTask<ConnectResult> OpenTunnelOverTlsAsync(
-        DialedSocket dialed,
+    /// <summary>
+    /// Dials the proxy and opens the tunnel through it, sending
+    /// <paramref name="proxyAuthorization" /> on the first CONNECT: the connect's result, or
+    /// <see langword="null" /> with the <c>Proxy-Authorization</c> to send on a new connection
+    /// when the proxy challenged and closed this one.
+    /// </summary>
+    private async ValueTask<(ConnectResult? Result, string? RedialAuthorization)> DialAndOpenThroughProxyAsync(
+        IReadOnlyList<IPAddress> addresses,
         ConnectTarget target,
         ConnectDestination destination,
         ProxyEndpoint proxy,
         long started,
         long nameResolved,
+        string? proxyAuthorization,
+        CancellationToken cancellationToken)
+    {
+        var (dialed, lastDialError) = await DialFirstReachableAsync(addresses, proxy.Port, proxy.Host, target.Events, cancellationToken).ConfigureAwait(false);
+        if (dialed is null)
+        {
+            var elapsedMilliseconds = (long)timeProvider.GetElapsedTime(nameResolved).TotalMilliseconds;
+            return (DialFailure(
+                target.Events,
+                lastDialError,
+                new ConnectTimings(started, nameResolved, null, null),
+                $"Failed to connect to {target.Host}:{target.Port} over proxy {proxy.Host} after {elapsedMilliseconds} ms: Could not connect to server"), null);
+        }
+
+        var tunnel = new TunnelRequest(target, destination, proxy, started, nameResolved);
+        return proxy.Kind switch
+        {
+            ProxyKind.Http or ProxyKind.Http10 => await OpenTunnelAsync(dialed, tunnel, proxyAuthorization, cancellationToken).ConfigureAwait(false),
+            ProxyKind.Https => await OpenTunnelOverTlsAsync(dialed, tunnel, proxyAuthorization, cancellationToken).ConfigureAwait(false),
+            _ => (await OpenSocksTunnelAsync(dialed, target, destination, proxy, new ConnectTimings(started, nameResolved, 0, null), cancellationToken).ConfigureAwait(false), null),
+        };
+    }
+
+    /// <summary>
+    /// Asks <see cref="HttpProxyTunnelOptions.ProxyAuthenticator" /> for the CONNECT's
+    /// <c>Proxy-Authorization</c> to <paramref name="destination" />: with no challenges for the
+    /// first CONNECT, with a <c>407</c>'s <c>Proxy-Authenticate</c> values after one.
+    /// </summary>
+    private ValueTask<string?> CreateProxyAuthorizationAsync(
+        ConnectDestination destination,
+        ProxyEndpoint proxy,
+        IReadOnlyList<string> challenges,
+        CancellationToken cancellationToken)
+    {
+        var authority = HttpProxyTunnel.FormatAuthority(destination.Host, destination.Port);
+        var scheme = proxy.Kind == ProxyKind.Https ? "https" : "http";
+        var request = new HttpAuthRequest(
+            "CONNECT",
+            CurlUrl.Parse($"{scheme}://{HttpProxyTunnel.FormatAuthority(proxy.Host, proxy.Port)}/"),
+            authority,
+            proxy.Credential,
+            null,
+            _proxyTunnelOptions.ProxyAuthSchemes,
+            IsProxy: true);
+        var authenticator = _proxyTunnelOptions.ProxyAuthenticator ?? new PreemptiveBasicProxyAuthenticator(_proxyTunnelOptions.CredentialEncoding);
+        return authenticator.CreateAuthorizationAsync(request, challenges, cancellationToken);
+    }
+
+    private async ValueTask<(ConnectResult? Result, string? RedialAuthorization)> OpenTunnelOverTlsAsync(
+        DialedSocket dialed,
+        TunnelRequest tunnel,
+        string? proxyAuthorization,
         CancellationToken cancellationToken)
     {
         // curl 8.21.0 verifies the proxy against its own host name and reports a failed
         // handshake to it with the same exit code and message as one to a target (measured).
         // It verifies with the --proxy-* TLS options, not -k or --cacert, so the proxy's own
         // provider runs this handshake (ADR-0061).
-        var securedProxy = await AuthenticateAsync(_proxyTlsProvider, dialed.Connection, proxy.Host, target.Events, isProxy: true, applicationProtocols: [], cancellationToken).ConfigureAwait(false);
+        var securedProxy = await AuthenticateAsync(_proxyTlsProvider, dialed.Connection, tunnel.Proxy.Host, tunnel.Target.Events, isProxy: true, applicationProtocols: [], cancellationToken).ConfigureAwait(false);
         if (securedProxy.Connection is not { } proxyConnection)
         {
-            return securedProxy;
+            return (securedProxy, null);
         }
 
         // CONNECT and the target's TLS run over the proxy's TLS; the socket's local end point stays.
         var securedDialed = dialed with { Connection = proxyConnection };
-        return await OpenTunnelAsync(securedDialed, target, destination, proxy, started, nameResolved, cancellationToken).ConfigureAwait(false);
+        return await OpenTunnelAsync(securedDialed, tunnel, proxyAuthorization, cancellationToken).ConfigureAwait(false);
     }
 
     private async ValueTask<ConnectResult> OpenSocksTunnelAsync(
@@ -657,39 +712,91 @@ public sealed class TcpConnector(
         return await SecureWhenAskedAsync(dialed, target, timings with { Connected = timeProvider.GetTimestamp() }, 0, cancellationToken).ConfigureAwait(false);
     }
 
-    private async ValueTask<ConnectResult> OpenTunnelAsync(
+    /// <summary>
+    /// Sends CONNECT with <paramref name="proxyAuthorization" /> and, when the proxy answers
+    /// <c>407</c> to one that sent none and the authenticator answers its challenge, sends it
+    /// again with that answer, as curl 8.21.0 does (BL-602): on this connection when the reply
+    /// leaves it reusable, else by returning the answer for a new one. A <c>407</c> to a CONNECT
+    /// that sent a credential is the tunnel's failure.
+    /// </summary>
+    private async ValueTask<(ConnectResult? Result, string? RedialAuthorization)> OpenTunnelAsync(
         DialedSocket dialed,
-        ConnectTarget target,
-        ConnectDestination destination,
-        ProxyEndpoint proxy,
-        long started,
-        long nameResolved,
+        TunnelRequest tunnel,
+        string? proxyAuthorization,
         CancellationToken cancellationToken)
     {
         var connection = dialed.Connection;
-        var (reply, exception) = await RequestTunnelAsync(connection, destination, proxy, cancellationToken).ConfigureAwait(false);
-        if (exception is not null || !reply.OpensTunnel)
+        while (true)
         {
-            // The proxy connection is disposed whether CONNECT failed or could not be sent or read.
-            await connection.DisposeAsync().ConfigureAwait(false);
-            exception?.Throw();
-            return TunnelFailure(reply);
+            var (reply, exception) = await RequestTunnelAsync(connection, tunnel.Destination, tunnel.Proxy, proxyAuthorization, cancellationToken).ConfigureAwait(false);
+            if (exception is null && reply.OpensTunnel)
+            {
+                // For a tunnel, %{time_connect} is when the tunnel is open (ConnectTimings.Connected).
+                var timings = new ConnectTimings(tunnel.Started, tunnel.NameResolved, timeProvider.GetTimestamp(), null);
+                return (await SecureWhenAskedAsync(dialed, tunnel.Target, timings, reply.StatusCode, cancellationToken).ConfigureAwait(false), null);
+            }
+
+            var (answer, onThisConnection) = exception is null
+                ? await AnswerProxyChallengeAsync(connection, reply, tunnel, proxyAuthorization, cancellationToken).ConfigureAwait(false)
+                : (null, false);
+            if (!onThisConnection)
+            {
+                return await CloseUnopenedTunnelAsync(connection, reply, exception, answer).ConfigureAwait(false);
+            }
+
+            proxyAuthorization = answer;
+        }
+    }
+
+    /// <summary>
+    /// Disposes the proxy connection whether CONNECT failed, could not be sent or read, or is
+    /// to be sent again on a new connection; then rethrows, or returns the tunnel's failure, or
+    /// <paramref name="redialAuthorization" /> for the new connection.
+    /// </summary>
+    private static async ValueTask<(ConnectResult? Result, string? RedialAuthorization)> CloseUnopenedTunnelAsync(
+        IConnection connection,
+        HttpProxyTunnelReply reply,
+        ExceptionDispatchInfo? exception,
+        string? redialAuthorization)
+    {
+        await connection.DisposeAsync().ConfigureAwait(false);
+        exception?.Throw();
+        return redialAuthorization is null ? (TunnelFailure(reply), null) : (null, redialAuthorization);
+    }
+
+    /// <summary>
+    /// The <c>Proxy-Authorization</c> that answers <paramref name="reply" />, and whether it goes
+    /// on the same connection, its body discarded: none unless the reply is a <c>407</c> to a
+    /// CONNECT that sent none, as curl 8.21.0 gives up on a credential sent and challenged again.
+    /// </summary>
+    private async ValueTask<(string? Answer, bool OnThisConnection)> AnswerProxyChallengeAsync(
+        IConnection connection,
+        HttpProxyTunnelReply reply,
+        TunnelRequest tunnel,
+        string? sentAuthorization,
+        CancellationToken cancellationToken)
+    {
+        if (sentAuthorization is not null || reply.StatusCode != 407)
+        {
+            return (null, false);
         }
 
-        // For a tunnel, %{time_connect} is when the tunnel is open (ConnectTimings.Connected).
-        var timings = new ConnectTimings(started, nameResolved, timeProvider.GetTimestamp(), null);
-        return await SecureWhenAskedAsync(dialed, target, timings, reply.StatusCode, cancellationToken).ConfigureAwait(false);
+        var answer = await CreateProxyAuthorizationAsync(tunnel.Destination, tunnel.Proxy, reply.ProxyAuthenticate, cancellationToken).ConfigureAwait(false);
+        return (answer, answer is not null
+            && reply.LeavesConnectionReusable
+            && await HttpProxyTunnel.DiscardBodyAsync(connection, reply.ContentLength, cancellationToken).ConfigureAwait(false));
     }
 
     private async ValueTask<(HttpProxyTunnelReply Reply, ExceptionDispatchInfo? Exception)> RequestTunnelAsync(
         IConnection connection,
         ConnectDestination destination,
         ProxyEndpoint proxy,
+        string? proxyAuthorization,
         CancellationToken cancellationToken)
     {
         try
         {
-            await connection.WriteAsync(HttpProxyTunnel.BuildConnectRequest(destination.Host, destination.Port, proxy, _proxyTunnelOptions), cancellationToken).ConfigureAwait(false);
+            await connection.WriteAsync(HttpProxyTunnel.BuildConnectRequest(destination.Host, destination.Port, proxy, _proxyTunnelOptions, proxyAuthorization), cancellationToken).ConfigureAwait(false);
             await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
             return (await HttpProxyTunnel.ReadReplyAsync(connection, cancellationToken).ConfigureAwait(false), null);
         }
@@ -912,6 +1019,17 @@ public sealed class TcpConnector(
         string HostName,
         IPEndPoint? RemoteEndPoint,
         string? UnixSocketRemoteIp = null);
+
+    /// <summary>
+    /// What a CONNECT tunnel is opened for: the target, the destination named in the CONNECT,
+    /// the proxy, and the connect's start and lookup timestamps.
+    /// </summary>
+    private sealed record TunnelRequest(
+        ConnectTarget Target,
+        ConnectDestination Destination,
+        ProxyEndpoint Proxy,
+        long Started,
+        long NameResolved);
 
     /// <summary>
     /// One key of curl's DNS cache: the host as it was cached (the name looked up, or a

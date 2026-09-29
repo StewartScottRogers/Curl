@@ -324,6 +324,40 @@ public sealed class CurlCompositionProxyTests
     }
 
     [TestMethod]
+    [DataRow(new[] { "-p", "-x", "127.0.0.1:18602", "http://example.com/a" }, HttpAuthSchemes.Basic)]
+    [DataRow(new[] { "--proxy-digest", "-p", "-x", "127.0.0.1:18602", "http://example.com/a" }, HttpAuthSchemes.Digest)]
+    [DataRow(new[] { "--proxy-anyauth", "-p", "-x", "127.0.0.1:18602", "http://example.com/a" }, HttpAuthSchemes.Any)]
+    public void CreateProxyTunnelOptions_AllowsTheSchemeTheProxyAuthSwitchesPickAndAnswersWithTheRankedAuthenticator(string[] arguments, HttpAuthSchemes expected)
+    {
+        HttpProxyTunnelOptions options = TunnelOptionsFor(arguments);
+
+        Assert.AreEqual(expected, options.ProxyAuthSchemes);
+        Assert.IsInstanceOfType<RankedHttpAuthenticator>(options.ProxyAuthenticator);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_ProxyTunnelWithProxyAnyAuth_AnswersTheProxysBasicChallengeOnTheSameConnection()
+    {
+        // curl -p -x http://127.0.0.1:18602 -U u:p --proxy-anyauth http://example.test/ against a 407 offering Basic (BL-602 Notes).
+        ScriptedConnector server = new(
+        [
+            Latin1("HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Basic realm=\"r\"\r\nContent-Length: 0\r\n\r\n"),
+            Latin1(ConnectionEstablished),
+            Latin1(Hello),
+        ]);
+        string[] arguments = ["-sS", "-p", "-U", "u:p", "--proxy-anyauth", "-x", "127.0.0.1:18238", "http://example.com/a"];
+
+        Run run = await RunThroughTcpConnectorAsync(server, TunnelOptionsFor(arguments), arguments);
+
+        Assert.AreEqual(0, run.ExitCode);
+        Assert.StartsWith(
+            "CONNECT example.com:80 HTTP/1.1\r\nHost: example.com:80\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n\r\n"
+            + "CONNECT example.com:80 HTTP/1.1\r\nHost: example.com:80\r\nProxy-Authorization: Basic dTpw\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n\r\n"
+            + "GET /a HTTP/1.1\r\n",
+            Latin1(server.Written));
+    }
+
+    [TestMethod]
     public async Task RunAsync_ProxyTunnelWithEmptyUserAgentOption_ConnectRequestHasNoUserAgent()
     {
         ScriptedConnector server = new([Latin1(ConnectionEstablished), Latin1(Hello)]);
