@@ -8,7 +8,7 @@ namespace Curl.Cryptography;
 /// </summary>
 /// <remarks>
 /// GHASH is constant-time and the received tag is compared in fixed time, but
-/// <see cref="Aria" /> indexes its S-boxes and is not constant-time (ADR-0146). The key
+/// <see cref="Aria" /> indexes its S-boxes and is not constant-time (ADR-0147). The key
 /// schedule and the hash subkey are zeroed by <see cref="Dispose" />.
 /// </remarks>
 public sealed class AeadAriaGcm : IDisposable

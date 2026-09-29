@@ -49,7 +49,7 @@ Namespace `Curl.Cryptography`. It holds:
   `EncryptBlock`, the one operation GCM needs; `Aria` implements it.
 - `Aria` (public, `IDisposable`): RFC 5794, keys of 16, 24 or 32 bytes - `EncryptBlock`
   and `DecryptBlock`, plus the internal SL1/SL2 (`Substitute`), A (`Diffuse`) and FO/FE
-  (`Round`) functions. Not constant-time (ADR-0146).
+  (`Round`) functions. Not constant-time (ADR-0147).
 - `GaloisCounterMode` (internal, `IDisposable`): NIST SP 800-38D GCM over any
   `IBlockCipher` - 12-byte nonce, 16-byte tag, `Encrypt` and `TryDecrypt`, plus the
   constant-time GF(2^128) `Multiply` of GHASH. Tested over the BCL's AES against `AesGcm`.
@@ -107,7 +107,7 @@ to BL-745).
   secret: select and swap with masks (`ConstantTime`), fixed-width limbs, never `/`, `%`
   or `BigInteger` on a secret. Compare tags and MACs with
   `CryptographicOperations.FixedTimeEquals`. Each public type says in its XML docs
-  whether it is constant-time; Blowfish, CAST-128, RC4, Camellia (ADR-0145) and ARIA (ADR-0146) are not,
+  whether it is constant-time; Blowfish, CAST-128, RC4, Camellia (ADR-0145) and ARIA (ADR-0147) are not,
   by design, and say so.
 - **Zeroing.** Every secret, `stackalloc` temporaries and intermediate key material
   included, is cleared with `CryptographicOperations.ZeroMemory` in a `finally` block or

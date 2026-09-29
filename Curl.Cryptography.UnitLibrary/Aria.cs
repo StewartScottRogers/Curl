@@ -13,7 +13,7 @@ namespace Curl.Cryptography;
 /// </summary>
 /// <remarks>
 /// Not constant-time: the substitution layers index ARIA's fixed S-boxes with key-mixed
-/// data bytes, as OpenSSL's own ARIA does (ADR-0146); it exists because curl's OpenSSL
+/// data bytes, as OpenSSL's own ARIA does (ADR-0147); it exists because curl's OpenSSL
 /// builds offer the ARIA suites (ADR-0140). The round keys are held in the instance and
 /// zeroed by <see cref="Dispose" />.
 /// </remarks>
