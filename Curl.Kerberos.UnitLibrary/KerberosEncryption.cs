@@ -54,9 +54,15 @@ public abstract class KerberosEncryption
     public static KerberosEncryption Create(KerberosEncryptionType encryptionType, IKerberosRandomSource randomSource) => encryptionType switch
     {
         KerberosEncryptionType.Des3CbcSha1 => new Des3CbcSha1KerberosEncryption(randomSource),
-        KerberosEncryptionType.Aes128CtsHmacSha196 or KerberosEncryptionType.Aes256CtsHmacSha196 => AesSha1KerberosEncryption.ForType(encryptionType, randomSource),
-        KerberosEncryptionType.Aes128CtsHmacSha256128 or KerberosEncryptionType.Aes256CtsHmacSha384192 => AesSha2KerberosEncryption.ForType(encryptionType, randomSource),
         KerberosEncryptionType.Rc4Hmac => new Rc4HmacKerberosEncryption(randomSource),
+        KerberosEncryptionType.Aes128CtsHmacSha196 or KerberosEncryptionType.Aes256CtsHmacSha196 => AesSha1KerberosEncryption.ForType(encryptionType, randomSource),
+        _ => CreateNewerThanRfc3962(encryptionType, randomSource),
+    };
+
+    /// <summary>Gives the RFC 8009 AES or RFC 6803 Camellia encryption type numbered <paramref name="encryptionType" />.</summary>
+    private static KerberosEncryption CreateNewerThanRfc3962(KerberosEncryptionType encryptionType, IKerberosRandomSource randomSource) => encryptionType switch
+    {
+        KerberosEncryptionType.Aes128CtsHmacSha256128 or KerberosEncryptionType.Aes256CtsHmacSha384192 => AesSha2KerberosEncryption.ForType(encryptionType, randomSource),
         KerberosEncryptionType.Camellia128CtsCmac or KerberosEncryptionType.Camellia256CtsCmac => CamelliaCmacKerberosEncryption.ForType(encryptionType, randomSource),
         _ => throw new KerberosCryptographyException(KerberosCryptographyError.UnsupportedEncryptionType),
     };
