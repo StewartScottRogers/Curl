@@ -103,6 +103,13 @@ public sealed record HttpRequestOptions
     public HttpVersionPreference Version { get; init; }
 
     /// <summary>
+    /// Gets the happy-eyeballs timeout from <c>--happy-eyeballs-timeout-ms</c>: how long a
+    /// <c>--http3</c> transfer waits for the QUIC handshake before it also starts a TCP
+    /// connect (ADR-0144 section 4); curl's default of 200 milliseconds when not given.
+    /// </summary>
+    public TimeSpan HappyEyeballsTimeout { get; init; } = TimeSpan.FromMilliseconds(200);
+
+    /// <summary>
     /// Gets a value indicating whether <c>--compressed</c> was given: ask for and decode a
     /// compressed body.
     /// </summary>
