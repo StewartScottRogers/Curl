@@ -102,3 +102,13 @@ constructed with. No gateway is `IpfsGatewayFailure.GatewayDetectionFailed` (exi
 `MalformedTargetUrl` (exit 3, `malformed target URL`); both are tool messages, printed as
 `curl: <message>` with no `(<code>)`. It is not yet wired into `Curl.Console` (BL-240), and
 `--ipfs-gateway` is not yet parsed (BL-353).
+
+`AltSvc\AltSvcCache` is the `--alt-svc` cache (ADR-0174, BL-622): `ReadFile` takes curl
+8.21.0's alt-svc file text (lines read strictly by `AltSvcFileLineParser`, expired entries
+skipped), `ApplyHeader` learns from one `Alt-Svc` value as `AltSvcHeaderParser` reads it
+(`clear`; `ma` and `persist` per alternative, 24 hours by default; the first known
+alternative replaces the origin's entries), `Find` gives the first unexpired entry for an
+origin and allowed versions, removing the expired ones it passes, and `FormatFile` writes
+curl's file byte for byte with the line ending the caller passes (`Environment.NewLine`:
+curl's Windows build writes CR LF). Time comes from the injected `TimeProvider`; it touches
+no file. It is not yet wired into `Curl.Console` (BL-623).
