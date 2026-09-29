@@ -168,7 +168,9 @@ public sealed class TcpConnector(
     /// dialled and, through an HTTP proxy, named in the CONNECT request; exit 6 then names the
     /// mapped host and exit 7 reads <c>Failed to connect to &lt;host&gt;:&lt;port&gt; via
     /// &lt;mapped host&gt;:&lt;mapped port&gt; after &lt;n&gt; ms: Could not connect to
-    /// server</c> (measured). TLS still verifies <see cref="ConnectTarget.Host" />. A
+    /// server</c> (measured). When no mapping matches, a <see cref="ConnectTarget.AltSvcRoute" />
+    /// is dialled the same way, after curl's <c>Alt-svc connecting from</c> line. TLS still
+    /// verifies <see cref="ConnectTarget.Host" />. A
     /// <c>--resolve</c> entry answers for the host and port being resolved, the proxy's
     /// included, in place of the <see cref="IDnsResolver" />.
     /// </para>
@@ -241,7 +243,7 @@ public sealed class TcpConnector(
 
         var started = timeProvider.GetTimestamp();
         LoadResolveEntriesUnlessLoaded(target.Events);
-        var destination = _connectToMappings.Map(target.Host, target.Port);
+        var destination = DestinationOf(target);
         if ((_resolveOverrides.ParseError ?? destination.ParseError) is { } parseError)
         {
             return ConnectResult.Failed(CurlExitCode.SetoptOptionSyntax, parseError);
@@ -293,7 +295,7 @@ public sealed class TcpConnector(
     {
         var started = timeProvider.GetTimestamp();
         LoadResolveEntriesUnlessLoaded(target.Events);
-        var destination = _connectToMappings.Map(target.Host, target.Port);
+        var destination = DestinationOf(target);
         if ((_resolveOverrides.ParseError ?? destination.ParseError) is { } parseError)
         {
             return (null, MultiplexedConnectResult.Failed(CurlExitCode.SetoptOptionSyntax, parseError));
@@ -348,6 +350,27 @@ public sealed class TcpConnector(
             target.Events.ReportInfo(message);
             return ConnectResult.Failed(CurlExitCode.OperationTimedOut, message);
         }
+    }
+
+    /// <summary>
+    /// Gives where a connection to <paramref name="target" /> goes: the <c>--connect-to</c>
+    /// mapping that matches it, else its <see cref="ConnectTarget.AltSvcRoute" />'s alternative,
+    /// reported first as curl 8.21.0's <c>Alt-svc connecting from [&lt;id&gt;]&lt;host&gt;:&lt;port&gt;
+    /// to [&lt;id&gt;]&lt;host&gt;:&lt;port&gt;</c> (measured, BL-623 Notes), else the target itself.
+    /// An alternative counts as mapped, so exit 7 names it after <c>via</c>, as curl's does.
+    /// </summary>
+    private ConnectDestination DestinationOf(ConnectTarget target)
+    {
+        var mapped = _connectToMappings.Map(target.Host, target.Port);
+        if (mapped.IsMapped || mapped.ParseError is not null || target.AltSvcRoute is not { } route)
+        {
+            return mapped;
+        }
+
+        var alternative = route.Alternative;
+        target.Events.ReportInfo(
+            $"Alt-svc connecting from [{route.OriginAlpn}]{target.Host}:{target.Port} to [{alternative.Alpn}]{alternative.Host}:{alternative.Port}");
+        return new ConnectDestination(alternative.Host, alternative.Port, IsMapped: true, ParseError: null);
     }
 
     private static TimeSpan ConnectTimeoutOrDefault(TimeSpan? connectTimeout) =>

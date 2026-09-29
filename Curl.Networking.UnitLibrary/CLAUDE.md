@@ -172,7 +172,10 @@ parses them (measured; BL-214). The first `--connect-to` mapping matching the UR
 and port gives the `ConnectDestination` that is resolved, dialled and named in the CONNECT
 request; TLS still verifies the URL's host. A `--resolve` entry for the host and port being
 resolved, the proxy's included, answers in place of `IDnsResolver`. An entry or a matching
-mapping that does not parse fails the connect with exit 49 and curl's message.
+mapping that does not parse fails the connect with exit 49 and curl's message. Per ADR-0208
+(BL-878) a target's `AltSvcRoute` (`--alt-svc`) is dialled the same way when no mapping matched,
+after curl's `Alt-svc connecting from [h1]H:P to [h1]H2:P2` line, and `ConnectionPoolKey` keys on
+the alternative too.
 
 `SystemDnsResolver` reports a host `Dns` refuses as over 255 characters as not resolved, so it
 is exit 6 (exit 5 for a proxy) as in curl 8.21.0, which accepts hosts up to 65535 bytes. Every

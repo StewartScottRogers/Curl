@@ -204,6 +204,7 @@ public sealed class PoolingConnectorTests
     [DataRow("proxy password")]
     [DataRow("proxy domain")]
     [DataRow("proxy credential")]
+    [DataRow("alt-svc")]
     public async Task ConnectAsync_ForADifferentKey_OpensANewConnection(string difference)
     {
         await using var pool = CreatePool();
@@ -215,6 +216,19 @@ public sealed class PoolingConnectorTests
         Assert.IsFalse(other.IsReused);
         Assert.AreEqual(1L, other.ConnectionNumber);
         Assert.HasCount(2, _inner.Targets);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_ToTheSameAltSvcAlternativeInAnotherCase_ReusesTheConnection()
+    {
+        await using var pool = CreatePool();
+        await ReturnToPoolAsync(pool, Target() with { AltSvcRoute = new AltSvcRoute("h1", new AltSvcAlternative("h1", "alt.example", 443)) });
+
+        var reused = await pool.ConnectAsync(
+            Target() with { AltSvcRoute = new AltSvcRoute("h1", new AltSvcAlternative("h1", "ALT.example", 443)) },
+            CancellationToken.None);
+
+        Assert.IsTrue(reused.IsReused);
     }
 
     [TestMethod]
@@ -455,6 +469,7 @@ public sealed class PoolingConnectorTests
             "proxy user" => pooled with { Proxy = Proxy("proxy.example", "other", "secret") },
             "proxy password" => pooled with { Proxy = Proxy("proxy.example", "user", "other") },
             "proxy domain" => pooled with { Proxy = Proxy("proxy.example", "user", "secret", domain: "CORP") },
+            "alt-svc" => pooled with { AltSvcRoute = new AltSvcRoute("h1", new AltSvcAlternative("h1", "alt.example", 443)) },
             _ => pooled with { Proxy = pooled.Proxy! with { Credential = null } },
         };
 
