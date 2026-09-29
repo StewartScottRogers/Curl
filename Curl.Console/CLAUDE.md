@@ -104,8 +104,15 @@ that name (case-insensitive), and a body is a `BytesBody` sent as
 the `-G` / `--url-query` query with `QueryUrl` before the URL is parsed. `http` and
 `https` are served by `HttpProtocolHandler`, registered in `CurlComposition` with a
 `RankedHttpAuthenticator` (Basic and Bearer, and Digest with a random client nonce, all in the
-platform's credential encoding), which answers the scheme `-u`, `--basic`, `--digest`,
-`--anyauth` and `--oauth2-bearer` allow (`HttpRequestOptions.AuthSchemes` and `BearerToken`).
+platform's credential encoding, and Negotiate), which answers the scheme `-u`, `--basic`, `--digest`,
+`--negotiate`, `--anyauth` and `--oauth2-bearer` allow (`HttpRequestOptions.AuthSchemes` and `BearerToken`).
+Negotiate's contexts come from `CurlComposition.CreateSecurityContextFactory`, ADR-0142's router:
+SSPI on Windows, elsewhere the system GSS-API with the hand-built SPNEGO and Kerberos behind it,
+reaching KDCs through `Curl.Networking`'s `KerberosKdcSocketTransport` over the run's connectors
+and finding them through `KerberosDnsSrvLookup`. `HandBuiltKerberosSources` reads `krb5.conf`
+and the credential cache from disk (`KerberosDiskFileReader`) only when a hand-built context first
+asks, with the `<uid>` of `/tmp/krb5cc_<uid>` from `ProcessUserId` (BL-527, ADR-0173). Tests pass
+their own `ISecurityContextFactory` to `CreateRunner`.
 `-0` / `--http1.0` and `--http1.1` set `HttpRequestOptions.Version` (the last one wins, HTTP/1.1
 when neither is given), and `--compressed`, `--tr-encoding`, `--raw` and `--ignore-content-length`
 are copied as they are (BL-236); `CurlCommandRunnerTransferEncodingTests` pins each one's request

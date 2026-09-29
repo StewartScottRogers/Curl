@@ -3,6 +3,7 @@ using System.Text;
 using Curl.Authentication;
 using Curl.Cli;
 using Curl.Cookies;
+using Curl.Kerberos;
 using Curl.Core;
 using Curl.Core.FileSystem;
 using Curl.Networking;
@@ -65,18 +66,25 @@ internal static class CurlComposition
     /// <param name="cookieStore">
     /// The cookies the HTTP handler sends and stores, or <see langword="null" /> to keep none.
     /// </param>
+    /// <param name="securityContexts">
+    /// Makes the HTTP handler's Negotiate contexts, or <see langword="null" /> for
+    /// <see cref="CreateSecurityContextFactory" />'s router over <paramref name="connector" /> and
+    /// <paramref name="datagramConnector" />.
+    /// </param>
     /// <returns>Every registered handler.</returns>
     internal static IReadOnlyList<IProtocolHandler> CreateProtocolHandlers(
         IConnector connector,
         IDatagramConnector datagramConnector,
         ITlsProvider tlsProvider,
         IDnsResolver dnsResolver,
-        ICookieStore? cookieStore = null)
+        ICookieStore? cookieStore = null,
+        ISecurityContextFactory? securityContexts = null)
     {
         ConnectionEndPointRecorder recorder = new();
         EndPointRecordingConnector recordingConnector = new(connector, recorder);
         EndPointRecordingDatagramConnector recordingDatagramConnector = new(datagramConnector, recorder);
-        HttpProtocolHandler http = new(recordingConnector, CreateHttpAuthenticator(), cookieStore);
+        RankedHttpAuthenticator httpAuthenticator = CreateHttpAuthenticator(securityContexts ?? CreateSecurityContextFactory(connector, datagramConnector));
+        HttpProtocolHandler http = new(recordingConnector, httpAuthenticator, cookieStore);
 
         IProtocolHandler[] handlers =
         [
@@ -89,7 +97,7 @@ internal static class CurlComposition
             new ImapProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator()),
             new Pop3ProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator()),
             new SmtpProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator()),
-            new WsProtocolHandler(recordingConnector, CreateHttpAuthenticator(), new SystemWebSocketRandomSource()),
+            new WsProtocolHandler(recordingConnector, httpAuthenticator, new SystemWebSocketRandomSource()),
             http,
             new RoutingFtpProtocolHandler(http, CreateFtpProtocolHandler(recordingConnector, tlsProvider, dnsResolver)),
         ];
@@ -117,18 +125,56 @@ internal static class CurlComposition
     /// scheme curl 8.21.0 picks among those <c>--basic</c>, <c>--digest</c> and <c>--anyauth</c>
     /// allow, with a <see cref="BasicAndBearerAuthenticator" /> for Basic, Bearer
     /// (<c>--oauth2-bearer</c>) and the first request, and a <see cref="DigestAuthenticator" />
-    /// drawing each client nonce from <see cref="DigestClientNonce.CreateRandom" />; both encode
-    /// credentials in the platform's encoding (<see cref="CredentialEncoding.ForPlatform" />).
+    /// drawing each client nonce from <see cref="DigestClientNonce.CreateRandom" />, both encoding
+    /// credentials in the platform's encoding (<see cref="CredentialEncoding.ForPlatform" />),
+    /// and a <see cref="NegotiateHttpAuthenticator" /> over <paramref name="securityContexts" />
+    /// for <c>--negotiate</c> (ADR-0173).
     /// </summary>
+    /// <param name="securityContexts">Makes Negotiate's contexts: <see cref="CreateSecurityContextFactory" />'s in production.</param>
     /// <returns>The authenticator.</returns>
-    internal static RankedHttpAuthenticator CreateHttpAuthenticator()
+    internal static RankedHttpAuthenticator CreateHttpAuthenticator(ISecurityContextFactory securityContexts)
     {
         Encoding credentialEncoding = CredentialEncoding.ForPlatform(OperatingSystem.IsWindows());
 
         return new RankedHttpAuthenticator(
             new BasicAndBearerAuthenticator(credentialEncoding),
-            new DigestAuthenticator(credentialEncoding, DigestClientNonce.CreateRandom));
+            new DigestAuthenticator(credentialEncoding, DigestClientNonce.CreateRandom),
+            new NegotiateHttpAuthenticator(securityContexts));
     }
+
+    /// <summary>
+    /// Creates ADR-0142's router for NTLM, Negotiate and Kerberos contexts: SSPI on Windows,
+    /// elsewhere the system GSS-API with the hand-built SPNEGO and Kerberos behind it, whose KDC
+    /// exchanges go through a <see cref="KerberosKdcSocketTransport" /> over
+    /// <paramref name="datagramConnector" /> and <paramref name="connector" /> (waiting
+    /// <see cref="KdcReplyTimeout" /> for a UDP reply) and whose SRV lookups go through a
+    /// <see cref="DnsServerResolver" /> asking the system's DNS servers (ADR-0173).
+    /// </summary>
+    /// <param name="connector">Opens TCP connections to a KDC.</param>
+    /// <param name="datagramConnector">Opens UDP channels to a KDC.</param>
+    /// <returns>The router.</returns>
+    internal static RoutingSecurityContextFactory CreateSecurityContextFactory(IConnector connector, IDatagramConnector datagramConnector)
+    {
+        KerberosKdcSocketTransport kdcTransport = new(datagramConnector, connector, KdcReplyTimeout, TimeProvider.System);
+        DnsServerResolver srvResolver = new(new DnsServerResolverOptions(null, null, null, null), TimeProvider.System);
+        HandBuiltKerberosSources sources = new(
+            new KerberosDiskFileReader(),
+            HandBuiltKerberosSources.ReadProcessEnvironmentVariable,
+            ProcessUserId.Read,
+            new KerberosDnsSrvLookup(srvResolver.ResolveServiceAsync),
+            kdcTransport,
+            TimeProvider.System);
+        return new RoutingSecurityContextFactory(
+            OperatingSystem.IsWindows(),
+            new SystemSecurityContextFactory(),
+            new HandBuiltSecurityContextFactory(sources.CreateTicketSource(), TimeProvider.System, new SystemKerberosRandomSource()));
+    }
+
+    /// <summary>
+    /// How long a UDP request to a KDC waits for its reply before the next KDC is tried: MIT's
+    /// first per-KDC wait (<c>krb5_sendto_kdc</c>), one second.
+    /// </summary>
+    internal static TimeSpan KdcReplyTimeout { get; } = TimeSpan.FromSeconds(1);
 
     /// <summary>
     /// Creates the SASL authenticator the SMTP, POP3 and IMAP handlers share (ADR-0121): a
@@ -412,6 +458,9 @@ internal static class CurlComposition
     /// Chooses each transfer's proxy, or <see langword="null" /> for one that reads no
     /// environment variables.
     /// </param>
+    /// <param name="securityContexts">
+    /// Makes the HTTP handler's Negotiate contexts, or <see langword="null" /> for the production router.
+    /// </param>
     /// <returns>The runner.</returns>
     internal static CurlCommandRunner CreateRunner(
         Stream standardOutput,
@@ -419,9 +468,10 @@ internal static class CurlComposition
         Stream standardInput,
         IConnector connector,
         IDatagramConnector datagramConnector,
-        ProxySelector? proxySelector = null) =>
+        ProxySelector? proxySelector = null,
+        ISecurityContextFactory? securityContexts = null) =>
         new(
-            SharingRunCookies((options, cookies) => CreateTransferDispatch(connector, datagramConnector, CreateTlsProvider(TlsClientOptionsMapping.FromCommandLine(options), TimeProvider.System), cookies, proxySelector)),
+            SharingRunCookies((options, cookies) => CreateTransferDispatch(connector, datagramConnector, CreateTlsProvider(TlsClientOptionsMapping.FromCommandLine(options), TimeProvider.System), cookies, proxySelector, securityContexts)),
             new PhysicalFileSystem(),
             new PhysicalFileSystem(),
             standardOutput,
@@ -501,15 +551,17 @@ internal static class CurlComposition
     /// <param name="tlsProvider">Upgrades an FTP connection after an accepted <c>AUTH</c> or <c>PROT P</c>.</param>
     /// <param name="cookies">The run's cookies, or <see langword="null" /> without <c>-b</c> or <c>-c</c>.</param>
     /// <param name="proxySelector">Chooses each transfer's proxy, or <see langword="null" /> for one that reads no environment variables.</param>
+    /// <param name="securityContexts">Makes the HTTP handler's Negotiate contexts, or <see langword="null" /> for the production router.</param>
     /// <returns>The dispatcher, no warning lines, the cookies and the proxy selector.</returns>
     private static TransferDispatch CreateTransferDispatch(
         IConnector connector,
         IDatagramConnector datagramConnector,
         ITlsProvider tlsProvider,
         CookieEngine? cookies,
-        ProxySelector? proxySelector) =>
+        ProxySelector? proxySelector,
+        ISecurityContextFactory? securityContexts) =>
         new(
-            new ProtocolDispatcher(CreateProtocolHandlers(connector, datagramConnector, tlsProvider, new SystemDnsResolver(), cookies?.HandlerStore)),
+            new ProtocolDispatcher(CreateProtocolHandlers(connector, datagramConnector, tlsProvider, new SystemDnsResolver(), cookies?.HandlerStore, securityContexts)),
             [],
             cookies,
             proxySelector);
