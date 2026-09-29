@@ -34,7 +34,7 @@ none.
 - The system GSS-API and SSPI routes are unchanged: the BCL's `NegotiateAuthentication`
   takes its own `ChannelBinding`, and curl's SSPI build is matched separately.
 - Filling `HttpAuthRequest.ServerCertificate` from the connection is the HTTP handler's
-  (BL-964); until then every request's is empty.
+  (BL-966); until then every request's is empty.
 
 ## Consequences
 

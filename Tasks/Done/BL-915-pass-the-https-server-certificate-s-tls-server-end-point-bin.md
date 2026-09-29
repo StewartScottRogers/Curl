@@ -35,7 +35,7 @@ completed: 2026-09-29
   and `HttpAuthRequest`, both in `Curl.Protocol.Abstractions.UnitLibrary`, which no task in
   Doing named; so it and its tests were added, with the new ADR-0234 and the ADR index.
   Filling `HttpAuthRequest.ServerCertificate` in `Curl.Protocol.Http.UnitLibrary` (held by
-  BL-624) is BL-964.
+  BL-624) is BL-966.
 - Carried as `ReadOnlyMemory<byte>` DER, the form `ConnectResult.PeerCertificates` uses;
   empty for none.
 - `TlsServerEndPointChannelBindings.Of` maps signature OIDs to RFC 5929 hashes in a table,

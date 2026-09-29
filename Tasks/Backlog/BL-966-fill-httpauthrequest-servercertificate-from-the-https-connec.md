@@ -1,5 +1,5 @@
 ---
-id: BL-964
+id: BL-966
 title: Fill HttpAuthRequest.ServerCertificate from the HTTPS connection so hand-built Negotiate sends channel bindings
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-964 — Fill HttpAuthRequest.ServerCertificate from the HTTPS connection so hand-built Negotiate sends channel bindings
+# BL-966 — Fill HttpAuthRequest.ServerCertificate from the HTTPS connection so hand-built Negotiate sends channel bindings
 
 ## Goal
 
