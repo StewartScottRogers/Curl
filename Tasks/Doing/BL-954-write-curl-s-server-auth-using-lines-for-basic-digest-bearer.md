@@ -34,3 +34,4 @@ Under `-v`, every HTTP request curl 8.21.0 sends with a scheme picked writes `* 
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-29: Backlog -> Doing.
