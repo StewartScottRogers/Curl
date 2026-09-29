@@ -10,7 +10,8 @@ namespace Curl.Networking;
 /// <summary>
 /// The production <see cref="IConnector" /> for TCP: resolves the host, dials each
 /// address in the resolver's order until one connects, and hands the connection to
-/// <see cref="ITlsProvider" /> when the target asks for TLS.
+/// <see cref="ITlsProvider" /> when the target asks for TLS. Given a <see cref="QuicDialer" />,
+/// it also resolves the host for a QUIC connection and hands the addresses to the dialer.
 /// </summary>
 /// <param name="dnsResolver">Resolves the target host to addresses.</param>
 /// <param name="tcpDialer">Opens a plaintext connection to one address.</param>
@@ -56,6 +57,10 @@ namespace Curl.Networking;
 /// <see cref="HttpApplicationProtocols" />' lists as the HTTP version options and the platform
 /// choose it (ADR-0141); <see langword="null" /> for <see cref="HttpApplicationProtocols.Http11Only" />.
 /// </param>
+/// <param name="quicDialer">
+/// Opens the QUIC connections <see cref="ConnectMultiplexedAsync" /> asks for, over the addresses
+/// this connector resolves (ADR-0179); <see langword="null" /> for a connector with no QUIC.
+/// </param>
 public sealed class TcpConnector(
     IDnsResolver dnsResolver,
     ITcpDialer tcpDialer,
@@ -68,7 +73,8 @@ public sealed class TcpConnector(
     TimeSpan? connectTimeout = null,
     AddressFamily addressFamily = AddressFamily.Unspecified,
     UnixSocketAddress? unixSocket = null,
-    IReadOnlyList<string>? httpOverTlsApplicationProtocols = null) : IConnector
+    IReadOnlyList<string>? httpOverTlsApplicationProtocols = null,
+    QuicDialer? quicDialer = null) : IConnector
 {
     private const string AnyHost = "*";
 
@@ -246,6 +252,69 @@ public sealed class TcpConnector(
         return result.Connection is null
             ? NumberedConnectFailure.Of(result, TakeConnectionNumber())
             : result;
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// <para>
+    /// Without a <see cref="QuicDialer" /> this is the interface's answer: exit 7 <c>QUIC is not
+    /// available on this connector</c>. With one, the <c>--resolve</c> entries load, a bad entry
+    /// or matching <c>--connect-to</c> mapping fails with exit 49, and the (mapped) host resolves
+    /// exactly as <see cref="ConnectAsync" /> resolves it, through the same DNS cache, <c>-4</c> or
+    /// <c>-6</c> and <c>-v</c> lines, failing with exit 6 (ADR-0144 section 3). The addresses go
+    /// to the <see cref="QuicDialer" /> with the connection's number, taken from the sequence
+    /// <see cref="ConnectAsync" /> takes from.
+    /// </para>
+    /// <para>
+    /// A <c>--connect-timeout</c> greater than zero bounds the handshakes; without one each
+    /// handshake has QUIC's own 10 seconds (ADR-0144 section 5). A proxy on the target is not
+    /// used: curl's ngtcp2 build connects QUIC directly.
+    /// </para>
+    /// </remarks>
+    public async ValueTask<MultiplexedConnectResult> ConnectMultiplexedAsync(ConnectTarget target, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        if (quicDialer is null)
+        {
+            return MultiplexedConnectResult.Failed(CurlExitCode.CouldntConnect, "QUIC is not available on this connector");
+        }
+
+        var (request, failure) = await ResolveForQuicAsync(target, cancellationToken).ConfigureAwait(false);
+        return request is null
+            ? failure!
+            : await quicDialer.DialAsync(request, cancellationToken).ConfigureAwait(false);
+    }
+
+    // Everything ConnectMultiplexedAsync does before the QUIC dial: the --resolve entries, the
+    // --connect-to mapping and the resolve, with ConnectAsync's failures for each.
+    private async ValueTask<(QuicDialRequest? Request, MultiplexedConnectResult? Failure)> ResolveForQuicAsync(
+        ConnectTarget target,
+        CancellationToken cancellationToken)
+    {
+        var started = timeProvider.GetTimestamp();
+        LoadResolveEntriesUnlessLoaded(target.Events);
+        var destination = _connectToMappings.Map(target.Host, target.Port);
+        if ((_resolveOverrides.ParseError ?? destination.ParseError) is { } parseError)
+        {
+            return (null, MultiplexedConnectResult.Failed(CurlExitCode.SetoptOptionSyntax, parseError));
+        }
+
+        var (addresses, failure) = await ResolveWithFailureReasonAsync(destination.Host, destination.Port, target.Events, cancellationToken).ConfigureAwait(false);
+        if (addresses.Count == 0)
+        {
+            var (exitCode, message) = NameResolutionFailure.Describe(CurlExitCode.CouldntResolveHost, "host", destination.Host, destination.Port, failure);
+            return (null, MultiplexedConnectResult.Failed(exitCode, message));
+        }
+
+        return (new QuicDialRequest(
+            target,
+            destination.Host,
+            destination.Port,
+            addresses,
+            started,
+            timeProvider.GetTimestamp(),
+            connectTimeout > TimeSpan.Zero ? connectTimeout : null,
+            TakeConnectionNumber()), null);
     }
 
     /// <summary>

@@ -5,8 +5,8 @@ Phase 1.
 Sockets, DNS, TLS via SslStream, proxy and SOCKS handling, connection reuse: the
 production implementations of the transport contracts in
 `Curl.Protocol.Abstractions.UnitLibrary` (ADR-0005). It references that project,
-`Curl.Tls.UnitLibrary`, the hand-built TLS client (ADR-0120, ADR-0140), and
-`Curl.Kerberos.UnitLibrary`, whose KDC transport and SRV lookup it implements, and nothing
+`Curl.Tls.UnitLibrary`, the hand-built TLS client (ADR-0120, ADR-0140), `Curl.Quic.UnitLibrary`,
+the hand-built QUIC client (ADR-0179), and `Curl.Kerberos.UnitLibrary`, whose KDC transport and SRV lookup it implements, and nothing
 else: `KerberosKdcSocketTransport` moves a KDC's UDP datagram through an `IDatagramConnector`
 (one-second reply wait) and its TCP stream through an `IConnector` (the stream owns and
 disposes the connection, `ConnectionStream`'s `ownsConnection`), and `KerberosDnsSrvLookup`
@@ -223,6 +223,19 @@ round on its `TimeProvider`; a truncated reply is asked again over TCP. Replies 
 (`DnsLookupFailureText`) in brackets, or make it exit 43, through `NameResolutionFailure`.
 `ResolveServiceAsync` looks up SRV records for Kerberos KDC location (BL-689). Sockets come from
 `IDnsSocketOpener`; tests use `Fakes/ScriptedDnsSocketOpener` and `ManualTimeProvider`.
+
+Per ADR-0179 (BL-728) `TcpConnector` takes an optional `QuicDialer`, and its
+`ConnectMultiplexedAsync` resolves the host exactly as `ConnectAsync` does (the same DNS cache,
+`--resolve`, `--connect-to`, `-4`/`-6` and `-v` lines) and hands the addresses, as a
+`QuicDialRequest`, to the dialer. `QuicDialer` opens a UDP channel for each address in turn
+through `IUdpChannelOpener` (`UdpChannelOpener` in production, binding `UdpDatagramChannel` to a
+local address and port), runs `Curl.Quic`'s `QuicClientConnector` with curl's ClientHello and a
+`HandBuiltCertificateVerifier`, and returns a `QuicConnection`; failures print curl's `QUIC connect
+to` and `Failed to connect to <host> port <port>` lines, and a socket error is exit 56 `QUIC:
+recvfrom() ...`. This project therefore references `Curl.Quic.UnitLibrary`, which lets
+`Curl.Networking.UnitTests` see its internals: `Fakes/QuicTestServer` and `QuicTestTlsServer` are
+copies of `Curl.Quic.UnitTests`' in-memory server, reached through `Fakes/QuicServerChannelOpener`.
+`PoolingConnector.ConnectMultiplexedAsync` passes straight through to its inner connector.
 
 Everything else takes the Abstractions contracts (`IDnsResolver`, `ITlsProvider`,
 `IConnection`, `IDatagramChannel`) or `ITcpDialer`, plus an injected `TimeProvider`, so the tests in

@@ -74,6 +74,14 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
             : Reuse(target, idle);
     }
 
+    /// <inheritdoc />
+    /// <remarks>
+    /// Asks the inner connector for a new QUIC connection every time; keeping one per origin
+    /// for later transfers and <c>-Z</c> streams is BL-735's.
+    /// </remarks>
+    public ValueTask<MultiplexedConnectResult> ConnectMultiplexedAsync(ConnectTarget target, CancellationToken cancellationToken) =>
+        innerConnector.ConnectMultiplexedAsync(target, cancellationToken);
+
     /// <summary>
     /// Closes every idle connection without reporting anything; a connection returned
     /// afterwards is closed instead of pooled.
