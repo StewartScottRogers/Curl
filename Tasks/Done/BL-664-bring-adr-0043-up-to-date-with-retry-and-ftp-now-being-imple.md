@@ -32,10 +32,10 @@ ADR-0043 no longer states anything false about the code: its Decision and Conseq
 - Did the docs pipeline in-session rather than through align-and-document: two Markdown edits, no code.
 - Amendment appended as a dated section (ADR-0040 style); the original Decision text is untouched. README status column reads "Accepted; amended 2026-09-29 by BL-664 ...", following the "Accepted; ... superseded by" pattern.
 - Checked against `TransferWriteOutVariables.cs` on 2026-09-29: `ssl_verify_result`, `proxy_ssl_verify_result` and `tls_earlydata` are still constant 0; `num_retries` is `RetryCount` (set in `CurlCommandRunner` from `TransferRetrier`); `ftp_entry_path` is `TransferReport.FtpEntryPath` (set by `FtpSession` from PWD).
-- `--tls-earlydata` is now parsed but no provider applies it (BL-710), so 0 stays true. No task covered reporting early-data bytes, so filed BL-905 (depends on BL-710).
+- `--tls-earlydata` is now parsed but no provider applies it (BL-710), so 0 stays true. No task covered reporting early-data bytes, so filed BL-906 (depends on BL-710).
 
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-29: Backlog -> Doing.
-- 2026-09-29: Doing -> Done. ADR-0043 amended with what each fixed and sourced -w variable prints now; BL-905 filed
+- 2026-09-29: Doing -> Done. ADR-0043 amended with what each fixed and sourced -w variable prints now; BL-906 filed

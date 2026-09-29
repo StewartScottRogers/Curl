@@ -1,5 +1,5 @@
 ---
-id: BL-905
+id: BL-906
 title: Report the early-data bytes sent in %{tls_earlydata}
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-905 — Report the early-data bytes sent in %{tls_earlydata}
+# BL-906 — Report the early-data bytes sent in %{tls_earlydata}
 
 ## Goal
 

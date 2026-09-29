@@ -96,7 +96,7 @@ Still fixed, on every platform:
 - `tls_earlydata` prints `0`. `--tls-earlydata` is now parsed
   (`CommandLineOptions.TlsEarlyData`) and passed on as `TlsClientOptions.AllowEarlyData`,
   but no TLS provider applies it yet (BL-710), so no early data is sent and `0` is still
-  true. BL-905, after BL-710, reports the bytes sent.
+  true. BL-906, after BL-710, reports the bytes sent.
 - `time_queue` is still measured from `TransferTimings.Started` to itself, as decided.
 
 Now given a source:
@@ -116,5 +116,5 @@ Now given a source:
 - `certs` and `num_certs` print and count `TransferReport.PeerCertificates`, the chain
   the TLS provider captured; nothing and `0` without TLS (BL-303, ADR-0054).
 
-The warning in Consequences still holds for the three fixed values: BL-661 and BL-905
+The warning in Consequences still holds for the three fixed values: BL-661 and BL-906
 must replace the constant in `TransferWriteOutVariables` when they land.
