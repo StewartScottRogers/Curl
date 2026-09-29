@@ -59,6 +59,13 @@ public sealed class RsaSshPrivateKeyTests
     }
 
     [TestMethod]
+    public void FromComponents_ZeroPrivateExponent_EncodesItAsZeroAndTheImportRefusesIt()
+    {
+        // The import refuses the key; OpenSSL's refusal is a subclass of CryptographicException.
+        Assert.Throws<CryptographicException>(() => RsaSshPrivateKey.FromComponents([15], [3], [0, 0], [2], [3], [5]));
+    }
+
+    [TestMethod]
     [DataRow(new byte[] { 1 }, new byte[] { 5 }, DisplayName = "p is one")]
     [DataRow(new byte[] { 3 }, new byte[0], DisplayName = "q is zero")]
     public void FromComponents_PrimeOfOneOrLess_ThrowsRatherThanDividingByZero(byte[] prime1, byte[] prime2)
