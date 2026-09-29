@@ -84,7 +84,10 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
 
     /// <summary>
     /// Closes every idle connection without reporting anything; a connection returned
-    /// afterwards is closed instead of pooled.
+    /// afterwards is closed instead of pooled. Wherever the pool closes a connection - here,
+    /// evicted, expired or found dead - the protocol session it holds is shut down first
+    /// (<see cref="IConnectionSession.ShutDownAsync" />), as curl sends HTTP/2's GOAWAY
+    /// (BL-817).
     /// </summary>
     /// <returns>A task that completes when every idle connection is closed.</returns>
     public async ValueTask DisposeAsync()
@@ -145,7 +148,7 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
     {
         foreach (var entry in entries)
         {
-            await entry.Connection.DisposeAsync();
+            await entry.CloseAsync();
         }
     }
 
@@ -161,7 +164,7 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
         {
             events.ReportInfo($"Connection {match.ConnectionNumber} seems to be dead");
             events.ReportInfo($"shutting down connection #{match.ConnectionNumber}");
-            await match.Connection.DisposeAsync();
+            await match.CloseAsync();
             match = await TakeMatchAsync(key);
         }
 

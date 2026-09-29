@@ -33,4 +33,25 @@ internal sealed record PoolEntry(
     /// reusing it (ADR-0112).
     /// </summary>
     public bool HasReadPeerClose { get; set; }
+
+    /// <summary>
+    /// Gets or sets the protocol session a transfer left with the connection, such as its
+    /// HTTP/2 session, or <see langword="null" /> when none did (BL-817).
+    /// </summary>
+    public IConnectionSession? Session { get; set; }
+
+    /// <summary>
+    /// Closes the connection, first letting its <see cref="Session" />, if any, write what
+    /// its protocol sends before a connection closes, such as HTTP/2's GOAWAY.
+    /// </summary>
+    /// <returns>A task that completes when the connection is closed.</returns>
+    public async ValueTask CloseAsync()
+    {
+        if (Session is not null)
+        {
+            await Session.ShutDownAsync(CancellationToken.None);
+        }
+
+        await Connection.DisposeAsync();
+    }
 }

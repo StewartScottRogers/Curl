@@ -74,9 +74,29 @@ public sealed class PooledConnection : IConnection
     /// </remarks>
     public void MarkReusable() => _isReusable = true;
 
+    /// <inheritdoc />
+    /// <remarks>
+    /// The session belongs to the underlying connection, so a later lease of it gives the
+    /// same one.
+    /// </remarks>
+    public IConnectionSession? Session => _underlying.Session;
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Always holds it: the session stays with the underlying connection while it is pooled,
+    /// and is shut down whenever the connection closes - on this dispose, or later by the
+    /// pool (BL-817).
+    /// </remarks>
+    public bool TryHoldSession(IConnectionSession session)
+    {
+        _underlying.Session = session;
+        return true;
+    }
+
     /// <summary>
     /// Returns the underlying connection to the pool when it was marked reusable and its
-    /// target is pooled, and closes it otherwise. A second call does nothing.
+    /// target is pooled, and closes it otherwise, shutting down any session it holds first. A
+    /// second call does nothing.
     /// </summary>
     /// <returns>A task that completes when the connection is pooled or closed.</returns>
     public ValueTask DisposeAsync()
@@ -90,6 +110,6 @@ public sealed class PooledConnection : IConnection
 
         return _isReusable && _underlying.Key is not null
             ? _pool.ReturnAsync(_underlying, _events)
-            : _underlying.Connection.DisposeAsync();
+            : _underlying.CloseAsync();
     }
 }
