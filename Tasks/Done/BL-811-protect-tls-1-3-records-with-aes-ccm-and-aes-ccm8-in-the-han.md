@@ -8,7 +8,7 @@ depends-on: [BL-700, BL-738]
 touches: [Curl.Tls.UnitLibrary, Curl.Tls.UnitTests, Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-29
 ---
 # BL-811 — Protect TLS 1.3 records with AES-CCM and AES-CCM8 in the hand-built TLS client
 
@@ -25,9 +25,9 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `Tls13RecordProtection.CanProtect` is true for 0x1304 and 0x1305, and `Curl.Tls.UnitTests` exchange application data both ways with the in-memory server over a pipe for each (the `ApplicationDataCrossesBothWaysWithEachCipherSuite` rows).
-- [ ] A CCM8 record whose fragment is shorter than 8 bytes, or whose tag is corrupted, fails with `bad_record_mac`.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1 -Library Curl.Tls.UnitLibrary` reports 100% line and branch coverage and no failing member.
+- [x] `Tls13RecordProtection.CanProtect` is true for 0x1304 and 0x1305, and `Curl.Tls.UnitTests` exchange application data both ways with the in-memory server over a pipe for each (the `ApplicationDataCrossesBothWaysWithEachCipherSuite` rows).
+- [x] A CCM8 record whose fragment is shorter than 8 bytes, or whose tag is corrupted, fails with `bad_record_mac`.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1 -Library Curl.Tls.UnitLibrary` reports 100% line and branch coverage and no failing member.
 
 ## Notes
 
@@ -52,9 +52,27 @@ completed:
   `touches`, so `Curl.Networking.UnitLibrary` and `Curl.Networking.UnitTests` were added
   here and the task waits for BL-819 to leave Doing.
 
+- 2026-09-29 (lane 3): redone on the current branch (the lane-5 stash was not reachable) and
+  finished. `Curl.Tls`: as above, the refusal tests now use 0x1306. `Curl.Networking`:
+  `HandBuiltTlsProvider.HandshakeAsync` runs TLS 1.3 whenever the range reaches it - every
+  TLS 1.3 suite is now runnable and a `--tls13-ciphers` list naming none is exit 59 before
+  the handshake, so the old `OffersSuiteFor(CanProtect)` check could never be false.
+  The CCM-only test became `..._WithOnlyACcmTls13CipherAndATls12Server_ConnectsOverTls12`
+  (it passes; no hang), the exit 59 CCM row became `TLS_PSK_WITH_AES_128_GCM_SHA256` with a
+  TLS 1.2 ceiling (a suite neither client runs), and
+  `..._WithTls12CiphersAndATls13Minimum_ConnectsOverTls13` covers `CanOffer` dropping a
+  TLS 1.2 suite. Measured: Curl.Networking.UnitLibrary 100/100, 0 failing; Curl.Tls.UnitLibrary
+  100/100, 0 failing, after extracting `BuildClientHello`, `SendClientFinishedFlight` and
+  `ValidateOfferExtensionPlaces` from the three members the measure flagged for complexity
+  (`SendClientHello` 14, `ReceiveFinished` 12, `ValidateExtensionPlaces` 12; older than
+  BL-811 but inside its gate; no behaviour change). 1171 Curl.Tls.UnitTests, 1629
+  Curl.Networking.UnitTests pass. No ADR: no curl-visible behaviour choice was made
+  (OpenSSL still offers CCM only when `--tls13-ciphers` names it, ADR-0140).
+
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-29: Backlog -> Doing.
 - 2026-09-29: Doing -> Backlog. Needs Curl.Networking.UnitLibrary and Curl.Networking.UnitTests (their tests treat TLS_AES_128_CCM_SHA256 as unrunnable), which BL-819 in Doing touches
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Done. TLS 1.3 connections negotiating TLS_AES_128_CCM_SHA256 or TLS_AES_128_CCM_8_SHA256 now complete over the hand-built client
