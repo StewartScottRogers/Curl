@@ -114,7 +114,8 @@ and the credential cache from disk (`KerberosDiskFileReader`) only when a hand-b
 asks, with the `<uid>` of `/tmp/krb5cc_<uid>` from `ProcessUserId` (BL-527, ADR-0176). Tests pass
 their own `ISecurityContextFactory` to `CreateRunner`.
 `-0` / `--http1.0` and `--http1.1` set `HttpRequestOptions.Version` (the last one wins, HTTP/1.1
-when neither is given), and `--compressed`, `--tr-encoding`, `--raw` and `--ignore-content-length`
+when neither is given), as do `--http3` and `--http3-only`, for which the TCP connector hands
+QUIC connects to the group's `QuicDialer` (ADR-0182, BL-732), and `--compressed`, `--tr-encoding`, `--raw` and `--ignore-content-length`
 are copied as they are (BL-236); `CurlCommandRunnerTransferEncodingTests` pins each one's request
 bytes and output as BL-177, BL-180 and BL-315 measured them.
 With `-b` or `-c` the handler also gets the option group's `CookieEngine`: one `CookieStore`

@@ -266,7 +266,8 @@ internal static class CurlComposition
         TlsClientOptions proxyTlsClientOptions = TlsClientOptionsMapping.ProxyFromCommandLine(options);
         ITlsProviderWithWarnings proxyTlsProvider = CreateTlsProvider(proxyTlsClientOptions, timeProvider);
         HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(options);
-        TcpConnector tcpConnector = CreateTcpConnector(options, dnsResolver, tcpDialer, tlsProvider, timeProvider, proxyTunnelOptions, proxyTlsProvider);
+        QuicDialer quicDialer = new(tlsClientOptions, timeProvider);
+        TcpConnector tcpConnector = CreateTcpConnector(options, dnsResolver, tcpDialer, tlsProvider, timeProvider, proxyTunnelOptions, proxyTlsProvider, quicDialer);
 
         return new CurlTransports(
             dnsResolver,
@@ -277,6 +278,7 @@ internal static class CurlComposition
             proxyTlsClientOptions,
             proxyTlsProvider,
             proxyTunnelOptions,
+            quicDialer,
             tcpConnector,
             CreateUdpDatagramConnector(options, dnsResolver, timeProvider),
             new PoolingConnector(tcpConnector, timeProvider));
@@ -302,6 +304,10 @@ internal static class CurlComposition
     /// <param name="proxyTlsProvider">
     /// Runs the handshake to an HTTPS proxy; <see langword="null" /> for <paramref name="tlsProvider" />.
     /// </param>
+    /// <param name="quicDialer">
+    /// Opens the QUIC connections <c>--http3</c> and <c>--http3-only</c> ask for (ADR-0144, BL-732);
+    /// <see langword="null" /> for a connector with no QUIC.
+    /// </param>
     /// <returns>The connector.</returns>
     internal static TcpConnector CreateTcpConnector(
         CommandLineOptions options,
@@ -310,7 +316,8 @@ internal static class CurlComposition
         ITlsProvider tlsProvider,
         TimeProvider timeProvider,
         HttpProxyTunnelOptions proxyTunnelOptions,
-        ITlsProvider? proxyTlsProvider = null) =>
+        ITlsProvider? proxyTlsProvider = null,
+        QuicDialer? quicDialer = null) =>
         new(
             dnsResolver,
             tcpDialer,
@@ -323,7 +330,8 @@ internal static class CurlComposition
             ConnectTimeoutOf(options),
             AddressFamilyOf(options),
             UnixSocketOf(options),
-            HttpVersionMapping.HttpOverTlsApplicationProtocolsOf(options.HttpVersion));
+            HttpVersionMapping.HttpOverTlsApplicationProtocolsOf(options.HttpVersion),
+            quicDialer);
 
     /// <summary>
     /// The Unix domain socket the TCP connector dials in place of each URL's host: the last of

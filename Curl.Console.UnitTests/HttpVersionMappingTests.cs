@@ -20,6 +20,8 @@ public sealed class HttpVersionMappingTests
     [DataRow(RequestedHttpVersion.Http11, HttpVersionPreference.Http11)]
     [DataRow(RequestedHttpVersion.Http2, HttpVersionPreference.Http11)]
     [DataRow(RequestedHttpVersion.Http2PriorKnowledge, HttpVersionPreference.Http2PriorKnowledge)]
+    [DataRow(RequestedHttpVersion.Http3, HttpVersionPreference.Http3)]
+    [DataRow(RequestedHttpVersion.Http3Only, HttpVersionPreference.Http3Only)]
     public void ToHttpVersionPreference_MapsEachVersionOption(RequestedHttpVersion? version, HttpVersionPreference expected)
     {
         Assert.AreEqual(expected, HttpVersionMapping.ToHttpVersionPreference(version));
@@ -36,6 +38,10 @@ public sealed class HttpVersionMappingTests
     [DataRow(RequestedHttpVersion.Http2, false, "h2,http/1.1")]
     [DataRow(RequestedHttpVersion.Http2PriorKnowledge, true, "h2")]
     [DataRow(RequestedHttpVersion.Http2PriorKnowledge, false, "h2")]
+    [DataRow(RequestedHttpVersion.Http3, true, "h2,http/1.1")]
+    [DataRow(RequestedHttpVersion.Http3, false, "h2,http/1.1")]
+    [DataRow(RequestedHttpVersion.Http3Only, true, "h2,http/1.1")]
+    [DataRow(RequestedHttpVersion.Http3Only, false, "h2,http/1.1")]
     public void HttpOverTlsApplicationProtocolsOf_OffersWhatThePlatformsCurlOffers(RequestedHttpVersion? version, bool isWindows, string expected)
     {
         Assert.AreEqual(expected, string.Join(',', HttpVersionMapping.HttpOverTlsApplicationProtocolsOf(version, isWindows)));
@@ -60,6 +66,8 @@ public sealed class HttpVersionMappingTests
     [DataRow("--http1.1", "http/1.1")]
     [DataRow("--http2", "h2,http/1.1")]
     [DataRow("--http2-prior-knowledge", "h2")]
+    [DataRow("--http3", "h2,http/1.1")]
+    [DataRow("--http3-only", "h2,http/1.1")]
     public void CreateTcpConnector_VersionOption_OffersTheSameOnEveryPlatform(string option, string expected)
     {
         Assert.AreEqual(expected, OfferedBy(option, Url));
@@ -68,7 +76,9 @@ public sealed class HttpVersionMappingTests
     [TestMethod]
     [DataRow("--http2", HttpVersionPreference.Http11)]
     [DataRow("--http2-prior-knowledge", HttpVersionPreference.Http2PriorKnowledge)]
-    public void HttpRequestOptionsFromCommandLine_Http2Option_SetsTheVersion(string option, HttpVersionPreference expected)
+    [DataRow("--http3", HttpVersionPreference.Http3)]
+    [DataRow("--http3-only", HttpVersionPreference.Http3Only)]
+    public void HttpRequestOptionsFromCommandLine_Http2OrHttp3Option_SetsTheVersion(string option, HttpVersionPreference expected)
     {
         CommandLineParseResult result = CommandLineParser.Parse([option, Url]);
         Assert.IsTrue(result.IsAccepted);

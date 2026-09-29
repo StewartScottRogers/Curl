@@ -24,7 +24,14 @@ namespace Curl.Console;
 /// The <c>User-Agent</c> and credential encoding of the CONNECT request <see cref="TcpConnector" />
 /// sends to tunnel through an HTTP proxy.
 /// </param>
-/// <param name="TcpConnector">Connects the TCP protocols, with TLS when the target asks for it.</param>
+/// <param name="QuicDialer">
+/// Opens the QUIC connections <see cref="TcpConnector" /> hands it for <c>--http3</c> and
+/// <c>--http3-only</c>, judging the server's certificate with <see cref="TlsClientOptions" /> (ADR-0144).
+/// </param>
+/// <param name="TcpConnector">
+/// Connects the TCP protocols, with TLS when the target asks for it, and resolves each QUIC
+/// connection's host for <see cref="QuicDialer" />.
+/// </param>
 /// <param name="UdpDatagramConnector">Opens the UDP channels the datagram protocols use.</param>
 /// <param name="PoolingConnector">
 /// The run's one connection pool over <see cref="TcpConnector" />: every TCP handler connects
@@ -40,6 +47,7 @@ internal sealed record CurlTransports(
     TlsClientOptions ProxyTlsClientOptions,
     ITlsProviderWithWarnings ProxyTlsProvider,
     HttpProxyTunnelOptions ProxyTunnelOptions,
+    QuicDialer QuicDialer,
     TcpConnector TcpConnector,
     UdpDatagramConnector UdpDatagramConnector,
     PoolingConnector PoolingConnector);

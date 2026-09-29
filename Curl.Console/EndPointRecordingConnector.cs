@@ -29,4 +29,22 @@ internal sealed class EndPointRecordingConnector(IConnector connector, Connectio
 
         return connect;
     }
+
+    /// <summary>
+    /// Opens a QUIC connection as the wrapped connector does and records its end points;
+    /// a failed connect records nothing.
+    /// </summary>
+    /// <param name="target">Where to connect.</param>
+    /// <param name="cancellationToken">Cancels the connect.</param>
+    /// <returns>The connect's result, unchanged.</returns>
+    public async ValueTask<MultiplexedConnectResult> ConnectMultiplexedAsync(ConnectTarget target, CancellationToken cancellationToken)
+    {
+        MultiplexedConnectResult connect = await connector.ConnectMultiplexedAsync(target, cancellationToken).ConfigureAwait(false);
+        if (connect.Connection is { } connection)
+        {
+            recorder.Record(connection.LocalEndPoint as IPEndPoint, connection.RemoteEndPoint as IPEndPoint);
+        }
+
+        return connect;
+    }
 }
