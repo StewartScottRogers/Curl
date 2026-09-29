@@ -33,3 +33,4 @@ The FTP handler sends `ACCT <account>` when the server answers `332` and `--ftp-
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
