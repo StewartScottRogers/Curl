@@ -43,6 +43,9 @@ namespace Curl.Networking;
 /// </remarks>
 public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsProviderWithWarnings
 {
+    /// <inheritdoc />
+    TlsClientRoute IHandshakeReportingTlsProvider.Route => TlsClientRoute.HandBuilt;
+
     private readonly TlsClientOptions _options;
 
     private readonly bool _matchesSchannelBuild;

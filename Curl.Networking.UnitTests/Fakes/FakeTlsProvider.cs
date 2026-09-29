@@ -21,6 +21,15 @@ public sealed class FakeTlsProvider : IHandshakeReportingTlsProvider
     /// </summary>
     public ConnectResult? FailureToReturn { get; init; }
 
+    /// <summary>Gets the route this provider says it is; <see cref="TlsClientRoute.SslStream" /> unless set.</summary>
+    public TlsClientRoute Route { get; init; } = TlsClientRoute.SslStream;
+
+    /// <summary>
+    /// Gets the handshake a successful four-argument handshake reports on its events, as the real
+    /// providers do; <see langword="null" /> reports none.
+    /// </summary>
+    public TlsHandshakeEvent? HandshakeToReport { get; init; }
+
     /// <summary>
     /// Gets or sets the timings a successful handshake reports; <see langword="null" />
     /// means it reports none.
@@ -64,6 +73,11 @@ public sealed class FakeTlsProvider : IHandshakeReportingTlsProvider
         CancellationToken cancellationToken)
     {
         ReceivedEvents = events;
+        if (HandshakeToReport is { } handshake && FailureToReturn is null)
+        {
+            events.ReportTlsHandshake(handshake);
+        }
+
         ReceivedIsProxy.Add(isProxy);
         ReceivedApplicationProtocols.Add(applicationProtocols);
         return AuthenticateAsClientAsync(plaintext, targetHost, cancellationToken);

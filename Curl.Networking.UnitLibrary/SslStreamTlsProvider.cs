@@ -25,6 +25,9 @@ namespace Curl.Networking;
 /// </remarks>
 public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsProviderWithWarnings
 {
+    /// <inheritdoc />
+    TlsClientRoute IHandshakeReportingTlsProvider.Route => TlsClientRoute.SslStream;
+
     // The one warning curl 8.21.0's Schannel build writes for --capath (ADR-0009), unwrapped:
     // the console wraps it at the terminal width, into two lines at curl's default 79 columns.
     private static readonly string[] SchannelCaCertificateDirectoryWarnings =

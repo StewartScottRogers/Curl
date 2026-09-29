@@ -241,6 +241,28 @@ public sealed class TcpConnector(
     {
         ArgumentNullException.ThrowIfNull(target);
 
+        // Every failure, and every exception that escapes, is written to the diagnostic log at
+        // error (BL-920).
+        var log = new NetworkDiagnosticLog(target.DiagnosticLog);
+        try
+        {
+            var result = await ConnectAndNumberAsync(target, cancellationToken).ConfigureAwait(false);
+            if (result.Connection is null)
+            {
+                log.Failed(DiagnosticLogComponents.Connect, result.ExitCode, result.ErrorMessage);
+            }
+
+            return result;
+        }
+        catch (Exception exception)
+        {
+            log.Threw(exception);
+            throw;
+        }
+    }
+
+    private async ValueTask<ConnectResult> ConnectAndNumberAsync(ConnectTarget target, CancellationToken cancellationToken)
+    {
         var started = timeProvider.GetTimestamp();
         LoadResolveEntriesUnlessLoaded(target.Events);
         var destination = DestinationOf(target);
@@ -281,10 +303,19 @@ public sealed class TcpConnector(
             return MultiplexedConnectResult.Failed(CurlExitCode.CouldntConnect, "QUIC is not available on this connector");
         }
 
+        var log = new NetworkDiagnosticLog(target.DiagnosticLog);
         var (request, failure) = await ResolveForQuicAsync(target, cancellationToken).ConfigureAwait(false);
-        return request is null
-            ? failure!
-            : await quicDialer.DialAsync(request, cancellationToken).ConfigureAwait(false);
+        if (request is null)
+        {
+            log.Failed(DiagnosticLogComponents.Quic, failure!.ExitCode, failure.ErrorMessage);
+            return failure;
+        }
+
+        // The QUIC steps are logged around the dial, so Curl.Quic needs no diagnostic log (BL-920).
+        log.QuicDialling(request.DestinationHost, request.Port, request.Addresses);
+        var dialled = await quicDialer.DialAsync(request, cancellationToken).ConfigureAwait(false);
+        log.QuicDialled(request.DestinationHost, request.Port, dialled);
+        return dialled;
     }
 
     // Everything ConnectMultiplexedAsync does before the QUIC dial: the --resolve entries, the
@@ -301,7 +332,7 @@ public sealed class TcpConnector(
             return (null, MultiplexedConnectResult.Failed(CurlExitCode.SetoptOptionSyntax, parseError));
         }
 
-        var (addresses, failure) = await ResolveWithFailureReasonAsync(destination.Host, destination.Port, target.Events, cancellationToken).ConfigureAwait(false);
+        var (addresses, failure) = await ResolveWithFailureReasonAsync(destination.Host, destination.Port, target, cancellationToken).ConfigureAwait(false);
         if (addresses.Count == 0)
         {
             var (exitCode, message) = NameResolutionFailure.Describe(CurlExitCode.CouldntResolveHost, "host", destination.Host, destination.Port, failure);
@@ -384,7 +415,7 @@ public sealed class TcpConnector(
         long started,
         CancellationToken cancellationToken)
     {
-        var (addresses, failure) = await ResolveWithFailureReasonAsync(destination.Host, destination.Port, target.Events, cancellationToken).ConfigureAwait(false);
+        var (addresses, failure) = await ResolveWithFailureReasonAsync(destination.Host, destination.Port, target, cancellationToken).ConfigureAwait(false);
         if (addresses.Count == 0)
         {
             var (exitCode, message) = NameResolutionFailure.Describe(CurlExitCode.CouldntResolveHost, "host", destination.Host, destination.Port, failure);
@@ -392,7 +423,7 @@ public sealed class TcpConnector(
         }
 
         var nameResolved = timeProvider.GetTimestamp();
-        var (dialed, lastDialError) = await DialFirstReachableAsync(addresses, destination.Port, destination.Host, target.Events, cancellationToken).ConfigureAwait(false);
+        var (dialed, lastDialError) = await DialFirstReachableAsync(addresses, destination.Port, destination.Host, target, cancellationToken).ConfigureAwait(false);
         if (dialed is null)
         {
             var elapsedMilliseconds = (long)timeProvider.GetElapsedTime(nameResolved).TotalMilliseconds;
@@ -513,9 +544,10 @@ public sealed class TcpConnector(
     /// Resolves <paramref name="host" /> for <paramref name="port" /> as curl 8.21.0's DNS cache
     /// does (BL-481): a <c>--resolve</c> entry for the host or for <c>*</c>, or a host and port
     /// this connector already resolved, answers without <see cref="IDnsResolver" /> and is
-    /// reported on <paramref name="events" /> as <c>Hostname &lt;host&gt; was found in DNS
+    /// reported on the target's events as <c>Hostname &lt;host&gt; was found in DNS
     /// cache</c>. A host that did not resolve is not kept, so it is looked up again. Every
-    /// answer is then reported as curl's resolved lines (<see cref="ReportResolved" />).
+    /// answer is then reported as curl's resolved lines (<see cref="ReportResolved" />), and
+    /// written to the target's diagnostic log (<see cref="LogResolution" />, BL-920).
     /// </summary>
     /// <remarks>
     /// Under <c>-4</c> or <c>-6</c> only the chosen family's addresses are returned for a name
@@ -525,12 +557,16 @@ public sealed class TcpConnector(
     /// whole, and one left with no address of the family is reported as <c>Negative DNS
     /// entry</c> instead, and so fails the resolve (measured on curl 8.21.0, BL-500).
     /// </remarks>
-    private async ValueTask<DnsResolution> ResolveWithFailureReasonAsync(string host, int port, ITransferEvents events, CancellationToken cancellationToken)
+    private async ValueTask<DnsResolution> ResolveWithFailureReasonAsync(string host, int port, ConnectTarget target, CancellationToken cancellationToken)
     {
+        var log = new NetworkDiagnosticLog(target.DiagnosticLog);
+        var resolveStarted = log.IsEnabled(DiagnosticLogLevel.Info) ? timeProvider.GetTimestamp() : 0;
         var cacheKey = DnsCacheKey(host, port);
         if ((_dnsCache.GetValueOrDefault(cacheKey) ?? _dnsCache.GetValueOrDefault(DnsCacheKey(AnyHost, port))) is { } cached)
         {
-            return new DnsResolution(AnswerFromCache(host, cached, events), DnsLookupFailure.None);
+            var fromCache = AnswerFromCache(host, cached, target.Events);
+            LogResolution(log, host, port, fromCache, fromCache: true, resolveStarted);
+            return new DnsResolution(fromCache, DnsLookupFailure.None);
         }
 
         var (addresses, failure) = await LookUpAsync(host, cancellationToken).ConfigureAwait(false);
@@ -539,15 +575,34 @@ public sealed class TcpConnector(
         {
             var resolved = new DnsCacheEntry(host, port, answered);
             _dnsCache[cacheKey] = resolved;
-            ReportResolved(resolved, events);
+            ReportResolved(resolved, target.Events);
         }
 
-        return new DnsResolution(AddressFamilyFilter.Dialable(host, answered, addressFamily), failure);
+        var dialable = AddressFamilyFilter.Dialable(host, answered, addressFamily);
+        LogResolution(log, host, port, dialable, fromCache: false, resolveStarted);
+        return new DnsResolution(dialable, failure);
+    }
+
+    /// <summary>
+    /// Writes a resolve's answer to the diagnostic log: the addresses and elapsed milliseconds at
+    /// <c>info</c>, or a <c>warning</c> when none can be dialled. The clock is read only when
+    /// <c>info</c> is enabled, so a disabled log takes no timestamp.
+    /// </summary>
+    private void LogResolution(NetworkDiagnosticLog log, string host, int port, IReadOnlyList<IPAddress> dialable, bool fromCache, long resolveStarted)
+    {
+        if (dialable.Count == 0)
+        {
+            log.NotResolved(host, port);
+        }
+        else if (log.IsEnabled(DiagnosticLogLevel.Info))
+        {
+            log.Resolved(host, port, dialable, fromCache, timeProvider.GetElapsedTime(resolveStarted));
+        }
     }
 
     /// <summary>Resolves as <see cref="ResolveWithFailureReasonAsync" /> does, for a SOCKS handshake, which needs only the addresses.</summary>
-    private async ValueTask<IReadOnlyList<IPAddress>> ResolveAsync(string host, int port, ITransferEvents events, CancellationToken cancellationToken) =>
-        (await ResolveWithFailureReasonAsync(host, port, events, cancellationToken).ConfigureAwait(false)).Addresses;
+    private async ValueTask<IReadOnlyList<IPAddress>> ResolveAsync(string host, int port, ConnectTarget target, CancellationToken cancellationToken) =>
+        (await ResolveWithFailureReasonAsync(host, port, target, cancellationToken).ConfigureAwait(false)).Addresses;
 
     /// <summary>Asks the resolver, with its failure reason when it gives one.</summary>
     private async ValueTask<DnsResolution> LookUpAsync(string host, CancellationToken cancellationToken) =>
@@ -607,7 +662,7 @@ public sealed class TcpConnector(
         long started,
         CancellationToken cancellationToken)
     {
-        var (addresses, failure) = await ResolveWithFailureReasonAsync(proxy.Host, proxy.Port, target.Events, cancellationToken).ConfigureAwait(false);
+        var (addresses, failure) = await ResolveWithFailureReasonAsync(proxy.Host, proxy.Port, target, cancellationToken).ConfigureAwait(false);
         if (addresses.Count == 0)
         {
             var (exitCode, message) = NameResolutionFailure.Describe(CurlExitCode.CouldntResolveProxy, "proxy", proxy.Host, proxy.Port, failure);
@@ -647,7 +702,7 @@ public sealed class TcpConnector(
         string? proxyAuthorization,
         CancellationToken cancellationToken)
     {
-        var (dialed, lastDialError) = await DialFirstReachableAsync(addresses, proxy.Port, proxy.Host, target.Events, cancellationToken).ConfigureAwait(false);
+        var (dialed, lastDialError) = await DialFirstReachableAsync(addresses, proxy.Port, proxy.Host, target, cancellationToken).ConfigureAwait(false);
         if (dialed is null)
         {
             var elapsedMilliseconds = (long)timeProvider.GetElapsedTime(nameResolved).TotalMilliseconds;
@@ -703,7 +758,7 @@ public sealed class TcpConnector(
         // It verifies with the --proxy-* TLS options, not -k or --cacert, so the proxy's own
         // provider runs this handshake (ADR-0061). It offers http/1.1 through ALPN whatever the
         // HTTP version options say, and none under --no-alpn (measured on both builds, ADR-0190).
-        var securedProxy = await AuthenticateAsync(_proxyTlsProvider, dialed.Connection, tunnel.Proxy.Host, tunnel.Target.Events, isProxy: true, applicationProtocols: HttpApplicationProtocols.Http11Only, cancellationToken).ConfigureAwait(false);
+        var securedProxy = await AuthenticateAsync(_proxyTlsProvider, dialed.Connection, tunnel.Proxy.Host, tunnel.Target, isProxy: true, applicationProtocols: HttpApplicationProtocols.Http11Only, cancellationToken).ConfigureAwait(false);
         if (securedProxy.Connection is not { } proxyConnection)
         {
             return (securedProxy, null);
@@ -729,7 +784,9 @@ public sealed class TcpConnector(
         CancellationToken cancellationToken)
     {
         var connection = dialed.Connection;
-        var (failure, exception) = await RunSocksHandshakeAsync(connection, destination, proxy, target.Events, cancellationToken).ConfigureAwait(false);
+        var log = new NetworkDiagnosticLog(target.DiagnosticLog);
+        log.SocksHandshakeStarting(proxy, destination.Host, destination.Port);
+        var (failure, exception) = await RunSocksHandshakeAsync(connection, destination, proxy, target, cancellationToken).ConfigureAwait(false);
         if (exception is not null || failure is not null)
         {
             // The proxy connection is disposed whether the handshake failed or could not be sent or read.
@@ -739,6 +796,7 @@ public sealed class TcpConnector(
         }
 
         // As through an HTTP proxy, %{time_connect} is when the tunnel is open.
+        log.TunnelEstablished(proxy, destination.Host, destination.Port, statusCode: 0);
         return await SecureWhenAskedAsync(dialed, target, timings with { Connected = timeProvider.GetTimestamp() }, 0, cancellationToken).ConfigureAwait(false);
     }
 
@@ -756,13 +814,16 @@ public sealed class TcpConnector(
         CancellationToken cancellationToken)
     {
         var connection = dialed.Connection;
+        var log = new NetworkDiagnosticLog(tunnel.Target.DiagnosticLog);
         while (true)
         {
+            log.TunnelRequested(tunnel.Proxy, tunnel.Destination.Host, tunnel.Destination.Port);
             var (reply, exception) = await RequestTunnelAsync(connection, tunnel.Destination, tunnel.Proxy, proxyAuthorization, cancellationToken).ConfigureAwait(false);
             if (exception is null && reply.OpensTunnel)
             {
                 // For a tunnel, %{time_connect} is when the tunnel is open (ConnectTimings.Connected).
                 var timings = new ConnectTimings(tunnel.Started, tunnel.NameResolved, timeProvider.GetTimestamp(), null);
+                log.TunnelEstablished(tunnel.Proxy, tunnel.Destination.Host, tunnel.Destination.Port, reply.StatusCode);
                 return (await SecureWhenAskedAsync(dialed, tunnel.Target, timings, reply.StatusCode, cancellationToken).ConfigureAwait(false), null);
             }
 
@@ -840,7 +901,7 @@ public sealed class TcpConnector(
         IConnection connection,
         ConnectDestination destination,
         ProxyEndpoint proxy,
-        ITransferEvents events,
+        ConnectTarget target,
         CancellationToken cancellationToken)
     {
         try
@@ -850,7 +911,7 @@ public sealed class TcpConnector(
                 proxy,
                 destination.Host,
                 destination.Port,
-                (host, port, token) => ResolveAsync(host, port, events, token),
+                (host, port, token) => ResolveAsync(host, port, target, token),
                 cancellationToken).ConfigureAwait(false), null);
         }
         catch (Exception exception)
@@ -940,7 +1001,7 @@ public sealed class TcpConnector(
             target.IsForwardProxy ? _proxyTlsProvider : tlsProvider,
             plaintext,
             target.Host,
-            target.Events,
+            target,
             target.IsForwardProxy,
             ApplicationProtocolsFor(target, HttpOverTlsApplicationProtocols),
             cancellationToken);
@@ -965,22 +1026,48 @@ public sealed class TcpConnector(
     // A provider that can report its handshake reports its trust and handshake on the
     // target's events, marked as the proxy's when it is with an HTTPS proxy (BL-404, BL-452),
     // and offers the target's application protocols through ALPN (BL-490).
-    private static ValueTask<ConnectResult> AuthenticateAsync(
+    // Either way the handshake's outcome goes to the diagnostic log (BL-920): the events are
+    // wrapped to catch the reported handshake only when info is enabled, so with the log off the
+    // provider receives the target's own events.
+    private static async ValueTask<ConnectResult> AuthenticateAsync(
         ITlsProvider provider,
         IConnection plaintext,
         string host,
-        ITransferEvents events,
+        ConnectTarget target,
         bool isProxy,
         IReadOnlyList<string> applicationProtocols,
-        CancellationToken cancellationToken) =>
-        provider is IHandshakeReportingTlsProvider reportingProvider
-            ? reportingProvider.AuthenticateAsClientAsync(plaintext, host, events, isProxy, applicationProtocols, cancellationToken)
-            : provider.AuthenticateAsClientAsync(plaintext, host, cancellationToken);
+        CancellationToken cancellationToken)
+    {
+        var log = new NetworkDiagnosticLog(target.DiagnosticLog);
+        if (provider is not IHandshakeReportingTlsProvider reportingProvider)
+        {
+            var unreported = await provider.AuthenticateAsClientAsync(plaintext, host, cancellationToken).ConfigureAwait(false);
+            LogHandshake(log, host, route: null, handshake: null, unreported);
+            return unreported;
+        }
+
+        var capturing = log.IsEnabled(DiagnosticLogLevel.Info) ? new HandshakeCapturingTransferEvents(target.Events) : null;
+        var secured = await reportingProvider.AuthenticateAsClientAsync(plaintext, host, capturing ?? target.Events, isProxy, applicationProtocols, cancellationToken).ConfigureAwait(false);
+        LogHandshake(log, host, reportingProvider.Route, capturing?.Handshake, secured);
+        return secured;
+    }
+
+    private static void LogHandshake(NetworkDiagnosticLog log, string host, TlsClientRoute? route, TlsHandshakeEvent? handshake, ConnectResult secured)
+    {
+        if (secured.Connection is null)
+        {
+            log.Failed(DiagnosticLogComponents.Tls, secured.ExitCode, secured.ErrorMessage);
+        }
+        else
+        {
+            log.HandshakeCompleted(host, route, handshake, secured.ApplicationProtocol);
+        }
+    }
 
     /// <summary>
     /// Dials each address in turn and returns the first connection, or <see langword="null" />
     /// with the <see cref="SocketError" /> of the last attempt, which curl keeps as
-    /// <c>CURLINFO_OS_ERRNO</c>. Each attempt is reported on <paramref name="events" /> as
+    /// <c>CURLINFO_OS_ERRNO</c>. Each attempt is reported on the target's events as
     /// curl 8.21.0's <c>-v</c> reports it: <c>Trying</c> before it, and the
     /// <c>connect to ... failed</c> line when it fails (measured, BL-408).
     /// </summary>
@@ -988,17 +1075,21 @@ public sealed class TcpConnector(
         IReadOnlyList<IPAddress> addresses,
         int port,
         string hostName,
-        ITransferEvents events,
+        ConnectTarget target,
         CancellationToken cancellationToken)
     {
+        var events = target.Events;
+        var log = new NetworkDiagnosticLog(target.DiagnosticLog);
         var lastError = SocketError.Success;
         foreach (var address in addresses)
         {
             var remoteEndPoint = new IPEndPoint(address, port);
             events.ReportInfo($"  Trying {remoteEndPoint}...");
+            log.Dialling(remoteEndPoint);
             try
             {
                 var dialed = await tcpDialer.DialAsync(remoteEndPoint, cancellationToken).ConfigureAwait(false);
+                log.Connected(remoteEndPoint, dialed.LocalEndPoint);
                 return (new DialedSocket(dialed.Connection, dialed.LocalEndPoint, hostName, remoteEndPoint), SocketError.Success);
             }
             catch (SocketException exception)
@@ -1006,6 +1097,7 @@ public sealed class TcpConnector(
                 // curl moves on to the next address; only when every one fails is it exit 7.
                 lastError = exception.SocketErrorCode;
                 events.ReportInfo(ConnectFailedLine(remoteEndPoint, exception));
+                log.DialFailed(remoteEndPoint, exception);
             }
         }
 

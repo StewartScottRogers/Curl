@@ -68,6 +68,7 @@ public sealed class PoolingConnector(IConnector innerConnector, TimeProvider tim
 
         var key = ConnectionPoolKey.Of(target);
         var idle = await TakeIdleAsync(key, target.Events);
+        new NetworkDiagnosticLog(target.DiagnosticLog).PoolDecision(target, idle?.ConnectionNumber);
 
         return idle is null
             ? await OpenAsync(target, key, cancellationToken)

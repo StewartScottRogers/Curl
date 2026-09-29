@@ -289,6 +289,21 @@ recvfrom() ...`. This project therefore references `Curl.Quic.UnitLibrary`, whic
 copies of `Curl.Quic.UnitTests`' in-memory server, reached through `Fakes/QuicServerChannelOpener`.
 `PoolingConnector.ConnectMultiplexedAsync` passes straight through to its inner connector.
 
+Per ADR-0222 (BL-920) `TcpConnector` and `PoolingConnector` write the connect steps to
+`ConnectTarget.DiagnosticLog` (`--log-level`) through `NetworkDiagnosticLog`, the one place that
+formats them and tests `IsEnabled` first: `dns` the addresses a name resolved to (cache or lookup,
+elapsed ms) at `info` and a name with none at `warning`; `connect` each address dialled at
+`verbose`, each failed dial at `warning`, the connection made at `info`, the pool's reuse decision
+at `verbose`, and every failed connect (with its `CurlExitCode`) or escaping exception (type and
+message) at `error`; `proxy` the CONNECT or SOCKS handshake at `verbose` and the tunnel at `info`;
+`tls` the handshake's version, cipher suite, ALPN and route (`IHandshakeReportingTlsProvider.Route`)
+at `info`, each certificate and the chain verdict at `verbose`, a failed handshake at `error`;
+`quic` the dial at `verbose`, the connection at `info`, a failure at `error`. The handshake's details
+come from the `TlsHandshakeEvent` the provider reports, caught by `HandshakeCapturingTransferEvents`,
+which wraps the target's events only when `info` is on. A proxy is named by kind, host and port and
+no credential, pass phrase or `Proxy-Authorization` reaches the log; `Curl.Tls` and `Curl.Quic`
+log nothing themselves. Tests record lines through `Fakes/RecordingDiagnosticLog`.
+
 Everything else takes the Abstractions contracts (`IDnsResolver`, `ITlsProvider`,
 `IConnection`, `IDatagramChannel`) or `ITcpDialer`, plus an injected `TimeProvider`, so the tests in
 `Curl.Networking.UnitTests` drive every branch with fakes and no network.
