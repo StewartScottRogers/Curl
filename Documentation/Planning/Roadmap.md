@@ -1,7 +1,9 @@
 # Roadmap
 
-Milestones 0 and 1 are set; later phases are not yet sequenced here. Dates are
-deliberately absent rather than guessed.
+Milestones 0 to 6 follow the phasing table in `Documentation/Product/Product-Overview.md`:
+Milestone 2 is Phase 2, Milestone 3 is Phase 3, Milestone 4 is the WebSocket part of
+Phase 4 (its other protocols shipped in Milestone 1), Milestone 5 is Phase 5 and
+Milestone 6 is Phase 6. Dates are deliberately absent rather than guessed.
 
 Ordered by dependency, not by calendar. A milestone is done when its exit
 criteria are met, and each milestone cites the requirement IDs it delivers.
@@ -101,13 +103,147 @@ built alongside it.
 - **Outstanding:** every task under "Delivers" that is not yet in `Tasks/Done`; the task
   board, not this page, holds each one's status.
 
+## Milestone 2 — Phase 2: FTP and SSH
+
+`Curl.Protocol.Ftp` and `Curl.Protocol.Ssh`: a second transport shape, a control
+channel beside data channels, without distorting the design.
+
+- **Status:** In progress. FTP is built and registered; SCP and SFTP are being built.
+- **Decisions that stand:** ADR-0122 (SCP and SFTP offer each platform curl's libssh2
+  algorithms), ADR-0206 (key exchange failures), ADR-0212 (packet protection), ADR-0213
+  (host key checks) and ADR-0215 (user authentication).
+- **Delivers:**
+  - FTP, `Curl.Protocol.Ftp`: download with login, passive mode and RETR (BL-431),
+    registration in `Curl.Console` (BL-434), the control options (BL-435, BL-436),
+    active mode and FTPS (BL-437, BL-456 to BL-459, BL-463 to BL-466, BL-474), `-r`,
+    `-C` and `-I` (BL-438), `-T` uploads (BL-439), `ftp://` through an HTTP proxy
+    (BL-343, BL-344), the reply code (BL-392), `--max-time` and `--connect-timeout`
+    (BL-512), `%{ftp_entry_path}` (BL-514), MDTM and SIZE (BL-637, BL-638) and exits
+    11 and 15 (BL-662).
+  - FTP follow-ups: ASCII mode, `--crlf` and `-a` (BL-632, BL-633), ACCT, the
+    alternative USER and PRET (BL-634, BL-635), CCC (BL-636), `-R` into the transfer
+    context (BL-854), the passive data connect under `--connect-timeout` (BL-797), EPSV
+    over IPv6 (BL-903) and the data connection's failure message (BL-904).
+  - SSH, `Curl.Protocol.Ssh`: the build decision (BL-560), the transfer options and
+    their parsing (BL-561, BL-562), the transport, key exchange and packet protection
+    (BL-563 to BL-565, BL-678), host key checks (BL-566), password, keyboard-interactive
+    and public key authentication (BL-567, BL-568, BL-681), SFTP download, listing,
+    upload, quote commands and ranges (BL-569 to BL-573), SCP download and upload
+    (BL-574, BL-577), compression (BL-575), registration for `scp` and `sftp` in
+    `Curl.Console` (BL-576) and `-v` and `--trace` lines (BL-578).
+  - The rest of the libssh2 and libssh algorithm set: ChaCha20-Poly1305 (BL-679), the
+    older ciphers and MACs (BL-680), the post-quantum hybrid key exchanges (BL-748),
+    host-key certificates (BL-749) and the ETM MACs (BL-750), on the hand-built
+    primitives in `Curl.Cryptography` (BL-669 to BL-677).
+- **Exit criteria:** `curl ftp://`, `ftps://`, `scp://` and `sftp://` run end to end
+  through `Curl.Console`, sending curl's commands and writing curl's output and exit
+  codes, measured against the platform's curl.
+- **Outstanding:** every task under "Delivers" that is not yet in `Tasks/Done`; the
+  task board, not this page, holds each one's status. `--krb` for FTP (BL-693) is
+  deferred.
+
+## Milestone 3 — Phase 3: SMTP, IMAP and POP3
+
+`Curl.Protocol.Smtp`, `Curl.Protocol.Imap` and `Curl.Protocol.Pop3`: line-oriented
+protocols sharing one SASL authenticator and one mail options record.
+
+- **Status:** In progress. All three handlers are built and registered; follow-ups
+  remain.
+- **Decisions that stand:** ADR-0121 (the shared SASL authenticator and mail options),
+  ADR-0123, ADR-0139, ADR-0183, ADR-0184 and ADR-0203 (SASL), ADR-0134 (POP3 login
+  order) and ADR-0136 (SMTP `MAIL FROM`).
+- **Delivers:**
+  - The exchange recording modes (BL-529 to BL-531), the SASL decision (BL-533), the
+    mail options and authenticator contract (BL-534), their parsing (BL-535), the SASL
+    mechanisms (BL-536 to BL-538) and carrying them into each handler (BL-539).
+  - SMTP: the session, authentication, upload, commands, options, registration and
+    `-v` lines (BL-540 to BL-546).
+  - POP3: the session, authentication, list and retrieve, commands, registration and
+    `-v` lines (BL-547 to BL-552).
+  - IMAP: the session, authentication, fetch, list and search, append, registration
+    and `-v` lines (BL-553 to BL-559).
+  - Follow-ups: the OAUTHBEARER port (BL-751, BL-876), SASL cancellation and exit 94
+    (BL-774, BL-781, BL-856), UTF-8 and IDNA addresses (BL-776), awaited SASL
+    exchanges and the security context factory (BL-851, BL-852), the `-v` SASL line
+    when no mechanism is found (BL-810) and `--delegation` for SASL GSSAPI (BL-874).
+- **Exit criteria:** `curl smtp://`, `smtps://`, `imap://`, `imaps://`, `pop3://` and
+  `pop3s://` run end to end through `Curl.Console`, sending curl's commands and writing
+  curl's output and exit codes, measured against the platform's curl.
+- **Outstanding:** every task under "Delivers" that is not yet in `Tasks/Done`.
+
+## Milestone 4 — Phase 4: WebSocket
+
+`Curl.Protocol.Ws`. The rest of Phase 4 (`Mqtt`, `Tftp`, `Dict`, `Gopher`, `Telnet`)
+shipped in Milestone 1.
+
+- **Status:** In progress. The handler is built and registered for `ws` and `wss`;
+  follow-ups remain.
+- **Decisions that stand:** ADR-0128 (the upgrade request and 101 head) and ADR-0131
+  (frame reading).
+- **Delivers:** the upgrade decision (BL-579), the upgrade request (BL-580), frames
+  (BL-581), writing messages (BL-582), registration (BL-583), `-v` and `--trace` lines
+  (BL-584, BL-813), `%{size_delivered}` (BL-777), `-I` on a WebSocket URL (BL-788) and
+  Negotiate continuation over `ws` (BL-842).
+- **Exit criteria:** `curl ws://` and `wss://` run end to end through `Curl.Console`,
+  writing curl's output and exit codes, measured against the platform's curl.
+- **Outstanding:** every task under "Delivers" that is not yet in `Tasks/Done`.
+
+## Milestone 5 — Phase 5: LDAP, SMB and RTSP
+
+`Curl.Protocol.Ldap`, `Curl.Protocol.Smb` and `Curl.Protocol.Rtsp`: the awkward
+remainder.
+
+- **Status:** In progress. LDAP and RTSP are built and registered; SMB is built but
+  not yet registered in `Curl.Console`.
+- **Decisions that stand:** ADR-0166 (LDAP on `IConnection`, as each platform's WinLDAP
+  or OpenLDAP build answers), ADR-0169 (RTSP requests and replies) and ADR-0200 (SMB
+  and SMBS speak curl's SMBv1 on every platform).
+- **Delivers:**
+  - LDAP: the build decision (BL-585), BER and bind (BL-586), the search (BL-587),
+    output (BL-588), registration (BL-589), the WinLDAP bind, signing and sealing
+    (BL-830, BL-853) and I/O failure exits (BL-845).
+  - RTSP: the message decision (BL-590), CSeq (BL-591), the session ID (BL-592),
+    registration with its options (BL-593) and reply header edge cases (BL-840).
+  - SMB: the platform decision (BL-594), negotiation and NTLM (BL-595), download
+    (BL-596), upload (BL-597) and registration for `smb` and `smbs` (BL-598).
+- **Exit criteria:** `curl ldap://`, `ldaps://`, `smb://`, `smbs://` and `rtsp://` run
+  end to end through `Curl.Console`, writing curl's output and exit codes, measured
+  against the platform's curl.
+- **Outstanding:** every task under "Delivers" that is not yet in `Tasks/Done`.
+
+## Milestone 6 — Phase 6: the conformance push, HTTP/2 and HTTP/3
+
+The options, `-w` variables and protocol versions the 2026-09-28 conformance audit found
+missing, so the drop-in claim becomes defensible.
+
+- **Status:** In progress.
+- **Decisions that stand:** ADR-0141 (HTTP/2 is hand-built), ADR-0144 and ADR-0172
+  (HTTP/3 over a hand-built QUIC), which supersede
+  [ADR-0017](Decisions/ADR-0017-no-http-2-or-http-3-in-milestone-1.md).
+- **Delivers:**
+  - The options and `-w` fixes filed on 2026-09-28: BL-488 to BL-528 and BL-599 to
+    BL-654 (with BL-661), among them the no-function and unimplemented options,
+    `--no-clobber` and the other output options, `-4` and `-6`, the TLS version
+    options, `.netrc`, Unix sockets, `-:`, timeouts for every scheme, the `-w` fixes,
+    `-Z`, `--proto`, NTLM and Negotiate, the proxy, TLS, HSTS, alt-svc, AWS, FTP, DoH,
+    socket and `--libcurl` options.
+  - HTTP/2: the decision (BL-655), HPACK (BL-656), frames (BL-657), requests (BL-658),
+    ALPN (BL-659), `-v`, `-i` and `%{http_version}` (BL-660), h2c (BL-716), `-Z`
+    multiplexing (BL-717) and pooling (BL-817).
+  - HTTP/3: the decision (BL-718), the QUIC and HTTP/3 libraries and contracts (BL-719
+    to BL-721), QUIC (BL-722 to BL-728), QPACK, framing and requests (BL-729 to
+    BL-731), `--http3` (BL-732), alt-svc (BL-733), output (BL-734) and multiplexing
+    (BL-735).
+- **Exit criteria:** every option in `curl --help all` and every `-w` variable is
+  accepted and behaves as the platform's curl does, and `--http2` and `--http3`
+  transfers write curl's output and exit codes.
+- **Outstanding:** every task under "Delivers" that is not yet in `Tasks/Done`.
+
 ## Later / unscheduled
 
 Work that is agreed in principle but not yet sequenced.
 
-- Hand-written HTTP/2 over `IConnection` (HPACK and framing; the BCL has none). Until
-  then `--http2`, `--http2-prior-knowledge` and `--http3` are refused on every platform;
-  see [ADR-0017](Decisions/ADR-0017-no-http-2-or-http-3-in-milestone-1.md).
-- Hand-written zstd decoder (then `--compressed` advertises `zstd`). Until then
+- `--compressed` advertising `zstd`. The hand-built Zstandard decoder exists in
+  `Curl.Zstandard` (BL-857 to BL-860); until BL-861 wires it into HTTP,
   `--compressed` sends `Accept-Encoding: deflate, gzip, br`; see
   [ADR-0020](Decisions/ADR-0020-compressed-advertises-deflate-gzip-and-br-until-a-zstd-decoder-exists.md).

@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation/Planning/Roadmap.md]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-29
 ---
 # BL-666 — Add Roadmap milestones for phases 2, 3 and 5 from the tasks filed for them
 
@@ -24,13 +24,18 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Planning/Roadmap.md` has Milestone 2 (and later) sections with Status, Delivers (task IDs), Exit criteria and Outstanding, covering phases 2, 3 and 5 and the WebSocket work.
-- [ ] The opening paragraph no longer says later phases are not sequenced.
-- [ ] Every task ID cited exists on the board or in its archive.
+- [x] `Documentation/Planning/Roadmap.md` has Milestone 2 (and later) sections with Status, Delivers (task IDs), Exit criteria and Outstanding, covering phases 2, 3 and 5 and the WebSocket work.
+- [x] The opening paragraph no longer says later phases are not sequenced.
+- [x] Every task ID cited exists on the board or in its archive.
 
 ## Notes
+
+- Done directly rather than through align-and-document: a single-document edit with every fact checked against the board. Milestone 4 is the WebSocket part of Phase 4 and Milestone 6 is Phase 6; the 2026-09-28 options and -w fixes (BL-488 to BL-528, BL-599 to BL-654, BL-661) and HTTP/2 and HTTP/3 went into Milestone 6 rather than "Later", since Phase 6 is the conformance push.
+- The stale "Later" HTTP/2 item (ADR-0017, superseded by ADR-0141 and ADR-0144) was removed; the zstd item now names the built decoder and BL-861.
+- Every cited ID was checked against Tasks/ with a grep over the board; none missing. BL-806 names two live tasks, so the Roadmap does not cite it.
 
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Done. Roadmap sequences Milestones 2 to 6 (FTP and SSH, mail, WebSocket, LDAP/SMB/RTSP, conformance with HTTP/2 and HTTP/3) with their task IDs
