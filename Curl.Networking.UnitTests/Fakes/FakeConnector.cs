@@ -28,6 +28,9 @@ public sealed class FakeConnector : IConnector
     /// <summary>Gets or sets the exception every opened connection's reads throw, or <see langword="null" /> to answer reads.</summary>
     public Exception? ReadException { get; set; }
 
+    /// <summary>Gets or sets the Unix domain socket path every connection reports, or <see langword="null" /> for TCP.</summary>
+    public string? UnixSocketPath { get; set; }
+
     /// <inheritdoc />
     public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
     {
@@ -50,6 +53,7 @@ public sealed class FakeConnector : IConnector
             new ConnectTimings(number, null, number, null),
             new IPEndPoint(IPAddress.Loopback, 50000 + number),
             proxyConnectResponseCode: 200,
-            peerCertificates: [new byte[] { (byte)number }]));
+            peerCertificates: [new byte[] { (byte)number }],
+            unixSocketPath: UnixSocketPath));
     }
 }

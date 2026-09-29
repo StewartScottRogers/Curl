@@ -452,7 +452,7 @@ public sealed class TcpConnector(
                 CurlErrorBuffer.Truncate($"Failed to connect to {target.Host}:{target.Port} over unix://{unixSocket.Path} after {elapsedMilliseconds} ms: Could not connect to server"));
         }
 
-        var dialed = new DialedSocket(connection, null, unixSocket.Path, null, name);
+        var dialed = new DialedSocket(connection, null, unixSocket.Path, null, name, unixSocket.Path);
         var timings = new ConnectTimings(started, nameResolved, timeProvider.GetTimestamp(), null);
         return await SecureWhenAskedAsync(dialed, target, timings, 0, cancellationToken).ConfigureAwait(false);
     }
@@ -924,7 +924,8 @@ public sealed class TcpConnector(
             proxyConnectResponseCode,
             peerCertificates,
             isReused: false,
-            connectionNumber);
+            connectionNumber,
+            unixSocketPath: dialed.UnixSocketPath);
     }
 
     // A forward proxy is the target itself, so its handshake runs through the proxy's
@@ -1044,14 +1045,17 @@ public sealed class TcpConnector(
     /// </summary>
     /// <remarks>
     /// Through a Unix domain socket the host name is the socket's path, the two end points are
-    /// <see langword="null" /> and <paramref name="UnixSocketRemoteIp" /> is what curl shows instead.
+    /// <see langword="null" />, <paramref name="UnixSocketRemoteIp" /> is what curl shows instead and
+    /// <paramref name="UnixSocketPath" /> is the whole path, which the HTTP handler names in its
+    /// left-intact line (BL-884).
     /// </remarks>
     private sealed record DialedSocket(
         IConnection Connection,
         IPEndPoint? LocalEndPoint,
         string HostName,
         IPEndPoint? RemoteEndPoint,
-        string? UnixSocketRemoteIp = null);
+        string? UnixSocketRemoteIp = null,
+        string? UnixSocketPath = null);
 
     /// <summary>
     /// What a CONNECT tunnel is opened for: the target, the destination named in the CONNECT,

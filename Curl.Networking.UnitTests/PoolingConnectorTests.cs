@@ -122,6 +122,22 @@ public sealed class PoolingConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_OverAUnixSocket_KeepsItsPathOnTheOpenedAndTheReusedResult()
+    {
+        _inner.UnixSocketPath = "/run/app.sock";
+        await using var pool = CreatePool();
+
+        var opened = await pool.ConnectAsync(Target(), CancellationToken.None);
+        opened.Connection!.MarkReusable();
+        await opened.Connection.DisposeAsync();
+        var reused = await pool.ConnectAsync(Target(), CancellationToken.None);
+
+        Assert.AreEqual("/run/app.sock", opened.UnixSocketPath);
+        Assert.IsTrue(reused.IsReused);
+        Assert.AreEqual("/run/app.sock", reused.UnixSocketPath);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_ReusingAForwardProxyConnection_ReportsItWithProxy()
     {
         await using var pool = CreatePool();

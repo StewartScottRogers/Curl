@@ -141,6 +141,7 @@ public sealed partial class TcpConnectorTests
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreSame(secondConnection, result.Connection);
+        Assert.IsNull(result.UnixSocketPath);
         CollectionAssert.AreEqual(
             new[] { new IPEndPoint(first, 80), new IPEndPoint(second, 80) },
             dialer.DialedEndPoints);

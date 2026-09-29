@@ -228,7 +228,10 @@ TLS to the URL's host when asked. `-v` shows curl 8.21.0's Windows lines on ever
 port 0 from  port 0 failed: <reason>` before exit 7 `Failed to connect to <host>:<port> over
 unix://<path> after N ms: Could not connect to server`; `<name>` is `UnixSocketAddress.RemoteIpText`,
 the path cut to 45 characters (empty for an abstract name). A success is reported opened with the
-path as the host and `ConnectionOpenedEvent.UnixSocketRemoteIp`. A path too long for `sun_path`
+path as the host and `ConnectionOpenedEvent.UnixSocketRemoteIp`, and returns the whole path (an
+abstract name as given) as `ConnectResult.UnixSocketPath`, which `PoolingConnector` keeps in its
+`PoolEntry` for the opened and every reused result, so the HTTP handler's left-intact line names
+the socket (BL-884). A path too long for `sun_path`
 (108 bytes, 104 on macOS, with its NUL) is exit 6 `Unix socket path too long: '<path>'`. Pools are
 per option group, so different sockets never share a connection.
 
