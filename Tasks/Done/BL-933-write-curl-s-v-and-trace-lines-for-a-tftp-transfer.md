@@ -114,7 +114,7 @@ the milliseconds already elapsed.
   the connect lines once the channel opens and `shutting down connection #0` after it is
   disposed. The `Established` line is a plain info line, not `ReportConnectionOpened`,
   because curl leaves the local end empty (`from  port 0 `) for its unconnected UDP socket.
-- Connection number: always `#0`. The datagram seam carries no number; filed BL-968 for
+- Connection number: always `#0`. The datagram seam carries no number; filed BL-969 for
   several URLs in one invocation.
 - `Total` is `TftpRetrySchedule.TimeLeftMilliseconds`: the whole milliseconds left the
   schedule was derived from, 0 when no limit applies (curl's `timeout_ms`). Tests freeze

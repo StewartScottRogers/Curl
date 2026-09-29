@@ -1,5 +1,5 @@
 ---
-id: BL-968
+id: BL-969
 title: Number a TFTP transfer's connection like curl across several URLs
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-968 — Number a TFTP transfer's connection like curl across several URLs
+# BL-969 — Number a TFTP transfer's connection like curl across several URLs
 
 ## Goal
 
