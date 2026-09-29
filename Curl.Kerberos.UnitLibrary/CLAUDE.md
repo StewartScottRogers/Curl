@@ -7,9 +7,11 @@ Negotiate (`Curl.Authentication.UnitLibrary`), SASL `GSSAPI` (BL-538), SOCKS5 GS
 (SSPI on Windows, the system GSS-API elsewhere) is ADR-0142's routing, not this
 library's.
 
-Namespace `Curl.Kerberos`. The project is scaffolded (BL-685) and holds no types yet;
-the client, its encryption types and the GSS-API mechanism land under their own tasks,
-starting with BL-686.
+Namespace `Curl.Kerberos`. It reads MIT's credential cache (version 4) and keytab
+(version 2) files and finds the default cache and keytab as MIT does
+(`CredentialCacheReader`, `KeytabReader`, `CredentialCacheStore`, `KeytabStore`;
+BL-688, ADR-0158). The client, its encryption types and the GSS-API mechanism land
+under their own tasks.
 
 ## Rules
 
@@ -19,7 +21,8 @@ starting with BL-686.
 - **Never a `Socket`.** The KDC is reached through an injected transport, so every
   exchange is testable with recorded bytes and no network.
 - **Files through an injected seam.** The credential cache, the keytab and `krb5.conf`
-  are read through an interface the caller supplies, never `System.IO.File` directly.
+  are read through an interface the caller supplies (`IKerberosFileReader`), never
+  `System.IO.File` directly.
 - **Time through `TimeProvider`.** Ticket lifetimes, authenticator timestamps and clock
   skew all take the injected `TimeProvider`; never `DateTime.Now` or `Thread.Sleep`.
 - **Randomness injected.** Confounders, session subkeys and nonces come from an injected
