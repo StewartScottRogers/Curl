@@ -14,7 +14,7 @@ namespace Curl.Tls;
 /// and always computes and compares the MAC, and only the combined answer is branched on,
 /// so bad padding and a bad MAC both end in <c>bad_record_mac</c> by the same path. The
 /// MAC is computed over the content the padding implies, so its hashing time still follows
-/// the padding length by up to a few hash blocks (the Lucky Thirteen residual, ADR-0148).
+/// the padding length by up to a few hash blocks (the Lucky Thirteen residual, ADR-0150).
 /// </remarks>
 internal sealed class Tls12CbcRecordCipher(
     ITls12CbcBlockCipher blockCipher,

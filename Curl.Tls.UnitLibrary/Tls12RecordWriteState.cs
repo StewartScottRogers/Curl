@@ -12,7 +12,7 @@ namespace Curl.Tls;
 /// With a CBC cipher in TLS 1.0, each call that writes application data first writes an
 /// empty application data record, the BEAST countermeasure OpenSSL applies unless
 /// <c>SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS</c> is set, which curl sets for
-/// <c>--ssl-allow-beast</c> (ADR-0148).
+/// <c>--ssl-allow-beast</c> (ADR-0150).
 /// </remarks>
 public sealed class Tls12RecordWriteState : IDisposable
 {

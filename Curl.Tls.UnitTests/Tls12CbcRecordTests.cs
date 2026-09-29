@@ -5,7 +5,7 @@ namespace Curl.Tls;
 /// <summary>
 /// CBC records in detail: the padding checked without a branch on the decrypted bytes, bad
 /// padding and a bad MAC both ending in <c>bad_record_mac</c>, malformed lengths, and
-/// TLS 1.0's empty-fragment BEAST countermeasure (ADR-0148).
+/// TLS 1.0's empty-fragment BEAST countermeasure (ADR-0150).
 /// </summary>
 [TestClass]
 public sealed class Tls12CbcRecordTests

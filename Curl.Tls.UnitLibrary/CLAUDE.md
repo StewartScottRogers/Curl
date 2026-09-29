@@ -11,7 +11,7 @@ where the operating system disables them, `--ssl-allow-beast`). Everything else 
 
 Namespace `Curl.Tls`. What is here so far: the handshake message codecs (BL-698), the
 TLS 1.3 key schedule (BL-697), the TLS 1.3 client handshake (BL-699, ADR-0146), and the
-TLS 1.2, 1.1 and 1.0 PRF and record protection (BL-702, ADR-0148).
+TLS 1.2, 1.1 and 1.0 PRF and record protection (BL-702, ADR-0150).
 
 - `HandshakeMessageReader` frames handshake bytes into `HandshakeMessage`s (type and
   body); an unknown type is `unexpected_message`.
@@ -64,8 +64,8 @@ TLS 1.2, 1.1 and 1.0 PRF and record protection (BL-702, ADR-0148).
   ARIA-GCM with the sequence number as the explicit nonce, ChaCha20-Poly1305 with the
   XORed nonce). TLS 1.0 CBC writes an empty record before application data unless
   `insertEmptyFragment` is off (`--ssl-allow-beast`). CBC padding is checked with masks
-  (`Tls12CbcPadding`); the Lucky Thirteen hash-time residual is BL-792's. AES-CCM and RC4
-  records are BL-793's.
+  (`Tls12CbcPadding`); the Lucky Thirteen hash-time residual is BL-795's. AES-CCM and RC4
+  records are BL-796's.
 - `ITlsRandomSource` supplies the random, session ID and key shares;
   `SystemTlsRandomSource` is the production one.
 - `IServerCertificateVerifier` gets the chain as a `ServerCertificateChain` (DER
