@@ -77,7 +77,8 @@ ClientHello (BL-821, ADR-0205), and post-handshake client authentication (BL-880
   legacy session ID on or off, the ClientHello extension order and verbatim extra
   extensions (`padding` in the order pads a 256-to-511-byte hello to 512).
 - Key shares: `X25519KeyShare`, `X448KeyShare`, `EcdhKeyShare` (NIST curves, points
-  checked by `NistCurve`), `FfdheKeyShare` (RFC 7919 groups) and
+  checked by `NistCurve`), `BrainpoolKeyShare` (TLS 1.2's brainpool curves over
+  `Curl.Cryptography`'s `BrainpoolEcdh`, BL-803), `FfdheKeyShare` (RFC 7919 groups) and
   `X25519MlKem768KeyShare` (BL-879: the ML-KEM-768 encapsulation key then the X25519
   key out, the 1088-byte ciphertext then the server's X25519 key in, the ML-KEM secret
   then the X25519 secret as the shared secret); `TlsNamedGroup` names them. A server
@@ -123,7 +124,8 @@ ClientHello (BL-821, ADR-0205), and post-handshake client authentication (BL-880
   the client's ChangeCipherSpec, in order), completion, or a `TlsHandshakeFailure`. It
   exposes `RecordProtection` and `KeyBlock`: the caller switches its write state after
   sending the ChangeCipherSpec and its read state after the server's is accepted. Key
-  exchanges: ECDHE (X25519, P-256/384/521), DHE with the server's group (1024 bits at
+  exchanges: ECDHE (X25519, P-256/384/521, and x448 and brainpoolP256r1/384r1/512r1 when
+  offered, ADR-0219), DHE with the server's group (1024 bits at
   least, authenticated by RSA or DSA), RSA and anonymous; `Tls12CipherSuite` holds the 86
   suites the record layer can protect (`Tls12KeyExchange`, `Tls12Authentication`, bulk
   cipher, MAC, PRF). Covers the ServerKeyExchange signature (TLS 1.2 schemes, and TLS
@@ -179,7 +181,8 @@ ClientHello (BL-821, ADR-0205), and post-handshake client authentication (BL-880
   1.2 adds `rsa_pkcs1_*`, `ecdsa_sha1` and the five `dsa_*` (verify only) and binds
   `ecdsa_*` to no curve - TLS 1.0/1.1's
   legacy signatures, and the CertificateVerify content), `TlsCertificatePublicKey` (a
-  certificate's `SubjectPublicKeyInfo`, the signature checks, and the RSA pre-master
+  certificate's `SubjectPublicKeyInfo`, the signature checks - a brainpool ECDSA key with
+  `Curl.Cryptography`'s `BrainpoolEcdsa`, ADR-0219 - and the RSA pre-master
   secret encryption), `TlsSigningKey` with `RsaTlsSigningKey`, `EcdsaTlsSigningKey` and
   `Ed25519TlsSigningKey`.
 - Tests: `Tls13TestServer` and `Tls12TestServer` in `Curl.Tls.UnitTests` are in-memory

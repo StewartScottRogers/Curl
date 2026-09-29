@@ -12,7 +12,7 @@ public interface ITlsRandomSource
     void Fill(Span<byte> destination);
 
     /// <summary>Creates a fresh ephemeral key share on <paramref name="group" />.</summary>
-    /// <param name="group">A group <see cref="TlsNamedGroup.CanShare" /> accepts.</param>
+    /// <param name="group">A group <see cref="TlsNamedGroup.CanShare" /> or <see cref="TlsNamedGroup.IsTls12EcdheGroup" /> accepts.</param>
     /// <returns>The key share, which the caller disposes.</returns>
     Tls13KeyShare CreateKeyShare(ushort group);
 }

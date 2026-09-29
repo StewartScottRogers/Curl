@@ -21,6 +21,9 @@ public sealed class KeyShareTests
     [DataRow(TlsNamedGroup.Ffdhe4096)]
     [DataRow(TlsNamedGroup.Ffdhe6144)]
     [DataRow(TlsNamedGroup.Ffdhe8192)]
+    [DataRow(TlsNamedGroup.BrainpoolP256r1)]
+    [DataRow(TlsNamedGroup.BrainpoolP384r1)]
+    [DataRow(TlsNamedGroup.BrainpoolP512r1)]
     public void TwoSharesOnAGroupAgreeOnTheSharedSecret(int group)
     {
         using Tls13KeyShare client = SystemTlsRandomSource.Instance.CreateKeyShare((ushort)group);
@@ -120,6 +123,49 @@ public sealed class KeyShareTests
     }
 
     [TestMethod]
+    [DataRow(TlsNamedGroup.BrainpoolP256r1, 65, 32)]
+    [DataRow(TlsNamedGroup.BrainpoolP384r1, 97, 48)]
+    [DataRow(TlsNamedGroup.BrainpoolP512r1, 129, 64)]
+    public void ABrainpoolShareRefusesAPeerThatIsNotAPointOfItsCurve(int group, int publicKeyLength, int secretLength)
+    {
+        using Tls13KeyShare share = SystemTlsRandomSource.Instance.CreateKeyShare((ushort)group);
+        using Tls13KeyShare peer = SystemTlsRandomSource.Instance.CreateKeyShare((ushort)group);
+        byte[] offCurve = [.. peer.PublicKey];
+        offCurve[^1] ^= 0x01;
+
+        Assert.AreEqual(publicKeyLength, share.PublicKey.Length);
+        Assert.AreEqual(secretLength, share.ComputeSharedSecret(peer.PublicKey)!.Length);
+        Assert.IsNull(share.ComputeSharedSecret(offCurve));
+        Assert.IsNull(share.ComputeSharedSecret(peer.PublicKey[..^1]));
+        Assert.IsNull(share.ComputeSharedSecret([0]));
+    }
+
+    [TestMethod]
+    public void ABrainpoolShareIsOnlyForABrainpoolCurveAndAKeyInRange()
+    {
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => BrainpoolKeyShare.Generate(TlsNamedGroup.Secp256r1));
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new BrainpoolKeyShare(TlsNamedGroup.X448, new byte[32]));
+        Assert.ThrowsExactly<ArgumentNullException>(() => new BrainpoolKeyShare(TlsNamedGroup.BrainpoolP256r1, null!));
+        Assert.ThrowsExactly<ArgumentException>(() => new BrainpoolKeyShare(TlsNamedGroup.BrainpoolP256r1, new byte[32]));
+        using BrainpoolKeyShare share = BrainpoolKeyShare.Generate(TlsNamedGroup.BrainpoolP256r1);
+        Assert.ThrowsExactly<ArgumentNullException>(() => share.ComputeSharedSecret(null!));
+    }
+
+    [TestMethod]
+    [DataRow(TlsNamedGroup.X25519, true)]
+    [DataRow(TlsNamedGroup.X448, true)]
+    [DataRow(TlsNamedGroup.Secp256r1, true)]
+    [DataRow(TlsNamedGroup.Secp521r1, true)]
+    [DataRow(TlsNamedGroup.BrainpoolP256r1, true)]
+    [DataRow(TlsNamedGroup.BrainpoolP512r1, true)]
+    [DataRow(0x0016, false)]
+    [DataRow(0x001f, false)]
+    [DataRow(TlsNamedGroup.Ffdhe2048, false)]
+    [DataRow(TlsNamedGroup.X25519MlKem768, false)]
+    public void IsTls12EcdheGroupNamesTheGroupsTlsOneTwoAgreesOn(int group, bool expected) =>
+        Assert.AreEqual(expected, TlsNamedGroup.IsTls12EcdheGroup((ushort)group));
+
+    [TestMethod]
     public void AnEcdhShareIsOnlyForANistCurve() =>
         Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => EcdhKeyShare.Generate(TlsNamedGroup.X25519));
 
@@ -154,6 +200,7 @@ public sealed class KeyShareTests
 
     [TestMethod]
     [DataRow(0x0016)]
+    [DataRow(0x001f)]
     [DataRow(0x0105)]
     [DataRow(0x11eb)]
     public void TheSystemRandomSourceRefusesAGroupItCannotShare(int group) =>

@@ -1,3 +1,4 @@
+using System.Formats.Asn1;
 using System.Numerics;
 using System.Security.Cryptography;
 using Curl.Cryptography;
@@ -41,6 +42,17 @@ public sealed class Tls12ClientHandshakeFailureTests
         Assert.ThrowsExactly<ArgumentException>(() => Client(DefaultSettings with { SessionToResume = session with { Version = TlsProtocolVersion.Tls11 } }));
         Assert.ThrowsExactly<ArgumentException>(() => Client(DefaultSettings with { MaximumVersion = TlsProtocolVersion.Tls11, MinimumVersion = TlsProtocolVersion.Tls10, SessionToResume = session }));
         Assert.ThrowsExactly<ArgumentException>(() => Client(DefaultSettings with { SessionToResume = session with { CipherSuite = 0x0001 } }));
+    }
+
+    [TestMethod]
+    public void SupportedGroupsTakeX448AndTheBrainpoolCurvesAndTheRefusalNamesEveryGroupAllowed()
+    {
+        _ = Client(DefaultSettings with { SupportedGroups = [TlsNamedGroup.BrainpoolP256r1, TlsNamedGroup.BrainpoolP384r1, TlsNamedGroup.BrainpoolP512r1, TlsNamedGroup.X448] });
+
+        ArgumentException refusal = Assert.ThrowsExactly<ArgumentException>(() => Client(DefaultSettings with { SupportedGroups = [TlsNamedGroup.X25519MlKem768] }));
+
+        Assert.AreEqual("SupportedGroups", refusal.ParamName);
+        StringAssert.StartsWith(refusal.Message, "Every supported group must be x25519, x448, secp256r1, secp384r1, secp521r1, brainpoolP256r1, brainpoolP384r1 or brainpoolP512r1.");
     }
 
     [TestMethod]
@@ -460,6 +472,75 @@ public sealed class Tls12ClientHandshakeFailureTests
     }
 
     [TestMethod]
+    [DataRow(TlsNamedGroup.BrainpoolP256r1)]
+    [DataRow(TlsNamedGroup.BrainpoolP384r1)]
+    [DataRow(TlsNamedGroup.BrainpoolP512r1)]
+    public void ABrainpoolKeyShareThatIsNotAPointOfItsCurveIsIllegal(int group)
+    {
+        Tls12ClientHandshake client = Client(EverySuite with { SupportedGroups = [(ushort)group] });
+
+        Tls12HandshakeOutput output = Run(client, new Tls12TestServer(null) { CipherSuite = 0xc018, EcdheGroup = (ushort)group }, flight => ReplaceEcdhePoint(flight, point => point[^1] ^= 0x01));
+
+        AssertFails(TlsAlertDescription.IllegalParameter, output);
+    }
+
+    [TestMethod]
+    public void AnX448KeyShareGivingAnAllZeroSharedSecretIsIllegal()
+    {
+        Tls12ClientHandshake client = Client(EverySuite with { SupportedGroups = [TlsNamedGroup.X448] });
+
+        Tls12HandshakeOutput output = Run(client, new Tls12TestServer(null) { CipherSuite = 0xc018, EcdheGroup = TlsNamedGroup.X448 }, flight => ReplaceEcdhePoint(flight, point => point.AsSpan().Clear()));
+
+        AssertFails(TlsAlertDescription.IllegalParameter, output);
+    }
+
+    [TestMethod]
+    public void ATlsOneThreeOnlyBrainpoolSchemeInATlsOneTwoServerKeyExchangeIsIllegal()
+    {
+        const ushort EcdsaBrainpoolP256r1Tls13Sha256 = 0x081a;
+        Tls12TestServer server = new(TestServerCredential.Brainpool(BrainpoolCurve.BrainpoolP256r1, TlsSignatureScheme.BrainpoolP256r1Oid, TlsSignatureScheme.EcdsaSecp256r1Sha256));
+        Tls12ClientHandshake client = Client();
+
+        Tls12HandshakeOutput output = Run(client, server, flight => ReplaceServerKeyExchange(flight, TlsProtocolVersion.Tls12, message => message with { SignatureAlgorithm = EcdsaBrainpoolP256r1Tls13Sha256 }));
+
+        Assert.IsFalse(TlsSignatureScheme.IsTls12Scheme(EcdsaBrainpoolP256r1Tls13Sha256));
+        AssertFails(TlsAlertDescription.IllegalParameter, output);
+    }
+
+    [TestMethod]
+    public void ABadBrainpoolServerKeyExchangeSignatureIsADecryptError()
+    {
+        Tls12TestServer server = new(TestServerCredential.Brainpool(BrainpoolCurve.BrainpoolP256r1, TlsSignatureScheme.BrainpoolP256r1Oid, TlsSignatureScheme.EcdsaSecp256r1Sha256));
+
+        Tls12HandshakeOutput corrupted = Run(Client(), server, flight => ReplaceServerKeyExchange(flight, TlsProtocolVersion.Tls12, message => message with { Signature = Corrupt(message.Signature!) }));
+        Tls12HandshakeOutput notDer = Run(Client(), server, flight => ReplaceServerKeyExchange(flight, TlsProtocolVersion.Tls12, message => message with { Signature = [0x30, 0x00] }));
+
+        AssertFails(TlsAlertDescription.DecryptError, corrupted);
+        AssertFails(TlsAlertDescription.DecryptError, notDer);
+    }
+
+    [TestMethod]
+    public void ABrainpoolCertificateKeyOfTheWrongLengthIsABadCertificate()
+    {
+        AsnWriter writer = new(AsnEncodingRules.DER);
+        using (writer.PushSequence())
+        {
+            using (writer.PushSequence())
+            {
+                writer.WriteObjectIdentifier(TlsSignatureScheme.EcPublicKeyOid);
+                writer.WriteObjectIdentifier(TlsSignatureScheme.BrainpoolP256r1Oid);
+            }
+
+            writer.WriteBitString(new byte[64]);
+        }
+
+        TlsCertificatePublicKey key = TlsCertificatePublicKey.ReadSubjectPublicKeyInfo(writer.Encode());
+
+        Assert.AreEqual(TlsSignatureScheme.BrainpoolP256r1Oid, key.CurveOid);
+        Assert.AreEqual(TlsAlertDescription.BadCertificate, key.VerifySignature(TlsSignatureScheme.FindTls12Rule(TlsSignatureScheme.EcdsaSecp256r1Sha256), [1], [0x30, 0x00]));
+    }
+
+    [TestMethod]
     public void DheParametersThatAreNoGroupOrAnInvalidPublicValueAreIllegal()
     {
         byte[] prime = FiniteFieldDiffieHellmanGroup.Ffdhe2048.Prime.ToArray();
@@ -629,6 +710,16 @@ public sealed class Tls12ClientHandshakeFailureTests
 
     private static List<Tls12OutgoingMessage> RewriteServerHello(List<Tls12OutgoingMessage> flight, Func<ServerHello, ServerHello> rewrite) =>
         Replace(flight, HandshakeType.ServerHello, rewrite(ServerHello.Decode(Body(flight[0])).Value).Encode());
+
+    /// <summary>Rewrites the server's point in an anonymous ECDHE ServerKeyExchange.</summary>
+    private static List<Tls12OutgoingMessage> ReplaceEcdhePoint(List<Tls12OutgoingMessage> flight, Action<byte[]> rewrite)
+    {
+        Tls12OutgoingMessage original = flight.First(message => (HandshakeType)message.Bytes[0] == HandshakeType.ServerKeyExchange);
+        Tls12EcdheParameters parameters = (Tls12EcdheParameters)Tls12ServerKeyExchange.Decode(Body(original), Tls12KeyExchange.Ecdhe, false, true).Value.Parameters;
+        byte[] point = [.. parameters.PublicKey];
+        rewrite(point);
+        return Replace(flight, HandshakeType.ServerKeyExchange, new Tls12ServerKeyExchange(parameters with { PublicKey = point }, null, null).Encode());
+    }
 
     private static List<Tls12OutgoingMessage> ReplaceServerKeyExchange(List<Tls12OutgoingMessage> flight, TlsProtocolVersion version, Func<Tls12ServerKeyExchange, Tls12ServerKeyExchange> rewrite, Tls12KeyExchange keyExchange = Tls12KeyExchange.Ecdhe)
     {

@@ -13,8 +13,8 @@ namespace Curl.Tls;
 /// handshake bytes and ChangeCipherSpec records, and sends the messages each step returns,
 /// switching its record write state to <see cref="KeyBlock" />'s client keys after the
 /// ChangeCipherSpec it sends, and its read state to the server keys after
-/// <see cref="ReceiveChangeCipherSpec" /> accepts the server's. Covers ECDHE (X25519 and
-/// the NIST curves), DHE with server-chosen parameters, RSA and anonymous key exchange
+/// <see cref="ReceiveChangeCipherSpec" /> accepts the server's. Covers ECDHE (X25519, x448,
+/// the NIST curves and the brainpool curves), DHE with server-chosen parameters, RSA and anonymous key exchange
 /// over every <see cref="Tls12CipherSuite" />, the ServerKeyExchange signature, secure
 /// renegotiation's empty <c>renegotiation_info</c> (RFC 5746), the extended master secret
 /// (RFC 7627), encrypt-then-MAC (RFC 7366), ALPN, SNI, <c>status_request</c> with the

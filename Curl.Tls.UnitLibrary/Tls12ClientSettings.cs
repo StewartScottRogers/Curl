@@ -28,7 +28,11 @@ public sealed record Tls12ClientSettings
         0xc00a, 0xc014, 0x0039, 0xc009, 0xc013, 0x0033, 0x009d, 0x009c, 0x003d, 0x003c, 0x0035, 0x002f,
     ];
 
-    /// <summary>Gets the ECDHE groups offered in <c>supported_groups</c>: X25519 and the NIST curves.</summary>
+    /// <summary>
+    /// Gets the ECDHE groups offered in <c>supported_groups</c>: by default X25519 and the
+    /// NIST curves; x448 and the brainpool curves may be added
+    /// (<see cref="TlsNamedGroup.IsTls12EcdheGroup" />).
+    /// </summary>
     public IReadOnlyList<ushort> SupportedGroups { get; init; } =
         [TlsNamedGroup.X25519, TlsNamedGroup.Secp256r1, TlsNamedGroup.Secp384r1, TlsNamedGroup.Secp521r1];
 
@@ -108,12 +112,13 @@ public sealed record Tls12ClientSettings
     {
         Require(HasVersionRange(), "The versions must be TLS 1.0, 1.1 or 1.2, the minimum not above the maximum.", nameof(MinimumVersion));
         Require(HasSuites(), "Offer at least one cipher suite the maximum version can run, and only TLS 1.2 and below suites.", nameof(CipherSuites));
-        Require(SupportedGroups.All(IsEcdheGroup), "Every supported group must be X25519 or a NIST curve.", nameof(SupportedGroups));
+        Require(
+            SupportedGroups.All(TlsNamedGroup.IsTls12EcdheGroup),
+            "Every supported group must be x25519, x448, secp256r1, secp384r1, secp521r1, brainpoolP256r1, brainpoolP384r1 or brainpoolP512r1.",
+            nameof(SupportedGroups));
         Require(SignatureAlgorithms.All(TlsSignatureScheme.IsTls12Scheme), "Every signature algorithm must be one TLS 1.2 can check.", nameof(SignatureAlgorithms));
         Require(SessionToResume is null || CanResume(SessionToResume), "The session to resume must have an offered version and suite.", nameof(SessionToResume));
     }
-
-    private static bool IsEcdheGroup(ushort group) => group is TlsNamedGroup.X25519 or (>= TlsNamedGroup.Secp256r1 and <= TlsNamedGroup.Secp521r1);
 
     private static bool IsOfferable(ushort code) => code == Tls12CipherSuite.EmptyRenegotiationInfoScsv || Tls12CipherSuite.Find(code) is not null;
 

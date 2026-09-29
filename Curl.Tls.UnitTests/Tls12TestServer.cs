@@ -282,7 +282,7 @@ internal sealed class Tls12TestServer(TestServerCredential? credential)
         }
 
         TlsSignatureRule? rule = credential.SignsWithDsa ? TlsSignatureScheme.FindLegacyRule(TlsSignatureScheme.DsaOid) : TlsSignatureScheme.LegacyRules[1];
-        return credential.SignsWithDsa || credential.SigningKey.CanSign(rule) ? credential.Sign(rule!, content) : [0];
+        return credential.SignsWithDsa || credential.BrainpoolKey is not null || credential.SigningKey.CanSign(rule) ? credential.Sign(rule!, content) : [0];
     }
 
     private Tls12EcdheParameters EcdheParameters()

@@ -27,8 +27,12 @@ public sealed class SystemTlsRandomSource : ITlsRandomSource
         TlsNamedGroup.X448 => new X448KeyShare(RandomNumberGenerator.GetBytes(X448.KeySize)),
         TlsNamedGroup.X25519MlKem768 => X25519MlKem768KeyShare.Generate(),
         >= TlsNamedGroup.Ffdhe2048 and <= TlsNamedGroup.Ffdhe8192 => new FfdheKeyShare(group, CreateFiniteFieldExponent()),
-        _ => EcdhKeyShare.Generate(group),
+        _ => CreateWeierstrassCurveShare(group),
     };
+
+    /// <summary>A brainpool share on a brainpool curve, otherwise a NIST curve share, which refuses any other group.</summary>
+    private static Tls13KeyShare CreateWeierstrassCurveShare(ushort group) =>
+        group is >= TlsNamedGroup.BrainpoolP256r1 and <= TlsNamedGroup.BrainpoolP512r1 ? BrainpoolKeyShare.Generate(group) : EcdhKeyShare.Generate(group);
 
     private static byte[] CreateFiniteFieldExponent()
     {
