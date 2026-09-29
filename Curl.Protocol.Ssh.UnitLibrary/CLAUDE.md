@@ -22,7 +22,7 @@ implemented names; `KeyExchange` holds one `ISshKeyExchange` per method family a
 reader and writer switch to at each `NEWKEYS` (ADR-0212); `Authentication` holds
 `SshUserAuthentication`, which requests the `ssh-userauth` service and authenticates the
 user with `none`, `publickey`, `password` and `keyboard-interactive` in curl's order
-(ADR-0215, ADR-0226); `Keys` holds `SshUserKeySource`, which finds `--key` (or curl's
+(ADR-0215, ADR-0230); `Keys` holds `SshUserKeySource`, which finds `--key` (or curl's
 default files through an injected `HOME` reader), `--pubkey` and `--pass`,
 `SshPrivateKeyReader`, which reads every PEM, PKCS #8 and `openssh-key-v1` key file
 ADR-0122 lists but Ed25519 and bcrypt (BL-681), and one `SshPrivateKey` per key type

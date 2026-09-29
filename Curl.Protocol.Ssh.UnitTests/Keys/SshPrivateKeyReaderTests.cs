@@ -8,7 +8,7 @@ namespace Curl.Protocol.Ssh.Keys;
 /// <summary>
 /// Pins <see cref="SshPrivateKeyReader" /> against key files written by <c>ssh-keygen</c> and
 /// OpenSSL: every format of one key reads to the same public blob as its <c>.pub</c> file,
-/// and every file libssh2 fails to use reads as none (ADR-0226).
+/// and every file libssh2 fails to use reads as none (ADR-0230).
 /// </summary>
 [TestClass]
 public sealed class SshPrivateKeyReaderTests

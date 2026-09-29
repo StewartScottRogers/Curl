@@ -12,7 +12,7 @@ namespace Curl.Protocol.Ssh.Authentication;
 /// libssh2 1.11.1 through it (ADR-0215): the <c>ssh-userauth</c> service request, which
 /// libssh2 sends as the last step of starting the session, before the host key is
 /// checked; then, after the check, a <c>none</c> request for the server's method list,
-/// <c>publickey</c> (ADR-0226), <c>password</c> and <c>keyboard-interactive</c>, in that
+/// <c>publickey</c> (ADR-0230), <c>password</c> and <c>keyboard-interactive</c>, in that
 /// order.
 /// </summary>
 /// <remarks>

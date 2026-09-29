@@ -5,7 +5,7 @@ namespace Curl.Protocol.Ssh.Keys;
 
 /// <summary>
 /// Reads a <c>--key</c> file in every format either of curl's SSH backends reads
-/// (ADR-0122, ADR-0226): PKCS #1 RSA, OpenSSL DSA and SEC 1 EC PEM, each plain or with
+/// (ADR-0122, ADR-0230): PKCS #1 RSA, OpenSSL DSA and SEC 1 EC PEM, each plain or with
 /// legacy PEM encryption; PKCS #8, plain or encrypted; and unencrypted
 /// <c>openssh-key-v1</c>. The file's first PEM block decides.
 /// </summary>

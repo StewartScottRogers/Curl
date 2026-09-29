@@ -13,7 +13,7 @@ using static Curl.Protocol.Ssh.Fakes.SshTestEncoding;
 namespace Curl.Protocol.Ssh.Authentication;
 
 /// <summary>
-/// Pins <c>publickey</c> authentication (BL-568, ADR-0226) against an in-memory peer after a
+/// Pins <c>publickey</c> authentication (BL-568, ADR-0230) against an in-memory peer after a
 /// real key exchange, so the signature covers a known session identifier: the question
 /// without a signature, the signed request, the algorithm chosen from
 /// <c>server-sig-algs</c>, and each outcome measured 2026-09-29 with curl 8.21.0 (libssh2

@@ -5,7 +5,7 @@ namespace Curl.Protocol.Ssh.Keys;
 
 /// <summary>
 /// Finds and reads the user's key files for <c>publickey</c> authentication as curl 8.21.0
-/// and libssh2 1.11.1 do (ADR-0226): <c>--key</c>, or else the first of
+/// and libssh2 1.11.1 do (ADR-0230): <c>--key</c>, or else the first of
 /// <c>$HOME/.ssh/id_rsa</c>, <c>$HOME/.ssh/id_dsa</c>, <c>id_rsa</c> and <c>id_dsa</c> (in
 /// the working directory) that exists, or else the empty path, which opens nothing; the
 /// public key from <c>--pubkey</c> or derived from the private key; the private key
