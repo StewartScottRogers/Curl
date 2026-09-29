@@ -42,7 +42,8 @@ namespace Curl.Protocol.Ftp;
 /// </para>
 /// <para>
 /// The conversation is <c>USER</c>, <c>PASS</c> (skipped when <c>USER</c> is answered
-/// with a 2xx), <c>PWD</c>, one <c>CWD</c> per directory in the path, <c>EPSV</c> (and
+/// with a 2xx; <c>ACCT</c> after a <c>332</c> under <c>--ftp-account</c>, and the
+/// <c>--ftp-alternative-to-user</c> command once after a refusal, BL-635), <c>PWD</c>, one <c>CWD</c> per directory in the path, <c>EPSV</c> (and
 /// <c>PASV</c> when <c>EPSV</c> is refused), <c>TYPE I</c>, <c>SIZE</c>, <c>RETR</c> and
 /// <c>QUIT</c>. A path ending in <c>/</c> sends <c>TYPE A</c> and <c>LIST</c> instead of
 /// <c>TYPE I</c>, <c>SIZE</c> and <c>RETR</c>, and copies the listing.
@@ -185,6 +186,9 @@ internal sealed class FtpSession(
 
     /// <summary>Whether an accepted <c>PROT P</c> makes every data connection TLS.</summary>
     private bool protectData;
+
+    /// <summary>Whether the <c>--ftp-alternative-to-user</c> command has been sent, which curl does once.</summary>
+    private bool alternativeUserSent;
 
     /// <summary>The port an active-mode data connection is accepted on, once bound.</summary>
     private IPendingConnection? pendingConnection;
@@ -350,7 +354,7 @@ internal sealed class FtpSession(
         return greeting.Code switch
         {
             230 => LoggedIn(),
-            220 =>await SecureControlAsync().ConfigureAwait(false) ?? await LogInAsync().ConfigureAwait(false),
+            220 => await SecureControlAsync().ConfigureAwait(false) ?? await LogInAsync().ConfigureAwait(false),
             _ => TransferResult.Failure(CurlExitCode.WeirdServerReply, FtpTransferMessages.UnexpectedGreeting(greeting.Code)),
         };
     }
@@ -435,27 +439,69 @@ internal sealed class FtpSession(
     private async ValueTask<TransferResult?> LogInAsync()
     {
         FtpReply user = await ExchangeAsync("USER " + (context.Credentials?.UserName ?? AnonymousUser)).ConfigureAwait(false);
-        if (user.IsCompletion)
+        return await AnswerLoginReplyAsync(user, passwordSent: false).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Answers a reply to <c>USER</c>, <c>PASS</c> or the alternative user command as curl
+    /// 8.21.0's <c>ftp_state_user_resp</c> does: <c>331</c> to a user command sends
+    /// <c>PASS</c>, a 2xx logs in, <c>332</c> sends <c>ACCT</c>, and anything else sends the
+    /// <c>--ftp-alternative-to-user</c> command once, or is exit 67.
+    /// </summary>
+    private async ValueTask<TransferResult?> AnswerLoginReplyAsync(FtpReply reply, bool passwordSent)
+    {
+        if (reply.Code == 331 && !passwordSent)
+        {
+            return await SendPasswordAsync().ConfigureAwait(false);
+        }
+
+        if (reply.IsCompletion)
         {
             return LoggedIn();
         }
 
-        return user.Code == 331
-            ? await SendPasswordAsync().ConfigureAwait(false)
-            : TransferResult.Failure(CurlExitCode.LoginDenied, FtpTransferMessages.AccessDenied(user.Code));
+        return reply.Code == 332
+            ? await SendAccountAsync().ConfigureAwait(false)
+            : await SendAlternativeUserAsync(reply.Code).ConfigureAwait(false);
     }
 
     private async ValueTask<TransferResult?> SendPasswordAsync()
     {
         FtpReply pass = await ExchangeAsync("PASS " + (context.Credentials?.Password ?? AnonymousPassword)).ConfigureAwait(false);
-        if (pass.IsCompletion)
+        return await AnswerLoginReplyAsync(pass, passwordSent: true).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sends <c>ACCT</c> with the <c>--ftp-account</c> account: exit 67 when there is none,
+    /// and exit 11 when the reply is anything but <c>230</c>, as curl 8.21.0 does (ADR-0216).
+    /// </summary>
+    private async ValueTask<TransferResult?> SendAccountAsync()
+    {
+        if (context.FtpAccount is not { } account)
         {
-            return LoggedIn();
+            return TransferResult.Failure(CurlExitCode.LoginDenied, FtpTransferMessages.AccountRequested);
         }
 
-        return TransferResult.Failure(
-            CurlExitCode.LoginDenied,
-            pass.Code == 332 ? FtpTransferMessages.AccountRequested : FtpTransferMessages.AccessDenied(pass.Code));
+        FtpReply acct = await ExchangeAsync("ACCT " + account).ConfigureAwait(false);
+        return acct.Code == 230
+            ? LoggedIn()
+            : TransferResult.Failure(CurlExitCode.FtpWeirdPassReply, FtpTransferMessages.AccountRejected(acct.Code));
+    }
+
+    /// <summary>
+    /// Sends the <c>--ftp-alternative-to-user</c> command verbatim after a refused user or
+    /// password, once; without one, or once it was sent, the refusal is exit 67.
+    /// </summary>
+    private async ValueTask<TransferResult?> SendAlternativeUserAsync(int refusedCode)
+    {
+        if (context.FtpAlternativeToUser is not { } command || alternativeUserSent)
+        {
+            return TransferResult.Failure(CurlExitCode.LoginDenied, FtpTransferMessages.AccessDenied(refusedCode));
+        }
+
+        alternativeUserSent = true;
+        FtpReply user = await ExchangeAsync(command).ConfigureAwait(false);
+        return await AnswerLoginReplyAsync(user, passwordSent: false).ConfigureAwait(false);
     }
 
     /// <summary>Logs the login complete and goes on.</summary>
@@ -502,7 +548,7 @@ internal sealed class FtpSession(
         bool listing = path.FileName.Length == 0 || typeCode.ListOnly;
         bool ascii = listing || typeCode.UseAscii;
         window = DownloadWindowOf(listing);
-        return await OpenDataConnectionAsync().ConfigureAwait(false)
+        return await OpenDataConnectionAsync(DownloadPretArgument(path, listing)).ConfigureAwait(false)
             ?? await SetTypeAsync(ascii).ConfigureAwait(false)
             ?? await SendQuotesAsync(quotes.BeforeTransfer).ConfigureAwait(false)
             ?? await ReadSizeAsync(path.FileName, ascii).ConfigureAwait(false)
@@ -530,11 +576,15 @@ internal sealed class FtpSession(
     /// The listing command: <c>NLST</c> under <c>-l</c>, <c>LIST</c> otherwise, with the
     /// directory as its argument under <c>--ftp-method nocwd</c>.
     /// </summary>
-    private string ListCommand(FtpUrlPath path)
-    {
-        string verb = typeCode.ListOnly ? "NLST" : "LIST";
-        return path.ListArgument is { } argument ? verb + " " + argument : verb;
-    }
+    private string ListCommand(FtpUrlPath path) =>
+        path.ListArgument is { } argument ? ListVerb + " " + argument : ListVerb;
+
+    /// <summary>What a download's <c>PRET</c> names: the listing verb alone, or <c>RETR</c> and the file.</summary>
+    private string DownloadPretArgument(FtpUrlPath path, bool listing) =>
+        listing ? ListVerb : "RETR " + path.FileName;
+
+    /// <summary>The listing verb: <c>NLST</c> under <c>-l</c>, <c>LIST</c> otherwise.</summary>
+    private string ListVerb => typeCode.ListOnly ? "NLST" : "LIST";
 
     /// <summary>
     /// Uploads <paramref name="upload" /> to the file <paramref name="path" /> names: exit 3,
@@ -551,7 +601,7 @@ internal sealed class FtpSession(
         return await SendQuotesAsync(quotes.AfterLogin).ConfigureAwait(false)
             ?? await ChangeDirectoriesAsync(path.Directories).ConfigureAwait(false)
             ?? await CheckModificationTimeAsync(path.FileName).ConfigureAwait(false)
-            ?? await OpenDataConnectionAsync().ConfigureAwait(false)
+            ?? await OpenDataConnectionAsync("STOR " + path.FileName).ConfigureAwait(false)
             ?? await SetTypeAsync(typeCode.UseAscii).ConfigureAwait(false)
             ?? await SendQuotesAsync(quotes.BeforeTransfer).ConfigureAwait(false)
             ?? await StoreAsync(path.FileName, upload).ConfigureAwait(false);
@@ -807,12 +857,36 @@ internal sealed class FtpSession(
 
     /// <summary>
     /// Prepares the data connection: under <c>-P</c> a listening port announced with
-    /// <c>EPRT</c> or <c>PORT</c>, otherwise a passive connection.
+    /// <c>EPRT</c> or <c>PORT</c>, otherwise a passive connection, announced first with
+    /// <c>PRET</c> under <c>--ftp-pret</c>.
     /// </summary>
-    private async ValueTask<TransferResult?> OpenDataConnectionAsync() =>
+    /// <param name="pretArgument">
+    /// What <c>PRET</c> names: <c>RETR</c> and the file, <c>LIST</c> or <c>NLST</c> with no
+    /// argument, or <c>STOR</c> and the file for an upload, <c>APPE</c> included, as curl
+    /// 8.21.0 was measured to send (BL-635).
+    /// </param>
+    private async ValueTask<TransferResult?> OpenDataConnectionAsync(string pretArgument) =>
         context.FtpPort is { } ftpPort
             ? await AnnounceActivePortAsync(FtpPortArgument.Parse(ftpPort)).ConfigureAwait(false)
-            : await OpenPassiveDataConnectionAsync().ConfigureAwait(false);
+            : await SendPretAsync(pretArgument).ConfigureAwait(false)
+                ?? await OpenPassiveDataConnectionAsync().ConfigureAwait(false);
+
+    /// <summary>
+    /// Sends <c>PRET</c> under <c>--ftp-pret</c>: anything but <c>200</c> ends the transfer
+    /// with exit 84 and no <c>QUIT</c>, as curl 8.21.0 does.
+    /// </summary>
+    private async ValueTask<TransferResult?> SendPretAsync(string pretArgument)
+    {
+        if (!context.FtpSendPret)
+        {
+            return null;
+        }
+
+        FtpReply pret = await ExchangeAsync("PRET " + pretArgument).ConfigureAwait(false);
+        return pret.Code == 200
+            ? null
+            : TransferResult.Failure(CurlExitCode.FtpPretFailed, FtpTransferMessages.PretNotAccepted(pret.Code));
+    }
 
     /// <summary>
     /// Binds a port on the <c>-P</c> address and announces it: <c>EPRT</c> first, unless

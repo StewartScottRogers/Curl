@@ -16,7 +16,11 @@ for `-C` or `-a` (ADR-0093's BL-439 addendum; `-a`, BL-633), converting LF to CR
 sends `TYPE A` under `-B` or a `;type=a` URL suffix (`FtpTypeCode`; an ASCII download sends no
 `SIZE` or `REST`, BL-633), and honours `--disable-epsv`,
 `--no-ftp-skip-pasv-ip`, `--ftp-method`, `--ftp-create-dirs`, `-l` and `-Q`
-(ADR-0093's BL-436 addendum). TLS: `ftps://` is TLS from the first byte, and `--ssl`,
+(ADR-0093's BL-436 addendum), and `--ftp-account` (`ACCT` after a `332` to `USER` or
+`PASS`; anything but `230` is exit 11), `--ftp-alternative-to-user` (sent once after a
+refused `USER` or `PASS`) and `--ftp-pret` (`PRET RETR <file>`, `PRET LIST`/`NLST` or
+`PRET STOR <file>` before the first of `EPSV`/`PASV`, never in active mode; anything but
+`200` is exit 84 with no `QUIT`), as curl 8.21.0 was measured to (BL-635). TLS: `ftps://` is TLS from the first byte, and `--ssl`,
 `--ssl-reqd` and `--ftp-ssl-control` upgrade `ftp://` with `AUTH`, then `PBSZ` and `PROT`
 (ADR-0102 and its BL-437 addendum). Time limits (BL-512): the handler reports
 `ReportTransferStarted` once the control connection is up, so the runner's `-m` watchdog

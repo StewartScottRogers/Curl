@@ -109,7 +109,7 @@ internal static class FtpTransferMessages
     /// </summary>
     internal const string RequestedSslLevelFailed = "Requested SSL level failed";
 
-    /// <summary>The exit 67 message for a <c>332</c> reply to <c>PASS</c>.</summary>
+    /// <summary>The exit 67 message for a <c>332</c> reply to <c>USER</c> or <c>PASS</c> without <c>--ftp-account</c>.</summary>
     internal const string AccountRequested = "ACCT requested but none available";
 
     /// <summary>The exit 9 message for a <c>CWD</c> the server refused.</summary>
@@ -193,6 +193,16 @@ internal static class FtpTransferMessages
     /// <param name="code">The refusing reply's code.</param>
     /// <returns>The message to report.</returns>
     internal static string AccessDenied(int code) => Format($"Access denied: {code}");
+
+    /// <summary>The exit 11 message for an <c>ACCT</c> answered with anything but <c>230</c>.</summary>
+    /// <param name="code">The refusing reply's code.</param>
+    /// <returns>The message to report.</returns>
+    internal static string AccountRejected(int code) => Format($"ACCT rejected by server: {code}");
+
+    /// <summary>The exit 84 message for a <c>PRET</c> answered with anything but <c>200</c>.</summary>
+    /// <param name="code">The refusing reply's code.</param>
+    /// <returns>The message to report.</returns>
+    internal static string PretNotAccepted(int code) => Format($"PRET command not accepted: {code}");
 
     /// <summary>
     /// The exit 6 message, and the first of two <c>-v</c> lines, for a <c>-P</c> name that

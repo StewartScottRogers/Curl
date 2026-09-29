@@ -103,16 +103,17 @@ public sealed class FtpProtocolHandlerDiagnosticLogTests
     [TestMethod]
     public async Task ExecuteAsync_FtpAccount_NeverLogsTheAccount()
     {
-        // curl --ftp-account s3cret -Q "ACCT s3cret" ftp://127.0.0.1:18321/file.txt, PASS answered 332.
+        // curl --ftp-account s3cret ftp://127.0.0.1:18321/file.txt, PASS answered 332, ACCT 530.
         var log = new RecordingDiagnosticLog(DiagnosticLogLevel.Verbose);
 
         Run run = await RunAsync(
             Url,
-            Greeting + "331 Password required\r\n332 Need account\r\n",
+            Greeting + "331 Password required\r\n332 Need account\r\n530 No\r\n",
             log,
             context => new TransferContext { Url = context.Url, Output = context.Output, DiagnosticLog = context.DiagnosticLog, FtpAccount = Secret });
 
-        Assert.AreEqual(CurlExitCode.LoginDenied, run.Result.ExitCode);
+        Assert.AreEqual(CurlExitCode.FtpWeirdPassReply, run.Result.ExitCode);
+        Assert.IsTrue(log.Lines.Any(line => line.Message.Contains("ACCT", StringComparison.Ordinal)));
         AssertNoMessageContainsTheSecret(log);
     }
 
