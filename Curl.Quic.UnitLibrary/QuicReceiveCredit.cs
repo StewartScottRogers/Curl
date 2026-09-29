@@ -7,7 +7,7 @@ namespace Curl.Quic;
 /// the peer has reached, and how much of it is consumed (read by the application, or, for
 /// streams, closed). The limit moves by a fixed window: once less than half the window is
 /// left above what was consumed, the new limit is what was consumed plus the window, as
-/// ngtcp2 does when curl turns window auto-tuning off (ADR-0144, ADR-0172).
+/// ngtcp2 does when curl turns window auto-tuning off (ADR-0144, ADR-0174).
 /// </summary>
 /// <param name="initialLimit">The initial limit, which is also the window each raise restores.</param>
 /// <param name="violation">The error a peer that goes past the limit is closed with.</param>

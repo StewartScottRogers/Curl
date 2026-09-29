@@ -78,7 +78,7 @@ Loss detection and congestion control (BL-725, RFC 9002, RFC 9438):
   CONNECTION_CLOSE go regardless) and starts a new datagram when the destination
   connection ID changes (RFC 9000 section 12.2).
 
-Streams and flow control (BL-726, RFC 9000 sections 2 to 4, ADR-0172):
+Streams and flow control (BL-726, RFC 9000 sections 2 to 4, ADR-0174):
 
 - `QuicStreamSet` (`QuicClientHandshake.Streams`): opens client bidirectional and
   unidirectional streams up to the server's MAX_STREAMS (STREAMS_BLOCKED once per limit),
