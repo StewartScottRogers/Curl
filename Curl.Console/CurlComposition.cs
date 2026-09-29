@@ -19,6 +19,7 @@ using Curl.Protocol.Imap;
 using Curl.Protocol.Ldap;
 using Curl.Protocol.Mqtt;
 using Curl.Protocol.Pop3;
+using Curl.Protocol.Rtsp;
 using Curl.Protocol.Smtp;
 using Curl.Protocol.Telnet;
 using Curl.Protocol.Tftp;
@@ -46,7 +47,9 @@ internal static class CurlComposition
     /// over <paramref name="connector" />, sending a pre-emptive <c>Authorization</c> from
     /// <see cref="CreateHttpAuthenticator" />'s authenticator and drawing each
     /// <c>Sec-WebSocket-Key</c> and frame mask from <see cref="SystemWebSocketRandomSource" />
-    /// (ADR-0128); and <c>tftp</c> over
+    /// (ADR-0128); <c>rtsp</c> over <paramref name="connector" />, sending one <c>OPTIONS *</c>
+    /// request per transfer with a pre-emptive <c>Authorization</c> from the same authenticator
+    /// (ADR-0169); and <c>tftp</c> over
     /// <paramref name="datagramConnector" />, sending its MASQUE request through an HTTP or HTTPS
     /// proxy over <paramref name="connector" /> with the proxy credential in the platform's
     /// encoding (ADR-0056, rule 4); and <c>ftp</c> and <c>ftps</c>, which
@@ -114,6 +117,7 @@ internal static class CurlComposition
             new SmtpProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator()),
             new LdapProtocolHandler(recordingConnector, OperatingSystem.IsWindows() ? LdapDialect.WinLdap : LdapDialect.OpenLdap),
             new WsProtocolHandler(recordingConnector, httpAuthenticator, new SystemWebSocketRandomSource()),
+            new RtspProtocolHandler(recordingConnector, httpAuthenticator),
             http,
             new RoutingFtpProtocolHandler(http, CreateFtpProtocolHandler(recordingConnector, tlsProvider, dnsResolver)),
         ];

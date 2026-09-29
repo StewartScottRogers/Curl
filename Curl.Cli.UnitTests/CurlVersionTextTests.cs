@@ -11,7 +11,7 @@ public sealed class CurlVersionTextTests
 {
     private const string ReleaseDate = "Release-Date: 2026-06-24";
 
-    private const string Protocols = "Protocols: dict file ftp ftps gopher gophers http https imap imaps ldap ldaps mqtt mqtts pop3 pop3s smtp smtps telnet tftp ws wss";
+    private const string Protocols = "Protocols: dict file ftp ftps gopher gophers http https imap imaps ldap ldaps mqtt mqtts pop3 pop3s rtsp smtp smtps telnet tftp ws wss";
 
     private const string Features = "Features: AsynchDNS brotli GSS-API HTTP2 IPv6 Kerberos Largefile libz NTLM SPNEGO SSL";
 
@@ -55,7 +55,7 @@ public sealed class CurlVersionTextTests
         Assert.AreEqual(
             "curl 8.21.0 (x86_64-w64-mingw32) libcurl/8.21.0 Schannel\r\n"
             + "Release-Date: 2026-06-24\r\n"
-            + "Protocols: dict file ftp ftps gopher gophers http https imap imaps ldap ldaps mqtt mqtts pop3 pop3s smtp smtps telnet tftp ws wss\r\n"
+            + "Protocols: dict file ftp ftps gopher gophers http https imap imaps ldap ldaps mqtt mqtts pop3 pop3s rtsp smtp smtps telnet tftp ws wss\r\n"
             + "Features: AsynchDNS brotli GSS-API HTTP2 IPv6 Kerberos Largefile libz NTLM SPNEGO SSL\r\n",
             text);
     }
