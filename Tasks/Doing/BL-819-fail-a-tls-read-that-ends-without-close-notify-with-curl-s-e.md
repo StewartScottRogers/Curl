@@ -36,3 +36,4 @@ When an `https://` transfer needs more bytes and the server's TLS connection end
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
