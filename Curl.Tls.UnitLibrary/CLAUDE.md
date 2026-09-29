@@ -16,7 +16,7 @@ TLS 1.2, 1.1 and 1.0 PRF and record protection (BL-702, ADR-0150), the TLS 1.2,
 (BL-700, ADR-0157), TLS 1.2, 1.1 and 1.0 over a byte stream (BL-815, ADR-0158), and
 the stapled OCSP response check for `--cert-status` (BL-705, ADR-0173), TLS 1.3
 certificate decompression (BL-786, ADR-0199), and TLS 1.3 and TLS 1.2 offered in one
-ClientHello (BL-821, ADR-0200).
+ClientHello (BL-821, ADR-0205).
 
 - `HandshakeMessageReader` frames handshake bytes into `HandshakeMessage`s (type and
   body); an unknown type is `unexpected_message`.
@@ -137,7 +137,7 @@ ClientHello (BL-821, ADR-0200).
   `Origin`. `Tls12ClientStream` behaves as `Tls13ClientStream` does (0 at `close_notify`
   or a bare transport end, `CloseNotifyReceived`, `TlsAlertException`, `ShutdownAsync`)
   and ignores HelloRequest.
-- One ClientHello for both (ADR-0200): `TlsClientConnection.ConnectAsync` takes a
+- One ClientHello for both (ADR-0205): `TlsClientConnection.ConnectAsync` takes a
   `TlsClientSettings` (a `Tls13ClientSettings` and a `Tls12ClientSettings` with a TLS 1.2
   ceiling and no session to resume) and sends the TLS 1.3 hello with the TLS 1.2 half added
   through the internal `Tls13ClientSettings.LowerVersions` (versions in

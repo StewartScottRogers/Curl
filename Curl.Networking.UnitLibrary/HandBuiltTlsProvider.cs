@@ -21,7 +21,7 @@ namespace Curl.Networking;
 /// <para>
 /// A range that reaches TLS 1.3 from below runs <see cref="TlsClientConnection" />, one
 /// ClientHello offering TLS 1.3 and TLS 1.2 down to the minimum (TLS 1.2 when none is
-/// given), continued on the version the server picks (ADR-0200); a TLS 1.3 minimum runs
+/// given), continued on the version the server picks (ADR-0205); a TLS 1.3 minimum runs
 /// <see cref="Tls13ClientConnection" />; a range whose ceiling is TLS 1.2, 1.1 or 1.0 runs
 /// <see cref="Tls12ClientConnection" /> offering every version from the minimum (TLS 1.0
 /// when none is given) to the ceiling (ADR-0162). When the cipher options leave no suite
@@ -105,7 +105,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     public IReadOnlyList<string> Warnings { get; }
 
     // A range that reaches TLS 1.3 offers it, and one whose minimum is below TLS 1.3 offers
-    // TLS 1.2 and below; a range doing both offers them in one ClientHello (ADR-0162, ADR-0200).
+    // TLS 1.2 and below; a range doing both offers them in one ClientHello (ADR-0162, ADR-0205).
     private bool OffersTls13 => _options.MaximumVersion is TlsVersion.SystemDefault or TlsVersion.Tls13;
 
     private bool OffersBelowTls13 => _options.MinimumVersion is not TlsVersion.Tls13;
@@ -454,7 +454,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         internal bool OffersSuiteFor(Func<ushort, bool> canProtect) => CipherSuites?.Any(canProtect) ?? true;
 
         // A range that reaches TLS 1.3 offers TLS 1.2 as its ceiling below it, and with no
-        // minimum starts at TLS 1.2, curl's default minimum since 8.10.0 (ADR-0200).
+        // minimum starts at TLS 1.2, curl's default minimum since 8.10.0 (ADR-0205).
         internal Tls12ClientSettings ToTls12(TlsClientOptions options)
         {
             var settings = new Tls12ClientSettings

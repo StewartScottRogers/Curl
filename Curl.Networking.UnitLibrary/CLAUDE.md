@@ -24,7 +24,7 @@ present the certificate `AutomaticClientCertificate.Choose` takes from `CurrentU
 providers; `HandBuiltTlsProviderTests.CertificateStatus` drives it against `Fakes/Tls13Server`,
 a copy of `Curl.Tls.UnitTests`' in-memory TLS 1.3 server and OCSP response builder. Both
 implement `ITlsProviderWithWarnings`. `HandBuiltTlsProvider` runs `TlsClientConnection` (one
-ClientHello offering TLS 1.3 and TLS 1.2, TLS 1.2 the default minimum, ADR-0200) for a range
+ClientHello offering TLS 1.3 and TLS 1.2, TLS 1.2 the default minimum, ADR-0205) for a range
 spanning both, `Tls13ClientConnection` for a TLS 1.3 minimum and `Tls12ClientConnection` for a
 ceiling below TLS 1.3, over the internal `ConnectionStream`, and returns a `HandBuiltTlsConnection`. Both providers judge the server's certificate with
 `ServerCertificateVerification` (trust anchors, tolerated chain errors, each build's name check,
