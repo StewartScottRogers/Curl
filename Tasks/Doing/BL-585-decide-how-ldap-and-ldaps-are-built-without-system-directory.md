@@ -34,3 +34,4 @@ An ADR fixes how `Curl.Protocol.Ldap.UnitLibrary` speaks LDAPv3 on `IConnection`
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
