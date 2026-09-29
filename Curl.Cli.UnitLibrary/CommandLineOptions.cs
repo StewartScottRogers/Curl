@@ -446,13 +446,71 @@ public sealed class CommandLineOptions
     public string? BearerToken { get; private set; }
 
     /// <summary>
-    /// The last <c>-x</c> / <c>--proxy</c>, <c>--socks4</c>, <c>--socks4a</c>, <c>--socks5</c> or
+    /// The last <c>-x</c> / <c>--proxy</c>, <c>--proxy1.0</c>, <c>--socks4</c>, <c>--socks4a</c>, <c>--socks5</c> or
     /// <c>--socks5-hostname</c> value, with the kind of proxy that option names; <see langword="null"/>
     /// when none was given. curl 8.21.0 keeps one proxy: the last of these options wins, value and kind
     /// together, and a scheme in the value outranks the option's kind. An empty <c>-x ''</c> is kept:
     /// it asks for no proxy at all, the environment's included.
     /// </summary>
+    /// <remarks>
+    /// Measured with the reference curl 8.21.0 on 2026-09-28 (<c>Record-CurlExchange.ps1</c>, reading the
+    /// CONNECT line a <c>-p</c> tunnel sent; BL-612 Notes): <c>--proxy1.0 A</c>, <c>-x A --proxy1.0 B</c>
+    /// and <c>--socks5 A --proxy1.0 B</c> send <c>CONNECT … HTTP/1.0</c>; <c>--proxy1.0 A -x B</c> sends
+    /// <c>HTTP/1.1</c>; <c>--proxy1.0 A --socks5 B</c> and <c>--proxy1.0 socks5://A</c> speak SOCKS5.
+    /// </remarks>
     public CommandLineProxy? Proxy { get; private set; }
+
+    /// <summary>
+    /// The last <c>--preproxy</c> value, verbatim: the SOCKS proxy to pass through before
+    /// <see cref="Proxy"/>; <see langword="null"/> when not given. An empty value is refused as blank.
+    /// Parsing it as a proxy URL is the proxy selector's job.
+    /// </summary>
+    public string? PreProxy { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--socks5-basic</c> was given and no <c>--no-socks5-basic</c> came
+    /// after it: allow user name and password authentication with a SOCKS5 proxy.
+    /// </summary>
+    public bool Socks5BasicAuth { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--socks5-gssapi</c> was given and no <c>--no-socks5-gssapi</c> came
+    /// after it: allow GSS-API authentication with a SOCKS5 proxy.
+    /// </summary>
+    public bool Socks5GssapiAuth { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--socks5-gssapi-service</c> value, verbatim: the service name for SOCKS5 GSS-API
+    /// authentication; <see langword="null"/> when not given. An empty value is accepted, as curl 8.21.0
+    /// accepts it.
+    /// </summary>
+    public string? Socks5GssapiServiceName { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--socks5-gssapi-nec</c> was given and no
+    /// <c>--no-socks5-gssapi-nec</c> came after it: leave the GSS-API protection negotiation
+    /// unprotected, as the NEC SOCKS5 server expects.
+    /// </summary>
+    public bool Socks5GssapiNec { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--haproxy-protocol</c> was given and no <c>--no-haproxy-protocol</c>
+    /// came after it: send a HAProxy PROXY protocol v1 header first on the connection.
+    /// </summary>
+    public bool HaproxyProtocol { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--haproxy-clientip</c> value, verbatim and unvalidated: the client address to put in
+    /// the HAProxy PROXY header; <see langword="null"/> when not given. An empty value is refused as blank.
+    /// </summary>
+    public string? HaproxyClientIp { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--suppress-connect-headers</c> was given and no
+    /// <c>--no-suppress-connect-headers</c> came after it: leave the proxy's CONNECT response headers
+    /// out of the headers shown and saved.
+    /// </summary>
+    public bool SuppressConnectHeaders { get; internal set; }
 
     /// <summary>
     /// The last <c>--noproxy</c> value, verbatim: the hosts to reach without a proxy. Empty is
@@ -1639,8 +1697,8 @@ public sealed class CommandLineOptions
     }
 
     /// <summary>
-    /// Records a <c>-x</c> / <c>--proxy</c> value, or a <c>--socks4</c>, <c>--socks4a</c>, <c>--socks5</c>
-    /// or <c>--socks5-hostname</c> one, as <see cref="Proxy"/>, replacing any earlier one.
+    /// Records a <c>-x</c> / <c>--proxy</c> value, or a <c>--proxy1.0</c>, <c>--socks4</c>, <c>--socks4a</c>,
+    /// <c>--socks5</c> or <c>--socks5-hostname</c> one, as <see cref="Proxy"/>, replacing any earlier one.
     /// </summary>
     /// <param name="address">The value as given, possibly empty.</param>
     /// <param name="kindWithoutScheme">The kind the option names, used when the value has no scheme.</param>

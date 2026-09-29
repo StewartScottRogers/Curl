@@ -4,7 +4,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Cli;
 
 /// <summary>
-/// The proxy a command line names: the <c>-x</c> / <c>--proxy</c>, <c>--socks4</c>, <c>--socks4a</c>,
+/// The proxy a command line names: the <c>-x</c> / <c>--proxy</c>, <c>--proxy1.0</c>, <c>--socks4</c>, <c>--socks4a</c>,
 /// <c>--socks5</c> or <c>--socks5-hostname</c> value as given, and the kind of proxy that option
 /// means when the value has no scheme.
 /// </summary>
@@ -69,7 +69,7 @@ public sealed record CommandLineProxy(string Address, ProxyKind KindWithoutSchem
         {
             if (string.Equals(scheme, supported, StringComparison.OrdinalIgnoreCase))
             {
-                kind = supportedKind;
+                kind = supportedKind == ProxyKind.Http ? HttpKindWithoutScheme() : supportedKind;
                 return true;
             }
         }
@@ -78,4 +78,12 @@ public sealed record CommandLineProxy(string Address, ProxyKind KindWithoutSchem
         failure = TransferResult.Failure(CurlExitCode.CouldntConnect, $"Unsupported proxy scheme for '{Address}'");
         return false;
     }
+
+    /// <summary>
+    /// The kind an <c>http://</c> scheme means: <see cref="ProxyKind.Http10"/> when the option was
+    /// <c>--proxy1.0</c> (curl 8.21.0 sends <c>CONNECT … HTTP/1.0</c> for <c>--proxy1.0 http://A</c>,
+    /// measured 2026-09-28), else <see cref="ProxyKind.Http"/>.
+    /// </summary>
+    private ProxyKind HttpKindWithoutScheme() =>
+        KindWithoutScheme == ProxyKind.Http10 ? ProxyKind.Http10 : ProxyKind.Http;
 }
