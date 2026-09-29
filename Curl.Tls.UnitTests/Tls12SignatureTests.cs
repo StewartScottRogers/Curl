@@ -25,7 +25,7 @@ public sealed class Tls12SignatureTests
     }
 
     [TestMethod]
-    public void AnRsaKeySignsAndVerifiesPkcs1ButCannotSignTheLegacyBlock()
+    public void AnRsaKeySignsAndVerifiesPkcs1()
     {
         TestServerCredential credential = TestServerCredential.Rsa(TlsSignatureScheme.RsaPkcs1Sha256);
         TlsSignatureRule rule = TlsSignatureScheme.FindTls12Rule(TlsSignatureScheme.RsaPkcs1Sha384)!;
@@ -34,9 +34,47 @@ public sealed class Tls12SignatureTests
         byte[] signature = credential.SigningKey.SignByRule(rule, Content);
 
         Assert.IsNull(key.VerifySignature(rule, Content, signature));
-        Assert.IsFalse(credential.SigningKey.CanSign(TlsSignatureScheme.LegacyRules[0]));
         Assert.IsFalse(credential.SigningKey.CanSign((TlsSignatureRule?)null));
         Assert.IsFalse(credential.SigningKey.CanSign(TlsSignatureScheme.RsaPkcs1Sha256));
+    }
+
+    [TestMethod]
+    public void AnRsaKeySignsTheLegacyMd5Sha1BlockWithTheRawPrivateOperation()
+    {
+        TestServerCredential credential = TestServerCredential.Rsa(TlsSignatureScheme.RsaPkcs1Sha256);
+        TlsSignatureRule rule = TlsSignatureScheme.LegacyRules[0];
+        TlsCertificatePublicKey key = TlsCertificatePublicKey.Read(credential.Certificate)!;
+        RSAParameters parameters = credential.RsaKey!.ExportParameters(includePrivateParameters: true);
+
+        byte[] signature = credential.SigningKey.SignByRule(rule, Content);
+
+        Assert.AreEqual(TlsSignatureKind.RsaMd5Sha1, rule.Kind);
+        Assert.IsTrue(credential.SigningKey.CanSign(rule));
+        Assert.IsNull(key.VerifySignature(rule, Content, signature));
+        BigInteger block = ToInteger(TlsSignatureScheme.BuildMd5Sha1Block(Content, parameters.Modulus!.Length));
+        BigInteger expected = BigInteger.ModPow(block, ToInteger(parameters.D!), ToInteger(parameters.Modulus!));
+        Assert.AreEqual(expected, ToInteger(signature));
+        Assert.HasCount(parameters.Modulus!.Length, signature);
+    }
+
+    [TestMethod]
+    public void AnRsaKeyWhosePrivateParametersCannotBeExportedCannotSignTheLegacyBlock()
+    {
+        using NonExportableRsa rsa = new();
+        var signingKey = new RsaTlsSigningKey(rsa);
+
+        Assert.IsFalse(signingKey.CanSign(TlsSignatureScheme.LegacyRules[0]));
+        Assert.IsFalse(signingKey.CanSign(TlsSignatureScheme.LegacyRules[0]));
+        Assert.AreEqual(1, rsa.ExportAttempts);
+        Assert.IsTrue(signingKey.CanSign(TlsSignatureScheme.RsaPssRsaeSha256));
+    }
+
+    [TestMethod]
+    public void AnRsaKeyCertifiedAsPssCannotSignTheLegacyBlock()
+    {
+        using RSA rsa = RSA.Create(2048);
+
+        Assert.IsFalse(new RsaTlsSigningKey(rsa, certifiedAsPss: true).CanSign(TlsSignatureScheme.LegacyRules[0]));
     }
 
     [TestMethod]
@@ -159,5 +197,21 @@ public sealed class Tls12SignatureTests
         Assert.HasCount(36, TlsPrf.Md5Sha1.HashHandshake(Content));
         CollectionAssert.AreEqual(SHA256.HashData(Content), TlsPrf.Sha256.HashHandshake(Content));
         CollectionAssert.AreEqual(SHA384.HashData(Content), TlsPrf.Sha384.HashHandshake(Content));
+    }
+
+    private static BigInteger ToInteger(ReadOnlySpan<byte> bigEndian) => new(bigEndian, isUnsigned: true, isBigEndian: true);
+
+    /// <summary>An RSA key whose private parameters refuse export, as a non-exportable CNG key does; it counts the attempts.</summary>
+    private sealed class NonExportableRsa : RSA
+    {
+        public int ExportAttempts { get; private set; }
+
+        public override RSAParameters ExportParameters(bool includePrivateParameters)
+        {
+            ExportAttempts++;
+            throw new CryptographicException("The key is not exportable.");
+        }
+
+        public override void ImportParameters(RSAParameters parameters) => throw new NotSupportedException();
     }
 }

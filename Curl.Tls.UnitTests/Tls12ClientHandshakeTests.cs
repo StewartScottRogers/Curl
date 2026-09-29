@@ -388,8 +388,30 @@ public sealed class Tls12ClientHandshakeTests
     }
 
     [TestMethod]
+    [DataRow(TlsProtocolVersion.Tls10)]
+    [DataRow(TlsProtocolVersion.Tls11)]
+    public void AnRsaClientCertificateBelowTlsOneTwoSignsTheMd5Sha1Block(TlsProtocolVersion version)
+    {
+        TestServerCredential clientCredential = Credential("rsa");
+        Tls12TestServer server = new(TestServerCredential.Rsa(TlsSignatureScheme.RsaPkcs1Sha256)) { Version = version, CipherSuite = 0xc013, RequestClientCertificate = true };
+        Tls12ClientHandshake client = Client(DefaultSettings with
+        {
+            MinimumVersion = TlsProtocolVersion.Tls10,
+            ClientCertificate = new TlsClientCertificate([clientCredential.Certificate], clientCredential.SigningKey),
+        });
+
+        Tls12HandshakeOutput output = Run(client, server);
+
+        // The server has already checked the CertificateVerify against the certificate's key by the MD5 + SHA-1 rule.
+        AssertCompletesWithServerKeys(client, server, output);
+        Assert.AreEqual(version, client.Version);
+        Assert.IsTrue(client.ClientCertificateSent);
+        CollectionAssert.AreEqual(clientCredential.Certificate, server.ClientCertificates[0]);
+    }
+
+    [TestMethod]
     [DataRow(TlsProtocolVersion.Tls12, "ed25519")]
-    [DataRow(TlsProtocolVersion.Tls10, "rsa")]
+    [DataRow(TlsProtocolVersion.Tls10, "rsa-pss")]
     [DataRow(TlsProtocolVersion.Tls12, "none")]
     public void WithoutAKeyThatCanSignTheClientSendsAnEmptyCertificate(TlsProtocolVersion version, string credential)
     {
@@ -449,6 +471,7 @@ public sealed class Tls12ClientHandshakeTests
         "ecdsa384" => TestServerCredential.Ecdsa(ECCurve.NamedCurves.nistP384, TlsSignatureScheme.EcdsaSecp384r1Sha384),
         "ed25519" => TestServerCredential.Ed25519(),
         "rsa" => TestServerCredential.Rsa(TlsSignatureScheme.RsaPkcs1Sha256),
+        "rsa-pss" => TestServerCredential.RsaPss(TlsSignatureScheme.RsaPssPssSha256),
         _ => null!,
     };
 
