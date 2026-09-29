@@ -35,3 +35,4 @@ A hand-built TLS connection whose range spans TLS 1.3 and TLS 1.2 (or lower) sen
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
