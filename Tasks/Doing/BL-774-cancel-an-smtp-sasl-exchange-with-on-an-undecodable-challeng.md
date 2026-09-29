@@ -39,3 +39,4 @@ When an SMTP server sends a 334 challenge that a challenge-decoding mechanism (C
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
