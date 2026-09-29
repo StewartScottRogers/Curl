@@ -1,5 +1,5 @@
 ---
-id: BL-840
+id: BL-843
 title: Write curl's -v lines for a Negotiate context that makes no token
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-840 — Write curl's -v lines for a Negotiate context that makes no token
+# BL-843 — Write curl's -v lines for a Negotiate context that makes no token
 
 ## Goal
 

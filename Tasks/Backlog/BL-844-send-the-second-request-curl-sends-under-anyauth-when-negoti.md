@@ -1,5 +1,5 @@
 ---
-id: BL-841
+id: BL-844
 title: Send the second request curl sends under --anyauth when Negotiate makes no token
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-841 — Send the second request curl sends under --anyauth when Negotiate makes no token
+# BL-844 — Send the second request curl sends under --anyauth when Negotiate makes no token
 
 ## Goal
 
