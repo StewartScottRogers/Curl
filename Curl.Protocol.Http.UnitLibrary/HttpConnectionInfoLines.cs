@@ -110,6 +110,26 @@ internal static class HttpConnectionInfoLines
         string.Create(CultureInfo.InvariantCulture, $"Connection #{connectionNumber} to host {host}:{port} left intact");
 
     /// <summary>
+    /// Formats the line for a connection through a Unix domain socket left open for another
+    /// transfer: curl 8.21.0 names the socket's whole path, its ASCII letters lower-cased, with
+    /// port <c>0</c> (measured, BL-794 Notes).
+    /// </summary>
+    /// <param name="connectionNumber">curl's number for the connection.</param>
+    /// <param name="socketPath">The path of the socket the connection was dialled through.</param>
+    /// <returns>The line, such as <c>Connection #0 to host c:\users\public\s.sock:0 left intact</c>.</returns>
+    internal static string LeftIntactOverUnixSocket(long connectionNumber, string socketPath) =>
+        LeftIntact(connectionNumber, LowerAsciiLetters(socketPath), 0);
+
+    private static string LowerAsciiLetters(string text) =>
+        string.Create(text.Length, text, static (lowered, source) =>
+        {
+            for (var index = 0; index < source.Length; index++)
+            {
+                lowered[index] = char.IsAsciiLetterUpper(source[index]) ? (char)(source[index] | 0x20) : source[index];
+            }
+        });
+
+    /// <summary>
     /// Formats the line for a connection closed because its response did not let it persist.
     /// </summary>
     /// <param name="connectionNumber">curl's number for the connection.</param>

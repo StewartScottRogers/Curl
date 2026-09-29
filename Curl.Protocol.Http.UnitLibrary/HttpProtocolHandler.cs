@@ -535,7 +535,7 @@ public sealed class HttpProtocolHandler(
     /// </summary>
     private static void ReportConnectionEnd(ITransferContext context, ConnectTarget target, ConnectResult connect, HttpAttemptOutcome outcome)
     {
-        context.Events.ReportInfo(ConnectionEndLine(target, connect.ConnectionNumber, outcome));
+        context.Events.ReportInfo(ConnectionEndLine(target, connect, outcome));
         if (outcome.DiedBeforeResponse)
         {
             context.Events.ReportInfo(HttpConnectionInfoLines.IssueAnotherRequest(context.Url));
@@ -543,16 +543,22 @@ public sealed class HttpProtocolHandler(
     }
 
     /// <summary>
-    /// Gives curl 8.21.0's <c>-v</c> line for what became of connection <paramref name="number" />
-    /// (ADR-0050): left intact, closing, or shutting down.
+    /// Gives curl 8.21.0's <c>-v</c> line for what became of <paramref name="connect" />'s
+    /// connection (ADR-0050): left intact, closing, or shutting down. A connection left intact is
+    /// named by the target's host and port, or by its Unix domain socket (BL-794).
     /// </summary>
-    private static string ConnectionEndLine(ConnectTarget target, long number, HttpAttemptOutcome outcome) =>
+    private static string ConnectionEndLine(ConnectTarget target, ConnectResult connect, HttpAttemptOutcome outcome) =>
         outcome switch
         {
-            { ReportsLeftIntact: true } => HttpConnectionInfoLines.LeftIntact(number, target.Host, target.Port),
-            { DiedBeforeResponse: false, Result.ExitCode: not CurlExitCode.Ok } => HttpConnectionInfoLines.Closing(number),
-            _ => HttpConnectionInfoLines.ShuttingDown(number),
+            { ReportsLeftIntact: true } => LeftIntactLine(target, connect),
+            { DiedBeforeResponse: false, Result.ExitCode: not CurlExitCode.Ok } => HttpConnectionInfoLines.Closing(connect.ConnectionNumber),
+            _ => HttpConnectionInfoLines.ShuttingDown(connect.ConnectionNumber),
         };
+
+    private static string LeftIntactLine(ConnectTarget target, ConnectResult connect) =>
+        connect.UnixSocketPath is { } socketPath
+            ? HttpConnectionInfoLines.LeftIntactOverUnixSocket(connect.ConnectionNumber, socketPath)
+            : HttpConnectionInfoLines.LeftIntact(connect.ConnectionNumber, target.Host, target.Port);
 
     /// <summary>
     /// Sends the request on <paramref name="transport" /> and reads the response into the
