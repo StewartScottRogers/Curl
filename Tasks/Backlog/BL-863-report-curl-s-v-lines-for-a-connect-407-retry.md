@@ -1,5 +1,5 @@
 ---
-id: BL-856
+id: BL-863
 title: Report curl's -v lines for a CONNECT 407 retry
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-856 — Report curl's -v lines for a CONNECT 407 retry
+# BL-863 — Report curl's -v lines for a CONNECT 407 retry
 
 ## Goal
 

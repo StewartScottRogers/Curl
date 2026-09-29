@@ -1,5 +1,5 @@
 ---
-id: BL-855
+id: BL-862
 title: Reuse the proxy connection after a chunked 407 to CONNECT
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-855 — Reuse the proxy connection after a chunked 407 to CONNECT
+# BL-862 — Reuse the proxy connection after a chunked 407 to CONNECT
 
 ## Goal
 

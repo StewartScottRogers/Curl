@@ -1,5 +1,5 @@
 ---
-id: BL-857
+id: BL-864
 title: Retry a proxy Digest answer challenged with stale=true
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-857 — Retry a proxy Digest answer challenged with stale=true
+# BL-864 — Retry a proxy Digest answer challenged with stale=true
 
 ## Goal
 
