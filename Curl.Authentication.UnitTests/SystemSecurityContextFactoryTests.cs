@@ -35,11 +35,9 @@ public sealed class SystemSecurityContextFactoryTests
     }
 
     [TestMethod]
-    [DataRow(SecurityDelegation.Policy)]
-    [DataRow(SecurityDelegation.Always)]
-    public void OptionsFor_ExplicitCredentialAndDelegation_PassesBoth(SecurityDelegation delegation)
+    public void OptionsFor_ExplicitCredentialAndAlwaysDelegation_PassesBoth()
     {
-        SecurityContextRequest request = new(SecurityMechanism.Negotiate, "HTTP", "h") { UserName = "alice", Password = "pw", Domain = "EXAMPLE", Delegation = delegation };
+        SecurityContextRequest request = new(SecurityMechanism.Negotiate, "HTTP", "h") { UserName = "alice", Password = "pw", Domain = "EXAMPLE", Delegation = SecurityDelegation.Always };
 
         NegotiateAuthenticationClientOptions options = SystemSecurityContextFactory.OptionsFor(request);
 
@@ -47,6 +45,22 @@ public sealed class SystemSecurityContextFactoryTests
         Assert.AreEqual("pw", options.Credential.Password);
         Assert.AreEqual("EXAMPLE", options.Credential.Domain);
         Assert.AreEqual(TokenImpersonationLevel.Delegation, options.AllowedImpersonationLevel);
+    }
+
+    [TestMethod]
+    public void OptionsFor_PolicyDelegation_AsksNoneForWantOfAPolicyFlag()
+    {
+        SecurityContextRequest request = new(SecurityMechanism.Negotiate, "HTTP", "h") { Delegation = SecurityDelegation.Policy };
+
+        Assert.AreEqual(TokenImpersonationLevel.None, SystemSecurityContextFactory.OptionsFor(request).AllowedImpersonationLevel);
+    }
+
+    [TestMethod]
+    public void OptionsFor_OtherServiceName_NamesItsServiceSlashHostTarget()
+    {
+        NegotiateAuthenticationClientOptions options = SystemSecurityContextFactory.OptionsFor(new SecurityContextRequest(SecurityMechanism.Negotiate, "svc", "proxy.example.test"));
+
+        Assert.AreEqual("svc/proxy.example.test", options.TargetName);
     }
 
     [TestMethod]

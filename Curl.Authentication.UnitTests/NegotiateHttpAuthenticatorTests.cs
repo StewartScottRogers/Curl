@@ -71,7 +71,7 @@ public sealed class NegotiateHttpAuthenticatorTests
     [DataRow(":secret", DisplayName = "-u :secret")]
     public void ContextRequestFor_NoUserName_AsksForTheDefaultCredentials(string? userColonPassword)
     {
-        SecurityContextRequest request = NegotiateHttpAuthenticator.ContextRequestFor(Request(userColonPassword));
+        SecurityContextRequest request = Default.ContextRequestFor(Request(userColonPassword));
 
         Assert.AreEqual(new SecurityContextRequest(SecurityMechanism.Negotiate, "HTTP", "server.example.test"), request);
     }
@@ -81,7 +81,7 @@ public sealed class NegotiateHttpAuthenticatorTests
     {
         HttpAuthRequest request = Request(":") with { Url = CurlUrl.Parse("http://[::1]:8080/") };
 
-        Assert.AreEqual("::1", NegotiateHttpAuthenticator.ContextRequestFor(request).HostName);
+        Assert.AreEqual("::1", Default.ContextRequestFor(request).HostName);
     }
 
     [TestMethod]
@@ -90,7 +90,7 @@ public sealed class NegotiateHttpAuthenticatorTests
     [DataRow("EXAMPLE/alice:pw", "EXAMPLE", "alice", DisplayName = "DOMAIN/user")]
     public void ContextRequestFor_UserName_PassesTheExplicitCredential(string userColonPassword, string? domain, string user)
     {
-        SecurityContextRequest request = NegotiateHttpAuthenticator.ContextRequestFor(Request(userColonPassword));
+        SecurityContextRequest request = Default.ContextRequestFor(Request(userColonPassword));
 
         Assert.AreEqual(user, request.UserName);
         Assert.AreEqual("pw", request.Password);
@@ -103,8 +103,67 @@ public sealed class NegotiateHttpAuthenticatorTests
     {
         HttpAuthRequest request = Request(":") with { Credential = new NetworkCredential("alice", "pw", "CORP") };
 
-        Assert.AreEqual("CORP", NegotiateHttpAuthenticator.ContextRequestFor(request).Domain);
+        Assert.AreEqual("CORP", Default.ContextRequestFor(request).Domain);
     }
+
+    [TestMethod]
+    [DataRow(false, "HTTP", DisplayName = "server, no --service-name")]
+    [DataRow(true, "HTTP", DisplayName = "proxy, no --proxy-service-name")]
+    public void ContextRequestFor_NoServiceNames_AsksForHttpWithoutDelegation(bool isProxy, string serviceName)
+    {
+        SecurityContextRequest request = Default.ContextRequestFor(Request(":") with { IsProxy = isProxy });
+
+        Assert.AreEqual(serviceName, request.ServiceName);
+        Assert.AreEqual(SecurityDelegation.None, request.Delegation);
+    }
+
+    [TestMethod]
+    [DataRow(false, "svc", DisplayName = "server takes --service-name")]
+    [DataRow(true, "proxysvc", DisplayName = "proxy takes --proxy-service-name")]
+    public void ContextRequestFor_BothServiceNames_AsksForTheOneForItsPeer(bool isProxy, string serviceName)
+    {
+        NegotiateHttpAuthenticator authenticator = new(new ScriptedSecurityContextFactory(), new NegotiateOptions("svc", "proxysvc", SecurityDelegation.None));
+
+        SecurityContextRequest request = authenticator.ContextRequestFor(Request(":") with { IsProxy = isProxy });
+
+        Assert.AreEqual(new SecurityContextRequest(SecurityMechanism.Negotiate, serviceName, "server.example.test"), request);
+    }
+
+    [TestMethod]
+    [DataRow(false, DisplayName = "server, only --proxy-service-name")]
+    [DataRow(true, DisplayName = "proxy, only --service-name")]
+    public void ContextRequestFor_OnlyTheOtherPeersServiceName_AsksForHttp(bool isProxy)
+    {
+        NegotiateOptions options = isProxy ? new NegotiateOptions("svc", null, SecurityDelegation.None) : new NegotiateOptions(null, "proxysvc", SecurityDelegation.None);
+
+        SecurityContextRequest request = new NegotiateHttpAuthenticator(new ScriptedSecurityContextFactory(), options).ContextRequestFor(Request(":") with { IsProxy = isProxy });
+
+        Assert.AreEqual("HTTP", request.ServiceName);
+    }
+
+    [TestMethod]
+    [DataRow(false, SecurityDelegation.Policy)]
+    [DataRow(false, SecurityDelegation.Always)]
+    [DataRow(true, SecurityDelegation.Policy)]
+    [DataRow(true, SecurityDelegation.Always)]
+    public void ContextRequestFor_Delegation_PassesTheLevelForServerAndProxy(bool isProxy, SecurityDelegation delegation)
+    {
+        NegotiateHttpAuthenticator authenticator = new(new ScriptedSecurityContextFactory(), NegotiateOptions.Default with { Delegation = delegation });
+
+        Assert.AreEqual(delegation, authenticator.ContextRequestFor(Request("alice:pw") with { IsProxy = isProxy }).Delegation);
+    }
+
+    [TestMethod]
+    public async Task CreateAuthorizationAsync_ServiceNameAndDelegation_ReachTheFactory()
+    {
+        ScriptedSecurityContextFactory factory = new(new ScriptedSecurityContext(new SecurityContextStep(SecurityContextStatus.ContinueNeeded, [0x01])));
+
+        await new NegotiateHttpAuthenticator(factory, new NegotiateOptions("svc", null, SecurityDelegation.Always)).CreateAuthorizationAsync(Request(":"), CancellationToken.None);
+
+        Assert.AreEqual(new SecurityContextRequest(SecurityMechanism.Negotiate, "svc", "server.example.test") { Delegation = SecurityDelegation.Always }, factory.Requests.Single());
+    }
+
+    private static NegotiateHttpAuthenticator Default { get; } = new(new ScriptedSecurityContextFactory());
 
     private static HttpAuthRequest Request(string? userColonPassword)
     {

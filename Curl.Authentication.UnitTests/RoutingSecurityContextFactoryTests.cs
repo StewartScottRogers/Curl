@@ -97,6 +97,28 @@ public sealed class RoutingSecurityContextFactoryTests
     }
 
     [TestMethod]
+    [DataRow(SecurityMechanism.Negotiate)]
+    [DataRow(SecurityMechanism.Kerberos)]
+    public void Create_WindowsWithDelegation_AsksSspiForNoneAsCurlsSspiCodeDoes(SecurityMechanism mechanism)
+    {
+        ScriptedSecurityContextFactory system = new(new ScriptedSecurityContext());
+
+        using ISecurityContext context = new RoutingSecurityContextFactory(isWindows: true, system, new ScriptedSecurityContextFactory()).Create(Explicit with { Mechanism = mechanism, Delegation = SecurityDelegation.Always });
+
+        Assert.AreEqual(Explicit with { Mechanism = mechanism }, system.Requests.Single());
+    }
+
+    [TestMethod]
+    public void Create_GssApiOffWindowsWithDelegation_PassesItOn()
+    {
+        ScriptedSecurityContextFactory system = new(new ScriptedSecurityContext());
+
+        using ISecurityContext context = new RoutingSecurityContextFactory(isWindows: false, system, new ScriptedSecurityContextFactory()).Create(Explicit with { ServiceName = "svc", Delegation = SecurityDelegation.Always });
+
+        Assert.AreEqual(new SecurityContextRequest(SecurityMechanism.Negotiate, "svc", "server.example.test") { Delegation = SecurityDelegation.Always }, system.Requests.Single());
+    }
+
+    [TestMethod]
     public void Create_NtlmOffWindows_UsesTheHandBuiltRoute()
     {
         ScriptedSecurityContext ntlm = new();

@@ -6,18 +6,23 @@ namespace Curl.Authentication;
 /// <summary>
 /// Answers with <c>Authorization: Negotiate &lt;base64&gt;</c> as curl 8.21.0 does
 /// (RFC 4559, ADR-0142, ADR-0176): the first token of a Negotiate context for the service
-/// <c>HTTP</c> on the URL's host, from <paramref name="securityContexts" />. When no token
+/// <c>HTTP</c> on the URL's host, or the <c>--service-name</c> (for a proxy
+/// <c>--proxy-service-name</c>) service when given, with the <c>--delegation</c> level
+/// (ADR-0188), from <paramref name="securityContexts" />. When no token
 /// can be made - no ticket, no logged-on user's credential, no mechanism - it answers
 /// nothing, and the transfer ends on the 401 with exit 0, as both platform curls do.
 /// </summary>
 /// <param name="securityContexts">Makes the Negotiate context; ADR-0142's router in production.</param>
+/// <param name="options">The service names and delegation level; <see cref="NegotiateOptions.Default" /> when <see langword="null" />.</param>
 /// <remarks>
 /// An explicit <c>-u user:password</c> is passed on (a <c>DOMAIN\user</c> or
 /// <c>DOMAIN/user</c> name split into its domain and user, as curl's SSPI build splits it),
 /// where only SSPI uses it; <c>-u :</c> and no <c>-u</c> mean the default credentials.
 /// </remarks>
-public sealed class NegotiateHttpAuthenticator(ISecurityContextFactory securityContexts)
+public sealed class NegotiateHttpAuthenticator(ISecurityContextFactory securityContexts, NegotiateOptions? options = null)
 {
+    private readonly NegotiateOptions options = options ?? NegotiateOptions.Default;
+
     /// <summary>The service name of an HTTP acceptor's principal, before <c>--service-name</c> changes it.</summary>
     public const string HttpServiceName = "HTTP";
 
@@ -37,10 +42,14 @@ public sealed class NegotiateHttpAuthenticator(ISecurityContextFactory securityC
 
     /// <summary>Gets the security context request <paramref name="request" /> comes to.</summary>
     /// <param name="request">The request being authorised.</param>
-    /// <returns>A Negotiate request for <c>HTTP</c> on the URL's host, with the explicit credential if any.</returns>
-    internal static SecurityContextRequest ContextRequestFor(HttpAuthRequest request)
+    /// <returns>
+    /// A Negotiate request for the server's (or proxy's) service on the URL's host, with the
+    /// delegation level and the explicit credential if any.
+    /// </returns>
+    internal SecurityContextRequest ContextRequestFor(HttpAuthRequest request)
     {
-        SecurityContextRequest defaults = new(SecurityMechanism.Negotiate, HttpServiceName, request.Url.IdnHost);
+        string serviceName = (request.IsProxy ? options.ProxyServiceName : options.ServiceName) ?? HttpServiceName;
+        SecurityContextRequest defaults = new(SecurityMechanism.Negotiate, serviceName, request.Url.IdnHost) { Delegation = options.Delegation };
         if (request.Credential is not { UserName.Length: > 0 } credential)
         {
             return defaults;

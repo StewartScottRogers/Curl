@@ -11,7 +11,9 @@ password curl 8.21.0 picks from `--netrc-file` text, BL-503).
 Negotiate (BL-527, ADR-0142, ADR-0176): `RankedHttpAuthenticator.CreateAuthorizationAsync`
 hands a Negotiate pick to `NegotiateHttpAuthenticator`, which asks an `ISecurityContextFactory`
 (the seam in `Curl.Protocol.Abstractions`) for the first token of a context for `HTTP` on the
-URL's host. The production factory is `RoutingSecurityContextFactory`: on Windows
+URL's host, or the service its `NegotiateOptions` name (`--service-name`, or
+`--proxy-service-name` for a proxy), with the `--delegation` level (ADR-0188); the router drops
+the level on Windows, as SSPI curl never delegates. The production factory is `RoutingSecurityContextFactory`: on Windows
 `SystemSecurityContextFactory` (the BCL's `NegotiateAuthentication`, SSPI), with Negotiate
 wrapped in `SspiNegotiateSecurityContext` so a token that falls back to NTLM counts as no
 credentials, as curl's SSPI gets `SEC_E_NO_CREDENTIALS`; elsewhere the system GSS-API through

@@ -21,7 +21,8 @@ public sealed class RoutingSecurityContextFactory(bool isWindows, ISecurityConte
         ArgumentNullException.ThrowIfNull(request);
         if (isWindows)
         {
-            ISecurityContext sspi = system.Create(request);
+            // curl's SSPI code never reads --delegation: its contexts ask no delegation (ADR-0188).
+            ISecurityContext sspi = system.Create(request with { Delegation = SecurityDelegation.None });
             return request.Mechanism == SecurityMechanism.Negotiate ? new SspiNegotiateSecurityContext(sspi) : sspi;
         }
 

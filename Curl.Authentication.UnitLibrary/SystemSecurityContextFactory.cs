@@ -30,9 +30,11 @@ public sealed class SystemSecurityContextFactory : ISecurityContextFactory
         Credential = request.UserName is null
             ? CredentialCache.DefaultNetworkCredentials
             : new NetworkCredential(request.UserName, request.Password, request.Domain),
-        AllowedImpersonationLevel = request.Delegation == SecurityDelegation.None
-            ? TokenImpersonationLevel.None
-            : TokenImpersonationLevel.Delegation,
+        // NegotiateAuthentication has GSS_C_DELEG_FLAG but no GSS_C_DELEG_POLICY_FLAG, so
+        // policy asks none rather than hand the credential to a host not trusted for it (ADR-0188).
+        AllowedImpersonationLevel = request.Delegation == SecurityDelegation.Always
+            ? TokenImpersonationLevel.Delegation
+            : TokenImpersonationLevel.None,
         RequiredProtectionLevel = request.MessageProtection,
     };
 
