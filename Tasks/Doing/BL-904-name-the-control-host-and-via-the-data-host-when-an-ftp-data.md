@@ -32,3 +32,4 @@ A failed FTP data connection ends with curl 8.21.0's message, which names the co
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-29: Backlog -> Doing.
