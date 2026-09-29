@@ -38,3 +38,4 @@ ADR numbers 0158, 0165 and 0200 each name exactly one record in `Documentation/P
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-29: Backlog -> Doing.
