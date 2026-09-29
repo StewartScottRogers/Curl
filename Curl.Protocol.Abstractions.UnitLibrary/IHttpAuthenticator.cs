@@ -11,7 +11,7 @@ namespace Curl.Protocol.Abstractions;
 /// <see cref="CreateAuthorizationAsync" />, which the HTTP handler calls, may, as Negotiate
 /// asks a KDC (ADR-0176). A handshake of more than one leg (NTLM) goes on through
 /// <see cref="ContinueAuthorizationAsync" />, which is told what the last request sent
-/// (ADR-0180).
+/// (ADR-0181).
 /// </remarks>
 public interface IHttpAuthenticator
 {
@@ -49,7 +49,7 @@ public interface IHttpAuthenticator
     /// <summary>
     /// Creates the authorization header value that answers a challenge to a request that
     /// already sent one, as NTLM answers its Type 2 challenge to the Type 1 message it sent
-    /// (ADR-0180). By default it answers nothing, so a credential sent and refused ends the
+    /// (ADR-0181). By default it answers nothing, so a credential sent and refused ends the
     /// transfer on the response, as curl 8.21.0 does for Basic, Digest and Negotiate.
     /// </summary>
     /// <param name="request">The request being authorised, and what it may be authorised with.</param>

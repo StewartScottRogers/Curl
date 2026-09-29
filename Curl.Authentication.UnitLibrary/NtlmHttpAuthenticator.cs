@@ -5,7 +5,7 @@ namespace Curl.Authentication;
 
 /// <summary>
 /// Answers with <c>Authorization: NTLM &lt;base64&gt;</c> as curl 8.21.0 does (ADR-0142,
-/// ADR-0180): the Type 1 message first, the Type 3 message in answer to the server's Type 2
+/// ADR-0181): the Type 1 message first, the Type 3 message in answer to the server's Type 2
 /// challenge, and nothing once Type 3 has been sent, from NTLM contexts for the service
 /// <c>HTTP</c> on the URL's host that <paramref name="securityContexts" /> makes.
 /// </summary>

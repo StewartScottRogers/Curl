@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-525, BL-684]
-touches: [Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests, Curl.Console, Curl.Console.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Documentation/Planning/Decisions/ADR-0180-http-ntlm-answers-in-three-legs-from-a-fresh-context-per-leg.md, Documentation/Planning/Decisions/README.md]
+touches: [Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests, Curl.Console, Curl.Console.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Documentation/Planning/Decisions/ADR-0181-http-ntlm-answers-in-three-legs-from-a-fresh-context-per-leg.md, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-09-28
 completed: 2026-09-28
@@ -65,7 +65,7 @@ CHALLENGE, `TlRMTVNTUAACAAAADAAMADgAAAAzgoriASNFZ4mrze8AAAAAAAAAACQAJABEAAAABgBw
 - `--ntlm`, 401 `NTLM @@@notbase64` (both): "NTLM authentication problem, ignoring",
   stdout `nope`, exit 0.
 
-### Plan and decisions (ADR-0180)
+### Plan and decisions (ADR-0181)
 
 - `IHttpAuthenticator` gains a default `ContinueAuthorizationAsync(request, sentAuthorization,
   sentBeforeAnyChallenge, challenges)` answering null; the HTTP handler calls it for a 401
@@ -92,11 +92,11 @@ CHALLENGE, `TlRMTVNTUAACAAAADAAMADgAAAAzgoriASNFZ4mrze8AAAAAAAAAACQAJABEAAAABgBw
 exception: the HTTP handler cannot see the authenticator otherwise),
 `Curl.Protocol.Http.UnitLibrary`/`.UnitTests` (the handler never retried a 401 after a
 credential was sent), `Curl.Cli.UnitLibrary`/`.UnitTests` (`CurlVersionText` holds the `-V`
-feature list), ADR-0180 and the decisions README. No task in Doing (BL-728, BL-747,
+feature list), ADR-0181 and the decisions README. No task in Doing (BL-728, BL-747,
 BL-787, BL-823) names any of them.
 
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Doing.
-- 2026-09-28: Doing -> Done. --ntlm and --anyauth answer NTLM in three legs on one connection: SSPI on Windows, curl's own NTLM byte for byte elsewhere; -V lists NTLM (ADR-0180)
+- 2026-09-28: Doing -> Done. --ntlm and --anyauth answer NTLM in three legs on one connection: SSPI on Windows, curl's own NTLM byte for byte elsewhere; -V lists NTLM (ADR-0181)

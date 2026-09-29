@@ -25,8 +25,8 @@ OpenSSL builds on Linux and macOS) builds Type 3 in a buffer of `NTLM_BUFSIZE` (
 bytes and fails with `CURLE_TOO_LARGE` (exit 100 per
 https://curl.se/libcurl/c/libcurl-errors.html, curl 8.21.0) when it does not fit.
 
-BL-526 (ADR-0180,
-`Documentation/Planning/Decisions/ADR-0180-http-ntlm-answers-in-three-legs-from-a-fresh-context-per-leg.md`)
+BL-526 (ADR-0181,
+`Documentation/Planning/Decisions/ADR-0181-http-ntlm-answers-in-three-legs-from-a-fresh-context-per-leg.md`)
 chose a default instead: `Curl.Authentication.UnitLibrary/HandBuiltNtlmSecurityContext.cs`
 answers `SecurityContextStatus.Refused` when the answer passes 1024 bytes, and
 `NtlmHttpAuthenticator` (constructed with `refusedChallengeFailsTransfer: false` off
@@ -63,7 +63,7 @@ Record exit code, stdout, stderr (with `-sS`) and whether a second request is se
       `dotnet test --filter "TestCategory!=Integration"` is green.
 - [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1` reports 100% line and
       branch coverage for `Curl.Authentication.UnitLibrary`.
-- [ ] ADR-0180's "a Type 3 past 1024 bytes ends on the 401" choice is marked as
+- [ ] ADR-0181's "a Type 3 past 1024 bytes ends on the 401" choice is marked as
       superseded by this task in a line appended to its Consequences (or the task notes
       why no ADR edit was needed). If that edit is needed, add
       `Documentation/Planning/Decisions` to `touches` first.

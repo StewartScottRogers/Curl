@@ -9,7 +9,7 @@ namespace Curl.Protocol.Http;
 /// Drives a handshake of more than one leg through <see cref="HandshakeAuthenticator" />:
 /// curl 8.21.0's NTLM exchange as measured in BL-526 - Type 1 on the first request, the
 /// Type 2 challenge answered with Type 3 on the same connection - and the ways it stops
-/// (ADR-0180).
+/// (ADR-0181).
 /// </content>
 public sealed partial class HttpProtocolHandlerTests
 {

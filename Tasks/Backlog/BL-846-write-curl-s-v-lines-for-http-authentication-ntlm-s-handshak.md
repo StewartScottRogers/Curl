@@ -21,8 +21,8 @@ rejected / failure / problem lines.
 
 ## Context
 
-BL-526 (ADR-0180,
-`Documentation/Planning/Decisions/ADR-0180-http-ntlm-answers-in-three-legs-from-a-fresh-context-per-leg.md`)
+BL-526 (ADR-0181,
+`Documentation/Planning/Decisions/ADR-0181-http-ntlm-answers-in-three-legs-from-a-fresh-context-per-leg.md`)
 made `--ntlm` answer in three legs through `NtlmHttpAuthenticator` and
 `IHttpAuthenticator.ContinueAuthorizationAsync`, but chose not to write any `-v` line for
 HTTP authentication. This task writes them.

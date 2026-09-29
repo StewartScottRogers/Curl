@@ -16,7 +16,7 @@ namespace Curl.Authentication;
 /// token, or a Digest or NTLM challenge cannot be read, it sends nothing rather than answer a
 /// lower-ranked scheme also offered. Negotiate and NTLM need I/O, so only
 /// <see cref="CreateAuthorizationAsync" /> and <see cref="ContinueAuthorizationAsync" /> answer
-/// them (ADR-0176, ADR-0180). As libcurl does, <c>--negotiate</c> alone tries it on the first
+/// them (ADR-0176, ADR-0181). As libcurl does, <c>--negotiate</c> alone tries it on the first
 /// request, and after a challenge answers only when <c>-u</c> was given, even as <c>-u :</c>;
 /// NTLM answers only when <c>-u</c> was given, and <c>--ntlm</c> alone sends its Type 1 message
 /// on the first request. Only NTLM goes on after a request that sent a credential.

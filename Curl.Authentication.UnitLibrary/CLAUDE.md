@@ -22,7 +22,7 @@ the same factory with the default credentials, falling back (`FallbackSecurityCo
 credential cache, else a TGS exchange). This library references `Curl.Kerberos.UnitLibrary`
 and `Curl.Ntlm.UnitLibrary`.
 
-NTLM (BL-526, ADR-0142, ADR-0180): `RankedHttpAuthenticator` hands an NTLM pick, and `--ntlm`
+NTLM (BL-526, ADR-0142, ADR-0181): `RankedHttpAuthenticator` hands an NTLM pick, and `--ntlm`
 before any challenge, to `NtlmHttpAuthenticator`, both on the first call and through
 `ContinueAuthorizationAsync` for a 401 to a request that already sent a credential. It sends
 Type 1, then Type 3 for the server's Type 2 from a fresh context stepped through Type 1 (no

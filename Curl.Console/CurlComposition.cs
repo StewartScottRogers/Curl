@@ -129,7 +129,7 @@ internal static class CurlComposition
     /// drawing each client nonce from <see cref="DigestClientNonce.CreateRandom" />, both encoding
     /// credentials in the platform's encoding (<see cref="CredentialEncoding.ForPlatform" />),
     /// and a <see cref="NegotiateHttpAuthenticator" /> and an <see cref="NtlmHttpAuthenticator" /> over <paramref name="securityContexts" />
-    /// for <c>--negotiate</c> and <c>--ntlm</c> (ADR-0176, ADR-0180), a refused NTLM Type 2 message failing the transfer
+    /// for <c>--negotiate</c> and <c>--ntlm</c> (ADR-0176, ADR-0181), a refused NTLM Type 2 message failing the transfer
     /// on Windows, as curl's SSPI build fails it.
     /// </summary>
     /// <param name="securityContexts">Makes Negotiate's and NTLM's contexts: <see cref="CreateSecurityContextFactory" />'s in production.</param>

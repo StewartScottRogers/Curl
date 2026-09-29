@@ -1086,7 +1086,7 @@ public sealed class HttpProtocolHandler(
     /// through <see cref="IHttpAuthenticator.ContinueAuthorizationAsync" /> when the request
     /// that drew it already sent one, which only a handshake of more than one leg (NTLM)
     /// answers, so a credential sent up front and refused ends the transfer, as in curl 8.21.0
-    /// (ADR-0180).
+    /// (ADR-0181).
     /// </summary>
     /// <exception cref="HttpTransferException">The authenticator fails the transfer (<see cref="HttpAuthenticationFailedException" />).</exception>
     private async ValueTask<string?> RetryAuthorizationAsync(HttpRequestPlan plan, HttpResponseHead head, CancellationToken cancellationToken)
