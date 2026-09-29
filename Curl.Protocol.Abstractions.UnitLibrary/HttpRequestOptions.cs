@@ -110,6 +110,20 @@ public sealed record HttpRequestOptions
     public TimeSpan HappyEyeballsTimeout { get; init; } = TimeSpan.FromMilliseconds(200);
 
     /// <summary>
+    /// How long curl 8.21.0 waits for <c>100 Continue</c> before it sends a request body
+    /// anyway when <c>--expect100-timeout</c> is not given, or is given as zero (measured,
+    /// BL-624 Notes).
+    /// </summary>
+    public static readonly TimeSpan DefaultContinueWait = TimeSpan.FromSeconds(1);
+
+    /// <summary>
+    /// Gets how long a request that carries <c>Expect: 100-continue</c> waits for
+    /// <c>100 Continue</c> before its body is sent anyway (<c>--expect100-timeout</c>);
+    /// <see cref="DefaultContinueWait" /> when not given.
+    /// </summary>
+    public TimeSpan ContinueWait { get; init; } = DefaultContinueWait;
+
+    /// <summary>
     /// Gets a value indicating whether <c>--compressed</c> was given: ask for and decode a
     /// compressed body.
     /// </summary>

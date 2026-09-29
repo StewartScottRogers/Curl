@@ -434,7 +434,7 @@ public sealed partial class HttpProtocolHandlerTests
 
         Task<TransferResult> transfer = Handler(QueueConnector.For(connection))
             .ExecuteAsync(BodyContext("http://127.0.0.1:18081/", options, time)).AsTask();
-        await time.TimerCreatedAsync(HttpContinueWaitConnection.ContinueWait);
+        await time.TimerCreatedAsync(HttpRequestOptions.DefaultContinueWait);
         time.Advance(TimeSpan.FromMilliseconds(999));
         Assert.AreEqual(head, Latin1(connection.Written), "The body was sent before one second.");
         time.Advance(TimeSpan.FromMilliseconds(1));
@@ -444,6 +444,32 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.HasCount(head.Length + 1048577, connection.Written);
         Assert.AreEqual(1048753L, result.Report!.RequestSize);
         Assert.AreEqual(1048577L, result.Report.UploadSize);
+    }
+
+    [TestMethod]
+    [DataRow(200, DisplayName = "--expect100-timeout 0.2")]
+    [DataRow(3000, DisplayName = "--expect100-timeout 3")]
+    public async Task ExecuteAsync_ContinueWaitSetAndNoReply_SendsTheBodyWhenThatWaitHasPassed(int milliseconds)
+    {
+        // curl --data-binary @b (2,000,000 bytes) --expect100-timeout 0.2 and 3: "Done waiting
+        // for 100-continue" and then the body 200 ms and 3 s after the head (BL-624 Notes).
+        const string head = "POST / HTTP/1.1\r\nHost: 127.0.0.1:18081\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+            + "Content-Length: 1048577\r\nContent-Type: application/x-www-form-urlencoded\r\nExpect: 100-continue\r\n\r\n";
+        TimeSpan continueWait = TimeSpan.FromMilliseconds(milliseconds);
+        FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
+        GatedConnection connection = new(Encoding.Latin1.GetBytes(NoContent), 65536, head.Length + 1048577);
+        HttpRequestOptions options = new() { Body = new BytesBody(new byte[1048577], "application/x-www-form-urlencoded"), ContinueWait = continueWait };
+
+        Task<TransferResult> transfer = Handler(QueueConnector.For(connection))
+            .ExecuteAsync(BodyContext("http://127.0.0.1:18081/", options, time)).AsTask();
+        await time.TimerCreatedAsync(continueWait);
+        time.Advance(continueWait - TimeSpan.FromMilliseconds(1));
+        Assert.AreEqual(head, Latin1(connection.Written), "The body was sent before the wait ran out.");
+        time.Advance(TimeSpan.FromMilliseconds(1));
+        TransferResult result = await transfer;
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.HasCount(head.Length + 1048577, connection.Written);
     }
 
     [TestMethod]

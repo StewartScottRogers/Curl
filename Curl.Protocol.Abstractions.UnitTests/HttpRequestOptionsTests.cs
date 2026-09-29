@@ -26,6 +26,8 @@ public sealed class HttpRequestOptionsTests
         Assert.AreEqual(HttpFailMode.None, options.Fail);
         Assert.AreEqual(HttpVersionPreference.Http11, options.Version);
         Assert.AreEqual(TimeSpan.FromMilliseconds(200), options.HappyEyeballsTimeout);
+        Assert.AreEqual(TimeSpan.FromSeconds(1), options.ContinueWait);
+        Assert.AreEqual(HttpRequestOptions.DefaultContinueWait, options.ContinueWait);
         Assert.IsFalse(options.Compressed);
         Assert.IsFalse(options.TransferEncoding);
         Assert.IsFalse(options.Raw);
@@ -59,6 +61,7 @@ public sealed class HttpRequestOptionsTests
             Fail = HttpFailMode.FailWithBody,
             Version = HttpVersionPreference.Http10,
             HappyEyeballsTimeout = TimeSpan.FromMilliseconds(1000),
+            ContinueWait = TimeSpan.FromMilliseconds(200),
             Compressed = true,
             TransferEncoding = true,
             Raw = true,
@@ -82,6 +85,7 @@ public sealed class HttpRequestOptionsTests
         Assert.AreEqual(HttpFailMode.FailWithBody, options.Fail);
         Assert.AreEqual(HttpVersionPreference.Http10, options.Version);
         Assert.AreEqual(TimeSpan.FromMilliseconds(1000), options.HappyEyeballsTimeout);
+        Assert.AreEqual(TimeSpan.FromMilliseconds(200), options.ContinueWait);
         Assert.IsTrue(options.Compressed);
         Assert.IsTrue(options.TransferEncoding);
         Assert.IsTrue(options.Raw);

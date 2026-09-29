@@ -205,9 +205,9 @@ public sealed partial class HttpProtocolHandlerTests
     {
         FakeTimeProvider time = (FakeTimeProvider)context.TimeProvider;
         Task<TransferResult> transfer = Handler(connector).ExecuteAsync(context).AsTask();
-        for (int wait = 1; await Task.WhenAny(transfer, time.TimerCreatedAsync(HttpContinueWaitConnection.ContinueWait, wait)) != transfer; wait++)
+        for (int wait = 1; await Task.WhenAny(transfer, time.TimerCreatedAsync(HttpRequestOptions.DefaultContinueWait, wait)) != transfer; wait++)
         {
-            time.Advance(HttpContinueWaitConnection.ContinueWait);
+            time.Advance(HttpRequestOptions.DefaultContinueWait);
         }
 
         return await transfer;

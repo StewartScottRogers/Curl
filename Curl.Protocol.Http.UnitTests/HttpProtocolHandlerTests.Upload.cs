@@ -48,9 +48,9 @@ public sealed partial class HttpProtocolHandlerTests
 
             Task<TransferResult> transfer = Handler(QueueConnector.For(connection))
                 .ExecuteAsync(UploadContext("http://127.0.0.1:18185/u", StandardInput("hello"u8.ToArray()), time)).AsTask();
-            await time.TimerCreatedAsync(HttpContinueWaitConnection.ContinueWait);
+            await time.TimerCreatedAsync(HttpRequestOptions.DefaultContinueWait);
             Assert.AreEqual(head, Latin1(connection.Written), $"Chunk size {chunkSize}");
-            time.Advance(HttpContinueWaitConnection.ContinueWait);
+            time.Advance(HttpRequestOptions.DefaultContinueWait);
             TransferResult result = await transfer;
 
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
@@ -71,8 +71,8 @@ public sealed partial class HttpProtocolHandlerTests
 
         Task<TransferResult> transfer = Handler(QueueConnector.For(connection))
             .ExecuteAsync(UploadContext("http://127.0.0.1:18190/u", StandardInput(Letters(200000)), time)).AsTask();
-        await time.TimerCreatedAsync(HttpContinueWaitConnection.ContinueWait);
-        time.Advance(HttpContinueWaitConnection.ContinueWait);
+        await time.TimerCreatedAsync(HttpRequestOptions.DefaultContinueWait);
+        time.Advance(HttpRequestOptions.DefaultContinueWait);
         TransferResult result = await transfer;
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);

@@ -757,7 +757,9 @@ public sealed class HttpProtocolHandler(
         IConnection connection = ExchangeConnectionOf(plan, requestStream, transport);
         byte[] request = FormatRequestHead(plan, streams, connection is HttpH2cUpgradeConnection);
         HttpFirstByteTimingConnection timedConnection = new(connection, context.TimeProvider);
-        IConnection responseConnection = framing.AwaitsContinue ? new HttpContinueWaitConnection(timedConnection) : timedConnection;
+        IConnection responseConnection = framing.AwaitsContinue
+            ? new HttpContinueWaitConnection(timedConnection) { ContinueWait = options.ContinueWait }
+            : timedConnection;
         HttpRequestBodyWriter upload = new(connection)
         {
             SharedHeadLength = framing.AwaitsContinue ? 0 : request.Length,
