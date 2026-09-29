@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-622, BL-878]
-touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Console, Curl.Console.UnitTests]
+touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Console, Curl.Console.UnitTests, Curl.Core.UnitLibrary, Curl.Core.UnitTests]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-29
 ---
 # BL-623 — Parse --alt-svc, use cached HTTP/1.1 alternatives and update the cache from Alt-Svc
 
@@ -24,9 +24,9 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] Measured first with `Record-CurlExchange.ps1 -Tls -k` on two ports: a cached `h1` alternative, an `h2`-only entry, an expired entry; stdout, stderr and the saved file copied into Notes.
-- [ ] `Curl.Cli.UnitTests` cover parsing; `Curl.Console.UnitTests` pin each measured case through fake connectors, file seams and `TimeProvider`.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports 100% line and branch coverage and no failing member for each library changed.
+- [x] Measured first with `Record-CurlExchange.ps1 -Tls -k` on two ports: a cached `h1` alternative, an `h2`-only entry, an expired entry; stdout, stderr and the saved file copied into Notes.
+- [x] `Curl.Cli.UnitTests` cover parsing; `Curl.Console.UnitTests` pin each measured case through fake connectors, file seams and `TimeProvider`.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports 100% line and branch coverage and no failing member for each library changed.
 
 ## Notes
 
@@ -45,6 +45,26 @@ completed:
   over HTTPS, with the origin (not the alternative) as the source; the file is read before
   the first transfer and written at the end, also when it did not exist (the two comment
   lines); `--alt-svc ""` learns and uses without reading or writing a file.
+
+- 2026-09-29 (lane 3, resumed): delivered. Decisions in ADR-0213 (Decided by Claude under
+  Stewart's delegation): each `http`/`https` transfer gets its own `AltSvcTransferCache`
+  (`Curl.Console`), read after the `-b` files and written after the `-c` jar, as libcurl gives each
+  easy handle one; only `h1` alternatives, never for plain `http`, a `--connect-to` origin (or an
+  unparsable mapping) or an entry naming the origin; headers learned as `h1` from the origin.
+- Added `Curl.Core.UnitLibrary` and `Curl.Core.UnitTests` to `touches` (no Doing task names them):
+  `RedirectFollower` copied the first URL's route onto every hop, so a redirect to another origin
+  would have dialled the first origin's alternative with the new `Host`. A hop now keeps the route
+  only for the first URL's origin.
+- Extra measurements (curl 8.21.0 mingw Schannel, 2026-09-29): `--alt-svc -abc` draws no
+  "looks like a flag" warning; `--alt-svc` with no value is `option --alt-svc: requires parameter`,
+  exit 2; the file is written after an `http` or `https` transfer even when its connect was refused
+  (exit 7), and not after `file://` (success or exit 37) or `ftp://`; `--alt-svc sub/altx.txt` with no
+  `sub` directory writes nothing and prints nothing.
+- Left for BL-900: curl's `Connection #0 to host localhost:18443 left intact` names the
+  alternative; ours still names the origin, and the HTTP handler (held by BL-819) writes it.
+- Tests: `CommandLineAltSvcOptionTests` (7), `CurlCommandRunnerAltSvcTests` (15), one
+  `RedirectFollowerTests` data-driven test (4 rows). Quality: Cli, Console and Core 100% line and
+  branch, no failing member.
 
 ### Measurements (curl 8.21.0 mingw Schannel, 2026-09-29 ~11:05 UTC)
 
@@ -110,3 +130,4 @@ Run from a scratch folder, `Record-CurlExchange.ps1 -Port 18443 -Tls` with
 - 2026-09-29: Backlog -> Doing.
 - 2026-09-29: Doing -> Backlog. Waits on BL-878: Alt-Used, the Alt-Svc response hook and dialling an alternative need Http, Abstractions and Networking (Http and Abstractions held by BL-794)
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Done. --alt-svc reads and writes curl's cache file per HTTP transfer, connects to a cached h1 alternative with Alt-Used, and learns Alt-Svc headers over HTTPS
