@@ -13,14 +13,20 @@ Namespace `Curl.Kerberos`. It reads MIT's credential cache (version 4) and keyta
 BL-688, ADR-0158). It reads `krb5.conf` as MIT's profile library does, maps a host to
 its realm and locates a realm's KDCs from the file or from DNS SRV records through
 `IKerberosSrvLookup` (`KerberosConfigurationStore`, `KerberosConfigurationReader`,
-`KerberosConfiguration`, `KerberosKdcLocator`; BL-689, ADR-0160). The client, its encryption types and the GSS-API mechanism land
-under their own tasks.
+`KerberosConfiguration`, `KerberosKdcLocator`; BL-689, ADR-0160). It encrypts,
+decrypts, checksums and makes keys from passwords with `aes128`/`aes256-cts-hmac-sha1-96`
+(RFC 3962), `aes128-cts-hmac-sha256-128`, `aes256-cts-hmac-sha384-192` (RFC 8009) and
+`rc4-hmac` (RFC 4757): `KerberosEncryption.Create` gives one per `KerberosEncryptionType`,
+confounders come from `IKerberosRandomSource`, and a failed integrity check throws
+`KerberosCryptographyException` (`KerberosNFold`, `KerberosAesCts`,
+`AesSha1KerberosEncryption`, `AesSha2KerberosEncryption`, `Rc4HmacKerberosEncryption`;
+BL-686, ADR-0161). The client and the GSS-API mechanism land under their own tasks.
 
 ## Rules
 
 - **Base class library plus `Curl.Cryptography.UnitLibrary` only.** No package, and no
-  other project reference. The reference to `Curl.Cryptography.UnitLibrary` is added by
-  the first task that needs one of its primitives (BL-686), not before.
+  other project reference. `Curl.Cryptography.UnitLibrary` supplies AES-CBC-CTS, MD4
+  and RC4 (BL-686).
 - **Never a `Socket`.** The KDC is reached through an injected transport, so every
   exchange is testable with recorded bytes and no network.
 - **Files through an injected seam.** The credential cache, the keytab and `krb5.conf`
