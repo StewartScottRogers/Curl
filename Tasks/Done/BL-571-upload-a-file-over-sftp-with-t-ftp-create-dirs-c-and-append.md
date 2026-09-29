@@ -69,13 +69,13 @@ completed: 2026-09-29
   the SSH layer` / `(79) Error in the SSH layer`; `/x.txt` needs no `MKDIR`; `/~/` paths make
   directories from `/home` down the resolved path; `STAT` with no size or size 0 under `-C -`
   uploads as new; a URL ending in `/` had the file name appended by the curl tool.
-- **Decisions (ADR-0243, decided under Stewart's delegation):** open flags, `MKDIR` 0755
+- **Decisions (ADR-0244, decided under Stewart's delegation):** open flags, `MKDIR` 0755
   and the create-directories statuses as measured; 64 KiB reads split into `WRITE`s of
   30000; a block's statuses are read before the next block is sent (libssh2 pipelines
   further, unobservably); a `WRITE` answered with another type fails at once with exit 79
   rather than hanging; a source that fails to read ends the upload as its end does, as the
   FTP upload takes it; `%{size_upload}` is the acknowledged bytes, set as
-  `TransferReport.UploadSize`. The ADR is numbered 0243 because other lanes take numbers in
+  `TransferReport.UploadSize`. The ADR is numbered 0244: 0243 went to another lane's AWS SigV4 ADR, and other lanes take numbers in
   the 023x range and 0242 may be taken concurrently.
 - **Append.** `-a`/`--append` already reaches `ITransferContext.Append`, so append is done
   here rather than left to row 24's task.
@@ -93,4 +93,4 @@ completed: 2026-09-29
 
 - 2026-09-28: Created.
 - 2026-09-29: Backlog -> Doing.
-- 2026-09-29: Doing -> Done. sftp:// -T uploads as curl 8.21.0 does: create/truncate, -C and -C - resume, -a append, --create-file-mode, --ftp-create-dirs MKDIRs, 30000-byte WRITEs, measured failures; ADR-0243
+- 2026-09-29: Doing -> Done. sftp:// -T uploads as curl 8.21.0 does: create/truncate, -C and -C - resume, -a append, --create-file-mode, --ftp-create-dirs MKDIRs, 30000-byte WRITEs, measured failures; ADR-0244
