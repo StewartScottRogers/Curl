@@ -32,3 +32,4 @@ ADR-0043 no longer states anything false about the code: its Decision and Conseq
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
