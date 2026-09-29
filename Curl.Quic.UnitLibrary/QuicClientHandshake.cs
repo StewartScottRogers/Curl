@@ -59,6 +59,14 @@ public sealed class QuicClientHandshake : IDisposable
 
     private QuicTransportErrorCode? closeErrorCode;
 
+    private TimeSpan idleSince;
+
+    private TimeSpan keepAliveSentAt;
+
+    private bool ackElicitingSentSinceReceived;
+
+    private bool packetOpened;
+
     /// <summary>Initializes a new instance of the <see cref="QuicClientHandshake" /> class: chooses the connection IDs and derives the Initial keys.</summary>
     /// <param name="settings">What the handshake offers.</param>
     /// <param name="random">Where connection IDs, reset tokens, the TLS client random and key shares come from.</param>
@@ -187,15 +195,17 @@ public sealed class QuicClientHandshake : IDisposable
             return [];
         }
 
+        packetOpened = false;
         try
         {
             ReceivePackets(datagram);
         }
         catch (QuicTransportException error)
         {
-            Fail(new QuicHandshakeFailure(CurlExitCode.CouldntConnect, error.Message), error.ErrorCode);
+            Fail(QuicHandshakeFailures.FromTransportError(error, IsComplete), error.ErrorCode);
         }
 
+        FailIfStatelessReset(datagram.Span);
         return Failure is null ? Flush() : CloseIfDetected();
     }
 
@@ -228,6 +238,42 @@ public sealed class QuicClientHandshake : IDisposable
         }
 
         return Flush(outcome.ProbeRequired);
+    }
+
+    /// <summary>
+    /// Gets how long until <see cref="OnIdleTimer" /> is due: zero when it is overdue, <see cref="Timeout.InfiniteTimeSpan" />
+    /// until the handshake is complete, once the connection has failed, and when neither side
+    /// declared a <c>max_idle_timeout</c>. It is due at the keep-alive, half the idle timeout
+    /// after the connection was last active, and at the idle timeout itself (RFC 9000 section 10.1).
+    /// </summary>
+    public TimeSpan TimeUntilIdleTimer => NegotiatedIdleTimeout() is { } idleTimeout
+        ? TimeSpan.FromTicks(Math.Max(0, (IdleTimerDue(idleTimeout) - Now()).Ticks))
+        : Timeout.InfiniteTimeSpan;
+
+    /// <summary>
+    /// Runs the idle timer as curl's build does: once the idle timeout, the smaller
+    /// <c>max_idle_timeout</c> of the two sides but at least three probe timeouts, has passed
+    /// since the server was last heard from, the connection closes silently with
+    /// <c>ERR_IDLE_CLOSE</c> (exit 55); at half the server's timeout it sends a PING so the
+    /// server keeps the connection while a transfer waits.
+    /// </summary>
+    /// <returns>The datagram carrying the keep-alive PING, or nothing.</returns>
+    public IReadOnlyList<byte[]> OnIdleTimer()
+    {
+        if (NegotiatedIdleTimeout() is not { } idleTimeout || IdleTimerDue(idleTimeout) > Now())
+        {
+            return [];
+        }
+
+        if (Now() >= IdleDeadline(idleTimeout))
+        {
+            Fail(QuicHandshakeFailures.IdleTimeout, null);
+            return [];
+        }
+
+        keepAliveSentAt = Now();
+        application.QueueFrame(new QuicPingFrame());
+        return Flush(ignoreCongestionWindow: true);
     }
 
     /// <summary>Returns the datagrams carrying what waits to be sent, such as the stream data, STOP_SENDING or raised limits the application's use of <see cref="Streams" /> queued, as far as the congestion window allows; nothing once the connection has failed.</summary>
@@ -282,6 +328,37 @@ public sealed class QuicClientHandshake : IDisposable
     }
 
     private TimeSpan Now() => timeProvider.GetElapsedTime(startTimestamp);
+
+    // The idle timeout runs once the handshake is complete: the smaller max_idle_timeout of
+    // the two sides, or the one side's that is not 0; none when both are 0 (RFC 9000 section 10.1).
+    private TimeSpan? NegotiatedIdleTimeout()
+    {
+        if (!IsComplete || Failure is not null)
+        {
+            return null;
+        }
+
+        var client = TransportParameters.MaxIdleTimeout;
+        var server = ServerTransportParameters!.MaxIdleTimeout;
+        var milliseconds = client == 0 || server == 0 ? Math.Max(client, server) : Math.Min(client, server);
+        return milliseconds == 0 ? null : TimeSpan.FromMilliseconds(milliseconds);
+    }
+
+    // At least three probe timeouts, so a lost packet or two cannot end the connection (RFC 9000 section 10.1).
+    private TimeSpan IdleDeadline(TimeSpan idleTimeout)
+    {
+        var floor = 3 * (Recovery.Rtt.ProbeTimeout + Recovery.MaxAckDelay);
+        return idleSince + (idleTimeout > floor ? idleTimeout : floor);
+    }
+
+    // The keep-alive goes half the idle timeout after the connection or the last keep-alive
+    // was active, as curl's build sets ngtcp2's keep-alive timeout, unless the deadline comes first.
+    private TimeSpan IdleTimerDue(TimeSpan idleTimeout)
+    {
+        var keepAlive = (idleSince > keepAliveSentAt ? idleSince : keepAliveSentAt) + (idleTimeout / 2);
+        var deadline = IdleDeadline(idleTimeout);
+        return keepAlive < deadline ? keepAlive : deadline;
+    }
 
     private QuicPacketNumberSpace SpaceOf(QuicPacketNumberSpaceId id) => spacesById[(int)id];
 
@@ -353,10 +430,27 @@ public sealed class QuicClientHandshake : IDisposable
     private void RecordSent(QuicPacketNumberSpace space, QuicSentPacket packet)
     {
         Recovery.OnPacketSent(space.Id, packet);
+        if (packet.IsAckEliciting && !ackElicitingSentSinceReceived)
+        {
+            // So does the first ack-eliciting packet sent since the server was last heard from (RFC 9000 section 10.1).
+            idleSince = Now();
+            ackElicitingSentSinceReceived = true;
+        }
+
         if (space == handshake && !initial.IsDiscarded)
         {
             // A client discards its Initial keys when it first sends a Handshake packet (RFC 9001 section 4.9.1).
             DiscardSpace(initial);
+        }
+    }
+
+    // A datagram with no packet the client could open may be a stateless reset: the server has
+    // lost the connection's state, so the client enters the draining period and sends nothing more (RFC 9000 section 10.3.1).
+    private void FailIfStatelessReset(ReadOnlySpan<byte> datagram)
+    {
+        if (!packetOpened && Failure is null && PeerConnectionIds?.IsStatelessReset(datagram) == true)
+        {
+            Fail(QuicHandshakeFailures.ConnectionLost, null);
         }
     }
 
@@ -471,6 +565,11 @@ public sealed class QuicClientHandshake : IDisposable
         }
 
         serverPacketReceived = true;
+        packetOpened = true;
+
+        // A packet from the server restarts the idle timer (RFC 9000 section 10.1).
+        idleSince = Now();
+        ackElicitingSentSinceReceived = false;
         return result.Packet;
     }
 
@@ -510,7 +609,7 @@ public sealed class QuicClientHandshake : IDisposable
                 ReceiveAcknowledgement(space, acknowledgement);
                 break;
             case QuicConnectionCloseFrame close:
-                Fail(QuicHandshakeFailures.FromServerClose(close), null);
+                Fail(QuicHandshakeFailures.FromServerClose(close, IsComplete), null);
                 break;
             default:
                 ReceiveConnectionFrame(frame);

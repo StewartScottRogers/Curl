@@ -8,7 +8,7 @@ namespace Curl.Quic;
 /// offered through the multiplexed-connection contract HTTP/3 uses (ADR-0144, BL-721). One
 /// loop owns the channel: it sends what the connection has queued, receives the server's
 /// datagrams and runs the loss detection timer, and wakes whenever a stream is written,
-/// read or aborted so what that queued goes out. Readers, writers and openers never touch
+/// read or aborted so what that queued goes out, and runs the idle timer (keep-alive PING, idle timeout). Readers, writers and openers never touch
 /// the channel; they change the <see cref="QuicClientHandshake" />'s streams under one lock
 /// and wait for the loop to report that something arrived.
 /// </summary>
@@ -157,6 +157,10 @@ public sealed class QuicConnection : IMultiplexedConnection
 
     private static TaskCompletionSource NewSignal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+    // The sooner of two waits, where Timeout.InfiniteTimeSpan is never.
+    private static TimeSpan Earlier(TimeSpan first, TimeSpan second) =>
+        second == Timeout.InfiniteTimeSpan || (first != Timeout.InfiniteTimeSpan && first < second) ? first : second;
+
     private async ValueTask<IMultiplexedStream> WaitForStreamAsync(Func<QuicStreamSet, QuicStream?> take, CancellationToken cancellationToken)
     {
         var stream = await WaitForAsync(() => take(handshake.Streams) is { } taken ? new StreamHandle(taken) : (StreamHandle?)null, cancellationToken).ConfigureAwait(false);
@@ -230,14 +234,14 @@ public sealed class QuicConnection : IMultiplexedConnection
         await SendAsync(datagrams).ConfigureAwait(false);
     }
 
-    // Waits for a datagram until the loss detection timer is due or a stream change wakes the loop.
+    // Waits for a datagram until the loss detection or idle timer is due or a stream change wakes the loop.
     private async Task ReceiveOrTimeOutAsync(byte[] buffer)
     {
         TimeSpan untilTimeout;
         CancellationToken wakeToken;
         lock (gate)
         {
-            untilTimeout = handshake.TimeUntilLossDetectionTimeout;
+            untilTimeout = Earlier(handshake.TimeUntilLossDetectionTimeout, handshake.TimeUntilIdleTimer);
             wakeToken = wake.Token;
         }
 
@@ -253,13 +257,7 @@ public sealed class QuicConnection : IMultiplexedConnection
         }
         catch (OperationCanceledException) when (!stop.IsCancellationRequested && timer.IsCancellationRequested)
         {
-            IReadOnlyList<byte[]> probes;
-            lock (gate)
-            {
-                probes = handshake.OnLossDetectionTimeout();
-            }
-
-            await SendAsync(probes).ConfigureAwait(false);
+            await RunDueTimersAsync().ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (!stop.IsCancellationRequested)
         {
@@ -267,17 +265,29 @@ public sealed class QuicConnection : IMultiplexedConnection
         }
     }
 
-    private async Task ReceiveAsync(ReadOnlyMemory<byte> datagram)
+    // Runs the loss detection timer and the idle timer, whichever is due: probes and
+    // keep-alives go out, and an idle timeout fails the connection.
+    private Task RunDueTimersAsync() => RunStepAsync(() =>
     {
-        IReadOnlyList<byte[]> answers;
+        IReadOnlyList<byte[]> probes = handshake.TimeUntilLossDetectionTimeout == TimeSpan.Zero ? handshake.OnLossDetectionTimeout() : [];
+        return [.. probes, .. handshake.OnIdleTimer()];
+    });
+
+    private Task ReceiveAsync(ReadOnlyMemory<byte> datagram) => RunStepAsync(() => handshake.Receive(datagram));
+
+    // Runs one step of the handshake under the lock, sends what it returns, then fails the
+    // connection when the step failed it or tells the waiters something may have changed.
+    private async Task RunStepAsync(Func<IReadOnlyList<byte[]>> step)
+    {
+        IReadOnlyList<byte[]> datagrams;
         QuicHandshakeFailure? connectionFailure;
         lock (gate)
         {
-            answers = handshake.Receive(datagram);
+            datagrams = step();
             connectionFailure = handshake.Failure;
         }
 
-        await SendAsync(answers).ConfigureAwait(false);
+        await SendAsync(datagrams).ConfigureAwait(false);
         if (connectionFailure is not null)
         {
             Fail(new MultiplexedConnectionFailedException(connectionFailure.ExitCode, connectionFailure.Message));

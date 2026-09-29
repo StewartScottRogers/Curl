@@ -25,10 +25,10 @@ internal static class QuicStreamTest
         InitialMaxStreamsUni = 8,
     };
 
-    /// <summary>Returns a client whose handshake with <paramref name="server" /> has completed and been confirmed.</summary>
-    public static QuicClientHandshake Connect(QuicTestServer server, QuicTransportParameters? clientParameters = null)
+    /// <summary>Returns a client whose handshake with <paramref name="server" /> has completed and been confirmed, on <paramref name="clock" /> when one is given.</summary>
+    public static QuicClientHandshake Connect(QuicTestServer server, QuicTransportParameters? clientParameters = null, ManualTimerTimeProvider? clock = null)
     {
-        QuicClientHandshake client = QuicHandshakeTest.Client(QuicHandshakeTest.CurlSettings with { TransportParameters = clientParameters ?? SmallClientLimits });
+        QuicClientHandshake client = QuicHandshakeTest.Client(QuicHandshakeTest.CurlSettings with { TransportParameters = clientParameters ?? SmallClientLimits }, clock: clock);
         QuicClientHandshakeTests.Run(client, server);
         Assert.IsTrue(client.IsConfirmed);
         return client;

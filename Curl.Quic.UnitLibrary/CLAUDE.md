@@ -100,8 +100,20 @@ Streams and flow control (BL-726, RFC 9000 sections 2 to 4, ADR-0174):
   (the internal `QuicMultiplexedStream`) change state under its lock and wake it. A lost
   channel is exit 56.
 
-The rest of the transport (close, idle timeout, stateless reset: BL-727) lands in the
-tasks ADR-0144 lists.
+Close, idle timeout and stateless reset (BL-727, RFC 9000 section 10, ADR-0175):
+
+- After the handshake, the server's CONNECTION_CLOSE (a TLS alert included), a transport
+  error the client detects and a stateless reset are exit 56, `Failure when receiving data
+  from the peer`, as in curl's ngtcp2 build; `QuicHandshakeFailure.ServerClose` keeps the
+  server's frame. During the handshake the mapping of ADR-0165 stands.
+- The client sends CONNECTION_CLOSE once, with no closing period, and after the server's
+  close or a stateless reset drains: it sends nothing more.
+- `QuicClientHandshake.TimeUntilIdleTimer` and `OnIdleTimer`: once complete, a PING at half
+  the idle timeout (the smaller non-zero `max_idle_timeout`, at least three probe timeouts),
+  and at the timeout a silent close, exit 55 `ngtcp2_conn_handle_expiry returned error:
+  ERR_IDLE_CLOSE`. `QuicConnection`'s loop runs it beside the loss detection timer.
+- `QuicPeerConnectionIds.IsStatelessReset`: the token of the connection ID in use, at the
+  end of a short-header-shaped datagram of 21 bytes or more, compared in fixed time.
 
 ## Rules
 

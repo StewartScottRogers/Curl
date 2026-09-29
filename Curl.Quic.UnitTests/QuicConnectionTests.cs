@@ -117,7 +117,7 @@ public sealed class QuicConnectionTests
     }
 
     [TestMethod]
-    public async Task ReadAsync_ServerBreaksFlowControl_FailsTheConnection()
+    public async Task ReadAsync_ServerBreaksFlowControl_FailsTheConnectionWithRecvError()
     {
         (QuicConnection connection, QuicTestLiveChannel channel) = await ConnectAsync();
         await using (connection)
@@ -128,7 +128,7 @@ public sealed class QuicConnectionTests
             channel.FromServer(new QuicStreamFrame(0, 0, Bytes(101), false));
 
             MultiplexedConnectionFailedException error = await Assert.ThrowsExactlyAsync<MultiplexedConnectionFailedException>(() => read);
-            Assert.AreEqual(CurlExitCode.CouldntConnect, error.ExitCode);
+            Assert.AreEqual(CurlExitCode.RecvError, error.ExitCode);
             await QuicTestLiveChannel.WaitUntilAsync(() => channel.Sent<QuicConnectionCloseFrame>().Count == 1);
             Assert.AreEqual((ulong)QuicTransportErrorCode.FlowControlError, channel.Sent<QuicConnectionCloseFrame>().Single().ErrorCode);
             await Assert.ThrowsExactlyAsync<MultiplexedConnectionFailedException>(() => stream.WriteAsync("x"u8.ToArray(), false, CancellationToken.None).AsTask());
@@ -151,6 +151,43 @@ public sealed class QuicConnectionTests
             Assert.AreEqual(CurlExitCode.RecvError, error.ExitCode);
             StringAssert.StartsWith(error.Message, "QUIC: the datagram channel failed: ");
         }
+    }
+
+    [TestMethod]
+    public async Task AcceptUnidirectionalStreamAsync_ServerClosesTheConnection_FailsWithRecvErrorAndSendsNoClose()
+    {
+        (QuicConnection connection, QuicTestLiveChannel channel) = await ConnectAsync();
+        await using (connection)
+        {
+            Task<IMultiplexedStream> accept = connection.AcceptUnidirectionalStreamAsync(CancellationToken.None).AsTask();
+
+            channel.FromServer(new QuicConnectionCloseFrame((ulong)QuicTransportErrorCode.InternalError, 0, ReadOnlyMemory<byte>.Empty));
+
+            MultiplexedConnectionFailedException error = await Assert.ThrowsExactlyAsync<MultiplexedConnectionFailedException>(() => accept);
+            Assert.AreEqual(CurlExitCode.RecvError, error.ExitCode);
+            Assert.AreEqual("Failure when receiving data from the peer", error.Message);
+        }
+
+        Assert.IsEmpty(channel.Sent<QuicConnectionCloseFrame>());
+    }
+
+    [TestMethod]
+    public async Task Loop_ServerGoesSilent_SendsKeepAlivesThenFailsWithTheIdleTimeout()
+    {
+        (QuicConnection connection, QuicTestLiveChannel channel) = await ConnectAsync(parameters => GenerousServerLimits(parameters) with { MaxIdleTimeout = 400 });
+        await using (connection)
+        {
+            Task<IMultiplexedStream> accept = connection.AcceptUnidirectionalStreamAsync(CancellationToken.None).AsTask();
+            channel.Silence();
+
+            MultiplexedConnectionFailedException error = await Assert.ThrowsExactlyAsync<MultiplexedConnectionFailedException>(() => accept);
+
+            Assert.AreEqual(CurlExitCode.SendError, error.ExitCode);
+            Assert.AreEqual("ngtcp2_conn_handle_expiry returned error: ERR_IDLE_CLOSE", error.Message);
+            Assert.IsNotEmpty(channel.Sent<QuicPingFrame>());
+        }
+
+        Assert.IsEmpty(channel.Sent<QuicConnectionCloseFrame>());
     }
 
     [TestMethod]

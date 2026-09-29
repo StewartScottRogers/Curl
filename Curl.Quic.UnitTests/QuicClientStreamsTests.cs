@@ -146,7 +146,7 @@ public sealed class QuicClientStreamsTests
     }
 
     [TestMethod]
-    public void Receive_MoreThanTheStreamLimit_ClosesWithFlowControlError()
+    public void Receive_MoreThanTheStreamLimit_ClosesWithFlowControlErrorAndExit56()
     {
         using QuicTestServer server = new();
         using QuicClientHandshake client = Connect(server);
@@ -154,7 +154,7 @@ public sealed class QuicClientStreamsTests
         Deliver(client, server, new QuicStreamFrame(3, 0, Bytes(101), false));
 
         Assert.AreEqual((ulong)QuicTransportErrorCode.FlowControlError, Sent<QuicConnectionCloseFrame>(server).Single().ErrorCode);
-        Assert.AreEqual(Protocol.Abstractions.CurlExitCode.CouldntConnect, client.Failure!.ExitCode);
+        Assert.AreEqual(Protocol.Abstractions.CurlExitCode.RecvError, client.Failure!.ExitCode);
         Assert.IsEmpty(client.TakeDatagramsToSend());
     }
 

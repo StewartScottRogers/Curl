@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+
 namespace Curl.Quic;
 
 /// <summary>
@@ -9,6 +11,9 @@ namespace Curl.Quic;
 /// </summary>
 public sealed class QuicPeerConnectionIds
 {
+    // The shortest stateless reset: 5 bytes that look like a short header, then the 16-byte token (RFC 9000 section 10.3).
+    private const int MinimumStatelessResetLength = 21;
+
     private readonly SortedDictionary<ulong, QuicConnectionIdEntry> active = [];
 
     private readonly int limit;
@@ -38,6 +43,20 @@ public sealed class QuicPeerConnectionIds
         active[0] = active[0] with { StatelessResetToken = statelessResetToken };
         Current = active[0];
     }
+
+    /// <summary>
+    /// Returns whether <paramref name="datagram" /> is a stateless reset (RFC 9000 section
+    /// 10.3.1): at least 21 bytes, beginning like a short header packet, and ending in the
+    /// stateless reset token of the connection ID in use, compared in fixed time. The token
+    /// of a connection ID the client never sent to, or has retired, is never checked.
+    /// </summary>
+    /// <param name="datagram">A datagram the client could not process.</param>
+    /// <returns><see langword="true" /> when the server has reset the connection.</returns>
+    public bool IsStatelessReset(ReadOnlySpan<byte> datagram) =>
+        datagram.Length >= MinimumStatelessResetLength
+        && (datagram[0] & 0x80) == 0
+        && Current.StatelessResetToken is { } token
+        && CryptographicOperations.FixedTimeEquals(datagram[^token.Length..], token);
 
     /// <summary>Takes a NEW_CONNECTION_ID frame and returns the RETIRE_CONNECTION_ID frames it calls for.</summary>
     /// <param name="frame">The frame.</param>
