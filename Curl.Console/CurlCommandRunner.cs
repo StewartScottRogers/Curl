@@ -1434,8 +1434,9 @@ internal sealed class CurlCommandRunner(
             return (UploadUrlMalformedFailure, givenUrl, transferUrl);
         }
 
-        dispatch.LoadResolveEntries(transferEventOutput.Events);
-        await LoadCookieFilesAsync(dispatch, options, transferUrl).ConfigureAwait(false);
+        ITransferEvents eventsBeforeConnecting = SetUpTransferEvents(transfer);
+        dispatch.LoadResolveEntries(eventsBeforeConnecting);
+        await LoadCookieFilesAsync(dispatch, options, transferUrl, eventsBeforeConnecting).ConfigureAwait(false);
         TransferResult result = await TransferWithHeaderOutputAsync(dispatch, options, transfer, transferUrl, uploadFile)
             .ConfigureAwait(false);
         return (result, givenUrl, transferUrl);
@@ -1812,12 +1813,13 @@ internal sealed class CurlCommandRunner(
     /// <param name="dispatch">What the run transfers through, with its cookies.</param>
     /// <param name="options">The accepted command line.</param>
     /// <param name="transferUrl">The URL about to be transferred.</param>
+    /// <param name="events">Where the files' <c>-v</c> lines go.</param>
     /// <returns>A task that completes when the files are loaded.</returns>
-    private async Task LoadCookieFilesAsync(TransferDispatch dispatch, CommandLineOptions options, string transferUrl)
+    private async Task LoadCookieFilesAsync(TransferDispatch dispatch, CommandLineOptions options, string transferUrl, ITransferEvents events)
     {
         if (dispatch.Cookies is { } cookies && IsHttpUrl(QueryUrl.Append(transferUrl, options)))
         {
-            await cookies.LoadCookieFilesAsync(fileSystem, standardInput, timeProvider.GetUtcNow(), transferEventOutput.Events).ConfigureAwait(false);
+            await cookies.LoadCookieFilesAsync(fileSystem, standardInput, timeProvider.GetUtcNow(), events).ConfigureAwait(false);
         }
     }
 
@@ -1858,7 +1860,24 @@ internal sealed class CurlCommandRunner(
     /// <param name="result">The transfer's result.</param>
     /// <returns>The number <c>%{conn_id}</c> prints.</returns>
     private long TakeConnectionId(TransferResult result) =>
-        UsedAConnection(result) ? nextConnectionId++ : NoConnectionId;
+        UsedAConnection(result) ? Running.ConnectionId ?? nextConnectionId++ : NoConnectionId;
+
+    /// <summary>
+    /// Sets the running transfer's <see cref="RunningTransferState.Events" />, whose lines under
+    /// <c>--trace-ids</c> carry <c>[&lt;xfer&gt;-&lt;conn&gt;] </c>, the transfer taking its
+    /// <c>%{conn_id}</c> at its first event; and returns the sink for what comes before it
+    /// connects, whose lines carry <c>[&lt;xfer&gt;-x] </c>, as curl 8.21.0 marked
+    /// <c>Added a.test:1:127.0.0.1 to DNS cache</c> <c>[0-x]</c> and the lines after it <c>[0-0]</c>
+    /// (measured 2026-09-29, BL-648 Notes).
+    /// </summary>
+    /// <param name="transfer">The transfer.</param>
+    /// <returns>The sink for the <c>--resolve</c> entries and <c>-b</c> files the transfer loads.</returns>
+    private ITransferEvents SetUpTransferEvents(UrlTransfer transfer)
+    {
+        RunningTransferState state = Running;
+        state.Events = transferEventOutput.EventsFor(transfer.TransferId, () => state.ConnectionId ??= nextConnectionId++);
+        return transferEventOutput.EventsFor(transfer.TransferId, () => null);
+    }
 
     /// <summary>
     /// The scheme <c>%{scheme}</c> prints: the URL's, in lower case, or <see langword="null" />
@@ -2378,7 +2397,7 @@ internal sealed class CurlCommandRunner(
                 upload,
                 proxy,
                 progress: Running.Progress,
-                events: transferEventOutput.Events,
+                events: Running.Events,
                 lowSpeedWatchdog: StartLowSpeedWatchdog(options),
                 abortToken: Running.AbortToken,
                 maxTimeWatchdog: StartMaxTimeWatchdog(options),
@@ -2932,7 +2951,7 @@ internal sealed class CurlCommandRunner(
                         proxy,
                         watchHeaderOutput,
                         Running.Progress,
-                        transferEventOutput.Events,
+                        Running.Events,
                         StartLowSpeedWatchdog(options),
                         Running.AbortToken,
                         StartMaxTimeWatchdog(options),

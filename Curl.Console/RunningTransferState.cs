@@ -1,5 +1,6 @@
 using Curl.Cli;
 using Curl.Core;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Console;
 
@@ -99,4 +100,16 @@ internal sealed class RunningTransferState(
     /// (tasks BL-505, BL-791).
     /// </summary>
     internal System.Net.NetworkCredential? LookedUpCredentials { get; set; }
+
+    /// <summary>
+    /// Gets or sets where the transfer's <c>-v</c> and trace events go once it is set up to connect:
+    /// under <c>--trace-ids</c> marked with its IDs (task BL-648); <see cref="NoTransferEvents.Instance" /> until then.
+    /// </summary>
+    internal ITransferEvents Events { get; set; } = NoTransferEvents.Instance;
+
+    /// <summary>
+    /// Gets or sets the <c>%{conn_id}</c> the transfer took for its <c>--trace-ids</c> marker, which its
+    /// <c>-w</c> output then prints; <see langword="null" /> until its first event (task BL-648).
+    /// </summary>
+    internal long? ConnectionId { get; set; }
 }
