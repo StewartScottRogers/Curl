@@ -106,8 +106,35 @@ public sealed record Tls13ClientSettings
     /// </summary>
     public IReadOnlyList<ushort> CertificateCompressionAlgorithms { get; init; } = [];
 
-    /// <summary>Gets the clock a stapled OCSP response's <c>thisUpdate</c> and <c>nextUpdate</c> are judged against.</summary>
+    /// <summary>
+    /// Gets the clock a stapled OCSP response's <c>thisUpdate</c> and <c>nextUpdate</c>, a
+    /// ticket's age and lifetime, and a received ticket's arrival are judged against.
+    /// </summary>
     public TimeProvider TimeProvider { get; init; } = TimeProvider.System;
+
+    /// <summary>
+    /// Gets the session to resume (RFC 8446 section 2.2), or <see langword="null" /> for a
+    /// full handshake. The ClientHello offers its ticket in <c>pre_shared_key</c> with a
+    /// binder, for <c>psk_dhe_ke</c>, when <see cref="TlsSessionRecord.CanResumeAt" /> holds
+    /// at <see cref="TimeProvider" />'s time, one offered suite shares its suite's hash, and
+    /// its host name is <see cref="ServerName" />; otherwise the handshake is a full one.
+    /// <c>psk_key_exchange_modes</c> must then be in <see cref="ExtensionOrder" />.
+    /// </summary>
+    public TlsSessionRecord? ResumptionSession { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether the ClientHello offers 0-RTT early data (RFC 8446
+    /// section 4.2.10) when it resumes <see cref="ResumptionSession" /> and the ticket allows
+    /// early data, and the session's ALPN protocol, if any, is offered. <c>early_data</c>
+    /// must then be in <see cref="ExtensionOrder" />.
+    /// </summary>
+    public bool OfferEarlyData { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether accepted early data ends with an EndOfEarlyData
+    /// message, as over TCP; QUIC turns it off (RFC 9001 section 8.3).
+    /// </summary>
+    public bool SendEndOfEarlyData { get; init; } = true;
 
     /// <summary>
     /// Gets the TLS 1.2-and-below offer the same ClientHello also carries, or
@@ -145,6 +172,8 @@ public sealed record Tls13ClientSettings
     {
         Require(!RequestOcspStatus || ExtensionOrder.Contains(TlsExtensionType.StatusRequest), "Asking for OCSP status needs status_request in the extension order.", nameof(ExtensionOrder));
         Require(CertificateCompressionAlgorithms.Count == 0 || ExtensionOrder.Contains(TlsExtensionType.CompressCertificate), "Offering certificate compression needs compress_certificate in the extension order.", nameof(ExtensionOrder));
+        Require(ResumptionSession is null || ExtensionOrder.Contains(TlsExtensionType.PskKeyExchangeModes), "Resuming a session needs psk_key_exchange_modes in the extension order.", nameof(ExtensionOrder));
+        Require(!OfferEarlyData || ExtensionOrder.Contains(TlsExtensionType.EarlyData), "Offering early data needs early_data in the extension order.", nameof(ExtensionOrder));
     }
 
     private void ValidateOffers()

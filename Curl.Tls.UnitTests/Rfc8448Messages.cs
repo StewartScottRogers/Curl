@@ -47,6 +47,19 @@ internal static class Rfc8448Messages
     public const string ResumedServerHello =
         "0200005c03033ccfd2dec890222763472ae8136777c9d7358777bb66e91ea5122495f559ea2d00130100003400290002000000330024001d0020121761ee42c333e1b9e77b60dd57c2053cd94512ab47f115e86eff50942cea31002b00020304";
 
+    // Section 4: {server} construct an EncryptedExtensions handshake message (early_data accepted).
+    public const string ResumedEncryptedExtensions =
+        "080000280026000a00140012001d00170018001901000101010201030104001c0002400100000000002a0000";
+
+    // Section 4: {server} construct a Finished handshake message.
+    public const string ResumedServerFinished = "1400002048d3e0e1b3d907c6acff145e16090388c77b05c050b634ab1a88bbd0dd1a34b2";
+
+    // Section 4: {client} construct an EndOfEarlyData handshake message.
+    public const string ResumedEndOfEarlyData = "05000000";
+
+    // Section 4: {client} construct a Finished handshake message.
+    public const string ResumedClientFinished = "140000207230a9c952c25cd6138fc5e6628308c41c5335dd81b9f96bcea50fd32bda416d";
+
     // Section 5, "HelloRetryRequest": {server} construct a ServerHello handshake message
     // (the HelloRetryRequest).
     public const string HelloRetryRequest =

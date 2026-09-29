@@ -23,6 +23,9 @@ public sealed class Tls13ClientHandshake : IDisposable
 
     private static readonly TlsExtensionType[] ServerHelloExtensions = [TlsExtensionType.KeyShare, TlsExtensionType.SupportedVersions];
 
+    private static readonly TlsExtensionType[] ResumedServerHelloExtensions =
+        [TlsExtensionType.KeyShare, TlsExtensionType.SupportedVersions, TlsExtensionType.PreSharedKey];
+
     private static readonly TlsExtensionType[] ForbiddenInEncryptedExtensions =
     [
         TlsExtensionType.StatusRequest,
@@ -43,7 +46,11 @@ public sealed class Tls13ClientHandshake : IDisposable
     private readonly IServerCertificateVerifier verifier;
     private readonly List<byte> received = [];
     private readonly List<NewSessionTicket> tickets = [];
+    private readonly List<TlsSessionRecord> sessions = [];
     private List<Tls13KeyShare> shares = [];
+    private TlsSessionRecord? offeredSession;
+    private Tls13PskOffer? pskOffer;
+    private byte[] sessionEarlySecret = [];
     private Tls13ClientHelloBuilder? helloBuilder;
     private ClientHello? clientHello;
     private byte[] clientHelloBytes = [];
@@ -122,12 +129,46 @@ public sealed class Tls13ClientHandshake : IDisposable
     /// <summary>Gets the NewSessionTicket messages received after the handshake, in order.</summary>
     public IReadOnlyList<NewSessionTicket> ReceivedTickets => tickets;
 
+    /// <summary>
+    /// Gets a session record for each NewSessionTicket received, in order: the ticket, its
+    /// resumption PSK (RFC 8446 section 4.6.1), its lifetime, age add and early data limit,
+    /// the suite, group, host name, ALPN protocol and server certificate, and when it arrived
+    /// by <see cref="Tls13ClientSettings.TimeProvider" />. Any of them resumes through
+    /// <see cref="Tls13ClientSettings.ResumptionSession" />.
+    /// </summary>
+    public IReadOnlyList<TlsSessionRecord> ReceivedSessions => sessions;
+
+    /// <summary>Gets a value indicating whether the server accepted the offered ticket, once its ServerHello has arrived: no Certificate or CertificateVerify follows.</summary>
+    public bool IsResumed { get; private set; }
+
+    /// <summary>
+    /// Gets a value indicating whether the first ClientHello offered 0-RTT early data. From
+    /// <see cref="Start" /> on, the caller may send up to <see cref="MaxEarlyDataSize" /> bytes
+    /// at <see cref="TlsEncryptionLevel.EarlyData" /> under <see cref="EarlyDataCipherSuite" />.
+    /// </summary>
+    public bool EarlyDataOffered { get; private set; }
+
+    /// <summary>
+    /// Gets a value indicating whether the server accepted the early data, once its
+    /// EncryptedExtensions has arrived. When it did not, the server discarded it, and the
+    /// caller sends it again as application data after the handshake.
+    /// </summary>
+    public bool EarlyDataAccepted { get; private set; }
+
+    /// <summary>Gets the most early data the offered ticket allows, in bytes, or zero when no early data was offered.</summary>
+    public uint MaxEarlyDataSize => EarlyDataOffered ? offeredSession!.MaxEarlyDataSize : 0;
+
+    /// <summary>Gets the suite that protects early data (the resumed session's), or <see langword="null" /> when no early data was offered.</summary>
+    public Tls13CipherSuite? EarlyDataCipherSuite => EarlyDataOffered ? Tls13CipherSuite.Find(offeredSession!.CipherSuite) : null;
+
     /// <summary>Gets the last ClientHello <see cref="Start" /> or a HelloRetryRequest sent, or <see langword="null" /> before the start.</summary>
     internal ClientHello? SentClientHello => clientHello;
 
     private TranscriptHash Transcript => transcript!;
 
     private Tls13KeySchedule Schedule => CipherSuite!.KeySchedule;
+
+    private Tls13KeySchedule SessionSchedule => Tls13CipherSuite.Find(offeredSession!.CipherSuite)!.KeySchedule;
 
     private TlsEncryptionLevel ExpectedLevel => state switch
     {
@@ -136,8 +177,13 @@ public sealed class Tls13ClientHandshake : IDisposable
         _ => TlsEncryptionLevel.Handshake,
     };
 
-    /// <summary>Starts the handshake: builds the ClientHello to send at the Initial level.</summary>
-    /// <returns>The ClientHello to send.</returns>
+    /// <summary>
+    /// Starts the handshake: builds the ClientHello to send at the Initial level, offering
+    /// <see cref="Tls13ClientSettings.ResumptionSession" /> when it can be resumed, and with
+    /// early data offered installs <c>client_early_traffic_secret</c> for writing at the
+    /// <see cref="TlsEncryptionLevel.EarlyData" /> level.
+    /// </summary>
+    /// <returns>The ClientHello to send, and the early traffic secret when early data is offered.</returns>
     /// <exception cref="InvalidOperationException">The handshake has already started.</exception>
     public Tls13HandshakeOutput Start()
     {
@@ -152,8 +198,15 @@ public sealed class Tls13ClientHandshake : IDisposable
         random.Fill(legacySessionId);
         helloBuilder = new Tls13ClientHelloBuilder(settings, clientRandom, legacySessionId);
         shares = [.. settings.KeyShareGroups.Select(random.CreateKeyShare)];
+        OfferSession(settings.TimeProvider.GetUtcNow());
         Tls13HandshakeOutputBuilder output = new();
         SendClientHello(null, output);
+        if (EarlyDataOffered)
+        {
+            byte[] clientHelloHash = CryptographicOperations.HashData(SessionSchedule.HashAlgorithm, clientHelloBytes);
+            output.Install(TlsEncryptionLevel.EarlyData, TlsTrafficDirection.Write, SessionSchedule.DeriveClientEarlyTrafficSecret(sessionEarlySecret, clientHelloHash));
+        }
+
         state = State.WaitServerHello;
         return output.Build(false, null);
     }
@@ -416,17 +469,24 @@ public sealed class Tls13ClientHandshake : IDisposable
             shares = [random.CreateKeyShare(retryGroup)];
         }
 
+        // RFC 8446 sections 4.1.2 and 4.2.10: the second hello never offers early data, and
+        // keeps the ticket only when the suite the server chose shares its hash.
+        pskOffer = pskOffer is not null && CipherSuite!.KeySchedule.HashAlgorithm == SessionSchedule.HashAlgorithm
+            ? pskOffer with { EarlyData = false }
+            : null;
         SendClientHello(cookie, output);
     }
 
     private TlsAlertDescription? ReceiveKeyShare(ServerHello hello, byte[] encoded, Tls13HandshakeOutputBuilder output)
     {
-        TlsAlertDescription? alert = CheckExtensionTypes(hello.Extensions, ServerHelloExtensions);
-        if (alert is not null)
-        {
-            return alert;
-        }
+        TlsAlertDescription? alert = CheckExtensionTypes(hello.Extensions, pskOffer is null ? ServerHelloExtensions : ResumedServerHelloExtensions)
+            ?? ReadSelectedIdentity(FindExtension(hello.Extensions, TlsExtensionType.PreSharedKey), hello.CipherSuite);
+        return alert ?? ReceiveServerShare(hello, encoded, output);
+    }
 
+    /// <summary>Computes the shared secret from the ServerHello's <c>key_share</c> and the client's share of its group, and enters the handshake keys.</summary>
+    private TlsAlertDescription? ReceiveServerShare(ServerHello hello, byte[] encoded, Tls13HandshakeOutputBuilder output)
+    {
         byte[]? data = FindExtension(hello.Extensions, TlsExtensionType.KeyShare);
         if (data is null)
         {
@@ -450,6 +510,27 @@ public sealed class Tls13ClientHandshake : IDisposable
         return null;
     }
 
+    /// <summary>
+    /// RFC 8446 section 4.2.11: a ServerHello's <c>pre_shared_key</c> selects the one identity
+    /// offered, index 0, with a suite of the ticket's hash; anything else is <c>illegal_parameter</c>.
+    /// </summary>
+    private TlsAlertDescription? ReadSelectedIdentity(byte[]? data, ushort cipherSuite)
+    {
+        if (data is null)
+        {
+            return null;
+        }
+
+        TlsDecodeResult<ushort> selected = PreSharedKeyExtension.DecodeSelected(data);
+        if (!selected.Succeeded)
+        {
+            return selected.Alert;
+        }
+
+        IsResumed = selected.Value == 0 && Tls13CipherSuite.Find(cipherSuite)!.KeySchedule.HashAlgorithm == SessionSchedule.HashAlgorithm;
+        return IsResumed ? null : TlsAlertDescription.IllegalParameter;
+    }
+
     private void EnterHandshakeKeys(ushort cipherSuite, byte[] encoded, ushort group, byte[] sharedSecret, Tls13HandshakeOutputBuilder output)
     {
         CipherSuite ??= Tls13CipherSuite.Find(cipherSuite);
@@ -461,7 +542,8 @@ public sealed class Tls13ClientHandshake : IDisposable
         Transcript.Append(encoded);
         NegotiatedGroup = group;
         DisposeShares();
-        byte[] handshakeSecret = Schedule.ComputeHandshakeSecret(Schedule.ComputeEarlySecret(null), sharedSecret);
+        byte[] earlySecret = IsResumed ? sessionEarlySecret : Schedule.ComputeEarlySecret(null);
+        byte[] handshakeSecret = Schedule.ComputeHandshakeSecret(earlySecret, sharedSecret);
         byte[] serverHelloHash = Transcript.GetCurrentHash();
         clientHandshakeTrafficSecret = Schedule.DeriveClientHandshakeTrafficSecret(handshakeSecret, serverHelloHash);
         serverHandshakeTrafficSecret = Schedule.DeriveServerHandshakeTrafficSecret(handshakeSecret, serverHelloHash);
@@ -480,8 +562,7 @@ public sealed class Tls13ClientHandshake : IDisposable
         }
 
         IReadOnlyList<TlsExtension> extensions = decoded.Value.Extensions;
-        TlsAlertDescription? alert = extensions.Select(extension => CheckEncryptedExtensionType(extension.Type)).FirstOrDefault(found => found is not null)
-            ?? ReadApplicationProtocol(FindExtension(extensions, TlsExtensionType.ApplicationLayerProtocolNegotiation));
+        TlsAlertDescription? alert = ReadEncryptedExtensions(extensions);
         if (alert is not null)
         {
             return alert;
@@ -489,8 +570,36 @@ public sealed class Tls13ClientHandshake : IDisposable
 
         ServerQuicTransportParameters = FindExtension(extensions, TlsExtensionType.QuicTransportParameters);
         Transcript.Append(encoded);
-        state = State.WaitCertificateOrRequest;
+
+        // RFC 8446 section 2.2: a resumed handshake authenticates with the PSK, so the server's Finished comes next.
+        state = IsResumed ? State.WaitFinished : State.WaitCertificateOrRequest;
         return null;
+    }
+
+    /// <summary>Checks each EncryptedExtensions extension may be there, then reads the ALPN protocol and the early data indication.</summary>
+    private TlsAlertDescription? ReadEncryptedExtensions(IReadOnlyList<TlsExtension> extensions) =>
+        extensions.Select(extension => CheckEncryptedExtensionType(extension.Type)).FirstOrDefault(found => found is not null)
+            ?? ReadApplicationProtocol(FindExtension(extensions, TlsExtensionType.ApplicationLayerProtocolNegotiation))
+            ?? ReadEarlyDataIndication(FindExtension(extensions, TlsExtensionType.EarlyData));
+
+    /// <summary>
+    /// RFC 8446 section 4.2.10: an empty <c>early_data</c> accepts the early data, and only
+    /// for the ticket offered, resumed with its own suite and ALPN protocol; otherwise it is
+    /// <c>illegal_parameter</c>. Without one the server rejected (and skipped) it.
+    /// </summary>
+    private TlsAlertDescription? ReadEarlyDataIndication(byte[]? data)
+    {
+        if (data is null)
+        {
+            return null;
+        }
+
+        bool acceptable = IsResumed
+            && CipherSuite!.Code == offeredSession!.CipherSuite
+            && ApplicationProtocol == offeredSession.ApplicationProtocol;
+        TlsAlertDescription? alert = EarlyDataExtension.DecodeIndication(data) ?? (acceptable ? null : TlsAlertDescription.IllegalParameter);
+        EarlyDataAccepted = alert is null;
+        return alert;
     }
 
     private TlsAlertDescription? CheckEncryptedExtensionType(TlsExtensionType type)
@@ -737,6 +846,12 @@ public sealed class Tls13ClientHandshake : IDisposable
         output.Install(TlsEncryptionLevel.Application, TlsTrafficDirection.Read, Schedule.DeriveServerApplicationTrafficSecret(masterSecret, serverFinishedHash));
         clientApplicationTrafficSecret = Schedule.DeriveClientApplicationTrafficSecret(masterSecret, serverFinishedHash);
         ExporterMasterSecret = Schedule.DeriveExporterMasterSecret(masterSecret, serverFinishedHash);
+        if (EarlyDataAccepted && settings.SendEndOfEarlyData)
+        {
+            // RFC 8446 section 4.5: accepted early data ends, under the early keys, before the client's flight.
+            SendHandshakeMessage(new HandshakeMessage(HandshakeType.EndOfEarlyData, []).Encode(), Transcript, TlsEncryptionLevel.EarlyData, output);
+        }
+
         if (requestedSchemes is not null)
         {
             SendClientCertificate([], requestedSchemes, Transcript, TlsEncryptionLevel.Handshake, output);
@@ -776,17 +891,97 @@ public sealed class Tls13ClientHandshake : IDisposable
     private TlsAlertDescription? ReceiveNewSessionTicket(byte[] body)
     {
         TlsDecodeResult<NewSessionTicket> decoded = NewSessionTicket.Decode(body);
-        if (decoded.Succeeded)
+        if (!decoded.Succeeded)
         {
-            tickets.Add(decoded.Value);
+            return decoded.Alert;
         }
 
-        return decoded.Alert;
+        byte[]? earlyData = FindExtension(decoded.Value.Extensions, TlsExtensionType.EarlyData);
+        TlsDecodeResult<uint> maxEarlyDataSize = earlyData is null ? TlsDecodeResult<uint>.Success(0) : EarlyDataExtension.DecodeMaxEarlyDataSize(earlyData);
+        if (!maxEarlyDataSize.Succeeded)
+        {
+            return maxEarlyDataSize.Alert;
+        }
+
+        tickets.Add(decoded.Value);
+        sessions.Add(RecordSession(decoded.Value, maxEarlyDataSize.Value));
+        return null;
+    }
+
+    /// <summary>The session a NewSessionTicket stands for: its PSK is HKDF-Expand-Label(resumption_master_secret, "resumption", ticket_nonce) (RFC 8446 section 4.6.1).</summary>
+    private TlsSessionRecord RecordSession(NewSessionTicket ticket, uint maxEarlyDataSize) =>
+        new(
+            Tls13ClientHelloBuilder.Tls13Version,
+            CipherSuite!.Code,
+            SHA256.HashData(ticket.Ticket),
+            Schedule.DeriveResumptionPreSharedKey(ResumptionMasterSecret!, ticket.TicketNonce),
+            ticket.Ticket,
+            ticket.TicketLifetime,
+            ticket.TicketAgeAdd,
+            maxEarlyDataSize,
+            settings.TimeProvider.GetUtcNow())
+        {
+            ServerName = settings.ServerName,
+            ApplicationProtocol = ApplicationProtocol,
+            Group = NegotiatedGroup!.Value,
+            PeerCertificate = IsResumed ? offeredSession!.PeerCertificate : ServerCertificates[0],
+        };
+
+    /// <summary>
+    /// Chooses to offer <see cref="Tls13ClientSettings.ResumptionSession" /> when it can be
+    /// resumed at <paramref name="now" /> with an offered suite's hash for the same host, and
+    /// early data with it when asked for and the ticket, its suite (which the server must
+    /// choose) and its ALPN protocol allow it (RFC 8446 section 4.2.10).
+    /// </summary>
+    private void OfferSession(DateTimeOffset now)
+    {
+        TlsSessionRecord? session = settings.ResumptionSession;
+        if (session is null || !CanOffer(session, now))
+        {
+            return;
+        }
+
+        offeredSession = session;
+        sessionEarlySecret = SessionSchedule.ComputeEarlySecret(session.PreSharedKey);
+        EarlyDataOffered = CanSendEarlyData(session);
+        PskIdentity identity = new(session.Ticket, session.ObfuscatedTicketAgeAt(now));
+        pskOffer = new Tls13PskOffer(identity, SessionSchedule.HashLength, EarlyDataOffered);
+    }
+
+    private bool CanOffer(TlsSessionRecord session, DateTimeOffset now) =>
+        Tls13CipherSuite.Find(session.CipherSuite) is { } sessionSuite
+            && session.CanResumeAt(now)
+            && string.Equals(session.ServerName, settings.ServerName, StringComparison.OrdinalIgnoreCase)
+            && settings.CipherSuites.Any(code => Tls13CipherSuite.Find(code)!.KeySchedule.HashAlgorithm == sessionSuite.KeySchedule.HashAlgorithm);
+
+    /// <summary>Early data goes with the ticket when asked for, when the ticket allows some, and when the settings offer its suite and ALPN protocol.</summary>
+    private bool CanSendEarlyData(TlsSessionRecord session) =>
+        settings.OfferEarlyData
+            && session.MaxEarlyDataSize > 0
+            && settings.CipherSuites.Contains(session.CipherSuite)
+            && (session.ApplicationProtocol is null || settings.ApplicationProtocols.Contains(session.ApplicationProtocol));
+
+    /// <summary>
+    /// Replaces the zero binder the builder left with the real one (RFC 8446 section
+    /// 4.2.11.2): the Finished HMAC under the resumption binder key over the transcript so far
+    /// and the hello up to its binders list.
+    /// </summary>
+    private ClientHello BindPsk(ClientHello hello)
+    {
+        byte[] encoded = hello.Encode();
+        ReadOnlySpan<byte> truncated = encoded.AsSpan(0, encoded.Length - (3 + pskOffer!.BinderLength));
+        using TranscriptHash prefix = transcript?.Clone() ?? SessionSchedule.CreateTranscriptHash();
+        prefix.Append(truncated);
+        byte[] binderKey = SessionSchedule.DeriveResumptionBinderKey(sessionEarlySecret);
+        byte[] binder = SessionSchedule.ComputePskBinder(binderKey, prefix.GetCurrentHash());
+        TlsExtension offered = PreSharedKeyExtension.EncodeOffered(new OfferedPsks([pskOffer.Identity], [binder]));
+        return hello with { Extensions = [.. hello.Extensions.SkipLast(1), offered] };
     }
 
     private void SendClientHello(byte[]? cookie, Tls13HandshakeOutputBuilder output)
     {
-        clientHello = helloBuilder!.Build([.. shares.Select(share => share.Entry)], cookie);
+        ClientHello hello = helloBuilder!.Build([.. shares.Select(share => share.Entry)], cookie, pskOffer);
+        clientHello = pskOffer is null ? hello : BindPsk(hello);
         clientHelloBytes = clientHello.Encode();
         transcript?.Append(clientHelloBytes);
         output.Send(TlsEncryptionLevel.Initial, clientHelloBytes);

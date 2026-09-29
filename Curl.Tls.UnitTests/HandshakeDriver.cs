@@ -34,10 +34,24 @@ internal static class HandshakeDriver
         Tls13HandshakeOutput finished = client.Receive(TlsEncryptionLevel.Handshake, [.. messages.SelectMany(message => message)]);
         if (finished.IsComplete)
         {
-            server.ReceiveClientFlight(finished.BytesToSend[0].Bytes);
+            foreach (TlsHandshakeBytes bytes in finished.BytesToSend)
+            {
+                ReceiveClientBytes(server, bytes);
+            }
         }
 
         return finished;
+    }
+
+    private static void ReceiveClientBytes(Tls13TestServer server, TlsHandshakeBytes bytes)
+    {
+        if (bytes.Level == TlsEncryptionLevel.EarlyData)
+        {
+            server.ReceiveEndOfEarlyData(bytes.Bytes);
+            return;
+        }
+
+        server.ReceiveClientFlight(bytes.Bytes);
     }
 
     public static Tls13ClientHandshake Client(Tls13ClientSettings? settings = null, IServerCertificateVerifier? verifier = null) =>

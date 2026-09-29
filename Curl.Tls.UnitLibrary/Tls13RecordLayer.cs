@@ -25,10 +25,11 @@ internal sealed class Tls13RecordLayer(Stream transport, Tls13ClientHandshake ha
     /// <summary>Gets a value indicating whether records from the server are protected.</summary>
     public bool IsReadProtected => reader is not null;
 
-    /// <summary>Installs a traffic secret the handshake derived for one level and direction.</summary>
+    /// <summary>Installs a traffic secret the handshake derived for one level and direction; early data is protected with the resumed session's suite.</summary>
     public void Install(Tls13TrafficSecret secret)
     {
-        Tls13RecordProtection protection = Tls13RecordProtection.Create(handshake.CipherSuite!, secret.Secret);
+        Tls13CipherSuite suite = secret.Level == TlsEncryptionLevel.EarlyData ? handshake.EarlyDataCipherSuite! : handshake.CipherSuite!;
+        Tls13RecordProtection protection = Tls13RecordProtection.Create(suite, secret.Secret);
         if (secret.Direction == TlsTrafficDirection.Read)
         {
             reader?.Dispose();

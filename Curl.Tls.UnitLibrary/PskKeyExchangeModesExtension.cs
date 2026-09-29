@@ -6,6 +6,9 @@ namespace Curl.Tls;
 /// </summary>
 public static class PskKeyExchangeModesExtension
 {
+    /// <summary>The <c>psk_dhe_ke</c> mode: the PSK with an (EC)DHE key exchange, the only one the client resumes with.</summary>
+    public const byte PskDheKe = 1;
+
     /// <summary>Returns a <c>psk_key_exchange_modes</c> extension listing <paramref name="modes" />.</summary>
     /// <param name="modes">The mode code points.</param>
     /// <returns>The extension.</returns>

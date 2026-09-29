@@ -17,13 +17,33 @@ internal sealed class Tls13ClientHelloBuilder(Tls13ClientSettings settings, byte
     private const int PaddingTarget = 0x200;
     private const int ExtensionHeaderLength = 4;
 
-    /// <summary>Returns the ClientHello offering <paramref name="shares" /> and echoing <paramref name="cookie" />.</summary>
+    /// <summary>
+    /// Returns the ClientHello offering <paramref name="shares" />, echoing <paramref name="cookie" />
+    /// and, with <paramref name="psk" />, ending in <c>pre_shared_key</c> (RFC 8446 section
+    /// 4.2.11) with a zero binder the caller replaces; <c>padding</c> counts the binder.
+    /// </summary>
     /// <param name="shares">The key shares to send.</param>
     /// <param name="cookie">The HelloRetryRequest's cookie, or <see langword="null" />.</param>
+    /// <param name="psk">The ticket to offer, or <see langword="null" />.</param>
     /// <returns>The ClientHello.</returns>
-    public ClientHello Build(IReadOnlyList<KeyShareEntry> shares, byte[]? cookie)
+    public ClientHello Build(IReadOnlyList<KeyShareEntry> shares, byte[]? cookie, Tls13PskOffer? psk = null)
     {
         List<TlsExtension> extensions = [];
+        int paddingIndex = BuildOrderedExtensions(extensions, shares, cookie, psk?.EarlyData == true);
+        extensions.AddRange(LowerVersionExtensions());
+        extensions.AddRange(settings.FixedExtensions.Where(fixedExtension => !settings.ExtensionOrder.Contains(fixedExtension.Type)));
+        if (psk is not null)
+        {
+            extensions.Add(PreSharedKeyExtension.EncodeOffered(new OfferedPsks([psk.Identity], [new byte[psk.BinderLength]])));
+        }
+
+        ClientHello hello = Create(extensions);
+        return paddingIndex < 0 ? hello : Pad(hello, extensions, paddingIndex);
+    }
+
+    /// <summary>Adds the extensions of <see cref="Tls13ClientSettings.ExtensionOrder" /> in that order, and returns where <c>padding</c> goes, or -1 when it is not in the order.</summary>
+    private int BuildOrderedExtensions(List<TlsExtension> extensions, IReadOnlyList<KeyShareEntry> shares, byte[]? cookie, bool earlyData)
+    {
         int paddingIndex = -1;
         foreach (TlsExtensionType type in settings.ExtensionOrder)
         {
@@ -33,16 +53,13 @@ internal sealed class Tls13ClientHelloBuilder(Tls13ClientSettings settings, byte
                 continue;
             }
 
-            if (BuildExtension(type, shares, cookie) is { } extension)
+            if (BuildExtension(type, shares, cookie, earlyData) is { } extension)
             {
                 extensions.Add(extension);
             }
         }
 
-        extensions.AddRange(LowerVersionExtensions());
-        extensions.AddRange(settings.FixedExtensions.Where(fixedExtension => !settings.ExtensionOrder.Contains(fixedExtension.Type)));
-        ClientHello hello = Create(extensions);
-        return paddingIndex < 0 ? hello : Pad(hello, extensions, paddingIndex);
+        return paddingIndex;
     }
 
     private static int? PaddingLength(int unpaddedLength)
@@ -90,11 +107,19 @@ internal sealed class Tls13ClientHelloBuilder(Tls13ClientSettings settings, byte
             : Tls12ClientHelloBuilder.Build(lower, random, legacySessionId).Extensions.Where(extension =>
                 !settings.ExtensionOrder.Contains(extension.Type) && settings.FixedExtensions.All(fixedExtension => fixedExtension.Type != extension.Type));
 
-    private TlsExtension? BuildExtension(TlsExtensionType type, IReadOnlyList<KeyShareEntry> shares, byte[]? cookie) => type switch
+    private TlsExtension? BuildExtension(TlsExtensionType type, IReadOnlyList<KeyShareEntry> shares, byte[]? cookie, bool earlyData) => type switch
     {
         TlsExtensionType.SupportedGroups => SupportedGroupsExtension.Encode(settings.SupportedGroups),
         TlsExtensionType.KeyShare => KeyShareExtension.EncodeClientShares(shares),
         TlsExtensionType.SupportedVersions => SupportedVersionsExtension.EncodeOffered(OfferedVersions()),
+        _ => BuildResumptionExtension(type, cookie, earlyData),
+    };
+
+    /// <summary>The <c>early_data</c> indication when 0-RTT is offered, and <c>psk_key_exchange_modes</c> offering <c>psk_dhe_ke</c> unless fixed.</summary>
+    private TlsExtension? BuildResumptionExtension(TlsExtensionType type, byte[]? cookie, bool earlyData) => type switch
+    {
+        TlsExtensionType.EarlyData => earlyData ? EarlyDataExtension.EncodeIndication() : null,
+        TlsExtensionType.PskKeyExchangeModes => FindFixedExtension(type) ?? PskKeyExchangeModesExtension.Encode([PskKeyExchangeModesExtension.PskDheKe]),
         _ => BuildSignatureOrCookieExtension(type, cookie),
     };
 

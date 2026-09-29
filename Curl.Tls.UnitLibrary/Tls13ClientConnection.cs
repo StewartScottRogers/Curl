@@ -17,6 +17,8 @@ public sealed class Tls13ClientConnection
     private readonly Tls13RecordLayer layer;
     private bool clientHelloSent;
     private bool changeCipherSpecSent;
+    private ReadOnlyMemory<byte> earlyData;
+    private int earlyDataSent;
 
     private Tls13ClientConnection(Tls13ClientSettings settings, Tls13ClientHandshake handshake, Stream transport)
     {
@@ -50,6 +52,38 @@ public sealed class Tls13ClientConnection
     }
 
     /// <summary>
+    /// Runs the handshake as <see cref="ConnectAsync" /> does, and sends <paramref name="earlyData" />
+    /// as application data the server reads first. When the ClientHello offers 0-RTT
+    /// (<see cref="Tls13ClientSettings.OfferEarlyData" /> with a ticket that allows it), up to
+    /// <see cref="Tls13ClientHandshake.MaxEarlyDataSize" /> bytes of it go out under the early
+    /// traffic keys right after the hello (RFC 8446 section 2.3); whatever the server did not
+    /// accept - all of it when it rejected early data - is sent once the handshake completes,
+    /// before the stream is returned. <see cref="Tls13ClientHandshake.EarlyDataAccepted" />
+    /// on the stream's handshake tells which happened.
+    /// </summary>
+    /// <param name="transport">The byte stream to the server, such as a TCP connection's.</param>
+    /// <param name="settings">What the ClientHello offers.</param>
+    /// <param name="random">The source of the random, the legacy session ID and the key shares.</param>
+    /// <param name="verifier">Judges the server's certificate chain.</param>
+    /// <param name="earlyData">The first application data to send, such as the request.</param>
+    /// <param name="cancellationToken">Cancels the handshake.</param>
+    /// <returns>The connected stream, or the failure.</returns>
+    /// <exception cref="ArgumentException">The settings offer a suite whose records cannot be protected yet (<see cref="Tls13RecordProtection.CanProtect" />).</exception>
+    public static async Task<Tls13ConnectResult> ConnectWithEarlyDataAsync(
+        Stream transport,
+        Tls13ClientSettings settings,
+        ITlsRandomSource random,
+        IServerCertificateVerifier verifier,
+        ReadOnlyMemory<byte> earlyData,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(transport);
+        Tls13ClientConnection connection = Create(transport, settings, random, verifier);
+        connection.earlyData = earlyData;
+        return await connection.CompleteAsync(transport, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Creates a connection that has sent nothing yet, for <see cref="TlsClientConnection" />
     /// to send its ClientHello, read the server's answer, and complete it or hand the hello
     /// to the TLS 1.2 client.
@@ -69,8 +103,19 @@ public sealed class Tls13ClientConnection
     /// <summary>Gets the ClientHello <see cref="SendClientHelloAsync" /> sent.</summary>
     internal ClientHello SentClientHello => handshake.SentClientHello!;
 
-    /// <summary>Starts the handshake and sends the ClientHello.</summary>
-    internal Task SendClientHelloAsync(CancellationToken cancellationToken) => ApplyAsync(handshake.Start(), cancellationToken);
+    /// <summary>Starts the handshake and sends the ClientHello, then as much early data as the ticket allows when 0-RTT is offered.</summary>
+    internal async Task SendClientHelloAsync(CancellationToken cancellationToken)
+    {
+        await ApplyAsync(handshake.Start(), cancellationToken).ConfigureAwait(false);
+        if (!handshake.EarlyDataOffered || earlyData.IsEmpty)
+        {
+            return;
+        }
+
+        earlyDataSent = (int)Math.Min((uint)earlyData.Length, handshake.MaxEarlyDataSize);
+        await SendChangeCipherSpecOnceAsync(cancellationToken).ConfigureAwait(false);
+        await layer.SendAsync(TlsEncryptionLevel.EarlyData, TlsContentType.ApplicationData, earlyData[..earlyDataSent], Tls13RecordProtection.LegacyRecordVersion, cancellationToken).ConfigureAwait(false);
+    }
 
     /// <summary>
     /// Runs the handshake to its end, starting it first unless <see cref="SendClientHelloAsync" />
@@ -85,7 +130,15 @@ public sealed class Tls13ClientConnection
             return new Tls13ConnectResult(null, failure);
         }
 
-        return new Tls13ConnectResult(new Tls13ClientStream(transport, layer, handshake), null);
+        Tls13ClientStream stream = new(transport, layer, handshake);
+        int accepted = handshake.EarlyDataAccepted ? earlyDataSent : 0;
+        if (accepted < earlyData.Length)
+        {
+            // RFC 8446 section 4.2.10: early data the server rejected is sent again as ordinary application data.
+            await stream.WriteAsync(earlyData[accepted..], cancellationToken).ConfigureAwait(false);
+        }
+
+        return new Tls13ConnectResult(stream, null);
     }
 
     /// <summary>Zeroes the keys and key shares of a connection that will not complete.</summary>
@@ -209,13 +262,22 @@ public sealed class Tls13ClientConnection
         }
     }
 
-    private async Task SendAsync(TlsHandshakeBytes bytes, CancellationToken cancellationToken)
+    /// <summary>In middlebox compatibility mode, sends the one <c>change_cipher_spec</c> before the first record after the first ClientHello (RFC 8446 appendix D.4).</summary>
+    private async Task SendChangeCipherSpecOnceAsync(CancellationToken cancellationToken)
     {
-        bool isFirstClientHello = !clientHelloSent;
-        if (!isFirstClientHello && settings.SendLegacySessionId && !changeCipherSpecSent)
+        if (settings.SendLegacySessionId && !changeCipherSpecSent)
         {
             changeCipherSpecSent = true;
             await layer.SendAsync(TlsEncryptionLevel.Initial, TlsContentType.ChangeCipherSpec, new byte[] { 1 }, Tls13RecordProtection.LegacyRecordVersion, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task SendAsync(TlsHandshakeBytes bytes, CancellationToken cancellationToken)
+    {
+        bool isFirstClientHello = !clientHelloSent;
+        if (!isFirstClientHello)
+        {
+            await SendChangeCipherSpecOnceAsync(cancellationToken).ConfigureAwait(false);
         }
 
         ushort recordVersion = isFirstClientHello ? settings.ClientHelloRecordVersion : Tls13RecordProtection.LegacyRecordVersion;
