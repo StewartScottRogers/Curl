@@ -9,7 +9,7 @@ namespace Curl.Console;
 
 /// <summary>
 /// Pins how <c>-n</c>, <c>--netrc-file</c> and <c>--netrc-optional</c> give a transfer its
-/// credentials, through fake file and environment seams (<see cref="NetrcCredentialLookup" />).
+/// credentials, through fake file and environment seams (<see cref="TransferCredentialLookup" />).
 /// Every expectation was measured on 2026-09-28 with curl 8.21.0 (mingw, Schannel) through
 /// <c>Record-CurlExchange.ps1</c> against 127.0.0.1:18505, with <c>HOME</c> and
 /// <c>USERPROFILE</c> pointed at prepared directories (BL-505 Notes).

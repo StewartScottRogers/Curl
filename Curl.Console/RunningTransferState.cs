@@ -94,9 +94,9 @@ internal sealed class RunningTransferState(
     internal bool UploadResumesFromUnknownOffset { get; set; }
 
     /// <summary>
-    /// Gets or sets the credentials <see cref="NetrcCredentialLookup" /> chose for the transfer, sent in
-    /// place of the <c>-u</c> ones; <see langword="null" /> when the netrc file had nothing to say
-    /// (task BL-505).
+    /// Gets or sets the credentials <see cref="TransferCredentialLookup" /> chose for the transfer, sent in
+    /// place of the <c>-u</c> ones; <see langword="null" /> when neither the netrc file nor the URL had anything to say
+    /// (tasks BL-505, BL-791).
     /// </summary>
-    internal System.Net.NetworkCredential? NetrcCredentials { get; set; }
+    internal System.Net.NetworkCredential? LookedUpCredentials { get; set; }
 }

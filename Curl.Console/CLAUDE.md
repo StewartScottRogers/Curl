@@ -184,9 +184,11 @@ proxy for `https` or under `-p` or `-L`, ends an `http`/`https` transfer with ex
 (ADR-0053, BL-328). Other schemes do not read the proxy yet (BL-330), and redirect hops keep
 the first URL's proxy (BL-329). Measured on curl 8.21.0 (BL-238 Notes).
 
-Under `-n`, `--netrc-file` or `--netrc-optional`, `NetrcCredentialLookup` then chooses the
-transfer's credentials, once per URL, and the runner keeps them as the running transfer's
-`NetrcCredentials`, which `TransferContextFactory` puts on every attempt's context in place of
+`TransferCredentialLookup` then chooses the transfer's credentials, once per URL. When `-u` gives
+no user name, the URL's percent-decoded user name and password are sent (`http://zz@host/` sends
+`zz:`, `http://:x@host/` sends `:x`, `http://@host/` nothing), replacing a `-u :pw` whole (BL-791).
+Under `-n`, `--netrc-file` or `--netrc-optional` the netrc file has its say too, and the runner keeps them as the running transfer's
+`LookedUpCredentials`, which `TransferContextFactory` puts on every attempt's context in place of
 `-u`'s. A `-u` with a user name wins and no file is read. The file is the `--netrc-file` one, else
 `.netrc` in `HOME` (on Windows `_netrc` after it, and `USERPROFILE` when `HOME` is not set), read
 through the runner's `IDataFileReader` and environment. The URL's percent-decoded user name picks

@@ -269,10 +269,10 @@ internal sealed class CurlCommandRunner(
     private IDataFileReader DataFileReader => configFileReader ?? DiskDataFileReader.ForProcess;
 
     /// <summary>
-    /// Gets what chooses each transfer's credentials from the netrc file, reading it with
-    /// <see cref="DataFileReader" /> and the home directory from the runner's environment (BL-505).
+    /// Gets what chooses each transfer's credentials from the URL and the netrc file, reading it with
+    /// <see cref="DataFileReader" /> and the home directory from the runner's environment (BL-505, BL-791).
     /// </summary>
-    private NetrcCredentialLookup NetrcCredentials =>
+    private TransferCredentialLookup CredentialLookup =>
         new(DataFileReader, EnvironmentVariables, runsOnWindows);
 
     /// <summary>
@@ -2265,8 +2265,8 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// Chooses the transfer's proxy with <see cref="TransferProxySelection" />, then its credentials
-    /// with <see cref="NetrcCredentialLookup" />, which it keeps as the running transfer's
-    /// <see cref="RunningTransferState.NetrcCredentials" /> for every attempt's context.
+    /// with <see cref="TransferCredentialLookup" />, which it keeps as the running transfer's
+    /// <see cref="RunningTransferState.LookedUpCredentials" /> for every attempt's context.
     /// </summary>
     /// <param name="proxySelector">Chooses the transfer's proxy.</param>
     /// <param name="options">The accepted command line.</param>
@@ -2286,8 +2286,8 @@ internal sealed class CurlCommandRunner(
             return false;
         }
 
-        bool looked = NetrcCredentials.TryLookUp(options, url, out NetworkCredential? netrcCredentials, out failure);
-        Running.NetrcCredentials = netrcCredentials;
+        bool looked = CredentialLookup.TryLookUp(options, url, out NetworkCredential? lookedUpCredentials, out failure);
+        Running.LookedUpCredentials = lookedUpCredentials;
         return looked;
     }
 
@@ -2297,7 +2297,7 @@ internal sealed class CurlCommandRunner(
     /// (<see cref="Stream.Null" />, with the progress meter drawn as for a file) and to standard
     /// output otherwise, and writes the progress meter after it. The transfer goes through the proxy
     /// <see cref="TransferProxySelection" /> chooses, with the credentials
-    /// <see cref="NetrcCredentialLookup" /> chooses; when either fails, the transfer ends with its
+    /// <see cref="TransferCredentialLookup" /> chooses; when either fails, the transfer ends with its
     /// failure and nothing is sent (<see cref="TrySelectProxyAndCredentials" />).
     /// </summary>
     /// <param name="follower">Performs the transfer with the handler for its scheme, following redirects under <c>-L</c>.</param>
@@ -2358,7 +2358,7 @@ internal sealed class CurlCommandRunner(
                 lowSpeedWatchdog: StartLowSpeedWatchdog(options),
                 abortToken: Running.AbortToken,
                 maxTimeWatchdog: StartMaxTimeWatchdog(options),
-                netrcCredentials: Running.NetrcCredentials);
+                lookedUpCredentials: Running.LookedUpCredentials);
             TransferResult result = toStandardOutput
                 ? await TransferToStandardOutputAsync(follower, options, createAttemptContext).ConfigureAwait(false)
                 : await FollowRetryingAsync(follower, options, createAttemptContext, options.ResumeFrom, null).ConfigureAwait(false);
@@ -2912,7 +2912,7 @@ internal sealed class CurlCommandRunner(
                         StartLowSpeedWatchdog(options),
                         Running.AbortToken,
                         StartMaxTimeWatchdog(options),
-                        Running.NetrcCredentials),
+                        Running.LookedUpCredentials),
                     resumeFrom,
                     output)
                 .ConfigureAwait(false);

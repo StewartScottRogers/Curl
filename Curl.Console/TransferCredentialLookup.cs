@@ -9,14 +9,16 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Console;
 
 /// <summary>
-/// Chooses a transfer's credentials from the netrc file when <c>-n</c>, <c>--netrc-file</c> or
-/// <c>--netrc-optional</c> asks, with curl 8.21.0's precedence against <c>-u</c> and the URL's user
-/// information (measured 2026-09-28, BL-505 Notes).
+/// Chooses a transfer's credentials from the URL's user information, and from the netrc file when
+/// <c>-n</c>, <c>--netrc-file</c> or <c>--netrc-optional</c> asks, with curl 8.21.0's precedence
+/// against <c>-u</c> (measured 2026-09-28, BL-505 and BL-791 Notes).
 /// </summary>
 /// <remarks>
 /// <para>
 /// A <c>-u</c> with a user name wins and no file is read, so a missing or broken file is not
-/// noticed; <c>-u :</c> or <c>-u :pw</c> has no user name and does not count. Otherwise the file
+/// noticed; <c>-u :</c> or <c>-u :pw</c> has no user name and does not count, so the URL's user
+/// name and password replace it whole. With no netrc option, the URL's credentials are sent when
+/// it gives a user name or a password (<see cref="CredentialsWrittenInUrl" />). Otherwise the file
 /// is the <c>--netrc-file</c> one, or <c>.netrc</c> in <c>HOME</c>, with <c>_netrc</c> after it on
 /// Windows, where <c>USERPROFILE</c> stands in when <c>HOME</c> is not set. A file that cannot be
 /// read, a directory included, fails the transfer with <c>(26) .netrc error: no such file</c>
@@ -42,7 +44,7 @@ namespace Curl.Console;
 /// for <c>HOME</c> and, on Windows, <c>USERPROFILE</c>.
 /// </param>
 /// <param name="runsOnWindows">Whether the default location is looked for as curl's Windows build does.</param>
-internal sealed class NetrcCredentialLookup(
+internal sealed class TransferCredentialLookup(
     IDataFileReader fileReader,
     Func<string, string?> readEnvironmentVariable,
     bool runsOnWindows)
@@ -57,7 +59,8 @@ internal sealed class NetrcCredentialLookup(
     /// <param name="url">The transfer's URL.</param>
     /// <param name="credentials">
     /// The credentials to send in place of <see cref="CommandLineOptions.Credentials" />;
-    /// <see langword="null" /> when the netrc file has nothing to say, so the <c>-u</c> ones stand.
+    /// <see langword="null" /> when neither the URL nor the netrc file has anything to say, so the
+    /// <c>-u</c> ones stand.
     /// </param>
     /// <param name="failure">The exit-26 failure the transfer ends with, when it fails.</param>
     /// <returns><see langword="false" /> when the transfer fails before it starts.</returns>
@@ -69,8 +72,14 @@ internal sealed class NetrcCredentialLookup(
     {
         credentials = null;
         failure = null;
-        if (!ReadsNetrc(options))
+        if (!string.IsNullOrEmpty(options.Credentials?.UserName))
         {
+            return true;
+        }
+
+        if (options.NetrcUse == NetrcUse.Ignored)
+        {
+            credentials = CredentialsWrittenInUrl(url);
             return true;
         }
 
@@ -83,13 +92,21 @@ internal sealed class NetrcCredentialLookup(
     }
 
     /// <summary>
-    /// Tells whether the transfer reads the netrc file: one of the netrc options is in effect and
-    /// <c>-u</c> gave no user name.
+    /// Gets the credentials written in the URL, sent when no netrc option is in effect: its
+    /// percent-decoded user name and password, either one empty when absent, as curl 8.21.0 sends
+    /// <c>zz:</c> for <c>http://zz@host/</c> and <c>:x</c> for <c>http://:x@host/</c> (BL-791 Notes).
     /// </summary>
-    /// <param name="options">The option group of the transfer.</param>
-    /// <returns><see langword="true" /> when the file is read.</returns>
-    private static bool ReadsNetrc(CommandLineOptions options) =>
-        options.NetrcUse != NetrcUse.Ignored && string.IsNullOrEmpty(options.Credentials?.UserName);
+    /// <param name="url">The transfer's URL.</param>
+    /// <returns>
+    /// The credentials, or <see langword="null" /> when the URL gives neither a user name nor a
+    /// password, as <c>http://@host/</c> and <c>http://:@host/</c> send none.
+    /// </returns>
+    private static NetworkCredential? CredentialsWrittenInUrl(CurlUrl url)
+    {
+        string? user = DecodedUserInformation(url.User);
+        string? password = DecodedUserInformation(url.Password);
+        return user is null && password is null ? null : new NetworkCredential(user ?? string.Empty, password ?? string.Empty);
+    }
 
     /// <summary>
     /// Gets what is wrong with the netrc file, whether or not it fails the transfer.

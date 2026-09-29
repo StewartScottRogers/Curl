@@ -81,8 +81,8 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// <paramref name="progress" />, and whose token also cancels
     /// <see cref="TransferContext.CancellationToken" />; <see langword="null" /> without a positive <c>-m</c>.
     /// </param>
-    /// <param name="netrcCredentials">
-    /// The credentials <see cref="NetrcCredentialLookup" /> chose, which the context carries in place
+    /// <param name="lookedUpCredentials">
+    /// The credentials <see cref="TransferCredentialLookup" /> chose, which the context carries in place
     /// of <c>-u</c>'s; <see langword="null" /> to carry <c>-u</c>'s.
     /// </param>
     /// <returns>
@@ -108,7 +108,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
         LowSpeedWatchdog? lowSpeedWatchdog = null,
         CancellationToken abortToken = default,
         MaxTimeWatchdog? maxTimeWatchdog = null,
-        NetworkCredential? netrcCredentials = null) =>
+        NetworkCredential? lookedUpCredentials = null) =>
         new()
         {
             Url = url,
@@ -124,7 +124,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             MaxFileSize = options.MaxFileSize,
             Upload = UploadOf(url, upload),
             PostData = options.PostData,
-            Credentials = netrcCredentials ?? options.Credentials,
+            Credentials = lookedUpCredentials ?? options.Credentials,
             TelnetOptions = options.TelnetOptions,
             TftpBlockSize = options.TftpBlockSize,
             TftpNoOptions = options.TftpNoOptions,
