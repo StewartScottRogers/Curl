@@ -88,7 +88,7 @@ bl694.example:1` for `--dns-servers bogus`.
 The code-reviewer found no must-fix bug. Applied: replies matched by address bytes and port, ignoring an
 IPv6 scope ID; an answer holding only records of another type or class is NoData, not a retried BadReply;
 the question's name is case-folded for ASCII letters only; link-local and `fec0::` handling above. Filed
-BL-824 for the SOCKS local-resolve path, which still prints the plain exit 6 message.
+BL-829 for the SOCKS local-resolve path, which still prints the plain exit 6 message.
 
 ## Log
 

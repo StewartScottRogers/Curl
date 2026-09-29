@@ -1,5 +1,5 @@
 ---
-id: BL-824
+id: BL-829
 title: Report the --dns-servers failure reason and exit 43 when a SOCKS proxy resolves the target locally
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-824 — Report the --dns-servers failure reason and exit 43 when a SOCKS proxy resolves the target locally
+# BL-829 — Report the --dns-servers failure reason and exit 43 when a SOCKS proxy resolves the target locally
 
 ## Goal
 
