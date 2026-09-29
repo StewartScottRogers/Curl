@@ -40,25 +40,25 @@ The hand-built client has the TLS 1.2, 1.1 and 1.0 record layer and key derivati
 - PRF vectors: recorded from OpenSSL 3.5.7's `TLS1-PRF` KDF (the command is in
   `TlsPrfTests`); the SHA-256 one is also the IETF TLS list's published vector. The
   derived secrets are checked against an independent RFC transcription in the test.
-- Decision (ADR-0148): the TLS 1.0 CBC BEAST countermeasure is OpenSSL/LibreSSL's empty
+- Decision (ADR-0150): the TLS 1.0 CBC BEAST countermeasure is OpenSSL/LibreSSL's empty
   fragment, not the 1/n-1 split the criterion names: those are the builds the hand-built
   client stands in for, and curl's `--ssl-allow-beast` sets OpenSSL's
   `SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS`. Criterion 1 ticked on that shape ("on by default
   for TLS 1.0 CBC and off when asked"). Not measured against real curl: no TLS 1.0 CBC
   server is at hand in this lane, so the OpenSSL source is cited; BL-713 measures it (note
   added there).
-- Decision (ADR-0148): GCM explicit nonce = sequence number (RFC 5288 section 3 allows it;
+- Decision (ADR-0150): GCM explicit nonce = sequence number (RFC 5288 section 3 allows it;
   BoringSSL and Go do it); OpenSSL counts up from a random start, which is not visible to
   the peer as different behaviour.
 - Constant time: padding checked with masks over the last 256 bytes, MAC always computed
   and compared in fixed time, one branch on both. The HMAC's length still follows the
-  padding (Lucky Thirteen residual): filed as BL-792 (hand-built SHA compression and a
+  padding (Lucky Thirteen residual): filed as BL-795 (hand-built SHA compression and a
   fixed-block HMAC).
 - Not here: AES-CCM/CCM8 and RC4 records wait on their primitives (BL-738, BL-676);
-  filed as BL-793.
-- Touches: added `Documentation/Planning/Decisions` for ADR-0148 and its README row; no
+  filed as BL-796.
+- Touches: added `Documentation/Planning/Decisions` for ADR-0150 and its README row; no
   task in Doing names it (BL-507 touches Networking/Console, BL-656 Http2). Also added a
-  note to BL-713's Notes pointing at ADR-0148.
+  note to BL-713's Notes pointing at ADR-0150.
 - Gates: `dotnet build Curl.slnx -warnaserror` clean; fast tests all pass (Curl.Tls.UnitTests
   397); `Measure-CodeQuality.ps1 -Library Curl.Tls.UnitLibrary`: 100% line, 100% branch,
   409 members, 0 failing, worst CRAP 10.
