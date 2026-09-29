@@ -42,3 +42,9 @@ flushed line per call under a lock, escapes CR and LF in a message as `\r` and `
 stops writing after the first `IOException` from its target. It is never built at
 `none`; components get `NoDiagnosticLog.Instance` instead. The format is a contract users
 may grep: change it only by a new ADR.
+
+`StyledHeaderLines` and `StyledHeaderStream` style `-i`/`-I` header lines on a terminal under
+`--styled-output` as curl 8.21.0's `tool_header_cb` does: the name in bold (`ESC[1m`, then
+`ESC[22m` on Windows or `ESC[0m` elsewhere) and, off Windows, a `Location` value as an OSC 8
+hyperlink to the URL it resolves to (ADR-0246, BL-736). When to style is `Curl.Console`'s
+decision. Change the bytes only against curl's `src/tool_cb_hdr.c` or a measurement.
