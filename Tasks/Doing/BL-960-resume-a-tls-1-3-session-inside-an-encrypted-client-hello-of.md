@@ -35,3 +35,4 @@ A `Tls13ClientHandshake` with both `EncryptedClientHelloConfigs` (a supported co
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-29: Backlog -> Doing.
