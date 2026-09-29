@@ -5,7 +5,7 @@ namespace Curl.Quic;
 
 /// <summary>
 /// Why a QUIC connection failed, during its handshake or after it, as curl reports it
-/// (ADR-0144 section 7, ADR-0165, ADR-0175): the exit code, the message, and when TLS failed,
+/// (ADR-0144 section 7, ADR-0165, ADR-0177): the exit code, the message, and when TLS failed,
 /// its failure.
 /// </summary>
 /// <param name="ExitCode">The exit code curl ends with.</param>

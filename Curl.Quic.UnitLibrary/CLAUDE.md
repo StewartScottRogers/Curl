@@ -100,7 +100,7 @@ Streams and flow control (BL-726, RFC 9000 sections 2 to 4, ADR-0174):
   (the internal `QuicMultiplexedStream`) change state under its lock and wake it. A lost
   channel is exit 56.
 
-Close, idle timeout and stateless reset (BL-727, RFC 9000 section 10, ADR-0175):
+Close, idle timeout and stateless reset (BL-727, RFC 9000 section 10, ADR-0177):
 
 - After the handshake, the server's CONNECTION_CLOSE (a TLS alert included), a transport
   error the client detects and a stateless reset are exit 56, `Failure when receiving data

@@ -5,7 +5,7 @@ namespace Curl.Quic;
 
 /// <summary>
 /// Maps what ends a QUIC connection to curl's exit code (ADR-0144 section 7, ADR-0165,
-/// ADR-0175): the server's CONNECTION_CLOSE, a TLS failure the client detected, and, once
+/// ADR-0177): the server's CONNECTION_CLOSE, a TLS failure the client detected, and, once
 /// the handshake is complete, a transport error, a stateless reset and the idle timeout.
 /// </summary>
 internal static class QuicHandshakeFailures

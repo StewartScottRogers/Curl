@@ -3,7 +3,7 @@ using static Curl.Quic.QuicStreamTest;
 
 namespace Curl.Quic;
 
-/// <summary>How a QUIC connection ends once its handshake is complete: the close it sends, the server's close, the idle timeout and a stateless reset (RFC 9000 section 10, ADR-0175).</summary>
+/// <summary>How a QUIC connection ends once its handshake is complete: the close it sends, the server's close, the idle timeout and a stateless reset (RFC 9000 section 10, ADR-0177).</summary>
 [TestClass]
 public sealed class QuicConnectionCloseTests
 {
