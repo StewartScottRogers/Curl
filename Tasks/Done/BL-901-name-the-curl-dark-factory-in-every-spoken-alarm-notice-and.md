@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1, .claude/hooks/whisper-milestone.ps1]
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-29
 ---
 # BL-901 — Name the Curl dark factory in every spoken alarm, notice and whisper
 
@@ -37,3 +37,4 @@ and the out-of-tokens notices said "the dark factory", and the whisper hook's mi
 
 - 2026-09-29: Created.
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Done. Alarm, token notices and on-screen banner say the Curl dark factory; whispers start with Curl.; self-checks, build and fast tests (33 assemblies) green.
