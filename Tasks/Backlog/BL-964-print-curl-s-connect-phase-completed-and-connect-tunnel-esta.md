@@ -1,5 +1,5 @@
 ---
-id: BL-959
+id: BL-964
 title: Print curl's CONNECT phase completed and CONNECT tunnel established lines for a proxy tunnel
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-959 — Print curl's CONNECT phase completed and CONNECT tunnel established lines for a proxy tunnel
+# BL-964 — Print curl's CONNECT phase completed and CONNECT tunnel established lines for a proxy tunnel
 
 ## Goal
 
