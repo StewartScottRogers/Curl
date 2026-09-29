@@ -34,3 +34,4 @@ An ADR decides which library holds a hand-built Zstandard (RFC 8878) decoder use
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
