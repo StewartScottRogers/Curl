@@ -85,9 +85,9 @@ know.
    - `machineCap` comes from the probe (item 7).
 
 5. **One step, with hysteresis.** Let `desired = min(pace target, ceiling)`. Scale up by
-   one when `desired >= current + 1`. Scale down by one when `desired < current - 0.25`
-   for a ceiling at once, and for a pace target only when the previous step was below the
-   band too (BL-808 amendment).
+   one when `desired >= current + 1`. Scale down when `desired < current - 0.25`, straight
+   to `max(1, floor(desired + 0.25))` (BL-823 amendment): for a ceiling at once, and for a
+   pace target only when the previous step was below the band too (BL-808 amendment).
    Otherwise hold. There is never fewer than 1 lane.
 
    These cases hold too:
@@ -98,7 +98,7 @@ know.
 6. **Scaling mechanics.**
    - Scaling up starts the lowest free lane number through the existing `Start-Detached`
      path: a herdr tab, or a console window outside herdr.
-   - Scaling down marks the highest-numbered active lane to retire with a
+   - Scaling down marks the highest-numbered active lanes, as many as the step drops, to retire with a
      `lane-<n>.retire` state file. At the top of its loop, before its next claim, that
      lane stops with `retired`: it writes its summary and exits.
    - A lane never retires mid-task, mid-integration, or while resuming a held task.
@@ -156,7 +156,7 @@ know.
    | `fiveHourRatePerLane` | Last five-hour rate, percentage points per hour per lane, or `null`. |
    | `weeklyRatePerLane` | Last weekly rate, percentage points per hour per lane, or `null`. |
 
-   - An Auto shift starts at `lanes`, raised to `-MinStartLanes` (default 3) when that is
+   - An Auto shift starts at `lanes`, raised to `-MinStartLanes` (default 16 since BL-823) when that is
      more, capped by the ceilings, and meters from the saved rates until it has its own.
    - The first-ever start (no file) is `-MinStartLanes` lanes. See the amendment below.
    - When adopted lanes number more than the start count, the shift starts at the highest
@@ -298,3 +298,26 @@ passes when every build succeeds and at least 20% of memory stays free. Wall tim
 slowdown are still recorded, for reading only.
 
 The new rule text makes the next Auto shift probe again.
+
+## Amendment 2026-09-28: start at the ceiling and retire straight down (BL-823)
+
+Stewart said "Just start aggressively and dial down", then "go" to making it the default,
+and "Maybe we should set the max lanes to 6". The details are decided by Claude under
+Stewart's delegation.
+
+With BL-808's two-low-steps rule, a shift retired at most one lane every 30 minutes.
+Going from 10 lanes to 4 took three hours, which can reach the 5-hour window's 85% stop
+first. So:
+
+- `-MinStartLanes` defaults to 16, so an Auto shift starts at its ceiling
+  (`min(capacity, machineCap, -MaxLanes)`). `-MinStartLanes 3` still starts at
+  `max(saved, 3)`, as the BL-780 amendment describes.
+- `-MaxLanes` defaults to 6, so a default start is at most 6 lanes.
+- A step that scales down goes straight to `max(1, floor(desired + 0.25))`, the count the
+  hold band accepts. A ceiling does this at once. A pace target does it once the previous
+  step was low too. So from 6 lanes with a confirmed pace of 2.4, the step traces
+  `lanes 6 -> 2 (5-hour pace allows 2.4)`.
+- The coordinator asks that many lanes to retire in one step, highest numbers first, and
+  traces each one. Each lane still finishes and integrates its task first.
+- Scaling up stays at one lane per step. The meter needs samples at each count before it
+  can trust the rate at the next one.

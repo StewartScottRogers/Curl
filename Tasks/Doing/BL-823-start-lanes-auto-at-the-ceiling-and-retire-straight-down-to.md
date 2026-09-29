@@ -27,18 +27,18 @@ stop first. Adding lanes stays one per step: the meter needs samples at each cou
 
 ## Acceptance criteria
 
-- [ ] `-MinStartLanes` defaults to 16, so an Auto shift starts at its ceiling; its help
+- [x] `-MinStartLanes` defaults to 16, so an Auto shift starts at its ceiling; its help
       says so. `-MinStartLanes 3` still starts at `max(saved, 3)` as before.
-- [ ] `-MaxLanes` defaults to 6 (Stewart, 2026-09-28: "Maybe we should set the max lanes
+- [x] `-MaxLanes` defaults to 6 (Stewart, 2026-09-28: "Maybe we should set the max lanes
       to 6"), so starting at the ceiling means at most 6.
-- [ ] `Get-NextLaneCount` scales down to `max(1, floor(desired + 0.25))` in one step: at
+- [x] `Get-NextLaneCount` scales down to `max(1, floor(desired + 0.25))` in one step: at
       once for a ceiling, and for a pace target once `-PreviousLow` confirms it. Up stays
       one lane per step.
-- [ ] The coordinator asks that many lanes to retire in one step, highest numbers first,
+- [x] The coordinator asks that many lanes to retire in one step, highest numbers first,
       and traces each.
-- [ ] `-TestAutoLanes` covers a multi-lane pace drop, a multi-lane ceiling drop and the
+- [x] `-TestAutoLanes` covers a multi-lane pace drop, a multi-lane ceiling drop and the
       unchanged single steps, and passes.
-- [ ] ADR-0130 has a dated amendment; the script header says how the start and the drop
+- [x] ADR-0130 has a dated amendment; the script header says how the start and the drop
       work.
 
 ## Notes

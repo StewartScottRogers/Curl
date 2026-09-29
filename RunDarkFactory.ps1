@@ -113,8 +113,9 @@
       start     The machine cap comes from <repo>.lanes\machine-lanes.json; the machine
                 probe (-ProbeMachine, below) runs first when that file is missing,
                 incomplete or from other hardware. The cold start is the lane count
-                <repo>.lanes\auto-lanes.json saved, raised to -MinStartLanes (default 3),
-                capped by the ceilings. -MinStartLanes is a start, not a floor.
+                <repo>.lanes\auto-lanes.json saved, raised to -MinStartLanes (default 16),
+                capped by the ceilings, so by default a shift starts at its ceiling and
+                dials down (BL-823). -MinStartLanes is a start, not a floor.
       step      Every 15 minutes, except while waiting for tokens, it samples usage and
                 paces to the 5-hour window (and, with -WeeklyPace, the weekly one): the
                 lanes that would spend each window up to -StopAtUsage or -StopAtWeeklyUsage
@@ -123,11 +124,13 @@
                 work, and loses what an idle factory leaves at the reset (BL-806).
       ceilings  task-board.ps1 capacity (read in a detached worktree, <repo>.lanes\auto-board,
                 so this checkout is only pulled at shift end), the machine cap and -MaxLanes.
-      change    At most one lane per step, added or retired; a retiring lane finishes and
-                integrates its task first. A pace target must be low two steps running
-                before a lane retires ("low once" holds); a ceiling retires at once. Each step traces "lanes a -> b (reason)", e.g.
-                "lanes 3 -> 4 (5-hour pace allows 4.9)". It holds while the tokens are low
-                or the shift's time is up.
+      change    Up at most one lane per step, so the meter samples each count. Down
+                straight to max(1, floor(desired + 0.25)) in one step, the highest lane
+                numbers first; a retiring lane finishes and integrates its task first. A
+                pace target must be low two steps running before lanes retire ("low once"
+                holds); a ceiling retires at once (BL-823). Each step traces
+                "lanes a -> b (reason)", e.g. "lanes 3 -> 4 (5-hour pace allows 4.9)". It
+                holds while the tokens are low or the shift's time is up.
 
     auto-lanes.json is saved on each change and at shift end, and -Continuous hands on
     -Lanes Auto. -AutoLanesReport prints one step's reading without starting a lane, and exits.
@@ -234,14 +237,15 @@ param(
     [ValidateRange(0.1, 1)][double]$StopAtWeeklyUsage = 0.97,
     # How many tasks run at once, each in its own worktree and window. 1 is the classic
     # single-runner shift in this checkout. Auto sizes the shift itself (ADR-0130): every
-    # 15 minutes it adds or retires at most one lane, paced to the usage windows and capped
-    # by the board, the machine and -MaxLanes.
+    # 15 minutes it adds at most one lane or retires straight down to the pace, paced to the
+    # usage windows and capped by the board, the machine and -MaxLanes.
     [ValidatePattern('^(?i:auto|[1-9]|1[0-6])$')][string]$Lanes = '1',
-    # -Lanes Auto's lane maximum.
-    [ValidateRange(1, 16)][int]$MaxLanes = 16,
-    # The fewest lanes a -Lanes Auto shift starts with (Stewart, 2026-09-28). A start, not a
-    # floor: the ceilings still cap it, and Auto still retires below it when pace demands.
-    [ValidateRange(1, 16)][int]$MinStartLanes = 3,
+    # -Lanes Auto's lane maximum (Stewart, 2026-09-28: "Maybe we should set the max lanes to 6").
+    [ValidateRange(1, 16)][int]$MaxLanes = 6,
+    # The fewest lanes a -Lanes Auto shift starts with. 16 starts at the ceiling and dials
+    # down (Stewart, 2026-09-28: "Just start aggressively and dial down", BL-823). A start,
+    # not a floor: the ceilings still cap it, and Auto still retires below it when pace demands.
+    [ValidateRange(1, 16)][int]$MinStartLanes = 16,
     # -Lanes Auto also paces to the weekly window, spreading its budget evenly until the
     # reset, instead of burning at the 5-hour pace and stopping at -StopAtWeeklyUsage.
     [switch]$WeeklyPace,
@@ -942,9 +946,10 @@ function Get-PaceTarget {
 
 function Get-NextLaneCount {
     # One step from -Current lanes toward the pace, capped by the ceilings: up one when
-    # the desired count is a whole lane above, down one when it is more than a quarter
-    # lane below, never below 1. A measured pace must be low two steps running before a
-    # lane retires (-PreviousLow, BL-808); a ceiling below -Current retires one at once.
+    # the desired count is a whole lane above, and when it is more than a quarter lane
+    # below, straight down to max(1, floor(desired + 0.25)) (BL-823). A measured pace must
+    # be low two steps running before lanes retire (-PreviousLow, BL-808); a ceiling below
+    # -Current retires at once.
     # Low says whether this step's pace was low. Reason is the log line, e.g.
     # "lanes 3 -> 4 (5-hour pace allows 4.9)".
     param([int]$Current, $Pace, [int]$Capacity, [int]$MachineCap, [int]$MaxLanes, [bool]$PreviousLow = $false)
@@ -957,7 +962,7 @@ function Get-NextLaneCount {
     if ($desired -ge $Current + 1) { $lanes = $Current + 1 }
     elseif ($desired -lt $Current - 0.25) {
         $low = $paceValue -le $ceiling
-        if (-not $low -or $PreviousLow) { $lanes = [math]::Max(1, $Current - 1) } else { $lowOnce = $true }
+        if (-not $low -or $PreviousLow) { $lanes = [int][math]::Max(1, [math]::Floor($desired + 0.25)) } else { $lowOnce = $true }
     }
     $culture = [Globalization.CultureInfo]::InvariantCulture
     $limit = if ($paceValue -le $ceiling) {
@@ -1045,7 +1050,7 @@ if ($TestAutoLanes) {
         ,@('five-hour-binds', 'lanes 3 -> 4 (5-hour pace allows 4.9)', (Get-SampledLaneCount $fiveHourBinds 3 $true 6 8 16))
         ,@('five-hour-binds weekly rate', 'null', "$(if ($null -eq (Get-BurnRate $fiveHourBinds Week)) { 'null' } else { 'a rate' })")
         ,@('weekly-binds low once', 'lanes 4 held (weekly pace allows 1.8, low once)', (Get-SampledLaneCount $weeklyBinds 4 $true 6 8 16))
-        ,@('weekly-binds low twice', 'lanes 4 -> 3 (weekly pace allows 1.8)', (Get-SampledLaneCount $weeklyBinds 4 $true 6 8 16 $true))
+        ,@('weekly-binds low twice', 'lanes 4 -> 2 (weekly pace allows 1.8)', (Get-SampledLaneCount $weeklyBinds 4 $true 6 8 16 $true))
         ,@('five-hour span under 30 min', 'null', "$(if ($null -eq (Get-BurnRate $fiveHourTooShort FiveHour)) { 'null' } else { 'a rate' })")
         ,@('weekly-pace-off', 'lanes 4 -> 5 (6 ready tasks can run at once)', (Get-SampledLaneCount $weeklyBinds 4 $false 6 8 16))
         ,@('weekly-pace-off by default', 'Infinity', "$((Get-PaceTarget -Sample $weeklyBinds[-1] -FiveHourRate 1.0 -WeeklyRate 5.0 -StopAtUsage 0.85 -StopAtWeeklyUsage 0.97).Weekly)")
@@ -1054,7 +1059,14 @@ if ($TestAutoLanes) {
         ,@('below-band low once', 'lanes 4 held (5-hour pace allows 3.7, low once)', (Get-NextLaneCount 4 (New-TestPace 3.7) 16 16 16).Reason)
         ,@('below-band low twice', 'lanes 4 -> 3 (5-hour pace allows 3.7)', (Get-NextLaneCount 4 (New-TestPace 3.7) 16 16 16 $true).Reason)
         ,@('below-band Low flag', 'True', "$((Get-NextLaneCount 4 (New-TestPace 3.7) 16 16 16).Low)")
-        ,@('capacity-ceiling 3', 'lanes 5 -> 4 (3 ready tasks can run at once)', (Get-NextLaneCount 5 (New-TestPace 9.0) 3 16 16).Reason)
+        ,@('capacity-ceiling 3', 'lanes 5 -> 3 (3 ready tasks can run at once)', (Get-NextLaneCount 5 (New-TestPace 9.0) 3 16 16).Reason)
+        ,@('pace drop 6 to 2.4 low once', 'lanes 6 held (5-hour pace allows 2.4, low once)', (Get-NextLaneCount 6 (New-TestPace 2.4) 16 16 16).Reason)
+        ,@('pace drop 6 to 2.4 low twice', 'lanes 6 -> 2 (5-hour pace allows 2.4)', (Get-NextLaneCount 6 (New-TestPace 2.4) 16 16 16 $true).Reason)
+        ,@('pace drop 6 to 2.8 rounds up', 'lanes 6 -> 3 (5-hour pace allows 2.8)', (Get-NextLaneCount 6 (New-TestPace 2.8) 16 16 16 $true).Reason)
+        ,@('pace drop 5 to spent budget', 'lanes 5 -> 1 (5-hour pace allows 0.0)', (Get-NextLaneCount 5 (New-TestPace 0.0) 16 16 16 $true).Reason)
+        ,@('ceiling drop 6 to capacity 2', 'lanes 6 -> 2 (2 ready tasks can run at once)', (Get-NextLaneCount 6 (New-TestPace 9.0) 2 16 16).Reason)
+        ,@('ceiling drop 6 to machine 3', 'lanes 6 -> 3 (machine sustains 3)', (Get-NextLaneCount 6 $infinite 20 3 16).Reason)
+        ,@('up one from 2 at ceiling 6', 'lanes 2 -> 3 (lane maximum 6)', (Get-NextLaneCount 2 $infinite 20 16 6).Reason)
         ,@('capacity-ceiling 1', 'lanes 2 -> 1 (1 ready task can run at once)', (Get-NextLaneCount 2 $null 1 16 16).Reason)
         ,@('machine-ceiling', 'lanes 7 held (machine sustains 7)', (Get-NextLaneCount 7 $infinite 20 7 16).Reason)
         ,@('max-ceiling', 'lanes 2 held (lane maximum 2)', (Get-NextLaneCount 2 $infinite 20 16 2).Reason)
@@ -1070,6 +1082,9 @@ if ($TestAutoLanes) {
         ,@('start saved 5', '5 (last shift saved 5)', "$((Get-AutoStartCount ([pscustomobject]@{ lanes = 5 }) 16 16 3 16) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
         ,@('start first shift', '3 (first auto shift)', "$((Get-AutoStartCount $null 16 16 3 16) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
         ,@('start min 4 ceiling 2', '2 (first auto shift, capped at 2)', "$((Get-AutoStartCount $null 2 16 4 16) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
+        ,@('start default at ceiling', '6 (last shift saved 2, raised to 16 by -MinStartLanes, capped at 6)', "$((Get-AutoStartCount ([pscustomobject]@{ lanes = 2 }) 16 16) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
+        ,@('start default at capacity', '4 (first auto shift, capped at 4)', "$((Get-AutoStartCount $null 4 16) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
+        ,@('start min 3 saved 2', '3 (last shift saved 2, raised to 3 by -MinStartLanes)', "$((Get-AutoStartCount ([pscustomobject]@{ lanes = 2 }) 16 16 3) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
         ,@('start min 1 saved 1', '1 (last shift saved 1)', "$((Get-AutoStartCount ([pscustomobject]@{ lanes = 1 }) 16 16 1 16) | ForEach-Object { "$($_.Count) ($($_.Why))" })"))
     $failed = 0
     foreach ($case in $cases) {
@@ -2487,8 +2502,8 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
 
     function Invoke-AutoLaneStep {
         # One -Lanes Auto step (ADR-0130 items 2 to 5): sample the usage, meter the rates,
-        # and add or retire at most one lane. Holds without asking while the tokens are low
-        # or the shift's time is up.
+        # and add one lane or retire straight down to the step's count, highest lane numbers
+        # first (BL-823). Holds without asking while the tokens are low or the shift's time is up.
         $retiring = @($activeLanes | Where-Object { Test-Path (Get-LaneStatePath $_ 'retire') })
         $current = @($activeLanes | Where-Object { $retiring -notcontains $_ }).Count
         $low = Get-UsageStop
@@ -2510,9 +2525,19 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         $script:Auto.LastLow = [bool]($step.Next.Low -and -not $step.Next.Changed)
         if (-not $step.Next.Changed) { Write-Trace '-' 'lanes' $step.Next.Reason 'DarkGray'; return }
         Write-Trace '-' 'lanes' $step.Next.Reason 'Cyan'
-        $moved = if ($step.Next.Lanes -gt $current) { Add-Lane } else { Request-LaneRetire }
-        if ($null -eq $moved) { Write-Trace '-' 'lanes' "no lane to $(if ($step.Next.Lanes -gt $current) { 'add' } else { 'retire' })" 'Yellow'; return }
-        $script:LaneCount = $step.Next.Lanes
+        if ($step.Next.Lanes -gt $current) {
+            if ($null -eq (Add-Lane)) { Write-Trace '-' 'lanes' 'no lane to add' 'Yellow'; return }
+            $script:LaneCount = $step.Next.Lanes
+        } else {
+            # Request-LaneRetire traces each lane it asks; one that finds none left stops the run.
+            $retired = 0
+            foreach ($i in 1..($current - $step.Next.Lanes)) {
+                if ($null -eq (Request-LaneRetire)) { break }
+                $retired++
+            }
+            if (-not $retired) { Write-Trace '-' 'lanes' 'no lane to retire' 'Yellow'; return }
+            $script:LaneCount = $current - $retired
+        }
         try { $Host.UI.RawUI.WindowTitle = "Dark factory - $($script:LaneCount) lanes (auto)" } catch { }
         Save-AutoLanes $script:LaneCount
     }
