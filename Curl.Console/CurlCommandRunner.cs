@@ -723,6 +723,13 @@ internal sealed class CurlCommandRunner(
         IReadOnlyList<CommandLineOptions> groups,
         IReadOnlyList<string> warningLinesAfterTransfers)
     {
+        if (options.AiHelpRequested)
+        {
+            await WriteAiHelpAsync(options.AiHelpSubject).ConfigureAwait(false);
+
+            return (int)CurlExitCode.Ok;
+        }
+
         if (InformationLines(options) is { } informationLines)
         {
             await WriteStandardOutputLinesAsync(informationLines).ConfigureAwait(false);
@@ -3602,6 +3609,26 @@ internal sealed class CurlCommandRunner(
         else
         {
             await WriteErrorLineAsync(CurlOptionManualSection.IncorrectOptionNameMessage).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Writes what <c>--ai-help [subject]</c> prints: <see cref="CurlAiHelpText" />'s Markdown as it is, its
+    /// lines ending in <c>\n</c> on every platform, or, for a subject naming no category,
+    /// <see cref="CurlAiHelpText.UnknownCategoryLines" /> as <c>--help</c> writes them.
+    /// </summary>
+    /// <param name="subject">The subject, <see langword="null" /> for the index.</param>
+    /// <returns>A task that completes when the output is flushed.</returns>
+    private async Task WriteAiHelpAsync(string? subject)
+    {
+        if (CurlAiHelpText.TryGetMarkdown(subject, out string markdown))
+        {
+            await standardOutput.WriteAsync(Encoding.UTF8.GetBytes(markdown)).ConfigureAwait(false);
+            await standardOutput.FlushAsync().ConfigureAwait(false);
+        }
+        else
+        {
+            await WriteStandardOutputLinesAsync(CurlAiHelpText.UnknownCategoryLines()).ConfigureAwait(false);
         }
     }
 
