@@ -79,13 +79,32 @@ server can be made to fail on demand (ADR-0144); those are read from curl's
 7. **Frame size.** `Curl.Http3` reads each frame's payload whole, so a request stream
    accepts frames of up to 16 MiB and fails a bigger one with `ERR_H3_EXCESSIVE_LOAD`.
    Streaming `DATA` of any length, as nghttp3 does, is its own task.
+8. **The server's streams** (BL-836, decided by Claude under Stewart's delegation). The
+   session accepts the server's unidirectional streams from its creation to its disposal,
+   one background reader per stream: the control stream through
+   `Http3ControlStreamReader`, the QPACK encoder and decoder streams into the session's
+   `QpackDecoder` and `QpackEncoder`, and a stream of an unknown or grease type abandoned
+   with `H3_STREAM_CREATION_ERROR` (RFC 9114 section 6.2). A `GOAWAY` makes
+   `AcceptsNewStreams` false, so the handler takes no further request on the connection;
+   it fails nothing in flight. The first `Http3Exception` or `QpackException` on any of
+   them is fatal to the connection, as `cf_ngtcp2_h3_err_is_fatal` makes an
+   `nghttp3_conn_read_stream` error at curl tag `curl-8_18_0`: the session closes the
+   connection with that error's code and fails the transfer's next read - or the read the
+   close interrupts - with exit 56 and `nghttp3_conn_read_stream returned error: <name>`,
+   where a QPACK stream error is `ERR_QPACK_ENCODER_STREAM_ERROR` or
+   `ERR_QPACK_DECODER_STREAM_ERROR`. Later errors change nothing. A reset of a stream whose
+   type has arrived is `ERR_H3_CLOSED_CRITICAL_STREAM`, since only critical streams are
+   still read by then; a reset before the type is ignored, as the stream's purpose is
+   unknown. A lost connection, or one that hands out no server streams
+   (`NotSupportedException`), ends the reading quietly: the request stream reports a lost
+   connection itself.
 
 ## Consequences
 
 - An HTTP/3 transfer writes the same output and takes the same `-f`, redirect, retry,
   cookie and progress paths as HTTP/2, tested over `FakeMultiplexedConnection` with no QUIC.
-- The server's control and QPACK streams are not read yet, so a `GOAWAY` does not stop
-  further requests and the server's `SETTINGS` are not checked; that is its own task.
+- The server's control and QPACK streams are read (section 8), so a `GOAWAY` stops further
+  requests and a broken control or QPACK stream fails the transfer as curl does.
 - Some failure texts come from curl's source rather than a run; the task that measures
   against a failing HTTP/3 server replaces them if they differ.
 

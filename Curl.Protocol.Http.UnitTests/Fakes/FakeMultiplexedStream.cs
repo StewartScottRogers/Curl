@@ -3,8 +3,10 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Protocol.Http.Fakes;
 
 /// <summary>
-/// An in-memory <see cref="IMultiplexedStream" />: reads replay scripted bytes in chunks, then
-/// end the stream (FIN) or throw <see cref="EndException" />; writes are recorded, with whether
+/// An in-memory <see cref="IMultiplexedStream" />: reads replay scripted bytes in chunks, once
+/// <see cref="ReadsAfter" /> lets them, then end the stream (FIN), throw
+/// <see cref="EndException" /> or, when it <see cref="StaysOpen" />, wait until cancelled;
+/// writes are recorded, with whether
 /// the client ended the stream and the code of any abort.
 /// </summary>
 /// <param name="streamId">The QUIC stream ID.</param>
@@ -12,6 +14,8 @@ namespace Curl.Protocol.Http.Fakes;
 /// <param name="chunkSize">The most bytes one read returns.</param>
 public sealed class FakeMultiplexedStream(long streamId, byte[] incoming, int chunkSize = 65536) : IMultiplexedStream
 {
+    private readonly TaskCompletionSource drained = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
     private int position;
 
     /// <inheritdoc />
@@ -43,12 +47,44 @@ public sealed class FakeMultiplexedStream(long streamId, byte[] incoming, int ch
     /// <summary>Gets a value indicating whether the stream was disposed.</summary>
     public bool IsDisposed { get; private set; }
 
+    /// <summary>
+    /// Gets a task every read waits for before it reads, so a test decides when the bytes
+    /// arrive, or <see langword="null" /> to read at once.
+    /// </summary>
+    public Task? ReadsAfter { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether a read past the scripted bytes waits until it is
+    /// cancelled, as an open stream the peer sends nothing more on does, instead of ending.
+    /// </summary>
+    public bool StaysOpen { get; init; }
+
+    /// <summary>Gets a task that completes once a read has found every scripted byte read.</summary>
+    public Task Drained => drained.Task;
+
     /// <inheritdoc />
     public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        return ReadsAfter is null ? ReadNow(buffer, cancellationToken) : ReadLaterAsync(buffer, cancellationToken);
+    }
+
+    private async ValueTask<int> ReadLaterAsync(Memory<byte> buffer, CancellationToken cancellationToken)
+    {
+        await ReadsAfter!;
+        return await ReadNow(buffer, cancellationToken);
+    }
+
+    private ValueTask<int> ReadNow(Memory<byte> buffer, CancellationToken cancellationToken)
+    {
         if (position == incoming.Length)
         {
+            drained.TrySetResult();
+            if (StaysOpen)
+            {
+                return WaitUntilCancelledAsync(cancellationToken);
+            }
+
             return EndException is null ? ValueTask.FromResult(0) : ValueTask.FromException<int>(EndException);
         }
 
@@ -74,6 +110,12 @@ public sealed class FakeMultiplexedStream(long streamId, byte[] incoming, int ch
 
     /// <inheritdoc />
     public void Abort(long applicationErrorCode) => AbortCode = applicationErrorCode;
+
+    private static async ValueTask<int> WaitUntilCancelledAsync(CancellationToken cancellationToken)
+    {
+        await Task.Delay(Timeout.Infinite, cancellationToken);
+        return 0;
+    }
 
     /// <inheritdoc />
     public ValueTask DisposeAsync()

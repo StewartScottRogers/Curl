@@ -27,7 +27,9 @@ namespace Curl.Protocol.Http;
 /// again; a reset with <c>H3_NO_ERROR</c>, or with any other code after the final head when
 /// no body is wanted, ends the stream as its end would. A stream that ends before the final
 /// head is exit 95; frames or field sections that break RFC 9114 or RFC 9204 are exit 56 with
-/// nghttp3's error name; and a lost connection is the exit code and message its
+/// nghttp3's error name, as is a connection error on the server's control or QPACK streams
+/// (<see cref="Http3Session.ConnectionError" />), which fails the next read and any read it
+/// interrupts; and a lost connection is the exit code and message its
 /// <see cref="MultiplexedConnectionFailedException" /> carries.
 /// </remarks>
 /// <param name="session">The connection's HTTP/3 session.</param>
@@ -161,8 +163,18 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
     /// Gives nghttp3's name for an HTTP/3 error as <c>nghttp3_strerror</c> gives it, such as
     /// <c>ERR_H3_FRAME_UNEXPECTED</c> for <see cref="Http3ErrorCode.FrameUnexpected" />.
     /// </summary>
-    private static string Nghttp3ErrorName(Http3ErrorCode errorCode) =>
-        "ERR_H3_" + string.Concat(errorCode.ToString().Select((letter, index) => index > 0 && char.IsUpper(letter) ? $"_{letter}" : $"{letter}")).ToUpperInvariant();
+    /// <param name="errorCode">The HTTP/3 error.</param>
+    /// <returns>nghttp3's name for it.</returns>
+    internal static string Nghttp3ErrorName(Http3ErrorCode errorCode) => "ERR_H3_" + UpperSnakeCase(errorCode.ToString());
+
+    /// <summary>
+    /// Gives a Pascal-case enumeration member's name in nghttp3's upper snake case, such as
+    /// <c>FRAME_UNEXPECTED</c> for <c>FrameUnexpected</c>.
+    /// </summary>
+    /// <param name="name">The member's name.</param>
+    /// <returns>The name in upper snake case.</returns>
+    internal static string UpperSnakeCase(string name) =>
+        string.Concat(name.Select((letter, index) => index > 0 && char.IsUpper(letter) ? $"_{letter}" : $"{letter}")).ToUpperInvariant();
 
     private static HttpTransferException ReadStreamFailed(string errorName) =>
         new(CurlExitCode.RecvError, HttpTransferMessages.Http3ReadStreamFailed(errorName));
@@ -227,11 +239,25 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
         }
     }
 
+    /// <summary>
+    /// Reads the next frame, unless a connection error on the server's control or QPACK
+    /// streams failed the whole connection (<see cref="Http3Session.ConnectionError" />).
+    /// </summary>
     private async ValueTask<Http3Frame?> ReadFrameAsync(CancellationToken cancellationToken)
     {
+        if (session.ConnectionError is { } failed)
+        {
+            throw failed;
+        }
+
         try
         {
             return await frames!.ReadFrameAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception) when (session.ConnectionError is { } connectionError)
+        {
+            // The session closed the connection under the read: its error is the cause.
+            throw connectionError;
         }
         catch (MultiplexedStreamResetException reset) when (reset.ApplicationErrorCode == (long)Http3ErrorCode.RequestRejected)
         {

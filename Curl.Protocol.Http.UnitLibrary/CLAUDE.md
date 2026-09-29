@@ -34,5 +34,8 @@ before falling back to TCP, the handler asks the connector for an `IMultiplexedC
 (`IConnector.ConnectMultiplexedAsync`) and wraps it in an `Http3Session`, which opens the
 client's control and QPACK streams and hands out an `Http3StreamConnection` per request
 (`HTTP/3 200 \r\n`, the headers, the empty line, then the DATA). `IHttpStreamSession` and
-`IHttpStreamConnection` are what the handler sees of either version. Tests drive it with
+`IHttpStreamConnection` are what the handler sees of either version. The session also reads
+the server's control and QPACK streams in the background for the connection's life
+(BL-836, ADR-0172 section 8): a `GOAWAY` stops new requests on it, and a broken control or
+QPACK stream fails the transfer's next read with exit 56. Tests drive it with
 `Fakes/FakeMultiplexedConnection` and `Fakes/FakeMultiplexedStream`.

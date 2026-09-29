@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using Curl.Protocol.Abstractions;
 
@@ -6,12 +7,15 @@ namespace Curl.Protocol.Http.Fakes;
 /// <summary>
 /// An in-memory <see cref="IMultiplexedConnection" />: hands out scripted request streams in
 /// order, opens recorded unidirectional streams with client-initiated IDs 2, 6, 10 and on,
+/// hands out scripted server streams to accepts, then waits until an accept is cancelled,
 /// and records how it was closed and disposed.
 /// </summary>
 /// <param name="requestStreams">The bidirectional streams the opens return, first to last.</param>
 public sealed class FakeMultiplexedConnection(params FakeMultiplexedStream[] requestStreams) : IMultiplexedConnection
 {
     private readonly Queue<FakeMultiplexedStream> pending = new(requestStreams);
+
+    private readonly Queue<FakeMultiplexedStream> serverStreams = new();
 
     /// <inheritdoc />
     public EndPoint? RemoteEndPoint { get; init; }
@@ -68,10 +72,45 @@ public sealed class FakeMultiplexedConnection(params FakeMultiplexedStream[] req
         return ValueTask.FromResult<IMultiplexedStream>(stream);
     }
 
+    /// <summary>
+    /// Gets the unidirectional streams the server opens, handed out by
+    /// <see cref="AcceptUnidirectionalStreamAsync" /> first to last.
+    /// </summary>
+    public IEnumerable<FakeMultiplexedStream> ServerStreams { init => serverStreams = new(value); }
+
+    /// <summary>
+    /// Gets the exception accepting throws once <see cref="ServerStreams" /> are used up, or
+    /// <see langword="null" /> to wait until the accept is cancelled.
+    /// </summary>
+    public Exception? AcceptException { get; init; }
+
+    /// <summary>Gets a value indicating whether an accept waiting for a server stream was cancelled.</summary>
+    public bool IsAcceptCancelled { get; private set; }
+
     /// <inheritdoc />
-    /// <exception cref="NotSupportedException">Always: the handler reads no server stream yet.</exception>
-    public ValueTask<IMultiplexedStream> AcceptUnidirectionalStreamAsync(CancellationToken cancellationToken) =>
-        throw new NotSupportedException();
+    public async ValueTask<IMultiplexedStream> AcceptUnidirectionalStreamAsync(CancellationToken cancellationToken)
+    {
+        if (serverStreams.TryDequeue(out FakeMultiplexedStream? stream))
+        {
+            return stream;
+        }
+
+        if (AcceptException is not null)
+        {
+            throw AcceptException;
+        }
+
+        try
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+        }
+        finally
+        {
+            IsAcceptCancelled = true;
+        }
+
+        throw new UnreachableException();
+    }
 
     /// <inheritdoc />
     public ValueTask CloseAsync(long applicationErrorCode, CancellationToken cancellationToken)

@@ -251,6 +251,29 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_Http3RetryAfterGoaway_GoesOnANewQuicConnection()
+    {
+        // The server's control stream sends SETTINGS then GOAWAY naming stream 4: stream 0's
+        // 401 is still answered, but the authenticated retry needs a new connection.
+        FakeMultiplexedStream control = new(3, [0x00, .. new Http3SettingsFrame([]).ToBytes(), .. new Http3GoawayFrame(4).ToBytes()]) { StaysOpen = true };
+        FakeMultiplexedStream challenged = new(0, Http3Response(Http3Head("401", ("www-authenticate", "Basic realm=\"r\""), ("content-length", "0"))));
+        FakeMultiplexedStream answered = new(0, Http3Response(Http3Head("204")));
+        FakeMultiplexedConnection first = new(challenged) { ServerStreams = [control] };
+        FakeMultiplexedConnection second = new(answered);
+        QueueConnector connector = QuicConnector(first, second);
+
+        TransferResult result = await new HttpProtocolHandler(connector, new ScriptedAuthenticator(null, "Basic dTpw"))
+            .ExecuteAsync(Http3Context("https://example.com/", new MemoryStream()));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.HasCount(2, connector.MultiplexedTargets, "the connection the GOAWAY came on takes no second request");
+        Assert.AreEqual(2, result.Report!.ConnectionCount);
+        Assert.AreEqual(0x100L, first.CloseCode);
+        Assert.IsTrue(first.IsDisposed);
+        CollectionAssert.Contains(await RequestFieldsAsync(answered), "authorization: Basic dTpw");
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_Http3StreamRefusedEveryTime_GivesUpAfterFiveRetriesWithExit56()
     {
         FakeMultiplexedConnection[] connections = [.. Enumerable.Range(0, 7).Select(_ => new FakeMultiplexedConnection(
