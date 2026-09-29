@@ -24,6 +24,11 @@ hand-built route answers it `NoMechanism`. This library references `Curl.Kerbero
 Tests fake the seam with `ScriptedSecurityContext` and run the hand-built route against
 `Curl.Kerberos.UnitTests`' `FakeKdc` and `FakeGssAcceptor`, linked into the test project.
 
+AWS Signature Version 4 (BL-628, ADR-0178): `AwsSigV4Signer` signs an `AwsSigV4Request`
+into an `AwsSigV4SigningResult` (header lines, or curl's exit code and message) exactly as
+curl 8.21.0's `http_aws_sigv4.c`, quirks included; `AwsSigV4Scope` parses `--aws-sigv4`,
+`AwsSigV4Headers` and `AwsSigV4UriEncoding` canonicalize. Not wired into a transfer yet (BL-629).
+
 Never construct a `Socket`, `SslStream` or `HttpClient` here. Take `IConnection`
 so the tests in the matching `.UnitTests` project can drive this code from a
 recorded byte stream with no network.
