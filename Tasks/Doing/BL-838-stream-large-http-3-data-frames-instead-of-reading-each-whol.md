@@ -35,3 +35,4 @@ An HTTP/3 response whose `DATA` frame is longer than 16 MiB downloads in full, i
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
