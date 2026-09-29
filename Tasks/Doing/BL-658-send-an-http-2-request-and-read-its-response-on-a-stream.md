@@ -31,3 +31,4 @@ When a connection speaks HTTP/2, the HTTP handler sends the request as HEADERS (
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
