@@ -33,3 +33,4 @@ With `--proto-default <scheme>`, a URL given without a scheme uses that scheme i
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
