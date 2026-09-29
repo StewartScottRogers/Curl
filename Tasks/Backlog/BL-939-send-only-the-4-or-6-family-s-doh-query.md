@@ -1,5 +1,5 @@
 ---
-id: BL-915
+id: BL-939
 title: Send only the -4 or -6 family's DoH query
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-915 — Send only the -4 or -6 family's DoH query
+# BL-939 — Send only the -4 or -6 family's DoH query
 
 ## Goal
 
