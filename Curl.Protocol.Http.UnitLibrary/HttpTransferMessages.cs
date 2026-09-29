@@ -108,6 +108,19 @@ internal static class HttpTransferMessages
     internal const string Http3NeedsHttps = "HTTP/3 requested for non-HTTPS URL";
 
     /// <summary>
+    /// Why <c>--http3</c> or <c>--http3-only</c> gives up HTTP/3 for an <c>https://</c> URL
+    /// through a SOCKS proxy (measured on curl.se's 8.18.0 build, BL-837; unchanged in
+    /// 8.21.0, ADR-0187).
+    /// </summary>
+    internal const string Http3NotOverSocksProxy = "HTTP/3 is not supported over a SOCKS proxy";
+
+    /// <summary>
+    /// Why <c>--http3</c> or <c>--http3-only</c> gives up HTTP/3 for an <c>https://</c> URL
+    /// through an HTTP or HTTPS proxy (measured on curl.se's 8.18.0 build, BL-837, ADR-0223).
+    /// </summary>
+    internal const string Http3NotOverHttpProxy = "HTTP/3 is not supported over an HTTP proxy";
+
+    /// <summary>
     /// Formats the message for an HTTP/3 request stream the server reset, exit 95 before any
     /// body byte arrived and exit 18 after: <c>HTTP/3 stream 0 reset by server (error 0x10c
     /// REQUEST_CANCELLED)</c> (<c>cf-ngtcp2.c</c> at <c>curl-8_21_0</c>, ADR-0187).

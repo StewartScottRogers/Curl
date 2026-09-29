@@ -272,7 +272,50 @@ public sealed class HttpProtocolHandler(
             ProxyAuthorization = proxyAuthRequest is null ? null : Authenticator.CreateAuthorization(proxyAuthRequest, []),
             RedirectsFollowed = options.RedirectsFollowed,
         };
-        return await ConnectAndExchangeAsync(plan, earlier: null).ConfigureAwait(false);
+        return Http3ProxyRefusalOf(plan) is { } refusal
+            ? await ExchangeWithoutHttp3Async(plan, refusal).ConfigureAwait(false)
+            : await ConnectAndExchangeAsync(plan, earlier: null).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Gives why HTTP/3 is refused for <paramref name="plan" />: <c>--http3</c> or
+    /// <c>--http3-only</c> with an <c>https://</c> URL through a SOCKS proxy, or through an HTTP
+    /// or HTTPS proxy; or <see langword="null" /> when HTTP/3 is not refused (ADR-0223).
+    /// </summary>
+    private static string? Http3ProxyRefusalOf(HttpRequestPlan plan) =>
+        plan.Options.Version is HttpVersionPreference.Http3 or HttpVersionPreference.Http3Only
+            && plan.Context.Url.Scheme == "https"
+            && plan.Options.ForwardProxy is { } proxy
+            ? Http3RefusalFor(proxy.Kind)
+            : null;
+
+    /// <summary>
+    /// Gives why a proxy of <paramref name="kind" /> refuses HTTP/3: the HTTP proxy message for
+    /// an HTTP or HTTPS proxy, and the SOCKS proxy message for any SOCKS kind (ADR-0223).
+    /// </summary>
+    private static string Http3RefusalFor(ProxyKind kind) =>
+        kind is ProxyKind.Http or ProxyKind.Http10 or ProxyKind.Https
+            ? HttpTransferMessages.Http3NotOverHttpProxy
+            : HttpTransferMessages.Http3NotOverSocksProxy;
+
+    /// <summary>
+    /// Runs a transfer whose HTTP/3 the proxy rules out, as curl.se's ngtcp2 build does
+    /// (measured, ADR-0223): reports <paramref name="refusal" />; then fails
+    /// <c>--http3-only</c> with exit 3 and that message before connecting; and runs
+    /// <c>--http3</c> over TCP through the proxy, where a failure keeps its own exit code but
+    /// is reported with <paramref name="refusal" />, the first message curl wrote into its
+    /// error buffer.
+    /// </summary>
+    private async ValueTask<TransferResult> ExchangeWithoutHttp3Async(HttpRequestPlan plan, string refusal)
+    {
+        plan.Context.Events.ReportInfo(refusal);
+        if (plan.Options.Version == HttpVersionPreference.Http3Only)
+        {
+            return FailBeforeConnecting(plan, refusal);
+        }
+
+        TransferResult result = await ConnectAndExchangeAsync(plan, earlier: null).ConfigureAwait(false);
+        return result.ExitCode == CurlExitCode.Ok ? result : result with { ErrorMessage = refusal };
     }
 
     /// <summary>
@@ -385,10 +428,20 @@ public sealed class HttpProtocolHandler(
     private static TransferResult Http3NeedsHttps(HttpRequestPlan plan)
     {
         plan.Context.Events.ReportInfo(HttpTransferMessages.Http3NeedsHttps);
+        return FailBeforeConnecting(plan, HttpTransferMessages.Http3NeedsHttps);
+    }
+
+    /// <summary>
+    /// Fails <c>--http3-only</c> with exit 3 and <paramref name="message" /> before connecting,
+    /// reported with <c>closing connection #-1</c>, as curl.se's ngtcp2 build does (measured,
+    /// ADR-0144, ADR-0223).
+    /// </summary>
+    private static TransferResult FailBeforeConnecting(HttpRequestPlan plan, string message)
+    {
         plan.Context.Events.ReportInfo(HttpConnectionInfoLines.Closing(-1));
-        return TransferResult.Failure(CurlExitCode.UrlMalformat, HttpTransferMessages.Http3NeedsHttps) with
+        return TransferResult.Failure(CurlExitCode.UrlMalformat, message) with
         {
-            Report = FailedConnectReport(plan, ConnectResult.Failed(CurlExitCode.UrlMalformat, HttpTransferMessages.Http3NeedsHttps)),
+            Report = FailedConnectReport(plan, ConnectResult.Failed(CurlExitCode.UrlMalformat, message)),
         };
     }
 
