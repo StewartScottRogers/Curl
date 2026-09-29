@@ -32,3 +32,4 @@ When the hand-built Negotiate or Kerberos context (ADR-0142's route K) answers a
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-29: Backlog -> Doing.
