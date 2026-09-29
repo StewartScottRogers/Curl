@@ -93,7 +93,7 @@ with exit 39, `LDAP remote: Server Down`.
   | Outcome | WinLDAP | OpenLDAP |
   | --- | --- | --- |
   | Bind not `success` | 38 `LdapCannotBind`, `LDAP local: bind via ldap_win_bind <WinLDAP text>`, after one LDAPv2 retry | 67 `LoginDenied` for 49 `invalidCredentials`, else 38 with curl's own `LDAP: cannot bind` |
-  | Connection closed before the bind is answered | 38, text `Unavailable` | measured by BL-586 |
+  | Connection closed before the bind is answered | 38, `Timeout` when the first bind is unanswered (after a 30-second wait), `Unavailable` when the LDAPv2 retry is (BL-586) | Unbind not sent, exit 7, `LDAP local: connecting ldap_result Can't contact LDAP server` (BL-586) |
   | SearchResultDone not `success` | 39 `LdapSearchFailed`, `LDAP remote: <WinLDAP text>` | 39, `LDAP remote: search failed <libldap text> <diagnostic message>` |
   | No search result in time | 39, `LDAP remote: Server Down` | measured by BL-587 |
   | URL curl refuses | measured by BL-587 | measured by BL-587 |
@@ -104,6 +104,32 @@ with exit 39, `LDAP remote: Server Down`.
   `Invalid credentials`), filled in by BL-586 and BL-587 from recordings of each result
   code they use. Timeouts are ADR-0117's: the connector owns `--connect-timeout`, the
   runner owns `--max-time`.
+
+## Measured by BL-586
+
+Decided by Claude under Stewart's delegation, in BL-586, from `Record-CurlExchange.ps1 -Script`
+recordings on 2026-09-28 (Windows curl 8.21.0 with WinLDAP; Linux curl 8.18.0 with OpenLDAP
+2.6.10 through WSL):
+
+- Both builds number messages from 1 and send the UnbindRequest with the next free
+  messageID: 2 after one bind, 3 after WinLDAP's LDAPv2 retry.
+- WinLDAP retries every failed result as LDAPv2 (49, 53 and 100 measured) and, when the
+  retry also fails, unbinds and reports `ldap_err2string` of the retry's code: `Invalid
+  Credentials`, `Unwilling To Perform`, and the empty string for a code it has no text for
+  (100). A retry answered `success` goes on as a bound session. The texts are
+  `wldap32.dll`'s `ldap_err2stringW` for 0 to 130, read on Windows 11.
+- WinLDAP ignores a reply that is not a BindResponse and ends with `Timeout` after its
+  30-second wait; so does a first bind the server closes on. The library reports both at
+  once rather than waiting: the exit code and message are the same, and a script cannot
+  depend on the wait.
+- OpenLDAP sends the UnbindRequest after any bind reply but `success`, a reply that is
+  not a BindResponse included (exit 38 `LDAP: cannot bind`), and after an anonymous bind
+  answered 49 as after a named one (exit 67 `Login denied`).
+- Bytes that cannot start an LDAPMessage (not a SEQUENCE, an indefinite or over-long
+  length) are treated as a reply that is not a BindResponse; not measured separately.
+- Without `-u` the Windows build reads the rootDSE (`supportedCapabilities`, time limit
+  120) before its NTLM bind. That bind is its own task, BL-825; until it lands the WinLDAP
+  dialect binds anonymously without `-u`, and BL-589 registers the handler only after it.
 
 ## Consequences
 
