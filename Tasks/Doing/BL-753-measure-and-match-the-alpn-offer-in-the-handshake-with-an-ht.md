@@ -33,3 +33,4 @@ The TLS handshake with an HTTPS proxy (`-x https://...`, and an HTTPS forward pr
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
