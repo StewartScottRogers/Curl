@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: docs
 depends-on: [BL-655, BL-695]
-touches: [Documentation/Planning/Decisions]
+touches: [Documentation/Planning/Decisions, Record-CurlExchange.ps1]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-28
 ---
 # BL-718 — Decide how HTTP/3 over QUIC is built, superseding what remains of ADR-0017
 
@@ -26,13 +26,36 @@ An ADR fixes how Curl speaks HTTP/3 over a hand-built QUIC on every platform: th
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Planning/Decisions/ADR-<next free number>-<slug>.md` exists (number checked unused), Status Accepted, marked "Decided by Claude under Stewart's delegation", with the measurements, the library and contract design, the racing and fallback rules, the transport parameters and congestion controller, and the error mapping.
-- [ ] ADR-0017 is marked superseded (by this ADR and BL-655's), and Consequences list BL-719 to BL-735.
-- [ ] `Documentation/Planning/Decisions/README.md` indexes the new ADR and updates ADR-0017's status column.
+- [x] `Documentation/Planning/Decisions/ADR-<next free number>-<slug>.md` exists (number checked unused), Status Accepted, marked "Decided by Claude under Stewart's delegation", with the measurements, the library and contract design, the racing and fallback rules, the transport parameters and congestion controller, and the error mapping.
+- [x] ADR-0017 is marked superseded (by this ADR and BL-655's), and Consequences list BL-719 to BL-735.
+- [x] `Documentation/Planning/Decisions/README.md` indexes the new ADR and updates ADR-0017's status column.
 
 ## Notes
+
+- Decision: ADR-0144 (0143 was taken by BL-500's ADR, pushed meanwhile by another lane).
+  Written in the session rather than by `align-and-document`, because the ADR is mostly
+  the measurements taken here.
+- Reference build: curl.se's Windows build 8.18.0 (LibreSSL 4.2.1, ngtcp2 1.21.0,
+  nghttp3 1.15.0) from WinGet, the only curl at hand with HTTP/3. Ubuntu's curl 8.18.0 has
+  no HTTP/3 and refuses `--http3` with exit 2 (recorded in the ADR).
+- No local HTTP/3 server could be run, so success was measured against
+  `https://www.google.com/` (public), and failures and fallback against the loopback
+  recorder. Failure texts that need a misbehaving HTTP/3 server (peer close, stream reset)
+  come from `lib/vquic/curl_ngtcp2.c` at `curl-8_18_0` and are marked "source" in the ADR.
+- `Record-CurlExchange.ps1` gained `-UdpSink` (UDP bound on the same port, datagrams taken
+  silently and written to `datagrams.txt` as hex). Needed to see curl's QUIC Initial and to
+  measure the race against a silent QUIC peer. The script is outside the original
+  `touches`; no task in Doing names it (BL-500: Networking and Console; BL-699: Tls),
+  so it was added here.
+- The Initial was decrypted with a throwaway C# file-based app (RFC 9001 section 5.2
+  Initial keys from the destination connection ID; HKDF, AES-GCM and AES-ECB from the BCL).
+  It was not committed.
+- Defaults taken: fixed extension order and one CRYPTO frame instead of LibreSSL's and
+  ngtcp2's per-connection shuffling (keeps the first Initial pinnable); the race lives in
+  the HTTP handler over two connector methods; `IDatagramChannel` is reused as the UDP seam.
 
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Doing.
+- 2026-09-28: Doing -> Done. ADR-0144 decides hand-built HTTP/3 over QUIC with measured transport parameters, racing and exit codes; supersedes ADR-0017
