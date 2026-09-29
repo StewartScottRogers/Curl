@@ -1,5 +1,5 @@
 ---
-id: BL-971
+id: BL-972
 title: Forward RepeatAuthorization through AwsSigV4HttpAuthenticator so curl.exe counts a kept Digest nonce on
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-971 — Forward RepeatAuthorization through AwsSigV4HttpAuthenticator so curl.exe counts a kept Digest nonce on
+# BL-972 — Forward RepeatAuthorization through AwsSigV4HttpAuthenticator so curl.exe counts a kept Digest nonce on
 
 ## Goal
 
