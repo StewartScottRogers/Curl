@@ -1,5 +1,5 @@
 ---
-id: BL-878
+id: BL-881
 title: Make the revoked stapled OCSP response test in Curl.Networking.UnitTests pass every run
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-878 — Make the revoked stapled OCSP response test in Curl.Networking.UnitTests pass every run
+# BL-881 — Make the revoked stapled OCSP response test in Curl.Networking.UnitTests pass every run
 
 ## Goal
 
