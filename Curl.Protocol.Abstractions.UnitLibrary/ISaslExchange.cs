@@ -18,12 +18,14 @@ public interface ISaslExchange
     string Mechanism { get; }
 
     /// <summary>
-    /// Makes the initial response (RFC 4422 section 3.3). The handler asks for it once, before
-    /// it sends the command that names the mechanism.
+    /// Makes the initial response (RFC 4422 section 3.3). The handler asks for it once: before
+    /// it sends the command that names the mechanism when the response may go on that command
+    /// (<c>--sasl-ir</c>, or IMAP's <c>SASL-IR</c> capability), and otherwise when the server's
+    /// first challenge arrives, as curl's <c>Curl_sasl_start</c> does (BL-856).
     /// </summary>
     /// <remarks>
-    /// The handler sends it on that command under <c>--sasl-ir</c>, and otherwise in answer to
-    /// the server's first challenge (RFC 4422 section 5, ADR-0123); <see cref="RespondAsync" />
+    /// The handler sends it on that command when it fits, and otherwise in answer to the
+    /// server's first challenge (RFC 4422 section 5, ADR-0123); <see cref="RespondAsync" />
     /// answers the challenges after that.
     /// </remarks>
     /// <param name="cancellationToken">Cancels any exchange the mechanism makes to build it.</param>
@@ -33,6 +35,11 @@ public interface ISaslExchange
     /// has one, the user name. An empty array is a present but empty response.
     /// </returns>
     /// <exception cref="OperationCanceledException"><paramref name="cancellationToken" /> was cancelled.</exception>
+    /// <exception cref="SaslAuthenticationFailedException">
+    /// The mechanism cannot make its initial response and curl fails the transfer with the
+    /// exception's exit code, sending nothing more, as curl 8.21.0 does with exit 94 for a
+    /// GSSAPI or NTLM security context without credentials (BL-856).
+    /// </exception>
     ValueTask<byte[]?> GetInitialResponseAsync(CancellationToken cancellationToken);
 
     /// <summary>

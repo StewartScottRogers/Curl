@@ -37,4 +37,29 @@ public sealed class SmtpProtocolHandlerSaslAuthErrorTests
             "realm=\"localhost\",qop=\"auth\",algorithm=md5-sess,charset=utf-8",
             Encoding.Latin1.GetString(sasl.Challenges.Single()));
     }
+
+    [TestMethod]
+    [DataRow(false, "EHLO x\r\nAUTH GSSAPI\r\n", DisplayName = "Without --sasl-ir: AUTH GSSAPI, 334, then (94)")]
+    [DataRow(true, "EHLO x\r\n", DisplayName = "--sasl-ir: no AUTH, then (94)")]
+    public async Task ExecuteAsync_ExchangeCannotMakeItsInitialResponse_FailsWithAuthErrorSendingNothingMore(bool saslInitialResponse, string expectedSent)
+    {
+        // Measured 2026-09-29 with -u 'DOMAIN\u:p' and no KDC (BL-856).
+        var sasl = new RejectingSaslAuthenticator("GSSAPI", failsInitialResponse: true);
+
+        SmtpRun run = await SmtpRun.ExecuteAsync(
+            new TransferContext
+            {
+                Url = CurlUrl.Parse(Url),
+                Output = Stream.Null,
+                Credentials = new NetworkCredential(@"DOMAIN\u", "p"),
+                Mail = new MailRequestOptions { SaslInitialResponse = saslInitialResponse },
+            },
+            new ScriptedConnection(Encoding.Latin1.GetBytes("220 localhost ESMTP\r\n250-localhost\r\n250 AUTH GSSAPI\r\n334 \r\n" + SmtpRun.HelpReply + "221 Bye\r\n")),
+            sasl);
+
+        Assert.AreEqual(expectedSent, run.Sent);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.AuthError, "An authentication function returned an error"), run.Result);
+        Assert.AreEqual(1, sasl.InitialResponsesAsked);
+        Assert.IsEmpty(sasl.Challenges);
+    }
 }

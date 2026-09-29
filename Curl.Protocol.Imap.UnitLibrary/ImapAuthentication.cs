@@ -118,29 +118,20 @@ internal sealed class ImapAuthentication(ImapControlChannel channel, ISaslAuthen
     }
 
     /// <summary>
-    /// Encodes the initial response for the <c>AUTHENTICATE</c> line, when there is one and
-    /// the server advertised <c>SASL-IR</c> or <c>--sasl-ir</c> was given; curl sets IMAP no
-    /// length limit.
-    /// </summary>
-    /// <returns>The encoded response, or <see langword="null" /> to send it after the first <c>+</c>.</returns>
-    private string? InlineInitialResponse(byte[]? initialResponse, bool serverTakesInitialResponse) =>
-        initialResponse is not null
-            && (serverTakesInitialResponse || context.Mail is { SaslInitialResponse: true })
-            ? Encode(initialResponse)
-            : null;
-
-    /// <summary>
     /// Sends <c>AUTHENTICATE</c> and answers each <c>+</c> until the tagged completion.
     /// </summary>
+    /// <remarks>
+    /// When the server advertised <c>SASL-IR</c> or <c>--sasl-ir</c> was given, the initial
+    /// response is made first and goes on the <c>AUTHENTICATE</c> line, curl setting IMAP no
+    /// length limit; otherwise curl makes it at the first <c>+</c>. So a mechanism that cannot
+    /// make one fails before <c>AUTHENTICATE</c> only in the first case (BL-856).
+    /// </remarks>
     /// <returns>Whether the server accepted the exchange.</returns>
     private async ValueTask<bool> ExchangeAsync(ISaslExchange exchange, bool serverTakesInitialResponse)
     {
-        byte[]? initialResponse = await exchange.GetInitialResponseAsync(context.CancellationToken).ConfigureAwait(false);
-        string? inline = InlineInitialResponse(initialResponse, serverTakesInitialResponse);
-        byte[]? pending = inline is null ? initialResponse : null;
-        bool messageSent = inline is not null;
-        await channel.SendCommandAsync("AUTHENTICATE " + exchange.Mechanism + (inline is null ? string.Empty : " " + inline))
-            .ConfigureAwait(false);
+        bool initialResponseFirst = serverTakesInitialResponse || context.Mail is { SaslInitialResponse: true };
+        bool messageSent = await SendAuthenticateAsync(exchange, initialResponseFirst).ConfigureAwait(false);
+        bool initialResponseDue = !initialResponseFirst;
         while (true)
         {
             ImapResponse response = await channel.ReadResponseAsync(NoUntagged, acceptsContinuation: true).ConfigureAwait(false)
@@ -150,8 +141,8 @@ internal sealed class ImapAuthentication(ImapControlChannel channel, ISaslAuthen
                 return response.Status == ImapResponseStatus.Ok && messageSent;
             }
 
-            byte[]? answer = pending ?? await exchange.RespondAsync(DecodeChallenge(response.Untagged[0]), context.CancellationToken).ConfigureAwait(false);
-            pending = null;
+            byte[]? answer = await AnswerAsync(exchange, response, initialResponseDue).ConfigureAwait(false);
+            initialResponseDue = false;
             if (answer is null)
             {
                 return false;
@@ -161,6 +152,28 @@ internal sealed class ImapAuthentication(ImapControlChannel channel, ISaslAuthen
             messageSent = true;
         }
     }
+
+    /// <summary>
+    /// Sends <c>AUTHENTICATE</c>; with <paramref name="initialResponseFirst" />, makes the initial
+    /// response first and puts it on the line when the mechanism has one.
+    /// </summary>
+    /// <returns>Whether the initial response was sent.</returns>
+    private async ValueTask<bool> SendAuthenticateAsync(ISaslExchange exchange, bool initialResponseFirst)
+    {
+        byte[]? initialResponse = initialResponseFirst ? await exchange.GetInitialResponseAsync(context.CancellationToken).ConfigureAwait(false) : null;
+        await channel.SendCommandAsync("AUTHENTICATE " + exchange.Mechanism + (initialResponse is null ? string.Empty : " " + Encode(initialResponse)))
+            .ConfigureAwait(false);
+        return initialResponse is not null;
+    }
+
+    /// <summary>
+    /// Answers a <c>+</c> with the initial response when it is due and the mechanism has one,
+    /// and otherwise with the exchange's answer to the decoded challenge.
+    /// </summary>
+    /// <returns>The answer, or <see langword="null" /> when the exchange cannot answer.</returns>
+    private async ValueTask<byte[]?> AnswerAsync(ISaslExchange exchange, ImapResponse continuation, bool initialResponseDue) =>
+        (initialResponseDue ? await exchange.GetInitialResponseAsync(context.CancellationToken).ConfigureAwait(false) : null)
+            ?? await exchange.RespondAsync(DecodeChallenge(continuation.Untagged[0]), context.CancellationToken).ConfigureAwait(false);
 
     /// <summary>Runs the exchange for <paramref name="mechanism" />; refused is exit 67 <c>Login denied</c>.</summary>
     private async ValueTask<TransferResult?> AuthenticateWithSaslAsync(string mechanism, SaslRequest request, bool serverTakesInitialResponse) =>

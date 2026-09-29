@@ -21,6 +21,8 @@ internal sealed class SecurityContextSaslExchange(string mechanism, ISecurityCon
     /// <summary>RFC 4752 section 3.3's bit for "no security layer".</summary>
     private const byte NoSecurityLayer = 0x01;
 
+    private const string AuthErrorMessage = "An authentication function returned an error";
+
     private bool finished;
 
     /// <inheritdoc />
@@ -49,9 +51,14 @@ internal sealed class SecurityContextSaslExchange(string mechanism, ISecurityCon
     }
 
     /// <inheritdoc />
-    /// <remarks>The context's first token, or <see langword="null" /> when it cannot make one, which ends the exchange.</remarks>
+    /// <remarks>The context's first token.</remarks>
+    /// <exception cref="SaslAuthenticationFailedException">
+    /// The context cannot make its first token - no credentials, no KDC - and curl 8.21.0 fails
+    /// the transfer with exit 94, sending nothing more (BL-856).
+    /// </exception>
     public async ValueTask<byte[]?> GetInitialResponseAsync(CancellationToken cancellationToken) =>
-        await StepAsync(ReadOnlyMemory<byte>.Empty, cancellationToken).ConfigureAwait(false);
+        await StepAsync(ReadOnlyMemory<byte>.Empty, cancellationToken).ConfigureAwait(false)
+            ?? throw new SaslAuthenticationFailedException(CurlExitCode.AuthError, AuthErrorMessage);
 
     /// <inheritdoc />
     public async ValueTask<byte[]?> RespondAsync(ReadOnlyMemory<byte> challenge, CancellationToken cancellationToken)

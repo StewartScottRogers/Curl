@@ -153,12 +153,19 @@ public sealed class SaslAuthenticatorSecurityContextTests
     }
 
     [TestMethod]
-    public async Task Begin_NtlmNoCredentialsForType1_HasNoInitialResponseAndAnswersNothing()
+    [DataRow("NTLM", "u", DisplayName = "NTLM, no Type 1")]
+    [DataRow("GSSAPI", @"DOMAIN\u", DisplayName = "GSSAPI, no first token (measured with no KDC)")]
+    public async Task Begin_NoCredentialsForTheFirstToken_FailsWithExit94(string mechanism, string user)
     {
+        // Measured 2026-09-29: curl 8.21.0 ends with (94) whatever it has sent (BL-856).
         ScriptedSecurityContext context = new(new SecurityContextStep(SecurityContextStatus.NoCredentials, []));
-        ISaslExchange exchange = Authenticator(new ScriptedSecurityContextFactory(context)).Begin("NTLM", Request(new NetworkCredential("u", "p")));
+        ISaslExchange exchange = Authenticator(new ScriptedSecurityContextFactory(context)).Begin(mechanism, Request(new NetworkCredential(user, "p")));
 
-        Assert.IsNull(await exchange.GetInitialResponseAsync(CancellationToken.None));
+        SaslAuthenticationFailedException failure = await Assert.ThrowsExactlyAsync<SaslAuthenticationFailedException>(
+            async () => await exchange.GetInitialResponseAsync(CancellationToken.None));
+
+        Assert.AreEqual(CurlExitCode.AuthError, failure.ExitCode);
+        Assert.AreEqual("An authentication function returned an error", failure.Message);
         Assert.IsTrue(context.IsDisposed);
         Assert.IsNull(await exchange.RespondAsync(Type2, CancellationToken.None));
     }

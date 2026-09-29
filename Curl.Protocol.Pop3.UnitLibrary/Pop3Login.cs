@@ -121,9 +121,16 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
     /// response on the line under <c>--sasl-ir</c>, then one answer per continuation until
     /// <c>+OK</c>.
     /// </summary>
+    /// <remarks>
+    /// curl makes the initial response before <c>AUTH</c> only under <c>--sasl-ir</c>, and
+    /// otherwise at the first continuation, so a mechanism that cannot make one fails before
+    /// <c>AUTH</c> only under <c>--sasl-ir</c> (BL-856). <c>+OK</c> before the initial response
+    /// was made or sent is <c>Login denied</c>, as it is anywhere before curl's final state.
+    /// </remarks>
     private async ValueTask<TransferResult?> AuthenticateAsync(ISaslExchange exchange)
     {
-        byte[]? unsent = await exchange.GetInitialResponseAsync(context.CancellationToken).ConfigureAwait(false);
+        byte[]? unsent = mail.SaslInitialResponse ? await exchange.GetInitialResponseAsync(context.CancellationToken).ConfigureAwait(false) : null;
+        bool initialResponseDue = !mail.SaslInitialResponse;
         string command = "AUTH " + exchange.Mechanism;
         if (SendsInitialResponseInline(exchange, unsent))
         {
@@ -137,15 +144,16 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
             Pop3Response response = await channel.ReadResponseAsync().ConfigureAwait(false);
             if (response.IsOk)
             {
-                return unsent is null ? null : LoginDenied();
+                return unsent is null && !initialResponseDue ? null : LoginDenied();
             }
 
-            if (await AnswerToAsync(response, unsent, exchange).ConfigureAwait(false) is not { } answer)
+            if (await AnswerToAsync(response, unsent, initialResponseDue, exchange).ConfigureAwait(false) is not { } answer)
             {
                 return LoginDenied();
             }
 
             unsent = null;
+            initialResponseDue = false;
             await channel.SendAsync(Encode(answer)).ConfigureAwait(false);
         }
     }
@@ -154,24 +162,26 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
     /// Whether the initial response goes on the <c>AUTH</c> line: only under <c>--sasl-ir</c>,
     /// and only while the mechanism's name and the base64 fit in 247 characters.
     /// </summary>
-    private bool SendsInitialResponseInline(ISaslExchange exchange, byte[]? initialResponse) =>
-        mail.SaslInitialResponse
-        && initialResponse is not null
+    private static bool SendsInitialResponseInline(ISaslExchange exchange, byte[]? initialResponse) =>
+        initialResponse is not null
         && exchange.Mechanism.Length + Encode(initialResponse).Length <= MaxInitialResponseLength;
 
     /// <summary>
-    /// The answer to a response other than <c>+OK</c>: the unsent initial response, or the
-    /// exchange's answer to the challenge, for a continuation; <see langword="null" /> for
-    /// <c>-ERR</c> or a challenge the exchange cannot answer.
+    /// The answer to a response other than <c>+OK</c>: the unsent initial response, the one
+    /// made now when it is due, or the exchange's answer to the challenge, for a continuation;
+    /// <see langword="null" /> for <c>-ERR</c> or a challenge the exchange cannot answer.
     /// </summary>
-    private async ValueTask<byte[]?> AnswerToAsync(Pop3Response response, byte[]? unsentInitialResponse, ISaslExchange exchange)
+    private async ValueTask<byte[]?> AnswerToAsync(Pop3Response response, byte[]? unsentInitialResponse, bool initialResponseDue, ISaslExchange exchange)
     {
         if (response.Line[0] != '+')
         {
             return null;
         }
 
-        return unsentInitialResponse ?? await exchange.RespondAsync(DecodeChallenge(response), context.CancellationToken).ConfigureAwait(false);
+        byte[]? initialResponse = initialResponseDue
+            ? await exchange.GetInitialResponseAsync(context.CancellationToken).ConfigureAwait(false)
+            : unsentInitialResponse;
+        return initialResponse ?? await exchange.RespondAsync(DecodeChallenge(response), context.CancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>

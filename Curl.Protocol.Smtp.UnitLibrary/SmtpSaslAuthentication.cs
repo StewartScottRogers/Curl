@@ -50,6 +50,9 @@ internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAu
     /// <summary>How many challenges the current exchange has been handed.</summary>
     private int challengesHanded;
 
+    /// <summary>Whether the current exchange has been asked for its initial response.</summary>
+    private bool initialResponseAsked;
+
     /// <summary>
     /// Gets a value indicating whether <see cref="AuthenticateAsync" /> ran an <c>AUTH</c>
     /// exchange the server accepted, which is when curl adds <c>--mail-auth</c>'s
@@ -170,9 +173,9 @@ internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAu
     /// only while the mechanism's name and the base64 fit in 504 characters.
     /// </summary>
     /// <returns>The encoded response, or <see langword="null" /> to send it after the first <c>334</c>.</returns>
-    private string? InlineInitialResponse(ISaslExchange exchange, byte[]? initialResponse)
+    private static string? InlineInitialResponse(ISaslExchange exchange, byte[]? initialResponse)
     {
-        if (initialResponse is null || context.Mail is not { SaslInitialResponse: true })
+        if (initialResponse is null)
         {
             return null;
         }
@@ -187,6 +190,7 @@ internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAu
     /// <returns>Whether the server accepted or refused the exchange, or it was cancelled with <c>*</c>.</returns>
     private async ValueTask<ExchangeOutcome> ExchangeAsync(ISaslExchange exchange)
     {
+        initialResponseAsked = false;
         (byte[]? pending, bool messageSent) = await SendAuthAsync(exchange).ConfigureAwait(false);
         challengesHanded = 0;
         while (true)
@@ -243,11 +247,16 @@ internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAu
     private static ExchangeOutcome Outcome(SmtpReply reply, bool messageSent) =>
         reply.Code == Authenticated && messageSent ? ExchangeOutcome.Accepted : ExchangeOutcome.Refused;
 
-    /// <summary>Sends <c>AUTH</c>, with the initial response on the line when it goes there.</summary>
+    /// <summary>
+    /// Sends <c>AUTH</c>, with the initial response on the line when it goes there. curl makes
+    /// the initial response before <c>AUTH</c> only under <c>--sasl-ir</c>, and otherwise at
+    /// the first <c>334</c>, so a mechanism that cannot make one fails before <c>AUTH</c> only
+    /// under <c>--sasl-ir</c> (BL-856).
+    /// </summary>
     /// <returns>The initial response still to send after the first <c>334</c>, and whether a message was sent.</returns>
     private async ValueTask<(byte[]? Pending, bool MessageSent)> SendAuthAsync(ISaslExchange exchange)
     {
-        byte[]? initialResponse = await exchange.GetInitialResponseAsync(context.CancellationToken).ConfigureAwait(false);
+        byte[]? initialResponse = context.Mail is { SaslInitialResponse: true } ? await TakeInitialResponseAsync(exchange).ConfigureAwait(false) : null;
         string? inline = InlineInitialResponse(exchange, initialResponse);
         await channel.SendAsync(AuthKeyword + exchange.Mechanism + (inline is null ? string.Empty : " " + inline)).ConfigureAwait(false);
         return inline is null ? (initialResponse, false) : (null, true);
@@ -260,7 +269,7 @@ internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAu
     /// <returns><see langword="null" /> once the answer is sent, or how the exchange ended.</returns>
     private async ValueTask<ExchangeOutcome?> AnswerAsync(ISaslExchange exchange, SmtpReply reply, byte[]? pending)
     {
-        byte[]? response = pending;
+        byte[]? response = pending ?? await TakeInitialResponseAsync(exchange).ConfigureAwait(false);
         if (response is null)
         {
             if (DecodeChallenge(reply, exchange.Mechanism, challengesHanded++) is not { } challenge)
@@ -278,6 +287,19 @@ internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAu
 
         await channel.SendAsync(Encode(response)).ConfigureAwait(false);
         return null;
+    }
+
+    /// <summary>Asks the exchange for its initial response the first time only.</summary>
+    /// <returns>The initial response; <see langword="null" /> when it has none or was already asked.</returns>
+    private async ValueTask<byte[]?> TakeInitialResponseAsync(ISaslExchange exchange)
+    {
+        if (initialResponseAsked)
+        {
+            return null;
+        }
+
+        initialResponseAsked = true;
+        return await exchange.GetInitialResponseAsync(context.CancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
