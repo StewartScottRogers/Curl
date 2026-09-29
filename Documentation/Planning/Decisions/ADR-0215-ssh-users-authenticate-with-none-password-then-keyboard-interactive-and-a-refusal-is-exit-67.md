@@ -79,7 +79,7 @@ method is allowed.
 
 ## Consequences
 
-- `publickey` (BL-568) slots in before `password`, and ssh-agent identities (BL-900) after
+- `publickey` (BL-568) slots in before `password`, and ssh-agent identities (BL-901) after
   `password` and before `keyboard-interactive`, both only when the list names `publickey`,
   as curl orders them.
 - On this machine curl found no key and no agent, so it sent no `publickey` request; a user

@@ -1,5 +1,5 @@
 ---
-id: BL-900
+id: BL-901
 title: Authenticate an SSH user with the identities an ssh-agent holds
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-900 — Authenticate an SSH user with the identities an ssh-agent holds
+# BL-901 — Authenticate an SSH user with the identities an ssh-agent holds
 
 ## Goal
 
@@ -18,7 +18,7 @@ When the server's method list (the answer to `none`) names `publickey`, curl 8.2
 
 ## Context
 
-BL-567 (ADR-0214) built none/password/keyboard-interactive and measured that with no agent reachable curl sends no publickey request; BL-568 builds publickey from key files. No existing task covers the agent. BCL only: named pipes (`System.IO.Pipes`) and Unix domain sockets are in the BCL; never a package. Measure with the reference curl (`Record-CurlExchange.ps1 -NoServer`) against a loopback server built from the library's classes, as ADR-0214 did, with a real ssh-agent holding a test key (Windows OpenSSH ssh-agent service or `ssh-agent` in WSL), recording the userauth messages curl sends.
+BL-567 (ADR-0215) built none/password/keyboard-interactive and measured that with no agent reachable curl sends no publickey request; BL-568 builds publickey from key files. No existing task covers the agent. BCL only: named pipes (`System.IO.Pipes`) and Unix domain sockets are in the BCL; never a package. Measure with the reference curl (`Record-CurlExchange.ps1 -NoServer`) against a loopback server built from the library's classes, as ADR-0215 did, with a real ssh-agent holding a test key (Windows OpenSSH ssh-agent service or `ssh-agent` in WSL), recording the userauth messages curl sends.
 
 ## Acceptance criteria
 

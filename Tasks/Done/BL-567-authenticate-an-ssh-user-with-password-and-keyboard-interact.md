@@ -5,7 +5,7 @@ priority: High
 assignee: Claude
 pipeline: protocol
 depends-on: [BL-565, BL-566]
-touches: [Curl.Protocol.Ssh.UnitLibrary, Curl.Protocol.Ssh.UnitTests, Documentation/Planning/Decisions/ADR-0214-ssh-users-authenticate-with-none-password-then-keyboard-interactive-and-a-refusal-is-exit-67.md, Documentation/Planning/Decisions/README.md]
+touches: [Curl.Protocol.Ssh.UnitLibrary, Curl.Protocol.Ssh.UnitTests, Documentation/Planning/Decisions/ADR-0215-ssh-users-authenticate-with-none-password-then-keyboard-interactive-and-a-refusal-is-exit-67.md, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-09-28
 completed: 2026-09-29
@@ -30,7 +30,7 @@ After the transport is up, the handler requests `ssh-userauth` and authenticates
 
 ## Notes
 
-- **Design (ADR-0214).** New `Authentication` folder: `SshUserAuthentication`
+- **Design (ADR-0215).** New `Authentication` folder: `SshUserAuthentication`
   (`RequestServiceAsync`, the `ssh-userauth` service request libssh2 sends at the end of
   session startup, before the host-key check; `AuthenticateAsync`, `none` then `password`
   then `keyboard-interactive`) and `SshAuthenticationMessageNumber`. `SshMessageNumber`
@@ -89,9 +89,9 @@ After the transport is up, the handler requests `ssh-userauth` and authenticates
   close (`-43`); a MAC failure there keeps ADR-0212's `-4`/`-12`; a MAC failure or broken
   framing during a method fails that method; a KEXINIT during authentication runs
   `SshTransport.ReExchangeKeysAsync` and carries on.
-- **Follow-up filed:** BL-900, ssh-agent identities (curl tries them between `password`
+- **Follow-up filed:** BL-901, ssh-agent identities (curl tries them between `password`
   and `keyboard-interactive` when `publickey` is listed); no task covered it.
-- **Touches.** Added ADR-0214 and `Documentation/Planning/Decisions/README.md`: the
+- **Touches.** Added ADR-0215 and `Documentation/Planning/Decisions/README.md`: the
   decision needed an ADR, and no task in Doing names either.
 - **Quality.** `Measure-CodeQuality.ps1 -Library Curl.Protocol.Ssh.UnitLibrary`: 100%
   line, 100% branch, 233 members, 0 failing, worst CRAP 10.
