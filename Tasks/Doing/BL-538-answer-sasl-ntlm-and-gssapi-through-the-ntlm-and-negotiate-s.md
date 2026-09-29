@@ -33,3 +33,4 @@ The SASL authenticator answers the NTLM and GSSAPI mechanisms with the token sou
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
