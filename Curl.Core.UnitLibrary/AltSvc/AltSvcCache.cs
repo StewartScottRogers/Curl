@@ -8,7 +8,7 @@ namespace Curl.Core.AltSvc;
 /// <summary>
 /// The alt-svc cache behind <c>--alt-svc</c>: reads curl 8.21.0's alt-svc file, learns from
 /// <c>Alt-Svc</c> headers, answers the alternative for an origin, and writes the file back
-/// byte for byte as curl does, measured on 2026-09-29 UTC (BL-622's notes, ADR-0174).
+/// byte for byte as curl does, measured on 2026-09-29 UTC (BL-622's notes, ADR-0175).
 /// </summary>
 /// <remarks>
 /// Entries keep the order they were read or learned in, and the first one that matches wins.

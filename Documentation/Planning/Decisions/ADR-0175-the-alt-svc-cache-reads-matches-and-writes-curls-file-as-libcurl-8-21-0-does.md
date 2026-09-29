@@ -1,4 +1,4 @@
-# ADR-0174 — The alt-svc cache reads, matches and writes curl's file as libcurl 8.21.0 does
+# ADR-0175 — The alt-svc cache reads, matches and writes curl's file as libcurl 8.21.0 does
 
 - **Status:** Accepted
 - **Date:** 2026-09-28

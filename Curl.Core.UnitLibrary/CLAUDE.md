@@ -103,7 +103,7 @@ constructed with. No gateway is `IpfsGatewayFailure.GatewayDetectionFailed` (exi
 `curl: <message>` with no `(<code>)`. It is not yet wired into `Curl.Console` (BL-240), and
 `--ipfs-gateway` is not yet parsed (BL-353).
 
-`AltSvc\AltSvcCache` is the `--alt-svc` cache (ADR-0174, BL-622): `ReadFile` takes curl
+`AltSvc\AltSvcCache` is the `--alt-svc` cache (ADR-0175, BL-622): `ReadFile` takes curl
 8.21.0's alt-svc file text (lines read strictly by `AltSvcFileLineParser`, expired entries
 skipped), `ApplyHeader` learns from one `Alt-Svc` value as `AltSvcHeaderParser` reads it
 (`clear`; `ma` and `persist` per alternative, 24 hours by default; the first known

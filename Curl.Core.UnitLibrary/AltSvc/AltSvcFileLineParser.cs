@@ -4,7 +4,7 @@ namespace Curl.Core.AltSvc;
 
 /// <summary>
 /// Reads one line of curl's alt-svc file as libcurl 8.21.0's <c>altsvc_add</c> does,
-/// measured on 2026-09-29 UTC (BL-622's notes, ADR-0174).
+/// measured on 2026-09-29 UTC (BL-622's notes, ADR-0175).
 /// </summary>
 /// <remarks>
 /// A line is <c>srcalpn srchost srcport dstalpn dsthost dstport "yyyyMMdd HH:mm:ss" persist

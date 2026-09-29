@@ -4,7 +4,7 @@ namespace Curl.Core.AltSvc;
 
 /// <summary>
 /// Reads an <c>Alt-Svc</c> header value (RFC 7838) as libcurl 8.21.0's
-/// <c>Curl_altsvc_parse</c> does, measured on 2026-09-29 UTC (BL-622's notes, ADR-0174).
+/// <c>Curl_altsvc_parse</c> does, measured on 2026-09-29 UTC (BL-622's notes, ADR-0175).
 /// </summary>
 /// <remarks>
 /// <para>

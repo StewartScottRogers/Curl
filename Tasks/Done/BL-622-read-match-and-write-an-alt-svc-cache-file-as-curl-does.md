@@ -30,11 +30,11 @@ An `AltSvcCache` in `Curl.Core.UnitLibrary` reads curl 8.21.0's alt-svc file for
 
 ## Notes
 
-- `touches` gained `Documentation/Planning/Decisions` for ADR-0174 (the decisions it records
+- `touches` gained `Documentation/Planning/Decisions` for ADR-0175 (the decisions it records
   are Claude's under Stewart's delegation); no task in `Doing` names it.
 - Pipeline `feature` run in-session: measure, tests with the code, verify, `code-reviewer`
   (no must-fix; its length-limit and `; foo, h3=` points were measured and pinned), docs
-  (ADR-0174, `Curl.Core.UnitLibrary/CLAUDE.md`).
+  (ADR-0175, `Curl.Core.UnitLibrary/CLAUDE.md`).
 - Design: `Curl.Core.UnitLibrary\AltSvc` - `AltSvcCache` (`ReadFile`, `ApplyHeader`, `Find`,
   `FormatFile(lineEnding)`, `TimeProvider` injected), `AltSvcHeaderParser`,
   `AltSvcFileLineParser`, `AltSvcEntry`, `AltSvcAlpn`/`AltSvcAlpnToken`. Default taken: the
