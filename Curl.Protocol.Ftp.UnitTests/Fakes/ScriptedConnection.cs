@@ -40,8 +40,11 @@ public sealed class ScriptedConnection(params byte[][] reads) : IConnection
     /// <inheritdoc />
     public bool IsSecure => false;
 
-    /// <inheritdoc />
-    public EndPoint? RemoteEndPoint => null;
+    /// <summary>
+    /// Gets the peer's endpoint the connection reports; <see langword="null" />, the default,
+    /// for none.
+    /// </summary>
+    public EndPoint? RemoteEndPoint { get; init; }
 
     /// <summary>
     /// Gets the local endpoint the connection reports, which <c>-P -</c> listens on;

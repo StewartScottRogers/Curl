@@ -20,7 +20,10 @@ for `-C` (ADR-0093's BL-439 addendum), and honours `--disable-epsv`,
 `ReportTransferStarted` once the control connection is up, so the runner's `-m` watchdog
 (ADR-0117) ends any later stall with curl's `Operation timed out` message, and
 `FtpConnectPhaseLimit` holds the greeting, login, `PBSZ`, `PROT` and `PWD` to
-`--connect-timeout` (300 s when not given), as curl holds its states before `DO`. Still to
+`--connect-timeout` (300 s when not given), as curl holds its states before `DO`. `-v` and
+`--trace` (BL-930, BL-931): every control command and reply line but `QUIT`'s is reported
+as a header, curl's `* ` lines about the data connection and the transfer as info lines, and
+every data-connection byte as data. Still to
 come: the other FTP-only options.
 
 **URL schemes:** `ftp`, and `ftps` for a handler built with a listener and a TLS provider.

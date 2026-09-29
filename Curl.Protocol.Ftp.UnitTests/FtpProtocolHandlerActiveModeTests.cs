@@ -321,7 +321,7 @@ public sealed class FtpProtocolHandlerActiveModeTests
         CollectionAssert.AreEqual(
             new[] { new ListenTarget(IPAddress.Parse("192.0.2.1"), 0, 0), new ListenTarget(IPAddress.Loopback, 0, 0) },
             listener.Targets);
-        CollectionAssert.AreEqual(new[] { NotLocalLine }, events.Info);
+        CollectionAssert.AreEqual(new[] { NotLocalLine }, events.Info.TakeWhile(line => line != "Connect data stream actively").ToArray());
         Assert.AreEqual(TransferResult.Success(5), run.Result);
     }
 
