@@ -31,3 +31,4 @@ When a transfer runs over HTTP/3, the HTTP handler sends the request as a QPACK 
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
