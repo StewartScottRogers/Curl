@@ -38,3 +38,4 @@ The WebSocket, RTSP and LDAP handlers write the diagnostic log (components `ws`,
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-29: Backlog -> Doing.
