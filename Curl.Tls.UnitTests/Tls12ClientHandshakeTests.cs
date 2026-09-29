@@ -295,18 +295,21 @@ public sealed class Tls12ClientHandshakeTests
     public void AStapledOcspResponseGoesToTheVerifierWithTheChain()
     {
         RecordingCertificateVerifier verifier = new();
-        byte[] ocspResponse = [0x30, 0x03, 0x0a, 0x01, 0x00];
-        Tls12TestServer server = new(TestServerCredential.Ecdsa(ECCurve.NamedCurves.nistP256, TlsSignatureScheme.EcdsaSecp256r1Sha256)) { OcspResponse = ocspResponse };
-        Tls12ClientHandshake client = Client(DefaultSettings with { RequestOcspStatus = true }, verifier);
+        using OcspTestPki pki = new();
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        byte[] ocspResponse = pki.Response(now).Build();
+        Tls12TestServer server = new(pki.LeafCredential) { OcspResponse = ocspResponse, IssuerCertificates = [pki.Ca.RawData] };
+        Tls12ClientHandshake client = Client(DefaultSettings with { RequestOcspStatus = true, TimeProvider = new FixedTimeProvider(now) }, verifier);
 
         AssertCompletesWithServerKeys(client, server, Run(client, server));
         CollectionAssert.AreEqual(ocspResponse, client.OcspResponse);
         CollectionAssert.AreEqual(ocspResponse, verifier.Presented[0].OcspResponse);
         Assert.AreEqual("localhost", verifier.Presented[0].HostName);
+        Assert.AreEqual(new OcspStapleOutcome(OcspStapleStatus.Good), client.CertificateStatus);
     }
 
     [TestMethod]
-    public void AServerThatPromisesButOmitsTheCertificateStatusStillCompletes()
+    public void AServerThatPromisesButOmitsTheCertificateStatusReachesTheStatusCheckWithNoResponse()
     {
         RecordingCertificateVerifier verifier = new();
         Tls12TestServer server = new(TestServerCredential.Ecdsa(ECCurve.NamedCurves.nistP256, TlsSignatureScheme.EcdsaSecp256r1Sha256)) { OcspResponse = [1], OmitCertificateStatus = true };
@@ -314,9 +317,9 @@ public sealed class Tls12ClientHandshakeTests
 
         Tls12HandshakeOutput output = Run(client, server);
 
-        Assert.IsNull(output.Failure);
         Assert.IsNull(client.OcspResponse);
         Assert.IsNull(verifier.Presented[0].OcspResponse);
+        Assert.AreEqual(new OcspStapleOutcome(OcspStapleStatus.NoResponse), output.Failure!.CertificateStatusRejection);
     }
 
     [TestMethod]

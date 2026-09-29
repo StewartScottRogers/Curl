@@ -2,9 +2,10 @@ namespace Curl.Tls;
 
 /// <summary>
 /// Why a handshake failed: the alert the client sent (or, over a byte stream, received),
-/// and when that alert rejects the server's certificate chain, the verifier's reason.
-/// Callers map it to curl's exit: 60 for a certificate rejection, 35 for any other
-/// handshake failure.
+/// and when that alert rejects the server's certificate chain, the verifier's reason, or
+/// when it rejects the stapled OCSP response, the <see cref="OcspStapleOutcome" />.
+/// Callers map it to curl's exit: 60 for a certificate rejection, 91 for a certificate
+/// status rejection, 35 for any other handshake failure.
 /// </summary>
 /// <param name="Alert">The alert the client sends to the server, or the one it received (<see cref="Origin" />).</param>
 /// <param name="CertificateRejection">
@@ -15,6 +16,13 @@ public sealed record TlsHandshakeFailure(TlsAlertDescription Alert, object? Cert
 {
     /// <summary>Gets a value indicating whether the failure is the verifier rejecting the server's certificate chain.</summary>
     public bool IsCertificateRejection => CertificateRejection is not null;
+
+    /// <summary>
+    /// Gets the outcome that failed the stapled OCSP response check the client runs when
+    /// it asks for one (<c>--cert-status</c>), or <see langword="null" /> when that check
+    /// did not fail the handshake. The alert is then <c>bad_certificate_status_response</c>.
+    /// </summary>
+    public OcspStapleOutcome? CertificateStatusRejection { get; init; }
 
     /// <summary>
     /// Gets where the failure came from. The I/O-free handshakes only ever send an alert;

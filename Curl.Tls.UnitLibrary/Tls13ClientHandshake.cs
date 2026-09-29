@@ -54,6 +54,7 @@ public sealed class Tls13ClientHandshake : IDisposable
     private TlsCertificatePublicKey? serverKey;
     private IReadOnlyList<ushort>? requestedSchemes;
     private object? certificateRejection;
+    private OcspStapleOutcome? certificateStatusRejection;
 
     /// <summary>Creates a handshake that has not started.</summary>
     /// <param name="settings">What to offer and present.</param>
@@ -95,6 +96,13 @@ public sealed class Tls13ClientHandshake : IDisposable
 
     /// <summary>Gets the server's DER certificates, leaf first, once its Certificate has arrived.</summary>
     public IReadOnlyList<byte[]> ServerCertificates { get; private set; } = [];
+
+    /// <summary>
+    /// Gets the outcome of the stapled OCSP response check, once the verifier has accepted
+    /// the server's Certificate, when <see cref="Tls13ClientSettings.RequestOcspStatus" />
+    /// asks for one; otherwise <see langword="null" />.
+    /// </summary>
+    public OcspStapleOutcome? CertificateStatus { get; private set; }
 
     /// <summary>Gets a value indicating whether the server sent a CertificateRequest.</summary>
     public bool ClientCertificateRequested => requestedSchemes is not null;
@@ -544,6 +552,20 @@ public sealed class Tls13ClientHandshake : IDisposable
         }
 
         ServerCertificates = [.. message.CertificateList.Select(entry => entry.CertificateData)];
+        alert = VerifyServerCertificates(ocspResponse);
+        if (alert is not null)
+        {
+            return alert;
+        }
+
+        Transcript.Append(encoded);
+        state = State.WaitCertificateVerify;
+        return null;
+    }
+
+    /// <summary>Hands the chain to the verifier, then with <c>--cert-status</c> checks the response stapled to the leaf.</summary>
+    private TlsAlertDescription? VerifyServerCertificates(byte[]? ocspResponse)
+    {
         ServerCertificateVerdict verdict = verifier.Verify(new ServerCertificateChain(ServerCertificates, settings.ServerName, ocspResponse));
         if (!verdict.IsAccepted)
         {
@@ -551,9 +573,24 @@ public sealed class Tls13ClientHandshake : IDisposable
             return verdict.Alert;
         }
 
-        Transcript.Append(encoded);
-        state = State.WaitCertificateVerify;
-        return null;
+        return CheckCertificateStatus(ocspResponse);
+    }
+
+    private TlsAlertDescription? CheckCertificateStatus(byte[]? ocspResponse)
+    {
+        if (!settings.RequestOcspStatus)
+        {
+            return null;
+        }
+
+        CertificateStatus = OcspStapleVerifier.Verify(ocspResponse, ServerCertificates, settings.TimeProvider.GetUtcNow());
+        if (CertificateStatus.IsGood)
+        {
+            return null;
+        }
+
+        certificateStatusRejection = CertificateStatus;
+        return TlsAlertDescription.BadCertificateStatusResponse;
     }
 
     private TlsAlertDescription? CheckCertificateShape(CertificateMessage message)
@@ -705,6 +742,6 @@ public sealed class Tls13ClientHandshake : IDisposable
     private void Fail(TlsAlertDescription alert)
     {
         state = State.Failed;
-        Failure = new TlsHandshakeFailure(alert, certificateRejection);
+        Failure = new TlsHandshakeFailure(alert, certificateRejection) { CertificateStatusRejection = certificateStatusRejection };
     }
 }

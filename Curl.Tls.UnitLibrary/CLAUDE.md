@@ -13,7 +13,8 @@ Namespace `Curl.Tls`. What is here so far: the handshake message codecs (BL-698)
 TLS 1.3 key schedule (BL-697), the TLS 1.3 client handshake (BL-699, ADR-0146), the
 TLS 1.2, 1.1 and 1.0 PRF and record protection (BL-702, ADR-0150), the TLS 1.2,
 1.1 and 1.0 client handshake (BL-703, ADR-0154), TLS 1.3 over a byte stream
-(BL-700, ADR-0157), and TLS 1.2, 1.1 and 1.0 over a byte stream (BL-815, ADR-0158).
+(BL-700, ADR-0157), TLS 1.2, 1.1 and 1.0 over a byte stream (BL-815, ADR-0158), and
+the stapled OCSP response check for `--cert-status` (BL-705, ADR-0173).
 
 - `HandshakeMessageReader` frames handshake bytes into `HandshakeMessage`s (type and
   body); an unknown type is `unexpected_message`.
@@ -120,6 +121,15 @@ TLS 1.2, 1.1 and 1.0 PRF and record protection (BL-702, ADR-0150), the TLS 1.2,
   pre-master secret; `SystemTlsRandomSource` is the production one.
 - `IServerCertificateVerifier` gets the chain as a `ServerCertificateChain` (DER
   certificates, SNI name, stapled OCSP response) and answers a `ServerCertificateVerdict`.
+- OCSP stapling (ADR-0173): `OcspStapleVerifier.Verify(response, chain, now)` checks a
+  stapled response (RFC 6960) in curl's OpenSSL order and returns an
+  `OcspStapleOutcome` (`OcspStapleStatus` and the CRL reason or `responseStatus`). It
+  reads with the internal `OcspBasicResponse`, `OcspSingleResponse` and
+  `OcspCertificateFields`, and maps signature and `CertID` hash OIDs with
+  `OcspSignatureAlgorithm`. With `RequestOcspStatus` (and the settings' `TimeProvider`)
+  both handshakes run it once the verifier accepts the chain, expose `CertificateStatus`,
+  and fail anything but good with `bad_certificate_status_response` and
+  `TlsHandshakeFailure.CertificateStatusRejection`.
 - Signatures: `TlsSignatureScheme` (codes, the TLS 1.3 and TLS 1.2 scheme tables - TLS
   1.2 adds `rsa_pkcs1_*` and `ecdsa_sha1` and binds `ecdsa_*` to no curve - TLS 1.0/1.1's
   legacy signatures, and the CertificateVerify content), `TlsCertificatePublicKey` (a

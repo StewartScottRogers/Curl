@@ -44,6 +44,9 @@ internal sealed class Tls12TestServer(TestServerCredential? credential)
     /// <summary>Gets a value indicating whether the server echoes <c>status_request</c> but sends no CertificateStatus.</summary>
     public bool OmitCertificateStatus { get; init; }
 
+    /// <summary>Gets the DER certificates sent after the leaf, issuer first.</summary>
+    public IReadOnlyList<byte[]> IssuerCertificates { get; init; } = [];
+
     public bool RequestClientCertificate { get; init; }
 
     public IReadOnlyList<ushort> ClientCertificateSchemes { get; init; } =
@@ -223,7 +226,7 @@ internal sealed class Tls12TestServer(TestServerCredential? credential)
     {
         if (credential is not null)
         {
-            Add(flight, new Tls12CertificateMessage([credential.Certificate]).Encode());
+            Add(flight, new Tls12CertificateMessage([credential.Certificate, .. IssuerCertificates]).Encode());
             if (OcspResponse is not null && Offered(TlsExtensionType.StatusRequest) && !OmitCertificateStatus)
             {
                 Add(flight, new HandshakeMessage(HandshakeType.CertificateStatus, StatusRequestExtension.EncodeOcspResponse(OcspResponse).Data).Encode());

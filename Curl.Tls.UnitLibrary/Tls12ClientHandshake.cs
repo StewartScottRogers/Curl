@@ -63,6 +63,7 @@ public sealed class Tls12ClientHandshake
     private byte[] masterSecret = [];
     private Tls12NewSessionTicket? newTicket;
     private object? certificateRejection;
+    private OcspStapleOutcome? certificateStatusRejection;
 
     /// <summary>Creates a handshake that has not started.</summary>
     /// <param name="settings">What to offer and present.</param>
@@ -109,6 +110,14 @@ public sealed class Tls12ClientHandshake
 
     /// <summary>Gets the DER OCSP response the server stapled in its CertificateStatus, or <see langword="null" />.</summary>
     public byte[]? OcspResponse { get; private set; }
+
+    /// <summary>
+    /// Gets the outcome of the stapled OCSP response check, once the verifier has accepted
+    /// the server's chain in a full handshake, when <see cref="Tls12ClientSettings.RequestOcspStatus" />
+    /// asks for one; otherwise <see langword="null" />. A resumed session presents no
+    /// certificate, so it is not checked.
+    /// </summary>
+    public OcspStapleOutcome? CertificateStatus { get; private set; }
 
     /// <summary>Gets a value indicating whether the server sent a CertificateRequest.</summary>
     public bool ClientCertificateRequested => certificateRequest is not null;
@@ -535,11 +544,29 @@ public sealed class Tls12ClientHandshake
         ServerCertificateVerdict verdict = verifier.Verify(new ServerCertificateChain(ServerCertificates, settings.ServerName, OcspResponse));
         if (verdict.IsAccepted)
         {
-            return null;
+            return CheckCertificateStatus();
         }
 
         certificateRejection = verdict.Rejection;
         return verdict.Alert;
+    }
+
+    /// <summary>With <c>--cert-status</c>, checks the CertificateStatus response, or its absence, once the verifier has accepted the chain.</summary>
+    private TlsAlertDescription? CheckCertificateStatus()
+    {
+        if (!settings.RequestOcspStatus)
+        {
+            return null;
+        }
+
+        CertificateStatus = OcspStapleVerifier.Verify(OcspResponse, ServerCertificates, settings.TimeProvider.GetUtcNow());
+        if (CertificateStatus.IsGood)
+        {
+            return null;
+        }
+
+        certificateStatusRejection = CertificateStatus;
+        return TlsAlertDescription.BadCertificateStatusResponse;
     }
 
     private TlsAlertDescription? ReceiveCertificateStatus(byte[] body)
@@ -795,7 +822,7 @@ public sealed class Tls12ClientHandshake
     private void Fail(TlsAlertDescription alert)
     {
         state = State.Failed;
-        Failure = new TlsHandshakeFailure(alert, certificateRejection);
+        Failure = new TlsHandshakeFailure(alert, certificateRejection) { CertificateStatusRejection = certificateStatusRejection };
     }
 
     /// <summary>The rule the client's CertificateVerify signs by, and the scheme it names in TLS 1.2.</summary>

@@ -4,7 +4,8 @@ namespace Curl.Tls;
 /// What one TLS 1.3 client handshake offers and presents. The handshake builds the
 /// ClientHello extensions it negotiates (<c>server_name</c>, <c>supported_groups</c>,
 /// <c>key_share</c>, <c>supported_versions</c>, <c>signature_algorithms</c>, ALPN,
-/// <c>cookie</c> and <c>padding</c>) and sends them in <see cref="ExtensionOrder" />;
+/// <c>cookie</c>, <c>status_request</c> with <see cref="RequestOcspStatus" />, and
+/// <c>padding</c>) and sends them in <see cref="ExtensionOrder" />;
 /// any other extension goes out verbatim from <see cref="FixedExtensions" />.
 /// </summary>
 public sealed record Tls13ClientSettings
@@ -14,6 +15,7 @@ public sealed record Tls13ClientSettings
     [
         TlsExtensionType.ServerName,
         TlsExtensionType.SupportedGroups,
+        TlsExtensionType.StatusRequest,
         TlsExtensionType.SignatureAlgorithms,
         TlsExtensionType.ApplicationLayerProtocolNegotiation,
         TlsExtensionType.SupportedVersions,
@@ -84,10 +86,25 @@ public sealed record Tls13ClientSettings
     /// <summary>Gets the certificate presented when the server asks for one, or <see langword="null" /> to answer with an empty Certificate.</summary>
     public TlsClientCertificate? ClientCertificate { get; init; }
 
+    /// <summary>
+    /// Gets a value indicating whether the client asks for a stapled OCSP response
+    /// (<c>status_request</c>, <c>--cert-status</c>) and fails the handshake with
+    /// <c>bad_certificate_status_response</c> unless <see cref="OcspStapleVerifier" /> finds it good.
+    /// <c>status_request</c> must then be in <see cref="ExtensionOrder" />.
+    /// </summary>
+    public bool RequestOcspStatus { get; init; }
+
+    /// <summary>Gets the clock a stapled OCSP response's <c>thisUpdate</c> and <c>nextUpdate</c> are judged against.</summary>
+    public TimeProvider TimeProvider { get; init; } = TimeProvider.System;
+
     /// <summary>Throws when the settings cannot drive a handshake.</summary>
-    /// <exception cref="ArgumentException">A cipher suite is not TLS 1.3, a group cannot be shared, or a key share group is not offered.</exception>
+    /// <exception cref="ArgumentException">
+    /// A cipher suite is not TLS 1.3, a group cannot be shared, a key share group is not
+    /// offered, or an OCSP status is asked for with no place for <c>status_request</c>.
+    /// </exception>
     internal void Validate()
     {
+        Require(!RequestOcspStatus || ExtensionOrder.Contains(TlsExtensionType.StatusRequest), "Asking for OCSP status needs status_request in the extension order.", nameof(ExtensionOrder));
         Require(CipherSuites.Count > 0 && CipherSuites.All(code => Tls13CipherSuite.Find(code) is not null), "Offer at least one cipher suite, and only TLS 1.3 suites.", nameof(CipherSuites));
         Require(SupportedGroups.All(TlsNamedGroup.CanShare), "Every supported group must be one the client can make a key share for.", nameof(SupportedGroups));
         Require(KeyShareGroups.All(SupportedGroups.Contains), "Every key share group must be one of the supported groups.", nameof(KeyShareGroups));

@@ -55,8 +55,15 @@ public sealed record Tls12ClientSettings
     /// <summary>Gets the ALPN protocols offered, in preference order; none sends no ALPN extension.</summary>
     public IReadOnlyList<string> ApplicationProtocols { get; init; } = [];
 
-    /// <summary>Gets a value indicating whether the client asks for a stapled OCSP response (<c>status_request</c>, <c>--cert-status</c>).</summary>
+    /// <summary>
+    /// Gets a value indicating whether the client asks for a stapled OCSP response
+    /// (<c>status_request</c>, <c>--cert-status</c>) and fails a full handshake with
+    /// <c>bad_certificate_status_response</c> unless <see cref="OcspStapleVerifier" /> finds it good.
+    /// </summary>
     public bool RequestOcspStatus { get; init; }
+
+    /// <summary>Gets the clock a stapled OCSP response's <c>thisUpdate</c> and <c>nextUpdate</c> are judged against.</summary>
+    public TimeProvider TimeProvider { get; init; } = TimeProvider.System;
 
     /// <summary>Gets a value indicating whether the client offers <c>session_ticket</c> (RFC 5077).</summary>
     public bool OfferSessionTicket { get; init; } = true;

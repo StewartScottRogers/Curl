@@ -92,6 +92,15 @@ internal sealed class Tls13ClientHelloBuilder(Tls13ClientSettings settings, byte
         TlsExtensionType.ApplicationLayerProtocolNegotiation => settings.ApplicationProtocols.Count == 0
             ? null
             : ApplicationLayerProtocolNegotiationExtension.Encode(settings.ApplicationProtocols),
-        _ => settings.FixedExtensions.FirstOrDefault(fixedExtension => fixedExtension.Type == type),
+        TlsExtensionType.StatusRequest => BuildStatusRequest(),
+        _ => FindFixedExtension(type),
     };
+
+    /// <summary>With <see cref="Tls13ClientSettings.RequestOcspStatus" />, an OCSP request naming no responders and no extensions, as OpenSSL sends.</summary>
+    private TlsExtension? BuildStatusRequest() => settings.RequestOcspStatus
+        ? StatusRequestExtension.EncodeOcspRequest(new OcspStatusRequest([], []))
+        : FindFixedExtension(TlsExtensionType.StatusRequest);
+
+    private TlsExtension? FindFixedExtension(TlsExtensionType type) =>
+        settings.FixedExtensions.FirstOrDefault(fixedExtension => fixedExtension.Type == type);
 }

@@ -38,6 +38,9 @@ internal sealed class Tls13TestServer(TestServerCredential credential)
 
     public IReadOnlyList<TlsExtension> LeafExtensions { get; init; } = [];
 
+    /// <summary>Gets the DER certificates sent after the leaf, issuer first.</summary>
+    public IReadOnlyList<byte[]> IssuerCertificates { get; init; } = [];
+
     public byte[] ClientHandshakeTrafficSecret { get; private set; } = [];
 
     public byte[] ServerHandshakeTrafficSecret { get; private set; } = [];
@@ -127,7 +130,8 @@ internal sealed class Tls13TestServer(TestServerCredential credential)
             Add(flight, new CertificateRequest([], [SignatureAlgorithmsExtension.Encode(ClientCertificateSchemes)]).Encode());
         }
 
-        Add(flight, new CertificateMessage([], [new CertificateEntry(credential.Certificate, LeafExtensions)]).Encode());
+        CertificateEntry[] chain = [new CertificateEntry(credential.Certificate, LeafExtensions), .. IssuerCertificates.Select(issuer => new CertificateEntry(issuer, []))];
+        Add(flight, new CertificateMessage([], chain).Encode());
         byte[] content = TlsSignatureScheme.BuildCertificateVerifyContent(true, TranscriptHash());
         Add(flight, new CertificateVerify(credential.Scheme, credential.SigningKey.Sign(credential.Scheme, content)).Encode());
         Add(flight, new Finished(schedule.ComputeFinishedVerifyData(ServerHandshakeTrafficSecret, TranscriptHash())).Encode());
