@@ -37,3 +37,4 @@ For `ftp://` and `ftps://`, `-v` shows every control-connection command as curl'
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-29: Backlog -> Doing.
