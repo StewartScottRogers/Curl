@@ -48,3 +48,4 @@ stop first. Adding lanes stays one per step: the meter needs samples at each cou
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Doing.
 - 2026-09-28: Doing -> Backlog. Handed to the dark factory: a task in Doing that no lane holds stops a shift from starting.
+- 2026-09-28: Backlog -> Doing.
