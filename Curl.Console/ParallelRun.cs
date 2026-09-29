@@ -9,7 +9,9 @@ namespace Curl.Console;
 /// holding the run's <see cref="WriteGate" />, or from the one flow that starts the transfers.
 /// </summary>
 /// <param name="maxRunning">The <c>--parallel-max</c> limit.</param>
-internal sealed class ParallelRun(int maxRunning)
+/// <param name="maxPerHost">The <c>--parallel-max-host</c> limit; zero for none.</param>
+/// <param name="parallelImmediate">Whether <c>--parallel-immediate</c> was given.</param>
+internal sealed class ParallelRun(int maxRunning, int maxPerHost, bool parallelImmediate)
 {
     /// <summary>
     /// The message of a transfer <c>--fail-early</c> aborted because another failed, with exit
@@ -31,6 +33,9 @@ internal sealed class ParallelRun(int maxRunning)
 
     /// <summary>Gets the queue the run's transfers wait in for a free slot.</summary>
     internal ParallelTransferQueue Queue { get; } = new(maxRunning);
+
+    /// <summary>Gets the queue the run's transfers wait in, holding their slot, for a busy host.</summary>
+    internal ParallelHostQueue Hosts { get; } = new(maxPerHost, parallelImmediate);
 
     /// <summary>Gets the token every transfer of the run is aborted through.</summary>
     internal CancellationToken AbortToken => abort.Token;

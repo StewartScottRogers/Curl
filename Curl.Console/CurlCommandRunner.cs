@@ -724,7 +724,7 @@ internal sealed class CurlCommandRunner(
     private async Task<CurlExitCode?> TransferAllGroupsAsync(IReadOnlyList<CommandLineOptions> groups)
     {
         standardError = writeGate.Guard(standardError);
-        parallelRun = groups[0].Parallel ? new ParallelRun(groups[0].ParallelMax) : null;
+        parallelRun = groups[0].Parallel ? new ParallelRun(groups[0].ParallelMax, groups[0].ParallelMaxHost, groups[0].ParallelImmediate) : null;
         try
         {
             CurlExitCode? exitCode = await TransferGroupsInOrderAsync(groups).ConfigureAwait(false);
@@ -1147,7 +1147,7 @@ internal sealed class CurlCommandRunner(
         (TransferResult Result, string GivenUrl, string TransferUrl) ended;
         try
         {
-            ended = await TransferUrlAsync(dispatch, options, transfer).ConfigureAwait(false);
+            ended = await TransferOnceHostIsFreeAsync(run, dispatch, options, transfer, state.AbortToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (state.AbortToken.IsCancellationRequested)
         {
@@ -1156,6 +1156,35 @@ internal sealed class CurlCommandRunner(
 
         await writeGate.RunExclusiveAsync(() => EndParallelTransferAsync(run, dispatch, options, transfer, state, ended))
             .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Performs one transfer of a <c>-Z</c> run once its host is free (<see cref="ParallelHostQueue" />:
+    /// <c>--parallel-max-host</c> and <c>--parallel-immediate</c>), counting it at the host until it ends.
+    /// </summary>
+    /// <param name="run">The run.</param>
+    /// <param name="dispatch">Performs the transfer with the handler for its scheme, after its warning lines.</param>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="transfer">The transfer.</param>
+    /// <param name="abortToken">Ends the wait for the host when <c>--fail-early</c> aborts the run.</param>
+    /// <returns>The transfer's result and URLs, as <see cref="TransferUrlAsync" /> gives them.</returns>
+    private async Task<(TransferResult Result, string GivenUrl, string TransferUrl)> TransferOnceHostIsFreeAsync(
+        ParallelRun run,
+        TransferDispatch dispatch,
+        CommandLineOptions options,
+        UrlTransfer transfer,
+        CancellationToken abortToken)
+    {
+        string url = UrlSchemeGuesser.AddGuessedScheme(transfer.Url);
+        await run.Hosts.WaitForHostAsync(url, abortToken).ConfigureAwait(false);
+        try
+        {
+            return await TransferUrlAsync(dispatch, options, transfer).ConfigureAwait(false);
+        }
+        finally
+        {
+            run.Hosts.Leave(url);
+        }
     }
 
     /// <summary>
