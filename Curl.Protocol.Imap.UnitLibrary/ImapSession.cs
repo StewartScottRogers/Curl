@@ -84,6 +84,12 @@ internal sealed class ImapSession(
     private IConnection? securedConnection;
 
     /// <summary>
+    /// Gets how far the session got, which decides the line <c>-v</c> ends a failed transfer
+    /// with (BL-559).
+    /// </summary>
+    public ImapSessionPhase Phase { get; private set; }
+
+    /// <summary>
     /// Opens the session, logs in, fetches, lists, searches or sends the <c>-X</c> command as
     /// the URL asks, and closes the session again with <c>LOGOUT</c>. Login options curl rejects are exit 3
     /// before anything is read or sent.
@@ -98,9 +104,13 @@ internal sealed class ImapSession(
 
         try
         {
-            return await OpenAsync().ConfigureAwait(false)
-                ?? await LoginAsync(loginOptions).ConfigureAwait(false)
-                ?? await PerformAsync().ConfigureAwait(false);
+            if ((await OpenAsync().ConfigureAwait(false) ?? await LoginAsync(loginOptions).ConfigureAwait(false)) is { } failure)
+            {
+                return failure;
+            }
+
+            Phase = ImapSessionPhase.Performing;
+            return await PerformAsync().ConfigureAwait(false);
         }
         catch (ImapResponseMissingException)
         {
@@ -262,6 +272,11 @@ internal sealed class ImapSession(
         }
 
         preauthenticated = greeting.Status == ImapResponseStatus.Preauth;
+        if (preauthenticated)
+        {
+            context.Events.ReportInfo(ImapInfoLines.Preauthenticated);
+        }
+
         return await CapabilityAsync().ConfigureAwait(false);
     }
 
@@ -388,7 +403,20 @@ internal sealed class ImapSession(
     /// </summary>
     private async ValueTask<TransferResult> AppendAsync(ImapUrlPath path, Stream upload)
     {
-        TransferResult result = await new ImapAppend(channel, context).AppendAsync(path.Mailbox, upload).ConfigureAwait(false);
+        var append = new ImapAppend(channel, context);
+        TransferResult result;
+        try
+        {
+            result = await append.AppendAsync(path.Mailbox, upload).ConfigureAwait(false);
+        }
+        finally
+        {
+            if (append.IsMessageSent)
+            {
+                Phase = ImapSessionPhase.Completing;
+            }
+        }
+
         await LogoutAsync().ConfigureAwait(false);
         return result;
     }
@@ -503,19 +531,46 @@ internal sealed class ImapSession(
                     : await LogoutAndFailAsync(CurlExitCode.QuoteError, ImapSessionMessages.QuoteCommandFailed, written).ConfigureAwait(false);
             }
 
+            long? literalSize = ReportedLiteralSizeOf(read.Untagged[0]);
             byte[] line = Encoding.Latin1.GetBytes(read.Untagged[0] + "\n");
+            context.Events.ReportDataReceived(line);
             if (await WriteOutputAsync(line, written).ConfigureAwait(false) is { } failure)
             {
                 return failure;
             }
 
             written += line.Length;
-            if (ImapListedResponses.LiteralSizeOf(read.Untagged[0]) is { } size)
+            if (literalSize is { } size)
             {
-                return await CopyLiteralAsync(size, written, static (_, _) => { }).ConfigureAwait(false)
-                    ?? await LogoutAndSucceedAsync(written + size).ConfigureAwait(false);
+                return await CopyListedLiteralAsync(size, written).ConfigureAwait(false);
             }
         }
+    }
+
+    /// <summary>
+    /// The size of the literal the listed <paramref name="response" /> announces, reported as
+    /// curl's <c>Found N bytes to download</c>; <see langword="null" /> when it announces none.
+    /// </summary>
+    private long? ReportedLiteralSizeOf(string response)
+    {
+        long? size = ImapListedResponses.LiteralSizeOf(response);
+        if (size is { } announced)
+        {
+            context.Events.ReportInfo(ImapInfoLines.Found(announced));
+        }
+
+        return size;
+    }
+
+    /// <summary>
+    /// Copies the literal a listed response announced, <paramref name="written" /> bytes
+    /// already written, then sends <c>LOGOUT</c> with the rest of the response unread.
+    /// </summary>
+    private async ValueTask<TransferResult> CopyListedLiteralAsync(long size, long written)
+    {
+        Phase = ImapSessionPhase.Transferring;
+        return await CopyLiteralAsync(size, written, reportsProgress: false).ConfigureAwait(false)
+            ?? await LogoutAndSucceedAsync(written + size).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -532,9 +587,13 @@ internal sealed class ImapSession(
             return await LogoutAndFailAsync(CurlExitCode.RemoteFileNotFound, ImapSessionMessages.RemoteFileNotFound).ConfigureAwait(false);
         }
 
-        return LiteralSizeOf(read.Untagged[0]) is { } size
-            ? await DownloadAsync(size).ConfigureAwait(false)
-            : await LogoutAndFailAsync(CurlExitCode.WeirdServerReply, ImapSessionMessages.FetchResponseUnparsed).ConfigureAwait(false);
+        if (LiteralSizeOf(read.Untagged[0]) is not { } size)
+        {
+            return await LogoutAndFailAsync(CurlExitCode.WeirdServerReply, ImapSessionMessages.FetchResponseUnparsed).ConfigureAwait(false);
+        }
+
+        context.Events.ReportInfo(ImapInfoLines.Found(size));
+        return await DownloadAsync(size).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -546,11 +605,13 @@ internal sealed class ImapSession(
     private async ValueTask<TransferResult> DownloadAsync(long size)
     {
         context.Progress.ReportTransferStarted();
-        if (await CopyLiteralAsync(size, 0, context.Progress.ReportDownloaded).ConfigureAwait(false) is { } failure)
+        Phase = ImapSessionPhase.Transferring;
+        if (await CopyLiteralAsync(size, 0, reportsProgress: true).ConfigureAwait(false) is { } failure)
         {
             return failure;
         }
 
+        Phase = ImapSessionPhase.Completing;
         ImapResponse completion = await channel.ReadResponseAsync(NoUntagged).ConfigureAwait(false)
             ?? throw new ImapResponseMissingException();
         if (completion.Status != ImapResponseStatus.Ok)
@@ -564,18 +625,27 @@ internal sealed class ImapSession(
 
     /// <summary>
     /// Copies the literal's <paramref name="size" /> bytes from the connection to the output,
-    /// <paramref name="writtenBefore" /> bytes already written, calling
-    /// <paramref name="reportCopied" /> with the literal's bytes copied so far and its size
-    /// after each piece. The server closing inside the literal is exit 18 and the output
-    /// failing exit 23.
+    /// <paramref name="writtenBefore" /> bytes already written. The server closing inside the
+    /// literal is exit 18 and the output failing exit 23.
     /// </summary>
+    /// <param name="size">The literal's size.</param>
+    /// <param name="writtenBefore">The bytes written before the literal.</param>
+    /// <param name="reportsProgress">
+    /// Whether each piece written is reported, as curl reports a <c>FETCH</c> literal and not
+    /// a listed one (BL-559): to the progress meter and, for the piece that arrived with the
+    /// response line, as <see cref="ImapInfoLines.Written" />. Every piece, listed or not, is
+    /// reported as data received before it is written, the empty piece of a server hanging up
+    /// included.
+    /// </param>
     /// <returns><see langword="null" /> once every byte is written, else the failure.</returns>
-    private async ValueTask<TransferResult?> CopyLiteralAsync(long size, long writtenBefore, Action<long, long?> reportCopied)
+    private async ValueTask<TransferResult?> CopyLiteralAsync(long size, long writtenBefore, bool reportsProgress)
     {
         long copied = 0;
         while (copied < size)
         {
+            bool arrivedWithResponse = channel.HasUnreadBytes;
             ReadOnlyMemory<byte> piece = await channel.ReadLiteralPieceAsync(size - copied).ConfigureAwait(false);
+            context.Events.ReportDataReceived(piece.Span);
             if (piece.IsEmpty)
             {
                 return TransferResult.Failure(CurlExitCode.PartialFile, ImapSessionMessages.LiteralCutShort(size - copied), writtenBefore + copied);
@@ -587,10 +657,27 @@ internal sealed class ImapSession(
             }
 
             copied += piece.Length;
-            reportCopied(copied, size);
+            if (reportsProgress)
+            {
+                ReportFetched(copied, size, arrivedWithResponse);
+            }
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Reports <paramref name="copied" /> of the <c>FETCH</c> literal's <paramref name="size" />
+    /// bytes written to the progress meter and, when the piece just written arrived with the
+    /// response line, as curl's <c>Written N bytes, M bytes are left for transfer</c>.
+    /// </summary>
+    private void ReportFetched(long copied, long size, bool arrivedWithResponse)
+    {
+        context.Progress.ReportDownloaded(copied, size);
+        if (arrivedWithResponse)
+        {
+            context.Events.ReportInfo(ImapInfoLines.Written(copied, size - copied));
+        }
     }
 
     private async ValueTask<TransferResult> LogoutAndSucceedAsync(long bytesTransferred)
@@ -623,6 +710,7 @@ internal sealed class ImapSession(
 
     private async ValueTask LogoutAsync()
     {
+        channel.StopReporting();
         await channel.SendCommandAsync("LOGOUT").ConfigureAwait(false);
         try
         {

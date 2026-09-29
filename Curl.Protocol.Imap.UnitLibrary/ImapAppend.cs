@@ -33,6 +33,13 @@ internal sealed class ImapAppend(ImapControlChannel channel, ITransferContext co
     private long uploaded;
 
     /// <summary>
+    /// Gets whether the message was sent in answer to the continuation, after which curl
+    /// 8.21.0 counts a failure as the command's completion and leaves the connection intact
+    /// (BL-559).
+    /// </summary>
+    public bool IsMessageSent { get; private set; }
+
+    /// <summary>
     /// Appends <paramref name="upload" /> to <paramref name="mailbox" />. The caller sends
     /// <c>LOGOUT</c> afterwards, whatever this returns.
     /// </summary>
@@ -83,7 +90,8 @@ internal sealed class ImapAppend(ImapControlChannel channel, ITransferContext co
 
     /// <summary>
     /// Sends the message's bytes, reporting each piece to the progress meter against
-    /// <paramref name="size" />, then the CRLF that ends the <c>APPEND</c> command.
+    /// <paramref name="size" />, then, after the <c>-v</c> line curl writes once the literal is
+    /// sent, the CRLF that ends the <c>APPEND</c> command.
     /// </summary>
     private async ValueTask SendMessageAsync(Stream upload, long size)
     {
@@ -97,7 +105,9 @@ internal sealed class ImapAppend(ImapControlChannel channel, ITransferContext co
             context.Progress.ReportUploaded(uploaded, size);
         }
 
+        context.Events.ReportInfo(uploaded == 0 ? ImapInfoLines.RequestSent : ImapInfoLines.UploadSent(uploaded));
         await channel.SendLineAsync(string.Empty).ConfigureAwait(false);
+        IsMessageSent = true;
     }
 
     private async ValueTask<ImapResponse> ReadResponseAsync(bool acceptsContinuation) =>

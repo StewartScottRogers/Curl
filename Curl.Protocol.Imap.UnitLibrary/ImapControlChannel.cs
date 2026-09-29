@@ -8,6 +8,7 @@ namespace Curl.Protocol.Imap;
 /// Sends tagged commands on an IMAP connection and reads their responses, a line at a time.
 /// </summary>
 /// <param name="connection">The connection; the caller owns and disposes it.</param>
+/// <param name="events">Where <c>-v</c> and <c>--trace</c> learn of each line and literal piece sent and each line read.</param>
 /// <param name="cancellationToken">Cancels every send and read.</param>
 /// <remarks>
 /// <para>
@@ -26,10 +27,23 @@ namespace Curl.Protocol.Imap;
 /// rest of the response, however the reads split them. curl reads a literal only in the
 /// response it is waiting for; the others it reads as lines, and so does this channel.
 /// </para>
+/// <para>
+/// For <c>-v</c> and <c>--trace</c> (BL-559), every line sent is reported with its CRLF as a
+/// request header and every piece of a literal sent as data sent, once written; every line
+/// read is reported with its LF as a response header, a literal's bytes included, split at
+/// each LF as curl's line reader splits them; all until <see cref="StopReporting" />. The
+/// bytes <see cref="ReadLiteralPieceAsync(long)" /> returns are the caller's to report. As
+/// curl's pingpong reader does, a read takes at most 900 bytes, so the part of a
+/// <c>FETCH</c> literal that arrives with its response line is at most what 900 bytes leave.
+/// </para>
 /// </remarks>
-internal sealed class ImapControlChannel(IConnection connection, CancellationToken cancellationToken)
+internal sealed class ImapControlChannel(IConnection connection, ITransferEvents events, CancellationToken cancellationToken)
 {
-    private const int ReadBufferSize = 4096;
+    /// <summary>The most bytes curl 8.21.0's pingpong reader takes in one read (measured, BL-559).</summary>
+    private const int ReadBufferSize = 900;
+
+    /// <summary>The most bytes one read of a streamed literal takes once the buffer is empty.</summary>
+    private const int LiteralReadSize = 64 * 1024;
 
     /// <summary>
     /// The most bytes a response line may hold before its LF, literals included, so that
@@ -48,6 +62,17 @@ internal sealed class ImapControlChannel(IConnection connection, CancellationTok
     private int bufferEnd;
 
     private byte commandId;
+
+    /// <summary>Where lines are reported: <c>events</c> until <see cref="StopReporting" />, nowhere after.</summary>
+    private ITransferEvents reporting = events;
+
+    /// <summary>
+    /// The bytes of a literal read after its last LF, reported with the next line read, as
+    /// curl's line reader sees them as that line's start.
+    /// </summary>
+    private readonly List<byte> unreportedLineStart = [];
+
+    private byte[]? literalBuffer;
 
     /// <summary>
     /// Gets the connection commands are sent on and responses read from: the one the channel
@@ -76,9 +101,16 @@ internal sealed class ImapControlChannel(IConnection connection, CancellationTok
     public void SwitchTo(IConnection secured) => connection = secured;
 
     /// <summary>
-    /// Tags <paramref name="command" /> with the next tag and sends it followed by CRLF. A
-    /// connection that fails with an <see cref="IOException" /> is left for the next
-    /// <see cref="ReadResponseAsync" /> to find closed.
+    /// Reports nothing more: curl sends <c>LOGOUT</c> once the transfer is over, where
+    /// <c>-v</c> does not see it or its answer.
+    /// </summary>
+    public void StopReporting() => reporting = NoTransferEvents.Instance;
+
+    /// <summary>
+    /// Tags <paramref name="command" /> with the next tag and sends it followed by CRLF,
+    /// reported as a request header once sent. A connection that fails with an
+    /// <see cref="IOException" /> is left for the next <see cref="ReadResponseAsync" /> to
+    /// find closed, and the command is not reported.
     /// </summary>
     /// <param name="command">The command without its tag or line end, such as <c>CAPABILITY</c>.</param>
     /// <returns>A task that completes once the command is sent or the send has failed.</returns>
@@ -90,32 +122,36 @@ internal sealed class ImapControlChannel(IConnection connection, CancellationTok
     }
 
     /// <summary>
-    /// Sends <paramref name="text" /> untagged, followed by CRLF: an answer to an
-    /// <c>AUTHENTICATE</c> continuation. A connection that fails with an
-    /// <see cref="IOException" /> is left for the next <see cref="ReadResponseAsync" /> to
-    /// find closed.
+    /// Sends <paramref name="text" /> untagged, followed by CRLF, reported as a request header
+    /// once sent: an answer to an <c>AUTHENTICATE</c> continuation, or the line end after an
+    /// <c>APPEND</c> literal. A connection that fails with an <see cref="IOException" /> is
+    /// left for the next <see cref="ReadResponseAsync" /> to find closed, and the line is not
+    /// reported.
     /// </summary>
     /// <param name="text">The line without its line end.</param>
     /// <returns>A task that completes once the line is sent or the send has failed.</returns>
-    public ValueTask SendLineAsync(string text) => SendBytesAsync(Encoding.Latin1.GetBytes(text + "\r\n"));
+    public async ValueTask SendLineAsync(string text)
+    {
+        byte[] line = Encoding.Latin1.GetBytes(text + "\r\n");
+        if (await TrySendAsync(line).ConfigureAwait(false))
+        {
+            reporting.ReportRequestHeader(line);
+        }
+    }
 
     /// <summary>
-    /// Sends <paramref name="bytes" /> as they are, with no tag and no line end: a piece of
-    /// the literal an <c>APPEND</c> uploads. A connection that fails with an
-    /// <see cref="IOException" /> is left for the next <see cref="ReadResponseAsync" /> to
-    /// find closed.
+    /// Sends <paramref name="bytes" /> as they are, with no tag and no line end, reported as
+    /// data sent once sent: a piece of the literal an <c>APPEND</c> uploads. A connection that
+    /// fails with an <see cref="IOException" /> is left for the next
+    /// <see cref="ReadResponseAsync" /> to find closed, and the bytes are not reported.
     /// </summary>
     /// <param name="bytes">The bytes to send.</param>
     /// <returns>A task that completes once the bytes are sent or the send has failed.</returns>
     public async ValueTask SendBytesAsync(ReadOnlyMemory<byte> bytes)
     {
-        try
+        if (await TrySendAsync(bytes).ConfigureAwait(false))
         {
-            await connection.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
-            await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
-        }
-        catch (IOException)
-        {
+            reporting.ReportDataSent(bytes.Span);
         }
     }
 
@@ -211,7 +247,10 @@ internal sealed class ImapControlChannel(IConnection connection, CancellationTok
 
     /// <summary>
     /// Reads the next bytes the server sent, at most <paramref name="maxCount" />, without
-    /// looking for line ends: the next piece of a literal being streamed.
+    /// looking for line ends: the next piece of a literal being streamed. Bytes already read
+    /// come first; once none are left, one read of the connection takes up to
+    /// <paramref name="maxCount" /> bytes (64 KiB at most), none past the literal, as curl's
+    /// transfer reads a literal it has been told the size of.
     /// </summary>
     /// <param name="maxCount">The most bytes wanted; more than zero.</param>
     /// <returns>
@@ -220,9 +259,10 @@ internal sealed class ImapControlChannel(IConnection connection, CancellationTok
     /// </returns>
     public async ValueTask<ReadOnlyMemory<byte>> ReadLiteralPieceAsync(long maxCount)
     {
-        if (bufferStart == bufferEnd && !await TryFillAsync().ConfigureAwait(false))
+        if (bufferStart == bufferEnd)
         {
-            return ReadOnlyMemory<byte>.Empty;
+            literalBuffer ??= new byte[LiteralReadSize];
+            return literalBuffer.AsMemory(0, await TryReadAsync(literalBuffer.AsMemory(0, (int)Math.Min(maxCount, LiteralReadSize))).ConfigureAwait(false));
         }
 
         int take = (int)Math.Min(maxCount, bufferEnd - bufferStart);
@@ -311,6 +351,7 @@ internal sealed class ImapControlChannel(IConnection connection, CancellationTok
             read += take;
         }
 
+        ReportLiteral(literal);
         return Encoding.Latin1.GetString(literal);
     }
 
@@ -331,9 +372,12 @@ internal sealed class ImapControlChannel(IConnection connection, CancellationTok
             byte next = buffer[bufferStart++];
             if (next == (byte)'\n')
             {
-                return line.Contains(0)
+                byte[] text = [.. line];
+                line.Add(next);
+                ReportLine([.. line]);
+                return text.Contains((byte)0)
                     ? throw new ImapWeirdResponseException(ImapSessionMessages.NulByteInLine)
-                    : Encoding.Latin1.GetString([.. line]);
+                    : Encoding.Latin1.GetString(text);
             }
 
             line.Add(next);
@@ -345,15 +389,68 @@ internal sealed class ImapControlChannel(IConnection connection, CancellationTok
     private async ValueTask<bool> TryFillAsync()
     {
         bufferStart = 0;
+        bufferEnd = await TryReadAsync(buffer).ConfigureAwait(false);
+        return bufferEnd > 0;
+    }
+
+    /// <summary>Reads once into <paramref name="destination" />; 0 when the read failed with an <see cref="IOException" />.</summary>
+    private async ValueTask<int> TryReadAsync(Memory<byte> destination)
+    {
         try
         {
-            bufferEnd = await connection.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+            return await connection.ReadAsync(destination, cancellationToken).ConfigureAwait(false);
         }
         catch (IOException)
         {
-            bufferEnd = 0;
+            return 0;
+        }
+    }
+
+    /// <summary>Writes and flushes <paramref name="bytes" />; <see langword="false" /> when that failed with an <see cref="IOException" />.</summary>
+    private async ValueTask<bool> TrySendAsync(ReadOnlyMemory<byte> bytes)
+    {
+        try
+        {
+            await connection.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
+            await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
+            return true;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Reports <paramref name="line" /> (up to and including its LF) as a response header,
+    /// after any literal bytes still waiting to be reported with it.
+    /// </summary>
+    private void ReportLine(ReadOnlySpan<byte> line)
+    {
+        if (unreportedLineStart.Count == 0)
+        {
+            reporting.ReportResponseHeader(line);
+            return;
         }
 
-        return bufferEnd > 0;
+        unreportedLineStart.AddRange(line);
+        reporting.ReportResponseHeader([.. unreportedLineStart]);
+        unreportedLineStart.Clear();
+    }
+
+    /// <summary>
+    /// Reports a literal's <paramref name="bytes" /> as curl's line reader sees them: each run
+    /// up to an LF as a response header, and what follows the last LF with the next line.
+    /// </summary>
+    private void ReportLiteral(ReadOnlySpan<byte> bytes)
+    {
+        int lineFeed;
+        while ((lineFeed = bytes.IndexOf((byte)'\n')) >= 0)
+        {
+            ReportLine(bytes[..(lineFeed + 1)]);
+            bytes = bytes[(lineFeed + 1)..];
+        }
+
+        unreportedLineStart.AddRange(bytes);
     }
 }
