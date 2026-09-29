@@ -17,13 +17,43 @@ internal sealed class LdapBerWriter(LdapDialect dialect)
     /// <summary>The first length octet of WinLDAP's constructed lengths: four length octets follow.</summary>
     private const byte FourOctetLength = 0x84;
 
+    /// <summary>A universal primitive ENUMERATED's identifier octet.</summary>
+    private const byte EnumeratedIdentifier = 0x0A;
+
     /// <summary>Writes an INTEGER.</summary>
     /// <param name="value">The value.</param>
     /// <returns>The element, identifier and length octets included.</returns>
-    public static byte[] Integer(int value)
+    public static byte[] Integer(int value) => Integer(value, Asn1Tag.Integer);
+
+    /// <summary>Writes an INTEGER with another tag, such as an AbandonRequest's.</summary>
+    /// <param name="value">The value.</param>
+    /// <param name="tag">The tag; it is written primitive.</param>
+    /// <returns>The element, identifier and length octets included.</returns>
+    public static byte[] Integer(int value, Asn1Tag tag)
     {
         AsnWriter writer = new(AsnEncodingRules.BER);
-        writer.WriteInteger(value);
+        writer.WriteInteger(value, tag);
+        return writer.Encode();
+    }
+
+    /// <summary>Writes an ENUMERATED: an INTEGER's content under the universal tag 10.</summary>
+    /// <param name="value">The value.</param>
+    /// <returns>The element, identifier and length octets included.</returns>
+    /// <remarks><see cref="AsnWriter" /> writes an ENUMERATED only from an <see cref="Enum" />, so the INTEGER's identifier octet is replaced.</remarks>
+    public static byte[] Enumerated(int value)
+    {
+        byte[] element = Integer(value);
+        element[0] = EnumeratedIdentifier;
+        return element;
+    }
+
+    /// <summary>Writes a BOOLEAN, <c>ff</c> for true as both builds write it.</summary>
+    /// <param name="value">The value.</param>
+    /// <returns>The element, identifier and length octets included.</returns>
+    public static byte[] Boolean(bool value)
+    {
+        AsnWriter writer = new(AsnEncodingRules.BER);
+        writer.WriteBoolean(value);
         return writer.Encode();
     }
 

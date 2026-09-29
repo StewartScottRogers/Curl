@@ -13,7 +13,7 @@ namespace Curl.Protocol.Ldap;
 /// argument.
 /// </summary>
 [TestClass]
-public sealed class LdapProtocolHandlerTests
+public sealed partial class LdapProtocolHandlerTests
 {
     private const string WinLdapBindV3 = "30 84 00 00 00 1f 02 01 01 60 84 00 00 00 16 02 01 03 04 09 63 6e 3d 75 2c 64 63 3d 78 80 06 73 65 63 72 65 74";
 
@@ -29,7 +29,20 @@ public sealed class LdapProtocolHandlerTests
 
     private const string OpenLdapUnbind = "30 05 02 01 02 42 00";
 
+    private const string WinLdapUnbind4 = "30 84 00 00 00 05 02 01 04 42 00";
+
+    private const string OpenLdapUnbind3 = "30 05 02 01 03 42 00";
+
+    /// <summary>The SearchRequest for <c>dc=example</c>, messageID 2, recorded from each build (BL-587).</summary>
+    private const string WinLdapSearch2 = "30 84 00 00 00 37 02 01 02 63 84 00 00 00 2e 04 0a 64 63 3d 65 78 61 6d 70 6c 65 0a 01 00 0a 01 00 02 01 00 02 01 00 01 01 00 87 0b 4f 62 6a 65 63 74 43 6c 61 73 73 30 84 00 00 00 00";
+
+    private const string WinLdapSearch3 = "30 84 00 00 00 37 02 01 03 63 84 00 00 00 2e 04 0a 64 63 3d 65 78 61 6d 70 6c 65 0a 01 00 0a 01 00 02 01 00 02 01 00 01 01 00 87 0b 4f 62 6a 65 63 74 43 6c 61 73 73 30 84 00 00 00 00";
+
+    private const string OpenLdapSearch2 = "30 2f 02 01 02 63 2a 04 0a 64 63 3d 65 78 61 6d 70 6c 65 0a 01 00 0a 01 00 02 01 00 02 01 00 01 01 00 87 0b 6f 62 6a 65 63 74 63 6c 61 73 73 30 00";
+
     private const string BindSuccess1 = "30 0c 02 01 01 61 07 0a 01 00 04 00 04 00";
+
+    private const string SearchDone2 = "30 0c 02 01 02 65 07 0a 01 00 04 00 04 00";
 
     private const string BindInvalidCredentials1 = "30 0c 02 01 01 61 07 0a 01 31 04 00 04 00";
 
@@ -104,12 +117,12 @@ public sealed class LdapProtocolHandlerTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_WinLdapBound_SendsTheBindThenTheUnbindAndSucceeds()
+    public async Task ExecuteAsync_WinLdapBound_SendsTheBindTheSearchThenTheUnbindAndSucceeds()
     {
-        (TransferResult result, byte[] sent) = await RunAsync(LdapDialect.WinLdap, User, BindSuccess1);
+        (TransferResult result, byte[] sent) = await RunAsync(LdapDialect.WinLdap, User, BindSuccess1, SearchDone2);
 
         Assert.AreEqual(TransferResult.Success(0), result);
-        CollectionAssert.AreEqual(Hex.Bytes(WinLdapBindV3 + " " + WinLdapUnbind2), sent);
+        CollectionAssert.AreEqual(Hex.Bytes(WinLdapBindV3 + " " + WinLdapSearch2 + " " + WinLdapUnbind3), sent);
     }
 
     [TestMethod]
@@ -140,16 +153,17 @@ public sealed class LdapProtocolHandlerTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_WinLdapRetrySucceeds_UnbindsWithMessageId3AndSucceeds()
+    public async Task ExecuteAsync_WinLdapRetrySucceeds_SearchesWithMessageId3AndUnbindsWith4()
     {
         (TransferResult result, byte[] sent) = await RunAsync(
             LdapDialect.WinLdap,
             User,
             BindInvalidCredentials1,
-            "30 0c 02 01 02 61 07 0a 01 00 04 00 04 00");
+            "30 0c 02 01 02 61 07 0a 01 00 04 00 04 00",
+            "30 0c 02 01 03 65 07 0a 01 00 04 00 04 00");
 
         Assert.AreEqual(TransferResult.Success(0), result);
-        CollectionAssert.AreEqual(Hex.Bytes(WinLdapBindV3 + " " + WinLdapBindV2 + " " + WinLdapUnbind3), sent);
+        CollectionAssert.AreEqual(Hex.Bytes(WinLdapBindV3 + " " + WinLdapBindV2 + " " + WinLdapSearch3 + " " + WinLdapUnbind4), sent);
     }
 
     [TestMethod]
@@ -185,30 +199,30 @@ public sealed class LdapProtocolHandlerTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_OpenLdapBound_SendsTheBindThenTheUnbindAndSucceeds()
+    public async Task ExecuteAsync_OpenLdapBound_SendsTheBindTheSearchThenTheUnbindAndSucceeds()
     {
-        (TransferResult result, byte[] sent) = await RunAsync(LdapDialect.OpenLdap, User, BindSuccess1);
+        (TransferResult result, byte[] sent) = await RunAsync(LdapDialect.OpenLdap, User, BindSuccess1, SearchDone2);
 
         Assert.AreEqual(TransferResult.Success(0), result);
-        CollectionAssert.AreEqual(Hex.Bytes(OpenLdapBind + " " + OpenLdapUnbind), sent);
+        CollectionAssert.AreEqual(Hex.Bytes(OpenLdapBind + " " + OpenLdapSearch2 + " " + OpenLdapUnbind3), sent);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_OpenLdapWithoutUser_BindsAnonymously()
     {
-        (TransferResult result, byte[] sent) = await RunAsync(LdapDialect.OpenLdap, null, BindSuccess1);
+        (TransferResult result, byte[] sent) = await RunAsync(LdapDialect.OpenLdap, null, BindSuccess1, SearchDone2);
 
         Assert.AreEqual(TransferResult.Success(0), result);
-        CollectionAssert.AreEqual(Hex.Bytes(OpenLdapAnonymousBind + " " + OpenLdapUnbind), sent);
+        CollectionAssert.AreEqual(Hex.Bytes(OpenLdapAnonymousBind + " " + OpenLdapSearch2 + " " + OpenLdapUnbind3), sent);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_WinLdapWithoutUser_BindsAnonymouslyUntilTheNtlmBindIsBuilt()
     {
-        (TransferResult result, byte[] sent) = await RunAsync(LdapDialect.WinLdap, null, BindSuccess1);
+        (TransferResult result, byte[] sent) = await RunAsync(LdapDialect.WinLdap, null, BindSuccess1, SearchDone2);
 
         Assert.AreEqual(TransferResult.Success(0), result);
-        CollectionAssert.AreEqual(Hex.Bytes("30 84 00 00 00 10 02 01 01 60 84 00 00 00 07 02 01 03 04 00 80 00 " + WinLdapUnbind2), sent);
+        CollectionAssert.AreEqual(Hex.Bytes("30 84 00 00 00 10 02 01 01 60 84 00 00 00 07 02 01 03 04 00 80 00 " + WinLdapSearch2 + " " + WinLdapUnbind3), sent);
     }
 
     [TestMethod]
@@ -248,7 +262,7 @@ public sealed class LdapProtocolHandlerTests
     [DataRow(LdapDialect.OpenLdap)]
     public async Task ExecuteAsync_BindResponseOneByteAtATime_IsReadWhole(LdapDialect dialect)
     {
-        byte[][] reads = [.. Hex.Bytes(BindSuccess1).Select(octet => new[] { octet })];
+        byte[][] reads = [.. Hex.Bytes(BindSuccess1 + " " + SearchDone2).Select(octet => new[] { octet })];
         var connection = new ScriptedConnection(reads);
 
         TransferResult result = await new LdapProtocolHandler(new RecordingConnector(ConnectResult.Connected(connection)), dialect)

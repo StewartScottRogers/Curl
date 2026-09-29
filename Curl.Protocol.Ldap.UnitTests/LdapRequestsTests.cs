@@ -98,4 +98,42 @@ public sealed class LdapRequestsTests
         message.ReadNull(new Asn1Tag(TagClass.Application, 2));
         Assert.IsFalse(message.HasData);
     }
+
+    [TestMethod]
+    public void Search_OpenLdap_MatchesTheLinuxBuild()
+    {
+        byte[] request = LdapRequests.Search(
+            new LdapBerWriter(LdapDialect.OpenLdap),
+            2,
+            "dc=example"u8.ToArray(),
+            2,
+            Hex.Bytes("a3 08 04 03 75 69 64 04 01 61"),
+            ["cn"u8.ToArray(), "mail"u8.ToArray()]);
+
+        CollectionAssert.AreEqual(
+            Hex.Bytes("30 36 02 01 02 63 31 04 0a 64 63 3d 65 78 61 6d 70 6c 65 0a 01 02 0a 01 00 02 01 00 02 01 00 01 01 00 a3 08 04 03 75 69 64 04 01 61 30 0a 04 02 63 6e 04 04 6d 61 69 6c"),
+            request);
+    }
+
+    [TestMethod]
+    public void Search_WinLdapNoAttributes_MatchesTheWindowsBuild()
+    {
+        byte[] request = LdapRequests.Search(
+            new LdapBerWriter(LdapDialect.WinLdap),
+            2,
+            "dc=example"u8.ToArray(),
+            0,
+            Hex.Bytes("87 0b 4f 62 6a 65 63 74 43 6c 61 73 73"),
+            []);
+
+        CollectionAssert.AreEqual(
+            Hex.Bytes("30 84 00 00 00 37 02 01 02 63 84 00 00 00 2e 04 0a 64 63 3d 65 78 61 6d 70 6c 65 0a 01 00 0a 01 00 02 01 00 02 01 00 01 01 00 87 0b 4f 62 6a 65 63 74 43 6c 61 73 73 30 84 00 00 00 00"),
+            request);
+    }
+
+    [TestMethod]
+    public void Abandon_OpenLdap_MatchesTheLinuxBuild()
+    {
+        CollectionAssert.AreEqual(Hex.Bytes("30 06 02 01 03 50 01 02"), LdapRequests.Abandon(new LdapBerWriter(LdapDialect.OpenLdap), 3, 2));
+    }
 }

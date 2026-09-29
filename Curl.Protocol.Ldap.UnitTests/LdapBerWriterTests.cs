@@ -138,6 +138,29 @@ public sealed class LdapBerWriterTests
     }
 
     [TestMethod]
+    [DataRow(0, "0a 01 00")]
+    [DataRow(3, "0a 01 03")]
+    [DataRow(128, "0a 02 00 80")]
+    public void Enumerated_WritesAnIntegersContentUnderTagTen(int value, string expected)
+    {
+        CollectionAssert.AreEqual(Hex.Bytes(expected), LdapBerWriter.Enumerated(value));
+    }
+
+    [TestMethod]
+    [DataRow(false, "01 01 00")]
+    [DataRow(true, "01 01 ff")]
+    public void Boolean_WritesZeroOrFf(bool value, string expected)
+    {
+        CollectionAssert.AreEqual(Hex.Bytes(expected), LdapBerWriter.Boolean(value));
+    }
+
+    [TestMethod]
+    public void Integer_ApplicationTagSixteen_WritesAnAbandonRequestsContent()
+    {
+        CollectionAssert.AreEqual(Hex.Bytes("50 01 02"), LdapBerWriter.Integer(2, new Asn1Tag(TagClass.Application, 16)));
+    }
+
+    [TestMethod]
     [DataRow(0, "84 00 00 00 00")]
     [DataRow(0x1f, "84 00 00 00 1f")]
     [DataRow(0x01020304, "84 01 02 03 04")]

@@ -5,8 +5,8 @@ namespace Curl.Protocol.Ldap;
 
 /// <summary>
 /// Serves the <c>ldap</c> and <c>ldaps</c> schemes as the reference build
-/// <see cref="LdapDialect" /> names does (ADR-0166): connects, binds, and leaves with an
-/// UnbindRequest.
+/// <see cref="LdapDialect" /> names does (ADR-0166): reads the URL, connects, binds, runs the
+/// search the URL names, and leaves with an UnbindRequest.
 /// </summary>
 /// <param name="connector">
 /// Supplies the connection to the URL's host and port, TLS from the first byte for
@@ -21,11 +21,14 @@ namespace Curl.Protocol.Ldap;
 /// is <see cref="LdapBind" />'s. A connect failure is returned as the connector reported it.
 /// </para>
 /// <para>
-/// This is the bind only (BL-586). Once bound it sends the UnbindRequest and succeeds with
-/// nothing written: the SearchRequest the URL names comes with BL-587, the output with
-/// BL-588, and the Windows build's bind without <c>-u</c> - the rootDSE read, then WinLDAP's
-/// NTLM bind as the logged-on user, which ADR-0166 decides - with its own task, so the
-/// WinLDAP dialect binds anonymously until then. The handler is not registered in <c>Curl.Console</c> until BL-589.
+/// The URL is read as the build reads it (<see cref="WinLdapUrlReader" />,
+/// <see cref="OpenLdapUrlReader" />): the OpenLDAP build refuses a bad URL with exit 3 before it
+/// connects, the Windows build after connecting and before it sends a byte. Once bound, the
+/// search runs as <see cref="LdapSearch" /> describes and succeeds with nothing written: the
+/// output comes with BL-588, and the Windows build's bind without <c>-u</c> - the rootDSE
+/// read, then WinLDAP's NTLM bind as the logged-on user, which ADR-0166 decides - with
+/// BL-830, so the WinLDAP dialect binds anonymously until then. The handler is not
+/// registered in <c>Curl.Console</c> until BL-589.
 /// </para>
 /// </remarks>
 public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialect) : IProtocolHandler
@@ -60,6 +63,13 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
     {
         ArgumentNullException.ThrowIfNull(context);
 
+        // The OpenLDAP build reads the URL before it connects and again to search; the Windows
+        // build reads it only once connected.
+        if (dialect == LdapDialect.OpenLdap && OpenLdapUrlReader.Read(context.Url).Failure is { } refused)
+        {
+            return refused;
+        }
+
         ConnectResult connect = await connector.ConnectAsync(TargetOf(context.Url), context.CancellationToken).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
         {
@@ -67,9 +77,18 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
         }
 
         context.Progress.ReportTransferStarted();
+        return await SearchOnAsync(connection, context).ConfigureAwait(false);
+    }
+
+    /// <summary>Reads the URL, then binds and searches on <paramref name="connection" />, which it disposes.</summary>
+    private async ValueTask<TransferResult> SearchOnAsync(IConnection connection, ITransferContext context)
+    {
         await using (connection.ConfigureAwait(false))
         {
-            return await BindAndLeaveAsync(connection, context).ConfigureAwait(false);
+            LdapUrlReading reading = dialect == LdapDialect.OpenLdap ? OpenLdapUrlReader.Read(context.Url) : WinLdapUrlReader.Read(context.Url);
+            return reading.Search is { } search
+                ? await BindAndSearchAsync(connection, context, search).ConfigureAwait(false)
+                : reading.Failure!;
         }
     }
 
@@ -81,8 +100,8 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
         return new ConnectTarget(url.IdnHost, url.IsDefaultPort ? defaultPort : url.Port, useTls);
     }
 
-    /// <summary>Binds with the transfer's credentials, or anonymously without them, then sends the UnbindRequest.</summary>
-    private async ValueTask<TransferResult> BindAndLeaveAsync(IConnection connection, ITransferContext context)
+    /// <summary>Binds with the transfer's credentials, or anonymously without them, then runs the search.</summary>
+    private async ValueTask<TransferResult> BindAndSearchAsync(IConnection connection, ITransferContext context, LdapSearchParameters search)
     {
         var exchange = new LdapExchange(connection, new LdapBerWriter(dialect));
         NetworkCredential credentials = context.Credentials ?? new NetworkCredential(string.Empty, string.Empty);
@@ -97,7 +116,6 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
             return bindFailure;
         }
 
-        await exchange.UnbindAsync(context.CancellationToken).ConfigureAwait(false);
-        return TransferResult.Success(0);
+        return await LdapSearch.RunAsync(dialect, exchange, search, context.CancellationToken).ConfigureAwait(false);
     }
 }
