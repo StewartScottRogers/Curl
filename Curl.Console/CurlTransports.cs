@@ -1,4 +1,5 @@
 using Curl.Networking;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Console;
 
@@ -6,7 +7,10 @@ namespace Curl.Console;
 /// The production transports one run builds, and the pieces they were built from, kept
 /// so the composition can be checked without opening a socket.
 /// </summary>
-/// <param name="DnsResolver">The one resolver both connectors share.</param>
+/// <param name="DnsResolver">
+/// The one resolver both connectors share: <see cref="SystemDnsResolver" />, or
+/// <see cref="DnsServerResolver" /> when a c-ares option is given (BL-694).
+/// </param>
 /// <param name="TimeProvider">The clock both connectors share.</param>
 /// <param name="TcpDialer">Opens the plaintext TCP connections <see cref="TcpConnector" /> dials.</param>
 /// <param name="TlsClientOptions">The settings <see cref="TlsProvider" /> applies to every handshake.</param>
@@ -28,7 +32,7 @@ namespace Curl.Console;
 /// run disposes it when it ends (ADR-0050).
 /// </param>
 internal sealed record CurlTransports(
-    SystemDnsResolver DnsResolver,
+    IDnsResolver DnsResolver,
     TimeProvider TimeProvider,
     TcpDialer TcpDialer,
     TlsClientOptions TlsClientOptions,

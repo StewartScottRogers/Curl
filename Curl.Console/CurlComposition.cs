@@ -140,8 +140,8 @@ internal static class CurlComposition
         new SaslAuthenticator(CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()));
 
     /// <summary>
-    /// Creates the network transports for one run: a <see cref="TcpConnector" /> over a
-    /// <see cref="SystemDnsResolver" />, a <see cref="TcpDialer" /> that sets <c>TCP_NODELAY</c> and
+    /// Creates the network transports for one run: a <see cref="TcpConnector" /> over the
+    /// resolver <see cref="CreateDnsResolver" /> picks, a <see cref="TcpDialer" /> that sets <c>TCP_NODELAY</c> and
     /// <c>SO_KEEPALIVE</c> unless <c>--no-tcp-nodelay</c> or <c>--no-keepalive</c> says not to, and the
     /// TLS provider <see cref="CreateTlsProvider" /> routes to, and a <see cref="UdpDatagramConnector" />. Both
     /// connectors and the TLS provider share the one resolver and <see cref="TimeProvider.System" />. TLS uses
@@ -162,6 +162,28 @@ internal static class CurlComposition
     /// <returns>The connectors and the pieces they were built from.</returns>
     internal static CurlTransports CreateTransports(CommandLineOptions options) =>
         CreateTransports(options, TimeProvider.System);
+
+    /// <summary>
+    /// Creates the run's resolver: the hand-built <see cref="DnsServerResolver" /> when any of
+    /// <c>--dns-servers</c>, <c>--dns-interface</c>, <c>--dns-ipv4-addr</c> and <c>--dns-ipv6-addr</c>
+    /// is given, as curl's c-ares build resolves then (ADR-0170, BL-694), asking only the
+    /// <c>-4</c> or <c>-6</c> family's records; otherwise the <see cref="SystemDnsResolver" />.
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <param name="timeProvider">The clock the hand-built resolver times its attempts on.</param>
+    /// <returns>The resolver.</returns>
+    internal static IDnsResolver CreateDnsResolver(CommandLineOptions options, TimeProvider timeProvider)
+    {
+        DnsServerResolverOptions resolverOptions = new(
+            options.DnsServers,
+            options.DnsInterface,
+            options.DnsIPv4Address,
+            options.DnsIPv6Address,
+            AddressFamilyOf(options));
+        return resolverOptions.IsAnyGiven
+            ? new DnsServerResolver(resolverOptions, timeProvider)
+            : new SystemDnsResolver();
+    }
 
     /// <summary>
     /// Creates the TLS provider for handshakes run with <paramref name="options" />: the
@@ -188,7 +210,7 @@ internal static class CurlComposition
     /// <returns>The connectors and the pieces they were built from.</returns>
     internal static CurlTransports CreateTransports(CommandLineOptions options, TimeProvider timeProvider)
     {
-        SystemDnsResolver dnsResolver = new();
+        IDnsResolver dnsResolver = CreateDnsResolver(options, timeProvider);
         TcpDialer tcpDialer = new(new TcpSocketOptions(options.TcpNoDelay, options.TcpKeepAlive));
         TlsClientOptions tlsClientOptions = TlsClientOptionsMapping.FromCommandLine(options);
         ITlsProviderWithWarnings tlsProvider = CreateTlsProvider(tlsClientOptions, timeProvider);
