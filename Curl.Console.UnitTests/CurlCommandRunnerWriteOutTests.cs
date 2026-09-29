@@ -193,6 +193,22 @@ public sealed class CurlCommandRunnerWriteOutTests
         Assert.AreEqual("ok://H/b", StandardOutputText);
     }
 
+    /// <summary>
+    /// Measured (BL-524 Notes): <c>curl --proto-default dict -w '%{url_effective}' ftp.localhost:1/</c>
+    /// prints <c>dict://ftp.localhost:1/</c>; the default scheme replaces the host-name guess.
+    /// </summary>
+    [TestMethod]
+    public async Task RunAsync_ProtoDefault_SchemelessUrlUsesItInsteadOfTheGuess()
+    {
+        await RunAsync(
+            new ProtocolDispatcher([RecordingProtocolHandler.WritingPath("dict"), RecordingProtocolHandler.WritingPath("ftp")]),
+            runsOnWindows: false,
+            null,
+            "-s", "-o", "a", "--proto-default", "dict", "-w", "%{url_effective}", "ftp.localhost:1/");
+
+        Assert.AreEqual("dict://ftp.localhost:1/", StandardOutputText);
+    }
+
     [TestMethod]
     public async Task RunAsync_UnknownVariableOnWindows_WarnsWithCrLf()
     {

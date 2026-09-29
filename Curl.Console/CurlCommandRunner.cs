@@ -1180,7 +1180,7 @@ internal sealed class CurlCommandRunner(
         }
         catch (OperationCanceledException) when (state.AbortToken.IsCancellationRequested)
         {
-            ended = (ParallelRun.AbortedResult, transfer.Url, UrlSchemeGuesser.AddGuessedScheme(transfer.Url));
+            ended = (ParallelRun.AbortedResult, transfer.Url, UrlSchemeGuesser.AddScheme(transfer.Url, options.DefaultProtocol));
         }
 
         await writeGate.RunExclusiveAsync(() => EndParallelTransferAsync(run, dispatch, options, transfer, state, ended))
@@ -1205,7 +1205,7 @@ internal sealed class CurlCommandRunner(
         UrlTransfer transfer,
         CancellationToken abortToken)
     {
-        string url = UrlSchemeGuesser.AddGuessedScheme(transfer.Url);
+        string url = UrlSchemeGuesser.AddScheme(transfer.Url, options.DefaultProtocol);
         await run.Hosts.WaitForHostAsync(url, abortToken).ConfigureAwait(false);
         Running.ParallelProgress?.MarkLive();
         try
@@ -1273,7 +1273,7 @@ internal sealed class CurlCommandRunner(
     {
         TransferResult skipped = TransferResult.Failure(firstFailure.ExitCode, CurlEasyErrorText.Of(firstFailure.ExitCode));
 
-        return ReportAsync(dispatch, options, transfer, state, skipped, transfer.Url, UrlSchemeGuesser.AddGuessedScheme(transfer.Url));
+        return ReportAsync(dispatch, options, transfer, state, skipped, transfer.Url, UrlSchemeGuesser.AddScheme(transfer.Url, options.DefaultProtocol));
     }
 
     /// <summary>
@@ -1397,7 +1397,7 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// Performs one transfer: rewrites an <c>ipfs://</c> or <c>ipns://</c> URL to its gateway URL,
-    /// gives a URL typed without a scheme the one <see cref="UrlSchemeGuesser" /> guesses, and
+    /// gives a URL typed without a scheme the <c>--proto-default</c> scheme or the one <see cref="UrlSchemeGuesser" /> guesses, and
     /// resolves the URL of a <c>-T</c> upload with <see cref="UploadTransferUrl" />, then loads
     /// the <c>--resolve</c> entries and the <c>-b</c> cookie files, in curl 8.21.0's order, before
     /// the transfer itself.
@@ -1428,7 +1428,7 @@ internal sealed class CurlCommandRunner(
         }
 
         string? uploadFile = transfer.UploadFile;
-        string transferUrl = UrlSchemeGuesser.AddGuessedScheme(givenUrl);
+        string transferUrl = UrlSchemeGuesser.AddScheme(givenUrl, options.DefaultProtocol);
         if (uploadFile is not null && !UploadTransferUrl.TryResolve(transferUrl, uploadFile, out transferUrl))
         {
             return (UploadUrlMalformedFailure, givenUrl, transferUrl);
