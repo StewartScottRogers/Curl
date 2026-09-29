@@ -1,5 +1,5 @@
 ---
-id: BL-877
+id: BL-946
 title: Load a PKCS #12 client key exportable so TLS 1.0 and 1.1 can sign with it on Windows
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-877 — Load a PKCS #12 client key exportable so TLS 1.0 and 1.1 can sign with it on Windows
+# BL-946 — Load a PKCS #12 client key exportable so TLS 1.0 and 1.1 can sign with it on Windows
 
 ## Goal
 
@@ -33,3 +33,4 @@ On Windows, an RSA client certificate given as a PKCS #12 file with `--cert` sig
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-29: Renumbered from BL-877, which the --pinnedpubkey -v task filed first also holds.
