@@ -8,8 +8,13 @@ congestion control). It carries `--http3` and `--http3-only` under ADR-0144;
 `Curl.Http3.UnitLibrary` reads and writes its streams as byte streams and never
 references it. `System.Net.Quic` is not used (ADR-0144).
 
-Namespace `Curl.Quic`. The project is an empty scaffold (BL-719); the transport lands in
-the tasks ADR-0144 lists.
+Namespace `Curl.Quic`. So far it holds the wire codec (BL-722): `QuicVariableLengthInteger`,
+`QuicPacketNumber` (Appendix A encoding and decoding), `QuicPacketCodec` with one record per
+header form (`QuicLongHeaderPacket`, `QuicRetryPacket`, `QuicVersionNegotiationPacket`,
+`QuicShortHeaderPacket`), and `QuicFrameCodec` with one `QuicFrame` record per frame type of
+RFC 9000 section 19. Bytes the peer sent that break a rule are a `QuicTransportException`
+carrying the `QuicTransportErrorCode` to close with, never an out-of-range read. The rest
+of the transport lands in the tasks ADR-0144 lists.
 
 ## Rules
 
