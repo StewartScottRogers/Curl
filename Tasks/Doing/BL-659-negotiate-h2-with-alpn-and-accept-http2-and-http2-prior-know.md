@@ -31,3 +31,4 @@ On Windows, Linux and macOS, the TLS handshake offers the ALPN list BL-655's ADR
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
