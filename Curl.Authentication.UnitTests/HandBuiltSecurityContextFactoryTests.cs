@@ -238,7 +238,7 @@ public sealed class HandBuiltSecurityContextFactoryTests
 
     private static SecurityContextRequest Request(SecurityMechanism mechanism) => new(mechanism, "HTTP", Host);
 
-    private static HandBuiltSecurityContextFactory Factory(FakeKdc kdc) => Factory(Tickets(kdc, Cache(TicketGrantingTicket())));
+    internal static HandBuiltSecurityContextFactory Factory(FakeKdc kdc) => Factory(Tickets(kdc, Cache(TicketGrantingTicket())));
 
     private static HandBuiltSecurityContextFactory Factory(KerberosServiceTicketSource tickets) =>
         new(tickets, new FixedTimeProvider(FakeKdc.Now), new FixedKerberosRandomSource(RandomBytes), new FixedNtlmRandomSource(RandomBytes));

@@ -193,7 +193,7 @@ public sealed class SaslAuthenticatorTests
     public async Task Begin_DigestMd5_AnswersTheChallengeThenRspauthAsCurl(bool answerAsSspi, string host, string clientNonce, string expected)
     {
         // Measured: AUTH DIGEST-MD5, 334 <challenge>, the answer, 334 <rspauth>, an empty line, 235.
-        var authenticator = new SaslAuthenticator(Windows1252, () => clientNonce, answerAsSspi);
+        var authenticator = new SaslAuthenticator(Windows1252, () => clientNonce, answerAsSspi, securityContexts: null);
         SaslRequest request = Request(new NetworkCredential("user", "pencil"), authorizationIdentity: "z") with { Host = host };
         ISaslExchange exchange = authenticator.Begin("DIGEST-MD5", request);
 
@@ -210,7 +210,7 @@ public sealed class SaslAuthenticatorTests
     [DataRow(false)]
     public async Task Begin_DigestMd5WithoutCredential_SendsAnEmptyUser(bool answerAsSspi)
     {
-        ISaslExchange exchange = new SaslAuthenticator(Windows1252, () => "c", answerAsSspi).Begin("DIGEST-MD5", Request(null));
+        ISaslExchange exchange = new SaslAuthenticator(Windows1252, () => "c", answerAsSspi, securityContexts: null).Begin("DIGEST-MD5", Request(null));
 
         StringAssert.StartsWith(
             Windows1252.GetString((await RespondAsync(exchange, "nonce=\"n\",qop=\"auth\",algorithm=md5-sess"u8))!), "username=\"\",");
@@ -227,7 +227,7 @@ public sealed class SaslAuthenticatorTests
     [TestMethod]
     [DataRow("NTLM")]
     [DataRow("SCRAM-SHA-256")]
-    public void Begin_MechanismNotBuilt_Throws(string mechanism)
+    public void Begin_MechanismNotBuiltWithoutSecurityContexts_Throws(string mechanism)
     {
         ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(
             () => Authenticator.Begin(mechanism, Request(new NetworkCredential("u", "p"))));
@@ -240,7 +240,7 @@ public sealed class SaslAuthenticatorTests
         DisplayName = "All ten: DIGEST-MD5")]
     [DataRow(new[] { "DIGEST-MD5", "CRAM-MD5", "PLAIN" }, "DIGEST-MD5", DisplayName = "DIGEST-MD5 CRAM-MD5 PLAIN: DIGEST-MD5")]
     [DataRow(new[] { "CRAM-MD5", "PLAIN" }, "CRAM-MD5", DisplayName = "CRAM-MD5 PLAIN: CRAM-MD5")]
-    [DataRow(new[] { "NTLM", "OAUTHBEARER", "XOAUTH2", "LOGIN", "PLAIN" }, "PLAIN", DisplayName = "Without the MD5 mechanisms: PLAIN until NTLM is built (BL-538)")]
+    [DataRow(new[] { "NTLM", "OAUTHBEARER", "XOAUTH2", "LOGIN", "PLAIN" }, "PLAIN", DisplayName = "Without the MD5 mechanisms and no security contexts: PLAIN")]
     [DataRow(new[] { "EXTERNAL", "GSSAPI", "OAUTHBEARER", "XOAUTH2", "LOGIN", "SCRAM-SHA-256" }, "LOGIN", DisplayName = "Without PLAIN: LOGIN")]
     [DataRow(new[] { "EXTERNAL", "GSSAPI", "OAUTHBEARER", "XOAUTH2", "SCRAM-SHA-256" }, null, DisplayName = "No usable mechanism: none (exit 67)")]
     [DataRow(new[] { "LOGIN", "PLAIN" }, "PLAIN", DisplayName = "LOGIN PLAIN: PLAIN")]

@@ -4,8 +4,8 @@ Phase 2.
 
 Basic, Digest, NTLM, Negotiate/SPNEGO/Kerberos, Bearer, AWS SigV4, and the SASL
 mechanisms the mail handlers use (`SaslAuthenticator`: PLAIN, LOGIN, EXTERNAL, XOAUTH2,
-OAUTHBEARER, CRAM-MD5 and DIGEST-MD5, the last as SSPI on Windows; ADR-0121, ADR-0123,
-ADR-0139), and the netrc reader (`NetrcFile`: which login and
+OAUTHBEARER, CRAM-MD5 and DIGEST-MD5, the last as SSPI on Windows, and GSSAPI and NTLM
+through security contexts; ADR-0121, ADR-0123, ADR-0139, ADR-0184), and the netrc reader (`NetrcFile`: which login and
 password curl 8.21.0 picks from `--netrc-file` text, BL-503).
 
 Negotiate (BL-527, ADR-0142, ADR-0176): `RankedHttpAuthenticator.CreateAuthorizationAsync`
@@ -35,6 +35,11 @@ Message protection (BL-851, ADR-0183): an established context wraps and unwraps
 the hand-built Kerberos route; curl's own NTLM throws `NotSupportedException`, and an unfinished
 context `InvalidOperationException`. SSPI's NTLM needs `SecurityContextRequest.MessageProtection`
 to negotiate the keys. SASL exchanges are awaited (`GetInitialResponseAsync`, `RespondAsync`).
+SASL GSSAPI and NTLM (BL-538, ADR-0184): `SaslAuthenticator`, given an `ISecurityContextFactory`,
+answers both on one `SecurityContextSaslExchange` per exchange, for the SASL service on the
+URL's host: NTLM's Type 1 then Type 3; GSSAPI's raw Kerberos tokens until established, then the
+wrapped RFC 4752 security-layer answer (no layer, size 0, `--sasl-authzid`). Without a factory
+both stay not offered; `Curl.Console` does not pass one yet (BL-852).
 Tests fake the seam with `ScriptedSecurityContext` and run the hand-built route against
 `Curl.Kerberos.UnitTests`' `FakeKdc` and `FakeGssAcceptor`, linked into the test project.
 
