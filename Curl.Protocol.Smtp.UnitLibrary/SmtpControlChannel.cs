@@ -7,6 +7,10 @@ namespace Curl.Protocol.Smtp;
 /// Sends commands on an SMTP connection and reads its replies, a line at a time.
 /// </summary>
 /// <param name="connection">The connection; the caller owns and disposes it.</param>
+/// <param name="events">
+/// Where <c>-v</c> and <c>--trace</c> learn of each command sent, as a request header, each
+/// line read, as a response header, and each piece of the message, as data sent.
+/// </param>
 /// <param name="cancellationToken">Cancels every send and read.</param>
 /// <remarks>
 /// Commands and replies are Latin-1, so every byte of a percent-decoded <c>EHLO</c> domain
@@ -14,9 +18,11 @@ namespace Curl.Protocol.Smtp;
 /// line ends at LF, with a CR before it dropped; a reply line starts with three digits; a
 /// line whose fourth character is a space, or that is exactly four characters long before
 /// its LF (<c>220</c> and a CR), ends the reply; a <c>-</c> there continues it; and any
-/// other line is skipped.
+/// other line is skipped. Every line read is reported with its line end, skipped or not, and
+/// <c>QUIT</c> and its reply are not reported at all, as curl 8.21.0 sends them once the
+/// transfer is over (BL-546).
 /// </remarks>
-internal sealed class SmtpControlChannel(IConnection connection, CancellationToken cancellationToken)
+internal sealed class SmtpControlChannel(IConnection connection, ITransferEvents events, CancellationToken cancellationToken)
 {
     private const int ReadBufferSize = 4096;
 
@@ -31,6 +37,15 @@ internal sealed class SmtpControlChannel(IConnection connection, CancellationTok
     private int bufferStart;
 
     private int bufferEnd;
+
+    /// <summary>Where lines are reported: <c>events</c> until <see cref="QuitAsync" />, nowhere after.</summary>
+    private ITransferEvents reporting = events;
+
+    /// <summary>
+    /// Gets whether <see cref="QuitAsync" /> has sent <c>QUIT</c>, so a failed transfer ends
+    /// with curl's <c>shutting down</c> line rather than its <c>closing</c> one.
+    /// </summary>
+    public bool QuitSent { get; private set; }
 
     /// <summary>
     /// Gets the connection commands are sent on and replies read from: the one the channel
@@ -57,24 +72,28 @@ internal sealed class SmtpControlChannel(IConnection connection, CancellationTok
     /// </summary>
     /// <param name="command">The command line without its line end, such as <c>EHLO x</c>.</param>
     /// <returns>A task that completes once the command is sent or the send has failed.</returns>
-    public ValueTask SendAsync(string command) => SendBytesAsync(Encoding.Latin1.GetBytes(command + "\r\n"));
+    public async ValueTask SendAsync(string command)
+    {
+        byte[] bytes = Encoding.Latin1.GetBytes(command + "\r\n");
+        if (await TryWriteAsync(bytes).ConfigureAwait(false))
+        {
+            reporting.ReportRequestHeader(bytes);
+        }
+    }
 
     /// <summary>
     /// Sends <paramref name="bytes" /> as they are, such as a piece of the message after
-    /// <c>DATA</c>. A connection that fails with an <see cref="IOException" /> is left for the
-    /// next <see cref="ReadReplyAsync()" /> to find closed.
+    /// <c>DATA</c>, reported as data sent. A connection that fails with an
+    /// <see cref="IOException" /> is left for the next <see cref="ReadReplyAsync()" /> to find
+    /// closed.
     /// </summary>
     /// <param name="bytes">The bytes to send.</param>
     /// <returns>A task that completes once the bytes are sent or the send has failed.</returns>
     public async ValueTask SendBytesAsync(ReadOnlyMemory<byte> bytes)
     {
-        try
+        if (await TryWriteAsync(bytes).ConfigureAwait(false))
         {
-            await connection.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
-            await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
-        }
-        catch (IOException)
-        {
+            reporting.ReportDataSent(bytes.Span);
         }
     }
 
@@ -134,11 +153,15 @@ internal sealed class SmtpControlChannel(IConnection connection, CancellationTok
 
     /// <summary>
     /// Sends <c>QUIT</c> and reads its reply, ignoring whatever it says and a reply line that
-    /// is too long, as curl does once the session is open.
+    /// is too long, as curl does once the session is open. Neither is reported, and nothing
+    /// is after them: curl sends <c>QUIT</c> once the transfer is over, where <c>-v</c> does
+    /// not see it.
     /// </summary>
     /// <returns>A task that completes once the reply is read or the connection has closed.</returns>
     public async ValueTask QuitAsync()
     {
+        reporting = NoTransferEvents.Instance;
+        QuitSent = true;
         await SendAsync("QUIT").ConfigureAwait(false);
         try
         {
@@ -149,12 +172,28 @@ internal sealed class SmtpControlChannel(IConnection connection, CancellationTok
         }
     }
 
+    /// <summary>Writes and flushes <paramref name="bytes" />; <see langword="false" /> when an <see cref="IOException" /> stopped it.</summary>
+    private async ValueTask<bool> TryWriteAsync(ReadOnlyMemory<byte> bytes)
+    {
+        try
+        {
+            await connection.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
+            await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
+            return true;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+    }
+
     private static bool StartsWithCode(string line) =>
         line.Length >= 4 && char.IsAsciiDigit(line[0]) && char.IsAsciiDigit(line[1]) && char.IsAsciiDigit(line[2]);
 
     /// <summary>
     /// Reads one line up to its LF, without the LF but with any CR before it, so that the
-    /// caller can tell <c>220</c> and a CR, a complete reply, from <c>220</c> alone.
+    /// caller can tell <c>220</c> and a CR, a complete reply, from <c>220</c> alone. The line
+    /// is reported with its LF as a response header.
     /// </summary>
     private async ValueTask<string?> ReadLineAsync()
     {
@@ -167,12 +206,13 @@ internal sealed class SmtpControlChannel(IConnection connection, CancellationTok
             }
 
             byte next = buffer[bufferStart++];
+            line.Add(next);
             if (next == (byte)'\n')
             {
-                return Encoding.Latin1.GetString([.. line]);
+                byte[] bytes = [.. line];
+                reporting.ReportResponseHeader(bytes);
+                return Encoding.Latin1.GetString(bytes, 0, bytes.Length - 1);
             }
-
-            line.Add(next);
         }
 
         return null;

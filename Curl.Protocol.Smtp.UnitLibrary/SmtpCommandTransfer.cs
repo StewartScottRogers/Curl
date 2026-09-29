@@ -129,6 +129,7 @@ internal sealed class SmtpCommandTransfer(SmtpControlChannel channel, ITransferC
 
         byte[] bytes = Encoding.Latin1.GetBytes(line);
         await context.Output.WriteAsync(bytes, context.CancellationToken).ConfigureAwait(false);
+        context.Events.ReportDataReceived(bytes);
         written += bytes.Length;
         context.Progress.ReportDownloaded(written, null);
     }

@@ -158,15 +158,24 @@ internal sealed class SmtpMailTransaction(SmtpControlChannel channel, ITransferC
 
     private async ValueTask<TransferResult> SendMessageAsync(Stream upload, long? expected)
     {
+        // The last piece goes out with the end-of-data mark, one send and one data event, as
+        // curl sends a message that fits its buffer (measured, BL-546).
         var stuffer = new SmtpDotStuffer();
         byte[] buffer = new byte[ReadBufferSize];
+        byte[] pending = [];
         int read;
         while ((read = await upload.ReadAsync(buffer, context.CancellationToken).ConfigureAwait(false)) > 0)
         {
-            await SendMessageBytesAsync(stuffer.Encode(buffer.AsSpan(0, read)), expected).ConfigureAwait(false);
+            if (pending.Length > 0)
+            {
+                await SendMessageBytesAsync(pending, expected).ConfigureAwait(false);
+            }
+
+            pending = stuffer.Encode(buffer.AsSpan(0, read));
         }
 
-        await SendMessageBytesAsync(stuffer.EndOfData, expected).ConfigureAwait(false);
+        await SendMessageBytesAsync([.. pending, .. stuffer.EndOfData], expected).ConfigureAwait(false);
+        context.Events.ReportInfo(SmtpConnectionInfoLines.UploadSent(uploaded));
 
         // Measured: curl reports response code 000 when the server closes instead of answering the message.
         responseCode = 0;

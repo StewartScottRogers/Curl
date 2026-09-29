@@ -127,17 +127,38 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
 
         await using (connection.ConfigureAwait(false))
         {
+            var channel = new SmtpControlChannel(connection, context.Events, context.CancellationToken);
+
             // curl decodes the path once connected, so a malformed one still costs a connect.
-            return SmtpEhloDomain.Read(url, localHostName) is { } domain
-                ? await RunSessionAsync(connection, context, domain, implicitTls).ConfigureAwait(false)
+            TransferResult result = SmtpEhloDomain.Read(url, localHostName) is { } domain
+                ? await RunSessionAsync(channel, context, domain, implicitTls).ConfigureAwait(false)
                 : TransferResult.Failure(CurlExitCode.UrlMalformat, SmtpSessionMessages.MalformedUrl);
+            ReportConnectionEnd(context.Events, result, channel.QuitSent, target, connected.ConnectionNumber);
+            return result;
         }
     }
 
-    private async ValueTask<TransferResult> RunSessionAsync(IConnection connection, ITransferContext context, string domain, bool implicitTls)
+    /// <summary>
+    /// Writes the lines curl 8.21.0's <c>-v</c> ends an SMTP transfer with (BL-546): a failure's
+    /// message, then <c>shutting down connection #N</c> when <c>QUIT</c> was sent and
+    /// <c>closing connection #N</c> when it was not; a success ends with
+    /// <c>Connection #N to host H:P left intact</c>.
+    /// </summary>
+    private static void ReportConnectionEnd(ITransferEvents events, TransferResult result, bool quitSent, ConnectTarget target, long connectionNumber)
     {
-        var session = new SmtpSession(
-            new SmtpControlChannel(connection, context.CancellationToken), tlsProvider, saslAuthenticator, context, domain, implicitTls);
+        if (result.ExitCode == CurlExitCode.Ok)
+        {
+            events.ReportInfo(SmtpConnectionInfoLines.LeftIntact(connectionNumber, target.Host, target.Port));
+            return;
+        }
+
+        events.ReportInfo(result.ErrorMessage!);
+        events.ReportInfo(quitSent ? SmtpConnectionInfoLines.ShuttingDown(connectionNumber) : SmtpConnectionInfoLines.Closing(connectionNumber));
+    }
+
+    private async ValueTask<TransferResult> RunSessionAsync(SmtpControlChannel channel, ITransferContext context, string domain, bool implicitTls)
+    {
+        var session = new SmtpSession(channel, tlsProvider, saslAuthenticator, context, domain, implicitTls);
         await using (session.ConfigureAwait(false))
         {
             return await session.RunAsync().ConfigureAwait(false);
