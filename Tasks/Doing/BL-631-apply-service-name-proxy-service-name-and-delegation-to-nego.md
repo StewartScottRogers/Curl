@@ -33,3 +33,4 @@ The Negotiate authenticator (BL-527) and the GSS-API users (SASL GSSAPI BL-538, 
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
