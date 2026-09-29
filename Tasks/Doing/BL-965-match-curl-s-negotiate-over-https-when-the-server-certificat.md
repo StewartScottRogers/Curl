@@ -35,3 +35,4 @@ Hand-built Negotiate over HTTPS does what curl 8.18.0 (OpenSSL, MIT) is measured
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-29: Backlog -> Doing.
