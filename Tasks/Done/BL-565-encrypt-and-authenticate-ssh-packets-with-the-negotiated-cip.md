@@ -5,7 +5,7 @@ priority: High
 assignee: Claude
 pipeline: protocol
 depends-on: [BL-564, BL-737, BL-668]
-touches: [Curl.Protocol.Ssh.UnitLibrary, Curl.Protocol.Ssh.UnitTests, Documentation/Planning/Decisions/ADR-0207-ssh-packets-are-sealed-behind-one-protection-seam-and-a-failed-mac-ends-with-libssh2-s-minus-4.md, Documentation/Planning/Decisions/README.md]
+touches: [Curl.Protocol.Ssh.UnitLibrary, Curl.Protocol.Ssh.UnitTests, Documentation/Planning/Decisions/ADR-0212-ssh-packets-are-sealed-behind-one-protection-seam-and-a-failed-mac-ends-with-libssh2-s-minus-4.md, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-09-28
 completed: 2026-09-29
@@ -30,7 +30,7 @@ After `NEWKEYS`, packets are encrypted and authenticated with the ciphers and MA
 
 ## Notes
 
-- **Design (ADR-0207).** New folder `PacketProtection`: `ISshPacketProtection` (one per
+- **Design (ADR-0212).** New folder `PacketProtection`: `ISshPacketProtection` (one per
   direction: `Seal`, `DecryptPacketLength`, `Open`, plus `BlockSize`,
   `PadsPacketLengthField`, `LengthBlockLength`, `TagLength`), `SshPlainPacketProtection`
   (before the first `NEWKEYS`), `CipherAndMacPacketProtection` (`ISshCipher` +
@@ -49,7 +49,7 @@ After `NEWKEYS`, packets are encrypted and authenticated with the ciphers and MA
   `hmac-sha2-512-etm@openssh.com`: exit 2, `curl: (2) Failure establishing ssh session:
   -4, Failed to get response to ssh-userauth request`. Server closing instead: exit 2,
   `-43, Failed to get response to ssh-userauth request`.
-- **Exit code.** BL-560's ADR (ADR-0122) states none for this case; ADR-0207 records the
+- **Exit code.** BL-560's ADR (ADR-0122) states none for this case; ADR-0212 records the
   measured `-4` (MAC) and `-12` for an AES-GCM tag, the latter from libssh2 1.11.1's
   `transport.c` since the Windows build offers no GCM and WSL's OpenSSL curl could not
   reach the Windows listener (Docker down). Filed **BL-889** to measure it. The
