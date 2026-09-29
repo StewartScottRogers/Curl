@@ -209,9 +209,10 @@ public sealed class Tls13ClientHandshake : IDisposable
 
     /// <summary>
     /// Starts the handshake: builds the ClientHello to send at the Initial level, offering
-    /// <see cref="Tls13ClientSettings.ResumptionSession" /> when it can be resumed, and with
-    /// early data offered installs <c>client_early_traffic_secret</c> for writing at the
-    /// <see cref="TlsEncryptionLevel.EarlyData" /> level.
+    /// <see cref="Tls13ClientSettings.ResumptionSession" /> when it can be resumed (with an ECH
+    /// offer, in the inner hello), and with early data offered installs
+    /// <c>client_early_traffic_secret</c>, over the inner hello with an ECH offer, for writing
+    /// at the <see cref="TlsEncryptionLevel.EarlyData" /> level.
     /// </summary>
     /// <returns>The ClientHello to send, and the early traffic secret when early data is offered.</returns>
     /// <exception cref="InvalidOperationException">The handshake has already started.</exception>
@@ -229,10 +230,7 @@ public sealed class Tls13ClientHandshake : IDisposable
         helloBuilder = new Tls13ClientHelloBuilder(settings, clientRandom, legacySessionId);
         shares = [.. settings.KeyShareGroups.Select(random.CreateKeyShare)];
         PrepareEncryptedClientHello(clientRandom, legacySessionId);
-        if (ech is null)
-        {
-            OfferSession(settings.TimeProvider.GetUtcNow());
-        }
+        OfferSession(settings.TimeProvider.GetUtcNow());
         Tls13HandshakeOutputBuilder output = new();
         SendClientHello(null, output);
         if (EarlyDataOffered)
@@ -515,8 +513,8 @@ public sealed class Tls13ClientHandshake : IDisposable
     private TlsAlertDescription? ReceiveKeyShare(ServerHello hello, byte[] encoded, Tls13HandshakeOutputBuilder output)
     {
         TlsAlertDescription? alert = CheckExtensionTypes(hello.Extensions, pskOffer is null ? ServerHelloExtensions : ResumedServerHelloExtensions)
-            ?? ReadSelectedIdentity(FindExtension(hello.Extensions, TlsExtensionType.PreSharedKey), hello.CipherSuite)
-            ?? ReceiveEchConfirmation(hello, encoded);
+            ?? ReceiveEchConfirmation(hello, encoded)
+            ?? ReadSelectedIdentity(FindExtension(hello.Extensions, TlsExtensionType.PreSharedKey), hello.CipherSuite);
         return alert ?? ReceiveServerShare(hello, encoded, output);
     }
 
@@ -571,12 +569,19 @@ public sealed class Tls13ClientHandshake : IDisposable
     /// <summary>
     /// RFC 8446 section 4.2.11: a ServerHello's <c>pre_shared_key</c> selects the one identity
     /// offered, index 0, with a suite of the ticket's hash; anything else is <c>illegal_parameter</c>.
+    /// After an ECH rejection the server answered the outer hello, whose <c>pre_shared_key</c>
+    /// is GREASE, so selecting any identity is <c>illegal_parameter</c> (RFC 9849 section 6.1.2).
     /// </summary>
     private TlsAlertDescription? ReadSelectedIdentity(byte[]? data, ushort cipherSuite)
     {
         if (data is null)
         {
             return null;
+        }
+
+        if (ech is { Rejected: true })
+        {
+            return TlsAlertDescription.IllegalParameter;
         }
 
         TlsDecodeResult<ushort> selected = PreSharedKeyExtension.DecodeSelected(data);
@@ -1104,13 +1109,17 @@ public sealed class Tls13ClientHandshake : IDisposable
         output.Send(TlsEncryptionLevel.Initial, clientHello.Encode());
     }
 
-    /// <summary>Builds the ClientHello to send: the ECH outer hello or the plain one, its PSK binders filled in when a session is offered.</summary>
+    /// <summary>
+    /// Builds the ClientHello to send: the ECH outer hello, whose inner hello carries the
+    /// bound ticket, or the plain one with its PSK binders filled in when a session is offered.
+    /// </summary>
     private ClientHello BuildClientHello(byte[]? cookie)
     {
         KeyShareEntry[] entries = [.. shares.Select(share => share.Entry)];
-        ClientHello hello = ech?.Build(entries, cookie) ?? helloBuilder!.Build(entries, cookie, pskOffer, echGrease);
-        return pskOffer is null ? hello : BindPsk(hello);
+        return ech?.Build(entries, cookie, pskOffer, BindOfferedPsk) ?? BindOfferedPsk(helloBuilder!.Build(entries, cookie, pskOffer, echGrease));
     }
+
+    private ClientHello BindOfferedPsk(ClientHello hello) => pskOffer is null ? hello : BindPsk(hello);
 
     private void UseTranscriptHello(ClientHello hello)
     {

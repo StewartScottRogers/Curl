@@ -186,8 +186,11 @@ TLS-SRP (BL-704, ADR-0229), and Encrypted Client Hello (BL-706, ADR-0233).
   the inner hello when accepted (`EncryptedClientHelloAccepted`), and on a rejection
   verifies the chain for the public name, keeps `EncryptedClientHelloRetryConfigs` and
   fails with `EchRequired` after the server's Finished. `SendEncryptedClientHelloGrease`
-  sends GREASE when no config is supported. An ECH offer offers no session to resume
-  (BL-960). `EncryptedClientHelloExtension` is the extension codec.
+  sends GREASE when no config is supported. An ECH offer resumes (BL-960): the ticket and
+  its binder (over the inner transcript) go in the inner hello, a GREASE `pre_shared_key`
+  of the same lengths in the outer one, `early_data` in both or neither, and early data
+  under the inner hello's early secret; a `pre_shared_key` in a ServerHello that rejected
+  ECH is `illegal_parameter`. `EncryptedClientHelloExtension` is the extension codec.
 - `ITlsRandomSource` supplies the random, session ID, key shares, DHE exponent, SRP private value, RSA
   pre-master secret and ECH's inner random, HPKE ephemeral key and GREASE bytes;
   `SystemTlsRandomSource` is the production one.

@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;
 using Curl.Cryptography;
@@ -15,7 +16,9 @@ namespace Curl.Tls;
 /// Both hellos carry the same key shares, cipher suites and legacy session ID, so the
 /// ServerHello works with the client's shares whichever the server answered. The inner
 /// hello offers TLS 1.3 alone (section 6.1) and is sent whole, with no
-/// <c>ech_outer_extensions</c>; it is padded by section 6.1.3's rule.
+/// <c>ech_outer_extensions</c>; it is padded by section 6.1.3's rule. A resuming inner hello
+/// carries the ticket, and the outer one a GREASE <c>pre_shared_key</c> of the same lengths
+/// (section 6.1.2), with <c>early_data</c> only when the inner one has it.
 /// </remarks>
 internal sealed class EchClientHello : IDisposable
 {
@@ -27,6 +30,7 @@ internal sealed class EchClientHello : IDisposable
 
     private readonly EchCipherSuite suite;
     private readonly HpkeContext context;
+    private readonly ITlsRandomSource random;
     private readonly Tls13ClientHelloBuilder innerBuilder;
     private readonly Tls13ClientHelloBuilder outerBuilder;
     private readonly string? serverName;
@@ -40,6 +44,7 @@ internal sealed class EchClientHello : IDisposable
         EchConfig config,
         EchCipherSuite suite,
         HpkeContext context,
+        ITlsRandomSource random,
         byte[] encapsulatedKey,
         byte[] innerRandom,
         byte[] outerRandom,
@@ -48,6 +53,7 @@ internal sealed class EchClientHello : IDisposable
         Config = config;
         this.suite = suite;
         this.context = context;
+        this.random = random;
         this.encapsulatedKey = encapsulatedKey;
         serverName = settings.ServerName;
         innerBuilder = new Tls13ClientHelloBuilder(InnerSettings(settings), innerRandom, legacySessionId);
@@ -91,7 +97,7 @@ internal sealed class EchClientHello : IDisposable
         // ephemeral scalar outside the curve's order (a chance of about 2^-32 on P-256) fails here.
         _ = Hpke.TrySetupBaseSender(kem, (HpkeKdf)suite.KdfId, (HpkeAead)suite.AeadId, config.PublicKey, ephemeralPrivateKey, info, encapsulatedKey, out HpkeContext? context);
         CryptographicOperations.ZeroMemory(ephemeralPrivateKey);
-        return new EchClientHello(settings, config, suite, context!, encapsulatedKey, innerRandom, outerRandom, legacySessionId);
+        return new EchClientHello(settings, config, suite, context!, random, encapsulatedKey, innerRandom, outerRandom, legacySessionId);
     }
 
     /// <summary>
@@ -124,14 +130,16 @@ internal sealed class EchClientHello : IDisposable
     /// <summary>
     /// Builds the inner hello and the outer hello that carries it sealed, and returns the
     /// outer one to send. After a HelloRetryRequest the sealing context runs on and
-    /// <c>enc</c> is empty (section 6.1.5).
+    /// <c>enc</c> is empty (section 6.1.5). With <paramref name="pskOffer" /> the inner hello
+    /// offers the ticket, its binder filled in by <paramref name="bindPsk" /> over the inner
+    /// transcript, and the outer hello a GREASE one (section 6.1.2).
     /// </summary>
-    public ClientHello Build(IReadOnlyList<KeyShareEntry> shares, byte[]? cookie)
+    public ClientHello Build(IReadOnlyList<KeyShareEntry> shares, byte[]? cookie, Tls13PskOffer? pskOffer, Func<ClientHello, ClientHello> bindPsk)
     {
-        inner = innerBuilder.Build(shares, cookie, null, EncryptedClientHelloExtension.EncodeInner());
+        inner = bindPsk(innerBuilder.Build(shares, cookie, pskOffer, EncryptedClientHelloExtension.EncodeInner()));
         byte[] encodedInner = EncodeInner(inner, Config.MaximumNameLength, serverName);
         byte[] payload = new byte[encodedInner.Length + HpkeContext.TagSize];
-        ClientHello associatedData = outerBuilder.Build(shares, cookie, null, EncryptedClientHelloExtension.EncodeOuter(suite, Config.ConfigId, encapsulatedKey, payload));
+        ClientHello associatedData = BuildOuter(shares, cookie, pskOffer, EncryptedClientHelloExtension.EncodeOuter(suite, Config.ConfigId, encapsulatedKey, payload));
         context.Seal(associatedData.Encode().AsSpan(HandshakeMessage.HeaderLength), encodedInner, payload);
         TlsExtension sealedExtension = EncryptedClientHelloExtension.EncodeOuter(suite, Config.ConfigId, encapsulatedKey, payload);
         outer = associatedData with
@@ -230,6 +238,32 @@ internal sealed class EchClientHello : IDisposable
 
         hash.Append(withoutConfirmation);
         return hash.GetCurrentHash();
+    }
+
+    /// <summary>
+    /// Builds the outer hello around <paramref name="echExtension" />. When the inner hello
+    /// offers a ticket, the outer one carries a GREASE <c>pre_shared_key</c> (section 6.1.2): a
+    /// random identity as long as the ticket, a random obfuscated age and a random binder as
+    /// long as the real one, drawn from the random source in that order, with <c>early_data</c>
+    /// only when the inner hello asks for it.
+    /// </summary>
+    private ClientHello BuildOuter(IReadOnlyList<KeyShareEntry> shares, byte[]? cookie, Tls13PskOffer? pskOffer, TlsExtension echExtension)
+    {
+        if (pskOffer is null)
+        {
+            return outerBuilder.Build(shares, cookie, null, echExtension);
+        }
+
+        byte[] identity = new byte[pskOffer.Identity.Identity.Length];
+        random.Fill(identity);
+        byte[] age = new byte[sizeof(uint)];
+        random.Fill(age);
+        byte[] binder = new byte[pskOffer.BinderLength];
+        random.Fill(binder);
+        Tls13PskOffer grease = pskOffer with { Identity = new PskIdentity(identity, BinaryPrimitives.ReadUInt32BigEndian(age)) };
+        ClientHello hello = outerBuilder.Build(shares, cookie, grease, echExtension);
+        TlsExtension offered = PreSharedKeyExtension.EncodeOffered(new OfferedPsks([grease.Identity], [binder]));
+        return hello with { Extensions = [.. hello.Extensions.SkipLast(1), offered] };
     }
 
     /// <summary>The inner hello offers TLS 1.3 alone (section 6.1).</summary>

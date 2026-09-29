@@ -223,21 +223,118 @@ public sealed class Tls13EncryptedClientHelloTests
     }
 
     [TestMethod]
-    public void AnEchOfferDoesNotOfferTheSessionToResume()
+    public void AnAcceptedOfferResumesWithTheTicketInTheInnerHelloAndGreaseInTheOuter()
     {
         EchTestConfig config = EchTestConfig.X25519();
+        Tls13TestTicketCache tickets = new();
+        TlsSessionRecord session = FirstSession(tickets);
         using EchTestFrontEnd frontEnd = new(config);
-        TlsSessionRecord session = new(0x0304, 0x1301, new byte[32], new byte[32], [1, 2, 3], 7200, 0, 0, DateTimeOffset.UtcNow) { ServerName = "localhost" };
-        using Tls13ClientHandshake client = Client(EchSettings(config) with
-        {
-            ExtensionOrder = [.. OrderWithEch, TlsExtensionType.PskKeyExchangeModes],
-            ResumptionSession = session,
-        });
+        Tls13TestServer server = new(TestServerCredential.Ed25519()) { ConfirmEch = true, Tickets = tickets };
+        RecordingCertificateVerifier verifier = new();
+        using Tls13ClientHandshake client = Client(ResumingEchSettings(config, session), verifier);
+
+        Tls13HandshakeOutput output = Run(client, server, forwardClientHello: frontEnd.Decrypt);
+
+        Assert.IsNull(output.Failure);
+        Assert.IsTrue(output.IsComplete);
+        Assert.IsTrue(client.EncryptedClientHelloAccepted);
+        Assert.IsTrue(client.IsResumed);
+        Assert.IsTrue(server.IsResumed);
+        Assert.IsEmpty(verifier.Presented);
+        OfferedPsks inner = OfferedPsksOf(frontEnd.InnerHellos[0])!;
+        OfferedPsks outer = OfferedPsksOf(frontEnd.OuterHellos[0])!;
+        CollectionAssert.AreEqual(session.Ticket, inner.Identities.Single().Identity);
+        Assert.HasCount(session.Ticket.Length, outer.Identities.Single().Identity);
+        CollectionAssert.AreNotEqual(session.Ticket, outer.Identities.Single().Identity);
+        Assert.HasCount(inner.Binders.Single().Length, outer.Binders.Single());
+        CollectionAssert.AreNotEqual(inner.Binders.Single(), outer.Binders.Single());
+        Assert.AreEqual(TlsExtensionType.PreSharedKey, frontEnd.OuterHellos[0].Extensions[^1].Type);
+    }
+
+    [TestMethod]
+    public void EarlyDataWithAnAcceptedOfferGoesUnderTheInnerHellosEarlySecret()
+    {
+        EchTestConfig config = EchTestConfig.X25519();
+        Tls13TestTicketCache tickets = new();
+        TlsSessionRecord session = FirstSession(tickets);
+        using EchTestFrontEnd frontEnd = new(config);
+        Tls13TestServer server = new(TestServerCredential.Ed25519()) { ConfirmEch = true, Tickets = tickets };
+        using Tls13ClientHandshake client = Client(ResumingEchSettings(config, session) with { OfferEarlyData = true });
+
+        Tls13HandshakeOutput start = client.Start();
+        server.Answer(frontEnd.Decrypt(start.BytesToSend[0].Bytes));
+
+        Assert.IsTrue(client.EarlyDataOffered);
+        Assert.IsTrue(server.EarlyDataAccepted);
+        Assert.IsNotNull(ExtensionOf(frontEnd.InnerHellos[0], TlsExtensionType.EarlyData));
+        Assert.IsNotNull(ExtensionOf(frontEnd.OuterHellos[0], TlsExtensionType.EarlyData));
+        Tls13TrafficSecret early = start.SecretsInstalled.Single();
+        Assert.AreEqual(TlsEncryptionLevel.EarlyData, early.Level);
+        CollectionAssert.AreEqual(server.ClientEarlyTrafficSecret, early.Secret);
+    }
+
+    [TestMethod]
+    public void AnOuterHelloCarriesEarlyDataOnlyWhenTheInnerHelloDoes()
+    {
+        EchTestConfig config = EchTestConfig.X25519();
+        TlsSessionRecord session = FirstSession(new Tls13TestTicketCache());
+        using EchTestFrontEnd frontEnd = new(config);
+        using Tls13ClientHandshake client = Client(ResumingEchSettings(config, session));
 
         frontEnd.Decrypt(client.Start().BytesToSend[0].Bytes);
 
-        Assert.IsFalse(frontEnd.InnerHellos[0].Extensions.Any(extension => extension.Type == TlsExtensionType.PreSharedKey));
-        Assert.IsFalse(frontEnd.OuterHellos[0].Extensions.Any(extension => extension.Type == TlsExtensionType.PreSharedKey));
+        Assert.IsNotNull(OfferedPsksOf(frontEnd.OuterHellos[0]));
+        Assert.IsNull(ExtensionOf(frontEnd.InnerHellos[0], TlsExtensionType.EarlyData));
+        Assert.IsNull(ExtensionOf(frontEnd.OuterHellos[0], TlsExtensionType.EarlyData));
+    }
+
+    [TestMethod]
+    public void AnAcceptedOfferResumesThroughAHelloRetryRequest()
+    {
+        EchTestConfig config = EchTestConfig.X25519();
+        Tls13TestTicketCache tickets = new();
+        TlsSessionRecord session = FirstSession(tickets);
+        using EchTestFrontEnd frontEnd = new(config);
+        Tls13TestServer server = new(TestServerCredential.Ed25519()) { ConfirmEch = true, Tickets = tickets, Group = TlsNamedGroup.Secp256r1 };
+        using Tls13ClientHandshake client = Client(ResumingEchSettings(config, session) with { SupportedGroups = [TlsNamedGroup.X25519, TlsNamedGroup.Secp256r1] });
+
+        Tls13HandshakeOutput output = Run(client, server, forwardClientHello: frontEnd.Decrypt);
+
+        Assert.IsNull(output.Failure);
+        Assert.IsTrue(server.SentHelloRetryRequest);
+        Assert.IsTrue(client.EncryptedClientHelloAccepted);
+        Assert.IsTrue(client.IsResumed);
+        Assert.IsNotNull(OfferedPsksOf(frontEnd.OuterHellos[1]));
+    }
+
+    [TestMethod]
+    public void ARejectedOfferDoesNotResume()
+    {
+        Tls13TestTicketCache tickets = new();
+        TlsSessionRecord session = FirstSession(tickets);
+        Tls13TestServer server = new(TestServerCredential.Ed25519()) { Tickets = tickets };
+        using Tls13ClientHandshake client = Client(ResumingEchSettings(EchTestConfig.X25519(), session));
+
+        Tls13HandshakeOutput output = Run(client, server);
+
+        Assert.AreEqual(TlsAlertDescription.EchRequired, output.Failure!.Alert);
+        Assert.IsFalse(client.IsResumed);
+        Assert.IsFalse(server.IsResumed);
+    }
+
+    [TestMethod]
+    public void ARejectionWhoseServerHelloSelectsAPreSharedKeyIsAnIllegalParameter()
+    {
+        Tls13TestTicketCache tickets = new();
+        TlsSessionRecord session = FirstSession(tickets);
+        Tls13TestServer server = new(TestServerCredential.Ed25519()) { Tickets = tickets };
+        using Tls13ClientHandshake client = Client(ResumingEchSettings(EchTestConfig.X25519(), session));
+
+        Tls13HandshakeOutput output = Run(client, server, replaceServerHello: SelectFirstPreSharedKey);
+
+        Assert.AreEqual(TlsAlertDescription.IllegalParameter, output.Failure!.Alert);
+        Assert.IsFalse(client.EncryptedClientHelloAccepted);
+        Assert.IsFalse(client.IsResumed);
     }
 
     [TestMethod]
@@ -345,6 +442,35 @@ public sealed class Tls13EncryptedClientHelloTests
 
     private static Tls13ClientSettings EchSettings(EchTestConfig config) =>
         DefaultSettings with { ExtensionOrder = OrderWithEch, EncryptedClientHelloConfigs = config.Decoded };
+
+    private static Tls13ClientSettings ResumingEchSettings(EchTestConfig config, TlsSessionRecord session) =>
+        EchSettings(config) with
+        {
+            ExtensionOrder = [.. Tls13ClientSettings.DefaultExtensionOrder, TlsExtensionType.EarlyData, TlsExtensionType.PskKeyExchangeModes, TlsExtensionType.EncryptedClientHello],
+            ResumptionSession = session,
+        };
+
+    /// <summary>Completes a plain handshake with a server issuing into <paramref name="tickets" /> and returns the session its ticket stands for.</summary>
+    private static TlsSessionRecord FirstSession(Tls13TestTicketCache tickets)
+    {
+        Tls13TestServer server = new(TestServerCredential.Ed25519()) { Tickets = tickets };
+        using Tls13ClientHandshake client = Client(DefaultSettings with { ExtensionOrder = [.. Tls13ClientSettings.DefaultExtensionOrder, TlsExtensionType.PskKeyExchangeModes] });
+        Assert.IsNull(Run(client, server).Failure);
+        Assert.IsNull(client.Receive(TlsEncryptionLevel.Application, server.IssueTicket()).Failure);
+        return client.ReceivedSessions.Single();
+    }
+
+    private static OfferedPsks? OfferedPsksOf(ClientHello hello) =>
+        ExtensionOf(hello, TlsExtensionType.PreSharedKey) is { } data ? PreSharedKeyExtension.DecodeOffered(data).Value : null;
+
+    private static byte[]? ExtensionOf(ClientHello hello, TlsExtensionType type) =>
+        hello.Extensions.FirstOrDefault(extension => extension.Type == type)?.Data;
+
+    private static byte[] SelectFirstPreSharedKey(byte[] serverHello)
+    {
+        ServerHello decoded = ServerHello.Decode(serverHello[HandshakeMessage.HeaderLength..]).Value;
+        return (decoded with { Extensions = [.. decoded.Extensions, PreSharedKeyExtension.EncodeSelected(0)] }).Encode();
+    }
 
     private static int EncodedInnerLength(Tls13ClientSettings settings)
     {
