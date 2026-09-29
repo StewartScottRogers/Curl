@@ -386,10 +386,10 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Opens the transfer's connection (ADR-0144 section 4, ADR-0172): over QUIC for
-    /// <c>--http3-only</c>, whose failure is the transfer's; over QUIC and then, when that fails,
-    /// over TCP for <c>--http3</c>, failing with the QUIC attempt's exit code and message when
-    /// both fail; and over TCP for every other version, for an <c>http://</c> URL and through a
-    /// proxy. A QUIC connection is handed on as an <see cref="Http3Session" />.
+    /// <c>--http3-only</c>, whose failure is the transfer's; over QUIC raced against TCP for
+    /// <c>--http3</c> (<see cref="RaceQuicAgainstTcpAsync" />); and over TCP for every other
+    /// version, for an <c>http://</c> URL and through a proxy. A QUIC connection is handed on
+    /// as an <see cref="Http3Session" />.
     /// </summary>
     private async ValueTask<ConnectResult> ConnectAsync(HttpRequestPlan plan, ConnectTarget target)
     {
@@ -398,24 +398,97 @@ public sealed class HttpProtocolHandler(
             return await plan.Deadline.ConnectAsync(connector, target).ConfigureAwait(false);
         }
 
+        if (plan.Options.Version == HttpVersionPreference.Http3)
+        {
+            return await RaceQuicAgainstTcpAsync(plan, target).ConfigureAwait(false);
+        }
+
         MultiplexedConnectResult quic = await plan.Deadline.ConnectMultiplexedAsync(connector, target).ConfigureAwait(false);
-        if (quic.Connection is { } quicConnection)
-        {
-            return ConnectResult.Connected(
-                new Http3Session(quicConnection),
-                quic.Timings,
-                quicConnection.LocalEndPoint as IPEndPoint,
-                applicationProtocol: quicConnection.ApplicationProtocol);
-        }
-
-        if (plan.Options.Version == HttpVersionPreference.Http3Only)
-        {
-            return ConnectResult.Failed(quic.ExitCode, quic.ErrorMessage!);
-        }
-
-        ConnectResult tcp = await plan.Deadline.ConnectAsync(connector, target).ConfigureAwait(false);
-        return tcp.Connection is null ? ConnectResult.Failed(quic.ExitCode, quic.ErrorMessage!, tcp.Timings, tcp.ConnectionNumber) : tcp;
+        return quic.Connection is { } quicConnection
+            ? Http3Connected(quicConnection, quic)
+            : ConnectResult.Failed(quic.ExitCode, quic.ErrorMessage!);
     }
+
+    /// <summary>
+    /// Races QUIC against TCP for <c>--http3</c> as curl's ngtcp2 build does
+    /// (<c>lib/cf-https-connect.c</c>, ADR-0144 section 4): the TCP connect starts when the QUIC
+    /// connect fails or once <see cref="HttpRequestOptions.HappyEyeballsTimeout" /> has passed on
+    /// the transfer's clock without it completing; the first to connect carries the transfer
+    /// and the other is cancelled, its connection disposed should it still complete; when both
+    /// fail the transfer fails with the QUIC attempt's exit code and message.
+    /// </summary>
+    private async ValueTask<ConnectResult> RaceQuicAgainstTcpAsync(HttpRequestPlan plan, ConnectTarget target)
+    {
+        using CancellationTokenSource quicAbandoned = new();
+        using CancellationTokenSource tcpAbandoned = new();
+        Task<MultiplexedConnectResult> quic = plan.Deadline.ConnectMultiplexedAsync(connector, target, quicAbandoned.Token).AsTask();
+        await QuicOrHappyEyeballsTimeoutAsync(plan, quic).ConfigureAwait(false);
+        if (quic.IsCompleted && (await quic.ConfigureAwait(false)).Connection is { } early)
+        {
+            return Http3Connected(early, quic.Result);
+        }
+
+        Task<ConnectResult> tcp = plan.Deadline.ConnectAsync(connector, target, tcpAbandoned.Token).AsTask();
+        if (await Task.WhenAny(quic, tcp).ConfigureAwait(false) == tcp && (await tcp.ConfigureAwait(false)).Connection is not null)
+        {
+            await quicAbandoned.CancelAsync().ConfigureAwait(false);
+            _ = DisposeLosingQuicAsync(quic);
+            return tcp.Result;
+        }
+
+        MultiplexedConnectResult quicResult = await quic.ConfigureAwait(false);
+        if (quicResult.Connection is { } quicConnection)
+        {
+            await tcpAbandoned.CancelAsync().ConfigureAwait(false);
+            _ = DisposeLosingTcpAsync(tcp);
+            return Http3Connected(quicConnection, quicResult);
+        }
+
+        ConnectResult tcpResult = await tcp.ConfigureAwait(false);
+        return tcpResult.Connection is null
+            ? ConnectResult.Failed(quicResult.ExitCode, quicResult.ErrorMessage!, tcpResult.Timings, tcpResult.ConnectionNumber)
+            : tcpResult;
+    }
+
+    /// <summary>
+    /// Waits until the QUIC connect completes or the happy-eyeballs timeout passes on the
+    /// transfer's clock, whichever comes first.
+    /// </summary>
+    private static async Task QuicOrHappyEyeballsTimeoutAsync(HttpRequestPlan plan, Task quic)
+    {
+        using CancellationTokenSource quicCompleted = new();
+        Task timeout = Task.Delay(plan.Options.HappyEyeballsTimeout, plan.Context.TimeProvider, quicCompleted.Token);
+        await Task.WhenAny(quic, timeout).ConfigureAwait(false);
+        await quicCompleted.CancelAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>Disposes the connection a TCP connect that lost the race opens anyway.</summary>
+    private static async Task DisposeLosingTcpAsync(Task<ConnectResult> tcp)
+    {
+        await ((Task)tcp).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        if (tcp.IsCompletedSuccessfully && tcp.Result.Connection is { } connection)
+        {
+            await connection.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>Disposes the connection a QUIC connect that lost the race opens anyway.</summary>
+    private static async Task DisposeLosingQuicAsync(Task<MultiplexedConnectResult> quic)
+    {
+        await ((Task)quic).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        if (quic.IsCompletedSuccessfully && quic.Result.Connection is { } connection)
+        {
+            await connection.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>Hands on a QUIC connection as an <see cref="Http3Session" />.</summary>
+    private static ConnectResult Http3Connected(IMultiplexedConnection connection, MultiplexedConnectResult quic) =>
+        ConnectResult.Connected(
+            new Http3Session(connection),
+            quic.Timings,
+            connection.LocalEndPoint as IPEndPoint,
+            applicationProtocol: connection.ApplicationProtocol);
 
     /// <summary>
     /// Decides whether the transfer tries QUIC: <c>--http3</c> or <c>--http3-only</c> with an

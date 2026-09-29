@@ -552,7 +552,8 @@ public sealed partial class HttpProtocolHandlerTests
         RecordingTransferEvents? events = null,
         HttpVersionPreference version = HttpVersionPreference.Http3Only,
         TimeProvider? time = null,
-        bool noBody = false) =>
+        bool noBody = false,
+        TimeSpan? connectTimeout = null) =>
         new()
         {
             Url = CurlUrl.Parse(url),
@@ -562,7 +563,7 @@ public sealed partial class HttpProtocolHandlerTests
             NoBody = noBody,
             Events = (ITransferEvents?)events ?? NoTransferEvents.Instance,
             TimeProvider = time ?? TimeProvider.System,
-            ConnectTimeout = TimeSpan.FromMilliseconds(1000),
+            ConnectTimeout = connectTimeout ?? TimeSpan.FromMilliseconds(1000),
             Http = (options ?? new HttpRequestOptions()) with { Version = version, UserAgent = MeasuredUserAgent },
         };
 

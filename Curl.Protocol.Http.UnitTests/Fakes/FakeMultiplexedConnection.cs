@@ -17,6 +17,8 @@ public sealed class FakeMultiplexedConnection(params FakeMultiplexedStream[] req
 
     private readonly Queue<FakeMultiplexedStream> serverStreams = new();
 
+    private readonly TaskCompletionSource disposed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
     /// <inheritdoc />
     public EndPoint? RemoteEndPoint { get; init; }
 
@@ -44,6 +46,9 @@ public sealed class FakeMultiplexedConnection(params FakeMultiplexedStream[] req
 
     /// <summary>Gets a value indicating whether the connection was disposed.</summary>
     public bool IsDisposed { get; private set; }
+
+    /// <summary>Gets a task that completes when the connection is disposed.</summary>
+    public Task Disposed => disposed.Task;
 
     /// <inheritdoc />
     /// <exception cref="InvalidOperationException">Every scripted stream has been opened.</exception>
@@ -128,6 +133,7 @@ public sealed class FakeMultiplexedConnection(params FakeMultiplexedStream[] req
     public ValueTask DisposeAsync()
     {
         IsDisposed = true;
+        disposed.TrySetResult();
         return ValueTask.CompletedTask;
     }
 }

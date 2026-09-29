@@ -54,6 +54,14 @@ server can be made to fail on demand (ADR-0144); those are read from curl's
    `http://`, and either option with a proxy configured, connect over TCP only. The race that
    also starts TCP once `--happy-eyeballs-timeout-ms` passes without a QUIC handshake is left
    to its own task, as is measuring what curl does with a proxy.
+
+   *Amended by BL-835 (2026-09-29):* that race is now built, as ADR-0144 section 4 states it.
+   `--http3` starts the TCP connect when the QUIC connect fails or once
+   `HttpRequestOptions.HappyEyeballsTimeout` (default 200 ms) passes on the transfer's
+   `TimeProvider` without it completing; the first to connect carries the transfer, and the
+   other is cancelled and its connection disposed should it still complete. Both failing
+   still reports the QUIC attempt's exit code and message. The title's "only when QUIC
+   fails" describes BL-731's behaviour, not the current one.
 6. **Failures** (from `curl_ngtcp2.c` where not measured):
    - The server resets the request stream: `HTTP/3 stream <id> reset by server`, exit 95
      `CURLE_HTTP3`, or exit 18 once body bytes have arrived (curl tests

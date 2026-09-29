@@ -101,12 +101,17 @@ internal sealed class HttpTransferDeadline : IDisposable
     /// </summary>
     /// <param name="connector">The connector to open the connection with.</param>
     /// <param name="target">What to connect to.</param>
+    /// <param name="abandoned">
+    /// Cancels this connect alone, when a racing connect has won (ADR-0144 section 4); the
+    /// connect then ends as the exit 28 failure, which the race discards.
+    /// </param>
     /// <returns>The connector's result, or the exit 28 failure.</returns>
     /// <exception cref="OperationCanceledException">The transfer was cancelled.</exception>
-    internal ValueTask<ConnectResult> ConnectAsync(IConnector connector, ConnectTarget target) =>
+    internal ValueTask<ConnectResult> ConnectAsync(IConnector connector, ConnectTarget target, CancellationToken abandoned = default) =>
         WithinConnectTimeoutAsync(
             token => connector.ConnectAsync(target, token),
-            message => ConnectResult.Failed(CurlExitCode.OperationTimedOut, message));
+            message => ConnectResult.Failed(CurlExitCode.OperationTimedOut, message),
+            abandoned);
 
     /// <summary>
     /// Connects over QUIC through <paramref name="connector" />
@@ -115,19 +120,25 @@ internal sealed class HttpTransferDeadline : IDisposable
     /// </summary>
     /// <param name="connector">The connector to open the connection with.</param>
     /// <param name="target">What to connect to.</param>
+    /// <param name="abandoned">
+    /// Cancels this connect alone, when a racing connect has won (ADR-0144 section 4); the
+    /// connect then ends as the exit 28 failure, which the race discards.
+    /// </param>
     /// <returns>The connector's result, or the exit 28 failure.</returns>
     /// <exception cref="OperationCanceledException">The transfer was cancelled.</exception>
-    internal ValueTask<MultiplexedConnectResult> ConnectMultiplexedAsync(IConnector connector, ConnectTarget target) =>
+    internal ValueTask<MultiplexedConnectResult> ConnectMultiplexedAsync(IConnector connector, ConnectTarget target, CancellationToken abandoned = default) =>
         WithinConnectTimeoutAsync(
             token => connector.ConnectMultiplexedAsync(target, token),
-            message => MultiplexedConnectResult.Failed(CurlExitCode.OperationTimedOut, message));
+            message => MultiplexedConnectResult.Failed(CurlExitCode.OperationTimedOut, message),
+            abandoned);
 
     private async ValueTask<TResult> WithinConnectTimeoutAsync<TResult>(
         Func<CancellationToken, ValueTask<TResult>> connectAsync,
-        Func<string, TResult> timedOut)
+        Func<string, TResult> timedOut,
+        CancellationToken abandoned)
     {
         using CancellationTokenSource connectElapsed = new(connectTimeout, timeProvider);
-        using CancellationTokenSource connect = CancellationTokenSource.CreateLinkedTokenSource(Token, connectElapsed.Token);
+        using CancellationTokenSource connect = CancellationTokenSource.CreateLinkedTokenSource(Token, connectElapsed.Token, abandoned);
         try
         {
             return await connectAsync(connect.Token).ConfigureAwait(false);

@@ -25,6 +25,8 @@ public sealed class ScriptedConnection : IConnection
 
     private readonly MemoryStream written = new();
 
+    private readonly TaskCompletionSource disposed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
     private int responseOffset;
 
     private bool requestChecked;
@@ -75,6 +77,9 @@ public sealed class ScriptedConnection : IConnection
     /// <summary>Gets a value indicating whether the connection has been disposed.</summary>
     public bool IsDisposed { get; private set; }
 
+    /// <summary>Gets a task that completes when the connection is disposed.</summary>
+    public Task Disposed => disposed.Task;
+
     /// <summary>
     /// Gets a value indicating whether <see cref="MarkReusable" /> has been called.
     /// </summary>
@@ -117,6 +122,7 @@ public sealed class ScriptedConnection : IConnection
     {
         written.Dispose();
         IsDisposed = true;
+        disposed.TrySetResult();
         return ValueTask.CompletedTask;
     }
 
