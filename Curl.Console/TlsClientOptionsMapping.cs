@@ -54,7 +54,9 @@ internal static class TlsClientOptionsMapping
     /// <see cref="CommandLineOptions.Ech" />, <see cref="CommandLineOptions.EchPublicName" />,
     /// <see cref="CommandLineOptions.EchConfigList" />, <see cref="CommandLineOptions.SslSessionsFile" />,
     /// <see cref="CommandLineOptions.Engine" />, <see cref="CommandLineOptions.TlsUser" />,
-    /// <see cref="CommandLineOptions.TlsPassword" /> and <see cref="CommandLineOptions.TlsAuthType" />.
+    /// <see cref="CommandLineOptions.TlsPassword" /> and <see cref="CommandLineOptions.TlsAuthType" />; and
+    /// ADR-0191's <see cref="CommandLineOptions.RequireCertificateStatus" /> (<c>--cert-status</c>) and
+    /// <see cref="CommandLineOptions.AutoClientCertificate" /> (<c>--ssl-auto-client-cert</c>).
     /// </returns>
     internal static TlsClientOptions FromCommandLine(CommandLineOptions options) =>
         new(
@@ -83,7 +85,9 @@ internal static class TlsClientOptionsMapping
             options.Engine,
             options.TlsUser,
             options.TlsPassword,
-            options.TlsAuthType);
+            options.TlsAuthType,
+            options.RequireCertificateStatus,
+            options.AutoClientCertificate);
 
     /// <summary>
     /// Maps the proxy TLS options of a parsed command line onto the <see cref="TlsClientOptions" />
@@ -99,7 +103,9 @@ internal static class TlsClientOptionsMapping
     /// <see cref="CommandLineOptions.CaCertificateDirectory" /> without it, as
     /// <see cref="TlsClientOptions.CaCertificateDirectory" />, since curl falls back to
     /// <c>--capath</c> for the proxy, and <see cref="CommandLineOptions.ProxyMinimumTlsVersion" />
-    /// (<c>--proxy-tlsv1</c>) as <see cref="TlsClientOptions.MinimumVersion" />; every other setting is
+    /// (<c>--proxy-tlsv1</c>) as <see cref="TlsClientOptions.MinimumVersion" />, and
+    /// <see cref="CommandLineOptions.ProxyAutoClientCertificate" /> (<c>--proxy-ssl-auto-client-cert</c>) as
+    /// <see cref="TlsClientOptions.AutoClientCertificate" /> (ADR-0191); every other setting is
     /// its default. Neither the target's minimum nor <c>--tls-max</c> reaches the proxy: curl 8.21.0
     /// completes the handshake with a TLS 1.2-only HTTPS proxy under <c>--tlsv1.3</c> and under
     /// <c>--tls-max 1.1</c> (measured, BL-502).
@@ -109,7 +115,8 @@ internal static class TlsClientOptionsMapping
             Insecure: options.ProxyInsecure,
             MinimumVersion: ToTlsVersion(options.ProxyMinimumTlsVersion),
             CaCertificateFile: options.ProxyCaCertificateFile,
-            CaCertificateDirectory: options.ProxyCaCertificateDirectory ?? options.CaCertificateDirectory);
+            CaCertificateDirectory: options.ProxyCaCertificateDirectory ?? options.CaCertificateDirectory,
+            AutoClientCertificate: options.ProxyAutoClientCertificate);
 
     /// <summary>
     /// Maps a TLS version from the command line, a minimum or a ceiling, onto the one the TLS

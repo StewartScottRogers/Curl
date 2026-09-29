@@ -278,6 +278,31 @@ public sealed class TlsClientOptionsMappingTests
             Map([.. trustArguments, "--ca-native", Url]));
     }
 
+    [TestMethod]
+    public void FromCommandLine_CertStatus_SetsRequireCertificateStatusOnly()
+    {
+        Assert.AreEqual(new TlsClientOptions(RequireCertificateStatus: true), Map("--cert-status", Url));
+    }
+
+    [TestMethod]
+    public void FromCommandLine_SslAutoClientCert_SetsAutoClientCertificateOnly()
+    {
+        Assert.AreEqual(new TlsClientOptions(AutoClientCertificate: true), Map("--ssl-auto-client-cert", Url));
+    }
+
+    [TestMethod]
+    public void ProxyFromCommandLine_ProxySslAutoClientCert_SetsTheProxysAutoClientCertificateOnly()
+    {
+        Assert.AreEqual(new TlsClientOptions(AutoClientCertificate: true), MapProxy("--proxy-ssl-auto-client-cert", Url));
+        Assert.AreEqual(new TlsClientOptions(AutoClientCertificate: true), Map("--proxy-ssl-auto-client-cert", "--ssl-auto-client-cert", Url));
+    }
+
+    [TestMethod]
+    public void ProxyFromCommandLine_CertStatusAndSslAutoClientCert_NeverReachTheProxy()
+    {
+        Assert.AreEqual(new TlsClientOptions(), MapProxy("--cert-status", "--ssl-auto-client-cert", Url));
+    }
+
     private static TlsClientOptions Map(params string[] arguments) =>
         TlsClientOptionsMapping.FromCommandLine(Parse(arguments));
 
