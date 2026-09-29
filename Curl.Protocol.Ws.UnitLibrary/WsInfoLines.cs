@@ -1,4 +1,5 @@
 using System.Globalization;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Ws;
 
@@ -27,6 +28,24 @@ internal static class WsInfoLines
     /// <returns>The line, such as <c>upload completely sent off: 10 bytes</c>.</returns>
     internal static string UploadSent(long frameLength) =>
         string.Create(CultureInfo.InvariantCulture, $"upload completely sent off: {frameLength} bytes");
+
+    /// <summary>
+    /// Formats the first of the two lines curl writes after a frame violation's message
+    /// (BL-813).
+    /// </summary>
+    /// <param name="exitCode">The exit code the violation ends the transfer with.</param>
+    /// <returns>The line, such as <c>[WS] decode frame error 56</c>.</returns>
+    internal static string DecodeFrameError(CurlExitCode exitCode) =>
+        string.Create(CultureInfo.InvariantCulture, $"[WS] decode frame error {(int)exitCode}");
+
+    /// <summary>
+    /// Formats the second of the two lines curl writes after a frame violation's message
+    /// (BL-813).
+    /// </summary>
+    /// <param name="exitCode">The exit code the violation ends the transfer with.</param>
+    /// <returns>The line, such as <c>[WS] decode payload error 56</c>.</returns>
+    internal static string DecodePayloadError(CurlExitCode exitCode) =>
+        string.Create(CultureInfo.InvariantCulture, $"[WS] decode payload error {(int)exitCode}");
 
     /// <summary>
     /// Formats the line for a transfer that ended after the upgrade, by the server closing the

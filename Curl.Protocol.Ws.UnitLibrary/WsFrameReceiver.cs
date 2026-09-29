@@ -44,20 +44,34 @@ internal sealed class WsFrameReceiver(IConnection connection, IWebSocketRandomSo
     /// <summary>Gets how many bytes of pong frames have been sent so far.</summary>
     internal long BytesSent { get; private set; }
 
-    /// <summary>Reads frames until the server closes the connection.</summary>
+    /// <summary>
+    /// Decodes the bytes that arrived with the upgrade reply's head, reporting them as one read
+    /// when there are any; curl 8.21.0 does this before it sends a <c>-T</c> frame (BL-813).
+    /// </summary>
     /// <param name="alreadyReceived">The bytes that arrived with the upgrade reply's head.</param>
+    /// <param name="writePayload">Receives each run of payload bytes curl writes to the output.</param>
+    /// <param name="cancellationToken">Cancels the writes and any pong.</param>
+    /// <returns>A task that completes once the bytes are decoded.</returns>
+    /// <exception cref="WsTransferException">
+    /// A frame broke the protocol (56) or a pong could not be sent (55).
+    /// </exception>
+    internal ValueTask DeliverAlreadyReceivedAsync(
+        ReadOnlyMemory<byte> alreadyReceived,
+        Func<ReadOnlyMemory<byte>, CancellationToken, ValueTask> writePayload,
+        CancellationToken cancellationToken) =>
+        DeliverReceivedAsync(alreadyReceived, writePayload, cancellationToken);
+
+    /// <summary>Reads frames until the server closes the connection.</summary>
     /// <param name="writePayload">Receives each run of payload bytes curl writes to the output.</param>
     /// <param name="cancellationToken">Cancels the reads and writes.</param>
     /// <returns>A task that completes once the server has closed the connection.</returns>
     /// <exception cref="WsTransferException">
     /// A frame broke the protocol (56), a read failed (56) or a pong could not be sent (55).
     /// </exception>
-    internal async ValueTask ReceiveAsync(
-        ReadOnlyMemory<byte> alreadyReceived,
+    internal async ValueTask ReceiveUntilClosedAsync(
         Func<ReadOnlyMemory<byte>, CancellationToken, ValueTask> writePayload,
         CancellationToken cancellationToken)
     {
-        await DeliverReceivedAsync(alreadyReceived, writePayload, cancellationToken).ConfigureAwait(false);
         byte[] buffer = new byte[ReadBufferSize];
         while (true)
         {

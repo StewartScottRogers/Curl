@@ -102,20 +102,86 @@ public sealed class WsProtocolHandlerEventTests
             events.Transcript);
     }
 
+    /// <summary>
+    /// Each violation <see cref="WsFrameDecoder" /> detects, after a whole <c>ok</c> text frame,
+    /// with the lines curl 8.21.0 writes for it under <c>-sv</c> (BL-813, measured 2026-09-29).
+    /// </summary>
     [TestMethod]
-    public async Task ExecuteAsync_FrameViolation_ReportsTheFailureAndCloses()
+    [DataRow("\u000f\u0000", "{ 6", "[WS] invalid opcode: 0f")]
+    [DataRow("Á\u0000", "{ 6", "[WS] invalid reserved bits: c1")]
+    [DataRow("\u0080\u0000", "{ 6", "[WS] no ongoing fragmented message to resume")]
+    [DataRow("\u0009\u0000", "{ 6", "[WS] invalid fragmented PING frame")]
+    [DataRow("\u0081\u0080abcd", "{ 10", "[WS] masked input frame")]
+    [DataRow("\u0089~\u0000\u0080", "{ 8", "[WS] received PING frame is too big")]
+    [DataRow("\u0082\u007f\u0080\u0000\u0000\u0000\u0000\u0000\u0000\u0000", "{ 14", "[WS] frame length longer than 63 bits not supported")]
+    public async Task ExecuteAsync_FrameViolation_ReportsTheViolationTheTwoDecodeErrorsAndCloses(string violation, string read, string message)
     {
-        RecordingTransferEvents events = await RunAsync(new ScriptedConnection(Bytes(Head101 + "\x81\x85\x01\x02\x03\x04")));
+        RecordingTransferEvents events = await RunAsync(new ScriptedConnection(Bytes(Head101 + "\u0081\u0002ok" + violation)));
 
-        Assert.AreEqual("* closing connection #0", events.Transcript[^1]);
-        Assert.AreEqual("{ 6", events.Transcript[^3]);
+        CollectionAssert.AreEqual(
+            (string[])
+            [
+                .. UpgradeLines,
+                read,
+                "* " + message,
+                "* [WS] decode frame error 56",
+                "* [WS] decode payload error 56",
+                "* closing connection #0",
+            ],
+            events.Transcript);
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_Upload_ReportsTheFrameSentAndTheUploadLine()
+    public async Task ExecuteAsync_TextMessageInterrupted_ReportsTheViolationTheTwoDecodeErrorsAndCloses()
+    {
+        RecordingTransferEvents events = await RunAsync(new ScriptedConnection(Bytes(Head101 + "\u0001\u0002ok\u0081\u0000")));
+
+        CollectionAssert.AreEqual(
+            (string[])
+            [
+                .. UpgradeLines,
+                "{ 6",
+                "* [WS] fragmented message interrupted by new TEXT msg",
+                "* [WS] decode frame error 56",
+                "* [WS] decode payload error 56",
+                "* closing connection #0",
+            ],
+            events.Transcript);
+    }
+
+    /// <summary>
+    /// curl 8.21.0 writes the frame that came with the <c>101</c> head before it sends the
+    /// <c>-T</c> frame, measured against a server holding the connection open (BL-813):
+    /// <c>Recv data, 4 bytes</c>, <c>Send data, 10 bytes</c>,
+    /// <c>upload completely sent off: 10 bytes</c>, <c>Recv data, 0 bytes</c>.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_UploadWithAFrameAfterTheHead_ReportsTheFrameReadBeforeTheFrameSent()
+    {
+        RecordingTransferEvents events = await UploadAsync(new ScriptedConnection(Bytes(Head101 + "\x81\x02ok")));
+
+        CollectionAssert.AreEqual(
+            (string[])[.. UpgradeLines, "{ 4", "} 9", "* upload completely sent off: 9 bytes", "{ 0", "* shutting down connection #0"],
+            events.Transcript);
+    }
+
+    /// <summary>
+    /// With nothing after the <c>101</c> head, curl 8.21.0 sends the <c>-T</c> frame first,
+    /// then ends with <c>Empty reply from server</c> (BL-813).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_UploadWithNothingAfterTheHead_ReportsTheFrameSentThenTheEmptyReply()
+    {
+        RecordingTransferEvents events = await UploadAsync(new ScriptedConnection(Bytes(Head101)));
+
+        CollectionAssert.AreEqual(
+            (string[])[.. UpgradeLines, "} 9", "* upload completely sent off: 9 bytes", "{ 0", "* Empty reply from server", "* shutting down connection #0"],
+            events.Transcript);
+    }
+
+    private static async Task<RecordingTransferEvents> UploadAsync(ScriptedConnection connection)
     {
         var events = new RecordingTransferEvents();
-        var connection = new ScriptedConnection(Bytes(Head101 + "\x81\x02ok"));
         var context = new TransferContext
         {
             Url = CurlUrl.Parse("ws://127.0.0.1:47932/p"),
@@ -125,10 +191,7 @@ public sealed class WsProtocolHandlerEventTests
         };
 
         await Handler(connection, 0).ExecuteAsync(context);
-
-        CollectionAssert.AreEqual(
-            (string[])[.. UpgradeLines, "} 9", "* upload completely sent off: 9 bytes", "{ 4", "{ 0", "* shutting down connection #0"],
-            events.Transcript);
+        return events;
     }
 
     private static async Task<RecordingTransferEvents> RunAsync(ScriptedConnection connection, long connectionNumber = 0)

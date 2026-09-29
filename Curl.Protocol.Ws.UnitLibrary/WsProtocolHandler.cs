@@ -169,28 +169,40 @@ public sealed class WsProtocolHandler(
     }
 
     /// <summary>
-    /// Writes the lines curl 8.21.0's <c>-v</c> ends an upgraded transfer with (BL-584):
-    /// <c>shutting down connection #N</c> after the server closed the connection; a failure's
-    /// message, then <c>shutting down connection #N</c> for <c>Empty reply from server</c> and
-    /// <c>closing connection #N</c> for any other.
+    /// Writes the line curl 8.21.0's <c>-v</c> ends an upgraded transfer with (BL-584):
+    /// <c>shutting down connection #N</c> after the server closed the connection or for
+    /// <c>Empty reply from server</c>, and <c>closing connection #N</c> for any other failure.
     /// </summary>
-    private static void ReportTransferEnd(ITransferEvents events, TransferResult result, long connectionNumber)
+    private static void ReportTransferEnd(ITransferEvents events, TransferResult result, long connectionNumber) =>
+        events.ReportInfo(result.ExitCode is CurlExitCode.Ok or CurlExitCode.GotNothing
+            ? WsInfoLines.ShuttingDown(connectionNumber)
+            : WsInfoLines.Closing(connectionNumber));
+
+    /// <summary>
+    /// Writes a failed exchange's message as curl 8.21.0's <c>-v</c> does, followed for a frame
+    /// violation by <c>[WS] decode frame error 56</c> and <c>[WS] decode payload error 56</c>
+    /// (BL-813).
+    /// </summary>
+    private static void ReportFailure(ITransferEvents events, TransferResult result, bool isFrameViolation)
     {
         if (result.ExitCode == CurlExitCode.Ok)
         {
-            events.ReportInfo(WsInfoLines.ShuttingDown(connectionNumber));
             return;
         }
 
         events.ReportInfo(result.ErrorMessage!);
-        events.ReportInfo(result.ExitCode == CurlExitCode.GotNothing
-            ? WsInfoLines.ShuttingDown(connectionNumber)
-            : WsInfoLines.Closing(connectionNumber));
+        if (isFrameViolation)
+        {
+            events.ReportInfo(WsInfoLines.DecodeFrameError(result.ExitCode));
+            events.ReportInfo(WsInfoLines.DecodePayloadError(result.ExitCode));
+        }
     }
 
     /// <summary>
-    /// Sends the <c>-T</c> upload as one binary frame, then writes the payload of every frame
-    /// received to the output until the server closes the connection (ADR-0128, ADR-0131).
+    /// Writes the payload of the frame bytes that came with the reply head, sends the <c>-T</c>
+    /// upload as one binary frame, then writes the payload of every frame received to the output
+    /// until the server closes the connection (ADR-0128, ADR-0131), in curl 8.21.0's order
+    /// (BL-813).
     /// </summary>
     /// <remarks>
     /// Measured against curl 8.21.0 (BL-582): the transfer ends with exit 0 when the server
@@ -209,15 +221,16 @@ public sealed class WsProtocolHandler(
         TransferReport report)
     {
         var receiver = new WsFrameReceiver(connection, randomSource, context.Progress, context.Events);
+        Func<ReadOnlyMemory<byte>, CancellationToken, ValueTask> writePayload =
+            (payload, token) => WriteAsync(context.Output, payload, token);
         long uploaded = 0;
+        bool isFrameViolation = false;
         TransferResult result;
         try
         {
+            await receiver.DeliverAlreadyReceivedAsync(alreadyReceived, writePayload, context.CancellationToken).ConfigureAwait(false);
             uploaded = await SendUploadAsync(connection, context).ConfigureAwait(false);
-            await receiver.ReceiveAsync(
-                alreadyReceived,
-                (payload, token) => WriteAsync(context.Output, payload, token),
-                context.CancellationToken).ConfigureAwait(false);
+            await receiver.ReceiveUntilClosedAsync(writePayload, context.CancellationToken).ConfigureAwait(false);
             result = receiver.BytesReceived == 0
                 ? TransferResult.Failure(CurlExitCode.GotNothing, WsUpgradeResponseReader.EmptyReply)
                 : TransferResult.Success(receiver.BytesReceived);
@@ -225,7 +238,10 @@ public sealed class WsProtocolHandler(
         catch (WsTransferException failure)
         {
             result = TransferResult.Failure(failure.ExitCode, failure.Message, receiver.BytesReceived);
+            isFrameViolation = failure.IsFrameViolation;
         }
+
+        ReportFailure(context.Events, result, isFrameViolation);
 
         context.Progress.ReportTransferDone();
         return result with

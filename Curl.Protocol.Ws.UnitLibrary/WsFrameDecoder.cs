@@ -236,5 +236,5 @@ internal sealed class WsFrameDecoder
     private static string Name(WsOpcode frameOpcode) => frameOpcode.ToString().ToUpperInvariant();
 
     private static WsTransferException Violation(string message) =>
-        new(CurlExitCode.RecvError, "[WS] " + message);
+        new(CurlExitCode.RecvError, "[WS] " + message) { IsFrameViolation = true };
 }

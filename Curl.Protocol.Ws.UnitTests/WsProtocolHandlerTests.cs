@@ -202,7 +202,7 @@ public sealed class WsProtocolHandlerTests
         Assert.AreEqual(4L, result.Report!.DownloadSize);
         Assert.AreEqual(9L, result.Report.UploadSize);
         Assert.AreEqual(Request.Length + 9L, result.Report.RequestSize);
-        CollectionAssert.AreEqual(new[] { "started", "up 9/9", "down 4/?", "done" }, progress.Reports.ToArray());
+        CollectionAssert.AreEqual(new[] { "started", "down 4/?", "up 9/9", "done" }, progress.Reports.ToArray());
     }
 
     [TestMethod]
