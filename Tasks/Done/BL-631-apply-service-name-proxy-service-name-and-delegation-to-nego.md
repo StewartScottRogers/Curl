@@ -51,7 +51,7 @@ The Negotiate authenticator (BL-527) and the GSS-API users (SASL GSSAPI BL-538, 
   SOCKS5 GSS-API (BL-615) is not built; both pick the names up from the same places.
 - Added `Documentation/Planning/Decisions` to `touches` for ADR-0188 and its index row; no task
   in Doing names it.
-- Filed BL-870 (hand-built Kerberos delegation needs a forwarded TGT) and BL-871 (`--delegation`
+- Filed BL-873 (hand-built Kerberos delegation needs a forwarded TGT) and BL-874 (`--delegation`
   for SASL GSSAPI, needs `SaslRequest` in Abstractions).
 - Tests: Authentication 604 passed (3 skipped), Console 1529 passed (9 skipped); Measure-CodeQuality:
   Curl.Authentication.UnitLibrary and Curl.Console 100% line, 100% branch, 0 failing, worst CRAP 10.

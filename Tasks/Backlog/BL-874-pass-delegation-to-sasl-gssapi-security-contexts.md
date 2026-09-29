@@ -1,5 +1,5 @@
 ---
-id: BL-871
+id: BL-874
 title: Pass --delegation to SASL GSSAPI security contexts
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-871 — Pass --delegation to SASL GSSAPI security contexts
+# BL-874 — Pass --delegation to SASL GSSAPI security contexts
 
 ## Goal
 

@@ -42,7 +42,7 @@ recorder, which has no KDC:
    delegation for `policy` would forward the user's ticket-granting ticket to hosts the realm
    has not marked ok-as-delegate, which `policy` exists to prevent; so `policy` asks none there.
 5. The hand-built Kerberos route (K) does not delegate yet: `KerberosGssContext` supports it,
-   but needs a forwarded ticket-granting ticket the ticket source does not get yet (BL-870); SASL passes no level yet (BL-871).
+   but needs a forwarded ticket-granting ticket the ticket source does not get yet (BL-873); SASL passes no level yet (BL-874).
 
 ## Consequences
 

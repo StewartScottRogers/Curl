@@ -1,5 +1,5 @@
 ---
-id: BL-870
+id: BL-873
 title: Delegate on the hand-built Kerberos route with a forwarded ticket-granting ticket for --delegation
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-870 — Delegate on the hand-built Kerberos route with a forwarded ticket-granting ticket for --delegation
+# BL-873 — Delegate on the hand-built Kerberos route with a forwarded ticket-granting ticket for --delegation
 
 ## Goal
 
