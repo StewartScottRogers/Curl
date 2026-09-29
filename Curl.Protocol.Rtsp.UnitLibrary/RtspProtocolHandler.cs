@@ -43,6 +43,9 @@ namespace Curl.Protocol.Rtsp;
 /// pooled under the <c>rtsp</c> scheme and handed back after a success, a <c>CSeq</c> mismatch
 /// or a refused <c>-H Session</c> header without a reply body; a transfer that starts on a
 /// reused connection sends <c>CSeq: 0</c> (ADR-0169 decision 5).
+/// The request, each reply header's name, the reply's status and session and the transfer's
+/// end are written to <see cref="ITransferContext.DiagnosticLog" /> under the <c>rtsp</c>
+/// component (<see cref="RtspTransferLog" />).
 /// </remarks>
 public sealed class RtspProtocolHandler(IConnector connector, IHttpAuthenticator authenticator) : IProtocolHandler
 {
@@ -93,12 +96,22 @@ public sealed class RtspProtocolHandler(IConnector connector, IHttpAuthenticator
     {
         ArgumentNullException.ThrowIfNull(context);
 
+        long startTimestamp = context.TimeProvider.GetTimestamp();
+        TransferResult result = await ConnectAndExchangeAsync(context).ConfigureAwait(false);
+        new RtspTransferLog(context.DiagnosticLog).Ended(result, context.TimeProvider.GetElapsedTime(startTimestamp));
+        return result;
+    }
+
+    // Connects and makes the transfer's one request; ExecuteAsync logs how it ended.
+    private async ValueTask<TransferResult> ConnectAndExchangeAsync(ITransferContext context)
+    {
         CurlUrl url = context.Url;
         var target = new ConnectTarget(url.IdnHost, url.IsDefaultPort ? DefaultPort : url.Port, false)
         {
             Proxy = context.Proxy,
             Events = context.Events,
             PoolScheme = Schemes[0],
+            DiagnosticLog = context.DiagnosticLog,
         };
         ConnectResult connect = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
@@ -222,7 +235,10 @@ public sealed class RtspProtocolHandler(IConnector connector, IHttpAuthenticator
         events.ReportRequestHeader(request);
         await SendAsync(connection, request, context.CancellationToken).ConfigureAwait(false);
         events.ReportInfo(RtspVerboseLines.RequestSent);
-        RtspReplyHead head = await RtspReplyReader.ReadHeadAsync(connection, session, context.HeaderOutput, events, context.CancellationToken).ConfigureAwait(false);
+        var log = new RtspTransferLog(context.DiagnosticLog);
+        log.RequestSent(RtspMethod.Options.Name, sequenceNumber);
+        RtspReplyHead head = await RtspReplyReader.ReadHeadAsync(connection, session, context.HeaderOutput, events, context.CancellationToken, log).ConfigureAwait(false);
+        log.ReplyRead(head, session.SessionId);
         TransferReport report = new()
         {
             ResponseCode = head.StatusCode,
