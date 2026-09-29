@@ -14,7 +14,7 @@ namespace Curl.Networking;
 
 /// <summary>
 /// Opens QUIC connections for <see cref="TcpConnector.ConnectMultiplexedAsync" /> (ADR-0144
-/// section 3, ADR-0179): for each resolved address in turn it opens a UDP channel through
+/// section 3, ADR-0180): for each resolved address in turn it opens a UDP channel through
 /// <see cref="IUdpChannelOpener" />, runs <c>Curl.Quic</c>'s handshake with the hand-built TLS
 /// client over it, and returns the <see cref="QuicConnection" /> once the handshake completes.
 /// The server's certificate is judged by the same <see cref="ServerCertificateVerification" />

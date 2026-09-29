@@ -14,7 +14,7 @@ namespace Curl.Networking;
 /// <see cref="TcpConnector.ConnectMultiplexedAsync" /> with a <see cref="QuicDialer" /> (BL-728):
 /// resolves as a TCP connect does, then runs a real QUIC handshake against the in-memory
 /// server through <see cref="QuicServerChannelOpener" />, and reports curl's <c>-v</c> lines,
-/// timings and exit codes (ADR-0144, ADR-0179).
+/// timings and exit codes (ADR-0144, ADR-0180).
 /// </summary>
 [TestClass]
 public sealed class TcpConnectorQuicTests

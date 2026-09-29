@@ -59,7 +59,7 @@ namespace Curl.Networking;
 /// </param>
 /// <param name="quicDialer">
 /// Opens the QUIC connections <see cref="ConnectMultiplexedAsync" /> asks for, over the addresses
-/// this connector resolves (ADR-0179); <see langword="null" /> for a connector with no QUIC.
+/// this connector resolves (ADR-0180); <see langword="null" /> for a connector with no QUIC.
 /// </param>
 public sealed class TcpConnector(
     IDnsResolver dnsResolver,

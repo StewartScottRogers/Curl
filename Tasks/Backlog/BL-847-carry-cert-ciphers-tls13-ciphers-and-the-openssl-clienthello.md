@@ -1,5 +1,5 @@
 ---
-id: BL-846
+id: BL-847
 title: Carry --cert, --ciphers, --tls13-ciphers and the OpenSSL ClientHello profile into QUIC handshakes
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-846 — Carry --cert, --ciphers, --tls13-ciphers and the OpenSSL ClientHello profile into QUIC handshakes
+# BL-847 — Carry --cert, --ciphers, --tls13-ciphers and the OpenSSL ClientHello profile into QUIC handshakes
 
 ## Goal
 
@@ -18,7 +18,7 @@ A QUIC handshake started by `QuicDialer` presents the `--cert` client certificat
 
 ## Context
 
-- BL-728 (ADR-0179) dials QUIC with `QuicClientSettings.CreateCurlTlsSettings`, curl.se's LibreSSL profile, on every platform, and passes none of `TlsClientOptions`' client-certificate or cipher options into the handshake.
+- BL-728 (ADR-0180) dials QUIC with `QuicClientSettings.CreateCurlTlsSettings`, curl.se's LibreSSL profile, on every platform, and passes none of `TlsClientOptions`' client-certificate or cipher options into the handshake.
 - `HandBuiltTlsProvider` already loads `--cert` (`ClientCertificateLoader.Load`, `ToTlsClientCertificate`) and selects suites (`SelectCipherSuites`, `OpenSslCipherSuites`); reuse them. BL-787 builds the measured ClientHello profiles in `Curl.Tls.UnitLibrary`.
 - Code: `Curl.Networking.UnitLibrary/QuicDialer.cs` (`AttemptAsync`), `Curl.Quic.UnitLibrary/QuicClientSettings.cs`.
 

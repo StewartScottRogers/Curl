@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-721, BL-727]
-touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Quic.UnitLibrary/Curl.Quic.UnitLibrary.csproj, Documentation/Planning/Decisions/ADR-0179-tcpconnector-resolves-for-quic-and-quicdialer-tries-each-address-in-turn.md, Documentation/Planning/Decisions/README.md]
+touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Quic.UnitLibrary/Curl.Quic.UnitLibrary.csproj, Documentation/Planning/Decisions/ADR-0180-tcpconnector-resolves-for-quic-and-quicdialer-tries-each-address-in-turn.md, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-09-28
 completed: 2026-09-28
@@ -29,7 +29,7 @@ completed: 2026-09-28
 
 ## Notes
 
-- Design in ADR-0179 (decided by Claude under Stewart's delegation): `TcpConnector` takes an
+- Design in ADR-0180 (decided by Claude under Stewart's delegation): `TcpConnector` takes an
   optional `QuicDialer`; its `ConnectMultiplexedAsync` resolves through the TCP path's DNS
   cache, `--resolve`, `--connect-to`, `-4`/`-6` and `-v` lines, then `QuicDialer` tries each
   address in turn over `IUdpChannelOpener` (`UdpChannelOpener` binds `UdpDatagramChannel`
@@ -40,7 +40,7 @@ completed: 2026-09-28
   `InternalsVisibleTo Curl.Networking.UnitTests`, because the in-memory QUIC server
   (copied into `Curl.Networking.UnitTests/Fakes/QuicTestServer.cs` and
   `QuicTestTlsServer.cs`) is built from Quic's internal packet-number spaces and assembler.
-  ADR-0179 and the ADR index are the decision record.
+  ADR-0180 and the ADR index are the decision record.
 - Tests: `TcpConnectorQuicTests` (25) - success with resolve/Trying lines, trust and TLS
   events (no ALPN), Established event and timings; exit 28 after `--connect-timeout`; exit 55
   after QUIC's 10 s; exit 8 on `CONNECTION_REFUSED`; exit 7 across two addresses; exit 60 from
@@ -49,7 +49,7 @@ completed: 2026-09-28
 - Defaults taken: `--interface` and `--local-port` are not parsed into an address anywhere
   yet (TCP ignores them too), so `QuicDialer` takes a local address and port for the
   composition to pass; the ClientHello is the LibreSSL profile everywhere and `--cert` and
-  the cipher options do not reach QUIC yet - filed as BL-846. Nothing calls
+  the cipher options do not reach QUIC yet - filed as BL-847. Nothing calls
   `ConnectMultiplexedAsync` until BL-732 composes a `QuicDialer`.
 - `SocketException.ErrorCode` is the platform's errno off Windows (104 on Linux for
   ECONNRESET), so the exit 56 tests read the code from the exception rather than pinning
