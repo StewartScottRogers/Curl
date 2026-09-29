@@ -103,24 +103,12 @@ public sealed class Camellia : IDisposable
         }
 
         (int Part, int Rotation, bool High)[] layout = key.Length == 16 ? ShortKeySubkeys : LongKeySubkeys;
-        roundGroups = key.Length == 16 ? 3 : 4;
+        // Four whitening subkeys, six per group of rounds and two per FL layer between
+        // groups: 26 = 4 + 18 + 4 for three groups, 34 = 4 + 24 + 6 for four.
+        roundGroups = (layout.Length - 2) / 8;
         encryptionSubkeys = new ulong[layout.Length];
         decryptionSubkeys = new ulong[layout.Length];
-        Span<UInt128> parts = stackalloc UInt128[4];
-        try
-        {
-            DeriveKeyParts(key, parts);
-            for (int index = 0; index < layout.Length; index++)
-            {
-                UInt128 rotated = UInt128.RotateLeft(parts[layout[index].Part], layout[index].Rotation);
-                encryptionSubkeys[index] = (ulong)(layout[index].High ? rotated >> 64 : rotated);
-            }
-        }
-        finally
-        {
-            CryptographicOperations.ZeroMemory(MemoryMarshal.AsBytes(parts));
-        }
-
+        ExpandEncryptionSubkeys(key, layout, encryptionSubkeys);
         ReverseForDecryption(encryptionSubkeys, decryptionSubkeys);
     }
 
@@ -230,6 +218,28 @@ public sealed class Camellia : IDisposable
         CryptographicOperations.ZeroMemory(MemoryMarshal.AsBytes(encryptionSubkeys.AsSpan()));
         CryptographicOperations.ZeroMemory(MemoryMarshal.AsBytes(decryptionSubkeys.AsSpan()));
         disposed = true;
+    }
+
+    /// <summary>
+    /// RFC 3713 section 2.2: each subkey in <paramref name="layout" />, the high or low half
+    /// of a rotated key part, into <paramref name="subkeys" />.
+    /// </summary>
+    private static void ExpandEncryptionSubkeys(ReadOnlySpan<byte> key, (int Part, int Rotation, bool High)[] layout, Span<ulong> subkeys)
+    {
+        Span<UInt128> parts = stackalloc UInt128[4];
+        try
+        {
+            DeriveKeyParts(key, parts);
+            for (int index = 0; index < layout.Length; index++)
+            {
+                UInt128 rotated = UInt128.RotateLeft(parts[layout[index].Part], layout[index].Rotation);
+                subkeys[index] = (ulong)(layout[index].High ? rotated >> 64 : rotated);
+            }
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(MemoryMarshal.AsBytes(parts));
+        }
     }
 
     /// <summary>
