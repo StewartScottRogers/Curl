@@ -50,3 +50,4 @@ stop first. Adding lanes stays one per step: the meter needs samples at each cou
 - 2026-09-28: Doing -> Backlog. Handed to the dark factory: a task in Doing that no lane holds stops a shift from starting.
 - 2026-09-28: Backlog -> Doing.
 - 2026-09-28: Doing -> Blocked. Stewart: dark factory run ended in Doing, exit 0; see Z:\repos\Curl.logs\BL-823-20260928-212155-L4.jsonl
+- 2026-09-28: Blocked -> Doing.
