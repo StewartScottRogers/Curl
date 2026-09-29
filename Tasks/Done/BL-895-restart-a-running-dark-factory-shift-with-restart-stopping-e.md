@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1, CLAUDE.md]
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-29
 ---
 # BL-895 — Restart a running dark factory shift with -Restart, stopping each lane as soon as it is safe
 
@@ -50,3 +50,4 @@ each lane it sees die.
 
 - 2026-09-29: Created.
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Done. -Restart and Select-LanesToStop added, CLAUDE.md and header say to use it; -TestRestart 2/2, other self-checks, build and fast tests (33 assemblies) green.
