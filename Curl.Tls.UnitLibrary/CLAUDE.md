@@ -14,7 +14,8 @@ TLS 1.3 key schedule (BL-697), the TLS 1.3 client handshake (BL-699, ADR-0146), 
 TLS 1.2, 1.1 and 1.0 PRF and record protection (BL-702, ADR-0150), the TLS 1.2,
 1.1 and 1.0 client handshake (BL-703, ADR-0154), TLS 1.3 over a byte stream
 (BL-700, ADR-0157), TLS 1.2, 1.1 and 1.0 over a byte stream (BL-815, ADR-0158), and
-the stapled OCSP response check for `--cert-status` (BL-705, ADR-0173).
+the stapled OCSP response check for `--cert-status` (BL-705, ADR-0173), and TLS 1.3
+certificate decompression (BL-786, ADR-0199).
 
 - `HandshakeMessageReader` frames handshake bytes into `HandshakeMessage`s (type and
   body); an unknown type is `unexpected_message`.
@@ -47,6 +48,14 @@ the stapled OCSP response check for `--cert-status` (BL-705, ADR-0173).
   SNI, CertificateVerify with RSA-PSS (RSAE and PSS keys), ECDSA P-256/384/521 and
   Ed25519, the server Finished, an optional client certificate
   (`TlsClientCertificate`), and NewSessionTicket after completion.
+- Certificate compression (RFC 8879, ADR-0199): `CompressedCertificate` is the message
+  codec, and `Decompress(offered)` returns the Certificate body through `ZLibStream`,
+  `BrotliDecoder` or `Curl.Zstandard`'s `ZstandardDecoder` when the algorithm was offered
+  and the data decompresses to exactly `uncompressed_length`. With
+  `Tls13ClientSettings.CertificateCompressionAlgorithms` (codes in
+  `CertificateCompressionAlgorithm`) the ClientHello offers `compress_certificate` and the
+  handshake takes a CompressedCertificate in place of the Certificate; anything that does
+  not decompress is `bad_certificate`.
 - `ClientHelloProfile` (BL-787): ADR-0140's three measured hellos as data -
   `Schannel`, `OpenSsl` (OpenSSL 3.5.5) and `LibreSsl` (curl.se's LibreSSL 4.2.1 build):
   record version, suites, extension order and each extension's list. `Build(host, random,
@@ -154,9 +163,11 @@ the stapled OCSP response check for `--cert-status` (BL-705, ADR-0173).
 
 ## Rules
 
-- **Base class library plus `Curl.Cryptography.UnitLibrary` only** (ADR-0120). It may
-  also reference `Curl.Protocol.Abstractions.UnitLibrary`; nothing else. BL-699 added the
-  `Curl.Cryptography.UnitLibrary` reference (X25519, Ed25519, finite-field DH).
+- **Base class library plus `Curl.Cryptography.UnitLibrary` and `Curl.Zstandard.UnitLibrary`
+  only** (ADR-0120, amended by ADR-0185). It may also reference
+  `Curl.Protocol.Abstractions.UnitLibrary`; nothing else. BL-699 added the
+  `Curl.Cryptography.UnitLibrary` reference (X25519, Ed25519, finite-field DH), BL-786 the
+  `Curl.Zstandard.UnitLibrary` one (zstd certificate decompression).
   `Curl.Quic.UnitLibrary` and `Curl.Networking.UnitLibrary` reference this library, never
   the other way round.
 - **Never a `Socket` or `SslStream`**, and no `HttpClient`. Bytes in, bytes out: record

@@ -46,6 +46,18 @@ public sealed class ClientHelloProfileTests
     }
 
     [TestMethod]
+    public void OpenSslProfileOffersCertificateCompressionAsCaptured()
+    {
+        // The capture ends with compress_certificate (27): zlib and zstd, no brotli (ADR-0199).
+        const string CapturedCompressCertificate = "001b00050400010003";
+        TlsExtension extension = CompressCertificateExtension.Encode(ClientHelloProfile.OpenSsl.CertificateCompressionAlgorithms);
+
+        CollectionAssert.AreEqual(new ushort[] { CertificateCompressionAlgorithm.Zlib, CertificateCompressionAlgorithm.Zstd }, ClientHelloProfile.OpenSsl.CertificateCompressionAlgorithms.ToArray());
+        Assert.EndsWith(CapturedCompressCertificate, OpenSslCaptureAfterMlKemShare);
+        Assert.AreEqual(CapturedCompressCertificate, "001b0005" + Convert.ToHexString(extension.Data).ToLowerInvariant());
+    }
+
+    [TestMethod]
     public void ProfilesShareTheGroupsTheCapturesShare()
     {
         CollectionAssert.AreEqual(new ushort[] { 0x001d }, ClientHelloProfile.LibreSsl.KeyShareGroups.ToArray());

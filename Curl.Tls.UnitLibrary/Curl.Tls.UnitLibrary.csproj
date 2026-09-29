@@ -6,6 +6,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Curl.Cryptography.UnitLibrary\Curl.Cryptography.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Zstandard.UnitLibrary\Curl.Zstandard.UnitLibrary.csproj" />
   </ItemGroup>
 
 </Project>

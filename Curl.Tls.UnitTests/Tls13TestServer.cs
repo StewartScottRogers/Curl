@@ -41,6 +41,9 @@ internal sealed class Tls13TestServer(TestServerCredential credential)
     /// <summary>Gets the DER certificates sent after the leaf, issuer first.</summary>
     public IReadOnlyList<byte[]> IssuerCertificates { get; init; } = [];
 
+    /// <summary>Gets what turns the Certificate body into the CompressedCertificate sent in its place (RFC 8879), or <see langword="null" /> to send the Certificate.</summary>
+    public Func<byte[], CompressedCertificate>? CompressCertificate { get; init; }
+
     public byte[] ClientHandshakeTrafficSecret { get; private set; } = [];
 
     public byte[] ServerHandshakeTrafficSecret { get; private set; } = [];
@@ -131,7 +134,8 @@ internal sealed class Tls13TestServer(TestServerCredential credential)
         }
 
         CertificateEntry[] chain = [new CertificateEntry(credential.Certificate, LeafExtensions), .. IssuerCertificates.Select(issuer => new CertificateEntry(issuer, []))];
-        Add(flight, new CertificateMessage([], chain).Encode());
+        byte[] certificate = new CertificateMessage([], chain).Encode();
+        Add(flight, CompressCertificate is null ? certificate : CompressCertificate(certificate[HandshakeMessage.HeaderLength..]).Encode());
         byte[] content = TlsSignatureScheme.BuildCertificateVerifyContent(true, TranscriptHash());
         Add(flight, new CertificateVerify(credential.Scheme, credential.SigningKey.Sign(credential.Scheme, content)).Encode());
         Add(flight, new Finished(schedule.ComputeFinishedVerifyData(ServerHandshakeTrafficSecret, TranscriptHash())).Encode());

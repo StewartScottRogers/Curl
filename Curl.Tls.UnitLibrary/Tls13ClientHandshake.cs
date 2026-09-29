@@ -12,7 +12,8 @@ namespace Curl.Tls;
 /// record layer drives it. Covers the full handshake with a HelloRetryRequest, key shares
 /// on X25519, the NIST curves and the finite-field groups, CertificateVerify with RSA-PSS,
 /// ECDSA and Ed25519, the server Finished check, and an optional client certificate; the
-/// server's chain goes to <see cref="IServerCertificateVerifier" />.
+/// server's chain, decompressed first when it arrives as a CompressedCertificate (RFC
+/// 8879), goes to <see cref="IServerCertificateVerifier" />.
 /// </summary>
 public sealed class Tls13ClientHandshake : IDisposable
 {
@@ -259,17 +260,24 @@ public sealed class Tls13ClientHandshake : IDisposable
         State.WaitServerHello => HandshakeType.ServerHello,
         State.WaitEncryptedExtensions => HandshakeType.EncryptedExtensions,
         State.WaitCertificateOrRequest when arrived == HandshakeType.CertificateRequest => HandshakeType.CertificateRequest,
-        State.WaitCertificateOrRequest or State.WaitCertificate => HandshakeType.Certificate,
+        State.WaitCertificateOrRequest or State.WaitCertificate => ExpectedCertificateType(arrived),
         State.WaitCertificateVerify => HandshakeType.CertificateVerify,
         State.WaitFinished => HandshakeType.Finished,
         _ => HandshakeType.NewSessionTicket,
     };
+
+    /// <summary>RFC 8879 section 4: a CompressedCertificate may replace the Certificate once <c>compress_certificate</c> was offered.</summary>
+    private HandshakeType ExpectedCertificateType(HandshakeType arrived) =>
+        arrived == HandshakeType.CompressedCertificate && settings.CertificateCompressionAlgorithms.Count > 0
+            ? HandshakeType.CompressedCertificate
+            : HandshakeType.Certificate;
 
     private TlsAlertDescription? Dispatch(HandshakeType type, byte[] body, byte[] encoded, Tls13HandshakeOutputBuilder output) => type switch
     {
         HandshakeType.ServerHello => ReceiveServerHello(body, encoded, output),
         HandshakeType.EncryptedExtensions => ReceiveEncryptedExtensions(body, encoded),
         HandshakeType.CertificateRequest => ReceiveCertificateRequest(body, encoded),
+        HandshakeType.CompressedCertificate => ReceiveCompressedCertificate(body, encoded),
         _ => DispatchAfterCertificateRequest(type, body, encoded, output),
     };
 
@@ -528,6 +536,23 @@ public sealed class Tls13ClientHandshake : IDisposable
         Transcript.Append(encoded);
         state = State.WaitCertificate;
         return null;
+    }
+
+    /// <summary>
+    /// RFC 8879 section 4: an algorithm not offered, a wrong <c>uncompressed_length</c> or
+    /// data that does not decompress is <c>bad_certificate</c>; the decompressed body is then
+    /// read as the Certificate, and the CompressedCertificate as sent enters the transcript.
+    /// </summary>
+    private TlsAlertDescription? ReceiveCompressedCertificate(byte[] body, byte[] encoded)
+    {
+        TlsDecodeResult<CompressedCertificate> decoded = CompressedCertificate.Decode(body);
+        if (!decoded.Succeeded)
+        {
+            return decoded.Alert;
+        }
+
+        byte[]? certificateBody = decoded.Value.Decompress(settings.CertificateCompressionAlgorithms);
+        return certificateBody is null ? TlsAlertDescription.BadCertificate : ReceiveCertificate(certificateBody, encoded);
     }
 
     private TlsAlertDescription? ReceiveCertificate(byte[] body, byte[] encoded)

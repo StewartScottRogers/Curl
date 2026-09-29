@@ -81,6 +81,7 @@ internal sealed class Tls13ClientHelloBuilder(Tls13ClientSettings settings, byte
     {
         TlsExtensionType.SignatureAlgorithms => SignatureAlgorithmsExtension.Encode(settings.SignatureAlgorithms),
         TlsExtensionType.Cookie => EchoCookie(cookie),
+        TlsExtensionType.CompressCertificate => BuildCompressCertificate(),
         _ => BuildOptionalExtension(type),
     };
 
@@ -95,6 +96,11 @@ internal sealed class Tls13ClientHelloBuilder(Tls13ClientSettings settings, byte
         TlsExtensionType.StatusRequest => BuildStatusRequest(),
         _ => FindFixedExtension(type),
     };
+
+    /// <summary>With <see cref="Tls13ClientSettings.CertificateCompressionAlgorithms" />, the algorithms the client decompresses (RFC 8879).</summary>
+    private TlsExtension? BuildCompressCertificate() => settings.CertificateCompressionAlgorithms.Count > 0
+        ? CompressCertificateExtension.Encode(settings.CertificateCompressionAlgorithms)
+        : FindFixedExtension(TlsExtensionType.CompressCertificate);
 
     /// <summary>With <see cref="Tls13ClientSettings.RequestOcspStatus" />, an OCSP request naming no responders and no extensions, as OpenSSL sends.</summary>
     private TlsExtension? BuildStatusRequest() => settings.RequestOcspStatus

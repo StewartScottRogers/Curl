@@ -4,7 +4,8 @@ namespace Curl.Tls;
 /// What one TLS 1.3 client handshake offers and presents. The handshake builds the
 /// ClientHello extensions it negotiates (<c>server_name</c>, <c>supported_groups</c>,
 /// <c>key_share</c>, <c>supported_versions</c>, <c>signature_algorithms</c>, ALPN,
-/// <c>cookie</c>, <c>status_request</c> with <see cref="RequestOcspStatus" />, and
+/// <c>cookie</c>, <c>status_request</c> with <see cref="RequestOcspStatus" />,
+/// <c>compress_certificate</c> with <see cref="CertificateCompressionAlgorithms" />, and
 /// <c>padding</c>) and sends them in <see cref="ExtensionOrder" />;
 /// any other extension goes out verbatim from <see cref="FixedExtensions" />.
 /// </summary>
@@ -20,6 +21,7 @@ public sealed record Tls13ClientSettings
         TlsExtensionType.ApplicationLayerProtocolNegotiation,
         TlsExtensionType.SupportedVersions,
         TlsExtensionType.KeyShare,
+        TlsExtensionType.CompressCertificate,
         TlsExtensionType.Cookie,
     ];
 
@@ -94,17 +96,30 @@ public sealed record Tls13ClientSettings
     /// </summary>
     public bool RequestOcspStatus { get; init; }
 
+    /// <summary>
+    /// Gets the certificate compression algorithms offered in <c>compress_certificate</c>
+    /// (RFC 8879), in preference order, each one <see cref="CertificateCompressionAlgorithm.CanDecompress" />
+    /// accepts; none sends no extension and refuses a CompressedCertificate. With any,
+    /// the server may send a CompressedCertificate in place of its Certificate, and
+    /// <c>compress_certificate</c> must be in <see cref="ExtensionOrder" />.
+    /// </summary>
+    public IReadOnlyList<ushort> CertificateCompressionAlgorithms { get; init; } = [];
+
     /// <summary>Gets the clock a stapled OCSP response's <c>thisUpdate</c> and <c>nextUpdate</c> are judged against.</summary>
     public TimeProvider TimeProvider { get; init; } = TimeProvider.System;
 
     /// <summary>Throws when the settings cannot drive a handshake.</summary>
     /// <exception cref="ArgumentException">
     /// A cipher suite is not TLS 1.3, a group cannot be shared, a key share group is not
-    /// offered, or an OCSP status is asked for with no place for <c>status_request</c>.
+    /// offered, an OCSP status is asked for with no place for <c>status_request</c>, or a
+    /// certificate compression algorithm cannot be decompressed or has no place for
+    /// <c>compress_certificate</c>.
     /// </exception>
     internal void Validate()
     {
         Require(!RequestOcspStatus || ExtensionOrder.Contains(TlsExtensionType.StatusRequest), "Asking for OCSP status needs status_request in the extension order.", nameof(ExtensionOrder));
+        Require(CertificateCompressionAlgorithms.Count == 0 || ExtensionOrder.Contains(TlsExtensionType.CompressCertificate), "Offering certificate compression needs compress_certificate in the extension order.", nameof(ExtensionOrder));
+        Require(CertificateCompressionAlgorithms.All(CertificateCompressionAlgorithm.CanDecompress), "Offer only certificate compression algorithms the client can decompress.", nameof(CertificateCompressionAlgorithms));
         Require(CipherSuites.Count > 0 && CipherSuites.All(code => Tls13CipherSuite.Find(code) is not null), "Offer at least one cipher suite, and only TLS 1.3 suites.", nameof(CipherSuites));
         Require(SupportedGroups.All(TlsNamedGroup.CanShare), "Every supported group must be one the client can make a key share for.", nameof(SupportedGroups));
         Require(KeyShareGroups.All(SupportedGroups.Contains), "Every key share group must be one of the supported groups.", nameof(KeyShareGroups));
