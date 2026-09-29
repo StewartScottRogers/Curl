@@ -32,3 +32,4 @@ A service ticket `KerberosKdcClient` gets by a TGS exchange is written back to t
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
