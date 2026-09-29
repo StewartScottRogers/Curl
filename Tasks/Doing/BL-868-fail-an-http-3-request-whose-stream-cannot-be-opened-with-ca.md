@@ -32,3 +32,4 @@ An HTTP/3 request whose request stream cannot be opened on the QUIC connection f
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-29: Backlog -> Doing.
