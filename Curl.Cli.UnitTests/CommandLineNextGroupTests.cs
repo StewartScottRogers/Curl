@@ -30,7 +30,7 @@ public sealed class CommandLineNextGroupTests
         "url", "globoff", "buffer", "output", "upload-file", "remote-name", "out-null", "remote-name-all",
         "remote-header-name", "output-dir", "create-dirs", "clobber", "skip-existing", "remove-on-error",
         "write-out", "data", "data-ascii", "data-binary", "data-raw", "data-urlencode", "json", "form",
-        "form-string", "form-escape", "get", "url-query", "dump-header", "etag-save", "etag-compare", "alt-svc", "hsts", "user", "basic", "digest", "ntlm", "negotiate",
+        "form-string", "form-escape", "disallow-username-in-url", "get", "url-query", "dump-header", "etag-save", "etag-compare", "alt-svc", "hsts", "user", "basic", "digest", "ntlm", "negotiate",
         "anyauth", "oauth2-bearer", "netrc", "netrc-optional", "netrc-file","proxy", "socks4", "socks4a", "socks5", "socks5-hostname", "proxy1.0", "preproxy", "socks5-basic", "socks5-gssapi", "socks5-gssapi-service", "socks5-gssapi-nec", "haproxy-protocol", "haproxy-clientip", "suppress-connect-headers", "proxy-user", "proxy-basic", "proxy-digest", "proxy-ntlm", "proxy-negotiate", "proxy-anyauth",
         "noproxy", "proxytunnel", "telnet-option", "tftp-blksize", "mail-from", "mail-rcpt", "mail-auth",
         "mail-rcpt-allowfails", "upload-flags", "login-options", "sasl-authzid", "sasl-ir", "resolve", "connect-to", "interface", "local-port", "dns-servers", "dns-interface", "dns-ipv4-addr", "dns-ipv6-addr", "unix-socket", "abstract-unix-socket", "tftp-no-options",

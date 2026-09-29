@@ -96,6 +96,7 @@ public static class CommandLineOptionTable
         CommandLineOption.Value("form", 'F', (options, value, spelledOption, _, dataFileReader) => MultipartFormField.Apply(options, value, literal: false, spelledOption, dataFileReader)),
         CommandLineOption.Value("form-string", null, (options, value, spelledOption, _, dataFileReader) => MultipartFormField.Apply(options, value, literal: true, spelledOption, dataFileReader)),
         CommandLineOption.NegatableFlag("form-escape", null, (options, on) => options.FormEscape = on),
+        CommandLineOption.NegatableFlag("disallow-username-in-url", null, (options, on) => options.DisallowUsernameInUrl = on),
         CommandLineOption.NegatableFlag("get", 'G', (options, on) => options.DataInQuery = on),
         CommandLineOption.Value("url-query", null, AppendUrlQuery),
         CommandLineOption.FileName("dump-header", 'D', (options, file) => options.DumpHeaderFile = file),

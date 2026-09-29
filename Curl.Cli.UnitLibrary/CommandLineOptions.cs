@@ -1351,6 +1351,14 @@ public sealed class CommandLineOptions
     public bool FormEscape { get; internal set; }
 
     /// <summary>
+    /// <see langword="true"/> when the last of <c>--disallow-username-in-url</c> and
+    /// <c>--no-disallow-username-in-url</c> was <c>--disallow-username-in-url</c>: a URL with user
+    /// information - an <c>@</c> in its authority, even with an empty user - is refused with exit 67
+    /// before any connection, the first URL and every followed redirect target alike (BL-626).
+    /// </summary>
+    public bool DisallowUsernameInUrl { get; internal set; }
+
+    /// <summary>
     /// The <c>-A</c> / <c>--user-agent</c> value, verbatim; empty when given empty, which curl 8.21.0
     /// sends as no <c>User-Agent</c> header at all; <see langword="null"/> when not given. The last value wins.
     /// </summary>
