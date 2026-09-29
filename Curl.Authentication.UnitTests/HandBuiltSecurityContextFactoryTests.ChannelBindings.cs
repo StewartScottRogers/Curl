@@ -10,7 +10,8 @@ namespace Curl.Authentication;
 // Checks the channel bindings the hand-built Kerberos sends (BL-915): over HTTPS the
 // authenticator checksum's Bnd is the MD5 of RFC 2744's structure holding
 // tls-server-end-point: and the server certificate's hash, as curl 8.18.0 with MIT was measured
-// sending (BL-832); without a certificate, plain HTTP, it is zeros.
+// sending (BL-832); without a certificate, plain HTTP, it is zeros; and a certificate whose
+// signature names no hash fails with exit 91 before any ticket is looked for (BL-965).
 // </summary>
 public sealed partial class HandBuiltSecurityContextFactoryTests
 {
@@ -36,6 +37,23 @@ public sealed partial class HandBuiltSecurityContextFactoryTests
         FakeGssAcceptor acceptor = await EstablishAsync(Request(SecurityMechanism.Negotiate));
 
         CollectionAssert.AreEqual(new byte[16], ChecksumBindings(acceptor));
+    }
+
+    [TestMethod]
+    public async Task ChannelBindings_RsaPssServerCertificateWithoutTicket_FailsWithExit91BeforeLookingForOne()
+    {
+        byte[] certificate = TlsServerEndPointChannelBindingsTests.RsaCertificate(HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
+        KerberosServiceTicketSource noCache = new(
+            () => KerberosConfiguration.Empty,
+            () => throw new AssertFailedException("The bindings fail before the cache is read."),
+            _ => throw new AssertFailedException("No KDC client is needed."));
+        using ISecurityContext context = Factory(noCache).Create(Request(SecurityMechanism.Negotiate) with { ServerCertificate = certificate });
+
+        HttpAuthenticationFailedException failure = await Assert.ThrowsExactlyAsync<HttpAuthenticationFailedException>(
+            async () => await context.NextTokenAsync(ReadOnlyMemory<byte>.Empty, CancellationToken.None));
+
+        Assert.AreEqual(CurlExitCode.SslInvalidCertStatus, failure.ExitCode);
+        Assert.AreEqual("Could not find digest algorithm UNDEF (NID 0)", failure.Message);
     }
 
     private static byte[] ChecksumBindings(FakeGssAcceptor acceptor) => acceptor.Authenticator!.Checksum!.Value.AsSpan(4, 16).ToArray();
