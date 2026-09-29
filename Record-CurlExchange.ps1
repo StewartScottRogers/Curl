@@ -1536,7 +1536,13 @@ $serveScriptedSession = {
         param([System.Collections.Generic.List[object]] $Accepted)
         $clock = [System.Diagnostics.Stopwatch]::StartNew()
         while ($clock.ElapsedMilliseconds -lt $IdleMilliseconds) {
-            while ($Listener.Pending()) { $Accepted.Add($Listener.AcceptTcpClient()) }
+            # curl can exit without writing on any connection, as the Windows build does for
+            # an LDAP URL it refuses after connecting (BL-587); the listener is then stopped.
+            try {
+                while ($Listener.Pending()) { $Accepted.Add($Listener.AcceptTcpClient()) }
+            } catch [System.InvalidOperationException] {
+                return $null
+            }
             foreach ($candidate in $Accepted) {
                 if ($candidate.Client.Available -gt 0) { return $candidate }
             }
