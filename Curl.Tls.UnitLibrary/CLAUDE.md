@@ -47,6 +47,15 @@ the stapled OCSP response check for `--cert-status` (BL-705, ADR-0173).
   SNI, CertificateVerify with RSA-PSS (RSAE and PSS keys), ECDSA P-256/384/521 and
   Ed25519, the server Finished, an optional client certificate
   (`TlsClientCertificate`), and NewSessionTicket after completion.
+- `ClientHelloProfile` (BL-787): ADR-0140's three measured hellos as data -
+  `Schannel`, `OpenSsl` (OpenSSL 3.5.5) and `LibreSsl` (curl.se's LibreSSL 4.2.1 build):
+  record version, suites, extension order and each extension's list. `Build(host, random,
+  sessionId, keyShares)` returns the build's ClientHello byte for byte; `EncodeRecord`
+  wraps it in the record header. Options change the lists with `with`, never the order.
+  The typed codecs those hellos needed: `EcPointFormatsExtension`,
+  `SessionTicketExtension`, `ExtendedMasterSecretExtension`, `EncryptThenMacExtension`,
+  `PostHandshakeAuthExtension`, `CompressCertificateExtension`; also
+  `CertificateAuthoritiesExtension` and `SrpExtension` from ADR-0140's supported list.
 - `Tls13ClientSettings`: suites, groups, key share groups, signature algorithms, ALPN,
   legacy session ID on or off, the ClientHello extension order and verbatim extra
   extensions (`padding` in the order pads a 256-to-511-byte hello to 512).
