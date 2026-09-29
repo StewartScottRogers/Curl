@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-29
 ---
 # BL-855 — Keep headless factory runs from ending while a build or test waits in the background
 
@@ -46,3 +46,4 @@ Takes effect for runs started by the next shift; the running coordinator keeps i
 
 - 2026-09-29: Created.
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Done. Runs start with BASH_DEFAULT/MAX_TIMEOUT_MS 30/60 min and all three headless prompts forbid ending the reply to wait; self-checks, build and fast tests (31 assemblies) green.
