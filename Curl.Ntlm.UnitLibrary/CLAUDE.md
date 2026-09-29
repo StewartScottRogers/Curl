@@ -12,14 +12,23 @@ own `lib/vauth/ntlm.c` writes and reads them: `NtlmNegotiateMessage` (curl's fix
 32-byte Type 1), `NtlmChallengeMessage.Decode` (Type 2, every offset checked, a malformed
 message an `NtlmMessageFailure`, never an exception), `NtlmTargetInformation` (its
 AV_PAIRs), `NtlmAuthenticateMessage` (Type 3 from supplied responses, within curl's
-1024-byte `NTLM_BUFSIZE`) and `NtlmUserName` (curl's `DOMAIN\user` split). The responses
-and session keys land under BL-684.
+1024-byte `NTLM_BUFSIZE`) and `NtlmUserName` (curl's `DOMAIN\user` split).
+
+The responses and keys (BL-684, ADR-0156): `NtlmOneWayFunctions` (`NTOWFv1`, `LMOWFv1`,
+`NTOWFv2`, hashing strings as curl does - UTF-8 bytes widened, ASCII-only uppercasing),
+`NtlmResponseComputation` (`ComputeV1`, `ComputeV1WithExtendedSessionSecurity`,
+`ComputeV2`, each returning `NtlmResponses` with the session base and key exchange keys,
+and `EncryptSessionKey`), and `NtlmChallengeAnswerer`, which turns a CHALLENGE into the
+AUTHENTICATE message curl sends - NTLMv2 when the challenge sets extended session
+security, NTLMv1 and LM otherwise - with its client challenge from `INtlmRandomSource`
+(`SystemNtlmRandomSource` in production) and its time from `TimeProvider`. Internal:
+`NtlmDes` (7-byte DES keys and `DESL`, on `Curl.Cryptography.Des`) and `NtlmCurlString`.
 
 ## Rules
 
 - **Base class library plus `Curl.Cryptography.UnitLibrary` only.** No package, and no
-  other project reference. The reference to `Curl.Cryptography.UnitLibrary` (for MD4,
-  which the BCL lacks) is added by BL-684, the first task that needs it, not before.
+  other project reference. `Curl.Cryptography.UnitLibrary` supplies MD4, RC4 and DES,
+  which the BCL lacks or (DES) refuses weak keys for.
 - **No network.** The library turns bytes into bytes; it never opens a `Socket` or any
   stream. Its callers carry the tokens over their own connections.
 - **Time through `TimeProvider`.** The NTLMv2 timestamp takes the injected

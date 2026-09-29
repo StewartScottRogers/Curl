@@ -88,20 +88,6 @@ public sealed record NtlmAuthenticateMessage(
     }
 
     // curl's unicodecpy: each byte of the C string becomes the low byte of a 16-bit unit.
-    private static byte[] EncodeString(string text, bool unicode)
-    {
-        byte[] bytes = Encoding.UTF8.GetBytes(text);
-        if (!unicode)
-        {
-            return bytes;
-        }
-
-        byte[] widened = new byte[bytes.Length * 2];
-        for (int index = 0; index < bytes.Length; index++)
-        {
-            widened[2 * index] = bytes[index];
-        }
-
-        return widened;
-    }
+    private static byte[] EncodeString(string text, bool unicode) =>
+        unicode ? NtlmCurlString.Widen(text) : Encoding.UTF8.GetBytes(text);
 }
