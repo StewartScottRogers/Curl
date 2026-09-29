@@ -1,5 +1,5 @@
 ---
-id: BL-812
+id: BL-817
 title: Pool HTTP/2 connections with their session and match curl's stream window and closing GOAWAY
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-812 — Pool HTTP/2 connections with their session and match curl's stream window and closing GOAWAY
+# BL-817 — Pool HTTP/2 connections with their session and match curl's stream window and closing GOAWAY
 
 ## Goal
 

@@ -83,7 +83,7 @@ run failed four members on complexity - three this change grew (`ExchangeOnConne
 all four were split so the library reports no failing member. The HTTP/2 stream's end is
 sent from `HttpRequestBodyWriter.WriteAsync`, where the body ends.
 
-**Known differences, filed as BL-812:** curl pools HTTP/2 connections (Curl never marks one
+**Known differences, filed as BL-817:** curl pools HTTP/2 connections (Curl never marks one
 reusable: the pool would lose its session), grows each stream window to 10 MiB after
 HEADERS, and sends GOAWAY `shutdown` on close.
 
