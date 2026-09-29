@@ -2,13 +2,16 @@ using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Sockets;
 
+using Curl.Protocol.Abstractions;
+
 namespace Curl.Networking;
 
 /// <summary>
 /// The production <see cref="ITcpDialer" />: connects a TCP <see cref="Socket" /> with the
 /// <see cref="TcpSocketOptions" /> it was created with and returns it as a
 /// <see cref="StreamConnection" /> over a <see cref="NetworkStream" /> that owns the socket,
-/// with the local end point the socket was bound to.
+/// with the local end point the socket was bound to; and connects a Unix domain socket the same
+/// way, without the TCP options (BL-507).
 /// </summary>
 /// <param name="socketOptions">The options set on every socket before it connects.</param>
 public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
@@ -53,6 +56,32 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
         return new DialedTcpConnection(
             new StreamConnection(new NetworkStream(socket, ownsSocket: true), endPoint, localEndPoint),
             localEndPoint);
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Excluded from coverage per ADR-0083, as <see cref="DialAsync" /> is: every line after the
+    /// argument check needs a listening socket, so the loopback test in the Integration run
+    /// measures it. The TCP options are not set, as curl sets none on a Unix socket.
+    /// </remarks>
+    [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin socket adapter, measured by the Integration run.")]
+    public async ValueTask<IConnection> DialUnixSocketAsync(UnixSocketAddress address, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(address);
+
+        var endPoint = address.ToEndPoint();
+        var socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+        try
+        {
+            await socket.ConnectAsync(endPoint, cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            socket.Dispose();
+            throw;
+        }
+
+        return new StreamConnection(new NetworkStream(socket, ownsSocket: true), endPoint);
     }
 
     /// <summary>

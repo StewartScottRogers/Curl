@@ -9,19 +9,32 @@ namespace Curl.Protocol.Abstractions;
 public sealed record ConnectionOpenedEvent
 {
     /// <summary>
-    /// Gets the name connected to, as in the URL or the proxy.
+    /// Gets the name connected to, as in the URL or the proxy; for a Unix domain socket, the
+    /// socket's path, as curl 8.21.0 names it (measured, BL-507).
     /// </summary>
     public required string HostName { get; init; }
 
     /// <summary>
-    /// Gets the address and port connected to.
+    /// Gets the address and port connected to; <c>0.0.0.0</c> port <c>0</c> for a Unix domain
+    /// socket, which <see cref="UnixSocketRemoteIp" /> describes instead.
     /// </summary>
     public required IPEndPoint RemoteEndPoint { get; init; }
 
     /// <summary>
-    /// Gets the local address and port the connection was made from.
+    /// Gets the local address and port the connection was made from; <c>0.0.0.0</c> port
+    /// <c>0</c> for a Unix domain socket, which has neither.
     /// </summary>
     public required IPEndPoint LocalEndPoint { get; init; }
+
+    /// <summary>
+    /// Gets, for a connection through a Unix domain socket (<c>--unix-socket</c>,
+    /// <c>--abstract-unix-socket</c>), the text curl 8.21.0 shows in place of the remote
+    /// address: the path cut to 45 characters, empty for an abstract name. With it set, curl's
+    /// line names this with port <c>0</c> and an empty local address with port <c>0</c>, and
+    /// <see cref="RemoteEndPoint" /> and <see cref="LocalEndPoint" /> carry no meaning.
+    /// <see langword="null" /> for a TCP connection.
+    /// </summary>
+    public string? UnixSocketRemoteIp { get; init; }
 
     /// <summary>
     /// Gets curl's number for the connection, the <c>N</c> of <c>#N</c>.

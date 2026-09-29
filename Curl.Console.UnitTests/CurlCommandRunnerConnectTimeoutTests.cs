@@ -109,5 +109,11 @@ public sealed class CurlCommandRunnerConnectTimeoutTests
             await Task.Delay(Timeout.Infinite, cancellationToken);
             throw new InvalidOperationException("An infinite delay ended without being cancelled.");
         }
+
+        public async ValueTask<IConnection> DialUnixSocketAsync(UnixSocketAddress address, CancellationToken cancellationToken)
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            throw new InvalidOperationException("An infinite delay ended without being cancelled.");
+        }
     }
 }

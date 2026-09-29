@@ -64,6 +64,28 @@ public sealed class VerboseTransferEventWriterTests
     }
 
     [TestMethod]
+    [DataRow(@"C:\Users\Public\s.sock", @"C:\Users\Public\s.sock")]
+    [DataRow(@"C:\Users\Stewart Rogers\AppData\Local\Temp\bl507.sock", @"C:\Users\Stewart Rogers\AppData\Local\Temp\bl")]
+    [DataRow("abs1", "")]
+    public void ConnectionOpenedThroughAUnixSocket_NamesTheSocketAsCurl(string hostName, string unixSocketRemoteIp)
+    {
+        // Measured 2026-09-28, curl 8.21.0 (mingw, Schannel), BL-507: -v --unix-socket C:\Users\Public\s.sock
+        // http://localhost/a -> * Established connection to C:\Users\Public\s.sock (C:\Users\Public\s.sock port 0) from  port 0
+        VerboseTransferEventWriter writer = new(output, writesDataLines: true);
+
+        writer.ReportConnectionOpened(new ConnectionOpenedEvent
+        {
+            HostName = hostName,
+            RemoteEndPoint = new IPEndPoint(IPAddress.Any, 0),
+            LocalEndPoint = new IPEndPoint(IPAddress.Any, 0),
+            UnixSocketRemoteIp = unixSocketRemoteIp,
+            ConnectionNumber = 0,
+        });
+
+        Assert.AreEqual($"* Established connection to {hostName} ({unixSocketRemoteIp} port 0) from  port 0 \r\n", WrittenAsWindowsStandardError());
+    }
+
+    [TestMethod]
     public void HttpExchangeWithTraceTime_StampsEachLineStartAsCurl()
     {
         // Measured 2026-09-27, curl 8.21.0 (mingw, Schannel): Record-CurlExchange.ps1 -Port 18358

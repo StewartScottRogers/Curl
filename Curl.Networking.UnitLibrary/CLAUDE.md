@@ -10,7 +10,7 @@ nothing else.
 This is the one project allowed to construct a `Socket`, and only inside a transport
 type: `TcpDialer` (behind `ITcpDialer`) and `TcpConnectionListener` with its
 `TcpPendingConnection` (behind `IConnectionListener`) are the only types that construct a TCP
-`Socket` or a `NetworkStream`, and `UdpDatagramChannel` (opened by
+`Socket` or a `NetworkStream` (`TcpDialer` also connects the Unix domain socket, BL-507), and `UdpDatagramChannel` (opened by
 `UdpDatagramConnector`, behind `IDatagramConnector`) the only one that constructs a
 UDP `Socket`. `SslStreamTlsProvider` (behind `ITlsProvider`, configured by
 `TlsClientOptions`) is the only type that constructs an `SslStream`; it runs the
@@ -167,6 +167,18 @@ connection is reported `with proxy` (`ConnectionReusedEvent.IsProxy`) when the t
 forward proxy (`ConnectTarget.IsForwardProxy`) or tunnels through one, naming the proxy's host
 and port for a tunnel, as curl 8.21.0 prints it (BL-360).
 
+Per ADR-0149 (BL-507) `TcpConnector` takes an optional `UnixSocketAddress` (`--unix-socket`,
+`--abstract-unix-socket`, whose name starts with a NUL). With one, every connect dials it through
+`ITcpDialer.DialUnixSocketAsync` in place of the host, port and proxy, resolving nothing, then runs
+TLS to the URL's host when asked. `-v` shows curl 8.21.0's Windows lines on every platform: `Trying
+<name>:0...`, and for a failure `Immediate connect fail for <name>: <reason>` and `connect to <name>
+port 0 from  port 0 failed: <reason>` before exit 7 `Failed to connect to <host>:<port> over
+unix://<path> after N ms: Could not connect to server`; `<name>` is `UnixSocketAddress.RemoteIpText`,
+the path cut to 45 characters (empty for an abstract name). A success is reported opened with the
+path as the host and `ConnectionOpenedEvent.UnixSocketRemoteIp`. A path too long for `sun_path`
+(108 bytes, 104 on macOS, with its NUL) is exit 6 `Unix socket path too long: '<path>'`. Pools are
+per option group, so different sockets never share a connection.
+
 Everything else takes the Abstractions contracts (`IDnsResolver`, `ITlsProvider`,
 `IConnection`, `IDatagramChannel`) or `ITcpDialer`, plus an injected `TimeProvider`, so the tests in
 `Curl.Networking.UnitTests` drive every branch with fakes and no network.
@@ -177,10 +189,10 @@ cancels and disposes local UDP sockets without sending anything.
 the in-memory `Fakes/InMemoryDuplexStream` pair, with a self-signed certificate made in
 the test, so TLS is tested without a socket. `TcpConnectionListenerTests` and
 `TcpPendingConnectionTests` bind local TCP sockets without connecting to them. The tests that
-connect or send bytes are the loopback tests in `TcpDialerTests`, `UdpDatagramChannelTests`,
+connect or send bytes are the loopback tests in `TcpDialerTests` (TCP and Unix socket), `UdpDatagramChannelTests`,
 `TcpConnectorTests.LocalEndPoint` (plain and over TLS) and the accepting test in `TcpConnectionListenerTests`, tagged
-`[TestCategory("Integration")]`. Per ADR-0083 the four members only those tests can reach,
-`TcpDialer.DialAsync`, `TcpPendingConnection.AcceptStreamConnectionAsync` (behind the internal
+`[TestCategory("Integration")]`. Per ADR-0083 the five members only those tests can reach,
+`TcpDialer.DialAsync`, `TcpDialer.DialUnixSocketAsync`, `TcpPendingConnection.AcceptStreamConnectionAsync` (behind the internal
 `AcceptConnectionAsync` seam), `UdpDatagramChannel.SendAsync` and `UdpDatagramChannel.ReceiveAsync`,
 carry `[ExcludeFromCodeCoverage]`, so the fast-run coverage gate holds without the network.
 Keep them thin: logic added there is not measured.

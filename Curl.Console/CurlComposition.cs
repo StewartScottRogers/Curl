@@ -203,7 +203,9 @@ internal static class CurlComposition
     /// <c>--resolve</c> entries parsed by <see cref="ResolveOverrides.Parse" /> and the
     /// <c>--connect-to</c> mappings of <paramref name="options" />, so a transfer dials the
     /// mapped host and port at the overridden addresses. An entry that does not parse fails
-    /// each transfer with exit 49 when it connects, as curl 8.21.0 fails it.
+    /// each transfer with exit 49 when it connects, as curl 8.21.0 fails it. Under
+    /// <c>--unix-socket</c> or <c>--abstract-unix-socket</c> it dials that socket for every
+    /// transfer of the option group instead (<see cref="UnixSocketOf" />, BL-507).
     /// </summary>
     /// <param name="options">The parsed command line.</param>
     /// <param name="dnsResolver">Resolves a host no <c>--resolve</c> entry answers for.</param>
@@ -233,10 +235,22 @@ internal static class CurlComposition
             new ConnectToMappings(options.ConnectToEntries),
             proxyTlsProvider,
             ConnectTimeoutOf(options),
-            AddressFamilyOf(options));
+            AddressFamilyOf(options),
+            UnixSocketOf(options));
 
     /// <summary>
-    /// The address family both connectors dial: <see cref="AddressFamily.InterNetwork" /> under
+    /// The Unix domain socket the TCP connector dials in place of each URL's host: the last of
+    /// <c>--unix-socket</c> and <c>--abstract-unix-socket</c>, or <see langword="null" /> for
+    /// neither (BL-507). Each option group builds its own transports, so each group's pool
+    /// holds only connections to its own socket.
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns>The socket, or <see langword="null" /> to dial TCP.</returns>
+    internal static UnixSocketAddress? UnixSocketOf(CommandLineOptions options) =>
+        options.UnixSocketPath is { } path ? new UnixSocketAddress(path, options.UnixSocketIsAbstract) : null;
+
+    /// <summary>
+    /// The address family both connectors dial:<see cref="AddressFamily.InterNetwork" /> under
     /// <c>-4</c>, <see cref="AddressFamily.InterNetworkV6" /> under <c>-6</c>, and
     /// <see cref="AddressFamily.Unspecified" /> (either) when neither was given (BL-500).
     /// </summary>

@@ -35,7 +35,7 @@ internal static class TransferProxySelection
     /// <param name="url">The URL being transferred.</param>
     /// <param name="proxy">
     /// The proxy, with the <c>-U</c> credential when one was given; <see langword="null" /> for a
-    /// direct connection, a <c>file</c> URL or a failure.
+    /// direct connection, a <c>file</c> URL, a transfer through a Unix domain socket or a failure.
     /// </param>
     /// <param name="failure">
     /// The selector's failure for proxy text curl cannot use; <see langword="null" /> otherwise.
@@ -50,7 +50,9 @@ internal static class TransferProxySelection
     {
         proxy = null;
         failure = null;
-        if (url.Scheme == FileScheme)
+        // curl 8.21.0 drops the proxy, unread, when --unix-socket or --abstract-unix-socket is given
+        // ("do not mix proxy and Unix domain sockets"; measured, BL-507).
+        if (url.Scheme == FileScheme || options.UnixSocketPath is not null)
         {
             return true;
         }

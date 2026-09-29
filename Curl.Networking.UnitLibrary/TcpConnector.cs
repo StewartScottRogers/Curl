@@ -47,6 +47,10 @@ namespace Curl.Networking;
 /// (<see cref="AddressFamily.InterNetworkV6" />) chose, or <see cref="AddressFamily.Unspecified" />
 /// for either: only addresses of that family are dialled for a host or proxy name (BL-500).
 /// </param>
+/// <param name="unixSocket">
+/// The Unix domain socket <c>--unix-socket</c> or <c>--abstract-unix-socket</c> named, dialled for
+/// every target in place of its host, port and proxy; <see langword="null" /> to dial TCP (BL-507).
+/// </param>
 public sealed class TcpConnector(
     IDnsResolver dnsResolver,
     ITcpDialer tcpDialer,
@@ -57,7 +61,8 @@ public sealed class TcpConnector(
     ConnectToMappings? connectToMappings = null,
     ITlsProvider? proxyTlsProvider = null,
     TimeSpan? connectTimeout = null,
-    AddressFamily addressFamily = AddressFamily.Unspecified) : IConnector
+    AddressFamily addressFamily = AddressFamily.Unspecified,
+    UnixSocketAddress? unixSocket = null) : IConnector
 {
     private const string AnyHost = "*";
 
@@ -67,7 +72,16 @@ public sealed class TcpConnector(
     /// </summary>
     public static TimeSpan DefaultConnectTimeout { get; } = TimeSpan.FromSeconds(300);
 
+    // A Unix domain socket's connection has no IP end points; its opened event carries this for both.
+    private static readonly IPEndPoint UnspecifiedEndPoint = new(IPAddress.Any, 0);
+
     private readonly TimeSpan _connectTimeout = ConnectTimeoutOrDefault(connectTimeout);
+
+    /// <summary>
+    /// Gets the Unix domain socket every connect dials in place of the target's host, port and
+    /// proxy (<c>--unix-socket</c>, <c>--abstract-unix-socket</c>), or <see langword="null" /> to dial TCP.
+    /// </summary>
+    public UnixSocketAddress? UnixSocket { get; } = unixSocket;
 
     private readonly ITlsProvider _proxyTlsProvider = proxyTlsProvider ?? tlsProvider;
     private readonly HttpProxyTunnelOptions _proxyTunnelOptions = proxyTunnelOptions ?? HttpProxyTunnelOptions.Default;
@@ -233,9 +247,12 @@ public sealed class TcpConnector(
         using var limited = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
         try
         {
-            return target.Proxy is { } proxy
-                ? await ConnectThroughProxyAsync(target, destination, proxy, started, limited.Token).ConfigureAwait(false)
-                : await ConnectDirectlyAsync(target, destination, started, limited.Token).ConfigureAwait(false);
+            return (UnixSocket, target.Proxy) switch
+            {
+                ({ } unixSocketAddress, _) => await ConnectOverUnixSocketAsync(target, unixSocketAddress, started, limited.Token).ConfigureAwait(false),
+                (null, { } proxy) => await ConnectThroughProxyAsync(target, destination, proxy, started, limited.Token).ConfigureAwait(false),
+                _ => await ConnectDirectlyAsync(target, destination, started, limited.Token).ConfigureAwait(false),
+            };
         }
         catch (OperationCanceledException) when (timeProvider.GetElapsedTime(started) >= _connectTimeout)
         {
@@ -277,6 +294,55 @@ public sealed class TcpConnector(
                 $"Failed to connect to {target.Host}:{target.Port}{via} after {elapsedMilliseconds} ms: Could not connect to server");
         }
 
+        var timings = new ConnectTimings(started, nameResolved, timeProvider.GetTimestamp(), null);
+        return await SecureWhenAskedAsync(dialed, target, timings, 0, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Dials <paramref name="unixSocket" /> in place of the target's host, port and proxy, with no
+    /// name resolved, then runs TLS to the target's host when it asks for it, as curl 8.21.0 does
+    /// (measured, BL-507). <c>-v</c> shows <c>  Trying &lt;name&gt;:0...</c>, where the name is
+    /// <see cref="UnixSocketAddress.RemoteIpText" />, and a failed dial <c>Immediate connect fail for
+    /// &lt;name&gt;: &lt;reason&gt;</c> and <c>connect to &lt;name&gt; port 0 from  port 0 failed:
+    /// &lt;reason&gt;</c> before exit 7 <c>Failed to connect to &lt;host&gt;:&lt;port&gt; over
+    /// unix://&lt;path&gt; after &lt;n&gt; ms: Could not connect to server</c>. A path too long for
+    /// a <c>sockaddr_un</c> is exit 6 <c>Unix socket path too long: '&lt;path&gt;'</c>.
+    /// </summary>
+    private async ValueTask<ConnectResult> ConnectOverUnixSocketAsync(
+        ConnectTarget target,
+        UnixSocketAddress unixSocket,
+        long started,
+        CancellationToken cancellationToken)
+    {
+        if (unixSocket.IsTooLong(OperatingSystem.IsMacOS()))
+        {
+            return ConnectResult.Failed(
+                CurlExitCode.CouldntResolveHost,
+                CurlErrorBuffer.Truncate($"Unix socket path too long: '{unixSocket.Path}'"));
+        }
+
+        var name = unixSocket.RemoteIpText;
+        target.Events.ReportInfo($"  Trying {name}:0...");
+        var nameResolved = timeProvider.GetTimestamp();
+        IConnection connection;
+        try
+        {
+            connection = await tcpDialer.DialUnixSocketAsync(unixSocket, cancellationToken).ConfigureAwait(false);
+        }
+        catch (SocketException exception)
+        {
+            var reason = ConnectFailureReason.Describe(exception, OperatingSystem.IsWindows());
+            target.Events.ReportInfo($"Immediate connect fail for {name}: {reason}");
+            target.Events.ReportInfo($"connect to {name} port 0 from  port 0 failed: {reason}");
+            var elapsedMilliseconds = (long)timeProvider.GetElapsedTime(nameResolved).TotalMilliseconds;
+            return DialFailure(
+                target.Events,
+                exception.SocketErrorCode,
+                new ConnectTimings(started, nameResolved, null, null),
+                CurlErrorBuffer.Truncate($"Failed to connect to {target.Host}:{target.Port} over unix://{unixSocket.Path} after {elapsedMilliseconds} ms: Could not connect to server"));
+        }
+
+        var dialed = new DialedSocket(connection, null, unixSocket.Path, null, name);
         var timings = new ConnectTimings(started, nameResolved, timeProvider.GetTimestamp(), null);
         return await SecureWhenAskedAsync(dialed, target, timings, 0, cancellationToken).ConfigureAwait(false);
     }
@@ -612,8 +678,9 @@ public sealed class TcpConnector(
         events.ReportConnectionOpened(new ConnectionOpenedEvent
         {
             HostName = dialed.HostName,
-            RemoteEndPoint = dialed.RemoteEndPoint,
-            LocalEndPoint = dialed.LocalEndPoint,
+            RemoteEndPoint = dialed.RemoteEndPoint ?? UnspecifiedEndPoint,
+            LocalEndPoint = dialed.LocalEndPoint ?? UnspecifiedEndPoint,
+            UnixSocketRemoteIp = dialed.UnixSocketRemoteIp,
             ConnectionNumber = connectionNumber,
         });
 
@@ -740,7 +807,16 @@ public sealed class TcpConnector(
     /// A dialled TCP connection with the name and address it was dialled for: the connection
     /// the transfer talks over, which becomes the proxy's TLS stream through an HTTPS proxy.
     /// </summary>
-    private sealed record DialedSocket(IConnection Connection, IPEndPoint LocalEndPoint, string HostName, IPEndPoint RemoteEndPoint);
+    /// <remarks>
+    /// Through a Unix domain socket the host name is the socket's path, the two end points are
+    /// <see langword="null" /> and <paramref name="UnixSocketRemoteIp" /> is what curl shows instead.
+    /// </remarks>
+    private sealed record DialedSocket(
+        IConnection Connection,
+        IPEndPoint? LocalEndPoint,
+        string HostName,
+        IPEndPoint? RemoteEndPoint,
+        string? UnixSocketRemoteIp = null);
 
     /// <summary>
     /// One key of curl's DNS cache: the host as it was cached (the name looked up, or a
