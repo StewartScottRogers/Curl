@@ -34,3 +34,4 @@ An `AwsSigV4Signer` in `Curl.Authentication.UnitLibrary` builds the canonical re
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-28: Backlog -> Doing.
