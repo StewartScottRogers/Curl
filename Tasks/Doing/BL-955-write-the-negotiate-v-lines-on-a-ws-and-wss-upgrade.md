@@ -31,3 +31,4 @@ Under `-v`, `--negotiate` on a `ws://` or `wss://` URL writes the context-failur
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-29: Backlog -> Doing.
