@@ -51,7 +51,7 @@ completed: 2026-09-28
   Timing out the previous keys (three PTOs) belongs to loss recovery; it calls
   `DiscardPreviousKeys`.
 - The AES-CCM suites are refused with `ArgumentException` until BL-738's hand-built AES-CCM
-  lands; filed BL-817 to add `TLS_AES_128_CCM_SHA256`. No ADR: this is sequencing, not a
+  lands; filed BL-818 to add `TLS_AES_128_CCM_SHA256`. No ADR: this is sequencing, not a
   decision to leave it out.
 - RFC 9001 Appendix A was read from https://www.rfc-editor.org/rfc/rfc9001.txt; every
   vector is pinned in `QuicPacketProtectionTests` and all pass on the first run.

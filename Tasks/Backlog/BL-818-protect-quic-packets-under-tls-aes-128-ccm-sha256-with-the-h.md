@@ -1,5 +1,5 @@
 ---
-id: BL-817
+id: BL-818
 title: Protect QUIC packets under TLS_AES_128_CCM_SHA256 with the hand-built AES-CCM
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-817 — Protect QUIC packets under TLS_AES_128_CCM_SHA256 with the hand-built AES-CCM
+# BL-818 — Protect QUIC packets under TLS_AES_128_CCM_SHA256 with the hand-built AES-CCM
 
 ## Goal
 
