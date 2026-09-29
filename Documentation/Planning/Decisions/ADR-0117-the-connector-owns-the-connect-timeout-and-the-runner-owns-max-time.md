@@ -187,3 +187,47 @@ itself (`telnet.c`) before the multi loop does.
    passed, and the runner's message never prints an N below `-m`.
 3. **MQTT reports each PUBLISH body's length as the expected size**, as curl's
    `Curl_pgrsSetDownloadSize` does, so its message says `with M out of T bytes received`.
+
+## Amendment (BL-512, 2026-09-28): FTP's login is part of the connect phase
+
+Decided by Claude under Stewart's delegation. Recorded in BL-798, from BL-512's Notes.
+
+Measured on curl 8.21.0 (mingw, Schannel) with `Record-CurlExchange.ps1 -Ftp`, every case exit
+28 (`-v` also prints `* <message>` before `* closing connection #0`):
+
+- `-m 1`, greeting stalled: `curl: (28) Operation timed out after 1008 milliseconds with 0 bytes received`.
+- `--connect-timeout 1`, greeting stalled: `curl: (28) Operation timed out after 1011 milliseconds with 0 bytes received`.
+- `-m 1` and `--connect-timeout 1`, `USER` stalled: `Operation timed out after 1005 milliseconds with 0 bytes received`.
+- `-m 1 --disable-epsv`, `PASV` stalled: `Operation timed out after 1002 milliseconds with 0 bytes received` (EPSV the same, 1012 ms).
+- `-m 1`, `SIZE` answered `213 100`, 5 bytes sent and the data connection held: `Operation timed out after 1005 milliseconds with 5 out of 100 bytes received`.
+- `-P - -m 1`, no connection back after `150`: `* Data conn was not available immediately`, then
+  `Operation timed out after 1004 milliseconds with 0 bytes received` (exit 28, not 12: `-m` wins);
+  with `--connect-timeout 1 -m 4` it is `after 4017 milliseconds`, so the active-mode accept wait
+  ignores `--connect-timeout`.
+
+1. **After the TCP connect the message is always the Operation message**, never `Connection
+   timed out`, even when `--connect-timeout` is what ran out. So a handler whose protocol has a
+   connect phase of its own calls `ITransferProgress.ReportTransferStarted` as soon as its TCP
+   connection is up, not when the transfer proper starts: that is what makes the runner's
+   `MaxTimeWatchdog` (Decision 3) choose the Operation wording. The contract line "Call
+   `ReportTransferStarted` once the connection is up" means the TCP connection.
+2. **A protocol whose login curl counts as connecting holds that phase to `--connect-timeout`
+   itself.** curl holds its states before `DO` to `--connect-timeout`, counted from the
+   request's start; for FTP those are the greeting, `AUTH`, `USER`, `PASS`, `PBSZ`, `PROT` and
+   `PWD`. The connector's limit (Decision 1) ends with the TCP connect, so the handler enforces
+   the rest. In FTP that is `FtpConnectPhaseLimit`: a timer on the context's `TimeProvider`
+   (set again if it fires early, as `MaxTimeWatchdog` is) cancels a token linked with the
+   transfer's, which `FtpControlChannel` and the `AUTH` handshake use until the `PWD` reply is
+   read; then the channel goes back to the transfer's token. The limit is `--connect-timeout`,
+   or 300 seconds (curl's `DEFAULT_CONNECT_TIMEOUT`, `FtpConnectPhaseLimit.DefaultConnectTimeout`)
+   when it is not given or is 0. When it passes the transfer ends with exit 28 and
+   `Operation timed out after N milliseconds with 0 bytes received`. A cancellation before the
+   limit has passed (`-m`) still escapes to the runner. SMTP, POP3, IMAP and SSH, whose logins
+   curl also counts as connecting, follow the same pattern when they land.
+3. **Open gap: the passive data connect.** curl does not hold FTP's passive data connect to
+   `--connect-timeout`: with `--connect-timeout 1` and no `-m`, a `PASV` naming 10.255.255.1
+   ends after Windows' 21-second SYN timeout with `curl: (28) Failed to connect to 127.0.0.1:47911
+   via 10.255.255.1:1025 after 21103 ms: Could not connect to server`, and with
+   `--connect-timeout 2 -m 5` with `Operation timed out after 5012 milliseconds with 0 bytes
+   received`. `TcpConnector` holds every connect to its limit, so ours ends sooner; BL-797 is
+   filed to close that gap.

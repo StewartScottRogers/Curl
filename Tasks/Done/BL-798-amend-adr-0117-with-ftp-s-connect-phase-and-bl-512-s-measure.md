@@ -8,7 +8,7 @@ depends-on: [BL-512]
 touches: [Documentation/Planning/Decisions/ADR-0117-the-connector-owns-the-connect-timeout-and-the-runner-owns-max-time.md]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-29
 ---
 # BL-798 — Amend ADR-0117 with FTP's connect phase and BL-512's measurements
 
@@ -24,13 +24,16 @@ ADR-0117 carries an amendment, "Decided by Claude under Stewart's delegation", r
 
 ## Acceptance criteria
 
-- [ ] ADR-0117 has an "Amendment (BL-512, 2026-09-28)" section, marked "Decided by Claude under Stewart's delegation", quoting the measured stderr and exit codes from BL-512's Notes.
-- [ ] The amendment names `FtpConnectPhaseLimit`, says where the phase ends (the `PWD` reply), and states the 300-second default when `--connect-timeout` is not given or is 0.
-- [ ] The amendment names BL-797 as the open gap for the passive data connect.
+- [x] ADR-0117 has an "Amendment (BL-512, 2026-09-28)" section, marked "Decided by Claude under Stewart's delegation", quoting the measured stderr and exit codes from BL-512's Notes.
+- [x] The amendment names `FtpConnectPhaseLimit`, says where the phase ends (the `PWD` reply), and states the 300-second default when `--connect-timeout` is not given or is 0.
+- [x] The amendment names BL-797 as the open gap for the passive data connect.
 
 ## Notes
+
+Done directly (a single ADR section; no subagent needed). The amendment copies BL-512's measurements verbatim, names `FtpConnectPhaseLimit` and its `DefaultConnectTimeout` (checked in `Curl.Protocol.Ftp.UnitLibrary/FtpConnectPhaseLimit.cs`), and clarifies that the contract's "once the connection is up" means the TCP connection. No `.cs` or project file changed, so `verify` was not needed.
 
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Done. ADR-0117 records FTP's connect phase, FtpConnectPhaseLimit, BL-512's measurements and the BL-797 gap
