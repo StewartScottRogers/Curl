@@ -48,3 +48,4 @@ completed:
 - 2026-09-28: Created.
 - 2026-09-29: Backlog -> Doing.
 - 2026-09-29: Doing -> Backlog. Needs Curl.Cli.UnitLibrary and Curl.Cli.UnitTests for the -V Protocols line; BL-645 in Doing touches them
+- 2026-09-29: Backlog -> Doing.
