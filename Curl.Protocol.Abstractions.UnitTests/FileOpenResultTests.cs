@@ -57,6 +57,35 @@ public sealed class FileOpenResultTests
     }
 
     [TestMethod]
+    public void Failed_WithoutAnException_CarriesNoFailureException()
+    {
+        var result = FileOpenResult.Failed(FileAccessStatus.NotFound);
+
+        Assert.IsNull(result.FailureException);
+    }
+
+    [TestMethod]
+    public void Failed_WithAnException_RoundTripsIt()
+    {
+        var failure = new FileNotFoundException("Could not find file '/dir/x'.");
+
+        var result = FileOpenResult.Failed(FileAccessStatus.NotFound, failure);
+
+        Assert.AreSame(failure, result.FailureException);
+        AssertIsClosedFailure(result, FileAccessStatus.NotFound);
+    }
+
+    [TestMethod]
+    public void Opened_CarriesNoFailureException()
+    {
+        using var content = new MemoryStream([1]);
+
+        var result = FileOpenResult.Opened(content, 1, null);
+
+        Assert.IsNull(result.FailureException);
+    }
+
+    [TestMethod]
     public void Failed_WithOk_ThrowsArgumentOutOfRangeException()
     {
         var status = FileAccessStatus.Ok;

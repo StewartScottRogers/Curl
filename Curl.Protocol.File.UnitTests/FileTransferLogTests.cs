@@ -52,6 +52,20 @@ public sealed class FileTransferLogTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_OpenFailureWithAnException_NamesItsTypeAndMessageAtError()
+    {
+        var fileSystem = new FakeFileSystem();
+        fileSystem.FailOpenForRead(OsPath, FileAccessStatus.AccessDenied, new UnauthorizedAccessException("Access to the path is denied."));
+        var log = new RecordingDiagnosticLog();
+
+        await new FileProtocolHandler(fileSystem).ExecuteAsync(Context(log));
+
+        Assert.AreEqual(
+            $"could not open {OsPath} for reading: AccessDenied (System.UnauthorizedAccessException: Access to the path is denied.)",
+            log.MessagesAt(DiagnosticLogLevel.Error)[0]);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_Upload_LogsTheDestinationOpenedAtInfo()
     {
         var fileSystem = new FakeFileSystem();

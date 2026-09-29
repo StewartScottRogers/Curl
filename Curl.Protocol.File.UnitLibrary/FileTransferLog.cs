@@ -37,15 +37,18 @@ internal sealed class FileTransferLog(IDiagnosticLog diagnosticLog)
         }
     }
 
-    /// <summary>Writes an open that failed and the file system's reason, at <c>error</c>.</summary>
+    /// <summary>
+    /// Writes an open that failed and the file system's reason, at <c>error</c>, followed by
+    /// the type and message of the .NET exception behind it when the open carried one.
+    /// </summary>
     /// <param name="path">The operating system path the open was refused for.</param>
     /// <param name="purpose">What it was opened for: <c>reading</c> or <c>writing</c>.</param>
-    /// <param name="status">Why the file system refused it.</param>
-    public void OpenFailed(string path, string purpose, FileAccessStatus status)
+    /// <param name="failed">The failed open: its status and, if any, its exception.</param>
+    public void OpenFailed(string path, string purpose, FileOpenResult failed)
     {
         if (diagnosticLog.IsEnabled(DiagnosticLogLevel.Error))
         {
-            Write(DiagnosticLogLevel.Error, $"could not open {path} for {purpose}: {status}");
+            Write(DiagnosticLogLevel.Error, $"could not open {path} for {purpose}: {failed.Status}{ExceptionSuffix(failed.FailureException)}");
         }
     }
 
@@ -82,6 +85,9 @@ internal sealed class FileTransferLog(IDiagnosticLog diagnosticLog)
             Write(DiagnosticLogLevel.Error, $"transfer failed with {result.ExitCode} (exit {((int)result.ExitCode).ToString(CultureInfo.InvariantCulture)}): {result.ErrorMessage}");
         }
     }
+
+    private static string ExceptionSuffix(Exception? exception) =>
+        exception is null ? string.Empty : $" ({exception.GetType().FullName}: {exception.Message})";
 
     private void Write(DiagnosticLogLevel level, string message) =>
         diagnosticLog.Write(level, DiagnosticLogComponents.File, message);

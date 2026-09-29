@@ -177,7 +177,7 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
         var transferLog = new FileTransferLog(context.DiagnosticLog);
         if (!opened.IsOpen || opened.Content is null)
         {
-            transferLog.OpenFailed(path.OsPath, "reading", opened.Status);
+            transferLog.OpenFailed(path.OsPath, "reading", opened);
             return TransferResult.Failure(
                 CurlExitCode.FileCouldntReadFile,
                 FileTransferMessages.CouldNotOpenForReading(path.UrlPath));
@@ -397,7 +397,7 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem) : IProtocolHandl
         var transferLog = new FileTransferLog(context.DiagnosticLog);
         if (!opened.IsOpen || opened.Content is null)
         {
-            transferLog.OpenFailed(path.OsPath, "writing", opened.Status);
+            transferLog.OpenFailed(path.OsPath, "writing", opened);
             return TransferResult.Failure(
                 CurlExitCode.WriteError,
                 FileTransferMessages.CannotOpenForWriting(path.OsPath));

@@ -62,6 +62,14 @@ public sealed record FileOpenResult(
     public bool IsOpen => Status == FileAccessStatus.Ok;
 
     /// <summary>
+    /// Gets the exception the operating system raised for a failed open, when the
+    /// implementation had one: what the <c>file</c> component's <c>error</c> line in the
+    /// diagnostic log names (ADR-0222). <see langword="null" /> for a successful open and
+    /// for a failure an implementation decided without one.
+    /// </summary>
+    public Exception? FailureException { get; init; }
+
+    /// <summary>
     /// Creates the result of a successful open.
     /// </summary>
     /// <param name="content">
@@ -92,6 +100,10 @@ public sealed record FileOpenResult(
     /// Creates the result of a failed open.
     /// </summary>
     /// <param name="status">Why the open failed.</param>
+    /// <param name="failureException">
+    /// The exception the operating system raised for the open, or <see langword="null" />
+    /// when there was none; carried as <see cref="FailureException" />.
+    /// </param>
     /// <returns>
     /// A result with no <see cref="Content" />, a <see cref="Length" /> of zero and a
     /// <see langword="null" /> <see cref="LastWriteTimeUtc" />.
@@ -100,7 +112,7 @@ public sealed record FileOpenResult(
     /// <paramref name="status" /> is <see cref="FileAccessStatus.Ok" />, which is not a
     /// failure; use <see cref="Opened(Stream, long, DateTimeOffset?)" /> instead.
     /// </exception>
-    public static FileOpenResult Failed(FileAccessStatus status)
+    public static FileOpenResult Failed(FileAccessStatus status, Exception? failureException = null)
     {
         if (status == FileAccessStatus.Ok)
         {
@@ -110,6 +122,6 @@ public sealed record FileOpenResult(
                 "A failed open cannot report FileAccessStatus.Ok; use FileOpenResult.Opened instead.");
         }
 
-        return new FileOpenResult(status, null, 0, null);
+        return new FileOpenResult(status, null, 0, null) { FailureException = failureException };
     }
 }
