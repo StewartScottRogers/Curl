@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: docs
 depends-on: [BL-726]
-touches: [Curl.Quic.UnitLibrary, Curl.Quic.UnitTests]
+touches: [Curl.Quic.UnitLibrary, Curl.Quic.UnitTests, Curl.Networking.UnitLibrary]
 requirement: none
 created: 2026-09-28
 completed:
@@ -28,7 +28,10 @@ The I/O-free QUIC client state machine has a name that says it carries the conne
 
 ## Notes
 
+- 2026-09-29: `Curl.Networking.UnitLibrary/QuicDialer.cs` constructs and passes `QuicClientHandshake` (lines 152, 240, 272), so the rename must edit it; added `Curl.Networking.UnitLibrary` to `touches`. BL-850 (in Doing) touches that project, so the task went back to Backlog until BL-850 finishes.
+
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Backlog. Needs Curl.Networking.UnitLibrary (QuicDialer uses QuicClientHandshake), which BL-850 in Doing touches
