@@ -34,3 +34,4 @@ A `ws://` or `wss://` upgrade answered with `401` and a `WWW-Authenticate` chall
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-29: Backlog -> Doing.
