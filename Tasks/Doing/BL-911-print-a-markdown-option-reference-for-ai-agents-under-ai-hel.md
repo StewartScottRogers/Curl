@@ -48,3 +48,4 @@ From now on any task that adds or changes a command-line option also keeps `--ai
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-29: Backlog -> Doing.
