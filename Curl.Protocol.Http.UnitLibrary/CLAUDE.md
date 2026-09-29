@@ -28,6 +28,11 @@ request asks to upgrade to h2c (`Upgrade: h2c`, `HTTP2-Settings`, `Connection: U
 HTTP2-Settings`) and runs on an `HttpH2cUpgradeConnection`: a response that is not
 `HTTP/1.1 101` is read through unchanged, and after a `101` head the connection sends the
 client preface and reads the response from stream 1 through an `Http2StreamConnection`.
+Its `Http2Session` then carries the transfer's later requests (BL-866): a 401 retry goes out
+as HEADERS on stream 3 of the same connection, the session is handed to the connection like
+any HTTP/2 session so the next URL continues it, and `-v` ends with `left intact`. Stream 1
+is opened half closed (`Http2Connection.OpenUpgradedStream`) and read to its end, so it
+closes with its response.
 
 HTTP/3 (BL-731, ADR-0172) does the same over QUIC: for `--http3-only`, and for `--http3`
 before falling back to TCP, the handler asks the connector for an `IMultiplexedConnection`

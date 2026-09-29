@@ -645,8 +645,9 @@ public sealed class HttpProtocolHandler(
 
         IHttpStreamSession? streams = StreamSessionOf(plan, connect, connection);
         Http2Session? unheldSession = UnheldHttp2Session(streams, connection);
-        HttpAttemptOutcome outcome = await ExchangeWithRetriesAsync(plan, connect, connection, earlier, streams).ConfigureAwait(false);
-        SettleConnection(plan, connection, streams, outcome);
+        (HttpAttemptOutcome outcome, Http2Session? upgradedSession) = await ExchangeWithRetriesAsync(plan, connect, connection, earlier, streams).ConfigureAwait(false);
+        unheldSession ??= UnheldHttp2Session(upgradedSession, connection);
+        SettleConnection(plan, connection, streams ?? upgradedSession, outcome);
         await ShutDownAsync(unheldSession).ConfigureAwait(false);
         return outcome;
     }
@@ -681,9 +682,11 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Sends <paramref name="plan" />, framed for HTTP/2 or HTTP/3 when <paramref name="streams" /> is set,
-    /// then each retry the response asks for while the connection stays open.
+    /// then each retry the response asks for while the connection stays open. After an h2c
+    /// upgrade the retries go out on new streams of the session the connection switched to, as
+    /// curl sends them (measured, BL-866 Notes), and that session is given back with the outcome.
     /// </summary>
-    private async ValueTask<HttpAttemptOutcome> ExchangeWithRetriesAsync(
+    private async ValueTask<(HttpAttemptOutcome Outcome, Http2Session? UpgradedSession)> ExchangeWithRetriesAsync(
         HttpRequestPlan plan,
         ConnectResult connect,
         IConnection connection,
@@ -692,12 +695,15 @@ public sealed class HttpProtocolHandler(
     {
         HttpRequestPlan first = streams is null ? plan : plan.ForHttp2OrHttp3();
         HttpAttemptOutcome outcome = await ExchangeAsync(first, connect, connection, earlier, newConnection: !connect.IsReused, streams).ConfigureAwait(false);
+        Http2Session? upgradedSession = outcome.UpgradedSession;
+        streams ??= upgradedSession;
         while (outcome.Retry is { } retry && outcome.KeepsAlive)
         {
-            outcome = await ExchangeAsync(retry, connect, connection, outcome.Result.Report, newConnection: false, streams).ConfigureAwait(false);
+            HttpRequestPlan next = streams is null ? retry : retry.ForHttp2OrHttp3();
+            outcome = await ExchangeAsync(next, connect, connection, outcome.Result.Report, newConnection: false, streams).ConfigureAwait(false);
         }
 
-        return outcome;
+        return (outcome, upgradedSession);
     }
 
     /// <summary>
@@ -864,7 +870,7 @@ public sealed class HttpProtocolHandler(
             ReportIgnoredBody(plan, actedOn, discardsBody);
             headReader.ReportHeldLines();
             delivery = DeliveryOf(plan, actedOn, discardsBody);
-            await ReadBodyAsync(plan, actedOn, body, requestStream, delivery, discardsBody, cancellationToken).ConfigureAwait(false);
+            await ReadBodyAsync(plan, actedOn, body, TrailerStreamOf(requestStream, connection), delivery, discardsBody, cancellationToken).ConfigureAwait(false);
             ThrowIfFailing(fail, HttpFailMode.FailWithBody, actedOn);
         }
         catch (HttpTransferException failure)
@@ -887,11 +893,36 @@ public sealed class HttpProtocolHandler(
         }
 
         TransferResult result = Succeeded(delivery, actedOn!, exchange.Report(body));
-        return new HttpAttemptOutcome(result, retry, KeepsAlive(plan, actedOn, upload, headReader, delivery, streams))
+        return new HttpAttemptOutcome(result, retry, KeepsAlive(plan, actedOn, upload, headReader, delivery, StreamSessionAfter(streams, connection)))
         {
             LeftIntactAfterServerClosed = LeftIntactAfterServerClosed(plan, actedOn, upload, headReader, delivery),
+            UpgradedSession = UpgradedSessionOf(connection),
         };
     }
+
+    /// <summary>
+    /// Gives the session the exchange ran on: <paramref name="streams" /> when it began on one,
+    /// else the HTTP/2 session its connection switched to after an h2c upgrade's <c>101</c>
+    /// (BL-866), else <see langword="null" /> for HTTP/1.x.
+    /// </summary>
+    private static IHttpStreamSession? StreamSessionAfter(IHttpStreamSession? streams, IConnection connection) =>
+        streams ?? UpgradedSessionOf(connection);
+
+    /// <summary>
+    /// Gives the HTTP/2 session a connection switched to after an h2c upgrade's <c>101</c>, or
+    /// <see langword="null" /> when it did not switch.
+    /// </summary>
+    private static Http2Session? UpgradedSessionOf(IConnection connection) =>
+        (connection as HttpH2cUpgradeConnection)?.UpgradedSession;
+
+    /// <summary>
+    /// Gives the stream whose end is read for the response's trailers: the exchange's HTTP/2 or
+    /// HTTP/3 stream, else stream 1 of a connection that switched to HTTP/2 after an h2c
+    /// upgrade's <c>101</c>, so it is read to its end before the connection carries another
+    /// request (BL-866), else <see langword="null" />.
+    /// </summary>
+    private static IHttpStreamConnection? TrailerStreamOf(IHttpStreamConnection? requestStream, IConnection connection) =>
+        requestStream ?? (connection as HttpH2cUpgradeConnection)?.UpgradedStream;
 
     /// <summary>
     /// Creates the HTTP/2 or HTTP/3 stream the exchange runs on, with the request body's length (0 for
@@ -1134,12 +1165,13 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Decides whether the exchange ran whole: its request body was not cut short, its
-    /// response body was delivered, and the response did not switch protocols.
+    /// response body was delivered, and the response did not switch protocols, unless it
+    /// switched to HTTP/2 after an h2c upgrade's <c>101</c> and was read from stream 1 (BL-866).
     /// </summary>
     private static bool DeliveredWhole(HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpBodyDelivery delivery) =>
         !upload.CutShort
             && delivery == HttpBodyDelivery.Deliver
-            && !headReader.SwitchedProtocols;
+            && (!headReader.SwitchedProtocols || headReader.IsSwitchedToHttp2());
 
     /// <summary>
     /// Decides whether a failed exchange was on a pooled connection that died while idle, so
@@ -2039,6 +2071,12 @@ public sealed class HttpProtocolHandler(
         /// the pool finds it dead (ADR-0112).
         /// </summary>
         public bool LeftIntactAfterServerClosed { get; init; }
+
+        /// <summary>
+        /// Gets the HTTP/2 session the exchange's connection switched to after an h2c upgrade's
+        /// <c>101</c> (BL-866), or <see langword="null" /> when it did not switch.
+        /// </summary>
+        public Http2Session? UpgradedSession { get; init; }
 
         /// <summary>
         /// Gets a value indicating whether the connection is reported left intact: it

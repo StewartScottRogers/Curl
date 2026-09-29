@@ -50,8 +50,10 @@ public sealed partial class HttpProtocolHandlerTests
                 Convert.ToHexString(connection.Written),
                 Convert.ToHexString(Encoding.Latin1.GetBytes(UpgradeRequest)) + Http2Preface.ToUpperInvariant() + SettingsAcknowledgement,
                 $"Chunk size {chunkSize}");
-            Assert.IsFalse(connection.IsMarkedReusable, "an upgraded connection is never pooled without its session");
+            Assert.IsTrue(connection.IsMarkedReusable, $"Chunk size {chunkSize}: the upgraded connection keeps its HTTP/2 session for later requests");
             CollectionAssert.Contains(events.Info, HttpConnectionInfoLines.SwitchingToHttp2);
+            Assert.AreEqual("Connection #0 to host 127.0.0.1:48717 left intact", events.Info[^1], $"Chunk size {chunkSize}");
+            StringAssert.EndsWith(Convert.ToHexString(connection.Written), ClosingGoAway, $"Chunk size {chunkSize}: a connection that holds no session is shut down with curl's GOAWAY");
         }
     }
 
@@ -119,6 +121,107 @@ public sealed partial class HttpProtocolHandlerTests
             .ExecuteAsync(UpgradeContext("http://127.0.0.1:48717/", new MemoryStream(), null, new RecordingTransferEvents()));
 
         Assert.AreEqual(CurlExitCode.Http2, result.ExitCode);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_Http2Upgrade401OnStream1_RetriesAsHeadersOnStream3OfTheSameConnection()
+    {
+        // curl --http2 -v --anyauth -u a:b http://127.0.0.1:48867/a (BL-866 Notes): the 401 read
+        // from stream 1 leaves the connection intact and the retry goes out as HEADERS on stream 3.
+        // The server allows one stream at a time, so stream 1 must be closed once its response ends.
+        HpackEncoder server = new();
+        byte[] response =
+        [
+            .. Encoding.Latin1.GetBytes(SwitchingProtocolsHead),
+            .. Http2Response(
+                Http2FrameFactory.CreateSettings([new(Http2SettingIdentifier.MaxConcurrentStreams, 1)]),
+                Http2FrameFactory.CreateHeaders(1, server.Encode([new(":status", "401"), new("www-authenticate", "Basic realm=\"x\"")]), isEndStream: false, isEndHeaders: true),
+                Http2FrameFactory.CreateData(1, "no\n"u8.ToArray(), isEndStream: true),
+                Http2FrameFactory.CreateHeaders(3, server.Encode([new(":status", "200"), new("content-length", "2")]), isEndStream: false, isEndHeaders: true),
+                Http2FrameFactory.CreateData(3, "ok"u8.ToArray(), isEndStream: true)),
+        ];
+        ScriptedConnection connection = new(response, 65536);
+        MemoryStream output = new();
+        RecordingTransferEvents events = new();
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new ScriptedAuthenticator(null, "Basic YTpi"))
+            .ExecuteAsync(UpgradeContext("http://127.0.0.1:48867/a", output, null, events));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("ok", Latin1(output.ToArray()));
+        Assert.AreEqual(1, result.Report!.ConnectionCount);
+        Http2Frame retry = (await FramesAfterUpgradeRequest(connection.Written)).Single(frame => frame.Type == Http2FrameType.Headers);
+        Assert.AreEqual(3, retry.StreamId);
+        Assert.AreEqual("Basic YTpi", new HpackDecoder().Decode(retry.Payload.Span).Single(field => field.Name == "authorization").Value);
+        Assert.AreEqual("Connection #0 to host 127.0.0.1:48867 left intact", events.Info[^1]);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TwoTransfersAfterAnHttp2Upgrade_SendTheSecondOnStream3OfThePooledConnection()
+    {
+        // curl --http2 -v http://127.0.0.1:48866/a http://127.0.0.1:48866/b (BL-866 Notes): the
+        // first is left intact and the second reuses its connection as HEADERS on stream 3.
+        HpackEncoder server = new();
+        byte[] response =
+        [
+            .. Encoding.Latin1.GetBytes(SwitchingProtocolsHead),
+            .. Http2Response(
+                Http2FrameFactory.CreateHeaders(1, server.Encode([new(":status", "200")]), isEndStream: false, isEndHeaders: true),
+                Http2FrameFactory.CreateData(1, "hi\n"u8.ToArray(), isEndStream: true),
+                Http2FrameFactory.CreateHeaders(3, server.Encode([new(":status", "200")]), isEndStream: false, isEndHeaders: true),
+                Http2FrameFactory.CreateData(3, "b\n"u8.ToArray(), isEndStream: true)),
+        ];
+        ScriptedConnection wire = new(response, 65536);
+        SessionHoldingConnection connection = new(wire);
+        HttpProtocolHandler handler = Handler(new QueueConnector(
+            ConnectResult.Connected(connection, null),
+            ConnectResult.Connected(connection, null, isReused: true)));
+        RecordingTransferEvents firstEvents = new();
+        MemoryStream secondOutput = new();
+
+        TransferResult first = await handler.ExecuteAsync(UpgradeContext("http://127.0.0.1:48866/a", new MemoryStream(), null, firstEvents));
+        TransferResult second = await handler.ExecuteAsync(UpgradeContext("http://127.0.0.1:48866/b", secondOutput, null, new RecordingTransferEvents()));
+        await connection.CloseAsync();
+
+        Assert.AreEqual(CurlExitCode.Ok, first.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, second.ExitCode);
+        Assert.AreEqual("Connection #0 to host 127.0.0.1:48866 left intact", firstEvents.Info[^1]);
+        Assert.AreEqual("b\n", Latin1(secondOutput.ToArray()));
+        Assert.AreEqual(2, connection.ReturnedReusableCount);
+        Assert.AreEqual(new Version(2, 0), second.Report!.HttpVersion);
+        Http2Frame next = (await FramesAfterUpgradeRequest(wire.Written)).Single(frame => frame.Type == Http2FrameType.Headers);
+        Assert.AreEqual(3, next.StreamId);
+        Assert.AreEqual(Http2FrameFlags.EndStream | Http2FrameFlags.EndHeaders, next.Flags);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_Http2UpgradeWithTrailersOnStream1_ReadsTheStreamToItsEndAndWritesThem()
+    {
+        HpackEncoder server = new();
+        byte[] response =
+        [
+            .. Encoding.Latin1.GetBytes(SwitchingProtocolsHead),
+            .. Http2Response(
+                Http2FrameFactory.CreateHeaders(1, server.Encode([new(":status", "200"), new("content-length", "2")]), isEndStream: false, isEndHeaders: true),
+                Http2FrameFactory.CreateData(1, "ok"u8.ToArray(), isEndStream: false),
+                Http2FrameFactory.CreateHeaders(1, server.Encode([new("x-checksum", "1")]), isEndStream: true, isEndHeaders: true)),
+        ];
+        ScriptedConnection connection = new(response, 65536);
+        MemoryStream headerOutput = new();
+
+        TransferResult result = await Handler(QueueConnector.For(connection))
+            .ExecuteAsync(UpgradeContext("http://127.0.0.1:48717/", new MemoryStream(), headerOutput, new RecordingTransferEvents()));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        StringAssert.EndsWith(Latin1(headerOutput.ToArray()), "HTTP/2 200 \r\ncontent-length: 2\r\n\r\nx-checksum: 1\r\n");
+        Assert.IsTrue(connection.IsMarkedReusable);
+    }
+
+    /// <summary>Reads the frames the client wrote after its HTTP/1.1 upgrade request and its preface.</summary>
+    private static Task<List<Http2Frame>> FramesAfterUpgradeRequest(byte[] written)
+    {
+        int requestEnd = written.AsSpan().IndexOf("\r\n\r\n"u8) + 4;
+        return FramesAfterPreface(written[requestEnd..]);
     }
 
     private static TransferContext UpgradeContext(string url, Stream output, Stream? headerOutput, ITransferEvents events) =>
