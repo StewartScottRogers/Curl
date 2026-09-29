@@ -18,10 +18,13 @@ caller owns: `SendPrefaceAsync` sends the preface, SETTINGS and connection WINDO
 curl sends (measured, pinned in `Http2ConnectionTests`), `OpenStream` allocates odd
 stream identifiers, `WriteHeadersAsync` and `WriteDataAsync` split into frames within the
 peer's frame size and flow-control windows, and `ReadStreamFrameAsync` returns DATA and
-whole header blocks while answering SETTINGS and PING and applying WINDOW_UPDATE itself.
+whole header blocks while answering SETTINGS and PING and applying WINDOW_UPDATE itself;
+`ReadFrameAsync` handles exactly one frame, so a sender waiting for window can take in
+WINDOW_UPDATE, and `IsClosedByPeer` tells when the peer closed between frames.
 Failures are typed: `Http2ProtocolException` (a connection error; GOAWAY already sent),
 `Http2StreamResetException` (the peer's RST_STREAM) and `Http2GoAwayException` (the
-peer's GOAWAY). A request and response on a stream come with BL-658.
+peer's GOAWAY). The request and response on a stream are in `Curl.Protocol.Http.UnitLibrary`
+(`Http2Session`, `Http2StreamConnection`; BL-658, ADR-0159).
 
 ## Rules
 

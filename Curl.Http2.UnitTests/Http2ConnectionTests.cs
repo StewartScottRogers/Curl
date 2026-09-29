@@ -303,6 +303,33 @@ public sealed class Http2ConnectionTests
     }
 
     [TestMethod]
+    public async Task ReadFrameAsync_WindowUpdate_AppliesItAndCompletesNoStreamFrame()
+    {
+        var (connection, _) = Connect(CreateWindowUpdate(0, 1000), CreateData(1, "x"u8.ToArray(), isEndStream: false));
+        _ = connection.OpenStream();
+
+        var afterWindowUpdate = await connection.ReadFrameAsync(None);
+        var afterData = await connection.ReadFrameAsync(None);
+
+        Assert.IsNull(afterWindowUpdate);
+        Assert.IsFalse(connection.IsClosedByPeer);
+        Assert.AreEqual(Http2Settings.DefaultInitialWindowSize + 1000, connection.ConnectionSendWindow.Size);
+        CollectionAssert.AreEqual("x"u8.ToArray(), afterData!.Content.ToArray());
+    }
+
+    [TestMethod]
+    public async Task ReadFrameAsync_PeerClosedBetweenFrames_ReturnsNullAndTellsItClosed()
+    {
+        var (connection, _) = Connect();
+
+        var frame = await connection.ReadFrameAsync(None);
+
+        Assert.IsNull(frame);
+        Assert.IsTrue(connection.IsClosedByPeer);
+        Assert.IsNull(await connection.ReadStreamFrameAsync(None));
+    }
+
+    [TestMethod]
     public async Task ReadStreamFrameAsync_DataWithEndStream_EndsTheStream()
     {
         var (connection, _) = Connect(CreateData(1, "x"u8.ToArray(), isEndStream: true), CreateData(1, "y"u8.ToArray(), isEndStream: false));

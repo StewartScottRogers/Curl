@@ -101,6 +101,9 @@ public sealed class Http2Connection
     /// <summary>Gets the GOAWAY the peer sent, or <see langword="null" /> if none.</summary>
     public Http2GoAwayPayload? PeerGoAway { get; private set; }
 
+    /// <summary>Gets whether a read found the peer had closed the connection between frames.</summary>
+    public bool IsClosedByPeer { get; private set; }
+
     /// <summary>Gets how many streams are open or half closed; a closed or reset stream is forgotten.</summary>
     public int OpenStreamCount => streams.Count;
 
@@ -315,10 +318,38 @@ public sealed class Http2Connection
     /// <exception cref="InvalidOperationException">The connection already failed with a protocol error.</exception>
     public async Task<Http2StreamFrame?> ReadStreamFrameAsync(CancellationToken cancellationToken)
     {
+        Http2StreamFrame? streamFrame;
+        do
+        {
+            streamFrame = await ReadFrameAsync(cancellationToken).ConfigureAwait(false);
+        }
+        while (streamFrame is null && !IsClosedByPeer);
+
+        return streamFrame;
+    }
+
+    /// <summary>
+    /// Reads and handles exactly one frame, as <see cref="ReadStreamFrameAsync" /> handles each:
+    /// the way to take in the peer's WINDOW_UPDATE while DATA waits for window, since the peer
+    /// may send nothing for a stream until the body is whole.
+    /// </summary>
+    /// <param name="cancellationToken">Cancels the read.</param>
+    /// <returns>
+    /// The stream frame the frame completed - DATA, or the end of a header block - or
+    /// <see langword="null" /> when it completed none or the peer closed the connection
+    /// between frames, which <see cref="IsClosedByPeer" /> then tells.
+    /// </returns>
+    /// <exception cref="Http2ProtocolException">The peer broke RFC 9113; GOAWAY has been sent with the error code.</exception>
+    /// <exception cref="Http2StreamResetException">The peer reset a stream this endpoint has open.</exception>
+    /// <exception cref="Http2GoAwayException">The peer sent GOAWAY with an error, or one leaving an open stream unprocessed.</exception>
+    /// <exception cref="EndOfStreamException">The peer closed the connection part way through a frame or header block.</exception>
+    /// <exception cref="InvalidOperationException">The connection already failed with a protocol error.</exception>
+    public async Task<Http2StreamFrame?> ReadFrameAsync(CancellationToken cancellationToken)
+    {
         ThrowIfFailed();
         try
         {
-            return await ReadUntilStreamFrameAsync(cancellationToken).ConfigureAwait(false);
+            return await ReadOneFrameAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (Http2ProtocolException exception)
         {
@@ -387,21 +418,16 @@ public sealed class Http2Connection
         ? null
         : throw new EndOfStreamException($"The connection closed part way through stream {pendingHeaderBlock.StreamId}'s header block.");
 
-    private async Task<Http2StreamFrame?> ReadUntilStreamFrameAsync(CancellationToken cancellationToken)
+    private async Task<Http2StreamFrame?> ReadOneFrameAsync(CancellationToken cancellationToken)
     {
-        Http2StreamFrame? streamFrame = null;
-        while (streamFrame is null)
+        var frame = await Http2FrameCodec.ReadAsync(stream, Http2FrameCodec.DefaultMaximumFrameSize, cancellationToken).ConfigureAwait(false);
+        if (frame is null)
         {
-            var frame = await Http2FrameCodec.ReadAsync(stream, Http2FrameCodec.DefaultMaximumFrameSize, cancellationToken).ConfigureAwait(false);
-            if (frame is null)
-            {
-                return EndOfConnection();
-            }
-
-            streamFrame = await ReceiveFrameAsync(frame, cancellationToken).ConfigureAwait(false);
+            IsClosedByPeer = true;
+            return EndOfConnection();
         }
 
-        return streamFrame;
+        return await ReceiveFrameAsync(frame, cancellationToken).ConfigureAwait(false);
     }
 
     private Task<Http2StreamFrame?> ReceiveFrameAsync(Http2Frame frame, CancellationToken cancellationToken)
