@@ -33,7 +33,7 @@ public sealed class CommandLineNextGroupTests
         "form-string", "get", "url-query", "dump-header", "user", "basic", "digest", "ntlm", "negotiate",
         "anyauth", "oauth2-bearer", "netrc", "netrc-optional", "netrc-file","proxy", "socks4", "socks4a", "socks5", "socks5-hostname", "proxy-user",
         "noproxy", "proxytunnel", "telnet-option", "tftp-blksize", "mail-from", "mail-rcpt", "mail-auth",
-        "mail-rcpt-allowfails", "upload-flags", "login-options", "sasl-authzid", "sasl-ir", "resolve", "connect-to", "unix-socket", "abstract-unix-socket", "tftp-no-options",
+        "mail-rcpt-allowfails", "upload-flags", "login-options", "sasl-authzid", "sasl-ir", "resolve", "connect-to", "dns-servers", "dns-interface", "dns-ipv4-addr", "dns-ipv6-addr", "unix-socket", "abstract-unix-socket", "tftp-no-options",
         "disable-epsv", "epsv", "ftp-skip-pasv-ip", "ftp-method", "ftp-create-dirs", "ftp-port", "ftp-pasv",
         "disable-eprt", "eprt", "ssl", "ftp-ssl", "ssl-reqd", "ftp-ssl-reqd", "ftp-ssl-control", "list-only",
         "quote", "create-file-mode", "insecure", "ssl-no-revoke", "ssl-revoke-best-effort", "ssl-allow-beast",

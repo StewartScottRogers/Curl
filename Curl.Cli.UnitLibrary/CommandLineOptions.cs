@@ -486,6 +486,37 @@ public sealed class CommandLineOptions
     public IReadOnlyList<string> ConnectToEntries => connectToEntries;
 
     /// <summary>
+    /// The last <c>--dns-servers</c> value (<c>host[:port]</c> entries separated by commas), verbatim and
+    /// unvalidated; <see langword="null"/> when not given. An empty value is refused as blank. A c-ares
+    /// build of curl checks the list only when it resolves a host name, failing that transfer with exit
+    /// code 43, so the parser accepts any other value (measured 2026-09-28, BL-643 Notes).
+    /// </summary>
+    public string? DnsServers { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--dns-interface</c>, the network interface name DNS queries go out on, verbatim;
+    /// <see langword="null"/> when not given. An empty value is refused as blank; any other name is
+    /// accepted without looking it up, as a c-ares build of curl does.
+    /// </summary>
+    public string? DnsInterface { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--dns-ipv4-addr</c>, the local IPv4 address DNS queries are sent from, verbatim and
+    /// unvalidated; <see langword="null"/> when not given. An empty value is refused as blank. A c-ares
+    /// build of curl checks the address only when it resolves a host name, failing that transfer with
+    /// exit code 43.
+    /// </summary>
+    public string? DnsIPv4Address { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--dns-ipv6-addr</c>, the local IPv6 address DNS queries are sent from, verbatim and
+    /// unvalidated; <see langword="null"/> when not given. An empty value is refused as blank. A c-ares
+    /// build of curl checks the address only when it resolves a host name, failing that transfer with
+    /// exit code 43.
+    /// </summary>
+    public string? DnsIPv6Address { get; internal set; }
+
+    /// <summary>
     /// The path of the Unix domain socket to connect through, from whichever of <c>--unix-socket</c> and
     /// <c>--abstract-unix-socket</c> came last; <see langword="null"/> when neither was given. curl 8.21.0
     /// refuses an empty path as blank and accepts any other without looking at it, on Windows too (measured
