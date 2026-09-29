@@ -19,9 +19,13 @@ namespace Curl.Networking;
 /// </summary>
 /// <remarks>
 /// <para>
-/// A range that reaches TLS 1.3 runs <see cref="Tls13ClientConnection" />; a range whose
-/// ceiling is TLS 1.2, 1.1 or 1.0 runs <see cref="Tls12ClientConnection" /> offering every
-/// version from the minimum (TLS 1.0 when none is given) to the ceiling (ADR-0162). The
+/// A range that reaches TLS 1.3 from below runs <see cref="TlsClientConnection" />, one
+/// ClientHello offering TLS 1.3 and TLS 1.2 down to the minimum (TLS 1.2 when none is
+/// given), continued on the version the server picks (ADR-0200); a TLS 1.3 minimum runs
+/// <see cref="Tls13ClientConnection" />; a range whose ceiling is TLS 1.2, 1.1 or 1.0 runs
+/// <see cref="Tls12ClientConnection" /> offering every version from the minimum (TLS 1.0
+/// when none is given) to the ceiling (ADR-0162). When the cipher options leave no suite
+/// the client can run for one side of a spanning range, the other side runs alone. The
 /// ClientHello carries the target host in <c>server_name</c> unless it is an IP address,
 /// the connection's protocols through ALPN unless <c>--no-alpn</c>, and the <c>--cert</c>
 /// certificate when the server asks for one and its key is RSA or ECDSA.
@@ -100,8 +104,11 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     /// </summary>
     public IReadOnlyList<string> Warnings { get; }
 
-    // A range that reaches TLS 1.3 runs the TLS 1.3 client (ADR-0162).
+    // A range that reaches TLS 1.3 offers it, and one whose minimum is below TLS 1.3 offers
+    // TLS 1.2 and below; a range doing both offers them in one ClientHello (ADR-0162, ADR-0200).
     private bool OffersTls13 => _options.MaximumVersion is TlsVersion.SystemDefault or TlsVersion.Tls13;
+
+    private bool OffersBelowTls13 => _options.MinimumVersion is not TlsVersion.Tls13;
 
     private bool OffersOnlyVersionsBelowTls12 => _options.MaximumVersion is TlsVersion.Tls10 or TlsVersion.Tls11;
 
@@ -325,12 +332,47 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         IServerCertificateVerifier verifier,
         CancellationToken cancellationToken)
     {
-        if (OffersTls13)
-        {
-            var tls13 = await Tls13ClientConnection.ConnectAsync(transport, settings.ToTls13(), _random, verifier, cancellationToken).ConfigureAwait(false);
-            return tls13.Stream is { } tls13Stream ? HandBuiltHandshake.Completed(tls13Stream) : HandBuiltHandshake.Failed(tls13.Failure!);
-        }
+        var runsTls13 = OffersTls13 && settings.OffersSuiteFor(Tls13RecordProtection.CanProtect);
+        var runsTls12 = OffersBelowTls13 && settings.OffersSuiteFor(IsTls12Suite);
+        return runsTls13 && runsTls12 ? await HandshakeTls13OrTls12Async(transport, settings, verifier, cancellationToken).ConfigureAwait(false)
+            : runsTls13 ? await HandshakeTls13Async(transport, settings, verifier, cancellationToken).ConfigureAwait(false)
+            : await HandshakeTls12Async(transport, settings, verifier, cancellationToken).ConfigureAwait(false);
+    }
 
+    private static bool IsTls12Suite(ushort cipherSuite) => Tls12CipherSuite.Find(cipherSuite) is not null;
+
+    private static HandBuiltHandshake Describe(TlsConnectResult result) =>
+        result.Tls13Stream is { } tls13Stream ? HandBuiltHandshake.Completed(tls13Stream)
+            : result.Tls12Stream is { } tls12Stream ? HandBuiltHandshake.Completed(tls12Stream)
+            : HandBuiltHandshake.Failed(result.Failure!);
+
+    // One ClientHello offering both, continued on the version the ServerHello picks (BL-821).
+    private async Task<HandBuiltHandshake> HandshakeTls13OrTls12Async(
+        Stream transport,
+        ClientSettings settings,
+        IServerCertificateVerifier verifier,
+        CancellationToken cancellationToken)
+    {
+        var offer = new TlsClientSettings(settings.ToTls13(), settings.ToTls12(_options));
+        return Describe(await TlsClientConnection.ConnectAsync(transport, offer, _random, verifier, cancellationToken).ConfigureAwait(false));
+    }
+
+    private async Task<HandBuiltHandshake> HandshakeTls13Async(
+        Stream transport,
+        ClientSettings settings,
+        IServerCertificateVerifier verifier,
+        CancellationToken cancellationToken)
+    {
+        var tls13 = await Tls13ClientConnection.ConnectAsync(transport, settings.ToTls13(), _random, verifier, cancellationToken).ConfigureAwait(false);
+        return tls13.Stream is { } tls13Stream ? HandBuiltHandshake.Completed(tls13Stream) : HandBuiltHandshake.Failed(tls13.Failure!);
+    }
+
+    private async Task<HandBuiltHandshake> HandshakeTls12Async(
+        Stream transport,
+        ClientSettings settings,
+        IServerCertificateVerifier verifier,
+        CancellationToken cancellationToken)
+    {
         var tls12 = await Tls12ClientConnection.ConnectAsync(transport, settings.ToTls12(_options), _random, verifier, cancellationToken).ConfigureAwait(false);
         return tls12.Stream is { } tls12Stream ? HandBuiltHandshake.Completed(tls12Stream) : HandBuiltHandshake.Failed(tls12.Failure!);
     }
@@ -357,9 +399,9 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             : (offered, null);
     }
 
-    // Whether the client the range runs can protect records with the suite.
+    // Whether a client the range runs can protect records with the suite.
     private bool CanOffer(ushort cipherSuite) =>
-        OffersTls13 ? Tls13RecordProtection.CanProtect(cipherSuite) : Tls12CipherSuite.Find(cipherSuite) is not null;
+        (OffersTls13 && Tls13RecordProtection.CanProtect(cipherSuite)) || (OffersBelowTls13 && IsTls12Suite(cipherSuite));
 
     private string SslConnectError(Exception failure) => _matchesSchannelBuild
         ? TlsFailureMessages.SchannelSslConnectError(failure, OffersOnlyVersionsBelowTls12)
@@ -405,23 +447,38 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
                 RequestOcspStatus = RequestOcspStatus,
                 TimeProvider = TimeProvider,
             };
-            return CipherSuites is null ? settings : settings with { CipherSuites = CipherSuites };
+            return CipherSuites is null ? settings : settings with { CipherSuites = [.. CipherSuites.Where(Tls13RecordProtection.CanProtect)] };
         }
 
+        // Whether the suites to offer include one the predicate accepts; the defaults always do.
+        internal bool OffersSuiteFor(Func<ushort, bool> canProtect) => CipherSuites?.Any(canProtect) ?? true;
+
+        // A range that reaches TLS 1.3 offers TLS 1.2 as its ceiling below it, and with no
+        // minimum starts at TLS 1.2, curl's default minimum since 8.10.0 (ADR-0200).
         internal Tls12ClientSettings ToTls12(TlsClientOptions options)
         {
             var settings = new Tls12ClientSettings
             {
                 ServerName = ServerName,
-                MinimumVersion = ToTlsProtocolVersion(options.MinimumVersion),
-                MaximumVersion = ToTlsProtocolVersion(options.MaximumVersion),
+                MinimumVersion = Tls12Minimum(options),
+                MaximumVersion = Tls12Maximum(options),
                 ApplicationProtocols = ApplicationProtocols,
                 ClientCertificate = ClientCertificate,
                 RequestOcspStatus = RequestOcspStatus,
                 TimeProvider = TimeProvider,
             };
-            return CipherSuites is null ? settings : settings with { CipherSuites = CipherSuites };
+            return CipherSuites is null ? settings : settings with { CipherSuites = [.. CipherSuites.Where(IsTls12Suite)] };
         }
+
+        private static bool ReachesTls13(TlsClientOptions options) => options.MaximumVersion is TlsVersion.SystemDefault or TlsVersion.Tls13;
+
+        private static TlsProtocolVersion Tls12Minimum(TlsClientOptions options) =>
+            ReachesTls13(options) && options.MinimumVersion == TlsVersion.SystemDefault
+                ? TlsProtocolVersion.Tls12
+                : ToTlsProtocolVersion(options.MinimumVersion);
+
+        private static TlsProtocolVersion Tls12Maximum(TlsClientOptions options) =>
+            ReachesTls13(options) ? TlsProtocolVersion.Tls12 : ToTlsProtocolVersion(options.MaximumVersion);
 
         // Below a TLS 1.2 ceiling an unset minimum is TLS 1.0, as TlsVersionRange offers it.
         private static TlsProtocolVersion ToTlsProtocolVersion(TlsVersion version) => version switch

@@ -79,6 +79,12 @@ internal sealed class Tls13RecordTestServer(Stream transport, Tls13TestServer se
     public async Task ReceiveClientFinishedAsync()
     {
         Tls13RecordContent clientFlight = (await ReceiveAsync())!;
+        if (clientFlight.Type == TlsContentType.Alert)
+        {
+            // The client refused the handshake, as the --cert-status tests expect it to.
+            throw new TlsAlertException((TlsAlertDescription)clientFlight.Content[1], false);
+        }
+
         Assert.AreEqual(TlsContentType.Handshake, clientFlight.Type);
         server.ReceiveClientFlight(clientFlight.Content);
         InstallWriter(server.ServerApplicationTrafficSecret);
