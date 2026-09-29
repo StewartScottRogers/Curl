@@ -62,8 +62,8 @@ internal static class HttpRequestOptionsMapping
     /// <see cref="CommandLineOptions.FollowRedirects" /> as <see cref="HttpRequestOptions.FollowRedirects" />; and
     /// <see cref="CommandLineOptions.MaxRedirects" /> as <see cref="HttpRequestOptions.MaxRedirects" />; and
     /// <see cref="CommandLineOptions.AuthSchemes" /> and <see cref="CommandLineOptions.BearerToken" /> verbatim; and
-    /// <see cref="CommandLineOptions.HttpVersion" /> as <see cref="HttpRequestOptions.Version" />, HTTP/1.1 when
-    /// neither <c>-0</c> nor <c>--http1.1</c> was given; and <see cref="CommandLineOptions.Compressed" />,
+    /// <see cref="CommandLineOptions.HttpVersion" /> as <see cref="HttpRequestOptions.Version" />, as
+    /// <see cref="HttpVersionMapping.ToHttpVersionPreference" /> maps it; and <see cref="CommandLineOptions.Compressed" />,
     /// <see cref="CommandLineOptions.TransferEncoding" />, <see cref="CommandLineOptions.Raw" /> and
     /// <see cref="CommandLineOptions.IgnoreContentLength" /> verbatim; and
     /// <paramref name="proxy" /> as <see cref="HttpRequestOptions.ForwardProxy" /> with
@@ -91,7 +91,7 @@ internal static class HttpRequestOptionsMapping
             MaxRedirects = options.MaxRedirects,
             AuthSchemes = options.AuthSchemes,
             BearerToken = options.BearerToken,
-            Version = options.HttpVersion ?? HttpVersionPreference.Http11,
+            Version = HttpVersionMapping.ToHttpVersionPreference(options.HttpVersion),
             Compressed = options.Compressed,
             TransferEncoding = options.TransferEncoding,
             Raw = options.Raw,

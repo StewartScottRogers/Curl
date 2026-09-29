@@ -240,7 +240,9 @@ internal static class CurlComposition
     /// mapped host and port at the overridden addresses. An entry that does not parse fails
     /// each transfer with exit 49 when it connects, as curl 8.21.0 fails it. Under
     /// <c>--unix-socket</c> or <c>--abstract-unix-socket</c> it dials that socket for every
-    /// transfer of the option group instead (<see cref="UnixSocketOf" />, BL-507).
+    /// transfer of the option group instead (<see cref="UnixSocketOf" />, BL-507). HTTP over TLS
+    /// offers the ALPN list the version option and the platform choose
+    /// (<see cref="HttpVersionMapping.HttpOverTlsApplicationProtocolsOf(RequestedHttpVersion?)" />, ADR-0141).
     /// </summary>
     /// <param name="options">The parsed command line.</param>
     /// <param name="dnsResolver">Resolves a host no <c>--resolve</c> entry answers for.</param>
@@ -271,7 +273,8 @@ internal static class CurlComposition
             proxyTlsProvider,
             ConnectTimeoutOf(options),
             AddressFamilyOf(options),
-            UnixSocketOf(options));
+            UnixSocketOf(options),
+            HttpVersionMapping.HttpOverTlsApplicationProtocolsOf(options.HttpVersion));
 
     /// <summary>
     /// The Unix domain socket the TCP connector dials in place of each URL's host: the last of
