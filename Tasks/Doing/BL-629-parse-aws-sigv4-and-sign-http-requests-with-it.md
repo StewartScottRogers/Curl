@@ -98,3 +98,4 @@ completed:
 - 2026-09-28: Created.
 - 2026-09-29: Backlog -> Doing.
 - 2026-09-29: Doing -> Backlog. Needs Curl.Protocol.Abstractions.UnitLibrary and Curl.Protocol.Http.UnitLibrary (multi-line Authorization slot, pre-emptive auth failure), which BL-819 in Doing touches
+- 2026-09-29: Backlog -> Doing.
