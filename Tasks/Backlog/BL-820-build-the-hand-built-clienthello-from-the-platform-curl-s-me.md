@@ -4,7 +4,7 @@ title: Build the hand-built ClientHello from the platform curl's measured profil
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-787]
+depends-on: [BL-787, BL-821, BL-786, BL-879, BL-880]
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-09-28
@@ -30,8 +30,10 @@ completed:
 ## Notes
 
 - Filed by BL-708 (ADR-0162).
+- 2026-09-29 (lane 5): cannot start yet. A profile hello cannot be sent by `Curl.Tls` as it stands, and `Curl.Tls` is outside this task's touches: both profiles offer TLS 1.2 suites and `supported_versions` 0304+0303, which `Tls13ClientSettings.Validate` refuses and the TLS 1.3 client cannot continue from (BL-821); OpenSSL offers `compress_certificate` (BL-786, in Doing) and key shares on X25519MLKEM768 with x448 among its groups (filed BL-879); both offer `post_handshake_auth`, which the client cannot answer (filed BL-880). Sending the profile bytes without those would advertise capabilities the client lacks, so a server choosing them would fail a handshake real curl completes. Once they land, map the profile to `Tls13ClientSettings` (`ExtensionOrder`, lists, `FixedExtensions` for the empty or fixed extensions, `SendLegacySessionId`) with `--ciphers`, the version range and `--no-alpn` changing only its lists.
 
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Backlog. Waits on BL-821, BL-786, BL-879 and BL-880: Curl.Tls cannot yet send a profile's hello honestly
