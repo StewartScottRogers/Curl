@@ -25,6 +25,7 @@ The FTP handler sends `ACCT <account>` when the server answers `332` and `--ftp-
 
 - [ ] Measured first with `Record-CurlExchange.ps1 -Ftp -FtpReply`: `PASS` answered `332` with and without `--ftp-account`, `USER` answered `530` with `--ftp-alternative-to-user "USER alt"`, `--ftp-pret` with `PRET` answered `200` and `500`, for a download and a listing; commands, stderr and exit code copied into Notes.
 - [ ] `Curl.Protocol.Ftp.UnitTests` pin commands and outcome for each case.
+- [ ] `ACCT` answered with anything but `230` ends with exit 11 (`CurlExitCode.FtpWeirdPassReply`) and `ACCT rejected by server: <code>`, pinned for `202` and `530` (measured in BL-662: `curl: (11) ACCT rejected by server: 530`; ADR-0215).
 - [ ] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports 100% line and branch coverage and no failing member for each library changed.
 
 ## Notes
