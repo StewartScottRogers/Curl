@@ -1,5 +1,5 @@
 ---
-id: BL-825
+id: BL-830
 title: Bind without -u as WinLDAP does: rootDSE read, then the Sicily NTLM bind
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-825 — Bind without -u as WinLDAP does: rootDSE read, then the Sicily NTLM bind
+# BL-830 — Bind without -u as WinLDAP does: rootDSE read, then the Sicily NTLM bind
 
 ## Goal
 

@@ -128,7 +128,7 @@ recordings on 2026-09-28 (Windows curl 8.21.0 with WinLDAP; Linux curl 8.18.0 wi
 - Bytes that cannot start an LDAPMessage (not a SEQUENCE, an indefinite or over-long
   length) are treated as a reply that is not a BindResponse; not measured separately.
 - Without `-u` the Windows build reads the rootDSE (`supportedCapabilities`, time limit
-  120) before its NTLM bind. That bind is its own task, BL-825; until it lands the WinLDAP
+  120) before its NTLM bind. That bind is its own task, BL-830; until it lands the WinLDAP
   dialect binds anonymously without `-u`, and BL-589 registers the handler only after it.
 
 ## Consequences

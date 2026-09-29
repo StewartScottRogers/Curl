@@ -4,7 +4,7 @@ title: Register the LDAP handler for ldap and ldaps in Curl.Console with its -v 
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-588, BL-825]
+depends-on: [BL-588, BL-830]
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Protocol.Ldap.UnitLibrary, Curl.Protocol.Ldap.UnitTests]
 requirement: none
 created: 2026-09-28
