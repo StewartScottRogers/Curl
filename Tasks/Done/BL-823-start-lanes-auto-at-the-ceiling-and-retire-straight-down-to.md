@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1, Documentation/Planning/Decisions/ADR-0130-lanes-auto-paces-dark-factory-lanes-to-the-usage-windows-the-board-and-the-machine.md]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-29
 ---
 # BL-823 — Start -Lanes Auto at the ceiling and retire straight down to a confirmed low pace
 
@@ -51,3 +51,4 @@ stop first. Adding lanes stays one per step: the meter needs samples at each cou
 - 2026-09-28: Backlog -> Doing.
 - 2026-09-28: Doing -> Blocked. Stewart: dark factory run ended in Doing, exit 0; see Z:\repos\Curl.logs\BL-823-20260928-212155-L4.jsonl
 - 2026-09-28: Blocked -> Doing.
+- 2026-09-29: Doing -> Done. Lane 4's work recovered from its stash; -TestAutoLanes 39/39, probe 6/6, branch 3/3, build and fast tests green.
