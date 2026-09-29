@@ -33,3 +33,4 @@ After `NEWKEYS`, packets are encrypted and authenticated with the ciphers and MA
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
