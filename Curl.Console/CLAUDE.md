@@ -136,7 +136,9 @@ the `-G` / `--url-query` query with `QueryUrl` before the URL is parsed. `http` 
 `https` are served by `HttpProtocolHandler`, registered in `CurlComposition` with a
 `RankedHttpAuthenticator` (Basic and Bearer, and Digest with a random client nonce, all in the
 platform's credential encoding, and Negotiate), which answers the scheme `-u`, `--basic`, `--digest`,
-`--negotiate`, `--anyauth` and `--oauth2-bearer` allow (`HttpRequestOptions.AuthSchemes` and `BearerToken`).
+`--negotiate`, `--anyauth` and `--oauth2-bearer` allow (`HttpRequestOptions.AuthSchemes` and `BearerToken`),
+wrapped for the HTTP handler alone in an `AwsSigV4HttpAuthenticator` that signs every request with
+`--aws-sigv4` in place of those schemes (`HttpRequestOptions.AwsSigV4`, ADR-0243).
 Negotiate's contexts come from `CurlComposition.CreateSecurityContextFactory`, ADR-0142's router:
 SSPI on Windows, elsewhere the system GSS-API with the hand-built SPNEGO and Kerberos behind it,
 reaching KDCs through `Curl.Networking`'s `KerberosKdcSocketTransport` over the run's connectors

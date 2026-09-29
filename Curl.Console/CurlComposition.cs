@@ -88,6 +88,10 @@ internal static class CurlComposition
     /// handler's Negotiate answers with (<see cref="NegotiateOptionsMapping.FromCommandLine" />);
     /// <see cref="NegotiateOptions.Default" /> when not given.
     /// </param>
+    /// <param name="signingClock">
+    /// The clock <c>--aws-sigv4</c> signs with (<see cref="AwsSigV4HttpAuthenticator" />, which
+    /// the HTTP handler alone is given); <see cref="TimeProvider.System" /> when not given.
+    /// </param>
     /// <returns>Every registered handler.</returns>
     internal static IReadOnlyList<IProtocolHandler> CreateProtocolHandlers(
         IConnector connector,
@@ -97,14 +101,16 @@ internal static class CurlComposition
         ICookieStore? cookieStore = null,
         ISecurityContextFactory? securityContexts = null,
         HttpAuthSchemes proxyAuthSchemes = HttpAuthSchemes.Basic,
-        NegotiateOptions? negotiateOptions = null)
+        NegotiateOptions? negotiateOptions = null,
+        TimeProvider? signingClock = null)
     {
         ConnectionEndPointRecorder recorder = new();
         EndPointRecordingConnector recordingConnector = new(connector, recorder);
         EndPointRecordingDatagramConnector recordingDatagramConnector = new(datagramConnector, recorder);
         ISecurityContextFactory contexts = securityContexts ?? CreateSecurityContextFactory(connector, datagramConnector);
         RankedHttpAuthenticator httpAuthenticator = CreateHttpAuthenticator(contexts, negotiateOptions);
-        HttpProtocolHandler http = new(recordingConnector, httpAuthenticator, cookieStore, proxyAuthSchemes);
+        AwsSigV4Signer signer = new(signingClock ?? TimeProvider.System, CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()));
+        HttpProtocolHandler http = new(recordingConnector, new AwsSigV4HttpAuthenticator(httpAuthenticator, signer), cookieStore, proxyAuthSchemes);
 
         IProtocolHandler[] handlers =
         [
@@ -564,6 +570,7 @@ internal static class CurlComposition
     /// <param name="securityContexts">
     /// Makes the HTTP handler's Negotiate and NTLM contexts and the mail handlers' GSSAPI and NTLM contexts, or <see langword="null" /> for the production router.
     /// </param>
+    /// <param name="signingClock">The clock <c>--aws-sigv4</c> signs with; <see cref="TimeProvider.System" /> when not given.</param>
     /// <returns>The runner.</returns>
     internal static CurlCommandRunner CreateRunner(
         Stream standardOutput,
@@ -572,9 +579,10 @@ internal static class CurlComposition
         IConnector connector,
         IDatagramConnector datagramConnector,
         ProxySelector? proxySelector = null,
-        ISecurityContextFactory? securityContexts = null) =>
+        ISecurityContextFactory? securityContexts = null,
+        TimeProvider? signingClock = null) =>
         new(
-            SharingRunCookies((options, cookies) => CreateTransferDispatch(connector, datagramConnector, CreateTlsProvider(TlsClientOptionsMapping.FromCommandLine(options), TimeProvider.System), cookies, proxySelector, securityContexts, options)),
+            SharingRunCookies((options, cookies) => CreateTransferDispatch(connector, datagramConnector, CreateTlsProvider(TlsClientOptionsMapping.FromCommandLine(options), TimeProvider.System), cookies, proxySelector, securityContexts, options, signingClock)),
             new PhysicalFileSystem(),
             new PhysicalFileSystem(),
             standardOutput,
@@ -661,6 +669,7 @@ internal static class CurlComposition
     /// forward proxy with, and its <c>--service-name</c>, <c>--proxy-service-name</c> and
     /// <c>--delegation</c> shape its Negotiate answers.
     /// </param>
+    /// <param name="signingClock">The clock <c>--aws-sigv4</c> signs with; <see cref="TimeProvider.System" /> when <see langword="null" />.</param>
     /// <returns>The dispatcher, no warning lines, the cookies and the proxy selector.</returns>
     private static TransferDispatch CreateTransferDispatch(
         IConnector connector,
@@ -669,9 +678,10 @@ internal static class CurlComposition
         CookieEngine? cookies,
         ProxySelector? proxySelector,
         ISecurityContextFactory? securityContexts,
-        CommandLineOptions options) =>
+        CommandLineOptions options,
+        TimeProvider? signingClock) =>
         new(
-            new ProtocolDispatcher(CreateProtocolHandlers(connector, datagramConnector, tlsProvider, new SystemDnsResolver(), cookies?.HandlerStore, securityContexts, options.ProxyAuthSchemes, NegotiateOptionsMapping.FromCommandLine(options))),
+            new ProtocolDispatcher(CreateProtocolHandlers(connector, datagramConnector, tlsProvider, new SystemDnsResolver(), cookies?.HandlerStore, securityContexts, options.ProxyAuthSchemes, NegotiateOptionsMapping.FromCommandLine(options), signingClock)),
             [],
             cookies,
             proxySelector);
