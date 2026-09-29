@@ -23,9 +23,12 @@ internal sealed class QuicPayloadProtection : IDisposable
     /// <summary>Creates the payload protection of <paramref name="keys" /> under <paramref name="cipherSuite" />'s AEAD.</summary>
     public static QuicPayloadProtection Create(Tls13CipherSuite cipherSuite, QuicPacketKeys keys)
     {
-        IQuicPacketAead aead = cipherSuite.Code == Tls13CipherSuite.ChaCha20Poly1305Sha256.Code
-            ? new ChaCha20Poly1305QuicPacketAead(keys.Key)
-            : new AesGcmQuicPacketAead(keys.Key);
+        IQuicPacketAead aead = cipherSuite.Code switch
+        {
+            0x1303 => new ChaCha20Poly1305QuicPacketAead(keys.Key),
+            0x1304 => new AesCcmQuicPacketAead(keys.Key),
+            _ => new AesGcmQuicPacketAead(keys.Key),
+        };
         return new QuicPayloadProtection(aead, keys.Iv);
     }
 

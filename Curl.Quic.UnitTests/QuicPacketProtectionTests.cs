@@ -310,6 +310,58 @@ public sealed class QuicPacketProtectionTests
     }
 
     [TestMethod]
+    public void ProtectThenUnprotect_Aes128CcmLongHeader_RoundTrips()
+    {
+        var secret = Enumerable.Range(0, 32).Select(value => (byte)value).ToArray();
+        using var sender = QuicPacketProtection.Create(Tls13CipherSuite.Aes128CcmSha256, secret);
+        using var receiver = QuicPacketProtection.Create(Tls13CipherSuite.Aes128CcmSha256, secret);
+        var packet = ClientInitial();
+
+        var protectedPacket = sender.Protect(packet, 2);
+        var result = receiver.Unprotect(protectedPacket, 0, null);
+
+        Assert.AreEqual(QuicUnprotectStatus.Unprotected, result.Status);
+        Assert.AreEqual(2UL, result.PacketNumber);
+        Assert.AreEqual(protectedPacket.Length, result.Length);
+        var received = (QuicLongHeaderPacket)result.Packet!;
+        Assert.AreEqual(QuicPacketType.Initial, received.Type);
+        Assert.AreEqual(HexOf(Hex(ClientDestinationConnectionId)), HexOf(received.DestinationConnectionId));
+        Assert.AreEqual(HexOf(packet.Payload), HexOf(received.Payload));
+    }
+
+    [TestMethod]
+    public void ProtectThenUnprotect_Aes128CcmShortHeader_RoundTrips()
+    {
+        var secret = Enumerable.Range(0, 32).Select(value => (byte)value).ToArray();
+        using var sender = QuicPacketProtection.Create(Tls13CipherSuite.Aes128CcmSha256, secret);
+        using var receiver = QuicPacketProtection.Create(Tls13CipherSuite.Aes128CcmSha256, secret);
+        var packet = new QuicShortHeaderPacket(ServerConnectionId, 2, 0x1234, Hex("0100000000"), SpinBit: true);
+
+        var result = receiver.Unprotect(sender.Protect(packet, 0x1234), ServerConnectionId.Length, 0x1200);
+
+        Assert.AreEqual(QuicUnprotectStatus.Unprotected, result.Status);
+        Assert.AreEqual(0x1234UL, result.PacketNumber);
+        var received = (QuicShortHeaderPacket)result.Packet!;
+        Assert.IsTrue(received.SpinBit);
+        Assert.AreEqual(HexOf(ServerConnectionId), HexOf(received.DestinationConnectionId));
+        Assert.AreEqual("0100000000", HexOf(received.Payload));
+    }
+
+    [TestMethod]
+    public void Unprotect_TamperedAes128CcmPacket_IsDroppedAsAuthenticationFailed()
+    {
+        var secret = Enumerable.Range(0, 32).Select(value => (byte)value).ToArray();
+        using var sender = QuicPacketProtection.Create(Tls13CipherSuite.Aes128CcmSha256, secret);
+        using var receiver = QuicPacketProtection.Create(Tls13CipherSuite.Aes128CcmSha256, secret);
+        var tampered = sender.Protect(new QuicShortHeaderPacket(ServerConnectionId, 2, 0x1234, Hex("0100000000")), 0x1234);
+        tampered[^1] ^= 0x01;
+
+        var result = receiver.Unprotect(tampered, ServerConnectionId.Length, 0x1200);
+
+        Assert.AreEqual(new QuicUnprotectResult(QuicUnprotectStatus.DroppedAuthenticationFailed, null, 0, tampered.Length, false), result);
+    }
+
+    [TestMethod]
     public void Unprotect_AuthenticPacketWithAReservedBitSet_IsAProtocolViolation()
     {
         using var sender = QuicPacketProtection.Create(Tls13CipherSuite.ChaCha20Poly1305Sha256, Hex(ChaChaSecret));
@@ -362,8 +414,9 @@ public sealed class QuicPacketProtectionTests
         Assert.IsTrue(QuicPacketProtection.CanProtect(0x1301));
         Assert.IsTrue(QuicPacketProtection.CanProtect(0x1302));
         Assert.IsTrue(QuicPacketProtection.CanProtect(0x1303));
-        Assert.IsFalse(QuicPacketProtection.CanProtect(0x1304));
-        Assert.ThrowsExactly<ArgumentException>(() => QuicPacketProtection.Create(Tls13CipherSuite.Aes128CcmSha256, new byte[32]));
+        Assert.IsTrue(QuicPacketProtection.CanProtect(0x1304));
+        Assert.IsFalse(QuicPacketProtection.CanProtect(0x1305));
+        Assert.ThrowsExactly<ArgumentException>(() => QuicPacketProtection.Create(Tls13CipherSuite.Aes128Ccm8Sha256, new byte[32]));
         Assert.ThrowsExactly<ArgumentNullException>(() => QuicPacketProtection.Create(null!, new byte[32]));
         Assert.ThrowsExactly<ArgumentNullException>(() => QuicPacketProtection.Create(QuicInitialSecrets.CipherSuite, null!));
     }

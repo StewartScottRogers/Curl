@@ -33,7 +33,8 @@ Packet protection (BL-723, RFC 9001 sections 5 and 6):
   the previous keys when no packet of the current phase has arrived yet or its number is
   lower than the first that did, otherwise with the next keys, and success moves the
   receiver to that phase (`KeyPhaseChanged`). `DiscardPreviousKeys` drops the old ones.
-  Suites: `0x1301`, `0x1302`, `0x1303`; the AES-CCM suites wait for the hand-built AES-CCM.
+  Suites: `0x1301`, `0x1302`, `0x1303` and `0x1304` (the hand-built `AeadAesCcm` with a
+  16-byte tag, BL-818); `0x1305`'s 8-byte tag is not used with QUIC and stays refused.
 - `QuicRetryIntegrity`: the Retry Integrity Tag (section 5.8) and its fixed-time check.
 
 The handshake (BL-724, RFC 9000 sections 5 to 8, 17 and 18, RFC 9001 section 4, ADR-0165):

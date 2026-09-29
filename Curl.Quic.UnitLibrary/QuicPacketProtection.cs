@@ -49,12 +49,13 @@ public sealed class QuicPacketProtection : IDisposable
 
     /// <summary>
     /// Returns whether QUIC packets can be protected under <paramref name="cipherSuite" />:
-    /// <c>TLS_AES_128_GCM_SHA256</c>, <c>TLS_AES_256_GCM_SHA384</c> and
-    /// <c>TLS_CHACHA20_POLY1305_SHA256</c>. The AES-CCM suites wait for the hand-built AES-CCM.
+    /// <c>TLS_AES_128_GCM_SHA256</c>, <c>TLS_AES_256_GCM_SHA384</c>,
+    /// <c>TLS_CHACHA20_POLY1305_SHA256</c> and <c>TLS_AES_128_CCM_SHA256</c> (RFC 9001 section 5.3).
+    /// <c>TLS_AES_128_CCM_8_SHA256</c>, whose 8-byte tag QUIC does not use, is refused.
     /// </summary>
     /// <param name="cipherSuite">The cipher suite code point.</param>
     /// <returns>Whether <see cref="Create" /> accepts the suite.</returns>
-    public static bool CanProtect(ushort cipherSuite) => cipherSuite is 0x1301 or 0x1302 or 0x1303;
+    public static bool CanProtect(ushort cipherSuite) => cipherSuite is 0x1301 or 0x1302 or 0x1303 or 0x1304;
 
     /// <summary>Creates the protection a packet protection secret gives, at the first key phase.</summary>
     /// <param name="cipherSuite">The negotiated suite.</param>
