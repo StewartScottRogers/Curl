@@ -16,6 +16,11 @@ and disposes that connection itself; it never takes an `IConnection` in its cons
 A transfer proxy (`ITransferContext.Proxy`) goes into that `ConnectTarget`, and the
 connector tunnels through it (ADR-0056); the handler holds no proxy code.
 
+Curl's own diagnostic log (`--log-level`, ADR-0222, BL-928): `GopherDiagnosticLog` writes
+component `gopher` from `ITransferContext.DiagnosticLog` - the failure that ends a transfer
+as `error` with its `CurlExitCode`, and the selector sent and the transfer's end (bytes
+and milliseconds) as `info`; the connect target carries the log on.
+
 This library may reference `Curl.Protocol.Abstractions.UnitLibrary` and nothing
 else horizontal. Referencing another protocol library is a build break, and
 `Curl.Protocol.Abstractions.UnitTests` fails if one appears.

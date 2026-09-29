@@ -25,6 +25,13 @@ namespace Curl.Protocol.Gopher;
 /// output accepted, from <see cref="OutputWriteFailedException.BytesAccepted" />.
 /// Cancellation leaves as an exception.
 /// </para>
+/// <para>
+/// Each step goes to Curl's own diagnostic log, component <c>gopher</c> (ADR-0222, BL-928):
+/// the selector sent and the bytes and milliseconds of a finished transfer as <c>info</c>,
+/// and the failure that ends a transfer, with its <see cref="CurlExitCode" />, as
+/// <c>error</c>. The log is also handed to the connector in
+/// <see cref="ConnectTarget.DiagnosticLog" />.
+/// </para>
 /// </remarks>
 public sealed class GopherProtocolHandler : IProtocolHandler
 {
@@ -66,6 +73,15 @@ public sealed class GopherProtocolHandler : IProtocolHandler
     {
         ArgumentNullException.ThrowIfNull(context);
 
+        GopherDiagnosticLog log = new(context.DiagnosticLog);
+        long started = context.TimeProvider.GetTimestamp();
+        TransferResult result = await TransferAsync(context, log).ConfigureAwait(false);
+        log.TransferEnded(result, context.TimeProvider.GetElapsedTime(started));
+        return result;
+    }
+
+    private async ValueTask<TransferResult> TransferAsync(ITransferContext context, GopherDiagnosticLog log)
+    {
         ConnectResult connected = await connector
             .ConnectAsync(CreateTarget(context), context.CancellationToken)
             .ConfigureAwait(false);
@@ -87,6 +103,8 @@ public sealed class GopherProtocolHandler : IProtocolHandler
                 return TransferResult.Failure(CurlExitCode.SendError, GopherTransferMessages.SendFailed);
             }
 
+            log.SelectorSent(selector);
+
             return await CopyReplyAsync(connection, context.Output, context.Progress, context.CancellationToken).ConfigureAwait(false);
         }
     }
@@ -98,6 +116,7 @@ public sealed class GopherProtocolHandler : IProtocolHandler
         {
             Proxy = context.Proxy,
             Events = context.Events,
+            DiagnosticLog = context.DiagnosticLog,
         };
     }
 
