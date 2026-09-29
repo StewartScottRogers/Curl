@@ -45,6 +45,17 @@ Namespace `Curl.Cryptography`. It holds:
 - `Camellia` (public, `IDisposable`): RFC 3713, keys of 16, 24 or 32 bytes - `EncryptBlock`,
   `DecryptBlock`, and the CBC mode of TLS's Camellia suites (RFC 5932), `EncryptCbc` and
   `DecryptCbc`, plus the internal F, FL and FLINV functions. Not constant-time (ADR-0145).
+- `IBlockCipher` (internal): the forward direction of a 16-byte block cipher,
+  `EncryptBlock`, the one operation GCM needs; `Aria` implements it.
+- `Aria` (public, `IDisposable`): RFC 5794, keys of 16, 24 or 32 bytes - `EncryptBlock`
+  and `DecryptBlock`, plus the internal SL1/SL2 (`Substitute`), A (`Diffuse`) and FO/FE
+  (`Round`) functions. Not constant-time (ADR-0146).
+- `GaloisCounterMode` (internal, `IDisposable`): NIST SP 800-38D GCM over any
+  `IBlockCipher` - 12-byte nonce, 16-byte tag, `Encrypt` and `TryDecrypt`, plus the
+  constant-time GF(2^128) `Multiply` of GHASH. Tested over the BCL's AES against `AesGcm`.
+- `AeadAriaGcm` (public, `IDisposable`): ARIA-GCM for TLS's ARIA-GCM suites (RFC 6209) -
+  `Encrypt` and `TryDecrypt`, which returns `false` with the plaintext zeroed on a wrong
+  tag.
 - `AesCtr` (public, `IDisposable`): NIST SP 800-38A counter mode on the BCL's AES-ECB,
   128-bit big-endian counter that wraps to zero (SSH `aes*-ctr`, RFC 4344).
   `ApplyKeyStream` keeps the counter and keystream position between calls, plus the
@@ -96,7 +107,7 @@ to BL-745).
   secret: select and swap with masks (`ConstantTime`), fixed-width limbs, never `/`, `%`
   or `BigInteger` on a secret. Compare tags and MACs with
   `CryptographicOperations.FixedTimeEquals`. Each public type says in its XML docs
-  whether it is constant-time; Blowfish, CAST-128, RC4 and Camellia (ADR-0145) are not,
+  whether it is constant-time; Blowfish, CAST-128, RC4, Camellia (ADR-0145) and ARIA (ADR-0146) are not,
   by design, and say so.
 - **Zeroing.** Every secret, `stackalloc` temporaries and intermediate key material
   included, is cleared with `CryptographicOperations.ZeroMemory` in a `finally` block or
