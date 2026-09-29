@@ -312,6 +312,15 @@
     Pop3Message, Pop3IdleMilliseconds and ListenAddress are ignored, and Port need not be given.
     Combining it with a server mode, -Ftp, -Smtp, -Imap, -Pop3 or -Tls, is refused. StandardInput and Curl work as in every other mode.
 
+.PARAMETER UdpSink
+    Also bind UDP on ListenAddress and Port, and take every datagram curl sends there
+    without ever answering, so a QUIC attempt (--http3, --http3-only) meets a silent
+    peer rather than an ICMP port unreachable (BL-718). After curl exits, datagrams.txt
+    holds one line per datagram in the order received, its bytes as lowercase hex. A
+    client's first QUIC Initial can be decrypted from it offline (RFC 9001 section 5.2),
+    which is how curl's transport parameters are read. Works in every mode, -NoServer
+    included; Port must then be given.
+
 .EXAMPLE
     .\Record-CurlExchange.ps1 -Port 18081 -Response 'HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello' -CurlArgs 'http://127.0.0.1:18081/a?b' -OutDirectory fixtures\default-get
 
@@ -375,7 +384,8 @@ param(
     [string] $TlsRootCertificateFile,
     [string] $Curl,
     [System.Net.IPAddress] $ListenAddress = [System.Net.IPAddress]::Loopback,
-    [switch] $NoServer
+    [switch] $NoServer,
+    [switch] $UdpSink
 )
 
 Set-StrictMode -Version Latest
@@ -387,6 +397,7 @@ if ([string]::IsNullOrEmpty($MyInvocation.Line) -and $CurlArgs.Count -eq 1) { $C
 if ($NoServer -and ($Ftp -or $Smtp -or $Imap -or $Pop3 -or $Tls)) { throw '-NoServer runs no server, so it cannot be combined with -Ftp, -Smtp, -Imap, -Pop3 or -Tls.' }
 if (@($Ftp, $Smtp, $Imap, $Pop3 | Where-Object { $_ }).Count -gt 1) { throw '-Ftp, -Smtp, -Imap and -Pop3 each serve a whole session; give one of them.' }
 if (-not $NoServer -and $Port -eq 0) { throw '-Port is required unless -NoServer is given: the URL in CurlArgs must name the port the server listens on.' }
+if ($UdpSink -and $Port -eq 0) { throw '-UdpSink binds UDP on -Port, so -Port is required with it.' }
 
 function Get-ReferenceCurlPath {
     $git = Get-Command git.exe -ErrorAction SilentlyContinue
@@ -1408,6 +1419,12 @@ if (-not $NoServer) {
     $listener.Start()
     $server = [System.Management.Automation.PowerShell]::Create()
 }
+# The sink never answers; the datagrams wait in its receive buffer until curl exits.
+$udpSinkClient = $null
+if ($UdpSink) {
+    $udpSinkClient = New-Object System.Net.Sockets.UdpClient(New-Object System.Net.IPEndPoint($ListenAddress, $Port))
+    $udpSinkClient.Client.ReceiveBufferSize = 8MB
+}
 try {
     if ($NoServer) {
         $serverRun = $null
@@ -1470,7 +1487,17 @@ try {
         $requests = $server.EndInvoke($serverRun)
         if ($server.Streams.Error.Count -gt 0) { throw $server.Streams.Error[0] }
     }
+
+    $udpDatagrams = New-Object System.Text.StringBuilder
+    if ($null -ne $udpSinkClient) {
+        $sender = New-Object System.Net.IPEndPoint([System.Net.IPAddress]::Any, 0)
+        while ($udpSinkClient.Available -gt 0) {
+            $datagram = $udpSinkClient.Receive([ref] $sender)
+            [void] $udpDatagrams.Append(([System.BitConverter]::ToString($datagram) -replace '-', '').ToLowerInvariant()).Append("`n")
+        }
+    }
 } finally {
+    if ($null -ne $udpSinkClient) { $udpSinkClient.Close() }
     if ($null -ne $listener) { $listener.Stop() }
     if ($null -ne $server) { $server.Dispose() }
     # Reset deletes the key container the PFX import created.
@@ -1489,6 +1516,9 @@ if (-not $NoServer) { [System.IO.File]::WriteAllBytes((Join-Path $OutDirectory '
 if ($Ftp) {
     [System.IO.File]::WriteAllText((Join-Path $OutDirectory 'transcript.txt'), $transcript.ToString(), [System.Text.Encoding]::GetEncoding(28591))
     [System.IO.File]::WriteAllBytes((Join-Path $OutDirectory 'upload.bin'), $uploadedData.ToArray())
+}
+if ($UdpSink) {
+    [System.IO.File]::WriteAllText((Join-Path $OutDirectory 'datagrams.txt'), $udpDatagrams.ToString(), [System.Text.Encoding]::ASCII)
 }
 if ($Smtp -or $Imap -or $Pop3) {
     [System.IO.File]::WriteAllText((Join-Path $OutDirectory 'transcript.txt'), $transcript.ToString(), [System.Text.Encoding]::GetEncoding(28591))
