@@ -94,7 +94,8 @@
                  push is refused and the lane picks again.
       run        /task-run in the lane's worktree. The run commits but never pushes.
       integrate  The lane rebases its commits onto the shared branch, rebuilds, runs
-                 the fast tests and pushes. A conflict gets one headless run to resolve
+                 the fast tests and pushes. Red fast tests are run once more, with the
+                 failing test names traced as "flaky?"; only red twice parks (BL-898). A conflict gets one headless run to resolve
                  it. Work that still will not integrate is pushed to its own branch,
                  factory/<ID>-lane-<n>, and the task goes to Blocked for Stewart.
 
@@ -228,6 +229,8 @@ param(
     [switch]$Restart,
     # Prove which lanes -Restart may stop from their heartbeat phases, and exit.
     [switch]$TestRestart,
+    # Prove how failing test names are read from dotnet test output, and exit.
+    [switch]$TestFlakyTests,
     # How often, in minutes, the lanes' heartbeats are published as status.json on the
     # force-pushed board branch, plus once at shift end. 0 = never publish.
     [ValidateRange(0, 60)][int]$HeartbeatMinutes = 3,
@@ -1557,6 +1560,46 @@ function Invoke-Requeue {
 
 function Get-Dirty { return @(git -C $Root status --porcelain) | Where-Object { $_ } }
 
+function Get-FailedTestNames {
+    # What a dotnet test run's -Output says failed, as one short line for a trace or a park
+    # reason: "Curl.Quic.UnitTests: Loop_A, Loop_B", "a test host aborted", or "no test
+    # named" when the run was red without naming one (BL-898).
+    param([string[]]$Output)
+    $tests = @($Output | ForEach-Object { if ($_ -match '^\s+Failed\s+(\S+)\s+\[') { $Matches[1] } } | Select-Object -Unique)
+    $assemblies = @($Output | ForEach-Object { if ($_ -match '^Failed!\s.*?-\s+([\w.]+)\.dll') { $Matches[1] } } | Select-Object -Unique)
+    $aborted = [bool]($Output | Where-Object { $_ -match 'test run was aborted|Test host process crashed|hang timeout' })
+    $parts = @()
+    if ($tests.Count) {
+        $shown = ($tests | Select-Object -First 4) -join ', '
+        if ($tests.Count -gt 4) { $shown += " and $($tests.Count - 4) more" }
+        $parts += $(if ($assemblies.Count) { "$($assemblies -join ', '): $shown" } else { $shown })
+    } elseif ($assemblies.Count) { $parts += "$($assemblies -join ', ') failed" }
+    if ($aborted) { $parts += 'a test host aborted' }
+    if (-not $parts.Count) { return 'no test named' }
+    return $parts -join '; '
+}
+
+if ($TestFlakyTests) {
+    $cases = @(
+        ,@('one named failure', 'Curl.Quic.UnitTests: Loop_ServerGoesSilent_SendsKeepAlivesThenFailsWithTheIdleTimeout', (Get-FailedTestNames @(
+            'Passed!  - Failed:     0, Passed:    44, Skipped:     0, Total:    44, Duration: 140 ms - Curl.Protocol.Dict.UnitTests.dll (net10.0)',
+            '  Failed Loop_ServerGoesSilent_SendsKeepAlivesThenFailsWithTheIdleTimeout [484 ms]',
+            'Failed!  - Failed:     1, Passed:   398, Skipped:     0, Total:   399, Duration: 1 s - Curl.Quic.UnitTests.dll (net10.0)')))
+        ,@('many named failures', 'Curl.Cli.UnitTests, Curl.Core.UnitTests: A, B, C, D and 1 more', (Get-FailedTestNames @(
+            '  Failed A [1 ms]', '  Failed B [1 ms]', '  Failed C [1 ms]',
+            'Failed!  - Failed:     3, Passed:     1, Skipped:     0, Total:     4, Duration: 1 s - Curl.Cli.UnitTests.dll (net10.0)',
+            '  Failed D [1 ms]', '  Failed E [1 ms]',
+            'Failed!  - Failed:     2, Passed:     1, Skipped:     0, Total:     3, Duration: 1 s - Curl.Core.UnitTests.dll (net10.0)')))
+        ,@('aborted host', 'a test host aborted', (Get-FailedTestNames @('The active test run was aborted. Reason: Test host process crashed')))
+        ,@('red without a name', 'no test named', (Get-FailedTestNames @('Passed!  - Failed:     0, Passed:     1 - Curl.Core.UnitTests.dll (net10.0)'))))
+    $failed = 0
+    foreach ($case in $cases) {
+        if ($case[1] -ceq $case[2]) { Write-Host "PASS $($case[0]): $($case[2])" -ForegroundColor Green }
+        else { Write-Host "FAIL $($case[0]): expected $($case[1]), got $($case[2])" -ForegroundColor Red; $failed++ }
+    }
+    exit $(if ($failed) { 1 } else { 0 })
+}
+
 function Restore-ShiftBranch {
     # Switches -Repo back to -Branch when something else checked out another branch under
     # a running shift (BL-809). Returns '' when it is on -Branch, or why it was left alone.
@@ -2004,15 +2047,31 @@ function Invoke-Claim {
     } finally { $lock.Dispose() }
 }
 
+function Invoke-FastTests {
+    # One fast-test run of this checkout: whether it was green, and what failed. A hung test
+    # would hold the integrate lock, and so every lane, for ever: the blame collector kills
+    # a test host that stops making progress, and the run counts as red.
+    $output = @(& dotnet test $Root --no-build -nologo --filter 'TestCategory!=Integration' --blame-hang-timeout 10m 2>&1 | ForEach-Object { "$_" })
+    return [pscustomobject]@{ Green = ($LASTEXITCODE -eq 0); Failed = (Get-FailedTestNames $output) }
+}
+
 function Test-Green {
     # Build and fast tests in this checkout, after a rebase put other lanes' work under ours.
+    # Returns '' when green, or why not. Under six lanes' load a timing-sensitive test can
+    # fail once and pass on the next run, which is no reason to throw a finished task away,
+    # so a red run is run once more and only red twice counts (BL-898).
+    param([string]$Id = '-')
     & dotnet build $Root -nologo -v q 2>&1 | Out-Null
     if ($LASTEXITCODE -ne 0) { return 'build failed' }
-    # A hung test would hold the integrate lock, and so every lane, for ever: the blame
-    # collector kills a test host that stops making progress, and the run counts as red.
-    & dotnet test $Root --no-build -nologo -v q --filter 'TestCategory!=Integration' --blame-hang-timeout 10m 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) { return 'fast tests failed' }
-    return ''
+    $first = Invoke-FastTests
+    if ($first.Green) { return '' }
+    Write-Trace $Id 'flaky?' "fast tests red ($($first.Failed)); running them once more" 'DarkYellow'
+    $second = Invoke-FastTests
+    if ($second.Green) {
+        Write-Trace $Id 'flaky' "failed once, passed on the rerun: $($first.Failed)" 'Yellow'
+        return ''
+    }
+    return "fast tests failed twice ($($first.Failed); then $($second.Failed))"
 }
 
 function Invoke-Integrate {
@@ -2053,7 +2112,7 @@ function Invoke-Integrate {
             }
             if ($State -eq 'Done') {
                 Set-HeartbeatStep @('verify', 'build and fast tests on the shared branch')
-                $red = Test-Green
+                $red = Test-Green -Id $Id
                 if ($red) { return "$red after rebasing onto the other lanes' work" }
                 Write-Trace $Id 'verify' 'build and fast tests green on the shared branch'
             }
