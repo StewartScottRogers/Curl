@@ -12,6 +12,9 @@ public sealed class KerberosErrorMessage
     /// <summary><c>KDC_ERR_PREAUTH_REQUIRED</c>: the client must pre-authenticate; <see cref="ErrorData" /> holds <c>METHOD-DATA</c>.</summary>
     public const int PreAuthenticationRequired = 25;
 
+    /// <summary><c>KRB_ERR_RESPONSE_TOO_BIG</c>: the reply does not fit a UDP datagram; ask again over TCP (RFC 4120 section 7.2.1).</summary>
+    public const int ResponseTooBig = 52;
+
     private static readonly Func<AsnReader, KerberosErrorMessage> ContentsReader = new Func<AsnReader, KerberosErrorMessage>(ReadContents);
 
     /// <summary>Gets the client's time from the request; <see langword="null" /> when the request gave none.</summary>

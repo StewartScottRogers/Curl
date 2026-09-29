@@ -27,8 +27,13 @@ messages with `System.Formats.Asn1`: `KerberosKdcRequest` (AS-REQ, TGS-REQ),
 `KerberosEncryptedApReplyPart`, `KerberosErrorMessage`, `KerberosTicket` and the
 structures inside them, with `KerberosMessage.PeekType` to tell a reply from a
 KRB-ERROR; a malformed or unexpected message throws `KerberosMessageException`
-(`KerberosAsn1` holds the shared ASN.1 pieces; BL-687, ADR-0163). The client and the
-GSS-API mechanism land under their own tasks.
+(`KerberosAsn1` holds the shared ASN.1 pieces; BL-687, ADR-0163). It gets tickets from
+the KDC: `KerberosKdcClient` returns a `KerberosCredential` for a service from the
+credential cache, by a TGS exchange with the cache's ticket-granting ticket, or from a
+`KerberosPasswordCredential` by an AS exchange with `PA-ENC-TIMESTAMP` and then a TGS
+exchange, over the injected `IKerberosKdcTransport` (`KerberosKdcSender` picks UDP or
+TCP and frames TCP); every refusal is a `KerberosKdcException` with a `KerberosKdcError`
+(BL-690, ADR-0164). The GSS-API mechanism lands under its own task.
 
 ## Rules
 
