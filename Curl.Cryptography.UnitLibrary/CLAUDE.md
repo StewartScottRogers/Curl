@@ -101,6 +101,19 @@ Namespace `Curl.Cryptography`. It holds:
   bytes, 16 above) - `EncryptBlock`, `DecryptBlock`, and the CBC mode of SSH's
   `cast128-cbc`, `EncryptCbc` and `DecryptCbc`, plus the internal round function
   `Round`. The key schedule is RFC 2144 section 2.4 as a row table. Not constant-time.
+- `Uint14Division` (internal): constant-time division of a secret 32-bit value by a public
+  modulus below 2^14, NTRU Prime's `uint32_divmod_uint14` and `int32_mod_uint14`.
+- `SortingNetwork` (internal): djbsort's constant-time `crypto_sort_uint32`.
+- `Sntrup761Ring` (internal): sntrup761's arithmetic in R/3 and R/q - multiplication, the
+  divided-difference reciprocals, rounding, small and short polynomials from random
+  bytes, and the core `Decrypt`.
+- `Sntrup761Encoding` (internal): the mixed-radix `Encode` and `Decode` and, on them, the
+  public key, rounded ciphertext and small-polynomial encodings.
+- `Sntrup761` (public): Streamlined NTRU Prime round 3's sntrup761 KEM, byte for byte the
+  submission's KAT and OpenSSH's `sntrup761.c` - `GenerateKeyPair`, `TryGenerateKeyPair`
+  (the random bytes as a parameter; `false` with both keys zeroed when they give a g with
+  no inverse mod 3), `Encapsulate` with and without the random bytes, and `Decapsulate`,
+  which gives the implicit-rejection secret for a tampered ciphertext. Constant-time.
 
 The remaining primitives land under their own tasks (BL-677, BL-738 to BL-745).
 
