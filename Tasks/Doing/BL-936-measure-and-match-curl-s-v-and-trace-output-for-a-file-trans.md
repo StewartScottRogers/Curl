@@ -36,3 +36,4 @@ A `file://` transfer's `-v`, `--trace` and `--trace-ascii` output is measured ag
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-29: Backlog -> Doing.
