@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Ssh.UnitLibrary/Keys/RsaSshPrivateKey.cs]
 requirement: none
 created: 2026-09-29
-completed:
+completed: 2026-09-29
 ---
 # BL-972 — Refuse a zero RSA coefficient in RsaSshPrivateKey before OpenSSL does, so Linux and macOS throw CryptographicException exactly
 
@@ -26,8 +26,8 @@ Since BL-568 (commit 0729839c) the CI runs fail on ubuntu-latest and macos-lates
 
 ## Acceptance criteria
 
-- [ ] `RsaSshPrivateKey.FromComponents` throws `CryptographicException` itself for a zero coefficient, beside its existing prime check.
-- [ ] `FromComponents_ZeroCoefficient_Throws` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands this.
+- [x] `RsaSshPrivateKey.FromComponents` throws `CryptographicException` itself for a zero coefficient, beside its existing prime check.
+- [x] `FromComponents_ZeroCoefficient_Throws` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands this.
 
 ## Notes
 
@@ -37,3 +37,4 @@ Claimed while lane 1 held BL-572 in the same project; BL-572 changes only `Sftp/
 
 - 2026-09-29: Created.
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Done. Zero RSA coefficient now throws CryptographicException on every platform; CI run 36639787351 green on Windows, Linux and macOS.

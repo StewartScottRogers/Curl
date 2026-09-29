@@ -32,7 +32,7 @@ When a transfer through a forward proxy answers both a `407` and a `401` with Di
 - Design (ADR-0246, decided by Claude under Stewart's delegation): `IHttpAuthenticator.RepeatAuthorization(request, sentAuthorization)`, a default interface method giving the value as sent. `DigestAuthenticator` reads the sent value back (`DigestChallengeParameters.ReadPairs`, new, which `Read` now uses too), takes its `cnonce` and hex `nc`, and rebuilds the answer with `nc + 1`; `RankedHttpAuthenticator` hands every value to it. `HttpProtocolHandler.RepeatAuthorization` / `RepeatProxyAuthorization` feed the kept header into `WithProxyAuthorization` / `WithAuthorization`. The authenticator stays stateless (ADR-0014): the sent value is the state.
 - Both measured hashes were checked independently in PowerShell (MD5 of `HA1:nonce:00000002:cnonce:auth:HA2`) before pinning.
 - Touches: added `Documentation/Planning/Decisions` for ADR-0246 and the note in ADR-0187; no task in Doing names it.
-- Follow-up: `Curl.Console`'s `AwsSigV4HttpAuthenticator` wraps the ranked authenticator and does not forward `RepeatAuthorization`, so `curl.exe` still sends the kept answer unchanged until BL-972 (Curl.Console was held by another Doing task).
+- Follow-up: `Curl.Console`'s `AwsSigV4HttpAuthenticator` wraps the ranked authenticator and does not forward `RepeatAuthorization`, so `curl.exe` still sends the kept answer unchanged until BL-979 (Curl.Console was held by another Doing task).
 - Measured: Abstractions 628, Authentication 688 (4 skipped), Http 1422 (2 skipped) tests pass; all three libraries 100% line and branch, 0 failing members.
 
 ## Log

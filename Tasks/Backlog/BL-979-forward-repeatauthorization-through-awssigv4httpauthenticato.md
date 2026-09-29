@@ -1,5 +1,5 @@
 ---
-id: BL-972
+id: BL-979
 title: Forward RepeatAuthorization through AwsSigV4HttpAuthenticator so curl.exe counts a kept Digest nonce on
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-972 — Forward RepeatAuthorization through AwsSigV4HttpAuthenticator so curl.exe counts a kept Digest nonce on
+# BL-979 — Forward RepeatAuthorization through AwsSigV4HttpAuthenticator so curl.exe counts a kept Digest nonce on
 
 ## Goal
 
@@ -32,3 +32,4 @@ completed:
 ## Log
 
 - 2026-09-29: Created.
+- 2026-09-29: Renumbered from BL-972, which the RSA coefficient fix pushed first also holds.
