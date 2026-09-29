@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-538]
-touches: [Curl.Protocol.Abstractions.UnitLibrary, Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests, Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests, Curl.Protocol.Imap.UnitLibrary, Curl.Protocol.Imap.UnitTests, Curl.Protocol.Pop3.UnitLibrary, Curl.Protocol.Pop3.UnitTests, Documentation/Planning/Decisions/ADR-0202-a-sasl-security-context-that-cannot-make-its-first-token-fails-with-exit-94.md, Documentation/Planning/Decisions/README.md]
+touches: [Curl.Protocol.Abstractions.UnitLibrary, Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests, Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests, Curl.Protocol.Imap.UnitLibrary, Curl.Protocol.Imap.UnitTests, Curl.Protocol.Pop3.UnitLibrary, Curl.Protocol.Pop3.UnitTests, Documentation/Planning/Decisions/ADR-0203-a-sasl-security-context-that-cannot-make-its-first-token-fails-with-exit-94.md, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-09-29
 completed: 2026-09-29
@@ -33,7 +33,7 @@ When the GSSAPI or NTLM security context cannot make a token, `curl smtp://`, `i
 - Delivered directly rather than through the full `/feature` agent stages: the contract
   (`SaslAuthenticationFailedException`, BL-781) and each session's catch already existed,
   so the change was one throw plus moving when the handlers ask for the initial response.
-- Decision recorded in ADR-0202: `SecurityContextSaslExchange.GetInitialResponseAsync`
+- Decision recorded in ADR-0203: `SecurityContextSaslExchange.GetInitialResponseAsync`
   throws exit 94 when the first step fails; SMTP, POP3 and IMAP ask for the initial
   response before the command only under `--sasl-ir` (IMAP also when the server offers
   `SASL-IR`), otherwise at the first continuation - curl's `Curl_sasl_start` `force_ir`
@@ -42,7 +42,7 @@ When the GSSAPI or NTLM security context cannot make a token, `curl smtp://`, `i
   measured, so it stays out of scope.
 - POP3: `+OK` before the initial response was made is now `Login denied` for every
   mechanism (it was already so when one was pending), matching curl's state machine.
-- Added `Documentation/Planning/Decisions/` ADR-0202 and its README row to `touches`:
+- Added `Documentation/Planning/Decisions/` ADR-0203 and its README row to `touches`:
   the ADR the decision rules require; no task in Doing names either file.
 - Tests: `Begin_NoCredentialsForTheFirstToken_FailsWithExit94` (Authentication, NTLM and
   GSSAPI rows); `ExecuteAsync_ExchangeCannotMakeItsInitialResponse_FailsWithAuthErrorSendingNothingMore`
