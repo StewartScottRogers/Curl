@@ -688,6 +688,32 @@ public sealed class CommandLineOptions
     public string? CaCertificateDirectory { get; internal set; }
 
     /// <summary>
+    /// The <c>--crlfile</c> certificate revocation list file, verbatim, checked as <c>--cacert</c> is;
+    /// <see langword="null"/> when not given. The last value wins. Applied by BL-608 to BL-610.
+    /// </summary>
+    public string? CertificateRevocationListFile { get; internal set; }
+
+    /// <summary>
+    /// The <c>--pinnedpubkey</c> value, verbatim and unchecked: a public key file, or <c>sha256//</c> hashes
+    /// separated by <c>;</c>, for the connector to match the server's key against. <see langword="null"/>
+    /// when not given. The last value wins. Applied by BL-608 to BL-610.
+    /// </summary>
+    public string? PinnedPublicKey { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--cert-status</c> was given and no <c>--no-cert-status</c> came after it:
+    /// require a good OCSP response stapled to the server certificate. Applied by BL-608 to BL-610.
+    /// </summary>
+    public bool RequireCertificateStatus { get; internal set; }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--ssl-auto-client-cert</c> was given and no <c>--no-ssl-auto-client-cert</c>
+    /// came after it: the Schannel build picks a client certificate from the user's store by itself.
+    /// curl accepts it in every build; the OpenSSL build ignores it. Applied by BL-608 to BL-610.
+    /// </summary>
+    public bool AutoClientCertificate { get; internal set; }
+
+    /// <summary>
     /// <see langword="true"/> when <c>--proxy-insecure</c> was given and no <c>--no-proxy-insecure</c> came
     /// after it: skip verification of an HTTPS proxy's certificate. <c>-k</c> never reaches the proxy.
     /// </summary>
