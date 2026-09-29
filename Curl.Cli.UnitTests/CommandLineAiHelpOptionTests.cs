@@ -3,7 +3,7 @@ using System.Text;
 namespace Curl.Cli;
 
 /// <summary>
-/// Pins how <c>--ai-help</c> is parsed (BL-911, ADR-0223): as <c>--help</c> is, it ends parsing where it
+/// Pins how <c>--ai-help</c> is parsed (BL-911, ADR-0224): as <c>--help</c> is, it ends parsing where it
 /// stands, so nothing after it is read and no URL is needed, and it reads its subject from the attached
 /// value or else the next argument. <c>--no-ai-help</c> is refused as not reversible, and an
 /// <c>ai-help</c> line in a <c>-K</c> file is ignored.

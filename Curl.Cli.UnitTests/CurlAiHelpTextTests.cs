@@ -1,7 +1,7 @@
 namespace Curl.Cli;
 
 /// <summary>
-/// Pins <see cref="CurlAiHelpText"/>, the Markdown <c>--ai-help</c> prints (BL-911, ADR-0223): the short
+/// Pins <see cref="CurlAiHelpText"/>, the Markdown <c>--ai-help</c> prints (BL-911, ADR-0224): the short
 /// index by default, one category's option sections by name, and every category with the exit codes and
 /// <c>--write-out</c> variables for <c>all</c>, built from the same tables and manual <c>--help</c> and
 /// <c>--manual</c> print.

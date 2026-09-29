@@ -2,7 +2,7 @@ namespace Curl.Cli;
 
 /// <summary>
 /// What <c>--ai-help [subject]</c> prints on standard output: Markdown for AI agents, where <c>--help</c>
-/// is for people (BL-911, ADR-0223). With no subject it is a short index: what this curl is, the
+/// is for people (BL-911, ADR-0224). With no subject it is a short index: what this curl is, the
 /// categories of <see cref="CurlHelpText.Categories"/> with the command that expands each, and the 20
 /// most-used options. A category name in any case gives a <c>#</c> heading for the category and a
 /// <c>##</c> section for each of its options; <c>all</c> gives every category that way, then the exit

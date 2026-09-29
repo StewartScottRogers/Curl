@@ -6,7 +6,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Console;
 
 /// <summary>
-/// Pins <c>--ai-help [subject]</c> end to end (BL-911, ADR-0223): <see cref="CurlAiHelpText"/>'s Markdown
+/// Pins <c>--ai-help [subject]</c> end to end (BL-911, ADR-0224): <see cref="CurlAiHelpText"/>'s Markdown
 /// on standard output with its <c>\n</c> line ends on every platform, no transfer and exit 0; for a subject
 /// naming no category, the page <c>--help</c> prints for one, with the platform newline, and exit 0.
 /// </summary>

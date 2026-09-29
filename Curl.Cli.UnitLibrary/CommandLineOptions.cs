@@ -167,7 +167,7 @@ public sealed class CommandLineOptions
     /// <see langword="true"/> when <c>--ai-help</c> was given on the command line. Parsing stops there, as it
     /// does for <c>--help</c>; the console prints <see cref="CurlAiHelpText"/>'s Markdown for
     /// <see cref="AiHelpSubject"/> and exits 0 instead of transferring. An <c>ai-help</c> line in a <c>-K</c>
-    /// file does not set it: it is ignored there (ADR-0223).
+    /// file does not set it: it is ignored there (ADR-0224).
     /// </summary>
     public bool AiHelpRequested { get => globals.AiHelpRequested; private set => globals.AiHelpRequested = value; }
 
