@@ -9,7 +9,8 @@ namespace Curl.Authentication;
 /// SPNEGO NegTokenInit offering Kerberos V5 alone, as MIT's library does; the second reads
 /// the acceptor's AP-REP, from inside a NegTokenResp for Negotiate, and completes the context.
 /// The credential cache is always the one used: curl's GSS-API Negotiate ignores
-/// <c>-u</c>'s password off Windows.
+/// <c>-u</c>'s password off Windows. <c>--delegation</c> forwards the ticket-granting ticket
+/// in the initial token, as MIT's <c>gss_init_sec_context</c> does.
 /// </summary>
 /// <param name="request">The mechanism, <see cref="SecurityMechanism.Negotiate" /> or <see cref="SecurityMechanism.Kerberos" />, and the acceptor.</param>
 /// <param name="tickets">Gets the service ticket.</param>
@@ -22,6 +23,7 @@ internal sealed class HandBuiltKerberosSecurityContext(
     IKerberosRandomSource randomSource) : ISecurityContext
 {
     private KerberosCredential? serviceTicket;
+    private KerberosCredential? forwardedTicketGrantingTicket;
     private KerberosGssContext? gss;
 
     /// <inheritdoc />
@@ -54,6 +56,7 @@ internal sealed class HandBuiltKerberosSecurityContext(
     public void Dispose()
     {
         gss?.Dispose();
+        forwardedTicketGrantingTicket?.Dispose();
         serviceTicket?.Dispose();
     }
 
@@ -100,12 +103,48 @@ internal sealed class HandBuiltKerberosSecurityContext(
         }
     }
 
+    private static KerberosDelegation DelegationOf(SecurityDelegation delegation) => delegation switch
+    {
+        SecurityDelegation.Always => KerberosDelegation.Always,
+        SecurityDelegation.Policy => KerberosDelegation.Policy,
+        _ => KerberosDelegation.None,
+    };
+
+    /// <summary>
+    /// Gets the forwarded ticket-granting ticket when the context will delegate: always for
+    /// <see cref="SecurityDelegation.Always" />, and for <see cref="SecurityDelegation.Policy" />
+    /// only with an ok-as-delegate service ticket, so no KDC exchange is spent otherwise.
+    /// Any failure, a ticket-granting ticket that is not forwardable among them, gives
+    /// <see langword="null" /> and so no delegation, as MIT's <c>gss_init_sec_context</c> drops
+    /// the delegation flag when <c>krb5_fwd_tgt_creds</c> fails (ADR-0210).
+    /// </summary>
+    private async Task<KerberosCredential?> ForwardedTicketGrantingTicketAsync(KerberosCredential ticket, CancellationToken cancellationToken)
+    {
+        bool delegates = request.Delegation == SecurityDelegation.Always
+            || (request.Delegation == SecurityDelegation.Policy && ticket.Flags.HasFlag(KerberosTicketFlags.OkAsDelegate));
+        if (!delegates)
+        {
+            return null;
+        }
+
+        try
+        {
+            return await tickets.GetForwardedTicketGrantingTicketAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception failure) when (failure is KerberosKdcException or KerberosFileException or KerberosConfigurationException or KerberosCryptographyException)
+        {
+            return null;
+        }
+    }
+
     private async ValueTask<SecurityContextStep> InitialStepAsync(CancellationToken cancellationToken)
     {
         try
         {
             serviceTicket = await tickets.GetAsync(request.ServiceName, request.HostName, cancellationToken).ConfigureAwait(false);
-            gss = new KerberosGssContext(serviceTicket, new KerberosGssContextOptions(), timeProvider, randomSource);
+            forwardedTicketGrantingTicket = await ForwardedTicketGrantingTicketAsync(serviceTicket, cancellationToken).ConfigureAwait(false);
+            KerberosGssContextOptions options = new() { Delegation = DelegationOf(request.Delegation), ForwardedTicketGrantingTicket = forwardedTicketGrantingTicket };
+            gss = new KerberosGssContext(serviceTicket, options, timeProvider, randomSource);
         }
         catch (KerberosFileException)
         {

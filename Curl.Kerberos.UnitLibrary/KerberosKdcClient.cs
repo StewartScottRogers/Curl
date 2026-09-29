@@ -234,6 +234,27 @@ public sealed class KerberosKdcClient
     }
 
     /// <summary>
+    /// Gets a forwarded ticket-granting ticket from <paramref name="cache" />'s live
+    /// ticket-granting ticket for its default principal's realm, as the overload taking a
+    /// <see cref="KerberosCredential" /> does. "Live" is judged by the time plus the cache's
+    /// KDC time offset.
+    /// </summary>
+    /// <param name="cache">The credential cache; it is only read.</param>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <returns>The forwarded ticket-granting ticket; the caller disposes it.</returns>
+    /// <exception cref="KerberosKdcException">
+    /// No ticket could be got; <see cref="KerberosKdcException.Error" /> says why:
+    /// <see cref="KerberosKdcError.NoCredentials" /> for a cache without a live ticket-granting
+    /// ticket, <see cref="KerberosKdcError.TicketNotForwardable" /> for one without <c>forwardable</c>.
+    /// </exception>
+    public async Task<KerberosCredential> GetForwardedTicketGrantingTicketAsync(CredentialCache cache, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(cache);
+        using KerberosCredential granting = CachedTicketGrantingTicket(cache);
+        return await GetForwardedTicketGrantingTicketAsync(granting, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Gets a forwarded ticket-granting ticket from <paramref name="ticketGrantingTicket" />
     /// for <c>--delegation</c>, as MIT's <c>krb5_fwd_tgt_creds</c> does for
     /// <c>gss_init_sec_context</c> (ADR-0210): one TGS exchange with the KDCs of the ticket's
@@ -357,10 +378,16 @@ public sealed class KerberosKdcClient
     /// <summary>Gets a ticket for <paramref name="server" /> by a TGS exchange with the cache's live ticket-granting ticket for its default principal's realm.</summary>
     private async Task<KerberosCredential> GetTicketWithCachedTicketGrantingTicketAsync(KerberosPrincipal server, CredentialCache cache, CancellationToken cancellationToken)
     {
-        CachedCredential? ticketGrantingTicket = FindLive(cache, TicketGrantingServer(cache.DefaultPrincipal.Realm), NowAtKdc(cache))
-            ?? throw new KerberosKdcException(KerberosKdcError.NoCredentials);
-        using KerberosCredential granting = KerberosCredential.FromCache(ticketGrantingTicket);
+        using KerberosCredential granting = CachedTicketGrantingTicket(cache);
         return await GetTicketFromTicketGrantingServiceAsync(granting, server, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Copies the cache's live ticket-granting ticket for its default principal's realm out of it, or fails with <see cref="KerberosKdcError.NoCredentials" />.</summary>
+    private KerberosCredential CachedTicketGrantingTicket(CredentialCache cache)
+    {
+        CachedCredential ticketGrantingTicket = FindLive(cache, TicketGrantingServer(cache.DefaultPrincipal.Realm), NowAtKdc(cache))
+            ?? throw new KerberosKdcException(KerberosKdcError.NoCredentials);
+        return KerberosCredential.FromCache(ticketGrantingTicket);
     }
 
     private static CachedCredential? FindLive(CredentialCache cache, KerberosPrincipal server, DateTimeOffset now) =>

@@ -41,8 +41,12 @@ recorder, which has no KDC:
    `NegotiateAuthentication` has no way to ask `GSS_C_DELEG_POLICY_FLAG`, and asking full
    delegation for `policy` would forward the user's ticket-granting ticket to hosts the realm
    has not marked ok-as-delegate, which `policy` exists to prevent; so `policy` asks none there.
-5. The hand-built Kerberos route (K) does not delegate yet: `KerberosGssContext` supports it,
-   but needs a forwarded ticket-granting ticket the ticket source does not get yet (BL-873); SASL passes no level yet (BL-874).
+5. The hand-built Kerberos route (K) delegates as MIT does (BL-873): for `always`, and for
+   `policy` with an ok-as-delegate service ticket, `KerberosServiceTicketSource` gets a
+   forwarded ticket-granting ticket (ADR-0210) and the initial token carries the delegation
+   flag and a `KRB-CRED`; a ticket-granting ticket that is not forwardable, or any failure to
+   forward it, sends no delegation, as MIT drops the flag when `krb5_fwd_tgt_creds` fails.
+   SASL passes no level yet (BL-874).
 
 ## Consequences
 

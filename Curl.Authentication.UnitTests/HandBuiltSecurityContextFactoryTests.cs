@@ -12,7 +12,7 @@ namespace Curl.Authentication;
 /// NegTokenInit MIT sends, the AP-REP read back, and each way it fails.
 /// </summary>
 [TestClass]
-public sealed class HandBuiltSecurityContextFactoryTests
+public sealed partial class HandBuiltSecurityContextFactoryTests
 {
     private const string Host = "server.example.test";
 
@@ -99,7 +99,7 @@ public sealed class HandBuiltSecurityContextFactoryTests
     {
         FakeKdc kdc = new();
 
-        await AssertFirstStepFailsAsync(Tickets(kdc, Cache()), SecurityContextStatus.NoCredentials);
+        await AssertFirstStepFailsAsync(Tickets(kdc, () => Cache()), SecurityContextStatus.NoCredentials);
 
         Assert.IsEmpty(kdc.Exchanges);
     }
@@ -110,7 +110,7 @@ public sealed class HandBuiltSecurityContextFactoryTests
         FakeKdc kdc = new();
         kdc.UnreachableHosts.Add("kdc.example.test");
 
-        await AssertFirstStepFailsAsync(Tickets(kdc, Cache(TicketGrantingTicket())), SecurityContextStatus.Refused);
+        await AssertFirstStepFailsAsync(Tickets(kdc, () => Cache(TicketGrantingTicket())), SecurityContextStatus.Refused);
     }
 
     [TestMethod]
@@ -118,7 +118,7 @@ public sealed class HandBuiltSecurityContextFactoryTests
     {
         FakeKdc kdc = new() { Override = _ => FakeKdc.Error(32) };
 
-        await AssertFirstStepFailsAsync(Tickets(kdc, Cache(TicketGrantingTicket())), SecurityContextStatus.NoCredentials);
+        await AssertFirstStepFailsAsync(Tickets(kdc, () => Cache(TicketGrantingTicket())), SecurityContextStatus.NoCredentials);
     }
 
     [TestMethod]
@@ -134,7 +134,7 @@ public sealed class HandBuiltSecurityContextFactoryTests
     {
         CachedCredential desTicket = Cached(new KerberosPrincipal(KerberosServiceTicketSource.HostBasedServiceNameType, FakeKdc.Realm, ["HTTP", Host]), new KerberosKey(1, new byte[8]));
 
-        await AssertFirstStepFailsAsync(Tickets(new FakeKdc(), Cache(desTicket)), SecurityContextStatus.Refused);
+        await AssertFirstStepFailsAsync(Tickets(new FakeKdc(), () => Cache(desTicket)), SecurityContextStatus.Refused);
     }
 
     [TestMethod]
@@ -238,15 +238,15 @@ public sealed class HandBuiltSecurityContextFactoryTests
 
     private static SecurityContextRequest Request(SecurityMechanism mechanism) => new(mechanism, "HTTP", Host);
 
-    internal static HandBuiltSecurityContextFactory Factory(FakeKdc kdc) => Factory(Tickets(kdc, Cache(TicketGrantingTicket())));
+    internal static HandBuiltSecurityContextFactory Factory(FakeKdc kdc) => Factory(Tickets(kdc, () => Cache(TicketGrantingTicket())));
 
     private static HandBuiltSecurityContextFactory Factory(KerberosServiceTicketSource tickets) =>
         new(tickets, new FixedTimeProvider(FakeKdc.Now), new FixedKerberosRandomSource(RandomBytes), new FixedNtlmRandomSource(RandomBytes));
 
-    private static KerberosServiceTicketSource Tickets(FakeKdc kdc, CredentialCache cache)
+    private static KerberosServiceTicketSource Tickets(FakeKdc kdc, Func<CredentialCache> readCache)
     {
         KerberosConfiguration configuration = Configuration(string.Empty);
-        return new KerberosServiceTicketSource(() => configuration, () => cache, _ => Client(configuration, kdc));
+        return new KerberosServiceTicketSource(() => configuration, readCache, _ => Client(configuration, kdc));
     }
 
     private static KerberosConfiguration Configuration(string extra) =>
@@ -262,7 +262,7 @@ public sealed class HandBuiltSecurityContextFactoryTests
     private static CachedCredential TicketGrantingTicket() =>
         Cached(KerberosKdcClient.TicketGrantingServer(FakeKdc.Realm), new KerberosKey(18, [.. FakeKdc.TicketGrantingSessionKey]));
 
-    private static CachedCredential Cached(KerberosPrincipal server, KerberosKey sessionKey) => new()
+    private static CachedCredential Cached(KerberosPrincipal server, KerberosKey sessionKey, KerberosTicketFlags flags = KerberosTicketFlags.Forwardable) => new()
     {
         Client = FakeKdc.Alice,
         Server = server,
@@ -272,7 +272,7 @@ public sealed class HandBuiltSecurityContextFactoryTests
         EndTime = FakeKdc.Now.AddHours(1),
         RenewUntil = DateTimeOffset.UnixEpoch,
         IsEncryptedInSessionKey = false,
-        Flags = KerberosTicketFlags.Forwardable,
+        Flags = flags,
         Addresses = [],
         AuthorizationData = [],
         Ticket = FakeKdc.TicketFor(new KerberosPrincipalName(server.NameType, server.Components)).Encode(),

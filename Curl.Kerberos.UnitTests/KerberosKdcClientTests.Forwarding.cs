@@ -92,7 +92,40 @@ public sealed partial class KerberosKdcClientTests
     public async Task GetForwardedTicketGrantingTicketAsync_TicketNull_Throws()
     {
         await Assert.ThrowsExactlyAsync<ArgumentNullException>(
-            () => ClientFor(new FakeKdc()).GetForwardedTicketGrantingTicketAsync(null!, CancellationToken.None));
+            () => ClientFor(new FakeKdc()).GetForwardedTicketGrantingTicketAsync((KerberosCredential)null!, CancellationToken.None));
+    }
+
+    [TestMethod]
+    public async Task GetForwardedTicketGrantingTicketAsync_CacheWithLiveTicketGrantingTicket_ForwardsIt()
+    {
+        FakeKdc kdc = new();
+        using CredentialCache cache = Cache(Cached(FakeKdc.Alice, KerberosKdcClient.TicketGrantingServer(FakeKdc.Realm), FakeKdc.Now.AddHours(8), FakeKdc.TicketGrantingSessionKey));
+
+        using KerberosCredential forwarded = await ClientFor(kdc).GetForwardedTicketGrantingTicketAsync(cache, CancellationToken.None);
+
+        Assert.AreEqual(KerberosKdcOptions.Forwarded | KerberosKdcOptions.Forwardable, kdc.Requests.Single().Body.Options);
+        Assert.AreEqual("krbtgt/EXAMPLE.TEST@EXAMPLE.TEST", forwarded.Server.ToString());
+        Assert.IsTrue(forwarded.Flags.HasFlag(KerberosTicketFlags.Forwarded));
+    }
+
+    [TestMethod]
+    public async Task GetForwardedTicketGrantingTicketAsync_CacheWithOnlyAnExpiredTicketGrantingTicket_ThrowsNoCredentialsAndSendsNothing()
+    {
+        FakeKdc kdc = new();
+        using CredentialCache cache = Cache(Cached(FakeKdc.Alice, KerberosKdcClient.TicketGrantingServer(FakeKdc.Realm), FakeKdc.Now.AddHours(-1), FakeKdc.TicketGrantingSessionKey));
+
+        KerberosKdcException failure = await Assert.ThrowsExactlyAsync<KerberosKdcException>(
+            () => ClientFor(kdc).GetForwardedTicketGrantingTicketAsync(cache, CancellationToken.None));
+
+        Assert.AreEqual(KerberosKdcError.NoCredentials, failure.Error);
+        Assert.IsEmpty(kdc.Exchanges);
+    }
+
+    [TestMethod]
+    public async Task GetForwardedTicketGrantingTicketAsync_CacheNull_Throws()
+    {
+        await Assert.ThrowsExactlyAsync<ArgumentNullException>(
+            () => ClientFor(new FakeKdc()).GetForwardedTicketGrantingTicketAsync((CredentialCache)null!, CancellationToken.None));
     }
 
     private static KerberosCredential TicketGrantingTicketWith(KerberosTicketFlags flags, DateTimeOffset? renewUntil = null) => new()
