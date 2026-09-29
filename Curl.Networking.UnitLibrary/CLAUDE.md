@@ -179,6 +179,14 @@ path as the host and `ConnectionOpenedEvent.UnixSocketRemoteIp`. A path too long
 (108 bytes, 104 on macOS, with its NUL) is exit 6 `Unix socket path too long: '<path>'`. Pools are
 per option group, so different sockets never share a connection.
 
+The DNS-over-HTTPS message codec (ADR-0152, BL-640) is pure code, bytes in and bytes out, as
+curl 8.21.0's `lib/doh.c` does it. `DnsQueryEncoder` writes the measured query (ID 0, flags
+`0x0100`, one question, QCLASS IN) for a `DnsRecordType`, refusing an empty label or one over 63
+bytes and a query over 272 bytes. `DnsAnswerDecoder` returns a `DnsAnswer`: the addresses of the
+type asked for (at most 24), the CNAME targets followed through compression pointers (at most 4),
+the smallest TTL, or a `DnsMessageFailure`, a pointer loop ending as `LabelLoop` after 128 steps.
+`DnsMessageFailureText` gives curl's `--trace-config doh` text for each failure.
+
 Everything else takes the Abstractions contracts (`IDnsResolver`, `ITlsProvider`,
 `IConnection`, `IDatagramChannel`) or `ITcpDialer`, plus an injected `TimeProvider`, so the tests in
 `Curl.Networking.UnitTests` drive every branch with fakes and no network.
