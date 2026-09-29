@@ -215,6 +215,7 @@ choices do not need one.
 | [0200](ADR-0200-the-hand-built-kerberos-follows-cross-realm-referrals-in-the-tgs-exchange.md) | `KerberosKdcClient` asks the TGS with `canonicalize` and follows `krbtgt/OTHER@REALM` referrals to OTHER's KDCs, up to MIT's 10 hops; the eleventh is `ReferralLimitExceeded` | Accepted | 2026-09-29 |
 | [0201](ADR-0201-dsa-is-hand-built-with-rfc-6979-nonces-and-openssl-s-parameter-limits.md) | DSA is the hand-built `DsaSignature` on every platform: RFC 6979 deterministic nonces over SHA-1 to SHA-512 (SHA-224 hand-built), OpenSSL's verification limits (q of 160, 224 or 256 bits, odd p up to 10,000 bits, 1 < g < p), r \|\| s at q's length, constant-time signing by Fermat inversion | Accepted | 2026-09-29 |
 | [0202](ADR-0202-trace-ids-mark-each-transfers-lines-through-a-per-transfer-view.md) | `--trace-ids` (and `-vv`) write `[<xfer>-<conn>] ` after the stamp, `[<xfer>-x] ` before a connection; each transfer reports through a `TraceIdsTransferEvents` view over the shared writer, and takes its `%{conn_id}` at its first event so the marker and `-w` agree | Accepted | 2026-09-29 |
+| [0203](ADR-0203-a-sasl-security-context-that-cannot-make-its-first-token-fails-with-exit-94.md) | A GSSAPI or NTLM SASL context that cannot make its first token throws `SaslAuthenticationFailedException` for exit 94, and the SMTP, IMAP and POP3 handlers ask for the initial response before the command only under `--sasl-ir` (or IMAP's `SASL-IR`), otherwise at the first continuation, as curl's `Curl_sasl_start` does | Accepted | 2026-09-29 |
 
 ## Template
 
