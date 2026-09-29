@@ -114,6 +114,48 @@ public sealed class RankedHttpAuthenticatorTests
     }
 
     [TestMethod]
+    [DataRow(HttpAuthSchemes.Any, DisplayName = "--anyauth")]
+    [DataRow(HttpAuthSchemes.Negotiate | HttpAuthSchemes.Basic, DisplayName = "--negotiate --basic")]
+    public async Task CreateAuthorizationAsync_NegotiatePickedAfterTheChallengeWithNoTicket_AsksForTheRequestAgainWithoutAHeader(HttpAuthSchemes allowed)
+    {
+        ScriptedSecurityContextFactory contexts = new(new ScriptedSecurityContext(new SecurityContextStep(SecurityContextStatus.NoCredentials, [])));
+        RecordingInfoEvents events = new();
+
+        string? value = await WithContexts(contexts).CreateAuthorizationAsync(Request(allowed) with { Events = events }, ["Negotiate"], CancellationToken.None);
+
+        Assert.AreEqual(string.Empty, value);
+        Assert.HasCount(1, events.Info);
+    }
+
+    [TestMethod]
+    public async Task ContinueAuthorizationAsync_401ToTheRequestSentAgainWithoutAHeader_StepsAContextAndTakesTheResponse()
+    {
+        ScriptedSecurityContext context = new(new SecurityContextStep(SecurityContextStatus.NoCredentials, []));
+        ScriptedSecurityContextFactory contexts = new(context);
+        RecordingInfoEvents events = new();
+
+        string? value = await WithContexts(contexts).ContinueAuthorizationAsync(Request(HttpAuthSchemes.Any) with { Events = events }, string.Empty, sentBeforeAnyChallenge: false, ["Negotiate"], CancellationToken.None);
+
+        Assert.IsNull(value);
+        Assert.HasCount(1, events.Info);
+        Assert.IsTrue(context.IsDisposed);
+    }
+
+    [TestMethod]
+    [DataRow(false, "Basic realm=\"r\"", DisplayName = "Negotiate no longer offered")]
+    [DataRow(true, "Negotiate", DisplayName = "No -u")]
+    public async Task ContinueAuthorizationAsync_401ToTheRequestSentAgainWithoutAHeaderNotNegotiates_StepsNoContext(bool withoutCredential, string challenge)
+    {
+        ScriptedSecurityContextFactory contexts = new();
+        HttpAuthRequest request = Request(HttpAuthSchemes.Any) with { Credential = withoutCredential ? null : new NetworkCredential("u", "p") };
+
+        string? value = await WithContexts(contexts).ContinueAuthorizationAsync(request, string.Empty, sentBeforeAnyChallenge: false, [challenge], CancellationToken.None);
+
+        Assert.IsNull(value);
+        Assert.IsEmpty(contexts.Requests);
+    }
+
+    [TestMethod]
     public async Task CreateAuthorizationAsync_NegotiateAloneWithoutCredential_StepsAContextButSendsNothing()
     {
         ScriptedSecurityContext context = new(new SecurityContextStep(SecurityContextStatus.Completed, [0x01]));

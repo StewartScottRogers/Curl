@@ -14,7 +14,9 @@ namespace Curl.Authentication;
 /// <remarks>
 /// There is no fallback, as the reference build has none: when a Negotiate context makes no
 /// token, or a Digest or NTLM challenge cannot be read, it sends nothing rather than answer a
-/// lower-ranked scheme also offered. Negotiate and NTLM need I/O, so only
+/// lower-ranked scheme also offered; when Negotiate was picked only after the challenge, as
+/// under <c>--anyauth</c>, that nothing is the empty value, so the request is sent once more
+/// without a header, and its 401 steps a context without answering (ADR-0232). Negotiate and NTLM need I/O, so only
 /// <see cref="CreateAuthorizationAsync" /> and <see cref="ContinueAuthorizationAsync" /> answer
 /// them (ADR-0176, ADR-0181). As libcurl does, <c>--negotiate</c> alone tries it on the first
 /// request, and after a challenge answers only when <c>-u</c> was given, even as <c>-u :</c>,
@@ -45,7 +47,8 @@ public sealed class RankedHttpAuthenticator(BasicAndBearerAuthenticator basicAnd
 
         if (AnswersWithNegotiate(request, challenges))
         {
-            return await negotiate.CreateAuthorizationAsync(request, cancellationToken).ConfigureAwait(false);
+            string? value = await negotiate.CreateAuthorizationAsync(request, cancellationToken).ConfigureAwait(false);
+            return value ?? (PicksNegotiateAfterTheChallenge(request, challenges) ? string.Empty : null);
         }
 
         if (StepsNegotiateWithoutAnswering(request, challenges))
@@ -68,6 +71,16 @@ public sealed class RankedHttpAuthenticator(BasicAndBearerAuthenticator basicAnd
 
         if (challenges.Count == 0)
         {
+            return null;
+        }
+
+        if (sentAuthorization.Length == 0)
+        {
+            if (AnswersWithNegotiate(request, challenges))
+            {
+                await negotiate.StepWithoutAnsweringAsync(request, cancellationToken).ConfigureAwait(false);
+            }
+
             return null;
         }
 
@@ -104,6 +117,16 @@ public sealed class RankedHttpAuthenticator(BasicAndBearerAuthenticator basicAnd
             && (challenges.Count == 0
                 ? request.AllowedSchemes == HttpAuthSchemes.Negotiate
                 : request.Credential is not null && PickOf(request, challenges) == HttpAuthSchemes.Negotiate);
+
+    /// <summary>
+    /// Decides whether Negotiate is picked only now, for the request that answers
+    /// <paramref name="challenges" />: when it was not the one scheme allowed, so the request
+    /// that drew them picked nothing, as <c>--anyauth</c> does. The request then goes out again
+    /// even when the context makes no token, as curl 8.21.0's <c>Curl_http_auth_act</c> asks for
+    /// it whatever the context will make (measured, ADR-0232).
+    /// </summary>
+    private static bool PicksNegotiateAfterTheChallenge(HttpAuthRequest request, IReadOnlyList<string> challenges) =>
+        challenges.Count != 0 && request.AllowedSchemes != HttpAuthSchemes.Negotiate;
 
     /// <summary>
     /// Decides whether a challenge is Negotiate's to step but not to answer: for the origin,

@@ -43,7 +43,11 @@ public interface IHttpAuthenticator
     /// <param name="request">The request being authorised, and what it may be authorised with.</param>
     /// <param name="challenges">As for <see cref="CreateAuthorization" />.</param>
     /// <param name="cancellationToken">Cancels the I/O.</param>
-    /// <returns>As for <see cref="CreateAuthorization" />.</returns>
+    /// <returns>
+    /// As for <see cref="CreateAuthorization" />; or, answering a challenge, the empty string to
+    /// send the request again without the header, as curl 8.21.0 does when <c>--anyauth</c>
+    /// picks Negotiate and its context makes no token (ADR-0232).
+    /// </returns>
     ValueTask<string?> CreateAuthorizationAsync(HttpAuthRequest request, IReadOnlyList<string> challenges, CancellationToken cancellationToken) =>
         ValueTask.FromResult(CreateAuthorization(request, challenges));
 
@@ -55,14 +59,21 @@ public interface IHttpAuthenticator
     /// curl 8.21.0 does for Basic, Digest and a Negotiate context with nothing more to say.
     /// </summary>
     /// <param name="request">The request being authorised, and what it may be authorised with.</param>
-    /// <param name="sentAuthorization">The header value the request that drew the challenges sent.</param>
+    /// <param name="sentAuthorization">
+    /// The header value the request that drew the challenges sent; empty when it was sent again
+    /// without one on <see cref="CreateAuthorizationAsync" />'s empty answer (ADR-0232).
+    /// </param>
     /// <param name="sentBeforeAnyChallenge">
     /// <see langword="true" /> when <paramref name="sentAuthorization" /> was sent on the
     /// transfer's first request, before any challenge; <see langword="false" /> when it answered one.
     /// </param>
     /// <param name="challenges">The response's challenges, as for <see cref="CreateAuthorization" />; never empty.</param>
     /// <param name="cancellationToken">Cancels the I/O.</param>
-    /// <returns>The next header value, or <see langword="null" /> to take the response as the result.</returns>
+    /// <returns>
+    /// The next header value, or <see langword="null" /> to take the response as the result;
+    /// the HTTP handler takes an empty value as <see langword="null" />, so a request is never
+    /// sent again without a header twice (ADR-0232).
+    /// </returns>
     /// <exception cref="HttpAuthenticationFailedException">curl fails the transfer instead of taking the response.</exception>
     ValueTask<string?> ContinueAuthorizationAsync(HttpAuthRequest request, string sentAuthorization, bool sentBeforeAnyChallenge, IReadOnlyList<string> challenges, CancellationToken cancellationToken) =>
         ValueTask.FromResult<string?>(null);
