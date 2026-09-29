@@ -37,3 +37,4 @@ completed:
 - 2026-09-28: Created.
 - 2026-09-29: Backlog -> Doing.
 - 2026-09-29: Doing -> Backlog. Waits on BL-913: ITransferContext needs UseAscii and Append before -B and -a can reach the FTP handler
+- 2026-09-29: Backlog -> Doing.
