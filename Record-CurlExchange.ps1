@@ -340,6 +340,14 @@
     Schannel build's revocation check of the leaf ends "status unknown", as ADR-0086
     describes. The root's key is never written; the file is left for the caller to delete.
 
+.PARAMETER TlsPublicKeyFile
+    With -Tls, write the served certificate's public key (its SubjectPublicKeyInfo) to this
+    path as a PEM "PUBLIC KEY" block, and the same key as DER to this path with ".der"
+    appended, before curl runs, so curl can be given --pinnedpubkey <path> (BL-608). With
+    -Tls, whether or not this is given, every "{TlsPublicKeySha256}" in CurlArgs is replaced
+    by the base64 SHA-256 of that SubjectPublicKeyInfo, the hash --pinnedpubkey sha256//
+    names. The files are left for the caller to delete.
+
 .PARAMETER FtpIdleMilliseconds
     How long, in -Ftp mode, the server waits for curl's next command before it hangs up.
     Default 5000. Raise it to measure a wait longer than five seconds, such as curl's
@@ -481,6 +489,7 @@ param(
     [ValidateRange(1, 600000)] [int] $ScriptGapMilliseconds = 250,
     [switch] $Tls,
     [string] $TlsRootCertificateFile,
+    [string] $TlsPublicKeyFile,
     [string] $Curl,
     [System.Net.IPAddress] $ListenAddress = [System.Net.IPAddress]::Loopback,
     [switch] $NoServer,
@@ -1656,6 +1665,26 @@ function New-IssuedByThrowawayRoot {
     }
 }
 
+function Get-SubjectPublicKeyInfo {
+    # The DER SubjectPublicKeyInfo of Certificate's key: SEQUENCE { SEQUENCE { algorithm OID,
+    # parameters }, BIT STRING key }. .NET Framework has no ExportSubjectPublicKeyInfo, so
+    # it is put together from the parts PublicKey exposes.
+    param($Certificate)
+    function ConvertTo-Der {
+        param([byte] $Tag, [byte[]] $Content)
+        $length = $Content.Length
+        $lengthBytes = if ($length -lt 0x80) { , [byte] $length }
+            elseif ($length -lt 0x100) { [byte[]] (0x81, $length) }
+            else { [byte[]] (0x82, ($length -shr 8), ($length -band 0xFF)) }
+        return , ([byte[]] (@($Tag) + $lengthBytes + $Content))
+    }
+    $publicKey = $Certificate.PublicKey
+    $oid = ConvertTo-Der -Tag 0x06 -Content ([System.Security.Cryptography.CryptoConfig]::EncodeOID($publicKey.Oid.Value) | Select-Object -Skip 2)
+    $algorithm = ConvertTo-Der -Tag 0x30 -Content ([byte[]] ($oid + $publicKey.EncodedParameters.RawData))
+    $key = ConvertTo-Der -Tag 0x03 -Content ([byte[]] (@([byte] 0) + $publicKey.EncodedKeyValue.RawData))
+    return , (ConvertTo-Der -Tag 0x30 -Content ([byte[]] ($algorithm + $key)))
+}
+
 function New-ThrowawayTlsCertificate {
     # Schannel will not serve the ephemeral key CreateSelfSigned returns, so the
     # certificate is reloaded from its PFX export. Loaded without PersistKeySet, its key
@@ -1712,6 +1741,17 @@ $OutDirectory = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine((Get-Loc
 New-Item -ItemType Directory -Path $OutDirectory -Force | Out-Null
 
 $tlsCertificate = if ($Tls -or $Ftp -or $Smtp -or $Imap -or $Pop3) { New-ThrowawayTlsCertificate -RootCertificateFile $TlsRootCertificateFile } else { $null }
+if ($null -ne $tlsCertificate) {
+    $publicKeyInfo = Get-SubjectPublicKeyInfo -Certificate $tlsCertificate
+    $publicKeySha256 = [System.Convert]::ToBase64String([System.Security.Cryptography.SHA256]::Create().ComputeHash($publicKeyInfo))
+    $CurlArgs = @($CurlArgs | ForEach-Object { $_.Replace('{TlsPublicKeySha256}', $publicKeySha256) })
+    if ($TlsPublicKeyFile) {
+        $TlsPublicKeyFile = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine((Get-Location).ProviderPath, $TlsPublicKeyFile))
+        $pem = "-----BEGIN PUBLIC KEY-----`n" + [System.Convert]::ToBase64String($publicKeyInfo, [System.Base64FormattingOptions]::InsertLineBreaks).Replace("`r`n", "`n") + "`n-----END PUBLIC KEY-----`n"
+        [System.IO.File]::WriteAllText($TlsPublicKeyFile, $pem, (New-Object System.Text.ASCIIEncoding))
+        [System.IO.File]::WriteAllBytes($TlsPublicKeyFile + '.der', $publicKeyInfo)
+    }
+}
 # -NoServer binds nothing: the caller's own server answers curl.
 $listener = $null
 $server = $null
