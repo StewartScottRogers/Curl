@@ -194,7 +194,7 @@ Namespace `Curl.Cryptography`. It holds:
 - `Shake` (public, `IDisposable`): SHAKE128 and SHAKE256 - static `HashData128` and
   `HashData256` for one output of any length, and `Create128`/`Create256` instances that
   `AppendData`, then `Read` output a piece at a time, then `Reset`. Ed448 and
-  ML-DSA (BL-744) reuse it. Constant-time.
+  ML-DSA reuse it. Constant-time.
 - `MlKemParameterSet` (public enum): `MlKem512`, `MlKem768`, `MlKem1024`.
 - `MlKemParameters` (internal): k, eta1, eta2, du, dv and the key and ciphertext lengths
   of each set (FIPS 203 tables 2 and 3).
@@ -212,6 +212,31 @@ Namespace `Curl.Cryptography`. It holds:
   re-encrypted ciphertext branch-free and picks the key or J(z || c) by mask. Static
   `TryEncapsulate` (random m, or m given) returns `false` with its outputs zeroed for an
   encapsulation key failing the modulus check. `Dispose` zeroes the key. Constant-time.
+- `MlDsaParameterSet` (public enum): `MlDsa44`, `MlDsa65`, `MlDsa87`.
+- `MlDsaParameters` (internal): k, l, eta, tau, gamma1, gamma2, omega, the commitment
+  hash length and the key and signature lengths of each set (FIPS 204 tables 1 and 2).
+- `MlDsaPolynomial` (internal): arithmetic mod q = 8380417 without division (`Reduce` by
+  a 64-bit reciprocal and masked correction), `Ntt`, `InverseNtt`, `NttEach`,
+  `InverseNttEach`, `MultiplyNttsAndAdd`, `Power2Round`, `Decompose`, `HighBits`,
+  `MakeHint`, `UseHint` (verification only), and the branch-free norm checks
+  `ExceedsBound` and `LowBitsExceedBound`.
+- `MlDsaEncoding` (internal): `Pack`/`Unpack` (SimpleBitPack), `PackCentered`/
+  `UnpackCentered` (BitPack), `PackHint` and `TryUnpackHint`, `false` for a malformed hint.
+- `MlDsaSampling` (internal): `SampleNtt` (rejection on public rho), `SampleBounded`
+  (s1 and s2), `SampleMask` (y) and `SampleInBall`, which places the challenge's
+  coefficients by a masked pass so no secret index becomes an address.
+- `MlDsaInternalFunctions` (internal): FIPS 204 section 6 - `GenerateKeys`, `DeriveKeys`,
+  `Sign` (the rejection loop, each attempt run to completion before its one branch),
+  `Verify`, `ComputeMessageRepresentative` (mu of pure ML-DSA with a context) and
+  `HashCommitment`; the matrix A is sampled once per call and kept.
+- `MlDsa` (public, `IDisposable`): FIPS 204 pure ML-DSA with a context of up to 255 bytes -
+  an instance holds one key pair: `GenerateKey` (random, or from the seed xi for known
+  answers), `ImportPrivateKey` (`ArgumentException` when its tr or t0 does not match the
+  public key its s1 and s2 give), `ExportPublicKey`, `ExportPrivateKey`, `SignData`
+  (hedged; random rnd, or rnd given), `SignDataDeterministic` (rnd all zero), and static
+  `VerifyData`, `false` for a malformed hint, z out of range or a mismatch. `Dispose`
+  zeroes the private key. Constant-time apart from the rejection loop's iteration count
+  and the samplers' rejection of out-of-range bytes, which FIPS 204 allows.
 - `HpkeKem`, `HpkeKdf`, `HpkeAead` (public enums): the RFC 9180 suite identifiers HPKE
   supports - DHKEM(P-256 or X25519, HKDF-SHA256), HKDF-SHA256, and AES-128-GCM,
   AES-256-GCM or ChaCha20-Poly1305, the suites Encrypted Client Hello uses.
@@ -228,8 +253,6 @@ Namespace `Curl.Cryptography`. It holds:
 - `Hpke` (public, static): HPKE base mode - `TrySetupBaseSender` (random skE, or skE given
   for known answers), `TrySetupBaseRecipient` and `GetEncapsulatedKeySize`. Constant-time
   as far as X25519 and the platform's P-256 and AES-GCM are.
-
-The remaining primitives land under their own tasks (BL-742, BL-744).
 
 ## Rules
 
