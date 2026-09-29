@@ -32,3 +32,4 @@ Under `-L`, a `Location` that carries user information (`Location: http://c:d@12
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
