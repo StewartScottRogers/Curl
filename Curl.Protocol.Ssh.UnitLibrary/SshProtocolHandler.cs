@@ -220,7 +220,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
 
         return SftpRemotePath.NamesDirectory(urlPath)
             ? await new SftpDirectoryListing(transport).ListAsync(urlPath, context.ListOnly, context.NoBody, context.Output, context.Progress, context.CancellationToken, quotes).ConfigureAwait(false)
-            : await new SftpFileDownload(transport).DownloadAsync(urlPath, context.CreateFileMode, context.Output, context.Progress, context.CancellationToken, quotes).ConfigureAwait(false);
+            : await new SftpFileDownload(transport).DownloadAsync(urlPath, context.CreateFileMode, context.Output, context.Progress, context.CancellationToken, quotes, context.Range, context.ResumeFrom).ConfigureAwait(false);
     }
 
     // What the host-key check and the key files need to know about the session.

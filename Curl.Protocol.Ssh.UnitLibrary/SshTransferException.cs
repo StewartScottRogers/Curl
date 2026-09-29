@@ -151,6 +151,40 @@ internal sealed class SshTransferException(CurlExitCode exitCode, string message
         new(CurlExitCode.QuoteError, message);
 
     /// <summary>
+    /// Creates the failure curl 8.21.0 reports when an SFTP download's range, or its
+    /// <c>-C</c> offset, starts beyond the file: exit 33 and <c>Offset (N) was beyond file
+    /// size (S)</c>, measured 2026-09-29 for <c>-r 11-</c>, <c>-r 20-30</c> and <c>-C 11</c>
+    /// on a 10-byte file (BL-573, ADR-0253).
+    /// </summary>
+    /// <param name="offset">Where the range starts.</param>
+    /// <param name="size">The file's size.</param>
+    /// <returns>The exception.</returns>
+    internal static SshTransferException SftpRangeBeyondFileSize(long offset, long size) =>
+        new(CurlExitCode.RangeError, $"Offset ({offset}) was beyond file size ({size})");
+
+    /// <summary>
+    /// Creates the failure curl 8.21.0 reports when an SFTP download's range, or its
+    /// <c>-C</c> offset, starts at the file's end: exit 33 and <c>Bad range: start offset
+    /// larger than end offset</c>, measured 2026-09-29 for <c>-r 10-</c> and <c>-C 10</c> on a
+    /// 10-byte file (BL-573, ADR-0253).
+    /// </summary>
+    /// <returns>The exception.</returns>
+    internal static SshTransferException SftpRangeStartAfterEnd() =>
+        new(CurlExitCode.RangeError, "Bad range: start offset larger than end offset");
+
+    /// <summary>
+    /// Creates the failure curl 8.21.0 reports when an SFTP download resumes with <c>-C</c>
+    /// and <c>STAT</c> gave no size: exit 36 and <c>Offset (N) was beyond file size (S)</c>,
+    /// measured 2026-09-29 as <c>Offset (3) was beyond file size (0)</c> for <c>-C 3</c> on an
+    /// empty file (BL-573, ADR-0253).
+    /// </summary>
+    /// <param name="offset">The <c>-C</c> offset.</param>
+    /// <param name="size">The size curl compares it with.</param>
+    /// <returns>The exception.</returns>
+    internal static SshTransferException SftpResumeBeyondFileSize(long offset, long size) =>
+        new(CurlExitCode.BadDownloadResume, $"Offset ({offset}) was beyond file size ({size})");
+
+    /// <summary>
     /// Creates the failure curl 8.21.0 reports when the server refuses the <c>session</c>
     /// channel an SCP transfer opens: exit 79 and libssh2's text for the reason code,
     /// measured 2026-09-29 as <c>Channel open failure (connect failed)</c> for OpenSSH's

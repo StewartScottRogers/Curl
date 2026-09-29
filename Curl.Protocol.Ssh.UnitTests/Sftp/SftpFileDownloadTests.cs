@@ -13,7 +13,7 @@ namespace Curl.Protocol.Ssh.Sftp;
 /// (BL-569, ADR-0220).
 /// </summary>
 [TestClass]
-public sealed class SftpFileDownloadTests
+public sealed partial class SftpFileDownloadTests
 {
     private const UnixFileMode Mode0644 =
         UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.OtherRead;

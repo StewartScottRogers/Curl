@@ -46,7 +46,7 @@ and `C` lines with libssh2's checks (`ScpFileHeaderReader`, `ScpHeaderNumber`) a
 the file (ADR-0225); `Sftp` holds `SftpSession`, the SFTP version 3 client over that
 channel, and `SftpFileDownload`, which downloads one file with `SftpReadAhead`'s reads in
 flight and maps each `SSH_FX_*` status to curl's exit code through `SftpStatusCode`
-(ADR-0220), and `SftpDirectoryListing`, which lists a directory with `OPENDIR` and
+(ADR-0220) - only the `SftpDownloadPart` that `-r` and `-C` ask for (ADR-0253) - and `SftpDirectoryListing`, which lists a directory with `OPENDIR` and
 `READDIR` as curl prints it - each `SftpDirectoryEntry`'s long name, a symbolic link
 followed with `READLINK`, or the names alone with `-l` (ADR-0241), and `SftpFileUpload`,
 which uploads with the `SftpOpenFlags` `SftpUploadOptions` call for (`-C`, `-C -`, `-a`,

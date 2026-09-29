@@ -6,7 +6,8 @@ namespace Curl.Protocol.Ssh.Sftp;
 /// <summary>
 /// Downloads one file over SFTP as curl 8.21.0 does through libssh2 1.11.1 (ADR-0220):
 /// starts the SFTP session, sends <c>REALPATH .</c> for the home directory, opens the
-/// URL's path for reading, asks its size with <c>STAT</c>, reads it with reads kept in
+/// URL's path for reading, asks its size with <c>STAT</c>, reads it - or the part of it
+/// <c>-r</c> or <c>-C</c> asks for (ADR-0253) - with reads kept in
 /// flight, writes each answer's bytes to the output as it arrives and reports progress,
 /// closes the handle, and closes the channel with <c>EOF</c> and <c>CLOSE</c>, as measured.
 /// A failure before the copy leaves the channel open for the handler's <c>DISCONNECT</c>.
@@ -25,8 +26,11 @@ internal sealed class SftpFileDownload(SshTransport transport)
     /// <param name="progress">Told the bytes downloaded so far, and the size when known.</param>
     /// <param name="cancellationToken">Cancels the download.</param>
     /// <param name="quotes">The <c>-Q</c> commands, run after <c>REALPATH</c> and after the handle's close; none when not given.</param>
+    /// <param name="range">The <c>-r</c> range, read as <see cref="SftpDownloadPart.Choose" /> reads it; the whole file when not given.</param>
+    /// <param name="resumeFrom">The <c>-C</c> offset; no resume when not given or 0.</param>
     /// <returns>
-    /// Success with the bytes downloaded; exit 18, <c>end of response with N bytes
+    /// Success with the bytes downloaded; exit 33 or 36, with nothing read, for a range or
+    /// <c>-C</c> offset the file cannot serve (<see cref="SftpDownloadPart.Choose" />); exit 18, <c>end of response with N bytes
     /// missing</c>, when the file ends before the size <c>STAT</c> gave; exit 79,
     /// <c>Error in the SSH layer</c>, when a read fails or the connection breaks during
     /// the copy - each with the bytes written so far.
@@ -42,7 +46,9 @@ internal sealed class SftpFileDownload(SshTransport transport)
         Stream output,
         ITransferProgress progress,
         CancellationToken cancellationToken,
-        SftpQuoteCommands? quotes = null)
+        SftpQuoteCommands? quotes = null,
+        ByteRange? range = null,
+        long? resumeFrom = null)
     {
         quotes ??= SftpQuoteCommands.None;
         SftpSession session = await SftpSession.StartAsync(transport, cancellationToken).ConfigureAwait(false);
@@ -55,12 +61,38 @@ internal sealed class SftpFileDownload(SshTransport transport)
             byte[] opened = await session.OpenForReadingAsync(path, createFileMode, cancellationToken).ConfigureAwait(false);
             return (opened, await session.StatSizeAsync(path, cancellationToken).ConfigureAwait(false));
         }).ConfigureAwait(false);
-        Copy copy = new(new SftpReadAhead(session, handle, size), size, output, progress);
-        TransferResult result = await copy.RunAsync(cancellationToken).ConfigureAwait(false);
+        TransferResult result = await CopyPartAsync(session, handle, size, range, resumeFrom, output, progress, cancellationToken).ConfigureAwait(false);
         return await quotes.FinishAsync(session, handle, homeDirectory, result, cancellationToken).ConfigureAwait(false);
     }
 
-    // One copy of the file's bytes to the output, counting them as they go.
+    // Measured: a range or -C offset the file cannot serve reads nothing, and the handle
+    // is still closed.
+    private static async ValueTask<TransferResult> CopyPartAsync(
+        SftpSession session,
+        byte[] handle,
+        long? size,
+        ByteRange? range,
+        long? resumeFrom,
+        Stream output,
+        ITransferProgress progress,
+        CancellationToken cancellationToken)
+    {
+        SftpDownloadPart part;
+        try
+        {
+            part = SftpDownloadPart.Choose(range, resumeFrom, size);
+        }
+        catch (SshTransferException failure)
+        {
+            return TransferResult.Failure(failure.ExitCode, failure.Message);
+        }
+
+        Copy copy = new(new SftpReadAhead(session, handle, part), part.Length, output, progress);
+        return await copy.RunAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    // One copy of the part's bytes to the output, counting them as they go; what a read
+    // returns beyond the part is dropped, as curl stops at the size it expects.
     private sealed class Copy(SftpReadAhead reads, long? size, Stream output, ITransferProgress progress)
     {
         private long received;
@@ -88,6 +120,7 @@ internal sealed class SftpFileDownload(SshTransport transport)
                     return EndOfFile();
                 }
 
+                data = data[..(int)Math.Min(data.Length, (size ?? long.MaxValue) - received)];
                 await output.WriteAsync(data, cancellationToken).ConfigureAwait(false);
                 received += data.Length;
                 progress.ReportDownloaded(received, size);
