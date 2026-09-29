@@ -184,8 +184,24 @@ Namespace `Curl.Cryptography`. It holds:
   re-encrypted ciphertext branch-free and picks the key or J(z || c) by mask. Static
   `TryEncapsulate` (random m, or m given) returns `false` with its outputs zeroed for an
   encapsulation key failing the modulus check. `Dispose` zeroes the key. Constant-time.
+- `HpkeKem`, `HpkeKdf`, `HpkeAead` (public enums): the RFC 9180 suite identifiers HPKE
+  supports - DHKEM(P-256 or X25519, HKDF-SHA256), HKDF-SHA256, and AES-128-GCM,
+  AES-256-GCM or ChaCha20-Poly1305, the suites Encrypted Client Hello uses.
+- `HpkeLabeledHkdf` (internal): RFC 9180 section 4's `LabeledExtract` and `LabeledExpand`
+  on the BCL's `HKDF`.
+- `HpkeDhkem` (internal): section 4.1's DHKEM - `TryEncapsulate` (skE given) and
+  `TryDecapsulate`, over the hand-built `X25519` or the BCL's `ECDiffieHellman` on P-256.
+  A peer key of the wrong length or form, off the curve (checked here, not by the
+  platform) or giving X25519's all-zero result is `false`.
+- `HpkeContext` (public, `IDisposable`): section 5.1's base-mode key schedule and 5.2's
+  context - `Seal`, `TryOpen` (`false`, plaintext zeroed and sequence number kept, on a
+  bad tag), `Export` and `SequenceNumber`. AES-GCM from the BCL's `AesGcm`,
+  ChaCha20-Poly1305 from `AeadChaCha20Poly1305`. `Dispose` zeroes every secret.
+- `Hpke` (public, static): HPKE base mode - `TrySetupBaseSender` (random skE, or skE given
+  for known answers), `TrySetupBaseRecipient` and `GetEncapsulatedKeySize`. Constant-time
+  as far as X25519 and the platform's P-256 and AES-GCM are.
 
-The remaining primitives land under their own tasks (BL-677, BL-741, BL-742, BL-744).
+The remaining primitives land under their own tasks (BL-741, BL-742, BL-744).
 
 ## Rules
 
