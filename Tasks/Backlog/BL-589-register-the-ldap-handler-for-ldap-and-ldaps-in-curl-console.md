@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-588, BL-830, BL-853]
-touches: [Curl.Console, Curl.Console.UnitTests, Curl.Protocol.Ldap.UnitLibrary, Curl.Protocol.Ldap.UnitTests]
+touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Console, Curl.Console.UnitTests, Curl.Protocol.Ldap.UnitLibrary, Curl.Protocol.Ldap.UnitTests]
 requirement: none
 created: 2026-09-28
 completed:
@@ -31,8 +31,11 @@ completed:
 
 ## Notes
 
+- 2026-09-29 (lane 1): The `-V` `Protocols:` line is the constant `CurlVersionText.ProtocolsLine` in `Curl.Cli.UnitLibrary`, pinned by `Curl.Cli.UnitTests/CurlVersionTextTests.cs`, and ADR-0021 Decision 6 requires it to change in the same change that registers the handler. So `touches` now names `Curl.Cli.UnitLibrary` and `Curl.Cli.UnitTests`. BL-645 (in Doing) touches both, so the task went back to Backlog until BL-645 is done. `ProtocolDispatcher` needs no change: it dispatches any scheme a registered handler claims, and `LdapProtocolHandler` already defaults the ports to 389 and 636.
+
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-28: Now depends on BL-853 (BL-830): WinLDAP seals the session after its logon bind, so the handler waits for that before it is registered.
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Backlog. Needs Curl.Cli.UnitLibrary and Curl.Cli.UnitTests (the -V Protocols line, ADR-0021 Decision 6), which BL-645 in Doing touches; restart once BL-645 is done.
