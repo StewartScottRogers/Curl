@@ -678,8 +678,9 @@ public sealed class TcpConnector(
         // curl 8.21.0 verifies the proxy against its own host name and reports a failed
         // handshake to it with the same exit code and message as one to a target (measured).
         // It verifies with the --proxy-* TLS options, not -k or --cacert, so the proxy's own
-        // provider runs this handshake (ADR-0061).
-        var securedProxy = await AuthenticateAsync(_proxyTlsProvider, dialed.Connection, tunnel.Proxy.Host, tunnel.Target.Events, isProxy: true, applicationProtocols: [], cancellationToken).ConfigureAwait(false);
+        // provider runs this handshake (ADR-0061). It offers http/1.1 through ALPN whatever the
+        // HTTP version options say, and none under --no-alpn (measured on both builds, ADR-0190).
+        var securedProxy = await AuthenticateAsync(_proxyTlsProvider, dialed.Connection, tunnel.Proxy.Host, tunnel.Target.Events, isProxy: true, applicationProtocols: HttpApplicationProtocols.Http11Only, cancellationToken).ConfigureAwait(false);
         if (securedProxy.Connection is not { } proxyConnection)
         {
             return (securedProxy, null);
@@ -917,16 +918,19 @@ public sealed class TcpConnector(
     /// <summary>
     /// Returns the protocols the handshake with <paramref name="target" /> offers through ALPN:
     /// <paramref name="httpOverTls" /> for HTTP over TLS to the origin, the one target the HTTP
-    /// handler pools as <c>https</c> (BL-490, ADR-0141); nothing for a forward proxy or any other
-    /// protocol, which curl offers no ALPN.
+    /// handler pools as <c>https</c> (BL-490, ADR-0141); <c>http/1.1</c> alone for an HTTPS
+    /// forward proxy, whatever the HTTP version options say, as both curl 8.21.0 builds offer it
+    /// (measured, BL-753, ADR-0190); nothing for any other protocol, which curl offers no ALPN.
     /// </summary>
     /// <param name="target">The target whose handshake is about to run.</param>
     /// <param name="httpOverTls">What HTTP over TLS to the origin offers.</param>
     /// <returns>The protocols, in preference order; empty to offer none.</returns>
     internal static IReadOnlyList<string> ApplicationProtocolsFor(ConnectTarget target, IReadOnlyList<string> httpOverTls) =>
-        !target.IsForwardProxy && string.Equals(target.PoolScheme, "https", StringComparison.OrdinalIgnoreCase)
-            ? httpOverTls
-            : [];
+        target.IsForwardProxy
+            ? HttpApplicationProtocols.Http11Only
+            : string.Equals(target.PoolScheme, "https", StringComparison.OrdinalIgnoreCase)
+                ? httpOverTls
+                : [];
 
     // A provider that can report its handshake reports its trust and handshake on the
     // target's events, marked as the proxy's when it is with an HTTPS proxy (BL-404, BL-452),
