@@ -90,6 +90,10 @@ internal static class HttpRequestHeadFormatter
     /// <paramref name="options" />; the resend after a 417 passes
     /// <see cref="HttpRequestFraming.WithoutExpect" />.
     /// </param>
+    /// <param name="upgradesToH2c">
+    /// <see langword="true" /> to ask to upgrade to h2c, for <c>--http2</c> over cleartext
+    /// (<see cref="AppendH2cUpgrade" />).
+    /// </param>
     /// <returns>The head's bytes, ending in the empty line.</returns>
     internal static byte[] Format(
         CurlUrl url,
@@ -101,7 +105,8 @@ internal static class HttpRequestHeadFormatter
         string? proxyAuthorization = null,
         string? range = null,
         TimeCondition? timeCondition = null,
-        HttpRequestFraming? framing = null)
+        HttpRequestFraming? framing = null,
+        bool upgradesToH2c = false)
     {
         options ??= new HttpRequestOptions();
         HttpCustomHeader[] customHeaders = CustomHeadersOf(options.Headers, options);
@@ -121,12 +126,13 @@ internal static class HttpRequestHeadFormatter
         AppendUnlessOverridden(head, customHeaders, "Content-Range", framing.ContentRange);
         AppendClientHeaders(head, customHeaders, options);
         AppendUnlessOverridden(head, [.. customHeaders, .. proxyHeaders], "Proxy-Connection", forwardProxy ? "Keep-Alive" : null);
+        AppendH2cUpgrade(head, upgradesToH2c);
         AppendAlways(head, "Cookie", cookie);
         AppendTimeCondition(head, customHeaders, timeCondition);
         AppendCustomHeaders(head, customHeaders, hostLine is not null);
         AppendCustomHeaders(head, proxyHeaders, hostLine is not null);
         AppendBodyHeaders(head, customHeaders, framing);
-        AppendConnection(head, customHeaders, SendsTe(options, customHeaders));
+        AppendConnection(head, customHeaders, SendsTe(options, customHeaders), upgradesToH2c);
         head.Append("\r\n");
         return Encoding.Latin1.GetBytes(head.ToString());
     }
@@ -316,20 +322,42 @@ internal static class HttpRequestHeadFormatter
         options.TransferEncoding && !customHeaders.Any(header => header.Names("TE"));
 
     /// <summary>
+    /// Appends the h2c upgrade request's <c>Upgrade: h2c</c> and <c>HTTP2-Settings</c> lines
+    /// (<see cref="Http2Session.UpgradeSettings" />) when <paramref name="upgradesToH2c" />, after
+    /// <c>Proxy-Connection</c> and before <c>Cookie</c>, whatever the <c>-H</c> values name, as
+    /// curl sends them for <c>--http2</c> over cleartext (measured, BL-716 Notes).
+    /// </summary>
+    private static void AppendH2cUpgrade(StringBuilder head, bool upgradesToH2c)
+    {
+        if (upgradesToH2c)
+        {
+            head.Append("Upgrade: h2c\r\nHTTP2-Settings: ").Append(Http2Session.UpgradeSettings).Append("\r\n");
+        }
+    }
+
+    /// <summary>
     /// Appends the <c>Connection</c> lines last, after <c>Expect</c>, as curl 8.21.0 does
     /// (measured, BL-315 Notes): the first <c>-H</c> value naming <c>Connection</c> that has a
     /// value, without the white space around it and with <c>, TE</c> added when
-    /// <paramref name="sendsTe" />, or <c>Connection: TE</c> alone when there is no such value;
-    /// then every later one verbatim. A <c>Connection</c> value with nothing after its colon
-    /// or semicolon, and a <c>--proxy-header</c> naming <c>Connection</c>, is not sent at all.
+    /// <paramref name="sendsTe" /> and <c>, Upgrade, HTTP2-Settings</c> after that when
+    /// <paramref name="upgradesToH2c" /> (measured, BL-716 Notes), or those options alone when
+    /// there is no such value; then every later one verbatim. A <c>Connection</c> value with
+    /// nothing after its colon or semicolon, and a <c>--proxy-header</c> naming <c>Connection</c>,
+    /// is not sent at all.
     /// </summary>
     /// <param name="head">The head being written.</param>
     /// <param name="customHeaders">The <c>-H</c> values.</param>
     /// <param name="sendsTe"><see langword="true" /> when <c>TE: gzip</c> was sent.</param>
-    private static void AppendConnection(StringBuilder head, HttpCustomHeader[] customHeaders, bool sendsTe)
+    /// <param name="upgradesToH2c"><see langword="true" /> when the request asks to upgrade to h2c.</param>
+    private static void AppendConnection(StringBuilder head, HttpCustomHeader[] customHeaders, bool sendsTe, bool upgradesToH2c)
     {
         HttpCustomHeader[] connections = [.. customHeaders.Where(header => header.Names(ConnectionName) && header.Value is not null)];
-        string[] options = [.. connections.Take(1).Select(header => header.Value!), .. sendsTe ? ["TE"] : Array.Empty<string>()];
+        string[] options =
+        [
+            .. connections.Take(1).Select(header => header.Value!),
+            .. sendsTe ? ["TE"] : Array.Empty<string>(),
+            .. upgradesToH2c ? ["Upgrade", "HTTP2-Settings"] : Array.Empty<string>(),
+        ];
         AppendAlways(head, ConnectionName, string.Join(", ", options));
         foreach (HttpCustomHeader header in connections.Skip(1))
         {

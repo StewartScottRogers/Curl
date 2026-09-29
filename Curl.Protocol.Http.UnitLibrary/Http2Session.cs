@@ -18,6 +18,17 @@ internal sealed class Http2Session(IConnection connection) : IHttpStreamSession
 
     private bool isPrefaceSent;
 
+    /// <summary>
+    /// Gets the <c>HTTP2-Settings</c> value an h2c upgrade request carries: the payload of the
+    /// SETTINGS frame the preface sends (<see cref="Http2Connection.ClientSettings" />) in
+    /// base64url with no padding, <c>AAMAAABkAAQAAQAAAAIAAAAA</c> as curl sends it (measured,
+    /// BL-716 Notes).
+    /// </summary>
+    internal static string UpgradeSettings { get; } = Convert.ToBase64String(Http2FrameFactory.CreateSettings(Http2Connection.ClientSettings).Payload.Span)
+        .TrimEnd('=')
+        .Replace('+', '-')
+        .Replace('/', '_');
+
     /// <summary>Gets the connection the session runs on.</summary>
     internal IConnection Connection { get; } = connection;
 
@@ -70,6 +81,21 @@ internal sealed class Http2Session(IConnection connection) : IHttpStreamSession
         int streamId = Frames.OpenStream();
         await Frames.WriteHeadersAsync(streamId, Encode(fields), isEndStream, cancellationToken).ConfigureAwait(false);
         return streamId;
+    }
+
+    /// <summary>
+    /// Sends the client preface and opens stream 1 without sending anything on it: the stream
+    /// an HTTP/1.1 request upgraded to h2c becomes, half closed by the client, whose response
+    /// arrives on it (RFC 7540 section 3.2), as curl sends the preface once the <c>101</c> has
+    /// arrived (measured, BL-716 Notes).
+    /// </summary>
+    /// <param name="cancellationToken">Cancels the write.</param>
+    /// <returns>The stream's identifier, 1.</returns>
+    internal async ValueTask<int> StartUpgradedStreamAsync(CancellationToken cancellationToken)
+    {
+        await Frames.SendPrefaceAsync(cancellationToken).ConfigureAwait(false);
+        isPrefaceSent = true;
+        return Frames.OpenStream();
     }
 
     /// <summary>

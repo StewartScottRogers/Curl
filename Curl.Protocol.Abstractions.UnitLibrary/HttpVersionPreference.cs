@@ -39,4 +39,12 @@ public enum HttpVersionPreference
     /// (ADR-0141).
     /// </summary>
     Http2PriorKnowledge,
+
+    /// <summary>
+    /// HTTP/2 where the server agrees, per <c>--http2</c>: over TLS the handshake offers
+    /// <c>h2</c> through ALPN, and over cleartext the HTTP handler sends an HTTP/1.1 request
+    /// asking to upgrade to <c>h2c</c>, switching to HTTP/2 on <c>101 Switching Protocols</c>
+    /// (BL-716).
+    /// </summary>
+    Http2,
 }

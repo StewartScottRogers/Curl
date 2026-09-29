@@ -35,6 +35,21 @@ internal static class HttpConnectionInfoLines
     internal const string UsingHttp3 = "using HTTP/3";
 
     /// <summary>
+    /// The line written after the head of the <c>101</c> an h2c upgrade request is answered
+    /// with, as the connection switches to HTTP/2 (measured, BL-716 Notes).
+    /// </summary>
+    internal const string SwitchingToHttp2 = "Received 101, Switching to HTTP/2";
+
+    /// <summary>
+    /// The line written after <see cref="SwitchingToHttp2" /> when HTTP/2 bytes arrived with the
+    /// <c>101</c>'s head (measured, BL-716 Notes).
+    /// </summary>
+    /// <param name="length">How many bytes arrived after the head.</param>
+    /// <returns>The line.</returns>
+    internal static string CopiedHttp2DataAfterUpgrade(int length) =>
+        string.Create(CultureInfo.InvariantCulture, $"Copied HTTP/2 data in stream buffer to connection buffer after upgrade: len={length}");
+
+    /// <summary>
     /// The line written once a request without a body has been sent.
     /// </summary>
     internal const string RequestSent = "Request completely sent off";

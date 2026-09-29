@@ -133,6 +133,20 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     }
 
     /// <summary>
+    /// Makes this the stream an HTTP/1.1 request upgraded to h2c continues on: sends the client
+    /// preface and takes stream 1, whose request went out as HTTP/1.1 and so has ended, and
+    /// whose response is read from it (<see cref="Http2Session.StartUpgradedStreamAsync" />).
+    /// Nothing may be written to it afterwards.
+    /// </summary>
+    /// <param name="cancellationToken">Cancels the write.</param>
+    /// <returns>A task that completes when the preface is written.</returns>
+    public async ValueTask StartUpgradedAsync(CancellationToken cancellationToken)
+    {
+        streamId = await session.StartUpgradedStreamAsync(cancellationToken).ConfigureAwait(false);
+        isRequestEnded = true;
+    }
+
+    /// <summary>
     /// Does nothing: the stream's connection is disposed by the handler that opened it.
     /// </summary>
     /// <returns>A completed task.</returns>

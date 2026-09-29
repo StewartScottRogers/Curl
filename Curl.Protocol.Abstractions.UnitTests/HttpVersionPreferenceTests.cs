@@ -17,6 +17,7 @@ public sealed class HttpVersionPreferenceTests
             HttpVersionPreference.Http3,
             HttpVersionPreference.Http3Only,
             HttpVersionPreference.Http2PriorKnowledge,
+            HttpVersionPreference.Http2,
         ];
 
         CollectionAssert.AreEqual(expected, Enum.GetValues<HttpVersionPreference>());
@@ -24,5 +25,6 @@ public sealed class HttpVersionPreferenceTests
         Assert.AreEqual(2, (int)HttpVersionPreference.Http3);
         Assert.AreEqual(3, (int)HttpVersionPreference.Http3Only);
         Assert.AreEqual(4, (int)HttpVersionPreference.Http2PriorKnowledge);
+        Assert.AreEqual(5, (int)HttpVersionPreference.Http2);
     }
 }

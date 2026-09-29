@@ -58,8 +58,10 @@ public sealed class ScriptedConnection : IConnection
         this.failureAfterResponse = failureAfterResponse;
     }
 
-    /// <inheritdoc />
-    public bool IsSecure => false;
+    /// <summary>
+    /// Gets a value indicating whether the connection claims TLS; <see langword="false" /> unless set.
+    /// </summary>
+    public bool IsSecure { get; init; }
 
     /// <inheritdoc />
     public EndPoint? RemoteEndPoint => null;

@@ -553,8 +553,8 @@ public sealed class HttpProtocolHandler(
         HttpRequestFraming framing = plan.Framing;
         CancellationToken cancellationToken = plan.Deadline.Token;
         IHttpStreamConnection? requestStream = CreateRequestStream(plan, streams);
-        IConnection connection = ExchangeConnectionOf(requestStream, transport);
-        byte[] request = FormatRequestHead(plan, streams);
+        IConnection connection = ExchangeConnectionOf(plan, requestStream, transport);
+        byte[] request = FormatRequestHead(plan, streams, connection is HttpH2cUpgradeConnection);
         HttpFirstByteTimingConnection timedConnection = new(connection, context.TimeProvider);
         IConnection responseConnection = framing.AwaitsContinue ? new HttpContinueWaitConnection(timedConnection) : timedConnection;
         HttpRequestBodyWriter upload = new(connection)
@@ -587,6 +587,7 @@ public sealed class HttpProtocolHandler(
             HeaderReceived = header => cookiesStored = StoreCookie(context, header, cookiesStored),
             FindRefusal = head => body.FindHeadRefusal(head, context.NoBody, DecodesContent(options)),
             IsHttp2OrHttp3 = requestStream is not null,
+            IsSwitchedToHttp2 = () => IsSwitchedToHttp2(connection),
         };
         HttpRequestPlan? retry = null;
         HttpResponseHead? actedOn = null;
@@ -653,18 +654,34 @@ public sealed class HttpProtocolHandler(
         streams?.CreateStream(plan.Context.Url.Scheme, plan.Framing.Body is null ? 0 : plan.Framing.KnownLength);
 
     /// <summary>
-    /// Gives the connection the exchange reads and writes: the HTTP/2 or HTTP/3 stream when there is one,
-    /// and else the transport itself.
+    /// Gives the connection the exchange reads and writes: the HTTP/2 or HTTP/3 stream when there is one;
+    /// else, for <see cref="HttpVersionPreference.Http2" /> over cleartext, the transport watched for an
+    /// h2c upgrade's <c>101</c> (<see cref="HttpH2cUpgradeConnection" />, BL-716); and else the transport itself.
     /// </summary>
-    private static IConnection ExchangeConnectionOf(IHttpStreamConnection? requestStream, IConnection transport) =>
-        (IConnection?)requestStream ?? transport;
+    private static IConnection ExchangeConnectionOf(HttpRequestPlan plan, IHttpStreamConnection? requestStream, IConnection transport) =>
+        (IConnection?)requestStream ?? (UpgradesToH2c(plan, transport) ? new HttpH2cUpgradeConnection(transport, plan.Context.Events, plan.Context.Url.Scheme) : transport);
 
     /// <summary>
-    /// Formats the request head: the HTTP/1.1 head, or over HTTP/2 or HTTP/3 the same head naming
+    /// Decides whether an HTTP/1.x exchange asks to upgrade to h2c: for <c>--http2</c>
+    /// (<see cref="HttpVersionPreference.Http2" />) on a connection without TLS, as curl does
+    /// (measured, BL-716 Notes).
+    /// </summary>
+    private static bool UpgradesToH2c(HttpRequestPlan plan, IConnection transport) =>
+        plan.Options.Version == HttpVersionPreference.Http2 && !transport.IsSecure;
+
+    /// <summary>
+    /// Tells whether the exchange's connection has switched to HTTP/2 after an h2c upgrade's <c>101</c>.
+    /// </summary>
+    private static bool IsSwitchedToHttp2(IConnection connection) =>
+        connection is HttpH2cUpgradeConnection { IsUpgraded: true };
+
+    /// <summary>
+    /// Formats the request head: the HTTP/1.1 head, asking to upgrade to h2c when
+    /// <paramref name="upgradesToH2c" />, or over HTTP/2 or HTTP/3 the same head naming
     /// <c>HTTP/2</c> or <c>HTTP/3</c> in its request line, which is what is reported sent and what the stream
     /// turns into its HEADERS (<see cref="Http2RequestHeaders" />).
     /// </summary>
-    private byte[] FormatRequestHead(HttpRequestPlan plan, IHttpStreamSession? streams)
+    private byte[] FormatRequestHead(HttpRequestPlan plan, IHttpStreamSession? streams, bool upgradesToH2c)
     {
         ITransferContext context = plan.Context;
         byte[] head = HttpRequestHeadFormatter.Format(
@@ -677,7 +694,8 @@ public sealed class HttpProtocolHandler(
             plan.ProxyAuthorization,
             HttpRangeHeader.ValueFor(context, plan.Framing.Body is not null),
             context.TimeCondition,
-            plan.Framing);
+            plan.Framing,
+            upgradesToH2c);
         return streams is null ? head : Http2RequestHeaders.WithRequestLineVersion(head, streams.VersionName);
     }
 

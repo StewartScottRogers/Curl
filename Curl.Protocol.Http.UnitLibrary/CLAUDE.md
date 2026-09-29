@@ -23,6 +23,12 @@ stream to the HTTP/1.1 head and body readers as the bytes curl's own HTTP/2 laye
 writes - `HTTP/2 200 \r\n`, the headers as received, the empty line, then the DATA - so
 output, `-i`/`-D`, `-f`, redirects, authentication, cookies and progress are shared.
 
+For `--http2` (`HttpVersionPreference.Http2`) over cleartext (BL-716), the HTTP/1.1
+request asks to upgrade to h2c (`Upgrade: h2c`, `HTTP2-Settings`, `Connection: Upgrade,
+HTTP2-Settings`) and runs on an `HttpH2cUpgradeConnection`: a response that is not
+`HTTP/1.1 101` is read through unchanged, and after a `101` head the connection sends the
+client preface and reads the response from stream 1 through an `Http2StreamConnection`.
+
 HTTP/3 (BL-731, ADR-0172) does the same over QUIC: for `--http3-only`, and for `--http3`
 before falling back to TCP, the handler asks the connector for an `IMultiplexedConnection`
 (`IConnector.ConnectMultiplexedAsync`) and wraps it in an `Http3Session`, which opens the
