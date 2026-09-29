@@ -31,7 +31,10 @@ public interface IHttpAuthenticator
     /// <returns>
     /// The header value only, for example <c>Basic dTpw</c>, without the header name or line
     /// ending; or <see langword="null" /> to send no header, when there is no credential or
-    /// token, no allowed scheme, or no challenge the authenticator can answer.
+    /// token, no allowed scheme, or no challenge the authenticator can answer. A value may go
+    /// on with whole header lines, each after a CRLF, which are sent right after the
+    /// <c>Authorization</c> line, as <c>--aws-sigv4</c> sends <c>X-Amz-Date</c> and
+    /// <c>x-amz-content-sha256</c> there (BL-629, ADR-0243).
     /// </returns>
     string? CreateAuthorization(HttpAuthRequest request, IReadOnlyList<string> challenges);
 
@@ -48,6 +51,10 @@ public interface IHttpAuthenticator
     /// send the request again without the header, as curl 8.21.0 does when <c>--anyauth</c>
     /// picks Negotiate and its context makes no token (ADR-0232).
     /// </returns>
+    /// <exception cref="HttpAuthenticationFailedException">
+    /// curl fails the transfer instead of sending the request, as it fails an
+    /// <c>--aws-sigv4</c> it cannot sign with (BL-629).
+    /// </exception>
     ValueTask<string?> CreateAuthorizationAsync(HttpAuthRequest request, IReadOnlyList<string> challenges, CancellationToken cancellationToken) =>
         ValueTask.FromResult(CreateAuthorization(request, challenges));
 

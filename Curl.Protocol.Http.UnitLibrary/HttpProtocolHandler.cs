@@ -260,14 +260,16 @@ public sealed class HttpProtocolHandler(
             IsProxy: false)
         {
             Events = context.Events,
+            AwsSigV4 = AwsSigV4InputsOf(context, options, framing),
         };
         ProxyEndpoint? forwardProxy = ForwardProxyOf(context.Url, options);
         HttpAuthRequest? proxyAuthRequest = forwardProxy is null ? null : ProxyAuthRequestOf(authRequest, forwardProxy);
         using HttpTransferDeadline deadline = new(context);
         HttpInfoLineRecorder authorizationLines = new();
-        string? authorization = await Authenticator.CreateAuthorizationAsync(authRequest with { Events = authorizationLines }, [], context.CancellationToken).ConfigureAwait(false);
+        (string? authorization, HttpTransferException? authorizationFailure) = await CreateFirstAuthorizationAsync(authRequest with { Events = authorizationLines }, context.CancellationToken).ConfigureAwait(false);
         HttpRequestPlan plan = new(context, options, framing, authRequest, authorization)
         {
+            AuthorizationFailure = authorizationFailure,
             AuthorizationInfoLines = authorizationLines.Lines,
             Started = started,
             Deadline = deadline,
@@ -366,7 +368,41 @@ public sealed class HttpProtocolHandler(
     /// only Basic sends.
     /// </summary>
     private HttpAuthRequest ProxyAuthRequestOf(HttpAuthRequest originRequest, ProxyEndpoint proxy) =>
-        originRequest with { Credential = proxy.Credential, BearerToken = null, AllowedSchemes = ProxyAuthSchemes, IsProxy = true };
+        originRequest with { Credential = proxy.Credential, BearerToken = null, AllowedSchemes = ProxyAuthSchemes, IsProxy = true, AwsSigV4 = null };
+
+    /// <summary>
+    /// Gives what signing the request with <c>--aws-sigv4</c> needs, or <see langword="null" />
+    /// without it: the <c>Host</c> value curl's own head carries, the <c>-H</c> headers, the
+    /// <c>-d</c> body, the <c>-T</c> upload's size and <c>--path-as-is</c> (BL-629).
+    /// </summary>
+    private static AwsSigV4Inputs? AwsSigV4InputsOf(ITransferContext context, HttpRequestOptions options, HttpRequestFraming framing) =>
+        options.AwsSigV4 is { } parameter
+            ? new AwsSigV4Inputs(parameter, HttpUrlText.HostHeaderAuthority(context.Url), options.Headers)
+            {
+                PostFields = options.Body is BytesBody postFields ? (ReadOnlyMemory<byte>?)postFields.Content : null,
+                UploadSize = framing.IsUpload ? framing.KnownLength ?? -1 : -1,
+                IsGetOrHead = framing.Body is null && !framing.IsUpload,
+                PathAsIs = context.PathAsIs,
+            }
+            : null;
+
+    /// <summary>
+    /// Asks the authenticator for the value the transfer's first request is sent with, before
+    /// any challenge; a refusal (<see cref="HttpAuthenticationFailedException" />) is given
+    /// back instead, to fail the exchange once connected, where curl 8.21.0 signs with
+    /// <c>--aws-sigv4</c> and reports its failure (measured, BL-629 Notes).
+    /// </summary>
+    private async ValueTask<(string? Authorization, HttpTransferException? Failure)> CreateFirstAuthorizationAsync(HttpAuthRequest request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return (await Authenticator.CreateAuthorizationAsync(request, [], cancellationToken).ConfigureAwait(false), null);
+        }
+        catch (HttpAuthenticationFailedException failure)
+        {
+            return (null, new HttpTransferException(failure.ExitCode, failure.Message));
+        }
+    }
 
     /// <summary>
     /// Opens a connection, or takes a pooled one, and sends <paramref name="plan" /> on it, then
@@ -805,6 +841,7 @@ public sealed class HttpProtocolHandler(
         try
         {
             ThrowIfRefused(framing);
+            ThrowIfAuthorizationFailed(plan);
             exchange.RequestReady = context.TimeProvider.GetTimestamp();
             bool bodyLeftUnsent = await SendBodyAsync(context, framing, responseConnection, upload, cancellationToken).ConfigureAwait(false);
             ReportRequestSent(context.Events, framing, upload, bodyLeftUnsent);
@@ -1146,6 +1183,20 @@ public sealed class HttpProtocolHandler(
         if (framing.RefusesUnknownLength)
         {
             throw new HttpTransferException(CurlExitCode.UploadFailed, HttpTransferMessages.ChunkedUploadNeedsHttp11);
+        }
+    }
+
+    /// <summary>
+    /// Fails the exchange, before the request is sent, with the authenticator's refusal to make
+    /// the first request's value (<see cref="HttpRequestPlan.AuthorizationFailure" />), as
+    /// curl 8.21.0 fails an <c>--aws-sigv4</c> it cannot sign with once connected (measured, BL-629 Notes).
+    /// </summary>
+    /// <exception cref="HttpTransferException">The authenticator refused.</exception>
+    private static void ThrowIfAuthorizationFailed(HttpRequestPlan plan)
+    {
+        if (plan.AuthorizationFailure is { } failure)
+        {
+            throw failure;
         }
     }
 
@@ -1862,6 +1913,13 @@ public sealed class HttpProtocolHandler(
         public IReadOnlyList<string> AuthorizationInfoLines { get; init; } = [];
 
         /// <summary>
+        /// Gets why the authenticator refused to make the value the transfer's first request is
+        /// sent with, which fails the exchange once connected (<see cref="CreateFirstAuthorizationAsync" />);
+        /// <see langword="null" /> when it did not refuse.
+        /// </summary>
+        public HttpTransferException? AuthorizationFailure { get; init; }
+
+        /// <summary>
         /// Makes the same request sent with <paramref name="authorization" /> instead, in answer
         /// to a challenge; an empty value sends no header (ADR-0232).
         /// </summary>
@@ -1945,6 +2003,7 @@ public sealed class HttpProtocolHandler(
                 RedirectsFollowed = redirectsFollowed,
                 AuthorizationAnswersChallenge = authorizationAnswersChallenge,
                 AuthorizationInfoLines = authorizationInfoLines ?? AuthorizationInfoLines,
+                AuthorizationFailure = AuthorizationFailure,
                 StreamRefusedRetries = StreamRefusedRetries,
             };
     }

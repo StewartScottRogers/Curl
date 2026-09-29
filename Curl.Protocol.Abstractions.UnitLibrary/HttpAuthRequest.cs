@@ -54,4 +54,11 @@ public sealed record HttpAuthRequest(
     /// empty, the default, when it has no TLS. Negotiate turns it into channel bindings (BL-915).
     /// </summary>
     public ReadOnlyMemory<byte> ServerCertificate { get; init; }
+
+    /// <summary>
+    /// Gets what signing the request with AWS Signature Version 4 needs, which curl does in
+    /// place of every other scheme when <c>--aws-sigv4</c> is given; <see langword="null" />,
+    /// the default, when it is not, and always for a proxy (BL-629).
+    /// </summary>
+    public AwsSigV4Inputs? AwsSigV4 { get; init; }
 }

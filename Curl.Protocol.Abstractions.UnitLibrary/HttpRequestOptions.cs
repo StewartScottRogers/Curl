@@ -167,6 +167,13 @@ public sealed record HttpRequestOptions
     public string? BearerToken { get; init; }
 
     /// <summary>
+    /// Gets the <c>--aws-sigv4</c> value, verbatim, or <see langword="null" /> when not given.
+    /// When given, every request to the origin is signed with AWS Signature Version 4 instead
+    /// of any <see cref="AuthSchemes" /> (<see cref="HttpAuthRequest.AwsSigV4" />).
+    /// </summary>
+    public string? AwsSigV4 { get; init; }
+
+    /// <summary>
     /// Gets the proxy already chosen for this URL, or <see langword="null" /> to connect
     /// directly.
     /// </summary>
