@@ -49,7 +49,10 @@ namespace Curl.Protocol.Ftp;
 /// <para>
 /// The directory the <c>257</c> reply to <c>PWD</c> quotes is reported as
 /// <see cref="TransferReport.FtpEntryPath" />; a quoted name that never ends is exit 8
-/// with no <c>QUIT</c>, as curl 8.21.0 does (<see cref="FtpEntryPath" />, BL-514).
+/// with no <c>QUIT</c>, as curl 8.21.0 does (<see cref="FtpEntryPath" />, BL-514). A
+/// directory that does not start with <c>/</c> sends <c>SYST</c>, and a <c>215</c> naming
+/// <c>OS/400</c> sends <c>SITE NAMEFMT 1</c> and, when that is accepted, <c>PWD</c> again
+/// (<see cref="FtpServerSystem" />, BL-782).
 /// </para>
 /// <para>
 /// A file download honours <c>-r</c> and <c>-C</c> through <see cref="FtpDownloadWindow" />:
@@ -248,10 +251,38 @@ internal sealed class FtpSession(
         }
     }
 
-    private async ValueTask<TransferResult?> ReadEntryPathAsync() =>
-        FtpEntryPath.TryRead(await ExchangeAsync("PWD").ConfigureAwait(false), out entryPath)
-            ? null
-            : TransferResult.Failure(CurlExitCode.WeirdServerReply, FtpTransferMessages.WeirdServerReply);
+    private ValueTask<TransferResult?> ReadEntryPathAsync() => ReadEntryPathAsync(askSystemForRelativePath: true);
+
+    /// <summary>
+    /// Sends <c>PWD</c> and reads the entry path; a relative one sends <c>SYST</c> when
+    /// <paramref name="askSystemForRelativePath" /> is set, as curl 8.21.0 does while it
+    /// knows no server system yet (BL-782).
+    /// </summary>
+    private async ValueTask<TransferResult?> ReadEntryPathAsync(bool askSystemForRelativePath)
+    {
+        if (!FtpEntryPath.TryRead(await ExchangeAsync("PWD").ConfigureAwait(false), out entryPath))
+        {
+            return TransferResult.Failure(CurlExitCode.WeirdServerReply, FtpTransferMessages.WeirdServerReply);
+        }
+
+        return askSystemForRelativePath && entryPath?.StartsWith('/') == false
+            ? await AskServerSystemAsync().ConfigureAwait(false)
+            : null;
+    }
+
+    /// <summary>
+    /// Sends <c>SYST</c>, whose refusal curl carries on past. A <c>215</c> naming
+    /// <c>OS/400</c> sends <c>SITE NAMEFMT 1</c>, and a 2xx to that sends <c>PWD</c> again
+    /// for the entry path in the new name format, with no second <c>SYST</c>.
+    /// </summary>
+    private async ValueTask<TransferResult?> AskServerSystemAsync()
+    {
+        FtpReply system = await ExchangeAsync("SYST").ConfigureAwait(false);
+        return FtpServerSystem.IsOs400(system)
+            && (await ExchangeAsync("SITE NAMEFMT 1").ConfigureAwait(false)).IsCompletion
+            ? await ReadEntryPathAsync(askSystemForRelativePath: false).ConfigureAwait(false)
+            : null;
+    }
 
     /// <summary>
     /// Reads the greeting and logs in: a <c>230</c> greeting means already logged in, a
