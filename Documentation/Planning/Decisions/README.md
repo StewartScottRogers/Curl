@@ -234,3 +234,4 @@ What this makes easy, and what it makes hard. Both, honestly.
 ## Alternatives considered
 Each option and the specific reason it lost.
 ```
+| [0200](ADR-0200-smb-and-smbs-speak-curls-smbv1-nt-lm-0-12-on-every-platform.md) | `smb` and `smbs` are offered on every platform and speak curl's SMBv1 (one dialect, `NT LM 0.12`, measured) with NTLMv1 LM and NT responses from `Curl.Ntlm.UnitLibrary`; every platform matches the OpenSSL build's text, and tests drive the handler through `IConnection` from recorded bytes | Accepted | 2026-09-29 |

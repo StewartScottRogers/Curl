@@ -8,7 +8,7 @@ depends-on: [BL-498, BL-515]
 touches: [Documentation/Planning/Decisions]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-09-29
 ---
 # BL-594 — Decide how smb and smbs are built and offered on every platform
 
@@ -25,13 +25,17 @@ An ADR decides how Curl offers `smb://` and `smbs://` on Windows, Linux and macO
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Planning/Decisions/ADR-<next free number>-<slug>.md` exists (number checked unused), Status Accepted, marked "Decided by Claude under Stewart's delegation", with the measured facts, stating that `smb`/`smbs` are offered on every platform and which build's text each platform matches.
-- [ ] It names the dialect, the messages needed, the NTLM route, and how tests stay off the network; its Consequences list BL-595 to BL-598.
-- [ ] `Documentation/Planning/Decisions/README.md` indexes the new ADR.
+- [x] `Documentation/Planning/Decisions/ADR-<next free number>-<slug>.md` exists (number checked unused), Status Accepted, marked "Decided by Claude under Stewart's delegation", with the measured facts, stating that `smb`/`smbs` are offered on every platform and which build's text each platform matches.
+- [x] It names the dialect, the messages needed, the NTLM route, and how tests stay off the network; its Consequences list BL-595 to BL-598.
+- [x] `Documentation/Planning/Decisions/README.md` indexes the new ADR.
 
 ## Notes
+
+- ADR-0200 decides it: SMBv1 `NT LM 0.12` as curl, NTLMv1 LM/NT responses via `NtlmResponseComputation.ComputeV1`, OpenSSL-build text on every platform, `IConnection` fixtures.
+- Measured 2026-09-29: Windows curl 8.21.0 Schannel `curl: (1) Protocol "smb" is disabled`, exit 1. Linux (Ubuntu curl 8.18.0 in WSL) NEGOTIATE bytes recorded with `nc -l` because `Record-CurlExchange.ps1` runs only the Windows curl, which has no SMB; no Samba server was available, so server-side fixtures stay hand-assembled (noted in the ADR).
 
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-29: Backlog -> Doing.
+- 2026-09-29: Doing -> Done. ADR-0200 decides smb/smbs: SMBv1 NT LM 0.12 with NTLMv1 responses on every platform, OpenSSL-build text, IConnection fixtures
