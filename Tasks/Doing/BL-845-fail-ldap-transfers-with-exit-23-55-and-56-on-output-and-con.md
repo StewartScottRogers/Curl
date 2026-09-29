@@ -33,3 +33,4 @@ An LDAP transfer whose output stops accepting bytes fails with exit 23 and curl'
 ## Log
 
 - 2026-09-28: Created.
+- 2026-09-29: Backlog -> Doing.
