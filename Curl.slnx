@@ -63,6 +63,8 @@
   <Project Path="Curl.Cryptography.UnitTests/Curl.Cryptography.UnitTests.csproj" />
   <Project Path="Curl.Http2.UnitLibrary/Curl.Http2.UnitLibrary.csproj" />
   <Project Path="Curl.Http2.UnitTests/Curl.Http2.UnitTests.csproj" />
+  <Project Path="Curl.Http3.UnitLibrary/Curl.Http3.UnitLibrary.csproj" />
+  <Project Path="Curl.Http3.UnitTests/Curl.Http3.UnitTests.csproj" />
   <Project Path="Curl.Kerberos.UnitLibrary/Curl.Kerberos.UnitLibrary.csproj" />
   <Project Path="Curl.Kerberos.UnitTests/Curl.Kerberos.UnitTests.csproj" />
   <Project Path="Curl.Networking.UnitLibrary/Curl.Networking.UnitLibrary.csproj" />
