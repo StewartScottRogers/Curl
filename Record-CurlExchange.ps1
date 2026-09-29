@@ -335,6 +335,11 @@
     with -Pop3, implicit POP3S, as pop3s:// expects (BL-530); with -Script, TLS from the
     first byte, as ldaps:// expects (BL-532).
 
+.PARAMETER TlsCloseNotify
+    With -Tls, send TLS close_notify after each response before closing the connection.
+    Without it the connection closes with no close_notify, a bare end of the transport
+    (BL-819). HTTP mode only.
+
 .PARAMETER TlsRootCertificateFile
     With -Tls, serve a certificate issued by a throwaway private root CA in place of the
     self-signed one, and write that root's PEM to this path so curl can be given
@@ -501,6 +506,7 @@ param(
     [ValidateRange(1, 600000)] [int] $ScriptIdleMilliseconds = 5000,
     [ValidateRange(1, 600000)] [int] $ScriptGapMilliseconds = 250,
     [switch] $Tls,
+    [switch] $TlsCloseNotify,
     [string] $TlsRootCertificateFile,
     [string] $TlsEmptyCrlFile,
     [string] $TlsRevokingCrlFile,
@@ -602,7 +608,7 @@ function ConvertTo-CommandLineArgument {
 # The server runs in its own runspace so curl can run in this one. It returns one
 # byte array per connection served.
 $serveConnections = {
-    param($Listener, $ResponseBytes, [int] $ConnectionCount, [int] $DelayMilliseconds, [bool] $ResetConnections, [int] $EarlyResponseBodyBytes, $TlsCertificate, [int] $HoldOpen)
+    param($Listener, $ResponseBytes, [int] $ConnectionCount, [int] $DelayMilliseconds, [bool] $ResetConnections, [int] $EarlyResponseBodyBytes, $TlsCertificate, [int] $HoldOpen, [bool] $CloseNotify)
 
     Set-StrictMode -Version Latest
     $ErrorActionPreference = 'Stop'
@@ -701,6 +707,9 @@ $serveConnections = {
                 }
             }
             $requests.Add($received.ToArray())
+            if ($CloseNotify -and $stream -is [System.Net.Security.SslStream]) {
+                try { $stream.ShutdownAsync().Wait() } catch { }  # curl may have hung up already.
+            }
         } finally {
             $client.Close()
         }
@@ -2053,7 +2062,7 @@ try {
     } elseif ($Script) {
         [void] $server.AddScript($serveScriptedSession).AddArgument($listener).AddArgument($scriptSteps).AddArgument($transcript).AddArgument($tlsCertificate).AddArgument([bool] $Tls).AddArgument($ScriptIdleMilliseconds).AddArgument($ScriptGapMilliseconds).AddArgument($sessionHelpers.ToString())
     } else {
-        [void] $server.AddScript($serveConnections).AddArgument($listener).AddArgument($responseBytes).AddArgument($Connections).AddArgument($ResponseDelayMilliseconds).AddArgument([bool] $Reset).AddArgument($RespondAfterBodyBytes).AddArgument($tlsCertificate).AddArgument($HoldOpenMilliseconds)
+        [void] $server.AddScript($serveConnections).AddArgument($listener).AddArgument($responseBytes).AddArgument($Connections).AddArgument($ResponseDelayMilliseconds).AddArgument([bool] $Reset).AddArgument($RespondAfterBodyBytes).AddArgument($tlsCertificate).AddArgument($HoldOpenMilliseconds).AddArgument([bool] $TlsCloseNotify)
     }
     if ($null -ne $server) { $serverRun = $server.BeginInvoke() }
 
