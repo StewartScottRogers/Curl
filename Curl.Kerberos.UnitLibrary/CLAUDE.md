@@ -33,7 +33,15 @@ credential cache, by a TGS exchange with the cache's ticket-granting ticket, or 
 `KerberosPasswordCredential` by an AS exchange with `PA-ENC-TIMESTAMP` and then a TGS
 exchange, over the injected `IKerberosKdcTransport` (`KerberosKdcSender` picks UDP or
 TCP and frames TCP); every refusal is a `KerberosKdcException` with a `KerberosKdcError`
-(BL-690, ADR-0168). The GSS-API mechanism lands under its own task.
+(BL-690, ADR-0168). It is the initiator of the GSS-API Kerberos V5 mechanism:
+`KerberosGssContext` makes the initial context token (an AP-REQ whose authenticator
+carries RFC 4121's checksum with the context flags and, for `--delegation`, a KRB-CRED of
+a forwarded ticket-granting ticket), checks the acceptor's AP-REP, and then makes and
+reads Wrap and MIC tokens, RFC 4121's for AES keys and RFC 4757's for `rc4-hmac`
+(`KerberosGssContextOptions`, `KerberosGssFlags`, `KerberosDelegation`,
+`KerberosGssToken` for RFC 2743's framing, `Rfc4121GssMessageProtection`,
+`Rc4HmacGssMessageProtection`, `KerberosCredentialMessage`); every refusal is a
+`KerberosGssException` with a `KerberosGssError` (BL-691, ADR-0169).
 
 ## Rules
 

@@ -302,12 +302,7 @@ public sealed class KerberosKdcClient
     }
 
     /// <summary>The time to the second and the microseconds past it, as timestamps and authenticators carry them.</summary>
-    private (DateTimeOffset Time, int Microseconds) Now()
-    {
-        DateTimeOffset now = timeProvider.GetUtcNow();
-        long subsecond = now.UtcTicks % TimeSpan.TicksPerSecond;
-        return (new DateTimeOffset(now.UtcTicks - subsecond, TimeSpan.Zero), (int)(subsecond / TimeSpan.TicksPerMicrosecond));
-    }
+    private (DateTimeOffset Time, int Microseconds) Now() => KerberosClock.Now(timeProvider);
 
     /// <summary>
     /// Makes the client's key for <paramref name="encryption" /> from the password, with the

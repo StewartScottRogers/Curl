@@ -24,6 +24,9 @@ public enum KerberosMessageType
     /// <summary><c>KRB_AP_REP</c>, <c>[APPLICATION 15]</c>.</summary>
     ApReply = 15,
 
+    /// <summary><c>KRB_CRED</c>, <c>[APPLICATION 22]</c>.</summary>
+    Credential = 22,
+
     /// <summary><c>KRB_ERROR</c>, <c>[APPLICATION 30]</c>.</summary>
     Error = 30,
 }
