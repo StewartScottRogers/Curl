@@ -1,5 +1,5 @@
 ---
-id: BL-950
+id: BL-952
 title: Compose SshProtocolHandler for scp and sftp in the SSH library
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-950 — Compose SshProtocolHandler for scp and sftp in the SSH library
+# BL-952 — Compose SshProtocolHandler for scp and sftp in the SSH library
 
 ## Goal
 

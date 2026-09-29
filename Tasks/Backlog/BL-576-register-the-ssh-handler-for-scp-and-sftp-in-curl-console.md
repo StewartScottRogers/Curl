@@ -4,7 +4,7 @@ title: Register the SSH handler for scp and sftp in Curl.Console
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: [BL-562, BL-569, BL-574, BL-950]
+depends-on: [BL-562, BL-569, BL-574, BL-952]
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-28
@@ -34,12 +34,12 @@ completed:
   has the transport, host key check, authentication, `SftpFileDownload` and `ScpFileDownload`,
   but no `IProtocolHandler` composing them, and every other protocol keeps its handler in its
   own library. Writing it in `Curl.Console` would put protocol logic in the executable, so it
-  is filed as BL-950 (touches the SSH library and its tests, which BL-568 in `Doing` holds)
-  and this task now depends on it. BL-950 also exposes the in-memory SSH peer this task's
+  is filed as BL-952 (touches the SSH library and its tests, which BL-568 in `Doing` holds)
+  and this task now depends on it. BL-952 also exposes the in-memory SSH peer this task's
   `Curl.Console.UnitTests` need. No code was changed by this run.
 
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-29: Backlog -> Doing.
-- 2026-09-29: Doing -> Backlog. Waiting on BL-950: no SshProtocolHandler exists in Curl.Protocol.Ssh.UnitLibrary to register
+- 2026-09-29: Doing -> Backlog. Waiting on BL-952: no SshProtocolHandler exists in Curl.Protocol.Ssh.UnitLibrary to register
