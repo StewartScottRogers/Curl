@@ -5,6 +5,10 @@
 
 Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in BL-667.
 
+Amended by ADR-0185 (2026-09-29, BL-785), as "Adding a hand-built library" below
+provides: the table gains `Curl.Zstandard.UnitLibrary`, and `Curl.Tls.UnitLibrary` may
+reference it.
+
 ## Context
 
 Curl is a complete reimplementation of curl (Stewart, 2026-09-28). Each piece the base
@@ -42,10 +46,11 @@ A `Curl.Protocol.*.UnitLibrary` may reference exactly these projects:
 | `Curl.Cryptography.UnitLibrary` | Primitives the BCL lacks on a CI platform (ADR-0118) | nothing |
 | `Curl.Ntlm.UnitLibrary` | NTLM messages and responses (MS-NLMP) | `Curl.Cryptography.UnitLibrary` |
 | `Curl.Kerberos.UnitLibrary` | Kerberos V5 client and the GSS-API Kerberos mechanism | `Curl.Cryptography.UnitLibrary`, `Curl.Protocol.Abstractions.UnitLibrary` |
-| `Curl.Tls.UnitLibrary` | The hand-built TLS client | `Curl.Cryptography.UnitLibrary`, `Curl.Protocol.Abstractions.UnitLibrary` |
+| `Curl.Tls.UnitLibrary` | The hand-built TLS client | `Curl.Cryptography.UnitLibrary`, `Curl.Zstandard.UnitLibrary`, `Curl.Protocol.Abstractions.UnitLibrary` |
 | `Curl.Http2.UnitLibrary` | HPACK and HTTP/2 framing | `Curl.Protocol.Abstractions.UnitLibrary` |
 | `Curl.Quic.UnitLibrary` | The QUIC v1 client transport | `Curl.Tls.UnitLibrary`, `Curl.Cryptography.UnitLibrary`, `Curl.Protocol.Abstractions.UnitLibrary` |
 | `Curl.Http3.UnitLibrary` | QPACK and HTTP/3 framing | `Curl.Http2.UnitLibrary`, `Curl.Protocol.Abstractions.UnitLibrary` |
+| `Curl.Zstandard.UnitLibrary` | The Zstandard (RFC 8878) decoder and XXH64 (added by ADR-0185) | nothing |
 
 A protocol library may reference any library on the list that it uses; which protocol
 uses which is that protocol's own design, not this ADR's. "May reference" in the table
@@ -56,7 +61,7 @@ allowed.
 ### What the hand-built libraries may reference
 
 - Only the BCL and the projects in their own row of the table. The rows form a layered,
-  acyclic graph: `Curl.Cryptography` at the bottom; `Curl.Ntlm`, `Curl.Kerberos`,
+  acyclic graph: `Curl.Cryptography` and `Curl.Zstandard` at the bottom; `Curl.Ntlm`, `Curl.Kerberos`,
   `Curl.Tls` and `Curl.Http2` above it; `Curl.Quic` and `Curl.Http3` above those.
 - `Curl.Http3` does not reference `Curl.Quic`: QUIC streams reach it as byte streams
   through Abstractions contracts, so HTTP/3 framing is tested without a QUIC stack.
