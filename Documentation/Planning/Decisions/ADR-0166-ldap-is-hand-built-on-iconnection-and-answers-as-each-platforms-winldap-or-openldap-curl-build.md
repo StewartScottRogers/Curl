@@ -244,7 +244,7 @@ LDAPv2 retry makes a second, identical attempt:
   closes during the retry's rootDSE reads ends with `Server Down`. Neither sends an Unbind.
 - **After the bind.** WinLDAP signs and seals everything that follows: the SearchRequest went
   out as a four-byte length, a 16-byte NTLM signature and the sealed message. That security
-  layer is BL-847's; until it lands the search after a logon bind is sent unsealed, and
+  layer is BL-853's; until it lands the search after a logon bind is sent unsealed, and
   BL-589 registers the handler only after it.
 - Not measured, decided by the same rules: a `success` answer to a `GSS-SPNEGO` bind before
   the security package has finished (recorded once: WinLDAP started its retry) fails the

@@ -1,5 +1,5 @@
 ---
-id: BL-847
+id: BL-853
 title: Sign and seal the WinLDAP session after its logon bind, as WinLDAP does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-847 — Sign and seal the WinLDAP session after its logon bind, as WinLDAP does
+# BL-853 — Sign and seal the WinLDAP session after its logon bind, as WinLDAP does
 
 ## Goal
 

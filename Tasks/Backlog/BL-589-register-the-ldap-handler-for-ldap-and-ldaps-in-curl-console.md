@@ -4,7 +4,7 @@ title: Register the LDAP handler for ldap and ldaps in Curl.Console with its -v 
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-588, BL-830, BL-847]
+depends-on: [BL-588, BL-830, BL-853]
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Protocol.Ldap.UnitLibrary, Curl.Protocol.Ldap.UnitTests]
 requirement: none
 created: 2026-09-28
@@ -34,4 +34,4 @@ completed:
 ## Log
 
 - 2026-09-28: Created.
-- 2026-09-28: Now depends on BL-847 (BL-830): WinLDAP seals the session after its logon bind, so the handler waits for that before it is registered.
+- 2026-09-28: Now depends on BL-853 (BL-830): WinLDAP seals the session after its logon bind, so the handler waits for that before it is registered.
