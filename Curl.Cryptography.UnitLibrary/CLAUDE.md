@@ -189,8 +189,8 @@ Namespace `Curl.Cryptography`. It holds:
   `Absorb` any number of pieces, then `Squeeze` any number (absorbing after squeezing
   throws `InvalidOperationException`), `Reset`; the rate and the domain byte (`0x06`
   SHA-3, `0x1F` SHAKE) are constructor parameters.
-- `Sha3` (public, static): SHA3-256 and SHA3-512, `HashData256` and `HashData512`; the
-  BCL's are missing on macOS. Constant-time.
+- `Sha3` (public, static): SHA3-224, SHA3-256, SHA3-384 and SHA3-512, `HashData224` to `HashData512`; the
+  BCL's are missing on macOS (and SHA3-224 everywhere). Constant-time.
 - `Shake` (public, `IDisposable`): SHAKE128 and SHAKE256 - static `HashData128` and
   `HashData256` for one output of any length, and `Create128`/`Create256` instances that
   `AppendData`, then `Read` output a piece at a time, then `Reset`. Ed448 and

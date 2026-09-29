@@ -1,6 +1,6 @@
 namespace Curl.Cryptography;
 
-/// <summary>Pins <see cref="Sha3" /> to NIST's FIPS 202 example values and CAVP vectors.</summary>
+/// <summary>Pins <see cref="Sha3" /> to NIST's FIPS 202 example values, and SHA3-256 and SHA3-512 to CAVP vectors.</summary>
 [TestClass]
 public sealed class Sha3Tests
 {
@@ -62,6 +62,71 @@ public sealed class Sha3Tests
             "E76DFAD22084A8B1467FCF2FFA58361BEC7628EDF5F3FDC0E4805DC48CAEECA8"
             + "1B7C13C30ADF52A3659584739A2DF46BE589C51CA1A4A8416DF6545A1CE8BA00",
             Convert.ToHexString(digest));
+    }
+
+    // NIST "SHA-3 Examples": SHA3-224_Msg0.pdf, SHA3-224_1600.pdf, SHA3-384_Msg0.pdf and
+    // SHA3-384_1600.pdf (the 1600-bit message crosses both rates), and the "abc" example;
+    // OpenSSL 3.5.5's openssl dgst gives the same digests.
+    [TestMethod]
+    [DataRow("", "6B4E03423667DBB73B6E15454F0EB1ABD4597F9A1B078E3F5B5A6BC7", DisplayName = "Empty")]
+    [DataRow("616263", "E642824C3F8CF24AD09234EE7D3C766FC9A3A5168D0C94AD73B46FDF", DisplayName = "abc")]
+    public void HashData224_NistExample_MatchesPublishedDigest(string messageHex, string expected)
+    {
+        byte[] digest = new byte[Sha3.Sha3_224HashSize];
+
+        Sha3.HashData224(Convert.FromHexString(messageHex), digest);
+
+        Assert.AreEqual(expected, Convert.ToHexString(digest));
+    }
+
+    [TestMethod]
+    public void HashData224_NistExample1600BitMessage_MatchesPublishedDigest()
+    {
+        byte[] digest = new byte[Sha3.Sha3_224HashSize];
+
+        Sha3.HashData224(RepeatedA3(), digest);
+
+        Assert.AreEqual("9376816ABA503F72F96CE7EB65AC095DEEE3BE4BF9BBC2A1CB7E11E0", Convert.ToHexString(digest));
+    }
+
+    [TestMethod]
+    [DataRow("", "0C63A75B845E4F7D01107D852E4C2485C51A50AAAA94FC61995E71BBEE983A2AC3713831264ADB47FB6BD1E058D5F004", DisplayName = "Empty")]
+    [DataRow("616263", "EC01498288516FC926459F58E2C6AD8DF9B473CB0FC08C2596DA7CF0E49BE4B298D88CEA927AC7F539F1EDF228376D25", DisplayName = "abc")]
+    public void HashData384_NistExample_MatchesPublishedDigest(string messageHex, string expected)
+    {
+        byte[] digest = new byte[Sha3.Sha3_384HashSize];
+
+        Sha3.HashData384(Convert.FromHexString(messageHex), digest);
+
+        Assert.AreEqual(expected, Convert.ToHexString(digest));
+    }
+
+    [TestMethod]
+    public void HashData384_NistExample1600BitMessage_MatchesPublishedDigest()
+    {
+        byte[] digest = new byte[Sha3.Sha3_384HashSize];
+
+        Sha3.HashData384(RepeatedA3(), digest);
+
+        Assert.AreEqual(
+            "1881DE2CA7E41EF95DC4732B8F5F002B189CC1E42B74168ED1732649CE1DBCDD76197A31FD55EE989F2D7050DD473E8F",
+            Convert.ToHexString(digest));
+    }
+
+    [TestMethod]
+    public void HashData224_DestinationNot28Bytes_ThrowsArgumentException()
+    {
+        byte[] destination = new byte[32];
+
+        Assert.ThrowsExactly<ArgumentException>(() => Sha3.HashData224([], destination));
+    }
+
+    [TestMethod]
+    public void HashData384_DestinationNot48Bytes_ThrowsArgumentException()
+    {
+        byte[] destination = new byte[64];
+
+        Assert.ThrowsExactly<ArgumentException>(() => Sha3.HashData384([], destination));
     }
 
     [TestMethod]
