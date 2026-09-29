@@ -8,7 +8,7 @@ namespace Curl.Http3;
 internal static class QpackRequiredInsertCount
 {
     /// <summary>The per-entry overhead of RFC 9204 section 3.2.1, which bounds how many entries fit.</summary>
-    private const long EntryOverhead = 32;
+    public const long EntryOverhead = 32;
 
     /// <summary>
     /// Gets MaxEntries: how many entries a table of <paramref name="maximumTableCapacity" /> can hold at most.

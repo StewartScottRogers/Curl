@@ -143,6 +143,38 @@ public sealed class QpackDecoderTests
     }
 
     [TestMethod]
+    [DataRow("3fbd01 5f8d02")]
+    [DataRow("3fbd01 c0 7f34")]
+    [DataRow("3fbd01 c0 ff9e04")]
+    [DataRow("3fbd01 41 61 7f3d")]
+    public void ReadEncoderStream_StringLongerThanTheTableAllows_FailsBeforeItsBytesArrive(string bytes)
+    {
+        // In a 220-byte table: 5f8d02 is a 300-byte literal name, above the advertised maximum;
+        // beside :authority a value may have 178 characters (668 Huffman-coded bytes), and
+        // beside the literal name "a", 187.
+        var decoder = new QpackDecoder(220, 0);
+
+        Assert.AreEqual(QpackErrorCode.EncoderStreamError, ErrorOf(() => decoder.ReadEncoderStream(FromHex(bytes))));
+    }
+
+    [TestMethod]
+    [DataRow("3fbd01 c0 7f33")]
+    [DataRow("3fbd01 c0 ff9d04")]
+    [DataRow("3fbd01 41 61 7f3c")]
+    public void ReadEncoderStream_StringThatCanFitTheTable_WaitsForItsBytes(string bytes)
+    {
+        var decoder = new QpackDecoder(220, 0);
+
+        decoder.ReadEncoderStream(FromHex(bytes));
+
+        Assert.AreEqual(0, decoder.InsertCount);
+    }
+
+    [TestMethod]
+    public void ReadEncoderStream_LiteralNameWithNoCapacitySet_FailsBeforeItsBytesArrive() =>
+        Assert.AreEqual(QpackErrorCode.EncoderStreamError, ErrorOf(() => new QpackDecoder(220, 0).ReadEncoderStream(FromHex("40"))));
+
+    [TestMethod]
     public void TakeDecoderStreamBytes_AfterInsertions_IncrementsTheInsertCountOnce()
     {
         var decoder = DecoderWithCustomKey();

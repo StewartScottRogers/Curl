@@ -173,6 +173,15 @@ public sealed class QpackEncoderTests
         Assert.AreEqual(QpackErrorCode.DecoderStreamError, ErrorOf(() => new QpackEncoder(100, 0).ReadDecoderStream(FromHex(bytes))));
 
     [TestMethod]
+    public void ReadDecoderStream_EndlessIntegerContinuation_FailsAsDecoderStreamErrorWithinTenBytes()
+    {
+        var encoder = new QpackEncoder(100, 0);
+        encoder.ReadDecoderStream(FromHex("ff 80808080 80808080"));
+
+        Assert.AreEqual(QpackErrorCode.DecoderStreamError, ErrorOf(() => encoder.ReadDecoderStream(FromHex("80"))));
+    }
+
+    [TestMethod]
     public void ReadDecoderStream_InstructionSplitAcrossReads_TakesEffectOnceComplete()
     {
         var encoder = new QpackEncoder(220, 1, huffmanCodeLiterals: false);

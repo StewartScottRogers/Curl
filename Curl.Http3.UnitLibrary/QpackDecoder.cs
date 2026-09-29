@@ -219,15 +219,23 @@ public sealed class QpackDecoder
     {
         var index = QpackPrimitives.ReadInteger(buffer, ref position, 6, EncoderStreamError);
         var name = isStatic ? QpackStaticTable.Get(index, EncoderStreamError).Name : GetRelative(index).Name;
-        var value = QpackPrimitives.ReadString(buffer, ref position, 7, EncoderStreamError);
+        var value = ReadEntryString(buffer, ref position, 7, name.Length);
         Insert(new HeaderField(name, value));
     }
 
     private void InsertWithLiteralName(ReadOnlySpan<byte> buffer, ref int position)
     {
-        var name = QpackPrimitives.ReadString(buffer, ref position, 5, EncoderStreamError);
-        var value = QpackPrimitives.ReadString(buffer, ref position, 7, EncoderStreamError);
+        var name = ReadEntryString(buffer, ref position, 5, 0);
+        var value = ReadEntryString(buffer, ref position, 7, name.Length);
         Insert(new HeaderField(name, value));
+    }
+
+    // An entry's strings must fit the dynamic table capacity beside its 32-byte overhead, so
+    // a longer length is rejected before its bytes are buffered (ADR-0164).
+    private string ReadEntryString(ReadOnlySpan<byte> buffer, ref int position, int prefixBits, int charactersAlreadyRead)
+    {
+        var maximumLength = table.Capacity - QpackRequiredInsertCount.EntryOverhead - charactersAlreadyRead;
+        return QpackPrimitives.ReadString(buffer, ref position, prefixBits, EncoderStreamError, maximumLength);
     }
 
     private void SetDynamicTableCapacity(long capacity)

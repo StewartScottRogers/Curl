@@ -15,6 +15,8 @@ internal static class QpackPrimitives
 
     private const int LargestContinuationShift = 56;
 
+    private const long LongestHuffmanCodeBits = 30;
+
     /// <summary>
     /// Appends <paramref name="value" /> as an integer with an N-bit prefix, the first byte
     /// carrying <paramref name="firstByteFlags" /> in the bits above the prefix.
@@ -109,13 +111,19 @@ internal static class QpackPrimitives
     /// <param name="position">Where the literal starts; on return, where it ended.</param>
     /// <param name="prefixBits">The length's prefix size N, 3 to 7.</param>
     /// <param name="error">The connection error an invalid literal calls for.</param>
+    /// <param name="maximumLength">
+    /// The most characters the string may have. A length that cannot decode to that few is
+    /// rejected as soon as it is read, before the string's bytes arrive.
+    /// </param>
     /// <returns>The string; each character is one byte.</returns>
     /// <exception cref="QpackIncompleteInstructionException">The input ends inside the literal.</exception>
     /// <exception cref="QpackException">The length is too large, or the Huffman coding is invalid.</exception>
-    public static string ReadString(ReadOnlySpan<byte> input, ref int position, int prefixBits, QpackErrorCode error)
+    public static string ReadString(ReadOnlySpan<byte> input, ref int position, int prefixBits, QpackErrorCode error, long maximumLength = int.MaxValue)
     {
         var isHuffmanCoded = (PeekByte(input, position) & (1 << prefixBits)) != 0;
         var length = ReadInteger(input, ref position, prefixBits, error);
+        var longestEncoding = isHuffmanCoded ? GetLongestHuffmanEncoding(maximumLength) : maximumLength;
+        ThrowIf(length > longestEncoding, error, $"a string literal of {length} bytes cannot decode to {maximumLength} characters or fewer");
         if (length > input.Length - position)
         {
             throw new QpackIncompleteInstructionException();
@@ -163,6 +171,14 @@ internal static class QpackPrimitives
         var octet = PeekByte(input, position);
         position++;
         return octet;
+    }
+
+    // The longest Huffman code is 30 bits, so n characters code to at most ceil(30n / 8)
+    // bytes; a negative n (no room at all) stays negative.
+    private static long GetLongestHuffmanEncoding(long maximumLength)
+    {
+        var characters = Math.Min(maximumLength, int.MaxValue);
+        return ((LongestHuffmanCodeBits * characters) + 7) / 8;
     }
 
     private static string DecodeHuffman(ReadOnlySpan<byte> coded, QpackErrorCode error)

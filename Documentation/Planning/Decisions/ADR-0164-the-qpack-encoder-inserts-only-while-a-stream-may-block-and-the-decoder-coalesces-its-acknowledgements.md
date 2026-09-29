@@ -59,6 +59,17 @@ for byte.
 - RFC 9204 appendix B.1 to B.5 come out byte for byte from both sides.
 - Under curl's own settings (capacity 0, 0 blocked streams) the decoder rejects any
   dynamic reference and the encoder sends static indexes and literals only.
-- An incomplete encoder stream instruction is buffered without a size limit; BL-822 bounds
-  it. Decoder stream instructions are single integers, rejected past 62 bits, so the
-  decoder stream is bounded already.
+- An incomplete encoder stream instruction is bounded by the dynamic table capacity
+  (amended in BL-822, decided by Claude under Stewart's delegation). An inserted entry must
+  fit the capacity, 32 bytes of overhead included, so a string literal is rejected with
+  `QPACK_ENCODER_STREAM_ERROR` as soon as its length integer is read if it could not fit:
+  a raw length above the capacity less 32 less the name's characters already read, or a
+  Huffman-coded length above ceil(30n / 8) for that many characters n (30 bits is the
+  longest Huffman code). Its bytes are never buffered, so an incomplete instruction holds
+  at most a few integers of at most 10 bytes each plus strings within the advertised
+  `SETTINGS_QPACK_MAX_TABLE_CAPACITY`. nghttp3 1.15 (`nghttp3_qpack_decoder_read_encoder`)
+  uses fixed caps instead, 256 bytes for a name and 65536 for a value, failing with
+  `NGHTTP3_ERR_QPACK_HEADER_TOO_LARGE`; the capacity bound is exact, never rejects an
+  instruction that could succeed, and is tighter under curl's advertised capacity of 0.
+  Decoder stream instructions are single integers, rejected past 62 bits (at most 10
+  bytes), so the decoder stream was bounded already.
