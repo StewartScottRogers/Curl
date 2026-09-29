@@ -69,10 +69,12 @@ measured (BL-916), the MD5 of the caller's channel
 bindings when given (RFC 2744's structure, as curl with MIT sends `tls-server-end-point`
 over HTTPS; BL-832) and, for `--delegation`, a KRB-CRED of a forwarded ticket-granting
 ticket), checks the acceptor's AP-REP, and then makes and
-reads Wrap and MIC tokens, RFC 4121's for AES keys and RFC 4757's for `rc4-hmac`
+reads Wrap and MIC tokens, RFC 4121's for AES and Camellia keys, RFC 4757's for
+`rc4-hmac`, and RFC 1964's DES3 tokens as MIT's `k5seal.c` makes them for `des3-cbc-sha1`
 (`KerberosGssContextOptions`, `KerberosGssFlags`, `KerberosDelegation`,
 `KerberosGssToken` for RFC 2743's framing, `Rfc4121GssMessageProtection`,
-`Rc4HmacGssMessageProtection`, `KerberosCredentialMessage`); every refusal is a
+`Rc4HmacGssMessageProtection`, `Des3CbcSha1GssMessageProtection` (BL-962),
+`KerberosCredentialMessage`); every refusal is a
 `KerberosGssException` with a `KerberosGssError` (BL-691, ADR-0171).
 
 ## Rules
