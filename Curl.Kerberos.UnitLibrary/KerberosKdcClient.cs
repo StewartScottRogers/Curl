@@ -90,17 +90,47 @@ public sealed class KerberosKdcClient
     {
         ArgumentNullException.ThrowIfNull(server);
         ArgumentNullException.ThrowIfNull(cache);
-        DateTimeOffset now = timeProvider.GetUtcNow() + (cache.KdcTimeOffset ?? TimeSpan.Zero);
-        CachedCredential? serviceTicket = FindLive(cache, server, now);
-        if (serviceTicket is not null)
+        return LiveServiceTicketIn(cache, server)
+            ?? await GetTicketWithCachedTicketGrantingTicketAsync(server, cache, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Gets a ticket for <paramref name="server" /> from the credential cache
+    /// <paramref name="cacheName" /> names, as the overload taking a <see cref="CredentialCache" />
+    /// does, and stores a ticket got by a TGS exchange back in that cache so the next request
+    /// finds it there, as MIT's <c>gss_init_sec_context</c> does (ADR-0208). A cache that
+    /// cannot be written leaves the ticket unstored and is otherwise ignored, as MIT ignores
+    /// <c>krb5_cc_store_cred</c>'s failure.
+    /// </summary>
+    /// <param name="server">The service, e.g. <c>HTTP/server.example.test@EXAMPLE.TEST</c>.</param>
+    /// <param name="store">Reads the cache and stores the new ticket in it.</param>
+    /// <param name="cacheName">The cache's name, e.g. <see cref="CredentialCacheStore.DefaultCacheName" />.</param>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <returns>The service ticket; the caller disposes it.</returns>
+    /// <exception cref="KerberosFileException">The cache cannot be read; <see cref="KerberosFileException.Error" /> says why.</exception>
+    /// <exception cref="KerberosKdcException">No ticket could be got; <see cref="KerberosKdcException.Error" /> says why.</exception>
+    public async Task<KerberosCredential> GetServiceTicketAsync(KerberosPrincipal server, CredentialCacheStore store, string cacheName, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(server);
+        ArgumentNullException.ThrowIfNull(store);
+        using CredentialCache cache = store.Read(cacheName);
+        KerberosCredential? cached = LiveServiceTicketIn(cache, server);
+        if (cached is not null)
         {
-            return KerberosCredential.FromCache(serviceTicket);
+            return cached;
         }
 
-        CachedCredential? ticketGrantingTicket = FindLive(cache, TicketGrantingServer(cache.DefaultPrincipal.Realm), now)
-            ?? throw new KerberosKdcException(KerberosKdcError.NoCredentials);
-        using KerberosCredential granting = KerberosCredential.FromCache(ticketGrantingTicket);
-        return await GetTicketFromTicketGrantingServiceAsync(granting, server, cancellationToken).ConfigureAwait(false);
+        KerberosCredential credential = await GetTicketWithCachedTicketGrantingTicketAsync(server, cache, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            store.Store(cacheName, credential);
+        }
+        catch (KerberosFileException)
+        {
+            // MIT's tkt_creds_get stores with (void) krb5_cc_store_cred: the ticket is good even when the cache is not.
+        }
+
+        return credential;
     }
 
     /// <summary>Gets a ticket for <paramref name="server" /> from a password: an AS exchange for a ticket-granting ticket, then a TGS exchange.</summary>
@@ -255,6 +285,25 @@ public sealed class KerberosKdcClient
         return CredentialFrom(kdcReply, plaintext, body.Nonce, expectedServer: null);
     }
 
+    /// <summary>The time the cache's tickets are judged live at: now plus the cache's KDC time offset.</summary>
+    private DateTimeOffset NowAtKdc(CredentialCache cache) => timeProvider.GetUtcNow() + (cache.KdcTimeOffset ?? TimeSpan.Zero);
+
+    /// <summary>Copies the cache's own live ticket for <paramref name="server" /> out of it; <see langword="null" /> when it has none.</summary>
+    private KerberosCredential? LiveServiceTicketIn(CredentialCache cache, KerberosPrincipal server)
+    {
+        CachedCredential? serviceTicket = FindLive(cache, server, NowAtKdc(cache));
+        return serviceTicket is null ? null : KerberosCredential.FromCache(serviceTicket);
+    }
+
+    /// <summary>Gets a ticket for <paramref name="server" /> by a TGS exchange with the cache's live ticket-granting ticket for its default principal's realm.</summary>
+    private async Task<KerberosCredential> GetTicketWithCachedTicketGrantingTicketAsync(KerberosPrincipal server, CredentialCache cache, CancellationToken cancellationToken)
+    {
+        CachedCredential? ticketGrantingTicket = FindLive(cache, TicketGrantingServer(cache.DefaultPrincipal.Realm), NowAtKdc(cache))
+            ?? throw new KerberosKdcException(KerberosKdcError.NoCredentials);
+        using KerberosCredential granting = KerberosCredential.FromCache(ticketGrantingTicket);
+        return await GetTicketFromTicketGrantingServiceAsync(granting, server, cancellationToken).ConfigureAwait(false);
+    }
+
     private static CachedCredential? FindLive(CredentialCache cache, KerberosPrincipal server, DateTimeOffset now) =>
         cache.Credentials.FirstOrDefault(credential =>
             SamePrincipal(credential.Client, cache.DefaultPrincipal) && SamePrincipal(credential.Server, server) && credential.EndTime > now);
@@ -347,7 +396,10 @@ public sealed class KerberosKdcClient
             SessionKey = part.Key,
             Flags = part.Flags,
             AuthenticationTime = part.AuthenticationTime,
+            StartTime = part.StartTime,
             EndTime = part.EndTime,
+            RenewUntil = part.RenewUntil,
+            Addresses = part.ClientAddresses,
         };
     }
 

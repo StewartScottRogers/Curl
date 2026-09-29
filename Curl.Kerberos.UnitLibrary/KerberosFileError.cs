@@ -1,6 +1,6 @@
 namespace Curl.Kerberos;
 
-/// <summary>Why a credential cache or keytab could not be read.</summary>
+/// <summary>Why a credential cache or keytab could not be read, or a credential cache could not be written.</summary>
 public enum KerberosFileError
 {
     /// <summary>The file ends inside a field, or a length runs past its end.</summary>
@@ -17,7 +17,8 @@ public enum KerberosFileError
 
     /// <summary>
     /// The name's type prefix is one this library does not read: anything but <c>FILE:</c>,
-    /// <c>DIR:</c> or <c>KCM:</c> for a credential cache, and anything but <c>FILE:</c> or
+    /// <c>DIR:</c> or <c>KCM:</c> for a credential cache, anything but <c>FILE:</c> or
+    /// <c>DIR:</c> for storing a credential in one, and anything but <c>FILE:</c> or
     /// <c>WRFILE:</c> for a keytab.
     /// </summary>
     UnsupportedType,
@@ -53,4 +54,10 @@ public enum KerberosFileError
     /// does not know (MIT's <c>EINVAL</c>).
     /// </summary>
     PathTokenInvalid,
+
+    /// <summary>
+    /// A credential cannot be stored in the cache: the <see cref="CredentialCacheStore" /> was
+    /// given no <see cref="IKerberosFileWriter" />.
+    /// </summary>
+    NotWritable,
 }

@@ -45,7 +45,11 @@ TCP and frames TCP) and, for an `https://` KDC, the optional `IKerberosKdcProxyT
 with the request wrapped in MS-KKDCP's `KerberosKdcProxyMessage` as MIT does (BL-827;
 without one, `https://` KDCs are skipped); every refusal is a `KerberosKdcException` with a `KerberosKdcError`
 (BL-690, ADR-0168), and follows the KDCs' cross-realm referrals (`krbtgt/OTHER@REALM`) to
-OTHER's KDCs up to `MaximumReferralHops` times (BL-826, ADR-0200). It is the initiator of the GSS-API Kerberos V5 mechanism:
+OTHER's KDCs up to `MaximumReferralHops` times (BL-826, ADR-0200); given a
+`CredentialCacheStore` and a cache name instead, it stores a ticket got by a TGS exchange
+back in a `FILE:` or `DIR:` cache by appending it through the injected
+`IKerberosFileWriter`, as MIT's `cc_file.c` does, ignoring a failed store as MIT does
+(`CredentialCacheWriter`, `CredentialCacheStore.Store`; BL-825, ADR-0208). It is the initiator of the GSS-API Kerberos V5 mechanism:
 `KerberosGssContext` makes the initial context token (an AP-REQ whose authenticator
 carries RFC 4121's checksum with the context flags and, for `--delegation`, a KRB-CRED of
 a forwarded ticket-granting ticket), checks the acceptor's AP-REP, and then makes and
@@ -63,7 +67,8 @@ reads Wrap and MIC tokens, RFC 4121's for AES keys and RFC 4757's for `rc4-hmac`
 - **Never a `Socket`.** The KDC is reached through an injected transport, so every
   exchange is testable with recorded bytes and no network.
 - **Files through an injected seam.** The credential cache, the keytab and `krb5.conf`
-  are read through an interface the caller supplies (`IKerberosFileReader`), never
+  are read through an interface the caller supplies (`IKerberosFileReader`), and a
+  credential cache is appended to through `IKerberosFileWriter`, never
   `System.IO.File` directly.
 - **Time through `TimeProvider`.** Ticket lifetimes, authenticator timestamps and clock
   skew all take the injected `TimeProvider`; never `DateTime.Now` or `Thread.Sleep`.

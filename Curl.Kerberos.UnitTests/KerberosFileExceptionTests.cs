@@ -11,7 +11,7 @@ public sealed class KerberosFileExceptionTests
 
         Assert.AreEqual(KerberosFileError.KcmFailed, failure.Error);
         Assert.AreEqual(-1765328243, failure.KcmStatus);
-        Assert.AreEqual("Kerberos file could not be read: KcmFailed (KCM status -1765328243).", failure.Message);
+        Assert.AreEqual("Kerberos file could not be read or written: KcmFailed (KCM status -1765328243).", failure.Message);
     }
 
     [TestMethod]

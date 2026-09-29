@@ -25,7 +25,7 @@ public sealed class KerberosFileNameTests
         KerberosFileException failure = new(KerberosFileError.UnknownVersion);
 
         Assert.AreEqual(KerberosFileError.UnknownVersion, failure.Error);
-        Assert.AreEqual("Kerberos file could not be read: UnknownVersion.", failure.Message);
+        Assert.AreEqual("Kerberos file could not be read or written: UnknownVersion.", failure.Message);
     }
 
     [TestMethod]

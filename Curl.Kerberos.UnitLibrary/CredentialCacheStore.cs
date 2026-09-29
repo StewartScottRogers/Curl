@@ -7,7 +7,9 @@ namespace Curl.Kerberos;
 /// <summary>
 /// Finds the default credential cache as MIT Kerberos does and reads a <c>FILE:</c> cache
 /// or a <c>DIR:</c> collection's cache through the injected file reader, and a <c>KCM:</c>
-/// cache through the injected KCM connector (ADR-0142, ADR-0158, ADR-0194).
+/// cache through the injected KCM connector (ADR-0142, ADR-0158, ADR-0194), and stores a
+/// credential in a <c>FILE:</c> or <c>DIR:</c> cache through the injected file writer
+/// (ADR-0208).
 /// </summary>
 /// <param name="files">Reads the cache file, and a <c>DIR:</c> collection's <c>primary</c> file.</param>
 /// <param name="readEnvironmentVariable">Reads an environment variable; <see langword="null" /> when unset.</param>
@@ -21,13 +23,19 @@ namespace Curl.Kerberos;
 /// Gives the user's login name for <c>%{username}</c>; <see langword="null" /> uses
 /// <see cref="Environment.UserName" />, which is <c>getpwuid(geteuid())</c>'s name off Windows.
 /// </param>
+/// <param name="fileWriter">
+/// Appends a stored credential to a <c>FILE:</c> or <c>DIR:</c> cache file;
+/// <see langword="null" /> when caches are only read, so <see cref="Store" /> fails as
+/// <see cref="KerberosFileError.NotWritable" />.
+/// </param>
 public sealed class CredentialCacheStore(
     IKerberosFileReader files,
     Func<string, string?> readEnvironmentVariable,
     Func<uint> readUserId,
     IKerberosKcmConnector? kcm = null,
     KerberosConfiguration? configuration = null,
-    Func<string>? readUserName = null)
+    Func<string>? readUserName = null,
+    IKerberosFileWriter? fileWriter = null)
 {
     /// <summary>The environment variable that names the credential cache.</summary>
     public const string CacheNameVariable = "KRB5CCNAME";
@@ -102,6 +110,48 @@ public sealed class CredentialCacheStore(
             _ => ReadFileCache(KerberosFileName.ReadFile(files, cacheName, KerberosFileName.FileType)),
         };
     }
+
+    /// <summary>
+    /// Stores <paramref name="credential" /> in the cache <paramref name="cacheName" /> names
+    /// by appending it to the cache file after the credentials already there, as MIT's
+    /// <c>cc_file.c</c> does (ADR-0208). The file must already exist; it is never created.
+    /// </summary>
+    /// <param name="cacheName">A <c>FILE:</c> name or bare path, or a <c>DIR:</c> name, resolved as <see cref="Read" /> resolves it.</param>
+    /// <param name="credential">The credential, e.g. a service ticket from a TGS exchange; it stays the caller's.</param>
+    /// <exception cref="KerberosFileException">
+    /// No file writer was given (<see cref="KerberosFileError.NotWritable" />), the name's type
+    /// is not <c>FILE</c> or <c>DIR</c> (<see cref="KerberosFileError.UnsupportedType" />), a
+    /// <c>DIR:</c> collection's <c>primary</c> file is malformed
+    /// (<see cref="KerberosFileError.DirectoryPrimaryMalformed" />), or the file does not exist
+    /// (<see cref="KerberosFileError.NotFound" />).
+    /// </exception>
+    public void Store(string cacheName, KerberosCredential credential)
+    {
+        ArgumentNullException.ThrowIfNull(credential);
+        IKerberosFileWriter writer = fileWriter ?? throw new KerberosFileException(KerberosFileError.NotWritable);
+        string path = CacheFilePath(KerberosFileName.Parse(cacheName));
+        CachedCredential cached = credential.ToCached();
+        byte[] bytes = CredentialCacheWriter.WriteCredential(cached);
+        cached.SessionKey.Dispose();
+        try
+        {
+            if (!writer.AppendAllBytes(path, bytes))
+            {
+                throw new KerberosFileException(KerberosFileError.NotFound);
+            }
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(bytes);
+        }
+    }
+
+    private string CacheFilePath(KerberosFileName name) => name.Type switch
+    {
+        KerberosFileName.FileType => name.Residual,
+        DirectoryType => DirectoryCachePath(name.Residual),
+        _ => throw new KerberosFileException(KerberosFileError.UnsupportedType),
+    };
 
     private static CredentialCache ReadFileCache(byte[] bytes)
     {

@@ -63,6 +63,15 @@ internal sealed class FakeKdc : IKerberosKdcTransport, IKerberosKdcProxyTranspor
 
     public KerberosPrincipalName? ReplyServerName { get; set; }
 
+    /// <summary>Gets or sets the start time the reply's encrypted part gives; <see langword="null" /> leaves it out.</summary>
+    public DateTimeOffset? ReplyStartTime { get; set; }
+
+    /// <summary>Gets or sets the renew-until time the reply's encrypted part gives; <see langword="null" /> leaves it out.</summary>
+    public DateTimeOffset? ReplyRenewUntil { get; set; }
+
+    /// <summary>Gets or sets the client addresses the reply's encrypted part gives.</summary>
+    public IReadOnlyList<KerberosAddress> ReplyAddresses { get; set; } = [];
+
     /// <summary>Gets or sets an answer given instead of the KDC's own when it returns bytes.</summary>
     public Func<KerberosKdcRequest, byte[]?> Override { get; set; } = _ => null;
 
@@ -219,7 +228,10 @@ internal sealed class FakeKdc : IKerberosKdcTransport, IKerberosKdcProxyTranspor
         Nonce = ReplyNonce(body.Nonce),
         Flags = KerberosTicketFlags.Initial | KerberosTicketFlags.PreAuthenticated,
         AuthenticationTime = new DateTimeOffset(2026, 9, 28, 12, 0, 0, TimeSpan.Zero),
+        StartTime = ReplyStartTime,
         EndTime = new DateTimeOffset(2026, 9, 28, 22, 0, 0, TimeSpan.Zero),
+        RenewUntil = ReplyRenewUntil,
+        ClientAddresses = ReplyAddresses,
         ServerRealm = ReplyServerRealm ?? body.Realm,
         ServerName = ReplyServerName ?? body.ServerName!,
     };

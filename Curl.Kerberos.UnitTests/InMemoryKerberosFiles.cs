@@ -2,8 +2,8 @@ using System.Text;
 
 namespace Curl.Kerberos;
 
-/// <summary>An <see cref="IKerberosFileReader" /> over a dictionary of paths, so no test touches the disk.</summary>
-internal sealed class InMemoryKerberosFiles : IKerberosFileReader
+/// <summary>An <see cref="IKerberosFileReader" /> and <see cref="IKerberosFileWriter" /> over a dictionary of paths, so no test touches the disk.</summary>
+internal sealed class InMemoryKerberosFiles : IKerberosFileReader, IKerberosFileWriter
 {
     private readonly Dictionary<string, byte[]> files = new(StringComparer.Ordinal);
 
@@ -25,11 +25,32 @@ internal sealed class InMemoryKerberosFiles : IKerberosFileReader
         return this;
     }
 
+    /// <summary>
+    /// Gets a value indicating whether each read returns new bytes, as a disk does, so a reader
+    /// that zeroes what it read leaves the file intact; otherwise a read returns the file's own
+    /// array, so a test sees the zeroing.
+    /// </summary>
+    public bool ReturnsCopies { get; init; }
+
     public byte[]? ReadAllBytes(string path)
     {
         PathsRead.Add(path);
-        return files.GetValueOrDefault(path);
+        byte[]? bytes = files.GetValueOrDefault(path);
+        return ReturnsCopies && bytes is not null ? [.. bytes] : bytes;
     }
 
     public IReadOnlyList<string>? ListFileNames(string path) => directories.GetValueOrDefault(path);
+
+    public bool AppendAllBytes(string path, ReadOnlySpan<byte> bytes)
+    {
+        if (!files.TryGetValue(path, out byte[]? existing))
+        {
+            return false;
+        }
+
+        files[path] = [.. existing, .. bytes];
+        return true;
+    }
+
+    public byte[] Contents(string path) => [.. files[path]];
 }

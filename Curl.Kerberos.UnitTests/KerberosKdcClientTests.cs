@@ -15,6 +15,8 @@ public sealed partial class KerberosKdcClientTests
 
     private static readonly KerberosPrincipal Bob = new(1, FakeKdc.Realm, ["bob"]);
 
+    private const string CacheName = "FILE:/tmp/krb5cc_1000";
+
     [TestMethod]
     public async Task GetServiceTicketAsync_CacheHoldsALiveServiceTicket_CopiesItWithoutAskingTheKdc()
     {
@@ -63,6 +65,73 @@ public sealed partial class KerberosKdcClientTests
         CollectionAssert.AreEqual(FakeKdc.ServiceSessionKey, credential.SessionKey.Value.ToArray());
         Assert.AreEqual(KerberosTicketFlags.Initial | KerberosTicketFlags.PreAuthenticated, credential.Flags);
         Assert.AreEqual(new DateTimeOffset(2026, 9, 28, 22, 0, 0, TimeSpan.Zero), credential.EndTime);
+    }
+
+    [TestMethod]
+    public async Task GetServiceTicketAsync_CacheFileHoldsATicketGrantingTicket_StoresTheTgsTicketSoTheSecondCallAsksNoKdc()
+    {
+        FakeKdc kdc = new()
+        {
+            ReplyStartTime = new DateTimeOffset(2026, 9, 28, 12, 1, 0, TimeSpan.Zero),
+            ReplyRenewUntil = new DateTimeOffset(2026, 10, 5, 12, 0, 0, TimeSpan.Zero),
+        };
+        (InMemoryKerberosFiles files, CredentialCacheStore store) = CacheFileWithTicketGrantingTicket(writable: true);
+        KerberosKdcClient client = ClientFor(kdc);
+
+        using KerberosCredential first = await client.GetServiceTicketAsync(FakeKdc.Service, store, CacheName, CancellationToken.None);
+        using KerberosCredential second = await client.GetServiceTicketAsync(FakeKdc.Service, store, CacheName, CancellationToken.None);
+
+        Assert.HasCount(1, kdc.Exchanges, "The second request must answer from the cache.");
+        using CredentialCache cache = CredentialCacheReader.Read(files.Contents("/tmp/krb5cc_1000"));
+        Assert.HasCount(2, cache.Credentials);
+        Assert.AreEqual("HTTP/server.example.test@EXAMPLE.TEST", cache.Credentials[1].Server.ToString());
+        Assert.AreEqual("HTTP/server.example.test@EXAMPLE.TEST", second.Server.ToString());
+        CollectionAssert.AreEqual(FakeKdc.ServiceSessionKey, second.SessionKey.Value.ToArray());
+        CollectionAssert.AreEqual(first.Ticket.Encode(), second.Ticket.Encode());
+        Assert.AreEqual(first.EndTime, second.EndTime);
+        Assert.AreEqual(first.Flags, second.Flags);
+        Assert.AreEqual(kdc.ReplyStartTime, second.StartTime);
+        Assert.AreEqual(kdc.ReplyRenewUntil, second.RenewUntil);
+    }
+
+    [TestMethod]
+    public async Task GetServiceTicketAsync_CacheFileCannotBeWritten_StillReturnsTheTgsTicket()
+    {
+        FakeKdc kdc = new();
+        (InMemoryKerberosFiles files, CredentialCacheStore store) = CacheFileWithTicketGrantingTicket(writable: false);
+        byte[] before = files.Contents("/tmp/krb5cc_1000");
+
+        using KerberosCredential credential = await ClientFor(kdc).GetServiceTicketAsync(FakeKdc.Service, store, CacheName, CancellationToken.None);
+
+        Assert.HasCount(1, kdc.Exchanges);
+        CollectionAssert.AreEqual(FakeKdc.ServiceSessionKey, credential.SessionKey.Value.ToArray());
+        CollectionAssert.AreEqual(before, files.Contents("/tmp/krb5cc_1000"));
+    }
+
+    [TestMethod]
+    public async Task GetServiceTicketAsync_CacheFileHoldsALiveServiceTicket_ReturnsItWithoutWriting()
+    {
+        FakeKdc kdc = new();
+        InMemoryKerberosFiles files = new InMemoryKerberosFiles { ReturnsCopies = true }.Add(
+            "/tmp/krb5cc_1000",
+            CredentialCacheWriterTests.CacheFile(Cached(FakeKdc.Alice, FakeKdc.Service, FakeKdc.Now.AddHours(1), FakeKdc.ServiceSessionKey)));
+        byte[] before = files.Contents("/tmp/krb5cc_1000");
+
+        using KerberosCredential credential = await ClientFor(kdc).GetServiceTicketAsync(FakeKdc.Service, WritableStore(files), CacheName, CancellationToken.None);
+
+        Assert.IsEmpty(kdc.Exchanges);
+        CollectionAssert.AreEqual(FakeKdc.ServiceSessionKey, credential.SessionKey.Value.ToArray());
+        CollectionAssert.AreEqual(before, files.Contents("/tmp/krb5cc_1000"));
+    }
+
+    [TestMethod]
+    public async Task GetServiceTicketAsync_StoreArgumentsNull_Throw()
+    {
+        KerberosKdcClient client = ClientFor(new FakeKdc());
+        CredentialCacheStore store = WritableStore(new InMemoryKerberosFiles());
+
+        await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => client.GetServiceTicketAsync(null!, store, CacheName, CancellationToken.None));
+        await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => client.GetServiceTicketAsync(FakeKdc.Service, (CredentialCacheStore)null!, CacheName, CancellationToken.None));
     }
 
     [TestMethod]
@@ -433,6 +502,18 @@ public sealed partial class KerberosKdcClientTests
         AuthenticationTime = FakeKdc.Now,
         EndTime = FakeKdc.Now.AddHours(8),
     };
+
+    private static (InMemoryKerberosFiles Files, CredentialCacheStore Store) CacheFileWithTicketGrantingTicket(bool writable)
+    {
+        InMemoryKerberosFiles files = new InMemoryKerberosFiles { ReturnsCopies = true }.Add(
+            "/tmp/krb5cc_1000",
+            CredentialCacheWriterTests.CacheFile(
+                Cached(FakeKdc.Alice, KerberosKdcClient.TicketGrantingServer(FakeKdc.Realm), FakeKdc.Now.AddHours(8), FakeKdc.TicketGrantingSessionKey)));
+        return (files, writable ? WritableStore(files) : new CredentialCacheStore(files, _ => null, () => 1000));
+    }
+
+    private static CredentialCacheStore WritableStore(InMemoryKerberosFiles files) =>
+        new(files, _ => null, () => 1000, fileWriter: files);
 
     private static CredentialCache Cache(params CachedCredential[] credentials) => Cache(null, credentials);
 
