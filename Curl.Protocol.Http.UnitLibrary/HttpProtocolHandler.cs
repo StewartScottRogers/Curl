@@ -257,13 +257,18 @@ public sealed class HttpProtocolHandler(
             context.Credentials,
             options.BearerToken,
             options.AuthSchemes,
-            IsProxy: false);
+            IsProxy: false)
+        {
+            Events = context.Events,
+        };
         ProxyEndpoint? forwardProxy = ForwardProxyOf(context.Url, options);
         HttpAuthRequest? proxyAuthRequest = forwardProxy is null ? null : ProxyAuthRequestOf(authRequest, forwardProxy);
         using HttpTransferDeadline deadline = new(context);
-        string? authorization = await Authenticator.CreateAuthorizationAsync(authRequest, [], context.CancellationToken).ConfigureAwait(false);
+        HttpInfoLineRecorder authorizationLines = new();
+        string? authorization = await Authenticator.CreateAuthorizationAsync(authRequest with { Events = authorizationLines }, [], context.CancellationToken).ConfigureAwait(false);
         HttpRequestPlan plan = new(context, options, framing, authRequest, authorization)
         {
+            AuthorizationInfoLines = authorizationLines.Lines,
             Started = started,
             Deadline = deadline,
             Progress = new HttpTransferProgress(context.Progress),
@@ -788,11 +793,13 @@ public sealed class HttpProtocolHandler(
             FindRefusal = head => body.FindHeadRefusal(head, context.NoBody, DecodesContent(options)),
             IsHttp2OrHttp3 = requestStream is not null,
             IsSwitchedToHttp2 = () => IsSwitchedToHttp2(connection),
+            DefersFrom = (statusLine, header) => framing.Body is not StreamBody && HttpNegotiateInfoLines.IsNegotiateChallenge(plan.AuthRequest, statusLine, header),
         };
         HttpRequestPlan? retry = null;
         HttpResponseHead? actedOn = null;
         HttpBodyDelivery delivery = HttpBodyDelivery.Deliver;
         ReportProtocolChosen(context.Events, newConnection, streams);
+        ReportAuthorizationLines(plan);
         try
         {
             ThrowIfRefused(framing);
@@ -811,6 +818,7 @@ public sealed class HttpProtocolHandler(
             headReader.ReportHeaderHeldAtClose();
             ReportNoEndOfMessageIndicator(plan, actedOn, headReader);
             retry = await RetryOfAsync(plan, actedOn, bodyLeftUnsent, upload, cancellationToken).ConfigureAwait(false);
+            headReader.ReleaseDeferredHeaders();
             HttpFailMode fail = retry is null ? options.Fail : HttpFailMode.None;
             ThrowIfFailing(fail, HttpFailMode.Fail, actedOn);
             bool discardsBody = retry is not null || (options.FollowRedirects && exchange.RedirectUrl is not null);
@@ -909,6 +917,25 @@ public sealed class HttpProtocolHandler(
         if (newConnection)
         {
             events.ReportInfo(streams?.UsingLine ?? HttpConnectionInfoLines.UsingHttp1);
+        }
+    }
+
+    /// <summary>
+    /// Reports, just before the request is sent, the lines the authenticator reported while it
+    /// made the request's <c>Authorization</c> value before any challenge, then
+    /// <c>Server auth using Negotiate with user '...'</c> when the request is sent with
+    /// Negotiate picked, as curl 8.21.0 does (measured, BL-843 Notes).
+    /// </summary>
+    private static void ReportAuthorizationLines(HttpRequestPlan plan)
+    {
+        foreach (string line in plan.AuthorizationInfoLines)
+        {
+            plan.Context.Events.ReportInfo(line);
+        }
+
+        if (HttpNegotiateInfoLines.PicksNegotiate(plan.AuthRequest, plan.Authorization, plan.AuthorizationAnswersChallenge))
+        {
+            plan.Context.Events.ReportInfo(HttpNegotiateInfoLines.ServerAuthUsing(plan.AuthRequest.Credential));
         }
     }
 
@@ -1778,6 +1805,14 @@ public sealed class HttpProtocolHandler(
         public bool AuthorizationAnswersChallenge { get; init; }
 
         /// <summary>
+        /// Gets the <c>-v</c> lines the authenticator reported while it made
+        /// <see cref="Authorization" /> before any challenge, written just before the request
+        /// each time it is sent; empty for a value that answers a challenge, whose lines were
+        /// written with the response's head (BL-843).
+        /// </summary>
+        public IReadOnlyList<string> AuthorizationInfoLines { get; init; } = [];
+
+        /// <summary>
         /// Makes the same request sent with <paramref name="authorization" /> instead, in answer
         /// to a challenge.
         /// </summary>
@@ -1858,6 +1893,7 @@ public sealed class HttpProtocolHandler(
                 SentOnFreshConnection = sentOnFreshConnection,
                 RedirectsFollowed = redirectsFollowed,
                 AuthorizationAnswersChallenge = authorizationAnswersChallenge,
+                AuthorizationInfoLines = authorizationAnswersChallenge ? [] : AuthorizationInfoLines,
                 StreamRefusedRetries = StreamRefusedRetries,
             };
     }
