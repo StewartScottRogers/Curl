@@ -62,7 +62,7 @@ public static class CommandLineOptionTable
 {
     private static readonly CommandLineOption[] RowsInTableOrder =
     [
-        CommandLineOption.Text("url", null, (options, url) => options.AddUrl(url)),
+        CommandLineOption.Value("url", null, AddUrl),
         CommandLineOption.NegatableFlag("globoff", 'g', (options, on) => options.GlobOff = on),
         CommandLineOption.NegatableFlag("silent", 's', (options, on) => options.Silent = on),
         CommandLineOption.NegatableFlag("show-error", 'S', (options, on) => options.ShowError = on),
@@ -98,6 +98,8 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("get", 'G', (options, on) => options.DataInQuery = on),
         CommandLineOption.Value("url-query", null, AppendUrlQuery),
         CommandLineOption.FileName("dump-header", 'D', (options, file) => options.DumpHeaderFile = file),
+        CommandLineOption.Value("etag-save", null, SetEtagFile((options, file) => options.EtagSaveFile = file)),
+        CommandLineOption.Value("etag-compare", null, SetEtagFile((options, file) => options.EtagCompareFile = file)),
         CommandLineOption.Value("user", 'u', AcceptingEmpty((options, user) => options.SetCredentials(user))),
         CommandLineOption.NegatableFlag("basic", null, (options, on) => options.WantAuthScheme(HttpAuthSchemes.Basic, on)),
         CommandLineOption.NegatableFlag("digest", null, (options, on) => options.WantAuthScheme(HttpAuthSchemes.Digest, on)),
@@ -743,6 +745,33 @@ public static class CommandLineOptionTable
 
         return refusal;
     }
+
+    /// <summary>
+    /// Adds a <c>--url</c> value to <see cref="CommandLineOptions.Urls"/>, refusing an empty one as blank,
+    /// and a second URL beside an etag option (<see cref="CommandLineOptions.RefuseEtagOptionsWithSeveralUrls"/>).
+    /// </summary>
+    private static CommandLineRefusal? AddUrl(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader) =>
+        value.Length == 0
+            ? CommandLineRefusal.BlankArgument(spelledOption)
+            : options.AddUrl(value, spelledOption);
+
+    /// <summary>
+    /// Records an <c>--etag-save</c> or <c>--etag-compare</c> file as a <see cref="CommandLineOption.FileName"/>
+    /// row does, then refuses it when the group already has more than one URL
+    /// (<see cref="CommandLineOptions.RefuseEtagOptionsWithSeveralUrls"/>).
+    /// </summary>
+    private static CommandLineOptionApplier SetEtagFile(Action<CommandLineOptions, string> set) =>
+        (options, value, spelledOption, _, _) =>
+        {
+            if (value.Length == 0)
+            {
+                return CommandLineRefusal.BlankArgument(spelledOption);
+            }
+
+            CommandLineOption.WarnWhenFileNameLooksLikeFlag(options, value);
+            set(options, value);
+            return options.RefuseEtagOptionsWithSeveralUrls(spelledOption);
+        };
 
     /// <summary>
     /// Appends a <c>--url-query</c> value to <see cref="CommandLineOptions.UrlQuery"/>: the text after

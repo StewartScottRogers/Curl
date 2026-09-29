@@ -392,6 +392,19 @@ public sealed class CommandLineOptions
     public string? DumpHeaderFile { get; internal set; }
 
     /// <summary>
+    /// The <c>--etag-save</c> file, verbatim and unchecked; <see langword="null"/> when not given. <c>-</c>
+    /// means standard output. The transfer writes the <c>ETag</c> of a 2xx or 3xx response there; nothing
+    /// is opened here. The last value wins.
+    /// </summary>
+    public string? EtagSaveFile { get; internal set; }
+
+    /// <summary>
+    /// The <c>--etag-compare</c> file, verbatim and unchecked; <see langword="null"/> when not given. The
+    /// transfer sends its content as <c>If-None-Match</c>; nothing is read here. The last value wins.
+    /// </summary>
+    public string? EtagCompareFile { get; internal set; }
+
+    /// <summary>
     /// The <c>-u</c> / <c>--user</c> value split at its first colon into user name and password;
     /// <see langword="null"/> when not given. A value with no colon that does not start with <c>;</c>
     /// is a user name whose password <see cref="CommandLineParser"/> asks for through its
@@ -1763,13 +1776,33 @@ public sealed class CommandLineOptions
     /// <returns>The variable's bytes; <see langword="null"/> when no variable has that name.</returns>
     internal byte[]? FindVariable(string name) => globals.Variables.GetValueOrDefault(name);
 
-    /// <summary>Appends <paramref name="url"/> to <see cref="Urls"/>, unchanged and unvalidated.</summary>
+    /// <summary>
+    /// Appends <paramref name="url"/> to <see cref="Urls"/>, unchanged and unvalidated, then refuses it as
+    /// <see cref="RefuseEtagOptionsWithSeveralUrls"/> does.
+    /// </summary>
     /// <param name="url">A positional argument or a <c>--url</c> value.</param>
-    internal void AddUrl(string url)
+    /// <param name="spelledOption">The argument as typed: the URL itself, or <c>--url</c>.</param>
+    /// <returns><see langword="null"/>, or the refusal of a second URL beside an etag option.</returns>
+    internal CommandLineRefusal? AddUrl(string url, string spelledOption)
     {
         urls.Add(url);
         (urlOutputs.Find(output => output.Url is null) ?? AddUrlOutput()).Url = url;
+        return RefuseEtagOptionsWithSeveralUrls(spelledOption);
     }
+
+    /// <summary>
+    /// Refuses the argument just read when this option group has an <c>--etag-save</c> or
+    /// <c>--etag-compare</c> and more than one URL, as curl 8.21.0 does whichever comes last:
+    /// <c>curl: The etag options only work on a single URL</c> (hidden when <see cref="ErrorsHidden"/>),
+    /// then <c>curl: option &lt;spelled&gt;: is badly used here</c>. A glob in one URL and a URL in a
+    /// later <c>--next</c> group are not refused (measured 2026-09-29, BL-619 Notes).
+    /// </summary>
+    /// <param name="spelledOption">The argument as typed.</param>
+    /// <returns>The refusal, or <see langword="null"/> when the group has at most one URL or no etag option.</returns>
+    internal CommandLineRefusal? RefuseEtagOptionsWithSeveralUrls(string spelledOption) =>
+        (EtagSaveFile ?? EtagCompareFile) is not null && urls.Count > 1
+            ? CommandLineRefusal.EtagOptionsWithSeveralUrls(spelledOption, ErrorsHidden)
+            : null;
 
     /// <summary>Appends <paramref name="uploadFile"/> to <see cref="UploadFiles"/>; nothing is opened.</summary>
     /// <param name="uploadFile">A <c>-T</c> / <c>--upload-file</c> value, which may be empty.</param>

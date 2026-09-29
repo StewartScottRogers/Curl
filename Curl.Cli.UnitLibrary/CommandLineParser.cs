@@ -267,8 +267,7 @@ public static class CommandLineParser
             return CommandLineRefusal.BlankArgument(string.Empty);
         }
 
-        options.AddUrl(argument);
-        return null;
+        return options.AddUrl(argument, argument);
     }
 
     private static CommandLineRefusal? ParseLong(CommandLineOptions options, string argument, ArgumentReader reader)

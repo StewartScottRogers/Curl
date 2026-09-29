@@ -403,6 +403,27 @@ public sealed class CommandLineRefusal
             "is badly used here");
 
     /// <summary>
+    /// Refuses a second URL in an option group with an <c>--etag-save</c> or <c>--etag-compare</c>, or such an
+    /// option read after a second URL: <c>curl: The etag options only work on a single URL</c> (hidden when
+    /// <paramref name="errorsHidden"/>), <c>curl: option &lt;spelled&gt;: is badly used here</c> and the
+    /// try-help line.
+    /// </summary>
+    /// <remarks>
+    /// Measured with the local curl 8.21.0 on 2026-09-29 (BL-619 Notes): <c>--etag-save f URL URL</c> names the
+    /// second URL, <c>URL URL --etag-save f</c> names <c>--etag-save</c>, and <c>--etag-save f --url URL --url URL</c>
+    /// names <c>--url</c>; each exits 2 before any transfer.
+    /// </remarks>
+    /// <param name="spelledOption">The whole argument as typed.</param>
+    /// <param name="errorsHidden"><see langword="true"/> when <c>-s</c> without <c>-S</c> is in effect.</param>
+    /// <returns>The refusal.</returns>
+    internal static CommandLineRefusal EtagOptionsWithSeveralUrls(string spelledOption, bool errorsHidden) =>
+        new(
+            CurlExitCode.FailedInit,
+            ErrorMessageLines(errorsHidden, "The etag options only work on a single URL"),
+            spelledOption,
+            "is badly used here");
+
+    /// <summary>
     /// Refuses a minimum TLS version option (<c>--tlsv1.1</c>, <c>--tlsv1.2</c>, <c>--tlsv1.3</c>) read after a
     /// <c>--tls-max</c> below it: <c>curl: Minimum TLS version set higher than max</c> (hidden when
     /// <paramref name="errorsHidden"/>), <c>curl: option &lt;spelled&gt;: is badly used here</c> and the
