@@ -28,10 +28,12 @@ internal abstract class Tls12RecordCipher : IDisposable
                 keys.Iv,
                 parameters.EncryptThenMac,
                 randomSource),
+            Tls12CipherMode.Stream => new Tls12StreamRecordCipher(new Rc4(keys.Key), CreateMac(parameters, keys)!),
             _ => new Tls12AeadRecordCipher(
                 CreateAead(parameters.BulkCipher, keys.Key),
                 keys.Iv,
-                parameters.Mode == Tls12CipherMode.ExplicitNonceAead),
+                parameters.Mode == Tls12CipherMode.ExplicitNonceAead,
+                parameters.TagLength),
         };
 
     /// <summary>
@@ -74,6 +76,7 @@ internal abstract class Tls12RecordCipher : IDisposable
     {
         Tls12BulkCipher.Aria128Gcm or Tls12BulkCipher.Aria256Gcm => new AriaGcmTlsAead(key),
         Tls12BulkCipher.ChaCha20Poly1305 => new ChaCha20Poly1305TlsAead(key),
+        Tls12BulkCipher.Aes128Ccm or Tls12BulkCipher.Aes256Ccm or Tls12BulkCipher.Aes128Ccm8 or Tls12BulkCipher.Aes256Ccm8 => new AesCcmTlsAead(key),
         _ => new AesGcmTlsAead(key),
     };
 }

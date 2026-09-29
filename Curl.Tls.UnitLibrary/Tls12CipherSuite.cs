@@ -9,7 +9,7 @@ namespace Curl.Tls;
 /// A TLS 1.2, 1.1 and 1.0 cipher suite the client can run (ADR-0140, "What the client
 /// supports"): its key exchange, how it authenticates the server, its bulk cipher and
 /// record MAC, and whether its TLS 1.2 PRF is SHA-384. The table holds every ECDHE, DHE
-/// (RSA and DSS), RSA and anonymous suite whose bulk cipher the record layer protects: AES-CBC, AES-GCM,
+/// (RSA and DSS), RSA and anonymous suite with one of these bulk ciphers: AES-CBC, AES-GCM,
 /// ChaCha20-Poly1305, Camellia-CBC, ARIA-GCM, 3DES and NULL.
 /// </summary>
 /// <param name="Code">The suite's code point.</param>

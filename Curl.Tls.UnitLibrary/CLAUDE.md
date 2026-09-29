@@ -92,7 +92,7 @@ ClientHello (BL-821, ADR-0205), and post-handshake client authentication (BL-880
   returns 0 at `close_notify` or a bare transport end (`CloseNotifyReceived` tells them
   apart), and throws `TlsAlertException` for any other alert. The AEADs behind
   `ITlsAead` (`AesGcmTlsAead`, `AriaGcmTlsAead`, `ChaCha20Poly1305TlsAead`) serve both
-  TLS 1.2 and 1.3.
+  TLS 1.2 and 1.3; `AesCcmTlsAead` (over `Curl.Cryptography`'s `AeadAesCcm`) serves TLS 1.2.
 - `TlsPrf` (`Md5Sha1` for TLS 1.0 and 1.1, `Sha256`, `Sha384`): the PRF of RFC 2246 and
   RFC 5246, the master secret, the extended master secret (RFC 7627), the key block and
   both Finished `verify_data`s. `Tls12KeyBlock.Partition` divides the key block into each
@@ -105,12 +105,12 @@ ClientHello (BL-821, ADR-0205), and post-handshake client authentication (BL-880
   `CreatePlaintext` is the initial state. Record layouts: null with or without a MAC, CBC
   (AES, Camellia, 3DES) MAC-then-encrypt or encrypt-then-MAC (RFC 7366), with TLS 1.0's
   chained IVs or explicit random IVs from `ITlsRandomSource`, and TLS 1.2 AEAD (AES-GCM,
-  ARIA-GCM with the sequence number as the explicit nonce, ChaCha20-Poly1305 with the
-  XORed nonce). TLS 1.0 CBC writes an empty record before application data unless
-  `insertEmptyFragment` is off (`--ssl-allow-beast`). CBC padding is checked with masks
+  ARIA-GCM and AES-CCM/CCM8 with the sequence number as the explicit nonce,
+  ChaCha20-Poly1305 with the XORed nonce), and RC4 stream records
+  (`Tls12StreamRecordCipher`, the keystream running on across records). TLS 1.0 CBC
+  writes an empty record before application data unless `insertEmptyFragment` is off (`--ssl-allow-beast`). CBC padding is checked with masks
   (`Tls12CbcPadding`) and the MAC with `Tls12RecordMac.VerifyInFixedBlocks`, which hashes
-  the same number of blocks whatever the padding (`FixedBlockHmac`, BL-795). AES-CCM and RC4
-  records are BL-796's.
+  the same number of blocks whatever the padding (`FixedBlockHmac`, BL-795).
 - `Tls12ClientHandshake`: the I/O-free TLS 1.2, 1.1 and 1.0 client state machine.
   `Start()` returns the ClientHello; `ReceiveHandshake(bytes)` takes handshake record
   content and `ReceiveChangeCipherSpec(content)` the server's ChangeCipherSpec; each

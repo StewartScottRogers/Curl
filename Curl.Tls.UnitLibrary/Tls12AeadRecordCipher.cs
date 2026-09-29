@@ -3,18 +3,15 @@ using System.Buffers.Binary;
 namespace Curl.Tls;
 
 /// <summary>
-/// AEAD record protection in TLS 1.2 (RFC 5246 section 6.2.3.3). GCM (RFC 5288, RFC
-/// 6209) builds the nonce from a 4-byte salt and an 8-byte explicit nonce sent at the
+/// AEAD record protection in TLS 1.2 (RFC 5246 section 6.2.3.3). GCM and CCM (RFC 5288, RFC
+/// 6209, RFC 6655) build the nonce from a 4-byte salt and an 8-byte explicit nonce sent at the
 /// front of the record, here the sequence number as RFC 5288 section 3 allows;
 /// ChaCha20-Poly1305 (RFC 7905) XORs the sequence number into a 12-byte IV and sends no
 /// explicit nonce. The additional data is the sequence number, type, version and
-/// plaintext length; the 16-byte tag ends the record.
+/// plaintext length; the tag, 16 bytes or CCM8's 8, ends the record.
 /// </summary>
-internal sealed class Tls12AeadRecordCipher(ITlsAead aead, byte[] keyBlockIv, bool hasExplicitNonce) : Tls12RecordCipher
+internal sealed class Tls12AeadRecordCipher(ITlsAead aead, byte[] keyBlockIv, bool hasExplicitNonce, int tagLength) : Tls12RecordCipher
 {
-    /// <summary>The length in bytes of the tag.</summary>
-    public const int TagLength = 16;
-
     private const int NonceLength = 12;
 
     private const int SequenceNumberOffset = NonceLength - sizeof(ulong);
@@ -26,7 +23,7 @@ internal sealed class Tls12AeadRecordCipher(ITlsAead aead, byte[] keyBlockIv, bo
     public override byte[] Seal(ulong sequenceNumber, TlsContentType contentType, TlsProtocolVersion version, ReadOnlySpan<byte> content)
     {
         int explicitLength = ExplicitNonceLength;
-        byte[] fragment = new byte[explicitLength + content.Length + TagLength];
+        byte[] fragment = new byte[explicitLength + content.Length + tagLength];
         Span<byte> nonce = stackalloc byte[NonceLength];
         WriteNonce(sequenceNumber, nonce);
         nonce[(NonceLength - explicitLength)..].CopyTo(fragment);
@@ -39,7 +36,7 @@ internal sealed class Tls12AeadRecordCipher(ITlsAead aead, byte[] keyBlockIv, bo
     public override TlsDecodeResult<byte[]> Open(ulong sequenceNumber, TlsContentType contentType, TlsProtocolVersion version, ReadOnlySpan<byte> fragment)
     {
         int explicitLength = ExplicitNonceLength;
-        if (fragment.Length < explicitLength + TagLength)
+        if (fragment.Length < explicitLength + tagLength)
         {
             return TlsDecodeResult<byte[]>.Failure(TlsAlertDescription.BadRecordMac);
         }
@@ -47,11 +44,11 @@ internal sealed class Tls12AeadRecordCipher(ITlsAead aead, byte[] keyBlockIv, bo
         Span<byte> nonce = stackalloc byte[NonceLength];
         WriteNonce(sequenceNumber, nonce);
         fragment[..explicitLength].CopyTo(nonce[(NonceLength - explicitLength)..]);
-        ReadOnlySpan<byte> ciphertext = fragment[explicitLength..^TagLength];
+        ReadOnlySpan<byte> ciphertext = fragment[explicitLength..^tagLength];
         Span<byte> additionalData = stackalloc byte[AdditionalDataLength];
         WriteAdditionalData(additionalData, sequenceNumber, contentType, version, ciphertext.Length);
         byte[] plaintext = new byte[ciphertext.Length];
-        return aead.TryDecrypt(nonce, ciphertext, fragment[^TagLength..], plaintext, additionalData)
+        return aead.TryDecrypt(nonce, ciphertext, fragment[^tagLength..], plaintext, additionalData)
             ? TlsDecodeResult<byte[]>.Success(plaintext)
             : TlsDecodeResult<byte[]>.Failure(TlsAlertDescription.BadRecordMac);
     }
@@ -60,7 +57,7 @@ internal sealed class Tls12AeadRecordCipher(ITlsAead aead, byte[] keyBlockIv, bo
 
     /// <summary>
     /// Writes the sequence number into the nonce's last eight bytes and XORs the key
-    /// block IV over its front: GCM's 4-byte salt lands before the sequence number,
+    /// block IV over its front: the GCM and CCM 4-byte salt lands before the sequence number,
     /// ChaCha20-Poly1305's 12-byte IV is XORed with it.
     /// </summary>
     private void WriteNonce(ulong sequenceNumber, Span<byte> nonce)

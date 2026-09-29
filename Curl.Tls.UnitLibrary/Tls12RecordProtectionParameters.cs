@@ -17,20 +17,25 @@ public sealed record Tls12RecordProtectionParameters(
     Tls12MacAlgorithm MacAlgorithm,
     bool EncryptThenMac = false)
 {
-    // Indexed by Tls12BulkCipher: the record layout, the key length and the CBC block size.
-    private static readonly (Tls12CipherMode Mode, int KeyLength, int BlockSize)[] BulkCipherShapes =
+    // Indexed by Tls12BulkCipher: the record layout, the key length, the CBC block size and the AEAD tag length.
+    private static readonly (Tls12CipherMode Mode, int KeyLength, int BlockSize, int TagLength)[] BulkCipherShapes =
     [
-        (Tls12CipherMode.Null, 0, 0),
-        (Tls12CipherMode.Cbc, 24, 8),
-        (Tls12CipherMode.Cbc, 16, 16),
-        (Tls12CipherMode.Cbc, 32, 16),
-        (Tls12CipherMode.Cbc, 16, 16),
-        (Tls12CipherMode.Cbc, 32, 16),
-        (Tls12CipherMode.ExplicitNonceAead, 16, 0),
-        (Tls12CipherMode.ExplicitNonceAead, 32, 0),
-        (Tls12CipherMode.ExplicitNonceAead, 16, 0),
-        (Tls12CipherMode.ExplicitNonceAead, 32, 0),
-        (Tls12CipherMode.XorNonceAead, 32, 0),
+        (Tls12CipherMode.Null, 0, 0, 0),
+        (Tls12CipherMode.Cbc, 24, 8, 0),
+        (Tls12CipherMode.Cbc, 16, 16, 0),
+        (Tls12CipherMode.Cbc, 32, 16, 0),
+        (Tls12CipherMode.Cbc, 16, 16, 0),
+        (Tls12CipherMode.Cbc, 32, 16, 0),
+        (Tls12CipherMode.ExplicitNonceAead, 16, 0, 16),
+        (Tls12CipherMode.ExplicitNonceAead, 32, 0, 16),
+        (Tls12CipherMode.ExplicitNonceAead, 16, 0, 16),
+        (Tls12CipherMode.ExplicitNonceAead, 32, 0, 16),
+        (Tls12CipherMode.XorNonceAead, 32, 0, 16),
+        (Tls12CipherMode.ExplicitNonceAead, 16, 0, 16),
+        (Tls12CipherMode.ExplicitNonceAead, 32, 0, 16),
+        (Tls12CipherMode.ExplicitNonceAead, 16, 0, 8),
+        (Tls12CipherMode.ExplicitNonceAead, 32, 0, 8),
+        (Tls12CipherMode.Stream, 16, 0, 0),
     ];
 
     // Indexed by Tls12MacAlgorithm.
@@ -54,7 +59,8 @@ public sealed record Tls12RecordProtectionParameters(
     /// <summary>
     /// Gets the length in bytes of each direction's IV from the key block: the block size
     /// for CBC in TLS 1.0 (chained IVs), none for CBC in TLS 1.1 and 1.2 (explicit IVs,
-    /// RFC 5246 section 6.3), 4 for GCM's salt and 12 for ChaCha20-Poly1305.
+    /// RFC 5246 section 6.3), 4 for the GCM and CCM salt, 12 for ChaCha20-Poly1305
+    /// and none for RC4.
     /// </summary>
     public int FixedIvLength => Mode switch
     {
@@ -73,6 +79,9 @@ public sealed record Tls12RecordProtectionParameters(
     /// <summary>Gets the CBC block size, or zero for the other modes.</summary>
     internal int BlockSize => BulkCipherShapes[(int)BulkCipher].BlockSize;
 
+    /// <summary>Gets the AEAD tag length: 8 for CCM8, 16 for the other AEADs, zero for the other modes.</summary>
+    internal int TagLength => BulkCipherShapes[(int)BulkCipher].TagLength;
+
     /// <summary>Gets the MAC's hash; meaningless for <see cref="Tls12MacAlgorithm.None" />.</summary>
     internal HashAlgorithmName MacHash => MacHashes[(int)MacAlgorithm];
 
@@ -81,13 +90,13 @@ public sealed record Tls12RecordProtectionParameters(
     /// has the lengths it implies.
     /// </summary>
     /// <exception cref="ArgumentException">
-    /// An AEAD below TLS 1.2 or with a MAC, a CBC cipher without a MAC, or a key of the wrong length.
+    /// An AEAD below TLS 1.2 or with a MAC, a CBC cipher or RC4 without a MAC, or a key of the wrong length.
     /// </exception>
     internal void Validate(Tls12WriteKeys keys)
     {
         if (!NamesASuite())
         {
-            throw new ArgumentException($"{BulkCipher} with {MacAlgorithm} in {Version} is no suite: an AEAD needs TLS 1.2 and no record MAC, and a CBC cipher needs a MAC.", nameof(keys));
+            throw new ArgumentException($"{BulkCipher} with {MacAlgorithm} in {Version} is no suite: an AEAD needs TLS 1.2 and no record MAC, and a CBC cipher or RC4 needs a MAC.", nameof(keys));
         }
 
         if (!HasKeyLengths(keys))
@@ -99,7 +108,7 @@ public sealed record Tls12RecordProtectionParameters(
     private bool NamesASuite() => Mode switch
     {
         Tls12CipherMode.Null => true,
-        Tls12CipherMode.Cbc => MacAlgorithm != Tls12MacAlgorithm.None,
+        Tls12CipherMode.Cbc or Tls12CipherMode.Stream => MacAlgorithm != Tls12MacAlgorithm.None,
         _ => Version == TlsProtocolVersion.Tls12 && MacAlgorithm == Tls12MacAlgorithm.None,
     };
 

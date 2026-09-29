@@ -9,6 +9,9 @@ public sealed class Tls12RecordProtectionParametersTests
     [DataRow(TlsProtocolVersion.Tls10, Tls12BulkCipher.ChaCha20Poly1305, Tls12MacAlgorithm.None)]
     [DataRow(TlsProtocolVersion.Tls12, Tls12BulkCipher.Aes128Gcm, Tls12MacAlgorithm.HmacSha256)]
     [DataRow(TlsProtocolVersion.Tls12, Tls12BulkCipher.Aes128Cbc, Tls12MacAlgorithm.None)]
+    [DataRow(TlsProtocolVersion.Tls11, Tls12BulkCipher.Aes128Ccm, Tls12MacAlgorithm.None)]
+    [DataRow(TlsProtocolVersion.Tls10, Tls12BulkCipher.Aes256Ccm8, Tls12MacAlgorithm.None)]
+    [DataRow(TlsProtocolVersion.Tls12, Tls12BulkCipher.Rc4128, Tls12MacAlgorithm.None)]
     public void ACombinationNoSuiteNamesIsRefused(TlsProtocolVersion version, Tls12BulkCipher bulkCipher, Tls12MacAlgorithm macAlgorithm)
     {
         Tls12RecordProtectionParameters parameters = new(version, bulkCipher, macAlgorithm);

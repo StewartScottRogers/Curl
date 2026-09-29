@@ -40,6 +40,15 @@ public sealed class Tls12RecordProtectionTests
         [TlsProtocolVersion.Tls12, Tls12BulkCipher.Aria128Gcm, Tls12MacAlgorithm.None, false],
         [TlsProtocolVersion.Tls12, Tls12BulkCipher.Aria256Gcm, Tls12MacAlgorithm.None, false],
         [TlsProtocolVersion.Tls12, Tls12BulkCipher.ChaCha20Poly1305, Tls12MacAlgorithm.None, false],
+        [TlsProtocolVersion.Tls12, Tls12BulkCipher.Aes128Ccm, Tls12MacAlgorithm.None, false],
+        [TlsProtocolVersion.Tls12, Tls12BulkCipher.Aes256Ccm, Tls12MacAlgorithm.None, false],
+        [TlsProtocolVersion.Tls12, Tls12BulkCipher.Aes128Ccm8, Tls12MacAlgorithm.None, false],
+        [TlsProtocolVersion.Tls12, Tls12BulkCipher.Aes256Ccm8, Tls12MacAlgorithm.None, false],
+        [TlsProtocolVersion.Tls10, Tls12BulkCipher.Rc4128, Tls12MacAlgorithm.HmacMd5, false],
+        [TlsProtocolVersion.Tls10, Tls12BulkCipher.Rc4128, Tls12MacAlgorithm.HmacSha1, false],
+        [TlsProtocolVersion.Tls11, Tls12BulkCipher.Rc4128, Tls12MacAlgorithm.HmacSha1, false],
+        [TlsProtocolVersion.Tls12, Tls12BulkCipher.Rc4128, Tls12MacAlgorithm.HmacMd5, false],
+        [TlsProtocolVersion.Tls12, Tls12BulkCipher.Rc4128, Tls12MacAlgorithm.HmacSha1, true],
     ];
 
     [TestMethod]
@@ -191,6 +200,44 @@ public sealed class Tls12RecordProtectionTests
     }
 
     [TestMethod]
+    [DataRow(Tls12BulkCipher.Aes128Ccm, 16, 16)]
+    [DataRow(Tls12BulkCipher.Aes256Ccm, 32, 16)]
+    [DataRow(Tls12BulkCipher.Aes128Ccm8, 16, 8)]
+    [DataRow(Tls12BulkCipher.Aes256Ccm8, 32, 8)]
+    public void CcmSendsTheSequenceNumberAsTheExplicitNonceAfterTheSaltAndEndsWithItsTag(Tls12BulkCipher bulkCipher, int keyLength, int tagLength)
+    {
+        Tls12RecordProtectionParameters parameters = new(TlsProtocolVersion.Tls12, bulkCipher, Tls12MacAlgorithm.None);
+        byte[] key = Enumerable.Range(0x10, keyLength).Select(value => (byte)value).ToArray();
+        byte[] salt = [0xC0, 0xC1, 0xC2, 0xC3];
+        using Tls12RecordWriteState writer = Tls12RecordWriteState.Create(parameters, new Tls12WriteKeys([], key, salt), Tls12Records.Replay());
+        writer.Protect(TlsContentType.Handshake, [1]);
+
+        byte[] fragment = Tls12Records.Split(writer.Protect(TlsContentType.ApplicationData, Content))[0].Fragment;
+
+        byte[] explicitNonce = [0, 0, 0, 0, 0, 0, 0, 1];
+        byte[] ciphertext = new byte[Content.Length];
+        byte[] tag = new byte[tagLength];
+        using AeadAesCcm aesCcm = new(key);
+        aesCcm.Encrypt((byte[])[.. salt, .. explicitNonce], Content, ciphertext, tag, Tls12Records.AdditionalData(1, TlsContentType.ApplicationData, TlsProtocolVersion.Tls12, Content.Length));
+        CollectionAssert.AreEqual((byte[])[.. explicitNonce, .. ciphertext, .. tag], fragment);
+    }
+
+    [TestMethod]
+    public void Rc4EncryptsTheContentAndItsMacWithAKeyStreamThatRunsOnAcrossRecords()
+    {
+        Tls12RecordProtectionParameters parameters = new(TlsProtocolVersion.Tls11, Tls12BulkCipher.Rc4128, Tls12MacAlgorithm.HmacSha1);
+        using Tls12RecordWriteState writer = Tls12RecordWriteState.Create(parameters, new Tls12WriteKeys(MacKey, AesKey, []), Tls12Records.Replay());
+
+        byte[] first = Tls12Records.Split(writer.Protect(TlsContentType.Handshake, Content))[0].Fragment;
+        byte[] second = Tls12Records.Split(writer.Protect(TlsContentType.ApplicationData, Content))[0].Fragment;
+
+        using Rc4 rc4 = new(AesKey);
+        byte[] expected = [.. Content, .. Mac(0, TlsContentType.Handshake, TlsProtocolVersion.Tls11), .. Content, .. Mac(1, TlsContentType.ApplicationData, TlsProtocolVersion.Tls11)];
+        rc4.ApplyKeyStream(expected, expected);
+        CollectionAssert.AreEqual(expected, (byte[])[.. first, .. second]);
+    }
+
+    [TestMethod]
     public void NullWithAMacSendsTheContentThenItsMac()
     {
         Tls12RecordProtectionParameters parameters = new(TlsProtocolVersion.Tls12, Tls12BulkCipher.Null, Tls12MacAlgorithm.HmacSha1);
@@ -247,6 +294,8 @@ public sealed class Tls12RecordProtectionTests
     [TestMethod]
     [DataRow(Tls12BulkCipher.Aes128Gcm, Tls12MacAlgorithm.None, 24)]
     [DataRow(Tls12BulkCipher.ChaCha20Poly1305, Tls12MacAlgorithm.None, 16)]
+    [DataRow(Tls12BulkCipher.Aes128Ccm8, Tls12MacAlgorithm.None, 16)]
+    [DataRow(Tls12BulkCipher.Rc4128, Tls12MacAlgorithm.HmacSha1, 20)]
     [DataRow(Tls12BulkCipher.Null, Tls12MacAlgorithm.HmacSha1, 20)]
     public void AFragmentShorterThanItsTagOrMacIsBadRecordMac(Tls12BulkCipher bulkCipher, Tls12MacAlgorithm macAlgorithm, int shortestLength)
     {
@@ -268,9 +317,9 @@ public sealed class Tls12RecordProtectionTests
         Assert.AreEqual(TlsAlertDescription.BadRecordMac, reader.Unprotect(TlsContentType.ApplicationData, fragment).Alert);
     }
 
-    private static byte[] MacThenPad(ulong sequenceNumber, TlsContentType contentType, TlsProtocolVersion version)
-    {
-        byte[] mac = HMACSHA1.HashData(MacKey, (byte[])[.. Tls12Records.AdditionalData(sequenceNumber, contentType, version, Content.Length), .. Content]);
-        return [.. Content, .. mac, .. Enumerable.Repeat((byte)2, 3)];
-    }
+    private static byte[] MacThenPad(ulong sequenceNumber, TlsContentType contentType, TlsProtocolVersion version) =>
+        [.. Content, .. Mac(sequenceNumber, contentType, version), .. Enumerable.Repeat((byte)2, 3)];
+
+    private static byte[] Mac(ulong sequenceNumber, TlsContentType contentType, TlsProtocolVersion version) =>
+        HMACSHA1.HashData(MacKey, (byte[])[.. Tls12Records.AdditionalData(sequenceNumber, contentType, version, Content.Length), .. Content]);
 }

@@ -1,6 +1,6 @@
 namespace Curl.Tls;
 
-/// <summary>An AEAD with a 12-byte nonce and a 16-byte tag, as TLS 1.2's AEAD records and TLS 1.3's GCM and ChaCha20-Poly1305 records use it.</summary>
+/// <summary>An AEAD with a 12-byte nonce and a tag as long as the <c>tag</c> span (16 bytes, or 8 for CCM8), as TLS 1.2's AEAD records and TLS 1.3's records use it.</summary>
 internal interface ITlsAead : IDisposable
 {
     /// <summary>Encrypts <paramref name="plaintext" /> and writes the tag over <paramref name="associatedData" /> and the ciphertext.</summary>
