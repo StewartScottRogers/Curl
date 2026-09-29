@@ -30,6 +30,9 @@ internal static class SmbMessageHeader
     /// <summary>SMB_COM_READ_ANDX.</summary>
     public const byte ReadAndXCommand = 0x2e;
 
+    /// <summary>SMB_COM_WRITE_ANDX.</summary>
+    public const byte WriteAndXCommand = 0x2f;
+
     /// <summary>SMB_COM_CLOSE.</summary>
     public const byte CloseCommand = 0x04;
 

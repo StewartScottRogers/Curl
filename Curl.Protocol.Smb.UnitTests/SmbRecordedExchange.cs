@@ -7,7 +7,8 @@ namespace Curl.Protocol.Smb;
 /// <c>-u DOM\Us:pw</c>. The server's side was hand-assembled from <c>lib/smb.c</c>'s
 /// structures (ADR-0200): session key <c>0x12345678</c>, challenge
 /// <c>0123456789abcdef</c> (MS-NLMP 4.2.1's), UID <c>0x0064</c>. The download that
-/// follows (BL-596) was measured the same way, with TID <c>0x0007</c> and FID <c>0x4001</c>.
+/// follows (BL-596) was measured the same way, with TID <c>0x0007</c> and FID <c>0x4001</c>,
+/// and so was the upload (BL-597).
 /// </summary>
 internal static class SmbRecordedExchange
 {
@@ -139,6 +140,77 @@ internal static class SmbRecordedExchange
     /// <summary>The server's tree disconnect response.</summary>
     public static byte[] TreeDisconnectAccepted => Hex(
         "00 00 00 23 ff 53 4d 42 71 00 00 00 00 98 01 00 00 00 00 00 00 00 00 00 00 00 00 00 07 00 00 00 64 00 00 00 00 00 00");
+
+    /// <summary>
+    /// The upload measured on 2026-09-29 (BL-597): the same curl and recorder,
+    /// <c>curl -u User:Password -T up.txt smb://172.26.96.1:14450/share/dir/x.txt</c>,
+    /// <c>up.txt</c> holding <see cref="FileContent" />.
+    /// </summary>
+    public const string UploadUrl = DownloadUrl;
+
+    /// <summary>curl's SMB_COM_NT_CREATE_ANDX opening <c>dir\x.txt</c> for an upload: GENERIC_READ | GENERIC_WRITE, FILE_OVERWRITE_IF.</summary>
+    public static byte[] UploadOpenRequest => Hex(
+        "00 00 00 5d ff 53 4d 42 a2 00 00 00 00 18 41 00 ba 00 00 00 00 00 00 00 00 00 00 00 07 00 1d d7 64 00 00 00 "
+        + "18 ff 00 00 00 00 09 00 00 00 00 00 00 00 00 00 00 00 00 c0 00 00 00 00 00 00 00 00 00 00 00 00 07 00 00 00 "
+        + "05 00 00 00 00 00 00 00 00 00 00 00 00 0a 00 64 69 72 5c 78 2e 74 78 74 00");
+
+    /// <summary>The server's open response for a file it created, FID 0x4001, create action FILE_CREATED.</summary>
+    public static byte[] UploadOpenCreated => Hex(
+        "00 00 00 67 ff 53 4d 42 a2 00 00 00 00 98 01 00 00 00 00 00 00 00 00 00 00 00 00 00 07 00 00 00 64 00 00 00 "
+        + "22 ff 00 00 00 00 01 40 02 00 00 00 80 00 40 74 94 7b dc 01 80 00 40 74 94 7b dc 01 80 00 40 74 94 7b dc 01 "
+        + "80 00 40 74 94 7b dc 01 80 00 00 00 0b 00 00 00 00 00 00 00 0b 00 00 00 00 00 00 00 00 00 00 00 00 00 00");
+
+    /// <summary>The server's open response refusing a read-only share, STATUS_ACCESS_DENIED; curl exits 78.</summary>
+    public static byte[] OpenAccessDenied => Hex(
+        "00 00 00 23 ff 53 4d 42 a2 22 00 00 c0 98 01 00 00 00 00 00 00 00 00 00 00 00 00 00 07 00 00 00 64 00 00 00 00 00 00");
+
+    /// <summary>curl's SMB_COM_WRITE_ANDX of <see cref="FileContent" /> at offset 0 of FID 0x4001.</summary>
+    public static byte[] WriteRequest => Hex(
+        "00 00 00 4b ff 53 4d 42 2f 00 00 00 00 18 41 00 ba 00 00 00 00 00 00 00 00 00 00 00 07 00 1d d7 64 00 00 00 "
+        + "0e ff 00 00 00 01 40 00 00 00 00 00 00 00 00 00 00 00 00 00 00 0b 00 40 00 00 00 00 00 0c 00 00 "
+        + "68 65 6c 6c 6f 20 77 6f 72 6c 64");
+
+    /// <summary>curl's SMB_COM_WRITE_ANDX uploading an empty file: no data, byte count 1 for the padding.</summary>
+    public static byte[] EmptyWriteRequest => Hex(
+        "00 00 00 40 ff 53 4d 42 2f 00 00 00 00 18 41 00 ba 00 00 00 00 00 00 00 00 00 00 00 07 00 1d d7 64 00 00 00 "
+        + "0e ff 00 00 00 01 40 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 40 00 00 00 00 00 01 00 00");
+
+    /// <summary>
+    /// The first 68 bytes of curl's two writes of a 40000-byte file: 0x7fff bytes at 0, then
+    /// 0x1c41 at 0x7fff.
+    /// </summary>
+    public static byte[][] LargeWriteHeaders =>
+    [
+        Hex("00 00 80 3f ff 53 4d 42 2f 00 00 00 00 18 41 00 ba 00 00 00 00 00 00 00 00 00 00 00 07 00 1d d7 64 00 00 00 "
+            + "0e ff 00 00 00 01 40 00 00 00 00 00 00 00 00 00 00 00 00 00 00 ff 7f 40 00 00 00 00 00 00 80 00"),
+        Hex("00 00 1c 81 ff 53 4d 42 2f 00 00 00 00 18 41 00 ba 00 00 00 00 00 00 00 00 00 00 00 07 00 1d d7 64 00 00 00 "
+            + "0e ff 00 00 00 01 40 ff 7f 00 00 00 00 00 00 00 00 00 00 00 00 41 1c 40 00 00 00 00 00 42 1c 00"),
+    ];
+
+    /// <summary>
+    /// curl's second write when the server said it wrote only 5 of the 11 bytes: 6 bytes
+    /// declared at offset 5, none sent, the source being at its end.
+    /// </summary>
+    public static byte[] ShortWriteRequest => Hex(
+        "00 00 00 46 ff 53 4d 42 2f 00 00 00 00 18 41 00 ba 00 00 00 00 00 00 00 00 00 00 00 07 00 1d d7 64 00 00 00 "
+        + "0e ff 00 00 00 01 40 05 00 00 00 00 00 00 00 00 00 00 00 00 00 06 00 40 00 00 00 00 00 07 00 00");
+
+    /// <summary>The server's write response saying it wrote <paramref name="count" /> bytes.</summary>
+    /// <param name="count">The bytes written, as the response's count word.</param>
+    /// <returns>The response.</returns>
+    public static byte[] WriteAccepted(ushort count)
+    {
+        byte[] response = Hex(
+            "00 00 00 2f ff 53 4d 42 2f 00 00 00 00 98 01 00 00 00 00 00 00 00 00 00 00 00 00 00 07 00 00 00 64 00 00 00 "
+            + "06 ff 00 00 00 00 00 ff ff 00 00 00 00 00 00");
+        response[41] = (byte)count;
+        response[42] = (byte)(count >> 8);
+        return response;
+    }
+
+    /// <summary>The server's write response refusing it, STATUS_ACCESS_DENIED; curl exits 25.</summary>
+    public static byte[] WriteRefused => Hex(
+        "00 00 00 23 ff 53 4d 42 2f 22 00 00 c0 98 01 00 00 00 00 00 00 00 00 00 00 00 00 00 07 00 00 00 64 00 00 00 00 00 00");
 
     /// <summary>A frame curl refuses with exit 56: a NetBIOS length of 1.</summary>
     public static byte[] TooSmallFrame => Hex("00 00 00 01 00");

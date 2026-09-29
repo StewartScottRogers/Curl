@@ -17,6 +17,12 @@ internal static class SmbMessages
     /// <summary>Exit 7, a negotiate response that is short or carries an error status.</summary>
     public const string NegotiateFailed = "Could not connect to server";
 
+    /// <summary>Exit 25, a write response that is short or carries an error status.</summary>
+    public const string UploadFailed = "Upload failed (at start/before it took off)";
+
+    /// <summary>Exit 55, an upload from a source whose size cannot be known, such as <c>-T -</c>.</summary>
+    public const string UploadSizeUnknown = "SMB upload needs to know the size up front";
+
     /// <summary>Exit 56, a message whose byte count runs past its frame.</summary>
     public const string ReceiveFailed = "Failure when receiving data from the peer";
 

@@ -7,15 +7,18 @@ SMB/CIFS file access, speaking curl 8.21.0's SMBv1 (`NT LM 0.12`) on every platf
 
 **URL schemes:** `smb`, `smbs`
 
-`SmbProtocolHandler` downloads a file. `SmbUrlPath` splits the share from the URL's
-path; `SmbSessionEstablisher` (BL-595) sends `SmbNegotiateRequest`, reads
-`SmbNegotiateResponse`'s challenge and answers it with `SmbSessionSetupRequest`, whose
-NTLMv1 LM and NT responses come from `Curl.Ntlm`'s `NtlmResponseComputation.ComputeV1`;
-then `SmbFileDownloader` (BL-596) sends `SmbTreeConnectRequest`, `SmbOpenRequest`
-(reading `SmbOpenResponse`), `SmbReadRequest` until a short `SmbReadResponse`,
-`SmbCloseRequest` and `SmbTreeDisconnectRequest`, each framed by
-`SmbMessageHeader.Frame`. `SmbMessageReader` frames every reply as curl's
-`smb_recv_message` does. Writing the file with `-T` is BL-597.
+`SmbProtocolHandler` downloads a file, or uploads one with `-T`. `SmbUrlPath` splits the
+share from the URL's path; `SmbSessionEstablisher` (BL-595) sends `SmbNegotiateRequest`,
+reads `SmbNegotiateResponse`'s challenge and answers it with `SmbSessionSetupRequest`,
+whose NTLMv1 LM and NT responses come from `Curl.Ntlm`'s
+`NtlmResponseComputation.ComputeV1`; then `SmbFileTransfer` sends `SmbTreeConnectRequest`,
+`SmbOpenRequest` (reading `SmbOpenResponse`), then for a download (BL-596)
+`SmbReadRequest` until a short `SmbReadResponse`, or for an upload (BL-597)
+`SmbWriteRequest` until `SmbWriteResponse`'s counts reach the source's size, then
+`SmbCloseRequest` and `SmbTreeDisconnectRequest`, each framed by `SmbMessageHeader`.
+`SmbMessageReader` frames every reply as curl's `smb_recv_message` does. An upload source
+that cannot seek (`-T -`) is refused with exit 55, as curl refuses an upload of unknown
+size.
 
 This library may reference `Curl.Protocol.Abstractions.UnitLibrary` and, of the
 hand-built libraries ADR-0120 lists, `Curl.Ntlm.UnitLibrary`; nothing else horizontal.
@@ -26,4 +29,4 @@ Never construct a `Socket`, `SslStream` or `HttpClient` here. Take `IConnection`
 so the tests in the matching `.UnitTests` project can drive this code from a
 recorded byte stream with no network. `Curl.Protocol.Smb.UnitTests`'
 `SmbRecordedExchange` holds the bytes measured from Linux curl on 2026-09-29, for the
-session and for the download.
+session, the download and the upload.

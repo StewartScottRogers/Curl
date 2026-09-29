@@ -10,7 +10,8 @@ namespace Curl.Protocol.Smb;
 /// (<see cref="SmbRecordedExchange" />): the bytes sent, the file written, and the exit code
 /// and message of each outcome - 3 for a path with no share, 67 with no user or a refused
 /// session setup, 7 for a refused negotiate, 78 for a missing share or file, 9 for a share
-/// refused with ERRnoaccess, 56 for a directory.
+/// refused with ERRnoaccess, 56 for a directory - and the <c>-T</c> upload (BL-597): a new or
+/// existing file, 78 for a read-only share, 25 for a refused write, 55 for <c>-T -</c>.
 /// </summary>
 [TestClass]
 public sealed class SmbProtocolHandlerTests
@@ -18,6 +19,8 @@ public sealed class SmbProtocolHandlerTests
     private const string Url = "smb://" + SmbRecordedExchange.Host + "/share/x.txt";
 
     private static readonly NetworkCredential User = new("User", "Password");
+
+    private static readonly byte[] Upload = Encoding.ASCII.GetBytes(SmbRecordedExchange.FileContent);
 
     [TestMethod]
     public void SupportedSchemes_AreSmbAndSmbs()
@@ -251,6 +254,109 @@ public sealed class SmbProtocolHandlerTests
 
         Assert.AreEqual(new ConnectTarget("h", 445, false) { Proxy = proxy }, connector.Targets.Single());
     }
+
+    [TestMethod]
+    public async Task ExecuteAsync_Upload_SendsCurlsRequestsAndReportsTheBytesUploaded()
+    {
+        var connection = FileUpload(SmbRecordedExchange.UploadOpenCreated, SmbRecordedExchange.WriteAccepted(11));
+        var progress = new RecordingProgress();
+
+        TransferResult result = await Handler(connection).ExecuteAsync(UploadContext(new MemoryStream(Upload), progress));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(11L, result.BytesTransferred);
+        Assert.AreEqual(11L, result.Report!.UploadSize);
+        Assert.AreEqual(0L, result.Report.DownloadSize);
+        CollectionAssert.AreEqual(
+            Concat(
+                SmbRecordedExchange.NegotiateRequest,
+                SmbRecordedExchange.SessionSetupRequest,
+                SmbRecordedExchange.TreeConnectRequest,
+                SmbRecordedExchange.UploadOpenRequest,
+                SmbRecordedExchange.WriteRequest,
+                SmbRecordedExchange.CloseRequest,
+                SmbRecordedExchange.TreeDisconnectRequest),
+            connection.Sent);
+        Assert.IsTrue(progress.Started);
+        CollectionAssert.AreEqual(new (long, long?)[] { (11, 11) }, progress.Uploads.ToArray());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_UploadOverAnExistingFile_SendsTheSameRequests()
+    {
+        byte[] overwritten = SmbRecordedExchange.UploadOpenCreated;
+        overwritten[44] = 3; // FILE_OVERWRITTEN
+        var connection = FileUpload(overwritten, SmbRecordedExchange.WriteAccepted(11));
+
+        TransferResult result = await Handler(connection).ExecuteAsync(UploadContext(new MemoryStream(Upload)));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.IsTrue(connection.Sent.AsSpan().EndsWith(
+            Concat(SmbRecordedExchange.WriteRequest, SmbRecordedExchange.CloseRequest, SmbRecordedExchange.TreeDisconnectRequest)));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_UploadToAReadOnlyShare_Exits78AfterDisconnecting()
+    {
+        var connection = new ScriptedConnection(
+            SmbRecordedExchange.NegotiateResponse,
+            SmbRecordedExchange.SessionSetupAccepted,
+            SmbRecordedExchange.TreeConnectAccepted,
+            SmbRecordedExchange.OpenAccessDenied,
+            SmbRecordedExchange.TreeDisconnectAccepted);
+
+        TransferResult result = await Handler(connection).ExecuteAsync(UploadContext(new MemoryStream(Upload)));
+
+        Assert.AreEqual(CurlExitCode.RemoteFileNotFound, result.ExitCode);
+        Assert.AreEqual("Remote file not found", result.ErrorMessage);
+        Assert.IsNull(result.Report);
+        Assert.IsTrue(connection.Sent.AsSpan().EndsWith(
+            Concat(SmbRecordedExchange.UploadOpenRequest, SmbRecordedExchange.TreeDisconnectRequest)));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_UploadWriteRefused_Exits25AfterClosingAndDisconnecting()
+    {
+        var connection = FileUpload(SmbRecordedExchange.UploadOpenCreated, SmbRecordedExchange.WriteRefused);
+
+        TransferResult result = await Handler(connection).ExecuteAsync(UploadContext(new MemoryStream(Upload)));
+
+        Assert.AreEqual(CurlExitCode.UploadFailed, result.ExitCode);
+        Assert.AreEqual("Upload failed (at start/before it took off)", result.ErrorMessage);
+        Assert.AreEqual(0L, result.Report!.UploadSize);
+        Assert.IsTrue(connection.Sent.AsSpan().EndsWith(
+            Concat(SmbRecordedExchange.WriteRequest, SmbRecordedExchange.CloseRequest, SmbRecordedExchange.TreeDisconnectRequest)));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_UploadFromStandardInput_Exits55AfterTheSessionSetup()
+    {
+        var connection = FileUpload(SmbRecordedExchange.UploadOpenCreated, SmbRecordedExchange.WriteAccepted(11));
+
+        TransferResult result = await Handler(connection).ExecuteAsync(UploadContext(new UnseekableStream(Upload)));
+
+        Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
+        Assert.AreEqual("SMB upload needs to know the size up front", result.ErrorMessage);
+        CollectionAssert.AreEqual(Concat(SmbRecordedExchange.NegotiateRequest, SmbRecordedExchange.SessionSetupRequest), connection.Sent);
+    }
+
+    private static TransferContext UploadContext(Stream upload, ITransferProgress? progress = null) => new()
+    {
+        Url = CurlUrl.Parse(SmbRecordedExchange.UploadUrl),
+        Output = new MemoryStream(),
+        Upload = upload,
+        Credentials = User,
+        Progress = progress ?? NoTransferProgress.Instance,
+    };
+
+    private static ScriptedConnection FileUpload(byte[] openResponse, byte[] writeResponse) => new(
+        SmbRecordedExchange.NegotiateResponse,
+        SmbRecordedExchange.SessionSetupAccepted,
+        SmbRecordedExchange.TreeConnectAccepted,
+        openResponse,
+        writeResponse,
+        SmbRecordedExchange.CloseAccepted,
+        SmbRecordedExchange.TreeDisconnectAccepted);
 
     private static SmbProtocolHandler Handler(ScriptedConnection connection) =>
         new(new RecordingConnector(ConnectResult.Connected(connection)), SmbCurlOperatingSystem.Linux);

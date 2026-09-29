@@ -4,10 +4,11 @@ namespace Curl.Protocol.Smb;
 
 /// <summary>
 /// Serves the <c>smb</c> and <c>smbs</c> schemes on every platform, speaking curl 8.21.0's
-/// SMBv1 (ADR-0200) to download a file: parses the share and file from the URL's path,
-/// connects, negotiates the <c>NT LM 0.12</c> dialect, sets up a session authenticated
-/// with NTLMv1 responses, then connects to the share, reads the file to the output and
-/// disconnects (<see cref="SmbFileDownloader" />). Uploading with <c>-T</c> is BL-597's.
+/// SMBv1 (ADR-0200) to download a file, or with <c>-T</c> to upload one: parses the share
+/// and file from the URL's path, connects, negotiates the <c>NT LM 0.12</c> dialect, sets
+/// up a session authenticated with NTLMv1 responses, then connects to the share, reads the
+/// file to the output or writes the upload source to it, created or truncated, and
+/// disconnects (<see cref="SmbFileTransfer" />).
 /// </summary>
 /// <remarks>
 /// The connector supplies the connection to the URL's host and port, in TLS from the
@@ -15,8 +16,10 @@ namespace Curl.Protocol.Smb;
 /// constructed here. The outcomes, in curl's order: a path with no share is refused before connecting with
 /// exit 3; a connect failure is returned as the connector reported it; a transfer with no
 /// user (<see cref="ITransferContext.Credentials" />) is refused once connected with exit
-/// 67 and nothing sent; then <see cref="SmbSessionEstablisher" />'s outcomes, then
-/// <see cref="SmbFileDownloader" />'s. The port
+/// 67 and nothing sent; then <see cref="SmbSessionEstablisher" />'s outcomes; then an
+/// upload source that cannot seek, such as <c>-T -</c>'s standard input, is refused with
+/// exit 55 and nothing more sent, as curl refuses an upload of unknown size; then
+/// <see cref="SmbFileTransfer" />'s. The port
 /// defaults to 445 for both schemes. A server that closes the connection mid-exchange is
 /// waited on until <see cref="ITransferContext.CancellationToken" /> ends the transfer, as
 /// curl waits for <c>-m</c>.
@@ -89,11 +92,11 @@ public sealed class SmbProtocolHandler : IProtocolHandler
 
         await using (connection.ConfigureAwait(false))
         {
-            return await DownloadAsync(connection, context, path!).ConfigureAwait(false);
+            return await TransferAsync(connection, context, path!).ConfigureAwait(false);
         }
     }
 
-    private async ValueTask<TransferResult> DownloadAsync(IConnection connection, ITransferContext context, SmbUrlPath path)
+    private async ValueTask<TransferResult> TransferAsync(IConnection connection, ITransferContext context, SmbUrlPath path)
     {
         if (context.Credentials is not { } credentials)
         {
@@ -106,8 +109,15 @@ public sealed class SmbProtocolHandler : IProtocolHandler
             credentials.Password,
             SmbIdentity.Split(credentials.UserName, context.Url.IdnHost),
             context.CancellationToken).ConfigureAwait(false);
-        return failure ?? await new SmbFileDownloader(connection, reader, userId, context)
-            .DownloadAsync(context.Url.IdnHost, path)
-            .ConfigureAwait(false);
+        if (failure is not null)
+        {
+            return failure;
+        }
+
+        return context.Upload is { CanSeek: false }
+            ? TransferResult.Failure(CurlExitCode.SendError, SmbMessages.UploadSizeUnknown)
+            : await new SmbFileTransfer(connection, reader, userId, context)
+                .TransferAsync(context.Url.IdnHost, path)
+                .ConfigureAwait(false);
     }
 }
