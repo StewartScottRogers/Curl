@@ -524,6 +524,57 @@ public sealed class RedirectFollowerTests
     }
 
     [TestMethod]
+    [DataRow("http://a:b@127.0.0.1:18814/a", "a:b", "http://a:b@127.0.0.1:18814/b", false, "a:b")]
+    [DataRow("http://a:b@127.0.0.1:18814/a", "a:b", "http://c:d@127.0.0.1:18814/b", false, "c:d")]
+    [DataRow("http://a:b@127.0.0.1:18814/a", "a:b", "http://c:d@localhost:18814/b", false, "c:d")]
+    [DataRow("http://a:b@127.0.0.1:18814/a", "a:b", "http://127.0.0.1:18814/b", false, null)]
+    [DataRow("http://a:b@127.0.0.1:18814/a", "a:b", "http://localhost:18814/b", false, null)]
+    [DataRow("http://a:b@127.0.0.1:18814/a", "a:b", "http://localhost:18814/b", true, null)]
+    [DataRow("http://a:b@127.0.0.1:18814/a", "a:b", "http://c@127.0.0.1:18814/b", false, "c:")]
+    [DataRow("http://127.0.0.1:18814/a", "q:r", "http://127.0.0.1:18814/b", false, "q:r")]
+    [DataRow("http://127.0.0.1:18814/a", "q:r", "http://c:d@127.0.0.1:18814/b", false, "q:r")]
+    [DataRow("http://127.0.0.1:18814/a", "q:r", "http://c:d@localhost:18814/b", false, "c:d")]
+    [DataRow("http://127.0.0.1:18814/a", "q:r", "http://localhost:18814/b", false, null)]
+    [DataRow("http://127.0.0.1:18814/a", "q:r", "http://c:d@localhost:18814/b", true, "q:r")]
+    [DataRow("http://a:b@127.0.0.1:18814/a", "q:r", "http://c:d@127.0.0.1:18814/b", false, "q:r")]
+    [DataRow("http://127.0.0.1:18814/a", null, "http://c:d@127.0.0.1:18814/b", false, "c:d")]
+    public async Task FollowAsync_LocationWithUserInformation_SendsCurlsCredentials(
+        string first,
+        string? credentials,
+        string target,
+        bool trusted,
+        string? expected)
+    {
+        // Measured (BL-814 Notes): curl -s -L [--location-trusted] [-u q:r] <first>, 302 to <target>;
+        // the second request's Authorization: Basic decodes to <expected>.
+        ScriptedHandler handler = new(Redirect(302, target), Ok(200, 0));
+
+        await Follow(handler, CredentialContext(first, credentials), new RedirectPolicy { LocationTrusted = trusted });
+
+        Assert.AreEqual(expected, UserAndPassword(handler.Contexts[1].Credentials));
+    }
+
+    [TestMethod]
+    [DataRow("http://a:b@127.0.0.1:18814/a", "a:x", "http://c:d@127.0.0.1:18814/b", "a:x")]
+    [DataRow("http://127.0.0.1:18814/a", null, "http://c%40e:d%3Af@127.0.0.1:18814/b", "c@e:d:f")]
+    [DataRow("http://127.0.0.1:18814/a", null, "http://:d@127.0.0.1:18814/b", ":d")]
+    [DataRow("http://127.0.0.1:18814/a", null, "http://@127.0.0.1:18814/b", null)]
+    public async Task FollowAsync_LocationUserInformation_IsDecodedAndLosesToOtherCredentials(
+        string first,
+        string? credentials,
+        string target,
+        string? expected)
+    {
+        // First-hop credentials that differ from the first URL's own came from -u; the hop URL's
+        // user information is percent-decoded, and an empty one is none.
+        ScriptedHandler handler = new(Redirect(302, target), Ok(200, 0));
+
+        await Follow(handler, CredentialContext(first, credentials));
+
+        Assert.AreEqual(expected, UserAndPassword(handler.Contexts[1].Credentials));
+    }
+
+    [TestMethod]
     public async Task FollowAsync_BackToFirstHost_SendsCredentialsAgain()
     {
         ScriptedHandler handler = new(Redirect(302, "http://localhost:18203/b"), Redirect(302, Next), Ok(200, 0));
@@ -1055,6 +1106,19 @@ public sealed class RedirectFollowerTests
             Credentials = credentials ? new NetworkCredential("u", "p") : null,
             TimeProvider = timeProvider ?? TimeProvider.System,
         };
+
+    private static TransferContext CredentialContext(string url, string? credentials) =>
+        new()
+        {
+            Url = CurlUrl.Parse(url),
+            Output = Stream.Null,
+            Http = Location(),
+            Credentials = credentials is null ? null : new NetworkCredential(credentials.Split(':')[0], credentials.Split(':')[1]),
+            TimeProvider = TimeProvider.System,
+        };
+
+    private static string? UserAndPassword(NetworkCredential? credentials) =>
+        credentials is null ? null : $"{credentials.UserName}:{credentials.Password}";
 
     private static Task<TransferResult> Follow(IProtocolHandler handler, ITransferContext context, RedirectPolicy? policy = null) =>
         new RedirectFollower(new ProtocolDispatcher([handler]))
