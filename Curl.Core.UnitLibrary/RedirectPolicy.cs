@@ -3,7 +3,8 @@ namespace Curl.Core;
 /// <summary>
 /// The command-line options that decide how <see cref="RedirectFollower" /> follows a
 /// redirect under <c>-L</c>/<c>--location</c>; every member defaults to curl 8.21.0's
-/// behaviour when the option is not given.
+/// behaviour when the option is not given. It also carries the <c>--proto</c> schemes, which
+/// <see cref="RedirectFollower" /> applies to the first URL as well as to every redirect target.
 /// </summary>
 public sealed record RedirectPolicy
 {
@@ -50,4 +51,12 @@ public sealed record RedirectPolicy
     /// </summary>
     public IReadOnlySet<string> AllowedSchemes { get; init; } =
         new HashSet<string>(["http", "https", "ftp", "ftps"], StringComparer.Ordinal);
+
+    /// <summary>
+    /// Gets the lowercase schemes <c>--proto</c> allows every URL the transfer requests to use,
+    /// the first URL and each redirect target alike; <see langword="null" />, allowing every scheme,
+    /// when not given. A redirect target must be allowed by both this and <see cref="AllowedSchemes" />
+    /// (curl 8.21.0, measured, BL-523 Notes).
+    /// </summary>
+    public IReadOnlySet<string>? AllowedTransferSchemes { get; init; }
 }

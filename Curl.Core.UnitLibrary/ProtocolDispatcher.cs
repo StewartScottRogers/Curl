@@ -11,7 +11,8 @@ namespace Curl.Core;
 /// When no handler serves the scheme, the transfer fails as curl 8.21.0 fails it: exit 1
 /// (<see cref="CurlExitCode.UnsupportedProtocol" />) with the message
 /// <c>Protocol "xyz" not supported</c>, the scheme lowercased. The <c>curl: (1) </c>
-/// prefix is added by the console layer, not here.
+/// prefix is added by the console layer, not here. A scheme a handler serves but
+/// <c>--proto</c> excludes fails with exit 1 and <c>Protocol "http" is disabled</c>.
 /// </remarks>
 public sealed class ProtocolDispatcher
 {
@@ -46,18 +47,30 @@ public sealed class ProtocolDispatcher
     /// Performs the transfer with the handler registered for its URL's scheme.
     /// </summary>
     /// <param name="context">The transfer to perform, passed to the handler unchanged.</param>
+    /// <param name="allowedSchemes">
+    /// The lowercase schemes <c>--proto</c> allows, or <see langword="null" /> to allow every scheme.
+    /// </param>
     /// <returns>
-    /// The handler's result unchanged, or exit 1
+    /// The handler's result unchanged; exit 1
     /// (<see cref="CurlExitCode.UnsupportedProtocol" />) with
-    /// <c>Protocol "&lt;scheme&gt;" not supported</c> when no handler serves the scheme.
+    /// <c>Protocol "&lt;scheme&gt;" not supported</c> when no handler serves the scheme; or exit 1 with
+    /// <c>Protocol "&lt;scheme&gt;" is disabled</c>, before the handler is called, when one does but
+    /// <paramref name="allowedSchemes" /> does not allow it, as curl 8.21.0 refuses it (measured, BL-523 Notes).
     /// </returns>
-    public ValueTask<TransferResult> DispatchAsync(ITransferContext context)
+    public ValueTask<TransferResult> DispatchAsync(ITransferContext context, IReadOnlySet<string>? allowedSchemes = null)
     {
         string scheme = context.Url.Scheme.ToLowerInvariant();
-        return handlersByScheme.TryGetValue(scheme, out IProtocolHandler? handler)
+        if (!handlersByScheme.TryGetValue(scheme, out IProtocolHandler? handler))
+        {
+            return ValueTask.FromResult(TransferResult.Failure(
+                CurlExitCode.UnsupportedProtocol,
+                $"Protocol \"{scheme}\" not supported"));
+        }
+
+        return allowedSchemes is null || allowedSchemes.Contains(scheme)
             ? handler.ExecuteAsync(context)
             : ValueTask.FromResult(TransferResult.Failure(
                 CurlExitCode.UnsupportedProtocol,
-                $"Protocol \"{scheme}\" not supported"));
+                $"Protocol \"{scheme}\" is disabled"));
     }
 }

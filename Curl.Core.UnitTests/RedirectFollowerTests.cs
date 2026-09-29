@@ -556,6 +556,77 @@ public sealed class RedirectFollowerTests
     }
 
     [TestMethod]
+    [DataRow("file:///dir/x", "file")]
+    [DataRow("https://127.0.0.1:48523/x", "https")]
+    public async Task FollowAsync_ProtoRedirAllowsButProtoExcludes_Exits1ProtocolDisabledInRedirect(string target, string scheme)
+    {
+        // Measured against curl 8.21.0 on 2026-09-28 (BL-523 Notes): curl -sS -L --proto =http
+        // --proto-redir =http,dict with Location: dict://... -> exit 1, "Protocol "dict" is disabled
+        // (in redirect)"; --proto -https alone refuses a redirect to https the same way.
+        ScriptedHandler handler = new(Redirect(302, target));
+        RedirectPolicy policy = new()
+        {
+            AllowedSchemes = new HashSet<string>(["http", "https", "file"]),
+            AllowedTransferSchemes = new HashSet<string>(["http"]),
+        };
+
+        TransferResult result = await Follow(handler, Context(Location()), policy);
+
+        Assert.AreEqual(CurlExitCode.UnsupportedProtocol, result.ExitCode);
+        Assert.AreEqual($"Protocol \"{scheme}\" is disabled (in redirect)", result.ErrorMessage);
+        Assert.HasCount(1, handler.Contexts);
+    }
+
+    [TestMethod]
+    public async Task FollowAsync_ProtoRedirExcludesFile_Exits1ProtocolDisabledInRedirect()
+    {
+        // curl -sS -L --proto-redir =http,dict, Location: file:///dir/x -> exit 1,
+        // "Protocol "file" is disabled (in redirect)" (BL-523 Notes).
+        ScriptedHandler handler = new(Redirect(302, "file:///dir/x"));
+        RedirectPolicy policy = new() { AllowedSchemes = new HashSet<string>(["http", "dict"]) };
+
+        TransferResult result = await Follow(handler, Context(Location()), policy);
+
+        Assert.AreEqual("Protocol \"file\" is disabled (in redirect)", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task FollowAsync_ProtoRedirAndProtoAllowDict_FollowsTheRedirectToDict()
+    {
+        // curl -sS -L --proto-redir =http,dict, Location: dict://127.0.0.1:48523/x -> the dict
+        // request is sent and curl exits 0 (BL-523 Notes).
+        ScriptedHandler handler = new(Redirect(302, "dict://127.0.0.1:48523/x"), Ok(200, 0));
+        RedirectPolicy policy = new()
+        {
+            AllowedSchemes = new HashSet<string>(["http", "dict"]),
+            AllowedTransferSchemes = new HashSet<string>(["http", "dict"]),
+        };
+
+        TransferResult result = await Follow(handler, Context(Location()), policy);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("dict://127.0.0.1:48523/x", handler.Contexts[1].Url.OriginalString);
+    }
+
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public async Task FollowAsync_FirstUrlSchemeProtoExcludes_Exits1ProtocolDisabledBeforeAnyRequest(bool location)
+    {
+        // curl -sS --proto =https http://127.0.0.1:48523/ -> exit 1, "Protocol "http" is disabled",
+        // and no connection is opened, with or without -L (BL-523 Notes).
+        ScriptedHandler handler = new(Ok(200, 0));
+        RedirectPolicy policy = new() { AllowedTransferSchemes = new HashSet<string>(["https"]) };
+        HttpRequestOptions http = location ? Location() : new HttpRequestOptions();
+
+        TransferResult result = await Follow(handler, Context(http), policy);
+
+        Assert.AreEqual(CurlExitCode.UnsupportedProtocol, result.ExitCode);
+        Assert.AreEqual("Protocol \"http\" is disabled", result.ErrorMessage);
+        Assert.IsEmpty(handler.Contexts);
+    }
+
+    [TestMethod]
     [DataRow("foo://127.0.0.1/x")]
     [DataRow("ipfs://abc/x")]
     public async Task FollowAsync_SchemeCurlCannotParse_Exits1RedirectTargetCouldNotBeParsed(string target)
