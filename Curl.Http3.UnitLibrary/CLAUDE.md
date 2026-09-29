@@ -14,7 +14,11 @@ work on byte spans and queue their stream instructions for the caller to take.
 HTTP/3 framing is here too (BL-730, ADR-0165): `Http3Frame` and its seven subclasses
 (`Http3DataFrame`, `Http3HeadersFrame`, `Http3CancelPushFrame`, `Http3SettingsFrame`,
 `Http3PushPromiseFrame`, `Http3GoawayFrame`, `Http3MaxPushIdFrame`) write themselves with
-`ToBytes`; `Http3FrameReader` reads them off a stream, skipping unknown and grease types.
+`ToBytes`; `Http3FrameReader` reads them off a stream, skipping unknown and grease types:
+`ReadFrameAsync` reads each frame whole under the reader's limit, and
+`ReadFrameOrDataAsync` hands `DATA` payload bytes over piece by piece into the caller's
+buffer, whatever the frame's length, as nghttp3 does, returning an `Http3FrameOrData`
+(BL-838).
 `Http3LocalUnidirectionalStreams` opens the client's control stream with curl's
 `SETTINGS` and its QPACK encoder and decoder streams; `Http3PeerUnidirectionalStreams`
 sorts the server's streams by type, `Http3ControlStreamReader` reads its control stream
