@@ -25,7 +25,17 @@ Namespace `Curl.Cryptography`. It holds:
   and `TryComputeSharedSecret`, which returns `false` for the all-zero result of a
   low-order peer key.
 - `Field448` (internal): GF(2^448 - 2^224 - 1) arithmetic on 28 limbs of 16 bits in a
-  caller's `Span<long>`; X448 uses it and Ed448 is to reuse it.
+  caller's `Span<long>`; X448 uses it and Ed448 reuses it.
+- `Edwards448` (internal): edwards448 points in projective coordinates - the complete
+  addition of RFC 8032 section 5.2.4 (which also doubles), constant-time scalar
+  multiplication over 456 bits, encoding, and section 5.2.3 decoding.
+- `Scalar448` (internal): scalars modulo the group order L on `MontgomeryModulus` -
+  reduction of a 114-byte SHAKE256 output, `MultiplyAdd` for S, and the `IsBelowOrder`
+  canonical-S check.
+- `Ed448` (public): RFC 8032 section 5.2 PureEdDSA signatures with an optional context of
+  up to 255 bytes - `GeneratePrivateKey`, `ComputePublicKey`, `Sign` and `Verify` (each
+  with and without a context), SHAKE256 from `Shake`. `Verify` is cofactorless and returns
+  `false` for S >= L or a public key that does not decode.
 - `X448` (public): RFC 7748 key agreement on Curve448 - `GeneratePrivateKey`,
   `ComputePublicKey`, and `TryComputeSharedSecret`, which returns `false` for the
   all-zero result of a low-order peer key, as `X25519` does.
@@ -183,7 +193,7 @@ Namespace `Curl.Cryptography`. It holds:
   BCL's are missing on macOS. Constant-time.
 - `Shake` (public, `IDisposable`): SHAKE128 and SHAKE256 - static `HashData128` and
   `HashData256` for one output of any length, and `Create128`/`Create256` instances that
-  `AppendData`, then `Read` output a piece at a time, then `Reset`. Ed448 (BL-741) and
+  `AppendData`, then `Read` output a piece at a time, then `Reset`. Ed448 and
   ML-DSA (BL-744) reuse it. Constant-time.
 - `MlKemParameterSet` (public enum): `MlKem512`, `MlKem768`, `MlKem1024`.
 - `MlKemParameters` (internal): k, eta1, eta2, du, dv and the key and ciphertext lengths
@@ -219,7 +229,7 @@ Namespace `Curl.Cryptography`. It holds:
   for known answers), `TrySetupBaseRecipient` and `GetEncapsulatedKeySize`. Constant-time
   as far as X25519 and the platform's P-256 and AES-GCM are.
 
-The remaining primitives land under their own tasks (BL-741, BL-742, BL-744).
+The remaining primitives land under their own tasks (BL-742, BL-744).
 
 ## Rules
 
