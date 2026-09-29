@@ -23,4 +23,17 @@ public enum RequestedHttpVersion
     /// alone, and a cleartext transfer sends the client preface with no upgrade.
     /// </summary>
     Http2PriorKnowledge,
+
+    /// <summary>
+    /// HTTP/3 where it connects, per <c>--http3</c>: an <c>https://</c> transfer tries QUIC first
+    /// and falls back to TCP, where ALPN offers <c>h2,http/1.1</c>; an <c>http://</c> one ignores it
+    /// (ADR-0144).
+    /// </summary>
+    Http3,
+
+    /// <summary>
+    /// HTTP/3 alone, per <c>--http3-only</c>: an <c>https://</c> transfer connects over QUIC and never
+    /// falls back; an <c>http://</c> one fails with exit 3 (ADR-0144).
+    /// </summary>
+    Http3Only,
 }
