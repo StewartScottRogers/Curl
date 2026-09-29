@@ -22,6 +22,10 @@ namespace Curl.Output;
 /// </param>
 /// <param name="timeProvider">The clock read for each stamp, when an event arrives.</param>
 /// <param name="tlsBackend">The curl build whose wording a TLS handshake gets (ADR-0085).</param>
+/// <param name="traceIds">
+/// The <c>--trace-ids</c> marker each line that starts an event carries after its stamp, or
+/// <see langword="null"/> for none; the dumped bytes' lines carry none.
+/// </param>
 /// <remarks>
 /// A port of the trace branch of <c>tool_debug_cb</c> and of <c>dump</c> in curl's
 /// <c>src/tool_cb_dbg.c</c>. Every body event is its own dump, unlike <c>-v</c>. The
@@ -35,7 +39,8 @@ public sealed class TraceTransferEventWriter(
     TraceDumpFormat format,
     bool writesTimestamps,
     TimeProvider timeProvider,
-    TlsBackend tlsBackend) : ITransferEvents
+    TlsBackend tlsBackend,
+    TraceIdsPrefix? traceIds) : ITransferEvents
 {
     private const byte CarriageReturn = 0x0D;
     private const byte LineFeed = 0x0A;
@@ -54,6 +59,20 @@ public sealed class TraceTransferEventWriter(
     /// <param name="timeProvider">The clock read for each stamp, when an event arrives.</param>
     public TraceTransferEventWriter(Stream output, TraceDumpFormat format, bool writesTimestamps, TimeProvider timeProvider)
         : this(output, format, writesTimestamps, timeProvider, PlatformTlsBackend.ForProcess)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="TraceTransferEventWriter"/> class that
+    /// writes no <c>--trace-ids</c> markers.
+    /// </summary>
+    /// <param name="output">The stream the dump is written to, not owned.</param>
+    /// <param name="format">Whether the bytes are shown as hex and text or as text only.</param>
+    /// <param name="writesTimestamps">Whether each line that starts an event carries curl's <c>--trace-time</c> stamp.</param>
+    /// <param name="timeProvider">The clock read for each stamp, when an event arrives.</param>
+    /// <param name="tlsBackend">The curl build whose wording a TLS handshake gets (ADR-0085).</param>
+    public TraceTransferEventWriter(Stream output, TraceDumpFormat format, bool writesTimestamps, TimeProvider timeProvider, TlsBackend tlsBackend)
+        : this(output, format, writesTimestamps, timeProvider, tlsBackend, traceIds: null)
     {
     }
 
@@ -155,13 +174,13 @@ public sealed class TraceTransferEventWriter(
 
     private void WriteInfoLine(string text)
     {
-        output.Write(Encoding.UTF8.GetBytes(Timestamp() + "* " + text + "\n"));
+        output.Write(Encoding.UTF8.GetBytes(LineStart() + "* " + text + "\n"));
     }
 
     private void WriteDump(string title, ReadOnlySpan<byte> bytes)
     {
         StringBuilder dump = new();
-        dump.Append(CultureInfo.InvariantCulture, $"{Timestamp()}{title}, {bytes.Length} bytes (0x{bytes.Length:x})\n");
+        dump.Append(CultureInfo.InvariantCulture, $"{LineStart()}{title}, {bytes.Length} bytes (0x{bytes.Length:x})\n");
         int offset = 0;
         while (offset < bytes.Length)
         {
@@ -219,13 +238,10 @@ public sealed class TraceTransferEventWriter(
             && bytes[index + 1] == LineFeed;
     }
 
-    private string Timestamp()
+    // The stamp, then the --trace-ids marker, go in front of a line that starts an event.
+    private string LineStart()
     {
-        if (!writesTimestamps)
-        {
-            return string.Empty;
-        }
-
-        return TraceTimeStamp.Read(timeProvider);
+        string stamp = writesTimestamps ? TraceTimeStamp.Read(timeProvider) : string.Empty;
+        return stamp + traceIds?.Text;
     }
 }
