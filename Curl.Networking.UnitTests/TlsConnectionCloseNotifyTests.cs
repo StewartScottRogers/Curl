@@ -12,7 +12,7 @@ using CertificateRequest = System.Security.Cryptography.X509Certificates.Certifi
 namespace Curl.Networking;
 
 /// <summary>
-/// Pins how a secure connection from either TLS provider ends (ADR-0213): a read returns 0
+/// Pins how a secure connection from either TLS provider ends (ADR-0221): a read returns 0
 /// once the server's <c>close_notify</c> arrives, and fails with
 /// <see cref="MissingCloseNotifyException" /> and the matched build's text when the transport
 /// ends without one, at a record boundary or inside a record. The server is a server-side

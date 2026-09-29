@@ -9,7 +9,7 @@ namespace Curl.Protocol.Http;
 /// throws <see cref="MissingCloseNotifyException" /> and the transfer fails with exit 56 and
 /// the exception's text, whatever the body's framing, keeping the bytes already written -
 /// as curl 8.21.0 (mingw, Schannel) and curl 8.18.0 (Ubuntu, OpenSSL 3.5.5) did against
-/// <c>Record-CurlExchange.ps1 -Tls</c> on 2026-09-29 (ADR-0213).
+/// <c>Record-CurlExchange.ps1 -Tls</c> on 2026-09-29 (ADR-0221).
 /// </summary>
 public sealed partial class HttpProtocolHandlerTests
 {

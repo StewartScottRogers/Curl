@@ -3,7 +3,7 @@ namespace Curl.Protocol.Abstractions;
 /// <summary>
 /// The <see cref="IOException" /> a secure <see cref="IConnection" /> throws when a read
 /// finds the TLS connection ended without the server's <c>close_notify</c>, carrying the
-/// message the platform's curl build prints for it (ADR-0157, ADR-0213).
+/// message the platform's curl build prints for it (ADR-0157, ADR-0221).
 /// </summary>
 /// <remarks>
 /// Every curl build fails such a read with exit 56 (<see cref="CurlExitCode.RecvError" />),

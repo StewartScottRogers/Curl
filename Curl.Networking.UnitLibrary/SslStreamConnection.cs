@@ -12,7 +12,7 @@ namespace Curl.Networking;
 /// plaintext connection this one owns, as it owns the client certificate presented.
 /// A read returns 0 at the server's <c>close_notify</c>, and fails with
 /// <see cref="MissingCloseNotifyException" /> when the connection ends without one, as every
-/// curl build fails it (ADR-0213). <see cref="SslStream" /> returns 0 for both, so the
+/// curl build fails it (ADR-0221). <see cref="SslStream" /> returns 0 for both, so the
 /// transport under it says which: only a bare end reads the transport to its end.
 /// </summary>
 /// <param name="sslStream">The authenticated stream, left open on its inner stream.</param>

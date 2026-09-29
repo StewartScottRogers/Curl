@@ -47,7 +47,7 @@ public sealed class PooledConnection : IConnection
     /// <remarks>
     /// A read into a non-empty buffer that returns zero records that the server closed the
     /// connection, so the pool reports it dead rather than reusing it (ADR-0112); so does a
-    /// read that finds a TLS connection ended without <c>close_notify</c> (ADR-0213).
+    /// read that finds a TLS connection ended without <c>close_notify</c> (ADR-0221).
     /// </remarks>
     public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {

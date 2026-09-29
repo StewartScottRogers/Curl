@@ -385,7 +385,7 @@ internal static class HttpTransferMessages
 
     /// <summary>
     /// Chooses the exit 56 message for a failed read: the TLS build's own text when the
-    /// connection ended without <c>close_notify</c> (ADR-0213), <see cref="ConnectionReset" />
+    /// connection ended without <c>close_notify</c> (ADR-0221), <see cref="ConnectionReset" />
     /// when the peer reset the connection, and <see cref="ReceiveFailed" /> for anything else.
     /// </summary>
     /// <param name="exception">The failure the read threw.</param>

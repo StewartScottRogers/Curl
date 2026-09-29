@@ -58,7 +58,7 @@ internal static class TlsFailureMessages
 
     /// <summary>
     /// The Schannel build's exit 56 message for a read that finds the connection ended
-    /// without <c>close_notify</c> (BL-819, measured; ADR-0213).
+    /// without <c>close_notify</c> (BL-819, measured; ADR-0221).
     /// </summary>
     internal const string SchannelMissingCloseNotify = "schannel: server closed abruptly (missing close_notify)";
 
@@ -66,7 +66,7 @@ internal static class TlsFailureMessages
     /// The OpenSSL build's exit 56 message for a read that finds the connection ended
     /// without <c>close_notify</c>: <c>SSL_read</c>'s error string, which curl prefixes
     /// with the OpenSSL version of the reference build, <c>curlimages/curl:8.21.0</c>
-    /// (BL-819; ADR-0213).
+    /// (BL-819; ADR-0221).
     /// </summary>
     internal const string OpenSslMissingCloseNotify =
         "OpenSSL SSL_read: OpenSSL/3.5.7: " + OpenSslUnexpectedEof + ", errno 0";

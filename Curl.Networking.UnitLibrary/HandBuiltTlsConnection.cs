@@ -11,7 +11,7 @@ namespace Curl.Networking;
 /// through the hand-built client's stream, the end points of the plaintext connection under it.
 /// A read returns 0 at the server's <c>close_notify</c>, and fails with
 /// <see cref="MissingCloseNotifyException" /> when the connection ends without one, as every
-/// curl build fails it (ADR-0213).
+/// curl build fails it (ADR-0221).
 /// </summary>
 /// <param name="tlsStream">
 /// The hand-built client's connected stream, a <see cref="Tls13ClientStream" /> or a
