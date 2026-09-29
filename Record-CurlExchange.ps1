@@ -321,6 +321,14 @@
     which is how curl's transport parameters are read. Works in every mode, -NoServer
     included; Port must then be given.
 
+.PARAMETER UnixSocket
+    Listen on a Unix domain socket at this path instead of TCP, for --unix-socket (BL-507).
+    Any file already at the path is deleted first, and the socket file is deleted at the
+    end. Only the HTTP mode serves over it: combining it with -Ftp, -Smtp, -Imap, -Pop3,
+    -Tls, -NoServer or -UdpSink is refused. Port need not be given. Windows PowerShell 5.1
+    runs on .NET Framework, which has no UnixDomainSocketEndPoint, so the socket is bound
+    through a small C# EndPoint compiled with Add-Type; Windows 10 1803 or later has AF_UNIX.
+
 .EXAMPLE
     .\Record-CurlExchange.ps1 -Port 18081 -Response 'HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello' -CurlArgs 'http://127.0.0.1:18081/a?b' -OutDirectory fixtures\default-get
 
@@ -385,7 +393,8 @@ param(
     [string] $Curl,
     [System.Net.IPAddress] $ListenAddress = [System.Net.IPAddress]::Loopback,
     [switch] $NoServer,
-    [switch] $UdpSink
+    [switch] $UdpSink,
+    [string] $UnixSocket
 )
 
 Set-StrictMode -Version Latest
@@ -396,7 +405,8 @@ $ErrorActionPreference = 'Stop'
 if ([string]::IsNullOrEmpty($MyInvocation.Line) -and $CurlArgs.Count -eq 1) { $CurlArgs = $CurlArgs[0].Split(',') }
 if ($NoServer -and ($Ftp -or $Smtp -or $Imap -or $Pop3 -or $Tls)) { throw '-NoServer runs no server, so it cannot be combined with -Ftp, -Smtp, -Imap, -Pop3 or -Tls.' }
 if (@($Ftp, $Smtp, $Imap, $Pop3 | Where-Object { $_ }).Count -gt 1) { throw '-Ftp, -Smtp, -Imap and -Pop3 each serve a whole session; give one of them.' }
-if (-not $NoServer -and $Port -eq 0) { throw '-Port is required unless -NoServer is given: the URL in CurlArgs must name the port the server listens on.' }
+if ($UnixSocket -and ($NoServer -or $Ftp -or $Smtp -or $Imap -or $Pop3 -or $Tls -or $UdpSink)) { throw '-UnixSocket serves HTTP only, so it cannot be combined with -NoServer, -Ftp, -Smtp, -Imap, -Pop3, -Tls or -UdpSink.' }
+if (-not $NoServer -and -not $UnixSocket -and $Port -eq 0) { throw '-Port is required unless -NoServer is given: the URL in CurlArgs must name the port the server listens on.' }
 if ($UdpSink -and $Port -eq 0) { throw '-UdpSink binds UDP on -Port, so -Port is required with it.' }
 
 function Get-ReferenceCurlPath {
@@ -1414,7 +1424,55 @@ $tlsCertificate = if ($Tls -or $Ftp -or $Smtp -or $Imap -or $Pop3) { New-Throwaw
 # -NoServer binds nothing: the caller's own server answers curl.
 $listener = $null
 $server = $null
-if (-not $NoServer) {
+if ($UnixSocket) {
+    # AcceptTcpClient hands back a TcpClient over the accepted Unix socket, so the HTTP
+    # server serves it unchanged. C#, not a PowerShell class, so no method needs this
+    # runspace, which is busy waiting for curl.
+    Add-Type -TypeDefinition @'
+using System;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+
+public sealed class RecorderUnixEndPoint : EndPoint
+{
+    private readonly string _path;
+    public RecorderUnixEndPoint(string path) { _path = path; }
+    public override AddressFamily AddressFamily { get { return AddressFamily.Unix; } }
+    public override SocketAddress Serialize()
+    {
+        byte[] path = Encoding.UTF8.GetBytes(_path);
+        var address = new SocketAddress(AddressFamily.Unix, 2 + 108);
+        for (int i = 0; i < path.Length; i++) { address[2 + i] = path[i]; }
+        return address;
+    }
+    public override EndPoint Create(SocketAddress socketAddress) { return this; }
+}
+
+public sealed class RecorderUnixSocketListener
+{
+    private readonly Socket _socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+    public RecorderUnixSocketListener(string path)
+    {
+        _socket.Bind(new RecorderUnixEndPoint(path));
+        _socket.Listen(16);
+    }
+    public TcpClient AcceptTcpClient()
+    {
+        Socket accepted = _socket.Accept();
+        var client = new TcpClient();
+        client.Client.Dispose();
+        client.Client = accepted;
+        return client;
+    }
+    public void Stop() { _socket.Close(); }
+}
+'@
+    $UnixSocket = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine((Get-Location).ProviderPath, $UnixSocket))
+    if (Test-Path -LiteralPath $UnixSocket) { Remove-Item -LiteralPath $UnixSocket -Force }
+    $listener = New-Object RecorderUnixSocketListener($UnixSocket)
+    $server = [System.Management.Automation.PowerShell]::Create()
+} elseif (-not $NoServer) {
     $listener = New-Object System.Net.Sockets.TcpListener($ListenAddress, $Port)
     $listener.Start()
     $server = [System.Management.Automation.PowerShell]::Create()
@@ -1499,6 +1557,7 @@ try {
 } finally {
     if ($null -ne $udpSinkClient) { $udpSinkClient.Close() }
     if ($null -ne $listener) { $listener.Stop() }
+    if ($UnixSocket -and (Test-Path -LiteralPath $UnixSocket)) { Remove-Item -LiteralPath $UnixSocket -Force }
     if ($null -ne $server) { $server.Dispose() }
     # Reset deletes the key container the PFX import created.
     if ($null -ne $tlsCertificate) { $tlsCertificate.Reset() }
