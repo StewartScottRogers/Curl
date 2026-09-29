@@ -1,5 +1,5 @@
 ---
-id: BL-983
+id: BL-985
 title: Record BL-980's SHA-3 tls-server-end-point measurement and decision in ADR-0234
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-29
 completed:
 ---
-# BL-983 — Record BL-980's SHA-3 tls-server-end-point measurement and decision in ADR-0234
+# BL-985 — Record BL-980's SHA-3 tls-server-end-point measurement and decision in ADR-0234
 
 ## Goal
 

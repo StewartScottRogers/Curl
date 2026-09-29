@@ -24,7 +24,7 @@ Hand-built Negotiate over HTTPS does what curl 8.18.0 (OpenSSL, MIT) is measured
 
 ## Acceptance criteria
 
-- [x] The measurement for an RSA SHA3-256 certificate is recorded under Notes below, and BL-983 carries it into ADR-0234 (amended again). (Was: "recorded in ADR-0234 or a new ADR"; split off, see Notes.)
+- [x] The measurement for an RSA SHA3-256 certificate is recorded under Notes below, and BL-985 carries it into ADR-0234 (amended again). (Was: "recorded in ADR-0234 or a new ADR"; split off, see Notes.)
 - [x] `Curl.Authentication.UnitTests` tests pin a hand-built SHA-3 to NIST examples and the bindings for each SHA-3 signature OID curl is measured to accept. (The NIST examples are pinned in `Curl.Cryptography.UnitTests`' `Sha3Tests`, beside the reused `Sha3`; see Notes.)
 - [x] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1 -Library Curl.Authentication.UnitLibrary` reports 100% line and branch coverage and no failing member.
 
@@ -40,7 +40,7 @@ Hand-built Negotiate over HTTPS does what curl 8.18.0 (OpenSSL, MIT) is measured
 
   So OpenSSL pairs each with its SHA-3 digest and curl binds with it (RFC 5929: the signature's own hash). `openssl dgst -sha3-256` of the RSA SHA3-256 certificate is `c5829afc…4217`, `-sha3-512` of the ECDSA SHA3-512 one `2179cd4b…dae6`; both certificates and hashes are pinned in `TlsServerEndPointChannelBindingsTests`.
 - **Design (decided by Claude under Stewart's delegation).** Reused `Curl.Cryptography`'s hand-built `Sha3` (Keccak, already there for ML-KEM and already a transitive dependency through `Curl.Kerberos`) instead of a second Keccak in `Curl.Authentication`: added `HashData224` and `HashData384` beside `HashData256`/`HashData512`, pinned to NIST's SHA-3 examples (empty message, "abc", the 1600-bit message) in `Sha3Tests`. `Curl.Authentication.UnitLibrary` now references `Curl.Cryptography.UnitLibrary` directly. The eight OIDs map to four private `Sha3_*` adapters in `TlsServerEndPointChannelBindings`. Added `Curl.Cryptography.UnitLibrary` and `Curl.Cryptography.UnitTests` to `touches`: no task in Doing names them.
-- **ADR split off.** ADR-0234 sits in `Documentation/Planning/Decisions`, which BL-887 (in Doing, renumbering ADRs) has in its `touches`, so this task could not edit it without overlapping. Filed BL-983 (depends on BL-980, touches only the ADR-0234 file) to write the amendment from the measurement above, and reworded the first criterion to match.
+- **ADR split off.** ADR-0234 sits in `Documentation/Planning/Decisions`, which BL-887 (in Doing, renumbering ADRs) has in its `touches`, so this task could not edit it without overlapping. Filed BL-985 (depends on BL-980, touches only the ADR-0234 file) to write the amendment from the measurement above, and reworded the first criterion to match.
 - Results: build `-warnaserror` 0 warnings; fast tests all green (Curl.Authentication.UnitTests 714 passed, 4 skipped; Curl.Cryptography.UnitTests 1302 passed); Measure-CodeQuality: Curl.Authentication.UnitLibrary and Curl.Cryptography.UnitLibrary both 100% line, 100% branch, 0 failing.
 
 ## Log
