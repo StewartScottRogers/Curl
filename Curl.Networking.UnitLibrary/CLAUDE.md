@@ -32,7 +32,7 @@ builds the chain and the `SslPolicyErrors` `SslStream` would. Both load `--cert`
 `ClientCertificateLoader.Load`. Per ADR-0193 `ServerCertificateVerification.Judge` also checks
 `--pinnedpubkey` (`TlsClientOptions.PinnedPublicKey`) once the certificate is accepted, `-k` included:
 `PinnedPublicKey` matches `sha256//` hashes or a PEM or DER key file as curl's `Curl_pin_peer_pubkey`
-does, and a mismatch is exit 90 in both providers. Per ADR-0194 the OpenSSL build, unless `-k`,
+does, and a mismatch is exit 90 in both providers. Per ADR-0197 the OpenSSL build, unless `-k`,
 reads `--crlfile` (`TlsClientOptions.CertificateRevocationListFile`) in `ReadTrustAnchors` through
 `CertificateRevocationListFile` (exit 82 through `CertificateRevocationListFileException` and
 `TrustAnchorsUnusable`) and `Judge` checks every chain certificate against a list from its issuer,

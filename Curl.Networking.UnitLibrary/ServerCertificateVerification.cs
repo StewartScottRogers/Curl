@@ -105,7 +105,7 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     /// a key the pin does not name is exit 90, so a certificate that fails both is exit 60, as
     /// curl reports it (ADR-0193, BL-608). Before the pin, a certificate
     /// <see cref="VerifyPeer" /> accepts is checked against the <c>--crlfile</c> lists, when
-    /// there are any: a refusal is exit 60 with OpenSSL's verify result (ADR-0194, BL-609).
+    /// there are any: a refusal is exit 60 with OpenSSL's verify result (ADR-0197, BL-609).
     /// </summary>
     /// <param name="errors">What was found wrong with the chain, as <see cref="SslStream" /> reports it.</param>
     /// <param name="chain">The chain built, if a certificate was presented.</param>

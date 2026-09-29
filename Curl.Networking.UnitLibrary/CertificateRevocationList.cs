@@ -9,7 +9,7 @@ namespace Curl.Networking;
 /// <summary>
 /// One X.509 certificate revocation list, decoded from its DER with
 /// <see cref="AsnReader" /> (RFC 5280, section 5.1), as curl's OpenSSL build reads a
-/// <c>--crlfile</c> entry (ADR-0194, BL-609). The BCL has no reader for a CRL's issuer, dates
+/// <c>--crlfile</c> entry (ADR-0197, BL-609). The BCL has no reader for a CRL's issuer, dates
 /// or signature (<c>CertificateRevocationListBuilder.Load</c>
 /// gives only the revoked serial numbers), so the list is decoded here and its signature
 /// verified with the issuer's key.

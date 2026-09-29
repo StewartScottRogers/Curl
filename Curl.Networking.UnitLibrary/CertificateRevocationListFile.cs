@@ -6,7 +6,7 @@ namespace Curl.Networking;
 
 /// <summary>
 /// The certificate revocation lists of a <c>--crlfile</c>, and the check curl's OpenSSL build
-/// makes with them (ADR-0194, BL-609). curl loads the file with <c>X509_load_crl_file</c>
+/// makes with them (ADR-0197, BL-609). curl loads the file with <c>X509_load_crl_file</c>
 /// (PEM) and verifies with <c>X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL</c>, so every
 /// certificate of the chain, the root included, needs a list from its issuer. The BCL cannot
 /// hand a list to <see cref="X509Chain" />, so the check is made here on the chain

@@ -7,7 +7,7 @@ namespace Curl.Networking;
 /// <see cref="HandBuiltTlsProvider" /> with <c>--crlfile</c>, as
 /// <see cref="SslStreamTlsProviderTests" /> pins it for the other provider: the OpenSSL build
 /// refuses a revoked server certificate with exit 60 and a file it cannot load with exit 82;
-/// the Schannel build ignores the option (ADR-0194, BL-609).
+/// the Schannel build ignores the option (ADR-0197, BL-609).
 /// </summary>
 public sealed partial class HandBuiltTlsProviderTests
 {

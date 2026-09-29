@@ -32,7 +32,7 @@ completed: 2026-09-29
 
 - `touches` gained `Record-CurlExchange.ps1` (it could not write a CRL, so it gained
   `-TlsEmptyCrlFile` and `-TlsRevokingCrlFile`, lists signed by the throwaway root, which may now
-  sign CRLs) and `Documentation/Planning/Decisions` (ADR-0194). No task in Doing names either.
+  sign CRLs) and `Documentation/Planning/Decisions` (ADR-0197). No task in Doing names either.
 - Measured 2026-09-29, `-sS --cacert root.pem --crlfile <file>`, curl 8.21.0 Schannel (Windows)
   and curl 8.18.0 OpenSSL 3.5.5 (WSL Ubuntu, `-Curl wsl.exe -ListenAddress 172.26.96.1` with
   `--connect-to 127.0.0.1:18609:172.26.96.1:18609`):
@@ -50,7 +50,7 @@ completed: 2026-09-29
     `--crlfile` entirely. `-k` with the revoking list or garbage: exit 0 in both builds.
   - The builds differ, but the providers pin both builds through their build flag on every
     platform, so no `OSCondition` split was needed.
-- Design (ADR-0194): the lists are decoded by hand (`CertificateRevocationList`, `System.Formats.Asn1`)
+- Design (ADR-0197): the lists are decoded by hand (`CertificateRevocationList`, `System.Formats.Asn1`)
   because `CertificateRevocationListBuilder.Load` gives only the entries; the check runs in
   `ServerCertificateVerification.Judge` after `VerifyPeer` and before the pin, shared by both
   providers and the QUIC verifier; exit 82 travels as `CertificateRevocationListFileException`

@@ -167,7 +167,7 @@ namespace Curl.Networking;
 /// not given. The OpenSSL build, unless <paramref name="Insecure" />, loads it before the
 /// handshake (exit 82 when it cannot) and then needs, for every certificate of the verified
 /// chain, a list from its issuer that does not revoke it (exit 60,
-/// <see cref="Networking.CertificateRevocationListFile" />, ADR-0194). The Schannel build ignores it,
+/// <see cref="Networking.CertificateRevocationListFile" />, ADR-0197). The Schannel build ignores it,
 /// as curl 8.21.0's does (measured, BL-609).
 /// </param>
 public sealed record TlsClientOptions(
