@@ -238,16 +238,25 @@ internal static class CurlComposition
         CreateTransports(options, TimeProvider.System);
 
     /// <summary>
-    /// Creates the run's resolver: the hand-built <see cref="DnsServerResolver" /> when any of
+    /// Creates the run's resolver: the <see cref="CreateDohResolver" /> one when <c>--doh-url</c> is
+    /// given, since curl asks the DoH server whichever resolver it was built with (BL-642); otherwise
+    /// the hand-built <see cref="DnsServerResolver" /> when any of
     /// <c>--dns-servers</c>, <c>--dns-interface</c>, <c>--dns-ipv4-addr</c> and <c>--dns-ipv6-addr</c>
     /// is given, as curl's c-ares build resolves then (ADR-0170, BL-694), asking only the
     /// <c>-4</c> or <c>-6</c> family's records; otherwise the <see cref="SystemDnsResolver" />.
     /// </summary>
     /// <param name="options">The parsed command line.</param>
-    /// <param name="timeProvider">The clock the hand-built resolver times its attempts on.</param>
+    /// <param name="timeProvider">The clock the hand-built resolver and the DoH connections time on.</param>
+    /// <param name="tcpDialer">Opens the plaintext TCP connections to the DoH server.</param>
     /// <returns>The resolver.</returns>
-    internal static IDnsResolver CreateDnsResolver(CommandLineOptions options, TimeProvider timeProvider)
+    internal static IDnsResolver CreateDnsResolver(CommandLineOptions options, TimeProvider timeProvider, ITcpDialer tcpDialer)
     {
+        if (options.DohUrl is { } dohUrl)
+        {
+            return CreateDohResolver(dohUrl, CreateDohConnector(options, tcpDialer, timeProvider));
+        }
+
+
         DnsServerResolverOptions resolverOptions = new(
             options.DnsServers,
             options.DnsInterface,
@@ -258,6 +267,55 @@ internal static class CurlComposition
             ? new DnsServerResolver(resolverOptions, timeProvider)
             : new SystemDnsResolver();
     }
+
+    /// <summary>
+    /// Creates the resolver <c>--doh-url</c> asks for: a <see cref="DohDnsResolver" /> over
+    /// <paramref name="connector" /> for the URL <see cref="DohUrlOf" /> makes of the value, or, when it
+    /// makes none, an <see cref="UnusableDohUrlResolver" />, so every name fails to resolve with exit 6
+    /// as curl 8.21.0 fails <c>--doh-url bogus</c> and an <c>ftp://</c> DoH URL (measured, BL-642).
+    /// </summary>
+    /// <param name="dohUrl">The <c>--doh-url</c> value.</param>
+    /// <param name="connector">Opens each DoH connection: <see cref="CreateDohConnector" />'s in production.</param>
+    /// <returns>The resolver.</returns>
+    internal static IDnsResolver CreateDohResolver(string dohUrl, IConnector connector) =>
+        DohUrlOf(dohUrl) is { } url ? new DohDnsResolver(connector, url) : new UnusableDohUrlResolver();
+
+    /// <summary>
+    /// The DoH URL curl makes of a <c>--doh-url</c> value: the value as it is when it names a scheme,
+    /// and with <c>http://</c> in front when it does not, as curl guesses the scheme of any URL (a
+    /// scheme-less DoH URL was measured to reach its server as plain HTTP, BL-642).
+    /// </summary>
+    /// <param name="dohUrl">The <c>--doh-url</c> value.</param>
+    /// <returns>
+    /// The absolute <c>http</c> or <c>https</c> URL, or <see langword="null" /> when the value does not
+    /// parse as one.
+    /// </returns>
+    internal static Uri? DohUrlOf(string dohUrl)
+    {
+        string withScheme = dohUrl.Contains("://", StringComparison.Ordinal) ? dohUrl : "http://" + dohUrl;
+        return Uri.TryCreate(withScheme, UriKind.Absolute, out Uri? url)
+            && (url.Scheme == Uri.UriSchemeHttp || url.Scheme == Uri.UriSchemeHttps)
+            ? url
+            : null;
+    }
+
+    /// <summary>
+    /// Creates the connector the DoH queries are sent through (ADR-0152): a <see cref="TcpConnector" />
+    /// of its own over the <see cref="SystemDnsResolver" /> (the DoH server's own name is resolved as any
+    /// host is), <paramref name="tcpDialer" />, and a TLS provider routed as
+    /// <see cref="CreateTlsProvider" /> routes the options <see cref="TlsClientOptionsMapping.DohFromCommandLine" />
+    /// maps. No <c>--resolve</c>, <c>--connect-to</c>, proxy or <c>-4</c>/<c>-6</c> applies to it.
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <param name="tcpDialer">Opens each plaintext connection.</param>
+    /// <param name="timeProvider">The clock the connector and its TLS provider time on.</param>
+    /// <returns>The connector.</returns>
+    internal static TcpConnector CreateDohConnector(CommandLineOptions options, ITcpDialer tcpDialer, TimeProvider timeProvider) =>
+        new(
+            new SystemDnsResolver(),
+            tcpDialer,
+            CreateTlsProvider(TlsClientOptionsMapping.DohFromCommandLine(options), timeProvider),
+            timeProvider);
 
     /// <summary>
     /// Creates the TLS provider for handshakes run with <paramref name="options" />: the
@@ -284,8 +342,8 @@ internal static class CurlComposition
     /// <returns>The connectors and the pieces they were built from.</returns>
     internal static CurlTransports CreateTransports(CommandLineOptions options, TimeProvider timeProvider)
     {
-        IDnsResolver dnsResolver = CreateDnsResolver(options, timeProvider);
         TcpDialer tcpDialer = new(new TcpSocketOptions(options.TcpNoDelay, options.TcpKeepAlive));
+        IDnsResolver dnsResolver = CreateDnsResolver(options, timeProvider, tcpDialer);
         TlsClientOptions tlsClientOptions = TlsClientOptionsMapping.FromCommandLine(options);
         ITlsProviderWithWarnings tlsProvider = CreateTlsProvider(tlsClientOptions, timeProvider);
         TlsClientOptions proxyTlsClientOptions = TlsClientOptionsMapping.ProxyFromCommandLine(options);

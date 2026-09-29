@@ -8,8 +8,9 @@ namespace Curl.Console;
 /// so the composition can be checked without opening a socket.
 /// </summary>
 /// <param name="DnsResolver">
-/// The one resolver both connectors share: <see cref="SystemDnsResolver" />, or
-/// <see cref="DnsServerResolver" /> when a c-ares option is given (BL-694).
+/// The one resolver both connectors share: <see cref="DohDnsResolver" /> (or
+/// <see cref="UnusableDohUrlResolver" />) when <c>--doh-url</c> is given (BL-642), otherwise
+/// <see cref="DnsServerResolver" /> when a c-ares option is given (BL-694), otherwise <see cref="SystemDnsResolver" />.
 /// </param>
 /// <param name="TimeProvider">The clock both connectors share.</param>
 /// <param name="TcpDialer">Opens the plaintext TCP connections <see cref="TcpConnector" /> dials.</param>
