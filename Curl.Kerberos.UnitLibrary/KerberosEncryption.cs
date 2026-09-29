@@ -53,6 +53,7 @@ public abstract class KerberosEncryption
     /// </exception>
     public static KerberosEncryption Create(KerberosEncryptionType encryptionType, IKerberosRandomSource randomSource) => encryptionType switch
     {
+        KerberosEncryptionType.Des3CbcSha1 => new Des3CbcSha1KerberosEncryption(randomSource),
         KerberosEncryptionType.Aes128CtsHmacSha196 => new AesSha1KerberosEncryption(encryptionType, 15, 16, randomSource),
         KerberosEncryptionType.Aes256CtsHmacSha196 => new AesSha1KerberosEncryption(encryptionType, 16, 32, randomSource),
         KerberosEncryptionType.Aes128CtsHmacSha256128 or KerberosEncryptionType.Aes256CtsHmacSha384192 => AesSha2KerberosEncryption.ForType(encryptionType, randomSource),
@@ -94,7 +95,8 @@ public abstract class KerberosEncryption
     /// <returns>The plaintext, confounder removed.</returns>
     /// <exception cref="ArgumentException"><paramref name="key" /> is not <see cref="KeySize" /> bytes.</exception>
     /// <exception cref="KerberosCryptographyException">
-    /// <see cref="KerberosCryptographyError.CiphertextTooShort" /> or
+    /// <see cref="KerberosCryptographyError.CiphertextTooShort" />,
+    /// <see cref="KerberosCryptographyError.CiphertextNotWholeBlocks" /> or
     /// <see cref="KerberosCryptographyError.IntegrityCheckFailed" />.
     /// </exception>
     public byte[] Decrypt(ReadOnlySpan<byte> key, int usage, ReadOnlySpan<byte> ciphertext)

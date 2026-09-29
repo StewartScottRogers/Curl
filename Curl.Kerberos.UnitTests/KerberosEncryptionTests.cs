@@ -8,6 +8,7 @@ namespace Curl.Kerberos;
 public sealed class KerberosEncryptionTests
 {
     [TestMethod]
+    [DataRow(KerberosEncryptionType.Des3CbcSha1, 12, 24, 20)]
     [DataRow(KerberosEncryptionType.Aes128CtsHmacSha196, 15, 16, 12)]
     [DataRow(KerberosEncryptionType.Aes256CtsHmacSha196, 16, 32, 12)]
     [DataRow(KerberosEncryptionType.Aes128CtsHmacSha256128, 19, 16, 16)]
@@ -27,7 +28,7 @@ public sealed class KerberosEncryptionTests
 
     [TestMethod]
     [DataRow(1)]
-    [DataRow(16)]
+    [DataRow(3)]
     [DataRow(24)]
     public void Create_UnknownType_ThrowsUnsupportedEncryptionType(int encryptionType)
     {

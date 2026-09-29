@@ -432,7 +432,7 @@ public sealed partial class KerberosKdcClientTests
     [TestMethod]
     public async Task GetTicketFromTicketGrantingServiceAsync_SessionKeyOfAnUnsupportedType_ThrowsEncryptionTypeNotSupported()
     {
-        using KerberosCredential ticketGrantingTicket = TicketGrantingTicket(new byte[24], 16);
+        using KerberosCredential ticketGrantingTicket = TicketGrantingTicket(new byte[8], 1);
         FakeKdc kdc = new();
 
         KerberosKdcException failure = await Assert.ThrowsExactlyAsync<KerberosKdcException>(

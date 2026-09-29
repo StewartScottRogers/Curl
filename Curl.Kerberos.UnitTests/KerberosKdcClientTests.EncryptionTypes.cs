@@ -30,6 +30,19 @@ public sealed partial class KerberosKdcClientTests
     }
 
     [TestMethod]
+    public async Task GetInitialTicketAsync_PermittedEncryptionTypesDes3Default_OffersDes3FirstAndServesADes3ClientKey()
+    {
+        FakeKdc kdc = new() { ClientKeyType = (int)KerberosEncryptionType.Des3CbcSha1 };
+        KerberosKdcClient client = ClientFor(kdc, " permitted_enctypes = des3 DEFAULT\n");
+
+        using KerberosCredential credential = await client.GetInitialTicketAsync(AlicePassword, KerberosKdcClient.TicketGrantingServer(FakeKdc.Realm), CancellationToken.None);
+
+        Assert.HasCount(2, kdc.Requests);
+        Assert.IsTrue(kdc.Requests.All(request => request.Body.EncryptionTypes.SequenceEqual([16, 18, 17, 20, 19, 25, 26])));
+        Assert.AreEqual(16, KerberosEncryptedData.Decode(kdc.Requests[1].PreAuthenticationData.Single().Value).EncryptionType);
+    }
+
+    [TestMethod]
     public async Task GetTicketFromTicketGrantingServiceAsync_DefaultTgsEncryptionTypesSet_OffersThemResolved()
     {
         using KerberosCredential ticketGrantingTicket = TicketGrantingTicket(FakeKdc.TicketGrantingSessionKey, 18);
@@ -47,7 +60,7 @@ public sealed partial class KerberosKdcClientTests
         FakeKdc kdc = new();
 
         KerberosKdcException failure = await Assert.ThrowsExactlyAsync<KerberosKdcException>(
-            () => ClientFor(kdc, " default_tkt_enctypes = des3\n").GetInitialTicketAsync(AlicePassword, KerberosKdcClient.TicketGrantingServer(FakeKdc.Realm), CancellationToken.None));
+            () => ClientFor(kdc, " allow_weak_crypto = true\n default_tkt_enctypes = arcfour-hmac-exp\n").GetInitialTicketAsync(AlicePassword, KerberosKdcClient.TicketGrantingServer(FakeKdc.Realm), CancellationToken.None));
 
         Assert.AreEqual(KerberosKdcError.EncryptionTypeNotSupported, failure.Error);
         Assert.IsEmpty(kdc.Exchanges);
@@ -60,7 +73,7 @@ public sealed partial class KerberosKdcClientTests
         FakeKdc kdc = new();
 
         KerberosKdcException failure = await Assert.ThrowsExactlyAsync<KerberosKdcException>(
-            () => ClientFor(kdc, " permitted_enctypes = des3 bogus\n").GetTicketFromTicketGrantingServiceAsync(ticketGrantingTicket, FakeKdc.Service, CancellationToken.None));
+            () => ClientFor(kdc, " allow_weak_crypto = true\n permitted_enctypes = arcfour-hmac-exp bogus\n").GetTicketFromTicketGrantingServiceAsync(ticketGrantingTicket, FakeKdc.Service, CancellationToken.None));
 
         Assert.AreEqual(KerberosKdcError.EncryptionTypeNotSupported, failure.Error);
         Assert.IsEmpty(kdc.Exchanges);

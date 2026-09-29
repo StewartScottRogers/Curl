@@ -156,7 +156,9 @@ internal sealed class FakeKdc : IKerberosKdcTransport, IKerberosKdcProxyTranspor
         {
             byte[] plaintext = KerberosEncryption.Create((KerberosEncryptionType)encrypted.EncryptionType, Confounders)
                 .Decrypt(ClientKey(encrypted.EncryptionType, Salt), 1, encrypted.Cipher);
-            LastTimestamp = KerberosEncryptedTimestamp.Decode(plaintext);
+            // des3-cbc-sha1 pads the plaintext with zeros to a whole block; the value ends before them.
+            System.Formats.Asn1.AsnDecoder.ReadEncodedValue(plaintext, System.Formats.Asn1.AsnEncodingRules.BER, out _, out _, out int valueLength);
+            LastTimestamp = KerberosEncryptedTimestamp.Decode(plaintext[..valueLength]);
         }
         catch (KerberosCryptographyException)
         {
