@@ -121,7 +121,7 @@ internal sealed class SshTransport
     /// message, a public value outside its group, a host key or signature of another type,
     /// or a signature that does not verify; with <c>-4</c> (a MAC) or <c>-12</c> (an AES-GCM
     /// tag) in place of <c>-8</c> when a re-exchange reads a packet that fails its check
-    /// (ADR-0207).
+    /// (ADR-0212).
     /// </exception>
     /// <exception cref="NotSupportedException">The agreed method, host key, cipher or MAC is not implemented.</exception>
     internal async ValueTask<SshKeyExchangeResult> ExchangeKeysAsync(SshNegotiatedHandshake handshake, CancellationToken cancellationToken)

@@ -5,7 +5,7 @@ namespace Curl.Protocol.Ssh.PacketProtection;
 /// on the way, or the two sides derived different keys. The packet is discarded unread.
 /// </summary>
 /// <param name="libssh2ErrorCode">
-/// The libssh2 error code curl prints for it (ADR-0207): <see cref="Libssh2ErrorCode.InvalidMac" />
+/// The libssh2 error code curl prints for it (ADR-0212): <see cref="Libssh2ErrorCode.InvalidMac" />
 /// for a MAC, <see cref="Libssh2ErrorCode.Decrypt" /> for an AES-GCM tag.
 /// </param>
 internal sealed class SshPacketAuthenticationException(int libssh2ErrorCode)

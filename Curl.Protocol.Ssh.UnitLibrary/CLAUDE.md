@@ -18,10 +18,10 @@ server's re-exchange); `Negotiation` holds the presets and the catalogue of
 implemented names; `KeyExchange` holds one `ISshKeyExchange` per method family and
 `SshKeyDerivation`; `HostKeys` holds one `ISshSignatureVerifier` per host-key type;
 `PacketProtection` holds one `ISshPacketProtection` per cipher family, which the packet
-reader and writer switch to at each `NEWKEYS` (ADR-0207). A new algorithm registers in
+reader and writer switch to at each `NEWKEYS` (ADR-0212). A new algorithm registers in
 `SshKeyExchangeMethods`, `SshSignatureVerifiers` or `SshPacketProtections`, and
 `SshAlgorithmCatalogue.Implemented` offers it from then on. Failure messages and
-their libssh2 codes are ADR-0122's, ADR-0206's and ADR-0207's, measured from the
+their libssh2 codes are ADR-0122's, ADR-0206's and ADR-0212's, measured from the
 reference builds.
 
 Never construct a `Socket`, `SslStream` or `HttpClient` here. Take `IConnection`

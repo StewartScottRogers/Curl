@@ -15,7 +15,7 @@ internal static class Libssh2ErrorCode
 
     /// <summary>
     /// <c>LIBSSH2_ERROR_INVALID_MAC</c>: a packet's MAC does not match. Measured 2026-09-29
-    /// (BL-565, ADR-0207) on the Windows reference build for <c>aes*-ctr</c> with
+    /// (BL-565, ADR-0212) on the Windows reference build for <c>aes*-ctr</c> with
     /// <c>hmac-sha2-256</c> and <c>hmac-sha2-512-etm@openssh.com</c>, the MAC or the
     /// ciphertext altered.
     /// </summary>
@@ -39,7 +39,7 @@ internal static class Libssh2ErrorCode
     /// <summary>
     /// <c>LIBSSH2_ERROR_DECRYPT</c>: an AES-GCM packet's tag does not match, so libssh2's
     /// cipher refuses to decrypt it. Taken from libssh2 1.11.1's <c>transport.c</c>, not yet
-    /// measured: only the OpenSSL build offers AES-GCM (ADR-0207, BL-889).
+    /// measured: only the OpenSSL build offers AES-GCM (ADR-0212, BL-889).
     /// </summary>
     internal const int Decrypt = -12;
 
