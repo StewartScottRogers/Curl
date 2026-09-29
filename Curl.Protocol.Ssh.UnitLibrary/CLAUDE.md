@@ -15,7 +15,8 @@ appears.
 `SshProtocolHandler`, at the root, is the library's `IProtocolHandler`: it narrows the
 host-key list from the known-hosts file, connects through the injected `IConnector`,
 runs the handshake, requests `ssh-userauth`, checks the host key, authenticates, runs
-`SftpFileDownload` or `ScpFileDownload` into the output, and ends the session with
+`SftpFileDownload` or `ScpFileDownload` - or `SftpDirectoryListing` for an `sftp` path
+ending with a slash - into the output, and ends the session with
 `DISCONNECT` 11 `Shutdown`; every `SshTransferException` becomes a failed
 `TransferResult`. The console passes the platform's preset and ADR-0022's credential
 encoding. `Curl.Protocol.Ssh.UnitTests` drives it end to end against the public
@@ -44,7 +45,9 @@ and `C` lines with libssh2's checks (`ScpFileHeaderReader`, `ScpHeaderNumber`) a
 the file (ADR-0225); `Sftp` holds `SftpSession`, the SFTP version 3 client over that
 channel, and `SftpFileDownload`, which downloads one file with `SftpReadAhead`'s reads in
 flight and maps each `SSH_FX_*` status to curl's exit code through `SftpStatusCode`
-(ADR-0220). A new algorithm registers in
+(ADR-0220), and `SftpDirectoryListing`, which lists a directory with `OPENDIR` and
+`READDIR` as curl prints it - each `SftpDirectoryEntry`'s long name, a symbolic link
+followed with `READLINK`, or the names alone with `-l` (ADR-0241). A new algorithm registers in
 `SshKeyExchangeMethods`, `SshSignatureVerifiers` or `SshPacketProtections`, and
 `SshAlgorithmCatalogue.Implemented` offers it from then on. Failure messages and
 their libssh2 codes are ADR-0122's, ADR-0206's and ADR-0212's, measured from the
