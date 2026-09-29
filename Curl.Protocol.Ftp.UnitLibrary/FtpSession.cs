@@ -1298,9 +1298,14 @@ internal sealed class FtpSession(
     }
 
     /// <summary>
-    /// Sends <c>QUIT</c>, whose reply curl 8.21.0 never reports as <c>%{response_code}</c>.
+    /// Sends <c>QUIT</c>, whose reply curl 8.21.0 never reports as <c>%{response_code}</c>;
+    /// neither it nor its reply is reported to <c>-v</c> or <c>--trace</c> (BL-930).
     /// </summary>
-    private async ValueTask QuitAsync() => await SendIgnoringReplyAsync("QUIT").ConfigureAwait(false);
+    private async ValueTask QuitAsync()
+    {
+        control.StopReporting();
+        await SendIgnoringReplyAsync("QUIT").ConfigureAwait(false);
+    }
 
     /// <summary>
     /// Sends <paramref name="command" /> and reads one reply, ignoring whatever goes wrong:

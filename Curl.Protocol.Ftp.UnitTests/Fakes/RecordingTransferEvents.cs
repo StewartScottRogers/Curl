@@ -1,9 +1,10 @@
+using System.Text;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Ftp.Fakes;
 
 /// <summary>
-/// An <see cref="ITransferEvents" /> that records the information lines it
+/// An <see cref="ITransferEvents" /> that records the information lines and headers it
 /// is given and ignores the rest.
 /// </summary>
 public sealed class RecordingTransferEvents : ITransferEvents
@@ -34,15 +35,17 @@ public sealed class RecordingTransferEvents : ITransferEvents
     {
     }
 
-    /// <inheritdoc />
-    public void ReportRequestHeader(ReadOnlySpan<byte> bytes)
-    {
-    }
+    /// <summary>
+    /// Gets every header reported, in order, as Latin-1 text: a request header prefixed
+    /// <c>"> "</c> and a response header <c>"< "</c>, each with its line end as reported.
+    /// </summary>
+    public List<string> Headers { get; } = [];
 
     /// <inheritdoc />
-    public void ReportResponseHeader(ReadOnlySpan<byte> bytes)
-    {
-    }
+    public void ReportRequestHeader(ReadOnlySpan<byte> bytes) => Headers.Add("> " + Encoding.Latin1.GetString(bytes));
+
+    /// <inheritdoc />
+    public void ReportResponseHeader(ReadOnlySpan<byte> bytes) => Headers.Add("< " + Encoding.Latin1.GetString(bytes));
 
     /// <inheritdoc />
     public void ReportDataSent(ReadOnlySpan<byte> bytes)
