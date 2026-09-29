@@ -336,9 +336,20 @@
 .PARAMETER TlsRootCertificateFile
     With -Tls, serve a certificate issued by a throwaway private root CA in place of the
     self-signed one, and write that root's PEM to this path so curl can be given
-    --cacert <path> (BL-490). Neither certificate names a revocation endpoint, so the
-    Schannel build's revocation check of the leaf ends "status unknown", as ADR-0086
-    describes. The root's key is never written; the file is left for the caller to delete.
+    --cacert <path> (BL-490); the root may sign certificates and CRLs. Neither certificate
+    names a revocation endpoint, so the Schannel build's revocation check of the leaf ends
+    "status unknown", as ADR-0086 describes. The root's key is never written; the file is left for the caller to delete.
+
+.PARAMETER TlsEmptyCrlFile
+    With -TlsRootCertificateFile, also write a PEM "X509 CRL" signed by the throwaway root
+    that revokes nothing, so curl can be given --crlfile <path> (BL-609). It is a version 1
+    list (no extensions), valid from five minutes ago for one day. Left for the caller to
+    delete.
+
+.PARAMETER TlsRevokingCrlFile
+    With -TlsRootCertificateFile, also write a PEM "X509 CRL" signed by the throwaway root
+    that revokes the served certificate by its serial number, otherwise as TlsEmptyCrlFile
+    (BL-609). Left for the caller to delete.
 
 .PARAMETER TlsPublicKeyFile
     With -Tls, write the served certificate's public key (its SubjectPublicKeyInfo) to this
@@ -489,6 +500,8 @@ param(
     [ValidateRange(1, 600000)] [int] $ScriptGapMilliseconds = 250,
     [switch] $Tls,
     [string] $TlsRootCertificateFile,
+    [string] $TlsEmptyCrlFile,
+    [string] $TlsRevokingCrlFile,
     [string] $TlsPublicKeyFile,
     [string] $Curl,
     [System.Net.IPAddress] $ListenAddress = [System.Net.IPAddress]::Loopback,
@@ -1635,6 +1648,39 @@ function ConvertFrom-ExchangeScript {
     return , $steps.ToArray()
 }
 
+function ConvertTo-DerElement {
+    # One DER element: Tag, the definite length of Content, then Content.
+    param([byte] $Tag, [byte[]] $Content)
+    $length = $Content.Length
+    $lengthBytes = if ($length -lt 0x80) { , [byte] $length }
+        elseif ($length -lt 0x100) { [byte[]] (0x81, $length) }
+        else { [byte[]] (0x82, ($length -shr 8), ($length -band 0xFF)) }
+    return , ([byte[]] (@($Tag) + $lengthBytes + $Content))
+}
+
+function Write-ThrowawayCrl {
+    # Writes a version 1 CRL issued and signed (SHA-256 with RSA) by Root, revoking
+    # RevokedSerial when given and nothing otherwise, to Path as PEM. .NET Framework has no
+    # CertificateRevocationListBuilder, so the DER is put together here.
+    param([string] $Path, $Root, $RootKey, [byte[]] $RevokedSerial)
+    $ascii = New-Object System.Text.ASCIIEncoding
+    $now = [System.DateTime]::UtcNow
+    $thisUpdate = ConvertTo-DerElement -Tag 0x17 -Content $ascii.GetBytes($now.AddMinutes(-5).ToString('yyMMddHHmmss') + 'Z')
+    $nextUpdate = ConvertTo-DerElement -Tag 0x17 -Content $ascii.GetBytes($now.AddDays(1).ToString('yyMMddHHmmss') + 'Z')
+    $sha256WithRsa = ConvertTo-DerElement -Tag 0x30 -Content ([byte[]] ((ConvertTo-DerElement -Tag 0x06 -Content ([byte[]] (0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x01, 0x0B))) + [byte[]] (0x05, 0x00)))
+    $tbsContent = [byte[]] ($sha256WithRsa + $Root.SubjectName.RawData + $thisUpdate + $nextUpdate)
+    if ($null -ne $RevokedSerial) {
+        $entry = ConvertTo-DerElement -Tag 0x30 -Content ([byte[]] ((ConvertTo-DerElement -Tag 0x02 -Content $RevokedSerial) + $thisUpdate))
+        $tbsContent = [byte[]] ($tbsContent + (ConvertTo-DerElement -Tag 0x30 -Content $entry))
+    }
+    $tbs = ConvertTo-DerElement -Tag 0x30 -Content $tbsContent
+    $signature = $RootKey.SignData($tbs, [System.Security.Cryptography.HashAlgorithmName]::SHA256, [System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
+    $signatureBits = ConvertTo-DerElement -Tag 0x03 -Content ([byte[]] (@([byte] 0) + $signature))
+    $crl = ConvertTo-DerElement -Tag 0x30 -Content ([byte[]] ($tbs + $sha256WithRsa + $signatureBits))
+    $pem = "-----BEGIN X509 CRL-----`n" + [System.Convert]::ToBase64String($crl, [System.Base64FormattingOptions]::InsertLineBreaks).Replace("`r`n", "`n") + "`n-----END X509 CRL-----`n"
+    [System.IO.File]::WriteAllText([System.IO.Path]::GetFullPath([System.IO.Path]::Combine((Get-Location).ProviderPath, $Path)), $pem, $ascii)
+}
+
 function New-IssuedByThrowawayRoot {
     # Signs Request with a throwaway root CA named by no store and writes the root's PEM
     # to RootCertificateFile. Neither certificate names a CRL or OCSP endpoint.
@@ -1643,7 +1689,7 @@ function New-IssuedByThrowawayRoot {
     try {
         $rootRequest = New-Object System.Security.Cryptography.X509Certificates.CertificateRequest('CN=Record-CurlExchange throwaway root', $rootKey, [System.Security.Cryptography.HashAlgorithmName]::SHA256, [System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
         $rootRequest.CertificateExtensions.Add((New-Object System.Security.Cryptography.X509Certificates.X509BasicConstraintsExtension($true, $false, 0, $true)))
-        $rootRequest.CertificateExtensions.Add((New-Object System.Security.Cryptography.X509Certificates.X509KeyUsageExtension([System.Security.Cryptography.X509Certificates.X509KeyUsageFlags]::KeyCertSign, $true)))
+        $rootRequest.CertificateExtensions.Add((New-Object System.Security.Cryptography.X509Certificates.X509KeyUsageExtension(([System.Security.Cryptography.X509Certificates.X509KeyUsageFlags]::KeyCertSign -bor [System.Security.Cryptography.X509Certificates.X509KeyUsageFlags]::CrlSign), $true)))
         $root = $rootRequest.CreateSelfSigned($NotBefore.AddMinutes(-5), $NotAfter.AddDays(1))
         try {
             $pem = "-----BEGIN CERTIFICATE-----`n" + [System.Convert]::ToBase64String($root.RawData, [System.Base64FormattingOptions]::InsertLineBreaks) + "`n-----END CERTIFICATE-----`n"
@@ -1652,6 +1698,8 @@ function New-IssuedByThrowawayRoot {
             [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($serial)
             $serial[0] = $serial[0] -band 0x7F
             $issued = $Request.Create($root, $NotBefore, $NotAfter, $serial)
+            if ($TlsEmptyCrlFile) { Write-ThrowawayCrl -Path $TlsEmptyCrlFile -Root $root -RootKey $rootKey -RevokedSerial $null }
+            if ($TlsRevokingCrlFile) { Write-ThrowawayCrl -Path $TlsRevokingCrlFile -Root $root -RootKey $rootKey -RevokedSerial $serial }
             try {
                 return [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::CopyWithPrivateKey($issued, $Key)
             } finally {
