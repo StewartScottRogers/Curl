@@ -22,4 +22,14 @@ public sealed class RecordingAuthenticator(string? authorization = null) : IHttp
         Challenges.Add(challenges);
         return authorization;
     }
+
+    /// <summary>Gets how many times a continuation was asked for.</summary>
+    public int ContinuationCount { get; private set; }
+
+    /// <inheritdoc />
+    public ValueTask<string?> ContinueAuthorizationAsync(HttpAuthRequest request, string sentAuthorization, bool sentBeforeAnyChallenge, IReadOnlyList<string> challenges, CancellationToken cancellationToken)
+    {
+        ContinuationCount++;
+        return ValueTask.FromResult(authorization);
+    }
 }

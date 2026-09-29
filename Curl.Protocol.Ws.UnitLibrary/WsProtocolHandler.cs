@@ -19,7 +19,9 @@ namespace Curl.Protocol.Ws;
 /// <param name="authenticator">
 /// Builds the pre-emptive <c>Authorization</c> value for <c>-u</c>, <c>--basic</c>,
 /// <c>--oauth2-bearer</c> and <c>--negotiate</c>, with no challenges, through
-/// <see cref="IHttpAuthenticator.CreateAuthorizationAsync" /> (ADR-0227).
+/// <see cref="IHttpAuthenticator.CreateAuthorizationAsync" /> (ADR-0227). It is asked once:
+/// a <c>401</c> is refused like any other status, and no continuation is asked for, because
+/// curl 8.21.0 sends the upgrade only once (ADR-0228).
 /// </param>
 /// <param name="randomSource">Supplies the 16 bytes behind <c>Sec-WebSocket-Key</c>.</param>
 /// <remarks>
