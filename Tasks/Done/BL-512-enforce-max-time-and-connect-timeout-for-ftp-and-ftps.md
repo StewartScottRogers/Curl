@@ -64,9 +64,9 @@ What this shows, and what was built (the mechanism is ADR-0117; decided by Claud
 - Every other wait already passed `ITransferContext.CancellationToken` and let `OperationCanceledException` out, and
   the active-mode accept keeps its 60 s exit 12, bounded by `-m` through the token, as measured.
 - Not pinned here: the data connect's OS timeout message and curl not holding it to `--connect-timeout`. That is
-  the connector's (`TcpConnector` holds every connect to its limit), so it is filed as BL-795.
+  the connector's (`TcpConnector` holds every connect to its limit), so it is filed as BL-797.
 - ADR-0117 could not take an amendment here: `Documentation/Planning/Decisions` is in BL-617's `touches`, which is in
-  Doing. Filed as BL-796 (docs); this Notes section and the FTP project's CLAUDE.md record the decision meanwhile.
+  Doing. Filed as BL-798 (docs); this Notes section and the FTP project's CLAUDE.md record the decision meanwhile.
 - `touches` gained `Record-CurlExchange.ps1` (the task's Context asks for the stall option; no task in Doing names it).
 - Tests: `FtpProtocolHandlerTimeLimitTests` (11, on a stepping fake clock: greeting and `USER` stalls at
   `--connect-timeout`, 999 ms still running, 300 s default for none and 0, an early timer, a slow TCP connect, no

@@ -1,5 +1,5 @@
 ---
-id: BL-795
+id: BL-797
 title: Let an FTP passive data connect outlast --connect-timeout and report curl's via message
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-09-28
 completed:
 ---
-# BL-795 — Let an FTP passive data connect outlast --connect-timeout and report curl's via message
+# BL-797 — Let an FTP passive data connect outlast --connect-timeout and report curl's via message
 
 ## Goal
 
