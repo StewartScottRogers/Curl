@@ -105,6 +105,12 @@ public sealed class RedirectFollower(
     /// <summary>The Linux and macOS build's message for a multipart body it cannot rewind for the next hop.</summary>
     public const string CannotRewindMessage = "Cannot rewind mime/post data";
 
+    /// <summary>
+    /// curl 8.21.0's message, with exit 67, for a URL with user information under
+    /// <c>--disallow-username-in-url</c> (BL-626 Notes).
+    /// </summary>
+    public const string CredentialsInUrlMessage = "URL rejected: Credentials was passed in the URL when prohibited";
+
     private readonly bool rewindFailsAsReadError = runsOnWindows ?? OperatingSystem.IsWindows();
 
     private static readonly HashSet<string> SchemesCurlParses = new(
@@ -211,12 +217,29 @@ public sealed class RedirectFollower(
         }
 
         // No refusal means the target parsed, so next is set.
+        if (policy.DisallowsUserInUrl && next!.User is not null)
+        {
+            return CredentialsInUrlFailure(target, chain, result);
+        }
+
         if (!TrySelectHopProxy(first, http, next!, out hopProxy, out TransferResult? failure))
         {
             return failure;
         }
 
         return bodyCannotBeResent ? BodyRewindFailure(target, chain, result) : null;
+    }
+
+    /// <summary>
+    /// curl's failure for a redirect target with user information under
+    /// <c>--disallow-username-in-url</c>: the redirect counts as followed, <c>%{url_effective}</c> is the
+    /// target, <c>%{redirect_url}</c> is empty, and nothing more is sent (measured, BL-626 Notes).
+    /// </summary>
+    private static TransferResult CredentialsInUrlFailure(string target, RedirectChain chain, TransferResult result)
+    {
+        chain.Followed(target);
+        chain.Refused(keepsRedirectUrl: false);
+        return TransferResult.Failure(CurlExitCode.LoginDenied, CredentialsInUrlMessage, result.BytesTransferred);
     }
 
     /// <summary>

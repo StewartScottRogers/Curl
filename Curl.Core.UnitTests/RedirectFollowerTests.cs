@@ -660,6 +660,52 @@ public sealed class RedirectFollowerTests
     }
 
     [TestMethod]
+    [DataRow("http://u@127.0.0.1:18626/x")]
+    [DataRow("http://u:p@127.0.0.1:18626/x")]
+    [DataRow("http://:p@127.0.0.1:18626/x")]
+    [DataRow("http://@127.0.0.1:18626/x")]
+    public async Task FollowAsync_DisallowUserInUrlAndTargetHasUser_Exits67AfterCountingTheRedirect(string target)
+    {
+        // Measured against curl 8.21.0 on 2026-09-29 (BL-626 Notes): curl -sS -L --disallow-username-in-url
+        // -w '[%{num_redirects}|%{url_effective}|%{redirect_url}|%{http_code}]', Location: http://u:p@...
+        // -> exit 67, "URL rejected: Credentials was passed in the URL when prohibited",
+        // [1|http://u:p@127.0.0.1:18626/x||302], and no second connection.
+        ScriptedHandler handler = new(Redirect(302, target));
+
+        TransferResult result = await Follow(handler, Context(Location()), new RedirectPolicy { DisallowsUserInUrl = true });
+
+        Assert.AreEqual(CurlExitCode.LoginDenied, result.ExitCode);
+        Assert.AreEqual(RedirectFollower.CredentialsInUrlMessage, result.ErrorMessage);
+        Assert.HasCount(1, handler.Contexts);
+        Assert.AreEqual(302, result.Report!.ResponseCode);
+        Assert.AreEqual(1, result.Report.RedirectCount);
+        Assert.AreEqual(target, result.Report.EffectiveUrl);
+        Assert.IsNull(result.Report.RedirectUrl);
+    }
+
+    [TestMethod]
+    public async Task FollowAsync_DisallowUserInUrlAndTargetHasNoUser_FollowsTheRedirect()
+    {
+        ScriptedHandler handler = new(Redirect(302, Next), Ok(200, 0));
+
+        TransferResult result = await Follow(handler, Context(Location()), new RedirectPolicy { DisallowsUserInUrl = true });
+
+        Assert.IsTrue(result.IsSuccess);
+        Assert.HasCount(2, handler.Contexts);
+    }
+
+    [TestMethod]
+    public async Task FollowAsync_UserInUrlAllowed_FollowsARedirectWithAUser()
+    {
+        ScriptedHandler handler = new(Redirect(302, "http://u@127.0.0.1:18626/x"), Ok(200, 0));
+
+        TransferResult result = await Follow(handler, Context(Location()));
+
+        Assert.IsTrue(result.IsSuccess);
+        Assert.HasCount(2, handler.Contexts);
+    }
+
+    [TestMethod]
     public async Task FollowAsync_ProtoRedirAndProtoAllowDict_FollowsTheRedirectToDict()
     {
         // curl -sS -L --proto-redir =http,dict, Location: dict://127.0.0.1:48523/x -> the dict

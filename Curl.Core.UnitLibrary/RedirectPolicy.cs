@@ -59,4 +59,11 @@ public sealed record RedirectPolicy
     /// (curl 8.21.0, measured, BL-523 Notes).
     /// </summary>
     public IReadOnlySet<string>? AllowedTransferSchemes { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether <c>--disallow-username-in-url</c> was given: a redirect
+    /// target with user information is refused with <see cref="RedirectFollower.CredentialsInUrlMessage" />
+    /// after it is counted as followed (curl 8.21.0, measured, BL-626 Notes).
+    /// </summary>
+    public bool DisallowsUserInUrl { get; init; }
 }
