@@ -40,6 +40,11 @@ namespace Curl.Protocol.Tftp;
 /// is returned with the connector's code and message unchanged.
 /// </para>
 /// <para>
+/// Each transfer's end, and a download's request, packets, options, retransmissions and
+/// error packets, are written to <see cref="ITransferContext.DiagnosticLog" /> under the
+/// <c>tftp</c> component (<see cref="TftpTransferLog" />).
+/// </para>
+/// <para>
 /// A download or an upload re-sends its last packet to a silent server on curl's
 /// schedule and ends with exit 7 when the read or write request goes unanswered, exit
 /// 28 when the server falls silent mid-transfer or
@@ -111,6 +116,14 @@ public sealed class TftpProtocolHandler(
         var startTimestamp = context.TimeProvider.GetTimestamp();
         var port = context.Url.Port > 0 ? context.Url.Port : DefaultPort;
 
+        var result = await TransferThroughProxyOrDirectlyAsync(context, port, startTimestamp).ConfigureAwait(false);
+        new TftpTransferLog(context.DiagnosticLog).Ended(result, context.TimeProvider.GetElapsedTime(startTimestamp));
+        return result;
+    }
+
+    // Transfers directly, or fails through the proxy as curl 8.21.0 does.
+    private async ValueTask<TransferResult> TransferThroughProxyOrDirectlyAsync(ITransferContext context, int port, long startTimestamp)
+    {
         return context.Proxy switch
         {
             null => await TransferFileAsync(context, port, startTimestamp).ConfigureAwait(false),
@@ -155,7 +168,7 @@ public sealed class TftpProtocolHandler(
             return TransferResult.Failure(CurlExitCode.CouldntConnect, TftpMasqueReply.BindFailedMessage);
         }
 
-        var target = new ConnectTarget(proxy.Host, proxy.Port, UseTls: proxy.Kind == ProxyKind.Https) { IsForwardProxy = true };
+        var target = new ConnectTarget(proxy.Host, proxy.Port, UseTls: proxy.Kind == ProxyKind.Https) { IsForwardProxy = true, DiagnosticLog = context.DiagnosticLog };
         var connected = await proxyConnector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
         if (connected.Connection is not { } connection)
         {

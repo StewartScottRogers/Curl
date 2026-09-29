@@ -73,3 +73,9 @@ which a byte stream cannot express. The tests in the matching `.UnitTests` proje
   neither to the proxy nor to the server, and the transfer ends with exit 97
   `Send failure: Socket is not connected`, before the file name is checked (ADR-0096;
   measured by BL-398).
+- Diagnostic log (`--log-level`, ADR-0222, BL-927): `TftpTransferLog` writes under the
+  `tftp` component - a download's read request and its options and the options an OACK
+  agreed (`info`), each packet received (`verbose`), a retransmission and a `blksize` the
+  server changed or ignored (`warning`), an ERROR packet's code and text (`error`) - and,
+  for every transfer, its end: bytes and milliseconds at `info`, or its `CurlExitCode`
+  at `error`.
