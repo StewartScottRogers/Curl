@@ -30,6 +30,15 @@ The TCP connector binds the socket to the address `--interface` names (an interf
 
 ## Notes
 
+- From BL-599 (parsing): `CommandLineOptions.Interface` is an `InterfaceBinding` (`InterfaceOrHostName`,
+  `InterfaceName`, `HostName`, `IsMalformed`) and `CommandLineOptions.LocalPorts` a `LocalPortRange`
+  (`First`, `Last`, `Count`). A value with `IsMalformed` set must fail the transfer before connecting with
+  exit 43 and `curl: (43) setopt 0x274e got bad argument` (curl 8.21.0, Windows, measured). An `ifhost!`
+  interface part longer than 254 characters fails at connect instead, with exit 43 and
+  `curl: (43) Failed to connect to <host>:<port> after 0 ms: A libcurl function was given a bad argument`.
+  Unbindable names measured on Windows: `nosuchif`, `if!nosuch`, ` `, `IF!`, `ifhost!!h` all give exit 45
+  `curl: (45) Failed to connect to 127.0.0.1:47599 after <n> ms: Failed binding local connection end`.
+
 ## Log
 
 - 2026-09-28: Created.
